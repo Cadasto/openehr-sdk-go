@@ -3,6 +3,7 @@ package instance_test
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/rmwrite"
@@ -169,5 +170,69 @@ func TestREQ107_PinnedActorLanguagesAreRefused(t *testing.T) {
 		if out != nil {
 			t.Errorf("%s returned %T, want no root", call, out)
 		}
+	}
+}
+
+// partyRefTypes are the class names BASE PARTY_REF Type_validity admits as
+// a reference's type.
+var partyRefTypes = []string{"PERSON", "ORGANISATION", "GROUP", "AGENT", "ROLE", "PARTY", "ACTOR"}
+
+// TestREQ107_PinnedPerformerTypeIsAPartyClass is the REQ-107 check that a
+// C_STRING the template pins on a ROLE performer's type yields a type BASE
+// PARTY_REF Type_validity admits, at either policy and either value fill.
+// Neither validator evaluates that invariant, so the test reads the value.
+// An open C_STRING or a pattern that also admits other strings still gives
+// a PARTY class name; a list pin keeps its member; and a pin that admits no
+// class name makes Generate return an error wrapping
+// ErrConstraintUnsatisfiable, and no root.
+func TestREQ107_PinnedPerformerTypeIsAPartyClass(t *testing.T) {
+	cases := []struct {
+		name string
+		pin  string // the C_STRING body
+		// want is the type every setting must give; "" accepts any class
+		// name Type_validity admits.
+		want          string
+		unsatisfiable bool
+	}{
+		{name: "open C_STRING", pin: ""},
+		{name: "pattern .*", pin: "<pattern>.*</pattern>"},
+		{name: "pattern [A-Z]+", pin: "<pattern>[A-Z]+</pattern>"},
+		{name: "list pin", pin: "<list>ORGANISATION</list>", want: "ORGANISATION"},
+		{name: "list that admits no class name", pin: "<list>CLINICIAN</list>", unsatisfiable: true},
+		{name: "pattern that admits no class name", pin: "<pattern>[a-z]+</pattern>", unsatisfiable: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := compileOPTText(t, rolePerformerOPT(
+				guardSingle("type", guardExistence11, optPrimitive("STRING", "C_STRING", tc.pin))), true)
+			for _, opts := range guardOptions() {
+				call := fmt.Sprintf("Generate(%v, %v)", opts.Policy, opts.ValueFill)
+				out, err := instance.Generate(t.Context(), c, opts)
+				if tc.unsatisfiable {
+					if !errors.Is(err, instance.ErrConstraintUnsatisfiable) {
+						t.Errorf("%s error = %v, want one wrapping ErrConstraintUnsatisfiable", call, err)
+					}
+					if out != nil {
+						t.Errorf("%s returned %T, want no root", call, out)
+					}
+					continue
+				}
+				if err != nil {
+					t.Fatalf("%s: %v, want a root", call, err)
+				}
+				role, ok := out.(*rm.Role)
+				if !ok {
+					t.Fatalf("%s returned %T, want *rm.Role", call, out)
+				}
+				got := role.Performer.Type
+				if !slices.Contains(partyRefTypes, got) {
+					t.Errorf("%s: performer type = %q, want one of %v (PARTY_REF Type_validity)", call, got, partyRefTypes)
+				}
+				if tc.want != "" && got != tc.want {
+					t.Errorf("%s: performer type = %q, want %q", call, got, tc.want)
+				}
+				checkBothValidators(t, call, out, c)
+			}
+		})
 	}
 }
