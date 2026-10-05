@@ -1307,6 +1307,10 @@ func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 				TerminologyID: rm.TerminologyID{Value: terminology.ID},
 			},
 		}
+	} else {
+		// The OPT pinned the code, and the walk left the synthesiser's text
+		// beside it.
+		useGroupRubric(&c.Category, terminology.CompositionCategory)
 	}
 	if c.Language.CodeString == "" {
 		c.Language = rm.CodePhrase{
@@ -1539,7 +1543,9 @@ func (g *generator) placeholderElement() *rm.Element {
 // and either null attribute, the null flavour and the null reason are both
 // dropped. An ELEMENT with no value, because the OPT constrains none or none
 // could be generated, keeps any null reason and gets the null flavour
-// "no information" when it has none.
+// "no information" when it has none. A null flavour the OPT filled keeps its
+// code, and takes the pinned rubric of that code when the code is in the
+// openEHR null flavours group.
 func settleElement(e *rm.Element) {
 	if e.Value != nil && !rm.IsTypedNil(e.Value) {
 		e.NullFlavour = nil
@@ -1548,6 +1554,22 @@ func settleElement(e *rm.Element) {
 	}
 	if e.NullFlavour == nil {
 		e.NullFlavour = noInformation()
+		return
+	}
+	useGroupRubric(e.NullFlavour, terminology.NullFlavours)
+}
+
+// useGroupRubric sets the text of a coded text to the pinned rubric of its
+// code, when that code is an `openehr` code in group. The walk fills a code
+// the OPT pins but leaves the synthesiser's placeholder text beside it. A
+// code in another terminology, or outside group, keeps its text, so the
+// generator invents no rubric for it.
+func useGroupRubric(v *rm.DVCodedText, group *terminology.Group) {
+	if v.DefiningCode.TerminologyID.Value != terminology.ID {
+		return
+	}
+	if rubric, ok := group.Rubric(v.DefiningCode.CodeString); ok {
+		v.Value = rubric
 	}
 }
 
