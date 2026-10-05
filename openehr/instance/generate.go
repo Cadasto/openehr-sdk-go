@@ -1479,8 +1479,10 @@ func isRequired(attr *tcimpl.CompiledAttribute) bool {
 }
 
 // newHierObjectID generates a HierObjectID with a random RFC 9562
-// version-4 UUID. Used for LOCATABLE.uid where openEHR mandates
-// uniqueness (Composition, Entry root types). Returns a pointer so
+// version-4 UUID. When Options.UIDSource is nil it gives the uid of each
+// locatable stampsUID names (a Composition, an Entry, a Party), and a
+// PARTY_RELATIONSHIP's uid and empty source or target id. Returns a
+// pointer so
 // canjson's polymorphic dispatch on the UIDBasedID interface emits
 // the `_type:"HIER_OBJECT_ID"` discriminator the decoder needs to
 // round-trip the field. uuid.NewV4 has no error path — it draws from

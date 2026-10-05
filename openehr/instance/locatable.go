@@ -43,16 +43,20 @@ func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *
 }
 
 // stampsUID lists the classes whose generated instances carry a fresh
-// uid (REQ-107 emission policy): COMPOSITION and the ENTRY concretes —
-// the openEHR entry-level, independently addressable objects.
+// uid (REQ-107 emission policy): COMPOSITION, the ENTRY concretes and
+// GENERIC_ENTRY, the independently addressable clinical objects, and the
+// PARTY concretes, whose uid the RM requires (PARTY Uid_mandatory). A
+// PARTY_RELATIONSHIP takes its uid in fillPartyRelationship instead.
 // Structure nodes (SECTION, ITEM_*, CLUSTER, ELEMENT, HISTORY, events)
-// deliberately do not get generator-minted uids. This is policy
-// dispatch, not identity plumbing — it stays a hand-written closed set
-// (REQ-024, no reflection).
+// and the other demographic locatables (PARTY_IDENTITY, CONTACT,
+// ADDRESS, CAPABILITY) deliberately get no generator-minted uid. This is
+// policy dispatch, not identity plumbing — it stays a hand-written
+// closed set (REQ-024, no reflection).
 func stampsUID(v any) bool {
 	switch v.(type) {
 	case *rm.Composition, *rm.Observation, *rm.Evaluation,
-		*rm.Instruction, *rm.Action, *rm.AdminEntry, *rm.GenericEntry:
+		*rm.Instruction, *rm.Action, *rm.AdminEntry, *rm.GenericEntry,
+		*rm.Person, *rm.Organisation, *rm.Group, *rm.Agent, *rm.Role:
 		return true
 	}
 	return false

@@ -94,11 +94,11 @@ type Options struct {
 	Now time.Time
 
 	// UIDSource is the optional generator for LOCATABLE.uid values.
-	// Each LOCATABLE root that openEHR requires a uid on (Composition,
-	// Observation, Evaluation, Instruction, Action, AdminEntry,
-	// GenericEntry) calls UIDSource once during synthesis. A
-	// PARTY_RELATIONSHIP also takes its uid, and an empty source or
-	// target id, from UIDSource. Nil falls back to a random RFC 9562 v4
+	// Each generated Composition, Observation, Evaluation, Instruction,
+	// Action, AdminEntry, GenericEntry, Person, Organisation, Group,
+	// Agent and Role calls UIDSource once during synthesis; no other
+	// LOCATABLE gets a uid. A PARTY_RELATIONSHIP also takes its uid, and
+	// an empty source or target id, from UIDSource. Nil falls back to a random RFC 9562 v4
 	// UUID (stdlib uuid.NewV4). Tests pin a counter or named-seed source
 	// for deterministic UIDs in golden fixtures.
 	UIDSource func() *rm.HierObjectID
