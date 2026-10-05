@@ -219,6 +219,42 @@ func TestREQ112_ReadTimeValidity(t *testing.T) {
 	}
 }
 
+// TestREQ112_ReadObjectIDValue is the REQ-112 and REQ-102 check that the
+// reader reads the value of every OBJECT_ID a reference's id can hold, and
+// a GENERIC_ID's scheme, so a template that constrains them below an id
+// finds them: each reads as present when set and as absent when empty, in
+// pointer and value form.
+func TestREQ112_ReadObjectIDValue(t *testing.T) {
+	cases := []struct {
+		rmType        string
+		attr          string
+		full, empty   any
+		fullP, emptyP any
+	}{
+		{"HIER_OBJECT_ID", "value", rm.HierObjectID{Value: "1.2.3"}, rm.HierObjectID{}, &rm.HierObjectID{Value: "1.2.3"}, &rm.HierObjectID{}},
+		{"OBJECT_VERSION_ID", "value", rm.ObjectVersionID{Value: "a::b::1"}, rm.ObjectVersionID{}, &rm.ObjectVersionID{Value: "a::b::1"}, &rm.ObjectVersionID{}},
+		{"GENERIC_ID", "value", rm.GenericID{Value: "123", Scheme: "BSN"}, rm.GenericID{}, &rm.GenericID{Value: "123", Scheme: "BSN"}, &rm.GenericID{}},
+		{"GENERIC_ID", "scheme", rm.GenericID{Value: "123", Scheme: "BSN"}, rm.GenericID{}, &rm.GenericID{Value: "123", Scheme: "BSN"}, &rm.GenericID{}},
+		{"ARCHETYPE_ID", "value", rm.ArchetypeID{Value: "openEHR-EHR-OBSERVATION.x.v1"}, rm.ArchetypeID{}, &rm.ArchetypeID{Value: "openEHR-EHR-OBSERVATION.x.v1"}, &rm.ArchetypeID{}},
+		{"TEMPLATE_ID", "value", rm.TemplateID{Value: "t"}, rm.TemplateID{}, &rm.TemplateID{Value: "t"}, &rm.TemplateID{}},
+		{"TERMINOLOGY_ID", "value", rm.TerminologyID{Value: "SNOMED-CT"}, rm.TerminologyID{}, &rm.TerminologyID{Value: "SNOMED-CT"}, &rm.TerminologyID{}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.rmType+"."+tc.attr, func(t *testing.T) {
+			for _, v := range []any{tc.full, tc.fullP} {
+				if _, ok := rmread.ReadSingle(v, tc.rmType, tc.attr); !ok {
+					t.Errorf("ReadSingle(%T, %s) ok=false when set, want true", v, tc.attr)
+				}
+			}
+			for _, v := range []any{tc.empty, tc.emptyP} {
+				if _, ok := rmread.ReadSingle(v, tc.rmType, tc.attr); ok {
+					t.Errorf("ReadSingle(%T, %s) ok=true when empty, want false", v, tc.attr)
+				}
+			}
+		})
+	}
+}
+
 func TestReadContactAndAddress(t *testing.T) {
 	c := &rm.Contact{
 		ArchetypeNodeID: "openEHR-DEMOGRAPHIC-CONTACT.person.v1",

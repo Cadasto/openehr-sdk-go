@@ -236,3 +236,43 @@ func TestREQ107_PinnedPerformerTypeIsAPartyClass(t *testing.T) {
 		})
 	}
 }
+
+// TestREQ102_ConstrainedPerformerIDIsRead is the REQ-102 check that the
+// template validator reads a ROLE performer's id when the template
+// constrains it: a HIER_OBJECT_ID whose value the template pins with a
+// C_STRING pattern. The generator cannot write a PARTY_REF's id from the
+// template, so the ROLE comes from the template without the id constraint,
+// and its performer id is set by hand. An id the pattern accepts passes
+// both validators; one it rejects is reported at its value.
+func TestREQ102_ConstrainedPerformerIDIsRead(t *testing.T) {
+	withID := compileOPTText(t, rolePerformerOPT(
+		guardSingle("id", guardExistence11,
+			guardChild("C_COMPLEX_OBJECT", "HIER_OBJECT_ID", "", guardOccurrences11, "",
+				guardSingle("value", guardExistence11, optPrimitive("STRING", "C_STRING", "<pattern>[0-9a-f-]+</pattern>"))))), true)
+	plain := compileOPTText(t, rolePerformerOPT(), true)
+	for _, opts := range guardOptions() {
+		call := fmt.Sprintf("Generate(%v, %v)", opts.Policy, opts.ValueFill)
+		out, err := instance.Generate(t.Context(), plain, opts)
+		if err != nil {
+			t.Fatalf("%s: %v, want a root", call, err)
+		}
+		role, ok := out.(*rm.Role)
+		if !ok {
+			t.Fatalf("%s returned %T, want *rm.Role", call, out)
+		}
+		role.Performer.ID = &rm.HierObjectID{Value: "6e4b1c2a-0000-4000-8000-00000000abcd"}
+		checkBothValidators(t, call+" with an id the pattern accepts", role, withID)
+
+		role.Performer.ID = &rm.HierObjectID{Value: "NOT-HEX"}
+		r := validation.Validate(role, withID)
+		var atValue bool
+		for _, issue := range r.Issues {
+			if issue.Path == "/performer/id/value" && issue.Code != "required" {
+				atValue = true
+			}
+		}
+		if !atValue {
+			t.Errorf("%s with an id the pattern rejects: Validate issues %+v, want one at /performer/id/value that is not required", call, r.Issues)
+		}
+	}
+}

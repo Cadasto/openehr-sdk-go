@@ -109,14 +109,22 @@ func TestHandles_ModelledTypes(t *testing.T) {
 	}
 }
 
-// readerOnlyTypes have ReadSingle arms but are not in Handles. They are
-// references, which the RM floor checks with its own evaluator
+// readerOnlyTypes have ReadSingle arms but are not in Handles. PARTY_REF is
+// a reference, which the RM floor checks with its own evaluator
 // (checkObjectRef) and must not descend into, or it reports a missing part
-// twice. The template walker reads them through ReadSingle, which does not
+// twice; the OBJECT_ID types are what a reference's id holds, which the
+// floor does not descend into either, so their arms leave it unchanged. The
+// template walker reads them all through ReadSingle, which does not
 // consult Handles, so a template that constrains a reference's parts finds
 // them.
 var readerOnlyTypes = []any{
 	rm.PartyRef{},
+	rm.HierObjectID{},
+	rm.ObjectVersionID{},
+	rm.GenericID{},
+	rm.ArchetypeID{},
+	rm.TemplateID{},
+	rm.TerminologyID{},
 }
 
 // TestHandles_ReaderOnlyTypes (REQ-112, REQ-102) checks that each reader-only
