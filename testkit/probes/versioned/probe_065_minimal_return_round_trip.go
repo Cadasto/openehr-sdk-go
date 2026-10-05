@@ -24,7 +24,7 @@ import (
 // That the SDK surfaces only metadata is the SDK's own contract (a minimal
 // write never decodes a body); asserting it here catches a regression that
 // started decoding one.
-func Probe065MinimalReturnRoundTrip(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, comp *rm.Composition) (Result, error) { // PROBE-065 (REQ-094)
+func Probe065MinimalReturnRoundTrip(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, comp *rm.Composition) (Result, error) { // PROBE-065 (REQ-094, REQ-054)
 	r := Result{Probe: "PROBE-065"}
 	if c == nil || ehrID == "" || comp == nil {
 		return r, errors.New("PROBE-065: missing required inputs (client/ehr/comp)")
