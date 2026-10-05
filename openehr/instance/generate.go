@@ -411,7 +411,7 @@ func (g *generator) populateBMMRequiredAttrs(parent any, parentRMType string, de
 		g.populatePrimitiveDefault(rmChild)
 		g.stampIfLocatable(rmChild, concrete)
 		if rel, ok := rmChild.(*rm.PartyRelationship); ok {
-			fillPartyRelationship(rel)
+			g.fillPartyRelationship(rel)
 		}
 		// Recurse so nested BMM-required attrs (e.g. CODE_PHRASE
 		// inside DV_CODED_TEXT) get filled.
@@ -969,7 +969,7 @@ func (g *generator) materialiseImplicitMultiple(
 	g.populatePrimitiveDefault(rmChild)
 	g.stampIfLocatable(rmChild, concreteFor(rmType))
 	if rel, ok := rmChild.(*rm.PartyRelationship); ok {
-		fillPartyRelationship(rel)
+		g.fillPartyRelationship(rel)
 	}
 	g.populateBMMRequiredAttrs(rmChild, concreteFor(rmType), 0)
 	_ = rmwrite.AppendMultiple(parentRM, optNode.RMTypeName(), attr.Name(), rmChild)
@@ -1023,7 +1023,7 @@ func (g *generator) makeChild(child *tcimpl.CompiledNode) (any, error) {
 	}
 	g.setLocatableIdentity(child, rmChild, false /* isTemplateRoot */)
 	if rel, ok := rmChild.(*rm.PartyRelationship); ok {
-		fillPartyRelationship(rel)
+		g.fillPartyRelationship(rel)
 	}
 	return rmChild, nil
 }
@@ -1520,7 +1520,7 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 	case *rm.ItemTree:
 		g.ensureItems(opt, &v.Items)
 	case *rm.PartyRelationship:
-		fillPartyRelationship(v)
+		g.fillPartyRelationship(v)
 	case *rm.Role:
 		fillPerformer(&v.Performer)
 	case *rm.Element:
@@ -1680,26 +1680,29 @@ func (g *generator) stampIfLocatable(rmValue any, rmType string) {
 	}
 }
 
-func fillPartyRelationship(rel *rm.PartyRelationship) {
+func (g *generator) fillPartyRelationship(rel *rm.PartyRelationship) {
 	if rel.GetArchetypeNodeID() == "" {
-		applyLocatableIdentity(rel, "at0000", "relationship", nil, func() *rm.HierObjectID {
-			return &rm.HierObjectID{Value: "00000000-0000-0000-0000-000000000001"}
-		})
+		applyLocatableIdentity(rel, "at0000", "relationship", nil, g.nextUID)
+	}
+	if rel.GetUID() == nil {
+		rel.SetUID(g.nextUID())
 	}
 	if rel.Source.Namespace == "" || rel.Source.Type == "" || rel.Source.ID == nil {
-		rel.Source = partyRef("00000000-0000-0000-0000-000000000001")
+		rel.Source = partyRef(g.nextUID())
 	}
 	if rel.Target.Namespace == "" || rel.Target.Type == "" || rel.Target.ID == nil {
-		rel.Target = partyRef("00000000-0000-0000-0000-000000000002")
+		rel.Target = partyRef(g.nextUID())
 	}
 }
 
 // fillPerformer gives a ROLE the performer the RM requires, a reference
-// to the actor that plays the role, built like a PARTY_RELATIONSHIP's
-// source and target: the generator cannot build the abstract OBJECT_ID a
-// PARTY_REF needs. Only the parts the template left empty are filled.
+// to the actor that plays the role, with partyRef's namespace and type:
+// the generator cannot build the abstract OBJECT_ID a PARTY_REF needs.
+// Only the parts the template left empty are filled. The id is a fixed
+// one, where a PARTY_RELATIONSHIP's source and target ids are drawn from
+// Options.UIDSource.
 func fillPerformer(ref *rm.PartyRef) {
-	def := partyRef("00000000-0000-0000-0000-000000000001")
+	def := partyRef(&rm.HierObjectID{Value: "00000000-0000-0000-0000-000000000001"})
 	if ref.ID == nil || rm.IsTypedNil(ref.ID) {
 		ref.ID = def.ID
 	}
@@ -1711,9 +1714,9 @@ func fillPerformer(ref *rm.PartyRef) {
 	}
 }
 
-func partyRef(id string) rm.PartyRef {
+func partyRef(id *rm.HierObjectID) rm.PartyRef {
 	return rm.PartyRef{
-		ID:        &rm.HierObjectID{Value: id},
+		ID:        id,
 		Namespace: "local",
 		Type:      defaultPartyRefType,
 	}
