@@ -128,7 +128,7 @@ type AuthEndpoints struct {
 	// a resource-server operation.
 	IntrospectionEndpoint *url.URL
 	// RevocationEndpoint is the RFC 7009 token-revocation endpoint. Nil when
-	// absent.
+	// absent. The revoke method in auth/smart posts the token there.
 	RevocationEndpoint *url.URL
 	// ManagementEndpoint is the SMART management endpoint (deployment-specific).
 	// Nil when absent.
