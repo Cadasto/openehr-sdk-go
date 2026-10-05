@@ -348,6 +348,32 @@ func ReadSingle(parent any, _ /* parentType */, attrName string) (any, bool) {
 	case rm.PartyRef:
 		return readPartyRefSingle(&p, attrName)
 
+	// --- OBJECT_ID: what a reference's id holds ---
+	case *rm.HierObjectID:
+		return readObjectIDSingle(p.Value, attrName)
+	case rm.HierObjectID:
+		return readObjectIDSingle(p.Value, attrName)
+	case *rm.ObjectVersionID:
+		return readObjectIDSingle(p.Value, attrName)
+	case rm.ObjectVersionID:
+		return readObjectIDSingle(p.Value, attrName)
+	case *rm.ArchetypeID:
+		return readObjectIDSingle(p.Value, attrName)
+	case rm.ArchetypeID:
+		return readObjectIDSingle(p.Value, attrName)
+	case *rm.TemplateID:
+		return readObjectIDSingle(p.Value, attrName)
+	case rm.TemplateID:
+		return readObjectIDSingle(p.Value, attrName)
+	case *rm.TerminologyID:
+		return readObjectIDSingle(p.Value, attrName)
+	case rm.TerminologyID:
+		return readObjectIDSingle(p.Value, attrName)
+	case *rm.GenericID:
+		return readGenericIDSingle(p, attrName)
+	case rm.GenericID:
+		return readGenericIDSingle(&p, attrName)
+
 	// --- EHR-IM roots ---
 	case *rm.Folder:
 		return readFolderSingle(p, attrName)
@@ -1495,6 +1521,25 @@ func readPartyRefSingle(r *rm.PartyRef, attr string) (any, bool) {
 		return strPresent(r.Type)
 	}
 	return nil, false
+}
+
+// readObjectIDSingle reads the value every OBJECT_ID carries, absent while
+// empty. Like PARTY_REF, the OBJECT_ID types are read for the template
+// walker and left out of Handles, so the floor does not descend into a
+// reference's id.
+func readObjectIDSingle(value, attr string) (any, bool) {
+	if attr == "value" {
+		return strPresent(value)
+	}
+	return nil, false
+}
+
+// readGenericIDSingle adds the scheme a GENERIC_ID carries beside its value.
+func readGenericIDSingle(g *rm.GenericID, attr string) (any, bool) {
+	if attr == "scheme" {
+		return strPresent(g.Scheme)
+	}
+	return readObjectIDSingle(g.Value, attr)
 }
 
 // --- EHR-IM roots: FOLDER, EHR_STATUS, EHR_ACCESS ------------------------------------
