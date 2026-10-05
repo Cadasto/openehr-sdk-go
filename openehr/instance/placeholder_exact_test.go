@@ -236,6 +236,30 @@ func TestREQ107_ExactPlaceholders(t *testing.T) {
 	}
 }
 
+// TestREQ107_NestedMediaTypeTerminology is the REQ-107 check that a
+// DV_MULTIMEDIA media_type the OPT names as an unconstrained CODE_PHRASE
+// gets the placeholder code under IANA_media-types, the terminology the
+// template-instance writer gives a media type with none (wire.md § the
+// DV_MULTIMEDIA coded attributes). A fallback for a root code phrase must
+// not give it local instead. The OPT is compiled with the implicit
+// attributes, the default.
+func TestREQ107_NestedMediaTypeTerminology(t *testing.T) {
+	c := compileOPTText(t, optTemplate("ELEMENT", optSingle("value",
+		optNode("DV_MULTIMEDIA", "", optSingle("media_type", optNode("CODE_PHRASE", ""))))), true)
+	want := rm.CodePhrase{CodeString: "at0000", TerminologyID: rm.TerminologyID{Value: "IANA_media-types"}}
+	for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+		t.Run(policy.String(), func(t *testing.T) {
+			out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, Now: defaultsNow})
+			if err != nil {
+				t.Fatalf("Generate: %v", err)
+			}
+			if got := rootElementValue[*rm.DVMultimedia](t, out).MediaType; got != want {
+				t.Errorf("DV_MULTIMEDIA.media_type = %+v, want %+v", got, want)
+			}
+		})
+	}
+}
+
 // rootElementValue returns the value of the generated root ELEMENT as a T, or
 // stops the test when the root is not an ELEMENT holding a T.
 func rootElementValue[T rm.DataValue](t *testing.T, out any) T {
