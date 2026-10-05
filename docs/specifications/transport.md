@@ -62,7 +62,8 @@ The SDK does not allocate its own `*http.Client` (REQ-021), so TLS configuration
 
 - Emit a warning when a `ServiceCatalog` entry's `BaseURL` uses plaintext `http://` and the entry is not explicitly marked insecure.
 - Emit a warning when the SMART discovery document is fetched over `http://`.
-- Default the opt-in discovery fetcher to refusing plaintext URLs unless `discovery.WithAllowInsecure()` is set.
+
+The resolver's refusal of plaintext discovery URLs, and the `discovery.WithAllowInsecure()` opt-out, are specified in [service-discovery.md § REQ-073](service-discovery.md#req-073--discovery-trust-posture).
 
 The SDK **MUST NOT** silently override or relax the consumer's `*http.Client` TLS config.
 
@@ -370,10 +371,11 @@ type BearerChallenge struct {
     ErrorDescription string
     ErrorURI         string
     Scope            string            // the scope the resource server says the request needs
-    Params           map[string]string // every other auth-param verbatim, e.g. resource_metadata (RFC 9728)
+    Params           map[string]string // every other auth-param, names in lower case, e.g. resource_metadata (RFC 9728)
 }
 ```
 
+- The parser **MUST** match auth-param names in any letter case, so `Error`, `SCOPE` and `Resource_Metadata` are read as `error`, `scope` and `resource_metadata`, and **MUST** store the name of every other auth-param in `Params` in lower case, so a caller reads `Params["resource_metadata"]` whatever case the server wrote.
 - A response without a `Bearer` challenge **MUST** leave `Challenge` nil; a challenge the transport cannot parse **MUST** leave it nil too, and the response **MUST** still map to its status sentinel. The parser **MUST** ignore empty list elements (RFC 9110 §5.6.1.2).
 - The work spent on a challenge **MUST** stay bounded: a `WWW-Authenticate` field line whose value is longer than 8 KiB **MUST** be treated as unparseable without being parsed, while the other lines are still read (RFC 9110 §5.4 lets a recipient ignore a field line it does not wish to process; real Bearer challenges are far shorter).
 - `WireError.Error()` **MUST NOT** include challenge values; they stay reachable through `errors.As`, under the same discipline as the openEHR error envelope (REQ-093): `Error`, `Scope`, `Realm`, `ErrorURI` and `Params` are always populated, while `ErrorDescription`, free text from the server, **MUST** be populated only when the client is built with `WithRawErrorBodies(true)`.

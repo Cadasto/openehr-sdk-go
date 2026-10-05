@@ -36,8 +36,8 @@ var (
 	ErrInvalidScope = errors.New("auth: invalid scope")
 
 	// ErrRevocationFailed indicates a token-revocation request (RFC 7009)
-	// failed: the revocation endpoint could not be reached or did not
-	// answer 200.
+	// failed: the client assertion could not be signed, the revocation
+	// endpoint could not be reached, or the endpoint did not answer 200.
 	ErrRevocationFailed = errors.New("auth: token revocation failed")
 )
 

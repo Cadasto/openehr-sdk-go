@@ -172,9 +172,9 @@ The registry is also **reversible** ([ADR 0013](../adr/0013-generated-locatable-
 - A generated `rm.IsTypedNil(any) bool` **MUST** report whether a value is an interface carrying a typed-nil pointer to a registered concrete; it is the sanctioned guard before calling `Locatable` accessors.
 - The reflection rule of [idiom.md § Generics policy (REQ-024)](idiom.md#generics-policy-req-024) applies to both unchanged, and both **MUST** be regenerated with the forward registrations, so forward and reverse mappings cannot drift.
 
-## Generics for clients, validators, repositories (REQ-024)
+## Generics for clients, validators, repositories
 
-Generics carry typed responses through clients and validators without `any`-casts at every call site. The reflection rule of [idiom.md § Generics policy (REQ-024)](idiom.md#generics-policy-req-024) applies unchanged.
+Client, validator and repository generics follow [idiom.md § Generics policy (REQ-024)](idiom.md#generics-policy-req-024).
 
 ```go
 // openehr/client/ehr/composition (sketch)
@@ -182,11 +182,6 @@ func Get[T rm.CompositionLike](ctx context.Context, c *Client, id ObjectVersionI
 ```
 
 `rm.CompositionLike` is a constraint interface bounding the generic to types in the Composition family (the rare consumer-defined extension of `Composition`; most callers use `*rm.Composition` directly).
-
-Constraints to follow:
-
-- A constraint interface **SHOULD** be a marker (`isComposition()`) plus the necessary method set — same rule as abstract categories.
-- Constraint interfaces **MUST NOT** appear in the *function* signature outside the type parameter list — `Get[T rm.CompositionLike](...) (T, error)` is correct; `func Get(...) (rm.CompositionLike, error)` is wrong because the runtime type is erased.
 
 ## What is NOT in scope here
 
