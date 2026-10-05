@@ -1271,6 +1271,7 @@ requirements:
       - openehr/instance/string_leaf_internal_test.go
       - openehr/instance/string_leaf_test.go
       - openehr/instance/uncarried_mandatory_test.go
+      - openehr/instance/valuefill_leaves_test.go
       - openehr/instance/valuefill_test.go
       - openehr/instance/visit_rules_test.go
       - openehr/serialize/simplified/flat_encode_test.go

@@ -384,7 +384,7 @@ func TestREQ107_RMDefaultsFillBMMSynthesisedValues(t *testing.T) {
 			},
 		},
 		{
-			name: "DV_PROPORTION precision and accuracy",
+			name: "DV_PROPORTION numerator, denominator, precision and accuracy",
 			opt: optTemplate("ELEMENT", optSingle("value", optNode("DV_PROPORTION", "",
 				optSingle("numerator", optPrimitive("REAL", "C_REAL", "<list>3</list>")),
 				optSingle("denominator", optPrimitive("REAL", "C_REAL", "<list>4</list>")),
@@ -395,6 +395,9 @@ func TestREQ107_RMDefaultsFillBMMSynthesisedValues(t *testing.T) {
 				p, _ := out.(*rm.Element).Value.(*rm.DVProportion)
 				if p == nil {
 					t.Fatalf("ELEMENT.value = %T, want *rm.DVProportion", out.(*rm.Element).Value)
+				}
+				if p.Numerator != 3 || p.Denominator != 4 {
+					t.Errorf("DV_PROPORTION = %v/%v, want the pinned 3/4", p.Numerator, p.Denominator)
 				}
 				if p.Precision == nil || *p.Precision != 2 {
 					t.Errorf("DV_PROPORTION.precision = %v, want 2", p.Precision)
