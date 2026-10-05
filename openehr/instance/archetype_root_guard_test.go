@@ -325,6 +325,35 @@ func TestREQ107_UnnamedNonRootTemplateRootHasNoArchetypeDetails(t *testing.T) {
 	}
 }
 
+// TestREQ107_NamedTemplateRootPassesTheFloor is the REQ-107 check that a
+// template root of every archetype-root class, for which the template names
+// an archetype id, generates output that passes the RM floor and the
+// template validator at either policy and either value fill. The template
+// says nothing below the root, so every RM-mandatory attribute of the class
+// comes from the generator's own defaults: a party's identities, and a
+// ROLE's performer.
+func TestREQ107_NamedTemplateRootPassesTheFloor(t *testing.T) {
+	checkGuardClasses(t)
+	for _, class := range guardRootClasses {
+		t.Run(class, func(t *testing.T) {
+			c := compileOPTText(t, guardRootOPT(class, "openEHR-EHR-"+class+".example.v1"), true)
+			for _, opts := range guardOptions() {
+				call := fmt.Sprintf("Generate(%v, %v)", opts.Policy, opts.ValueFill)
+				out, err := instance.Generate(t.Context(), c, opts)
+				if err != nil {
+					t.Fatalf("%s: %v, want a root", call, err)
+				}
+				if r := validation.ValidateRM(out); !r.OK {
+					t.Errorf("%s: ValidateRM issues %+v, want none", call, r.Issues)
+				}
+				if r := validation.Validate(out, c); !r.OK {
+					t.Errorf("%s: Validate issues %+v, want none", call, r.Issues)
+				}
+			}
+		})
+	}
+}
+
 // checkSlotFallbackStamp fails t unless out is a COMPOSITION whose first
 // content item carries the RM-type-prefix archetype id the slot-fill rule
 // gives a slot without parsed includes, as its node id and in its
