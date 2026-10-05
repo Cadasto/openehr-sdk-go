@@ -52,6 +52,11 @@ func optCodedText(terminologyID string, codes ...string) string {
 	return optNode("DV_CODED_TEXT", "", optSingle("defining_code", phrase))
 }
 
+// walkText is the text the walk gives a DV_CODED_TEXT built by
+// optCodedText, under every policy and value fill: the OPT constrains no
+// text, so it is the open-string example.
+const walkText = "example"
+
 // optSingle is a C_SINGLE_ATTRIBUTE called name over children.
 func optSingle(name string, children ...string) string {
 	return `<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>` + name + `</rm_attribute_name>` +
@@ -480,9 +485,9 @@ func TestREQ034_REQ107_PinnedCategoryCarriesItsRubric(t *testing.T) {
 							}
 							return
 						}
-						if code, found := terminology.CompositionCategory.Code(got.Value); found {
-							t.Errorf("category %s::%s value = %q, the rubric of %s; want the walk's text, not an invented rubric",
-								tc.terminologyID, tc.code, got.Value, code)
+						if got.Value != walkText {
+							t.Errorf("category %s::%s value = %q, want the walk's text %q, not an invented rubric",
+								tc.terminologyID, tc.code, got.Value, walkText)
 						}
 					})
 				}

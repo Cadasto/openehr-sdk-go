@@ -201,9 +201,9 @@ func TestREQ034_REQ107_OPTFilledNullFlavourCarriesItsRubric(t *testing.T) {
 								tc.terminologyID, tc.code, nf.DefiningCode.TerminologyID.Value, nf.DefiningCode.CodeString)
 						}
 						if tc.wantValue == "" {
-							if code, found := terminology.NullFlavours.Code(nf.Value); found {
-								t.Errorf("null_flavour %s::%s value = %q, the rubric of %s; want the walk's text, not an invented rubric",
-									tc.terminologyID, tc.code, nf.Value, code)
+							if nf.Value != walkText {
+								t.Errorf("null_flavour %s::%s value = %q, want the walk's text %q, not an invented rubric",
+									tc.terminologyID, tc.code, nf.Value, walkText)
 							}
 							return
 						}
