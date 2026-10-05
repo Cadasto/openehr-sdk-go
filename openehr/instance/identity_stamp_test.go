@@ -242,3 +242,66 @@ func TestREQ107_TemplateIDOnTheRootOnly(t *testing.T) {
 		}
 	}
 }
+
+// partyClasses are the PARTY concretes, whose uid the RM needs (PARTY
+// Uid_mandatory).
+var partyClasses = []string{"PERSON", "ORGANISATION", "GROUP", "AGENT", "ROLE"}
+
+// TestREQ107_ProhibitedUIDYieldsExceptOnAParty is the REQ-107 check that
+// the generator gives no uid to a COMPOSITION, an ENTRY, a GENERIC_ENTRY or
+// a PARTY_RELATIONSHIP whose OPT prohibits its uid, and gives a PARTY one
+// all the same, because the RM needs it. Each class is the template root;
+// a PARTY_RELATIONSHIP is also nested in a PERSON's relationships. It
+// holds under both policies, both value fills and both compile modes, and
+// the output passes the RM floor.
+func TestREQ107_ProhibitedUIDYieldsExceptOnAParty(t *testing.T) {
+	type tree struct {
+		name    string
+		opt     string
+		located func(t *testing.T, out any) rm.Locatable
+		wantUID bool
+	}
+	root := func(_ *testing.T, out any) rm.Locatable { return out.(rm.Locatable) }
+	var cases []tree
+	for _, class := range uidClasses {
+		cases = append(cases, tree{
+			name:    class + " root",
+			opt:     optTemplate(class, optProhibitedSingle("uid")),
+			located: root,
+			wantUID: slices.Contains(partyClasses, class),
+		})
+	}
+	cases = append(cases, tree{
+		name: "PARTY_RELATIONSHIP in PERSON.relationships",
+		opt: optTemplate("PERSON", optMultiple("relationships",
+			optNode("PARTY_RELATIONSHIP", "at0001", optProhibitedSingle("uid")))),
+		located: func(t *testing.T, out any) rm.Locatable {
+			p := out.(*rm.Person)
+			if len(p.Relationships) != 1 {
+				t.Fatalf("PERSON.relationships has %d members, want 1", len(p.Relationships))
+			}
+			return &p.Relationships[0]
+		},
+	})
+	for _, tc := range cases {
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, tc.opt, implicit)
+			for _, opts := range defaultsOptions() {
+				uids := &recordingUIDs{}
+				opts.UIDSource = uids.next
+				opts.Language, opts.Territory, opts.Composer = "en", "NL", testComposer()
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err != nil {
+						t.Fatalf("Generate: %v", err)
+					}
+					uid := tc.located(t, out).GetUID()
+					if has := uid != nil && !rm.IsTypedNil(uid); has != tc.wantUID {
+						t.Errorf("uid = %v, present %t, want %t", uid, has, tc.wantUID)
+					}
+					noFloorErrors(t, out)
+				})
+			}
+		}
+	}
+}
