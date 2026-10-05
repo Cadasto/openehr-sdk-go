@@ -1243,6 +1243,8 @@ requirements:
       - openehr/instance/interval_zone_test.go
       - openehr/instance/node_id_internal_test.go
       - openehr/instance/node_id_test.go
+      - openehr/instance/nonstorable_visit_internal_test.go
+      - openehr/instance/nonstorable_visit_test.go
       - openehr/instance/party_attribute_test.go
       - openehr/instance/party_relationship_uid_test.go
       - openehr/instance/phase4_test.go

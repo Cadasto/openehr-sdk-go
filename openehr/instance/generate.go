@@ -196,12 +196,7 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	}
 
 	for _, attr := range optNode.Attributes() {
-		// rminfo knows each class by its bare BMM name; the OPT may declare
-		// a generic instantiation (DV_INTERVAL<DV_QUANTITY>).
-		if rminfo.IsNonStorableAttr(bmmtype.Class(optNode.RMTypeName()), attr.Name()) {
-			continue
-		}
-		if !g.shouldVisit(attr) {
+		if !g.visits(optNode, attr) {
 			continue
 		}
 		switch attr.Cardinality() {
@@ -219,6 +214,21 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	settleIntervalEndpoints(optNode, rmValue)
 	g.finishNode(optNode, rmValue)
 	return nil
+}
+
+// visits decides whether the walk descends into attr of optNode. It
+// never visits an attribute the RM computes rather than stores (offset
+// on POINT_EVENT and INTERVAL_EVENT, is_integral on DV_QUANTITY and
+// DV_PROPORTION), under either policy: the generator has nothing to
+// write there. Any other attribute is visited when the policy says so
+// (shouldVisit).
+func (g *generator) visits(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
+	// rminfo knows each class by its bare BMM name; the OPT may declare
+	// a generic instantiation (DV_INTERVAL<DV_QUANTITY>).
+	if rminfo.IsNonStorableAttr(bmmtype.Class(optNode.RMTypeName()), attr.Name()) {
+		return false
+	}
+	return g.shouldVisit(attr)
 }
 
 // shouldVisit decides whether an attribute is in scope under the
