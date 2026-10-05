@@ -1,7 +1,8 @@
 ---
 description: >-
   Runnable programs under cmd/examples/: decode, validate, synthesise, build
-  AQL, create an EHR, and run a SMART PKCE launch. All of them work offline.
+  and run AQL, call the REST API, and authenticate with a SMART PKCE launch or
+  client credentials. All of them work offline.
 ---
 
 # Examples
@@ -9,9 +10,12 @@ description: >-
 The programs under
 [`cmd/examples/`](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples)
 are short programs to copy from. Between them they cover the building blocks
-end to end (decode, parse, compile, validate, synthesise, encode, and AQL),
-plus the smallest REST create and a SMART launch. The REST examples talk to an
-in-process mock, so none of them needs a clinical data repository (CDR).
+end to end (decode, parse, compile, validate, synthesise, encode, and AQL).
+They also cover REST calls for EHRs, compositions, AQL queries, templates and
+contributions, and two ways to authenticate: a SMART launch for an app with a
+signed-in user, and client credentials for a service with no user. The REST
+examples talk to a mock server in the same process, so none of them needs a
+clinical data repository (CDR) or an account.
 
 The full catalogue in the repository,
 [docs/examples.md](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/examples.md),
@@ -115,7 +119,11 @@ call made through `sandbox.Backend` as the transport, see
 | [Export a Web Template](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/webtemplate-export) | `webtemplate-export` | None | Compiled OPT → EHRbase Web Template JSON |
 | [FLAT and STRUCTURED round-trip](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/flat-roundtrip) | `flat-roundtrip` | None | COMPOSITION ↔ FLAT / STRUCTURED |
 | [Build a Contribution](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/contribution-build) | `contribution-build` | In-process mock, with `-commit` | Fluent `Contribution_create` assembly |
+| [Manage a template on the server](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/definition-lifecycle) | `definition-lifecycle` | In-process mock | Upload, list, download and compile a template |
+| [Save, read and update a Composition](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/composition-crud) | `composition-crud` | In-process mock | Optimistic concurrency with `If-Match`; a stale update refused |
+| [Execute an AQL query](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/query-execute) | `query-execute` | In-process mock | Bound parameters, RESULT_SET cells as typed values, a refused query |
 | [Run a SMART PKCE launch](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/smart-launch) | `smart-launch` | In-process mock | Standalone PKCE launch; state and verifier persistence |
+| [Authenticate a backend service](https://github.com/cadasto/openehr-sdk-go/tree/main/cmd/examples/service-auth) | `service-auth` | In-process mock | OAuth 2.0 client credentials; the cached token reused |
 
 Build every example:
 
