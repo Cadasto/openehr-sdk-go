@@ -10,6 +10,7 @@ import (
 	"uuid"
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
+	"github.com/cadasto/openehr-sdk-go/internal/rmroots"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/rmwrite"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -28,6 +29,10 @@ import (
 // PrimitiveConstraint.ExampleValue. The returned root is typed as
 // any; use [AsComposition], [AsObservation], etc. for the concrete
 // access path.
+//
+// When the template asks for an object of a class that is always an
+// archetype root but names no archetype for it, Generate returns an
+// error wrapping [ErrArchetypeIDMissing] and no root.
 func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (any, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -37,6 +42,12 @@ func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (a
 	}
 
 	rootType := c.Root().RMTypeName()
+
+	// A root of an archetype-root class needs the archetype id the
+	// template names for it; the generator does not invent one.
+	if rmroots.IsArchetypeRoot(rootType) && c.Root().ArchetypeID() == "" {
+		return nil, fmt.Errorf("%w: %s at %s (the template root)", ErrArchetypeIDMissing, rootType, c.Root().AQLPath())
+	}
 
 	// COMPOSITION roots require Composer + Territory; fail fast
 	// before constructing any RM tree.
@@ -321,6 +332,14 @@ func (g *generator) materialiseImplicitSingle(
 		// the attribute is outside the current registry, both of
 		// which the validator will flag.
 		return nil //nolint:nilerr // intentional: defer to validator
+	}
+	// A default built from the BMM alone has no archetype to name, so an
+	// archetype root is refused rather than built without
+	// archetype_details. No single attribute of the pinned RM reaches
+	// this today; it is kept in step with materialiseImplicitMultiple.
+	if built := rmTypeOf(rmChild); rmroots.IsArchetypeRoot(built) {
+		return fmt.Errorf("%w: %s for %s.%s at %s (the template names no child)",
+			ErrArchetypeIDMissing, built, optNode.RMTypeName(), attr.Name(), optNode.AQLPath())
 	}
 	// Stamp documented sentinel values on DV primitives so the
 	// validator's "required attribute absent" check passes for
@@ -891,7 +910,9 @@ func firstNonSlot(children []*tcimpl.CompiledNode) *tcimpl.CompiledNode {
 // the attribute's BMM element type via [concreteFor]; silently no-op
 // when the type is outside the typereg registry — the validator
 // will flag it. An attribute that is optional (neither BMM-mandatory,
-// nor existence or cardinality lower ≥ 1) gets no child.
+// nor existence or cardinality lower ≥ 1) gets no child. A required
+// one whose child would be an archetype root is refused with
+// [ErrArchetypeIDMissing].
 func (g *generator) materialiseImplicitMultiple(
 	optNode *tcimpl.CompiledNode,
 	attr *tcimpl.CompiledAttribute,
@@ -911,6 +932,13 @@ func (g *generator) materialiseImplicitMultiple(
 	rmChild, err := newRMForOPTType(rmType)
 	if err != nil {
 		return nil //nolint:nilerr // intentional: defer to validator
+	}
+	// A required attribute whose child would be an archetype root is
+	// refused instead, for the same reason: the generator does not
+	// invent an archetype id.
+	if built := rmTypeOf(rmChild); rmroots.IsArchetypeRoot(built) {
+		return fmt.Errorf("%w: %s for %s.%s at %s (required, but the template names no child)",
+			ErrArchetypeIDMissing, built, optNode.RMTypeName(), attr.Name(), optNode.AQLPath())
 	}
 	g.populatePrimitiveDefault(rmChild)
 	g.stampIfLocatable(rmChild, concreteFor(rmType))
@@ -949,10 +977,18 @@ func remainingLowerNeeded(attr *tcimpl.CompiledAttribute, current int) int {
 // OPT (EVENT, ITEM_STRUCTURE, DATA_VALUE, ITEM, CONTENT_ITEM,
 // CARE_ENTRY, ENTRY, LOCATABLE) resolve to a documented concrete
 // substitute — see [concreteFor].
+//
+// A child that would be an archetype root, but for which the OPT
+// names no archetype id, is refused with [ErrArchetypeIDMissing]. A
+// slot is left to its own path: [generator.stampSlotFill] gives it an
+// archetype id, or its caller refuses it with ErrSlotFillUnsupported.
 func (g *generator) makeChild(child *tcimpl.CompiledNode) (any, error) {
 	rmChild, err := newRMForOPTType(child.RMTypeName())
 	if err != nil {
 		return nil, fmt.Errorf("makeChild %s: %w", child.RMTypeName(), err)
+	}
+	if !child.IsSlot() && child.ArchetypeID() == "" && rmroots.IsArchetypeRoot(rmTypeOf(rmChild)) {
+		return nil, fmt.Errorf("%w: %s at %s", ErrArchetypeIDMissing, child.RMTypeName(), child.AQLPath())
 	}
 	g.setLocatableIdentity(child, rmChild, false /* isTemplateRoot */)
 	if rel, ok := rmChild.(*rm.PartyRelationship); ok {
@@ -1062,6 +1098,8 @@ func (g *generator) setLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, 
 		} else if id != "" {
 			// Template root with no explicit ArchetypeID on the OPT
 			// node — leave the slot empty rather than fabricating one.
+			// Generate has already refused such a root when its class
+			// is always an archetype root.
 			ad.ArchetypeID = rm.ArchetypeID{Value: ""}
 		}
 		if isTemplateRoot && g.compiled.TemplateID() != "" {

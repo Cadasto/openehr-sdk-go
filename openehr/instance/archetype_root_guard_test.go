@@ -1,13 +1,18 @@
 package instance_test
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	mrand "math/rand/v2"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/cadasto/openehr-sdk-go/internal/rmroots"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
@@ -226,5 +231,139 @@ func TestREQ107_UnsatisfiableConstraintIsNotArchetypeIDMissing(t *testing.T) {
 		if errors.Is(err, instance.ErrArchetypeIDMissing) {
 			t.Errorf("Generate(%v) error = %v, want it not to wrap ErrArchetypeIDMissing", opts.ValueFill, err)
 		}
+	}
+}
+
+// bmmTypeDef is the part of a BMM property's type_def the test below reads.
+type bmmTypeDef struct {
+	Type              string      `json:"type"`
+	RootType          string      `json:"root_type"`
+	GenericParameters []string    `json:"generic_parameters"`
+	TypeDef           *bmmTypeDef `json:"type_def"`
+}
+
+// names returns every type name td mentions: a container's element type, a
+// generic type's root type and its parameters, and those of a nested
+// type_def.
+func (td *bmmTypeDef) names() []string {
+	if td == nil {
+		return nil
+	}
+	var out []string
+	if td.Type != "" {
+		out = append(out, td.Type)
+	}
+	if td.RootType != "" {
+		out = append(out, td.RootType)
+	}
+	out = append(out, td.GenericParameters...)
+	return append(out, td.TypeDef.names()...)
+}
+
+// TestREQ107_BMMMandatoryAttributesReachNoArchetypeRoot pins why the
+// generator's fill for the mandatory attributes the OPT leaves out, which
+// builds each value from the BMM alone and has no error to return, never
+// builds an archetype root without archetype_details. No mandatory property
+// anywhere in the vendored RM BMM is typed with a class that admits an
+// archetype root: neither a root class itself, nor an abstract class with a
+// root among its concrete descendants, such as PARTY, ACTOR, ENTRY and
+// CARE_ENTRY, whose concrete descendants are all roots. A property is
+// mandatory when the BMM marks it is_mandatory, or when it is a container
+// whose cardinality has a lower bound of 1 or more, as rminfo reads it. If a
+// BMM bump breaks this, the fill needs the same refusal as the generator's
+// other paths.
+func TestREQ107_BMMMandatoryAttributesReachNoArchetypeRoot(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "resources", "bmm", "openehr_rm_1.2.0.bmm.json"))
+	if err != nil {
+		t.Fatalf("read vendored RM BMM: %v", err)
+	}
+	var schema struct {
+		ClassDefinitions map[string]struct {
+			Ancestors  []string `json:"ancestors"`
+			IsAbstract bool     `json:"is_abstract"`
+			Properties map[string]struct {
+				Kind        string      `json:"_type"`
+				Type        string      `json:"type"`
+				IsMandatory bool        `json:"is_mandatory"`
+				TypeDef     *bmmTypeDef `json:"type_def"`
+				Cardinality *struct {
+					Lower int `json:"lower"`
+				} `json:"cardinality"`
+			} `json:"properties"`
+		} `json:"class_definitions"`
+	}
+	if err := json.Unmarshal(raw, &schema); err != nil {
+		t.Fatalf("decode vendored RM BMM: %v", err)
+	}
+	defs := schema.ClassDefinitions
+	descendants := map[string][]string{}
+	for name, c := range defs {
+		for _, a := range c.Ancestors {
+			descendants[a] = append(descendants[a], name)
+		}
+	}
+	// concretes returns the concrete classes a value typed name can be: name
+	// itself when the BMM defines it as concrete, and every concrete
+	// descendant. A name the RM BMM does not define (a base type, a formal
+	// generic parameter) has no RM descendants other than those it lists.
+	concretes := func(name string) []string {
+		seen := map[string]bool{}
+		var out []string
+		var walk func(string)
+		walk = func(n string) {
+			if seen[n] {
+				return
+			}
+			seen[n] = true
+			if c, ok := defs[n]; ok && !c.IsAbstract {
+				out = append(out, n)
+			}
+			for _, d := range descendants[n] {
+				walk(d)
+			}
+		}
+		walk(name)
+		slices.Sort(out)
+		return out
+	}
+	rootsAdmitted := func(name string) []string {
+		var out []string
+		for _, n := range concretes(name) {
+			if rmroots.IsArchetypeRoot(n) {
+				out = append(out, n)
+			}
+		}
+		return out
+	}
+
+	// The walk must see the abstract classes whose concrete descendants are
+	// all archetype roots, or the check below is vacuous.
+	for _, abstract := range []string{"PARTY", "ACTOR", "ENTRY", "CARE_ENTRY"} {
+		all, roots := concretes(abstract), rootsAdmitted(abstract)
+		if len(all) == 0 || !slices.Equal(all, roots) {
+			t.Errorf("BMM %s admits %v, of which %v are archetype roots; want a non-empty set, all roots", abstract, all, roots)
+		}
+	}
+
+	checked := 0
+	for class, c := range defs {
+		for prop, p := range c.Properties {
+			container := p.Kind == "P_BMM_CONTAINER_PROPERTY"
+			if !p.IsMandatory && (!container || p.Cardinality == nil || p.Cardinality.Lower < 1) {
+				continue
+			}
+			checked++
+			for _, name := range append([]string{p.Type}, p.TypeDef.names()...) {
+				if name == "" {
+					continue
+				}
+				if roots := rootsAdmitted(name); len(roots) > 0 {
+					t.Errorf("BMM %s.%s is mandatory and typed %s, which admits the archetype roots %v: the generator would build one without archetype_details", class, prop, name, roots)
+				}
+			}
+		}
+	}
+	if checked == 0 {
+		t.Fatal("found no mandatory BMM property; want the RM's, or the check is vacuous")
 	}
 }
