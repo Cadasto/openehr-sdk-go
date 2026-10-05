@@ -1505,6 +1505,8 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 		g.ensureItems(opt, &v.Items)
 	case *rm.PartyRelationship:
 		fillPartyRelationship(v)
+	case *rm.Role:
+		fillPerformer(&v.Performer)
 	case *rm.Element:
 		settleElement(v)
 	case *rm.ItemList:
@@ -1673,6 +1675,23 @@ func fillPartyRelationship(rel *rm.PartyRelationship) {
 	}
 	if rel.Target.Namespace == "" || rel.Target.Type == "" || rel.Target.ID == nil {
 		rel.Target = partyRef("00000000-0000-0000-0000-000000000002")
+	}
+}
+
+// fillPerformer gives a ROLE the performer the RM requires, a reference
+// to the actor that plays the role, built like a PARTY_RELATIONSHIP's
+// source and target: the generator cannot build the abstract OBJECT_ID a
+// PARTY_REF needs. Only the parts the template left empty are filled.
+func fillPerformer(ref *rm.PartyRef) {
+	def := partyRef("00000000-0000-0000-0000-000000000001")
+	if ref.ID == nil || rm.IsTypedNil(ref.ID) {
+		ref.ID = def.ID
+	}
+	if ref.Namespace == "" {
+		ref.Namespace = def.Namespace
+	}
+	if ref.Type == "" {
+		ref.Type = def.Type
 	}
 }
 

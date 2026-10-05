@@ -120,7 +120,17 @@ func EnsureSingle(parent any, _ /* parentType */, attrName string, child any) er
 	case *rm.IsmTransition:
 		return writeIsmTransitionSingle(p, attrName, child)
 	case *rm.Person:
-		return writePersonSingle(p, attrName, child)
+		return writePartySingle(personFields(p), attrName, child)
+	case *rm.Agent:
+		return writePartySingle(agentFields(p), attrName, child)
+	case *rm.Group:
+		return writePartySingle(groupFields(p), attrName, child)
+	case *rm.Organisation:
+		return writePartySingle(organisationFields(p), attrName, child)
+	case *rm.Role:
+		return writeRoleSingle(p, attrName, child)
+	case *rm.Capability:
+		return writeCapabilitySingle(p, attrName, child)
 	case *rm.Address:
 		return writeAddressSingle(p, attrName, child)
 	case *rm.PartyIdentity:
@@ -151,7 +161,15 @@ func AppendMultiple(parent any, _ /* parentType */, attrName string, child any) 
 	case *rm.Cluster:
 		return writeClusterMultiple(p, attrName, child)
 	case *rm.Person:
-		return writePersonMultiple(p, attrName, child)
+		return writePartyMultiple(personFields(p), attrName, child)
+	case *rm.Agent:
+		return writePartyMultiple(agentFields(p), attrName, child)
+	case *rm.Group:
+		return writePartyMultiple(groupFields(p), attrName, child)
+	case *rm.Organisation:
+		return writePartyMultiple(organisationFields(p), attrName, child)
+	case *rm.Role:
+		return writeRoleMultiple(p, attrName, child)
 	case *rm.Contact:
 		return writeContactMultiple(p, attrName, child)
 	}
@@ -1031,7 +1049,7 @@ func mismatch(attr string, got any, wantRM string) error {
 	return fmt.Errorf("%w: attr %q expects %s, got %T", ErrTypeMismatch, attr, wantRM, got)
 }
 
-// --- ISM_TRANSITION / PERSON / ADDRESS -----------------------------------
+// --- ISM_TRANSITION / PARTY / ADDRESS ------------------------------------
 
 func writeIsmTransitionSingle(i *rm.IsmTransition, attr string, child any) error {
 	switch attr {
@@ -1049,26 +1067,99 @@ func writeIsmTransitionSingle(i *rm.IsmTransition, attr string, child any) error
 	return fmt.Errorf("%w: *rm.IsmTransition has no single attr %q", ErrUnknownAttribute, attr)
 }
 
-func writePersonSingle(p *rm.Person, attr string, child any) error {
-	switch attr {
-	case "name":
-		return assignDVTextLike(child, func(v rm.DVTextLike) { p.Name = v }, attr)
-	case "details":
-		return assignItemStructure(child, func(v rm.ItemStructure) { p.Details = v }, attr)
-	}
-	return fmt.Errorf("%w: *rm.Person has no single attr %q", ErrUnknownAttribute, attr)
+// partyFields points at the attributes PARTY gives every party class, so
+// one pair of writers serves all five. languages is the one ACTOR
+// attribute rmwrite builds a member for; it is nil for a ROLE, which is
+// no actor. ACTOR.roles is not addressed: its PARTY_REF members need an
+// OBJECT_ID, which is abstract, so rmwrite cannot build one.
+type partyFields struct {
+	class         string // the Go type, for the error detail
+	name          *rm.DVTextLike
+	details       *rm.ItemStructure
+	identities    *[]rm.PartyIdentity
+	contacts      *[]rm.Contact
+	relationships *[]rm.PartyRelationship
+	languages     *[]rm.DVTextLike
 }
 
-func writePersonMultiple(p *rm.Person, attr string, child any) error {
+func personFields(p *rm.Person) partyFields {
+	return partyFields{"*rm.Person", &p.Name, &p.Details, &p.Identities, &p.Contacts, &p.Relationships, &p.Languages}
+}
+
+func agentFields(a *rm.Agent) partyFields {
+	return partyFields{"*rm.Agent", &a.Name, &a.Details, &a.Identities, &a.Contacts, &a.Relationships, &a.Languages}
+}
+
+func groupFields(g *rm.Group) partyFields {
+	return partyFields{"*rm.Group", &g.Name, &g.Details, &g.Identities, &g.Contacts, &g.Relationships, &g.Languages}
+}
+
+func organisationFields(o *rm.Organisation) partyFields {
+	return partyFields{"*rm.Organisation", &o.Name, &o.Details, &o.Identities, &o.Contacts, &o.Relationships, &o.Languages}
+}
+
+func roleFields(r *rm.Role) partyFields {
+	return partyFields{"*rm.Role", &r.Name, &r.Details, &r.Identities, &r.Contacts, &r.Relationships, nil}
+}
+
+func writePartySingle(f partyFields, attr string, child any) error {
+	switch attr {
+	case "name":
+		return assignDVTextLike(child, func(v rm.DVTextLike) { *f.name = v }, attr)
+	case "details":
+		return assignItemStructure(child, func(v rm.ItemStructure) { *f.details = v }, attr)
+	}
+	return fmt.Errorf("%w: %s has no single attr %q", ErrUnknownAttribute, f.class, attr)
+}
+
+func writePartyMultiple(f partyFields, attr string, child any) error {
 	switch attr {
 	case "identities":
-		return assignVia(child, func(v rm.PartyIdentity) { p.Identities = append(p.Identities, v) }, attr, "PARTY_IDENTITY")
+		return assignVia(child, func(v rm.PartyIdentity) { *f.identities = append(*f.identities, v) }, attr, "PARTY_IDENTITY")
 	case "contacts":
-		return assignVia(child, func(v rm.Contact) { p.Contacts = append(p.Contacts, v) }, attr, "CONTACT")
+		return assignVia(child, func(v rm.Contact) { *f.contacts = append(*f.contacts, v) }, attr, "CONTACT")
 	case "relationships":
-		return assignVia(child, func(v rm.PartyRelationship) { p.Relationships = append(p.Relationships, v) }, attr, "PARTY_RELATIONSHIP")
+		return assignVia(child, func(v rm.PartyRelationship) { *f.relationships = append(*f.relationships, v) }, attr, "PARTY_RELATIONSHIP")
+	case "languages":
+		if f.languages != nil {
+			return assignDVTextLike(child, func(v rm.DVTextLike) { *f.languages = append(*f.languages, v) }, attr)
+		}
 	}
-	return fmt.Errorf("%w: *rm.Person has no multiple attr %q", ErrUnknownAttribute, attr)
+	return fmt.Errorf("%w: %s has no multiple attr %q", ErrUnknownAttribute, f.class, attr)
+}
+
+// writeRoleSingle adds the single attributes ROLE declares beyond PARTY.
+// A PARTY_REF performer is stored as given; the generator fills one the
+// template leaves empty.
+func writeRoleSingle(r *rm.Role, attr string, child any) error {
+	switch attr {
+	case "performer":
+		return assignVia(child, func(v rm.PartyRef) { r.Performer = v }, attr, "PARTY_REF")
+	case "time_validity":
+		return assignVia(child, func(v rm.DVInterval[rm.DVDate]) { r.TimeValidity = &v }, attr, "DV_INTERVAL<DV_DATE>")
+	}
+	return writePartySingle(roleFields(r), attr, child)
+}
+
+func writeRoleMultiple(r *rm.Role, attr string, child any) error {
+	if attr == "capabilities" {
+		return assignVia(child, func(v rm.Capability) { r.Capabilities = append(r.Capabilities, v) }, attr, "CAPABILITY")
+	}
+	return writePartyMultiple(roleFields(r), attr, child)
+}
+
+// writeCapabilitySingle writes a ROLE's capability, so its RM-mandatory
+// credentials can be filled like any other item structure.
+func writeCapabilitySingle(c *rm.Capability, attr string, child any) error {
+	switch attr {
+	case "name":
+		return assignDVTextLike(child, func(v rm.DVTextLike) { c.Name = v }, attr)
+	case "credentials":
+		return assignItemStructure(child, func(v rm.ItemStructure) { c.Credentials = v }, attr)
+	case "time_validity":
+		return assignVia(child, func(v rm.DVInterval[rm.DVDate]) { c.TimeValidity = &v }, attr, "DV_INTERVAL<DV_DATE>")
+	}
+	return fmt.Errorf("%w: *rm.Capability has no single attr %q", ErrUnknownAttribute, attr)
 }
 
 func writeAddressSingle(a *rm.Address, attr string, child any) error {
