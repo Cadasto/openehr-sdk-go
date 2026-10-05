@@ -1307,6 +1307,10 @@ func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 				TerminologyID: rm.TerminologyID{Value: terminology.ID},
 			},
 		}
+	} else {
+		// The OPT pinned the code, and the walk left the synthesiser's text
+		// beside it.
+		useGroupRubric(&c.Category, terminology.CompositionCategory)
 	}
 	if c.Language.CodeString == "" {
 		c.Language = rm.CodePhrase{
@@ -1548,6 +1552,20 @@ func settleElement(e *rm.Element) {
 	}
 	if e.NullFlavour == nil {
 		e.NullFlavour = noInformation()
+	}
+}
+
+// useGroupRubric sets the text of a coded text to the pinned rubric of its
+// code, when that code is an `openehr` code in group. The walk fills a code
+// the OPT pins but leaves the synthesiser's placeholder text beside it. A
+// code in another terminology, or outside group, keeps its text, so the
+// generator invents no rubric for it.
+func useGroupRubric(v *rm.DVCodedText, group *terminology.Group) {
+	if v.DefiningCode.TerminologyID.Value != terminology.ID {
+		return
+	}
+	if rubric, ok := group.Rubric(v.DefiningCode.CodeString); ok {
+		v.Value = rubric
 	}
 }
 
