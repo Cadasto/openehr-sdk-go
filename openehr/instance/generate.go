@@ -550,8 +550,9 @@ func stringAttr(parent any, attr string) (string, bool) {
 
 // stringField returns a reader and a writer for the BMM String attribute
 // attr of parent. It covers every String attribute of the data values the
-// generator builds, plus ACTIVITY.action_archetype_id and
-// TERMINOLOGY_ID.value. An optional attribute reads as "" while unset, and
+// generator builds, plus ACTIVITY.action_archetype_id, TERMINOLOGY_ID.value
+// and a PARTY_REF's namespace and type, so a C_STRING the OPT pins on any
+// of them is honoured. An optional attribute reads as "" while unset, and
 // its writer sets it. ok is false when parent has no such field; when ok is
 // true, get and set are both non-nil.
 func stringField(parent any, attr string) (get func() string, set func(string), ok bool) {
@@ -614,6 +615,13 @@ func stringField(parent any, attr string) (get func() string, set func(string), 
 		}
 	case *rm.TerminologyID:
 		return valueField(&p.Value, attr)
+	case *rm.PartyRef:
+		switch attr {
+		case "namespace":
+			return requiredString(&p.Namespace)
+		case "type":
+			return requiredString(&p.Type)
+		}
 	}
 	return nil, nil, false
 }
