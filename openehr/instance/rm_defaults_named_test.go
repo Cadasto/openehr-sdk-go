@@ -167,3 +167,59 @@ func checkOpenEHRCode(t *testing.T, what string, got rm.DVCodedText, group *term
 		t.Errorf("%s.value = %q, want %q", what, got.Value, rubric)
 	}
 }
+
+// TestREQ107_RMDefaultsKeepOPTCode is the REQ-107 check that an RM default
+// does not replace a code the OPT gives: an ENTRY's language and encoding,
+// a COMPOSITION's language and territory, and an ISM_TRANSITION's current
+// state, each pinned by a C_CODE_PHRASE listing one code.
+func TestREQ107_RMDefaultsKeepOPTCode(t *testing.T) {
+	phrase := func(terminologyID, code string) rm.CodePhrase {
+		return rm.CodePhrase{CodeString: code, TerminologyID: rm.TerminologyID{Value: terminologyID}}
+	}
+	action := optTemplate("ACTION",
+		optSingle("language", optCodePhrase("ISO_639-1", "de")),
+		optSingle("encoding", optCodePhrase("IANA_character-sets", "ISO-8859-1")),
+		optSingle("subject"),
+		optSingle("ism_transition", optNode("ISM_TRANSITION", "",
+			optSingle("current_state", optCodedText(terminology.ID, "526")))),
+		optSingle("description", emptyTree))
+	composition := optTemplate("COMPOSITION",
+		optSingle("language", optCodePhrase("ISO_639-1", "de")),
+		optSingle("territory", optCodePhrase("ISO_3166-1", "DE")))
+	cases := []struct {
+		name string
+		opt  string
+		got  func(out any) rm.CodePhrase
+		want rm.CodePhrase
+	}{
+		{"ENTRY language", action, func(out any) rm.CodePhrase { return out.(*rm.Action).Language }, phrase("ISO_639-1", "de")},
+		{"ENTRY encoding", action, func(out any) rm.CodePhrase { return out.(*rm.Action).Encoding }, phrase("IANA_character-sets", "ISO-8859-1")},
+		{
+			"ISM_TRANSITION current_state", action,
+			func(out any) rm.CodePhrase { return out.(*rm.Action).IsmTransition.CurrentState.DefiningCode },
+			phrase(terminology.ID, "526"),
+		},
+		{"COMPOSITION language", composition, func(out any) rm.CodePhrase { return out.(*rm.Composition).Language }, phrase("ISO_639-1", "de")},
+		{"COMPOSITION territory", composition, func(out any) rm.CodePhrase { return out.(*rm.Composition).Territory }, phrase("ISO_3166-1", "DE")},
+	}
+	for _, tc := range cases {
+		c := compileOPTText(t, tc.opt, true)
+		for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+			t.Run(tc.name+"/"+policy.String(), func(t *testing.T) {
+				out, err := instance.Generate(t.Context(), c, instance.Options{
+					Policy:    policy,
+					Language:  namedLanguage,
+					Territory: namedTerritory,
+					Composer:  testComposer(),
+					Now:       defaultsNow,
+				})
+				if err != nil {
+					t.Fatalf("Generate: %v", err)
+				}
+				if got := tc.got(out); got != tc.want {
+					t.Errorf("%s = %+v, want the OPT's %+v", tc.name, got, tc.want)
+				}
+			})
+		}
+	}
+}

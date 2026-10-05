@@ -637,9 +637,9 @@ func optionalString(f **string) (func() string, func(string), bool) {
 }
 
 // fillEntryCode sets ENTRY.language from Options.Language and
-// ENTRY.encoding to UTF-8 when that code is still empty. It reports
-// whether attr is one of those two fields, so the caller does not
-// also build a generic code phrase.
+// ENTRY.encoding to UTF-8 when that field has no code (noCode). It
+// reports whether attr is one of those two fields, so the caller does
+// not also build a generic code phrase.
 func (g *generator) fillEntryCode(parent any, parentType, attr string) bool {
 	phrase, ok := g.entryCodePhrase(parentType, attr)
 	if !ok {
@@ -683,12 +683,23 @@ func entryCodeEmpty(parent any, attr string) bool {
 	}
 	switch attr {
 	case "language":
-		return lang.CodeString == ""
+		return noCode(lang.CodeString)
 	case "encoding":
-		return enc.CodeString == ""
+		return noCode(enc.CodeString)
 	default:
 		return true
 	}
+}
+
+// noCode reports whether code is no real code: empty, or the placeholder
+// at0000 the walk writes where the OPT names a code phrase without a code
+// (the primitive default of an unconstrained CODE_PHRASE, and the example
+// value of a C_CODE_PHRASE with an empty code list). An RM default
+// replaces such a code. at0000 is an archetype node code, never an ISO
+// 639-1, ISO 3166-1, IANA character-set or openEHR code, so an OPT cannot
+// give it as a real value of an attribute an RM default fills.
+func noCode(code string) bool {
+	return code == "" || code == "at0000"
 }
 
 func entryCodes(parent any) (language, encoding rm.CodePhrase, ok bool) {
@@ -1309,7 +1320,7 @@ func ordinalSymbolText(ref constraints.CodedTermRef) rm.DVCodedText {
 // context.start_time. Called once after the OPT-driven walk so the
 // values land regardless of whether the OPT pinned them.
 func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
-	if c.Category.DefiningCode.CodeString == "" {
+	if noCode(c.Category.DefiningCode.CodeString) {
 		// The rubric comes from the pinned `composition category` group, never
 		// typed beside the code (REQ-034).
 		value, _ := terminology.CompositionCategory.Rubric("433")
@@ -1325,13 +1336,13 @@ func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 		// beside it.
 		useGroupRubric(&c.Category, terminology.CompositionCategory)
 	}
-	if c.Language.CodeString == "" {
+	if noCode(c.Language.CodeString) {
 		c.Language = rm.CodePhrase{
 			CodeString:    g.opts.Language,
 			TerminologyID: rm.TerminologyID{Value: "ISO_639-1"},
 		}
 	}
-	if c.Territory.CodeString == "" {
+	if noCode(c.Territory.CodeString) {
 		c.Territory = rm.CodePhrase{
 			CodeString:    g.opts.Territory,
 			TerminologyID: rm.TerminologyID{Value: "ISO_3166-1"},
@@ -1454,6 +1465,12 @@ func firstCollidingOptionalSibling(child *tcimpl.CompiledNode, siblings []*tcimp
 // finishNode fills RM-mandatory fields the OPT walk left empty.
 // REQ-107: generated output has to pass the template-less floor.
 func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
+	// An OPT can name an ENTRY's language or encoding without a code; the
+	// walk then leaves the placeholder there for the RM default to replace.
+	if _, _, ok := entryCodes(rmValue); ok {
+		g.fillEntryCode(rmValue, opt.RMTypeName(), "language")
+		g.fillEntryCode(rmValue, opt.RMTypeName(), "encoding")
+	}
 	switch v := rmValue.(type) {
 	case *rm.Action:
 		if v.Time.Value == "" {
@@ -1655,7 +1672,7 @@ func partyRef(id *rm.HierObjectID) rm.PartyRef {
 }
 
 func fillCurrentState(opt *tcimpl.CompiledNode, iv *rm.IsmTransition) {
-	if iv.CurrentState.DefiningCode.CodeString != "" {
+	if !noCode(iv.CurrentState.DefiningCode.CodeString) {
 		return
 	}
 	ref, ok := firstCodedExample(opt, "current_state")
@@ -1692,7 +1709,7 @@ func firstCodedExample(opt *tcimpl.CompiledNode, attrName string) (constraints.C
 		}
 		if pc := n.PrimitiveConstraint(); pc != nil {
 			if phrase, is := pc.(constraints.CodePhrase); is {
-				if ref, isRef := phrase.ExampleValue().(constraints.CodedTermRef); isRef && ref.CodeString != "" {
+				if ref, isRef := phrase.ExampleValue().(constraints.CodedTermRef); isRef && !noCode(ref.CodeString) {
 					found = ref
 					ok = true
 					return
