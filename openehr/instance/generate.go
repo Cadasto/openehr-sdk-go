@@ -1556,6 +1556,11 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 		}
 	case *rm.IsmTransition:
 		fillCurrentState(opt, v)
+	case *rm.IntervalEvent[rm.ItemStructure]:
+		// typereg builds every INTERVAL_EVENT with this instantiation.
+		fillMathFunction(&v.MathFunction)
+	case *rm.DVMultimedia:
+		settleMultimedia(opt, v)
 	case *rm.Cluster:
 		// CLUSTER.items is RM-mandatory. ITEM_TREE.items and ITEM_LIST.items
 		// are optional, so they get no member here: the walk gives them one
@@ -1591,6 +1596,63 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 			v.Symbol = localSymbol()
 		}
 	}
+}
+
+// fillMathFunction gives an INTERVAL_EVENT's math function the code 146
+// (mean) of the openEHR event math function group, with that code's
+// rubric, when the OPT gave it no code (noCode), so RM
+// Math_function_validity holds. A code the OPT gave is kept.
+func fillMathFunction(mf *rm.DVCodedText) {
+	if !noCode(mf.DefiningCode.CodeString) {
+		return
+	}
+	const code = "146"
+	rubric, _ := terminology.EventMathFunction.Rubric(code)
+	*mf = rm.DVCodedText{
+		Value: rubric,
+		DefiningCode: rm.CodePhrase{
+			CodeString:    code,
+			TerminologyID: rm.TerminologyID{Value: terminology.ID},
+		},
+	}
+}
+
+// settleMultimedia gives a DV_MULTIMEDIA the RM defaults the OPT left it
+// without. A media type with no code (noCode) becomes text/plain in
+// IANA_media-types, so RM Media_type_valid holds; a code the OPT gave is
+// kept. The default is not written where the C_CODE_PHRASE the OPT puts on
+// media_type rejects it, such as one that names the terminology openEHR:
+// the OPT's own constraint then keeps the walk's value. A value with
+// neither uri nor data gets the uri http://example.com, so RM Not_empty
+// holds. opt is the OPT node of m.
+func settleMultimedia(opt *tcimpl.CompiledNode, m *rm.DVMultimedia) {
+	textPlain := rm.CodePhrase{
+		CodeString:    "text/plain",
+		TerminologyID: rm.TerminologyID{Value: "IANA_media-types"},
+	}
+	if noCode(m.MediaType.CodeString) && codeAdmitted(opt, "media_type", textPlain) {
+		m.MediaType = textPlain
+	}
+	if (m.URI == nil || rm.IsTypedNil(m.URI)) && len(m.Data) == 0 {
+		m.URI = &rm.DVURI{Value: "http://example.com"}
+	}
+}
+
+// codeAdmitted reports whether the C_CODE_PHRASE the OPT puts on attrName
+// of opt accepts phrase. The walk builds an attribute from its first OPT
+// child, so that child's constraint is the one read. An attribute the OPT
+// does not name, or names without a C_CODE_PHRASE, admits any phrase.
+func codeAdmitted(opt *tcimpl.CompiledNode, attrName string, phrase rm.CodePhrase) bool {
+	attr := opt.Attribute(attrName)
+	if attr == nil || len(attr.Children()) == 0 {
+		return true
+	}
+	cp, ok := attr.Children()[0].PrimitiveConstraint().(constraints.CodePhrase)
+	if !ok {
+		return true
+	}
+	ref := constraints.CodedTermRef{Terminology: phrase.TerminologyID.Value, CodeString: phrase.CodeString}
+	return len(cp.Validate(ref)) == 0
 }
 
 // ensureItems puts one member in an RM-mandatory items list. When the

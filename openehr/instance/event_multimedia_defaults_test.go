@@ -3,6 +3,7 @@ package instance_test
 import (
 	"fmt"
 	mrand "math/rand/v2"
+	"slices"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
@@ -258,13 +259,53 @@ func TestREQ107_MultimediaTakesTextPlainAndExampleURI(t *testing.T) {
 
 // TestREQ107_MultimediaKeepsPinnedMediaType is the REQ-107 check that a
 // media type code the OPT gives a DV_MULTIMEDIA is kept, while the uri
-// default still applies.
+// default still applies. One pin lists text/plain beside image/png, so the
+// OPT admits the default and only the rule that keeps a given code stops
+// it: under ExampleFill the walk gives the first code, image/png, and
+// under RandomFill one of the two.
 func TestREQ107_MultimediaKeepsPinnedMediaType(t *testing.T) {
-	pinned := []string{optSingle("media_type", optCodePhrase("IANA_media-types", "image/png"))}
-	want := rm.CodePhrase{CodeString: "image/png", TerminologyID: rm.TerminologyID{Value: "IANA_media-types"}}
+	for _, codes := range [][]string{{"image/png"}, {"image/png", "text/plain"}} {
+		pinned := []string{optSingle("media_type", optCodePhrase("IANA_media-types", codes...))}
+		for _, place := range multimediaPlacements {
+			for _, implicit := range []bool{true, false} {
+				c := compileOPTText(t, place.opt(pinned), implicit)
+				for _, opts := range defaultsOptions() {
+					t.Run(fmt.Sprintf("%v/%s/implicit=%t/%v/%v", codes, place.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+						out, err := instance.Generate(t.Context(), c, opts)
+						if err != nil {
+							t.Fatalf("Generate: %v", err)
+						}
+						mm := place.multimedia(t, out)
+						if got := mm.MediaType.TerminologyID.Value; got != "IANA_media-types" {
+							t.Errorf("DV_MULTIMEDIA.media_type = %+v, want the pinned terminology IANA_media-types", mm.MediaType)
+						}
+						switch got := mm.MediaType.CodeString; {
+						case opts.ValueFill == instance.ExampleFill && got != codes[0]:
+							t.Errorf("DV_MULTIMEDIA.media_type code = %q, want the walk's %q", got, codes[0])
+						case !slices.Contains(codes, got):
+							t.Errorf("DV_MULTIMEDIA.media_type code = %q, want one of the pinned %q", got, codes)
+						}
+						checkExampleURI(t, mm)
+						noFloorErrors(t, out)
+					})
+				}
+			}
+		}
+	}
+}
+
+// TestREQ107_MultimediaMediaTypeKeepsTheOPTTerminology is the REQ-107
+// check that the media type default does not override the terminology the
+// OPT's C_CODE_PHRASE names: the generated value must satisfy the OPT's
+// primitive constraints, and text/plain in IANA_media-types does not
+// satisfy a C_CODE_PHRASE that names the terminology openEHR. The media
+// type keeps that terminology, the uri default still applies, and the
+// template validator finds no error.
+func TestREQ107_MultimediaMediaTypeKeepsTheOPTTerminology(t *testing.T) {
+	named := []string{optSingle("media_type", optCodePhrase("openEHR"))}
 	for _, place := range multimediaPlacements {
 		for _, implicit := range []bool{true, false} {
-			c := compileOPTText(t, place.opt(pinned), implicit)
+			c := compileOPTText(t, place.opt(named), implicit)
 			for _, opts := range defaultsOptions() {
 				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", place.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
 					out, err := instance.Generate(t.Context(), c, opts)
@@ -272,11 +313,15 @@ func TestREQ107_MultimediaKeepsPinnedMediaType(t *testing.T) {
 						t.Fatalf("Generate: %v", err)
 					}
 					mm := place.multimedia(t, out)
-					if mm.MediaType != want {
-						t.Errorf("DV_MULTIMEDIA.media_type = %+v, want the pinned %+v", mm.MediaType, want)
+					if got := mm.MediaType.TerminologyID.Value; got != "openEHR" {
+						t.Errorf("DV_MULTIMEDIA.media_type = %+v, want the OPT's terminology openEHR", mm.MediaType)
 					}
 					checkExampleURI(t, mm)
-					noFloorErrors(t, out)
+					for _, iss := range validation.Validate(out, c).Issues {
+						if iss.Severity == validation.Error {
+							t.Errorf("Validate: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+						}
+					}
 				})
 			}
 		}

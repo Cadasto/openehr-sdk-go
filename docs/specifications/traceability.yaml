@@ -1244,6 +1244,7 @@ requirements:
       - openehr/instance/interval_temporal_internal_test.go
       - openehr/instance/interval_zone_test.go
       - openehr/instance/items_rule_test.go
+      - openehr/instance/multimedia_uri_internal_test.go
       - openehr/instance/node_id_internal_test.go
       - openehr/instance/node_id_test.go
       - openehr/instance/nonstorable_visit_internal_test.go
