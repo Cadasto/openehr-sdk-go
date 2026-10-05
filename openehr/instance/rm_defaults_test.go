@@ -9,6 +9,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
@@ -37,6 +38,24 @@ func optPrimitive(rmType, itemType, body string) string {
 	return `<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>` + rmType + `</rm_type_name>` +
 		`<node_id></node_id><item xsi:type="` + itemType + `">` + body + `</item></children>`
 }
+
+// optCodedText is a DV_CODED_TEXT whose defining code the OPT pins to
+// codes of terminologyID with a C_CODE_PHRASE. The OPT says nothing about
+// the text.
+func optCodedText(terminologyID string, codes ...string) string {
+	var list strings.Builder
+	for _, code := range codes {
+		list.WriteString(`<code_list>` + code + `</code_list>`)
+	}
+	phrase := `<children xsi:type="C_CODE_PHRASE"><rm_type_name>CODE_PHRASE</rm_type_name><node_id></node_id>` +
+		`<terminology_id><value>` + terminologyID + `</value></terminology_id>` + list.String() + `</children>`
+	return optNode("DV_CODED_TEXT", "", optSingle("defining_code", phrase))
+}
+
+// walkText is the text the walk gives a DV_CODED_TEXT built by
+// optCodedText, under every policy and value fill: the OPT constrains no
+// text, so it is the open-string example.
+const walkText = "example"
 
 // optSingle is a C_SINGLE_ATTRIBUTE called name over children.
 func optSingle(name string, children ...string) string {
@@ -408,6 +427,67 @@ func TestREQ107_RMDefaultsFillBMMSynthesisedValues(t *testing.T) {
 							if iss.Severity == validation.Error {
 								t.Errorf("ValidateRM: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
 							}
+						}
+					})
+				}
+			}
+		})
+	}
+}
+
+// A COMPOSITION category that the OPT pins to a code of the openEHR
+// "composition category" group carries that code's pinned rubric as its
+// text, not the synthesiser's placeholder. A code outside the group, or a
+// group code in another terminology, keeps the text the walk gave it: the
+// generator invents no rubric for it.
+func TestREQ034_REQ107_PinnedCategoryCarriesItsRubric(t *testing.T) {
+	cases := []struct {
+		name          string
+		terminologyID string
+		code          string
+		wantRubric    bool
+	}{
+		{name: "event", terminologyID: terminology.ID, code: "433", wantRubric: true},
+		{name: "persistent", terminologyID: terminology.ID, code: "431", wantRubric: true},
+		{name: "openehr code outside the group", terminologyID: terminology.ID, code: "999"},
+		{name: "group code in another terminology", terminologyID: "local", code: "433"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := compileOPTText(t, optTemplate("COMPOSITION", optSingle("category", optCodedText(tc.terminologyID, tc.code))), true)
+			for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+				for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
+					t.Run(policy.String()+"/"+fill.String(), func(t *testing.T) {
+						out, err := instance.Generate(t.Context(), c, instance.Options{
+							Policy:    policy,
+							ValueFill: fill,
+							Language:  "en",
+							Territory: "NL",
+							Composer:  testComposer(),
+							Now:       defaultsNow,
+						})
+						if err != nil {
+							t.Fatalf("Generate: %v", err)
+						}
+						comp, err := instance.AsComposition(out)
+						if err != nil {
+							t.Fatalf("AsComposition: %v", err)
+						}
+						got := comp.Category
+						if got.DefiningCode.TerminologyID.Value != tc.terminologyID || got.DefiningCode.CodeString != tc.code {
+							t.Fatalf("category pinned to %s::%s generated code %s::%s",
+								tc.terminologyID, tc.code, got.DefiningCode.TerminologyID.Value, got.DefiningCode.CodeString)
+						}
+						if tc.wantRubric {
+							want, _ := terminology.CompositionCategory.Rubric(tc.code)
+							if got.Value != want {
+								t.Errorf("category %s::%s value = %q, want the pin's rubric %q", tc.terminologyID, tc.code, got.Value, want)
+							}
+							return
+						}
+						if got.Value != walkText {
+							t.Errorf("category %s::%s value = %q, want the walk's text %q, not an invented rubric",
+								tc.terminologyID, tc.code, got.Value, walkText)
 						}
 					})
 				}

@@ -1110,6 +1110,8 @@ requirements:
       - internal/templatecompile/node_primitive_test.go
       - openehr/validation/aql_test.go
       - openehr/validation/composition_test.go
+      - openehr/validation/constraint_fixtures_test.go
+      - openehr/validation/data_value_subtypes_test.go
       - openehr/validation/interval_bounds_test.go
       - openehr/validation/interval_open_side_test.go
       - openehr/validation/rmread/interval_void_test.go

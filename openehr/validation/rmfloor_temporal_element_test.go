@@ -6,9 +6,12 @@ package validation_test
 // value and null_flavour). Each test fails when its rule is removed.
 
 import (
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
@@ -64,6 +67,82 @@ func TestREQ112_TemporalValueValidNested(t *testing.T) {
 	r := validation.ValidateRM(el)
 	if !containsIssue(r.Issues, "/value", "rm_invariant") {
 		t.Errorf("ValidateRM(ELEMENT with placeholder DV_DATE_TIME) want rm_invariant at /value; got %+v", r.Issues)
+	}
+}
+
+// TestREQ112_TemporalAndElementDetailsAreValueFree pins that the issues for
+// Value_valid and Inv_null_flavour_indicated name the rule and the attribute,
+// never the offending value. Each ELEMENT carries a malformed temporal literal
+// and a null_flavour, so both rules fire, and the literal must appear in no
+// field of any reported issue.
+func TestREQ112_TemporalAndElementDetailsAreValueFree(t *testing.T) {
+	const literal = "2024-13-45T99:99:99Z"
+	cases := []struct {
+		name  string
+		value rm.DataValue
+	}{
+		{name: "DV_DATE_TIME", value: &rm.DVDateTime{Value: literal}},
+		{name: "DV_DATE", value: &rm.DVDate{Value: literal}},
+		{name: "DV_TIME", value: &rm.DVTime{Value: literal}},
+		{name: "DV_DURATION", value: &rm.DVDuration{Value: literal}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			el := validElement()
+			el.Value = tc.value
+			el.NullFlavour = unknownNullFlavour()
+			r := validation.ValidateRM(el)
+			// Both rules must fire, or the check below would pass on a report
+			// that holds neither of them.
+			if !containsIssue(r.Issues, "/value", "rm_invariant") {
+				t.Errorf("ValidateRM(ELEMENT with %s %q and a null_flavour): want rm_invariant (Value_valid) at /value; issues=%+v", tc.name, literal, r.Issues)
+			}
+			if !containsIssue(r.Issues, "/", "rm_invariant") {
+				t.Errorf("ValidateRM(ELEMENT with %s %q and a null_flavour): want rm_invariant (Inv_null_flavour_indicated) at /; issues=%+v", tc.name, literal, r.Issues)
+			}
+			for _, issue := range r.Issues {
+				fields := []struct{ name, text string }{
+					{name: "Path", text: issue.Path},
+					{name: "Code", text: issue.Code},
+					{name: "Detail", text: issue.Detail},
+					{name: "Severity", text: issue.Severity.String()},
+				}
+				for _, f := range fields {
+					if strings.Contains(f.text, literal) {
+						t.Errorf("ValidateRM(ELEMENT with %s %q): issue %s at %q has %s %q, which echoes the offending value", tc.name, literal, issue.Code, issue.Path, f.name, f.text)
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestREQ112_TemporalJSONNullValue pins what the floor reports today for a
+// temporal data value whose value is JSON null, decoded through canjson. The
+// null decodes to the empty string, and the floor reports it twice: as
+// required at /value/value and as rm_invariant (Value_valid) at /value.
+// REQ-112 does not state that pair; this test records it as it is.
+func TestREQ112_TemporalJSONNullValue(t *testing.T) {
+	for _, rmType := range []string{"DV_DATE_TIME", "DV_DATE", "DV_TIME", "DV_DURATION"} {
+		t.Run(rmType, func(t *testing.T) {
+			body := `{"_type":"ELEMENT","archetype_node_id":"at0001",` +
+				`"name":{"_type":"DV_TEXT","value":"item"},` +
+				`"value":{"_type":"` + rmType + `","value":null}}`
+			var el rm.Element
+			if err := canjson.Unmarshal([]byte(body), &el); err != nil {
+				t.Fatalf("canjson.Unmarshal(%s): %v", body, err)
+			}
+			r := validation.ValidateRM(&el)
+			got := make([]string, 0, len(r.Issues))
+			for _, issue := range r.Issues {
+				got = append(got, issue.Code+" "+issue.Path)
+			}
+			slices.Sort(got)
+			want := []string{"required /value/value", "rm_invariant /value"}
+			if !slices.Equal(got, want) {
+				t.Errorf("ValidateRM(%s) issues (code path) = %q, want %q; issues=%+v", body, got, want, r.Issues)
+			}
+		})
 	}
 }
 
