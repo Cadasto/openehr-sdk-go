@@ -7,17 +7,19 @@ import (
 
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/ehrstatus"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
 // Probe010PutWithoutIfMatch implements PROBE-010: a PUT against a
 // versioned resource without an If-Match header is never sent.
 //
-// The probe uses [ehrstatus.Put] with an empty ifMatch and asserts
-// that the SDK refuses to issue the request, short-circuiting with
-// [transport.ErrInvalidConfig] before any network call. A backend
-// signals a missing If-Match as 400; a 428 maps to
-// [transport.ErrPreconditionRequired] only as a defensive mapping.
+// The probe calls [ehrstatus.Put] with an empty ifMatch and a status, so
+// only the If-Match guard can refuse the call, and asserts that the SDK
+// refuses to issue the request, short-circuiting with
+// [transport.ErrInvalidConfig] before any network call. It sends nothing,
+// so it cannot observe how a backend answers a missing If-Match; that
+// status mapping is REQ-093's.
 func Probe010PutWithoutIfMatch(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID) (Result, error) { // PROBE-010 (REQ-054, REQ-093)
 	r := Result{Probe: "PROBE-010"}
 	if c == nil {
@@ -26,7 +28,7 @@ func Probe010PutWithoutIfMatch(ctx context.Context, c *transport.Client, ehrID o
 	if ehrID == "" {
 		return r, errors.New("PROBE-010: empty EHRID")
 	}
-	_, _, err := ehrstatus.Put(ctx, c, ehrID, "", nil)
+	_, _, err := ehrstatus.Put(ctx, c, ehrID, "", &rm.EHRStatus{})
 	if err == nil {
 		r.Status = "fail"
 		r.Detail = "Put(ifMatch=\"\") returned nil error; expected guard rejection"

@@ -512,10 +512,22 @@ func TestSaveRejectsNil(t *testing.T) {
 	}
 }
 
+// TestUpdateRequiresIfMatch pins REQ-054: an empty ifMatch is refused with
+// ErrInvalidConfig before any request is sent. The client is live and the
+// body is set, so only the If-Match guard can refuse the call.
 func TestUpdateRequiresIfMatch(t *testing.T) {
-	_, _, err := composition.Update(t.Context(), nil, ehrIDFixture, compositionVOID, "", &rm.Composition{})
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+	_, _, err := composition.Update(t.Context(), newClient(t, srv), ehrIDFixture, compositionVOID, "", &rm.Composition{})
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("expected ErrInvalidConfig on empty If-Match, got %v", err)
+	}
+	if n := hits.Load(); n != 0 {
+		t.Errorf("server saw %d request(s), want none", n)
 	}
 }
 
@@ -604,15 +616,23 @@ func TestUpdateRepresentationRejectsOriginalVersionShape(t *testing.T) {
 	}
 }
 
+// TestUpdateMapsPreconditionFailed pins REQ-054: a stale If-Match is a 412
+// that maps to ErrPreconditionFailed, and the latest version uid the
+// server names in its ETag stays reachable beside the error.
 func TestUpdateMapsPreconditionFailed(t *testing.T) {
+	const latest = "11111111-2222-4333-8444-555555555555::sandbox.local::3"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("ETag", `"`+latest+`"`)
 		w.WriteHeader(http.StatusPreconditionFailed)
 		_, _ = w.Write([]byte(`{"message":"stale","code":"PRECONDITION_FAILED"}`))
 	}))
 	defer srv.Close()
-	_, _, err := composition.Update(t.Context(), newClient(t, srv), ehrIDFixture, compositionVOID, "stale", &rm.Composition{})
+	_, meta, err := composition.Update(t.Context(), newClient(t, srv), ehrIDFixture, compositionVOID, "stale", &rm.Composition{})
 	if !errors.Is(err, transport.ErrPreconditionFailed) {
-		t.Errorf("expected ErrPreconditionFailed, got %v", err)
+		t.Fatalf("expected ErrPreconditionFailed, got %v", err)
+	}
+	if meta == nil || string(meta.VersionUID) != latest {
+		t.Errorf("latest version beside the error = %+v, want %q", meta, latest)
 	}
 }
 
