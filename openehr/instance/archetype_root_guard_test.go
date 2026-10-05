@@ -156,8 +156,8 @@ type guardCase struct {
 	// detail is what the error says after the sentinel's own text; ""
 	// marks a control row, which must generate.
 	detail string
-	// check, when set, replaces the RM-floor check on a control row's
-	// output.
+	// check, when set, runs on a control row's output after the RM-floor
+	// check.
 	check func(t *testing.T, call string, out any)
 }
 
@@ -176,7 +176,7 @@ type guardCase struct {
 // an entry the OPT names, and an optional content attribute the OPT leaves
 // silent, written as multiple or as single, which gets no child at all. A
 // required slot is no such node: the slot-fill rule stamps it with the
-// RM-type-prefix archetype id instead.
+// RM-type-prefix archetype id instead, and the fill passes the floor too.
 func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 	checkGuardClasses(t)
 	cases := []guardCase{
@@ -238,7 +238,10 @@ func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 			name: "control: a required slot of an entry class with no includes",
 			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
 				guardChild("ARCHETYPE_SLOT", "OBSERVATION", "at0000", guardOccurrences11, ""))),
-			check: checkSlotFallbackStamp,
+			check: func(t *testing.T, call string, out any) {
+				t.Helper()
+				checkSlotFallbackStamp(t, call, firstContent(t, call, out), "OBSERVATION")
+			},
 		},
 	}
 	for _, class := range guardRootClasses {
@@ -270,12 +273,11 @@ func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 					if err != nil {
 						t.Fatalf("%s: %v, want a root", call, err)
 					}
-					if tc.check != nil {
-						tc.check(t, call, out)
-						continue
-					}
 					if r := validation.ValidateRM(out); !r.OK {
 						t.Errorf("%s: ValidateRM issues %+v, want none", call, r.Issues)
+					}
+					if tc.check != nil {
+						tc.check(t, call, out)
 					}
 					continue
 				}
@@ -354,13 +356,91 @@ func TestREQ107_NamedTemplateRootPassesTheFloor(t *testing.T) {
 	}
 }
 
-// checkSlotFallbackStamp fails t unless out is a COMPOSITION whose first
-// content item carries the RM-type-prefix archetype id the slot-fill rule
-// gives a slot without parsed includes, as its node id and in its
-// archetype_details.
-func checkSlotFallbackStamp(t *testing.T, call string, out any) {
+// TestREQ107_RequiredSlotFillPassesTheFloor is the REQ-107 check that a
+// required slot with no includes, which the slot-fill rule stamps with the
+// RM-type-prefix archetype id, generates a fill that passes the RM floor at
+// either policy and either value fill. The fill's body is not in the
+// template, so the RM-mandatory attributes of its class come from the
+// generator's defaults: an ENTRY's language, encoding and subject, and
+// each class's own, such as an OBSERVATION's data or an ACTION's time,
+// ism_transition and description. A SECTION, which has none, and a
+// CLUSTER, whose one is items, are controls. A CLUSTER fill gets exactly
+// one item, whether the top-up of a required items list or the RM fill of
+// an optional one makes it.
+func TestREQ107_RequiredSlotFillPassesTheFloor(t *testing.T) {
+	type slotCase struct {
+		name   string
+		opt    string
+		rmType string
+		// fill returns the slot fill in the output.
+		fill func(t *testing.T, call string, out any) any
+	}
+	var cases []slotCase
+	for _, class := range []string{"OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION", "ADMIN_ENTRY", "GENERIC_ENTRY", "SECTION"} {
+		cases = append(cases, slotCase{
+			name: "content slot of " + class,
+			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
+				guardChild("ARCHETYPE_SLOT", class, "at0000", guardOccurrences11, ""))),
+			rmType: class,
+			fill:   firstContent,
+		})
+	}
+	cases = append(cases,
+		slotCase{
+			name: "required items slot of CLUSTER in a CLUSTER",
+			opt: guardRootOPT("CLUSTER", "", guardMultiple("items", guardExistence11,
+				guardChild("ARCHETYPE_SLOT", "CLUSTER", "at0001", guardOccurrences11, ""))),
+			rmType: "CLUSTER",
+			fill: func(t *testing.T, call string, out any) any {
+				t.Helper()
+				root, ok := out.(*rm.Cluster)
+				if !ok || len(root.Items) != 1 {
+					t.Fatalf("%s returned %T %+v, want a CLUSTER with one item", call, out, out)
+				}
+				return root.Items[0]
+			},
+		},
+		slotCase{
+			name: "optional items slot of CLUSTER in an ITEM_TREE",
+			opt: guardRootOPT("ITEM_TREE", "", guardMultiple("items", guardExistence01,
+				guardChild("ARCHETYPE_SLOT", "CLUSTER", "at0001", guardOccurrences01, ""))),
+			rmType: "CLUSTER",
+			fill: func(t *testing.T, call string, out any) any {
+				t.Helper()
+				root, ok := out.(*rm.ItemTree)
+				if !ok || len(root.Items) != 1 {
+					t.Fatalf("%s returned %T %+v, want an ITEM_TREE with one item", call, out, out)
+				}
+				return root.Items[0]
+			},
+		},
+	)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := compileOPTText(t, tc.opt, true)
+			for _, opts := range guardOptions() {
+				call := fmt.Sprintf("Generate(%v, %v)", opts.Policy, opts.ValueFill)
+				out, err := instance.Generate(t.Context(), c, opts)
+				if err != nil {
+					t.Fatalf("%s: %v, want a root", call, err)
+				}
+				fill := tc.fill(t, call, out)
+				checkSlotFallbackStamp(t, call, fill, tc.rmType)
+				if cl, ok := fill.(*rm.Cluster); ok && len(cl.Items) != 1 {
+					t.Errorf("%s: the CLUSTER fill has %d items, want 1", call, len(cl.Items))
+				}
+				if r := validation.ValidateRM(out); !r.OK {
+					t.Errorf("%s: ValidateRM issues %+v, want none", call, r.Issues)
+				}
+			}
+		})
+	}
+}
+
+// firstContent returns the first content item of out, which must be a
+// COMPOSITION with content.
+func firstContent(t *testing.T, call string, out any) any {
 	t.Helper()
-	const want = "openEHR-EHR-OBSERVATION.example.v1"
 	comp, err := instance.AsComposition(out)
 	if err != nil {
 		t.Fatalf("%s: AsComposition: %v", call, err)
@@ -368,16 +448,25 @@ func checkSlotFallbackStamp(t *testing.T, call string, out any) {
 	if len(comp.Content) == 0 {
 		t.Fatalf("%s: content is empty, want the stamped slot fill", call)
 	}
-	item, ok := comp.Content[0].(rm.Locatable)
+	return comp.Content[0]
+}
+
+// checkSlotFallbackStamp fails t unless fill is a LOCATABLE that carries the
+// RM-type-prefix archetype id the slot-fill rule gives a slot of rmType
+// without parsed includes, as its node id and in its archetype_details.
+func checkSlotFallbackStamp(t *testing.T, call string, fill any, rmType string) {
+	t.Helper()
+	want := "openEHR-EHR-" + rmType + ".example.v1"
+	item, ok := fill.(rm.Locatable)
 	if !ok {
-		t.Fatalf("%s: content[0] is %T, want a LOCATABLE", call, comp.Content[0])
+		t.Fatalf("%s: the slot fill is %T, want a LOCATABLE", call, fill)
 	}
 	if got := item.GetArchetypeNodeID(); got != want {
-		t.Errorf("%s: content[0].archetype_node_id = %q, want %q", call, got, want)
+		t.Errorf("%s: the slot fill's archetype_node_id = %q, want %q", call, got, want)
 	}
 	ad := item.GetArchetypeDetails()
 	if ad == nil || ad.ArchetypeID.Value != want {
-		t.Errorf("%s: content[0].archetype_details = %+v, want archetype_id %q", call, ad, want)
+		t.Errorf("%s: the slot fill's archetype_details = %+v, want archetype_id %q", call, ad, want)
 	}
 }
 
