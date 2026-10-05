@@ -42,6 +42,16 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 ## openehr/aom
 - openehr/aom/aom14 · no standalone ADL 1.4 archetype corpus is vendored, so the aom14 interval corpus tests read their constraint intervals out of the OPTs instead of real archetype files · from: audit-2026-09
 
+## openehr/aql
+- openehr/aql/query.go:21 · The Query.EHRID doc says the executor maps it to the `ehr_id` URL query parameter, but client/query sends the `openehr-ehr-id` header on POST and the parameter only on GET (execute.go:239) · by: sdd-implementer · from: docs/pkg-go-dev-examples
+- openehr/aql/builder_test.go:40 · TestBuilderClauses and TestFromEHRInjectsWhere (lines 40-93) pair the blood-pressure path data[at0001]/events[at0006]/data/items[at0004] with openEHR-EHR-OBSERVATION.body_temperature.v2, whose value is at data[at0002]/events[at0003]/data[at0001]/items[at0004]; text-only tests, so nothing breaks, but the queries mislead as examples · by: go-reviewer · from: docs/examples-rest-golden-paths
+
+## openehr/client/definition
+- openehr/client/definition/template.go:537 · The extractLastPathSegment comment says the Location fallback is for a 204 upload reply, but UploadTemplate also uses it for the spec's empty-body 201 reply · by: sdd-implementer · from: docs/examples-rest-golden-paths
+
+## openehr/client/ehr/composition
+- openehr/client/ehr/composition/composition.go:245 · A runtime error text callers see ends in an internal requirement id, `empty If-Match (REQ-054)`; the same text is in ehr/directory/directory.go:275, ehr/ehrstatus/ehrstatus.go and demographic/party.go:262 · by: sdd-implementer · from: docs/examples-rest-golden-paths
+
 ## openehr/instance
 - openehr/instance/rmtype.go · Generate refuses a generic non-interval rm_type_name such as POINT_EVENT<ITEM_TREE> with ErrUnknownRMType because newGenericRM builds only DV_INTERVAL instantiations, and the template validator reports the matching node as rm_type_mismatch (pinned by nonstorable_generic_test.go) · from: audit-2026-09
 - openehr/instance/generate.go · a template root whose OPT node has no archetype id gets archetype_details with an empty archetype_id.value, which ValidateRM reports as required · from: audit-2026-09
@@ -86,6 +96,9 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 ## pages
 - pages/examples.md:51 · The heading still says "against a template", and the at-a-glance row at docs/examples.md:29 still says "vs OPT", while the rewritten sections say both the RM floor and the template constraints are required · by: sdd-doc-reviewer · from: #225
 
+## resources/its-rest
+- resources/its-rest/ehr-validation.openapi.yaml:4386 · The vendored ETag_COMPOSITION example `W/"8849…::1` has no closing double quote; definition-validation.openapi.yaml:247 ends its description with stray text "formats.tags:"; upstream content, not to be hand-edited, so raise it with ITS-REST if it matters · by: sdd-implementer · from: docs/examples-rest-golden-paths
+
 ## scripts
 - scripts/probe-status.sh · the test-file column is a filename heuristic (its header says so), not the runner's per-mode state the runnability work wanted `make probe-status` to show · from: probe-runnability plan
 
@@ -95,12 +108,15 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - smart/discovery/errors.go:73 · DiscoveryError.Issuer now holds the Platform base URL while ServiceCatalog.Issuer holds the OpenID Connect issuer, so one field name means two things on neighbouring types; this PR already breaks the Error() text, so adding a BaseURL field (and deprecating Issuer) costs less now than later · by: go-reviewer · from: feat/smart-discovery-model
 - smart/discovery/resolver.go:246 · A fresh cache hit returns the cached catalog without the calling Resolver's own checks, so with a Cache shared between Resolvers built with different options a stricter Resolver gets a catalog its checks would refuse until the entry expires; this predates the branch (main returned a fresh hit unchecked too) · by: sdd-implementer · from: feat/smart-discovery-model
 - smart/discovery/catalog.go:207 · only the launch-base64-json capability constant exists; no decoder reads a base64-JSON launch context, and the SMART client plan's watch list also named relative endpoint URLs in the discovery document, not yet checked · from: smart-client-conformance plan
+- smart/discovery/static.go · SpecVersionPin is "1.1.0-development" while resources/its-rest is pinned at Release-1.1.0; check whether the constant names the SMART-on-openEHR spec version on purpose, and say so in its doc if it does · by: sdd-implementer · from: docs/examples-rest-golden-paths
 
 ## testkit/conformance/webtemplate
 - testkit/conformance/webtemplate/case.go · IsCompositionMeta matches only unindexed spellings, so StructuredToFlat's `language:0|code`, `composer:0|name` and `context:0/start_time:0` reach decode in PROBE-105's structured-flat leg instead of being held out; changing it moves PROBE-086 · from: pr-crossformat
+- testkit/conformance/webtemplate/SKIPPED.md:131 · Cites REQ-115, which docs/specifications/REQ.md lists as reserved only, so sdd-check warns `unknown identifier cited: REQ-115` · by: sdd-implementer · from: docs/pkg-go-dev-examples
 
 ## testkit/corpus
 - testkit/corpus/README.md:117 · lists only the rewrites applied to social.opt; the full recipe for normalising Code24 OPT exports (eight steps, a script, and FerroEHR accepting all seven converted exports) is in git history at `f649aae4:docs/plans/2026-09-29-generated-instances-pass-the-rm-floor.md`; move it here if more Code24 exports are vendored · from: generated-instances plan
+- testkit/corpus/its_rest/errors/412.json:2 · The message "Malformed If-Match header" describes what ITS-REST answers with a 400; its 412 means the If-Match does not match the latest version · by: go-reviewer · from: docs/pkg-go-dev-examples
 
 ## testkit/probe
 - testkit/probe/livestatus_test.go · the Live snapshots assert less than the cassette witnesses: createEHRProbe (live_test.go) passes on any non-empty EHR id without comparing it to the per-run id, and the PROBE-065 read-back checks only a non-empty archetype_node_id, not the saved node id or template id · from: pr201
@@ -109,3 +125,6 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - testkit/probes/instance/corpus_ratchet_test.go · the census runs with Language en and one fixed Now, and its placeholder scan flags only the literal example, so a generator that wrote encoding utf8 or read time.Now() would leave it green · from: audit-2026-09
 - testkit/probes/instance/corpus_ratchet_test.go · the hollow_body floor counts every ELEMENT, so a body of null-flavour placeholders passes; counting only ELEMENTs that hold a value adds two rows (clinical_content_validation generate/example/example and generate/example/random) · from: pr199
 
+## transport
+- transport/errors.go:62 · OpenEHRErrorDetail decodes `coded_text`, but the ITS-REST overview example names the coded list `errors` (DV_CODED_TEXT entries with defining_code); the list is not decoded, so a server that follows the overview example gets no coded detail on the error; decide whether to read `errors` into CodedText · by: sdd-implementer · from: fix/composition-write-errors
+- transport/options.go:51 · The WithTokenSource doc comment has one unwrapped overlong line, unlike its neighbours · by: go-reviewer · from: docs/pkg-go-dev-examples

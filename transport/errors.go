@@ -2,6 +2,7 @@ package transport
 
 import (
 	"cmp"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -19,7 +20,11 @@ var (
 	ErrUnauthorized = errors.New("transport: unauthorized")
 	// ErrForbidden maps a wire 403.
 	ErrForbidden = errors.New("transport: forbidden")
-	// ErrVersionConflict maps a wire 409 (stale If-Match).
+	// ErrVersionConflict maps a wire 409: the request conflicts with the
+	// current state of the resource, for example deleting a Composition
+	// version that is no longer the latest, or creating a resource that
+	// already exists. A stale If-Match on a PUT is a 412
+	// ([ErrPreconditionFailed]), not a 409.
 	ErrVersionConflict = errors.New("transport: version conflict")
 	// ErrPreconditionFailed maps a wire 412.
 	ErrPreconditionFailed = errors.New("transport: precondition failed")
@@ -64,12 +69,61 @@ type OpenEHRErrorDetail struct {
 	// empty by default so error values are safe to log and trace.
 	// Extract via errors.As when needed; do not include in log lines.
 	Message string `json:"message"`
-	// Code is the openEHR error code (e.g. "VALIDATION_FAILED").
-	// It is a coded terminology identifier, treated as non-PHI and always
-	// preserved.
+	// Code is the openEHR error code (e.g. "VALIDATION_FAILED"). It is
+	// a coded terminology identifier, treated as non-PHI and always
+	// preserved. A server may send it as a JSON string or as a JSON
+	// number (the ITS-REST overview shows 90000); either way it is kept
+	// here as text.
 	Code string `json:"code"`
 	// CodedText optionally enumerates terminology-coded error tags.
 	CodedText []CodedTextItem `json:"coded_text,omitempty"`
+	// ValidationErrors lists the validation messages that the ITS-REST
+	// Error schema of a 400 response carries beside the message. Like
+	// Message it is free text that may name patients, so it is populated
+	// only when the client is constructed with WithRawErrorBodies(true).
+	ValidationErrors []string `json:"validationErrors,omitempty"`
+}
+
+// UnmarshalJSON reads the envelope, accepting a string or a number for
+// code. A code of any other JSON type is left empty rather than failing
+// the whole envelope, since the message and the other fields are still
+// usable.
+func (d *OpenEHRErrorDetail) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		Message          string          `json:"message"`
+		Code             json.RawMessage `json:"code"`
+		CodedText        []CodedTextItem `json:"coded_text"`
+		ValidationErrors []string        `json:"validationErrors"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*d = OpenEHRErrorDetail{
+		Message:          raw.Message,
+		Code:             envelopeCode(raw.Code),
+		CodedText:        raw.CodedText,
+		ValidationErrors: raw.ValidationErrors,
+	}
+	return nil
+}
+
+// envelopeCode returns the text of a JSON string or number code, and ""
+// for an absent code, null, or any other JSON type.
+func envelopeCode(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	switch raw[0] {
+	case '"':
+		var s string
+		if json.Unmarshal(raw, &s) != nil {
+			return ""
+		}
+		return s
+	case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+		return string(raw)
+	}
+	return ""
 }
 
 // CodedTextItem mirrors the openEHR error envelope's coded_text entry.

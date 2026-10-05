@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -268,10 +269,22 @@ func TestPutIdentifierPopulatesVersionUIDFromBody(t *testing.T) {
 	}
 }
 
+// TestPutRejectsEmptyIfMatch pins REQ-054: an empty ifMatch is refused with
+// ErrInvalidConfig before any request is sent. The client is live and the
+// status is set, so only the If-Match guard can refuse the call.
 func TestPutRejectsEmptyIfMatch(t *testing.T) {
-	_, _, err := ehrstatus.Put(t.Context(), nil, ehrIDFixture, "", &rm.EHRStatus{})
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+	_, _, err := ehrstatus.Put(t.Context(), newClient(t, srv), ehrIDFixture, "", &rm.EHRStatus{})
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("expected ErrInvalidConfig, got %v", err)
+	}
+	if n := hits.Load(); n != 0 {
+		t.Errorf("server saw %d request(s), want none", n)
 	}
 }
 
