@@ -160,6 +160,59 @@ func TestREQ107_GeneratedNullFlavourIsFromTheOpenEHRGroup(t *testing.T) {
 	}
 }
 
+// TestREQ107_ElementWithNeitherGetsNoInformation is the REQ-107 check that
+// an ELEMENT left with neither value nor null_flavour gets the null flavour
+// openehr 271|no information|, not just any member of the group: an ELEMENT
+// the OPT names with no value, and the placeholder ELEMENT of an items list
+// the OPT does not describe.
+func TestREQ107_ElementWithNeitherGetsNoInformation(t *testing.T) {
+	wantText, _ := terminology.NullFlavours.Rubric("271")
+	wantCode := rm.CodePhrase{CodeString: "271", TerminologyID: rm.TerminologyID{Value: terminology.ID}}
+	cases := []struct {
+		name     string
+		opt      string
+		implicit bool
+		element  func(out any) *rm.Element
+	}{
+		{
+			name:     "ELEMENT the OPT names with no value",
+			opt:      optTemplate("ELEMENT"),
+			implicit: true,
+			element:  func(out any) *rm.Element { return out.(*rm.Element) },
+		},
+		{
+			name:     "placeholder ELEMENT of an items list the OPT does not describe",
+			opt:      optTemplate("CLUSTER"),
+			implicit: false,
+			element: func(out any) *rm.Element {
+				el, _ := out.(*rm.Cluster).Items[0].(*rm.Element)
+				return el
+			},
+		},
+	}
+	for _, tc := range cases {
+		c := compileOPTText(t, tc.opt, tc.implicit)
+		for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+			t.Run(tc.name+"/"+policy.String(), func(t *testing.T) {
+				out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, Now: defaultsNow})
+				if err != nil {
+					t.Fatalf("Generate: %v", err)
+				}
+				el := tc.element(out)
+				if el == nil || el.NullFlavour == nil {
+					t.Fatalf("ELEMENT = %+v, want one with a null_flavour", el)
+				}
+				if got := el.NullFlavour.DefiningCode; got != wantCode {
+					t.Errorf("ELEMENT.null_flavour.defining_code = %+v, want %+v", got, wantCode)
+				}
+				if got := el.NullFlavour.Value; got != wantText {
+					t.Errorf("ELEMENT.null_flavour.value = %q, want %q", got, wantText)
+				}
+			})
+		}
+	}
+}
+
 // A null flavour the OPT fills, on an ELEMENT with no value, carries its
 // code's pinned rubric as its text, so the rubric check above meets an
 // OPT-filled null flavour too: an OPT that allows only openehr::253 yields
