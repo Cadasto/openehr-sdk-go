@@ -41,26 +41,29 @@ func withMeaning[T rm.DVOrdered](r rm.ReferenceRange[T]) rm.ReferenceRange[T] {
 // one populated attribute first (probeValue).
 func TestHandles_EveryTypeHasAReadArm(t *testing.T) {
 	for _, v := range handledTypes {
-		typ := reflect.TypeOf(v)
-		v = probeValue(v)
-		if typ.Kind() != reflect.Struct {
+		if typ := reflect.TypeOf(v); typ.Kind() != reflect.Struct {
 			t.Fatalf("handledTypes holds %v, want a struct value", typ)
 		}
-		served := false
-		for _, f := range reflect.VisibleFields(typ) {
-			attr, _, _ := strings.Cut(f.Tag.Get("json"), ",")
-			if attr == "" || attr == "-" || attr == "archetype_details" {
-				continue
-			}
-			if got, _ := ReadSingle(v, "", attr); got != nil {
-				served = true
-			}
-			if _, ok := ReadMultiple(v, "", attr); ok {
-				served = true
-			}
-		}
-		if !served {
+		if !servesAnAttribute(probeValue(v)) {
 			t.Errorf("%T: Handles accepts it but ReadSingle and ReadMultiple serve none of its attributes", v)
 		}
 	}
+}
+
+// servesAnAttribute reports whether ReadSingle or ReadMultiple serves at
+// least one of v's attributes, named by v's json tags.
+func servesAnAttribute(v any) bool {
+	for _, f := range reflect.VisibleFields(reflect.TypeOf(v)) {
+		attr, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+		if attr == "" || attr == "-" || attr == "archetype_details" {
+			continue
+		}
+		if got, _ := ReadSingle(v, "", attr); got != nil {
+			return true
+		}
+		if _, ok := ReadMultiple(v, "", attr); ok {
+			return true
+		}
+	}
+	return false
 }

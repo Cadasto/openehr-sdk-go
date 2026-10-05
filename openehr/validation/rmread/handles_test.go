@@ -3,6 +3,7 @@ package rmread
 import (
 	"fmt"
 	"maps"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -89,7 +90,6 @@ var handledTypes = []any{
 	rm.PartyIdentity{},
 	rm.PartyRelationship{},
 	rm.Capability{},
-	rm.PartyRef{},
 	// EHR-IM roots
 	rm.Folder{},
 	rm.EHRStatus{},
@@ -99,12 +99,39 @@ var handledTypes = []any{
 }
 
 func TestHandles_ModelledTypes(t *testing.T) {
-	if got, want := len(handledTypes), 68; got != want {
+	if got, want := len(handledTypes), 67; got != want {
 		t.Errorf("handledTypes has %d entries, want %d — keep it in sync with Handles/ReadSingle", got, want)
 	}
 	for _, v := range handledTypes {
 		if !Handles(v) {
 			t.Errorf("Handles(%T) = false, want true (modelled by ReadSingle/ReadMultiple)", v)
+		}
+	}
+}
+
+// readerOnlyTypes have ReadSingle arms but are not in Handles. They are
+// references, which the RM floor checks with its own evaluator
+// (checkObjectRef) and must not descend into, or it reports a missing part
+// twice. The template walker reads them through ReadSingle, which does not
+// consult Handles, so a template that constrains a reference's parts finds
+// them.
+var readerOnlyTypes = []any{
+	rm.PartyRef{},
+}
+
+// TestHandles_ReaderOnlyTypes (REQ-112, REQ-102) checks that each reader-only
+// type is served by ReadSingle and left out of Handles, in pointer and value
+// form.
+func TestHandles_ReaderOnlyTypes(t *testing.T) {
+	for _, v := range readerOnlyTypes {
+		if !servesAnAttribute(v) {
+			t.Errorf("%T: ReadSingle and ReadMultiple serve none of its attributes, want its reader arms", v)
+		}
+		ptr := reflect.New(reflect.TypeOf(v)).Interface()
+		for _, form := range []any{v, ptr} {
+			if Handles(form) {
+				t.Errorf("Handles(%T) = true, want false: the floor checks a reference with checkObjectRef", form)
+			}
 		}
 	}
 }
