@@ -184,9 +184,10 @@ var partyRefTypes = []string{"PERSON", "ORGANISATION", "GROUP", "AGENT", "ROLE",
 // Neither validator evaluates that invariant, so the test reads the value.
 // An open C_STRING or a pattern that also admits other strings gives the
 // default PERSON; a list pin keeps its member, and ExampleFill its first
-// member when the list has several; and a pin that admits no class name
-// makes Generate return an error wrapping ErrConstraintUnsatisfiable, and
-// no root.
+// member when the list has several; a pin that rejects PERSON and whose own
+// example is no class name gives the first class name it admits; and a pin
+// that admits no class name makes Generate return an error wrapping
+// ErrConstraintUnsatisfiable, and no root.
 func TestREQ107_PinnedPerformerTypeIsAPartyClass(t *testing.T) {
 	cases := []struct {
 		name string
@@ -202,6 +203,8 @@ func TestREQ107_PinnedPerformerTypeIsAPartyClass(t *testing.T) {
 		{name: "pattern [A-Z]+", pin: "<pattern>[A-Z]+</pattern>", want: "PERSON"},
 		{name: "list pin", pin: "<list>ORGANISATION</list>", want: "ORGANISATION"},
 		{name: "list pin with two class names", pin: "<list>ROLE</list><list>ORGANISATION</list>", wantExample: "ROLE"},
+		{name: "list whose first member is no class name", pin: "<list>CLINICIAN</list><list>ORGANISATION</list>", want: "ORGANISATION"},
+		{name: "pattern that admits a later class name", pin: "<pattern>ORG.*</pattern>", want: "ORGANISATION"},
 		{name: "list that admits no class name", pin: "<list>CLINICIAN</list>", unsatisfiable: true},
 		{name: "pattern that admits no class name", pin: "<pattern>[a-z]+</pattern>", unsatisfiable: true},
 	}
