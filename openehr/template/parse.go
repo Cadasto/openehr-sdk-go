@@ -27,7 +27,8 @@ import (
 // from xsi:type="T_ARCHETYPE_ROOT", because some exporters write the
 // second spelling. openEHR Template.xsd defines only C_ARCHETYPE_ROOT.
 // Both spellings give the same *ArchetypeRoot, with its archetype id,
-// term definitions and full subtree, so neither is an unknown type.
+// optional template id, term definitions and full subtree, so neither
+// is an unknown type.
 func ParseOPT(r io.Reader) (*OperationalTemplate, error) {
 	return parseOPT(r, false)
 }
@@ -232,8 +233,10 @@ type xmlCObject struct {
 	Occurrences *xmlInterval     `xml:"occurrences"`
 	Attributes  []*xmlCAttribute `xml:"attributes"`
 	// C_ARCHETYPE_ROOT extras — the archetype_id element wraps a
-	// <value> child in the openEHR OPT shape.
+	// <value> child in the openEHR OPT shape, and so does the optional
+	// template_id Template.xsd allows after it.
 	ArchetypeID     string               `xml:"archetype_id>value"`
+	TemplateID      string               `xml:"template_id>value"`
 	TermDefinitions []xmlTermDefSection  `xml:"term_definitions"`
 	TermBindings    []xmlTermBindSection `xml:"term_bindings"`
 	// ARCHETYPE_SLOT extras (raw text — assertion grammar not
@@ -394,6 +397,7 @@ func buildNode(o *xmlCObject, strict bool, depth int) (Node, error) {
 		}
 		return &ArchetypeRoot{
 			archetypeID:   strings.TrimSpace(o.ArchetypeID),
+			templateID:    strings.TrimSpace(o.TemplateID),
 			ComplexObject: *co,
 			terms:         collectTermDefs(o.TermDefinitions),
 			termBindings:  collectTermBindings(o.TermBindings),
