@@ -150,14 +150,15 @@ func TestREQ107_TimeValidityPassesBothValidators(t *testing.T) {
 	}
 }
 
-// TestREQ107_PinnedActorLanguagesAreRefused is the REQ-107 check that a
-// PERSON template that pins languages makes Generate return an error
-// wrapping rmwrite.ErrUnknownAttribute, and no root, at either policy and
-// either value fill. The generator does not write ACTOR languages: the
-// template validator matches a multi-valued attribute's members by
-// archetype_node_id, which a DV_TEXT lacks, so it would reject every
-// member written.
-func TestREQ107_PinnedActorLanguagesAreRefused(t *testing.T) {
+// TestREQ107_KnownGapPinnedActorLanguages pins the REQ-107 known gap on
+// attributes the generator cannot write: a PERSON template that pins
+// languages makes Generate return an error wrapping
+// rmwrite.ErrUnknownAttribute, and no root, at either policy and either
+// value fill, rather than members the template validator rejects. That
+// validator matches a multi-valued attribute's members by
+// archetype_node_id, which a DV_TEXT lacks. When it matches such members,
+// the generator can write languages and this test changes with the gap.
+func TestREQ107_KnownGapPinnedActorLanguages(t *testing.T) {
 	c := compileOPTText(t, guardRootOPT("PERSON", "openEHR-DEMOGRAPHIC-PERSON.example.v1",
 		guardMultiple("languages", guardExistence11,
 			guardChild("C_COMPLEX_OBJECT", "DV_TEXT", "", guardOccurrences11, ""))), true)
