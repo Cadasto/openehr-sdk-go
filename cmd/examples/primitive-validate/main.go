@@ -57,9 +57,11 @@ func main() {
 }
 
 func run() error {
-	// Step 1: parse the template. ParseOPT reads from any io.Reader; ParseFile
-	// is the convenience for a path on disk.
-	opt, err := template.ParseOPT(strings.NewReader(minimalQuantityOPT))
+	// Step 1: parse the template. ParseOPTStrict reads from any io.Reader;
+	// ParseFileStrict is the convenience for a path on disk. Strict parsing
+	// refuses an unknown node type that has attributes under it, where the
+	// lenient ParseOPT would silently drop that subtree.
+	opt, err := template.ParseOPTStrict(strings.NewReader(minimalQuantityOPT))
 	if err != nil {
 		return fmt.Errorf("parse OPT: %w", err)
 	}

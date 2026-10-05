@@ -8,16 +8,16 @@
 //   - RM floor (validation.ValidateRM): the openEHR Reference Model alone, with
 //     no template. It checks the attributes the RM makes mandatory on every
 //     node, and the RM's own rules for each type, such as an ELEMENT carrying
-//     a value or a null flavour, and an archetype root carrying
-//     archetype_details.
+//     exactly one of a value or a null flavour, and an archetype root
+//     carrying archetype_details.
 //   - Template constraints (validation.ValidateComposition): what the OPT
 //     declares, node by node: existence, cardinality, RM type, archetype
 //     identity and value constraints.
 //
 // The two passes compose but do not chain. A composition that satisfies its
 // template can still break the Reference Model: today ValidateComposition
-// checks the template's constraints and does not run the RM floor's rules, so
-// a program that wants both guarantees calls both.
+// checks the template's constraints and does not run the RM floor's per-type
+// rules, so a program that wants both guarantees calls both.
 //
 // By default it validates testdata/minimal_blood_pressure.json, a hand-made
 // composition that passes both against the vendored vital_signs.opt. With
@@ -29,7 +29,10 @@
 //	go run ./cmd/examples/validate-from-json -corpus
 //	go run ./cmd/examples/validate-from-json composition.json template.opt
 //
-// The exit status is 1 when either pass reports an error.
+// The exit status is 0 when both passes find no issue. It is 1 when either
+// pass reports an issue, or when the program cannot run: a missing or
+// unreadable file, a composition or OPT that does not parse, or the wrong
+// number of file arguments. A bad flag exits with status 2.
 package main
 
 import (
@@ -90,11 +93,11 @@ func run() (valid bool, err error) {
 	// Step 2: parse and compile the OPT. An operational template is the
 	// deployable form of an openEHR template: every archetype it uses,
 	// flattened into one XML file with the template's constraints applied.
-	// ParseFileStrict rejects a node type the parser does not support instead
-	// of keeping it as a leaf and dropping its constraints, which a validator
-	// must not do silently. Compile turns the parsed XML into the driver that
-	// the validator (and the composition builder, the instance generator, the
-	// AQL lint) walks.
+	// ParseFileStrict rejects an unknown node type that has attributes under
+	// it, where the lenient ParseFile would keep it as a leaf and silently
+	// drop the constraints beneath it, which a validator must not do.
+	// Compile turns the parsed XML into the driver that the validator (and
+	// the composition builder, the instance generator, the AQL lint) walks.
 	opt, err := template.ParseFileStrict(optPath)
 	if err != nil {
 		return false, fmt.Errorf("parse OPT %q: %w", optPath, err)

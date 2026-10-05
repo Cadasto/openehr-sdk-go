@@ -1,9 +1,12 @@
 //go:build ignore
 
-// One-off generator: go run gen_fixture.go
-// Writes testdata/minimal_blood_pressure.json, a composition that round-trips
-// through canjson and passes both validation passes against vital_signs.opt:
-// the RM floor (validation.ValidateRM) and the template constraints
+// The generator of this example's default fixture,
+// testdata/minimal_blood_pressure.json. After changing it, rerun it from this
+// directory with go run gen_fixture.go.
+//
+// The composition it writes round-trips through canjson and passes both
+// validation passes against vital_signs.opt: the RM floor
+// (validation.ValidateRM) and the template constraints
 // (validation.ValidateComposition). Passing the template alone is not enough,
 // because today the template pass does not run the Reference Model's own
 // per-type rules, so the generator refuses to write a fixture that fails
@@ -105,9 +108,9 @@ func injectPartySelf(v any) {
 	}
 }
 
-// compileVitalSigns parses the vendored vital_signs.opt strictly, so a
-// template shape the parser does not support stops the generator instead of
-// silently dropping the nodes beneath it, and compiles it.
+// compileVitalSigns parses the vendored vital_signs.opt strictly, so an
+// unknown node type that has attributes under it stops the generator instead
+// of silently dropping the nodes beneath it, and compiles it.
 func compileVitalSigns() *templatecompile.Compiled {
 	opt, err := template.ParseFileStrict(fixtures.TemplateOptForName("vital_signs"))
 	if err != nil {
@@ -141,7 +144,7 @@ func minimalComposition() *rm.Composition {
 			RMVersion:   rm.Release,
 		},
 		Category: rm.DVCodedText{
-			DVText: rm.DVText{Value: eventRubric},
+			Value: eventRubric,
 			DefiningCode: rm.CodePhrase{
 				TerminologyID: rm.TerminologyID{Value: terminology.ID},
 				CodeString:    "433",
@@ -198,8 +201,8 @@ func minimalObservation() *rm.Observation {
 					State: &rm.ItemList{
 						ArchetypeNodeID: "at0007",
 						Name:            rm.DVText{Value: "state"},
-						// An ELEMENT carries a value or a null flavour, never
-						// neither: at1001 is the archetype's local code for
+						// An ELEMENT carries exactly one of a value or a null
+						// flavour: at1001 is the archetype's local code for
 						// "Sitting".
 						Items: []rm.Element{{
 							ArchetypeNodeID: "at0008",

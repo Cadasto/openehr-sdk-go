@@ -28,7 +28,8 @@
 //   - template-explore: walk a compiled OPT: structure tree and leaf paths
 //   - webtemplate-export: export a compiled OPT as Web Template JSON
 //   - flat-roundtrip: a COMPOSITION to and from the FLAT and STRUCTURED
-//     simplified formats
+//     simplified formats, then the template-aware decode validated against
+//     the RM floor and the template
 //   - ehr_create: create an EHR through the REST client path, against an
 //     in-process server
 //   - contribution-build: assemble a multi-version CONTRIBUTION and, with

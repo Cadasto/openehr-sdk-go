@@ -15,14 +15,18 @@
 //
 // Public entry, with the RM floor beside the template constraints:
 //
+//	valid := true
 //	for _, r := range []validation.Result{
 //	    validation.ValidateRM(comp),                    // RM floor, no template
 //	    validation.ValidateComposition(comp, compiled), // template constraints
 //	} {
+//	    valid = valid && r.OK
 //	    for _, issue := range r.Issues {
 //	        log.Printf("%s: %s: %s", issue.Path, issue.Code, issue.Detail)
 //	    }
 //	}
+//
+// The composition is valid only when both results are OK.
 //
 // The walker works over any value source: [Validate] runs it over any
 // RM root the closed RM set recognises, and the typed wrappers

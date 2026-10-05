@@ -10,13 +10,15 @@
 // internal package, so this package exposes its constructor and lets any
 // module drive the whole pipeline from a public API:
 //
-//	opt, _ := template.ParseFile("encounter.opt")   // openehr/template
-//	c, _ := templatecompile.Compile(opt)            // this package
-//	b, _ := composition.NewBuilder(ctx, c,          // openehr/composition
+//	opt, _ := template.ParseFileStrict("encounter.opt") // openehr/template
+//	c, _ := templatecompile.Compile(opt)                // this package
+//	b, _ := composition.NewBuilder(ctx, c,              // openehr/composition
 //	    composition.WithTerritory("NL"),
 //	    composition.WithComposer(composer))
 //	comp, _ := b.Build()
-//	res := validation.ValidateComposition(comp, c)  // openehr/validation
+//	rmRes := validation.ValidateRM(comp)                // openehr/validation: RM floor
+//	tmplRes := validation.ValidateComposition(comp, c)  // template constraints
+//	valid := rmRes.OK && tmplRes.OK                     // valid only when both pass
 //
 // # Public surface
 //

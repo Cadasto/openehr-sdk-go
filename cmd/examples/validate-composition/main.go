@@ -7,7 +7,7 @@
 // composition against the openEHR Reference Model alone, and the template
 // constraints (validation.ValidateComposition), which check it against the
 // OPT. They compose but do not chain: today ValidateComposition checks the
-// template's constraints and does not run the RM floor's rules, so a
+// template's constraints and does not run the RM floor's per-type rules, so a
 // composition can satisfy its template and still break the Reference Model.
 // A program that wants both guarantees calls both.
 //
@@ -144,7 +144,7 @@ func vitalSignsComposition() (*rm.Composition, error) {
 			RMVersion:   rm.Release,
 		},
 		Category: rm.DVCodedText{
-			DVText: rm.DVText{Value: eventRubric},
+			Value: eventRubric,
 			DefiningCode: rm.CodePhrase{
 				TerminologyID: rm.TerminologyID{Value: terminology.ID},
 				CodeString:    "433",
@@ -203,8 +203,8 @@ func vitalSignsComposition() (*rm.Composition, error) {
 							State: &rm.ItemList{
 								ArchetypeNodeID: "at0007",
 								Name:            rm.DVText{Value: "state"},
-								// An ELEMENT carries a value or a null
-								// flavour, never neither: at1001 is the
+								// An ELEMENT carries exactly one of a value
+								// or a null flavour: at1001 is the
 								// archetype's local code for "Sitting".
 								Items: []rm.Element{{
 									ArchetypeNodeID: "at0008",

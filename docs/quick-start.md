@@ -90,7 +90,7 @@ go run ./cmd/examples/canonical_json
 
 Expected output includes the composition archetype id, language, and `OK: canonical-JSON Composition decoded`.
 
-### Validate against a template
+### Validate against the RM and a template
 
 A typical CI pipeline runs bytes → RM → compiled OPT → validation issues.
 

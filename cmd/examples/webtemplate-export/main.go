@@ -44,9 +44,9 @@ func run() error {
 
 	// Step 1: parse and compile the OPT. The Web Template is derived from the
 	// compiled form, so the template has to be compiled first.
-	// ParseFileStrict rejects a node type the parser does not support. The
-	// lenient ParseFile would keep such a node as a leaf and silently drop
-	// everything beneath it, so the export would be an incomplete Web
+	// ParseFileStrict rejects an unknown node type that has attributes under
+	// it. The lenient ParseFile would keep such a node as a leaf and silently
+	// drop everything beneath it, so the export would be an incomplete Web
 	// Template with nothing to say so.
 	opt, err := template.ParseFileStrict(optPath)
 	if err != nil {

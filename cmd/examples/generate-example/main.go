@@ -58,10 +58,10 @@ func run() error {
 	// Step 1: parse and compile the OPT. An operational template is the
 	// deployable form of an openEHR template: every archetype it uses,
 	// flattened into one XML file with the template's constraints applied.
-	// ParseFileStrict rejects a node type the parser does not support. The
-	// lenient ParseFile would keep such a node as a leaf and silently drop
-	// everything beneath it, and the generator would then emit an instance
-	// with that whole subtree missing. Compile turns the parsed template into
+	// ParseFileStrict rejects an unknown node type that has attributes under
+	// it. The lenient ParseFile would keep such a node as a leaf and silently
+	// drop everything beneath it, and the generator would then emit an
+	// instance with that whole subtree missing. Compile turns the parsed template into
 	// the driver the generator walks; the same compiled value feeds the
 	// validator and the composition builder.
 	opt, err := template.ParseFileStrict(optPath)

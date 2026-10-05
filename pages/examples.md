@@ -67,7 +67,7 @@ The first form validates a bundled composition that passes, `-corpus`
 validates demo data that reports issues, and two paths validate your own
 files.
 
-Packages: `canjson`, `template`, `templatecompile`, `validation`.
+Packages: `rm`, `canjson`, `template`, `templatecompile`, `validation`.
 
 ## Build an AQL query {#aql-build}
 

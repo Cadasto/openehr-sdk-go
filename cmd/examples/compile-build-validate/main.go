@@ -8,8 +8,9 @@
 // module can do exactly the same.
 //
 // The two passes compose but do not chain: today ValidateComposition checks
-// the template's constraints and does not run the RM floor's rules, so a
-// composition can satisfy its template and still break the Reference Model.
+// the template's constraints and does not run the RM floor's per-type rules,
+// so a composition can satisfy its template and still break the Reference
+// Model.
 // A program that wants both guarantees calls both.
 //
 // Runs offline. With no argument it uses the vendored vital_signs.opt fixture:
@@ -55,10 +56,10 @@ func run() error {
 
 	// Step 1: parse the OPT. An operational template is the ADL 1.4 XML file
 	// a clinical modeller exports; it fixes which archetypes, nodes and value
-	// constraints a composition may contain. ParseFileStrict rejects a node
-	// type the parser does not support; the lenient ParseFile would keep it
-	// as a leaf and silently drop the constraints beneath it, which a program
-	// that builds and validates data must not do.
+	// constraints a composition may contain. ParseFileStrict rejects an
+	// unknown node type that has attributes under it; the lenient ParseFile
+	// would keep such a node as a leaf and silently drop the constraints
+	// beneath it, which a program that builds and validates data must not do.
 	opt, err := template.ParseFileStrict(optPath)
 	if err != nil {
 		return fmt.Errorf("parse OPT %s: %w", optPath, err)

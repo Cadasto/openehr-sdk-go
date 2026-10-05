@@ -112,8 +112,8 @@ func run() error {
 
 	// Step 7: validate it in both passes. The RM floor checks it against the
 	// Reference Model alone; the template pass checks the OPT's constraints.
-	// Today the template pass does not run the RM floor's rules, so a
-	// program that wants both guarantees calls both.
+	// Today the template pass does not run the RM floor's per-type rules,
+	// so a program that wants both guarantees calls both.
 	rmOK := reportPass("RM floor", validation.ValidateRM(conformant))
 	templateOK := reportPass("template constraints", validation.ValidateComposition(conformant, compiled))
 	if !rmOK || !templateOK {
@@ -139,9 +139,10 @@ func reportPass(name string, result validation.Result) bool {
 
 // loadTemplate parses the vendored OPT, compiles it, and builds its Web
 // Template. Do this once per template in your own code and reuse both results.
-// ParseFileStrict rejects a node type the parser does not support instead of
-// silently dropping the constraints beneath it, which matters here because
-// the compiled template drives the validation below.
+// ParseFileStrict rejects an unknown node type that has attributes under it,
+// where the lenient ParseFile would keep it as a leaf and silently drop the
+// constraints beneath it. That matters here because the compiled template
+// drives the validation below.
 func loadTemplate() (*templatecompile.Compiled, *webtemplate.WebTemplate, error) {
 	optPath := fixtures.TemplateOpt(templateID)
 	opt, err := template.ParseFileStrict(optPath)

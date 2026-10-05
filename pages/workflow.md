@@ -37,8 +37,8 @@ SDK starts from the file you export.
 ### 2. Work in process
 Parse the OPT and compile it, all without a network. Export Web Template JSON
 for FLAT paths. Build a Composition or synthesise one, then validate it
-against the Reference Model and the compiled template. Encode canonical JSON, canonical XML, FLAT, or
-STRUCTURED. Build or parse AQL and lint it.
+against the Reference Model and the compiled template. Encode canonical JSON,
+canonical XML, FLAT, or STRUCTURED. Build or parse AQL and lint it.
 
 Packages: `template`, `templatecompile`, `validation`, and the codecs under
 `serialize/`. The full map is on [Packages](packages.md).
