@@ -363,10 +363,12 @@ func TestREQ107_NamedTemplateRootPassesTheFloor(t *testing.T) {
 // template, so the RM-mandatory attributes of its class come from the
 // generator's defaults: an ENTRY's language, encoding and subject, and
 // each class's own, such as an OBSERVATION's data or an ACTION's time,
-// ism_transition and description. A SECTION, which has none, and a
-// CLUSTER, whose one is items, are controls. A CLUSTER fill gets exactly
-// one item, whether the top-up of a required items list or the RM fill of
-// an optional one makes it.
+// ism_transition and description. A slot of an abstract class (ENTRY,
+// CARE_ENTRY, CONTENT_ITEM) is stamped with its declared type and built as
+// OBSERVATION, so its defaults are OBSERVATION's. A SECTION, which has
+// none, and a CLUSTER, whose one is items, are controls. A CLUSTER fill
+// gets exactly one item, whether the top-up of a required items list or
+// the RM fill of an optional one makes it.
 func TestREQ107_RequiredSlotFillPassesTheFloor(t *testing.T) {
 	type slotCase struct {
 		name   string
@@ -376,7 +378,10 @@ func TestREQ107_RequiredSlotFillPassesTheFloor(t *testing.T) {
 		fill func(t *testing.T, call string, out any) any
 	}
 	var cases []slotCase
-	for _, class := range []string{"OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION", "ADMIN_ENTRY", "GENERIC_ENTRY", "SECTION"} {
+	for _, class := range []string{
+		"OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION", "ADMIN_ENTRY", "GENERIC_ENTRY", "SECTION",
+		"ENTRY", "CARE_ENTRY", "CONTENT_ITEM",
+	} {
 		cases = append(cases, slotCase{
 			name: "content slot of " + class,
 			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
