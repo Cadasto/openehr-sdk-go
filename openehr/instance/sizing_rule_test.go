@@ -142,9 +142,8 @@ func TestREQ107_ProhibitedChildGetsNoMember(t *testing.T) {
 
 // TestREQ107_ProhibitedAlternativeIsSkipped is the REQ-107 check that a
 // C_SINGLE_ATTRIBUTE skips an alternative whose occurrences upper bound is
-// 0: the next allowed one wins, and with none allowed the attribute is
-// treated as one the OPT leaves silent, which Minimal does not
-// materialise when it is optional and Example fills from its BMM type.
+// 0: the next allowed one wins, and with none allowed the OPT prohibits
+// the attribute, so neither policy visits an optional one.
 func TestREQ107_ProhibitedAlternativeIsSkipped(t *testing.T) {
 	cases := []struct {
 		name string
@@ -160,9 +159,11 @@ func TestREQ107_ProhibitedAlternativeIsSkipped(t *testing.T) {
 			want: map[instance.Policy]string{instance.Minimal: "DV_COUNT", instance.Example: "DV_COUNT"},
 		},
 		{
-			name: "no allowed alternative: as silent",
+			// Every alternative is prohibited, so the OPT prohibits the
+			// optional attribute: neither policy visits it.
+			name: "no allowed alternative: prohibited",
 			attr: optOptionalSingleOver("value", optOccurring("C_COMPLEX_OBJECT", "DV_COUNT", "", 0, 0)),
-			want: map[instance.Policy]string{instance.Minimal: "", instance.Example: "DV_TEXT"},
+			want: map[instance.Policy]string{instance.Minimal: "", instance.Example: ""},
 		},
 	}
 	for _, tc := range cases {

@@ -137,6 +137,36 @@ func TestREQ107_VisitsSkipsProhibitedAttributes(t *testing.T) {
 	}
 }
 
+// TestREQ107_VisitsSkipsAnAttributeWithOnlyProhibitedChildren is the
+// REQ-107 check that the visit predicate counts an attribute all of whose
+// OPT children are prohibited as prohibited: an optional one is not
+// visited under either policy, and a mandatory one is, since the RM needs
+// it.
+func TestREQ107_VisitsSkipsAnAttributeWithOnlyProhibitedChildren(t *testing.T) {
+	prohibitedTree := `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>ITEM_TREE</rm_type_name>` +
+		`<occurrences><lower_included>true</lower_included><upper_included>true</upper_included>` +
+		`<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded>` +
+		`<lower>0</lower><upper>0</upper></occurrences><node_id>at0001</node_id></children>`
+	optional := `<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>protocol</rm_attribute_name>` +
+		`<existence><lower_included>true</lower_included><upper_included>true</upper_included>` +
+		`<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded>` +
+		`<lower>0</lower><upper>1</upper></existence>` + prohibitedTree + `</attributes>`
+	node, attr := visitAttribute(t, visitRootOPT("OBSERVATION", optional), "protocol")
+	for _, policy := range []Policy{Minimal, Example} {
+		g := &generator{opts: Options{Policy: policy}}
+		if g.visits(node, attr) {
+			t.Errorf("visits(OBSERVATION, protocol with only prohibited children) under %v = true, want false", policy)
+		}
+	}
+	node, attr = visitAttribute(t, visitRootOPT("OBSERVATION", visitSingle("data", strings.ReplaceAll(prohibitedTree, "ITEM_TREE", "HISTORY"))), "data")
+	for _, policy := range []Policy{Minimal, Example} {
+		g := &generator{opts: Options{Policy: policy}}
+		if !g.visits(node, attr) {
+			t.Errorf("visits(OBSERVATION, mandatory data with only prohibited children) under %v = false, want true", policy)
+		}
+	}
+}
+
 // TestREQ107_VisitsReadsAnOpenExistenceAsAllowed is the REQ-107 check that
 // an existence whose upper bound is unbounded does not prohibit the
 // attribute, although its upper value reads 0: Example visits it.

@@ -95,3 +95,75 @@ func TestREQ107_ProhibitedAttributeIsNotVisited(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ107_AttributeWithOnlyProhibitedChildrenIsProhibited is the REQ-107
+// check that the OPT prohibits an attribute all of whose OPT children it
+// prohibits (occurrences upper bound 0): an optional one is not visited,
+// under Example either, so nothing is written there and an RM default
+// that yields to a prohibition writes nothing either; a mandatory one,
+// which the RM needs, is built from its BMM type as if the OPT left it
+// silent. It holds under both value fills and both compile modes.
+func TestREQ107_AttributeWithOnlyProhibitedChildrenIsProhibited(t *testing.T) {
+	prohibitedTree := optOccurring("C_COMPLEX_OBJECT", "ITEM_TREE", "at0009", 0, 0)
+	cases := []struct {
+		name  string
+		opt   string
+		check func(t *testing.T, out any)
+	}{
+		{
+			name: "optional single: OBSERVATION protocol",
+			opt:  optTemplate("OBSERVATION", optOptionalSingleOver("protocol", prohibitedTree)),
+			check: func(t *testing.T, out any) {
+				if p := out.(*rm.Observation).Protocol; p != nil && !rm.IsTypedNil(p) {
+					t.Errorf("OBSERVATION.protocol = %#v, want none", p)
+				}
+			},
+		},
+		{
+			name: "optional multiple: ITEM_TREE items",
+			opt:  optTemplate("ITEM_TREE", optMultipleLowerZero("items", optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0001", 0, 0))),
+			check: func(t *testing.T, out any) {
+				if items := out.(*rm.ItemTree).Items; len(items) != 0 {
+					t.Errorf("ITEM_TREE.items has %d members, want none", len(items))
+				}
+			},
+		},
+		{
+			name: "optional single with a yielding default: COMPOSITION context",
+			opt: optTemplate("COMPOSITION", optOptionalSingleOver("context",
+				optOccurring("C_COMPLEX_OBJECT", "EVENT_CONTEXT", "", 0, 0))),
+			check: func(t *testing.T, out any) {
+				if ctx := out.(*rm.Composition).Context; ctx != nil {
+					t.Errorf("COMPOSITION.context = %+v, want none", ctx)
+				}
+			},
+		},
+		{
+			name: "mandatory single: ACTION description",
+			opt: optTemplate("ACTION", optSingle("language"), optSingle("encoding"), optSingle("subject"),
+				optSingle("ism_transition", optNode("ISM_TRANSITION", "")), optSingle("description", prohibitedTree)),
+			check: func(t *testing.T, out any) {
+				tree, ok := out.(*rm.Action).Description.(*rm.ItemTree)
+				if !ok || tree == nil || tree.ArchetypeNodeID != "at0000" {
+					t.Errorf("ACTION.description = %#v, want an ITEM_TREE built from the BMM (at0000)", out.(*rm.Action).Description)
+				}
+			},
+		},
+	}
+	for _, tc := range cases {
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, tc.opt, implicit)
+			for _, opts := range defaultsOptions() {
+				opts.Territory, opts.Composer = "NL", testComposer()
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err != nil {
+						t.Fatalf("Generate: %v", err)
+					}
+					tc.check(t, out)
+					noFloorErrors(t, out)
+				})
+			}
+		}
+	}
+}
