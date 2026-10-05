@@ -84,3 +84,65 @@ func TestREQ107_RolePerformerPassesBothValidators(t *testing.T) {
 		})
 	}
 }
+
+// guardDateInterval is a time_validity attribute the template requires,
+// holding a DV_INTERVAL<DV_DATE>.
+func guardDateInterval() string {
+	return guardSingle("time_validity", guardExistence11,
+		guardChild("C_COMPLEX_OBJECT", "DV_INTERVAL&lt;DV_DATE&gt;", "", guardOccurrences11, ""))
+}
+
+// TestREQ107_TimeValidityPassesBothValidators is the REQ-107 check that a
+// time_validity the template requires, on a ROLE root or on a capability
+// of one, comes out set and passes both validators at either policy and
+// either value fill.
+func TestREQ107_TimeValidityPassesBothValidators(t *testing.T) {
+	cases := []struct {
+		name string
+		opt  string
+		// validity returns the time_validity the case requires.
+		validity func(t *testing.T, call string, role *rm.Role) *rm.DVInterval[rm.DVDate]
+	}{
+		{
+			name: "on a ROLE root",
+			opt:  guardRootOPT("ROLE", "openEHR-DEMOGRAPHIC-ROLE.example.v1", guardDateInterval()),
+			validity: func(t *testing.T, call string, role *rm.Role) *rm.DVInterval[rm.DVDate] {
+				t.Helper()
+				return role.TimeValidity
+			},
+		},
+		{
+			name: "on a ROLE capability",
+			opt: guardRootOPT("ROLE", "openEHR-DEMOGRAPHIC-ROLE.example.v1",
+				guardMultiple("capabilities", guardExistence11,
+					guardChild("C_COMPLEX_OBJECT", "CAPABILITY", "at0001", guardOccurrences11, "", guardDateInterval()))),
+			validity: func(t *testing.T, call string, role *rm.Role) *rm.DVInterval[rm.DVDate] {
+				t.Helper()
+				if len(role.Capabilities) != 1 {
+					t.Fatalf("%s: the ROLE has %d capabilities, want 1", call, len(role.Capabilities))
+				}
+				return role.Capabilities[0].TimeValidity
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := compileOPTText(t, tc.opt, true)
+			for _, opts := range guardOptions() {
+				call := fmt.Sprintf("Generate(%v, %v)", opts.Policy, opts.ValueFill)
+				out, err := instance.Generate(t.Context(), c, opts)
+				if err != nil {
+					t.Fatalf("%s: %v, want a root", call, err)
+				}
+				role, ok := out.(*rm.Role)
+				if !ok {
+					t.Fatalf("%s returned %T, want *rm.Role", call, out)
+				}
+				if tc.validity(t, call, role) == nil {
+					t.Errorf("%s: time_validity is unset, want the interval the template requires", call)
+				}
+				checkBothValidators(t, call, out, c)
+			}
+		})
+	}
+}

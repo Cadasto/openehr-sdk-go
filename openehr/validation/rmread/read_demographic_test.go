@@ -183,6 +183,42 @@ func TestREQ112_ReadPartyRef(t *testing.T) {
 	}
 }
 
+// TestREQ112_ReadTimeValidity is the REQ-112 and REQ-102 check that the
+// reader sees the time_validity of a ROLE and of a CAPABILITY: an interval
+// that is set reads as present, so a template that requires it accepts it,
+// and a nil one reads as absent. Both the pointer and the value form of
+// the holder are read.
+func TestREQ112_ReadTimeValidity(t *testing.T) {
+	validity := &rm.DVInterval[rm.DVDate]{LowerUnbounded: true, UpperUnbounded: true}
+	cases := []struct {
+		rmType  string
+		holding func(*rm.DVInterval[rm.DVDate]) []any
+	}{
+		{rmType: "ROLE", holding: func(iv *rm.DVInterval[rm.DVDate]) []any {
+			r := rm.Role{ArchetypeNodeID: "openEHR-DEMOGRAPHIC-ROLE.role.v1", TimeValidity: iv}
+			return []any{&r, r}
+		}},
+		{rmType: "CAPABILITY", holding: func(iv *rm.DVInterval[rm.DVDate]) []any {
+			c := rm.Capability{ArchetypeNodeID: "at0001", TimeValidity: iv}
+			return []any{&c, c}
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.rmType, func(t *testing.T) {
+			for _, v := range tc.holding(validity) {
+				if got, ok := rmread.ReadSingle(v, tc.rmType, "time_validity"); !ok || got != validity {
+					t.Errorf("ReadSingle(%T, time_validity) = %v, %v, want the interval, true", v, got, ok)
+				}
+			}
+			for _, v := range tc.holding(nil) {
+				if _, ok := rmread.ReadSingle(v, tc.rmType, "time_validity"); ok {
+					t.Errorf("ReadSingle(%T, time_validity) ok=true with no interval, want false", v)
+				}
+			}
+		})
+	}
+}
+
 func TestReadContactAndAddress(t *testing.T) {
 	c := &rm.Contact{
 		ArchetypeNodeID: "openEHR-DEMOGRAPHIC-CONTACT.person.v1",
