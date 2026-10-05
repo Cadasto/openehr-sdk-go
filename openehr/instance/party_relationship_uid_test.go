@@ -21,7 +21,7 @@ const (
 // TestREQ107_PartyRelationshipIDsFromUIDSource is the REQ-107 check that a
 // PARTY_RELATIONSHIP takes its uid, and an empty source or target id, from
 // Options.UIDSource. A counting source fails the test when any of those three
-// is 00000000-0000-0000-0000-000000000001 or ...0002.
+// is missing or is 00000000-0000-0000-0000-000000000001 or ...0002.
 func TestREQ107_PartyRelationshipIDsFromUIDSource(t *testing.T) {
 	c := compileOPTText(t, optTemplate("PARTY_RELATIONSHIP"), true)
 	for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
@@ -42,7 +42,7 @@ func TestREQ107_PartyRelationshipIDsFromUIDSource(t *testing.T) {
 				t.Fatalf("Generate(%s): %v", policy, err)
 			}
 			rel := out.(*rm.PartyRelationship)
-			if uid := hierIDText(rel.GetUID()); uid != "" && (fixedRelationshipID(uid) || !slices.Contains(issued, uid)) {
+			if uid := hierIDText(rel.GetUID()); fixedRelationshipID(uid) || !slices.Contains(issued, uid) {
 				t.Errorf("PARTY_RELATIONSHIP.uid = %q, want a UIDSource value, issued %v", uid, issued)
 			}
 			checkPartyRefID(t, "source", rel.Source, issued)
@@ -57,12 +57,19 @@ func TestREQ107_PartyRelationshipIDsFromUIDSource(t *testing.T) {
 }
 
 // TestREQ107_PartyRelationshipNilUIDSourceStillMintsIDs is the REQ-107 check
-// that a nil UIDSource still mints a source id and a target id, through the
-// same fallback other locatables use, rather than the two fixed literals.
+// that a nil UIDSource still mints the relationship uid and an empty source
+// or target id, through the same fallback other locatables use, rather than
+// the two fixed literals.
 func TestREQ107_PartyRelationshipNilUIDSourceStillMintsIDs(t *testing.T) {
 	c := compileOPTText(t, optTemplate("PARTY_RELATIONSHIP"), true)
 	first := generatedRelationship(t, c)
 	second := generatedRelationship(t, c)
+	if uid := hierIDText(first.GetUID()); uid == "" || fixedRelationshipID(uid) {
+		t.Errorf("PARTY_RELATIONSHIP.uid = %q, want a minted id", uid)
+	}
+	if hierIDText(first.GetUID()) == hierIDText(second.GetUID()) {
+		t.Errorf("two nil-UIDSource runs shared uid %q", hierIDText(first.GetUID()))
+	}
 	for _, side := range []struct {
 		name string
 		ref  rm.PartyRef
