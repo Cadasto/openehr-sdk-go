@@ -33,6 +33,9 @@ func ParseOPT(r io.Reader) (*OperationalTemplate, error) {
 // validators that need to fail loudly on shapes outside the supported
 // taxonomy (e.g. AOM 2 / ADL 2 inputs, primitive constraint trees).
 // Returns ErrUnsupportedNode (wrapped) on the first such occurrence.
+// It also refuses an unparseable C_INTEGER or C_REAL bound, an
+// unparseable C_INTEGER or C_REAL list item, and a C_PRIMITIVE_OBJECT
+// with no <item> child, returning an error that wraps ErrInvalidOPT.
 func ParseOPTStrict(r io.Reader) (*OperationalTemplate, error) {
 	return parseOPT(r, true)
 }

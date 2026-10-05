@@ -269,10 +269,10 @@ LOCATABLE concrete descendants additionally receive the **generated identity sur
 | `P_BMM_SINGLE_PROPERTY` + `is_mandatory: true` | `T` (the mapped type) |
 | `P_BMM_SINGLE_PROPERTY` + `is_mandatory: false` or absent | `*T` (pointer to express optionality) |
 | `P_BMM_SINGLE_PROPERTY_OPEN` | `T` where `T` is the open generic parameter |
-| `P_BMM_CONTAINER_PROPERTY` | `[]T` for `List` / `Array`; `[]T` (with a documented uniqueness invariant) for `Set`; `map[K]V` for `Hash` — see § Container mapping |
+| `P_BMM_CONTAINER_PROPERTY` | `[]T` for `List` / `Array`; `[]T` (with a documented uniqueness invariant) for `Set`; `map[string]V` for `Hash` — see § Container mapping |
 | `P_BMM_GENERIC_PROPERTY` | The generic instantiation, e.g. `*DVInterval[DVQuantity]` for `DV_INTERVAL<DV_QUANTITY>` |
 
-Two cases depart from the single-property rows. A non-mandatory property whose type the generator emits as a Go interface (an abstract class, or a concrete class with subtypes, emitted as a narrow `…Like` interface) stays `T`, because an interface field is already nilable. A mandatory property that closes a cycle of mandatory struct-typed properties, such as AOM 1.4's `ARCHETYPE.ontology` and `ARCHETYPE_ONTOLOGY.parent_archetype`, becomes `*T`, because Go cannot declare a struct that contains itself by value.
+Three cases depart from the single-property rows. A non-mandatory property whose type the generator emits as a Go interface (an abstract class, or a concrete class with subtypes, emitted as a narrow `…Like` interface) stays `T`, because an interface field is already nilable. A mandatory property that closes a cycle of mandatory struct-typed properties, such as AOM 1.4's `ARCHETYPE.ontology` and `ARCHETYPE_ONTOLOGY.parent_archetype`, becomes `*T`, because Go cannot declare a struct that contains itself by value. A non-mandatory property whose BMM type is `Any` **MUST** be emitted as `*any`, because `Any` is a primitive and not a class the interface exception covers. The pinned schemas emit five such fields, each an `assumed_value` on `C_COMPLEX_OBJECT`, `C_PRIMITIVE_OBJECT`, `C_CODED_TEXT`, `C_ORDINAL` or `C_QUANTITY`. A mandatory `Any` property stays `any`.
 
 JSON tags **MUST** preserve the original BMM property name (snake_case), with `omitzero` on a non-mandatory single or generic property held as a pointer (`*T`, `*DVInterval[DVQuantity]`, `*[]T`, `*map[string]V`), so that only a nil pointer is omitted, and `omitempty` on a non-mandatory one that is not a pointer (a Go interface, or a `P_BMM_SINGLE_PROPERTY_OPEN` typed by the open generic parameter). A mandatory property carries no omit option, including one held as a pointer to break a cycle. A `P_BMM_CONTAINER_PROPERTY` field (`[]T`) carries `omitempty` when its cardinality lower bound is 0 or absent, and no omit option otherwise. A `P_BMM_GENERIC_PROPERTY` over `Hash` or `List` follows the single-property rule: a mandatory one is `map[string]V` or `[]T` with no omit option, and an optional one is `*map[string]V` or `*[]T` with `omitzero`. Why pointer and container fields differ under `encoding/json/v2` is recorded in [ADR 0002 § D8](../adr/0002-bmm-codegen-decisions.md#d8--the-generator-emits-no-bespoke-json-codec-methods) and [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md). The example below is **conceptual** — it shows the BMM property → Go field mapping and the `DV_AMOUNT` ancestor relationship:
 
@@ -307,7 +307,7 @@ type DVQuantity struct {
 | `List` | `[]T` | Order matters; duplicates allowed |
 | `Array` | `[]T` | Same as List in Go; the distinction is historical |
 | `Set` | `[]T` | With a generated `Set` invariant check in `Validate()` if validation hooks exist. Go has no native set; modelling as `map[T]struct{}` complicates JSON. |
-| `Hash` | `map[K]V` | Keys are typically `String` |
+| `Hash` | `map[string]V` | Keys are `String` |
 
 The wire format JSON does not distinguish List/Set/Array — they all serialise as arrays. Modelling them all as `[]T` keeps round-tripping exact; the Set / Array semantics surface in validators and AQL path-resolution rather than in the type itself.
 
@@ -342,7 +342,7 @@ The 29 primitives in `openehr_base_1.3.0.bmm.json` map to Go types per the table
 | `String` | `string` | |
 | `Octet` | `byte` | |
 | `Uri` | `string` | Validated at codec boundary; not `net/url.URL` to preserve round-trip exact representation |
-| `Any` | `any` | |
+| `Any` | `any` | A non-mandatory property is `*any` (five fields in the pinned schemas). A mandatory property stays `any`. |
 | `Iso8601_date` | `string` (validated) | See § ISO 8601 types below |
 | `Iso8601_time` | `string` (validated) | |
 | `Iso8601_date_time` | `string` (validated) | |
@@ -358,7 +358,7 @@ The 29 primitives in `openehr_base_1.3.0.bmm.json` map to Go types per the table
 | `List` | `[]T` | See § Container mapping |
 | `Set` | `[]T` | See § Container mapping |
 | `Array` | `[]T` | See § Container mapping |
-| `Hash` | `map[K]V` | See § Container mapping |
+| `Hash` | `map[string]V` | See § Container mapping |
 | `Container` | abstract; not directly used | |
 | `Terminology_code` | `rm.TerminologyCode` (struct or alias) | TBD by generator; see plan |
 | `Terminology_term` | `rm.TerminologyTerm` (struct or alias) | TBD by generator; see plan |
