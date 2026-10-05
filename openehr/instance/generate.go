@@ -217,19 +217,30 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	return nil
 }
 
-// visits decides whether the walk descends into attr of optNode. It
-// never visits an attribute the RM computes rather than stores (offset
-// on POINT_EVENT and INTERVAL_EVENT, is_integral on DV_QUANTITY and
-// DV_PROPORTION), under either policy: the generator has nothing to
-// write there. Any other attribute is visited when the policy says so
-// (shouldVisit).
+// visits decides whether the walk descends into attr of optNode. Under
+// either policy it never visits an attribute the OPT prohibits (an
+// existence of 0..0), whatever children the OPT names under it, nor one
+// the RM computes rather than stores (offset on POINT_EVENT and
+// INTERVAL_EVENT, is_integral on DV_QUANTITY and DV_PROPORTION): the
+// generator has nothing to write there. Any other attribute is visited
+// when the policy says so (shouldVisit).
 func (g *generator) visits(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
+	if attrProhibited(attr) {
+		return false
+	}
 	// rminfo knows each class by its bare BMM name; the OPT may declare
 	// a generic instantiation (DV_INTERVAL<DV_QUANTITY>).
 	if rminfo.IsNonStorableAttr(bmmtype.Class(optNode.RMTypeName()), attr.Name()) {
 		return false
 	}
 	return g.shouldVisit(attr)
+}
+
+// attrProhibited reports whether the OPT prohibits attr: its existence
+// upper bound is bounded and 0.
+func attrProhibited(attr *tcimpl.CompiledAttribute) bool {
+	e := attr.Existence()
+	return e != nil && !e.UpperUnbounded() && e.Upper() == 0
 }
 
 // shouldVisit decides whether an attribute is in scope under the

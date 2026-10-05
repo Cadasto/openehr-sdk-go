@@ -133,6 +133,24 @@ func TestREQ107_VisitsSkipsProhibitedAttributes(t *testing.T) {
 	}
 }
 
+// TestREQ107_VisitsReadsAnOpenExistenceAsAllowed is the REQ-107 check that
+// an existence whose upper bound is unbounded does not prohibit the
+// attribute, although its upper value reads 0: Example visits it.
+func TestREQ107_VisitsReadsAnOpenExistenceAsAllowed(t *testing.T) {
+	open := `<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>protocol</rm_attribute_name>` +
+		`<existence><lower_included>true</lower_included>` +
+		`<lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded>` +
+		`<lower>0</lower></existence></attributes>`
+	node, attr := visitAttribute(t, visitRootOPT("OBSERVATION", open), "protocol")
+	if e := attr.Existence(); e == nil || !e.UpperUnbounded() || e.Upper() != 0 {
+		t.Fatalf("protocol existence = %+v, want an unbounded upper that reads 0", e)
+	}
+	g := &generator{opts: Options{Policy: Example}}
+	if !g.visits(node, attr) {
+		t.Errorf("visits(OBSERVATION, protocol 0..*) under example = false, want true")
+	}
+}
+
 // TestREQ107_VisitsFollowsThePolicy is the REQ-107 check that the visit
 // predicate applies the policy to a storable attribute: an optional
 // attribute the OPT names with no children is visited under Example and
