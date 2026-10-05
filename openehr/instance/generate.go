@@ -1660,7 +1660,9 @@ func ordinalSymbolText(ref constraints.CodedTermRef) rm.DVCodedText {
 // pinned them. Each coded default yields to the OPT: it is written only
 // where the OPT's own constraint on that attribute admits it
 // (codeAdmitted), and no EVENT_CONTEXT is created where the OPT
-// prohibits context. The OPT node of c is the template root.
+// prohibits context. The composer is Options.Composer, as given, over any
+// party the walk built from the OPT. The OPT node of c is the template
+// root.
 func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 	root := g.compiled.Root()
 	if noCode(c.Category.DefiningCode.CodeString) {
@@ -1682,9 +1684,7 @@ func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 	if noCode(c.Territory.CodeString) && codeAdmitted(root, "territory", territory) {
 		c.Territory = territory
 	}
-	if c.Composer == nil {
-		c.Composer = g.opts.Composer
-	}
+	c.Composer = g.opts.Composer
 	if c.Context == nil {
 		if prohibited(root, "context") {
 			return nil
