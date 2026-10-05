@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp/syntax"
+	"slices"
 	"strings"
 	"time"
 	"uuid"
@@ -551,9 +552,13 @@ func stringAttr(parent any, attr string) (string, bool) {
 // stringField returns a reader and a writer for the BMM String attribute
 // attr of parent. It covers every String attribute of the data values the
 // generator builds, plus ACTIVITY.action_archetype_id, TERMINOLOGY_ID.value
-// and a PARTY_REF's namespace and type, so a C_STRING the OPT pins on any
-// of them is honoured. An optional attribute reads as "" while unset, and
-// its writer sets it. ok is false when parent has no such field; when ok is
+// and a PARTY_REF's namespace and type, so the walk writes a C_STRING the
+// OPT pins on any of them. A pin on a PARTY_REF is kept only where no later
+// default replaces the reference: a ROLE's performer keeps it, because
+// fillPerformer fills only the empty parts, but a PARTY_RELATIONSHIP's
+// source or target loses it, because fillPartyRelationship replaces a
+// reference with any empty part whole, and the walk cannot build the id.
+// An optional attribute reads as "" while unset, and its writer sets it. ok is false when parent has no such field; when ok is
 // true, get and set are both non-nil.
 func stringField(parent any, attr string) (get func() string, set func(string), ok bool) {
 	switch p := parent.(type) {
@@ -1707,8 +1712,44 @@ func partyRef(id string) rm.PartyRef {
 	return rm.PartyRef{
 		ID:        &rm.HierObjectID{Value: id},
 		Namespace: "local",
-		Type:      "PERSON",
+		Type:      defaultPartyRefType,
 	}
+}
+
+// defaultPartyRefType is the type of the references the generator builds
+// itself: a PARTY_RELATIONSHIP's source and target, a ROLE's performer.
+const defaultPartyRefType = "PERSON"
+
+// partyRefTypes are the class names BASE PARTY_REF Type_validity admits as
+// a reference's type.
+var partyRefTypes = []string{"PERSON", "ORGANISATION", "GROUP", "AGENT", "ROLE", "PARTY", "ACTOR"}
+
+// errNoPartyRefType reports a C_STRING on a PARTY_REF's type that accepts
+// none of the class names PARTY_REF Type_validity admits.
+var errNoPartyRefType = errors.New("the C_STRING accepts no class name PARTY_REF Type_validity admits")
+
+// partyRefType returns the type the generator writes on a PARTY_REF whose
+// OPT constrains it with cs, so BASE PARTY_REF Type_validity holds, which
+// neither validator evaluates. It is chosen, the string the C_STRING path
+// picked, when that is an admitted class name, so a list pin keeps its
+// example value and RandomFill its draw; else the default type when cs
+// accepts it; else the first admitted class name cs accepts. chosen is ""
+// when the C_STRING path found no string. It returns errNoPartyRefType
+// when cs accepts no admitted class name.
+func partyRefType(cs constraints.CString, chosen string) (string, error) {
+	if slices.Contains(partyRefTypes, chosen) {
+		return chosen, nil
+	}
+	accepts := func(v string) bool { return len(cs.Validate(v)) == 0 }
+	if accepts(defaultPartyRefType) {
+		return defaultPartyRefType, nil
+	}
+	for _, class := range partyRefTypes {
+		if accepts(class) {
+			return class, nil
+		}
+	}
+	return "", errNoPartyRefType
 }
 
 func fillCurrentState(opt *tcimpl.CompiledNode, iv *rm.IsmTransition) {
@@ -1770,10 +1811,12 @@ func firstCodedExample(opt *tcimpl.CompiledNode, attrName string) (constraints.C
 
 // applyStringLeaf writes a C_STRING leaf onto the String attribute attr
 // of rmValue, or onto its main string attribute when attr is "". The
-// value is a list member or a pattern match that the constraint accepts.
-// When there is none, it writes nothing and returns an error wrapping
-// ErrConstraintUnsatisfiable. An attribute the generator has no field for
-// is left alone, like any other unknown primitive target.
+// value is a list member or a pattern match that the constraint accepts;
+// on a PARTY_REF's type it is also a class name PARTY_REF Type_validity
+// admits (see partyRefType). When there is none, it writes nothing and
+// returns an error wrapping ErrConstraintUnsatisfiable. An attribute the
+// generator has no field for is left alone, like any other unknown
+// primitive target.
 func applyStringLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, cs constraints.CString, ex any) error {
 	if attr == "" {
 		attr = mainStringAttr(rmValue)
@@ -1783,6 +1826,9 @@ func applyStringLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, cs con
 		return nil
 	}
 	s, err := stringForConstraint(cs, ex)
+	if _, isRef := rmValue.(*rm.PartyRef); isRef && attr == "type" {
+		s, err = partyRefType(cs, s)
+	}
 	if err != nil {
 		return fmt.Errorf("%w: %s.%s at %s: %w", ErrConstraintUnsatisfiable, rmTypeOf(rmValue), attr, leafPath(leaf), err)
 	}
