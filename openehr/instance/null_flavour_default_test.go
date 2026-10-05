@@ -111,14 +111,22 @@ func TestREQ107_BothProhibitedNullFlavourIsWalked(t *testing.T) {
 		nf   string
 		want rm.CodePhrase
 	}{
-		{name: "no child", nf: optProhibitedSingle("null_flavour"),
-			want: rm.CodePhrase{CodeString: "271", TerminologyID: rm.TerminologyID{Value: terminology.ID}}},
-		{name: "a C_CODE_PHRASE pinning 253", nf: optProhibitedSingle("null_flavour", optCodedText(terminology.ID, "253")),
-			want: rm.CodePhrase{CodeString: "253", TerminologyID: rm.TerminologyID{Value: terminology.ID}}},
-		{name: "an empty-list C_CODE_PHRASE under openehr", nf: optProhibitedSingle("null_flavour", optCodedText(terminology.ID)),
-			want: rm.CodePhrase{CodeString: "271", TerminologyID: rm.TerminologyID{Value: terminology.ID}}},
-		{name: "an empty-list C_CODE_PHRASE under local", nf: optProhibitedSingle("null_flavour", optCodedText("local")),
-			want: localAt0000},
+		{
+			name: "no child", nf: optProhibitedSingle("null_flavour"),
+			want: rm.CodePhrase{CodeString: "271", TerminologyID: rm.TerminologyID{Value: terminology.ID}},
+		},
+		{
+			name: "a C_CODE_PHRASE pinning 253", nf: optProhibitedSingle("null_flavour", optCodedText(terminology.ID, "253")),
+			want: rm.CodePhrase{CodeString: "253", TerminologyID: rm.TerminologyID{Value: terminology.ID}},
+		},
+		{
+			name: "an empty-list C_CODE_PHRASE under openehr", nf: optProhibitedSingle("null_flavour", optCodedText(terminology.ID)),
+			want: rm.CodePhrase{CodeString: "271", TerminologyID: rm.TerminologyID{Value: terminology.ID}},
+		},
+		{
+			name: "an empty-list C_CODE_PHRASE under local", nf: optProhibitedSingle("null_flavour", optCodedText("local")),
+			want: localAt0000,
+		},
 	}
 	for _, tc := range cases {
 		for _, implicit := range []bool{true, false} {
@@ -162,16 +170,26 @@ func TestREQ107_ValueGivesWayToARequiredNullAttribute(t *testing.T) {
 		wantNR    bool   // a null_reason
 		contra    bool   // the OPT contradicts itself
 	}{
-		{name: "null_flavour required, pinned 253", attrs: []string{optionalText, optSingle("null_flavour", optCodedText(terminology.ID, "253"))},
-			wantNF: "253"},
-		{name: "null_flavour required, no child", attrs: []string{optionalText, optSingle("null_flavour")},
-			wantNF: "271"},
-		{name: "null_reason required", attrs: []string{optionalText, optSingle("null_reason", optNode("DV_TEXT", ""))},
-			wantNF: "271", wantNR: true},
-		{name: "neither required", attrs: []string{optionalText, optOptionalSingleOver("null_flavour", optCodedText(terminology.ID, "253"))},
-			wantValue: true},
-		{name: "value and null_flavour required", attrs: []string{optSingle("value", optNode("DV_TEXT", "")), optSingle("null_flavour", optCodedText(terminology.ID, "253"))},
-			wantValue: true, contra: true},
+		{
+			name: "null_flavour required, pinned 253", attrs: []string{optionalText, optSingle("null_flavour", optCodedText(terminology.ID, "253"))},
+			wantNF: "253",
+		},
+		{
+			name: "null_flavour required, no child", attrs: []string{optionalText, optSingle("null_flavour")},
+			wantNF: "271",
+		},
+		{
+			name: "null_reason required", attrs: []string{optionalText, optSingle("null_reason", optNode("DV_TEXT", ""))},
+			wantNF: "271", wantNR: true,
+		},
+		{
+			name: "neither required", attrs: []string{optionalText, optOptionalSingleOver("null_flavour", optCodedText(terminology.ID, "253"))},
+			wantValue: true,
+		},
+		{
+			name: "value and null_flavour required", attrs: []string{optSingle("value", optNode("DV_TEXT", "")), optSingle("null_flavour", optCodedText(terminology.ID, "253"))},
+			wantValue: true, contra: true,
+		},
 	}
 	for _, tc := range cases {
 		for _, implicit := range []bool{true, false} {
