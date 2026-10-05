@@ -6,9 +6,6 @@ harvested_through: 2026-10-05T10:59:37Z
 
 Leftovers of merged branches, by directory: suggestions, and findings the maintainer deferred here. Each line is a lead, not a finding: verify it before acting. A delivery whose `Files` touch a line's path folds it in and deletes the line. `sdd-pr harvest` and `sdd-pr flip --carry` append; edit freely.
 
-## auth/jwtbearer
-- auth/jwtbearer/assertion.go:370 · Removing usablePublicKey's `case nil` arm keeps every test green because the algorithm check refuses a nil key anyway; give the "Public reports no key" row a wantInMsg so the arm is pinned · by: sdd-spec-conformance-reviewer · from: feat/smart-token-lifecycle
-
 ## auth/smart
 - auth/smart/revoke.go:64 · Token called after Revoke waits for an overtaken refresh to finish its network round trip before returning ErrReauthRequired, because Revoke leaves s.inflight set and a zero access token counts as stale; Revoke could set s.inflight = nil under the lock, which is safe because the old refresh checks `s.inflight == ex` before clearing it · by: go-reviewer · from: feat/smart-token-lifecycle
 - auth/smart/source.go:948 · The token and revocation POSTs follow a caller client's 307/308 redirects with the token still in the body; discovery guards its redirects, auth/smart does not (predates the range for the token endpoint) · by: go-reviewer · from: feat/smart-token-lifecycle
@@ -29,7 +26,6 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - docs/specifications/traceability.yaml · test files may still cite a REQ they do not pin and so appear in its generated tests list; a sweep over all test files is still to do (the audit estimated 45 to 50 files, not re-counted) · from: audit-2026-09
 - docs/specifications/clinical-modeling.md · § REQ-107 has no spec text for what Options.Now sets (HISTORY.origin, ACTION.time and every DV_DATE_TIME default) or for the generator's placeholder values (the at0000 node id, the local::at0000 code, ehr://example) · from: audit-2026-09
 - docs/specifications/clinical-modeling.md · § REQ-107 says Minimal materialises attributes with existence lower >= 1 plus BMM-mandatory ones, but shouldVisit in openehr/instance/generate.go also visits attributes whose cardinality lower is >= 1 and those with OPT-pinned children · from: audit-2026-09
-- docs/specifications/clinical-modeling.md · nine Building-block independence (REQ-013) sections restate REQ-013 with no RFC-2119 keyword, and two more sections (Public surface scope near line 391, Amends REQ-117 near line 1416) carry none either, so sdd-check warns on each · from: audit-2026-09
 - docs/specifications/wire.md · § REQ-052 says decode keeps whatever bound it reads with no keyword, and no sentence says a flag set only on the embedded interval of a Point_interval does not open a side (the outer flags win, pinned only by tests); the client-package split in Functional API areas also has no keyword and no normative home · from: audit-2026-09
 - docs/specifications/bmm-conformance.md · the rm.Release bullet in Generator output conventions has no RFC-2119 keyword and points at § REQ-107, while REQ-107's MUST points back at it, so no binding sentence makes the generator emit the constant · from: audit-2026-09
 - docs/specifications/bmm-conformance.md · the mapping tables never say an optional Any property becomes *any (bmmgen emits five), and the Hash rows give map[K]V with keys typically String while bmmgen always emits map[string]V · from: audit-2026-09
@@ -38,7 +34,6 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - docs/specifications/rm-modeling.md · a second (REQ-024) section, Generics for clients, validators, repositories, sits beside the canonical one in idiom.md § Generics policy · from: audit-2026-09
 - docs/specifications/module-layout.md · § Versioning says a field added to an exported struct is not a breaking change with no RFC-2119 keyword, so it cannot relax the table row that makes a breaking change to a public type a major bump · from: audit-2026-09
 - docs/specifications/conformance.md · § Adding probes still says a backend-facing probe must be runnable in at least Sandbox mode, but nothing checks it and § REQ-082 treats a missing mode as an open gap; the retired REQ-081 and the Launch-mode coverage (REQ-068) sections also carry no keyword · from: audit-2026-09
-- docs/specifications/transport.md · the deprecated REQ-097 section carries no RFC-2119 keyword, so sdd-check warns on it; so does the service-discovery.md section Surfaced authorization-server metadata (REQ-070, REQ-062) · from: audit-2026-09
 - docs/specifications/conformance.md:603 · Legs (b) and (c) say "the decoded upstream canonical document" but do not say which document a set that carries both canonical JSON and canonical XML uses, and the harness takes the JSON (testkit/conformance/crossformat/harness.go:452), so consult_record's canonical.xml never reaches a FLAT leg and the spec could name that choice · by: sdd-spec-conformance-reviewer · from: test/cross-format-goldens
 - docs/specifications/conformance.md:168 · No automated check covers the MUST NOT on vendoring different instances as one set; it rests on the curated table in scripts/ingest-crossformat.sh:15, confirmed by hand for alternative_events, test_all_types and consult_record, so recording each set's pairing evidence in that table would make the rule reviewable · by: sdd-spec-conformance-reviewer · from: test/cross-format-goldens
 - docs/specifications/conformance.md:610 · The landing tally (ten sets, 24 legs, 4 agree, 3 refused, 17 differ) repeats the generated CENSUS.md summary in the normative entry and goes stale at the next record change, so pointing at the census alone keeps one home · by: sdd-doc-reviewer · from: test/cross-format-goldens
@@ -58,9 +53,6 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - docs/specifications/clinical-modeling.md:786 · the shared simplified-template model is to be "extracted with REQ-053 when a second consumer exists", but REQ-053 was that second consumer and the extraction was left on purpose for a third; say so · from: simplified-formats plan
 - docs/specifications/clinical-modeling.md:80 · § Strict parse mode does not record the decision to stop where it is: no check for a missing language with original_language in its place, a top-level archetype id, or empty description fields, and the lenient parse stays silent when it drops the nested subtree · from: generated-instances plan
 
-## internal/bmmtype
-- internal/bmmtype/bmmtype.go · Substitute leaves a formal parameter unresolved for a bare generic owner, so the data attribute of an OPT's EVENT, POINT_EVENT or INTERVAL_EVENT compiles with RM type T (the row is pinned in bmmtype_test.go) · from: audit-2026-09
-
 ## internal/templateinstance/rmwrite
 - internal/templateinstance/rmwrite/write.go · EnsureSingle has no case for TERMINOLOGY_ID.value or a locatable's archetype_node_id, so the generator's writeBMMString cannot write them and drops the refusal; surfacing write errors in the generator (materialiseImplicitSingle, populateBMMRequiredAttrs, fillEntryCode, materialiseImplicitMultiple) needs this first and would move census outcomes · from: audit-2026-09
 
@@ -68,8 +60,6 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - openehr/aom/aom14 · no standalone ADL 1.4 archetype corpus is vendored, so the aom14 interval corpus tests read their constraint intervals out of the OPTs instead of real archetype files · from: audit-2026-09
 
 ## openehr/instance
-- openehr/instance/interval_order.go · an interval whose two sides' OPT constraints admit no ordered pair is left inverted with no error, as § REQ-107 prescribes; reporting it needs a spec change first, and ErrConstraintUnsatisfiable is raised only for C_STRING leaves · from: audit-2026-09
-- openehr/instance/generate.go · settleIntervalEndpoints never reads a C_BOOLEAN on lower_unbounded or upper_unbounded, and a true-only C_BOOLEAN on lower_included or upper_included is not honoured on an open side (no vendored OPT constrains either flag) · from: audit-2026-09
 - openehr/instance/rmtype.go · Generate refuses a generic non-interval rm_type_name such as POINT_EVENT<ITEM_TREE> with ErrUnknownRMType because newGenericRM builds only DV_INTERVAL instantiations, and the template validator reports the matching node as rm_type_mismatch (pinned by nonstorable_generic_test.go) · from: audit-2026-09
 - openehr/instance/generate.go · a template root whose OPT node has no archetype id gets archetype_details with an empty archetype_id.value, which ValidateRM reports as required · from: audit-2026-09
 - openehr/instance/generate.go · fillPartyRelationship gives every PARTY_RELATIONSHIP the same literal source and target ids (00000000-0000-0000-0000-000000000001 and -0002) instead of drawing from Options.UIDSource, and its fixed-uid closure is dead because stampsUID leaves PARTY_RELATIONSHIP out · from: audit-2026-09
@@ -109,7 +99,6 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - openehr/validation/walk_composition.go · bmmSubtypes has a row for DATA_VALUE only, so an OPT node declared as another abstract DV class such as DV_ORDERED or DV_QUANTIFIED is refused with a false rm_type_mismatch (no vendored OPT declares one) · from: chore/backlog-round3
 - openehr/validation/rmfloor.go · the RM floor does not evaluate Interval Limits_comparable, DV_ORDERED Other_reference_ranges_validity, REFERENCE_RANGE Range_is_simple, EHR_ACCESS Scheme_valid, DV_AMOUNT Accuracy_is_percent_validity and Accuracy_validity, or DV_QUANTIFIED Magnitude_status_valid, and checkDVInterval walks a bound beside its own *_unbounded flag without reporting the contradiction · from: audit-2026-09
 - openehr/validation/rmfloor.go · an empty or absent temporal value is reported twice, as required at <path>/value and as rm_invariant (Value_valid) at <path>, and § REQ-112 does not state the pair as it does for TERM_MAPPING; also a typed-nil element inside a container such as COMPOSITION.content is skipped without any report · from: pr199
-- openehr/validation/rmread · rmread does not read the optional String fields magnitude_status on DV_COUNT, DV_PROPORTION and the temporal types, units_display_name and units_system on DV_QUANTITY, PARTY_IDENTIFIED.name or ATTESTATION.proof; the generator writes none of them, so no template can constrain them yet · from: pr199
 
 ## pages
 - pages/examples.md:51 · The heading still says "against a template", and the at-a-glance row at docs/examples.md:29 still says "vs OPT", while the rewritten sections say both the RM floor and the template constraints are required · by: sdd-doc-reviewer · from: #225
@@ -143,5 +132,3 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - testkit/probes/instance/corpus_ratchet_test.go · the census runs with Language en and one fixed Now, and its placeholder scan flags only the literal example, so a generator that wrote encoding utf8 or read time.Now() would leave it green · from: audit-2026-09
 - testkit/probes/instance/corpus_ratchet_test.go · the hollow_body floor counts every ELEMENT, so a body of null-flavour placeholders passes; counting only ELEMENTs that hold a value adds two rows (clinical_content_validation generate/example/example and generate/example/random) · from: pr199
 
-## testkit/recordings
-- testkit/recordings/composition-minimal.har · the captured OPT keeps its authoring tool's Generated By entry with an account name, as the vendored corpus OPTs do; strip it at capture if recordings are to carry no account names · from: pr201
