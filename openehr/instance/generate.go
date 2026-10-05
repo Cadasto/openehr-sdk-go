@@ -245,10 +245,11 @@ func compositionDefaultOwns(class, attrName string) bool {
 // children the OPT names under it, nor one the RM computes rather than
 // stores (offset on POINT_EVENT and INTERVAL_EVENT, is_integral on
 // DV_QUANTITY and DV_PROPORTION): the generator has nothing to write
-// there. Any other attribute is visited when the policy says so
+// there. Nor does it visit a locatable's uid, which setLocatableIdentity
+// stamps. Any other attribute is visited when the policy says so
 // (shouldVisit).
 func (g *generator) visits(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
-	if attrProhibited(attr) {
+	if attrProhibited(attr) || locatableUID(optNode, attr) {
 		return false
 	}
 	// rminfo knows each class by its bare BMM name; the OPT may declare
@@ -257,6 +258,45 @@ func (g *generator) visits(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAt
 		return false
 	}
 	return g.shouldVisit(attr)
+}
+
+// locatableUID reports whether attr is the uid of a locatable, the one
+// LOCATABLE declares, which the identity rule rather than the walk
+// decides.
+func locatableUID(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
+	if attr.Name() != "uid" {
+		return false
+	}
+	h, ok := rminfo.Default.(rminfo.Hierarchy)
+	if !ok {
+		return false
+	}
+	site, ok := h.DeclaredOn(bmmtype.Class(concreteFor(optNode.RMTypeName())), "uid")
+	return ok && site == "LOCATABLE"
+}
+
+// requiresUID reports whether the OPT requires the uid of opt, with an
+// existence lower bound of at least 1.
+func requiresUID(opt *tcimpl.CompiledNode) bool {
+	if opt == nil {
+		return false
+	}
+	attr := opt.Attribute("uid")
+	if attr == nil {
+		return false
+	}
+	e := attr.Existence()
+	return e != nil && !e.LowerUnbounded() && e.Lower() >= 1
+}
+
+// uidFor returns the uid source for a value built without an OPT node
+// that names its uid: Options.UIDSource, or its fallback, for a class
+// stampsUID names, and nil, no uid, for any other.
+func (g *generator) uidFor(v any) func() *rm.HierObjectID {
+	if stampsUID(v) {
+		return g.nextUID
+	}
+	return nil
 }
 
 // attrProhibited reports whether the OPT prohibits attr, with an
@@ -1085,7 +1125,7 @@ func (g *generator) stampSlotFill(rmValue any, slot *tcimpl.CompiledNode) bool {
 		ArchetypeID: rm.ArchetypeID{Value: archetypeID},
 		RMVersion:   rm.Release,
 	}
-	applyLocatableIdentity(rmValue, archetypeID, slot.RMTypeName(), ad, g.nextUID)
+	applyLocatableIdentity(rmValue, archetypeID, slot.RMTypeName(), ad, g.uidFor(rmValue))
 	return true
 }
 
@@ -1257,7 +1297,8 @@ func concreteFor(rmType string) string {
 
 // setLocatableIdentity stamps archetype_node_id, name, uid (on the
 // classes stampsUID names, unless opt prohibits uid on one that is not a
-// PARTY), and archetype_details on the freshly-built RM value. The
+// PARTY, and on any locatable whose uid opt requires), and
+// archetype_details on the freshly-built RM value. The
 // isTemplateRoot flag controls whether template_id is stamped on
 // archetype_details — only the very top-level root carries it.
 func (g *generator) setLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, isTemplateRoot bool) {
@@ -1309,9 +1350,12 @@ func (g *generator) setLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, 
 		archetypeDetails = ad
 	}
 
-	uidSource := g.nextUID
-	if prohibited(opt, "uid") && !partyNeedsUID(rmValue) {
+	uidSource := g.uidFor(rmValue)
+	switch {
+	case prohibited(opt, "uid") && !partyNeedsUID(rmValue):
 		uidSource = nil
+	case requiresUID(opt):
+		uidSource = g.nextUID
 	}
 	applyLocatableIdentity(rmValue, id, name, archetypeDetails, uidSource)
 }
@@ -1884,7 +1928,7 @@ func (g *generator) ensureItems(items *[]rm.Item) {
 // fill, so it carries a null flavour (RM Inv_null_flavour_indicated).
 func (g *generator) placeholderElement() *rm.Element {
 	el := &rm.Element{}
-	applyLocatableIdentity(el, "at0000", "element", nil, g.nextUID)
+	applyLocatableIdentity(el, "at0000", "element", nil, nil)
 	g.settleElement(nil, el)
 	return el
 }
@@ -1998,7 +2042,7 @@ func (g *generator) stampIfLocatable(rmValue any, rmType string) {
 	if name == "" {
 		name = "element"
 	}
-	applyLocatableIdentity(rmValue, "at0000", name, nil, g.nextUID)
+	applyLocatableIdentity(rmValue, "at0000", name, nil, g.uidFor(rmValue))
 	if el, ok := rmValue.(*rm.Element); ok {
 		g.settleElement(nil, el)
 	}
@@ -2011,7 +2055,7 @@ func (g *generator) stampIfLocatable(rmValue any, rmType string) {
 // one built from the BMM alone.
 func (g *generator) fillPartyRelationship(opt *tcimpl.CompiledNode, rel *rm.PartyRelationship) {
 	if rel.GetArchetypeNodeID() == "" {
-		applyLocatableIdentity(rel, "at0000", "relationship", nil, g.nextUID)
+		applyLocatableIdentity(rel, "at0000", "relationship", nil, nil)
 	}
 	if rel.GetUID() == nil && !prohibited(opt, "uid") {
 		rel.SetUID(g.nextUID())
