@@ -30,7 +30,7 @@ const bodyTemperature = "openEHR-EHR-OBSERVATION.body_temperature.v2"
 
 // magnitudePath is the RM path, starting at the alias "o", of the measured
 // temperature inside that archetype.
-const magnitudePath = "o/data[at0001]/events[at0006]/data/items[at0004]/value/magnitude"
+const magnitudePath = "o/data[at0002]/events[at0003]/data[at0001]/items[at0004]/value/magnitude"
 
 func main() {
 	if err := run(); err != nil {

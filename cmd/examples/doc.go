@@ -1,7 +1,9 @@
 // Package examples holds the runnable example programs that show how to use
 // the SDK, one directory per program. They are short reference shapes to copy
 // from, not production tools. Every one of them runs offline: the REST ones
-// talk to an in-process test server, so none needs a clinical data repository.
+// talk to a fake server in the same process, so none needs a clinical data
+// repository. Some fakes are httptest servers on a loopback address; the
+// others are built on the sandbox package and open no listener at all.
 //
 // The catalogue in docs/examples.md describes each program (what it shows,
 // how to run it, what the output means, and what to copy into your own
@@ -34,6 +36,14 @@
 //     in-process server
 //   - contribution-build: assemble a multi-version CONTRIBUTION and, with
 //     -commit, POST it to an in-process fake CDR
+//   - definition-lifecycle: upload, list and download a template through the
+//     Definition REST client, compile it, and ask for an example composition
+//   - composition-crud: save, read and update a COMPOSITION through the REST
+//     client, and handle the 412 a stale If-Match meets
+//   - query-execute: execute AQL with bound parameters, decode a RESULT_SET
+//     cell into a typed value, and classify a refused query
 //   - smart-launch: a standalone SMART-on-openEHR PKCE launch, with the
 //     AuthorizationRequest stored across the redirect
+//   - service-auth: authenticate a backend service with the OAuth 2.0 client
+//     credentials grant, reusing the cached token
 package examples
