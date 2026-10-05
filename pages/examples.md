@@ -137,4 +137,8 @@ If you are new to the SDK, try them in this order:
 2. Validate JSON against a template
 3. Build an AQL query
 4. Create an EHR
-5. Run a SMART PKCE launch
+5. Manage a template on the server
+6. Save, read and update a Composition
+7. Execute an AQL query
+8. Run a SMART PKCE launch
+9. Authenticate a backend service

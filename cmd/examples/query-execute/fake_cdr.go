@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/sandbox"
@@ -64,11 +65,13 @@ func answerQuery(w http.ResponseWriter, r *http.Request) {
 	}
 	// Stricter than a real CDR, so the example proves the binding: the EHR id
 	// and the threshold arrive in query_parameters, and the text holds only
-	// their placeholders.
+	// their placeholders, never their values.
 	params := body.QueryParameters
-	if params["ehr_id"] != patientEHRID || params["min_temp"] != feverThreshold ||
-		!strings.Contains(body.Q, "$ehr_id") || !strings.Contains(body.Q, "$min_temp") ||
-		strings.Contains(body.Q, patientEHRID) {
+	bound := params["ehr_id"] == patientEHRID && params["min_temp"] == feverThreshold &&
+		strings.Contains(body.Q, "$ehr_id") && strings.Contains(body.Q, "$min_temp")
+	pasted := strings.Contains(body.Q, patientEHRID) ||
+		strings.Contains(body.Q, strconv.FormatFloat(feverThreshold, 'g', -1, 64))
+	if !bound || pasted {
 		writeError(w, "AQL_PARAMETER_INVALID", "the EHR id and threshold were not bound as parameters")
 		return
 	}

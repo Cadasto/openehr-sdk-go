@@ -115,8 +115,10 @@ CDR.
 
 In tests you have two ways to avoid a real CDR. Inject `sandbox.Backend` as the
 client's `http.RoundTripper` and it answers requests in memory, with no
-server at all. The examples take the other route and start a loopback
-`httptest` server, which needs no credentials.
+server at all. Or start a loopback `httptest` server. The examples use both.
+The template, composition, query and client credentials examples run on
+`sandbox`. The examples that create an EHR, commit a contribution or run a
+SMART launch start an `httptest` server.
 
 Packages: `client/ehr` and the providers under `auth/`.
 

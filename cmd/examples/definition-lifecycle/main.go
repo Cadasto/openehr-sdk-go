@@ -19,11 +19,11 @@ package main
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
@@ -84,23 +84,26 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("list templates: %w", err)
 	}
-	if len(listed) != 1 {
-		return fmt.Errorf("listing for %s has %d entries, want 1", id, len(listed))
+	// The server matches the filter as a pattern and may list other templates
+	// too, so pick the entry whose id is exactly this one.
+	i := slices.IndexFunc(listed, func(m definition.TemplateMetadata) bool { return m.TemplateID == id })
+	if i < 0 {
+		return fmt.Errorf("listing has no entry for %s", id)
 	}
-	fmt.Printf("listed metadata      : id=%s concept=%s\n", listed[0].TemplateID, listed[0].Concept)
+	fmt.Printf("listed metadata      : id=%s concept=%s\n", listed[i].TemplateID, listed[i].Concept)
 
 	// Step 4: download the stored OPT. GetTemplate returns the bytes exactly
-	// as the server sends them; this server stores them unchanged.
+	// as the server sends them. A server may store a template in another form
+	// than the one uploaded, so the bytes need not match the upload; the
+	// program reports whether they do, and step 5 is the real check.
 	raw, _, err := definition.GetTemplate(ctx, client, id, definition.FormatADL14)
 	if err != nil {
 		return fmt.Errorf("get template: %w", err)
 	}
-	if !bytes.Equal(raw, opt) {
-		return errors.New("downloaded OPT differs from the uploaded one")
-	}
-	fmt.Printf("downloaded OPT       : %d bytes, matches the upload\n", len(raw))
+	fmt.Printf("downloaded OPT       : %d bytes, identical to the upload: %t\n", len(raw), bytes.Equal(raw, opt))
 
-	// Step 5: turn the bytes into the local handle. ParseOPTStrict fails on a
+	// Step 5: turn the bytes into the local handle. Whatever form the server
+	// sent, the download has to parse and compile. ParseOPTStrict fails on a
 	// node type it does not know instead of silently dropping what is under
 	// it. The compiled template is what the builder, validator and generator
 	// take; compile it once and reuse it.

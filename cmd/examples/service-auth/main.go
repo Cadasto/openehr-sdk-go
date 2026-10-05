@@ -62,6 +62,9 @@ func run() error {
 	// deployment fills these variables from its secret store. Nothing below
 	// prints the secret, the token or the Authorization header.
 	clientID := cmp.Or(os.Getenv("OPENEHR_CLIENT_ID"), placeholderClientID)
+	// An application refuses to start when OPENEHR_CLIENT_SECRET is empty.
+	// This fallback to a placeholder exists only because the in-process fake
+	// is wired in below, built with whatever secret this line reads.
 	clientSecret := cmp.Or(os.Getenv("OPENEHR_CLIENT_SECRET"), placeholderClientSecret)
 
 	// Step 2: bound the work. The context caps the whole run and the HTTP

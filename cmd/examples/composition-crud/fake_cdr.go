@@ -38,7 +38,9 @@ func newFakeCDR(base, ehrID string) *fakeCDR {
 // httpClient returns an *http.Client whose transport is the fake. sandbox
 // matches a route with or without the REST base in front, so "/ehr/..." here
 // answers "https://sandbox.local/openehr/v1/ehr/...". A path ending in "/"
-// matches that whole subtree. Every other request gets 404.
+// matches that whole subtree. Besides the routes the fake registers here, the
+// sandbox's built-in EHR routes still answer: POST /ehr, PUT /ehr/{id}, and
+// GET and HEAD /ehr/{id}. Anything else gets 404.
 func (f *fakeCDR) httpClient() *http.Client {
 	b := sandbox.New()
 	route := "/ehr/" + f.ehrID + "/composition"

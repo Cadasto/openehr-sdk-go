@@ -703,20 +703,20 @@ go run ./cmd/examples/definition-lifecycle
 ```text
 uploaded template    : body_weight
 listed metadata      : id=body_weight concept=body_weight
-downloaded OPT       : 84804 bytes, matches the upload
+downloaded OPT       : 84804 bytes, identical to the upload: true
 compiled handle      : template=body_weight root=openEHR-EHR-COMPOSITION.encounter.v1
 example composition  : openEHR-EHR-COMPOSITION.encounter.v1 with 1 content item(s)
 OK: template uploaded, listed, downloaded and compiled; example received
 ```
 
-`definition.UploadTemplate` sends no `Prefer` header, and the fake answers the way ITS-REST describes for that case: `201 Created`, a `Location` header naming the template, and an empty body. `UploadTemplate` then takes the template id from the last segment of `Location`; a server that sends a JSON body with a `template_id` works as well. The SDK has no call that returns the metadata of one template, so the program filters `definition.ListTemplates` by the id. The downloaded OPT matches the upload byte for byte because this fake stores it unchanged. For the example, the fake ignores the `type` and `detail_level` parameters and returns a composition recorded against the same template; a real server generates the example from the template.
+`definition.UploadTemplate` sends no `Prefer` header, and the fake answers the way ITS-REST describes for that case: `201 Created`, a `Location` header naming the template, and an empty body. `UploadTemplate` then takes the template id from the last segment of `Location`; a server that sends a JSON body with a `template_id` works as well. The SDK has no call that returns the metadata of one template, so the program filters `definition.ListTemplates` by the id. The server matches that filter as a pattern and may list other templates too, so the program picks the entry whose `TemplateID` is exactly the id. This fake stores the OPT unchanged, so the download is identical to the upload. A real server may store a template in another form, so the program only reports the comparison; the check is that the download parses with `template.ParseOPTStrict` and compiles. For the example, the fake ignores the `type` and `detail_level` parameters and returns a composition recorded against the same template; a real server generates the example from the template.
 
 **What to copy into your app:**
 
 1. Bound the work with `context.WithTimeout`, give your `*http.Client` a `Timeout` of its own, and pass it to `transport.New` with `transport.WithHTTPClient`.
 2. `definition.UploadTemplate(ctx, client, definition.FormatADL14, body)`, then read the id from the returned metadata's `TemplateID`.
-3. `definition.ListTemplates(ctx, client, definition.FormatADL14, definition.WithTemplateID(id))` to read one template's metadata. ITS-REST makes the filter a wildcard pattern, matched by the server.
-4. To compile exactly what the server holds, download it with `definition.GetTemplate`, then run `template.ParseOPTStrict` and `templatecompile.Compile`. Compile once per template and reuse the handle.
+3. `definition.ListTemplates(ctx, client, definition.FormatADL14, definition.WithTemplateID(id))` to read one template's metadata. ITS-REST makes the filter a wildcard pattern, matched by the server, so take the entry whose `TemplateID` equals the id, not the first entry.
+4. To compile exactly what the server holds, download it with `definition.GetTemplate`, then run `template.ParseOPTStrict` and `templatecompile.Compile`. The download may differ from the bytes you uploaded. Compile once per template and reuse the handle.
 5. `definition.ExampleComposition` gives a starting payload for a template. `WithExampleType` and `WithExampleDetailLevel` choose the kind of example; without them the server applies the ITS-REST defaults, `input` and `required`.
 
 ---
@@ -884,9 +884,10 @@ Without the variables the program falls back to two marked placeholders, `exampl
 5. ehr_create              ← REST wiring (mock first, then real CDR)
 6. definition-lifecycle    ← get a template onto the server
 7. composition-crud        ← write data, with optimistic concurrency
-8. query-execute           ← read it back with AQL
-9. smart-launch            ← SMART PKCE auth (standalone, public client)
-10. service-auth           ← client credentials for a backend service
+8. aql-build               ← build an AQL query in code
+9. query-execute           ← run it and read the data back
+10. smart-launch           ← SMART PKCE auth (standalone, public client)
+11. service-auth           ← client credentials for a backend service
 ```
 
 Optional depth: `canxml_roundtrip` (multi-format), `primitive-validate` (leaf constraints), `validate-composition` (in-memory RM construction), `contribution-build` (batched atomic writes).

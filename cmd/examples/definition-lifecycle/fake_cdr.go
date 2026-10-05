@@ -40,7 +40,7 @@ type storedTemplate struct {
 	opt  []byte
 }
 
-// fakeCDR stands in for a clinical data repository. It answers only the four
+// fakeCDR stands in for a clinical data repository. It answers the four
 // ADL 1.4 template routes the example calls and keeps every uploaded OPT in
 // memory. It is safe for concurrent use.
 type fakeCDR struct {
@@ -62,6 +62,9 @@ func newFakeCDR() (*fakeCDR, error) {
 
 // backend registers the fake's routes on a sandbox backend, an in-process
 // http.RoundTripper. A path ending in "/" matches the whole subtree under it.
+// Besides the routes the fake registers here, the sandbox's built-in EHR
+// routes still answer: POST /ehr, PUT /ehr/{id}, and GET and HEAD /ehr/{id}.
+// Anything else gets 404.
 func (f *fakeCDR) backend() *sandbox.Backend {
 	b := sandbox.New()
 	b.HandleFunc(http.MethodPost, templateRoute, f.upload)

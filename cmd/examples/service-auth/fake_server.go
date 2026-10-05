@@ -88,7 +88,14 @@ func (f *fakeServer) validClient(r *http.Request) bool {
 	}
 	id, errID := url.QueryUnescape(rawID)
 	secret, errSecret := url.QueryUnescape(rawSecret)
-	return errID == nil && errSecret == nil && same(id, f.clientID) && same(secret, f.clientSecret)
+	if errID != nil || errSecret != nil {
+		return false
+	}
+	// Run both comparisons before combining them, so a wrong id does not skip
+	// the secret comparison and answer sooner than a wrong secret.
+	idOK := same(id, f.clientID)
+	secretOK := same(secret, f.clientSecret)
+	return idOK && secretOK
 }
 
 // options answers the System API's OPTIONS /, but only for a request that
