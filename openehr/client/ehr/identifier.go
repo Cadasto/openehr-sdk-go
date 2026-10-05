@@ -39,8 +39,8 @@ type Identifier struct {
 // bytes, whitespace, or JSON `null`, as [transport.IsNoRepresentationBody]
 // defines empty for every 2xx response. A server honouring
 // `Prefer: return=identifier` with `null` sent no identifier rather than a
-// malformed one, so the version id already chosen — a well-formed ETag,
-// then Location — stays in place.
+// malformed one, so the version id already chosen (a well-formed ETag,
+// then Location) stays in place.
 func (m *VersionMetadata) ResolveIdentifierBody(body []byte) error {
 	if m == nil || transport.IsNoRepresentationBody(body) {
 		return nil
