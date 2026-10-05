@@ -695,6 +695,62 @@ func TestRevokeDiscardsARefreshInFlight(t *testing.T) { // REQ-167 REQ-063
 	})
 }
 
+// TestTokenAfterRevokeDoesNotWaitForTheInflightExchange pins REQ-167 and
+// REQ-063: Revoke clears the exchange that is still in flight when it
+// clears the session, so a later Token returns auth.ErrReauthRequired
+// without waiting for that exchange's blocked HTTP call, and the exchange
+// does not install its tokens.
+func TestTokenAfterRevokeDoesNotWaitForTheInflightExchange(t *testing.T) { // REQ-167 REQ-063
+	key := newRSAKey(t)
+	synctest.Test(t, func(t *testing.T) {
+		h := newHeldRefreshTransport(t, key)
+		rt := &revokingTransport{next: h}
+		src, err := newSource("client-id", discovery.AuthEndpoints{
+			AuthorizationEndpoint: discovery.MustParseURL("https://idp.test/authorize"),
+			TokenEndpoint:         discovery.MustParseURL("https://idp.test/token"),
+			RevocationEndpoint:    discovery.MustParseURL("https://idp.test/revoke"),
+		},
+			smart.WithHTTPClient(&http.Client{Transport: rt}),
+			smart.WithRedirectURI("https://app.example/callback"),
+		)
+		if err != nil {
+			t.Fatalf("newSource: %v", err)
+		}
+		src.SetTokens(staleAccess("A-1"), "rt-A")
+
+		leader := make(chan tokenResult, 1)
+		go func() {
+			tok, err := src.Token(t.Context())
+			leader <- tokenResult{tok, err}
+		}()
+		<-h.arrived // the refresh is held in the HTTP client
+
+		if err := src.Revoke(t.Context()); err != nil {
+			t.Fatalf("Revoke() error = %v, want nil", err)
+		}
+
+		// The exchange is still blocked. Token must answer from the signed-out
+		// session now, not when that call returns.
+		ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+		defer cancel()
+		tok, err := src.Token(ctx)
+		if !errors.Is(err, auth.ErrReauthRequired) || tok.Value != "" {
+			t.Errorf("Token() while the exchange is still blocked = %q, %v; want auth.ErrReauthRequired", tok.Value, err)
+		}
+		if n := len(h.refreshes()); n != 1 {
+			t.Errorf("refresh grants while the exchange is blocked = %d, want 1: Token sent another request", n)
+		}
+
+		h.release <- heldResponse{http.StatusOK, `{"access_token":"A-2","token_type":"Bearer","expires_in":3600,"refresh_token":"rt-A2"}`}
+		if r := <-leader; !errors.Is(r.err, auth.ErrReauthRequired) || r.tok.Value != "" {
+			t.Errorf("the overtaken Token() = %q, %v; want ErrReauthRequired and none of its tokens installed", r.tok.Value, r.err)
+		}
+		if access, refresh := src.HeldTokens(); !access.IsZero() || refresh != "" {
+			t.Errorf("held tokens = %+v, %q; want none", access, refresh)
+		}
+	})
+}
+
 // TestRevokeEndsTheSessionIdentity pins REQ-167 and REQ-064: signing out
 // also ends the identity of the ID token the source verified, so a refresh
 // of tokens imported afterwards may carry an ID token naming another user.

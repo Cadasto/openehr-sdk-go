@@ -10,7 +10,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"sync"
-	"time"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
 	"github.com/cadasto/openehr-sdk-go/auth/clientcreds"
@@ -261,21 +260,12 @@ func captureBackendToken(ctx context.Context, newSource func(tokenURL string, hc
 	return gotForm, gotAuth, nil
 }
 
-// backendSigner builds a jwtbearer.ClaimsSigner (RS384) for backend
-// client-assertion / jwt-bearer flows.
+// backendSigner builds the SMART client assertion (RS384) for backend
+// client-assertion and jwt-bearer flows.
 func backendSigner(clientID, tokenURL string) (*jwtbearer.ClaimsSigner, error) {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return nil, fmt.Errorf("generate key: %w", err)
 	}
-	return jwtbearer.NewClaimsSigner(
-		jwtbearer.ClaimsTemplate{
-			Issuer:   clientID,
-			Subject:  clientID,
-			Audience: tokenURL,
-			Lifetime: 5 * time.Minute,
-		},
-		key,
-		jwtbearer.WithKeyID("backend-kid"),
-	)
+	return jwtbearer.NewClientAssertion(clientID, tokenURL, key, "RS384", "backend-kid")
 }

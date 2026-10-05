@@ -73,6 +73,11 @@ func (s *Source) Revoke(ctx context.Context) error {
 	// refresh that is running now does not install its tokens when it ends.
 	s.session++
 	s.setTokensLocked(auth.Token{}, "")
+	// The exchange still running belongs to the session just ended. Drop it
+	// so a later Token does not wait out its HTTP call (REQ-167, REQ-063).
+	// That exchange clears inflight only when the stored one is still
+	// itself, so a newer exchange is left in place.
+	s.inflight = nil
 	// The change is queued now, so it keeps its place among the changes
 	// installed before and after it, but reported only once the request has
 	// been sent or has failed: a hook that panics or blocks cannot stop it.
