@@ -172,3 +172,45 @@ func TestREQ107_ProhibitedFirstAlternativeSuppliesNothing(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ107_IncludedFlagFromAllowedAlternative is the REQ-107 check that a
+// bounded interval side takes its lower_included or upper_included from
+// the first C_BOOLEAN alternative the OPT does not prohibit, the one the
+// walk would build, and never from a prohibited one: the prohibited first
+// alternative admits only the opposite value. It holds under both
+// policies, both value fills and both compile modes.
+func TestREQ107_IncludedFlagFromAllowedAlternative(t *testing.T) {
+	onlyTrue := "<true_valid>true</true_valid><false_valid>false</false_valid>"
+	onlyFalse := "<true_valid>false</true_valid><false_valid>true</false_valid>"
+	flag := func(name, prohibited, allowed string) string {
+		return optSingle(name,
+			optPrimitiveOccurring(0, 0, "BOOLEAN", "C_BOOLEAN", prohibited),
+			optPrimitiveOccurring(0, 1, "BOOLEAN", "C_BOOLEAN", allowed))
+	}
+	opt := optTemplate("ELEMENT", optSingle("value", optNode("DV_INTERVAL&lt;DV_COUNT&gt;", "",
+		optSingle("lower", optCount(false, "<list>1</list>")),
+		optSingle("upper", optCount(false, "<list>9</list>")),
+		flag("lower_included", onlyFalse, onlyTrue),
+		flag("upper_included", onlyTrue, onlyFalse))))
+	for _, implicit := range []bool{true, false} {
+		c := compileOPTText(t, opt, implicit)
+		for _, opts := range defaultsOptions() {
+			t.Run(fmt.Sprintf("implicit=%t/%v/%v", implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+				out, err := instance.Generate(t.Context(), c, opts)
+				if err != nil {
+					t.Fatalf("Generate: %v", err)
+				}
+				iv, ok := out.(*rm.Element).Value.(*rm.DVInterval[rm.DVCount])
+				if !ok {
+					t.Fatalf("ELEMENT.value is %T, want *rm.DVInterval[rm.DVCount]", out.(*rm.Element).Value)
+				}
+				if !iv.LowerIncluded {
+					t.Errorf("LowerIncluded = false, want true from the allowed alternative")
+				}
+				if iv.UpperIncluded {
+					t.Errorf("UpperIncluded = true, want false from the allowed alternative")
+				}
+			})
+		}
+	}
+}
