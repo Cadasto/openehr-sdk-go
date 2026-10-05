@@ -74,6 +74,10 @@ func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (a
 	if err != nil {
 		return nil, fmt.Errorf("Generate: root %q: %w", rootType, err)
 	}
+	// A data-value root gets the primitive default a child of its type
+	// gets when it is built, so a root and a nested value of one type get
+	// the same placeholder. No-op for a root that is not a data value.
+	g.populatePrimitiveDefault(root)
 
 	// The root carries the template_id; nested archetype roots only
 	// get archetype_details with the archetype_id.
@@ -488,44 +492,25 @@ func (g *generator) temporalSentinel(v any) string {
 
 // writeBMMString stores a BMM String attribute. A field that already
 // holds a value is left alone: populatePrimitiveDefault may have set
-// a clock or a code before this pass. An empty field takes the value
-// stringSentinel gives it.
+// a clock or a code before this pass. An empty value of a temporal
+// data value takes its temporal sentinel, so it stays a valid ISO 8601
+// value; every other empty string keeps the open-string example
+// sentinel.
 func (g *generator) writeBMMString(parent any, parentType, attr string) {
 	cur, known := stringAttr(parent, attr)
 	if known && cur != "" {
 		return
+	}
+	val := "example"
+	if s := g.temporalSentinel(parent); attr == "value" && s != "" {
+		val = s
 	}
 	// Best-effort, on purpose: the write is refused for a String
 	// attribute rmwrite does not address (TERMINOLOGY_ID.value, a
 	// locatable's archetype_node_id), and those are filled by another
 	// default or reported by the validator. Returning the error would
 	// fail Generate on every OPT.
-	_ = rmwrite.EnsureSingle(parent, parentType, attr, g.stringSentinel(parent, attr))
-}
-
-// stringSentinel is the value writeBMMString gives an empty String
-// attribute. The value of a temporal data value takes its temporal
-// sentinel, so it stays a valid ISO 8601 value. The value of a DV_EHR_URI
-// and the code of a code phrase take the placeholders
-// populatePrimitiveDefault writes on a nested one, so a generation root,
-// which that pass does not reach, gets the same placeholder; rmwrite puts
-// the code in terminology local when the code phrase names none. Every
-// other attribute takes the open-string example sentinel.
-func (g *generator) stringSentinel(parent any, attr string) string {
-	switch parent.(type) {
-	case *rm.DVEHRURI:
-		if attr == "value" {
-			return "ehr://example"
-		}
-	case *rm.CodePhrase:
-		if attr == "code_string" {
-			return "at0000"
-		}
-	}
-	if s := g.temporalSentinel(parent); attr == "value" && s != "" {
-		return s
-	}
-	return "example"
+	_ = rmwrite.EnsureSingle(parent, parentType, attr, val)
 }
 
 // stringAttr reads a BMM String field the generator itself writes.
@@ -1487,17 +1472,15 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 		if v.Item.GetArchetypeNodeID() == "" && (v.Item.Value == nil || rm.IsTypedNil(v.Item.Value)) {
 			v.Item = *g.placeholderElement()
 		}
-	case *rm.DVCodedText:
-		// Backstop for a coded text the primitive default did not reach,
-		// such as a generation root with no attribute to walk: it gets
-		// the text and the code a nested one gets.
-		if v.Value == "" {
-			v.Value = "example"
-		}
-		fillBlankCode(&v.DefiningCode)
 	case *rm.CodePhrase:
-		// The same backstop for a code phrase.
-		fillBlankCode(v)
+		// The implicit terminology_id attribute replaces the terminology
+		// the primitive default wrote with an empty TERMINOLOGY_ID, whose
+		// value the generator cannot write. rmwrite puts local back when
+		// it attaches a code phrase to a coded text; a root code phrase is
+		// not attached, so it is put back here.
+		if v.TerminologyID.Value == "" {
+			v.TerminologyID = rm.TerminologyID{Value: "local"}
+		}
 	case *rm.DVEHRURI:
 		// Backstop for a DV_EHR_URI the primitive default did not reach;
 		// every one the generator emits is walked.
@@ -1614,19 +1597,6 @@ func noInformation() *rm.DVCodedText {
 			CodeString:    code,
 			TerminologyID: rm.TerminologyID{Value: terminology.ID},
 		},
-	}
-}
-
-// fillBlankCode gives a code phrase with no code the placeholder code
-// at0000, in terminology local when it names none. A code phrase that has
-// a code is left alone.
-func fillBlankCode(c *rm.CodePhrase) {
-	if c.CodeString != "" {
-		return
-	}
-	c.CodeString = "at0000"
-	if c.TerminologyID.Value == "" {
-		c.TerminologyID = rm.TerminologyID{Value: "local"}
 	}
 }
 
