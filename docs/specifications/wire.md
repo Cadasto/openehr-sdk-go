@@ -381,7 +381,8 @@ Rules the SDK **MUST** enforce:
 - A `412 Precondition Failed` response (a stale `If-Match`: the preceding version is no longer the latest) **MUST** map to `transport.ErrPreconditionFailed`. The latest `version_uid` is in the response `ETag` and **MUST** stay reachable beside the error through the returned `VersionMetadata`.
 - A `409 Conflict` response **MUST** map to `transport.ErrVersionConflict`. The vendored ITS-REST pin answers `409` for deleting a Composition version that is not the latest; a stale `If-Match` on a PUT is `412`, not `409`.
 - A `428 Precondition Required` response **MUST** map to `transport.ErrPreconditionRequired`. It is a defensive mapping for non-conformant servers, not an openEHR status.
-- The Composition delete takes no `If-Match`: the `version_uid` in its path is the preceding version, so the SDK **MUST NOT** require or send one for it.
+- The Composition delete and the demographic delete take no `If-Match`: the `version_uid` in the path is the preceding version, so the SDK **MUST NOT** require or send one for either. A `409` on the demographic delete answers as on the Composition delete: `transport.ErrVersionConflict`, with the latest `version_uid` reachable beside the error through the returned `VersionMetadata` (the pin's `409_PERSON_with_uid_based_id` returns it in the `ETag` header). The Directory delete takes an `If-Match` and the SDK **MUST** require it.
+- The SDK **MUST** refuse an empty `If-Match` on a PUT or a Directory delete with `transport.ErrInvalidConfig` before it issues any request.
 - The SDK **MUST NOT** synthesise these statuses client-side — they come from the backend.
 
 ETag handling on reads is symmetric: the SDK **MUST** capture `ETag` from a response and expose it on the typed return value. The value the caller sends on the next PUT is the `VersionUID` from the version-identifier rule below, which is that `ETag` only when the rule selects it.
