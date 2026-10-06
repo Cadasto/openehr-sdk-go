@@ -17,6 +17,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/auth"
 	"github.com/cadasto/openehr-sdk-go/auth/jwtbearer"
+	"github.com/cadasto/openehr-sdk-go/internal/noredirect"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 )
 
@@ -227,6 +228,10 @@ func WithTokenChange(fn func(ctx context.Context, change TokenChange)) Option {
 // Source implements auth.TokenSource for SMART authorization-code + PKCE.
 type Source struct {
 	cfg Config
+	// credClient sends the token, refresh and revocation requests, which
+	// carry a credential: it never follows a redirect. cfg.HTTPClient,
+	// which the caller owns, is left as it was.
+	credClient *http.Client
 
 	mu       sync.Mutex
 	cur      auth.Token
@@ -463,7 +468,7 @@ func FromConfig(cfg Config) (*Source, error) {
 		}
 		cfg.JWKS = jwks
 	}
-	return &Source{cfg: cfg}, nil
+	return &Source{cfg: cfg, credClient: noredirect.Client(cfg.HTTPClient)}, nil
 }
 
 // configureClientAuth resolves the confidential-client authentication method
@@ -1105,7 +1110,7 @@ func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, To
 	if err != nil {
 		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, Inner: err}
 	}
-	resp, err := s.cfg.HTTPClient.Do(req)
+	resp, err := s.credClient.Do(req)
 	if err != nil {
 		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, Inner: err}
 	}

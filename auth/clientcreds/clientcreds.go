@@ -17,6 +17,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/auth"
 	"github.com/cadasto/openehr-sdk-go/auth/jwtbearer"
+	"github.com/cadasto/openehr-sdk-go/internal/noredirect"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 )
 
@@ -133,6 +134,10 @@ func WithClientAssertion(src jwtbearer.AssertionSource) Option {
 type Source struct {
 	cfg      Config
 	tokenURL *url.URL
+	// client sends the token request, which carries a credential: it never
+	// follows a redirect. cfg.HTTPClient, which the caller owns, is left as
+	// it was.
+	client *http.Client
 
 	mu       sync.Mutex
 	cur      auth.Token
@@ -202,7 +207,7 @@ func FromConfig(cfg Config) (*Source, error) {
 	if cfg.RefreshThreshold == 0 {
 		cfg.RefreshThreshold = 30 * time.Second
 	}
-	return &Source{cfg: cfg, tokenURL: u}, nil
+	return &Source{cfg: cfg, tokenURL: u, client: noredirect.Client(cfg.HTTPClient)}, nil
 }
 
 // NewFromCatalog builds a Source for SMART Backend Services from a resolved
@@ -445,7 +450,7 @@ func (s *Source) fetch(ctx context.Context) (auth.Token, error) {
 		req.SetBasicAuth(url.QueryEscape(s.cfg.ClientID), url.QueryEscape(s.cfg.ClientSecret))
 	}
 
-	resp, err := s.cfg.HTTPClient.Do(req)
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return auth.Token{}, &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, Inner: err}
 	}

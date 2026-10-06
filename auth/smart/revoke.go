@@ -94,7 +94,7 @@ func (s *Source) Revoke(ctx context.Context) error {
 	if err != nil {
 		return &auth.ExchangeError{Sentinel: auth.ErrRevocationFailed, Inner: err}
 	}
-	resp, err := s.cfg.HTTPClient.Do(req)
+	resp, err := s.credClient.Do(req)
 	if err != nil {
 		return &auth.ExchangeError{Sentinel: auth.ErrRevocationFailed, Inner: err}
 	}

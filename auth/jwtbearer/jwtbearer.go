@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
+	"github.com/cadasto/openehr-sdk-go/internal/noredirect"
 )
 
 // GrantType is the assertion grant identifier defined by RFC 7523.
@@ -67,6 +68,10 @@ func WithIssuer(iss string) Option { return func(cfg *Config) { cfg.Issuer = iss
 type Source struct {
 	cfg      Config
 	tokenURL *url.URL
+	// client sends the token request, which carries a credential: it never
+	// follows a redirect. cfg.HTTPClient, which the caller owns, is left as
+	// it was.
+	client *http.Client
 
 	mu       sync.Mutex
 	cur      auth.Token
@@ -117,7 +122,7 @@ func FromConfig(cfg Config) (*Source, error) {
 	if cfg.RefreshThreshold == 0 {
 		cfg.RefreshThreshold = 30 * time.Second
 	}
-	return &Source{cfg: cfg, tokenURL: u}, nil
+	return &Source{cfg: cfg, tokenURL: u, client: noredirect.Client(cfg.HTTPClient)}, nil
 }
 
 var _ auth.Reauther = (*Source)(nil)
@@ -252,7 +257,7 @@ func (s *Source) fetch(ctx context.Context) (auth.Token, error) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := s.cfg.HTTPClient.Do(req)
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return auth.Token{}, &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, Inner: err}
 	}
