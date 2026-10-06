@@ -362,6 +362,92 @@ func TestCoalescedWaiterReturnsItsOwnContextError(t *testing.T) { // REQ-026, RE
 	})
 }
 
+// lateContext wraps a waiter's context so that a test can end it after the
+// in-flight fetch woke the waiter but before the waiter looks at its context
+// again. Once hold is called, every call to Done or Err waits until open is
+// called, then reports the wrapped context as it is at that moment. Without
+// it, the test would depend on the scheduler running the code that ends the
+// context between the wake-up and that look.
+type lateContext struct {
+	context.Context //nolint:containedctx // a test double that delays the context it wraps
+
+	held    atomic.Bool
+	release chan struct{}
+	once    sync.Once
+}
+
+func newLateContext(ctx context.Context) *lateContext {
+	return &lateContext{Context: ctx, release: make(chan struct{})}
+}
+
+func (c *lateContext) Done() <-chan struct{} {
+	c.wait()
+	return c.Context.Done()
+}
+
+func (c *lateContext) Err() error {
+	c.wait()
+	return c.Context.Err()
+}
+
+func (c *lateContext) wait() {
+	if c.held.Load() {
+		<-c.release
+	}
+}
+
+// hold makes every later call to Done or Err wait for open.
+func (c *lateContext) hold() { c.held.Store(true) }
+
+// open lets the calls to Done or Err that wait go on.
+func (c *lateContext) open() { c.once.Do(func() { close(c.release) }) }
+
+// TestCoalescedWaiterWhoseContextEndsAsItWakesDoesNotFetch pins REQ-026 and
+// REQ-071: a waiter woken because the fetching caller's own context ended
+// looks at its own context again before it fetches. When that context has
+// ended by then, the waiter returns that context's error itself, not the
+// fetching caller's error or the error of a fetch of its own, and sends no
+// request.
+func TestCoalescedWaiterWhoseContextEndsAsItWakesDoesNotFetch(t *testing.T) { // REQ-026, REQ-071
+	synctest.Test(t, func(t *testing.T) {
+		p := startHeldPlatform(t, 1, 0)
+		res, _ := p.resolver(t)
+		baseURL := p.baseURL()
+
+		ctx1, cancel1 := context.WithCancel(t.Context())
+		defer cancel1()
+		inner2, cancel2 := context.WithCancel(t.Context())
+		defer cancel2()
+		ctx2 := newLateContext(inner2)
+		defer ctx2.open()
+		var (
+			wg         sync.WaitGroup
+			err1, err2 error
+			cat2       *discovery.ServiceCatalog
+		)
+		wg.Go(func() { _, err1 = res.Resolve(ctx1, baseURL) })
+		synctest.Wait() // caller 1's request is held at the server
+		wg.Go(func() { cat2, err2 = res.Resolve(ctx2, baseURL) })
+		synctest.Wait() // caller 2 waits for caller 1's fetch
+		ctx2.hold()
+		cancel1()
+		synctest.Wait() // caller 1 gave up and woke caller 2, whose next look at its context waits
+		cancel2()
+		ctx2.open()
+		wg.Wait()
+
+		if !errors.Is(err1, context.Canceled) {
+			t.Errorf("caller 1 error = %v, want its own context.Canceled", err1)
+		}
+		if err2 != context.Canceled || cat2 != nil { //nolint:errorlint // the waiter returns its context's error itself, wrapped in nothing
+			t.Errorf("caller 2 = %v, %v, want nil and its own context's error %v itself: its context ended before it looked again", cat2, err2, context.Canceled)
+		}
+		if got := p.hits.Load(); got != 1 {
+			t.Errorf("server answered %d requests, want 1: caller 2 sends none once its own context ended", got)
+		}
+	})
+}
+
 // TestCoalescedStarterDeadlineIsItsOwnFailure pins REQ-071: a fetching caller
 // whose context ends by its deadline is treated like one that cancelled. It
 // gets its own deadline error, a waiter whose context is live fetches again and
