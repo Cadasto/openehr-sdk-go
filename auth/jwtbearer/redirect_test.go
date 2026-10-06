@@ -45,16 +45,23 @@ func (rt *redirectTarget) received() []string {
 	return append([]string(nil), rt.reqs...)
 }
 
+// redirectBody is a well-formed token response that newRedirector sends
+// with its 3xx, so the answer cannot fail on its body and only the status
+// check can refuse it (REQ-060).
+const redirectBody = `{"access_token":"from-a-3xx","token_type":"Bearer","expires_in":3600}`
+
 // newRedirector returns a stub token endpoint that answers every request
-// with status and a Location header that names to, and counts the requests
-// it receives.
+// with status, a Location header that names to and redirectBody, and counts
+// the requests it receives.
 func newRedirector(t *testing.T, status int, to string) (*httptest.Server, *atomic.Int32) {
 	t.Helper()
 	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		hits.Add(1)
 		w.Header().Set("Location", to)
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(status)
+		_, _ = w.Write([]byte(redirectBody))
 	}))
 	t.Cleanup(srv.Close)
 	return srv, &hits
