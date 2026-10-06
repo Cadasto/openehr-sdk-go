@@ -806,6 +806,10 @@ func (s *Source) verifyIDToken(ctx context.Context, raw, nonce string) (*IDToken
 // the member is absent from the response body: a member the refresh
 // response carries replaces the earlier value, even when it is an empty
 // string or null. Raw's other members are the refresh response's own.
+// When the earlier response has no scope member either, as for a session
+// whose tokens [Source.SetTokens] installed, the scope of the access token
+// the source held when the refresh began stands in, in Scope and in
+// Raw["scope"], although no server sent it.
 //
 // After [Source.Revoke] it is the zero value until a code exchange or a
 // refresh succeeds.
@@ -826,6 +830,10 @@ func (s *Source) LastTokenResponse() TokenResponse {
 //
 // SetTokens does not call the [WithTokenChange] hook: the application
 // already has the tokens it passes.
+//
+// A later refresh response that leaves out the scope, on a session whose
+// last token response has no scope member, gives the refreshed token and
+// [Source.LastTokenResponse] the scope of access.
 func (s *Source) SetTokens(access auth.Token, refresh string) {
 	s.mu.Lock()
 	s.session++
