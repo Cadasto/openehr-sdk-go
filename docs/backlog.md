@@ -12,14 +12,8 @@ Leftovers of merged branches, by directory: suggestions, and findings the mainta
 - auth/smart/source.go:95 · The TokenChange.Response doc says "Its Raw map is the hook's own copy", but maps.Clone copies only the top level: nested values such as fhirContext objects stay shared with LastTokenResponse; add the values inside Raw to the read-only list · by: go-reviewer · from: feat/smart-token-lifecycle
 - auth/smart/jwks.go:15 · the JWKS cache uses a fixed five-minute TTL; Cache-Control on the JWKS response and stale-if-error are not honoured · from: smart-client-conformance plan
 
-## cmd/examples/validate-composition
-- cmd/examples/validate-composition/main.go:122 · The claims that this composition "matches the default fixture of the validate-from-json example" and that the committed fixture is what gen_fixture.go writes have no test; the generator is `//go:build ignore`, so the copies can drift · evidence: generator output byte-identical today; overlay canjson comparison identical; no test refers to either · fix: move the builder into a normal file and add a comparison test, or drop the "matches" sentence · by: go-reviewer · from: docs/examples-validation-path
-
 ## cmd/probe-record
 - cmd/probe-record/scenarios_writes.go · the ehr-status scenario submits is_modifiable true, so its recording would also pass against a server that behaves differently; changing it needs a recapture · from: pr201
-
-## docs
-- docs/examples.md:205 · The failing-run outcomes documented here (-invalid: one `required` issue per pass at /category; -corpus at line 253: RM floor 0, template 12) are not checked by any test; the transcript test runs each program with no arguments and requires exit 0 · evidence: cmd/examples/transcripts_test.go:394-418; both variants match the prose by hand today · fix: add a transcript case with arguments that expects exit 1 and checks the issue lines, or drop the exact count · by: go-reviewer · from: docs/examples-validation-path
 
 ## docs/specifications
 - docs/specifications/traceability.yaml · test files may still cite a REQ they do not pin and so appear in its generated tests list; a sweep over all test files is still to do (the audit estimated 45 to 50 files, not re-counted) · from: audit-2026-09
