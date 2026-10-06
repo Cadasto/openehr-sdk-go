@@ -11,7 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - **`demographic.Delete` takes no `If-Match` (REQ-054).** Breaking: the `ifMatch` parameter is gone, from the repository method too, and a 409 returns `ErrVersionConflict` with the latest version uid beside it.
-- **Token, refresh and revocation requests never follow a redirect (REQ-060).** `auth/smart`, `auth/clientcreds` and `auth/jwtbearer` return a 3xx answer as an `ExchangeError` instead of re-sending the form to another URL.
+- **Token, refresh and revocation requests never follow a redirect (REQ-060).** Breaking: `auth/smart`, `auth/clientcreds` and `auth/jwtbearer` return a 3xx answer as an `ExchangeError` instead of re-sending the form to another URL.
 - **A restored session keeps its scope on refresh (REQ-064).** After `SetTokens`, a refresh response that omits `scope` gives an access token with the held token's scope, not an empty one.
 - **One cancelled caller no longer fails the others (REQ-071).** In `smart/discovery`, a waiter whose own context is live fetches again when the fetching caller's context ends, and the cached catalog stays.
 

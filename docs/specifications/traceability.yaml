@@ -511,7 +511,7 @@ requirements:
     canonical: docs/specifications/wire.md#req-054
     status: draft
     implementation: landed
-    packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/ehrstatus]
+    packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/demographic]
     probes: [PROBE-010, PROBE-011, PROBE-012, PROBE-013, PROBE-065]
     tests:
       - openehr/client/demographic/party_test.go
@@ -622,7 +622,7 @@ requirements:
     canonical: docs/specifications/auth.md#req-060
     status: draft
     implementation: landed
-    packages: [auth, transport]
+    packages: [auth, auth/clientcreds, auth/jwtbearer, auth/smart, internal/noredirect, transport]
     tests:
       - auth/clientcreds/redirect_test.go
       - auth/clientcreds/token_type_test.go
