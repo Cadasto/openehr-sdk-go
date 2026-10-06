@@ -58,6 +58,11 @@ type resolveCall struct {
 	done    chan struct{}
 	catalog *ServiceCatalog
 	err     error
+	// ownContextEnded is set when the fetch failed only because the context
+	// of the caller that ran it ended. The failure says nothing about the
+	// Platform, so a waiter does not take it as its own result. Read only
+	// after done is closed.
+	ownContextEnded bool
 }
 
 type resolverConfig struct {
@@ -238,7 +243,9 @@ func requestFailure(err error) DiscoveryErrorReason {
 // When the cached catalog has expired and carries an ETag, the fetch is
 // conditional, as for Refresh: a 304 Not Modified renews the cached
 // catalog once it passes the same checks as a new document, the issuer
-// check included. A failed fetch or check drops the cached catalog.
+// check included. A failed fetch or check drops the cached catalog, unless
+// only the caller's own cancelled or expired context caused the failure,
+// which leaves it in place.
 func (r *Resolver) Resolve(ctx context.Context, baseURL string) (*ServiceCatalog, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -262,8 +269,10 @@ func (r *Resolver) Resolve(ctx context.Context, baseURL string) (*ServiceCatalog
 // the issuer's OpenID configuration. A new document replaces the cached
 // catalog. When the refresh fails, the cached catalog is dropped, so the
 // next Resolve fetches again and reports the error if that fetch fails
-// too. Until the refresh completes,
-// Resolve keeps returning the cached catalog while it is fresh.
+// too. The exception is a refresh that failed only because the caller's own
+// context ended: that says nothing about the Platform, so the cached catalog
+// stays. Until the refresh completes, Resolve keeps returning the cached
+// catalog while it is fresh.
 func (r *Resolver) Refresh(ctx context.Context, baseURL string) (*ServiceCatalog, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -274,42 +283,76 @@ func (r *Resolver) Refresh(ctx context.Context, baseURL string) (*ServiceCatalog
 
 // fetchCoalesced runs at most one in-flight fetch per base URL; other
 // callers for the same base URL wait for its result. The fetch runs under
-// the context of the caller that started it: if that context ends, the
-// fetch fails with the context's error and every waiter receives that same
-// error. A waiter whose own context ends first stops waiting and returns
-// its own context's error. A successful fetch is cached under baseURL; a
-// failed one drops whatever was cached there. The cache is written before
-// the call leaves the in-flight set, so callers that arrive while it is
-// written join the call and get its result, and a later fetch for baseURL
-// never has its cache entry overwritten or dropped by an earlier one.
+// the context of the caller that started it. A waiter whose own context ends
+// first stops waiting and returns its own context's error.
+//
+// When the starter's context ends and that alone fails the fetch, the
+// starter returns its context's error, and the failure says nothing about
+// the Platform: the fetch leaves the cache as it was, and a waiter whose own
+// context is still live does not receive it. That waiter fetches again,
+// joining the next in-flight fetch for baseURL or, when there is none,
+// running one under its own context. It repeats this only while its own
+// context is live, and each round is a real fetch, so it ends when a fetch
+// succeeds, fails for another reason, or the waiter's context ends. Every
+// other failure reaches every waiter as it is, the HTTP client's own timeout
+// included, because it leaves the starter's context live.
+//
+// A successful fetch is cached under baseURL; any failure other than the
+// starter's own context ending drops whatever was cached there. The cache is
+// written before the call leaves the in-flight set, so callers that arrive
+// while it is written join the call and get its result, and a later fetch
+// for baseURL never has its cache entry overwritten or dropped by an earlier
+// one.
 //
 // cached is the catalog held for baseURL, or nil; fetch uses its ETag for
 // a conditional request.
 func (r *Resolver) fetchCoalesced(ctx context.Context, baseURL string, cached *ServiceCatalog) (*ServiceCatalog, error) {
-	r.mu.Lock()
-	if call, ok := r.inflight[baseURL]; ok {
+	for {
+		r.mu.Lock()
+		call, joined := r.inflight[baseURL]
+		if !joined {
+			call = &resolveCall{done: make(chan struct{})}
+			r.inflight[baseURL] = call
+		}
 		r.mu.Unlock()
+		if !joined {
+			return r.runCall(ctx, baseURL, cached, call)
+		}
+
 		select {
 		case <-call.done:
-			return call.catalog, call.err
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		}
+		if !call.ownContextEnded {
+			return call.catalog, call.err
+		}
+		// The starter's context ended, not this caller's. Never hand the
+		// starter's error on; give up with this caller's own error when its
+		// context ended too, otherwise fetch again.
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 	}
-	call := &resolveCall{done: make(chan struct{})}
-	r.inflight[baseURL] = call
-	r.mu.Unlock()
+}
 
+// runCall runs the fetch for call, which the caller has put in the in-flight
+// set, writes the cache, takes call out of the set and publishes its result
+// to the waiters.
+func (r *Resolver) runCall(ctx context.Context, baseURL string, cached *ServiceCatalog, call *resolveCall) (*ServiceCatalog, error) {
 	cat, err := r.fetch(ctx, baseURL, cached)
+	ownContextEnded := endedByContext(ctx, err)
 
 	// Write the cache while this call is still in flight. A caller arriving
 	// meanwhile joins it, so no later fetch for baseURL can write the cache
 	// first and then have this older result overwrite or drop its entry.
 	switch {
+	case ownContextEnded:
+		// The caller gave up; the Platform did not fail. Keep what is cached.
 	case err != nil:
 		// Drop what was cached, so the next resolution fetches again and
 		// reports the failure instead of serving a catalog the Platform no
-		// longer vouches for. The caller's context may be the reason for the
+		// longer vouches for. The caller's context may have ended after the
 		// failure, so it must not stop the invalidation.
 		if ierr := r.cache.Invalidate(context.WithoutCancel(ctx), baseURL); ierr != nil {
 			r.cfg.logger.Warn("discovery: cache invalidate failed", "base_url", baseURL, "err", ierr)
@@ -329,8 +372,19 @@ func (r *Resolver) fetchCoalesced(ctx context.Context, baseURL string, cached *S
 
 	call.catalog = cat
 	call.err = err
+	call.ownContextEnded = ownContextEnded
 	close(call.done)
 	return cat, err
+}
+
+// endedByContext reports whether err means the fetch failed only because ctx
+// ended: err is non-nil and reports context.Canceled or
+// context.DeadlineExceeded, and ctx is done. An error that reports a context
+// error while ctx is live, such as the HTTP client's own timeout, is a
+// failure of the fetch and does not count.
+func endedByContext(ctx context.Context, err error) bool {
+	return err != nil && ctx.Err() != nil &&
+		(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded))
 }
 
 // fetch retrieves, validates and confirms the SMART configuration at

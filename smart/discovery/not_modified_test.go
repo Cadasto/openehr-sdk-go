@@ -299,43 +299,34 @@ func TestResolveExtendsExpiredOnNotModified(t *testing.T) { // REQ-071
 
 // TestRefreshFailureDropsCachedCatalog pins REQ-071: when a refresh fails,
 // the cached catalog is dropped, so the next resolution fetches again and
-// reports the failure instead of serving the old catalog. That holds when
-// the failure is the caller giving up, too.
+// reports the failure instead of serving the old catalog. A refresh that
+// fails only because the caller's own context ended is the exception, which
+// TestCancelledFetchKeepsCachedCatalog pins.
 func TestRefreshFailureDropsCachedCatalog(t *testing.T) { // REQ-071
 	tests := []struct {
 		name string
-		// later answers the Refresh request, the second one; cancel ends
-		// the context of the Refresh call. Every later request gets a 503.
-		later func(w http.ResponseWriter, r *http.Request, cancel context.CancelFunc)
+		// later answers the Refresh request, the second one. Every later
+		// request gets a 503.
+		later func(w http.ResponseWriter)
 	}{
-		{name: "server error", later: func(w http.ResponseWriter, _ *http.Request, _ context.CancelFunc) {
+		{name: "server error", later: func(w http.ResponseWriter) {
 			w.WriteHeader(http.StatusServiceUnavailable)
 		}},
-		{name: "document missing the required service", later: func(w http.ResponseWriter, _ *http.Request, _ context.CancelFunc) {
+		{name: "document missing the required service", later: func(w http.ResponseWriter) {
 			_, _ = io.WriteString(w, `{"token_endpoint":"https://auth.example.com/token"}`)
-		}},
-		{name: "caller gives up", later: func(w http.ResponseWriter, r *http.Request, cancel context.CancelFunc) {
-			cancel()
-			select {
-			case <-r.Context().Done():
-			case <-time.After(10 * time.Second): // bounds a broken run only
-				w.WriteHeader(http.StatusServiceUnavailable)
-			}
 		}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			refreshCtx, cancel := context.WithCancel(t.Context())
-			defer cancel()
 			var served atomic.Int32
-			srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				switch served.Add(1) {
 				case 1:
 					w.Header().Set("ETag", `"v1"`)
 					w.Header().Set("Cache-Control", "max-age=3600")
 					_, _ = io.WriteString(w, smartDocument("", ""))
 				case 2:
-					tc.later(w, r, cancel)
+					tc.later(w)
 				default:
 					w.WriteHeader(http.StatusServiceUnavailable)
 				}
@@ -350,7 +341,7 @@ func TestRefreshFailureDropsCachedCatalog(t *testing.T) { // REQ-071
 			if _, err := res.Resolve(t.Context(), baseURL); err != nil {
 				t.Fatalf("Resolve(%q) error = %v", baseURL, err)
 			}
-			if _, err := res.Refresh(refreshCtx, baseURL); err == nil {
+			if _, err := res.Refresh(t.Context(), baseURL); err == nil {
 				t.Fatalf("Refresh(%q) succeeded, want the %s to fail it", baseURL, tc.name)
 			}
 			if _, ok := cache.Get(t.Context(), baseURL); ok {
