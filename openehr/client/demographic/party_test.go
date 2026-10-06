@@ -320,7 +320,9 @@ func TestUpdatePreconditionFailed(t *testing.T) {
 	}
 }
 
-func TestDeleteRoutesAndSendsIfMatch(t *testing.T) {
+// TestDeleteRoutesAndSendsNoIfMatch pins REQ-054: the demographic delete names
+// the preceding version in its path and sends no If-Match.
+func TestDeleteRoutesAndSendsNoIfMatch(t *testing.T) {
 	var captured *http.Request
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
@@ -339,8 +341,10 @@ func TestDeleteRoutesAndSendsIfMatch(t *testing.T) {
 	if captured.URL.Path != "/openehr/v1/demographic/person/"+personVersion {
 		t.Errorf("path = %q", captured.URL.Path)
 	}
-	if got := captured.Header.Get("If-Match"); got != `"`+personVersion+`"` {
-		t.Errorf("If-Match = %q", got)
+	// The openEHR delete operation takes no If-Match: the version uid in
+	// the path is the preceding version.
+	if got := captured.Header.Get("If-Match"); got != "" {
+		t.Errorf("If-Match = %q, want none", got)
 	}
 }
 
