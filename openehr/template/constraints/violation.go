@@ -5,20 +5,39 @@ package constraints
 // pattern, …), never collapsing several failures into one. Callers
 // that need a single-line message can join Detail values.
 //
-// The zero value is not useful. Validators in this package build
-// violations with internal helpers; construct one directly when the
-// detail is bespoke.
+// Code and Detail never contain the value passed to Validate, or any
+// part of it, such as a quantity's magnitude or a coded term's code.
+// They name the clause that failed, and may quote the constraint
+// itself (its list, range, pattern, units or terminology), so a
+// Violation can be logged or returned to a client as it is. The value
+// is kept only in Value, which prints as "[redacted]", is left out of
+// JSON, and is read with Value.Reveal().
+//
+// Violations can be compared with ==. The zero value is not useful:
+// validators in this package build violations themselves. A caller
+// that builds one keeps the input out of Code and Detail and wraps it
+// with [Redact] into Value.
 type Violation struct {
 	// Code is the typed reason for the failure. Use the exported
 	// `Code*` constants in this package; new codes appear here only
 	// when a constraint type cannot be expressed with the existing
-	// vocabulary.
+	// vocabulary. It never contains the value under validation.
 	Code ViolationCode
 
-	// Detail is a human-readable message describing the failure,
-	// suitable for display in validator output. Implementations
-	// include the offending value verbatim where reasonable.
+	// Detail is a human-readable message naming the clause that
+	// failed, suitable for display in validator output. It never
+	// contains the value passed to Validate or any part of it.
 	Detail string
+
+	// Value holds the part of the input that the failing clause
+	// tested: the argument as passed, or the one field of it the
+	// clause read, such as a quantity's magnitude or a coded term's
+	// code. It prints as "[redacted]" and is left out of JSON; read it
+	// with Value.Reveal(), and only where showing it is safe. Value is
+	// empty on CodeWrongType, where no clause tested the input, and
+	// when the constraint itself is at fault, such as a pattern that
+	// does not parse.
+	Value Redacted `json:"-"`
 }
 
 // ViolationCode is the typed failure category attached to every

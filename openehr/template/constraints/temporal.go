@@ -37,7 +37,7 @@ func (c CDate) Validate(value any) []Violation {
 			return nil
 		}
 	}
-	return []Violation{{Code: CodeInvalidValue, Detail: fmt.Sprintf("%q is not a valid ISO 8601 date", s)}}
+	return []Violation{{Code: CodeInvalidValue, Detail: "value is not a valid ISO 8601 date", Value: Redact(value)}}
 }
 
 // CTime constrains an RM ISO_TIME value (C_TIME). Validate accepts
@@ -64,7 +64,7 @@ func (c CTime) Validate(value any) []Violation {
 			return nil
 		}
 	}
-	return []Violation{{Code: CodeInvalidValue, Detail: fmt.Sprintf("%q is not a valid ISO 8601 time", s)}}
+	return []Violation{{Code: CodeInvalidValue, Detail: "value is not a valid ISO 8601 time", Value: Redact(value)}}
 }
 
 // CDateTime constrains an RM ISO_DATE_TIME value (C_DATE_TIME).
@@ -92,7 +92,7 @@ func (c CDateTime) Validate(value any) []Violation {
 			return nil
 		}
 	}
-	return []Violation{{Code: CodeInvalidValue, Detail: fmt.Sprintf("%q is not a valid ISO 8601 date-time", s)}}
+	return []Violation{{Code: CodeInvalidValue, Detail: "value is not a valid ISO 8601 date-time", Value: Redact(value)}}
 }
 
 // CDuration constrains an RM ISO_DURATION value (C_DURATION).
@@ -122,7 +122,7 @@ func (c CDuration) Validate(value any) []Violation {
 		return []Violation{{Code: CodeWrongType, Detail: fmt.Sprintf("expected string duration, got %T", value)}}
 	}
 	if s == "" || s == "P" || s == "PT" || !durationRe.MatchString(s) {
-		return []Violation{{Code: CodeInvalidValue, Detail: fmt.Sprintf("%q is not a valid ISO 8601 duration", s)}}
+		return []Violation{{Code: CodeInvalidValue, Detail: "value is not a valid ISO 8601 duration", Value: Redact(value)}}
 	}
 	return nil
 }
