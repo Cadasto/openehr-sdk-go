@@ -441,6 +441,107 @@ func TestCoalescedStarterDeadlineIsItsOwnFailure(t *testing.T) { // REQ-071
 	}
 }
 
+// errCallerGaveUp is the cause a fetching caller's context ends with.
+var errCallerGaveUp = errors.New("caller gave up")
+
+// TestCoalescedStarterContextEndedWithACauseIsItsOwnFailure pins REQ-071 for a
+// fetching caller whose context ends with a cause, as context.WithCancelCause,
+// context.WithTimeoutCause and errgroup end one. The HTTP client then reports
+// the cause instead of context.Canceled or context.DeadlineExceeded, but the
+// fetch still failed only because that caller's context ended. That caller
+// gets an error that reports both its context's error and the cause, a waiter
+// whose context is live fetches again and gets a catalog, and the cached entry
+// stays in place.
+func TestCoalescedStarterContextEndedWithACauseIsItsOwnFailure(t *testing.T) { // REQ-071
+	endings := []struct {
+		name string
+		// start returns caller 1's context and the function that ends it with
+		// errCallerGaveUp while its request is held at the server.
+		start func(t *testing.T) (context.Context, func())
+		// wantCtxErr is the error caller 1's context reports once it ended.
+		wantCtxErr error
+	}{
+		{
+			name: "cancelled with a cause",
+			start: func(t *testing.T) (context.Context, func()) {
+				ctx, cancel := context.WithCancelCause(t.Context())
+				t.Cleanup(func() { cancel(nil) })
+				return ctx, func() { cancel(errCallerGaveUp) }
+			},
+			wantCtxErr: context.Canceled,
+		},
+		{
+			name: "deadline with a cause",
+			start: func(t *testing.T) (context.Context, func()) {
+				ctx, cancel := context.WithTimeoutCause(t.Context(), time.Minute, errCallerGaveUp)
+				t.Cleanup(cancel)
+				return ctx, func() { time.Sleep(2 * time.Minute) } // past the deadline
+			},
+			wantCtxErr: context.DeadlineExceeded,
+		},
+	}
+	for _, ending := range endings {
+		for _, joined := range []bool{true, false} {
+			name := ending.name + ", a waiter joins"
+			if !joined {
+				name = ending.name + ", no waiter"
+			}
+			t.Run(name, func(t *testing.T) {
+				synctest.Test(t, func(t *testing.T) {
+					p := startHeldPlatform(t, 2, 0)
+					res, cache := p.resolver(t)
+					baseURL := p.baseURL()
+					warm, err := res.Resolve(t.Context(), baseURL)
+					if err != nil {
+						t.Fatalf("warm-up Resolve(%q) error = %v", baseURL, err)
+					}
+
+					ctx1, end1 := ending.start(t)
+					var (
+						wg         sync.WaitGroup
+						err1, err2 error
+						cat2       *discovery.ServiceCatalog
+					)
+					wg.Go(func() { _, err1 = res.Refresh(ctx1, baseURL) })
+					synctest.Wait() // caller 1's request is held at the server
+					if joined {
+						wg.Go(func() { cat2, err2 = res.Refresh(t.Context(), baseURL) })
+						synctest.Wait() // caller 2 waits for caller 1's fetch
+					}
+					end1()
+					synctest.Wait() // caller 1 gave up; caller 2 fetched again, or failed
+					wg.Wait()       // the held request was never answered
+
+					if !errors.Is(err1, ending.wantCtxErr) || !errors.Is(err1, errCallerGaveUp) {
+						t.Errorf("caller 1 error = %v, want one that reports both its context's error %v and the cause %v", err1, ending.wantCtxErr, errCallerGaveUp)
+					}
+					if _, ok := errors.AsType[*discovery.DiscoveryError](err1); !ok {
+						t.Errorf("caller 1 error = %v, want one that still carries the DiscoveryError of the failed fetch", err1)
+					}
+					if !joined {
+						if got := p.hits.Load(); got != 2 {
+							t.Errorf("server answered %d requests, want 2: the warm-up and the held fetch", got)
+						}
+						if cached, ok := cache.Get(t.Context(), baseURL); !ok || cached != warm {
+							t.Errorf("cache.Get(%q) = %p, %t, want the entry %p kept: the failure was the caller's own context ending", baseURL, cached, ok, warm)
+						}
+						return
+					}
+					if err2 != nil || cat2 == nil {
+						t.Errorf("caller 2 = %v, %v, want a catalog: its own context is live, so it fetches again", cat2, err2)
+					}
+					if got := p.hits.Load(); got != 3 {
+						t.Errorf("server answered %d requests, want 3: caller 2 sends a request of its own after the held fetch", got)
+					}
+					if cached, ok := cache.Get(t.Context(), baseURL); !ok || cached != cat2 {
+						t.Errorf("cache.Get(%q) = %p, %t, want the catalog %p caller 2 fetched", baseURL, cached, ok, cat2)
+					}
+				})
+			})
+		}
+	}
+}
+
 // TestCoalescedPlatformFailureAsCallersContextEndsIsShared pins REQ-071: the
 // exception for a caller's own ended context covers a failure that only that
 // context caused. A Platform that answers 503 as the fetching caller's context
