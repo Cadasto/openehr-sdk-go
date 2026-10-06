@@ -344,6 +344,30 @@ func (s *Source) setTokensLocked(access auth.Token, refresh string) {
 	s.forceRefresh = false
 }
 
+// withHeldScope returns prev, the session's last token response, with the
+// scope of held, the access token the session held when a refresh began,
+// standing in for an earlier scope that prev lacks. A source whose tokens
+// SetTokens installed has had no token response yet, so the scope of the
+// token it holds is the only grant it knows (RFC 6749 §6 reads an omitted
+// scope as the original grant).
+//
+// Lacks is decided as keepSessionMembers decides it: prev has no earlier
+// scope when its body had no scope member. A scope member prev carried, even
+// as an empty string or null, stays, so the earlier response wins over held.
+// A held token without a scope leaves prev as it is. The result has its own
+// Raw map, so prev is not changed.
+func withHeldScope(prev TokenResponse, held auth.Token) TokenResponse {
+	if _, had := prev.Raw["scope"]; had || held.Scope == "" {
+		return prev
+	}
+	raw := make(map[string]any, len(prev.Raw)+1)
+	maps.Copy(raw, prev.Raw)
+	raw["scope"] = held.Scope
+	prev.Raw = raw
+	prev.Scope = held.Scope
+	return prev
+}
+
 // idTokenBinding holds the claims of a verified ID token that a later one
 // in the same session must repeat (OpenID Connect Core 1.0 §12.2). The
 // issuer is not kept: every ID token the source accepts is checked against
@@ -904,8 +928,10 @@ func (s *Source) tryToken(ctx context.Context) (tok auth.Token, retry bool, err 
 		}
 		// Nor does the session lose the launch context or the scope a
 		// refresh response leaves out, and the new access token carries the
-		// scope the session keeps.
-		s.lastTR = keepSessionMembers(s.lastTR, refreshedTR)
+		// scope the session keeps. A session with no earlier scope on its
+		// last token response keeps the scope of the access token it held
+		// when the refresh began.
+		s.lastTR = keepSessionMembers(withHeldScope(s.lastTR, cur), refreshedTR)
 		tok.Scope = s.lastTR.Scope
 		s.setTokensLocked(tok, refreshTok)
 		if refreshedTR.IDTokenClaims != nil {

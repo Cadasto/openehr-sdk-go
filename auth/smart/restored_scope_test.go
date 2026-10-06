@@ -173,27 +173,42 @@ func TestRestoredSessionWithoutAnAccessTokenKeepsNoScope(t *testing.T) { // REQ-
 	}
 }
 
-// TestEarlierResponseScopeWinsOverTheInstalledToken pins REQ-064: when the
-// source has a last token response that carried a scope, a refresh response
-// that leaves the scope out keeps that scope, even when SetTokens installed an
-// access token with another one afterwards.
-func TestEarlierResponseScopeWinsOverTheInstalledToken(t *testing.T) { // REQ-064
+// TestInstalledTokenScopeStandsInOnlyForAnAbsentEarlierScope pins REQ-064:
+// when the source has a last token response, a refresh response that leaves
+// the scope out keeps the scope member that response carried, even as an
+// empty string, over the scope of an access token SetTokens installed
+// afterwards; only a last token response with no scope member lets the
+// installed token's scope stand in.
+func TestInstalledTokenScopeStandsInOnlyForAnAbsentEarlierScope(t *testing.T) { // REQ-064
 	const earlier = "openid launch/patient patient/*.rs"
-	as := newStubServer(t)
-	var log changeLog
-	src := as.source(t, as.endpoints(), smart.WithTokenChange(log.record))
-	as.answerToken(0, launchBody(t, "at-0", map[string]any{"scope": earlier}, map[string]any{"refresh_token": "rt-1"}))
-	req, err := src.BeginAuthorization("")
-	if err != nil {
-		t.Fatalf("BeginAuthorization: %v", err)
+	tests := []struct {
+		name     string
+		exchange map[string]any
+		want     string
+	}{
+		{name: "earlier response carried a scope", exchange: map[string]any{"scope": earlier}, want: earlier},
+		{name: "earlier response carried an empty scope", exchange: map[string]any{"scope": ""}, want: ""},
+		{name: "earlier response carried no scope", want: heldScope},
 	}
-	if _, _, err := src.ExchangeAuthorizationCode(t.Context(), "code-1", req.State, req); err != nil {
-		t.Fatalf("ExchangeAuthorizationCode() error = %v", err)
-	}
-	installed := staleAccess("installed")
-	installed.Scope = heldScope
-	src.SetTokens(installed, "rt-1")
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			as := newStubServer(t)
+			var log changeLog
+			src := as.source(t, as.endpoints(), smart.WithTokenChange(log.record))
+			as.answerToken(0, launchBody(t, "at-0", tc.exchange, map[string]any{"refresh_token": "rt-1"}))
+			req, err := src.BeginAuthorization("")
+			if err != nil {
+				t.Fatalf("BeginAuthorization: %v", err)
+			}
+			if _, _, err := src.ExchangeAuthorizationCode(t.Context(), "code-1", req.State, req); err != nil {
+				t.Fatalf("ExchangeAuthorizationCode() error = %v", err)
+			}
+			installed := staleAccess("installed")
+			installed.Scope = heldScope
+			src.SetTokens(installed, "rt-1")
 
-	tok := refreshOnce(t, as, src, "at-1", nil)
-	checkScope(t, src, &log, tok, earlier)
+			tok := refreshOnce(t, as, src, "at-1", nil)
+			checkScope(t, src, &log, tok, tc.want)
+		})
+	}
 }
