@@ -103,7 +103,9 @@ type Option func(*Config)
 
 // WithHTTPClient injects the client for token and JWKS calls. The token,
 // refresh and revocation requests never follow a redirect, whatever
-// CheckRedirect c has, and c is not modified.
+// CheckRedirect c has, and c is not modified. Those requests use a copy of
+// c made when the source is built, so a Transport, Timeout or Jar set on c
+// afterwards does not reach them.
 func WithHTTPClient(c *http.Client) Option {
 	return func(cfg *Config) { cfg.HTTPClient = c }
 }
