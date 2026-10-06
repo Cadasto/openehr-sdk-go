@@ -52,7 +52,11 @@
 // through the supported content types (Observation,
 // Evaluation, Instruction, Action, AdminEntry, Section,
 // GenericEntry) plus the History / Event / ItemStructure / Item /
-// DataValue paths below them. Beyond COMPOSITION they cover the
+// DataValue paths below them. They also cover the party proxies
+// (PARTY_SELF, PARTY_IDENTIFIED with its identifiers, PARTY_RELATED)
+// wherever one sits, and PARTICIPATION in the two lists that hold it:
+// an EVENT_CONTEXT's participations and an ENTRY's
+// other_participations. Beyond COMPOSITION they cover the
 // other LOCATABLE roots (FOLDER, EHR_STATUS, EHR_ACCESS and the
 // demographic PARTY hierarchy with its parts), the ARCHETYPED node
 // under every LOCATABLE's archetype_details, and every DV_ORDERED

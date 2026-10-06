@@ -87,6 +87,27 @@ func ReadSingle(parent any, _ /* parentType */, attrName string) (any, bool) {
 	case rm.EventContext:
 		return readEventContextSingle(&p, attrName)
 
+	// --- party proxies and PARTICIPATION ---
+	case *rm.PartySelf:
+		return readPartySelfSingle(p, attrName)
+	case rm.PartySelf:
+		return readPartySelfSingle(&p, attrName)
+
+	case *rm.PartyIdentified:
+		return readPartyIdentifiedSingle(p, attrName)
+	case rm.PartyIdentified:
+		return readPartyIdentifiedSingle(&p, attrName)
+
+	case *rm.PartyRelated:
+		return readPartyRelatedSingle(p, attrName)
+	case rm.PartyRelated:
+		return readPartyRelatedSingle(&p, attrName)
+
+	case *rm.Participation:
+		return readParticipationSingle(p, attrName)
+	case rm.Participation:
+		return readParticipationSingle(&p, attrName)
+
 	case *rm.History[rm.ItemStructure]:
 		return readHistorySingle(p, attrName)
 	case rm.History[rm.ItemStructure]:
@@ -402,7 +423,7 @@ func ReadSingle(parent any, _ /* parentType */, attrName string) (any, bool) {
 // Handles reports whether the RM floor (validation.ValidateRM)
 // walks into the attributes of parent's RM type: whether it reads and
 // required-checks each of them through [ReadSingle] / [ReadMultiple]. A
-// type it does not handle (OBJECT_REF, PARTICIPATION, LINK, …) is an
+// type it does not handle (OBJECT_REF, FEEDER_AUDIT, LINK, …) is an
 // opaque leaf to the floor and is validated by its own evaluator, not by
 // reading its members, which would all read back as absent and fabricate
 // `required`.
@@ -430,6 +451,10 @@ func Handles(parent any) bool {
 		*rm.Section, rm.Section,
 		*rm.Activity, rm.Activity,
 		*rm.EventContext, rm.EventContext,
+		*rm.PartySelf, rm.PartySelf,
+		*rm.PartyIdentified, rm.PartyIdentified,
+		*rm.PartyRelated, rm.PartyRelated,
+		*rm.Participation, rm.Participation,
 		*rm.History[rm.ItemStructure], rm.History[rm.ItemStructure],
 		*rm.PointEvent[rm.ItemStructure], rm.PointEvent[rm.ItemStructure],
 		*rm.IntervalEvent[rm.ItemStructure], rm.IntervalEvent[rm.ItemStructure],
@@ -517,6 +542,39 @@ func ReadMultiple(parent any, _ /* parentType */, attrName string) ([]any, bool)
 		return readInstructionMultiple(p, attrName)
 	case rm.Instruction:
 		return readInstructionMultiple(&p, attrName)
+
+	// --- ENTRY.other_participations on the other ENTRY concretes ---
+	case *rm.Observation:
+		return readEntryMultiple(p.OtherParticipations, attrName)
+	case rm.Observation:
+		return readEntryMultiple(p.OtherParticipations, attrName)
+	case *rm.Evaluation:
+		return readEntryMultiple(p.OtherParticipations, attrName)
+	case rm.Evaluation:
+		return readEntryMultiple(p.OtherParticipations, attrName)
+	case *rm.Action:
+		return readEntryMultiple(p.OtherParticipations, attrName)
+	case rm.Action:
+		return readEntryMultiple(p.OtherParticipations, attrName)
+	case *rm.AdminEntry:
+		return readEntryMultiple(p.OtherParticipations, attrName)
+	case rm.AdminEntry:
+		return readEntryMultiple(p.OtherParticipations, attrName)
+
+	case *rm.EventContext:
+		return readEventContextMultiple(p, attrName)
+	case rm.EventContext:
+		return readEventContextMultiple(&p, attrName)
+
+	// --- PARTY_IDENTIFIED.identifiers (inherited by PARTY_RELATED) ---
+	case *rm.PartyIdentified:
+		return readPartyIdentifiedMultiple(p, attrName)
+	case rm.PartyIdentified:
+		return readPartyIdentifiedMultiple(&p, attrName)
+	case *rm.PartyRelated:
+		return readPartyIdentifiedMultiple(&p.PartyIdentified, attrName)
+	case rm.PartyRelated:
+		return readPartyIdentifiedMultiple(&p.PartyIdentified, attrName)
 
 	case *rm.History[rm.ItemStructure]:
 		return readHistoryMultiple(p, attrName)
@@ -761,6 +819,16 @@ func readInstructionMultiple(i *rm.Instruction, attr string) ([]any, bool) {
 		}
 		return out, true
 	}
+	return readEntryMultiple(i.OtherParticipations, attr)
+}
+
+// readEntryMultiple serves other_participations, the multiple every ENTRY
+// concrete inherits from ENTRY. Each PARTICIPATION is boxed as a pointer
+// into the slice, so the walker visits it as a node of its own.
+func readEntryMultiple(otherParticipations []rm.Participation, attr string) ([]any, bool) {
+	if attr == "other_participations" {
+		return boxPtrs(otherParticipations), true
+	}
 	return nil, false
 }
 
@@ -945,6 +1013,80 @@ func readEventContextSingle(c *rm.EventContext, attr string) (any, bool) {
 		return ifacePresent(c.HealthCareFacility)
 	case "other_context":
 		return ifacePresent(c.OtherContext)
+	}
+	return nil, false
+}
+
+// readEventContextMultiple serves participations, EVENT_CONTEXT's one
+// multiple. Each PARTICIPATION is boxed as a pointer into the slice.
+func readEventContextMultiple(c *rm.EventContext, attr string) ([]any, bool) {
+	if attr == "participations" {
+		return boxPtrs(c.Participations), true
+	}
+	return nil, false
+}
+
+// --- party proxies and PARTICIPATION --------------------------------------
+//
+// A party proxy's external_ref is optional, so it reads present whenever it
+// is set, whatever its parts hold. The floor then walks the PARTY_REF and
+// checks it with its reference evaluator, which reports each missing part.
+// Reading it with partyRefPresent instead would hide a partly-filled
+// reference as absent.
+
+// readPartySelfSingle serves PARTY_SELF's one attribute, external_ref.
+func readPartySelfSingle(p *rm.PartySelf, attr string) (any, bool) {
+	if attr == "external_ref" {
+		return ptrPresent(p.ExternalRef)
+	}
+	return nil, false
+}
+
+// readPartyIdentifiedSingle serves PARTY_IDENTIFIED's single attributes.
+// name is an optional String: set, it reads present and is returned as its
+// *string, even when empty.
+func readPartyIdentifiedSingle(p *rm.PartyIdentified, attr string) (any, bool) {
+	switch attr {
+	case "name":
+		return ptrPresent(p.Name)
+	case "external_ref":
+		return ptrPresent(p.ExternalRef)
+	}
+	return nil, false
+}
+
+// readPartyIdentifiedMultiple serves identifiers, each DV_IDENTIFIER boxed
+// as a pointer into the slice. PARTY_RELATED routes here through its
+// embedded PARTY_IDENTIFIED.
+func readPartyIdentifiedMultiple(p *rm.PartyIdentified, attr string) ([]any, bool) {
+	if attr == "identifiers" {
+		return boxPtrs(p.Identifiers), true
+	}
+	return nil, false
+}
+
+// readPartyRelatedSingle serves PARTY_RELATED's RM-mandatory relationship
+// and hands every other attribute to the PARTY_IDENTIFIED reader.
+func readPartyRelatedSingle(r *rm.PartyRelated, attr string) (any, bool) {
+	if attr == "relationship" {
+		return dvCodedTextPresent(r.Relationship)
+	}
+	return readPartyIdentifiedSingle(&r.PartyIdentified, attr)
+}
+
+// readParticipationSingle serves PARTICIPATION: the RM-mandatory function
+// (absent when nil or its value is empty, as a LOCATABLE's name) and
+// performer, and the optional mode and time.
+func readParticipationSingle(p *rm.Participation, attr string) (any, bool) {
+	switch attr {
+	case "function":
+		return dvTextPresent(p.Function)
+	case "performer":
+		return ifacePresent(p.Performer)
+	case "mode":
+		return ptrPresent(p.Mode)
+	case "time":
+		return ptrPresent(p.Time)
 	}
 	return nil, false
 }
@@ -1510,7 +1652,8 @@ func readCapabilitySingle(c *rm.Capability, attr string) (any, bool) {
 }
 
 // PARTY_REF is the reference a ROLE's performer, a PARTY_RELATIONSHIP's
-// source and target and an ACTOR's roles hold. Its id, namespace and type
+// source and target, an ACTOR's roles and a party proxy's external_ref
+// hold. Its id, namespace and type
 // are RM-mandatory; each reads as absent while unset. The template walker
 // reads them here when an OPT constrains a reference's parts. PARTY_REF is
 // not in Handles: the RM floor checks a reference with its own evaluator

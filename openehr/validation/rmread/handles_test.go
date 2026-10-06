@@ -38,6 +38,11 @@ var handledTypes = []any{
 	rm.Section{},
 	rm.Activity{},
 	rm.EventContext{},
+	// party proxies and PARTICIPATION
+	rm.PartySelf{},
+	rm.PartyIdentified{},
+	rm.PartyRelated{},
+	rm.Participation{},
 	rm.History[rm.ItemStructure]{},
 	rm.PointEvent[rm.ItemStructure]{},
 	rm.IntervalEvent[rm.ItemStructure]{},
@@ -102,7 +107,7 @@ var handledTypes = []any{
 }
 
 func TestHandles_ModelledTypes(t *testing.T) {
-	if got, want := len(handledTypes), 67; got != want {
+	if got, want := len(handledTypes), 71; got != want {
 		t.Errorf("handledTypes has %d entries, want %d — keep it in sync with Handles/ReadSingle", got, want)
 	}
 	for _, v := range handledTypes {
@@ -154,6 +159,7 @@ func TestHandles_PointerForm(t *testing.T) {
 		&rm.Composition{}, &rm.DVQuantity{}, &rm.DVInterval[rm.DVQuantity]{},
 		&rm.Folder{}, &rm.EHRStatus{}, &rm.Cluster{}, &rm.Archetyped{},
 		&rm.DVOrdinal{}, &rm.DVScale{}, &rm.ReferenceRange[rm.DVOrdered]{}, &rm.EHRAccess{},
+		&rm.PartySelf{}, &rm.PartyIdentified{}, &rm.PartyRelated{}, &rm.Participation{},
 	}
 	for _, v := range ptrs {
 		if !Handles(v) {
@@ -166,14 +172,15 @@ func TestHandles_Unmodelled(t *testing.T) {
 	// Types rmread does NOT model must report false so the floor treats them
 	// as opaque leaves (validated by their own invariant evaluators) rather
 	// than reading their members back as absent and fabricating `required`.
-	// Includes a flattened scalar, an OBJECT_REF, and a PARTY proxy concrete
-	// (recognised by rmTypeInfo but not modelled here).
+	// Includes a flattened scalar, an OBJECT_REF, and a FEEDER_AUDIT and a
+	// LINK (recognised by rmTypeInfo but not modelled here).
 	unmodelled := []any{
 		"a flattened string",
 		42,
 		rm.ObjectRef{},
 		&rm.ObjectRef{},
-		rm.PartySelf{},
+		rm.FeederAudit{},
+		&rm.Link{},
 		nil,
 	}
 	for _, v := range unmodelled {
