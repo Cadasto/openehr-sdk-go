@@ -9,6 +9,7 @@ package validation_test
 import (
 	json "encoding/json/v2"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -281,6 +282,72 @@ func TestREQ112_PartyProxyAndParticipationFindings(t *testing.T) {
 				t.Errorf("ValidateRM(COMPOSITION, %s) findings = %q, want %q", tc.name, got, want)
 			}
 		})
+	}
+}
+
+// TestREQ112_PartyProxyDetailsAreValueFree pins that the findings on a party
+// proxy name the attribute and the RM rule, never a value the proxy holds
+// (REQ-112, REQ-093). Three PARTY_RELATED proxies carry distinctive strings
+// wherever a value can sit, and each draws findings at its own node. The
+// composer has a name, a present but empty identifiers, an external_ref
+// whose id is set and whose namespace is empty, and no relationship. The
+// ENTRY subject has an empty name, one identifier with an id, and the same
+// kind of external_ref. The participation performer has only a
+// relationship, so it breaks Basic_validity. No marker may appear in the
+// Path, Code, Detail or Severity of any finding.
+func TestREQ112_PartyProxyDetailsAreValueFree(t *testing.T) {
+	const (
+		nameMarker         = "Dr Jones Marker"
+		identifierMarker   = "IDENTIFIER-MARKER-4417"
+		refMarker          = "REF-MARKER-9fcc1c70"
+		relationshipMarker = "RELATIONSHIP-MARKER-mother"
+	)
+	refMarked := func() *rm.PartyRef {
+		return &rm.PartyRef{ID: &rm.HierObjectID{Value: refMarker}, Type: "PERSON"}
+	}
+	c := partyProxyComposition()
+	c.Composer = &rm.PartyRelated{
+		Name:        new(nameMarker),
+		Identifiers: []rm.DVIdentifier{},
+		ExternalRef: refMarked(),
+	}
+	evaluationOf(c).Subject = &rm.PartyRelated{
+		Name:         new(""),
+		Identifiers:  []rm.DVIdentifier{{ID: identifierMarker}},
+		ExternalRef:  refMarked(),
+		Relationship: codedText(relationshipMarker, "10"),
+	}
+	c.Context.Participations[0].Performer = &rm.PartyRelated{Relationship: codedText(relationshipMarker, "10")}
+
+	r := validation.ValidateRM(c)
+	// Every rule must fire, or the check below would pass on a report that
+	// holds none of them.
+	want := sortedFindings([]string{
+		"required /composer/relationship",
+		"rm_invariant /composer/external_ref/namespace",
+		"rm_invariant /composer/identifiers",
+		"rm_invariant /content[0]/subject/external_ref/namespace",
+		"rm_invariant /content[0]/subject/name",
+		"rm_invariant /context/participations[0]/performer",
+	})
+	if got := findingsOf(r); !slices.Equal(got, want) {
+		t.Fatalf("ValidateRM(COMPOSITION with marked party proxies) findings = %q, want %q", got, want)
+	}
+	markers := []string{nameMarker, identifierMarker, refMarker, relationshipMarker}
+	for _, issue := range r.Issues {
+		fields := []struct{ name, text string }{
+			{name: "Path", text: issue.Path},
+			{name: "Code", text: issue.Code},
+			{name: "Detail", text: issue.Detail},
+			{name: "Severity", text: issue.Severity.String()},
+		}
+		for _, f := range fields {
+			for _, marker := range markers {
+				if strings.Contains(f.text, marker) {
+					t.Errorf("ValidateRM(COMPOSITION with marked party proxies): issue %s at %q has %s %q, which echoes the value %q", issue.Code, issue.Path, f.name, f.text, marker)
+				}
+			}
+		}
 	}
 }
 
