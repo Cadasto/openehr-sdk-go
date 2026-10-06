@@ -34,7 +34,7 @@ Generic openEHR primitives. No application-specific healthcare models live here.
 | `openehr/rm/` | RM types (clinical + demographic) as concrete structs with embedded base types; abstract RM categories as Go interfaces. **Generated** from the pinned `openehr_rm_*.bmm.json` schema (REQ-042). |
 | `openehr/rm/typereg/` | Central type registry mapping `_type` discriminator → concrete Go type. **Generated** as part of the RM emission. |
 | `openehr/bmm/` | Public BMM loader and in-memory model (`bmm.Schema`, `bmm.Class`, `bmm.Property`, …). Parses P_BMM JSON; resolves `includes`. Importable as a building block (REQ-013, REQ-045). |
-| `openehr/terminology/` | The openEHR Terminology's `openehr` groups and code sets as compiled-in, closed tables — **generated** from the pinned `resources/terminology/openehr_terminology.xml` by `cmd/termgen` (REQ-034). Stdlib-only; sits below `openehr/rm` and joins the REQ-013 set. |
+| `openehr/terminology/` | The openEHR Terminology's `openehr` groups and code sets, and the external code sets the Foundation publishes beside them, as compiled-in, closed tables — **generated** from the pinned `resources/terminology/openehr_terminology.xml` and `openehr_external_terminologies.xml` by `cmd/termgen` (REQ-034). Stdlib-only; sits below `openehr/rm` and joins the REQ-013 set. |
 | `openehr/serialize/` | Canonical JSON / XML, FLAT, STRUCTURED codecs. |
 | `openehr/validation/` | Validation interfaces and implementations: Composition vs OPT, demographic structural validation, AQL syntax / path resolution. |
 | `openehr/template/` | ADL 1.4 operational template (OPT: `.opt` / `OPERATIONAL_TEMPLATE`) parse and path utilities. **Consumes** `openehr/aom/` types but does not own them. OET (`.oet`) is out of scope for v1. |
@@ -87,7 +87,7 @@ Application-specific layer. Shipped in the same module in v1 for adoption conven
 | `internal/` | Implementation helpers excluded from BC promises (Go convention). |
 | `internal/bmmgen/` | BMM code-generator implementation. Reads `resources/bmm/*.bmm.json` via `openehr/bmm/` and emits `openehr/rm/`, `openehr/aom/aom14/`, and the `typereg` registry. Not part of the public API. |
 | `cmd/termgen/` | CLI entry point for the openEHR terminology code generator (REQ-034): `-resources ./resources/terminology -out . [-verify]`. Driven by `make termgen` / `make termgen-verify`. |
-| `internal/termgen/` | Terminology code-generator implementation. Parses the pinned `resources/terminology/openehr_terminology.xml` and renders `openehr/terminology/openehr_gen.go`. Go-internal, consumed only by `cmd/termgen/`. |
+| `internal/termgen/` | Terminology code-generator implementation. Parses the pinned `resources/terminology/openehr_terminology.xml` and `openehr_external_terminologies.xml` and renders `openehr/terminology/openehr_gen.go`. Go-internal, consumed only by `cmd/termgen/`. |
 | `resources/` | Pinned SDK assets (BMM schemas under `resources/bmm/`, the openEHR Terminology under `resources/terminology/`, future XSDs and similar). See [`../resources/README.md`](../../resources/README.md), [`../resources/bmm/README.md`](../../resources/bmm/README.md) and [`../resources/terminology/README.md`](../../resources/terminology/README.md). |
 | `docs/` | Narrative documentation (architecture, AI workflow, ADRs, plans). |
 | `docs/specifications/` | Normative specifications — this tree. |
