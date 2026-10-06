@@ -101,7 +101,9 @@ type TokenChange struct {
 // Option mutates Config during construction.
 type Option func(*Config)
 
-// WithHTTPClient injects the client for token and JWKS calls.
+// WithHTTPClient injects the client for token and JWKS calls. The token,
+// refresh and revocation requests never follow a redirect, whatever
+// CheckRedirect c has, and c is not modified.
 func WithHTTPClient(c *http.Client) Option {
 	return func(cfg *Config) { cfg.HTTPClient = c }
 }

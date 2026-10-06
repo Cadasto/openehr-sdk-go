@@ -61,7 +61,8 @@ const (
 // (env, YAML).
 type Config struct {
 	// HTTPClient is the injected client used for token-endpoint calls.
-	// Required.
+	// The token request never follows a redirect, whatever CheckRedirect
+	// the client has, and the client is not modified. Required.
 	HTTPClient *http.Client
 	// TokenURL is the token endpoint of the authorization server.
 	TokenURL string
@@ -97,7 +98,9 @@ type Config struct {
 type Option func(*Config)
 
 // WithHTTPClient injects the *http.Client used for token-endpoint
-// calls. It is required; there is no default.
+// calls. The token request never follows a redirect, whatever
+// CheckRedirect c has, and c is not modified. It is required; there is no
+// default.
 func WithHTTPClient(c *http.Client) Option {
 	return func(cfg *Config) { cfg.HTTPClient = c }
 }

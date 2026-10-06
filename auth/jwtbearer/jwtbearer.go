@@ -41,7 +41,8 @@ type Config struct {
 type Option func(*Config)
 
 // WithHTTPClient injects the *http.Client used for token-endpoint
-// calls. Required.
+// calls. The token request never follows a redirect, whatever
+// CheckRedirect c has, and c is not modified. Required.
 func WithHTTPClient(c *http.Client) Option {
 	return func(cfg *Config) { cfg.HTTPClient = c }
 }
