@@ -129,8 +129,9 @@ func TestCodeSetMembershipFollowsTheIssuer(t *testing.T) {
 		{name: "external, empty", set: external, code: "", want: false},
 		// The next two rows catch Unicode case folding: Go's
 		// unicode.ToLower maps U+212A KELVIN SIGN to k and U+0130 LATIN
-		// CAPITAL LETTER I WITH DOT ABOVE to i, so strings.ToLower or
-		// strings.EqualFold would admit them as KE and it.
+		// CAPITAL LETTER I WITH DOT ABOVE to i, so strings.ToLower would
+		// admit both, as KE and it; strings.EqualFold would admit the
+		// Kelvin sign only.
 		{name: "external, Kelvin sign for K", set: external, code: "KE", want: false},
 		{name: "external, dotted capital I for I", set: external, code: "İT", want: false},
 		{name: "external, ASCII capital I", set: external, code: "IT", want: true},

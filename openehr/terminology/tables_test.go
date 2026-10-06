@@ -49,8 +49,9 @@ func TestPinnedRelease(t *testing.T) {
 	}
 }
 
-// REQ-034: the four external code sets of the pin, each with the issuer and
-// the external id the pin gives it, and the counts of TERM Release-3.0.0.
+// REQ-034: every code set of the pin, the four external ones and the three
+// openEHR-issued ones, each with the issuer and the external id the pin gives
+// it, and the counts of TERM Release-3.0.0.
 func TestExternalCodeSetsCarryTheirIssuerAndExternalID(t *testing.T) {
 	tests := []struct {
 		set               *terminology.CodeSet
