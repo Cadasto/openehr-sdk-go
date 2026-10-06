@@ -200,7 +200,7 @@ requirements:
     canonical: docs/specifications/idiom.md#concurrency-req-026
     status: draft
     implementation: landed
-    packages: [transport]
+    packages: [smart/discovery, transport]
     tests:
       - auth/clientcreds/reauth_test.go
       - auth/jwtbearer/reauth_test.go

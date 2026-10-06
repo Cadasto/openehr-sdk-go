@@ -71,6 +71,10 @@ Rules:
 
 The coalesced refresh in `auth/smart` is race-free: the goroutine that refreshes stores the token before it closes the channel the other callers wait on, so under the Go memory model every waiter reads the stored result. Discovery resolution (`smart/discovery`) coalesces the same way.
 
+#### Credential-bearing requests
+
+The token, refresh and revocation requests of `auth/smart`, `auth/clientcreds` and `auth/jwtbearer` carry a credential, and they **MUST NOT** be redirected. The SDK **MUST** send each with a copy of the injected `HTTPClient` that keeps its `Transport`, `Jar` and `Timeout` and whose redirect policy returns a 3xx response instead of following it, whatever `CheckRedirect` the injected client has and without modifying the injected client, so a 307 or 308 cannot carry a refresh token, a client secret or a client assertion to another URL. A 3xx response **MUST** then fail like any other non-2xx answer, with an `*auth.ExchangeError` that carries the status code and matches `auth.ErrTokenExchangeFailed`, `auth.ErrRefreshFailed` or `auth.ErrRevocationFailed`, as the request's own class says. This copy is the one exception to [REQ-021](idiom.md#http-client-injection-req-021).
+
 ### Provider sub-packages (REQ-012)
 
 `auth/` does not contain provider implementations. Each provider is a sub-package:
@@ -95,10 +99,6 @@ func TokenSourceFromContext(ctx context.Context) (TokenSource, bool)
 ```
 
 The `transport/` package **MUST** check the context for a per-request `TokenSource` and prefer it over the client-default `TokenSource` when present. This **MUST** be documented in `transport/` and `auth/`.
-
-### Credential-bearing requests
-
-The token, refresh and revocation requests of `auth/smart`, `auth/clientcreds` and `auth/jwtbearer` carry a credential, and they **MUST NOT** be redirected. The SDK **MUST** send each with a client whose redirect policy returns a 3xx response instead of following it, whatever `CheckRedirect` the injected `HTTPClient` has and without modifying that client, so a 307 or 308 cannot carry a refresh token, a client secret or a client assertion to another URL. A 3xx response **MUST** then fail like any other non-2xx answer, with an `*auth.ExchangeError` that carries the status code and matches `auth.ErrTokenExchangeFailed`, `auth.ErrRefreshFailed` or `auth.ErrRevocationFailed`, as the request's own class says.
 
 ## SMART flows
 

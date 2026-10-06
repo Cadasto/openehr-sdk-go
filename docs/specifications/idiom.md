@@ -37,7 +37,7 @@ Pure functions (codecs, validators with no I/O, AQL string builders) **MUST NOT*
 
 ## HTTP client injection (REQ-021)
 
-The SDK **MUST NOT** allocate its own `*http.Client`. Constructors accept one via functional option or wrapper. Acceptable patterns:
+The SDK **MUST NOT** allocate its own `*http.Client`. The one exception is the copy of the injected client that [auth.md § Credential-bearing requests](auth.md#credential-bearing-requests) prescribes for token, refresh and revocation requests. Constructors accept one via functional option or wrapper. Acceptable patterns:
 
 ```go
 // MUST — explicit injection
