@@ -62,8 +62,7 @@ func newRedirector(t *testing.T, status int, to string) (*httptest.Server, *atom
 }
 
 // TestREQ060_TokenPostDoesNotFollowRedirect pins REQ-060 (§ Credential-bearing
-// requests), REQ-063 and REQ-167: the token request of auth/clientcreds
-// refuses a 3xx answer, whatever redirect policy the injected client has
+// requests): the token request of auth/clientcreds refuses a 3xx answer, whatever redirect policy the injected client has
 // and whichever way the client authenticates, so a 307 or a 308 cannot
 // carry the client secret or the client assertion to another server. The
 // 3xx answer fails as an *auth.ExchangeError, and the injected client is
