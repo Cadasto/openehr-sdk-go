@@ -212,3 +212,46 @@ func TestInstalledTokenScopeStandsInOnlyForAnAbsentEarlierScope(t *testing.T) { 
 		})
 	}
 }
+
+// TestHeldScopeStandingInLeavesAnEarlierResponseUntouched pins REQ-064: the
+// scope the held access token lends a refresh goes on a new last token
+// response with its own Raw map, because LastTokenResponse hands callers the
+// map the source holds, and one that kept an earlier response would see a
+// scope member appear in it after a refresh.
+func TestHeldScopeStandingInLeavesAnEarlierResponseUntouched(t *testing.T) { // REQ-064
+	as := newStubServer(t)
+	src := as.source(t, as.endpoints())
+	as.answerToken(0, launchBody(t, "at-0", nil, map[string]any{"refresh_token": "rt-1"}))
+	req, err := src.BeginAuthorization("")
+	if err != nil {
+		t.Fatalf("BeginAuthorization: %v", err)
+	}
+	if _, _, err := src.ExchangeAuthorizationCode(t.Context(), "code-1", req.State, req); err != nil {
+		t.Fatalf("ExchangeAuthorizationCode() error = %v", err)
+	}
+
+	before := src.LastTokenResponse()
+	if before.Raw == nil {
+		t.Fatal("LastTokenResponse().Raw = nil after a code exchange, want the response members")
+	}
+	if got, ok := before.Raw["scope"]; ok {
+		t.Fatalf("LastTokenResponse().Raw[scope] = %#v after a response without one, want no such member", got)
+	}
+	snapshot := maps.Clone(before.Raw)
+
+	installed := staleAccess("installed")
+	installed.Scope = heldScope
+	src.SetTokens(installed, "rt-1")
+	refreshOnce(t, as, src, "at-1", nil)
+
+	after := src.LastTokenResponse()
+	if after.Scope != heldScope {
+		t.Errorf("LastTokenResponse().Scope = %q after the refresh, want the held %q", after.Scope, heldScope)
+	}
+	if got := after.Raw["scope"]; got != heldScope {
+		t.Errorf("LastTokenResponse().Raw[scope] = %#v after the refresh, want the held %q", got, heldScope)
+	}
+	if !maps.Equal(before.Raw, snapshot) {
+		t.Errorf("Raw of the response returned before the refresh = %#v, want it as it was, %#v", before.Raw, snapshot)
+	}
+}
