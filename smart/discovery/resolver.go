@@ -287,15 +287,22 @@ func (r *Resolver) Refresh(ctx context.Context, baseURL string) (*ServiceCatalog
 // first stops waiting and returns its own context's error.
 //
 // When the starter's context ends and that alone fails the fetch, the
-// starter returns its context's error, and the failure says nothing about
-// the Platform: the fetch leaves the cache as it was, and a waiter whose own
-// context is still live does not receive it. That waiter fetches again,
-// joining the next in-flight fetch for baseURL or, when there is none,
-// running one under its own context. It repeats this only while its own
-// context is live, and each round is a real fetch, so it ends when a fetch
-// succeeds, fails for another reason, or the waiter's context ends. Every
-// other failure reaches every waiter as it is, the HTTP client's own timeout
-// included, because it leaves the starter's context live.
+// starter returns an error that reports its context's error, and the failure
+// says nothing about the Platform. The fetch failed that way when its error
+// reports the error of the starter's ended context or the cause that context
+// ended with (see endedByContext). Such a failure leaves the cache as it was,
+// and a waiter whose own context is still live does not receive it. That
+// waiter fetches again, joining the next in-flight fetch for baseURL or, when
+// there is none, running one under its own context. It repeats this only
+// while its own context is live, and each round is a real fetch, so it ends
+// when a fetch succeeds, fails for another reason, or the waiter's context
+// ends. A waiter woken by such a failure whose own context has ended too
+// returns its own context's error and does not fetch.
+//
+// Every other failure reaches every waiter as it is. That includes the HTTP
+// client's own timeout, whose error reports context.DeadlineExceeded: it
+// counts as the starter's own ending only when the starter's context ended
+// by its deadline too.
 //
 // A successful fetch is cached under baseURL; any failure other than the
 // starter's own context ending drops whatever was cached there. The cache is
@@ -366,6 +373,13 @@ func (r *Resolver) runCall(ctx context.Context, baseURL string, cached *ServiceC
 		}
 	}
 
+	// The fetch's error reports the cause, not ctx's own error, when ctx
+	// ended with one. The caller still gets an error that reports its
+	// context's error, and the fetch's error with the cause stays inside it.
+	if ownContextEnded && !errors.Is(err, ctx.Err()) {
+		err = fmt.Errorf("%w: %w", ctx.Err(), err)
+	}
+
 	r.mu.Lock()
 	delete(r.inflight, baseURL)
 	r.mu.Unlock()
@@ -378,13 +392,18 @@ func (r *Resolver) runCall(ctx context.Context, baseURL string, cached *ServiceC
 }
 
 // endedByContext reports whether err means the fetch failed only because ctx
-// ended: err is non-nil and reports context.Canceled or
-// context.DeadlineExceeded, and ctx is done. An error that reports a context
-// error while ctx is live, such as the HTTP client's own timeout, is a
-// failure of the fetch and does not count.
+// ended: ctx is done, and err reports ctx's own error or its cause. The cause
+// counts because net/http returns context.Cause(ctx) when a request's context
+// ends, so a context ended with a cause (context.WithCancelCause,
+// context.WithTimeoutCause, errgroup) yields an error that reports the cause
+// and not context.Canceled or context.DeadlineExceeded. An error that reports
+// some other context error does not count and is a failure of the fetch: the
+// HTTP client's own timeout reports context.DeadlineExceeded whether ctx is
+// live or was only cancelled.
 func endedByContext(ctx context.Context, err error) bool {
-	return err != nil && ctx.Err() != nil &&
-		(errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded))
+	ctxErr := ctx.Err()
+	return err != nil && ctxErr != nil &&
+		(errors.Is(err, ctxErr) || errors.Is(err, context.Cause(ctx)))
 }
 
 // fetch retrieves, validates and confirms the SMART configuration at

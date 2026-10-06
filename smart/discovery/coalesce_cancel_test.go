@@ -545,53 +545,83 @@ func TestCoalescedStarterContextEndedWithACauseIsItsOwnFailure(t *testing.T) { /
 // TestCoalescedPlatformFailureAsCallersContextEndsIsShared pins REQ-071: the
 // exception for a caller's own ended context covers a failure that only that
 // context caused. A Platform that answers 503 as the fetching caller's context
-// ends has failed all the same, so that caller gets the 503 error rather than a
-// bare context error, the cached entry is dropped, and a waiter that joined the
-// fetch gets the same error with no second request.
+// ends has failed all the same, and so has a request that the HTTP client's own
+// timeout ends as that context is cancelled: its error reports
+// context.DeadlineExceeded, which is not the context.Canceled that the
+// caller's context reports. Either way that caller gets the fetch's error
+// rather than a bare context error, the cached entry is dropped, and a waiter
+// that joined the fetch gets the same error with no second request.
 func TestCoalescedPlatformFailureAsCallersContextEndsIsShared(t *testing.T) { // REQ-071
-	synctest.Test(t, func(t *testing.T) {
-		p := startHeldPlatform(t, 2, http.StatusServiceUnavailable)
-		ctx1, cancel1 := context.WithCancel(t.Context())
-		defer cancel1()
-		// The held 503 is request 2; its answer and caller 1's cancellation coincide.
-		p.client.Transport = &cancelAfterAnswer{next: p.client.Transport, at: 2, cancel: cancel1}
-		res, cache := p.resolver(t)
-		baseURL := p.baseURL()
-		if _, err := res.Resolve(t.Context(), baseURL); err != nil {
-			t.Fatalf("warm-up Resolve(%q) error = %v", baseURL, err)
-		}
+	tests := []struct {
+		name       string
+		heldStatus int
+		timeout    time.Duration // the HTTP client's Timeout; zero means none
+		// settle ends the held fetch; caller 1's context is cancelled as the
+		// fetch's answer or error arrives.
+		settle func(p *heldPlatform)
+	}{
+		{
+			name:       "server error",
+			heldStatus: http.StatusServiceUnavailable,
+			settle:     func(p *heldPlatform) { p.open() },
+		},
+		{
+			name:    "HTTP client timeout",
+			timeout: 30 * time.Second,
+			settle:  func(*heldPlatform) { time.Sleep(time.Minute) },
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				p := startHeldPlatform(t, 2, tc.heldStatus)
+				p.client.Timeout = tc.timeout
+				ctx1, cancel1 := context.WithCancel(t.Context())
+				defer cancel1()
+				// The held fetch is request 2; its end and caller 1's cancellation coincide.
+				p.client.Transport = &cancelAfterAnswer{next: p.client.Transport, at: 2, cancel: cancel1}
+				res, cache := p.resolver(t)
+				baseURL := p.baseURL()
+				if _, err := res.Resolve(t.Context(), baseURL); err != nil {
+					t.Fatalf("warm-up Resolve(%q) error = %v", baseURL, err)
+				}
 
-		var (
-			wg         sync.WaitGroup
-			err1, err2 error
-		)
-		wg.Go(func() { _, err1 = res.Refresh(ctx1, baseURL) })
-		synctest.Wait() // the held fetch is at the server
-		wg.Go(func() { _, err2 = res.Refresh(t.Context(), baseURL) })
-		synctest.Wait() // caller 2 waits for caller 1's fetch
-		p.open()        // the 503 arrives and caller 1's context ends
-		wg.Wait()
+				var (
+					wg         sync.WaitGroup
+					err1, err2 error
+				)
+				wg.Go(func() { _, err1 = res.Refresh(ctx1, baseURL) })
+				synctest.Wait() // the held fetch is at the server
+				wg.Go(func() { _, err2 = res.Refresh(t.Context(), baseURL) })
+				synctest.Wait() // caller 2 waits for caller 1's fetch
+				tc.settle(p)    // the fetch ends and caller 1's context ends
+				wg.Wait()
 
-		if ctx1.Err() == nil {
-			t.Fatal("caller 1's context is still live, want it ended as the 503 arrived")
-		}
-		derr1, ok := errors.AsType[*discovery.DiscoveryError](err1)
-		if !ok || derr1.Reason != discovery.ReasonFetchFailed {
-			t.Errorf("caller 1 error = %v, want a DiscoveryError with Reason %q: the Platform's 503", err1, discovery.ReasonFetchFailed)
-		}
-		if errors.Is(err1, context.Canceled) {
-			t.Errorf("caller 1 error = %v, want one that does not report context.Canceled: the 503 caused the failure, not the cancellation", err1)
-		}
-		if derr2, ok := errors.AsType[*discovery.DiscoveryError](err2); !ok || derr2 != derr1 {
-			t.Errorf("caller 2 error = %v, want the error caller 1 got, %v: both share one fetch", err2, err1)
-		}
-		if got := p.hits.Load(); got != 2 {
-			t.Errorf("server answered %d requests, want 2: the warm-up and one shared fetch", got)
-		}
-		if _, ok := cache.Get(t.Context(), baseURL); ok {
-			t.Errorf("cache still holds a catalog for %q after a 503, want it dropped", baseURL)
-		}
-	})
+				if ctx1.Err() == nil {
+					t.Fatal("caller 1's context is still live, want it ended as the fetch ended")
+				}
+				derr1, ok := errors.AsType[*discovery.DiscoveryError](err1)
+				if !ok || derr1.Reason != discovery.ReasonFetchFailed {
+					t.Errorf("caller 1 error = %v, want a DiscoveryError with Reason %q: the fetch's own failure", err1, discovery.ReasonFetchFailed)
+				}
+				if errors.Is(err1, context.Canceled) {
+					t.Errorf("caller 1 error = %v, want one that does not report context.Canceled: the fetch failed, not the cancellation", err1)
+				}
+				if tc.timeout != 0 && !errors.Is(err1, context.DeadlineExceeded) {
+					t.Errorf("caller 1 error = %v, want one that reports context.DeadlineExceeded, as the HTTP client's timeout does", err1)
+				}
+				if derr2, ok := errors.AsType[*discovery.DiscoveryError](err2); !ok || derr2 != derr1 {
+					t.Errorf("caller 2 error = %v, want the error caller 1 got, %v: both share one fetch", err2, err1)
+				}
+				if got := p.hits.Load(); got != 2 {
+					t.Errorf("server answered %d requests, want 2: the warm-up and one shared fetch", got)
+				}
+				if _, ok := cache.Get(t.Context(), baseURL); ok {
+					t.Errorf("cache still holds a catalog for %q after the failed fetch, want it dropped", baseURL)
+				}
+			})
+		})
+	}
 }
 
 // TestCoalescedWaiterRetryIsConditional pins REQ-071: the retry of a waiter
