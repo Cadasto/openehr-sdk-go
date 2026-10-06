@@ -19,9 +19,13 @@ import (
 // its own and restores them, so every test that reads the real registry
 // stays on the serial run.
 
-// pinPath is the vendored terminology, relative to this package directory —
-// `go test` runs each package with its own directory as the working one.
-const pinPath = "../../resources/terminology/openehr_terminology.xml"
+// pinPath and externalPinPath are the two vendored files of the pin, relative
+// to this package directory — `go test` runs each package with its own
+// directory as the working one.
+const (
+	pinPath         = "../../resources/terminology/openehr_terminology.xml"
+	externalPinPath = "../../resources/terminology/openehr_external_terminologies.xml"
+)
 
 func TestPinnedRelease(t *testing.T) {
 	if terminology.Version != "3.0.0" {
@@ -30,13 +34,108 @@ func TestPinnedRelease(t *testing.T) {
 	if terminology.ID != "openehr" {
 		t.Errorf("ID = %q, want openehr", terminology.ID)
 	}
-	pin, err := os.ReadFile(pinPath)
-	if err != nil {
-		t.Fatalf("read the pinned terminology: %v", err)
+	for _, tc := range []struct{ name, got, path string }{
+		{"SourceSHA256", terminology.SourceSHA256, pinPath},
+		{"ExternalSourceSHA256", terminology.ExternalSourceSHA256, externalPinPath},
+	} {
+		pin, err := os.ReadFile(tc.path)
+		if err != nil {
+			t.Fatalf("read the pinned file: %v", err)
+		}
+		sum := sha256.Sum256(pin)
+		if want := hex.EncodeToString(sum[:]); tc.got != want {
+			t.Errorf("%s = %q, but %s hashes to %q — run 'make termgen'", tc.name, tc.got, tc.path, want)
+		}
 	}
-	sum := sha256.Sum256(pin)
-	if got, want := terminology.SourceSHA256, hex.EncodeToString(sum[:]); got != want {
-		t.Errorf("SourceSHA256 = %q, but %s hashes to %q — run 'make termgen'", got, pinPath, want)
+}
+
+// REQ-034: the four external code sets of the pin, each with the issuer and
+// the external id the pin gives it, and the counts of TERM Release-3.0.0.
+func TestExternalCodeSetsCarryTheirIssuerAndExternalID(t *testing.T) {
+	tests := []struct {
+		set               *terminology.CodeSet
+		id, issuer, extID string
+		n                 int
+	}{
+		{terminology.Countries, "countries", "ISO", "ISO_3166-1", 250},
+		{terminology.CharacterSets, "character_sets", "IANA", "IANA_character-sets", 14},
+		{terminology.Languages, "languages", "ISO", "ISO_639-1", 253},
+		{terminology.MediaTypes, "media_types", "IANA", "IANA_media-types", 107},
+		{terminology.NormalStatuses, "normal_statuses", "openehr", "openehr_normal_statuses", 7},
+		{terminology.CompressionAlgorithms, "compression_algorithms", "openehr", "openehr_compression_algorithms", 5},
+		{terminology.IntegrityCheckAlgorithms, "integrity_check_algorithms", "openehr", "openehr_integrity_check_algorithms", 7},
+	}
+	for _, tc := range tests {
+		if got := tc.set.ID(); got != tc.id {
+			t.Errorf("ID() = %q, want %q", got, tc.id)
+		}
+		if got := tc.set.Issuer(); got != tc.issuer {
+			t.Errorf("%s.Issuer() = %q, want %q", tc.id, got, tc.issuer)
+		}
+		if got := tc.set.ExternalID(); got != tc.extID {
+			t.Errorf("%s.ExternalID() = %q, want %q", tc.id, got, tc.extID)
+		}
+		if got := tc.set.Len(); got != tc.n {
+			t.Errorf("%s.Len() = %d, want %d", tc.id, got, tc.n)
+		}
+		if s, ok := terminology.CodeSetByID(tc.id); !ok || s != tc.set {
+			t.Errorf("CodeSetByID(%q) = %v, %v; want the generated variable", tc.id, s, ok)
+		}
+	}
+}
+
+// REQ-034: membership of an ISO or IANA code set ignores letter case, as
+// those registers do; membership of an openEHR code set is exact. A member is
+// a code the pinned set lists, and nothing else: no alias the set leaves out,
+// no code the live register added later, no non-ASCII look-alike.
+func TestCodeSetMembershipOverThePin(t *testing.T) {
+	tests := []struct {
+		set  *terminology.CodeSet
+		code string
+		want bool
+	}{
+		{terminology.Languages, "en", true},
+		{terminology.Languages, "EN", true},
+		{terminology.Languages, "en-US", true},
+		{terminology.Languages, "xx", false},
+		{terminology.CharacterSets, "UTF-8", true},
+		{terminology.CharacterSets, "utf-8", true},
+		{terminology.CharacterSets, "iso_8859-1:1987", true},
+		// ISO-8859-1 is an IANA alias of ISO_8859-1:1987 the pin does not list.
+		{terminology.CharacterSets, "ISO-8859-1", false},
+		{terminology.CharacterSets, "UTF-99", false},
+		// U+FF18 FULLWIDTH DIGIT EIGHT.
+		{terminology.CharacterSets, "utf-８", false},
+		{terminology.Countries, "nl", true},
+		{terminology.Countries, "NL", true},
+		{terminology.Countries, "ZZ", false},
+		// U+212A KELVIN SIGN, which Unicode folds to k: KE is Kenya.
+		{terminology.Countries, "KE", false},
+		{terminology.Countries, "ke", true},
+		{terminology.MediaTypes, "text/plain", true},
+		{terminology.MediaTypes, "TEXT/PLAIN", true},
+		{terminology.MediaTypes, "video/jpeg", true},
+		{terminology.NormalStatuses, "H", true},
+		{terminology.NormalStatuses, "h", false},
+		{terminology.IntegrityCheckAlgorithms, "SHA-256", true},
+		{terminology.IntegrityCheckAlgorithms, "sha-256", false},
+	}
+	for _, tc := range tests {
+		if got := tc.set.Has(tc.code); got != tc.want {
+			t.Errorf("%s (issuer %q).Has(%q) = %v, want %v", tc.set.ID(), tc.set.Issuer(), tc.code, got, tc.want)
+		}
+	}
+}
+
+// REQ-034: a nil code set reports zero values and never panics, seen from
+// outside the package.
+func TestNilCodeSetIsInertFromOutside(t *testing.T) {
+	var s *terminology.CodeSet
+	if s.Has("en") || s.Len() != 0 || s.ID() != "" || s.Name() != "" || s.Issuer() != "" || s.ExternalID() != "" {
+		t.Error("a nil *terminology.CodeSet must answer zero values")
+	}
+	if n := len(slices.Collect(s.All())); n != 0 {
+		t.Errorf("nil All yields %d codes, want 0", n)
 	}
 }
 
@@ -48,8 +147,8 @@ func TestTablesMatchTheOpenEHRTerminology(t *testing.T) {
 	if len(groups) != 17 {
 		t.Errorf("Groups() yields %d groups, want 17", len(groups))
 	}
-	if len(codeSets) != 3 {
-		t.Errorf("CodeSets() yields %d code sets, want 3", len(codeSets))
+	if len(codeSets) != 7 {
+		t.Errorf("CodeSets() yields %d code sets, want 7 (3 openEHR-issued, 4 external)", len(codeSets))
 	}
 	concepts := 0
 	for _, g := range groups {
@@ -62,8 +161,9 @@ func TestTablesMatchTheOpenEHRTerminology(t *testing.T) {
 	for _, s := range codeSets {
 		codes += s.Len()
 	}
-	if codes != 19 {
-		t.Errorf("the code sets hold %d codes in total, want 19", codes)
+	// 19 openEHR-issued codes, then 250 + 14 + 253 + 107 external ones.
+	if codes != 643 {
+		t.Errorf("the code sets hold %d codes in total, want 643", codes)
 	}
 
 	// Spot pins — the codes SDK surfaces default, validate and decode with,
@@ -186,7 +286,12 @@ func TestTablesAreInSourceOrder(t *testing.T) {
 		t.Errorf("last group is %q, want extract_update_trigger_event_type", got.ID())
 	}
 	codeSets := slices.Collect(terminology.CodeSets())
-	wantIDs := []string{"compression_algorithms", "integrity_check_algorithms", "normal_statuses"}
+	// openehr_terminology.xml's code sets first, then
+	// openehr_external_terminologies.xml's, each in its document order.
+	wantIDs := []string{
+		"compression_algorithms", "integrity_check_algorithms", "normal_statuses",
+		"countries", "character_sets", "languages", "media_types",
+	}
 	gotIDs := make([]string, 0, len(codeSets))
 	for _, s := range codeSets {
 		gotIDs = append(gotIDs, s.ID())

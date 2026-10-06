@@ -5,10 +5,18 @@ import (
 	"slices"
 )
 
-// ID is the TERMINOLOGY_ID.value every group and code set in this package is
-// defined in: the openEHR Terminology's own identifier. A DV_CODED_TEXT the
-// SDK builds from one of these codes carries it as its terminology id.
+// ID is the TERMINOLOGY_ID.value of the openEHR Terminology itself, the
+// terminology every [Group] and every openEHR-issued [CodeSet] in this
+// package is defined in. A DV_CODED_TEXT the SDK builds from a group's code
+// carries it as its terminology id. The code sets from other issuers
+// (languages, countries, character sets, media types) are not defined in it:
+// each carries its own external id, such as "ISO_639-1", given by
+// [CodeSet.ExternalID].
 const ID = "openehr"
+
+// openEHRIssuer is the issuer the pin names for the code sets openEHR defines
+// itself. Their membership is exact; see [CodeSet.Has].
+const openEHRIssuer = "openehr"
 
 // Concept is one coded entry of a [Group]: the code and its English rubric.
 type Concept struct {
@@ -123,28 +131,80 @@ func (g *Group) Code(rubric string) (string, bool) {
 	return g.concepts[i].Code, true
 }
 
-// CodeSet is one closed, source-ordered openEHR code set: a value set whose
-// members are bare codes with no rubric, such as the normal statuses
-// DV_ORDERED.Normal_status_validity names. Every code set is a package-level
-// variable generated from the pinned terminology file (see openehr_gen.go);
-// a nil pointer is inert, with every method reporting absence.
+// CodeSet is one closed, source-ordered code set of the pinned terminology: a
+// value set whose members are bare codes with no rubric. Every code set is a
+// package-level variable generated from the pinned terminology files (see
+// openehr_gen.go); a nil pointer is inert, with every method reporting
+// absence.
+//
+// A code set is issued either by openEHR or by an external body. The
+// openEHR-issued ones, such as the normal statuses
+// DV_ORDERED.Normal_status_validity names, are defined in the openEHR
+// terminology itself, whose id is [ID]. The others are the openEHR
+// Foundation's snapshot of an ISO or IANA register, published with the
+// pinned release: [Languages] (ISO 639-1), [Countries] (ISO 3166-1),
+// [CharacterSets] (IANA character sets) and [MediaTypes] (IANA media
+// types). A snapshot is not the live register: a
+// code the register added after the pinned release is not a member.
+// [CodeSet.Issuer] and [CodeSet.ExternalID] say which kind a set is, and
+// [CodeSet.Has] matches codes accordingly.
 type CodeSet struct {
-	id, name string
-	codes    []string
-	index    map[string]struct{}
+	id, name           string
+	issuer, externalID string
+	codes              []string
+	// ignoreCase is set for an issuer other than openEHR. Then index is
+	// keyed by each code with its ASCII letters lower-cased.
+	ignoreCase bool
+	index      map[string]struct{}
 }
 
-// newCodeSet builds a code set from its openehr_id, its display name and its
-// codes in source order. Only the generated tables call it.
-func newCodeSet(id, name string, codes []string) *CodeSet {
+// newCodeSet builds a code set from its openehr_id, its display name, its
+// issuer, its external id and its codes in source order. Only the generated
+// tables call it, and its precondition — for an issuer other than openEHR,
+// no two codes differ only in ASCII letter case — is what keeps the index
+// one entry per code: the generator refuses a pin that breaks it (see
+// internal/termgen), so newCodeSet trusts its input.
+func newCodeSet(id, name, issuer, externalID string, codes []string) *CodeSet {
 	s := &CodeSet{
-		id:    id,
-		name:  name,
-		codes: codes,
-		index: make(map[string]struct{}, len(codes)),
+		id:         id,
+		name:       name,
+		issuer:     issuer,
+		externalID: externalID,
+		codes:      codes,
+		ignoreCase: lowerASCII(issuer) != openEHRIssuer,
+		index:      make(map[string]struct{}, len(codes)),
 	}
 	for _, c := range codes {
-		s.index[c] = struct{}{}
+		s.index[s.key(c)] = struct{}{}
+	}
+	return s
+}
+
+// key is the index key for code: the code as given for an openEHR-issued
+// set, or with its ASCII letters lower-cased for any other.
+func (s *CodeSet) key(code string) string {
+	if s.ignoreCase {
+		return lowerASCII(code)
+	}
+	return code
+}
+
+// lowerASCII returns s with the ASCII letters A to Z turned into a to z and
+// every other byte left as it is. Unlike strings.ToLower it never maps a
+// character outside ASCII onto an ASCII letter (the Kelvin sign onto k, say),
+// so no look-alike can match a pinned code. It returns s itself, without
+// allocating, when s holds no upper-case ASCII letter.
+func lowerASCII(s string) string {
+	for i := range len(s) {
+		if c := s[i]; 'A' <= c && c <= 'Z' {
+			b := []byte(s)
+			for j := i; j < len(b); j++ {
+				if c := b[j]; 'A' <= c && c <= 'Z' {
+					b[j] = c + ('a' - 'A')
+				}
+			}
+			return string(b)
+		}
 	}
 	return s
 }
@@ -165,6 +225,27 @@ func (s *CodeSet) Name() string {
 	return s.name
 }
 
+// Issuer returns the body the pin names as the code set's issuer: "openehr"
+// for the code sets openEHR defines itself, "ISO" or "IANA" for the external
+// ones. A nil code set returns "".
+func (s *CodeSet) Issuer() string {
+	if s == nil {
+		return ""
+	}
+	return s.issuer
+}
+
+// ExternalID returns the identifier the pin gives the code set, e.g.
+// "ISO_639-1" for the languages, "IANA_character-sets" for the character
+// sets or "openehr_normal_statuses" for the normal statuses. A nil code set
+// returns "".
+func (s *CodeSet) ExternalID() string {
+	if s == nil {
+		return ""
+	}
+	return s.externalID
+}
+
 // Len returns the number of codes in the code set.
 func (s *CodeSet) Len() int {
 	if s == nil {
@@ -182,12 +263,22 @@ func (s *CodeSet) All() iter.Seq[string] {
 	return slices.Values(s.codes)
 }
 
-// Has reports whether code is a member of the code set.
+// Has reports whether code is a member of the code set: a code the pinned set
+// lists, and nothing else.
+//
+// For a code set openEHR issues, the comparison is exact, as a group's is:
+// NormalStatuses.Has("h") is false. For any other issuer (ISO, IANA) it
+// ignores letter case, because those registers do: Languages.Has("en-US") and
+// CharacterSets.Has("utf-8") are true. Only the ASCII letters A to Z fold, so
+// a character outside ASCII never matches a pinned letter, whatever it looks
+// like. An alias the register knows but the pinned set leaves out is not a
+// member: CharacterSets.Has("ISO-8859-1") is false beside the listed
+// "ISO_8859-1:1987".
 func (s *CodeSet) Has(code string) bool {
 	if s == nil {
 		return false
 	}
-	_, ok := s.index[code]
+	_, ok := s.index[s.key(code)]
 	return ok
 }
 
@@ -196,7 +287,9 @@ func Groups() iter.Seq[*Group] {
 	return slices.Values(groups)
 }
 
-// CodeSets yields every code set of the pinned terminology in source order.
+// CodeSets yields every code set of the pinned terminology in source order:
+// the openEHR-issued ones of openehr_terminology.xml first, then the external
+// ones of openehr_external_terminologies.xml, each file in its own order.
 func CodeSets() iter.Seq[*CodeSet] {
 	return slices.Values(codeSets)
 }
@@ -213,8 +306,10 @@ func GroupByID(id string) (*Group, bool) {
 	return nil, false
 }
 
-// CodeSetByID returns the code set whose openehr_id is id, and false when the
-// pinned terminology has no such code set.
+// CodeSetByID returns the code set whose openehr_id is id, such as
+// "normal_statuses" or "languages", and false when the pinned terminology has
+// no such code set. The id is the openehr_id, not the external id: "languages"
+// finds [Languages], "ISO_639-1" finds nothing.
 func CodeSetByID(id string) (*CodeSet, bool) {
 	for _, s := range codeSets {
 		if s.ID() == id {

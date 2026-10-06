@@ -10,18 +10,26 @@ import (
 // fixtureSource is the provenance the render tests pass in. Run derives the
 // real one from the pin's bytes and its MANIFEST.txt.
 var fixtureSource = SourceInfo{
-	Path:   "resources/terminology/openehr_terminology.xml",
-	Ref:    "Release-9.9.9",
-	SHA256: "abc",
+	Ref:            "Release-9.9.9",
+	Path:           "resources/terminology/openehr_terminology.xml",
+	SHA256:         "abc",
+	ExternalPath:   "resources/terminology/openehr_external_terminologies.xml",
+	ExternalSHA256: "def",
+}
+
+// mergedFixture is the two fixture files as one pin, the shape Render takes.
+func mergedFixture(t *testing.T) *Terminology {
+	t.Helper()
+	term, err := Merge(mustParse(t, fixture), mustParse(t, externalFixture))
+	if err != nil {
+		t.Fatalf("Merge(fixture, externalFixture) = _, %v", err)
+	}
+	return term
 }
 
 func TestRenderEmitsTheGeneratedTable(t *testing.T) {
 	t.Parallel()
-	term, err := Parse(strings.NewReader(fixture))
-	if err != nil {
-		t.Fatalf("Parse(fixture) = _, %v", err)
-	}
-	body, err := Render(term, fixtureSource)
+	body, err := Render(mergedFixture(t), fixtureSource)
 	if err != nil {
 		t.Fatalf("Render = _, %v", err)
 	}
@@ -36,18 +44,29 @@ func TestRenderEmitsTheGeneratedTable(t *testing.T) {
 
 	// Substrings in the order the file must carry them.
 	want := []string{
-		"// Source: resources/terminology/openehr_terminology.xml — openEHR TERM Release-9.9.9",
-		"sha256 abc",
+		"// Source: openEHR TERM Release-9.9.9 (terminology version 9.9.9):",
+		"resources/terminology/openehr_terminology.xml (sha256 abc)",
+		"resources/terminology/openehr_external_terminologies.xml (sha256 def)",
 		"// Regenerate: make termgen. Verify: make termgen-verify.",
 		"package terminology",
 		`const Version = "9.9.9"`,
 		`const SourceSHA256 = "abc"`,
+		`const ExternalSourceSHA256 = "def"`,
 		`var AuditChangeType = newGroup("audit_change_type", "audit change type", []Concept{`,
 		`{Code: "249", Rubric: "creation"},`,
 		`{Code: "523", Rubric: "deleted"},`,
-		`var NormalStatuses = newCodeSet("normal_statuses", "normal statuses", []string{"N", "H"})`,
+		`// NormalStatuses is the code set "normal statuses" issued by openEHR (openehr_id normal_statuses, external id openehr_normal_statuses), 2 codes.`,
+		`var NormalStatuses = newCodeSet("normal_statuses", "normal statuses", "openehr", "openehr_normal_statuses", []string{`,
+		`"N",`,
+		`"H",`,
+		`// Languages is the code set "languages" issued by ISO (openehr_id languages, external id ISO_639-1), 2 codes.`,
+		`var Languages = newCodeSet("languages", "languages", "ISO", "ISO_639-1", []string{`,
+		`"en",`,
+		`"en-us",`,
+		`var CharacterSets = newCodeSet("character_sets", "character sets", "IANA", "IANA_character-sets", []string{`,
+		`"UTF-8",`,
 		"var groups = []*Group{AuditChangeType}",
-		"var codeSets = []*CodeSet{NormalStatuses}",
+		"var codeSets = []*CodeSet{NormalStatuses, Languages, CharacterSets}",
 	}
 	at := 0
 	for _, w := range want {
@@ -64,10 +83,7 @@ func TestRenderEmitsTheGeneratedTable(t *testing.T) {
 // depends on.
 func TestRenderOutputIsGofmtCleanAndDeterministic(t *testing.T) {
 	t.Parallel()
-	term, err := Parse(strings.NewReader(fixture))
-	if err != nil {
-		t.Fatalf("Parse(fixture) = _, %v", err)
-	}
+	term := mergedFixture(t)
 	first, err := Render(term, fixtureSource)
 	if err != nil {
 		t.Fatalf("Render = _, %v", err)
@@ -96,6 +112,10 @@ func TestGoName(t *testing.T) {
 		{"property", "Property"},
 		{"extract_update_trigger_event_type", "ExtractUpdateTriggerEventType"},
 		{"normal_statuses", "NormalStatuses"},
+		{"countries", "Countries"},
+		{"character_sets", "CharacterSets"},
+		{"languages", "Languages"},
+		{"media_types", "MediaTypes"},
 	}
 	for _, tc := range tests {
 		if got := GoName(tc.id); got != tc.want {

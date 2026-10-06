@@ -1,8 +1,10 @@
 // Package termgen generates the openehr/terminology tables from the pinned
-// openEHR Terminology XML under resources/terminology/.
+// openEHR Terminology XML under resources/terminology/: the Foundation's
+// openehr_terminology.xml and openehr_external_terminologies.xml.
 //
 // It is the terminology counterpart of internal/bmmgen: [Parse] decodes and
-// validates the pin, [Render] emits one gofmt-clean openehr_gen.go, and [Run]
+// validates one file of the pin, [Merge] joins the two files into one
+// vocabulary, [Render] emits one gofmt-clean openehr_gen.go, and [Run]
 // either writes that file or, in verify mode, reports how it drifts from
 // the pin without touching it. cmd/termgen is the CLI; `make termgen` and
 // `make termgen-verify` are the entry points.
@@ -14,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -23,12 +26,19 @@ import (
 // a variant to generate from.
 const terminologyName = "openehr"
 
+// openEHRIssuer is the issuer attribute of the code sets openEHR defines
+// itself. Their membership is exact; the code sets of every other issuer
+// (ISO, IANA) match ignoring ASCII letter case, which is why [Parse] refuses
+// two of their codes that differ only in letter case.
+const openEHRIssuer = "openehr"
+
 // idPattern is the openehr_id shape the generator accepts: lower-case ASCII
 // words joined by underscores. It is what makes [GoName]'s mangling total.
 var idPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 
-// Terminology is one parsed openehr_terminology.xml: the release metadata
-// plus every code set and group of the pin, in document order.
+// Terminology is one parsed file of the pin, or the two files joined by
+// [Merge]: the release metadata plus every code set and group, in source
+// order.
 type Terminology struct {
 	Name     string
 	Language string
@@ -39,11 +49,20 @@ type Terminology struct {
 }
 
 // CodeSetDef is one <codeset> of the pin: a value set of bare codes with no
-// rubrics, such as the normal statuses.
+// rubrics, such as the normal statuses or the ISO 639-1 languages, with the
+// issuer and the external id the pin gives it.
 type CodeSetDef struct {
-	ID    string
-	Name  string
-	Codes []string
+	ID         string
+	Name       string
+	Issuer     string
+	ExternalID string
+	Codes      []string
+}
+
+// IssuedByOpenEHR reports whether openEHR issues the code set itself, which
+// makes its membership exact rather than blind to letter case.
+func (cs CodeSetDef) IssuedByOpenEHR() bool {
+	return isOpenEHRIssuer(cs.Issuer)
 }
 
 // GroupDef is one <group> of the pin: a value set of coded concepts, each
@@ -77,9 +96,11 @@ type xmlTerminology struct {
 }
 
 type xmlCodeSet struct {
-	ID    string    `xml:"openehr_id,attr"`
-	Name  string    `xml:"name,attr"`
-	Codes []xmlCode `xml:"code"`
+	ID         string    `xml:"openehr_id,attr"`
+	Name       string    `xml:"name,attr"`
+	Issuer     string    `xml:"issuer,attr"`
+	ExternalID string    `xml:"external_id,attr"`
+	Codes      []xmlCode `xml:"code"`
 }
 
 type xmlCode struct {
@@ -97,12 +118,16 @@ type xmlConcept struct {
 	Rubric string `xml:"rubric,attr"`
 }
 
-// Parse decodes openehr_terminology.xml and validates the invariants the
+// Parse decodes one file of the pin (openehr_terminology.xml or
+// openehr_external_terminologies.xml) and validates the invariants the
 // generated tables rely on: it is the openEHR terminology, it names a
-// release, every code and rubric of a group is present and unique within it,
-// every code of a code set is present and unique within it, no table is
+// release, it holds at least one table, every code and rubric of a group is
+// present and unique within it, every code set names its issuer and external
+// id, every code of a code set is present and unique within it (and, for an
+// issuer other than openEHR, unique ignoring ASCII letter case), no table is
 // empty, and every openehr_id is lower-case snake_case and mangles to a Go
-// name no other id claims.
+// name no other id of the file claims. [Merge] checks what spans the two
+// files.
 //
 // Every breach comes back as an error naming the offending id. The pin is
 // vendored from upstream, so a bad table is a version-bump surprise the
@@ -151,8 +176,51 @@ func Parse(r io.Reader) (*Terminology, error) {
 		}
 		t.Groups = append(t.Groups, def)
 	}
+	// One file may lack groups (the external file has none), but a file with
+	// no table at all has lost them to an upstream rename, and would drop out
+	// of the pin without a word.
+	if len(t.Groups) == 0 && len(t.CodeSets) == 0 {
+		return nil, errors.New("terminology has no groups and no code sets — a renamed or dropped table would otherwise generate a silently incomplete vocabulary")
+	}
+	return t, nil
+}
+
+// Merge joins the two parsed files of the pin into one vocabulary: the
+// release metadata of core (openehr_terminology.xml), then its code sets
+// followed by those of external (openehr_external_terminologies.xml), and
+// the groups of both, each file in its own order.
+//
+// It refuses what only the pair can break: the two files name different
+// releases, an openehr_id of one file claims a Go name an id of the other
+// already claims, or the joined pin lacks a group or a code set. Neither
+// argument is modified.
+func Merge(core, external *Terminology) (*Terminology, error) {
+	if core.Version != external.Version {
+		return nil, fmt.Errorf("the external code sets are terminology version %q but the terminology is version %q — both files must come from one TERM release", external.Version, core.Version)
+	}
+	t := &Terminology{
+		Name:     core.Name,
+		Language: core.Language,
+		Version:  core.Version,
+		Date:     core.Date,
+		CodeSets: slices.Concat(core.CodeSets, external.CodeSets),
+		Groups:   slices.Concat(core.Groups, external.Groups),
+	}
+	// Parse already refused a clash within one file, so a clash here spans
+	// the two; claiming every id of both in one map finds it either way.
+	taken := make(map[string]string, len(t.CodeSets)+len(t.Groups))
+	for _, cs := range t.CodeSets {
+		if err := claimGoName(taken, "code set", cs.ID); err != nil {
+			return nil, err
+		}
+	}
+	for _, g := range t.Groups {
+		if err := claimGoName(taken, "group", g.ID); err != nil {
+			return nil, err
+		}
+	}
 	if len(t.Groups) == 0 || len(t.CodeSets) == 0 {
-		return nil, fmt.Errorf("terminology has %d group(s) and %d code set(s) — the pin must carry at least one of each; a renamed or dropped table would otherwise generate a silently incomplete vocabulary", len(t.Groups), len(t.CodeSets))
+		return nil, fmt.Errorf("the pin has %d group(s) and %d code set(s) — it must carry at least one of each; a renamed or dropped table would otherwise generate a silently incomplete vocabulary", len(t.Groups), len(t.CodeSets))
 	}
 	return t, nil
 }
@@ -176,9 +244,24 @@ func expectEOF(dec *xml.Decoder) error {
 }
 
 // codeSetDef validates one <codeset> and returns it as a [CodeSetDef].
+//
+// The issuer decides how the accessor matches a code: exactly for openEHR,
+// ignoring ASCII letter case for anyone else. So the issuer has to be there,
+// and a set from another issuer must not list two codes that differ only in
+// letter case: the accessor would take them for one member.
 func codeSetDef(cs xmlCodeSet) (CodeSetDef, error) {
-	def := CodeSetDef{ID: cs.ID, Name: cs.Name}
+	switch {
+	case cs.Issuer == "":
+		return CodeSetDef{}, fmt.Errorf("code set %q has no issuer attribute — whether its membership ignores letter case depends on it", cs.ID)
+	case cs.ExternalID == "":
+		return CodeSetDef{}, fmt.Errorf("code set %q has no external_id attribute", cs.ID)
+	}
+	def := CodeSetDef{ID: cs.ID, Name: cs.Name, Issuer: cs.Issuer, ExternalID: cs.ExternalID}
+	foldCase := !def.IssuedByOpenEHR()
 	seen := make(map[string]bool, len(cs.Codes))
+	// folded maps each code, with its ASCII letters lower-cased, to the code
+	// as the pin spells it. Only filled for a set matched ignoring case.
+	folded := make(map[string]string)
 	for _, c := range cs.Codes {
 		switch {
 		case c.Value == "":
@@ -187,12 +270,39 @@ func codeSetDef(cs xmlCodeSet) (CodeSetDef, error) {
 			return CodeSetDef{}, fmt.Errorf("code set %q repeats code %q — membership would be ambiguous", cs.ID, c.Value)
 		}
 		seen[c.Value] = true
+		if foldCase {
+			key := lowerASCII(c.Value)
+			if other, ok := folded[key]; ok {
+				return CodeSetDef{}, fmt.Errorf("code set %q (issuer %q) lists %q and %q, which differ only in letter case — its membership ignores letter case, so they would be one ambiguous member", cs.ID, cs.Issuer, other, c.Value)
+			}
+			folded[key] = c.Value
+		}
 		def.Codes = append(def.Codes, c.Value)
 	}
 	if len(def.Codes) == 0 {
 		return CodeSetDef{}, fmt.Errorf("code set %q has no codes", cs.ID)
 	}
 	return def, nil
+}
+
+// isOpenEHRIssuer reports whether issuer names openEHR itself. The pin
+// spells it "openehr"; the comparison ignores ASCII letter case.
+func isOpenEHRIssuer(issuer string) bool {
+	return lowerASCII(issuer) == openEHRIssuer
+}
+
+// lowerASCII returns s with the ASCII letters A to Z turned into a to z and
+// every other byte left as it is. It is the folding openehr/terminology's
+// CodeSet.Has applies, kept to ASCII so that no character outside it (the
+// Kelvin sign, say, which Unicode folds to k) ever matches a pinned letter.
+func lowerASCII(s string) string {
+	b := []byte(s)
+	for i, c := range b {
+		if 'A' <= c && c <= 'Z' {
+			b[i] = c + ('a' - 'A')
+		}
+	}
+	return string(b)
 }
 
 // groupDef validates one <group> and returns it as a [GroupDef]. Rubrics are

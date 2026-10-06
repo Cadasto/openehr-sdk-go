@@ -136,7 +136,7 @@ codegen: ## Regenerate RM and AOM 1.4 from pinned BMM sources
 codegen-verify: ## Fail if generated code drifts from resources/bmm
 	@$(GO) run ./cmd/bmmgen -resources ./resources/bmm -out . -verify
 
-termgen: ## Regenerate openehr/terminology from the pinned resources/terminology/openehr_terminology.xml
+termgen: ## Regenerate openehr/terminology from the pinned resources/terminology/ (openehr_terminology.xml + openehr_external_terminologies.xml)
 	@$(GO) run ./cmd/termgen -resources ./resources/terminology -out .
 
 termgen-verify: ## Fail if openehr/terminology drifts from resources/terminology
@@ -184,7 +184,7 @@ crossformat-ingest: ## Vendor the upstream cross-format sets into testkit/corpus
 crossformat-verify: ## Offline sha256 integrity of the vendored cross-format sets (the same check runs in `make test`)
 	@./scripts/ingest-crossformat.sh verify
 
-terminology-sync: ## Vendor the openEHR Terminology (openehr_terminology.xml) into resources/terminology/ and regenerate the accessor (needs network; TERMINOLOGY_REF to pin)
+terminology-sync: ## Vendor the openEHR Terminology (openehr_terminology.xml + openehr_external_terminologies.xml) into resources/terminology/ and regenerate the accessor (needs network; TERMINOLOGY_REF to pin)
 	@./scripts/sync-terminology.sh sync
 
 terminology-check: ## Verify the vendored terminology matches MANIFEST + report a newer upstream release (offline integrity; network for drift)

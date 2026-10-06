@@ -1,5 +1,5 @@
 // termgen generates the openehr/terminology tables from the pinned openEHR
-// Terminology XML.
+// Terminology XML files.
 //
 // Usage:
 //
@@ -10,13 +10,14 @@
 //	  -verify             do not write; instead compare with the file on
 //	                      disk; exit 1 on drift
 //
-// The generator reads <resources>/openehr_terminology.xml and the `ref:` line
-// of <resources>/MANIFEST.txt and emits
+// The generator reads <resources>/openehr_terminology.xml,
+// <resources>/openehr_external_terminologies.xml and the `ref:` line of
+// <resources>/MANIFEST.txt and emits
 // <out>/openehr/terminology/openehr_gen.go, with one variable per
-// terminology group and code set, plus the release version and the pin's
-// sha256. `make termgen` regenerates it; `make termgen-verify` fails the
-// build when it drifts from the pin. The implementation lives in
-// internal/termgen.
+// terminology group and code set of both files, plus the release version
+// and each file's sha256. `make termgen` regenerates it; `make
+// termgen-verify` fails the build when it drifts from either file. The
+// implementation lives in internal/termgen.
 package main
 
 import (
