@@ -303,7 +303,9 @@ func (c *Client) doOnce(ctx context.Context, req *Request, target *url.URL) (*Re
 	// Propagate W3C traceparent / tracestate from the active span.
 	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(httpReq.Header))
 
-	httpResp, err := c.cfg.httpClient.Do(httpReq)
+	// REQ-092: a request carrying a credential goes out on a per-request
+	// copy that refuses an https to non-https redirect; see httpClientFor.
+	httpResp, err := c.httpClientFor(httpReq).Do(httpReq)
 	if err != nil {
 		// A network failure arrives from net/http as *url.Error, whose own
 		// Error() prints the resolved URL it was dialling — so this arm's
@@ -560,6 +562,12 @@ func (c *Client) shouldRetry(req *Request, resp *Response, err error, attempt in
 		// it) will fail identically on every attempt — retrying only burns the
 		// budget and re-invokes Token(). Treat them as non-retriable.
 		if errors.Is(err, auth.ErrReauthRequired) || errors.Is(err, auth.ErrInvalidConfig) {
+			return false
+		}
+		// REQ-092: a refused https to non-https redirect is decided by the
+		// server's Location and the request's own credential, so every
+		// attempt would be refused the same way.
+		if errors.Is(err, ErrInsecureRedirect) {
 			return false
 		}
 		// Anything else is a network / transport / transient token error;
