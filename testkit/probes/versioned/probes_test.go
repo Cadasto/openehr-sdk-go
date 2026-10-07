@@ -321,6 +321,222 @@ func TestProbe072RejectsTimeCommittedAudit(t *testing.T) {
 	}
 }
 
+// probe072DeletionSubmission builds, through the public builder, a batch of a
+// creation (with its payload) and a deletion given no payload — the one
+// version REQ-130 § Deletion lets carry no `data` member, and the exception
+// PROBE-072 makes to its inline-`data` rule. The batch audit names `unknown`
+// (253), a code neither version carries, so the audit shape is the builder's
+// own rather than a copy of either version.
+func probe072DeletionSubmission(t *testing.T) *contribution.Submission {
+	t.Helper()
+	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
+	sub, err := contribution.NewBuilder().
+		WithCommitterName("probe-072").
+		WithChangeType(contribution.ChangeTypeUnknown).
+		Add(
+			contribution.Creation(&comp),
+			contribution.Deletion[rm.Composition]("8849182c-82ad-4088-a07f-48ead4180515::cdr.example::1", nil),
+		).
+		Build()
+	if err != nil {
+		t.Fatalf("build the PROBE-072 deletion batch: %v", err)
+	}
+	return sub
+}
+
+// TestProbe072AcceptsDeletionWithoutPayload is the PROBE-072 arm for REQ-130
+// § Deletion: a real body, built and sent through the client, whose deletion
+// carries no `data` member must pass instead of failing "data missing".
+func TestProbe072AcceptsDeletionWithoutPayload(t *testing.T) {
+	var captured []byte
+	b := contributionCommitBackend(&captured, nil)
+	r, err := probes.Probe072ContributionSubmissionShape(context.Background(), newClient(t, b), &captured, ehrIDFixture, probe072DeletionSubmission(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Status != "pass" {
+		t.Errorf("PROBE-072 status = %q, want pass for a deletion built without a payload (detail=%q)", r.Status, r.Detail)
+	}
+	// The pass is only worth anything if the body really is the data-less
+	// shape: key presence, since `"data":null` would also read as no payload.
+	var body struct {
+		Versions []map[string]json.RawMessage `json:"versions"`
+	}
+	if err := json.Unmarshal(captured, &body); err != nil {
+		t.Fatalf("captured body is not JSON: %v", err)
+	}
+	if len(body.Versions) != 2 {
+		t.Fatalf("captured body has %d versions, want 2 (a creation and a deletion)", len(body.Versions))
+	}
+	if _, has := body.Versions[0]["data"]; !has {
+		t.Errorf("the creation lost its inline payload: %s", captured)
+	}
+	if raw, has := body.Versions[1]["data"]; has {
+		t.Errorf("the deletion built without a payload carries data %s, want no data member", raw)
+	}
+	if !strings.Contains(r.Detail, "without a payload") {
+		t.Errorf("PROBE-072 pass detail = %q, want it to name the deletion built without a payload", r.Detail)
+	}
+}
+
+// probe072Version is one `Contribution_create` version as the builder emits
+// it, so a planted variant differs in exactly the member under test: typ is
+// its `_type`, code its commit_audit change-type code, data the raw JSON of
+// its `data` member (empty leaves the member out), and auditExtra extra
+// members spliced into the commit_audit.
+func probe072Version(typ, code, data, auditExtra string) string {
+	s := `{"_type":"` + typ + `","commit_audit":{"_type":"AUDIT_DETAILS"` + auditExtra +
+		`,"change_type":{"_type":"DV_CODED_TEXT","defining_code":{"_type":"CODE_PHRASE","code_string":"` + code + `"}}}`
+	if data != "" {
+		s += `,"data":` + data
+	}
+	return s + "}"
+}
+
+// probe072Body wraps versions in a conformant batch audit.
+func probe072Body(versions ...string) []byte {
+	return []byte(`{"audit":{"_type":"AUDIT_DETAILS","change_type":{"_type":"DV_CODED_TEXT","defining_code":{"_type":"CODE_PHRASE","code_string":"253"}}},"versions":[` +
+		strings.Join(versions, ",") + `]}`)
+}
+
+// probe072PlantDataNull takes the real body the builder sends and rewrites
+// versions[i].data to a present-but-null member — what a builder that dropped
+// `omitempty` from the payload would emit.
+func probe072PlantDataNull(t *testing.T, i int) []byte {
+	t.Helper()
+	var captured []byte
+	b := contributionCommitBackend(&captured, nil)
+	if _, _, err := contribution.Commit(context.Background(), newClient(t, b), ehrIDFixture, probe072DeletionSubmission(t)); err != nil {
+		t.Fatal(err)
+	}
+	var body map[string]json.RawMessage
+	if err := json.Unmarshal(captured, &body); err != nil {
+		t.Fatalf("captured body is not JSON: %v", err)
+	}
+	var versions []map[string]json.RawMessage
+	if err := json.Unmarshal(body["versions"], &versions); err != nil {
+		t.Fatalf("captured versions[] is not a list of objects: %v", err)
+	}
+	versions[i]["data"] = json.RawMessage("null")
+	raw, err := json.Marshal(versions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body["versions"] = raw
+	planted, err := json.Marshal(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return planted
+}
+
+// TestProbe072RejectsDeletionExceptionMisuse plants bodies that each cross
+// the edge of the PROBE-072 exception for a deletion built without a payload
+// (REQ-130 § Deletion), so a probe that let the exception grow, or stopped
+// asserting the rest of the shape on such a version, fails here. Each case
+// names the substring its Detail must carry: asserting only `status == "fail"`
+// would let a case rot into failing for an unrelated reason.
+func TestProbe072RejectsDeletionExceptionMisuse(t *testing.T) {
+	const (
+		payload       = `{"_type":"COMPOSITION"}`
+		missingType   = "data missing or has no _type"
+		timeCommitted = `,"time_committed":{"value":"2026-01-01T00:00:00Z"}`
+	)
+	cases := []struct {
+		name       string
+		planted    []byte
+		wantDetail string
+	}{
+		{
+			// The builder's real deletion, its data member turned into null:
+			// REQ-130 asks for the member to be left out, so null is a defect
+			// even on the one version allowed to carry no payload.
+			name:       "deletion built without a payload emits null data",
+			planted:    probe072PlantDataNull(t, 1),
+			wantDetail: "versions[1].data is null",
+		},
+		{
+			name:       "creation emits null data",
+			planted:    probe072PlantDataNull(t, 0),
+			wantDetail: "versions[0].data is null",
+		},
+		{
+			name:       "imported version emits null data",
+			planted:    probe072Body(probe072Version("IMPORTED_VERSION", "249", "null", "")),
+			wantDetail: "versions[0].data is null",
+		},
+		{
+			// The exception is for a version with NO data; an empty object is
+			// a payload that lost its `_type`, which the old rule still catches.
+			name:       "deletion carries an untyped data object",
+			planted:    probe072Body(probe072Version("ORIGINAL_VERSION", "523", `{}`, "")),
+			wantDetail: missingType,
+		},
+		{
+			// The exception is keyed on change type 523: an amendment with no
+			// payload keeps failing under the existing rule.
+			name:       "amendment lacks data",
+			planted:    probe072Body(probe072Version("ORIGINAL_VERSION", "250", "", "")),
+			wantDetail: missingType,
+		},
+		{
+			name:       "creation lacks data",
+			planted:    probe072Body(probe072Version("ORIGINAL_VERSION", "249", "", "")),
+			wantDetail: missingType,
+		},
+		{
+			// The exception is for an ORIGINAL_VERSION only; an imported
+			// version without data keeps failing even with change type 523.
+			name:       "imported deletion lacks data",
+			planted:    probe072Body(probe072Version("IMPORTED_VERSION", "523", "", "")),
+			wantDetail: missingType,
+		},
+		{
+			// A version with no commit_audit has no change type to key the
+			// exception on, so it cannot claim it.
+			name:       "version without commit_audit lacks data",
+			planted:    probe072Body(`{"_type":"ORIGINAL_VERSION"}`),
+			wantDetail: missingType,
+		},
+		{
+			// The rest of the shape is still asserted on the version that
+			// carries no payload: its commit_audit write shape.
+			name:       "deletion without data carries time_committed",
+			planted:    probe072Body(probe072Version("ORIGINAL_VERSION", "523", "", timeCommitted)),
+			wantDetail: "time_committed",
+		},
+		{
+			// And the payload a version does carry is still required to be
+			// typed on a creation next to the data-less deletion.
+			name:       "creation beside a deletion carries an untyped payload",
+			planted:    probe072Body(probe072Version("ORIGINAL_VERSION", "249", `{}`, ""), probe072Version("ORIGINAL_VERSION", "523", "", "")),
+			wantDetail: "versions[0]." + missingType,
+		},
+		{
+			// A deletion given its payload still passes through the typed rule.
+			name:       "deletion with a payload lacking _type",
+			planted:    probe072Body(probe072Version("ORIGINAL_VERSION", "249", payload, ""), probe072Version("ORIGINAL_VERSION", "523", `{"name":"x"}`, "")),
+			wantDetail: "versions[1]." + missingType,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var captured []byte
+			b := contributionCommitBackend(&captured, tc.planted)
+			r, err := probes.Probe072ContributionSubmissionShape(context.Background(), newClient(t, b), &captured, ehrIDFixture, probe072DeletionSubmission(t))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if r.Status != "fail" {
+				t.Errorf("PROBE-072 status = %q, want fail (detail=%q)", r.Status, r.Detail)
+			}
+			if !strings.Contains(r.Detail, tc.wantDetail) {
+				t.Errorf("PROBE-072 failed for the wrong reason:\n got: %s\nwant it to mention: %s", r.Detail, tc.wantDetail)
+			}
+		})
+	}
+}
+
 func TestProbe013CrossEHRIsolation(t *testing.T) {
 	const (
 		ehrAID          openehrclient.EHRID      = "ehrA-1111-2222-3333-444444444444"
@@ -496,11 +712,17 @@ func TestProbe084BuiltContributionBodyPass(t *testing.T) {
 // probe084Planted builds a `Contribution_create` body in the shape
 // PROBE-084's own batch produces, so a planted variant differs from the
 // real thing in exactly the one clause under test. Each version is
-// `{code, rmType, extra}`; `extra` injects the violation.
+// `{code, rmType, extra}`; `extra` injects the violation. `lifecycle` is the
+// lifecycle_state code the version carries, and when it is empty the version
+// carries what the builder would give it: `deleted` (523) for a deletion,
+// `complete` (532) otherwise. `noData` leaves out the `data` member, as a
+// deletion built without a payload does.
 type probe084Planted struct {
-	code   string
-	rmType string
-	extra  string
+	code      string
+	rmType    string
+	extra     string
+	lifecycle string
+	noData    bool
 }
 
 func probe084Body(batchCode string, versions ...probe084Planted) []byte {
@@ -509,9 +731,18 @@ func probe084Body(batchCode string, versions ...probe084Planted) []byte {
 	}
 	out := make([]string, 0, len(versions))
 	for _, v := range versions {
+		lifecycle := v.lifecycle
+		if lifecycle == "" {
+			lifecycle = "532"
+			if v.code == "523" {
+				lifecycle = "523"
+			}
+		}
 		s := `{"_type":"ORIGINAL_VERSION","commit_audit":` + audit(v.code) +
-			`,"lifecycle_state":{"_type":"DV_CODED_TEXT","defining_code":{"_type":"CODE_PHRASE","code_string":"532"}}` +
-			`,"data":{"_type":"` + v.rmType + `"}`
+			`,"lifecycle_state":{"_type":"DV_CODED_TEXT","defining_code":{"_type":"CODE_PHRASE","code_string":"` + lifecycle + `"}}`
+		if !v.noData {
+			s += `,"data":{"_type":"` + v.rmType + `"}`
+		}
 		if v.extra != "" {
 			s += "," + v.extra
 		}
@@ -531,14 +762,17 @@ func TestProbe084BuiltContributionBodyRejects(t *testing.T) {
 		preceding1 = `"preceding_version_uid":{"value":"8849182c-82ad-4088-a07f-48ead4180515::cdr.example::1"}`
 		preceding2 = `"preceding_version_uid":{"value":"8849182c-82ad-4088-a07f-48ead4180515::cdr.example::2"}`
 		preceding4 = `"preceding_version_uid":{"value":"8849182c-82ad-4088-a07f-48ead4180515::cdr.example::4"}`
+		preceding5 = `"preceding_version_uid":{"value":"8849182c-82ad-4088-a07f-48ead4180515::cdr.example::5"}`
 		callerUID  = `"uid":{"value":"8849182c-82ad-4088-a07f-48ead4180515::cdr.example::3"}`
 	)
-	// The four versions PROBE-084's own batch emits, in order.
+	// The five versions PROBE-084's own batch emits, in order: the last is a
+	// deletion built without a payload, so it carries no `data` member.
 	conformant := []probe084Planted{
 		{code: "249", rmType: "COMPOSITION"},
 		{code: "250", rmType: "COMPOSITION", extra: preceding1},
 		{code: "251", rmType: "EHR_STATUS", extra: preceding2 + "," + callerUID},
 		{code: "523", rmType: "FOLDER", extra: preceding4},
+		{code: "523", noData: true, extra: preceding5},
 	}
 	// mutate returns the conformant batch with one version replaced.
 	mutate := func(i int, v probe084Planted) []probe084Planted {
@@ -612,6 +846,35 @@ func TestProbe084BuiltContributionBodyRejects(t *testing.T) {
 			name:       "null uid emitted",
 			planted:    probe084Body("253", mutate(0, probe084Planted{code: "249", rmType: "COMPOSITION", extra: `"uid":null`})...),
 			wantDetail: "absent rather than empty or null",
+		},
+		{
+			// A deletion built without a payload has no `data` member at all.
+			// A present-but-null key type-asserts like a missing one, so this is
+			// the arm that keeps absence judged on key presence.
+			name:       "data-less deletion emits null data",
+			planted:    probe084Body("253", mutate(4, probe084Planted{code: "523", noData: true, extra: preceding5 + `,"data":null`})...),
+			wantDetail: "built without a payload",
+		},
+		{
+			// The counter-arm: a deletion that WAS given a payload still sends
+			// it, so a missing `data` is a defect there.
+			name:       "deletion with a payload lacks data",
+			planted:    probe084Body("253", mutate(3, probe084Planted{code: "523", noData: true, extra: preceding4})...),
+			wantDetail: "data is missing",
+		},
+		{
+			// The batch names no lifecycle override, so a deletion carries the
+			// `deleted` default, not `complete`.
+			name:       "deletion carries complete under the default",
+			planted:    probe084Body("253", mutate(3, probe084Planted{code: "523", rmType: "FOLDER", lifecycle: "532", extra: preceding4})...),
+			wantDetail: `lifecycle_state code = "532", want "523"`,
+		},
+		{
+			// The default is not derived from the change type for anything but
+			// a deletion: a creation stays `complete`.
+			name:       "creation carries deleted",
+			planted:    probe084Body("253", mutate(0, probe084Planted{code: "249", rmType: "COMPOSITION", lifecycle: "523"})...),
+			wantDetail: `lifecycle_state code = "523", want "532"`,
 		},
 		{
 			name:       "top-level CONTRIBUTION envelope",

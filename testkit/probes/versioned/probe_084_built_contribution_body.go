@@ -41,13 +41,23 @@ type probe084Step struct {
 	label string
 	// rmType is the `data._type` the payload must keep on the wire — the
 	// batch spans three of the four versionable types, so a generic
-	// instantiation that lost its discriminator shows up here.
+	// instantiation that lost its discriminator shows up here. It is empty
+	// for a deletion built without a payload, which carries no `data`.
 	rmType string
+	// noPayload marks a deletion built without a payload. Such a version
+	// must carry **no** `data` member: absent, not `null`. Judging key
+	// presence is what keeps this arm biting, since a `"data":null` member
+	// type-asserts like a missing one.
+	noPayload bool
 	// precedingUID is the version this one follows; empty for a creation,
 	// which must carry no `preceding_version_uid` at all.
 	precedingUID string
 	// wantCode is the audit change-type code the operation implies.
 	wantCode string
+	// wantLifecycle is the lifecycle-state code the version must carry: the
+	// batch names no override, so it is `complete` (532) for a creation,
+	// amendment or modification, and `deleted` (523) for a deletion.
+	wantLifecycle string
 	// wantUID is the `uid` the caller supplied. Empty means the caller
 	// supplied none, and the version must then carry **no** `uid` key:
 	// REQ-130 forbids the builder synthesising one. Asserting "absent"
@@ -58,15 +68,18 @@ type probe084Step struct {
 
 // probe084Batch is the batch PROBE-084 builds: one version per operation, so
 // the whole change-type table (249 / 250 / 251 / 523) is asserted in one
-// pass, across three of the four versionable types.
+// pass, across three of the four versionable types, plus a second deletion
+// built without a payload. The two deletions are the two ways the builder
+// takes one: with the content being deleted, and without it.
 var probe084Batch = []probe084Step{
-	{label: "creation of a COMPOSITION", rmType: "COMPOSITION", wantCode: "249"},
-	{label: "amendment of a COMPOSITION", rmType: "COMPOSITION", precedingUID: "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::1", wantCode: "250"},
+	{label: "creation of a COMPOSITION", rmType: "COMPOSITION", wantCode: "249", wantLifecycle: "532"},
+	{label: "amendment of a COMPOSITION", rmType: "COMPOSITION", precedingUID: "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::1", wantCode: "250", wantLifecycle: "532"},
 	// This one names its own uid, so both halves of the server-assigned-field
-	// rule are asserted on the wire: three versions must carry no `uid`, and
+	// rule are asserted on the wire: four versions must carry no `uid`, and
 	// this one must carry exactly the caller's.
-	{label: "modification of an EHR_STATUS with a caller-supplied uid", rmType: "EHR_STATUS", precedingUID: "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::2", wantCode: "251", wantUID: "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::3"},
-	{label: "deletion of a FOLDER", rmType: "FOLDER", precedingUID: "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::4", wantCode: "523"},
+	{label: "modification of an EHR_STATUS with a caller-supplied uid", rmType: "EHR_STATUS", precedingUID: "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::2", wantCode: "251", wantLifecycle: "532", wantUID: "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::3"},
+	{label: "deletion of a FOLDER, with its payload", rmType: "FOLDER", precedingUID: "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::4", wantCode: "523", wantLifecycle: "523"},
+	{label: "deletion of a COMPOSITION, without a payload", noPayload: true, precedingUID: "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::5", wantCode: "523", wantLifecycle: "523"},
 }
 
 // probe084BatchCode is the batch audit's change type — openEHR `unknown`, a
@@ -86,8 +99,10 @@ const probe084BatchCode = "253"
 // Probe084BuiltContributionBody implements PROBE-084: a
 // `Contribution_create` body assembled by [contribution.Builder] reaches
 // the wire carrying, per version, the requested operation's change-type
-// code, a DV_CODED_TEXT lifecycle state, `preceding_version_uid` exactly
-// where the operation requires it, and none of the server-assigned fields
+// code, a DV_CODED_TEXT lifecycle state (`complete`, or `deleted` on a
+// deletion), `preceding_version_uid` exactly where the operation requires
+// it, the payload inline under `data` (a deletion built without a payload
+// carries no `data` member at all), and none of the server-assigned fields
 // the pin's `UpdateVersion` DTO does not declare.
 //
 // The body is built and then committed through [contribution.Commit],
@@ -170,7 +185,7 @@ func Probe084BuiltContributionBody(ctx context.Context, c *transport.Client, cap
 		return r, nil
 	}
 	r.Status = "pass"
-	r.Detail = fmt.Sprintf("built body: %d versions covering 249/250/251/523 over COMPOSITION/EHR_STATUS/FOLDER, batch audit code %s carried as declared; %d corpus records witness %d version fields, all emittable",
+	r.Detail = fmt.Sprintf("built body: %d versions covering 249/250/251/523 over COMPOSITION/EHR_STATUS/FOLDER, deletions carrying lifecycle 523 and the payload-less one no data member, batch audit code %s carried as declared; %d corpus records witness %d version fields, all emittable",
 		len(body.Versions), probe084BatchCode, len(corpus), corpusFields)
 	return r, nil
 }
@@ -180,9 +195,10 @@ func Probe084BuiltContributionBody(ctx context.Context, c *transport.Client, cap
 // because each operation instantiates its own payload type, which is the
 // point: three of the four versionable types travel in one batch. The
 // payloads need only carry their discriminator — this probe asserts version
-// metadata, not composition validity (composition validation owns that). Their
-// order must match [probe084Batch], and a mismatch is reported as framework
-// misuse rather than as a builder defect.
+// metadata, not composition validity (composition validation owns that). The
+// last change is a deletion given no payload, so its type is named
+// explicitly. Their order must match [probe084Batch], and a mismatch is
+// reported as framework misuse rather than as a builder defect.
 func buildProbe084Submission() (*contribution.Submission, error) {
 	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
 	status := rm.EHRStatus{ArchetypeNodeID: "openEHR-EHR-EHR_STATUS.generic.v1", IsQueryable: true, IsModifiable: true}
@@ -192,6 +208,7 @@ func buildProbe084Submission() (*contribution.Submission, error) {
 		contribution.Amendment(probe084Batch[1].precedingUID, &comp),
 		contribution.Modification(probe084Batch[2].precedingUID, &status, contribution.WithVersionUID(probe084Batch[2].wantUID)),
 		contribution.Deletion(probe084Batch[3].precedingUID, &folder),
+		contribution.Deletion[rm.Composition](probe084Batch[4].precedingUID, nil),
 	}
 	if len(changes) != len(probe084Batch) {
 		return nil, fmt.Errorf("built %d changes for %d expected steps", len(changes), len(probe084Batch))
@@ -237,8 +254,12 @@ func probe084VersionIssue(i int, want probe084Step, v map[string]any) string {
 	if got := codedCodeString(ca, "change_type"); got != want.wantCode {
 		return fmt.Sprintf("%s.commit_audit.change_type code = %q, want %q", at, got, want.wantCode)
 	}
-	if got := codedCodeString(v, "lifecycle_state"); got == "" {
+	lifecycle := codedCodeString(v, "lifecycle_state")
+	if lifecycle == "" {
 		return at + ".lifecycle_state is missing or not DV_CODED_TEXT-shaped (required on the pin's UpdateVersion)"
+	}
+	if lifecycle != want.wantLifecycle {
+		return fmt.Sprintf("%s.lifecycle_state code = %q, want %q (`complete` by default, `deleted` on a deletion — REQ-130)", at, lifecycle, want.wantLifecycle)
 	}
 	uid, hasPreceding := v["preceding_version_uid"].(map[string]any)
 	switch {
@@ -255,7 +276,24 @@ func probe084VersionIssue(i int, want probe084Step, v map[string]any) string {
 	if msg := probe084UIDIssue(at, want.wantUID, v); msg != "" {
 		return msg
 	}
-	data, ok := v["data"].(map[string]any)
+	return probe084DataIssue(at, want, v)
+}
+
+// probe084DataIssue holds `data` to what the operation asked for: the
+// payload inline with its `_type`, except on a deletion built without a
+// payload, which must carry no `data` member. Absence is judged on **key
+// presence**, before any type assertion, because `"data":null` is a present
+// key whose value type-asserts like a missing one — and REQ-130 asks for the
+// member to be left out, not nulled.
+func probe084DataIssue(at string, want probe084Step, v map[string]any) string {
+	raw, present := v["data"]
+	if want.noPayload {
+		if present {
+			return fmt.Sprintf("%s emits `data` %v for a deletion built without a payload — the member must be absent, not null (REQ-130)", at, raw)
+		}
+		return ""
+	}
+	data, ok := raw.(map[string]any)
 	if !ok || data["_type"] == nil {
 		return at + ".data is missing or carries no _type (Contribution_create requires the payload inline)"
 	}

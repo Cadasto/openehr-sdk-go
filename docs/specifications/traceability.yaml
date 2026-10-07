@@ -1657,6 +1657,7 @@ requirements:
       - openehr/client/ehr/contribution/builder_test.go
       - openehr/client/ehr/contribution/version_shadow_internal_test.go
       - openehr/client/ehr/contribution/version_test.go
+      - testkit/probes/versioned/probe_072_contribution_submission_shape.go
       - testkit/probes/versioned/probe_084_built_contribution_body.go
       - testkit/probes/versioned/probes_test.go
 

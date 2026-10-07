@@ -2,7 +2,9 @@ package contribution_test
 
 import (
 	"encoding/json"
+	"maps"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -75,6 +77,13 @@ func valueOf(m map[string]any, field string) string {
 	}
 	s, _ := ct["value"].(string)
 	return s
+}
+
+// versionKeys returns the member names of one decoded version in sorted order,
+// so a test can pin the whole shape of a version instead of the few members it
+// happens to look at.
+func versionKeys(v map[string]any) []string {
+	return slices.Sorted(maps.Keys(v))
 }
 
 // TestBuilderCreationWireShape pins the REQ-130 creation contract: the
@@ -162,13 +171,14 @@ func TestBuilderPrecedingVersionPerOperation(t *testing.T) {
 	const preceding = "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::1"
 	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
 	cases := []struct {
-		name     string
-		change   contribution.Change
-		wantCode string
+		name          string
+		change        contribution.Change
+		wantCode      string
+		wantLifecycle string
 	}{
-		{"amendment", contribution.Amendment(preceding, &comp), "250"},
-		{"modification", contribution.Modification(preceding, &comp), "251"},
-		{"deletion", contribution.Deletion(preceding, &comp), "523"},
+		{name: "amendment", change: contribution.Amendment(preceding, &comp), wantCode: "250", wantLifecycle: "532"},
+		{name: "modification", change: contribution.Modification(preceding, &comp), wantCode: "251", wantLifecycle: "532"},
+		{name: "deletion", change: contribution.Deletion(preceding, &comp), wantCode: "523", wantLifecycle: "523"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -201,32 +211,257 @@ func TestBuilderPrecedingVersionPerOperation(t *testing.T) {
 			if uid["value"] != preceding {
 				t.Errorf("preceding_version_uid = %v, want %q", uid["value"], preceding)
 			}
-			// The lifecycle state is not derived from the change type —
-			// most deletions in the vendored corpus are `complete`.
-			if got := codeOf(v, "lifecycle_state"); got != "532" {
-				t.Errorf("lifecycle_state code = %q, want 532 (never derived from the change type)", got)
+			// An amendment and a modification default to `complete`; the
+			// lifecycle state is not derived from their change type. A
+			// deletion is the one operation whose default is `deleted`.
+			if got := codeOf(v, "lifecycle_state"); got != tc.wantLifecycle {
+				t.Errorf("lifecycle_state code = %q, want %q (`complete` unless the operation is a deletion)", got, tc.wantLifecycle)
 			}
 		})
 	}
 }
 
 // TestBuilderLifecycleStateOverride proves the per-version override reaches
-// the body, and that the code the caller names is the code emitted.
+// the body, and that the code the caller names is the code emitted. The
+// deletion row names `complete`, the opposite of a deletion's own default, so
+// it shows the override replacing that default. REQ-130.
 func TestBuilderLifecycleStateOverride(t *testing.T) {
 	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
 	sub, err := newBuilder().
-		Add(contribution.Deletion("1::cdr.example::1", &comp, contribution.WithLifecycleState(ehr.LifecycleStateDeleted))).
+		Add(contribution.Deletion("1::cdr.example::1", &comp, contribution.WithLifecycleState(ehr.LifecycleStateComplete))).
 		Add(contribution.Creation(&comp, contribution.WithLifecycleState(ehr.LifecycleStateIncomplete))).
 		Build()
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
 	_, versions := marshalSubmission(t, sub)
-	if got := codeOf(versions[0], "lifecycle_state"); got != "523" {
-		t.Errorf("versions[0].lifecycle_state = %q, want 523", got)
+	if got := codeOf(versions[0], "lifecycle_state"); got != "532" {
+		t.Errorf("versions[0].lifecycle_state = %q, want 532 (the override of a deletion's default)", got)
 	}
 	if got := codeOf(versions[1], "lifecycle_state"); got != "553" {
 		t.Errorf("versions[1].lifecycle_state = %q, want 553", got)
+	}
+}
+
+// TestBuilderDeletionWithoutPayload pins REQ-130 § Deletion: a deletion given
+// no payload builds, and the version it emits carries no `data` member at all
+// (absent, not `"data":null`), change type `deleted` (523) and lifecycle state
+// `deleted` (523). A nil payload has no type to infer the instantiation from,
+// so each versionable type is named explicitly.
+func TestBuilderDeletionWithoutPayload(t *testing.T) {
+	const preceding = "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::1"
+	cases := []struct {
+		name   string
+		change contribution.Change
+	}{
+		{"composition", contribution.Deletion[rm.Composition](preceding, nil)},
+		{"ehr status", contribution.Deletion[rm.EHRStatus](preceding, nil)},
+		{"folder", contribution.Deletion[rm.Folder](preceding, nil)},
+		{"ehr access", contribution.Deletion[rm.EHRAccess](preceding, nil)},
+	}
+	wantKeys := []string{"_type", "commit_audit", "lifecycle_state", "preceding_version_uid"}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			sub, err := newBuilder().Add(tc.change).Build()
+			if err != nil {
+				t.Fatalf("Build refused a deletion with no payload: %v", err)
+			}
+			if err := sub.Validate(); err != nil {
+				t.Fatalf("Validate refused the built deletion with no payload: %v", err)
+			}
+			_, versions := marshalSubmission(t, sub)
+			if len(versions) != 1 {
+				t.Fatalf("len(versions) = %d, want 1", len(versions))
+			}
+			v := versions[0]
+			// Presence is judged on the key, not the value: a `"data":null`
+			// member decodes to a nil value but is still a member.
+			if raw, has := v["data"]; has {
+				t.Errorf("version carries a `data` member (%v); a deletion built without a payload must omit it, not send null", raw)
+			}
+			if got := versionKeys(v); !slices.Equal(got, wantKeys) {
+				t.Errorf("version members = %v, want exactly %v", got, wantKeys)
+			}
+			if v["_type"] != "ORIGINAL_VERSION" {
+				t.Errorf("_type = %v, want ORIGINAL_VERSION", v["_type"])
+			}
+			ca, ok := v["commit_audit"].(map[string]any)
+			if !ok {
+				t.Fatalf("commit_audit missing: %v", v)
+			}
+			if got := codeOf(ca, "change_type"); got != "523" {
+				t.Errorf("commit_audit.change_type code = %q, want 523", got)
+			}
+			if got := codeOf(v, "lifecycle_state"); got != "523" {
+				t.Errorf("lifecycle_state code = %q, want 523 (a deletion defaults to deleted)", got)
+			}
+			if got := valueOf(v, "lifecycle_state"); got != "deleted" {
+				t.Errorf("lifecycle_state value = %q, want the pinned rubric %q", got, "deleted")
+			}
+			if got := termOf(v, "lifecycle_state"); got != "openehr" {
+				t.Errorf("lifecycle_state terminology = %q, want openehr", got)
+			}
+			uid, ok := v["preceding_version_uid"].(map[string]any)
+			if !ok {
+				t.Fatalf("preceding_version_uid missing: %v", v)
+			}
+			if uid["value"] != preceding {
+				t.Errorf("preceding_version_uid = %v, want %q", uid["value"], preceding)
+			}
+		})
+	}
+}
+
+// TestBuilderDeletionWithPayload is the counter-arm of
+// [TestBuilderDeletionWithoutPayload]: a deletion given a payload still sends
+// it inline under `data` with its `_type`, so a caller whose server asks for
+// the previous content keeps sending it, and the lifecycle state defaults to
+// `deleted` (523) with the payload present too. REQ-130.
+func TestBuilderDeletionWithPayload(t *testing.T) {
+	const preceding = "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::1"
+	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
+	folder := rm.Folder{Name: rm.DVText{Value: "Encounters"}}
+	cases := []struct {
+		name     string
+		change   contribution.Change
+		wantType string
+	}{
+		{"composition", contribution.Deletion(preceding, &comp), "COMPOSITION"},
+		{"folder", contribution.Deletion(preceding, &folder), "FOLDER"},
+	}
+	wantKeys := []string{"_type", "commit_audit", "data", "lifecycle_state", "preceding_version_uid"}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			sub, err := newBuilder().Add(tc.change).Build()
+			if err != nil {
+				t.Fatalf("Build: %v", err)
+			}
+			_, versions := marshalSubmission(t, sub)
+			v := versions[0]
+			if got := versionKeys(v); !slices.Equal(got, wantKeys) {
+				t.Errorf("version members = %v, want exactly %v", got, wantKeys)
+			}
+			data, ok := v["data"].(map[string]any)
+			if !ok {
+				t.Fatalf("data missing or not an object: %v", v)
+			}
+			if data["_type"] != tc.wantType {
+				t.Errorf("data._type = %v, want %s", data["_type"], tc.wantType)
+			}
+			ca, ok := v["commit_audit"].(map[string]any)
+			if !ok {
+				t.Fatalf("commit_audit missing: %v", v)
+			}
+			if got := codeOf(ca, "change_type"); got != "523" {
+				t.Errorf("commit_audit.change_type code = %q, want 523", got)
+			}
+			if got := codeOf(v, "lifecycle_state"); got != "523" {
+				t.Errorf("lifecycle_state code = %q, want 523 (a deletion defaults to deleted)", got)
+			}
+		})
+	}
+}
+
+// TestBuilderDeletionLifecycleOverride — a per-version [WithLifecycleState]
+// replaces a deletion's `deleted` default, with a payload and without one, and
+// the rubric beside the code is the pin's own. The change type stays `deleted`:
+// the override names a lifecycle state, not an operation. REQ-130.
+func TestBuilderDeletionLifecycleOverride(t *testing.T) {
+	const preceding = "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::1"
+	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
+	cases := []struct {
+		name     string
+		change   contribution.Change
+		wantCode string
+		wantData bool
+	}{
+		{
+			name:     "complete with a payload",
+			change:   contribution.Deletion(preceding, &comp, contribution.WithLifecycleState(ehr.LifecycleStateComplete)),
+			wantCode: "532",
+			wantData: true,
+		},
+		{
+			name:     "complete without a payload",
+			change:   contribution.Deletion[rm.Composition](preceding, nil, contribution.WithLifecycleState(ehr.LifecycleStateComplete)),
+			wantCode: "532",
+		},
+		{
+			name:     "incomplete without a payload",
+			change:   contribution.Deletion[rm.Composition](preceding, nil, contribution.WithLifecycleState(ehr.LifecycleStateIncomplete)),
+			wantCode: "553",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			sub, err := newBuilder().Add(tc.change).Build()
+			if err != nil {
+				t.Fatalf("Build: %v", err)
+			}
+			_, versions := marshalSubmission(t, sub)
+			v := versions[0]
+			if got := codeOf(v, "lifecycle_state"); got != tc.wantCode {
+				t.Errorf("lifecycle_state code = %q, want %q", got, tc.wantCode)
+			}
+			wantRubric, ok := terminology.VersionLifecycleState.Rubric(tc.wantCode)
+			if !ok {
+				t.Fatalf("code %q is not in the pinned version-lifecycle-state group, so this table row is stale", tc.wantCode)
+			}
+			if got := valueOf(v, "lifecycle_state"); got != wantRubric {
+				t.Errorf("lifecycle_state value = %q, want the pinned rubric %q", got, wantRubric)
+			}
+			if _, has := v["data"]; has != tc.wantData {
+				t.Errorf("data member present = %v, want %v", has, tc.wantData)
+			}
+			ca, ok := v["commit_audit"].(map[string]any)
+			if !ok {
+				t.Fatalf("commit_audit missing: %v", v)
+			}
+			if got := codeOf(ca, "change_type"); got != "523" {
+				t.Errorf("commit_audit.change_type code = %q, want 523 (the override must not change the operation)", got)
+			}
+		})
+	}
+}
+
+// TestBuilderDeletionWithoutPayloadDecodesIntoRM — the marshalled version of
+// a deletion built without a payload decodes into an rm.OriginalVersion whose
+// `data` is nil, so a reader of the SDK's own output sees a Void payload and
+// not an empty COMPOSITION. REQ-130.
+func TestBuilderDeletionWithoutPayloadDecodesIntoRM(t *testing.T) {
+	const preceding = "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::1"
+	sub, err := newBuilder().Add(contribution.Deletion[rm.Composition](preceding, nil)).Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if err := sub.Validate(); err != nil {
+		t.Fatalf("Validate refused a version with no data: %v", err)
+	}
+	b, err := canjson.Marshal(sub)
+	if err != nil {
+		t.Fatalf("canjson.Marshal: %v", err)
+	}
+	var body struct {
+		Versions []json.RawMessage `json:"versions"`
+	}
+	if err := json.Unmarshal(b, &body); err != nil {
+		t.Fatalf("not valid JSON: %v\n%s", err, b)
+	}
+	if len(body.Versions) != 1 {
+		t.Fatalf("len(versions) = %d, want 1", len(body.Versions))
+	}
+	var ov rm.OriginalVersion[rm.Composition]
+	if err := canjson.Unmarshal(body.Versions[0], &ov); err != nil {
+		t.Fatalf("decode into rm.OriginalVersion[rm.Composition]: %v\n%s", err, body.Versions[0])
+	}
+	if ov.Data != nil {
+		t.Errorf("decoded Data = %+v, want nil (the deletion carries no data)", ov.Data)
+	}
+	if ov.PrecedingVersionUID == nil || ov.PrecedingVersionUID.Value != preceding {
+		t.Errorf("decoded PrecedingVersionUID = %+v, want %q", ov.PrecedingVersionUID, preceding)
+	}
+	if got := ov.LifecycleState.DefiningCode.CodeString; got != "523" {
+		t.Errorf("decoded lifecycle_state code = %q, want 523", got)
 	}
 }
 
@@ -277,6 +512,7 @@ func TestBuilderDoesNotDeriveBatchChangeType(t *testing.T) {
 // TestBuilderRefusals covers every accumulation error REQ-130 requires to
 // surface at Build with no submission returned.
 func TestBuilderRefusals(t *testing.T) {
+	const preceding = "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::1"
 	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
 	cases := []struct {
 		name    string
@@ -307,9 +543,21 @@ func TestBuilderRefusals(t *testing.T) {
 			builder: newBuilder().Add(contribution.Amendment("", &comp)),
 			want:    "preceding version uid",
 		},
+		// Only a deletion may be given no payload (REQ-130 § Deletion): each
+		// of the other three operations is still refused at Build.
 		{
-			name:    "nil payload",
+			name:    "creation with a nil payload",
 			builder: newBuilder().Add(contribution.Creation[rm.Composition](nil)),
+			want:    "nil data",
+		},
+		{
+			name:    "amendment with a nil payload",
+			builder: newBuilder().Add(contribution.Amendment[rm.Composition](preceding, nil)),
+			want:    "nil data",
+		},
+		{
+			name:    "modification with a nil payload",
+			builder: newBuilder().Add(contribution.Modification[rm.Composition](preceding, nil)),
 			want:    "nil data",
 		},
 		{
@@ -334,6 +582,48 @@ func TestBuilderRefusals(t *testing.T) {
 			}
 			if !strings.Contains(err.Error(), tc.want) {
 				t.Errorf("error = %q, want it to mention %q", err, tc.want)
+			}
+		})
+	}
+}
+
+// TestBuilderDeletionWithoutPayloadRefusals — a deletion given no payload is
+// exempt from the nil-data refusal and from nothing else: it still needs the
+// version it deletes, and its lifecycle state must still be a code of the
+// openEHR version-lifecycle-state group. Each refusal is for its own reason,
+// never for the missing payload. REQ-130.
+func TestBuilderDeletionWithoutPayloadRefusals(t *testing.T) {
+	const preceding = "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::1"
+	cases := []struct {
+		name   string
+		change contribution.Change
+		want   string
+	}{
+		{
+			name:   "no preceding uid",
+			change: contribution.Deletion[rm.Composition]("", nil),
+			want:   "preceding version uid",
+		},
+		{
+			name:   "unknown lifecycle code",
+			change: contribution.Deletion[rm.Composition](preceding, nil, contribution.WithLifecycleState(ehr.LifecycleState("999"))),
+			want:   "version-lifecycle-state",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			sub, err := newBuilder().Add(tc.change).Build()
+			if err == nil {
+				t.Fatalf("Build accepted the deletion, want an error mentioning %q: %+v", tc.want, sub)
+			}
+			if sub != nil {
+				t.Error("Build returned a submission alongside an error")
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("error = %q, want it to mention %q", err, tc.want)
+			}
+			if strings.Contains(err.Error(), "nil data") {
+				t.Errorf("error = %q, a deletion is not refused for having no payload", err)
 			}
 		})
 	}
