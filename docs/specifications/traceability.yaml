@@ -120,6 +120,7 @@ requirements:
     packages: [transport]
     tests:
       - transport/client_test.go
+      - transport/redirect_internal_test.go
       - transport/redirect_test.go
 
   - id: REQ-022
@@ -955,6 +956,7 @@ requirements:
     implementation: landed
     packages: [transport, smart/discovery]
     tests:
+      - transport/redirect_internal_test.go
       - transport/redirect_test.go
 
   - id: REQ-093
