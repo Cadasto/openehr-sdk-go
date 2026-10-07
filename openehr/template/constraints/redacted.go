@@ -69,6 +69,10 @@ func (r Redacted) empty() bool {
 // Reveal returns the held value, or nil when none is held. It is the only way
 // to read the value, so call it only where showing the value is safe, such as
 // a form shown back to the person who filled it in.
+//
+// The value comes back with its type and equal under == to the one given to
+// [Redact]. Because equal values share one handle, a floating-point negative
+// zero may come back as a positive zero, which == treats as the same number.
 func (r Redacted) Reveal() any {
 	switch {
 	case r.box != nil:

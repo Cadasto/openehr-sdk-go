@@ -1014,7 +1014,7 @@ A value-free field **MUST NOT** fall back to quoting the value where a value-fre
 `Value` **MUST** be of the type `constraints.Redacted`, which holds one submitted value and never prints it:
 
 - `constraints.Redact(v)` **MUST** return a `Redacted` holding `v`. The zero `Redacted` holds no value.
-- `Reveal()` **MUST** return the held value unchanged, or nil when none is held. It is the only way to read the value.
+- `Reveal()` **MUST** return the held value with its type, or nil when none is held. It is the only way to read the value. A value that `==` can compare **MUST** come back equal under `==` to the one held, which lets a floating-point negative zero come back as a positive zero; any other value **MUST** come back as the same value.
 - Every `fmt` verb, `%v`, `%+v` and `%#v` included, **MUST** print `[redacted]` for a `Redacted` that holds a value and nothing for one that does not, so printing a whole `Violation`, `Issue` or `Result` prints no submitted value. `String()` **MUST** return the same text.
 - Where `fmt` prints a `Redacted` without calling its methods (under `%p`, and through an unexported field of the caller's own struct), the output **MUST NOT** contain the value either.
 - The `Value` field of `Violation` and of `Issue` **MUST** be left out of `encoding/json` output, v1 and v2 alike, so encoding a `Result` writes no `Value` member. A `Redacted` encoded on its own **MUST** encode as JSON `null`.
