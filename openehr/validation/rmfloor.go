@@ -146,7 +146,7 @@ func (w *rmFloorWalker) emit(i Issue) {
 // emitting `required` for any RM-mandatory attribute that is absent or
 // empty and recursing into every present attribute.
 //
-// A type rmread does NOT model (OBJECT_REF, PARTICIPATION, LINK, … — see
+// A type rmread does NOT model (OBJECT_REF, FEEDER_AUDIT, LINK, … — see
 // [rmread.Handles]) is an opaque leaf here: its members are unreadable, so
 // reading them would report every one absent and fabricate `required`.
 // Such a node is validated solely by its per-type invariant evaluator
@@ -284,6 +284,10 @@ func (w *rmFloorWalker) checkInvariants(value any, rmType, path string) {
 		w.checkDVInterval(value, path)
 	case rmType == "OBJECT_REF", rmType == "PARTY_REF", rmType == "ACCESS_GROUP_REF", rmType == "LOCATABLE_REF":
 		w.checkObjectRef(value, path)
+	case rmType == "PARTY_IDENTIFIED", rmType == "PARTY_RELATED":
+		// PARTY_RELATED inherits the PARTY_IDENTIFIED rules via embedding —
+		// one evaluator, dispatched for both runtime types.
+		w.checkPartyIdentified(value, path)
 	case rmType == "DV_TEXT", rmType == "DV_CODED_TEXT":
 		// DV_CODED_TEXT inherits `mappings` from DV_TEXT via embedding —
 		// one evaluator, dispatched for both runtime types.
@@ -602,6 +606,53 @@ func (w *rmFloorWalker) checkObjectRef(value any, path string) {
 			Path:   joinPath(path, "/namespace"),
 			Code:   "rm_invariant",
 			Detail: "OBJECT_REF.namespace must be non-empty",
+		})
+	}
+}
+
+// checkPartyIdentified enforces the three REQ-112 invariants PARTY_IDENTIFIED
+// declares, and PARTY_RELATED inherits:
+//
+//   - Basic_validity: at least one of name, identifiers and external_ref is
+//     present, reported on the node;
+//   - Name_valid: a present name is not empty, reported at name;
+//   - Identifiers_valid: a present identifiers is not empty, reported at
+//     identifiers.
+//
+// Presence is read from Go nilness, as for DV_TEXT mappings (see
+// [rmFloorWalker.checkTermMappings]): an absent key and an explicit JSON
+// `null` both decode to a nil pointer or a nil slice and read as absent, so
+// only a decoded `"name":""` or `"identifiers":[]` is present and empty. A
+// present external_ref is walked as its own node, where checkObjectRef
+// checks its parts. The terminology-group rules (PARTY_RELATED's
+// Relationship_valid) are not in the floor.
+//
+// Diagnostics name the attribute and the RM rule, never the offending value
+// (REQ-093).
+func (w *rmFloorWalker) checkPartyIdentified(value any, path string) {
+	p, ok := asPartyIdentified(value)
+	if !ok {
+		return
+	}
+	if p.Name == nil && p.Identifiers == nil && p.ExternalRef == nil {
+		w.emit(Issue{
+			Path:   path,
+			Code:   "rm_invariant",
+			Detail: "PARTY_IDENTIFIED has none of name, identifiers and external_ref; at least one must be present (RM Basic_validity)",
+		})
+	}
+	if p.Name != nil && *p.Name == "" {
+		w.emit(Issue{
+			Path:   joinPath(path, "/name"),
+			Code:   "rm_invariant",
+			Detail: "PARTY_IDENTIFIED.name is present but empty (RM Name_valid)",
+		})
+	}
+	if p.Identifiers != nil && len(p.Identifiers) == 0 {
+		w.emit(Issue{
+			Path:   joinPath(path, "/identifiers"),
+			Code:   "rm_invariant",
+			Detail: "PARTY_IDENTIFIED.identifiers is present but empty (RM Identifiers_valid)",
 		})
 	}
 }

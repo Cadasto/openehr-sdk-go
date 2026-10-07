@@ -130,7 +130,7 @@ The discovery cache **MUST**:
 - Honour the TTL declared in the discovery response. If no TTL is declared, a default TTL (default: 15 minutes) **MUST** apply.
 - Honour `ETag` / `If-None-Match` for conditional refresh: a `304 Not Modified` to a conditional request extends the cached entry's TTL without replacing the body, and a `304 Not Modified` to a request without `If-None-Match` is a failed fetch ([§ Refresh API](#refresh-api)).
 - Be invalidated on `401` / `403` against a previously-working endpoint, after at most one refresh attempt.
-- Coalesce concurrent resolution attempts (REQ-026) — one goroutine fetches; the others wait.
+- Coalesce concurrent resolution attempts (REQ-026) — one goroutine fetches; the others wait. A waiter whose own context ends **MUST** stop waiting and return its context's error. When the fetching caller's own context ends and that alone fails the fetch, that caller **MUST** get an error that wraps its context's error, and the fetch **MUST NOT** fail the callers that joined it: a waiter whose own context is still live **MUST** fetch again. Such a failure says nothing about the Platform, so it **MUST NOT** invalidate the cached entry.
 - Key every entry by the Platform base URL the caller resolved, never by the document's `issuer` ([ADR 0023](../adr/0023-smart-platform-base-url-and-oidc-issuer.md)).
 
 The resolver defers closing the response body before it branches on the status, so the `304` path closes it too.
@@ -206,10 +206,10 @@ catalog, err := sdk.RefreshDiscovery(ctx)
 A refresh **MUST**:
 
 - Send a conditional request (`If-None-Match`) when the cached entry carries an `ETag`, and a plain request when it carries none, keeping that entry in place meanwhile.
-- On a `304 Not Modified` to a conditional request, re-run the REQ-072 checks and the REQ-073 trust checks, the OIDC cross-check included, on the cached document, and renew the cached entry's TTL without replacing its document (REQ-071); on a `200`, re-run the resolve / validate / cache pipeline and replace the entry; on a failure, invalidate the entry. A `304 Not Modified` to a plain request is a failed fetch: no document came back.
+- On a `304 Not Modified` to a conditional request, re-run the REQ-072 checks and the REQ-073 trust checks, the OIDC cross-check included, on the cached document, and renew the cached entry's TTL without replacing its document (REQ-071); on a `200`, re-run the resolve / validate / cache pipeline and replace the entry; on a failure, invalidate the entry, except a failure that only the caller's own cancelled or expired context caused (REQ-071). A `304 Not Modified` to a plain request is a failed fetch: no document came back.
 - Return the current catalog (or an error if resolution fails).
 
-The refresh API **MUST NOT** block other in-flight requests beyond the coalescing window — they continue with the stale catalog until the refresh completes (typical) or fails (in which case the next request after refresh fails with the discovery error).
+The refresh API **MUST NOT** block other in-flight requests beyond the coalescing window — they continue with the stale catalog until the refresh completes (typical) or fails (in which case the next request after refresh fails with the discovery error, unless only the refreshing caller's own context ended it, which leaves the cached entry in place).
 
 ## Errors
 

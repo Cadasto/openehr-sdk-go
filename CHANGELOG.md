@@ -8,6 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+**Breaking:** `demographic.Delete` drops its `ifMatch` parameter, on the repository method too, and token, refresh and revocation requests in `auth/smart`, `auth/clientcreds` and `auth/jwtbearer` no longer follow a redirect.
+
+### Changed
+
+- **`demographic.Delete` takes no `If-Match` (REQ-054).** The `ifMatch` parameter is gone, from the repository method too, and a 409 returns `ErrVersionConflict` with the latest version uid beside it.
+- **Token, refresh and revocation requests never follow a redirect (REQ-060).** `auth/smart`, `auth/clientcreds` and `auth/jwtbearer` return a 3xx answer as an `ExchangeError` instead of re-sending the form to another URL.
+- **A restored session keeps its scope on refresh (REQ-064).** After `SetTokens`, a refresh response that omits `scope` gives an access token with the held token's scope, not an empty one.
+- **One cancelled caller no longer fails the others (REQ-071).** In `smart/discovery`, a waiter whose own context is live fetches again when the fetching caller's context ends, and the cached catalog stays.
+
 ## [0.31.0] - 2026-10-06
 
 Thirty-first `v0.x` minor: offline REST examples and pkg.go.dev Examples, generated instances that pass the RM floor for more templates, and composition deletes and error bodies that follow ITS-REST Release-1.1.0. **Breaking:** `composition.Delete` drops its `ifMatch` parameter, `instance.Generate` refuses an archetype root with no archetype id, the validators check party references and ROLE and CAPABILITY validity intervals they skipped, and PROBE-011 fails a server that answers a stale `If-Match` with 409.

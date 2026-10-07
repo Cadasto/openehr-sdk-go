@@ -70,6 +70,30 @@ func asElement(value any) (rm.Element, bool) {
 	return rm.Element{}, false
 }
 
+// asPartyIdentified recovers the PARTY_IDENTIFIED attributes (by value or by
+// pointer) from a PARTY_IDENTIFIED, or from a PARTY_RELATED, which inherits
+// them through its embedded PARTY_IDENTIFIED. Returns ok=false for a nil
+// pointer and for any other value.
+func asPartyIdentified(value any) (rm.PartyIdentified, bool) {
+	switch v := value.(type) {
+	case *rm.PartyIdentified:
+		if v == nil {
+			return rm.PartyIdentified{}, false
+		}
+		return *v, true
+	case rm.PartyIdentified:
+		return v, true
+	case *rm.PartyRelated:
+		if v == nil {
+			return rm.PartyIdentified{}, false
+		}
+		return v.PartyIdentified, true
+	case rm.PartyRelated:
+		return v.PartyIdentified, true
+	}
+	return rm.PartyIdentified{}, false
+}
+
 // temporalValue returns the `value` string of a DV_DATE_TIME / DV_DATE /
 // DV_TIME / DV_DURATION (by value or by pointer) and reports whether it
 // satisfies the type's ISO 8601 predicate, using the REQ-123 parse. ok is
