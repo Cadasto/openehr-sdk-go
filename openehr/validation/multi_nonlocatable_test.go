@@ -230,6 +230,19 @@ func TestValidateDemographic_REQ102_ActorListsBindByRMType(t *testing.T) {
         <rm_type_name>DV_TEXT</rm_type_name>
         <node_id>at9000</node_id>
       </children>`
+	dvTextAtMostOnce := `
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>DV_TEXT</rm_type_name>
+        <occurrences>
+          <lower_included>true</lower_included>
+          <upper_included>true</upper_included>
+          <lower_unbounded>false</lower_unbounded>
+          <upper_unbounded>false</upper_unbounded>
+          <lower>0</lower>
+          <upper>1</upper>
+        </occurrences>
+        <node_id></node_id>
+      </children>`
 	nilLanguage := func(p *rm.Person) { p.Languages = []rm.DVTextLike{nil} }
 	typedNilLanguage := func(p *rm.Person) { p.Languages = []rm.DVTextLike{(*rm.DVText)(nil)} }
 
@@ -269,6 +282,16 @@ func TestValidateDemographic_REQ102_ActorListsBindByRMType(t *testing.T) {
 			name:      "two children that do not admit the item",
 			languages: dvCodedText + dvCodedText,
 			want:      []string{"alternative_mismatch /languages[@1]"},
+		},
+		{
+			// Both children admit a DV_TEXT; binding to the first puts two
+			// items on a child that allows one, binding to the last does not.
+			name:      "the first child that admits the item binds it",
+			languages: dvTextAtMostOnce + dataValue,
+			mutate: func(p *rm.Person) {
+				p.Languages = []rm.DVTextLike{rm.DVText{Value: "en"}, rm.DVText{Value: "nl"}}
+			},
+			want: []string{"cardinality /languages[@1]"},
 		},
 		{
 			name:      "a slot child is skipped for the next non-slot child",
