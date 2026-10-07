@@ -3,6 +3,8 @@ package validation
 import (
 	"fmt"
 	"strings"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
 
 // Severity is the typed severity attached to every [Issue]. [ValidateComposition]
@@ -38,26 +40,74 @@ func (s Severity) String() string {
 
 // Issue is one failing clause from a validator. Validators emit one
 // Issue per failure (collect-all, not fail-fast). The zero value is
-// not useful; construct via the per-validator helpers.
+// not useful; the validators in this package build issues themselves.
+//
+// What a field may hold depends on the validator that reported the issue.
+//
+// On an issue from the instance validators — [ValidateComposition],
+// [Validate], [ValidateDemographic], [ValidateFolder] and
+// [ValidateEHRStatus], and the template-less floor [ValidateRM],
+// [ValidateRMFolder], [ValidateRMEHRStatus], [ValidateRMEHRAccess],
+// [ValidateRMDemographic] and [ValidateRMEHRStatusBytes] — Path, Code,
+// Detail and Severity never contain a value taken from the instance: not
+// the content of a data value, a code, units, a precision, an interval
+// bound, nor the text of an error raised while decoding it. They may name
+// RM types and attributes, archetype and node ids, and the template's own
+// constraint, so such an issue can be logged or returned to a client as it
+// is. The value the failed check read is kept only in Value, which always
+// prints as "[redacted]" when it holds one, is left out of JSON and gob
+// output, and is read with Value.Reveal().
+//
+// On an issue from [ValidateAQL] or [ValidateAQLWithTypeRelation], Code
+// and Severity never contain a value either, but Detail and Path carry the
+// lint text and may quote the query, its literals included. Value is
+// empty.
+//
+// Issues can be compared with ==, and the comparison never panics. Two
+// issues compare equal when all their fields, the value held in Value
+// included, are equal.
 type Issue struct {
 	// Path is the AQL path of the offending node. Empty for global
 	// issues that do not localise to a specific node (e.g. root
-	// archetype-id mismatch).
+	// archetype-id mismatch). On an issue from [ValidateAQL] it is the
+	// lint path and may quote the query.
 	Path string
 
 	// Code is a stable programmatic identifier (e.g. "required",
 	// "cardinality", "rm_type_mismatch", "slot_fill",
 	// "primitive_out_of_range"). Consumers should dispatch on Code
-	// rather than parse Detail.
+	// rather than parse Detail. It never contains a value from the input.
 	Code string
 
-	// Detail is a human-readable message describing the failure.
-	// Includes the offending value where reasonable; not localised.
+	// Detail is a human-readable message describing the failure; it is
+	// not localised. From an instance validator it names the check that
+	// failed and never the value the check read; from [ValidateAQL] it
+	// is the lint text and may quote the query.
 	Detail string
 
 	// Severity classifies the issue. [ValidateComposition] emits [Error] only;
 	// [ValidateAQL] may emit [Warning] advisories that do not flip [Result.OK].
 	Severity Severity
+
+	// Value holds the value from the instance that the failed check read:
+	//
+	//   - on a primitive_* issue, the Value of the
+	//     [constraints.Violation] it reports;
+	//   - on an rm_invariant issue, the precision below -1, the
+	//     numerator and denominator that a precision of 0 found
+	//     fractional, the two interval bounds out of order (lower
+	//     first), or the date, time or duration string that is not
+	//     valid ISO 8601;
+	//   - on a term_mapping_match issue, the match;
+	//   - on an invalid_shape issue from a failed decode, the decode
+	//     error, whose text may quote the input.
+	//
+	// It is empty on every other issue (something absent, a count, a
+	// type or identity mismatch, a guard) and on every issue from
+	// [ValidateAQL]. Holding a value, it always prints as "[redacted]";
+	// it is left out of JSON and gob output, and Value.Reveal() returns
+	// the value itself, to be called only where showing it is safe.
+	Value constraints.Redacted `json:"-"`
 }
 
 // Err returns the typed sentinel matching this Issue's Code, or

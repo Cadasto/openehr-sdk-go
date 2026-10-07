@@ -39,9 +39,9 @@ func TestValidateComposition_ConstraintFixtures_NoPrimitiveViolations(t *testing
 		// OPT pins false_valid=false while the instance carries false.
 		// Surfaced once INTEGER/BOOLEAN AOM short-name channels validate
 		// through DV wrapper scalar attrs (REQ-110 rmread path).
-		"Test_dv_boolean_true_false.v0": "value false not allowed",
+		"Test_dv_boolean_true_false.v0": "DV_BOOLEAN value the C_BOOLEAN does not allow",
 		// OPT pins magnitude range [10..20] while the instance carries 25.
-		"Test_dv_count_range_constraint.v0": "magnitude 25 outside [10..20]",
+		"Test_dv_count_range_constraint.v0": "DV_COUNT magnitude outside the C_INTEGER range",
 		// OPT pins formalism to [text/plain] while the instance carries abc.
 		// Surfaced once STRING became an AOM primitive short name (REQ-107).
 		// Pinned in TestValidateComposition_ConstraintFixture_ParsableViolation.

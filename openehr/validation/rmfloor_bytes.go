@@ -21,6 +21,7 @@ import (
 	json "encoding/json/v2"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
 
 // ValidateRMEHRStatusBytes validates a canonical-JSON EHR_STATUS against
@@ -55,7 +56,9 @@ import (
 // unchanged. Input that is not a well-formed JSON object (malformed, array,
 // scalar, null, or an object repeating a member name), or that fails
 // EHR_STATUS decode, surfaces a single
-// `invalid_shape` issue at `/` and a not-OK [Result].
+// `invalid_shape` issue at `/` and a not-OK [Result]. When the EHR_STATUS
+// decode fails, the decode error, whose text may quote the input, is in
+// that issue's Value and not in its Detail.
 //
 // The decode uses encoding/json/v2 directly rather than
 // openehr/serialize/canjson, which openehr/validation does not import:
@@ -83,11 +86,14 @@ func ValidateRMEHRStatusBytes(data []byte) Result {
 
 	var status rm.EHRStatus
 	if err := json.Unmarshal(data, &status); err != nil {
+		// The decode error's text may quote a literal from the input, so
+		// it goes into Value and stays out of Detail (REQ-168).
 		return resultFromIssues([]Issue{{
 			Path:     "/",
 			Code:     "invalid_shape",
-			Detail:   "ValidateRMEHRStatusBytes: EHR_STATUS decode failed: " + err.Error(),
+			Detail:   "ValidateRMEHRStatusBytes: EHR_STATUS decode failed",
 			Severity: Error,
+			Value:    constraints.Redact(err),
 		}})
 	}
 
