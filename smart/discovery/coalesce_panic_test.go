@@ -3,6 +3,7 @@ package discovery_test
 import (
 	"context"
 	"net/http"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"testing/synctest"
@@ -170,5 +171,115 @@ func TestPanicInFetchReachesStarterAndStrandsNoCaller(t *testing.T) { // REQ-071
 				})
 			})
 		}
+	}
+}
+
+// TestCoalescedWaiterFetchesAgainWhenStarterPanics pins REQ-026 and REQ-071: a
+// caller that joined a fetch which then panicked is not left waiting, and the
+// panic is not its result. While its own context is live it fetches again and
+// gets the result of that fetch, while the panic reaches only the caller that
+// started the first fetch.
+func TestCoalescedWaiterFetchesAgainWhenStarterPanics(t *testing.T) { // REQ-026, REQ-071
+	for _, src := range panicSources {
+		t.Run(src.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				f := startPanicFixture(t, 1, src.heldStatus)
+				baseURL := f.p.baseURL()
+				src.arm(f)
+
+				// The deadline only bounds the test should caller 2 be stranded.
+				ctx2, cancel2 := context.WithTimeout(t.Context(), time.Minute)
+				defer cancel2()
+				var (
+					wg        sync.WaitGroup
+					recovered any
+					cat2      *discovery.ServiceCatalog
+					err2      error
+				)
+				returned2 := make(chan struct{})
+				wg.Go(func() {
+					recovered = catchPanic(func() { _, _ = f.res.Resolve(t.Context(), baseURL) })
+				})
+				synctest.Wait() // caller 1's request is held at the server
+				wg.Go(func() {
+					defer close(returned2)
+					cat2, err2 = f.res.Resolve(ctx2, baseURL)
+				})
+				synctest.Wait() // caller 2 waits for caller 1's fetch
+				select {
+				case <-returned2:
+					t.Error("caller 2 returned while caller 1's fetch was held, want it waiting on that fetch")
+				default:
+				}
+				if got := f.p.hits.Load(); got != 1 {
+					t.Errorf("server saw %d requests while caller 1's fetch was held, want 1: caller 2 joins that fetch", got)
+				}
+				f.p.open() // caller 1's fetch ends in the panic
+				wg.Wait()
+
+				if recovered != f.value {
+					t.Errorf("caller 1 panicked with %#v, want the value %#v the fake raised, unchanged", recovered, f.value)
+				}
+				if err2 != nil || cat2 == nil {
+					t.Errorf("caller 2 = %v, %v, want a catalog: its own context is live, so it fetches again", cat2, err2)
+				}
+				if got := f.p.hits.Load(); got != 2 {
+					t.Errorf("server answered %d requests, want 2: caller 2 sends a request of its own after the panic", got)
+				}
+				if cached, ok := f.cache.Get(t.Context(), baseURL); !ok || cached != cat2 {
+					t.Errorf("cache.Get(%q) = %p, %t, want the catalog %p caller 2 fetched", baseURL, cached, ok, cat2)
+				}
+			})
+		})
+	}
+}
+
+// TestCoalescedWaiterWhoseContextEndsAsStarterPanicsDoesNotFetch pins REQ-026
+// and REQ-071: a waiter woken because the fetch it joined panicked looks at its
+// own context again before it fetches. When that context has ended by then,
+// the waiter returns that context's error itself, not the empty result of the
+// fetch that panicked, and sends no request.
+func TestCoalescedWaiterWhoseContextEndsAsStarterPanicsDoesNotFetch(t *testing.T) { // REQ-026, REQ-071
+	for _, src := range panicSources {
+		t.Run(src.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				f := startPanicFixture(t, 1, src.heldStatus)
+				baseURL := f.p.baseURL()
+				src.arm(f)
+
+				inner2, cancel2 := context.WithCancel(t.Context())
+				defer cancel2()
+				ctx2 := newLateContext(inner2)
+				defer ctx2.open()
+				var (
+					wg        sync.WaitGroup
+					recovered any
+					cat2      *discovery.ServiceCatalog
+					err2      error
+				)
+				wg.Go(func() {
+					recovered = catchPanic(func() { _, _ = f.res.Resolve(t.Context(), baseURL) })
+				})
+				synctest.Wait() // caller 1's request is held at the server
+				wg.Go(func() { cat2, err2 = f.res.Resolve(ctx2, baseURL) })
+				synctest.Wait() // caller 2 waits for caller 1's fetch
+				ctx2.hold()
+				f.p.open()      // caller 1's fetch ends in the panic
+				synctest.Wait() // caller 1 panicked and woke caller 2, whose next look at its context waits
+				cancel2()
+				ctx2.open()
+				wg.Wait()
+
+				if recovered != f.value {
+					t.Errorf("caller 1 panicked with %#v, want the value %#v the fake raised, unchanged", recovered, f.value)
+				}
+				if err2 != context.Canceled || cat2 != nil { //nolint:errorlint // the waiter returns its context's error itself, wrapped in nothing
+					t.Errorf("caller 2 = %v, %v, want nil and its own context's error %v itself: its context ended before it looked again", cat2, err2, context.Canceled)
+				}
+				if got := f.p.hits.Load(); got != 1 {
+					t.Errorf("server answered %d requests, want 1: caller 2 sends none once its own context ended", got)
+				}
+			})
+		})
 	}
 }

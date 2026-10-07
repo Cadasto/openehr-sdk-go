@@ -63,6 +63,11 @@ type resolveCall struct {
 	// Platform, so a waiter does not take it as its own result. Read only
 	// after done is closed.
 	ownContextEnded bool
+	// abandoned is set when the call ended without a result, because a panic
+	// in the fetch or in the Cache call that records its result unwound the
+	// caller that ran it. As with ownContextEnded, a waiter does not take the
+	// call's empty result as its own. Read only after done is closed.
+	abandoned bool
 }
 
 type resolverConfig struct {
@@ -311,6 +316,14 @@ func (r *Resolver) Refresh(ctx context.Context, baseURL string) (*ServiceCatalog
 // for baseURL never has its cache entry overwritten or dropped by an earlier
 // one.
 //
+// A panic in the fetch, or in the Cache call that records its result, is not
+// recovered: it goes on to the starter as it was raised. The call still leaves
+// the in-flight set, so no caller for baseURL is left waiting on it, and its
+// waiters behave as when the starter's context ended: each whose own context
+// is live fetches again, and one whose context has ended returns its own
+// context's error. After a panic the resolver neither writes nor drops the
+// cached entry itself.
+//
 // cached is the catalog held for baseURL, or nil; fetch uses its ETag for
 // a conditional request.
 func (r *Resolver) fetchCoalesced(ctx context.Context, baseURL string, cached *ServiceCatalog) (*ServiceCatalog, error) {
@@ -331,12 +344,13 @@ func (r *Resolver) fetchCoalesced(ctx context.Context, baseURL string, cached *S
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		}
-		if !call.ownContextEnded {
+		if !call.ownContextEnded && !call.abandoned {
 			return call.catalog, call.err
 		}
-		// The starter's context ended, not this caller's. Never hand the
-		// starter's error on; give up with this caller's own error when its
-		// context ended too, otherwise fetch again.
+		// The starter's context ended, not this caller's, or a panic ended the
+		// call without a result. Never hand the starter's outcome on; give up
+		// with this caller's own error when its context ended too, otherwise
+		// fetch again.
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
@@ -346,7 +360,16 @@ func (r *Resolver) fetchCoalesced(ctx context.Context, baseURL string, cached *S
 // runCall runs the fetch for call, which the caller has put in the in-flight
 // set, writes the cache, takes call out of the set and publishes its result
 // to the waiters.
+//
+// A panic in the fetch or in the cache write unwinds runCall before the result
+// is published. The deferred release still takes call out of the set and
+// wakes the waiters, with call marked abandoned so that they fetch again, and
+// the panic goes on to the caller as it was raised.
 func (r *Resolver) runCall(ctx context.Context, baseURL string, cached *ServiceCatalog, call *resolveCall) (*ServiceCatalog, error) {
+	// call stays abandoned unless the fetch and the cache write below return.
+	call.abandoned = true
+	defer r.release(baseURL, call)
+
 	cat, err := r.fetch(ctx, baseURL, cached)
 	ownContextEnded := endedByContext(ctx, err)
 
@@ -380,15 +403,21 @@ func (r *Resolver) runCall(ctx context.Context, baseURL string, cached *ServiceC
 		err = fmt.Errorf("%w: %w", ctx.Err(), err)
 	}
 
-	r.mu.Lock()
-	delete(r.inflight, baseURL)
-	r.mu.Unlock()
-
 	call.catalog = cat
 	call.err = err
 	call.ownContextEnded = ownContextEnded
-	close(call.done)
+	call.abandoned = false
 	return cat, err
+}
+
+// release takes call out of the in-flight set, then wakes its waiters. runCall
+// defers it, so it runs exactly once per call, also when a panic unwinds
+// runCall.
+func (r *Resolver) release(baseURL string, call *resolveCall) {
+	r.mu.Lock()
+	delete(r.inflight, baseURL)
+	r.mu.Unlock()
+	close(call.done)
 }
 
 // endedByContext reports whether err means the fetch failed only because ctx
