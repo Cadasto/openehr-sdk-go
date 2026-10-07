@@ -442,6 +442,25 @@ func TestREQ112_CodedInvariantsValueFree(t *testing.T) {
 	}
 }
 
+// TestREQ112_CodedInvariantsEmptyCode breaks every row with an empty
+// code_string, once with no terminology id either (an attribute the source
+// left out, as a value-typed mandatory one decodes) and once in the row's own
+// terminology: an empty code_string is no member, so each gives exactly one
+// `code_not_in_value_set`, at the CODE_PHRASE the row reads.
+func TestREQ112_CodedInvariantsEmptyCode(t *testing.T) {
+	for _, row := range append(codedRows(), rootRows()...) {
+		t.Run(row.name, func(t *testing.T) {
+			for _, empty := range []rm.CodePhrase{{}, phrase(row.valid.TerminologyID.Value, "")} {
+				r := validation.ValidateRM(row.root(empty))
+				if got, want := codedFindings(r.Issues), []string{row.path}; !slices.Equal(got, want) {
+					t.Errorf("ValidateRM(%s %q::\"\") code_not_in_value_set at %q, want %q; issues=%+v",
+						row.name, empty.TerminologyID.Value, got, want, r.Issues)
+				}
+			}
+		})
+	}
+}
+
 // assertCodedDetail checks the Detail of the row's finding: it names the
 // invariant, the group or code set and, for an ISO or IANA code set, its
 // external id, and it carries neither the code string nor the terminology id
