@@ -244,7 +244,9 @@ func TestREQ168_RedactUncomparableValue(t *testing.T) {
 	t.Run("map", func(t *testing.T) {
 		t.Parallel()
 		got, ok := constraints.Redact(m).Reveal().(map[string]string)
-		if !ok || !maps.Equal(got, m) {
+		// A copy holds equal entries in other storage, so compare where the
+		// two maps live.
+		if !ok || !maps.Equal(got, m) || reflect.ValueOf(got).UnsafePointer() != reflect.ValueOf(m).UnsafePointer() {
 			t.Errorf("Redact(%v).Reveal() = %#v, want the same map back", m, got)
 		}
 	})
