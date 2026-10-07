@@ -129,9 +129,10 @@ type versionConfig struct {
 	hasSystemID bool
 }
 
-// WithLifecycleState sets this version's `lifecycle_state`, defaulting to
-// `complete` (532). It is carried in the version body, not the
-// `openehr-version` header: the header is per-request and cannot express a
+// WithLifecycleState sets this version's `lifecycle_state`, replacing the
+// default: `complete` (532) for a [Creation], [Amendment] or [Modification],
+// and `deleted` (523) for a [Deletion]. It is carried in the version body, not
+// the `openehr-version` header: the header is per-request and cannot express a
 // distinct state for each version of a multi-version contribution.
 func WithLifecycleState(s openehrclient.LifecycleState) VersionOption {
 	return func(c *versionConfig) { c.lifecycle = s }
@@ -183,9 +184,15 @@ func Modification[T Versionable](precedingUID string, data *T, opts ...VersionOp
 }
 
 // Deletion accumulates a logical deletion of the version at precedingUID,
-// with change type `deleted` (523). The version's `lifecycle_state` is not
-// derived from the change type: it defaults to `complete` like any other
-// version, since most recorded deletions are of complete content. Pass [WithLifecycleState] to say otherwise.
+// with change type `deleted` (523) and, by default, lifecycle state `deleted`
+// (523); pass [WithLifecycleState] to name another.
+//
+// data may be nil. The openEHR Reference Model describes a deletion as a new
+// version whose data is Void, so a deletion given no payload builds a version
+// with no `data` member at all. A deletion given a payload sends it inline
+// under `data`, for a server that asks for the content being deleted. A nil
+// payload carries no type, so name it: Deletion[rm.Composition](uid, nil).
+// Every other operation refuses a nil payload when the batch is built.
 func Deletion[T Versionable](precedingUID string, data *T, opts ...VersionOption) Change {
 	return newChange(ChangeTypeDeleted, precedingUID, data, opts...)
 }
@@ -198,14 +205,26 @@ func Deletion[T Versionable](precedingUID string, data *T, opts ...VersionOption
 // (REQ-130, REQ-023). Go 1.27 allows generic methods; four generic Add*
 // methods would still be a worse fluent surface than four constructors
 // plus Add.
+//
+// A nil payload is refused for every change type except a deletion, whose
+// version carries Void data (REQ-130 § Deletion). That exemption sits on the
+// payload guard only: a deletion with no payload still needs its preceding
+// uid and a valid lifecycle state, so the checks below run for it unchanged.
 func newChange[T Versionable](ct ChangeType, precedingUID string, data *T, opts ...VersionOption) Change {
-	if data == nil {
+	if data == nil && ct != ChangeTypeDeleted {
 		return Change{err: fmt.Errorf("contribution: %s change has nil data", ct.label())}
 	}
 	if ct != ChangeTypeCreation && precedingUID == "" {
 		return Change{err: fmt.Errorf("contribution: %s change needs a preceding version uid", ct.label())}
 	}
+	// The default is `complete` for every operation but a deletion, whose
+	// default is `deleted`. It is chosen before the options run so that
+	// WithLifecycleState replaces it on every operation (REQ-130 § Lifecycle
+	// state). No other lifecycle state is derived from the change type.
 	cfg := versionConfig{lifecycle: openehrclient.LifecycleStateComplete}
+	if ct == ChangeTypeDeleted {
+		cfg.lifecycle = openehrclient.LifecycleStateDeleted
+	}
 	for _, o := range opts {
 		if o != nil {
 			o(&cfg)
@@ -364,8 +383,9 @@ func (b *Builder) WithAuditType(t AuditType) *Builder {
 	return b
 }
 
-// Add accumulates changes in order. A nil-data or otherwise malformed
-// Change is kept and reported by Build, so a chain never loses an error.
+// Add accumulates changes in order. A malformed Change, such as a creation
+// given no payload or an amendment given no preceding uid, is kept and
+// reported by Build, so a chain never loses an error.
 func (b *Builder) Add(changes ...Change) *Builder {
 	if b == nil {
 		return b
