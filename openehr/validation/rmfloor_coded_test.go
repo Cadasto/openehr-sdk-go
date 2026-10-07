@@ -25,8 +25,8 @@ func phrase(tid, code string) rm.CodePhrase {
 	return rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: tid}, CodeString: code}
 }
 
-// codedText returns a DV_CODED_TEXT whose defining_code is code.
-func codedText(code rm.CodePhrase) rm.DVCodedText {
+// codedTextOf returns a DV_CODED_TEXT whose defining_code is code.
+func codedTextOf(code rm.CodePhrase) rm.DVCodedText {
 	return rm.DVCodedText{Value: "coded", DefiningCode: code}
 }
 
@@ -45,7 +45,7 @@ func codedComposition() *rm.Composition {
 		ArchetypeNodeID:  "openEHR-EHR-COMPOSITION.encounter.v1",
 		ArchetypeDetails: codedArchetyped("openEHR-EHR-COMPOSITION.encounter.v1"),
 		Name:             rm.DVText{Value: "Encounter"},
-		Category:         codedText(openEHRCode("433")),
+		Category:         codedTextOf(openEHRCode("433")),
 		Composer:         rm.PartySelf{},
 		Language:         phrase("ISO_639-1", "en"),
 		Territory:        phrase("ISO_3166-1", "NL"),
@@ -56,7 +56,7 @@ func codedComposition() *rm.Composition {
 func codedContext() *rm.EventContext {
 	return &rm.EventContext{
 		StartTime: rm.DVDateTime{Value: "2026-10-01T10:00:00Z"},
-		Setting:   codedText(openEHRCode("238")),
+		Setting:   codedTextOf(openEHRCode("238")),
 	}
 }
 
@@ -134,7 +134,7 @@ func codedRows() []codedRow {
 			name: "COMPOSITION category", invariant: "Category_validity", group: terminology.CompositionCategory,
 			root: func(c rm.CodePhrase) any {
 				comp := codedComposition()
-				comp.Category = codedText(c)
+				comp.Category = codedTextOf(c)
 				return comp
 			},
 			path: "/category/defining_code", valid: openEHRCode("433"), breach: openEHRCode("9999"),
@@ -162,7 +162,7 @@ func codedRows() []codedRow {
 			root: func(c rm.CodePhrase) any {
 				comp := codedComposition()
 				comp.Context = codedContext()
-				comp.Context.Setting = codedText(c)
+				comp.Context.Setting = codedTextOf(c)
 				return comp
 			},
 			path: "/context/setting/defining_code", valid: openEHRCode("238"), breach: openEHRCode("9999"),
@@ -188,7 +188,7 @@ func codedRows() []codedRow {
 		{
 			name: "ELEMENT null_flavour", invariant: "Inv_null_flavour_valid", group: terminology.NullFlavours,
 			root: func(c rm.CodePhrase) any {
-				nf := codedText(c)
+				nf := codedTextOf(c)
 				return &rm.Element{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "item"}, NullFlavour: &nf}
 			},
 			path: "/null_flavour/defining_code", valid: openEHRCode("253"), breach: openEHRCode("999"),
@@ -196,22 +196,22 @@ func codedRows() []codedRow {
 		{
 			name: "INTERVAL_EVENT math_function", invariant: "Math_function_validity", group: terminology.EventMathFunction,
 			root: func(c rm.CodePhrase) any {
-				return &rm.IntervalEvent[rm.ItemStructure]{MathFunction: codedText(c)}
+				return &rm.IntervalEvent[rm.ItemStructure]{MathFunction: codedTextOf(c)}
 			},
 			path: "/math_function/defining_code", valid: openEHRCode("146"), breach: openEHRCode("9999"),
 		},
 		{
 			name: "ISM_TRANSITION current_state", invariant: "Current_state_valid", group: terminology.InstructionStates,
 			root: func(c rm.CodePhrase) any {
-				return &rm.IsmTransition{CurrentState: codedText(c)}
+				return &rm.IsmTransition{CurrentState: codedTextOf(c)}
 			},
 			path: "/current_state/defining_code", valid: openEHRCode("532"), breach: openEHRCode("9999"),
 		},
 		{
 			name: "ISM_TRANSITION transition", invariant: "Transition_valid", group: terminology.InstructionTransitions,
 			root: func(c rm.CodePhrase) any {
-				tr := codedText(c)
-				return &rm.IsmTransition{CurrentState: codedText(openEHRCode("532")), Transition: &tr}
+				tr := codedTextOf(c)
+				return &rm.IsmTransition{CurrentState: codedTextOf(openEHRCode("532")), Transition: &tr}
 			},
 			path: "/transition/defining_code", valid: openEHRCode("541"), breach: openEHRCode("9999"),
 		},
@@ -219,7 +219,7 @@ func codedRows() []codedRow {
 			name: "PARTICIPATION function", invariant: "Function_valid", group: terminology.ParticipationFunction,
 			root: func(c rm.CodePhrase) any {
 				ev := codedEvaluation()
-				ev.OtherParticipations = []rm.Participation{{Function: codedText(c), Performer: rm.PartySelf{}}}
+				ev.OtherParticipations = []rm.Participation{{Function: codedTextOf(c), Performer: rm.PartySelf{}}}
 				return ev
 			},
 			path: "/other_participations[0]/function/defining_code", valid: openEHRCode("253"), breach: openEHRCode("999"),
@@ -227,7 +227,7 @@ func codedRows() []codedRow {
 		{
 			name: "PARTICIPATION mode", invariant: "Mode_valid", group: terminology.ParticipationMode,
 			root: func(c rm.CodePhrase) any {
-				mode := codedText(c)
+				mode := codedTextOf(c)
 				ev := codedEvaluation()
 				ev.OtherParticipations = []rm.Participation{{Function: rm.DVText{Value: "nurse"}, Mode: &mode, Performer: rm.PartySelf{}}}
 				return ev
@@ -238,7 +238,7 @@ func codedRows() []codedRow {
 			name: "PARTY_RELATED relationship", invariant: "Relationship_valid", group: terminology.SubjectRelationship,
 			root: func(c rm.CodePhrase) any {
 				ev := codedEvaluation()
-				ev.Subject = rm.PartyRelated{Relationship: codedText(c)}
+				ev.Subject = rm.PartyRelated{Relationship: codedTextOf(c)}
 				return ev
 			},
 			path: "/subject/relationship/defining_code", valid: openEHRCode("10"), breach: openEHRCode("9999"),
@@ -246,7 +246,7 @@ func codedRows() []codedRow {
 		{
 			name: "TERM_MAPPING purpose", invariant: "Purpose_valid", group: terminology.TermMappingPurpose,
 			root: func(c rm.CodePhrase) any {
-				purpose := codedText(c)
+				purpose := codedTextOf(c)
 				return &rm.DVText{Value: "x", Mappings: []rm.TermMapping{{Match: "=", Target: phrase("SNOMED-CT", "123"), Purpose: &purpose}}}
 			},
 			path: "/mappings[0]/purpose/defining_code", valid: openEHRCode("669"), breach: openEHRCode("9999"),
@@ -259,7 +259,7 @@ func codedRows() []codedRow {
 		{
 			name: "DV_CODED_TEXT language", invariant: "Language_valid", codeSet: terminology.Languages,
 			root: func(c rm.CodePhrase) any {
-				ct := codedText(phrase("local", "at1"))
+				ct := codedTextOf(phrase("local", "at1"))
 				ct.Language = &c
 				return &ct
 			},
@@ -273,7 +273,7 @@ func codedRows() []codedRow {
 		{
 			name: "DV_CODED_TEXT encoding", invariant: "Encoding_valid", codeSet: terminology.CharacterSets,
 			root: func(c rm.CodePhrase) any {
-				ct := codedText(phrase("local", "at1"))
+				ct := codedTextOf(phrase("local", "at1"))
 				ct.Encoding = &c
 				return ct
 			},
@@ -351,7 +351,7 @@ func rootRows() []codedRow {
 			name: "EVENT_CONTEXT setting, as the root", invariant: "Setting_valid", group: terminology.Setting,
 			root: func(c rm.CodePhrase) any {
 				ec := codedContext()
-				ec.Setting = codedText(c)
+				ec.Setting = codedTextOf(c)
 				return ec
 			},
 			path: "/setting/defining_code", valid: openEHRCode("238"), breach: openEHRCode("9999"),
@@ -359,19 +359,19 @@ func rootRows() []codedRow {
 		{
 			name: "PARTICIPATION function, as the root", invariant: "Function_valid", group: terminology.ParticipationFunction,
 			root: func(c rm.CodePhrase) any {
-				return &rm.Participation{Function: codedText(c), Performer: rm.PartySelf{}}
+				return &rm.Participation{Function: codedTextOf(c), Performer: rm.PartySelf{}}
 			},
 			path: "/function/defining_code", valid: openEHRCode("253"), breach: openEHRCode("999"),
 		},
 		{
 			name: "PARTY_RELATED relationship, as the root", invariant: "Relationship_valid", group: terminology.SubjectRelationship,
-			root: func(c rm.CodePhrase) any { return &rm.PartyRelated{Relationship: codedText(c)} },
+			root: func(c rm.CodePhrase) any { return &rm.PartyRelated{Relationship: codedTextOf(c)} },
 			path: "/relationship/defining_code", valid: openEHRCode("10"), breach: openEHRCode("9999"),
 		},
 		{
 			name: "TERM_MAPPING purpose, as the root", invariant: "Purpose_valid", group: terminology.TermMappingPurpose,
 			root: func(c rm.CodePhrase) any {
-				purpose := codedText(c)
+				purpose := codedTextOf(c)
 				return &rm.TermMapping{Match: "=", Target: phrase("SNOMED-CT", "123"), Purpose: &purpose}
 			},
 			path: "/purpose/defining_code", valid: openEHRCode("669"), breach: openEHRCode("9999"),
@@ -500,7 +500,7 @@ func assertCodedDetail(t *testing.T, row codedRow, issues []validation.Issue, co
 func TestREQ112_CodedInvariantsAcceptance(t *testing.T) {
 	ev := codedEvaluation()
 	ev.Encoding = phrase("IANA_character-sets", "UTF-99")
-	nf := codedText(openEHRCode("999"))
+	nf := codedTextOf(openEHRCode("999"))
 	ev.Data = &rm.ItemTree{
 		ArchetypeNodeID: "at0001",
 		Name:            rm.DVText{Value: "tree"},
@@ -510,7 +510,7 @@ func TestREQ112_CodedInvariantsAcceptance(t *testing.T) {
 	comp.Language = phrase("ISO_639-1", "xx")
 	comp.Territory = phrase("ISO_3166-1", "ZZ")
 	comp.Context = codedContext()
-	comp.Context.Setting = codedText(openEHRCode("9999"))
+	comp.Context.Setting = codedTextOf(openEHRCode("9999"))
 	comp.Content = []rm.ContentItem{ev}
 
 	got := codedFindings(validation.ValidateRM(comp).Issues)
@@ -543,7 +543,7 @@ func TestREQ112_CodedGroupNeedsOpenEHRTerminology(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			comp := codedComposition()
 			comp.Context = codedContext()
-			comp.Context.Setting = codedText(tc.code)
+			comp.Context.Setting = codedTextOf(tc.code)
 			if got := codedFindings(validation.ValidateRM(comp).Issues); !slices.Equal(got, tc.want) {
 				t.Errorf("ValidateRM(setting %s::%s) code_not_in_value_set at %q, want %q",
 					tc.code.TerminologyID.Value, tc.code.CodeString, got, tc.want)
@@ -637,7 +637,7 @@ func TestREQ112_CodeSetLetterCase(t *testing.T) {
 // value-typed attribute always, empty or not, a PARTY_RELATED's relationship
 // included. Each row lists every finding the root gives, by code and path.
 func TestREQ112_CodedInvariantGuards(t *testing.T) {
-	badCode := codedText(openEHRCode("999"))
+	badCode := codedTextOf(openEHRCode("999"))
 	nurse := rm.DVText{Value: "nurse"}
 	elementWithBoth := &rm.Element{
 		ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "item"},
@@ -663,12 +663,15 @@ func TestREQ112_CodedInvariantGuards(t *testing.T) {
 	emptyLanguage.Language = rm.CodePhrase{}
 	blankLanguage := codedComposition()
 	blankLanguage.Language = phrase("ISO_639-1", "")
+	// A named PARTY_RELATED satisfies Basic_validity, so its relationship is
+	// the only thing a row can break.
+	relative := "relative"
 	noRelationship := codedEvaluation()
-	noRelationship.Subject = rm.PartyRelated{}
+	noRelationship.Subject = rm.PartyRelated{Name: &relative}
 	noRelationshipCode := codedEvaluation()
-	noRelationshipCode.Subject = rm.PartyRelated{Relationship: rm.DVCodedText{Value: "mother"}}
-	badRelative := rm.PartyRelated{Relationship: codedText(openEHRCode("9999"))}
-	mother := rm.PartyRelated{Relationship: codedText(openEHRCode("10"))}
+	noRelationshipCode.Subject = rm.PartyRelated{Name: &relative, Relationship: rm.DVCodedText{Value: "mother"}}
+	badRelative := rm.PartyRelated{Name: &relative, Relationship: codedTextOf(openEHRCode("9999"))}
+	mother := rm.PartyRelated{Name: &relative, Relationship: codedTextOf(openEHRCode("10"))}
 	performer := func(p rm.PartyProxy) rm.Participation {
 		return rm.Participation{Function: nurse, Performer: p}
 	}
@@ -711,6 +714,7 @@ func TestREQ112_CodedInvariantGuards(t *testing.T) {
 		{
 			name: "PARTICIPATION with no function",
 			root: withParticipations(rm.Participation{Performer: rm.PartySelf{}}),
+			want: []string{"required /other_participations[0]/function"},
 		},
 		{
 			name: "PARTICIPATION mode absent",
@@ -765,8 +769,11 @@ func TestREQ112_CodedInvariantGuards(t *testing.T) {
 		},
 		{
 			name: "ENTRY participation performer, a PARTY_RELATED with no relationship",
-			root: withParticipations(performer(rm.PartyRelated{})),
-			want: []string{"code_not_in_value_set /other_participations[0]/performer/relationship/defining_code"},
+			root: withParticipations(performer(rm.PartyRelated{Name: &relative})),
+			want: []string{
+				"code_not_in_value_set /other_participations[0]/performer/relationship/defining_code",
+				"required /other_participations[0]/performer/relationship",
+			},
 		},
 		{
 			name: "EVENT_CONTEXT participation performer, a PARTY_RELATED outside the group",
@@ -798,12 +805,12 @@ func TestREQ112_CodedInvariantGuards(t *testing.T) {
 		{
 			name: "PARTY_RELATED with no relationship",
 			root: noRelationship,
-			want: []string{"code_not_in_value_set /subject/relationship/defining_code"},
+			want: []string{"code_not_in_value_set /subject/relationship/defining_code", "required /subject/relationship"},
 		},
 		{
 			name: "PARTY_RELATED relationship with a value and no code",
 			root: noRelationshipCode,
-			want: []string{"code_not_in_value_set /subject/relationship/defining_code"},
+			want: []string{"code_not_in_value_set /subject/relationship/defining_code", "required /subject/relationship/defining_code"},
 		},
 		{
 			name: "COMPOSITION language left out",
@@ -833,7 +840,7 @@ func TestREQ112_CodedInvariantGuards(t *testing.T) {
 		},
 		{
 			name: "ISM_TRANSITION without transition",
-			root: &rm.IsmTransition{CurrentState: codedText(openEHRCode("532"))},
+			root: &rm.IsmTransition{CurrentState: codedTextOf(openEHRCode("532"))},
 		},
 		{
 			name: "TERM_MAPPING without purpose",
@@ -858,7 +865,7 @@ func TestREQ112_CodedInvariantGuards(t *testing.T) {
 // TestREQ112_CodedIntervalEventInstantiations checks Math_function_validity on
 // every INTERVAL_EVENT instantiation the floor recognises, as a root.
 func TestREQ112_CodedIntervalEventInstantiations(t *testing.T) {
-	mf := codedText(openEHRCode("9999"))
+	mf := codedTextOf(openEHRCode("9999"))
 	for _, root := range []any{
 		&rm.IntervalEvent[rm.ItemStructure]{MathFunction: mf},
 		rm.IntervalEvent[rm.ItemStructure]{MathFunction: mf},
@@ -1044,7 +1051,7 @@ func TestREQ112_CodedIntervalBound(t *testing.T) {
 // `code_not_in_value_set`. A change that adds one of these rules fails here
 // on purpose, so that it closes the known gap in REQ-112 as well.
 func TestREQ112_CodedInvariantsOutOfScope(t *testing.T) {
-	bad := codedText(openEHRCode("9999"))
+	bad := codedTextOf(openEHRCode("9999"))
 	badLanguage := phrase("ISO_639-1", "xx")
 	for _, root := range []any{
 		&rm.AuditDetails{

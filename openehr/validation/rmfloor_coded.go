@@ -5,8 +5,8 @@ package validation
 // checked by the RM floor on every node it visits. The rule table below is
 // the catalogue's table, one rule per row; codedValues reads the coded
 // attributes each class carries, by value or by pointer, straight from the
-// typed RM value (rmread reads neither DV_TEXT language/encoding, nor the
-// DV_ENCAPSULATED codes, nor any PARTICIPATION). The group, the code set and
+// typed RM value (rmread reads neither DV_TEXT language/encoding nor the
+// DV_ENCAPSULATED codes). The group, the code set and
 // the membership verdict come from openehr/terminology (REQ-034).
 
 import (
@@ -96,24 +96,15 @@ func (r *codedRule) detail(class string) string {
 const openEHRIssuer = "openehr"
 
 // codedValue is one coded attribute a node carries, checked under rule.
-// at is the path from the node to the object holding the attribute ("" for
-// the node itself, "/other_participations[0]" for one of an ENTRY's
-// participations), and class names that object when it is not the node.
 type codedValue struct {
-	rule  *codedRule
-	code  rm.CodePhrase
-	at    string
-	class string
+	rule *codedRule
+	code rm.CodePhrase
 }
 
 // path returns where the CODE_PHRASE the rule reads sits, below the node at
 // nodePath.
 func (v codedValue) path(nodePath string) string {
-	p := nodePath
-	if v.at != "" {
-		p = joinPath(p, v.at)
-	}
-	p = joinPath(p, "/"+v.rule.attr)
+	p := joinPath(nodePath, "/"+v.rule.attr)
 	if v.rule.codedText {
 		p += "/defining_code"
 	}
@@ -128,14 +119,10 @@ func (w *rmFloorWalker) checkCodedInvariants(value any, rmType, path string) {
 		if v.rule.holds(v.code) {
 			continue
 		}
-		class := rmType
-		if v.class != "" {
-			class = v.class
-		}
 		w.emit(Issue{
 			Path:   v.path(path),
 			Code:   "code_not_in_value_set",
-			Detail: v.rule.detail(class),
+			Detail: v.rule.detail(rmType),
 		})
 	}
 }
@@ -165,25 +152,25 @@ func codedValues(value any) []codedValue {
 		return eventContextCoded(&v)
 
 	case *rm.Observation:
-		return entryCoded(v.Language, v.Encoding, v.OtherParticipations)
+		return entryCoded(v.Language, v.Encoding)
 	case rm.Observation:
-		return entryCoded(v.Language, v.Encoding, v.OtherParticipations)
+		return entryCoded(v.Language, v.Encoding)
 	case *rm.Evaluation:
-		return entryCoded(v.Language, v.Encoding, v.OtherParticipations)
+		return entryCoded(v.Language, v.Encoding)
 	case rm.Evaluation:
-		return entryCoded(v.Language, v.Encoding, v.OtherParticipations)
+		return entryCoded(v.Language, v.Encoding)
 	case *rm.Instruction:
-		return entryCoded(v.Language, v.Encoding, v.OtherParticipations)
+		return entryCoded(v.Language, v.Encoding)
 	case rm.Instruction:
-		return entryCoded(v.Language, v.Encoding, v.OtherParticipations)
+		return entryCoded(v.Language, v.Encoding)
 	case *rm.Action:
-		return entryCoded(v.Language, v.Encoding, v.OtherParticipations)
+		return entryCoded(v.Language, v.Encoding)
 	case rm.Action:
-		return entryCoded(v.Language, v.Encoding, v.OtherParticipations)
+		return entryCoded(v.Language, v.Encoding)
 	case *rm.AdminEntry:
-		return entryCoded(v.Language, v.Encoding, v.OtherParticipations)
+		return entryCoded(v.Language, v.Encoding)
 	case rm.AdminEntry:
-		return entryCoded(v.Language, v.Encoding, v.OtherParticipations)
+		return entryCoded(v.Language, v.Encoding)
 
 	case *rm.Element:
 		return elementCoded(v)
@@ -216,13 +203,13 @@ func codedValues(value any) []codedValue {
 	case rm.IsmTransition:
 		return ismTransitionCoded(&v)
 	case *rm.Participation:
-		return participationCoded(nil, "", *v)
+		return participationCoded(*v)
 	case rm.Participation:
-		return participationCoded(nil, "", v)
+		return participationCoded(v)
 	case *rm.PartyRelated:
-		return []codedValue{relationshipCoded("", v)}
+		return relationshipCoded(v)
 	case rm.PartyRelated:
-		return []codedValue{relationshipCoded("", &v)}
+		return relationshipCoded(&v)
 	case *rm.TermMapping:
 		return appendCodedText(nil, &ruleTermMappingPurpose, v.Purpose)
 	case rm.TermMapping:
@@ -296,22 +283,19 @@ func compositionCoded(c *rm.Composition) []codedValue {
 	}
 }
 
-// eventContextCoded lists EVENT_CONTEXT's mandatory setting and the coded
-// attributes of each of its participations, which the walk does not reach.
+// eventContextCoded lists EVENT_CONTEXT's mandatory setting. Its
+// participations are nodes of the walk, checked where it visits them.
 func eventContextCoded(ec *rm.EventContext) []codedValue {
-	out := []codedValue{{rule: &ruleEventContextSetting, code: ec.Setting.DefiningCode}}
-	return appendParticipations(out, "participations", ec.Participations)
+	return []codedValue{{rule: &ruleEventContextSetting, code: ec.Setting.DefiningCode}}
 }
 
-// entryCoded lists an ENTRY's mandatory language and encoding and the coded
-// attributes of each of its other_participations, which the walk does not
-// reach.
-func entryCoded(language, encoding rm.CodePhrase, participations []rm.Participation) []codedValue {
-	out := []codedValue{
+// entryCoded lists an ENTRY's mandatory language and encoding. Its
+// other_participations are nodes of the walk, checked where it visits them.
+func entryCoded(language, encoding rm.CodePhrase) []codedValue {
+	return []codedValue{
 		{rule: &ruleEntryLanguage, code: language},
 		{rule: &ruleEntryEncoding, code: encoding},
 	}
-	return appendParticipations(out, "other_participations", participations)
 }
 
 // elementCoded lists ELEMENT's null_flavour when the ELEMENT has no value:
@@ -336,14 +320,11 @@ func ismTransitionCoded(t *rm.IsmTransition) []codedValue {
 	return appendCodedText(out, &ruleISMTransition, t.Transition)
 }
 
-// relationshipCoded is PARTY_RELATED's relationship, at at below the node.
-// The attribute is mandatory and Relationship_valid unconditional, so an
-// empty relationship breaks it too. That finding is the only one the floor
-// gives a PARTY_RELATED with no relationship: the walk does not read the
-// leaf's attributes, so it reports no `required` there (REQ-112, Known gap —
-// classes rmread does not model).
-func relationshipCoded(at string, p *rm.PartyRelated) codedValue {
-	return codedValue{rule: &rulePartyRelationship, code: p.Relationship.DefiningCode, at: at, class: "PARTY_RELATED"}
+// relationshipCoded lists PARTY_RELATED's relationship. The attribute is
+// mandatory and Relationship_valid unconditional, so an empty relationship
+// breaks it too, beside the `required` the walk reports there.
+func relationshipCoded(p *rm.PartyRelated) []codedValue {
+	return []codedValue{{rule: &rulePartyRelationship, code: p.Relationship.DefiningCode}}
 }
 
 // textCoded lists a DV_TEXT's (or DV_CODED_TEXT's) language and encoding,
@@ -370,32 +351,15 @@ func multimediaCoded(m *rm.DVMultimedia) []codedValue {
 	return appendCode(out, &ruleIntegrityCheck, m.IntegrityCheckAlgorithm)
 }
 
-// appendParticipations appends the coded attributes of each participation,
-// held by the node under its container attribute attr.
-func appendParticipations(out []codedValue, attr string, participations []rm.Participation) []codedValue {
-	for i, p := range participations {
-		out = participationCoded(out, fmt.Sprintf("/%s[%d]", attr, i), p)
-	}
-	return out
-}
-
-// participationCoded appends PARTICIPATION's function when it is a
-// DV_CODED_TEXT (Function_valid's own guard), its mode when present, and the
-// relationship of its performer when that is a PARTY_RELATED: the walk
-// reaches no PARTICIPATION, so nothing else reads the performer. at is the
-// path from the node to the participation ("" when the participation is the
-// node).
-func participationCoded(out []codedValue, at string, p rm.Participation) []codedValue {
+// participationCoded lists PARTICIPATION's function when it is a
+// DV_CODED_TEXT (Function_valid's own guard) and its mode when present. Its
+// performer is a node of the walk, checked where it visits it.
+func participationCoded(p rm.Participation) []codedValue {
+	var out []codedValue
 	if fn, ok := asDVCodedText(p.Function); ok {
-		out = append(out, codedValue{rule: &ruleParticipationFunc, code: fn.DefiningCode, at: at, class: "PARTICIPATION"})
+		out = append(out, codedValue{rule: &ruleParticipationFunc, code: fn.DefiningCode})
 	}
-	if p.Mode != nil {
-		out = append(out, codedValue{rule: &ruleParticipationMode, code: p.Mode.DefiningCode, at: at, class: "PARTICIPATION"})
-	}
-	if pr, ok := asPartyRelated(p.Performer); ok {
-		out = append(out, relationshipCoded(at+"/performer", &pr))
-	}
-	return out
+	return appendCodedText(out, &ruleParticipationMode, p.Mode)
 }
 
 // appendCode appends the rule's check of an optional CODE_PHRASE attribute

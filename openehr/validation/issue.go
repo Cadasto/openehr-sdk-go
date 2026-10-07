@@ -3,6 +3,8 @@ package validation
 import (
 	"fmt"
 	"strings"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
 
 // Severity is the typed severity attached to every [Issue]. [ValidateComposition]
@@ -38,26 +40,106 @@ func (s Severity) String() string {
 
 // Issue is one failing clause from a validator. Validators emit one
 // Issue per failure (collect-all, not fail-fast). The zero value is
-// not useful; construct via the per-validator helpers.
+// not useful; the validators in this package build issues themselves.
+//
+// The doc of each field ends with its class, value-free or value-bearing.
+// The class of Path and Detail depends on the entry point that returned
+// the issue.
+//
+// The instance validators are [ValidateComposition], [Validate],
+// [ValidateDemographic], [ValidateFolder] and [ValidateEHRStatus], and the
+// template-less floor [ValidateRM], [ValidateRMFolder],
+// [ValidateRMEHRStatus], [ValidateRMEHRAccess], [ValidateRMDemographic]
+// and [ValidateRMEHRStatusBytes]. On their issues Path, Code, Detail and
+// Severity never contain a value taken from the instance: not the content
+// of a data value, a code, units, a precision, an interval bound, nor the
+// text of an error raised while decoding it. They may name RM types and
+// attributes, archetype and node ids, and the template's own constraint,
+// so such an issue can be logged or returned to a client as it is. The
+// value the failed check read is kept only in Value.
+//
+// On an issue from [ValidateAQL] or [ValidateAQLWithTypeRelation], Code
+// and Severity never contain text from the query, but Detail and Path
+// carry the lint text and may quote the query, its literals included.
+// Value is empty.
+//
+// Two issues compare equal under == when their paths, codes, details and
+// severities are equal and their held values are equal under ==, and the
+// comparison never panics. A value that == cannot compare, such as a slice
+// or a map, is held by reference, so it equals only copies of the same
+// [constraints.Redacted].
 type Issue struct {
 	// Path is the AQL path of the offending node. Empty for global
 	// issues that do not localise to a specific node (e.g. root
-	// archetype-id mismatch).
+	// archetype-id mismatch). On an issue from [ValidateAQL] or
+	// [ValidateAQLWithTypeRelation] it is the lint path.
+	//
+	// Value-free on issues from the instance validators: never contains a
+	// value from the instance. Value-bearing on issues from [ValidateAQL]
+	// and [ValidateAQLWithTypeRelation]: may quote the query, literals
+	// included.
 	Path string
 
 	// Code is a stable programmatic identifier (e.g. "required",
 	// "cardinality", "rm_type_mismatch", "slot_fill",
 	// "primitive_out_of_range"). Consumers should dispatch on Code
 	// rather than parse Detail.
+	//
+	// Value-free: never carries a value from the instance or text from
+	// the query.
 	Code string
 
-	// Detail is a human-readable message describing the failure.
-	// Includes the offending value where reasonable; not localised.
+	// Detail is a human-readable message describing the failure; it is
+	// not localised. From an instance validator it names the check that
+	// failed; from [ValidateAQL] or [ValidateAQLWithTypeRelation] it is
+	// the lint text.
+	//
+	// Value-free on issues from the instance validators: never contains a
+	// value from the instance, such as the value the check read.
+	// Value-bearing on issues from [ValidateAQL] and
+	// [ValidateAQLWithTypeRelation]: may quote the query, literals
+	// included.
 	Detail string
 
 	// Severity classifies the issue. [ValidateComposition] emits [Error] only;
 	// [ValidateAQL] may emit [Warning] advisories that do not flip [Result.OK].
+	//
+	// Value-free: never carries a value from the instance or text from
+	// the query.
 	Severity Severity
+
+	// Value holds the value from the instance that the failed check
+	// read. Value.Reveal() returns it with this Go type:
+	//
+	//   - on a primitive_* issue, the value of the
+	//     [constraints.Violation] it reports, with the type that
+	//     violation holds;
+	//   - on an rm_invariant issue for a precision below -1, the
+	//     precision, an rm.Integer;
+	//   - on an rm_invariant issue for a precision of 0 with a
+	//     fractional operand, the numerator and the denominator, a
+	//     [2]float64;
+	//   - on an rm_invariant issue for interval bounds out of order, the
+	//     two compared magnitudes, lower first, a [2]float64;
+	//   - on an rm_invariant issue for a date, time or duration that is
+	//     not valid ISO 8601, its value, a string;
+	//   - on a term_mapping_match issue, the match, an rm.Character;
+	//   - on an invalid_shape issue from a failed decode, the decode
+	//     error, an error whose text may quote the input.
+	//
+	// Each call that fails to decode creates a new error value, so two
+	// calls over the same bytes give invalid_shape issues that are not
+	// equal under ==.
+	//
+	// Value is empty on every other issue (something absent, a count, a
+	// type or identity mismatch, a guard).
+	//
+	// Value-bearing: holds a value from the instance. It prints as
+	// "[redacted]", as [constraints.Redacted] describes, and is left out
+	// of JSON and gob output. Value.Reveal() returns the value itself, to
+	// be called only where showing it is safe. Value is empty on every
+	// issue from [ValidateAQL] and [ValidateAQLWithTypeRelation].
+	Value constraints.Redacted `json:"-"`
 }
 
 // Err returns the typed sentinel matching this Issue's Code, or

@@ -200,11 +200,12 @@ requirements:
     canonical: docs/specifications/idiom.md#concurrency-req-026
     status: draft
     implementation: landed
-    packages: [transport]
+    packages: [smart/discovery, transport]
     tests:
       - auth/clientcreds/reauth_test.go
       - auth/jwtbearer/reauth_test.go
       - sandbox/roundtrip_test.go
+      - smart/discovery/coalesce_cancel_test.go
 
   - id: REQ-030
     title: Concrete RM structs
@@ -510,7 +511,7 @@ requirements:
     canonical: docs/specifications/wire.md#req-054
     status: draft
     implementation: landed
-    packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/ehrstatus]
+    packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/demographic]
     probes: [PROBE-010, PROBE-011, PROBE-012, PROBE-013, PROBE-065]
     tests:
       - openehr/client/demographic/party_test.go
@@ -621,12 +622,16 @@ requirements:
     canonical: docs/specifications/auth.md#req-060
     status: draft
     implementation: landed
-    packages: [auth, transport]
+    packages: [auth, auth/clientcreds, auth/jwtbearer, auth/smart, internal/noredirect, transport]
     tests:
+      - auth/clientcreds/redirect_test.go
       - auth/clientcreds/token_type_test.go
+      - auth/jwtbearer/redirect_test.go
       - auth/jwtbearer/token_type_test.go
+      - auth/smart/redirect_test.go
       - auth/smart/smart_test.go
       - auth/tokensource_test.go
+      - internal/noredirect/noredirect_test.go
       - transport/client_test.go
 
   - id: REQ-061
@@ -681,8 +686,10 @@ requirements:
       - auth/errors_test.go
       - auth/jwtbearer/reauth_test.go
       - auth/smart/reauth_test.go
+      - auth/smart/redirect_test.go
       - auth/smart/refresh_carry_test.go
       - auth/smart/refresh_idtoken_test.go
+      - auth/smart/restored_scope_test.go
       - auth/smart/revoke_test.go
       - auth/smart/smart_test.go
       - auth/smart/token_change_test.go
@@ -708,6 +715,7 @@ requirements:
       - auth/smart/refresh_carry_test.go
       - auth/smart/refresh_idtoken_test.go
       - auth/smart/refresh_race_test.go
+      - auth/smart/restored_scope_test.go
       - auth/smart/revoke_test.go
       - auth/smart/token_change_test.go
       - smart/idtoken_test.go
@@ -804,6 +812,7 @@ requirements:
     packages: [smart/discovery]
     probes: [PROBE-041]
     tests:
+      - smart/discovery/coalesce_cancel_test.go
       - smart/discovery/issuer_test.go
       - smart/discovery/not_modified_test.go
       - testkit/probes/discovery/probe_041_catalog_refresh_on_401.go
@@ -955,7 +964,7 @@ requirements:
       - openehr/client/ehr/resource_test.go
       - openehr/rm/character_test.go
       - openehr/rm/real_test.go
-      - openehr/validation/rmfloor_proportion_test.go
+      - openehr/validation/rmfloor_party_proxy_test.go
       - testkit/probe/har_test.go
       - testkit/probe/record_test.go
       - testkit/probe/run_test.go
@@ -1122,9 +1131,11 @@ requirements:
       - openehr/validation/data_value_subtypes_test.go
       - openehr/validation/interval_bounds_test.go
       - openehr/validation/interval_open_side_test.go
+      - openehr/validation/multi_nonlocatable_test.go
       - openehr/validation/rmread/handles_test.go
       - openehr/validation/rmread/interval_void_test.go
       - openehr/validation/rmread/read_demographic_test.go
+      - openehr/validation/rmread/read_object_ref_test.go
       - openehr/validation/rmread/read_test.go
       - openehr/validation/walk_primitive_test.go
       - testkit/probes/validation/probe_025_composition_validate.go
@@ -1412,6 +1423,7 @@ requirements:
       - openehr/validation/rmfloor_coded_test.go
       - openehr/validation/rmfloor_ism_transition_test.go
       - openehr/validation/rmfloor_ordered_test.go
+      - openehr/validation/rmfloor_party_proxy_test.go
       - openehr/validation/rmfloor_party_ref_test.go
       - openehr/validation/rmfloor_proportion_test.go
       - openehr/validation/rmfloor_temporal_element_test.go
@@ -1424,6 +1436,7 @@ requirements:
       - openehr/validation/rmread/read_datavalues_test.go
       - openehr/validation/rmread/read_demographic_test.go
       - openehr/validation/rmread/read_ordered_test.go
+      - openehr/validation/rmread/read_party_proxy_test.go
       - openehr/validation/rmread/read_test.go
       - openehr/validation/strand14_nonchaining_test.go
       - sandbox/rmvalid_test.go
@@ -1916,7 +1929,22 @@ requirements:
     packages: [auth/smart, auth, testkit/probes/auth]
     probes: [PROBE-106]
     tests:
+      - auth/smart/redirect_test.go
       - auth/smart/revoke_test.go
       - auth/smart/token_change_test.go
       - testkit/probes/auth/probe_106_token_revocation.go
       - testkit/probes/auth/probes_test.go
+
+  - id: REQ-168
+    title: Value-free validation diagnostics
+    canonical: docs/specifications/clinical-modeling.md#req-168--value-free-validation-diagnostics
+    status: draft
+    implementation: landed
+    packages: [openehr/template/constraints, openehr/validation]
+    tests:
+      - openehr/template/constraints/godoc_class_test.go
+      - openehr/template/constraints/redacted_test.go
+      - openehr/template/constraints/value_free_test.go
+      - openehr/validation/godoc_class_test.go
+      - openehr/validation/rmfloor_proportion_test.go
+      - openehr/validation/value_free_test.go

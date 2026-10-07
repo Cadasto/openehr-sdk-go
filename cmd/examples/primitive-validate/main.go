@@ -98,8 +98,12 @@ func run() error {
 		fmt.Printf("  %-22s %d violation(s)\n", tc.label, len(violations))
 		for _, violation := range violations {
 			// Code is the stable identifier a program branches on; Detail
-			// is the explanation for people.
-			fmt.Printf("    [%s] %s\n", violation.Code, violation.Detail)
+			// is the explanation for people. Detail never carries the value
+			// itself, so it is safe to log or send back to a client.
+			// Value.Reveal() is the explicit step that reads the value: take
+			// it only where showing the value is safe, as here, where the
+			// value is the program's own demo input.
+			fmt.Printf("    [%s] %s (submitted: %v)\n", violation.Code, violation.Detail, violation.Value.Reveal())
 		}
 	}
 	if failures > 0 {

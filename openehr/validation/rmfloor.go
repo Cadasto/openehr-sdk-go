@@ -31,6 +31,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/rmroots"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
+	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
 )
 
@@ -50,11 +51,9 @@ const maxWalkDepth = 256
 // The invariants include the RM's coded ones: an attribute the RM codes from
 // a group or a code set of the openEHR terminology, such as a COMPOSITION's
 // language and territory, an EVENT_CONTEXT's setting, an ENTRY's language
-// and encoding, an ELEMENT's null_flavour, a DV_ORDERED's normal_status or
-// a PARTY_RELATED's relationship, must hold a member of it. The
-// participations of an ENTRY or an EVENT_CONTEXT are read too: their
-// function and mode, and the relationship of a performer that is a
-// PARTY_RELATED. Groups and code sets come from
+// and encoding, an ELEMENT's null_flavour, a DV_ORDERED's normal_status, a
+// PARTICIPATION's function and mode or a PARTY_RELATED's relationship, must
+// hold a member of it. Groups and code sets come from
 // [github.com/cadasto/openehr-sdk-go/openehr/terminology]. A group code must
 // also be coded in the openEHR terminology itself; a code-set code is
 // matched alone, ignoring letter case for the ISO and IANA sets. An optional
@@ -168,7 +167,7 @@ func (w *rmFloorWalker) emit(i Issue) {
 // emitting `required` for any RM-mandatory attribute that is absent or
 // empty and recursing into every present attribute.
 //
-// A type rmread does NOT model (OBJECT_REF, PARTICIPATION, LINK, … — see
+// A type rmread does NOT model (OBJECT_REF, FEEDER_AUDIT, LINK, … — see
 // [rmread.Handles]) is an opaque leaf here: its members are unreadable, so
 // reading them would report every one absent and fabricate `required`.
 // Such a node is validated solely by its per-type invariant evaluator
@@ -182,9 +181,9 @@ func (w *rmFloorWalker) walk(value any, rmType string, path string, depth int) {
 	w.checkInvariants(value, rmType, path)
 	// The coded invariants (REQ-112) run as their own pass rather than as
 	// checkInvariants arms: that switch stops at its first match, and a
-	// COMPOSITION or an ENTRY already lands on the archetype-root arm. The
-	// pass also reads a leaf such as PARTY_RELATED, so it runs before the
-	// Handles gate below.
+	// COMPOSITION or an ENTRY already lands on the archetype-root arm. Like
+	// checkInvariants, it runs before the Handles gate below, so it sees every
+	// node the walk visits.
 	w.checkCodedInvariants(value, rmType, path)
 
 	if !rmread.Handles(value) {
@@ -312,6 +311,10 @@ func (w *rmFloorWalker) checkInvariants(value any, rmType, path string) {
 		w.checkDVInterval(value, path)
 	case rmType == "OBJECT_REF", rmType == "PARTY_REF", rmType == "ACCESS_GROUP_REF", rmType == "LOCATABLE_REF":
 		w.checkObjectRef(value, path)
+	case rmType == "PARTY_IDENTIFIED", rmType == "PARTY_RELATED":
+		// PARTY_RELATED inherits the PARTY_IDENTIFIED rules via embedding —
+		// one evaluator, dispatched for both runtime types.
+		w.checkPartyIdentified(value, path)
 	case rmType == "DV_TEXT", rmType == "DV_CODED_TEXT":
 		// DV_CODED_TEXT inherits `mappings` from DV_TEXT via embedding —
 		// one evaluator, dispatched for both runtime types.
@@ -437,6 +440,10 @@ func (w *rmFloorWalker) mayBeBlank(path, attr string) bool {
 // places) — so -1 is valid and only precision < -1 is out of range. units
 // is RM-required (caught by the floor's required-set walk); magnitude is
 // always a number on the wire so needs no separate presence check.
+//
+// The Detail names the attribute and the allowed range, never the
+// precision the instance carries; that precision is carried in Issue.Value
+// (REQ-168).
 func (w *rmFloorWalker) checkDVQuantity(value any, path string) {
 	q, ok := asDVQuantity(value)
 	if !ok {
@@ -446,7 +453,8 @@ func (w *rmFloorWalker) checkDVQuantity(value any, path string) {
 		w.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
-			Detail: fmt.Sprintf("DV_QUANTITY.precision must be ≥ -1 (-1 = no limit); got %d", *q.Precision),
+			Detail: "DV_QUANTITY.precision must be ≥ -1 (-1 = no limit)",
+			Value:  constraints.Redact(*q.Precision),
 		})
 	}
 }
@@ -474,9 +482,11 @@ func (w *rmFloorWalker) checkDVQuantity(value any, path string) {
 // turn on the `type` proportion-kind code, a different axis from
 // precision.
 //
-// Diagnostics name the attribute and the offending operand, never the
-// operand's value (REQ-093); the precision value itself is named because
-// it is the constraint being reported.
+// Diagnostics name the attribute and the offending operand, never a value
+// from the instance: neither the precision nor an operand (REQ-168). The
+// value the check read is carried in Issue.Value: the precision on the
+// range arm, and the numerator and the denominator, as a [2]float64, on
+// the integrality arm.
 func (w *rmFloorWalker) checkDVProportion(value any, path string) {
 	p, ok := asDVProportion(value)
 	if !ok || p.Precision == nil {
@@ -487,7 +497,8 @@ func (w *rmFloorWalker) checkDVProportion(value any, path string) {
 		w.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
-			Detail: fmt.Sprintf("DV_PROPORTION.precision must be ≥ -1 (-1 = no limit); got %d", prec),
+			Detail: "DV_PROPORTION.precision must be ≥ -1 (-1 = no limit)",
+			Value:  constraints.Redact(*p.Precision),
 		})
 	case prec == 0:
 		var fractional []string
@@ -502,6 +513,7 @@ func (w *rmFloorWalker) checkDVProportion(value any, path string) {
 				Path:   path,
 				Code:   "rm_invariant",
 				Detail: "DV_PROPORTION.precision is 0, which requires a whole-number numerator and denominator (RM Precision_validity); not integral: " + strings.Join(fractional, ", "),
+				Value:  constraints.Redact([2]float64{float64(p.Numerator), float64(p.Denominator)}),
 			})
 		}
 	}
@@ -522,9 +534,10 @@ func isIntegralReal(v rm.Real) bool {
 // decided with the REQ-123 parse so the partial forms it admits and
 // DV_DURATION's documented deviations stay valid. The empty string and a
 // placeholder such as "example" fail it. The diagnostic names the attribute,
-// never the offending value (REQ-093).
+// never the offending value (REQ-168); that value string is carried in
+// Issue.Value.
 func (w *rmFloorWalker) checkTemporalValue(value any, rmType, path string) {
-	valid, ok := temporalValueValid(value)
+	text, valid, ok := temporalValue(value)
 	if !ok || valid {
 		return
 	}
@@ -532,6 +545,7 @@ func (w *rmFloorWalker) checkTemporalValue(value any, rmType, path string) {
 		Path:   path,
 		Code:   "rm_invariant",
 		Detail: rmType + ".value must be a valid ISO 8601 value (RM Value_valid)",
+		Value:  constraints.Redact(text),
 	})
 }
 
@@ -569,6 +583,9 @@ func (w *rmFloorWalker) checkElementNullFlavour(value any, path string) {
 // Other DVOrdered bound types (DV_DATE, DV_TIME, …) carry richer
 // comparison semantics — those are deferred from the first cycle and
 // will land alongside the REQ-123 temporal helpers' interval support.
+//
+// The Detail names the rule, never the bounds; the two compared magnitudes
+// are carried in Issue.Value, lower first, as a [2]float64 (REQ-168).
 func (w *rmFloorWalker) checkDVInterval(value any, path string) {
 	lower, upper, ok := dvIntervalNumericBounds(value)
 	if !ok {
@@ -578,7 +595,8 @@ func (w *rmFloorWalker) checkDVInterval(value any, path string) {
 		w.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
-			Detail: fmt.Sprintf("DV_INTERVAL: lower (%v) must be ≤ upper (%v)", lower, upper),
+			Detail: "DV_INTERVAL: lower must be ≤ upper",
+			Value:  constraints.Redact([2]float64{lower, upper}),
 		})
 	}
 }
@@ -619,6 +637,53 @@ func (w *rmFloorWalker) checkObjectRef(value any, path string) {
 	}
 }
 
+// checkPartyIdentified enforces the three REQ-112 invariants PARTY_IDENTIFIED
+// declares, and PARTY_RELATED inherits:
+//
+//   - Basic_validity: at least one of name, identifiers and external_ref is
+//     present, reported on the node;
+//   - Name_valid: a present name is not empty, reported at name;
+//   - Identifiers_valid: a present identifiers is not empty, reported at
+//     identifiers.
+//
+// Presence is read from Go nilness, as for DV_TEXT mappings (see
+// [rmFloorWalker.checkTermMappings]): an absent key and an explicit JSON
+// `null` both decode to a nil pointer or a nil slice and read as absent, so
+// only a decoded `"name":""` or `"identifiers":[]` is present and empty. A
+// present external_ref is walked as its own node, where checkObjectRef
+// checks its parts. The terminology-group rules (PARTY_RELATED's
+// Relationship_valid) are not in the floor.
+//
+// Diagnostics name the attribute and the RM rule, never the offending value
+// (REQ-093).
+func (w *rmFloorWalker) checkPartyIdentified(value any, path string) {
+	p, ok := asPartyIdentified(value)
+	if !ok {
+		return
+	}
+	if p.Name == nil && p.Identifiers == nil && p.ExternalRef == nil {
+		w.emit(Issue{
+			Path:   path,
+			Code:   "rm_invariant",
+			Detail: "PARTY_IDENTIFIED has none of name, identifiers and external_ref; at least one must be present (RM Basic_validity)",
+		})
+	}
+	if p.Name != nil && *p.Name == "" {
+		w.emit(Issue{
+			Path:   joinPath(path, "/name"),
+			Code:   "rm_invariant",
+			Detail: "PARTY_IDENTIFIED.name is present but empty (RM Name_valid)",
+		})
+	}
+	if p.Identifiers != nil && len(p.Identifiers) == 0 {
+		w.emit(Issue{
+			Path:   joinPath(path, "/identifiers"),
+			Code:   "rm_invariant",
+			Detail: "PARTY_IDENTIFIED.identifiers is present but empty (RM Identifiers_valid)",
+		})
+	}
+}
+
 // checkTermMappings enforces the REQ-112 Mappings_valid invariant on the
 // `mappings` attribute DV_TEXT carries (and DV_CODED_TEXT inherits via its
 // embedded DV_TEXT): a *present* mappings MUST be non-empty.
@@ -633,8 +698,9 @@ func (w *rmFloorWalker) checkObjectRef(value any, path string) {
 // walked container (rmread reads it), so each TERM_MAPPING is a node of
 // its own and [rmFloorWalker.checkTermMapping] evaluates it there.
 //
-// Diagnostics name the attribute only — never the offending value
-// (REQ-093's value-free boundary-diagnostic discipline).
+// Diagnostics name the attribute only — never a value from the instance
+// (REQ-168). The check reads no value, only the list's length, so the
+// issue's Value stays empty.
 func (w *rmFloorWalker) checkTermMappings(value any, path string) {
 	ms, ok := asMappings(value)
 	if !ok {
@@ -657,7 +723,7 @@ func (w *rmFloorWalker) checkTermMappings(value any, path string) {
 // as the validated root.
 //
 // The diagnostic names the attribute and the allowed set only — never the
-// offending value (REQ-093).
+// offending value (REQ-168); the match is carried in Issue.Value.
 func (w *rmFloorWalker) checkTermMapping(value any, path string) {
 	m, ok := asTermMapping(value)
 	if !ok {
@@ -670,6 +736,7 @@ func (w *rmFloorWalker) checkTermMapping(value any, path string) {
 			Path:   joinPath(path, "/match"),
 			Code:   "term_mapping_match",
 			Detail: "TERM_MAPPING.match must be one of {'>', '=', '<', '?'}",
+			Value:  constraints.Redact(m.Match),
 		})
 	}
 }

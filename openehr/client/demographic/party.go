@@ -245,21 +245,22 @@ func WithDeleteAudit(a *rm.AuditDetails) DeleteOption {
 }
 
 // Delete logically deletes the PARTY version addressed by versionUID,
-// attaching the preceding version's id as If-Match. The server
-// responds 204 No Content on success. Forgetting ifMatch returns
-// [transport.ErrInvalidConfig] without issuing a request.
+// which must be the latest version (the preceding version of the
+// deletion). The server responds 204 No Content on success.
 //
-// Wire: DELETE /demographic/{type}/{version_uid} with If-Match. A
-// referential-integrity conflict maps to [transport.ErrVersionConflict] (409).
-func Delete(ctx context.Context, c *transport.Client, t Type, versionUID openehrclient.VersionUID, ifMatch string, opts ...DeleteOption) (*openehrclient.VersionMetadata, error) {
+// Wire: DELETE /demographic/{type}/{version_uid}. The openEHR operation
+// takes no If-Match header: the version uid in the path is the
+// precondition. Errors: 409 (the uid is no longer the latest version) →
+// [transport.ErrVersionConflict], with the server's latest version uid in
+// the metadata returned beside the error; 404 (unknown version) →
+// [transport.ErrNotFound]. A 400 (for example, already deleted) has no
+// sentinel and surfaces as a bare [transport.WireError].
+func Delete(ctx context.Context, c *transport.Client, t Type, versionUID openehrclient.VersionUID, opts ...DeleteOption) (*openehrclient.VersionMetadata, error) {
 	if !t.valid() {
 		return nil, fmt.Errorf("demographic.Delete: %w: invalid PARTY type %q", transport.ErrInvalidConfig, t)
 	}
 	if versionUID == "" {
 		return nil, fmt.Errorf("demographic.Delete: %w: empty VersionUID", transport.ErrInvalidConfig)
-	}
-	if ifMatch == "" {
-		return nil, fmt.Errorf("demographic.Delete: %w: empty If-Match (REQ-054)", transport.ErrInvalidConfig)
 	}
 	cfg := deleteConfig{}
 	for _, o := range opts {
@@ -275,7 +276,6 @@ func Delete(ctx context.Context, c *transport.Client, t Type, versionUID openehr
 		Method:             http.MethodDelete,
 		Path:               basePath(t) + "/" + string(versionUID),
 		Route:              basePath(t) + "/{version_uid}",
-		IfMatch:            ifMatch,
 		AuditDetailsHeader: auditHeader,
 	}
 	return openehrclient.DoDelete(ctx, c, req)
@@ -332,7 +332,7 @@ type Repository interface {
 	Get(ctx context.Context, t Type, ref openehrclient.Ref) (rm.Party, *openehrclient.VersionMetadata, error)
 	Create(ctx context.Context, party rm.Party, opts ...WriteOption) (rm.Party, *openehrclient.VersionMetadata, error)
 	Update(ctx context.Context, t Type, voID openehrclient.VersionedObjectID, ifMatch string, party rm.Party, opts ...WriteOption) (rm.Party, *openehrclient.VersionMetadata, error)
-	Delete(ctx context.Context, t Type, versionUID openehrclient.VersionUID, ifMatch string, opts ...DeleteOption) (*openehrclient.VersionMetadata, error)
+	Delete(ctx context.Context, t Type, versionUID openehrclient.VersionUID, opts ...DeleteOption) (*openehrclient.VersionMetadata, error)
 
 	// Versioned-resource reads.
 	GetVersionedParty(ctx context.Context, voUID openehrclient.VersionedObjectID) (*rm.VersionedParty, *openehrclient.VersionMetadata, error)
@@ -359,6 +359,6 @@ func (r *repository) Update(ctx context.Context, t Type, voID openehrclient.Vers
 	return Update(ctx, r.c, t, voID, ifMatch, party, opts...)
 }
 
-func (r *repository) Delete(ctx context.Context, t Type, versionUID openehrclient.VersionUID, ifMatch string, opts ...DeleteOption) (*openehrclient.VersionMetadata, error) {
-	return Delete(ctx, r.c, t, versionUID, ifMatch, opts...)
+func (r *repository) Delete(ctx context.Context, t Type, versionUID openehrclient.VersionUID, opts ...DeleteOption) (*openehrclient.VersionMetadata, error) {
+	return Delete(ctx, r.c, t, versionUID, opts...)
 }

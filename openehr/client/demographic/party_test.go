@@ -320,7 +320,9 @@ func TestUpdatePreconditionFailed(t *testing.T) {
 	}
 }
 
-func TestDeleteRoutesAndSendsIfMatch(t *testing.T) {
+// TestDeleteRoutesAndSendsNoIfMatch pins REQ-054: the demographic delete names
+// the preceding version in its path and sends no If-Match.
+func TestDeleteRoutesAndSendsNoIfMatch(t *testing.T) {
 	var captured *http.Request
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
@@ -329,7 +331,7 @@ func TestDeleteRoutesAndSendsIfMatch(t *testing.T) {
 	defer srv.Close()
 
 	_, err := demographic.Delete(t.Context(), newClient(t, srv),
-		demographic.Person, personVersion, personVersion)
+		demographic.Person, personVersion)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -339,23 +341,54 @@ func TestDeleteRoutesAndSendsIfMatch(t *testing.T) {
 	if captured.URL.Path != "/openehr/v1/demographic/person/"+personVersion {
 		t.Errorf("path = %q", captured.URL.Path)
 	}
-	if got := captured.Header.Get("If-Match"); got != `"`+personVersion+`"` {
-		t.Errorf("If-Match = %q", got)
+	// The openEHR delete operation takes no If-Match: the version uid in
+	// the path is the preceding version.
+	if got := captured.Header.Get("If-Match"); got != "" {
+		t.Errorf("If-Match = %q, want none", got)
 	}
 }
 
-// TestDeleteVersionConflict covers the error branch: a 409 (referential
-// conflict) maps to ErrVersionConflict.
+// TestDeleteVersionConflict pins REQ-054: the 409 the openEHR delete answers
+// when the addressed version is no longer the latest maps to ErrVersionConflict,
+// and the latest version uid (the pin returns it in the ETag header) stays
+// reachable on the metadata returned beside the error.
 func TestDeleteVersionConflict(t *testing.T) {
+	const latest = "8849182c-82ad-4088-a07f-48ead4180515::cdr.example.com::2"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("ETag", `"`+latest+`"`)
 		w.WriteHeader(http.StatusConflict)
 	}))
 	defer srv.Close()
 
-	_, err := demographic.Delete(t.Context(), newClient(t, srv),
-		demographic.Person, personVersion, personVersion)
+	meta, err := demographic.Delete(t.Context(), newClient(t, srv),
+		demographic.Person, personVersion)
 	if !errors.Is(err, transport.ErrVersionConflict) {
 		t.Fatalf("err = %v, want ErrVersionConflict", err)
+	}
+	if meta == nil || string(meta.VersionUID) != latest {
+		t.Errorf("latest version beside the error = %+v, want %q", meta, latest)
+	}
+}
+
+// TestDeleteRejectsInvalidType pins REQ-054's before-any-request rule for the
+// refusal demographic.Delete keeps: an invalid PARTY type returns
+// ErrInvalidConfig and issues no request. The client is live and the version
+// uid is set, so only the type guard can refuse the call.
+func TestDeleteRejectsInvalidType(t *testing.T) {
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	_, err := demographic.Delete(t.Context(), newClient(t, srv),
+		demographic.Type("widget"), personVersion)
+	if !errors.Is(err, transport.ErrInvalidConfig) {
+		t.Errorf("invalid type: err = %v, want ErrInvalidConfig", err)
+	}
+	if n := hits.Load(); n != 0 {
+		t.Errorf("server saw %d request(s), want none", n)
 	}
 }
 
@@ -550,7 +583,7 @@ func TestDeleteSendsAuditDetails(t *testing.T) {
 		TimeCommitted: rm.DVDateTime{Value: "2026-05-17T10:00:00Z"},
 	}
 	if _, err := demographic.Delete(t.Context(), newClient(t, srv),
-		demographic.Person, personVersion, personVersion,
+		demographic.Person, personVersion,
 		demographic.WithDeleteAudit(audit)); err != nil {
 		t.Fatal(err)
 	}

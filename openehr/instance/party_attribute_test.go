@@ -157,10 +157,9 @@ func TestREQ107_TimeValidityPassesBothValidators(t *testing.T) {
 // value fill. The rows pin each attribute the gap names: a PERSON's
 // languages holding a DV_TEXT, a PERSON's roles holding a PARTY_REF, and a
 // ROLE performer's id holding a HIER_OBJECT_ID, which rmwrite cannot
-// attach to a PARTY_REF. The template validator matches a multi-valued
-// attribute's members by archetype_node_id, which a DV_TEXT or a PARTY_REF
-// lacks, so it would reject any language or role written; the languages
-// and roles rows change when it matches such members by RM type.
+// attach to a PARTY_REF. Languages and roles have no writer yet, although
+// the template validator now binds their members by RM type; those rows
+// change when rmwrite gains the writers.
 func TestREQ107_KnownGapUnwritableAttributes(t *testing.T) {
 	cases := []struct {
 		name string

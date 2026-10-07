@@ -59,7 +59,7 @@ func TestValidateRM_DVProportionPrecision(t *testing.T) {
 		// without matching the constraint sentence, which names both.
 		wantOperand string
 		// wantNoValue, when set, is the rendering of the offending operand
-		// that must NOT appear anywhere in the Detail (REQ-093: the
+		// that must NOT appear anywhere in the Detail (REQ-168: the
 		// diagnostic names the attribute, not the value).
 		wantNoValue string
 	}{
@@ -193,7 +193,7 @@ func TestValidateRM_DVProportionPrecision(t *testing.T) {
 			}
 			if tc.wantNoValue != "" {
 				if got := invariants[0].Detail; strings.Contains(got, tc.wantNoValue) {
-					t.Errorf("ValidateRM(%s) rm_invariant Detail = %q, want it NOT to echo the operand value %q (REQ-093)", tc.desc, got, tc.wantNoValue)
+					t.Errorf("ValidateRM(%s) rm_invariant Detail = %q, want it NOT to echo the operand value %q (REQ-168)", tc.desc, got, tc.wantNoValue)
 				}
 			}
 		})

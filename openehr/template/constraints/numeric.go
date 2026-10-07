@@ -34,10 +34,10 @@ func (c CBoolean) Validate(value any) []Violation {
 		return []Violation{{Code: CodeWrongType, Detail: fmt.Sprintf("expected bool, got %T", value)}}
 	}
 	if b && !c.TrueValid {
-		return []Violation{{Code: CodeNotInList, Detail: "value true not allowed"}}
+		return []Violation{{Code: CodeNotInList, Detail: "constraint does not allow true", Value: Redact(value)}}
 	}
 	if !b && !c.FalseValid {
-		return []Violation{{Code: CodeNotInList, Detail: "value false not allowed"}}
+		return []Violation{{Code: CodeNotInList, Detail: "constraint does not allow false", Value: Redact(value)}}
 	}
 	return nil
 }
@@ -107,13 +107,15 @@ func (c CInteger) Validate(value any) []Violation {
 	if len(c.List) > 0 && !slices.Contains(c.List, n) {
 		out = append(out, Violation{
 			Code:   CodeNotInList,
-			Detail: fmt.Sprintf("%d not in allowed list %v", n, c.List),
+			Detail: fmt.Sprintf("value not in allowed list %v", c.List),
+			Value:  Redact(value),
 		})
 	}
 	if c.Range.IsBounded() && !c.Range.Contains(float64(n)) {
 		out = append(out, Violation{
 			Code:   CodeOutOfRange,
-			Detail: fmt.Sprintf("%d outside %s", n, c.Range),
+			Detail: fmt.Sprintf("value outside %s", c.Range),
+			Value:  Redact(value),
 		})
 	}
 	return out
@@ -185,13 +187,15 @@ func (c CReal) Validate(value any) []Violation {
 	if len(c.List) > 0 && !slices.Contains(c.List, f) {
 		out = append(out, Violation{
 			Code:   CodeNotInList,
-			Detail: fmt.Sprintf("%v not in allowed list %v", f, c.List),
+			Detail: fmt.Sprintf("value not in allowed list %v", c.List),
+			Value:  Redact(value),
 		})
 	}
 	if c.Range.IsBounded() && !c.Range.Contains(f) {
 		out = append(out, Violation{
 			Code:   CodeOutOfRange,
-			Detail: fmt.Sprintf("%v outside %s", f, c.Range),
+			Detail: fmt.Sprintf("value outside %s", c.Range),
+			Value:  Redact(value),
 		})
 	}
 	return out

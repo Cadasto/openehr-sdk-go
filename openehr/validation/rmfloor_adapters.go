@@ -70,29 +70,66 @@ func asElement(value any) (rm.Element, bool) {
 	return rm.Element{}, false
 }
 
-// temporalValueValid reports whether value, one of DV_DATE_TIME / DV_DATE /
-// DV_TIME / DV_DURATION (by value or by pointer), satisfies its ISO 8601
-// predicate, using the REQ-123 parse. ok is false for any other value.
-func temporalValueValid(value any) (valid, ok bool) {
+// asPartyIdentified recovers the PARTY_IDENTIFIED attributes (by value or by
+// pointer) from a PARTY_IDENTIFIED, or from a PARTY_RELATED, which inherits
+// them through its embedded PARTY_IDENTIFIED. Returns ok=false for a nil
+// pointer and for any other value.
+func asPartyIdentified(value any) (rm.PartyIdentified, bool) {
+	switch v := value.(type) {
+	case *rm.PartyIdentified:
+		if v == nil {
+			return rm.PartyIdentified{}, false
+		}
+		return *v, true
+	case rm.PartyIdentified:
+		return v, true
+	case *rm.PartyRelated:
+		if v == nil {
+			return rm.PartyIdentified{}, false
+		}
+		return v.PartyIdentified, true
+	case rm.PartyRelated:
+		return v.PartyIdentified, true
+	}
+	return rm.PartyIdentified{}, false
+}
+
+// temporalValue returns the `value` string of a DV_DATE_TIME / DV_DATE /
+// DV_TIME / DV_DURATION (by value or by pointer) and reports whether it
+// satisfies the type's ISO 8601 predicate, using the REQ-123 parse. ok is
+// false for any other value and for a nil pointer.
+func temporalValue(value any) (text string, valid, ok bool) {
 	switch v := value.(type) {
 	case *rm.DVDateTime:
-		return v != nil && v.ValidISO8601(), v != nil
+		if v == nil {
+			return "", false, false
+		}
+		return v.Value, v.ValidISO8601(), true
 	case rm.DVDateTime:
-		return v.ValidISO8601(), true
+		return v.Value, v.ValidISO8601(), true
 	case *rm.DVDate:
-		return v != nil && v.ValidISO8601(), v != nil
+		if v == nil {
+			return "", false, false
+		}
+		return v.Value, v.ValidISO8601(), true
 	case rm.DVDate:
-		return v.ValidISO8601(), true
+		return v.Value, v.ValidISO8601(), true
 	case *rm.DVTime:
-		return v != nil && v.ValidISO8601(), v != nil
+		if v == nil {
+			return "", false, false
+		}
+		return v.Value, v.ValidISO8601(), true
 	case rm.DVTime:
-		return v.ValidISO8601(), true
+		return v.Value, v.ValidISO8601(), true
 	case *rm.DVDuration:
-		return v != nil && v.ValidISO8601(), v != nil
+		if v == nil {
+			return "", false, false
+		}
+		return v.Value, v.ValidISO8601(), true
 	case rm.DVDuration:
-		return v.ValidISO8601(), true
+		return v.Value, v.ValidISO8601(), true
 	}
-	return false, false
+	return "", false, false
 }
 
 // asMappings recovers the DV_TEXT.mappings slice (by value or by
@@ -133,22 +170,6 @@ func asDVCodedText(value any) (rm.DVCodedText, bool) {
 		return v, true
 	}
 	return rm.DVCodedText{}, false
-}
-
-// asPartyRelated recovers a PARTY_RELATED value (by value or by non-nil
-// pointer). It is how a coded check tells a PARTY_RELATED from another
-// PARTY_PROXY in a slot such as PARTICIPATION.performer.
-func asPartyRelated(value any) (rm.PartyRelated, bool) {
-	switch v := value.(type) {
-	case *rm.PartyRelated:
-		if v == nil {
-			return rm.PartyRelated{}, false
-		}
-		return *v, true
-	case rm.PartyRelated:
-		return v, true
-	}
-	return rm.PartyRelated{}, false
 }
 
 // asTermMapping recovers a TERM_MAPPING value (by value or by pointer).

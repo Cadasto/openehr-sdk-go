@@ -48,11 +48,15 @@
 //
 // # Coverage
 //
-// Rows cover every (RMType, attr) pair reachable from COMPOSITION
-// through the supported content types (Observation,
+// Rows cover the attributes the validators walk on the types reachable
+// from COMPOSITION through the supported content types (Observation,
 // Evaluation, Instruction, Action, AdminEntry, Section,
 // GenericEntry) plus the History / Event / ItemStructure / Item /
-// DataValue paths below them. Beyond COMPOSITION they cover the
+// DataValue paths below them. They also cover the party proxies
+// (PARTY_SELF, PARTY_IDENTIFIED with its identifiers, PARTY_RELATED)
+// wherever one sits, and PARTICIPATION in the two lists that hold it:
+// an EVENT_CONTEXT's participations and an ENTRY's
+// other_participations. Beyond COMPOSITION they cover the
 // other LOCATABLE roots (FOLDER, EHR_STATUS, EHR_ACCESS and the
 // demographic PARTY hierarchy with its parts), the ARCHETYPED node
 // under every LOCATABLE's archetype_details, and every DV_ORDERED
@@ -62,6 +66,20 @@
 // registered LOCATABLE and DV_ORDERED concrete is modelled. The
 // closed taxonomy is asserted by table-driven and registry-driven
 // tests in this package.
+//
+// A modelled type is not read in full. These optional attributes have
+// no row, so reading one returns (nil, false), as for an unknown pair:
+//
+//   - uid, links and feeder_audit on every LOCATABLE;
+//   - workflow_id on every ENTRY, and guideline_id on every CARE_ENTRY;
+//   - hyperlink, language and encoding on DV_TEXT and DV_CODED_TEXT;
+//   - every optional attribute of DV_MULTIMEDIA except alternate_text,
+//     and charset and language on DV_PARSABLE;
+//   - precision, units_system and units_display_name on DV_QUANTITY,
+//     accuracy_is_percent on the amounts, and magnitude_status on every
+//     quantified value except DV_QUANTITY;
+//   - reason on ISM_TRANSITION, and time_validity on CONTACT and
+//     PARTY_RELATIONSHIP.
 //
 // # Dependencies
 //
