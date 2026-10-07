@@ -137,6 +137,9 @@ func TestValidateRM_ReferenceRangesWalked(t *testing.T) {
 			name: "DV_DATE in an ELEMENT, normal_status with an empty code_string",
 			root: scoreElement(&rm.DVDate{Value: "2026-09-29", NormalStatus: &rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr_normal_statuses"}}}),
 			want: []string{
+				// An empty code_string is no normal status either (REQ-112
+				// Coded invariants, Normal_status_validity).
+				"code_not_in_value_set /value/normal_status",
 				"required /value/normal_status/code_string",
 				"rm_invariant /value/normal_status",
 			},
@@ -350,6 +353,10 @@ func TestValidateRM_ScaleSymbolMayHaveNoCode(t *testing.T) {
 			name: "DV_SCALE normal_status with a blank code_string",
 			root: scoreElement(&rm.DVScale{Value: 0.5, Symbol: codedSymbol("at1"), NormalStatus: &blankTarget}),
 			want: []string{
+				// The DV_SCALE symbol exemption does not reach normal_status,
+				// and an empty code_string is no normal status (REQ-112 Coded
+				// invariants, Normal_status_validity).
+				"code_not_in_value_set /value/normal_status",
 				"required /value/normal_status/code_string",
 				"rm_invariant /value/normal_status",
 			},

@@ -27,8 +27,13 @@ func optOptionalSingleOver(name string, children ...string) string {
 // terminology local, wherever it sits: the empty TERMINOLOGY_ID the
 // generator builds from the BMM for the code phrase's own terminology_id
 // must not replace that local. It holds under both policies, both value
-// fills and both compile modes, and neither the RM floor nor the template
-// validator reports anything on the code phrase.
+// fills and both compile modes. The template validator reports nothing on
+// the code phrase, and neither does the RM floor, except where an RM rule
+// ties the attribute to a code set: there local::at0000 is no member, and
+// the floor reports exactly one code_not_in_value_set on the code phrase
+// (REQ-107 § Exceptions and known gaps, "A placeholder code on an attribute
+// an RM rule ties to a code set or terminology group for which § Contract
+// gives no default").
 func TestREQ107_BareCodePhraseKeepsLocal(t *testing.T) {
 	bare := optNode("CODE_PHRASE", "")
 	cases := []struct {
@@ -36,36 +41,44 @@ func TestREQ107_BareCodePhraseKeepsLocal(t *testing.T) {
 		value string
 		path  string
 		code  func(v rm.DataValue) *rm.CodePhrase
+		// codeSet is set when an RM rule ties the attribute to a code set
+		// (REQ-112 Coded invariants), which the placeholder breaks.
+		codeSet bool
 	}{
 		{
-			name:  "DV_COUNT normal_status",
-			value: optNode("DV_COUNT", "", optOptionalSingleOver("normal_status", bare)),
-			path:  "/value/normal_status",
-			code:  func(v rm.DataValue) *rm.CodePhrase { return v.(*rm.DVCount).NormalStatus },
+			name:    "DV_COUNT normal_status",
+			value:   optNode("DV_COUNT", "", optOptionalSingleOver("normal_status", bare)),
+			path:    "/value/normal_status",
+			code:    func(v rm.DataValue) *rm.CodePhrase { return v.(*rm.DVCount).NormalStatus },
+			codeSet: true,
 		},
 		{
-			name:  "DV_QUANTITY normal_status",
-			value: optNode("DV_QUANTITY", "", optOptionalSingleOver("normal_status", bare)),
-			path:  "/value/normal_status",
-			code:  func(v rm.DataValue) *rm.CodePhrase { return v.(*rm.DVQuantity).NormalStatus },
+			name:    "DV_QUANTITY normal_status",
+			value:   optNode("DV_QUANTITY", "", optOptionalSingleOver("normal_status", bare)),
+			path:    "/value/normal_status",
+			code:    func(v rm.DataValue) *rm.CodePhrase { return v.(*rm.DVQuantity).NormalStatus },
+			codeSet: true,
 		},
 		{
-			name:  "DV_PARSABLE charset",
-			value: optNode("DV_PARSABLE", "", optOptionalSingleOver("charset", bare)),
-			path:  "/value/charset",
-			code:  func(v rm.DataValue) *rm.CodePhrase { return v.(*rm.DVParsable).Charset },
+			name:    "DV_PARSABLE charset",
+			value:   optNode("DV_PARSABLE", "", optOptionalSingleOver("charset", bare)),
+			path:    "/value/charset",
+			code:    func(v rm.DataValue) *rm.CodePhrase { return v.(*rm.DVParsable).Charset },
+			codeSet: true,
 		},
 		{
-			name:  "DV_PARSABLE language",
-			value: optNode("DV_PARSABLE", "", optOptionalSingleOver("language", bare)),
-			path:  "/value/language",
-			code:  func(v rm.DataValue) *rm.CodePhrase { return v.(*rm.DVParsable).Language },
+			name:    "DV_PARSABLE language",
+			value:   optNode("DV_PARSABLE", "", optOptionalSingleOver("language", bare)),
+			path:    "/value/language",
+			code:    func(v rm.DataValue) *rm.CodePhrase { return v.(*rm.DVParsable).Language },
+			codeSet: true,
 		},
 		{
-			name:  "DV_MULTIMEDIA compression_algorithm",
-			value: optNode("DV_MULTIMEDIA", "", optOptionalSingleOver("compression_algorithm", bare)),
-			path:  "/value/compression_algorithm",
-			code:  func(v rm.DataValue) *rm.CodePhrase { return v.(*rm.DVMultimedia).CompressionAlgorithm },
+			name:    "DV_MULTIMEDIA compression_algorithm",
+			value:   optNode("DV_MULTIMEDIA", "", optOptionalSingleOver("compression_algorithm", bare)),
+			path:    "/value/compression_algorithm",
+			code:    func(v rm.DataValue) *rm.CodePhrase { return v.(*rm.DVMultimedia).CompressionAlgorithm },
+			codeSet: true,
 		},
 		{
 			name:  "DV_CODED_TEXT defining_code",
@@ -88,10 +101,23 @@ func TestREQ107_BareCodePhraseKeepsLocal(t *testing.T) {
 						t.Fatalf("%s absent, want local::at0000", tc.name)
 					}
 					checkCode(t, tc.name, *cp, localAt0000)
+					var outsideCodeSet int
 					for _, iss := range validation.ValidateRM(out).Issues {
-						if iss.Severity == validation.Error && strings.HasPrefix(iss.Path, tc.path) {
-							t.Errorf("ValidateRM: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+						if iss.Severity != validation.Error || !strings.HasPrefix(iss.Path, tc.path) {
+							continue
 						}
+						if tc.codeSet && iss.Code == "code_not_in_value_set" && iss.Path == tc.path {
+							outsideCodeSet++
+							continue
+						}
+						t.Errorf("ValidateRM: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+					}
+					want := 0
+					if tc.codeSet {
+						want = 1
+					}
+					if outsideCodeSet != want {
+						t.Errorf("ValidateRM: %d code_not_in_value_set @ %s, want %d", outsideCodeSet, tc.path, want)
 					}
 					for _, iss := range templateErrors(out, c) {
 						if strings.HasPrefix(iss.Path, tc.path) {

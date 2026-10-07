@@ -78,6 +78,36 @@ func TestREQ112_RatchetKeysFloorRules(t *testing.T) {
 	}
 }
 
+// TestREQ112_RatchetKeysCodedInvariants pins the census category of the
+// REQ-112 coded invariants: a code outside the group or code set an RM rule
+// names keys as floor_coded, never as validator_other, so a row the
+// generator adds there names its rule family.
+func TestREQ112_RatchetKeysCodedInvariants(t *testing.T) {
+	noValue := categoryElement()
+	noValue.NullFlavour = categoryNullFlavour()
+	noValue.NullFlavour.DefiningCode.CodeString = "999"
+
+	charset := rm.CodePhrase{CodeString: "UTF-99", TerminologyID: rm.TerminologyID{Value: "IANA_character-sets"}}
+	text := categoryElement()
+	text.Value = &rm.DVText{Value: "x", Encoding: &charset}
+
+	cases := []struct {
+		name string
+		root any
+		want []string
+	}{
+		{"null_flavour outside the null flavours group", noValue, []string{reasonFloorCoded}},
+		{"DV_TEXT encoding outside the character sets", text, []string{reasonFloorCoded}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ratchetCategories(tc.root, "code_not_in_value_set"); !slices.Equal(got, tc.want) {
+				t.Errorf("code_not_in_value_set categories = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 // TestREQ107_HollowBodyFloor pins the coverage floor: a body with no ELEMENT
 // is reported, and a body with one is not.
 func TestREQ107_HollowBodyFloor(t *testing.T) {

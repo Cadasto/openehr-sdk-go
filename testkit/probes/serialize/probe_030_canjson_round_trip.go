@@ -258,10 +258,14 @@ var probe030SkipFloor = map[string][]string{
 		"rm_invariant /content[0]/data/events[3]/data/items[2]/items[4]/value",
 		"rm_invariant /content[0]/data/events[3]/data/items[2]/items[12]",
 	},
-	// TestPerson.v2: DV_MULTIMEDIA.media_type is a CODE_PHRASE whose
-	// code_string is null, which the floor reports both as an empty
+	// TestPerson.v2: two DV_MULTIMEDIA.media_type values break
+	// Media_type_valid (REQ-112 Coded invariants), since neither is an IANA
+	// media type: one is openEHR::425, the other a CODE_PHRASE whose
+	// code_string is null. The null one is also reported as an empty
 	// CODE_PHRASE and as an absent mandatory attribute.
 	"compositions/TestPerson.v2.json": {
+		"code_not_in_value_set /details/items[12]/items[0]/value/media_type",
+		"code_not_in_value_set /details/items[13]/items[5]/value/media_type",
 		"rm_invariant /details/items[13]/items[5]/value/media_type",
 		"required /details/items[13]/items[5]/value/media_type/code_string",
 	},
@@ -281,9 +285,13 @@ var probe030SkipFloor = map[string][]string{
 	// LOCATABLE.Archetyped_valid).
 
 	// compo_with_nested_party_related (EHRbase openEHR_SDK test data): the
-	// EVALUATION inside the first SECTION has no archetype_details.
+	// EVALUATION inside the first SECTION has no archetype_details, and its
+	// PARTY_RELATED subject codes its relationship as external::237, which
+	// breaks Relationship_valid (REQ-112 Coded invariants: the code must be
+	// in the openEHR subject relationship group).
 	"rm/compo_with_nested_party_related.json": {
 		"is_archetype_root /content[0]/items[0]/archetype_details",
+		"code_not_in_value_set /content[0]/items[0]/subject/relationship/defining_code",
 	},
 	// ehr_status_other_details_simple (EHRbase openEHR_SDK test data): the
 	// EHR_STATUS root has no archetype_details.

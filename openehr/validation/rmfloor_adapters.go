@@ -119,6 +119,22 @@ func asMappings(value any) ([]rm.TermMapping, bool) {
 	return nil, false
 }
 
+// asDVCodedText recovers a DV_CODED_TEXT value (by value or by non-nil
+// pointer). It is how a coded check tells a DV_CODED_TEXT from a plain
+// DV_TEXT in a DV_TEXT slot such as PARTICIPATION.function.
+func asDVCodedText(value any) (rm.DVCodedText, bool) {
+	switch v := value.(type) {
+	case *rm.DVCodedText:
+		if v == nil {
+			return rm.DVCodedText{}, false
+		}
+		return *v, true
+	case rm.DVCodedText:
+		return v, true
+	}
+	return rm.DVCodedText{}, false
+}
+
 // asTermMapping recovers a TERM_MAPPING value (by value or by pointer).
 // The walk boxes `mappings` elements as pointers, so the pointer arm is
 // the one that fires during a descent; the value arm covers a caller

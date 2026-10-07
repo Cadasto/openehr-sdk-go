@@ -1399,6 +1399,8 @@ requirements:
     probes: [PROBE-081]
     tests:
       - internal/rmroots/rmroots_test.go
+      - openehr/instance/code_phrase_terminology_test.go
+      - openehr/instance/phase4_test.go
       - openehr/rm/interval_bound_test.go
       - openehr/rm/temporal_iso_test.go
       - openehr/serialize/canjson/interval_open_side_test.go
@@ -1407,6 +1409,7 @@ requirements:
       - openehr/validation/nonstorable_generic_test.go
       - openehr/validation/rmfloor_archetype_test.go
       - openehr/validation/rmfloor_bytes_test.go
+      - openehr/validation/rmfloor_coded_test.go
       - openehr/validation/rmfloor_ism_transition_test.go
       - openehr/validation/rmfloor_ordered_test.go
       - openehr/validation/rmfloor_party_ref_test.go

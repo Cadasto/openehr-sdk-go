@@ -54,9 +54,12 @@
 // [github.com/cadasto/openehr-sdk-go/openehr/client/ehr/contribution] use it
 // for version-lifecycle-state and audit-change-type validity and rubrics,
 // [github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified] for
-// participation modes and the ctx/ defaults, and
+// participation modes and the ctx/ defaults,
 // [github.com/cadasto/openehr-sdk-go/openehr/instance] for setting and
-// category defaults. SDK code that mints, defaults, validates or
+// category defaults, and
+// [github.com/cadasto/openehr-sdk-go/openehr/validation] for the RM floor's
+// checks of coded attributes against their group or code set. SDK code that
+// mints, defaults, validates or
 // reconstructs an openEHR coded value from a bare code or rubric takes the
 // code set, the rubric and the membership verdict from here. A codec that
 // transports a caller-supplied code and rubric pair whole passes it through

@@ -56,10 +56,12 @@
 // id/type/namespace, a DV_TEXT mappings list that is not empty when
 // present, a TERM_MAPPING match from its closed set, archetype_details
 // on every archetype root (COMPOSITION, EHR_STATUS, EHR_ACCESS, and
-// every PARTY and ENTRY), and a non-empty archetype_id and rm_version
-// on every ARCHETYPED. Template validity does not imply RM validity:
-// the template layer covers RM-mandatory presence on the nodes the
-// template models, not the per-type invariant catalogue, so a
+// every PARTY and ENTRY), a non-empty archetype_id and rm_version
+// on every ARCHETYPED, and a member of its group or code set in every
+// attribute the RM codes from the openEHR terminology (reported as
+// `code_not_in_value_set`; see [ValidateRM]). Template validity does not
+// imply RM validity: the template layer covers RM-mandatory presence on
+// the nodes the template models, not the per-type invariant catalogue, so a
 // composition can pass [Validate] and still be RM-invalid. The two
 // layers therefore compose but do not chain: callers with a template
 // run [Validate], callers without one run [ValidateRM], callers

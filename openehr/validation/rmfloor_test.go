@@ -545,9 +545,11 @@ func TestValidateRM_NestedPurposeMappingValid(t *testing.T) {
 	txt := &rm.DVText{Value: "x", Mappings: []rm.TermMapping{{
 		Match: rm.Character("="),
 		Purpose: &rm.DVCodedText{
-			Value:        "billing",
-			Mappings:     []rm.TermMapping{{Match: rm.Character("?"), Target: target}},
-			DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}, CodeString: "532"},
+			Value:    "reimbursement",
+			Mappings: []rm.TermMapping{{Match: rm.Character("?"), Target: target}},
+			// 670|reimbursement| is a term mapping purpose, so the purpose
+			// itself holds (REQ-112 Coded invariants, Purpose_valid).
+			DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}, CodeString: "670"},
 		},
 		Target: target,
 	}}}
@@ -711,6 +713,9 @@ func TestValidateRM_TypedIntervalBoundsWalked(t *testing.T) {
 				Upper: rm.DVCount{Magnitude: 5}, UpperIncluded: true,
 			}},
 			want: []issue{
+				// An empty code_string is no normal status (REQ-112 Coded
+				// invariants, Normal_status_validity).
+				{"/normal_range/lower/normal_status", "code_not_in_value_set"},
 				{"/normal_range/lower/normal_status", "rm_invariant"},
 				{"/normal_range/lower/normal_status/code_string", "required"},
 			},
