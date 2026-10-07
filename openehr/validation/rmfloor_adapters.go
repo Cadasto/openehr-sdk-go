@@ -94,29 +94,42 @@ func asPartyIdentified(value any) (rm.PartyIdentified, bool) {
 	return rm.PartyIdentified{}, false
 }
 
-// temporalValueValid reports whether value, one of DV_DATE_TIME / DV_DATE /
-// DV_TIME / DV_DURATION (by value or by pointer), satisfies its ISO 8601
-// predicate, using the REQ-123 parse. ok is false for any other value.
-func temporalValueValid(value any) (valid, ok bool) {
+// temporalValue returns the `value` string of a DV_DATE_TIME / DV_DATE /
+// DV_TIME / DV_DURATION (by value or by pointer) and reports whether it
+// satisfies the type's ISO 8601 predicate, using the REQ-123 parse. ok is
+// false for any other value and for a nil pointer.
+func temporalValue(value any) (text string, valid, ok bool) {
 	switch v := value.(type) {
 	case *rm.DVDateTime:
-		return v != nil && v.ValidISO8601(), v != nil
+		if v == nil {
+			return "", false, false
+		}
+		return v.Value, v.ValidISO8601(), true
 	case rm.DVDateTime:
-		return v.ValidISO8601(), true
+		return v.Value, v.ValidISO8601(), true
 	case *rm.DVDate:
-		return v != nil && v.ValidISO8601(), v != nil
+		if v == nil {
+			return "", false, false
+		}
+		return v.Value, v.ValidISO8601(), true
 	case rm.DVDate:
-		return v.ValidISO8601(), true
+		return v.Value, v.ValidISO8601(), true
 	case *rm.DVTime:
-		return v != nil && v.ValidISO8601(), v != nil
+		if v == nil {
+			return "", false, false
+		}
+		return v.Value, v.ValidISO8601(), true
 	case rm.DVTime:
-		return v.ValidISO8601(), true
+		return v.Value, v.ValidISO8601(), true
 	case *rm.DVDuration:
-		return v != nil && v.ValidISO8601(), v != nil
+		if v == nil {
+			return "", false, false
+		}
+		return v.Value, v.ValidISO8601(), true
 	case rm.DVDuration:
-		return v.ValidISO8601(), true
+		return v.Value, v.ValidISO8601(), true
 	}
-	return false, false
+	return "", false, false
 }
 
 // asMappings recovers the DV_TEXT.mappings slice (by value or by

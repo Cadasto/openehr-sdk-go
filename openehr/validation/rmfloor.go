@@ -29,6 +29,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/rmroots"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
+	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
 )
 
@@ -412,6 +413,10 @@ func (w *rmFloorWalker) mayBeBlank(path, attr string) bool {
 // places) — so -1 is valid and only precision < -1 is out of range. units
 // is RM-required (caught by the floor's required-set walk); magnitude is
 // always a number on the wire so needs no separate presence check.
+//
+// The Detail names the attribute and the allowed range, never the
+// precision the instance carries; that precision is carried in Issue.Value
+// (REQ-168).
 func (w *rmFloorWalker) checkDVQuantity(value any, path string) {
 	q, ok := asDVQuantity(value)
 	if !ok {
@@ -421,7 +426,8 @@ func (w *rmFloorWalker) checkDVQuantity(value any, path string) {
 		w.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
-			Detail: fmt.Sprintf("DV_QUANTITY.precision must be ≥ -1 (-1 = no limit); got %d", *q.Precision),
+			Detail: "DV_QUANTITY.precision must be ≥ -1 (-1 = no limit)",
+			Value:  constraints.Redact(*q.Precision),
 		})
 	}
 }
@@ -449,9 +455,11 @@ func (w *rmFloorWalker) checkDVQuantity(value any, path string) {
 // turn on the `type` proportion-kind code, a different axis from
 // precision.
 //
-// Diagnostics name the attribute and the offending operand, never the
-// operand's value (REQ-093); the precision value itself is named because
-// it is the constraint being reported.
+// Diagnostics name the attribute and the offending operand, never a value
+// from the instance: neither the precision nor an operand (REQ-168). The
+// value the check read is carried in Issue.Value: the precision on the
+// range arm, and the numerator and the denominator, as a [2]float64, on
+// the integrality arm.
 func (w *rmFloorWalker) checkDVProportion(value any, path string) {
 	p, ok := asDVProportion(value)
 	if !ok || p.Precision == nil {
@@ -462,7 +470,8 @@ func (w *rmFloorWalker) checkDVProportion(value any, path string) {
 		w.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
-			Detail: fmt.Sprintf("DV_PROPORTION.precision must be ≥ -1 (-1 = no limit); got %d", prec),
+			Detail: "DV_PROPORTION.precision must be ≥ -1 (-1 = no limit)",
+			Value:  constraints.Redact(*p.Precision),
 		})
 	case prec == 0:
 		var fractional []string
@@ -477,6 +486,7 @@ func (w *rmFloorWalker) checkDVProportion(value any, path string) {
 				Path:   path,
 				Code:   "rm_invariant",
 				Detail: "DV_PROPORTION.precision is 0, which requires a whole-number numerator and denominator (RM Precision_validity); not integral: " + strings.Join(fractional, ", "),
+				Value:  constraints.Redact([2]float64{float64(p.Numerator), float64(p.Denominator)}),
 			})
 		}
 	}
@@ -497,9 +507,10 @@ func isIntegralReal(v rm.Real) bool {
 // decided with the REQ-123 parse so the partial forms it admits and
 // DV_DURATION's documented deviations stay valid. The empty string and a
 // placeholder such as "example" fail it. The diagnostic names the attribute,
-// never the offending value (REQ-093).
+// never the offending value (REQ-168); that value string is carried in
+// Issue.Value.
 func (w *rmFloorWalker) checkTemporalValue(value any, rmType, path string) {
-	valid, ok := temporalValueValid(value)
+	text, valid, ok := temporalValue(value)
 	if !ok || valid {
 		return
 	}
@@ -507,6 +518,7 @@ func (w *rmFloorWalker) checkTemporalValue(value any, rmType, path string) {
 		Path:   path,
 		Code:   "rm_invariant",
 		Detail: rmType + ".value must be a valid ISO 8601 value (RM Value_valid)",
+		Value:  constraints.Redact(text),
 	})
 }
 
@@ -544,6 +556,9 @@ func (w *rmFloorWalker) checkElementNullFlavour(value any, path string) {
 // Other DVOrdered bound types (DV_DATE, DV_TIME, …) carry richer
 // comparison semantics — those are deferred from the first cycle and
 // will land alongside the REQ-123 temporal helpers' interval support.
+//
+// The Detail names the rule, never the bounds; the two compared magnitudes
+// are carried in Issue.Value, lower first, as a [2]float64 (REQ-168).
 func (w *rmFloorWalker) checkDVInterval(value any, path string) {
 	lower, upper, ok := dvIntervalNumericBounds(value)
 	if !ok {
@@ -553,7 +568,8 @@ func (w *rmFloorWalker) checkDVInterval(value any, path string) {
 		w.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
-			Detail: fmt.Sprintf("DV_INTERVAL: lower (%v) must be ≤ upper (%v)", lower, upper),
+			Detail: "DV_INTERVAL: lower must be ≤ upper",
+			Value:  constraints.Redact([2]float64{lower, upper}),
 		})
 	}
 }
@@ -655,8 +671,9 @@ func (w *rmFloorWalker) checkPartyIdentified(value any, path string) {
 // walked container (rmread reads it), so each TERM_MAPPING is a node of
 // its own and [rmFloorWalker.checkTermMapping] evaluates it there.
 //
-// Diagnostics name the attribute only — never the offending value
-// (REQ-093's value-free boundary-diagnostic discipline).
+// Diagnostics name the attribute only — never a value from the instance
+// (REQ-168). The check reads no value, only the list's length, so the
+// issue's Value stays empty.
 func (w *rmFloorWalker) checkTermMappings(value any, path string) {
 	ms, ok := asMappings(value)
 	if !ok {
@@ -679,7 +696,7 @@ func (w *rmFloorWalker) checkTermMappings(value any, path string) {
 // as the validated root.
 //
 // The diagnostic names the attribute and the allowed set only — never the
-// offending value (REQ-093).
+// offending value (REQ-168); the match is carried in Issue.Value.
 func (w *rmFloorWalker) checkTermMapping(value any, path string) {
 	m, ok := asTermMapping(value)
 	if !ok {
@@ -692,6 +709,7 @@ func (w *rmFloorWalker) checkTermMapping(value any, path string) {
 			Path:   joinPath(path, "/match"),
 			Code:   "term_mapping_match",
 			Detail: "TERM_MAPPING.match must be one of {'>', '=', '<', '?'}",
+			Value:  constraints.Redact(m.Match),
 		})
 	}
 }

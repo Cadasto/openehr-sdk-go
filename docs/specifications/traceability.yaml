@@ -965,7 +965,6 @@ requirements:
       - openehr/rm/character_test.go
       - openehr/rm/real_test.go
       - openehr/validation/rmfloor_party_proxy_test.go
-      - openehr/validation/rmfloor_proportion_test.go
       - testkit/probe/har_test.go
       - testkit/probe/record_test.go
       - testkit/probe/run_test.go
@@ -1932,3 +1931,17 @@ requirements:
       - auth/smart/token_change_test.go
       - testkit/probes/auth/probe_106_token_revocation.go
       - testkit/probes/auth/probes_test.go
+
+  - id: REQ-168
+    title: Value-free validation diagnostics
+    canonical: docs/specifications/clinical-modeling.md#req-168--value-free-validation-diagnostics
+    status: draft
+    implementation: landed
+    packages: [openehr/template/constraints, openehr/validation]
+    tests:
+      - openehr/template/constraints/godoc_class_test.go
+      - openehr/template/constraints/redacted_test.go
+      - openehr/template/constraints/value_free_test.go
+      - openehr/validation/godoc_class_test.go
+      - openehr/validation/rmfloor_proportion_test.go
+      - openehr/validation/value_free_test.go

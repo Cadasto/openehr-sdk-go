@@ -102,13 +102,15 @@ func (c DvQuantity) Validate(value any) []Violation {
 		if u.Magnitude.IsBounded() && !u.Magnitude.Contains(q.Magnitude) {
 			out = append(out, Violation{
 				Code:   CodeOutOfRange,
-				Detail: fmt.Sprintf("magnitude %v outside %s for units %q", q.Magnitude, u.Magnitude, u.Units),
+				Detail: fmt.Sprintf("magnitude outside %s for units %q", u.Magnitude, u.Units),
+				Value:  Redact(q.Magnitude),
 			})
 		}
 		if u.Precision.IsBounded() && q.Precision >= 0 && !u.Precision.Contains(float64(q.Precision)) {
 			out = append(out, Violation{
 				Code:   CodeOutOfRange,
-				Detail: fmt.Sprintf("precision %d outside %s for units %q", q.Precision, u.Precision, u.Units),
+				Detail: fmt.Sprintf("precision outside %s for units %q", u.Precision, u.Units),
+				Value:  Redact(q.Precision),
 			})
 		}
 		return out
@@ -119,7 +121,8 @@ func (c DvQuantity) Validate(value any) []Violation {
 	}
 	return []Violation{{
 		Code:   CodeUnitUnknown,
-		Detail: fmt.Sprintf("units %q not in allowed %v", q.Units, allowed),
+		Detail: fmt.Sprintf("units not in allowed %v", allowed),
+		Value:  Redact(q.Units),
 	}}
 }
 
@@ -180,7 +183,8 @@ func (c CDvOrdinal) Validate(value any) []Violation {
 		}
 		return []Violation{{
 			Code:   CodeNotInList,
-			Detail: fmt.Sprintf("ordinal value %d not in allowed %v", v, allowed),
+			Detail: fmt.Sprintf("ordinal value not in allowed %v", allowed),
+			Value:  Redact(value),
 		}}
 	case OrdinalSymbol:
 		for _, s := range c.Values {
@@ -190,7 +194,8 @@ func (c CDvOrdinal) Validate(value any) []Violation {
 		}
 		return []Violation{{
 			Code:   CodeNotInList,
-			Detail: fmt.Sprintf("(%d, %s) not in allowed ordinal list", v.Value, v.Symbol),
+			Detail: "ordinal (value, symbol) pair not in allowed list",
+			Value:  Redact(value),
 		}}
 	default:
 		return []Violation{{Code: CodeWrongType, Detail: fmt.Sprintf("expected int or OrdinalSymbol, got %T", value)}}

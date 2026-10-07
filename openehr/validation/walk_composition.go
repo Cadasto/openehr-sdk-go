@@ -346,6 +346,9 @@ func childIdentity(c *tcimpl.CompiledNode) string {
 // for non-DataValue RM types that map to a primitive (e.g.
 // CODE_PHRASE directly under category/defining_code → C_CODE_PHRASE),
 // the value is passed through as-is.
+//
+// The violation's Detail is value-free, and the value it read moves
+// over to Issue.Value unchanged, still redacted (REQ-168).
 func (w *walker) applyPrimitive(
 	optNode *tcimpl.CompiledNode,
 	rmValue any,
@@ -359,6 +362,7 @@ func (w *walker) applyPrimitive(
 			Code:     "primitive_" + string(v.Code),
 			Detail:   v.Detail,
 			Severity: Error,
+			Value:    v.Value,
 		})
 	}
 }

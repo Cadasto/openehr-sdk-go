@@ -99,7 +99,8 @@ func (c CString) Validate(value any) []Violation {
 	if len(c.List) > 0 && !slices.Contains(c.List, s) {
 		out = append(out, Violation{
 			Code:   CodeNotInList,
-			Detail: fmt.Sprintf("%q not in allowed list %v", s, c.List),
+			Detail: fmt.Sprintf("value not in allowed list %v", c.List),
+			Value:  Redact(value),
 		})
 	}
 	if c.Pattern != "" {
@@ -111,7 +112,11 @@ func (c CString) Validate(value any) []Violation {
 		if err != nil {
 			out = append(out, Violation{Code: CodeInvalidValue, Detail: fmt.Sprintf("constraint pattern %q is not a valid regex: %v", c.Pattern, err)})
 		} else if !re.MatchString(s) {
-			out = append(out, Violation{Code: CodePatternMismatch, Detail: fmt.Sprintf("%q does not match pattern %q", s, c.Pattern)})
+			out = append(out, Violation{
+				Code:   CodePatternMismatch,
+				Detail: fmt.Sprintf("value does not match pattern %q", c.Pattern),
+				Value:  Redact(value),
+			})
 		}
 	}
 	return out

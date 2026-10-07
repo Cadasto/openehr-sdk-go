@@ -79,13 +79,15 @@ func (c CodePhrase) Validate(value any) []Violation {
 	if c.Terminology != "" && ref.Terminology != "" && ref.Terminology != c.Terminology {
 		out = append(out, Violation{
 			Code:   CodeInvalidValue,
-			Detail: fmt.Sprintf("terminology %q does not match constraint %q", ref.Terminology, c.Terminology),
+			Detail: fmt.Sprintf("terminology does not match constraint terminology %q", c.Terminology),
+			Value:  Redact(ref.Terminology),
 		})
 	}
 	if len(c.CodeList) > 0 && !slices.Contains(c.CodeList, ref.CodeString) {
 		out = append(out, Violation{
 			Code:   CodeNotInList,
-			Detail: fmt.Sprintf("code %q not in allowed list %v", ref.CodeString, c.CodeList),
+			Detail: fmt.Sprintf("code not in allowed list %v", c.CodeList),
+			Value:  Redact(ref.CodeString),
 		})
 	}
 	return out

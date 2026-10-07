@@ -207,7 +207,7 @@ Every `Violation` carries a typed `ViolationCode`. The closed set is:
 | `CodeUnitUnknown` | DV_QUANTITY units string is not in the enumerated allowed list |
 | `CodeInvalidValue` | constraint or input is malformed (e.g. unparseable regex in the OPT, malformed date string) |
 
-`Violation.Detail` carries a human-readable message; consumers building structured diagnostics SHOULD pattern-match on `Code`.
+`Violation.Detail` carries a human-readable message; consumers building structured diagnostics SHOULD pattern-match on `Code`. The class of each `Violation` field, and where the value goes, are in [§ REQ-168](#req-168--value-free-validation-diagnostics) and not restated here.
 
 ### Numeric range
 
@@ -299,10 +299,11 @@ The SDK **MUST** ship a `ValidateComposition(comp *rm.Composition, c *templateco
       Issues []Issue
   }
   type Issue struct {
-      Path     string   // AQL path of the offending node (empty for global issues)
-      Code     string   // stable programmatic identifier — see code taxonomy below
-      Detail   string   // human-readable message
-      Severity Severity // Error for normative violations; Warning for advisories
+      Path     string               // AQL path of the offending node (empty for global issues)
+      Code     string               // stable programmatic identifier — see code taxonomy below
+      Detail   string               // human-readable message; field class in REQ-168
+      Severity Severity             // Error for normative violations; Warning for advisories
+      Value    constraints.Redacted // value-bearing field; see REQ-168
   }
   type Severity int
   const (
@@ -985,6 +986,99 @@ The floor lives in `openehr/validation`; the package's imports and its guard are
 
 - **Lives in:** [`internal/rmroots/`](../../internal/rmroots/) (the closed archetype-root class list) + [`openehr/validation/rmfloor.go`](../../openehr/validation/rmfloor.go) + [`openehr/validation/rmfloor_adapters.go`](../../openehr/validation/rmfloor_adapters.go) + [`openehr/validation/rmfloor_bytes.go`](../../openehr/validation/rmfloor_bytes.go) (the presence-aware EHR_STATUS entry); the closed-RM-set helpers (`rmTypeInfo` / `describeRMType`) and the rmread layer are shared with REQ-102 / REQ-110.
 - **Verification:** unit pins in [`openehr/validation/rmfloor_test.go`](../../openehr/validation/rmfloor_test.go): required-set absences (FOLDER.name missing), the per-type invariants (CODE_PHRASE, DV_QUANTITY, DV_INTERVAL, OBJECT_REF-family, DV_TEXT/DV_CODED_TEXT `mappings`, and TERM_MAPPING `match` as a container element, nested under `purpose`, and as the validated root), the unbounded-side negatives (a half-open interval fires no bound-ordering check, and the walk does not descend into an open side whose bound is empty, built in memory or decoded from JSON), and the nil-guard contract on every typed wrapper. The typed-interval walk is pinned by the fault-inside-bound rows of `TestValidateRM_TypedIntervalBoundsWalked` in the same file (one planted fault per typed instantiation, reported by code and path, plus a real bound beside its open flag in bare and concrete form, and a DV_COUNT bound over a unitless DV_QUANTITY one that is not compared). [`internal/rmroots/rmroots_test.go`](../../internal/rmroots/rmroots_test.go) (`TestREQ112_IsArchetypeRootMatchesBMM`) ties the shared closed root list to the vendored BMM's `Is_archetype_root` declarations. The archetype-root and ARCHETYPED rows are pinned in [`rmfloor_archetype_test.go`](../../openehr/validation/rmfloor_archetype_test.go): `TestValidateRM_ArchetypeRootClassesMatchSharedList` sweeps every registered LOCATABLE against that list, and the other tests there cover typed entries, nested roots and nested ARCHETYPED at their own paths, and an ARCHETYPED as the root. DV_ORDINAL, DV_SCALE, REFERENCE_RANGE (reached through `other_reference_ranges`) and EHR_ACCESS are walked in [`rmfloor_ordered_test.go`](../../openehr/validation/rmfloor_ordered_test.go), with the DV_SCALE blank-`code_string` exemption and `accuracy` on the date, time and amount types. In rmread, the reader parity test (`TestTypedIntervalReaderParity`, [`handles_test.go`](../../openehr/validation/rmread/handles_test.go)) ties the typed-interval readers to rmnames and the registry, `TestHandles_EveryLocatableAndOrdered` ([`read_ordered_test.go`](../../openehr/validation/rmread/read_ordered_test.go)) requires every registered LOCATABLE and DV_ORDERED to be modelled, and [`interval_void_test.go`](../../openehr/validation/rmread/interval_void_test.go) holds the open-side reader table and the Void-predicate guard. The template-driven walker's open-side behaviour is pinned by the REQ-102 tests in [`openehr/validation/interval_open_side_test.go`](../../openehr/validation/interval_open_side_test.go). The DV_TEXT/DV_CODED_TEXT coverage includes the canjson decode-path pair distinguishing absent/`null` `mappings` (valid) from a decoded literal `[]` (`mappings_valid`); the `mappings` traversal and the TERM_MAPPING attribute readers are pinned in [`openehr/validation/rmread/read_datavalues_test.go`](../../openehr/validation/rmread/read_datavalues_test.go). The PARTY_PROXY family and PARTICIPATION rows, with the decoded-presence pair for `name` and `identifiers` and a check that no finding repeats a party's name or identifier, are pinned in [`rmfloor_party_proxy_test.go`](../../openehr/validation/rmfloor_party_proxy_test.go); their readers and the two participation lists are pinned in [`read_party_proxy_test.go`](../../openehr/validation/rmread/read_party_proxy_test.go). The unit-test fixture matrix is the first-cycle verification; a dedicated PROBE-077 against vendored fixtures is deferred to a follow-up cycle. Value-typed mandatory presence (EHR_STATUS.subject and the root ARCHETYPED keys) is pinned by **PROBE-081** in [`openehr/validation/rmfloor_bytes_test.go`](../../openehr/validation/rmfloor_bytes_test.go).
+
+---
+
+## REQ-168 — Value-free validation diagnostics
+
+A [`constraints.Violation`](../../openehr/template/constraints/violation.go), and an [`Issue`](../../openehr/validation/issue.go) from the instance validators, **MUST NOT** repeat the value under validation outside their value-bearing field (§ Field classes). Both travel to places a caller does not choose for clinical data: an HTTP error body, a log line, a monitoring event. The values they describe are clinical data (a date of birth, a measured magnitude, a free-text name), so a message that quotes one carries it to each of those places, in callers that never meant to send it. [§ REQ-113 § Value-free structured drop records](#value-free-structured-drop-records) holds the AQL diagnostics to this line, and [REQ-093](transport.md#req-093--openehr-error-envelope-mapping) holds the transport errors to it. This requirement applies it to [§ REQ-103](#req-103--primitive-constraint-introspection)'s `Violation` and to the `Issue` that [§ REQ-102](#req-102--composition-validation), [§ REQ-110](#req-110--template-driven-validation-beyond-composition) and [§ REQ-112](#req-112--template-less-reference-model-validation-floor) return; the `Issue` that `ValidateAQL` returns keeps [§ REQ-109](#req-109--aql-static-lint)'s classification. The value stays reachable through `Value.Reveal()` ([§ The redacting carrier](#the-redacting-carrier)).
+
+### Submitted values and structure
+
+A **submitted value** is data taken from the input under validation:
+
+- for `PrimitiveConstraint.Validate`, the argument and each of its fields: a `QuantityValue`'s magnitude, units and precision, a `CodedTermRef`'s terminology and code, an `OrdinalSymbol`'s value and symbol;
+- for the instance validators, the content of a data value or a primitive attribute in the instance (a `value`, `magnitude`, `units`, `precision`, `numerator` or `denominator`, an interval bound, a `CODE_PHRASE`'s terminology and code, a `TERM_MAPPING`'s `match`), and the text of an error raised while decoding the instance.
+
+**Structure** is not a submitted value: RM type and attribute names, archetype and node ids, a path, a child count, the Go type name of a wrong-typed argument, and the constraint itself (its allowed list, range, pattern, units and terminology), which comes from the template rather than the instance. Naming the clause a value failed lets a reader infer something about the value: that it lies outside a range, which units entry it matched, which of the two booleans it was. That inference is what a diagnostic is for, and it is not an echo. Copying the value, or any part of it, is.
+
+### Field classes
+
+A field's class is fixed by its type and, for an `Issue`, by the entry point that returned it, which a consumer knows because it made the call. It never depends on an issue's content. The class **MUST** be stated in the godoc of the type, so a consumer reads it on the type it holds ([§ REQ-113](#value-free-structured-drop-records)):
+
+| Type and entry point | Value-free | Value-bearing |
+|---|---|---|
+| `constraints.Violation` | `Code`, `Detail`: **MUST NOT** carry a submitted value | `Value` |
+| `validation.Issue` from `ValidateComposition`, the REQ-110 entries and the REQ-112 floor entries | `Path`, `Code`, `Detail`, `Severity`: **MUST NOT** carry a submitted value | `Value` |
+| `validation.Issue` from `ValidateAQL` and `ValidateAQLWithTypeRelation` | `Code`, `Severity`: **MUST NOT** carry source text ([§ REQ-109 § Value-free lint diagnostics](#value-free-lint-diagnostics)) | `Detail` and `Path`, as § REQ-109 classifies them |
+
+A value-free field **MUST NOT** fall back to quoting the value where a value-free wording is hard to find ([§ REQ-113](#value-free-structured-drop-records)'s no-fallback clause). What cannot be said without the value goes in `Value`, or nowhere.
+
+### The redacting carrier
+
+`Value` **MUST** be of the type `constraints.Redacted`, which holds one submitted value and never prints it:
+
+- `constraints.Redact(v)` **MUST** return a `Redacted` holding `v`. The zero `Redacted` holds no value.
+- `Reveal()` **MUST** return the held value with its type, or nil when none is held, and **MUST** be the only method of `Redacted` that returns the value. A value that `==` can compare **MUST** come back equal under `==` to the one held, with two exceptions. A floating-point zero may come back with either sign. A NaN, alone or inside an array or a struct, **MUST** come back as a NaN in the same place, though `==` never finds it equal, so a value that holds one never compares equal to the one given. Any other value **MUST** come back as the same value.
+- Every `fmt` verb other than `%T` and `%p`, `%v`, `%+v` and `%#v` included, **MUST** print `[redacted]` for a `Redacted` that holds a value and nothing for one that does not, so printing a whole `Violation`, `Issue` or `Result` prints no submitted value. `String()` **MUST** return the same text.
+- `fmt` answers `%T` with the type name, and prints a `Redacted` without calling its methods under `%p` and through an unexported field of the caller's own struct. On those paths the output **MUST NOT** contain the value either. It shows memory addresses instead, and equal held values show the same address, so two such lines reveal that their values are equal.
+- Tools other than `fmt` that read unexported fields by reflection, such as a diff reporter or a debugger, are outside these rules.
+- The `Value` field of `Violation` and of `Issue` **MUST** be left out of `encoding/json` output, v1 and v2 alike, so encoding a `Result` writes no `Value` member. A `Redacted` encoded on its own **MUST** encode as JSON `null`.
+- Logging a `Violation`, `Issue`, `Result` or `Redacted` through the text or JSON handler of `log/slog` **MUST NOT** write the value.
+- Encoding a `Violation`, `Issue` or `Result` with `encoding/gob` **MUST** succeed and **MUST NOT** carry the value: a `Redacted` gob-encodes as empty and decodes as the zero `Redacted`.
+- `Violation` and `Issue` values **MUST** be comparable with `==`, and the comparison **MUST NOT** panic, whatever a `Redacted` holds. Every value the SDK puts in a `Redacted` **MUST** be comparable, so two diagnostics that hold equal values compare equal. A value that `==` cannot compare, such as a slice, **MUST** be held by reference, so only copies of one `Redacted` compare equal. `Redacted` **MUST** have an `Equal(Redacted) bool` method that agrees with `==`, so a comparison library that refuses unexported fields but honours such a method can still compare a `Violation`, `Issue` or `Result`.
+
+### What `Value` holds
+
+On a `Violation`, `Value` **MUST** hold the part of the input that the failing clause tested:
+
+| Validator and clause | `Value` |
+|---|---|
+| `CBoolean`, `CInteger`, `CReal`, `CString`, `CDate`, `CTime`, `CDateTime`, `CDuration`, `CDvOrdinal` | the argument as passed |
+| `CodePhrase`, terminology mismatch | the input's terminology id |
+| `CodePhrase`, code not in the list | the input's code string |
+| `DvQuantity`, magnitude range | the input's `Magnitude` |
+| `DvQuantity`, precision range | the input's `Precision` |
+| `DvQuantity`, units not enumerated | the input's `Units` |
+
+`Value` **MUST** be empty on `CodeWrongType`, where no clause tested the input and `Detail` names its Go type, and on a violation the constraint causes itself, such as an unparseable `CString` pattern.
+
+On an `Issue` from the instance validators, `Value` **MUST** hold:
+
+| Issue | `Value` |
+|---|---|
+| `primitive_*` | the `Value` of the violation it reports |
+| `rm_invariant` on a `DV_QUANTITY` or `DV_PROPORTION` `precision` below -1 | the precision |
+| `rm_invariant` on a `DV_PROPORTION` with precision 0 and a fractional operand | the numerator and the denominator, as a `[2]float64` |
+| `rm_invariant` on a `DV_INTERVAL` whose lower bound is above its upper bound | the two compared magnitudes, lower first, as a `[2]float64` |
+| `rm_invariant` on a temporal `value` (`Value_valid`) | the `value` string |
+| `term_mapping_match` | the `match` |
+| `invalid_shape` from a failed decode | the decode error, whose text may name a literal ([wire.md § REQ-052](wire.md#req-052)) |
+
+Every other `Issue` (an absence, a count, a type or identity mismatch, a guard) **MUST** carry an empty `Value`. On an `Issue` from `ValidateAQL` or `ValidateAQLWithTypeRelation`, `Value` **MUST** be empty.
+
+### Compatibility
+
+- This requirement says which fields may carry a submitted value and what `Value` holds; it defines no code, path, severity or finding. `Code`, and on an instance validator's `Issue` also `Path` and `Severity`, are value-free (§ Field classes). Their vocabularies, `Result.OK` and the set of findings are the ones [§ REQ-102](#req-102--composition-validation), [§ REQ-103](#req-103--primitive-constraint-introspection), [§ REQ-110](#req-110--template-driven-validation-beyond-composition) and [§ REQ-112](#req-112--template-less-reference-model-validation-floor) define. A caller dispatches on `Code`, not on `Detail` text ([§ REQ-103 § Violation taxonomy](#violation-taxonomy), [§ REQ-102 § Issue codes](#issue-codes)).
+- The issues of `ValidateAQL` follow [§ REQ-109 § Value-free lint diagnostics](#value-free-lint-diagnostics).
+
+### Out of scope
+
+- Errors the codecs return as `error` values; [wire.md](wire.md) governs their text.
+- `lint.Issue` and the AQL drop records, which [§ REQ-109](#req-109--aql-static-lint) and [§ REQ-113](#req-113--execution-oriented-parsed-aql-ast) govern.
+- Redaction policy for structure. Whether an archetype id or a path is sensitive in a deployment is the consumer's decision.
+
+### Acceptance
+
+- For each row of § What `Value` holds, a test **MUST** plant a marker value that no constraint text contains, and **MUST** fail when the marker appears in a value-free field or when `Value.Reveal()` does not return what the row names: the marker itself, the pair that holds it, or an error whose text carries it. Restoring a `Detail` that quotes the value **MUST** fail a named test.
+- The empty-`Value` cases (`CodeWrongType`, an unparseable pattern, an absence, an issue from `ValidateAQL`) **MUST** each be pinned by a named test.
+- A test **MUST** fail when `==` on two `Violation` or `Issue` values panics, when two diagnostics that hold equal values compare unequal, or when `Equal` disagrees with `==`.
+- A test **MUST** fail when `Reveal` returns a NaN, alone or inside an array, as anything but a NaN in the same place, and when `Redacted` gains a method that no test checks for the held value.
+- A test **MUST** fail when the godoc of `Violation` or `Issue` stops stating the class of one of its fields.
+- A test **MUST** render a `Violation`, an `Issue` and a `Result` that hold a marker with each of `%v`, `%+v`, `%#v`, `%s`, `%d` and `%p`, directly and through an unexported field of a test struct, encode them with `encoding/json` v1 and v2 and with `encoding/gob`, and log them through the text and JSON handlers of `log/slog`, and **MUST** fail when the marker appears in any output or when an encoding fails.
+- `ValidateComposition` over a composition carrying a marker at a constrained primitive leaf **MUST** report the marker in that issue's `Value` and in no other field.
+
+- **Lives in:** [`openehr/template/constraints/`](../../openehr/template/constraints/) (`Redacted`, `Violation`) and [`openehr/validation/`](../../openehr/validation/) (`Issue`, the template walker, the RM floor)
 
 ---
 
