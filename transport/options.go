@@ -43,6 +43,19 @@ type Option func(*config)
 // WithHTTPClient injects the *http.Client used for outgoing requests.
 // It is required: there is no built-in default, and transport.New
 // returns ErrInvalidConfig when the option is omitted.
+//
+// c is used as it is, with one exception. A request that carries an
+// Authorization header, from the token source or from Request.Headers,
+// is sent with a shallow copy of c, made for that request, whose
+// redirect policy refuses a redirect from an https URL to a URL that is
+// not https: net/http would otherwise send the header to the new URL
+// unencrypted when it names the same host or a subdomain. Do then fails
+// with an error matching [ErrInsecureRedirect], the request does not
+// reach the new URL, and it is not retried. Any other redirect goes
+// through c's own CheckRedirect, or net/http's default limit of 10
+// redirects when c has none. The copy shares c's Transport, Jar and
+// Timeout, and c itself is never modified, so a change made to c later
+// applies to the next request.
 func WithHTTPClient(c *http.Client) Option {
 	return func(cfg *config) { cfg.httpClient = c }
 }

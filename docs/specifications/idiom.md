@@ -37,7 +37,7 @@ Pure functions (codecs, validators with no I/O, AQL string builders) **MUST NOT*
 
 ## HTTP client injection (REQ-021)
 
-The SDK **MUST NOT** allocate its own `*http.Client`. Two shallow copies of the injected client are the exceptions, each changing only its redirect policy and leaving the injected client as it is: the copy that [auth.md § Credential-bearing requests](auth.md#credential-bearing-requests) prescribes for token, refresh and revocation requests, and the copy the discovery resolver fetches with to refuse a redirect to a URL that is not https ([service-discovery.md § REQ-073](service-discovery.md#req-073--discovery-trust-posture)). Constructors accept one via functional option or wrapper. Acceptable patterns:
+The SDK **MUST NOT** allocate its own `*http.Client`. Three shallow copies of the injected client are the exceptions, each changing only its redirect policy and leaving the injected client as it is: the copy that [auth.md § Credential-bearing requests](auth.md#credential-bearing-requests) prescribes for token, refresh and revocation requests, the copy the discovery resolver fetches with to refuse a redirect to a URL that is not https ([service-discovery.md § REQ-073](service-discovery.md#req-073--discovery-trust-posture)), and the copy the transport sends a request carrying an `Authorization` header with, to refuse a redirect from https to a URL that is not https ([transport.md § REQ-092](transport.md#req-092--tls-posture)). Constructors accept one via functional option or wrapper. Acceptable patterns:
 
 ```go
 // MUST — explicit injection
