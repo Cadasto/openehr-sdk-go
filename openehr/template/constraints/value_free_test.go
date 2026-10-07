@@ -55,6 +55,9 @@ type valueFreeCase struct {
 	// wantValue is what Value.Reveal must return: the part of the input the
 	// failing clause tested.
 	wantValue any
+	// wantDetail, when set, is the exact Detail. It replaces needles for an
+	// input with no printed form unique enough to search for.
+	wantDetail string
 	// needles are the printed forms of every submitted value in input; none
 	// may appear in Code or Detail.
 	needles []string
@@ -65,13 +68,16 @@ type valueFreeCase struct {
 func valueFreeCases() []valueFreeCase {
 	return []valueFreeCase{
 		// CBoolean: a boolean has no value unique enough to search for, so
-		// these rows check Value only.
+		// these rows pin the whole Detail. It names the clause that failed,
+		// which tells the reader which boolean it was (REQ-168 § Submitted
+		// values and structure).
 		{
 			name:       "CBoolean true not allowed",
 			constraint: constraints.CBoolean{FalseValid: true},
 			input:      true,
 			wantCode:   constraints.CodeNotInList,
 			wantValue:  true,
+			wantDetail: "constraint does not allow true",
 		},
 		{
 			name:       "CBoolean false not allowed",
@@ -79,6 +85,7 @@ func valueFreeCases() []valueFreeCase {
 			input:      false,
 			wantCode:   constraints.CodeNotInList,
 			wantValue:  false,
+			wantDetail: "constraint does not allow false",
 		},
 
 		// CInteger: Value is the argument as passed, not the int64 the
@@ -296,6 +303,9 @@ func TestREQ168_ViolationDetailIsValueFree(t *testing.T) {
 			}
 			if v.Detail == "" {
 				t.Errorf("%T.Validate(%#v) Detail is empty, want a message naming the failed clause", tc.constraint, tc.input)
+			}
+			if tc.wantDetail != "" && v.Detail != tc.wantDetail {
+				t.Errorf("%T.Validate(%#v) Detail = %q, want %q", tc.constraint, tc.input, v.Detail, tc.wantDetail)
 			}
 			for _, needle := range tc.needles {
 				if strings.Contains(string(v.Code), needle) {
