@@ -10,26 +10,30 @@ const redactedText = "[redacted]"
 
 // Redacted carries one value taken from the input under validation, such as
 // the argument a Validate method rejected, and keeps it out of logs, messages
-// and encoded output. A Redacted that holds a value always prints as
-// "[redacted]"; [Redacted.Reveal] returns the value itself, for the places
-// where showing it is safe.
+// and encoded output. [Redacted.Reveal] returns the value itself, for the
+// places where showing it is safe.
 //
 // Printed with the fmt package, a Redacted that holds a value gives the text
-// "[redacted]" for every verb, %v, %+v and %#v included, and one that holds
-// no value gives nothing. Where fmt prints it without calling its methods,
-// as under %p or through an unexported field of a struct, it shows only
-// memory addresses. Encoded with encoding/json, v1 or v2, it gives null;
-// encoded with encoding/gob, it gives no bytes and decodes as the zero
+// "[redacted]" for every verb other than %T and %p, %v, %+v and %#v included,
+// and one that holds no value gives nothing. %T gives the type name. Under %p,
+// and through an unexported field of a struct, fmt prints a Redacted without
+// calling its methods: it shows memory addresses and never the value, but
+// equal held values show the same address, so two such lines reveal that
+// their values are equal. Encoded with encoding/json, v1 or v2, it gives
+// null; encoded with encoding/gob, it gives no bytes and decodes as the zero
 // Redacted. The text and JSON handlers of log/slog follow these rules, so
-// logging a Redacted never writes the value.
+// logging a Redacted never writes the value. These rules cover fmt, JSON, gob
+// and log/slog. A tool that reads unexported fields by reflection, such as a
+// diff reporter or a debugger, can see the value.
 //
 // The zero value holds no value; [Redact] builds one that does. Comparing two
-// Redacted values with == never panics. Two Redacted values that hold equal
-// values compare equal when those values can be compared, and every value
-// this package stores can be. A value that cannot be compared, such as a
-// slice or a map, is held by reference, so a Redacted holding one equals only
-// its own copies. [Redacted.Equal] gives the same answer as ==, for
-// comparison libraries that skip unexported fields but call an Equal method.
+// Redacted values with == never panics. Two Redacted values compare equal when
+// neither holds a value, or when they hold values that are equal under ==,
+// and every value this package stores can be compared that way. A value that
+// == cannot compare, such as a slice or a map, is held by reference, so a
+// Redacted holding one equals only its own copies. [Redacted.Equal] gives the
+// same answer as ==, for comparison libraries that skip unexported fields but
+// call an Equal method.
 type Redacted struct {
 	// Exactly one field is set when a value is held, and neither when none
 	// is. Both are pointers inside, so fmt, reading them without calling a
@@ -71,9 +75,13 @@ func (r Redacted) empty() bool {
 // to read the value, so call it only where showing the value is safe, such as
 // a form shown back to the person who filled it in.
 //
-// The value comes back with its type and equal under == to the one given to
-// [Redact]. Because equal values share one handle, a floating-point negative
-// zero may come back as a positive zero, which == treats as the same number.
+// The value comes back with its type. A value that == can compare comes back
+// equal under == to the one given to [Redact], with two caveats. A
+// floating-point zero may come back with either sign: equal values share one
+// handle, so the sign depends on which zero was interned first, and == finds
+// the two signs equal. A NaN comes back as a NaN, which == never finds equal,
+// not even to itself. A value that == cannot compare, such as a slice or a
+// map, comes back as the same value, not a copy.
 func (r Redacted) Reveal() any {
 	switch {
 	case r.box != nil:
@@ -102,8 +110,10 @@ func (r Redacted) String() string {
 	return redactedText
 }
 
-// Format writes the text of [Redacted.String] for every verb and ignores
-// flags, width and precision, so no fmt verb prints the held value.
+// Format writes the text of [Redacted.String] for every verb fmt passes to it,
+// and ignores flags, width and precision, so no fmt verb prints the held
+// value. fmt answers %T and %p itself, without calling Format; [Redacted]
+// says what those print.
 func (r Redacted) Format(f fmt.State, verb rune) {
 	// A fmt.State writes into the caller's buffer and does not fail.
 	_, _ = f.Write([]byte(r.String()))
