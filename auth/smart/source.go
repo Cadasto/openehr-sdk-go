@@ -17,6 +17,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/auth"
 	"github.com/cadasto/openehr-sdk-go/auth/jwtbearer"
+	"github.com/cadasto/openehr-sdk-go/internal/noredirect"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 )
 
@@ -100,7 +101,11 @@ type TokenChange struct {
 // Option mutates Config during construction.
 type Option func(*Config)
 
-// WithHTTPClient injects the client for token and JWKS calls.
+// WithHTTPClient injects the client for token and JWKS calls. The token,
+// refresh and revocation requests never follow a redirect, whatever
+// CheckRedirect c has, and c is not modified. Those requests use a copy of
+// c made when the source is built, so a Transport, Timeout or Jar set on c
+// afterwards does not reach them.
 func WithHTTPClient(c *http.Client) Option {
 	return func(cfg *Config) { cfg.HTTPClient = c }
 }
@@ -227,6 +232,10 @@ func WithTokenChange(fn func(ctx context.Context, change TokenChange)) Option {
 // Source implements auth.TokenSource for SMART authorization-code + PKCE.
 type Source struct {
 	cfg Config
+	// credClient sends the token, refresh and revocation requests, which
+	// carry a credential: it never follows a redirect. cfg.HTTPClient,
+	// which the caller owns, is left as it was.
+	credClient *http.Client
 
 	mu       sync.Mutex
 	cur      auth.Token
@@ -337,6 +346,30 @@ func (s *Source) setTokensLocked(access auth.Token, refresh string) {
 	s.cur = access
 	s.refresh = refresh
 	s.forceRefresh = false
+}
+
+// withHeldScope returns prev, the session's last token response, with the
+// scope of held, the access token the session held when a refresh began,
+// standing in for an earlier scope that prev lacks. A source whose tokens
+// SetTokens installed has had no token response yet, so the scope of the
+// token it holds is the only grant it knows (RFC 6749 §6 reads an omitted
+// scope as the original grant).
+//
+// Lacks is decided as keepSessionMembers decides it: prev has no earlier
+// scope when its body had no scope member. A scope member prev carried, even
+// as an empty string or null, stays, so the earlier response wins over held.
+// A held token without a scope leaves prev as it is. The result has its own
+// Raw map, so prev is not changed.
+func withHeldScope(prev TokenResponse, held auth.Token) TokenResponse {
+	if _, had := prev.Raw["scope"]; had || held.Scope == "" {
+		return prev
+	}
+	raw := make(map[string]any, len(prev.Raw)+1)
+	maps.Copy(raw, prev.Raw)
+	raw["scope"] = held.Scope
+	prev.Raw = raw
+	prev.Scope = held.Scope
+	return prev
 }
 
 // idTokenBinding holds the claims of a verified ID token that a later one
@@ -463,7 +496,7 @@ func FromConfig(cfg Config) (*Source, error) {
 		}
 		cfg.JWKS = jwks
 	}
-	return &Source{cfg: cfg}, nil
+	return &Source{cfg: cfg, credClient: noredirect.Client(cfg.HTTPClient)}, nil
 }
 
 // configureClientAuth resolves the confidential-client authentication method
@@ -773,6 +806,10 @@ func (s *Source) verifyIDToken(ctx context.Context, raw, nonce string) (*IDToken
 // the member is absent from the response body: a member the refresh
 // response carries replaces the earlier value, even when it is an empty
 // string or null. Raw's other members are the refresh response's own.
+// When the earlier response has no scope member either, as for a session
+// whose tokens [Source.SetTokens] installed, the scope of the access token
+// the source held when the refresh began stands in, in Scope and in
+// Raw["scope"], although no server sent it.
 //
 // After [Source.Revoke] it is the zero value until a code exchange or a
 // refresh succeeds.
@@ -793,6 +830,10 @@ func (s *Source) LastTokenResponse() TokenResponse {
 //
 // SetTokens does not call the [WithTokenChange] hook: the application
 // already has the tokens it passes.
+//
+// A later refresh response that leaves out the scope, on a session whose
+// last token response has no scope member, gives the refreshed token and
+// [Source.LastTokenResponse] the scope of access.
 func (s *Source) SetTokens(access auth.Token, refresh string) {
 	s.mu.Lock()
 	s.session++
@@ -899,8 +940,10 @@ func (s *Source) tryToken(ctx context.Context) (tok auth.Token, retry bool, err 
 		}
 		// Nor does the session lose the launch context or the scope a
 		// refresh response leaves out, and the new access token carries the
-		// scope the session keeps.
-		s.lastTR = keepSessionMembers(s.lastTR, refreshedTR)
+		// scope the session keeps. A session with no earlier scope on its
+		// last token response keeps the scope of the access token it held
+		// when the refresh began.
+		s.lastTR = keepSessionMembers(withHeldScope(s.lastTR, cur), refreshedTR)
 		tok.Scope = s.lastTR.Scope
 		s.setTokensLocked(tok, refreshTok)
 		if refreshedTR.IDTokenClaims != nil {
@@ -1105,7 +1148,7 @@ func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, To
 	if err != nil {
 		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, Inner: err}
 	}
-	resp, err := s.cfg.HTTPClient.Do(req)
+	resp, err := s.credClient.Do(req)
 	if err != nil {
 		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, Inner: err}
 	}
