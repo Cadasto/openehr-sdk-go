@@ -438,8 +438,9 @@ func ReadSingle(parent any, _ /* parentType */, attrName string) (any, bool) {
 // required-checks each of them through [ReadSingle] / [ReadMultiple]. A
 // type it does not handle (OBJECT_REF, FEEDER_AUDIT, LINK, …) is an
 // opaque leaf to the floor and is validated by its own evaluator, not by
-// reading its members, which would all read back as absent and fabricate
-// `required`.
+// reading its members. For FEEDER_AUDIT, LINK and the like rmread has no
+// reader, so their members would all read back as absent and fabricate
+// `required`; the reference types are covered below.
 //
 // The handled set is the reader set minus the reference types: OBJECT_REF,
 // PARTY_REF, LOCATABLE_REF, ACCESS_GROUP_REF and the OBJECT_ID family a

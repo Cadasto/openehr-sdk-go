@@ -250,7 +250,8 @@ func requestFailure(err error) DiscoveryErrorReason {
 // catalog once it passes the same checks as a new document, the issuer
 // check included. A failed fetch or check drops the cached catalog, unless
 // only the caller's own cancelled or expired context caused the failure,
-// which leaves it in place.
+// which leaves it in place. An error from the Cache is logged and does not
+// fail the call.
 func (r *Resolver) Resolve(ctx context.Context, baseURL string) (*ServiceCatalog, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err

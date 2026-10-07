@@ -260,15 +260,14 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 	return openehrclient.WriteResult(ctx, c, req, "directory", decodeFolder)
 }
 
-// Delete logically deletes the Directory addressed by versionUID,
-// requiring `ifMatch` as the If-Match header. An empty `ifMatch` returns
+// Delete logically deletes the Directory of the EHR ehrID, requiring
+// `ifMatch` as the If-Match header. An empty `ifMatch` returns
 // [transport.ErrInvalidConfig] without issuing a request.
 //
-// Wire: DELETE /ehr/{ehr_id}/directory with If-Match. Some deployments
-// require the version UID in the path; the openEHR REST spec leaves
-// the canonical path slightly under-specified; this binding follows
-// the base-path form. If a deployment requires `/directory/{vuid}`,
-// use [transport.Client.Do] with a custom request to override.
+// Wire: DELETE /ehr/{ehr_id}/directory with If-Match, the path the
+// ITS-REST definition this SDK targets gives. If a deployment expects
+// another path, such as `/directory/{version_uid}`, use
+// [transport.Client.Do] with a custom request.
 func Delete(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, ifMatch string, opts ...DeleteOption) (*openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, fmt.Errorf("directory.Delete: %w: empty EHRID", transport.ErrInvalidConfig)

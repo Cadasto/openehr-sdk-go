@@ -104,6 +104,11 @@ func (c *Client) Catalog() *discovery.ServiceCatalog {
 // configured HTTP transport without injecting or wrapping it again. It
 // returns nil only when the Client itself is nil; a Client built by New
 // always has an HTTP client.
+//
+// The client comes back as it was injected. It lacks the refusal Do applies
+// to a request that carries an Authorization header, which stops it
+// following a redirect from https to a URL that is not https, so a caller
+// that sends a credential through it must refuse that redirect itself.
 func (c *Client) HTTPClient() *http.Client {
 	// REQ-025: a nil Client is caller-constructible — see Do.
 	if c == nil {

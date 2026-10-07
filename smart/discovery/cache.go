@@ -11,6 +11,14 @@ import (
 //
 // The Resolver keys every entry by the Platform base URL the caller
 // resolved (ServiceCatalog.BaseURL), never by the OpenID Connect issuer.
+//
+// The Resolver logs an error from Put or Invalidate at warning level and
+// carries on: it does not reach the caller of Resolve or Refresh. A failed
+// Put or Invalidate leaves the cache as it was, so the next Resolve fetches
+// again unless the entry the cache still holds is fresh. A panic in Put or
+// Invalidate reaches the caller that started the fetch as it was raised, and
+// each caller waiting on that fetch whose own context is live fetches it
+// again.
 type Cache interface {
 	Get(ctx context.Context, baseURL string) (*ServiceCatalog, bool)
 	Put(ctx context.Context, baseURL string, c *ServiceCatalog) error

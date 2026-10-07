@@ -19,8 +19,9 @@ type Query struct {
 	// the leading dollar sign (e.g. "ehr_id", not "$ehr_id").
 	Parameters map[string]any
 	// EHRID scopes execution to a single EHR when non-empty. The query
-	// executor maps this to the `ehr_id` URL query parameter (distinct
-	// from AQL placeholder keys inside Parameters).
+	// executor sends it as the `ehr_id` URL query parameter on a GET and as
+	// the `openehr-ehr-id` request header on a POST. It is separate from the
+	// AQL placeholder keys inside Parameters.
 	EHRID string
 }
 

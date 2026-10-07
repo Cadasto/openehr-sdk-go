@@ -18,17 +18,18 @@ import (
 // persisted `rm.Contribution` shape where `versions[]` is `[]OBJECT_REF`.
 //
 // The persisted shape carries OBJECT_REFs pointing at versions that do
-// not yet exist at submission time, so a spec-conformant CDR rejects it. The probe inspects the captured request
-// body (Sandbox mode; the caller supplies a transport.Client wired to
-// a `sandbox.Backend` scripted route) and asserts:
+// not yet exist at submission time, so a spec-conformant CDR rejects it.
+// The probe inspects the captured request body (Sandbox mode; the caller
+// supplies a transport.Client wired to a `sandbox.Backend` scripted route)
+// and asserts:
 //
 //   - `versions[i]._type` ∈ {"ORIGINAL_VERSION","IMPORTED_VERSION"}
 //   - `versions[i].data._type` is present (the inline payload), except on
 //     an ORIGINAL_VERSION whose commit_audit change type is `523` (deleted)
 //     and that has no `data` member at all: a deletion built without a
-//     payload sends none (§ REQ-130 Deletion). No other version is exempt,
-//     and a `"data":null` fails on every version, a `523` one included,
-//     because the member is to be left out, not nulled
+//     payload sends none (see [contribution.Deletion]). No other version
+//     is exempt, and a `"data":null` fails on every version, a `523` one
+//     included, because the member is to be left out, not nulled
 //   - `versions[i]._type` ≠ "OBJECT_REF" (the regression)
 //   - the batch `audit` and each `versions[i].commit_audit` carry no
 //     server-assigned `time_committed` and a `DV_CODED_TEXT`-shaped

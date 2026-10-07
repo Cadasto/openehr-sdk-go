@@ -195,14 +195,14 @@ func matchSingleAlternative(children []*tcimpl.CompiledNode, val any) *tcimpl.Co
 func admitsRMValue(c *tcimpl.CompiledNode, gotType string, val any) bool {
 	want := c.RMTypeName()
 	if want == "" {
-		// Wildcard / not-typed OPT child — accept.
+		// Wildcard / not-typed OPT child: accept.
 		return true
 	}
 	if gotType == want || rmTypeIsSubtypeOf(gotType, want) || intervalRMTypeMatches(gotType, want, val) {
 		return true
 	}
 	// AOM 1.4 primitive short name (DURATION, DATE, INTEGER, …)
-	// pinned under a BMM-typed attribute channel — the RM value
+	// pinned under a BMM-typed attribute channel: the RM value
 	// may be a Go string, integer, real, or bool rather than an
 	// RM wrapper type.
 	return tcimpl.IsAOMPrimitiveShortName(want) && c.PrimitiveConstraint() != nil &&
@@ -276,7 +276,7 @@ func (w *walker) walkMultipleAttribute(
 		}
 	}
 	// Recurse into each matched item. An item no OPT child binds
-	// contributes one issue — UNLESS the OPT declared no children for
+	// contributes one issue, unless the OPT declared no children for
 	// this attribute, in which case the attribute is "open" (any RM
 	// item passes; the OPT pinned only existence / cardinality, not
 	// membership). Tally per-child occurrences for the AOM 1.4
@@ -538,7 +538,7 @@ func isNilItem(item any) bool {
 // assertions admit it. It serves only items that [bindsByNodeID]
 // accepts. Returns nil when none match, and always for an empty or
 // unreadable id (a typed-nil LOCATABLE, a nil under a LOCATABLE
-// attribute) — the caller then emits slot_fill.
+// attribute); the caller then emits slot_fill.
 func matchChildByID(children []*tcimpl.CompiledNode, item any) *tcimpl.CompiledNode {
 	id := locatableArchetypeNodeID(item)
 	if id == "" {

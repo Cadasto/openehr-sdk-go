@@ -15,7 +15,10 @@ type StaticConfig struct {
 	// BaseURL is the Platform base URL. Leave it empty when it is the same
 	// as Issuer; the catalog's BaseURL then takes the value of Issuer.
 	BaseURL string
-	// Issuer is the OpenID Connect issuer. Required.
+	// Issuer is the OpenID Connect issuer. Required. With no BaseURL,
+	// auth/smart's NewFromCatalog sends the Issuer as the audience of an
+	// authorization request when the caller sets none, so set BaseURL when
+	// the issuer is a separate identity provider.
 	Issuer   string
 	Services map[string]ServiceEntry
 	Auth     AuthEndpoints

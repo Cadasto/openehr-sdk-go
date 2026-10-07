@@ -534,9 +534,10 @@ func ExampleComposition(ctx context.Context, c *transport.Client, templateID str
 	return out, meta, err
 }
 
-// extractLastPathSegment returns the trailing segment of a URL path —
-// used as a fallback to surface a template id when the deployment
-// returns 204 from upload with only a Location header.
+// extractLastPathSegment returns the trailing segment of a URL path.
+// UploadTemplate uses it to name the template from the Location header when
+// the reply carries no template record, such as a 204 with only a Location
+// header, a 201 with an empty body or an XML template body.
 func extractLastPathSegment(p string) string {
 	if p == "" {
 		return ""

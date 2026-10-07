@@ -17,7 +17,7 @@ A full copy of Apache License 2.0 sits at [`licenses/Apache-2.0.txt`](licenses/A
 | openEHR ITS-REST OpenAPI | [`resources/its-rest/`](resources/its-rest/) | [openEHR/specifications-ITS-REST](https://github.com/openEHR/specifications-ITS-REST) | CC-BY-ND 3.0 (declared on each YAML `info.license`) | Normative REST contract (REQ-095). Unmodified. |
 | openEHR AQL grammar | [`resources/aql/grammar/`](resources/aql/grammar/) | openEHR Foundation | CC-BY-SA 3.0 Unported | Parser input. SDK deltas in `active/` are a documented derivative under the same terms. |
 | openEHR BMM schemas | [`resources/bmm/`](resources/bmm/) | [openEHR/BMM-publisher](https://github.com/openEHR/BMM-publisher) | openEHR Foundation specification artefact | Pinned RM / AM / BASE inputs for codegen. |
-| openEHR Terminology | [`resources/terminology/`](resources/terminology/) (`openehr_terminology.xml`, `openehr_external_terminologies.xml`) | [openEHR/specifications-TERM](https://github.com/openEHR/specifications-TERM) | openEHR Foundation specification artefact | Pinned vocabulary for `openehr/terminology` (REQ-034): the openEHR groups and code sets, and the Foundation's snapshot of the ISO and IANA code sets. |
+| openEHR Terminology | [`resources/terminology/`](resources/terminology/) (`openehr_terminology.xml`, `openehr_external_terminologies.xml`) | [openEHR/specifications-TERM](https://github.com/openEHR/specifications-TERM) | openEHR Foundation specification artefact | Pinned vocabulary for `openehr/terminology`: the openEHR groups and code sets, and the Foundation's snapshot of the ISO and IANA code sets. |
 
 Copyright notices for the Apache-2.0 corpora:
 

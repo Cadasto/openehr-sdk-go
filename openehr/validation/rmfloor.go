@@ -162,18 +162,21 @@ func (w *rmFloorWalker) emit(i Issue) {
 }
 
 // walk descends value (of declared BMM type rmType) at the given AQL
-// path. It first runs the per-type invariants on the current node, then
-// — for types rmread models — iterates every BMM-known attribute,
-// emitting `required` for any RM-mandatory attribute that is absent or
-// empty and recursing into every present attribute.
+// path. It first runs the per-type invariants on the current node, then,
+// for types the floor handles (see [rmread.Handles]), iterates every
+// BMM-known attribute, emitting `required` for any RM-mandatory attribute
+// that is absent or empty and recursing into every present attribute.
 //
-// A type rmread does NOT model (OBJECT_REF, FEEDER_AUDIT, LINK, … — see
-// [rmread.Handles]) is an opaque leaf here: its members are unreadable, so
-// reading them would report every one absent and fabricate `required`.
-// Such a node is validated solely by its per-type invariant evaluator
-// (run above). The same gate stops descent into a flattened scalar a
-// reader surfaces directly — e.g. CODE_PHRASE.terminology_id comes back
-// as a Go string, which is not an RM node to walk.
+// A type the floor does not handle is a leaf here: the reference types
+// (OBJECT_REF and its subtypes) and the id types a reference holds, which
+// rmread can read but the floor leaves to checkObjectRef so that a missing
+// part is reported once, and the types rmread has no reader for
+// (FEEDER_AUDIT, LINK, ...), whose members would all read back as absent
+// and fabricate `required`. Such a node is
+// validated solely by its per-type invariant evaluator (run above). The
+// same gate stops descent into a flattened scalar a reader surfaces
+// directly: CODE_PHRASE.terminology_id comes back as a Go string, which is
+// not an RM node to walk.
 func (w *rmFloorWalker) walk(value any, rmType string, path string, depth int) {
 	if value == nil || rmread.IsTypedNilPointer(value) {
 		return
@@ -312,7 +315,7 @@ func (w *rmFloorWalker) checkInvariants(value any, rmType, path string) {
 	case rmType == "OBJECT_REF", rmType == "PARTY_REF", rmType == "ACCESS_GROUP_REF", rmType == "LOCATABLE_REF":
 		w.checkObjectRef(value, path)
 	case rmType == "PARTY_IDENTIFIED", rmType == "PARTY_RELATED":
-		// PARTY_RELATED inherits the PARTY_IDENTIFIED rules via embedding —
+		// PARTY_RELATED inherits the PARTY_IDENTIFIED rules via embedding:
 		// one evaluator, dispatched for both runtime types.
 		w.checkPartyIdentified(value, path)
 	case rmType == "DV_TEXT", rmType == "DV_CODED_TEXT":
@@ -602,10 +605,11 @@ func (w *rmFloorWalker) checkDVInterval(value any, path string) {
 }
 
 // checkObjectRef enforces the spec floor on OBJECT_REF (and subtypes):
-// id, type, and namespace are RM-mandatory. rmread models OBJECT_REF as an
-// opaque leaf (the walk does not read its members), so this evaluator is
-// the floor's sole check for the reference — reading the fields through the
-// [rm.ObjectRefLike] interface (REQ-052) so any BMM subtype is covered.
+// id, type, and namespace are RM-mandatory. [rmread.Handles] refuses the
+// reference types, so the walk does not read their members itself and this
+// evaluator is the floor's only check of a reference, which keeps a missing
+// part from being reported twice. It reads the fields through the
+// [rm.ObjectRefLike] interface (REQ-052), so any BMM subtype is covered.
 func (w *rmFloorWalker) checkObjectRef(value any, path string) {
 	if value == nil || rmread.IsTypedNilPointer(value) {
 		return
@@ -698,7 +702,7 @@ func (w *rmFloorWalker) checkPartyIdentified(value any, path string) {
 // walked container (rmread reads it), so each TERM_MAPPING is a node of
 // its own and [rmFloorWalker.checkTermMapping] evaluates it there.
 //
-// Diagnostics name the attribute only — never a value from the instance
+// Diagnostics name the attribute only, never a value from the instance
 // (REQ-168). The check reads no value, only the list's length, so the
 // issue's Value stays empty.
 func (w *rmFloorWalker) checkTermMappings(value any, path string) {

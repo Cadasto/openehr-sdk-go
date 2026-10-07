@@ -1,6 +1,6 @@
 package validation
 
-// rmfloor_coded.go: REQ-112 Coded invariants — the RM invariants that tie a
+// rmfloor_coded.go: REQ-112 Coded invariants, the RM invariants that tie a
 // coded attribute to a group or a code set of the openEHR terminology,
 // checked by the RM floor on every node it visits. The rule table below is
 // the catalogue's table, one rule per row; codedValues reads the coded

@@ -24,6 +24,11 @@ const GrantType = "urn:ietf:params:oauth:grant-type:jwt-bearer"
 // Config carries the constructor inputs. Use New(...Option) for the
 // idiomatic call site; Config is exposed for declarative configuration.
 type Config struct {
+	// HTTPClient is the injected client used for token-endpoint calls.
+	// The token request never follows a redirect, whatever CheckRedirect
+	// the client has, and the client is not modified. The request uses a
+	// copy made when the source is built, so a Transport, Timeout or Jar set
+	// on the client afterwards does not reach it. Required.
 	HTTPClient       *http.Client
 	TokenURL         string
 	Assertion        AssertionSource

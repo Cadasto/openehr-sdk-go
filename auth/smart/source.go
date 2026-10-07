@@ -51,6 +51,12 @@ type clientAssertionKey struct {
 
 // Config carries SMART-on-openEHR OAuth2 settings.
 type Config struct {
+	// HTTPClient is the injected client used for token and JWKS calls. The
+	// token, refresh and revocation requests never follow a redirect,
+	// whatever CheckRedirect the client has, and the client is not modified.
+	// Those requests use a copy made when the source is built, so a
+	// Transport, Timeout or Jar set on the client afterwards does not reach
+	// them. Required.
 	HTTPClient       *http.Client
 	ClientID         string
 	ClientSecret     string
@@ -93,8 +99,10 @@ type TokenChange struct {
 	RefreshToken string
 	// Response is the token response as [Source.LastTokenResponse] returns
 	// it, so a refresh response's left-out launch context is filled in. Its
-	// Raw map is the hook's own copy. IDTokenClaims and NeedPatientBanner
-	// point at values the source keeps: treat them as read-only.
+	// Raw map is a copy of the source's top level, so adding, replacing or
+	// deleting a key of it does not reach the source. Values nested inside Raw (a fhirContext
+	// object, for example), IDTokenClaims and NeedPatientBanner are shared
+	// with the source: treat them as read-only.
 	Response TokenResponse
 }
 

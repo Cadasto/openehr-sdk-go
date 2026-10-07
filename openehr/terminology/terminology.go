@@ -161,8 +161,8 @@ type CodeSet struct {
 
 // newCodeSet builds a code set from its openehr_id, its display name, its
 // issuer, its external id and its codes in source order. Only the generated
-// tables call it, and its precondition — for an issuer other than openEHR,
-// no two codes differ only in ASCII letter case — is what keeps the index
+// tables call it, and its precondition (for an issuer other than openEHR,
+// no two codes differ only in ASCII letter case) is what keeps the index
 // one entry per code: the generator refuses a pin that breaks it (see
 // internal/termgen), so newCodeSet trusts its input.
 func newCodeSet(id, name, issuer, externalID string, codes []string) *CodeSet {

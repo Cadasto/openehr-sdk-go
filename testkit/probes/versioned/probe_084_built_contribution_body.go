@@ -283,7 +283,7 @@ func probe084VersionIssue(i int, want probe084Step, v map[string]any) string {
 // payload inline with its `_type`, except on a deletion built without a
 // payload, which must carry no `data` member. Absence is judged on **key
 // presence**, before any type assertion, because `"data":null` is a present
-// key whose value type-asserts like a missing one — and REQ-130 asks for the
+// key whose value type-asserts like a missing one; REQ-130 asks for the
 // member to be left out, not nulled.
 func probe084DataIssue(at string, want probe084Step, v map[string]any) string {
 	raw, present := v["data"]
