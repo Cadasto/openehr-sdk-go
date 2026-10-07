@@ -8,14 +8,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-**Breaking:** `demographic.Delete` drops its `ifMatch` parameter, on the repository method too, and token, refresh and revocation requests in `auth/smart`, `auth/clientcreds` and `auth/jwtbearer` no longer follow a redirect.
+Thirty-second `v0.x` minor: the RM floor checks party proxies, participations and coded values against the openEHR terminology, validation diagnostics stop quoting the submitted value, and credential-bearing requests no longer follow an unsafe redirect. **Breaking:** `demographic.Delete` drops its `ifMatch` parameter, token, refresh and revocation requests stop following redirects, a request with an `Authorization` header refuses an https-to-http redirect, and the RM floor reports party proxies, participations and coded values it accepted.
+
+### Added
+
+- **The RM floor checks party proxies and participations (REQ-112).** `ValidateRM` walks PARTY_SELF, PARTY_IDENTIFIED, PARTY_RELATED and PARTICIPATION, and reports a party with no name, identifier or external ref and a participation with no function or performer.
+- **The RM floor checks coded values against the openEHR terminology (REQ-112, REQ-034).** A code outside its group or code set gets the new issue code `code_not_in_value_set`, and `openehr/terminology` adds ISO and IANA code sets.
+- **`contribution.Deletion` builds the RM's deletion without data (REQ-130).** `Deletion[rm.Composition](uid, nil)` sends a version with no `data` member, which a server that enforces the pinned ITS-REST schema refuses.
 
 ### Changed
 
 - **`demographic.Delete` takes no `If-Match` (REQ-054).** The `ifMatch` parameter is gone, from the repository method too, and a 409 returns `ErrVersionConflict` with the latest version uid beside it.
 - **Token, refresh and revocation requests never follow a redirect (REQ-060).** `auth/smart`, `auth/clientcreds` and `auth/jwtbearer` return a 3xx answer as an `ExchangeError` instead of re-sending the form to another URL.
+- **A request with an `Authorization` header refuses an https-to-http redirect (REQ-092, REQ-021).** `transport.Client.Do` fails with `transport.ErrInsecureRedirect`, before the caller's `CheckRedirect` can allow the hop, and does not retry.
 - **A restored session keeps its scope on refresh (REQ-064).** After `SetTokens`, a refresh response that omits `scope` gives an access token with the held token's scope, not an empty one.
-- **One cancelled caller no longer fails the others (REQ-071).** In `smart/discovery`, a waiter whose own context is live fetches again when the fetching caller's context ends, and the cached catalog stays.
+- **One cancelled or panicking caller no longer fails the others (REQ-071).** In `smart/discovery`, a waiter whose own context is live fetches again when the fetching caller's context ends or its fetch panics.
+- **Validation diagnostics stop quoting the submitted value (REQ-168).** `Detail` names the clause that failed, and the value moves to the new `Value` field, a `constraints.Redacted` that prints as redacted until `Reveal` is called.
+- **A deletion's lifecycle state defaults to `deleted` (REQ-130).** A `contribution.Deletion` given a payload sends 523 where it sent `complete` (532); `WithLifecycleState` restores the old value.
+- **Template validation no longer reports `slot_fill` for a list item that is not locatable (REQ-102).** A PARTICIPATION or other such item is matched to an OPT child by its RM type.
 
 ## [0.31.0] - 2026-10-06
 
