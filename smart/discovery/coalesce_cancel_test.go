@@ -367,11 +367,14 @@ func TestCoalescedWaiterReturnsItsOwnContextError(t *testing.T) { // REQ-026, RE
 // again. Once hold is called, every call to Done or Err waits until open is
 // called, then reports the wrapped context as it is at that moment. Without
 // it, the test would depend on the scheduler running the code that ends the
-// context between the wake-up and that look.
+// context between the wake-up and that look. parked counts the calls that
+// have started to wait, so a test can tell that the waiter woke and is
+// looking at its context.
 type lateContext struct {
 	context.Context //nolint:containedctx // a test double that delays the context it wraps
 
 	held    atomic.Bool
+	parked  atomic.Int32
 	release chan struct{}
 	once    sync.Once
 }
@@ -392,6 +395,7 @@ func (c *lateContext) Err() error {
 
 func (c *lateContext) wait() {
 	if c.held.Load() {
+		c.parked.Add(1)
 		<-c.release
 	}
 }

@@ -266,6 +266,11 @@ func TestCoalescedWaiterWhoseContextEndsAsStarterPanicsDoesNotFetch(t *testing.T
 				ctx2.hold()
 				f.p.open()      // caller 1's fetch ends in the panic
 				synctest.Wait() // caller 1 panicked and woke caller 2, whose next look at its context waits
+				// Checked before cancel2: a caller 2 still stranded on the fetch
+				// would otherwise wake on its own context and pass the checks below.
+				if got := ctx2.parked.Load(); got != 1 {
+					t.Errorf("caller 2 looked at its context %d times after the panic, want 1: the panic wakes caller 2, which then looks at its context", got)
+				}
 				cancel2()
 				ctx2.open()
 				wg.Wait()
