@@ -496,11 +496,17 @@ func TestProbe084BuiltContributionBodyPass(t *testing.T) {
 // probe084Planted builds a `Contribution_create` body in the shape
 // PROBE-084's own batch produces, so a planted variant differs from the
 // real thing in exactly the one clause under test. Each version is
-// `{code, rmType, extra}`; `extra` injects the violation.
+// `{code, rmType, extra}`; `extra` injects the violation. `lifecycle` is the
+// lifecycle_state code the version carries, and when it is empty the version
+// carries what the builder would give it: `deleted` (523) for a deletion,
+// `complete` (532) otherwise. `noData` leaves out the `data` member, as a
+// deletion built without a payload does.
 type probe084Planted struct {
-	code   string
-	rmType string
-	extra  string
+	code      string
+	rmType    string
+	extra     string
+	lifecycle string
+	noData    bool
 }
 
 func probe084Body(batchCode string, versions ...probe084Planted) []byte {
@@ -509,9 +515,18 @@ func probe084Body(batchCode string, versions ...probe084Planted) []byte {
 	}
 	out := make([]string, 0, len(versions))
 	for _, v := range versions {
+		lifecycle := v.lifecycle
+		if lifecycle == "" {
+			lifecycle = "532"
+			if v.code == "523" {
+				lifecycle = "523"
+			}
+		}
 		s := `{"_type":"ORIGINAL_VERSION","commit_audit":` + audit(v.code) +
-			`,"lifecycle_state":{"_type":"DV_CODED_TEXT","defining_code":{"_type":"CODE_PHRASE","code_string":"532"}}` +
-			`,"data":{"_type":"` + v.rmType + `"}`
+			`,"lifecycle_state":{"_type":"DV_CODED_TEXT","defining_code":{"_type":"CODE_PHRASE","code_string":"` + lifecycle + `"}}`
+		if !v.noData {
+			s += `,"data":{"_type":"` + v.rmType + `"}`
+		}
 		if v.extra != "" {
 			s += "," + v.extra
 		}
@@ -531,14 +546,17 @@ func TestProbe084BuiltContributionBodyRejects(t *testing.T) {
 		preceding1 = `"preceding_version_uid":{"value":"8849182c-82ad-4088-a07f-48ead4180515::cdr.example::1"}`
 		preceding2 = `"preceding_version_uid":{"value":"8849182c-82ad-4088-a07f-48ead4180515::cdr.example::2"}`
 		preceding4 = `"preceding_version_uid":{"value":"8849182c-82ad-4088-a07f-48ead4180515::cdr.example::4"}`
+		preceding5 = `"preceding_version_uid":{"value":"8849182c-82ad-4088-a07f-48ead4180515::cdr.example::5"}`
 		callerUID  = `"uid":{"value":"8849182c-82ad-4088-a07f-48ead4180515::cdr.example::3"}`
 	)
-	// The four versions PROBE-084's own batch emits, in order.
+	// The five versions PROBE-084's own batch emits, in order: the last is a
+	// deletion built without a payload, so it carries no `data` member.
 	conformant := []probe084Planted{
 		{code: "249", rmType: "COMPOSITION"},
 		{code: "250", rmType: "COMPOSITION", extra: preceding1},
 		{code: "251", rmType: "EHR_STATUS", extra: preceding2 + "," + callerUID},
 		{code: "523", rmType: "FOLDER", extra: preceding4},
+		{code: "523", noData: true, extra: preceding5},
 	}
 	// mutate returns the conformant batch with one version replaced.
 	mutate := func(i int, v probe084Planted) []probe084Planted {
@@ -612,6 +630,35 @@ func TestProbe084BuiltContributionBodyRejects(t *testing.T) {
 			name:       "null uid emitted",
 			planted:    probe084Body("253", mutate(0, probe084Planted{code: "249", rmType: "COMPOSITION", extra: `"uid":null`})...),
 			wantDetail: "absent rather than empty or null",
+		},
+		{
+			// A deletion built without a payload has no `data` member at all.
+			// A present-but-null key type-asserts like a missing one, so this is
+			// the arm that keeps absence judged on key presence.
+			name:       "data-less deletion emits null data",
+			planted:    probe084Body("253", mutate(4, probe084Planted{code: "523", noData: true, extra: preceding5 + `,"data":null`})...),
+			wantDetail: "built without a payload",
+		},
+		{
+			// The counter-arm: a deletion that WAS given a payload still sends
+			// it, so a missing `data` is a defect there.
+			name:       "deletion with a payload lacks data",
+			planted:    probe084Body("253", mutate(3, probe084Planted{code: "523", noData: true, extra: preceding4})...),
+			wantDetail: "data is missing",
+		},
+		{
+			// The batch names no lifecycle override, so a deletion carries the
+			// `deleted` default, not `complete`.
+			name:       "deletion carries complete under the default",
+			planted:    probe084Body("253", mutate(3, probe084Planted{code: "523", rmType: "FOLDER", lifecycle: "532", extra: preceding4})...),
+			wantDetail: `lifecycle_state code = "532", want "523"`,
+		},
+		{
+			// The default is not derived from the change type for anything but
+			// a deletion: a creation stays `complete`.
+			name:       "creation carries deleted",
+			planted:    probe084Body("253", mutate(0, probe084Planted{code: "249", rmType: "COMPOSITION", lifecycle: "523"})...),
+			wantDetail: `lifecycle_state code = "523", want "532"`,
 		},
 		{
 			name:       "top-level CONTRIBUTION envelope",
