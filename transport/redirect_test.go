@@ -343,8 +343,8 @@ func TestDoLeavesInjectedClientUnmodified(t *testing.T) { // REQ-092, REQ-021
 		}
 		// Ask the injected client's policy about the very hop the transport
 		// refused: the caller's own function answers, not the refusal.
-		from := httptest.NewRequest(http.MethodGet, origin.URL+"/openehr/v1/ehr", nil)
-		to := httptest.NewRequest(http.MethodGet, plain.srv.URL+"/landing", nil)
+		from := httptest.NewRequestWithContext(t.Context(), http.MethodGet, origin.URL+"/openehr/v1/ehr", nil)
+		to := httptest.NewRequestWithContext(t.Context(), http.MethodGet, plain.srv.URL+"/landing", nil)
 		if got := hc.CheckRedirect(to, []*http.Request{from}); !errors.Is(got, errCaller) {
 			t.Errorf("injected client's CheckRedirect(https to http) = %v, want the caller's own answer %q", got, errCaller)
 		}
