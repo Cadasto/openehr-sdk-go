@@ -1069,10 +1069,9 @@ func writeIsmTransitionSingle(i *rm.IsmTransition, attr string, child any) error
 
 // partyFields points at the attributes PARTY gives every party class, so
 // one pair of writers serves all five. The ACTOR attributes languages and
-// roles stay unwritten: the template validator matches the members of a
-// multi-valued attribute by archetype_node_id, and a DV_TEXT language or a
-// PARTY_REF role carries none, so it would reject any member written. A
-// template that names either makes the write fail instead.
+// roles have no writer yet; the template validator binds their members by
+// RM type, so adding one is a follow-up. A template that names either
+// makes the write fail instead.
 type partyFields struct {
 	class         string // the Go type, for the error detail
 	name          *rm.DVTextLike
