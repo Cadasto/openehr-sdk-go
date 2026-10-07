@@ -288,7 +288,7 @@ func (w *walker) walkMultipleAttribute(
 	perChildCount := make(map[*tcimpl.CompiledNode]int, len(children))
 	for idx, item := range items {
 		itemPath := joinPath(parentPath, segmentForRMItem(attr, item, idx))
-		byNodeID := bindsByNodeID(item)
+		byNodeID := bindsByNodeID(item, opt.RMTypeName(), attr.Name())
 		var matched *tcimpl.CompiledNode
 		if byNodeID {
 			matched = matchChildByID(children, item)
@@ -489,17 +489,43 @@ func segmentForRMItem(attr *tcimpl.CompiledAttribute, item any, idx int) string 
 	return seg + fmt.Sprintf("[@%d]", idx+1)
 }
 
-// bindsByNodeID reports whether an item of a multi-valued attribute
-// is bound by its archetype_node_id. It holds for every LOCATABLE,
-// a typed-nil one included, and for a nil item, which has no type to
-// tell; every other item carries no archetype_node_id and is bound
-// by RM type (REQ-102).
-func bindsByNodeID(item any) bool {
+// bindsByNodeID reports whether an item of the multi-valued attribute
+// attrName, on a node of type parentRMType, is bound by its
+// archetype_node_id. It holds for every LOCATABLE, a typed-nil one
+// included. A nil item has no type of its own, so it follows the
+// attribute's declared item type: node id where that type is a
+// LOCATABLE (COMPOSITION.content), RM type where it is not
+// (ACTOR.languages, FOLDER.items). Every other item carries no
+// archetype_node_id and is bound by RM type (REQ-102).
+func bindsByNodeID(item any, parentRMType, attrName string) bool {
 	if item == nil {
-		return true
+		return declaresLocatableItems(parentRMType, attrName)
 	}
 	_, isLocatable := item.(rm.Locatable)
 	return isLocatable
+}
+
+// declaresLocatableItems reports whether the pinned BMM declares the
+// items of attrName on parentRMType as LOCATABLE. An attribute or type
+// the BMM does not know keeps the node-id path, as before REQ-102 bound
+// items by RM type.
+func declaresLocatableItems(parentRMType, attrName string) bool {
+	itemType, ok := rminfo.Default.AttributeRMType(bmmtype.Class(parentRMType), attrName)
+	if !ok {
+		return true
+	}
+	h, ok := rminfo.Default.(rminfo.Hierarchy)
+	if !ok {
+		return true
+	}
+	conforms, known := h.ConformsTo(bmmtype.Class(itemType), "LOCATABLE")
+	return conforms || !known
+}
+
+// isNilItem reports whether item carries no RM value: nil, or a
+// typed-nil pointer.
+func isNilItem(item any) bool {
+	return item == nil || rmread.IsTypedNilPointer(item)
 }
 
 // matchChildByID picks the OPT child whose ArchetypeID (for
@@ -507,7 +533,8 @@ func bindsByNodeID(item any) bool {
 // item's archetype_node_id, then the first slot whose parsed
 // assertions admit it. It serves only items that [bindsByNodeID]
 // accepts. Returns nil when none match, and always for an empty or
-// unreadable id (nil, typed-nil) — the caller then emits slot_fill.
+// unreadable id (a typed-nil LOCATABLE, a nil under a LOCATABLE
+// attribute) — the caller then emits slot_fill.
 func matchChildByID(children []*tcimpl.CompiledNode, item any) *tcimpl.CompiledNode {
 	id := locatableArchetypeNodeID(item)
 	if id == "" {
@@ -535,11 +562,11 @@ func matchChildByID(children []*tcimpl.CompiledNode, item any) *tcimpl.CompiledN
 // matchChildByRMType binds an item that carries no archetype_node_id
 // (REQ-102) to the first non-slot child whose RMTypeName admits the
 // item's RM type, by the rule a single-valued attribute uses
-// ([admitsRMValue]). A typed-nil item has no value to bind, so no
-// child takes it, not even an untyped one. Returns nil when no child
-// admits the item.
+// ([admitsRMValue]). A nil or typed-nil item has no value to bind, so
+// no child takes it, not even an untyped one. Returns nil when no
+// child admits the item.
 func matchChildByRMType(children []*tcimpl.CompiledNode, item any) *tcimpl.CompiledNode {
-	if rmread.IsTypedNilPointer(item) {
+	if isNilItem(item) {
 		return nil
 	}
 	gotType := describeRMType(item)
@@ -553,10 +580,12 @@ func matchChildByRMType(children []*tcimpl.CompiledNode, item any) *tcimpl.Compi
 
 // unboundItemIssue reports an item of a multi-valued attribute that
 // no OPT child binds, at the item's own path. An item that binds by
-// node id is a slot_fill. An item without an archetype_node_id is never a
-// slot_fill (REQ-102): it is an rm_type_mismatch when the attribute
-// has one child and an alternative_mismatch when it has more, as on a
-// single-valued attribute. Details name RM types, never values.
+// node id is a slot_fill. An item without an archetype_node_id is
+// never a slot_fill (REQ-102): it is an rm_type_mismatch when the
+// attribute has one child and an alternative_mismatch when it has
+// more, as on a single-valued attribute. The Detail names the item's
+// RM type and the children's, never a value; a nil or typed-nil item
+// has no RM type to name, so its Detail says it is a nil item.
 func unboundItemIssue(
 	attr *tcimpl.CompiledAttribute,
 	children []*tcimpl.CompiledNode,
@@ -564,29 +593,27 @@ func unboundItemIssue(
 	byNodeID bool,
 	itemPath string,
 ) Issue {
-	switch {
-	case byNodeID:
+	if byNodeID {
 		return Issue{
 			Path:     itemPath,
 			Code:     "slot_fill",
 			Detail:   fmt.Sprintf("RM item %s does not match any OPT child of %q (archetype/at-code mismatch)", describeLocatableID(item), attr.Name()),
 			Severity: Error,
 		}
-	case len(children) == 1:
-		return Issue{
-			Path:     itemPath,
-			Code:     "rm_type_mismatch",
-			Detail:   fmt.Sprintf("RM value of type %s under %q does not satisfy template RM type %s", describeRMType(item), attr.Name(), children[0].RMTypeName()),
-			Severity: Error,
-		}
-	default:
-		return Issue{
-			Path:     itemPath,
-			Code:     "alternative_mismatch",
-			Detail:   fmt.Sprintf("RM value of type %s under %q matches none of the OPT alternatives %s", describeRMType(item), attr.Name(), formatAllowedTypes(children)),
-			Severity: Error,
-		}
 	}
+	iss := Issue{Path: itemPath, Code: "alternative_mismatch", Severity: Error}
+	if len(children) == 1 {
+		iss.Code = "rm_type_mismatch"
+	}
+	switch {
+	case isNilItem(item):
+		iss.Detail = fmt.Sprintf("nil item under %q has no RM value for an OPT child to bind", attr.Name())
+	case len(children) == 1:
+		iss.Detail = fmt.Sprintf("RM value of type %s under %q does not satisfy template RM type %s", describeRMType(item), attr.Name(), children[0].RMTypeName())
+	default:
+		iss.Detail = fmt.Sprintf("RM value of type %s under %q matches none of the OPT alternatives %s", describeRMType(item), attr.Name(), formatAllowedTypes(children))
+	}
+	return iss
 }
 
 // slotFitsArchetypeID checks whether archetypeID satisfies the

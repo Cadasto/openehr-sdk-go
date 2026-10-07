@@ -213,20 +213,25 @@ func TestValidateComposition_REQ102_ParticipationsBindByRMType(t *testing.T) {
 
 // REQ-102 — ACTOR.languages and ACTOR.roles items are not LOCATABLE: a
 // matching DV_TEXT or PARTY_REF binds by RM type to the first non-slot
-// child that admits it, and one no child admits is an rm_type_mismatch
-// (one child) or an alternative_mismatch (two or more) at the item's
-// own path, never a slot_fill. A LOCATABLE
-// that matches no child still gets slot_fill. A typed-nil item has no
-// value to bind, so no child takes it, an untyped one included.
+// child that admits it, by the admission a single-valued attribute uses
+// (an untyped child, the exact type, an abstract supertype). One no
+// child admits is an rm_type_mismatch (one child) or an
+// alternative_mismatch (two or more) at the item's own path, never a
+// slot_fill. A LOCATABLE that matches no child still gets slot_fill. A
+// nil or typed-nil item has no value to bind, so no child takes it, an
+// untyped one included.
 func TestValidateDemographic_REQ102_ActorListsBindByRMType(t *testing.T) {
 	dvText := languagesChild("DV_TEXT")
 	dvCodedText := languagesChild("DV_CODED_TEXT")
+	dataValue := languagesChild("DATA_VALUE")
 	untyped := languagesChild("")
 	dvTextSlot := `
       <children xsi:type="ARCHETYPE_SLOT">
         <rm_type_name>DV_TEXT</rm_type_name>
         <node_id>at9000</node_id>
       </children>`
+	nilLanguage := func(p *rm.Person) { p.Languages = []rm.DVTextLike{nil} }
+	typedNilLanguage := func(p *rm.Person) { p.Languages = []rm.DVTextLike{(*rm.DVText)(nil)} }
 
 	tests := []struct {
 		name      string
@@ -246,6 +251,16 @@ func TestValidateDemographic_REQ102_ActorListsBindByRMType(t *testing.T) {
 			want:      []string{"required /roles[@1]/namespace"},
 		},
 		{
+			name:      "an abstract supertype child admits the item",
+			languages: dataValue,
+			want:      []string{},
+		},
+		{
+			name:      "an untyped child admits the item",
+			languages: untyped,
+			want:      []string{},
+		},
+		{
 			name:      "one child that does not admit the item",
 			languages: dvCodedText,
 			want:      []string{"rm_type_mismatch /languages[@1]"},
@@ -262,15 +277,33 @@ func TestValidateDemographic_REQ102_ActorListsBindByRMType(t *testing.T) {
 			want:      []string{"required /languages[@1]/value"},
 		},
 		{
+			name:      "nil item is not bound",
+			languages: dvText,
+			mutate:    nilLanguage,
+			want:      []string{"rm_type_mismatch /languages[@1]"},
+		},
+		{
+			name:      "nil item is not bound to an untyped child",
+			languages: untyped,
+			mutate:    nilLanguage,
+			want:      []string{"rm_type_mismatch /languages[@1]"},
+		},
+		{
+			name:      "nil item under two children",
+			languages: dvText + dvCodedText,
+			mutate:    nilLanguage,
+			want:      []string{"alternative_mismatch /languages[@1]"},
+		},
+		{
 			name:      "typed-nil item is not bound",
 			languages: dvText,
-			mutate:    func(p *rm.Person) { p.Languages = []rm.DVTextLike{(*rm.DVText)(nil)} },
+			mutate:    typedNilLanguage,
 			want:      []string{"rm_type_mismatch /languages[@1]"},
 		},
 		{
 			name:      "typed-nil item is not bound to an untyped child",
 			languages: untyped,
-			mutate:    func(p *rm.Person) { p.Languages = []rm.DVTextLike{(*rm.DVText)(nil)} },
+			mutate:    typedNilLanguage,
 			want:      []string{"rm_type_mismatch /languages[@1]"},
 		},
 		{
@@ -301,9 +334,54 @@ func TestValidateDemographic_REQ102_ActorListsBindByRMType(t *testing.T) {
 	}
 }
 
-// REQ-102 — a nil item has no type that says it is not a LOCATABLE, so
-// it keeps the node-id path: a nil under COMPOSITION.content is still a
-// slot_fill at its own path, not a type mismatch.
+// REQ-102 — the issue for a nil or typed-nil item says it is a nil
+// item. It names no Go type, and it does not end on the empty RM type
+// of an untyped child.
+func TestValidateDemographic_REQ102_NilItemDetail(t *testing.T) {
+	tests := []struct {
+		name      string
+		languages string
+		item      rm.DVTextLike
+		want      string
+	}{
+		{
+			name:      "typed-nil under one typed child",
+			languages: languagesChild("DV_TEXT"),
+			item:      (*rm.DVText)(nil),
+			want:      `nil item under "languages" has no RM value for an OPT child to bind`,
+		},
+		{
+			name:      "typed-nil under an untyped child",
+			languages: languagesChild(""),
+			item:      (*rm.DVText)(nil),
+			want:      `nil item under "languages" has no RM value for an OPT child to bind`,
+		},
+		{
+			name:      "nil under two children",
+			languages: languagesChild("DV_TEXT") + languagesChild("DV_CODED_TEXT"),
+			item:      nil,
+			want:      `nil item under "languages" has no RM value for an OPT child to bind`,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c := mustCompileInline(t, actorOPT(tc.languages))
+			p := validActor()
+			p.Languages = []rm.DVTextLike{tc.item}
+			r := validation.ValidateDemographic(p, c)
+			if len(r.Issues) != 1 {
+				t.Fatalf("ValidateDemographic issues = %+v, want one", r.Issues)
+			}
+			if got := r.Issues[0].Detail; got != tc.want {
+				t.Errorf("Detail = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// REQ-102 — a nil item has no type of its own, so it follows the
+// attribute's declared item type: under COMPOSITION.content, whose items
+// are LOCATABLE, it is still a slot_fill at its own path.
 func TestValidateComposition_REQ102_NilContentItemKeepsSlotFill(t *testing.T) {
 	c := mustCompile(t, "vital_signs")
 	comp := validVitalSignsComposition()
@@ -313,5 +391,97 @@ func TestValidateComposition_REQ102_NilContentItemKeepsSlotFill(t *testing.T) {
 	want := []string{"slot_fill /content[@1]"}
 	if got := issueKeys(r.Issues); !slices.Equal(got, want) {
 		t.Errorf("ValidateComposition issues = %q, want %q", got, want)
+	}
+}
+
+// folderOPT returns a FOLDER OPT whose items admit one child of the
+// given RM type.
+func folderOPT(itemType string) string {
+	return `<?xml version="1.0"?>
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <template_id><value>folder-items</value></template_id>
+  <concept>folder-items</concept>
+  <language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
+  <definition>
+    <rm_type_name>FOLDER</rm_type_name>
+    <node_id>at0000</node_id>
+    <attributes xsi:type="C_MULTIPLE_ATTRIBUTE">
+      <rm_attribute_name>items</rm_attribute_name>
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>` + itemType + `</rm_type_name>
+        <node_id></node_id>
+      </children>
+    </attributes>
+    <archetype_id><value>openEHR-EHR-FOLDER.generic.v1</value></archetype_id>
+  </definition>
+</template>`
+}
+
+// REQ-102 — FOLDER.items holds references, which are not LOCATABLE: a
+// reference binds to the child of its RM type and its id, namespace and
+// type are read, so a full one passes and one without a namespace gets
+// `required`. A nil item, whose declared type OBJECT_REF is not a
+// LOCATABLE, is a type mismatch, not a slot_fill.
+func TestValidateFolder_REQ102_ItemsBindByRMType(t *testing.T) {
+	objectRef := func() *rm.ObjectRef {
+		return &rm.ObjectRef{
+			ID:        &rm.HierObjectID{Value: "6f1d3a52-9c0e-4b7a-8f21-3d5e7a9b1c04"},
+			Namespace: "local",
+			Type:      "COMPOSITION",
+		}
+	}
+	noNamespace := objectRef()
+	noNamespace.Namespace = ""
+	locatableRef := rm.LocatableRef{
+		ID:        &rm.HierObjectID{Value: "6f1d3a52-9c0e-4b7a-8f21-3d5e7a9b1c04"},
+		Namespace: "local",
+		Type:      "COMPOSITION",
+		Path:      new("/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]"),
+	}
+
+	tests := []struct {
+		name     string
+		itemType string
+		items    []rm.ObjectRefLike
+		want     []string
+	}{
+		{
+			name:     "full OBJECT_REF binds",
+			itemType: "OBJECT_REF",
+			items:    []rm.ObjectRefLike{objectRef()},
+			want:     []string{},
+		},
+		{
+			name:     "OBJECT_REF without namespace is walked",
+			itemType: "OBJECT_REF",
+			items:    []rm.ObjectRefLike{noNamespace},
+			want:     []string{"required /items[@1]/namespace"},
+		},
+		{
+			name:     "full LOCATABLE_REF binds",
+			itemType: "LOCATABLE_REF",
+			items:    []rm.ObjectRefLike{locatableRef},
+			want:     []string{},
+		},
+		{
+			name:     "nil item is a type mismatch",
+			itemType: "OBJECT_REF",
+			items:    []rm.ObjectRefLike{nil},
+			want:     []string{"rm_type_mismatch /items[@1]"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c := mustCompileInline(t, folderOPT(tc.itemType))
+			folder := &rm.Folder{
+				ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
+				Name:            rm.DVText{Value: "root"},
+				Items:           tc.items,
+			}
+			r := validation.ValidateFolder(folder, c)
+			if got := issueKeys(r.Issues); !slices.Equal(got, tc.want) {
+				t.Errorf("ValidateFolder issues = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
