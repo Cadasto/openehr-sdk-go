@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"math"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -265,6 +267,82 @@ func TestREQ168_RedactUncomparableValue(t *testing.T) {
 				t.Errorf("two Violations holding separate Redact calls on one %s compare %v (panic: %v), want false", held.name, eq, panicked)
 			}
 		})
+	}
+}
+
+// TestREQ168_RevealReturnsNaNAsNaN covers the value Reveal cannot return
+// equal under ==: a NaN comes back as a NaN in the same place, alone or
+// inside an array or a struct, and every other part comes back equal. The
+// [2]float64 rows are the pairs a DV_PROPORTION or DV_INTERVAL issue holds.
+func TestREQ168_RevealReturnsNaNAsNaN(t *testing.T) {
+	t.Parallel()
+	nan := math.NaN()
+	t.Run("float64", func(t *testing.T) {
+		t.Parallel()
+		got := constraints.Redact(nan).Reveal()
+		if f, ok := got.(float64); !ok || !math.IsNaN(f) {
+			t.Errorf("Redact(NaN).Reveal() = %#v (%T), want a float64 NaN", got, got)
+		}
+	})
+	t.Run("float32", func(t *testing.T) {
+		t.Parallel()
+		got := constraints.Redact(float32(nan)).Reveal()
+		if f, ok := got.(float32); !ok || !math.IsNaN(float64(f)) {
+			t.Errorf("Redact(float32(NaN)).Reveal() = %#v (%T), want a float32 NaN", got, got)
+		}
+	})
+	for _, pair := range [][2]float64{{nan, markerReal}, {markerReal, nan}, {nan, nan}} {
+		t.Run(fmt.Sprintf("[2]float64%v", pair), func(t *testing.T) {
+			t.Parallel()
+			got, ok := constraints.Redact(pair).Reveal().([2]float64)
+			if !ok {
+				t.Fatalf("Redact(%v).Reveal() is not a [2]float64", pair)
+			}
+			for i := range pair {
+				if math.IsNaN(pair[i]) != math.IsNaN(got[i]) || !math.IsNaN(pair[i]) && got[i] != pair[i] {
+					t.Errorf("Redact(%v).Reveal()[%d] = %v, want %v", pair, i, got[i], pair[i])
+				}
+			}
+		})
+	}
+	t.Run("struct", func(t *testing.T) {
+		t.Parallel()
+		q := constraints.QuantityValue{Magnitude: nan, Units: markerUnits, Precision: markerPrecision}
+		got, ok := constraints.Redact(q).Reveal().(constraints.QuantityValue)
+		if !ok || !math.IsNaN(got.Magnitude) || got.Units != q.Units || got.Precision != q.Precision {
+			t.Errorf("Redact(%+v).Reveal() = %+v, want a NaN Magnitude and the other fields unchanged", q, got)
+		}
+	})
+}
+
+// TestREQ168_RevealIsTheOnlyMethodThatReturnsTheValue lists every method of
+// Redacted with the test that shows it does not return the held value, or,
+// for Reveal, that it does. A method added to Redacted fails this test until
+// it is checked for the held value and listed here.
+func TestREQ168_RevealIsTheOnlyMethodThatReturnsTheValue(t *testing.T) {
+	t.Parallel()
+	checked := map[string]string{
+		"Reveal":      "TestREQ168_RedactRevealReturnsTheValueUnchanged: the one method that returns the value",
+		"String":      "TestREQ168_RedactedPrintsNoValue",
+		"Format":      "TestREQ168_RedactedPrintsNoValue",
+		"MarshalJSON": "TestREQ168_JSONLeavesTheValueOut",
+		"GobEncode":   "TestREQ168_GobDropsTheValue",
+		"GobDecode":   "TestREQ168_GobDropsTheValue",
+		"Equal":       "TestREQ168_RedactedEqualAgreesWithEquality: returns a bool",
+	}
+	// The method set of *Redacted holds the methods of Redacted too.
+	rt := reflect.TypeFor[*constraints.Redacted]()
+	seen := map[string]bool{}
+	for m := range rt.Methods() {
+		seen[m.Name] = true
+		if _, ok := checked[m.Name]; !ok {
+			t.Errorf("Redacted has a method %s that no test checks for the held value; check it, then list it here", m.Name)
+		}
+	}
+	for name := range checked {
+		if !seen[name] {
+			t.Errorf("Redacted has no method %s, which this test lists; drop it from the list", name)
+		}
 	}
 }
 

@@ -79,9 +79,11 @@ func (r Redacted) empty() bool {
 // equal under == to the one given to [Redact], with two caveats. A
 // floating-point zero may come back with either sign: equal values share one
 // handle, so the sign depends on which zero was interned first, and == finds
-// the two signs equal. A NaN comes back as a NaN, which == never finds equal,
-// not even to itself. A value that == cannot compare, such as a slice or a
-// map, comes back as the same value, not a copy.
+// the two signs equal. A NaN, alone or inside an array or a struct, comes
+// back as a NaN in the same place; == never finds a NaN equal, not even to
+// itself, so a value that holds one never compares equal to the one given.
+// A value that == cannot compare, such as a slice or a map, comes back as
+// the same value, not a copy.
 func (r Redacted) Reveal() any {
 	switch {
 	case r.box != nil:
