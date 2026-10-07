@@ -1020,7 +1020,7 @@ A value-free field **MUST NOT** fall back to quoting the value where a value-fre
 - The `Value` field of `Violation` and of `Issue` **MUST** be left out of `encoding/json` output, v1 and v2 alike, so encoding a `Result` writes no `Value` member. A `Redacted` encoded on its own **MUST** encode as JSON `null`.
 - Logging a `Violation`, `Issue`, `Result` or `Redacted` through the text or JSON handler of `log/slog` **MUST NOT** write the value.
 - Encoding a `Violation`, `Issue` or `Result` with `encoding/gob` **MUST** keep working, as it did before the field existed, and **MUST NOT** carry the value: a `Redacted` gob-encodes as empty and decodes as the zero `Redacted`.
-- `Violation` and `Issue` values **MUST** stay comparable with `==`, as they were before the field existed, and the comparison **MUST NOT** panic, whatever a `Redacted` holds. Every value the SDK puts in a `Redacted` **MUST** be comparable, so two diagnostics that hold equal values compare equal.
+- `Violation` and `Issue` values **MUST** stay comparable with `==`, as they were before the field existed, and the comparison **MUST NOT** panic, whatever a `Redacted` holds. Every value the SDK puts in a `Redacted` **MUST** be comparable, so two diagnostics that hold equal values compare equal. `Redacted` **MUST** have an `Equal(Redacted) bool` method that agrees with `==`, so a comparison library that refuses unexported fields but honours such a method can still compare a `Violation`, `Issue` or `Result`.
 
 ### What `Value` holds
 
