@@ -175,7 +175,7 @@ constraint  : constraints.DvQuantity at /content
 summary     : 2/3 cases failed validation (expected for demo)
 ```
 
-Each violation carries a `Code`, the stable identifier a program branches on, and a `Detail`, the explanation for people. `Detail` names the clause that failed and never repeats the submitted value, so it is safe to log or return to a client. The value sits in `Value`, which prints as `[redacted]` until the program calls `Value.Reveal()`; the demo does that for its own input to print the `(submitted: …)` part.
+Each violation carries a `Code`, the stable identifier a program branches on, and a `Detail`, the explanation for people. `Detail` names the clause that failed and never repeats the submitted value, so it is safe to log or return to a client. The value sits in `Value`, which always prints as `[redacted]`; `Value.Reveal()` returns the value itself, and the demo calls it on its own input to print the `(submitted: …)` part.
 
 **What to copy into your app:** resolve the leaf with `opt.ParsePath` and `opt.NodeAt`, assert `*template.ComplexObject`, and read its `PrimitiveConstraint()` (nil on a structural node). `constraint.Validate(constraints.QuantityValue{Magnitude: m, Units: u})` returns nil when every clause holds, otherwise one `Violation` per failed clause. Use this for field-level checks in a form; use the composition validators when you hold a whole document.
 

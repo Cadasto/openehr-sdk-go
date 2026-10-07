@@ -10,13 +10,15 @@ package constraints
 // They name the clause that failed, and may quote the constraint
 // itself (its list, range, pattern, units or terminology), so a
 // Violation can be logged or returned to a client as it is. The value
-// is kept only in Value, which prints as "[redacted]", is left out of
-// JSON, and is read with Value.Reveal().
+// is kept only in Value, which always prints as "[redacted]" when it
+// holds a value, is left out of JSON and gob output, and is read with
+// Value.Reveal().
 //
-// Violations can be compared with ==. The zero value is not useful:
-// validators in this package build violations themselves. A caller
-// that builds one keeps the input out of Code and Detail and wraps it
-// with [Redact] into Value.
+// Violations can be compared with ==, and two compare equal when their
+// codes, details and held values are equal. The zero value is not
+// useful: validators in this package build violations themselves. A
+// caller that builds one keeps the input out of Code and Detail and
+// wraps it with [Redact] into Value.
 type Violation struct {
 	// Code is the typed reason for the failure. Use the exported
 	// `Code*` constants in this package; new codes appear here only
@@ -32,8 +34,9 @@ type Violation struct {
 	// Value holds the part of the input that the failing clause
 	// tested: the argument as passed, or the one field of it the
 	// clause read, such as a quantity's magnitude or a coded term's
-	// code. It prints as "[redacted]" and is left out of JSON; read it
-	// with Value.Reveal(), and only where showing it is safe. Value is
+	// code. Holding a value, it always prints as "[redacted]"; it is
+	// left out of JSON and gob output, and Value.Reveal() returns the
+	// value itself, to be called only where showing it is safe. Value is
 	// empty on CodeWrongType, where no clause tested the input, and
 	// when the constraint itself is at fault, such as a pattern that
 	// does not parse.

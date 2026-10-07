@@ -37,6 +37,7 @@ var pureImports = map[string]struct {
 	"slices":  {reason: "works on slices in memory"},
 	"strings": {reason: "works on strings in memory"},
 	"time":    {reason: "parses and compares time values in memory; the banned members read or wait on the clock, or read the time zone database", banned: []string{"After", "AfterFunc", "LoadLocation", "NewTicker", "NewTimer", "Now", "Since", "Sleep", "Tick", "Until"}},
+	"unique":  {reason: "interns comparable values in memory"},
 }
 
 func TestREQ103ValidatorsImportNoIO(t *testing.T) {

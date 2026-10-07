@@ -370,37 +370,47 @@ func TestREQ168_ViolationValueIsEmptyWhenNoClauseTestedTheInput(t *testing.T) {
 	}
 }
 
-// TestREQ168_ViolationsStayComparable compares every violation the cases above
-// produce with a copy of itself. == on two Violations panics when Value holds
-// a value whose type cannot be compared, such as a slice.
+// TestREQ168_ViolationsStayComparable validates each case above twice. Every
+// violation equals its copy, and equals the violation the second run gives
+// for the same input: two diagnostics that hold equal values compare equal.
 func TestREQ168_ViolationsStayComparable(t *testing.T) {
 	t.Parallel()
-	var produced []constraints.Violation
+	type run struct {
+		name  string
+		input any
+		got   func() []constraints.Violation
+	}
+	var runs []run
 	for _, tc := range valueFreeCases() {
-		produced = append(produced, tc.constraint.Validate(tc.input)...)
+		runs = append(runs, run{name: tc.name, input: tc.input, got: func() []constraints.Violation { return tc.constraint.Validate(tc.input) }})
 	}
 	for _, tc := range emptyValueCases() {
-		produced = append(produced, tc.constraint.Validate(tc.input)...)
+		runs = append(runs, run{name: tc.name, input: tc.input, got: func() []constraints.Violation { return tc.constraint.Validate(tc.input) }})
 	}
-	if len(produced) == 0 {
-		t.Fatal("the cases produced no violation, so nothing was compared")
-	}
-	for _, v := range produced {
-		eq, panicked := equalsCopy(v)
-		if panicked != nil {
-			t.Errorf("Violation{Code: %q, Detail: %q} == its copy panicked: %v", v.Code, v.Detail, panicked)
+	compared := 0
+	for _, r := range runs {
+		first, second := r.got(), r.got()
+		if len(first) != len(second) {
+			t.Errorf("%s: two runs on %#v gave %d and %d violations", r.name, r.input, len(first), len(second))
 			continue
 		}
-		if !eq {
-			t.Errorf("Violation{Code: %q, Detail: %q} == its copy = false, want true", v.Code, v.Detail)
+		for i, v := range first {
+			compared++
+			if eq, panicked := equal(v, v); panicked != nil || !eq {
+				t.Errorf("%s: Violation{Code: %q, Detail: %q} == its copy = %v (panic: %v), want true", r.name, v.Code, v.Detail, eq, panicked)
+			}
+			if eq, panicked := equal(v, second[i]); panicked != nil || !eq {
+				t.Errorf("%s: two runs on %#v gave Violations that compare %v (panic: %v), want true", r.name, r.input, eq, panicked)
+			}
 		}
+	}
+	if compared == 0 {
+		t.Fatal("the cases produced no violation, so nothing was compared")
 	}
 }
 
-// equalsCopy compares v with a copy of itself and returns a panic instead of
-// raising it.
-func equalsCopy(v constraints.Violation) (eq bool, panicked any) {
+// equal compares a and b with == and returns a panic instead of raising it.
+func equal(a, b constraints.Violation) (eq bool, panicked any) {
 	defer func() { panicked = recover() }()
-	w := v
-	return v == w, nil
+	return a == b, nil
 }
