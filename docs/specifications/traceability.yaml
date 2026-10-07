@@ -955,7 +955,6 @@ requirements:
       - openehr/client/ehr/resource_test.go
       - openehr/rm/character_test.go
       - openehr/rm/real_test.go
-      - openehr/validation/rmfloor_proportion_test.go
       - testkit/probe/har_test.go
       - testkit/probe/record_test.go
       - testkit/probe/run_test.go
@@ -1924,3 +1923,8 @@ requirements:
     status: draft
     implementation: planned
     packages: [openehr/template/constraints, openehr/validation]
+    tests:
+      - openehr/template/constraints/redacted_test.go
+      - openehr/template/constraints/value_free_test.go
+      - openehr/validation/rmfloor_proportion_test.go
+      - openehr/validation/value_free_test.go
