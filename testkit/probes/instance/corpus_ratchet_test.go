@@ -35,6 +35,7 @@ const (
 	reasonFloorTemporal       = "floor_temporal"
 	reasonHollowBody          = "hollow_body"
 	reasonFloorAction         = "floor_action"
+	reasonFloorCoded          = "floor_coded"
 	reasonValidatorOther      = "validator_other"
 
 	entryGenerate = "generate"
@@ -77,7 +78,20 @@ var corpusCompileFailures = []string{
 // content entry, a SECTION that declares no items. That section holds no
 // ELEMENT, so the body is hollow. The three rows pin that fact so that any
 // other template going hollow fails the ratchet.
+//
+// floor_coded rows: TestPerson.v2 codes both its DV_MULTIMEDIA media_type
+// nodes in terminology openEHR, one with the code list 425 to 429 and one
+// with no code. REQ-107 § Exceptions and known gaps, "An OPT constraint that
+// admits no value an RM rule accepts, such as an RM default that yields to
+// the OPT (§ Precedence 1)": the generator keeps the openEHR code the OPT
+// gives (items[10]/items[0]) or the at0000 placeholder in openEHR
+// (items[11]/items[5]) over the text/plain default, so Media_type_valid
+// (REQ-112 Coded invariants) breaks.
 var corpusRatchet = []ratchetFailure{
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "example", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[10]/items[0]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "example", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[11]/items[5]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "example", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[10]/items[0]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "example", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[11]/items[5]/value/media_type"},
 	{template: "templates/clinical_content_validation", entry: "builder", policy: "minimal", fill: "example", reason: "hollow_body:/"},
 	{template: "templates/clinical_content_validation", entry: "generate", policy: "minimal", fill: "example", reason: "hollow_body:/"},
 	{template: "templates/clinical_content_validation", entry: "generate", policy: "minimal", fill: "random", reason: "hollow_body:/"},
@@ -304,11 +318,15 @@ func generateReason(t *testing.T, err error) string {
 // The two REQ-112 rm_invariant rules that have no path signature of their
 // own, the ELEMENT null-flavour rule and the temporal Value_valid rule, are
 // told apart by the RM invariant name in the detail, so a regression of
-// either keeps a precise key. Any other detail text is not read.
+// either keeps a precise key. A REQ-112 coded invariant has a code of its
+// own, code_not_in_value_set, which keys it as floor_coded. Any other detail
+// text is not read.
 func issueReason(iss validation.Issue, fill instance.ValueFill) string {
 	last := lastAttr(iss.Path)
 	cat := reasonValidatorOther
 	switch {
+	case iss.Code == "code_not_in_value_set":
+		cat = reasonFloorCoded
 	case iss.Code == "rm_invariant" && strings.Contains(iss.Detail, "Inv_null_flavour_indicated"):
 		cat = reasonFloorElementValue
 	case iss.Code == "rm_invariant" && last == "value" && strings.Contains(iss.Detail, "Value_valid"):

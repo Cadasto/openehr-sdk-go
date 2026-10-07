@@ -8,8 +8,10 @@ package validation
 //     plus the container "lower bound ≥ 1" reading);
 //   - the per-RM-type invariant catalogue of § REQ-112 in
 //     docs/specifications/clinical-modeling.md, on every node it reaches.
-//     checkInvariants dispatches it, one evaluator per catalogue row; the
-//     catalogue, not this comment, is the list to keep current.
+//     checkInvariants dispatches it, one evaluator per catalogue row, and
+//     checkCodedInvariants (rmfloor_coded.go) runs the Coded invariants
+//     entry beside it; the catalogue, not this comment, is the list to keep
+//     current.
 //
 // REQ-112 surface. Independent of REQ-102/110 (template-driven); both
 // drivers may run against the same root — REQ-110 enforces template
@@ -45,6 +47,25 @@ const maxWalkDepth = 256
 // touches. It does not consult any operational template; use
 // [Validate] / [ValidateComposition] / [ValidateFolder] / [ValidateEHRStatus]
 // / [ValidateDemographic] when a compiled OPT is available.
+//
+// The invariants include the RM's coded ones: an attribute the RM codes from
+// a group or a code set of the openEHR terminology, such as a COMPOSITION's
+// language and territory, an EVENT_CONTEXT's setting, an ENTRY's language
+// and encoding, an ELEMENT's null_flavour, a DV_ORDERED's normal_status, a
+// PARTICIPATION's function and mode or a PARTY_RELATED's relationship, must
+// hold a member of it. Groups and code sets come from
+// [github.com/cadasto/openehr-sdk-go/openehr/terminology]. A group code must
+// also be coded in the openEHR terminology itself; a code-set code is
+// matched alone, ignoring letter case for the ISO and IANA sets. An optional
+// attribute is checked only when present, and a mandatory one always, so an
+// empty one is reported too. A breach is reported as `code_not_in_value_set`
+// at the CODE_PHRASE read: the attribute itself, or its defining_code for a
+// coded text. The detail names the attribute, the RM invariant and the
+// group or code set, never the code. The coded rules of the change-control
+// classes (VERSION, AUDIT_DETAILS, ATTESTATION) and of the resource-description
+// classes (TRANSLATION_DETAILS, RESOURCE_DESCRIPTION_ITEM) are not checked,
+// even on such a value passed as root, an ORIGINAL_VERSION included; nor are
+// those of EXTRACT_PARTICIPATION, a class the SDK's RM types leave out.
 //
 // A nil root surfaces a single `nil_root` issue and is reported as
 // not-OK. An unknown RM root type (a Go value outside the closed RM
@@ -158,6 +179,12 @@ func (w *rmFloorWalker) walk(value any, rmType string, path string, depth int) {
 		return
 	}
 	w.checkInvariants(value, rmType, path)
+	// The coded invariants (REQ-112) run as their own pass rather than as
+	// checkInvariants arms: that switch stops at its first match, and a
+	// COMPOSITION or an ENTRY already lands on the archetype-root arm. Like
+	// checkInvariants, it runs before the Handles gate below, so it sees every
+	// node the walk visits.
+	w.checkCodedInvariants(value, rmType, path)
 
 	if !rmread.Handles(value) {
 		return

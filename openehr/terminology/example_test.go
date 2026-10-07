@@ -24,3 +24,17 @@ func ExampleGroup_Rubric() {
 	// 225 is a composition category: false
 	// 225: home true
 }
+
+// Check codes against code sets. The ISO and IANA code sets ignore letter
+// case, as those registers do; the openEHR code sets match exactly. Only a
+// code the pinned set lists is a member: ISO-8859-1 is an alias the IANA
+// register gives ISO_8859-1:1987, and the pinned set lists only the latter.
+func ExampleCodeSet_Has() {
+	fmt.Println(terminology.Languages.ExternalID(), terminology.Languages.Has("en-US"))
+	fmt.Println(terminology.CharacterSets.Has("iso_8859-1:1987"), terminology.CharacterSets.Has("ISO-8859-1"))
+	fmt.Println(terminology.NormalStatuses.Has("H"), terminology.NormalStatuses.Has("h"))
+	// Output:
+	// ISO_639-1 true
+	// true false
+	// true false
+}

@@ -14,16 +14,20 @@ import (
 )
 
 const (
-	// pinFile is the vendored terminology inside ResourcesDir.
+	// pinFile is the vendored terminology inside ResourcesDir: the groups
+	// and the openEHR-issued code sets.
 	pinFile = "openehr_terminology.xml"
+	// externalPinFile is the vendored external code sets inside
+	// ResourcesDir: ISO and IANA, as the Foundation snapshots them.
+	externalPinFile = "openehr_external_terminologies.xml"
 	// manifestFile is the provenance scripts/sync-terminology.sh writes
 	// beside the pin; its `ref:` line names the TERM release.
 	manifestFile = "MANIFEST.txt"
-	// headerPath is the pin's repo-relative path as recorded in the
+	// headerDir is the pin's repo-relative directory as recorded in the
 	// generated header. It is a constant rather than the ResourcesDir the
 	// caller passed, so the committed file stays byte-identical however
 	// `-resources` was spelled (or wherever a test stages a copy).
-	headerPath = "resources/terminology/" + pinFile
+	headerDir = "resources/terminology/"
 )
 
 // outPath is where the generated table lives, relative to a module root.
@@ -49,33 +53,43 @@ type Result struct {
 	Missing bool
 }
 
-// Run reads <ResourcesDir>/openehr_terminology.xml and the `ref:` line of
+// Run reads <ResourcesDir>/openehr_terminology.xml,
+// <ResourcesDir>/openehr_external_terminologies.xml and the `ref:` line of
 // <ResourcesDir>/MANIFEST.txt, renders openehr_gen.go under
 // <OutDir>/openehr/terminology/, and either writes it atomically or, with
 // Verify, compares it with the file on disk, reporting Drift / Missing
-// without writing anything.
+// without writing anything. The table records both files' sha256, so a
+// change to either one is drift.
 //
 // The sha256 the generated file carries is computed here, over the very bytes
-// that were parsed: the manifest's own hash is the sync script's integrity
+// that were parsed: the manifest's own hashes are the sync script's integrity
 // check (`make terminology-verify`), not an input to the tables.
 func Run(opts Options) (Result, error) {
 	res := Result{Path: filepath.Join(opts.OutDir, outPath)}
 
-	pin := filepath.Join(opts.ResourcesDir, pinFile)
-	data, err := os.ReadFile(pin)
-	if err != nil {
-		return res, fmt.Errorf("read the pinned terminology: %w", err)
-	}
 	ref, err := manifestRef(filepath.Join(opts.ResourcesDir, manifestFile))
 	if err != nil {
 		return res, err
 	}
-	term, err := Parse(bytes.NewReader(data))
+	core, coreSum, err := parsePinFile(filepath.Join(opts.ResourcesDir, pinFile))
 	if err != nil {
-		return res, fmt.Errorf("%s: %w", pin, err)
+		return res, err
 	}
-	sum := sha256.Sum256(data)
-	body, err := Render(term, SourceInfo{Path: headerPath, Ref: ref, SHA256: hex.EncodeToString(sum[:])})
+	external, externalSum, err := parsePinFile(filepath.Join(opts.ResourcesDir, externalPinFile))
+	if err != nil {
+		return res, err
+	}
+	term, err := Merge(core, external)
+	if err != nil {
+		return res, fmt.Errorf("%s with %s: %w", pinFile, externalPinFile, err)
+	}
+	body, err := Render(term, SourceInfo{
+		Ref:            ref,
+		Path:           headerDir + pinFile,
+		SHA256:         coreSum,
+		ExternalPath:   headerDir + externalPinFile,
+		ExternalSHA256: externalSum,
+	})
 	if err != nil {
 		return res, err
 	}
@@ -106,6 +120,21 @@ func Run(opts Options) (Result, error) {
 		_, _ = fmt.Fprintf(opts.Stderr, "%s %s\n", what, res.Path)
 	}
 	return res, nil
+}
+
+// parsePinFile reads and parses one file of the pin, and returns it with the
+// hex sha256 of the bytes it parsed. A refusal names the file.
+func parsePinFile(path string) (*Terminology, string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, "", fmt.Errorf("read the pinned terminology: %w", err)
+	}
+	term, err := Parse(bytes.NewReader(data))
+	if err != nil {
+		return nil, "", fmt.Errorf("%s: %w", path, err)
+	}
+	sum := sha256.Sum256(data)
+	return term, hex.EncodeToString(sum[:]), nil
 }
 
 // manifestRef returns the TERM release recorded on the manifest's `ref:`

@@ -1,28 +1,34 @@
 #!/usr/bin/env bash
 #
 # sync-terminology.sh — vendor / verify the openEHR Terminology
-# (openehr_terminology.xml) into resources/terminology/ (REQ-034).
+# (openehr_terminology.xml and openehr_external_terminologies.xml) into
+# resources/terminology/ (REQ-034).
 #
 # Source: https://github.com/openEHR/specifications-TERM
 #         computable/XML/en/openehr_terminology.xml
+#         computable/XML/openehr_external_terminologies.xml
 #
-# This is the openEHR Foundation's computable form of the openEHR Terminology:
-# the `openehr` terminology *groups* (audit change type, version lifecycle
-# state, setting, participation mode, composition category, …) and *code sets*
-# (normal statuses, compression algorithms, integrity check algorithms) that the
-# RM's own invariants reference. It is small, closed, and versioned with the
-# specifications — so the SDK pins it in-tree and generates from it the way it
-# does the BMM (REQ-034), rather than fetching it at build time or treating it
-# as a runtime terminology-service lookup.
+# These are the openEHR Foundation's computable form of the openEHR
+# Terminology. openehr_terminology.xml holds the `openehr` terminology
+# *groups* (audit change type, version lifecycle state, setting, participation
+# mode, composition category, …) and its own *code sets* (normal statuses,
+# compression algorithms, integrity check algorithms) that the RM's own
+# invariants reference. openehr_external_terminologies.xml holds the
+# Foundation's snapshot of the external code sets the RM names (ISO 639-1
+# languages, ISO 3166-1 countries, IANA character sets, IANA media types).
+# Both are small, closed, and versioned with the specifications — so the SDK
+# pins them in-tree and generates from them the way it does the BMM
+# (REQ-034), rather than fetching them at build time or treating them as a
+# runtime terminology-service lookup.
 #
 # Subcommands:
 #   sync     Resolve TERMINOLOGY_REF (default: the ref pinned in MANIFEST.txt,
-#            else the latest GitHub release tag) to a commit sha, download the
-#            file at that sha, write it byte-identical, regenerate MANIFEST.txt.
-#            Then run `make termgen` so the generated tables follow the pin
-#            (skipped when TERMINOLOGY_SKIP_GEN=1).
-#   verify   Offline: recompute the sha256 and compare to MANIFEST.txt.
-#            No network, no curl/jq — run by `make ci`.
+#            else the latest GitHub release tag) to a commit sha, download
+#            both files at that one sha, write them byte-identical, regenerate
+#            MANIFEST.txt. Then run `make termgen` so the generated tables
+#            follow the pin (skipped when TERMINOLOGY_SKIP_GEN=1).
+#   verify   Offline: recompute each file's sha256 and compare it to
+#            MANIFEST.txt. No network, no curl/jq — run by `make ci`.
 #   check    verify, then (best-effort, network) compare the pinned commit
 #            with the latest release tag's commit and say if a sync is due.
 #            The network step never fails the command.
@@ -33,13 +39,20 @@
 #   GITHUB_TOKEN           optional; raises the unauthenticated API rate limit.
 #
 # Reproducibility: `sync` resolves the ref to a concrete commit sha and
-# downloads the file at that sha, so two syncs of the same ref are
-# byte-identical. The resolved sha is recorded in MANIFEST.txt.
+# downloads both files at that sha, so two syncs of the same ref are
+# byte-identical and the two files always come from the same commit. The
+# resolved sha is recorded in MANIFEST.txt.
 set -euo pipefail
 
 readonly REPO="openEHR/specifications-TERM"
-readonly SRC_PATH="computable/XML/en"
-readonly FILE="openehr_terminology.xml"
+# The pinned files, as paths from the upstream repository root. Each one is
+# vendored under its base name, and all of them come from one resolved commit.
+readonly SRC_PATHS=(
+  "computable/XML/en/openehr_terminology.xml"
+  "computable/XML/openehr_external_terminologies.xml"
+)
+# The upstream directory both files live under, for the manifest's tree link.
+readonly SRC_TREE="computable/XML"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 readonly DEST="$ROOT/resources/terminology"
 readonly MANIFEST="$DEST/MANIFEST.txt"
@@ -116,9 +129,10 @@ resolve_commit() {
     || die "could not resolve ref '$ref' in $REPO"
 }
 
-# raw_url <commit> — the raw.githubusercontent URL for the file at a commit.
+# raw_url <commit> <path> — the raw.githubusercontent URL for an upstream
+# path at a commit.
 raw_url() {
-  echo "https://raw.githubusercontent.com/$REPO/$1/$SRC_PATH/$FILE"
+  echo "https://raw.githubusercontent.com/$REPO/$1/$2"
 }
 
 require_tools() {
@@ -144,41 +158,54 @@ cmd_sync() {
   commit="$(resolve_commit "$ref")"
   echo "Pinned commit: $commit"
 
-  # Download beside the pin and move into place only once the body passes the
-  # guards below, so a failed or bogus fetch (a ref whose tree has no such
-  # file, say) leaves the vendored pin and its manifest untouched.
-  echo "  fetch $SRC_PATH/$FILE"
-  local tmp="$DEST/.$FILE.tmp"
-  curl -fsSL --retry 3 --retry-all-errors "$(raw_url "$commit")" -o "$tmp" \
-    || { rm -f "$tmp"; die "download failed: $FILE"; }
+  # Download every file beside the pin first, and move them into place only
+  # once all of them pass the guards below. A failed or bogus fetch (a ref
+  # whose tree lacks one of the files, say) then leaves the vendored pair and
+  # its manifest untouched: the two files only ever move together.
+  local src name tmp head_bytes
+  local -a tmps=()
+  for src in "${SRC_PATHS[@]}"; do
+    name="$(basename "$src")"
+    tmp="$DEST/.$name.tmp"
+    tmps+=("$tmp")
+    echo "  fetch $src"
+    curl -fsSL --retry 3 --retry-all-errors "$(raw_url "$commit" "$src")" -o "$tmp" \
+      || { rm -f "${tmps[@]}"; die "download failed: $src"; }
 
-  # Guard against a truncated body or an error page that still returned HTTP
-  # 200 — don't let a corrupt file become the canonical (hashed) copy.
-  [[ -s "$tmp" ]] || { rm -f "$tmp"; die "download produced an empty file: $FILE"; }
-  local head_bytes
-  head_bytes="$(head -c 64 "$tmp")"
-  [[ "$head_bytes" == *"<terminology"* ]] \
-    || { rm -f "$tmp"; die "download is not the openEHR Terminology XML (no <terminology root): $FILE"; }
-  mv -f "$tmp" "$DEST/$FILE"
+    # Guard against a truncated body or an error page that still returned
+    # HTTP 200 — don't let a corrupt file become the canonical (hashed) copy.
+    [[ -s "$tmp" ]] || { rm -f "${tmps[@]}"; die "download produced an empty file: $src"; }
+    head_bytes="$(head -c 64 "$tmp")"
+    [[ "$head_bytes" == *"<terminology"* ]] \
+      || { rm -f "${tmps[@]}"; die "download is not openEHR Terminology XML (no <terminology root): $src"; }
+  done
+  for src in "${SRC_PATHS[@]}"; do
+    name="$(basename "$src")"
+    mv -f "$DEST/.$name.tmp" "$DEST/$name"
+  done
 
-  # Regenerate the manifest (provenance + integrity hash). The hash path is
-  # relative to $DEST so the hash block reads as a plain `sha256  filename`.
+  # Regenerate the manifest (provenance + integrity hashes). The hash paths
+  # are relative to $DEST so the hash block reads as plain `sha256  filename`.
   {
     echo "# openEHR Terminology — sync manifest"
     echo "# Generated by scripts/sync-terminology.sh — do not edit by hand."
     echo "source_repo: $REPO"
-    echo "source_path: $SRC_PATH"
-    echo "file: $FILE"
     echo "ref: $ref"
     echo "commit: $commit"
     echo "fetched_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    echo "source_tree: https://github.com/$REPO/tree/$commit/$SRC_PATH"
+    echo "source_tree: https://github.com/$REPO/tree/$commit/$SRC_TREE"
+    for src in "${SRC_PATHS[@]}"; do
+      echo "source_path: $src"
+    done
     echo "#"
     echo "# sha256  filename"
-    echo "$(sha256_of "$DEST/$FILE")  $FILE"
+    for src in "${SRC_PATHS[@]}"; do
+      name="$(basename "$src")"
+      echo "$(sha256_of "$DEST/$name")  $name"
+    done
   } >"$MANIFEST"
 
-  echo "Synced $FILE → resources/terminology/ ($ref, commit ${commit:0:12})"
+  echo "Synced ${#SRC_PATHS[@]} files → resources/terminology/ ($ref, commit ${commit:0:12})"
 
   # Keep the generated tables in step with the pin (REQ-034 / the REQ-042 rule).
   if [[ "${TERMINOLOGY_SKIP_GEN:-}" == "1" ]]; then
@@ -194,7 +221,7 @@ cmd_sync() {
 cmd_check() {
   [[ -f "$MANIFEST" ]] || die "no MANIFEST.txt — run 'make terminology-sync' first"
 
-  # 1. Offline integrity: the vendored file must match the manifest hash.
+  # 1. Offline integrity: every vendored file must match its manifest hash.
   local hash_block
   hash_block="$(sed -n '/^# sha256  filename/,$p' "$MANIFEST" | tail -n +2)"
   [[ -n "$hash_block" ]] || die "manifest has no hash block"
@@ -216,6 +243,24 @@ cmd_check() {
       rc=1
     fi
   done <<<"$hash_block"
+
+  # Every file the pin is made of must have a hash line. A manifest that lost
+  # one would otherwise pass this check with that file never hashed.
+  local src want_name found
+  for src in "${SRC_PATHS[@]}"; do
+    want_name="$(basename "$src")"
+    found=""
+    while IFS= read -r line; do
+      if [[ "${line#*  }" == "$want_name" ]]; then
+        found=1
+        break
+      fi
+    done <<<"$hash_block"
+    if [[ -z "$found" ]]; then
+      echo "  NOT PINNED: $want_name (no sha256 line in MANIFEST.txt)"
+      rc=1
+    fi
+  done
 
   # Detect vendored files absent from the manifest (extras). Compare each
   # file name against the manifest's exact path set — never as a regex, so a
@@ -282,7 +327,9 @@ main() {
     check) cmd_check ;;
     verify) cmd_check offline ;;
     "" | -h | --help)
-      sed -n '2,37p' "$0" | sed 's/^# \{0,1\}//'
+      # Print the header comment: every line after the shebang up to the
+      # first line that is not a comment.
+      awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$0"
       ;;
     *) die "unknown subcommand '$1' (want: sync | check | verify)" ;;
   esac

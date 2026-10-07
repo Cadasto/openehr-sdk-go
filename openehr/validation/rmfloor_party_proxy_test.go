@@ -189,6 +189,7 @@ func TestREQ112_PartyProxyAndParticipationFindings(t *testing.T) {
 			name:   "participation mode with an empty code_string",
 			mutate: func(c *rm.Composition) { c.Context.Participations[0].Mode.DefiningCode.CodeString = "" },
 			want: []string{
+				"code_not_in_value_set /context/participations[0]/mode/defining_code",
 				"required /context/participations[0]/mode/defining_code/code_string",
 				"rm_invariant /context/participations[0]/mode/defining_code",
 			},
@@ -230,7 +231,10 @@ func TestREQ112_PartyProxyAndParticipationFindings(t *testing.T) {
 			mutate: func(c *rm.Composition) {
 				evaluationOf(c).Subject = &rm.PartyRelated{Name: new("Jane")}
 			},
-			want: []string{"required /content[0]/subject/relationship"},
+			want: []string{
+				"code_not_in_value_set /content[0]/subject/relationship/defining_code",
+				"required /content[0]/subject/relationship",
+			},
 		},
 		{
 			name: "ENTRY subject PARTY_RELATED with only a relationship",
@@ -323,6 +327,7 @@ func TestREQ112_PartyProxyDetailsAreValueFree(t *testing.T) {
 	// Every rule must fire, or the check below would pass on a report that
 	// holds none of them.
 	want := sortedFindings([]string{
+		"code_not_in_value_set /composer/relationship/defining_code",
 		"required /composer/relationship",
 		"rm_invariant /composer/external_ref/namespace",
 		"rm_invariant /composer/identifiers",
@@ -375,8 +380,8 @@ func TestREQ112_PartyProxyAndParticipationRoots(t *testing.T) {
 			root: &rm.PartyIdentified{ExternalRef: refWithoutNamespace()},
 			want: []string{"rm_invariant /external_ref/namespace"},
 		},
-		{name: "empty PARTY_RELATED", root: &rm.PartyRelated{}, want: []string{"required /relationship", "rm_invariant /"}},
-		{name: "empty PARTY_RELATED value", root: rm.PartyRelated{}, want: []string{"required /relationship", "rm_invariant /"}},
+		{name: "empty PARTY_RELATED", root: &rm.PartyRelated{}, want: []string{"code_not_in_value_set /relationship/defining_code", "required /relationship", "rm_invariant /"}},
+		{name: "empty PARTY_RELATED value", root: rm.PartyRelated{}, want: []string{"code_not_in_value_set /relationship/defining_code", "required /relationship", "rm_invariant /"}},
 		{name: "bare PARTY_SELF", root: &rm.PartySelf{}},
 		{name: "bare PARTY_SELF value", root: rm.PartySelf{}},
 		{

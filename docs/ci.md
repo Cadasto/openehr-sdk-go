@@ -61,7 +61,7 @@ Run `make help` for the full grouped list. Common targets:
 | Modules | `make mod-tidy-check` | Fail if `go mod tidy` would change `go.mod` / `go.sum` |
 | Codegen | `make codegen-verify` | BMM-generated tree matches `resources/bmm/` |
 | Codegen | `make aqlgen-verify` | Committed AQL parser matches `resources/aql/grammar/active/` (needs Docker) |
-| Codegen | `make termgen-verify` | `openehr/terminology/openehr_gen.go` matches the pinned `resources/terminology/openehr_terminology.xml`; regenerate with `make termgen` |
+| Codegen | `make termgen-verify` | `openehr/terminology/openehr_gen.go` matches the pinned `resources/terminology/openehr_terminology.xml` and `openehr_external_terminologies.xml`; regenerate with `make termgen` |
 | Specs | `make spec-check` | `docs/specifications/traceability.yaml` paths and probes match the tree, and the generated REQ.md registry and `tests:` lists are current; also runs the vendored `sdd-check` gate (`scripts/sdd-check.py`) |
 | Specs | `make sdd-check` | Prints the vendored gate's full report, warnings included (`spec-check` runs it too) |
 | Specs | `make spec-gen` | Regenerate the REQ.md registry and the map's `tests:` lists (not a gate; `spec-check` fails until it is run) |

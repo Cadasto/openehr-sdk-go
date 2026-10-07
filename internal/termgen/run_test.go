@@ -10,25 +10,35 @@ import (
 	"testing"
 )
 
-// pin writes the fixture and a manifest into a fresh resources directory and
-// returns it alongside an output module root, mirroring the two paths
-// resources/terminology/ and the repo root have in a real run.
+// pin writes the two fixture files and a manifest into a fresh resources
+// directory and returns it alongside an output module root, mirroring the
+// two paths resources/terminology/ and the repo root have in a real run.
 func pin(t *testing.T, manifest string) (resources, outDir string) {
 	t.Helper()
 	resources = filepath.Join(t.TempDir(), "terminology")
 	if err := os.MkdirAll(resources, 0o755); err != nil {
 		t.Fatalf("mkdir resources: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(resources, "openehr_terminology.xml"), []byte(fixture), 0o644); err != nil {
-		t.Fatalf("write pin: %v", err)
+	files := map[string]string{
+		"openehr_terminology.xml":            fixture,
+		"openehr_external_terminologies.xml": externalFixture,
+		"MANIFEST.txt":                       manifest,
 	}
-	if err := os.WriteFile(filepath.Join(resources, "MANIFEST.txt"), []byte(manifest), 0o644); err != nil {
-		t.Fatalf("write manifest: %v", err)
+	for name, body := range files {
+		if err := os.WriteFile(filepath.Join(resources, name), []byte(body), 0o644); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
 	}
 	return resources, t.TempDir()
 }
 
-const fixtureManifest = "file: openehr_terminology.xml\nref: Release-9.9.9\n"
+const fixtureManifest = "ref: Release-9.9.9\n"
+
+// sha256Hex is the lower-case hex sha256 the generated constants carry.
+func sha256Hex(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:])
+}
 
 func TestRunWritesTheTableThenVerifiesItClean(t *testing.T) {
 	t.Parallel()
@@ -50,11 +60,21 @@ func TestRunWritesTheTableThenVerifiesItClean(t *testing.T) {
 		t.Fatalf("read the generated table: %v", err)
 	}
 
-	// The sha256 in the generated file must be the one the generator computed
-	// over the bytes it read — never a value copied from the manifest.
-	sum := sha256.Sum256([]byte(fixture))
-	if wantConst := `const SourceSHA256 = "` + hex.EncodeToString(sum[:]) + `"`; !bytes.Contains(body, []byte(wantConst)) {
-		t.Errorf("generated table does not carry %s", wantConst)
+	// The sha256 of each file in the generated table must be the one the
+	// generator computed over the bytes it read — never a value copied from
+	// the manifest.
+	for _, wantConst := range []string{
+		`const SourceSHA256 = "` + sha256Hex(fixture) + `"`,
+		`const ExternalSourceSHA256 = "` + sha256Hex(externalFixture) + `"`,
+	} {
+		if !bytes.Contains(body, []byte(wantConst)) {
+			t.Errorf("generated table does not carry %s", wantConst)
+		}
+	}
+	// The external file's code sets are in the table, after the
+	// terminology file's own.
+	if !bytes.Contains(body, []byte("var codeSets = []*CodeSet{NormalStatuses, Languages, CharacterSets}")) {
+		t.Error("generated registry does not list the code sets of both files in source order")
 	}
 	// The release in the header comes from the manifest's ref: line.
 	if !bytes.Contains(body, []byte("openEHR TERM Release-9.9.9")) {
@@ -113,6 +133,81 @@ func TestRunVerifyReportsDriftWithoutWriting(t *testing.T) {
 	}
 }
 
+// REQ-034: the generated table follows both pinned files, so the drift check
+// fails when either one moves under a committed table. Each row changes the
+// bytes of one file only (a trailing XML comment keeps it a valid pin), and
+// the verdict must be drift.
+func TestRunVerifyReportsDriftFromEitherPinnedFile(t *testing.T) {
+	t.Parallel()
+	for _, file := range []string{"openehr_terminology.xml", "openehr_external_terminologies.xml"} {
+		t.Run(file, func(t *testing.T) {
+			t.Parallel()
+			resources, outDir := pin(t, fixtureManifest)
+			if _, err := Run(Options{ResourcesDir: resources, OutDir: outDir}); err != nil {
+				t.Fatalf("Run(write) = _, %v", err)
+			}
+			path := filepath.Join(resources, file)
+			body, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("read %s: %v", file, err)
+			}
+			if err := os.WriteFile(path, append(body, []byte("\n<!-- a version bump -->\n")...), 0o644); err != nil {
+				t.Fatalf("change %s: %v", file, err)
+			}
+
+			var stderr bytes.Buffer
+			res, err := Run(Options{ResourcesDir: resources, OutDir: outDir, Verify: true, Stderr: &stderr})
+			if err != nil {
+				t.Fatalf("Run(verify) after changing %s = _, %v", file, err)
+			}
+			if !res.Drift || res.Missing {
+				t.Errorf("Run(verify) after changing %s = %+v, want Drift without Missing", file, res)
+			}
+			if !strings.Contains(stderr.String(), "DIFFER") {
+				t.Errorf("Run(verify) stderr = %q, want it to report DIFFER", stderr.String())
+			}
+		})
+	}
+}
+
+// REQ-034: the pin is the two files together; a resources directory missing
+// the external one is a broken sync, refused before anything is written.
+func TestRunRefusesAPinWithoutTheExternalFile(t *testing.T) {
+	t.Parallel()
+	resources, outDir := pin(t, fixtureManifest)
+	if err := os.Remove(filepath.Join(resources, "openehr_external_terminologies.xml")); err != nil {
+		t.Fatalf("remove the external file: %v", err)
+	}
+	_, err := Run(Options{ResourcesDir: resources, OutDir: outDir})
+	if err == nil {
+		t.Fatal("Run without openehr_external_terminologies.xml = _, nil; want a refusal")
+	}
+	if !strings.Contains(err.Error(), "openehr_external_terminologies.xml") {
+		t.Errorf("Run error = %q, want it to name the missing file", err)
+	}
+	if _, err := os.Stat(filepath.Join(outDir, "openehr", "terminology", "openehr_gen.go")); err == nil {
+		t.Error("Run wrote a table despite the missing file")
+	}
+}
+
+// REQ-034: a refusal of one file names that file, so the maintainer knows
+// which half of the pin to read.
+func TestRunNamesTheFileItRefuses(t *testing.T) {
+	t.Parallel()
+	resources, outDir := pin(t, fixtureManifest)
+	broken := strings.Replace(externalFixture, `issuer="ISO" `, ``, 1)
+	if err := os.WriteFile(filepath.Join(resources, "openehr_external_terminologies.xml"), []byte(broken), 0o644); err != nil {
+		t.Fatalf("write the broken external file: %v", err)
+	}
+	_, err := Run(Options{ResourcesDir: resources, OutDir: outDir})
+	if err == nil {
+		t.Fatal("Run over an external file with an issuer-less code set = _, nil; want a refusal")
+	}
+	if !strings.Contains(err.Error(), "openehr_external_terminologies.xml") || !strings.Contains(err.Error(), "issuer") {
+		t.Errorf("Run error = %q, want it to name openehr_external_terminologies.xml and the missing issuer", err)
+	}
+}
+
 func TestRunVerifyReportsAMissingTable(t *testing.T) {
 	t.Parallel()
 	resources, outDir := pin(t, fixtureManifest)
@@ -135,7 +230,7 @@ func TestRunVerifyReportsAMissingTable(t *testing.T) {
 
 func TestRunRefusesAManifestWithoutARef(t *testing.T) {
 	t.Parallel()
-	resources, outDir := pin(t, "file: openehr_terminology.xml\ncommit: deadbeef\n")
+	resources, outDir := pin(t, "source_repo: openEHR/specifications-TERM\ncommit: deadbeef\n")
 
 	_, err := Run(Options{ResourcesDir: resources, OutDir: outDir})
 	if err == nil {
