@@ -193,6 +193,10 @@ func Modification[T Versionable](precedingUID string, data *T, opts ...VersionOp
 // under `data`, for a server that asks for the content being deleted. A nil
 // payload carries no type, so name it: Deletion[rm.Composition](uid, nil).
 // Every other operation refuses a nil payload when the batch is built.
+//
+// The ITS-REST schema this SDK follows lists `data` as required on every
+// version, so a server that enforces that schema refuses a deletion without
+// a payload; pass the payload to such a server.
 func Deletion[T Versionable](precedingUID string, data *T, opts ...VersionOption) Change {
 	return newChange(ChangeTypeDeleted, precedingUID, data, opts...)
 }

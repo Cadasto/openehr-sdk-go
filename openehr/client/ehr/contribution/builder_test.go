@@ -176,9 +176,9 @@ func TestBuilderPrecedingVersionPerOperation(t *testing.T) {
 		wantCode      string
 		wantLifecycle string
 	}{
-		{"amendment", contribution.Amendment(preceding, &comp), "250", "532"},
-		{"modification", contribution.Modification(preceding, &comp), "251", "532"},
-		{"deletion", contribution.Deletion(preceding, &comp), "523", "523"},
+		{name: "amendment", change: contribution.Amendment(preceding, &comp), wantCode: "250", wantLifecycle: "532"},
+		{name: "modification", change: contribution.Modification(preceding, &comp), wantCode: "251", wantLifecycle: "532"},
+		{name: "deletion", change: contribution.Deletion(preceding, &comp), wantCode: "523", wantLifecycle: "523"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
