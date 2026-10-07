@@ -22,7 +22,7 @@ minor release can change the public API. The version policy is
 [docs/releases.md](https://github.com/cadasto/openehr-sdk-go/blob/main/docs/releases.md).
 
 ```bash
-go get github.com/cadasto/openehr-sdk-go@v0.31.0
+go get github.com/cadasto/openehr-sdk-go@v0.32.0
 ```
 
 To run the bundled examples, or to work on the SDK itself, clone the

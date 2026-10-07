@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-10-08
+
 Thirty-second `v0.x` minor: the RM floor checks party proxies, participations and coded values against the openEHR terminology, validation diagnostics stop quoting the submitted value, and credential-bearing requests no longer follow an unsafe redirect. **Breaking:** `demographic.Delete` drops its `ifMatch` parameter, token, refresh and revocation requests stop following redirects, a request with an `Authorization` header refuses an https-to-http redirect, and the RM floor reports party proxies, participations and coded values it accepted.
 
 ### Added
