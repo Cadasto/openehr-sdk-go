@@ -1016,10 +1016,11 @@ A value-free field **MUST NOT** fall back to quoting the value where a value-fre
 - `constraints.Redact(v)` **MUST** return a `Redacted` holding `v`. The zero `Redacted` holds no value.
 - `Reveal()` **MUST** return the held value unchanged, or nil when none is held. It is the only way to read the value.
 - Every `fmt` verb, `%v`, `%+v` and `%#v` included, **MUST** print `[redacted]` for a `Redacted` that holds a value and nothing for one that does not, so printing a whole `Violation`, `Issue` or `Result` prints no submitted value. `String()` **MUST** return the same text.
+- Where `fmt` prints a `Redacted` without calling its methods (under `%p`, and through an unexported field of the caller's own struct), the output **MUST NOT** contain the value either.
 - The `Value` field of `Violation` and of `Issue` **MUST** be left out of `encoding/json` output, v1 and v2 alike, so encoding a `Result` writes no `Value` member. A `Redacted` encoded on its own **MUST** encode as JSON `null`.
 - Logging a `Violation`, `Issue`, `Result` or `Redacted` through the text or JSON handler of `log/slog` **MUST NOT** write the value.
 - Encoding a `Violation`, `Issue` or `Result` with `encoding/gob` **MUST** keep working, as it did before the field existed, and **MUST NOT** carry the value: a `Redacted` gob-encodes as empty and decodes as the zero `Redacted`.
-- Every value the SDK puts in a `Redacted` **MUST** be comparable, so `Violation` and `Issue` values stay comparable with `==`, as they were before the field existed.
+- `Violation` and `Issue` values **MUST** stay comparable with `==`, as they were before the field existed, and the comparison **MUST NOT** panic, whatever a `Redacted` holds. Every value the SDK puts in a `Redacted` **MUST** be comparable, so two diagnostics that hold equal values compare equal.
 
 ### What `Value` holds
 
@@ -1065,7 +1066,7 @@ Every other `Issue` (an absence, a count, a type or identity mismatch, a guard) 
 
 - For each row of § What `Value` holds, a test **MUST** plant a marker value that no constraint text contains, and **MUST** fail when the marker appears in a value-free field or when `Value.Reveal()` does not return it. Restoring a `Detail` that quotes the value **MUST** fail a named test.
 - The empty-`Value` cases (`CodeWrongType`, an unparseable pattern, an absence) **MUST** each be pinned by a named test.
-- A test **MUST** render a `Violation`, an `Issue` and a `Result` that hold a marker with each of `%v`, `%+v`, `%#v`, `%s` and `%d`, encode them with `encoding/json` v1 and v2 and with `encoding/gob`, and log them through the text and JSON handlers of `log/slog`, and **MUST** fail when the marker appears in any output or when an encoding fails.
+- A test **MUST** render a `Violation`, an `Issue` and a `Result` that hold a marker with each of `%v`, `%+v`, `%#v`, `%s`, `%d` and `%p`, directly and through an unexported field of a test struct, encode them with `encoding/json` v1 and v2 and with `encoding/gob`, and log them through the text and JSON handlers of `log/slog`, and **MUST** fail when the marker appears in any output or when an encoding fails.
 - `ValidateComposition` over a composition carrying a marker at a constrained primitive leaf **MUST** report the marker in that issue's `Value` and in no other field.
 
 - **Lives in:** [`openehr/template/constraints/`](../../openehr/template/constraints/) (`Redacted`, `Violation`) and [`openehr/validation/`](../../openehr/validation/) (`Issue`, the template walker, the RM floor)
