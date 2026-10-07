@@ -88,7 +88,8 @@ func TestExternalCodeSetsCarryTheirIssuerAndExternalID(t *testing.T) {
 // REQ-034: membership of an ISO or IANA code set ignores letter case, as
 // those registers do; membership of an openEHR code set is exact. A member is
 // a code the pinned set lists, and nothing else: no alias the set leaves out,
-// no code the live register added later, no non-ASCII look-alike.
+// no code of the live register the snapshot leaves out, no non-ASCII
+// look-alike.
 func TestCodeSetMembershipOverThePin(t *testing.T) {
 	tests := []struct {
 		set  *terminology.CodeSet
@@ -104,6 +105,8 @@ func TestCodeSetMembershipOverThePin(t *testing.T) {
 		{terminology.CharacterSets, "iso_8859-1:1987", true},
 		// ISO-8859-1 is an IANA alias of ISO_8859-1:1987 the pin does not list.
 		{terminology.CharacterSets, "ISO-8859-1", false},
+		// IANA registers windows-1252; the pinned snapshot does not list it.
+		{terminology.CharacterSets, "windows-1252", false},
 		{terminology.CharacterSets, "UTF-99", false},
 		// U+FF18 FULLWIDTH DIGIT EIGHT.
 		{terminology.CharacterSets, "utf-８", false},
