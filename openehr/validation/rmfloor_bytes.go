@@ -56,9 +56,10 @@ import (
 // unchanged. Input that is not a well-formed JSON object (malformed, array,
 // scalar, null, or an object repeating a member name), or that fails
 // EHR_STATUS decode, surfaces a single
-// `invalid_shape` issue at `/` and a not-OK [Result]. When the EHR_STATUS
-// decode fails, the decode error, whose text may quote the input, is in
-// that issue's Value and not in its Detail.
+// `invalid_shape` issue at `/` and a not-OK [Result]. When either decode
+// fails, the decode error, whose text may quote the input, is in that
+// issue's Value and not in its Detail; `null` input raises no decode error,
+// so its issue's Value is empty.
 //
 // The decode uses encoding/json/v2 directly rather than
 // openehr/serialize/canjson, which openehr/validation does not import:
@@ -76,11 +77,14 @@ func ValidateRMEHRStatusBytes(data []byte) Result {
 	// reported as an invalid shape.
 	var keys map[string]jsontext.Value
 	if err := json.Unmarshal(data, &keys); err != nil || keys == nil {
+		// As below, the decode error goes into Value (REQ-168). `null`
+		// decodes without one, and Redact(nil) leaves Value empty.
 		return resultFromIssues([]Issue{{
 			Path:     "/",
 			Code:     "invalid_shape",
 			Detail:   "ValidateRMEHRStatusBytes: input is not a well-formed JSON object",
 			Severity: Error,
+			Value:    constraints.Redact(err),
 		}})
 	}
 

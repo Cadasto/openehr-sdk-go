@@ -14,6 +14,7 @@ import (
 	jsonv2 "encoding/json/v2"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"testing"
 
@@ -47,12 +48,82 @@ type valueCase struct {
 // valueCases returns the rows of REQ-168's table that hold a comparable
 // value: the RM-floor rows and a primitive through the template walker.
 // The decode-error row is TestREQ168_DecodeErrorInValue.
+//
+// The temporal row has one case for each of the four types, held by
+// pointer inside an ELEMENT, and cases where the type is held by value as
+// an interval's bounds, so every branch that reads the value string is
+// pinned.
 func valueCases() []valueCase {
 	precision := func(n int) *rm.Integer {
 		v := rm.Integer(n)
 		return &v
 	}
-	return []valueCase{
+	// inElement validates an ELEMENT whose value is v.
+	inElement := func(v rm.DataValue) func(*testing.T) validation.Result {
+		return func(*testing.T) validation.Result {
+			el := validElement()
+			el.Value = v
+			return validation.ValidateRM(el)
+		}
+	}
+	// boundCases returns the rows for an interval whose two bounds are
+	// temporal values held by value, each carrying its own marker.
+	boundCases := func(rmType string, interval any, lower, upper string) []valueCase {
+		run := func(*testing.T) validation.Result { return validation.ValidateRM(interval) }
+		return []valueCase{
+			{name: "rm_invariant " + rmType + " by value, lower bound", run: run, code: "rm_invariant", path: "/lower", markers: []string{lower, upper}, want: lower},
+			{name: "rm_invariant " + rmType + " by value, upper bound", run: run, code: "rm_invariant", path: "/upper", markers: []string{lower, upper}, want: upper},
+		}
+	}
+	temporal := slices.Concat(
+		[]valueCase{
+			{
+				name:    "rm_invariant DV_DATE_TIME value (Value_valid)",
+				run:     inElement(&rm.DVDateTime{Value: "MARKER-dt-3c4d"}),
+				code:    "rm_invariant",
+				path:    "/value",
+				markers: []string{"MARKER-dt-3c4d"},
+				want:    "MARKER-dt-3c4d",
+			},
+			{
+				name:    "rm_invariant DV_DATE value (Value_valid)",
+				run:     inElement(&rm.DVDate{Value: dateMarker}),
+				code:    "rm_invariant",
+				path:    "/value",
+				markers: []string{dateMarker},
+				want:    dateMarker,
+			},
+			{
+				name:    "rm_invariant DV_TIME value (Value_valid)",
+				run:     inElement(&rm.DVTime{Value: "MARKER-t-5e6f"}),
+				code:    "rm_invariant",
+				path:    "/value",
+				markers: []string{"MARKER-t-5e6f"},
+				want:    "MARKER-t-5e6f",
+			},
+			{
+				name:    "rm_invariant DV_DURATION value (Value_valid)",
+				run:     inElement(&rm.DVDuration{Value: "MARKER-du-7a8b"}),
+				code:    "rm_invariant",
+				path:    "/value",
+				markers: []string{"MARKER-du-7a8b"},
+				want:    "MARKER-du-7a8b",
+			},
+		},
+		boundCases("DV_DATE_TIME", &rm.DVInterval[rm.DVDateTime]{
+			Lower: rm.DVDateTime{Value: "MARKER-dt-lo"}, Upper: rm.DVDateTime{Value: "MARKER-dt-hi"}, LowerIncluded: true, UpperIncluded: true,
+		}, "MARKER-dt-lo", "MARKER-dt-hi"),
+		boundCases("DV_DATE", &rm.DVInterval[rm.DVDate]{
+			Lower: rm.DVDate{Value: "MARKER-date-lo"}, Upper: rm.DVDate{Value: "MARKER-date-hi"}, LowerIncluded: true, UpperIncluded: true,
+		}, "MARKER-date-lo", "MARKER-date-hi"),
+		boundCases("DV_TIME", &rm.DVInterval[rm.DVTime]{
+			Lower: rm.DVTime{Value: "MARKER-time-lo"}, Upper: rm.DVTime{Value: "MARKER-time-hi"}, LowerIncluded: true, UpperIncluded: true,
+		}, "MARKER-time-lo", "MARKER-time-hi"),
+		boundCases("DV_DURATION", &rm.DVInterval[rm.DVDuration]{
+			Lower: rm.DVDuration{Value: "MARKER-du-lo"}, Upper: rm.DVDuration{Value: "MARKER-du-hi"}, LowerIncluded: true, UpperIncluded: true,
+		}, "MARKER-du-lo", "MARKER-du-hi"),
+	)
+	return slices.Concat(temporal, []valueCase{
 		{
 			name: "rm_invariant DV_QUANTITY precision below -1",
 			run: func(*testing.T) validation.Result {
@@ -99,18 +170,6 @@ func valueCases() []valueCase {
 			want:    [2]float64{98765, 4321},
 		},
 		{
-			name: "rm_invariant temporal value (Value_valid)",
-			run: func(*testing.T) validation.Result {
-				el := validElement()
-				el.Value = &rm.DVDate{Value: dateMarker}
-				return validation.ValidateRM(el)
-			},
-			code:    "rm_invariant",
-			path:    "/value",
-			markers: []string{dateMarker},
-			want:    dateMarker,
-		},
-		{
 			name: "term_mapping_match",
 			run: func(*testing.T) validation.Result {
 				return validation.ValidateRM(&rm.DVText{
@@ -141,7 +200,7 @@ func valueCases() []valueCase {
 			markers: []string{"98765.25"},
 			want:    98765.25,
 		},
-	}
+	})
 }
 
 // TestREQ168_InstanceIssuesKeepTheValueInValue plants a marker for each row
@@ -161,47 +220,80 @@ func TestREQ168_InstanceIssuesKeepTheValueInValue(t *testing.T) {
 	}
 }
 
-// TestREQ168_DecodeErrorInValue covers the invalid_shape row: an EHR_STATUS
-// whose nested DV_QUANTITY quotes its magnitude fails to decode, and the
-// decode error, whose text quotes the literal, goes into Value and not into
-// Detail.
+// TestREQ168_DecodeErrorInValue covers the invalid_shape row: input that
+// fails either decode of ValidateRMEHRStatusBytes reports one invalid_shape
+// at "/" whose Value is the decode error. When the EHR_STATUS decode fails
+// on a nested DV_QUANTITY that quotes its magnitude, the error's text quotes
+// the literal, which stays out of every value-free field.
 func TestREQ168_DecodeErrorInValue(t *testing.T) {
-	const marker = "MARKER98765"
-	r := validation.ValidateRMEHRStatusBytes(ehrStatusWithQuotedMagnitude(marker))
-	issue := oneIssue(t, r, "invalid_shape", "/")
-	if len(r.Issues) != 1 {
-		t.Errorf("ValidateRMEHRStatusBytes(quoted magnitude) reported %d issues, want 1; issues=%+v", len(r.Issues), r.Issues)
+	cases := []struct {
+		name string
+		data []byte
+		// marker, when set, is a literal the decode error quotes.
+		marker string
+	}{
+		{name: "malformed JSON", data: []byte(`{"_type": "EHR_STATUS",`)},
+		{name: "a JSON array, not an object", data: []byte(`["EHR_STATUS"]`)},
+		{name: "EHR_STATUS decode fails on a quoted magnitude", data: ehrStatusWithQuotedMagnitude("MARKER98765"), marker: "MARKER98765"},
 	}
-	assertValueFree(t, r, marker)
-	err, ok := issue.Value.Reveal().(error)
-	if !ok {
-		t.Fatalf("invalid_shape Value.Reveal() = %T, want an error", issue.Value.Reveal())
-	}
-	if !strings.Contains(err.Error(), marker) {
-		t.Errorf("invalid_shape Value.Reveal().Error() = %q, want it to contain the decode literal %q", err.Error(), marker)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := validation.ValidateRMEHRStatusBytes(tc.data)
+			issue := oneIssue(t, r, "invalid_shape", "/")
+			if len(r.Issues) != 1 {
+				t.Errorf("ValidateRMEHRStatusBytes(%s) reported %d issues, want 1; issues=%+v", tc.data, len(r.Issues), r.Issues)
+			}
+			if tc.marker != "" {
+				assertValueFree(t, r, tc.marker)
+			}
+			err, ok := issue.Value.Reveal().(error)
+			if !ok {
+				t.Fatalf("ValidateRMEHRStatusBytes(%s): invalid_shape Value.Reveal() = %T, want an error", tc.data, issue.Value.Reveal())
+			}
+			if !strings.Contains(err.Error(), tc.marker) {
+				t.Errorf("invalid_shape Value.Reveal().Error() = %q, want it to contain the decode literal %q", err.Error(), tc.marker)
+			}
+		})
 	}
 }
 
-// TestREQ168_EmptyValue pins the issues that read no value: something
-// absent, on the template walker and on the floor, and a ValidateAQL issue.
+// TestREQ168_EmptyValue pins the issues that read no value, one case per
+// kind the package emits: something absent, a count, a type or identity
+// mismatch, a guard, and a ValidateAQL issue. Each listed path must carry an
+// issue with the code; a case with no paths takes every issue with the code.
 // The AQL issue's Detail may quote the query by design, so only its Value is
 // checked.
+//
+// primitive_wrong_type has no case: the walker checks the RM type before it
+// runs a primitive constraint, so no ordinary composition reaches it.
 func TestREQ168_EmptyValue(t *testing.T) {
+	vitalSigns := func(edit func(*rm.Composition)) func(t *testing.T) validation.Result {
+		return func(t *testing.T) validation.Result {
+			comp := validVitalSignsComposition()
+			edit(comp)
+			return validation.ValidateComposition(comp, mustCompile(t, "vital_signs"))
+		}
+	}
+	itemList := func(comp *rm.Composition) *rm.ItemList {
+		return comp.Content[0].(*rm.Observation).Data.Events[0].(*rm.PointEvent[rm.ItemStructure]).Data.(*rm.ItemList)
+	}
+	floor := func(root any) func(*testing.T) validation.Result {
+		return func(*testing.T) validation.Result { return validation.ValidateRM(root) }
+	}
+	const bloodPressure = "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]"
+	type unknownRoot struct{ X int }
+
 	cases := []struct {
-		name       string
-		run        func(t *testing.T) validation.Result
-		code, path string
+		name  string
+		run   func(t *testing.T) validation.Result
+		code  string
+		paths []string
 	}{
 		{
-			name: "required through the template walker",
-			run: func(t *testing.T) validation.Result {
-				comp := validVitalSignsComposition()
-				pe := comp.Content[0].(*rm.Observation).Data.Events[0].(*rm.PointEvent[rm.ItemStructure])
-				pe.Data.(*rm.ItemList).Items = nil
-				return validation.ValidateComposition(comp, mustCompile(t, "vital_signs"))
-			},
-			code: "required",
-			path: "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]/data/items",
+			name:  "required through the template walker",
+			run:   vitalSigns(func(c *rm.Composition) { itemList(c).Items = nil }),
+			code:  "required",
+			paths: []string{bloodPressure + "/data/events[at0006]/data/items"},
 		},
 		{
 			name: "required on the floor",
@@ -214,8 +306,104 @@ func TestREQ168_EmptyValue(t *testing.T) {
 					"is_queryable": true
 				}`))
 			},
-			code: "required",
-			path: "/subject",
+			code:  "required",
+			paths: []string{"/subject"},
+		},
+		{
+			name:  "rm_invariant ELEMENT with neither value nor null_flavour",
+			run:   floor(validElement()),
+			code:  "rm_invariant",
+			paths: []string{"/"},
+		},
+		{
+			name:  "rm_invariant CODE_PHRASE with an empty code_string",
+			run:   floor(&rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}}),
+			code:  "rm_invariant",
+			paths: []string{"/"},
+		},
+		{
+			name: "rm_invariant OBJECT_REF without id, type and namespace",
+			run: func(*testing.T) validation.Result {
+				return validation.ValidateRMFolder(&rm.Folder{
+					ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
+					Name:            rm.DVText{Value: "root"},
+					Items:           []rm.ObjectRefLike{rm.ObjectRef{}},
+				})
+			},
+			code:  "rm_invariant",
+			paths: []string{"/items[0]/id", "/items[0]/type", "/items[0]/namespace"},
+		},
+		{
+			name:  "mappings_valid",
+			run:   floor(&rm.DVText{Value: "text", Mappings: []rm.TermMapping{}}),
+			code:  "mappings_valid",
+			paths: []string{"/mappings"},
+		},
+		{
+			name: "is_archetype_root",
+			run: func(*testing.T) validation.Result {
+				return validation.ValidateRMEHRStatusBytes(ehrStatusWithArchetypeDetails(""))
+			},
+			code:  "is_archetype_root",
+			paths: []string{"/archetype_details"},
+		},
+		{
+			name:  "rm_version_valid",
+			run:   floor(&rm.Archetyped{ArchetypeID: rm.ArchetypeID{Value: "openEHR-EHR-EHR_STATUS.generic.v1"}}),
+			code:  "rm_version_valid",
+			paths: []string{"/rm_version"},
+		},
+		{
+			name:  "cardinality through the template walker",
+			run:   vitalSigns(func(c *rm.Composition) { c.Content[0].(*rm.Observation).Data.Events = nil }),
+			code:  "cardinality",
+			paths: []string{bloodPressure + "/data/events"},
+		},
+		{
+			name: "rm_type_mismatch",
+			run: vitalSigns(func(c *rm.Composition) {
+				c.Content = []rm.ContentItem{&rm.Evaluation{ArchetypeNodeID: "openEHR-EHR-OBSERVATION.blood_pressure.v1"}}
+			}),
+			code: "rm_type_mismatch",
+		},
+		{
+			name: "slot_fill",
+			run: vitalSigns(func(c *rm.Composition) {
+				c.Content = []rm.ContentItem{&rm.Observation{ArchetypeNodeID: "openEHR-EHR-OBSERVATION.no_such_archetype.v1"}}
+			}),
+			code: "slot_fill",
+		},
+		{
+			name: "node_id_mismatch",
+			run:  vitalSigns(func(c *rm.Composition) { itemList(c).ArchetypeNodeID = "at9999" }),
+			code: "node_id_mismatch",
+		},
+		{
+			name:  "nil_root guard",
+			run:   floor(nil),
+			code:  "nil_root",
+			paths: []string{"/"},
+		},
+		{
+			name: "nil_composition guard",
+			run: func(t *testing.T) validation.Result {
+				return validation.ValidateComposition(nil, mustCompile(t, "vital_signs"))
+			},
+			code: "nil_composition",
+		},
+		{
+			name:  "rm_type_unknown",
+			run:   floor(&unknownRoot{X: 1}),
+			code:  "rm_type_unknown",
+			paths: []string{"/"},
+		},
+		{
+			name: "invalid_shape on null input, which raises no decode error",
+			run: func(*testing.T) validation.Result {
+				return validation.ValidateRMEHRStatusBytes([]byte("null"))
+			},
+			code:  "invalid_shape",
+			paths: []string{"/"},
 		},
 		{
 			name: "aql_syntax from ValidateAQL",
@@ -228,9 +416,14 @@ func TestREQ168_EmptyValue(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := tc.run(t)
+			for _, path := range tc.paths {
+				if !containsIssue(r.Issues, path, tc.code) {
+					t.Errorf("no %s issue at %q; issues=%+v", tc.code, path, r.Issues)
+				}
+			}
 			var found bool
 			for _, issue := range r.Issues {
-				if issue.Code != tc.code || (tc.path != "" && issue.Path != tc.path) {
+				if issue.Code != tc.code {
 					continue
 				}
 				found = true
@@ -242,7 +435,7 @@ func TestREQ168_EmptyValue(t *testing.T) {
 				}
 			}
 			if !found {
-				t.Fatalf("no %s issue at %q; issues=%+v", tc.code, tc.path, r.Issues)
+				t.Errorf("no %s issue; issues=%+v", tc.code, r.Issues)
 			}
 		})
 	}

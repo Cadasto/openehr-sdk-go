@@ -28,7 +28,8 @@ const redactedText = "[redacted]"
 // values compare equal when those values can be compared, and every value
 // this package stores can be. A value that cannot be compared, such as a
 // slice or a map, is held by reference, so a Redacted holding one equals only
-// its own copies.
+// its own copies. [Redacted.Equal] gives the same answer as ==, for
+// comparison libraries that skip unexported fields but call an Equal method.
 type Redacted struct {
 	// Exactly one field is set when a value is held, and neither when none
 	// is. Both are pointers inside, so fmt, reading them without calling a
@@ -82,6 +83,15 @@ func (r Redacted) Reveal() any {
 	default:
 		return r.h.Value()
 	}
+}
+
+// Equal reports whether r and o hold equal values, exactly as r == o does.
+// It exists for comparison libraries that refuse to read unexported fields
+// but call a type's Equal method instead, so they can still compare a
+// [Violation] or any other value that holds a Redacted, without seeing the
+// held value.
+func (r Redacted) Equal(o Redacted) bool {
+	return r == o
 }
 
 // String returns "[redacted]" when r holds a value and "" when it holds none.

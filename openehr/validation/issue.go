@@ -69,8 +69,9 @@ func (s Severity) String() string {
 type Issue struct {
 	// Path is the AQL path of the offending node. Empty for global
 	// issues that do not localise to a specific node (e.g. root
-	// archetype-id mismatch). On an issue from [ValidateAQL] it is the
-	// lint path and may quote the query.
+	// archetype-id mismatch). On an issue from [ValidateAQL] or
+	// [ValidateAQLWithTypeRelation] it is the lint path and may quote
+	// the query.
 	Path string
 
 	// Code is a stable programmatic identifier (e.g. "required",
@@ -81,32 +82,44 @@ type Issue struct {
 
 	// Detail is a human-readable message describing the failure; it is
 	// not localised. From an instance validator it names the check that
-	// failed and never the value the check read; from [ValidateAQL] it
-	// is the lint text and may quote the query.
+	// failed and never the value the check read; from [ValidateAQL] or
+	// [ValidateAQLWithTypeRelation] it is the lint text and may quote
+	// the query.
 	Detail string
 
 	// Severity classifies the issue. [ValidateComposition] emits [Error] only;
 	// [ValidateAQL] may emit [Warning] advisories that do not flip [Result.OK].
 	Severity Severity
 
-	// Value holds the value from the instance that the failed check read:
+	// Value holds the value from the instance that the failed check
+	// read. Value.Reveal() returns it with this Go type:
 	//
-	//   - on a primitive_* issue, the Value of the
-	//     [constraints.Violation] it reports;
-	//   - on an rm_invariant issue, the precision below -1, the
-	//     numerator and denominator that a precision of 0 found
-	//     fractional, the two interval bounds out of order (lower
-	//     first), or the date, time or duration string that is not
-	//     valid ISO 8601;
-	//   - on a term_mapping_match issue, the match;
+	//   - on a primitive_* issue, the value of the
+	//     [constraints.Violation] it reports, with the type that
+	//     violation holds;
+	//   - on an rm_invariant issue for a precision below -1, the
+	//     precision, an rm.Integer;
+	//   - on an rm_invariant issue for a precision of 0 with a
+	//     fractional operand, the numerator and the denominator, a
+	//     [2]float64;
+	//   - on an rm_invariant issue for interval bounds out of order, the
+	//     two compared magnitudes, lower first, a [2]float64;
+	//   - on an rm_invariant issue for a date, time or duration that is
+	//     not valid ISO 8601, its value, a string;
+	//   - on a term_mapping_match issue, the match, an rm.Character;
 	//   - on an invalid_shape issue from a failed decode, the decode
-	//     error, whose text may quote the input.
+	//     error, an error whose text may quote the input.
 	//
-	// It is empty on every other issue (something absent, a count, a
+	// Each call that fails to decode creates a new error value, so two
+	// calls over the same bytes give invalid_shape issues that are not
+	// equal under ==.
+	//
+	// Value is empty on every other issue (something absent, a count, a
 	// type or identity mismatch, a guard) and on every issue from
-	// [ValidateAQL]. Holding a value, it always prints as "[redacted]";
-	// it is left out of JSON and gob output, and Value.Reveal() returns
-	// the value itself, to be called only where showing it is safe.
+	// [ValidateAQL] and [ValidateAQLWithTypeRelation]. Holding a value, it
+	// always prints as "[redacted]"; it is left out of JSON and gob
+	// output, and Value.Reveal() returns the value itself, to be called
+	// only where showing it is safe.
 	Value constraints.Redacted `json:"-"`
 }
 

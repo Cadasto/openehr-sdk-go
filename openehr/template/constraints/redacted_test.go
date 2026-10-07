@@ -460,3 +460,44 @@ func TestREQ168_SlogWritesNoValue(t *testing.T) {
 		}
 	}
 }
+
+// Redacted has the Equal method that comparison libraries look for when a
+// type has unexported fields (REQ-168).
+var _ interface {
+	Equal(constraints.Redacted) bool
+} = constraints.Redacted{}
+
+// TestREQ168_RedactedEqualAgreesWithEquality checks that Redacted.Equal gives
+// the same answer as == in both directions, for the zero value, for comparable
+// values and for a value that is held by reference.
+func TestREQ168_RedactedEqualAgreesWithEquality(t *testing.T) {
+	t.Parallel()
+	boxed := constraints.Redact([]string{markerString})
+	boxedCopy := boxed
+	cases := []struct {
+		name string
+		a, b constraints.Redacted
+		want bool
+	}{
+		{name: "two zero values", a: constraints.Redacted{}, b: constraints.Redacted{}, want: true},
+		{name: "a zero value and a held value", a: constraints.Redacted{}, b: constraints.Redact(markerString), want: false},
+		{name: "two Redact calls on an equal string", a: constraints.Redact(markerString), b: constraints.Redact(strings.Clone(markerString)), want: true},
+		{name: "int32 7 and int 7", a: constraints.Redact(int32(7)), b: constraints.Redact(7), want: false},
+		{name: "a boxed slice and its copy", a: boxed, b: boxedCopy, want: true},
+		{name: "two Redact calls on equal slices", a: constraints.Redact([]string{markerString}), b: constraints.Redact([]string{markerString}), want: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := tc.a == tc.b; got != tc.want {
+				t.Fatalf("a == b = %v, want %v; the case no longer pins what == does", got, tc.want)
+			}
+			if got := tc.a.Equal(tc.b); got != tc.want {
+				t.Errorf("a.Equal(b) = %v, want %v, as a == b", got, tc.want)
+			}
+			if got := tc.b.Equal(tc.a); got != tc.want {
+				t.Errorf("b.Equal(a) = %v, want %v, as b == a", got, tc.want)
+			}
+		})
+	}
+}
