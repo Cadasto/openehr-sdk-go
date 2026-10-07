@@ -955,6 +955,7 @@ requirements:
       - openehr/client/ehr/resource_test.go
       - openehr/rm/character_test.go
       - openehr/rm/real_test.go
+      - openehr/validation/rmfloor_party_proxy_test.go
       - openehr/validation/rmfloor_proportion_test.go
       - testkit/probe/har_test.go
       - testkit/probe/record_test.go
@@ -1122,9 +1123,11 @@ requirements:
       - openehr/validation/data_value_subtypes_test.go
       - openehr/validation/interval_bounds_test.go
       - openehr/validation/interval_open_side_test.go
+      - openehr/validation/multi_nonlocatable_test.go
       - openehr/validation/rmread/handles_test.go
       - openehr/validation/rmread/interval_void_test.go
       - openehr/validation/rmread/read_demographic_test.go
+      - openehr/validation/rmread/read_object_ref_test.go
       - openehr/validation/rmread/read_test.go
       - openehr/validation/walk_primitive_test.go
       - testkit/probes/validation/probe_025_composition_validate.go
@@ -1409,6 +1412,7 @@ requirements:
       - openehr/validation/rmfloor_bytes_test.go
       - openehr/validation/rmfloor_ism_transition_test.go
       - openehr/validation/rmfloor_ordered_test.go
+      - openehr/validation/rmfloor_party_proxy_test.go
       - openehr/validation/rmfloor_party_ref_test.go
       - openehr/validation/rmfloor_proportion_test.go
       - openehr/validation/rmfloor_temporal_element_test.go
@@ -1421,6 +1425,7 @@ requirements:
       - openehr/validation/rmread/read_datavalues_test.go
       - openehr/validation/rmread/read_demographic_test.go
       - openehr/validation/rmread/read_ordered_test.go
+      - openehr/validation/rmread/read_party_proxy_test.go
       - openehr/validation/rmread/read_test.go
       - openehr/validation/strand14_nonchaining_test.go
       - sandbox/rmvalid_test.go
