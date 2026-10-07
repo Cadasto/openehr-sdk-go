@@ -373,15 +373,16 @@ A stored query is identified by a qualified name (typically reverse-DNS, e.g. `o
 
 ### REQ-054
 
-openEHR versioned resources (Composition, EHR_STATUS, Directory, Contribution) are versioned by `version_uid` with `If-Match` / `ETag` optimistic concurrency on the wire.
+openEHR versioned resources (Composition, EHR_STATUS, Directory, Contribution, and the demographic PARTY resources) are versioned by `version_uid` with `If-Match` / `ETag` optimistic concurrency on the wire.
 
 Rules the SDK **MUST** enforce:
 
 - A PUT against a versioned resource **MUST** include `If-Match: "<preceding_version_uid>"` (the canonical form per the openEHR REST envelope). The SDK **MUST NOT** retry without an `If-Match`. A backend signals a missing `If-Match` as `400`.
 - A `412 Precondition Failed` response (a stale `If-Match`: the preceding version is no longer the latest) **MUST** map to `transport.ErrPreconditionFailed`. The latest `version_uid` is in the response `ETag` and **MUST** stay reachable beside the error through the returned `VersionMetadata`.
-- A `409 Conflict` response **MUST** map to `transport.ErrVersionConflict`. The vendored ITS-REST pin answers `409` for deleting a Composition version that is not the latest; a stale `If-Match` on a PUT is `412`, not `409`.
+- A `409 Conflict` response **MUST** map to `transport.ErrVersionConflict`. The vendored ITS-REST pin answers `409` for deleting a Composition or a demographic PARTY version that is not the latest, with the latest `version_uid` in the response `ETag` (`409_COMPOSITION_with_uid_based_id`, `409_PERSON_with_uid_based_id`); on either delete that `version_uid` **MUST** stay reachable beside the error through the returned `VersionMetadata`. A stale `If-Match` on a PUT is `412`, not `409`.
 - A `428 Precondition Required` response **MUST** map to `transport.ErrPreconditionRequired`. It is a defensive mapping for non-conformant servers, not an openEHR status.
-- The Composition delete takes no `If-Match`: the `version_uid` in its path is the preceding version, so the SDK **MUST NOT** require or send one for it.
+- The Composition delete and the demographic delete take no `If-Match`: the `version_uid` in the path is the preceding version, so the SDK **MUST NOT** require or send one for either. The Directory delete takes an `If-Match` and the SDK **MUST** require it.
+- The SDK **MUST** refuse an empty `If-Match` on a PUT or a Directory delete with `transport.ErrInvalidConfig` before it issues any request.
 - The SDK **MUST NOT** synthesise these statuses client-side — they come from the backend.
 
 ETag handling on reads is symmetric: the SDK **MUST** capture `ETag` from a response and expose it on the typed return value. The value the caller sends on the next PUT is the `VersionUID` from the version-identifier rule below, which is that `ETag` only when the rule selects it.

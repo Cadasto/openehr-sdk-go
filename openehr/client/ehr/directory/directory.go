@@ -212,8 +212,9 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, f
 }
 
 // Update modifies the Directory under ehrID, requiring `ifMatch` as the
-// If-Match header. HTTP errors map to the standard [transport] sentinels
-// (e.g. 412 → [transport.ErrPreconditionFailed]).
+// If-Match header. An empty `ifMatch` returns [transport.ErrInvalidConfig]
+// without issuing a request. HTTP errors map to the standard [transport]
+// sentinels (e.g. 412 → [transport.ErrPreconditionFailed]).
 //
 // Wire: PUT /ehr/{ehr_id}/directory with If-Match. Response shape
 // matches [Save]: bare `*rm.Folder` per the ITS-REST OpenAPI
@@ -260,7 +261,8 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 }
 
 // Delete logically deletes the Directory addressed by versionUID,
-// requiring `ifMatch` as the If-Match header.
+// requiring `ifMatch` as the If-Match header. An empty `ifMatch` returns
+// [transport.ErrInvalidConfig] without issuing a request.
 //
 // Wire: DELETE /ehr/{ehr_id}/directory with If-Match. Some deployments
 // require the version UID in the path; the openEHR REST spec leaves
