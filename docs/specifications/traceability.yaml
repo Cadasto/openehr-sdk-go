@@ -1921,7 +1921,7 @@ requirements:
     title: Value-free validation diagnostics
     canonical: docs/specifications/clinical-modeling.md#req-168--value-free-validation-diagnostics
     status: draft
-    implementation: planned
+    implementation: landed
     packages: [openehr/template/constraints, openehr/validation]
     tests:
       - openehr/template/constraints/godoc_class_test.go
