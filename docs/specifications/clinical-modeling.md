@@ -207,7 +207,7 @@ Every `Violation` carries a typed `ViolationCode`. The closed set is:
 | `CodeUnitUnknown` | DV_QUANTITY units string is not in the enumerated allowed list |
 | `CodeInvalidValue` | constraint or input is malformed (e.g. unparseable regex in the OPT, malformed date string) |
 
-`Violation.Detail` carries a human-readable message; consumers building structured diagnostics SHOULD pattern-match on `Code`. `Detail` names the failed clause and never the value; the value is reachable only through `Violation.Value` ([§ REQ-168](#req-168--value-free-validation-diagnostics)).
+`Violation.Detail` carries a human-readable message; consumers building structured diagnostics SHOULD pattern-match on `Code`. The class of each `Violation` field, and where the value goes, are in [§ REQ-168](#req-168--value-free-validation-diagnostics) and not restated here.
 
 ### Numeric range
 
@@ -301,9 +301,9 @@ The SDK **MUST** ship a `ValidateComposition(comp *rm.Composition, c *templateco
   type Issue struct {
       Path     string               // AQL path of the offending node (empty for global issues)
       Code     string               // stable programmatic identifier — see code taxonomy below
-      Detail   string               // human-readable message; never the value (REQ-168)
+      Detail   string               // human-readable message; field class in REQ-168
       Severity Severity             // Error for normative violations; Warning for advisories
-      Value    constraints.Redacted // the value the failed check read, redacted (REQ-168)
+      Value    constraints.Redacted // value-bearing field; see REQ-168
   }
   type Severity int
   const (
@@ -986,7 +986,7 @@ The floor lives in `openehr/validation`; the package's imports and its guard are
 
 ## REQ-168 — Value-free validation diagnostics
 
-The validation diagnostics **MUST NOT** repeat the value under validation. A [`constraints.Violation`](../../openehr/template/constraints/violation.go) and an [`Issue`](../../openehr/validation/issue.go) from the instance validators travel to places a caller does not choose for clinical data: an HTTP error body, a log line, a monitoring event. The values they describe are clinical data (a date of birth, a measured magnitude, a free-text name), so a message that quotes one carries it to each of those places, in callers that never meant to send it. [§ REQ-113 § Value-free structured drop records](#value-free-structured-drop-records) holds the AQL diagnostics to this line, and [REQ-093](transport.md#req-093--openehr-error-envelope-mapping) holds the transport errors to it. This requirement applies it to [§ REQ-103](#req-103--primitive-constraint-introspection)'s `Violation` and to the `Issue` that [§ REQ-102](#req-102--composition-validation), [§ REQ-110](#req-110--template-driven-validation-beyond-composition) and [§ REQ-112](#req-112--template-less-reference-model-validation-floor) return. The value stays reachable, but only through a call that asks for it.
+A [`constraints.Violation`](../../openehr/template/constraints/violation.go), and an [`Issue`](../../openehr/validation/issue.go) from the instance validators, **MUST NOT** repeat the value under validation outside their value-bearing field (§ Field classes). Both travel to places a caller does not choose for clinical data: an HTTP error body, a log line, a monitoring event. The values they describe are clinical data (a date of birth, a measured magnitude, a free-text name), so a message that quotes one carries it to each of those places, in callers that never meant to send it. [§ REQ-113 § Value-free structured drop records](#value-free-structured-drop-records) holds the AQL diagnostics to this line, and [REQ-093](transport.md#req-093--openehr-error-envelope-mapping) holds the transport errors to it. This requirement applies it to [§ REQ-103](#req-103--primitive-constraint-introspection)'s `Violation` and to the `Issue` that [§ REQ-102](#req-102--composition-validation), [§ REQ-110](#req-110--template-driven-validation-beyond-composition) and [§ REQ-112](#req-112--template-less-reference-model-validation-floor) return; the `Issue` that `ValidateAQL` returns keeps [§ REQ-109](#req-109--aql-static-lint)'s classification. The value stays reachable, but only through a call that asks for it.
 
 ### Submitted values and structure
 
@@ -999,28 +999,29 @@ A **submitted value** is data taken from the input under validation:
 
 ### Field classes
 
-Each field of the two types belongs to one class, and the class **MUST** be stated in the godoc of the type, so a consumer reads it on the type it holds ([§ REQ-113](#value-free-structured-drop-records)):
+A field's class is fixed by its type and, for an `Issue`, by the entry point that returned it, which a consumer knows because it made the call. It never depends on an issue's content. The class **MUST** be stated in the godoc of the type, so a consumer reads it on the type it holds ([§ REQ-113](#value-free-structured-drop-records)):
 
-| Type | Value-free: **MUST NOT** carry a submitted value | Value-bearing |
+| Type and entry point | Value-free | Value-bearing |
 |---|---|---|
-| `constraints.Violation` | `Code`, `Detail` | `Value` |
-| `validation.Issue` from `ValidateComposition`, the REQ-110 entries and the REQ-112 floor entries | `Path`, `Code`, `Detail`, `Severity` | `Value` |
-| `validation.Issue` from `ValidateAQL` and `ValidateAQLWithTypeRelation` | `Code`, `Severity` | `Detail` and `Path`, as [§ REQ-109 § Value-free lint diagnostics](#value-free-lint-diagnostics) classifies them; `Value` is empty |
+| `constraints.Violation` | `Code`, `Detail`: **MUST NOT** carry a submitted value | `Value` |
+| `validation.Issue` from `ValidateComposition`, the REQ-110 entries and the REQ-112 floor entries | `Path`, `Code`, `Detail`, `Severity`: **MUST NOT** carry a submitted value | `Value` |
+| `validation.Issue` from `ValidateAQL` and `ValidateAQLWithTypeRelation` | `Code`, `Severity`: **MUST NOT** carry source text ([§ REQ-109 § Value-free lint diagnostics](#value-free-lint-diagnostics)) | `Detail` and `Path`, as § REQ-109 classifies them |
 
-A value-free field **MUST NOT** fall back to quoting the value where a value-free wording is hard to find: [§ REQ-113](#value-free-structured-drop-records)'s no-fallback clause applies here unchanged.
+A value-free field **MUST NOT** fall back to quoting the value where a value-free wording is hard to find ([§ REQ-113](#value-free-structured-drop-records)'s no-fallback clause). What cannot be said without the value goes in `Value`, or nowhere.
 
 ### The redacting carrier
 
 `Value` **MUST** be of the type `constraints.Redacted`, which holds one submitted value and never prints it:
 
 - `constraints.Redact(v)` **MUST** return a `Redacted` holding `v`. The zero `Redacted` holds no value.
-- `Reveal()` **MUST** return the held value with its type, or nil when none is held. It is the only way to read the value. A value that `==` can compare **MUST** come back equal under `==` to the one held, which lets a floating-point negative zero come back as a positive zero; any other value **MUST** come back as the same value.
-- Every `fmt` verb, `%v`, `%+v` and `%#v` included, **MUST** print `[redacted]` for a `Redacted` that holds a value and nothing for one that does not, so printing a whole `Violation`, `Issue` or `Result` prints no submitted value. `String()` **MUST** return the same text.
-- Where `fmt` prints a `Redacted` without calling its methods (under `%p`, and through an unexported field of the caller's own struct), the output **MUST NOT** contain the value either.
+- `Reveal()` **MUST** return the held value with its type, or nil when none is held; it is the only method that returns the value. A value that `==` can compare **MUST** come back equal under `==` to the one held, except that a floating-point zero may come back with either sign and a NaN comes back as a NaN, which `==` never finds equal. Any other value **MUST** come back as the same value.
+- Every `fmt` verb other than `%T` and `%p`, `%v`, `%+v` and `%#v` included, **MUST** print `[redacted]` for a `Redacted` that holds a value and nothing for one that does not, so printing a whole `Violation`, `Issue` or `Result` prints no submitted value. `String()` **MUST** return the same text.
+- `fmt` answers `%T` with the type name, and prints a `Redacted` without calling its methods under `%p` and through an unexported field of the caller's own struct. On those paths the output **MUST NOT** contain the value either. It shows memory addresses instead, and equal held values show the same address, so two such lines reveal that their values are equal.
+- Tools other than `fmt` that read unexported fields by reflection, such as a diff reporter or a debugger, are outside these rules.
 - The `Value` field of `Violation` and of `Issue` **MUST** be left out of `encoding/json` output, v1 and v2 alike, so encoding a `Result` writes no `Value` member. A `Redacted` encoded on its own **MUST** encode as JSON `null`.
 - Logging a `Violation`, `Issue`, `Result` or `Redacted` through the text or JSON handler of `log/slog` **MUST NOT** write the value.
-- Encoding a `Violation`, `Issue` or `Result` with `encoding/gob` **MUST** keep working, as it did before the field existed, and **MUST NOT** carry the value: a `Redacted` gob-encodes as empty and decodes as the zero `Redacted`.
-- `Violation` and `Issue` values **MUST** stay comparable with `==`, as they were before the field existed, and the comparison **MUST NOT** panic, whatever a `Redacted` holds. Every value the SDK puts in a `Redacted` **MUST** be comparable, so two diagnostics that hold equal values compare equal. `Redacted` **MUST** have an `Equal(Redacted) bool` method that agrees with `==`, so a comparison library that refuses unexported fields but honours such a method can still compare a `Violation`, `Issue` or `Result`.
+- Encoding a `Violation`, `Issue` or `Result` with `encoding/gob` **MUST** succeed and **MUST NOT** carry the value: a `Redacted` gob-encodes as empty and decodes as the zero `Redacted`.
+- `Violation` and `Issue` values **MUST** be comparable with `==`, and the comparison **MUST NOT** panic, whatever a `Redacted` holds. Every value the SDK puts in a `Redacted` **MUST** be comparable, so two diagnostics that hold equal values compare equal. A value that `==` cannot compare, such as a slice, is held by reference, so only copies of one `Redacted` compare equal. `Redacted` **MUST** have an `Equal(Redacted) bool` method that agrees with `==`, so a comparison library that refuses unexported fields but honours such a method can still compare a `Violation`, `Issue` or `Result`.
 
 ### What `Value` holds
 
@@ -1049,12 +1050,12 @@ On an `Issue` from the instance validators, `Value` **MUST** hold:
 | `term_mapping_match` | the `match` |
 | `invalid_shape` from a failed decode | the decode error, whose text may name a literal ([wire.md § REQ-052](wire.md#req-052)) |
 
-Every other `Issue` (an absence, a count, a type or identity mismatch, a guard) **MUST** carry an empty `Value`.
+Every other `Issue` (an absence, a count, a type or identity mismatch, a guard) **MUST** carry an empty `Value`. On an `Issue` from `ValidateAQL` or `ValidateAQLWithTypeRelation`, `Value` **MUST** be empty.
 
 ### Compatibility
 
-- Codes, paths, severities, `Result.OK` and the set of findings do not change. Only `Detail` texts change, by losing the value, and the `Value` field is additive. A caller that matched on `Detail` text sees different text; the contract already points such callers to `Code` ([§ REQ-103 § Violation taxonomy](#violation-taxonomy), [§ REQ-102 § Issue codes](#issue-codes)).
-- The issues of `ValidateAQL` do not change ([§ REQ-109 § Value-free lint diagnostics](#value-free-lint-diagnostics)).
+- The rule governs `Detail` text and the `Value` field only. Codes, paths, severities, `Result.OK` and the set of findings are the ones [§ REQ-102](#req-102--composition-validation), [§ REQ-110](#req-110--template-driven-validation-beyond-composition) and [§ REQ-112](#req-112--template-less-reference-model-validation-floor) define, and a caller dispatches on `Code`, not on `Detail` text ([§ REQ-103 § Violation taxonomy](#violation-taxonomy), [§ REQ-102 § Issue codes](#issue-codes)).
+- The issues of `ValidateAQL` follow [§ REQ-109 § Value-free lint diagnostics](#value-free-lint-diagnostics).
 
 ### Out of scope
 
@@ -1064,8 +1065,10 @@ Every other `Issue` (an absence, a count, a type or identity mismatch, a guard) 
 
 ### Acceptance
 
-- For each row of § What `Value` holds, a test **MUST** plant a marker value that no constraint text contains, and **MUST** fail when the marker appears in a value-free field or when `Value.Reveal()` does not return it. Restoring a `Detail` that quotes the value **MUST** fail a named test.
-- The empty-`Value` cases (`CodeWrongType`, an unparseable pattern, an absence) **MUST** each be pinned by a named test.
+- For each row of § What `Value` holds, a test **MUST** plant a marker value that no constraint text contains, and **MUST** fail when the marker appears in a value-free field or when `Value.Reveal()` does not return what the row names: the marker itself, the pair that holds it, or an error whose text carries it. Restoring a `Detail` that quotes the value **MUST** fail a named test.
+- The empty-`Value` cases (`CodeWrongType`, an unparseable pattern, an absence, an issue from `ValidateAQL`) **MUST** each be pinned by a named test.
+- A test **MUST** fail when `==` on two `Violation` or `Issue` values panics, when two diagnostics that hold equal values compare unequal, or when `Equal` disagrees with `==`.
+- A test **MUST** fail when the godoc of `Violation` or `Issue` stops stating the class of one of its fields.
 - A test **MUST** render a `Violation`, an `Issue` and a `Result` that hold a marker with each of `%v`, `%+v`, `%#v`, `%s`, `%d` and `%p`, directly and through an unexported field of a test struct, encode them with `encoding/json` v1 and v2 and with `encoding/gob`, and log them through the text and JSON handlers of `log/slog`, and **MUST** fail when the marker appears in any output or when an encoding fails.
 - `ValidateComposition` over a composition carrying a marker at a constrained primitive leaf **MUST** report the marker in that issue's `Value` and in no other field.
 
