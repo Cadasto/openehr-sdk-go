@@ -144,8 +144,9 @@ func (g *Group) Code(rubric string) (string, bool) {
 // Foundation's snapshot of an ISO or IANA register, published with the
 // pinned release: [Languages] (ISO 639-1), [Countries] (ISO 3166-1),
 // [CharacterSets] (IANA character sets) and [MediaTypes] (IANA media
-// types). A snapshot is not the live register: a
-// code the register added after the pinned release is not a member.
+// types). A snapshot is not the live register: a code the register holds
+// and the pinned set leaves out, such as one added after the release, is not
+// a member.
 // [CodeSet.Issuer] and [CodeSet.ExternalID] say which kind a set is, and
 // [CodeSet.Has] matches codes accordingly.
 type CodeSet struct {

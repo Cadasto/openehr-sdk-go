@@ -22,8 +22,9 @@
 // each carrying its own external id: [Languages] (ISO_639-1), [Countries]
 // (ISO_3166-1), [CharacterSets] (IANA_character-sets) and [MediaTypes]
 // (IANA_media-types). They are the snapshot published with the pinned
-// release, not the live registers, so a code a register added later is not a
-// member. [CodeSet.Issuer] and [CodeSet.ExternalID] report which is which.
+// release, not the live registers, so a code a register holds and the pinned
+// set leaves out, such as one added after the release, is not a member.
+// [CodeSet.Issuer] and [CodeSet.ExternalID] report which is which.
 // Membership of an openEHR-issued code set is exact, as a group's is;
 // membership of an ISO or IANA code set ignores the case of the ASCII
 // letters, as those registers do. Either way, a member is a code the pinned
