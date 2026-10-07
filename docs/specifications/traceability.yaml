@@ -1924,7 +1924,9 @@ requirements:
     implementation: planned
     packages: [openehr/template/constraints, openehr/validation]
     tests:
+      - openehr/template/constraints/godoc_class_test.go
       - openehr/template/constraints/redacted_test.go
       - openehr/template/constraints/value_free_test.go
+      - openehr/validation/godoc_class_test.go
       - openehr/validation/rmfloor_proportion_test.go
       - openehr/validation/value_free_test.go
