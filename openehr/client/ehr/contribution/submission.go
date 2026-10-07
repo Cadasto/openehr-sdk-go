@@ -13,8 +13,8 @@ import (
 // the ITS-REST `Contribution_create` schema. It is distinct from
 // [rm.Contribution] (the persisted/response shape) because each versions[]
 // element carries the resource payload inline under `data`, not a stub
-// [rm.ObjectRef]. The one version that may carry no `data` is a deletion
-// built without a payload (see [Deletion]).
+// [rm.ObjectRef]. A version may carry no `data`; the builder produces one
+// only for a deletion given no payload (see [Deletion]).
 //
 // At submission time the OBJECT_REFs in the persisted shape would point
 // at versions that do not yet exist, so a conformant CDR rejects
@@ -31,7 +31,7 @@ type Submission struct {
 	// to fall back to "UPDATE_AUDIT" for servers that accept only that form.
 	Audit UpdateAudit
 	// Versions is the closed type-set of inline-data versions to commit; a
-	// deletion may carry no data.
+	// version may carry no data (see [Deletion]).
 	// Each element must be an *[OriginalVersion][T] or *[ImportedVersion][T]
 	// for T in {rm.Composition, rm.EHRStatus, rm.Folder, rm.EHRAccess}.
 	// Construct elements with [WrapOriginalVersion] / [WrapImportedVersion].
