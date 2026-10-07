@@ -145,8 +145,11 @@ func (w *rmFloorWalker) checkCodedInvariants(value any, rmType, path string) {
 // one that decoded empty breaks its rule; an optional one only when present.
 // A class with no coded invariant in the table yields nothing: that includes
 // the change-control classes (AUDIT_DETAILS, ATTESTATION) the table leaves
-// out. The ENTRY and DV_ORDERED arms are pinned against the registry by
-// tests, so a concrete added there that is missing here fails loudly.
+// out. Every arm is pinned by tests in both forms, since the walk hands over
+// either: a DV_INTERVAL holds its bounds by value, for one. The ENTRY and
+// DV_ORDERED arms are pinned against the registry, by pointer and by value,
+// so a concrete added there that is missing here, in either form, fails
+// loudly.
 func codedValues(value any) []codedValue {
 	if value == nil || rmread.IsTypedNilPointer(value) {
 		return nil
@@ -217,9 +220,9 @@ func codedValues(value any) []codedValue {
 	case rm.Participation:
 		return participationCoded(nil, "", v)
 	case *rm.PartyRelated:
-		return partyRelatedCoded(v)
+		return []codedValue{relationshipCoded("", v)}
 	case rm.PartyRelated:
-		return partyRelatedCoded(&v)
+		return []codedValue{relationshipCoded("", &v)}
 	case *rm.TermMapping:
 		return appendCodedText(nil, &ruleTermMappingPurpose, v.Purpose)
 	case rm.TermMapping:
@@ -333,16 +336,14 @@ func ismTransitionCoded(t *rm.IsmTransition) []codedValue {
 	return appendCodedText(out, &ruleISMTransition, t.Transition)
 }
 
-// partyRelatedCoded lists PARTY_RELATED's relationship when it carries one.
-// The floor reads a PARTY_RELATED on the walk's leaf for its coded attribute
-// only, never for its presence, so a relationship with neither a value nor
-// a code is left alone (REQ-112, Known gap — classes rmread does not model).
-func partyRelatedCoded(p *rm.PartyRelated) []codedValue {
-	r := p.Relationship
-	if r.Value == "" && r.DefiningCode.CodeString == "" && r.DefiningCode.TerminologyID.Value == "" {
-		return nil
-	}
-	return []codedValue{{rule: &rulePartyRelationship, code: r.DefiningCode}}
+// relationshipCoded is PARTY_RELATED's relationship, at at below the node.
+// The attribute is mandatory and Relationship_valid unconditional, so an
+// empty relationship breaks it too. That finding is the only one the floor
+// gives a PARTY_RELATED with no relationship: the walk does not read the
+// leaf's attributes, so it reports no `required` there (REQ-112, Known gap —
+// classes rmread does not model).
+func relationshipCoded(at string, p *rm.PartyRelated) codedValue {
+	return codedValue{rule: &rulePartyRelationship, code: p.Relationship.DefiningCode, at: at, class: "PARTY_RELATED"}
 }
 
 // textCoded lists a DV_TEXT's (or DV_CODED_TEXT's) language and encoding,
@@ -379,15 +380,20 @@ func appendParticipations(out []codedValue, attr string, participations []rm.Par
 }
 
 // participationCoded appends PARTICIPATION's function when it is a
-// DV_CODED_TEXT (Function_valid's own guard) and its mode when present. at
-// is the path from the node to the participation ("" when the participation
-// is the node). Its performer is not read.
+// DV_CODED_TEXT (Function_valid's own guard), its mode when present, and the
+// relationship of its performer when that is a PARTY_RELATED: the walk
+// reaches no PARTICIPATION, so nothing else reads the performer. at is the
+// path from the node to the participation ("" when the participation is the
+// node).
 func participationCoded(out []codedValue, at string, p rm.Participation) []codedValue {
 	if fn, ok := asDVCodedText(p.Function); ok {
 		out = append(out, codedValue{rule: &ruleParticipationFunc, code: fn.DefiningCode, at: at, class: "PARTICIPATION"})
 	}
 	if p.Mode != nil {
 		out = append(out, codedValue{rule: &ruleParticipationMode, code: p.Mode.DefiningCode, at: at, class: "PARTICIPATION"})
+	}
+	if pr, ok := asPartyRelated(p.Performer); ok {
+		out = append(out, relationshipCoded(at+"/performer", &pr))
 	}
 	return out
 }

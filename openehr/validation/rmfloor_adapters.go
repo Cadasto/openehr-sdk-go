@@ -135,6 +135,22 @@ func asDVCodedText(value any) (rm.DVCodedText, bool) {
 	return rm.DVCodedText{}, false
 }
 
+// asPartyRelated recovers a PARTY_RELATED value (by value or by non-nil
+// pointer). It is how a coded check tells a PARTY_RELATED from another
+// PARTY_PROXY in a slot such as PARTICIPATION.performer.
+func asPartyRelated(value any) (rm.PartyRelated, bool) {
+	switch v := value.(type) {
+	case *rm.PartyRelated:
+		if v == nil {
+			return rm.PartyRelated{}, false
+		}
+		return *v, true
+	case rm.PartyRelated:
+		return v, true
+	}
+	return rm.PartyRelated{}, false
+}
+
 // asTermMapping recovers a TERM_MAPPING value (by value or by pointer).
 // The walk boxes `mappings` elements as pointers, so the pointer arm is
 // the one that fires during a descent; the value arm covers a caller

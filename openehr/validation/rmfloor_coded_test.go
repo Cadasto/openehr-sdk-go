@@ -6,6 +6,7 @@ package validation_test
 // at the CODE_PHRASE it read. Each test lists the exact findings by path.
 
 import (
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -341,24 +342,86 @@ func codedRows() []codedRow {
 	}
 }
 
+// rootRows add a row for each class that codedRows reaches only through a
+// holder, with the class itself as the root, so that every class of the
+// table is a root in some row.
+func rootRows() []codedRow {
+	return []codedRow{
+		{
+			name: "EVENT_CONTEXT setting, as the root", invariant: "Setting_valid", group: terminology.Setting,
+			root: func(c rm.CodePhrase) any {
+				ec := codedContext()
+				ec.Setting = codedText(c)
+				return ec
+			},
+			path: "/setting/defining_code", valid: openEHRCode("238"), breach: openEHRCode("9999"),
+		},
+		{
+			name: "PARTICIPATION function, as the root", invariant: "Function_valid", group: terminology.ParticipationFunction,
+			root: func(c rm.CodePhrase) any {
+				return &rm.Participation{Function: codedText(c), Performer: rm.PartySelf{}}
+			},
+			path: "/function/defining_code", valid: openEHRCode("253"), breach: openEHRCode("999"),
+		},
+		{
+			name: "PARTY_RELATED relationship, as the root", invariant: "Relationship_valid", group: terminology.SubjectRelationship,
+			root: func(c rm.CodePhrase) any { return &rm.PartyRelated{Relationship: codedText(c)} },
+			path: "/relationship/defining_code", valid: openEHRCode("10"), breach: openEHRCode("9999"),
+		},
+		{
+			name: "TERM_MAPPING purpose, as the root", invariant: "Purpose_valid", group: terminology.TermMappingPurpose,
+			root: func(c rm.CodePhrase) any {
+				purpose := codedText(c)
+				return &rm.TermMapping{Match: "=", Target: phrase("SNOMED-CT", "123"), Purpose: &purpose}
+			},
+			path: "/purpose/defining_code", valid: openEHRCode("669"), breach: openEHRCode("9999"),
+		},
+	}
+}
+
+// bothForms returns v by pointer and by value, whichever of the two it is.
+// The walk hands the coded pass either form: an interface slot usually holds
+// a pointer, a value-typed attribute such as a DV_INTERVAL bound a value.
+func bothForms(v any) (ptr, val any) {
+	rv := reflect.ValueOf(v)
+	if rv.Kind() == reflect.Pointer {
+		return v, rv.Elem().Interface()
+	}
+	p := reflect.New(rv.Type())
+	p.Elem().Set(rv)
+	return p.Interface(), v
+}
+
 // TestREQ112_CodedInvariantsTable checks every row of the Coded invariants
-// table: a member of the row's group or code set gives no
-// `code_not_in_value_set`, and a code outside it gives exactly one, at the
-// CODE_PHRASE the row reads. The diagnostic names the invariant and the group
-// or code set, and carries neither the caller's code nor its terminology id.
+// table, with the root by pointer and by value: a member of the row's group
+// or code set gives no `code_not_in_value_set`, and a code outside it gives
+// exactly one, at the CODE_PHRASE the row reads. The diagnostic names the
+// invariant and the group or code set, and carries neither the caller's code
+// nor its terminology id.
 func TestREQ112_CodedInvariantsTable(t *testing.T) {
-	for _, row := range codedRows() {
+	for _, row := range append(codedRows(), rootRows()...) {
 		t.Run(row.name, func(t *testing.T) {
-			if got := codedFindings(validation.ValidateRM(row.root(row.valid)).Issues); len(got) != 0 {
-				t.Errorf("ValidateRM(%s %s::%s) code_not_in_value_set at %q, want none",
-					row.name, row.valid.TerminologyID.Value, row.valid.CodeString, got)
+			validPtr, validVal := bothForms(row.root(row.valid))
+			breachPtr, breachVal := bothForms(row.root(row.breach))
+			for _, form := range []struct {
+				name          string
+				valid, breach any
+			}{
+				{"by pointer", validPtr, breachPtr},
+				{"by value", validVal, breachVal},
+			} {
+				if got := codedFindings(validation.ValidateRM(form.valid).Issues); len(got) != 0 {
+					t.Errorf("ValidateRM(%s %s::%s, %s) code_not_in_value_set at %q, want none",
+						row.name, row.valid.TerminologyID.Value, row.valid.CodeString, form.name, got)
+				}
+				r := validation.ValidateRM(form.breach)
+				if got, want := codedFindings(r.Issues), []string{row.path}; !slices.Equal(got, want) {
+					t.Errorf("ValidateRM(%s %s::%s, %s) code_not_in_value_set at %q, want %q; issues=%+v",
+						row.name, row.breach.TerminologyID.Value, row.breach.CodeString, form.name, got, want, r.Issues)
+					continue
+				}
+				assertCodedDetail(t, row, r.Issues, row.breach)
 			}
-			r := validation.ValidateRM(row.root(row.breach))
-			if got, want := codedFindings(r.Issues), []string{row.path}; !slices.Equal(got, want) {
-				t.Fatalf("ValidateRM(%s %s::%s) code_not_in_value_set at %q, want %q; issues=%+v",
-					row.name, row.breach.TerminologyID.Value, row.breach.CodeString, got, want, r.Issues)
-			}
-			assertCodedDetail(t, row, r.Issues, row.breach)
 		})
 	}
 }
@@ -551,9 +614,9 @@ func TestREQ112_CodeSetLetterCase(t *testing.T) {
 // TestREQ112_CodedInvariantGuards pins when an invariant applies: an optional
 // attribute only when present, ELEMENT's null_flavour only when the ELEMENT
 // has no value, PARTICIPATION's function only when it is a DV_CODED_TEXT, a
-// PARTY_RELATED's relationship only when it carries one, and a mandatory
-// value-typed attribute always, empty or not. Each row lists every finding
-// the root gives, by code and path.
+// PARTICIPATION's performer only when it is a PARTY_RELATED, and a mandatory
+// value-typed attribute always, empty or not, a PARTY_RELATED's relationship
+// included. Each row lists every finding the root gives, by code and path.
 func TestREQ112_CodedInvariantGuards(t *testing.T) {
 	badCode := codedText(openEHRCode("999"))
 	nurse := rm.DVText{Value: "nurse"}
@@ -585,6 +648,12 @@ func TestREQ112_CodedInvariantGuards(t *testing.T) {
 	noRelationship.Subject = rm.PartyRelated{}
 	noRelationshipCode := codedEvaluation()
 	noRelationshipCode.Subject = rm.PartyRelated{Relationship: rm.DVCodedText{Value: "mother"}}
+	badRelative := rm.PartyRelated{Relationship: codedText(openEHRCode("9999"))}
+	mother := rm.PartyRelated{Relationship: codedText(openEHRCode("10"))}
+	performer := func(p rm.PartyProxy) rm.Participation {
+		return rm.Participation{Function: nurse, Performer: p}
+	}
+	carer := "carer"
 
 	cases := []struct {
 		name string
@@ -662,15 +731,55 @@ func TestREQ112_CodedInvariantGuards(t *testing.T) {
 			want: []string{"code_not_in_value_set /function/defining_code"},
 		},
 		{
-			name: "PARTICIPATION performer is not checked",
-			root: withParticipations(rm.Participation{
-				Function:  nurse,
-				Performer: rm.PartyRelated{Relationship: badCode},
-			}),
+			name: "ENTRY participation performer, a PARTY_RELATED outside the group",
+			root: withParticipations(performer(badRelative)),
+			want: []string{"code_not_in_value_set /other_participations[0]/performer/relationship/defining_code"},
+		},
+		{
+			name: "ENTRY participation performer, a pointer to a PARTY_RELATED outside the group",
+			root: withParticipations(performer(&badRelative)),
+			want: []string{"code_not_in_value_set /other_participations[0]/performer/relationship/defining_code"},
+		},
+		{
+			name: "ENTRY participation performer, a PARTY_RELATED in the group",
+			root: withParticipations(performer(mother)),
+		},
+		{
+			name: "ENTRY participation performer, a PARTY_RELATED with no relationship",
+			root: withParticipations(performer(rm.PartyRelated{})),
+			want: []string{"code_not_in_value_set /other_participations[0]/performer/relationship/defining_code"},
+		},
+		{
+			name: "EVENT_CONTEXT participation performer, a PARTY_RELATED outside the group",
+			root: withContextParticipations(performer(badRelative)),
+			want: []string{"code_not_in_value_set /context/participations[0]/performer/relationship/defining_code"},
+		},
+		{
+			name: "PARTICIPATION root performer, a PARTY_RELATED outside the group",
+			root: &rm.Participation{Function: nurse, Performer: &badRelative},
+			want: []string{"code_not_in_value_set /performer/relationship/defining_code"},
+		},
+		{
+			name: "PARTICIPATION root by value, performer a PARTY_RELATED outside the group",
+			root: rm.Participation{Function: nurse, Performer: badRelative},
+			want: []string{"code_not_in_value_set /performer/relationship/defining_code"},
+		},
+		{
+			name: "ENTRY participation performer, a PARTY_SELF",
+			root: withParticipations(performer(rm.PartySelf{})),
+		},
+		{
+			name: "ENTRY participation performer, a PARTY_IDENTIFIED",
+			root: withParticipations(performer(&rm.PartyIdentified{Name: &carer})),
+		},
+		{
+			name: "PARTICIPATION root performer, a PARTY_IDENTIFIED",
+			root: &rm.Participation{Function: nurse, Performer: rm.PartyIdentified{Name: &carer}},
 		},
 		{
 			name: "PARTY_RELATED with no relationship",
 			root: noRelationship,
+			want: []string{"code_not_in_value_set /subject/relationship/defining_code"},
 		},
 		{
 			name: "PARTY_RELATED relationship with a value and no code",
@@ -755,9 +864,25 @@ func codedJSONPhrase(tid, code string) string {
 	return `{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"` + tid + `"},"code_string":"` + code + `"}`
 }
 
+// assertCodedBothForms validates v by pointer and by value and checks that
+// each gives `code_not_in_value_set` exactly at want.
+func assertCodedBothForms(t *testing.T, label string, v any, want []string) {
+	t.Helper()
+	ptr, val := bothForms(v)
+	for _, form := range []struct {
+		name string
+		root any
+	}{{"by pointer", ptr}, {"by value", val}} {
+		if got := codedFindings(validation.ValidateRM(form.root).Issues); !slices.Equal(got, want) {
+			t.Errorf("ValidateRM(%s, %s) code_not_in_value_set at %q, want %q", label, form.name, got, want)
+		}
+	}
+}
+
 // TestREQ112_CodedInvariantsEveryEntry checks Language_valid and
-// Encoding_valid on every registered ENTRY concrete. A concrete added to the
-// registry that the floor's coded pass does not read fails here.
+// Encoding_valid on every registered ENTRY concrete, by pointer and by value.
+// A concrete added to the registry that the floor's coded pass does not read,
+// in either form, fails here.
 func TestREQ112_CodedInvariantsEveryEntry(t *testing.T) {
 	var checked int
 	for _, name := range typereg.Default.Names() {
@@ -774,10 +899,7 @@ func TestREQ112_CodedInvariantsEveryEntry(t *testing.T) {
 			if err != nil {
 				t.Fatalf("typereg.Decode(%s with a language and an encoding): %v", name, err)
 			}
-			want := []string{"/encoding", "/language"}
-			if got := codedFindings(validation.ValidateRM(v).Issues); !slices.Equal(got, want) {
-				t.Errorf("ValidateRM(%s) code_not_in_value_set at %q, want %q", name, got, want)
-			}
+			assertCodedBothForms(t, name, v, []string{"/encoding", "/language"})
 		})
 	}
 	if checked == 0 {
@@ -786,8 +908,9 @@ func TestREQ112_CodedInvariantsEveryEntry(t *testing.T) {
 }
 
 // TestREQ112_CodedInvariantsEveryOrdered checks Normal_status_validity on
-// every registered DV_ORDERED concrete. A concrete added to the registry that
-// the floor's coded pass does not read fails here.
+// every registered DV_ORDERED concrete, by pointer and by value: the walk
+// meets a DV_INTERVAL's bounds by value. A concrete added to the registry
+// that the floor's coded pass does not read, in either form, fails here.
 func TestREQ112_CodedInvariantsEveryOrdered(t *testing.T) {
 	var checked int
 	for _, name := range typereg.Default.Names() {
@@ -809,14 +932,90 @@ func TestREQ112_CodedInvariantsEveryOrdered(t *testing.T) {
 				if err != nil {
 					t.Fatalf("typereg.Decode(%s with normal_status %s): %v", name, tc.code, err)
 				}
-				if got := codedFindings(validation.ValidateRM(v).Issues); !slices.Equal(got, tc.want) {
-					t.Errorf("ValidateRM(%s normal_status %s) code_not_in_value_set at %q, want %q", name, tc.code, got, tc.want)
-				}
+				assertCodedBothForms(t, name+" normal_status "+tc.code, v, tc.want)
 			}
 		})
 	}
 	if checked == 0 {
 		t.Fatal("the registry yields no DV_ORDERED concretes; registrations missing?")
+	}
+}
+
+// TestREQ112_CodedIntervalBound checks Normal_status_validity on an interval
+// bound, in the shapes the walk meets one. DV_QUANTITY, DV_COUNT and
+// DV_PROPORTION type their normal_range, so its bounds are values; the
+// temporal types' normal_range is a bare DV_INTERVAL<DV_ORDERED>, whose
+// decoded bounds are pointers; and a typed interval such as the
+// DV_INTERVAL<DV_DATE> the generator writes holds its bounds by value.
+func TestREQ112_CodedIntervalBound(t *testing.T) {
+	const bad = `"normal_status":{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"openehr_normal_statuses"},"code_string":"HHHH"}`
+	interval := func(lower, upper string) string {
+		return `{"_type":"DV_INTERVAL","lower":` + lower + `,"upper":` + upper + `,` +
+			`"lower_included":true,"upper_included":true,"lower_unbounded":false,"upper_unbounded":false}`
+	}
+	decodedElement := func(t *testing.T, value string) any {
+		t.Helper()
+		body := `{"_type":"ELEMENT","archetype_node_id":"at0001","name":{"_type":"DV_TEXT","value":"item"},"value":` + value + `}`
+		v, err := typereg.Default.Decode([]byte(body))
+		if err != nil {
+			t.Fatalf("typereg.Decode(ELEMENT %s): %v", body, err)
+		}
+		return v
+	}
+	badStatus := phrase("openehr_normal_statuses", "HHHH")
+	cases := []struct {
+		name string
+		root func(t *testing.T) any
+		want []string
+	}{
+		{
+			name: "decoded DV_QUANTITY normal_range, lower bound by value",
+			root: func(t *testing.T) any {
+				return decodedElement(t, `{"_type":"DV_QUANTITY","magnitude":5,"units":"mg","normal_range":`+interval(
+					`{"_type":"DV_QUANTITY","magnitude":1,"units":"mg",`+bad+`}`,
+					`{"_type":"DV_QUANTITY","magnitude":9,"units":"mg"}`)+`}`)
+			},
+			want: []string{"/value/normal_range/lower/normal_status"},
+		},
+		{
+			name: "decoded DV_COUNT normal_range, upper bound by value",
+			root: func(t *testing.T) any {
+				return decodedElement(t, `{"_type":"DV_COUNT","magnitude":5,"normal_range":`+interval(
+					`{"_type":"DV_COUNT","magnitude":1}`,
+					`{"_type":"DV_COUNT","magnitude":9,`+bad+`}`)+`}`)
+			},
+			want: []string{"/value/normal_range/upper/normal_status"},
+		},
+		{
+			name: "decoded DV_DATE_TIME normal_range, upper bound by pointer",
+			root: func(t *testing.T) any {
+				return decodedElement(t, `{"_type":"DV_DATE_TIME","value":"2026-10-01T10:00:00Z","normal_range":`+interval(
+					`{"_type":"DV_DATE_TIME","value":"2026-10-01T09:00:00Z"}`,
+					`{"_type":"DV_DATE_TIME","value":"2026-10-01T11:00:00Z",`+bad+`}`)+`}`)
+			},
+			want: []string{"/value/normal_range/upper/normal_status"},
+		},
+		{
+			name: "DV_INTERVAL<DV_DATE> as an ELEMENT value, lower bound by value",
+			root: func(*testing.T) any {
+				return &rm.Element{
+					ArchetypeNodeID: "at0001",
+					Name:            rm.DVText{Value: "item"},
+					Value: &rm.DVInterval[rm.DVDate]{
+						Lower: rm.DVDate{Value: "2026-10-01", NormalStatus: &badStatus}, LowerIncluded: true,
+						Upper: rm.DVDate{Value: "2026-10-02"}, UpperIncluded: true,
+					},
+				}
+			},
+			want: []string{"/value/lower/normal_status"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := codedFindings(validation.ValidateRM(tc.root(t)).Issues); !slices.Equal(got, tc.want) {
+				t.Errorf("ValidateRM(ELEMENT, %s outside the normal statuses) code_not_in_value_set at %q, want %q", tc.name, got, tc.want)
+			}
+		})
 	}
 }
 

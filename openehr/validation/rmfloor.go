@@ -50,18 +50,21 @@ const maxWalkDepth = 256
 // The invariants include the RM's coded ones: an attribute the RM codes from
 // a group or a code set of the openEHR terminology, such as a COMPOSITION's
 // language and territory, an EVENT_CONTEXT's setting, an ENTRY's language
-// and encoding (and the function and mode of its participations), an
-// ELEMENT's null_flavour or a DV_ORDERED's normal_status, must hold a member
-// of it. Groups and code sets come from
+// and encoding, an ELEMENT's null_flavour, a DV_ORDERED's normal_status or
+// a PARTY_RELATED's relationship, must hold a member of it. The
+// participations of an ENTRY or an EVENT_CONTEXT are read too: their
+// function and mode, and the relationship of a performer that is a
+// PARTY_RELATED. Groups and code sets come from
 // [github.com/cadasto/openehr-sdk-go/openehr/terminology]. A group code must
 // also be coded in the openEHR terminology itself; a code-set code is
-// matched alone, ignoring letter case for the ISO and IANA sets. Optional
-// attributes are checked only when present. A breach is reported as
-// `code_not_in_value_set` at the CODE_PHRASE read: the attribute itself, or
-// its defining_code for a coded text. The detail names the attribute, the
-// RM invariant and the group or code set, never the code. The coded rules
-// of the change-control classes (AUDIT_DETAILS, ATTESTATION, VERSION) are
-// not checked.
+// matched alone, ignoring letter case for the ISO and IANA sets. An optional
+// attribute is checked only when present, and a mandatory one always, so an
+// empty one is reported too. A breach is reported as `code_not_in_value_set`
+// at the CODE_PHRASE read: the attribute itself, or its defining_code for a
+// coded text. The detail names the attribute, the RM invariant and the
+// group or code set, never the code. The coded rules of the change-control
+// classes (VERSION, AUDIT_DETAILS, ATTESTATION) are not checked, nor those of
+// EXTRACT_PARTICIPATION, a class the SDK's RM types leave out.
 //
 // A nil root surfaces a single `nil_root` issue and is reported as
 // not-OK. An unknown RM root type (a Go value outside the closed RM
