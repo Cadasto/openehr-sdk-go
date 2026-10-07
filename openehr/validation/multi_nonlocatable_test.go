@@ -417,6 +417,49 @@ func TestValidateComposition_REQ102_NilContentItemKeepsSlotFill(t *testing.T) {
 	}
 }
 
+// REQ-102 — the nil-item rule applies only where the attribute declares
+// children. An attribute that declares none is open and accepts any item,
+// a nil one included; the same attribute with one child reports the nil
+// item as slot_fill, which shows the attribute is walked.
+func TestValidateComposition_REQ102_NilItemUnderOpenAttributePasses(t *testing.T) {
+	tests := []struct {
+		name     string
+		children string
+		want     []string
+	}{
+		{name: "open attribute accepts a nil item", children: "", want: []string{}},
+		{
+			name: "attribute with a child reports a nil item",
+			children: `
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>OBSERVATION</rm_type_name>
+        <node_id>at0001</node_id>
+      </children>`,
+			want: []string{"slot_fill /content[@1]"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			opt := mustReplaceOnce(t, participationsOPT, `
+    <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+      <rm_attribute_name>context</rm_attribute_name>`, `
+    <attributes xsi:type="C_MULTIPLE_ATTRIBUTE">
+      <rm_attribute_name>content</rm_attribute_name>`+tc.children+`
+    </attributes>
+    <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+      <rm_attribute_name>context</rm_attribute_name>`)
+			c := mustCompileSyntheticOPT(t, opt)
+			comp := participationsComposition(validParticipation())
+			comp.Content = []rm.ContentItem{nil}
+
+			r := validation.ValidateComposition(comp, c)
+			if got := issueKeys(r.Issues); !slices.Equal(got, tc.want) {
+				t.Errorf("ValidateComposition issues = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 // folderOPT returns a FOLDER OPT whose items admit one child of the
 // given RM type.
 func folderOPT(itemType string) string {
