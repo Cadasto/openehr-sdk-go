@@ -49,13 +49,13 @@ type Option func(*config)
 // is sent with a shallow copy of c, made for that request, whose
 // redirect policy refuses a redirect from an https URL to a URL that is
 // not https: net/http would otherwise send the header to the new URL
-// unencrypted when it names the same host. Do then fails with an error
-// matching [ErrInsecureRedirect], the request does not reach the new
-// URL, and it is not retried. Any other redirect goes through c's own
-// CheckRedirect, or net/http's default limit of 10 redirects when c has
-// none. The copy shares c's Transport, Jar and Timeout, and c itself is
-// never modified, so a change made to c later applies to the next
-// request.
+// unencrypted when it names the same host or a subdomain. Do then fails
+// with an error matching [ErrInsecureRedirect], the request does not
+// reach the new URL, and it is not retried. Any other redirect goes
+// through c's own CheckRedirect, or net/http's default limit of 10
+// redirects when c has none. The copy shares c's Transport, Jar and
+// Timeout, and c itself is never modified, so a change made to c later
+// applies to the next request.
 func WithHTTPClient(c *http.Client) Option {
 	return func(cfg *config) { cfg.httpClient = c }
 }

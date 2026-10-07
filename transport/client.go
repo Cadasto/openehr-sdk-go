@@ -122,7 +122,10 @@ func (c *Client) HTTPClient() *http.Client {
 //  1. Resolve the service base URL from the catalog by ServiceID.
 //  2. Build the http.Request, plumb headers, attach the bearer token.
 //  3. Emit an OTel span and propagate traceparent.
-//  4. Execute via the injected *http.Client.
+//  4. Execute via the injected *http.Client, or, for a request carrying
+//     an Authorization header, via a per-request copy of it that refuses
+//     a redirect from https to a URL that is not https (see
+//     WithHTTPClient).
 //  5. Retry per RetryPolicy on retriable statuses.
 //  6. Parse the response body into Body + Metadata; map the wire
 //     error envelope onto the typed-sentinel hierarchy.

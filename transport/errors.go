@@ -60,9 +60,10 @@ var (
 	ErrInvalidPathSegment = errors.New("transport: invalid path segment")
 	// ErrInsecureRedirect indicates the transport refused to follow a
 	// redirect from an https URL to a URL that is not https, because the
-	// request carried an Authorization header that net/http would have
-	// sent to the new URL unencrypted. The request never reached that URL,
-	// and the retry policy does not retry it.
+	// request carried an Authorization header, which net/http forwards to
+	// a redirect target on the same host or a subdomain whatever its
+	// scheme. The request never reached that URL, and the retry policy
+	// does not retry it.
 	ErrInsecureRedirect = errors.New("transport: redirect from https to a URL that is not https refused")
 )
 

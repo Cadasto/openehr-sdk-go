@@ -7,6 +7,7 @@ package transport_test
 // consumer injected.
 
 import (
+	"cmp"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -125,20 +126,25 @@ func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { retu
 // answers 307 to a plain-http URL on the same host, where net/http would copy
 // the Authorization header whatever the scheme. The second case starts on
 // plain http and is upgraded to https first, so the hop is judged from the
-// request just before the refused one, not from the first.
+// request just before the refused one, not from the first. The third case
+// redirects to a scheme that is neither http nor https, which is refused too:
+// the rule names any URL whose scheme is not https.
 func TestDoRefusesHTTPSToHTTPRedirectWithToken(t *testing.T) { // REQ-092
 	t.Parallel()
 	for _, tc := range []struct {
 		name     string
 		upgraded bool
+		location string // empty: the plain-http landing server
 	}{
 		{name: "https origin redirects to http"},
 		{name: "http origin redirects to https, which redirects to http", upgraded: true},
+		{name: "https origin redirects to a ws URL", location: "ws://127.0.0.1:1/landing"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			plain := newLanding(t, false)
-			origin, _ := newRedirector(t, true, plain.srv.URL+"/landing")
+			location := cmp.Or(tc.location, plain.srv.URL+"/landing")
+			origin, _ := newRedirector(t, true, location)
 			hc := origin.Client()
 			if tc.upgraded {
 				origin, _ = newRedirector(t, false, origin.URL+"/openehr/v1/ehr")
@@ -245,8 +251,7 @@ func TestDoFollowsHTTPSToHTTPSRedirectWithToken(t *testing.T) { // REQ-092
 
 // TestDoAppliesCallerRedirectPolicyWithToken pins that the copy defers to the
 // injected client's own CheckRedirect for an https to https hop. The policy is
-// set after transport.New, so it also pins that the copy is taken per request:
-// a copy taken once at New would not see it.
+// set after transport.New, so a copy taken in New would not see it.
 func TestDoAppliesCallerRedirectPolicyWithToken(t *testing.T) { // REQ-092, REQ-021
 	t.Parallel()
 	secure := newLanding(t, true)
@@ -346,9 +351,10 @@ func TestDoLeavesInjectedClientUnmodified(t *testing.T) { // REQ-092, REQ-021
 	})
 }
 
-// TestDoUsesTransportSetAfterNew pins that the copy is taken for each
-// request: a Transport the caller sets on the injected client after
-// transport.New carries the next request that has an Authorization header.
+// TestDoUsesTransportSetAfterNew pins that the copy is not taken in New: a
+// Transport the caller sets on the injected client after transport.New
+// carries the first request that has an Authorization header. A change made
+// between two requests is TestDoAppliesInjectedClientChangesBetweenRequests.
 func TestDoUsesTransportSetAfterNew(t *testing.T) { // REQ-092, REQ-021
 	t.Parallel()
 	secure := newLanding(t, true)
@@ -368,6 +374,65 @@ func TestDoUsesTransportSetAfterNew(t *testing.T) { // REQ-092, REQ-021
 	if got := trips.Load(); got != 1 {
 		t.Errorf("Transport set after transport.New carried %d request(s), want 1", got)
 	}
+}
+
+// TestDoAppliesInjectedClientChangesBetweenRequests pins that the copy is
+// taken for each request, not cached after the first: a change the caller
+// makes to the injected client between two requests on one Client reaches
+// the second request.
+func TestDoAppliesInjectedClientChangesBetweenRequests(t *testing.T) { // REQ-092, REQ-021
+	t.Parallel()
+
+	t.Run("CheckRedirect set between requests", func(t *testing.T) {
+		t.Parallel()
+		secure := newLanding(t, true)
+		origin, _ := newRedirector(t, true, secure.srv.URL+"/landing")
+		hc := copyClient(origin.Client())
+		c := newRedirectClient(t, origin, hc, withToken("tok"))
+
+		if _, err := c.Do(t.Context(), &transport.Request{Path: "/ehr"}); err != nil {
+			t.Fatalf("first Do() error = %v, want the https to https redirect followed", err)
+		}
+		var calls atomic.Int32
+		hc.CheckRedirect = func(*http.Request, []*http.Request) error {
+			calls.Add(1)
+			return http.ErrUseLastResponse
+		}
+		_, err := c.Do(t.Context(), &transport.Request{Path: "/ehr"})
+		we, ok := errors.AsType[*transport.WireError](err)
+		if !ok || we == nil || we.StatusCode != http.StatusTemporaryRedirect {
+			t.Fatalf("second Do() error = %v, want a *transport.WireError with status 307 from the policy set between requests", err)
+		}
+		if got := calls.Load(); got != 1 {
+			t.Errorf("CheckRedirect set between requests called %d time(s), want 1", got)
+		}
+		if got := secure.hits.Load(); got != 1 {
+			t.Errorf("https target received %d request(s), want 1: only the first request follows the redirect", got)
+		}
+	})
+
+	t.Run("Transport set between requests", func(t *testing.T) {
+		t.Parallel()
+		secure := newLanding(t, true)
+		base := secure.srv.Client()
+		hc := copyClient(base)
+		c := newRedirectClient(t, secure.srv, hc, withToken("tok"))
+
+		if _, err := c.Do(t.Context(), &transport.Request{Path: "/ehr"}); err != nil {
+			t.Fatalf("first Do() error = %v", err)
+		}
+		var trips atomic.Int32
+		hc.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			trips.Add(1)
+			return base.Transport.RoundTrip(r)
+		})
+		if _, err := c.Do(t.Context(), &transport.Request{Path: "/ehr"}); err != nil {
+			t.Fatalf("second Do() error = %v", err)
+		}
+		if got := trips.Load(); got != 1 {
+			t.Errorf("Transport set between requests carried %d request(s), want 1", got)
+		}
+	})
 }
 
 // TestDoDoesNotRetryRefusedRedirect pins that the refusal is final: with a
