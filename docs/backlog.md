@@ -8,7 +8,7 @@ Leftovers of merged branches: suggestions, and findings the maintainer deferred 
 
 ## Template validation: false rm_type_mismatch and paths (REQ-102)
 Code in openehr/validation/walk_composition.go, one delivery with a test per row; the keyword lead is its spec half.
-- openehr/validation/walk_composition.go:845 · bmmSubtypes (the map at :845, read by rmTypeIsSubtypeOf at :722) has no row for DV_TEXT, PARTY_IDENTIFIED, OBJECT_REF or the abstract DV classes (DV_ORDERED, DV_QUANTIFIED, DV_AMOUNT), so a DV_CODED_TEXT, PARTY_RELATED, PARTY_REF (or LOCATABLE_REF, ACCESS_GROUP_REF) or DV_QUANTITY under an OPT node declared as one of them gets a false rm_type_mismatch, on single attributes and on list items alike (no vendored OPT declares an abstract DV class) · evidence: a DV_CODED_TEXT in ACTOR.languages under a DV_TEXT child reports rm_type_mismatch /languages[@1]; ValidateFolder with a PARTY_REF item under an OBJECT_REF child reports rm_type_mismatch /items[@1] · by: sdd-implementer, go-reviewer · from: #243, chore/backlog-round3
+- openehr/validation/walk_composition.go:845 · tracked in #248: template validation rejects a DV_CODED_TEXT under a DV_TEXT node, and other RM subtypes the bmmSubtypes table lacks
 - openehr/validation/walk_composition.go:321 · The occurrences check builds its path with segmentForChild(attr, c, 0), so an OPT child with no archetype or node id is always reported at [@1], even when it is the second child · evidence: worker's temporary test: two DV_TEXT items bound to the second (DV_TEXT) child of ACTOR.languages with occurrences 0..1 report cardinality /languages[@1] · by: sdd-implementer · from: #243
 - docs/specifications/clinical-modeling.md:368 · "A bound item counts toward its child's occurrences like any other item" is the only sentence of the new rule without a keyword, although the code guarantees it and a test pins it · evidence: multi_nonlocatable_test.go:199-201 row "bound participations count toward occurrences" wants "cardinality /context/participations[@1]" · by: sdd-doc-reviewer · from: #243
 
@@ -29,7 +29,7 @@ Stale comments and missing tests around openehr/validation and its rmread reader
 
 ## Template package: constraints and strict parse
 Code in openehr/template and its constraints package; the strict-parse lead needs a spec edit first.
-- openehr/template/parse.go:419 · Strict parsing keeps an unrecognised leaf node type (CONSTRAINT_REF, for one) as a bare leaf and drops its constraint without error, so a strictly parsed template can still lose constraints; out of this range, a lead for the parser · evidence: Demonstration.v1.opt (8 CONSTRAINT_REF nodes) parses under ParseFileStrict with a nil error (go-reviewer overlay test) · fix: decide whether strict mode should reject or support CONSTRAINT_REF; backlog · by: go-reviewer · from: docs/examples-validation-path
+- openehr/template/parse.go:419 · tracked in #249 (D): ParseFileStrict keeps a CONSTRAINT_REF node and drops its constraint
 - openehr/template/constraints/temporal.go:57 · CTime, CDateTime and CDuration Validate refuse forms the REQ-123 parse and the RM floor accept (20251024T121033, 10:30:00+0100, -P1D, PT1,5S); align them or record the gap · from: pr199
 - openehr/template/constraints/range.go:58 · NumericRange.Contains accepts NaN, so CReal and DvQuantity let a NaN magnitude through a bounded range with no violation. · evidence: T1 review of 29aff8e5, read of range.go:58; pre-existing, not introduced by REQ-168 · by: go-reviewer · from: #245
 - openehr/template/constraints/redacted.go:66 · Redact interns with unique.Handle[any], and unique.clone does not copy a string held in an interface, so a substring keeps its whole backing array alive for the life of the diagnostic (resource retention). · by: go-reviewer · from: #245
@@ -129,8 +129,8 @@ Code and tests in openehr/instance; the composition uid lead needs a live EHRbas
 
 ## Simplified formats: FLAT and STRUCTURED decode (PROBE-105)
 Code in openehr/serialize/simplified and the web template conformance harness; the metadata-keys lead is an ADR-level decision.
-- openehr/serialize/simplified/flat_decode.go:266 · FLAT decode does not recognise the indexed composition-metadata spellings that StructuredToFlat writes (for one, `<root>/language:0|code`); they flow through as ordinary leaves and the ctx values overwrite them, a silent drop (PROBE-105 structured-flat; the harness side is the IsCompositionMeta lead below) · from: pr-crossformat
-- testkit/conformance/webtemplate/case.go:167 · IsCompositionMeta matches only unindexed spellings, so StructuredToFlat's `language:0|code`, `composer:0|name` and `context:0/start_time:0` reach decode in PROBE-105's structured-flat leg instead of being held out; changing it moves PROBE-086 · from: pr-crossformat
+- openehr/serialize/simplified/flat_decode.go:266 · tracked in #249 (C): FLAT decode drops an indexed composition-metadata key such as `<root>/language:0|code`
+- testkit/conformance/webtemplate/case.go:167 · tracked in #249 (C, harness side): IsCompositionMeta matches only unindexed metadata spellings
 - openehr/serialize/simplified/flat_decode.go:1799 · DV_PROPORTION `|type` (and numerator, denominator) reach canjson unchecked, so EHRbase's `1.0` fails as a canjson error naming no FLAT key, where deviations.md promises a refusal naming the key (PROBE-105 test_all_types flat-canonical) · from: pr-crossformat
 - openehr/serialize/simplified/flat_decode.go:670 · the WithTemplate completion of RM-mandatory attributes skips ACTIVITY.action_archetype_id, so a FLAT that omits it decodes to an empty string that breaks Action_archetype_id_valid although the OPT constrains it (PROBE-105 nested) · from: pr-crossformat
 - openehr/serialize/simplified/flat_decode.go:266 · EHRbase's composition-level metadata keys: it writes a renamed composition as `<root>/_name` (encode drops it and decode refuses it, while deviations.md says the formats carry no names), and most EHRbase-produced FLAT carries the body-form composer keys `<root>/composer|id`, `|id_scheme` and `|id_namespace`, which FLAT and STRUCTURED decode refuse as an unsupported PARTY_PROXY datatype (`composer|name` aliases to ctx/composer_name); both are recorded as deliberate boundaries (ADR 0015, deviations.md), so closing either needs a decision on a ctx carrier (PROBE-105 census: consult_record, ehrn_abdm) · from: pr-crossformat
@@ -143,8 +143,8 @@ Code in openehr/template/webtemplate; each fix moves the PROBE-086 census counts
 
 ## RM value types: intervals and temporal (REQ-052)
 Code in openehr/rm plus the wire.md wording that goes with it.
-- openehr/rm/foundation_types_interval_gen.go:38 · LowerIncluded and UpperIncluded are plain bools, so a canonical document that omits the RM-mandatory flag decodes it as false (excluded), the opposite of EHRbase's reading, and FLAT encode then writes `false` (PROBE-105 test_all_types canonical-flat) · from: pr-crossformat
-- openehr/rm/temporal_funcs.go:218 · DVTime.ToTime and DVDateTime.ToTime pass the valid leap second 23:59:60 to time.Date as second 60, so it converts to the next minute's instant with a nil error · from: pr199
+- openehr/rm/foundation_types_interval_gen.go:38 · tracked in #249 (A): a canonical DV_INTERVAL without its included flags decodes as excluding both bounds
+- openehr/rm/temporal_funcs.go:218 · tracked in #249 (B): ToTime turns the leap second 23:59:60 into the next minute with a nil error
 - docs/specifications/wire.md:122 · § REQ-052 says decode keeps whatever bound it reads with no keyword, and no sentence says a flag set only on the embedded interval of a Point_interval does not open a side (the outer flags win, pinned only by tests); the client-package split in Functional API areas also has no keyword and no normative home · from: audit-2026-09
 
 ## Probe and corpus witnesses
