@@ -120,6 +120,7 @@ requirements:
     packages: [transport]
     tests:
       - transport/client_test.go
+      - transport/redirect_test.go
 
   - id: REQ-022
     title: Functional options
@@ -206,6 +207,7 @@ requirements:
       - auth/jwtbearer/reauth_test.go
       - sandbox/roundtrip_test.go
       - smart/discovery/coalesce_cancel_test.go
+      - smart/discovery/coalesce_panic_test.go
 
   - id: REQ-030
     title: Concrete RM structs
@@ -813,6 +815,7 @@ requirements:
     probes: [PROBE-041]
     tests:
       - smart/discovery/coalesce_cancel_test.go
+      - smart/discovery/coalesce_panic_test.go
       - smart/discovery/issuer_test.go
       - smart/discovery/not_modified_test.go
       - testkit/probes/discovery/probe_041_catalog_refresh_on_401.go
@@ -943,6 +946,7 @@ requirements:
     tests:
       - transport/client_test.go
       - transport/reauth_challenge_test.go
+      - transport/redirect_test.go
 
   - id: REQ-092
     title: TLS posture
@@ -950,6 +954,8 @@ requirements:
     status: draft
     implementation: landed
     packages: [transport, smart/discovery]
+    tests:
+      - transport/redirect_test.go
 
   - id: REQ-093
     title: Error envelope mapping
@@ -975,6 +981,7 @@ requirements:
       - transport/error_envelope_test.go
       - transport/errors_test.go
       - transport/reauth_challenge_test.go
+      - transport/redirect_test.go
 
   - id: REQ-094
     title: "`Prefer` negotiation"
