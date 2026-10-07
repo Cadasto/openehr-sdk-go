@@ -40,8 +40,9 @@
 // A [Violation] names the clause that failed and never repeats the
 // value under validation in its Code or Detail, so it can be logged or
 // returned to a client as it is. The value is kept in Violation.Value,
-// a [Redacted] that always prints as "[redacted]" when it holds a
-// value; [Redacted.Reveal] returns the value itself.
+// a [Redacted] that keeps it out of fmt, JSON, gob and log/slog output
+// (see its documentation for the exact rules); [Redacted.Reveal]
+// returns the value itself.
 //
 // The package is stdlib-only, so primitive constraint shapes are usable
 // from any consumer (composition builder, validator, codegen) without
