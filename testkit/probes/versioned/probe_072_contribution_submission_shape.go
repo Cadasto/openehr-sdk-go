@@ -23,11 +23,17 @@ import (
 // a `sandbox.Backend` scripted route) and asserts:
 //
 //   - `versions[i]._type` ∈ {"ORIGINAL_VERSION","IMPORTED_VERSION"}
-//   - `versions[i].data._type` is present (the inline payload)
+//   - `versions[i].data._type` is present (the inline payload), except on
+//     an ORIGINAL_VERSION whose commit_audit change type is `523` (deleted)
+//     and that has no `data` member at all: a deletion built without a
+//     payload sends none (§ REQ-130 Deletion). No other version is exempt,
+//     and a `"data":null` fails on every version, a `523` one included,
+//     because the member is to be left out, not nulled
 //   - `versions[i]._type` ≠ "OBJECT_REF" (the regression)
 //   - the batch `audit` and each `versions[i].commit_audit` carry no
 //     server-assigned `time_committed` and a `DV_CODED_TEXT`-shaped
-//     `change_type` (SPECITS-95 / ITS-REST PR 131); see [auditWriteShapeIssue]
+//     `change_type` (SPECITS-95 / ITS-REST PR 131); see [auditWriteShapeIssue].
+//     This holds for a deletion built without a payload too
 //
 // It is symmetric to [Probe071CompositionWriteResponseShape]: both pin
 // request/response shape asymmetries that the persisted RM shape would
@@ -84,14 +90,17 @@ func Probe072ContributionSubmissionShape(ctx context.Context, c *transport.Clien
 		r.Detail = "versions[] is empty — every Contribution_create body must carry at least one version"
 		return r, nil
 	}
+	payloadless := 0 // deletions built without a payload, counted for the pass detail
 	for i, v := range body.Versions {
 		switch t := v["_type"]; t {
 		case "ORIGINAL_VERSION", "IMPORTED_VERSION":
-			data, ok := v["data"].(map[string]any)
-			if !ok || data["_type"] == nil {
+			if msg := submissionDataIssue(i, v); msg != "" {
 				r.Status = "fail"
-				r.Detail = fmt.Sprintf("versions[%d].data missing or has no _type (Contribution_create requires inline payload)", i)
+				r.Detail = msg
 				return r, nil
+			}
+			if isPayloadlessDeletion(v) {
+				payloadless++
 			}
 			if ca, ok := v["commit_audit"].(map[string]any); ok {
 				if msg := auditWriteShapeIssue(fmt.Sprintf("versions[%d].commit_audit", i), ca); msg != "" {
@@ -111,8 +120,46 @@ func Probe072ContributionSubmissionShape(ctx context.Context, c *transport.Clien
 		}
 	}
 	r.Status = "pass"
-	r.Detail = fmt.Sprintf("Contribution_create body: %d version(s), all inline ORIGINAL/IMPORTED_VERSION with data._type set", len(body.Versions))
+	r.Detail = fmt.Sprintf("Contribution_create body: %d version(s), all ORIGINAL/IMPORTED_VERSION with data._type set inline, except %d deletion(s) built without a payload that carry no data member (REQ-130 Deletion)", len(body.Versions), payloadless)
 	return r, nil
+}
+
+// submissionDataIssue returns a non-empty description when versions[i] does
+// not carry its payload the way Contribution_create asks, or "" when it does.
+// A `"data":null` fails on every version, including a deletion built without
+// a payload, because that version must leave the member out. Otherwise `data`
+// must be an object with a `_type`, unless the version is a deletion built
+// without a payload ([isPayloadlessDeletion]).
+func submissionDataIssue(i int, v map[string]any) string {
+	raw, present := v["data"]
+	if present && raw == nil {
+		return fmt.Sprintf("versions[%d].data is null (a version carries its payload inline, and a deletion built without one leaves the data member out rather than null — REQ-130 Deletion)", i)
+	}
+	if isPayloadlessDeletion(v) {
+		return ""
+	}
+	data, ok := raw.(map[string]any)
+	if !ok || data["_type"] == nil {
+		return fmt.Sprintf("versions[%d].data missing or has no _type (Contribution_create requires inline payload)", i)
+	}
+	return ""
+}
+
+// isPayloadlessDeletion reports whether a decoded version is the one the
+// inline-payload rule lets carry no `data`: an ORIGINAL_VERSION whose
+// commit_audit change type is `523` (deleted) and that has no `data` key at
+// all (REQ-130 Deletion). Absence is judged on **key presence**, as PROBE-084
+// does, because `"data":null` is a present key whose value reads like a
+// missing one. An IMPORTED_VERSION is never exempt.
+func isPayloadlessDeletion(v map[string]any) bool {
+	if v["_type"] != "ORIGINAL_VERSION" {
+		return false
+	}
+	if _, has := v["data"]; has {
+		return false
+	}
+	ca, _ := v["commit_audit"].(map[string]any)
+	return codedCodeString(ca, "change_type") == "523"
 }
 
 // auditWriteShapeIssue returns a non-empty description when a decoded
