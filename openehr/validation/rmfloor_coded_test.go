@@ -1038,11 +1038,14 @@ func TestREQ112_CodedIntervalBound(t *testing.T) {
 	}
 }
 
-// TestREQ112_CodedInvariantsOutOfScope pins the coded invariants the entry
-// leaves out: an AUDIT_DETAILS change_type or an ATTESTATION reason outside
-// its group gives no `code_not_in_value_set`, even as the root.
+// TestREQ112_CodedInvariantsOutOfScope pins the known gap of the coded
+// invariants outside the table: a change-control or resource-description
+// root whose coded attribute breaks its rule gives no
+// `code_not_in_value_set`. A change that adds one of these rules fails here
+// on purpose, so that it closes the known gap in REQ-112 as well.
 func TestREQ112_CodedInvariantsOutOfScope(t *testing.T) {
 	bad := codedText(openEHRCode("9999"))
+	badLanguage := phrase("ISO_639-1", "xx")
 	for _, root := range []any{
 		&rm.AuditDetails{
 			SystemID:      "example.org",
@@ -1051,9 +1054,18 @@ func TestREQ112_CodedInvariantsOutOfScope(t *testing.T) {
 			ChangeType:    bad,
 		},
 		&rm.Attestation{SystemID: "example.org", Committer: rm.PartySelf{}, ChangeType: bad, Reason: bad},
+		&rm.OriginalVersion[any]{LifecycleState: bad},
+		&rm.ImportedVersion[any]{Item: rm.OriginalVersion[any]{LifecycleState: bad}},
+		&rm.TranslationDetails{Author: map[string]string{"name": "A. Translator"}, Language: badLanguage},
+		&rm.ResourceDescriptionItem{Purpose: "x", Language: badLanguage},
 	} {
-		if got := codedFindings(validation.ValidateRM(root).Issues); len(got) != 0 {
-			t.Errorf("ValidateRM(%T with a code outside its group) code_not_in_value_set at %q, want none", root, got)
+		issues := validation.ValidateRM(root).Issues
+		// The root must be walked, or a rule added for it could not fire here.
+		if slices.ContainsFunc(issues, func(i validation.Issue) bool { return i.Code == "rm_type_unknown" }) {
+			t.Fatalf("ValidateRM(%T) reports rm_type_unknown, want the root walked; issues=%+v", root, issues)
+		}
+		if got := codedFindings(issues); len(got) != 0 {
+			t.Errorf("ValidateRM(%T with a code outside its value set) code_not_in_value_set at %q, want none", root, got)
 		}
 	}
 }
