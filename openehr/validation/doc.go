@@ -59,7 +59,8 @@
 // every PARTY and ENTRY), a non-empty archetype_id and rm_version
 // on every ARCHETYPED, and a member of its group or code set in each
 // attribute the RM codes from the openEHR terminology, apart from those of
-// the change-control classes and EXTRACT_PARTICIPATION (reported as
+// the change-control and resource-description classes and
+// EXTRACT_PARTICIPATION (reported as
 // `code_not_in_value_set`; see [ValidateRM]). Template validity does not
 // imply RM validity: the template layer covers RM-mandatory presence on
 // the nodes the template models, not the per-type invariant catalogue, so a

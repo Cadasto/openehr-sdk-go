@@ -63,8 +63,10 @@ const maxWalkDepth = 256
 // at the CODE_PHRASE read: the attribute itself, or its defining_code for a
 // coded text. The detail names the attribute, the RM invariant and the
 // group or code set, never the code. The coded rules of the change-control
-// classes (VERSION, AUDIT_DETAILS, ATTESTATION) are not checked, nor those of
-// EXTRACT_PARTICIPATION, a class the SDK's RM types leave out.
+// classes (VERSION, AUDIT_DETAILS, ATTESTATION) and of the resource-description
+// classes (TRANSLATION_DETAILS, RESOURCE_DESCRIPTION_ITEM) are not checked,
+// even on such a value passed as root, an ORIGINAL_VERSION included; nor are
+// those of EXTRACT_PARTICIPATION, a class the SDK's RM types leave out.
 //
 // A nil root surfaces a single `nil_root` issue and is reported as
 // not-OK. An unknown RM root type (a Go value outside the closed RM

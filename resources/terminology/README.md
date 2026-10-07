@@ -38,7 +38,7 @@ fetched at build time and not looked up in a terminology service at run time. Co
 | Contents of `openehr_terminology.xml` | **17** groups · **3** code sets (issuer `openehr`) · **249** concepts · **19** code-set codes |
 | Contents of `openehr_external_terminologies.xml` | **4** code sets · **624** codes: *countries* `ISO_3166-1` (250) · *character sets* `IANA_character-sets` (14) · *languages* `ISO_639-1` (253) · *media types* `IANA_media-types` (107) |
 
-The exact upstream commit, each file's `sha256` and upstream path, and the fetch timestamp
+The exact upstream commit, each file's `sha256` and the fetch timestamp
 are recorded in [`MANIFEST.txt`](MANIFEST.txt), and nowhere else. The sync
 script generates it, so do not edit it by hand. Regenerate with `make terminology-sync`; verify
 with `make terminology-verify` (see [the sync script](../../scripts/sync-terminology.sh)).
