@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
@@ -12,11 +13,12 @@ import (
 // REQ-102 (Validation dimensions, Issue codes, Items that are not a
 // LOCATABLE) and REQ-110 (Implementation) — an RM value satisfies an OPT
 // child when its type equals the child's RMTypeName or descends from it in
-// the pinned BMM, whether that ancestor is abstract or concrete. A child of
-// the value's own type binds before a child the type only conforms to, on a
-// single-valued attribute and for an item of a multi-valued attribute that is
-// not a LOCATABLE. The tests build small synthetic OPTs so each case pins one
-// rule.
+// the pinned BMM, whether that ancestor is abstract or concrete. The value
+// binds to the most specific child, in three tiers: a child of its own type,
+// then the AOM 1.4 short name it wraps, then a child it conforms to or an
+// untyped one. The rule holds on a single-valued attribute and for an item of
+// a multi-valued attribute that is not a LOCATABLE. The tests build small
+// synthetic OPTs so each case pins one rule.
 
 // elementValueOPT returns an ELEMENT template whose value attribute holds
 // children, in that order.
@@ -331,42 +333,233 @@ func TestValidate_REQ102_NonConformingTypeStillFails(t *testing.T) {
 	}
 }
 
+// shortNameChild renders an AOM 1.4 primitive short name child whose
+// item is a constraint of itemType carrying body.
+func shortNameChild(shortName, itemType, body string) string {
+	return `
+      <children xsi:type="C_PRIMITIVE_OBJECT">
+        <rm_type_name>` + shortName + `</rm_type_name>
+        <node_id></node_id>
+        <item xsi:type="` + itemType + `">` + body + `</item>
+      </children>`
+}
+
 // REQ-102 — an AOM 1.4 primitive short name is no BMM class, so the
-// hierarchy cannot answer for it. DURATION still admits its canonical
-// DV_DURATION wrapper and INTEGER its DV_COUNT, the types the generator
-// builds for them, and the short name's constraint then checks the
-// wrapper's value. Each still refuses any other type, the wrapper of
-// another short name included.
+// hierarchy cannot answer for it: each of the six admits the DV wrapper the
+// generator builds for it (REQ-107), and refuses any other type, the wrapper
+// of another short name included. The generator builds each value, so a
+// wrapper the validator and the generator disagree on fails here.
 func TestValidate_REQ102_AOMShortNameAdmitsItsWrapper(t *testing.T) {
 	t.Parallel()
-	duration := mustCompileInline(t, elementValueOPT(durationChild))
-	integer := mustCompileInline(t, elementValueOPT(integerChild))
+	tests := []struct {
+		short   string
+		child   string
+		wrapper string
+		refused rm.DataValue
+	}{
+		{short: "DURATION", child: durationChild, wrapper: "DV_DURATION", refused: rm.DVDate{Value: "2026-10-11"}},
+		{short: "DATE", child: shortNameChild("DATE", "C_DATE", ""), wrapper: "DV_DATE", refused: rm.DVDateTime{Value: "2026-10-11T09:00:00Z"}},
+		{short: "TIME", child: shortNameChild("TIME", "C_TIME", ""), wrapper: "DV_TIME", refused: rm.DVDuration{Value: "PT5M"}},
+		{short: "DATE_TIME", child: shortNameChild("DATE_TIME", "C_DATE_TIME", ""), wrapper: "DV_DATE_TIME", refused: rm.DVDate{Value: "2026-10-11"}},
+		{
+			short:   "BOOLEAN",
+			child:   shortNameChild("BOOLEAN", "C_BOOLEAN", "<true_valid>true</true_valid><false_valid>true</false_valid>"),
+			wrapper: "DV_BOOLEAN",
+			refused: rm.DVCount{Magnitude: 1},
+		},
+		{short: "INTEGER", child: integerChild, wrapper: "DV_COUNT", refused: &rm.DVQuantity{Magnitude: 15, Units: "1"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.short, func(t *testing.T) {
+			t.Parallel()
+			c := mustCompileInline(t, elementValueOPT(tc.child))
+			out, err := instance.Generate(t.Context(), c, instance.Options{Policy: instance.Example})
+			if err != nil {
+				t.Fatalf("Generate(ELEMENT value %s): %v", tc.short, err)
+			}
+			el, ok := out.(*rm.Element)
+			if !ok {
+				t.Fatalf("Generate root = %T, want *rm.Element", out)
+			}
+			if got, _ := rm.RMTypeName(el.Value); got != tc.wrapper {
+				t.Fatalf("Generate built ELEMENT.value of type %q under %s, want %s", got, tc.short, tc.wrapper)
+			}
+			if got := issueKeys(validation.Validate(el, c).Issues); len(got) != 0 {
+				t.Errorf("Validate(generated %s under %s) issues = %q, want none", tc.wrapper, tc.short, got)
+			}
+			refusedType, _ := rm.RMTypeName(tc.refused)
+			want := []string{"rm_type_mismatch /value"}
+			if got := issueKeys(validation.Validate(valueElement(tc.refused), c).Issues); !slices.Equal(got, want) {
+				t.Errorf("Validate(%s under %s) issues = %q, want %q", refusedType, tc.short, got, want)
+			}
+		})
+	}
+}
+
+// OPT children for the binding-tier cases.
+const (
+	dataValueChild = `
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>DATA_VALUE</rm_type_name>
+        <node_id></node_id>
+      </children>`
+	untypedChild = `
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name></rm_type_name>
+        <node_id></node_id>
+      </children>`
+	bareIntervalChild = `
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>DV_INTERVAL</rm_type_name>
+        <node_id></node_id>
+      </children>`
+	// countIntervalChild admits a DV_INTERVAL<DV_COUNT> whose upper
+	// bound is 0 to 10.
+	countIntervalChild = `
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>DV_INTERVAL&lt;DV_COUNT&gt;</rm_type_name>
+        <node_id></node_id>
+        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+          <rm_attribute_name>upper</rm_attribute_name>
+          <children xsi:type="C_COMPLEX_OBJECT">
+            <rm_type_name>DV_COUNT</rm_type_name>
+            <node_id></node_id>
+            <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+              <rm_attribute_name>magnitude</rm_attribute_name>
+              <children xsi:type="C_PRIMITIVE_OBJECT">
+                <rm_type_name>INTEGER</rm_type_name>
+                <node_id></node_id>
+                <item xsi:type="C_INTEGER">
+                  <range>
+                    <lower_included>true</lower_included><upper_included>true</upper_included>
+                    <lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded>
+                    <lower>0</lower><upper>10</upper>
+                  </range>
+                </item>
+              </children>
+            </attributes>
+          </children>
+        </attributes>
+      </children>`
+	// countChild admits a DV_COUNT of 0 to 5.
+	countChild = `
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>DV_COUNT</rm_type_name>
+        <node_id></node_id>
+        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+          <rm_attribute_name>magnitude</rm_attribute_name>
+          <children xsi:type="C_PRIMITIVE_OBJECT">
+            <rm_type_name>INTEGER</rm_type_name>
+            <node_id></node_id>
+            <item xsi:type="C_INTEGER">
+              <range>
+                <lower_included>true</lower_included><upper_included>true</upper_included>
+                <lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded>
+                <lower>0</lower><upper>5</upper>
+              </range>
+            </item>
+          </children>
+        </attributes>
+      </children>`
+)
+
+// REQ-102 — binding prefers the most specific child, in three tiers, and
+// the order of the alternatives does not change which child binds. Each
+// case's value conforms to both alternatives, and only the tighter one
+// reports the violation the value carries, so the issue shows which child
+// bound it:
+//   - a DV_INTERVAL<DV_COUNT> names the typed child, not the bare
+//     DV_INTERVAL it conforms to;
+//   - a round-tripped interval that decoded as the bare DV_INTERVAL takes
+//     the type its DV_COUNT bounds give, so it names the typed child too;
+//   - a DV_COUNT names the DV_COUNT child before the INTEGER short name it
+//     wraps;
+//   - a DV_DURATION is the wrapper of DURATION, a tighter child than the
+//     DATA_VALUE it conforms to;
+//   - a DV_CODED_TEXT names the DV_CODED_TEXT child before an untyped one.
+func TestValidate_REQ102_AlternativeTiers(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name  string
-		child string
+		tight string
+		loose string
 		value rm.DataValue
 		want  []string
 	}{
-		{name: "DV_DURATION", child: "DURATION", value: rm.DVDuration{Value: "PT5M"}, want: []string{}},
-		{name: "DV_DURATION with no duration", child: "DURATION", value: rm.DVDuration{Value: "five minutes"}, want: []string{"primitive_invalid_value /value"}},
-		{name: "DV_TEXT", child: "DURATION", value: rm.DVText{Value: "PT5M"}, want: []string{"rm_type_mismatch /value"}},
-		{name: "DV_DATE", child: "DURATION", value: rm.DVDate{Value: "2026-10-11"}, want: []string{"rm_type_mismatch /value"}},
-		{name: "DV_COUNT", child: "INTEGER", value: rm.DVCount{Magnitude: 15}, want: []string{}},
-		{name: "DV_COUNT out of range", child: "INTEGER", value: rm.DVCount{Magnitude: 25}, want: []string{"primitive_out_of_range /value"}},
-		{name: "DV_QUANTITY", child: "INTEGER", value: &rm.DVQuantity{Magnitude: 15, Units: "1"}, want: []string{"rm_type_mismatch /value"}},
-		{name: "DV_BOOLEAN", child: "INTEGER", value: rm.DVBoolean{Value: true}, want: []string{"rm_type_mismatch /value"}},
+		{
+			name:  "typed interval",
+			tight: countIntervalChild,
+			loose: bareIntervalChild,
+			value: &rm.DVInterval[rm.DVCount]{Lower: rm.DVCount{Magnitude: 1}, Upper: rm.DVCount{Magnitude: 50}},
+			want:  []string{"primitive_out_of_range /value/upper/magnitude"},
+		},
+		{
+			name:  "round-tripped interval",
+			tight: countIntervalChild,
+			loose: bareIntervalChild,
+			value: &rm.DVInterval[rm.DVOrdered]{Lower: &rm.DVCount{Magnitude: 1}, Upper: &rm.DVCount{Magnitude: 50}},
+			want:  []string{"primitive_out_of_range /value/upper/magnitude"},
+		},
+		{
+			name:  "DV_COUNT and INTEGER",
+			tight: countChild,
+			loose: integerChild,
+			value: rm.DVCount{Magnitude: 15},
+			want:  []string{"primitive_out_of_range /value/magnitude"},
+		},
+		{
+			name:  "DURATION and DATA_VALUE",
+			tight: durationChild,
+			loose: dataValueChild,
+			value: rm.DVDuration{Value: "five minutes"},
+			want:  []string{"primitive_invalid_value /value"},
+		},
+		{
+			name:  "DV_CODED_TEXT and untyped",
+			tight: dvCodedTextChild,
+			loose: untypedChild,
+			value: localCoded("at9999"),
+			want:  []string{"primitive_not_in_list /value/defining_code"},
+		},
 	}
 	for _, tc := range tests {
-		t.Run(tc.child+"/"+tc.name, func(t *testing.T) {
-			t.Parallel()
-			c := duration
-			if tc.child == "INTEGER" {
-				c = integer
-			}
-			r := validation.Validate(valueElement(tc.value), c)
-			if got := issueKeys(r.Issues); !slices.Equal(got, tc.want) {
-				t.Errorf("Validate(%s under %s) issues = %q, want %q", tc.name, tc.child, got, tc.want)
-			}
-		})
+		for _, order := range []struct {
+			name     string
+			children []string
+		}{
+			{name: "tight first", children: []string{tc.tight, tc.loose}},
+			{name: "loose first", children: []string{tc.loose, tc.tight}},
+		} {
+			t.Run(tc.name+"/"+order.name, func(t *testing.T) {
+				t.Parallel()
+				c := mustCompileInline(t, elementValueOPT(order.children...))
+				r := validation.Validate(valueElement(tc.value), c)
+				if got := issueKeys(r.Issues); !slices.Equal(got, tc.want) {
+					t.Errorf("Validate(%s, %s) issues = %q, want %q", tc.name, order.name, got, tc.want)
+				}
+			})
+		}
+	}
+}
+
+// REQ-102 — a slot child never binds an item that is not a LOCATABLE, in
+// any tier. A DV_CODED_TEXT names neither child, and conforms to both the
+// DV_TEXT slot listed first and the DV_TEXT child after it; it binds to the
+// DV_TEXT child, which is walked and reports the item's empty value.
+func TestValidateDemographic_REQ102_SlotSkippedInConformanceTier(t *testing.T) {
+	t.Parallel()
+	const dvTextSlot = `
+      <children xsi:type="ARCHETYPE_SLOT">
+        <rm_type_name>DV_TEXT</rm_type_name>
+        <node_id>at9000</node_id>
+      </children>`
+	c := mustCompileInline(t, actorOPT(dvTextSlot+dvTextChild))
+	p := validActor()
+	p.Languages = []rm.DVTextLike{rm.DVCodedText{
+		DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "local"}, CodeString: "at0001"},
+	}}
+	want := []string{"required /languages[@1]/value"}
+	if got := issueKeys(validation.ValidateDemographic(p, c).Issues); !slices.Equal(got, want) {
+		t.Errorf("ValidateDemographic(DV_CODED_TEXT language under [DV_TEXT slot, DV_TEXT]) issues = %q, want %q", got, want)
 	}
 }

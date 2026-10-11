@@ -234,12 +234,16 @@ func TestValidate_REQ102_CorpusCodedTextValues(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListAllOPTs: %v", err)
 	}
-	swept := 0
+	// The floor holds only for a full run: a -run pattern that selects
+	// some templates enters fewer, and must not fail the parent for it.
+	listed, entered, swept := 0, 0, 0
 	for _, ref := range refs {
 		if !strings.HasPrefix(ref.Name, "templates/") {
 			continue
 		}
+		listed++
 		t.Run(ref.Name, func(t *testing.T) {
+			entered++
 			opt, err := template.ParseFile(ref.Path)
 			if err != nil {
 				t.Skipf("ParseFile: %v", err)
@@ -267,7 +271,7 @@ func TestValidate_REQ102_CorpusCodedTextValues(t *testing.T) {
 			}
 		})
 	}
-	if swept < minCorpusSwept {
-		t.Errorf("the sweep covered %d templates, want at least %d", swept, minCorpusSwept)
+	if entered == listed && swept < minCorpusSwept {
+		t.Errorf("the sweep covered %d of %d templates, want at least %d", swept, listed, minCorpusSwept)
 	}
 }

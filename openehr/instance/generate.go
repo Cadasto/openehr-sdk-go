@@ -374,11 +374,57 @@ func allowedChildren(attr *tcimpl.CompiledAttribute) []*tcimpl.CompiledNode {
 	return allowed
 }
 
+// bindingAlternative returns the allowed alternative of a single-valued
+// attribute whose constraints the walk builds under. built is the RM
+// type the walk builds: the type the first alternative names, or its
+// concrete substitute ([builtRMType]). The template validator
+// binds a value of that type to the first alternative that names the
+// type exactly, else to the first that is the AOM 1.4 primitive short
+// name the type wraps, else to the first alternative (REQ-102
+// alternatives rule, REQ-107 What a visit writes). Under
+// [DATA_VALUE, DV_TEXT] the walk therefore builds a DV_TEXT under the
+// DV_TEXT alternative's constraints, not the open DATA_VALUE's.
+func bindingAlternative(children []*tcimpl.CompiledNode, built string) *tcimpl.CompiledNode {
+	for _, c := range children {
+		if strings.TrimSpace(c.RMTypeName()) == built {
+			return c
+		}
+	}
+	for _, c := range children {
+		name := strings.TrimSpace(c.RMTypeName())
+		if tcimpl.IsAOMPrimitiveShortName(name) && concreteFor(name) == built {
+			return c
+		}
+	}
+	return children[0]
+}
+
+// builtRMType is the RM type the walk builds for an alternative: the
+// type it names, or its concrete substitute (concreteFor).
+func builtRMType(alternative *tcimpl.CompiledNode) string {
+	return concreteFor(strings.TrimSpace(alternative.RMTypeName()))
+}
+
+// attrTypedByRMClass reports whether the pinned BMM types attr of
+// optNode by an RM class (ELEMENT.value, a DATA_VALUE), rather than by
+// a primitive such as String or Boolean (DV_DURATION.value,
+// ITEM_TABLE.rotated) or not at all.
+func attrTypedByRMClass(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
+	h, ok := rminfo.Default.(rminfo.Hierarchy)
+	if !ok {
+		return false
+	}
+	_, known := h.IsAbstract(bmmtype.Class(attrType(optNode.RMTypeName(), attr.RMTypeName())))
+	return known
+}
+
 // materialiseSingle synthesises and attaches one child under a
-// C_SINGLE_ATTRIBUTE. For OPT alternatives (multiple children) the
-// first wins. Validation binds a value to the first child of its own
-// RM type before any child it only conforms to (matchSingleAlternative),
-// so a value built for the first concrete child binds back to it.
+// C_SINGLE_ATTRIBUTE. The built value takes the RM type the first
+// allowed alternative names, or that alternative's concrete
+// substitute, and is built under the constraints of the alternative
+// the validator binds a value of that type to ([bindingAlternative]),
+// so validation checks what the generator built against the child
+// whose constraints built it (REQ-107, What a visit writes).
 //
 // Implicit BMM-mandatory attributes (no OPT children) get a default
 // RM value materialised from the attribute's BMM type so the
@@ -402,7 +448,6 @@ func (g *generator) materialiseSingle(
 		// .start_time) overwrite the placeholder afterwards.
 		return g.materialiseImplicitSingle(optNode, attr, parentRM)
 	}
-	child := children[0]
 	// AOM 1.4 primitive short name (DURATION, DATE, BOOLEAN, …)
 	// under a BMM-primitive attribute (e.g. DV_DURATION.value): the
 	// parent is itself the DV wrapper; populatePrimitiveDefault has
@@ -414,13 +459,16 @@ func (g *generator) materialiseSingle(
 	// default sentinel on the parent. When the constraint is absent
 	// (a C_PRIMITIVE_OBJECT wrapper whose inner item the OPT author
 	// omitted, or an unknown xsi:type the parser admitted leniently),
-	// the populatePrimitiveDefault sentinel holds.
-	if tcimpl.IsAOMPrimitiveShortName(child.RMTypeName()) {
-		if pc := child.PrimitiveConstraint(); pc != nil {
-			return g.applyPrimitiveExample(child, parentRM, attr.Name(), pc)
+	// the populatePrimitiveDefault sentinel holds. Under an attribute
+	// an RM class types (ELEMENT.value) the short name is built below
+	// as its DV wrapper, which concreteFor names.
+	if first := children[0]; tcimpl.IsAOMPrimitiveShortName(first.RMTypeName()) && !attrTypedByRMClass(optNode, attr) {
+		if pc := first.PrimitiveConstraint(); pc != nil {
+			return g.applyPrimitiveExample(first, parentRM, attr.Name(), pc)
 		}
 		return nil
 	}
+	child := bindingAlternative(children, builtRMType(children[0]))
 	rmChild, err := g.makeChild(child)
 	if err != nil {
 		return err

@@ -1133,6 +1133,8 @@ requirements:
     tests:
       - internal/templatecompile/compile_test.go
       - internal/templatecompile/node_primitive_test.go
+      - openehr/instance/binding_alternative_internal_test.go
+      - openehr/instance/binding_alternative_test.go
       - openehr/instance/party_attribute_test.go
       - openehr/validation/aql_test.go
       - openehr/validation/composition_test.go
@@ -1253,6 +1255,8 @@ requirements:
       - openehr/instance/allowed_alternative_test.go
       - openehr/instance/archetype_root_guard_internal_test.go
       - openehr/instance/archetype_root_guard_test.go
+      - openehr/instance/binding_alternative_internal_test.go
+      - openehr/instance/binding_alternative_test.go
       - openehr/instance/built_type_argument_internal_test.go
       - openehr/instance/clock_defaults_test.go
       - openehr/instance/clock_test.go
@@ -1311,6 +1315,7 @@ requirements:
       - openehr/validation/optional_string_test.go
       - openehr/validation/rmread/handles_reader_test.go
       - openehr/validation/rmread/read_optional_string_test.go
+      - openehr/validation/subtype_conformance_test.go
       - openehr/validation/walk_primitive_test.go
       - testkit/probes/composition/probe_023_builder_round_trip.go
       - testkit/probes/instance/corpus_ratchet_test.go
