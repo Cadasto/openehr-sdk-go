@@ -23,7 +23,8 @@ import (
 // matched to the template node whose name it carries; an item whose name
 // the template does not give goes to such a node that leaves the name
 // open, or else to the first of them, whose name check then reports it.
-// The item's name decides this match only and appears in no issue.
+// The item's name decides this match only and appears in no issue path or
+// message.
 //
 // Returns a [Result] whose Issues slice is never nil. A nil root or nil
 // compiled template yields a single guard issue (nil_root /

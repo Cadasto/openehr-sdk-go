@@ -10,6 +10,7 @@ package validation_test
 
 import (
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -161,10 +162,16 @@ var reusedArchetypeOPT = reusedArchetypeOPTOf("Erste", `O'Brien\Notes`)
 // archetype root of openEHR-EHR-OBSERVATION.reused.v1 per name, each
 // required once and pinning that name; an empty name pins none.
 func reusedArchetypeOPTOf(names ...string) string {
-	var children strings.Builder
-	for _, name := range names {
-		children.WriteString(reusedObservationChild(name))
+	children := make([]string, len(names))
+	for i, name := range names {
+		children[i] = reusedObservationChild(name, 1)
 	}
+	return reusedArchetypeOPTWith(children...)
+}
+
+// reusedArchetypeOPTWith returns an OPT whose COMPOSITION content holds
+// children, each rendered by reusedObservationChild.
+func reusedArchetypeOPTWith(children ...string) string {
 	return `<?xml version="1.0" encoding="UTF-8"?>
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
@@ -174,7 +181,7 @@ func reusedArchetypeOPTOf(names ...string) string {
     <rm_type_name>COMPOSITION</rm_type_name>
     <node_id>at0000</node_id>
     <attributes xsi:type="C_MULTIPLE_ATTRIBUTE">
-      <rm_attribute_name>content</rm_attribute_name>` + children.String() + `
+      <rm_attribute_name>content</rm_attribute_name>` + strings.Join(children, "") + `
     </attributes>
     <archetype_id><value>openEHR-EHR-COMPOSITION.reused.v1</value></archetype_id>
   </definition>
@@ -182,9 +189,9 @@ func reusedArchetypeOPTOf(names ...string) string {
 }
 
 // reusedObservationChild renders one OBSERVATION archetype root of
-// openEHR-EHR-OBSERVATION.reused.v1, occurring once, that pins name, or no
-// name when name is empty.
-func reusedObservationChild(name string) string {
+// openEHR-EHR-OBSERVATION.reused.v1, occurring at least lower times and at
+// most once, that pins name, or no name when name is empty.
+func reusedObservationChild(name string, lower int) string {
 	pin := ""
 	if name != "" {
 		pin = `
@@ -210,7 +217,7 @@ func reusedObservationChild(name string) string {
         <occurrences>
           <lower_included>true</lower_included><upper_included>true</upper_included>
           <lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded>
-          <lower>1</lower><upper>1</upper>
+          <lower>` + strconv.Itoa(lower) + `</lower><upper>1</upper>
         </occurrences>
         <node_id>at0000</node_id>` + pin + `
         <archetype_id><value>openEHR-EHR-OBSERVATION.reused.v1</value></archetype_id>

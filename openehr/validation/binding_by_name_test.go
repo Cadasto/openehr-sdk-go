@@ -9,10 +9,13 @@ package validation_test
 // no message.
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
@@ -38,16 +41,54 @@ func withoutLanguage(t *testing.T, comp *rm.Composition, i int) *rm.Composition 
 	return comp
 }
 
+// withNames returns comp with the name of each of its content items replaced
+// by the one name makes of the text at the same index.
+func withNames(t *testing.T, comp *rm.Composition, name func(string) rm.DVTextLike, texts ...string) *rm.Composition {
+	t.Helper()
+	for i, text := range texts {
+		obs, ok := comp.Content[i].(*rm.Observation)
+		if !ok {
+			t.Fatalf("content[%d] is %T, want *rm.Observation", i, comp.Content[i])
+		}
+		obs.Name = name(text)
+	}
+	return comp
+}
+
+// codedName returns a DV_CODED_TEXT whose value is text and whose code is a
+// well-formed local one.
+func codedName(text string) rm.DVCodedText {
+	return rm.DVCodedText{
+		Value:        text,
+		DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "local"}, CodeString: "at0001"},
+	}
+}
+
 // REQ-102, REQ-116 — items whose names are the names the template pins bind
 // to the children that pin them, whatever their order, so a correct
-// composition passes.
+// composition passes. The name is read from a DV_TEXT or a DV_CODED_TEXT, by
+// value or by pointer, as the walk reads the name it checks.
 func TestValidateComposition_REQ102_REQ116_SharedIDBindsByPinnedName(t *testing.T) {
 	c := mustCompileSyntheticOPT(t, reusedArchetypeOPT)
-	for _, names := range [][]string{{"Erste", obrienName}, {obrienName, "Erste"}} {
-		r := validation.ValidateComposition(reusedComposition(names...), c)
-		if len(r.Issues) != 0 {
-			t.Errorf("ValidateComposition(content named %q) issues = %q, want none", names, issueKeys(r.Issues))
-		}
+	forms := []struct {
+		name string
+		make func(string) rm.DVTextLike
+	}{
+		{name: "DV_TEXT", make: func(s string) rm.DVTextLike { return rm.DVText{Value: s} }},
+		{name: "*DV_TEXT", make: func(s string) rm.DVTextLike { return &rm.DVText{Value: s} }},
+		{name: "DV_CODED_TEXT", make: func(s string) rm.DVTextLike { return codedName(s) }},
+		{name: "*DV_CODED_TEXT", make: func(s string) rm.DVTextLike { n := codedName(s); return &n }},
+	}
+	for _, form := range forms {
+		t.Run(form.name, func(t *testing.T) {
+			for _, names := range [][]string{{"Erste", obrienName}, {obrienName, "Erste"}} {
+				comp := withNames(t, reusedComposition(names...), form.make, names...)
+				r := validation.ValidateComposition(comp, c)
+				if len(r.Issues) != 0 {
+					t.Errorf("ValidateComposition(content named %q as %s) issues = %q, want none", names, form.name, issueKeys(r.Issues))
+				}
+			}
+		})
 	}
 }
 
@@ -126,6 +167,22 @@ func TestValidateComposition_REQ102_UnmatchedNameBindsToUnnamedChild(t *testing.
 	}
 }
 
+// REQ-102 — of two children that carry the id and pin no name, an item whose
+// name no child pins binds to the first. The first may occur once and the
+// second must, so the second is reported as occurring too seldom; had the item
+// bound to the second, neither would be.
+func TestValidateComposition_REQ102_UnmatchedNameBindsToFirstUnnamedChild(t *testing.T) {
+	c := mustCompileSyntheticOPT(t, reusedArchetypeOPTWith(reusedObservationChild("", 0), reusedObservationChild("", 1)))
+	r := validation.ValidateComposition(reusedComposition("Andere"), c)
+	want := []string{"cardinality /content[" + reusedID + "]"}
+	if got := issueKeys(r.Issues); !slices.Equal(got, want) {
+		t.Fatalf("ValidateComposition issues = %q, want %q", got, want)
+	}
+	if detail := r.Issues[0].Detail; !strings.Contains(detail, "appears 0 times") || !strings.Contains(detail, "[1..1]") {
+		t.Errorf("cardinality detail = %q, want the second child, occurring 0 times against [1..1]", detail)
+	}
+}
+
 // REQ-102 — when every child that carries the id pins a name and none is the
 // item's, the item binds to the first of them, whose name constraint then
 // reports the mismatch.
@@ -135,6 +192,40 @@ func TestValidateComposition_REQ102_UnmatchedNameBindsToFirstNamedChild(t *testi
 	want := []string{"cardinality " + obrienPath, "primitive_not_in_list /content[" + reusedID + "]/name/value"}
 	if got := issueKeys(r.Issues); !slices.Equal(got, want) {
 		t.Errorf("ValidateComposition issues = %q, want %q", got, want)
+	}
+}
+
+// REQ-107, REQ-102, REQ-116 — the generator's output for a template that
+// reuses one archetype under several names, or beside a reuse that pins no
+// name, validates against that template with no issue, under both policies.
+// The corpus cannot show this: no corpus composition has two items with one
+// archetype_node_id.
+func TestGenerate_REQ107_REQ116_ReusedArchetypeOutputValidates(t *testing.T) {
+	for _, names := range [][]string{{"Erste", "Zweite"}, {"Erste", "Zweite", ""}, {"", "Erste"}} {
+		c := mustCompileSyntheticOPT(t, reusedArchetypeOPTOf(names...))
+		for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+			t.Run(fmt.Sprintf("%q/%s", names, policy), func(t *testing.T) {
+				out, err := instance.Generate(t.Context(), c, instance.Options{
+					Policy:    policy,
+					Territory: "NL",
+					Composer:  &rm.PartyIdentified{Name: new("Dr Jones")},
+					Now:       time.Date(2026, 10, 11, 9, 0, 0, 0, time.UTC),
+				})
+				if err != nil {
+					t.Fatalf("Generate: %v", err)
+				}
+				comp, ok := out.(*rm.Composition)
+				if !ok {
+					t.Fatalf("Generate root = %T, want *rm.Composition", out)
+				}
+				if len(comp.Content) != len(names) {
+					t.Fatalf("Generate built %d content items, want %d", len(comp.Content), len(names))
+				}
+				if got := issueKeys(validation.ValidateComposition(comp, c).Issues); len(got) != 0 {
+					t.Errorf("ValidateComposition(generated) issues = %q, want none", got)
+				}
+			})
+		}
 	}
 }
 
