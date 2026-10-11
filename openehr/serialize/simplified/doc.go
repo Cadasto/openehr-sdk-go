@@ -32,9 +32,11 @@
 // refuses it: the composer's `external_ref` suffixes and party sub-structure,
 // a PARTICIPATION `time`, a FEEDER_AUDIT_DETAILS `other_details`,
 // `_instruction_details` and `_wf_definition` have no carrier and fail the
-// decode in every mode. So do an ACTION transition's `transition` leaf and
-// `_reason` family under its ISM transition node, which the Web Template does
-// not model but which name RM data decode would otherwise drop, and malformed
+// decode in every mode. So do an ACTION's ISM transition and time in the
+// reference's in-context spelling where the Web Template does not resolve them
+// (a `current_state`, `transition` or `careflow_step` leaf or a `_reason`
+// family under an `ism_transition` node, and the ACTION's own `time` leaf),
+// which name RM data decode would otherwise drop or replace, and malformed
 // content (a value of the wrong shape, a missing required suffix, two spellings
 // of one field that disagree, such as `x` and `x|`, an index past its bound). A key is judged segment by segment from the left:
 // an index past the bound of a segment that resolves makes the key malformed,

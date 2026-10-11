@@ -381,7 +381,10 @@ var Recorded = map[string]map[Leg]Record{
 			Outcome: Outcome{Refused: "unmarshal JSON number 1.0 into Go int32"},
 			Reason: "DV_PROPORTION type: the upstream FLAT writes proportion_any|type as 1.0, decode passes it to " +
 				"canjson, and canjson refuses 1.0 for the Integer type with an error that names no FLAT key, so the " +
-				"reducing decode cannot remove the key and the leg ends.",
+				"reducing decode cannot remove the key and the leg ends. Web Template projection: before that, the " +
+				"reducing decode removes the section_3 ACTION's in-context ism_transition/current_state (3 keys) and " +
+				"time (1), which decode refuses in every mode as RM data it would otherwise drop or replace " +
+				"(REQ-170).",
 		},
 	},
 }

@@ -143,9 +143,10 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	if err != nil {
 		return nil, err
 	}
-	// The reference's keys for an ACTION transition's `transition` and `reason`
+	// The reference's in-context keys for an ACTION's ISM transition and time
 	// name RM data the Web Template this SDK builds does not model: refused in
-	// every mode, before anything could set them aside as unmatched (REQ-170).
+	// every mode, before anything could set them aside as unmatched or the
+	// WithTemplate defaults replace them (REQ-170).
 	if err := refuseIsmTransitionKeys(content, wt); err != nil {
 		return nil, err
 	}
@@ -1468,26 +1469,39 @@ func settleIsmTransition(tr map[string]any, n ismNode) error {
 // localTerminology is the terminology an archetype's own at-codes belong to.
 const localTerminology = "local"
 
-// The reference's spelling of the two ISM_TRANSITION attributes REQ-140's
-// fourth out-of-scope class names: an in-context `transition` leaf and a
-// `_reason` family, under an ACTION's ISM transition node. ismReferenceSeg is the
-// FLAT id the reference gives that node when it writes it in context.
+// The reference's in-context spelling of an ACTION's ISM transition and time,
+// which REQ-140's fourth out-of-scope class covers: a `current_state`,
+// `transition` or `careflow_step` leaf or a `_reason` family under an ISM
+// transition node, and the ACTION's own `time` leaf. ismReferenceSeg is the FLAT
+// id the reference gives the ISM transition node when it writes it in context.
 const (
-	ismTransitionLeaf = "transition"
-	ismReasonFamily   = "_reason"
-	ismReferenceSeg   = "ism_transition"
+	ismReasonFamily = "_reason"
+	ismReferenceSeg = "ism_transition"
+	actionTimeLeaf  = "time"
 )
 
-// refuseIsmTransitionKeys refuses the reference's spelling of an ACTION
-// transition's `transition` and `reason` in every mode (REQ-140's fourth
-// out-of-scope class, REQ-170): an in-context `transition` leaf, with any
-// suffix, and a `_reason` family, under an ACTION's ISM transition node. That
-// node is an archetyped `ism_transition[atNNNN]` node the Web Template models,
-// or the in-context `ism_transition` node the reference writes and this SDK's
-// Web Template does not. The Web Template models neither key, but each names RM
-// data decode would otherwise drop, so it is refused rather than ignored. Any
-// other key under that node is decoded, or set aside as unmatched content, as
-// usual.
+// ismLeaves are the ISM_TRANSITION leaves the reference writes under its ISM
+// transition node, by FLAT id.
+var ismLeaves = map[string]bool{"current_state": true, "transition": true, "careflow_step": true}
+
+// refuseIsmTransitionKeys refuses the reference's in-context spelling of an
+// ACTION's ISM transition and time in every mode (REQ-140's fourth out-of-scope
+// class, REQ-170), wherever the Web Template does not resolve it:
+//
+//   - a `current_state`, `transition` or `careflow_step` leaf, with any suffix,
+//     under an ISM transition node: the reference's in-context `ism_transition`
+//     node, which this SDK's Web Template does not project, or an archetyped
+//     `ism_transition[atNNNN]` node that has no child of that id (the Web
+//     Template models `current_state` and `careflow_step` there, never
+//     `transition`);
+//   - a `_reason` family under either node;
+//   - the ACTION's own `time` leaf, with any suffix, where the ACTION has no
+//     Web Template node for it.
+//
+// Each names RM data the decode would otherwise drop, or replace with a
+// default, so it is refused rather than ignored. A key the Web Template
+// resolves is decoded as usual, and any other unresolved key under those nodes
+// is unmatched content.
 //
 // Keys are checked in sorted order, so a body with several names the same one on
 // every run. The error names the key, or the `_reason` family instance, and
@@ -1503,44 +1517,58 @@ func refuseIsmTransitionKeys(content map[string]any, wt *webtemplate.WebTemplate
 		if !ok {
 			continue
 		}
-		return fmt.Errorf("%w: %q is an ACTION transition's %s in the reference's spelling, which the Web Template this SDK builds does not model — refused rather than dropped (REQ-140, see deviations.md)",
+		return fmt.Errorf("%w: %q is the reference's in-context spelling of an ACTION's %s, which the Web Template this SDK builds does not model — refused rather than dropped or replaced (REQ-140, see deviations.md)",
 			ErrUnknownPath, named, attr)
 	}
 	return nil
 }
 
-// ismTransitionKey reports whether key, parsed as pk, is one of the two key
-// shapes [refuseIsmTransitionKeys] refuses: named is what the refusal names (the
-// key for the `transition` leaf, the family instance for `_reason`) and attr the
-// ISM_TRANSITION attribute it spells.
+// ismTransitionKey reports whether key, parsed as pk, is one of the key shapes
+// [refuseIsmTransitionKeys] refuses: named is what the refusal names (the key
+// for a leaf, the family instance for `_reason`) and attr the RM attribute it
+// spells.
 func ismTransitionKey(wt *webtemplate.WebTemplate, key string, pk parsedKey) (named, attr string, ok bool) {
 	segs := pk.segs
 	node := wt.Tree
-	if len(segs) < 3 || segs[0].id != node.ID {
+	if len(segs) < 2 || segs[0].id != node.ID {
 		return "", "", false
 	}
-	for i := 1; i+1 < len(segs); i++ {
+	for i := 1; i < len(segs); i++ {
 		child := childByID(node, segs[i].id)
-		if nodeRMType(node) == "ACTION" && isIsmTransitionSeg(child, segs[i].id) {
-			switch rest := segs[i+1:]; {
-			case rest[0].id == ismTransitionLeaf && len(rest) == 1:
-				return key, "transition", true
-			case rest[0].id == ismReasonFamily:
-				var b strings.Builder
-				for j, s := range segs[:i+2] {
-					if j > 0 {
-						b.WriteByte('/')
-					}
-					writeFlatSeg(&b, s)
-				}
-				return b.String(), "reason", true
+		if nodeRMType(node) == "ACTION" {
+			last := i == len(segs)-1
+			if last && segs[i].id == actionTimeLeaf && child == nil {
+				return key, "time", true
 			}
-			return "", "", false
+			if !last && isIsmTransitionSeg(child, segs[i].id) {
+				return ismAttrKey(key, segs, i, child)
+			}
 		}
 		if child == nil {
 			return "", "", false
 		}
 		node = child
+	}
+	return "", "", false
+}
+
+// ismAttrKey judges the key below the ISM transition segment segs[i], whose Web
+// Template node is ism (nil for the reference's in-context node): an
+// ISM_TRANSITION leaf the node does not model, or a `_reason` family.
+func ismAttrKey(key string, segs []flatSeg, i int, ism *webtemplate.Node) (named, attr string, ok bool) {
+	rest := segs[i+1:]
+	switch {
+	case len(rest) == 1 && ismLeaves[rest[0].id] && (ism == nil || childByID(ism, rest[0].id) == nil):
+		return key, "ISM transition " + rest[0].id, true
+	case rest[0].id == ismReasonFamily:
+		var b strings.Builder
+		for j, s := range segs[:i+2] {
+			if j > 0 {
+				b.WriteByte('/')
+			}
+			writeFlatSeg(&b, s)
+		}
+		return b.String(), "ISM transition reason", true
 	}
 	return "", "", false
 }

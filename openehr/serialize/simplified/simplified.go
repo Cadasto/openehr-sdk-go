@@ -27,10 +27,10 @@ type decodeConfig struct {
 // reads is never unmatched, even where the decode then refuses it: the
 // composer's `external_ref` suffixes and party sub-structure, a PARTICIPATION
 // `time`, a FEEDER_AUDIT_DETAILS `other_details`, `_instruction_details`,
-// `_wf_definition`, an ACTION transition's `transition` leaf and `_reason`
-// family in the reference's spelling, and any malformed value, missing
-// required suffix, disagreeing pair of spellings or index past its bound fail
-// the decode in every mode.
+// `_wf_definition`, an ACTION's ISM transition and time in the reference's
+// in-context spelling, and any malformed value, missing required suffix,
+// disagreeing pair of spellings or index past its bound fail the decode in
+// every mode.
 //
 // By default the decoder ignores unmatched content: the value it returns
 // holds the rest of the input and none of it. With this option fn receives
@@ -137,8 +137,8 @@ var (
 	// same key ending in a bare `|` with differing values. The codec fails
 	// rather than dropping the entry or inventing a precedence rule. The two
 	// deferred underscore families, `_instruction_details` and `_wf_definition`,
-	// and an ACTION transition's `transition` leaf and `_reason` family in the
-	// reference's spelling return it in every mode too.
+	// and an ACTION's ISM transition and time in the reference's in-context
+	// spelling return it in every mode too.
 	ErrUnknownPath = errors.New("simplified: path not in web template")
 	// ErrUnsupportedDatatype is returned when a leaf's RM datatype is not mapped
 	// to/from a FLAT suffix set and cannot ride |raw, when a suffix or ctx/
