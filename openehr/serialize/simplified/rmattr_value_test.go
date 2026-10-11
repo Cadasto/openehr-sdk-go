@@ -169,6 +169,33 @@ func flagsOf[T any](iv rm.Interval[T]) intervalFlags {
 	return intervalFlags{iv.LowerUnbounded, iv.LowerIncluded, iv.UpperUnbounded, iv.UpperIncluded}
 }
 
+// normalRangeFlags reads the flags of the decoded DV_QUANTITY's normal_range.
+func normalRangeFlags(t *testing.T, comp *rm.Composition) intervalFlags {
+	t.Helper()
+	q := elementValue[rm.DVQuantity](t, comp)
+	if q.NormalRange == nil {
+		t.Fatal("normal_range not decoded")
+	}
+	return flagsOf(q.NormalRange.Interval)
+}
+
+// referenceRangeFlags reads the flags of the decoded DV_QUANTITY's one
+// other_reference_ranges entry.
+func referenceRangeFlags(t *testing.T, comp *rm.Composition) intervalFlags {
+	t.Helper()
+	q := elementValue[rm.DVQuantity](t, comp)
+	if len(q.OtherReferenceRanges) != 1 {
+		t.Fatalf("other_reference_ranges = %d, want 1", len(q.OtherReferenceRanges))
+	}
+	return flagsOf(q.OtherReferenceRanges[0].Range.Interval)
+}
+
+// intervalLeafFlags reads the flags of the decoded DV_INTERVAL leaf.
+func intervalLeafFlags(t *testing.T, comp *rm.Composition) intervalFlags {
+	t.Helper()
+	return flagsOf(intervalLeafOf(t, comp).Interval)
+}
+
 // TestRMAttrIntervalOpenSideIncludedDefault — REQ-140. An absent `|*_included`
 // defaults by side. On an open side (`|*_unbounded: true`) it decodes as false,
 // the only value BASE `Lower_included_valid` / `Upper_included_valid` permit
@@ -183,26 +210,7 @@ func TestRMAttrIntervalOpenSideIncludedDefault(t *testing.T) {
 		nr  = rmattrElement + "/_normal_range"
 		orr = rmattrElement + "/_other_reference_ranges:0"
 	)
-	normalRange := func(t *testing.T, comp *rm.Composition) intervalFlags {
-		t.Helper()
-		q := elementValue[rm.DVQuantity](t, comp)
-		if q.NormalRange == nil {
-			t.Fatal("normal_range not decoded")
-		}
-		return flagsOf(q.NormalRange.Interval)
-	}
-	referenceRange := func(t *testing.T, comp *rm.Composition) intervalFlags {
-		t.Helper()
-		q := elementValue[rm.DVQuantity](t, comp)
-		if len(q.OtherReferenceRanges) != 1 {
-			t.Fatalf("other_reference_ranges = %d, want 1", len(q.OtherReferenceRanges))
-		}
-		return flagsOf(q.OtherReferenceRanges[0].Range.Interval)
-	}
-	leaf := func(t *testing.T, comp *rm.Composition) intervalFlags {
-		t.Helper()
-		return flagsOf(intervalLeafOf(t, comp).Interval)
-	}
+	normalRange, referenceRange, leaf := normalRangeFlags, referenceRangeFlags, intervalLeafFlags
 	openUpper := intervalFlags{lowerIncluded: true, upperUnbounded: true}
 	openLower := intervalFlags{lowerUnbounded: true, upperIncluded: true}
 	for _, tc := range []struct {

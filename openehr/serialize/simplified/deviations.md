@@ -222,11 +222,14 @@ not partially/silently accepted.
   decodes as `false`, and only `true` is emitted. `\|lower_included` / `\|upper_included`
   default by side. On a bounded side they are omitted when `true`, the **closed** endpoint:
   absent decodes as `true`, and only `false` is emitted. On an open side absent decodes as
-  `false`, the only value BASE `Lower_included_valid` / `Upper_included_valid` permit there,
-  and an included open side spelled in the interval keys is a typed error both ways (a
-  `\|raw` fragment carries it as canonical JSON writes it): an explicit `\|*_included: true`
-  beside `\|*_unbounded: true` on decode, an interval side both unbounded and included on
-  encode. An open end is spelled by its `\|*_unbounded: true` flag alone: an end that
+  `false`, the only value BASE `Lower_included_valid` / `Upper_included_valid` permit there.
+  An included open side, an explicit `\|*_included: true` beside `\|*_unbounded: true`,
+  breaks that invariant, but a typed value can still be built from it, so decode reads it
+  as written (wire.md § REQ-169) and RM validation reports it (clinical-modeling.md
+  § REQ-112). Encode refuses, with a typed error, to write an interval side both unbounded
+  and included into the interval keys (a `\|raw` fragment carries it as canonical JSON
+  writes it), so the pair decodes but does not re-encode. An open end is spelled by its
+  `\|*_unbounded: true` flag alone: an end that
   spells neither a bound nor that flag is refused both ways, and a missing bound is never
   emitted as a zero-valued one. Consequences, deliberate: a redundant
   `\|lower_included: true` on a bounded side is **normalised away** on re-encode, and an

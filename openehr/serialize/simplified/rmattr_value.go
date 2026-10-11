@@ -326,7 +326,8 @@ var (
 // `lower_included` / `upper_included` default by side. On a bounded side they
 // are omitted when true, the closed endpoint, so absent is true. On an open
 // side absent is false, the only value BASE `Lower_included_valid` /
-// `Upper_included_valid` permit there, and an explicit true is refused.
+// `Upper_included_valid` permit there, and an explicit true is read as
+// written, although it breaks that invariant (encode refuses it).
 // Every open end in the corpus spells `|*_included: false`, so those
 // invariants fix the open-side default, not the corpus. The corpus pins
 // the bounded side: `dv_count`'s `_normal_range` omits the flags where
@@ -368,15 +369,14 @@ func intervalSuffixes(g rmattrGroup, ts rmattrTails, anchor string) (map[string]
 			iv[end] = dv
 		}
 		// The closed endpoint is the default only where there is an endpoint:
-		// an open side defaults to not included, the one value BASE allows it,
-		// and an explicit true there is refused rather than carried into an RM
-		// value that breaks the invariant.
+		// an open side defaults to not included, the one value BASE allows it.
+		// An explicit true there is read as written. The RM value then breaks
+		// BASE `Lower_included_valid` or `Upper_included_valid`, but it can
+		// still be built: RM validation reports it, and encode refuses to
+		// write it back ([intervalToFlat]).
 		included, err := ts.boolTail(g, end+"_included", !unbounded)
 		if err != nil {
 			return nil, err
-		}
-		if unbounded && included {
-			return nil, includedOpenSideError(ts.key(g, ownTail(end+"_included")), end)
 		}
 		iv[end+"_unbounded"] = unbounded
 		iv[end+"_included"] = included
@@ -384,10 +384,11 @@ func intervalSuffixes(g rmattrGroup, ts rmattrTails, anchor string) (map[string]
 	return iv, nil
 }
 
-// includedOpenSideError refuses an interval side that is both open and
-// included, which BASE `Interval` forbids by name (`Lower_included_valid`,
-// `Upper_included_valid`). Decode and encode share it, so the codec refuses the
-// same pair in the same words both ways. key is the side's `|*_included` key.
+// includedOpenSideError refuses to encode an interval side that is both open
+// and included, which BASE `Interval` forbids by name (`Lower_included_valid`,
+// `Upper_included_valid`). Decode reads that pair as written
+// ([intervalSuffixes]); only encode refuses it. key is the side's
+// `|*_included` key.
 func includedOpenSideError(key, end string) error {
 	invariant := "Lower_included_valid"
 	if end == "upper" {

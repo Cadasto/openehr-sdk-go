@@ -245,8 +245,8 @@ func orderedRMAttrs[T rm.DVOrdered](out map[string]any, base, anchor string,
 // the corpus spelling, although decode reads its absence the same way.
 //
 // A side both unbounded and included is refused: BASE `Interval` forbids it
-// (`Lower_included_valid`, `Upper_included_valid`), and decode refuses the pair
-// that would spell it, so the codec never writes a pair it will not read.
+// (`Lower_included_valid`, `Upper_included_valid`). Decode reads that pair as
+// written, so a decoded value can carry it, but the codec never writes it.
 //
 // An unbounded end writes no bound: the RM's bound value is meaningless there.
 // For the nine *concrete* instantiations that reach here — the three narrowed

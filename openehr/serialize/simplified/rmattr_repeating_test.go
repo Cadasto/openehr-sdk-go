@@ -346,23 +346,32 @@ func TestIntervalHalfOpenDecodes(t *testing.T) {
 	}
 }
 
-// REQ-140. An explicit `|*_included: true` beside that side's `|*_unbounded: true`
-// spells an included open boundary, which BASE Interval forbids
-// (`Lower_included_valid`, `Upper_included_valid`). Decode refuses it and names
-// the key, at every position the interval grammar reaches and through
-// STRUCTURED. An explicit false there is the corpus spelling and still decodes
+// TestREQ169_IncludedOpenSideDecodesAsWritten — REQ-169, REQ-140. An explicit
+// `|*_included: true` beside that side's `|*_unbounded: true` breaks BASE
+// Interval's `Lower_included_valid` / `Upper_included_valid`, but a typed value
+// can still be built from it, so decode reads it as written: the side stays
+// open and included. RM validation reports it, and encode still refuses to
+// write it, through FLAT and STRUCTURED alike, naming the key. Every decode
+// position the interval grammar reaches is pinned, plus STRUCTURED. An explicit
+// false there is the corpus spelling and decodes too
 // (TestRMAttrIntervalUnboundedEnd, TestDVIntervalLeafRoundTrip).
-func TestIntervalIncludedOpenSideRefusedOnDecode(t *testing.T) {
+func TestREQ169_IncludedOpenSideDecodesAsWritten(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	const (
 		nr  = rmattrElement + "/_normal_range"
 		orr = rmattrElement + "/_other_reference_ranges:0"
 	)
+	includedOpenUpper := intervalFlags{lowerIncluded: true, upperUnbounded: true, upperIncluded: true}
+	includedOpenLower := intervalFlags{lowerUnbounded: true, lowerIncluded: true, upperIncluded: true}
 	for _, tc := range []struct {
 		name       string
 		keys       map[string]any
 		structured bool
-		key        string
+		read       func(*testing.T, *rm.Composition) intervalFlags
+		want       intervalFlags
+		// key is the included open side's `|*_included` key, which the encode
+		// refusal names.
+		key string
 	}{
 		{
 			name: "_normal_range upper",
@@ -372,6 +381,7 @@ func TestIntervalIncludedOpenSideRefusedOnDecode(t *testing.T) {
 				nr + "|upper_unbounded": true,
 				nr + "|upper_included":  true,
 			},
+			read: normalRangeFlags, want: includedOpenUpper,
 			key: nr + "|upper_included",
 		},
 		{
@@ -382,6 +392,7 @@ func TestIntervalIncludedOpenSideRefusedOnDecode(t *testing.T) {
 				nr + "|lower_unbounded": true,
 				nr + "|lower_included":  true,
 			},
+			read: normalRangeFlags, want: includedOpenLower,
 			key: nr + "|lower_included",
 		},
 		{
@@ -393,6 +404,7 @@ func TestIntervalIncludedOpenSideRefusedOnDecode(t *testing.T) {
 				orr + "|upper_unbounded": true,
 				orr + "|upper_included":  true,
 			},
+			read: referenceRangeFlags, want: includedOpenUpper,
 			key: orr + "|upper_included",
 		},
 		{
@@ -404,6 +416,7 @@ func TestIntervalIncludedOpenSideRefusedOnDecode(t *testing.T) {
 				rmattrInterval + "|upper_unbounded": true,
 				rmattrInterval + "|upper_included":  true,
 			},
+			read: intervalLeafFlags, want: includedOpenUpper,
 			key: rmattrInterval + "|upper_included",
 		},
 		{
@@ -415,6 +428,7 @@ func TestIntervalIncludedOpenSideRefusedOnDecode(t *testing.T) {
 				rmattrInterval + "|lower_unbounded": true,
 				rmattrInterval + "|lower_included":  true,
 			},
+			read: intervalLeafFlags, want: includedOpenLower,
 			key: rmattrInterval + "|lower_included",
 		},
 		{
@@ -426,72 +440,70 @@ func TestIntervalIncludedOpenSideRefusedOnDecode(t *testing.T) {
 				nr + "|upper_included":  true,
 			},
 			structured: true,
-			// STRUCTURED reaches FLAT with every segment re-spelled `:0`, and the
-			// refusal names the key as it arrived there.
-			key: "/_normal_range:0|upper_included",
+			read:       normalRangeFlags, want: includedOpenUpper,
+			key: nr + "|upper_included",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			comp, err := decodeIntervalBody(t, wt, rmattrBody(tc.keys), tc.structured)
-			if err == nil {
-				t.Fatalf("decode succeeded (%d content items), want a refusal of the included open side", len(comp.Content))
+			if err != nil {
+				t.Fatalf("decode of an included open side: %v, want it read as written", err)
 			}
-			if !errors.Is(err, ErrUnsupportedDatatype) {
-				t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
+			if got := tc.read(t, comp); got != tc.want {
+				t.Errorf("decoded flags = %+v, want %+v", got, tc.want)
 			}
-			if !strings.Contains(err.Error(), tc.key) {
-				t.Errorf("err = %v, want it to name %q", err, tc.key)
+			for _, enc := range []struct {
+				name    string
+				marshal func(*rm.Composition, *webtemplate.WebTemplate) ([]byte, error)
+			}{
+				{name: "MarshalFlat", marshal: MarshalFlat},
+				{name: "MarshalStructured", marshal: MarshalStructured},
+			} {
+				out, err := enc.marshal(comp, wt)
+				if !errors.Is(err, ErrUnsupportedDatatype) {
+					t.Errorf("%s of the decoded included open side: err = %v, want ErrUnsupportedDatatype (wrote %s)", enc.name, err, out)
+					continue
+				}
+				if !strings.Contains(err.Error(), tc.key) {
+					t.Errorf("%s: err = %v, want it to name %q", enc.name, err, tc.key)
+				}
 			}
 		})
 	}
 }
 
-// TestREQ140_IncludedOpenSideNamesItsInvariant — REQ-140. Decode of an included
+// TestREQ140_IncludedOpenSideNamesItsInvariant — REQ-140. Encode of an included
 // open side names that side's BASE invariant (`Lower_included_valid` for lower,
 // `Upper_included_valid` for upper) and not the other side's. The two names are
 // chosen in includedOpenSideError; swapping them must fail this test.
 func TestREQ140_IncludedOpenSideNamesItsInvariant(t *testing.T) {
-	wt, _ := conformanceWT(t)
-	const nr = rmattrElement + "/_normal_range"
+	q := func(m rm.Real) *rm.DVQuantity { return &rm.DVQuantity{Magnitude: m, Units: "mm"} }
 	for _, tc := range []struct {
 		name        string
-		keys        map[string]any
+		iv          rm.Interval[rm.DVOrdered]
 		want, other string
 	}{
 		{
-			name: "lower",
-			keys: map[string]any{
-				nr + "/upper|magnitude": 66.6,
-				nr + "/upper|unit":      "unit",
-				nr + "|lower_unbounded": true,
-				nr + "|lower_included":  true,
-			},
+			name:  "lower",
+			iv:    rm.Interval[rm.DVOrdered]{LowerUnbounded: true, LowerIncluded: true, Upper: q(9), UpperIncluded: true},
 			want:  "Lower_included_valid",
 			other: "Upper_included_valid",
 		},
 		{
-			name: "upper",
-			keys: map[string]any{
-				nr + "/lower|magnitude": 20.5,
-				nr + "/lower|unit":      "unit",
-				nr + "|upper_unbounded": true,
-				nr + "|upper_included":  true,
-			},
+			name:  "upper",
+			iv:    rm.Interval[rm.DVOrdered]{Lower: q(3), LowerIncluded: true, UpperUnbounded: true, UpperIncluded: true},
 			want:  "Upper_included_valid",
 			other: "Lower_included_valid",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := decodeIntervalBody(t, wt, rmattrBody(tc.keys), false)
-			if err == nil {
-				t.Fatal("decode succeeded, want a refusal of the included open side")
-			}
+			err := intervalToFlat(map[string]any{}, "b", "DV_QUANTITY", tc.iv)
 			if !errors.Is(err, ErrUnsupportedDatatype) {
-				t.Fatalf("decode included open %s: err = %v, want ErrUnsupportedDatatype", tc.name, err)
+				t.Fatalf("encode included open %s: err = %v, want ErrUnsupportedDatatype", tc.name, err)
 			}
 			msg := err.Error()
 			if !strings.Contains(msg, tc.want) || strings.Contains(msg, tc.other) {
-				t.Errorf("decode included open %s: err = %v, want it to name %s and not %s", tc.name, err, tc.want, tc.other)
+				t.Errorf("encode included open %s: err = %v, want it to name %s and not %s", tc.name, err, tc.want, tc.other)
 			}
 		})
 	}
@@ -786,13 +798,13 @@ func TestIntervalBoundBesideUnboundedFlagRefusedOnEncode(t *testing.T) {
 	}
 }
 
-// REQ-140. The encode mirror of TestIntervalIncludedOpenSideRefusedOnDecode: an
-// RM interval whose side is both unbounded and included breaks BASE Interval's
-// `Lower_included_valid` / `Upper_included_valid`, and decode refuses the pair
-// that would spell it, so encode refuses it too rather than write what it will
-// not read. Both instantiations are pinned, interface-typed and concrete-typed,
-// and so is every encode entry: the bare interval grammar, the DV_INTERVAL leaf,
-// and the two DV_ORDERED decorations.
+// REQ-140. An RM interval whose side is both unbounded and included breaks BASE
+// Interval's `Lower_included_valid` / `Upper_included_valid`. Decode reads that
+// pair as written (TestREQ169_IncludedOpenSideDecodesAsWritten), and RM
+// validation reports it, but encode refuses it rather than emit it. Both
+// instantiations are pinned, interface-typed and concrete-typed, and so is every
+// encode entry: the bare interval grammar, the DV_INTERVAL leaf, and the two
+// DV_ORDERED decorations.
 func TestIntervalIncludedOpenSideRefusedOnEncode(t *testing.T) {
 	mm := func(m rm.Real) rm.DVQuantity { return rm.DVQuantity{Magnitude: m, Units: "mm"} }
 	pmm := func(m rm.Real) *rm.DVQuantity { return new(mm(m)) }
