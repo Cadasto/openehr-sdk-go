@@ -320,7 +320,7 @@ The SDK **MUST** ship a `ValidateComposition(comp *rm.Composition, c *templateco
 
 ### Trust model
 
-The validator treats the **compiled OPT as authoritative for structure** and the **composition as the instance under test**. Structural traversal is template-driven: for each compiled OPT node, the walker reads the corresponding RM property by `rm_attribute_name`, enforces existence / cardinality / alternatives, and recurses into matched RM children. Path strings in `Issue.Path` come from the OPT's pre-computed `AQLPath` (`templatecompile.CompiledNode.AQLPath`) — composition-supplied predicates never form lookup keys, so missing nodes are reported instead of silently bypassed.
+The validator treats the **compiled OPT as authoritative for structure** and the **composition as the instance under test**. Structural traversal is template-driven: for each compiled OPT node, the walker reads the corresponding RM property by `rm_attribute_name`, enforces existence / cardinality / alternatives, and recurses into matched RM children. `Issue.Path` is written by § Issue paths below. Composition-supplied predicates never form lookup keys, so missing nodes are reported instead of silently bypassed.
 
 The lockstep walker lives in `openehr/validation/` (not `internal/templatecompile/walk/`) — see [ADR 0006](../adr/0006-composition-validation-walker-placement.md). `internal/templatecompile/walk/` remains OPT-only traversal for compile-time tooling.
 
@@ -382,7 +382,7 @@ Existence and child-count cardinality are **independent constraints**: a multi-v
 - `[atNNNN, 'name']` when another item shares the id and the OPT node the item binds to pins a name ([REQ-116](#req-116--template-level-node-naming-and-name-predicated-paths)) that tells it apart, the name single-quoted with `'` and `\` escaped by a backslash;
 - `[n]`, the item's 1-based position in the attribute, in every other case: an item with no `archetype_node_id`, or one whose id is shared and whose OPT node pins no telling name.
 
-A node the OPT requires and the instance lacks is written with the OPT child's own predicate, since no item exists to number. The floor binds no OPT node, so on its own it never writes a name predicate; where it runs inside a template-driven validation, it takes the names from that validation's bindings, so both report one node by one path.
+A node the OPT requires and the instance lacks is written with the OPT child's own predicate, since no item exists to number; a child that declares no id has none and is written at the attribute's path. The floor binds no OPT node, so on its own it never writes a name predicate; where it runs inside a template-driven validation, it takes the names from that validation's bindings, so both report one node by one path.
 
 A path **MUST NOT** carry a value from the instance ([REQ-168](#req-168--value-free-validation-diagnostics)): a name predicate is always a name the OPT pins, never the instance's own `name`. A path with no positional predicate is a valid AQL path; the AQL grammar has no positional predicate, so one with `[n]` is an openEHR path but not AQL.
 
