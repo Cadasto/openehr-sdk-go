@@ -13,7 +13,10 @@ import (
 // C_INTEGER, C_REAL, and the magnitude / precision sub-intervals of
 // C_DV_QUANTITY. Distinct from xmlInterval (which models
 // existence / occurrences as integer cardinalities) — primitive
-// ranges are float-typed and carry inclusivity flags.
+// ranges are float-typed and keep their inclusivity flags, where a
+// Multiplicity closes an excluded end instead. The included flags are
+// pointers so that an omitted flag stays nil, and includedFlag can then
+// give it the default for its side.
 type xmlNumericInterval struct {
 	LowerIncluded  *bool `xml:"lower_included"`
 	UpperIncluded  *bool `xml:"upper_included"`
@@ -312,8 +315,9 @@ func buildDvOrdinal(o *xmlCObject) constraints.CDvOrdinal {
 }
 
 // numericRange folds a wire numeric interval into the public range
-// shape, defaulting LowerIncluded / UpperIncluded to true when the
-// OPT omits them (AOM convention). xmlNumericInterval.Lower / Upper
+// shape. A LowerIncluded / UpperIncluded flag the OPT omits defaults
+// by its side's unbounded flag as written: true on a bounded side,
+// false on an unbounded one. xmlNumericInterval.Lower / Upper
 // are decoded as strings (AOM 1.4 reuses `<range>` for both numeric
 // and temporal types); parsed to float64 lazily here.
 //
@@ -329,8 +333,8 @@ func numericRange(i *xmlNumericInterval, strict bool, ctx string) (constraints.N
 	r := constraints.NumericRange{
 		LowerUnbounded: i.LowerUnbounded,
 		UpperUnbounded: i.UpperUnbounded,
-		LowerInclusive: i.LowerIncluded == nil || *i.LowerIncluded,
-		UpperInclusive: i.UpperIncluded == nil || *i.UpperIncluded,
+		LowerInclusive: includedFlag(i.LowerIncluded, i.LowerUnbounded),
+		UpperInclusive: includedFlag(i.UpperIncluded, i.UpperUnbounded),
 	}
 	if !r.LowerUnbounded {
 		if f, err := strconv.ParseFloat(strings.TrimSpace(i.Lower), 64); err == nil {

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -313,11 +314,17 @@ type xmlCAttribute struct {
 	Children    []*xmlCObject   `xml:"children"`
 }
 
+// xmlInterval is the whole-number interval of an occurrences, existence
+// or cardinality block. An omitted unbounded flag decodes as false. The
+// included flags are pointers so that an omitted flag stays nil, and
+// includedFlag can then give it the default for its side.
 type xmlInterval struct {
-	Lower          int  `xml:"lower"`
-	Upper          int  `xml:"upper"`
-	LowerUnbounded bool `xml:"lower_unbounded"`
-	UpperUnbounded bool `xml:"upper_unbounded"`
+	Lower          int   `xml:"lower"`
+	Upper          int   `xml:"upper"`
+	LowerIncluded  *bool `xml:"lower_included"`
+	UpperIncluded  *bool `xml:"upper_included"`
+	LowerUnbounded bool  `xml:"lower_unbounded"`
+	UpperUnbounded bool  `xml:"upper_unbounded"`
 }
 
 // xmlCardinality maps the AOM 1.4 CARDINALITY type — the
@@ -569,23 +576,55 @@ func buildAttribute(a *xmlCAttribute, strict bool, depth int) (*Attribute, error
 	return attr, nil
 }
 
+// includedFlag reads the lower_included or upper_included flag of an
+// interval. A flag the OPT writes is read as written. An omitted flag is
+// a closed end on a bounded side and an open end on an unbounded side,
+// the only value the BASE interval invariants allow there.
+func includedFlag(flag *bool, unbounded bool) bool {
+	if flag != nil {
+		return *flag
+	}
+	return !unbounded
+}
+
+// intervalToMultiplicity returns the interval with each bounded side
+// closed, or nil when the OPT omits the interval.
 func intervalToMultiplicity(i *xmlInterval) (*Multiplicity, error) {
 	if i == nil {
 		return nil, nil
 	}
-	// Reject inverted intervals at parse time so downstream walkers
-	// can assume `Lower <= Upper` whenever both bounds are present.
-	// Unbounded sides are skipped — by definition they have no
-	// concrete value to compare.
-	if !i.LowerUnbounded && !i.UpperUnbounded && i.Lower > i.Upper {
-		return nil, fmt.Errorf("inverted interval lower=%d > upper=%d", i.Lower, i.Upper)
-	}
-	return &Multiplicity{
+	m := &Multiplicity{
 		lower:          i.Lower,
 		upper:          i.Upper,
 		lowerUnbounded: i.LowerUnbounded,
 		upperUnbounded: i.UpperUnbounded,
-	}, nil
+	}
+	// A Multiplicity counts whole items, so an excluded end on a bounded
+	// side becomes the closed end it stands for: ">0" is 1 and "<3" is 2.
+	// An unbounded side has no bound to move, whatever its included flag
+	// says. No whole number lies beyond the int range, so an excluded end
+	// at its limit leaves the interval empty.
+	if !i.LowerUnbounded && !includedFlag(i.LowerIncluded, i.LowerUnbounded) {
+		if m.lower == math.MaxInt {
+			return nil, fmt.Errorf("empty interval: no whole number above excluded lower=%d", i.Lower)
+		}
+		m.lower++
+	}
+	if !i.UpperUnbounded && !includedFlag(i.UpperIncluded, i.UpperUnbounded) {
+		if m.upper == math.MinInt {
+			return nil, fmt.Errorf("empty interval: no whole number below excluded upper=%d", i.Upper)
+		}
+		m.upper--
+	}
+	// Reject inverted intervals at parse time so downstream walkers
+	// can assume `Lower <= Upper` whenever both bounds are present.
+	// The check runs on the closed ends, so an interval that closing
+	// leaves empty, such as ">2..<3", is refused here too. Unbounded
+	// sides are skipped: they have no concrete value to compare.
+	if !m.lowerUnbounded && !m.upperUnbounded && m.lower > m.upper {
+		return nil, fmt.Errorf("inverted interval lower=%d > upper=%d", m.lower, m.upper)
+	}
+	return m, nil
 }
 
 func collectAssertions(xs []xmlAssertion) []string {
