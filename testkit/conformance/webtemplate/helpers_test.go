@@ -508,6 +508,16 @@ func TestHoldOutMatchesCodecAliases(t *testing.T) {
 			t.Errorf("the comparison holds out %q, but the codec refuses an index other than :0 on a "+
 				"metadata path — the hold-out would absorb that refusal", over)
 		}
+		// The template root's own segment takes `:0` as well, and nothing else.
+		for _, spelling := range []string{rel, indexed} {
+			if key := corpusRoot + zeroIndex + "/" + spelling; !IsCompositionMeta(key, corpusRoot) && !waived {
+				t.Errorf("codec reads %q as the accepted spelling %q, but the comparison does not hold it out", key, rel)
+			}
+			if key := corpusRoot + ":1/" + spelling; IsCompositionMeta(key, corpusRoot) {
+				t.Errorf("the comparison holds out %q, but the codec refuses an index other than :0 on the "+
+					"template root — the hold-out would absorb that refusal", key)
+			}
+		}
 	}
 
 	// The reverse direction, over the real corpus rather than a hand-picked list:
@@ -540,6 +550,9 @@ func TestHoldOutMatchesCodecAliases(t *testing.T) {
 				continue
 			}
 			rel, rooted := strings.CutPrefix(key, corpusRoot+"/")
+			if !rooted {
+				rel, rooted = strings.CutPrefix(key, corpusRoot+zeroIndex+"/")
+			}
 			if !rooted {
 				t.Errorf("held out %q, which is neither ctx/-prefixed nor under the corpus root", key)
 				continue
@@ -634,6 +647,15 @@ func TestIsCompositionMeta(t *testing.T) {
 		{root + "/context:1/start_time:0", false},
 		{root + "/context:0/start_time:1", false},
 		{root + "/context:0/setting:1|code", false},
+		// The template root's own segment takes `:0` too, and nothing else.
+		{root + ":0/language|code", true},
+		{root + ":0/composer:0|name", true},
+		{root + ":0/context:0/start_time:0", true},
+		{root + ":0/composer|id", false},
+		{root + ":0/context/other_context/anything", false},
+		{root + ":1/language|code", false},
+		{root + ":1/composer|name", false},
+		{root + ":00/language|code", false},
 		// category is *not* a ctx/ field: it is a template-constrained Web
 		// Template leaf, spelled identically on both sides, so it is compared
 		// like any other content key rather than held out.

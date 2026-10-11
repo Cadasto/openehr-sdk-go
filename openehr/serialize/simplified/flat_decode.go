@@ -249,7 +249,8 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 //
 // Each entry is keyed on the unindexed spelling. [metadataRel] reads a key
 // whose metadata segments carry `:0` as that spelling and reports any other
-// index, which [siphonContext] refuses (REQ-053).
+// index, which [siphonContext] refuses (REQ-053); [cutRoot] does the same for
+// the template root's own segment.
 //
 // Entries here are respellings *only* — same information, different surface.
 // `context/setting|code` / `|value` joined on 2026-08-05 (the amended REQ-053):
@@ -401,6 +402,79 @@ func isMetadataSpelling(rel string) bool {
 	return strings.HasPrefix(rel, "composer/")
 }
 
+// cutRoot splits a FLAT key at its template-root segment and returns the path
+// below it. The root segment may carry an explicit index (`<root>:0/…`, the
+// form REQ-053 reads as `<root>/…`), so it is parsed rather than matched as a
+// literal prefix; rootSeg reports the index it carries. rooted is false for a
+// key whose first segment is not the root, has nothing below it, or carries a
+// malformed index (the leaf loop refuses that one).
+func cutRoot(key, rootID string) (rel string, rootSeg flatSeg, rooted bool) {
+	first, rel, found := strings.Cut(key, "/")
+	if !found {
+		return "", flatSeg{}, false
+	}
+	pk, err := parseFlatKey(first)
+	if err != nil || pk.suffix != "" || len(pk.segs) != 1 || pk.segs[0].id != rootID {
+		return "", flatSeg{}, false
+	}
+	return rel, pk.segs[0], true
+}
+
+// errRootIndex refuses an index past the bound of the template root's own
+// segment. The root is the one COMPOSITION, so `:0` is its explicit-index
+// spelling and anything higher names a composition that does not exist; reading
+// the key as the root's would merge it in with no error. REQ-170 lists an index
+// past its bound as malformed matched content. The message names the segment
+// and carries no value; the caller names the key.
+func errRootIndex(seg flatSeg) error {
+	return fmt.Errorf("%w: FLAT id %q carries :%d, but the template root is the one COMPOSITION, not an indexed list",
+		ErrUnknownPath, seg.id, seg.idx)
+}
+
+// errSingleValuedIndex refuses an index past the bound of a segment that
+// addresses a single-valued RM attribute (COMPOSITION.context,
+// ACTION.ism_transition, ENTRY.language, …). `:0` is the one value's
+// explicit-index spelling, which OPT-free STRUCTURED → FLAT conversion writes;
+// anything higher names a list slot the attribute does not have, and ignoring
+// the index would merge the key into the one value with no error (REQ-170: an
+// index past its bound). The message names the segment and carries no value;
+// the caller names the key.
+func errSingleValuedIndex(seg flatSeg) error {
+	return fmt.Errorf("%w: FLAT id %q carries :%d, but it addresses a single-valued RM attribute, not an indexed list",
+		ErrUnknownPath, seg.id, seg.idx)
+}
+
+// holdsOneValue reports whether the Web Template node child, reached from its
+// parent node, stands on a single-valued RM attribute: the one its FLAT
+// segment's :index addresses. That is judged against the RM, not the Web
+// Template's occurrences: the attribute chain from the parent's canonical path
+// to the child's is walked with rminfo, so a node the Web Template reaches
+// through folded structures (an EVENT under OBSERVATION/data/events) is judged
+// on the attribute that actually holds it. For a collapsed ELEMENT leaf the
+// index belongs to the ELEMENT the leaf folds away, so the attribute judged is
+// the one before `/value`, as [resolveLeaf] stores it. An attribute rminfo does
+// not know is not judged.
+func holdsOneValue(parent, child *webtemplate.Node) bool {
+	parentSegs, childSegs := parseAQL(parent.AQLPath), parseAQL(child.AQLPath)
+	if len(childSegs) <= len(parentSegs) {
+		return false
+	}
+	rel := childSegs[len(parentSegs):]
+	target := len(rel) - 1
+	if child.NodeID != "" && len(child.Children) == 0 && rel[target].attr == "value" && target > 0 {
+		target--
+	}
+	curType := nodeRMType(parent)
+	for i, seg := range rel[:target] {
+		curType = concreteType(curType, seg.attr, "", rel[i+1].attr)
+		if curType == "" {
+			return false
+		}
+	}
+	container, known := rminfo.Default.IsContainer(curType, rel[target].attr)
+	return known && !container
+}
+
 // MetadataAliasSpellings returns the root-relative FLAT spellings the decoder
 // accepts as aliases of the ctx/ composition-metadata short forms,
 // sorted. `"language|code"`, for instance, is accepted at
@@ -411,7 +485,8 @@ func isMetadataSpelling(rel string) bool {
 // on any of its segments (`<root>/language:0|code`,
 // `<root>/context:0/start_time:0`, the form OPT-free STRUCTURED → FLAT
 // conversion writes) exactly as the unindexed one, and refuses any other
-// index there. The same holds for [MetadataWitnessSpellings].
+// index there. The template root's own segment is read the same way
+// (`<root>:0/composer:0|name`). The same holds for [MetadataWitnessSpellings].
 //
 // This is informative public surface for conformance tooling, not a decode knob.
 // A harness that has to hold composition metadata out of a like-for-like FLAT
@@ -459,10 +534,16 @@ func siphonContext(flat map[string]any, rootID string) (ctx map[string]any, ctxO
 			}
 			continue
 		}
-		rel, isRooted := strings.CutPrefix(key, rootID+"/")
+		rel, rootSeg, isRooted := cutRoot(key, rootID)
 		if !isRooted {
 			content[key] = val
 			continue
+		}
+		// The template root is the one COMPOSITION: `<root>:0/` is `<root>/`
+		// (REQ-053), and any other index is past its bound, refused whatever
+		// follows it (REQ-170).
+		if rootSeg.idx > 0 {
+			return nil, nil, nil, fmt.Errorf("simplified: %q: %w", key, errRootIndex(rootSeg))
 		}
 		// The tables below are keyed on the unindexed spelling. An indexed
 		// metadata path is read exactly as that spelling, and only `:0` is an
@@ -878,6 +959,12 @@ func resolveLeaf(wt *webtemplate.WebTemplate, segs []flatSeg, ambiguous map[stri
 		}
 		if next == nil {
 			return nil, nil, nil, errSegNotFound
+		}
+		// Placement reads an index only where the attribute is a list, so on a
+		// single-valued one an index past :0 would be dropped and the key merged
+		// into the one value (REQ-170).
+		if seg.idx > 0 && holdsOneValue(node, next) {
+			return nil, nil, nil, errSingleValuedIndex(seg)
 		}
 		if next.NodeID != "" {
 			bare := bareAQLPath(next.AQLPath)
@@ -1489,9 +1576,14 @@ func rmattrOwnerAt(wt *webtemplate.WebTemplate, compJSON map[string]any, base st
 			return node, err
 		}
 	}
-	// segs[1].idx <= 0: the OPT-free STRUCTURED interconversion re-spells every
-	// segment with an explicit index, so `context` and `context:0` are one node.
-	if len(segs) == 2 && segs[1].id == "context" && segs[1].idx <= 0 {
+	// The OPT-free STRUCTURED interconversion re-spells every segment with an
+	// explicit index, so `context` and `context:0` are one node. COMPOSITION.context
+	// is single-valued, so any other index is past its bound (REQ-170), whether or
+	// not the template carries a `context` node.
+	if len(segs) == 2 && segs[1].id == "context" {
+		if segs[1].idx > 0 {
+			return rmattrOwner{}, errSingleValuedIndex(segs[1])
+		}
 		return rmattrOwner{kind: "EVENT_CONTEXT", resolve: walk("/context", nil, nil)}, nil
 	}
 	if len(segs) == 1 {

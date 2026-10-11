@@ -162,10 +162,11 @@ var contextMetaLeaves = map[string]bool{
 //
 // The match reads a key through [unindexedSpelling] first, because the codec
 // does: a metadata path whose segments carry `:0` (`<root>/language:0|code`,
-// `<root>/context:0/start_time:0`, the spelling OPT-free STRUCTURED → FLAT
-// conversion writes) is the same real path as the unindexed one (REQ-053).
-// Any other index is refused by the codec, so it is not held out: it reaches
-// decode and is counted there.
+// `<root>:0/composer:0|name`, `<root>/context:0/start_time:0`, the spelling
+// OPT-free STRUCTURED → FLAT conversion writes) is the same real path as the
+// unindexed one, the template root's own segment included (REQ-053). Any other
+// index is refused by the codec, so it is not held out: it reaches decode and
+// is counted there.
 //
 // This creates an asymmetry on the emitted side: the `ctx/` prefix test is
 // unbounded, so every ctx/ key the encoder writes is skipped and a bogus one
@@ -176,6 +177,10 @@ func IsCompositionMeta(key, root string) bool {
 		return true
 	}
 	rel, rooted := strings.CutPrefix(key, root+"/")
+	if !rooted {
+		// The template root's own segment takes `:0` too (REQ-053).
+		rel, rooted = strings.CutPrefix(key, root+zeroIndex+"/")
+	}
 	if !rooted {
 		return false
 	}
