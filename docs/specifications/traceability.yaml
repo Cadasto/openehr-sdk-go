@@ -433,6 +433,7 @@ requirements:
       - openehr/rm/quoted_literal_test.go
       - openehr/rm/real_test.go
       - openehr/rm/typereg/registry_test.go
+      - openehr/rm/typereg/unmatched_test.go
       - openehr/serialize/canjson/bare_v2_decode_test.go
       - openehr/serialize/canjson/corpus_parity_test.go
       - openehr/serialize/canjson/decode_test.go
@@ -452,6 +453,7 @@ requirements:
       - openehr/serialize/canjson/roundtrip_test.go
       - openehr/serialize/canjson/type_census_test.go
       - openehr/serialize/canjson/typednil_slot_test.go
+      - openehr/serialize/canjson/unmatched_test.go
       - openehr/serialize/canxml/interval_open_side_test.go
       - openehr/templatecompile/external_test.go
       - openehr/validation/interval_bounds_test.go
@@ -1095,6 +1097,7 @@ requirements:
       - internal/templatecompile/webtemplate_oracle_compile_test.go
       - openehr/rm/rminfo/lookup_test.go
       - openehr/template/archetype_root_template_id_test.go
+      - openehr/template/constraint_ref_test.go
       - openehr/template/imports_test.go
       - openehr/template/interval_flags_test.go
       - openehr/template/node_name_test.go
@@ -1173,6 +1176,8 @@ requirements:
       - openehr/instance/placeholder_test.go
       - openehr/instance/string_leaf_internal_test.go
       - openehr/instance/string_leaf_test.go
+      - openehr/template/constraint_ref_test.go
+      - openehr/template/constraints/constraint_ref_test.go
       - openehr/template/constraints/constraints_test.go
       - openehr/template/constraints/example_test.go
       - openehr/template/constraints/pure_imports_test.go
@@ -1317,6 +1322,7 @@ requirements:
       - openehr/instance/valuefill_test.go
       - openehr/instance/visit_rules_test.go
       - openehr/serialize/simplified/flat_encode_test.go
+      - openehr/template/constraints/constraint_ref_test.go
       - openehr/template/constraints/example_test.go
       - openehr/validation/constraint_fixtures_test.go
       - openehr/validation/optional_string_test.go
@@ -1987,6 +1993,7 @@ requirements:
       - openehr/rm/interval_closed_test.go
       - openehr/serialize/canjson/interval_flag_defaults_test.go
       - openehr/serialize/canjson/roundtrip_test.go
+      - openehr/serialize/canjson/unmatched_test.go
       - openehr/serialize/canxml/interval_flag_defaults_test.go
       - openehr/serialize/simplified/rmattr_repeating_test.go
       - openehr/template/interval_flags_test.go
@@ -1999,3 +2006,7 @@ requirements:
     implementation: planned
     packages: [openehr/serialize/canjson, openehr/rm/typereg, openehr/serialize/canxml, internal/bmmgen, openehr/serialize/simplified]
     probes: [PROBE-086, PROBE-105, PROBE-030]
+    tests:
+      - openehr/rm/typereg/unmatched_internal_test.go
+      - openehr/rm/typereg/unmatched_test.go
+      - openehr/serialize/canjson/unmatched_test.go
