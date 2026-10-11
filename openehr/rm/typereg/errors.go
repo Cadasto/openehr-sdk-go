@@ -9,7 +9,6 @@ import (
 	"encoding/json/jsontext"
 	"errors"
 	"fmt"
-	"strconv"
 )
 
 // Sentinel errors returned by [Registry.Decode], [DecodeAs] and the decode
@@ -69,15 +68,6 @@ var (
 	// in openehr/rm can attach it without forming an
 	// `openehr/rm → openehr/serialize` import cycle.
 	ErrInvalidShape = errors.New("canjson: invalid JSON shape")
-	// ErrUnknownMember classifies a member that names nothing the decode
-	// reads: its name is neither `_type` nor a member of the RM or AOM 1.4
-	// type its object decodes as. Such a member is ignored by default; it
-	// is an error only when the caller tracks unmatched members and asks for
-	// the first one to be refused ([TrackUnmatched]). It is a sentinel of its
-	// own, distinct from [ErrInvalidShape]: the member is not malformed, it
-	// is simply not read. Like ErrInvalidShape it lives here so generated
-	// code can reach it, and it is re-exported as canjson.ErrUnknownMember.
-	ErrUnknownMember = errors.New("canjson: unknown member")
 )
 
 // DecodeError is the unified envelope returned by the canjson and
@@ -234,40 +224,6 @@ func ClassifyShape(err error) error {
 func ClassifyDuplicate(err error) error {
 	if err != nil && errors.Is(err, jsontext.ErrDuplicateName) && !errors.Is(err, ErrInvalidShape) {
 		return ClassifyShape(err)
-	}
-	return err
-}
-
-// unknownMemberError is the refusal of an unmatched member under strict
-// tracking. It names the member by its JSON Pointer from the document root and
-// carries nothing else from the input, so the member's value never reaches the
-// message. It wraps [ErrUnknownMember].
-type unknownMemberError struct {
-	pointer string
-}
-
-// Error names the member's pointer, quoted so a name holding a control
-// character cannot break the line it is logged on.
-func (e *unknownMemberError) Error() string {
-	return ErrUnknownMember.Error() + " " + strconv.Quote(e.pointer)
-}
-
-// Unwrap returns [ErrUnknownMember], the classification this refusal carries.
-func (e *unknownMemberError) Unwrap() error {
-	return ErrUnknownMember
-}
-
-// UnwrapUnknownMember returns the unknown-member refusal in err's chain on its
-// own, or err unchanged when the chain holds none (a nil err included).
-//
-// The refusal names the member's JSON Pointer from the root of the document.
-// On its way out it passes through the decoder's own error envelopes, and
-// those name positions relative to the value each one decoded, which inside a
-// polymorphic slot is not the document root. A decode entry point therefore
-// returns the refusal alone, so its message names one pointer, the right one.
-func UnwrapUnknownMember(err error) error {
-	if ue, ok := errors.AsType[*unknownMemberError](err); ok && ue != nil {
-		return ue
 	}
 	return err
 }

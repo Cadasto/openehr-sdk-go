@@ -63,20 +63,6 @@ import (
 // cycle; this is the caller-facing name for it.
 var ErrInvalidShape = typereg.ErrInvalidShape
 
-// ErrUnknownMember is the sentinel for a member the decode does not read:
-// its name is neither `_type` nor a member of the RM type its object decodes
-// as. Such a member is ignored by default. Only a decode given [WithStrict]
-// refuses one, and the refusal wraps this sentinel and names the member's
-// JSON Pointer from the root of the input (RFC 6901). The pointer carries
-// the member's name but none of its value.
-//
-// It is distinct from [ErrInvalidShape] and [ErrInvalidValue]: the member is
-// not malformed, it is unknown, and errors.Is against one of the three
-// sentinels never matches an error raised for another. Like
-// [ErrInvalidShape], the value lives in [typereg] so generated code can
-// reach it; this is the caller-facing name for it.
-var ErrUnknownMember = typereg.ErrUnknownMember
-
 // DecodeError is the unified error returned by the decoder at
 // polymorphic dispatch sites. Re-exported from the internal poly
 // helper so consumers can `errors.As` against a stable type without
@@ -107,57 +93,6 @@ func newDecoderConfig(opts []DecoderOption) decoderConfig {
 		}
 	}
 	return c
-}
-
-// target returns what the decode writes into: v itself by default, or v
-// wrapped so that unmatched members are reported or refused when an option
-// asks for either.
-func (c decoderConfig) target(v any) any {
-	if c.unmatched == nil && !c.strict {
-		return v
-	}
-	return typereg.TrackUnmatched(v, c.unmatched, c.strict)
-}
-
-// WithUnmatched passes every unmatched member of the input to fn while the
-// decode carries on. A member is unmatched when its name is neither `_type`
-// nor a member of the RM type its object decodes as, at any depth: inside a
-// polymorphic slot, an interval bound or an AOM 1.4 value too.
-//
-// By default the decoder ignores unmatched members: the value it returns
-// holds the rest of the input and none of them. With this option fn receives
-// each one, once, in the order it appears in the input, and the value
-// returned is the same as without the option. fn gets the member's JSON
-// Pointer (RFC 6901) from the root of the input, such as
-// "/content/0/data/x-note"; the pointer carries the member's name, never its
-// value. fn runs during the decode, on the caller's goroutine.
-//
-// A nil fn is the same as leaving the option out. Combined with
-// [WithStrict], fn sees the first unmatched member before the decode is
-// refused.
-//
-// REST reads through the transport and client packages decode with the
-// default and ignore unmatched members.
-func WithUnmatched(fn func(pointer string)) DecoderOption {
-	return func(c *decoderConfig) { c.unmatched = fn }
-}
-
-// WithStrict refuses the decode at its first unmatched member: a member
-// whose name is neither `_type` nor a member of the RM type its object
-// decodes as, at any depth. The error wraps [ErrUnknownMember] and names the
-// member's JSON Pointer (RFC 6901) from the root of the input; it carries
-// none of the member's value. The value v points to is unspecified after the
-// refusal.
-//
-// Strict covers unmatched members only. An absent member is never refused,
-// mandatory or not, and neither is a boundary flag an interval leaves out.
-// The option is unrelated to `_type` dispatch: an unknown `_type` fails in
-// every mode (see [DecodeError]).
-//
-// By default the decoder ignores unmatched members. REST reads through the
-// transport and client packages decode with the default.
-func WithStrict() DecoderOption {
-	return func(c *decoderConfig) { c.strict = true }
 }
 
 // WithRelaxedTypeDispatch toggles the polymorphic-dispatch policy
@@ -193,13 +128,8 @@ func WithRelaxedTypeDispatch(enabled bool) DecoderOption {
 // [Unmarshal] and [Decoder.Decode] accept non-RM targets, which never
 // travel through the registry, so the registry gate alone would not cover
 // them.
-//
-// A [WithStrict] refusal of an unmatched member is returned on its own
-// ([typereg.UnwrapUnknownMember]): it names the member from the root of the
-// input, where the envelopes the decoder wrapped around it name positions
-// relative to inner values.
 func classifyDecode(err error) error {
-	return typereg.ClassifyDuplicate(typereg.UnwrapUnknownMember(err))
+	return typereg.ClassifyDuplicate(err)
 }
 
 // Unmarshal parses canonical-JSON-encoded data and stores the result
@@ -224,13 +154,18 @@ func classifyDecode(err error) error {
 //
 // A member the target does not read is ignored by default. [WithUnmatched]
 // reports each such member and [WithStrict] refuses the first, wrapping
-// [ErrUnknownMember].
+// [ErrUnknownMember]. Either option checks the members once the decode has
+// succeeded and changes nothing about the decode itself; with neither, no
+// member is checked.
 //
 // The value v points to is unspecified after an error: a failed decode may
 // leave it partly written.
 func Unmarshal(data []byte, v any, opts ...DecoderOption) error {
-	cfg := newDecoderConfig(opts)
-	return classifyDecode(json.Unmarshal(data, cfg.target(v), typereg.Unmarshalers()))
+	err := classifyDecode(json.Unmarshal(data, v, typereg.Unmarshalers()))
+	if err != nil || len(opts) == 0 {
+		return err
+	}
+	return checkUnmatched(data, v, opts)
 }
 
 // Decoder reads and decodes canonical-JSON values from a stream.
@@ -260,10 +195,28 @@ func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 // value is a *jsontext.SyntacticError wrapping io.ErrUnexpectedEOF in
 // both.
 //
+// With [WithUnmatched] or [WithStrict], Decode first reads the whole next
+// value into the decoder's read buffer, then decodes those bytes as
+// [Unmarshal] does and checks their members, with no copy of its own.
+// Reading the value whole first changes which failure a bad value reports:
+// malformed bytes anywhere in the value come back ahead of a shape failure
+// earlier in it, and a shape failure's byte offset counts from the start of
+// the value, not of the stream.
+//
 // The value v points to is unspecified after an error: a failed decode may
 // leave it partly written.
 func (d *Decoder) Decode(v any) error {
-	return classifyDecode(json.UnmarshalDecode(d.dec, d.cfg.target(v), typereg.Unmarshalers()))
+	if !d.cfg.checksMembers() {
+		return classifyDecode(json.UnmarshalDecode(d.dec, v, typereg.Unmarshalers()))
+	}
+	raw, err := d.dec.ReadValue()
+	if err != nil {
+		return classifyDecode(err)
+	}
+	if err := classifyDecode(json.Unmarshal(raw, v, typereg.Unmarshalers())); err != nil {
+		return err
+	}
+	return d.cfg.walkUnmatched(raw, v)
 }
 
 // RelaxedTypeDispatch reports whether the decoder was configured with

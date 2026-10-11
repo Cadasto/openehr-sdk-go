@@ -5,9 +5,13 @@ package canjson_test
 // sentinels distinct. A member is unmatched when its name is neither `_type`
 // nor an attribute of the RM type its object decodes as. The default ignores
 // it; WithUnmatched reports every one, in document order, as a JSON Pointer;
-// WithStrict refuses the first with canjson.ErrUnknownMember.
+// WithStrict refuses the first with canjson.ErrUnknownMember. Both options
+// check the members against the RM's attribute lists after the decode has
+// succeeded, so a decode error is reported as itself and a value of a class
+// outside the RM (AOM 1.4) is not checked.
 
 import (
+	"encoding/json/jsontext"
 	"errors"
 	"os"
 	"reflect"
@@ -18,6 +22,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -72,8 +77,15 @@ const (
 // canonical JSON: the root of a COMPOSITION, inside an ENTRY, an EVENT and a
 // data value (each in a polymorphic slot), in a narrow slot that falls back
 // to its declared parent, in an interval and its bound (both a by-value bound
-// and a bound that is itself a polymorphic slot), and in an AOM 1.4 value and
-// its constraint intervals. One case has names RFC 6901 must escape.
+// and a bound that is itself a polymorphic slot), ahead of the `_type` that
+// decides its object, and in a CODE_PHRASE and the TERMINOLOGY_ID it holds by
+// value. One case has names RFC 6901 must escape.
+//
+// No RM attribute reaches a class the generated decoders leave without a
+// decode method of its own (rm.TerminologyCode, rm.TerminologyTerm,
+// rm.Cardinality, rm.MultiplicityInterval): AOM 1.4 alone holds them, and its
+// members are not checked (TestREQ170_ClassesOutsideTheRMAreNotChecked). The
+// TERMINOLOGY_ID case is the by-value RM class nearest to that shape.
 func unmatchedCases() []unmatchedCase {
 	element := func(value string) string {
 		return `{"_type":"ELEMENT","name":` + ucText + `,"archetype_node_id":"at0004","value":` + value + `}`
@@ -121,18 +133,20 @@ func unmatchedCases() []unmatchedCase {
 			into: func() any { return new(rm.Composition) },
 		},
 		{
-			// AOM 1.4: a C_COMPLEX_OBJECT, its `occurrences` (the abstract BASE
-			// Interval, which declares no `_type`: the `_type` member it carries
-			// is never unmatched), a C_SINGLE_ATTRIBUTE in a polymorphic slot,
-			// and that attribute's `existence` interval.
-			name: "AOM 1.4 value",
-			tmpl: `{"_type":"C_COMPLEX_OBJECT",` + extPlaceholder + `"rm_type_name":"OBSERVATION","node_id":"at0000",` +
-				`"occurrences":{"_type":"MULTIPLICITY_INTERVAL",` + extPlaceholder + `"lower":1,"upper":1},` +
-				`"attributes":[{"_type":"C_SINGLE_ATTRIBUTE",` + extPlaceholder + `"rm_attribute_name":"data",` +
-				`"existence":{` + extPlaceholder + `"lower":1,"upper":1}}]}`,
-			names:    []string{"x-object", "x-occurrences", "x-attribute", "x-existence"},
-			pointers: []string{"/x-object", "/occurrences/x-occurrences", "/attributes/0/x-attribute", "/attributes/0/existence/x-existence"},
-			into:     func() any { return new(aom14.CComplexObject) },
+			// The CODE_PHRASE's members come before its `_type`, and its
+			// TERMINOLOGY_ID, held by value, is written once with its
+			// `_type` and once with it elided.
+			name: "CODE_PHRASE and TERMINOLOGY_ID",
+			tmpl: `{"_type":"DV_CODED_TEXT","value":"event","defining_code":{` + extPlaceholder +
+				`"terminology_id":{"_type":"TERMINOLOGY_ID",` + extPlaceholder + `"value":"openehr"},"code_string":"433","_type":"CODE_PHRASE"},` +
+				`"language":{"terminology_id":{` + extPlaceholder + `"value":"ISO_639-1"},"code_string":"en"}}`,
+			names: []string{"x-code-phrase", "x-terminology-id", "x-elided-terminology-id"},
+			pointers: []string{
+				"/defining_code/x-code-phrase",
+				"/defining_code/terminology_id/x-terminology-id",
+				"/language/terminology_id/x-elided-terminology-id",
+			},
+			into: func() any { return new(rm.DVCodedText) },
 		},
 		{
 			// RFC 6901 § 3: `~` is written `~0` and `/` is written `~1`.
@@ -156,10 +170,10 @@ func decodeCollecting(c unmatchedCase, in []byte, opts ...canjson.DecoderOption)
 }
 
 // assertStrictRefusal checks every facet REQ-170 gives a strict refusal: it
-// wraps canjson.ErrUnknownMember, is returned on its own (so its message names
-// one pointer), names the first unmatched member's pointer, carries no value
-// from the input, and matches neither of the codec's other two sentinels
-// (REQ-052) nor the dispatch envelope.
+// wraps canjson.ErrUnknownMember, one step from the sentinel (so its message
+// names one pointer), names the first unmatched member's pointer, carries no
+// value from the input, and matches neither of the codec's other two
+// sentinels (REQ-052) nor the dispatch envelope.
 func assertStrictRefusal(t *testing.T, call string, err error, first string) {
 	t.Helper()
 	if !errors.Is(err, canjson.ErrUnknownMember) {
@@ -276,11 +290,65 @@ func TestREQ170_DecoderUnmatchedOptions(t *testing.T) {
 	assertStrictRefusal(t, "Decoder(WithStrict).Decode", err, "/x-one")
 }
 
-// TestREQ170_ConcurrentDecodesKeepTheirOwnReports runs tracked decodes in
+// TestREQ170_DecoderWithOptionsReadsTheValueWhole pins what Decoder.Decode's
+// documentation says about a decoder given either option: it reads the whole
+// next value before decoding it. So malformed bytes later in a value are
+// reported ahead of a shape failure earlier in it, where a decoder without
+// options reports the shape failure first (REQ-052's malformed-JSON
+// exclusion), and a shape failure's byte offset counts from the start of the
+// value. canjson.Unmarshal has the whole input already and decodes as it does
+// by default.
+func TestREQ170_DecoderWithOptionsReadsTheValueWhole(t *testing.T) {
+	const (
+		shapeFirst = `{"_type":"DV_QUANTITY","magnitude":"abc","units":"kg" x}`
+		first      = `{"_type":"DV_TEXT","value":"a"}   `
+		second     = `{"_type":"DV_QUANTITY","magnitude":"abc","units":"kg"}`
+	)
+	// secondShapeFailure decodes the second value of first+second and returns
+	// the shape failure it reports.
+	secondShapeFailure := func(t *testing.T, opts ...canjson.DecoderOption) error {
+		t.Helper()
+		dec := canjson.NewDecoder(strings.NewReader(first+second), opts...)
+		if err := dec.Decode(new(rm.DVText)); err != nil {
+			t.Fatalf("Decode(first value) = %v; want nil", err)
+		}
+		err := dec.Decode(new(rm.DVQuantity))
+		if !errors.Is(err, canjson.ErrInvalidShape) {
+			t.Fatalf("Decode(second value) err = %v; want canjson.ErrInvalidShape", err)
+		}
+		return err
+	}
+	// The failing literal starts at this offset in the second value.
+	inValue := strings.Index(second, `"abc"`)
+
+	t.Run("no options", func(t *testing.T) {
+		if want := "after offset " + strconv.Itoa(len(first)+inValue); !strings.Contains(secondShapeFailure(t).Error(), want) {
+			t.Errorf("Decoder().Decode(second value) err names no %q, counted from the start of the stream", want)
+		}
+	})
+	opts := map[string][]canjson.DecoderOption{
+		"WithUnmatched": {canjson.WithUnmatched(func(string) {})},
+		"WithStrict":    {canjson.WithStrict()},
+	}
+	for name, o := range opts {
+		t.Run(name, func(t *testing.T) {
+			err := canjson.NewDecoder(strings.NewReader(shapeFirst), o...).Decode(new(rm.DVQuantity))
+			if se, ok := errors.AsType[*jsontext.SyntacticError](err); !ok || se == nil || errors.Is(err, canjson.ErrInvalidShape) {
+				t.Errorf("Decoder(%s).Decode(%s) err = %v; want the malformed bytes reported, with no canjson.ErrInvalidShape", name, shapeFirst, err)
+			}
+			if err := canjson.Unmarshal([]byte(shapeFirst), new(rm.DVQuantity), o...); !errors.Is(err, canjson.ErrInvalidShape) {
+				t.Errorf("canjson.Unmarshal(%s, %s) err = %v; want the shape failure, as by default", shapeFirst, name, err)
+			}
+			if want := "after offset " + strconv.Itoa(inValue); !strings.Contains(secondShapeFailure(t, o...).Error(), want) {
+				t.Errorf("Decoder(%s).Decode(second value) err names no %q, counted from the start of the value", name, want)
+			}
+		})
+	}
+}
+
+// TestREQ170_ConcurrentDecodesKeepTheirOwnReports runs reporting decodes in
 // parallel, each with its own report function and its own extension member,
-// and requires each to see exactly its own member. The tracking state is held
-// per decoder, so concurrent decodes never see each other's members, slots
-// included.
+// and requires each to see exactly its own member, slots included.
 func TestREQ170_ConcurrentDecodesKeepTheirOwnReports(t *testing.T) {
 	for i := range 8 {
 		name := "x-decode-" + strconv.Itoa(i)
@@ -303,23 +371,27 @@ func TestREQ170_ConcurrentDecodesKeepTheirOwnReports(t *testing.T) {
 	}
 }
 
+// modes are the three decode modes, each as the options it passes and the
+// pointers it collects.
+func modes(reported *[]string) map[string][]canjson.DecoderOption {
+	report := canjson.WithUnmatched(func(p string) { *reported = append(*reported, p) })
+	return map[string][]canjson.DecoderOption{
+		"default": nil,
+		"report":  {report},
+		"strict":  {canjson.WithStrict(), report},
+	}
+}
+
 // TestREQ170_UnknownTypeFailsInEveryMode pins that a `_type` naming no RM
 // class is a dispatch failure in every mode, never an unmatched member: the
 // slot cannot be decoded at all, so nothing under it is reported either.
 func TestREQ170_UnknownTypeFailsInEveryMode(t *testing.T) {
 	const in = `{"_type":"ELEMENT","name":{"_type":"DV_TEXT","value":"n"},"archetype_node_id":"at1",` +
 		`"value":{"_type":"NO_SUCH_CLASS","x-ext":"` + plantedValue + `"}}`
-	for _, mode := range []string{"default", "report", "strict"} {
+	var reported []string
+	for mode, opts := range modes(&reported) {
 		t.Run(mode, func(t *testing.T) {
-			var reported []string
-			report := canjson.WithUnmatched(func(p string) { reported = append(reported, p) })
-			var opts []canjson.DecoderOption
-			switch mode {
-			case "report":
-				opts = []canjson.DecoderOption{report}
-			case "strict":
-				opts = []canjson.DecoderOption{canjson.WithStrict(), report}
-			}
+			reported = nil
 			err := canjson.Unmarshal([]byte(in), new(rm.Element), opts...)
 			if !errors.Is(err, typereg.ErrUnknownType) {
 				t.Fatalf("canjson.Unmarshal(%s) err = %v; want errors.Is(_, typereg.ErrUnknownType)", mode, err)
@@ -331,6 +403,64 @@ func TestREQ170_UnknownTypeFailsInEveryMode(t *testing.T) {
 				t.Errorf("canjson.Unmarshal(%s) reported %q; want nothing: the slot is never decoded", mode, reported)
 			}
 		})
+	}
+}
+
+// TestREQ170_TypeAtAConcretePositionFailsAsDispatch pins that an unknown or
+// mismatched `_type` where the decode target fixes the class, at the root and
+// at a field held by value, fails in all three modes with the dispatch
+// failure the decoder reports for it (canjson.DecodeError on `/_type`,
+// typereg.ErrTypeMismatch), not with canjson.ErrUnknownMember, and reports
+// nothing. Each object also carries an extension member ahead of its
+// `_type`, which a check that ran before the decode, or in its place, would
+// reach first.
+func TestREQ170_TypeAtAConcretePositionFailsAsDispatch(t *testing.T) {
+	cases := []struct {
+		name, in string
+		into     func() any
+	}{
+		{
+			name: "unknown at the root",
+			in:   `{"x-ext":"` + plantedValue + `","_type":"NO_SUCH_CLASS","value":"v"}`,
+			into: func() any { return new(rm.DVText) },
+		},
+		{
+			name: "mismatched at the root",
+			in:   `{"x-ext":"` + plantedValue + `","_type":"DV_QUANTITY","value":"v"}`,
+			into: func() any { return new(rm.DVText) },
+		},
+		{
+			name: "unknown at a by-value field",
+			in:   `{"_type":"CODE_PHRASE","code_string":"433","terminology_id":{"x-ext":"` + plantedValue + `","_type":"NO_SUCH_CLASS","value":"openehr"}}`,
+			into: func() any { return new(rm.CodePhrase) },
+		},
+		{
+			name: "mismatched at a by-value field",
+			in:   `{"_type":"CODE_PHRASE","code_string":"433","terminology_id":{"x-ext":"` + plantedValue + `","_type":"DV_TEXT","value":"openehr"}}`,
+			into: func() any { return new(rm.CodePhrase) },
+		},
+	}
+	for _, tc := range cases {
+		var reported []string
+		for mode, opts := range modes(&reported) {
+			t.Run(tc.name+"/"+mode, func(t *testing.T) {
+				reported = nil
+				err := canjson.Unmarshal([]byte(tc.in), tc.into(), opts...)
+				de, ok := errors.AsType[*canjson.DecodeError](err)
+				if !ok || de == nil || !errors.Is(err, typereg.ErrTypeMismatch) {
+					t.Fatalf("canjson.Unmarshal(%s, %s) err = %v; want a *canjson.DecodeError wrapping typereg.ErrTypeMismatch", tc.in, mode, err)
+				}
+				if errors.Is(err, canjson.ErrUnknownMember) {
+					t.Errorf("canjson.Unmarshal(%s, %s) err = %v; the `_type` is a dispatch failure, not an unknown member", tc.in, mode, err)
+				}
+				if strings.Contains(err.Error(), plantedValue) {
+					t.Errorf("canjson.Unmarshal(%s, %s) err = %q; it carries the extension member's value", tc.in, mode, err)
+				}
+				if len(reported) != 0 {
+					t.Errorf("canjson.Unmarshal(%s, %s) reported %q; want nothing: a failed decode is not checked", tc.in, mode, reported)
+				}
+			})
+		}
 	}
 }
 
@@ -359,14 +489,122 @@ func TestREQ170_StrictNeverRefusesAnAbsentMember(t *testing.T) {
 	})
 }
 
-// TestREQ170_RegisteredTypeCensus decodes, for every registered library type
-// (RM and AOM 1.4), a body carrying its `_type` and one extension member, and
-// requires the report to name exactly that member. It is the control that no
-// registered type decodes outside the tracked path, where an unmatched member
-// would be skipped unreported.
+// TestREQ170_ClassesOutsideTheRMAreNotChecked pins the canonical-JSON scope
+// of the options: a value of a class outside the RM, an AOM 1.4 archetype or
+// constraint, decodes as by default and none of its members is checked, the
+// RM values it holds included (its ARCHETYPE_ID, and its original_language,
+// an rm.TerminologyCode). Each input carries extension members at several
+// depths; the report sees none, strict refuses none, and the value is the
+// default's.
+func TestREQ170_ClassesOutsideTheRMAreNotChecked(t *testing.T) {
+	cases := []struct {
+		name, in string
+		into     func() any
+	}{
+		{
+			name: "archetype",
+			in: `{"_type":"ARCHETYPE","x-archetype":"` + plantedValue + `",` +
+				`"archetype_id":{"value":"openEHR-EHR-OBSERVATION.x.v1","x-id":1},"concept":"at0000",` +
+				`"original_language":{"terminology_id":"ISO_639-1","code_string":"en","x-language":1},` +
+				`"definition":{"_type":"C_COMPLEX_OBJECT","rm_type_name":"OBSERVATION","node_id":"at0000","x-definition":1}}`,
+			into: func() any { return new(aom14.Archetype) },
+		},
+		{
+			// A C_COMPLEX_OBJECT, its `occurrences` (the abstract BASE
+			// Interval), a C_SINGLE_ATTRIBUTE in a polymorphic slot, and that
+			// attribute's `existence` interval.
+			name: "constraint",
+			in: `{"_type":"C_COMPLEX_OBJECT","x-object":1,"rm_type_name":"OBSERVATION","node_id":"at0000",` +
+				`"occurrences":{"_type":"MULTIPLICITY_INTERVAL","x-occurrences":1,"lower":1,"upper":1},` +
+				`"attributes":[{"_type":"C_SINGLE_ATTRIBUTE","x-attribute":1,"rm_attribute_name":"data",` +
+				`"existence":{"x-existence":1,"lower":1,"upper":1}}]}`,
+			into: func() any { return new(aom14.CComplexObject) },
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			want := tc.into()
+			if err := canjson.Unmarshal([]byte(tc.in), want); err != nil {
+				t.Fatalf("canjson.Unmarshal(%s) = %v; want nil", tc.in, err)
+			}
+			var reported []string
+			for mode, opts := range modes(&reported) {
+				reported = nil
+				got := tc.into()
+				if err := canjson.Unmarshal([]byte(tc.in), got, opts...); err != nil {
+					t.Errorf("canjson.Unmarshal(%s) = %v; want nil: a class outside the RM is not checked", mode, err)
+				}
+				if len(reported) != 0 {
+					t.Errorf("canjson.Unmarshal(%s) reported %q; want nothing", mode, reported)
+				}
+				if !reflect.DeepEqual(got, want) {
+					t.Errorf("canjson.Unmarshal(%s) decoded\n%#v\nwant the default's value\n%#v", mode, got, want)
+				}
+			}
+		})
+	}
+}
+
+// TestREQ170_NilOptionsTakeTheDefaultPath pins that canjson.Unmarshal given
+// only nil options decodes exactly as with none: no member is checked, the
+// value is the default's, and the call allocates no more than one with no
+// options.
+func TestREQ170_NilOptionsTakeTheDefaultPath(t *testing.T) {
+	in := []byte(`{"_type":"DV_QUANTITY","magnitude":80.5,"units":"kg","x-ext":"` + plantedValue + `"}`)
+	var want, got rm.DVQuantity
+	if err := canjson.Unmarshal(in, &want); err != nil {
+		t.Fatalf("canjson.Unmarshal = %v; want nil", err)
+	}
+	if err := canjson.Unmarshal(in, &got, nil, nil); err != nil {
+		t.Fatalf("canjson.Unmarshal(nil, nil) = %v; want nil: a nil option asks for nothing", err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("canjson.Unmarshal(nil, nil) decoded %+v; want the default's %+v", got, want)
+	}
+	if raceEnabled {
+		t.Skip("allocation counts vary under the race detector")
+	}
+	none := testing.AllocsPerRun(50, func() { _ = canjson.Unmarshal(in, new(rm.DVQuantity)) })
+	nils := testing.AllocsPerRun(50, func() { _ = canjson.Unmarshal(in, new(rm.DVQuantity), nil) })
+	if nils > none {
+		t.Errorf("canjson.Unmarshal(nil) allocates %v times per call; want at most the %v of a call with no options", nils, none)
+	}
+}
+
+// maxDefaultDecodeAllocs is what a default canjson.Unmarshal of a small
+// DV_QUANTITY into a fresh value allocated before the unmatched-member options
+// existed, the target included (the figure BenchmarkDecodeDVQuantity reports).
+// The options run after the decode, so the default decode pays nothing for
+// them.
+const maxDefaultDecodeAllocs = 4
+
+// TestREQ170_DefaultDecodeAllocatesAsBefore pins the cost of the options on a
+// decode that passes none: the default path allocates no more than it did
+// before they existed. A check carried inside the decoder, such as a
+// per-object wrapper or a tracking hook, adds to it: the decoder-side tracking
+// these options first shipped with cost one more allocation here.
+func TestREQ170_DefaultDecodeAllocatesAsBefore(t *testing.T) {
+	if raceEnabled {
+		t.Skip("allocation counts vary under the race detector")
+	}
+	in := []byte(`{"_type":"DV_QUANTITY","magnitude":80.5,"units":"kg"}`)
+	if got := testing.AllocsPerRun(100, func() { _ = canjson.Unmarshal(in, new(rm.DVQuantity)) }); got > maxDefaultDecodeAllocs {
+		t.Errorf("canjson.Unmarshal(DV_QUANTITY) allocates %v times per call; want at most %d, the default decode's cost before the options", got, maxDefaultDecodeAllocs)
+	}
+}
+
+// TestREQ170_RegisteredTypeCensus decodes, for every registered library type,
+// a body carrying its `_type` and one extension member. For an RM class the
+// report names exactly that member; for an AOM 1.4 class, outside the RM, it
+// names nothing. It is the control that the check reaches every RM class the
+// registry decodes, and no class outside the RM.
 func TestREQ170_RegisteredTypeCensus(t *testing.T) {
 	const libraryPrefix = "github.com/cadasto/openehr-sdk-go/openehr/"
-	checked := 0
+	known := map[string]bool{}
+	for _, n := range rminfo.Default.KnownRMTypes() {
+		known[n] = true
+	}
+	rmChecked, outside := 0, 0
 	for _, name := range typereg.Default.Names() {
 		ctor, _ := typereg.Default.Lookup(name)
 		rt := reflect.TypeOf(ctor())
@@ -376,7 +614,6 @@ func TestREQ170_RegisteredTypeCensus(t *testing.T) {
 		if !strings.HasPrefix(rt.PkgPath(), libraryPrefix) {
 			continue // a test fixture registered elsewhere; not a shipped type
 		}
-		checked++
 		in := `{"_type":"` + name + `","x-census":"` + plantedValue + `"}`
 		var got []string
 		err := canjson.Unmarshal([]byte(in), ctor(), canjson.WithUnmatched(func(p string) { got = append(got, p) }))
@@ -384,12 +621,22 @@ func TestREQ170_RegisteredTypeCensus(t *testing.T) {
 			t.Errorf("%s: canjson.Unmarshal(%s, WithUnmatched) = %v; want nil", name, in, err)
 			continue
 		}
-		if want := []string{"/x-census"}; !slices.Equal(got, want) {
-			t.Errorf("%s: WithUnmatched reported %q; want %q", name, got, want)
+		var want []string
+		if known[name] {
+			want = []string{"/x-census"}
+			rmChecked++
+		} else {
+			outside++
+		}
+		if !slices.Equal(got, want) {
+			t.Errorf("%s (RM class: %v): WithUnmatched reported %q; want %q", name, known[name], got, want)
 		}
 	}
-	if checked < 100 {
-		t.Errorf("census covered %d library types; want the full RM + AOM 1.4 inventory", checked)
+	if rmChecked < 100 {
+		t.Errorf("census covered %d RM types; want the full RM inventory", rmChecked)
+	}
+	if outside < 20 {
+		t.Errorf("census covered %d types outside the RM; want the AOM 1.4 inventory", outside)
 	}
 }
 

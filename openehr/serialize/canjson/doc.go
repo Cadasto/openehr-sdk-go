@@ -14,9 +14,11 @@
 //	import "github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 //
 // The codec is usable without the HTTP client, auth, transport, or any
-// other SDK subsystem. The only dependencies are the generated RM types
-// and the type registry under
-// [github.com/cadasto/openehr-sdk-go/openehr/rm/typereg].
+// other SDK subsystem. The only dependencies are the generated RM types,
+// the type registry under
+// [github.com/cadasto/openehr-sdk-go/openehr/rm/typereg], and the RM's
+// attribute lists in [github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo],
+// which the options for unmatched members read.
 //
 // # Wire profile
 //
@@ -64,10 +66,10 @@
 //     Two encodes of one value therefore agree on member order; this is
 //     a determinism property, not a byte-level promise to a consumer.
 //
-//   - A member whose name is neither `_type` nor a member of the RM type
-//     its object decodes as is unmatched, and the decoder ignores it by
-//     default: the decoded value holds the rest of the input and none of
-//     the unmatched members, so a read, change and write drops a
+//   - A member whose name is neither `_type` nor an attribute of the RM
+//     type its object decodes as is unmatched, and the decoder ignores it
+//     by default: the decoded value holds the rest of the input and none
+//     of the unmatched members, so a read, change and write drops a
 //     producer's extension members. See "Unmatched members" below.
 //
 //   - Nil-pointer optional fields are emitted as absent (no key), not
@@ -188,22 +190,37 @@
 //
 // # Unmatched members
 //
-// A member is unmatched when its name is neither `_type` nor a member of
-// the RM type its object decodes as. That holds at any depth: inside a
-// polymorphic slot, an interval and its bounds, and an AOM 1.4 value too.
-// A member the decoder reads but refuses is not unmatched: an unknown
-// `_type` is a dispatch failure in every mode, and a member of the wrong
-// shape is a shape failure.
+// A member is unmatched when its name is neither `_type` nor an attribute
+// of the RM type its object decodes as. An object decodes as the class its
+// `_type` names, or else as the type the RM declares where it sits: the
+// declared type of the attribute that holds it, the class an interval slot
+// binds its bounds to, and for the root the RM type the decode target
+// names. That holds at any depth: inside a polymorphic slot and an
+// interval and its bounds too. A member the decoder reads but refuses is
+// not unmatched: an unknown `_type` is a dispatch failure in every mode,
+// and a member of the wrong shape is a shape failure.
 //
 // [Unmarshal] and [NewDecoder] take two options for unmatched members:
 //
 //   - [WithUnmatched] passes each one to a function, in the order it
 //     appears in the input, as a JSON Pointer (RFC 6901) from the root of
-//     the value, such as "/content/0/x-note". The decode carries on and
-//     returns the same value as the default.
+//     the value, such as "/content/0/x-note". The decode returns the same
+//     value as the default.
 //   - [WithStrict] refuses the decode at the first one, with an error that
 //     wraps [ErrUnknownMember] and names its pointer. An absent member is
 //     never refused.
+//
+// The options check the members once the decode has succeeded, in a second
+// pass over the same input that reads the RM's own attribute lists. So a
+// decode error, such as an unknown `_type`, is returned as itself in every
+// mode, wherever it sits in the input, and a decode that fails reports no
+// member. The pass does not look inside a value it cannot read as an RM
+// class: a value of a class outside the RM, such as an AOM 1.4 archetype,
+// decodes as by default and none of its members is checked, the RM values
+// it holds included. Nor does the pass check the members of a generic
+// payload the decoder holds as plain JSON (the data of the registry's
+// ORIGINAL_VERSION), of a `Hash` attribute, or of an object whose type
+// neither its `_type` nor its position names.
 //
 // Neither option changes what the decoder reads, and neither is available
 // on REST reads through the transport and client packages, which decode

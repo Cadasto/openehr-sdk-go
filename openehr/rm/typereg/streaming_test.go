@@ -27,7 +27,7 @@ func TestDecodeOptionsMemoisesCallerJoin(t *testing.T) {
 
 	before := callerJoinCount.Load()
 	for range 3 {
-		_, _ = decodeOptions(dec)
+		_ = decodeOptions(dec)
 	}
 	if got := callerJoinCount.Load() - before; got != 1 {
 		t.Errorf("decodeOptions joined the caller %d times across three calls under one caller pointer, want 1: the join must be memoised per caller, not repeated per nested level", got)
@@ -43,7 +43,7 @@ func TestDecodeOptionsNilCallerIsNoCaller(t *testing.T) {
 	dec := jsontext.NewDecoder(strings.NewReader(`{}`), json.WithUnmarshalers(nil))
 
 	before := callerJoinCount.Load()
-	_, _ = decodeOptions(dec)
+	_ = decodeOptions(dec)
 	if got := callerJoinCount.Load() - before; got != 0 {
 		t.Errorf("decodeOptions joined %d times for a nil caller, want 0: WithUnmarshalers(nil) must be treated as no caller", got)
 	}
@@ -72,17 +72,17 @@ func TestDecodeOptionsMemoHoldsOneEntry(t *testing.T) {
 	decB := jsontext.NewDecoder(strings.NewReader(`{}`), json.WithUnmarshalers(callerB))
 
 	before := callerJoinCount.Load()
-	_, _ = decodeOptions(decA) // miss: first sight of callerA
-	_, _ = decodeOptions(decB) // miss: the stored pair is callerA
-	_, _ = decodeOptions(decA) // miss: the stored pair is callerB
-	_, _ = decodeOptions(decB) // miss: the stored pair is callerA
+	_ = decodeOptions(decA) // miss: first sight of callerA
+	_ = decodeOptions(decB) // miss: the stored pair is callerA
+	_ = decodeOptions(decA) // miss: the stored pair is callerB
+	_ = decodeOptions(decB) // miss: the stored pair is callerA
 	if got := callerJoinCount.Load() - before; got != 4 {
 		t.Errorf("two distinct callers alternating joined %d times across four calls, want 4: a single-entry memo cannot serve either after the other displaces it", got)
 	}
 
 	before = callerJoinCount.Load()
-	_, _ = decodeOptions(decA) // miss: the stored pair is callerB
-	_, _ = decodeOptions(decA) // hit: the stored pair is now callerA
+	_ = decodeOptions(decA) // miss: the stored pair is callerB
+	_ = decodeOptions(decA) // hit: the stored pair is now callerA
 	if got := callerJoinCount.Load() - before; got != 1 {
 		t.Errorf("the same caller twice in a row joined %d times, want 1: the second call must reuse the memo entry", got)
 	}
@@ -140,7 +140,7 @@ func TestDecodeIntoNilArguments(t *testing.T) {
 	}{
 		{"dec", func(out *wireText) error { return DecodeInto(nil, "DV_TEXT", out, &out.Type) }},
 		{"out", func(out *wireText) error {
-			return DecodeInto[wireText](jsontext.NewDecoder(strings.NewReader(body)), "DV_TEXT", nil, &out.Type)
+			return DecodeInto(jsontext.NewDecoder(strings.NewReader(body)), "DV_TEXT", nil, &out.Type)
 		}},
 		{"gotType", func(out *wireText) error {
 			return DecodeInto(jsontext.NewDecoder(strings.NewReader(body)), "DV_TEXT", out, nil)

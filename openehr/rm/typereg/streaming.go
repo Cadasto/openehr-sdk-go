@@ -45,22 +45,13 @@ import (
 // a later decode reusing the same WithUnmarshalers value cost nothing, but a cold
 // decode still joins once per nesting level, because each level's options carry
 // the previous level's joined pointer as that level's caller.
-//
-// tracked reports that the decoder carries the tracked hook set
-// ([trackedUnmarshalers]), which only a [TrackUnmatched] decode installs. That
-// set already holds the aggregate, so it is threaded on as it is, never joined:
-// every nesting level then sees the same pointer and stays tracked.
-func decodeOptions(dec *jsontext.Decoder) (opts json.Options, tracked bool) {
+func decodeOptions(dec *jsontext.Decoder) json.Options {
 	hooks := aggregateUnmarshalers()
 	if caller, ok := json.GetOption(dec.Options(), json.WithUnmarshalers); ok && caller != nil && caller != hooks {
-		if caller == trackedUnmarshalers() {
-			hooks, tracked = caller, true
-		} else {
-			hooks = joinCallerUnmarshalers(hooks, caller)
-		}
+		hooks = joinCallerUnmarshalers(hooks, caller)
 	}
 	unmarshalers, legacySemantics := hookOptions(hooks)
-	return json.JoinOptions(dec.Options(), unmarshalers, legacySemantics), tracked
+	return json.JoinOptions(dec.Options(), unmarshalers, legacySemantics)
 }
 
 // hookOptions returns the SDK's two decode options for a resolved interface-hook
@@ -130,18 +121,7 @@ var (
 	unmarshalerRegMu sync.Mutex           // guards unmarshalerHooks during registration
 	unmarshalerHooks []*json.Unmarshalers // append-only, init-time
 	unmarshalerAgg   atomic.Pointer[json.Unmarshalers]
-	// trackedAgg is the hook set of a tracked decode ([TrackUnmatched]): the
-	// unmatched-member hook, then the same interface hooks as unmarshalerAgg.
-	// It is never nil and never equal to unmarshalerAgg, so finding it on a
-	// decoder is how [decodeOptions] tells that the decode is tracked.
-	trackedAgg atomic.Pointer[json.Unmarshalers]
 )
-
-// init seeds the tracked hook set, so it is never nil, even before (or
-// without) any interface hook registering.
-func init() {
-	trackedAgg.Store(json.JoinUnmarshalers(unmatchedHook))
-}
 
 // RegisterUnmarshaler adds one per-interface decode hook to the aggregate.
 // The generator emits one call per polymorphic interface from the owning
@@ -157,18 +137,12 @@ func RegisterUnmarshaler(hook *json.Unmarshalers) {
 	defer unmarshalerRegMu.Unlock()
 	unmarshalerHooks = append(unmarshalerHooks, hook)
 	unmarshalerAgg.Store(json.JoinUnmarshalers(unmarshalerHooks...))
-	trackedAgg.Store(json.JoinUnmarshalers(append([]*json.Unmarshalers{unmatchedHook}, unmarshalerHooks...)...))
 }
 
 // aggregateUnmarshalers returns the joined SDK interface hooks, or nil when
 // none are registered (JoinUnmarshalers treats a nil element as empty).
 func aggregateUnmarshalers() *json.Unmarshalers {
 	return unmarshalerAgg.Load()
-}
-
-// trackedUnmarshalers returns the hook set a tracked decode carries.
-func trackedUnmarshalers() *json.Unmarshalers {
-	return trackedAgg.Load()
 }
 
 // Unmarshalers returns the aggregate of every registered interface hook as a
@@ -221,7 +195,7 @@ func MarshalOptions(enc *jsontext.Encoder) json.Options {
 // from a nested value passes through unwrapped and does not gain the shape
 // sentinel.
 //
-// out points at either the receiver viewed through its method-free alias (the
+// out is either the receiver viewed through its method-free alias (the
 // zero-copy shape) or a flat wire struct the caller copies back (the shape used
 // for a type that embeds a marshaler-bearing ancestor, whose alias would
 // promote the ancestor's methods). Either way out declares the _type field
@@ -229,16 +203,12 @@ func MarshalOptions(enc *jsontext.Encoder) json.Options {
 // a caller who sets json.RejectUnknownMembers is not tripped by the SDK's own
 // discriminator reaching out.
 //
-// Under a [TrackUnmatched] decode, out is decoded inside [withUnmatched], so
-// every member out's struct does not declare reaches the tracking policy
-// instead of being skipped. A strict refusal ([ErrUnknownMember]) passes
-// through unwrapped, like a depth refusal: it is not a shape failure of this
-// type.
-//
-// A nil dec, a nil out or a nil gotType is caller misuse (no generated body
-// passes one); each is refused before any decode with a [DecodeError]
-// wrapping [ErrNilArgument] that names the argument, rather than dereferenced.
-func DecodeInto[T any](dec *jsontext.Decoder, rmType string, out *T, gotType *string) error {
+// A nil dec, a nil out (the interface itself, not a typed nil inside it) or a
+// nil gotType is caller misuse (no generated body passes one); each is refused
+// before any decode with a [DecodeError] wrapping [ErrNilArgument] that names
+// the argument, rather than dereferenced. A typed nil inside out
+// reaches the decode and is reported by encoding/json/v2 as a shape failure.
+func DecodeInto(dec *jsontext.Decoder, rmType string, out any, gotType *string) error {
 	switch {
 	case dec == nil:
 		return nilArgument("DecodeInto", "dec", rmType)
@@ -263,12 +233,7 @@ func DecodeInto[T any](dec *jsontext.Decoder, rmType string, out *T, gotType *st
 	if d := dec.StackDepth() + 1; d > maxDecodeDepth {
 		return &DecodeError{Inner: fmt.Errorf("typereg.Decode: %w (%d > %d)", ErrMaxDepthExceeded, d, maxDecodeDepth)}
 	}
-	opts, tracked := decodeOptions(dec)
-	var target any = out
-	if tracked {
-		target = &withUnmatched[T]{Value: out}
-	}
-	if err := json.UnmarshalDecode(dec, target, opts); err != nil {
+	if err := json.UnmarshalDecode(dec, out, decodeOptions(dec)); err != nil {
 		return classifyDecode(rmType, err)
 	}
 	if *gotType != "" && *gotType != rmType {
@@ -301,10 +266,7 @@ func nilArgument(fn, arg, typeName string) error {
 // refusal ([ErrMaxDepthExceeded], REQ-108) from a nested value passes through
 // as it is: it is not a shape failure of this type, and re-wrapping it at every
 // enclosing level would repeat the path per level, growing the message with
-// the square of the depth. A strict refusal of an unmatched member
-// ([ErrUnknownMember], REQ-170) passes through the same way: the member is not
-// read, so it is no shape failure, and the refusal already names its pointer
-// from the document root.
+// the square of the depth.
 //
 // A dispatch failure at a polymorphic slot arrives as a [DecodeError] a hook
 // produced with no Path; this fills the Path from the v2 decoder's SemanticError
@@ -316,7 +278,7 @@ func classifyDecode(rmType string, err error) error {
 	if errors.Is(err, jsontext.ErrDuplicateName) {
 		return ClassifyDuplicate(err)
 	}
-	if errors.Is(err, ErrMaxDepthExceeded) || errors.Is(err, ErrUnknownMember) {
+	if errors.Is(err, ErrMaxDepthExceeded) {
 		return err
 	}
 	se, hasSemantic := errors.AsType[*json.SemanticError](err)
@@ -417,21 +379,7 @@ func DecodePolymorphic[T any](dec *jsontext.Decoder, out *T, fallback func() any
 		}
 		v = ctor()
 	}
-	opts, tracked := decodeOptions(dec)
-	target := v
-	if tracked {
-		// The slot's value is decoded on a fresh decoder, whose pointers start
-		// at the slot. Register that decoder with the slot's own pointer
-		// (dec's most recently read value is raw) added to the base, so a
-		// member inside the slot is still named from the document root.
-		target = &trackedValue{target: v, tracker: trackerOf(dec).at(dec.StackPointer())}
-	}
-	if err := json.Unmarshal(raw, target, opts); err != nil {
-		if errors.Is(err, ErrUnknownMember) {
-			// A strict refusal is not a failure of this slot's dispatch or
-			// shape; it already names the member from the document root.
-			return err
-		}
+	if err := json.Unmarshal(raw, v, decodeOptions(dec)); err != nil {
 		// A shape failure inside the concrete type selected at this slot stays a
 		// shape failure (it already carries ErrInvalidShape from the concrete's
 		// own funnel); wrapping it in a DecodeError adds the slot classification
