@@ -4,7 +4,7 @@ harvested_through: 2026-10-07T20:51:26Z
 ---
 # Backlog
 
-Leftovers of merged branches: suggestions, and findings the maintainer deferred here. Each line is a lead, not a finding: verify it before acting. Lines are grouped by theme so one delivery can take a whole group; the sentence under each heading says what such a delivery is. A delivery whose `Files` touch a line's path folds it in and deletes the line. `sdd-pr harvest` and `sdd-pr flip --carry` append new lines at the end, under a directory heading; the next `/sdd-triage --backlog` sorts them into a group. Edit freely.
+Leftovers of merged branches: suggestions, and findings the maintainer deferred here. Each line is a lead, not a finding: verify it before acting. Lines are grouped by theme so one delivery can take a whole group; the sentence under each heading says what such a delivery is. A delivery whose `Files` touch a line's path verifies it, and fixes it or finds it stale; the next `/sdd-triage --backlog` deletes what is settled. `sdd-pr harvest` and `sdd-pr flip --carry` add new lines under `## Unsorted`, defects first; the next `/sdd-triage --backlog` sorts them into a group. Edit freely.
 
 ## Template validation: false rm_type_mismatch and paths (REQ-102)
 Code in openehr/validation/walk_composition.go, one delivery with a test per row; the keyword lead is its spec half.

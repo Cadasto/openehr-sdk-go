@@ -32,7 +32,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 # Constants
 # ---------------------------------------------------------------------------
 
-__version__ = "0.11.0"
+__version__ = "0.12.1"
 
 #: Every family, in report order.
 FAMILIES = (
@@ -3200,7 +3200,18 @@ def render_specifications_index(ctx: Context, home: Optional[Path] = None) -> st
 
 
 _ADR_NAME_RE = re.compile(r"^(ADR-|\d{4}-)")
-_TRACE_REF_RE = re.compile(r"^\s*-\s*(Resolves|Amends)\s*:\s*(.+?)\s*$", re.IGNORECASE)
+# The label may sit inside Markdown emphasis, colon inside or outside it: `- Amends: X`,
+# `- **Amends:** X` and `- **Amends**: X` all render alike. The empty alternative lets the
+# closing (?P=em) match nothing when there is no emphasis. The value may start on the next
+# line, so it may be empty here.
+_TRACE_REF_RE = re.compile(
+    r"^\s*-\s*(?P<em>\*\*|__|\*|_|)(?P<label>Resolves|Amends)"
+    r"(?:\s*:\s*(?P=em)|(?P=em)\s*:)\s*(?P<value>.*?)\s*$",
+    re.IGNORECASE,
+)
+# What ends a list item's first paragraph: a blank line, the next item (nested or not),
+# a heading or a code fence. Any other line continues it, indented or lazy.
+_ITEM_END_RE = re.compile(r"^\s*$|^\s*(?:[-*+]|\d+[.)])\s|^\s{0,3}(?:#|```|~~~)")
 
 
 def _traceability_refs(text: str) -> str:
@@ -3210,11 +3221,22 @@ def _traceability_refs(text: str) -> str:
         return "—"
     start, end = span
     lines = text.split("\n")
+    last = min(end, len(lines) + 1)
     refs = []
-    for lineno in range(start, min(end, len(lines) + 1)):
+    for lineno in range(start, last):
         match = _TRACE_REF_RE.match(lines[lineno - 1])
-        if match:
-            refs.append("%s: %s" % (match.group(1).capitalize(), match.group(2)))
+        if not match:
+            continue
+        # A wrapped bullet keeps its continuation lines: the value is the item's whole
+        # first paragraph, joined with single spaces.
+        parts = [match.group("value")] if match.group("value") else []
+        for follow in range(lineno + 1, last):
+            line = lines[follow - 1]
+            if _ITEM_END_RE.match(line):
+                break
+            parts.append(line.strip())
+        if parts:
+            refs.append("%s: %s" % (match.group("label").capitalize(), " ".join(parts)))
     return "; ".join(refs) if refs else "—"
 
 

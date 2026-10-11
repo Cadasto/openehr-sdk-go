@@ -61,18 +61,18 @@ For an exact attribute list, invariant, or signature, call the MCP tool `type_sp
 
 The full editing rules (idiomatic surface, the `cadasto/` boundary contract, and the do-not-touch list) are canonical in [AGENTS.md](../AGENTS.md) and [specifications/idiom.md](specifications/idiom.md). Follow those; this file does not repeat them.
 
-`/sdd-deliver` runs this loop as a pipeline: workers per task, the per-task gate, the first review pass, the draft PR. `/sdd-deliver <PR> --close-out` then updates the requirement status and writes the PR body, in the same PR. After merges, `/sdd-triage --backlog` on `main` carries the merged PRs' suggestions to `docs/backlog.md`.
+`/sdd-deliver` runs this loop as a pipeline: workers per task, the per-task gate, the first review pass, the PR. `/sdd-deliver <PR> --close-out` then updates the requirement status and writes the PR body, in the same PR. After merges, `/sdd-triage --backlog` on `main` carries the merged PRs' suggestions to `docs/backlog.md`.
 
 ## Orchestration
 
-- **One orchestrator, bounded workers.** The main session orchestrates, on the strongest model available. It reads what binds, briefs and dispatches workers, gates each task, adjudicates spec questions, opens the draft PR, runs triage and closes out.
+- **One orchestrator, bounded workers.** The main session orchestrates, on the strongest model available. It reads what binds, briefs and dispatches workers, gates each task, adjudicates spec questions, opens the PR, runs triage and closes out.
 - **The orchestrator does not write product code**, except for a task that cannot be made self-contained. That task is done in-session, and the PR body says so.
 - **A brief is self-contained.** It holds the task, what it cites, the clauses it must satisfy (quoted), the files it may touch, the verification command, en-route findings, the skills to load (§ Recommended tooling), and no subagents.
 - **Code index:** codebase-memory-mcp (§ Recommended tooling). Workers query it first and fall back to `grep` for literals and prose; the brief repeats the name.
 - **Workers do not spawn workers.** Tasks run in sequence on the branch; a parallel wave (large tasks, disjoint files) shares it, each worker committing only its own files.
 - **Completion is accounted for.** A worker that dies is re-dispatched, or the gap is named. A task is not done because a dispatch ended.
 - **Findings state is read from the findings file (§ Review), never remembered.**
-- **The maintainer merges.** Agents open draft PRs and mark them ready.
+- **The maintainer merges.** Agents open PRs, a draft only when asked.
 - The worker model, parallelism, worktrees, the per-task review gate and the review panel are declared under `agents:` in [`.sdd.yaml`](.sdd.yaml). The model is passed per dispatch.
 
 ## Examples
@@ -87,7 +87,7 @@ The Claude Code format-on-save hook is documented in [`.claude/CLAUDE.md`](../.c
 
 Findings for a branch live in one file in the clone's git directory, `<git-common-dir>/sdd/findings/<branch-slug>.md`, named after the branch with `/` replaced by `--`. Every worktree and every agent on this machine sees it, git never commits it, and removing a worktree keeps it; `sdd-pr status` prints its path. `sdd-pr` makes every write to it (`add`, `flip`, `record`, `rename`), so nobody edits it by hand. It is the only list of findings, with or without a PR, and `sdd-pr status` names it for deletion once the PR merges. When a PR exists, `sdd-pr` keeps the file, the PR's inline review threads, one summary per pass and the suggestion comments in step; nothing else about findings is posted, the PR body included. `sdd-pr status` lists what is open, prints `Mergeable: yes|no` and names the next command. The line format, the severities and the evidence rules are in the sdd plugin's `references/review.md`.
 
-There are three severities. **Critical** and **important** findings carry evidence: the command run, the failing test, or the two sentences that disagree, quoted. They are resolved before merge, either fixed or declined with the reason on the finding's line, and they are the only ones that get inline threads on the PR. **Suggestions** never block and stay on the PR in its suggestion comments; after merge, `/sdd-triage --backlog` carries them to `docs/backlog.md`. A suggestion is written down only when it outlives the change; taste (naming, wording, style) never does. In anything posted to the PR, never write a number with a leading hash sign, which GitHub turns into a link to an unrelated issue.
+There are three severities, graded by harm. **Critical** and **important** findings carry evidence: the command run, the failing test, or the two sentences that disagree, quoted. A claim of wrong code behaviour is settled by running it, or by a named input, then graded by its harm; a missing specification sentence never lowers it. Those about the change are resolved before merge, either fixed or declined with the reason on the finding's line, and they are the only ones that get inline threads on the PR. One about code or a document the change did not touch keeps its severity, is marked `outside`, blocks nothing and is carried after merge unless fixed here. **Suggestions** never block and stay on the PR in its suggestion comments; after merge, `/sdd-triage --backlog` carries them to `docs/backlog.md`. A suggestion is written down only when it outlives the change; taste (naming, wording, style) never does. In anything posted to the PR, never write a number with a leading hash sign, which GitHub turns into a link to an unrelated issue.
 
 A reviewer that runs outside this repository gets this request, filled in by `/sdd-review --panel`:
 
@@ -95,10 +95,13 @@ A reviewer that runs outside this repository gets this request, filled in by `/s
 ── review request · <branch> · range <a>..<b> · profile formal ──
 Review commits <a>..<b> of Cadasto/openehr-sdk-go, and only those. Read docs/ai-workflow.md § Review.
 Report critical and important findings only, each with evidence (what you ran, or the two
-sentences that disagree) and a one-line fix; write anything smaller as a suggestion.
+sentences that disagree) and a one-line fix, ending a defect in what the range did not change with
+` · outside`; write anything smaller as a suggestion.
 If you work on this machine, pipe your lines in that grammar to: <plugin root>/tools/sdd-pr.py add -
-If you work on the pull request, post one review with one inline comment per finding, its
-first word **critical** or **important**; post nothing else, and do not restate the PR body.
+If you work on the pull request, post one review: one inline comment per finding about the change,
+its first word **critical** or **important** and its last line `By: <your name>`, and a defect in
+what the range did not change in the review body, in the grammar above; post nothing else, and do not
+restate the PR body.
 ──────────────────────────────────────────────────────────────────────────────
 ```
 
