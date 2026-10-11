@@ -159,13 +159,14 @@ func Verify(res SetResult, recs map[Leg]Record) []string {
 //   - canxml Array<Octet>: canonical XML reads DV_MULTIMEDIA.data and
 //     integrity_check as one element per byte, where ITS-XML types them
 //     xs:base64Binary.
-//   - body-form composer: FLAT decode refuses the composer's real-path
-//     keys (composer|name and the external_ref composer|id, |id_scheme,
-//     |id_namespace) as an unsupported PARTY_PROXY, and FLAT encode writes the
-//     composer as ctx/composer_name alone, without its external_ref.
+//   - body-form composer: FLAT decode refuses the composer's external_ref
+//     keys (composer|id, |id_scheme, |id_namespace) as an unsupported
+//     PARTY_PROXY, one key at a time, while composer|name, an accepted alias of
+//     ctx/composer_name, decodes; FLAT encode writes the composer as
+//     ctx/composer_name alone, without its external_ref.
 //   - INTERVAL_EVENT attributes: the Web Template has no math_function
 //     or width node for the event, so FLAT encode writes neither and decode
-//     refuses both.
+//     reports both as unmatched content.
 //   - reused archetype siblings: several siblings reuse one archetype
 //     under one attribute, which FLAT encode refuses ("path resolves to
 //     multiple items") and FLAT decode refuses ("not yet decodable").
@@ -182,8 +183,9 @@ var Recorded = map[string]map[Leg]Record{
 		},
 		LegFlatCanonical: {
 			Outcome: Outcome{Compared: 115, Missing: 8, Extra: 4, Altered: 13, Excluded: 4},
-			Reason: "INTERVAL_EVENT attributes: decode refuses math_function and width (the 4 excluded keys), so " +
-				"the interval event loses both and decodes as a POINT_EVENT. Sibling order: FLAT carries no order " +
+			Reason: "INTERVAL_EVENT attributes: decode reports math_function and width as unmatched content (the 4 " +
+				"excluded keys), so the interval event loses both and decodes as a POINT_EVENT. Sibling order: FLAT " +
+				"carries no order " +
 				"between the birth_en and any_event_en events; decode lists them in Web Template order, the canonical lists " +
 				"Birth first, so the leaves of all three events compare at shifted positions. HISTORY.origin: the " +
 				"FLAT has no origin key and decode fills it from the context start time (openehr/serialize/simplified/deviations.md), where the " +
@@ -210,19 +212,20 @@ var Recorded = map[string]map[Leg]Record{
 				"them on document_attachment and FLAT encode writes them (4 keys).",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 150, Missing: 41, Extra: 27, Altered: 17, Excluded: 9},
-			Reason: "The 9 excluded keys are the composer's 4, ctx/time, ctx/setting, ctx/location, _name and " +
-				"created/date_time_value, each refused as follows. " +
-				"body-form composer: decode refuses the composer keys (4), so the composer's name and " +
-				"external_ref are missing and decode fills a PARTY_SELF. UPSTREAM consult_record ctx conflict: the " +
+			Outcome: Outcome{Compared: 150, Missing: 40, Extra: 27, Altered: 16, Excluded: 8},
+			Reason: "The 8 excluded keys are the composer's external_ref (3) and ctx/time, refused, and " +
+				"ctx/setting, ctx/location, _name and created/date_time_value, reported as unmatched content, as " +
+				"follows. body-form composer: decode refuses the composer's external_ref keys (3), so the " +
+				"external_ref is missing; composer|name decodes, so the composer is the canonical's " +
+				"PARTY_IDENTIFIED. UPSTREAM consult_record ctx conflict: the " +
 				"FLAT gives ctx/time and context/start_time different values, decode refuses the pair and the " +
 				"harness removes ctx/time; the start time left agrees with the canonical. ctx/setting: the FLAT " +
-				"writes ctx/setting as bare text, which the codec refuses (it takes ctx/setting|code and |value), so " +
-				"decode fills the default 238 other care against the canonical 228 primary medical care. " +
-				"ctx/location: the codec refuses ctx/location (it reads context/_location, ADR 0016), so the " +
-				"location is missing. LOCATABLE name: the codec refuses _name, so decode names the composition " +
+				"writes ctx/setting as bare text, which the codec does not read (it reads ctx/setting|code and " +
+				"|value), so decode fills the default 238 other care against the canonical 228 primary medical care. " +
+				"ctx/location: the codec does not read ctx/location (it reads context/_location, ADR 0016), so the " +
+				"location is missing. LOCATABLE name: the codec does not read _name, so decode names the composition " +
 				"OPConsultation from the template against the canonical Routine checkup. Choice element: decode " +
-				"refuses media_file/created/date_time_value (the SDK spells it created). Sibling order: FLAT " +
+				"does not read media_file/created/date_time_value (the SDK spells it created). Sibling order: FLAT " +
 				"carries no order between the document_attachment items; decode lists the media_file cluster first, " +
 				"the canonical lists it last, so the item leaves compare at shifted positions. RM-FLOOR " +
 				"archetype_details: rm_version is 1.2.0 against 1.0.4 (3 leaves).",
@@ -238,9 +241,10 @@ var Recorded = map[string]map[Leg]Record{
 			Outcome: Outcome{Compared: 25, Extra: 1, Excluded: 5},
 			Reason: "ctx/location: the upstream FLAT spells the location ctx/location, which the hold-out removes, " +
 				"while the upstream STRUCTURED spells it context/_location (ADR 0016), which decodes and re-encodes, " +
-				"so only our side carries it. Excluded: decode refuses the same three families on both sides and " +
-				"they drop out of the comparison: the composer's external_ref (3 keys, body-form composer), the " +
-				"composition's _name (LOCATABLE name) and media_file/created/date_time_value (choice element).",
+				"so only our side carries it. Excluded: the same three families drop out of both sides of the " +
+				"comparison: decode refuses the composer's external_ref (3 keys, body-form composer) and reports " +
+				"the composition's _name (LOCATABLE name) and media_file/created/date_time_value (choice element) " +
+				"as unmatched content.",
 		},
 	},
 	"corona": {
@@ -274,13 +278,14 @@ var Recorded = map[string]map[Leg]Record{
 				"spells the value created/date_time_value, the SDK's Web Template keeps one value leaf, created.",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 150, Missing: 40, Extra: 27, Altered: 15, Excluded: 6},
-			Reason: "The 6 excluded keys are the composer's 4, _name and created/date_time_value, each refused as " +
-				"follows. body-form composer: decode refuses the composer keys (4), so the composer's name and " +
-				"external_ref are missing and decode fills a PARTY_SELF. LOCATABLE name: the codec refuses _name, " +
-				"so decode names the composition OPConsultation from the template against the canonical Routine " +
-				"checkup. Choice element: decode refuses media_file/created/date_time_value (the SDK spells it " +
-				"created). Sibling order: FLAT carries no order between the document_attachment items; decode lists " +
+			Outcome: Outcome{Compared: 150, Missing: 39, Extra: 27, Altered: 14, Excluded: 5},
+			Reason: "The 5 excluded keys are the composer's external_ref (3), refused, and _name and " +
+				"created/date_time_value, reported as unmatched content, as follows. body-form composer: decode " +
+				"refuses the composer's external_ref keys (3), so the external_ref is missing; composer|name " +
+				"decodes, so the composer is the canonical's PARTY_IDENTIFIED. LOCATABLE name: the codec does not " +
+				"read _name, so decode names the composition OPConsultation from the template against the canonical " +
+				"Routine checkup. Choice element: decode does not read media_file/created/date_time_value (the SDK " +
+				"spells it created). Sibling order: FLAT carries no order between the document_attachment items; decode lists " +
 				"the media_file cluster first, the canonical lists it last, so the item leaves compare at shifted " +
 				"positions. RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (3 leaves).",
 		},
@@ -319,9 +324,10 @@ var Recorded = map[string]map[Leg]Record{
 				"ACTIVITY action_archetype_id that the canonical XML holds, and FLAT encode writes both.",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 156, Missing: 84, Extra: 48, Altered: 11, Excluded: 3},
-			Reason: "body-form composer: decode refuses the composer keys (the 3 excluded keys), so the " +
-				"composer's name and external_ref are missing and decode fills a PARTY_SELF. Upstream FLAT " +
+			Outcome: Outcome{Compared: 156, Missing: 83, Extra: 48, Altered: 10, Excluded: 2},
+			Reason: "body-form composer: decode refuses the composer's external_ref keys (the 2 excluded keys), " +
+				"so the external_ref is missing; composer|name decodes, so the composer is the canonical's " +
+				"PARTY_IDENTIFIED. Upstream FLAT " +
 				"omissions: the FLAT carries no context (start time, setting, participation) and no ACTIVITY action_archetype_id, so the decoded " +
 				"composition has no context and an empty action_archetype_id. Sibling order: FLAT carries no order " +
 				"between the ordinal ELEMENT and the nested CLUSTER of the activity description; decode lists the " +
@@ -341,9 +347,10 @@ var Recorded = map[string]map[Leg]Record{
 				"text as written.",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 72, Missing: 8, Altered: 5, Excluded: 3},
-			Reason: "body-form composer: decode refuses the composer keys (the 3 excluded keys), so the " +
-				"composer's name and external_ref are missing and decode fills a PARTY_SELF. Upstream date-time " +
+			Outcome: Outcome{Compared: 72, Missing: 7, Altered: 4, Excluded: 2},
+			Reason: "body-form composer: decode refuses the composer's external_ref keys (the 2 excluded keys), " +
+				"so the external_ref is missing; composer|name decodes, so the composer is the canonical's " +
+				"PARTY_IDENTIFIED. Upstream date-time " +
 				"spelling: the event time is 21:11:36.7 in the FLAT and 21:11:36.700 in the canonical XML. HISTORY.origin: a persistent " +
 				"composition has no context start time, and decode, which fills origin from it (openehr/serialize/simplified/deviations.md), " +
 				"leaves the origin empty. RM-FLOOR archetype_details: the canonical carries template_id on the " +

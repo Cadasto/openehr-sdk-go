@@ -64,7 +64,9 @@ func NewTargetFromOPT(path string) (*Target, error) {
 	return &Target{Compiled: c, Web: w, Root: w.Tree.ID}, nil
 }
 
-// Refusal is one upstream key family the codec declined, with the reason it
+// Refusal is one upstream key family the decode left out, with the reason:
+// a key the codec reported as unmatched content (REQ-170, Reason
+// [UnmatchedReason]), or a key family the codec refused, with the reason it
 // gave. Reason is normalised (the key itself is stripped out) so refusals
 // aggregate across fixtures.
 type Refusal struct {
@@ -81,6 +83,19 @@ type Refusal struct {
 	Keys int
 }
 
+// UnmatchedReason is the [Refusal.Reason] of a key the codec reported as
+// unmatched content (REQ-170): the decode ignored it, so it cannot come back
+// on re-encode and is excluded from the comparison. UnmatchedMessage is its
+// [Refusal.Message].
+const (
+	UnmatchedReason  = "unmatched content"
+	UnmatchedMessage = "reported as unmatched content"
+)
+
+// Unmatched reports whether r is a key the codec reported as unmatched
+// content rather than a key family it refused.
+func (r Refusal) Unmatched() bool { return r.Reason == UnmatchedReason }
+
 // Report is the outcome of round-tripping one fixture.
 type Report struct {
 	Case string
@@ -89,8 +104,9 @@ type Report struct {
 	// Meta is upstream composition-level metadata keys, held out of the
 	// comparison on both sides (see [IsCompositionMeta]).
 	Meta int
-	// Refusals are the unmodelled key families, discovered from the codec's
-	// own decode errors, in the order they surfaced.
+	// Refusals are the key families left out of the comparison: those the
+	// codec refused on decode, in the order they surfaced, then the keys it
+	// reported as unmatched content, in document order.
 	Refusals []Refusal
 	// Excluded is how many concrete upstream keys the refusals removed.
 	Excluded int
@@ -252,22 +268,26 @@ func (e *IrreducibleError) Error() string { return e.why + ": " + e.Err.Error() 
 // Unwrap returns the codec's error.
 func (e *IrreducibleError) Unwrap() error { return e.Err }
 
-// DecodeReducing decodes candidate with the target's template, removing each
-// key family the codec refuses until what remains decodes. It mutates
+// DecodeReducing decodes candidate with the target's template, excluding what
+// the codec does not decode: the keys it reports as unmatched content
+// (REQ-170), which the decode ignores, and each key family it refuses, removed
+// no wider than the refusal names before the decode is retried. It mutates
 // candidate down to the modelled subset and returns the refusals in the order
-// they surfaced. mode says whether to inject the mandatory context.
+// they surfaced, then one [Refusal] per unmatched key, in document order. mode
+// says whether to inject the mandatory context.
 //
-// The excluded set is whatever the codec itself refuses. Closing a gap
-// shrinks it automatically, and there is no hand-kept list to drift from the
-// code.
+// The excluded set is whatever the codec itself reports or refuses. Closing a
+// gap shrinks it automatically, and there is no hand-kept list to drift from
+// the code.
 //
 // A decode error the loop cannot reduce comes back as an [*IrreducibleError]
 // carrying the codec's error. Any other error is a harness fault: an unknown
-// mode, or a decode that does not converge within the refusal budget. With
-// either error the refusals made before it come back too, and the keys they
-// removed are already gone from candidate.
+// mode, a decode that does not converge within the refusal budget, or an
+// unmatched key the body does not carry. With either error the refusals made
+// before it come back too, and the keys they removed are already gone from
+// candidate.
 func DecodeReducing(t *Target, candidate map[string]any, mode ContextMode) (*rm.Composition, []Refusal, error) {
-	var decode func(*Target, map[string]any) (*rm.Composition, error)
+	var decode func(*Target, map[string]any, simplified.Option) (*rm.Composition, error)
 	switch mode {
 	case InjectContext:
 		decode = decodeSubset
@@ -278,9 +298,11 @@ func DecodeReducing(t *Target, candidate map[string]any, mode ContextMode) (*rm.
 	}
 	var refusals []Refusal
 	for range maxRefusals {
-		comp, err := decode(t, candidate)
+		var unmatched []string
+		comp, err := decode(t, candidate, simplified.WithUnmatched(func(key string) { unmatched = append(unmatched, key) }))
 		if err == nil {
-			return comp, refusals, nil
+			excluded, err := excludeUnmatched(candidate, unmatched)
+			return comp, append(refusals, excluded...), err
 		}
 		key := offendingKey(err)
 		if key == "" {
@@ -307,14 +329,30 @@ func DecodeReducing(t *Target, candidate map[string]any, mode ContextMode) (*rm.
 	return nil, refusals, fmt.Errorf("decode did not converge after %d refusals", maxRefusals)
 }
 
+// excludeUnmatched removes from candidate every key the codec reported as
+// unmatched content and returns one [Refusal] per key, in the order reported.
+// The codec reports a FLAT key as written, so a reported key the body does not
+// carry is a harness fault, not a key to skip.
+func excludeUnmatched(candidate map[string]any, unmatched []string) ([]Refusal, error) {
+	out := make([]Refusal, 0, len(unmatched))
+	for _, key := range unmatched {
+		if _, ok := candidate[key]; !ok {
+			return out, fmt.Errorf("the codec reported %q as unmatched content, but the body does not carry it", key)
+		}
+		delete(candidate, key)
+		out = append(out, Refusal{Key: key, Reason: UnmatchedReason, Message: UnmatchedMessage, Keys: 1})
+	}
+	return out, nil
+}
+
 // decodeAsGiven decodes the given keys with the template attached and nothing
 // added, for [KeepContext].
-func decodeAsGiven(t *Target, keys map[string]any) (*rm.Composition, error) {
+func decodeAsGiven(t *Target, keys map[string]any, opt simplified.Option) (*rm.Composition, error) {
 	b, err := json.Marshal(keys)
 	if err != nil {
 		return nil, err
 	}
-	return simplified.UnmarshalFlat(b, t.Web, simplified.WithTemplate(t.Compiled))
+	return simplified.UnmarshalFlat(b, t.Web, simplified.WithTemplate(t.Compiled), opt)
 }
 
 // decodeSubset decodes the given keys with the template attached.
@@ -325,7 +363,7 @@ func decodeAsGiven(t *Target, keys map[string]any) (*rm.Composition, error) {
 // accept those spellings since ADR 0015; the hold-out, not a refusal, is why
 // they are absent.) They are synthetic scaffolding for the decode, never
 // compared.
-func decodeSubset(t *Target, keys map[string]any) (*rm.Composition, error) {
+func decodeSubset(t *Target, keys map[string]any, opt simplified.Option) (*rm.Composition, error) {
 	body := make(map[string]any, len(keys)+2)
 	maps.Copy(body, keys)
 	body["ctx/language"] = "en"
@@ -334,14 +372,14 @@ func decodeSubset(t *Target, keys map[string]any) (*rm.Composition, error) {
 	if err != nil {
 		return nil, err
 	}
-	return simplified.UnmarshalFlat(b, t.Web, simplified.WithTemplate(t.Compiled))
+	return simplified.UnmarshalFlat(b, t.Web, simplified.WithTemplate(t.Compiled), opt)
 }
 
 // dropRefused removes the entries one refusal actually covers and reports how
-// many went, plus whether the error was a modelled-gap refusal at all. The
-// codec names a *base* path (flat_decode groups a leaf's suffixes before
-// decoding it), so how much of the body that base stands for has to be read
-// off the error.
+// many went, plus whether the error was a modelled-gap refusal at all. What a
+// refusal covers has to be read off the error: the codec names a whole key, a
+// leaf's *base* path (flat_decode groups a leaf's suffixes before decoding it)
+// or a family prefix.
 //
 // Only the two REQ-053 gap sentinels are refusals. Any other keyed error —
 // a bug in the codec, a malformed fixture, a budget breach — returns
@@ -350,40 +388,44 @@ func decodeSubset(t *Target, keys map[string]any) (*rm.Composition, error) {
 // present as a bigger Excluded count instead of a red test.
 //
 // Precision is the whole game here: every key dropped wider than the refusal
-// is a key the codec would have round-tripped, silently missing from the
-// compared subset this probe exists to grow. Three refusal shapes, three
-// scopes:
+// names is a key the codec would have round-tripped, silently missing from
+// the compared subset this probe exists to grow (PROBE-086: each refusal
+// MUST remove only what it names). Since REQ-170 the codec reports what it
+// does not read instead of refusing it, so a refusal is always of something
+// it reads. Four shapes, four scopes:
 //
-//   - A suffix the datatype does not map ("unexpected |precision for
-//     DV_QUANTITY") — only that one entry goes. |magnitude and |unit on the
-//     same leaf are modelled and stay in the comparison; the next pass names
-//     the next unmodelled suffix, so the leaf is pared down rather than
-//     discarded.
-//   - A leaf whose datatype is not modelled at all, including a container
-//     addressed as a value leaf ("unsupported datatype: EVENT" for
-//     `any_event:0|sample_count`) — the leaf's own entries go, but *not* the
-//     subtree beneath it. An EVENT this codec cannot read as a value still
-//     has children it reads fine.
-//   - A path that does not resolve at all (ErrUnknownPath) — leaf and subtree
-//     both go, since no longer path through an unresolvable node can resolve
-//     either. This is the only shape where dropping the subtree is sound, and
-//     it is also the bulk of the corpus's exclusions.
+//   - A whole key, suffix and all (`<root>/composer|id`, the composer's
+//     `external_ref`): that one entry goes. `composer|name` beside it is an
+//     accepted alias and stays.
+//   - A suffix of a leaf named by its base ("unexpected |value for DV_TEXT",
+//     a DV_TEXT `|value` without the `|code` that selects the coded subtype):
+//     only that one entry goes, and the rest of the leaf stays.
+//   - Any other ErrUnsupportedDatatype refusal naming a leaf's base (a
+//     missing required suffix): the leaf's own entries go, but *not* the
+//     subtree beneath it, which belongs to other nodes or families.
+//   - Any other ErrUnknownPath refusal naming a path or a family prefix (an
+//     index past its bound, a deferred family): the entries under it go,
+//     leaf and subtree, since everything under that segment is refused with
+//     it.
 func dropRefused(candidate map[string]any, key string, err error) (removed int, gap bool) {
-	base := baseOf(key)
-	if sfx, ok := refusedSuffix(err); ok {
-		return dropMatching(candidate, func(k string) bool { return k == base+sfx }), true
+	unknownPath, unsupported := errors.Is(err, simplified.ErrUnknownPath), errors.Is(err, simplified.ErrUnsupportedDatatype)
+	switch {
+	case !unknownPath && !unsupported:
+		return 0, false
+	case strings.Contains(key, "|"):
+		return dropMatching(candidate, func(k string) bool { return k == key }), true
 	}
-	if errors.Is(err, simplified.ErrUnknownPath) {
+	if sfx, ok := refusedSuffix(err); ok {
+		return dropMatching(candidate, func(k string) bool { return k == key+sfx }), true
+	}
+	if unknownPath {
 		return dropMatching(candidate, func(k string) bool {
-			// base+"/" and not base alone: the boundary keeps a string-prefix
+			// key+"/" and not key alone: the boundary keeps a string-prefix
 			// sibling (`…/_uid_based_id` beside `…/_uid`) out of the subtree.
-			return baseOf(k) == base || strings.HasPrefix(k, base+"/")
+			return baseOf(k) == key || strings.HasPrefix(k, key+"/")
 		}), true
 	}
-	if errors.Is(err, simplified.ErrUnsupportedDatatype) {
-		return dropMatching(candidate, func(k string) bool { return baseOf(k) == base }), true
-	}
-	return 0, false
+	return dropMatching(candidate, func(k string) bool { return baseOf(k) == key }), true
 }
 
 // dropMatching deletes every entry the predicate selects.
@@ -423,9 +465,8 @@ func refusedSuffix(err error) (string, bool) {
 }
 
 // offendingKey extracts the FLAT key a decode error names: the *first*
-// double-quoted token in the message. The two refusal shapes the census is
-// built on put the key there — `path not in web template: "K"` and
-// `decode "K": …`.
+// double-quoted token in the message. The refusal shapes the census is built
+// on put the key there — `path not in web template: "K"` and `decode "K": …`.
 //
 // This is a phrasing seam, not a contract the codec ever gave. Decode sites
 // exist that quote something else first — flat_decode's reused-sibling refusal

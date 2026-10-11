@@ -260,9 +260,10 @@ func TestRefusedSuffix(t *testing.T) {
 	}
 }
 
-// TestDropRefusedScope pins the three drop scopes. Every case here was a real
+// TestDropRefusedScope pins the drop scopes. Every case here was a real
 // over-drop at some point: the suffix cases used to take the whole leaf with
-// them, and the container case used to take the whole subtree.
+// them, the container case the whole subtree, and a refusal naming a whole key
+// every suffix of its leaf (the composer's `|name` beside a refused `|id`).
 func TestDropRefusedScope(t *testing.T) {
 	const (
 		qty   = "c/obs/quantity"
@@ -311,10 +312,28 @@ func TestDropRefusedScope(t *testing.T) {
 			gone:    []string{event + "|sample_count"},
 		},
 		{
-			// Nothing below an unresolvable node can resolve either, so the
-			// subtree goes with it — but only the subtree: `_uid_based_id` is a
-			// different leaf that merely starts with the same characters.
-			name:    "unresolvable path takes leaf and subtree but not a prefix sibling",
+			// A refusal naming a whole key covers that key alone, whichever
+			// sentinel it carries: the composer's `external_ref` is refused, its
+			// `|name` beside it is an accepted alias (PROBE-086: each refusal
+			// removes only what it names).
+			name:    "a whole key takes only that entry",
+			key:     qty + "|unit",
+			err:     fmt.Errorf("simplified: decode %q: %w: PARTY_PROXY", qty+"|unit", simplified.ErrUnsupportedDatatype),
+			removed: 1,
+			gone:    []string{qty + "|unit"},
+		},
+		{
+			name:    "a whole key under ErrUnknownPath takes only that entry",
+			key:     qty + "|magnitude",
+			err:     fmt.Errorf("%w: conflicting spellings: %q", simplified.ErrUnknownPath, qty+"|magnitude"),
+			removed: 1,
+			gone:    []string{qty + "|magnitude"},
+		},
+		{
+			// Nothing below a refused path decodes either, so the subtree goes
+			// with it — but only the subtree: `_uid_based_id` is a different leaf
+			// that merely starts with the same characters.
+			name:    "refused path takes leaf and subtree but not a prefix sibling",
 			key:     "c/obs/_uid",
 			err:     fmt.Errorf("%w: %q", simplified.ErrUnknownPath, "c/obs/_uid"),
 			removed: 2,
@@ -676,65 +695,80 @@ func TestIsCompositionMeta(t *testing.T) {
 	}
 }
 
-// TestRealCodecRefusal parses a *genuine* codec refusal rather than a
-// hand-written lookalike. Every other test above feeds the extraction helpers
-// an error this file phrased itself (see [suffixErr]), so if flat_decode's
-// wrapper were reworded they would all still pass while the census silently
-// lost its attribution — the refusal key, the suffix scope, and the reason row
-// are all read out of the codec's prose. This test is the seam's pin: it drives
-// the real decoder against the real corpus template and asserts the harness
-// still understands what came back.
+// TestRealCodecRefusal drives the *genuine* codec rather than a hand-written
+// lookalike. Every other test above feeds the extraction helpers an error this
+// file phrased itself (see [suffixErr]), so if flat_decode's wording drifted
+// they would all still pass while the census silently lost its attribution —
+// the refusal key, its scope, and the reason row are all read out of the
+// codec's prose. This test is the seam's pin, for both ways a key leaves the
+// comparison (REQ-170): reported as unmatched content, and refused.
 func TestRealCodecRefusal(t *testing.T) {
 	target, err := NewTarget()
 	if err != nil {
 		t.Fatalf("build target: %v", err)
 	}
-	base, body := modelledQuantityLeaf(t, target)
+	base, leaf := modelledQuantityLeaf(t, target)
 
-	// |normal_range is a DV_QUANTITY attribute with no suffix mapping: it is a
-	// DV_INTERVAL, so it can never reduce to a scalar suffix and rides |raw
-	// instead — which makes it a durable choice here. (|precision served until
-	// the optional-suffix set landed and made it modelled.) Appending it to a
-	// leaf that otherwise decodes makes the codec produce exactly the shape
-	// refusedSuffix has to read.
-	body[base+"|normal_range"] = json.Number("1")
-	_, err = decodeSubset(target, body)
-	if err == nil {
-		t.Fatalf("%q|normal_range decoded — the codec now models this suffix, so this test "+
-			"needs a different unmodelled one (and SKIPPED.md needs regenerating)", base)
-	}
-	if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
-		t.Fatalf("real refusal is not ErrUnsupportedDatatype: %v", err)
-	}
-	if got := offendingKey(err); got != base {
-		t.Errorf("offendingKey(real refusal) = %q, want the leaf base %q\nrefusal: %v", got, base, err)
-	}
-	if got, ok := refusedSuffix(err); !ok || got != "|normal_range" {
-		t.Errorf("refusedSuffix(real refusal) = %q, %v; want %q, true\nrefusal: %v",
-			got, ok, "|normal_range", err)
-	}
-	if got, want := reasonOf(err, base), "unsupported |suffix for DV_QUANTITY"; got != want {
-		t.Errorf("reasonOf(real refusal) = %q, want %q\nrefusal: %v", got, want, err)
-	}
+	t.Run("unmatched suffix is reported and excluded alone", func(t *testing.T) {
+		// |normal_range is a DV_QUANTITY attribute with no suffix mapping: it is a
+		// DV_INTERVAL, so it can never reduce to a scalar suffix and is outside
+		// the datatype's suffix set — unmatched content the codec ignores and
+		// reports.
+		body := maps.Clone(leaf)
+		body[base+"|normal_range"] = json.Number("1")
+		_, refusals, err := DecodeReducing(target, body, InjectContext)
+		if err != nil {
+			t.Fatalf("DecodeReducing: %v", err)
+		}
+		want := []Refusal{{Key: base + "|normal_range", Reason: UnmatchedReason, Message: UnmatchedMessage, Keys: 1}}
+		if !slices.Equal(refusals, want) {
+			t.Errorf("DecodeReducing refusals = %+v, want %+v", refusals, want)
+		}
+		if _, still := body[base+"|normal_range"]; still {
+			t.Error("|normal_range survived its own report")
+		}
+		if _, ok := body[base+"|magnitude"]; !ok {
+			t.Error("|magnitude was dropped by a |normal_range report — the leaf, not the entry, went")
+		}
+	})
 
-	// And the scope decision the coverage number depends on: the offending
-	// entry goes, its modelled siblings on the same leaf stay.
-	removed, gap := dropRefused(body, offendingKey(err), err)
-	if !gap || removed != 1 {
-		t.Fatalf("dropRefused(real refusal) = %d, %v; want 1, true", removed, gap)
-	}
-	if _, still := body[base+"|normal_range"]; still {
-		t.Error("|normal_range survived its own refusal")
-	}
-	if _, ok := body[base+"|magnitude"]; !ok {
-		t.Error("|magnitude was dropped by a |normal_range refusal — the leaf, not the entry, went")
-	}
-
-	// What remains must decode: otherwise the assertions above passed on an
-	// error raised for some other reason entirely.
-	if _, err := decodeSubset(target, body); err != nil {
-		t.Errorf("body decodes only with the refused suffix removed, but still fails: %v", err)
-	}
+	t.Run("refused key is removed alone", func(t *testing.T) {
+		// The composer's external_ref is read and refused (ADR 0015): the codec
+		// names the key itself, so the harness removes that key and not the
+		// accepted `composer|name` alias beside it.
+		body := maps.Clone(leaf)
+		maps.Copy(body, map[string]any{
+			"ctx/language": "en", "ctx/territory": "US",
+			target.Root + "/composer|name": "Dr. Who",
+			target.Root + "/composer|id":   "1234-5678",
+		})
+		_, err := decodeAsGiven(target, body, nil)
+		if err == nil {
+			t.Fatal("composer|id decoded — the codec now carries the composer's external_ref, so this test needs another refusal")
+		}
+		if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
+			t.Fatalf("real refusal is not ErrUnsupportedDatatype: %v", err)
+		}
+		key := target.Root + "/composer|id"
+		if got := offendingKey(err); got != key {
+			t.Errorf("offendingKey(real refusal) = %q, want the key %q\nrefusal: %v", got, key, err)
+		}
+		if got, want := reasonOf(err, key), "unsupported datatype: PARTY_PROXY"; got != want {
+			t.Errorf("reasonOf(real refusal) = %q, want %q\nrefusal: %v", got, want, err)
+		}
+		removed, gap := dropRefused(body, offendingKey(err), err)
+		if !gap || removed != 1 {
+			t.Fatalf("dropRefused(real refusal) = %d, %v; want 1, true", removed, gap)
+		}
+		if _, ok := body[target.Root+"/composer|name"]; !ok {
+			t.Error("composer|name was dropped by a composer|id refusal — wider than the refusal names")
+		}
+		// What remains must decode: otherwise the assertions above passed on an
+		// error raised for some other reason entirely.
+		if _, err := decodeAsGiven(target, body, nil); err != nil {
+			t.Errorf("body decodes only with the refused key removed, but still fails: %v", err)
+		}
+	})
 }
 
 // modelledQuantityLeaf returns a DV_QUANTITY leaf the codec *does* model, as
@@ -759,8 +793,8 @@ func modelledQuantityLeaf(t *testing.T, target *Target) (string, map[string]any)
 		bases := make([]string, 0, len(body))
 		for k := range body {
 			b, sfx, ok := strings.Cut(k, "|")
-			// The `_`-prefixed RM attribute family is not modelled at all and
-			// would refuse with ErrUnknownPath before any suffix check.
+			// Keep to a plain leaf: a key under an `_`-prefixed family is
+			// decoded by that family's grammar, not the DV_QUANTITY leaf's.
 			if !ok || sfx != "magnitude" || strings.Contains(b, "/_") {
 				continue
 			}
@@ -775,7 +809,7 @@ func modelledQuantityLeaf(t *testing.T, target *Target) (string, map[string]any)
 				b + "|magnitude": body[b+"|magnitude"],
 				b + "|unit":      body[b+"|unit"],
 			}
-			if _, err := decodeSubset(target, probe); err == nil {
+			if _, err := decodeSubset(target, probe, nil); err == nil {
 				return b, probe
 			}
 		}

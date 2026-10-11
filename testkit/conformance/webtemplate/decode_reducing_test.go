@@ -98,11 +98,11 @@ func TestDecodeReducingKeepsRefusalsOnError(t *testing.T) {
 
 	base, leaf := modelledQuantityLeaf(t, target)
 	// Decode reads leaf groups in sorted key order and checks the context
-	// after them, so this unknown path, sorting first, is refused and removed
-	// before the irreducible error stops the loop.
-	unknown := target.Root + "/0_no_such_node"
-	if unknown >= base {
-		t.Fatalf("unknown path %q does not sort before the leaf %q; pick another", unknown, base)
+	// after them, so the composer's external_ref, sorting first, is refused and
+	// removed before the irreducible error stops the loop.
+	refused := target.Root + "/composer|id"
+	if refused >= base {
+		t.Fatalf("refused key %q does not sort before the leaf %q; pick another", refused, base)
 	}
 	irreducible := []struct {
 		name    string
@@ -125,7 +125,7 @@ func TestDecodeReducingKeepsRefusalsOnError(t *testing.T) {
 	for _, tt := range irreducible {
 		t.Run(tt.name, func(t *testing.T) {
 			body := maps.Clone(leaf)
-			body[unknown+"|code"], body[unknown+"|value"] = "x", "y"
+			body[refused] = "1234-5678"
 			tt.change(body)
 
 			_, refusals, err := DecodeReducing(target, body, tt.mode)
@@ -133,38 +133,91 @@ func TestDecodeReducingKeepsRefusalsOnError(t *testing.T) {
 				t.Fatalf("DecodeReducing() error = %v, want an *IrreducibleError with key %q", err, tt.wantKey)
 			}
 			want := []Refusal{{
-				Key:     unknown,
-				Reason:  "path not in web template",
-				Message: `simplified: path not in web template: "<key>"`,
-				Keys:    2,
+				Key:     refused,
+				Reason:  "unsupported datatype: PARTY_PROXY",
+				Message: `simplified: decode "<key>": simplified: unsupported datatype: PARTY_PROXY`,
+				Keys:    1,
 			}}
 			if !slices.Equal(refusals, want) {
 				t.Errorf("DecodeReducing() refusals = %+v, want %+v", refusals, want)
 			}
-			if _, ok := body[unknown+"|code"]; ok {
-				t.Errorf("body still carries %s|code; the refusal that removed it must have been applied", unknown)
+			if _, ok := body[refused]; ok {
+				t.Errorf("body still carries %s; the refusal that removed it must have been applied", refused)
 			}
 		})
 	}
 
 	t.Run("refusal budget breached", func(t *testing.T) {
-		// One unknown path more than the budget allows, each its own family.
+		// One refused key more than the budget allows, each its own family: an
+		// index past the bound of the template root, which the codec refuses one
+		// key at a time. (Unmatched keys would all be reported in one pass.)
 		body := make(map[string]any, maxRefusals+1)
 		for i := range maxRefusals + 1 {
-			body[fmt.Sprintf("%s/no_such_node_%03d", target.Root, i)] = "x"
+			body[fmt.Sprintf("%s:1/no_such_node_%03d", target.Root, i)] = "x"
 		}
 		_, refusals, err := DecodeReducing(target, body, InjectContext)
 		if err == nil || !strings.Contains(err.Error(), "did not converge") {
-			t.Fatalf("DecodeReducing(%d unknown paths) error = %v, want the budget breach", maxRefusals+1, err)
+			t.Fatalf("DecodeReducing(%d refused keys) error = %v, want the budget breach", maxRefusals+1, err)
 		}
 		if _, ok := errors.AsType[*IrreducibleError](err); ok {
-			t.Errorf("DecodeReducing(%d unknown paths) error = %v, want a harness fault, not an *IrreducibleError", maxRefusals+1, err)
+			t.Errorf("DecodeReducing(%d refused keys) error = %v, want a harness fault, not an *IrreducibleError", maxRefusals+1, err)
 		}
 		if len(refusals) != maxRefusals || len(body) != 1 {
-			t.Errorf("DecodeReducing(%d unknown paths) = %d refusals, %d keys left; want %d refusals and 1 key left",
+			t.Errorf("DecodeReducing(%d refused keys) = %d refusals, %d keys left; want %d refusals and 1 key left",
 				maxRefusals+1, len(refusals), len(body), maxRefusals)
 		}
 	})
+}
+
+// TestDecodeReducingExcludesWhatTheCodecReports pins the exclusion the report
+// option drives (PROBE-086, PROBE-105; REQ-170): the keys the codec reports as
+// unmatched content leave the body, each as one [Refusal] in document order,
+// and nothing else does. Without the exclusion they would stay in the body
+// and come back as Missing, since the decode ignored them.
+func TestDecodeReducingExcludesWhatTheCodecReports(t *testing.T) {
+	target, err := NewTarget()
+	if err != nil {
+		t.Fatalf("NewTarget() error = %v", err)
+	}
+	base, leaf := modelledQuantityLeaf(t, target)
+	body := maps.Clone(leaf)
+	unmatched := []string{base + "|x_note", target.Root + "/no_such_node"}
+	for _, k := range unmatched {
+		body[k] = "x"
+	}
+	_, refusals, err := DecodeReducing(target, body, InjectContext)
+	if err != nil {
+		t.Fatalf("DecodeReducing() error = %v", err)
+	}
+	var want []Refusal
+	for _, k := range slices.Sorted(slices.Values(unmatched)) {
+		want = append(want, Refusal{Key: k, Reason: UnmatchedReason, Message: UnmatchedMessage, Keys: 1})
+	}
+	if !slices.Equal(refusals, want) {
+		t.Errorf("DecodeReducing() refusals = %+v, want %+v", refusals, want)
+	}
+	if !maps.Equal(body, leaf) {
+		t.Errorf("DecodeReducing() left %v, want exactly the modelled leaf %v", slices.Sorted(maps.Keys(body)), slices.Sorted(maps.Keys(leaf)))
+	}
+	for _, r := range refusals {
+		if !r.Unmatched() {
+			t.Errorf("refusal %+v is not marked unmatched", r)
+		}
+	}
+}
+
+// TestExcludeUnmatchedRefusesAKeyTheBodyLacks pins the harness-fault guard: a
+// key the codec reports must be one the body carries as written, so a report of
+// any other key fails rather than being skipped.
+func TestExcludeUnmatchedRefusesAKeyTheBodyLacks(t *testing.T) {
+	body := map[string]any{"c/a": "1"}
+	refusals, err := excludeUnmatched(body, []string{"c/a", "c/b"})
+	if err == nil || !strings.Contains(err.Error(), `"c/b"`) {
+		t.Fatalf("excludeUnmatched() error = %v, want one naming the key the body lacks", err)
+	}
+	if len(refusals) != 1 || len(body) != 0 {
+		t.Errorf("excludeUnmatched() = %+v, body %v; want the carried key excluded before the fault", refusals, body)
+	}
 }
 
 // TestDecodeReducingUnknownMode pins that a mode outside the two is a harness

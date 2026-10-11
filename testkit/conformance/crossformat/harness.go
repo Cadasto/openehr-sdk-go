@@ -25,7 +25,8 @@
 // Every FLAT comparison holds composition metadata out of both sides, using
 // the hold-out of the upstream FLAT parity harness (webtemplate.IsCompositionMeta).
 // All FLAT decodes go through that harness's reducing decode
-// (webtemplate.DecodeReducing): it removes each key family the codec refuses,
+// (webtemplate.DecodeReducing): it excludes the keys the codec reports as
+// unmatched content (REQ-170), and removes each key family the codec refuses,
 // and no key beyond what the refusal names, then retries the decode.
 //
 // # Outcomes and the ratchet
@@ -115,7 +116,8 @@ type Outcome struct {
 	// values.
 	Altered int
 	// Excluded is how many upstream FLAT keys the reducing decode removed
-	// before the comparison, in [LegFlatCanonical] and [LegStructuredFlat].
+	// before the comparison, reported as unmatched content or refused, in
+	// [LegFlatCanonical] and [LegStructuredFlat].
 	// It is zero in the other legs, which decode no upstream FLAT. In
 	// LegStructuredFlat both sides are decoded, so a refused key family drops
 	// out of both and no other count shows it.
