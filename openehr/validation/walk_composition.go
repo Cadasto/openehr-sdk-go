@@ -100,8 +100,9 @@ func (w *walker) walkNode(optNode *tcimpl.CompiledNode, rmValue any, path string
 // "one alternative MUST match" semantics, by [bindByRMType]: the most
 // specific child wins, a child of the value's own RM type before the
 // AOM 1.4 short name it wraps, and that before a child the type only
-// conforms to in the pinned BMM. When none match the walker emits a
-// typed issue:
+// conforms to in the pinned BMM, or a typed DV_INTERVAL<T> child for a
+// round-tripped bare DV_INTERVAL with no bound present. When none match
+// the walker emits a typed issue:
 //   - exactly one child → `rm_type_mismatch` (plain type constraint,
 //     no real alternatives);
 //   - two or more children → `alternative_mismatch` with the list
@@ -188,7 +189,8 @@ func matchSingleAlternative(children []*tcimpl.CompiledNode, val any) *tcimpl.Co
 //  2. A child that names the AOM 1.4 primitive short name whose
 //     canonical DV wrapper val is ([wrapsShortName]).
 //  3. A child val's type conforms to by BMM descent, or an untyped
-//     child ([conformsToChild]).
+//     child, or, for a round-tripped bare DV_INTERVAL with no bound
+//     present, a typed DV_INTERVAL<T> child ([conformsToChild]).
 //
 // A value therefore meets the constraints of the tightest child that
 // admits it, not those of a looser one listed first: under
