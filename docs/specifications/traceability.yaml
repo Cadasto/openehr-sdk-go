@@ -1991,3 +1991,10 @@ requirements:
       - openehr/template/interval_flags_test.go
       - testkit/expectedform/expectedform_test.go
       - testkit/probes/serialize/probe_030_guard_internal_test.go
+  - id: REQ-170
+    title: Unmatched content on decode
+    canonical: docs/specifications/wire.md#req-170--unmatched-content-on-decode
+    status: draft
+    implementation: planned
+    packages: [openehr/serialize/canjson, openehr/rm/typereg, openehr/serialize/canxml, internal/bmmgen, openehr/serialize/simplified]
+    probes: [PROBE-086, PROBE-105, PROBE-030]

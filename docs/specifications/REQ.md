@@ -128,6 +128,7 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-167 | Token revocation | [auth.md](auth.md#req-167--token-revocation) | draft | landed |
 | REQ-168 | Value-free validation diagnostics | [clinical-modeling.md](clinical-modeling.md#req-168--value-free-validation-diagnostics) | draft | landed |
 | REQ-169 | Interval boundary flag defaults | [wire.md](wire.md#req-169--interval-boundary-flag-defaults) | draft | planned |
+| REQ-170 | Unmatched content on decode | [wire.md](wire.md#req-170--unmatched-content-on-decode) | draft | planned |
 <!-- END GENERATED: registry -->
 
 **Impl.** column: `landed` (code + tests), `partial` (subset), `planned` (spec only), `retired` (a withdrawn requirement, **Stability** `deprecated`: normative text retained, implementation removed or not shipped; removal target in canonical spec).
