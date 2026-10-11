@@ -240,7 +240,7 @@ Every decoder of RM content, canonical JSON ([§ REQ-052](#req-052)), canonical 
 | Format | Unmatched content |
 |---|---|
 | canonical JSON | a member whose name is neither `_type` nor an attribute of the RM type its object decodes as |
-| canonical XML | an element or attribute that names no attribute of the RM type its element decodes as, other than the `xsi:type` discriminator and namespace declarations; and an element in a namespace other than the openEHR one |
+| canonical XML | an element or attribute that names no attribute of the RM type its element decodes as, other than namespace declarations and attributes in the XML Schema instance namespace (the `xsi:type` discriminator, `xsi:schemaLocation`, `xsi:nil`); and an element in a namespace other than the openEHR one (an element in no namespace is read as openEHR's, since many producers omit the declaration) |
 | FLAT and STRUCTURED | a key whose path the Web Template does not resolve, an unknown `_`-segment (§ REQ-140), a suffix outside its datatype's suffix set, and an unknown `ctx/` field |
 
 Input is matched when it names something the decoder reads, even where the decoder then refuses it. These refusals are not unmatched content and stay errors in every mode:
@@ -255,9 +255,9 @@ Input is matched when it names something the decoder reads, even where the decod
 
 **Strict.** Each codec **MUST** offer a strict decode option under which the first unmatched item refuses the decode with an error that names its path, carries no value from the input, and wraps the codec's sentinel for unmatched content: `canjson.ErrUnknownMember`, `canxml.ErrUnknownElement`, and `simplified.ErrUnknownPath`. An element in a foreign namespace also wraps `canxml.ErrNamespace`. `canjson.ErrUnknownMember` **MUST** stay distinct from `canjson.ErrInvalidShape` and `canjson.ErrInvalidValue` under the three-sentinel rule of § REQ-052. Strict covers unmatched content only: an absent member, a boundary flag [§ REQ-169](#req-169--interval-boundary-flag-defaults) defaults among them, is never refused.
 
-The canonical-XML codec does not model `Hash` (`map[K]V`) members: by default it skips a `Hash` element, the report option reports it, and strict refuses it like unmatched content.
+The canonical-XML codec does not model `Hash` (`map[K]V`) members, nor the content of a BMM `Any` member (the AOM 1.4 `assumed_value` and `EXPR_LEAF.item`): by default it skips such an element, the report option reports the element as one item, and strict refuses it like unmatched content.
 
-**Scope.** The two options belong to the codecs' own decode entry points. In canonical JSON they check the members of RM classes, decided against the RM's own attribute lists after the decode succeeds, so a decode error such as an unknown `_type` is reported as itself; a value of a class outside the RM, such as an AOM 1.4 archetype, decodes as by default and its members are not checked. REST reads through `transport` and the `openehr/client/*` packages decode with the default and offer neither option.
+**Scope.** The two options belong to the codecs' own decode entry points. In canonical JSON they check the members of RM classes, decided against the RM's own attribute lists after the decode succeeds, so a decode error such as an unknown `_type` is reported as itself; a value of a class outside the RM, such as an AOM 1.4 archetype, decodes as by default and its members are not checked. In canonical XML they check, as the decode reads, every class the generated decoders read, AOM 1.4 included; because that decode streams, strict returns the first problem in document order, whether an unmatched item or a dispatch failure. REST reads through `transport` and the `openehr/client/*` packages decode with the default and offer neither option.
 
 **Acceptance:**
 
