@@ -376,7 +376,9 @@ func allowedChildren(attr *tcimpl.CompiledAttribute) []*tcimpl.CompiledNode {
 
 // materialiseSingle synthesises and attaches one child under a
 // C_SINGLE_ATTRIBUTE. For OPT alternatives (multiple children) the
-// first wins — same convention validation uses for matchSingleAlternative.
+// first wins. Validation binds a value to the first child of its own
+// RM type before any child it only conforms to (matchSingleAlternative),
+// so a value built for the first concrete child binds back to it.
 //
 // Implicit BMM-mandatory attributes (no OPT children) get a default
 // RM value materialised from the attribute's BMM type so the
@@ -1320,17 +1322,20 @@ func (g *generator) makeChild(child *tcimpl.CompiledNode) (any, error) {
 
 // concreteFor maps abstract RM class names the OPT may declare on
 // child constraints to the documented concrete substitute the
-// generator materialises. Mirrors the validation walker's
-// bmmSubtypes "first concrete" pick — POINT_EVENT for EVENT,
-// ITEM_TREE for ITEM_STRUCTURE, ELEMENT for ITEM, etc. Concrete RM
-// types pass through unchanged.
+// generator materialises — POINT_EVENT for EVENT, ITEM_TREE for
+// ITEM_STRUCTURE, ELEMENT for ITEM, etc. Each substitute descends
+// from the abstract class in the pinned BMM, and the validation
+// walker admits a value by that class hierarchy, so the substitute
+// passes its type check. Concrete RM types pass through unchanged.
 //
 // AOM 1.4 primitive short names (DURATION, DATE, TIME, DATE_TIME,
-// BOOLEAN) appear under C_PRIMITIVE_OBJECT in some OPTs where the
-// modeller constrains the primitive directly rather than its DV
-// wrapper. The generator materialises the canonical DV wrapper for
-// each; the validator's bmmSubtypes carries the lockstep admission
-// rule so checkRMType does not reject the substitute.
+// BOOLEAN, INTEGER) appear under C_PRIMITIVE_OBJECT in some OPTs
+// where the modeller constrains the primitive directly rather than
+// its DV wrapper. The generator materialises the canonical DV
+// wrapper for each. The short names are no BMM classes, so the
+// validator keeps its own short-name → wrapper table,
+// aomPrimitiveWrappers, in lockstep with these cases so checkRMType
+// does not reject the substitute.
 func concreteFor(rmType string) string {
 	switch rmType {
 	case "EVENT":

@@ -2,7 +2,6 @@ package validation
 
 import (
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -23,8 +22,8 @@ import (
 //
 // Per-node behaviour:
 //   - Identity (LOCATABLE.archetype_node_id ↔ OPT pin) and RM-type
-//     match (with BMM abstract-supertype admission) fire at every
-//     node.
+//     match (conformance in the pinned BMM's class hierarchy) fire at
+//     every node.
 //   - Slot leaves: no descent (slot-fit was decided by the parent
 //     attribute when binding RM items to OPT children).
 //   - Primitive constraint leaves (PrimitiveConstraint() != nil):
@@ -98,10 +97,10 @@ func (w *walker) walkNode(optNode *tcimpl.CompiledNode, rmValue any, path string
 
 // walkSingleAttribute enforces existence on a C_SINGLE_ATTRIBUTE
 // and binds the RM value to one of attr.Children() via the AOM 1.4
-// "one alternative MUST match" semantics. Tries each OPT child in
-// order; first that fits the RM value's concrete type (with BMM
-// abstract-supertype admission) wins. When none match the walker
-// emits a typed issue:
+// "one alternative MUST match" semantics, by [bindByRMType]: a child
+// of the value's own RM type wins, otherwise the first child in OPT
+// order the type conforms to in the pinned BMM. When none match the
+// walker emits a typed issue:
 //   - exactly one child → `rm_type_mismatch` (plain type constraint,
 //     no real alternatives);
 //   - two or more children → `alternative_mismatch` with the list
@@ -170,35 +169,58 @@ func (w *walker) walkSingleAttribute(
 	w.walkNode(child, val, joinPath(parentPath, segmentForChild(attr, child, 0)))
 }
 
-// matchSingleAlternative picks the OPT child whose declared
-// RMTypeName admits the RM value (concrete equality + BMM
-// supertype expansion). Returns nil when no child fits. With
-// exactly one child the function is effectively "does the child
-// fit?"; the alternative_mismatch case fires only when the OPT
-// declared more than one alternative.
+// matchSingleAlternative picks the OPT child of a single-valued
+// attribute that binds the RM value, slot children included, by
+// [bindByRMType]. Returns nil when no child fits. With exactly one
+// child the function is effectively "does the child fit?"; the
+// alternative_mismatch case fires only when the OPT declared more
+// than one alternative.
 func matchSingleAlternative(children []*tcimpl.CompiledNode, val any) *tcimpl.CompiledNode {
+	return bindByRMType(children, val, func(*tcimpl.CompiledNode) bool { return true })
+}
+
+// bindByRMType picks, among the children eligible accepts, the one
+// that binds the RM value val, in two passes (REQ-102). The first
+// pass takes the first child that names val's own RM type
+// ([namesRMType]). Only when none does, the second takes the first
+// child in OPT order that admits val by BMM conformance or declares
+// no RM type ([conformsToChild]). The exact pass comes first so that,
+// under alternatives [DV_TEXT, DV_CODED_TEXT], a DV_CODED_TEXT meets
+// the DV_CODED_TEXT child's constraints rather than passing the
+// DV_TEXT child it also conforms to. Both the single-valued
+// alternatives and the multi-valued items without an
+// archetype_node_id bind by this rule. Returns nil when no child
+// admits val.
+func bindByRMType(children []*tcimpl.CompiledNode, val any, eligible func(*tcimpl.CompiledNode) bool) *tcimpl.CompiledNode {
 	gotType := describeRMType(val)
 	for _, c := range children {
-		if admitsRMValue(c, gotType, val) {
+		if eligible(c) && namesRMType(c, gotType, val) {
+			return c
+		}
+	}
+	for _, c := range children {
+		if eligible(c) && conformsToChild(c, gotType) {
 			return c
 		}
 	}
 	return nil
 }
 
-// admitsRMValue reports whether the OPT child c admits the RM value
-// val, whose RM type name is gotType: an untyped child, the exact
-// type, a BMM subtype, a collapsed DV_INTERVAL whose bounds fit, or a
-// Go primitive under an AOM 1.4 primitive short name. Both the
-// single-valued alternatives and the multi-valued items without an
-// archetype_node_id (REQ-102) bind by this rule.
-func admitsRMValue(c *tcimpl.CompiledNode, gotType string, val any) bool {
+// namesRMType reports whether the OPT child c declares the RM value
+// val's own type, gotType: the same name, a parameterised
+// DV_INTERVAL<T> a collapsed interval's bounds fit (or the bare
+// DV_INTERVAL a typed one has), an AOM 1.4 primitive short name whose
+// DV wrapper val is, or such a short name over a Go primitive val. An
+// untyped child names no type.
+func namesRMType(c *tcimpl.CompiledNode, gotType string, val any) bool {
 	want := c.RMTypeName()
 	if want == "" {
-		// Wildcard / not-typed OPT child: accept.
+		return false
+	}
+	if gotType == want || intervalRMTypeMatches(gotType, want, val) {
 		return true
 	}
-	if gotType == want || rmTypeIsSubtypeOf(gotType, want) || intervalRMTypeMatches(gotType, want, val) {
+	if wrapper, ok := aomPrimitiveWrappers[want]; ok && wrapper == gotType {
 		return true
 	}
 	// AOM 1.4 primitive short name (DURATION, DATE, INTEGER, …)
@@ -207,6 +229,13 @@ func admitsRMValue(c *tcimpl.CompiledNode, gotType string, val any) bool {
 	// RM wrapper type.
 	return tcimpl.IsAOMPrimitiveShortName(want) && c.PrimitiveConstraint() != nil &&
 		primitiveValueMatchesShortName(want, val)
+}
+
+// conformsToChild reports whether the OPT child c declares no RM type,
+// or one the RM type gotType conforms to ([rmTypeIsSubtypeOf]).
+func conformsToChild(c *tcimpl.CompiledNode, gotType string) bool {
+	want := c.RMTypeName()
+	return want == "" || rmTypeIsSubtypeOf(gotType, want)
 }
 
 // formatAllowedTypes renders the OPT child RM types for inclusion
@@ -564,22 +593,17 @@ func matchChildByID(children []*tcimpl.CompiledNode, item any) *tcimpl.CompiledN
 }
 
 // matchChildByRMType binds an item that carries no archetype_node_id
-// (REQ-102) to the first non-slot child whose RMTypeName admits the
-// item's RM type, by the rule a single-valued attribute uses
-// ([admitsRMValue]). A nil or typed-nil item has no value to bind, so
+// (REQ-102) to a non-slot child whose RMTypeName admits the item's RM
+// type, by the rule a single-valued attribute uses ([bindByRMType]):
+// a child of the item's own type first, otherwise the first that the
+// type conforms to. A nil or typed-nil item has no value to bind, so
 // no child takes it, not even an untyped one. Returns nil when no
 // child admits the item.
 func matchChildByRMType(children []*tcimpl.CompiledNode, item any) *tcimpl.CompiledNode {
 	if isNilItem(item) {
 		return nil
 	}
-	gotType := describeRMType(item)
-	for _, c := range children {
-		if !c.IsSlot() && admitsRMValue(c, gotType, item) {
-			return c
-		}
-	}
-	return nil
+	return bindByRMType(children, item, func(c *tcimpl.CompiledNode) bool { return !c.IsSlot() })
 }
 
 // unboundItemIssue reports an item of a multi-valued attribute that
@@ -686,10 +710,12 @@ func (w *walker) checkLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, p
 	}
 }
 
-// checkRMType emits rm_type_mismatch when the concrete RM Go type
-// disagrees with the compiled OPT node's RMTypeName. Honours BMM
-// abstract supertypes: an OPT slot constrained to ITEM_STRUCTURE
-// admits ITEM_TREE / ITEM_LIST / ITEM_SINGLE / ITEM_TABLE, etc.
+// checkRMType emits rm_type_mismatch when the concrete RM type does
+// not conform to the compiled OPT node's RMTypeName. Conformance is
+// the pinned BMM's class hierarchy ([rmTypeIsSubtypeOf]), for an
+// abstract and a concrete ancestor alike: a node declared as
+// ITEM_STRUCTURE admits ITEM_TREE, one declared as DV_TEXT admits
+// DV_CODED_TEXT.
 func (w *walker) checkRMType(opt *tcimpl.CompiledNode, rmValue any, path string) {
 	want := opt.RMTypeName()
 	if want == "" {
@@ -710,18 +736,33 @@ func (w *walker) checkRMType(opt *tcimpl.CompiledNode, rmValue any, path string)
 	})
 }
 
-// rmTypeIsSubtypeOf encodes the BMM supertype relations the
-// validator exercises. Restricted to the abstract slots the OPT
-// can name (LOCATABLE, ITEM, ITEM_STRUCTURE, DATA_VALUE, EVENT,
-// CONTENT_ITEM, ENTRY, CARE_ENTRY, PARTY_PROXY); concrete
-// subtypes admitted under each.
+// rmTypeIsSubtypeOf reports whether the RM type concrete conforms to
+// the OPT-declared RM type declared: equal to it, or a descendant of
+// it in the pinned BMM's class hierarchy (rminfo), whether declared is
+// abstract or concrete (REQ-102, REQ-110). A newly covered RM class
+// therefore needs no admission row here. What the walker reads below
+// a node still comes from rmread, so an OPT that constrains attributes
+// of a newly covered class also needs rmread readers for them.
 //
-// A parameterised name such as "DV_INTERVAL<DV_COUNT>" is looked up by
-// its class, "DV_INTERVAL", because the generic parameter does not
-// change which abstract types the class conforms to.
-func rmTypeIsSubtypeOf(concrete, abstract string) bool {
-	subtypes := bmmSubtypes[abstract]
-	return slices.Contains(subtypes, bmmtype.Class(concrete))
+// A parameterised value type such as "DV_INTERVAL<DV_COUNT>" is looked
+// up by its class, "DV_INTERVAL", because the generic parameter does
+// not change which classes it descends from. The declared type is
+// looked up as written: a parameterised DV_INTERVAL<T> is no BMM class
+// name, so the hierarchy does not know it, and [intervalRMTypeMatches]
+// decides it instead.
+//
+// When the hierarchy does not know one of the two names, an AOM 1.4
+// primitive short name in declared still admits its canonical DV
+// wrapper ([aomPrimitiveWrappers]).
+func rmTypeIsSubtypeOf(concrete, declared string) bool {
+	class := bmmtype.Class(concrete)
+	if h, ok := rminfo.Default.(rminfo.Hierarchy); ok {
+		if conforms, known := h.ConformsTo(class, declared); known {
+			return conforms
+		}
+	}
+	wrapper, ok := aomPrimitiveWrappers[declared]
+	return ok && wrapper == class
 }
 
 // intervalRMTypeMatches reports whether a concrete interval RM type
@@ -819,88 +860,22 @@ func primitiveValueMatchesShortName(shortName string, val any) bool {
 	}
 }
 
-// bmmSubtypes is the closed lookup of abstract → concrete RM type
-// admission rules used by checkRMType. Sourced from
-// openehr_rm_1.2.0.bmm: concrete classes that satisfy each
-// abstract slot. Every row is written by hand.
+// aomPrimitiveWrappers maps each AOM 1.4 primitive short name an OPT
+// may declare as an RM type, typically under C_PRIMITIVE_OBJECT, to the
+// canonical DV wrapper that carries its value. The short names are no
+// BMM classes, so the class hierarchy cannot admit the wrapper; this
+// table does (REQ-102, Validation dimensions: RM type match). Each
+// wrapper is the type instance.concreteFor builds for the short name,
+// so the generator's output passes checkRMType.
 //
-// A concrete class missing from its abstract row is refused with a
-// false rm_type_mismatch wherever an OPT node declares that abstract
-// type. Adding a class to a row needs no naming table elsewhere:
-// describeRMType names every class the generated type registry holds
-// (rm.RMTypeName), and locatableArchetypeNodeID reads
-// archetype_node_id through rm.Locatable. What the walker reads below
-// a node still comes from rmread, so an OPT that constrains attributes
-// of a newly admitted class also needs rmread readers for them. Extend
-// the rows in lock-step with the BMM and with rmread.
-//
-// The DATA_VALUE row holds every concrete DATA_VALUE descendant of the
-// pinned BMM. TestDataValueSubtypesMatchBMM compares it with rminfo, so
-// a BMM bump that adds or drops a data value type fails that test until
-// the row follows it.
-//
-// REQ-110 added the demographic PARTY hierarchy (+ sub-components) and
-// the EHR-IM roots FOLDER / EHR_STATUS so non-COMPOSITION OPTs validate
-// through the same walker.
-var bmmSubtypes = map[string][]string{
-	"LOCATABLE": {
-		"COMPOSITION", "OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION",
-		"ADMIN_ENTRY", "GENERIC_ENTRY", "SECTION", "ACTIVITY",
-		"HISTORY", "POINT_EVENT", "INTERVAL_EVENT",
-		"ITEM_TREE", "ITEM_LIST", "ITEM_SINGLE", "ITEM_TABLE",
-		"CLUSTER", "ELEMENT",
-		// REQ-110: demographic + EHR-IM LOCATABLE concretes.
-		"PERSON", "ORGANISATION", "GROUP", "AGENT", "ROLE",
-		"ADDRESS", "CONTACT", "PARTY_IDENTITY", "PARTY_RELATIONSHIP", "CAPABILITY",
-		"FOLDER", "EHR_STATUS",
-	},
-	// PARTY hierarchy (org.openehr.rm.demographic): PARTY is the common
-	// ancestor; ACTOR adds the real-world-entity subtypes (PERSON,
-	// ORGANISATION, GROUP, AGENT). ROLE is a PARTY but not an ACTOR.
-	"PARTY": {
-		"PERSON", "ORGANISATION", "GROUP", "AGENT", "ROLE",
-	},
-	"ACTOR": {
-		"PERSON", "ORGANISATION", "GROUP", "AGENT",
-	},
-	"CONTENT_ITEM": {
-		"OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION",
-		"ADMIN_ENTRY", "GENERIC_ENTRY", "SECTION",
-	},
-	"ENTRY": {
-		"OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION", "ADMIN_ENTRY",
-	},
-	"CARE_ENTRY": {
-		"OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION",
-	},
-	"ITEM_STRUCTURE": {
-		"ITEM_TREE", "ITEM_LIST", "ITEM_SINGLE", "ITEM_TABLE",
-	},
-	"ITEM": {
-		"CLUSTER", "ELEMENT",
-	},
-	"EVENT": {
-		"POINT_EVENT", "INTERVAL_EVENT",
-	},
-	"PARTY_PROXY": {
-		"PARTY_SELF", "PARTY_IDENTIFIED", "PARTY_RELATED",
-	},
-	"DATA_VALUE": {
-		"DV_BOOLEAN", "DV_CODED_TEXT", "DV_COUNT", "DV_DATE",
-		"DV_DATE_TIME", "DV_DURATION", "DV_EHR_URI",
-		"DV_GENERAL_TIME_SPECIFICATION", "DV_IDENTIFIER", "DV_INTERVAL",
-		"DV_MULTIMEDIA", "DV_ORDINAL", "DV_PARAGRAPH", "DV_PARSABLE",
-		"DV_PERIODIC_TIME_SPECIFICATION", "DV_PROPORTION", "DV_QUANTITY",
-		"DV_SCALE", "DV_STATE", "DV_TEXT", "DV_TIME", "DV_URI",
-	},
-	// AOM 1.4 primitive short names (used under C_PRIMITIVE_OBJECT)
-	// admit the canonical DV wrapper carrying the primitive value.
-	// Lockstep with instance.concreteFor — surfaced by clinical_note.opt
-	// where DURATION appears as the rm_type_name of a primitive-
-	// constrained ELEMENT.value child.
-	"DURATION":  {"DV_DURATION"},
-	"DATE":      {"DV_DATE"},
-	"TIME":      {"DV_TIME"},
-	"DATE_TIME": {"DV_DATE_TIME"},
-	"BOOLEAN":   {"DV_BOOLEAN"},
+// A Go primitive under a short name (an int64 under INTEGER, a string
+// under DURATION) is admitted apart from this table, by
+// primitiveValueMatchesShortName.
+var aomPrimitiveWrappers = map[string]string{
+	"DURATION":  "DV_DURATION",
+	"DATE":      "DV_DATE",
+	"TIME":      "DV_TIME",
+	"DATE_TIME": "DV_DATE_TIME",
+	"BOOLEAN":   "DV_BOOLEAN",
+	"INTEGER":   "DV_COUNT",
 }

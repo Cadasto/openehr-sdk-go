@@ -254,7 +254,7 @@ const probe026AlternativeMismatchOPT = `<?xml version="1.0"?>
         <node_id />
       </children>
       <children xsi:type="C_COMPLEX_OBJECT">
-        <rm_type_name>PARTY_IDENTIFIED</rm_type_name>
+        <rm_type_name>PARTY_RELATED</rm_type_name>
         <node_id />
       </children>
     </attributes>
@@ -283,12 +283,13 @@ const probe026RMTypeMismatchOPT = `<?xml version="1.0"?>
   </definition>
 </template>`
 
-// PROBE-026 — C_SINGLE_ATTRIBUTE with two alternatives: PartyRelated
-// matches neither PARTY_SELF nor PARTY_IDENTIFIED → alternative_mismatch.
+// PROBE-026 — C_SINGLE_ATTRIBUTE with two alternatives: PartyIdentified
+// conforms to neither PARTY_SELF nor PARTY_RELATED (it is the supertype
+// of PARTY_RELATED, not a descendant) → alternative_mismatch.
 func TestProbe026MissingNodes_AlternativeMismatch(t *testing.T) {
 	cases := []probes.ValidateCase{
 		{
-			Name: "composer_party_related",
+			Name: "composer_party_identified",
 			OPT:  []byte(probe026AlternativeMismatchOPT),
 			Composition: &rm.Composition{
 				ArchetypeNodeID: "at0000",
@@ -308,9 +309,7 @@ func TestProbe026MissingNodes_AlternativeMismatch(t *testing.T) {
 					TerminologyID: rm.TerminologyID{Value: "ISO_3166-1"},
 					CodeString:    "NL",
 				},
-				Composer: &rm.PartyRelated{
-					PartyIdentified: rm.PartyIdentified{},
-				},
+				Composer: &rm.PartyIdentified{Name: new("Dr. Jones")},
 			},
 			WantCodes: []string{"alternative_mismatch"},
 		},
