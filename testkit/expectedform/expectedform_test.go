@@ -347,6 +347,23 @@ func TestREQ052_BuildRemovesEmptyMappingsAndMultimediaBytes(t *testing.T) {
 	})
 }
 
+// TestREQ052_BuildLeavesAGenericPayloadAlone pins that no change is made
+// inside a generic payload: the registry's ORIGINAL_VERSION holds its "data"
+// as plain JSON, so a member the RM does not define, a null member and a
+// quoted number inside it are all expected as written, while a member of the
+// ORIGINAL_VERSION itself is still removed.
+func TestREQ052_BuildLeavesAGenericPayloadAlone(t *testing.T) {
+	const payload = `{"_type":"DV_TEXT","value":"v","x-a":1,"language":null,"mappings":[]}`
+	runBuild(t, []buildCase{
+		{
+			name: "ORIGINAL_VERSION data",
+			root: "ORIGINAL_VERSION",
+			in:   `{"_type":"ORIGINAL_VERSION","data":` + payload + `,"x-root":1}`,
+			want: `{"_type":"ORIGINAL_VERSION","data":` + payload + `}`,
+		},
+	})
+}
+
 // TestREQ052_BuildWritesNumbersAsTheEncoderDoes pins that a number held by a
 // numeric attribute, bare or quoted, becomes the literal the encoder writes
 // for its value (ADR 0004), and that a value that is not such a number is
