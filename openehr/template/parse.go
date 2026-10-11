@@ -48,11 +48,16 @@ func ParseOPT(r io.Reader) (*OperationalTemplate, error) {
 // Returns ErrUnsupportedNode (wrapped) on the first such occurrence.
 // It also refuses an unparseable C_INTEGER or C_REAL bound, an
 // unparseable C_INTEGER or C_REAL list item, a C_PRIMITIVE_OBJECT
-// with no <item> child, and a CONSTRAINT_REF with no or a blank
-// <reference>, returning an error that wraps ErrInvalidOPT.
+// with no <item> child, and a CONSTRAINT_REF with no <reference> or
+// a blank one, returning an error that wraps ErrInvalidOPT.
 //
-// T_ARCHETYPE_ROOT and CONSTRAINT_REF are not such values. Strict mode
-// reads them exactly as ParseOPT does and accepts them.
+// T_ARCHETYPE_ROOT and CONSTRAINT_REF are not unknown values, so
+// strict mode never refuses them as unsupported. It reads
+// T_ARCHETYPE_ROOT exactly as ParseOPT does. It reads a
+// CONSTRAINT_REF as ParseOPT does, as a leaf carrying a
+// [constraints.ConstraintRef], with one difference: where the
+// reference is missing or blank, ParseOPT keeps the leaf with an
+// empty Reference and strict mode refuses the template.
 func ParseOPTStrict(r io.Reader) (*OperationalTemplate, error) {
 	return parseOPT(r, true)
 }

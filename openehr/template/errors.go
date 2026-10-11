@@ -10,7 +10,9 @@ var (
 	// wrapper elements (template_id, definition). encoding/xml
 	// errors from the XML decoder are wrapped through this sentinel,
 	// so callers can match either with errors.Is(err, ErrInvalidOPT)
-	// or unwrap to the inner decoder error.
+	// or unwrap to the inner decoder error. In strict mode it also
+	// signals a malformed primitive constraint, such as a
+	// CONSTRAINT_REF with no reference (see [ParseOPTStrict]).
 	ErrInvalidOPT = errors.New("template: invalid OPT")
 
 	// ErrNotOPTFile signals ParseFile was called with a path whose
