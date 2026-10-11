@@ -3,6 +3,66 @@
 
 package rm
 
+import (
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
+)
+
+// intervalFlagsSeen records which of an interval's four boundary flags a
+// canonical document carried, so a decoder can tell an absent flag from one
+// written as false.
+type intervalFlagsSeen struct {
+	lowerIncluded  bool
+	lowerUnbounded bool
+	upperIncluded  bool
+	upperUnbounded bool
+}
+
+// setDefaults gives every boundary flag the document left out the value an
+// absent flag reads as: `lower_unbounded` and `upper_unbounded` read as
+// false, and `lower_included` and `upper_included` read as true on a side
+// that is not open and as false on a side that is, the only value an open
+// side admits. A flag the document carried keeps the value it was read as.
+// The open flags are settled first, so an included default sees its side's
+// open flag whatever order the members came in.
+func (s intervalFlagsSeen) setDefaults(lowerIncluded, lowerUnbounded, upperIncluded, upperUnbounded *bool) {
+	if !s.lowerUnbounded {
+		*lowerUnbounded = false
+	}
+	if !s.upperUnbounded {
+		*upperUnbounded = false
+	}
+	if !s.lowerIncluded {
+		*lowerIncluded = !*lowerUnbounded
+	}
+	if !s.upperIncluded {
+		*upperIncluded = !*upperUnbounded
+	}
+}
+
+// intervalFlagJSON is the canonical-JSON decode target of one interval
+// boundary flag. It decodes the member straight into the interval's own flag
+// field, so a failed decode leaves the field as an in-place decode would, and
+// marks the flag seen once it is read. A null member reads as an absent one.
+type intervalFlagJSON struct {
+	field *bool
+	seen  *bool
+}
+
+// UnmarshalJSONFrom decodes one boundary flag into its field and records that
+// the document carried it.
+func (f intervalFlagJSON) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if dec.PeekKind() == 'n' {
+		_, err := dec.ReadToken()
+		return err
+	}
+	if err := json.UnmarshalDecode(dec, f.field, dec.Options()); err != nil {
+		return err
+	}
+	*f.seen = true
+	return nil
+}
+
 // omitIntervalBound reports whether the canonical encoders leave out an
 // interval side's bound: the side is open (its `lower_unbounded` or
 // `upper_unbounded` flag is set) and its bound is empty. A non-empty bound

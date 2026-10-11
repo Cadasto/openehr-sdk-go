@@ -193,7 +193,7 @@ func xmlIntervalReaders() []xmlIntervalReader {
 					return intervalFlags{}, err
 				}
 				if v.NormalRange == nil {
-					return intervalFlags{}, fmt.Errorf("DV_QUANTITY.normal_range decoded as nil")
+					return intervalFlags{}, errors.New("DV_QUANTITY.normal_range decoded as nil")
 				}
 				return baseFlags(v.NormalRange.Interval), nil
 			},
@@ -266,7 +266,7 @@ func xmlIntervalReaders() []xmlIntervalReader {
 					return intervalFlags{}, err
 				}
 				if v.Range == nil {
-					return intervalFlags{}, fmt.Errorf("C_INTEGER.range decoded as nil")
+					return intervalFlags{}, errors.New("C_INTEGER.range decoded as nil")
 				}
 				return baseFlags(*v.Range), nil
 			},
@@ -279,7 +279,7 @@ func xmlIntervalReaders() []xmlIntervalReader {
 					return intervalFlags{}, err
 				}
 				if v.Range == nil {
-					return intervalFlags{}, fmt.Errorf("C_REAL.range decoded as nil")
+					return intervalFlags{}, errors.New("C_REAL.range decoded as nil")
 				}
 				return baseFlags(*v.Range), nil
 			},
@@ -373,7 +373,7 @@ func TestREQ169IntervalAbsentFlagsOverwriteReusedReceiver(t *testing.T) {
 	stale := intervalFlags{LowerUnbounded: true, UpperUnbounded: true}
 
 	t.Run("DV_INTERVAL", func(t *testing.T) {
-		v := rm.DVInterval[rm.DVCount]{Interval: rm.Interval[rm.DVCount]{LowerUnbounded: true, UpperUnbounded: true}}
+		v := rm.DVInterval[rm.DVCount]{LowerUnbounded: true, UpperUnbounded: true}
 		doc := `<dv_interval` + xmlNS + `>` + xmlCount1 + xmlCount5 + `</dv_interval>`
 		if err := canxml.Unmarshal([]byte(doc), &v); err != nil {
 			t.Fatalf("canxml.Unmarshal: %v", err)

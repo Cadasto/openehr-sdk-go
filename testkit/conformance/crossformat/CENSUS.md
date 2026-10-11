@@ -44,7 +44,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 | nested | flat-canonical | compared 156, missing 84, extra 48, altered 11, excluded 3 |
 | persistent_minimal | canonical-flat | compared 11, missing 2, extra 0, altered 1, excluded 0 |
 | persistent_minimal | flat-canonical | compared 72, missing 8, extra 0, altered 5, excluded 3 |
-| test_all_types | canonical-flat | compared 83, missing 11, extra 11, altered 11, excluded 0 |
+| test_all_types | canonical-flat | compared 83, missing 11, extra 5, altered 11, excluded 0 |
 | test_all_types | flat-canonical | refused |
 
 ## alternative_events
@@ -458,8 +458,8 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 
 ### canonical-flat
 
-- Outcome: compared 83, missing 11, extra 11, altered 11, excluded 0
-- Reason: body-form composer: FLAT encode writes the composer as ctx/composer_name alone (3 missing keys). Web Template projection: the SDK's Web Template has no in-context time or ism_transition node for the section_3 ACTION (openehr/template/webtemplate/deviations.md, inContext coverage), and its per-careflow-step transition nodes do not match a transition without a careflow_step, so FLAT encode writes neither (4 missing keys). Choice element: upstream spells the value of the choice element choice/quantity_value, the SDK choice. DV_IDENTIFIER: this upstream FLAT writes the id as the bare value, the codec as |id. DV_PROPORTION: upstream writes the derived magnitude as a bare value, which the codec does not write (a PROBE-086 residue), and writes the Integer type and the Real denominator as 1.0 where the codec writes 1. DV_INTERVAL bounds: the canonical omits the RM-mandatory lower_included and upper_included, canjson reads the absence as false, and FLAT encode writes false where upstream writes nothing (6 keys). Upstream date and time spelling: the canonical writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the extended format with a full stop and Z (8 leaves). Upstream conversion differences: upstream openEHR_SDK's FlatJsonMarshallerTest.toFlatJsonAllTypesErrors encodes this canonical (all_types_no_multimedia.json) as FLAT and expects these differences against this FLAT (test_all_types.json): duration_any (P1Y2M10DT2H30M against PT30M), a DV_URI only the canonical carries and the proportion's precision, which only the canonical carries, besides the DV_IDENTIFIER and proportion type spellings above.
+- Outcome: compared 83, missing 11, extra 5, altered 11, excluded 0
+- Reason: body-form composer: FLAT encode writes the composer as ctx/composer_name alone (3 missing keys). Web Template projection: the SDK's Web Template has no in-context time or ism_transition node for the section_3 ACTION (openehr/template/webtemplate/deviations.md, inContext coverage), and its per-careflow-step transition nodes do not match a transition without a careflow_step, so FLAT encode writes neither (4 missing keys). Choice element: upstream spells the value of the choice element choice/quantity_value, the SDK choice. DV_IDENTIFIER: this upstream FLAT writes the id as the bare value, the codec as |id. DV_PROPORTION: upstream writes the derived magnitude as a bare value, which the codec does not write (a PROBE-086 residue), and writes the Integer type and the Real denominator as 1.0 where the codec writes 1. Upstream date and time spelling: the canonical writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the extended format with a full stop and Z (8 leaves). Upstream conversion differences: upstream openEHR_SDK's FlatJsonMarshallerTest.toFlatJsonAllTypesErrors encodes this canonical (all_types_no_multimedia.json) as FLAT and expects these differences against this FLAT (test_all_types.json): duration_any (P1Y2M10DT2H30M against PT30M), a DV_URI only the canonical carries and the proportion's precision, which only the canonical carries, besides the DV_IDENTIFIER and proportion type spellings above.
 - Missing (11, first 10 shown):
   - `test_all_types/composer|id`
   - `test_all_types/composer|id_namespace`
@@ -471,17 +471,12 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `test_all_types/test_all_types3:0/section_2/section_3/test_all_types2:0/ism_transition/current_state|value`
   - `test_all_types/test_all_types3:0/section_2/section_3/test_all_types2:0/time`
   - `test_all_types/test_all_types:0/identifier`
-- Extra (11, first 10 shown):
+- Extra (5):
   - `test_all_types/test_all_types2:0/choice|magnitude`
   - `test_all_types/test_all_types2:0/choice|unit`
-  - `test_all_types/test_all_types2:0/interval_count|lower_included`
-  - `test_all_types/test_all_types2:0/interval_count|upper_included`
-  - `test_all_types/test_all_types2:0/interval_datetime|lower_included`
-  - `test_all_types/test_all_types2:0/interval_datetime|upper_included`
-  - `test_all_types/test_all_types2:0/interval_quantity|lower_included`
-  - `test_all_types/test_all_types2:0/interval_quantity|upper_included`
   - `test_all_types/test_all_types2:0/uri`
   - `test_all_types/test_all_types:0/identifier|id`
+  - `test_all_types/test_all_types:0/proportion_any|precision`
 - Altered (11, first 10 shown):
   - `test_all_types/test_all_types2:0/interval_datetime/lower`: reference `"2019-01-28T21:22:49.426Z"`, ours `"2019-01-28T21:22:49,426+00:00"`
   - `test_all_types/test_all_types2:0/interval_datetime/upper`: reference `"2019-01-28T21:22:49.426Z"`, ours `"2019-01-28T21:22:49,426+00:00"`

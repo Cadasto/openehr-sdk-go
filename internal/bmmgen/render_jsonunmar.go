@@ -10,9 +10,11 @@ import (
 )
 
 // RenderUnmarshalJSONFile renders the canonical-JSON UnmarshalJSONFrom
-// companions (encoding/json/v2) for every concrete class in `file`.
+// companions (encoding/json/v2) for every concrete class in `file`, and for
+// the abstract BASE Interval struct ([codecClassesIn]), whose decoder gives a
+// boundary flag the document leaves out its default (REQ-169).
 //
-// Returns (nil, nil) when the file has no concrete classes.
+// Returns (nil, nil) when the file has no such classes.
 //
 // # Strategy
 //
@@ -28,7 +30,10 @@ import (
 // fields resolve through the registered hooks, with no per-field
 // typereg.DecodeAs dispatch or json.RawMessage staging.
 func RenderUnmarshalJSONFile(plan *Plan, file *PlannedFile) ([]byte, error) {
-	emitting := concreteClassesIn(file)
+	emitting, err := codecClassesIn(plan, file)
+	if err != nil {
+		return nil, err
+	}
 	if len(emitting) == 0 {
 		return nil, nil
 	}
@@ -76,11 +81,14 @@ func RenderUnmarshalJSONFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	return formatted, nil
 }
 
-// renderUnmarshalJSON emits the UnmarshalJSONFrom method for a single concrete
-// class. The wire type it decodes into is defined in the sibling
-// _jsonmar_gen.go: a method-free alias (zero-copy), a flat wire struct (copied
-// back) or an interval wire struct, chosen by [classJSONWireShape] exactly as
-// for the marshaller.
+// renderUnmarshalJSON emits the UnmarshalJSONFrom method for a single class.
+// The wire type it decodes into is defined in the sibling _jsonmar_gen.go: a
+// method-free alias (zero-copy), a flat wire struct (copied back) or an
+// interval wire struct, chosen by [classJSONWireShape] exactly as for the
+// marshaller. A class that carries the four boundary flags reads them
+// through [renderIntervalFlagJSONDecode] (REQ-169), which only the interval
+// wire struct and BASE Interval support; any other shape carrying them is
+// refused rather than given a decoder that reads an absent flag as false.
 func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (string, error) {
 	sc, ok := pc.Class.(*bmm.SimpleClass)
 	if !ok {
@@ -92,6 +100,22 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 		typeArgs = genericTypeArgList(sc)
 	}
 
+	shape, base, err := classJSONWireShape(plan, pc)
+	if err != nil {
+		return "", err
+	}
+	flagged, err := intervalFlagged(fields)
+	if err != nil {
+		return "", err
+	}
+	if flagged && shape != shapeIntervalDerived && shape != shapeIntervalBase {
+		return "", fmt.Errorf("%s carries the interval boundary flags but takes JSON wire shape %d, "+
+			"whose decoder cannot give an absent flag its default", pc.BMMName, shape)
+	}
+	if shape == shapeIntervalBase {
+		return renderUnmarshalIntervalBase(pc, recv, typeArgs), nil
+	}
+
 	var b strings.Builder
 	fmt.Fprintf(&b, "// UnmarshalJSONFrom decodes canonical openEHR JSON into %s.\n", pc.GoName)
 	b.WriteString("// A nil receiver is refused with typereg.ErrNilReceiver rather than\n")
@@ -100,38 +124,35 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 	b.WriteString("// slot resolves, and wraps a whole-value shape failure through\n")
 	b.WriteString("// typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and\n")
 	b.WriteString("// adding typereg.ErrInvalidShape.\n")
+	if flagged {
+		b.WriteString("//\n")
+		b.WriteString(intervalFlagDecodeDoc())
+	}
 	fmt.Fprintf(&b, "func (%s *%s%s) UnmarshalJSONFrom(dec *jsontext.Decoder) error {\n", recv, pc.GoName, typeArgs)
 	fmt.Fprintf(&b, "\tif %s == nil {\n", recv)
 	fmt.Fprintf(&b, "\t\treturn fmt.Errorf(\"canjson: %s: %%w\", typereg.ErrNilReceiver)\n", pc.BMMName)
 	b.WriteString("\t}\n")
 
-	shape, base, err := classJSONWireShape(plan, pc)
-	if err != nil {
-		return "", err
-	}
 	switch shape {
 	case shapeIntervalDerived:
-		own, err := intervalDerivedOwnFields(plan, pc)
+		own, err := intervalDecodeOwnFields(plan, pc)
 		if err != nil {
 			return "", err
 		}
 		// The wire struct reaches the receiver's embedded BASE Interval
-		// through its method-free alias, so those members decode in place.
-		// The class's own members go in by value and come back whether or
+		// through its method-free alias, so those members decode in place,
+		// and the flag wrapper decodes the flags into the receiver too. The
+		// class's other own members go in by value and come back whether or
 		// not the decode fails, so a failed decode leaves the receiver as an
 		// in-place decode would: members read before the failure are set, the
 		// others keep their previous values.
-		fmt.Fprintf(&b, "\twire := %s\n", intervalDerivedWireValue(pc, base, recv, typeArgs, own, false))
-		if len(own) == 0 {
-			fmt.Fprintf(&b, "\treturn typereg.DecodeInto(dec, %q, wire, &wire.Type)\n", pc.BMMName)
-			break
-		}
-		fmt.Fprintf(&b, "\terr := typereg.DecodeInto(dec, %q, wire, &wire.Type)\n", pc.BMMName)
+		copyBack := make([]string, 0, len(own))
 		for _, ef := range own {
-			fn := FieldName(ef.Prop.PropertyName())
-			fmt.Fprintf(&b, "\t%s.%s = wire.%s\n", recv, fn, fn)
+			copyBack = append(copyBack, FieldName(ef.Prop.PropertyName()))
 		}
-		b.WriteString("\treturn err\n")
+		wireType := "*" + flatWireTypeName(pc.GoName) + typeArgs
+		wireValue := intervalDerivedWireValue(pc, base, recv, typeArgs, own, false)
+		renderIntervalFlagJSONDecode(&b, recv, pc.BMMName, wireType, wireValue, "", "&wire.Type", copyBack)
 	case shapeFlat:
 		wire := flatWireTypeName(pc.GoName)
 		fmt.Fprintf(&b, "\tvar wire %s%s\n", wire, typeArgs)
@@ -144,7 +165,9 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 		}
 		b.WriteString("\treturn nil\n")
 	case shapeIntervalBase:
-		return "", fmt.Errorf("%s is abstract and has no UnmarshalJSONFrom", pc.BMMName)
+		// Rendered by renderUnmarshalIntervalBase above, before the shared
+		// doc comment and nil-receiver check.
+		return "", fmt.Errorf("%s: BASE Interval's decoder has its own renderer", pc.BMMName)
 	case shapeAlias, shapeIntervalAlias:
 		alias := aliasTypeName(pc.GoName)
 		b.WriteString("\tw := struct {\n")

@@ -352,7 +352,7 @@ var Recorded = map[string]map[Leg]Record{
 	},
 	"test_all_types": {
 		LegCanonicalFlat: {
-			Outcome: Outcome{Compared: 83, Missing: 11, Extra: 11, Altered: 11},
+			Outcome: Outcome{Compared: 83, Missing: 11, Extra: 5, Altered: 11},
 			Reason: "body-form composer: FLAT encode writes the composer as ctx/composer_name alone (3 missing " +
 				"keys). Web Template projection: the SDK's Web Template has no in-context time or ism_transition " +
 				"node for the section_3 ACTION (openehr/template/webtemplate/deviations.md, inContext coverage), and its " +
@@ -361,9 +361,7 @@ var Recorded = map[string]map[Leg]Record{
 				"element choice/quantity_value, the SDK choice. DV_IDENTIFIER: this upstream FLAT writes the id as " +
 				"the bare value, the codec as |id. DV_PROPORTION: upstream writes the derived magnitude as a bare " +
 				"value, which the codec does not write (a PROBE-086 residue), and writes the Integer type and the " +
-				"Real denominator as 1.0 where the codec writes 1. DV_INTERVAL bounds: the canonical omits the " +
-				"RM-mandatory lower_included and upper_included, canjson reads the absence as false, and FLAT encode " +
-				"writes false where upstream writes nothing (6 keys). Upstream date and time spelling: the canonical " +
+				"Real denominator as 1.0 where the codec writes 1. Upstream date and time spelling: the canonical " +
 				"writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the " +
 				"extended format with a full stop and Z (8 leaves). Upstream conversion differences: upstream " +
 				"openEHR_SDK's FlatJsonMarshallerTest.toFlatJsonAllTypesErrors encodes this canonical " +

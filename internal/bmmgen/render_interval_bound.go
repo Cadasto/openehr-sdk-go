@@ -13,7 +13,8 @@ import (
 )
 
 // intervalBoundFile is the per-target file that carries the interval-bound
-// emptiness test the canonical encoders share.
+// emptiness test the canonical encoders share, and the boundary-flag defaults
+// the canonical decoders share.
 const intervalBoundFile = "interval_bound_gen.go"
 
 // The BASE Interval shape: the two bounds and the two open-side flags. A
@@ -31,7 +32,239 @@ const (
 	propUpper          = "upper"
 	propLowerUnbounded = "lower_unbounded"
 	propUpperUnbounded = "upper_unbounded"
+	propLowerIncluded  = "lower_included"
+	propUpperIncluded  = "upper_included"
 )
+
+// intervalFlagProps are the four BASE Interval boundary flags, in the order
+// of the Go struct fields. A decoder reads each one as written when the
+// document carries it and gives it a default when the document leaves it out
+// (REQ-169).
+var intervalFlagProps = []string{propLowerIncluded, propLowerUnbounded, propUpperIncluded, propUpperUnbounded}
+
+// isIntervalFlag reports whether prop is one of the four boundary flags.
+func isIntervalFlag(prop string) bool {
+	return slices.Contains(intervalFlagProps, prop)
+}
+
+// seenFlagField is the field of the generated intervalFlagsSeen that records
+// whether the document carried the boundary flag prop: the flag's Go field
+// name with a lower-case first letter.
+func seenFlagField(prop string) string {
+	name := FieldName(prop)
+	return strings.ToLower(name[:1]) + name[1:]
+}
+
+// intervalFlagged reports whether a class's codec fields carry the four
+// boundary flags, so its decoders read an absent flag by REQ-169. A class that
+// carries some of the flags but not all four, or a flag that is not a
+// mandatory Boolean, is refused: the generated defaults need all four as plain
+// bool fields.
+func intervalFlagged(fields []emittedField) (bool, error) {
+	var found []string
+	for _, ef := range fields {
+		name := ef.Prop.PropertyName()
+		if !isIntervalFlag(name) {
+			continue
+		}
+		p, ok := ef.Prop.(*bmm.SingleProperty)
+		if !ok || !p.IsMandatory || !isPrimitive(p.TypeName) || primitiveGoType[p.TypeName] != "bool" {
+			return false, fmt.Errorf("interval flag %s of %s is not a mandatory Boolean", name, ef.OwnerName)
+		}
+		found = append(found, name)
+	}
+	switch len(found) {
+	case 0:
+		return false, nil
+	case len(intervalFlagProps):
+		return true, nil
+	}
+	return false, fmt.Errorf("carries the interval flags %q but not all four of %q", found, intervalFlagProps)
+}
+
+// intervalFlagSetDefaults renders the call that gives every boundary flag the
+// document left out its default, on the flag fields of recv.
+func intervalFlagSetDefaults(seen, recv string) string {
+	args := make([]string, 0, len(intervalFlagProps))
+	for _, prop := range intervalFlagProps {
+		args = append(args, "&"+recv+"."+FieldName(prop))
+	}
+	return fmt.Sprintf("%s.setDefaults(%s)", seen, strings.Join(args, ", "))
+}
+
+// intervalFlagDecodeDoc is the part of an interval decoder's doc comment that
+// says how a flag the document leaves out is read.
+func intervalFlagDecodeDoc() string {
+	var b strings.Builder
+	b.WriteString("// A boundary flag the document leaves out takes its default once the whole\n")
+	fmt.Fprintf(&b, "// value is read: `%s` and `%s` read as false,\n", propLowerUnbounded, propUpperUnbounded)
+	fmt.Fprintf(&b, "// and `%s` and `%s` read as true on a side that is\n", propLowerIncluded, propUpperIncluded)
+	b.WriteString("// not open and as false on a side that is. A flag the document carries is\n")
+	b.WriteString("// read as written, and a failed decode takes no defaults.\n")
+	return b.String()
+}
+
+// markIntervalFlagSeen appends, to the UnmarshalXML case branch of a boundary
+// flag, the statement that records the flag as read. The branch returns on a
+// decode error before it, so only a flag read in full counts as present.
+// Branches of any other property pass through unchanged.
+func markIntervalFlagSeen(caseBody, prop string) string {
+	if !isIntervalFlag(prop) {
+		return caseBody
+	}
+	return caseBody + fmt.Sprintf("\t\t\t\t_seen.%s = true\n", seenFlagField(prop))
+}
+
+// renderIntervalFlagJSONDecode renders the body of the UnmarshalJSONFrom of a
+// class that carries the four boundary flags, after the nil-receiver check.
+//
+// The decode target is an anonymous wrapper that embeds the class's wire value
+// (embedType, set to embedValue) and declares the four flags at its own level,
+// shallower than the flags reached through the embedded value, so the
+// wrapper's win. Each is an intervalFlagJSON that decodes the member straight
+// into recv's own flag field, so a failed decode leaves the field as an
+// in-place decode would, and records that the document carried it. Only after
+// a decode that succeeds are the absent flags given their defaults (REQ-169),
+// so the `*_included` default sees its side's `*_unbounded` whatever the member
+// order. copyBack lists the class's own members besides the flags, which the
+// wire carries by value and which come back whether or not the decode fails.
+// typeDecl, when not empty, is a statement that declares the `_type` target
+// gotType names.
+func renderIntervalFlagJSONDecode(b *strings.Builder, recv, rmType, embedType, embedValue, typeDecl, gotType string, copyBack []string) {
+	embedField := strings.TrimPrefix(embedType, "*")
+	if i := strings.IndexByte(embedField, '['); i >= 0 {
+		embedField = embedField[:i]
+	}
+	b.WriteString("\tvar seen intervalFlagsSeen\n")
+	if typeDecl != "" {
+		b.WriteString(typeDecl)
+	}
+	b.WriteString("\twire := &struct {\n")
+	fmt.Fprintf(b, "\t\t%s\n", embedType)
+	for _, prop := range intervalFlagProps {
+		fmt.Fprintf(b, "\t\t%s intervalFlagJSON `json:%q`\n", FieldName(prop), prop)
+	}
+	b.WriteString("\t}{\n")
+	fmt.Fprintf(b, "\t\t%s: %s,\n", embedField, embedValue)
+	for _, prop := range intervalFlagProps {
+		fn := FieldName(prop)
+		fmt.Fprintf(b, "\t\t%s: intervalFlagJSON{field: &%s.%s, seen: &seen.%s},\n", fn, recv, fn, seenFlagField(prop))
+	}
+	b.WriteString("\t}\n")
+	if len(copyBack) == 0 {
+		fmt.Fprintf(b, "\tif err := typereg.DecodeInto(dec, %q, wire, %s); err != nil {\n", rmType, gotType)
+		b.WriteString("\t\treturn err\n")
+		b.WriteString("\t}\n")
+	} else {
+		fmt.Fprintf(b, "\terr := typereg.DecodeInto(dec, %q, wire, %s)\n", rmType, gotType)
+		for _, fn := range copyBack {
+			fmt.Fprintf(b, "\t%s.%s = wire.%s\n", recv, fn, fn)
+		}
+		b.WriteString("\tif err != nil {\n")
+		b.WriteString("\t\treturn err\n")
+		b.WriteString("\t}\n")
+	}
+	fmt.Fprintf(b, "\t%s\n", intervalFlagSetDefaults("seen", recv))
+	b.WriteString("\treturn nil\n")
+}
+
+// renderIntervalFlagHelpers renders the boundary-flag helpers the canonical
+// decoders of every interval class share (REQ-169): intervalFlagsSeen, which
+// records the flags a document carried and gives the others their defaults,
+// and intervalFlagJSON, the canonical-JSON decode target of one flag. The
+// field and parameter order follows [intervalFlagProps].
+func renderIntervalFlagHelpers() string {
+	var b strings.Builder
+	b.WriteString("// intervalFlagsSeen records which of an interval's four boundary flags a\n")
+	b.WriteString("// canonical document carried, so a decoder can tell an absent flag from one\n")
+	b.WriteString("// written as false.\n")
+	b.WriteString("type intervalFlagsSeen struct {\n")
+	for _, prop := range intervalFlagProps {
+		fmt.Fprintf(&b, "\t%s bool\n", seenFlagField(prop))
+	}
+	b.WriteString("}\n\n")
+
+	params := make([]string, 0, len(intervalFlagProps))
+	for _, prop := range intervalFlagProps {
+		params = append(params, seenFlagField(prop))
+	}
+	b.WriteString("// setDefaults gives every boundary flag the document left out the value an\n")
+	fmt.Fprintf(&b, "// absent flag reads as: `%s` and `%s` read as\n", propLowerUnbounded, propUpperUnbounded)
+	fmt.Fprintf(&b, "// false, and `%s` and `%s` read as true on a side\n", propLowerIncluded, propUpperIncluded)
+	b.WriteString("// that is not open and as false on a side that is, the only value an open\n")
+	b.WriteString("// side admits. A flag the document carried keeps the value it was read as.\n")
+	b.WriteString("// The open flags are settled first, so an included default sees its side's\n")
+	b.WriteString("// open flag whatever order the members came in.\n")
+	fmt.Fprintf(&b, "func (s intervalFlagsSeen) setDefaults(%s *bool) {\n", strings.Join(params, ", "))
+	sides := []struct{ included, unbounded string }{
+		{propLowerIncluded, propLowerUnbounded},
+		{propUpperIncluded, propUpperUnbounded},
+	}
+	for _, side := range sides {
+		u := seenFlagField(side.unbounded)
+		fmt.Fprintf(&b, "\tif !s.%s {\n\t\t*%s = false\n\t}\n", u, u)
+	}
+	for _, side := range sides {
+		in, u := seenFlagField(side.included), seenFlagField(side.unbounded)
+		fmt.Fprintf(&b, "\tif !s.%s {\n\t\t*%s = !*%s\n\t}\n", in, in, u)
+	}
+	b.WriteString("}\n\n")
+
+	b.WriteString("// intervalFlagJSON is the canonical-JSON decode target of one interval\n")
+	b.WriteString("// boundary flag. It decodes the member straight into the interval's own flag\n")
+	b.WriteString("// field, so a failed decode leaves the field as an in-place decode would, and\n")
+	b.WriteString("// marks the flag seen once it is read. A null member reads as an absent one.\n")
+	b.WriteString("type intervalFlagJSON struct {\n")
+	b.WriteString("\tfield *bool\n")
+	b.WriteString("\tseen  *bool\n")
+	b.WriteString("}\n\n")
+	b.WriteString("// UnmarshalJSONFrom decodes one boundary flag into its field and records that\n")
+	b.WriteString("// the document carried it.\n")
+	b.WriteString("func (f intervalFlagJSON) UnmarshalJSONFrom(dec *jsontext.Decoder) error {\n")
+	b.WriteString("\tif dec.PeekKind() == 'n' {\n")
+	b.WriteString("\t\t_, err := dec.ReadToken()\n")
+	b.WriteString("\t\treturn err\n")
+	b.WriteString("\t}\n")
+	b.WriteString("\tif err := json.UnmarshalDecode(dec, f.field, dec.Options()); err != nil {\n")
+	b.WriteString("\t\treturn err\n")
+	b.WriteString("\t}\n")
+	b.WriteString("\t*f.seen = true\n")
+	b.WriteString("\treturn nil\n")
+	b.WriteString("}\n\n")
+	return b.String()
+}
+
+// renderUnmarshalIntervalBase renders the UnmarshalJSONFrom of BASE Interval.
+// The class is abstract and writes no `_type`, so its decoder reads none: the
+// wrapper declares no `_type` field, a `_type` member is skipped like any
+// other member the class does not declare, and the discriminator target
+// handed to typereg.DecodeInto stays empty, which leaves its check out. The
+// shared helper still bounds the depth, threads the decode hooks and
+// classifies a shape failure.
+func renderUnmarshalIntervalBase(pc *PlannedClass, recv, typeArgs string) string {
+	alias := aliasTypeName(pc.GoName)
+	var b strings.Builder
+	fmt.Fprintf(&b, "// UnmarshalJSONFrom decodes canonical openEHR JSON into %s, which is abstract\n", pc.GoName)
+	b.WriteString("// and so reads no `_type`: a `_type` member is skipped like any other member\n")
+	b.WriteString("// the class does not declare. A nil receiver is refused with\n")
+	b.WriteString("// typereg.ErrNilReceiver rather than dereferenced. The shared helper threads\n")
+	b.WriteString("// the polymorphic decode hooks and wraps a shape failure through\n")
+	b.WriteString("// typereg.WrapShapeError. The receiver is a pointer, so an Interval held by\n")
+	b.WriteString("// value in a struct field takes this decoder.\n")
+	b.WriteString("//\n")
+	b.WriteString(intervalFlagDecodeDoc())
+	fmt.Fprintf(&b, "func (%s *%s%s) UnmarshalJSONFrom(dec *jsontext.Decoder) error {\n", recv, pc.GoName, typeArgs)
+	fmt.Fprintf(&b, "\tif %s == nil {\n", recv)
+	fmt.Fprintf(&b, "\t\treturn fmt.Errorf(\"canjson: %s: %%w\", typereg.ErrNilReceiver)\n", pc.BMMName)
+	b.WriteString("\t}\n")
+	typeDecl := "\t// No `_type` is declared, so the discriminator stays empty and is not checked.\n" +
+		"\tvar noType string\n"
+	renderIntervalFlagJSONDecode(&b, recv, pc.BMMName,
+		"*"+alias+typeArgs, fmt.Sprintf("(*%s%s)(%s)", alias, typeArgs, recv),
+		typeDecl, "&noType", nil)
+	b.WriteString("}\n")
+	return b.String()
+}
 
 // hasIntervalShape reports whether a class's codec field list carries the
 // BASE Interval shape.
@@ -75,12 +308,12 @@ func isIntervalBase(plan *Plan, pc *PlannedClass) (bool, error) {
 	return intervalShaped(plan, pc)
 }
 
-// codecClassesIn returns the classes of file that receive a canonical-JSON
-// marshaller and the canonical-XML codec: the concrete classes, plus the
-// abstract BASE Interval struct ([isIntervalBase]). Type registration, the
-// canonical-JSON decoder and the discriminator methods stay with the concrete
-// classes ([concreteClassesIn]); BASE Interval decodes from JSON through its
-// struct tags and writes no `_type`.
+// codecClassesIn returns the classes of file that receive the canonical-JSON
+// codec and the canonical-XML codec: the concrete classes, plus the abstract
+// BASE Interval struct ([isIntervalBase]). Type registration and the
+// discriminator methods stay with the concrete classes ([concreteClassesIn]);
+// BASE Interval writes and reads no `_type`, and has a JSON decoder of its own
+// only so that a flag the document leaves out takes its default (REQ-169).
 func codecClassesIn(plan *Plan, file *PlannedFile) ([]*PlannedClass, error) {
 	out := make([]*PlannedClass, 0, len(file.Classes))
 	for _, pc := range file.Classes {
@@ -296,6 +529,19 @@ func intervalDerivedOwnFields(plan *Plan, pc *PlannedClass) ([]emittedField, err
 	return own, nil
 }
 
+// intervalDecodeOwnFields returns the own members of a class that embeds BASE
+// Interval that its decoder copies back from the wire struct: the members of
+// [intervalDerivedOwnFields] that are not boundary flags. The decoder reads
+// the flags straight into the receiver ([renderIntervalFlagJSONDecode]), so
+// Point_interval, whose own members are exactly the four flags, copies none.
+func intervalDecodeOwnFields(plan *Plan, pc *PlannedClass) ([]emittedField, error) {
+	own, err := intervalDerivedOwnFields(plan, pc)
+	if err != nil {
+		return nil, err
+	}
+	return slices.DeleteFunc(own, func(ef emittedField) bool { return isIntervalFlag(ef.Prop.PropertyName()) }), nil
+}
+
 // renderIntervalDerivedWire emits the canonical-JSON wire struct of a class
 // that embeds BASE Interval: `_type`, the method-free alias of the base, and
 // the class's own members. The class cannot be marshalled through a method-free
@@ -348,7 +594,9 @@ func withoutCommentLines(src string) string {
 // intervalDerivedWireValue renders the composite literal that fills the wire
 // struct of a class from its receiver: the base through the method-free alias,
 // and each own member by value. The encoder sets `_type`; the decoder leaves it
-// empty so that a missing discriminator is still seen as missing.
+// empty so that a missing discriminator is still seen as missing. The decoder
+// passes only the own members that are not boundary flags
+// ([intervalDecodeOwnFields]): it reads the flags through its own wrapper.
 func intervalDerivedWireValue(pc, base *PlannedClass, recv, typeArgs string, own []emittedField, withType bool) string {
 	alias := aliasTypeName(base.GoName)
 	var b strings.Builder
@@ -412,7 +660,8 @@ func renderMarshalIntervalDerived(plan *Plan, pc, base *PlannedClass, recv, type
 // Interval struct, see [codecClassesIn]): the exported emptiness test the
 // canonical encoders apply to an open side's bound, with one field-by-field
 // zero predicate per concrete bound type, derived from the BMM class's
-// properties and using no reflection.
+// properties and using no reflection. It also carries the boundary-flag
+// helpers the canonical decoders share ([renderIntervalFlagHelpers]).
 //
 // The bound types are read from each interval class's `lower` and `upper`
 // fields (see [intervalBounds]): the concrete classes a generic bound admits
@@ -446,6 +695,11 @@ func RenderIntervalBoundFile(plan *Plan) ([]byte, error) {
 	var b bytes.Buffer
 	b.WriteString(renderGeneratedHeader(plan))
 	b.WriteString("\n")
+	b.WriteString("import (\n")
+	b.WriteString("\t\"encoding/json/jsontext\"\n")
+	b.WriteString("\tjson \"encoding/json/v2\"\n")
+	b.WriteString(")\n\n")
+	b.WriteString(renderIntervalFlagHelpers())
 	b.WriteString("// omitIntervalBound reports whether the canonical encoders leave out an\n")
 	b.WriteString("// interval side's bound: the side is open (its `lower_unbounded` or\n")
 	b.WriteString("// `upper_unbounded` flag is set) and its bound is empty. A non-empty bound\n")

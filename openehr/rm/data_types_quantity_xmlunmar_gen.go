@@ -87,7 +87,14 @@ func (d *DVCount) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+//
+// A boundary flag the document leaves out takes its default once the whole
+// value is read: `lower_unbounded` and `upper_unbounded` read as false,
+// and `lower_included` and `upper_included` read as true on a side that is
+// not open and as false on a side that is. A flag the document carries is
+// read as written, and a failed decode takes no defaults.
 func (d *DVInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	var _seen intervalFlagsSeen
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -112,24 +119,29 @@ func (d *DVInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 				if _err := _dec.DecodeElement(&d.LowerUnbounded, &_t); _err != nil {
 					return _err
 				}
+				_seen.lowerUnbounded = true
 			case "upper_unbounded":
 				if _err := _dec.DecodeElement(&d.UpperUnbounded, &_t); _err != nil {
 					return _err
 				}
+				_seen.upperUnbounded = true
 			case "lower_included":
 				if _err := _dec.DecodeElement(&d.LowerIncluded, &_t); _err != nil {
 					return _err
 				}
+				_seen.lowerIncluded = true
 			case "upper_included":
 				if _err := _dec.DecodeElement(&d.UpperIncluded, &_t); _err != nil {
 					return _err
 				}
+				_seen.upperIncluded = true
 			default:
 				if _err := _dec.Skip(); _err != nil {
 					return _err
 				}
 			}
 		case xml.EndElement:
+			_seen.setDefaults(&d.LowerIncluded, &d.LowerUnbounded, &d.UpperIncluded, &d.UpperUnbounded)
 			return nil
 		}
 	}

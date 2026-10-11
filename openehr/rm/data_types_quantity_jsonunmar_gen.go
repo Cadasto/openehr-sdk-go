@@ -37,12 +37,35 @@ func (d *DVCount) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // slot resolves, and wraps a whole-value shape failure through
 // typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
 // adding typereg.ErrInvalidShape.
+//
+// A boundary flag the document leaves out takes its default once the whole
+// value is read: `lower_unbounded` and `upper_unbounded` read as false,
+// and `lower_included` and `upper_included` read as true on a side that is
+// not open and as false on a side that is. A flag the document carries is
+// read as written, and a failed decode takes no defaults.
 func (d *DVInterval[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_INTERVAL: %w", typereg.ErrNilReceiver)
 	}
-	wire := &jsonWireDVInterval[T]{rawInterval: (*rawInterval[T])(&d.Interval)}
-	return typereg.DecodeInto(dec, "DV_INTERVAL", wire, &wire.Type)
+	var seen intervalFlagsSeen
+	wire := &struct {
+		*jsonWireDVInterval[T]
+		LowerIncluded  intervalFlagJSON `json:"lower_included"`
+		LowerUnbounded intervalFlagJSON `json:"lower_unbounded"`
+		UpperIncluded  intervalFlagJSON `json:"upper_included"`
+		UpperUnbounded intervalFlagJSON `json:"upper_unbounded"`
+	}{
+		jsonWireDVInterval: &jsonWireDVInterval[T]{rawInterval: (*rawInterval[T])(&d.Interval)},
+		LowerIncluded:      intervalFlagJSON{field: &d.LowerIncluded, seen: &seen.lowerIncluded},
+		LowerUnbounded:     intervalFlagJSON{field: &d.LowerUnbounded, seen: &seen.lowerUnbounded},
+		UpperIncluded:      intervalFlagJSON{field: &d.UpperIncluded, seen: &seen.upperIncluded},
+		UpperUnbounded:     intervalFlagJSON{field: &d.UpperUnbounded, seen: &seen.upperUnbounded},
+	}
+	if err := typereg.DecodeInto(dec, "DV_INTERVAL", wire, &wire.Type); err != nil {
+		return err
+	}
+	seen.setDefaults(&d.LowerIncluded, &d.LowerUnbounded, &d.UpperIncluded, &d.UpperUnbounded)
+	return nil
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into DVOrdinal.
