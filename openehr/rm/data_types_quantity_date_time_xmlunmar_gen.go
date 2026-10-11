@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"fmt"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
@@ -23,7 +24,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
 		return _err
 	}
 	for {
@@ -33,10 +34,10 @@ func (d *DVDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch canxml.LocalName(_t.Name) {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "magnitude_status":
 				var _v string
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.MagnitudeStatus = &_v
@@ -65,11 +66,11 @@ func (d *DVDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 				}
 				d.OtherReferenceRanges = append(d.OtherReferenceRanges, _v)
 			case "value":
-				if _err := canxml.DecodeElement(_dec, &_t, &d.Value); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Value); _err != nil {
 					return _err
 				}
 			default:
-				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -89,7 +90,7 @@ func (d *DVDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
 		return _err
 	}
 	for {
@@ -99,10 +100,10 @@ func (d *DVDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch canxml.LocalName(_t.Name) {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "magnitude_status":
 				var _v string
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.MagnitudeStatus = &_v
@@ -131,11 +132,11 @@ func (d *DVDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 				}
 				d.OtherReferenceRanges = append(d.OtherReferenceRanges, _v)
 			case "value":
-				if _err := canxml.DecodeElement(_dec, &_t, &d.Value); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Value); _err != nil {
 					return _err
 				}
 			default:
-				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -155,7 +156,7 @@ func (d *DVDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
 		return _err
 	}
 	for {
@@ -165,22 +166,22 @@ func (d *DVDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch canxml.LocalName(_t.Name) {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "accuracy_is_percent":
 				var _v bool
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.AccuracyIsPercent = &_v
 			case "magnitude_status":
 				var _v string
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.MagnitudeStatus = &_v
 			case "accuracy":
 				var _v Real
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.Accuracy = &_v
@@ -203,11 +204,11 @@ func (d *DVDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 				}
 				d.OtherReferenceRanges = append(d.OtherReferenceRanges, _v)
 			case "value":
-				if _err := canxml.DecodeElement(_dec, &_t, &d.Value); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Value); _err != nil {
 					return _err
 				}
 			default:
-				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -227,7 +228,7 @@ func (d *DVDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
 		return _err
 	}
 	for {
@@ -237,10 +238,10 @@ func (d *DVTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch canxml.LocalName(_t.Name) {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "magnitude_status":
 				var _v string
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.MagnitudeStatus = &_v
@@ -269,11 +270,11 @@ func (d *DVTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 				}
 				d.OtherReferenceRanges = append(d.OtherReferenceRanges, _v)
 			case "value":
-				if _err := canxml.DecodeElement(_dec, &_t, &d.Value); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Value); _err != nil {
 					return _err
 				}
 			default:
-				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}

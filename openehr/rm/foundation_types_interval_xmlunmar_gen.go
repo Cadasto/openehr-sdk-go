@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"fmt"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
@@ -36,7 +37,7 @@ import (
 // An empty or whitespace-only flag element carries no boolean and reads as
 // a flag the document leaves out.
 func (i *Interval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
 		return _err
 	}
 	var _seen intervalFlagsSeen
@@ -47,13 +48,13 @@ func (i *Interval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch canxml.LocalName(_t.Name) {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "lower", "Lower":
-				if _err := canxml.DecodeElement(_dec, &_t, &i.Lower); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &i.Lower); _err != nil {
 					return _err
 				}
 			case "upper", "Upper":
-				if _err := canxml.DecodeElement(_dec, &_t, &i.Upper); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &i.Upper); _err != nil {
 					return _err
 				}
 			case "lower_unbounded", "LowerUnbounded":
@@ -73,7 +74,7 @@ func (i *Interval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					return _err
 				}
 			default:
-				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -102,7 +103,7 @@ func (i *Interval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 // An empty or whitespace-only flag element carries no boolean and reads as
 // a flag the document leaves out.
 func (p *PointInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
 		return _err
 	}
 	var _seen intervalFlagsSeen
@@ -113,13 +114,13 @@ func (p *PointInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch canxml.LocalName(_t.Name) {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "lower":
-				if _err := canxml.DecodeElement(_dec, &_t, &p.Lower); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &p.Lower); _err != nil {
 					return _err
 				}
 			case "upper":
-				if _err := canxml.DecodeElement(_dec, &_t, &p.Upper); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &p.Upper); _err != nil {
 					return _err
 				}
 			case "lower_unbounded":
@@ -139,7 +140,7 @@ func (p *PointInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 					return _err
 				}
 			default:
-				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -168,7 +169,7 @@ func (p *PointInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 // An empty or whitespace-only flag element carries no boolean and reads as
 // a flag the document leaves out.
 func (p *ProperInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
 		return _err
 	}
 	var _seen intervalFlagsSeen
@@ -179,13 +180,13 @@ func (p *ProperInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch canxml.LocalName(_t.Name) {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "lower":
-				if _err := canxml.DecodeElement(_dec, &_t, &p.Lower); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &p.Lower); _err != nil {
 					return _err
 				}
 			case "upper":
-				if _err := canxml.DecodeElement(_dec, &_t, &p.Upper); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &p.Upper); _err != nil {
 					return _err
 				}
 			case "lower_unbounded":
@@ -205,7 +206,7 @@ func (p *ProperInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 					return _err
 				}
 			default:
-				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}

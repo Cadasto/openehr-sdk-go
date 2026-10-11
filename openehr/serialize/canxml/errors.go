@@ -3,6 +3,7 @@ package canxml
 import (
 	"errors"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/internal/poly"
 )
 
@@ -34,7 +35,7 @@ var ErrInvalidShape = errors.New("canxml: invalid XML shape")
 // refuses it: the refusal wraps this sentinel and names the item's path
 // from the root of the document (see [WithUnmatched] for the form of a
 // path). The path carries the item's name but none of its value.
-var ErrUnknownElement = errors.New("canxml: unknown element or attribute")
+var ErrUnknownElement = xmlunmatched.ErrUnknownElement
 
 // ErrNamespace classifies an element in a namespace other than the openEHR
 // one, `http://schemas.openehr.org/v1`. An element in no namespace counts
@@ -46,7 +47,7 @@ var ErrUnknownElement = errors.New("canxml: unknown element or attribute")
 // [ErrUnknownElement] and this sentinel. An attribute in a foreign
 // namespace is unmatched content too, but its refusal wraps
 // [ErrUnknownElement] only.
-var ErrNamespace = errors.New("canxml: foreign XML namespace")
+var ErrNamespace = xmlunmatched.ErrNamespace
 
 // DecodeError is the unified error returned by the decoder at
 // polymorphic dispatch sites. Re-exported from the internal poly

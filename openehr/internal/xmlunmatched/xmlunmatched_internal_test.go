@@ -1,4 +1,4 @@
-package canxml
+package xmlunmatched
 
 import (
 	"encoding/xml"
@@ -13,7 +13,7 @@ import (
 // same name, a closed element leaving its siblings' counts in place, and a
 // new value starting its paths afresh.
 func TestREQ170_TrackerPaths(t *testing.T) {
-	tr := newTracker(nil, false)
+	tr := NewTracker(nil, false)
 	var got []string
 	step := func(open ...string) {
 		for _, name := range open {
@@ -69,19 +69,23 @@ func (*readsNothing) UnmarshalXML(dec *xml.Decoder, start xml.StartElement) erro
 // registered and the in-progress count is back at zero, so an untracked
 // decode skips the lookup again and no decoder is kept alive.
 func TestREQ170_TrackedDecodeUnregisters(t *testing.T) {
-	doc := []byte(`<r a="1"><x/></r>`)
+	decode := func(doc string, report func(string), strict bool) error {
+		tr := NewTracker(report, strict)
+		return tr.Decode(tr.NewDecoder(strings.NewReader(doc)), new(readsNothing))
+	}
+	const doc = `<r a="1"><x/></r>`
 	var got []string
-	if err := Unmarshal(doc, new(readsNothing), WithUnmatched(func(p string) { got = append(got, p) })); err != nil {
-		t.Fatalf("Unmarshal(WithUnmatched) = %v; want nil", err)
+	if err := decode(doc, func(p string) { got = append(got, p) }, false); err != nil {
+		t.Fatalf("Decode(reporting) = %v; want nil", err)
 	}
 	if want := []string{"/r[1]/@a", "/r[1]/x[1]"}; !slices.Equal(got, want) {
-		t.Errorf("WithUnmatched reported %q; want %q", got, want)
+		t.Errorf("reported %q; want %q", got, want)
 	}
-	if err := Unmarshal(doc, new(readsNothing), WithStrict()); !errors.Is(err, ErrUnknownElement) {
-		t.Errorf("Unmarshal(WithStrict) = %v; want a refusal wrapping ErrUnknownElement", err)
+	if err := decode(doc, nil, true); !errors.Is(err, ErrUnknownElement) {
+		t.Errorf("Decode(strict) = %v; want a refusal wrapping ErrUnknownElement", err)
 	}
-	if err := Unmarshal([]byte(`<r><x>`), new(readsNothing), WithUnmatched(func(string) {})); err == nil {
-		t.Error("Unmarshal(truncated document, WithUnmatched) = nil; want a syntax error")
+	if err := decode(`<r><x>`, func(string) {}, false); err == nil {
+		t.Error("Decode(truncated document) = nil; want a syntax error")
 	}
 	if n := tracking.Load(); n != 0 {
 		t.Errorf("tracked decodes in progress = %d after every decode returned; want 0", n)

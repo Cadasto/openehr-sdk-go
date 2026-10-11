@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
@@ -126,7 +127,7 @@ type Decoder struct {
 	cfg decoderConfig
 	// trk is the decoder's tracker when an option reports or refuses
 	// unmatched content, and nil otherwise.
-	trk *tracker
+	trk *xmlunmatched.Tracker
 }
 
 // NewDecoder returns a [Decoder] that reads canonical-XML from r. The
@@ -137,12 +138,8 @@ func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 	if !cfg.tracked() {
 		return &Decoder{dec: xml.NewDecoder(r), cfg: cfg}
 	}
-	t := newTracker(cfg.unmatched, cfg.strict)
-	return &Decoder{
-		dec: xml.NewTokenDecoder(&trackingReader{src: xml.NewDecoder(r), t: t}),
-		cfg: cfg,
-		trk: t,
-	}
+	t := xmlunmatched.NewTracker(cfg.unmatched, cfg.strict)
+	return &Decoder{dec: t.NewDecoder(r), cfg: cfg, trk: t}
 }
 
 // Decode reads the next XML element from the stream and stores it
@@ -151,7 +148,7 @@ func (d *Decoder) Decode(v any) error {
 	if d.trk == nil {
 		return d.dec.Decode(v)
 	}
-	return d.trk.decode(d.dec, v)
+	return d.trk.Decode(d.dec, v)
 }
 
 // RelaxedTypeDispatch reports whether the decoder was configured
@@ -223,7 +220,7 @@ func XSITypeOf(start xml.StartElement) (string, error) {
 			return "", fmt.Errorf("canxml: %w: xmi:type on the wire is rejected (use xsi:type)", ErrInvalidShape)
 		}
 		// Accept xsi:type (resolved and literal forms).
-		if isDiscriminator(attr.Name) {
+		if xmlunmatched.IsDiscriminator(attr.Name) {
 			return stripXSDPrefix(attr.Value), nil
 		}
 	}
@@ -283,7 +280,7 @@ func DecodeAs[T any](dec *xml.Decoder, start xml.StartElement) (T, error) {
 		}
 	}
 	v := ctor()
-	if err := DecodeElement(dec, &start, v); err != nil {
+	if err := xmlunmatched.DecodeElement(dec, &start, v); err != nil {
 		return zero, &DecodeError{
 			Path:  "/" + start.Name.Local,
 			Type:  typeName,
@@ -326,7 +323,7 @@ func DecodeAsOrDefault[T any](dec *xml.Decoder, start xml.StartElement, defaultC
 			return zero, &DecodeError{Path: "/" + start.Name.Local, Inner: fmt.Errorf("canxml: %w", typereg.ErrMissingType)}
 		}
 		v = defaultCtor()
-		if err := DecodeElement(dec, &start, v); err != nil {
+		if err := xmlunmatched.DecodeElement(dec, &start, v); err != nil {
 			return zero, &DecodeError{
 				Path:  "/" + start.Name.Local,
 				Inner: fmt.Errorf("canxml: %w", err),
@@ -342,7 +339,7 @@ func DecodeAsOrDefault[T any](dec *xml.Decoder, start xml.StartElement, defaultC
 			}
 		}
 		v = ctor()
-		if err := DecodeElement(dec, &start, v); err != nil {
+		if err := xmlunmatched.DecodeElement(dec, &start, v); err != nil {
 			return zero, &DecodeError{
 				Path:  "/" + start.Name.Local,
 				Type:  typeName,

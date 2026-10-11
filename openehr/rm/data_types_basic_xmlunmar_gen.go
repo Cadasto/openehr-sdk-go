@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"fmt"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
@@ -23,7 +24,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVBoolean) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
 		return _err
 	}
 	for {
@@ -33,13 +34,13 @@ func (d *DVBoolean) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch canxml.LocalName(_t.Name) {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "value":
-				if _err := canxml.DecodeElement(_dec, &_t, &d.Value); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Value); _err != nil {
 					return _err
 				}
 			default:
-				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -59,7 +60,7 @@ func (d *DVBoolean) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVIdentifier) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
 		return _err
 	}
 	for {
@@ -69,31 +70,31 @@ func (d *DVIdentifier) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch canxml.LocalName(_t.Name) {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "issuer":
 				var _v string
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.Issuer = &_v
 			case "assigner":
 				var _v string
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.Assigner = &_v
 			case "id":
-				if _err := canxml.DecodeElement(_dec, &_t, &d.ID); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.ID); _err != nil {
 					return _err
 				}
 			case "type":
 				var _v string
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.Type = &_v
 			default:
-				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -113,7 +114,7 @@ func (d *DVIdentifier) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVState) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
 		return _err
 	}
 	for {
@@ -123,17 +124,17 @@ func (d *DVState) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch canxml.LocalName(_t.Name) {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "value":
 				if _err := _dec.DecodeElement(&d.Value, &_t); _err != nil {
 					return _err
 				}
 			case "is_terminal":
-				if _err := canxml.DecodeElement(_dec, &_t, &d.IsTerminal); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.IsTerminal); _err != nil {
 					return _err
 				}
 			default:
-				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}

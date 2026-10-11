@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"fmt"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
@@ -23,7 +24,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVMultimedia) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
 		return _err
 	}
 	for {
@@ -33,7 +34,7 @@ func (d *DVMultimedia) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch canxml.LocalName(_t.Name) {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "charset":
 				_v := new(CodePhrase)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
@@ -48,7 +49,7 @@ func (d *DVMultimedia) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 				d.Language = _v
 			case "alternate_text":
 				var _v string
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.AlternateText = &_v
@@ -60,7 +61,7 @@ func (d *DVMultimedia) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 				d.URI = _v
 			case "data":
 				var _v byte
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.Data = append(d.Data, _v)
@@ -76,7 +77,7 @@ func (d *DVMultimedia) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 				d.CompressionAlgorithm = _v
 			case "integrity_check":
 				var _v byte
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.IntegrityCheck = append(d.IntegrityCheck, _v)
@@ -93,11 +94,11 @@ func (d *DVMultimedia) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 				}
 				d.Thumbnail = _v
 			case "size":
-				if _err := canxml.DecodeElement(_dec, &_t, &d.Size); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Size); _err != nil {
 					return _err
 				}
 			default:
-				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -117,7 +118,7 @@ func (d *DVMultimedia) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVParsable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
 		return _err
 	}
 	for {
@@ -127,7 +128,7 @@ func (d *DVParsable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch canxml.LocalName(_t.Name) {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "charset":
 				_v := new(CodePhrase)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
@@ -141,15 +142,15 @@ func (d *DVParsable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 				}
 				d.Language = _v
 			case "value":
-				if _err := canxml.DecodeElement(_dec, &_t, &d.Value); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Value); _err != nil {
 					return _err
 				}
 			case "formalism":
-				if _err := canxml.DecodeElement(_dec, &_t, &d.Formalism); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Formalism); _err != nil {
 					return _err
 				}
 			default:
-				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}

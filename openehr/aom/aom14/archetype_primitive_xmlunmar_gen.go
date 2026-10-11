@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"fmt"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
@@ -24,7 +25,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CBoolean) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
 		return _err
 	}
 	for {
@@ -34,23 +35,23 @@ func (c *CBoolean) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch canxml.LocalName(_t.Name) {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "true_valid":
-				if _err := canxml.DecodeElement(_dec, &_t, &c.TrueValid); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.TrueValid); _err != nil {
 					return _err
 				}
 			case "false_valid":
-				if _err := canxml.DecodeElement(_dec, &_t, &c.FalseValid); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.FalseValid); _err != nil {
 					return _err
 				}
 			case "assumed_value":
 				var _v bool
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.AssumedValue = &_v
 			default:
-				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -70,7 +71,7 @@ func (c *CBoolean) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
 		return _err
 	}
 	for {
@@ -80,7 +81,7 @@ func (c *CDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch canxml.LocalName(_t.Name) {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "day_validity":
 				_v := new(rm.ValidityKind)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
@@ -101,12 +102,12 @@ func (c *CDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 				c.Range = _v
 			case "assumed_value":
 				var _v string
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.AssumedValue = &_v
 			default:
-				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -126,7 +127,7 @@ func (c *CDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
 		return _err
 	}
 	for {
@@ -136,7 +137,7 @@ func (c *CDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch canxml.LocalName(_t.Name) {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "month_validity":
 				_v := new(rm.ValidityKind)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
@@ -187,12 +188,12 @@ func (c *CDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 				c.Range = _v
 			case "assumed_value":
 				var _v string
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.AssumedValue = &_v
 			default:
-				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -212,7 +213,7 @@ func (c *CDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
 		return _err
 	}
 	for {
@@ -222,52 +223,52 @@ func (c *CDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch canxml.LocalName(_t.Name) {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "years_allowed":
 				var _v bool
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.YearsAllowed = &_v
 			case "months_allowed":
 				var _v bool
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.MonthsAllowed = &_v
 			case "weeks_allowed":
 				var _v bool
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.WeeksAllowed = &_v
 			case "days_allowed":
 				var _v bool
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.DaysAllowed = &_v
 			case "hours_allowed":
 				var _v bool
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.HoursAllowed = &_v
 			case "minutes_allowed":
 				var _v bool
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.MinutesAllowed = &_v
 			case "seconds_allowed":
 				var _v bool
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.SecondsAllowed = &_v
 			case "fractional_seconds_allowed":
 				var _v bool
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.FractionalSecondsAllowed = &_v
@@ -279,12 +280,12 @@ func (c *CDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 				c.Range = _v
 			case "assumed_value":
 				var _v string
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.AssumedValue = &_v
 			default:
-				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -304,7 +305,7 @@ func (c *CDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CInteger) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
 		return _err
 	}
 	for {
@@ -314,10 +315,10 @@ func (c *CInteger) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch canxml.LocalName(_t.Name) {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "list":
 				var _v Integer
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.List = append(c.List, _v)
@@ -329,12 +330,12 @@ func (c *CInteger) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 				c.Range = _v
 			case "assumed_value":
 				var _v Integer
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.AssumedValue = &_v
 			default:
-				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -354,7 +355,7 @@ func (c *CInteger) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CReal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
 		return _err
 	}
 	for {
@@ -364,10 +365,10 @@ func (c *CReal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch canxml.LocalName(_t.Name) {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "list":
 				var _v Real
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.List = append(c.List, _v)
@@ -379,12 +380,12 @@ func (c *CReal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 				c.Range = _v
 			case "assumed_value":
 				var _v Real
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.AssumedValue = &_v
 			default:
-				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -404,7 +405,7 @@ func (c *CReal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CString) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
 		return _err
 	}
 	for {
@@ -414,31 +415,31 @@ func (c *CString) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch canxml.LocalName(_t.Name) {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "pattern":
 				var _v string
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.Pattern = &_v
 			case "list":
 				var _v string
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.List = append(c.List, _v)
 			case "list_open":
-				if _err := canxml.DecodeElement(_dec, &_t, &c.ListOpen); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.ListOpen); _err != nil {
 					return _err
 				}
 			case "assumed_value":
 				var _v string
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.AssumedValue = &_v
 			default:
-				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -458,7 +459,7 @@ func (c *CString) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
 		return _err
 	}
 	for {
@@ -468,7 +469,7 @@ func (c *CTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch canxml.LocalName(_t.Name) {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "minute_validity":
 				_v := new(rm.ValidityKind)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
@@ -501,12 +502,12 @@ func (c *CTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 				c.Range = _v
 			case "assumed_value":
 				var _v string
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.AssumedValue = &_v
 			default:
-				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}

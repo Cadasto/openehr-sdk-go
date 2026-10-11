@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"fmt"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
@@ -23,7 +24,7 @@ import (
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *Assertion) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
 		return _err
 	}
 	for {
@@ -33,16 +34,16 @@ func (a *Assertion) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch canxml.LocalName(_t.Name) {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "tag":
 				var _v string
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				a.Tag = &_v
 			case "string_expression":
 				var _v string
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				a.StringExpression = &_v
@@ -59,7 +60,7 @@ func (a *Assertion) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 				}
 				a.Variables = append(a.Variables, _v)
 			default:
-				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -79,7 +80,7 @@ func (a *Assertion) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *AssertionVariable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
 		return _err
 	}
 	for {
@@ -89,17 +90,17 @@ func (a *AssertionVariable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch canxml.LocalName(_t.Name) {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "name":
-				if _err := canxml.DecodeElement(_dec, &_t, &a.Name); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &a.Name); _err != nil {
 					return _err
 				}
 			case "definition":
-				if _err := canxml.DecodeElement(_dec, &_t, &a.Definition); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &a.Definition); _err != nil {
 					return _err
 				}
 			default:
-				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -119,7 +120,7 @@ func (a *AssertionVariable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (e *ExprBinaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
 		return _err
 	}
 	for {
@@ -129,10 +130,10 @@ func (e *ExprBinaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch canxml.LocalName(_t.Name) {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "precedence_overridden":
 				var _v bool
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				e.PrecedenceOverridden = &_v
@@ -141,7 +142,7 @@ func (e *ExprBinaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					return _err
 				}
 			case "type":
-				if _err := canxml.DecodeElement(_dec, &_t, &e.Type); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &e.Type); _err != nil {
 					return _err
 				}
 			case "left_operand":
@@ -157,7 +158,7 @@ func (e *ExprBinaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 				}
 				e.RightOperand = _v
 			default:
-				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -177,7 +178,7 @@ func (e *ExprBinaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (e *ExprLeaf) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
 		return _err
 	}
 	for {
@@ -187,22 +188,22 @@ func (e *ExprLeaf) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch canxml.LocalName(_t.Name) {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "type":
-				if _err := canxml.DecodeElement(_dec, &_t, &e.Type); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &e.Type); _err != nil {
 					return _err
 				}
 			case "reference_type":
-				if _err := canxml.DecodeElement(_dec, &_t, &e.ReferenceType); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &e.ReferenceType); _err != nil {
 					return _err
 				}
 			case "item":
 				// Canonical XML does not model the content of an Any member — see canxml/doc.go.
-				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			default:
-				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -222,7 +223,7 @@ func (e *ExprLeaf) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 // Content the method does not read is unmatched: it is skipped, or
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (e *ExprUnaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
-	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
 		return _err
 	}
 	for {
@@ -232,10 +233,10 @@ func (e *ExprUnaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch canxml.LocalName(_t.Name) {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "precedence_overridden":
 				var _v bool
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				e.PrecedenceOverridden = &_v
@@ -244,7 +245,7 @@ func (e *ExprUnaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 					return _err
 				}
 			case "type":
-				if _err := canxml.DecodeElement(_dec, &_t, &e.Type); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &e.Type); _err != nil {
 					return _err
 				}
 			case "operand":
@@ -254,7 +255,7 @@ func (e *ExprUnaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 				}
 				e.Operand = _v
 			default:
-				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}

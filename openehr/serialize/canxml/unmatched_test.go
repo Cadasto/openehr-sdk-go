@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
@@ -929,5 +930,18 @@ func TestREQ170_XMLSentinelsStayDistinct(t *testing.T) {
 	err := canxml.Unmarshal(in, new(rm.Element), canxml.WithStrict())
 	if !errors.Is(err, canxml.ErrInvalidShape) || errors.Is(err, canxml.ErrUnknownElement) {
 		t.Errorf("canxml.Unmarshal(xmi:type, WithStrict) err = %v; want canxml.ErrInvalidShape and not canxml.ErrUnknownElement", err)
+	}
+}
+
+// TestREQ170_XMLNamespaceConstantsAgree pins that the namespaces the
+// unmatched-content tracker compares names against are canxml's own: the
+// openEHR namespace that decides a foreign element, and the XML Schema
+// instance namespace whose attributes are never unmatched.
+func TestREQ170_XMLNamespaceConstantsAgree(t *testing.T) {
+	if canxml.NSDefault != xmlunmatched.NSOpenEHR {
+		t.Errorf("canxml.NSDefault = %q; xmlunmatched.NSOpenEHR = %q; want them equal", canxml.NSDefault, xmlunmatched.NSOpenEHR)
+	}
+	if canxml.NSXSI != xmlunmatched.NSXSI {
+		t.Errorf("canxml.NSXSI = %q; xmlunmatched.NSXSI = %q; want them equal", canxml.NSXSI, xmlunmatched.NSXSI)
 	}
 }

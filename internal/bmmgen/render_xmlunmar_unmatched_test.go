@@ -16,13 +16,13 @@ import (
 // element in a foreign namespace through the name it switches on, every other
 // element it does not read through its default arm, a Hash element and the
 // element of an Any member through their own arms, and a primitive element
-// through canxml.DecodeElement. No decoder skips an element itself, so none
+// through xmlunmatched.DecodeElement. No decoder skips an element itself, so none
 // drops content unreported.
 func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 	const (
-		attrs        = "\tif _err := canxml.CheckUnmatchedAttrs(_dec, _start"
-		switchOnName = "\t\t\tswitch canxml.LocalName(_t.Name) {\n"
-		defaultArm   = "\t\t\tdefault:\n\t\t\t\tif _err := canxml.SkipUnmatched(_dec, _t); _err != nil {\n"
+		attrs        = "\tif _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start"
+		switchOnName = "\t\t\tswitch xmlunmatched.LocalName(_t.Name) {\n"
+		defaultArm   = "\t\t\tdefault:\n\t\t\t\tif _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {\n"
 	)
 	for _, target := range []Target{TargetRM, TargetAOM14} {
 		plan, err := BuildPlanForTarget(context.Background(), target, bmm.FSResolver{Root: testResources})
@@ -59,15 +59,15 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 					switch {
 					case isHashProperty(ef.Prop):
 						hashes++
-						if !strings.Contains(arm, "canxml.SkipUnmatched(_dec, _t)") {
-							t.Errorf("%s.%s is a Hash member; its arm must hand the element to canxml.SkipUnmatched:\n%s", pc.BMMName, ef.Prop.PropertyName(), arm)
+						if !strings.Contains(arm, "xmlunmatched.SkipUnmatched(_dec, _t)") {
+							t.Errorf("%s.%s is a Hash member; its arm must hand the element to xmlunmatched.SkipUnmatched:\n%s", pc.BMMName, ef.Prop.PropertyName(), arm)
 						}
 					case isAnyProperty(ef.Prop):
 						anys++
-						if !strings.Contains(arm, "canxml.SkipUnmatched(_dec, _t)") || strings.Contains(arm, "DecodeElement(") {
-							t.Errorf("%s.%s is an Any member; its arm must hand the element to canxml.SkipUnmatched as one item and decode nothing:\n%s", pc.BMMName, ef.Prop.PropertyName(), arm)
+						if !strings.Contains(arm, "xmlunmatched.SkipUnmatched(_dec, _t)") || strings.Contains(arm, "DecodeElement(") {
+							t.Errorf("%s.%s is an Any member; its arm must hand the element to xmlunmatched.SkipUnmatched as one item and decode nothing:\n%s", pc.BMMName, ef.Prop.PropertyName(), arm)
 						}
-					case strings.Contains(arm, "DecodeElement(") && !strings.Contains(arm, "canxml.DecodeElement(") && !isClassTypedProperty(plan, ef.Prop):
+					case strings.Contains(arm, "DecodeElement(") && !strings.Contains(arm, "xmlunmatched.DecodeElement(") && !isClassTypedProperty(plan, ef.Prop):
 						t.Errorf("%s.%s decodes as text through the decoder's own DecodeElement, which drops its attributes and child elements unreported:\n%s", pc.BMMName, ef.Prop.PropertyName(), arm)
 					}
 				}

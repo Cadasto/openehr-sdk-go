@@ -1,32 +1,40 @@
-package canxml
-
-// Tracking of unmatched content on the canonical-XML decode path. Content is
-// unmatched when the decode does not read it: an element or attribute that
-// names no attribute of the RM or AOM 1.4 type its element decodes as, other
-// than namespace declarations and attributes in the XML Schema instance
-// namespace (`xsi:type`, `xsi:schemaLocation`, `xsi:nil`, …); an element in a
-// namespace other than the openEHR one; and the element of a `Hash` member or
-// of a BMM `Any` member, which the codec does not model. By default the decode
-// skips it. A caller can instead track it: report each item, in document
-// order, by its path, and optionally refuse the first one.
+// Package xmlunmatched tracks unmatched content on the canonical-XML decode
+// path: the content a decode does not read. It is the runtime the generated
+// UnmarshalXML methods of openehr/rm and openehr/aom/aom14 call, and that
+// canxml drives from its decode entry points; canxml re-exports its
+// sentinels.
 //
-// How it works. encoding/xml hands a generated UnmarshalXML method only the
-// *xml.Decoder and the start element, so the decode's policy cannot travel as
-// an argument. It travels with the decoder instead:
+// Content is unmatched when the decode does not read it: an element or
+// attribute that names no attribute of the RM or AOM 1.4 type its element
+// decodes as, other than namespace declarations and attributes in the XML
+// Schema instance namespace (`xsi:type`, `xsi:schemaLocation`, `xsi:nil`, …);
+// an element in a namespace other than the openEHR one; and the element of a
+// `Hash` member or of a BMM `Any` member, which the codec does not model. By
+// default the decode skips it. A caller can instead track it: report each
+// item, in document order, by its path, and optionally refuse the first one.
 //
-//   - A tracked decode reads the input through a [trackingReader], which keeps
-//     the stack of open elements and, for each, how many children of each
-//     name it has opened. Every token passes through it, whichever code asks
-//     for it, so the path of the element just read is always known.
-//   - The decoder built on that reader is registered in [trackers] with the
-//     decode's [tracker] for exactly as long as one value decodes. Each
-//     tracked decode has its own decoder and tracker, so concurrent decodes
-//     never see each other's policy.
-//   - The generated decoders call the exported helpers below where content
-//     goes unread: [SkipUnmatched] in the arm for an element they do not
-//     read, [CheckUnmatchedAttrs] on entry, and [DecodeElement] for an
-//     element decoded as text. Each helper looks the decoder up; an untracked
-//     decode finds nothing and behaves as before.
+// # How it works
+//
+// encoding/xml hands a generated UnmarshalXML method only the *xml.Decoder
+// and the start element, so the decode's policy cannot travel as an argument.
+// It travels with the decoder instead:
+//
+//   - A tracked decode reads the input through the decoder [Tracker.NewDecoder]
+//     returns, whose token source keeps the stack of open elements and, for
+//     each, how many children of each name it has opened. Every token passes
+//     through it, whichever code asks for it, so the path of the element just
+//     read is always known.
+//   - [Tracker.Decode] registers that decoder with the decode's [Tracker] for
+//     exactly as long as one value decodes. Each tracked decode has its own
+//     decoder and tracker, so concurrent decodes never see each other's
+//     policy.
+//   - The generated decoders call the helpers of this package where content
+//     goes unread: [CheckUnmatchedAttrs] on entry, [LocalName] for the name
+//     they switch on, [SkipUnmatched] in the arm for an element they do not
+//     read, and [DecodeElement] for an element decoded as text. Each helper
+//     looks the decoder up; an untracked decode finds nothing and behaves as
+//     encoding/xml does.
+package xmlunmatched
 
 import (
 	"encoding/xml"
@@ -39,10 +47,28 @@ import (
 	"sync/atomic"
 )
 
-// tracker is the policy and position of one tracked decode: the caller's
+// Canonical XML namespaces: the values of canxml.NSDefault and canxml.NSXSI,
+// which a canxml test holds equal to these.
+const (
+	// NSOpenEHR is the openEHR canonical-XML namespace.
+	NSOpenEHR = "http://schemas.openehr.org/v1"
+	// NSXSI is the XML Schema instance namespace.
+	NSXSI = "http://www.w3.org/2001/XMLSchema-instance"
+)
+
+// ErrUnknownElement classifies content the decode does not read. canxml
+// re-exports it as canxml.ErrUnknownElement, where it is documented.
+var ErrUnknownElement = errors.New("canxml: unknown element or attribute")
+
+// ErrNamespace classifies an element in a namespace other than the openEHR
+// one. canxml re-exports it as canxml.ErrNamespace, where it is documented.
+var ErrNamespace = errors.New("canxml: foreign XML namespace")
+
+// Tracker is the policy and position of one tracked decode: the caller's
 // report function, whether the first unmatched item refuses the decode, and
-// the elements open at the decoder's current token.
-type tracker struct {
+// the elements open at the decoder's current token. A Tracker serves one
+// decoder, from one goroutine at a time.
+type Tracker struct {
 	report func(path string)
 	strict bool
 	// open holds one frame per element opened and not yet closed, after a
@@ -66,14 +92,41 @@ type nameCount struct {
 	n    int
 }
 
-func newTracker(report func(path string), strict bool) *tracker {
-	return &tracker{report: report, strict: strict, open: make([]frame, 1, 16)}
+// NewTracker returns the tracker of a decode that passes every unmatched item
+// to report, when report is not nil, and refuses the first one when strict is
+// set.
+func NewTracker(report func(path string), strict bool) *Tracker {
+	return &Tracker{report: report, strict: strict, open: make([]frame, 1, 16)}
+}
+
+// NewDecoder returns a decoder that reads canonical XML from r and records
+// every element it opens and closes in t. Decode values from it with
+// [Tracker.Decode].
+func (t *Tracker) NewDecoder(r io.Reader) *xml.Decoder {
+	return xml.NewTokenDecoder(&trackingReader{src: xml.NewDecoder(r), t: t})
+}
+
+// Decode decodes the next value of dec, a decoder from [Tracker.NewDecoder],
+// into v, with dec registered for t meanwhile, so the generated decoders
+// apply t's policy. Paths are relative to the value being decoded. A strict
+// refusal comes back on its own, not inside the dispatch envelopes it passed
+// through on its way out: it names the item from the root of the value, where
+// each envelope names only its own slot.
+func (t *Tracker) Decode(dec *xml.Decoder, v any) error {
+	t.reset()
+	tracking.Add(1)
+	trackers.Store(dec, t)
+	defer func() {
+		trackers.Delete(dec)
+		tracking.Add(-1)
+	}()
+	return unwrapUnknownElement(dec.Decode(v))
 }
 
 // reset starts a new value: the document frame forgets the top-level elements
 // of the values decoded before, so every path is relative to the value being
 // decoded.
-func (t *tracker) reset() {
+func (t *Tracker) reset() {
 	t.open = t.open[:1]
 	t.open[0].children = t.open[0].children[:0]
 }
@@ -81,7 +134,7 @@ func (t *tracker) reset() {
 // push records that the decoder opened an element named local inside the
 // innermost open element. A frame left over from an earlier element keeps its
 // children slice, so a long decode does not allocate one per element.
-func (t *tracker) push(local string) {
+func (t *Tracker) push(local string) {
 	pos := t.open[len(t.open)-1].count(local)
 	if len(t.open) < cap(t.open) {
 		t.open = t.open[:len(t.open)+1]
@@ -93,7 +146,7 @@ func (t *tracker) push(local string) {
 }
 
 // pop records that the decoder closed the innermost open element.
-func (t *tracker) pop() {
+func (t *Tracker) pop() {
 	if len(t.open) > 1 {
 		t.open = t.open[:len(t.open)-1]
 	}
@@ -114,7 +167,7 @@ func (f *frame) count(local string) int {
 
 // path returns the path of the innermost open element: one `/name[n]`
 // segment per open element, from the root of the value.
-func (t *tracker) path() string {
+func (t *Tracker) path() string {
 	var b strings.Builder
 	for _, f := range t.open[1:] {
 		b.WriteByte('/')
@@ -128,7 +181,7 @@ func (t *tracker) path() string {
 
 // unmatched applies the policy to the unmatched item at path: report it, then
 // refuse it under strict. foreign marks an element in a foreign namespace.
-func (t *tracker) unmatched(path string, foreign bool) error {
+func (t *Tracker) unmatched(path string, foreign bool) error {
 	if t.report != nil {
 		t.report(path)
 	}
@@ -142,7 +195,7 @@ func (t *tracker) unmatched(path string, foreign bool) error {
 // that is not read: neither an XML Schema instance attribute (the `xsi:type`
 // discriminator among them), nor a namespace declaration, nor one of known in
 // no namespace.
-func (t *tracker) attrs(attrs []xml.Attr, known []string) error {
+func (t *Tracker) attrs(attrs []xml.Attr, known []string) error {
 	var base string
 	for _, a := range attrs {
 		if isSchemaInstance(a.Name) || isNamespaceDecl(a.Name) || (a.Name.Space == "" && slices.Contains(known, a.Name.Local)) {
@@ -163,7 +216,7 @@ func (t *tracker) attrs(attrs []xml.Attr, known []string) error {
 // element is kept, as encoding/xml keeps it. The text then decodes into v
 // through encoding/xml itself, so the conversion is the one an untracked
 // decode applies.
-func (t *tracker) decodeText(dec *xml.Decoder, start *xml.StartElement, v any) error {
+func (t *Tracker) decodeText(dec *xml.Decoder, start *xml.StartElement, v any) error {
 	if err := t.attrs(start.Attr, nil); err != nil {
 		return err
 	}
@@ -192,24 +245,10 @@ func (t *tracker) decodeText(dec *xml.Decoder, start *xml.StartElement, v any) e
 	}
 }
 
-// decode decodes the next value of dec, a decoder reading through t, into v,
-// with dec registered for t meanwhile. A strict refusal comes back on its
-// own (see [unwrapUnknownElement]).
-func (t *tracker) decode(dec *xml.Decoder, v any) error {
-	t.reset()
-	tracking.Add(1)
-	trackers.Store(dec, t)
-	defer func() {
-		trackers.Delete(dec)
-		tracking.Add(-1)
-	}()
-	return unwrapUnknownElement(dec.Decode(v))
-}
-
 var (
 	// trackers maps the decoder of each tracked decode in progress to its
 	// policy, for exactly as long as that decode runs.
-	trackers sync.Map // *xml.Decoder → *tracker
+	trackers sync.Map // *xml.Decoder → *Tracker
 	// tracking counts the tracked decodes in progress. While it is zero no
 	// decoder is registered, and the helpers skip the lookup, so an untracked
 	// decode pays one atomic load per helper call.
@@ -218,12 +257,12 @@ var (
 
 // trackerOf returns the policy registered for dec, or nil when dec belongs to
 // no tracked decode.
-func trackerOf(dec *xml.Decoder) *tracker {
+func trackerOf(dec *xml.Decoder) *Tracker {
 	if tracking.Load() == 0 {
 		return nil
 	}
 	if t, ok := trackers.Load(dec); ok {
-		return t.(*tracker)
+		return t.(*Tracker)
 	}
 	return nil
 }
@@ -235,7 +274,7 @@ func trackerOf(dec *xml.Decoder) *tracker {
 // prefix to resolve and passes every name through as src resolved it.
 type trackingReader struct {
 	src *xml.Decoder
-	t   *tracker
+	t   *Tracker
 }
 
 // Token returns the next token of src, after recording it.
@@ -276,20 +315,21 @@ func (l *tokenList) Token() (xml.Token, error) {
 	return tok, nil
 }
 
-// isDiscriminator reports whether name is the `xsi:type` discriminator in a
-// form [XSITypeOf] reads: in the XSI namespace, in none, or written literally.
-func isDiscriminator(name xml.Name) bool {
+// IsDiscriminator reports whether an attribute named name is the `xsi:type`
+// discriminator in a form canxml.XSITypeOf reads: in the XSI namespace, in
+// none (a bare `type`), or written literally as `xsi:type`.
+func IsDiscriminator(name xml.Name) bool {
 	return (name.Local == "type" && (name.Space == NSXSI || name.Space == "")) || name.Local == "xsi:type"
 }
 
 // isSchemaInstance reports whether an attribute named name belongs to the XML
 // Schema instance namespace, such as `xsi:schemaLocation`, `xsi:nil` or the
 // `xsi:type` discriminator, in a form encoding/xml resolves or as written
-// literally. A bare `type`, which [XSITypeOf] reads as the discriminator,
-// counts too. An `xsi:` prefix bound to no namespace does not: encoding/xml
-// leaves it unresolved, so the attribute is not in the namespace.
+// literally. A bare `type`, which canxml.XSITypeOf reads as the
+// discriminator, counts too. An `xsi:` prefix bound to no namespace does not:
+// encoding/xml leaves it unresolved, so the attribute is not in the namespace.
 func isSchemaInstance(name xml.Name) bool {
-	return name.Space == NSXSI || strings.HasPrefix(name.Local, "xsi:") || isDiscriminator(name)
+	return name.Space == NSXSI || strings.HasPrefix(name.Local, "xsi:") || IsDiscriminator(name)
 }
 
 // isNamespaceDecl reports whether name is a namespace declaration: `xmlns`,
@@ -301,14 +341,14 @@ func isNamespaceDecl(name xml.Name) bool {
 // isForeign reports whether an element named name lies outside the openEHR
 // namespace. An element in no namespace counts as an openEHR one.
 func isForeign(name xml.Name) bool {
-	return name.Space != "" && name.Space != NSDefault
+	return name.Space != "" && name.Space != NSOpenEHR
 }
 
-// unknownElementError is the refusal of an unmatched item under [WithStrict].
-// It names the item by its path from the root of the value and carries
-// nothing else from the input, so no value reaches the message. It wraps
-// [ErrUnknownElement], and [ErrNamespace] too for an element in a foreign
-// namespace.
+// unknownElementError is the refusal of an unmatched item under strict
+// tracking. It names the item by its path from the root of the value and
+// carries nothing else from the input, so no value reaches the message. It
+// wraps [ErrUnknownElement], and [ErrNamespace] too for an element in a
+// foreign namespace.
 type unknownElementError struct {
 	path    string
 	foreign bool
@@ -332,10 +372,7 @@ func (e *unknownElementError) Unwrap() []error {
 }
 
 // unwrapUnknownElement returns the strict refusal in err's chain on its own,
-// or err unchanged when the chain holds none (a nil err included). On its way
-// out the refusal may pass through a [DecodeError] at each polymorphic slot,
-// which names the slot's element alone; the refusal names the item from the
-// root, so the entry point returns it alone.
+// or err unchanged when the chain holds none (a nil err included).
 func unwrapUnknownElement(err error) error {
 	if ue, ok := errors.AsType[*unknownElementError](err); ok && ue != nil {
 		return ue
@@ -356,16 +393,14 @@ func LocalName(name xml.Name) string {
 
 // SkipUnmatched skips the element start opens, which the generated decoder
 // does not read: its name matches no attribute of the RM type being decoded,
-// it lies in a foreign namespace, or it holds a `Hash` attribute or the
-// content of a BMM `Any` attribute, which this codec does not model. The
-// element is one item, whatever it holds. start must be the token the decoder
-// read last.
+// it lies in a foreign namespace, or it holds content the codec does not
+// model, such as a `Hash` attribute or a BMM `Any` attribute. The element is
+// one item, whatever it holds. start must be the token the decoder read last.
 //
-// By default it only skips. Under [WithUnmatched] it first reports the
-// element's path. Under [WithStrict] it refuses the decode with an error
-// that wraps [ErrUnknownElement], and [ErrNamespace] too for an element in a
-// foreign namespace. Generated UnmarshalXML methods call it; it is exported
-// for them only.
+// By default it only skips. A tracked decode first reports the element's
+// path, and a strict one refuses the decode with an error that wraps
+// [ErrUnknownElement], and [ErrNamespace] too for an element in a foreign
+// namespace.
 func SkipUnmatched(dec *xml.Decoder, start xml.StartElement) error {
 	if t := trackerOf(dec); t != nil {
 		if err := t.unmatched(t.path(), isForeign(start.Name)); err != nil {
@@ -382,10 +417,9 @@ func SkipUnmatched(dec *xml.Decoder, start xml.StartElement) error {
 // declarations, and those named in known, which are read in no namespace.
 // start must be the token the decoder read last.
 //
-// By default it does nothing. Under [WithUnmatched] it reports the path of
-// each such attribute, in the order written, and under [WithStrict] it
-// refuses the first with an error that wraps [ErrUnknownElement]. Generated
-// UnmarshalXML methods call it on entry; it is exported for them only.
+// By default it does nothing. A tracked decode reports the path of each such
+// attribute, in the order written, and a strict one refuses the first with an
+// error that wraps [ErrUnknownElement].
 func CheckUnmatchedAttrs(dec *xml.Decoder, start xml.StartElement, known ...string) error {
 	t := trackerOf(dec)
 	if t == nil {
@@ -400,11 +434,10 @@ func CheckUnmatchedAttrs(dec *xml.Decoder, start xml.StartElement, known ...stri
 // start must be the token the decoder read last.
 //
 // A primitive decodes from the element's text alone: by default, as with
-// encoding/xml, an attribute or a child element on it is ignored. Under
-// [WithUnmatched] and [WithStrict] each is unmatched content, reported or
-// refused like any other, and the value decoded is the same as by default.
-// A type with an UnmarshalXML method checks its own content. Generated
-// UnmarshalXML methods call it; it is exported for them only.
+// encoding/xml, an attribute or a child element on it is ignored. A tracked
+// decode reports or refuses each as unmatched content, and the value decoded
+// is the same as by default. A type with an UnmarshalXML method checks its
+// own content.
 func DecodeElement(dec *xml.Decoder, start *xml.StartElement, v any) error {
 	t := trackerOf(dec)
 	if t == nil {

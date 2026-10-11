@@ -107,9 +107,8 @@
 // tracks the open elements, and registers its decoder with its own policy
 // while it runs. Concurrent decodes each have their own decoder and so
 // their own policy. The generated methods hand the content they do not
-// read to [SkipUnmatched], [CheckUnmatchedAttrs] and [DecodeElement], which
-// look the decoder up and, for an untracked decode, behave as encoding/xml
-// does.
+// read to helpers in an internal package of the SDK, which look the
+// decoder up and, for an untracked decode, behave as encoding/xml does.
 //
 // # Polymorphic dispatch
 //
