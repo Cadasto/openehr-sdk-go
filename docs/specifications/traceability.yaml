@@ -433,7 +433,6 @@ requirements:
       - openehr/rm/quoted_literal_test.go
       - openehr/rm/real_test.go
       - openehr/rm/typereg/registry_test.go
-      - openehr/rm/typereg/unmatched_test.go
       - openehr/serialize/canjson/bare_v2_decode_test.go
       - openehr/serialize/canjson/corpus_parity_test.go
       - openehr/serialize/canjson/decode_test.go
@@ -2007,6 +2006,4 @@ requirements:
     packages: [openehr/serialize/canjson, openehr/rm/typereg, openehr/serialize/canxml, internal/bmmgen, openehr/serialize/simplified]
     probes: [PROBE-086, PROBE-105, PROBE-030]
     tests:
-      - openehr/rm/typereg/unmatched_internal_test.go
-      - openehr/rm/typereg/unmatched_test.go
       - openehr/serialize/canjson/unmatched_test.go

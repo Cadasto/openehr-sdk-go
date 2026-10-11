@@ -267,7 +267,7 @@ The canonical-XML codec does not model `Hash` (`map[K]V`) members, nor the conte
 - Under strict, each of those inputs fails with an error that wraps the codec's sentinel, names the first item's path and carries none of its value.
 - An unknown `_type` or `xsi:type` fails in every mode; each carrier-less FLAT key above fails in every mode; an absent mandatory member does not fail under strict.
 
-- **Lives in:** `openehr/serialize/canjson`, `internal/rmjsonwalk` (the canonical-JSON name pass, shared with `testkit/expectedform`), `openehr/serialize/canxml`, `internal/bmmgen` (the generated XML decoders), `openehr/serialize/simplified`.
+- **Lives in:** `openehr/serialize/canjson`, `internal/rmjsonwalk` (the canonical-JSON name pass, shared with `testkit/expectedform`), `openehr/serialize/canxml`, `openehr/internal/xmlunmatched` and `internal/bmmgen` (the generated XML decoders and their runtime, [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D9), `openehr/serialize/simplified`.
 - **Probes:** PROBE-086 and PROBE-105 (their exclusion reads the report option), PROBE-030 (the expected form).
 
 ## Simplified formats

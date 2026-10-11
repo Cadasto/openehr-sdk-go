@@ -11,7 +11,7 @@ date: 2026-05-16
 - **Status:** Accepted, 2026-05-16.
 - **Supersedes:** —
 - **Superseded by:** —
-- **Amended:** D4, 2026-10-01 (the `P_BMM_INTERFACE` shape). D8, 2026-10-11 (the interval classes' boundary-flag logic).
+- **Amended:** D4, 2026-10-01 (the `P_BMM_INTERFACE` shape). D8, 2026-10-11 (the interval classes' boundary-flag logic). D9 added, 2026-10-12 (canonical-XML unmatched content).
 - **Tracks:** the BMM code generator, landed on `main` in commit [b89aa589](https://github.com/Cadasto/openehr-sdk-go/commit/b89aa589).
 - **Requirements:** [REQ-043](../specifications/bmm-conformance.md#mapping-rules) (the P_BMM to Go mapping rules the generator applies).
 
@@ -70,6 +70,12 @@ Superseding the emission policy `internal/bmmgen/render_jsonmar.go` and `interna
 The invariant D8 asserts: **no per-type JSON codec logic is generated into `openehr/rm/*_gen.go` or `openehr/aom/aom14/*_gen.go` beyond the two-method delegation above, except for the interval classes.** An interval's codec has to know which of its four boundary flags the wire carried and whether a side is open: encode omits an open side's empty bound ([REQ-052](../specifications/wire.md#req-052)), and decode gives an absent flag its default ([REQ-169](../specifications/wire.md#req-169--interval-boundary-flag-defaults)), neither of which the delegation can see. That logic is generated for every class carrying the four flags, BASE `Interval` included, so the AOM 1.4 constraint intervals get it too, and the generator refuses a flag-carrying class whose shape it does not handle.
 
 **Warning, on the `omitzero` row.** `go doc encoding/json` § Migrating to v2 recommends migrating `omitempty` to `omitzero` for a bool, number, pointer or interface value, and that is right for the 42 `*string`, 16 `*bool`, 23 pointer-to-number, 6 `*map[string]T` and 5 `*any` fields the generator emits. Those counts omit the `*[]string` field `CodeList`. It is wrong for container fields. v2's `omitempty` omits a field that encodes as an empty JSON value, so a nil slice and a non-nil empty slice are both omitted, which is the collapse [REQ-052](../specifications/wire.md#req-052)'s `DV_TEXT.mappings` re-encode collapse clause documents and `TestDVTextMappingsDecodePresenceAndEncodeCollapse` pins. Under `omitzero` a non-nil empty slice is not zero and would emit `[]`, which that clause states would be RM-invalid (`Mappings_valid`). A blanket sweep would break an RM invariant silently.
+
+### D9 — The generated XML decoders hand what they do not read to an internal runtime
+
+Canonical XML decodes through a generated `UnmarshalXML` per class, and [REQ-170](../specifications/wire.md#req-170--unmatched-content-on-decode) asks the codec's entry points for options that report or refuse unmatched content. `encoding/xml` passes such a method only the `*xml.Decoder` and the start element, so no option can reach the generated code as an argument.
+
+The generated decoders therefore read nothing they do not model themselves. On entry each hands its element's attributes, and in its fallback arm every child it does not read (an unknown element, an element in a foreign namespace, a `Hash` member, the content of a BMM `Any` member, a member whose type has no decoder of its own), to helpers in the internal package `openehr/internal/xmlunmatched`. A primitive leaf and a member typed by a generic parameter decode through the same package. When a caller sets an option, `canxml` builds the decoder through that package, which tracks the open elements and registers the decoder with the decode's own policy for the length of each value. Without an option, each helper finds no registration and does exactly what `encoding/xml` would. The helpers stay off `canxml`'s public API: `canxml` exposes only the options and re-exports the sentinels. The generator refuses no class for this; every class-typed arm goes either to a decoder the generator emitted or to the helpers, which its test checks.
 
 ## Consequences
 
