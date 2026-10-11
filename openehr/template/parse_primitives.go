@@ -15,13 +15,13 @@ import (
 // existence / occurrences as integer cardinalities) — primitive
 // ranges are float-typed and keep their inclusivity flags, where a
 // Multiplicity closes an excluded end instead. The included flags are
-// pointers so that an omitted flag stays nil, and includedFlag can then
-// give it the default for its side.
+// xmlBoolFlag values, so an omitted, empty or whitespace-only element
+// stays unset, and includedFlag can then give it the default for its side.
 type xmlNumericInterval struct {
-	LowerIncluded  *bool `xml:"lower_included"`
-	UpperIncluded  *bool `xml:"upper_included"`
-	LowerUnbounded bool  `xml:"lower_unbounded"`
-	UpperUnbounded bool  `xml:"upper_unbounded"`
+	LowerIncluded  xmlBoolFlag `xml:"lower_included"`
+	UpperIncluded  xmlBoolFlag `xml:"upper_included"`
+	LowerUnbounded bool        `xml:"lower_unbounded"`
+	UpperUnbounded bool        `xml:"upper_unbounded"`
 	// Lower / Upper are decoded as string and parsed to float lazily
 	// in numericRange. AOM 1.4 reuses the same `<range>` element name
 	// for both numeric ranges (C_INTEGER / C_REAL / C_DV_QUANTITY)
@@ -34,8 +34,8 @@ type xmlNumericInterval struct {
 }
 
 // xmlBoolFlag is the true_valid or false_valid element of a C_BOOLEAN,
-// or the lower_included or upper_included element of an occurrences,
-// existence or cardinality interval.
+// or the lower_included or upper_included element of an interval: an
+// occurrences, existence or cardinality interval, or a numeric range.
 // A plain bool field would read an empty element as false. This type
 // leaves an empty or whitespace-only element unset instead, so it reads
 // exactly like an omitted one. Any other text is parsed with
@@ -326,10 +326,10 @@ func buildDvOrdinal(o *xmlCObject) constraints.CDvOrdinal {
 }
 
 // numericRange folds a wire numeric interval into the public range
-// shape. A LowerIncluded / UpperIncluded flag the OPT omits defaults
-// by its side's unbounded flag as written: true on a bounded side,
-// false on an unbounded one. xmlNumericInterval.Lower / Upper
-// are decoded as strings (AOM 1.4 reuses `<range>` for both numeric
+// shape. A LowerIncluded / UpperIncluded flag the OPT omits or leaves
+// empty defaults by its side's unbounded flag as written: true on a
+// bounded side, false on an unbounded one. xmlNumericInterval.Lower /
+// Upper are decoded as strings (AOM 1.4 reuses `<range>` for both numeric
 // and temporal types); parsed to float64 lazily here.
 //
 // In lenient mode an unparseable bound falls through as the unbounded
@@ -344,8 +344,8 @@ func numericRange(i *xmlNumericInterval, strict bool, ctx string) (constraints.N
 	r := constraints.NumericRange{
 		LowerUnbounded: i.LowerUnbounded,
 		UpperUnbounded: i.UpperUnbounded,
-		LowerInclusive: includedFlag(i.LowerIncluded, i.LowerUnbounded),
-		UpperInclusive: includedFlag(i.UpperIncluded, i.UpperUnbounded),
+		LowerInclusive: includedFlag(i.LowerIncluded.ptr(), i.LowerUnbounded),
+		UpperInclusive: includedFlag(i.UpperIncluded.ptr(), i.UpperUnbounded),
 	}
 	if !r.LowerUnbounded {
 		if f, err := strconv.ParseFloat(strings.TrimSpace(i.Lower), 64); err == nil {

@@ -598,3 +598,83 @@ func TestREQ169_REQ103_NumericRangeFlags(t *testing.T) {
 		}
 	}
 }
+
+// An empty or whitespace-only lower_included or upper_included element on
+// a numeric range reads like an omitted one, so REQ-169's default applies:
+// inclusive on a bounded side, exclusive on an unbounded side. Read as a
+// written false, it would make a bounded end exclusive.
+func TestREQ169_REQ103_NumericRangeEmptyIncludedFlagReadsAsOmitted(t *testing.T) {
+	const (
+		closedBounds = `<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded>` +
+			`<lower>1</lower><upper>9</upper>`
+		openLower = `<lower_unbounded>true</lower_unbounded><upper_unbounded>false</upper_unbounded><upper>9</upper>`
+		openUpper = `<lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>1</lower>`
+	)
+	closed := constraints.NumericRange{Lower: 1, Upper: 9, LowerInclusive: true, UpperInclusive: true}
+	cases := []struct {
+		name  string
+		ivXML string
+		want  constraints.NumericRange
+	}{
+		{name: "lower_self_closing_bounded", ivXML: `<lower_included/>` + closedBounds, want: closed},
+		{name: "lower_empty_bounded", ivXML: `<lower_included></lower_included>` + closedBounds, want: closed},
+		{name: "lower_whitespace_bounded", ivXML: "<lower_included> \n\t</lower_included>" + closedBounds, want: closed},
+		{name: "upper_self_closing_bounded", ivXML: `<upper_included/>` + closedBounds, want: closed},
+		{name: "upper_empty_bounded", ivXML: `<upper_included></upper_included>` + closedBounds, want: closed},
+		{name: "upper_whitespace_bounded", ivXML: "<upper_included>  </upper_included>" + closedBounds, want: closed},
+		{name: "both_self_closing_bounded", ivXML: `<lower_included/><upper_included/>` + closedBounds, want: closed},
+		{
+			name:  "lower_self_closing_unbounded",
+			ivXML: `<lower_included/>` + openLower,
+			want:  constraints.NumericRange{Upper: 9, UpperInclusive: true, LowerUnbounded: true},
+		},
+		{
+			name:  "upper_self_closing_unbounded",
+			ivXML: `<upper_included/>` + openUpper,
+			want:  constraints.NumericRange{Lower: 1, LowerInclusive: true, UpperUnbounded: true},
+		},
+		{
+			// A written value beside an empty sibling is still read as written.
+			name:  "lower_written_false_upper_empty",
+			ivXML: `<lower_included>false</lower_included><upper_included/>` + closedBounds,
+			want:  constraints.NumericRange{Lower: 1, Upper: 9, UpperInclusive: true},
+		},
+	}
+	for _, p := range intervalParsers {
+		for _, site := range numericRangeSites {
+			for _, tc := range cases {
+				t.Run(p.name+"/"+site.name+"/"+tc.name, func(t *testing.T) {
+					child := strings.ReplaceAll(site.child, "{{interval}}", tc.ivXML)
+					body := strings.Replace(primitiveOPTTemplate, "%s", child, 1)
+					opt, err := p.parse(strings.NewReader(body))
+					if err != nil {
+						t.Fatalf("%s(%s %q) error = %v, want nil", p.name, site.name, tc.ivXML, err)
+					}
+					got := site.get(t, firstChildPrimitive(t, opt))
+					if got != tc.want {
+						t.Errorf("%s(%s %q) range = %+v, want %+v", p.name, site.name, tc.ivXML, got, tc.want)
+					}
+				})
+			}
+		}
+	}
+}
+
+// A lower_included or upper_included element on a numeric range whose
+// text is not a boolean still fails the parse in both modes.
+func TestREQ103_NumericRangeNonBooleanIncludedFlagRefused(t *testing.T) {
+	ivXML := `<upper_included>maybe</upper_included><lower_unbounded>false</lower_unbounded>` +
+		`<upper_unbounded>false</upper_unbounded><lower>1</lower><upper>9</upper>`
+	for _, p := range intervalParsers {
+		for _, site := range numericRangeSites {
+			t.Run(p.name+"/"+site.name, func(t *testing.T) {
+				child := strings.ReplaceAll(site.child, "{{interval}}", ivXML)
+				body := strings.Replace(primitiveOPTTemplate, "%s", child, 1)
+				_, err := p.parse(strings.NewReader(body))
+				if !errors.Is(err, template.ErrInvalidOPT) {
+					t.Errorf("%s(%s %q) error = %v, want errors.Is(err, ErrInvalidOPT)", p.name, site.name, ivXML, err)
+				}
+			})
+		}
+	}
+}
