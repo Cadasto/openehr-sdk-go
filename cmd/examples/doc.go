@@ -15,8 +15,8 @@
 //   - canxml_roundtrip: one COMPOSITION through canonical JSON and XML and back
 //   - opt-parse: parse an operational template (OPT) and resolve paths in it
 //   - primitive-validate: check single values against one OPT leaf constraint
-//   - validate-composition: validate an in-memory composition twice, against
-//     the Reference Model alone (the RM floor) and against an OPT's constraints
+//   - validate-composition: validate an in-memory composition with one call,
+//     against an OPT's constraints and the Reference Model (the RM floor)
 //   - validate-from-json: decode canonical JSON, then validate it against the
 //     RM floor and an OPT's constraints
 //   - generate-example: generate an RM instance from an OPT and print it as JSON

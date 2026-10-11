@@ -4,13 +4,10 @@
 // testdata/minimal_blood_pressure.json. After changing it, rerun it from this
 // directory with go run gen_fixture.go.
 //
-// The composition it writes round-trips through canjson and passes both
-// validation passes against vital_signs.opt: the RM floor
-// (validation.ValidateRM) and the template constraints
-// (validation.ValidateComposition). Passing the template alone is not enough,
-// because today the template pass does not run the Reference Model's own
-// per-type rules, so the generator refuses to write a fixture that fails
-// either pass.
+// The composition it writes round-trips through canjson and is valid against
+// vital_signs.opt: validation.ValidateComposition, which checks the template
+// constraints and the RM floor in one call, reports no error. The generator
+// refuses to write a fixture that fails it.
 package main
 
 import (
@@ -30,7 +27,7 @@ import (
 func main() {
 	compiled := compileVitalSigns()
 	comp := minimalComposition()
-	requireBothPasses("built composition", comp, compiled)
+	requireValid("built composition", comp, compiled)
 	b, err := canjson.Marshal(comp)
 	if err != nil {
 		panic(err)
@@ -43,7 +40,7 @@ func main() {
 	if err := canjson.Unmarshal(b, &back); err != nil {
 		panic(err)
 	}
-	requireBothPasses("round-tripped composition", &back, compiled)
+	requireValid("round-tripped composition", &back, compiled)
 	if err := os.MkdirAll("testdata", 0o755); err != nil {
 		panic(err)
 	}
@@ -53,30 +50,18 @@ func main() {
 	fmt.Printf("wrote testdata/minimal_blood_pressure.json (%d bytes)\n", len(b))
 }
 
-// requireBothPasses stops the generator, listing every issue, unless comp
-// passes the RM floor and the template constraints.
-func requireBothPasses(label string, comp *rm.Composition, compiled *templatecompile.Compiled) {
-	passes := []struct {
-		name   string
-		result validation.Result
-	}{
-		{"RM floor", validation.ValidateRM(comp)},
-		{"template constraints", validation.ValidateComposition(comp, compiled)},
+// requireValid stops the generator, listing every issue, unless comp is
+// valid against the template constraints and the RM floor.
+func requireValid(label string, comp *rm.Composition, compiled *templatecompile.Compiled) {
+	result := validation.ValidateComposition(comp, compiled)
+	if result.OK {
+		return
 	}
-	failed := false
-	for _, p := range passes {
-		if p.result.OK {
-			continue
-		}
-		failed = true
-		fmt.Printf("%s fails the %s pass:\n", label, p.name)
-		for _, i := range p.result.Issues {
-			fmt.Printf("  %s [%s] %s\n", i.Path, i.Code, i.Detail)
-		}
+	fmt.Printf("%s is not valid:\n", label)
+	for _, i := range result.Issues {
+		fmt.Printf("  %s [%s] %s\n", i.Path, i.Code, i.Detail)
 	}
-	if failed {
-		panic(label + " does not pass both validation passes")
-	}
+	panic(label + " is not valid")
 }
 
 // patchPartyProxyDiscriminators fixes empty composer/subject objects emitted

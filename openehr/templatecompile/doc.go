@@ -16,9 +16,11 @@
 //	    composition.WithTerritory("NL"),
 //	    composition.WithComposer(composer))
 //	comp, _ := b.Build()
-//	rmRes := validation.ValidateRM(comp)                // openehr/validation: RM floor
-//	tmplRes := validation.ValidateComposition(comp, c)  // template constraints
-//	valid := rmRes.OK && tmplRes.OK                     // valid only when both pass
+//	res := validation.ValidateComposition(comp, c)      // openehr/validation
+//	valid := res.OK                                     // template and RM floor
+//
+// ValidateComposition checks the template constraints and the Reference
+// Model floor in one call, reporting a defect both find once.
 //
 // # Public surface
 //
