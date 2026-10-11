@@ -14,9 +14,10 @@ import (
 // decoder hands the content it does not read to the canxml helpers that apply
 // the decode's policy (REQ-170): the start element's attributes on entry, an
 // element in a foreign namespace through the name it switches on, every other
-// element it does not read through its default arm, a Hash element through
-// its own arm, and a primitive element through canxml.DecodeElement. No
-// decoder skips an element itself, so none drops content unreported.
+// element it does not read through its default arm, a Hash element and the
+// element of an Any member through their own arms, and a primitive element
+// through canxml.DecodeElement. No decoder skips an element itself, so none
+// drops content unreported.
 func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 	const (
 		attrs        = "\tif _err := canxml.CheckUnmatchedAttrs(_dec, _start"
@@ -28,7 +29,7 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 		if err != nil {
 			t.Fatalf("BuildPlanForTarget: %v", err)
 		}
-		hashes := 0
+		hashes, anys := 0, 0
 		for _, f := range plan.Files {
 			classes, err := codecClassesIn(plan, f)
 			if err != nil {
@@ -61,6 +62,11 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 						if !strings.Contains(arm, "canxml.SkipUnmatched(_dec, _t)") {
 							t.Errorf("%s.%s is a Hash member; its arm must hand the element to canxml.SkipUnmatched:\n%s", pc.BMMName, ef.Prop.PropertyName(), arm)
 						}
+					case isAnyProperty(ef.Prop):
+						anys++
+						if !strings.Contains(arm, "canxml.SkipUnmatched(_dec, _t)") || strings.Contains(arm, "DecodeElement(") {
+							t.Errorf("%s.%s is an Any member; its arm must hand the element to canxml.SkipUnmatched as one item and decode nothing:\n%s", pc.BMMName, ef.Prop.PropertyName(), arm)
+						}
 					case strings.Contains(arm, "DecodeElement(") && !strings.Contains(arm, "canxml.DecodeElement(") && !isClassTypedProperty(plan, ef.Prop):
 						t.Errorf("%s.%s decodes as text through the decoder's own DecodeElement, which drops its attributes and child elements unreported:\n%s", pc.BMMName, ef.Prop.PropertyName(), arm)
 					}
@@ -69,6 +75,9 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 		}
 		if target.GoPackage == TargetRM.GoPackage && hashes == 0 {
 			t.Errorf("the RM target rendered no Hash arm; want the resource-metadata Hash members covered")
+		}
+		if target.GoPackage == TargetAOM14.GoPackage && anys == 0 {
+			t.Errorf("the AOM 1.4 target rendered no Any arm; want `assumed_value` and `EXPR_LEAF.item` covered")
 		}
 	}
 }
@@ -100,6 +109,13 @@ func isHashProperty(prop bmm.Property) bool {
 		return p.TypeDef != nil && containerKinds[p.TypeDef.RootType]
 	}
 	return false
+}
+
+// isAnyProperty reports whether prop is a single property typed by the BMM
+// root type Any, whose content canonical XML does not model.
+func isAnyProperty(prop bmm.Property) bool {
+	p, ok := prop.(*bmm.SingleProperty)
+	return ok && p.TypeName == bmmAnyType
 }
 
 // isClassTypedProperty reports whether prop is a single property typed by a

@@ -24,10 +24,11 @@ var ErrInvalidShape = errors.New("canxml: invalid XML shape")
 
 // ErrUnknownElement is the sentinel for content the decode does not read:
 // an element or attribute that names no attribute of the RM type its
-// element decodes as, other than the `xsi:type` discriminator and namespace
-// declarations, and an element in a namespace other than the openEHR one
-// (see [ErrNamespace]). A `Hash` element, which this codec does not model,
-// counts as such content too.
+// element decodes as, other than namespace declarations and attributes in
+// the XML Schema instance namespace (`xsi:type`, `xsi:schemaLocation`,
+// `xsi:nil`, …), and an element in a namespace other than the openEHR one
+// (see [ErrNamespace]). The element of a `Hash` member or of a BMM `Any`
+// member, which this codec does not model, counts as such content too.
 //
 // Such content is ignored by default. Only a decode given [WithStrict]
 // refuses it: the refusal wraps this sentinel and names the item's path

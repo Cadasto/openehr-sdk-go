@@ -47,11 +47,13 @@ func (c decoderConfig) tracked() bool {
 // WithUnmatched passes every unmatched item of the input to fn while the
 // decode carries on. An item is unmatched when the decode does not read it:
 // an element or attribute that names no attribute of the RM type its element
-// decodes as, other than the `xsi:type` discriminator and namespace
-// declarations; an element in a namespace other than the openEHR one (see
-// [ErrNamespace]); and a `Hash` element, which this codec does not model. It
-// applies at any depth: inside a polymorphic slot, an interval bound, a
-// primitive element or an AOM 1.4 value too.
+// decodes as, other than namespace declarations and attributes in the XML
+// Schema instance namespace (`xsi:type`, `xsi:schemaLocation`, `xsi:nil`,
+// …); an element in a namespace other than the openEHR one (see
+// [ErrNamespace]); and the element of a `Hash` member or of a BMM `Any`
+// member (the AOM 1.4 `assumed_value` and `EXPR_LEAF.item`), which this codec
+// does not model. It applies at any depth: inside a polymorphic slot, an
+// interval bound, a primitive element or an AOM 1.4 value too.
 //
 // By default the decoder ignores unmatched content: the value it returns
 // holds the rest of the input and none of it. With this option fn receives
@@ -83,8 +85,11 @@ func WithUnmatched(fn func(path string)) DecoderOption {
 //
 // Strict covers unmatched content only. An absent element is never refused,
 // mandatory or not, and neither is a boundary flag an interval leaves out.
-// The option is unrelated to `xsi:type` dispatch: an unknown `xsi:type`
-// fails in every mode (see [DecodeError]).
+// An unknown `xsi:type` fails in every mode (see [DecodeError]). The decode
+// reads the input as a stream, so strict returns the first problem in
+// document order: an unmatched item before an unknown `xsi:type` refuses the
+// decode with [ErrUnknownElement], and an unknown `xsi:type` first fails as
+// itself.
 //
 // By default the decoder ignores unmatched content.
 func WithStrict() DecoderOption {

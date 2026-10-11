@@ -3,11 +3,12 @@ package canxml
 // Tracking of unmatched content on the canonical-XML decode path. Content is
 // unmatched when the decode does not read it: an element or attribute that
 // names no attribute of the RM or AOM 1.4 type its element decodes as, other
-// than the `xsi:type` discriminator and namespace declarations; an element in
-// a namespace other than the openEHR one; and a `Hash` element, which the
-// codec does not model. By default the decode skips it. A caller can instead
-// track it: report each item, in document order, by its path, and optionally
-// refuse the first one.
+// than namespace declarations and attributes in the XML Schema instance
+// namespace (`xsi:type`, `xsi:schemaLocation`, `xsi:nil`, …); an element in a
+// namespace other than the openEHR one; and the element of a `Hash` member or
+// of a BMM `Any` member, which the codec does not model. By default the decode
+// skips it. A caller can instead track it: report each item, in document
+// order, by its path, and optionally refuse the first one.
 //
 // How it works. encoding/xml hands a generated UnmarshalXML method only the
 // *xml.Decoder and the start element, so the decode's policy cannot travel as
@@ -138,12 +139,13 @@ func (t *tracker) unmatched(path string, foreign bool) error {
 }
 
 // attrs applies the policy to every attribute of the innermost open element
-// that is not read: neither the `xsi:type` discriminator, nor a namespace
-// declaration, nor one of known in no namespace.
+// that is not read: neither an XML Schema instance attribute (the `xsi:type`
+// discriminator among them), nor a namespace declaration, nor one of known in
+// no namespace.
 func (t *tracker) attrs(attrs []xml.Attr, known []string) error {
 	var base string
 	for _, a := range attrs {
-		if isDiscriminator(a.Name) || isNamespaceDecl(a.Name) || (a.Name.Space == "" && slices.Contains(known, a.Name.Local)) {
+		if isSchemaInstance(a.Name) || isNamespaceDecl(a.Name) || (a.Name.Space == "" && slices.Contains(known, a.Name.Local)) {
 			continue
 		}
 		if base == "" {
@@ -280,6 +282,16 @@ func isDiscriminator(name xml.Name) bool {
 	return (name.Local == "type" && (name.Space == NSXSI || name.Space == "")) || name.Local == "xsi:type"
 }
 
+// isSchemaInstance reports whether an attribute named name belongs to the XML
+// Schema instance namespace, such as `xsi:schemaLocation`, `xsi:nil` or the
+// `xsi:type` discriminator, in a form encoding/xml resolves or as written
+// literally. A bare `type`, which [XSITypeOf] reads as the discriminator,
+// counts too. An `xsi:` prefix bound to no namespace does not: encoding/xml
+// leaves it unresolved, so the attribute is not in the namespace.
+func isSchemaInstance(name xml.Name) bool {
+	return name.Space == NSXSI || strings.HasPrefix(name.Local, "xsi:") || isDiscriminator(name)
+}
+
 // isNamespaceDecl reports whether name is a namespace declaration: `xmlns`,
 // or `xmlns:p` as encoding/xml resolves it or as written literally.
 func isNamespaceDecl(name xml.Name) bool {
@@ -344,8 +356,10 @@ func LocalName(name xml.Name) string {
 
 // SkipUnmatched skips the element start opens, which the generated decoder
 // does not read: its name matches no attribute of the RM type being decoded,
-// it lies in a foreign namespace, or it holds a `Hash` attribute, which this
-// codec does not model. start must be the token the decoder read last.
+// it lies in a foreign namespace, or it holds a `Hash` attribute or the
+// content of a BMM `Any` attribute, which this codec does not model. The
+// element is one item, whatever it holds. start must be the token the decoder
+// read last.
 //
 // By default it only skips. Under [WithUnmatched] it first reports the
 // element's path. Under [WithStrict] it refuses the decode with an error
@@ -363,9 +377,10 @@ func SkipUnmatched(dec *xml.Decoder, start xml.StartElement) error {
 
 // CheckUnmatchedAttrs applies the decode's policy for unmatched content to
 // the attributes of start that the generated decoder does not read: every
-// attribute but the `xsi:type` discriminator, the namespace declarations,
-// and those named in known, which are read in no namespace. start must be the
-// token the decoder read last.
+// attribute but those in the XML Schema instance namespace (the `xsi:type`
+// discriminator, `xsi:schemaLocation`, `xsi:nil`, …), the namespace
+// declarations, and those named in known, which are read in no namespace.
+// start must be the token the decoder read last.
 //
 // By default it does nothing. Under [WithUnmatched] it reports the path of
 // each such attribute, in the order written, and under [WithStrict] it
@@ -388,14 +403,8 @@ func CheckUnmatchedAttrs(dec *xml.Decoder, start xml.StartElement, known ...stri
 // encoding/xml, an attribute or a child element on it is ignored. Under
 // [WithUnmatched] and [WithStrict] each is unmatched content, reported or
 // refused like any other, and the value decoded is the same as by default.
-// A type with an UnmarshalXML method checks its own content.
-//
-// A pointer to an empty interface is the Go type of a BMM `Any` attribute,
-// such as the AOM 1.4 `assumed_value`, which the codec cannot decode: as
-// with encoding/xml, the element leaves v as it was. `Any` declares no
-// attributes, so under the options each attribute and child element of
-// such an element is unmatched content too. Generated UnmarshalXML methods
-// call it; it is exported for them only.
+// A type with an UnmarshalXML method checks its own content. Generated
+// UnmarshalXML methods call it; it is exported for them only.
 func DecodeElement(dec *xml.Decoder, start *xml.StartElement, v any) error {
 	t := trackerOf(dec)
 	if t == nil {

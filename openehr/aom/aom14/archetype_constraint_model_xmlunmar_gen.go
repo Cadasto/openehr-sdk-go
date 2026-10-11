@@ -139,11 +139,10 @@ func (c *CComplexObject) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement
 		case xml.StartElement:
 			switch canxml.LocalName(_t.Name) {
 			case "assumed_value":
-				var _v any
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				// Canonical XML does not model the content of an Any member — see canxml/doc.go.
+				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
-				c.AssumedValue = &_v
 			case "rm_type_name":
 				if _err := canxml.DecodeElement(_dec, &_t, &c.RMTypeName); _err != nil {
 					return _err
@@ -245,11 +244,10 @@ func (c *CPrimitiveObject) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 		case xml.StartElement:
 			switch canxml.LocalName(_t.Name) {
 			case "assumed_value":
-				var _v any
-				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
+				// Canonical XML does not model the content of an Any member — see canxml/doc.go.
+				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
-				c.AssumedValue = &_v
 			case "rm_type_name":
 				if _err := canxml.DecodeElement(_dec, &_t, &c.RMTypeName); _err != nil {
 					return _err

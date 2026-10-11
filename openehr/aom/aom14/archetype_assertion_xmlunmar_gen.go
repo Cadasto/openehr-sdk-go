@@ -197,7 +197,8 @@ func (e *ExprLeaf) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 					return _err
 				}
 			case "item":
-				if _err := canxml.DecodeElement(_dec, &_t, &e.Item); _err != nil {
+				// Canonical XML does not model the content of an Any member — see canxml/doc.go.
+				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			default:

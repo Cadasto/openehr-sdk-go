@@ -73,11 +73,17 @@
 // # Unmatched content
 //
 // Content the decode does not read is unmatched: an element or attribute
-// that names no attribute of the RM type its element decodes as, other
-// than the `xsi:type` discriminator and namespace declarations; an
-// element in a namespace other than the openEHR one ([ErrNamespace]);
-// and a `Hash` element (see below). An element in no namespace counts as
-// an openEHR one.
+// that names no attribute of the RM type its element decodes as; an
+// element in a namespace other than the openEHR one ([ErrNamespace]); and
+// the element of a `Hash` member or of a BMM `Any` member (see below).
+// Two kinds of attribute are never unmatched: a namespace declaration,
+// and an attribute in the XML Schema instance namespace, whether the
+// `xsi:type` discriminator, `xsi:schemaLocation`, `xsi:nil` or another.
+// An element in no namespace is read as an openEHR element, since many
+// producers leave the declaration out.
+//
+// The check covers every class the generated decoders read, the AOM 1.4
+// classes included.
 //
 // By default the decoder ignores unmatched content: the value holds the
 // rest of the input and none of it. [WithUnmatched] passes each item, in
@@ -86,8 +92,14 @@
 // "/composition[1]/@x-flag"; the path names the item and carries none of
 // its value. [WithStrict] refuses the decode at the first item with an
 // error wrapping [ErrUnknownElement] (and [ErrNamespace] for a foreign
-// element). Strict never refuses an absent element, and it is unrelated
-// to `xsi:type` dispatch: an unknown `xsi:type` fails in every mode.
+// element). Strict never refuses an absent element.
+//
+// An unknown `xsi:type` fails in every mode. The decoder reads the input
+// as a stream and checks content as it goes, so strict returns the first
+// problem in document order: an unmatched item that comes before an
+// unknown `xsi:type` refuses the decode with [ErrUnknownElement], and an
+// unknown `xsi:type` that comes first fails as itself. Without strict, the
+// same input fails on the unknown `xsi:type`.
 //
 // The options reach the generated UnmarshalXML methods, which encoding/xml
 // calls with nothing but the *xml.Decoder, through the decoder itself: a
@@ -121,7 +133,7 @@
 // perform XSD validation at the wire layer; OPT-driven validation is
 // available under openehr/template/.
 //
-// # Unsupported: Hash<K,V> elements
+// # Unsupported: Hash<K,V> elements and Any content
 //
 // BMM Hash<K,V> (map-typed) RM attributes are not supported by this
 // codec, and concrete RM types hit this limit. Resource-metadata types
@@ -130,9 +142,9 @@
 // TranslationDetails (author, other_details), all map[string]…
 // attributes.
 //
-// Decode does not read these elements: it treats each as unmatched
-// content, so it skips it by default, [WithUnmatched] reports it and
-// [WithStrict] refuses it, and the map field stays nil. Encode cannot
+// Decode does not read these elements: it treats each as one item of
+// unmatched content, so it skips it by default, [WithUnmatched] reports it
+// and [WithStrict] refuses it, and the map field stays nil. Encode cannot
 // emit them at all: the generated codec hands the Go map to
 // encoding/xml, which rejects map types, so [Marshal] of any
 // AuthoredResource / ResourceDescription fails with
@@ -140,6 +152,11 @@
 // since original_author is always encoded. Canonical XML for these
 // resource-metadata types is therefore unavailable until a Hash codec
 // exists.
+//
+// Nor can the codec decode the content of a BMM `Any` attribute, held as
+// a Go empty interface: the AOM 1.4 `assumed_value` and `EXPR_LEAF.item`.
+// Decode treats such an element the same way, as one item of unmatched
+// content, and leaves the field at its zero value.
 //
 // The canjson codec is unaffected (encoding/json handles maps).
 //

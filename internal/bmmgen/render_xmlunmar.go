@@ -32,8 +32,9 @@ import (
 //
 //  1. On entry, hand the start element's attributes to
 //     `canxml.CheckUnmatchedAttrs`, naming the ones the class reads as
-//     XML attributes: every other attribute, bar `xsi:type` and the
-//     namespace declarations, is unmatched.
+//     XML attributes: every other attribute, bar the XML Schema instance
+//     attributes (`xsi:type` among them) and the namespace declarations,
+//     is unmatched.
 //
 //  2. Initialise a flat switch on `canxml.LocalName` of the child
 //     element covering every effective property (in any order: XML
@@ -58,13 +59,14 @@ import (
 //  5. `xmi:type` is rejected via [canxml.XSITypeOf] (centralised in the
 //     helper).
 //
-// # Hash/map decoding
+// # Hash/map and Any decoding
 //
 // Same limitation as the encoder: Hash<K,V> properties are not
-// decoded. Their element goes to `canxml.SkipUnmatched` like unmatched
-// content, so it is skipped by default, reported or refused on request,
-// and the receiver field is left at its zero value. Documented in
-// canxml/doc.go.
+// decoded, and neither is the content of a property typed by the BMM
+// root type Any. Their element goes to `canxml.SkipUnmatched` as one
+// item of unmatched content, so it is skipped by default, reported or
+// refused on request, and the receiver field is left at its zero value.
+// Documented in canxml/doc.go.
 func RenderUnmarshalXMLFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	emitting, err := codecClassesIn(plan, file)
 	if err != nil {
@@ -257,6 +259,11 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 
 	switch p := ef.Prop.(type) {
 	case *bmm.SingleProperty:
+		if p.TypeName == bmmAnyType {
+			// The codec cannot decode the content of an Any member: the
+			// element goes to canxml.SkipUnmatched, like a Hash member's.
+			return unmarshalXMLAnyContent(elemName), nil
+		}
 		ifaceName, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
 		if kind == polySingle {
 			return unmarshalXMLPolySingle(recv, goField, elemName, ifaceName), nil
@@ -451,6 +458,21 @@ func checkUnmatchedXMLAttrs(attrFields []emittedField) string {
 	return fmt.Sprintf(
 		"\tif _err := canxml.CheckUnmatchedAttrs(_dec, _start%s); _err != nil {\n\t\treturn _err\n\t}\n",
 		known.String())
+}
+
+// bmmAnyType is the BMM name of the root type, which the generator maps to
+// the Go empty interface.
+const bmmAnyType = "Any"
+
+// unmarshalXMLAnyContent emits the case of a property typed by the BMM root
+// type Any, such as the AOM 1.4 `assumed_value` and `EXPR_LEAF.item`. The
+// codec cannot decode its content, so the element is handed to
+// canxml.SkipUnmatched as one item, like a Hash member's: skipped by default,
+// reported or refused on request, and the field is left at its zero value.
+func unmarshalXMLAnyContent(elem string) string {
+	return fmt.Sprintf(
+		"\t\t\tcase %q:\n\t\t\t\t// Canonical XML does not model the content of an Any member — see canxml/doc.go.\n\t\t\t\tif _err := canxml.SkipUnmatched(_dec, _t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
+		elem)
 }
 
 // unmarshalXMLHashTODO emits the case of a Hash<K,V> property. Canonical XML

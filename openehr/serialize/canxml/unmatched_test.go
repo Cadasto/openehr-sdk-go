@@ -481,33 +481,161 @@ func TestREQ170_XMLHashElements(t *testing.T) {
 	assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, wantPaths[0], false)
 }
 
-// TestREQ170_XMLAnyMemberContent pins how the content of a BMM `Any` member is
-// read, here the AOM 1.4 `assumed_value`, which the codec cannot decode. The
-// element names an attribute of its type, so it is matched; `Any` declares no
-// attributes, so each attribute (bar `xsi:type`) and child element it carries
-// is unmatched. The default decodes as before, the report option names each
-// item, and strict refuses the first.
+// TestREQ170_XMLAnyMemberContent pins the rule for the content of a BMM `Any`
+// member, which the codec cannot decode: the AOM 1.4 `assumed_value` and
+// `EXPR_LEAF.item`. Like a Hash element, the element is skipped by default,
+// leaving the field at its zero value; the report option reports it as one
+// item at its own path, whatever it holds, an empty element included; and
+// strict refuses it like unmatched content.
 func TestREQ170_XMLAnyMemberContent(t *testing.T) {
-	in := []byte(`<definition ` + ucNS + `><rm_type_name>DV_TEXT</rm_type_name><node_id>at1</node_id>` +
-		`<assumed_value xsi:type="DV_TEXT" x-attr="` + xmlPlanted + `"><value>` + xmlPlanted + `</value></assumed_value></definition>`)
-	wantPaths := []string{"/definition[1]/assumed_value[1]/@x-attr", "/definition[1]/assumed_value[1]/value[1]"}
+	const slot = "{{any}}"
+	for _, tc := range []struct {
+		name    string
+		tmpl    string
+		element string
+		path    string
+		into    func() any
+	}{
+		{
+			name:    "assumed_value with content",
+			tmpl:    `<definition ` + ucNS + `><rm_type_name>DV_TEXT</rm_type_name>` + slot + `<node_id>at1</node_id></definition>`,
+			element: `<assumed_value xsi:type="DV_TEXT" x-attr="` + xmlPlanted + `"><value>` + xmlPlanted + `</value></assumed_value>`,
+			path:    "/definition[1]/assumed_value[1]",
+			into:    func() any { return new(aom14.CComplexObject) },
+		},
+		{
+			name:    "empty assumed_value",
+			tmpl:    `<definition ` + ucNS + `><rm_type_name>DV_TEXT</rm_type_name>` + slot + `<node_id>at1</node_id></definition>`,
+			element: `<assumed_value/>`,
+			path:    "/definition[1]/assumed_value[1]",
+			into:    func() any { return new(aom14.CComplexObject) },
+		},
+		{
+			name: "EXPR_LEAF item",
+			tmpl: `<expr_leaf ` + ucNS + `><type>C_STRING</type>` + slot +
+				`<reference_type>constraint</reference_type></expr_leaf>`,
+			element: `<item xsi:type="C_STRING"><pattern>` + xmlPlanted + `</pattern></item>`,
+			path:    "/expr_leaf[1]/item[1]",
+			into:    func() any { return new(aom14.ExprLeaf) },
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			in := []byte(strings.Replace(tc.tmpl, slot, tc.element, 1))
+			want := tc.into()
+			if err := canxml.Unmarshal([]byte(strings.Replace(tc.tmpl, slot, "", 1)), want); err != nil {
+				t.Fatalf("canxml.Unmarshal(input without the Any element) = %v; want nil", err)
+			}
 
-	want := new(aom14.CComplexObject)
-	if err := canxml.Unmarshal(in, want); err != nil {
-		t.Fatalf("canxml.Unmarshal = %v; want nil", err)
+			got := tc.into()
+			if err := canxml.Unmarshal(in, got); err != nil {
+				t.Fatalf("canxml.Unmarshal = %v; want nil: the Any element is skipped by default", err)
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("canxml.Unmarshal decoded\n%#v\nwant the value without the Any element\n%#v", got, want)
+			}
+
+			got, paths, err := unmarshalCollecting(tc.into, in)
+			if err != nil {
+				t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
+			}
+			if wantPaths := []string{tc.path}; !slices.Equal(paths, wantPaths) {
+				t.Errorf("WithUnmatched reported %q; want %q, the element as one item", paths, wantPaths)
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("canxml.Unmarshal(WithUnmatched) decoded\n%#v\nwant the default's value\n%#v", got, want)
+			}
+
+			err = canxml.Unmarshal(in, tc.into(), canxml.WithStrict())
+			assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, tc.path, false)
+		})
 	}
-	got, paths, err := unmarshalCollecting(func() any { return new(aom14.CComplexObject) }, in)
+}
+
+// TestREQ170_XMLSchemaInstanceAttributesAreNotUnmatched pins that no attribute
+// in the XML Schema instance namespace is unmatched content, wherever it sits:
+// `xsi:schemaLocation` and `xsi:noNamespaceSchemaLocation` on the root and
+// `xsi:nil` on a primitive element decode under strict, nothing is reported,
+// and the value is the one without them. An `xsi:` prefix bound to no
+// namespace is not that namespace, so its attribute stays unmatched.
+func TestREQ170_XMLSchemaInstanceAttributesAreNotUnmatched(t *testing.T) {
+	doc := func(rootAttrs, leafAttrs string) []byte {
+		return []byte(`<composition ` + ucNS + ` archetype_node_id="openEHR-EHR-COMPOSITION.encounter.v1"` + rootAttrs + `>` +
+			`<name><value` + leafAttrs + `>n</value></name>` + xLanguage + `<composer xsi:type="PARTY_SELF"/></composition>`)
+	}
+	in := doc(` xsi:schemaLocation="http://schemas.openehr.org/v1 Composition.xsd" xsi:noNamespaceSchemaLocation="Composition.xsd"`, ` xsi:nil="false"`)
+	want := new(rm.Composition)
+	if err := canxml.Unmarshal(doc("", ""), want); err != nil {
+		t.Fatalf("canxml.Unmarshal(base input) = %v; want nil", err)
+	}
+
+	got, paths, err := unmarshalCollecting(func() any { return new(rm.Composition) }, in, canxml.WithStrict())
 	if err != nil {
-		t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
+		t.Fatalf("canxml.Unmarshal(xsi attributes, WithStrict) = %v; want nil: an XML Schema instance attribute is not unmatched", err)
 	}
-	if !slices.Equal(paths, wantPaths) {
-		t.Errorf("WithUnmatched reported %q; want %q", paths, wantPaths)
+	if len(paths) != 0 {
+		t.Errorf("WithUnmatched reported %q; want nothing", paths)
 	}
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("canxml.Unmarshal(WithUnmatched) decoded\n%#v\nwant the default's value\n%#v", got, want)
+		t.Errorf("canxml.Unmarshal decoded\n%#v\nwant the value without the xsi attributes\n%#v", got, want)
 	}
-	err = canxml.Unmarshal(in, new(aom14.CComplexObject), canxml.WithStrict())
-	assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, wantPaths[0], false)
+
+	t.Run("unbound xsi prefix", func(t *testing.T) {
+		unbound := []byte(`<dv_text xmlns="http://schemas.openehr.org/v1" xsi:type="DV_TEXT"><value>a</value></dv_text>`)
+		_, paths, err := unmarshalCollecting(func() any { return new(rm.DVText) }, unbound)
+		if err != nil {
+			t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
+		}
+		if want := []string{"/dv_text[1]/@type"}; !slices.Equal(paths, want) {
+			t.Errorf("WithUnmatched reported %q; want %q: an unbound `xsi:` prefix names no namespace", paths, want)
+		}
+	})
+}
+
+// TestREQ170_XMLStrictReturnsTheFirstProblem pins the order the streaming
+// decode reports problems in. An unmatched element that comes before an
+// unknown `xsi:type` refuses a strict decode with canxml.ErrUnknownElement,
+// while the default and the report option, which do not refuse it, fail on
+// the unknown `xsi:type`. With the unknown `xsi:type` first, every mode fails
+// on it.
+func TestREQ170_XMLStrictReturnsTheFirstProblem(t *testing.T) {
+	doc := func(before, after string) []byte {
+		return []byte(`<element ` + ucNS + ` archetype_node_id="at1"><name><value>n</value></name>` + before +
+			`<value xsi:type="NO_SUCH_CLASS"><magnitude>1</magnitude></value>` + after + `</element>`)
+	}
+	ext := `<x-ext>` + xmlPlanted + `</x-ext>`
+	const extPath = "/element[1]/x-ext[1]"
+
+	t.Run("unmatched element first", func(t *testing.T) {
+		in := doc(ext, "")
+		err := canxml.Unmarshal(in, new(rm.Element), canxml.WithStrict())
+		assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, extPath, false)
+		if errors.Is(err, typereg.ErrUnknownType) {
+			t.Errorf("canxml.Unmarshal(WithStrict) err = %v; want the refusal of the element that comes first, not the dispatch failure after it", err)
+		}
+
+		err = canxml.Unmarshal(in, new(rm.Element))
+		if !errors.Is(err, typereg.ErrUnknownType) || errors.Is(err, canxml.ErrUnknownElement) {
+			t.Errorf("canxml.Unmarshal err = %v; want typereg.ErrUnknownType and not canxml.ErrUnknownElement: the default ignores the element", err)
+		}
+
+		_, paths, err := unmarshalCollecting(func() any { return new(rm.Element) }, in)
+		if !errors.Is(err, typereg.ErrUnknownType) || errors.Is(err, canxml.ErrUnknownElement) {
+			t.Errorf("canxml.Unmarshal(WithUnmatched) err = %v; want typereg.ErrUnknownType and not canxml.ErrUnknownElement", err)
+		}
+		if want := []string{extPath}; !slices.Equal(paths, want) {
+			t.Errorf("WithUnmatched reported %q; want %q, the element before the failure", paths, want)
+		}
+	})
+
+	t.Run("dispatch failure first", func(t *testing.T) {
+		in := doc("", ext)
+		for _, opts := range [][]canxml.DecoderOption{nil, {canxml.WithStrict()}} {
+			err := canxml.Unmarshal(in, new(rm.Element), opts...)
+			if !errors.Is(err, typereg.ErrUnknownType) || errors.Is(err, canxml.ErrUnknownElement) {
+				t.Errorf("canxml.Unmarshal(%d options) err = %v; want typereg.ErrUnknownType and not canxml.ErrUnknownElement: the decode stops at the first problem", len(opts), err)
+			}
+		}
+	})
 }
 
 // TestREQ170_XMLDecoderUnmatchedOptions drives the streaming entry point: a
