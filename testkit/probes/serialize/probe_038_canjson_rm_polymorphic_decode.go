@@ -11,6 +11,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
+	"github.com/cadasto/openehr-sdk-go/testkit/expectedform"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 	"github.com/cadasto/openehr-sdk-go/testkit/wireequiv"
 )
@@ -27,12 +28,15 @@ import (
 //
 //  1. canjson.Unmarshal succeeds.
 //  2. canjson.Marshal of the recovered value succeeds.
-//  3. Every `_type` discriminator the input carried also appears at
-//     least once in the re-marshalled output. Substitution must be
-//     lossless across decode then re-marshal; a silent narrowing
-//     (e.g. DV_CODED_TEXT decoded into a parent DVText struct that
-//     loses defining_code and re-emits as DV_TEXT) is the regression
-//     this assertion guards against.
+//  3. Every `_type` discriminator the input carried on a member the RM
+//     defines appears in the re-marshalled output at least as often,
+//     counted as a multiset. Substitution must be lossless across decode
+//     then re-marshal; a silent narrowing (e.g. DV_CODED_TEXT decoded
+//     into a parent DVText struct that loses defining_code and re-emits
+//     as DV_TEXT) is the regression this assertion guards against. A
+//     `_type` inside a member that names no attribute of its object's RM
+//     type is not counted: the decoder ignores that member, so its
+//     discriminators are not part of the value (testkit/expectedform).
 //  4. Re-marshalling is a wire-equivalence fixpoint: decoding the
 //     re-marshalled bytes (b1) and encoding again (b2) produces a
 //     document wire-equivalent to b1 (testkit/wireequiv): re-marshalling
@@ -66,6 +70,10 @@ func probe038PolymorphicDecode(body []byte, factory func() any, secondMarshal fu
 		return r, nil
 	}
 	v := factory()
+	root, ok := expectedform.RootType(v)
+	if !ok {
+		return r, errors.New("PROBE-038: the factory's value names no RM type")
+	}
 	if err := canjson.Unmarshal(body, v); err != nil {
 		r.Status = "fail"
 		r.Detail = fmt.Sprintf("decode: %v", err)
@@ -77,7 +85,12 @@ func probe038PolymorphicDecode(body []byte, factory func() any, secondMarshal fu
 		r.Detail = fmt.Sprintf("re-marshal: %v", err)
 		return r, nil
 	}
-	wantTypes := collectDiscriminators(body)
+	wantTypes, err := inputDiscriminators(body, root)
+	if err != nil {
+		r.Status = "fail"
+		r.Detail = err.Error()
+		return r, nil
+	}
 	gotTypes := collectDiscriminators(out)
 	missing := wantTypes.Diff(gotTypes)
 	if len(missing) > 0 {
@@ -130,6 +143,19 @@ func (want typeSet) Diff(got typeSet) []string {
 	}
 	slices.Sort(out)
 	return out
+}
+
+// inputDiscriminators returns the multiset of `_type` discriminators the
+// input carries on members the RM defines: the input is pruned first
+// (expectedform.Prune), so a `_type` inside a member that names no
+// attribute of its object's RM type, which the decoder ignores, is not
+// counted. root is the decode target's RM type.
+func inputDiscriminators(body []byte, root string) (typeSet, error) {
+	pruned, err := expectedform.Prune(body, root)
+	if err != nil {
+		return nil, fmt.Errorf("read the input against the RM: %w", err)
+	}
+	return collectDiscriminators(pruned), nil
 }
 
 // collectDiscriminators returns a multiset of every `_type` string
