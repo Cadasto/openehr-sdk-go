@@ -40,8 +40,8 @@ func emitStringLeaf(out map[string]any, flatPath string, root rm.Locatable, relP
 		return fmt.Errorf("simplified: resolve %q: %w", relPath, err)
 	}
 	ownerRel, attr := "", relPath
-	if i := strings.LastIndexByte(relPath, '/'); i >= 0 {
-		ownerRel, attr = relPath[:i], relPath[i+1:]
+	if before, after, ok := strings.CutLast(relPath, "/"); ok {
+		ownerRel, attr = before, after
 	}
 	if ownerRel != "" {
 		if _, err := rmpath.ItemAtPath(root, ownerRel); err != nil {

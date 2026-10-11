@@ -25,7 +25,7 @@ Jobs run in parallel. All use Go 1.27.x (`actions/setup-go@v7` with module cache
 |---|---|---|
 | **Verify** | `fmt-check`, `mod-tidy-check`, `codegen-verify`, `aqlgen-verify`, `termgen-verify`, `vet`, `spec-check`, `flat-conformance-verify`, `terminology-verify`, `build` | Static checks and compile-all without running tests |
 | **Test** | `test` | Unit tests; `test` already depends on `codegen-verify`, `aqlgen-verify` and `termgen-verify` |
-| **Lint** | (via `golangci-lint-action` v2.13.2, config [`.golangci.yml`](../.golangci.yml)) | Same rules as `make lint` / `make lint-ci` |
+| **Lint** | (via `golangci-lint-action` v2.14.0, config [`.golangci.yml`](../.golangci.yml)) | Same rules as `make lint` / `make lint-ci` |
 | **Race** | `test-race` | **Push to `main` only**, because `-race` is slower. Catches data races in `typereg` and codecs |
 
 PRs do not run the **Race** job. Merge to `main` triggers it on the post-merge push.
@@ -80,7 +80,7 @@ Run `make help` for the full grouped list. Common targets:
 ### Lint configuration
 
 - Config: [`.golangci.yml`](../.golangci.yml)
-- Pin: `golangci/golangci-lint:v2.13.2` (Makefile `LINT_IMAGE` and GitHub Action `version`). Official release binaries are built with Go 1.27; a host `go install` from an older toolchain cannot load this module (golangci-lint refuses when its build Go is below the `go.mod` floor). `make lint` / `make fmt-check` then fall back to the pinned image.
+- Pin: `golangci/golangci-lint:v2.14.0-alpine` (Makefile `LINT_IMAGE` and the Dockerfile's `GOLANGCI_IMAGE`), and `v2.14.0` as the GitHub Action `version`. It is the first release that reads the export data Go 1.27.2 writes (version 5); v2.13.2 fails every package with `could not load export data` against a 1.27.2 toolchain, which the CI job's `go-version: '1.27.x'` resolves to. Official release binaries are built with Go 1.27; a host `go install` from an older toolchain cannot load this module (golangci-lint refuses when its build Go is below the `go.mod` floor). `make lint` / `make fmt-check` then fall back to the pinned image.
 - Generated files (the `// Code generated … DO NOT EDIT.` set) are skipped via `exclusions: generated: lax` in `.golangci.yml`
 
 ## Dependency updates

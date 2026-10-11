@@ -121,11 +121,11 @@ func ParseOpenEHRScope(token string) (OpenEHRScope, bool) {
 	if !found {
 		return OpenEHRScope{}, false
 	}
-	dot := strings.LastIndexByte(rest, '.')
-	if dot < 0 {
+	before, after, ok := strings.CutLast(rest, ".")
+	if !ok {
 		return OpenEHRScope{}, false
 	}
-	resource, pattern, found := strings.Cut(rest[:dot], "-")
+	resource, pattern, found := strings.Cut(before, "-")
 	if !found {
 		return OpenEHRScope{}, false
 	}
@@ -133,7 +133,7 @@ func ParseOpenEHRScope(token string) (OpenEHRScope, bool) {
 		Compartment: compartment,
 		Resource:    resource,
 		Pattern:     pattern,
-		Permissions: rest[dot+1:],
+		Permissions: after,
 	}
 	if s.check() != nil {
 		return OpenEHRScope{}, false

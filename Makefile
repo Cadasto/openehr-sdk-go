@@ -12,7 +12,7 @@
 
 COMPOSE         ?= docker compose
 COMPOSE_PROJECT ?= openehr-sdk-go
-LINT_IMAGE      ?= golangci/golangci-lint:v2.13.2-alpine
+LINT_IMAGE      ?= golangci/golangci-lint:v2.14.0-alpine
 DOCKER_MOUNT    = -v $(CURDIR):/app -w /app
 
 # ANTLR codegen (maintainer-only). The generator is Java, confined to the
