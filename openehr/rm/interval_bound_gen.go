@@ -9,6 +9,8 @@ import (
 	"encoding/xml"
 	"strconv"
 	"strings"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
 
 // intervalFlagsSeen records which of an interval's four boundary flags a
@@ -71,9 +73,11 @@ func (f intervalFlagJSON) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // carries no boolean: it leaves field alone and the flag unmarked, so the
 // flag takes its default like one the document leaves out. Any other text,
 // trimmed, is parsed as a boolean, and a text that is none is an error.
+// The text is read through canxml.DecodeElement, so an attribute or child
+// element on the flag is unmatched content like any other.
 func decodeIntervalFlagXML(dec *xml.Decoder, start *xml.StartElement, field, seen *bool) error {
 	var text string
-	if err := dec.DecodeElement(&text, start); err != nil {
+	if err := canxml.DecodeElement(dec, start, &text); err != nil {
 		return err
 	}
 	text = strings.TrimSpace(text)

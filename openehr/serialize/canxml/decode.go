@@ -14,14 +14,81 @@ import (
 // `xmi:type` it sees to [ErrInvalidShape].
 const NSXMI = "http://www.omg.org/XMI"
 
-// DecoderOption configures a [Decoder]. Use [WithRelaxedTypeDispatch]
-// to switch the polymorphic-dispatch policy from strict (default)
-// to relaxed.
+// DecoderOption configures a decode, through [Unmarshal] or a [Decoder].
+// [WithUnmatched] and [WithStrict] say what happens to content the decode
+// does not read; [WithRelaxedTypeDispatch] switches the polymorphic-dispatch
+// policy from strict (the default) to relaxed.
 type DecoderOption func(*decoderConfig)
 
-// decoderConfig holds the option-driven state of a Decoder.
+// decoderConfig holds the option-driven state of a decode. Kept unexported so
+// the option list can grow without churning the [Decoder] type.
 type decoderConfig struct {
 	relaxedTypeDispatch bool
+	unmatched           func(path string)
+	strict              bool
+}
+
+// newDecoderConfig applies opts in order, skipping a nil option.
+func newDecoderConfig(opts []DecoderOption) decoderConfig {
+	var c decoderConfig
+	for _, o := range opts {
+		if o != nil {
+			o(&c)
+		}
+	}
+	return c
+}
+
+// tracked reports whether the decode reports or refuses unmatched content.
+func (c decoderConfig) tracked() bool {
+	return c.unmatched != nil || c.strict
+}
+
+// WithUnmatched passes every unmatched item of the input to fn while the
+// decode carries on. An item is unmatched when the decode does not read it:
+// an element or attribute that names no attribute of the RM type its element
+// decodes as, other than the `xsi:type` discriminator and namespace
+// declarations; an element in a namespace other than the openEHR one (see
+// [ErrNamespace]); and a `Hash` element, which this codec does not model. It
+// applies at any depth: inside a polymorphic slot, an interval bound, a
+// primitive element or an AOM 1.4 value too.
+//
+// By default the decoder ignores unmatched content: the value it returns
+// holds the rest of the input and none of it. With this option fn receives
+// each item, once, in the order it appears in the input, and the value
+// returned is the same as without the option. An unmatched element is one
+// item, whatever it holds.
+//
+// fn gets the item's path from the root of the value: one `/name[n]` segment
+// per element, where name is the element's local name and n its position
+// among the earlier siblings of the same name plus one, counting from 1; an
+// attribute adds a last `/@name` segment. For example
+// "/composition[1]/content[2]/x-note[1]" or "/composition[1]/@x-flag". The
+// path carries names only, never a value from the input. fn runs during the
+// decode, on the caller's goroutine.
+//
+// A nil fn is the same as leaving the option out. Combined with
+// [WithStrict], fn sees the first unmatched item before the decode is
+// refused.
+func WithUnmatched(fn func(path string)) DecoderOption {
+	return func(c *decoderConfig) { c.unmatched = fn }
+}
+
+// WithStrict refuses the decode at its first unmatched item (see
+// [WithUnmatched] for what is unmatched and for the form of its path). The
+// error wraps [ErrUnknownElement] and names the item's path from the root of
+// the value; it carries none of the item's value. An element in a foreign
+// namespace also wraps [ErrNamespace]. The value v points to is unspecified
+// after the refusal.
+//
+// Strict covers unmatched content only. An absent element is never refused,
+// mandatory or not, and neither is a boundary flag an interval leaves out.
+// The option is unrelated to `xsi:type` dispatch: an unknown `xsi:type`
+// fails in every mode (see [DecodeError]).
+//
+// By default the decoder ignores unmatched content.
+func WithStrict() DecoderOption {
+	return func(c *decoderConfig) { c.strict = true }
 }
 
 // WithRelaxedTypeDispatch toggles the polymorphic-dispatch policy
@@ -52,23 +119,34 @@ func WithRelaxedTypeDispatch(enabled bool) DecoderOption {
 type Decoder struct {
 	dec *xml.Decoder
 	cfg decoderConfig
+	// trk is the decoder's tracker when an option reports or refuses
+	// unmatched content, and nil otherwise.
+	trk *tracker
 }
 
-// NewDecoder returns a [Decoder] that reads canonical-XML from r.
+// NewDecoder returns a [Decoder] that reads canonical-XML from r. The
+// options apply to every value it decodes; a path that [WithUnmatched] or
+// [WithStrict] reports is relative to the value being decoded.
 func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
-	d := &Decoder{dec: xml.NewDecoder(r)}
-	for _, o := range opts {
-		if o != nil {
-			o(&d.cfg)
-		}
+	cfg := newDecoderConfig(opts)
+	if !cfg.tracked() {
+		return &Decoder{dec: xml.NewDecoder(r), cfg: cfg}
 	}
-	return d
+	t := newTracker(cfg.unmatched, cfg.strict)
+	return &Decoder{
+		dec: xml.NewTokenDecoder(&trackingReader{src: xml.NewDecoder(r), t: t}),
+		cfg: cfg,
+		trk: t,
+	}
 }
 
 // Decode reads the next XML element from the stream and stores it
 // in v. Errors follow the same classification as [Unmarshal].
 func (d *Decoder) Decode(v any) error {
-	return d.dec.Decode(v)
+	if d.trk == nil {
+		return d.dec.Decode(v)
+	}
+	return d.trk.decode(d.dec, v)
 }
 
 // RelaxedTypeDispatch reports whether the decoder was configured
@@ -94,8 +172,15 @@ func (d *Decoder) RelaxedTypeDispatch() bool { return d.cfg.relaxedTypeDispatch 
 // classified: they come back unchanged from encoding/xml, so an
 // errors.Is against [ErrInvalidShape] does not match a truncated or
 // otherwise malformed document.
-func Unmarshal(data []byte, v any) error {
-	return xml.NewDecoder(bytes.NewReader(data)).Decode(v)
+//
+// Content the decode does not read is ignored by default. [WithUnmatched]
+// reports each such item and [WithStrict] refuses the first, wrapping
+// [ErrUnknownElement].
+func Unmarshal(data []byte, v any, opts ...DecoderOption) error {
+	if len(opts) == 0 {
+		return xml.NewDecoder(bytes.NewReader(data)).Decode(v)
+	}
+	return NewDecoder(bytes.NewReader(data), opts...).Decode(v)
 }
 
 // XSITypeOf scans a start element's attribute list and returns the
@@ -133,10 +218,7 @@ func XSITypeOf(start xml.StartElement) (string, error) {
 			return "", fmt.Errorf("canxml: %w: xmi:type on the wire is rejected (use xsi:type)", ErrInvalidShape)
 		}
 		// Accept xsi:type (resolved and literal forms).
-		if attr.Name.Local == "type" && (attr.Name.Space == NSXSI || attr.Name.Space == "") {
-			return stripXSDPrefix(attr.Value), nil
-		}
-		if attr.Name.Local == "xsi:type" {
+		if isDiscriminator(attr.Name) {
 			return stripXSDPrefix(attr.Value), nil
 		}
 	}
@@ -196,7 +278,7 @@ func DecodeAs[T any](dec *xml.Decoder, start xml.StartElement) (T, error) {
 		}
 	}
 	v := ctor()
-	if err := dec.DecodeElement(v, &start); err != nil {
+	if err := DecodeElement(dec, &start, v); err != nil {
 		return zero, &DecodeError{
 			Path:  "/" + start.Name.Local,
 			Type:  typeName,
@@ -239,7 +321,7 @@ func DecodeAsOrDefault[T any](dec *xml.Decoder, start xml.StartElement, defaultC
 			return zero, &DecodeError{Path: "/" + start.Name.Local, Inner: fmt.Errorf("canxml: %w", typereg.ErrMissingType)}
 		}
 		v = defaultCtor()
-		if err := dec.DecodeElement(v, &start); err != nil {
+		if err := DecodeElement(dec, &start, v); err != nil {
 			return zero, &DecodeError{
 				Path:  "/" + start.Name.Local,
 				Inner: fmt.Errorf("canxml: %w", err),
@@ -255,7 +337,7 @@ func DecodeAsOrDefault[T any](dec *xml.Decoder, start xml.StartElement, defaultC
 			}
 		}
 		v = ctor()
-		if err := dec.DecodeElement(v, &start); err != nil {
+		if err := DecodeElement(dec, &start, v); err != nil {
 			return zero, &DecodeError{
 				Path:  "/" + start.Name.Local,
 				Type:  typeName,

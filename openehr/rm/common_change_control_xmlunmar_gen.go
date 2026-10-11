@@ -20,7 +20,12 @@ import (
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *Contribution) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -28,7 +33,7 @@ func (c *Contribution) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch canxml.LocalName(_t.Name) {
 			case "uid":
 				if _err := _dec.DecodeElement(&c.UID, &_t); _err != nil {
 					return _err
@@ -46,7 +51,7 @@ func (c *Contribution) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 				}
 				c.Audit = _v
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -63,7 +68,12 @@ func (c *Contribution) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (i *ImportedVersion[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -71,7 +81,7 @@ func (i *ImportedVersion[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch canxml.LocalName(_t.Name) {
 			case "contribution":
 				_v, _err := canxml.DecodeAsOrDefault[ObjectRefLike](_dec, _t, func() any { return new(ObjectRef) })
 				if _err != nil {
@@ -80,7 +90,7 @@ func (i *ImportedVersion[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 				i.Contribution = _v
 			case "signature":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				i.Signature = &_v
@@ -95,7 +105,7 @@ func (i *ImportedVersion[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					return _err
 				}
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -112,7 +122,12 @@ func (i *ImportedVersion[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (o *OriginalVersion[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -120,7 +135,7 @@ func (o *OriginalVersion[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch canxml.LocalName(_t.Name) {
 			case "contribution":
 				_v, _err := canxml.DecodeAsOrDefault[ObjectRefLike](_dec, _t, func() any { return new(ObjectRef) })
 				if _err != nil {
@@ -129,7 +144,7 @@ func (o *OriginalVersion[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 				o.Contribution = _v
 			case "signature":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				o.Signature = &_v
@@ -172,7 +187,7 @@ func (o *OriginalVersion[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 				}
 				o.Data = _v
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -189,7 +204,12 @@ func (o *OriginalVersion[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (v *VersionedObject[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -197,7 +217,7 @@ func (v *VersionedObject[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch canxml.LocalName(_t.Name) {
 			case "uid":
 				if _err := _dec.DecodeElement(&v.UID, &_t); _err != nil {
 					return _err
@@ -213,7 +233,7 @@ func (v *VersionedObject[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					return _err
 				}
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}

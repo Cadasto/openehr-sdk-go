@@ -57,17 +57,47 @@
 //     `xsi:type` is recognised (openEHR ITS-XML uses XMI in UML
 //     diagrams, not on the wire).
 //
-// # Strict vs relaxed decode
+// # Strict vs relaxed type dispatch
 //
 // The decoder defaults to strict polymorphism: at any element whose
 // declared type is an abstract RM class or interface, the input
 // element must carry `xsi:type` or the decode fails with
 // [typereg.ErrMissingType] wrapped in [DecodeError].
 //
-// [NewDecoder] accepts [WithRelaxedTypeDispatch] to opt into relaxed
-// dispatch (as in canjson): when the declared abstract field
-// has exactly one concrete descendant in the merged BMM, the decoder
-// instantiates that descendant without `xsi:type`. The default is off.
+// [Unmarshal] and [NewDecoder] accept [WithRelaxedTypeDispatch], which
+// names relaxed dispatch (as in canjson): when the declared abstract
+// field has exactly one concrete descendant in the merged BMM, the
+// decoder would instantiate that descendant without `xsi:type`. The
+// option is accepted but not yet enforced, so dispatch stays strict.
+//
+// # Unmatched content
+//
+// Content the decode does not read is unmatched: an element or attribute
+// that names no attribute of the RM type its element decodes as, other
+// than the `xsi:type` discriminator and namespace declarations; an
+// element in a namespace other than the openEHR one ([ErrNamespace]);
+// and a `Hash` element (see below). An element in no namespace counts as
+// an openEHR one.
+//
+// By default the decoder ignores unmatched content: the value holds the
+// rest of the input and none of it. [WithUnmatched] passes each item, in
+// document order, to a caller function as its path from the root of the
+// value, such as "/composition[1]/content[2]/x-note[1]" or
+// "/composition[1]/@x-flag"; the path names the item and carries none of
+// its value. [WithStrict] refuses the decode at the first item with an
+// error wrapping [ErrUnknownElement] (and [ErrNamespace] for a foreign
+// element). Strict never refuses an absent element, and it is unrelated
+// to `xsi:type` dispatch: an unknown `xsi:type` fails in every mode.
+//
+// The options reach the generated UnmarshalXML methods, which encoding/xml
+// calls with nothing but the *xml.Decoder, through the decoder itself: a
+// decode given either option reads its input through a token source that
+// tracks the open elements, and registers its decoder with its own policy
+// while it runs. Concurrent decodes each have their own decoder and so
+// their own policy. The generated methods hand the content they do not
+// read to [SkipUnmatched], [CheckUnmatchedAttrs] and [DecodeElement], which
+// look the decoder up and, for an untracked decode, behave as encoding/xml
+// does.
 //
 // # Polymorphic dispatch
 //
@@ -100,7 +130,9 @@
 // TranslationDetails (author, other_details), all map[string]…
 // attributes.
 //
-// Decode skips these elements (via xml.Decoder.Skip). Encode cannot
+// Decode does not read these elements: it treats each as unmatched
+// content, so it skips it by default, [WithUnmatched] reports it and
+// [WithStrict] refuses it, and the map field stays nil. Encode cannot
 // emit them at all: the generated codec hands the Go map to
 // encoding/xml, which rejects map types, so [Marshal] of any
 // AuthoredResource / ResourceDescription fails with

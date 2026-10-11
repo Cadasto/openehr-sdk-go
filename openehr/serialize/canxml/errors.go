@@ -22,16 +22,29 @@ import (
 // this sentinel.
 var ErrInvalidShape = errors.New("canxml: invalid XML shape")
 
-// ErrNamespace is the canxml-local sentinel reserved for foreign-
-// namespace rejection: an element decoded outside the openEHR
-// canonical default namespace at a position where canonical XML
-// requires it.
+// ErrUnknownElement is the sentinel for content the decode does not read:
+// an element or attribute that names no attribute of the RM type its
+// element decodes as, other than the `xsi:type` discriminator and namespace
+// declarations, and an element in a namespace other than the openEHR one
+// (see [ErrNamespace]). A `Hash` element, which this codec does not model,
+// counts as such content too.
 //
-// The decoder does not currently return it: the generated
-// UnmarshalXML methods match children by local name and skip
-// unrecognised elements, so foreign namespaces are tolerated rather
-// than rejected. The sentinel stays exported for source compatibility
-// and for a future strict-namespace decode path.
+// Such content is ignored by default. Only a decode given [WithStrict]
+// refuses it: the refusal wraps this sentinel and names the item's path
+// from the root of the document (see [WithUnmatched] for the form of a
+// path). The path carries the item's name but none of its value.
+var ErrUnknownElement = errors.New("canxml: unknown element or attribute")
+
+// ErrNamespace classifies an element in a namespace other than the openEHR
+// one, `http://schemas.openehr.org/v1`. An element in no namespace counts
+// as an openEHR element, since many producers declare no default namespace.
+//
+// A foreign element is unmatched content, even when its local name is that
+// of an RM attribute: the decode ignores it by default, [WithUnmatched]
+// reports it, and [WithStrict] refuses it with an error that wraps both
+// [ErrUnknownElement] and this sentinel. An attribute in a foreign
+// namespace is unmatched content too, but its refusal wraps
+// [ErrUnknownElement] only.
 var ErrNamespace = errors.New("canxml: foreign XML namespace")
 
 // DecodeError is the unified error returned by the decoder at

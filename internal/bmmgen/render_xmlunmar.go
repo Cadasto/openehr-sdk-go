@@ -20,7 +20,9 @@ import (
 // the snake-cased element local name back to the matching struct
 // field. Polymorphic fields are routed through
 // [canxml.DecodeAs] which consults [typereg.Default] for the
-// `xsi:type` discriminator.
+// `xsi:type` discriminator. Content the method does not read is handed
+// to the canxml helpers that apply the decode's policy for unmatched
+// content: ignore it (the default), report it, or refuse it.
 //
 // Returns (nil, nil) when the file has no concrete classes.
 //
@@ -28,29 +30,41 @@ import (
 //
 // For each concrete class C:
 //
-//  1. Initialise a flat switch on the child element's local name
-//     covering every effective property (in any order: XML decode
-//     is name-keyed, unlike encode which is order-pinned).
+//  1. On entry, hand the start element's attributes to
+//     `canxml.CheckUnmatchedAttrs`, naming the ones the class reads as
+//     XML attributes: every other attribute, bar `xsi:type` and the
+//     namespace declarations, is unmatched.
 //
-//  2. Per property:
-//     - Mandatory / optional primitive → `dec.DecodeElement(&v.Field, &t)`
+//  2. Initialise a flat switch on `canxml.LocalName` of the child
+//     element covering every effective property (in any order: XML
+//     decode is name-keyed, unlike encode which is order-pinned).
+//     LocalName answers "" for an element in a foreign namespace, so
+//     such an element matches no property.
+//
+//  3. Per property:
+//     - Mandatory / optional primitive → `canxml.DecodeElement(dec, &t, &v.Field)`
 //     - Mandatory struct → `dec.DecodeElement(&v.Field, &t)` (or `v.Field, ...` for pointer)
 //     - Optional struct (pointer) → allocate, decode, assign
+//     - Open generic parameter → `canxml.DecodeElement`, which serves a
+//     primitive and a struct alike
 //     - Polymorphic single → `canxml.DecodeAs[Iface](dec, t)` + assign
 //     - Slice of primitive/struct → append per occurrence
 //     - Slice of polymorphic → append result of `canxml.DecodeAs[Iface]`
 //
-//  3. Unknown elements are skipped via `dec.Skip()` so foreign-namespace
-//     additions don't trip strict decode.
+//  4. Every other element, a foreign one included, reaches the default
+//     arm, `canxml.SkipUnmatched`, which skips it, reports it or refuses
+//     it as the decode's options say.
 //
-//  4. Unknown attributes are tolerated; `xmi:type` is rejected via
-//     [canxml.XSITypeOf] (centralised in the helper).
+//  5. `xmi:type` is rejected via [canxml.XSITypeOf] (centralised in the
+//     helper).
 //
 // # Hash/map decoding
 //
-// Same limitation as the encoder: Hash<K,V> properties are
-// skipped at decode time. The receiver field is left at its zero
-// value. Documented in canxml/doc.go.
+// Same limitation as the encoder: Hash<K,V> properties are not
+// decoded. Their element goes to `canxml.SkipUnmatched` like unmatched
+// content, so it is skipped by default, reported or refused on request,
+// and the receiver field is left at its zero value. Documented in
+// canxml/doc.go.
 func RenderUnmarshalXMLFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	emitting, err := codecClassesIn(plan, file)
 	if err != nil {
@@ -160,6 +174,8 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	b.WriteString("// sentinels inside *canxml.DecodeError for errors.Is / errors.As.\n")
 	b.WriteString("// Properties typed as XML attributes per the openEHR ITS-XML XSDs\n")
 	b.WriteString("// (currently `archetype_node_id`) are read from _start.Attr.\n")
+	b.WriteString("// Content the method does not read is unmatched: it is skipped, or\n")
+	b.WriteString("// reported or refused under canxml.WithUnmatched and canxml.WithStrict.\n")
 	legacy := sc.IsAbstract() && hasIntervalShape(fields)
 	if legacy {
 		b.WriteString("//\n")
@@ -178,6 +194,8 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 		b.WriteString(intervalFlagXMLDoc)
 	}
 	fmt.Fprintf(&b, "func (%s *%s%s) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {\n", recv, pc.GoName, typeArgs)
+	// Every attribute the class does not read is unmatched content.
+	b.WriteString(checkUnmatchedXMLAttrs(attrFields))
 	// Read attribute-typed properties from _start.Attr.
 	for _, ef := range attrFields {
 		line := unmarshalXMLAttribute(recv, FieldName(ef.Prop.PropertyName()), ef.Prop.PropertyName())
@@ -193,7 +211,7 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	b.WriteString("\t\t}\n")
 	b.WriteString("\t\tswitch _t := _tok.(type) {\n")
 	b.WriteString("\t\tcase xml.StartElement:\n")
-	b.WriteString("\t\t\tswitch _t.Name.Local {\n")
+	b.WriteString("\t\t\tswitch canxml.LocalName(_t.Name) {\n")
 
 	for _, ef := range elemFields {
 		var caseBody string
@@ -212,7 +230,7 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	}
 
 	b.WriteString("\t\t\tdefault:\n")
-	b.WriteString("\t\t\t\tif _err := _dec.Skip(); _err != nil {\n")
+	b.WriteString("\t\t\t\tif _err := canxml.SkipUnmatched(_dec, _t); _err != nil {\n")
 	b.WriteString("\t\t\t\t\treturn _err\n")
 	b.WriteString("\t\t\t\t}\n")
 	b.WriteString("\t\t\t}\n") // close inner switch (Name.Local)
@@ -282,13 +300,13 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 			return unmarshalXMLPolySingle(recv, goField, elemName, ifaceName), nil
 		}
 		// Open generic param bound to a concrete primitive or struct —
-		// emit a generic decode that defers to encoding/xml at runtime.
-		if p.IsMandatory {
-			return unmarshalXMLStructMandatory(recv, goField, elemName), nil
-		}
-		// Field is declared as `T` (open param), not `*T`. We cannot
-		// allocate via new(T) for an unknown layout — decode in place.
-		return unmarshalXMLStructMandatory(recv, goField, elemName), nil
+		// emit a generic decode that defers to encoding/xml at runtime,
+		// through canxml.DecodeElement so a primitive's attributes and
+		// child elements count as unmatched content. The field is
+		// declared as `T` (open param), not `*T`, mandatory or not: we
+		// cannot allocate via new(T) for an unknown layout, so decode
+		// in place.
+		return unmarshalXMLOpenParam(recv, goField, elemName), nil
 
 	case *bmm.ContainerProperty:
 		ifaceName, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
@@ -335,16 +353,31 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 
 // --- Per-shape decode helpers ------------------------------------------
 
+// The primitive helpers decode through canxml.DecodeElement rather than
+// the decoder's own DecodeElement: encoding/xml reads a primitive from its
+// text and ignores any attribute or child element on it, and the helper
+// hands those to the decode's policy for unmatched content.
+
 func unmarshalXMLPrimitiveMandatory(recv, field, elem string) string {
 	return fmt.Sprintf(
-		"\t\t\tcase %q:\n\t\t\t\tif _err := _dec.DecodeElement(&%s.%s, &_t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
+		"\t\t\tcase %q:\n\t\t\t\tif _err := canxml.DecodeElement(_dec, &_t, &%s.%s); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
 		elem, recv, field)
 }
 
 func unmarshalXMLPrimitiveOptionalLit(recv, field, elem, goType string) string {
 	return fmt.Sprintf(
-		"\t\t\tcase %q:\n\t\t\t\tvar _v %s\n\t\t\t\tif _err := _dec.DecodeElement(&_v, &_t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = &_v\n",
+		"\t\t\tcase %q:\n\t\t\t\tvar _v %s\n\t\t\t\tif _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = &_v\n",
 		elem, goType, recv, field)
+}
+
+// unmarshalXMLOpenParam emits the decode case of a field typed by an open
+// generic parameter that is not polymorphic. The parameter may be bound to
+// a primitive (BASE Interval<Integer>) or to a class, so the case decodes
+// in place through canxml.DecodeElement, which serves both.
+func unmarshalXMLOpenParam(recv, field, elem string) string {
+	return fmt.Sprintf(
+		"\t\t\tcase %q:\n\t\t\t\tif _err := canxml.DecodeElement(_dec, &_t, &%s.%s); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
+		elem, recv, field)
 }
 
 func unmarshalXMLStructMandatory(recv, field, elem string) string {
@@ -390,7 +423,7 @@ func unmarshalXMLStructSlice(recv, field, elem, innerType string) string {
 
 func unmarshalXMLPrimitiveSlice(recv, field, elem, innerType string) string {
 	return fmt.Sprintf(
-		"\t\t\tcase %q:\n\t\t\t\tvar _v %s\n\t\t\t\tif _err := _dec.DecodeElement(&_v, &_t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = append(%s.%s, _v)\n",
+		"\t\t\tcase %q:\n\t\t\t\tvar _v %s\n\t\t\t\tif _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = append(%s.%s, _v)\n",
 		elem, innerType, recv, field, recv, field)
 }
 
@@ -407,8 +440,24 @@ func unmarshalXMLAttribute(recv, goField, attrName string) string {
 		attrName, recv, goField)
 }
 
+// checkUnmatchedXMLAttrs emits the call that hands the start element's
+// attributes to canxml.CheckUnmatchedAttrs at the head of UnmarshalXML,
+// naming the properties the class reads as XML attributes.
+func checkUnmatchedXMLAttrs(attrFields []emittedField) string {
+	var known strings.Builder
+	for _, ef := range attrFields {
+		fmt.Fprintf(&known, ", %q", ef.Prop.PropertyName())
+	}
+	return fmt.Sprintf(
+		"\tif _err := canxml.CheckUnmatchedAttrs(_dec, _start%s); _err != nil {\n\t\treturn _err\n\t}\n",
+		known.String())
+}
+
+// unmarshalXMLHashTODO emits the case of a Hash<K,V> property. Canonical XML
+// does not model Hash, so the element is handed to canxml.SkipUnmatched like
+// unmatched content: skipped by default, reported or refused on request.
 func unmarshalXMLHashTODO(elem string) string {
 	return fmt.Sprintf(
-		"\t\t\tcase %q:\n\t\t\t\t// TODO(canxml): Hash<K,V> XML decode deferred — see canxml/doc.go.\n\t\t\t\tif _err := _dec.Skip(); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
+		"\t\t\tcase %q:\n\t\t\t\t// TODO(canxml): Hash<K,V> XML decode deferred — see canxml/doc.go.\n\t\t\t\tif _err := canxml.SkipUnmatched(_dec, _t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
 		elem)
 }

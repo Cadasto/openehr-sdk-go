@@ -21,7 +21,12 @@ import (
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *Archetype) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -29,7 +34,7 @@ func (a *Archetype) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch canxml.LocalName(_t.Name) {
 			case "original_language":
 				if _err := _dec.DecodeElement(&a.OriginalLanguage, &_t); _err != nil {
 					return _err
@@ -42,7 +47,7 @@ func (a *Archetype) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 				a.Description = _v
 			case "is_controlled":
 				var _v bool
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				a.IsControlled = &_v
@@ -54,7 +59,7 @@ func (a *Archetype) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 				a.Annotations = _v
 			case "translations":
 				// TODO(canxml): Hash<K,V> XML decode deferred — see canxml/doc.go.
-				if _err := _dec.Skip(); _err != nil {
+				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			case "definition":
@@ -67,7 +72,7 @@ func (a *Archetype) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 				}
 			case "adl_version":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				a.AdlVersion = &_v
@@ -82,7 +87,7 @@ func (a *Archetype) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 				}
 				a.UID = _v
 			case "concept":
-				if _err := _dec.DecodeElement(&a.Concept, &_t); _err != nil {
+				if _err := canxml.DecodeElement(_dec, &_t, &a.Concept); _err != nil {
 					return _err
 				}
 			case "parent_archetype_id":
@@ -98,7 +103,7 @@ func (a *Archetype) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 				}
 				a.Invariants = append(a.Invariants, _v)
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}

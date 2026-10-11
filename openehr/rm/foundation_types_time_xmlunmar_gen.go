@@ -20,7 +20,12 @@ import (
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (i *ISO8601Timezone) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -28,9 +33,9 @@ func (i *ISO8601Timezone) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElemen
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch canxml.LocalName(_t.Name) {
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -47,7 +52,12 @@ func (i *ISO8601Timezone) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElemen
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TimeDefinitions) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -55,9 +65,9 @@ func (t *TimeDefinitions) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElemen
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch canxml.LocalName(_t.Name) {
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}

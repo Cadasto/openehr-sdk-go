@@ -20,7 +20,12 @@ import (
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *Composition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := canxml.CheckUnmatchedAttrs(_dec, _start, "archetype_node_id"); _err != nil {
+		return _err
+	}
 	for _, _a := range _start.Attr {
 		if _a.Name.Local == "archetype_node_id" && _a.Name.Space == "" {
 			c.ArchetypeNodeID = _a.Value
@@ -34,7 +39,7 @@ func (c *Composition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch canxml.LocalName(_t.Name) {
 			case "name":
 				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
@@ -42,7 +47,7 @@ func (c *Composition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 				}
 				c.Name = _v
 			case "archetype_node_id":
-				if _err := _dec.DecodeElement(&c.ArchetypeNodeID, &_t); _err != nil {
+				if _err := canxml.DecodeElement(_dec, &_t, &c.ArchetypeNodeID); _err != nil {
 					return _err
 				}
 			case "uid":
@@ -100,7 +105,7 @@ func (c *Composition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 				}
 				c.Content = append(c.Content, _v)
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -117,7 +122,12 @@ func (c *Composition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (e *EventContext) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := canxml.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -125,7 +135,7 @@ func (e *EventContext) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch canxml.LocalName(_t.Name) {
 			case "start_time":
 				if _err := _dec.DecodeElement(&e.StartTime, &_t); _err != nil {
 					return _err
@@ -138,7 +148,7 @@ func (e *EventContext) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 				e.EndTime = _v
 			case "location":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := canxml.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				e.Location = &_v
@@ -165,7 +175,7 @@ func (e *EventContext) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 				}
 				e.Participations = append(e.Participations, _v)
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := canxml.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
