@@ -4,15 +4,11 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 )
 
 // bmmNamer is a Go type that names the BMM class it implements.
 type bmmNamer interface{ BMMName() string }
-
-// typeArgumenter is a generic RM type that hands out a new zero value of its
-// type argument.
-type typeArgumenter interface{ BMMTypeArgument() any }
 
 // rootOf is what [Model.RootOf] found for one target type.
 type rootOf struct {
@@ -73,7 +69,7 @@ func (m *Model) readRoot(t reflect.Type) (Root, bool) {
 	if !ok {
 		return Root{}, false
 	}
-	return Root{Nest: nest.String(), Type: declared, Bound: m.boundOf(t)}, true
+	return Root{Nest: nest.String(), Type: declared, Bound: m.boundOf(t, declared)}, true
 }
 
 // declaredOf returns the RM class a Go type is declared as, under any
@@ -81,36 +77,59 @@ func (m *Model) readRoot(t reflect.Type) (Root, bool) {
 // the interface stands for, such as DATA_VALUE for rm.DataValue or DV_TEXT for
 // rm.DVTextLike. The second result is false when t is neither.
 //
-// Both answers come from methods reached through a new value of t: BMMName on
-// the class's Go type, and the type switch of rm.PolymorphicClass on a
-// pointer to the interface.
+// Both answers come from a new value of t: BMMName on the class's Go type, and
+// the generated type switch of polymorphicClass on a pointer to the interface.
 func (m *Model) declaredOf(t reflect.Type) (string, bool) {
 	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 	p := reflect.New(t).Interface()
-	if class, _, ok := rm.PolymorphicClass(p); ok {
-		return class, m.IsClass(class)
+	name := ""
+	if class, _, ok := polymorphicClass(p); ok {
+		name = class
+	} else if n, ok := p.(bmmNamer); ok {
+		name = n.BMMName()
 	}
-	n, ok := p.(bmmNamer)
-	if !ok {
+	if !m.IsClass(name) {
 		return "", false
 	}
-	name := n.BMMName()
-	return name, m.IsClass(name)
+	return name, true
 }
 
-// boundOf returns the class a generic RM type t binds its type parameter to:
-// the class its type argument is declared as, such as DV_QUANTITY for an
-// rm.DVInterval[rm.DVQuantity] or DATA_VALUE for an
-// rm.OriginalVersion[rm.DataValue]. It returns the empty string for a type
-// that is not generic, and for a type argument that is no RM type, such as
-// Go's any, which leaves a generic payload as plain JSON.
-func (m *Model) boundOf(t reflect.Type) string {
-	g, ok := reflect.TypeAssert[typeArgumenter](reflect.New(t))
-	if !ok {
+// boundOf returns the class a generic RM type t binds the type parameter of
+// class to: the class its type argument is declared as, such as DV_QUANTITY
+// for an rm.DVInterval[rm.DVQuantity] or DATA_VALUE for an
+// rm.OriginalVersion[rm.DataValue]. The type argument is read by field
+// mapping: for each attribute rminfo declares with the type parameter, the Go
+// field whose JSON tag is the attribute's name, its type peeled of pointers.
+//
+// It returns the empty string for a class with no such attribute, for a type
+// argument that is no RM type, such as Go's any, which leaves a generic
+// payload as plain JSON, and when the fields disagree: two attributes of one
+// parameter held as different classes, or attributes of two parameters. With
+// no binding, the walk reads such values by their own "_type", or not at all.
+func (m *Model) boundOf(t reflect.Type, class string) string {
+	lister, ok := m.lookup.(rminfo.AttributeLister)
+	if !ok || t.Kind() != reflect.Struct {
 		return ""
 	}
-	bound, _ := m.declaredOf(reflect.TypeOf(g.BMMTypeArgument()))
+	bound, param := "", ""
+	for _, attr := range lister.AttributeNames(class) {
+		typ, _ := m.lookup.AttributeRMType(class, attr)
+		if m.kindOf(typ) != KindParameter {
+			continue
+		}
+		for _, f := range reflect.VisibleFields(t) {
+			if name, _, _ := strings.Cut(f.Tag.Get("json"), ","); name != attr || !f.IsExported() {
+				continue
+			}
+			b, _ := m.declaredOf(f.Type)
+			if param != "" && (typ != param || b != bound) {
+				return ""
+			}
+			bound, param = b, typ
+			break
+		}
+	}
 	return bound
 }

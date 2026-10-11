@@ -26,44 +26,25 @@ type polyInterface struct {
 	Class string
 }
 
-// genericClass is one concrete generic class owned by the target whose Go type
-// takes a single type parameter.
-type genericClass struct {
-	GoName string // unqualified Go type name
-	Param  string // the type parameter's name, such as "T"
-}
-
 // RenderJSONHooksFile renders <pkg>/jsonhooks_gen.go: one json.UnmarshalFromFunc
 // per polymorphic interface owned by the target, registered into the typereg
 // aggregate at init. Every nested decode threads the
 // aggregate through [typereg.Unmarshalers], so a polymorphic slot resolves from
 // any entry point, including a bare encoding/json/v2 Unmarshal with no options.
 //
-// Beside the hooks it renders the type information a reader of a decode
-// target's Go type needs (REQ-170): PolymorphicClass, which names the BMM
-// class each polymorphic interface stands for and its fallback, and a
-// BMMTypeArgument method on each concrete generic class with one type
-// parameter, which returns a new zero value of the type argument.
-//
-// Returns (nil, nil) when the target has neither polymorphic interfaces nor
-// generic classes.
+// Returns (nil, nil) when the target has no polymorphic interfaces.
 func RenderJSONHooksFile(plan *Plan) ([]byte, error) {
 	ifaces, err := polymorphicInterfaces(plan)
 	if err != nil {
 		return nil, err
 	}
-	generics := singleParameterGenerics(plan)
-	if len(ifaces) == 0 && len(generics) == 0 {
+	if len(ifaces) == 0 {
 		return nil, nil
 	}
 
 	var b bytes.Buffer
 	b.WriteString(renderGeneratedHeader(plan))
 	b.WriteString("\n")
-	if len(ifaces) == 0 {
-		renderTypeArguments(&b, generics)
-		return formatHooks(b.Bytes())
-	}
 	b.WriteString("import (\n")
 	b.WriteString("\t\"encoding/json/jsontext\"\n")
 	b.WriteString("\tjson \"encoding/json/v2\"\n\n")
@@ -84,68 +65,17 @@ func RenderJSONHooksFile(plan *Plan) ([]byte, error) {
 		}
 		b.WriteString("\t}))\n")
 	}
-	b.WriteString("}\n\n")
-
-	b.WriteString("// PolymorphicClass reports the BMM classes behind the polymorphic\n")
-	b.WriteString("// interface of this package that p points to, for code that reads the\n")
-	b.WriteString("// classes a decode target's Go type declares. class is the class the\n")
-	b.WriteString("// interface stands for: an abstract class, or for a narrow interface\n")
-	b.WriteString("// (<Parent>Like) its parent class. fallback is the class a value that\n")
-	b.WriteString("// leaves out `_type` decodes as, which is the parent class of a narrow\n")
-	b.WriteString("// interface; it is empty where the decoder refuses such a value. ok is false\n")
-	b.WriteString("// when p points to no polymorphic interface of this package.\n")
-	b.WriteString("func PolymorphicClass(p any) (class, fallback string, ok bool) {\n")
-	b.WriteString("\tswitch p.(type) {\n")
-	for _, pi := range ifaces {
-		fallback := ""
-		if pi.Narrow {
-			fallback = pi.Class
-		}
-		fmt.Fprintf(&b, "\tcase *%s:\n\t\treturn %q, %q, true\n", pi.GoName, pi.Class, fallback)
-	}
-	b.WriteString("\t}\n")
-	b.WriteString("\treturn \"\", \"\", false\n")
 	b.WriteString("}\n")
-	renderTypeArguments(&b, generics)
-	return formatHooks(b.Bytes())
+	return formatGenerated(b.Bytes(), "jsonhooks_gen.go")
 }
 
-// formatHooks gofmts the rendered jsonhooks_gen.go source.
-func formatHooks(src []byte) ([]byte, error) {
+// formatGenerated gofmts the rendered source of the generated file name.
+func formatGenerated(src []byte, name string) ([]byte, error) {
 	formatted, err := format.Source(src)
 	if err != nil {
-		return src, fmt.Errorf("gofmt jsonhooks_gen.go: %w", err)
+		return src, fmt.Errorf("gofmt %s: %w", name, err)
 	}
 	return formatted, nil
-}
-
-// renderTypeArguments writes one BMMTypeArgument method per generic class.
-func renderTypeArguments(b *bytes.Buffer, generics []genericClass) {
-	for _, g := range generics {
-		b.WriteString("\n// BMMTypeArgument returns a new zero value of the type argument, for code\n")
-		b.WriteString("// that reads the RM class a Go type binds the class's type parameter to.\n")
-		fmt.Fprintf(b, "func (*%s[%s]) BMMTypeArgument() any { return new(%s) }\n", g.GoName, g.Param, g.Param)
-	}
-}
-
-// singleParameterGenerics returns the concrete generic classes owned by the
-// plan's target whose Go type takes exactly one type parameter, sorted by Go
-// name. A class with more parameters gets no BMMTypeArgument method, so a
-// reader of its Go type binds none of them.
-func singleParameterGenerics(plan *Plan) []genericClass {
-	var out []genericClass
-	for _, pc := range plan.ConcreteClasses {
-		if pc.External || !isConcreteCodecClass(pc) {
-			continue
-		}
-		sc, ok := pc.Class.(*bmm.SimpleClass)
-		if !ok || !sc.IsGeneric() || len(sc.GenericParameterDefs) != 1 {
-			continue
-		}
-		out = append(out, genericClass{GoName: pc.GoName, Param: sortedStringKeys(sc.GenericParameterDefs)[0]})
-	}
-	slices.SortFunc(out, func(a, b genericClass) int { return cmp.Compare(a.GoName, b.GoName) })
-	return out
 }
 
 // interfaceClassNames maps the Go name of every polymorphic interface the
