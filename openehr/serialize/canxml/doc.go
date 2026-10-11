@@ -31,8 +31,9 @@
 //   - Polymorphic discrimination: `xsi:type="<BMM_CLASS_NAME>"`
 //     (unprefixed openEHR class name). The encoder emits it as the
 //     first attribute on every concrete element at a polymorphic
-//     site. The decoder requires it at polymorphic sites unless
-//     [WithRelaxedTypeDispatch] is set. Discriminator values are
+//     site. The decoder requires it at polymorphic sites;
+//     [WithRelaxedTypeDispatch], which would relax that, is accepted but
+//     not yet enforced. Discriminator values are
 //     matched unprefixed; namespace-prefixed values (the Better/Marand
 //     `xsi:type="ns2:DV_QUANTITY"` dialect) are not supported and fail
 //     closed with [typereg.ErrUnknownType].
@@ -79,8 +80,10 @@
 // Two kinds of attribute are never unmatched: a namespace declaration,
 // and an attribute in the XML Schema instance namespace, whether the
 // `xsi:type` discriminator, `xsi:schemaLocation`, `xsi:nil` or another.
-// An element in no namespace is read as an openEHR element, since many
-// producers leave the declaration out.
+// A bare `type` attribute, in no namespace, is read as the discriminator
+// only where dispatch reads it, at a polymorphic slot; anywhere else it is
+// unmatched. An element in no namespace is read as an openEHR element,
+// since many producers leave the declaration out.
 //
 // The check covers every class the generated decoders read, the AOM 1.4
 // classes included.
@@ -155,7 +158,12 @@
 // Nor can the codec decode the content of a BMM `Any` attribute, held as
 // a Go empty interface: the AOM 1.4 `assumed_value` and `EXPR_LEAF.item`.
 // Decode treats such an element the same way, as one item of unmatched
-// content, and leaves the field at its zero value.
+// content, and leaves the field at its zero value. So it does for a
+// member whose Go type has no canonical-XML decoder of its own, such as
+// the AOM 1.4 `ARCHETYPE.original_language` (a TERMINOLOGY_CODE) and the
+// `data` of a version whose content type is an interface, such as
+// ORIGINAL_VERSION<any>: the report option and strict see that element as
+// one item.
 //
 // The canjson codec is unaffected (encoding/json handles maps).
 //

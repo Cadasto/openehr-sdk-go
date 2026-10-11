@@ -183,7 +183,7 @@ func (o *OriginalVersion[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 				o.Attestations = append(o.Attestations, _v)
 			case "data":
 				_v := new(T)
-				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeParam(_dec, &_t, _v); _err != nil {
 					return _err
 				}
 				o.Data = _v

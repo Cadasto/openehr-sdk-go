@@ -3,10 +3,14 @@ package canxml_test
 // unmatched_test.go — REQ-170 (wire.md § REQ-170, Unmatched content on
 // decode) for canonical XML, on the REQ-056 codec. Content is unmatched when
 // it is an element or attribute that names no attribute of the RM type its
-// element decodes as, other than `xsi:type` and namespace declarations; an
-// element in a namespace other than the openEHR one; or a `Hash` element. The
-// default ignores it; WithUnmatched reports every item, in document order, by
-// its path; WithStrict refuses the first with canxml.ErrUnknownElement.
+// element decodes as, other than namespace declarations and attributes in the
+// XML Schema instance namespace (a bare `type` counts only where dispatch
+// reads it); an element in a namespace other than the openEHR one; or an
+// element whose content the codec does not model: a `Hash` member, a BMM
+// `Any` member, or a member whose Go type has no decoder of its own, each one
+// item. The default ignores it; WithUnmatched reports every item, in document
+// order, by its path; WithStrict refuses the first with
+// canxml.ErrUnknownElement.
 
 import (
 	"encoding/xml"
@@ -557,7 +561,10 @@ func TestREQ170_XMLAnyMemberContent(t *testing.T) {
 // `xsi:schemaLocation` and `xsi:noNamespaceSchemaLocation` on the root and
 // `xsi:nil` on a primitive element decode under strict, nothing is reported,
 // and the value is the one without them. An `xsi:` prefix bound to no
-// namespace is not that namespace, so its attribute stays unmatched.
+// namespace is not that namespace, so its attribute stays unmatched. A bare
+// `type`, in no namespace, is matched only where dispatch reads it as the
+// discriminator; anywhere else, the root and a primitive element included,
+// and beside an `xsi:type` that dispatch read instead, it is unmatched.
 func TestREQ170_XMLSchemaInstanceAttributesAreNotUnmatched(t *testing.T) {
 	doc := func(rootAttrs, leafAttrs string) []byte {
 		return []byte(`<composition ` + ucNS + ` archetype_node_id="openEHR-EHR-COMPOSITION.encounter.v1"` + rootAttrs + `>` +
@@ -588,6 +595,166 @@ func TestREQ170_XMLSchemaInstanceAttributesAreNotUnmatched(t *testing.T) {
 		}
 		if want := []string{"/dv_text[1]/@type"}; !slices.Equal(paths, want) {
 			t.Errorf("WithUnmatched reported %q; want %q: an unbound `xsi:` prefix names no namespace", paths, want)
+		}
+	})
+
+	t.Run("bare type read by dispatch", func(t *testing.T) {
+		in := []byte(`<element ` + ucNS + ` archetype_node_id="at1"><name><value>n</value></name>` +
+			`<value type="DV_TEXT"><value>x</value></value></element>`)
+		got, paths, err := unmarshalCollecting(func() any { return new(rm.Element) }, in, canxml.WithStrict())
+		if err != nil {
+			t.Fatalf("canxml.Unmarshal(WithStrict) = %v; want nil: dispatch read the bare `type` as the discriminator", err)
+		}
+		if len(paths) != 0 {
+			t.Errorf("WithUnmatched reported %q; want nothing", paths)
+		}
+		if v, ok := got.(*rm.Element).Value.(*rm.DVText); !ok || v.Value != "x" {
+			t.Errorf("Value = %#v; want the DV_TEXT \"x\" the bare `type` selected", got.(*rm.Element).Value)
+		}
+	})
+
+	for _, tc := range []struct {
+		name string
+		in   string
+		into func() any
+		path string
+	}{
+		{
+			name: "bare type on the root",
+			in:   `<composition ` + ucNS + ` type="` + xmlPlanted + `"><name><value>n</value></name></composition>`,
+			into: func() any { return new(rm.Composition) },
+			path: "/composition[1]/@type",
+		},
+		{
+			name: "bare type on a primitive element",
+			in:   `<dv_text ` + ucNS + `><value type="` + xmlPlanted + `">a</value></dv_text>`,
+			into: func() any { return new(rm.DVText) },
+			path: "/dv_text[1]/value[1]/@type",
+		},
+		{
+			name: "bare type beside the xsi:type dispatch read",
+			in: `<element ` + ucNS + ` archetype_node_id="at1"><name><value>n</value></name>` +
+				`<value xsi:type="DV_TEXT" type="` + xmlPlanted + `"><value>x</value></value></element>`,
+			into: func() any { return new(rm.Element) },
+			path: "/element[1]/value[1]/@type",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, paths, err := unmarshalCollecting(tc.into, []byte(tc.in))
+			if err != nil {
+				t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
+			}
+			if want := []string{tc.path}; !slices.Equal(paths, want) {
+				t.Errorf("WithUnmatched reported %q; want %q: nothing reads this bare `type`", paths, want)
+			}
+			err = canxml.Unmarshal([]byte(tc.in), tc.into(), canxml.WithStrict())
+			assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, tc.path, false)
+		})
+	}
+}
+
+// TestREQ170_XMLMembersWithoutADecoder pins the members whose Go type has no
+// canonical-XML decoder of its own, so encoding/xml would read nothing from
+// the element and report nothing either: the AOM 1.4
+// `ARCHETYPE.original_language`, a TERMINOLOGY_CODE held as a plain struct,
+// and the `data` of ORIGINAL_VERSION<any>, whose content type is an
+// interface. Each element is one item: the default decodes as before, the
+// report option names the element once and returns the default's value, and
+// strict refuses it. An enumeration member (C_DATE's `day_validity`) decodes
+// from its text, so an attribute on it is unmatched like on any primitive.
+func TestREQ170_XMLMembersWithoutADecoder(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		in   string
+		into func() any
+		path string
+	}{
+		{
+			name: "ARCHETYPE.original_language",
+			in: `<archetype ` + ucNS + `><concept>at0000</concept>` +
+				`<original_language x-attr="` + xmlPlanted + `"><terminology_id>ISO_639-1</terminology_id>` +
+				`<code_string>en</code_string><x-ext>` + xmlPlanted + `</x-ext></original_language></archetype>`,
+			into: func() any { return new(aom14.Archetype) },
+			path: "/archetype[1]/original_language[1]",
+		},
+		{
+			name: "ORIGINAL_VERSION<any>.data",
+			in: `<original_version ` + ucNS + `><data xsi:type="COMPOSITION"><x-ext>` + xmlPlanted + `</x-ext></data>` +
+				`<lifecycle_state><value>complete</value></lifecycle_state></original_version>`,
+			into: func() any { return new(rm.OriginalVersion[any]) },
+			path: "/original_version[1]/data[1]",
+		},
+		{
+			name: "enumeration with an attribute",
+			in:   `<c_date ` + ucNS + `><day_validity x-attr="` + xmlPlanted + `">optional</day_validity></c_date>`,
+			into: func() any { return new(aom14.CDate) },
+			path: "/c_date[1]/day_validity[1]/@x-attr",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			in := []byte(tc.in)
+			want := tc.into()
+			if err := canxml.Unmarshal(in, want); err != nil {
+				t.Fatalf("canxml.Unmarshal = %v; want nil", err)
+			}
+			got, paths, err := unmarshalCollecting(tc.into, in)
+			if err != nil {
+				t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
+			}
+			if want := []string{tc.path}; !slices.Equal(paths, want) {
+				t.Errorf("WithUnmatched reported %q; want %q, one item", paths, want)
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("canxml.Unmarshal(WithUnmatched) decoded\n%#v\nwant the default's value\n%#v", got, want)
+			}
+			err = canxml.Unmarshal(in, tc.into(), canxml.WithStrict())
+			assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, tc.path, false)
+		})
+	}
+
+	// A concrete instantiation of the generic parameter decodes as before,
+	// by value or by pointer, and its class checks its own content.
+	nameOf := func(c *rm.Composition) string {
+		if c == nil || c.Name == nil {
+			return ""
+		}
+		return c.Name.GetValue()
+	}
+	data := `<original_version ` + ucNS + `><data><name><value>c</value></name><x-ext>` + xmlPlanted + `</x-ext></data></original_version>`
+	const dataExt = "/original_version[1]/data[1]/x-ext[1]"
+	t.Run("ORIGINAL_VERSION<COMPOSITION>.data", func(t *testing.T) {
+		got, paths, err := unmarshalCollecting(func() any { return new(rm.OriginalVersion[rm.Composition]) }, []byte(data))
+		if err != nil {
+			t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
+		}
+		if v := got.(*rm.OriginalVersion[rm.Composition]); nameOf(v.Data) != "c" {
+			t.Errorf("Data = %#v; want the COMPOSITION named \"c\"", v.Data)
+		}
+		if want := []string{dataExt}; !slices.Equal(paths, want) {
+			t.Errorf("WithUnmatched reported %q; want %q", paths, want)
+		}
+	})
+	t.Run("ORIGINAL_VERSION<*COMPOSITION>.data", func(t *testing.T) {
+		got, paths, err := unmarshalCollecting(func() any { return new(rm.OriginalVersion[*rm.Composition]) }, []byte(data))
+		if err != nil {
+			t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
+		}
+		if v := got.(*rm.OriginalVersion[*rm.Composition]); v.Data == nil || nameOf(*v.Data) != "c" {
+			t.Errorf("Data = %#v; want the COMPOSITION named \"c\"", v.Data)
+		}
+		if want := []string{dataExt}; !slices.Equal(paths, want) {
+			t.Errorf("WithUnmatched reported %q; want %q", paths, want)
+		}
+	})
+
+	t.Run("enumeration value", func(t *testing.T) {
+		var c aom14.CDate
+		in := []byte(`<c_date ` + ucNS + `><day_validity>optional</day_validity></c_date>`)
+		if err := canxml.Unmarshal(in, &c, canxml.WithStrict()); err != nil {
+			t.Fatalf("canxml.Unmarshal(WithStrict) = %v; want nil", err)
+		}
+		if c.DayValidity == nil || string(*c.DayValidity) != "optional" {
+			t.Errorf("DayValidity = %v; want \"optional\" read from the element's text", c.DayValidity)
 		}
 	})
 }

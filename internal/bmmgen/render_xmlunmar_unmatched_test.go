@@ -11,25 +11,49 @@ import (
 
 // TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent pins, for every class
 // whose canonical-XML decoder the RM and AOM 1.4 targets render, that the
-// decoder hands the content it does not read to the canxml helpers that apply
-// the decode's policy (REQ-170): the start element's attributes on entry, an
-// element in a foreign namespace through the name it switches on, every other
-// element it does not read through its default arm, a Hash element and the
-// element of an Any member through their own arms, and a primitive element
-// through xmlunmatched.DecodeElement. No decoder skips an element itself, so none
-// drops content unreported.
+// decoder hands the content it does not read to the xmlunmatched helpers that
+// apply the decode's policy (REQ-170): the start element's attributes on
+// entry, an element in a foreign namespace through the name it switches on,
+// every other element it does not read through its default arm, a Hash
+// element and the element of an Any member through their own arms, and a
+// primitive element through xmlunmatched.DecodeElement.
+//
+// An arm may hand an element to the decoder's own DecodeElement only when the
+// member's class is one of those the two targets render a decoder for, which
+// checks its own content; the test collects that set from the targets
+// themselves. Any other class-typed member, such as one held as a BMM
+// primitive class or by a generic parameter, would otherwise read nothing and
+// report nothing. A member typed by a generic parameter goes through
+// xmlunmatched.DecodeParam. No decoder skips an element itself, so none drops
+// content unreported.
 func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 	const (
 		attrs        = "\tif _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start"
 		switchOnName = "\t\t\tswitch xmlunmatched.LocalName(_t.Name) {\n"
 		defaultArm   = "\t\t\tdefault:\n\t\t\t\tif _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {\n"
 	)
+	plans := map[string]*Plan{}
+	withDecoder := map[string]bool{}
 	for _, target := range []Target{TargetRM, TargetAOM14} {
 		plan, err := BuildPlanForTarget(context.Background(), target, bmm.FSResolver{Root: testResources})
 		if err != nil {
 			t.Fatalf("BuildPlanForTarget: %v", err)
 		}
-		hashes, anys := 0, 0
+		plans[target.GoPackage] = plan
+		for _, f := range plan.Files {
+			classes, err := codecClassesIn(plan, f)
+			if err != nil {
+				t.Fatalf("codecClassesIn(%s): %v", f.FileBase, err)
+			}
+			for _, pc := range classes {
+				withDecoder[pc.BMMName] = true
+			}
+		}
+	}
+
+	for _, target := range []Target{TargetRM, TargetAOM14} {
+		plan := plans[target.GoPackage]
+		hashes, anys, params := 0, 0, 0
 		for _, f := range plan.Files {
 			classes, err := codecClassesIn(plan, f)
 			if err != nil {
@@ -51,30 +75,41 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 				}
 				for _, banned := range []string{"_dec.Skip()", "_t.Name.Local"} {
 					if strings.Contains(src, banned) {
-						t.Errorf("%s XML decoder still uses %q: content it does not read must go through canxml:\n%s", pc.BMMName, banned, src)
+						t.Errorf("%s XML decoder still uses %q: content it does not read must go through xmlunmatched:\n%s", pc.BMMName, banned, src)
 					}
 				}
 				for _, ef := range fields {
-					arm := xmlCaseArm(src, ef.Prop.PropertyName())
+					prop := ef.Prop.PropertyName()
+					arm := xmlCaseArm(src, prop)
 					switch {
 					case isHashProperty(ef.Prop):
 						hashes++
 						if !strings.Contains(arm, "xmlunmatched.SkipUnmatched(_dec, _t)") {
-							t.Errorf("%s.%s is a Hash member; its arm must hand the element to xmlunmatched.SkipUnmatched:\n%s", pc.BMMName, ef.Prop.PropertyName(), arm)
+							t.Errorf("%s.%s is a Hash member; its arm must hand the element to xmlunmatched.SkipUnmatched:\n%s", pc.BMMName, prop, arm)
 						}
 					case isAnyProperty(ef.Prop):
 						anys++
 						if !strings.Contains(arm, "xmlunmatched.SkipUnmatched(_dec, _t)") || strings.Contains(arm, "DecodeElement(") {
-							t.Errorf("%s.%s is an Any member; its arm must hand the element to xmlunmatched.SkipUnmatched as one item and decode nothing:\n%s", pc.BMMName, ef.Prop.PropertyName(), arm)
+							t.Errorf("%s.%s is an Any member; its arm must hand the element to xmlunmatched.SkipUnmatched as one item and decode nothing:\n%s", pc.BMMName, prop, arm)
 						}
-					case strings.Contains(arm, "DecodeElement(") && !strings.Contains(arm, "xmlunmatched.DecodeElement(") && !isClassTypedProperty(plan, ef.Prop):
-						t.Errorf("%s.%s decodes as text through the decoder's own DecodeElement, which drops its attributes and child elements unreported:\n%s", pc.BMMName, ef.Prop.PropertyName(), arm)
+					case isOpenParamProperty(ef):
+						if strings.Contains(arm, "canxml.DecodeAs") {
+							continue // a polymorphic slot, dispatched by xsi:type
+						}
+						params++
+						if !strings.Contains(arm, "xmlunmatched.DecodeParam(") {
+							t.Errorf("%s.%s is typed by a generic parameter; its arm must decode through xmlunmatched.DecodeParam, which chooses by the instantiation:\n%s", pc.BMMName, prop, arm)
+						}
+					case strings.Contains(arm, "_dec.DecodeElement("):
+						if name := decodedClassName(ef.Prop); !withDecoder[name] {
+							t.Errorf("%s.%s hands its element to the decoder's own DecodeElement, but %q has no generated decoder: encoding/xml would read nothing from it and report nothing:\n%s", pc.BMMName, prop, name, arm)
+						}
 					}
 				}
 			}
 		}
-		if target.GoPackage == TargetRM.GoPackage && hashes == 0 {
-			t.Errorf("the RM target rendered no Hash arm; want the resource-metadata Hash members covered")
+		if target.GoPackage == TargetRM.GoPackage && (hashes == 0 || params == 0) {
+			t.Errorf("the RM target rendered %d Hash arms and %d generic-parameter arms; want the resource-metadata Hash members and VERSION<T>.data covered", hashes, params)
 		}
 		if target.GoPackage == TargetAOM14.GoPackage && anys == 0 {
 			t.Errorf("the AOM 1.4 target rendered no Any arm; want `assumed_value` and `EXPR_LEAF.item` covered")
@@ -118,17 +153,32 @@ func isAnyProperty(prop bmm.Property) bool {
 	return ok && p.TypeName == bmmAnyType
 }
 
-// isClassTypedProperty reports whether prop is a single property typed by a
-// class, whose decoder checks its own content, rather than by a primitive or
-// an open generic parameter.
-func isClassTypedProperty(plan *Plan, prop bmm.Property) bool {
-	switch p := prop.(type) {
-	case *bmm.SingleProperty:
-		return !isPrimitive(p.TypeName)
-	case *bmm.GenericProperty:
+// isOpenParamProperty reports whether ef is typed by a generic parameter of
+// the class that declares it.
+func isOpenParamProperty(ef emittedField) bool {
+	switch p := ef.Prop.(type) {
+	case *bmm.SinglePropertyOpen:
 		return true
+	case *bmm.SingleProperty:
+		return isOpenParam(ef.Owner, p.TypeName)
 	case *bmm.ContainerProperty:
-		return containerInnerIsClass(plan, p.TypeDef)
+		return isOpenParam(ef.Owner, containerInnerName(p.TypeDef))
 	}
 	return false
+}
+
+// decodedClassName returns the BMM class a property's element decodes as:
+// its type, a container's item type, or a generic type's root.
+func decodedClassName(prop bmm.Property) string {
+	switch p := prop.(type) {
+	case *bmm.SingleProperty:
+		return p.TypeName
+	case *bmm.ContainerProperty:
+		return containerInnerName(p.TypeDef)
+	case *bmm.GenericProperty:
+		if p.TypeDef != nil {
+			return p.TypeDef.RootType
+		}
+	}
+	return ""
 }

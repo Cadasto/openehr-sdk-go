@@ -28,12 +28,13 @@ var ErrInvalidShape = errors.New("canxml: invalid XML shape")
 // element decodes as, other than namespace declarations and attributes in
 // the XML Schema instance namespace (`xsi:type`, `xsi:schemaLocation`,
 // `xsi:nil`, …), and an element in a namespace other than the openEHR one
-// (see [ErrNamespace]). The element of a `Hash` member or of a BMM `Any`
-// member, which this codec does not model, counts as such content too.
+// (see [ErrNamespace]). An element whose content this codec does not
+// model, such as a `Hash` member or a BMM `Any` member, counts as such
+// content too.
 //
 // Such content is ignored by default. Only a decode given [WithStrict]
 // refuses it: the refusal wraps this sentinel and names the item's path
-// from the root of the document (see [WithUnmatched] for the form of a
+// from the root of the value (see [WithUnmatched] for the form of a
 // path). The path carries the item's name but none of its value.
 var ErrUnknownElement = xmlunmatched.ErrUnknownElement
 

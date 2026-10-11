@@ -17,8 +17,8 @@ const NSXMI = "http://www.omg.org/XMI"
 
 // DecoderOption configures a decode, through [Unmarshal] or a [Decoder].
 // [WithUnmatched] and [WithStrict] say what happens to content the decode
-// does not read; [WithRelaxedTypeDispatch] switches the polymorphic-dispatch
-// policy from strict (the default) to relaxed.
+// does not read. [WithRelaxedTypeDispatch] names relaxed polymorphic
+// dispatch; it is accepted but not yet enforced, so dispatch stays strict.
 type DecoderOption func(*decoderConfig)
 
 // decoderConfig holds the option-driven state of a decode. Kept unexported so
@@ -51,10 +51,13 @@ func (c decoderConfig) tracked() bool {
 // decodes as, other than namespace declarations and attributes in the XML
 // Schema instance namespace (`xsi:type`, `xsi:schemaLocation`, `xsi:nil`,
 // …); an element in a namespace other than the openEHR one (see
-// [ErrNamespace]); and the element of a `Hash` member or of a BMM `Any`
-// member (the AOM 1.4 `assumed_value` and `EXPR_LEAF.item`), which this codec
-// does not model. It applies at any depth: inside a polymorphic slot, an
-// interval bound, a primitive element or an AOM 1.4 value too.
+// [ErrNamespace]); and an element whose content this codec does not model:
+// a `Hash` member, a BMM `Any` member (the AOM 1.4 `assumed_value` and
+// `EXPR_LEAF.item`), and a member whose Go type has no decoder of its own
+// (see the package documentation). A bare `type` attribute is unmatched
+// except where dispatch reads it as the discriminator. It applies at any
+// depth: inside a polymorphic slot, an interval bound, a primitive element or
+// an AOM 1.4 value too.
 //
 // By default the decoder ignores unmatched content: the value it returns
 // holds the rest of the input and none of it. With this option fn receives
@@ -211,20 +214,29 @@ func Unmarshal(data []byte, v any, opts ...DecoderOption) error {
 // all; the caller decides whether that is an error (strict) or
 // acceptable (relaxed dispatch).
 func XSITypeOf(start xml.StartElement) (string, error) {
+	_, typeName, err := discriminator(start)
+	return typeName, err
+}
+
+// discriminator returns the attribute of start that [XSITypeOf] reads as the
+// `xsi:type` discriminator, by name, with its normalised value. The name lets
+// dispatch record which attribute it read, so that a bare `type` it did not
+// read stays unmatched content.
+func discriminator(start xml.StartElement) (xml.Name, string, error) {
 	for _, attr := range start.Attr {
 		// Reject xmi:type (both resolved and literal forms).
 		if attr.Name.Local == "type" && attr.Name.Space == NSXMI {
-			return "", fmt.Errorf("canxml: %w: xmi:type on the wire is rejected (use xsi:type)", ErrInvalidShape)
+			return xml.Name{}, "", fmt.Errorf("canxml: %w: xmi:type on the wire is rejected (use xsi:type)", ErrInvalidShape)
 		}
 		if attr.Name.Local == "xmi:type" {
-			return "", fmt.Errorf("canxml: %w: xmi:type on the wire is rejected (use xsi:type)", ErrInvalidShape)
+			return xml.Name{}, "", fmt.Errorf("canxml: %w: xmi:type on the wire is rejected (use xsi:type)", ErrInvalidShape)
 		}
 		// Accept xsi:type (resolved and literal forms).
 		if xmlunmatched.IsDiscriminator(attr.Name) {
-			return stripXSDPrefix(attr.Value), nil
+			return attr.Name, stripXSDPrefix(attr.Value), nil
 		}
 	}
-	return "", nil
+	return xml.Name{}, "", nil
 }
 
 // stripXSDPrefix strips a leading `xsd:` namespace prefix from a
@@ -264,7 +276,7 @@ func stripXSDPrefix(s string) string {
 //     the next child.
 func DecodeAs[T any](dec *xml.Decoder, start xml.StartElement) (T, error) {
 	var zero T
-	typeName, err := XSITypeOf(start)
+	attrName, typeName, err := discriminator(start)
 	if err != nil {
 		return zero, &DecodeError{Path: "/" + start.Name.Local, Inner: err}
 	}
@@ -279,6 +291,7 @@ func DecodeAs[T any](dec *xml.Decoder, start xml.StartElement) (T, error) {
 			Inner: fmt.Errorf("canxml: %q: %w", typeName, typereg.ErrUnknownType),
 		}
 	}
+	xmlunmatched.DiscriminatorRead(dec, attrName)
 	v := ctor()
 	if err := xmlunmatched.DecodeElement(dec, &start, v); err != nil {
 		return zero, &DecodeError{
@@ -313,7 +326,7 @@ func DecodeAs[T any](dec *xml.Decoder, start xml.StartElement) (T, error) {
 // fixes the concrete subtype.
 func DecodeAsOrDefault[T any](dec *xml.Decoder, start xml.StartElement, defaultCtor func() any) (T, error) {
 	var zero T
-	typeName, err := XSITypeOf(start)
+	attrName, typeName, err := discriminator(start)
 	if err != nil {
 		return zero, &DecodeError{Path: "/" + start.Name.Local, Inner: err}
 	}
@@ -338,6 +351,7 @@ func DecodeAsOrDefault[T any](dec *xml.Decoder, start xml.StartElement, defaultC
 				Inner: fmt.Errorf("canxml: %q: %w", typeName, typereg.ErrUnknownType),
 			}
 		}
+		xmlunmatched.DiscriminatorRead(dec, attrName)
 		v = ctor()
 		if err := xmlunmatched.DecodeElement(dec, &start, v); err != nil {
 			return zero, &DecodeError{

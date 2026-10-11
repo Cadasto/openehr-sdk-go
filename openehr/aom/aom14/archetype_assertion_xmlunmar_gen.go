@@ -138,7 +138,7 @@ func (e *ExprBinaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 				}
 				e.PrecedenceOverridden = &_v
 			case "operator":
-				if _err := _dec.DecodeElement(&e.Operator, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &e.Operator); _err != nil {
 					return _err
 				}
 			case "type":
@@ -241,7 +241,7 @@ func (e *ExprUnaryOperator) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 				}
 				e.PrecedenceOverridden = &_v
 			case "operator":
-				if _err := _dec.DecodeElement(&e.Operator, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &e.Operator); _err != nil {
 					return _err
 				}
 			case "type":

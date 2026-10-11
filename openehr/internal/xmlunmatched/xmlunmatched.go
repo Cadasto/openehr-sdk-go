@@ -8,10 +8,11 @@
 // attribute that names no attribute of the RM or AOM 1.4 type its element
 // decodes as, other than namespace declarations and attributes in the XML
 // Schema instance namespace (`xsi:type`, `xsi:schemaLocation`, `xsi:nil`, …);
-// an element in a namespace other than the openEHR one; and the element of a
-// `Hash` member or of a BMM `Any` member, which the codec does not model. By
-// default the decode skips it. A caller can instead track it: report each
-// item, in document order, by its path, and optionally refuse the first one.
+// an element in a namespace other than the openEHR one; and an element whose
+// content the codec does not model: a `Hash` member, a BMM `Any` member, and
+// a member whose Go type has no decoder of its own. By default the decode
+// skips it. A caller can instead track it: report each item, in document
+// order, by its path, and optionally refuse the first one.
 //
 // # How it works
 //
@@ -31,9 +32,11 @@
 //   - The generated decoders call the helpers of this package where content
 //     goes unread: [CheckUnmatchedAttrs] on entry, [LocalName] for the name
 //     they switch on, [SkipUnmatched] in the arm for an element they do not
-//     read, and [DecodeElement] for an element decoded as text. Each helper
-//     looks the decoder up; an untracked decode finds nothing and behaves as
-//     encoding/xml does.
+//     read, [DecodeElement] for an element decoded as text, and
+//     [DecodeParam] for a member typed by an open generic parameter. canxml
+//     calls [DiscriminatorRead] where its dispatch reads a bare `type`. Each
+//     helper looks the decoder up; an untracked decode finds nothing and
+//     behaves as encoding/xml does.
 package xmlunmatched
 
 import (
@@ -78,12 +81,14 @@ type Tracker struct {
 }
 
 // frame is one open element: its local name, its 1-based position among its
-// earlier siblings of the same name plus one, and the children it has opened
-// so far, counted by local name.
+// earlier siblings of the same name plus one, the children it has opened so
+// far, counted by local name, and whether dispatch read its bare `type`
+// attribute as the discriminator.
 type frame struct {
-	name     string
-	pos      int
-	children []nameCount
+	name          string
+	pos           int
+	children      []nameCount
+	discriminator bool
 }
 
 // nameCount is how many children of one local name an element has opened.
@@ -139,7 +144,7 @@ func (t *Tracker) push(local string) {
 	if len(t.open) < cap(t.open) {
 		t.open = t.open[:len(t.open)+1]
 		f := &t.open[len(t.open)-1]
-		f.name, f.pos, f.children = local, pos, f.children[:0]
+		f.name, f.pos, f.children, f.discriminator = local, pos, f.children[:0], false
 		return
 	}
 	t.open = append(t.open, frame{name: local, pos: pos})
@@ -194,11 +199,14 @@ func (t *Tracker) unmatched(path string, foreign bool) error {
 // attrs applies the policy to every attribute of the innermost open element
 // that is not read: neither an XML Schema instance attribute (the `xsi:type`
 // discriminator among them), nor a namespace declaration, nor one of known in
-// no namespace.
+// no namespace, nor a bare `type` that dispatch read as the discriminator.
 func (t *Tracker) attrs(attrs []xml.Attr, known []string) error {
 	var base string
+	read := t.open[len(t.open)-1].discriminator
 	for _, a := range attrs {
-		if isSchemaInstance(a.Name) || isNamespaceDecl(a.Name) || (a.Name.Space == "" && slices.Contains(known, a.Name.Local)) {
+		if isSchemaInstance(a.Name) || isNamespaceDecl(a.Name) ||
+			(a.Name.Space == "" && slices.Contains(known, a.Name.Local)) ||
+			(read && isBareType(a.Name)) {
 			continue
 		}
 		if base == "" {
@@ -325,11 +333,32 @@ func IsDiscriminator(name xml.Name) bool {
 // isSchemaInstance reports whether an attribute named name belongs to the XML
 // Schema instance namespace, such as `xsi:schemaLocation`, `xsi:nil` or the
 // `xsi:type` discriminator, in a form encoding/xml resolves or as written
-// literally. A bare `type`, which canxml.XSITypeOf reads as the
-// discriminator, counts too. An `xsi:` prefix bound to no namespace does not:
-// encoding/xml leaves it unresolved, so the attribute is not in the namespace.
+// literally. A bare `type` does not: it is in no namespace. Nor does an
+// `xsi:` prefix bound to no namespace: encoding/xml leaves it unresolved, so
+// the attribute is not in the namespace.
 func isSchemaInstance(name xml.Name) bool {
-	return name.Space == NSXSI || strings.HasPrefix(name.Local, "xsi:") || IsDiscriminator(name)
+	return name.Space == NSXSI || strings.HasPrefix(name.Local, "xsi:")
+}
+
+// isBareType reports whether an attribute named name is a `type` in no
+// namespace, which canxml.XSITypeOf also reads as the discriminator.
+func isBareType(name xml.Name) bool {
+	return name.Space == "" && name.Local == "type"
+}
+
+// DiscriminatorRead records that dispatch read the attribute name of the
+// element the decoder read last as its `xsi:type` discriminator. canxml's
+// polymorphic dispatch calls it. Only a bare `type` needs the record: an
+// attribute in the XML Schema instance namespace is never unmatched, but a
+// bare `type` is matched only on an element whose dispatch read it, and is
+// unmatched content everywhere else.
+func DiscriminatorRead(dec *xml.Decoder, name xml.Name) {
+	if !isBareType(name) {
+		return
+	}
+	if t := trackerOf(dec); t != nil {
+		t.open[len(t.open)-1].discriminator = true
+	}
 }
 
 // isNamespaceDecl reports whether name is a namespace declaration: `xmlns`,
@@ -394,8 +423,9 @@ func LocalName(name xml.Name) string {
 // SkipUnmatched skips the element start opens, which the generated decoder
 // does not read: its name matches no attribute of the RM type being decoded,
 // it lies in a foreign namespace, or it holds content the codec does not
-// model, such as a `Hash` attribute or a BMM `Any` attribute. The element is
-// one item, whatever it holds. start must be the token the decoder read last.
+// model, such as a `Hash` attribute, a BMM `Any` attribute or a member whose
+// Go type has no decoder of its own. The element is one item, whatever it
+// holds. start must be the token the decoder read last.
 //
 // By default it only skips. A tracked decode first reports the element's
 // path, and a strict one refuses the decode with an error that wraps
@@ -414,7 +444,8 @@ func SkipUnmatched(dec *xml.Decoder, start xml.StartElement) error {
 // the attributes of start that the generated decoder does not read: every
 // attribute but those in the XML Schema instance namespace (the `xsi:type`
 // discriminator, `xsi:schemaLocation`, `xsi:nil`, …), the namespace
-// declarations, and those named in known, which are read in no namespace.
+// declarations, those named in known, which are read in no namespace, and a
+// bare `type` that dispatch read as the discriminator ([DiscriminatorRead]).
 // start must be the token the decoder read last.
 //
 // By default it does nothing. A tracked decode reports the path of each such
@@ -437,14 +468,41 @@ func CheckUnmatchedAttrs(dec *xml.Decoder, start xml.StartElement, known ...stri
 // encoding/xml, an attribute or a child element on it is ignored. A tracked
 // decode reports or refuses each as unmatched content, and the value decoded
 // is the same as by default. A type with an UnmarshalXML method checks its
-// own content.
+// own content. A pointer to an empty interface gives encoding/xml no Go type
+// to decode into, so it skips the element; a tracked decode reports or
+// refuses that element as one item ([SkipUnmatched]).
 func DecodeElement(dec *xml.Decoder, start *xml.StartElement, v any) error {
 	t := trackerOf(dec)
 	if t == nil {
 		return dec.DecodeElement(v, start)
 	}
-	if _, ok := v.(xml.Unmarshaler); ok {
+	switch v.(type) {
+	case xml.Unmarshaler:
 		return dec.DecodeElement(v, start)
+	case *any:
+		return SkipUnmatched(dec, *start)
 	}
 	return t.decodeText(dec, start, v)
+}
+
+// DecodeParam decodes the element start opens into v, a member typed by an
+// open generic parameter T, choosing by T what [DecodeElement] chooses by v.
+// start must be the token the decoder read last.
+//
+//   - T is an interface type, such as the `any` of ORIGINAL_VERSION<any>:
+//     encoding/xml has no Go type to decode into, and the element is skipped
+//     as one item ([SkipUnmatched]), reported or refused by a tracked decode.
+//   - T is a pointer to a type with an UnmarshalXML method: encoding/xml
+//     allocates it and that method checks its own content.
+//   - Any other T, a primitive or a type with an UnmarshalXML method on its
+//     pointer, goes to [DecodeElement].
+func DecodeParam[T any](dec *xml.Decoder, start *xml.StartElement, v *T) error {
+	var zero T
+	switch any(zero).(type) {
+	case nil:
+		return SkipUnmatched(dec, *start)
+	case xml.Unmarshaler:
+		return dec.DecodeElement(v, start)
+	}
+	return DecodeElement(dec, start, v)
 }

@@ -47,8 +47,10 @@ import (
 //     - Mandatory / optional primitive → `xmlunmatched.DecodeElement(dec, &t, &v.Field)`
 //     - Mandatory struct → `dec.DecodeElement(&v.Field, &t)` (or `v.Field, ...` for pointer)
 //     - Optional struct (pointer) → allocate, decode, assign
-//     - Open generic parameter → `xmlunmatched.DecodeElement`, which serves a
-//     primitive and a struct alike
+//     - Open generic parameter → `xmlunmatched.DecodeParam`, which chooses
+//     by the instantiation: a primitive, a struct or an interface
+//     - Class with no generated decoder (a BMM primitive class such as
+//     TERMINOLOGY_CODE) → `xmlunmatched.SkipUnmatched`, one item
 //     - Polymorphic single → `canxml.DecodeAs[Iface](dec, t)` + assign
 //     - Slice of primitive/struct → append per occurrence
 //     - Slice of polymorphic → append result of `canxml.DecodeAs[Iface]`
@@ -286,6 +288,30 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 			// other interface-typed shape.
 			return unmarshalXMLPolySingle(recv, goField, elemName, p.TypeName), nil
 		}
+		if isOpenParam(ef.Owner, p.TypeName) {
+			// Typed by the owner's generic parameter (VERSION<T>.data):
+			// what the element decodes into depends on the instantiation,
+			// so xmlunmatched.DecodeParam chooses at run time.
+			if p.IsMandatory {
+				return unmarshalXMLOpenParam(recv, goField, elemName), nil
+			}
+			return unmarshalXMLOpenParamOptional(recv, goField, elemName, p.TypeName), nil
+		}
+		if isClass {
+			decoding, err := xmlClassDecoding(plan, p.TypeName)
+			if err != nil {
+				return "", err
+			}
+			switch decoding {
+			case xmlNoDecoder:
+				return unmarshalXMLNoDecoder(elemName, p.TypeName), nil
+			case xmlTextDecoder:
+				// An enumeration's Go type is a named string or integer,
+				// which decodes from the element's text like a primitive.
+				isClass = false
+			case xmlOwnDecoder:
+			}
+		}
 		if p.IsMandatory {
 			if isClass {
 				return unmarshalXMLStructMandatory(recv, goField, elemName), nil
@@ -309,12 +335,12 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 			return unmarshalXMLPolySingle(recv, goField, elemName, ifaceName), nil
 		}
 		// Open generic param bound to a concrete primitive or struct —
-		// emit a generic decode that defers to encoding/xml at runtime,
-		// through xmlunmatched.DecodeElement so a primitive's attributes and
-		// child elements count as unmatched content. The field is
-		// declared as `T` (open param), not `*T`, mandatory or not: we
-		// cannot allocate via new(T) for an unknown layout, so decode
-		// in place.
+		// emit a generic decode that chooses at run time, through
+		// xmlunmatched.DecodeParam, so a primitive's attributes and child
+		// elements count as unmatched content and an interface-typed
+		// instantiation's element is one item. The field is declared as
+		// `T` (open param), not `*T`, mandatory or not: we cannot allocate
+		// via new(T) for an unknown layout, so decode in place.
 		return unmarshalXMLOpenParam(recv, goField, elemName), nil
 
 	case *bmm.ContainerProperty:
@@ -336,7 +362,21 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 			return "", err
 		}
 		if innerIsClass {
+			decoding, err := xmlClassDecoding(plan, containerInnerName(p.TypeDef))
+			if err != nil {
+				return "", err
+			}
+			switch decoding {
+			case xmlNoDecoder:
+				return unmarshalXMLNoDecoder(elemName, containerInnerName(p.TypeDef)), nil
+			case xmlTextDecoder:
+				return unmarshalXMLPrimitiveSlice(recv, goField, elemName, innerType), nil
+			case xmlOwnDecoder:
+			}
 			return unmarshalXMLStructSlice(recv, goField, elemName, innerType), nil
+		}
+		if isOpenParam(ef.Owner, containerInnerName(p.TypeDef)) {
+			return unmarshalXMLOpenParamSlice(recv, goField, elemName, innerType), nil
 		}
 		return unmarshalXMLPrimitiveSlice(recv, goField, elemName, innerType), nil
 
@@ -345,6 +385,15 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 		// map[K]V. v1 defers XML emission/decoding (see canxml/doc.go).
 		if p.TypeDef != nil && containerKinds[p.TypeDef.RootType] {
 			return unmarshalXMLHashTODO(elemName), nil
+		}
+		if p.TypeDef != nil {
+			decoding, err := xmlClassDecoding(plan, p.TypeDef.RootType)
+			if err != nil {
+				return "", err
+			}
+			if decoding != xmlOwnDecoder {
+				return unmarshalXMLNoDecoder(elemName, p.TypeDef.RootType), nil
+			}
 		}
 		if p.IsMandatory {
 			return unmarshalXMLStructMandatory(recv, goField, elemName), nil
@@ -381,12 +430,117 @@ func unmarshalXMLPrimitiveOptionalLit(recv, field, elem, goType string) string {
 
 // unmarshalXMLOpenParam emits the decode case of a field typed by an open
 // generic parameter that is not polymorphic. The parameter may be bound to
-// a primitive (BASE Interval<Integer>) or to a class, so the case decodes
-// in place through xmlunmatched.DecodeElement, which serves both.
+// a primitive (BASE Interval<Integer>), to a class, or to an interface
+// (ORIGINAL_VERSION<any>), so the case decodes in place through
+// xmlunmatched.DecodeParam, which chooses by the instantiation.
 func unmarshalXMLOpenParam(recv, field, elem string) string {
 	return fmt.Sprintf(
-		"\t\t\tcase %q:\n\t\t\t\tif _err := xmlunmatched.DecodeElement(_dec, &_t, &%s.%s); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
+		"\t\t\tcase %q:\n\t\t\t\tif _err := xmlunmatched.DecodeParam(_dec, &_t, &%s.%s); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
 		elem, recv, field)
+}
+
+// unmarshalXMLOpenParamOptional emits the decode case of an optional field
+// typed by an open generic parameter, held as a pointer: it allocates the
+// value, decodes it through xmlunmatched.DecodeParam and assigns it.
+func unmarshalXMLOpenParamOptional(recv, field, elem, param string) string {
+	return fmt.Sprintf(
+		"\t\t\tcase %q:\n\t\t\t\t_v := new(%s)\n\t\t\t\tif _err := xmlunmatched.DecodeParam(_dec, &_t, _v); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = _v\n",
+		elem, param, recv, field)
+}
+
+// unmarshalXMLOpenParamSlice emits the decode case of a container whose
+// items are typed by an open generic parameter: each item decodes through
+// xmlunmatched.DecodeParam and is appended.
+func unmarshalXMLOpenParamSlice(recv, field, elem, param string) string {
+	return fmt.Sprintf(
+		"\t\t\tcase %q:\n\t\t\t\tvar _v %s\n\t\t\t\tif _err := xmlunmatched.DecodeParam(_dec, &_t, &_v); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = append(%s.%s, _v)\n",
+		elem, param, recv, field, recv, field)
+}
+
+// unmarshalXMLNoDecoder emits the case of a property whose class has no
+// canonical-XML decoder of its own, such as a BMM primitive class like
+// TERMINOLOGY_CODE: encoding/xml would read nothing from it and report
+// nothing either. The element is handed to xmlunmatched.SkipUnmatched as one
+// item, like a Hash member's: skipped by default, reported or refused on
+// request, and the field is left at its zero value.
+func unmarshalXMLNoDecoder(elem, bmmType string) string {
+	return fmt.Sprintf(
+		"\t\t\tcase %q:\n\t\t\t\t// Canonical XML has no decoder for %s — see canxml/doc.go.\n\t\t\t\tif _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
+		elem, bmmType)
+}
+
+// xmlDecoding says how the Go type of a BMM class decodes from canonical XML.
+type xmlDecoding int
+
+const (
+	// xmlNoDecoder: nothing reads the element, such as a BMM primitive
+	// class like TERMINOLOGY_CODE, held as a struct with no XML decoder.
+	xmlNoDecoder xmlDecoding = iota
+	// xmlOwnDecoder: the type has a generated UnmarshalXML, which reads its
+	// own content and hands what it does not read to the unmatched-content
+	// helpers.
+	xmlOwnDecoder
+	// xmlTextDecoder: the type is a named string or integer (an
+	// enumeration) and decodes from the element's text like a primitive.
+	xmlTextDecoder
+)
+
+// xmlClassDecoding reports how the Go type of the BMM class name decodes.
+// A class has a generated UnmarshalXML by the rule [codecClassesIn] applies:
+// a concrete class that is not a BMM primitive class, or the abstract BASE
+// Interval, which the base schema lists among its primitive types. A class
+// another target owns counts by the same rule, since that target renders its
+// decoder. A class the plan does not hold is rendered as `any`, which
+// nothing decodes.
+func xmlClassDecoding(plan *Plan, name string) (xmlDecoding, error) {
+	pc, ok := plan.Classes[name]
+	if !ok {
+		return xmlNoDecoder, nil
+	}
+	switch cls := pc.Class.(type) {
+	case *bmm.Enumeration:
+		return xmlTextDecoder, nil
+	case *bmm.SimpleClass:
+		if cls.IsAbstract() {
+			if !cls.IsGeneric() || codecPolymorphicAbstractGeneric(plan, pc) {
+				return xmlNoDecoder, nil
+			}
+			shaped, err := intervalShaped(plan, pc)
+			if err != nil || !shaped {
+				return xmlNoDecoder, err
+			}
+			return xmlOwnDecoder, nil
+		}
+		if pc.IsPrimitive {
+			return xmlNoDecoder, nil
+		}
+		return xmlOwnDecoder, nil
+	}
+	return xmlNoDecoder, nil
+}
+
+// isOpenParam reports whether name is one of owner's generic parameters.
+func isOpenParam(owner *bmm.SimpleClass, name string) bool {
+	if owner == nil || owner.GenericParameterDefs == nil {
+		return false
+	}
+	_, ok := owner.GenericParameterDefs[name]
+	return ok
+}
+
+// containerInnerName returns the BMM name of a container's item type: the
+// class name, or the root type of a generic class.
+func containerInnerName(td *bmm.ContainerType) string {
+	if td == nil || td.TypeDef == nil {
+		return ""
+	}
+	switch inner := td.TypeDef.(type) {
+	case *bmm.SimpleType:
+		return inner.TypeName
+	case *bmm.GenericType:
+		return inner.RootType
+	}
+	return ""
 }
 
 func unmarshalXMLStructMandatory(recv, field, elem string) string {
