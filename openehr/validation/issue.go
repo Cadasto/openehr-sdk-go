@@ -90,9 +90,10 @@ type Issue struct {
 	// positional predicate, so a path with one, such as /items[2], is an
 	// openEHR path but not an AQL path.
 	//
-	// Empty for global issues that do not localise to a specific node
-	// (e.g. root archetype-id mismatch). On an issue from [ValidateAQL] or
-	// [ValidateAQLWithTypeRelation] it is the lint path.
+	// Empty for global issues that do not localise to a specific node,
+	// such as nil_composition or nil_template for a nil argument. On an
+	// issue from [ValidateAQL] or [ValidateAQLWithTypeRelation] it is the
+	// lint path.
 	//
 	// Value-free on issues from the instance validators: never contains a
 	// value from the instance. Value-bearing on issues from [ValidateAQL]

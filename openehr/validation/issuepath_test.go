@@ -80,6 +80,38 @@ func TestIssuePath_REQ102_REQ112_UniqueIDs(t *testing.T) {
 	assertBothReport(t, validation.ValidateComposition(comp, c), validation.ValidateRM(comp), "required", want)
 }
 
+// REQ-102, REQ-112 — an attribute of the root is written below "/" with one
+// slash in both walkers: a wrong root archetype id is reported at
+// /archetype_node_id, where the floor reports an absent one, and that path
+// is valid AQL. Below the root the attribute follows its node's path.
+func TestIssuePath_REQ102_REQ112_RootAttribute(t *testing.T) {
+	c := mustCompile(t, "vital_signs")
+	wrongRoot := validVitalSignsComposition()
+	wrongRoot.ArchetypeNodeID = "openEHR-EHR-COMPOSITION.other.v1"
+	if r := validation.ValidateComposition(wrongRoot, c); !containsIssue(r.Issues, "/archetype_node_id", "archetype_id_mismatch") {
+		t.Errorf("template validator: no archetype_id_mismatch at /archetype_node_id; got %q", issueKeys(r.Issues))
+	}
+	absentRoot := validVitalSignsComposition()
+	absentRoot.ArchetypeNodeID = ""
+	if r := validation.ValidateRM(absentRoot); !containsIssue(r.Issues, "/archetype_node_id", "required") {
+		t.Errorf("floor: no required at /archetype_node_id; got %q", issueKeys(r.Issues))
+	}
+	if _, err := parse.Parse("SELECT c/archetype_node_id FROM COMPOSITION c"); err != nil {
+		t.Errorf("parse.Parse of the root attribute path: %v", err)
+	}
+
+	wrongData := validVitalSignsComposition()
+	obs, ok := wrongData.Content[0].(*rm.Observation)
+	if !ok {
+		t.Fatalf("fixture content[0] is %T, want *rm.Observation", wrongData.Content[0])
+	}
+	obs.Data.ArchetypeNodeID = "at9999"
+	want := "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/archetype_node_id"
+	if r := validation.ValidateComposition(wrongData, c); !containsIssue(r.Issues, want, "node_id_mismatch") {
+		t.Errorf("template validator: no node_id_mismatch at %s; got %q", want, issueKeys(r.Issues))
+	}
+}
+
 // REQ-102, REQ-112 — two items that share an archetype_node_id, bound to OPT
 // nodes that pin no name, are written by their 1-based position, the same in
 // both walkers. The OPT child they bind to, whose occurrences they exceed,

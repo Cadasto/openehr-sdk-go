@@ -310,6 +310,12 @@ func TestValidateRM_ScaleSymbolMayHaveNoCode(t *testing.T) {
 	blankTarget := rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}}
 	withBlankMapping := noCode("very slight")
 	withBlankMapping.Mappings = []rm.TermMapping{{Match: "=", Target: blankTarget}}
+	withBlankPurpose := codedSymbol("at1")
+	withBlankPurpose.Mappings = []rm.TermMapping{{
+		Match:   "=",
+		Target:  rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}, CodeString: "40917007"},
+		Purpose: &rm.DVCodedText{Value: "billing", DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}}},
+	}}
 	cases := []struct {
 		name string
 		root any
@@ -367,6 +373,19 @@ func TestValidateRM_ScaleSymbolMayHaveNoCode(t *testing.T) {
 			want: []string{
 				"required /value/symbol/mappings[1]/target/code_string",
 				"rm_invariant /value/symbol/mappings[1]/target",
+			},
+		},
+		{
+			// The exemption stops at the symbol's own defining_code: a
+			// DV_CODED_TEXT deeper under the symbol, here a mapping's
+			// purpose, also has a defining_code, and its blank code is
+			// reported.
+			name: "a mapping purpose with a blank code_string under a DV_SCALE symbol",
+			root: scoreElement(&rm.DVScale{Value: 0.5, Symbol: withBlankPurpose}),
+			want: []string{
+				"code_not_in_value_set /value/symbol/mappings[1]/purpose/defining_code",
+				"required /value/symbol/mappings[1]/purpose/defining_code/code_string",
+				"rm_invariant /value/symbol/mappings[1]/purpose/defining_code",
 			},
 		},
 		{

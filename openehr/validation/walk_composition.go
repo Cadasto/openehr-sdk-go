@@ -729,7 +729,7 @@ func (w *walker) checkLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, p
 	if want := opt.ArchetypeID(); want != "" {
 		if id != want {
 			w.emit(Issue{
-				Path:     path + "/archetype_node_id",
+				Path:     joinPath(path, "/archetype_node_id"),
 				Code:     "archetype_id_mismatch",
 				Detail:   fmt.Sprintf("archetype_node_id %q does not match template archetype id %q at %s", id, want, path),
 				Severity: Error,
@@ -739,7 +739,7 @@ func (w *walker) checkLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, p
 	}
 	if want := opt.NodeID(); want != "" && id != want {
 		w.emit(Issue{
-			Path:     path + "/archetype_node_id",
+			Path:     joinPath(path, "/archetype_node_id"),
 			Code:     "node_id_mismatch",
 			Detail:   fmt.Sprintf("archetype_node_id %q does not match template node_id %q at %s", id, want, path),
 			Severity: Error,

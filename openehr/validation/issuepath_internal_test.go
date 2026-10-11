@@ -164,3 +164,60 @@ func TestRMFloor_REQ112_REQ102_TakesPinnedNames(t *testing.T) {
 		})
 	}
 }
+
+// nestedPinnedCluster is a CLUSTER holding two CLUSTERs that share at0002,
+// each holding two ELEMENTs that share at0004 and carry neither value nor
+// null_flavour.
+func nestedPinnedCluster() *rm.Cluster {
+	inner := func() *rm.Cluster {
+		c := pinnedCluster()
+		c.ArchetypeNodeID = "at0002"
+		return c
+	}
+	return &rm.Cluster{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "outer"}, Items: []rm.Item{inner(), inner()}}
+}
+
+// REQ-112, REQ-102 — a pinned name is found by the whole path of its
+// attribute, not by the attribute's name: names given to the items of the
+// outer /items reach neither inner /items, and names given to the items of
+// one inner /items reach only those.
+func TestRMFloor_REQ112_REQ102_PinnedNamesKeyedByWholePath(t *testing.T) {
+	const first, second = "/items[at0002, 'Erste']", "/items[at0002, 'Zweite']"
+	outer := pinnedNames{
+		{attrPath: "/items", index: 0}: "Erste",
+		{attrPath: "/items", index: 1}: "Zweite",
+	}
+	tests := []struct {
+		name  string
+		names pinnedNames
+		want  []string
+	}{
+		{
+			name:  "names for the outer items",
+			names: outer,
+			want:  []string{first + "/items[1]", first + "/items[2]", second + "/items[1]", second + "/items[2]"},
+		},
+		{
+			name: "names for the outer items and the first inner items",
+			names: pinnedNames{
+				{attrPath: "/items", index: 0}:         "Erste",
+				{attrPath: "/items", index: 1}:         "Zweite",
+				{attrPath: first + "/items", index: 0}: "Systolic",
+				{attrPath: first + "/items", index: 1}: "Diastolic",
+			},
+			want: []string{
+				first + "/items[at0004, 'Diastolic']",
+				first + "/items[at0004, 'Systolic']",
+				second + "/items[1]",
+				second + "/items[2]",
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := floorPaths(nestedPinnedCluster(), tc.names); !slices.Equal(got, tc.want) {
+				t.Errorf("floor paths = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
