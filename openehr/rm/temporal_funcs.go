@@ -31,9 +31,9 @@ import (
 
 // ErrTemporalConversion is returned (wrapped) by ToTime / ToDuration
 // when a value cannot map cleanly to a Go time.Time / time.Duration:
-// the receiver is nil, the text is malformed or partial, a duration
-// carries calendar-nominal year or month components, or a definite
-// duration does not fit in a time.Duration.
+// the receiver is nil, the text is malformed or partial, a time names a
+// leap second, a duration carries calendar-nominal year or month
+// components, or a definite duration does not fit in a time.Duration.
 // Detect with errors.Is(err, rm.ErrTemporalConversion).
 var ErrTemporalConversion = errors.New("rm: temporal value not convertible")
 
@@ -44,6 +44,10 @@ const (
 	nominalDaysInMonth = 30.42
 	secondsPerDay      = 86400.0
 )
+
+// leapSecond is the seconds value of a positive leap second (hh:mm:60). ISO
+// 8601 allows it, but time.Date would carry it into the next minute.
+const leapSecond = 60
 
 // --- parsed component structs -------------------------------------------
 
@@ -202,7 +206,8 @@ func (d *DVTime) IsStrictlyComparableTo(other DVTime) bool { return true }
 
 // ToTime converts a full time-of-day to a time.Time on the reference
 // date 0000-01-01, or returns ErrTemporalConversion when the receiver is
-// nil or the value is partial or malformed.
+// nil, the value is partial or malformed, or it names a leap second
+// (second 60), which a time.Time cannot hold.
 func (d *DVTime) ToTime() (time.Time, error) {
 	p, err := parseTime(d.isoValue())
 	if err != nil {
@@ -210,6 +215,9 @@ func (d *DVTime) ToTime() (time.Time, error) {
 	}
 	if !p.secondKnown {
 		return time.Time{}, fmt.Errorf("%w: time %q is partial", ErrTemporalConversion, d.isoValue())
+	}
+	if p.second == leapSecond {
+		return time.Time{}, fmt.Errorf("%w: time names a leap second", ErrTemporalConversion)
 	}
 	loc, err := tzLocation(p)
 	if err != nil {
@@ -337,8 +345,9 @@ func (d *DVDateTime) LessThan(other DVDateTime) bool { return d.Compare(other) <
 func (d *DVDateTime) IsStrictlyComparableTo(other DVDateTime) bool { return true }
 
 // ToTime converts a full date-time to a time.Time (UTC when no timezone
-// is present), or returns ErrTemporalConversion when the receiver is nil
-// or the value is partial or malformed.
+// is present), or returns ErrTemporalConversion when the receiver is nil,
+// the value is partial or malformed, or it names a leap second (second
+// 60), which a time.Time cannot hold.
 func (d *DVDateTime) ToTime() (time.Time, error) {
 	dp, tp, err := d.split()
 	if err != nil {
@@ -346,6 +355,9 @@ func (d *DVDateTime) ToTime() (time.Time, error) {
 	}
 	if !dp.dayKnown || !tp.secondKnown {
 		return time.Time{}, fmt.Errorf("%w: date-time %q is partial", ErrTemporalConversion, d.isoValue())
+	}
+	if tp.second == leapSecond {
+		return time.Time{}, fmt.Errorf("%w: date-time names a leap second", ErrTemporalConversion)
 	}
 	loc, err := tzLocation(tp)
 	if err != nil {
