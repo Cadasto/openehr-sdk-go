@@ -261,12 +261,19 @@ func TestIssuePath_REQ102_MissingNodeKeepsNamedOPTPredicate(t *testing.T) {
 // REQ-102, REQ-112, REQ-168 — a path never carries a value from the
 // instance: sibling items that share an id and carry distinct instance names
 // are written by position in both walkers, and the names appear in no path.
+// Each item carries a defect the floor reports, so the floor alone has paths
+// under both items to inspect.
 func TestIssuePath_REQ102_REQ112_NoInstanceNameInPath(t *testing.T) {
 	const planted = "PLANTED-SIBLING"
 	vital := mustCompile(t, "vital_signs")
 	reused := mustCompileSyntheticOPT(t, reusedArchetypeOPT)
-	bp := vitalSignsWithEventItems(t, systolicItem(planted+"-A"), systolicItem(planted+"-B"))
-	twice := reusedComposition(planted+"-A", planted+"-B")
+	noValue := func(name string) rm.Element {
+		e := systolicItem(name)
+		e.Value = nil
+		return e
+	}
+	bp := vitalSignsWithEventItems(t, noValue(planted+"-A"), noValue(planted+"-B"))
+	twice := withoutLanguage(t, withoutLanguage(t, reusedComposition(planted+"-A", planted+"-B"), 0), 1)
 
 	for name, r := range map[string]validation.Result{
 		"template, vital_signs":      validation.ValidateComposition(bp, vital),

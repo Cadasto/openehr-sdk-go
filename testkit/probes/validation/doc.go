@@ -15,6 +15,10 @@
 // PARTY hierarchy (PERSON / ORGANISATION / GROUP / AGENT / ROLE +
 // sub-components) and the EHR-IM roots FOLDER / EHR_STATUS, asserting
 // the issue-code multiset per (OPT, root) shape via [validation.Validate].
+//
+// Template-driven validation includes the RM floor, so each multiset holds
+// the floor's findings too, a defect both layers find once. The fixtures
+// are valid against the RM where a case means to test the template alone.
 package validationprobes
 
 import "github.com/cadasto/openehr-sdk-go/testkit/probe"

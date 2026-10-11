@@ -17,7 +17,10 @@ import (
 // is 10, so the pair is inverted, and no ordered pair fits the DV_COUNT
 // alternative's 50, so the bounds stay as built. Read from the INTEGER
 // alternative, which puts nothing on a magnitude, the lower bound would
-// drop to 10, which the validator rejects.
+// drop to 10, which the validator rejects. The OPT admits no ordered pair,
+// so the RM floor, which template validation includes, reports the inverted
+// interval: REQ-107 excepts an OPT constraint that admits no value an RM
+// rule accepts.
 func TestREQ107_IntervalOrderReadsBindingAlternative(t *testing.T) {
 	interval := optNode("DV_INTERVAL&lt;DV_COUNT&gt;", "",
 		optSingle("lower",
@@ -43,8 +46,9 @@ func TestREQ107_IntervalOrderReadsBindingAlternative(t *testing.T) {
 				if got := iv.Lower.Magnitude; got != 50 {
 					t.Errorf("DV_INTERVAL.lower = %d, want 50, the only value the DV_COUNT alternative admits", got)
 				}
-				if r := validation.Validate(out, c); len(r.Issues) != 0 {
-					t.Errorf("Validate(generated ELEMENT) issues = %+v, want none", r.Issues)
+				r := validation.Validate(out, c)
+				if len(r.Issues) != 1 || r.Issues[0].Code != "rm_invariant" || r.Issues[0].Path != "/value" {
+					t.Errorf("Validate(generated ELEMENT) issues = %+v, want the one rm_invariant at /value the inverted pair gives", r.Issues)
 				}
 			})
 		}

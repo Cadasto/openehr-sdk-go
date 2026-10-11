@@ -64,6 +64,14 @@ func codedName(text string) rm.DVCodedText {
 	}
 }
 
+// emptyLanguage returns, sorted as issueKeys sorts them, the issues an empty
+// language on the item at itemPath gives: `required`, which the template
+// walk and the RM floor both report and the result carries once, and the
+// floor's `code_not_in_value_set`, since an empty code is in no code set.
+func emptyLanguage(itemPath string) []string {
+	return []string{"code_not_in_value_set " + itemPath + "/language", "required " + itemPath + "/language"}
+}
+
 // REQ-102, REQ-116 — items whose names are the names the template pins bind
 // to the children that pin them, whatever their order, so a correct
 // composition passes. The name is read from a DV_TEXT or a DV_CODED_TEXT, by
@@ -107,25 +115,25 @@ func TestValidateComposition_REQ102_REQ116_BoundNameReachesItemPath(t *testing.T
 	}{
 		{
 			name: "named item second", names: []string{"Erste", obrienName}, index: 1,
-			want: []string{"required " + obrienPath + "/language"},
+			want: emptyLanguage(obrienPath),
 		},
 		{
 			name: "named item first", names: []string{obrienName, "Erste"}, index: 0,
-			want: []string{"required " + obrienPath + "/language"},
+			want: emptyLanguage(obrienPath),
 		},
 		{
 			// The OPT requires each of its three children once, so the
 			// missing one is reported too.
 			name: "named item beside one bound to the child that pins no name", opt: "unnamed",
 			names: []string{"Andere", "Erste"}, index: 1,
-			want: []string{"cardinality " + obrienPath, "required " + erstePath + "/language"},
+			want: append([]string{"cardinality " + obrienPath}, emptyLanguage(erstePath)...),
 		},
 		{
 			// The item bound to the child that pins no name has no name to
 			// be written with, so it is written by its position.
 			name: "item bound to the child that pins no name", opt: "unnamed",
 			names: []string{"Erste", obrienName, "Andere"}, index: 2,
-			want: []string{"required /content[3]/language"},
+			want: emptyLanguage("/content[3]"),
 		},
 	}
 	for _, tc := range tests {

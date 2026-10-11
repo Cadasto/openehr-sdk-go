@@ -13,9 +13,9 @@ package validation
 //     entry beside it; the catalogue, not this comment, is the list to keep
 //     current.
 //
-// REQ-112 surface. Independent of REQ-102/110 (template-driven); both
-// drivers may run against the same root — REQ-110 enforces template
-// constraints, REQ-112 enforces the RM-only floor.
+// REQ-112 surface. ValidateRM runs it alone; the REQ-102/110
+// template-driven entries run it after their own walk over the same root
+// and merge its findings (validate.go, ADR 0025).
 //
 // Sign-off (2026-06-29): Option A — second driver alongside the
 // template-driven walker. Walker + invariant evaluators live in this
@@ -41,12 +41,16 @@ import (
 // stack. The deepest legitimate RM nesting is far below this bound.
 const maxWalkDepth = 256
 
-// ValidateRM validates root against the openEHR Reference Model alone.
-// It checks every RM-mandatory attribute on every node
+// ValidateRM validates root against the openEHR Reference Model alone:
+// it is the floor on its own, for a root no operational template applies
+// to. It checks every RM-mandatory attribute on every node
 // reachable from root, and runs per-RM-type invariants on the leaves it
-// touches. It does not consult any operational template; use
-// [Validate] / [ValidateComposition] / [ValidateFolder] / [ValidateEHRStatus]
-// / [ValidateDemographic] when a compiled OPT is available.
+// touches. It does not consult any operational template. The
+// template-driven entries, [Validate] / [ValidateComposition] /
+// [ValidateFolder] / [ValidateEHRStatus] / [ValidateDemographic], include
+// this floor, so a caller with a compiled OPT needs only one of them. On its
+// own the floor knows no template names, so an item whose archetype node id
+// a sibling shares is written by its position.
 //
 // The invariants include the RM's coded ones: an attribute the RM codes from
 // a group or a code set of the openEHR terminology, such as a COMPOSITION's
@@ -89,9 +93,35 @@ func ValidateRM(root any) Result {
 			Severity: Error,
 		}})
 	}
-	w := &rmFloorWalker{info: rminfo.Default}
+	return resultFromIssues(walkFloor(root, rmType, nil))
+}
+
+// walkFloor runs the floor over root, of RM type rmType, and returns its
+// issues. names gives the name the OPT pins on each item a template walk
+// bound, so the floor writes that walk's path for the node; nil writes no
+// name predicate.
+func walkFloor(root any, rmType string, names pinnedNames) []Issue {
+	w := &rmFloorWalker{info: rminfo.Default, names: names}
 	w.walk(root, rmType, "/", roleNone, 0)
-	return resultFromIssues(w.issues)
+	return w.issues
+}
+
+// floorIssues runs the floor over the root a template-driven validation
+// walked, with the names that walk bound. A root outside the closed RM set,
+// which the template walk reports as a type mismatch, is one the floor
+// cannot descend: it reports it as `rm_type_unknown` at "/", as [ValidateRM]
+// does.
+func floorIssues(root any, names pinnedNames) []Issue {
+	rmType, _, ok := rmTypeInfo(root)
+	if !ok {
+		return []Issue{{
+			Path:     "/",
+			Code:     "rm_type_unknown",
+			Detail:   fmt.Sprintf("root Go type %T is outside the closed RM set; the RM floor cannot descend", root),
+			Severity: Error,
+		}}
+	}
+	return walkFloor(root, rmType, names)
 }
 
 // ValidateRMFolder is the typed convenience wrapper for FOLDER roots.

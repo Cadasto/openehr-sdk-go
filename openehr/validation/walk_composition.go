@@ -2,6 +2,7 @@ package validation
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -372,7 +373,9 @@ func (w *walker) walkMultipleAttribute(
 		return
 	}
 	bound, byNodeID := bindItems(opt.RMTypeName(), attr.Name(), children, items)
-	itemPath := itemPaths(attrPath, boundPathItems(items, bound))
+	pathItems := boundPathItems(items, bound)
+	w.recordNames(attrPath, pathItems)
+	itemPath := itemPaths(attrPath, pathItems)
 	perChildCount := make(map[*tcimpl.CompiledNode]int, len(children))
 	for idx, item := range items {
 		matched := bound[idx]
@@ -445,6 +448,27 @@ func boundPathItems(items []any, bound []*tcimpl.CompiledNode) []pathItem {
 		}
 	}
 	return out
+}
+
+// recordNames keeps, in w.names, the pinned name of each of the items of
+// the multi-valued attribute at attrPath whose id a sibling shares, keyed
+// by attrPath and the item's index. The name of an item whose id is its
+// own never reaches its path, so it is not kept: the floor, fed what is
+// kept, writes every item as this walk does.
+func (w *walker) recordNames(attrPath string, items []pathItem) {
+	if !slices.ContainsFunc(items, func(it pathItem) bool { return it.name != "" }) {
+		return
+	}
+	s := newIDSharing(items)
+	for i, it := range items {
+		if it.name == "" || !s.shared(it.id) {
+			continue
+		}
+		if w.names == nil {
+			w.names = pinnedNames{}
+		}
+		w.names[itemKey{attrPath: attrPath, index: i}] = it.name
+	}
 }
 
 // childIdentity describes an OPT child for inclusion in cardinality

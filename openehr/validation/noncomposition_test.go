@@ -3,6 +3,7 @@ package validation_test
 import (
 	"encoding/json"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -91,20 +92,23 @@ func TestValidateDemographic_PersonFixture(t *testing.T) {
 
 	r := validation.ValidateDemographic(&person, c)
 
-	// The fixture validates clean except the genuine /relationships
-	// cardinality finding (instance has none; template pins >= 1). After
-	// REQ-052 sub-gap B no spurious DV_INTERVAL rm_type_mismatch remains.
-	sawCardinality := false
-	for _, iss := range r.Issues {
-		switch iss.Code {
-		case "cardinality":
-			sawCardinality = true
-		default:
-			t.Errorf("unexpected %s issue at %s — %s", iss.Code, iss.Path, iss.Detail)
-		}
+	// The template walk finds only the genuine /relationships cardinality
+	// (instance has none; template pins >= 1). After REQ-052 sub-gap B no
+	// spurious DV_INTERVAL rm_type_mismatch remains. The RM floor, which
+	// template validation includes, adds the fixture's two DV_MULTIMEDIA
+	// media types: both are coded in openEHR rather than the IANA media
+	// types, and the second carries no code at all.
+	const multimedia = "/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"
+	const wid = "/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"
+	want := []string{
+		"cardinality /relationships",
+		"code_not_in_value_set " + multimedia,
+		"code_not_in_value_set " + wid,
+		"required " + wid + "/code_string",
+		"rm_invariant " + wid,
 	}
-	if !sawCardinality {
-		t.Error("expected the genuine /relationships cardinality finding")
+	if got := issueKeys(r.Issues); !slices.Equal(got, want) {
+		t.Errorf("ValidateDemographic(TestPerson.v2) issues = %q, want %q", got, want)
 	}
 
 	// Positive descent guard: the clean fixture leaves no residual deep
@@ -256,11 +260,12 @@ func TestValidateEHRStatus_Synthetic(t *testing.T) {
 </template>`
 	c := mustCompileInline(t, body)
 	status := &rm.EHRStatus{
-		ArchetypeNodeID: "openEHR-EHR-EHR_STATUS.generic.v1",
-		Name:            rm.DVText{Value: "EHR Status"},
-		Subject:         rm.PartySelf{},
-		IsModifiable:    true,
-		IsQueryable:     true,
+		ArchetypeNodeID:  "openEHR-EHR-EHR_STATUS.generic.v1",
+		Name:             rm.DVText{Value: "EHR Status"},
+		ArchetypeDetails: archetypeDetails("openEHR-EHR-EHR_STATUS.generic.v1"),
+		Subject:          rm.PartySelf{},
+		IsModifiable:     true,
+		IsQueryable:      true,
 	}
 	if r := validation.ValidateEHRStatus(status, c); !r.OK {
 		t.Errorf("ValidateEHRStatus(synthetic) not OK: %+v", r.Issues)
@@ -319,9 +324,15 @@ func TestValidateDemographic_OrganisationRootClean(t *testing.T) {
 </template>`
 	c := mustCompileInline(t, body)
 	org := &rm.Organisation{
-		ArchetypeNodeID: "openEHR-DEMOGRAPHIC-ORGANISATION.organisation.v1",
-		Name:            rm.DVText{Value: "Org"},
-		Identities:      []rm.PartyIdentity{{ArchetypeNodeID: "at0001"}},
+		ArchetypeNodeID:  "openEHR-DEMOGRAPHIC-ORGANISATION.organisation.v1",
+		Name:             rm.DVText{Value: "Org"},
+		ArchetypeDetails: archetypeDetails("openEHR-DEMOGRAPHIC-ORGANISATION.organisation.v1"),
+		// The RM requires a PARTY_IDENTITY's name and details.
+		Identities: []rm.PartyIdentity{{
+			ArchetypeNodeID: "at0001",
+			Name:            rm.DVText{Value: "Identity"},
+			Details:         &rm.ItemTree{ArchetypeNodeID: "at0002", Name: rm.DVText{Value: "Details"}},
+		}},
 	}
 	if r := validation.ValidateDemographic(org, c); !r.OK {
 		t.Errorf("ValidateDemographic(ORGANISATION) not OK: %+v", r.Issues)

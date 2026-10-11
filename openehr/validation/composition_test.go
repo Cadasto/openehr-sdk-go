@@ -767,8 +767,9 @@ func TestValidateComposition_SectionEmptyNoPanic(t *testing.T) {
 // "valid" test asserts a zero-issue result.
 func validVitalSignsComposition() *rm.Composition {
 	return &rm.Composition{
-		ArchetypeNodeID: "openEHR-EHR-COMPOSITION.encounter.v1",
-		Name:            rm.DVText{Value: "Encounter"},
+		ArchetypeNodeID:  "openEHR-EHR-COMPOSITION.encounter.v1",
+		Name:             rm.DVText{Value: "Encounter"},
+		ArchetypeDetails: archetypeDetails("openEHR-EHR-COMPOSITION.encounter.v1"),
 		Category: rm.DVCodedText{
 			DVText: rm.DVText{Value: "event"},
 			DefiningCode: rm.CodePhrase{
@@ -798,8 +799,9 @@ func validVitalSignsComposition() *rm.Composition {
 // (language, encoding, subject, name).
 func validBloodPressureObservation() *rm.Observation {
 	return &rm.Observation{
-		ArchetypeNodeID: "openEHR-EHR-OBSERVATION.blood_pressure.v1",
-		Name:            rm.DVText{Value: "Blood pressure"},
+		ArchetypeNodeID:  "openEHR-EHR-OBSERVATION.blood_pressure.v1",
+		Name:             rm.DVText{Value: "Blood pressure"},
+		ArchetypeDetails: archetypeDetails("openEHR-EHR-OBSERVATION.blood_pressure.v1"),
 		Language: rm.CodePhrase{
 			TerminologyID: rm.TerminologyID{Value: "ISO_639-1"},
 			CodeString:    "en",
@@ -860,10 +862,22 @@ func validBloodPressureObservation() *rm.Observation {
 				&rm.Cluster{
 					ArchetypeNodeID: "openEHR-EHR-CLUSTER.device.v1",
 					Name:            rm.DVText{Value: "Device"},
+					// The RM requires a CLUSTER to hold at least one item.
+					Items: []rm.Item{&rm.Element{
+						ArchetypeNodeID: "at0001",
+						Name:            rm.DVText{Value: "Device name"},
+						Value:           &rm.DVText{Value: "Cuff"},
+					}},
 				},
 			},
 		},
 	}
+}
+
+// archetypeDetails returns the archetype_details the RM requires on an
+// archetype root of archetypeID (RM Is_archetype_root).
+func archetypeDetails(archetypeID string) *rm.Archetyped {
+	return &rm.Archetyped{ArchetypeID: rm.ArchetypeID{Value: archetypeID}, RMVersion: "1.1.0"}
 }
 
 func validSingleAttributeSlotComposition(protocolID string) *rm.Composition {

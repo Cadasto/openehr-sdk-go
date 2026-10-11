@@ -1,6 +1,8 @@
 package validation
 
 import (
+	"slices"
+
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
@@ -18,6 +20,13 @@ import (
 // PARTY_RELATIONSHIP / CAPABILITY) and the EHR IM roots FOLDER /
 // EHR_STATUS. A root whose concrete RM type does not match the OPT root
 // surfaces as an rm_type_mismatch at "/", not a silent pass.
+//
+// The result includes the Reference Model floor ([ValidateRM]): after the
+// template walk, the floor runs over the whole root, the nodes the template
+// does not model included, and its findings follow the template walk's in
+// the same Result. A finding the floor makes with the same code at the same
+// path as the template walk is dropped, so each defect is reported once.
+// No option leaves the floor out; [ValidateRM] runs the floor alone.
 //
 // Where a template reuses one archetype under several names, an item is
 // matched to the template node whose name it carries; an item whose name
@@ -57,11 +66,46 @@ func Validate(root any, c *templatecompile.Compiled) Result {
 
 	w := newWalker(c)
 	w.walkNode(c.Root(), root, "/")
-	return resultFromIssues(w.issues)
+	return resultFromIssues(withoutRepeats(w.issues, floorIssues(root, w.names)))
+}
+
+// issueAt is what makes two issues the same finding: the code, at the path.
+type issueAt struct {
+	code, path string
+}
+
+// withoutRepeats returns the template walk's issues, in walk order, followed
+// by each of the floor's issues, in walk order, that does not repeat a
+// template issue's code at its path. Both walkers write one path per node,
+// so an exact match is one defect seen twice; nothing is stripped from a
+// path before comparing, which would merge siblings. Neither list is
+// deduplicated against itself: the template walk may report one code twice
+// at one path for two clauses, and both stay.
+func withoutRepeats(template, floor []Issue) []Issue {
+	switch {
+	case len(floor) == 0:
+		return template
+	case len(template) == 0:
+		return floor
+	}
+	seen := make(map[issueAt]struct{}, len(template))
+	for _, i := range template {
+		seen[issueAt{code: i.Code, path: i.Path}] = struct{}{}
+	}
+	out := slices.Grow(template, len(floor))
+	for _, i := range floor {
+		if _, repeat := seen[issueAt{code: i.Code, path: i.Path}]; repeat {
+			continue
+		}
+		out = append(out, i)
+	}
+	return out
 }
 
 // ValidateDemographic validates an in-memory demographic PARTY (PERSON,
-// ORGANISATION, GROUP, AGENT or ROLE) against a compiled OPT.
+// ORGANISATION, GROUP, AGENT or ROLE) against a compiled OPT, the
+// Reference Model floor included, as [Validate] describes: the floor's
+// findings follow the template walk's, less those that repeat one.
 // It guards the nil party (yielding nil_party), then delegates to
 // [Validate]. The PARTY sub-components (ADDRESS, CONTACT, PARTY_IDENTITY,
 // PARTY_RELATIONSHIP, CAPABILITY) are validated in place as the walk
@@ -83,7 +127,9 @@ func ValidateDemographic(party rm.Party, c *templatecompile.Compiled) Result {
 }
 
 // ValidateFolder validates an in-memory FOLDER (a directory tree root or
-// sub-folder) against a compiled OPT.
+// sub-folder) against a compiled OPT, the Reference Model floor included,
+// as [Validate] describes: the floor's findings follow the template walk's,
+// less those that repeat one. A nil folder yields nil_folder.
 func ValidateFolder(folder *rm.Folder, c *templatecompile.Compiled) Result {
 	if folder == nil {
 		return resultFromIssues([]Issue{{
@@ -97,7 +143,9 @@ func ValidateFolder(folder *rm.Folder, c *templatecompile.Compiled) Result {
 }
 
 // ValidateEHRStatus validates an in-memory EHR_STATUS against a compiled
-// OPT.
+// OPT, the Reference Model floor included, as [Validate] describes: the
+// floor's findings follow the template walk's, less those that repeat one.
+// A nil status yields nil_ehr_status.
 func ValidateEHRStatus(status *rm.EHRStatus, c *templatecompile.Compiled) Result {
 	if status == nil {
 		return resultFromIssues([]Issue{{

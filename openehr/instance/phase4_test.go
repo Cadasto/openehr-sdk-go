@@ -104,6 +104,9 @@ func TestREQ107_FloorGapsFilled(t *testing.T) {
 			} else {
 				templ = validation.Validate(out, c)
 			}
+			// Template validation includes the RM floor, so it carries the
+			// floor findings REQ-107 excepts too, each once.
+			var templExcepted []string
 			for _, iss := range templ.Issues {
 				if iss.Severity != validation.Error {
 					continue
@@ -112,7 +115,14 @@ func TestREQ107_FloorGapsFilled(t *testing.T) {
 				if iss.Path == "/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rotated" {
 					continue
 				}
+				if f := iss.Code + " " + iss.Path; slices.Contains(allowed, f) {
+					templExcepted = append(templExcepted, f)
+					continue
+				}
 				t.Errorf("template %s %s (%s)", iss.Code, iss.Path, iss.Detail)
+			}
+			if !slices.Equal(templExcepted, allowed) {
+				t.Errorf("template findings REQ-107 excepts = %q, want %q", templExcepted, allowed)
 			}
 		})
 	}

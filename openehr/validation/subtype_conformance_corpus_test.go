@@ -25,8 +25,11 @@ import (
 // minCorpusSwept is the number of vendored templates the corpus sweep
 // measured: their Example instance validates clean and holds a DV_TEXT
 // ELEMENT value. A sweep that covers fewer has lost templates, and passes
-// for that reason rather than for the rule it checks.
-const minCorpusSwept = 48
+// for that reason rather than for the rule it checks. Template validation
+// includes the RM floor, so TestPerson.v2 is not counted: its Example
+// instance breaks the floor's media type rule, a known generator gap the
+// REQ-107 corpus ratchet records.
+const minCorpusSwept = 47
 
 // generateExample builds the Example instance of c, with the composer and
 // territory a COMPOSITION root needs; any other root ignores them.

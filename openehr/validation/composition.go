@@ -19,6 +19,13 @@ import (
 // the attribute's own path, and a required node the composition lacks
 // at the path the template gives it.
 //
+// The result includes the Reference Model floor ([ValidateRM]), run over
+// the whole composition after the template walk, as [Validate] describes:
+// the floor's findings follow the template walk's, and one that repeats a
+// template issue's code at its path is dropped, so each defect is reported
+// once. A composition that passes is valid against the template and the
+// RM rules the floor checks.
+//
 // Returns a [Result] whose Issues slice is never nil (zero-length
 // allocation when no issues fire).
 //
@@ -46,6 +53,12 @@ func ValidateComposition(comp *rm.Composition, c *templatecompile.Compiled) Resu
 type walker struct {
 	compiled *templatecompile.Compiled
 	issues   []Issue
+	// names collects, over the whole walk, the name the OPT pins on the
+	// node each item binds to, for the items whose archetype_node_id a
+	// sibling shares: the only items whose path a pinned name changes
+	// ([itemPaths]). The floor takes it, so it writes the path this walk
+	// writes for the same node. Nil until a walk records a name.
+	names pinnedNames
 }
 
 func newWalker(c *templatecompile.Compiled) *walker {

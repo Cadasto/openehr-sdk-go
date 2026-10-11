@@ -106,8 +106,9 @@ func languagesChild(rmType string) string {
 // participationsOPT apart from what parts carries.
 func participationsComposition(parts ...rm.Participation) *rm.Composition {
 	return &rm.Composition{
-		ArchetypeNodeID: "openEHR-EHR-COMPOSITION.participations.v1",
-		Name:            rm.DVText{Value: "Encounter"},
+		ArchetypeNodeID:  "openEHR-EHR-COMPOSITION.participations.v1",
+		Name:             rm.DVText{Value: "Encounter"},
+		ArchetypeDetails: archetypeDetails("openEHR-EHR-COMPOSITION.participations.v1"),
 		Category: rm.DVCodedText{
 			DVText: rm.DVText{Value: "event"},
 			DefiningCode: rm.CodePhrase{
@@ -142,8 +143,9 @@ func participationsComposition(parts ...rm.Participation) *rm.Composition {
 // languages child.
 func validActor() *rm.Person {
 	return &rm.Person{
-		ArchetypeNodeID: "openEHR-DEMOGRAPHIC-PERSON.person.v1",
-		Name:            rm.DVText{Value: "Person"},
+		ArchetypeNodeID:  "openEHR-DEMOGRAPHIC-PERSON.person.v1",
+		Name:             rm.DVText{Value: "Person"},
+		ArchetypeDetails: archetypeDetails("openEHR-DEMOGRAPHIC-PERSON.person.v1"),
 		Identities: []rm.PartyIdentity{{
 			ArchetypeNodeID: "at0001",
 			Name:            rm.DVText{Value: "Identity"},
@@ -266,7 +268,9 @@ func TestValidateDemographic_REQ102_ActorListsBindByRMType(t *testing.T) {
 			name:      "bound role is walked",
 			languages: dvText,
 			mutate:    func(p *rm.Person) { p.Roles[0].Namespace = "" },
-			want:      []string{"required /roles[1]/namespace"},
+			// The template walk reports the absent namespace, and the RM
+			// floor its own OBJECT_REF rule under another code.
+			want: []string{"required /roles[1]/namespace", "rm_invariant /roles[1]/namespace"},
 		},
 		{
 			name:      "an abstract supertype child admits the item",
@@ -346,7 +350,8 @@ func TestValidateDemographic_REQ102_ActorListsBindByRMType(t *testing.T) {
 			name:      "LOCATABLE without a node id is a slot_fill",
 			languages: dvText,
 			mutate:    func(p *rm.Person) { p.Identities[0].ArchetypeNodeID = "" },
-			want:      []string{"slot_fill /identities[1]"},
+			// The RM floor reports the RM-mandatory archetype_node_id too.
+			want: []string{"required /identities[1]/archetype_node_id", "slot_fill /identities[1]"},
 		},
 	}
 	for _, tc := range tests {
@@ -528,7 +533,9 @@ func TestValidateFolder_REQ102_ItemsBindByRMType(t *testing.T) {
 			name:     "OBJECT_REF without namespace is walked",
 			itemType: "OBJECT_REF",
 			items:    []rm.ObjectRefLike{noNamespace},
-			want:     []string{"required /items[1]/namespace"},
+			// The template walk reports the absent namespace, and the RM
+			// floor its own OBJECT_REF rule under another code.
+			want: []string{"required /items[1]/namespace", "rm_invariant /items[1]/namespace"},
 		},
 		{
 			name:     "full LOCATABLE_REF binds",

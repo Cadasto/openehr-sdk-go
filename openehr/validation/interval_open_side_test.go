@@ -121,7 +121,13 @@ func TestValidateComposition_BuiltBoundBesideOpenFlag(t *testing.T) {
 		t.Fatalf("Build: %v", err)
 	}
 	r := validation.ValidateComposition(comp, c)
-	want := []pathCode{{intervalValuePath + "/lower/magnitude", "primitive_out_of_range"}}
+	// The template walk reports the bound outside the OPT's range, then the
+	// RM floor reports the interval whose lower bound now lies above its
+	// upper one.
+	want := []pathCode{
+		{intervalValuePath + "/lower/magnitude", "primitive_out_of_range"},
+		{intervalValuePath, "rm_invariant"},
+	}
 	if got := pathCodes(r.Issues); !slices.Equal(got, want) {
 		t.Errorf("ValidateComposition(built, lower 500) issues = %v, want %v\nfull issues: %+v", got, want, r.Issues)
 	}

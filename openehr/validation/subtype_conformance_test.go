@@ -169,7 +169,9 @@ func TestValidateFolder_REQ102_ReferenceSubtypeUnderObjectRefChild(t *testing.T)
 			name:     "bound PARTY_REF is walked",
 			itemType: "OBJECT_REF",
 			item:     noNamespace,
-			want:     []string{"required /items[1]/namespace"},
+			// The template walk reports the absent namespace, and the RM
+			// floor its own OBJECT_REF rule under another code.
+			want: []string{"required /items[1]/namespace", "rm_invariant /items[1]/namespace"},
 		},
 		{
 			name:     "OBJECT_REF under PARTY_REF",
@@ -531,7 +533,9 @@ func TestValidate_REQ102_AlternativeTiers(t *testing.T) {
 			tight: durationChild,
 			loose: dataValueChild,
 			value: rm.DVDuration{Value: "five minutes"},
-			want:  []string{"primitive_invalid_value /value"},
+			// The DURATION child's C_DURATION refuses the text, and the RM
+			// floor's ISO 8601 rule refuses it under its own code.
+			want: []string{"primitive_invalid_value /value", "rm_invariant /value"},
 		},
 		{
 			name:  "DV_CODED_TEXT and untyped",

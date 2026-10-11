@@ -99,11 +99,11 @@ func TestProbe026MissingNodes_MissingSystolic(t *testing.T) {
 func TestProbe026MissingNodes_SlotFillUnknownArchetype(t *testing.T) {
 	body := loadFixture(t, "vital_signs")
 	comp := validBloodPressureComposition()
-	comp.Content = []rm.ContentItem{
-		&rm.Observation{
-			ArchetypeNodeID: "openEHR-EHR-OBSERVATION.no_such_archetype.v1",
-		},
-	}
+	// The OBSERVATION is RM-valid apart from its id, so only the slot fit
+	// fails: template validation includes the RM floor, which walks it.
+	obs := comp.Content[0].(*rm.Observation)
+	obs.ArchetypeNodeID = "openEHR-EHR-OBSERVATION.no_such_archetype.v1"
+	obs.ArchetypeDetails = archetyped(obs.ArchetypeNodeID)
 	cases := []probes.ValidateCase{
 		{
 			Name:        "unknown_archetype_id_under_content",
@@ -164,7 +164,10 @@ func TestProbe026MissingNodes_PrimitiveNotInList(t *testing.T) {
 			Name:        "category_code_999",
 			OPT:         body,
 			Composition: comp,
-			WantCodes:   []string{"primitive_not_in_list"},
+			// The OPT's code list refuses 999, and the RM floor, which
+			// template validation includes, refuses it under its own code:
+			// 999 is in no composition category of the openEHR terminology.
+			WantCodes: []string{"primitive_not_in_list", "code_not_in_value_set"},
 		},
 	}
 	r, err := probes.Probe026MissingNodes(cases)
@@ -292,8 +295,9 @@ func TestProbe026MissingNodes_AlternativeMismatch(t *testing.T) {
 			Name: "composer_party_identified",
 			OPT:  []byte(probe026AlternativeMismatchOPT),
 			Composition: &rm.Composition{
-				ArchetypeNodeID: "at0000",
-				Name:            rm.DVText{Value: "probe"},
+				ArchetypeNodeID:  "at0000",
+				Name:             rm.DVText{Value: "probe"},
+				ArchetypeDetails: archetyped("openEHR-EHR-COMPOSITION.probe.v1"),
 				Category: rm.DVCodedText{
 					DVText: rm.DVText{Value: "event"},
 					DefiningCode: rm.CodePhrase{
@@ -331,8 +335,9 @@ func TestProbe026MissingNodes_RMTypeMismatch(t *testing.T) {
 			Name: "composer_party_related_single_alt",
 			OPT:  []byte(probe026RMTypeMismatchOPT),
 			Composition: &rm.Composition{
-				ArchetypeNodeID: "at0000",
-				Name:            rm.DVText{Value: "probe"},
+				ArchetypeNodeID:  "at0000",
+				Name:             rm.DVText{Value: "probe"},
+				ArchetypeDetails: archetyped("openEHR-EHR-COMPOSITION.probe.v1"),
 				Category: rm.DVCodedText{
 					DVText: rm.DVText{Value: "event"},
 					DefiningCode: rm.CodePhrase{
@@ -348,8 +353,13 @@ func TestProbe026MissingNodes_RMTypeMismatch(t *testing.T) {
 					TerminologyID: rm.TerminologyID{Value: "ISO_3166-1"},
 					CodeString:    "NL",
 				},
+				// An RM-valid PARTY_RELATED, so only its type is refused.
 				Composer: &rm.PartyRelated{
-					PartyIdentified: rm.PartyIdentified{},
+					Name: new("Mother"),
+					Relationship: rm.DVCodedText{
+						Value:        "mother",
+						DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}, CodeString: "10"},
+					},
 				},
 			},
 			WantCodes: []string{"rm_type_mismatch"},
@@ -374,10 +384,19 @@ func loadFixture(t *testing.T, name string) []byte {
 	return body
 }
 
+// archetyped returns the archetype_details the RM requires on an archetype
+// root of archetypeID.
+func archetyped(archetypeID string) *rm.Archetyped {
+	return &rm.Archetyped{ArchetypeID: rm.ArchetypeID{Value: archetypeID}, RMVersion: "1.1.0"}
+}
+
+// validBloodPressureComposition is valid against vital_signs.opt and, since
+// template validation includes the RM floor, against the RM too.
 func validBloodPressureComposition() *rm.Composition {
 	return &rm.Composition{
-		ArchetypeNodeID: "openEHR-EHR-COMPOSITION.encounter.v1",
-		Name:            rm.DVText{Value: "Encounter"},
+		ArchetypeNodeID:  "openEHR-EHR-COMPOSITION.encounter.v1",
+		Name:             rm.DVText{Value: "Encounter"},
+		ArchetypeDetails: archetyped("openEHR-EHR-COMPOSITION.encounter.v1"),
 		Category: rm.DVCodedText{
 			DVText: rm.DVText{Value: "event"},
 			DefiningCode: rm.CodePhrase{
@@ -396,8 +415,9 @@ func validBloodPressureComposition() *rm.Composition {
 		},
 		Content: []rm.ContentItem{
 			&rm.Observation{
-				ArchetypeNodeID: "openEHR-EHR-OBSERVATION.blood_pressure.v1",
-				Name:            rm.DVText{Value: "Blood pressure"},
+				ArchetypeNodeID:  "openEHR-EHR-OBSERVATION.blood_pressure.v1",
+				Name:             rm.DVText{Value: "Blood pressure"},
+				ArchetypeDetails: archetyped("openEHR-EHR-OBSERVATION.blood_pressure.v1"),
 				Language: rm.CodePhrase{
 					TerminologyID: rm.TerminologyID{Value: "ISO_639-1"},
 					CodeString:    "en",
@@ -434,6 +454,7 @@ func validBloodPressureComposition() *rm.Composition {
 								Items: []rm.Element{{
 									ArchetypeNodeID: "at0008",
 									Name:            rm.DVText{Value: "Position"},
+									Value:           &rm.DVText{Value: "Sitting"},
 								}},
 							},
 						},
@@ -446,6 +467,11 @@ func validBloodPressureComposition() *rm.Composition {
 						&rm.Cluster{
 							ArchetypeNodeID: "openEHR-EHR-CLUSTER.device.v1",
 							Name:            rm.DVText{Value: "Device"},
+							Items: []rm.Item{&rm.Element{
+								ArchetypeNodeID: "at0001",
+								Name:            rm.DVText{Value: "Device name"},
+								Value:           &rm.DVText{Value: "Cuff"},
+							}},
 						},
 					},
 				},

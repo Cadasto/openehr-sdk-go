@@ -1,6 +1,7 @@
 package validation_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -39,26 +40,30 @@ func constraintRefCode(t *testing.T) (*rm.Composition, *rm.CodePhrase) {
 // template walk still checks the RM-mandatory attributes of the CODE_PHRASE
 // it binds there, as at a node the OPT leaves unconstrained: a blank
 // terminology_id or code_string is `required` at that attribute's path.
-// The RM floor is not part of this walk, so the issue comes from the
-// template walk alone.
+// Template validation includes the RM floor (REQ-102 RM floor), which
+// reports the same `required` there, carried once, and a blank code_string
+// also as its own CODE_PHRASE rule at the code.
 func TestREQ102_REQ103_ConstraintRefLeafChecksCodePhraseAttributes(t *testing.T) {
 	t.Parallel()
 	c := mustCompile(t, "Demonstration.v1")
 	tests := []struct {
-		name     string
-		blank    func(*rm.CodePhrase)
-		wantPath string // "" when no required issue is expected under the code
+		name  string
+		blank func(*rm.CodePhrase)
+		want  []string // the issues under the code, as issueKeys writes them
 	}{
-		{name: "fixture as written", blank: func(*rm.CodePhrase) {}},
+		{name: "fixture as written", blank: func(*rm.CodePhrase) {}, want: []string{}},
 		{
-			name:     "blank terminology_id value",
-			blank:    func(cp *rm.CodePhrase) { cp.TerminologyID.Value = "" },
-			wantPath: constraintRefCodePath + "/terminology_id",
+			name:  "blank terminology_id value",
+			blank: func(cp *rm.CodePhrase) { cp.TerminologyID.Value = "" },
+			want:  []string{"required " + constraintRefCodePath + "/terminology_id"},
 		},
 		{
-			name:     "blank code_string",
-			blank:    func(cp *rm.CodePhrase) { cp.CodeString = "" },
-			wantPath: constraintRefCodePath + "/code_string",
+			name:  "blank code_string",
+			blank: func(cp *rm.CodePhrase) { cp.CodeString = "" },
+			want: []string{
+				"required " + constraintRefCodePath + "/code_string",
+				"rm_invariant " + constraintRefCodePath,
+			},
 		},
 	}
 	for _, tc := range tests {
@@ -73,14 +78,8 @@ func TestREQ102_REQ103_ConstraintRefLeafChecksCodePhraseAttributes(t *testing.T)
 					under = append(under, is)
 				}
 			}
-			if tc.wantPath == "" {
-				if len(under) != 0 {
-					t.Errorf("ValidateComposition(%s) issues under %s = %+v, want none", tc.name, constraintRefCodePath, under)
-				}
-				return
-			}
-			if len(under) != 1 || under[0].Path != tc.wantPath || under[0].Code != "required" {
-				t.Errorf("ValidateComposition(%s) issues under %s = %+v, want one required at %s", tc.name, constraintRefCodePath, under, tc.wantPath)
+			if got := issueKeys(under); !slices.Equal(got, tc.want) {
+				t.Errorf("ValidateComposition(%s) issues under %s = %q, want %q", tc.name, constraintRefCodePath, got, tc.want)
 			}
 		})
 	}
