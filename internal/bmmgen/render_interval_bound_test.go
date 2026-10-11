@@ -589,10 +589,13 @@ func TestREQ169IntervalDecodeReadsFlagsInPlace(t *testing.T) {
 			t.Errorf("Point_interval decoder still copies %s back from the wire (%q):\n%s", prop, copyBack, src)
 		}
 	}
-	ret := strings.Index(src, "\t\treturn err\n")
+	// The error branch that follows the decode; the null branch before it
+	// returns too, so the search starts at the decode.
+	decode := strings.Index(src, "typereg.DecodeInto(")
+	ret := indexFrom(src, "\t\treturn err\n", decode)
 	defaults := strings.Index(src, "seen.setDefaults(&p.LowerIncluded, &p.LowerUnbounded, &p.UpperIncluded, &p.UpperUnbounded)")
-	if ret < 0 || defaults < 0 || ret >= defaults {
-		t.Errorf("Point_interval decoder does not return a decode error before it gives the defaults (positions %d, %d):\n%s", ret, defaults, src)
+	if decode < 0 || ret < 0 || defaults < 0 || ret >= defaults {
+		t.Errorf("Point_interval decoder does not return a decode error before it gives the defaults (positions %d, %d, %d):\n%s", decode, ret, defaults, src)
 	}
 }
 
@@ -608,7 +611,7 @@ func TestREQ169IntervalFlagDecodeCopiesOwnMembersBeforeReturning(t *testing.T) {
 	src := b.String()
 	decode := strings.Index(src, "err := typereg.DecodeInto(dec, \"X_INTERVAL\", wire, &wire.Type)")
 	copyBack := strings.Index(src, "x.Extra = wire.Extra")
-	ret := strings.Index(src, "\t\treturn err\n")
+	ret := indexFrom(src, "\t\treturn err\n", copyBack)
 	defaults := strings.Index(src, "seen.setDefaults(")
 	if decode < 0 || copyBack < 0 || ret < 0 || defaults < 0 || decode >= copyBack || copyBack >= ret || ret >= defaults {
 		t.Errorf("decoder does not decode, copy the own members back, return the error, then give the defaults (positions %d, %d, %d, %d):\n%s", decode, copyBack, ret, defaults, src)
@@ -669,6 +672,14 @@ func TestREQ169IntervalFlaggedDecoderCensus(t *testing.T) {
 					if !strings.Contains(jsonSrc, defaults) {
 						t.Errorf("%s JSON decoder does not give the absent flags their defaults (%q):\n%s", pc.BMMName, defaults, jsonSrc)
 					}
+					// A null in place of the interval reads as the member
+					// left out (REQ-052): it is consumed before the decode,
+					// so no default is given.
+					null := strings.Index(jsonSrc, "if dec.PeekKind() == 'n' {")
+					decode := strings.Index(jsonSrc, "typereg.DecodeInto(")
+					if null < 0 || decode < 0 || null >= decode {
+						t.Errorf("%s JSON decoder does not consume a null interval before the decode (positions %d, %d):\n%s", pc.BMMName, null, decode, jsonSrc)
+					}
 					if !strings.Contains(xmlSrc, "var _seen intervalFlagsSeen") || !strings.Contains(xmlSrc, "_"+defaults) {
 						t.Errorf("%s XML decoder does not record the flags and give the absent ones their defaults:\n%s", pc.BMMName, xmlSrc)
 					}
@@ -676,8 +687,10 @@ func TestREQ169IntervalFlaggedDecoderCensus(t *testing.T) {
 						if want := fmt.Sprintf("%s intervalFlagJSON `json:%q`", FieldName(prop), prop); !strings.Contains(jsonSrc, want) {
 							t.Errorf("%s JSON decoder does not read %s through the flag wrapper (%q):\n%s", pc.BMMName, prop, want, jsonSrc)
 						}
-						if want := "_seen." + seenFlagField(prop) + " = true"; !strings.Contains(xmlSrc, want) {
-							t.Errorf("%s XML decoder does not record %s as read (%q):\n%s", pc.BMMName, prop, want, xmlSrc)
+						fn := FieldName(prop)
+						want := fmt.Sprintf("decodeIntervalFlagXML(_dec, &_t, &%s.%s, &_seen.%s)", recv, fn, seenFlagField(prop))
+						if !strings.Contains(xmlSrc, want) {
+							t.Errorf("%s XML decoder does not read %s through the shared flag reader (%q):\n%s", pc.BMMName, prop, want, xmlSrc)
 						}
 					}
 				}
@@ -750,7 +763,10 @@ func TestREQ169IntervalFlagHelpersSettleOpenFlagsFirst(t *testing.T) {
 		t.Fatalf("RenderIntervalBoundFile: %v", err)
 	}
 	src := string(body)
-	for _, want := range []string{"type intervalFlagsSeen struct", "type intervalFlagJSON struct", "func (f intervalFlagJSON) UnmarshalJSONFrom("} {
+	for _, want := range []string{
+		"type intervalFlagsSeen struct", "type intervalFlagJSON struct", "func (f intervalFlagJSON) UnmarshalJSONFrom(",
+		"func decodeIntervalFlagXML(", "text = strings.TrimSpace(text)",
+	} {
 		if !strings.Contains(src, want) {
 			t.Errorf("interval file lacks %q:\n%s", want, src)
 		}
@@ -789,4 +805,17 @@ func TestJSONWireShapeCensus(t *testing.T) {
 	if _, _, err := classJSONWireShape(plan, plan.Classes["Multiplicity_interval"]); err == nil {
 		t.Error("classJSONWireShape(Multiplicity_interval) succeeded, want a refusal")
 	}
+}
+
+// indexFrom returns the index of the first substr in s at or after from, or
+// -1 when from is negative or substr does not occur there.
+func indexFrom(s, substr string, from int) int {
+	if from < 0 {
+		return -1
+	}
+	i := strings.Index(s[from:], substr)
+	if i < 0 {
+		return -1
+	}
+	return from + i
 }

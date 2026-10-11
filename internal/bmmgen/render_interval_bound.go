@@ -100,19 +100,26 @@ func intervalFlagDecodeDoc() string {
 	fmt.Fprintf(&b, "// value is read: `%s` and `%s` read as false,\n", propLowerUnbounded, propUpperUnbounded)
 	fmt.Fprintf(&b, "// and `%s` and `%s` read as true on a side that is\n", propLowerIncluded, propUpperIncluded)
 	b.WriteString("// not open and as false on a side that is. A flag the document carries is\n")
-	b.WriteString("// read as written, and a failed decode takes no defaults.\n")
+	b.WriteString("// read as written.\n")
 	return b.String()
 }
 
-// markIntervalFlagSeen appends, to the UnmarshalXML case branch of a boundary
-// flag, the statement that records the flag as read. The branch returns on a
-// decode error before it, so only a flag read in full counts as present.
-// Branches of any other property pass through unchanged.
-func markIntervalFlagSeen(caseBody, prop string) string {
-	if !isIntervalFlag(prop) {
-		return caseBody
-	}
-	return caseBody + fmt.Sprintf("\t\t\t\t_seen.%s = true\n", seenFlagField(prop))
+// intervalFlagXMLDoc is the part of an interval UnmarshalXML doc comment that
+// says how an empty flag element is read.
+const intervalFlagXMLDoc = "// An empty or whitespace-only flag element carries no boolean and reads as\n" +
+	"// a flag the document leaves out.\n"
+
+// unmarshalXMLIntervalFlag renders the UnmarshalXML case branch of one
+// boundary flag of a class that carries all four. The shared
+// decodeIntervalFlagXML reads the element's text, trimmed: an empty or
+// whitespace-only element carries no boolean, so it leaves the field alone and
+// the flag unmarked, and the flag takes its default like an absent one
+// (REQ-169); any other text is parsed as a boolean, and a text that is none is
+// a decode error. Only a flag read as a boolean is marked as present.
+func unmarshalXMLIntervalFlag(recv, prop string) string {
+	return fmt.Sprintf(
+		"\t\t\tcase %q:\n\t\t\t\tif _err := decodeIntervalFlagXML(_dec, &_t, &%s.%s, &_seen.%s); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
+		prop, recv, FieldName(prop), seenFlagField(prop))
 }
 
 // renderIntervalFlagJSONDecode renders the body of the UnmarshalJSONFrom of a
@@ -130,11 +137,22 @@ func markIntervalFlagSeen(caseBody, prop string) string {
 // wire carries by value and which come back whether or not the decode fails.
 // typeDecl, when not empty, is a statement that declares the `_type` target
 // gotType names.
+//
+// A JSON null in place of the whole interval is consumed first and decodes as
+// the member left out (REQ-052, "a null member as absent"): the receiver keeps
+// what it holds and no flag takes a default, so a null interval held by value
+// does not read as a closed interval.
 func renderIntervalFlagJSONDecode(b *strings.Builder, recv, rmType, embedType, embedValue, typeDecl, gotType string, copyBack []string) {
 	embedField := strings.TrimPrefix(embedType, "*")
 	if i := strings.IndexByte(embedField, '['); i >= 0 {
 		embedField = embedField[:i]
 	}
+	b.WriteString("\t// A null in place of the interval reads as the member left out: the\n")
+	b.WriteString("\t// receiver keeps what it holds and no flag takes a default.\n")
+	b.WriteString("\tif dec.PeekKind() == 'n' {\n")
+	b.WriteString("\t\t_, err := dec.ReadToken()\n")
+	b.WriteString("\t\treturn err\n")
+	b.WriteString("\t}\n")
 	b.WriteString("\tvar seen intervalFlagsSeen\n")
 	if typeDecl != "" {
 		b.WriteString(typeDecl)
@@ -171,8 +189,10 @@ func renderIntervalFlagJSONDecode(b *strings.Builder, recv, rmType, embedType, e
 // renderIntervalFlagHelpers renders the boundary-flag helpers the canonical
 // decoders of every interval class share (REQ-169): intervalFlagsSeen, which
 // records the flags a document carried and gives the others their defaults,
-// and intervalFlagJSON, the canonical-JSON decode target of one flag. The
-// field and parameter order follows [intervalFlagProps].
+// intervalFlagJSON, the canonical-JSON decode target of one flag, and
+// decodeIntervalFlagXML, which reads one canonical-XML flag element and reads
+// an empty or whitespace-only one as absent. The field and parameter order
+// follows [intervalFlagProps].
 func renderIntervalFlagHelpers() string {
 	var b strings.Builder
 	b.WriteString("// intervalFlagsSeen records which of an interval's four boundary flags a\n")
@@ -229,6 +249,29 @@ func renderIntervalFlagHelpers() string {
 	b.WriteString("\t\treturn err\n")
 	b.WriteString("\t}\n")
 	b.WriteString("\t*f.seen = true\n")
+	b.WriteString("\treturn nil\n")
+	b.WriteString("}\n\n")
+
+	b.WriteString("// decodeIntervalFlagXML reads one interval boundary flag element of canonical\n")
+	b.WriteString("// XML into field and marks it seen. An empty or whitespace-only element\n")
+	b.WriteString("// carries no boolean: it leaves field alone and the flag unmarked, so the\n")
+	b.WriteString("// flag takes its default like one the document leaves out. Any other text,\n")
+	b.WriteString("// trimmed, is parsed as a boolean, and a text that is none is an error.\n")
+	b.WriteString("func decodeIntervalFlagXML(dec *xml.Decoder, start *xml.StartElement, field, seen *bool) error {\n")
+	b.WriteString("\tvar text string\n")
+	b.WriteString("\tif err := dec.DecodeElement(&text, start); err != nil {\n")
+	b.WriteString("\t\treturn err\n")
+	b.WriteString("\t}\n")
+	b.WriteString("\ttext = strings.TrimSpace(text)\n")
+	b.WriteString("\tif text == \"\" {\n")
+	b.WriteString("\t\treturn nil\n")
+	b.WriteString("\t}\n")
+	b.WriteString("\tv, err := strconv.ParseBool(text)\n")
+	b.WriteString("\tif err != nil {\n")
+	b.WriteString("\t\treturn err\n")
+	b.WriteString("\t}\n")
+	b.WriteString("\t*field = v\n")
+	b.WriteString("\t*seen = true\n")
 	b.WriteString("\treturn nil\n")
 	b.WriteString("}\n\n")
 	return b.String()
@@ -698,6 +741,9 @@ func RenderIntervalBoundFile(plan *Plan) ([]byte, error) {
 	b.WriteString("import (\n")
 	b.WriteString("\t\"encoding/json/jsontext\"\n")
 	b.WriteString("\tjson \"encoding/json/v2\"\n")
+	b.WriteString("\t\"encoding/xml\"\n")
+	b.WriteString("\t\"strconv\"\n")
+	b.WriteString("\t\"strings\"\n")
 	b.WriteString(")\n\n")
 	b.WriteString(renderIntervalFlagHelpers())
 	b.WriteString("// omitIntervalBound reports whether the canonical encoders leave out an\n")

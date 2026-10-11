@@ -30,7 +30,9 @@ import (
 // value is read: `lower_unbounded` and `upper_unbounded` read as false,
 // and `lower_included` and `upper_included` read as true on a side that is
 // not open and as false on a side that is. A flag the document carries is
-// read as written, and a failed decode takes no defaults.
+// read as written.
+// An empty or whitespace-only flag element carries no boolean and reads as
+// a flag the document leaves out.
 func (i *Interval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 	var _seen intervalFlagsSeen
 	for {
@@ -50,25 +52,21 @@ func (i *Interval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					return _err
 				}
 			case "lower_unbounded", "LowerUnbounded":
-				if _err := _dec.DecodeElement(&i.LowerUnbounded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &i.LowerUnbounded, &_seen.lowerUnbounded); _err != nil {
 					return _err
 				}
-				_seen.lowerUnbounded = true
 			case "upper_unbounded", "UpperUnbounded":
-				if _err := _dec.DecodeElement(&i.UpperUnbounded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &i.UpperUnbounded, &_seen.upperUnbounded); _err != nil {
 					return _err
 				}
-				_seen.upperUnbounded = true
 			case "lower_included", "LowerIncluded":
-				if _err := _dec.DecodeElement(&i.LowerIncluded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &i.LowerIncluded, &_seen.lowerIncluded); _err != nil {
 					return _err
 				}
-				_seen.lowerIncluded = true
 			case "upper_included", "UpperIncluded":
-				if _err := _dec.DecodeElement(&i.UpperIncluded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &i.UpperIncluded, &_seen.upperIncluded); _err != nil {
 					return _err
 				}
-				_seen.upperIncluded = true
 			default:
 				if _err := _dec.Skip(); _err != nil {
 					return _err
@@ -93,7 +91,9 @@ func (i *Interval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 // value is read: `lower_unbounded` and `upper_unbounded` read as false,
 // and `lower_included` and `upper_included` read as true on a side that is
 // not open and as false on a side that is. A flag the document carries is
-// read as written, and a failed decode takes no defaults.
+// read as written.
+// An empty or whitespace-only flag element carries no boolean and reads as
+// a flag the document leaves out.
 func (p *PointInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 	var _seen intervalFlagsSeen
 	for {
@@ -113,25 +113,21 @@ func (p *PointInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 					return _err
 				}
 			case "lower_unbounded":
-				if _err := _dec.DecodeElement(&p.LowerUnbounded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &p.LowerUnbounded, &_seen.lowerUnbounded); _err != nil {
 					return _err
 				}
-				_seen.lowerUnbounded = true
 			case "upper_unbounded":
-				if _err := _dec.DecodeElement(&p.UpperUnbounded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &p.UpperUnbounded, &_seen.upperUnbounded); _err != nil {
 					return _err
 				}
-				_seen.upperUnbounded = true
 			case "lower_included":
-				if _err := _dec.DecodeElement(&p.LowerIncluded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &p.LowerIncluded, &_seen.lowerIncluded); _err != nil {
 					return _err
 				}
-				_seen.lowerIncluded = true
 			case "upper_included":
-				if _err := _dec.DecodeElement(&p.UpperIncluded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &p.UpperIncluded, &_seen.upperIncluded); _err != nil {
 					return _err
 				}
-				_seen.upperIncluded = true
 			default:
 				if _err := _dec.Skip(); _err != nil {
 					return _err
@@ -156,7 +152,9 @@ func (p *PointInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 // value is read: `lower_unbounded` and `upper_unbounded` read as false,
 // and `lower_included` and `upper_included` read as true on a side that is
 // not open and as false on a side that is. A flag the document carries is
-// read as written, and a failed decode takes no defaults.
+// read as written.
+// An empty or whitespace-only flag element carries no boolean and reads as
+// a flag the document leaves out.
 func (p *ProperInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 	var _seen intervalFlagsSeen
 	for {
@@ -176,25 +174,21 @@ func (p *ProperInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 					return _err
 				}
 			case "lower_unbounded":
-				if _err := _dec.DecodeElement(&p.LowerUnbounded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &p.LowerUnbounded, &_seen.lowerUnbounded); _err != nil {
 					return _err
 				}
-				_seen.lowerUnbounded = true
 			case "upper_unbounded":
-				if _err := _dec.DecodeElement(&p.UpperUnbounded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &p.UpperUnbounded, &_seen.upperUnbounded); _err != nil {
 					return _err
 				}
-				_seen.upperUnbounded = true
 			case "lower_included":
-				if _err := _dec.DecodeElement(&p.LowerIncluded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &p.LowerIncluded, &_seen.lowerIncluded); _err != nil {
 					return _err
 				}
-				_seen.lowerIncluded = true
 			case "upper_included":
-				if _err := _dec.DecodeElement(&p.UpperIncluded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &p.UpperIncluded, &_seen.upperIncluded); _err != nil {
 					return _err
 				}
-				_seen.upperIncluded = true
 			default:
 				if _err := _dec.Skip(); _err != nil {
 					return _err

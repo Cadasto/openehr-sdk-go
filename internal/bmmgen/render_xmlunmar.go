@@ -175,6 +175,7 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	if flagged {
 		b.WriteString("//\n")
 		b.WriteString(intervalFlagDecodeDoc())
+		b.WriteString(intervalFlagXMLDoc)
 	}
 	fmt.Fprintf(&b, "func (%s *%s%s) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {\n", recv, pc.GoName, typeArgs)
 	// Read attribute-typed properties from _start.Attr.
@@ -195,15 +196,17 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	b.WriteString("\t\t\tswitch _t.Name.Local {\n")
 
 	for _, ef := range elemFields {
-		caseBody, err := renderUnmarshalXMLField(plan, recv, sc, ef)
-		if err != nil {
-			return "", fmt.Errorf("render UnmarshalXML field %s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
+		var caseBody string
+		if prop := ef.Prop.PropertyName(); flagged && isIntervalFlag(prop) {
+			caseBody = unmarshalXMLIntervalFlag(recv, prop)
+		} else {
+			caseBody, err = renderUnmarshalXMLField(plan, recv, sc, ef)
+			if err != nil {
+				return "", fmt.Errorf("render UnmarshalXML field %s.%s: %w", pc.BMMName, prop, err)
+			}
 		}
 		if legacy {
 			caseBody = withLegacyElementName(caseBody, ef.Prop.PropertyName())
-		}
-		if flagged {
-			caseBody = markIntervalFlagSeen(caseBody, ef.Prop.PropertyName())
 		}
 		b.WriteString(caseBody)
 	}

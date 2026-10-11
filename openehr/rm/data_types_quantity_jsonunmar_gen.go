@@ -42,10 +42,16 @@ func (d *DVCount) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // value is read: `lower_unbounded` and `upper_unbounded` read as false,
 // and `lower_included` and `upper_included` read as true on a side that is
 // not open and as false on a side that is. A flag the document carries is
-// read as written, and a failed decode takes no defaults.
+// read as written.
 func (d *DVInterval[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if d == nil {
 		return fmt.Errorf("canjson: DV_INTERVAL: %w", typereg.ErrNilReceiver)
+	}
+	// A null in place of the interval reads as the member left out: the
+	// receiver keeps what it holds and no flag takes a default.
+	if dec.PeekKind() == 'n' {
+		_, err := dec.ReadToken()
+		return err
 	}
 	var seen intervalFlagsSeen
 	wire := &struct {

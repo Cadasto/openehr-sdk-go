@@ -6,6 +6,9 @@ package rm
 import (
 	"encoding/json/jsontext"
 	json "encoding/json/v2"
+	"encoding/xml"
+	"strconv"
+	"strings"
 )
 
 // intervalFlagsSeen records which of an interval's four boundary flags a
@@ -60,6 +63,29 @@ func (f intervalFlagJSON) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		return err
 	}
 	*f.seen = true
+	return nil
+}
+
+// decodeIntervalFlagXML reads one interval boundary flag element of canonical
+// XML into field and marks it seen. An empty or whitespace-only element
+// carries no boolean: it leaves field alone and the flag unmarked, so the
+// flag takes its default like one the document leaves out. Any other text,
+// trimmed, is parsed as a boolean, and a text that is none is an error.
+func decodeIntervalFlagXML(dec *xml.Decoder, start *xml.StartElement, field, seen *bool) error {
+	var text string
+	if err := dec.DecodeElement(&text, start); err != nil {
+		return err
+	}
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return nil
+	}
+	v, err := strconv.ParseBool(text)
+	if err != nil {
+		return err
+	}
+	*field = v
+	*seen = true
 	return nil
 }
 

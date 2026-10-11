@@ -479,3 +479,175 @@ func TestREQ169CorpusIntervalsDecodeClosed(t *testing.T) {
 		})
 	}
 }
+
+// xmlEmptyFlagCases place one flag element with no boolean in it ("$empty")
+// on a bounded side and beside an open side, each with the flags the decoded
+// interval carries when that element reads as a flag the document leaves out.
+var xmlEmptyFlagCases = []struct {
+	name     string
+	flag     string
+	children []xmlChild
+	want     intervalFlags
+}{
+	{
+		name: "lower_included on a bounded side", flag: "lower_included",
+		children: []xmlChild{{"lower", "$lower"}, {"upper", "$upper"}, {"lower_included", "$empty"}},
+		want:     closedFlags,
+	},
+	{
+		name: "lower_included on an open side", flag: "lower_included",
+		children: []xmlChild{{"upper", "$upper"}, {"lower_unbounded", "true"}, {"lower_included", "$empty"}},
+		want:     intervalFlags{LowerUnbounded: true, UpperIncluded: true},
+	},
+	{
+		name: "upper_included on a bounded side", flag: "upper_included",
+		children: []xmlChild{{"lower", "$lower"}, {"upper", "$upper"}, {"upper_included", "$empty"}},
+		want:     closedFlags,
+	},
+	{
+		name: "upper_included on an open side", flag: "upper_included",
+		children: []xmlChild{{"lower", "$lower"}, {"upper_unbounded", "true"}, {"upper_included", "$empty"}},
+		want:     intervalFlags{LowerIncluded: true, UpperUnbounded: true},
+	},
+	{
+		name: "lower_unbounded on a bounded side", flag: "lower_unbounded",
+		children: []xmlChild{{"lower", "$lower"}, {"upper", "$upper"}, {"lower_unbounded", "$empty"}},
+		want:     closedFlags,
+	},
+	{
+		name: "lower_unbounded beside an open upper side", flag: "lower_unbounded",
+		children: []xmlChild{{"lower", "$lower"}, {"lower_unbounded", "$empty"}, {"upper_unbounded", "true"}},
+		want:     intervalFlags{LowerIncluded: true, UpperUnbounded: true},
+	},
+	{
+		name: "upper_unbounded on a bounded side", flag: "upper_unbounded",
+		children: []xmlChild{{"lower", "$lower"}, {"upper", "$upper"}, {"upper_unbounded", "$empty"}},
+		want:     closedFlags,
+	},
+	{
+		name: "upper_unbounded beside an open lower side", flag: "upper_unbounded",
+		children: []xmlChild{{"lower_unbounded", "true"}, {"upper", "$upper"}, {"upper_unbounded", "$empty"}},
+		want:     intervalFlags{LowerUnbounded: true, UpperIncluded: true},
+	},
+}
+
+// legacyFlagName is the Go field spelling SDK v0.28.0 and earlier wrote for
+// each BASE Interval flag.
+var legacyFlagName = map[string]string{
+	"lower_included":  "LowerIncluded",
+	"lower_unbounded": "LowerUnbounded",
+	"upper_included":  "UpperIncluded",
+	"upper_unbounded": "UpperUnbounded",
+}
+
+// xmlEmptyFlagSpellings are the three ways an element can carry no boolean.
+var xmlEmptyFlagSpellings = []struct {
+	name string
+	elem func(name string) string
+}{
+	{"self-closing", func(n string) string { return "<" + n + "/>" }},
+	{"empty", func(n string) string { return "<" + n + "></" + n + ">" }},
+	{"whitespace-only", func(n string) string { return "<" + n + "> \n\t </" + n + ">" }},
+}
+
+// xmlEmptyFlagReaders are the readers the empty-flag rule is checked on:
+// DV_INTERVAL, BASE Interval and two AOM 1.4 constraint intervals. legacy
+// marks the ones decoded by BASE Interval, which also reads the Go field
+// names SDK v0.28.0 and earlier wrote.
+func xmlEmptyFlagReaders(t *testing.T) []struct {
+	r      xmlIntervalReader
+	legacy bool
+} {
+	t.Helper()
+	want := map[string]bool{
+		"DV_INTERVAL<DV_COUNT>":                false,
+		"BASE Interval held directly":          true,
+		"AOM 1.4 C_INTEGER.range":              true,
+		"AOM 1.4 C_COMPLEX_OBJECT.occurrences": true,
+	}
+	var out []struct {
+		r      xmlIntervalReader
+		legacy bool
+	}
+	for _, r := range xmlIntervalReaders() {
+		if legacy, ok := want[r.name]; ok {
+			out = append(out, struct {
+				r      xmlIntervalReader
+				legacy bool
+			}{r, legacy})
+		}
+	}
+	if len(out) != len(want) {
+		t.Fatalf("found %d of the %d empty-flag readers", len(out), len(want))
+	}
+	return out
+}
+
+// TestREQ169EmptyXMLFlagReadsAsAbsent pins the REQ-169 rule for canonical XML
+// (REQ-056) that an empty or whitespace-only flag element carries no boolean
+// and is read as an absent flag: a self-closing, an empty and a
+// whitespace-only element of each of the four flags, on a bounded side and
+// beside an open side, decode with no error and with the flag's default. BASE
+// Interval reads the same of the v0.28.0 Go field spelling.
+//
+// Can-fail control: read an empty element as a present false and the
+// included-on-a-bounded-side cases fail; parse the untrimmed text and every
+// whitespace-only case is refused.
+func TestREQ169EmptyXMLFlagReadsAsAbsent(t *testing.T) {
+	for _, er := range xmlEmptyFlagReaders(t) {
+		for _, tc := range xmlEmptyFlagCases {
+			for _, sp := range xmlEmptyFlagSpellings {
+				names := []string{tc.flag}
+				if er.legacy {
+					names = append(names, legacyFlagName[tc.flag])
+				}
+				for _, name := range names {
+					t.Run(er.r.name+"/"+tc.name+"/"+sp.name+"/"+name, func(t *testing.T) {
+						var b strings.Builder
+						for _, c := range tc.children {
+							if c.value == "$empty" {
+								b.WriteString(sp.elem(name))
+								continue
+							}
+							b.WriteString(xmlIntervalBody([]xmlChild{c}, er.r.lower, er.r.upper))
+						}
+						doc := fmt.Sprintf(er.r.doc, b.String())
+						got, err := er.r.decode([]byte(doc))
+						if err != nil {
+							t.Fatalf("canxml.Unmarshal(%s) = %v, want no error: an empty flag element reads as absent", doc, err)
+						}
+						if got != tc.want {
+							t.Errorf("canxml.Unmarshal(%s) flags = %+v, want %+v", doc, got, tc.want)
+						}
+					})
+				}
+			}
+		}
+	}
+}
+
+// TestREQ169XMLFlagTextIsTrimmedAndParsed pins the other side of the
+// empty-flag rule: a flag element that does carry text is read as written once
+// its surrounding whitespace is trimmed, and text that is no boolean stays a
+// decode error rather than reading as absent.
+func TestREQ169XMLFlagTextIsTrimmedAndParsed(t *testing.T) {
+	for _, er := range xmlEmptyFlagReaders(t) {
+		r := er.r
+		t.Run(r.name+"/padded false is read as written", func(t *testing.T) {
+			doc := fmt.Sprintf(r.doc, r.lower+r.upper+"<lower_included>\n  false \t</lower_included>")
+			got, err := r.decode([]byte(doc))
+			if err != nil {
+				t.Fatalf("canxml.Unmarshal(%s) = %v, want no error", doc, err)
+			}
+			if want := (intervalFlags{UpperIncluded: true}); got != want {
+				t.Errorf("canxml.Unmarshal(%s) flags = %+v, want %+v", doc, got, want)
+			}
+		})
+		t.Run(r.name+"/text that is no boolean is refused", func(t *testing.T) {
+			doc := fmt.Sprintf(r.doc, r.lower+r.upper+"<lower_included>maybe</lower_included>")
+			if _, err := r.decode([]byte(doc)); err == nil {
+				t.Errorf("canxml.Unmarshal(%s) succeeded, want an error for a flag that is no boolean", doc)
+			}
+		})
+	}
+}
