@@ -25,9 +25,11 @@
 //     as a JSON number or as a quoted string, is replaced by the literal the
 //     encoder writes for its value.
 //
-// No change is made inside a generic payload, such as the "data" of an
-// ORIGINAL_VERSION: the decoder holds it as plain JSON rather than as RM
-// values, so none of the changes above applies to it.
+// Inside a generic payload, such as the "data" of an ORIGINAL_VERSION, the
+// decoder holds plain JSON rather than RM values, so none of the changes above
+// applies there. The only change inside it is that every number, which the
+// decoder reads as a float64, is written as the literal the encoder writes for
+// that float64; strings, booleans, nulls and member names stay as written.
 //
 // [Prune] applies the first change only. A caller counting what the input
 // carries on the members the RM defines uses it.
@@ -117,7 +119,7 @@ func transform(input []byte, rootType string, full bool) ([]byte, error) {
 		return nil, errors.New("expectedform: the document is not a JSON object")
 	}
 	w.unmatched = map[string]bool{}
-	err = w.model.Unmatched(input, rootType, func(pointer string) error {
+	err = w.model.Unmatched(input, rmjsonwalk.Root{Type: rootType}, func(pointer string) error {
 		w.unmatched[pointer] = true
 		return nil
 	})
@@ -256,7 +258,28 @@ func (w walker) resolve(obj map[string]any, declared, ptr string) (string, error
 // The second result is false when the expected form drops the member.
 func (w walker) member(name string, attr rmjsonwalk.Attribute, val any, ptr string) (any, bool, error) {
 	if attr.Payload {
-		return val, true, nil // the decoder holds a generic payload as plain JSON
+		// The decoder holds a generic payload as plain JSON.
+		if w.full {
+			return payloadNumbers(val), true, nil
+		}
+		return val, true, nil
+	}
+	if attr.Hash {
+		// A Hash of RM objects: each member's value is one object of
+		// attr.Type, keyed by any name.
+		entries, ok := val.(map[string]any)
+		if !ok {
+			return nil, false, fmt.Errorf("%s: want a JSON object for a Hash attribute", ptr)
+		}
+		out := make(map[string]any, len(entries))
+		for k, e := range entries {
+			nv, _, err := w.single(attr.Type, attr.Kind, attr.Bound, e, ptr+"/"+escapeToken(k))
+			if err != nil {
+				return nil, false, err
+			}
+			out[k] = nv
+		}
+		return out, true, nil
 	}
 	if attr.Kind == rmjsonwalk.KindParameter {
 		// No binding: the value must carry its own _type, which resolve
@@ -451,6 +474,29 @@ func normaliseNumber(attrType string, v any) any {
 			return v
 		}
 		return json.Number(strconv.FormatInt(n, 10))
+	}
+	return v
+}
+
+// payloadNumbers returns v, plain JSON inside a generic payload, with every
+// number written as the literal the encoder writes for the float64 the
+// decoder reads it into, at any depth. Everything else is kept as written.
+func payloadNumbers(v any) any {
+	switch x := v.(type) {
+	case json.Number:
+		return normaliseNumber("Double", x)
+	case map[string]any:
+		out := make(map[string]any, len(x))
+		for k, e := range x {
+			out[k] = payloadNumbers(e)
+		}
+		return out
+	case []any:
+		out := make([]any, len(x))
+		for i, e := range x {
+			out[i] = payloadNumbers(e)
+		}
+		return out
 	}
 	return v
 }

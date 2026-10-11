@@ -31,6 +31,7 @@ type Model struct {
 	lookup  rminfo.Lookup
 	hier    rminfo.Hierarchy
 	absence rminfo.AbsenceReporter
+	roots   sync.Map // reflect.Type → rootOf, see [Model.RootOf]
 }
 
 // New returns a Model over l. l must also implement [rminfo.Hierarchy] and
@@ -88,6 +89,10 @@ type Attribute struct {
 	// holds as plain JSON rather than as an RM value. A walk does not look
 	// inside it.
 	Payload bool
+	// Hash reports a Hash attribute whose values are RM objects: the JSON
+	// value is an object whose members each hold one value of class Type,
+	// keyed by any name.
+	Hash bool
 }
 
 // boundBindings binds the type parameter of a DV_INTERVAL slot whose RM type
@@ -122,6 +127,20 @@ var payloads = map[string]bool{
 	"Point_interval.upper":  true,
 	"Proper_interval.lower": true,
 	"Proper_interval.upper": true,
+}
+
+// hashValues gives the class of the values of each Hash attribute that holds
+// RM objects, keyed by the class that declares the attribute and its name.
+// rminfo types every Hash attribute as plain "Hash" and drops its value type,
+// so it is written out here from the openEHR RM 1.2 class definitions. A Hash
+// attribute not listed holds strings or other plain JSON, which a walk does
+// not look inside. AUTHORED_RESOURCE.translations has no RM descendant in
+// this RM release; the AOM 1.4 ARCHETYPE inherits it. TestHashValuesMatchTheRM
+// checks the table against rminfo and the Go map fields of the registered
+// types, in both directions.
+var hashValues = map[string]string{
+	"AUTHORED_RESOURCE.translations": "TRANSLATION_DETAILS",
+	"RESOURCE_DESCRIPTION.details":   "RESOURCE_DESCRIPTION_ITEM",
 }
 
 // IsClass reports whether name is an RM class in the model's class universe.
@@ -177,10 +196,13 @@ func (m *Model) Resolve(typ string, hasType bool, declared string) (string, erro
 // when rmType has no attribute name: the member is unmatched.
 //
 // A type-parameter attribute takes bound as its type; with bound empty its
-// Kind stays [KindParameter] and its value must carry its own "_type". The
-// returned Bound is the binding the attribute's own value passes down: a
-// DV_INTERVAL attribute whose RM type argument is a concrete class, such as
-// DV_QUANTITY.normal_range, binds its bounds to that class.
+// Kind stays [KindParameter] and its value must carry its own "_type", unless
+// the attribute is a generic payload. A binding overrides the payload rule:
+// the slot names the class the value decodes as. The returned Bound is the
+// binding the attribute's own value passes down: a DV_INTERVAL attribute
+// whose RM type argument is a concrete class, such as
+// DV_QUANTITY.normal_range, binds its bounds to that class. A Hash attribute
+// whose values are RM objects reports the values' class as its Type.
 func (m *Model) Attribute(rmType, name, bound string) (Attribute, bool) {
 	typ, ok := m.lookup.AttributeRMType(rmType, name)
 	if !ok {
@@ -195,11 +217,13 @@ func (m *Model) Attribute(rmType, name, bound string) (Attribute, bool) {
 		DeclaredOn: site,
 		Bound:      boundBindings[site+"."+name],
 	}
-	if a.Kind == KindParameter {
-		a.Type, a.Payload = bound, payloads[rmType+"."+name]
-		if bound != "" {
-			a.Kind = KindClass
-		}
+	switch {
+	case a.Kind == KindParameter && bound != "":
+		a.Type, a.Kind = bound, KindClass
+	case a.Kind == KindParameter:
+		a.Type, a.Payload = "", payloads[rmType+"."+name]
+	case typ == "Hash" && hashValues[site+"."+name] != "":
+		a.Type, a.Kind, a.Hash = hashValues[site+"."+name], KindClass, true
 	}
 	return a, true
 }

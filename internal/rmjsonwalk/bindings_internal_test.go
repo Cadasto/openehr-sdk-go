@@ -7,8 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	// The rm package registers the RM types in typereg.Default when it is
-	// initialised; the reverse checks below walk that registry.
+	// The rm and aom14 packages register their types in typereg.Default
+	// when they are initialised; the reverse checks below walk that
+	// registry.
+	_ "github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	_ "github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -192,6 +194,113 @@ func TestPayloadsMatchTheRM(t *testing.T) {
 	for _, key := range slices.Sorted(maps.Keys(payloads)) {
 		if !found[key] {
 			t.Errorf("payloads lists %s, which no registered rm type holds as any", key)
+		}
+	}
+}
+
+// TestHashValuesMatchTheRM checks hashValues against rminfo and the Go map
+// fields of the registered types, in both directions (REQ-170: every object
+// that decodes as an RM class is checked). Each entry must name a Hash
+// attribute declared on the keyed class and give a concrete RM class. And
+// every registered library type, RM or AOM 1.4, that holds a Hash attribute
+// as a Go map whose values are a class of the model must be an entry giving
+// that class: the decoder reads each of those values as that class. The AOM
+// 1.4 ARCHETYPE is the only holder of AUTHORED_RESOURCE.translations, which no
+// RM class inherits.
+func TestHashValuesMatchTheRM(t *testing.T) {
+	m, err := Default()
+	if err != nil {
+		t.Fatalf("Default(): %v", err)
+	}
+	h := m.hier
+	for key, class := range hashValues {
+		owner, attr, ok := strings.Cut(key, ".")
+		if !ok {
+			t.Errorf("key %q is not CLASS.attribute", key)
+			continue
+		}
+		if typ, ok := rminfo.Default.AttributeRMType(owner, attr); !ok || typ != "Hash" {
+			t.Errorf("%s: AttributeRMType = %q, %v, want Hash, true", key, typ, ok)
+		}
+		if site, ok := h.DeclaredOn(owner, attr); !ok || site != owner {
+			t.Errorf("%s: DeclaredOn = %q, %v, want %s, true", key, site, ok, owner)
+		}
+		if abstract, known := h.IsAbstract(class); !known || abstract {
+			t.Errorf("%s gives %s: IsAbstract = %v, known %v, want a concrete RM class", key, class, abstract, known)
+		}
+	}
+
+	// declaringSites returns every class.attr where the model declares attr
+	// as a Hash, for a holder rminfo does not know (an AOM 1.4 class).
+	declaringSites := func(attr string) []string {
+		var sites []string
+		for _, c := range rminfo.Default.KnownRMTypes() {
+			typ, _ := rminfo.Default.AttributeRMType(c, attr)
+			if site, _ := h.DeclaredOn(c, attr); typ == "Hash" && site == c {
+				sites = append(sites, c+"."+attr)
+			}
+		}
+		return sites
+	}
+	found := map[string]string{}
+	holders := 0
+	for _, name := range typereg.Default.Names() {
+		ctor, ok := typereg.Default.Lookup(name)
+		if !ok {
+			continue
+		}
+		st := reflect.TypeOf(ctor())
+		for st.Kind() == reflect.Pointer {
+			st = st.Elem()
+		}
+		if st.Kind() != reflect.Struct || !strings.HasPrefix(st.PkgPath(), "github.com/cadasto/openehr-sdk-go/openehr/") {
+			continue
+		}
+		for _, f := range reflect.VisibleFields(st) {
+			ft := f.Type
+			for ft.Kind() == reflect.Pointer {
+				ft = ft.Elem()
+			}
+			if !f.IsExported() || ft.Kind() != reflect.Map || ft.Key().Kind() != reflect.String {
+				continue
+			}
+			vt := ft.Elem()
+			for vt.Kind() == reflect.Pointer {
+				vt = vt.Elem()
+			}
+			value, ok := reflect.TypeAssert[bmmNamer](reflect.New(vt))
+			if !ok || !m.IsClass(value.BMMName()) {
+				continue // a map of strings or of plain JSON
+			}
+			attr, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+			var sites []string
+			if site, ok := h.DeclaredOn(name, attr); ok {
+				sites = []string{site + "." + attr}
+			} else {
+				sites = declaringSites(attr)
+			}
+			if len(sites) != 1 {
+				t.Errorf("%s.%s: the model declares it as a Hash on %q, want exactly one class", name, attr, sites)
+				continue
+			}
+			holders++
+			if prev, seen := found[sites[0]]; seen && prev != value.BMMName() {
+				t.Errorf("%s: the Go types hold its values as both %s and %s", sites[0], prev, value.BMMName())
+			}
+			found[sites[0]] = value.BMMName()
+		}
+	}
+	if holders == 0 {
+		t.Fatal("no Go map field holding RM values found; the reverse check asserts nothing")
+	}
+	for _, key := range slices.Sorted(maps.Keys(found)) {
+		if got, want := hashValues[key], found[key]; got != want {
+			t.Errorf("hashValues[%q] = %q, want %q (a Go type holds the Hash's values as that class)", key, got, want)
+		}
+	}
+	for _, key := range slices.Sorted(maps.Keys(hashValues)) {
+		if _, ok := found[key]; !ok {
+			t.Errorf("hashValues[%q] names no Go map field holding RM values", key)
 		}
 	}
 }

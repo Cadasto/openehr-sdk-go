@@ -5,15 +5,35 @@ import (
 	"encoding/json/jsontext"
 )
 
+// Root is the RM shape a decode target gives a document's root: the JSON
+// containers the target wraps around its RM values, and the RM type each of
+// those values is declared as. [Model.RootOf] reads it from a decode target.
+type Root struct {
+	// Nest lists the containers, outermost first: '[' for a Go slice or
+	// array, whose JSON array elements each hold one value, and '{' for a Go
+	// map, whose JSON object members each hold one. It is empty for a target
+	// that is itself an RM value.
+	Nest string
+	// Type is the RM type each value is declared as: the class a value
+	// decodes as when it carries no "_type". It is empty where only the
+	// value's own "_type" can name its class.
+	Type string
+	// Bound is the class the target binds the type parameter of each value's
+	// class to, such as DV_QUANTITY for an rm.DVInterval[rm.DVQuantity], or
+	// empty.
+	Bound string
+}
+
 // Unmatched walks the first JSON value in data and calls report with the JSON
 // Pointer (RFC 6901) of every unmatched member, once each, in the order the
 // members appear. A member is unmatched when its name is neither "_type" nor
 // an attribute of the RM type its object decodes as. A pointer names the
 // member and carries none of its value.
 //
-// rootType is the RM type the root decodes as when the root object carries no
-// "_type", or empty when the caller does not know it. A root array's elements
-// are each read as a root.
+// root says how the document's root holds its RM values. A value where root
+// expects a container of another JSON kind is skipped. A Hash attribute whose
+// values are RM objects is read member by member, each pointer naming the
+// member's key.
 //
 // The walk looks inside an object only when it can read the object's RM type
 // (see [Model.Resolve]); an empty "_type" reads as an elided one, as the
@@ -27,25 +47,51 @@ import (
 // returns that error. Any other error is a malformed document, reported by
 // encoding/json/jsontext under its default options; data the canonical-JSON
 // decoder accepted walks without one.
-func (m *Model) Unmatched(data []byte, rootType string, report func(pointer string) error) error {
+func (m *Model) Unmatched(data []byte, root Root, report func(pointer string) error) error {
 	types, err := typeIndex(data)
 	if err != nil {
 		return err
 	}
 	w := &walk{m: m, types: types, report: report}
-	dec := jsontext.NewDecoder(bytes.NewReader(data))
-	if dec.PeekKind() != '[' {
-		return w.value(dec, rootType, "")
+	return w.root(jsontext.NewDecoder(bytes.NewReader(data)), root.Nest, root)
+}
+
+// root reads the next value from dec as the containers nest still lists
+// around root's RM values.
+func (w *walk) root(dec *jsontext.Decoder, nest string, root Root) error {
+	if nest == "" {
+		return w.value(dec, root.Type, root.Bound)
+	}
+	return each(dec, jsontext.Kind(nest[0]), func() error {
+		return w.root(dec, nest[1:], root)
+	})
+}
+
+// each reads the next value from dec as a JSON array (open '[') or object
+// (open '{') and calls fn to read each element or member value in turn. A
+// value of any other kind is skipped.
+func each(dec *jsontext.Decoder, open jsontext.Kind, fn func() error) error {
+	if dec.PeekKind() != open {
+		return dec.SkipValue()
 	}
 	if _, err := dec.ReadToken(); err != nil {
 		return err
 	}
-	for dec.PeekKind() != ']' {
-		if err := w.value(dec, rootType, ""); err != nil {
+	end := jsontext.Kind(']')
+	if open == '{' {
+		end = '}'
+	}
+	for dec.PeekKind() != end {
+		if open == '{' {
+			if _, err := dec.ReadToken(); err != nil { // the member's name
+				return err
+			}
+		}
+		if err := fn(); err != nil {
 			return err
 		}
 	}
-	_, err = dec.ReadToken()
+	_, err := dec.ReadToken()
 	return err
 }
 
@@ -156,19 +202,12 @@ func (w *walk) member(dec *jsontext.Decoder, rmType, name, bound string) error {
 		return dec.SkipValue()
 	case attr.Payload, attr.Kind == KindPrimitive:
 		return dec.SkipValue()
-	case attr.Container && dec.PeekKind() == '[':
-		if _, err := dec.ReadToken(); err != nil {
-			return err
+	case attr.Hash, attr.Container:
+		open := jsontext.Kind('[')
+		if attr.Hash {
+			open = '{'
 		}
-		for dec.PeekKind() != ']' {
-			if err := w.value(dec, attr.Type, attr.Bound); err != nil {
-				return err
-			}
-		}
-		_, err := dec.ReadToken()
-		return err
-	case attr.Container:
-		return dec.SkipValue()
+		return each(dec, open, func() error { return w.value(dec, attr.Type, attr.Bound) })
 	default:
 		return w.value(dec, attr.Type, attr.Bound)
 	}

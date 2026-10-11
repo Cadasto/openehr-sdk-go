@@ -78,8 +78,9 @@ const (
 // data value (each in a polymorphic slot), in a narrow slot that falls back
 // to its declared parent, in an interval and its bound (both a by-value bound
 // and a bound that is itself a polymorphic slot), ahead of the `_type` that
-// decides its object, and in a CODE_PHRASE and the TERMINOLOGY_ID it holds by
-// value. One case has names RFC 6901 must escape.
+// decides its object, in a CODE_PHRASE and the TERMINOLOGY_ID it holds by
+// value, and in the RM objects a `Hash` holds. One case has names RFC 6901
+// must escape.
 //
 // No RM attribute reaches a class the generated decoders leave without a
 // decode method of its own (rm.TerminologyCode, rm.TerminologyTerm,
@@ -147,6 +148,19 @@ func unmatchedCases() []unmatchedCase {
 				"/language/terminology_id/x-elided-terminology-id",
 			},
 			into: func() any { return new(rm.DVCodedText) },
+		},
+		{
+			// RESOURCE_DESCRIPTION.details is a Hash whose values the decoder
+			// reads as RESOURCE_DESCRIPTION_ITEM; original_author is a Hash
+			// of strings.
+			name: "Hash of RM objects",
+			tmpl: `{"_type":"RESOURCE_DESCRIPTION","lifecycle_state":"published","original_author":{"name":"a"},` +
+				`"details":{"en":{` + extPlaceholder + `"language":{"terminology_id":{"value":"ISO_639-1"},"code_string":"en"},"purpose":"p"},` +
+				`"de":{"language":{` + extPlaceholder + `"terminology_id":{"value":"ISO_639-1"},"code_string":"de"},"purpose":"q"}},` +
+				extPlaceholder + `"other_contributors":["c"]}`,
+			names:    []string{"x-entry", "x-entry-language", "x-root"},
+			pointers: []string{"/details/en/x-entry", "/details/de/language/x-entry-language", "/x-root"},
+			into:     func() any { return new(rm.ResourceDescription) },
 		},
 		{
 			// RFC 6901 § 3: `~` is written `~0` and `/` is written `~1`.
@@ -539,6 +553,108 @@ func TestREQ170_ClassesOutsideTheRMAreNotChecked(t *testing.T) {
 				}
 				if !reflect.DeepEqual(got, want) {
 					t.Errorf("canjson.Unmarshal(%s) decoded\n%#v\nwant the default's value\n%#v", mode, got, want)
+				}
+			}
+		})
+	}
+}
+
+// TestREQ170_RootTargetsAreChecked pins that the root's RM type comes from
+// the decode target's Go type, so every object that decodes as an RM class is
+// checked (REQ-170): the elements of a slice and the values of a map of RM
+// values, eliding `_type` or not; the bounds of a generic target, which binds
+// them to a class; the payload of an ORIGINAL_VERSION whose target names its
+// class; and a narrow RM interface, which an elided `_type` decodes as its
+// parent class.
+func TestREQ170_RootTargetsAreChecked(t *testing.T) {
+	cases := []struct {
+		name, in string
+		into     func() any
+		want     []string
+	}{
+		{
+			name: "slice",
+			in:   `[{"value":"a","x-a":"` + plantedValue + `"},{"_type":"DV_TEXT","value":"b","x-b":1}]`,
+			into: func() any { return new([]rm.DVText) },
+			want: []string{"/0/x-a", "/1/x-b"},
+		},
+		{
+			name: "map",
+			in:   `{"k":{"value":"a","x-a":"` + plantedValue + `"}}`,
+			into: func() any { return new(map[string]rm.DVText) },
+			want: []string{"/k/x-a"},
+		},
+		{
+			name: "generic bound to a class",
+			in:   `{"_type":"DV_INTERVAL","lower":{"magnitude":1,"units":"kg","x-a":"` + plantedValue + `"},"upper":{"magnitude":2,"units":"kg"}}`,
+			into: func() any { return new(rm.DVInterval[rm.DVQuantity]) },
+			want: []string{"/lower/x-a"},
+		},
+		{
+			name: "payload bound to a class",
+			in:   `{"_type":"ORIGINAL_VERSION","data":{"value":"a","x-a":"` + plantedValue + `"}}`,
+			into: func() any { return new(rm.OriginalVersion[rm.DVText]) },
+			want: []string{"/data/x-a"},
+		},
+		{
+			name: "narrow RM interface",
+			in:   `{"value":"a","x-a":"` + plantedValue + `"}`,
+			into: func() any { return new(rm.DVTextLike) },
+			want: []string{"/x-a"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var got []string
+			if err := canjson.Unmarshal([]byte(tc.in), tc.into(), canjson.WithUnmatched(func(p string) { got = append(got, p) })); err != nil {
+				t.Fatalf("canjson.Unmarshal(%s, WithUnmatched) = %v; want nil", tc.in, err)
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("WithUnmatched reported %q; want %q", got, tc.want)
+			}
+			err := canjson.Unmarshal([]byte(tc.in), tc.into(), canjson.WithStrict())
+			assertStrictRefusal(t, "canjson.Unmarshal(WithStrict)", err, tc.want[0])
+		})
+	}
+}
+
+// callerStruct is a caller's own type, with a member named like an extension.
+type callerStruct struct {
+	Type  string `json:"_type"`
+	Value string `json:"value"`
+	XA    int    `json:"x-a"`
+}
+
+// TestREQ170_NonRMTargetsAreNotChecked pins that a target holding no RM value
+// is not checked (REQ-170 defines unmatched against the RM type an object
+// decodes as, and these objects decode as none): an any, a map[string]any and
+// a caller's own struct that reads the member decode an RM-looking input in
+// every mode, report nothing, and get the default's value.
+func TestREQ170_NonRMTargetsAreNotChecked(t *testing.T) {
+	const in = `{"_type":"DV_TEXT","value":"v","x-a":1}`
+	targets := map[string]func() any{
+		"any":            func() any { return new(any) },
+		"map[string]any": func() any { return new(map[string]any) },
+		"caller struct":  func() any { return new(callerStruct) },
+	}
+	for name, into := range targets {
+		t.Run(name, func(t *testing.T) {
+			want := into()
+			if err := canjson.Unmarshal([]byte(in), want); err != nil {
+				t.Fatalf("canjson.Unmarshal(%s) = %v; want nil", in, err)
+			}
+			var reported []string
+			for mode, opts := range modes(&reported) {
+				reported = nil
+				got := into()
+				if err := canjson.Unmarshal([]byte(in), got, opts...); err != nil {
+					t.Errorf("canjson.Unmarshal(%s, %s) = %v; want nil: the target decodes as no RM type", in, mode, err)
+				}
+				if len(reported) != 0 {
+					t.Errorf("canjson.Unmarshal(%s, %s) reported %q; want nothing", in, mode, reported)
+				}
+				if !reflect.DeepEqual(got, want) {
+					t.Errorf("canjson.Unmarshal(%s, %s) decoded %#v; want the default's %#v", in, mode, got, want)
 				}
 			}
 		})

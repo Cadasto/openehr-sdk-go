@@ -127,7 +127,9 @@ func WithRelaxedTypeDispatch(enabled bool) DecoderOption {
 // duplicate the same way. canjson keeps its own application here because
 // [Unmarshal] and [Decoder.Decode] accept non-RM targets, which never
 // travel through the registry, so the registry gate alone would not cover
-// them.
+// them. Such a target decodes as no RM type, so [WithUnmatched] and
+// [WithStrict] check nothing in it; a duplicate name in it is refused all
+// the same.
 func classifyDecode(err error) error {
 	return typereg.ClassifyDuplicate(err)
 }

@@ -11,19 +11,19 @@ import (
 
 // unmatched walks doc with the default model and returns the pointers it
 // reports.
-func unmatched(t *testing.T, doc, rootType string) []string {
+func unmatched(t *testing.T, doc string, root rmjsonwalk.Root) []string {
 	t.Helper()
 	m, err := rmjsonwalk.Default()
 	if err != nil {
 		t.Fatalf("Default(): %v", err)
 	}
 	var got []string
-	err = m.Unmatched([]byte(doc), rootType, func(p string) error {
+	err = m.Unmatched([]byte(doc), root, func(p string) error {
 		got = append(got, p)
 		return nil
 	})
 	if err != nil {
-		t.Fatalf("Unmatched(%s, %q) error: %v", doc, rootType, err)
+		t.Fatalf("Unmatched(%s, %+v) error: %v", doc, root, err)
 	}
 	return got
 }
@@ -34,8 +34,9 @@ func unmatched(t *testing.T, doc, rootType string) []string {
 // any depth. Each case isolates one way the walk reads an object's type.
 func TestREQ170_UnmatchedNamesEveryMemberTheRMDoesNotDefine(t *testing.T) {
 	cases := []struct {
-		name, root, doc string
-		want            []string
+		name, doc string
+		root      rmjsonwalk.Root
+		want      []string
 	}{
 		{
 			name: "root by its _type, the target unknown",
@@ -44,7 +45,7 @@ func TestREQ170_UnmatchedNamesEveryMemberTheRMDoesNotDefine(t *testing.T) {
 		},
 		{
 			name: "root by the decode target",
-			root: "DV_TEXT",
+			root: rmjsonwalk.Root{Type: "DV_TEXT"},
 			doc:  `{"value":"v","x-a":1}`,
 			want: []string{"/x-a"},
 		},
@@ -85,7 +86,7 @@ func TestREQ170_UnmatchedNamesEveryMemberTheRMDoesNotDefine(t *testing.T) {
 		},
 		{
 			name: "a null member and a null _type",
-			root: "DV_TEXT",
+			root: rmjsonwalk.Root{Type: "DV_TEXT"},
 			doc:  `{"_type":null,"value":"v","language":null,"x-a":null}`,
 			want: []string{"/x-a"},
 		},
@@ -96,15 +97,52 @@ func TestREQ170_UnmatchedNamesEveryMemberTheRMDoesNotDefine(t *testing.T) {
 			want: []string{"/a~0b~1c", "/~01"},
 		},
 		{
-			name: "a root array reads each element as a root",
+			name: "a slice target: each element a root of the element type",
+			root: rmjsonwalk.Root{Nest: "[", Type: "DV_TEXT"},
+			doc:  `[{"value":"v","x-a":1},{"_type":"DV_TEXT","value":"w","x-b":1},null]`,
+			want: []string{"/0/x-a", "/1/x-b"},
+		},
+		{
+			name: "a slice of an RM interface: elements by their _type",
+			root: rmjsonwalk.Root{Nest: "["},
 			doc:  `[{"_type":"DV_TEXT","value":"v","x-a":1},{"value":"w","x-b":1},{"_type":"DV_COUNT","magnitude":1,"x-c":1}]`,
 			want: []string{"/0/x-a", "/2/x-c"},
+		},
+		{
+			name: "a map target: each member value a root",
+			root: rmjsonwalk.Root{Nest: "{", Type: "DV_TEXT"},
+			doc:  `{"k":{"value":"v","x-a":1},"x/y":{"value":"w","x-b":1}}`,
+			want: []string{"/k/x-a", "/x~1y/x-b"},
+		},
+		{
+			name: "a map of slices",
+			root: rmjsonwalk.Root{Nest: "{[", Type: "DV_TEXT"},
+			doc:  `{"k":[{"value":"v","x-a":1}],"j":null}`,
+			want: []string{"/k/0/x-a"},
+		},
+		{
+			name: "a generic root bound by the target",
+			root: rmjsonwalk.Root{Type: "DV_INTERVAL", Bound: "DV_QUANTITY"},
+			doc:  `{"lower":{"magnitude":1,"units":"kg","x-a":1},"x-b":1}`,
+			want: []string{"/lower/x-a", "/x-b"},
+		},
+		{
+			name: "a binding overrides the generic payload",
+			root: rmjsonwalk.Root{Type: "ORIGINAL_VERSION", Bound: "DV_TEXT"},
+			doc:  `{"_type":"ORIGINAL_VERSION","data":{"value":"v","x-a":1}}`,
+			want: []string{"/data/x-a"},
+		},
+		{
+			name: "RM objects held in a Hash",
+			doc: `{"_type":"RESOURCE_DESCRIPTION","lifecycle_state":"published","original_author":{"name":"x","x-not-checked":"y"},` +
+				`"details":{"en":{"language":{"terminology_id":{"value":"ISO_639-1"},"code_string":"en"},"purpose":"p","x-in-hash":1},"de~/":{"purpose":"q","x-b":1}},"x-root":1}`,
+			want: []string{"/details/en/x-in-hash", "/details/de~0~1/x-b", "/x-root"},
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := unmatched(t, tc.doc, tc.root); !slices.Equal(got, tc.want) {
-				t.Errorf("Unmatched(%s, %q) reported %q, want %q", tc.doc, tc.root, got, tc.want)
+				t.Errorf("Unmatched(%s, %+v) reported %q, want %q", tc.doc, tc.root, got, tc.want)
 			}
 		})
 	}
@@ -117,12 +155,13 @@ func TestREQ170_UnmatchedNamesEveryMemberTheRMDoesNotDefine(t *testing.T) {
 // names; the root's own extension member shows the walk ran.
 func TestREQ170_UnmatchedLeavesOpaqueValuesAlone(t *testing.T) {
 	cases := []struct {
-		name, root, doc string
-		want            []string
+		name, doc string
+		root      rmjsonwalk.Root
+		want      []string
 	}{
 		{
 			name: "a class outside the RM at the root",
-			root: "C_COMPLEX_OBJECT",
+			root: rmjsonwalk.Root{Type: "C_COMPLEX_OBJECT"},
 			doc:  `{"_type":"C_COMPLEX_OBJECT","rm_type_name":"OBSERVATION","x-a":1,"attributes":[{"_type":"C_SINGLE_ATTRIBUTE","x-b":1}]}`,
 		},
 		{
@@ -163,7 +202,7 @@ func TestREQ170_UnmatchedLeavesOpaqueValuesAlone(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := unmatched(t, tc.doc, tc.root); !slices.Equal(got, tc.want) {
-				t.Errorf("Unmatched(%s, %q) reported %q, want %q", tc.doc, tc.root, got, tc.want)
+				t.Errorf("Unmatched(%s, %+v) reported %q, want %q", tc.doc, tc.root, got, tc.want)
 			}
 		})
 	}
@@ -179,7 +218,7 @@ func TestUnmatchedStopsAtTheReportsError(t *testing.T) {
 	}
 	stop := errors.New("stop")
 	var got []string
-	err = m.Unmatched([]byte(`{"_type":"DV_TEXT","x-a":1,"value":"v","x-b":2}`), "", func(p string) error {
+	err = m.Unmatched([]byte(`{"_type":"DV_TEXT","x-a":1,"value":"v","x-b":2}`), rmjsonwalk.Root{}, func(p string) error {
 		got = append(got, p)
 		return stop
 	})
@@ -199,7 +238,7 @@ func TestUnmatchedReportsMalformedInput(t *testing.T) {
 		t.Fatalf("Default(): %v", err)
 	}
 	for _, doc := range []string{`{"_type":"DV_TEXT","value":`, `{"value":1,"value":2}`} {
-		err := m.Unmatched([]byte(doc), "DV_TEXT", func(string) error { return nil })
+		err := m.Unmatched([]byte(doc), rmjsonwalk.Root{Type: "DV_TEXT"}, func(string) error { return nil })
 		if err == nil {
 			t.Errorf("Unmatched(%s) error = nil, want jsontext's refusal", doc)
 		}
@@ -210,7 +249,7 @@ func TestUnmatchedReportsMalformedInput(t *testing.T) {
 // the value the member holds never reaches the report.
 func TestUnmatchedPointersCarryNoValue(t *testing.T) { // REQ-170
 	const secret = "planted-secret-value"
-	got := unmatched(t, `{"_type":"DV_TEXT","x-a":"`+secret+`","value":"v","x-b":{"k":"`+secret+`"}}`, "")
+	got := unmatched(t, `{"_type":"DV_TEXT","x-a":"`+secret+`","value":"v","x-b":{"k":"`+secret+`"}}`, rmjsonwalk.Root{})
 	for _, p := range got {
 		if strings.Contains(p, secret) {
 			t.Errorf("Unmatched reported %q, which carries the member's value", p)

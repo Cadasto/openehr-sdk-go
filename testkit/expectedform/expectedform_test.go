@@ -347,21 +347,62 @@ func TestREQ052_BuildRemovesEmptyMappingsAndMultimediaBytes(t *testing.T) {
 	})
 }
 
-// TestREQ052_BuildLeavesAGenericPayloadAlone pins that no change is made
-// inside a generic payload: the registry's ORIGINAL_VERSION holds its "data"
-// as plain JSON, so a member the RM does not define, a null member and a
-// quoted number inside it are all expected as written, while a member of the
-// ORIGINAL_VERSION itself is still removed.
+// TestREQ052_BuildLeavesAGenericPayloadAlone pins that inside a generic
+// payload only numbers change: the registry's ORIGINAL_VERSION holds its
+// "data" as plain JSON, which the decoder reads numbers in as float64 and the
+// encoder writes back from them. So a bare number, at any depth, is expected
+// as the literal the encoder writes for its float64, while a member the RM
+// does not define, a null member, an empty list and a quoted number stay as
+// written. A member of the ORIGINAL_VERSION itself is still removed.
 func TestREQ052_BuildLeavesAGenericPayloadAlone(t *testing.T) {
-	const payload = `{"_type":"DV_TEXT","value":"v","x-a":1,"language":null,"mappings":[]}`
+	payload := func(magnitude, list string) string {
+		return `{"_type":"DV_QUANTITY","magnitude":` + magnitude + `,"units":"kg","precision":"2.0","x-a":1,` +
+			`"normal_range":null,"mappings":[],"x-list":` + list + `}`
+	}
 	runBuild(t, []buildCase{
 		{
 			name: "ORIGINAL_VERSION data",
 			root: "ORIGINAL_VERSION",
-			in:   `{"_type":"ORIGINAL_VERSION","data":` + payload + `,"x-root":1}`,
-			want: `{"_type":"ORIGINAL_VERSION","data":` + payload + `}`,
+			in:   `{"_type":"ORIGINAL_VERSION","data":` + payload(`1.50`, `[1e2,{"n":0.10},"3.0",null,true]`) + `,"x-root":1}`,
+			want: `{"_type":"ORIGINAL_VERSION","data":` + payload(`1.5`, `[100,{"n":0.1},"3.0",null,true]`) + `}`,
 		},
 	})
+}
+
+// TestREQ052_BuildWalksAHashOfRMObjects pins that the RM objects a Hash
+// attribute holds are read as their class: RESOURCE_DESCRIPTION.details holds
+// RESOURCE_DESCRIPTION_ITEM values, so a member the class does not define is
+// removed from each entry and every change applies inside it, while a Hash of
+// strings (original_author) is kept as written.
+func TestREQ052_BuildWalksAHashOfRMObjects(t *testing.T) {
+	const language = `{"terminology_id":{"value":"ISO_639-1"},"code_string":"en"}`
+	runBuild(t, []buildCase{
+		{
+			name: "RESOURCE_DESCRIPTION details",
+			root: "RESOURCE_DESCRIPTION",
+			in: `{"_type":"RESOURCE_DESCRIPTION","lifecycle_state":"published","original_author":{"name":"a","x-b":"c"},` +
+				`"details":{"en":{"language":` + language + `,"purpose":"p","x-in-hash":1,"use":null}}}`,
+			want: `{"_type":"RESOURCE_DESCRIPTION","lifecycle_state":"published","original_author":{"name":"a","x-b":"c"},` +
+				`"details":{"en":{"_type":"RESOURCE_DESCRIPTION_ITEM","language":{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"ISO_639-1"},"code_string":"en"},"purpose":"p"}}}`,
+		},
+	})
+	got, err := expectedform.Prune([]byte(`{"_type":"RESOURCE_DESCRIPTION","details":{"en":{"purpose":"p","x-in-hash":1,"use":null}}}`), "RESOURCE_DESCRIPTION")
+	if err != nil {
+		t.Fatalf("Prune error: %v", err)
+	}
+	if want := `{"_type":"RESOURCE_DESCRIPTION","details":{"en":{"purpose":"p","use":null}}}`; !wireEqual(t, want, got) {
+		t.Errorf("Prune = %s, want %s", got, want)
+	}
+}
+
+// wireEqual reports whether got is wire-equivalent to want.
+func wireEqual(t *testing.T, want string, got []byte) bool {
+	t.Helper()
+	ok, diff := wireequiv.Equivalent([]byte(want), got)
+	if !ok {
+		t.Log(diff)
+	}
+	return ok
 }
 
 // TestREQ052_BuildWritesNumbersAsTheEncoderDoes pins that a number held by a
@@ -407,6 +448,7 @@ func TestREQ052_BuildRefusesInputItCannotRead(t *testing.T) {
 		{name: "elided _type behind an unbound parameter", root: "ELEMENT", in: element(`{"_type":"DV_INTERVAL","lower":{"magnitude":1,"units":"kg"}}`), want: "type parameter with no binding"},
 		{name: "container not an array", root: "DV_TEXT", in: `{"_type":"DV_TEXT","value":"v","mappings":{}}`, want: "want a JSON array"},
 		{name: "class value not an object", root: "DV_TEXT", in: `{"_type":"DV_TEXT","value":"v","language":"en"}`, want: "want a JSON object"},
+		{name: "Hash of RM objects not an object", root: "RESOURCE_DESCRIPTION", in: `{"_type":"RESOURCE_DESCRIPTION","details":[]}`, want: "want a JSON object for a Hash attribute"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

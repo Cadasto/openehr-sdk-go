@@ -40,10 +40,17 @@ func (e *unknownMemberError) Unwrap() error {
 // WithUnmatched passes every unmatched member of the input to fn while the
 // decode carries on. A member is unmatched when its name is neither `_type`
 // nor an attribute of the RM type its object decodes as: the class its
-// `_type` names, or else the type the RM declares where it sits, the root
-// taking the RM type v points to. It applies at any depth: inside a
-// polymorphic slot and an interval bound too. The members of a value of a
-// class outside the RM, such as an AOM 1.4 archetype, are not checked (see
+// `_type` names, or else the type the RM declares where it sits. At the root
+// that is the RM type v points to, or for a slice, array or map of RM values
+// the RM type of its elements; a generic RM type such as
+// rm.DVInterval[rm.DVQuantity] also declares its bounds' class. It applies at
+// any depth: inside a polymorphic slot, an interval bound and a `Hash` of RM
+// values too.
+//
+// Only objects that decode as an RM class are checked. When v holds no RM
+// value, as with a pointer to any, to a map[string]any or to a caller's own
+// struct, the option reports nothing; the members of a value of a class
+// outside the RM, such as an AOM 1.4 archetype, are not checked either (see
 // the package documentation, "Unmatched members").
 //
 // By default the decoder ignores unmatched members: the value it returns
@@ -104,16 +111,17 @@ func checkUnmatched(data []byte, v any, opts []DecoderOption) error {
 
 // walkUnmatched walks data, the input the default decode has just read into v
 // without error, against the RM's attribute lists, and reports or refuses each
-// unmatched member as c says. The root's RM type is the one v names, when it
-// names one.
+// unmatched member as c says. v's Go type gives the root's shape: the RM type
+// each value at the root is declared as, inside any slices and maps. A target
+// that holds no RM value is not walked.
 func (c *decoderConfig) walkUnmatched(data []byte, v any) error {
 	model, err := rmjsonwalk.Default()
 	if err != nil {
 		return err
 	}
-	root := ""
-	if n, ok := v.(interface{ BMMName() string }); ok {
-		root = n.BMMName()
+	root, ok := model.RootOf(v)
+	if !ok {
+		return nil
 	}
 	return model.Unmatched(data, root, func(pointer string) error {
 		if c.unmatched != nil {
