@@ -122,6 +122,30 @@ func TestEquivalent(t *testing.T) {
 	}
 }
 
+// TestEquivalentNamesTheSideAMemberIsOn pins that a member only one document
+// carries is reported with the side it is on, so a caller comparing an
+// expected document (left) with an output (right) can tell a dropped member
+// from an added one.
+func TestEquivalentNamesTheSideAMemberIsOn(t *testing.T) {
+	cases := []struct {
+		name string
+		a, b string
+		want string
+	}{
+		{name: "left only", a: `{"a":1,"c":2}`, b: `{"a":1}`, want: "/c: present in the left document only"},
+		{name: "right only", a: `{"a":1}`, b: `{"a":1,"c":2}`, want: "/c: present in the right document only"},
+		{name: "nested left only", a: `{"o":{"x":1}}`, b: `{"o":{}}`, want: "/o/x: present in the left document only"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ok, diag := wireequiv.Equivalent([]byte(tc.a), []byte(tc.b))
+			if ok || diag != tc.want {
+				t.Errorf("Equivalent(%s, %s) = %v, %q, want false, %q", tc.a, tc.b, ok, diag, tc.want)
+			}
+		})
+	}
+}
+
 // TestEquivalentReportsInvalidJSON pins the no-panic contract: a document that
 // does not parse is reported through the diagnostic, and which side failed is
 // named.

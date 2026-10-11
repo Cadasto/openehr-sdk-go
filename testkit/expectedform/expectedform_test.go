@@ -1,6 +1,8 @@
 package expectedform_test
 
 import (
+	"errors"
+	"io"
 	"strings"
 	"testing"
 
@@ -212,8 +214,11 @@ func TestREQ169_BuildWritesDefaultedIntervalFlags(t *testing.T) {
 // TestREQ052_BuildRemovesAnEmptyBoundBesideItsOpenFlag pins that an empty
 // bound on a side marked unbounded is removed, and that a non-empty one, or an
 // empty one on a closed side, is kept. Where the slot binds the bound to a
-// concrete class, a bound carrying only zero values is empty; behind an
-// unbound parameter an object is never empty.
+// concrete class, a bound is empty when every member it carries is a mandatory
+// attribute holding a zero literal: a non-zero mandatory member, or any
+// optional member (held behind a pointer, so present even when it holds 0),
+// keeps it. Behind an unbound parameter an object is never empty, and a
+// primitive bound is empty when it is a zero literal.
 func TestREQ052_BuildRemovesAnEmptyBoundBesideItsOpenFlag(t *testing.T) {
 	normalRange := func(lower string) string {
 		return `{"_type":"DV_QUANTITY","magnitude":3,"units":"kg","normal_range":{"_type":"DV_INTERVAL",` + lower + `"upper":` + dvQuantity + `,"lower_unbounded":true,"upper_unbounded":false,"lower_included":false,"upper_included":true}}`
@@ -244,6 +249,24 @@ func TestREQ052_BuildRemovesAnEmptyBoundBesideItsOpenFlag(t *testing.T) {
 			want: normalRange(`"lower":{"_type":"DV_QUANTITY","magnitude":1,"units":"kg"},`),
 		},
 		{
+			name: "non-zero magnitude keeps the bound",
+			root: "DV_QUANTITY",
+			in:   normalRange(`"lower":{"_type":"DV_QUANTITY","magnitude":5,"units":""},`),
+			want: normalRange(`"lower":{"_type":"DV_QUANTITY","magnitude":5,"units":""},`),
+		},
+		{
+			name: "non-empty units keep the bound",
+			root: "DV_QUANTITY",
+			in:   normalRange(`"lower":{"_type":"DV_QUANTITY","magnitude":0,"units":"kg"},`),
+			want: normalRange(`"lower":{"_type":"DV_QUANTITY","magnitude":0,"units":"kg"},`),
+		},
+		{
+			name: "an optional member holding zero keeps the bound",
+			root: "DV_QUANTITY",
+			in:   normalRange(`"lower":{"_type":"DV_QUANTITY","magnitude":0,"units":"","precision":0},`),
+			want: normalRange(`"lower":{"_type":"DV_QUANTITY","magnitude":0,"units":"","precision":0},`),
+		},
+		{
 			name: "type-only bound behind an unbound parameter is kept",
 			root: "ELEMENT",
 			in:   element(`{"_type":"DV_INTERVAL","lower":{"_type":"DV_QUANTITY"},"upper":` + dvQuantity + `,"lower_unbounded":true}`),
@@ -255,7 +278,23 @@ func TestREQ052_BuildRemovesAnEmptyBoundBesideItsOpenFlag(t *testing.T) {
 			in:   `{"_type":"DV_QUANTITY","magnitude":3,"units":"kg","normal_range":{"_type":"DV_INTERVAL","lower":{"_type":"DV_QUANTITY"},"upper":` + dvQuantity + `}}`,
 			want: `{"_type":"DV_QUANTITY","magnitude":3,"units":"kg","normal_range":{"_type":"DV_INTERVAL","lower":{"_type":"DV_QUANTITY"},"upper":` + dvQuantity + `,"lower_unbounded":false,"upper_unbounded":false,"lower_included":true,"upper_included":true}}`,
 		},
+		{name: "primitive zero number bound", root: "Proper_interval", in: primitiveBound(`0`), want: primitiveBound(``)},
+		{name: "primitive empty string bound", root: "Proper_interval", in: primitiveBound(`""`), want: primitiveBound(``)},
+		{name: "primitive false bound", root: "Proper_interval", in: primitiveBound(`false`), want: primitiveBound(``)},
+		{name: "primitive non-zero number bound kept", root: "Proper_interval", in: primitiveBound(`5`), want: primitiveBound(`5`)},
+		{name: "primitive non-empty string bound kept", root: "Proper_interval", in: primitiveBound(`"a"`), want: primitiveBound(`"a"`)},
+		{name: "primitive true bound kept", root: "Proper_interval", in: primitiveBound(`true`), want: primitiveBound(`true`)},
 	})
+}
+
+// primitiveBound builds a BASE Proper_interval whose open lower side carries
+// the given primitive bound, or none when lower is empty.
+func primitiveBound(lower string) string {
+	member := ""
+	if lower != "" {
+		member = `"lower":` + lower + `,`
+	}
+	return `{"_type":"Proper_interval",` + member + `"upper":9,"lower_unbounded":true,"upper_unbounded":false,"lower_included":false,"upper_included":true}`
 }
 
 // multimedia builds a DV_MULTIMEDIA with extra members appended.
@@ -329,31 +368,37 @@ func TestREQ052_BuildWritesNumbersAsTheEncoderDoes(t *testing.T) {
 }
 
 // TestREQ052_BuildRefusesInputItCannotRead pins the errors: Build never guesses
-// a type or a shape, so an input the decoder would refuse is reported rather
-// than turned into an expected form.
+// a type or a shape, so an input it cannot read against the RM is reported
+// rather than turned into an expected form. A case that names wantErr must
+// wrap that error; the others must name the reason in the message.
 func TestREQ052_BuildRefusesInputItCannotRead(t *testing.T) {
 	cases := []struct {
-		name string
-		root string
-		in   string
-		want string
+		name    string
+		root    string
+		in      string
+		want    string // a substring of the error message
+		wantErr error  // when set, an error the result must wrap
 	}{
-		{"not JSON", "DV_TEXT", `{`, "unexpected EOF"},
-		{"not an object", "DV_TEXT", `[1]`, "not a JSON object"},
-		{"trailing data", "DV_TEXT", `{"value":"v"} {}`, "after top-level"},
-		{"empty root type", "", `{"_type":"DV_TEXT","value":"v"}`, "root type is empty"},
-		{"unknown _type", "DV_TEXT", `{"_type":"DV_TEXTUAL","value":"v"}`, "names no RM class"},
-		{"_type not a string", "DV_TEXT", `{"_type":1,"value":"v"}`, "not a string"},
-		{"elided _type on an abstract slot", "ELEMENT", element(`{"value":"v"}`), "abstract"},
-		{"elided _type behind an unbound parameter", "ELEMENT", element(`{"_type":"DV_INTERVAL","lower":{"magnitude":1,"units":"kg"}}`), "type parameter with no binding"},
-		{"container not an array", "DV_TEXT", `{"_type":"DV_TEXT","value":"v","mappings":{}}`, "want a JSON array"},
-		{"class value not an object", "DV_TEXT", `{"_type":"DV_TEXT","value":"v","language":"en"}`, "want a JSON object"},
+		{name: "not JSON", root: "DV_TEXT", in: `{`, wantErr: io.ErrUnexpectedEOF},
+		{name: "not an object", root: "DV_TEXT", in: `[1]`, want: "not a JSON object"},
+		{name: "trailing data", root: "DV_TEXT", in: `{"value":"v"} {}`, want: "after top-level"},
+		{name: "empty root type", root: "", in: `{"_type":"DV_TEXT","value":"v"}`, want: "root type is empty"},
+		{name: "unknown _type", root: "DV_TEXT", in: `{"_type":"DV_TEXTUAL","value":"v"}`, want: "names no RM class"},
+		{name: "empty _type", root: "ELEMENT", in: `{"_type":"ELEMENT","archetype_node_id":"at1","name":{"_type":"","value":"n"}}`, want: `_type "" names no RM class`},
+		{name: "_type not a string", root: "DV_TEXT", in: `{"_type":1,"value":"v"}`, want: "not a string"},
+		{name: "elided _type on an abstract slot", root: "ELEMENT", in: element(`{"value":"v"}`), want: "abstract"},
+		{name: "elided _type behind an unbound parameter", root: "ELEMENT", in: element(`{"_type":"DV_INTERVAL","lower":{"magnitude":1,"units":"kg"}}`), want: "type parameter with no binding"},
+		{name: "container not an array", root: "DV_TEXT", in: `{"_type":"DV_TEXT","value":"v","mappings":{}}`, want: "want a JSON array"},
+		{name: "class value not an object", root: "DV_TEXT", in: `{"_type":"DV_TEXT","value":"v","language":"en"}`, want: "want a JSON object"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := expectedform.Build([]byte(tc.in), tc.root)
 			if err == nil {
-				t.Fatalf("Build(%s, %q) = %s, want an error containing %q", tc.in, tc.root, got, tc.want)
+				t.Fatalf("Build(%s, %q) = %s, want an error", tc.in, tc.root, got)
+			}
+			if tc.wantErr != nil && !errors.Is(err, tc.wantErr) {
+				t.Errorf("Build(%s, %q) error = %v, want it to wrap %v", tc.in, tc.root, err, tc.wantErr)
 			}
 			if !strings.Contains(err.Error(), tc.want) {
 				t.Errorf("Build(%s, %q) error = %q, want it to contain %q", tc.in, tc.root, err, tc.want)

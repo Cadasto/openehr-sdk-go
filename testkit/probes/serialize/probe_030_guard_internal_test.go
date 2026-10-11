@@ -125,6 +125,27 @@ func TestProbe030InputLegCatchesAWronglyDefaultedFlag(t *testing.T) {
 	}
 }
 
+// TestProbe030InputLegFailsWhenTheExpectedFormCannotBeBuilt pins that an input
+// the expected form refuses fails the probe rather than skipping the input leg
+// (REQ-052, PROBE-030). The decoder reads an empty "_type" as an elided one, so
+// the round trip itself succeeds, while expectedform.Build refuses a "_type"
+// that names no RM class. Set Status to "pass" on that branch of
+// probe030RoundTrip and this test reddens.
+func TestProbe030InputLegFailsWhenTheExpectedFormCannotBeBuilt(t *testing.T) {
+	body := []byte(`{"_type":"ELEMENT","archetype_node_id":"at0001","name":{"_type":"","value":"n"},` +
+		`"value":{"_type":"DV_COUNT","magnitude":1}}`)
+	r, err := probe030RoundTrip(body, func() any { return new(rm.Element) }, canjson.Marshal, canjson.Marshal, false)
+	if err != nil {
+		t.Fatalf("probe framework error: %v", err)
+	}
+	if r.Status != "fail" {
+		t.Fatalf("status = %q (detail: %s), want fail: an input whose expected form cannot be built must fail the probe", r.Status, r.Detail)
+	}
+	if !strings.HasPrefix(r.Detail, "the input's expected form: ") {
+		t.Fatalf("detail = %q; want the expected-form refusal, after the round-trip legs passed", r.Detail)
+	}
+}
+
 // excludeIntervalEndsEncoder canjson-encodes the value and then sets both
 // included flags of the top-level value's interval to false, standing in for a
 // decoder that reads an omitted included flag as false.

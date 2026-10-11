@@ -166,7 +166,7 @@ func probe030RoundTrip(body []byte, factory func() any, encode, reEncode func(an
 	}
 	if ok, diff := wireequiv.Equivalent(want, b1); !ok {
 		r.Status = "fail"
-		r.Detail = "the first encode (b1) is not wire-equivalent to the input's expected form (expected form versus b1): " + diff
+		r.Detail = "the first encode (b1) is not wire-equivalent to the input's expected form (left: the expected form, right: b1): " + diff
 		return r, nil
 	}
 	r.Status = "pass"

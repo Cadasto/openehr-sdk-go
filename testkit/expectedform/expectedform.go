@@ -57,8 +57,10 @@ import (
 // a single JSON object, an object carries a "_type" no RM class has, an object
 // leaves out "_type" where the declared type is abstract or a type parameter
 // with no binding, or a member's value has the wrong JSON kind for its
-// attribute. The decoder refuses such inputs too, so an error here never hides
-// a difference.
+// attribute. Build does not guess a type or a shape, so such an input fails
+// loudly where the expected form is needed. The decoder refuses most of these
+// inputs too, but not all: it reads an empty "_type" as an elided one, which
+// Build refuses.
 func Build(input []byte, rootType string) ([]byte, error) {
 	return transform(input, rootType, true)
 }
@@ -239,7 +241,7 @@ func (w walker) object(obj map[string]any, declared, boundType, ptr string) (map
 	if w.full {
 		out["_type"] = rmType
 		if w.isInterval(rmType) {
-			settleInterval(out, boundType != "")
+			w.settleInterval(out, boundType)
 		}
 	}
 	return out, nil
@@ -294,9 +296,9 @@ func (w walker) member(rmType, name, attrType string, container bool, boundType 
 		return w.single(attrType, k, childBound, val, ptr)
 	}
 	if attrType == "Octet" {
-		// DV_MULTIMEDIA.data and integrity_check: a byte list written as one
-		// base64 string. An empty one is dropped on re-encode.
-		if w.full && isEmptyBytes(val) {
+		// A byte list written as one base64 string. An empty DV_MULTIMEDIA
+		// data or integrity_check is dropped on re-encode.
+		if w.full && w.declaredOn(rmType, name) == "DV_MULTIMEDIA" && isEmptyBytes(val) {
 			return nil, false, nil
 		}
 		return val, true, nil
@@ -361,10 +363,9 @@ func (w walker) isInterval(rmType string) bool {
 
 // settleInterval writes each omitted boundary flag with its default and drops
 // an empty bound on a side marked unbounded. A flag present in the input is
-// kept as written, an included open side among them. concreteBound is true
-// when the slot binds the bound to a concrete class, which the SDK holds by
-// value, so a bound carrying only zero values is empty there.
-func settleInterval(obj map[string]any, concreteBound bool) {
+// kept as written, an included open side among them. boundType is the
+// concrete class the slot binds the bound to, or empty (see isEmptyBound).
+func (w walker) settleInterval(obj map[string]any, boundType string) {
 	for _, side := range [...]string{"lower", "upper"} {
 		open := false
 		if v, ok := obj[side+"_unbounded"]; ok {
@@ -375,29 +376,42 @@ func settleInterval(obj map[string]any, concreteBound bool) {
 		if _, ok := obj[side+"_included"]; !ok {
 			obj[side+"_included"] = !open
 		}
-		if bound, ok := obj[side]; ok && open && isEmptyBound(bound, concreteBound) {
+		if bound, ok := obj[side]; ok && open && w.isEmptyBound(bound, boundType) {
 			delete(obj, side)
 		}
 	}
 }
 
-// isEmptyBound reports whether an interval bound is empty: null, the zero
-// literal of a primitive bound, or, where the bound type is a concrete class,
-// an object whose every member other than "_type" holds a zero literal. That is
-// the zero value of every concrete bound type the RM binds (DV_QUANTITY,
-// DV_COUNT, DV_PROPORTION, DV_DATE_TIME, DV_DATE), whose mandatory attributes
-// are all primitives. A bound behind an unbound or abstract parameter is held
-// by reference, so an object there is never empty.
-func isEmptyBound(v any, concreteBound bool) bool {
+// isEmptyBound reports whether an interval bound is empty in the encoder's
+// sense: nil, or the zero value of a concrete bound type. In JSON that is
+// null, the zero literal of a primitive bound, or, where the slot binds the
+// bound to the concrete class boundType, an object in which every member other
+// than "_type" is a mandatory attribute of that class holding a zero literal.
+// The SDK holds such a bound by value, its mandatory attributes as values and
+// its optional ones behind pointers, so an optional member present, even one
+// holding a zero literal, makes the bound non-empty. The mandatory attributes
+// of every concrete bound type the RM binds (DV_QUANTITY, DV_COUNT,
+// DV_PROPORTION, DV_DATE_TIME, DV_DATE) are all primitives. A bound behind an
+// unbound or abstract parameter, boundType empty, is held by reference, so an
+// object there is never empty.
+func (w walker) isEmptyBound(v any, boundType string) bool {
 	switch x := v.(type) {
 	case nil:
 		return true
 	case map[string]any:
-		if !concreteBound {
+		if boundType == "" {
 			return false
 		}
+		rmType := boundType
+		if t, ok := x["_type"].(string); ok {
+			rmType = t
+		}
+		mandatory := w.lookup.RequiredAttributes(rmType)
 		for name, m := range x {
-			if name != "_type" && !isZeroLiteral(m) {
+			if name == "_type" {
+				continue
+			}
+			if !slices.Contains(mandatory, name) || !isZeroLiteral(m) {
 				return false
 			}
 		}

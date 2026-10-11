@@ -42,9 +42,11 @@ import (
 
 // Equivalent reports whether documents a and b are wire-equivalent, as defined
 // in the package comment. When they are not equivalent, the second result names
-// the first differing location as an RFC 6901 JSON Pointer with the two values;
-// when they are equivalent it is the empty string. A document that does not
-// parse as JSON is reported through the second result, never as a panic.
+// the first differing location as an RFC 6901 JSON Pointer with the two values,
+// a's first; when they are equivalent it is the empty string. a is the left
+// document and b the right one: a member only one of them carries is reported
+// as present in the left or in the right document only. A document that does
+// not parse as JSON is reported through the second result, never as a panic.
 func Equivalent(a, b []byte) (bool, string) {
 	va, err := decode(a)
 	if err != nil {
@@ -98,8 +100,11 @@ func firstDiff(a, b any, ptr string) string {
 			ae, aok := av[k]
 			be, bok := bv[k]
 			child := ptr + "/" + escapeToken(k)
-			if !aok || !bok {
-				return child + ": present on one side only"
+			switch {
+			case !bok:
+				return child + ": present in the left document only"
+			case !aok:
+				return child + ": present in the right document only"
 			}
 			if !reflect.DeepEqual(ae, be) {
 				return firstDiff(ae, be, child)

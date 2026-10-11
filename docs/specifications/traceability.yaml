@@ -459,6 +459,7 @@ requirements:
       - openehr/validation/rmfloor_bytes_test.go
       - openehr/validation/rmfloor_test.go
       - openehr/validation/rmread/interval_void_parity_test.go
+      - testkit/expectedform/walker_internal_test.go
       - testkit/fixtures/discover_test.go
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
       - testkit/probes/serialize/probe_030_guard_internal_test.go

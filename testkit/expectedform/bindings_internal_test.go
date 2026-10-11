@@ -78,7 +78,11 @@ func TestBoundBindingsMatchTheRM(t *testing.T) {
 				t.Errorf("%s.%s: bound type %s does not name its BMM class", name, attr, lower.Type)
 				continue
 			}
-			found[site+"."+attr] = boundName.BMMName()
+			key, bound := site+"."+attr, boundName.BMMName()
+			if prev, seen := found[key]; seen && prev != bound {
+				t.Errorf("%s: the rm types bind it to both %s and %s", key, prev, bound)
+			}
+			found[key] = bound
 		}
 	}
 	if len(found) == 0 {
