@@ -414,7 +414,7 @@ requirements:
     canonical: docs/specifications/wire.md#req-052
     status: draft
     implementation: landed
-    packages: [openehr/serialize/canjson, openehr/rm, openehr/rm/typereg, openehr/aom/aom14, testkit/corpus, testkit/fixtures, testkit/wireequiv]
+    packages: [openehr/serialize/canjson, openehr/rm, openehr/rm/typereg, openehr/aom/aom14, testkit/corpus, testkit/fixtures, testkit/wireequiv, testkit/expectedform]
     probes: [PROBE-030, PROBE-031, PROBE-038]
     tests:
       - internal/bmmgen/render_interval_bound_test.go
@@ -1444,6 +1444,7 @@ requirements:
       - openehr/validation/rmfloor_archetype_test.go
       - openehr/validation/rmfloor_bytes_test.go
       - openehr/validation/rmfloor_coded_test.go
+      - openehr/validation/rmfloor_interval_flags_test.go
       - openehr/validation/rmfloor_ism_transition_test.go
       - openehr/validation/rmfloor_ordered_test.go
       - openehr/validation/rmfloor_party_proxy_test.go
@@ -1970,6 +1971,7 @@ requirements:
       - openehr/template/constraints/redacted_test.go
       - openehr/template/constraints/value_free_test.go
       - openehr/validation/godoc_class_test.go
+      - openehr/validation/rmfloor_interval_flags_test.go
       - openehr/validation/rmfloor_proportion_test.go
       - openehr/validation/value_free_test.go
   - id: REQ-169
@@ -1984,4 +1986,6 @@ requirements:
       - openehr/rm/interval_closed_test.go
       - openehr/serialize/canjson/interval_flag_defaults_test.go
       - openehr/serialize/canxml/interval_flag_defaults_test.go
+      - openehr/serialize/simplified/rmattr_repeating_test.go
       - openehr/template/interval_flags_test.go
+      - testkit/expectedform/expectedform_test.go
