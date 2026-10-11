@@ -1136,6 +1136,7 @@ requirements:
       - openehr/instance/binding_alternative_internal_test.go
       - openehr/instance/binding_alternative_test.go
       - openehr/instance/party_attribute_test.go
+      - openehr/instance/post_walk_binding_test.go
       - openehr/validation/aql_test.go
       - openehr/validation/composition_test.go
       - openehr/validation/constraint_fixtures_test.go
@@ -1292,6 +1293,7 @@ requirements:
       - openehr/instance/placeholder_exact_test.go
       - openehr/instance/placeholder_test.go
       - openehr/instance/polymorphic_roundtrip_test.go
+      - openehr/instance/post_walk_binding_test.go
       - openehr/instance/prohibited_attribute_test.go
       - openehr/instance/realworld_opt_synthesis_test.go
       - openehr/instance/rm_defaults_named_test.go

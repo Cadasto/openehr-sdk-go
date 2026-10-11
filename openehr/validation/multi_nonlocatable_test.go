@@ -13,9 +13,9 @@ import (
 // (a PARTICIPATION, a DV_TEXT in ACTOR.languages, a PARTY_REF in
 // ACTOR.roles) carries no archetype_node_id. The walker binds it to a
 // non-slot OPT child whose RM type admits it (a child of the item's own
-// type first, otherwise the first the type conforms to), walks it, and
-// counts it toward that child's occurrences; it never reports such an
-// item as slot_fill. The vendored OPTs constrain none of these
+// type first, then one naming the AOM 1.4 short name it wraps, then one
+// the type conforms to or an untyped one), walks it, and counts it toward
+// that child's occurrences; it never reports such an item as slot_fill. The vendored OPTs constrain none of these
 // attributes, so the tests build small synthetic ones.
 
 // participationsOPT constrains COMPOSITION.context.participations to one
@@ -214,10 +214,11 @@ func TestValidateComposition_REQ102_ParticipationsBindByRMType(t *testing.T) {
 
 // REQ-102 — ACTOR.languages and ACTOR.roles items are not LOCATABLE: a
 // matching DV_TEXT or PARTY_REF binds by RM type to a non-slot child that
-// admits it, by the rule a single-valued attribute uses: a child of the
-// item's own type first, otherwise the first that is untyped or whose
-// type the item's type equals or descends from in the BMM, abstract or
-// concrete. One no child admits is an rm_type_mismatch (one child) or an
+// admits it, by the three tiers a single-valued attribute uses: a child
+// of the item's own type first, then one naming the AOM 1.4 short name
+// the type wraps, then the first that is untyped or whose type the
+// item's type descends from in the BMM, abstract or concrete. One no
+// child admits is an rm_type_mismatch (one child) or an
 // alternative_mismatch (two or more) at the item's own path, never a
 // slot_fill. A LOCATABLE that matches no child still gets slot_fill. A
 // nil or typed-nil item has no value to bind, so no child takes it, an

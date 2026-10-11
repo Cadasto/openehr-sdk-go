@@ -196,9 +196,12 @@ func boundNodes(optNode *tcimpl.CompiledNode) (lower, upper *tcimpl.CompiledNode
 	return firstChild(optNode, "lower"), firstChild(optNode, "upper")
 }
 
-// firstChild returns the first child of node's attrName the OPT does not
-// prohibit, the alternative materialiseSingle builds, or nil when node or
-// the attribute has none.
+// firstChild returns the alternative of node's attrName whose
+// constraints materialiseSingle builds under ([bindingAlternative]),
+// among those the OPT does not prohibit, or nil when node or the
+// attribute has none. A pass after the walk reads the constraints the
+// walk built under, so a default it writes passes the child the
+// validator binds.
 func firstChild(node *tcimpl.CompiledNode, attrName string) *tcimpl.CompiledNode {
 	if node == nil {
 		return nil
@@ -211,7 +214,7 @@ func firstChild(node *tcimpl.CompiledNode, attrName string) *tcimpl.CompiledNode
 	if len(children) == 0 {
 		return nil
 	}
-	return children[0]
+	return bindingAlternative(children, builtRMType(children[0]))
 }
 
 // primitiveOf returns node's primitive constraint, or nil for a nil node.
