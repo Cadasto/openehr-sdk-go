@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- **Decode options for unmatched content (REQ-170).** `canjson`, `canxml` and `simplified` gain `WithUnmatched`, which passes each unmatched member, element or key to a function by path, and `WithStrict`, which refuses the first.
+- **Decode options for unmatched content (REQ-170).** The canonical JSON, canonical XML and FLAT/STRUCTURED codecs gain `WithUnmatched`, which passes each unmatched member, element or key to a function by path, and `WithStrict`, which refuses the first.
 - **Closed-interval constructors (REQ-169).** `rm.NewClosedInterval` and `rm.NewClosedDVInterval` build an interval that includes both bounds, which a Go zero value does not.
 - **OPT `CONSTRAINT_REF` is modelled (REQ-100, REQ-103).** Both parse modes read it as `constraints.ConstraintRef`; strict mode refuses one with no reference, and the validator still checks the code it constrains.
 
@@ -18,7 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - **Template validation includes the RM floor (REQ-102, ADR 0025).** `ValidateComposition` and the other template-driven entry points also return the floor's findings, each defect once, so an RM-invalid instance no longer passes.
 - **One issue path rule (REQ-102).** Both validators write `[atNNNN]` for an id no sibling shares, `[atNNNN, 'name']` for a name the template pins, and otherwise a 1-based `[n]`; `ValidateRM` used 0-based positions.
-- **FLAT and STRUCTURED decode ignore unmatched keys (REQ-170).** A key the Web Template does not resolve is dropped instead of refused; `WithStrict` refuses it. Keys naming RM data the codec cannot carry still fail.
+- **FLAT and STRUCTURED decode ignore unmatched keys (REQ-170).** A key the Web Template does not resolve is dropped, not refused, unless `WithStrict` is set; keys naming RM data the codec cannot carry still fail.
 - **Absent interval flags take the RM defaults (REQ-169).** A missing `*_included` reads as true on a bounded side and a missing `*_unbounded` as false, in canonical JSON and XML, FLAT and OPT parsing.
 - **Items sharing an archetype id bind by pinned name (REQ-102, REQ-116).** A template that reuses one archetype under several names now validates a correct composition instead of reporting name and occurrence errors.
 - **Type conformance follows the BMM (REQ-102).** A value conforms to any OPT type it descends from, and among alternatives an exact type binds before a conforming one.
