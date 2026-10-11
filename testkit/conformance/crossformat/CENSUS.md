@@ -194,8 +194,8 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - 3: `simplified: decode "<key>": simplified: unsupported datatype: PARTY_PROXY`
   - 1: `simplified: path not in web template: "<key>"`
   - 1: `simplified: path not in web template: "<key>" (no such RM attribute family - see docs/specifications/wire.md § REQ-140 for the vocabulary this codec carries)`
-- Reducing decode removed 6 keys from the flattened upstream STRUCTURED:
-  - 4: `simplified: decode "<key>": simplified: unsupported datatype: PARTY_PROXY`
+- Reducing decode removed 5 keys from the flattened upstream STRUCTURED:
+  - 3: `simplified: decode "<key>": simplified: unsupported datatype: PARTY_PROXY`
   - 1: `simplified: path not in web template: "<key>"`
   - 1: `simplified: path not in web template: "<key>" (no such RM attribute family - see docs/specifications/wire.md § REQ-140 for the vocabulary this codec carries)`
 
@@ -241,10 +241,9 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 - Reducing decode removed 94 keys from the upstream FLAT:
   - 70: `simplified: "<key>": simplified: path not in web template: FLAT id "symptome" reaches one of several reused siblings sharing the path "/content[openEHR-EHR-SECTION.adhoc.v1]" - not yet decodable (see deviations.md)`
   - 24: `simplified: "<key>": simplified: path not in web template: FLAT id "risikogebiet" reaches one of several reused siblings sharing the path "/content[openEHR-EHR-SECTION.adhoc.v1]" - not yet decodable (see deviations.md)`
-- Reducing decode removed 95 keys from the flattened upstream STRUCTURED:
+- Reducing decode removed 94 keys from the flattened upstream STRUCTURED:
   - 70: `simplified: "<key>": simplified: path not in web template: FLAT id "symptome" reaches one of several reused siblings sharing the path "/content[openEHR-EHR-SECTION.adhoc.v1]" - not yet decodable (see deviations.md)`
   - 24: `simplified: "<key>": simplified: path not in web template: FLAT id "risikogebiet" reaches one of several reused siblings sharing the path "/content[openEHR-EHR-SECTION.adhoc.v1]" - not yet decodable (see deviations.md)`
-  - 1: `simplified: decode "<key>": simplified: unsupported datatype: PARTY_PROXY`
 
 ## ehrn_abdm
 
@@ -318,8 +317,6 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 ### structured-flat
 
 - Outcome: compared 41, missing 0, extra 0, altered 0, excluded 0
-- Reducing decode removed 1 key from the flattened upstream STRUCTURED:
-  - 1: `simplified: decode "<key>": simplified: unsupported datatype: PARTY_PROXY`
 
 ## multi_occurrence
 

@@ -495,6 +495,19 @@ func TestHoldOutMatchesCodecAliases(t *testing.T) {
 		case held && waived:
 			t.Errorf("%q is held out but still listed in notHeldOut (%s) — drop the stale entry", rel, why)
 		}
+		// REQ-053: the same spelling with `:0` on every segment is the same real
+		// path, and STRUCTURED → FLAT conversion writes exactly that, so it is
+		// held out too. Any other index is refused by the codec, so holding it
+		// out would hide that refusal.
+		indexed := indexEverySegment(rel, zeroIndex)
+		if !IsCompositionMeta(corpusRoot+"/"+indexed, corpusRoot) && !waived {
+			t.Errorf("codec reads %q as the accepted spelling %q, but the comparison does not hold it out "+
+				"— a STRUCTURED-sourced body reaches decode with it beside the injected ctx/ context", indexed, rel)
+		}
+		if over := indexEverySegment(rel, ":1"); IsCompositionMeta(corpusRoot+"/"+over, corpusRoot) {
+			t.Errorf("the comparison holds out %q, but the codec refuses an index other than :0 on a "+
+				"metadata path — the hold-out would absorb that refusal", over)
+		}
 	}
 
 	// The reverse direction, over the real corpus rather than a hand-picked list:
@@ -539,7 +552,7 @@ func TestHoldOutMatchesCodecAliases(t *testing.T) {
 			"matcher or the root is wrong and the Meta count is silently zero")
 	}
 	for _, rel := range slices.Sorted(maps.Keys(heldOut)) {
-		if accepted[rel] {
+		if accepted[unindexedSpelling(rel)] {
 			continue
 		}
 		t.Errorf("the harness holds out %d corpus keys spelled %q, but the codec accepts no such "+
@@ -550,6 +563,18 @@ func TestHoldOutMatchesCodecAliases(t *testing.T) {
 			"decision (conformance.md § PROBE-086), not a harness edit",
 			heldOut[rel], rel)
 	}
+}
+
+// indexEverySegment writes index after every segment of a root-relative FLAT
+// spelling's path, keeping its |suffix: ("context/start_time", ":0") gives
+// "context:0/start_time:0", the spelling STRUCTURED → FLAT conversion writes.
+func indexEverySegment(rel, index string) string {
+	path, suffix, piped := strings.Cut(rel, "|")
+	out := strings.ReplaceAll(path, "/", index+"/") + index
+	if piped {
+		out += "|" + suffix
+	}
+	return out
 }
 
 // TestIsCompositionMeta guards the hold-out's edges. It is the one place the
@@ -585,6 +610,30 @@ func TestIsCompositionMeta(t *testing.T) {
 		// unnoticed until the PR #86 review.
 		{root + "/composer_self", true},
 		{"ctx/composer_self", true},
+		// REQ-053: a metadata path whose segments carry `:0` is the same real
+		// path, and OPT-free STRUCTURED → FLAT conversion writes it that way, so
+		// it is held out exactly as the unindexed spelling is, suffix-aware
+		// composer included.
+		{root + "/language:0|code", true},
+		{root + "/language:0|terminology", true},
+		{root + "/territory:0|code", true},
+		{root + "/composer:0|name", true},
+		{root + "/composer_self:0", true},
+		{root + "/context:0/start_time:0", true},
+		{root + "/context:0/start_time", true},
+		{root + "/context/start_time:0", true},
+		{root + "/context:0/setting:0|code", true},
+		{root + "/context:0/setting:0|terminology", true},
+		{root + "/composer:0|id", false},
+		{root + "/context:0/other_context:0/anything", false},
+		// Any other index is refused by the codec, so it reaches decode and is
+		// counted rather than held out.
+		{root + "/language:1|code", false},
+		{root + "/composer:1|name", false},
+		{root + "/composer_self:1", false},
+		{root + "/context:1/start_time:0", false},
+		{root + "/context:0/start_time:1", false},
+		{root + "/context:0/setting:1|code", false},
 		// category is *not* a ctx/ field: it is a template-constrained Web
 		// Template leaf, spelled identically on both sides, so it is compared
 		// like any other content key rather than held out.

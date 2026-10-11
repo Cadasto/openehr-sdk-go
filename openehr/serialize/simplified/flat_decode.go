@@ -247,6 +247,10 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 //     assigns from the ctx/ values) overwrote it; a body carrying only the real
 //     path failed the mandatory-context check instead.
 //
+// Each entry is keyed on the unindexed spelling. [metadataRel] reads a key
+// whose metadata segments carry `:0` as that spelling and reports any other
+// index, which [siphonContext] refuses (REQ-053).
+//
 // Entries here are respellings *only* — same information, different surface.
 // `context/setting|code` / `|value` joined on 2026-08-05 (the amended REQ-053):
 // ADR 0015 had left it out because `ctx/setting` was unimplemented on both
@@ -306,10 +310,108 @@ var metadataOwnedBaseCtx = map[string]string{
 	"context/setting": "ctx/setting|code + ctx/setting|value", "context/start_time": "ctx/time",
 }
 
+// metadataSegPaths are the root-relative segment paths the metadata spellings
+// run through: every leading run of segments of an alias, a witness or a
+// ctx/-owned base, plus `composer` for its party sub-structure. Each names a
+// single-valued RM attribute (COMPOSITION.language, .composer, .context,
+// EVENT_CONTEXT.start_time, …). The set is read off those tables, so an alias
+// added there brings its segments with it.
+var metadataSegPaths = func() map[string]bool {
+	paths := map[string]bool{"composer": true}
+	add := func(spelling string) {
+		base, _, _ := strings.Cut(spelling, "|")
+		for i := range len(base) {
+			if base[i] == '/' {
+				paths[base[:i]] = true
+			}
+		}
+		paths[base] = true
+	}
+	for _, s := range slices.Concat(slices.Collect(maps.Keys(metadataAliases)),
+		slices.Collect(maps.Keys(metadataAliasTerminology)),
+		slices.Collect(maps.Keys(contextMetaOwnedBases))) {
+		add(s)
+	}
+	return paths
+}()
+
+// metadataRel rewrites a root-relative FLAT key into the unindexed spelling the
+// metadata tables are keyed on. Every segment on a metadata path is a
+// single-valued attribute, and OPT-free STRUCTURED → FLAT conversion writes
+// each segment with an explicit index, so REQ-053 makes `language:0|code` the
+// same real path as `language|code`, and `context:0/start_time:0` the same as
+// `context/start_time`. Only the leading run of metadata segments loses its
+// index: what follows keeps it, such as a party's `_identifier:0` or the
+// archetyped content under `context:0/other_context`. The suffix is kept as
+// written.
+//
+// overIndexed reports a metadata segment that carries an index other than :0.
+// That index addresses a list slot a single-valued attribute does not have.
+// The segment is rewritten without it all the same, so the caller can tell
+// whether the key is a metadata spelling at all. A malformed index comes back
+// unchanged, for the leaf loop to refuse.
+func metadataRel(rel string) (norm string, overIndexed bool) {
+	path, suffix, piped := strings.Cut(rel, "|")
+	pk, err := parseFlatKey(path)
+	if err != nil {
+		return rel, false
+	}
+	var b strings.Builder
+	var seen string
+	onMeta := true
+	for i, s := range pk.segs {
+		if i > 0 {
+			b.WriteByte('/')
+		}
+		if onMeta {
+			p := s.id
+			if seen != "" {
+				p = seen + "/" + s.id
+			}
+			if metadataSegPaths[p] {
+				seen = p
+				b.WriteString(s.id)
+				overIndexed = overIndexed || s.idx > 0
+				continue
+			}
+			onMeta = false
+		}
+		writeFlatSeg(&b, s)
+	}
+	if piped {
+		b.WriteByte('|')
+		b.WriteString(suffix)
+	}
+	return b.String(), overIndexed
+}
+
+// isMetadataSpelling reports whether an unindexed root-relative spelling is one
+// [siphonContext] handles itself: an alias, a terminology witness, a suffix of
+// a leaf the ctx/ short form owns, or the composer's party sub-structure.
+func isMetadataSpelling(rel string) bool {
+	if _, isAlias := metadataAliases[rel]; isAlias {
+		return true
+	}
+	if _, isWitness := metadataAliasTerminology[rel]; isWitness {
+		return true
+	}
+	if base, _, _ := strings.Cut(rel, "|"); contextMetaOwnedBases[base] {
+		return true
+	}
+	return strings.HasPrefix(rel, "composer/")
+}
+
 // MetadataAliasSpellings returns the root-relative FLAT spellings the decoder
 // accepts as aliases of the ctx/ composition-metadata short forms,
 // sorted. `"language|code"`, for instance, is accepted at
 // `<root>/language|code` and normalised to `ctx/language`.
+//
+// Each spelling is listed once, unindexed. Every segment on it is a
+// single-valued attribute, so the decoder reads the same spelling with `:0`
+// on any of its segments (`<root>/language:0|code`,
+// `<root>/context:0/start_time:0`, the form OPT-free STRUCTURED → FLAT
+// conversion writes) exactly as the unindexed one, and refuses any other
+// index there. The same holds for [MetadataWitnessSpellings].
 //
 // This is informative public surface for conformance tooling, not a decode knob.
 // A harness that has to hold composition metadata out of a like-for-like FLAT
@@ -361,6 +463,16 @@ func siphonContext(flat map[string]any, rootID string) (ctx map[string]any, ctxO
 		if !isRooted {
 			content[key] = val
 			continue
+		}
+		// The tables below are keyed on the unindexed spelling. An indexed
+		// metadata path is read exactly as that spelling, and only `:0` is an
+		// index a single-valued attribute has (REQ-053). A key that is no
+		// metadata spelling once its index is gone keeps flowing as content under
+		// the key it arrived with.
+		rel, overIndexed := metadataRel(rel)
+		if overIndexed && isMetadataSpelling(rel) {
+			return nil, nil, nil, fmt.Errorf("%w: %q (a composition metadata path runs through single-valued attributes, so :0 is the only index it takes)",
+				ErrUnknownPath, key)
 		}
 		if want, isWitness := metadataAliasTerminology[rel]; isWitness {
 			got, err := ctxString(key, val)
