@@ -200,16 +200,19 @@ func matchSingleAlternative(children []*tcimpl.CompiledNode, val any) *tcimpl.Co
 // admits val.
 func bindByRMType(children []*tcimpl.CompiledNode, val any, eligible func(*tcimpl.CompiledNode) bool) *tcimpl.CompiledNode {
 	gotType := describeRMType(val)
-	tiers := [...]func(*tcimpl.CompiledNode) bool{
-		func(c *tcimpl.CompiledNode) bool { return namesRMType(c, gotType, val) },
-		func(c *tcimpl.CompiledNode) bool { return wrapsShortName(c, gotType) },
-		func(c *tcimpl.CompiledNode) bool { return conformsToChild(c, gotType) },
+	for _, c := range children {
+		if eligible(c) && namesRMType(c, gotType, val) {
+			return c
+		}
 	}
-	for _, binds := range tiers {
-		for _, c := range children {
-			if eligible(c) && binds(c) {
-				return c
-			}
+	for _, c := range children {
+		if eligible(c) && wrapsShortName(c, gotType) {
+			return c
+		}
+	}
+	for _, c := range children {
+		if eligible(c) && conformsToChild(c, gotType, val) {
+			return c
 		}
 	}
 	return nil
@@ -220,22 +223,24 @@ func bindByRMType(children []*tcimpl.CompiledNode, val any, eligible func(*tcimp
 // interval that went through a canonical-JSON round-trip and decoded
 // as the bare DV_INTERVAL: its type is the parameterised
 // DV_INTERVAL<T> its bounds give (REQ-102, REQ-110), so a typed child
-// whose T every present bound is names it, and a bare DV_INTERVAL
-// child names it only when it has no bound to give a T. An AOM 1.4
-// primitive short name over a Go primitive val (an int64 under
-// INTEGER, a string under DURATION) also names val's type. An untyped
-// child names no type.
+// whose T every present bound is names it. One with no bound present
+// has no parameter, so only a bare DV_INTERVAL child names its type,
+// and a typed child admits it in the third tier ([conformsToChild]).
+// An AOM 1.4 primitive short name over a Go primitive val (an int64
+// under INTEGER, a string under DURATION) also names val's type. An
+// untyped child names no type.
 func namesRMType(c *tcimpl.CompiledNode, gotType string, val any) bool {
 	want := c.RMTypeName()
 	if want == "" {
 		return false
 	}
 	if gotType == "DV_INTERVAL" {
+		bounded := collapsedIntervalBounded(val)
 		if bound, typed := typedIntervalBound(want); typed {
-			return intervalBoundsSatisfy(val, bound)
+			return bounded && intervalBoundsSatisfy(val, bound)
 		}
 		if want == "DV_INTERVAL" {
-			return !collapsedIntervalBounded(val)
+			return !bounded
 		}
 	}
 	if gotType == want {
@@ -258,10 +263,17 @@ func wrapsShortName(c *tcimpl.CompiledNode, gotType string) bool {
 }
 
 // conformsToChild reports whether the OPT child c declares no RM type,
-// or one the RM type gotType conforms to ([rmTypeIsSubtypeOf]).
-func conformsToChild(c *tcimpl.CompiledNode, gotType string) bool {
+// or one the RM type gotType conforms to ([rmTypeIsSubtypeOf]). A
+// round-tripped bare DV_INTERVAL val with no bound present carries no T
+// to check, so a typed DV_INTERVAL<T> child admits it here, after any
+// bare DV_INTERVAL child has named its type ([namesRMType]).
+func conformsToChild(c *tcimpl.CompiledNode, gotType string, val any) bool {
 	want := c.RMTypeName()
-	return want == "" || rmTypeIsSubtypeOf(gotType, want)
+	if want == "" || rmTypeIsSubtypeOf(gotType, want) {
+		return true
+	}
+	_, typed := typedIntervalBound(want)
+	return typed && gotType == "DV_INTERVAL" && collapsedIntervalUnbounded(val)
 }
 
 // formatAllowedTypes renders the OPT child RM types for inclusion
@@ -854,6 +866,14 @@ func intervalBoundsSatisfy(val any, wantInner string) bool {
 func collapsedIntervalBounded(val any) bool {
 	bounds, ok := collapsedIntervalBounds(val)
 	return ok && len(bounds) > 0
+}
+
+// collapsedIntervalUnbounded reports whether val is a
+// round-trip-collapsed DVInterval[DVOrdered] with no bound present, so
+// no parameterised type ([conformsToChild]).
+func collapsedIntervalUnbounded(val any) bool {
+	bounds, ok := collapsedIntervalBounds(val)
+	return ok && len(bounds) == 0
 }
 
 // collapsedIntervalBounds returns the present bounds of a

@@ -441,6 +441,25 @@ const (
           </children>
         </attributes>
       </children>`
+	// countIntervalUpperRequiredChild admits a DV_INTERVAL<DV_COUNT> whose
+	// upper bound must be present.
+	countIntervalUpperRequiredChild = `
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>DV_INTERVAL&lt;DV_COUNT&gt;</rm_type_name>
+        <node_id></node_id>
+        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+          <rm_attribute_name>upper</rm_attribute_name>
+          <existence>
+            <lower_included>true</lower_included><upper_included>true</upper_included>
+            <lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded>
+            <lower>1</lower><upper>1</upper>
+          </existence>
+          <children xsi:type="C_COMPLEX_OBJECT">
+            <rm_type_name>DV_COUNT</rm_type_name>
+            <node_id></node_id>
+          </children>
+        </attributes>
+      </children>`
 	// countChild admits a DV_COUNT of 0 to 5.
 	countChild = `
       <children xsi:type="C_COMPLEX_OBJECT">
@@ -539,6 +558,38 @@ func TestValidate_REQ102_AlternativeTiers(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// REQ-102, REQ-110 — a round-tripped bare DV_INTERVAL with no bound present
+// has no parameter, so only a bare DV_INTERVAL child names its type. Under
+// [DV_INTERVAL<DV_COUNT>, DV_INTERVAL] it binds the bare child in either
+// order, and the typed child's mandatory upper bound is not reported. Under a
+// DV_INTERVAL<DV_COUNT> child alone it is still admitted, in the third tier
+// (REQ-110 Known limitations): it is walked under that child, so a mandatory
+// upper bound is reported there, and no type mismatch is.
+func TestValidate_REQ102_UnboundedIntervalNamesBareChild(t *testing.T) {
+	t.Parallel()
+	unbounded := &rm.DVInterval[rm.DVOrdered]{LowerUnbounded: true, UpperUnbounded: true}
+	tests := []struct {
+		name     string
+		children []string
+		want     []string
+	}{
+		{name: "typed first", children: []string{countIntervalUpperRequiredChild, bareIntervalChild}, want: []string{}},
+		{name: "bare first", children: []string{bareIntervalChild, countIntervalUpperRequiredChild}, want: []string{}},
+		{name: "typed alone", children: []string{countIntervalChild}, want: []string{}},
+		{name: "typed alone, upper mandatory", children: []string{countIntervalUpperRequiredChild}, want: []string{"required /value/upper"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			c := mustCompileInline(t, elementValueOPT(tc.children...))
+			r := validation.Validate(valueElement(unbounded), c)
+			if got := issueKeys(r.Issues); !slices.Equal(got, tc.want) {
+				t.Errorf("Validate(unbounded bare DV_INTERVAL, %s) issues = %q, want %q", tc.name, got, tc.want)
+			}
+		})
 	}
 }
 
