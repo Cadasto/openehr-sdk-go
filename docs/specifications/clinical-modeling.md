@@ -304,7 +304,7 @@ The SDK **MUST** ship a `ValidateComposition(comp *rm.Composition, c *templateco
       Issues []Issue
   }
   type Issue struct {
-      Path     string               // AQL path of the offending node (empty for global issues)
+      Path     string               // openEHR path of the offending node, § Issue paths (empty for global issues)
       Code     string               // stable programmatic identifier — see code taxonomy below
       Detail   string               // human-readable message; field class in REQ-168
       Severity Severity             // Error for normative violations; Warning for advisories
@@ -372,6 +372,18 @@ Existence and child-count cardinality are **independent constraints**: a multi-v
 **Open multi-valued attributes** — when a C_MULTIPLE_ATTRIBUTE declares no `<children>` (the OPT pinned only existence / cardinality, not membership), validators MUST accept any RM item under that attribute without firing `slot_fill`. The constraint surface is the attribute itself; the items inside are unconstrained. This admits the OPT idiom "items here, any shape allowed" — e.g. a SECTION whose /items is open to any archetype-root content.
 
 **Items that are not a LOCATABLE** — an item of a C_MULTIPLE_ATTRIBUTE that is not a LOCATABLE (a PARTICIPATION under `participations` or `other_participations`, a TERM_MAPPING, a REFERENCE_RANGE, a DV_IDENTIFIER, a PARTY_REF) carries no `archetype_node_id`, so it cannot be matched by id. Validators **MUST** bind such an item to a non-slot child whose `RMTypeName` admits the item's RM type, by the same conformance rule and the same three binding tiers a C_SINGLE_ATTRIBUTE uses, and **MUST NOT** report it as `slot_fill`. When no child admits it, the item **MUST** be reported at its own path as `rm_type_mismatch` if the attribute has exactly one child, and as `alternative_mismatch` if it has two or more. A bound item counts toward its child's occurrences like any other item. A nil item (a nil element, or a nil pointer) under an attribute that declares children has no RM value to bind, so validators **MUST NOT** bind it to any child, an untyped one included. It is reported as `slot_fill`, like a LOCATABLE whose `archetype_node_id` is empty, when it is a nil pointer to a LOCATABLE class or a nil element of an attribute whose declared item type is a LOCATABLE; any other nil item is reported as `rm_type_mismatch` or `alternative_mismatch` by the rule above. An attribute that declares no children accepts a nil item like any other item (*Open multi-valued attributes* above).
+
+### Issue paths
+
+`Issue.Path` is an openEHR path from the validated root: RM attribute names joined by `/`, with a predicate on each item of a multi-valued attribute and none on a single-valued one. The template-driven validators (this REQ and [REQ-110](#req-110--template-driven-validation-beyond-composition)) and the floor ([REQ-112](#req-112--template-less-reference-model-validation-floor)) **MUST** build it by one rule, so one node has one path whichever validator reports it. An item's predicate is:
+
+- `[atNNNN]`, its `archetype_node_id` (an archetype id on an archetype root), when no other item of the same attribute carries that id;
+- `[atNNNN, 'name']` when another item shares the id and the OPT node the item binds to pins a name ([REQ-116](#req-116--template-level-node-naming-and-name-predicated-paths)) that tells it apart, the name single-quoted with `'` and `\` escaped by a backslash;
+- `[n]`, the item's 1-based position in the attribute, in every other case: an item with no `archetype_node_id`, or one whose id is shared and whose OPT node pins no telling name.
+
+A node the OPT requires and the instance lacks is written with the OPT child's own predicate, since no item exists to number. The floor binds no OPT node, so on its own it never writes a name predicate; where it runs inside a template-driven validation, it takes the names from that validation's bindings, so both report one node by one path.
+
+A path **MUST NOT** carry a value from the instance ([REQ-168](#req-168--value-free-validation-diagnostics)): a name predicate is always a name the OPT pins, never the instance's own `name`. A path with no positional predicate is a valid AQL path; the AQL grammar has no positional predicate, so one with `[n]` is an openEHR path but not AQL.
 
 ### Sentinels
 
