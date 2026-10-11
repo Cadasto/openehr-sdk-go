@@ -1,0 +1,87 @@
+package validation_test
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
+)
+
+// constraintRefCodePath is the issue path of the defining_code that a
+// CONSTRAINT_REF constrains in the Demonstration.v1 fixture: element at0011
+// ("Text That is Sourced From an External Terminology") of the first event.
+const constraintRefCodePath = "/content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0002]/data/items[at0004]/items[at0011]/value/defining_code"
+
+// constraintRefCode decodes a fresh Demonstration.v1 composition and returns
+// it with the defining_code its CONSTRAINT_REF leaf binds to.
+func constraintRefCode(t *testing.T) (*rm.Composition, *rm.CodePhrase) {
+	t.Helper()
+	var comp rm.Composition
+	mustDecodeJSON(t, fixtures.CompositionJSON("Demonstration.v1"), &comp)
+	obs := comp.Content[0].(*rm.Observation)
+	event := obs.Data.Events[0].(*rm.PointEvent[rm.ItemStructure])
+	cluster := event.Data.(*rm.ItemTree).Items[1].(*rm.Cluster)
+	element := cluster.Items[2].(*rm.Element)
+	if element.ArchetypeNodeID != "at0011" {
+		t.Fatalf("element archetype_node_id = %q, want at0011 (fixture drift)", element.ArchetypeNodeID)
+	}
+	coded, ok := element.Value.(*rm.DVCodedText)
+	if !ok {
+		t.Fatalf("at0011 value = %T, want *rm.DVCodedText (fixture drift)", element.Value)
+	}
+	return &comp, &coded.DefiningCode
+}
+
+// REQ-102 / REQ-103: a CONSTRAINT_REF leaf names an external value set, so
+// its ConstraintRef constrains nothing the walker can check locally. The
+// template walk still checks the RM-mandatory attributes of the CODE_PHRASE
+// it binds there, as at a node the OPT leaves unconstrained: a blank
+// terminology_id or code_string is `required` at that attribute's path.
+// The RM floor is not part of this walk, so the issue comes from the
+// template walk alone.
+func TestREQ102_REQ103_ConstraintRefLeafChecksCodePhraseAttributes(t *testing.T) {
+	t.Parallel()
+	c := mustCompile(t, "Demonstration.v1")
+	tests := []struct {
+		name     string
+		blank    func(*rm.CodePhrase)
+		wantPath string // "" when no required issue is expected under the code
+	}{
+		{name: "fixture as written", blank: func(*rm.CodePhrase) {}},
+		{
+			name:     "blank terminology_id value",
+			blank:    func(cp *rm.CodePhrase) { cp.TerminologyID.Value = "" },
+			wantPath: constraintRefCodePath + "/terminology_id",
+		},
+		{
+			name:     "blank code_string",
+			blank:    func(cp *rm.CodePhrase) { cp.CodeString = "" },
+			wantPath: constraintRefCodePath + "/code_string",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			comp, code := constraintRefCode(t)
+			tc.blank(code)
+			r := validation.ValidateComposition(comp, c)
+			var under []validation.Issue
+			for _, is := range r.Issues {
+				if strings.HasPrefix(is.Path, constraintRefCodePath) {
+					under = append(under, is)
+				}
+			}
+			if tc.wantPath == "" {
+				if len(under) != 0 {
+					t.Errorf("ValidateComposition(%s) issues under %s = %+v, want none", tc.name, constraintRefCodePath, under)
+				}
+				return
+			}
+			if len(under) != 1 || under[0].Path != tc.wantPath || under[0].Code != "required" {
+				t.Errorf("ValidateComposition(%s) issues under %s = %+v, want one required at %s", tc.name, constraintRefCodePath, under, tc.wantPath)
+			}
+		})
+	}
+}

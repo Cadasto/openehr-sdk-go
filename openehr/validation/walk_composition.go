@@ -30,7 +30,9 @@ import (
 //   - Primitive constraint leaves (PrimitiveConstraint() != nil):
 //     the REQ-103 typed validator runs against the bound RM value;
 //     no descent into implicit RM-mandatory attrs of the
-//     primitive's RM type.
+//     primitive's RM type. A CONSTRAINT_REF leaf is the exception:
+//     its value set is external, so the attributes of the bound
+//     value are still walked, as below.
 //   - Otherwise: iterate every attribute (explicit OPT-declared
 //     and BMM-mandatory implicits), enforce existence + cardinality,
 //     match RM child(ren), recurse.
@@ -76,11 +78,18 @@ func (w *walker) walkNode(optNode *tcimpl.CompiledNode, rmValue any, path string
 		// DataValue (or RM-typed primitive Go value) to the
 		// constraint's expected input via dataValueInput, then
 		// fan Violations out as Issues. The structural walker
-		// MUST NOT descend further: implicit RM attrs of the
+		// does not descend further: implicit RM attrs of the
 		// primitive's RM type (e.g. DV_QUANTITY.magnitude / .units)
 		// are the primitive validator's territory.
 		w.applyPrimitive(optNode, rmValue, path, pc)
-		return
+		// REQ-102: a CONSTRAINT_REF names an external value set and
+		// checks nothing locally, so the bound value's RM-mandatory
+		// attributes (a CODE_PHRASE's terminology_id and code_string)
+		// are still walked below, as at a node the OPT leaves
+		// unconstrained.
+		if _, isRef := pc.(constraints.ConstraintRef); !isRef {
+			return
+		}
 	}
 
 	for _, attr := range optNode.Attributes() {
