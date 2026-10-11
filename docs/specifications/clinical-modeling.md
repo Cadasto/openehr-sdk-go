@@ -85,7 +85,7 @@ The parser **MUST** read every interval it parses by [wire.md § REQ-169](wire.m
 
 ### Strict parse mode (optional)
 
-The default `ParseOPT` / `ParseFile` entry points remain forward-compatible: unknown child `xsi:type` values are admitted as leaf `*ComplexObject` nodes. `ParseOPTStrict` / `ParseFileStrict` opt into stricter behaviour — an unknown child `xsi:type` that carries nested `<attributes>` is rejected with `ErrUnsupportedNode` (the only case where lenient mode would silently drop a non-trivial subtree). Strict mode stops there: it does not check a missing `language` with `original_language` in its place, a top-level archetype id, or empty description fields. Use strict mode in validators and code generators that must surface unsupported shapes rather than silently truncate them.
+The default `ParseOPT` / `ParseFile` entry points remain forward-compatible: unknown child `xsi:type` values are admitted as leaf `*ComplexObject` nodes. `CONSTRAINT_REF` is not unknown: both modes **MUST** read it as a leaf carrying its `ConstraintRef` primitive constraint (REQ-103), with its `reference`. `ParseOPTStrict` / `ParseFileStrict` opt into stricter behaviour — an unknown child `xsi:type` that carries nested `<attributes>` is rejected with `ErrUnsupportedNode` (the only case where lenient mode would silently drop a non-trivial subtree). Strict mode stops there: it does not check a missing `language` with `original_language` in its place, a top-level archetype id, or empty description fields. Use strict mode in validators and code generators that must surface unsupported shapes rather than silently truncate them.
 
 ### Error taxonomy
 
@@ -167,6 +167,7 @@ The closed set of REQ-103 primitive constraints maps **one-to-one** to ADL 1.4 O
 | `C_CODE_PHRASE` | `CodePhrase` | `Terminology`, optional `CodeList`, `External()` predicate |
 | `C_DV_QUANTITY` | `DvQuantity` | enumerated `Units` (each with magnitude / precision `NumericRange`), optional `Property` (CodedTermRef) |
 | `C_DV_ORDINAL` | `CDvOrdinal` | `Values` (closed list of `(int, CodedTermRef)` pairs) |
+| `CONSTRAINT_REF` | `ConstraintRef` | `Reference` (the `ac` code that names the value set; the node's `RMTypeName()` is the RM type it constrains, typically `CODE_PHRASE`). The value set is external terminology, so `Validate` reports no violation for a value of that RM type ([§ REQ-102](#req-102--composition-validation) *Terminology binding value-set*) |
 
 Each type implements the sealed interface `constraints.PrimitiveConstraint`:
 
