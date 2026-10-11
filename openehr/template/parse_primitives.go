@@ -157,6 +157,8 @@ func buildPrimitive(o *xmlCObject, strict bool) (constraints.PrimitiveConstraint
 		return buildDvQuantity(o), nil
 	case "C_DV_ORDINAL":
 		return buildDvOrdinal(o), nil
+	case "CONSTRAINT_REF":
+		return buildConstraintRef(o, strict)
 	case "C_PRIMITIVE_OBJECT":
 		// The wrapper carries the AOM 1.4 primitive short name on
 		// `rm_type_name` (DURATION / DATE / BOOLEAN / etc.); the
@@ -323,6 +325,21 @@ func buildDvOrdinal(o *xmlCObject) constraints.CDvOrdinal {
 		})
 	}
 	return c
+}
+
+// buildConstraintRef reads a CONSTRAINT_REF: the reference (an ac code)
+// that names a value set outside the archetype. The node's rm_type_name,
+// which the caller keeps on the leaf, is the RM type the value set
+// constrains. A reference is required, so a missing or blank one is
+// refused in strict mode; lenient mode keeps the leaf with an empty
+// reference, as it keeps a partly broken primitive with a weaker
+// constraint.
+func buildConstraintRef(o *xmlCObject, strict bool) (constraints.ConstraintRef, error) {
+	ref := strings.TrimSpace(o.Reference)
+	if ref == "" && strict {
+		return constraints.ConstraintRef{}, fmt.Errorf("%w: CONSTRAINT_REF for %q has no <reference>", ErrInvalidOPT, o.RMTypeName)
+	}
+	return constraints.ConstraintRef{Reference: ref}, nil
 }
 
 // numericRange folds a wire numeric interval into the public range

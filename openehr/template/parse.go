@@ -30,6 +30,11 @@ import (
 // Both spellings give the same *ArchetypeRoot, with its archetype id,
 // optional template id, term definitions and full subtree, so neither
 // is an unknown type.
+//
+// Nor is xsi:type="CONSTRAINT_REF": it is read as a leaf
+// *ComplexObject whose PrimitiveConstraint is a
+// [constraints.ConstraintRef] carrying its <reference>. A missing or
+// blank reference leaves that constraint with an empty Reference.
 func ParseOPT(r io.Reader) (*OperationalTemplate, error) {
 	return parseOPT(r, false)
 }
@@ -42,11 +47,12 @@ func ParseOPT(r io.Reader) (*OperationalTemplate, error) {
 // taxonomy (e.g. AOM 2 / ADL 2 inputs, primitive constraint trees).
 // Returns ErrUnsupportedNode (wrapped) on the first such occurrence.
 // It also refuses an unparseable C_INTEGER or C_REAL bound, an
-// unparseable C_INTEGER or C_REAL list item, and a C_PRIMITIVE_OBJECT
-// with no <item> child, returning an error that wraps ErrInvalidOPT.
+// unparseable C_INTEGER or C_REAL list item, a C_PRIMITIVE_OBJECT
+// with no <item> child, and a CONSTRAINT_REF with no or a blank
+// <reference>, returning an error that wraps ErrInvalidOPT.
 //
-// T_ARCHETYPE_ROOT is not such a value. Strict mode reads it as an
-// archetype root, exactly as ParseOPT does, and accepts it.
+// T_ARCHETYPE_ROOT and CONSTRAINT_REF are not such values. Strict mode
+// reads them exactly as ParseOPT does and accepts them.
 func ParseOPTStrict(r io.Reader) (*OperationalTemplate, error) {
 	return parseOPT(r, true)
 }
@@ -266,6 +272,10 @@ type xmlCObject struct {
 	// `C_DURATION`, …). buildPrimitive recurses into Item when the
 	// wrapper is named. Empty for all other shapes.
 	Item *xmlCObject `xml:"item"`
+	// Reference is the constraint code (e.g. "ac0001") of a
+	// CONSTRAINT_REF, which names a value set outside the archetype.
+	// Empty for all other shapes.
+	Reference string `xml:"reference"`
 }
 
 // xmlTermDefSection is one <term_definitions code="..."> block on a
@@ -425,11 +435,11 @@ func buildNode(o *xmlCObject, strict bool, depth int) (Node, error) {
 			parsedExcludes: parseSlotAssertions(excludes),
 		}, nil
 	default:
-		// REQ-103 primitive constraint types map to leaf
-		// ComplexObject nodes carrying a typed PrimitiveConstraint.
-		// Unknown xsi:type values (outside the v1 closed set) still
-		// fall through as bare leaf ComplexObject — the
-		// forward-compatibility escape hatch from REQ-100.
+		// REQ-103 primitive constraint types, CONSTRAINT_REF among
+		// them, map to leaf ComplexObject nodes carrying a typed
+		// PrimitiveConstraint. Unknown xsi:type values (outside the
+		// closed set) still fall through as bare leaf ComplexObject —
+		// the forward-compatibility escape hatch from REQ-100.
 		//
 		// In strict mode, an unknown xsi:type that carries nested
 		// <attributes> means lenient mode would silently drop a
