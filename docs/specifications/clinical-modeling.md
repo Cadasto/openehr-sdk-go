@@ -385,6 +385,10 @@ A node the OPT requires and the instance lacks is written with the OPT child's o
 
 A path **MUST NOT** carry a value from the instance ([REQ-168](#req-168--value-free-validation-diagnostics)): a name predicate is always a name the OPT pins, never the instance's own `name`. A path with no positional predicate is a valid AQL path; the AQL grammar has no positional predicate, so one with `[n]` is an openEHR path but not AQL.
 
+### RM floor
+
+`ValidateComposition` and every [REQ-110](#req-110--template-driven-validation-beyond-composition) entry point **MUST** also run the [REQ-112](#req-112--template-less-reference-model-validation-floor) floor over the whole root and return its findings in the same `Result`, on the nodes the OPT models and on those it does not ([ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md)). Where the template walk and the floor report the same `Code` at the same `Path` (§ Issue paths), the `Result` **MUST** carry that issue once. No option leaves the floor out of these entry points; `ValidateRM` and its typed wrappers remain the entries for the floor alone.
+
 ### Sentinels
 
 The package **MUST** expose typed sentinels callers compare via `errors.Is` for programmatic dispatch. Issues bridge to sentinels via `Issue.Err() error`:
@@ -732,7 +736,7 @@ func ValidateFolder(folder *rm.Folder, c *templatecompile.Compiled) Result
 func ValidateEHRStatus(status *rm.EHRStatus, c *templatecompile.Compiled) Result
 ```
 
-`ValidateComposition` keeps its `nil_composition` guard for source compatibility, then delegates. A nil/typed-nil root yields `nil_root` (or the wrapper's `nil_party` / `nil_folder` / `nil_ehr_status`); a root whose concrete RM type does not match the OPT root surfaces `rm_type_mismatch` at `/`, never a silent pass.
+Every entry point includes the REQ-112 floor, as [§ REQ-102](#req-102--composition-validation) *RM floor* says. `ValidateComposition` keeps its `nil_composition` guard for source compatibility, then delegates. A nil/typed-nil root yields `nil_root` (or the wrapper's `nil_party` / `nil_folder` / `nil_ehr_status`); a root whose concrete RM type does not match the OPT root surfaces `rm_type_mismatch` at `/`, never a silent pass.
 
 ### Covered roots
 
@@ -903,7 +907,7 @@ Where a node pins a template-level name, the compiled AQL path **MUST** carry th
 
 The validators introduced by REQ-102 and generalised by REQ-110 are **template-driven** — every entry point accepts a `*templatecompile.Compiled` as the authoritative driver. A consumer persisting RM roots that bind to no operational template (FOLDER, EHR_STATUS, EHR_ACCESS, and untemplated demographic PARTY on a write path) has no SDK call to assert RM conformance. The strongest substitute today is a strict `canjson` typed decode, which proves JSON↔type correctness but **not** RM invariants — mandatory-attribute omissions decode cleanly, as do `DV_INTERVAL` lower>upper, empty `CODE_PHRASE.code_string`, and `DV_QUANTITY.precision < -1`.
 
-The SDK **MUST** expose a **template-less RM validation floor** beneath the OPT-driven path — an entry point that walks any RM root with the BMM as its sole driver and reports `Issue`s for (a) RM-mandatory attribute breaches and (b) per-RM-type invariants on the leaves it touches. The OPT-driven path stays the authoritative template-conformance layer; this floor is what runs when no template applies. The two layers compose but do not chain: template validity covers RM-mandatory presence — this floor's arm (a) — on the nodes the template models. It does not cover arm (b)'s per-type invariant catalogue, which `ValidateComposition` and the REQ-110 entry points do **not** run. A composition can therefore be template-valid and still RM-invalid; a caller wanting both layers runs both. Whether the template-driven pass should chain the floor is open as [STRAND-14](research-strands.md#strand-14--should-template-driven-validation-also-run-the-rm-floor-invariants) and **MUST NOT** be pre-empted in code.
+The SDK **MUST** expose a **template-less RM validation floor** beneath the OPT-driven path — an entry point that walks any RM root with the BMM as its sole driver and reports `Issue`s for (a) RM-mandatory attribute breaches and (b) per-RM-type invariants on the leaves it touches. The OPT-driven path stays the authoritative template-conformance layer; this floor is what runs when no template applies. The template-driven entry points include this floor ([§ REQ-102](#req-102--composition-validation) *RM floor*, [ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md)), so a template-valid result is also RM-valid; this floor's own entries run it alone, for a root no template applies to.
 
 ### Surface
 

@@ -264,7 +264,7 @@ This is a pre-existing emission gap, not a REQ-048 regression — REQ-048 only m
 
 ## STRAND-14 — Should template-driven validation also run the RM-floor invariants?
 
-**Status:** Open — opened 2026-09-05 from the review round of the RM canonical-JSON fidelity work ([PR 145](https://github.com/Cadasto/openehr-sdk-go/pull/145)), whose plan text claimed `ValidateComposition` would report the new `TERM_MAPPING` invariants; it never has, and the claim was corrected in the plan rather than in code.
+**Status:** Resolved 2026-10-11 by [ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md): template-driven validation includes the floor, each defect reported once, with no template-only option. Opened 2026-09-05 from the review round of the RM canonical-JSON fidelity work ([PR 145](https://github.com/Cadasto/openehr-sdk-go/pull/145)), whose plan text claimed `ValidateComposition` would report the new `TERM_MAPPING` invariants; it never has, and the claim was corrected in the plan rather than in code.
 
 **Question:** should `ValidateComposition` ([REQ-102](clinical-modeling.md#req-102--composition-validation)) and the [REQ-110](clinical-modeling.md#req-110--template-driven-validation-beyond-composition) entry points run the [REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor) per-type invariant catalogue as part of a template-driven pass, or stay exactly template conformance with the floor a separate call?
 
@@ -303,4 +303,4 @@ This is a pre-existing emission gap, not a REQ-048 regression — REQ-048 only m
 | [STRAND-11](#strand-11--probe-recording-format-har-or-a-purpose-built-yaml) | Probe recording format (HAR vs YAML) | **Resolved** ([ADR 0020](../adr/0020-cassette-recording-har.md)) | REQ-082 |
 | [STRAND-12](#strand-12--bmm-interface-classes-carry-no-is_abstract-flag) | BMM interface classes carry no `is_abstract` | Open | REQ-047, REQ-048 |
 | [STRAND-13](#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped) | Properties inherited from a primitive-mapped ancestor are dropped | Open | REQ-042, REQ-043, REQ-046, REQ-048 |
-| [STRAND-14](#strand-14--should-template-driven-validation-also-run-the-rm-floor-invariants) | Template-driven validation and the RM floor | Open | REQ-102, REQ-110, REQ-112 |
+| [STRAND-14](#strand-14--should-template-driven-validation-also-run-the-rm-floor-invariants) | Template-driven validation and the RM floor | **Resolved** ([ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md)) | REQ-102, REQ-110, REQ-112 |

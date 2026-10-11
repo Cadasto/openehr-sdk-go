@@ -36,6 +36,7 @@ Open decisions (those that would be ADRs once resolved) live in this repo as **r
 | ADR-0022 | Canonical JSON is encoded by `encoding/json/v2` | Accepted | 2026-09-14 | — |
 | ADR-0023 | SMART discovery: the Platform base URL and the OIDC issuer are separate values | Accepted | 2026-10-04 | — |
 | ADR-0024 | A contribution deletion built without a payload carries no data, departing from the pinned UpdateVersion schema | Accepted | 2026-10-07 | Amends: REQ-095, REQ-130 |
+| ADR-0025 | Template-driven validation includes the RM floor | Accepted | 2026-10-11 | — |
 
 <!-- /sdd:generated -->
 
