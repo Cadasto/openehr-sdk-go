@@ -287,18 +287,51 @@ func TestREQ170SingleValuedIndexPastBound(t *testing.T) {
 	}
 }
 
-// TestREQ170SingleValuedIndexCarriesNoValue: the refusal names the key and
-// carries none of its value.
+// TestREQ170SingleValuedIndexCarriesNoValue: each refusal of an index past
+// the bound names the key and carries none of its value, by default, under the
+// report option and under strict alike, since the key is matched content. One
+// row per refusal site: an underscore family's owner segment, a composition
+// metadata segment, the template root's own segment, and an ENTRY leaf
+// segment.
 func TestREQ170SingleValuedIndexCarriesNoValue(t *testing.T) {
 	wt, compiled := corpusTarget(t)
-	const secret = "Secret Hospital Name"
-	body := indexedMetaBase()
-	body[wt.Tree.ID+"/context:1/_health_care_facility|name"] = secret
-	_, err := simplified.UnmarshalFlat(marshalBody(t, body), wt, simplified.WithTemplate(compiled))
-	if !errors.Is(err, simplified.ErrUnknownPath) {
-		t.Fatalf("err = %v, want ErrUnknownPath", err)
-	}
-	if strings.Contains(err.Error(), secret) {
-		t.Errorf("error %q carries the key's value", err)
+	root := wt.Tree.ID
+	const secret = "Secret Value 7f3a"
+	for _, tc := range []struct {
+		name string
+		key  string
+		// names is what the refusal must name: the key, or the family prefix
+		// or leaf base the decode reports it by.
+		names string
+	}{
+		{"underscore family owner", root + "/context:1/_health_care_facility|name", root + "/context:1/_health_care_facility"},
+		{"composition metadata", root + "/composer:1|name", root + "/composer:1|name"},
+		{"template root", root + ":1/composer|name", root + ":1/composer|name"},
+		{"entry leaf", root + "/conformance_section/conformance_observation/language:1|code", root + "/conformance_section/conformance_observation/language:1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body := indexedMetaBase()
+			body[tc.key] = secret
+			var reported []string
+			for mode, opts := range map[string][]simplified.Option{
+				"default":       nil,
+				"WithUnmatched": {simplified.WithUnmatched(func(p string) { reported = append(reported, p) })},
+				"WithStrict":    {simplified.WithStrict()},
+			} {
+				_, err := simplified.UnmarshalFlat(marshalBody(t, body), wt, append(opts, simplified.WithTemplate(compiled))...)
+				if !errors.Is(err, simplified.ErrUnknownPath) {
+					t.Fatalf("%s: err = %v, want ErrUnknownPath", mode, err)
+				}
+				if !strings.Contains(err.Error(), tc.names) {
+					t.Errorf("%s: error %q does not name %q", mode, err, tc.names)
+				}
+				if strings.Contains(err.Error(), secret) {
+					t.Errorf("%s: error %q carries the key's value", mode, err)
+				}
+			}
+			if len(reported) != 0 {
+				t.Errorf("WithUnmatched reported %q, want nothing for a matched key", reported)
+			}
+		})
 	}
 }

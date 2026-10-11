@@ -34,21 +34,32 @@ func MarshalStructured(comp *rm.Composition, wt *webtemplate.WebTemplate) ([]byt
 }
 
 // UnmarshalStructured decodes STRUCTURED JSON into a canonical COMPOSITION
-// using wt. It restructures to FLAT and delegates to UnmarshalFlat.
+// using wt. It restructures to FLAT and decodes that as [UnmarshalFlat] does.
+//
+// A member the decode does not read is ignored by default, and the value
+// holds the rest of the body. [WithUnmatched] reports each such member by its
+// path of members from the root, and [WithStrict] refuses the first, wrapping
+// [ErrUnknownPath].
 func UnmarshalStructured(data []byte, wt *webtemplate.WebTemplate, opts ...Option) (*rm.Composition, error) {
 	s, err := unmarshalObject(data)
 	if err != nil {
 		return nil, err
 	}
-	flatMap, err := structuredToFlat(s)
+	flat, err := structuredToFlat(s)
 	if err != nil {
 		return nil, err
 	}
-	flat, err := json.Marshal(flatMap)
-	if err != nil {
-		return nil, err
+	if wt == nil || wt.Tree == nil {
+		return nil, ErrNoTemplate
 	}
-	return UnmarshalFlat(flat, wt, opts...)
+	cfg := newDecodeConfig(opts)
+	var loc locator
+	if cfg.tracked() {
+		if loc, err = structuredLocations(data); err != nil {
+			return nil, err
+		}
+	}
+	return decodeFlatMap(flat, wt, cfg, loc)
 }
 
 // FlatToStructured restructures FLAT JSON into STRUCTURED JSON (no OPT needed).

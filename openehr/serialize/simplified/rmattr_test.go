@@ -368,21 +368,20 @@ func TestRMAttrObjectRefWithoutScheme(t *testing.T) {
 	}
 }
 
-// TestRMAttrGuidelineIDNotOnAdminEntry — REQ-140. The grammar is typed by the
-// owning RM class, and `guideline_id` is declared on CARE_ENTRY: ADMIN_ENTRY is
-// an ENTRY but not a CARE_ENTRY, so it carries `_work_flow_id` and no
-// `_guideline_id`. The corpus agrees — `ehrbase_conformance_admin_entry` writes
-// exactly that pair of presences.
+// TestRMAttrGuidelineIDNotOnAdminEntry — REQ-140 / REQ-170. The grammar is typed
+// by the owning RM class, and `guideline_id` is declared on CARE_ENTRY:
+// ADMIN_ENTRY is an ENTRY but not a CARE_ENTRY, so it carries `_work_flow_id` and
+// no `_guideline_id`, which is unmatched content there. The corpus agrees —
+// `ehrbase_conformance_admin_entry` writes exactly that pair of presences.
 func TestRMAttrGuidelineIDNotOnAdminEntry(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	const adminEntry = rmattrSection + "/conformance_admin_entry"
-	if err := decodeRMAttrErr(t, wt, rmattrBody(map[string]any{
+	guideline := map[string]any{
 		adminEntry + "/_guideline_id|id":        "3445",
 		adminEntry + "/_guideline_id|namespace": "local",
 		adminEntry + "/_guideline_id|type":      "GUIDELINE",
-	})); !errors.Is(err, ErrUnknownPath) {
-		t.Errorf("_guideline_id on an ADMIN_ENTRY err = %v, want ErrUnknownPath", err)
 	}
+	assertUnmatched(t, wt, rmattrBody(guideline), slices.Sorted(maps.Keys(guideline))...)
 	// …while `_work_flow_id` is admitted on the same owner.
 	assertRMAttrRoundTrip(t, wt, map[string]any{
 		adminEntry + "/_work_flow_id|id":        "335645",
@@ -391,21 +390,20 @@ func TestRMAttrGuidelineIDNotOnAdminEntry(t *testing.T) {
 	})
 }
 
-// TestRMAttrObjectRefRefusedOnNonEntry — REQ-140. A SECTION, CLUSTER or
-// collapsed ELEMENT declares neither attribute, so both families are
-// ErrUnknownPath there.
+// TestRMAttrObjectRefRefusedOnNonEntry — REQ-140 / REQ-170. A SECTION, CLUSTER
+// or collapsed ELEMENT declares neither attribute, so both families are
+// unmatched content there: ignored by default, ErrUnknownPath under strict.
 func TestRMAttrObjectRefRefusedOnNonEntry(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	for _, owner := range []string{rmattrRoot, rmattrSection, rmattrElement} {
 		for _, family := range []string{"_work_flow_id", "_guideline_id"} {
 			t.Run(owner+family, func(t *testing.T) {
-				if err := decodeRMAttrErr(t, wt, rmattrBody(map[string]any{
+				keys := map[string]any{
 					owner + "/" + family + "|id":        "1",
 					owner + "/" + family + "|namespace": "local",
 					owner + "/" + family + "|type":      "ANY",
-				})); !errors.Is(err, ErrUnknownPath) {
-					t.Errorf("err = %v, want ErrUnknownPath", err)
 				}
+				assertUnmatched(t, wt, rmattrBody(keys), slices.Sorted(maps.Keys(keys))...)
 			})
 		}
 	}
@@ -522,31 +520,40 @@ func TestRMAttrEndTimeDecoratedRefusedOnEncode(t *testing.T) {
 
 // --- router: refusals ---------------------------------------------------
 
-// TestRMAttrDeferredFamiliesRefused — REQ-140. Every family this phase does
-// not carry must keep refusing loudly, so a later phase flips a test rather
-// than a behaviour. The refusal names the family prefix, which is what the
-// PROBE-086 census scopes its exclusions by.
+// TestRMAttrDeferredFamiliesRefused — REQ-140 / REQ-170. The two families this
+// codec defers, at an owner that declares them, resolve but have no carrier, so
+// they refuse loudly in every mode. A family that names nothing at its owner —
+// a deferred one where the owner declares no such attribute, `_identifier`
+// (not a router family at all), a typo — is unmatched content: ignored by
+// default, ErrUnknownPath under strict. Either way the refusal names the family
+// prefix, which is what the PROBE-086 census scopes its exclusions by.
 func TestRMAttrDeferredFamiliesRefused(t *testing.T) {
 	wt, _ := conformanceWT(t)
-	for _, key := range []string{
+	for _, tc := range []struct {
+		key  string
+		want error
+	}{
+		{rmattrAction + "/_instruction_details|activity_id", ErrUnknownPath},
+		{rmattrSection + "/conformance_instruction/_wf_definition|value", ErrUnknownPath},
 		// `_identifier` is not a router family at all: every position that
 		// reaches a party reaches its identifier list through the party grammar
 		// (rmattr_party.go), so an ENTRY owner is a path that names no family.
-		rmattrObs + "/_identifier:0|id",
-		rmattrAction + "/_instruction_details|activity_id",
-		rmattrSection + "/_wf_definition|value",
+		{rmattrObs + "/_identifier:0|id", errUnmatched},
+		// A SECTION declares no wf_definition: the family names nothing here.
+		{rmattrSection + "/_wf_definition|value", errUnmatched},
 		// Not a family at all: a typo must not be mistaken for one.
-		rmattrRoot + "/_nonsense",
+		{rmattrRoot + "/_nonsense", errUnmatched},
 	} {
-		t.Run(key, func(t *testing.T) {
-			err := decodeRMAttrErr(t, wt, rmattrBody(map[string]any{key: "x"}))
+		t.Run(tc.key, func(t *testing.T) {
+			keys := map[string]any{tc.key: "x"}
+			err := refusalLegs(t, wt, rmattrBody(keys), keys, tc.want)
 			if !errors.Is(err, ErrUnknownPath) {
 				t.Fatalf("err = %v, want ErrUnknownPath", err)
 			}
 			// The message must name the family prefix so the census can scope
 			// the exclusion to it (SKIPPED.md § How the exclusion list is
 			// produced).
-			prefix, _, _ := strings.Cut(key, "|")
+			prefix, _, _ := strings.Cut(tc.key, "|")
 			prefix, _, _ = strings.Cut(prefix, "/_")
 			if !strings.Contains(err.Error(), prefix) {
 				t.Errorf("err = %v, want it to name %q", err, prefix)
@@ -665,21 +672,19 @@ func firstInstruction(t *testing.T, comp *rm.Composition) *rm.Instruction {
 	return nil
 }
 
-// TestRMAttrUnknownSuffixRefused — REQ-140. A recognised family carrying an
-// unrecognised suffix is ErrUnsupportedDatatype naming the offending FLAT key,
-// not ErrUnknownPath: the path resolved, the grammar did not.
+// TestRMAttrUnknownSuffixRefused — REQ-140 / REQ-170. A recognised family
+// carrying an unrecognised suffix is unmatched content: the family decodes
+// without it by default, and under strict the decode is refused with
+// ErrUnknownPath naming the offending FLAT key.
 func TestRMAttrUnknownSuffixRefused(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	key := rmattrRoot + "/_link:0|typo"
-	err := decodeRMAttrErr(t, wt, rmattrBody(map[string]any{
+	err := unmatchedStrictErr(t, wt, rmattrBody(map[string]any{
 		rmattrRoot + "/_link:0|meaning": "m",
 		rmattrRoot + "/_link:0|type":    "t",
 		rmattrRoot + "/_link:0|target":  "ehr://x",
 		key:                             "boom",
-	}))
-	if !errors.Is(err, ErrUnsupportedDatatype) {
-		t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
-	}
+	}), key)
 	if !strings.Contains(err.Error(), key) {
 		t.Errorf("err = %v, want it to name %q", err, key)
 	}
@@ -690,7 +695,9 @@ func TestRMAttrUnknownSuffixRefused(t *testing.T) {
 // string.
 func TestRMAttrMissingMandatorySuffixRefused(t *testing.T) {
 	wt, _ := conformanceWT(t)
-	err := decodeRMAttrErr(t, wt, rmattrBody(map[string]any{
+	// A missing required suffix is malformed matched content: refused in every
+	// mode (REQ-170).
+	err := refusedInEveryMode(t, wt, rmattrBody(map[string]any{
 		rmattrRoot + "/_link:0|meaning": "m",
 	}))
 	if !errors.Is(err, ErrUnsupportedDatatype) {
@@ -746,9 +753,10 @@ func mergeRMAttr(maps_ ...map[string]any) map[string]any {
 	return out
 }
 
-// TestRMAttrOwnerKindRefused — REQ-140. The grammar is typed by the owning RM
-// class: a family the owner's RM class does not declare is ErrUnknownPath, the
-// same refusal an unknown family gets.
+// TestRMAttrOwnerKindRefused — REQ-140 / REQ-170. The grammar is typed by the
+// owning RM class: a family the owner's RM class does not declare is unmatched
+// content, as an unknown family is — ignored by default, ErrUnknownPath under
+// strict.
 //
 //   - ISM_TRANSITION and EVENT_CONTEXT are not LOCATABLEs, so neither has a
 //     `_uid` or `_link`;
@@ -766,9 +774,7 @@ func TestRMAttrOwnerKindRefused(t *testing.T) {
 		rmattrSection + "/conformance_instruction/current_activity/timing/_uid",
 	} {
 		t.Run(key, func(t *testing.T) {
-			if err := decodeRMAttrErr(t, wt, rmattrBody(map[string]any{key: "x"})); !errors.Is(err, ErrUnknownPath) {
-				t.Errorf("err = %v, want ErrUnknownPath", err)
-			}
+			assertUnmatched(t, wt, rmattrBody(map[string]any{key: "x"}), key)
 		})
 	}
 }

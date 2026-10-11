@@ -21,4 +21,36 @@
 //
 // Context output-form and exotic-datatype fallbacks are documented in
 // deviations.md beside the package tests.
+//
+// # Unmatched content
+//
+// Input the decode does not read is unmatched: a key whose path the Web
+// Template does not resolve, an underscore-prefixed segment that names no RM
+// attribute this codec carries at that node, a suffix outside the suffix set
+// of its datatype or underscore family, and a ctx/ field the codec does not
+// read. A key the decode reads is never unmatched, even where the decode then
+// refuses it: the composer's `external_ref` suffixes and party sub-structure,
+// a PARTICIPATION `time`, a FEEDER_AUDIT_DETAILS `other_details`,
+// `_instruction_details` and `_wf_definition` have no carrier and fail the
+// decode in every mode, and so does malformed content (a value of the wrong
+// shape, a missing required suffix, two spellings of one field that disagree,
+// an index past its bound). A key is judged segment by segment from the left:
+// an index past the bound of a segment that resolves makes the key malformed,
+// whatever follows it.
+//
+// By default the decoder ignores unmatched content: the value holds the rest
+// of the input and none of it, exactly as if the input had left those keys
+// out. [WithUnmatched] passes each item, in the order the input gives it, to
+// a caller function as its path: the key as written for FLAT, such as
+// "vital_signs/body_temperature:0/any_event:0/temperature|x-note", and for
+// STRUCTURED the member names from the root joined by "/", with each array
+// element's position as a segment, such as
+// "vital_signs/body_temperature/0/any_event/0/temperature/0/|x-note". The
+// path names the item and carries none of its value. [WithStrict] refuses the
+// decode at the first item with an error wrapping [ErrUnknownPath]. Strict
+// never refuses an absent key.
+//
+// The options belong to one decode: concurrent decodes with different options
+// do not see each other's policy. [FlatToStructured] and [StructuredToFlat]
+// take no options; they restructure every key whatever it names.
 package simplified

@@ -685,40 +685,40 @@ func TestRMAttrNullFlavourBesideValue(t *testing.T) {
 	}
 }
 
-// TestRMAttrNullFlavourHalfPairRefused — REQ-140. `_null_flavour` is a
+// TestRMAttrNullFlavourHalfPairRefused — REQ-140 / REQ-170. `_null_flavour` is a
 // DV_CODED_TEXT: `|code` and `|value` are both required, so half a pair must not
-// decode to a coerced empty rubric or an unlabelled code.
+// decode to a coerced empty rubric or an unlabelled code — refused in every mode.
+// A bare value, a suffix outside DV_CODED_TEXT's set and a sub-path are not part
+// of that grammar at all: unmatched content.
 func TestRMAttrNullFlavourHalfPairRefused(t *testing.T) {
 	wt, _ := conformanceWT(t)
-	for name, keys := range map[string]map[string]any{
-		"code alone":        {rmattrCount + "/_null_flavour|code": "253"},
-		"value alone":       {rmattrCount + "/_null_flavour|value": "unknown"},
-		"terminology alone": {rmattrCount + "/_null_flavour|terminology": "openehr"},
-		"bare value":        {rmattrCount + "/_null_flavour": "unknown"},
-		"unknown suffix":    {rmattrCount + "/_null_flavour|typo": "x"},
-		"sub-path":          {rmattrCount + "/_null_flavour/target|code": "x"},
+	for name, tc := range map[string]struct {
+		keys map[string]any
+		want error
+	}{
+		"code alone":        {map[string]any{rmattrCount + "/_null_flavour|code": "253"}, ErrUnsupportedDatatype},
+		"value alone":       {map[string]any{rmattrCount + "/_null_flavour|value": "unknown"}, ErrUnsupportedDatatype},
+		"terminology alone": {map[string]any{rmattrCount + "/_null_flavour|terminology": "openehr"}, ErrUnsupportedDatatype},
+		"bare value":        {map[string]any{rmattrCount + "/_null_flavour": "unknown"}, errUnmatched},
+		"unknown suffix":    {map[string]any{rmattrCount + "/_null_flavour|typo": "x"}, errUnmatched},
+		"sub-path":          {map[string]any{rmattrCount + "/_null_flavour/target|code": "x"}, errUnmatched},
 	} {
 		t.Run(name, func(t *testing.T) {
-			if err := decodeRMAttrErr(t, wt, rmattrBody(keys)); !errors.Is(err, ErrUnsupportedDatatype) {
-				t.Errorf("err = %v, want ErrUnsupportedDatatype", err)
-			}
+			assertRefusalLegs(t, wt, rmattrBody(tc.keys), tc.keys, tc.want)
 		})
 	}
 }
 
-// TestRMAttrNullFamiliesOnlyOnElement — REQ-140. `null_flavour` and `null_reason`
-// are declared on ELEMENT, so the families reach a collapsed leaf and nothing
-// else — the rminfo rule, not a hand-kept owner list.
+// TestRMAttrNullFamiliesOnlyOnElement — REQ-140 / REQ-170. `null_flavour` and
+// `null_reason` are declared on ELEMENT, so the families reach a collapsed leaf
+// and nothing else — the rminfo rule, not a hand-kept owner list. Anywhere else
+// they are unmatched content.
 func TestRMAttrNullFamiliesOnlyOnElement(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	for _, owner := range []string{rmattrRoot, rmattrSection, rmattrObs} {
 		for _, family := range []string{"/_null_flavour|code", "/_null_reason"} {
 			t.Run(owner+family, func(t *testing.T) {
-				if err := decodeRMAttrErr(t, wt, rmattrBody(map[string]any{
-					owner + family: "x",
-				})); !errors.Is(err, ErrUnknownPath) {
-					t.Errorf("err = %v, want ErrUnknownPath", err)
-				}
+				assertUnmatched(t, wt, rmattrBody(map[string]any{owner + family: "x"}), owner+family)
 			})
 		}
 	}
@@ -749,10 +749,11 @@ func nullFlavouredElement(t *testing.T, comp *rm.Composition) *rm.Element {
 
 // --- the anchor rule ----------------------------------------------------
 
-// TestRMAttrValueFamilyOwnerRule — REQ-140. A value-decoration family is judged
-// against the **leaf datatype**, read off the RM (rminfo), not against the
-// ELEMENT that holds it: `normal_range` reaches every DV_ORDERED leaf and
+// TestRMAttrValueFamilyOwnerRule — REQ-140 / REQ-170. A value-decoration family
+// is judged against the **leaf datatype**, read off the RM (rminfo), not against
+// the ELEMENT that holds it: `normal_range` reaches every DV_ORDERED leaf and
 // nothing else, `mappings` reaches DV_TEXT / DV_CODED_TEXT and nothing else.
+// Anywhere else the family names nothing and is unmatched content.
 func TestRMAttrValueFamilyOwnerRule(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	for _, key := range []string{
@@ -767,19 +768,16 @@ func TestRMAttrValueFamilyOwnerRule(t *testing.T) {
 		rmattrRoot + "/_mapping:0|match",
 	} {
 		t.Run(key, func(t *testing.T) {
-			if err := decodeRMAttrErr(t, wt, rmattrBody(map[string]any{key: "x"})); !errors.Is(err, ErrUnknownPath) {
-				t.Errorf("err = %v, want ErrUnknownPath", err)
-			}
+			assertUnmatched(t, wt, rmattrBody(map[string]any{key: "x"}), key)
 		})
 	}
 }
 
-// TestRMAttrIntervalBadTails — REQ-140. A recognised family carrying a tail
-// outside its grammar is ErrUnsupportedDatatype naming the offending FLAT key —
-// the shape the PROBE-086 census scopes an exclusion by. A tail the *anchor
-// datatype* rejects is named the way a clinical leaf's is instead — the bound's
-// base key plus the suffix label — because it is the datatype allowlist
-// speaking, and the census narrows that refusal to the one suffix.
+// TestRMAttrIntervalBadTails — REQ-140 / REQ-170. A recognised family carrying a
+// tail outside its grammar, or a bound suffix outside the anchor datatype's set,
+// is unmatched content: the interval decodes without it by default, and strict
+// refuses the decode with ErrUnknownPath naming the offending FLAT key as
+// written.
 func TestRMAttrIntervalBadTails(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	for _, tc := range []struct{ key, names string }{
@@ -790,7 +788,7 @@ func TestRMAttrIntervalBadTails(t *testing.T) {
 		{key: rmattrElement + "/_other_reference_ranges:0|typo"},
 	} {
 		t.Run(tc.key, func(t *testing.T) {
-			err := decodeRMAttrErr(t, wt, rmattrBody(map[string]any{
+			err := unmatchedStrictErr(t, wt, rmattrBody(map[string]any{
 				rmattrElement + "/_normal_range/lower|magnitude":             20.5,
 				rmattrElement + "/_normal_range/lower|unit":                  "unit",
 				rmattrElement + "/_normal_range|upper_unbounded":             true,
@@ -799,10 +797,7 @@ func TestRMAttrIntervalBadTails(t *testing.T) {
 				rmattrElement + "/_other_reference_ranges:0|upper_unbounded": true,
 				rmattrElement + "/_other_reference_ranges:0/meaning":         "high",
 				tc.key: "boom",
-			}))
-			if !errors.Is(err, ErrUnsupportedDatatype) {
-				t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
-			}
+			}), tc.key)
 			want := cmp.Or(tc.names, tc.key)
 			if !strings.Contains(err.Error(), want) {
 				t.Errorf("err = %v, want it to name %q", err, want)

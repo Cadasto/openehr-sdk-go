@@ -127,19 +127,16 @@ func TestFeederAuditOwners(t *testing.T) {
 	}
 }
 
-// TestFeederAuditRefusedOnNonLocatable — REQ-140. EVENT_CONTEXT and ISM_TRANSITION
-// are not LOCATABLEs and declare no `feeder_audit`, so the family is ErrUnknownPath
-// there — read off the RM, not off a list.
+// TestFeederAuditRefusedOnNonLocatable — REQ-140/REQ-170. EVENT_CONTEXT and
+// ISM_TRANSITION are not LOCATABLEs and declare no `feeder_audit`, so the family
+// names nothing there — read off the RM, not off a list — and is unmatched
+// content: ignored by default, refused with ErrUnknownPath under strict.
 func TestFeederAuditRefusedOnNonLocatable(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	for _, base := range []string{rmattrRoot + "/context", rmattrAction + "/transition"} {
 		t.Run(base, func(t *testing.T) {
-			err := decodeRMAttrErr(t, wt, rmattrBody(map[string]any{
-				base + "/_feeder_audit/originating_system_audit|system_id": "orig",
-			}))
-			if !errors.Is(err, ErrUnknownPath) {
-				t.Errorf("err = %v, want ErrUnknownPath", err)
-			}
+			key := base + "/_feeder_audit/originating_system_audit|system_id"
+			assertUnmatched(t, wt, rmattrBody(map[string]any{key: "orig"}), key)
 		})
 	}
 }
@@ -257,17 +254,26 @@ func TestFeederAuditTypeSuffixBounds(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	audit := rmattrObs + "/_feeder_audit/originating_system_audit"
 	for name, extra := range map[string]map[string]any{
-		"other subtype":                  {audit + "/subject|_type": "PARTY_IDENTIFIED"},
-		"beside a party key":             {audit + "/subject|_type": "PARTY_SELF", audit + "/subject|name": "Per 1"},
-		"at a PARTY_IDENTIFIED position": {audit + "/provider|_type": "PARTY_SELF"},
-		"at a standalone party":          {rmattrContext + "/_health_care_facility|_type": "PARTY_SELF"},
+		"other subtype":      {audit + "/subject|_type": "PARTY_IDENTIFIED"},
+		"beside a party key": {audit + "/subject|_type": "PARTY_SELF", audit + "/subject|name": "Per 1"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			body := map[string]any{audit + "|system_id": "orig"}
 			maps.Copy(body, extra)
-			if err := decodeRMAttrErr(t, wt, rmattrBody(body)); !errors.Is(err, ErrUnsupportedDatatype) {
+			// Malformed matched content: refused in every mode (REQ-170).
+			if err := refusedInEveryMode(t, wt, rmattrBody(body)); !errors.Is(err, ErrUnsupportedDatatype) {
 				t.Errorf("err = %v, want ErrUnsupportedDatatype", err)
 			}
+		})
+	}
+	// Where the grammar has no `|_type` at all it is a suffix outside the party's
+	// set: unmatched content (REQ-170).
+	for name, key := range map[string]string{
+		"at a PARTY_IDENTIFIED position": audit + "/provider|_type",
+		"at a standalone party":          rmattrContext + "/_health_care_facility|_type",
+	} {
+		t.Run(name, func(t *testing.T) {
+			assertUnmatched(t, wt, rmattrBody(map[string]any{audit + "|system_id": "orig", key: "PARTY_SELF"}), key)
 		})
 	}
 }
@@ -279,7 +285,8 @@ func TestFeederAuditTypeSuffixBounds(t *testing.T) {
 func TestFeederAuditOtherDetailsRefused(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	key := rmattrObs + "/_feeder_audit/originating_system_audit/other_details|x"
-	err := decodeRMAttrErr(t, wt, rmattrBody(map[string]any{
+	// The key resolves but has no carrier: refused in every mode (REQ-170).
+	err := refusedInEveryMode(t, wt, rmattrBody(map[string]any{
 		rmattrObs + "/_feeder_audit/originating_system_audit|system_id": "orig",
 		key: "boom",
 	}))
@@ -291,31 +298,34 @@ func TestFeederAuditOtherDetailsRefused(t *testing.T) {
 	}
 }
 
-// TestFeederAuditGrammarBounds — REQ-140. The family's grammar is closed: an own
-// suffix (FEEDER_AUDIT has none — every attribute is a sub-path), an unknown
-// sub-path, an unknown FEEDER_AUDIT_DETAILS suffix, an indexed audit, a sparse
-// item-id sequence and a missing RM-mandatory `system_id` all refuse loudly,
-// naming the offending FLAT key.
+// TestFeederAuditGrammarBounds — REQ-140/REQ-170. The family's grammar is
+// closed. An own suffix (FEEDER_AUDIT has none — every attribute is a
+// sub-path), an unknown sub-path and an unknown FEEDER_AUDIT_DETAILS suffix are
+// unmatched content: ignored by default and refused under strict, naming the
+// key. An indexed audit, a sparse item-id sequence and a missing RM-mandatory
+// `system_id` are malformed matched content and refuse in every mode, naming
+// the offending FLAT key.
 func TestFeederAuditGrammarBounds(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	fa := rmattrObs + "/_feeder_audit"
 	audit := fa + "/originating_system_audit"
+	for name, key := range map[string]string{
+		"own suffix on the family": fa + "|typo",
+		"bare family value":        fa,
+		"unknown sub-path":         fa + "/bogus|x",
+		"unknown audit suffix":     audit + "|typo",
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := unmatchedStrictErr(t, wt, rmattrBody(map[string]any{audit + "|system_id": "orig", key: "x"}), key)
+			if !strings.Contains(err.Error(), key) {
+				t.Errorf("err = %v, want it to name %q", err, key)
+			}
+		})
+	}
 	for name, tc := range map[string]struct {
 		extra map[string]any
 		names string
 	}{
-		"own suffix on the family": {
-			extra: map[string]any{fa + "|typo": "x"}, names: fa + "|typo",
-		},
-		"bare family value": {
-			extra: map[string]any{fa: "x"}, names: fa,
-		},
-		"unknown sub-path": {
-			extra: map[string]any{fa + "/bogus|x": "y"}, names: fa + "/bogus|x",
-		},
-		"unknown audit suffix": {
-			extra: map[string]any{audit + "|typo": "x"}, names: audit + "|typo",
-		},
 		"indexed audit": {
 			extra: map[string]any{fa + "/originating_system_audit:1|system_id": "x"},
 			names: "originating_system_audit",
@@ -338,7 +348,7 @@ func TestFeederAuditGrammarBounds(t *testing.T) {
 				body[audit+"|system_id"] = "orig"
 			}
 			maps.Copy(body, tc.extra)
-			err := decodeRMAttrErr(t, wt, rmattrBody(body))
+			err := refusedInEveryMode(t, wt, rmattrBody(body))
 			if !errors.Is(err, ErrUnsupportedDatatype) && !errors.Is(err, ErrUnknownPath) {
 				t.Fatalf("err = %v, want a typed refusal", err)
 			}
@@ -413,16 +423,15 @@ func TestRMAttrProviderRoundTrip(t *testing.T) {
 	}
 }
 
-// TestRMAttrProviderOwnerAdmission — REQ-140. `provider` is declared on ENTRY, so
-// the family reaches the five ENTRY subtypes and nothing else — read off the RM.
+// TestRMAttrProviderOwnerAdmission — REQ-140/REQ-170. `provider` is declared on
+// ENTRY, so the family reaches the five ENTRY subtypes and nothing else — read
+// off the RM. Anywhere else it is unmatched content.
 func TestRMAttrProviderOwnerAdmission(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	for _, base := range []string{rmattrRoot, rmattrSection, rmattrElement, rmattrEvent} {
 		t.Run(base, func(t *testing.T) {
-			err := decodeRMAttrErr(t, wt, rmattrBody(map[string]any{base + "/_provider|name": "x"}))
-			if !errors.Is(err, ErrUnknownPath) {
-				t.Errorf("err = %v, want ErrUnknownPath", err)
-			}
+			key := base + "/_provider|name"
+			assertUnmatched(t, wt, rmattrBody(map[string]any{key: "x"}), key)
 		})
 	}
 }

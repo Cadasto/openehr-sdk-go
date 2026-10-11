@@ -9,6 +9,7 @@ import (
 	"maps"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -1080,7 +1081,6 @@ func TestContextOwnedLeafUnacceptedSpellingRefused(t *testing.T) {
 			},
 		}},
 		{"setting formatting", root + "/context/setting|formatting", "plain"},
-		{"setting bare", root + "/context/setting", "other care"},
 		{"start_time raw beside ctx/time", root + "/context/start_time|raw", map[string]any{
 			"_type": "DV_DATE_TIME", "value": "2026-08-05T10:00:00Z",
 		}},
@@ -1096,14 +1096,66 @@ func TestContextOwnedLeafUnacceptedSpellingRefused(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, err = simplified.UnmarshalFlat(raw, wt, simplified.WithTemplate(compiled))
-			if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
-				t.Fatalf("err = %v, want ErrUnsupportedDatatype (the value must not be silently dropped)", err)
+			// The suffix is one the leaf's datatype has, so the key is matched
+			// content the ctx/ form cannot carry: refused in every mode (REQ-170).
+			var reported []string
+			for name, opts := range map[string][]simplified.Option{
+				"default":       nil,
+				"WithUnmatched": {simplified.WithUnmatched(func(p string) { reported = append(reported, p) })},
+				"WithStrict":    {simplified.WithStrict()},
+			} {
+				_, err = simplified.UnmarshalFlat(raw, wt, append(opts, simplified.WithTemplate(compiled))...)
+				if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
+					t.Fatalf("%s: err = %v, want ErrUnsupportedDatatype (the value must not be silently dropped)", name, err)
+				}
+				if !strings.Contains(err.Error(), tc.key) {
+					t.Errorf("%s: error %q does not name the offending key %q", name, err, tc.key)
+				}
 			}
-			if !strings.Contains(err.Error(), tc.key) {
-				t.Errorf("error %q does not name the offending key %q", err, tc.key)
+			if len(reported) != 0 {
+				t.Errorf("WithUnmatched reported %q, want nothing for a matched key", reported)
 			}
 		})
+	}
+	// A bare value is outside DV_CODED_TEXT's suffix set, so the decode does not
+	// read it: unmatched content, ignored by default and refused under strict
+	// naming the key (REQ-170).
+	t.Run("setting bare", func(t *testing.T) {
+		key := root + "/context/setting"
+		body := map[string]any{
+			"ctx/language": "en", "ctx/territory": "NL",
+			"ctx/setting|code": "238", "ctx/setting|value": "other care",
+			"ctx/time": "2026-08-05T09:00:00Z",
+			key:        "other care",
+		}
+		raw, err := json.Marshal(body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertUnmatchedKey(t, raw, wt, key, simplified.WithTemplate(compiled))
+	})
+}
+
+// assertUnmatchedKey checks the REQ-170 legs for a FLAT body whose one
+// unmatched key is key: the default decode succeeds, WithUnmatched reports key
+// alone, and WithStrict refuses with ErrUnknownPath naming key and nothing else.
+func assertUnmatchedKey(t *testing.T, raw []byte, wt *webtemplate.WebTemplate, key string, opts ...simplified.Option) {
+	t.Helper()
+	if _, err := simplified.UnmarshalFlat(raw, wt, opts...); err != nil {
+		t.Fatalf("UnmarshalFlat (default) = %v, want %q ignored", err, key)
+	}
+	var reported []string
+	report := simplified.WithUnmatched(func(p string) { reported = append(reported, p) })
+	if _, err := simplified.UnmarshalFlat(raw, wt, append(opts, report)...); err != nil {
+		t.Fatalf("UnmarshalFlat (WithUnmatched) = %v", err)
+	}
+	if len(reported) != 1 || reported[0] != key {
+		t.Errorf("WithUnmatched reported %q, want [%q]", reported, key)
+	}
+	_, err := simplified.UnmarshalFlat(raw, wt, append(opts, simplified.WithStrict())...)
+	want := "simplified: path not in web template: " + strconv.Quote(key) + " is unmatched content"
+	if !errors.Is(err, simplified.ErrUnknownPath) || err.Error() != want {
+		t.Errorf("UnmarshalFlat (WithStrict) = %v, want %q", err, want)
 	}
 }
 

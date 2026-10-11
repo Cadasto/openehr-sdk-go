@@ -84,14 +84,16 @@ func (ts rmattrTails) key(g rmattrGroup, tail string) string {
 	return g.key(tail)
 }
 
-// splitRMAttrTails partitions g's tails. lists names the sub-path segments the
-// family treats as an indexed list (nil for a family that has none); every other
-// segment is single-valued, so a `:0` on it is the index-less spelling (the
-// interconversion normalises every segment) and folds onto it, while anything
-// higher addresses a list position that attribute does not have. Two spellings
-// landing on one slot are refused rather than silently merged — the same rule
-// [checkRMAttrIndexes] applies to `_family:N`.
-func splitRMAttrTails(g rmattrGroup, lists map[string]bool) (rmattrTails, error) {
+// splitRMAttrTails partitions g's tails. sub names the single-valued sub-path
+// segments the family's grammar reads and lists the ones it treats as an
+// indexed list (nil for a family that has none). A tail whose sub-path names
+// neither is unmatched content (REQ-170): it goes to the group's sink before
+// its indexes are judged. A `:0` on a single-valued segment is the index-less
+// spelling (the interconversion normalises every segment) and folds onto it,
+// while anything higher addresses a list position that attribute does not
+// have. Two spellings landing on one slot are refused rather than silently
+// merged — the same rule [checkRMAttrIndexes] applies to `_family:N`.
+func splitRMAttrTails(g rmattrGroup, sub, lists map[string]bool) (rmattrTails, error) {
 	ts := rmattrTails{
 		own:     make(map[string]any),
 		sub:     make(map[string]map[string]any),
@@ -106,9 +108,13 @@ func splitRMAttrTails(g rmattrGroup, lists map[string]bool) (rmattrTails, error)
 			ts.orig[ownTail(suffix)] = tail
 			continue
 		}
-		seg, idx, isList, err := rmattrSubSegment(g, tail, path, lists)
+		seg, idx, isList, known, err := rmattrSubSegment(g, tail, path, sub, lists)
 		if err != nil {
 			return rmattrTails{}, err
+		}
+		if !known {
+			g.sink.add(g.key(tail))
+			continue
 		}
 		slot := ts.sub[seg]
 		norm := subTail(seg, suffix)
@@ -136,38 +142,40 @@ func splitRMAttrTails(g rmattrGroup, lists map[string]bool) (rmattrTails, error)
 
 // rmattrSubSegment normalises one tail's sub-path into the segment name the
 // grammar tables are keyed by, and reports whether it addresses a slot of an
-// indexed list. A multi-segment path is returned joined, so the caller's
-// allowlist refuses it naming the offending key rather than reporting its first
-// segment as if the rest were not there.
+// indexed list. A multi-segment path is joined, so it matches no single
+// segment of the grammar and is unmatched as a whole. known is false for a
+// path that names neither a segment in sub nor one in lists.
 //
 // Only the leading segment may carry an index, and only for a segment in lists:
 // the recursive grammar's lists sit at the position the family names them at
-// (`/_identifier:N`), never deeper.
-func rmattrSubSegment(g rmattrGroup, tail, path string, lists map[string]bool) (seg string, idx int, isList bool, err error) {
+// (`/_identifier:N`), never deeper. A malformed index spelling is refused
+// whatever segment it is on.
+func rmattrSubSegment(g rmattrGroup, tail, path string, sub, lists map[string]bool) (seg string, idx int, isList, known bool, err error) {
 	segs := strings.Split(strings.TrimPrefix(path, "/"), "/")
-	head := -1
+	indexes := make([]int, len(segs))
 	for i, s := range segs {
 		id, n, err := rmattrSegIndex(g, tail, s)
 		if err != nil {
-			return "", 0, false, err
+			return "", 0, false, false, err
 		}
-		segs[i] = id
-		if i == 0 {
-			head = n
-			continue
-		}
-		if n > 0 {
-			return "", 0, false, rmattrNotAList(g, tail, id)
-		}
+		segs[i], indexes[i] = id, n
 	}
 	joined := strings.Join(segs, "/")
+	if !sub[joined] && !lists[joined] {
+		return joined, 0, false, false, nil
+	}
+	for i := 1; i < len(segs); i++ {
+		if indexes[i] > 0 {
+			return "", 0, false, true, rmattrNotAList(g, tail, segs[i])
+		}
+	}
 	if lists[joined] {
-		return joined, max(head, 0), true, nil
+		return joined, max(indexes[0], 0), true, true, nil
 	}
-	if head > 0 {
-		return "", 0, false, rmattrNotAList(g, tail, segs[0])
+	if indexes[0] > 0 {
+		return "", 0, false, true, rmattrNotAList(g, tail, segs[0])
 	}
-	return joined, 0, false, nil
+	return joined, 0, false, true, nil
 }
 
 // rmattrNotAList is the refusal for a `:index` on a sub-path segment the family
@@ -195,25 +203,74 @@ func rmattrSegIndex(g rmattrGroup, tail, seg string) (id string, idx int, err er
 	return id, n, nil
 }
 
-// check refuses any tail outside a family's grammar, naming the offending FLAT
-// key. Own suffixes and sub-paths are checked against separate sets because
-// they are separate positions: `|lower_included` is not `/lower_included`.
-func (ts rmattrTails) check(g rmattrGroup, own, sub map[string]bool) error {
+// check hands every tail outside a family's grammar to the group's sink as
+// unmatched content and removes it (REQ-170). Own suffixes and sub-paths are
+// checked against separate sets because they are separate positions:
+// `|lower_included` is not `/lower_included`. [splitRMAttrTails] has already
+// set aside a sub-path the grammar does not name, so the sub-path pass is a
+// backstop.
+func (ts rmattrTails) check(g rmattrGroup, own, sub map[string]bool) {
 	for _, suffix := range slices.Sorted(maps.Keys(ts.own)) {
 		if !own[suffix] {
-			return fmt.Errorf("%w: %q is not part of the %s grammar (REQ-140)",
-				ErrUnsupportedDatatype, ts.key(g, ownTail(suffix)), g.family)
+			g.sink.add(ts.key(g, ownTail(suffix)))
+			delete(ts.own, suffix)
 		}
 	}
 	for _, seg := range slices.Sorted(maps.Keys(ts.sub)) {
-		if sub[seg] {
+		if !sub[seg] {
+			ts.dropSub(g, seg)
+		}
+	}
+}
+
+// dropSub hands every key of the sub-object seg to the group's sink as
+// unmatched content and removes the sub-object.
+func (ts rmattrTails) dropSub(g rmattrGroup, seg string) {
+	for _, suffix := range slices.Sorted(maps.Keys(ts.sub[seg])) {
+		g.sink.add(ts.key(g, subTail(seg, suffix)))
+	}
+	delete(ts.sub, seg)
+}
+
+// filterSub keeps, of the sub-object seg, the suffixes a value of rmType
+// reads, handing the key of every other one to the group's sink; a sub-object
+// left with nothing is removed, as if the body did not spell it.
+func (ts rmattrTails) filterSub(g rmattrGroup, seg, rmType string) {
+	sfx, ok := ts.sub[seg]
+	if !ok {
+		return
+	}
+	sfx = matchedSuffixes(rmType, sfx, func(suffix string) string { return ts.key(g, subTail(seg, suffix)) }, g.sink)
+	if len(sfx) == 0 {
+		delete(ts.sub, seg)
+		return
+	}
+	ts.sub[seg] = sfx
+}
+
+// filterSublist is [rmattrTails.filterSub] for every slot of the indexed
+// sub-path list seg. A slot left with nothing is removed, so the :index rules
+// then judge only the slots the body spells with matched keys.
+func (ts rmattrTails) filterSublist(g rmattrGroup, seg, rmType string) {
+	for _, idx := range slices.Sorted(maps.Keys(ts.sublist[seg])) {
+		sfx := matchedSuffixes(rmType, ts.sublist[seg][idx], func(suffix string) string {
+			return ts.key(g, subListTail(seg, idx, suffix))
+		}, g.sink)
+		if len(sfx) == 0 {
+			delete(ts.sublist[seg], idx)
 			continue
 		}
-		suffix := slices.Sorted(maps.Keys(ts.sub[seg]))[0]
-		return fmt.Errorf("%w: %q is not part of the %s grammar (REQ-140)",
-			ErrUnsupportedDatatype, ts.key(g, subTail(seg, suffix)), g.family)
+		ts.sublist[seg][idx] = sfx
 	}
-	return nil
+	if len(ts.sublist[seg]) == 0 {
+		delete(ts.sublist, seg)
+	}
+}
+
+// empty reports whether no tail is left: every key of the family instance was
+// unmatched.
+func (ts rmattrTails) empty() bool {
+	return len(ts.own) == 0 && len(ts.sub) == 0 && len(ts.sublist) == 0
 }
 
 // value decodes one sub-object with the datatype machinery a clinical leaf of
@@ -407,24 +464,36 @@ func includedOpenSideError(key, end string) error {
 // family is the leaf's own FLAT segment id and every refusal names the key the
 // payload author wrote.
 func intervalLeafSuffixes(g rmattrGroup, anchor string) (map[string]any, error) {
-	ts, err := splitRMAttrTails(g, nil)
+	ts, err := intervalTails(g, anchor, intervalSubTails)
 	if err != nil {
-		return nil, err
-	}
-	if err := ts.check(g, intervalOwnTails, intervalSubTails); err != nil {
 		return nil, err
 	}
 	return intervalSuffixes(g, ts, anchor)
 }
 
+// intervalTails splits g's tails for the interval grammar, sub being the
+// family's sub-object set, and sets aside every key the grammar does not read:
+// a tail outside it, and a bound suffix outside the anchor's suffix set. It
+// returns [errNothingMatched] when nothing is left.
+func intervalTails(g rmattrGroup, anchor string, sub map[string]bool) (rmattrTails, error) {
+	ts, err := splitRMAttrTails(g, sub, nil)
+	if err != nil {
+		return rmattrTails{}, err
+	}
+	ts.check(g, intervalOwnTails, sub)
+	ts.filterSub(g, "lower", anchor)
+	ts.filterSub(g, "upper", anchor)
+	if ts.empty() {
+		return rmattrTails{}, errNothingMatched
+	}
+	return ts, nil
+}
+
 // decodeRMAttrNormalRange decodes `_normal_range` on a DV_ORDERED leaf — a
 // DV_INTERVAL of the leaf's own anchor type.
 func decodeRMAttrNormalRange(g rmattrGroup, anchor string) (any, error) {
-	ts, err := splitRMAttrTails(g, nil)
+	ts, err := intervalTails(g, anchor, intervalSubTails)
 	if err != nil {
-		return nil, err
-	}
-	if err := ts.check(g, intervalOwnTails, intervalSubTails); err != nil {
 		return nil, err
 	}
 	return intervalSuffixes(g, ts, anchor)
@@ -444,12 +513,16 @@ var refRangeSubTails = map[string]bool{"lower": true, "upper": true, "meaning": 
 // or a DV_CODED_TEXT under the Phase A rule — `|code` present selects the coded
 // builder — which is exactly what the corpus writes at both spellings.
 func decodeRMAttrReferenceRange(g rmattrGroup, anchor string) (any, error) {
-	ts, err := splitRMAttrTails(g, nil)
+	ts, err := splitRMAttrTails(g, refRangeSubTails, nil)
 	if err != nil {
 		return nil, err
 	}
-	if err := ts.check(g, intervalOwnTails, refRangeSubTails); err != nil {
-		return nil, err
+	ts.check(g, intervalOwnTails, refRangeSubTails)
+	ts.filterSub(g, "lower", anchor)
+	ts.filterSub(g, "upper", anchor)
+	ts.filterSub(g, "meaning", "DV_TEXT")
+	if ts.empty() {
+		return nil, errNothingMatched
 	}
 	iv, err := intervalSuffixes(g, ts, anchor)
 	if err != nil {
@@ -497,12 +570,15 @@ const matchCodes = "=<>?"
 // diverging — and `/purpose` by the DV_CODED_TEXT one, which requires
 // `|code`+`|value` and takes `|terminology` when present.
 func decodeRMAttrTermMapping(g rmattrGroup, _ string) (any, error) {
-	ts, err := splitRMAttrTails(g, nil)
+	ts, err := splitRMAttrTails(g, mappingSubTails, nil)
 	if err != nil {
 		return nil, err
 	}
-	if err := ts.check(g, mappingOwnTails, mappingSubTails); err != nil {
-		return nil, err
+	ts.check(g, mappingOwnTails, mappingSubTails)
+	ts.filterSub(g, "target", "CODE_PHRASE")
+	ts.filterSub(g, "purpose", "DV_CODED_TEXT")
+	if ts.empty() {
+		return nil, errNothingMatched
 	}
 	match, err := ts.matchCode(g)
 	if err != nil {
@@ -594,20 +670,19 @@ func decodeRMAttrTemporalAccuracy(g rmattrGroup, _ string) (any, error) {
 
 // decodeRMAttrLeafValue decodes a family whose whole value is one datatype
 // spelled in its own suffix form, with no sub-paths of its own: the group's tails
-// *are* the suffix map. Errors are wrapped naming the family prefix, the base key
-// the census scopes a datatype refusal by.
+// *are* the suffix map. A sub-path, and a suffix outside the datatype's set, is
+// unmatched content (REQ-170). Errors are wrapped naming the family prefix, the
+// base key the census scopes a datatype refusal by.
 func decodeRMAttrLeafValue(g rmattrGroup, rmType string) (any, error) {
-	ts, err := splitRMAttrTails(g, nil)
+	ts, err := splitRMAttrTails(g, nil, nil)
 	if err != nil {
 		return nil, err
 	}
-	if len(ts.sub) > 0 {
-		seg := slices.Sorted(maps.Keys(ts.sub))[0]
-		suffix := slices.Sorted(maps.Keys(ts.sub[seg]))[0]
-		return nil, fmt.Errorf("%w: %q is not part of the %s grammar (REQ-140)",
-			ErrUnsupportedDatatype, ts.key(g, subTail(seg, suffix)), g.family)
+	own := matchedSuffixes(rmType, ts.own, func(suffix string) string { return ts.key(g, ownTail(suffix)) }, g.sink)
+	if len(own) == 0 {
+		return nil, errNothingMatched
 	}
-	dv, err := dvFromSuffixes(rmType, false, ts.own)
+	dv, err := dvFromSuffixes(rmType, false, own)
 	if err != nil {
 		return nil, fmt.Errorf("simplified: decode %q: %w", g.prefix(), err)
 	}

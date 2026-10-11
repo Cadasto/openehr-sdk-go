@@ -39,6 +39,7 @@ package simplified
 
 import (
 	"cmp"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -48,6 +49,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
+	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 )
 
 // rmattrGroup is one `_`-family instance's FLAT entries: the tail of each key
@@ -60,6 +62,30 @@ type rmattrGroup struct {
 	family string
 	index  int
 	tails  map[string]any
+	// keys maps each tail to the FLAT key it arrived under, as written. A tail
+	// it does not hold (a group built in a test) is spelled by rebuilding the
+	// key from the prefix.
+	keys map[string]string
+	// sink takes the keys of the tails the family's grammar does not read
+	// (REQ-170). A nil sink drops them without a record.
+	sink *unmatchedSink
+}
+
+// newRMAttrGroup starts an empty group whose unmatched tails go to sink.
+func newRMAttrGroup(base, family string, index int, sink *unmatchedSink) *rmattrGroup {
+	return &rmattrGroup{
+		base: base, family: family, index: index,
+		tails: make(map[string]any), keys: make(map[string]string), sink: sink,
+	}
+}
+
+// put records one tail's value and the FLAT key it arrived under.
+func (g *rmattrGroup) put(tail string, val any, key string) {
+	g.tails[tail] = val
+	if g.keys == nil {
+		g.keys = make(map[string]string)
+	}
+	g.keys[tail] = key
 }
 
 // prefix is the FLAT spelling of the family instance itself, without any tail:
@@ -73,7 +99,27 @@ func (g rmattrGroup) prefix() string {
 }
 
 // key is the full FLAT key a tail arrived under.
-func (g rmattrGroup) key(tail string) string { return g.prefix() + tail }
+func (g rmattrGroup) key(tail string) string {
+	if k, ok := g.keys[tail]; ok {
+		return k
+	}
+	return g.prefix() + tail
+}
+
+// drop hands the key of tail to the sink as unmatched content and removes the
+// tail from the group, so the grammar that follows never sees it.
+func (g rmattrGroup) drop(tail string) {
+	g.sink.add(g.key(tail))
+	delete(g.tails, tail)
+}
+
+// dropAll hands every key of the group to the sink: the whole family instance
+// is unmatched content.
+func (g rmattrGroup) dropAll() {
+	for _, tail := range slices.Sorted(maps.Keys(g.tails)) {
+		g.drop(tail)
+	}
+}
 
 // slot is the effective list position of this instance. A missing `:N` is
 // position 0: the OPT-free FLAT ↔ STRUCTURED interconversion re-spells every
@@ -111,10 +157,10 @@ type rmattrFamily struct {
 }
 
 // rmattrFamilies is the vocabulary this codec carries. A family absent here is
-// ErrUnknownPath — the fail-loud posture REQ-053 sets and REQ-140 inherits, and
-// the mechanism by which the families later phases own (`_feeder_audit`,
-// `_charset`, `_language`, `_encoding`, `_thumbnail`) and the two the plan defers
-// indefinitely (`_instruction_details`, `_wf_definition`) stay visible in the
+// unmatched content (REQ-170): ignored by default, reported or refused on
+// request. The two the plan defers indefinitely (`_instruction_details`,
+// `_wf_definition`) are the exception, [rmattrDeferredFamilies]: the decode
+// reads their keys and refuses them in every mode, so they stay visible in the
 // PROBE-086 census instead of decoding into nothing.
 //
 // `_identifier` is deliberately **not** a family here, though the corpus writes
@@ -162,6 +208,16 @@ var rmattrFamilies = map[string]rmattrFamily{
 	},
 	"_feeder_audit": {attr: "feeder_audit", decode: decodeRMAttrFeederAudit},
 	"_provider":     {attr: "provider", decode: decodeRMAttrProvider},
+}
+
+// rmattrDeferredFamilies are the two families the spec names and this codec
+// defers (REQ-140 *Deliberate exclusions*), by the RM attribute each addresses.
+// At an owner that declares the attribute the key resolves but has no carrier,
+// so it is refused in every mode (REQ-170); anywhere else it names nothing and
+// is unmatched content like any other unknown family.
+var rmattrDeferredFamilies = map[string]string{
+	"_instruction_details": "instruction_details",
+	"_wf_definition":       "wf_definition",
 }
 
 // rmattrOwner is the resolved owner of an `_`-family group: the RM class name
@@ -231,17 +287,16 @@ func writeFlatSeg(b *strings.Builder, s flatSeg) {
 // rmattrGroups collects the `_`-family groups out of a FLAT body's content
 // keys, one per (base path, family, :index), and returns them in a stable order
 // (base, then family, then index) so a body with two bad groups names the same
-// one on every run. The second return maps each (base, family) to the raw
-// indexes seen for it, which [checkRMAttrIndexes] needs to judge the sequence.
+// one on every run. Each group carries sink, which takes the keys its grammar
+// does not read.
 //
 // Keys are consumed from content: what stays behind is ordinary leaf data.
-func rmattrGroups(content map[string]any) ([]rmattrGroup, map[string]map[int]bool, error) {
+func rmattrGroups(content map[string]any, sink *unmatchedSink) ([]rmattrGroup, error) {
 	byInstance := make(map[string]*rmattrGroup)
-	indexes := make(map[string]map[int]bool)
 	for _, key := range slices.Sorted(maps.Keys(content)) {
 		pk, err := parseFlatKey(key)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		base, family, index, tail, isAttr := splitRMAttrKey(pk)
 		if !isAttr {
@@ -249,18 +304,13 @@ func rmattrGroups(content map[string]any) ([]rmattrGroup, map[string]map[int]boo
 		}
 		val := content[key]
 		delete(content, key)
-		fam := base + "\x00" + family
-		id := fam + "\x00" + strconv.Itoa(index)
+		id := base + "\x00" + family + "\x00" + strconv.Itoa(index)
 		g := byInstance[id]
 		if g == nil {
-			g = &rmattrGroup{base: base, family: family, index: index, tails: make(map[string]any)}
+			g = newRMAttrGroup(base, family, index, sink)
 			byInstance[id] = g
 		}
-		g.tails[tail] = val
-		if indexes[fam] == nil {
-			indexes[fam] = make(map[int]bool)
-		}
-		indexes[fam][index] = true
+		g.put(tail, val, key)
 	}
 	groups := make([]rmattrGroup, 0, len(byInstance))
 	for _, g := range byInstance {
@@ -273,74 +323,142 @@ func rmattrGroups(content map[string]any) ([]rmattrGroup, map[string]map[int]boo
 			cmp.Compare(a.index, b.index),
 		)
 	})
-	return groups, indexes, nil
+	return groups, nil
 }
 
-// rmattrDecode routes one `_`-family group to its typed decoder and places the
-// result on the owner (REQ-140). The order of the checks is the error taxonomy:
+// rmattrDecoded is one family instance that decoded, waiting for its owner.
+type rmattrDecoded struct {
+	g      rmattrGroup
+	owner  rmattrOwner
+	fam    rmattrFamily
+	judged string
+	val    any
+}
+
+// decodeRMAttrGroups routes every `_`-family group to its typed decoder and
+// places the results on their owners (REQ-140). The order of the checks is the
+// error taxonomy:
 //
-//  1. an unrecognised family, or one the owner's RM class does not declare, is
-//     ErrUnknownPath — the same refusal a path that reaches no Web Template
-//     node gets, because that is exactly what it is;
-//  2. a recognised family whose `:index` breaks the FLAT indexing rules is
-//     ErrUnknownPath (structurally inadmissible, like a sparse clinical index);
-//  3. a recognised family carrying a suffix outside its grammar, or missing an
-//     RM-mandatory one, is ErrUnsupportedDatatype naming the offending key;
+//  1. a group whose owner path reaches no Web Template node, whose family is
+//     unrecognised, or whose family the owner's RM class does not declare is
+//     unmatched content (REQ-170): every key goes to the sink and the group is
+//     skipped. The two deferred families are the exception where the owner
+//     declares them: [ErrUnknownPath] in every mode;
+//  2. a recognised family carrying a key outside its grammar hands that key to
+//     the sink; one missing an RM-mandatory key, or holding a value its
+//     suffixes cannot express, is ErrUnsupportedDatatype naming the key;
+//  3. a recognised family whose `:index` breaks the FLAT indexing rules is
+//     ErrUnknownPath (structurally inadmissible, like a sparse clinical index),
+//     judged over the instances that decoded, since an instance every key of
+//     which is unmatched is not in the body the decode reads;
 //  4. only then is the owner materialised, so a refusal leaves no half-built
 //     node in the rebuilt tree.
-func rmattrDecode(owner rmattrOwner, g rmattrGroup, indexes map[int]bool, budget *allocBudget) error {
+func decodeRMAttrGroups(compJSON map[string]any, wt *webtemplate.WebTemplate, groups []rmattrGroup,
+	ambiguous map[string]bool, budget *allocBudget, names map[string]string,
+) error {
+	var ready []rmattrDecoded
+	for _, g := range groups {
+		owner, err := rmattrOwnerAt(wt, compJSON, g.base, ambiguous, budget, names)
+		if errors.Is(err, errSegNotFound) {
+			g.dropAll()
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("simplified: %q: %w", g.prefix(), err)
+		}
+		fam, judged, err := rmattrFamilyAt(owner, g)
+		if errors.Is(err, errNothingMatched) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		val, err := fam.decode(g, owner.leaf)
+		if errors.Is(err, errNothingMatched) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		ready = append(ready, rmattrDecoded{g: g, owner: owner, fam: fam, judged: judged, val: val})
+	}
+	indexes := make(map[string]map[int]bool)
+	for _, d := range ready {
+		id := d.g.base + "\x00" + d.g.family
+		if indexes[id] == nil {
+			indexes[id] = make(map[int]bool)
+		}
+		indexes[id][d.g.index] = true
+	}
+	for _, d := range ready {
+		if err := checkRMAttrIndexes(d.g, d.fam, indexes[d.g.base+"\x00"+d.g.family]); err != nil {
+			return err
+		}
+		if err := placeRMAttr(d, budget); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// rmattrFamilyAt judges g's family against its owner: the family the decode
+// reads there and the RM class it is judged against. A family that names
+// nothing at this owner hands every key of g to the sink and returns
+// [errNothingMatched]; a deferred family the owner declares is refused.
+func rmattrFamilyAt(owner rmattrOwner, g rmattrGroup) (rmattrFamily, string, error) {
 	fam, known := rmattrFamilies[g.family]
 	if !known {
-		return fmt.Errorf("%w: %q (no such RM attribute family — see docs/specifications/wire.md § REQ-140 for the vocabulary this codec carries)",
-			ErrUnknownPath, g.prefix())
+		if attr, deferred := rmattrDeferredFamilies[g.family]; deferred {
+			if _, declared := rminfo.Default.AttributeRMType(bmmtype.Class(owner.kind), attr); declared {
+				return rmattrFamily{}, "", fmt.Errorf("%w: %q addresses %s.%s, which this codec defers: the reference's suffix set gives it no channel, so it is refused rather than dropped (REQ-140, see deviations.md)",
+					ErrUnknownPath, g.prefix(), owner.kind, attr)
+			}
+		}
+		g.dropAll()
+		return rmattrFamily{}, "", errNothingMatched
 	}
 	// A value-decoration family is judged against the leaf datatype, not the
 	// ELEMENT that holds it (both answer to the same FLAT path). owner.leaf is ""
 	// for every owner that is not a collapsed leaf, which declares nothing — so
-	// `_normal_range` on a SECTION is refused by this one check.
+	// `_normal_range` on a SECTION is unmatched by this one check.
 	judged := owner.kind
 	if fam.value {
 		judged = owner.leaf
 	}
 	// rminfo knows each class by its bare BMM name, and a leaf datatype from the
-	// Web Template may be a generic instantiation (DV_INTERVAL<DV_QUANTITY>). The
-	// messages keep the spelling the Web Template gave.
+	// Web Template may be a generic instantiation (DV_INTERVAL<DV_QUANTITY>).
 	declaredType, declared := rminfo.Default.AttributeRMType(bmmtype.Class(judged), fam.attr)
 	declaredType = bmmtype.Substitute(judged, declaredType)
-	if !declared {
-		return fmt.Errorf("%w: %q (%s declares no %s attribute)", ErrUnknownPath, g.prefix(),
-			cmp.Or(judged, owner.kind), fam.attr)
+	// The attribute exists on this owner but not in the type the family spells
+	// it as — the DV_TEMPORAL / DV_AMOUNT `accuracy` split, where the Real form
+	// rides the scalar `|accuracy` suffix instead (see [rmattrFamily.attrType]):
+	// the family names nothing here either.
+	if !declared || (fam.attrType != "" && declaredType != fam.attrType) {
+		g.dropAll()
+		return rmattrFamily{}, "", errNothingMatched
 	}
-	// The attribute exists on this owner but not in the type the family spells it
-	// as — the DV_TEMPORAL / DV_AMOUNT `accuracy` split, where the Real form rides
-	// the scalar `|accuracy` suffix instead (see [rmattrFamily.attrType]).
-	if fam.attrType != "" && declaredType != fam.attrType {
-		return fmt.Errorf("%w: %q addresses %s.%s, which is typed %s here rather than %s — that form has its own suffix (REQ-140)",
-			ErrUnknownPath, g.prefix(), judged, fam.attr, declaredType, fam.attrType)
-	}
-	if err := checkRMAttrIndexes(g, fam, indexes); err != nil {
-		return err
-	}
-	val, err := fam.decode(g, owner.leaf)
+	return fam, judged, nil
+}
+
+// placeRMAttr writes one decoded family instance onto its owner, materialising
+// the owner only now.
+func placeRMAttr(d rmattrDecoded, budget *allocBudget) error {
+	node, err := d.owner.resolve(d.fam.host())
 	if err != nil {
 		return err
 	}
-	node, err := owner.resolve(fam.host())
-	if err != nil {
-		return err
-	}
-	if fam.value {
-		if node, err = rmattrValueNode(node, g, judged); err != nil {
+	if d.fam.value {
+		if node, err = rmattrValueNode(node, d.g, d.judged); err != nil {
 			return err
 		}
 	}
-	if fam.list {
-		return placeRMAttrList(node, fam.attr, g, val, budget)
+	if d.fam.list {
+		return placeRMAttrList(node, d.fam.attr, d.g, d.val, budget)
 	}
-	if _, taken := node[fam.attr]; taken {
-		return fmt.Errorf("%w: %q duplicates a value already placed on %s.%s", ErrUnknownPath, g.prefix(), judged, fam.attr)
+	if _, taken := node[d.fam.attr]; taken {
+		return fmt.Errorf("%w: %q duplicates a value already placed on %s.%s", ErrUnknownPath, d.g.prefix(), d.judged, d.fam.attr)
 	}
-	node[fam.attr] = val
+	node[d.fam.attr] = d.val
 	return nil
 }
 
@@ -451,16 +569,17 @@ func placeRMAttrList(node map[string]any, attr string, g rmattrGroup, val any, b
 
 // --- suffix helpers -----------------------------------------------------
 
-// checkRMAttrTails rejects any tail outside a family's grammar, naming the
-// offending FLAT key. The message deliberately avoids the "unexpected |x for
-// TYPE" phrasing the datatype allowlist uses: that shape is parsed by the
-// PROBE-086 harness to scope a refusal to one suffix, and a family refusal
-// scopes to the whole family instance.
+// checkRMAttrTails hands every tail outside a family's grammar to the sink as
+// unmatched content and removes it (REQ-170). It returns [errNothingMatched]
+// when no tail is left, so the family instance is skipped as if absent.
 func checkRMAttrTails(g rmattrGroup, allowed map[string]bool) error {
 	for _, tail := range slices.Sorted(maps.Keys(g.tails)) {
 		if !allowed[tail] {
-			return fmt.Errorf("%w: %q is not part of the %s grammar (REQ-140)", ErrUnsupportedDatatype, g.key(tail), g.family)
+			g.drop(tail)
 		}
+	}
+	if len(g.tails) == 0 {
+		return errNothingMatched
 	}
 	return nil
 }

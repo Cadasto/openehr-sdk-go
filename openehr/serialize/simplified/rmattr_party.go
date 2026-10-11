@@ -140,11 +140,8 @@ func decodeRMAttrHealthCareFacility(g rmattrGroup, _ string) (any, error) {
 // party. It is the nested `_identifier:N` spelling of the identifier list, as
 // against a PARTICIPATION's inlined one.
 func partyLeafSuffixes(g rmattrGroup) (map[string]any, bool, error) {
-	ts, err := splitRMAttrTails(g, partyListTails)
+	ts, err := partyTails(g, partyOwnTails)
 	if err != nil {
-		return nil, false, err
-	}
-	if err := ts.check(g, partyOwnTails, partySubTails); err != nil {
 		return nil, false, err
 	}
 	ids, err := partyIdentifiers(g, ts)
@@ -152,6 +149,25 @@ func partyLeafSuffixes(g rmattrGroup) (map[string]any, bool, error) {
 		return nil, false, err
 	}
 	return partySuffixes(g, ts, ids)
+}
+
+// partyTails splits a standalone party's tails, own being its own-suffix set,
+// and sets aside every key the party grammar does not read (REQ-170): a tail
+// outside the grammar, and a suffix of `/relationship` or of an
+// `_identifier:N` outside its datatype's set. It returns [errNothingMatched]
+// when nothing is left.
+func partyTails(g rmattrGroup, own map[string]bool) (rmattrTails, error) {
+	ts, err := splitRMAttrTails(g, partySubTails, partyListTails)
+	if err != nil {
+		return rmattrTails{}, err
+	}
+	ts.check(g, own, partySubTails)
+	ts.filterSub(g, "relationship", "DV_CODED_TEXT")
+	ts.filterSublist(g, partyIdentifierSeg, "DV_IDENTIFIER")
+	if ts.empty() {
+		return rmattrTails{}, errNothingMatched
+	}
+	return ts, nil
 }
 
 // decodeRMAttrProvider decodes `_provider` on an ENTRY — ENTRY.provider, an
@@ -172,11 +188,8 @@ func decodeRMAttrProvider(g rmattrGroup, _ string) (any, error) {
 // key on the wire the reference never writes), and it may not stand beside a party
 // key it would contradict. Both are typed errors naming the key.
 func partyProxyLeafSuffixes(g rmattrGroup) (map[string]any, error) {
-	ts, err := splitRMAttrTails(g, partyListTails)
+	ts, err := partyTails(g, partyProxyOwnTails)
 	if err != nil {
-		return nil, err
-	}
-	if err := ts.check(g, partyProxyOwnTails, partySubTails); err != nil {
 		return nil, err
 	}
 	subtype, spelled, err := ts.ownString(g, partyProxyTypeSuffix)
@@ -364,28 +377,40 @@ var participationOwnTails = func() map[string]bool {
 	return out
 }()
 
+// participationTimeSuffix is the suffix that would carry PARTICIPATION.time,
+// the RM attribute the reference's grammar has no channel for. The key names
+// an attribute the decode knows, so it is refused rather than unmatched.
+const participationTimeSuffix = "time"
+
 // decodeRMAttrParticipation decodes one `context/_participation:N` or
 // `<entry>/_other_participation:N` instance. Both families are the same
 // PARTICIPATION grammar on two owners, so they share this decoder.
 //
 // PARTICIPATION.time is deliberately unmodelled: the reference's suffix set has
-// no channel for it and the corpus never writes one, so decode has nothing to
-// read and encode refuses a populated one loudly rather than dropping it
-// (rmattr_party_encode.go; recorded in deviations.md).
+// no channel for it and the corpus never writes one, so a `|time` key resolves
+// but has no carrier, and decode refuses it in every mode (REQ-170), as encode
+// refuses a populated one rather than dropping it (rmattr_party_encode.go;
+// recorded in deviations.md).
 func decodeRMAttrParticipation(g rmattrGroup, _ string) (any, error) {
 	// lists is nil: a participation's identifiers ride the inlined suffix
-	// spelling, so the nested `/_identifier:N` falls through to the allowlist and
-	// is refused naming the key the payload wrote.
-	ts, err := splitRMAttrTails(g, nil)
+	// spelling, so the nested `/_identifier:N` names nothing here and is
+	// unmatched content.
+	ts, err := splitRMAttrTails(g, partySubTails, nil)
 	if err != nil {
 		return nil, err
+	}
+	if _, timed := ts.own[participationTimeSuffix]; timed {
+		return nil, fmt.Errorf("%w: %q addresses PARTICIPATION.time, which the reference's suffix set has no channel for — deferred rather than dropped (REQ-140, see deviations.md)",
+			ErrUnsupportedDatatype, ts.key(g, ownTail(participationTimeSuffix)))
 	}
 	ids, err := takeInlineIdentifiers(g, ts)
 	if err != nil {
 		return nil, err
 	}
-	if err := ts.check(g, participationOwnTails, partySubTails); err != nil {
-		return nil, err
+	ts.check(g, participationOwnTails, partySubTails)
+	ts.filterSub(g, "relationship", "DV_CODED_TEXT")
+	if ts.empty() && len(ids) == 0 {
+		return nil, errNothingMatched
 	}
 	function, haveFunction, err := ts.ownString(g, "function")
 	if err != nil {
@@ -437,8 +462,8 @@ var inlineIdentifierFields = map[string]string{
 // They are taken out rather than allowlisted because the `:index` is part of the
 // suffix, so the set is unbounded; what remains in ts is what a fixed allowlist
 // can judge. An `|identifiers_id` with **no** index is left behind on purpose —
-// the reference always indexes, so the allowlist refuses it naming the key
-// instead of this function guessing slot 0.
+// the reference always indexes, so the allowlist sets it aside as unmatched
+// content instead of this function guessing slot 0.
 func takeInlineIdentifiers(g rmattrGroup, ts rmattrTails) ([]any, error) {
 	slots := make(map[int]map[string]any)
 	for _, suffix := range slices.Sorted(maps.Keys(ts.own)) {

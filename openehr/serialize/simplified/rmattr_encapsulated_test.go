@@ -149,23 +149,32 @@ func TestDVMultimediaLeafRoundTrip(t *testing.T) {
 	}
 }
 
-// TestDVMultimediaMandatorySuffixesRequired — REQ-053. `media_type` and `size`
+// TestDVMultimediaMandatorySuffixesRequired — REQ-053/REQ-170. `media_type` and `size`
 // are RM-mandatory on DV_MULTIMEDIA; a body spelling neither must not decode to
 // a zero-valued one.
 func TestDVMultimediaMandatorySuffixesRequired(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	for name, body := range map[string]map[string]any{
-		"uri alone":      {rmattrMultimedia: "http://x"},
-		"no size":        {rmattrMultimedia + "|mediatype": "image/png"},
-		"no mediatype":   {rmattrMultimedia + "|size": 1},
-		"unknown suffix": {rmattrMultimedia + "|mediatype": "image/png", rmattrMultimedia + "|size": 1, rmattrMultimedia + "|typo": "x"},
+		"uri alone":    {rmattrMultimedia: "http://x"},
+		"no size":      {rmattrMultimedia + "|mediatype": "image/png"},
+		"no mediatype": {rmattrMultimedia + "|size": 1},
 	} {
 		t.Run(name, func(t *testing.T) {
-			if err := decodeRMAttrErr(t, wt, rmattrBody(body)); !errors.Is(err, ErrUnsupportedDatatype) {
+			// A missing required suffix is malformed matched content: refused in
+			// every mode (REQ-170).
+			if err := refusedInEveryMode(t, wt, rmattrBody(body)); !errors.Is(err, ErrUnsupportedDatatype) {
 				t.Errorf("err = %v, want ErrUnsupportedDatatype", err)
 			}
 		})
 	}
+	// A suffix outside DV_MULTIMEDIA's set is unmatched content (REQ-170):
+	// ignored by default, reported, refused under strict.
+	t.Run("unknown suffix", func(t *testing.T) {
+		key := rmattrMultimedia + "|typo"
+		assertUnmatched(t, wt, rmattrBody(map[string]any{
+			rmattrMultimedia + "|mediatype": "image/png", rmattrMultimedia + "|size": 1, key: "x",
+		}), key)
+	})
 }
 
 // TestDVMultimediaRawBoundary — REQ-140. `|mediatype` carries the code alone, so
@@ -267,16 +276,14 @@ func TestDVIntervalLeafBareBound(t *testing.T) {
 	})
 }
 
-// TestDVIntervalLeafBogusSubPathRefused — REQ-053/REQ-140. The interval leaf's grammar is
-// closed: a sub-path that is neither `/lower` nor `/upper` is refused naming the
-// key rather than resolving as a Web Template child that does not exist.
+// TestDVIntervalLeafBogusSubPathRefused — REQ-053/REQ-140/REQ-170. The interval leaf's
+// grammar is closed: a sub-path that is neither `/lower` nor `/upper` is unmatched
+// content rather than a Web Template child that does not exist — ignored by
+// default, and under strict refused naming the key.
 func TestDVIntervalLeafBogusSubPathRefused(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	key := rmattrInterval + "/middle|magnitude"
-	err := decodeRMAttrErr(t, wt, rmattrBody(map[string]any{key: 1.0}))
-	if !errors.Is(err, ErrUnsupportedDatatype) {
-		t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
-	}
+	err := unmatchedStrictErr(t, wt, rmattrBody(map[string]any{key: 1.0}), key)
 	if !strings.Contains(err.Error(), key) {
 		t.Errorf("err = %v, want it to name %q", err, key)
 	}
@@ -311,7 +318,7 @@ func TestDVTextLanguageEncodingRoundTrip(t *testing.T) {
 	}
 }
 
-// TestCodePhraseMemberOwnerAdmission — REQ-140. Which owner admits which member
+// TestCodePhraseMemberOwnerAdmission — REQ-140/REQ-170. Which owner admits which member
 // is read off the RM (rminfo), not listed: `charset` reaches the two
 // DV_ENCAPSULATED subtypes, `encoding` only DV_TEXT and its coded subtype,
 // `thumbnail` only DV_MULTIMEDIA.
@@ -325,9 +332,8 @@ func TestCodePhraseMemberOwnerAdmission(t *testing.T) {
 		rmattrText + "/_charset|code",        // nor DV_TEXT a charset
 	} {
 		t.Run(key, func(t *testing.T) {
-			if err := decodeRMAttrErr(t, wt, rmattrBody(map[string]any{key: "x"})); !errors.Is(err, ErrUnknownPath) {
-				t.Errorf("err = %v, want ErrUnknownPath", err)
-			}
+			// A member the owner does not declare is unmatched content (REQ-170).
+			assertUnmatched(t, wt, rmattrBody(map[string]any{key: "x"}), key)
 		})
 	}
 }
@@ -355,7 +361,7 @@ func TestTemporalAccuracyRoundTrip(t *testing.T) {
 	}
 }
 
-// TestScalarAccuracyStaysASuffix — REQ-140. DV_QUANTITY / COUNT / DURATION /
+// TestScalarAccuracyStaysASuffix — REQ-140/REQ-170. DV_QUANTITY / COUNT / DURATION /
 // PROPORTION declare `accuracy` as a Real, which the `|accuracy` suffix already
 // carries — so the `_accuracy` family must not be admitted there, or one
 // attribute would have two spellings.
@@ -367,9 +373,8 @@ func TestScalarAccuracyStaysASuffix(t *testing.T) {
 		rmattrProportion + "/_accuracy",
 	} {
 		t.Run(key, func(t *testing.T) {
-			if err := decodeRMAttrErr(t, wt, rmattrBody(map[string]any{key: "P1D"})); !errors.Is(err, ErrUnknownPath) {
-				t.Errorf("err = %v, want ErrUnknownPath", err)
-			}
+			// The family names nothing at these owners: unmatched content (REQ-170).
+			assertUnmatched(t, wt, rmattrBody(map[string]any{key: "P1D"}), key)
 		})
 	}
 }

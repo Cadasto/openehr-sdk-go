@@ -17,13 +17,17 @@ const minDecodedCorpusBodies = 24
 
 // TestREQ053_REQ112_DecodedCorpusPassesRMFloor decodes every body of the
 // upstream FLAT corpus as written, with the template attached, and requires
-// each one that decodes to pass the RM floor (REQ-112). FLAT has no key for
-// archetype_details, so the floor's archetype-root rule holds only if decode
-// rebuilds it from the Web Template (REQ-053).
+// each one that decodes whole to pass the RM floor (REQ-112). FLAT has no key
+// for archetype_details, so the floor's archetype-root rule holds only if
+// decode rebuilds it from the Web Template (REQ-053).
 //
-// A body the codec refuses is not this test's concern: PROBE-086 counts those
-// refusals. What is asserted is that a successful decode never yields a
-// composition the SDK's own floor rejects.
+// The decode is strict, so a body carrying unmatched content (REQ-170) is
+// refused rather than decoded without it: what is left of such a body can be
+// a node whose only data the codec does not read (the CLUSTER of
+// `ehrbase_conformance_cluster`, whose one item has no Web Template node), and
+// that says nothing about decode. A body the codec refuses is not this test's
+// concern: PROBE-086 counts those keys. What is asserted is that a body the
+// codec reads whole never yields a composition the SDK's own floor rejects.
 func TestREQ053_REQ112_DecodedCorpusPassesRMFloor(t *testing.T) {
 	target, err := conformance.NewTarget()
 	if err != nil {
@@ -40,7 +44,7 @@ func TestREQ053_REQ112_DecodedCorpusPassesRMFloor(t *testing.T) {
 		if err != nil {
 			t.Fatalf("read %s: %v", c.Name, err)
 		}
-		comp, err := simplified.UnmarshalFlat(raw, target.Web, simplified.WithTemplate(target.Compiled))
+		comp, err := simplified.UnmarshalFlat(raw, target.Web, simplified.WithTemplate(target.Compiled), simplified.WithStrict())
 		if err != nil {
 			continue
 		}

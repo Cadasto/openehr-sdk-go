@@ -62,6 +62,10 @@ func (b *allocBudget) add(k int) error {
 // node's id, rm_version is [rm.Release], and the COMPOSITION alone also
 // gets the Web Template's template id. Whatever the original composition
 // held there is not recovered.
+//
+// A key the decode does not read is ignored by default, and the value holds
+// the rest of the body. [WithUnmatched] reports each such key and
+// [WithStrict] refuses the first, wrapping [ErrUnknownPath].
 func UnmarshalFlat(data []byte, wt *webtemplate.WebTemplate, opts ...Option) (*rm.Composition, error) {
 	if wt == nil || wt.Tree == nil {
 		return nil, ErrNoTemplate
@@ -71,11 +75,30 @@ func UnmarshalFlat(data []byte, wt *webtemplate.WebTemplate, opts ...Option) (*r
 		return nil, err
 	}
 	cfg := newDecodeConfig(opts)
+	var loc locator
+	if cfg.tracked() {
+		if loc, err = flatLocations(data); err != nil {
+			return nil, err
+		}
+	}
+	return decodeFlatMap(flat, wt, cfg, loc)
+}
+
+// decodeFlatMap is the decode both entry points share once the body is a FLAT
+// map: it decodes the map without its unmatched keys, applies the caller's
+// policy for them (loc places each key in the input), and builds the
+// COMPOSITION through canjson.
+func decodeFlatMap(flat map[string]any, wt *webtemplate.WebTemplate, cfg decodeConfig, loc locator) (*rm.Composition, error) {
 	var names map[string]string
 	if cfg.template != nil {
 		names = buildNameIndex(cfg.template)
 	}
-	compJSON, err := decodeFlat(flat, wt, names)
+	compJSON, unmatched, err := decodeFlatIgnoring(flat, wt, names)
+	if cfg.strict {
+		if refusal := applyUnmatchedPolicy(cfg, loc, unmatched); refusal != nil {
+			return nil, refusal
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -87,13 +110,21 @@ func UnmarshalFlat(data []byte, wt *webtemplate.WebTemplate, opts ...Option) (*r
 	if err := canjson.Unmarshal(b, &comp); err != nil {
 		return nil, err
 	}
+	if !cfg.strict {
+		// The report waits for the decode to succeed, so a decode that fails
+		// passes the caller nothing.
+		if err := applyUnmatchedPolicy(cfg, loc, unmatched); err != nil {
+			return nil, err
+		}
+	}
 	return &comp, nil
 }
 
 // decodeFlat builds the canonical-JSON object for the COMPOSITION from the
 // FLAT map, driven by the Web Template. names (optional; nil unless a template
-// was supplied) maps a node's compiled aqlPath to its LOCATABLE.name.
-func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[string]string) (map[string]any, error) {
+// was supplied) maps a node's compiled aqlPath to its LOCATABLE.name. Every
+// key it does not read goes to sink, and the decode carries on without it.
+func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[string]string, sink *unmatchedSink) (map[string]any, error) {
 	root := wt.Tree
 	compJSON := map[string]any{
 		"_type":             "COMPOSITION",
@@ -102,7 +133,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	}
 	// Separate composition-level context from clinical content; context is
 	// rebuilt from RM attributes, not from a Web Template leaf path.
-	ctx, ctxOrigin, content, err := siphonContext(flat, root.ID)
+	ctx, ctxOrigin, content, err := siphonContext(flat, root.ID, sink)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +150,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	// grammar has. It has to run before the `_` router, which would otherwise claim
 	// `subject/_identifier:0` as a family whose owner is a leaf the grammar cannot
 	// judge.
-	compositeGroups, err := compositeLeafGroups(content, wt)
+	compositeGroups, err := compositeLeafGroups(content, wt, sink)
 	if err != nil {
 		return nil, err
 	}
@@ -128,40 +159,55 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	// before it, so those keys are grouped per (owner path, family, :index) and
 	// routed by the owner's RM class instead of resolving to a leaf. What stays
 	// in content is ordinary template-constrained leaf data.
-	attrGroups, attrIndexes, err := rmattrGroups(content)
+	attrGroups, err := rmattrGroups(content, sink)
 	if err != nil {
 		return nil, err
 	}
 	// Group the remaining FLAT keys by leaf instance (key minus the |suffix);
-	// each group's suffix->value pairs build one DataValue.
+	// each group's suffix->value pairs build one DataValue. keys keeps the key
+	// each suffix arrived under, which is the one an unmatched suffix reports.
 	groups := make(map[string]map[string]any)
+	keys := make(map[string]map[string]string)
 	for key, val := range content {
 		base, suffix := splitSuffix(key)
 		if groups[base] == nil {
 			groups[base] = make(map[string]any)
+			keys[base] = make(map[string]string)
 		}
 		groups[base][suffix] = val
+		keys[base][suffix] = key
 	}
 	// Process leaf groups in a stable (sorted) order so the reconstructed tree
 	// is deterministic: distinct-node-id siblings with no explicit :index
 	// (e.g. multiple content items, or elements under one ITEM_TREE) are
 	// appended in this order, which must not depend on Go map iteration.
 	for _, base := range slices.Sorted(maps.Keys(groups)) {
-		sfx := groups[base]
+		keyOf := func(suffix string) string { return keys[base][suffix] }
 		pk, err := parseFlatKey(base)
 		if err != nil {
 			return nil, err
 		}
 		leaf, predIndex, predType, err := resolveLeaf(wt, pk.segs, ambiguous)
 		if errors.Is(err, errSegNotFound) {
-			// A key that does not resolve to a WT node is a wrong template, a
-			// typo, or an unsupported _-prefixed RM attribute (see deviations.md
-			// — ctx/ is siphoned off above and |raw is a suffix, so neither
-			// reaches this branch). Fail loudly, never drop silently (REQ-053).
-			return nil, fmt.Errorf("%w: %q", ErrUnknownPath, base)
+			// A key that does not resolve to a Web Template node is a wrong
+			// template, a typo, or an unsupported _-prefixed RM attribute (ctx/
+			// is siphoned off above and |raw is a suffix, so neither reaches this
+			// branch): unmatched content, which the decode does not read
+			// (REQ-170).
+			for _, suffix := range slices.Sorted(maps.Keys(groups[base])) {
+				sink.add(keyOf(suffix))
+			}
+			continue
 		}
 		if err != nil {
 			return nil, fmt.Errorf("simplified: %q: %w", base, err)
+		}
+		sfx, err := leafSuffixes(leaf, groups[base], keyOf, sink)
+		if err != nil {
+			return nil, err
+		}
+		if len(sfx) == 0 {
+			continue
 		}
 		dv, err := leafFromSuffixes(nodeRMType(leaf), leafListOpen(leaf), sfx)
 		if err != nil {
@@ -181,17 +227,8 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	// Underscore RM attributes come after the clinical leaves, so their owners
 	// are decorated onto nodes the content walk has already materialised rather
 	// than gap-filling their own (REQ-140).
-	for _, g := range attrGroups {
-		owner, err := rmattrOwnerAt(wt, compJSON, g.base, ambiguous, budget, names)
-		if errors.Is(err, errSegNotFound) {
-			return nil, fmt.Errorf("%w: %q", ErrUnknownPath, g.prefix())
-		}
-		if err != nil {
-			return nil, fmt.Errorf("simplified: %q: %w", g.prefix(), err)
-		}
-		if err := rmattrDecode(owner, g, attrIndexes[g.base+"\x00"+g.family], budget); err != nil {
-			return nil, err
-		}
+	if err := decodeRMAttrGroups(compJSON, wt, attrGroups, ambiguous, budget, names); err != nil {
+		return nil, err
 	}
 	// Every key is placed, so each rebuilt ISM transition can now get the careflow
 	// step its node names, or have the body's checked against it (REQ-053).
@@ -205,7 +242,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 		return nil, err
 	}
 	// Context: parse once, then apply (with the mandatory-field check) after
-	// content, so an unresolvable content key surfaces as ErrUnknownPath first.
+	// content, so a refused content key surfaces first.
 	ci, err := parseCtx(ctx, ctxOrigin)
 	if err != nil {
 		return nil, err
@@ -223,6 +260,49 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	// alone holds what it records (REQ-053).
 	rebuildArchetypeDetails(compJSON, wt)
 	return compJSON, nil
+}
+
+// leafSuffixes returns the suffixes of one leaf group that the decode reads,
+// handing the key of every other one to sink (REQ-170). keyOf gives the key a
+// suffix arrived under.
+//
+//   - A node with children is structure, not a value: the decode reads a |raw
+//     fragment there and nothing else, so every other key is unmatched (an
+//     INTERVAL_EVENT `|sample_count` the Web Template has no node for, say).
+//   - A leaf whose datatype has a suffix set keeps the suffixes in that set
+//     ([leafSuffixMatched]); the rest are unmatched.
+//   - A leaf whose datatype has no suffix set resolves but has no carrier
+//     other than |raw, the composer's PARTY_PROXY among them, so any other key
+//     there is refused in every mode, naming the first such key.
+func leafSuffixes(leaf *webtemplate.Node, sfx map[string]any, keyOf func(string) string, sink *unmatchedSink) (map[string]any, error) {
+	if len(leaf.Children) > 0 {
+		var out map[string]any
+		for _, suffix := range slices.Sorted(maps.Keys(sfx)) {
+			if suffix == "raw" {
+				continue
+			}
+			if out == nil {
+				out = maps.Clone(sfx)
+			}
+			delete(out, suffix)
+			sink.add(keyOf(suffix))
+		}
+		if out == nil {
+			return sfx, nil
+		}
+		return out, nil
+	}
+	rmType := nodeRMType(leaf)
+	if _, judged := leafSuffixMatched(rmType, ""); judged {
+		return matchedSuffixes(rmType, sfx, keyOf, sink), nil
+	}
+	if _, raw := sfx["raw"]; raw {
+		// |raw is the carrier of an unmapped datatype; dvFromSuffixes refuses it
+		// beside any other suffix.
+		return sfx, nil
+	}
+	first := slices.Sorted(maps.Keys(sfx))[0]
+	return nil, fmt.Errorf("simplified: decode %q: %w: %s", keyOf(first), ErrUnsupportedDatatype, rmType)
 }
 
 // metadataAliases maps the reference implementation's real-path spelling of
@@ -293,7 +373,9 @@ var metadataAliasTerminology = map[string]string{
 // outright: the Web Template carries a node for them, so an unaccepted spelling
 // would resolve as an ordinary leaf and then be silently overwritten by
 // [applyContext], which writes the ctx/ values last. Refusing every other
-// spelling of these two bases in [siphonContext] is what keeps that unreachable.
+// spelling of these two bases that their datatype has, in [siphonContext], is
+// what keeps that unreachable; a suffix their datatype does not have is
+// unmatched content and is never placed.
 //
 // Only these two. `language`, `territory` and `composer` are deliberately absent:
 // the composer external_ref suffixes (`composer|id` / `|id_scheme` /
@@ -309,6 +391,23 @@ var contextMetaOwnedBases = map[string]bool{
 // refusal points at the spelling the payload should have used.
 var metadataOwnedBaseCtx = map[string]string{
 	"context/setting": "ctx/setting|code + ctx/setting|value", "context/start_time": "ctx/time",
+}
+
+// metadataOwnedBaseType is the RM type of each ctx/-owned base, EVENT_CONTEXT's
+// own attribute type, whether or not the template carries a node for it. A
+// suffix in that type's suffix set is one the decode reads, and the ctx/ form
+// cannot carry it; any other suffix is unmatched content (REQ-170).
+var metadataOwnedBaseType = map[string]string{
+	"context/setting": "DV_CODED_TEXT", "context/start_time": "DV_DATE_TIME",
+}
+
+// ctxFields are the ctx/ keys the decode reads (REQ-053). Any other ctx/ key
+// is unmatched content (REQ-170).
+var ctxFields = map[string]bool{
+	"ctx/language": true, "ctx/territory": true,
+	"ctx/composer_name": true, "ctx/composer_self": true,
+	"ctx/time":         true,
+	"ctx/setting|code": true, "ctx/setting|value": true,
 }
 
 // metadataSegPaths are the root-relative segment paths the metadata spellings
@@ -521,7 +620,10 @@ func MetadataWitnessSpellings() []string {
 // A real path that contradicts an explicit ctx/ entry is an error rather than a
 // precedence rule: preferring either silently would corrupt composition
 // metadata, the same stance the codec already takes on an index collision.
-func siphonContext(flat map[string]any, rootID string) (ctx map[string]any, ctxOrigin map[string]string, content map[string]any, err error) {
+//
+// A ctx/ field the decode does not read, and a suffix of a ctx/-owned leaf
+// outside that leaf's datatype, go to sink as unmatched content (REQ-170).
+func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx map[string]any, ctxOrigin map[string]string, content map[string]any, err error) {
 	ctx, ctxOrigin, content = make(map[string]any), make(map[string]string), make(map[string]any)
 	// Sorted so a body carrying two conflicting real-path spellings reports the
 	// same key first on every run — a map-order-dependent error message is not
@@ -529,6 +631,10 @@ func siphonContext(flat map[string]any, rootID string) (ctx map[string]any, ctxO
 	for _, key := range slices.Sorted(maps.Keys(flat)) {
 		val := flat[key]
 		if strings.HasPrefix(key, "ctx/") {
+			if !ctxFields[key] {
+				sink.add(key)
+				continue
+			}
 			if err := putCtx(ctx, ctxOrigin, key, val, key); err != nil {
 				return nil, nil, nil, err
 			}
@@ -579,7 +685,13 @@ func siphonContext(flat map[string]any, rootID string) (ctx map[string]any, ctxO
 		// checked witness, or refused here naming the key (REQ-053) — the
 		// composer external_ref suffixes stay out of this set deliberately, so
 		// they keep flowing to decode and stay visible in the PROBE-086 census.
-		if base, _, _ := strings.Cut(rel, "|"); contextMetaOwnedBases[base] {
+		// A suffix the leaf's datatype does not have at all is not such a
+		// spelling: the decode does not read it, so it is unmatched (REQ-170).
+		if base, suffix, _ := strings.Cut(rel, "|"); contextMetaOwnedBases[base] {
+			if matched, _ := leafSuffixMatched(metadataOwnedBaseType[base], suffix); !matched {
+				sink.add(key)
+				continue
+			}
 			return nil, nil, nil, fmt.Errorf("%w: %s is not a spelling the ctx/ short form can carry — %q owns this leaf, so only its accepted suffixes travel (see deviations.md)",
 				ErrUnsupportedDatatype, key, metadataOwnedBaseCtx[base])
 		}
@@ -679,8 +791,9 @@ type ctxInfo struct {
 	haveSettingCode, haveSettingValue bool
 }
 
-// parseCtx decodes the ctx/ entries. Only the core context fields are supported;
-// any other ctx/ field is ErrUnknownPath (see deviations.md). Values of the
+// parseCtx decodes the ctx/ entries. Only the core context fields reach it:
+// [siphonContext] sets every other ctx/ field aside as unmatched content
+// ([ctxFields]), so the default arm is a broken invariant. Values of the
 // wrong JSON type are rejected — coercing them would silently corrupt
 // composition metadata (e.g. a numeric composer_name becoming an empty
 // PARTY_IDENTIFIED name). origin (from [siphonContext]) names the body key each
@@ -717,7 +830,7 @@ func parseCtx(ctx map[string]any, origin map[string]string) (ctxInfo, error) {
 			ci.settingValue, err = ctxString(label, val)
 			ci.haveSettingValue = true
 		default:
-			err = fmt.Errorf("%w: %q (context field not supported — see deviations.md)", ErrUnknownPath, key)
+			err = fmt.Errorf("simplified: %q reached the ctx/ parser, which reads only the fields in ctxFields", key)
 		}
 		if err != nil {
 			return ci, err
@@ -1361,8 +1474,9 @@ func definingCodeOf(v any) map[string]any {
 // party / interval grammars decode it with no second mechanism (REQ-140 design
 // constraint 5).
 //
-// Keys are consumed from content: what stays behind is ordinary leaf data.
-func compositeLeafGroups(content map[string]any, wt *webtemplate.WebTemplate) ([]rmattrGroup, error) {
+// Keys are consumed from content: what stays behind is ordinary leaf data. Each
+// group carries sink, which takes the keys its grammar does not read.
+func compositeLeafGroups(content map[string]any, wt *webtemplate.WebTemplate, sink *unmatchedSink) ([]rmattrGroup, error) {
 	byLeaf := make(map[string]*rmattrGroup)
 	for _, key := range slices.Sorted(maps.Keys(content)) {
 		pk, err := parseFlatKey(key)
@@ -1378,10 +1492,10 @@ func compositeLeafGroups(content map[string]any, wt *webtemplate.WebTemplate) ([
 		id := base + "\x00" + family + "\x00" + strconv.Itoa(index)
 		g := byLeaf[id]
 		if g == nil {
-			g = &rmattrGroup{base: base, family: family, index: index, tails: make(map[string]any)}
+			g = newRMAttrGroup(base, family, index, sink)
 			byLeaf[id] = g
 		}
-		g.tails[tail] = val
+		g.put(tail, val, key)
 	}
 	groups := make([]rmattrGroup, 0, len(byLeaf))
 	for _, g := range byLeaf {
@@ -1511,6 +1625,9 @@ func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g 
 		return fmt.Errorf("simplified: %q: %w", g.prefix(), err)
 	}
 	value, err := compositeLeafValue(g, nodeRMType(node))
+	if errors.Is(err, errNothingMatched) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}

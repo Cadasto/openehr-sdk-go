@@ -7,11 +7,70 @@ import (
 )
 
 // Option configures a decode (UnmarshalFlat / UnmarshalStructured).
+// [WithTemplate] supplies the compiled template; [WithUnmatched] and
+// [WithStrict] say what happens to input the decode does not read.
 type Option func(*decodeConfig)
 
 // decodeConfig holds the resolved decode options.
 type decodeConfig struct {
-	template *templatecompile.Compiled
+	template  *templatecompile.Compiled
+	unmatched func(path string)
+	strict    bool
+}
+
+// WithUnmatched passes every unmatched item of the input to fn while the
+// decode carries on. An item is unmatched when the decode does not read it:
+// a key whose path the Web Template does not resolve, an underscore-prefixed
+// segment that names no RM attribute this codec carries at that node, a
+// suffix outside the suffix set of its datatype (or of its underscore
+// family), and a `ctx/` field this codec does not read. A key the decode
+// reads is never unmatched, even where the decode then refuses it: the
+// composer's `external_ref` suffixes and party sub-structure, a PARTICIPATION
+// `time`, a FEEDER_AUDIT_DETAILS `other_details`, `_instruction_details`,
+// `_wf_definition`, and any malformed value, missing required suffix,
+// disagreeing pair of spellings or index past its bound fail the decode in
+// every mode.
+//
+// By default the decoder ignores unmatched content: the value it returns
+// holds the rest of the input and none of it. With this option fn receives
+// each item, once, in the order it appears in the input, and the value
+// returned is the same as without the option.
+//
+// fn gets the item's path. For FLAT that is the key as written, such as
+// "vital_signs/body_temperature:0/any_event:0/temperature|x-note". For
+// STRUCTURED it is the path of members from the root, joined by "/", with
+// the position of each array element as its own segment, counting from 0:
+// "vital_signs/body_temperature/0/any_event/0/temperature/0/|x-note", or
+// "ctx/x-flag" for a field of the ctx object. The path carries names only,
+// never a value from the input. fn runs on the caller's goroutine, after the
+// decode has read the whole input and only when the decode succeeds.
+//
+// A nil fn is the same as leaving the option out. Combined with
+// [WithStrict], fn sees the first unmatched item before the decode is
+// refused.
+func WithUnmatched(fn func(path string)) Option {
+	return func(cfg *decodeConfig) { cfg.unmatched = fn }
+}
+
+// WithStrict refuses the decode at its first unmatched item (see
+// [WithUnmatched] for what is unmatched and for the form of its path), the
+// first in the order the input gives. The error wraps [ErrUnknownPath] and
+// names the item's path, quoted; it carries none of the item's value.
+//
+// Strict covers unmatched content only. An absent key is never refused,
+// mandatory or not, and neither is a boundary flag an interval leaves out.
+// The keys the decode reads but refuses (see [WithUnmatched]) fail in every
+// mode, so a body holding one of them can fail on it before strict refuses
+// its unmatched content.
+//
+// By default the decoder ignores unmatched content.
+func WithStrict() Option {
+	return func(cfg *decodeConfig) { cfg.strict = true }
+}
+
+// tracked reports whether the decode reports or refuses unmatched content.
+func (c decodeConfig) tracked() bool {
+	return c.unmatched != nil || c.strict
 }
 
 // WithTemplate supplies the compiled template, switching decode into
@@ -58,35 +117,38 @@ var (
 	// conversion that needs one to resolve identifiers, types, and level
 	// removal.
 	ErrNoTemplate = errors.New("simplified: nil web template")
-	// ErrUnknownPath is returned when a FLAT/STRUCTURED key is unresolvable or
-	// structurally inadmissible.
+	// ErrUnknownPath is returned when a FLAT/STRUCTURED key is unmatched and
+	// the decode is strict, or when a key the decode reads cannot be placed.
 	//
-	// Unresolvable means the key does not name a Web Template node (a typo, a
-	// wrong template, an unsupported ctx/ field); or it names an
-	// underscore-prefixed RM attribute family this codec does not carry, or one
-	// the owning node's RM class does not declare (the grammar is typed by the
-	// owner, so `_work_flow_id` on a SECTION is as unresolvable as a misspelled
-	// segment); or it cannot be placed faithfully (an invalid, out-of-bound or
-	// sparse :index, including on a `_family:N` list, a slot conflict between
-	// two keys, or the decoded-node budget).
+	// Under [WithStrict] the first unmatched item refuses the decode with an
+	// error that wraps this sentinel and names the item (see [WithUnmatched]).
+	// By default unmatched content is ignored and never returns it.
 	//
-	// Inadmissible means every key resolves but the set of them cannot be
-	// honoured at once: two accepted spellings of one composition-metadata
-	// field that disagree, ctx/composer_self beside a composer name (mutually
-	// exclusive representations of one RM attribute), or two spellings of one
-	// single-valued underscore attribute. The codec fails rather than dropping
-	// the entry or inventing a precedence rule.
+	// In every mode it is returned for a key that cannot be placed faithfully
+	// (an invalid, out-of-bound or sparse :index, including on a `_family:N`
+	// list, an index past :0 on a single-valued attribute, a slot conflict
+	// between two keys, a key that walks through one of several reused
+	// siblings, or the decoded-node budget), and for keys that each resolve
+	// but cannot be honoured at once: two accepted spellings of one
+	// composition-metadata field that disagree, ctx/composer_self beside a
+	// composer name (mutually exclusive representations of one RM attribute),
+	// or two spellings of one single-valued underscore attribute. The codec
+	// fails rather than dropping the entry or inventing a precedence rule. The
+	// two deferred underscore families, `_instruction_details` and
+	// `_wf_definition`, return it in every mode too.
 	ErrUnknownPath = errors.New("simplified: path not in web template")
 	// ErrUnsupportedDatatype is returned when a leaf's RM datatype is not mapped
 	// to/from a FLAT suffix set and cannot ride |raw, when a suffix or ctx/
 	// value is not valid for its slot, when a |raw / |other suffix is
-	// misused, or when an underscore-prefixed RM attribute family
-	// carries a key outside its grammar, is missing an RM-mandatory one, or
-	// holds a value the family's suffixes cannot express (a coded LINK.meaning,
-	// a decorated `context/_end_time`, an OBJECT_REF id that is neither
-	// GENERIC_ID nor HIER_OBJECT_ID). Those families have no |raw carrier, so
-	// there is nothing to fall back to. The codec fails rather than silently
-	// omitting or mistyping a value.
+	// misused, when a key the decode reads has no carrier (the composer's
+	// `external_ref` suffixes and party sub-structure, a PARTICIPATION `time`,
+	// a FEEDER_AUDIT_DETAILS `other_details`), or when an underscore-prefixed
+	// RM attribute family is missing an RM-mandatory key or holds a value the
+	// family's suffixes cannot express (a coded LINK.meaning, a decorated
+	// `context/_end_time`, an OBJECT_REF id that is neither GENERIC_ID nor
+	// HIER_OBJECT_ID). Those families have no |raw carrier, so there is
+	// nothing to fall back to. The codec fails rather than silently omitting
+	// or mistyping a value.
 	ErrUnsupportedDatatype = errors.New("simplified: unsupported datatype")
 	// ErrMissingContext is returned when mandatory context (ctx/language,
 	// ctx/territory) is absent on decode.

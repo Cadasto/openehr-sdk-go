@@ -454,11 +454,20 @@ type Probe089Refusal struct {
 	// the citation that says why it is refused where a boundary decision owns
 	// it.
 	Names []string
+	// Unmatched marks keys the codec does not read at all, unmatched content
+	// (REQ-170): the default decode ignores them and the report option names
+	// each, so the refusal is asserted under simplified.WithStrict. Every other
+	// case is a key the codec reads and refuses, so it must fail by default,
+	// under the report option and under strict alike.
+	Unmatched bool
 }
 
-// Probe089Refusals are the grammar's deliberate exclusions. Each one must fail
-// on decode, so a decode-and-drop satisfies no assertion here: these are the
-// shapes a permissive codec loses silently.
+// Probe089Refusals are the grammar's deliberate exclusions. Each one the codec
+// reads must fail on decode in every mode, so a decode-and-drop satisfies no
+// assertion here: these are the shapes a permissive codec loses silently. A
+// key the codec does not read at all is the one exception: it is unmatched
+// content, ignored by default, reported on request and refused under strict
+// (REQ-170).
 var Probe089Refusals = []Probe089Refusal{
 	{
 		// ADR 0015: no `ctx/` short form can carry the composer's external_ref,
@@ -515,11 +524,13 @@ var Probe089Refusals = []Probe089Refusal{
 	{
 		// Not a family at all. `_identifier:N` is reached only *inside* a party,
 		// so an ENTRY owner names no family — and a typo must not be mistaken
-		// for one.
-		Name:  "unknown_family",
-		Keys:  map[string]any{probe089Obs + "/_nonsense|id": "x"},
-		Want:  simplified.ErrUnknownPath,
-		Names: []string{probe089Obs + "/_nonsense"},
+		// for one. The codec does not read it, so it is unmatched content
+		// (REQ-170): refused under strict, ignored and reported by default.
+		Name:      "unknown_family",
+		Keys:      map[string]any{probe089Obs + "/_nonsense|id": "x"},
+		Want:      simplified.ErrUnknownPath,
+		Names:     []string{probe089Obs + "/_nonsense|id"},
+		Unmatched: true,
 	},
 }
 
@@ -658,9 +669,13 @@ func Probe089UnderscoreRoundTrip(target *conformance.Target, c Probe089Case) (Re
 
 // Probe089RefusedFamilies runs leg (c) for one deliberate refusal: the body
 // must fail to decode, with the sentinel the boundary declares and a message
-// naming the offending key. A successful decode is a failure however faithful
-// the rest of the body is, because that is the forbidden decode-and-drop.
-func Probe089RefusedFamilies(target *conformance.Target, ref Probe089Refusal) (Result, error) { // PROBE-089 (REQ-053, REQ-080, REQ-140)
+// naming the offending key. A key the codec reads must fail by default, under
+// the report option (which then reports nothing) and under strict: a
+// successful decode is a failure however faithful the rest of the body is,
+// because that is the forbidden decode-and-drop. A key marked Unmatched must
+// instead decode by default, be reported, each key once, and fail under strict
+// (REQ-170).
+func Probe089RefusedFamilies(target *conformance.Target, ref Probe089Refusal) (Result, error) { // PROBE-089 (REQ-053, REQ-080, REQ-140, REQ-170)
 	r := Result{Probe: "PROBE-089"}
 	if target == nil || target.Web == nil {
 		return r, errors.New("PROBE-089: nil target")
@@ -672,24 +687,51 @@ func Probe089RefusedFamilies(target *conformance.Target, ref Probe089Refusal) (R
 	if err != nil {
 		return r, fmt.Errorf("PROBE-089: refusal %q: marshal fixture: %w", ref.Name, err)
 	}
-	comp, err := simplified.UnmarshalFlat(body, target.Web)
-	if err == nil {
-		r.Status = "fail"
-		r.Detail = fmt.Sprintf("%s: decoded without error (%d content items) — a deliberate exclusion MUST refuse, not decode and drop",
-			ref.Name, len(comp.Content))
-		return r, nil
+	var reported []string
+	report := simplified.WithUnmatched(func(key string) { reported = append(reported, key) })
+	type mode struct {
+		name string
+		opts []simplified.Option
 	}
-	if !errors.Is(err, ref.Want) {
-		r.Status, r.Detail = "fail", fmt.Sprintf("%s: err = %v, want %v", ref.Name, err, ref.Want)
-		return r, nil
-	}
-	for _, want := range ref.Names {
-		if !strings.Contains(err.Error(), want) {
-			r.Status, r.Detail = "fail", fmt.Sprintf("%s: err = %v, want it to name %q", ref.Name, err, want)
+	modes := []mode{{"strict", []simplified.Option{simplified.WithStrict()}}}
+	if ref.Unmatched {
+		if _, err := simplified.UnmarshalFlat(body, target.Web, report); err != nil {
+			r.Status, r.Detail = "fail", fmt.Sprintf("%s: default decode failed: %v — unmatched content MUST be ignored by default", ref.Name, err)
 			return r, nil
 		}
+		if want := slices.Sorted(maps.Keys(ref.Keys)); !slices.Equal(reported, want) {
+			r.Status, r.Detail = "fail", fmt.Sprintf("%s: reported %q, want %q", ref.Name, reported, want)
+			return r, nil
+		}
+	} else {
+		modes = append(modes, mode{"default", nil}, mode{"report", []simplified.Option{report}})
 	}
-	r.Status, r.Detail = "pass", fmt.Sprintf("%s refused: %v", ref.Name, err)
+	var refusal error
+	for _, m := range modes {
+		comp, err := simplified.UnmarshalFlat(body, target.Web, m.opts...)
+		if err == nil {
+			r.Status = "fail"
+			r.Detail = fmt.Sprintf("%s: %s decode succeeded (%d content items) — a deliberate exclusion MUST refuse, not decode and drop",
+				ref.Name, m.name, len(comp.Content))
+			return r, nil
+		}
+		if !errors.Is(err, ref.Want) {
+			r.Status, r.Detail = "fail", fmt.Sprintf("%s: %s err = %v, want %v", ref.Name, m.name, err, ref.Want)
+			return r, nil
+		}
+		for _, want := range ref.Names {
+			if !strings.Contains(err.Error(), want) {
+				r.Status, r.Detail = "fail", fmt.Sprintf("%s: %s err = %v, want it to name %q", ref.Name, m.name, err, want)
+				return r, nil
+			}
+		}
+		refusal = err
+	}
+	if !ref.Unmatched && len(reported) != 0 {
+		r.Status, r.Detail = "fail", fmt.Sprintf("%s: reported %q as unmatched, but the codec reads the key", ref.Name, reported)
+		return r, nil
+	}
+	r.Status, r.Detail = "pass", fmt.Sprintf("%s refused: %v", ref.Name, refusal)
 	return r, nil
 }
 

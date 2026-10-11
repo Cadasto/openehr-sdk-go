@@ -157,20 +157,23 @@ func TestStringLeafDecodesBareValue(t *testing.T) {
 	}
 }
 
-// TestStringLeafRefusesSuffixes — REQ-053, REQ-140. The STRING leaf is "bare
-// value only", so a suffix there, |raw included, is a typed refusal rather
-// than a silent drop.
+// TestStringLeafRefusesSuffixes — REQ-053, REQ-140, REQ-170. The STRING leaf
+// is "bare value only", so a suffix there, |raw included, is outside its suffix
+// set: unmatched content, ignored by default and refused under strict with
+// ErrUnknownPath naming the key.
 func TestStringLeafRefusesSuffixes(t *testing.T) {
-	for name, extra := range map[string]map[string]any{
-		"|value alone":         {stringLeafKey + "|value": stringLeafValue},
-		"|raw alone":           {stringLeafKey + "|raw": map[string]any{"_type": "STRING", "value": stringLeafValue}},
-		"bare value and |code": {stringLeafKey: stringLeafValue, stringLeafKey + "|code": "x"},
+	for name, tc := range map[string]struct {
+		extra     map[string]any
+		unmatched string
+	}{
+		"|value alone":         {map[string]any{stringLeafKey + "|value": stringLeafValue}, stringLeafKey + "|value"},
+		"|raw alone":           {map[string]any{stringLeafKey + "|raw": map[string]any{"_type": "STRING", "value": stringLeafValue}}, stringLeafKey + "|raw"},
+		"bare value and |code": {map[string]any{stringLeafKey: stringLeafValue, stringLeafKey + "|code": "x"}, stringLeafKey + "|code"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, err := UnmarshalFlat(stringLeafBody(extra), stringLeafWT())
-			if !errors.Is(err, ErrUnsupportedDatatype) {
-				t.Errorf("UnmarshalFlat = %v, want ErrUnsupportedDatatype", err)
-			}
+			body := map[string]any{"ctx/language": "en", "ctx/territory": "NL"}
+			maps.Copy(body, tc.extra)
+			assertUnmatched(t, stringLeafWT(), body, tc.unmatched)
 		})
 	}
 }
