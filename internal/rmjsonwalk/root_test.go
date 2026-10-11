@@ -8,9 +8,12 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
 
-// callerStruct is a caller's own type with a member named like an extension.
+// callerStruct is a caller's own type with a member named like an extension,
+// holding an RM value.
 type callerStruct struct {
-	X string `json:"x-a"`
+	X    string          `json:"x-a"`
+	Text rm.DVText       `json:"text"`
+	Comp *rm.Composition `json:"composition"`
 }
 
 // TestREQ170_RootOfReadsTheTargetsRMShape pins what a decode target says
@@ -35,16 +38,23 @@ func TestREQ170_RootOfReadsTheTargetsRMShape(t *testing.T) {
 		{name: "map", target: new(map[string]rm.DVText), want: rmjsonwalk.Root{Nest: "{", Type: "DV_TEXT"}, ok: true},
 		{name: "map of slices of pointers", target: new(map[string][]*rm.DVText), want: rmjsonwalk.Root{Nest: "{[", Type: "DV_TEXT"}, ok: true},
 		{name: "generic bound to a class", target: new(rm.DVInterval[rm.DVQuantity]), want: rmjsonwalk.Root{Type: "DV_INTERVAL", Bound: "DV_QUANTITY"}, ok: true},
-		{name: "generic bound to an abstract interface", target: new(rm.DVInterval[rm.DVOrdered]), want: rmjsonwalk.Root{Type: "DV_INTERVAL"}, ok: true},
+		{name: "generic bound to an abstract interface", target: new(rm.DVInterval[rm.DVOrdered]), want: rmjsonwalk.Root{Type: "DV_INTERVAL", Bound: "DV_ORDERED"}, ok: true},
 		{name: "generic payload bound to a class", target: new(rm.OriginalVersion[rm.Composition]), want: rmjsonwalk.Root{Type: "ORIGINAL_VERSION", Bound: "COMPOSITION"}, ok: true},
+		{name: "generic payload bound to a class pointer", target: new(rm.OriginalVersion[*rm.Composition]), want: rmjsonwalk.Root{Type: "ORIGINAL_VERSION", Bound: "COMPOSITION"}, ok: true},
+		{name: "generic payload bound to an abstract interface", target: new(rm.OriginalVersion[rm.DataValue]), want: rmjsonwalk.Root{Type: "ORIGINAL_VERSION", Bound: "DATA_VALUE"}, ok: true},
+		{name: "generic payload bound to another abstract interface", target: new(rm.OriginalVersion[rm.ContentItem]), want: rmjsonwalk.Root{Type: "ORIGINAL_VERSION", Bound: "CONTENT_ITEM"}, ok: true},
+		{name: "BASE interval bound to an abstract interface", target: new(rm.PointInterval[rm.DVOrdered]), want: rmjsonwalk.Root{Type: "Point_interval", Bound: "DV_ORDERED"}, ok: true},
+		{name: "BASE interval of a primitive", target: new(rm.ProperInterval[int]), want: rmjsonwalk.Root{Type: "Proper_interval"}, ok: true},
 		{name: "generic payload left open", target: new(rm.OriginalVersion[any]), want: rmjsonwalk.Root{Type: "ORIGINAL_VERSION"}, ok: true},
-		{name: "abstract RM interface", target: new(rm.DataValue), want: rmjsonwalk.Root{}, ok: true},
+		{name: "abstract RM interface", target: new(rm.DataValue), want: rmjsonwalk.Root{Type: "DATA_VALUE"}, ok: true},
 		{name: "narrow RM interface falls back to its parent", target: new(rm.DVTextLike), want: rmjsonwalk.Root{Type: "DV_TEXT"}, ok: true},
-		{name: "slice of an RM interface", target: new([]rm.DataValue), want: rmjsonwalk.Root{Nest: "["}, ok: true},
+		{name: "slice of an RM interface", target: new([]rm.DataValue), want: rmjsonwalk.Root{Nest: "[", Type: "DATA_VALUE"}, ok: true},
 		{name: "nil", target: nil},
 		{name: "any", target: new(any)},
 		{name: "map of any", target: new(map[string]any)},
-		{name: "caller's struct", target: new(callerStruct)},
+		{name: "caller's struct with RM fields", target: new(callerStruct)},
+		{name: "slice of a caller's struct", target: new([]callerStruct)},
+		{name: "RM interface with no decode hook", target: new(rm.DVAmount)},
 		{name: "AOM 1.4 class", target: new(aom14.Archetype)},
 		{name: "slice of AOM 1.4 class", target: new([]aom14.CComplexObject)},
 		{name: "bytes", target: new([]byte)},

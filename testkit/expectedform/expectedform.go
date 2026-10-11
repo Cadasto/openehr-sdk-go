@@ -35,10 +35,14 @@
 // carries on the members the RM defines uses it.
 //
 // The members the first change removes are the ones canjson.WithUnmatched
-// reports for the same input: both get them from the same walker, which reads
-// each object's RM type and the RM's attribute lists from [rminfo.Default].
-// Member order is not part of either result: compare with
-// [wireequiv.Equivalent].
+// reports when the same input is decoded into the same target: both get them
+// from the same walker, which reads each object's RM type and the RM's
+// attribute lists from [rminfo.Default]. [BuildFor] and [PruneFor] read the
+// root from a decode target as canjson does, so a generic class takes the
+// class its type argument names, such as DV_TEXT for the data of an
+// rm.OriginalVersion[rm.DVText]. [Build] and [Prune] take a class name and
+// bind no type parameter. Member order is not part of any result: compare
+// with [wireequiv.Equivalent].
 //
 // The package reads its input with the v1 encoding/json package and keeps every
 // number as its literal text, for the reason testkit/wireequiv gives: it is an
@@ -73,7 +77,26 @@ import (
 // inputs too, but not all: it reads an empty "_type" as an elided one, which
 // Build refuses.
 func Build(input []byte, rootType string) ([]byte, error) {
-	return transform(input, rootType, true)
+	if rootType == "" {
+		return nil, errors.New("expectedform: the root type is empty")
+	}
+	return transform(input, rmjsonwalk.Root{Type: rootType}, true)
+}
+
+// BuildFor returns the expected form of input for a decode into target, such
+// as a *rm.Composition or a *rm.DVInterval[rm.DVQuantity]: the RM class target
+// names is the root's type, and the class a generic target's type argument
+// names binds the class's type parameter. A polymorphic RM interface target
+// is read by the root's own "_type", or as its fallback class. An error means
+// target holds no single RM value at its root (a slice or map of RM values,
+// Go's any or a type of the caller's own), or the input cannot be read, as
+// for [Build].
+func BuildFor(input []byte, target any) ([]byte, error) {
+	root, err := rootFor(target)
+	if err != nil {
+		return nil, err
+	}
+	return transform(input, root, true)
 }
 
 // Prune returns input with every member that names no attribute of its
@@ -81,7 +104,35 @@ func Build(input []byte, rootType string) ([]byte, error) {
 // "_type" and an omitted interval flag stay as they are. rootType and the
 // errors are as for [Build].
 func Prune(input []byte, rootType string) ([]byte, error) {
-	return transform(input, rootType, false)
+	if rootType == "" {
+		return nil, errors.New("expectedform: the root type is empty")
+	}
+	return transform(input, rmjsonwalk.Root{Type: rootType}, false)
+}
+
+// PruneFor returns input with every member that names no attribute of its
+// object's RM type removed, for a decode into target, and nothing else
+// changed. target and the errors are as for [BuildFor].
+func PruneFor(input []byte, target any) ([]byte, error) {
+	root, err := rootFor(target)
+	if err != nil {
+		return nil, err
+	}
+	return transform(input, root, false)
+}
+
+// rootFor reads the root of a decode into target, which must hold one RM
+// value at its root.
+func rootFor(target any) (rmjsonwalk.Root, error) {
+	m, err := rmjsonwalk.Default()
+	if err != nil {
+		return rmjsonwalk.Root{}, fmt.Errorf("expectedform: %w", err)
+	}
+	root, ok := m.RootOf(target)
+	if !ok || root.Nest != "" {
+		return rmjsonwalk.Root{}, fmt.Errorf("expectedform: the target %T holds no single RM value at its root", target)
+	}
+	return root, nil
 }
 
 // RootType returns the RM type name of a decode target, such as "COMPOSITION"
@@ -102,10 +153,7 @@ var intervalFlags = [...]string{"lower_unbounded", "upper_unbounded", "lower_inc
 
 // transform decodes input, asks the shared walker which members are unmatched,
 // walks the document from the root and encodes the result.
-func transform(input []byte, rootType string, full bool) ([]byte, error) {
-	if rootType == "" {
-		return nil, errors.New("expectedform: the root type is empty")
-	}
+func transform(input []byte, rootShape rmjsonwalk.Root, full bool) ([]byte, error) {
 	w, err := newWalker(rminfo.Default, full)
 	if err != nil {
 		return nil, err
@@ -119,14 +167,14 @@ func transform(input []byte, rootType string, full bool) ([]byte, error) {
 		return nil, errors.New("expectedform: the document is not a JSON object")
 	}
 	w.unmatched = map[string]bool{}
-	err = w.model.Unmatched(input, rmjsonwalk.Root{Type: rootType}, func(pointer string) error {
+	err = w.model.Unmatched(input, rootShape, func(pointer string) error {
 		w.unmatched[pointer] = true
 		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("expectedform: %w", err)
 	}
-	out, err := w.object(root, rootType, "", "")
+	out, err := w.object(root, rootShape.Type, rootShape.Bound, "")
 	if err != nil {
 		return nil, fmt.Errorf("expectedform: %w", err)
 	}

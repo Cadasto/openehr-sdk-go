@@ -15,11 +15,14 @@ type Root struct {
 	// that is itself an RM value.
 	Nest string
 	// Type is the RM type each value is declared as: the class a value
-	// decodes as when it carries no "_type". It is empty where only the
-	// value's own "_type" can name its class.
+	// decodes as when it carries no "_type". For a polymorphic RM interface
+	// it is the class the interface stands for, an abstract class where only
+	// the value's own "_type" can name its concrete class. It is empty where
+	// nothing declares a type.
 	Type string
 	// Bound is the class the target binds the type parameter of each value's
-	// class to, such as DV_QUANTITY for an rm.DVInterval[rm.DVQuantity], or
+	// class to, such as DV_QUANTITY for an rm.DVInterval[rm.DVQuantity] or
+	// the abstract DATA_VALUE for an rm.OriginalVersion[rm.DataValue], or
 	// empty.
 	Bound string
 }

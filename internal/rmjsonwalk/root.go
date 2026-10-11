@@ -4,16 +4,15 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
-	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
-
-// rmPackage is the import path of the package that declares the RM's Go
-// types. An interface declared there is a polymorphic RM slot.
-const rmPackage = "github.com/cadasto/openehr-sdk-go/openehr/rm"
 
 // bmmNamer is a Go type that names the BMM class it implements.
 type bmmNamer interface{ BMMName() string }
+
+// typeArgumenter is a generic RM type that hands out a new zero value of its
+// type argument.
+type typeArgumenter interface{ BMMTypeArgument() any }
 
 // rootOf is what [Model.RootOf] found for one target type.
 type rootOf struct {
@@ -22,15 +21,17 @@ type rootOf struct {
 }
 
 // RootOf reads the RM shape a decode target gives a document's root. target
-// is what the decode writes into: a pointer to an RM type, such as a
-// *rm.Composition or a *rm.DVInterval[rm.DVQuantity], to an RM interface such
-// as rm.DataValue, or to slices, arrays and maps of these, at any depth.
+// is what the decode writes into: a pointer to an RM class, such as a
+// *rm.Composition or a *rm.DVInterval[rm.DVQuantity], to a polymorphic RM
+// interface such as rm.DataValue, or to slices, arrays and maps of these, at
+// any depth. A generic class takes the class its type argument names as the
+// binding of its type parameter.
 //
-// The second result is false when the target holds no RM value: under its
-// pointers, slices, arrays and maps it is neither a Go type that names a
-// class of the model nor an interface the RM package declares. Such a target,
-// an any, a map[string]any, an AOM 1.4 type or a caller's own struct, decodes
-// as no RM type, so a walk has nothing to check in it.
+// The second result is false when the target's own shape holds no RM value:
+// under its pointers, slices, arrays and maps it is neither a Go type that
+// names a class of the model nor a polymorphic RM interface. Such a target,
+// an any, a map[string]any, an AOM 1.4 type or a type of the caller's own,
+// even one with RM fields, gives a walk no RM value to start from.
 //
 // The Go type tells the declared type a "_type" can override, and nothing
 // else: RootOf reads no JSON. Results are kept per target type.
@@ -72,20 +73,26 @@ func (m *Model) readRoot(t reflect.Type) (Root, bool) {
 	if !ok {
 		return Root{}, false
 	}
-	return Root{Nest: nest.String(), Type: declared, Bound: m.boundOf(t, declared)}, true
+	return Root{Nest: nest.String(), Type: declared, Bound: m.boundOf(t)}, true
 }
 
-// declaredOf returns the RM type a Go type is declared as: the class it names,
-// or for an RM interface the class its elided "_type" falls back to (see
-// interfaceClass). The second result is false when t is no RM type.
+// declaredOf returns the RM class a Go type is declared as, under any
+// pointers: the class it names, or for a polymorphic RM interface the class
+// the interface stands for, such as DATA_VALUE for rm.DataValue or DV_TEXT for
+// rm.DVTextLike. The second result is false when t is neither.
+//
+// Both answers come from methods reached through a new value of t: BMMName on
+// the class's Go type, and the type switch of rm.PolymorphicClass on a
+// pointer to the interface.
 func (m *Model) declaredOf(t reflect.Type) (string, bool) {
-	if t.Kind() == reflect.Interface {
-		if t.PkgPath() != rmPackage {
-			return "", false
-		}
-		return m.interfaceClass(t), true
+	for t.Kind() == reflect.Pointer {
+		t = t.Elem()
 	}
-	n, ok := reflect.TypeAssert[bmmNamer](reflect.New(t))
+	p := reflect.New(t).Interface()
+	if class, _, ok := rm.PolymorphicClass(p); ok {
+		return class, m.IsClass(class)
+	}
+	n, ok := p.(bmmNamer)
 	if !ok {
 		return "", false
 	}
@@ -93,66 +100,17 @@ func (m *Model) declaredOf(t reflect.Type) (string, bool) {
 	return name, m.IsClass(name)
 }
 
-// interfaceClass returns the class an RM interface t falls back to when a
-// value elides its "_type": the one registered RM class every registered class
-// implementing t conforms to, such as DV_TEXT for rm.DVTextLike, which DV_TEXT
-// and DV_CODED_TEXT implement. It returns the empty string when there is none,
-// as for rm.DataValue, whose classes share no concrete ancestor; a value there
-// must carry its own "_type".
-func (m *Model) interfaceClass(t reflect.Type) string {
-	var classes []string
-	for _, name := range typereg.Default.Names() {
-		ctor, ok := typereg.Default.Lookup(name)
-		if !ok || !m.IsClass(name) {
-			continue
-		}
-		if reflect.TypeOf(ctor()).Implements(t) {
-			classes = append(classes, name)
-		}
-	}
-	for _, c := range classes {
-		all := true
-		for _, other := range classes {
-			if conforms, _ := m.hier.ConformsTo(other, c); !conforms {
-				all = false
-				break
-			}
-		}
-		if all {
-			return c
-		}
-	}
-	return ""
-}
-
-// boundOf returns the class Go type t binds the type parameter of class to:
-// the declared type of the Go field behind the class's first type-parameter
-// attribute, as for the Lower field of an rm.DVInterval[rm.DVQuantity]. It
-// returns the empty string when class has no such attribute, or the field's
-// type names no class of its own (Go's any, or an RM interface with no
-// fallback class).
-func (m *Model) boundOf(t reflect.Type, class string) string {
-	lister, ok := m.lookup.(rminfo.AttributeLister)
-	if !ok || t.Kind() != reflect.Struct {
+// boundOf returns the class a generic RM type t binds its type parameter to:
+// the class its type argument is declared as, such as DV_QUANTITY for an
+// rm.DVInterval[rm.DVQuantity] or DATA_VALUE for an
+// rm.OriginalVersion[rm.DataValue]. It returns the empty string for a type
+// that is not generic, and for a type argument that is no RM type, such as
+// Go's any, which leaves a generic payload as plain JSON.
+func (m *Model) boundOf(t reflect.Type) string {
+	g, ok := reflect.TypeAssert[typeArgumenter](reflect.New(t))
+	if !ok {
 		return ""
 	}
-	for _, attr := range lister.AttributeNames(class) {
-		typ, _ := m.lookup.AttributeRMType(class, attr)
-		if m.kindOf(typ) != KindParameter {
-			continue
-		}
-		for _, f := range reflect.VisibleFields(t) {
-			if name, _, _ := strings.Cut(f.Tag.Get("json"), ","); name != attr || !f.IsExported() {
-				continue
-			}
-			ft := f.Type
-			for ft.Kind() == reflect.Pointer {
-				ft = ft.Elem()
-			}
-			bound, _ := m.declaredOf(ft)
-			return bound
-		}
-		return ""
-	}
-	return ""
+	bound, _ := m.declaredOf(reflect.TypeOf(g.BMMTypeArgument()))
+	return bound
 }

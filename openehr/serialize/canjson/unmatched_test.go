@@ -559,13 +559,14 @@ func TestREQ170_ClassesOutsideTheRMAreNotChecked(t *testing.T) {
 	}
 }
 
-// TestREQ170_RootTargetsAreChecked pins that the root's RM type comes from
-// the decode target's Go type, so every object that decodes as an RM class is
-// checked (REQ-170): the elements of a slice and the values of a map of RM
+// TestREQ170_RootTargetsAreChecked pins that the walk starts from the decode
+// target's own RM shape (REQ-170 *Scope*), so every object that decodes as an
+// RM class is checked: the elements of a slice and the values of a map of RM
 // values, eliding `_type` or not; the bounds of a generic target, which binds
-// them to a class; the payload of an ORIGINAL_VERSION whose target names its
-// class; and a narrow RM interface, which an elided `_type` decodes as its
-// parent class.
+// them to a class; the payload of an ORIGINAL_VERSION or the bounds of a BASE
+// interval whose type argument is an RM class or a polymorphic RM interface,
+// read by their own `_type`; and a narrow RM interface, which an elided
+// `_type` decodes as its parent class.
 func TestREQ170_RootTargetsAreChecked(t *testing.T) {
 	cases := []struct {
 		name, in string
@@ -597,6 +598,25 @@ func TestREQ170_RootTargetsAreChecked(t *testing.T) {
 			want: []string{"/data/x-a"},
 		},
 		{
+			name: "payload bound to an abstract RM interface",
+			in:   `{"_type":"ORIGINAL_VERSION","data":{"_type":"DV_TEXT","value":"a","x-a":"` + plantedValue + `"}}`,
+			into: func() any { return new(rm.OriginalVersion[rm.DataValue]) },
+			want: []string{"/data/x-a"},
+		},
+		{
+			name: "payload bound to another abstract RM interface",
+			in: `{"_type":"ORIGINAL_VERSION","data":{"_type":"ADMIN_ENTRY","name":{"value":"n"},"archetype_node_id":"at1",` +
+				`"x-a":"` + plantedValue + `"}}`,
+			into: func() any { return new(rm.OriginalVersion[rm.ContentItem]) },
+			want: []string{"/data/x-a"},
+		},
+		{
+			name: "BASE interval bound to an abstract RM interface",
+			in:   `{"_type":"Point_interval","lower":{"_type":"DV_COUNT","magnitude":1,"x-a":"` + plantedValue + `"}}`,
+			into: func() any { return new(rm.PointInterval[rm.DVOrdered]) },
+			want: []string{"/lower/x-a"},
+		},
+		{
 			name: "narrow RM interface",
 			in:   `{"value":"a","x-a":"` + plantedValue + `"}`,
 			into: func() any { return new(rm.DVTextLike) },
@@ -618,20 +638,22 @@ func TestREQ170_RootTargetsAreChecked(t *testing.T) {
 	}
 }
 
-// callerStruct is a caller's own type, with a member named like an extension.
+// callerStruct is a caller's own type, with a member named like an extension
+// and an RM value inside it.
 type callerStruct struct {
-	Type  string `json:"_type"`
-	Value string `json:"value"`
-	XA    int    `json:"x-a"`
+	Type  string    `json:"_type"`
+	Value string    `json:"value"`
+	XA    int       `json:"x-a"`
+	Text  rm.DVText `json:"text"`
 }
 
-// TestREQ170_NonRMTargetsAreNotChecked pins that a target holding no RM value
-// is not checked (REQ-170 defines unmatched against the RM type an object
-// decodes as, and these objects decode as none): an any, a map[string]any and
-// a caller's own struct that reads the member decode an RM-looking input in
-// every mode, report nothing, and get the default's value.
+// TestREQ170_NonRMTargetsAreNotChecked pins that the walk starts only from a
+// target whose own shape is an RM class (REQ-170 *Scope*): an any, a
+// map[string]any and a caller's own struct, which reads the member and holds
+// an RM value whose extension member the walk does not reach, decode an
+// RM-looking input in every mode, report nothing, and get the default's value.
 func TestREQ170_NonRMTargetsAreNotChecked(t *testing.T) {
-	const in = `{"_type":"DV_TEXT","value":"v","x-a":1}`
+	const in = `{"_type":"DV_TEXT","value":"v","x-a":1,"text":{"value":"t","x-b":1}}`
 	targets := map[string]func() any{
 		"any":            func() any { return new(any) },
 		"map[string]any": func() any { return new(map[string]any) },

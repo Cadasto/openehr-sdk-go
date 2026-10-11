@@ -189,11 +189,7 @@ func TestRoundTripFixtures(t *testing.T) {
 			if ok, diff := wireequiv.Equivalent(b1, b2); !ok {
 				t.Errorf("the two SDK encodes are not wire-equivalent for %s: %s", rel.Rel, diff)
 			}
-			root, ok := expectedform.RootType(v)
-			if !ok {
-				t.Fatalf("decode target %T names no RM type", v)
-			}
-			want, err := expectedform.Build(raw, root)
+			want, err := expectedform.BuildFor(raw, v)
 			if err != nil {
 				t.Fatalf("the input's expected form: %v", err)
 			}

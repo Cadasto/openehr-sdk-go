@@ -395,6 +395,66 @@ func TestREQ052_BuildWalksAHashOfRMObjects(t *testing.T) {
 	}
 }
 
+// TestREQ052_BuildForReadsTheRootFromTheTarget pins that BuildFor and
+// PruneFor read the root the way canjson.WithUnmatched does (REQ-170): a
+// generic target's type argument binds the class's type parameter, so the
+// data of an rm.OriginalVersion[rm.DVText] is a DV_TEXT, not a generic
+// payload, and the bounds of an rm.DVInterval[rm.DVQuantity] may elide their
+// "_type". Build and Prune with the bare class name bind nothing, which is
+// the contrast each case checks.
+func TestREQ052_BuildForReadsTheRootFromTheTarget(t *testing.T) {
+	const version = `{"_type":"ORIGINAL_VERSION","data":{"value":"a","x-a":1}}`
+	t.Run("ORIGINAL_VERSION bound to DV_TEXT", func(t *testing.T) {
+		got, err := expectedform.BuildFor([]byte(version), new(rm.OriginalVersion[rm.DVText]))
+		if err != nil {
+			t.Fatalf("BuildFor error: %v", err)
+		}
+		if want := `{"_type":"ORIGINAL_VERSION","data":{"_type":"DV_TEXT","value":"a"}}`; !wireEqual(t, want, got) {
+			t.Errorf("BuildFor(%s, *rm.OriginalVersion[rm.DVText]) = %s, want %s", version, got, want)
+		}
+		got, err = expectedform.PruneFor([]byte(version), new(rm.OriginalVersion[rm.DVText]))
+		if err != nil {
+			t.Fatalf("PruneFor error: %v", err)
+		}
+		if want := `{"_type":"ORIGINAL_VERSION","data":{"value":"a"}}`; !wireEqual(t, want, got) {
+			t.Errorf("PruneFor(%s, *rm.OriginalVersion[rm.DVText]) = %s, want %s", version, got, want)
+		}
+		got, err = expectedform.Prune([]byte(version), "ORIGINAL_VERSION")
+		if err != nil {
+			t.Fatalf("Prune error: %v", err)
+		}
+		if !wireEqual(t, version, got) {
+			t.Errorf("Prune(%s, ORIGINAL_VERSION) = %s, want the generic payload as written", version, got)
+		}
+	})
+	t.Run("DV_INTERVAL bound to DV_QUANTITY", func(t *testing.T) {
+		const interval = `{"lower":{"magnitude":1,"units":"kg"},"upper":{"magnitude":2,"units":"kg","x-a":1}}`
+		got, err := expectedform.BuildFor([]byte(interval), new(rm.DVInterval[rm.DVQuantity]))
+		if err != nil {
+			t.Fatalf("BuildFor error: %v", err)
+		}
+		want := `{"_type":"DV_INTERVAL","lower":{"_type":"DV_QUANTITY","magnitude":1,"units":"kg"},"upper":{"_type":"DV_QUANTITY","magnitude":2,"units":"kg"},` +
+			`"lower_unbounded":false,"upper_unbounded":false,"lower_included":true,"upper_included":true}`
+		if !wireEqual(t, want, got) {
+			t.Errorf("BuildFor(%s, *rm.DVInterval[rm.DVQuantity]) = %s, want %s", interval, got, want)
+		}
+		if _, err := expectedform.Build([]byte(interval), "DV_INTERVAL"); err == nil || !strings.Contains(err.Error(), "type parameter with no binding") {
+			t.Errorf("Build(%s, DV_INTERVAL) error = %v, want the elided bound refused: the class name binds nothing", interval, err)
+		}
+	})
+	t.Run("targets with no single RM value at the root", func(t *testing.T) {
+		for name, target := range map[string]any{
+			"slice": new([]rm.DVText),
+			"any":   new(any),
+			"map":   new(map[string]any),
+		} {
+			if got, err := expectedform.BuildFor([]byte(`{"value":"a"}`), target); err == nil || !strings.Contains(err.Error(), "no single RM value") {
+				t.Errorf("BuildFor(%s target) = %s, %v, want an error naming the target", name, got, err)
+			}
+		}
+	})
+}
+
 // wireEqual reports whether got is wire-equivalent to want.
 func wireEqual(t *testing.T, want string, got []byte) bool {
 	t.Helper()
@@ -469,7 +529,8 @@ func TestREQ052_BuildRefusesInputItCannotRead(t *testing.T) {
 // TestREQ052_PruneOnlyRemovesMembersTheRMDoesNotDefine pins that Prune applies
 // the member filter and nothing else: a null member (a mandatory String among
 // them), an elided "_type", an omitted interval flag and a quoted number all
-// stay as written.
+// stay as written, and so does a number inside a generic payload, which Build
+// writes as the encoder does.
 func TestREQ052_PruneOnlyRemovesMembersTheRMDoesNotDefine(t *testing.T) {
 	in := `{"_type":"DV_QUANTITY","magnitude":"80.50","units":null,"precision":null,"note":{"_type":"DV_TEXT","value":"x"},` +
 		`"normal_range":{"lower":{"magnitude":1,"units":"kg","extra":{"_type":"DV_BOOLEAN","value":true}},"lower_unbounded":false,"upper_unbounded":true}}`
@@ -481,6 +542,15 @@ func TestREQ052_PruneOnlyRemovesMembersTheRMDoesNotDefine(t *testing.T) {
 	}
 	if ok, diff := wireequiv.Equivalent([]byte(want), got); !ok {
 		t.Errorf("Prune(%s) = %s, want %s: %s", in, got, want, diff)
+	}
+
+	const payload = `{"_type":"ORIGINAL_VERSION","data":{"_type":"DV_QUANTITY","magnitude":1.50,"x-list":[1e2]}}`
+	got, err = expectedform.Prune([]byte(payload), "ORIGINAL_VERSION")
+	if err != nil {
+		t.Fatalf("Prune error: %v", err)
+	}
+	if ok, diff := wireequiv.Equivalent([]byte(payload), got); !ok {
+		t.Errorf("Prune(%s) = %s, want the payload's numbers as written: %s", payload, got, diff)
 	}
 }
 

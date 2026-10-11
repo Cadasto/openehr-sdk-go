@@ -47,11 +47,14 @@ func (e *unknownMemberError) Unwrap() error {
 // any depth: inside a polymorphic slot, an interval bound and a `Hash` of RM
 // values too.
 //
-// Only objects that decode as an RM class are checked. When v holds no RM
-// value, as with a pointer to any, to a map[string]any or to a caller's own
-// struct, the option reports nothing; the members of a value of a class
-// outside the RM, such as an AOM 1.4 archetype, are not checked either (see
-// the package documentation, "Unmatched members").
+// The walk starts from v's own RM shape: an RM class or a polymorphic RM
+// interface, or a slice, array or map of one. When v is none of these, as
+// with a pointer to any, to a map[string]any or to a type of the caller's
+// own, the option reports nothing: RM values held inside a type of the
+// caller's own are not checked.
+// The members of a value of a class outside the RM, such as an AOM 1.4
+// archetype, are not checked either (see the package documentation,
+// "Unmatched members").
 //
 // By default the decoder ignores unmatched members: the value it returns
 // holds the rest of the input and none of them. With this option fn receives
@@ -113,7 +116,7 @@ func checkUnmatched(data []byte, v any, opts []DecoderOption) error {
 // without error, against the RM's attribute lists, and reports or refuses each
 // unmatched member as c says. v's Go type gives the root's shape: the RM type
 // each value at the root is declared as, inside any slices and maps. A target
-// that holds no RM value is not walked.
+// whose own shape is no RM class is not walked.
 func (c *decoderConfig) walkUnmatched(data []byte, v any) error {
 	model, err := rmjsonwalk.Default()
 	if err != nil {

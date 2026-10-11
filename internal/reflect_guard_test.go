@@ -62,9 +62,9 @@ var reflectReviewed = map[string]struct {
 	reason  string
 }{
 	"internal/rmjsonwalk/root.go": {
-		[]string{"Array", "Interface", "Map", "New", "Pointer", "Slice", "Struct", "Type", "TypeAssert", "TypeOf", "VisibleFields"},
-		[]string{reflectAddressableCopy, reflectFieldMapping},
-		"reads the RM class a decode target's root is declared as: reaches BMMName on the element type through reflect.New, and finds a generic class's type-parameter field by its JSON tag; no Go type is chosen from _type",
+		[]string{"Array", "Map", "New", "Pointer", "Slice", "Type", "TypeAssert", "TypeOf"},
+		[]string{reflectAddressableCopy},
+		"reads the RM class a decode target's root is declared as: peels the target's pointers, slices, arrays and maps to the element type, then asks a reflect.New copy of it through generated methods (BMMName, BMMTypeArgument) and rm.PolymorphicClass's type switch; no Go type is chosen from _type",
 	},
 	"openehr/aql/parse/ast.go": {
 		[]string{"Pointer", "ValueOf"},

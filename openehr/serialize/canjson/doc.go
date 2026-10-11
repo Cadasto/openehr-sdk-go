@@ -217,15 +217,20 @@
 // pass over the same input that reads the RM's own attribute lists. So a
 // decode error, such as an unknown `_type`, is returned as itself in every
 // mode, wherever it sits in the input, and a decode that fails reports no
-// member. Only objects that decode as an RM class are checked. A target
-// that holds no RM value, such as a pointer to any, to a map[string]any or
-// to a caller's own struct, is not walked at all. The pass does not look
-// inside a value it cannot read as an RM class either: a value of a class
-// outside the RM, such as an AOM 1.4 archetype, decodes as by default and
-// none of its members is checked, the RM values it holds included; nor does
-// the pass check a generic payload the decoder holds as plain JSON (the
-// data of an rm.OriginalVersion[any]), a `Hash` of strings, or an object
-// whose type neither its `_type` nor its position names.
+// member.
+//
+// The walk starts from the decode target's own RM shape: an RM class or a
+// polymorphic RM interface, or a slice, array or map of one, a generic class
+// taking its type parameter from the target's type argument. A target of any
+// other shape, such as a pointer to any, to a map[string]any or to a type of
+// the caller's own, is not walked, so RM values held inside a type of the
+// caller's own are not checked. The pass does not look inside a value it
+// cannot read as an RM class either: a value of a class outside the RM, such
+// as an AOM 1.4 archetype, decodes as by default and none of its members is
+// checked, the RM values it holds included; nor does the pass check a generic
+// payload the decoder holds as plain JSON (the data of an
+// rm.OriginalVersion[any]), a `Hash` of strings, or an object whose type
+// neither its `_type` nor its position names.
 //
 // Neither option changes what the decoder reads, and neither is available
 // on REST reads through the transport and client packages, which decode

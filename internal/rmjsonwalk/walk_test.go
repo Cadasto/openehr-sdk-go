@@ -104,7 +104,7 @@ func TestREQ170_UnmatchedNamesEveryMemberTheRMDoesNotDefine(t *testing.T) {
 		},
 		{
 			name: "a slice of an RM interface: elements by their _type",
-			root: rmjsonwalk.Root{Nest: "["},
+			root: rmjsonwalk.Root{Nest: "[", Type: "DATA_VALUE"},
 			doc:  `[{"_type":"DV_TEXT","value":"v","x-a":1},{"value":"w","x-b":1},{"_type":"DV_COUNT","magnitude":1,"x-c":1}]`,
 			want: []string{"/0/x-a", "/2/x-c"},
 		},
@@ -125,6 +125,22 @@ func TestREQ170_UnmatchedNamesEveryMemberTheRMDoesNotDefine(t *testing.T) {
 			root: rmjsonwalk.Root{Type: "DV_INTERVAL", Bound: "DV_QUANTITY"},
 			doc:  `{"lower":{"magnitude":1,"units":"kg","x-a":1},"x-b":1}`,
 			want: []string{"/lower/x-a", "/x-b"},
+		},
+		{
+			// The payload is bound to an abstract class: an object there is
+			// read by its own _type.
+			name: "a binding to an abstract class overrides the generic payload",
+			root: rmjsonwalk.Root{Type: "ORIGINAL_VERSION", Bound: "DATA_VALUE"},
+			doc:  `{"_type":"ORIGINAL_VERSION","data":{"_type":"DV_TEXT","value":"v","x-a":1}}`,
+			want: []string{"/data/x-a"},
+		},
+		{
+			// An object that elides its _type where the binding is abstract
+			// is not read: the decoder refuses it.
+			name: "an elided _type under a binding to an abstract class",
+			root: rmjsonwalk.Root{Type: "ORIGINAL_VERSION", Bound: "DATA_VALUE"},
+			doc:  `{"data":{"value":"w","x-b":1},"x-root":1}`,
+			want: []string{"/x-root"},
 		},
 		{
 			name: "a binding overrides the generic payload",
