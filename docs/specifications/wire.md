@@ -257,7 +257,7 @@ Input is matched when it names something the decoder reads, even where the decod
 
 The canonical-XML codec does not model `Hash` (`map[K]V`) members: by default it skips a `Hash` element, the report option reports it, and strict refuses it like unmatched content.
 
-**Scope.** The two options belong to the codecs' own decode entry points. REST reads through `transport` and the `openehr/client/*` packages decode with the default and offer neither option.
+**Scope.** The two options belong to the codecs' own decode entry points. In canonical JSON they check the members of RM classes, decided against the RM's own attribute lists after the decode succeeds, so a decode error such as an unknown `_type` is reported as itself; a value of a class outside the RM, such as an AOM 1.4 archetype, decodes as by default and its members are not checked. REST reads through `transport` and the `openehr/client/*` packages decode with the default and offer neither option.
 
 **Acceptance:**
 
