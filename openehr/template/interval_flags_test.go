@@ -126,8 +126,7 @@ var multiplicitySites = []struct {
 	},
 }
 
-func multiplicityBody(attribute, child string, iv wireInterval) string {
-	ivXML := iv.xml()
+func multiplicityBody(attribute, child, ivXML string) string {
 	return strings.NewReplacer(
 		"{{attribute}}", strings.ReplaceAll(attribute, "{{interval}}", ivXML),
 		"{{child}}", strings.ReplaceAll(child, "{{interval}}", ivXML),
@@ -272,7 +271,7 @@ func TestREQ169_REQ100_MultiplicityFlags(t *testing.T) {
 		for _, site := range multiplicitySites {
 			for _, tc := range cases {
 				t.Run(p.name+"/"+site.name+"/"+tc.name, func(t *testing.T) {
-					opt, err := p.parse(strings.NewReader(multiplicityBody(site.attribute, site.child, tc.iv)))
+					opt, err := p.parse(strings.NewReader(multiplicityBody(site.attribute, site.child, tc.iv.xml())))
 					if err != nil {
 						t.Fatalf("%s(%s %s) error = %v, want nil", p.name, site.name, tc.iv.xml(), err)
 					}
@@ -290,9 +289,11 @@ func TestREQ169_REQ100_MultiplicityFlags(t *testing.T) {
 }
 
 // An interval that leaves no whole number once its excluded ends are
-// closed is refused exactly like an inverted one: an error that wraps
-// ErrInvalidOPT and names the site.
-func TestREQ100_EmptyMultiplicityRefusedLikeInverted(t *testing.T) {
+// closed is refused exactly like an inverted one, and so is an excluded
+// end whose closed end an int cannot hold. Each refusal wraps
+// ErrInvalidOPT and names the site. The inverted-interval message gives
+// the closed bounds it compared and the interval as the OPT wrote it.
+func TestREQ100_MultiplicityRefusedLikeInverted(t *testing.T) {
 	cases := []struct {
 		name    string
 		iv      wireInterval
@@ -300,10 +301,11 @@ func TestREQ100_EmptyMultiplicityRefusedLikeInverted(t *testing.T) {
 	}{
 		{
 			// The control: an inverted interval was refused before
-			// excluded ends were read.
+			// excluded ends were read. Omitted included flags read as
+			// closed ends, so the written form has no > or <.
 			name:    "inverted",
 			iv:      wireInterval{lowerUnbounded: "false", upperUnbounded: "false", lower: "5", upper: "2"},
-			wantMsg: "inverted interval lower=5 > upper=2",
+			wantMsg: "inverted interval lower=5 > upper=2 (written 5..2)",
 		},
 		{
 			name: "both_excluded_adjacent", // >2..<3
@@ -311,7 +313,7 @@ func TestREQ100_EmptyMultiplicityRefusedLikeInverted(t *testing.T) {
 				lowerIncluded: "false", upperIncluded: "false",
 				lowerUnbounded: "false", upperUnbounded: "false", lower: "2", upper: "3",
 			},
-			wantMsg: "inverted interval lower=3 > upper=2",
+			wantMsg: "inverted interval lower=3 > upper=2 (written >2..<3)",
 		},
 		{
 			name: "excluded_lower_at_upper", // >2..2
@@ -319,7 +321,7 @@ func TestREQ100_EmptyMultiplicityRefusedLikeInverted(t *testing.T) {
 				lowerIncluded: "false", upperIncluded: "true",
 				lowerUnbounded: "false", upperUnbounded: "false", lower: "2", upper: "2",
 			},
-			wantMsg: "inverted interval lower=3 > upper=2",
+			wantMsg: "inverted interval lower=3 > upper=2 (written >2..2)",
 		},
 		{
 			name: "excluded_upper_at_lower", // 2..<2
@@ -327,17 +329,17 @@ func TestREQ100_EmptyMultiplicityRefusedLikeInverted(t *testing.T) {
 				lowerIncluded: "true", upperIncluded: "false",
 				lowerUnbounded: "false", upperUnbounded: "false", lower: "2", upper: "2",
 			},
-			wantMsg: "inverted interval lower=2 > upper=1",
+			wantMsg: "inverted interval lower=2 > upper=1 (written 2..<2)",
 		},
 		{
-			// No whole number lies above the largest int, so the
-			// interval is empty even with an unbounded upper side.
+			// The closed end of ">largest int" is one past the int
+			// range, so it would wrap around to the smallest int.
 			name: "excluded_lower_at_max_int",
 			iv: wireInterval{
 				lowerIncluded:  "false",
 				lowerUnbounded: "false", upperUnbounded: "true", lower: strconv.Itoa(math.MaxInt),
 			},
-			wantMsg: "empty interval",
+			wantMsg: "closed lower bound overflows int: excluded lower=" + strconv.Itoa(math.MaxInt),
 		},
 		{
 			name: "excluded_upper_at_min_int",
@@ -345,14 +347,14 @@ func TestREQ100_EmptyMultiplicityRefusedLikeInverted(t *testing.T) {
 				upperIncluded:  "false",
 				lowerUnbounded: "true", upperUnbounded: "false", upper: strconv.Itoa(math.MinInt),
 			},
-			wantMsg: "empty interval",
+			wantMsg: "closed upper bound overflows int: excluded upper=" + strconv.Itoa(math.MinInt),
 		},
 	}
 	for _, p := range intervalParsers {
 		for _, site := range multiplicitySites {
 			for _, tc := range cases {
 				t.Run(p.name+"/"+site.name+"/"+tc.name, func(t *testing.T) {
-					opt, err := p.parse(strings.NewReader(multiplicityBody(site.attribute, site.child, tc.iv)))
+					opt, err := p.parse(strings.NewReader(multiplicityBody(site.attribute, site.child, tc.iv.xml())))
 					if err == nil {
 						t.Fatalf("%s(%s %s) = %v, nil; want an error wrapping ErrInvalidOPT",
 							p.name, site.name, tc.iv.xml(), opt)
@@ -369,6 +371,76 @@ func TestREQ100_EmptyMultiplicityRefusedLikeInverted(t *testing.T) {
 					}
 				})
 			}
+		}
+	}
+}
+
+// An empty or whitespace-only lower_included or upper_included element
+// reads like an omitted one, so REQ-169's default applies: a closed end on
+// a bounded side, no effect on an unbounded side. Read as a written false,
+// it would close a bounded end one step inwards.
+func TestREQ169_REQ100_EmptyIncludedFlagReadsAsOmitted(t *testing.T) {
+	const (
+		closedBounds = `<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded>` +
+			`<lower>1</lower><upper>3</upper>`
+		openLower = `<lower_unbounded>true</lower_unbounded><upper_unbounded>false</upper_unbounded><upper>3</upper>`
+		openUpper = `<lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>1</lower>`
+	)
+	cases := []struct {
+		name  string
+		ivXML string
+		want  bounds
+	}{
+		{name: "lower_self_closing_bounded", ivXML: `<lower_included/>` + closedBounds, want: bounds{lower: 1, upper: 3}},
+		{name: "lower_empty_bounded", ivXML: `<lower_included></lower_included>` + closedBounds, want: bounds{lower: 1, upper: 3}},
+		{name: "lower_whitespace_bounded", ivXML: "<lower_included> \n\t</lower_included>" + closedBounds, want: bounds{lower: 1, upper: 3}},
+		{name: "upper_self_closing_bounded", ivXML: `<upper_included/>` + closedBounds, want: bounds{lower: 1, upper: 3}},
+		{name: "upper_empty_bounded", ivXML: `<upper_included></upper_included>` + closedBounds, want: bounds{lower: 1, upper: 3}},
+		{name: "upper_whitespace_bounded", ivXML: "<upper_included>  </upper_included>" + closedBounds, want: bounds{lower: 1, upper: 3}},
+		{name: "both_self_closing_bounded", ivXML: `<lower_included/><upper_included/>` + closedBounds, want: bounds{lower: 1, upper: 3}},
+		{name: "lower_self_closing_unbounded", ivXML: `<lower_included/>` + openLower, want: bounds{upper: 3, lowerUnbounded: true}},
+		{name: "upper_self_closing_unbounded", ivXML: `<upper_included/>` + openUpper, want: bounds{lower: 1, upperUnbounded: true}},
+		{
+			// A written value beside an empty sibling is still read as written.
+			name:  "lower_written_false_upper_empty",
+			ivXML: `<lower_included>false</lower_included><upper_included/>` + closedBounds,
+			want:  bounds{lower: 2, upper: 3},
+		},
+	}
+	for _, p := range intervalParsers {
+		for _, site := range multiplicitySites {
+			for _, tc := range cases {
+				t.Run(p.name+"/"+site.name+"/"+tc.name, func(t *testing.T) {
+					opt, err := p.parse(strings.NewReader(multiplicityBody(site.attribute, site.child, tc.ivXML)))
+					if err != nil {
+						t.Fatalf("%s(%s %q) error = %v, want nil", p.name, site.name, tc.ivXML, err)
+					}
+					m := site.get(t, opt)
+					if m == nil {
+						t.Fatalf("%s(%s %q) Multiplicity = nil, want %+v", p.name, site.name, tc.ivXML, tc.want)
+					}
+					if got := boundsOf(m); got != tc.want {
+						t.Errorf("%s(%s %q) Multiplicity = %+v, want %+v", p.name, site.name, tc.ivXML, got, tc.want)
+					}
+				})
+			}
+		}
+	}
+}
+
+// A lower_included or upper_included element whose text is not a boolean
+// still fails the parse in both modes.
+func TestREQ100_NonBooleanIncludedFlagRefused(t *testing.T) {
+	ivXML := `<lower_included>maybe</lower_included><lower_unbounded>false</lower_unbounded>` +
+		`<upper_unbounded>false</upper_unbounded><lower>1</lower><upper>3</upper>`
+	for _, p := range intervalParsers {
+		for _, site := range multiplicitySites {
+			t.Run(p.name+"/"+site.name, func(t *testing.T) {
+				_, err := p.parse(strings.NewReader(multiplicityBody(site.attribute, site.child, ivXML)))
+				if !errors.Is(err, template.ErrInvalidOPT) {
+					t.Errorf("%s(%s %q) error = %v, want errors.Is(err, ErrInvalidOPT)", p.name, site.name, ivXML, err)
+				}
+			})
 		}
 	}
 }

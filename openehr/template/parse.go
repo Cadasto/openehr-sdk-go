@@ -316,15 +316,16 @@ type xmlCAttribute struct {
 
 // xmlInterval is the whole-number interval of an occurrences, existence
 // or cardinality block. An omitted unbounded flag decodes as false. The
-// included flags are pointers so that an omitted flag stays nil, and
-// includedFlag can then give it the default for its side.
+// included flags are xmlBoolFlag values, so an omitted, empty or
+// whitespace-only element stays unset, and includedFlag can then give it
+// the default for its side.
 type xmlInterval struct {
-	Lower          int   `xml:"lower"`
-	Upper          int   `xml:"upper"`
-	LowerIncluded  *bool `xml:"lower_included"`
-	UpperIncluded  *bool `xml:"upper_included"`
-	LowerUnbounded bool  `xml:"lower_unbounded"`
-	UpperUnbounded bool  `xml:"upper_unbounded"`
+	Lower          int         `xml:"lower"`
+	Upper          int         `xml:"upper"`
+	LowerIncluded  xmlBoolFlag `xml:"lower_included"`
+	UpperIncluded  xmlBoolFlag `xml:"upper_included"`
+	LowerUnbounded bool        `xml:"lower_unbounded"`
+	UpperUnbounded bool        `xml:"upper_unbounded"`
 }
 
 // xmlCardinality maps the AOM 1.4 CARDINALITY type — the
@@ -593,6 +594,8 @@ func intervalToMultiplicity(i *xmlInterval) (*Multiplicity, error) {
 	if i == nil {
 		return nil, nil
 	}
+	lowerIncluded := includedFlag(i.LowerIncluded.ptr(), i.LowerUnbounded)
+	upperIncluded := includedFlag(i.UpperIncluded.ptr(), i.UpperUnbounded)
 	m := &Multiplicity{
 		lower:          i.Lower,
 		upper:          i.Upper,
@@ -602,29 +605,46 @@ func intervalToMultiplicity(i *xmlInterval) (*Multiplicity, error) {
 	// A Multiplicity counts whole items, so an excluded end on a bounded
 	// side becomes the closed end it stands for: ">0" is 1 and "<3" is 2.
 	// An unbounded side has no bound to move, whatever its included flag
-	// says. No whole number lies beyond the int range, so an excluded end
-	// at its limit leaves the interval empty.
-	if !i.LowerUnbounded && !includedFlag(i.LowerIncluded, i.LowerUnbounded) {
+	// says. An int cannot hold the closed end of "> the largest int" or
+	// "< the smallest int", so such an end is refused instead of being
+	// left to wrap around to the other end of the int range.
+	if !i.LowerUnbounded && !lowerIncluded {
 		if m.lower == math.MaxInt {
-			return nil, fmt.Errorf("empty interval: no whole number above excluded lower=%d", i.Lower)
+			return nil, fmt.Errorf("closed lower bound overflows int: excluded lower=%d", i.Lower)
 		}
 		m.lower++
 	}
-	if !i.UpperUnbounded && !includedFlag(i.UpperIncluded, i.UpperUnbounded) {
+	if !i.UpperUnbounded && !upperIncluded {
 		if m.upper == math.MinInt {
-			return nil, fmt.Errorf("empty interval: no whole number below excluded upper=%d", i.Upper)
+			return nil, fmt.Errorf("closed upper bound overflows int: excluded upper=%d", i.Upper)
 		}
 		m.upper--
 	}
 	// Reject inverted intervals at parse time so downstream walkers
 	// can assume `Lower <= Upper` whenever both bounds are present.
 	// The check runs on the closed ends, so an interval that closing
-	// leaves empty, such as ">2..<3", is refused here too. Unbounded
-	// sides are skipped: they have no concrete value to compare.
+	// leaves empty, such as ">2..<3", is refused here too; the message
+	// adds the interval as written so the reader recognises it.
+	// Unbounded sides are skipped: they have no concrete value to compare.
 	if !m.lowerUnbounded && !m.upperUnbounded && m.lower > m.upper {
-		return nil, fmt.Errorf("inverted interval lower=%d > upper=%d", m.lower, m.upper)
+		return nil, fmt.Errorf("inverted interval lower=%d > upper=%d (written %s)",
+			m.lower, m.upper, writtenBounds(i.Lower, i.Upper, lowerIncluded, upperIncluded))
 	}
 	return m, nil
+}
+
+// writtenBounds spells a bounded interval in ADL notation, with the
+// bounds the OPT wrote and each end marked by its included flag:
+// ">2..<3" when both ends are excluded, "2..3" when both are closed.
+func writtenBounds(lower, upper int, lowerIncluded, upperIncluded bool) string {
+	lowerMark, upperMark := "", ""
+	if !lowerIncluded {
+		lowerMark = ">"
+	}
+	if !upperIncluded {
+		upperMark = "<"
+	}
+	return fmt.Sprintf("%s%d..%s%d", lowerMark, lower, upperMark, upper)
 }
 
 func collectAssertions(xs []xmlAssertion) []string {

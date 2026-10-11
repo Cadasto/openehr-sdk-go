@@ -33,7 +33,9 @@ type xmlNumericInterval struct {
 	Upper string `xml:"upper"`
 }
 
-// xmlBoolFlag is the true_valid or false_valid element of a C_BOOLEAN.
+// xmlBoolFlag is the true_valid or false_valid element of a C_BOOLEAN,
+// or the lower_included or upper_included element of an occurrences,
+// existence or cardinality interval.
 // A plain bool field would read an empty element as false. This type
 // leaves an empty or whitespace-only element unset instead, so it reads
 // exactly like an omitted one. Any other text is parsed with
@@ -66,6 +68,15 @@ func (f *xmlBoolFlag) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 // or empty.
 func (f xmlBoolFlag) orTrue() bool {
 	return !f.set || f.value
+}
+
+// ptr returns a pointer to the flag's value, or nil when the element was
+// omitted or empty.
+func (f xmlBoolFlag) ptr() *bool {
+	if !f.set {
+		return nil
+	}
+	return &f.value
 }
 
 // xmlPrimitiveListItem captures one <list> entry inside a primitive

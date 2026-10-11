@@ -169,6 +169,12 @@ type ObjectNode interface {
 // existence and occurrences blocks. Fields are unexported to keep
 // parsed intervals immutable from outside the package; only the
 // parser constructs values (there is no public constructor).
+//
+// A Multiplicity counts whole items, so every bounded side of a parsed
+// Multiplicity is closed: the parser turns an end the OPT excludes into
+// the closed end it stands for. An OPT interval ">0..<3" gives Lower 1
+// and Upper 2, and the bound of any side that is not unbounded is
+// always inclusive.
 type Multiplicity struct {
 	lower          int
 	upper          int
