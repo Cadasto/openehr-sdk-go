@@ -29,3 +29,25 @@ func init() {
 		return typereg.DecodePolymorphic(dec, out, nil)
 	}))
 }
+
+// PolymorphicClass reports the BMM classes behind the polymorphic
+// interface of this package that p points to, for code that reads the
+// classes a decode target's Go type declares. class is the class the
+// interface stands for: an abstract class, or for a narrow interface
+// (<Parent>Like) its parent class. fallback is the class a value that
+// leaves out `_type` decodes as, which is the parent class of a narrow
+// interface; it is empty where the decoder refuses such a value. ok is false
+// when p points to no polymorphic interface of this package.
+func PolymorphicClass(p any) (class, fallback string, ok bool) {
+	switch p.(type) {
+	case *CAttribute:
+		return "C_ATTRIBUTE", "", true
+	case *CObject:
+		return "C_OBJECT", "", true
+	case *CPrimitive:
+		return "C_PRIMITIVE", "", true
+	case *ExprItem:
+		return "EXPR_ITEM", "", true
+	}
+	return "", "", false
+}
