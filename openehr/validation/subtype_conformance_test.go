@@ -169,19 +169,19 @@ func TestValidateFolder_REQ102_ReferenceSubtypeUnderObjectRefChild(t *testing.T)
 			name:     "bound PARTY_REF is walked",
 			itemType: "OBJECT_REF",
 			item:     noNamespace,
-			want:     []string{"required /items[@1]/namespace"},
+			want:     []string{"required /items[1]/namespace"},
 		},
 		{
 			name:     "OBJECT_REF under PARTY_REF",
 			itemType: "PARTY_REF",
 			item:     objectRef,
-			want:     []string{"rm_type_mismatch /items[@1]"},
+			want:     []string{"rm_type_mismatch /items[1]"},
 		},
 		{
 			name:     "PARTY_REF under LOCATABLE_REF",
 			itemType: "LOCATABLE_REF",
 			item:     partyRef(),
-			want:     []string{"rm_type_mismatch /items[@1]"},
+			want:     []string{"rm_type_mismatch /items[1]"},
 		},
 	}
 	for _, tc := range tests {
@@ -263,7 +263,7 @@ func TestValidateDemographic_REQ102_ExactTypeItemChildBindsFirst(t *testing.T) {
 		item rm.DVTextLike
 		want []string
 	}{
-		{name: "code outside the list", item: localCoded("at9999"), want: []string{"primitive_not_in_list /languages[@1]/defining_code"}},
+		{name: "code outside the list", item: localCoded("at9999"), want: []string{"primitive_not_in_list /languages[1]/defining_code"}},
 		{name: "code in the list", item: localCoded("at0002"), want: []string{}},
 		{name: "plain text", item: rm.DVText{Value: "en"}, want: []string{}},
 	}
@@ -621,7 +621,7 @@ func TestValidateDemographic_REQ102_SlotSkippedInConformanceTier(t *testing.T) {
 	p.Languages = []rm.DVTextLike{rm.DVCodedText{
 		DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "local"}, CodeString: "at0001"},
 	}}
-	want := []string{"required /languages[@1]/value"}
+	want := []string{"required /languages[1]/value"}
 	if got := issueKeys(validation.ValidateDemographic(p, c).Issues); !slices.Equal(got, want) {
 		t.Errorf("ValidateDemographic(DV_CODED_TEXT language under [DV_TEXT slot, DV_TEXT]) issues = %q, want %q", got, want)
 	}

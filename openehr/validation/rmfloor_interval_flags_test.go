@@ -116,7 +116,7 @@ func TestValidateRM_REQ112_IntervalFlags(t *testing.T) {
 					}},
 				}
 			},
-			path: "/other_reference_ranges[0]/range",
+			path: "/other_reference_ranges[1]/range",
 		},
 	}
 	patterns := []struct {

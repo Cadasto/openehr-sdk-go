@@ -90,7 +90,7 @@ func ValidateRM(root any) Result {
 		}})
 	}
 	w := &rmFloorWalker{info: rminfo.Default}
-	w.walk(root, rmType, "/", 0)
+	w.walk(root, rmType, "/", roleNone, 0)
 	return resultFromIssues(w.issues)
 }
 
@@ -148,10 +148,38 @@ func ValidateRMDemographic(party rm.Party) Result {
 type rmFloorWalker struct {
 	info   rminfo.Lookup
 	issues []Issue
-	// blankCodeAllowed holds the paths of the CODE_PHRASE nodes whose
-	// code_string may be blank: the defining_code of each DV_SCALE symbol
-	// the walk has reached (see [rmFloorWalker.allowScaleSymbolWithoutCode]).
-	blankCodeAllowed map[string]bool
+	// names gives the name the OPT pins on the node an item binds to, so
+	// the floor writes an item's path as the template walk does
+	// ([itemPaths]). The floor on its own binds no OPT node, so it leaves
+	// names nil and writes no name predicate.
+	names pinnedNames
+}
+
+// floorRole is what the floor knows of a node from where it sits, beyond
+// its RM type. It is carried down the walk, never looked up by path, so two
+// nodes that share a path cannot share a role.
+type floorRole uint8
+
+const (
+	// roleNone is every node the roles below do not name.
+	roleNone floorRole = iota
+	// roleScaleSymbol is the symbol of a DV_SCALE.
+	roleScaleSymbol
+	// roleScaleSymbolCode is the defining_code of a DV_SCALE symbol, whose
+	// code_string may be blank (see [scaleSymbolMayHaveNoCode]).
+	roleScaleSymbolCode
+)
+
+// childRole returns the role of the node under attr of a node of RM class
+// class that has role.
+func childRole(class string, role floorRole, attr string) floorRole {
+	switch {
+	case class == "DV_SCALE" && attr == "symbol":
+		return roleScaleSymbol
+	case role == roleScaleSymbol && attr == "defining_code":
+		return roleScaleSymbolCode
+	}
+	return roleNone
 }
 
 func (w *rmFloorWalker) emit(i Issue) {
@@ -161,11 +189,13 @@ func (w *rmFloorWalker) emit(i Issue) {
 	w.issues = append(w.issues, i)
 }
 
-// walk descends value (of declared BMM type rmType) at the given AQL
-// path. It first runs the per-type invariants on the current node, then,
-// for types the floor handles (see [rmread.Handles]), iterates every
-// BMM-known attribute, emitting `required` for any RM-mandatory attribute
-// that is absent or empty and recursing into every present attribute.
+// walk descends value (of declared BMM type rmType, in role role) at the
+// given issue path. It first runs the per-type invariants on the current
+// node, then, for types the floor handles (see [rmread.Handles]), iterates
+// every BMM-known attribute, emitting `required` for any RM-mandatory
+// attribute that is absent or empty and recursing into every present
+// attribute. The items of a multi-valued attribute are written by the path
+// rule the template walk shares ([itemPaths]).
 //
 // A type the floor does not handle is a leaf here: the reference types
 // (OBJECT_REF and its subtypes) and the id types a reference holds, which
@@ -177,11 +207,11 @@ func (w *rmFloorWalker) emit(i Issue) {
 // same gate stops descent into a flattened scalar a reader surfaces
 // directly: CODE_PHRASE.terminology_id comes back as a Go string, which is
 // not an RM node to walk.
-func (w *rmFloorWalker) walk(value any, rmType string, path string, depth int) {
+func (w *rmFloorWalker) walk(value any, rmType string, path string, role floorRole, depth int) {
 	if value == nil || rmread.IsTypedNilPointer(value) {
 		return
 	}
-	w.checkInvariants(value, rmType, path)
+	w.checkInvariants(value, rmType, path, role)
 	// The coded invariants (REQ-112) run as their own pass rather than as
 	// checkInvariants arms: that switch stops at its first match, and a
 	// COMPOSITION or an ENTRY already lands on the archetype-root arm. Like
@@ -247,8 +277,9 @@ func (w *rmFloorWalker) walk(value any, rmType string, path string, depth int) {
 					Detail: fmt.Sprintf("RM-mandatory multi-valued attribute %q must be non-empty on %s", attr, rmType),
 				})
 			}
-			for i, k := range kids {
-				w.walk(k, runtimeRMType(k, attrType), fmt.Sprintf("%s[%d]", attrPath, i), depth+1)
+			kidRole := childRole(class, role, attr)
+			for i, kidPath := range w.itemPaths(attrPath, kids) {
+				w.walk(kids[i], runtimeRMType(kids[i], attrType), kidPath, kidRole, depth+1)
 			}
 			continue
 		}
@@ -256,7 +287,7 @@ func (w *rmFloorWalker) walk(value any, rmType string, path string, depth int) {
 		// Single-valued attribute.
 		val, hadField := rmread.ReadSingle(value, rmType, attr)
 		if !hadField || val == nil || rmread.IsTypedNilPointer(val) {
-			if required && !w.mayBeBlank(path, attr) {
+			if required && !mayBeBlank(role, attr) {
 				w.emit(Issue{
 					Path:   attrPath,
 					Code:   "required",
@@ -265,8 +296,22 @@ func (w *rmFloorWalker) walk(value any, rmType string, path string, depth int) {
 			}
 			continue
 		}
-		w.walk(val, runtimeRMType(val, attrType), attrPath, depth+1)
+		w.walk(val, runtimeRMType(val, attrType), attrPath, childRole(class, role, attr), depth+1)
 	}
+}
+
+// itemPaths returns the issue path of each of the items kids of the
+// multi-valued attribute at attrPath: the shared path rule ([itemPaths]),
+// fed each item's archetype_node_id and the name w.names pins for it.
+func (w *rmFloorWalker) itemPaths(attrPath string, kids []any) []string {
+	items := make([]pathItem, len(kids))
+	for i, k := range kids {
+		items[i] = pathItem{
+			id:   locatableArchetypeNodeID(k),
+			name: w.names[itemKey{attrPath: attrPath, index: i}],
+		}
+	}
+	return itemPaths(attrPath, items)
 }
 
 // runtimeRMType resolves the RM type to descend into: the value's runtime
@@ -299,10 +344,10 @@ func setFromSlice(s []string) map[string]bool {
 // The catalogue is intentionally small (REQ-112 first cycle) — additions
 // land per the BMM-bump runbook and any spec refresh. Unknown types are
 // silently skipped (this is a floor, not an exhaustive RM check).
-func (w *rmFloorWalker) checkInvariants(value any, rmType, path string) {
+func (w *rmFloorWalker) checkInvariants(value any, rmType, path string, role floorRole) {
 	switch {
 	case rmType == "CODE_PHRASE":
-		w.checkCodePhrase(value, path)
+		w.checkCodePhrase(value, path, role)
 	case rmType == "DV_QUANTITY":
 		w.checkDVQuantity(value, path)
 	case rmType == "DV_PROPORTION":
@@ -326,8 +371,6 @@ func (w *rmFloorWalker) checkInvariants(value any, rmType, path string) {
 		w.checkTermMapping(value, path)
 	case rmType == "ARCHETYPED":
 		w.checkArchetyped(value, path)
-	case rmType == "DV_SCALE":
-		w.allowScaleSymbolWithoutCode(path)
 	case rmType == "DV_DATE_TIME", rmType == "DV_DATE", rmType == "DV_TIME", rmType == "DV_DURATION":
 		w.checkTemporalValue(value, rmType, path)
 	case rmType == "ELEMENT":
@@ -397,15 +440,15 @@ func (w *rmFloorWalker) checkArchetyped(value any, path string) {
 
 // checkCodePhrase enforces the RM spec floor on CODE_PHRASE: the
 // code_string MUST be non-empty when the value is present, except on a
-// DV_SCALE symbol's defining_code (see
-// [rmFloorWalker.allowScaleSymbolWithoutCode]). (The terminology_id absence
-// is already RM-required and caught by the floor's required-set walk.)
-func (w *rmFloorWalker) checkCodePhrase(value any, path string) {
+// DV_SCALE symbol's defining_code (see [scaleSymbolMayHaveNoCode]). (The
+// terminology_id absence is already RM-required and caught by the floor's
+// required-set walk.)
+func (w *rmFloorWalker) checkCodePhrase(value any, path string, role floorRole) {
 	cp, ok := asCodePhrase(value)
 	if !ok {
 		return
 	}
-	if cp.CodeString == "" && !w.blankCodeAllowed[path] {
+	if cp.CodeString == "" && !scaleSymbolMayHaveNoCode(role) {
 		w.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
@@ -414,27 +457,25 @@ func (w *rmFloorWalker) checkCodePhrase(value any, path string) {
 	}
 }
 
-// allowScaleSymbolWithoutCode lets the DV_SCALE at path carry a symbol with
-// no code. The RM's DV_SCALE.symbol allows a scale value that has none: its
-// symbol is then a DV_CODED_TEXT carrying the terminology_id and a blank
-// code_string. The CODE_PHRASE at the symbol's defining_code therefore reports
-// neither the non-empty code_string invariant nor a `required` code_string.
-// The exemption covers that one node only: a blank terminology_id, the
-// symbol's own value, a DV_ORDINAL symbol, and every other CODE_PHRASE under
-// the scale are checked as usual. It runs before the walk descends into the
-// scale, so the exemption is in place when the defining_code is reached.
-func (w *rmFloorWalker) allowScaleSymbolWithoutCode(path string) {
-	if w.blankCodeAllowed == nil {
-		w.blankCodeAllowed = map[string]bool{}
-	}
-	w.blankCodeAllowed[joinPath(path, "/symbol/defining_code")] = true
+// scaleSymbolMayHaveNoCode reports whether a CODE_PHRASE in role may carry a
+// blank code_string. The RM's DV_SCALE.symbol allows a scale value that has
+// no code: its symbol is then a DV_CODED_TEXT carrying the terminology_id and
+// a blank code_string. The CODE_PHRASE at the symbol's defining_code therefore
+// reports neither the non-empty code_string invariant nor a `required`
+// code_string. The exemption covers that one node only: a blank
+// terminology_id, the symbol's own value, a DV_ORDINAL symbol, and every other
+// CODE_PHRASE under the scale are checked as usual. The walk hands the role
+// down from the DV_SCALE ([childRole]), so the exemption follows the node and
+// not its path, which another node may share.
+func scaleSymbolMayHaveNoCode(role floorRole) bool {
+	return role == roleScaleSymbolCode
 }
 
-// mayBeBlank reports whether the RM-mandatory attr on the node at path is
+// mayBeBlank reports whether the RM-mandatory attr on a node in role is
 // exempt from the required-set check. Only the code_string of a DV_SCALE
-// symbol's defining_code is (see [rmFloorWalker.allowScaleSymbolWithoutCode]).
-func (w *rmFloorWalker) mayBeBlank(path, attr string) bool {
-	return attr == "code_string" && w.blankCodeAllowed[path]
+// symbol's defining_code is (see [scaleSymbolMayHaveNoCode]).
+func mayBeBlank(role floorRole, attr string) bool {
+	return attr == "code_string" && scaleSymbolMayHaveNoCode(role)
 }
 
 // checkDVQuantity enforces the spec floor on DV_QUANTITY: precision, when

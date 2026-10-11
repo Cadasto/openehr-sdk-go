@@ -87,15 +87,17 @@ func TestValidateComposition_ConstraintFixtures_NoPrimitiveViolations(t *testing
 // C_CODE_PHRASE constraint run instead of skipping the attribute.
 // Test_dv_multimedia_open_constraint.v0 pins media_type to the closed code
 // list [application/pdf] while its instance carries application/dicom. The
-// instance has three events, all at at0002, so the one path is reported
-// three times, and the report is exactly those three violations.
+// instance has three events, all at at0002, so each is written by its
+// position (REQ-102 § Issue paths), and the report is exactly those three
+// violations.
 func TestValidateComposition_ConstraintFixture_MultimediaViolation(t *testing.T) {
 	const id = "Test_dv_multimedia_open_constraint.v0"
-	const mediaType = "/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0028]/value/media_type"
+	const events = "/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events"
+	const mediaType = "/data/items[at0028]/value/media_type"
 	want := []string{
-		"primitive_not_in_list " + mediaType,
-		"primitive_not_in_list " + mediaType,
-		"primitive_not_in_list " + mediaType,
+		"primitive_not_in_list " + events + "[1]" + mediaType,
+		"primitive_not_in_list " + events + "[2]" + mediaType,
+		"primitive_not_in_list " + events + "[3]" + mediaType,
 	}
 	assertFixtureIssues(t, id, want)
 }
@@ -103,16 +105,17 @@ func TestValidateComposition_ConstraintFixture_MultimediaViolation(t *testing.T)
 // REQ-103 and REQ-110: a BOOLEAN AOM short name on a DV wrapper's scalar
 // channel validates against the OPT's C_BOOLEAN constraint.
 // Test_dv_boolean_true_false.v0 pins false_valid=false while its instance
-// carries false. The instance has three events, all at at0002, so the one
-// path is reported three times, and the report is exactly those three
-// violations.
+// carries false. The instance has three events, all at at0002, so each is
+// written by its position (REQ-102 § Issue paths), and the report is exactly
+// those three violations.
 func TestValidateComposition_ConstraintFixture_BooleanViolation(t *testing.T) {
 	const id = "Test_dv_boolean_true_false.v0"
-	const value = "/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0029]/value/value"
+	const events = "/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events"
+	const value = "/data/items[at0029]/value/value"
 	want := []string{
-		"primitive_not_in_list " + value,
-		"primitive_not_in_list " + value,
-		"primitive_not_in_list " + value,
+		"primitive_not_in_list " + events + "[1]" + value,
+		"primitive_not_in_list " + events + "[2]" + value,
+		"primitive_not_in_list " + events + "[3]" + value,
 	}
 	assertFixtureIssues(t, id, want)
 }
@@ -120,16 +123,17 @@ func TestValidateComposition_ConstraintFixture_BooleanViolation(t *testing.T) {
 // REQ-103 and REQ-110: an INTEGER magnitude on DV_COUNT's scalar channel
 // validates against the OPT's C_INTEGER range.
 // Test_dv_count_range_constraint.v0 pins magnitude to [10..20] while its
-// instance carries 25. The instance has three events, all at at0002, so the
-// one path is reported three times, and the report is exactly those three
-// violations.
+// instance carries 25. The instance has three events, all at at0002, so
+// each is written by its position (REQ-102 § Issue paths), and the report is
+// exactly those three violations.
 func TestValidateComposition_ConstraintFixture_CountRangeViolation(t *testing.T) {
 	const id = "Test_dv_count_range_constraint.v0"
-	const magnitude = "/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0042]/value/magnitude"
+	const events = "/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events"
+	const magnitude = "/data/items[at0042]/value/magnitude"
 	want := []string{
-		"primitive_out_of_range " + magnitude,
-		"primitive_out_of_range " + magnitude,
-		"primitive_out_of_range " + magnitude,
+		"primitive_out_of_range " + events + "[1]" + magnitude,
+		"primitive_out_of_range " + events + "[2]" + magnitude,
+		"primitive_out_of_range " + events + "[3]" + magnitude,
 	}
 	assertFixtureIssues(t, id, want)
 }
@@ -137,15 +141,16 @@ func TestValidateComposition_ConstraintFixture_CountRangeViolation(t *testing.T)
 // REQ-103: Test_dv_parsable_open_constraint.v0 pins DV_PARSABLE.formalism to
 // the closed list [text/plain] (the C_STRING sets no list_open), while its
 // instance carries abc. The instance has three events, all at at0002, and
-// each holds the same element, so the one path is reported three times.
-// The report is exactly those three violations.
+// each holds the same element, so each event is written by its position
+// (REQ-102 § Issue paths). The report is exactly those three violations.
 func TestValidateComposition_ConstraintFixture_ParsableViolation(t *testing.T) {
 	const id = "Test_dv_parsable_open_constraint.v0"
-	const formalism = "/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0028]/value/formalism"
+	const events = "/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events"
+	const formalism = "/data/items[at0028]/value/formalism"
 	want := []string{
-		"primitive_not_in_list " + formalism,
-		"primitive_not_in_list " + formalism,
-		"primitive_not_in_list " + formalism,
+		"primitive_not_in_list " + events + "[1]" + formalism,
+		"primitive_not_in_list " + events + "[2]" + formalism,
+		"primitive_not_in_list " + events + "[3]" + formalism,
 	}
 	assertFixtureIssues(t, id, want)
 }

@@ -175,7 +175,9 @@ func issueKeys(issues []validation.Issue) []string {
 // REQ-102 — a PARTICIPATION under EVENT_CONTEXT.participations binds to
 // the PARTICIPATION child by RM type: a valid one passes, one without
 // its function is walked and gets `required` at …/function, and a
-// second one exceeds the child's occurrences 0..1.
+// second one exceeds the child's occurrences 0..1. That child declares no
+// id, so its cardinality is written at the attribute (REQ-102 § Issue
+// paths).
 func TestValidateComposition_REQ102_ParticipationsBindByRMType(t *testing.T) {
 	c := mustCompileSyntheticOPT(t, participationsOPT)
 	noFunction := validParticipation()
@@ -194,12 +196,12 @@ func TestValidateComposition_REQ102_ParticipationsBindByRMType(t *testing.T) {
 		{
 			name:  "bound participation is walked",
 			parts: []rm.Participation{noFunction},
-			want:  []string{"required /context/participations[@1]/function"},
+			want:  []string{"required /context/participations[1]/function"},
 		},
 		{
 			name:  "bound participations count toward occurrences",
 			parts: []rm.Participation{validParticipation(), validParticipation()},
-			want:  []string{"cardinality /context/participations[@1]"},
+			want:  []string{"cardinality /context/participations"},
 		},
 	}
 	for _, tc := range tests {
@@ -264,7 +266,7 @@ func TestValidateDemographic_REQ102_ActorListsBindByRMType(t *testing.T) {
 			name:      "bound role is walked",
 			languages: dvText,
 			mutate:    func(p *rm.Person) { p.Roles[0].Namespace = "" },
-			want:      []string{"required /roles[@1]/namespace"},
+			want:      []string{"required /roles[1]/namespace"},
 		},
 		{
 			name:      "an abstract supertype child admits the item",
@@ -279,58 +281,60 @@ func TestValidateDemographic_REQ102_ActorListsBindByRMType(t *testing.T) {
 		{
 			name:      "one child that does not admit the item",
 			languages: dvCodedText,
-			want:      []string{"rm_type_mismatch /languages[@1]"},
+			want:      []string{"rm_type_mismatch /languages[1]"},
 		},
 		{
 			name:      "two children that do not admit the item",
 			languages: dvCodedText + dvCodedText,
-			want:      []string{"alternative_mismatch /languages[@1]"},
+			want:      []string{"alternative_mismatch /languages[1]"},
 		},
 		{
 			// Both children admit a DV_TEXT; binding to the first puts two
 			// items on a child that allows one, binding to the last does not.
+			// The child declares no id, so its cardinality is written at the
+			// attribute (REQ-102 § Issue paths).
 			name:      "the first child that admits the item binds it",
 			languages: dvTextAtMostOnce + dataValue,
 			mutate: func(p *rm.Person) {
 				p.Languages = []rm.DVTextLike{rm.DVText{Value: "en"}, rm.DVText{Value: "nl"}}
 			},
-			want: []string{"cardinality /languages[@1]"},
+			want: []string{"cardinality /languages"},
 		},
 		{
 			name:      "a slot child is skipped for the next non-slot child",
 			languages: dvTextSlot + dvText,
 			mutate:    func(p *rm.Person) { p.Languages = []rm.DVTextLike{rm.DVText{}} },
-			want:      []string{"required /languages[@1]/value"},
+			want:      []string{"required /languages[1]/value"},
 		},
 		{
 			name:      "nil item is not bound",
 			languages: dvText,
 			mutate:    nilLanguage,
-			want:      []string{"rm_type_mismatch /languages[@1]"},
+			want:      []string{"rm_type_mismatch /languages[1]"},
 		},
 		{
 			name:      "nil item is not bound to an untyped child",
 			languages: untyped,
 			mutate:    nilLanguage,
-			want:      []string{"rm_type_mismatch /languages[@1]"},
+			want:      []string{"rm_type_mismatch /languages[1]"},
 		},
 		{
 			name:      "nil item under two children",
 			languages: dvText + dvCodedText,
 			mutate:    nilLanguage,
-			want:      []string{"alternative_mismatch /languages[@1]"},
+			want:      []string{"alternative_mismatch /languages[1]"},
 		},
 		{
 			name:      "typed-nil item is not bound",
 			languages: dvText,
 			mutate:    typedNilLanguage,
-			want:      []string{"rm_type_mismatch /languages[@1]"},
+			want:      []string{"rm_type_mismatch /languages[1]"},
 		},
 		{
 			name:      "typed-nil item is not bound to an untyped child",
 			languages: untyped,
 			mutate:    typedNilLanguage,
-			want:      []string{"rm_type_mismatch /languages[@1]"},
+			want:      []string{"rm_type_mismatch /languages[1]"},
 		},
 		{
 			name:      "LOCATABLE with an unknown node id is a slot_fill",
@@ -342,7 +346,7 @@ func TestValidateDemographic_REQ102_ActorListsBindByRMType(t *testing.T) {
 			name:      "LOCATABLE without a node id is a slot_fill",
 			languages: dvText,
 			mutate:    func(p *rm.Person) { p.Identities[0].ArchetypeNodeID = "" },
-			want:      []string{"slot_fill /identities[@1]"},
+			want:      []string{"slot_fill /identities[1]"},
 		},
 	}
 	for _, tc := range tests {
@@ -414,7 +418,7 @@ func TestValidateComposition_REQ102_NilContentItemKeepsSlotFill(t *testing.T) {
 	comp.Content = []rm.ContentItem{nil}
 
 	r := validation.ValidateComposition(comp, c)
-	want := []string{"slot_fill /content[@1]"}
+	want := []string{"slot_fill /content[1]"}
 	if got := issueKeys(r.Issues); !slices.Equal(got, want) {
 		t.Errorf("ValidateComposition issues = %q, want %q", got, want)
 	}
@@ -438,7 +442,7 @@ func TestValidateComposition_REQ102_NilItemUnderOpenAttributePasses(t *testing.T
         <rm_type_name>OBSERVATION</rm_type_name>
         <node_id>at0001</node_id>
       </children>`,
-			want: []string{"slot_fill /content[@1]"},
+			want: []string{"slot_fill /content[1]"},
 		},
 	}
 	for _, tc := range tests {
@@ -524,7 +528,7 @@ func TestValidateFolder_REQ102_ItemsBindByRMType(t *testing.T) {
 			name:     "OBJECT_REF without namespace is walked",
 			itemType: "OBJECT_REF",
 			items:    []rm.ObjectRefLike{noNamespace},
-			want:     []string{"required /items[@1]/namespace"},
+			want:     []string{"required /items[1]/namespace"},
 		},
 		{
 			name:     "full LOCATABLE_REF binds",
@@ -536,7 +540,7 @@ func TestValidateFolder_REQ102_ItemsBindByRMType(t *testing.T) {
 			name:     "nil item is a type mismatch",
 			itemType: "OBJECT_REF",
 			items:    []rm.ObjectRefLike{nil},
-			want:     []string{"rm_type_mismatch /items[@1]"},
+			want:     []string{"rm_type_mismatch /items[1]"},
 		},
 	}
 	for _, tc := range tests {

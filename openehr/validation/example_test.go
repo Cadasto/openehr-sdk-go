@@ -33,7 +33,7 @@ func ExampleValidateRM() {
 	}
 	// Output:
 	// OK: false
-	// rm_invariant at /items[0]
+	// rm_invariant at /items[at0004]
 }
 
 // reportOPT is a minimal operational template: a COMPOSITION whose content

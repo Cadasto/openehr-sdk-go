@@ -241,27 +241,27 @@ func TestValidateRM_NestedArchetypeRootsAndArchetyped(t *testing.T) {
 		{
 			name: "EVALUATION in content without archetype_details",
 			body: compositionJSON(root, evaluationJSON("")),
-			want: []string{"is_archetype_root /content[0]/archetype_details"},
+			want: []string{"is_archetype_root /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/archetype_details"},
 		},
 		{
 			name: "EVALUATION in a SECTION without archetype_details",
 			body: compositionJSON(root, sectionJSON(evaluationJSON(archetypedJSON(evaluationID))), sectionJSON(evaluationJSON(""))),
-			want: []string{"is_archetype_root /content[1]/items[0]/archetype_details"},
+			want: []string{"is_archetype_root /content[2]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/archetype_details"},
 		},
 		{
 			name: "EVALUATION with an incomplete ARCHETYPED",
 			body: compositionJSON(root, evaluationJSON(incomplete)),
 			want: []string{
-				"required /content[0]/archetype_details/archetype_id/value",
-				"rm_version_valid /content[0]/archetype_details/rm_version",
+				"required /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/archetype_details/archetype_id/value",
+				"rm_version_valid /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/archetype_details/rm_version",
 			},
 		},
 		{
 			name: "CLUSTER with an incomplete ARCHETYPED",
 			body: compositionJSON(root, evaluationJSON(archetypedJSON(evaluationID), clusterJSON(incomplete))),
 			want: []string{
-				"required /content[0]/data/items[0]/archetype_details/archetype_id/value",
-				"rm_version_valid /content[0]/data/items[0]/archetype_details/rm_version",
+				"required /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[openEHR-EHR-CLUSTER.anatomical_location.v1]/archetype_details/archetype_id/value",
+				"rm_version_valid /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[openEHR-EHR-CLUSTER.anatomical_location.v1]/archetype_details/rm_version",
 			},
 		},
 		{

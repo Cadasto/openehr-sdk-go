@@ -184,7 +184,7 @@ func valueCases() []valueCase {
 				})
 			},
 			code:    "term_mapping_match",
-			path:    "/mappings[0]/match",
+			path:    "/mappings[1]/match",
 			markers: []string{"Ω"},
 			want:    rm.Character("Ω"),
 		},
@@ -331,7 +331,7 @@ func TestREQ168_EmptyValue(t *testing.T) {
 				})
 			},
 			code:  "rm_invariant",
-			paths: []string{"/items[0]/id", "/items[0]/type", "/items[0]/namespace"},
+			paths: []string{"/items[1]/id", "/items[1]/type", "/items[1]/namespace"},
 		},
 		{
 			name:  "mappings_valid",

@@ -29,12 +29,12 @@ func TestREQ112_FloorReportsAMissingReferencePartOnce(t *testing.T) {
 			ArchetypeNodeID: "openEHR-DEMOGRAPHIC-PERSON.person.v1",
 			Name:            rm.DVText{Value: "person"},
 			Roles:           []rm.PartyRef{{}},
-		}, at: "/roles[0]"},
+		}, at: "/roles[1]"},
 		{name: "FOLDER.items member", root: &rm.Folder{
 			ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 			Name:            rm.DVText{Value: "folder"},
 			Items:           []rm.ObjectRefLike{rm.PartyRef{}},
-		}, at: "/items[0]"},
+		}, at: "/items[1]"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -13,13 +13,11 @@ import (
 // against a compiled OPT and returns every issue in one pass.
 //
 // The walk is template-driven (see package doc): the compiled OPT
-// drives traversal and the composition is the value source. Path
-// strings are built incrementally as the walker descends: OPT-side
-// attribute names contribute the segments and matched RM children
-// contribute the bracket predicates. The composition's at-codes
-// therefore appear in [Issue.Path] only on nodes the walker actually
-// bound to an OPT child; missing required nodes report at the parent
-// attribute path without a composition-side predicate.
+// drives traversal and the composition is the value source. Each
+// issue's path is written as [Issue.Path] describes, by the same rule
+// [ValidateRM] uses: a required attribute that is absent is reported at
+// the attribute's own path, and a required node the composition lacks
+// at the path the template gives it.
 //
 // Returns a [Result] whose Issues slice is never nil (zero-length
 // allocation when no issues fire).

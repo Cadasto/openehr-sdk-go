@@ -245,42 +245,44 @@ type Probe030Input struct {
 var probe030SkipFloor = map[string][]string{
 	// clinical_notes.v0 leaves required RM attributes absent or empty, for
 	// example the empty string at action_archetype_id. Its DV_DURATION and
-	// DV_DATE_TIME elements under description/items[2] carry a JSON null
-	// `value`, which the floor reports twice: as a missing mandatory
-	// attribute and as a Value_valid failure (the empty string is not an
-	// ISO 8601 value).
+	// DV_DATE_TIME elements under the therapeutic_direction cluster of the
+	// activity's description carry a JSON null `value`, which the floor
+	// reports twice: as a missing mandatory attribute and as a Value_valid
+	// failure (the empty string is not an ISO 8601 value).
 	"compositions/clinical_notes.v0.json": {
-		"required /content[0]/data/origin",
-		"required /content[0]/data/events[0]/time",
-		"required /content[2]/narrative",
-		"required /content[2]/activities[0]/timing/value",
-		"required /content[2]/activities[0]/timing/formalism",
-		"required /content[2]/activities[0]/action_archetype_id",
-		"rm_invariant /content[2]/activities[0]/description/items[2]/items[0]/value",
-		"required /content[2]/activities[0]/description/items[2]/items[0]/value/value",
-		"rm_invariant /content[2]/activities[0]/description/items[2]/items[1]/value",
-		"required /content[2]/activities[0]/description/items[2]/items[1]/value/value",
-		"rm_invariant /content[2]/activities[0]/description/items[2]/items[2]/value",
-		"required /content[2]/activities[0]/description/items[2]/items[2]/value/value",
+		"required /content[openEHR-EHR-OBSERVATION.story.v1]/data/origin",
+		"required /content[openEHR-EHR-OBSERVATION.story.v1]/data/events[at0002]/time",
+		"required /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/narrative",
+		"required /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/timing/value",
+		"required /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/timing/formalism",
+		"required /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/action_archetype_id",
+		"rm_invariant /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/description/items[openEHR-EHR-CLUSTER.therapeutic_direction.v1]/items[at0066]/value",
+		"required /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/description/items[openEHR-EHR-CLUSTER.therapeutic_direction.v1]/items[at0066]/value/value",
+		"rm_invariant /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/description/items[openEHR-EHR-CLUSTER.therapeutic_direction.v1]/items[at0178]/value",
+		"required /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/description/items[openEHR-EHR-CLUSTER.therapeutic_direction.v1]/items[at0178]/value/value",
+		"rm_invariant /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/description/items[openEHR-EHR-CLUSTER.therapeutic_direction.v1]/items[at0179]/value",
+		"required /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/description/items[openEHR-EHR-CLUSTER.therapeutic_direction.v1]/items[at0179]/value/value",
 	},
 	// Demonstration.v1: seven DV_INTERVAL values (DV_QUANTITY and DV_COUNT
 	// bounds) have lower greater than upper, for example 30 over 12.25 cm.
-	// Five ELEMENTs at items[12] (archetype node at0016, "Boolean") carry both
-	// a DV_BOOLEAN value and a null_flavour, which breaks
-	// Inv_null_flavour_indicated (exactly one of the two is present).
+	// Five ELEMENTs at items[at0016] ("Boolean") carry both a DV_BOOLEAN
+	// value and a null_flavour, which breaks Inv_null_flavour_indicated
+	// (exactly one of the two is present). The last event holds two at0004
+	// clusters, so they are written by their positions, items[2] and
+	// items[3].
 	"compositions/Demonstration.v1.json": {
-		"rm_invariant /content[0]/data/events[0]/data/items[1]/items[4]/value",
-		"rm_invariant /content[0]/data/events[0]/data/items[1]/items[6]/value",
-		"rm_invariant /content[0]/data/events[0]/data/items[1]/items[12]",
-		"rm_invariant /content[0]/data/events[1]/data/items[1]/items[4]/value",
-		"rm_invariant /content[0]/data/events[1]/data/items[1]/items[6]/value",
-		"rm_invariant /content[0]/data/events[1]/data/items[1]/items[12]",
-		"rm_invariant /content[0]/data/events[2]/data/items[1]/items[6]/value",
-		"rm_invariant /content[0]/data/events[2]/data/items[1]/items[12]",
-		"rm_invariant /content[0]/data/events[3]/data/items[1]/items[4]/value",
-		"rm_invariant /content[0]/data/events[3]/data/items[1]/items[12]",
-		"rm_invariant /content[0]/data/events[3]/data/items[2]/items[4]/value",
-		"rm_invariant /content[0]/data/events[3]/data/items[2]/items[12]",
+		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0002]/data/items[at0004]/items[at0023]/value",
+		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0002]/data/items[at0004]/items[at0022]/value",
+		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0002]/data/items[at0004]/items[at0016]",
+		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0033]/data/items[at0004]/items[at0023]/value",
+		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0033]/data/items[at0004]/items[at0022]/value",
+		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0033]/data/items[at0004]/items[at0016]",
+		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0034]/data/items[at0004]/items[at0022]/value",
+		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0034]/data/items[at0004]/items[at0016]",
+		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0035]/data/items[2]/items[at0023]/value",
+		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0035]/data/items[2]/items[at0016]",
+		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0035]/data/items[3]/items[at0023]/value",
+		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0035]/data/items[3]/items[at0016]",
 	},
 	// TestPerson.v2: two DV_MULTIMEDIA.media_type values break
 	// Media_type_valid (REQ-112 Coded invariants), since neither is an IANA
@@ -288,20 +290,23 @@ var probe030SkipFloor = map[string][]string{
 	// code_string is null. The null one is also reported as an empty
 	// CODE_PHRASE and as an absent mandatory attribute.
 	"compositions/TestPerson.v2.json": {
-		"code_not_in_value_set /details/items[12]/items[0]/value/media_type",
-		"code_not_in_value_set /details/items[13]/items[5]/value/media_type",
-		"rm_invariant /details/items[13]/items[5]/value/media_type",
-		"required /details/items[13]/items[5]/value/media_type/code_string",
+		"code_not_in_value_set /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type",
+		"code_not_in_value_set /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type",
+		"rm_invariant /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type",
+		"required /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type/code_string",
 	},
 	// Test_dv_interval_dv_count_open_constraint.v0: a DV_INTERVAL<DV_COUNT>
-	// with lower 200 over upper 100.
+	// with lower 200 over upper 100, in the first of events that share one
+	// archetype node id, so the event is written by its position.
 	"compositions/Test_dv_interval_dv_count_open_constraint.v0.json": {
-		"rm_invariant /content[0]/data/events[0]/data/items[0]/value",
+		"rm_invariant /content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[1]/data/items[at0046]/value",
 	},
 	// Test_dv_interval_dv_quantity_open_constraint.v0: a
-	// DV_INTERVAL<DV_QUANTITY> with lower 200 mm over upper 100 mm.
+	// DV_INTERVAL<DV_QUANTITY> with lower 200 mm over upper 100 mm, in the
+	// first of events that share one archetype node id, so the event is
+	// written by its position.
 	"compositions/Test_dv_interval_dv_quantity_open_constraint.v0.json": {
-		"rm_invariant /content[0]/data/events[0]/data/items[0]/value",
+		"rm_invariant /content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[1]/data/items[at0046]/value",
 	},
 
 	// The entries below omit archetype_details on an archetype root, which
@@ -314,8 +319,8 @@ var probe030SkipFloor = map[string][]string{
 	// breaks Relationship_valid (REQ-112 Coded invariants: the code must be
 	// in the openEHR subject relationship group).
 	"rm/compo_with_nested_party_related.json": {
-		"is_archetype_root /content[0]/items[0]/archetype_details",
-		"code_not_in_value_set /content[0]/items[0]/subject/relationship/defining_code",
+		"is_archetype_root /content[openEHR-EHR-SECTION.allgemeine_angaben.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/archetype_details",
+		"code_not_in_value_set /content[openEHR-EHR-SECTION.allgemeine_angaben.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/subject/relationship/defining_code",
 	},
 	// ehr_status_other_details_simple (EHRbase openEHR_SDK test data): the
 	// EHR_STATUS root has no archetype_details.
@@ -351,7 +356,7 @@ var probe030SkipFloor = map[string][]string{
 	// minimal_evaluation (EHRbase openEHR_SDK test data): the EVALUATION in
 	// content has no archetype_details.
 	"rm/minimal_evaluation.json": {
-		"is_archetype_root /content[0]/archetype_details",
+		"is_archetype_root /content[openEHR-EHR-EVALUATION.minimal.v1]/archetype_details",
 	},
 }
 

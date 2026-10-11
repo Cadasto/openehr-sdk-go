@@ -69,15 +69,14 @@
 // run [Validate], callers without one run [ValidateRM], callers
 // wanting both run both.
 //
-// Path strings in [Issue.Path] are built by appending OPT-side
-// attribute names and matched-child predicates to the parent OPT
-// node's path as the walker descends. The OPT contributes the
-// attribute names; the RM-side archetype_node_id of each matched
-// child contributes the bracket predicate. Composition-supplied
-// predicates therefore appear in the path only on RM nodes the
-// walker has bound to an OPT child. A composition missing an
-// OPT-required node is flagged at the parent attribute's path
-// (no descent) rather than silently bypassed.
+// The template-driven validators and [ValidateRM] write [Issue.Path] by
+// one rule, so a node has one path whichever of them reports it: an
+// item of a multi-valued attribute is written by its archetype node id
+// when that id is unique among its siblings, and otherwise by the name
+// the template gives its node or by its position. A composition missing
+// an OPT-required attribute is flagged at the attribute's path, and one
+// missing an OPT-required node at the path the template gives that node,
+// rather than silently bypassed.
 //
 // # Collect-all
 //

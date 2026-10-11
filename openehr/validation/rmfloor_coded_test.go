@@ -222,7 +222,7 @@ func codedRows() []codedRow {
 				ev.OtherParticipations = []rm.Participation{{Function: codedTextOf(c), Performer: rm.PartySelf{}}}
 				return ev
 			},
-			path: "/other_participations[0]/function/defining_code", valid: openEHRCode("253"), breach: openEHRCode("999"),
+			path: "/other_participations[1]/function/defining_code", valid: openEHRCode("253"), breach: openEHRCode("999"),
 		},
 		{
 			name: "PARTICIPATION mode", invariant: "Mode_valid", group: terminology.ParticipationMode,
@@ -232,7 +232,7 @@ func codedRows() []codedRow {
 				ev.OtherParticipations = []rm.Participation{{Function: rm.DVText{Value: "nurse"}, Mode: &mode, Performer: rm.PartySelf{}}}
 				return ev
 			},
-			path: "/other_participations[0]/mode/defining_code", valid: openEHRCode("193"), breach: openEHRCode("9999"),
+			path: "/other_participations[1]/mode/defining_code", valid: openEHRCode("193"), breach: openEHRCode("9999"),
 		},
 		{
 			name: "PARTY_RELATED relationship", invariant: "Relationship_valid", group: terminology.SubjectRelationship,
@@ -249,7 +249,7 @@ func codedRows() []codedRow {
 				purpose := codedTextOf(c)
 				return &rm.DVText{Value: "x", Mappings: []rm.TermMapping{{Match: "=", Target: phrase("SNOMED-CT", "123"), Purpose: &purpose}}}
 			},
-			path: "/mappings[0]/purpose/defining_code", valid: openEHRCode("669"), breach: openEHRCode("9999"),
+			path: "/mappings[1]/purpose/defining_code", valid: openEHRCode("669"), breach: openEHRCode("9999"),
 		},
 		{
 			name: "DV_TEXT language", invariant: "Language_valid", codeSet: terminology.Languages,
@@ -515,8 +515,8 @@ func TestREQ112_CodedInvariantsAcceptance(t *testing.T) {
 
 	got := codedFindings(validation.ValidateRM(comp).Issues)
 	want := []string{
-		"/content[0]/data/items[0]/null_flavour/defining_code",
-		"/content[0]/encoding",
+		"/content[openEHR-EHR-EVALUATION.problem.v1]/data/items[at0002]/null_flavour/defining_code",
+		"/content[openEHR-EHR-EVALUATION.problem.v1]/encoding",
 		"/context/setting/defining_code",
 		"/language",
 		"/territory",
@@ -704,17 +704,17 @@ func TestREQ112_CodedInvariantGuards(t *testing.T) {
 		{
 			name: "PARTICIPATION function as a DV_CODED_TEXT outside the group",
 			root: withParticipations(rm.Participation{Function: badCode, Performer: rm.PartySelf{}}),
-			want: []string{"code_not_in_value_set /other_participations[0]/function/defining_code"},
+			want: []string{"code_not_in_value_set /other_participations[1]/function/defining_code"},
 		},
 		{
 			name: "PARTICIPATION function as a pointer to a DV_CODED_TEXT outside the group",
 			root: withParticipations(rm.Participation{Function: &badCode, Performer: rm.PartySelf{}}),
-			want: []string{"code_not_in_value_set /other_participations[0]/function/defining_code"},
+			want: []string{"code_not_in_value_set /other_participations[1]/function/defining_code"},
 		},
 		{
 			name: "PARTICIPATION with no function",
 			root: withParticipations(rm.Participation{Performer: rm.PartySelf{}}),
-			want: []string{"required /other_participations[0]/function"},
+			want: []string{"required /other_participations[1]/function"},
 		},
 		{
 			name: "PARTICIPATION mode absent",
@@ -726,14 +726,14 @@ func TestREQ112_CodedInvariantGuards(t *testing.T) {
 				rm.Participation{Function: nurse, Performer: rm.PartySelf{}},
 				rm.Participation{Function: nurse, Mode: &badCode, Performer: rm.PartySelf{}},
 			),
-			want: []string{"code_not_in_value_set /other_participations[1]/mode/defining_code"},
+			want: []string{"code_not_in_value_set /other_participations[2]/mode/defining_code"},
 		},
 		{
 			name: "EVENT_CONTEXT participation function and mode outside their groups",
 			root: withContextParticipations(rm.Participation{Function: badCode, Mode: &badCode, Performer: rm.PartySelf{}}),
 			want: []string{
-				"code_not_in_value_set /context/participations[0]/function/defining_code",
-				"code_not_in_value_set /context/participations[0]/mode/defining_code",
+				"code_not_in_value_set /context/participations[1]/function/defining_code",
+				"code_not_in_value_set /context/participations[1]/mode/defining_code",
 			},
 		},
 		{
@@ -756,12 +756,12 @@ func TestREQ112_CodedInvariantGuards(t *testing.T) {
 		{
 			name: "ENTRY participation performer, a PARTY_RELATED outside the group",
 			root: withParticipations(performer(badRelative)),
-			want: []string{"code_not_in_value_set /other_participations[0]/performer/relationship/defining_code"},
+			want: []string{"code_not_in_value_set /other_participations[1]/performer/relationship/defining_code"},
 		},
 		{
 			name: "ENTRY participation performer, a pointer to a PARTY_RELATED outside the group",
 			root: withParticipations(performer(&badRelative)),
-			want: []string{"code_not_in_value_set /other_participations[0]/performer/relationship/defining_code"},
+			want: []string{"code_not_in_value_set /other_participations[1]/performer/relationship/defining_code"},
 		},
 		{
 			name: "ENTRY participation performer, a PARTY_RELATED in the group",
@@ -771,14 +771,14 @@ func TestREQ112_CodedInvariantGuards(t *testing.T) {
 			name: "ENTRY participation performer, a PARTY_RELATED with no relationship",
 			root: withParticipations(performer(rm.PartyRelated{Name: &relative})),
 			want: []string{
-				"code_not_in_value_set /other_participations[0]/performer/relationship/defining_code",
-				"required /other_participations[0]/performer/relationship",
+				"code_not_in_value_set /other_participations[1]/performer/relationship/defining_code",
+				"required /other_participations[1]/performer/relationship",
 			},
 		},
 		{
 			name: "EVENT_CONTEXT participation performer, a PARTY_RELATED outside the group",
 			root: withContextParticipations(performer(badRelative)),
-			want: []string{"code_not_in_value_set /context/participations[0]/performer/relationship/defining_code"},
+			want: []string{"code_not_in_value_set /context/participations[1]/performer/relationship/defining_code"},
 		},
 		{
 			name: "PARTICIPATION root performer, a PARTY_RELATED outside the group",

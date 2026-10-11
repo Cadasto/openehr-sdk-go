@@ -17,8 +17,9 @@ import (
 // walkNode is the lockstep visitor: it enters the OPT node `optNode`
 // bound to the RM value `rmValue`, emits structural issues at this
 // node, then descends each OPT-declared attribute into its matched
-// RM child(ren). The `path` argument is the OPT-authoritative AQL
-// path of `optNode` (root = "/").
+// RM child(ren). The `path` argument is the issue path of `rmValue`
+// (root = "/"), written by the rule the floor shares (see
+// [itemPaths]).
 //
 // Per-node behaviour:
 //   - Identity (LOCATABLE.archetype_node_id ↔ OPT pin) and RM-type
@@ -168,7 +169,7 @@ func (w *walker) walkSingleAttribute(
 		}
 		return
 	}
-	w.walkNode(child, val, joinPath(parentPath, segmentForChild(attr, child, 0)))
+	w.walkNode(child, val, attrPath)
 }
 
 // matchSingleAlternative picks the OPT child of a single-valued
@@ -298,6 +299,12 @@ func formatAllowedTypes(children []*tcimpl.CompiledNode) string {
 // rm_type_mismatch or alternative_mismatch, never a slot_fill (see
 // [unboundItemIssue]). Every bound item counts toward its child's
 // occurrences.
+//
+// Each item is written in Issue.Path by the shared path rule
+// ([itemPaths]): the binding comes first, because an item's predicate
+// depends on its siblings' ids and on the names their bound OPT nodes
+// pin. A child whose occurrences the items miss is written with its own
+// predicate ([optChildPaths]).
 func (w *walker) walkMultipleAttribute(
 	opt *tcimpl.CompiledNode,
 	attr *tcimpl.CompiledAttribute,
@@ -354,22 +361,31 @@ func (w *walker) walkMultipleAttribute(
 	if len(children) == 0 {
 		return
 	}
+	bound := make([]*tcimpl.CompiledNode, len(items))
+	byNodeID := make([]bool, len(items))
+	pathItems := make([]pathItem, len(items))
+	for idx, item := range items {
+		byNodeID[idx] = bindsByNodeID(item, opt.RMTypeName(), attr.Name())
+		if byNodeID[idx] {
+			bound[idx] = matchChildByID(children, item)
+		} else {
+			bound[idx] = matchChildByRMType(children, item)
+		}
+		pathItems[idx].id = locatableArchetypeNodeID(item)
+		if bound[idx] != nil {
+			pathItems[idx].name = bound[idx].NodeName()
+		}
+	}
+	itemPath := itemPaths(attrPath, pathItems)
 	perChildCount := make(map[*tcimpl.CompiledNode]int, len(children))
 	for idx, item := range items {
-		itemPath := joinPath(parentPath, segmentForRMItem(attr, item, idx))
-		byNodeID := bindsByNodeID(item, opt.RMTypeName(), attr.Name())
-		var matched *tcimpl.CompiledNode
-		if byNodeID {
-			matched = matchChildByID(children, item)
-		} else {
-			matched = matchChildByRMType(children, item)
-		}
+		matched := bound[idx]
 		if matched == nil {
-			w.emit(unboundItemIssue(attr, children, item, byNodeID, itemPath))
+			w.emit(unboundItemIssue(attr, children, item, byNodeID[idx], itemPath[idx]))
 			continue
 		}
 		perChildCount[matched]++
-		w.walkNode(matched, item, itemPath)
+		w.walkNode(matched, item, itemPath[idx])
 	}
 	// AOM 1.4 occurrences upper bound on each OPT child: when the
 	// OPT pins a child's `<occurrences>` interval, the count of
@@ -379,15 +395,19 @@ func (w *walker) walkMultipleAttribute(
 	// check above when the attribute itself is empty, but we still
 	// fire here per-child when the attribute is non-empty and a
 	// specific OPT child is missing or over-represented.
-	for _, c := range children {
+	var childPath []string
+	for i, c := range children {
 		occ := c.Occurrences()
 		if occ == nil {
 			continue
 		}
 		got := perChildCount[c]
 		if outOfMultiplicityInterval(got, occ) {
+			if childPath == nil {
+				childPath = optChildPaths(attrPath, children)
+			}
 			w.emit(Issue{
-				Path:     joinPath(parentPath, segmentForChild(attr, c, 0)),
+				Path:     childPath[i],
 				Code:     "cardinality",
 				Detail:   fmt.Sprintf("OPT child %s appears %d times under %q; occurrences %s", childIdentity(c), got, attr.Name(), formatInterval(occ)),
 				Severity: Error,
@@ -529,37 +549,6 @@ func formatInterval(m *template.Multiplicity) string {
 		hi = "*"
 	}
 	return "[" + lo + ".." + hi + "]"
-}
-
-// segmentForChild computes the path delta from a single-attribute
-// descent. For Single attrs the delta is "/attr"; for Multiple
-// attrs (rare on this code path — walkMultipleAttribute uses
-// segmentForRMItem instead) we fall back to the child's
-// id-or-index segment.
-func segmentForChild(attr *tcimpl.CompiledAttribute, child *tcimpl.CompiledNode, idx int) string {
-	seg := "/" + attr.Name()
-	if attr.Cardinality() != template.Multiple {
-		return seg
-	}
-	if id := child.ArchetypeID(); id != "" {
-		return seg + "[" + id + "]"
-	}
-	if id := child.NodeID(); id != "" {
-		return seg + "[" + id + "]"
-	}
-	return seg + fmt.Sprintf("[@%d]", idx+1)
-}
-
-// segmentForRMItem computes the path delta for an RM item under a
-// Multiple attribute. Predicate is the RM item's
-// archetype_node_id when available; otherwise a 1-based sibling
-// index ("@1", "@2", ...).
-func segmentForRMItem(attr *tcimpl.CompiledAttribute, item any, idx int) string {
-	seg := "/" + attr.Name()
-	if id := locatableArchetypeNodeID(item); id != "" {
-		return seg + "[" + id + "]"
-	}
-	return seg + fmt.Sprintf("[@%d]", idx+1)
 }
 
 // bindsByNodeID reports whether an item of the multi-valued attribute

@@ -25,8 +25,8 @@ var floorGapExceptions = map[string][]string{
 	// value an RM rule accepts, such as an RM default that yields to the OPT
 	// (§ Precedence 1)".
 	"templates/TestPerson.v2": {
-		"code_not_in_value_set /details/items[10]/items[0]/value/media_type",
-		"code_not_in_value_set /details/items[11]/items[5]/value/media_type",
+		"code_not_in_value_set /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type",
+		"code_not_in_value_set /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type",
 	},
 }
 
