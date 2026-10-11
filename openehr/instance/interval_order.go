@@ -193,16 +193,16 @@ func orderPair[K any](lower, upper K, lowerNode, upperNode *tcimpl.CompiledNode,
 // boundNodes returns the OPT nodes the generator built an interval's lower
 // and upper bounds from, nil for a bound the OPT does not constrain.
 func boundNodes(optNode *tcimpl.CompiledNode) (lower, upper *tcimpl.CompiledNode) {
-	return firstChild(optNode, "lower"), firstChild(optNode, "upper")
+	return bindingChild(optNode, "lower"), bindingChild(optNode, "upper")
 }
 
-// firstChild returns the alternative of node's attrName whose
+// bindingChild returns the alternative of node's attrName whose
 // constraints materialiseSingle builds under ([bindingAlternative]),
 // among those the OPT does not prohibit, or nil when node or the
 // attribute has none. A pass after the walk reads the constraints the
 // walk built under, so a default it writes passes the child the
 // validator binds.
-func firstChild(node *tcimpl.CompiledNode, attrName string) *tcimpl.CompiledNode {
+func bindingChild(node *tcimpl.CompiledNode, attrName string) *tcimpl.CompiledNode {
 	if node == nil {
 		return nil
 	}
@@ -240,7 +240,7 @@ func compareOrdered[N int64 | float64](a, b N) int {
 var countScale = scale[int64]{
 	compare: func(a, b int64) (int, bool) { return compareOrdered(a, b), true },
 	fits: func(node *tcimpl.CompiledNode, m int64) bool {
-		pc := primitiveOf(firstChild(node, "magnitude"))
+		pc := primitiveOf(bindingChild(node, "magnitude"))
 		return pc == nil || len(pc.Validate(m)) == 0
 	},
 	lowest: func(node *tcimpl.CompiledNode, _ int64) (int64, bool) {
@@ -256,7 +256,7 @@ var countScale = scale[int64]{
 // also admits, or the range's own end. It returns false when there is no
 // such constraint, or when the constraint has no end in that direction.
 func integerEnd(node *tcimpl.CompiledNode, low bool) (int64, bool) {
-	c, ok := primitiveOf(firstChild(node, "magnitude")).(constraints.CInteger)
+	c, ok := primitiveOf(bindingChild(node, "magnitude")).(constraints.CInteger)
 	if !ok {
 		return 0, false
 	}
@@ -427,7 +427,7 @@ func temporalScale(compare func(a, b string) (int, bool)) scale[string] {
 	return scale[string]{
 		compare: compare,
 		fits: func(node *tcimpl.CompiledNode, v string) bool {
-			pc := primitiveOf(firstChild(node, "value"))
+			pc := primitiveOf(bindingChild(node, "value"))
 			return pc == nil || len(pc.Validate(v)) == 0
 		},
 		lowest:  func(*tcimpl.CompiledNode, string) (string, bool) { return "", false },
@@ -538,9 +538,9 @@ func proportionRatio(k proportionKey) (float64, bool) {
 }
 
 func proportionFits(node *tcimpl.CompiledNode, k proportionKey) bool {
-	return componentFits(firstChild(node, "numerator"), k.numerator) &&
-		componentFits(firstChild(node, "denominator"), k.denominator) &&
-		componentFits(firstChild(node, "type"), k.kind)
+	return componentFits(bindingChild(node, "numerator"), k.numerator) &&
+		componentFits(bindingChild(node, "denominator"), k.denominator) &&
+		componentFits(bindingChild(node, "type"), k.kind)
 }
 
 func componentFits(node *tcimpl.CompiledNode, v any) bool {
@@ -553,14 +553,14 @@ func componentFits(node *tcimpl.CompiledNode, v any) bool {
 // numerator constraint has no end in the direction that moves the ratio
 // that way, or when like itself does not fit.
 func proportionEnd(node *tcimpl.CompiledNode, like proportionKey, low bool) (proportionKey, bool) {
-	if like.denominator == 0 || !componentFits(firstChild(node, "type"), like.kind) || !componentFits(firstChild(node, "denominator"), like.denominator) {
+	if like.denominator == 0 || !componentFits(bindingChild(node, "type"), like.kind) || !componentFits(bindingChild(node, "denominator"), like.denominator) {
 		return proportionKey{}, false
 	}
 	numLow := low
 	if like.denominator < 0 {
 		numLow = !low
 	}
-	n, ok := realEnd(firstChild(node, "numerator"), numLow)
+	n, ok := realEnd(bindingChild(node, "numerator"), numLow)
 	if !ok {
 		return proportionKey{}, false
 	}

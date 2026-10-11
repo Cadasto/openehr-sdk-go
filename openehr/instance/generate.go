@@ -1747,7 +1747,7 @@ func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 		}
 		c.Context = &rm.EventContext{}
 	}
-	contextNode := firstChild(root, "context")
+	contextNode := bindingChild(root, "context")
 	if c.Context.StartTime.Value == "" && !prohibited(contextNode, "start_time") {
 		c.Context.StartTime = rm.DVDateTime{Value: g.opts.Now.Format(time.RFC3339)}
 	}
@@ -1992,9 +1992,9 @@ func codedTextAdmits(node *tcimpl.CompiledNode, ct rm.DVCodedText) bool {
 }
 
 // defaultAdmitted reports whether the OPT's own constraint on attrName of
-// opt admits an RM default, as admits says of the first OPT child the OPT
-// does not prohibit, the one the walk builds the attribute from. An
-// attribute the OPT prohibits admits nothing. opt is nil for a value built
+// opt admits an RM default, as admits says of the alternative the walk
+// builds the attribute under ([bindingChild]), among those the OPT does
+// not prohibit. An attribute the OPT prohibits admits nothing. opt is nil for a value built
 // from the BMM alone, and an attribute the OPT does not name, or names
 // with no child, admits any default, as does a mandatory one whose
 // children the OPT all prohibits.
@@ -2009,7 +2009,7 @@ func defaultAdmitted(opt *tcimpl.CompiledNode, attrName string, admits func(*tci
 	if attrProhibited(attr) {
 		return false
 	}
-	if node := firstChild(opt, attrName); node != nil {
+	if node := bindingChild(opt, attrName); node != nil {
 		return admits(node)
 	}
 	return true
@@ -2020,20 +2020,20 @@ func defaultAdmitted(opt *tcimpl.CompiledNode, attrName string, admits func(*tci
 // reads the two shapes an OPT gives that constraint, as the template
 // validator does: a C_CODE_PHRASE, and a CODE_PHRASE node whose
 // code_string, or whose terminology_id's value, carries a C_STRING. Below
-// node it reads, like the walk, the first alternative the OPT does not
-// prohibit.
+// node it reads, like the walk, the alternative the walk builds under
+// ([bindingChild]), among those the OPT does not prohibit.
 func phraseAdmitted(node *tcimpl.CompiledNode, phrase rm.CodePhrase) bool {
 	if cp, ok := node.PrimitiveConstraint().(constraints.CodePhrase); ok {
 		ref := constraints.CodedTermRef{Terminology: phrase.TerminologyID.Value, CodeString: phrase.CodeString}
 		return len(cp.Validate(ref)) == 0
 	}
-	if dc := firstChild(node, "defining_code"); dc != nil {
+	if dc := bindingChild(node, "defining_code"); dc != nil {
 		return phraseAdmitted(dc, phrase)
 	}
 	if !stringAdmitted(node.Attribute("code_string"), phrase.CodeString) {
 		return false
 	}
-	if tid := firstChild(node, "terminology_id"); tid != nil {
+	if tid := bindingChild(node, "terminology_id"); tid != nil {
 		return stringAdmitted(tid.Attribute("value"), phrase.TerminologyID.Value)
 	}
 	return true
@@ -2112,7 +2112,7 @@ func (g *generator) settleElement(opt *tcimpl.CompiledNode, e *rm.Element) {
 		// The OPT prohibits value and null_flavour, and the RM rule needs
 		// the null flavour: the walk wrote it as if the OPT allowed it, and
 		// the default goes where its own child admits it.
-		if codedTextAdmits(firstChild(opt, "null_flavour"), *nf) {
+		if codedTextAdmits(bindingChild(opt, "null_flavour"), *nf) {
 			e.NullFlavour = nf
 		}
 		return
