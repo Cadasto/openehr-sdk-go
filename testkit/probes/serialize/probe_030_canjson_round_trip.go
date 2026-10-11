@@ -23,6 +23,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
+	"github.com/cadasto/openehr-sdk-go/testkit/expectedform"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 	"github.com/cadasto/openehr-sdk-go/testkit/probe"
 	"github.com/cadasto/openehr-sdk-go/testkit/wireequiv"
@@ -43,13 +44,18 @@ type Result = probe.Result
 // with no issues. As a secondary check, b1 and b2 must be
 // wire-equivalent (testkit/wireequiv): equal once each is parsed into a
 // generic JSON value, with member order ignored and array order kept.
+// Against the input, b1 must be wire-equivalent to the input's expected
+// form (testkit/expectedform), so a member the decoder reads with the
+// wrong meaning, an interval flag defaulted wrongly among them, fails.
 //
-// The comparison straddles the second encode, not the first. The first
-// encode may legitimately collapse a container (an empty DV_TEXT.mappings
-// is omitted), so A and B are read either side of the
-// re-encode instead. The input is never compared byte-wise: JSON member
-// order carries no meaning (RFC 8259 section 4) and the encoder makes no
-// byte-level promise.
+// The typed comparison straddles the second encode, not the first. The
+// first encode may legitimately collapse a container (an empty
+// DV_TEXT.mappings is omitted), so A and B are read either side of the
+// re-encode instead, and the input leg compares b1 with the input's
+// expected form, which spells each such collapse the way the encoder
+// does. The input is never compared byte-wise: JSON member order carries
+// no meaning (RFC 8259 section 4) and the encoder makes no byte-level
+// promise.
 //
 // `body` must be canonical-JSON bytes for a known concrete RM type.
 // `factory` returns a fresh pointer to the target Go type, called three
@@ -60,7 +66,7 @@ type Result = probe.Result
 // return a non-nil error so the harness can distinguish probe
 // failure from probe-framework failure.
 func Probe030CanjsonRoundTrip(body []byte, factory func() any) (Result, error) { // PROBE-030 (REQ-040, REQ-052, REQ-082)
-	return probe030RoundTrip(body, factory, canjson.Marshal, false)
+	return probe030RoundTrip(body, factory, canjson.Marshal, canjson.Marshal, false)
 }
 
 // Probe030CanjsonRoundTripInput runs PROBE-030 for one input from
@@ -74,21 +80,24 @@ func Probe030CanjsonRoundTripInput(in Probe030Input) (Result, error) { // PROBE-
 	if in.loadErr != nil {
 		return Result{Probe: "PROBE-030", Status: "fail", Detail: "fixture discovery: " + in.loadErr.Error()}, nil
 	}
-	return probe030RoundTrip(in.Body, in.Factory, canjson.Marshal, in.SkipFloor)
+	return probe030RoundTrip(in.Body, in.Factory, canjson.Marshal, canjson.Marshal, in.SkipFloor)
 }
 
-// probe030RoundTrip runs the PROBE-030 pipeline with reEncode as the
-// second encode step. Probe030CanjsonRoundTrip passes the real
-// canjson.Marshal. A can-fail test passes a lossy double to prove the
-// typed deep comparison of A and B catches a field dropped, or a
-// polymorphic slot narrowed, on the re-encode path: each mutation
-// changes B without touching A, so reflect.DeepEqual and the
-// wire-equivalence secondary both flag it (probe_030_guard_internal_test.go).
+// probe030RoundTrip runs the PROBE-030 pipeline with encode as the first
+// encode step (b1) and reEncode as the second (b2). The public entry
+// points pass the real canjson.Marshal for both. A can-fail test passes a
+// lossy reEncode to prove the typed deep comparison of A and B catches a
+// field dropped, or a polymorphic slot narrowed, on the re-encode path:
+// each mutation changes B without touching A, so reflect.DeepEqual and
+// the wire-equivalence secondary both flag it. Another passes an encode
+// that rewrites a member's meaning in b1: A and B are then both decoded
+// from the rewritten form and agree, so only the input leg can catch it
+// (probe_030_guard_internal_test.go).
 //
 // skipFloor drops only the validation.ValidateRM leg, for an input whose
 // vendored content carries an RM-floor finding independent of the round trip
 // (see [Probe030Input.SkipFloor]); the fidelity legs always run.
-func probe030RoundTrip(body []byte, factory func() any, reEncode func(any) ([]byte, error), skipFloor bool) (Result, error) {
+func probe030RoundTrip(body []byte, factory func() any, encode, reEncode func(any) ([]byte, error), skipFloor bool) (Result, error) {
 	r := Result{Probe: "PROBE-030"}
 	if factory == nil {
 		return r, errors.New("PROBE-030: factory is nil")
@@ -99,12 +108,16 @@ func probe030RoundTrip(body []byte, factory func() any, reEncode func(any) ([]by
 		return r, nil
 	}
 	v := factory()
+	root, ok := expectedform.RootType(v)
+	if !ok {
+		return r, errors.New("PROBE-030: the factory's value names no RM type")
+	}
 	if err := canjson.Unmarshal(body, v); err != nil {
 		r.Status = "fail"
 		r.Detail = fmt.Sprintf("first decode: %v", err)
 		return r, nil
 	}
-	b1, err := canjson.Marshal(v)
+	b1, err := encode(v)
 	if err != nil {
 		r.Status = "fail"
 		r.Detail = fmt.Sprintf("first encode (b1): %v", err)
@@ -143,6 +156,17 @@ func probe030RoundTrip(body []byte, factory func() any, reEncode func(any) ([]by
 	if ok, diff := wireequiv.Equivalent(b1, b2); !ok {
 		r.Status = "fail"
 		r.Detail = "the two SDK encodes are not wire-equivalent: " + diff
+		return r, nil
+	}
+	want, err := expectedform.Build(body, root)
+	if err != nil {
+		r.Status = "fail"
+		r.Detail = "the input's expected form: " + err.Error()
+		return r, nil
+	}
+	if ok, diff := wireequiv.Equivalent(want, b1); !ok {
+		r.Status = "fail"
+		r.Detail = "the first encode (b1) is not wire-equivalent to the input's expected form (expected form versus b1): " + diff
 		return r, nil
 	}
 	r.Status = "pass"

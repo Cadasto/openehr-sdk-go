@@ -9,7 +9,9 @@
 // others:
 //
 //   - a member that names no attribute of its object's RM type is removed;
-//   - a member whose value is null is removed;
+//   - a member whose value is null is removed, except a mandatory String
+//     member, which becomes the empty string the encoder writes for it (a Go
+//     string holds no null);
 //   - an object that leaves out "_type" gains it: its RM type is the declared
 //     type of the attribute that holds it, and the root's type is the decode
 //     target's;
@@ -42,6 +44,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -214,13 +217,16 @@ func (w walker) object(obj map[string]any, declared, boundType, ptr string) (map
 		if !ok {
 			continue // names no attribute of rmType
 		}
+		container, _ := w.lookup.IsContainer(rmType, name)
 		if val == nil {
-			if !w.full {
+			switch {
+			case !w.full:
 				out[name] = val
+			case attrType == "String" && !container && slices.Contains(w.lookup.RequiredAttributes(rmType), name):
+				out[name] = "" // a Go string holds no null: the encoder writes ""
 			}
 			continue
 		}
-		container, _ := w.lookup.IsContainer(rmType, name)
 		child := ptr + "/" + escapeToken(name)
 		nv, keep, err := w.member(rmType, name, attrType, container, boundType, val, child)
 		if err != nil {

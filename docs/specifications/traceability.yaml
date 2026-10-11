@@ -1985,7 +1985,9 @@ requirements:
       - internal/bmmgen/render_interval_bound_test.go
       - openehr/rm/interval_closed_test.go
       - openehr/serialize/canjson/interval_flag_defaults_test.go
+      - openehr/serialize/canjson/roundtrip_test.go
       - openehr/serialize/canxml/interval_flag_defaults_test.go
       - openehr/serialize/simplified/rmattr_repeating_test.go
       - openehr/template/interval_flags_test.go
       - testkit/expectedform/expectedform_test.go
+      - testkit/probes/serialize/probe_030_guard_internal_test.go

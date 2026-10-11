@@ -8,6 +8,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
+	"github.com/cadasto/openehr-sdk-go/testkit/expectedform"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 	"github.com/cadasto/openehr-sdk-go/testkit/wireequiv"
 )
@@ -147,8 +148,11 @@ func TestRoundTripStructuralEquivalence(t *testing.T) {
 // whole vendored corpus: decode, encode (b1), decode (A), encode (b2),
 // decode (B). A and B straddle the second encode and MUST be equal by
 // typed deep comparison; b1 and b2 MUST be wire-equivalent as a
-// secondary check. Byte equality is not asserted (member order is not a
-// contract, REQ-052). The SDK's own fixtures are all COMPOSITION;
+// secondary check. Against the input, b1 MUST be wire-equivalent to the
+// input's expected form (REQ-052, testkit/expectedform), which carries
+// every interval flag REQ-169 defaults, so a flag the decoder defaults
+// wrongly fails here. Byte equality is not asserted (member order is not
+// a contract, REQ-052). The SDK's own fixtures are all COMPOSITION;
 // vendored upstream sets (e.g. ehrbase/) include EHR_STATUS and FOLDER,
 // so the target factory is selected per fixture path.
 func TestRoundTripFixtures(t *testing.T) {
@@ -184,6 +188,17 @@ func TestRoundTripFixtures(t *testing.T) {
 			}
 			if ok, diff := wireequiv.Equivalent(b1, b2); !ok {
 				t.Errorf("the two SDK encodes are not wire-equivalent for %s: %s", rel.Rel, diff)
+			}
+			root, ok := expectedform.RootType(v)
+			if !ok {
+				t.Fatalf("decode target %T names no RM type", v)
+			}
+			want, err := expectedform.Build(raw, root)
+			if err != nil {
+				t.Fatalf("the input's expected form: %v", err)
+			}
+			if ok, diff := wireequiv.Equivalent(want, b1); !ok {
+				t.Errorf("b1 is not wire-equivalent to the input's expected form for %s (expected form versus b1): %s", rel.Rel, diff)
 			}
 		})
 	}

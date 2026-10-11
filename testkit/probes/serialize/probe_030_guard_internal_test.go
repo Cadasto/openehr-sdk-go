@@ -2,6 +2,7 @@ package serializeprobes
 
 import (
 	"encoding/json"
+	"errors"
 	"maps"
 	"os"
 	"slices"
@@ -26,7 +27,7 @@ import (
 // lost on re-encode must fail the probe.
 func TestProbe030GuardCatchesDroppedFieldOnReEncode(t *testing.T) {
 	body := []byte(`{"_type":"DV_QUANTITY","magnitude":80.5,"units":"kg"}`)
-	r, err := probe030RoundTrip(body, func() any { return new(rm.DVQuantity) }, dropMemberReEncoder("units"), false)
+	r, err := probe030RoundTrip(body, func() any { return new(rm.DVQuantity) }, canjson.Marshal, dropMemberReEncoder("units"), false)
 	if err != nil {
 		t.Fatalf("probe framework error: %v", err)
 	}
@@ -88,7 +89,7 @@ func TestProbe030GuardCatchesMissingValidateRM(t *testing.T) {
 func TestProbe030GuardCatchesNarrowedPolymorphicSlot(t *testing.T) {
 	body := []byte(`{"_type":"ELEMENT","archetype_node_id":"at0001","name":{"_type":"DV_TEXT","value":"n"},"value":{"_type":"DV_QUANTITY","magnitude":120,"units":"mm[Hg]"}}`)
 	double := retypeSlotReEncoder("value", map[string]any{"_type": "DV_TEXT", "value": "120 mm[Hg]"})
-	r, err := probe030RoundTrip(body, func() any { return new(rm.Element) }, double, false)
+	r, err := probe030RoundTrip(body, func() any { return new(rm.Element) }, canjson.Marshal, double, false)
 	if err != nil {
 		t.Fatalf("probe framework error: %v", err)
 	}
@@ -98,6 +99,51 @@ func TestProbe030GuardCatchesNarrowedPolymorphicSlot(t *testing.T) {
 	if !strings.Contains(r.Detail, "A and B differ") {
 		t.Fatalf("detail = %q; want the typed deep comparison to fire, so the A-versus-B guard is what caught the changed dynamic type", r.Detail)
 	}
+}
+
+// TestProbe030InputLegCatchesAWronglyDefaultedFlag is the can-fail control
+// for PROBE-030's input leg (REQ-052, REQ-169). The input interval omits both
+// included flags, which REQ-169 reads as closed ends. The encode double writes
+// b1 with both ends excluded, the reading the decoder gave such an interval
+// before REQ-169, so A and B are both decoded from that wrong reading and
+// agree, b1 and b2 are wire-equivalent, and the excluded interval is RM-valid.
+// Only the comparison with the input's expected form, which spells the two
+// defaulted flags true, can catch it. Remove the input leg from
+// probe030RoundTrip and this test reddens with Status == "pass".
+func TestProbe030InputLegCatchesAWronglyDefaultedFlag(t *testing.T) {
+	body := []byte(`{"_type":"ELEMENT","archetype_node_id":"at0001","name":{"_type":"DV_TEXT","value":"n"},` +
+		`"value":{"_type":"DV_INTERVAL","lower":{"_type":"DV_COUNT","magnitude":1},"upper":{"_type":"DV_COUNT","magnitude":5},"lower_unbounded":false,"upper_unbounded":false}}`)
+	r, err := probe030RoundTrip(body, func() any { return new(rm.Element) }, excludeIntervalEndsEncoder, canjson.Marshal, false)
+	if err != nil {
+		t.Fatalf("probe framework error: %v", err)
+	}
+	if r.Status != "fail" {
+		t.Fatalf("status = %q (detail: %s), want fail: an interval flag read with the wrong default must fail the input leg", r.Status, r.Detail)
+	}
+	if !strings.Contains(r.Detail, "expected form") || !strings.Contains(r.Detail, "_included") {
+		t.Fatalf("detail = %q; want the input leg to name an included flag", r.Detail)
+	}
+}
+
+// excludeIntervalEndsEncoder canjson-encodes the value and then sets both
+// included flags of the top-level value's interval to false, standing in for a
+// decoder that reads an omitted included flag as false.
+func excludeIntervalEndsEncoder(v any) ([]byte, error) {
+	b, err := canjson.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		return nil, err
+	}
+	interval, ok := m["value"].(map[string]any)
+	if !ok {
+		return nil, errors.New("the encoded value has no interval at /value")
+	}
+	interval["lower_included"] = false
+	interval["upper_included"] = false
+	return json.Marshal(m)
 }
 
 // dropMemberReEncoder is a lossy re-encode double: it canjson-encodes the value

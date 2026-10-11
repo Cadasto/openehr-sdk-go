@@ -100,6 +100,47 @@ func TestREQ052_BuildRemovesNullMembers(t *testing.T) {
 	})
 }
 
+// TestREQ052_BuildWritesANullMandatoryStringAsEmpty pins that a null member
+// the RM declares mandatory with a String type is expected as the empty string
+// the encoder writes for it, since a Go string holds no null. The rule is read
+// from rminfo, so it reaches every mandatory String attribute, at the root and
+// nested. A null optional String, and a null mandatory member of another type,
+// still read as absent.
+func TestREQ052_BuildWritesANullMandatoryStringAsEmpty(t *testing.T) {
+	runBuild(t, []buildCase{
+		{
+			name: "mandatory String at the root",
+			root: "DV_DATE_TIME",
+			in:   `{"_type":"DV_DATE_TIME","value":null}`,
+			want: `{"_type":"DV_DATE_TIME","value":""}`,
+		},
+		{
+			name: "mandatory String nested",
+			root: "DV_MULTIMEDIA",
+			in:   `{"_type":"DV_MULTIMEDIA","size":3,"media_type":{"terminology_id":{"value":"openEHR"},"code_string":null}}`,
+			want: `{"_type":"DV_MULTIMEDIA","size":3,"media_type":{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"openEHR"},"code_string":""}}`,
+		},
+		{
+			name: "optional String stays absent",
+			root: "DV_TEXT",
+			in:   `{"_type":"DV_TEXT","value":"v","formatting":null}`,
+			want: `{"_type":"DV_TEXT","value":"v"}`,
+		},
+		{
+			name: "mandatory Character stays absent",
+			root: "TERM_MAPPING",
+			in:   `{"_type":"TERM_MAPPING","match":null,"target":` + codePhrase + `}`,
+			want: `{"_type":"TERM_MAPPING","target":` + codePhrase + `}`,
+		},
+		{
+			name: "mandatory object stays absent",
+			root: "CODE_PHRASE",
+			in:   `{"_type":"CODE_PHRASE","code_string":"433","terminology_id":null}`,
+			want: `{"_type":"CODE_PHRASE","code_string":"433"}`,
+		},
+	})
+}
+
 // TestREQ052_BuildWritesAnElidedType pins that an elided "_type" is written:
 // the root takes the decode target's type, a nested object the declared type
 // of its slot, and an interval bound the type its slot binds the parameter to.
@@ -322,12 +363,13 @@ func TestREQ052_BuildRefusesInputItCannotRead(t *testing.T) {
 }
 
 // TestREQ052_PruneOnlyRemovesMembersTheRMDoesNotDefine pins that Prune applies
-// the member filter and nothing else: a null member, an elided "_type", an
-// omitted interval flag and a quoted number all stay as written.
+// the member filter and nothing else: a null member (a mandatory String among
+// them), an elided "_type", an omitted interval flag and a quoted number all
+// stay as written.
 func TestREQ052_PruneOnlyRemovesMembersTheRMDoesNotDefine(t *testing.T) {
-	in := `{"_type":"DV_QUANTITY","magnitude":"80.50","units":"kg","precision":null,"note":{"_type":"DV_TEXT","value":"x"},` +
+	in := `{"_type":"DV_QUANTITY","magnitude":"80.50","units":null,"precision":null,"note":{"_type":"DV_TEXT","value":"x"},` +
 		`"normal_range":{"lower":{"magnitude":1,"units":"kg","extra":{"_type":"DV_BOOLEAN","value":true}},"lower_unbounded":false,"upper_unbounded":true}}`
-	want := `{"_type":"DV_QUANTITY","magnitude":"80.50","units":"kg","precision":null,` +
+	want := `{"_type":"DV_QUANTITY","magnitude":"80.50","units":null,"precision":null,` +
 		`"normal_range":{"lower":{"magnitude":1,"units":"kg"},"lower_unbounded":false,"upper_unbounded":true}}`
 	got, err := expectedform.Prune([]byte(in), "DV_QUANTITY")
 	if err != nil {
