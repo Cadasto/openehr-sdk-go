@@ -131,10 +131,22 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 		"archetype_node_id": root.NodeID,
 		"name":              textJSON(cmp.Or(root.Name, wt.TemplateID)),
 	}
+	// A key ending in a bare `|` spells the key without it; both at once are two
+	// spellings of one field (REQ-170).
+	flat, err := foldEmptySuffix(flat)
+	if err != nil {
+		return nil, err
+	}
 	// Separate composition-level context from clinical content; context is
 	// rebuilt from RM attributes, not from a Web Template leaf path.
 	ctx, ctxOrigin, content, err := siphonContext(flat, root.ID, sink)
 	if err != nil {
+		return nil, err
+	}
+	// The reference's keys for an ACTION transition's `transition` and `reason`
+	// name RM data the Web Template this SDK builds does not model: refused in
+	// every mode, before anything could set them aside as unmatched (REQ-170).
+	if err := refuseIsmTransitionKeys(content, wt); err != nil {
 		return nil, err
 	}
 	budget := &allocBudget{limit: maxTotalNodes}
@@ -369,28 +381,33 @@ var metadataAliasTerminology = map[string]string{
 	"context/setting|terminology": terminology.ID,
 }
 
-// contextMetaOwnedBases are the EVENT_CONTEXT leaves the ctx/ short forms own
-// outright: the Web Template carries a node for them, so an unaccepted spelling
-// would resolve as an ordinary leaf and then be silently overwritten by
-// [applyContext], which writes the ctx/ values last. Refusing every other
-// spelling of these two bases that their datatype has, in [siphonContext], is
-// what keeps that unreachable; a suffix their datatype does not have is
-// unmatched content and is never placed.
+// contextMetaOwnedBases are the composition-metadata leaves the ctx/ short
+// forms own outright: COMPOSITION `language` and `territory`, and EVENT_CONTEXT
+// `setting` and `start_time`. The Web Template carries a node for them, so an
+// unaccepted spelling would resolve as an ordinary leaf and then be silently
+// overwritten by [applyContext], which writes the ctx/ values last, or fail
+// there for a reason that is not the real one (`language|preferred_term` alone
+// is a CODE_PHRASE with no `|code`). Refusing every other spelling of these
+// bases that their datatype has, in [siphonContext], naming the ctx/ form that
+// owns the leaf, is what keeps that unreachable; a suffix their datatype does
+// not have is unmatched content and is never placed.
 //
-// Only these two. `language`, `territory` and `composer` are deliberately absent:
-// the composer external_ref suffixes (`composer|id` / `|id_scheme` /
-// `|id_namespace`) must keep flowing through to decode so they are refused there
-// and counted in the PROBE-086 census as the real PARTY_PROXY data loss they are
-// (ADR 0015). Both bases here are held out of that census by the harness
-// (`IsCompositionMeta`), so refusing extra suffixes early moves no count.
+// `composer` is deliberately absent: the composer external_ref suffixes
+// (`composer|id` / `|id_scheme` / `|id_namespace`) must keep flowing through to
+// decode so they are refused there and counted in the PROBE-086 census as the
+// real PARTY_PROXY data loss they are (ADR 0015). Every base here is held out of
+// that census by the harness (`IsCompositionMeta`), so refusing extra suffixes
+// early moves no count.
 var contextMetaOwnedBases = map[string]bool{
 	"context/setting": true, "context/start_time": true,
+	"language": true, "territory": true,
 }
 
 // metadataOwnedBaseCtx names the ctx/ short form that owns each base, so the
 // refusal points at the spelling the payload should have used.
 var metadataOwnedBaseCtx = map[string]string{
 	"context/setting": "ctx/setting|code + ctx/setting|value", "context/start_time": "ctx/time",
+	"language": "ctx/language", "territory": "ctx/territory",
 }
 
 // metadataOwnedBaseType is the RM type of each ctx/-owned base, EVENT_CONTEXT's
@@ -399,6 +416,7 @@ var metadataOwnedBaseCtx = map[string]string{
 // cannot carry it; any other suffix is unmatched content (REQ-170).
 var metadataOwnedBaseType = map[string]string{
 	"context/setting": "DV_CODED_TEXT", "context/start_time": "DV_DATE_TIME",
+	"language": "CODE_PHRASE", "territory": "CODE_PHRASE",
 }
 
 // ctxFields are the ctx/ keys the decode reads (REQ-053). Any other ctx/ key
@@ -692,7 +710,7 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 				sink.add(key)
 				continue
 			}
-			return nil, nil, nil, fmt.Errorf("%w: %s is not a spelling the ctx/ short form can carry — %q owns this leaf, so only its accepted suffixes travel (see deviations.md)",
+			return nil, nil, nil, fmt.Errorf("%w: %q is not a spelling the ctx/ short form can carry — %s owns this leaf, so only its accepted suffixes travel (see deviations.md)",
 				ErrUnsupportedDatatype, key, metadataOwnedBaseCtx[base])
 		}
 		// The ADR 0015 boundary, REQ-140 edition. REQ-140's party grammar reaches
@@ -1449,6 +1467,94 @@ func settleIsmTransition(tr map[string]any, n ismNode) error {
 
 // localTerminology is the terminology an archetype's own at-codes belong to.
 const localTerminology = "local"
+
+// The reference's spelling of the two ISM_TRANSITION attributes REQ-140's
+// fourth out-of-scope class names: an in-context `transition` leaf and a
+// `_reason` family, under an ACTION's ISM transition node. ismReferenceSeg is the
+// FLAT id the reference gives that node when it writes it in context.
+const (
+	ismTransitionLeaf = "transition"
+	ismReasonFamily   = "_reason"
+	ismReferenceSeg   = "ism_transition"
+)
+
+// refuseIsmTransitionKeys refuses the reference's spelling of an ACTION
+// transition's `transition` and `reason` in every mode (REQ-140's fourth
+// out-of-scope class, REQ-170): an in-context `transition` leaf, with any
+// suffix, and a `_reason` family, under an ACTION's ISM transition node. That
+// node is an archetyped `ism_transition[atNNNN]` node the Web Template models,
+// or the in-context `ism_transition` node the reference writes and this SDK's
+// Web Template does not. The Web Template models neither key, but each names RM
+// data decode would otherwise drop, so it is refused rather than ignored. Any
+// other key under that node is decoded, or set aside as unmatched content, as
+// usual.
+//
+// Keys are checked in sorted order, so a body with several names the same one on
+// every run. The error names the key, or the `_reason` family instance, and
+// carries no value.
+func refuseIsmTransitionKeys(content map[string]any, wt *webtemplate.WebTemplate) error {
+	for _, key := range slices.Sorted(maps.Keys(content)) {
+		pk, err := parseFlatKey(key)
+		if err != nil {
+			// A malformed index is refused where the key is decoded.
+			continue
+		}
+		named, attr, ok := ismTransitionKey(wt, key, pk)
+		if !ok {
+			continue
+		}
+		return fmt.Errorf("%w: %q is an ACTION transition's %s in the reference's spelling, which the Web Template this SDK builds does not model — refused rather than dropped (REQ-140, see deviations.md)",
+			ErrUnknownPath, named, attr)
+	}
+	return nil
+}
+
+// ismTransitionKey reports whether key, parsed as pk, is one of the two key
+// shapes [refuseIsmTransitionKeys] refuses: named is what the refusal names (the
+// key for the `transition` leaf, the family instance for `_reason`) and attr the
+// ISM_TRANSITION attribute it spells.
+func ismTransitionKey(wt *webtemplate.WebTemplate, key string, pk parsedKey) (named, attr string, ok bool) {
+	segs := pk.segs
+	node := wt.Tree
+	if len(segs) < 3 || segs[0].id != node.ID {
+		return "", "", false
+	}
+	for i := 1; i+1 < len(segs); i++ {
+		child := childByID(node, segs[i].id)
+		if nodeRMType(node) == "ACTION" && isIsmTransitionSeg(child, segs[i].id) {
+			switch rest := segs[i+1:]; {
+			case rest[0].id == ismTransitionLeaf && len(rest) == 1:
+				return key, "transition", true
+			case rest[0].id == ismReasonFamily:
+				var b strings.Builder
+				for j, s := range segs[:i+2] {
+					if j > 0 {
+						b.WriteByte('/')
+					}
+					writeFlatSeg(&b, s)
+				}
+				return b.String(), "reason", true
+			}
+			return "", "", false
+		}
+		if child == nil {
+			return "", "", false
+		}
+		node = child
+	}
+	return "", "", false
+}
+
+// isIsmTransitionSeg reports whether a FLAT segment under an ACTION addresses its
+// ISM transition: a Web Template child of RM type ISM_TRANSITION, or, where the
+// Web Template has no child of that id, the reference's in-context
+// `ism_transition` node.
+func isIsmTransitionSeg(child *webtemplate.Node, id string) bool {
+	if child != nil {
+		return nodeRMType(child) == "ISM_TRANSITION"
+	}
+	return id == ismReferenceSeg
+}
 
 // definingCodeOf returns the defining_code of a rebuilt DV_CODED_TEXT, or nil
 // when the value carries none (a DV_TEXT, a |raw fragment of another shape);
@@ -2445,6 +2551,37 @@ func requireSuffix(rmType string, sfx map[string]any, name string) (any, error) 
 // textJSON is a canonical DV_TEXT object.
 func textJSON(value string) map[string]any {
 	return map[string]any{"_type": "DV_TEXT", "value": value}
+}
+
+// foldEmptySuffix reads a key that ends in a bare `|` as the spelling of the key
+// without it: the empty suffix is the bare value, so `x|` is `x`. Both spellings
+// in one body are two spellings of one field (REQ-170): the same value is read
+// once, and differing values are refused naming both keys and neither value. The
+// map returned is flat itself when nothing was folded.
+func foldEmptySuffix(flat map[string]any) (map[string]any, error) {
+	var out map[string]any
+	for _, key := range slices.Sorted(maps.Keys(flat)) {
+		bare, piped := strings.CutSuffix(key, "|")
+		if !piped {
+			continue
+		}
+		other, both := flat[bare]
+		if !both {
+			continue
+		}
+		if !sameCtxValue(other, flat[key]) {
+			return nil, fmt.Errorf("%w: %q and %q spell one bare value twice and disagree; remove one",
+				ErrUnknownPath, bare, key)
+		}
+		if out == nil {
+			out = maps.Clone(flat)
+		}
+		delete(out, key)
+	}
+	if out == nil {
+		return flat, nil
+	}
+	return out, nil
 }
 
 // splitSuffix splits a FLAT key at its trailing pipe attribute — the one place

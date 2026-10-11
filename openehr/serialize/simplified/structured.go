@@ -95,6 +95,12 @@ func StructuredToFlat(data []byte) ([]byte, error) {
 // with another key's (scalar vs object at one slot) is an error, never a
 // last-write-wins overwrite.
 func flatToStructured(flat map[string]any) (map[string]any, error) {
+	// `x|` spells the bare value of `x`: the two are one key here, and differing
+	// values are refused, as decode refuses them.
+	flat, err := foldEmptySuffix(flat)
+	if err != nil {
+		return nil, err
+	}
 	root := make(map[string]any)
 	budget := &allocBudget{limit: maxTotalNodes}
 	var ctxObj map[string]any

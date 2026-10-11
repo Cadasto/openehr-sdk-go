@@ -563,3 +563,177 @@ func TestREQ170IndexPastBoundSentinels(t *testing.T) {
 		})
 	}
 }
+
+// TestREQ170IsmTransitionReferenceKeysRefusedInEveryMode — REQ-170 / REQ-140.
+// The reference's spelling of an ACTION transition's `transition` and `reason`
+// — an in-context `transition` leaf and a `_reason` family under the ISM
+// transition node — names RM data the Web Template this SDK builds does not
+// model. It is refused by default, under the report option and under strict,
+// naming the key and none of its value, both under the reference's in-context
+// `ism_transition` node and under an archetyped `ism_transition[atNNNN]` node
+// the Web Template does model (FLAT id `transition`).
+func TestREQ170IsmTransitionReferenceKeysRefusedInEveryMode(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	const secret = "secret-value-0451"
+	for _, node := range []string{"ism_transition", "transition"} {
+		base := rmattrAction + "/" + node
+		for _, tc := range []struct {
+			name  string
+			keys  []string
+			names string
+		}{
+			{"transition leaf", []string{base + "/transition|code", base + "/transition|value", base + "/transition|terminology"}, base + "/transition|code"},
+			{"bare transition leaf", []string{base + "/transition"}, base + "/transition"},
+			{"reason family", []string{base + "/_reason:0"}, base + "/_reason:0"},
+			{"reason family with a suffix", []string{base + "/_reason|code"}, base + "/_reason"},
+		} {
+			t.Run(node+"/"+tc.name, func(t *testing.T) {
+				keys := make(map[string]any, len(tc.keys))
+				for _, k := range tc.keys {
+					keys[k] = secret
+				}
+				err := refusedInEveryMode(t, wt, rmattrBody(keys))
+				if !errors.Is(err, ErrUnknownPath) {
+					t.Errorf("err = %v, want ErrUnknownPath", err)
+				}
+				if !strings.Contains(err.Error(), strconv.Quote(tc.names)) {
+					t.Errorf("err = %v, want it to name %q", err, tc.names)
+				}
+				if strings.Contains(err.Error(), secret) {
+					t.Errorf("err = %v carries the key's value", err)
+				}
+			})
+		}
+	}
+	// Any other key the Web Template does not resolve under that node is
+	// unmatched content, ignored by default; so is a `transition` that is not a
+	// leaf of the node.
+	for _, key := range []string{
+		rmattrAction + "/ism_transition/x_note|code",
+		rmattrAction + "/ism_transition/current_state|code",
+		rmattrAction + "/ism_transition/transition/deeper|code",
+		rmattrAction + "/transition/x_note",
+	} {
+		t.Run("unmatched "+key, func(t *testing.T) {
+			assertUnmatched(t, wt, rmattrBody(map[string]any{key: "x"}), key)
+		})
+	}
+}
+
+// TestREQ170TwoSpellingsOfABareValue — REQ-170 / REQ-053. `x|` spells the bare
+// value of `x` (the empty suffix), so a body carrying both carries two
+// spellings of one field: the same value is read once, and differing values are
+// refused in every mode, naming both keys and neither value. The OPT-free
+// interconversion reads them the same way, and STRUCTURED's `"|"` member is the
+// same bare value as a bare scalar element.
+func TestREQ170TwoSpellingsOfABareValue(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	bareOnly := rmattrBody(map[string]any{rmattrText: "text value"})
+	ref, err := UnmarshalFlat(mustJSON(t, bareOnly), wt)
+	if err != nil {
+		t.Fatalf("UnmarshalFlat (bare value alone): %v", err)
+	}
+
+	t.Run("equal values decode once", func(t *testing.T) {
+		body := rmattrBody(map[string]any{rmattrText: "text value", rmattrText + "|": "text value"})
+		for name, opts := range map[string][]Option{"default": nil, "WithStrict": {WithStrict()}} {
+			got, err := UnmarshalFlat(mustJSON(t, body), wt, opts...)
+			if err != nil {
+				t.Fatalf("UnmarshalFlat (%s) = %v, want both spellings read as one", name, err)
+			}
+			if !bytes.Equal(canonical(t, got), canonical(t, ref)) {
+				t.Errorf("UnmarshalFlat (%s) value differs from the bare value alone", name)
+			}
+		}
+		s, err := FlatToStructured(mustJSON(t, body))
+		if err != nil {
+			t.Fatalf("FlatToStructured = %v, want both spellings read as one", err)
+		}
+		want, err := FlatToStructured(mustJSON(t, bareOnly))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(s, want) {
+			t.Errorf("FlatToStructured = %s, want %s", s, want)
+		}
+	})
+
+	t.Run("differing values are refused", func(t *testing.T) {
+		const secret = "secret-value-0451"
+		body := rmattrBody(map[string]any{rmattrText: "text value", rmattrText + "|": secret})
+		err := refusedInEveryMode(t, wt, body)
+		if !errors.Is(err, ErrUnknownPath) {
+			t.Errorf("err = %v, want ErrUnknownPath", err)
+		}
+		for _, k := range []string{rmattrText, rmattrText + "|"} {
+			if !strings.Contains(err.Error(), strconv.Quote(k)) {
+				t.Errorf("err = %v, want it to name %q", err, k)
+			}
+		}
+		if strings.Contains(err.Error(), secret) {
+			t.Errorf("err = %v carries a value", err)
+		}
+		if _, err := FlatToStructured(mustJSON(t, body)); !errors.Is(err, ErrUnknownPath) {
+			t.Errorf("FlatToStructured = %v, want ErrUnknownPath", err)
+		}
+	})
+
+	t.Run("STRUCTURED bare member and bare scalar agree", func(t *testing.T) {
+		s, err := FlatToStructured(mustJSON(t, bareOnly))
+		if err != nil {
+			t.Fatal(err)
+		}
+		scalar, err := UnmarshalStructured(s, wt)
+		if err != nil {
+			t.Fatalf("UnmarshalStructured (scalar element): %v", err)
+		}
+		member := bytes.Replace(s, []byte(`"dv_text":["text value"]`), []byte(`"dv_text":[{"|":"text value"}]`), 1)
+		if bytes.Equal(member, s) {
+			t.Fatalf("fixture: no bare dv_text element in %s", s)
+		}
+		got, err := UnmarshalStructured(member, wt, WithStrict())
+		if err != nil {
+			t.Fatalf("UnmarshalStructured (\"|\" member) = %v", err)
+		}
+		if !bytes.Equal(canonical(t, got), canonical(t, scalar)) || !bytes.Equal(canonical(t, got), canonical(t, ref)) {
+			t.Error(`the "|" member decodes differently from the bare scalar element`)
+		}
+	})
+}
+
+// TestREQ053CtxOwnedMetadataSuffixRefused — REQ-053 / REQ-170. COMPOSITION
+// `language` and `territory` are owned by their ctx/ short forms, which carry
+// the code alone: a suffix their CODE_PHRASE has but the ctx/ form cannot carry
+// is refused in every mode with ErrUnsupportedDatatype, naming the key and the
+// owning ctx/ form and no value — not as a CODE_PHRASE missing its `|code`. A
+// suffix outside CODE_PHRASE's set is unmatched content.
+func TestREQ053CtxOwnedMetadataSuffixRefused(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	const secret = "secret-value-0451"
+	for _, field := range []string{"language", "territory"} {
+		t.Run(field, func(t *testing.T) {
+			key := rmattrRoot + "/" + field + "|preferred_term"
+			code := "en"
+			if field == "territory" {
+				code = "US"
+			}
+			err := refusedInEveryMode(t, wt, rmattrBody(map[string]any{
+				rmattrRoot + "/" + field + "|code": code,
+				key:                                secret,
+			}))
+			if !errors.Is(err, ErrUnsupportedDatatype) {
+				t.Errorf("err = %v, want ErrUnsupportedDatatype", err)
+			}
+			for _, want := range []string{strconv.Quote(key), "ctx/" + field} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("err = %v, want it to name %s", err, want)
+				}
+			}
+			if strings.Contains(err.Error(), secret) || strings.Contains(err.Error(), "missing required") {
+				t.Errorf("err = %v, want the ctx/ ownership refusal and no value", err)
+			}
+			unmatched := rmattrRoot + "/" + field + "|x_note"
+			assertUnmatched(t, wt, rmattrBody(map[string]any{unmatched: "x"}), unmatched)
+		})
+	}
+}
