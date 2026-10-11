@@ -5,11 +5,17 @@ package validation
 // bind, which the floor alone never has.
 
 import (
+	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
+	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
+	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
 )
 
 // REQ-102 — the predicate of each item of one multi-valued attribute.
@@ -40,9 +46,11 @@ func TestItemPaths_REQ102_Rule(t *testing.T) {
 			want:  []string{"/items[1]", "/items[2]"},
 		},
 		{
+			// An item whose name a child pins binds to that child, so the
+			// sibling bound where no name is pinned does not carry it.
 			name:  "shared id, one pinned name and one sibling that pins none",
 			items: []pathItem{{id: "at0004", name: "Systolic"}, {id: "at0004"}},
-			want:  []string{"/items[1]", "/items[2]"},
+			want:  []string{"/items[at0004, 'Systolic']", "/items[2]"},
 		},
 		{
 			name:  "shared id, two items bound to one named node",
@@ -219,5 +227,111 @@ func TestRMFloor_REQ112_REQ102_PinnedNamesKeyedByWholePath(t *testing.T) {
 				t.Errorf("floor paths = %q, want %q", got, tc.want)
 			}
 		})
+	}
+}
+
+// handoffOPT has a COMPOSITION whose content holds two archetype roots of
+// openEHR-EHR-OBSERVATION.reused.v1, told apart by the names Erste and
+// Zweite the template pins on them.
+var handoffOPT = `<?xml version="1.0" encoding="UTF-8"?>
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
+  <template_id><value>handoff</value></template_id>
+  <concept>handoff</concept>
+  <definition>
+    <rm_type_name>COMPOSITION</rm_type_name>
+    <node_id>at0000</node_id>
+    <attributes xsi:type="C_MULTIPLE_ATTRIBUTE">
+      <rm_attribute_name>content</rm_attribute_name>` + handoffChild("Erste") + handoffChild("Zweite") + `
+    </attributes>
+    <archetype_id><value>openEHR-EHR-COMPOSITION.reused.v1</value></archetype_id>
+  </definition>
+</template>`
+
+func handoffChild(name string) string {
+	return fmt.Sprintf(`
+      <children xsi:type="C_ARCHETYPE_ROOT">
+        <rm_type_name>OBSERVATION</rm_type_name>
+        <node_id>at0000</node_id>
+        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+          <rm_attribute_name>name</rm_attribute_name>
+          <children xsi:type="C_COMPLEX_OBJECT">
+            <rm_type_name>DV_TEXT</rm_type_name>
+            <node_id/>
+            <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+              <rm_attribute_name>value</rm_attribute_name>
+              <children xsi:type="C_PRIMITIVE_OBJECT">
+                <rm_type_name>STRING</rm_type_name>
+                <node_id/>
+                <item xsi:type="C_STRING"><list>%s</list></item>
+              </children>
+            </attributes>
+          </children>
+        </attributes>
+        <archetype_id><value>openEHR-EHR-OBSERVATION.reused.v1</value></archetype_id>
+      </children>`, name)
+}
+
+// handoffObservation returns a reused OBSERVATION named name whose
+// RM-mandatory language is empty, a defect both walkers report.
+func handoffObservation(name string) *rm.Observation {
+	return &rm.Observation{
+		ArchetypeNodeID: "openEHR-EHR-OBSERVATION.reused.v1",
+		Name:            rm.DVText{Value: name},
+		Encoding:        rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "IANA_character-sets"}, CodeString: "UTF-8"},
+		Subject:         rm.PartySelf{},
+	}
+}
+
+// REQ-102, REQ-112, REQ-116 — the names the template walk binds, recorded
+// by the attribute's path and each item's index, make the floor write the
+// path the template walk writes for the same node.
+func TestBindings_REQ102_REQ112_HandOffGivesOnePath(t *testing.T) {
+	opt, err := template.ParseOPT(strings.NewReader(handoffOPT))
+	if err != nil {
+		t.Fatalf("ParseOPT: %v", err)
+	}
+	c, err := templatecompile.Compile(opt)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	comp := &rm.Composition{
+		ArchetypeNodeID: "openEHR-EHR-COMPOSITION.reused.v1",
+		Name:            rm.DVText{Value: "Reused"},
+		Content:         []rm.ContentItem{handoffObservation("Zweite"), handoffObservation("Erste")},
+	}
+	var content *tcimpl.CompiledAttribute
+	for _, a := range c.Root().Attributes() {
+		if a.Name() == "content" {
+			content = a
+		}
+	}
+	if content == nil {
+		t.Fatal("compiled root has no content attribute")
+	}
+	items, ok := rmread.ReadMultiple(comp, "COMPOSITION", "content")
+	if !ok {
+		t.Fatal("rmread cannot read COMPOSITION.content")
+	}
+	bound, _ := bindItems("COMPOSITION", "content", content.Children(), items)
+	names := pinnedNames{}
+	for i, it := range boundPathItems(items, bound) {
+		names[itemKey{attrPath: "/content", index: i}] = it.name
+	}
+
+	w := newWalker(c)
+	w.walkNode(c.Root(), comp, "/")
+	floor := &rmFloorWalker{info: rminfo.Default, names: names}
+	floor.walk(comp, "COMPOSITION", "/", roleNone, 0)
+
+	for _, want := range []string{
+		"/content[openEHR-EHR-OBSERVATION.reused.v1, 'Zweite']/language",
+		"/content[openEHR-EHR-OBSERVATION.reused.v1, 'Erste']/language",
+	} {
+		for name, issues := range map[string][]Issue{"template walk": w.issues, "floor": floor.issues} {
+			if !slices.ContainsFunc(issues, func(i Issue) bool { return i.Code == "required" && i.Path == want }) {
+				t.Errorf("%s: no required at %s; got %+v", name, want, issues)
+			}
+		}
 	}
 }

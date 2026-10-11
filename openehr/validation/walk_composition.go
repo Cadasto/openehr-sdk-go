@@ -301,7 +301,8 @@ func formatAllowedTypes(children []*tcimpl.CompiledNode) string {
 // walkMultipleAttribute enforces existence + cardinality on a
 // multi-valued attribute and binds each RM item to an OPT child.
 // A LOCATABLE binds by archetype_node_id: exact archetype/node ids
-// first, then the parsed REQ-104 slot grammar (see [matchChildByID]);
+// first, picked by the template-level name where several children share
+// the id, then the parsed REQ-104 slot grammar (see [matchChildByID]);
 // one that matches no child is a slot_fill. An item that is not a
 // LOCATABLE has no archetype_node_id and binds by RM type instead
 // (REQ-102, see [matchChildByRMType]); one that no child admits is an
@@ -370,22 +371,8 @@ func (w *walker) walkMultipleAttribute(
 	if len(children) == 0 {
 		return
 	}
-	bound := make([]*tcimpl.CompiledNode, len(items))
-	byNodeID := make([]bool, len(items))
-	pathItems := make([]pathItem, len(items))
-	for idx, item := range items {
-		byNodeID[idx] = bindsByNodeID(item, opt.RMTypeName(), attr.Name())
-		if byNodeID[idx] {
-			bound[idx] = matchChildByID(children, item)
-		} else {
-			bound[idx] = matchChildByRMType(children, item)
-		}
-		pathItems[idx].id = locatableArchetypeNodeID(item)
-		if bound[idx] != nil {
-			pathItems[idx].name = bound[idx].NodeName()
-		}
-	}
-	itemPath := itemPaths(attrPath, pathItems)
+	bound, byNodeID := bindItems(opt.RMTypeName(), attr.Name(), children, items)
+	itemPath := itemPaths(attrPath, boundPathItems(items, bound))
 	perChildCount := make(map[*tcimpl.CompiledNode]int, len(children))
 	for idx, item := range items {
 		matched := bound[idx]
@@ -423,6 +410,41 @@ func (w *walker) walkMultipleAttribute(
 			})
 		}
 	}
+}
+
+// bindItems binds each of the items of the multi-valued attribute
+// attrName, on a node of RM type parentRMType, to one of its OPT
+// children: a LOCATABLE by its archetype_node_id ([matchChildByID]),
+// any other item by its RM type ([matchChildByRMType]). bound holds the
+// child each item binds to, nil when none does, and byNodeID whether the
+// item binds by its id.
+func bindItems(parentRMType, attrName string, children []*tcimpl.CompiledNode, items []any) (bound []*tcimpl.CompiledNode, byNodeID []bool) {
+	bound = make([]*tcimpl.CompiledNode, len(items))
+	byNodeID = make([]bool, len(items))
+	for idx, item := range items {
+		byNodeID[idx] = bindsByNodeID(item, parentRMType, attrName)
+		if byNodeID[idx] {
+			bound[idx] = matchChildByID(children, item)
+		} else {
+			bound[idx] = matchChildByRMType(children, item)
+		}
+	}
+	return bound, byNodeID
+}
+
+// boundPathItems returns what the path rule reads of each item: its
+// archetype_node_id and the name pinned on the child it binds to. These
+// names, keyed by the attribute's path and each item's index, are the
+// bindings the floor takes to write the same paths ([pinnedNames]).
+func boundPathItems(items []any, bound []*tcimpl.CompiledNode) []pathItem {
+	out := make([]pathItem, len(items))
+	for idx, item := range items {
+		out[idx].id = locatableArchetypeNodeID(item)
+		if bound[idx] != nil {
+			out[idx].name = bound[idx].NodeName()
+		}
+	}
+	return out
 }
 
 // childIdentity describes an OPT child for inclusion in cardinality
@@ -602,25 +624,30 @@ func isNilItem(item any) bool {
 // matchChildByID picks the OPT child whose ArchetypeID (for
 // archetype-root pins) or NodeID (for at-code pins) matches the RM
 // item's archetype_node_id, then the first slot whose parsed
-// assertions admit it. It serves only items that [bindsByNodeID]
-// accepts. Returns nil when none match, and always for an empty or
-// unreadable id (a typed-nil LOCATABLE, a nil under a LOCATABLE
-// attribute); the caller then emits slot_fill.
+// assertions admit it. Where several non-slot children carry the id,
+// as when a template reuses one archetype under distinct names, the
+// item's name picks among them ([matchChildByPinnedName]). It serves
+// only items that [bindsByNodeID] accepts. Returns nil when none
+// match, and always for an empty or unreadable id (a typed-nil
+// LOCATABLE, a nil under a LOCATABLE attribute); the caller then
+// emits slot_fill.
 func matchChildByID(children []*tcimpl.CompiledNode, item any) *tcimpl.CompiledNode {
 	id := locatableArchetypeNodeID(item)
 	if id == "" {
 		return nil
 	}
+	var first *tcimpl.CompiledNode
 	for _, c := range children {
-		if c.IsSlot() {
+		if c.IsSlot() || !carriesID(c, id) {
 			continue
 		}
-		if c.ArchetypeID() != "" && c.ArchetypeID() == id {
-			return c
+		if first != nil {
+			return matchChildByPinnedName(children, id, locatableName(item))
 		}
-		if c.NodeID() != "" && c.NodeID() == id {
-			return c
-		}
+		first = c
+	}
+	if first != nil {
+		return first
 	}
 	for _, c := range children {
 		if c.IsSlot() && slotFitsArchetypeID(c, id) {
@@ -628,6 +655,60 @@ func matchChildByID(children []*tcimpl.CompiledNode, item any) *tcimpl.CompiledN
 		}
 	}
 	return nil
+}
+
+// carriesID reports whether the OPT child c pins id: as its archetype id
+// (an archetype root) or as its at-code.
+func carriesID(c *tcimpl.CompiledNode, id string) bool {
+	return (c.ArchetypeID() != "" && c.ArchetypeID() == id) || (c.NodeID() != "" && c.NodeID() == id)
+}
+
+// matchChildByPinnedName picks, among the non-slot children that carry
+// id, the one an item named name binds to: the child whose pinned name
+// (the template-level node name) is name; failing that, the first that
+// pins no name; failing that, the first, whose name constraint then
+// reports the mismatch. The name only decides the binding; no issue
+// path or message carries it.
+func matchChildByPinnedName(children []*tcimpl.CompiledNode, id, name string) *tcimpl.CompiledNode {
+	var first, unnamed *tcimpl.CompiledNode
+	for _, c := range children {
+		if c.IsSlot() || !carriesID(c, id) {
+			continue
+		}
+		pinned := c.NodeName()
+		if pinned != "" && pinned == name {
+			return c
+		}
+		if first == nil {
+			first = c
+		}
+		if pinned == "" && unnamed == nil {
+			unnamed = c
+		}
+	}
+	if unnamed != nil {
+		return unnamed
+	}
+	return first
+}
+
+// locatableName returns the value of a LOCATABLE item's name, a DV_TEXT
+// or a DV_CODED_TEXT, read as the walk reads the name it checks against
+// the template, or "" when the item has none.
+func locatableName(item any) string {
+	v, ok := rmread.ReadSingle(item, describeRMType(item), "name")
+	if !ok {
+		return ""
+	}
+	like, ok := v.(rm.DVTextLike)
+	if !ok {
+		return ""
+	}
+	text, ok := rm.AsDVText(like)
+	if !ok {
+		return ""
+	}
+	return text.Value
 }
 
 // matchChildByRMType binds an item that carries no archetype_node_id

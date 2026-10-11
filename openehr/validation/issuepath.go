@@ -127,13 +127,11 @@ func namePredicate(id, name string) string {
 
 // idSharing counts, over the items of one attribute, how many carry each id
 // and, for the ids that more than one item carries, how many carry each
-// pinned name and how many carry none.
+// pinned name.
 type idSharing struct {
 	perID map[string]int
 	// perName counts the items of each shared id by their pinned name.
 	perName map[pathItem]int
-	// unnamed counts the items of each shared id that carry no pinned name.
-	unnamed map[string]int
 }
 
 // newIDSharing counts the ids of items. An attribute with one item or none
@@ -150,14 +148,7 @@ func newIDSharing(items []pathItem) idSharing {
 		}
 	}
 	for _, it := range items {
-		if !s.shared(it.id) {
-			continue
-		}
-		if it.name == "" {
-			if s.unnamed == nil {
-				s.unnamed = map[string]int{}
-			}
-			s.unnamed[it.id]++
+		if !s.shared(it.id) || it.name == "" {
 			continue
 		}
 		if s.perName == nil {
@@ -174,9 +165,11 @@ func (s idSharing) shared(id string) bool {
 }
 
 // tellsApart reports whether the pinned name of it tells it apart from every
-// other item that carries its id: it has a name, every other such item has a
-// name too, and none has the same one. An item whose OPT node pins no name
-// may carry any name, so a sibling like that leaves the name telling nothing.
+// other item that carries its id: it has a name and no other such item binds
+// to a node pinning the same one. A sibling bound to a node that pins no name
+// does not carry that name either, since an item whose name a child pins
+// binds to that child (see [matchChildByID]), so it does not stop the name
+// from telling the item apart.
 func (s idSharing) tellsApart(it pathItem) bool {
-	return it.name != "" && s.unnamed[it.id] == 0 && s.perName[it] == 1
+	return it.name != "" && s.perName[it] == 1
 }
