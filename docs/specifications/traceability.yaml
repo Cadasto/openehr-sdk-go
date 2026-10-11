@@ -1961,3 +1961,10 @@ requirements:
       - openehr/validation/godoc_class_test.go
       - openehr/validation/rmfloor_proportion_test.go
       - openehr/validation/value_free_test.go
+  - id: REQ-169
+    title: Interval boundary flag defaults
+    canonical: docs/specifications/wire.md#req-169--interval-boundary-flag-defaults
+    status: draft
+    implementation: planned
+    packages: [openehr/rm, internal/bmmgen, openehr/serialize/canjson, openehr/serialize/canxml, openehr/serialize/simplified, openehr/template, openehr/validation]
+    probes: [PROBE-030, PROBE-105]
