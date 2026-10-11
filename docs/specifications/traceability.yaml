@@ -439,6 +439,7 @@ requirements:
       - openehr/serialize/canjson/edgecases_test.go
       - openehr/serialize/canjson/encode_test.go
       - openehr/serialize/canjson/interval_failed_decode_test.go
+      - openehr/serialize/canjson/interval_flag_defaults_test.go
       - openehr/serialize/canjson/interval_open_side_test.go
       - openehr/serialize/canjson/map_value_type_test.go
       - openehr/serialize/canjson/mappings_presence_test.go
@@ -570,6 +571,7 @@ requirements:
       - openehr/rm/interval_bound_test.go
       - openehr/serialize/canxml/crossformat_test.go
       - openehr/serialize/canxml/decode_test.go
+      - openehr/serialize/canxml/interval_flag_defaults_test.go
       - openehr/serialize/canxml/interval_open_side_test.go
       - openehr/serialize/canxml/roundtrip_test.go
       - openehr/validation/rmread/interval_void_parity_test.go
@@ -1093,6 +1095,7 @@ requirements:
       - openehr/rm/rminfo/lookup_test.go
       - openehr/template/archetype_root_template_id_test.go
       - openehr/template/imports_test.go
+      - openehr/template/interval_flags_test.go
       - openehr/template/node_name_test.go
       - openehr/template/parse_primitives_test.go
       - openehr/template/path_test.go
@@ -1173,6 +1176,7 @@ requirements:
       - openehr/template/constraints/example_test.go
       - openehr/template/constraints/pure_imports_test.go
       - openehr/template/constraints/string_cache_test.go
+      - openehr/template/interval_flags_test.go
       - openehr/template/parse_primitives_test.go
       - openehr/validation/constraint_fixtures_test.go
       - openehr/validation/optional_string_test.go
@@ -1975,3 +1979,9 @@ requirements:
     implementation: planned
     packages: [openehr/rm, internal/bmmgen, openehr/serialize/canjson, openehr/serialize/canxml, openehr/serialize/simplified, openehr/template, openehr/validation]
     probes: [PROBE-030, PROBE-105]
+    tests:
+      - internal/bmmgen/render_interval_bound_test.go
+      - openehr/rm/interval_closed_test.go
+      - openehr/serialize/canjson/interval_flag_defaults_test.go
+      - openehr/serialize/canxml/interval_flag_defaults_test.go
+      - openehr/template/interval_flags_test.go
