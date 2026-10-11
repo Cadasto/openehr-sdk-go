@@ -21,7 +21,9 @@ import (
 // An arm may hand an element to the decoder's own DecodeElement only when the
 // member's class is one of those the two targets render a decoder for, which
 // checks its own content; the test collects that set from the targets
-// themselves. Any other class-typed member, such as one held as a BMM
+// themselves. An arm may read an element as text through
+// xmlunmatched.DecodeElement only when the member is a primitive or an
+// enumeration. Any other class-typed member, such as one held as a BMM
 // primitive class or by a generic parameter, would otherwise read nothing and
 // report nothing. A member typed by a generic parameter goes through
 // xmlunmatched.DecodeParam. No decoder skips an element itself, so none drops
@@ -100,6 +102,10 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 						if !strings.Contains(arm, "xmlunmatched.DecodeParam(") {
 							t.Errorf("%s.%s is typed by a generic parameter; its arm must decode through xmlunmatched.DecodeParam, which chooses by the instantiation:\n%s", pc.BMMName, prop, arm)
 						}
+					case strings.Contains(arm, "xmlunmatched.DecodeElement("):
+						if name := decodedClassName(ef.Prop); !isPrimitive(name) && !isEnumerationClass(plan, name) {
+							t.Errorf("%s.%s decodes its element as text through xmlunmatched.DecodeElement, but %q is neither a primitive nor an enumeration:\n%s", pc.BMMName, prop, name, arm)
+						}
 					case strings.Contains(arm, "_dec.DecodeElement("):
 						if name := decodedClassName(ef.Prop); !withDecoder[name] {
 							t.Errorf("%s.%s hands its element to the decoder's own DecodeElement, but %q has no generated decoder: encoding/xml would read nothing from it and report nothing:\n%s", pc.BMMName, prop, name, arm)
@@ -165,6 +171,17 @@ func isOpenParamProperty(ef emittedField) bool {
 		return isOpenParam(ef.Owner, containerInnerName(p.TypeDef))
 	}
 	return false
+}
+
+// isEnumerationClass reports whether the BMM class name is an enumeration,
+// whose Go type is a named string or integer.
+func isEnumerationClass(plan *Plan, name string) bool {
+	pc, ok := plan.Classes[name]
+	if !ok {
+		return false
+	}
+	_, enum := pc.Class.(*bmm.Enumeration)
+	return enum
 }
 
 // decodedClassName returns the BMM class a property's element decodes as:

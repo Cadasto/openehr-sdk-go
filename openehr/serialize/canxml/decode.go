@@ -197,7 +197,10 @@ func Unmarshal(data []byte, v any, opts ...DecoderOption) error {
 // An `xsi:type` written with no in-scope `xmlns:xsi` does not
 // take the literal branch: encoding/xml yields `Space == "xsi",
 // Local == "type"`, which matches neither branch and is reported as a
-// missing discriminator (below).
+// missing discriminator (below). A bare `type` attribute, in no
+// namespace, is read as the discriminator too, but only when the element
+// carries no `xsi:type` in either form above: an `xsi:type` wins
+// wherever it is written.
 //
 // The returned discriminator is normalised: a leading `xsd:` (XML
 // Schema datatype) prefix is stripped so foundation primitives like
@@ -219,11 +222,13 @@ func XSITypeOf(start xml.StartElement) (string, error) {
 }
 
 // discriminator returns the attribute of start that [XSITypeOf] reads as the
-// `xsi:type` discriminator, by name, with its normalised value. The name lets
-// dispatch record which attribute it read, so that a bare `type` it did not
-// read stays unmatched content.
+// `xsi:type` discriminator, by name, with its normalised value. An `xsi:type`
+// in the XSI namespace or written literally wins; a bare `type` is read only
+// when there is none, so a bare `type` beside an `xsi:type` stays unmatched
+// content. The name lets dispatch record which attribute it read.
 func discriminator(start xml.StartElement) (xml.Name, string, error) {
-	for _, attr := range start.Attr {
+	bare := -1
+	for i, attr := range start.Attr {
 		// Reject xmi:type (both resolved and literal forms).
 		if attr.Name.Local == "type" && attr.Name.Space == NSXMI {
 			return xml.Name{}, "", fmt.Errorf("canxml: %w: xmi:type on the wire is rejected (use xsi:type)", ErrInvalidShape)
@@ -231,10 +236,20 @@ func discriminator(start xml.StartElement) (xml.Name, string, error) {
 		if attr.Name.Local == "xmi:type" {
 			return xml.Name{}, "", fmt.Errorf("canxml: %w: xmi:type on the wire is rejected (use xsi:type)", ErrInvalidShape)
 		}
-		// Accept xsi:type (resolved and literal forms).
-		if xmlunmatched.IsDiscriminator(attr.Name) {
+		if !xmlunmatched.IsDiscriminator(attr.Name) {
+			continue
+		}
+		// Accept xsi:type (resolved and literal forms) at once; keep a bare
+		// type for when there is none.
+		if attr.Name.Space != "" || attr.Name.Local != "type" {
 			return attr.Name, stripXSDPrefix(attr.Value), nil
 		}
+		if bare < 0 {
+			bare = i
+		}
+	}
+	if bare >= 0 {
+		return start.Attr[bare].Name, stripXSDPrefix(start.Attr[bare].Value), nil
 	}
 	return xml.Name{}, "", nil
 }
@@ -266,9 +281,8 @@ func stripXSDPrefix(s string) string {
 //     concrete instance which receives the element body via
 //     `dec.DecodeElement`.
 //   - If start carries no `xsi:type`, returns [typereg.ErrMissingType]
-//     wrapped in [DecodeError]. Relaxed-dispatch fallback lives in
-//     the generated code and the [Decoder.RelaxedTypeDispatch] flag;
-//     see the package documentation.
+//     wrapped in [DecodeError], always: relaxed dispatch
+//     ([WithRelaxedTypeDispatch]) is not implemented yet.
 //   - If the concrete value does not satisfy T, returns
 //     [typereg.ErrTypeMismatch] wrapped in [DecodeError].
 //   - The body bytes are consumed up to and including the matching

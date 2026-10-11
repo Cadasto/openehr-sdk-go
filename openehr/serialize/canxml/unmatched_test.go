@@ -613,6 +613,50 @@ func TestREQ170_XMLSchemaInstanceAttributesAreNotUnmatched(t *testing.T) {
 		}
 	})
 
+	t.Run("bare type read by a narrow slot", func(t *testing.T) {
+		// LOCATABLE.name falls back to DV_TEXT without a discriminator, and
+		// reads one when the element carries it.
+		in := []byte(`<item_tree ` + ucNS + ` archetype_node_id="at1"><name type="DV_TEXT"><value>t</value></name></item_tree>`)
+		got, paths, err := unmarshalCollecting(func() any { return new(rm.ItemTree) }, in, canxml.WithStrict())
+		if err != nil {
+			t.Fatalf("canxml.Unmarshal(WithStrict) = %v; want nil: dispatch read the bare `type` as the discriminator", err)
+		}
+		if len(paths) != 0 {
+			t.Errorf("WithUnmatched reported %q; want nothing", paths)
+		}
+		if name := got.(*rm.ItemTree).Name; name == nil || name.GetValue() != "t" {
+			t.Errorf("Name = %#v; want the DV_TEXT \"t\"", name)
+		}
+	})
+
+	t.Run("bare type written before the xsi:type", func(t *testing.T) {
+		// The `xsi:type` wins wherever it is written, so the element is a
+		// DV_CODED_TEXT in every mode and the bare `type` is unread.
+		in := []byte(`<element ` + ucNS + ` archetype_node_id="at1"><name><value>n</value></name>` +
+			`<value type="DV_TEXT" xsi:type="DV_CODED_TEXT"><value>x</value><defining_code>` +
+			`<terminology_id><value>local</value></terminology_id><code_string>at9</code_string></defining_code></value></element>`)
+		const path = "/element[1]/value[1]/@type"
+		def := new(rm.Element)
+		if err := canxml.Unmarshal(in, def); err != nil {
+			t.Fatalf("canxml.Unmarshal = %v; want nil", err)
+		}
+		if _, ok := def.Value.(*rm.DVCodedText); !ok {
+			t.Errorf("Value = %T; want *rm.DVCodedText, the type `xsi:type` names", def.Value)
+		}
+		got, paths, err := unmarshalCollecting(func() any { return new(rm.Element) }, in)
+		if err != nil {
+			t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
+		}
+		if _, ok := got.(*rm.Element).Value.(*rm.DVCodedText); !ok {
+			t.Errorf("WithUnmatched: Value = %T; want *rm.DVCodedText", got.(*rm.Element).Value)
+		}
+		if want := []string{path}; !slices.Equal(paths, want) {
+			t.Errorf("WithUnmatched reported %q; want %q: the bare `type` is not read", paths, want)
+		}
+		err = canxml.Unmarshal(in, new(rm.Element), canxml.WithStrict())
+		assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, path, false)
+	})
+
 	for _, tc := range []struct {
 		name string
 		in   string
@@ -638,6 +682,16 @@ func TestREQ170_XMLSchemaInstanceAttributesAreNotUnmatched(t *testing.T) {
 			into: func() any { return new(rm.Element) },
 			path: "/element[1]/value[1]/@type",
 		},
+		{
+			// Dispatch read the first sibling's bare `type`; that says
+			// nothing of the second sibling, whose `xsi:type` dispatch read.
+			name: "bare type read on an earlier sibling only",
+			in: `<item_tree ` + ucNS + ` archetype_node_id="at1"><name><value>t</value></name>` +
+				`<items type="ELEMENT" archetype_node_id="at2"><name><value>a</value></name></items>` +
+				`<items xsi:type="ELEMENT" type="` + xmlPlanted + `" archetype_node_id="at3"><name><value>b</value></name></items></item_tree>`,
+			into: func() any { return new(rm.ItemTree) },
+			path: "/item_tree[1]/items[2]/@type",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, paths, err := unmarshalCollecting(tc.into, []byte(tc.in))
@@ -651,6 +705,79 @@ func TestREQ170_XMLSchemaInstanceAttributesAreNotUnmatched(t *testing.T) {
 			assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, tc.path, false)
 		})
 	}
+}
+
+// TestREQ170_XMLInterfaceTypedParameter pins a member typed by a generic
+// parameter that is instantiated with an interface other than `any`: the
+// bounds of BASE Interval<DV_ORDERED>. encoding/xml decodes into such a member
+// only when it already holds a pointer, and skips the element otherwise.
+//
+//   - An empty bound: the default skips it, the report option names each
+//     bound element as one item and returns the default's value, and strict
+//     refuses the first.
+//   - A bound that holds a pointer to a DV_QUANTITY: the default decodes into
+//     it, as encoding/xml does, and so do the options, which see its content,
+//     so an extension inside it is reported at its own path.
+func TestREQ170_XMLInterfaceTypedParameter(t *testing.T) {
+	const quantity = `<magnitude>1</magnitude><units>kg</units>`
+	t.Run("empty bounds", func(t *testing.T) {
+		in := []byte(`<iv ` + ucNS + `><lower xsi:type="DV_QUANTITY">` + quantity + `</lower>` +
+			`<upper xsi:type="DV_QUANTITY"><magnitude>2</magnitude><units>kg</units></upper></iv>`)
+		into := func() any { return new(rm.Interval[rm.DVOrdered]) }
+		wantPaths := []string{"/iv[1]/lower[1]", "/iv[1]/upper[1]"}
+		want := into()
+		if err := canxml.Unmarshal(in, want); err != nil {
+			t.Fatalf("canxml.Unmarshal = %v; want nil", err)
+		}
+		got, paths, err := unmarshalCollecting(into, in)
+		if err != nil {
+			t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
+		}
+		if !slices.Equal(paths, wantPaths) {
+			t.Errorf("WithUnmatched reported %q; want %q, each bound as one item", paths, wantPaths)
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("canxml.Unmarshal(WithUnmatched) decoded\n%#v\nwant the default's value\n%#v", got, want)
+		}
+		err = canxml.Unmarshal(in, into(), canxml.WithStrict())
+		assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, wantPaths[0], false)
+	})
+
+	t.Run("bound holding a pointer", func(t *testing.T) {
+		held := func() any { return &rm.Interval[rm.DVOrdered]{Lower: &rm.DVQuantity{}} }
+		lowerOf := func(v any) *rm.DVQuantity {
+			q, _ := v.(*rm.Interval[rm.DVOrdered]).Lower.(*rm.DVQuantity)
+			return q
+		}
+		plain := []byte(`<iv ` + ucNS + `><lower xsi:type="DV_QUANTITY">` + quantity + `</lower></iv>`)
+		for name, opts := range map[string][]canxml.DecoderOption{
+			"default": nil,
+			"strict":  {canxml.WithStrict()},
+		} {
+			v := held()
+			if err := canxml.Unmarshal(plain, v, opts...); err != nil {
+				t.Fatalf("canxml.Unmarshal(%s) = %v; want nil", name, err)
+			}
+			if q := lowerOf(v); q == nil || float64(q.Magnitude) != 1 || q.Units != "kg" {
+				t.Errorf("canxml.Unmarshal(%s): Lower = %#v; want the held DV_QUANTITY filled with 1 kg", name, q)
+			}
+		}
+
+		ext := []byte(`<iv ` + ucNS + `><lower xsi:type="DV_QUANTITY">` + quantity + `<x-ext>` + xmlPlanted + `</x-ext></lower></iv>`)
+		const extPath = "/iv[1]/lower[1]/x-ext[1]"
+		got, paths, err := unmarshalCollecting(held, ext)
+		if err != nil {
+			t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
+		}
+		if want := []string{extPath}; !slices.Equal(paths, want) {
+			t.Errorf("WithUnmatched reported %q; want %q: the held bound checks its own content", paths, want)
+		}
+		if q := lowerOf(got); q == nil || float64(q.Magnitude) != 1 || q.Units != "kg" {
+			t.Errorf("WithUnmatched: Lower = %#v; want the held DV_QUANTITY filled with 1 kg", q)
+		}
+		err = canxml.Unmarshal(ext, held(), canxml.WithStrict())
+		assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, extPath, false)
+	})
 }
 
 // TestREQ170_XMLMembersWithoutADecoder pins the members whose Go type has no

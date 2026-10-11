@@ -74,6 +74,11 @@ var ErrNamespace = errors.New("canxml: foreign XML namespace")
 type Tracker struct {
 	report func(path string)
 	strict bool
+	// checked counts the elements whose content a decoder of the SDK has
+	// checked: each generated UnmarshalXML, through [CheckUnmatchedAttrs],
+	// and each primitive element [DecodeElement] reads as text. A rise
+	// across a decode shows that something read the element.
+	checked int
 	// open holds one frame per element opened and not yet closed, after a
 	// first frame for the document itself, which counts the top-level
 	// elements of the value being decoded.
@@ -201,6 +206,7 @@ func (t *Tracker) unmatched(path string, foreign bool) error {
 // discriminator among them), nor a namespace declaration, nor one of known in
 // no namespace, nor a bare `type` that dispatch read as the discriminator.
 func (t *Tracker) attrs(attrs []xml.Attr, known []string) error {
+	t.checked++
 	var base string
 	read := t.open[len(t.open)-1].discriminator
 	for _, a := range attrs {
@@ -468,19 +474,15 @@ func CheckUnmatchedAttrs(dec *xml.Decoder, start xml.StartElement, known ...stri
 // encoding/xml, an attribute or a child element on it is ignored. A tracked
 // decode reports or refuses each as unmatched content, and the value decoded
 // is the same as by default. A type with an UnmarshalXML method checks its
-// own content. A pointer to an empty interface gives encoding/xml no Go type
-// to decode into, so it skips the element; a tracked decode reports or
-// refuses that element as one item ([SkipUnmatched]).
+// own content. A member of interface type goes through [DecodeParam]
+// instead, which sees its type.
 func DecodeElement(dec *xml.Decoder, start *xml.StartElement, v any) error {
 	t := trackerOf(dec)
 	if t == nil {
 		return dec.DecodeElement(v, start)
 	}
-	switch v.(type) {
-	case xml.Unmarshaler:
+	if _, ok := v.(xml.Unmarshaler); ok {
 		return dec.DecodeElement(v, start)
-	case *any:
-		return SkipUnmatched(dec, *start)
 	}
 	return t.decodeText(dec, start, v)
 }
@@ -489,9 +491,8 @@ func DecodeElement(dec *xml.Decoder, start *xml.StartElement, v any) error {
 // open generic parameter T, choosing by T what [DecodeElement] chooses by v.
 // start must be the token the decoder read last.
 //
-//   - T is an interface type, such as the `any` of ORIGINAL_VERSION<any>:
-//     encoding/xml has no Go type to decode into, and the element is skipped
-//     as one item ([SkipUnmatched]), reported or refused by a tracked decode.
+//   - T is an interface type, such as the `any` of ORIGINAL_VERSION<any> or
+//     the DV_ORDERED of BASE Interval<DV_ORDERED>: see [decodeInterface].
 //   - T is a pointer to a type with an UnmarshalXML method: encoding/xml
 //     allocates it and that method checks its own content.
 //   - Any other T, a primitive or a type with an UnmarshalXML method on its
@@ -500,9 +501,39 @@ func DecodeParam[T any](dec *xml.Decoder, start *xml.StartElement, v *T) error {
 	var zero T
 	switch any(zero).(type) {
 	case nil:
-		return SkipUnmatched(dec, *start)
+		return decodeInterface(dec, start, any(*v) == nil, v)
 	case xml.Unmarshaler:
 		return dec.DecodeElement(v, start)
 	}
 	return DecodeElement(dec, start, v)
+}
+
+// decodeInterface decodes the element start opens into v, a pointer to a
+// member of interface type; empty reports whether the member holds nothing.
+//
+// encoding/xml decodes into a member of interface type only when it holds a
+// non-nil pointer, and skips the element otherwise; the default decode does
+// exactly that. An empty member gives it nothing to decode into, so a
+// tracked decode reports or refuses the element as one item before it is
+// skipped ([SkipUnmatched]). A member that holds a value is left to
+// encoding/xml as well: a pointer to an RM type then checks its own content,
+// and when nothing of the SDK checked the element's content, because
+// encoding/xml skipped it or read it into a primitive, a tracked decode
+// reports or refuses the element as one item once it is read.
+func decodeInterface(dec *xml.Decoder, start *xml.StartElement, empty bool, v any) error {
+	t := trackerOf(dec)
+	if t == nil {
+		return dec.DecodeElement(v, start)
+	}
+	if empty {
+		return SkipUnmatched(dec, *start)
+	}
+	path, checked := t.path(), t.checked
+	if err := dec.DecodeElement(v, start); err != nil {
+		return err
+	}
+	if t.checked == checked {
+		return t.unmatched(path, isForeign(start.Name))
+	}
+	return nil
 }
