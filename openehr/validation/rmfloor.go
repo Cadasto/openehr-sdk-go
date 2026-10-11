@@ -308,10 +308,10 @@ func (w *rmFloorWalker) checkInvariants(value any, rmType, path string) {
 	case rmType == "DV_PROPORTION":
 		w.checkDVProportion(value, path)
 	case strings.HasPrefix(rmType, "DV_INTERVAL"):
-		// rmTypeInfo reports the numeric instantiations as
-		// "DV_INTERVAL<DV_QUANTITY>" / "<DV_COUNT>" (and "DV_INTERVAL" for
-		// the bare collapsed form); all dispatch to the bounds check.
-		w.checkDVInterval(value, path)
+		// rmTypeInfo reports the typed instantiations as
+		// "DV_INTERVAL<DV_QUANTITY>" / "<DV_COUNT>" / … (and "DV_INTERVAL" for
+		// the bare collapsed form); all dispatch to the flags and bounds checks.
+		w.checkDVInterval(value, rmType, path)
 	case rmType == "OBJECT_REF", rmType == "PARTY_REF", rmType == "ACCESS_GROUP_REF", rmType == "LOCATABLE_REF":
 		w.checkObjectRef(value, path)
 	case rmType == "PARTY_IDENTIFIED", rmType == "PARTY_RELATED":
@@ -580,16 +580,19 @@ func (w *rmFloorWalker) checkElementNullFlavour(value any, path string) {
 	}
 }
 
-// checkDVInterval enforces the spec floor on DV_INTERVAL when both
-// bounds are numerically comparable (DV_QUANTITY / DV_COUNT) and
-// neither side is unbounded: lower magnitude MUST be ≤ upper magnitude.
-// Other DVOrdered bound types (DV_DATE, DV_TIME, …) carry richer
-// comparison semantics — those are deferred from the first cycle and
-// will land alongside the REQ-123 temporal helpers' interval support.
+// checkDVInterval enforces the spec floor on DV_INTERVAL. The boundary
+// flags are checked on every interval ([rmFloorWalker.checkIntervalFlags]).
+// The bound order is checked when both bounds are numerically comparable
+// (DV_QUANTITY / DV_COUNT) and neither side is unbounded: lower magnitude
+// MUST be ≤ upper magnitude. Other DVOrdered bound types (DV_DATE, DV_TIME,
+// …) carry richer comparison semantics — those are deferred from the first
+// cycle and will land alongside the REQ-123 temporal helpers' interval
+// support.
 //
 // The Detail names the rule, never the bounds; the two compared magnitudes
 // are carried in Issue.Value, lower first, as a [2]float64 (REQ-168).
-func (w *rmFloorWalker) checkDVInterval(value any, path string) {
+func (w *rmFloorWalker) checkDVInterval(value any, rmType, path string) {
+	w.checkIntervalFlags(value, rmType, path)
 	lower, upper, ok := dvIntervalNumericBounds(value)
 	if !ok {
 		return
@@ -602,6 +605,42 @@ func (w *rmFloorWalker) checkDVInterval(value any, path string) {
 			Value:  constraints.Redact([2]float64{lower, upper}),
 		})
 	}
+}
+
+// checkIntervalFlags enforces BASE Interval's Lower_included_valid and
+// Upper_included_valid (lower_unbounded implies not lower_included, and the
+// same for upper). A side marked both unbounded and included is reported at
+// the interval's own path, as lower_included_valid or upper_included_valid;
+// both sides wrong give both issues. Decode reads such a side as written, and
+// a value built in Go can carry it too, so the floor is where it is reported.
+//
+// The flags are read through [rmread.ReadSingle], which serves every
+// DV_INTERVAL instantiation, the typed ones and the bare one, as a pointer or
+// a value. The Detail names the flags and the invariant, never a bound. The
+// check reads only the two flags, which the code already states, so the
+// issue's Value stays empty.
+func (w *rmFloorWalker) checkIntervalFlags(value any, rmType, path string) {
+	for _, side := range [...]struct{ end, code, invariant string }{
+		{end: "lower", code: "lower_included_valid", invariant: "Lower_included_valid"},
+		{end: "upper", code: "upper_included_valid", invariant: "Upper_included_valid"},
+	} {
+		if !intervalFlagSet(value, rmType, side.end+"_unbounded") || !intervalFlagSet(value, rmType, side.end+"_included") {
+			continue
+		}
+		w.emit(Issue{
+			Path:   path,
+			Code:   side.code,
+			Detail: "DV_INTERVAL." + side.end + "_included must be false when " + side.end + "_unbounded is true (BASE " + side.invariant + ")",
+		})
+	}
+}
+
+// intervalFlagSet reports whether the boundary flag attr of the interval
+// value is true. A value rmread cannot read the flag from reads as false.
+func intervalFlagSet(value any, rmType, attr string) bool {
+	v, ok := rmread.ReadSingle(value, rmType, attr)
+	set, isBool := v.(bool)
+	return ok && isBool && set
 }
 
 // checkObjectRef enforces the spec floor on OBJECT_REF (and subtypes):
