@@ -1468,7 +1468,7 @@ requirements:
       - openehr/validation/rmread/read_ordered_test.go
       - openehr/validation/rmread/read_party_proxy_test.go
       - openehr/validation/rmread/read_test.go
-      - openehr/validation/strand14_nonchaining_test.go
+      - openehr/validation/rmfloor_chained_test.go
       - sandbox/rmvalid_test.go
       - testkit/conformance/webtemplate/archetype_details_test.go
       - testkit/probes/instance/corpus_ratchet_test.go
