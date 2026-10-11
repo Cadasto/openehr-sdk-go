@@ -575,7 +575,7 @@ func TestUnmarshalFirstFailureInDocumentOrderWins(t *testing.T) {
 		name   string
 		decode func([]byte, any) error
 	}{
-		{"Unmarshal", canjson.Unmarshal},
+		{"Unmarshal", func(b []byte, v any) error { return canjson.Unmarshal(b, v) }},
 		{"Decoder.Decode", func(b []byte, v any) error {
 			return canjson.NewDecoder(strings.NewReader(string(b))).Decode(v)
 		}},

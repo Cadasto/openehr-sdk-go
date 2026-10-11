@@ -64,6 +64,12 @@
 //     Two encodes of one value therefore agree on member order; this is
 //     a determinism property, not a byte-level promise to a consumer.
 //
+//   - A member whose name is neither `_type` nor a member of the RM type
+//     its object decodes as is unmatched, and the decoder ignores it by
+//     default: the decoded value holds the rest of the input and none of
+//     the unmatched members, so a read, change and write drops a
+//     producer's extension members. See "Unmatched members" below.
+//
 //   - Nil-pointer optional fields are emitted as absent (no key), not
 //     as `null`. Both absent and `null` are accepted on decode.
 //
@@ -100,8 +106,9 @@
 //
 // # Error classification
 //
-// The package keeps its two sentinels one-directional, so a
-// caller can classify a failure with errors.Is alone:
+// The package keeps its three sentinels apart, so a caller can classify a
+// failure with errors.Is alone, and errors.Is against one never matches an
+// error raised for another:
 //
 //   - [ErrInvalidValue] is encode only. Every [Marshal] / [MarshalIndent]
 //     failure wraps it, over the encoder's own error (a
@@ -114,8 +121,11 @@
 //     reachable through unwrapping; a duplicate member name wraps it too
 //     (see below). The other decode outcomes described below do not
 //     carry it.
+//   - [ErrUnknownMember] is decode only, and only a decode given
+//     [WithStrict] raises it, for the first unmatched member. The error
+//     names the member's JSON Pointer and nothing else from the input.
 //
-// Both are distinct from the transport-level transport.ErrInvalidShape,
+// They are distinct from the transport-level transport.ErrInvalidShape,
 // which classifies a response body rather than a codec operation.
 // Do not confuse [ErrInvalidShape] with canxml.ErrInvalidShape either:
 // they share a name and a subtree but are different values, and canxml's
@@ -176,7 +186,30 @@
 //     receiver on any of them, as on every generated type, is a
 //     typereg.ErrNilReceiver error.
 //
-// # Strict vs relaxed decode
+// # Unmatched members
+//
+// A member is unmatched when its name is neither `_type` nor a member of
+// the RM type its object decodes as. That holds at any depth: inside a
+// polymorphic slot, an interval and its bounds, and an AOM 1.4 value too.
+// A member the decoder reads but refuses is not unmatched: an unknown
+// `_type` is a dispatch failure in every mode, and a member of the wrong
+// shape is a shape failure.
+//
+// [Unmarshal] and [NewDecoder] take two options for unmatched members:
+//
+//   - [WithUnmatched] passes each one to a function, in the order it
+//     appears in the input, as a JSON Pointer (RFC 6901) from the root of
+//     the value, such as "/content/0/x-note". The decode carries on and
+//     returns the same value as the default.
+//   - [WithStrict] refuses the decode at the first one, with an error that
+//     wraps [ErrUnknownMember] and names its pointer. An absent member is
+//     never refused.
+//
+// Neither option changes what the decoder reads, and neither is available
+// on REST reads through the transport and client packages, which decode
+// with the default.
+//
+// # Strict vs relaxed type dispatch
 //
 // The decoder defaults to strict polymorphism: at any field whose
 // declared type is an abstract RM class or interface, the input
