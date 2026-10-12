@@ -70,10 +70,6 @@ func probe038PolymorphicDecode(body []byte, factory func() any, secondMarshal fu
 		return r, nil
 	}
 	v := factory()
-	root, ok := expectedform.RootType(v)
-	if !ok {
-		return r, errors.New("PROBE-038: the factory's value names no RM type")
-	}
 	if err := canjson.Unmarshal(body, v); err != nil {
 		r.Status = "fail"
 		r.Detail = fmt.Sprintf("decode: %v", err)
@@ -85,7 +81,7 @@ func probe038PolymorphicDecode(body []byte, factory func() any, secondMarshal fu
 		r.Detail = fmt.Sprintf("re-marshal: %v", err)
 		return r, nil
 	}
-	wantTypes, err := inputDiscriminators(body, root)
+	wantTypes, err := inputDiscriminators(body, v)
 	if err != nil {
 		r.Status = "fail"
 		r.Detail = err.Error()
@@ -147,11 +143,12 @@ func (want typeSet) Diff(got typeSet) []string {
 
 // inputDiscriminators returns the multiset of `_type` discriminators the
 // input carries on members the RM defines: the input is pruned first
-// (expectedform.Prune), so a `_type` inside a member that names no
+// (expectedform.PruneFor), so a `_type` inside a member that names no
 // attribute of its object's RM type, which the decoder ignores, is not
-// counted. root is the decode target's RM type.
-func inputDiscriminators(body []byte, root string) (typeSet, error) {
-	pruned, err := expectedform.Prune(body, root)
+// counted. target is the decode target, whose Go type gives the root's RM
+// type and, for a generic class, the class its type parameter is bound to.
+func inputDiscriminators(body []byte, target any) (typeSet, error) {
+	pruned, err := expectedform.PruneFor(body, target)
 	if err != nil {
 		return nil, fmt.Errorf("read the input against the RM: %w", err)
 	}

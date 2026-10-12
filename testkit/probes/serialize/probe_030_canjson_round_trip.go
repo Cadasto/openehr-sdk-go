@@ -108,10 +108,6 @@ func probe030RoundTrip(body []byte, factory func() any, encode, reEncode func(an
 		return r, nil
 	}
 	v := factory()
-	root, ok := expectedform.RootType(v)
-	if !ok {
-		return r, errors.New("PROBE-030: the factory's value names no RM type")
-	}
 	if err := canjson.Unmarshal(body, v); err != nil {
 		r.Status = "fail"
 		r.Detail = fmt.Sprintf("first decode: %v", err)
@@ -158,7 +154,9 @@ func probe030RoundTrip(body []byte, factory func() any, encode, reEncode func(an
 		r.Detail = "the two SDK encodes are not wire-equivalent: " + diff
 		return r, nil
 	}
-	want, err := expectedform.Build(body, root)
+	// The expected form reads the root from the factory's value as canjson
+	// does, so a generic target's type argument binds its type parameter.
+	want, err := expectedform.BuildFor(body, v)
 	if err != nil {
 		r.Status = "fail"
 		r.Detail = "the input's expected form: " + err.Error()

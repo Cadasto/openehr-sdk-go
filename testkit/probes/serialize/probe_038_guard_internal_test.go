@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -87,12 +88,27 @@ func TestProbe038CountsTypesOnDefinedMembers(t *testing.T) {
 		`"links":[{"_type":"LINK","meaning":{"_type":"DV_TEXT","value":"m"},"type":{"_type":"DV_TEXT","value":"t"},"target":{"_type":"DV_EHR_URI","value":"ehr://x"}}],` +
 		`"value":{"_type":"DV_QUANTITY","magnitude":1,"units":"kg"},` +
 		`"vendor":{"_type":"DV_TEXT","value":"ignored"}}`)
-	got, err := inputDiscriminators(body, "ELEMENT")
+	got, err := inputDiscriminators(body, new(rm.Element))
 	if err != nil {
 		t.Fatalf("inputDiscriminators: %v", err)
 	}
 	want := typeSet{"ELEMENT": 1, "DV_CODED_TEXT": 1, "CODE_PHRASE": 1, "TERMINOLOGY_ID": 1, "LINK": 1, "DV_TEXT": 2, "DV_EHR_URI": 1, "DV_QUANTITY": 1}
 	if !maps.Equal(got, want) {
 		t.Errorf("inputDiscriminators = %v, want %v", got, want)
+	}
+}
+
+// TestProbe038PassesAGenericTarget pins that the discriminator leg prunes the
+// input against the factory's value, as canjson reads it (REQ-052, REQ-170): a
+// valid input that a generic target decodes cleanly passes. Pruned against the
+// class name alone, the bounds' elided "_type" has no binding and the probe
+// fails before it compares anything.
+func TestProbe038PassesAGenericTarget(t *testing.T) {
+	r, err := probe038PolymorphicDecode([]byte(genericTargetBody), func() any { return new(rm.DVInterval[rm.DVQuantity]) }, canjson.Marshal)
+	if err != nil {
+		t.Fatalf("probe framework error: %v", err)
+	}
+	if r.Status != "pass" {
+		t.Errorf("status = %q (detail: %s), want pass: canjson decodes the input into the generic target", r.Status, r.Detail)
 	}
 }

@@ -324,3 +324,23 @@ func floorFindings(r validation.Result) []string {
 	}
 	return out
 }
+
+// genericTargetBody is a DV_INTERVAL whose bounds elide their "_type", which
+// canjson decodes into an rm.DVInterval[rm.DVQuantity]: the target's type
+// argument binds the bounds to DV_QUANTITY.
+const genericTargetBody = `{"_type":"DV_INTERVAL","lower":{"magnitude":1,"units":"kg"},"upper":{"magnitude":2,"units":"kg"}}`
+
+// TestProbe030PassesAGenericTarget pins that the input leg reads the root
+// from the factory's value, as canjson does (REQ-052, REQ-170): a valid input
+// that a generic target decodes cleanly passes. Built from the class name
+// alone, the expected form refuses the bounds' elided "_type", which no type
+// argument binds, and the probe fails a round trip that holds.
+func TestProbe030PassesAGenericTarget(t *testing.T) {
+	r, err := probe030RoundTrip([]byte(genericTargetBody), func() any { return new(rm.DVInterval[rm.DVQuantity]) }, canjson.Marshal, canjson.Marshal, false)
+	if err != nil {
+		t.Fatalf("probe framework error: %v", err)
+	}
+	if r.Status != "pass" {
+		t.Errorf("status = %q (detail: %s), want pass: canjson decodes the input into the generic target", r.Status, r.Detail)
+	}
+}
