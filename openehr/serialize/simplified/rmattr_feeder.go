@@ -262,12 +262,9 @@ var feederAuditSegs = func() map[string]bool {
 }()
 
 // feederAuditDetailsSegs are the sub-path segments FEEDER_AUDIT_DETAILS'
-// grammar reads: its three parties, and `other_details`, which it refuses.
-var feederAuditDetailsSegs = func() map[string]bool {
-	out := maps.Clone(feederAuditDetailsParties)
-	out[feederAuditOtherDetails] = true
-	return out
-}()
+// grammar reads: its three parties. `other_details` never reaches it; it is
+// refused first.
+var feederAuditDetailsSegs = feederAuditDetailsParties
 
 // feederAuditOtherDetails is FEEDER_AUDIT_DETAILS.other_details, the one
 // attribute of the family the reference's grammar has no channel for.
@@ -279,12 +276,15 @@ const feederAuditOtherDetails = "other_details"
 // unmatched content (REQ-170), except `other_details`, which resolves but has
 // no carrier and is refused.
 func decodeFeederAuditDetails(g rmattrGroup) (any, error) {
+	// other_details is refused in every spelling, an own suffix as much as a
+	// sub-path.
+	if tail, named := tailNaming(g, feederAuditOtherDetails); named {
+		return nil, fmt.Errorf("%w: %q addresses FEEDER_AUDIT_DETAILS.other_details, an ITEM_STRUCTURE the reference's suffix set has no channel for and the pinned corpus never writes — deferred rather than dropped (REQ-140, see deviations.md)",
+			ErrUnsupportedDatatype, g.key(tail))
+	}
 	own, children, err := rmattrChildGroups(g, feederAuditDetailsSegs)
 	if err != nil {
 		return nil, err
-	}
-	if insts, ok := children[feederAuditOtherDetails]; ok {
-		return nil, feederOtherDetails(insts[0])
 	}
 	for _, suffix := range slices.Sorted(maps.Keys(own)) {
 		if !feederAuditDetailsOwnTails[suffix] {
@@ -391,17 +391,6 @@ func feederOwnString(g rmattrGroup, own map[string]any, suffix string) (string, 
 			ErrUnsupportedDatatype, g.key(ownTail(suffix)), v)
 	}
 	return s, true, nil
-}
-
-// feederOtherDetails is the refusal for FEEDER_AUDIT_DETAILS.other_details, a
-// **named RM attribute this codec defers** (an ITEM_STRUCTURE with no channel in
-// the reference's suffix set and no corpus fixture), not a typo. Its key
-// resolves but has no carrier, so it is refused in every mode (REQ-170), naming
-// the first key under it.
-func feederOtherDetails(child rmattrGroup) error {
-	tail := slices.Sorted(maps.Keys(child.tails))[0]
-	return fmt.Errorf("%w: %q addresses FEEDER_AUDIT_DETAILS.other_details, an ITEM_STRUCTURE the reference's suffix set has no channel for and the pinned corpus never writes — deferred rather than dropped (REQ-140, see deviations.md)",
-		ErrUnsupportedDatatype, child.key(tail))
 }
 
 // feederItemIDPath is the FLAT prefix of one DV_IDENTIFIER list slot, shared by the

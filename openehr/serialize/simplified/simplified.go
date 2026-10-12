@@ -27,10 +27,11 @@ type decodeConfig struct {
 // reads is never unmatched, even where the decode then refuses it: the
 // composer's `external_ref` suffixes and party sub-structure, a PARTICIPATION
 // `time`, a FEEDER_AUDIT_DETAILS `other_details`, `_instruction_details`,
-// `_wf_definition`, an ACTION's ISM transition and time in the reference's
-// in-context spelling, and any malformed value, missing required suffix,
-// disagreeing pair of spellings or index past its bound fail the decode in
-// every mode.
+// `_wf_definition`, an ACTION's ISM transition and time, an INTERVAL_EVENT's
+// `math_function`, `width` and `sample_count` and an OBSERVATION's
+// `history_origin` in the reference's in-context spelling, and any malformed
+// value, missing required suffix, disagreeing pair of spellings or index past
+// its bound fail the decode in every mode.
 //
 // By default the decoder ignores unmatched content: the value it returns
 // holds the rest of the input and none of it. With this option fn receives
@@ -44,7 +45,8 @@ type decodeConfig struct {
 // "vital_signs/body_temperature/0/any_event/0/temperature/0/|x-note", or
 // "ctx/x-flag" for a field of the ctx object. The path carries names only,
 // never a value from the input. fn runs on the caller's goroutine, after the
-// decode has read the whole input and only when the decode succeeds.
+// decode has read the input. Without [WithStrict], fn runs only when the decode
+// succeeds.
 //
 // A nil fn is the same as leaving the option out. Combined with
 // [WithStrict], fn sees the first unmatched item before the decode is
@@ -137,8 +139,9 @@ var (
 	// same key ending in a bare `|` with differing values. The codec fails
 	// rather than dropping the entry or inventing a precedence rule. The two
 	// deferred underscore families, `_instruction_details` and `_wf_definition`,
-	// and an ACTION's ISM transition and time in the reference's in-context
-	// spelling return it in every mode too.
+	// and the reference's in-context spelling of an ACTION's ISM transition and
+	// time, an INTERVAL_EVENT's `math_function`, `width` and `sample_count`
+	// and an OBSERVATION's `history_origin` return it in every mode too.
 	ErrUnknownPath = errors.New("simplified: path not in web template")
 	// ErrUnsupportedDatatype is returned when a leaf's RM datatype is not mapped
 	// to/from a FLAT suffix set and cannot ride |raw, when a suffix or ctx/

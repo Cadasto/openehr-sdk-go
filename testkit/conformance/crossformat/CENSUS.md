@@ -62,7 +62,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 ### flat-canonical
 
 - Outcome: compared 115, missing 8, extra 4, altered 13, excluded 4
-- Reason: INTERVAL_EVENT attributes: decode reports math_function and width as unmatched content (the 4 excluded keys), so the interval event loses both and decodes as a POINT_EVENT. Sibling order: FLAT carries no order between the birth_en and any_event_en events; decode lists them in Web Template order, the canonical lists Birth first, so the leaves of all three events compare at shifted positions. HISTORY.origin: the FLAT has no origin key and decode fills it from the context start time (openehr/serialize/simplified/deviations.md), where the canonical sets it to the Birth time. RM-FLOOR archetype_details: the canonical OBSERVATION has none, decode adds it (4 extra leaves), and rm_version is 1.2.0 against 1.0.4.
+- Reason: INTERVAL_EVENT attributes: decode refuses math_function and width in every mode (the 4 excluded keys), so the interval event loses both and decodes as a POINT_EVENT. Sibling order: FLAT carries no order between the birth_en and any_event_en events; decode lists them in Web Template order, the canonical lists Birth first, so the leaves of all three events compare at shifted positions. HISTORY.origin: the FLAT has no origin key and decode fills it from the context start time (openehr/serialize/simplified/deviations.md), where the canonical sets it to the Birth time. RM-FLOOR archetype_details: the canonical OBSERVATION has none, decode adds it (4 extra leaves), and rm_version is 1.2.0 against 1.0.4.
 - Missing (8):
   - `/content/0/data/events/2/math_function/_type`
   - `/content/0/data/events/2/math_function/defining_code/_type`
@@ -89,7 +89,8 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `/content/0/data/events/2/archetype_node_id`: reference `"at0003"`, ours `"at0026"`
   - `/content/0/data/events/2/data/items/0/value/magnitude`: reference `60`, ours `30`
 - Reducing decode removed 4 keys from the upstream FLAT:
-  - 4: `reported as unmatched content`
+  - 3: `simplified: path not in web template: "<key>" is the reference's in-context spelling of an INTERVAL_EVENT's math_function, which the Web Template this SDK builds does not model - refused rather than dropped or replaced (REQ-140, see deviations.md)`
+  - 1: `simplified: path not in web template: "<key>" is the reference's in-context spelling of an INTERVAL_EVENT's width, which the Web Template this SDK builds does not model - refused rather than dropped or replaced (REQ-140, see deviations.md)`
 
 ## consult_record
 

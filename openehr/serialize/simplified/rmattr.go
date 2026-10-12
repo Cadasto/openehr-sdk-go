@@ -373,6 +373,12 @@ func decodeRMAttrGroups(compJSON map[string]any, wt *webtemplate.WebTemplate, gr
 		if err != nil {
 			return err
 		}
+		// An index past the family's bound makes every key of the instance
+		// malformed, whatever follows the index (REQ-170), so it is judged before
+		// the grammar sets any tail aside as unmatched.
+		if err := checkRMAttrIndexBound(g, fam); err != nil {
+			return err
+		}
 		val, err := fam.decode(g, owner.leaf)
 		if errors.Is(err, errNothingMatched) {
 			continue
@@ -504,10 +510,10 @@ func rmattrValueNode(node map[string]any, g rmattrGroup, anchor string) (map[str
 // OPT-free FLAT ↔ STRUCTURED interconversion re-spells every segment with an
 // explicit index; anything higher is a list where the RM has a single value.
 func checkRMAttrIndexes(g rmattrGroup, fam rmattrFamily, indexes map[int]bool) error {
+	if err := checkRMAttrIndexBound(g, fam); err != nil {
+		return err
+	}
 	if !fam.list {
-		if g.index > 0 {
-			return fmt.Errorf("%w: %q (%s addresses a single-valued RM attribute, not an indexed list)", ErrUnknownPath, g.prefix(), g.family)
-		}
 		if len(indexes) > 1 {
 			// Either `_uid` beside `_uid:0`, or `_uid:0` beside `_uid:1`: both are
 			// two spellings competing for one RM slot, and picking either would be
@@ -516,9 +522,6 @@ func checkRMAttrIndexes(g rmattrGroup, fam rmattrFamily, indexes map[int]bool) e
 				ErrUnknownPath, g.prefix(), g.family)
 		}
 		return nil
-	}
-	if g.slot() > maxRepeatIndex {
-		return fmt.Errorf("%w: %q :index %d exceeds bound %d", ErrUnknownPath, g.prefix(), g.slot(), maxRepeatIndex)
 	}
 	slots := make(map[int]bool, len(indexes))
 	for idx := range indexes {
@@ -533,6 +536,19 @@ func checkRMAttrIndexes(g rmattrGroup, fam rmattrFamily, indexes map[int]bool) e
 			return fmt.Errorf("%w: %q sits in a sparse :index sequence (no :%d); the occurrences must run 0..%d",
 				ErrUnknownPath, g.prefix(), i, len(slots)-1)
 		}
+	}
+	return nil
+}
+
+// checkRMAttrIndexBound refuses a `_family:N` index past the family's bound,
+// one instance on its own: above `:0` on a single-valued family, above
+// [maxRepeatIndex] on a list.
+func checkRMAttrIndexBound(g rmattrGroup, fam rmattrFamily) error {
+	if !fam.list && g.index > 0 {
+		return fmt.Errorf("%w: %q (%s addresses a single-valued RM attribute, not an indexed list)", ErrUnknownPath, g.prefix(), g.family)
+	}
+	if fam.list && g.slot() > maxRepeatIndex {
+		return fmt.Errorf("%w: %q :index %d exceeds bound %d", ErrUnknownPath, g.prefix(), g.slot(), maxRepeatIndex)
 	}
 	return nil
 }

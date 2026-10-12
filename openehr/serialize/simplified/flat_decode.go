@@ -93,7 +93,7 @@ func decodeFlatMap(flat map[string]any, wt *webtemplate.WebTemplate, cfg decodeC
 	if cfg.template != nil {
 		names = buildNameIndex(cfg.template)
 	}
-	compJSON, unmatched, err := decodeFlatIgnoring(flat, wt, names)
+	compJSON, unmatched, err := decodeFlatIgnoring(flat, wt, names, cfg.strict)
 	if cfg.strict {
 		if refusal := applyUnmatchedPolicy(cfg, loc, unmatched); refusal != nil {
 			return nil, refusal
@@ -143,15 +143,15 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	if err != nil {
 		return nil, err
 	}
-	// The reference's in-context keys for an ACTION's ISM transition and time
-	// name RM data the Web Template this SDK builds does not model: refused in
-	// every mode, before anything could set them aside as unmatched or the
-	// WithTemplate defaults replace them (REQ-170).
-	if err := refuseIsmTransitionKeys(content, wt); err != nil {
-		return nil, err
-	}
 	budget := &allocBudget{limit: maxTotalNodes}
 	ambiguous := ambiguousBarePaths(wt)
+	// The reference's in-context keys for RM attributes the Web Template this
+	// SDK builds does not model name RM data decode would drop: refused in every
+	// mode, before anything could set them aside as unmatched or the
+	// WithTemplate defaults replace them (REQ-170).
+	if err := refuseInContextKeys(content, wt, ambiguous); err != nil {
+		return nil, err
+	}
 	// Siphon off the composite leaves first — the ones whose FLAT form has
 	// sub-paths of its own rather than a suffix set (REQ-053's ENTRY `subject` and
 	// the DV_INTERVAL leaf, REQ-140's party and interval grammars). A party leaf's
@@ -285,8 +285,11 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 //   - A leaf whose datatype has a suffix set keeps the suffixes in that set
 //     ([leafSuffixMatched]); the rest are unmatched.
 //   - A leaf whose datatype has no suffix set resolves but has no carrier
-//     other than |raw, the composer's PARTY_PROXY among them, so any other key
-//     there is refused in every mode, naming the first such key.
+//     other than |raw, the composer's PARTY_PROXY among them. Its bare value,
+//     and a suffix that names something the datatype has, are refused in every
+//     mode, naming the first such key: an attribute of its RM class, or for a
+//     party the party grammar's suffixes (the composer's `external_ref` among
+//     them). Any other suffix is unmatched.
 func leafSuffixes(leaf *webtemplate.Node, sfx map[string]any, keyOf func(string) string, sink *unmatchedSink) (map[string]any, error) {
 	if len(leaf.Children) > 0 {
 		var out map[string]any
@@ -309,13 +312,40 @@ func leafSuffixes(leaf *webtemplate.Node, sfx map[string]any, keyOf func(string)
 	if _, judged := leafSuffixMatched(rmType, ""); judged {
 		return matchedSuffixes(rmType, sfx, keyOf, sink), nil
 	}
-	if _, raw := sfx["raw"]; raw {
-		// |raw is the carrier of an unmapped datatype; dvFromSuffixes refuses it
-		// beside any other suffix.
+	var out map[string]any
+	for _, suffix := range slices.Sorted(maps.Keys(sfx)) {
+		switch {
+		case suffix == "raw":
+			// |raw is the carrier of an unmapped datatype; dvFromSuffixes refuses
+			// it beside any other suffix.
+		case suffix == "" || unmappedReads(rmType, suffix):
+			if _, raw := sfx["raw"]; !raw {
+				return nil, fmt.Errorf("simplified: decode %q: %w: %s", keyOf(suffix), ErrUnsupportedDatatype, rmType)
+			}
+		default:
+			if out == nil {
+				out = maps.Clone(sfx)
+			}
+			delete(out, suffix)
+			sink.add(keyOf(suffix))
+		}
+	}
+	if out == nil {
 		return sfx, nil
 	}
-	first := slices.Sorted(maps.Keys(sfx))[0]
-	return nil, fmt.Errorf("simplified: decode %q: %w: %s", keyOf(first), ErrUnsupportedDatatype, rmType)
+	return out, nil
+}
+
+// unmappedReads reports whether suffix names something a leaf of rmType, a
+// datatype with no suffix set, has: for a party, a suffix of the party grammar
+// (the composer's `external_ref` suffixes and `|name`); otherwise an attribute
+// of its RM class.
+func unmappedReads(rmType, suffix string) bool {
+	if isPartyLeafType(rmType) {
+		return partyProxyOwnTails[suffix]
+	}
+	_, declared := rminfo.Default.AttributeRMType(bmmtype.Class(rmType), suffix)
+	return declared
 }
 
 // metadataAliases maps the reference implementation's real-path spelling of
@@ -502,6 +532,18 @@ func metadataRel(rel string) (norm string, overIndexed bool) {
 		b.WriteString(suffix)
 	}
 	return b.String(), overIndexed
+}
+
+// composerSubStructure reports whether sub, the path below `composer/`, opens
+// with a segment of the party grammar's sub-structure: the nested
+// `_identifier:N` list or PARTY_RELATED's `relationship`.
+func composerSubStructure(sub string) bool {
+	seg := sub
+	if cut := strings.IndexAny(seg, "/|"); cut >= 0 {
+		seg = seg[:cut]
+	}
+	id, _, _ := strings.Cut(seg, ":")
+	return partyListTails[id] || partySubTails[id]
 }
 
 // isMetadataSpelling reports whether an unindexed root-relative spelling is one
@@ -725,7 +767,10 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 		// reach the leaf loop and are refused there as PARTY_PROXY). Closing this
 		// means giving the composer's reference a `ctx/` carrier, which is an
 		// ADR-level decision, not a codec one.
-		if _, isComposerSub := strings.CutPrefix(rel, "composer/"); isComposerSub {
+		// Only the party grammar's sub-structure is the composer's: any other
+		// sub-path names nothing a party has, and is unmatched content where the
+		// leaf loop finds no node for it.
+		if sub, isComposerSub := strings.CutPrefix(rel, "composer/"); isComposerSub && composerSubStructure(sub) {
 			return nil, nil, nil, fmt.Errorf("%w: %q is composer party sub-structure, which no ctx/ short form can carry (ADR 0015 boundary)",
 				ErrUnsupportedDatatype, key)
 		}
@@ -1469,24 +1514,50 @@ func settleIsmTransition(tr map[string]any, n ismNode) error {
 // localTerminology is the terminology an archetype's own at-codes belong to.
 const localTerminology = "local"
 
-// The reference's in-context spelling of an ACTION's ISM transition and time,
-// which REQ-140's fourth out-of-scope class covers: a `current_state`,
-// `transition` or `careflow_step` leaf or a `_reason` family under an ISM
-// transition node, and the ACTION's own `time` leaf. ismReferenceSeg is the FLAT
-// id the reference gives the ISM transition node when it writes it in context.
+// The reference's in-context spelling of RM attributes the Web Template this SDK
+// builds does not model, which REQ-170 refuses in every mode: an ACTION's ISM
+// transition (a `current_state`, `transition` or `careflow_step` leaf or a
+// `_reason` family under an ISM transition node) and its own `time` leaf, an
+// INTERVAL_EVENT's `math_function`, `width` and `sample_count`, and an
+// OBSERVATION's `history_origin`. ismReferenceSeg is the FLAT id the reference
+// gives the ISM transition node when it writes it in context.
 const (
 	ismReasonFamily = "_reason"
 	ismReferenceSeg = "ism_transition"
-	actionTimeLeaf  = "time"
 )
 
 // ismLeaves are the ISM_TRANSITION leaves the reference writes under its ISM
 // transition node, by FLAT id.
 var ismLeaves = map[string]bool{"current_state": true, "transition": true, "careflow_step": true}
 
-// refuseIsmTransitionKeys refuses the reference's in-context spelling of an
-// ACTION's ISM transition and time in every mode (REQ-140's fourth out-of-scope
-// class, REQ-170), wherever the Web Template does not resolve it:
+// intervalEventAttrs are the INTERVAL_EVENT attributes the reference writes in
+// context.
+var intervalEventAttrs = map[string]bool{"math_function": true, "width": true, "sample_count": true}
+
+// inContextAttrs names, per Web Template node RM type, the RM attributes the
+// reference writes in context under such a node and REQ-170 refuses where the
+// Web Template does not resolve them. leaf holds those spelled as a leaf under
+// the node, suffix those also spelled as a suffix on it, and owner is the RM
+// class the message names. An EVENT node is the abstract slot a Web Template
+// gives an event; the attributes are INTERVAL_EVENT's, and a body that spells
+// one is an interval event.
+var inContextAttrs = map[string]struct {
+	owner        string
+	leaf, suffix map[string]bool
+}{
+	"ACTION":         {owner: "ACTION", leaf: map[string]bool{"time": true}},
+	"EVENT":          {owner: "INTERVAL_EVENT", leaf: intervalEventAttrs, suffix: intervalEventAttrs},
+	"INTERVAL_EVENT": {owner: "INTERVAL_EVENT", leaf: intervalEventAttrs, suffix: intervalEventAttrs},
+	"OBSERVATION": {
+		owner: "OBSERVATION", leaf: map[string]bool{"history_origin": true},
+		suffix: map[string]bool{"history_origin": true},
+	},
+}
+
+// refuseInContextKeys refuses, in every mode, the reference's in-context
+// spelling of the RM attributes in [inContextAttrs] and of an ACTION's ISM
+// transition, wherever the Web Template does not resolve it (REQ-140's fourth
+// out-of-scope class, REQ-170):
 //
 //   - a `current_state`, `transition` or `careflow_step` leaf, with any suffix,
 //     under an ISM transition node: the reference's in-context `ism_transition`
@@ -1495,61 +1566,68 @@ var ismLeaves = map[string]bool{"current_state": true, "transition": true, "care
 //     Template models `current_state` and `careflow_step` there, never
 //     `transition`);
 //   - a `_reason` family under either node;
-//   - the ACTION's own `time` leaf, with any suffix, where the ACTION has no
-//     Web Template node for it.
+//   - the ACTION's own `time` leaf, with any suffix;
+//   - an INTERVAL_EVENT's `math_function`, `width` or `sample_count`, and an
+//     OBSERVATION's `history_origin`, each as a leaf under the node, with any
+//     suffix, or as a suffix on the node.
 //
 // Each names RM data the decode would otherwise drop, or replace with a
 // default, so it is refused rather than ignored. A key the Web Template
 // resolves is decoded as usual, and any other unresolved key under those nodes
-// is unmatched content.
+// is unmatched content. A key that walks through one of several reused siblings
+// is left to the refusal that path gets.
 //
 // Keys are checked in sorted order, so a body with several names the same one on
 // every run. The error names the key, or the `_reason` family instance, and
 // carries no value.
-func refuseIsmTransitionKeys(content map[string]any, wt *webtemplate.WebTemplate) error {
+func refuseInContextKeys(content map[string]any, wt *webtemplate.WebTemplate, ambiguous map[string]bool) error {
 	for _, key := range slices.Sorted(maps.Keys(content)) {
 		pk, err := parseFlatKey(key)
 		if err != nil {
 			// A malformed index is refused where the key is decoded.
 			continue
 		}
-		named, attr, ok := ismTransitionKey(wt, key, pk)
+		named, owner, attr, ok := inContextKey(wt, key, pk, ambiguous)
 		if !ok {
 			continue
 		}
-		return fmt.Errorf("%w: %q is the reference's in-context spelling of an ACTION's %s, which the Web Template this SDK builds does not model — refused rather than dropped or replaced (REQ-140, see deviations.md)",
-			ErrUnknownPath, named, attr)
+		return fmt.Errorf("%w: %q is the reference's in-context spelling of an %s's %s, which the Web Template this SDK builds does not model — refused rather than dropped or replaced (REQ-140, see deviations.md)",
+			ErrUnknownPath, named, owner, attr)
 	}
 	return nil
 }
 
-// ismTransitionKey reports whether key, parsed as pk, is one of the key shapes
-// [refuseIsmTransitionKeys] refuses: named is what the refusal names (the key
-// for a leaf, the family instance for `_reason`) and attr the RM attribute it
-// spells.
-func ismTransitionKey(wt *webtemplate.WebTemplate, key string, pk parsedKey) (named, attr string, ok bool) {
+// inContextKey reports whether key, parsed as pk, is one of the key shapes
+// [refuseInContextKeys] refuses: named is what the refusal names (the key, or
+// the family instance for `_reason`), owner the RM class and attr the
+// attribute it spells.
+func inContextKey(wt *webtemplate.WebTemplate, key string, pk parsedKey, ambiguous map[string]bool) (named, owner, attr string, ok bool) {
 	segs := pk.segs
 	node := wt.Tree
 	if len(segs) < 2 || segs[0].id != node.ID {
-		return "", "", false
+		return "", "", "", false
 	}
 	for i := 1; i < len(segs); i++ {
 		child := childByID(node, segs[i].id)
-		if nodeRMType(node) == "ACTION" {
-			last := i == len(segs)-1
-			if last && segs[i].id == actionTimeLeaf && child == nil {
-				return key, "time", true
-			}
-			if !last && isIsmTransitionSeg(child, segs[i].id) {
-				return ismAttrKey(key, segs, i, child)
-			}
+		rmType := nodeRMType(node)
+		attrs := inContextAttrs[rmType]
+		last := i == len(segs)-1
+		if last && child == nil && attrs.leaf[segs[i].id] {
+			return key, attrs.owner, segs[i].id, true
 		}
-		if child == nil {
-			return "", "", false
+		if rmType == "ACTION" && !last && isIsmTransitionSeg(child, segs[i].id) {
+			named, attr, ok := ismAttrKey(key, segs, i, child)
+			return named, "ACTION", attr, ok
+		}
+		if child == nil || (child.NodeID != "" && ambiguous[bareAQLPath(child.AQLPath)]) {
+			return "", "", "", false
 		}
 		node = child
 	}
-	return "", "", false
+	if attrs := inContextAttrs[nodeRMType(node)]; attrs.suffix[pk.suffix] && childByID(node, pk.suffix) == nil {
+		return key, attrs.owner, pk.suffix, true
+	}
+	return "", "", "", false
 }
 
 // ismAttrKey judges the key below the ISM transition segment segs[i], whose Web

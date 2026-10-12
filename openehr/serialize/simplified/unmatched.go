@@ -63,16 +63,24 @@ var errNothingMatched = errors.New("simplified: every key of the group is unmatc
 
 // decodeFlatIgnoring decodes flat as the default decode must: without its
 // unmatched keys. It returns the canonical-JSON composition of the last pass,
-// that pass's error, and every unmatched key met, in the order met. flat is
-// not modified.
-func decodeFlatIgnoring(flat map[string]any, wt *webtemplate.WebTemplate, names map[string]string) (map[string]any, []string, error) {
+// that pass's error, and every unmatched key met, in the order met.
+//
+// flat is never modified, and no pass writes into another's input: decode
+// places a composite value (a `|raw` fragment, say) by reference and may then
+// decorate it, so each pass reads its own deep copy of every composite value
+// ([passInput]).
+//
+// stopEarly ends the loop after a first pass that found unmatched keys and
+// read the whole body without failing: every unmatched key is then known, and
+// a strict decode refuses whatever the next pass would make of the rest.
+func decodeFlatIgnoring(flat map[string]any, wt *webtemplate.WebTemplate, names map[string]string, stopEarly bool) (map[string]any, []string, error) {
 	var unmatched []string
 	body := flat
 	for {
 		sink := &unmatchedSink{}
-		compJSON, err := decodeFlat(body, wt, names, sink)
-		if len(sink.keys) == 0 {
-			return compJSON, unmatched, err
+		compJSON, err := decodeFlat(passInput(body), wt, names, sink)
+		if len(sink.keys) == 0 || (stopEarly && err == nil) {
+			return compJSON, append(unmatched, sink.keys...), err
 		}
 		if len(unmatched) == 0 {
 			body = maps.Clone(flat)
@@ -92,6 +100,50 @@ func decodeFlatIgnoring(flat map[string]any, wt *webtemplate.WebTemplate, names 
 			return compJSON, unmatched, err
 		}
 	}
+}
+
+// passInput returns the body one decode pass reads: body itself when it holds
+// no composite value, which decode cannot write into, and otherwise a copy
+// whose objects and arrays are deep copies, so the pass cannot reach body's.
+func passInput(body map[string]any) map[string]any {
+	composite := false
+	for _, v := range body {
+		switch v.(type) {
+		case map[string]any, []any:
+			composite = true
+		}
+		if composite {
+			break
+		}
+	}
+	if !composite {
+		return body
+	}
+	out := make(map[string]any, len(body))
+	for k, v := range body {
+		out[k] = deepCopyJSON(v)
+	}
+	return out
+}
+
+// deepCopyJSON copies a decoded JSON value: objects and arrays are copied all
+// the way down, scalars are shared.
+func deepCopyJSON(v any) any {
+	switch t := v.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(t))
+		for k, e := range t {
+			out[k] = deepCopyJSON(e)
+		}
+		return out
+	case []any:
+		out := make([]any, len(t))
+		for i, e := range t {
+			out[i] = deepCopyJSON(e)
+		}
+		return out
+	}
+	return v
 }
 
 // keyLocation is where a FLAT key sits in the input: its position among the

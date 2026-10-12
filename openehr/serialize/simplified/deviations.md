@@ -69,8 +69,13 @@ Concretely:
   ACTION's own `time` leaf where the ACTION has no node for it. Each names RM data the decode
   would otherwise drop, or for `time` replace with the `ctx/time` default a `WithTemplate` decode
   fills in, so the refusal (`ErrUnknownPath`) names the key, or the `_reason` family instance, and
-  carries no value. Any other key under those nodes that the Web Template does not resolve is
-  unmatched content. The composition-level metadata leaves (`language`, `territory`, `composer`,
+  carries no value. On the same ground decode refuses an INTERVAL_EVENT's `math_function`, `width`
+  and `sample_count` and an OBSERVATION's `history_origin` in the reference's spelling, a leaf
+  under the event or observation node (with any suffix) or a suffix on it, wherever the Web
+  Template does not resolve them (the corpus writes `any_event:0/math_function|code`,
+  `any_event:0/width`, `any_event:0|sample_count` and `<observation>/history_origin`). A Web
+  Template that models one decodes it as before. Any other key under those nodes that the Web
+  Template does not resolve is unmatched content. The composition-level metadata leaves (`language`, `territory`, `composer`,
   `context/start_time`, `context/setting`) are held back **by name** (`ctxOnlyLeafPaths`),
   because ADR 0015 gives them a `ctx/`-only output spelling and emitting them at their real
   path would spell one value twice. A container node that resolves to a
@@ -101,8 +106,11 @@ Concretely:
   cannot be honoured: the keys that resolve but have no carrier (the composer's `external_ref`
   suffixes and party sub-structure, PARTICIPATION `\|time`, FEEDER_AUDIT_DETAILS
   `other_details`, `_instruction_details` at an ACTION and `_wf_definition` at an INSTRUCTION —
-  the REQ-140 deliberate exclusions — and an ACTION's ISM transition and time in the reference's
-  in-context spelling, the ISM transition note above), an unmapped leaf datatype without `\|raw`,
+  the REQ-140 deliberate exclusions — and an ACTION's ISM transition and time, an INTERVAL_EVENT's
+  `math_function`, `width` and `sample_count` and an OBSERVATION's `history_origin` in the
+  reference's in-context spelling, the ISM transition note above), the bare value of a leaf whose
+  datatype has no suffix set and a suffix naming something that datatype has (an attribute of its RM
+  class, or for the composer a suffix of the party grammar; any other suffix there is unmatched),
   a suffix of `language`, `territory`, `context/setting` or `context/start_time` that the leaf's
   datatype has but its `ctx/` form cannot carry (`ErrUnsupportedDatatype` naming the key and the
   `ctx/` form), and malformed matched content. That is a misused `\|raw`/`\|other` or a `\|other`

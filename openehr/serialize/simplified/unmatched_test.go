@@ -336,10 +336,28 @@ func TestREQ170CarrierlessKeysRefusedInEveryMode(t *testing.T) {
 			rmattrContext + "/_participation:0|function": "requester",
 			rmattrContext + "/_participation:0|time":     "2021-12-21T14:19:31+01:00",
 		}, ErrUnsupportedDatatype},
+		{"PARTICIPATION time as an interval bound", map[string]any{
+			rmattrContext + "/_participation:0|function":   "requester",
+			rmattrContext + "/_participation:0/time/lower": "2021-12-21T14:19:31+01:00",
+		}, ErrUnsupportedDatatype},
+		{"PARTICIPATION time as a sub-path", map[string]any{
+			rmattrContext + "/_participation:0|function": "requester",
+			rmattrContext + "/_participation:0/time":     "2021-12-21T14:19:31+01:00",
+		}, ErrUnsupportedDatatype},
+		{"PARTICIPATION time as a sub-path with a suffix", map[string]any{
+			rmattrContext + "/_participation:0|function":   "requester",
+			rmattrContext + "/_participation:0/time|lower": "2021-12-21T14:19:31+01:00",
+		}, ErrUnsupportedDatatype},
 		{"FEEDER_AUDIT_DETAILS other_details", map[string]any{
 			rmattrObs + "/_feeder_audit/originating_system_audit|system_id":       "orig",
 			rmattrObs + "/_feeder_audit/originating_system_audit/other_details|x": "boom",
 		}, ErrUnsupportedDatatype},
+		{"FEEDER_AUDIT_DETAILS other_details as a suffix", map[string]any{
+			rmattrObs + "/_feeder_audit/originating_system_audit|system_id":     "orig",
+			rmattrObs + "/_feeder_audit/originating_system_audit|other_details": "boom",
+		}, ErrUnsupportedDatatype},
+		{"composer bare value", map[string]any{rmattrRoot + "/composer": "Dr. Who"}, ErrUnsupportedDatatype},
+		{"composer external_ref type", map[string]any{rmattrRoot + "/composer|type": "PERSON"}, ErrUnsupportedDatatype},
 		{"_instruction_details", map[string]any{rmattrAction + "/_instruction_details|activity_id": "activities[at0001]"}, ErrUnknownPath},
 		{"_wf_definition", map[string]any{instruction + "/_wf_definition|value": "wf"}, ErrUnknownPath},
 	} {
@@ -796,4 +814,203 @@ func TestREQ053CtxOwnedMetadataSuffixRefused(t *testing.T) {
 			assertUnmatched(t, wt, rmattrBody(map[string]any{unmatched: "x"}), unmatched)
 		})
 	}
+}
+
+// TestREQ170RawDecorationIgnoresUnmatchedKey — REQ-170. A `|raw` fragment is
+// placed by reference and a value decoration is then written into it, so a
+// second decode pass must not see the first pass's writes: a body carrying a
+// `|raw` value, a decoration on it and one unrelated unmatched key decodes, by
+// default and under the report option, to the value of the body without that
+// key, and strict refuses only the key.
+func TestREQ170RawDecorationIgnoresUnmatchedKey(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	for _, tc := range []struct {
+		name string
+		keys map[string]any
+	}{
+		{"dv_count raw with a normal range", map[string]any{
+			rmattrCount + "|raw":                 map[string]any{"_type": "DV_COUNT", "magnitude": 3},
+			rmattrCount + "/_normal_range/lower": 1,
+			rmattrCount + "/_normal_range/upper": 5,
+		}},
+		{"dv_quantity raw with a normal range", map[string]any{
+			rmattrElement + "|raw":                           map[string]any{"_type": "DV_QUANTITY", "magnitude": 65.9, "units": "unit"},
+			rmattrElement + "/_normal_range/lower|magnitude": 1.0,
+			rmattrElement + "/_normal_range/lower|unit":      "unit",
+			rmattrElement + "/_normal_range|upper_unbounded": true,
+		}},
+		{"dv_text raw with a mapping", map[string]any{
+			rmattrText + "|raw":                           map[string]any{"_type": "DV_TEXT", "value": "text value"},
+			rmattrText + "/_mapping:0|match":              "=",
+			rmattrText + "/_mapping:0/target|code":        "Z.1",
+			rmattrText + "/_mapping:0/target|terminology": "ICD10",
+		}},
+		{"dv_date_time raw with an accuracy", map[string]any{
+			rmattrDateTime + "|raw":       map[string]any{"_type": "DV_DATE_TIME", "value": "2022-01-12T13:22:34+01:00"},
+			rmattrDateTime + "/_accuracy": "P1D",
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body := rmattrBody(tc.keys)
+			if _, raw := tc.keys[rmattrElement+"|raw"]; raw {
+				delete(body, rmattrElement+"|magnitude")
+				delete(body, rmattrElement+"|unit")
+			}
+			body["ctx/x_flag"] = "x"
+			assertUnmatched(t, wt, body, "ctx/x_flag")
+		})
+	}
+}
+
+// TestREQ170UnmappedLeafSplitsRefusedFromUnmatched — REQ-170. A leaf whose
+// datatype has no suffix set resolves but carries nothing but `|raw`: its bare
+// value, and a suffix naming something the datatype has, are refused in every
+// mode, and any other suffix or sub-path is unmatched content. For the
+// composer's PARTY_PROXY that is the party grammar's suffixes and
+// sub-structure; for any other unmapped datatype, an attribute of its RM class.
+func TestREQ170UnmappedLeafSplitsRefusedFromUnmatched(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	t.Run("composer suffix the party grammar lacks, beside a name", func(t *testing.T) {
+		key := rmattrRoot + "/composer|x_note"
+		assertUnmatched(t, wt, rmattrBody(map[string]any{rmattrRoot + "/composer|name": "Dr. Who", key: "x"}), key)
+	})
+	t.Run("composer sub-path outside the party sub-structure", func(t *testing.T) {
+		key := rmattrRoot + "/composer/x_foo|bar"
+		assertUnmatched(t, wt, rmattrBody(map[string]any{key: "x"}), key)
+	})
+
+	state := &webtemplate.WebTemplate{Tree: &webtemplate.Node{
+		ID: "root", RMType: "COMPOSITION", NodeID: "openEHR-EHR-COMPOSITION.t.v1",
+		Children: []*webtemplate.Node{{
+			ID: "state", RMType: "DV_STATE", NodeID: "at0002", Max: 1,
+			AQLPath: "/context/other_context[at0001]/items[at0002]/value",
+		}},
+	}}
+	ctx := map[string]any{"ctx/language": "en", "ctx/territory": "NL"}
+	t.Run("an attribute of the unmapped datatype", func(t *testing.T) {
+		body := maps.Clone(ctx)
+		body["root/state|is_terminal"] = true
+		err := refusedInEveryMode(t, state, body)
+		if !errors.Is(err, ErrUnsupportedDatatype) || !strings.Contains(err.Error(), `"root/state|is_terminal"`) {
+			t.Errorf("err = %v, want ErrUnsupportedDatatype naming root/state|is_terminal", err)
+		}
+	})
+	t.Run("the unmapped datatype's bare value", func(t *testing.T) {
+		body := maps.Clone(ctx)
+		body["root/state"] = "x"
+		if err := refusedInEveryMode(t, state, body); !errors.Is(err, ErrUnsupportedDatatype) {
+			t.Errorf("err = %v, want ErrUnsupportedDatatype", err)
+		}
+	})
+	t.Run("a suffix the unmapped datatype lacks", func(t *testing.T) {
+		body := maps.Clone(ctx)
+		body["root/state|x_note"] = "x"
+		assertUnmatched(t, state, body, "root/state|x_note")
+	})
+}
+
+// TestREQ170FamilyIndexJudgedBeforeItsTails — REQ-170. A key is judged from the
+// left: a `_family:N` index past the family's bound makes the key malformed
+// whatever follows it, so `_uid:1|x_note` is refused in every mode as
+// `language:1|x_note` is. A list family's index within its bound is no
+// refusal, so `_link:3|x_note` is unmatched content like any unknown suffix.
+func TestREQ170FamilyIndexJudgedBeforeItsTails(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	for _, key := range []string{rmattrObs + "/_uid:1|x_note", rmattrObs + "/_link:10001|x_note", rmattrObs + "/language:1|x_note"} {
+		t.Run("refused "+key, func(t *testing.T) {
+			if err := refusedInEveryMode(t, wt, rmattrBody(map[string]any{key: "x"})); !errors.Is(err, ErrUnknownPath) {
+				t.Errorf("err = %v, want ErrUnknownPath", err)
+			}
+		})
+	}
+	t.Run("unmatched _link:3|x_note", func(t *testing.T) {
+		key := rmattrObs + "/_link:3|x_note"
+		assertUnmatched(t, wt, rmattrBody(map[string]any{key: "x"}), key)
+	})
+}
+
+// TestREQ170IntervalEventAndObservationAttrsRefused — REQ-170 / REQ-140. An
+// INTERVAL_EVENT's `math_function`, `width` and `sample_count` and an
+// OBSERVATION's `history_origin`, in the reference's spelling — a leaf under
+// the node or a suffix on it — name RM data the Web Template this SDK builds
+// does not model. Each is refused by default, under the report option and
+// under strict, naming the key and none of its value. Where the Web Template
+// does resolve one, it decodes as before.
+func TestREQ170IntervalEventAndObservationAttrsRefused(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	const secret = "secret-value-0451"
+	for _, tc := range []struct {
+		keys  []string
+		names string
+	}{
+		{[]string{rmattrEvent + "/math_function|code", rmattrEvent + "/math_function|value", rmattrEvent + "/math_function|terminology"}, rmattrEvent + "/math_function|code"},
+		{[]string{rmattrEvent + "/width"}, rmattrEvent + "/width"},
+		{[]string{rmattrEvent + "/sample_count"}, rmattrEvent + "/sample_count"},
+		{[]string{rmattrEvent + "|sample_count"}, rmattrEvent + "|sample_count"},
+		{[]string{rmattrEvent + "|math_function"}, rmattrEvent + "|math_function"},
+		{[]string{rmattrEvent + "|width"}, rmattrEvent + "|width"},
+		{[]string{rmattrObs + "/history_origin"}, rmattrObs + "/history_origin"},
+		{[]string{rmattrObs + "|history_origin"}, rmattrObs + "|history_origin"},
+	} {
+		t.Run(tc.names, func(t *testing.T) {
+			keys := make(map[string]any, len(tc.keys))
+			for _, k := range tc.keys {
+				keys[k] = secret
+			}
+			err := refusedInEveryMode(t, wt, rmattrBody(keys))
+			if !errors.Is(err, ErrUnknownPath) || !strings.Contains(err.Error(), strconv.Quote(tc.names)) {
+				t.Errorf("err = %v, want ErrUnknownPath naming %q", err, tc.names)
+			}
+			if strings.Contains(err.Error(), secret) {
+				t.Errorf("err = %v carries the key's value", err)
+			}
+		})
+	}
+	// Any other unresolved key under those nodes stays unmatched content.
+	for _, key := range []string{rmattrEvent + "/x_note", rmattrEvent + "|x_note", rmattrObs + "/width"} {
+		t.Run("unmatched "+key, func(t *testing.T) {
+			assertUnmatched(t, wt, rmattrBody(map[string]any{key: "x"}), key)
+		})
+	}
+	t.Run("width decodes where the Web Template models it", func(t *testing.T) {
+		interval := withIntervalEventWidth(t, wt)
+		body := rmattrBody(map[string]any{rmattrEvent + "/width": "PT1H"})
+		comp, err := UnmarshalFlat(mustJSON(t, body), interval, WithStrict())
+		if err != nil {
+			t.Fatalf("UnmarshalFlat: %v", err)
+		}
+		ev, ok := firstObservation(t, comp).Data.Events[0].(*rm.IntervalEvent[rm.ItemStructure])
+		if !ok || ev.Width.Value != "PT1H" {
+			t.Errorf("event = %#v, want an INTERVAL_EVENT of width PT1H", firstObservation(t, comp).Data.Events[0])
+		}
+	})
+}
+
+// withIntervalEventWidth returns a copy of the corpus Web Template whose
+// conformance_observation event is an INTERVAL_EVENT with a `width` leaf, the
+// nodes on that path copied so the shared template is left as it is.
+func withIntervalEventWidth(t *testing.T, wt *webtemplate.WebTemplate) *webtemplate.WebTemplate {
+	t.Helper()
+	ids := strings.Split(strings.TrimPrefix(rmattrEvent, rmattrRoot+"/"), "/")
+	ids[len(ids)-1], _, _ = strings.Cut(ids[len(ids)-1], ":")
+	out := *wt
+	tree := *wt.Tree
+	out.Tree = &tree
+	node := out.Tree
+	for _, id := range ids {
+		kids := slices.Clone(node.Children)
+		i := slices.IndexFunc(kids, func(n *webtemplate.Node) bool { return n.ID == id })
+		if i < 0 {
+			t.Fatalf("corpus template has no %q under %q", id, node.ID)
+		}
+		cp := *kids[i]
+		kids[i] = &cp
+		node.Children = kids
+		node = &cp
+	}
+	node.RMType = "INTERVAL_EVENT"
+	node.Children = append(slices.Clone(node.Children), &webtemplate.Node{
+		ID: "width", RMType: "DV_DURATION", Max: 1, AQLPath: node.AQLPath + "/width",
+	})
+	return &out
 }

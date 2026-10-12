@@ -166,7 +166,7 @@ func Verify(res SetResult, recs map[Leg]Record) []string {
 //     ctx/composer_name alone, without its external_ref.
 //   - INTERVAL_EVENT attributes: the Web Template has no math_function
 //     or width node for the event, so FLAT encode writes neither and decode
-//     reports both as unmatched content.
+//     refuses both in every mode, as RM data it would otherwise drop.
 //   - reused archetype siblings: several siblings reuse one archetype
 //     under one attribute, which FLAT encode refuses ("path resolves to
 //     multiple items") and FLAT decode refuses ("not yet decodable").
@@ -183,7 +183,7 @@ var Recorded = map[string]map[Leg]Record{
 		},
 		LegFlatCanonical: {
 			Outcome: Outcome{Compared: 115, Missing: 8, Extra: 4, Altered: 13, Excluded: 4},
-			Reason: "INTERVAL_EVENT attributes: decode reports math_function and width as unmatched content (the 4 " +
+			Reason: "INTERVAL_EVENT attributes: decode refuses math_function and width in every mode (the 4 " +
 				"excluded keys), so the interval event loses both and decodes as a POINT_EVENT. Sibling order: FLAT " +
 				"carries no order " +
 				"between the birth_en and any_event_en events; decode lists them in Web Template order, the canonical lists " +

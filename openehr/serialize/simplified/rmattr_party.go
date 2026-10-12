@@ -377,10 +377,38 @@ var participationOwnTails = func() map[string]bool {
 	return out
 }()
 
-// participationTimeSuffix is the suffix that would carry PARTICIPATION.time,
-// the RM attribute the reference's grammar has no channel for. The key names
-// an attribute the decode knows, so it is refused rather than unmatched.
+// participationTimeSuffix is the name that would carry PARTICIPATION.time, the
+// RM attribute the reference's grammar has no channel for, whether as an own
+// suffix (`|time`) or as a sub-path (`/time`, `/time/lower`, the interval
+// grammar's spelling of its DV_INTERVAL). The key names an attribute the
+// decode knows, so it is refused rather than unmatched.
 const participationTimeSuffix = "time"
+
+// tailNaming returns the first of g's tails, in sorted order, whose own suffix
+// or first sub-path segment (its `:index` aside) is name.
+func tailNaming(g rmattrGroup, name string) (string, bool) {
+	for _, tail := range slices.Sorted(maps.Keys(g.tails)) {
+		var first string
+		switch {
+		case strings.HasPrefix(tail, "|"):
+			first = tail[1:]
+		case strings.HasPrefix(tail, "/"):
+			first = tail[1:]
+			if cut := strings.IndexAny(first, "/|"); cut >= 0 {
+				first = first[:cut]
+			}
+			if id, idx, found := strings.Cut(first, ":"); found {
+				if _, err := strconv.Atoi(idx); err == nil {
+					first = id
+				}
+			}
+		}
+		if first == name {
+			return tail, true
+		}
+	}
+	return "", false
+}
 
 // decodeRMAttrParticipation decodes one `context/_participation:N` or
 // `<entry>/_other_participation:N` instance. Both families are the same
@@ -392,16 +420,18 @@ const participationTimeSuffix = "time"
 // refuses a populated one rather than dropping it (rmattr_party_encode.go;
 // recorded in deviations.md).
 func decodeRMAttrParticipation(g rmattrGroup, _ string) (any, error) {
+	// PARTICIPATION.time is refused in every spelling, before the grammar below
+	// would set a sub-path spelling aside as unmatched.
+	if tail, timed := tailNaming(g, participationTimeSuffix); timed {
+		return nil, fmt.Errorf("%w: %q addresses PARTICIPATION.time, which the reference's suffix set has no channel for — deferred rather than dropped (REQ-140, see deviations.md)",
+			ErrUnsupportedDatatype, g.key(tail))
+	}
 	// lists is nil: a participation's identifiers ride the inlined suffix
 	// spelling, so the nested `/_identifier:N` names nothing here and is
 	// unmatched content.
 	ts, err := splitRMAttrTails(g, partySubTails, nil)
 	if err != nil {
 		return nil, err
-	}
-	if _, timed := ts.own[participationTimeSuffix]; timed {
-		return nil, fmt.Errorf("%w: %q addresses PARTICIPATION.time, which the reference's suffix set has no channel for — deferred rather than dropped (REQ-140, see deviations.md)",
-			ErrUnsupportedDatatype, ts.key(g, ownTail(participationTimeSuffix)))
 	}
 	ids, err := takeInlineIdentifiers(g, ts)
 	if err != nil {
