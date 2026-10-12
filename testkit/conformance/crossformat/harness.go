@@ -26,8 +26,9 @@
 // the hold-out of the upstream FLAT parity harness (webtemplate.IsCompositionMeta).
 // All FLAT decodes go through that harness's reducing decode
 // (webtemplate.DecodeReducing): it excludes the keys the codec reports as
-// unmatched content (REQ-170), and removes each key family the codec refuses,
-// and no key beyond what the refusal names, then retries the decode.
+// unmatched content (see simplified.WithUnmatched), and removes each key
+// family the codec refuses, and no key beyond what the refusal names, then
+// retries the decode.
 //
 // # Outcomes and the ratchet
 //

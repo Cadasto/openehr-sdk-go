@@ -16,14 +16,14 @@
 //
 //  1. Decode the upstream body with the codec's report option. The codec
 //     ignores a key it does not read and reports it as unmatched content
-//     (REQ-170); it refuses, with an error, a key it reads but cannot carry,
-//     and never drops one silently. Exclude each reported key, and for each
-//     refusal record it and its reason, remove exactly what that refusal names
-//     (see [dropRefused]: one key, one suffix, one leaf, or a whole subtree,
-//     depending on the shape), and retry. The resulting [Report.Excluded]
-//     count is the unmodelled surface, derived from the codec's own report and
-//     errors instead of from a hand-kept table that would go stale as gaps
-//     close.
+//     (see simplified.WithUnmatched); it refuses, with an error, a key it
+//     reads but cannot carry, and never drops one silently. Exclude each
+//     reported key, and for each refusal record it and its reason, remove
+//     exactly what that refusal names (see [dropRefused]: one key, one suffix,
+//     one leaf, or a whole subtree, depending on the shape), and retry. The
+//     resulting [Report.Excluded] count is the unmodelled surface, derived
+//     from the codec's own report and errors instead of from a hand-kept table
+//     that would go stale as gaps close.
 //  2. Re-encode what decoded, and compare against the surviving upstream
 //     keys. Inside that subset a missing key, an extra key, or a changed
 //     value is a failure. There is no list of tolerated drops.

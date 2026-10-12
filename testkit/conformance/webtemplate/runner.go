@@ -65,9 +65,9 @@ func NewTargetFromOPT(path string) (*Target, error) {
 }
 
 // Refusal is one upstream key family the decode left out, with the reason:
-// a key the codec reported as unmatched content (REQ-170, Reason
-// [UnmatchedReason]), or a key family the codec refused, with the reason it
-// gave. Reason is normalised (the key itself is stripped out) so refusals
+// a key the codec reported as unmatched content (see simplified.WithUnmatched;
+// Reason [UnmatchedReason]), or a key family the codec refused, with the
+// reason it gave. Reason is normalised (the key itself is stripped out) so refusals
 // aggregate across fixtures.
 type Refusal struct {
 	// Key is the offending FLAT key as the codec named it.
@@ -84,9 +84,9 @@ type Refusal struct {
 }
 
 // UnmatchedReason is the [Refusal.Reason] of a key the codec reported as
-// unmatched content (REQ-170): the decode ignored it, so it cannot come back
-// on re-encode and is excluded from the comparison. UnmatchedMessage is its
-// [Refusal.Message].
+// unmatched content (see simplified.WithUnmatched): the decode ignored it, so
+// it cannot come back on re-encode and is excluded from the comparison.
+// UnmatchedMessage is its [Refusal.Message].
 const (
 	UnmatchedReason  = "unmatched content"
 	UnmatchedMessage = "reported as unmatched content"
@@ -269,9 +269,10 @@ func (e *IrreducibleError) Error() string { return e.why + ": " + e.Err.Error() 
 func (e *IrreducibleError) Unwrap() error { return e.Err }
 
 // DecodeReducing decodes candidate with the target's template, excluding what
-// the codec does not decode: the keys it reports as unmatched content
-// (REQ-170), which the decode ignores, and each key family it refuses, removed
-// no wider than the refusal names before the decode is retried. It mutates
+// the codec does not decode: the keys it reports as unmatched content (see
+// simplified.WithUnmatched), which the decode ignores, and each key family it
+// refuses, removed no wider than the refusal names before the decode is
+// retried. It mutates
 // candidate down to the modelled subset and returns the refusals in the order
 // they surfaced, then one [Refusal] per unmatched key, in document order. mode
 // says whether to inject the mandatory context.
