@@ -1037,6 +1037,7 @@ requirements:
       - testkit/probes/transport/probe_091_path_segment_validation.go
       - testkit/probes/versioned/probe_072_contribution_submission_shape.go
       - transport/path_encoding_test.go
+      - transport/query_encoding_test.go
 
   - id: REQ-096
     title: Unambiguous "disable retry"

@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"go.opentelemetry.io/otel"
@@ -599,7 +600,12 @@ func joinTarget(base *url.URL, path string, query url.Values) (*url.URL, error) 
 		for k, vv := range query {
 			q[k] = append(q[k][:0], vv...)
 		}
-		out.RawQuery = q.Encode()
+		// REQ-095: encode a space as %20, not the HTML form "+".
+		// Encode writes a literal plus as %2B, so every "+" it emits
+		// stands for a space; a server that percent-decodes the query by
+		// RFC 3986 (where "+" is a literal plus) then reads the value as
+		// the caller sent it.
+		out.RawQuery = strings.ReplaceAll(q.Encode(), "+", "%20")
 	}
 	return out, nil
 }
