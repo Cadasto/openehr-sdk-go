@@ -449,6 +449,7 @@ requirements:
       - openehr/serialize/canjson/member_order_test.go
       - openehr/serialize/canjson/multimedia_bytes_test.go
       - openehr/serialize/canjson/omitzero_test.go
+      - openehr/serialize/canjson/options_route_test.go
       - openehr/serialize/canjson/polymorphic_decode_test.go
       - openehr/serialize/canjson/polymorphic_encode_test.go
       - openehr/serialize/canjson/roundtrip_test.go
@@ -581,6 +582,7 @@ requirements:
       - openehr/serialize/canxml/decode_test.go
       - openehr/serialize/canxml/interval_flag_defaults_test.go
       - openehr/serialize/canxml/interval_open_side_test.go
+      - openehr/serialize/canxml/oneroot_test.go
       - openehr/serialize/canxml/roundtrip_test.go
       - openehr/serialize/canxml/unmatched_test.go
       - openehr/validation/rmread/interval_void_parity_test.go
@@ -1164,6 +1166,7 @@ requirements:
       - openehr/validation/rmfloor_chained_corpus_test.go
       - openehr/validation/rmfloor_chained_internal_test.go
       - openehr/validation/rmfloor_chained_test.go
+      - openehr/validation/rmfloor_cycle_test.go
       - openehr/validation/rmfloor_ordered_test.go
       - openehr/validation/rmread/handles_test.go
       - openehr/validation/rmread/interval_void_test.go
@@ -1474,6 +1477,8 @@ requirements:
       - openehr/validation/rmfloor_chained_internal_test.go
       - openehr/validation/rmfloor_chained_test.go
       - openehr/validation/rmfloor_coded_test.go
+      - openehr/validation/rmfloor_cycle_test.go
+      - openehr/validation/rmfloor_identity_internal_test.go
       - openehr/validation/rmfloor_interval_flags_test.go
       - openehr/validation/rmfloor_ism_transition_test.go
       - openehr/validation/rmfloor_ordered_test.go
