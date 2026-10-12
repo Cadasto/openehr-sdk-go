@@ -23,9 +23,10 @@ type decodeConfig struct {
 // a key whose path the Web Template does not resolve, an underscore-prefixed
 // segment that names no RM attribute this codec carries at that node, a
 // suffix outside the suffix set of its datatype (or of its underscore
-// family), and a `ctx/` field this codec does not read. A STRUCTURED member
-// whose name resolves nothing the decode reads is unmatched whatever its value
-// holds. A key the decode reads is never unmatched, even where the decode then
+// family), and a `ctx/` field this codec does not read. At every level of a
+// STRUCTURED body, a member whose name the FLAT grammar does not read there is
+// unmatched whatever its value holds. A key the decode reads is never
+// unmatched, even where the decode then
 // refuses it, and these fail the decode in every mode: the keys with no
 // carrier (the composer's `external_ref` suffixes and party sub-structure, a
 // PARTICIPATION `time`, a FEEDER_AUDIT_DETAILS `other_details`,

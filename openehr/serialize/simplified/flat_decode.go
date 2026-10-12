@@ -287,10 +287,11 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 // suffix arrived under.
 //
 //   - A node with children is structure, not a value: the decode reads a |raw
-//     fragment there and nothing else, so every other key is unmatched (an
-//     extension suffix such as `|x_note`, say). The RM attributes the reference
-//     spells as a suffix on such a node never get here: [refuseInContextKeys]
-//     refuses them first.
+//     fragment there and its bare value, which names the node and so is
+//     matched content of the wrong shape, refused where the value is built
+//     (REQ-170). Every other suffix is unmatched (an extension suffix such as
+//     `|x_note`, say). The RM attributes the reference spells as a suffix on
+//     such a node never get here: [refuseInContextKeys] refuses them first.
 //   - A leaf whose datatype has a suffix set keeps the suffixes in that set
 //     ([leafSuffixMatched]); the rest are unmatched.
 //   - A leaf whose datatype has neither a suffix set nor a sub-path grammar
@@ -308,7 +309,7 @@ func leafSuffixes(leaf *webtemplate.Node, sfx map[string]any, keyOf func(string)
 	if len(leaf.Children) > 0 {
 		var out map[string]any
 		for _, suffix := range slices.Sorted(maps.Keys(sfx)) {
-			if suffix == "raw" {
+			if suffix == "raw" || suffix == "" {
 				continue
 			}
 			if out == nil {
@@ -472,11 +473,16 @@ var metadataOwnedBaseType = map[string]string{
 }
 
 // ctxSettingBare is the bare spelling of ctx/setting, which the decode reads as
-// a pair of suffixes only.
-const ctxSettingBare = "ctx/setting"
+// a pair of suffixes only, and ctxSettingTerminology the witness of the
+// terminology that pair implies.
+const (
+	ctxSettingBare        = "ctx/setting"
+	ctxSettingTerminology = "ctx/setting|terminology"
+)
 
-// ctxFields are the ctx/ keys the decode reads (REQ-053). Any other ctx/ key
-// is unmatched content (REQ-170), except [ctxSettingBare].
+// ctxFields are the ctx/ keys the decode reads into context (REQ-053). Any
+// other ctx/ key is unmatched content (REQ-170), except [ctxSettingBare] and
+// [ctxSettingTerminology], which the decode also reads.
 var ctxFields = map[string]bool{
 	"ctx/language": true, "ctx/territory": true,
 	"ctx/composer_name": true, "ctx/composer_self": true,
@@ -605,6 +611,19 @@ func cutRoot(key, rootID string) (rel string, rootSeg flatSeg, rooted bool) {
 	return rel, pk.segs[0], true
 }
 
+// rootSegmentAlone parses a key that has no `/` as one segment and its
+// suffix, and reports the segment when it is the template root's.
+func rootSegmentAlone(key, rootID string) (flatSeg, bool) {
+	if strings.Contains(key, "/") {
+		return flatSeg{}, false
+	}
+	pk, err := parseFlatKey(key)
+	if err != nil || len(pk.segs) != 1 || pk.segs[0].id != rootID {
+		return flatSeg{}, false
+	}
+	return pk.segs[0], true
+}
+
 // errRootIndex refuses an index past the bound of the template root's own
 // segment. The root is the one COMPOSITION, so `:0` is its explicit-index
 // spelling and anything higher names a composition that does not exist; reading
@@ -723,6 +742,16 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 				return nil, nil, nil, fmt.Errorf("%w: %q spells the setting without its |code and |value, the pair ctx/setting travels as",
 					ErrUnsupportedDatatype, key)
 			}
+			if key == ctxSettingTerminology {
+				// The setting's terminology is implied, never carried: a witness
+				// naming it is read and dropped, and one naming any other
+				// terminology is a typed error, not a silent rewrite (REQ-053),
+				// exactly as the real-path witness below.
+				if err := checkTerminologyWitness(key, val, terminology.ID); err != nil {
+					return nil, nil, nil, err
+				}
+				continue
+			}
 			if !ctxFields[key] {
 				sink.add(key)
 				continue
@@ -731,6 +760,12 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 				return nil, nil, nil, err
 			}
 			continue
+		}
+		// A key that is the root segment alone, with or without a suffix,
+		// is judged from the left like any other: an index past :0 on it is
+		// past its bound (REQ-170).
+		if seg, alone := rootSegmentAlone(key, rootID); alone && seg.idx > 0 {
+			return nil, nil, nil, fmt.Errorf("simplified: %q: %w", key, errRootIndex(seg))
 		}
 		rel, rootSeg, isRooted := cutRoot(key, rootID)
 		if !isRooted {
@@ -754,13 +789,8 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 				ErrUnknownPath, key)
 		}
 		if want, isWitness := metadataAliasTerminology[rel]; isWitness {
-			got, err := ctxString(key, val)
-			if err != nil {
+			if err := checkTerminologyWitness(key, val, want); err != nil {
 				return nil, nil, nil, err
-			}
-			if got != want {
-				return nil, nil, nil, fmt.Errorf("%w: %s = %q, but the ctx/ form implies %q (a differing terminology cannot be carried)",
-					ErrUnsupportedDatatype, key, got, want)
 			}
 			continue
 		}
@@ -810,6 +840,22 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 		content[key] = val
 	}
 	return ctx, ctxOrigin, content, nil
+}
+
+// checkTerminologyWitness reads a terminology witness of a coded metadata
+// field: a key that names the terminology the ctx/ form implies, which matches
+// and is dropped, or names another, which the ctx/ form cannot carry and is
+// refused (REQ-053).
+func checkTerminologyWitness(key string, val any, want string) error {
+	got, err := ctxString(key, val)
+	if err != nil {
+		return err
+	}
+	if got != want {
+		return fmt.Errorf("%w: %s = %q, but the ctx/ form implies %q (a differing terminology cannot be carried)",
+			ErrUnsupportedDatatype, key, got, want)
+	}
+	return nil
 }
 
 // putCtx records a context value under its normalised ctx/ key, tracking in

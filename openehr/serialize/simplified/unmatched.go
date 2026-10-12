@@ -19,9 +19,9 @@ package simplified
 // they would for the body without the unmatched ones. A pass that meets none
 // is the result. Each repeat removes at least one key, so the loop ends.
 //
-// A STRUCTURED member whose name resolves nothing is set aside before the
-// body becomes a FLAT map ([structuredToFlatJudged]), whatever it holds, and
-// joins the keys the passes set aside.
+// A STRUCTURED member whose name the FLAT grammar does not read at its level
+// is set aside before the body becomes a FLAT map ([structuredToFlatJudged],
+// [memberLevel]), whatever it holds, and joins the keys the passes set aside.
 //
 // Document order is recovered only when an option asks for it: the FLAT
 // object's keys are read in order, and a STRUCTURED body's members are walked
@@ -376,7 +376,11 @@ func structuredLocations(data []byte) (locator, error) {
 				put(memberKeyPrefix+"ctx/"+field.name, "ctx/"+field.name)
 				if field.value.isObject {
 					for _, sfx := range field.value.members {
-						put("ctx/"+field.name+sfx.name, "ctx/"+field.name+"/"+sfx.name)
+						if strings.HasPrefix(sfx.name, "|") {
+							put("ctx/"+field.name+sfx.name, "ctx/"+field.name+"/"+sfx.name)
+							continue
+						}
+						put(memberKeyPrefix+"ctx/"+field.name+"/"+sfx.name, "ctx/"+field.name+"/"+sfx.name)
 					}
 					continue
 				}
