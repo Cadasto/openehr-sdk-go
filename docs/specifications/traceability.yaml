@@ -144,7 +144,7 @@ requirements:
     implementation: landed
     packages: [openehr/rm/typereg, openehr/serialize]
     tests:
-      - internal/bmmgen/render_walker_test.go
+      - internal/bmmgen/render_jsonhooks_test.go
       - internal/reflect_guard_test.go
       - internal/rmjsonwalk/root_internal_test.go
 
@@ -2037,7 +2037,7 @@ requirements:
     packages: [openehr/serialize/canjson, internal/rmjsonwalk, openehr/serialize/canxml, openehr/internal/xmlunmatched, internal/bmmgen, openehr/rm, openehr/serialize/simplified, testkit/expectedform]
     probes: [PROBE-086, PROBE-105, PROBE-030]
     tests:
-      - internal/bmmgen/render_walker_test.go
+      - internal/bmmgen/render_jsonhooks_test.go
       - internal/bmmgen/render_xmlunmar_unmatched_test.go
       - internal/rmjsonwalk/bindings_internal_test.go
       - internal/rmjsonwalk/root_internal_test.go
@@ -2061,4 +2061,6 @@ requirements:
       - testkit/conformance/webtemplate/helpers_test.go
       - testkit/expectedform/expectedform_test.go
       - testkit/expectedform/walker_internal_test.go
+      - testkit/probes/serialize/probe_030_guard_internal_test.go
+      - testkit/probes/serialize/probe_038_guard_internal_test.go
       - testkit/probes/serialize/probe_089_underscore_round_trip.go
