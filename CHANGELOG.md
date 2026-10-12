@@ -25,11 +25,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Type conformance follows the BMM (REQ-102).** A value conforms to any OPT type it descends from, and among alternatives an exact type binds before a conforming one.
 - **The RM floor checks interval flags (REQ-112).** An open side marked included is reported as `lower_included_valid` or `upper_included_valid`.
 - **Canonical XML reads only the openEHR namespace (REQ-170).** An element in a foreign namespace is ignored even when its local name matches an RM attribute.
+- **Canonical XML writes DV_MULTIMEDIA bytes as base64 (REQ-056).** `data` and `integrity_check` are one base64 element each, so XML an earlier version wrote with one element per byte no longer decodes.
+- **Canonical XML needs `xsi:type` on an interface-typed generic member (REQ-056).** An empty `ORIGINAL_VERSION<any>.data` or `Interval<DV_ORDERED>` bound without one fails with `typereg.ErrMissingType` instead of being skipped.
 
 ### Fixed
 
 - **FLAT decode keeps `:0`-indexed metadata (REQ-053).** `<root>/language:0|code` and the other indexed metadata spellings read as the unindexed ones instead of losing to `ctx/`; any other index is refused.
 - **A leap second no longer converts silently (REQ-123).** `ToTime` returns `rm.ErrTemporalConversion` for second 60.
+- **Canonical XML decodes three members it dropped or refused (REQ-056).** Base64 DV_MULTIMEDIA bytes, the AOM 1.4 `original_language` and the `data` of an `ORIGINAL_VERSION<any>` now decode.
 
 ## [0.32.0] - 2026-10-08
 
