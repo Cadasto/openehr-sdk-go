@@ -155,7 +155,11 @@ func splitRMAttrTails(g rmattrGroup, sub, lists map[string]bool) (rmattrTails, e
 // Only the leading segment may carry an index, and only for a segment in lists:
 // the recursive grammar's lists sit at the position the family names them at
 // (`/_identifier:N`), never deeper. A malformed index spelling is refused
-// whatever segment it is on.
+// whatever segment it is on. The key is judged from the left (REQ-170): a
+// leading segment the grammar reads, past its bound (above `:0` on a
+// single-valued one, above [maxRepeatIndex] on a list), makes the key
+// malformed whatever follows it, so it is refused even where a later segment
+// would leave the key unmatched.
 func rmattrSubSegment(g rmattrGroup, tail, path string, sub, lists map[string]bool) (seg string, idx int, isList, known bool, err error) {
 	segs := strings.Split(strings.TrimPrefix(path, "/"), "/")
 	indexes := make([]int, len(segs))
@@ -165,6 +169,13 @@ func rmattrSubSegment(g rmattrGroup, tail, path string, sub, lists map[string]bo
 			return "", 0, false, false, err
 		}
 		segs[i], indexes[i] = id, n
+	}
+	switch first := segs[0]; {
+	case lists[first] && indexes[0] > maxRepeatIndex:
+		return "", 0, false, true, fmt.Errorf("%w: %q :index %d exceeds bound %d",
+			ErrUnknownPath, g.key(tail), indexes[0], maxRepeatIndex)
+	case sub[first] && !lists[first] && indexes[0] > 0:
+		return "", 0, false, true, rmattrNotAList(g, tail, first)
 	}
 	joined := strings.Join(segs, "/")
 	if !sub[joined] && !lists[joined] {

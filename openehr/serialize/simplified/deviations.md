@@ -159,13 +159,16 @@ Concretely:
   Template carries its node, is an index past its bound (REQ-170): `ErrUnknownPath` naming the
   key, never merged into the one value. STRUCTURED judges an element's position in its member's
   array the same way, before what the element holds: an element past the bound of a
-  single-valued node, metadata segment, underscore family or FEEDER_AUDIT sub-path is refused
-  even when every member it holds is unmatched content. An interval leaf's index belongs to the ELEMENT the Web
+  single-valued node, metadata segment, underscore family, FEEDER_AUDIT sub-path, or sub-path
+  inside a family or a composite leaf's grammar is refused even when every member it holds is
+  unmatched content. An interval leaf's index belongs to the ELEMENT the Web
   Template folds away, judged on the RM attribute that holds it as any other leaf's, so a
   repeating interval ELEMENT takes `:N` and round-trips.
   The same index on a sub-path inside an underscore family's value or an interval value
   (`…/interval_dv_quantity/lower:1\|magnitude`, `…/dv_count/_normal_range/lower:1`) is refused
-  with `ErrUnsupportedDatatype` instead (`rmattrNotAList`); on a single-valued `_family`
+  with `ErrUnsupportedDatatype` instead (`rmattrNotAList`), whatever follows it
+  (`…/_normal_range/lower:1/x_unknown` too), and an index past the repeat bound on a party's
+  `_identifier` list with `ErrUnknownPath`; on a single-valued `_family`
   (`…/_uid:1`) and on a FEEDER_AUDIT sub-path (`…/_feeder_audit/originating_system_audit:1\|system_id`)
   it is `ErrUnknownPath`. Every one of these names the key, or the path up to the offending
   segment, and carries no value (`TestREQ170IndexPastBoundSentinels`).

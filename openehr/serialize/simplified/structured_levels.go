@@ -61,10 +61,9 @@ type memberLevel struct {
 
 // indexBound is a bound the FLAT decode puts on a segment's :index whatever
 // follows the segment, so an element past it is malformed whatever it holds
-// (REQ-170: an index past its bound). Where the FLAT decode judges an index
-// only on a key it reads (a sub-path inside a family, a Web Template list,
-// which placement bounds), the element is left unbounded and its keys judge
-// it.
+// (REQ-170: an index past its bound). A Web Template list is bounded only
+// where placement reads a key, so its element is left unbounded and its keys
+// judge it.
 type indexBound int
 
 const (
@@ -83,6 +82,13 @@ const (
 	// childList is a FEEDER_AUDIT identifier list, bounded by
 	// [maxRepeatIndex] ([rmattrChildGroups]).
 	childList
+	// subPathOne is a single-valued sub-path inside a family or a composite
+	// leaf's grammar ([rmattrSubSegment]): an interval's bound, a party's
+	// relationship, a range's meaning, a mapping's target or purpose.
+	subPathOne
+	// subPathList is a sub-path list inside such a grammar, bounded by
+	// [maxRepeatIndex]: a party's `_identifier`.
+	subPathList
 )
 
 // check refuses the element at position idx of member id under the FLAT path
@@ -103,7 +109,11 @@ func (b indexBound) check(path, id string, idx int) error {
 		if idx > 0 {
 			return fmt.Errorf("%w: %q addresses a single-valued RM attribute, not an indexed list", ErrUnknownPath, path+"/"+id)
 		}
-	case familyList, childList:
+	case subPathOne:
+		if idx > 0 {
+			return fmt.Errorf("%w: %q carries a :index, but %s addresses a single-valued RM attribute", ErrUnsupportedDatatype, seg, id)
+		}
+	case familyList, childList, subPathList:
 		if idx > maxRepeatIndex {
 			return fmt.Errorf("%w: %q :index %d exceeds bound %d", ErrUnknownPath, seg, idx, maxRepeatIndex)
 		}
@@ -125,13 +135,27 @@ var opaqueLevel = memberLevel{kind: levelOpaque}
 var suffixesOnly = memberLevel{kind: levelGrammar}
 
 // grammarOf is a levelGrammar reading each of names with suffixes only below
-// it.
+// it, at no bound.
 func grammarOf(names ...map[string]bool) memberLevel {
 	sub := make(map[string]memberLevel)
 	for _, set := range names {
 		for name := range set {
 			sub[name] = suffixesOnly
 		}
+	}
+	return memberLevel{kind: levelGrammar, sub: sub}
+}
+
+// subPathGrammar is the levelGrammar of a family's or a composite leaf's
+// sub-paths ([splitRMAttrTails]): each of single a single-valued sub-path and
+// each of lists an indexed list, each in its own suffix form below.
+func subPathGrammar(single, lists map[string]bool) memberLevel {
+	sub := make(map[string]memberLevel, len(single)+len(lists))
+	for name := range single {
+		sub[name] = suffixesOnly.bounded(subPathOne)
+	}
+	for name := range lists {
+		sub[name] = suffixesOnly.bounded(subPathList)
 	}
 	return memberLevel{kind: levelGrammar, sub: sub}
 }
@@ -147,10 +171,10 @@ func (l memberLevel) with(name string, level memberLevel) memberLevel {
 var (
 	// partyLevel is the party grammar ([partyTails]): `relationship` and the
 	// nested `_identifier` list, each in its own suffix form.
-	partyLevel = grammarOf(partySubTails, partyListTails)
+	partyLevel = subPathGrammar(partySubTails, partyListTails)
 	// participationLevel is PARTICIPATION's grammar: the performer's
 	// `relationship`, and `time`, which the decode refuses in every spelling.
-	participationLevel = grammarOf(partySubTails).with(participationTimeSuffix, opaqueLevel)
+	participationLevel = subPathGrammar(partySubTails, nil).with(participationTimeSuffix, opaqueLevel)
 	// feederDetailsLevel is FEEDER_AUDIT_DETAILS: its three parties, and
 	// `other_details`, which the decode refuses.
 	feederDetailsLevel = func() memberLevel {
@@ -183,9 +207,9 @@ var (
 		"_provider":               partyLevel,
 		"_participation":          participationLevel,
 		"_other_participation":    participationLevel,
-		"_normal_range":           grammarOf(intervalSubTails),
-		"_other_reference_ranges": grammarOf(refRangeSubTails),
-		"_mapping":                grammarOf(mappingSubTails),
+		"_normal_range":           subPathGrammar(intervalSubTails, nil),
+		"_other_reference_ranges": subPathGrammar(refRangeSubTails, nil),
+		"_mapping":                subPathGrammar(mappingSubTails, nil),
 		"_feeder_audit":           feederLevel,
 	}
 	// composerLevel is the composer's party grammar. No ctx/ short form can
@@ -318,7 +342,7 @@ func (l memberLevel) judgeLeaf(name string) (memberLevel, bool) {
 	rmType := nodeRMType(l.node)
 	switch {
 	case isIntervalLeafType(rmType) && intervalSubTails[name]:
-		return suffixesOnly, true
+		return suffixesOnly.bounded(subPathOne), true
 	case isPartyLeafType(rmType):
 		party := partyLevel
 		if ctxOnlyLeafPaths[bareAQLPath(l.node.AQLPath)] {
