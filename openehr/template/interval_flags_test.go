@@ -767,3 +767,145 @@ func TestREQ103_NumericRangeNonBooleanIncludedFlagRefused(t *testing.T) {
 		}
 	}
 }
+
+// REQ-169: an omitted lower_unbounded or upper_unbounded reads as false
+// beside a bound and as true where that side's bound is omitted too, so an
+// interval that gives only an upper bound is open below. A written flag is
+// read as written, true beside a bound among them. Both parse modes read
+// every Multiplicity site this way.
+//
+// Can-fail control: read an omitted unbounded flag as false whatever the
+// bound, as before, and the cases with a side that has no bound read it
+// closed, with a bound of 0.
+func TestREQ169_REQ100_MultiplicityUnboundedFollowsItsBound(t *testing.T) {
+	cases := []struct {
+		name string
+		iv   wireInterval
+		want bounds
+	}{
+		{name: "only_upper_is_open_below", iv: wireInterval{upper: "3"}, want: bounds{upper: 3, lowerUnbounded: true}},
+		{name: "only_lower_is_open_above", iv: wireInterval{lower: "1"}, want: bounds{lower: 1, upperUnbounded: true}},
+		{name: "no_bounds_no_flags_is_open_both", iv: wireInterval{}, want: bounds{lowerUnbounded: true, upperUnbounded: true}},
+		{
+			name: "written_unbounded_beside_its_bound_is_read_as_written",
+			iv:   wireInterval{lowerUnbounded: "true", lower: "1", upper: "3"},
+			want: bounds{lower: 1, upper: 3, lowerUnbounded: true},
+		},
+	}
+	for _, p := range intervalParsers {
+		for _, site := range multiplicitySites {
+			for _, tc := range cases {
+				t.Run(p.name+"/"+site.name+"/"+tc.name, func(t *testing.T) {
+					opt, err := p.parse(strings.NewReader(multiplicityBody(site.attribute, site.child, tc.iv.xml())))
+					if err != nil {
+						t.Fatalf("%s(%s %q) error = %v, want nil", p.name, site.name, tc.iv.xml(), err)
+					}
+					m := site.get(t, opt)
+					if m == nil {
+						t.Fatalf("%s(%s %q) Multiplicity = nil, want %+v", p.name, site.name, tc.iv.xml(), tc.want)
+					}
+					if got := boundsOf(m); got != tc.want {
+						t.Errorf("%s(%s %q) Multiplicity = %+v, want %+v", p.name, site.name, tc.iv.xml(), got, tc.want)
+					}
+				})
+			}
+		}
+	}
+}
+
+// closedSideCases write one side bounded, `*_unbounded` false, and give it
+// no bound. side names the flag the refusal must name.
+var closedSideCases = []struct {
+	name string
+	iv   wireInterval
+	side string
+}{
+	{name: "lower_written_bounded_without_lower", iv: wireInterval{lowerUnbounded: "false", upper: "3"}, side: "lower"},
+	{name: "upper_written_bounded_without_upper", iv: wireInterval{upperUnbounded: "false", lower: "1"}, side: "upper"},
+	{name: "both_written_bounded_without_bounds", iv: wireInterval{lowerUnbounded: "false", upperUnbounded: "false"}, side: "lower"},
+}
+
+// REQ-169: a side the OPT writes bounded but gives no bound is refused in
+// both parse modes, wrapping ErrInvalidOPT and naming the flag: the parser
+// holds every bound by value, so it has no value to give that side.
+//
+// Can-fail control: drop the refusal and the side reads closed at 0.
+func TestREQ169_REQ100_MultiplicityClosedSideWithNoBoundRefused(t *testing.T) {
+	for _, p := range intervalParsers {
+		for _, site := range multiplicitySites {
+			for _, tc := range closedSideCases {
+				t.Run(p.name+"/"+site.name+"/"+tc.name, func(t *testing.T) {
+					_, err := p.parse(strings.NewReader(multiplicityBody(site.attribute, site.child, tc.iv.xml())))
+					if !errors.Is(err, template.ErrInvalidOPT) {
+						t.Fatalf("%s(%s %q) error = %v, want one wrapping ErrInvalidOPT", p.name, site.name, tc.iv.xml(), err)
+					}
+					if flag := tc.side + "_unbounded"; !strings.Contains(err.Error(), flag) || !strings.Contains(err.Error(), site.context) {
+						t.Errorf("%s(%s %q) error = %v, want it to name %s and %s", p.name, site.name, tc.iv.xml(), err, flag, site.context)
+					}
+				})
+			}
+		}
+	}
+}
+
+// REQ-169: the numeric ranges of C_INTEGER, C_REAL and C_DV_QUANTITY read an
+// omitted unbounded flag by their side's bound too, in both parse modes.
+func TestREQ169_REQ103_NumericRangeUnboundedFollowsItsBound(t *testing.T) {
+	cases := []struct {
+		name string
+		iv   wireInterval
+		want constraints.NumericRange
+	}{
+		{name: "only_upper_is_open_below", iv: wireInterval{upper: "9"}, want: constraints.NumericRange{Upper: 9, UpperInclusive: true, LowerUnbounded: true}},
+		{name: "only_lower_is_open_above", iv: wireInterval{lower: "1"}, want: constraints.NumericRange{Lower: 1, LowerInclusive: true, UpperUnbounded: true}},
+		{
+			name: "written_unbounded_beside_its_bound_is_read_as_written",
+			iv:   wireInterval{upperUnbounded: "true", lower: "1", upper: "9"},
+			want: constraints.NumericRange{Lower: 1, LowerInclusive: true, UpperUnbounded: true},
+		},
+	}
+	for _, p := range intervalParsers {
+		for _, site := range numericRangeSites {
+			for _, tc := range cases {
+				t.Run(p.name+"/"+site.name+"/"+tc.name, func(t *testing.T) {
+					child := strings.ReplaceAll(site.child, "{{interval}}", tc.iv.xml())
+					body := strings.Replace(primitiveOPTTemplate, "%s", child, 1)
+					opt, err := p.parse(strings.NewReader(body))
+					if err != nil {
+						t.Fatalf("%s(%s %q) error = %v, want nil", p.name, site.name, tc.iv.xml(), err)
+					}
+					if got := site.get(t, firstChildPrimitive(t, opt)); got != tc.want {
+						t.Errorf("%s(%s %q) range = %+v, want %+v", p.name, site.name, tc.iv.xml(), got, tc.want)
+					}
+				})
+			}
+		}
+	}
+}
+
+// REQ-169: a numeric range side written bounded with no bound is refused in
+// both parse modes, wrapping ErrInvalidOPT and naming the flag, the
+// C_DV_QUANTITY magnitude and precision included, which are otherwise lenient
+// on a bound they cannot read.
+//
+// Can-fail control: drop the refusal and the side reads as a bound of 0, or
+// as unbounded where the lenient path falls back.
+func TestREQ169_REQ103_NumericRangeClosedSideWithNoBoundRefused(t *testing.T) {
+	for _, p := range intervalParsers {
+		for _, site := range numericRangeSites {
+			for _, tc := range closedSideCases {
+				t.Run(p.name+"/"+site.name+"/"+tc.name, func(t *testing.T) {
+					child := strings.ReplaceAll(site.child, "{{interval}}", tc.iv.xml())
+					body := strings.Replace(primitiveOPTTemplate, "%s", child, 1)
+					_, err := p.parse(strings.NewReader(body))
+					if !errors.Is(err, template.ErrInvalidOPT) {
+						t.Fatalf("%s(%s %q) error = %v, want one wrapping ErrInvalidOPT", p.name, site.name, tc.iv.xml(), err)
+					}
+					if flag := tc.side + "_unbounded"; !strings.Contains(err.Error(), flag) {
+						t.Errorf("%s(%s %q) error = %v, want it to name %s", p.name, site.name, tc.iv.xml(), err, flag)
+					}
+				})
+			}
+		}
+	}
+}
