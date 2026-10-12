@@ -244,7 +244,12 @@ func element(interval string) string {
 // TestREQ169_BuildWritesDefaultedIntervalFlags pins that every boundary flag
 // the input leaves out is written with the default REQ-169 reads it with, and
 // that a flag the input carries is kept as written, an included open side
-// among them.
+// among them. An omitted "*_unbounded" is false beside a bound and true where
+// the side's bound is omitted or null, and a null bound is dropped.
+//
+// Can-fail control: write an omitted "*_unbounded" as false whatever the
+// bound, as before, and the cases with a side that has no bound expect it
+// closed.
 func TestREQ169_BuildWritesDefaultedIntervalFlags(t *testing.T) {
 	runBuild(t, []buildCase{
 		{
@@ -264,6 +269,39 @@ func TestREQ169_BuildWritesDefaultedIntervalFlags(t *testing.T) {
 			root: "ELEMENT",
 			in:   element(`{"_type":"DV_INTERVAL","upper":` + dvQuantity + `,"lower_unbounded":true,"lower_included":true,"upper_included":false}`),
 			want: element(`{"_type":"DV_INTERVAL","upper":` + dvQuantity + `,"lower_unbounded":true,"upper_unbounded":false,"lower_included":true,"upper_included":false}`),
+		},
+		{
+			name: "only an upper bound: open below",
+			root: "ELEMENT",
+			in:   element(`{"_type":"DV_INTERVAL","upper":` + dvQuantity + `}`),
+			want: element(`{"_type":"DV_INTERVAL","upper":` + dvQuantity + `,"lower_unbounded":true,"upper_unbounded":false,"lower_included":false,"upper_included":true}`),
+		},
+		{
+			name: "only a lower bound: open above",
+			root: "ELEMENT",
+			in:   element(`{"_type":"DV_INTERVAL","lower":` + dvQuantity + `}`),
+			want: element(`{"_type":"DV_INTERVAL","lower":` + dvQuantity + `,"lower_unbounded":false,"upper_unbounded":true,"lower_included":true,"upper_included":false}`),
+		},
+		{
+			name: "a null bound is dropped and its side is open",
+			root: "ELEMENT",
+			in:   element(`{"_type":"DV_INTERVAL","lower":null,"upper":` + dvQuantity + `}`),
+			want: element(`{"_type":"DV_INTERVAL","upper":` + dvQuantity + `,"lower_unbounded":true,"upper_unbounded":false,"lower_included":false,"upper_included":true}`),
+		},
+		{
+			name: "no bound on either side: open on both",
+			root: "ELEMENT",
+			in:   element(`{"_type":"DV_INTERVAL"}`),
+			want: element(`{"_type":"DV_INTERVAL","lower_unbounded":true,"upper_unbounded":true,"lower_included":false,"upper_included":false}`),
+		},
+		{
+			// Held by reference, as here, the side decodes as written with no
+			// bound; held by value, the decode refuses it before any
+			// comparison.
+			name: "a side written bounded with no bound is kept as written",
+			root: "ELEMENT",
+			in:   element(`{"_type":"DV_INTERVAL","lower_unbounded":false,"upper":` + dvQuantity + `}`),
+			want: element(`{"_type":"DV_INTERVAL","upper":` + dvQuantity + `,"lower_unbounded":false,"upper_unbounded":false,"lower_included":true,"upper_included":true}`),
 		},
 	})
 }

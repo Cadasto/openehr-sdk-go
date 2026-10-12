@@ -21,8 +21,9 @@
 //     type of the attribute that holds it, and the root's type is the decode
 //     target's;
 //   - an interval that leaves out a boundary flag gains it with its default:
-//     "*_unbounded" is false, and "*_included" is true on a side that is not
-//     unbounded and false on a side that is;
+//     "*_unbounded" is false on a side that carries a bound and true on a
+//     side whose bound is left out or null, and "*_included" is true on a
+//     side that is not unbounded and false on a side that is;
 //   - an empty bound on a side marked unbounded is removed;
 //   - an empty DV_TEXT "mappings", DV_MULTIMEDIA "data" or DV_MULTIMEDIA
 //     "integrity_check" is removed;
@@ -433,16 +434,21 @@ func (w walker) isInterval(rmType string) bool {
 }
 
 // settleInterval writes each omitted boundary flag with its default and drops
-// an empty bound on a side marked unbounded. A flag present in the input is
-// kept as written, an included open side among them. boundType is the class
-// the slot binds the bound to, or empty (see isEmptyBound).
+// an empty bound on a side marked unbounded. An omitted "*_unbounded" is
+// false on a side that carries a bound and true on a side whose bound the
+// input omits or gives as null, which the walk has already removed; an
+// omitted "*_included" follows its side's open flag. A flag present in the
+// input is kept as written, an included open side among them. boundType is
+// the class the slot binds the bound to, or empty (see isEmptyBound).
 func (w walker) settleInterval(obj map[string]any, boundType string) {
 	for _, side := range [...]string{"lower", "upper"} {
 		open := false
 		if v, ok := obj[side+"_unbounded"]; ok {
 			open = v == true
 		} else {
-			obj[side+"_unbounded"] = false
+			_, hasBound := obj[side]
+			open = !hasBound
+			obj[side+"_unbounded"] = open
 		}
 		if _, ok := obj[side+"_included"]; !ok {
 			obj[side+"_included"] = !open

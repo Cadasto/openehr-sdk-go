@@ -146,6 +146,33 @@ func TestProbe030InputLegFailsWhenTheExpectedFormCannotBeBuilt(t *testing.T) {
 	}
 }
 
+// TestProbe030AcceptsAnIntervalWithOnlyAnUpperBound pins that PROBE-030 passes
+// an interval that gives only an upper bound (REQ-169, REQ-052): canjson reads
+// its lower side as open and writes `lower_unbounded` true and
+// `lower_included` false with no lower, and the input's expected form spells
+// the same defaults. It holds whether the target holds its bounds by value or
+// by reference.
+func TestProbe030AcceptsAnIntervalWithOnlyAnUpperBound(t *testing.T) {
+	const body = `{"_type":"DV_INTERVAL","upper":{"_type":"DV_COUNT","magnitude":5}}`
+	for _, tc := range []struct {
+		name    string
+		factory func() any
+	}{
+		{name: "DV_INTERVAL<DV_ORDERED>, by reference", factory: func() any { return new(rm.DVInterval[rm.DVOrdered]) }},
+		{name: "DV_INTERVAL<DV_COUNT>, by value", factory: func() any { return new(rm.DVInterval[rm.DVCount]) }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r, err := Probe030CanjsonRoundTrip([]byte(body), tc.factory)
+			if err != nil {
+				t.Fatalf("probe framework error: %v", err)
+			}
+			if r.Status != "pass" {
+				t.Errorf("Probe030CanjsonRoundTrip(%s) status = %q (detail: %s), want pass", body, r.Status, r.Detail)
+			}
+		})
+	}
+}
+
 // TestProbe030AcceptsANullMandatoryNumberOrBoolean pins that PROBE-030 passes
 // an input that gives a mandatory Integer64, Real or Boolean member a null
 // (REQ-052). canjson decodes the null to the Go zero and writes that zero back,
