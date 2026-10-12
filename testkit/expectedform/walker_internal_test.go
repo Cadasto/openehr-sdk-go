@@ -1,6 +1,7 @@
 package expectedform
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -68,5 +69,38 @@ func TestREQ052_MemberFilterIsTheSharedWalkers(t *testing.T) {
 	in["x-a"] = "planted"
 	if _, err := w.object(in, "DV_TEXT", "", ""); err == nil || !strings.Contains(err.Error(), "/x-a") {
 		t.Errorf("object(x-a not reported) error = %v, want one naming /x-a: the walk does not filter on its own", err)
+	}
+}
+
+// TestREQ052_NullMandatoryDoubleIsZero pins the Double arm of the null rule:
+// a null member declared mandatory with a Double type is expected as 0, the
+// zero the encoder writes for it, and an optional one is removed. The pinned
+// RM declares no mandatory Double, so a synthetic class carries both. Drop
+// Double from the rule and the mandatory member is removed, reddening this
+// test.
+func TestREQ052_NullMandatoryDoubleIsZero(t *testing.T) {
+	data := map[string]rminfo.ClassMeta{
+		"MEASURE": {
+			Attributes: map[string]rminfo.AttrMeta{
+				"value":  {TypeName: "Double", Required: true, DeclaredIn: "MEASURE"},
+				"spread": {TypeName: "Double", DeclaredIn: "MEASURE"},
+			},
+			AttrOrder: []string{"value", "spread"},
+		},
+	}
+	absence := map[string]rminfo.AbsenceReason{"Double": rminfo.AbsencePrimitive}
+	w, err := newWalker(rminfo.NewWithAbsence(data, absence), true)
+	if err != nil {
+		t.Fatalf("newWalker: %v", err)
+	}
+	got, err := w.object(map[string]any{"value": nil, "spread": nil}, "MEASURE", "", "")
+	if err != nil {
+		t.Fatalf("object: %v", err)
+	}
+	if v, ok := got["value"]; !ok || v != json.Number("0") {
+		t.Errorf("MEASURE.value = %v (present %v), want 0: a null mandatory Double is the zero the encoder writes", v, ok)
+	}
+	if v, ok := got["spread"]; ok {
+		t.Errorf("MEASURE.spread = %v, want it removed: a null optional Double reads as absent", v)
 	}
 }

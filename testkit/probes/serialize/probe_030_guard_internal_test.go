@@ -146,6 +146,36 @@ func TestProbe030InputLegFailsWhenTheExpectedFormCannotBeBuilt(t *testing.T) {
 	}
 }
 
+// TestProbe030AcceptsANullMandatoryNumberOrBoolean pins that PROBE-030 passes
+// an input that gives a mandatory Integer64, Real or Boolean member a null
+// (REQ-052). canjson decodes the null to the Go zero and writes that zero back,
+// so the input leg expects it there: the input's expected form spells the
+// member as 0 or false. Read such a null as absent in the expected form, as
+// before, and the input leg fails each case with the member present in b1
+// only.
+func TestProbe030AcceptsANullMandatoryNumberOrBoolean(t *testing.T) {
+	cases := []struct {
+		name    string
+		body    string
+		factory func() any
+	}{
+		{name: "DV_COUNT magnitude", body: `{"_type":"DV_COUNT","magnitude":null}`, factory: func() any { return new(rm.DVCount) }},
+		{name: "DV_QUANTITY magnitude", body: `{"_type":"DV_QUANTITY","magnitude":null,"units":"kg"}`, factory: func() any { return new(rm.DVQuantity) }},
+		{name: "DV_BOOLEAN value", body: `{"_type":"DV_BOOLEAN","value":null}`, factory: func() any { return new(rm.DVBoolean) }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r, err := Probe030CanjsonRoundTrip([]byte(tc.body), tc.factory)
+			if err != nil {
+				t.Fatalf("probe framework error: %v", err)
+			}
+			if r.Status != "pass" {
+				t.Errorf("Probe030CanjsonRoundTrip(%s) status = %q (detail: %s), want pass", tc.body, r.Status, r.Detail)
+			}
+		})
+	}
+}
+
 // excludeIntervalEndsEncoder canjson-encodes the value and then sets both
 // included flags of the top-level value's interval to false, standing in for a
 // decoder that reads an omitted included flag as false.

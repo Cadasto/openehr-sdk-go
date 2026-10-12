@@ -9,9 +9,14 @@
 // others:
 //
 //   - a member that names no attribute of its object's RM type is removed;
-//   - a member whose value is null is removed, except a mandatory String
-//     member, which becomes the empty string the encoder writes for it (a Go
-//     string holds no null);
+//   - a member whose value is null is removed, except a mandatory member of a
+//     primitive type the encoder writes a zero for, since a Go value of that
+//     type holds no null: a String becomes the empty string, an Integer,
+//     Integer64, Real or Double becomes 0, and a Boolean becomes false. An
+//     interval's boundary flag is the one Boolean left out: the decoder reads
+//     a null flag as an absent one, so it gains its default (below). A null
+//     Character is removed too, since the encoder refuses the empty value it
+//     decodes to;
 //   - an object that leaves out "_type" gains it: its RM type is the declared
 //     type of the attribute that holds it, and the root's type is the decode
 //     target's;
@@ -255,11 +260,10 @@ func (w walker) object(obj map[string]any, declared, boundType, ptr string) (map
 			return nil, fmt.Errorf("%s: names no attribute of %s, and the shared walker did not report it", child, rmType)
 		}
 		if val == nil {
-			switch {
-			case !w.full:
+			if !w.full {
 				out[name] = val
-			case attr.Type == "String" && !attr.Container && slices.Contains(w.lookup.RequiredAttributes(rmType), name):
-				out[name] = "" // a Go string holds no null: the encoder writes ""
+			} else if zero, ok := w.nullZero(rmType, name, attr); ok {
+				out[name] = zero
 			}
 			continue
 		}
@@ -278,6 +282,32 @@ func (w walker) object(obj map[string]any, declared, boundType, ptr string) (map
 		}
 	}
 	return out, nil
+}
+
+// nullZero returns what the encoder writes for the attribute name of rmType,
+// declared as attr, when the input gives it a null: the zero of a mandatory
+// String, number or Boolean, since a Go value of those types holds no null.
+// The second result is false for every other null member, which the
+// expected form removes: an optional attribute, an RM object, a container, an
+// interval's boundary flag, which the decoder reads as absent and
+// settleInterval then writes with its default, and any other primitive, such
+// as a Character, whose empty value the encoder refuses.
+func (w walker) nullZero(rmType, name string, attr rmjsonwalk.Attribute) (any, bool) {
+	if attr.Container || attr.Kind != rmjsonwalk.KindPrimitive || !slices.Contains(w.lookup.RequiredAttributes(rmType), name) {
+		return nil, false
+	}
+	switch attr.Type {
+	case "String":
+		return "", true
+	case "Integer", "Integer64", "Real", "Double":
+		return json.Number("0"), true
+	case "Boolean":
+		if slices.Contains(intervalFlags[:], name) && w.isInterval(rmType) {
+			return nil, false
+		}
+		return false, true
+	}
+	return nil, false
 }
 
 // resolve returns obj's RM type: its own "_type" when it carries one, else the

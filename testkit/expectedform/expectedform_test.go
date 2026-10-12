@@ -106,8 +106,8 @@ func TestREQ052_BuildRemovesNullMembers(t *testing.T) {
 // the RM declares mandatory with a String type is expected as the empty string
 // the encoder writes for it, since a Go string holds no null. The rule is read
 // from rminfo, so it reaches every mandatory String attribute, at the root and
-// nested. A null optional String, and a null mandatory member of another type,
-// still read as absent.
+// nested. A null optional String, a null mandatory Character, whose empty value
+// the encoder refuses, and a null mandatory RM object still read as absent.
 func TestREQ052_BuildWritesANullMandatoryStringAsEmpty(t *testing.T) {
 	runBuild(t, []buildCase{
 		{
@@ -139,6 +139,63 @@ func TestREQ052_BuildWritesANullMandatoryStringAsEmpty(t *testing.T) {
 			root: "CODE_PHRASE",
 			in:   `{"_type":"CODE_PHRASE","code_string":"433","terminology_id":null}`,
 			want: `{"_type":"CODE_PHRASE","code_string":"433"}`,
+		},
+	})
+}
+
+// TestREQ052_BuildWritesANullMandatoryNumberOrBooleanAsItsZero pins that a
+// null member the RM declares mandatory with an Integer, Integer64, Real or
+// Boolean type is expected as the zero the encoder writes for it, 0 or false,
+// since a Go value of those types holds no null. Each kind has its own case,
+// so dropping any one from the rule reddens that case. The Double kind, which
+// no mandatory RM attribute has, is pinned on a synthetic class in
+// walker_internal_test.go. An interval's boundary flag is a mandatory Boolean
+// the decoder reads as absent when it is null, so it takes its REQ-169
+// default, true on a closed side, rather than false.
+func TestREQ052_BuildWritesANullMandatoryNumberOrBooleanAsItsZero(t *testing.T) {
+	const symbol = `{"_type":"DV_CODED_TEXT","value":"s","defining_code":` + codePhrase + `}`
+	runBuild(t, []buildCase{
+		{
+			name: "Integer",
+			root: "DV_ORDINAL",
+			in:   `{"_type":"DV_ORDINAL","value":null,"symbol":` + symbol + `}`,
+			want: `{"_type":"DV_ORDINAL","value":0,"symbol":` + symbol + `}`,
+		},
+		{
+			name: "Integer64",
+			root: "DV_COUNT",
+			in:   `{"_type":"DV_COUNT","magnitude":null}`,
+			want: `{"_type":"DV_COUNT","magnitude":0}`,
+		},
+		{
+			name: "Real",
+			root: "DV_QUANTITY",
+			in:   `{"_type":"DV_QUANTITY","magnitude":null,"units":"kg"}`,
+			want: `{"_type":"DV_QUANTITY","magnitude":0,"units":"kg"}`,
+		},
+		{
+			name: "Boolean",
+			root: "DV_BOOLEAN",
+			in:   `{"_type":"DV_BOOLEAN","value":null}`,
+			want: `{"_type":"DV_BOOLEAN","value":false}`,
+		},
+		{
+			name: "Boolean nested",
+			root: "ELEMENT",
+			in:   element(`{"_type":"DV_BOOLEAN","value":null}`),
+			want: element(`{"_type":"DV_BOOLEAN","value":false}`),
+		},
+		{
+			name: "optional Integer stays absent",
+			root: "DV_QUANTITY",
+			in:   `{"_type":"DV_QUANTITY","magnitude":1,"units":"kg","precision":null}`,
+			want: `{"_type":"DV_QUANTITY","magnitude":1,"units":"kg"}`,
+		},
+		{
+			name: "interval flags take their defaults",
+			root: "ELEMENT",
+			in:   element(`{"_type":"DV_INTERVAL","lower":` + dvQuantity + `,"upper":` + dvQuantity + `,"lower_unbounded":null,"upper_unbounded":null,"lower_included":null,"upper_included":null}`),
+			want: element(`{"_type":"DV_INTERVAL","lower":` + dvQuantity + `,"upper":` + dvQuantity + `,"lower_unbounded":false,"upper_unbounded":false,"lower_included":true,"upper_included":true}`),
 		},
 	})
 }
