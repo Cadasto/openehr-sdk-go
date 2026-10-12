@@ -447,6 +447,35 @@ func TestREQ170_XMLForeignNamespace(t *testing.T) {
 			t.Errorf("Value = %#v; want a DV_QUANTITY in kg", got.Value)
 		}
 	})
+	t.Run("root element is exempt", func(t *testing.T) {
+		// The root is not matched by name, so its own namespace is not
+		// checked; its children, here in no namespace, are openEHR's.
+		in := []byte(`<x:element xmlns:x="urn:example:extension" archetype_node_id="at1"><name><value>n</value></name></x:element>`)
+		got, paths, err := unmarshalCollecting(func() any { return new(rm.Element) }, in, canxml.WithStrict())
+		if err != nil {
+			t.Fatalf("canxml.Unmarshal(foreign root, WithStrict) = %v; want nil: the root element is exempt", err)
+		}
+		if len(paths) != 0 {
+			t.Errorf("WithUnmatched reported %q; want nothing", paths)
+		}
+		if name := got.(*rm.Element).Name; name == nil || name.GetValue() != "n" {
+			t.Errorf("Name = %#v; want the DV_TEXT \"n\"", name)
+		}
+	})
+
+	t.Run("children inherit a foreign default namespace", func(t *testing.T) {
+		in := []byte(`<element xmlns="urn:example:extension" archetype_node_id="at1"><name><value>n</value></name></element>`)
+		const path = "/element[1]/name[1]"
+		_, paths, err := unmarshalCollecting(func() any { return new(rm.Element) }, in)
+		if err != nil {
+			t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
+		}
+		if want := []string{path}; !slices.Equal(paths, want) {
+			t.Errorf("WithUnmatched reported %q; want %q", paths, want)
+		}
+		err = canxml.Unmarshal(in, new(rm.Element), canxml.WithStrict())
+		assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, path, true)
+	})
 }
 
 // TestREQ170_XMLHashElements pins the rule for `Hash` members, which the
@@ -484,6 +513,34 @@ func TestREQ170_XMLHashElements(t *testing.T) {
 
 	err = canxml.Unmarshal(in, new(rm.ResourceDescription), canxml.WithStrict())
 	assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, wantPaths[0], false)
+}
+
+// TestREQ170_XMLWideElement pins the report paths of an element with many
+// differently named children, past the point where the tracker stops
+// scanning names and counts them by map: each child is reported once with its
+// right position, and a name repeated after that point counts on from where
+// it was.
+func TestREQ170_XMLWideElement(t *testing.T) {
+	const n = 50
+	var b strings.Builder
+	var want []string
+	b.WriteString(`<dv_text ` + ucNS + `><value>a</value>`)
+	for i := range n {
+		b.WriteString("<x" + strconv.Itoa(i) + "/>")
+		want = append(want, "/dv_text[1]/x"+strconv.Itoa(i)+"[1]")
+	}
+	b.WriteString(`<x0/><x49/></dv_text>`)
+	want = append(want, "/dv_text[1]/x0[2]", "/dv_text[1]/x49[2]")
+	got, paths, err := unmarshalCollecting(func() any { return new(rm.DVText) }, []byte(b.String()))
+	if err != nil {
+		t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
+	}
+	if !slices.Equal(paths, want) {
+		t.Errorf("WithUnmatched reported\n%q\nwant\n%q", paths, want)
+	}
+	if v := got.(*rm.DVText).Value; v != "a" {
+		t.Errorf("Value = %q; want \"a\"", v)
+	}
 }
 
 // TestREQ170_XMLAnyMemberContent pins the rule for the content of a BMM `Any`

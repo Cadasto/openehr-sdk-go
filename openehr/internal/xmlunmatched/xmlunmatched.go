@@ -89,11 +89,32 @@ type Tracker struct {
 // earlier siblings of the same name plus one, the children it has opened so
 // far, counted by local name, and whether dispatch read its bare `type`
 // attribute as the discriminator.
+//
+// The child counts sit in a short slice while the element has opened children
+// of few names, which is the canonical shape and costs no map. Once it opens
+// children of more than [linearChildNames] names, the counts move to a map, so
+// an element with many differently named children costs a lookup per child
+// rather than a scan of every name seen before it.
 type frame struct {
 	name          string
 	pos           int
 	children      []nameCount
+	byName        map[string]int // nil until the slice outgrows linearChildNames
 	discriminator bool
+}
+
+// linearChildNames is the number of distinct child names a frame counts in its
+// slice before it moves the counts to a map. An RM class has a few dozen
+// attributes at most, and an element of canonical XML repeats few names.
+const linearChildNames = 8
+
+// open makes f the frame of a newly opened element named local at position
+// pos, keeping the slice a frame left over from an earlier element had, so a
+// long decode does not allocate one per element. A map from an earlier wide
+// element is dropped rather than cleared, so a later narrow element never pays
+// for it.
+func (f *frame) open(local string, pos int) {
+	f.name, f.pos, f.children, f.byName, f.discriminator = local, pos, f.children[:0], nil, false
 }
 
 // nameCount is how many children of one local name an element has opened.
@@ -138,18 +159,17 @@ func (t *Tracker) Decode(dec *xml.Decoder, v any) error {
 // decoded.
 func (t *Tracker) reset() {
 	t.open = t.open[:1]
-	t.open[0].children = t.open[0].children[:0]
+	t.open[0].open("", 0)
 }
 
 // push records that the decoder opened an element named local inside the
-// innermost open element. A frame left over from an earlier element keeps its
-// children slice, so a long decode does not allocate one per element.
+// innermost open element. A frame left over from an earlier element is
+// reused ([frame.open]).
 func (t *Tracker) push(local string) {
 	pos := t.open[len(t.open)-1].count(local)
 	if len(t.open) < cap(t.open) {
 		t.open = t.open[:len(t.open)+1]
-		f := &t.open[len(t.open)-1]
-		f.name, f.pos, f.children, f.discriminator = local, pos, f.children[:0], false
+		t.open[len(t.open)-1].open(local, pos)
 		return
 	}
 	t.open = append(t.open, frame{name: local, pos: pos})
@@ -163,15 +183,28 @@ func (t *Tracker) pop() {
 }
 
 // count notes one more child named local and returns its position among the
-// children of that name.
+// children of that name. It scans at most [linearChildNames] names, then
+// looks the name up in the map.
 func (f *frame) count(local string) int {
+	if f.byName != nil {
+		f.byName[local]++
+		return f.byName[local]
+	}
 	for i := range f.children {
 		if f.children[i].name == local {
 			f.children[i].n++
 			return f.children[i].n
 		}
 	}
-	f.children = append(f.children, nameCount{name: local, n: 1})
+	if len(f.children) < linearChildNames {
+		f.children = append(f.children, nameCount{name: local, n: 1})
+		return 1
+	}
+	f.byName = make(map[string]int, 4*linearChildNames)
+	for _, c := range f.children {
+		f.byName[c.name] = c.n
+	}
+	f.byName[local] = 1
 	return 1
 }
 

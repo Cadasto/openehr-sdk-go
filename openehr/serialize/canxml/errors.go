@@ -48,6 +48,11 @@ var ErrUnknownElement = xmlunmatched.ErrUnknownElement
 // [ErrUnknownElement] and this sentinel. An attribute in a foreign
 // namespace is unmatched content too, but its refusal wraps
 // [ErrUnknownElement] only.
+//
+// The root element is exempt: the decode does not match it by name, since
+// the value the caller decodes into says what it decodes as, so its own
+// namespace is not checked. Its children are: an element that inherits a
+// foreign default namespace from the root is foreign.
 var ErrNamespace = xmlunmatched.ErrNamespace
 
 // DecodeError is the unified error returned by the decoder at

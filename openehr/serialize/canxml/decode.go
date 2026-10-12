@@ -51,7 +51,7 @@ func (c decoderConfig) tracked() bool {
 // decodes as, other than namespace declarations and attributes in the XML
 // Schema instance namespace (`xsi:type`, `xsi:schemaLocation`, `xsi:nil`,
 // …); an element in a namespace other than the openEHR one (see
-// [ErrNamespace]); and an element whose content this codec does not model:
+// [ErrNamespace]), the root element aside; and an element whose content this codec does not model:
 // a `Hash` member, a BMM `Any` member (the AOM 1.4 `assumed_value` and
 // `EXPR_LEAF.item`), and a member whose Go type has no decoder of its own
 // (see the package documentation). A bare `type` attribute is unmatched
@@ -276,12 +276,13 @@ func stripXSDPrefix(s string) string {
 //
 // Behaviour:
 //
-//   - If start carries `xsi:type`, the discriminator is looked up in
-//     [typereg.Default]; the matching constructor produces a fresh
-//     concrete instance which receives the element body via
-//     `dec.DecodeElement`.
-//   - If start carries no `xsi:type`, returns [typereg.ErrMissingType]
-//     wrapped in [DecodeError], always: relaxed dispatch
+//   - If start carries a discriminator, an `xsi:type` or failing that a
+//     bare `type` (see [XSITypeOf]), it is looked up in [typereg.Default];
+//     the matching constructor produces a fresh concrete instance, and the
+//     element body decodes into it as the decode's options say (see
+//     [WithUnmatched]).
+//   - If start carries neither, returns [typereg.ErrMissingType] wrapped
+//     in [DecodeError], always: relaxed dispatch
 //     ([WithRelaxedTypeDispatch]) is not implemented yet.
 //   - If the concrete value does not satisfy T, returns
 //     [typereg.ErrTypeMismatch] wrapped in [DecodeError].
@@ -332,12 +333,14 @@ func DecodeAs[T any](dec *xml.Decoder, start xml.StartElement) (T, error) {
 }
 
 // DecodeAsOrDefault is the XML counterpart of [DecodeAs] for
-// narrow-interface (`<Parent>Like`) slots. When the element carries an
-// `xsi:type`, dispatch goes through [typereg.Default] exactly like
-// DecodeAs. When `xsi:type` is absent, the supplied defaultCtor
-// instantiates the declared parent type and dec.DecodeElement populates
-// it. This preserves openEHR canonical XML where the static field type
-// fixes the concrete subtype.
+// narrow-interface (`<Parent>Like`) slots. When the element carries a
+// discriminator, an `xsi:type` or failing that a bare `type` (see
+// [XSITypeOf]), dispatch goes through [typereg.Default] exactly like
+// DecodeAs. When it carries neither, the decode does not fail: the
+// supplied defaultCtor instantiates the declared parent type, and the
+// element body decodes into it as the decode's options say (see
+// [WithUnmatched]). This preserves openEHR canonical XML where the static
+// field type fixes the concrete subtype.
 func DecodeAsOrDefault[T any](dec *xml.Decoder, start xml.StartElement, defaultCtor func() any) (T, error) {
 	var zero T
 	attrName, typeName, err := discriminator(start)

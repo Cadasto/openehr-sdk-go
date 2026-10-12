@@ -83,7 +83,9 @@
 // A bare `type` attribute, in no namespace, is read as the discriminator
 // only where dispatch reads it, at a polymorphic slot; anywhere else it is
 // unmatched. An element in no namespace is read as an openEHR element,
-// since many producers leave the declaration out.
+// since many producers leave the declaration out. The root element is not
+// matched by name, since the value decoded into says what it is, so its
+// own namespace is not checked.
 //
 // The check covers every class the generated decoders read, the AOM 1.4
 // classes included.

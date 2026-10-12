@@ -715,6 +715,12 @@ func TestREQ169IntervalFlaggedRefusals(t *testing.T) {
 		p.IsMandatory = mandatory
 		return emittedField{Prop: p, OwnerName: "X_INTERVAL"}
 	}
+	openFlag := func(name string) emittedField {
+		p := &bmm.SinglePropertyOpen{TypeName: "T"}
+		p.Name = name
+		p.IsMandatory = true
+		return emittedField{Prop: p, OwnerName: "X_INTERVAL"}
+	}
 	all := func() []emittedField {
 		out := make([]emittedField, 0, len(intervalFlagProps))
 		for _, prop := range intervalFlagProps {
@@ -733,6 +739,7 @@ func TestREQ169IntervalFlaggedRefusals(t *testing.T) {
 		{name: "two of the four", fields: all()[:2], wantErr: "not all four"},
 		{name: "an optional flag", fields: append(all()[:3], flag(propUpperUnbounded, "Boolean", false)), wantErr: "not a mandatory Boolean"},
 		{name: "a flag of another type", fields: append(all()[:3], flag(propUpperUnbounded, "String", true)), wantErr: "not a mandatory Boolean"},
+		{name: "a flag that is no single property", fields: append(all()[:3], openFlag(propUpperUnbounded)), wantErr: "not a mandatory Boolean"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := intervalFlagged(tc.fields)

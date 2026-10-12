@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -36,6 +37,58 @@ func TestREQ170_TrackerPaths(t *testing.T) {
 	want := []string{"/a[1]", "/a[1]/b[1]", "/a[1]/b[2]", "/a[1]/c[1]", "/a[1]/b[3]/b[1]", "/a[2]", "/a[1]"}
 	if !slices.Equal(got, want) {
 		t.Errorf("tracker paths = %q; want %q", got, want)
+	}
+}
+
+// TestREQ170_WideElementCountsByMap pins that an element with many
+// differently named children costs a bounded amount of work per child: its
+// frame keeps at most linearChildNames names in the slice it scans and moves
+// the counts to a map past that, so a report or strict decode of a document
+// with many distinct sibling names grows linearly, not quadratically, with
+// its size. The positions stay right across the move, a name seen before it
+// keeps counting, and a frame reused for a later element starts without the
+// map.
+func TestREQ170_WideElementCountsByMap(t *testing.T) {
+	const n = 1000
+	tr := NewTracker(nil, false)
+	tr.push("root")
+	child := func(name string) string {
+		tr.push(name)
+		defer tr.pop()
+		return tr.path()
+	}
+	for i := range n {
+		if got, want := child("x"+strconv.Itoa(i)), "/root[1]/x"+strconv.Itoa(i)+"[1]"; got != want {
+			t.Fatalf("path of child %d = %q; want %q", i, got, want)
+		}
+	}
+	root := &tr.open[1]
+	if len(root.children) > linearChildNames {
+		t.Errorf("the frame of an element with %d distinct child names scans %d names; want at most %d, the rest counted by map",
+			n, len(root.children), linearChildNames)
+	}
+	if len(root.byName) != n {
+		t.Errorf("the frame's map counts %d names; want all %d once the element outgrew the slice", len(root.byName), n)
+	}
+	// A name counted in the slice before the move, and one counted after it.
+	for _, tc := range []struct{ name, want string }{
+		{"x0", "/root[1]/x0[2]"},
+		{"x" + strconv.Itoa(n-1), "/root[1]/x" + strconv.Itoa(n-1) + "[2]"},
+		{"fresh", "/root[1]/fresh[1]"},
+	} {
+		if got := child(tc.name); got != tc.want {
+			t.Errorf("path of another %s = %q; want %q", tc.name, got, tc.want)
+		}
+	}
+
+	// The frame's slot, reused for the next element, starts afresh.
+	tr.pop()
+	tr.push("root")
+	if tr.open[1].byName != nil || len(tr.open[1].children) != 0 {
+		t.Errorf("a reused frame keeps %d names and a map of %d; want neither", len(tr.open[1].children), len(tr.open[1].byName))
+	}
+	if got, want := child("x0"), "/root[2]/x0[1]"; got != want {
+		t.Errorf("path in the next element = %q; want %q", got, want)
 	}
 }
 
