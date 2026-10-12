@@ -204,10 +204,12 @@ BASE `Interval<T>` declares its four boundary flags, `lower_unbounded`, `upper_u
 
 Wherever the SDK reads an openEHR interval from a serialised form, it **MUST** read an absent flag this way:
 
-- an absent `*_unbounded` as `false`;
-- an absent `*_included` as `true`, a closed end, on a side not marked unbounded, and as `false` on a side marked unbounded, the only value BASE `Lower_included_valid` / `Upper_included_valid` permit there.
+- an absent `*_unbounded` as `false` when that side carries a bound, and as `true` when its bound is absent or `null` too, so an interval that gives only an upper bound is open below;
+- an absent `*_included` as `true`, a closed end, on a side not unbounded, and as `false` on a side unbounded, as written or as read by the rule above, the only value BASE `Lower_included_valid` / `Upper_included_valid` permit there.
 
 A flag that is present **MUST** be read as written, and an absent flag **MUST NOT** be a decode error. In canonical XML and in OPT XML an empty or whitespace-only flag element carries no boolean and **MUST** be read as an absent flag.
+
+**A closed side with no bound.** A side whose `*_unbounded` is present and `false` but whose bound is absent or `null` names a closed end with no value. Where the SDK holds that bound by value, as it does for a concrete `T` (`DV_COUNT.normal_range`, an AOM 1.4 occurrences interval, an OPT numeric range), the Go value cannot hold the absence, and a reader that filled in the zero bound would change the interval's meaning. Every reader **MUST** refuse such a side, in every mode, wrapping its sentinel for malformed input: `canjson.ErrInvalidShape`, `canxml.ErrInvalidShape`, `simplified.ErrUnsupportedDatatype` and `template.ErrInvalidOPT`. Where the SDK holds the bound by pointer or as an interface, the side decodes as written, with no bound.
 
 The rule binds every interval reader the SDK has:
 
@@ -225,8 +227,9 @@ The rule binds every interval reader the SDK has:
 
 **Acceptance:**
 
-- A canonical-JSON or canonical-XML `DV_INTERVAL` with both bounds and no `*_included` member decodes with both ends included; a side marked `*_unbounded: true` with no `*_included` decodes as not included; an absent `*_unbounded` decodes as `false`. The same holds for an AOM 1.4 constraint interval in either canonical format, for the FLAT and STRUCTURED keys, and for the OPT parser's intervals and numeric ranges.
+- A canonical-JSON or canonical-XML `DV_INTERVAL` with both bounds and no `*_included` member decodes with both ends included; a side marked `*_unbounded: true` with no `*_included` decodes as not included; an absent `*_unbounded` decodes as `false` beside a bound and as `true` where the bound is absent or `null`, so `{"upper": …}` alone is open below. The same holds for an AOM 1.4 constraint interval in either canonical format, for the FLAT and STRUCTURED keys, and for the OPT parser's intervals and numeric ranges.
 - A present flag is read as written in every reader; no default overrides it.
+- A side marked `*_unbounded: false` with an absent or `null` bound is refused in every reader and mode where the bound is held by value (a `DV_COUNT` normal range, an AOM 1.4 constraint interval, an OPT range), and decodes with no bound where it is held by pointer or as an interface (`DV_INTERVAL<DV_ORDERED>`).
 - An included open side decodes as written in canonical JSON, canonical XML, FLAT and STRUCTURED, and `ValidateRM` reports it.
 - The closed-interval constructors return an interval with both bounds set, both `*_included` `true` and both `*_unbounded` `false`.
 
