@@ -25,6 +25,7 @@ package validation
 import (
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
@@ -36,9 +37,11 @@ import (
 )
 
 // maxWalkDepth bounds the RM-floor descent. RM graphs decoded from the
-// wire are acyclic trees, but ValidateRM accepts any caller-built value;
-// a pathological cyclic graph is stopped here rather than overflowing the
-// stack. The deepest legitimate RM nesting is far below this bound.
+// wire are acyclic trees, but ValidateRM accepts any caller-built value.
+// The walk's visit record stops a cycle through a pointer
+// ([rmFloorWalker.walk]); this bound stops a graph that is merely too deep,
+// rather than overflowing the stack. The deepest legitimate RM nesting is
+// far below it.
 const maxWalkDepth = 256
 
 // ValidateRM validates root against the openEHR Reference Model alone:
@@ -70,6 +73,14 @@ const maxWalkDepth = 256
 // classes (TRANSLATION_DETAILS, RESOURCE_DESCRIPTION_ITEM) are not checked,
 // even on such a value passed as root, an ORIGINAL_VERSION included; nor are
 // those of EXTRACT_PARTICIPATION, a class the SDK's RM types leave out.
+//
+// The floor visits each value once. A value built in Go may hold a pointer
+// in two places, or hold itself; a decoded document holds neither. A value
+// reached again by another path is not walked a second time, so its issues
+// carry the first path only, and a value reached again inside itself is
+// reported as `cyclic_value` at each path where it recurs and is not
+// descended into. A graph nested deeper than the walk's limit stops there,
+// with `max_depth`.
 //
 // A nil root surfaces a single `nil_root` issue and is reported as
 // not-OK. An unknown RM root type (a Go value outside the closed RM
@@ -172,12 +183,19 @@ func ValidateRMDemographic(party rm.Party) Result {
 
 // rmFloorWalker accumulates issues as it descends the RM graph driven
 // by rminfo. There is no notion of "OPT-declared attribute" here —
-// every BMM-known attribute is a descend candidate. Recursion depth is
-// bounded by maxWalkDepth so a pathological cyclic in-memory graph
-// terminates instead of overflowing the stack.
+// every BMM-known attribute is a descend candidate. Each value with an
+// identity is visited once ([rmFloorWalker.walk]), and recursion depth is
+// bounded by maxWalkDepth, so a caller-built graph that shares or cycles
+// through a pointer, or nests too deep, terminates instead of branching
+// without end or overflowing the stack.
 type rmFloorWalker struct {
 	info   rminfo.Lookup
 	issues []Issue
+	// reached holds each value with an identity ([hasIdentity]) the walk has
+	// reached; walk allocates it. inside holds those the walk is inside,
+	// outermost first.
+	reached map[any]struct{}
+	inside  []any
 	// names gives the name the OPT pins on the node an item binds to, so
 	// the floor writes an item's path as the template walk does
 	// ([itemPaths]). The floor on its own binds no OPT node, so it leaves
@@ -220,6 +238,47 @@ func (w *rmFloorWalker) emit(i Issue) {
 }
 
 // walk descends value (of declared BMM type rmType, in role role) at the
+// given issue path, once per value. A value with an identity
+// ([hasIdentity]) that the walk is inside, reached again, is a cycle:
+// walk reports `cyclic_value` at path and does not descend. One the walk
+// has finished, reached again by another path, is shared: walk leaves it,
+// so its issues carry the first path only. Every other value is visited.
+func (w *rmFloorWalker) walk(value any, rmType string, path string, role floorRole, depth int) {
+	if value == nil || rmread.IsTypedNilPointer(value) {
+		return
+	}
+	if !hasIdentity(value) {
+		w.visit(value, rmType, path, role, depth)
+		return
+	}
+	if w.reached == nil {
+		// Sized for a small composition, so the common walk grows them
+		// rarely.
+		w.reached = make(map[any]struct{}, 64)
+		w.inside = make([]any, 0, 16)
+	}
+	// One map operation records value and tells whether it was there: the
+	// set grows only for a value reached for the first time.
+	before := len(w.reached)
+	w.reached[value] = struct{}{}
+	if len(w.reached) == before {
+		// The inside list is searched only for a value reached again, which
+		// a decoded document never holds.
+		if slices.Contains(w.inside, value) {
+			w.emit(Issue{
+				Path:   path,
+				Code:   "cyclic_value",
+				Detail: fmt.Sprintf("RM-floor walk reached this %s again inside itself; it is not descended into again", rmType),
+			})
+		}
+		return
+	}
+	w.inside = append(w.inside, value)
+	w.visit(value, rmType, path, role, depth)
+	w.inside = w.inside[:len(w.inside)-1]
+}
+
+// visit checks value (of declared BMM type rmType, in role role) at the
 // given issue path. It first runs the per-type invariants on the current
 // node, then, for types the floor handles (see [rmread.Handles]), iterates
 // every BMM-known attribute, emitting `required` for any RM-mandatory
@@ -237,10 +296,7 @@ func (w *rmFloorWalker) emit(i Issue) {
 // same gate stops descent into a flattened scalar a reader surfaces
 // directly: CODE_PHRASE.terminology_id comes back as a Go string, which is
 // not an RM node to walk.
-func (w *rmFloorWalker) walk(value any, rmType string, path string, role floorRole, depth int) {
-	if value == nil || rmread.IsTypedNilPointer(value) {
-		return
-	}
+func (w *rmFloorWalker) visit(value any, rmType string, path string, role floorRole, depth int) {
 	w.checkInvariants(value, rmType, path, role)
 	// The coded invariants (REQ-112) run as their own pass rather than as
 	// checkInvariants arms: that switch stops at its first match, and a
