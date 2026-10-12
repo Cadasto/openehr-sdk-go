@@ -147,6 +147,7 @@ requirements:
       - internal/bmmgen/render_jsonhooks_test.go
       - internal/reflect_guard_test.go
       - internal/rmjsonwalk/root_internal_test.go
+      - openehr/serialize/simplified/interval_unbounded_test.go
 
   - id: REQ-025
     title: Error wrapping
@@ -1481,6 +1482,7 @@ requirements:
       - openehr/validation/rmfloor_identity_internal_test.go
       - openehr/validation/rmfloor_interval_flags_test.go
       - openehr/validation/rmfloor_ism_transition_test.go
+      - openehr/validation/rmfloor_limit_internal_test.go
       - openehr/validation/rmfloor_ordered_test.go
       - openehr/validation/rmfloor_party_proxy_test.go
       - openehr/validation/rmfloor_party_ref_test.go
@@ -2027,11 +2029,15 @@ requirements:
       - internal/bmmgen/render_interval_bound_test.go
       - openehr/rm/interval_closed_test.go
       - openehr/serialize/canjson/interval_flag_defaults_test.go
+      - openehr/serialize/canjson/interval_unbounded_bound_test.go
       - openehr/serialize/canjson/roundtrip_test.go
       - openehr/serialize/canjson/unmatched_test.go
       - openehr/serialize/canxml/interval_flag_defaults_test.go
+      - openehr/serialize/canxml/interval_unbounded_bound_test.go
       - openehr/serialize/canxml/unmatched_test.go
+      - openehr/serialize/simplified/interval_unbounded_test.go
       - openehr/serialize/simplified/rmattr_repeating_test.go
+      - openehr/serialize/simplified/rmattr_value_test.go
       - openehr/template/interval_flags_test.go
       - testkit/expectedform/expectedform_test.go
       - testkit/probes/serialize/probe_030_guard_internal_test.go
