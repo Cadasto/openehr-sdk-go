@@ -8,6 +8,7 @@ Leftovers of merged branches: suggestions, and findings the maintainer deferred 
 
 ## Unsorted
 - important · openehr/serialize/canxml/decode.go:201 · canxml.Unmarshal accepts non-whitespace text, a CDATA section or extra DOCTYPEs before the root element in every mode, strict included, because encoding/xml skips every token before the first start element; the mirror of the after-root rule REQ-056 now states. · evidence: canxml worker probe after 434fa259; maintainer chose to leave it for the backlog · by: sdd-implementer · from: feat/decode-validation
+- openehr/rm/resource_gen.go:28 · tracked in #257: canjson writes null for an absent mandatory list, map or reference instead of omitting it
 
 ## Template validation: false rm_type_mismatch and paths (REQ-102)
 Code in openehr/validation/walk_composition.go, one delivery with a test per row; the keyword lead is its spec half.
