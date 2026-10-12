@@ -96,7 +96,10 @@ Concretely:
   does not declare), a suffix outside the suffix set of its datatype or family (e.g. a
   `\|unitt` typo, the derived bare magnitude of a DV_PROPORTION), and a `ctx/` field the codec
   does not read. A STRUCTURED member whose name resolves nothing the decode reads is unmatched
-  whatever the JSON shape of its value, and is reported as that member. It is **ignored by
+  whatever the JSON shape of its value, and is reported as that member; under a Web Template
+  leaf that is any member but a suffix, the bare `"\|"` member, a sub-path of the leaf's grammar
+  (an interval's `lower` and `upper`, a party's `relationship` and `_identifier`) and an
+  underscore family the leaf's owner carries. It is **ignored by
   default**: the decode carries on, and the value holds what the input says without it, exactly as
   if the input had left those keys out (structural checks such as a dense `:index` sequence
   included). It never reaches the value anywhere.
@@ -131,7 +134,9 @@ Concretely:
   reads that disagree (including a key and the same key ending in a bare `\|`, the empty suffix
   that spells the bare value: refused with `ErrUnknownPath` unless their values are equal, when
   the value is read once; a lone `x\|` reads as `x`; two spellings of a key the decode does not
-  read are two unmatched keys, each reported as written, whatever their values),
+  read are two unmatched keys, each reported as written, whatever their values; inside a
+  `_feeder_audit` the index-less spelling of a sub-path segment and its `:0` name one slot and
+  merge, under the same rule for a key spelled under both),
   a key that walks
   through one of several reused siblings, and an out-of-bound, over-budget or sparse `:index`.
   Trailing JSON after the object is rejected too. A key is judged segment by segment from the

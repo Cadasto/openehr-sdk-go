@@ -1869,16 +1869,11 @@ func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g 
 	if err != nil {
 		return err
 	}
-	// A party leaf is single-valued at every position the reference spells one,
-	// so `:0` is the interconversion's explicit-index spelling and anything
-	// higher addresses a list slot the RM attribute does not have. A DV_INTERVAL
-	// leaf's index belongs to the ELEMENT the Web Template folded away, which
-	// may repeat: resolveLeaf judges it as it judges any other leaf's, and the
-	// placement reads it.
-	if g.index > 0 && isPartyLeafType(compositeLeafRMType(wt, pk.segs, ambiguous)) {
-		return fmt.Errorf("%w: %q (%s addresses a single-valued RM attribute, not an indexed list)",
-			ErrUnknownPath, g.prefix(), g.family)
-	}
+	// resolveLeaf judges the leaf's own index as it judges any other leaf's:
+	// a party leaf stands on a single-valued RM attribute, so `:0` is the
+	// interconversion's explicit-index spelling and anything higher is refused;
+	// a DV_INTERVAL leaf's index belongs to the ELEMENT the Web Template folded
+	// away, which may repeat, and the placement reads it.
 	node, predIndex, predType, err := resolveLeaf(wt, pk.segs, ambiguous)
 	if err != nil {
 		// splitCompositeLeafKey resolved this path already, so the only ways
@@ -1902,19 +1897,6 @@ func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g 
 		return fmt.Errorf("simplified: place %q: %w", g.prefix(), err)
 	}
 	return nil
-}
-
-// compositeLeafRMType is the RM type of the composite leaf segs addresses, read
-// without judging the leaf segment's own index; "" where the path does not
-// resolve.
-func compositeLeafRMType(wt *webtemplate.WebTemplate, segs []flatSeg, ambiguous map[string]bool) string {
-	leaf := slices.Clone(segs)
-	leaf[len(leaf)-1].idx = -1
-	node, _, _, err := resolveLeaf(wt, leaf, ambiguous)
-	if err != nil {
-		return ""
-	}
-	return nodeRMType(node)
 }
 
 // compositeLeafValue decodes a composite leaf's group by its RM type: the party

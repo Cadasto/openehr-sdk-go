@@ -458,24 +458,45 @@ func decodeRMAttrGroups(compJSON map[string]any, wt *webtemplate.WebTemplate, gr
 // nothing at this owner hands every key of g to the sink and returns
 // [errNothingMatched]; a deferred family the owner declares is refused.
 func rmattrFamilyAt(owner rmattrOwner, g rmattrGroup) (rmattrFamily, string, error) {
-	fam, known := rmattrFamilies[g.family]
-	if !known {
-		if attr, deferred := rmattrDeferredFamilies[g.family]; deferred {
-			if _, declared := rminfo.Default.AttributeRMType(bmmtype.Class(owner.kind), attr); declared {
-				return rmattrFamily{}, "", fmt.Errorf("%w: %q addresses %s.%s, which this codec defers: the reference's suffix set gives it no channel, so it is refused rather than dropped (REQ-140, see deviations.md)",
-					ErrUnknownPath, g.prefix(), owner.kind, attr)
-			}
-		}
+	if rmattrDeferredAt(owner.kind, g.family) {
+		return rmattrFamily{}, "", fmt.Errorf("%w: %q addresses %s.%s, which this codec defers: the reference's suffix set gives it no channel, so it is refused rather than dropped (REQ-140, see deviations.md)",
+			ErrUnknownPath, g.prefix(), owner.kind, rmattrDeferredFamilies[g.family])
+	}
+	fam, judged, read := rmattrFamilyOf(owner.kind, owner.leaf, g.family)
+	if !read {
 		g.dropAll()
 		return rmattrFamily{}, "", errNothingMatched
 	}
+	return fam, judged, nil
+}
+
+// rmattrDeferredAt reports whether family is one of [rmattrDeferredFamilies]
+// and an owner of RM class kind declares the attribute it addresses.
+func rmattrDeferredAt(kind, family string) bool {
+	attr, deferred := rmattrDeferredFamilies[family]
+	if !deferred {
+		return false
+	}
+	_, declared := rminfo.Default.AttributeRMType(bmmtype.Class(kind), attr)
+	return declared
+}
+
+// rmattrFamilyOf returns the family the decode reads under family at an owner
+// of RM class kind, and the class it is judged against. leaf is the datatype
+// a collapsed ELEMENT owner holds, "" for any other owner. read is false where
+// the family names nothing there.
+func rmattrFamilyOf(kind, leaf, family string) (fam rmattrFamily, judged string, read bool) {
+	fam, known := rmattrFamilies[family]
+	if !known {
+		return rmattrFamily{}, "", false
+	}
 	// A value-decoration family is judged against the leaf datatype, not the
-	// ELEMENT that holds it (both answer to the same FLAT path). owner.leaf is ""
-	// for every owner that is not a collapsed leaf, which declares nothing — so
+	// ELEMENT that holds it (both answer to the same FLAT path). leaf is "" for
+	// every owner that is not a collapsed leaf, which declares nothing — so
 	// `_normal_range` on a SECTION is unmatched by this one check.
-	judged := owner.kind
+	judged = kind
 	if fam.value {
-		judged = owner.leaf
+		judged = leaf
 	}
 	// rminfo knows each class by its bare BMM name, and a leaf datatype from the
 	// Web Template may be a generic instantiation (DV_INTERVAL<DV_QUANTITY>).
@@ -486,10 +507,9 @@ func rmattrFamilyAt(owner rmattrOwner, g rmattrGroup) (rmattrFamily, string, err
 	// rides the scalar `|accuracy` suffix instead (see [rmattrFamily.attrType]):
 	// the family names nothing here either.
 	if !declared || (fam.attrType != "" && declaredType != fam.attrType) {
-		g.dropAll()
-		return rmattrFamily{}, "", errNothingMatched
+		return rmattrFamily{}, "", false
 	}
-	return fam, judged, nil
+	return fam, judged, true
 }
 
 // placeRMAttr writes one decoded family instance onto its owner, materialising

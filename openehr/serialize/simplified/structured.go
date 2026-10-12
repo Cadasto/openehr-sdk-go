@@ -269,9 +269,9 @@ func structuredToFlat(s map[string]any) (map[string]any, error) {
 //
 // Members are judged where the Web Template tells what resolves: the top-level
 // members (the template root and `ctx`), the fields of `ctx`, and the members
-// of an object at a Web Template node that has children. Below a leaf, an
-// underscore family or any other name kept for the FLAT decode, members are
-// flattened as they stand and the FLAT decode judges their keys.
+// of an object at a Web Template node, a leaf included. Below a member of a
+// leaf, an underscore family or any other name kept for the FLAT decode,
+// members are flattened as they stand and the FLAT decode judges their keys.
 func structuredToFlatJudged(s map[string]any, wt *webtemplate.WebTemplate) (map[string]any, []string, error) {
 	w := structuredWalker{out: make(map[string]any), wt: wt}
 	for rootID, v := range s {
@@ -365,7 +365,7 @@ func (w *structuredWalker) ctx(obj map[string]any) error {
 // or |-prefixed leaf suffixes, accumulating FLAT entries under path. member is
 // the object's member path and rel the Web Template ids below the root that
 // reach it. node is the Web Template node the object stands for where its
-// members are judged ([structuredWalker.unmatched]), and nil where they are
+// members are judged ([structuredMemberUnmatched]), and nil where they are
 // not. An element that contributes no FLAT entry at all ("{}", or an object
 // holding only empty arrays) would vanish from the conversion — it is an
 // error, per the fail-loud posture — unless what it held was set aside as
@@ -393,13 +393,11 @@ func (w *structuredWalker) walk(path, member, rel string, node *webtemplate.Node
 		if !ok {
 			return fmt.Errorf("%w: structured: expected an array at %q, got %T", ErrUnknownPath, path+"/"+k, v)
 		}
-		// Members are judged again only below a child of node that has
-		// children of its own.
+		// Members are judged again below a Web Template child of node, a leaf
+		// included, and nowhere below a leaf.
 		var child *webtemplate.Node
-		if node != nil {
-			if c := childByID(node, k); c != nil && len(c.Children) > 0 {
-				child = c
-			}
+		if node != nil && len(node.Children) > 0 {
+			child = childByID(node, k)
 		}
 		childRel := strings.TrimPrefix(rel+"/"+k, "/")
 		for i, el := range arr {
@@ -424,14 +422,23 @@ func (w *structuredWalker) walk(path, member, rel string, node *webtemplate.Node
 }
 
 // structuredMemberUnmatched reports whether member name of an object at the
-// Web Template node node, which has children, resolves nothing the decode
-// reads: no child of node, no underscore family, no metadata spelling below
-// the root (rel is node's ids below the root) and no reference spelling the
-// decode refuses (REQ-170). Such a member is unmatched content whatever the
-// JSON shape of its value. A name carrying a `:`, `/` or `|` is left to the
-// FLAT decode, which judges the key it makes.
+// Web Template node node resolves nothing the decode reads (REQ-170). Such a
+// member is unmatched content whatever the JSON shape of its value. A name
+// carrying a `:`, `/` or `|` is left to the FLAT decode, which judges the key
+// it makes.
+//
+// At a node with children the decode reads a child of node, an underscore
+// family, a metadata spelling below the root (rel is node's ids below the
+// root) and a reference spelling it refuses. At a leaf it reads what the
+// leaf's own grammar reads ([structuredLeafReads]).
 func structuredMemberUnmatched(node *webtemplate.Node, rel, name string) bool {
-	if strings.ContainsAny(name, ":/|") || childByID(node, name) != nil {
+	if strings.ContainsAny(name, ":/|") {
+		return false
+	}
+	if len(node.Children) == 0 {
+		return !structuredLeafReads(node, name)
+	}
+	if childByID(node, name) != nil {
 		return false
 	}
 	rmType := nodeRMType(node)
@@ -448,4 +455,32 @@ func structuredMemberUnmatched(node *webtemplate.Node, rel, name string) bool {
 		return false
 	}
 	return true
+}
+
+// structuredLeafReads reports whether the decode reads member name of an
+// element of the Web Template leaf: a sub-path of the leaf's grammar (an
+// interval's `lower` and `upper`, a party's `relationship` and `_identifier`)
+// or an underscore family the leaf's owner carries. A collapsed ELEMENT leaf
+// owns the families of its ELEMENT and, for a value family, of the datatype
+// it holds (REQ-140); a leaf on any other attribute owns none, as
+// [rmattrOwnerAt] resolves no owner for it. Suffix members are judged before
+// this, and an unparameterised DV_INTERVAL reads no sub-path.
+func structuredLeafReads(leaf *webtemplate.Node, name string) bool {
+	rmType := nodeRMType(leaf)
+	switch {
+	case isIntervalLeafType(rmType) && intervalSubTails[name]:
+		return true
+	case isPartyLeafType(rmType) && (partySubTails[name] || partyListTails[name]):
+		return true
+	case !strings.HasPrefix(name, "_"):
+		return false
+	}
+	if !strings.HasSuffix(bareAQLPath(leaf.AQLPath), "/value") {
+		return false
+	}
+	if rmattrDeferredAt("ELEMENT", name) {
+		return true
+	}
+	_, _, read := rmattrFamilyOf("ELEMENT", rmType, name)
+	return read
 }

@@ -6,6 +6,7 @@ package simplified
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1467,4 +1468,159 @@ func twoReusedObservationWT() *webtemplate.WebTemplate {
 		ID: "root", RMType: "COMPOSITION", NodeID: "openEHR-EHR-COMPOSITION.t.v1",
 		Children: []*webtemplate.Node{obs("a", "A"), obs("b", "B")},
 	}}
+}
+
+// TestREQ170FeederAuditSlotSpellingsMerge — REQ-170 / REQ-053. Inside a
+// `_feeder_audit`, the index-less spelling of a sub-path segment and its `:0`
+// name one slot, so their keys merge into one instance and each key keeps the
+// spelling it was written in. A key under both spellings that the decode does
+// not read is two unmatched keys, reported as written; two spellings of one
+// field it reads must agree, judged after the decode: the same value is read
+// once, and differing values are refused in every mode, naming both keys.
+func TestREQ170FeederAuditSlotSpellingsMerge(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	const audit = rmattrObs + "/_feeder_audit/originating_system_audit"
+
+	t.Run("the two spellings of one slot merge", func(t *testing.T) {
+		merged := decodeRMAttr(t, wt, rmattrBody(map[string]any{
+			audit + "|system_id":    "orig",
+			audit + ":0|version_id": "v1",
+		}))
+		one := decodeRMAttr(t, wt, rmattrBody(map[string]any{
+			audit + "|system_id":  "orig",
+			audit + "|version_id": "v1",
+		}))
+		if !bytes.Equal(canonical(t, merged), canonical(t, one)) {
+			t.Errorf("the two slot spellings decode differently from one:\n got %s\nwant %s", canonical(t, merged), canonical(t, one))
+		}
+	})
+
+	t.Run("an unread key under both spellings is two unmatched keys", func(t *testing.T) {
+		body := rmattrBody(map[string]any{
+			audit + "|system_id":     "orig",
+			audit + "/x_unknown|a":   "1",
+			audit + ":0/x_unknown|a": "2",
+		})
+		assertUnmatched(t, wt, body, audit+"/x_unknown|a", audit+":0/x_unknown|a")
+	})
+
+	t.Run("a read field under both spellings must agree", func(t *testing.T) {
+		same := decodeRMAttr(t, wt, rmattrBody(map[string]any{audit + "|system_id": "orig", audit + ":0|system_id": "orig"}))
+		one := decodeRMAttr(t, wt, rmattrBody(map[string]any{audit + "|system_id": "orig"}))
+		if !bytes.Equal(canonical(t, same), canonical(t, one)) {
+			t.Error("two equal spellings of system_id decode differently from one")
+		}
+		const secret = "secret-value-0451"
+		err := refusedInEveryMode(t, wt, rmattrBody(map[string]any{audit + "|system_id": "orig", audit + ":0|system_id": secret}))
+		if !errors.Is(err, ErrUnsupportedDatatype) {
+			t.Errorf("err = %v, want ErrUnsupportedDatatype", err)
+		}
+		for _, k := range []string{audit + "|system_id", audit + ":0|system_id"} {
+			if !strings.Contains(err.Error(), strconv.Quote(k)) {
+				t.Errorf("err = %v, want it to name %q", err, k)
+			}
+		}
+		if strings.Contains(err.Error(), secret) {
+			t.Errorf("err = %v carries a value", err)
+		}
+	})
+}
+
+// TestREQ170StructuredLeafMembersByName — REQ-170. Under a Web Template leaf
+// a member is read when it is a suffix, the bare `"|"` member, a sub-path of
+// the leaf's grammar (an interval's `lower` and `upper`, a party's
+// `relationship` and `_identifier`) or an underscore family the leaf's owner
+// carries (REQ-140). Any other member is unmatched content whatever its value
+// holds: skipped by default, reported by its member path, refused under
+// strict. A member the leaf reads keeps the shape refusal, in every mode.
+func TestREQ170StructuredLeafMembersByName(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	const secret = "secret-value-0451"
+	const intervalTime = "2022-01-12T09:00:11.7842493+01:00"
+	interval := map[string]any{
+		rmattrIntervalEvent + "/time":       intervalTime,
+		rmattrInterval + "/lower|magnitude": 1.0, rmattrInterval + "/lower|unit": "Unit",
+		rmattrInterval + "/upper|magnitude": 2.0, rmattrInterval + "/upper|unit": "Unit",
+	}
+	party := map[string]any{
+		rmattrObs + "/subject|name":                     "Silvia Blake",
+		rmattrObs + "/subject/relationship|code":        "10",
+		rmattrObs + "/subject/relationship|terminology": "openehr",
+		rmattrObs + "/subject/relationship|value":       "mother",
+	}
+	sectionPath := rmattrRoot + "/conformance_section/0"
+	obsPath := sectionPath + "/conformance_observation/0"
+	quantityPath := obsPath + "/any_event/0/dv_quantity/0"
+	textPath := obsPath + "/any_event/0/dv_text/0"
+	intervalPath := sectionPath + "/conformance_interval/0/any_event/0/interval_dv_quantity/0"
+	subjectPath := obsPath + "/subject/0"
+	// element returns the one element of the leaf at the member path p.
+	element := func(doc map[string]any, p string) map[string]any {
+		segs := strings.Split(strings.TrimPrefix(p, rmattrRoot+"/"), "/")
+		cur := doc[rmattrRoot].(map[string]any)
+		for i := 0; i < len(segs); i += 2 {
+			n, err := strconv.Atoi(segs[i+1])
+			if err != nil {
+				t.Fatalf("fixture: path %q", p)
+			}
+			cur = cur[segs[i]].([]any)[n].(map[string]any)
+		}
+		return cur
+	}
+	for _, tc := range []struct {
+		name  string
+		extra map[string]any
+		leaf  string
+		value any
+		want  string
+	}{
+		{"scalar under a DV_QUANTITY leaf", nil, quantityPath, secret, ""},
+		{"object under a DV_QUANTITY leaf", nil, quantityPath, map[string]any{"y": secret}, ""},
+		{"array under a DV_QUANTITY leaf", nil, quantityPath, []any{secret}, ""},
+		{"scalar under a DV_INTERVAL leaf beside lower", interval, intervalPath, secret, ""},
+		{"object under a party leaf beside relationship", party, subjectPath, map[string]any{"y": secret}, ""},
+		{"unknown _ member under a DV_QUANTITY leaf", nil, quantityPath, secret, "_x_unknown"},
+		{"_normal_range under a DV_TEXT leaf, which has none", map[string]any{rmattrText: "text value", rmattrText + "|formatting": "plain"}, textPath, secret, "_normal_range"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			name := cmp.Or(tc.want, "x_member")
+			ref, doc := structuredDoc(t, rmattrBody(tc.extra))
+			element(doc, tc.leaf)[name] = tc.value
+			assertStructuredUnmatched(t, wt, mustJSON(t, doc), ref, secret, tc.leaf+"/"+name)
+		})
+	}
+
+	// A member the leaf reads keeps the array-shape refusal.
+	for _, tc := range []struct {
+		name  string
+		extra map[string]any
+		leaf  string
+		read  string
+	}{
+		{"interval lower holding a scalar", interval, intervalPath, "lower"},
+		{"party relationship holding a scalar", party, subjectPath, "relationship"},
+		{"party _identifier holding a scalar", party, subjectPath, "_identifier"},
+		{"DV_QUANTITY _normal_range holding a scalar", nil, quantityPath, "_normal_range"},
+	} {
+		t.Run("refused: "+tc.name, func(t *testing.T) {
+			_, doc := structuredDoc(t, rmattrBody(tc.extra))
+			element(doc, tc.leaf)[tc.read] = secret
+			b := mustJSON(t, doc)
+			_, def := UnmarshalStructured(b, wt)
+			if !errors.Is(def, ErrUnknownPath) || !strings.Contains(def.Error(), "expected an array") {
+				t.Fatalf("UnmarshalStructured (default) = %v, want the array-shape refusal", def)
+			}
+			var reported []string
+			_, rep := UnmarshalStructured(b, wt, WithUnmatched(func(p string) { reported = append(reported, p) }))
+			_, strict := UnmarshalStructured(b, wt, WithStrict())
+			for mode, err := range map[string]error{"WithUnmatched": rep, "WithStrict": strict} {
+				if err == nil || err.Error() != def.Error() {
+					t.Errorf("UnmarshalStructured (%s) = %v, want %v", mode, err, def)
+				}
+			}
+			if len(reported) != 0 {
+				t.Errorf("WithUnmatched reported %q on a refused decode", reported)
+			}
+		})
+	}
 }

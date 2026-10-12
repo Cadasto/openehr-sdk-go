@@ -476,6 +476,8 @@ func TestSubjectLeafRefusals(t *testing.T) {
 		keys map[string]any
 		want error
 		name string
+		// says is a further phrase the refusal must carry.
+		says string
 	}{
 		"unknown suffix": {
 			keys: map[string]any{rmattrObs + "/subject|id_typo": "x"},
@@ -491,6 +493,7 @@ func TestSubjectLeafRefusals(t *testing.T) {
 			keys: map[string]any{rmattrObs + "/subject:1|name": "Silvia Blake"},
 			want: ErrUnknownPath,
 			name: rmattrObs + "/subject:1",
+			says: "single-valued RM attribute",
 		},
 		"raw fragment": {
 			keys: map[string]any{rmattrObs + "/subject|raw": map[string]any{"_type": "PARTY_SELF"}},
@@ -502,6 +505,9 @@ func TestSubjectLeafRefusals(t *testing.T) {
 			err := refusalLegs(t, wt, rmattrBody(tc.keys), tc.keys, tc.want)
 			if !strings.Contains(err.Error(), tc.name) {
 				t.Errorf("err = %v, want it to name %q", err, tc.name)
+			}
+			if !strings.Contains(err.Error(), tc.says) {
+				t.Errorf("err = %v, want it to say %q", err, tc.says)
 			}
 		})
 	}

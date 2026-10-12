@@ -85,10 +85,13 @@ var feederAuditDetailsParties = map[string]bool{"location": true, "subject": tru
 // a real FLAT key, and what lets the party and datatype decoders be reused verbatim.
 //
 // The `:index` rules are the ones [checkRMAttrIndexes] applies to a `_family:N`
-// sequence, for the same reasons: bounded by [maxRepeatIndex], no two spellings of
-// one slot, no gaps (a gap would fabricate an empty instance out of a malformed
-// payload). Whether a segment may be a list at all is the caller's judgement — a
-// single-valued segment simply has exactly one instance.
+// sequence, for the same reasons: bounded by [maxRepeatIndex] and no gaps (a gap
+// would fabricate an empty instance out of a malformed payload). The index-less
+// spelling and `:0` name one slot, so their tails merge into one instance; a
+// tail spelled under both is two spellings of one sub-path, judged once the
+// decode knows whether it reads it ([rmattrGroup.settleDups]). Whether a
+// segment may be a list at all is the caller's judgement — a single-valued
+// segment simply has exactly one instance.
 //
 // known names the sub-path segments the level's grammar reads. A tail under any
 // other segment is unmatched content (REQ-170): it goes to the group's sink
@@ -124,18 +127,23 @@ func rmattrChildGroups(g rmattrGroup, known map[string]bool) (map[string]any, ma
 		if bySeg[id] == nil {
 			bySeg[id] = make(map[int]*rmattrGroup)
 		}
+		// The index-less spelling and `:0` are one slot (REQ-053), so their
+		// tails merge into one instance, each keeping the key as written.
 		child := bySeg[id][slot]
 		if child == nil {
 			child = newRMAttrGroup(g.prefix(), id, idx, g.sink)
 			child.dups = g.dups
 			bySeg[id][slot] = child
-		} else if child.index != idx {
-			return nil, nil, fmt.Errorf("%w: %q collides with another spelling of :index %d; remove one",
-				ErrUnknownPath, g.key(tail), slot)
 		}
-		if _, taken := child.tails[remainder]; taken {
-			return nil, nil, fmt.Errorf("%w: %q collides with another spelling of the same sub-path; remove one",
-				ErrUnsupportedDatatype, g.key(tail))
+		if held, taken := child.tails[remainder]; taken {
+			if g.dups == nil {
+				return nil, nil, fmt.Errorf("%w: %q collides with another spelling of the same sub-path; remove one",
+					ErrUnsupportedDatatype, g.key(tail))
+			}
+			// Judged once the decode knows whether it reads the sub-path
+			// ([rmattrGroup.settleDups]).
+			*g.dups = append(*g.dups, tailDup{first: child.key(remainder), second: g.key(tail), firstVal: held, secondVal: val})
+			continue
 		}
 		child.put(remainder, val, g.key(tail))
 	}

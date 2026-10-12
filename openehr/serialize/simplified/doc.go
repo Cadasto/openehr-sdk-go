@@ -29,7 +29,9 @@
 // attribute this codec carries at that node, a suffix outside the suffix set
 // of its datatype or underscore family, and a ctx/ field the codec does not
 // read. A STRUCTURED member whose name resolves nothing the decode reads is
-// unmatched whatever its value holds, and is reported as that member. A key
+// unmatched whatever its value holds, and is reported as that member; under a
+// leaf, the decode reads only suffixes, the bare `"|"` member, the leaf
+// grammar's sub-paths and the underscore families its owner carries. A key
 // the decode reads is never unmatched, even where the decode then
 // refuses it: the composer's `external_ref` suffixes and party sub-structure,
 // a PARTICIPATION `time`, a FEEDER_AUDIT_DETAILS `other_details`,
