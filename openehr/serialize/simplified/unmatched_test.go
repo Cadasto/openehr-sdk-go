@@ -633,6 +633,11 @@ func TestREQ170IsmTransitionReferenceKeysRefusedInEveryMode(t *testing.T) {
 			if strings.Contains(err.Error(), secret) {
 				t.Errorf("err = %v carries the key's value", err)
 			}
+			// REQ-140 names an ACTION's ISM transition and time among its
+			// out-of-scope classes.
+			if !strings.Contains(err.Error(), "(REQ-140,") {
+				t.Errorf("err = %v, want it to cite REQ-140", err)
+			}
 		})
 	}
 	// Any other key the Web Template does not resolve under those nodes is
@@ -862,12 +867,15 @@ func TestREQ170RawDecorationIgnoresUnmatchedKey(t *testing.T) {
 	}
 }
 
-// TestREQ170UnmappedLeafSplitsRefusedFromUnmatched — REQ-170. A leaf whose
-// datatype has no suffix set resolves but carries nothing but `|raw`: its bare
-// value, and a suffix naming something the datatype has, are refused in every
-// mode, and any other suffix or sub-path is unmatched content. For the
-// composer's PARTY_PROXY that is the party grammar's suffixes and
-// sub-structure; for any other unmapped datatype, an attribute of its RM class.
+// TestREQ170UnmappedLeafSplitsRefusedFromUnmatched — REQ-170, which refuses in
+// every mode, "at a leaf whose datatype has neither a suffix set nor a sub-path
+// grammar (the composer's PARTY_PROXY among them), its bare value and a suffix
+// that names an attribute of its RM class". Such a leaf carries nothing but
+// `|raw`; any other suffix or sub-path is unmatched content. For the composer
+// that is the party grammar's suffixes and sub-structure; for any other such
+// datatype, an attribute of its RM class, refused with ErrUnsupportedDatatype
+// as the other carrier-less keys at a leaf are. An unparameterised
+// `DV_INTERVAL` leaf has a sub-path grammar, so the rule does not reach it.
 func TestREQ170UnmappedLeafSplitsRefusedFromUnmatched(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	t.Run("composer suffix the party grammar lacks, beside a name", func(t *testing.T) {
@@ -906,6 +914,20 @@ func TestREQ170UnmappedLeafSplitsRefusedFromUnmatched(t *testing.T) {
 		body := maps.Clone(ctx)
 		body["root/state|x_note"] = "x"
 		assertUnmatched(t, state, body, "root/state|x_note")
+	})
+
+	interval := &webtemplate.WebTemplate{Tree: &webtemplate.Node{
+		ID: "root", RMType: "COMPOSITION", NodeID: "openEHR-EHR-COMPOSITION.t.v1",
+		Children: []*webtemplate.Node{{
+			ID: "range", RMType: "DV_INTERVAL", NodeID: "at0002", Max: 1,
+			AQLPath: "/context/other_context[at0001]/items[at0002]/value",
+		}},
+	}}
+	t.Run("an unparameterised DV_INTERVAL leaf has a sub-path grammar", func(t *testing.T) {
+		body := maps.Clone(ctx)
+		body["root/range|lower_unbounded"] = true
+		body["root/range"] = "x"
+		assertUnmatched(t, interval, body, "root/range", "root/range|lower_unbounded")
 	})
 }
 
@@ -961,6 +983,10 @@ func TestREQ170IntervalEventAndObservationAttrsRefused(t *testing.T) {
 			if !errors.Is(err, ErrUnknownPath) || !strings.Contains(err.Error(), strconv.Quote(tc.names)) {
 				t.Errorf("err = %v, want ErrUnknownPath naming %q", err, tc.names)
 			}
+			// REQ-170 binds these attributes; REQ-140 does not name them.
+			if !strings.Contains(err.Error(), "(REQ-170,") || strings.Contains(err.Error(), "REQ-140") {
+				t.Errorf("err = %v, want it to cite REQ-170 and not REQ-140", err)
+			}
 			if strings.Contains(err.Error(), secret) {
 				t.Errorf("err = %v carries the key's value", err)
 			}
@@ -972,6 +998,17 @@ func TestREQ170IntervalEventAndObservationAttrsRefused(t *testing.T) {
 			assertUnmatched(t, wt, rmattrBody(map[string]any{key: "x"}), key)
 		})
 	}
+	// A key that walks through one of several reused siblings is left to the
+	// refusal that path gets, before any in-context rule could name it.
+	t.Run("keys under a reused sibling", func(t *testing.T) {
+		reused := twoReusedObservationWT()
+		for _, key := range []string{"root/a/history_origin", "root/a/any_event:0/width"} {
+			err := refusedInEveryMode(t, reused, map[string]any{"ctx/language": "en", "ctx/territory": "NL", key: "x"})
+			if !errors.Is(err, ErrUnknownPath) || !strings.Contains(err.Error(), "reused siblings") {
+				t.Errorf("%s: err = %v, want the reused-siblings refusal", key, err)
+			}
+		}
+	})
 	t.Run("width decodes where the Web Template models it", func(t *testing.T) {
 		interval := withIntervalEventWidth(t, wt)
 		body := rmattrBody(map[string]any{rmattrEvent + "/width": "PT1H"})
@@ -1013,4 +1050,24 @@ func withIntervalEventWidth(t *testing.T, wt *webtemplate.WebTemplate) *webtempl
 		ID: "width", RMType: "DV_DURATION", Max: 1, AQLPath: node.AQLPath + "/width",
 	})
 	return &out
+}
+
+// twoReusedObservationWT is a minimal Web Template with two reused OBSERVATION
+// siblings — one archetype id, distinct pinned names 'A'/'B' — each holding an
+// EVENT, the shape [twoSiblingWT] gives EVALUATIONs.
+func twoReusedObservationWT() *webtemplate.WebTemplate {
+	obs := func(id, pin string) *webtemplate.Node {
+		base := "/content[openEHR-EHR-OBSERVATION.test.v1,'" + pin + "']"
+		return &webtemplate.Node{
+			ID: id, RMType: "OBSERVATION", NodeID: "openEHR-EHR-OBSERVATION.test.v1", Max: 1, AQLPath: base,
+			Children: []*webtemplate.Node{{
+				ID: "any_event", RMType: "EVENT", NodeID: "at0002", Max: -1,
+				AQLPath: base + "/data[at0001]/events[at0002]",
+			}},
+		}
+	}
+	return &webtemplate.WebTemplate{Tree: &webtemplate.Node{
+		ID: "root", RMType: "COMPOSITION", NodeID: "openEHR-EHR-COMPOSITION.t.v1",
+		Children: []*webtemplate.Node{obs("a", "A"), obs("b", "B")},
+	}}
 }

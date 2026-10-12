@@ -109,8 +109,11 @@ Concretely:
   the REQ-140 deliberate exclusions — and an ACTION's ISM transition and time, an INTERVAL_EVENT's
   `math_function`, `width` and `sample_count` and an OBSERVATION's `history_origin` in the
   reference's in-context spelling, the ISM transition note above), the bare value of a leaf whose
-  datatype has no suffix set and a suffix naming something that datatype has (an attribute of its RM
-  class, or for the composer a suffix of the party grammar; any other suffix there is unmatched),
+  datatype has neither a suffix set nor a sub-path grammar (in practice the composer's
+  PARTY_PROXY) and a suffix naming something that datatype has (an attribute of its RM class, or
+  for the composer a suffix of the party grammar; any other suffix there is unmatched, and so is
+  every key but `\|raw` at an unparameterised `DV_INTERVAL` leaf, whose interval grammar has no
+  bound datatype to read with),
   a suffix of `language`, `territory`, `context/setting` or `context/start_time` that the leaf's
   datatype has but its `ctx/` form cannot carry (`ErrUnsupportedDatatype` naming the key and the
   `ctx/` form), and malformed matched content. That is a misused `\|raw`/`\|other` or a `\|other`

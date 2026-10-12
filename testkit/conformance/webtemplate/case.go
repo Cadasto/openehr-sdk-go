@@ -167,9 +167,9 @@ var contextMetaLeaves = map[string]bool{
 // does: a metadata path whose segments carry `:0` (`<root>/language:0|code`,
 // `<root>:0/composer:0|name`, `<root>/context:0/start_time:0`, the spelling
 // OPT-free STRUCTURED → FLAT conversion writes) is the same real path as the
-// unindexed one, the template root's own segment included (REQ-053). Any other
-// index is refused by the codec, so it is not held out: it reaches decode and
-// is counted there.
+// unindexed one, the template root's own segment included, as the codec reads
+// it. Any other index is refused by the codec, so it is not held out: it
+// reaches decode and is counted there.
 //
 // This creates an asymmetry on the emitted side: the `ctx/` prefix test is
 // unbounded, so every ctx/ key the encoder writes is skipped and a bogus one
@@ -209,7 +209,7 @@ func IsCompositionMeta(key, root string) bool {
 
 // zeroIndex is the one index a composition metadata segment takes. Each such
 // segment is a single-valued RM attribute, so the codec reads `:0` as no index
-// at all and refuses any other (REQ-053).
+// at all and refuses any other.
 const zeroIndex = ":0"
 
 // unindexedSpelling drops a `:0` index from every segment of a root-relative

@@ -89,8 +89,8 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `/content/0/data/events/2/archetype_node_id`: reference `"at0003"`, ours `"at0026"`
   - `/content/0/data/events/2/data/items/0/value/magnitude`: reference `60`, ours `30`
 - Reducing decode removed 4 keys from the upstream FLAT:
-  - 3: `simplified: path not in web template: "<key>" is the reference's in-context spelling of an INTERVAL_EVENT's math_function, which the Web Template this SDK builds does not model - refused rather than dropped or replaced (REQ-140, see deviations.md)`
-  - 1: `simplified: path not in web template: "<key>" is the reference's in-context spelling of an INTERVAL_EVENT's width, which the Web Template this SDK builds does not model - refused rather than dropped or replaced (REQ-140, see deviations.md)`
+  - 3: `simplified: path not in web template: "<key>" is the reference's in-context spelling of an INTERVAL_EVENT's math_function, which the Web Template this SDK builds does not model - refused rather than dropped or replaced (REQ-170, see deviations.md)`
+  - 1: `simplified: path not in web template: "<key>" is the reference's in-context spelling of an INTERVAL_EVENT's width, which the Web Template this SDK builds does not model - refused rather than dropped or replaced (REQ-170, see deviations.md)`
 
 ## consult_record
 

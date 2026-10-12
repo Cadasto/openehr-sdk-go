@@ -39,7 +39,8 @@
 // INTERVAL_EVENT's `math_function`, `width` and `sample_count` and an
 // OBSERVATION's `history_origin` (a leaf under the node or a suffix on it),
 // which name RM data decode would otherwise drop or replace. A leaf whose
-// datatype has no suffix set refuses its bare value and any suffix naming an
+// datatype has neither a suffix set nor a sub-path grammar, in practice the
+// composer's PARTY_PROXY, refuses its bare value and any suffix naming an
 // attribute of its RM class (for the composer, a suffix of the party grammar).
 // So does malformed content: a value of the wrong shape, a missing required
 // suffix, two spellings of one field that disagree (such as `x` and `x|`), an

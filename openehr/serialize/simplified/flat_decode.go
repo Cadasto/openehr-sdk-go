@@ -281,15 +281,22 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 //
 //   - A node with children is structure, not a value: the decode reads a |raw
 //     fragment there and nothing else, so every other key is unmatched (an
-//     INTERVAL_EVENT `|sample_count` the Web Template has no node for, say).
+//     extension suffix such as `|x_note`, say). The RM attributes the reference
+//     spells as a suffix on such a node never get here: [refuseInContextKeys]
+//     refuses them first.
 //   - A leaf whose datatype has a suffix set keeps the suffixes in that set
 //     ([leafSuffixMatched]); the rest are unmatched.
-//   - A leaf whose datatype has no suffix set resolves but has no carrier
-//     other than |raw, the composer's PARTY_PROXY among them. Its bare value,
-//     and a suffix that names something the datatype has, are refused in every
-//     mode, naming the first such key: an attribute of its RM class, or for a
-//     party the party grammar's suffixes (the composer's `external_ref` among
-//     them). Any other suffix is unmatched.
+//   - A leaf whose datatype has neither a suffix set nor a sub-path grammar
+//     resolves but has no carrier other than |raw: in practice the composer's
+//     PARTY_PROXY, whose party grammar the ctx/ forms own. Its bare value, and
+//     a suffix that names something the datatype has, are refused in every
+//     mode with ErrUnsupportedDatatype, as the other carrier-less keys at a
+//     leaf are, naming the first such key: an attribute of its RM class, or
+//     for a party the party grammar's suffixes (the composer's `external_ref`
+//     among them). Any other suffix is unmatched (REQ-170).
+//   - An unparameterised `DV_INTERVAL` leaf has a sub-path grammar, the
+//     interval grammar, but names no bound datatype to read it with, so it
+//     reads its |raw fragment alone; every other key is unmatched.
 func leafSuffixes(leaf *webtemplate.Node, sfx map[string]any, keyOf func(string) string, sink *unmatchedSink) (map[string]any, error) {
 	if len(leaf.Children) > 0 {
 		var out map[string]any
@@ -312,13 +319,14 @@ func leafSuffixes(leaf *webtemplate.Node, sfx map[string]any, keyOf func(string)
 	if _, judged := leafSuffixMatched(rmType, ""); judged {
 		return matchedSuffixes(rmType, sfx, keyOf, sink), nil
 	}
+	subPathGrammar := bmmtype.Class(rmType) == "DV_INTERVAL"
 	var out map[string]any
 	for _, suffix := range slices.Sorted(maps.Keys(sfx)) {
 		switch {
 		case suffix == "raw":
 			// |raw is the carrier of an unmapped datatype; dvFromSuffixes refuses
 			// it beside any other suffix.
-		case suffix == "" || unmappedReads(rmType, suffix):
+		case !subPathGrammar && (suffix == "" || unmappedReads(rmType, suffix)):
 			if _, raw := sfx["raw"]; !raw {
 				return nil, fmt.Errorf("simplified: decode %q: %w: %s", keyOf(suffix), ErrUnsupportedDatatype, rmType)
 			}
@@ -337,9 +345,9 @@ func leafSuffixes(leaf *webtemplate.Node, sfx map[string]any, keyOf func(string)
 }
 
 // unmappedReads reports whether suffix names something a leaf of rmType, a
-// datatype with no suffix set, has: for a party, a suffix of the party grammar
-// (the composer's `external_ref` suffixes and `|name`); otherwise an attribute
-// of its RM class.
+// datatype with neither a suffix set nor a sub-path grammar, has: for a party,
+// a suffix of the party grammar (the composer's `external_ref` suffixes and
+// `|name`); otherwise an attribute of its RM class.
 func unmappedReads(rmType, suffix string) bool {
 	if isPartyLeafType(rmType) {
 		return partyProxyOwnTails[suffix]
@@ -1554,6 +1562,14 @@ var inContextAttrs = map[string]struct {
 	},
 }
 
+// inContextCite names the section a refusal of an owner's in-context
+// attribute cites: REQ-140 lists an ACTION's ISM transition and time among its
+// out-of-scope classes; REQ-170 alone binds the INTERVAL_EVENT and OBSERVATION
+// attributes.
+var inContextCite = map[string]string{
+	"ACTION": "REQ-140", "INTERVAL_EVENT": "REQ-170", "OBSERVATION": "REQ-170",
+}
+
 // refuseInContextKeys refuses, in every mode, the reference's in-context
 // spelling of the RM attributes in [inContextAttrs] and of an ACTION's ISM
 // transition, wherever the Web Template does not resolve it (REQ-140's fourth
@@ -1591,8 +1607,8 @@ func refuseInContextKeys(content map[string]any, wt *webtemplate.WebTemplate, am
 		if !ok {
 			continue
 		}
-		return fmt.Errorf("%w: %q is the reference's in-context spelling of an %s's %s, which the Web Template this SDK builds does not model — refused rather than dropped or replaced (REQ-140, see deviations.md)",
-			ErrUnknownPath, named, owner, attr)
+		return fmt.Errorf("%w: %q is the reference's in-context spelling of an %s's %s, which the Web Template this SDK builds does not model — refused rather than dropped or replaced (%s, see deviations.md)",
+			ErrUnknownPath, named, owner, attr, inContextCite[owner])
 	}
 	return nil
 }
