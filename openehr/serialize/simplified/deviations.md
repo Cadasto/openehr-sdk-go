@@ -101,7 +101,9 @@ Concretely:
   levels are the top level, the ctx fields (a ctx field reads its suffixes only), the Web
   Template's nodes and leaves, a leaf's sub-paths (an interval's `lower` and `upper`, a party's
   `relationship` and `_identifier`), the underscore families an owner carries and the grammar
-  inside each, and everything below those. A name that spells more than one FLAT piece (a `:`,
+  inside each, and everything below those. The composer's party sub-structure, and everything
+  below it, is read whether or not the Web Template carries a composer node, so it is refused in
+  STRUCTURED as in FLAT (the ADR 0015 boundary). A name that spells more than one FLAT piece (a `:`,
   `\|` or `/` in it) is judged by its base, the id before the first of them: where the base
   reads nothing the member is unmatched; where it reads something the member is flattened as
   written, the FLAT decode judges the key it spells, and a value that is not an array is

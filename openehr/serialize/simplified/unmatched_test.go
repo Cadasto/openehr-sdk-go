@@ -1756,15 +1756,26 @@ func TestREQ170BareValueAtANodeIsRefused(t *testing.T) {
 // EVENT_CONTEXT does not carry among them, is set aside whatever its value
 // holds, reported by its member path and refused under strict. A name it reads
 // keeps the shape refusal in every mode.
+//
+// The composer's party sub-structure (`_identifier`, `relationship`) is read
+// whether or not the Web Template carries a composer node, and so is anything
+// below it: no ctx/ short form can carry it, so FLAT and STRUCTURED alike
+// refuse it in every mode (REQ-170, the ADR 0015 boundary), reporting nothing
+// and naming no value.
 func TestREQ170StructuredMetadataWithoutANode(t *testing.T) {
 	full, _ := conformanceWT(t)
-	wt := *full
-	root := *full.Tree
-	root.Children = slices.DeleteFunc(slices.Clone(root.Children), func(n *webtemplate.Node) bool { return n.ID == "context" })
-	if len(root.Children) == len(full.Tree.Children) {
-		t.Fatal("fixture: the corpus template has no context node to remove")
+	without := func(id string) *webtemplate.WebTemplate {
+		t.Helper()
+		out := *full
+		root := *full.Tree
+		root.Children = slices.DeleteFunc(slices.Clone(root.Children), func(n *webtemplate.Node) bool { return n.ID == id })
+		if len(root.Children) == len(full.Tree.Children) {
+			t.Fatalf("fixture: the corpus template has no %s node to remove", id)
+		}
+		out.Tree = &root
+		return &out
 	}
-	wt.Tree = &root
+	wt := *without("context")
 	const secret = "secret-value-0451"
 	body := rmattrBody(map[string]any{
 		rmattrContext + "/start_time":                 "2020-02-03T04:05:06+01:00",
@@ -1810,5 +1821,29 @@ func TestREQ170StructuredMetadataWithoutANode(t *testing.T) {
 				t.Errorf("WithUnmatched reported %q on a refused decode", reported)
 			}
 		})
+	}
+	for _, tc := range []struct {
+		name string
+		wt   *webtemplate.WebTemplate
+	}{{"with a composer node", full}, {"without a composer node", without("composer")}} {
+		for _, key := range []string{
+			rmattrRoot + "/composer/_identifier:0|id",
+			rmattrRoot + "/composer/relationship|code",
+			rmattrRoot + "/composer/_identifier:0/x_member|id",
+			rmattrRoot + "/composer/relationship/x_member|code",
+		} {
+			t.Run("composer sub-structure "+tc.name+"/"+key, func(t *testing.T) {
+				body := rmattrBody(map[string]any{key: secret})
+				for form, err := range map[string]error{
+					"FLAT":       refusedInEveryMode(t, tc.wt, body),
+					"STRUCTURED": structuredRefusedInEveryMode(t, tc.wt, body),
+				} {
+					if !errors.Is(err, ErrUnsupportedDatatype) || !strings.Contains(err.Error(), "composer party sub-structure") ||
+						strings.Contains(err.Error(), secret) {
+						t.Errorf("%s err = %v, want the composer party sub-structure refusal and no value", form, err)
+					}
+				}
+			})
+		}
 	}
 }
