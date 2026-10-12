@@ -3,6 +3,7 @@ package canxml
 import (
 	"bytes"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 
@@ -147,6 +148,11 @@ func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 
 // Decode reads the next XML element from the stream and stores it
 // in v. Errors follow the same classification as [Unmarshal].
+//
+// Decode reads no further than the end of that element, so whatever
+// follows it, another element included, is left for the next call. A
+// stream may hold many values, one after another. [Unmarshal], which is
+// given a whole document, is the call that holds it to one root element.
 func (d *Decoder) Decode(v any) error {
 	if d.trk == nil {
 		return d.dec.Decode(v)
@@ -170,22 +176,69 @@ func (d *Decoder) RelaxedTypeDispatch() bool { return d.cfg.relaxedTypeDispatch 
 // [UnmarshalXML] methods the BMM generator emits; each consults
 // [typereg.Default] to resolve `xsi:type` discriminators.
 //
+// data is one document, so it holds one root element. Comments,
+// processing instructions and whitespace may follow the root, as XML
+// allows. Another element, or text other than whitespace, after the root
+// is not well-formed XML, and the decode refuses it in every mode, with
+// or without [WithUnmatched] or [WithStrict]: it is malformed input, not
+// unmatched content. The error wraps [ErrInvalidShape] and carries none
+// of the content after the root. A root that fails to decode fails as
+// itself, and the decode does not read on.
+//
 // Returns [DecodeError] wrapping a typereg sentinel
 // ([typereg.ErrMissingType] / ErrUnknownType / ErrTypeMismatch) at
 // polymorphic failures, and [ErrInvalidShape] (wrapped) for an
-// `xmi:type` discriminator failure. Generic XML syntax errors are not
-// classified: they come back unchanged from encoding/xml, so an
-// errors.Is against [ErrInvalidShape] does not match a truncated or
-// otherwise malformed document.
+// `xmi:type` discriminator failure and for content after the root.
+// Other XML syntax errors are not classified: they come back unchanged
+// from encoding/xml, so an errors.Is against [ErrInvalidShape] does not
+// match a truncated root or a syntax error inside it.
 //
 // Content the decode does not read is ignored by default. [WithUnmatched]
 // reports each such item and [WithStrict] refuses the first, wrapping
 // [ErrUnknownElement].
 func Unmarshal(data []byte, v any, opts ...DecoderOption) error {
-	if len(opts) == 0 {
-		return xml.NewDecoder(bytes.NewReader(data)).Decode(v)
+	d := NewDecoder(bytes.NewReader(data), opts...)
+	if err := d.Decode(v); err != nil {
+		return err
 	}
-	return NewDecoder(bytes.NewReader(data), opts...).Decode(v)
+	return d.end()
+}
+
+// end reads the rest of the document after the root element. Comments,
+// processing instructions and whitespace pass. Anything else, an element,
+// other text, a document type declaration or a token encoding/xml cannot
+// read, is refused: the error wraps [ErrInvalidShape] and names none of
+// it.
+func (d *Decoder) end() error {
+	for {
+		tok, err := d.dec.Token()
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		if err != nil {
+			return errAfterRoot()
+		}
+		switch t := tok.(type) {
+		case xml.Comment, xml.ProcInst:
+			continue
+		case xml.CharData:
+			if isXMLSpace(t) {
+				continue
+			}
+		}
+		return errAfterRoot()
+	}
+}
+
+// errAfterRoot is the refusal of content after the root element.
+func errAfterRoot() error {
+	return fmt.Errorf("%w: content after the root element", ErrInvalidShape)
+}
+
+// isXMLSpace reports whether text holds XML whitespace only: spaces, tabs,
+// carriage returns and line feeds.
+func isXMLSpace(text []byte) bool {
+	return len(bytes.Trim(text, " \t\r\n")) == 0
 }
 
 // XSITypeOf scans a start element's attribute list and returns the
@@ -309,11 +362,7 @@ func DecodeAs[T any](dec *xml.Decoder, start xml.StartElement) (T, error) {
 	xmlunmatched.DiscriminatorRead(dec, attrName)
 	v := ctor()
 	if err := xmlunmatched.DecodeElement(dec, &start, v); err != nil {
-		return zero, &DecodeError{
-			Path:  "/" + start.Name.Local,
-			Type:  typeName,
-			Inner: fmt.Errorf("canxml: %w", err),
-		}
+		return zero, enclose("/"+start.Name.Local, typeName, err)
 	}
 	if t, ok := v.(T); ok {
 		return t, nil
@@ -354,10 +403,7 @@ func DecodeAsOrDefault[T any](dec *xml.Decoder, start xml.StartElement, defaultC
 		}
 		v = defaultCtor()
 		if err := xmlunmatched.DecodeElement(dec, &start, v); err != nil {
-			return zero, &DecodeError{
-				Path:  "/" + start.Name.Local,
-				Inner: fmt.Errorf("canxml: %w", err),
-			}
+			return zero, enclose("/"+start.Name.Local, "", err)
 		}
 	} else {
 		ctor, ok := typereg.Default.Lookup(typeName)
@@ -371,11 +417,7 @@ func DecodeAsOrDefault[T any](dec *xml.Decoder, start xml.StartElement, defaultC
 		xmlunmatched.DiscriminatorRead(dec, attrName)
 		v = ctor()
 		if err := xmlunmatched.DecodeElement(dec, &start, v); err != nil {
-			return zero, &DecodeError{
-				Path:  "/" + start.Name.Local,
-				Type:  typeName,
-				Inner: fmt.Errorf("canxml: %w", err),
-			}
+			return zero, enclose("/"+start.Name.Local, typeName, err)
 		}
 	}
 	if t, ok := v.(T); ok {
@@ -389,4 +431,21 @@ func DecodeAsOrDefault[T any](dec *xml.Decoder, start xml.StartElement, defaultC
 		Type:  typeName,
 		Inner: fmt.Errorf("canxml: decoded %T: %w", v, typereg.ErrTypeMismatch),
 	}
+}
+
+// enclose returns the [DecodeError] for err, a failure while the element at
+// path decoded as typeName (empty when no discriminator chose the type).
+//
+// A failure that is itself a DecodeError comes from a polymorphic slot
+// further in. It becomes the Inner of the new one as it is, so a failure deep
+// inside nested slots is a chain of envelopes, one per slot, whose message is
+// written once, when it is asked for. Wrapping it in a formatted error instead
+// would write out the whole message below at every slot on the way out, at a
+// cost that grows with the square of the depth. Any other failure keeps the
+// canxml prefix.
+func enclose(path, typeName string, err error) *DecodeError {
+	if de, ok := err.(*DecodeError); ok && de != nil { //nolint:errorlint // a direct envelope only: a wrapped one keeps its wrapper, prefixed below
+		return &DecodeError{Path: path, Type: typeName, Inner: de}
+	}
+	return &DecodeError{Path: path, Type: typeName, Inner: fmt.Errorf("canxml: %w", err)}
 }

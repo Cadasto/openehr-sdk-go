@@ -860,10 +860,12 @@ func TestREQ170_XMLInterfaceTypedParameter(t *testing.T) {
 // by VERSION's generic parameter. The registered ORIGINAL_VERSION<any> holds
 // it as an interface, so `data` is a polymorphic slot: the COMPOSITION its
 // `xsi:type` names is decoded, in every mode, and the options see inside it.
-// A `data` without `xsi:type` fails with typereg.ErrMissingType, and one with
-// an unknown `xsi:type` with typereg.ErrUnknownType. A concrete instantiation
-// decodes into its own type, by value or by pointer, with or without
-// `xsi:type`.
+// A `data` without `xsi:type` fails with typereg.ErrMissingType, even an empty
+// one, and one with an unknown `xsi:type` with typereg.ErrUnknownType. A
+// version with no `data` element decodes with Data nil: the empty-element
+// acceptance of optionals does not reach an interface-typed member, but its
+// absence is accepted. A concrete instantiation decodes into its own type, by
+// value or by pointer, with or without `xsi:type`.
 func TestREQ056_XMLOriginalVersionData(t *testing.T) {
 	composition := `<name><value>c</value></name>` + xLanguage +
 		`<territory><terminology_id><value>ISO_3166-1</value></terminology_id><code_string>GB</code_string></territory>` +
@@ -940,6 +942,56 @@ func TestREQ056_XMLOriginalVersionData(t *testing.T) {
 			}
 		})
 	}
+
+	// Can-fail control for the empty-data subtests: skip an interface-typed
+	// member that holds no value instead of dispatching on its xsi:type, and
+	// the decode succeeds with Data a pointer to nil. The no-data subtest
+	// pins that an absent member is accepted and leaves Data nil: the
+	// generated decoder reaches `data` only when the element is there.
+	lifecycle := `<lifecycle_state><value>complete</value><defining_code><terminology_id><value>openehr</value></terminology_id>` +
+		`<code_string>532</code_string></defining_code></lifecycle_state>`
+	everyMode := map[string][]canxml.DecoderOption{
+		"default": nil,
+		"report":  {canxml.WithUnmatched(func(string) {})},
+		"strict":  {canxml.WithStrict()},
+	}
+	for name, empty := range map[string]string{
+		"self-closing":    `<data/>`,
+		"start and end":   `<data></data>`,
+		"whitespace only": "<data>\n  </data>",
+	} {
+		t.Run("empty data without xsi:type, "+name, func(t *testing.T) {
+			in := []byte(`<original_version ` + ucNS + `>` + empty + lifecycle + `</original_version>`)
+			for mode, opts := range everyMode {
+				err := canxml.Unmarshal(in, new(rm.OriginalVersion[any]), opts...)
+				if !errors.Is(err, typereg.ErrMissingType) {
+					t.Errorf("canxml.Unmarshal(%s) err = %v; want typereg.ErrMissingType: an empty interface-typed member still needs xsi:type", mode, err)
+				}
+			}
+		})
+	}
+	t.Run("no data element", func(t *testing.T) {
+		in := []byte(`<original_version ` + ucNS + `>` + lifecycle + `</original_version>`)
+		for mode, opts := range everyMode {
+			var reported []string
+			if mode == "report" {
+				opts = []canxml.DecoderOption{canxml.WithUnmatched(func(p string) { reported = append(reported, p) })}
+			}
+			v := new(rm.OriginalVersion[any])
+			if err := canxml.Unmarshal(in, v, opts...); err != nil {
+				t.Fatalf("canxml.Unmarshal(%s) = %v; want nil: an absent member is accepted", mode, err)
+			}
+			if v.Data != nil {
+				t.Errorf("canxml.Unmarshal(%s): Data = %#v; want nil", mode, v.Data)
+			}
+			if v.LifecycleState.DefiningCode.CodeString != "532" {
+				t.Errorf("canxml.Unmarshal(%s): lifecycle_state = %#v; want code 532", mode, v.LifecycleState)
+			}
+			if len(reported) != 0 {
+				t.Errorf("canxml.Unmarshal(%s) reported %q; want nothing", mode, reported)
+			}
+		}
+	})
 
 	data := `<original_version ` + ucNS + `><data><name><value>c</value></name><x-ext>` + xmlPlanted + `</x-ext></data></original_version>`
 	const dataExt = "/original_version[1]/data[1]/x-ext[1]"

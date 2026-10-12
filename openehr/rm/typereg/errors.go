@@ -9,6 +9,8 @@ import (
 	"encoding/json/jsontext"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 )
 
 // Sentinel errors returned by [Registry.Decode], [DecodeAs] and the decode
@@ -105,9 +107,27 @@ type DecodeError struct {
 // for both codecs (it is re-exported as canjson.DecodeError and
 // canxml.DecodeError), so a failed match can leave a typed nil in
 // caller hands.
+//
+// When Inner is itself a DecodeError, the text names both nodes, the
+// outer first, and so on down a chain of them: a failure inside nested
+// polymorphic slots names every slot from the outside in, then the cause.
+// The whole chain is written in one pass, so its cost grows with its
+// length rather than with the square of it.
 func (e *DecodeError) Error() string {
 	if e == nil {
 		return (&DecodeError{}).Error()
+	}
+	var b strings.Builder
+	for {
+		e.writeNode(&b)
+		// Only an envelope held directly continues the chain. Any other
+		// error, one that wraps an envelope included, is the cause and is
+		// written whole below.
+		next, ok := e.Inner.(*DecodeError) //nolint:errorlint // a direct link only, see above
+		if !ok || next == nil {
+			break
+		}
+		e = next
 	}
 	// Every producer sets Inner; only a caller-built zero value leaves it
 	// nil. Inner is any error a codec or caller can supply — including a
@@ -116,21 +136,34 @@ func (e *DecodeError) Error() string {
 	// err.Error() call is not safe here the way it is for this package's own
 	// guarded types. %v is: fmt recovers a panicking Error() method itself
 	// and renders a nil-pointer receiver as "<nil>" (REQ-025 nil-receiver
-	// axis).
-	cause := "unspecified error"
-	if e.Inner != nil {
-		cause = fmt.Sprintf("%v", e.Inner)
+	// axis). A typed-nil *DecodeError ends the chain above and lands here
+	// too, where its own nil guard answers.
+	if e.Inner == nil {
+		b.WriteString("unspecified error")
+	} else {
+		fmt.Fprintf(&b, "%v", e.Inner)
+	}
+	return b.String()
+}
+
+// writeNode writes the part of the text that names e's own node, up to and
+// including the colon before the cause.
+func (e *DecodeError) writeNode(b *strings.Builder) {
+	b.WriteString("decode")
+	if e.Path != "" {
+		b.WriteByte(' ')
+		b.WriteString(e.Path)
 	}
 	switch {
 	case e.Path != "" && e.Type != "":
-		return fmt.Sprintf("decode %s (_type=%q): %s", e.Path, e.Type, cause)
-	case e.Path != "":
-		return fmt.Sprintf("decode %s: %s", e.Path, cause)
+		b.WriteString(" (_type=")
+		b.WriteString(strconv.Quote(e.Type))
+		b.WriteByte(')')
 	case e.Type != "":
-		return fmt.Sprintf("decode _type=%q: %s", e.Type, cause)
-	default:
-		return "decode: " + cause
+		b.WriteString(" _type=")
+		b.WriteString(strconv.Quote(e.Type))
 	}
+	b.WriteString(": ")
 }
 
 // Unwrap returns the wrapped error so errors.Is / errors.As reach the

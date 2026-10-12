@@ -11,11 +11,12 @@ import (
 // shape errors (malformed XML, element-name mismatch on a
 // non-polymorphic field, numeric overflow, `xmi:type` rejection).
 // Only part of that range is produced today: decode returns it for an
-// `xmi:type` discriminator on the wire (via [XSITypeOf]), and encode
-// returns it for a nil value or a value that does not implement
-// xml.Marshaler. Generic XML syntax errors come back unchanged from
-// encoding/xml, so an errors.Is against this sentinel does not match
-// a malformed document.
+// `xmi:type` discriminator on the wire (via [XSITypeOf]) and, through
+// [Unmarshal], for content after the root element other than comments,
+// processing instructions and whitespace; encode returns it for a nil
+// value or a value that does not implement xml.Marshaler. Other XML syntax errors come back
+// unchanged from encoding/xml, so an errors.Is against this sentinel
+// does not match a truncated root or a syntax error inside it.
 //
 // Polymorphic-discrimination errors come from the typereg package
 // instead: match those with errors.Is against [typereg.ErrMissingType]
@@ -59,4 +60,9 @@ var ErrNamespace = xmlunmatched.ErrNamespace
 // polymorphic dispatch sites. Re-exported from the internal poly
 // helper so consumers can `errors.As` against a stable type without
 // importing internal packages. It has the same shape as canjson's.
+//
+// Each one names its own slot. A failure inside a slot that sits in
+// another slot comes back as one DecodeError per slot, each the Inner of
+// the one outside it: errors.As finds the outermost, and the message
+// names every slot from the outside in, then the failure itself.
 type DecodeError = poly.DecodeError

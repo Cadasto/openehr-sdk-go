@@ -24,6 +24,10 @@
 //
 // The codec produces deterministic canonical XML:
 //
+//   - One root element per document. [Unmarshal] refuses an element, or
+//     text other than whitespace, after the root, in every mode, with
+//     [ErrInvalidShape]; comments, processing instructions and whitespace
+//     after the root are accepted, as XML allows them.
 //   - Default namespace: `http://schemas.openehr.org/v1`.
 //   - `xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"` is
 //     declared on the document root whenever any descendant carries
@@ -45,7 +49,8 @@
 //   - Nil-pointer optional fields and empty containers with
 //     `cardinality.lower == 0` are emitted as absent (no element).
 //     Both absent and an empty self-closing element are accepted on
-//     decode.
+//     decode, for optionals and containers; an interface-typed member
+//     (below) needs its `xsi:type` even when empty.
 //   - ISO 8601 dates/times/durations are passed through as element
 //     text content; the codec does not parse them.
 //   - Numeric magnitudes use IEEE 754 double-precision (same as
@@ -67,7 +72,8 @@
 //     decode also reads a plain text `terminology_id`.
 //   - A member typed by a generic parameter that is instantiated with an
 //     interface, such as the `data` of ORIGINAL_VERSION<any>, is a
-//     polymorphic site and needs `xsi:type`.
+//     polymorphic site and needs `xsi:type`, even when its element is
+//     empty. With no element at all, the member stays nil.
 //
 // # Strict vs relaxed type dispatch
 //
