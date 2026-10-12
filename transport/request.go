@@ -55,7 +55,9 @@ type Request struct {
 	// when Route is set, so leaving it empty silently disables that
 	// check. Every leaf client in openehr/client sets it.
 	Route string
-	// Query is appended to the resolved URL.
+	// Query is appended to the resolved URL. Its keys and values are
+	// percent-encoded per RFC 3986, so a space is sent as `%20`, never
+	// as `+`.
 	Query url.Values
 	// Headers carries extra caller-supplied headers, merged after
 	// the transport's standard plumbing so callers can override.
