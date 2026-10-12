@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/cadasto/openehr-sdk-go/internal/rmjsonwalk/polyreg"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 )
 
@@ -78,14 +79,14 @@ func (m *Model) readRoot(t reflect.Type) (Root, bool) {
 // rm.DVTextLike. The second result is false when t is neither.
 //
 // Both answers come from a new value of t: BMMName on the class's Go type, and
-// the generated type switch of polymorphicClass on a pointer to the interface.
+// for a pointer to an interface the table openehr/rm registers in polyreg.
 func (m *Model) declaredOf(t reflect.Type) (string, bool) {
 	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 	p := reflect.New(t).Interface()
 	name := ""
-	if class, _, ok := polymorphicClass(p); ok {
+	if class, ok := polyreg.Class(p); ok {
 		name = class
 	} else if n, ok := p.(bmmNamer); ok {
 		name = n.BMMName()

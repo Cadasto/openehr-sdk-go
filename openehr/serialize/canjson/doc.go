@@ -137,9 +137,10 @@
 //
 //   - Malformed JSON is refused by the tokenizer as the value it
 //     malforms is decoded, except where a value is buffered first: a
-//     polymorphic slot is read whole before it is decoded, so malformed
-//     bytes anywhere inside it are reported ahead of a shape failure
-//     inside it.
+//     polymorphic slot is read whole before it is decoded, and so is each
+//     value a [Decoder] given [WithUnmatched] or [WithStrict] reads, so
+//     malformed bytes anywhere inside such a value are reported ahead of a
+//     shape failure inside it.
 //     No sentinel: the codec reports its own syntax or truncated-input
 //     error (a *jsontext.SyntacticError), except that [Decoder.Decode]
 //     reports an empty stream as io.EOF and a truncated value wraps

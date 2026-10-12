@@ -22,7 +22,6 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -732,16 +731,18 @@ func TestREQ170_DefaultDecodeAllocatesAsBefore(t *testing.T) {
 }
 
 // TestREQ170_RegisteredTypeCensus decodes, for every registered library type,
-// a body carrying its `_type` and one extension member. For an RM class the
-// report names exactly that member; for an AOM 1.4 class, outside the RM, it
-// names nothing. It is the control that the check reaches every RM class the
-// registry decodes, and no class outside the RM.
+// a body carrying its `_type` and one extension member. A type of the rm
+// package is an RM class, and the report names exactly that member; a type of
+// the aom14 package is outside the RM, and it names nothing. The side is
+// decided by the Go package, not by the RM metadata the check itself reads,
+// so an RM type that metadata misses fails here. It is the control that the
+// check reaches every RM class the registry decodes, and no class outside
+// the RM.
 func TestREQ170_RegisteredTypeCensus(t *testing.T) {
-	const libraryPrefix = "github.com/cadasto/openehr-sdk-go/openehr/"
-	known := map[string]bool{}
-	for _, n := range rminfo.Default.KnownRMTypes() {
-		known[n] = true
-	}
+	const (
+		rmPackage  = "github.com/cadasto/openehr-sdk-go/openehr/rm"
+		aomPackage = "github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
+	)
 	rmChecked, outside := 0, 0
 	for _, name := range typereg.Default.Names() {
 		ctor, _ := typereg.Default.Lookup(name)
@@ -749,7 +750,14 @@ func TestREQ170_RegisteredTypeCensus(t *testing.T) {
 		for rt.Kind() == reflect.Pointer {
 			rt = rt.Elem()
 		}
-		if !strings.HasPrefix(rt.PkgPath(), libraryPrefix) {
+		var want []string
+		switch rt.PkgPath() {
+		case rmPackage:
+			want = []string{"/x-census"}
+			rmChecked++
+		case aomPackage:
+			outside++
+		default:
 			continue // a test fixture registered elsewhere; not a shipped type
 		}
 		in := `{"_type":"` + name + `","x-census":"` + plantedValue + `"}`
@@ -759,15 +767,8 @@ func TestREQ170_RegisteredTypeCensus(t *testing.T) {
 			t.Errorf("%s: canjson.Unmarshal(%s, WithUnmatched) = %v; want nil", name, in, err)
 			continue
 		}
-		var want []string
-		if known[name] {
-			want = []string{"/x-census"}
-			rmChecked++
-		} else {
-			outside++
-		}
 		if !slices.Equal(got, want) {
-			t.Errorf("%s (RM class: %v): WithUnmatched reported %q; want %q", name, known[name], got, want)
+			t.Errorf("%s (Go package %s): WithUnmatched reported %q; want %q", name, rt.PkgPath(), got, want)
 		}
 	}
 	if rmChecked < 100 {

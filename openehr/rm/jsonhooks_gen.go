@@ -7,6 +7,7 @@ import (
 	"encoding/json/jsontext"
 	json "encoding/json/v2"
 
+	"github.com/cadasto/openehr-sdk-go/internal/rmjsonwalk/polyreg"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
@@ -67,4 +68,51 @@ func init() {
 	typereg.RegisterUnmarshaler(json.UnmarshalFromFunc(func(dec *jsontext.Decoder, out *UIDBasedID) error {
 		return typereg.DecodePolymorphic(dec, out, nil)
 	}))
+	polyreg.Register(polymorphicClass)
+}
+
+// polymorphicClass names the BMM class behind the polymorphic interface p
+// points to: the abstract class the interface stands for, or for a narrow
+// interface (<Parent>Like) its parent class. ok is false when p points to no
+// polymorphic interface of this package. init registers it into
+// internal/rmjsonwalk/polyreg for the canonical-JSON walker, which reads a
+// decode target's Go type without importing this package.
+func polymorphicClass(p any) (string, bool) {
+	switch p.(type) {
+	case *AccessControlSettings:
+		return "ACCESS_CONTROL_SETTINGS", true
+	case *AuditDetailsLike:
+		return "AUDIT_DETAILS", true
+	case *AuthoredResource:
+		return "AUTHORED_RESOURCE", true
+	case *ContentItem:
+		return "CONTENT_ITEM", true
+	case *DVEncapsulated:
+		return "DV_ENCAPSULATED", true
+	case *DVOrdered:
+		return "DV_ORDERED", true
+	case *DVTextLike:
+		return "DV_TEXT", true
+	case *DVURILike:
+		return "DV_URI", true
+	case *DataValue:
+		return "DATA_VALUE", true
+	case *Event:
+		return "EVENT", true
+	case *Item:
+		return "ITEM", true
+	case *ItemStructure:
+		return "ITEM_STRUCTURE", true
+	case *ObjectID:
+		return "OBJECT_ID", true
+	case *ObjectRefLike:
+		return "OBJECT_REF", true
+	case *PartyIdentifiedLike:
+		return "PARTY_IDENTIFIED", true
+	case *PartyProxy:
+		return "PARTY_PROXY", true
+	case *UIDBasedID:
+		return "UID_BASED_ID", true
+	}
+	return "", false
 }

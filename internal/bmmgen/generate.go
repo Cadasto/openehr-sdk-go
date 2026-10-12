@@ -20,9 +20,10 @@
 // produce one of them fails generation instead of being overwritten.
 //
 // The RM target also gets release_gen.go, the constant Release taken
-// from the root schema's rm_release, the two rminfo tables,
-// openehr/rm/rminfo/lookup_gen.go and absence_gen.go, and the JSON
-// walker's interface table, internal/rmjsonwalk/polymorphic_gen.go.
+// from the root schema's rm_release, and the two rminfo tables,
+// openehr/rm/rminfo/lookup_gen.go and absence_gen.go. Its jsonhooks_gen.go
+// also registers the JSON walker's interface table into
+// internal/rmjsonwalk/polyreg.
 //
 // # Targets
 //
@@ -432,21 +433,13 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, result *Result)
 	if err != nil {
 		return tr, err
 	}
-	// The JSON walker's interface table (REQ-170) is internal to the walker
-	// package, so it adds no public API; RM target only, like rminfo.
-	walkerBody, err := RenderWalkerPolymorphicFile(plan)
-	if err != nil {
-		return tr, err
-	}
 	rminfoDir := filepath.Join(opts.OutDir, "openehr", "rm", "rminfo")
-	walkerDir := filepath.Join(opts.OutDir, "internal", "rmjsonwalk")
 	for _, gen := range []struct {
 		path string
 		body []byte
 	}{
 		{filepath.Join(rminfoDir, "lookup_gen.go"), lookupBody},
 		{filepath.Join(rminfoDir, "absence_gen.go"), absenceBody},
-		{filepath.Join(walkerDir, walkerPolymorphicFile), walkerBody},
 	} {
 		if gen.body == nil {
 			continue
