@@ -1,7 +1,9 @@
 package simplified
 
 import (
+	"fmt"
 	"maps"
+	"strconv"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
@@ -52,6 +54,68 @@ type memberLevel struct {
 	// sub names the sub-path members a levelGrammar object reads, each with
 	// the level its elements stand for. A nil sub reads suffixes only.
 	sub map[string]memberLevel
+	// bound is the bound the FLAT decode puts on the position of an element
+	// of this level in its member's array.
+	bound indexBound
+}
+
+// indexBound is a bound the FLAT decode puts on a segment's :index whatever
+// follows the segment, so an element past it is malformed whatever it holds
+// (REQ-170: an index past its bound). Where the FLAT decode judges an index
+// only on a key it reads (a sub-path inside a family, a Web Template list,
+// which placement bounds), the element is left unbounded and its keys judge
+// it.
+type indexBound int
+
+const (
+	unbounded indexBound = iota
+	// oneValue is a Web Template node or metadata segment on a
+	// single-valued RM attribute ([holdsOneValue], [metadataSegPaths]).
+	oneValue
+	// oneFamilyValue is a single-valued underscore family
+	// ([checkRMAttrIndexBound]).
+	oneFamilyValue
+	// familyList is a list family, bounded by [maxRepeatIndex].
+	familyList
+	// oneChildValue is a single-valued FEEDER_AUDIT sub-path
+	// ([rmattrChildSingle]).
+	oneChildValue
+	// childList is a FEEDER_AUDIT identifier list, bounded by
+	// [maxRepeatIndex] ([rmattrChildGroups]).
+	childList
+)
+
+// check refuses the element at position idx of member id under the FLAT path
+// path where b puts it past its bound, with the refusal the FLAT decode gives
+// the key that position spells.
+func (b indexBound) check(path, id string, idx int) error {
+	seg := path + "/" + id + ":" + strconv.Itoa(idx)
+	switch b {
+	case oneValue:
+		if idx > 0 {
+			return fmt.Errorf("simplified: %q: %w", seg, errSingleValuedIndex(flatSeg{id: id, idx: idx}))
+		}
+	case oneFamilyValue:
+		if idx > 0 {
+			return fmt.Errorf("%w: %q (%s addresses a single-valued RM attribute, not an indexed list)", ErrUnknownPath, seg, id)
+		}
+	case oneChildValue:
+		if idx > 0 {
+			return fmt.Errorf("%w: %q addresses a single-valued RM attribute, not an indexed list", ErrUnknownPath, path+"/"+id)
+		}
+	case familyList, childList:
+		if idx > maxRepeatIndex {
+			return fmt.Errorf("%w: %q :index %d exceeds bound %d", ErrUnknownPath, seg, idx, maxRepeatIndex)
+		}
+	case unbounded:
+	}
+	return nil
+}
+
+// bounded returns l with bound b.
+func (l memberLevel) bounded(b indexBound) memberLevel {
+	l.bound = b
+	return l
 }
 
 // opaqueLevel reads every name below it.
@@ -92,7 +156,7 @@ var (
 	feederDetailsLevel = func() memberLevel {
 		l := memberLevel{kind: levelGrammar, sub: map[string]memberLevel{feederAuditOtherDetails: opaqueLevel}}
 		for seg := range feederAuditDetailsParties {
-			l.sub[seg] = partyLevel
+			l.sub[seg] = partyLevel.bounded(oneChildValue)
 		}
 		return l
 	}()
@@ -101,13 +165,13 @@ var (
 	feederLevel = func() memberLevel {
 		l := memberLevel{kind: levelGrammar, sub: map[string]memberLevel{}}
 		for seg := range feederAuditItemIDLists {
-			l.sub[seg] = suffixesOnly
+			l.sub[seg] = suffixesOnly.bounded(childList)
 		}
 		for seg := range feederAuditDetailSegs {
-			l.sub[seg] = feederDetailsLevel
+			l.sub[seg] = feederDetailsLevel.bounded(oneChildValue)
 		}
 		for seg := range feederAuditContentSegs {
-			l.sub[seg] = suffixesOnly
+			l.sub[seg] = suffixesOnly.bounded(oneChildValue)
 		}
 		return l
 	}()
@@ -155,13 +219,18 @@ func familyLevel(kind, leaf, name string) (memberLevel, bool) {
 	if rmattrDeferredAt(kind, name) {
 		return opaqueLevel, true
 	}
-	if _, _, read := rmattrFamilyOf(kind, leaf, name); !read {
+	fam, _, read := rmattrFamilyOf(kind, leaf, name)
+	if !read {
 		return memberLevel{}, false
 	}
-	if l, ok := familyLevels[name]; ok {
-		return l, true
+	bound := oneFamilyValue
+	if fam.list {
+		bound = familyList
 	}
-	return suffixesOnly, true
+	if l, ok := familyLevels[name]; ok {
+		return l.bounded(bound), true
+	}
+	return suffixesOnly.bounded(bound), true
 }
 
 // memberBase is the part of a member name that the grammar judges: the first
@@ -214,7 +283,11 @@ func (l memberLevel) judge(name string) (memberLevel, bool) {
 func (l memberLevel) judgeNode(name string) (memberLevel, bool) {
 	rel := strings.TrimPrefix(l.rel+"/"+name, "/")
 	if child := childByID(l.node, name); child != nil {
-		return nodeLevel(child, rel), true
+		level := nodeLevel(child, rel)
+		if holdsOneValue(l.node, child) {
+			level = level.bounded(oneValue)
+		}
+		return level, true
 	}
 	rmType := nodeRMType(l.node)
 	if strings.HasPrefix(name, "_") {
@@ -225,7 +298,7 @@ func (l memberLevel) judgeNode(name string) (memberLevel, bool) {
 	}
 	switch {
 	case metadataSegPaths[rel]:
-		return memberLevel{kind: levelMetadata, rel: rel}, true
+		return memberLevel{kind: levelMetadata, rel: rel, bound: oneValue}, true
 	case rmType == "ACTION" && name == ismReferenceSeg:
 		return ismReferenceLevel, true
 	case inContextAttrs[rmType].leaf[name], rmType == "ISM_TRANSITION" && ismLeaves[name]:
@@ -269,7 +342,7 @@ func (l memberLevel) judgeMetadata(name string) (memberLevel, bool) {
 	rel := l.rel + "/" + name
 	switch {
 	case metadataSegPaths[rel]:
-		return memberLevel{kind: levelMetadata, rel: rel}, true
+		return memberLevel{kind: levelMetadata, rel: rel, bound: oneValue}, true
 	case l.rel == "composer":
 		below, read := composerLevel.sub[name]
 		return below, read

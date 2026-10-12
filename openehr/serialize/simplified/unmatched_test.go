@@ -193,6 +193,13 @@ func structuredRefusedInEveryMode(t *testing.T, wt *webtemplate.WebTemplate, fla
 	if err != nil {
 		t.Fatalf("FlatToStructured: %v", err)
 	}
+	return structuredDocRefusedInEveryMode(t, wt, b)
+}
+
+// structuredDocRefusedInEveryMode is [structuredRefusedInEveryMode] for a
+// STRUCTURED document as written.
+func structuredDocRefusedInEveryMode(t *testing.T, wt *webtemplate.WebTemplate, b []byte) error {
+	t.Helper()
 	_, def := UnmarshalStructured(b, wt)
 	if def == nil {
 		t.Fatal("UnmarshalStructured (default) succeeded, want a refusal")
@@ -597,7 +604,8 @@ func TestREQ170IgnoredKeysLeaveNoStructuralTrace(t *testing.T) {
 // [TestREQ170RepeatableIntervalElement]), a `_family:N` list and a
 // FEEDER_AUDIT sub-path give ErrUnknownPath; a
 // sub-path inside an underscore family's value or an interval value gives
-// ErrUnsupportedDatatype. deviations.md states the same split.
+// ErrUnsupportedDatatype. deviations.md states the same split. STRUCTURED
+// judges an element's position the same way, whatever the element holds.
 func TestREQ170IndexPastBoundSentinels(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	for _, tc := range []struct {
@@ -621,6 +629,47 @@ func TestREQ170IndexPastBoundSentinels(t *testing.T) {
 			err := refusalLegs(t, wt, rmattrBody(map[string]any{tc.key: tc.val}), nil, tc.want)
 			if !strings.Contains(err.Error(), tc.names) {
 				t.Errorf("err = %v, want it to name %q", err, tc.names)
+			}
+		})
+	}
+	// STRUCTURED: an element past the bound of its member's position is
+	// refused whatever it holds, even when every member it holds is unmatched
+	// content, as the FLAT spelling of the same body is (REQ-170).
+	for _, tc := range []struct {
+		name   string
+		extra  map[string]any
+		at     string
+		member string
+	}{
+		{"context", map[string]any{rmattrContext + "/_health_care_facility|name": "Hospital"}, rmattrRoot, "context"},
+		{"composer", map[string]any{rmattrRoot + "/composer|name": "Dr. Who"}, rmattrRoot, "composer"},
+		{"observation language", nil, rmattrRoot + "/conformance_section/0/conformance_observation/0", "language"},
+		{"single-valued family", map[string]any{rmattrObs + "/_uid": "8f8f8f8f-0000-4000-8000-000000000000"}, rmattrRoot + "/conformance_section/0/conformance_observation/0", "_uid"},
+		{
+			"FEEDER_AUDIT sub-path",
+			map[string]any{rmattrObs + "/_feeder_audit/originating_system_audit|system_id": "orig"},
+			rmattrRoot + "/conformance_section/0/conformance_observation/0/_feeder_audit/0", "originating_system_audit",
+		},
+	} {
+		t.Run("STRUCTURED "+tc.name+"/1 holding only unmatched members", func(t *testing.T) {
+			_, doc := structuredDoc(t, rmattrBody(tc.extra))
+			obj := structuredObject(t, doc, tc.at)
+			obj[tc.member] = append(obj[tc.member].([]any), map[string]any{"x_unknown": []any{"v"}})
+			b := mustJSON(t, doc)
+			err := structuredDocRefusedInEveryMode(t, wt, b)
+			if !errors.Is(err, ErrUnknownPath) || !strings.Contains(err.Error(), "single-valued") {
+				t.Errorf("STRUCTURED err = %v, want ErrUnknownPath for a single-valued position", err)
+			}
+			flat, convErr := StructuredToFlat(b)
+			if convErr != nil {
+				t.Fatalf("StructuredToFlat: %v", convErr)
+			}
+			var body map[string]any
+			if err := json.Unmarshal(flat, &body); err != nil {
+				t.Fatal(err)
+			}
+			if err := refusedInEveryMode(t, wt, body); !errors.Is(err, ErrUnknownPath) {
+				t.Errorf("FLAT err = %v, want ErrUnknownPath", err)
 			}
 		})
 	}
@@ -1564,7 +1613,9 @@ var structuredLevels = func() []struct {
 		{"ctx field", map[string]any{"ctx/setting|code": "238", "ctx/setting|value": "other care"}, "ctx/setting"},
 		{"node with children", nil, section},
 		{"leaf", nil, quantity},
+		{"interval leaf", interval, section + "/conformance_interval/0/any_event/0/interval_dv_quantity/0"},
 		{"interval leaf's lower", interval, section + "/conformance_interval/0/any_event/0/interval_dv_quantity/0/lower/0"},
+		{"party leaf", party, obs + "/subject/0"},
 		{"party leaf's relationship", party, obs + "/subject/0/relationship/0"},
 		{"party leaf's _identifier", identifier, obs + "/subject/0/_identifier/0"},
 		{"underscore family of a leaf", normalRange, quantity + "/_normal_range/0"},
@@ -1593,15 +1644,43 @@ func TestREQ170StructuredOneRuleAtEveryLevel(t *testing.T) {
 		{"array", func() any { return []any{secret} }},
 	}
 	for _, level := range structuredLevels {
-		for _, shape := range shapes {
-			t.Run(level.name+"/"+shape.name, func(t *testing.T) {
-				ref, doc := structuredDoc(t, rmattrBody(level.extra))
-				structuredObject(t, doc, level.path)["x_member"] = shape.value()
-				want := strings.TrimPrefix(level.path+"/x_member", "/")
-				assertStructuredUnmatched(t, wt, mustJSON(t, doc), ref, secret, want)
-			})
+		// An unknown name, and an unknown underscore name, which names no
+		// family the level carries.
+		for _, name := range []string{"x_member", "_x_member"} {
+			for _, shape := range shapes {
+				t.Run(level.name+"/"+name+"/"+shape.name, func(t *testing.T) {
+					ref, doc := structuredDoc(t, rmattrBody(level.extra))
+					structuredObject(t, doc, level.path)[name] = shape.value()
+					want := strings.TrimPrefix(level.path+"/"+name, "/")
+					assertStructuredUnmatched(t, wt, mustJSON(t, doc), ref, secret, want)
+				})
+			}
 		}
 	}
+	quantity := rmattrRoot + "/conformance_section/0/conformance_observation/0/any_event/0/dv_quantity/0"
+	// A member the level would read elsewhere: a family the leaf's datatype
+	// does not carry (DV_TEXT has no normal_range).
+	t.Run("_normal_range under a DV_TEXT leaf", func(t *testing.T) {
+		text := map[string]any{rmattrText: "text value", rmattrText + "|formatting": "plain"}
+		ref, doc := structuredDoc(t, rmattrBody(text))
+		at := rmattrRoot + "/conformance_section/0/conformance_observation/0/any_event/0/dv_text/0"
+		structuredObject(t, doc, at)["_normal_range"] = secret
+		assertStructuredUnmatched(t, wt, mustJSON(t, doc), ref, secret, at+"/_normal_range")
+	})
+	// A suffix member the decode does not read is reported down to the
+	// member: the bare "|" beside the suffixes DV_QUANTITY reads, and a
+	// suffix of a ctx field the decode has no key for.
+	t.Run("bare value member beside read suffixes", func(t *testing.T) {
+		ref, doc := structuredDoc(t, rmattrBody(nil))
+		structuredObject(t, doc, quantity)["|"] = 5
+		assertStructuredUnmatched(t, wt, mustJSON(t, doc), ref, secret, quantity+"/|")
+	})
+	t.Run("suffix member on a ctx field", func(t *testing.T) {
+		setting := map[string]any{"ctx/setting|code": "238", "ctx/setting|value": "other care"}
+		ref, doc := structuredDoc(t, rmattrBody(setting))
+		structuredObject(t, doc, "ctx/setting")["|x"] = secret
+		assertStructuredUnmatched(t, wt, mustJSON(t, doc), ref, secret, "ctx/setting/|x")
+	})
 	// A name of several FLAT pieces whose base reads nothing.
 	for _, name := range []string{"x_ext:0", "x|y", "x/y"} {
 		for _, at := range []string{rmattrRoot, rmattrRoot + "/conformance_section/0/conformance_observation/0/any_event/0/dv_quantity/0"} {
@@ -1642,6 +1721,7 @@ func TestREQ170StructuredReadNamesKeepShapeRefusals(t *testing.T) {
 		{"template root", rmattrRoot, "conformance_section"},
 		{"template root", rmattrRoot, "conformance_section:0"},
 		{"node with children", rmattrRoot + "/conformance_section/0", "conformance_observation"},
+		{"node with children", obs, "_uid"},
 		{"leaf", quantity, "_normal_range"},
 		{"interval leaf's lower", rmattrRoot + "/conformance_section/0/conformance_interval/0/any_event/0/interval_dv_quantity/0", "lower"},
 		{"party leaf's relationship", obs + "/subject/0", "relationship"},
@@ -1845,5 +1925,25 @@ func TestREQ170StructuredMetadataWithoutANode(t *testing.T) {
 				}
 			})
 		}
+	}
+	// A metadata segment is single-valued with or without its node, so an
+	// element past :0 is refused whatever it holds, in STRUCTURED and FLAT.
+	for _, tc := range []struct{ name, at, member, flatKey string }{
+		{"context/1", rmattrRoot, "context", rmattrRoot + "/context:1/x_unknown|y"},
+		{"context/0/start_time/1", contextPath, "start_time", rmattrRoot + "/context/start_time:1/x_unknown|y"},
+	} {
+		t.Run(tc.name+" holding only unmatched members", func(t *testing.T) {
+			_, doc := structuredDoc(t, body)
+			obj := structuredObject(t, doc, tc.at)
+			obj[tc.member] = append(obj[tc.member].([]any), map[string]any{"x_unknown": []any{"v"}})
+			if err := structuredDocRefusedInEveryMode(t, &wt, mustJSON(t, doc)); !errors.Is(err, ErrUnknownPath) || !strings.Contains(err.Error(), "single-valued") {
+				t.Errorf("STRUCTURED err = %v, want ErrUnknownPath for a single-valued position", err)
+			}
+			flat := maps.Clone(body)
+			flat[tc.flatKey] = "v"
+			if err := refusedInEveryMode(t, &wt, flat); !errors.Is(err, ErrUnknownPath) || !strings.Contains(err.Error(), "single-valued") {
+				t.Errorf("FLAT err = %v, want ErrUnknownPath for a single-valued position", err)
+			}
+		})
 	}
 }

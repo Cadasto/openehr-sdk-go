@@ -152,11 +152,15 @@ Concretely:
   Trailing JSON after the object is rejected too. A key is judged segment by segment from the
   left, so an index past the bound of a segment that resolves makes the key malformed whatever
   follows it. An `:index` past `:0` on the template root's own segment (a key that is that
-  segment alone, `<root>:1\|x_note`, included), or on a segment of the
+  segment alone, `<root>:1\|x_note`, included), on a segment of the
   Web Template path that addresses a single-valued RM attribute (`<root>/context:1/…`, an
   ACTION's `ism_transition` node, an ENTRY's `language`, a party leaf, an interval leaf on a
-  single-valued attribute), is an index past its bound (REQ-170): `ErrUnknownPath` naming the
-  key, never merged into the one value. An interval leaf's index belongs to the ELEMENT the Web
+  single-valued attribute), or on a composition-metadata segment, whether or not the Web
+  Template carries its node, is an index past its bound (REQ-170): `ErrUnknownPath` naming the
+  key, never merged into the one value. STRUCTURED judges an element's position in its member's
+  array the same way, before what the element holds: an element past the bound of a
+  single-valued node, metadata segment, underscore family or FEEDER_AUDIT sub-path is refused
+  even when every member it holds is unmatched content. An interval leaf's index belongs to the ELEMENT the Web
   Template folds away, judged on the RM attribute that holds it as any other leaf's, so a
   repeating interval ELEMENT takes `:N` and round-trips.
   The same index on a sub-path inside an underscore family's value or an interval value

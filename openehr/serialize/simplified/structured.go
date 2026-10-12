@@ -389,6 +389,11 @@ func (w *structuredWalker) walk(path, member string, level memberLevel, obj map[
 			return fmt.Errorf("%w: structured: expected an array at %q, got %T", ErrUnknownPath, path+"/"+k, v)
 		}
 		for i, el := range arr {
+			// The position is judged before what the element holds, as the
+			// FLAT decode judges a key's segments from the left (REQ-170).
+			if err := below.bound.check(path, k, i); err != nil {
+				return err
+			}
 			seg := path + "/" + k + ":" + strconv.Itoa(i)
 			switch obj := el.(type) {
 			case map[string]any:

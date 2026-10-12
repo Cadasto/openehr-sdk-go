@@ -50,9 +50,11 @@
 // suffix (a lone bare value where the datatype has no bare spelling, a bare
 // ctx/setting), two spellings of one field the decode reads that disagree
 // (such as `x` and `x|`; a lone `x|` reads as `x`), an index past its bound.
-// Two spellings of a key the decode does not read are two unmatched keys. A key is judged segment by segment from the left: an
-// index past the bound of a segment that resolves makes the key malformed,
-// whatever follows it.
+// Two spellings of a key the decode does not read are two unmatched keys. A
+// key is judged segment by segment from the left: an index past the bound of a
+// segment that resolves makes the key malformed, whatever follows it. In
+// STRUCTURED the same holds for an element's position in its member's array,
+// whatever the element holds.
 //
 // By default the decoder ignores unmatched content: the value holds the rest
 // of the input and none of it, exactly as if the input had left those keys

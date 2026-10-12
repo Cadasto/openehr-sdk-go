@@ -565,6 +565,29 @@ func metadataRel(rel string) (norm string, overIndexed bool) {
 	return b.String(), overIndexed
 }
 
+// overIndexedMetadataSeg returns the first segment of the leading run of
+// metadata segments of rel, a root-relative path, that carries an index past
+// :0. [metadataRel] reports that one exists.
+func overIndexedMetadataSeg(rel string) flatSeg {
+	path, _, _ := strings.Cut(rel, "|")
+	pk, err := parseFlatKey(path)
+	if err != nil {
+		return flatSeg{}
+	}
+	var seen string
+	for _, s := range pk.segs {
+		p := strings.TrimPrefix(seen+"/"+s.id, "/")
+		if !metadataSegPaths[p] {
+			break
+		}
+		if s.idx > 0 {
+			return s
+		}
+		seen = p
+	}
+	return flatSeg{}
+}
+
 // composerSubStructure reports whether sub, the path below `composer/`, opens
 // with a segment of the party grammar's sub-structure: the nested
 // `_identifier:N` list or PARTY_RELATED's `relationship`.
@@ -780,13 +803,20 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 		}
 		// The tables below are keyed on the unindexed spelling. An indexed
 		// metadata path is read exactly as that spelling, and only `:0` is an
-		// index a single-valued attribute has (REQ-053). A key that is no
-		// metadata spelling once its index is gone keeps flowing as content under
-		// the key it arrived with.
+		// index a single-valued attribute has (REQ-053), so any other is
+		// refused. A key that is no metadata spelling once its `:0` is gone
+		// keeps flowing as content under the key it arrived with.
+		raw := rel
 		rel, overIndexed := metadataRel(rel)
 		if overIndexed && isMetadataSpelling(rel) {
 			return nil, nil, nil, fmt.Errorf("%w: %q (a composition metadata path runs through single-valued attributes, so :0 is the only index it takes)",
 				ErrUnknownPath, key)
+		}
+		// Any other key that runs through a metadata segment past :0 is past
+		// that segment's bound whatever follows it, whether or not the Web
+		// Template carries a node for the segment (REQ-170).
+		if overIndexed {
+			return nil, nil, nil, fmt.Errorf("simplified: %q: %w", key, errSingleValuedIndex(overIndexedMetadataSeg(raw)))
 		}
 		if want, isWitness := metadataAliasTerminology[rel]; isWitness {
 			if err := checkTerminologyWitness(key, val, want); err != nil {
