@@ -127,6 +127,7 @@ func rmattrChildGroups(g rmattrGroup, known map[string]bool) (map[string]any, ma
 		child := bySeg[id][slot]
 		if child == nil {
 			child = newRMAttrGroup(g.prefix(), id, idx, g.sink)
+			child.dups = g.dups
 			bySeg[id][slot] = child
 		} else if child.index != idx {
 			return nil, nil, fmt.Errorf("%w: %q collides with another spelling of :index %d; remove one",

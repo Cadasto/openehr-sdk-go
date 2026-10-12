@@ -810,6 +810,44 @@ func TestRealCodecRefusal(t *testing.T) {
 			t.Errorf("body decodes only with the refused key removed, but still fails: %v", err)
 		}
 	})
+
+	t.Run("refused bare value at an unmapped leaf is removed alone", func(t *testing.T) {
+		// The composer's PARTY_PROXY has neither a suffix set nor a sub-path
+		// grammar, so the codec refuses its bare value (REQ-170) naming the
+		// leaf's base with the allowlist's "unexpected bare value" wording:
+		// the harness removes that one key, not the accepted `composer|name`
+		// alias beside it, which shares the base.
+		body := maps.Clone(leaf)
+		maps.Copy(body, map[string]any{
+			"ctx/language": "en", "ctx/territory": "US",
+			target.Root + "/composer|name": "Dr. Who",
+			target.Root + "/composer":      "bare composer",
+		})
+		_, err := decodeAsGiven(target, body, nil)
+		if err == nil {
+			t.Fatal("a bare composer decoded — the codec no longer refuses it, so this test needs another bare refusal")
+		}
+		if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
+			t.Fatalf("real refusal is not ErrUnsupportedDatatype: %v", err)
+		}
+		key := target.Root + "/composer"
+		if got := offendingKey(err); got != key {
+			t.Errorf("offendingKey(real refusal) = %q, want the leaf base %q\nrefusal: %v", got, key, err)
+		}
+		if got, want := reasonOf(err, key), "unsupported bare value for PARTY_PROXY"; got != want {
+			t.Errorf("reasonOf(real refusal) = %q, want %q\nrefusal: %v", got, want, err)
+		}
+		removed, gap := dropRefused(body, offendingKey(err), err)
+		if !gap || removed != 1 {
+			t.Fatalf("dropRefused(real refusal) = %d, %v; want 1, true", removed, gap)
+		}
+		if _, ok := body[target.Root+"/composer|name"]; !ok {
+			t.Error("composer|name was dropped by a bare composer refusal — wider than the refusal names")
+		}
+		if _, err := decodeAsGiven(target, body, nil); err != nil {
+			t.Errorf("body decodes only with the refused key removed, but still fails: %v", err)
+		}
+	})
 }
 
 // modelledQuantityLeaf returns a DV_QUANTITY leaf the codec *does* model, as

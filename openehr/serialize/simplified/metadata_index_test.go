@@ -383,6 +383,7 @@ func TestREQ053IndexedMetadataRefusalsHold(t *testing.T) {
 		named []string
 	}{
 		{"setting formatting", "context:0/setting:0|formatting", "plain", simplified.ErrUnsupportedDatatype, nil},
+		{"setting bare", "context:0/setting:0", "other care", simplified.ErrUnsupportedDatatype, nil},
 		{"start_time raw", "context:0/start_time:0|raw", map[string]any{"_type": "DV_DATE_TIME", "value": "2026-08-05T10:00:00Z"}, simplified.ErrUnsupportedDatatype, nil},
 		{"composer nested identifier", "composer:0/_identifier:0|id", "122", simplified.ErrUnsupportedDatatype, []string{"ADR 0015"}},
 		{"composer relationship", "composer:0/relationship|code", "122", simplified.ErrUnsupportedDatatype, []string{"ADR 0015"}},
@@ -401,15 +402,6 @@ func TestREQ053IndexedMetadataRefusalsHold(t *testing.T) {
 		if _, err := simplified.UnmarshalFlat(marshalBody(t, body), wt, simplified.WithTemplate(compiled)); err == nil {
 			t.Error("indexed composer external_ref decoded without error; want a refusal (ADR 0015)")
 		}
-	})
-	// A bare value is outside DV_CODED_TEXT's suffix set: unmatched content,
-	// ignored by default and refused under strict naming the key as written
-	// (REQ-170).
-	t.Run("setting bare", func(t *testing.T) {
-		body := indexedMetaBase()
-		key := root + "/context:0/setting:0"
-		body[key] = "other care"
-		assertUnmatchedKey(t, marshalBody(t, body), wt, key, simplified.WithTemplate(compiled))
 	})
 }
 

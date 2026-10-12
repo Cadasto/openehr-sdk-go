@@ -208,15 +208,16 @@ var Recorded = map[string]map[Leg]Record{
 		},
 		LegFlatCanonical: {
 			Outcome: Outcome{Compared: 150, Missing: 40, Extra: 27, Altered: 16, Excluded: 8},
-			Reason: "The 8 excluded keys are the composer's external_ref (3) and ctx/time, refused, and " +
-				"ctx/setting, ctx/location, _name and created/date_time_value, reported as unmatched content, as " +
+			Reason: "The 8 excluded keys are the composer's external_ref (3), ctx/time and ctx/setting, refused, " +
+				"and ctx/location, _name and created/date_time_value, reported as unmatched content, as " +
 				"follows. body-form composer: decode refuses the composer's external_ref keys (3), so the " +
 				"external_ref is missing; composer|name decodes, so the composer is the canonical's " +
 				"PARTY_IDENTIFIED. UPSTREAM consult_record ctx conflict: the " +
 				"FLAT gives ctx/time and context/start_time different values, decode refuses the pair and the " +
 				"harness removes ctx/time; the start time left agrees with the canonical. ctx/setting: the FLAT " +
-				"writes ctx/setting as bare text, which the codec does not read (it reads ctx/setting|code and " +
-				"|value), so decode fills the default 238 other care against the canonical 228 primary medical care. " +
+				"writes ctx/setting as bare text, the setting without the |code and |value the codec reads it as, " +
+				"which decode refuses in every mode as a missing required suffix (REQ-170); the harness removes it, " +
+				"so decode fills the default 238 other care against the canonical 228 primary medical care. " +
 				"ctx/location: the codec does not read ctx/location (it reads context/_location, ADR 0016), so the " +
 				"location is missing. LOCATABLE name: the codec does not read _name, so decode names the composition " +
 				"OPConsultation from the template against the canonical Routine checkup. Choice element: decode " +

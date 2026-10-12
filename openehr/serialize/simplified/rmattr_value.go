@@ -130,9 +130,15 @@ func splitRMAttrTails(g rmattrGroup, sub, lists map[string]bool) (rmattrTails, e
 			slot = make(map[string]any)
 			ts.sub[seg] = slot
 		}
-		if _, taken := slot[suffix]; taken {
-			return rmattrTails{}, fmt.Errorf("%w: %q collides with another spelling of the same sub-path; remove one",
-				ErrUnsupportedDatatype, g.key(tail))
+		if held, taken := slot[suffix]; taken {
+			if g.dups == nil {
+				return rmattrTails{}, fmt.Errorf("%w: %q collides with another spelling of the same sub-path; remove one",
+					ErrUnsupportedDatatype, g.key(tail))
+			}
+			// Judged once the decode knows whether it reads the sub-path
+			// ([rmattrGroup.settleDups]).
+			*g.dups = append(*g.dups, tailDup{first: ts.key(g, norm), second: g.key(tail), firstVal: held, secondVal: val})
+			continue
 		}
 		slot[suffix] = val
 		ts.orig[norm] = tail

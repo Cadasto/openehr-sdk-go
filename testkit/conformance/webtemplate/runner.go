@@ -399,8 +399,10 @@ func decodeSubset(t *Target, keys map[string]any, opt simplified.Option) (*rm.Co
 //     `external_ref`): that one entry goes. `composer|name` beside it is an
 //     accepted alias and stays.
 //   - A suffix of a leaf named by its base ("unexpected |value for DV_TEXT",
-//     a DV_TEXT `|value` without the `|code` that selects the coded subtype):
-//     only that one entry goes, and the rest of the leaf stays.
+//     a DV_TEXT `|value` without the `|code` that selects the coded subtype),
+//     or its bare value ("unexpected bare value for PARTY_PROXY", the
+//     composer's bare value): only that one entry goes, and the rest of the
+//     leaf stays.
 //   - Any other ErrUnsupportedDatatype refusal naming a leaf's base (a
 //     missing required suffix): the leaf's own entries go, but *not* the
 //     subtree beneath it, which belongs to other nodes or families.

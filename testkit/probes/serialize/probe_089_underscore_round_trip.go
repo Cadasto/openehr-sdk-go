@@ -673,7 +673,8 @@ func Probe089UnderscoreRoundTrip(target *conformance.Target, c Probe089Case) (Re
 // the report option (which then reports nothing) and under strict: a
 // successful decode is a failure however faithful the rest of the body is,
 // because that is the forbidden decode-and-drop. A key marked Unmatched must
-// instead decode by default, be reported, each key once, and fail under strict
+// instead decode, by default and under the report option, to the value of the
+// body without it, be reported, each key once, and fail under strict
 // (REQ-170).
 func Probe089RefusedFamilies(target *conformance.Target, ref Probe089Refusal) (Result, error) { // PROBE-089 (REQ-053, REQ-080, REQ-140, REQ-170)
 	r := Result{Probe: "PROBE-089"}
@@ -695,9 +696,26 @@ func Probe089RefusedFamilies(target *conformance.Target, ref Probe089Refusal) (R
 	}
 	modes := []mode{{"strict", []simplified.Option{simplified.WithStrict()}}}
 	if ref.Unmatched {
-		if _, err := simplified.UnmarshalFlat(body, target.Web, report); err != nil {
-			r.Status, r.Detail = "fail", fmt.Sprintf("%s: default decode failed: %v — unmatched content MUST be ignored by default", ref.Name, err)
-			return r, nil
+		// Ignored means the value is the body's without the keys, by default
+		// and under the report option alike.
+		without, err := json.Marshal(Probe089Case{}.Body())
+		if err != nil {
+			return r, fmt.Errorf("PROBE-089: refusal %q: marshal fixture: %w", ref.Name, err)
+		}
+		want, err := probe089Canonical(without, target, nil)
+		if err != nil {
+			return r, fmt.Errorf("PROBE-089: refusal %q: decode the body without its keys: %w", ref.Name, err)
+		}
+		for _, m := range []mode{{"default", nil}, {"report", []simplified.Option{report}}} {
+			got, err := probe089Canonical(body, target, m.opts)
+			if err != nil {
+				r.Status, r.Detail = "fail", fmt.Sprintf("%s: %s decode failed: %v — unmatched content MUST be ignored by default", ref.Name, m.name, err)
+				return r, nil
+			}
+			if _, diff := wireequiv.Equivalent(want, got); diff != "" {
+				r.Status, r.Detail = "fail", fmt.Sprintf("%s: %s decode differs from the body without the unmatched keys: %s", ref.Name, m.name, diff)
+				return r, nil
+			}
 		}
 		if want := slices.Sorted(maps.Keys(ref.Keys)); !slices.Equal(reported, want) {
 			r.Status, r.Detail = "fail", fmt.Sprintf("%s: reported %q, want %q", ref.Name, reported, want)
@@ -733,6 +751,16 @@ func Probe089RefusedFamilies(target *conformance.Target, ref Probe089Refusal) (R
 	}
 	r.Status, r.Detail = "pass", fmt.Sprintf("%s refused: %v", ref.Name, refusal)
 	return r, nil
+}
+
+// probe089Canonical decodes a FLAT body with opts and renders the value as
+// canonical JSON, the form two decodes are compared in.
+func probe089Canonical(body []byte, target *conformance.Target, opts []simplified.Option) ([]byte, error) {
+	comp, err := simplified.UnmarshalFlat(body, target.Web, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return canjson.Marshal(comp)
 }
 
 // probe089EncodeDiff compares the family key set the encoder emitted against

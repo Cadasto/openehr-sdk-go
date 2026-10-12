@@ -69,6 +69,40 @@ type rmattrGroup struct {
 	// sink takes the keys of the tails the family's grammar does not read
 	// (REQ-170). A nil sink drops them without a record.
 	sink *unmatchedSink
+	// dups holds the second spellings of one tail that the grammar normalises
+	// onto a tail it already holds (`/relationship|x` beside
+	// `/relationship:0|x`), shared with the group's child groups, for
+	// [rmattrGroup.settleDups] to judge once the decode knows whether it reads
+	// the tail. A nil dups refuses such a pair at once.
+	dups *[]tailDup
+}
+
+// tailDup is a second spelling of a tail: the key the group holds, the key
+// that spells it again, and their values.
+type tailDup struct {
+	first, second       string
+	firstVal, secondVal any
+}
+
+// settleDups judges every second spelling the family's grammar met: where the
+// decode set the first spelling aside as unmatched, the second is unmatched
+// too; where it read it, the two must hold the same value, or they are two
+// spellings of one field that disagree (REQ-170).
+func (g rmattrGroup) settleDups() error {
+	if g.dups == nil {
+		return nil
+	}
+	for _, d := range *g.dups {
+		if g.sink.reported(d.first) {
+			g.sink.add(d.second)
+			continue
+		}
+		if !sameCtxValue(d.firstVal, d.secondVal) {
+			return fmt.Errorf("%w: %q and %q spell one sub-path twice and disagree; remove one",
+				ErrUnsupportedDatatype, d.first, d.second)
+		}
+	}
+	return nil
 }
 
 // newRMAttrGroup starts an empty group whose unmatched tails go to sink.
@@ -76,6 +110,7 @@ func newRMAttrGroup(base, family string, index int, sink *unmatchedSink) *rmattr
 	return &rmattrGroup{
 		base: base, family: family, index: index,
 		tails: make(map[string]any), keys: make(map[string]string), sink: sink,
+		dups: new([]tailDup),
 	}
 }
 
@@ -344,14 +379,20 @@ type rmattrDecoded struct {
 //     unmatched content (REQ-170): every key goes to the sink and the group is
 //     skipped. The two deferred families are the exception where the owner
 //     declares them: [ErrUnknownPath] in every mode;
-//  2. a recognised family carrying a key outside its grammar hands that key to
-//     the sink; one missing an RM-mandatory key, or holding a value its
-//     suffixes cannot express, is ErrUnsupportedDatatype naming the key;
-//  3. a recognised family whose `:index` breaks the FLAT indexing rules is
+//  2. an instance whose `:index` is past its family's bound is ErrUnknownPath,
+//     judged before its tails, since the index makes every key of the
+//     instance malformed whatever follows it (REQ-170);
+//  3. a recognised family carrying a key outside its grammar hands that key to
+//     the sink; two spellings of one sub-path are judged once the decode knows
+//     whether it reads the sub-path ([rmattrGroup.settleDups]); one missing an
+//     RM-mandatory key, or holding a value its suffixes cannot express, is
+//     ErrUnsupportedDatatype naming the key;
+//  4. a sequence of instances that breaks the FLAT indexing rules (a
+//     collision, a gap, two spellings of a single-valued family) is
 //     ErrUnknownPath (structurally inadmissible, like a sparse clinical index),
 //     judged over the instances that decoded, since an instance every key of
 //     which is unmatched is not in the body the decode reads;
-//  4. only then is the owner materialised, so a refusal leaves no half-built
+//  5. only then is the owner materialised, so a refusal leaves no half-built
 //     node in the rebuilt tree.
 func decodeRMAttrGroups(compJSON map[string]any, wt *webtemplate.WebTemplate, groups []rmattrGroup,
 	ambiguous map[string]bool, budget *allocBudget, names map[string]string,
@@ -380,6 +421,11 @@ func decodeRMAttrGroups(compJSON map[string]any, wt *webtemplate.WebTemplate, gr
 			return err
 		}
 		val, err := fam.decode(g, owner.leaf)
+		if err == nil || errors.Is(err, errNothingMatched) {
+			if dupErr := g.settleDups(); dupErr != nil {
+				return dupErr
+			}
+		}
 		if errors.Is(err, errNothingMatched) {
 			continue
 		}
@@ -501,18 +547,16 @@ func rmattrValueNode(node map[string]any, g rmattrGroup, anchor string) (map[str
 
 // checkRMAttrIndexes applies the FLAT `:index` rules to a `_family:N` sequence.
 // They are the clinical-segment rules, not a second set: canonical spelling and
-// the negative-index rejection live in [parseFlatKey], the repeat bound is
-// [maxRepeatIndex], and a gap is refused for the same reason [checkNoPhantoms]
-// refuses one on a clinical container — a missing occurrence would gap-fill a
-// phantom instance out of a malformed payload.
+// the negative-index rejection live in [parseFlatKey], the bound of each
+// instance was judged before its tails ([checkRMAttrIndexBound]), and a gap is
+// refused for the same reason [checkNoPhantoms] refuses one on a clinical
+// container — a missing occurrence would gap-fill a phantom instance out of a
+// malformed payload.
 //
 // A scalar family admits `:0` beside the index-less spelling because the
 // OPT-free FLAT ↔ STRUCTURED interconversion re-spells every segment with an
-// explicit index; anything higher is a list where the RM has a single value.
+// explicit index, but not both at once.
 func checkRMAttrIndexes(g rmattrGroup, fam rmattrFamily, indexes map[int]bool) error {
-	if err := checkRMAttrIndexBound(g, fam); err != nil {
-		return err
-	}
 	if !fam.list {
 		if len(indexes) > 1 {
 			// Either `_uid` beside `_uid:0`, or `_uid:0` beside `_uid:1`: both are

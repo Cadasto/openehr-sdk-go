@@ -28,7 +28,9 @@
 // Template does not resolve, an underscore-prefixed segment that names no RM
 // attribute this codec carries at that node, a suffix outside the suffix set
 // of its datatype or underscore family, and a ctx/ field the codec does not
-// read. A key the decode reads is never unmatched, even where the decode then
+// read. A STRUCTURED member whose name resolves nothing the decode reads is
+// unmatched whatever its value holds, and is reported as that member. A key
+// the decode reads is never unmatched, even where the decode then
 // refuses it: the composer's `external_ref` suffixes and party sub-structure,
 // a PARTICIPATION `time`, a FEEDER_AUDIT_DETAILS `other_details`,
 // `_instruction_details` and `_wf_definition` have no carrier and fail the
@@ -43,8 +45,10 @@
 // composer's PARTY_PROXY, refuses its bare value and any suffix naming an
 // attribute of its RM class (for the composer, a suffix of the party grammar).
 // So does malformed content: a value of the wrong shape, a missing required
-// suffix, two spellings of one field that disagree (such as `x` and `x|`), an
-// index past its bound. A key is judged segment by segment from the left: an
+// suffix (a lone bare value where the datatype has no bare spelling, a bare
+// ctx/setting), two spellings of one field the decode reads that disagree
+// (such as `x` and `x|`; a lone `x|` reads as `x`), an index past its bound.
+// Two spellings of a key the decode does not read are two unmatched keys. A key is judged segment by segment from the left: an
 // index past the bound of a segment that resolves makes the key malformed,
 // whatever follows it.
 //

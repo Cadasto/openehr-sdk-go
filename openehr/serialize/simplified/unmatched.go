@@ -9,7 +9,9 @@ package simplified
 //
 // How it works. The decode sites that meet a key they do not read hand it to
 // the decode's [unmatchedSink] and carry on without it. Whether a key is
-// unmatched never depends on the other keys of the body, so the value the
+// unmatched depends at most on the other spellings of its own leaf (a bare
+// value is unmatched beside a suffix its datatype reads, and malformed alone),
+// never on what the decode makes of the rest of the body, so the value the
 // default decode must return is the decode of the body without those keys. A
 // pass that met unmatched keys therefore decodes again, from the body with
 // them removed: structural checks (a dense :index sequence, one instance of a
@@ -17,10 +19,14 @@ package simplified
 // they would for the body without the unmatched ones. A pass that meets none
 // is the result. Each repeat removes at least one key, so the loop ends.
 //
+// A STRUCTURED member whose name resolves nothing is set aside before the
+// body becomes a FLAT map ([structuredToFlatJudged]), whatever it holds, and
+// joins the keys the passes set aside.
+//
 // Document order is recovered only when an option asks for it: the FLAT
 // object's keys are read in order, and a STRUCTURED body's members are walked
-// in order to map each FLAT key the interconversion produces back to its
-// member path.
+// in order to map each FLAT key the interconversion produces, and each member
+// set aside, back to its member path.
 
 import (
 	"bytes"
@@ -42,11 +48,29 @@ import (
 type unmatchedSink struct {
 	keys []string
 	seen map[string]bool
+	// spellings maps a key the decode works on to every key as written that
+	// it stands for, where that is not just itself: [foldEmptySuffix] reads
+	// `x|` as `x`, so an unmatched `x` reports each spelling the body carried.
+	spellings map[string][]string
 }
 
 // add records key as unmatched.
 func (s *unmatchedSink) add(key string) {
-	if s == nil || s.seen[key] {
+	if s == nil {
+		return
+	}
+	if written, ok := s.spellings[key]; ok {
+		for _, w := range written {
+			s.addWritten(w)
+		}
+		return
+	}
+	s.addWritten(key)
+}
+
+// addWritten records one key as written in the body.
+func (s *unmatchedSink) addWritten(key string) {
+	if s.seen[key] {
 		return
 	}
 	if s.seen == nil {
@@ -54,6 +78,11 @@ func (s *unmatchedSink) add(key string) {
 	}
 	s.seen[key] = true
 	s.keys = append(s.keys, key)
+}
+
+// reported reports whether key, as written, went to the sink.
+func (s *unmatchedSink) reported(key string) bool {
+	return s != nil && s.seen[key]
 }
 
 // errNothingMatched is how a group decoder says that every key of its group
@@ -153,8 +182,22 @@ type keyLocation struct {
 	path string
 }
 
-// locator maps a FLAT key to its location in the input.
+// locator maps a FLAT key to its location in the input. A STRUCTURED member
+// set aside before the FLAT map is made is located under its [memberKeys] key.
 type locator map[string]keyLocation
+
+// memberKeyPrefix opens the locator key of a STRUCTURED member path. No FLAT
+// key starts with it, so the two never meet.
+const memberKeyPrefix = "\x00"
+
+// memberKeys returns the locator keys of STRUCTURED member paths.
+func memberKeys(paths []string) []string {
+	keys := make([]string, len(paths))
+	for i, p := range paths {
+		keys[i] = memberKeyPrefix + p
+	}
+	return keys
+}
 
 // order sorts keys into the order the input gives them and returns their
 // paths. A key the locator does not know goes after the known ones, sorted,
@@ -181,7 +224,7 @@ func (l locator) order(keys []string) []string {
 			paths = append(paths, loc.path)
 			continue
 		}
-		paths = append(paths, k)
+		paths = append(paths, strings.TrimPrefix(k, memberKeyPrefix))
 	}
 	return paths
 }
@@ -280,7 +323,10 @@ func readOrdered(dec *json.Decoder) (orderedValue, error) {
 // for each FLAT key [structuredToFlat] makes of it, its position and its
 // member path. The walk mirrors that conversion: the ctx object's fields, and
 // under every other root member the child arrays, each element taking a
-// `:index` in FLAT and its position as a segment in the member path.
+// `:index` in FLAT and its position as a segment in the member path. Every
+// member that is not a suffix, the top-level ones and the ctx fields
+// included, is located too, under its [memberKeys] key and ahead of what it
+// holds, for a member [structuredToFlatJudged] sets aside.
 func structuredLocations(data []byte) (locator, error) {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
@@ -299,6 +345,9 @@ func structuredLocations(data []byte) (locator, error) {
 	var walk func(flatPath, memberPath string, obj orderedValue)
 	walk = func(flatPath, memberPath string, obj orderedValue) {
 		for _, m := range obj.members {
+			if m.name != bareStructuredKey && !strings.HasPrefix(m.name, "|") {
+				put(memberKeyPrefix+memberPath+"/"+m.name, memberPath+"/"+m.name)
+			}
 			switch {
 			case m.name == bareStructuredKey:
 				put(flatPath, memberPath+"/"+m.name)
@@ -318,11 +367,13 @@ func structuredLocations(data []byte) (locator, error) {
 		}
 	}
 	for _, m := range root.members {
+		put(memberKeyPrefix+m.name, m.name)
 		if !m.value.isObject {
 			continue
 		}
 		if m.name == "ctx" {
 			for _, field := range m.value.members {
+				put(memberKeyPrefix+"ctx/"+field.name, "ctx/"+field.name)
 				if field.value.isObject {
 					for _, sfx := range field.value.members {
 						put("ctx/"+field.name+sfx.name, "ctx/"+field.name+"/"+sfx.name)
@@ -407,24 +458,32 @@ func leafSuffixMatched(rmType, suffix string) (matched, judged bool) {
 // read, handing the key of each one dropped to sink. keyOf builds the FLAT key
 // a suffix arrived under. For a datatype with no suffix set it returns sfx as
 // it is. The map returned is sfx itself when nothing was dropped.
+//
+// A bare value at a datatype with no bare spelling is unmatched beside a
+// suffix the datatype reads, as DV_PROPORTION's derived magnitude beside its
+// numerator is. Alone it is a value missing every required suffix, malformed
+// content (REQ-170): it is kept, so the datatype's own decoding refuses it.
 func matchedSuffixes(rmType string, sfx map[string]any, keyOf func(suffix string) string, sink *unmatchedSink) map[string]any {
-	var out map[string]any
+	var drop []string
 	for _, suffix := range slices.Sorted(maps.Keys(sfx)) {
 		matched, judged := leafSuffixMatched(rmType, suffix)
 		if !judged {
 			return sfx
 		}
-		if matched {
-			continue
+		if !matched {
+			drop = append(drop, suffix)
 		}
-		if out == nil {
-			out = maps.Clone(sfx)
-		}
+	}
+	if len(drop) == 0 {
+		return sfx
+	}
+	if _, bare := sfx[""]; bare && len(drop) == len(sfx) {
+		drop = slices.DeleteFunc(drop, func(suffix string) bool { return suffix == "" })
+	}
+	out := maps.Clone(sfx)
+	for _, suffix := range drop {
 		delete(out, suffix)
 		sink.add(keyOf(suffix))
-	}
-	if out == nil {
-		return sfx
 	}
 	return out
 }

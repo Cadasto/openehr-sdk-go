@@ -119,7 +119,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 ### flat-canonical
 
 - Outcome: compared 150, missing 40, extra 27, altered 16, excluded 8
-- Reason: The 8 excluded keys are the composer's external_ref (3) and ctx/time, refused, and ctx/setting, ctx/location, _name and created/date_time_value, reported as unmatched content, as follows. body-form composer: decode refuses the composer's external_ref keys (3), so the external_ref is missing; composer|name decodes, so the composer is the canonical's PARTY_IDENTIFIED. UPSTREAM consult_record ctx conflict: the FLAT gives ctx/time and context/start_time different values, decode refuses the pair and the harness removes ctx/time; the start time left agrees with the canonical. ctx/setting: the FLAT writes ctx/setting as bare text, which the codec does not read (it reads ctx/setting|code and |value), so decode fills the default 238 other care against the canonical 228 primary medical care. ctx/location: the codec does not read ctx/location (it reads context/_location, ADR 0016), so the location is missing. LOCATABLE name: the codec does not read _name, so decode names the composition OPConsultation from the template against the canonical Routine checkup. Choice element: decode does not read media_file/created/date_time_value (the SDK spells it created). Sibling order: FLAT carries no order between the document_attachment items; decode lists the media_file cluster first, the canonical lists it last, so the item leaves compare at shifted positions. RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (3 leaves).
+- Reason: The 8 excluded keys are the composer's external_ref (3), ctx/time and ctx/setting, refused, and ctx/location, _name and created/date_time_value, reported as unmatched content, as follows. body-form composer: decode refuses the composer's external_ref keys (3), so the external_ref is missing; composer|name decodes, so the composer is the canonical's PARTY_IDENTIFIED. UPSTREAM consult_record ctx conflict: the FLAT gives ctx/time and context/start_time different values, decode refuses the pair and the harness removes ctx/time; the start time left agrees with the canonical. ctx/setting: the FLAT writes ctx/setting as bare text, the setting without the |code and |value the codec reads it as, which decode refuses in every mode as a missing required suffix (REQ-170); the harness removes it, so decode fills the default 238 other care against the canonical 228 primary medical care. ctx/location: the codec does not read ctx/location (it reads context/_location, ADR 0016), so the location is missing. LOCATABLE name: the codec does not read _name, so decode names the composition OPConsultation from the template against the canonical Routine checkup. Choice element: decode does not read media_file/created/date_time_value (the SDK spells it created). Sibling order: FLAT carries no order between the document_attachment items; decode lists the media_file cluster first, the canonical lists it last, so the item leaves compare at shifted positions. RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (3 leaves).
 - Missing (40, first 10 shown):
   - `/composer/external_ref/_type`
   - `/composer/external_ref/id/_type`
@@ -154,9 +154,10 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `/content/0/data/items/1/value/value`: reference `"final"`, ours `"OP consult record"`
   - `/content/0/data/items/2/_type`: reference `"CLUSTER"`, ours `"ELEMENT"`
 - Reducing decode removed 8 keys from the upstream FLAT:
-  - 4: `reported as unmatched content`
+  - 3: `reported as unmatched content`
   - 3: `simplified: decode "<key>": simplified: unsupported datatype: PARTY_PROXY`
   - 1: `simplified: path not in web template: conflicting spellings of <key>: "<key>" gives "2023-06-02T12:50:00Z", "opconsultation/context/start_time" gives "2022-02-03T04:05:06"; remove one`
+  - 1: `simplified: unsupported datatype: "<key>" spells the setting without its |code and |value, the pair <key> travels as`
 
 ### flat-structured
 
@@ -486,5 +487,5 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 - Reducing decode removed 11 keys from the upstream FLAT:
   - 4: `simplified: decode "<key>": simplified: unsupported datatype: DV_IDENTIFIER missing required |id`
   - 3: `simplified: decode "<key>": simplified: unsupported datatype: PARTY_PROXY`
-  - 3: `simplified: path not in web template: "<key>" is the reference's in-context spelling of an ACTION's ISM transition current_state, which the Web Template this SDK builds does not model - refused rather than dropped or replaced (REQ-140, see deviations.md)`
-  - 1: `simplified: path not in web template: "<key>" is the reference's in-context spelling of an ACTION's time, which the Web Template this SDK builds does not model - refused rather than dropped or replaced (REQ-140, see deviations.md)`
+  - 3: `simplified: path not in web template: "<key>" is the reference's in-context spelling of an ACTION's ISM transition current_state, which the Web Template this SDK builds does not model - refused rather than dropped or replaced (REQ-170, see deviations.md)`
+  - 1: `simplified: path not in web template: "<key>" is the reference's in-context spelling of an ACTION's time, which the Web Template this SDK builds does not model - refused rather than dropped or replaced (REQ-170, see deviations.md)`

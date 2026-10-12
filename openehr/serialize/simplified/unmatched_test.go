@@ -222,29 +222,80 @@ func TestREQ170FlatUnmatchedIgnoredReportedRefused(t *testing.T) {
 func TestREQ170FlatReportFollowsDocumentOrder(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	body, unmatched := req170Body()
-	var b strings.Builder
-	b.WriteString("{")
 	written := slices.Clone(unmatched)
 	slices.Reverse(written)
-	order := append(slices.Clone(written), slices.Sorted(maps.Keys(rmattrBody(nil)))...)
-	for i, k := range order {
-		if i > 0 {
-			b.WriteString(",")
-		}
-		fmt.Fprintf(&b, "%s:%s", mustJSON(t, k), mustJSON(t, body[k]))
-	}
-	b.WriteString("}")
+	b := orderedFlat(t, body, written...)
 
 	var reported []string
-	if _, err := UnmarshalFlat([]byte(b.String()), wt, WithUnmatched(func(p string) { reported = append(reported, p) })); err != nil {
+	if _, err := UnmarshalFlat(b, wt, WithUnmatched(func(p string) { reported = append(reported, p) })); err != nil {
 		t.Fatalf("UnmarshalFlat: %v", err)
 	}
 	if !slices.Equal(reported, written) {
 		t.Errorf("WithUnmatched reported %q, want the written order %q", reported, written)
 	}
-	_, err := UnmarshalFlat([]byte(b.String()), wt, WithStrict())
+	_, err := UnmarshalFlat(b, wt, WithStrict())
 	if err == nil || err.Error() != strictRefusal(written[0]) {
 		t.Errorf("UnmarshalFlat (WithStrict) = %v, want %q", err, strictRefusal(written[0]))
+	}
+}
+
+// structuredDoc returns the STRUCTURED form of the FLAT body flat, as written
+// and as a map to modify.
+func structuredDoc(t *testing.T, flat map[string]any) ([]byte, map[string]any) {
+	t.Helper()
+	b, err := FlatToStructured(mustJSON(t, flat))
+	if err != nil {
+		t.Fatalf("FlatToStructured: %v", err)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(b, &doc); err != nil {
+		t.Fatal(err)
+	}
+	return b, doc
+}
+
+// structuredObservation is the observation element of a [structuredDoc] made
+// from [rmattrBody].
+func structuredObservation(doc map[string]any) map[string]any {
+	section := doc[rmattrRoot].(map[string]any)["conformance_section"].([]any)[0].(map[string]any)
+	return section["conformance_observation"].([]any)[0].(map[string]any)
+}
+
+// assertStructuredUnmatched runs the three REQ-170 legs over a STRUCTURED
+// document whose unmatched items are exactly want, in document order: by
+// default it decodes to what ref decodes to; WithUnmatched receives want,
+// each once, and the value is the same; WithStrict refuses with an error that
+// wraps ErrUnknownPath, names want[0] and carries none of secret.
+func assertStructuredUnmatched(t *testing.T, wt *webtemplate.WebTemplate, doc, ref []byte, secret string, want ...string) {
+	t.Helper()
+	refComp, err := UnmarshalStructured(ref, wt)
+	if err != nil {
+		t.Fatalf("UnmarshalStructured (reference) = %v", err)
+	}
+	got, err := UnmarshalStructured(doc, wt)
+	if err != nil {
+		t.Fatalf("UnmarshalStructured (default) = %v, want the unmatched members ignored", err)
+	}
+	if !bytes.Equal(canonical(t, got), canonical(t, refComp)) {
+		t.Errorf("UnmarshalStructured (default) value differs from the body without the unmatched members")
+	}
+	var reported []string
+	got, err = UnmarshalStructured(doc, wt, WithUnmatched(func(p string) { reported = append(reported, p) }))
+	if err != nil {
+		t.Fatalf("UnmarshalStructured (WithUnmatched) = %v", err)
+	}
+	if !slices.Equal(reported, want) {
+		t.Errorf("WithUnmatched reported %q, want %q", reported, want)
+	}
+	if !bytes.Equal(canonical(t, got), canonical(t, refComp)) {
+		t.Errorf("UnmarshalStructured (WithUnmatched) value differs from the default")
+	}
+	_, err = UnmarshalStructured(doc, wt, WithStrict())
+	if !errors.Is(err, ErrUnknownPath) || err.Error() != strictRefusal(want[0]) {
+		t.Errorf("UnmarshalStructured (WithStrict) = %v, want %q wrapping ErrUnknownPath", err, strictRefusal(want[0]))
+	}
+	if err != nil && strings.Contains(err.Error(), secret) {
+		t.Errorf("strict refusal %q carries the unmatched member's value", err)
 	}
 }
 
@@ -252,69 +303,116 @@ func TestREQ170FlatReportFollowsDocumentOrder(t *testing.T) {
 // STRUCTURED: the same four kinds of unmatched member decode by default to the
 // value without them, the report names each once by its slash-joined member
 // path in document order, and strict refuses naming the first, wrapping
-// ErrUnknownPath and carrying none of its value.
+// ErrUnknownPath and carrying none of its value. A member whose name resolves
+// nothing is reported as the member itself, whatever it holds.
 func TestREQ170StructuredUnmatchedIgnoredReportedRefused(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	const secret = "secret-value-0451"
-	clean := rmattrBody(nil)
-	cleanStructured, err := FlatToStructured(mustJSON(t, clean))
-	if err != nil {
-		t.Fatalf("FlatToStructured: %v", err)
-	}
-	ref, err := UnmarshalStructured(cleanStructured, wt)
-	if err != nil {
-		t.Fatalf("UnmarshalStructured (clean): %v", err)
-	}
+	clean, doc := structuredDoc(t, rmattrBody(nil))
 
-	// The same body with the four unmatched members, written by hand so their
-	// document order is known: the ctx field, then the unknown suffix, the
-	// unknown node and the unknown `_` member in the observation, in this order.
-	var doc map[string]any
-	if err := json.Unmarshal(cleanStructured, &doc); err != nil {
-		t.Fatal(err)
-	}
+	// The same body with the four unmatched members: the ctx field, then the
+	// unknown suffix, the unknown node and the unknown `_` member in the
+	// observation.
 	doc["ctx"].(map[string]any)["x_flag"] = secret
-	obs := doc[rmattrRoot].(map[string]any)["conformance_section"].([]any)[0].(map[string]any)["conformance_observation"].([]any)[0].(map[string]any)
+	obs := structuredObservation(doc)
 	obs["any_event"].([]any)[0].(map[string]any)["dv_quantity"].([]any)[0].(map[string]any)["|x_note"] = secret
 	obs["no_such_node"] = []any{map[string]any{"|magnitude": secret}}
 	obs["_x_extension"] = []any{secret}
-	b := mustJSON(t, doc)
 
 	obsPath := rmattrRoot + "/conformance_section/0/conformance_observation/0"
 	// json.Marshal writes each object's members sorted, so that is the document
 	// order: `_x_extension` sorts before `any_event` and `no_such_node`, and
 	// `conformance-ehrbase.de.v0` before `ctx`.
-	want := []string{
-		obsPath + "/_x_extension/0",
-		obsPath + "/any_event/0/dv_quantity/0/|x_note",
-		obsPath + "/no_such_node/0/|magnitude",
+	assertStructuredUnmatched(t, wt, mustJSON(t, doc), clean, secret,
+		obsPath+"/_x_extension",
+		obsPath+"/any_event/0/dv_quantity/0/|x_note",
+		obsPath+"/no_such_node",
 		"ctx/x_flag",
+	)
+}
+
+// TestREQ170StructuredUnmatchedWhateverItsShape — REQ-170: a STRUCTURED member
+// whose name the Web Template does not resolve is unmatched content "whatever
+// the JSON shape of a STRUCTURED member's value". A scalar or an object where
+// an array would stand, at a section element, at the template root and at the
+// top level, an unknown `_` member holding a scalar, an unknown ctx field
+// holding an object, and an element holding nothing else are each skipped and
+// reported by member path; a bare `"|"` member and a ctx field's suffix member
+// that the decode does not read are reported down to the member. A member
+// whose name resolves keeps the shape refusal, in every mode.
+func TestREQ170StructuredUnmatchedWhateverItsShape(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	const secret = "secret-value-0451"
+	clean, _ := structuredDoc(t, rmattrBody(nil))
+	sectionPath := rmattrRoot + "/conformance_section/0"
+	obsPath := sectionPath + "/conformance_observation/0"
+	quantityPath := obsPath + "/any_event/0/dv_quantity/0"
+	section := func(doc map[string]any) map[string]any {
+		return doc[rmattrRoot].(map[string]any)["conformance_section"].([]any)[0].(map[string]any)
+	}
+	for _, tc := range []struct {
+		name string
+		edit func(doc map[string]any)
+		want string
+	}{
+		{"scalar at a section element", func(doc map[string]any) { section(doc)["x_scalar"] = secret }, sectionPath + "/x_scalar"},
+		{"object at a section element", func(doc map[string]any) { section(doc)["x_obj"] = map[string]any{"y": secret} }, sectionPath + "/x_obj"},
+		{"scalar at the template root", func(doc map[string]any) { doc[rmattrRoot].(map[string]any)["x_root"] = secret }, rmattrRoot + "/x_root"},
+		{"scalar at the top level", func(doc map[string]any) { doc["x_top"] = secret }, "x_top"},
+		{"unknown _ member holding a scalar", func(doc map[string]any) { structuredObservation(doc)["_x_scalar"] = secret }, obsPath + "/_x_scalar"},
+		{"unknown ctx field holding an object", func(doc map[string]any) {
+			doc["ctx"].(map[string]any)["x_obj"] = map[string]any{"y": secret}
+		}, "ctx/x_obj"},
+		{"element holding only unmatched members", func(doc map[string]any) {
+			list := doc[rmattrRoot].(map[string]any)["conformance_section"].([]any)
+			doc[rmattrRoot].(map[string]any)["conformance_section"] = append(list, map[string]any{"x_only": secret})
+		}, rmattrRoot + "/conformance_section/1/x_only"},
+		{"bare value member beside read suffixes", func(doc map[string]any) {
+			structuredObservation(doc)["any_event"].([]any)[0].(map[string]any)["dv_quantity"].([]any)[0].(map[string]any)["|"] = 5
+		}, quantityPath + "/|"},
+		{"suffix member on a ctx field", func(doc map[string]any) {
+			doc["ctx"].(map[string]any)["setting"] = map[string]any{"|code": "238", "|value": "other care", "|x": secret}
+		}, "ctx/setting/|x"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, doc := structuredDoc(t, rmattrBody(nil))
+			ref := clean
+			if tc.want == "ctx/setting/|x" {
+				ref, _ = structuredDoc(t, rmattrBody(map[string]any{"ctx/setting|code": "238", "ctx/setting|value": "other care"}))
+			}
+			tc.edit(doc)
+			assertStructuredUnmatched(t, wt, mustJSON(t, doc), ref, secret, tc.want)
+		})
 	}
 
-	got, err := UnmarshalStructured(b, wt)
-	if err != nil {
-		t.Fatalf("UnmarshalStructured (default) = %v, want the unmatched members ignored", err)
-	}
-	if !bytes.Equal(canonical(t, got), canonical(t, ref)) {
-		t.Errorf("UnmarshalStructured (default) value differs from the body without the unmatched members")
-	}
-	var reported []string
-	got, err = UnmarshalStructured(b, wt, WithUnmatched(func(p string) { reported = append(reported, p) }))
-	if err != nil {
-		t.Fatalf("UnmarshalStructured (WithUnmatched) = %v", err)
-	}
-	if !slices.Equal(reported, want) {
-		t.Errorf("WithUnmatched reported %q, want %q", reported, want)
-	}
-	if !bytes.Equal(canonical(t, got), canonical(t, ref)) {
-		t.Errorf("UnmarshalStructured (WithUnmatched) value differs from the default")
-	}
-	_, err = UnmarshalStructured(b, wt, WithStrict())
-	if !errors.Is(err, ErrUnknownPath) || err.Error() != strictRefusal(want[0]) {
-		t.Errorf("UnmarshalStructured (WithStrict) = %v, want %q wrapping ErrUnknownPath", err, strictRefusal(want[0]))
-	}
-	if err != nil && strings.Contains(err.Error(), secret) {
-		t.Errorf("strict refusal %q carries the unmatched member's value", err)
+	// A member whose name resolves keeps the array-shape refusal.
+	for _, tc := range []struct {
+		name string
+		edit func(doc map[string]any)
+	}{
+		{"Web Template child holding a scalar", func(doc map[string]any) { section(doc)["conformance_observation"] = secret }},
+		{"underscore family holding a scalar", func(doc map[string]any) { structuredObservation(doc)["_uid"] = secret }},
+	} {
+		t.Run("refused: "+tc.name, func(t *testing.T) {
+			_, doc := structuredDoc(t, rmattrBody(nil))
+			tc.edit(doc)
+			b := mustJSON(t, doc)
+			_, def := UnmarshalStructured(b, wt)
+			if !errors.Is(def, ErrUnknownPath) || !strings.Contains(def.Error(), "expected an array") {
+				t.Fatalf("UnmarshalStructured (default) = %v, want the array-shape refusal", def)
+			}
+			var reported []string
+			_, rep := UnmarshalStructured(b, wt, WithUnmatched(func(p string) { reported = append(reported, p) }))
+			_, strict := UnmarshalStructured(b, wt, WithStrict())
+			for name, err := range map[string]error{"WithUnmatched": rep, "WithStrict": strict} {
+				if err == nil || err.Error() != def.Error() {
+					t.Errorf("UnmarshalStructured (%s) = %v, want %v", name, err, def)
+				}
+			}
+			if len(reported) != 0 {
+				t.Errorf("WithUnmatched reported %q on a refused decode", reported)
+			}
+		})
 	}
 }
 
@@ -551,8 +649,10 @@ func TestREQ170IgnoredKeysLeaveNoStructuralTrace(t *testing.T) {
 // TestREQ170IndexPastBoundSentinels — REQ-170 / REQ-053 / REQ-140. An index
 // past its bound is malformed matched content, refused in every mode naming
 // the key, with the sentinel of the grammar the segment belongs to: a segment
-// of the Web Template path (a single-valued attribute, a party or interval
-// leaf), a `_family:N` list and a FEEDER_AUDIT sub-path give ErrUnknownPath; a
+// of the Web Template path (a single-valued attribute, a party leaf, an
+// interval leaf on a single-valued attribute, the last in
+// [TestREQ170RepeatableIntervalElement]), a `_family:N` list and a
+// FEEDER_AUDIT sub-path give ErrUnknownPath; a
 // sub-path inside an underscore family's value or an interval value gives
 // ErrUnsupportedDatatype. deviations.md states the same split.
 func TestREQ170IndexPastBoundSentinels(t *testing.T) {
@@ -567,7 +667,6 @@ func TestREQ170IndexPastBoundSentinels(t *testing.T) {
 		names string
 	}{
 		{"single-valued Web Template segment", rmattrObs + "/language:1|code", "nl", ErrUnknownPath, rmattrObs + "/language:1"},
-		{"interval leaf segment", rmattrIntervalEvent + "/interval_dv_quantity:1/lower|magnitude", 1.0, ErrUnknownPath, rmattrIntervalEvent + "/interval_dv_quantity:1"},
 		{"scalar underscore family", rmattrObs + "/_uid:1", "8f8f8f8f-0000-4000-8000-000000000000", ErrUnknownPath, rmattrObs + "/_uid:1"},
 		{"FEEDER_AUDIT sub-path", rmattrObs + "/_feeder_audit/originating_system_audit:1|system_id", "orig", ErrUnknownPath, rmattrObs + "/_feeder_audit/originating_system_audit"},
 		{"interval value sub-path", rmattrInterval + "/lower:1|magnitude", 1.0, ErrUnsupportedDatatype, rmattrInterval + "/lower:1"},
@@ -582,6 +681,77 @@ func TestREQ170IndexPastBoundSentinels(t *testing.T) {
 	}
 }
 
+// TestREQ170RepeatableIntervalElement — REQ-053 / REQ-170. A DV_INTERVAL
+// leaf's :N belongs to the ELEMENT the Web Template folds away and is judged
+// on the RM attribute that holds that ELEMENT, as any other leaf's is. Where
+// the ELEMENT repeats, two intervals decode to two ELEMENTs and MarshalFlat →
+// UnmarshalFlat round-trips them. Where the interval stands on a single-valued
+// attribute (ELEMENT.value, under an ELEMENT the Web Template keeps as a
+// node), an index past :0 is an index past its bound, refused in every mode.
+func TestREQ170RepeatableIntervalElement(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	interval := func(i int, lower, upper float64) map[string]any {
+		leaf := rmattrIntervalEvent + "/interval_dv_quantity:" + strconv.Itoa(i)
+		return map[string]any{
+			leaf + "/lower|magnitude": lower, leaf + "/lower|unit": "Unit",
+			leaf + "/upper|magnitude": upper, leaf + "/upper|unit": "Unit",
+		}
+	}
+
+	t.Run("a repeating ELEMENT round-trips", func(t *testing.T) {
+		repeat := editWTNode(t, wt, rmattrInterval, func(n *webtemplate.Node) { n.Max = -1 })
+		body := rmattrBody(map[string]any{rmattrIntervalEvent + "/time": "2022-01-12T09:00:11.7842493+01:00"})
+		maps.Copy(body, interval(0, 1, 2))
+		maps.Copy(body, interval(1, 3, 4))
+		comp, err := UnmarshalFlat(mustJSON(t, body), repeat, WithStrict())
+		if err != nil {
+			t.Fatalf("UnmarshalFlat (two intervals) = %v", err)
+		}
+		flat, err := MarshalFlat(comp, repeat)
+		if err != nil {
+			t.Fatalf("MarshalFlat: %v", err)
+		}
+		for _, k := range []string{rmattrIntervalEvent + "/interval_dv_quantity:0/lower|magnitude", rmattrIntervalEvent + "/interval_dv_quantity:1/upper|magnitude"} {
+			if !bytes.Contains(flat, mustJSON(t, k)) {
+				t.Errorf("MarshalFlat = %s, want it to carry %q", flat, k)
+			}
+		}
+		again, err := UnmarshalFlat(flat, repeat, WithStrict())
+		if err != nil {
+			t.Fatalf("UnmarshalFlat (MarshalFlat output) = %v", err)
+		}
+		if !bytes.Equal(canonical(t, again), canonical(t, comp)) {
+			t.Errorf("the round trip changed the value:\n got %s\nwant %s", canonical(t, again), canonical(t, comp))
+		}
+	})
+
+	t.Run("a single-valued interval refuses :1", func(t *testing.T) {
+		// The interval ELEMENT kept as a node, its value a child on
+		// ELEMENT.value, the shape a Web Template gives an ELEMENT it does
+		// not collapse.
+		single := editWTNode(t, wt, rmattrInterval, func(n *webtemplate.Node) {
+			valuePath, rmType := n.AQLPath, n.RMType
+			n.AQLPath, n.RMType = strings.TrimSuffix(valuePath, "/value"), "ELEMENT"
+			n.Children = []*webtemplate.Node{{ID: "interval_value", RMType: rmType, Max: 1, AQLPath: valuePath}}
+		})
+		leaf := rmattrInterval + "/interval_value"
+		at := func(index string) map[string]any {
+			return rmattrBody(map[string]any{
+				rmattrIntervalEvent + "/time":     "2022-01-12T09:00:11.7842493+01:00",
+				leaf + index + "/lower|magnitude": 1.0, leaf + index + "/lower|unit": "Unit",
+				leaf + index + "/upper|magnitude": 2.0, leaf + index + "/upper|unit": "Unit",
+			})
+		}
+		if _, err := UnmarshalFlat(mustJSON(t, at(":0")), single, WithStrict()); err != nil {
+			t.Fatalf("fixture: UnmarshalFlat (:0) = %v, want the one value decoded", err)
+		}
+		err := refusalLegs(t, single, at(":1"), nil, ErrUnknownPath)
+		if !strings.Contains(err.Error(), leaf+":1") || !strings.Contains(err.Error(), "single-valued") {
+			t.Errorf("err = %v, want it to name %q as single-valued", err, leaf+":1")
+		}
+	})
+}
+
 // TestREQ170IsmTransitionReferenceKeysRefusedInEveryMode — REQ-170 / REQ-140.
 // The reference's in-context spelling of an ACTION's ISM transition and time
 // names RM data the Web Template this SDK builds does not model. It is refused
@@ -591,7 +761,8 @@ func TestREQ170IndexPastBoundSentinels(t *testing.T) {
 // `transition` leaf or `_reason` family under an archetyped
 // `ism_transition[atNNNN]` node (FLAT id `transition`), which models
 // `current_state` and `careflow_step` but neither of those; and the ACTION's own
-// `time` leaf.
+// `time` leaf. The refusal of `transition` and `reason` cites REQ-140, whose
+// fourth out-of-scope class covers them; any other cites REQ-170.
 func TestREQ170IsmTransitionReferenceKeysRefusedInEveryMode(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	const secret = "secret-value-0451"
@@ -599,9 +770,14 @@ func TestREQ170IsmTransitionReferenceKeysRefusedInEveryMode(t *testing.T) {
 		name  string
 		keys  []string
 		names string
+		cite  string
 	}
 	leaf := func(base, id string) refusal {
-		return refusal{id + " leaf under " + base, []string{base + "/" + id + "|code", base + "/" + id + "|value", base + "/" + id + "|terminology"}, base + "/" + id + "|code"}
+		cite := "REQ-170"
+		if id == "transition" {
+			cite = "REQ-140"
+		}
+		return refusal{id + " leaf under " + base, []string{base + "/" + id + "|code", base + "/" + id + "|value", base + "/" + id + "|terminology"}, base + "/" + id + "|code", cite}
 	}
 	reference, archetyped := rmattrAction+"/ism_transition", rmattrAction+"/transition"
 	cases := []refusal{
@@ -609,13 +785,13 @@ func TestREQ170IsmTransitionReferenceKeysRefusedInEveryMode(t *testing.T) {
 		leaf(reference, "transition"),
 		leaf(reference, "careflow_step"),
 		leaf(archetyped, "transition"),
-		{"bare transition leaf under " + reference, []string{reference + "/transition"}, reference + "/transition"},
-		{"bare transition leaf under " + archetyped, []string{archetyped + "/transition"}, archetyped + "/transition"},
-		{"reason family under " + reference, []string{reference + "/_reason:0"}, reference + "/_reason:0"},
-		{"reason family under " + archetyped, []string{archetyped + "/_reason:0"}, archetyped + "/_reason:0"},
-		{"reason family with a suffix", []string{reference + "/_reason|code"}, reference + "/_reason"},
-		{"ACTION time leaf", []string{rmattrAction + "/time"}, rmattrAction + "/time"},
-		{"ACTION time leaf with a suffix", []string{rmattrAction + "/time|magnitude_status"}, rmattrAction + "/time|magnitude_status"},
+		{"bare transition leaf under " + reference, []string{reference + "/transition"}, reference + "/transition", "REQ-140"},
+		{"bare transition leaf under " + archetyped, []string{archetyped + "/transition"}, archetyped + "/transition", "REQ-140"},
+		{"reason family under " + reference, []string{reference + "/_reason:0"}, reference + "/_reason:0", "REQ-140"},
+		{"reason family under " + archetyped, []string{archetyped + "/_reason:0"}, archetyped + "/_reason:0", "REQ-140"},
+		{"reason family with a suffix", []string{reference + "/_reason|code"}, reference + "/_reason", "REQ-140"},
+		{"ACTION time leaf", []string{rmattrAction + "/time"}, rmattrAction + "/time", "REQ-170"},
+		{"ACTION time leaf with a suffix", []string{rmattrAction + "/time|magnitude_status"}, rmattrAction + "/time|magnitude_status", "REQ-170"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -633,10 +809,8 @@ func TestREQ170IsmTransitionReferenceKeysRefusedInEveryMode(t *testing.T) {
 			if strings.Contains(err.Error(), secret) {
 				t.Errorf("err = %v carries the key's value", err)
 			}
-			// REQ-140 names an ACTION's ISM transition and time among its
-			// out-of-scope classes.
-			if !strings.Contains(err.Error(), "(REQ-140,") {
-				t.Errorf("err = %v, want it to cite REQ-140", err)
+			if !strings.Contains(err.Error(), "("+tc.cite+",") {
+				t.Errorf("err = %v, want it to cite %s", err, tc.cite)
 			}
 		})
 	}
@@ -781,6 +955,219 @@ func TestREQ170TwoSpellingsOfABareValue(t *testing.T) {
 		if !bytes.Equal(canonical(t, got), canonical(t, scalar)) || !bytes.Equal(canonical(t, got), canonical(t, ref)) {
 			t.Error(`the "|" member decodes differently from the bare scalar element`)
 		}
+	})
+}
+
+// orderedFlat writes body as a FLAT document whose first keys are first, in
+// that order, and whose other keys follow sorted, so a test controls the
+// document order the report and strict follow.
+func orderedFlat(t *testing.T, body map[string]any, first ...string) []byte {
+	t.Helper()
+	var b strings.Builder
+	b.WriteString("{")
+	rest := maps.Clone(body)
+	for _, k := range first {
+		delete(rest, k)
+	}
+	for i, k := range append(slices.Clone(first), slices.Sorted(maps.Keys(rest))...) {
+		v, ok := body[k]
+		if !ok {
+			t.Fatalf("fixture: key %q is not in the body", k)
+		}
+		if i > 0 {
+			b.WriteString(",")
+		}
+		fmt.Fprintf(&b, "%s:%s", mustJSON(t, k), mustJSON(t, v))
+	}
+	b.WriteString("}")
+	return []byte(b.String())
+}
+
+// TestREQ170LoneEmptySuffixIsTheBareValue — REQ-170 / REQ-053. A lone `x|`
+// spells the bare value of `x`, so the decode reads it wherever it reads `x`:
+// `ctx/time|` sets the start time and `ctx/composer_name|` names the composer
+// as their bare spellings do, in every mode, and the report receives nothing.
+func TestREQ170LoneEmptySuffixIsTheBareValue(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	for _, tc := range []struct {
+		key   string
+		value string
+	}{
+		{"ctx/time", "2020-02-03T04:05:06+01:00"},
+		{"ctx/composer_name", "Dr Lone Pipe"},
+		{rmattrText, "lone pipe text"},
+	} {
+		t.Run(tc.key, func(t *testing.T) {
+			bare := rmattrBody(map[string]any{tc.key: tc.value})
+			ref := canonical(t, decodeRMAttr(t, wt, bare))
+			if !bytes.Contains(ref, []byte(tc.value)) {
+				t.Fatalf("fixture: %q does not reach the value %s", tc.key, ref)
+			}
+			piped := rmattrBody(nil)
+			delete(piped, tc.key)
+			piped[tc.key+"|"] = tc.value
+			var reported []string
+			for name, opts := range map[string][]Option{
+				"default":       nil,
+				"WithUnmatched": {WithUnmatched(func(p string) { reported = append(reported, p) })},
+				"WithStrict":    {WithStrict()},
+			} {
+				got, err := UnmarshalFlat(mustJSON(t, piped), wt, opts...)
+				if err != nil {
+					t.Fatalf("UnmarshalFlat (%s) = %v, want %q read as %q", name, err, tc.key+"|", tc.key)
+				}
+				if !bytes.Equal(canonical(t, got), ref) {
+					t.Errorf("UnmarshalFlat (%s) value differs from the bare spelling:\n got %s\nwant %s", name, canonical(t, got), ref)
+				}
+			}
+			if len(reported) != 0 {
+				t.Errorf("WithUnmatched reported %q, want nothing", reported)
+			}
+		})
+	}
+}
+
+// TestREQ170SpellingPairsJudgedWhereRead — REQ-170. Two spellings of one key
+// are two spellings of one field only where the decode reads that field, and
+// only there must their values agree. Two spellings of a key the decode does
+// not read are two unmatched keys, each reported as written, whatever their
+// values: a key the Web Template does not resolve with and without its bare
+// `|`, an unknown ctx/ field likewise, and a sub-path a party family does not
+// read with and without its :0.
+func TestREQ170SpellingPairsJudgedWhereRead(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	const facility = rmattrContext + "/_health_care_facility"
+	for _, tc := range []struct {
+		name string
+		read map[string]any
+		keys map[string]any
+	}{
+		{"unresolved node", nil, map[string]any{
+			rmattrObs + "/no_such_node":  "a",
+			rmattrObs + "/no_such_node|": "b",
+		}},
+		{"unknown ctx field", nil, map[string]any{"ctx/x_flag": "a", "ctx/x_flag|": "b"}},
+		{"party sub-path suffix", map[string]any{facility + "|name": "Hospital"}, map[string]any{
+			facility + "/relationship|x_ext":   "a",
+			facility + "/relationship:0|x_ext": "b",
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body := rmattrBody(tc.read)
+			maps.Copy(body, tc.keys)
+			assertUnmatched(t, wt, body, slices.Sorted(maps.Keys(tc.keys))...)
+		})
+	}
+
+	// Where the family reads the sub-path, the same value is read once and
+	// differing values are refused in every mode, naming both keys.
+	read := func(second string) map[string]any {
+		return rmattrBody(map[string]any{
+			facility + "|name":                     "Hospital",
+			facility + "/relationship|code":        "10",
+			facility + "/relationship|terminology": "openehr",
+			facility + "/relationship|value":       "mother",
+			facility + "/relationship:0|code":      second,
+		})
+	}
+	one := rmattrBody(map[string]any{
+		facility + "|name":                     "Hospital",
+		facility + "/relationship|code":        "10",
+		facility + "/relationship|terminology": "openehr",
+		facility + "/relationship|value":       "mother",
+	})
+	got := decodeRMAttr(t, wt, read("10"))
+	if !bytes.Equal(canonical(t, got), canonical(t, decodeRMAttr(t, wt, one))) {
+		t.Error("two equal spellings of a read sub-path decode differently from one")
+	}
+	err := refusedInEveryMode(t, wt, read("11"))
+	if !errors.Is(err, ErrUnsupportedDatatype) {
+		t.Errorf("err = %v, want ErrUnsupportedDatatype", err)
+	}
+	for _, k := range []string{facility + "/relationship|code", facility + "/relationship:0|code"} {
+		if !strings.Contains(err.Error(), strconv.Quote(k)) {
+			t.Errorf("err = %v, want it to name %q", err, k)
+		}
+	}
+}
+
+// TestREQ170StrictNamesTheFirstSpellingWritten — REQ-170: strict names the
+// first unmatched item in document order. Where `x|` and `x` carry the same
+// value and the decode does not read `x`, both are unmatched, so a body that
+// writes `x|` first is refused naming `x|`, and the report receives both in the
+// order written.
+func TestREQ170StrictNamesTheFirstSpellingWritten(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	bare := rmattrObs + "/no_such_node"
+	body := rmattrBody(map[string]any{bare: "same", bare + "|": "same"})
+	b := orderedFlat(t, body, bare+"|", bare)
+
+	_, err := UnmarshalFlat(b, wt, WithStrict())
+	if !errors.Is(err, ErrUnknownPath) || err.Error() != strictRefusal(bare+"|") {
+		t.Errorf("UnmarshalFlat (WithStrict) = %v, want %q", err, strictRefusal(bare+"|"))
+	}
+	var reported []string
+	if _, err := UnmarshalFlat(b, wt, WithUnmatched(func(p string) { reported = append(reported, p) })); err != nil {
+		t.Fatalf("UnmarshalFlat (WithUnmatched) = %v", err)
+	}
+	if want := []string{bare + "|", bare}; !slices.Equal(reported, want) {
+		t.Errorf("WithUnmatched reported %q, want %q", reported, want)
+	}
+}
+
+// TestREQ170StrictWithReportPassesTheFirstPath — REQ-170. With both options,
+// strict refuses at the first unmatched item: the function receives that one
+// path and no other, and the error is the strict refusal naming it.
+func TestREQ170StrictWithReportPassesTheFirstPath(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	body, unmatched := req170Body()
+	first := slices.Sorted(slices.Values(unmatched))[0]
+	var reported []string
+	_, err := UnmarshalFlat(mustJSON(t, body), wt, WithStrict(), WithUnmatched(func(p string) { reported = append(reported, p) }))
+	if !errors.Is(err, ErrUnknownPath) || err.Error() != strictRefusal(first) {
+		t.Errorf("UnmarshalFlat (WithStrict, WithUnmatched) = %v, want %q", err, strictRefusal(first))
+	}
+	if !slices.Equal(reported, []string{first}) {
+		t.Errorf("WithUnmatched under WithStrict received %q, want exactly [%q]", reported, first)
+	}
+}
+
+// TestREQ170LoneBareValueIsAMissingSuffix — REQ-170 refuses in every mode
+// "matched content that is malformed: … a missing required suffix". A bare
+// value alone at a leaf whose datatype has no bare spelling is that datatype
+// missing every suffix it requires, and a bare ctx/setting is the setting
+// missing its |code and |value: both fail by default, under the report option
+// and under strict, naming no value. Beside a suffix the datatype reads,
+// DV_PROPORTION's derived bare magnitude stays unmatched content.
+func TestREQ170LoneBareValueIsAMissingSuffix(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	const secret = "secret-value-0451"
+	quantity := rmattrBody(map[string]any{rmattrElement: secret})
+	delete(quantity, rmattrElement+"|magnitude")
+	delete(quantity, rmattrElement+"|unit")
+	for name, body := range map[string]map[string]any{
+		"DV_CODED_TEXT": rmattrBody(map[string]any{rmattrCodedText: secret}),
+		"DV_QUANTITY":   quantity,
+		"DV_IDENTIFIER": rmattrBody(map[string]any{rmattrEvent + "/dv_identifier": secret}),
+		"ctx/setting":   rmattrBody(map[string]any{"ctx/setting": secret}),
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := refusedInEveryMode(t, wt, body)
+			if !errors.Is(err, ErrUnsupportedDatatype) {
+				t.Errorf("err = %v, want ErrUnsupportedDatatype", err)
+			}
+			if strings.Contains(err.Error(), secret) {
+				t.Errorf("err = %v carries the value", err)
+			}
+		})
+	}
+	t.Run("DV_PROPORTION bare beside its numerator", func(t *testing.T) {
+		assertUnmatched(t, wt, rmattrBody(map[string]any{
+			rmattrProportion + "|numerator":   1,
+			rmattrProportion + "|denominator": 2,
+			rmattrProportion + "|type":        0,
+			rmattrProportion:                  0.5,
+		}), rmattrProportion)
 	})
 }
 
@@ -1028,13 +1415,26 @@ func TestREQ170IntervalEventAndObservationAttrsRefused(t *testing.T) {
 // nodes on that path copied so the shared template is left as it is.
 func withIntervalEventWidth(t *testing.T, wt *webtemplate.WebTemplate) *webtemplate.WebTemplate {
 	t.Helper()
-	ids := strings.Split(strings.TrimPrefix(rmattrEvent, rmattrRoot+"/"), "/")
-	ids[len(ids)-1], _, _ = strings.Cut(ids[len(ids)-1], ":")
+	return editWTNode(t, wt, rmattrEvent, func(node *webtemplate.Node) {
+		node.RMType = "INTERVAL_EVENT"
+		node.Children = append(slices.Clone(node.Children), &webtemplate.Node{
+			ID: "width", RMType: "DV_DURATION", Max: 1, AQLPath: node.AQLPath + "/width",
+		})
+	})
+}
+
+// editWTNode returns a copy of wt in which edit has changed the node at the
+// FLAT path flat (indexes ignored), copying every node on the way down so wt
+// itself is untouched.
+func editWTNode(t *testing.T, wt *webtemplate.WebTemplate, flat string, edit func(*webtemplate.Node)) *webtemplate.WebTemplate {
+	t.Helper()
+	ids := strings.Split(strings.TrimPrefix(flat, rmattrRoot+"/"), "/")
 	out := *wt
 	tree := *wt.Tree
 	out.Tree = &tree
 	node := out.Tree
 	for _, id := range ids {
+		id, _, _ = strings.Cut(id, ":")
 		kids := slices.Clone(node.Children)
 		i := slices.IndexFunc(kids, func(n *webtemplate.Node) bool { return n.ID == id })
 		if i < 0 {
@@ -1045,10 +1445,7 @@ func withIntervalEventWidth(t *testing.T, wt *webtemplate.WebTemplate) *webtempl
 		node.Children = kids
 		node = &cp
 	}
-	node.RMType = "INTERVAL_EVENT"
-	node.Children = append(slices.Clone(node.Children), &webtemplate.Node{
-		ID: "width", RMType: "DV_DURATION", Max: 1, AQLPath: node.AQLPath + "/width",
-	})
+	edit(node)
 	return &out
 }
 

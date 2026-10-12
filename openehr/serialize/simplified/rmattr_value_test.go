@@ -687,9 +687,10 @@ func TestRMAttrNullFlavourBesideValue(t *testing.T) {
 
 // TestRMAttrNullFlavourHalfPairRefused — REQ-140 / REQ-170. `_null_flavour` is a
 // DV_CODED_TEXT: `|code` and `|value` are both required, so half a pair must not
-// decode to a coerced empty rubric or an unlabelled code — refused in every mode.
-// A bare value, a suffix outside DV_CODED_TEXT's set and a sub-path are not part
-// of that grammar at all: unmatched content.
+// decode to a coerced empty rubric or an unlabelled code — refused in every mode,
+// as is a lone bare value, which spells the coded text missing both. A suffix
+// outside DV_CODED_TEXT's set and a sub-path are not part of that grammar at
+// all: unmatched content.
 func TestRMAttrNullFlavourHalfPairRefused(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	for name, tc := range map[string]struct {
@@ -699,7 +700,7 @@ func TestRMAttrNullFlavourHalfPairRefused(t *testing.T) {
 		"code alone":        {map[string]any{rmattrCount + "/_null_flavour|code": "253"}, ErrUnsupportedDatatype},
 		"value alone":       {map[string]any{rmattrCount + "/_null_flavour|value": "unknown"}, ErrUnsupportedDatatype},
 		"terminology alone": {map[string]any{rmattrCount + "/_null_flavour|terminology": "openehr"}, ErrUnsupportedDatatype},
-		"bare value":        {map[string]any{rmattrCount + "/_null_flavour": "unknown"}, errUnmatched},
+		"bare value":        {map[string]any{rmattrCount + "/_null_flavour": "unknown"}, ErrUnsupportedDatatype},
 		"unknown suffix":    {map[string]any{rmattrCount + "/_null_flavour|typo": "x"}, errUnmatched},
 		"sub-path":          {map[string]any{rmattrCount + "/_null_flavour/target|code": "x"}, errUnmatched},
 	} {

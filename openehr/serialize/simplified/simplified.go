@@ -23,15 +23,21 @@ type decodeConfig struct {
 // a key whose path the Web Template does not resolve, an underscore-prefixed
 // segment that names no RM attribute this codec carries at that node, a
 // suffix outside the suffix set of its datatype (or of its underscore
-// family), and a `ctx/` field this codec does not read. A key the decode
-// reads is never unmatched, even where the decode then refuses it: the
-// composer's `external_ref` suffixes and party sub-structure, a PARTICIPATION
-// `time`, a FEEDER_AUDIT_DETAILS `other_details`, `_instruction_details`,
-// `_wf_definition`, an ACTION's ISM transition and time, an INTERVAL_EVENT's
-// `math_function`, `width` and `sample_count` and an OBSERVATION's
-// `history_origin` in the reference's in-context spelling, and any malformed
-// value, missing required suffix, disagreeing pair of spellings or index past
-// its bound fail the decode in every mode.
+// family), and a `ctx/` field this codec does not read. A STRUCTURED member
+// whose name resolves nothing the decode reads is unmatched whatever its value
+// holds. A key the decode reads is never unmatched, even where the decode then
+// refuses it, and these fail the decode in every mode: the keys with no
+// carrier (the composer's `external_ref` suffixes and party sub-structure, a
+// PARTICIPATION `time`, a FEEDER_AUDIT_DETAILS `other_details`,
+// `_instruction_details`, `_wf_definition`); the reference's in-context
+// spelling of RM data this codec's Web Template does not model (an ACTION's
+// ISM transition and time, an INTERVAL_EVENT's `math_function`, `width` and
+// `sample_count`, an OBSERVATION's `history_origin`); at a leaf whose datatype
+// has neither a suffix set nor a sub-path grammar, such as the composer's
+// PARTY_PROXY, its bare value and a suffix naming an attribute of its RM
+// class; and any malformed value, missing required suffix (a lone bare value
+// where the datatype has no bare spelling among them), disagreeing pair of
+// spellings of a key the decode reads, or index past its bound.
 //
 // By default the decoder ignores unmatched content: the value it returns
 // holds the rest of the input and none of it. With this option fn receives
@@ -43,14 +49,16 @@ type decodeConfig struct {
 // STRUCTURED it is the path of members from the root, joined by "/", with
 // the position of each array element as its own segment, counting from 0:
 // "vital_signs/body_temperature/0/any_event/0/temperature/0/|x-note", or
-// "ctx/x-flag" for a field of the ctx object. The path carries names only,
+// "ctx/x-flag" for a field of the ctx object. A member whose name resolves
+// nothing is reported as that member, not as what it holds. The path carries
+// names only,
 // never a value from the input. fn runs on the caller's goroutine, after the
 // decode has read the input. Without [WithStrict], fn runs only when the decode
 // succeeds.
 //
 // A nil fn is the same as leaving the option out. Combined with
-// [WithStrict], fn sees the first unmatched item before the decode is
-// refused.
+// [WithStrict], fn receives the first unmatched item, and no other, before
+// the decode is refused.
 func WithUnmatched(fn func(path string)) Option {
 	return func(cfg *decodeConfig) { cfg.unmatched = fn }
 }
@@ -135,8 +143,9 @@ var (
 	// but cannot be honoured at once: two accepted spellings of one
 	// composition-metadata field that disagree, ctx/composer_self beside a
 	// composer name (mutually exclusive representations of one RM attribute),
-	// two spellings of one single-valued underscore attribute, or a key and the
-	// same key ending in a bare `|` with differing values. The codec fails
+	// two spellings of one single-valued underscore attribute, or a key the
+	// decode reads and the same key ending in a bare `|` with differing values.
+	// The codec fails
 	// rather than dropping the entry or inventing a precedence rule. The two
 	// deferred underscore families, `_instruction_details` and `_wf_definition`,
 	// and the reference's in-context spelling of an ACTION's ISM transition and
