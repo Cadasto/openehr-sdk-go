@@ -107,7 +107,8 @@ func TestRMAttrNormalRangeAnchors(t *testing.T) {
 // four boundary Booleans mandatory, and the reference writes each one only
 // where it differs from its default, so the codec fixes the defaults in one
 // place. On a bounded side an absent `|*_included` is the closed endpoint
-// (true) and is not re-emitted; an absent `|*_unbounded` is false. Both
+// (true) and is not re-emitted; an absent `|*_unbounded` beside a bound is
+// false (REQ-169). Both
 // directions are pinned here because the corpus writes both shapes —
 // `dv_count`'s `_normal_range` omits the flags, `dv_quantity`'s spells them
 // false. The open side's default is false, pinned by
@@ -859,7 +860,7 @@ func TestRMAttrIntervalBoundRidesRaw(t *testing.T) {
 // value-decoration families are the first with a sub-path for it to reach
 // (`/lower:0`). Decode folds `:0` onto the index-less spelling, refuses anything
 // higher (no attribute of a DataValue is a list at that position) and refuses two
-// spellings competing for one slot.
+// spellings of one slot that disagree.
 func TestRMAttrSubPathIndexNormalisation(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	comp := decodeRMAttr(t, wt, rmattrBody(map[string]any{
@@ -876,9 +877,9 @@ func TestRMAttrSubPathIndexNormalisation(t *testing.T) {
 			rmattrElement + "/_normal_range/lower:1|magnitude": 20.5,
 			rmattrElement + "/_normal_range/lower:1|unit":      "unit",
 		},
-		"two spellings of one slot": {
+		"two spellings of one slot that disagree": {
 			rmattrElement + "/_normal_range/lower|magnitude":   20.5,
-			rmattrElement + "/_normal_range/lower:0|magnitude": 20.5,
+			rmattrElement + "/_normal_range/lower:0|magnitude": 21.5,
 			rmattrElement + "/_normal_range/lower|unit":        "unit",
 		},
 	} {

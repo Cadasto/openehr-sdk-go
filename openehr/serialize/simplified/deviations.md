@@ -320,8 +320,15 @@ partially or silently accepted.
   Booleans is written only where it differs from its bounded-side default, and decode reads
   an absent one back by side.
   BASE `Interval` declares all four mandatory (`1..1`), and the reference omits each one's
-  bounded-side default. `\|lower_unbounded` / `\|upper_unbounded` are omitted when `false`: absent
-  decodes as `false`, and only `true` is emitted. `\|lower_included` / `\|upper_included`
+  bounded-side default. `\|lower_unbounded` / `\|upper_unbounded` are omitted when `false`, and
+  only `true` is emitted. Absent, they follow the side's bound (wire.md § REQ-169, amended
+  2026-10-13): `false` beside a bound, `true` where the side's bound keys are absent or all
+  null, so an interval that spells only an upper bound is open below. A side marked
+  `\|*_unbounded: false` with no bound names a closed end with no value: decode refuses it with
+  `ErrUnsupportedDatatype` where the RM holds the bound by value (the `_normal_range` of a
+  DV_COUNT, DV_QUANTITY or DV_PROPORTION), and reads it as written, with no bound, where the RM
+  holds it as an interface (every other `_normal_range`, every `_other_reference_ranges` range,
+  a DV_INTERVAL leaf). `\|lower_included` / `\|upper_included`
   default by side. On a bounded side they are omitted when `true`, the **closed** endpoint:
   absent decodes as `true`, and only `false` is emitted. On an open side absent decodes as
   `false`, the only value BASE `Lower_included_valid` / `Upper_included_valid` permit there.
@@ -331,9 +338,9 @@ partially or silently accepted.
   § REQ-112). Encode refuses, with a typed error, to write an interval side both unbounded
   and included into the interval keys (a `\|raw` fragment carries it as canonical JSON
   writes it), so the pair decodes but does not re-encode. An open end is spelled by its
-  `\|*_unbounded: true` flag alone: an end that
-  spells neither a bound nor that flag is refused both ways, and a missing bound is never
-  emitted as a zero-valued one. Consequences, deliberate: a redundant
+  `\|*_unbounded: true` flag alone. Encode refuses a side not marked unbounded that has no
+  bound to spell (written without either, it would read back as open), and a missing bound is
+  never emitted as a zero-valued one. Consequences, deliberate: a redundant
   `\|lower_included: true` on a bounded side is **normalised away** on re-encode, and an
   absent `\|*_included` on an open side re-encodes as an explicit `false`. Each denotes the
   same RM value as the other spelling, so these are canonical-spelling normalisations like

@@ -286,28 +286,19 @@ func TestRepeatingLeafOwnersRefuseReusedSiblingOnFirstEmission(t *testing.T) {
 
 // --- interval decode symmetry --------------------------------------------
 
-// Decode must refuse exactly what encode refuses. A bounded end with no bound
-// used to decode fine and then fail to re-encode, and a bound spelled beside
-// `|*_unbounded: true` contradicts the open boundary that flag marks outright.
-// REQ-140. The boundless end is one interval grammar, so the refusal is pinned
-// at `_normal_range`, at `_other_reference_ranges:N`, and at a DV_INTERVAL leaf.
+// A bound spelled beside `|*_unbounded: true` contradicts the open boundary
+// that flag marks, and decode refuses it as encode does (REQ-140). A side
+// marked `|*_unbounded: false` with no bound is refused where the RM holds the
+// bound by value (REQ-169). An end that spells neither a bound nor its flag
+// is open (REQ-169): TestREQ169FlatUnboundedFollowsItsBound pins that at every
+// interval position.
 func TestIntervalDecodeMirrorsEncodeRefusals(t *testing.T) {
 	wt, _ := conformanceWT(t)
-	const orr = rmattrElement + "/_other_reference_ranges:0"
 	for name, extra := range map[string]map[string]any{
-		"bounded end with no bound": {
+		"closed end with no bound, held by value": {
 			rmattrElement + "/_normal_range/lower|magnitude": 20.5,
 			rmattrElement + "/_normal_range/lower|unit":      "unit",
-		},
-		"_other_reference_ranges:0 bounded end with no bound": {
-			orr + "/lower|magnitude": 70.5,
-			orr + "/lower|unit":      "unit",
-			orr + "/meaning":         "high",
-		},
-		"DV_INTERVAL leaf bounded end with no bound": {
-			rmattrIntervalEvent + "/time":       "2022-01-12T09:00:11.7842493+01:00",
-			rmattrInterval + "/lower|magnitude": 72.83,
-			rmattrInterval + "/lower|unit":      "Unit",
+			rmattrElement + "/_normal_range|upper_unbounded": false,
 		},
 		"bound beside an unbounded flag": {
 			rmattrElement + "/_normal_range/lower|magnitude": 20.5,

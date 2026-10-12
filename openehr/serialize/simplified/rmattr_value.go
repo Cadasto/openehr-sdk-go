@@ -374,6 +374,16 @@ func (ts rmattrTails) boolTail(g rmattrGroup, suffix string, def bool) (bool, er
 	return b, nil
 }
 
+// flagTail reads an optional Boolean own suffix, reporting whether the key
+// is present at all, for a default that depends on more than the key.
+func (ts rmattrTails) flagTail(g rmattrGroup, suffix string) (value, present bool, err error) {
+	if _, present = ts.own[suffix]; !present {
+		return false, false, nil
+	}
+	value, err = ts.boolTail(g, suffix, false)
+	return value, true, err
+}
+
 // --- DV_INTERVAL --------------------------------------------------------
 
 // intervalOwnTails / intervalSubTails are the DV_INTERVAL grammar: the two
@@ -386,6 +396,13 @@ var (
 	intervalSubTails = map[string]bool{"lower": true, "upper": true}
 )
 
+// normalRangeBoundByValue are the datatypes whose normal_range the RM holds as
+// a DV_INTERVAL of the datatype itself, a concrete T, so a bound is held by
+// value and its absence cannot be told from the Go zero (REQ-169). Every other
+// DV_ORDERED holds DV_INTERVAL<DV_ORDERED>, an interface bound, and so does a
+// REFERENCE_RANGE's range and a polymorphic DV_INTERVAL leaf.
+var normalRangeBoundByValue = map[string]bool{"DV_COUNT": true, "DV_QUANTITY": true, "DV_PROPORTION": true}
+
 // intervalSuffixes decodes the DV_INTERVAL grammar out of a family instance's
 // tails into a canonical DV_INTERVAL: `/lower` and `/upper` through the anchor
 // datatype's own captured-key machinery, plus the four boundary Booleans. It is
@@ -395,44 +412,53 @@ var (
 //
 // The defaults are the whole reason this is one function rather than four
 // suffix reads. BASE `Interval` declares all four Booleans mandatory (1..1),
-// and the reference omits each one's default value. `lower_unbounded` /
-// `upper_unbounded` are omitted when false, so absent is false.
-// `lower_included` / `upper_included` default by side. On a bounded side they
-// are omitted when true, the closed endpoint, so absent is true. On an open
-// side absent is false, the only value BASE `Lower_included_valid` /
-// `Upper_included_valid` permit there, and an explicit true is read as
-// written, although it breaks that invariant (encode refuses it).
-// Every open end in the corpus spells `|*_included: false`, so those
-// invariants fix the open-side default, not the corpus. The corpus pins
+// and the reference omits each one's default value (REQ-169).
+// `lower_unbounded` / `upper_unbounded` follow the side's bound: absent, they
+// are false beside a bound and true where the side's bound keys are absent or
+// all null, so an interval that spells only an upper bound is open below.
+// `lower_included` / `upper_included` default by side. On a side not
+// unbounded they are omitted when true, the closed endpoint, so absent is
+// true. On an open side absent is false, the only value BASE
+// `Lower_included_valid` / `Upper_included_valid` permit there, and an
+// explicit true is read as written, although it breaks that invariant (encode
+// refuses it). Every open end in the corpus spells `|*_included: false`, so
+// those invariants fix the open-side default, not the corpus. The corpus pins
 // the bounded side: `dv_count`'s `_normal_range` omits the flags where
-// `dv_quantity`'s spells them `false`, and encode's inverse rule (emit
-// only what contradicts the bounded-side default) reproduces each. Two
-// consequences are deliberate and recorded in
-// deviations.md: a redundant `|lower_included: true` on a bounded side is
-// normalised away, since it decodes to the same RM value as its absence, and an
-// absent `|*_included` on an open side re-encodes as an explicit false.
-func intervalSuffixes(g rmattrGroup, ts rmattrTails, anchor string) (map[string]any, error) {
+// `dv_quantity`'s spells them `false`, and encode's inverse rule (emit only
+// what contradicts the bounded-side default) reproduces each. Two
+// consequences are deliberate and recorded in deviations.md: a redundant
+// `|lower_included: true` on a bounded side is normalised away, since it
+// decodes to the same RM value as its absence, and an absent `|*_included` on
+// an open side re-encodes as an explicit false.
+//
+// A side marked `|*_unbounded: false` with no bound names a closed end with no
+// value. boundByValue says whether the RM holds the interval's bounds by value
+// ([normalRangeBoundByValue]): there the Go value cannot hold the absence, and
+// filling in a zero bound would change the interval's meaning, so the side is
+// refused; held as an interface, it decodes as written, with no bound.
+func intervalSuffixes(g rmattrGroup, ts rmattrTails, anchor string, boundByValue bool) (map[string]any, error) {
 	iv := map[string]any{"_type": "DV_INTERVAL"}
 	for _, end := range []string{"lower", "upper"} {
-		_, bounded := ts.sub[end]
-		unbounded, err := ts.boolTail(g, end+"_unbounded", false)
+		slot, written := ts.sub[end]
+		bounded := written && !allNull(slot)
+		unbounded, flagged, err := ts.flagTail(g, end+"_unbounded")
 		if err != nil {
 			return nil, err
 		}
+		if !flagged {
+			unbounded = !bounded
+		}
 		// BASE `Interval` defines `lower_unbounded` as the lower boundary being
 		// open (-infinity), and `upper_unbounded` the upper one (+infinity), so
-		// an open side carries no bound, and the grammar spells an open side by
-		// its flag alone: each end must spell exactly one of the two. Both, or
-		// neither, is a contradiction the codec must not resolve by guessing:
-		// accepting a flagless boundless end would build the very interval
-		// [intervalBoundToFlat] refuses on the way out, so the same payload
-		// would decode and then fail to re-encode.
+		// an open side carries no bound. A bound beside a true flag is a
+		// contradiction the codec must not resolve by guessing; encode refuses
+		// the same pair ([intervalBoundToFlat]).
 		switch {
 		case bounded && unbounded:
 			return nil, fmt.Errorf("%w: %s spells a /%s bound beside `|%s_unbounded: true`; BASE Interval marks that boundary open, so it carries no bound and the pair contradicts itself",
 				ErrUnsupportedDatatype, g.prefix(), end, end)
-		case !bounded && !unbounded:
-			return nil, fmt.Errorf("%w: %s carries no /%s bound and no `|%s_unbounded: true`; a side not marked `|%s_unbounded` must carry a bound, and an open side is spelled by that flag alone",
+		case !bounded && !unbounded && boundByValue:
+			return nil, fmt.Errorf("%w: %s marks its %s side closed with `|%s_unbounded: false` but carries no /%s bound; the RM holds this bound by value, so a missing bound cannot be told from a zero one (REQ-169)",
 				ErrUnsupportedDatatype, g.prefix(), end, end, end)
 		}
 		if bounded {
@@ -456,6 +482,17 @@ func intervalSuffixes(g rmattrGroup, ts rmattrTails, anchor string) (map[string]
 		iv[end+"_included"] = included
 	}
 	return iv, nil
+}
+
+// allNull reports whether every key of a bound holds JSON null: a null bound,
+// which REQ-169 reads as an absent one.
+func allNull(slot map[string]any) bool {
+	for _, v := range slot {
+		if v != nil {
+			return false
+		}
+	}
+	return true
 }
 
 // includedOpenSideError refuses to encode an interval side that is both open
@@ -485,7 +522,9 @@ func intervalLeafSuffixes(g rmattrGroup, anchor string) (map[string]any, error) 
 	if err != nil {
 		return nil, err
 	}
-	return intervalSuffixes(g, ts, anchor)
+	// A DV_INTERVAL at a Web Template leaf is polymorphic: canonical JSON
+	// decodes it as DV_INTERVAL<DV_ORDERED>, an interface bound.
+	return intervalSuffixes(g, ts, anchor, false)
 }
 
 // intervalTails splits g's tails for the interval grammar, sub being the
@@ -513,7 +552,7 @@ func decodeRMAttrNormalRange(g rmattrGroup, anchor string) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return intervalSuffixes(g, ts, anchor)
+	return intervalSuffixes(g, ts, anchor, normalRangeBoundByValue[anchor])
 }
 
 // refRangeSubTails is REFERENCE_RANGE's sub-object set: the interval's two
@@ -541,7 +580,9 @@ func decodeRMAttrReferenceRange(g rmattrGroup, anchor string) (any, error) {
 	if ts.empty() {
 		return nil, errNothingMatched
 	}
-	iv, err := intervalSuffixes(g, ts, anchor)
+	// REFERENCE_RANGE.range is DV_INTERVAL<DV_ORDERED>, an interface bound,
+	// whatever the leaf's datatype.
+	iv, err := intervalSuffixes(g, ts, anchor, false)
 	if err != nil {
 		return nil, err
 	}

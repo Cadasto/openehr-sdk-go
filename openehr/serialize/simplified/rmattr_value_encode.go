@@ -297,7 +297,8 @@ func intervalToFlat[T any](out map[string]any, base, anchor string, iv rm.Interv
 // finite without saying where. Neither way of papering over it is acceptable:
 // with an interface-typed bound (`DVInterval[DVOrdered]`, what a canonical
 // decode produces) a Void bound emits nothing at all, an end spelling neither a
-// bound nor its flag, which decode refuses; while a concrete-typed bound cannot
+// bound nor its flag, which decode reads as open (REQ-169), the opposite of
+// what the flags say; while a concrete-typed bound cannot
 // be nil and its Go zero value puts a *fabricated* bound on the wire
 // (`|magnitude` 0 under an empty, RM-mandatory `|unit`). Refuse both (REQ-140).
 //
@@ -323,7 +324,7 @@ func intervalBoundToFlat(out map[string]any, base, anchor, end string, bound any
 		return err
 	}
 	if len(sub) == 0 {
-		return fmt.Errorf("%w: %q carries no %s bound but is not marked `|%s_unbounded`; a side not marked `|%s_unbounded` must carry a bound, and decode refuses an end that spells neither",
+		return fmt.Errorf("%w: %q carries no %s bound but is not marked `|%s_unbounded`; a side not marked `|%s_unbounded` must carry a bound, since an end that spells neither reads back as open",
 			ErrUnsupportedDatatype, path, end, end, end)
 	}
 	if key, empty := emptyMandatorySuffix(sub, path, anchor); empty {
