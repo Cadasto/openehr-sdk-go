@@ -21,7 +21,10 @@ import (
 //   - A shape failure raised inside a generated RM type's decode (the
 //     `canjson: <RM_TYPE>:` family), where the bytes are valid JSON but
 //     the wrong shape for the target. The cause is the codec's own error,
-//     a *encoding/json/v2.SemanticError. When the failure happens inside
+//     a *encoding/json/v2.SemanticError, except that an interval side
+//     written bounded with no bound, refused where the bound is held by
+//     value, has a plain error naming the flag as its cause when the
+//     interval is the decode root. When the failure happens inside
 //     the concrete type selected at a polymorphic slot the error is also
 //     a [DecodeError] naming that slot, so both classifications hold: the
 //     path from the [DecodeError], the kind from this sentinel.

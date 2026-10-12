@@ -20,7 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Template validation includes the RM floor (REQ-102, ADR 0025).** `ValidateComposition` and the other template-driven entry points also return the floor's findings, each defect once, so an RM-invalid instance no longer passes.
 - **One issue path rule (REQ-102).** Both validators write `[atNNNN]` for an unshared id, `[atNNNN, 'name']` where siblings share it, else a 1-based `[n]`; `ValidateRM` was 0-based and template validation named every pinned node.
 - **FLAT and STRUCTURED decode ignore unmatched keys (REQ-170).** A key the Web Template does not resolve is dropped, not refused, unless `WithStrict` is set; keys naming RM data the codec cannot carry still fail.
-- **Interval flags are read as written or defaulted (REQ-169).** A missing `*_included` reads true on a bounded side, a missing `*_unbounded` false, and the OPT parser now honours a written excluded end.
+- **Interval flags default by REQ-169.** A missing `*_included` reads true on a closed side, a missing `*_unbounded` follows its bound, a by-value closed side without a bound is refused, and OPT excluded ends count.
 - **Items sharing an archetype id bind by pinned name (REQ-102, REQ-116).** A template that reuses one archetype under several names now validates a correct composition instead of reporting name and occurrence errors.
 - **Type conformance follows the BMM (REQ-102).** A value conforms to any OPT type it descends from, and among alternatives an exact type binds before a conforming one.
 - **The RM floor checks interval flags (REQ-112).** An open side marked included is reported as `lower_included_valid` or `upper_included_valid`.
