@@ -428,19 +428,68 @@ func TestREQ169_REQ100_EmptyIncludedFlagReadsAsOmitted(t *testing.T) {
 	}
 }
 
-// A lower_included or upper_included element whose text is not a boolean
-// still fails the parse in both modes.
-func TestREQ100_NonBooleanIncludedFlagRefused(t *testing.T) {
-	ivXML := `<lower_included>maybe</lower_included><lower_unbounded>false</lower_unbounded>` +
-		`<upper_unbounded>false</upper_unbounded><lower>1</lower><upper>3</upper>`
+// An empty or whitespace-only lower_unbounded or upper_unbounded element
+// reads like an omitted one: absent, so that side is bounded, and never a
+// decode error. Read by a plain bool, a whitespace-only element failed the
+// parse.
+func TestREQ169_REQ100_EmptyUnboundedFlagReadsAsOmitted(t *testing.T) {
+	const bothBounds = `<lower>1</lower><upper>3</upper>`
+	closed := bounds{lower: 1, upper: 3}
+	cases := []struct {
+		name  string
+		ivXML string
+		want  bounds
+	}{
+		{name: "lower_self_closing", ivXML: `<lower_unbounded/><upper_unbounded>false</upper_unbounded>` + bothBounds, want: closed},
+		{name: "lower_empty", ivXML: `<lower_unbounded></lower_unbounded><upper_unbounded>false</upper_unbounded>` + bothBounds, want: closed},
+		{name: "lower_whitespace", ivXML: "<lower_unbounded> </lower_unbounded><upper_unbounded>false</upper_unbounded>" + bothBounds, want: closed},
+		{name: "upper_whitespace", ivXML: "<lower_unbounded>false</lower_unbounded><upper_unbounded> \n\t</upper_unbounded>" + bothBounds, want: closed},
+		{name: "both_whitespace", ivXML: "<lower_unbounded> </lower_unbounded><upper_unbounded>  </upper_unbounded>" + bothBounds, want: closed},
+		{
+			// A written value beside a whitespace-only sibling is still read as written.
+			name:  "upper_written_true_lower_whitespace",
+			ivXML: "<lower_unbounded> </lower_unbounded><upper_unbounded>true</upper_unbounded><lower>1</lower>",
+			want:  bounds{lower: 1, upperUnbounded: true},
+		},
+	}
 	for _, p := range intervalParsers {
 		for _, site := range multiplicitySites {
-			t.Run(p.name+"/"+site.name, func(t *testing.T) {
-				_, err := p.parse(strings.NewReader(multiplicityBody(site.attribute, site.child, ivXML)))
-				if !errors.Is(err, template.ErrInvalidOPT) {
-					t.Errorf("%s(%s %q) error = %v, want errors.Is(err, ErrInvalidOPT)", p.name, site.name, ivXML, err)
-				}
-			})
+			for _, tc := range cases {
+				t.Run(p.name+"/"+site.name+"/"+tc.name, func(t *testing.T) {
+					opt, err := p.parse(strings.NewReader(multiplicityBody(site.attribute, site.child, tc.ivXML)))
+					if err != nil {
+						t.Fatalf("%s(%s %q) error = %v, want nil", p.name, site.name, tc.ivXML, err)
+					}
+					m := site.get(t, opt)
+					if m == nil {
+						t.Fatalf("%s(%s %q) Multiplicity = nil, want %+v", p.name, site.name, tc.ivXML, tc.want)
+					}
+					if got := boundsOf(m); got != tc.want {
+						t.Errorf("%s(%s %q) Multiplicity = %+v, want %+v", p.name, site.name, tc.ivXML, got, tc.want)
+					}
+				})
+			}
+		}
+	}
+}
+
+// A lower_included or upper_included element whose text is not a boolean
+// still fails the parse in both modes, and so does such an unbounded flag.
+func TestREQ100_NonBooleanIncludedFlagRefused(t *testing.T) {
+	for _, ivXML := range []string{
+		`<lower_included>maybe</lower_included><lower_unbounded>false</lower_unbounded>` +
+			`<upper_unbounded>false</upper_unbounded><lower>1</lower><upper>3</upper>`,
+		`<lower_unbounded>maybe</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>1</lower><upper>3</upper>`,
+	} {
+		for _, p := range intervalParsers {
+			for _, site := range multiplicitySites {
+				t.Run(p.name+"/"+site.name, func(t *testing.T) {
+					_, err := p.parse(strings.NewReader(multiplicityBody(site.attribute, site.child, ivXML)))
+					if !errors.Is(err, template.ErrInvalidOPT) {
+						t.Errorf("%s(%s %q) error = %v, want errors.Is(err, ErrInvalidOPT)", p.name, site.name, ivXML, err)
+					}
+				})
+			}
 		}
 	}
 }
@@ -652,6 +701,46 @@ func TestREQ169_REQ103_NumericRangeEmptyIncludedFlagReadsAsOmitted(t *testing.T)
 					}
 					got := site.get(t, firstChildPrimitive(t, opt))
 					if got != tc.want {
+						t.Errorf("%s(%s %q) range = %+v, want %+v", p.name, site.name, tc.ivXML, got, tc.want)
+					}
+				})
+			}
+		}
+	}
+}
+
+// An empty or whitespace-only lower_unbounded or upper_unbounded element on
+// a numeric range reads like an omitted one: absent, so that side is
+// bounded, and never a decode error.
+func TestREQ169_REQ103_NumericRangeEmptyUnboundedFlagReadsAsOmitted(t *testing.T) {
+	const bothBounds = `<lower>1</lower><upper>9</upper>`
+	closed := constraints.NumericRange{Lower: 1, Upper: 9, LowerInclusive: true, UpperInclusive: true}
+	cases := []struct {
+		name  string
+		ivXML string
+		want  constraints.NumericRange
+	}{
+		{name: "lower_self_closing", ivXML: `<lower_unbounded/><upper_unbounded>false</upper_unbounded>` + bothBounds, want: closed},
+		{name: "lower_whitespace", ivXML: "<lower_unbounded> </lower_unbounded><upper_unbounded>false</upper_unbounded>" + bothBounds, want: closed},
+		{name: "upper_whitespace", ivXML: "<lower_unbounded>false</lower_unbounded><upper_unbounded> \n\t</upper_unbounded>" + bothBounds, want: closed},
+		{name: "both_whitespace", ivXML: "<lower_unbounded> </lower_unbounded><upper_unbounded>  </upper_unbounded>" + bothBounds, want: closed},
+		{
+			name:  "lower_written_true_upper_whitespace",
+			ivXML: "<lower_unbounded>true</lower_unbounded><upper_unbounded> </upper_unbounded><upper>9</upper>",
+			want:  constraints.NumericRange{Upper: 9, UpperInclusive: true, LowerUnbounded: true},
+		},
+	}
+	for _, p := range intervalParsers {
+		for _, site := range numericRangeSites {
+			for _, tc := range cases {
+				t.Run(p.name+"/"+site.name+"/"+tc.name, func(t *testing.T) {
+					child := strings.ReplaceAll(site.child, "{{interval}}", tc.ivXML)
+					body := strings.Replace(primitiveOPTTemplate, "%s", child, 1)
+					opt, err := p.parse(strings.NewReader(body))
+					if err != nil {
+						t.Fatalf("%s(%s %q) error = %v, want nil", p.name, site.name, tc.ivXML, err)
+					}
+					if got := site.get(t, firstChildPrimitive(t, opt)); got != tc.want {
 						t.Errorf("%s(%s %q) range = %+v, want %+v", p.name, site.name, tc.ivXML, got, tc.want)
 					}
 				})

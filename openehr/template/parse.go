@@ -330,17 +330,17 @@ type xmlCAttribute struct {
 }
 
 // xmlInterval is the whole-number interval of an occurrences, existence
-// or cardinality block. An omitted unbounded flag decodes as false. The
-// included flags are xmlBoolFlag values, so an omitted, empty or
-// whitespace-only element stays unset, and includedFlag can then give it
-// the default for its side.
+// or cardinality block. All four flags are xmlBoolFlag values, so an
+// omitted, empty or whitespace-only element stays unset and is never a
+// decode error. An unset unbounded flag reads as false, a bounded side,
+// and includedFlag gives an unset included flag the default for its side.
 type xmlInterval struct {
 	Lower          int         `xml:"lower"`
 	Upper          int         `xml:"upper"`
 	LowerIncluded  xmlBoolFlag `xml:"lower_included"`
 	UpperIncluded  xmlBoolFlag `xml:"upper_included"`
-	LowerUnbounded bool        `xml:"lower_unbounded"`
-	UpperUnbounded bool        `xml:"upper_unbounded"`
+	LowerUnbounded xmlBoolFlag `xml:"lower_unbounded"`
+	UpperUnbounded xmlBoolFlag `xml:"upper_unbounded"`
 }
 
 // xmlCardinality maps the AOM 1.4 CARDINALITY type — the
@@ -609,13 +609,14 @@ func intervalToMultiplicity(i *xmlInterval) (*Multiplicity, error) {
 	if i == nil {
 		return nil, nil
 	}
-	lowerIncluded := includedFlag(i.LowerIncluded.ptr(), i.LowerUnbounded)
-	upperIncluded := includedFlag(i.UpperIncluded.ptr(), i.UpperUnbounded)
+	lowerUnbounded, upperUnbounded := i.LowerUnbounded.orFalse(), i.UpperUnbounded.orFalse()
+	lowerIncluded := includedFlag(i.LowerIncluded.ptr(), lowerUnbounded)
+	upperIncluded := includedFlag(i.UpperIncluded.ptr(), upperUnbounded)
 	m := &Multiplicity{
 		lower:          i.Lower,
 		upper:          i.Upper,
-		lowerUnbounded: i.LowerUnbounded,
-		upperUnbounded: i.UpperUnbounded,
+		lowerUnbounded: lowerUnbounded,
+		upperUnbounded: upperUnbounded,
 	}
 	// A Multiplicity counts whole items, so an excluded end on a bounded
 	// side becomes the closed end it stands for: ">0" is 1 and "<3" is 2.
@@ -623,13 +624,13 @@ func intervalToMultiplicity(i *xmlInterval) (*Multiplicity, error) {
 	// says. An int cannot hold the closed end of "> the largest int" or
 	// "< the smallest int", so such an end is refused instead of being
 	// left to wrap around to the other end of the int range.
-	if !i.LowerUnbounded && !lowerIncluded {
+	if !lowerUnbounded && !lowerIncluded {
 		if m.lower == math.MaxInt {
 			return nil, fmt.Errorf("closed lower bound overflows int: excluded lower=%d", i.Lower)
 		}
 		m.lower++
 	}
-	if !i.UpperUnbounded && !upperIncluded {
+	if !upperUnbounded && !upperIncluded {
 		if m.upper == math.MinInt {
 			return nil, fmt.Errorf("closed upper bound overflows int: excluded upper=%d", i.Upper)
 		}

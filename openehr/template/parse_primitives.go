@@ -14,14 +14,16 @@ import (
 // C_DV_QUANTITY. Distinct from xmlInterval (which models
 // existence / occurrences as integer cardinalities) — primitive
 // ranges are float-typed and keep their inclusivity flags, where a
-// Multiplicity closes an excluded end instead. The included flags are
+// Multiplicity closes an excluded end instead. All four flags are
 // xmlBoolFlag values, so an omitted, empty or whitespace-only element
-// stays unset, and includedFlag can then give it the default for its side.
+// stays unset and is never a decode error. An unset unbounded flag reads
+// as false, a bounded side, and includedFlag gives an unset included flag
+// the default for its side.
 type xmlNumericInterval struct {
 	LowerIncluded  xmlBoolFlag `xml:"lower_included"`
 	UpperIncluded  xmlBoolFlag `xml:"upper_included"`
-	LowerUnbounded bool        `xml:"lower_unbounded"`
-	UpperUnbounded bool        `xml:"upper_unbounded"`
+	LowerUnbounded xmlBoolFlag `xml:"lower_unbounded"`
+	UpperUnbounded xmlBoolFlag `xml:"upper_unbounded"`
 	// Lower / Upper are decoded as string and parsed to float lazily
 	// in numericRange. AOM 1.4 reuses the same `<range>` element name
 	// for both numeric ranges (C_INTEGER / C_REAL / C_DV_QUANTITY)
@@ -34,8 +36,9 @@ type xmlNumericInterval struct {
 }
 
 // xmlBoolFlag is the true_valid or false_valid element of a C_BOOLEAN,
-// or the lower_included or upper_included element of an interval: an
-// occurrences, existence or cardinality interval, or a numeric range.
+// or one of the four boundary flags (lower_included, upper_included,
+// lower_unbounded, upper_unbounded) of an interval: an occurrences,
+// existence or cardinality interval, or a numeric range.
 // A plain bool field would read an empty element as false. This type
 // leaves an empty or whitespace-only element unset instead, so it reads
 // exactly like an omitted one. Any other text is parsed with
@@ -62,6 +65,12 @@ func (f *xmlBoolFlag) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 	}
 	*f = xmlBoolFlag{set: true, value: v}
 	return nil
+}
+
+// orFalse returns the flag's value, or false when the element was
+// omitted or empty.
+func (f xmlBoolFlag) orFalse() bool {
+	return f.set && f.value
 }
 
 // orTrue returns the flag's value, or true when the element was omitted
@@ -358,11 +367,12 @@ func numericRange(i *xmlNumericInterval, strict bool, ctx string) (constraints.N
 	if i == nil {
 		return constraints.NumericRange{LowerUnbounded: true, UpperUnbounded: true}, nil
 	}
+	lowerUnbounded, upperUnbounded := i.LowerUnbounded.orFalse(), i.UpperUnbounded.orFalse()
 	r := constraints.NumericRange{
-		LowerUnbounded: i.LowerUnbounded,
-		UpperUnbounded: i.UpperUnbounded,
-		LowerInclusive: includedFlag(i.LowerIncluded.ptr(), i.LowerUnbounded),
-		UpperInclusive: includedFlag(i.UpperIncluded.ptr(), i.UpperUnbounded),
+		LowerUnbounded: lowerUnbounded,
+		UpperUnbounded: upperUnbounded,
+		LowerInclusive: includedFlag(i.LowerIncluded.ptr(), lowerUnbounded),
+		UpperInclusive: includedFlag(i.UpperIncluded.ptr(), upperUnbounded),
 	}
 	if !r.LowerUnbounded {
 		if f, err := strconv.ParseFloat(strings.TrimSpace(i.Lower), 64); err == nil {
