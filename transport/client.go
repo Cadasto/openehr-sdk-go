@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"go.opentelemetry.io/otel"
@@ -595,13 +596,40 @@ func joinTarget(base *url.URL, path string, query url.Values) (*url.URL, error) 
 	out := base.Clone()
 	out.Path = joinPaths(base.Path, path)
 	if len(query) > 0 {
-		q := out.Query()
-		for k, vv := range query {
-			q[k] = append(q[k][:0], vv...)
-		}
-		out.RawQuery = q.Encode()
+		out.RawQuery = mergeQuery(base.RawQuery, query)
 	}
 	return out, nil
+}
+
+// mergeQuery returns the raw query for a request whose base URL has the raw
+// query baseRaw: the base pairs as configured and in their order, then query.
+// A key in query replaces the base pair of the same name, even when query
+// holds no value for it.
+func mergeQuery(baseRaw string, query url.Values) string {
+	// The base pairs are copied, not decoded and encoded again. A round trip
+	// can change their bytes ('+' to %20, or %20 to '+'), and with them what
+	// a server reads: '+' is a space to an HTML-form decoder but a plus to an
+	// RFC 3986 decoder. Only a pair's key is decoded, to find the pairs a
+	// request key replaces; a key that does not decode is kept.
+	var pairs []string
+	for pair := range strings.SplitSeq(baseRaw, "&") {
+		if pair == "" {
+			continue
+		}
+		rawKey, _, _ := strings.Cut(pair, "=")
+		if key, err := url.QueryUnescape(rawKey); err == nil && query.Has(key) {
+			continue
+		}
+		pairs = append(pairs, pair)
+	}
+	// REQ-095: the pinned OAS declares query parameters `style: form`,
+	// defined by RFC 6570, where a space is %20; `+` is a space only under
+	// HTML-form decoding. Encode writes a literal plus as %2B, so every `+`
+	// it emits stands for a space.
+	if enc := query.Encode(); enc != "" {
+		pairs = append(pairs, strings.ReplaceAll(enc, "+", "%20"))
+	}
+	return strings.Join(pairs, "&")
 }
 
 func joinPaths(a, b string) string {

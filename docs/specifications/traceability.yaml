@@ -1027,6 +1027,7 @@ requirements:
       - openehr/client/ehr/path_encoding_test.go
       - openehr/client/pathencoding_guard_test.go
       - openehr/client/query/path_encoding_test.go
+      - openehr/client/query/query_encoding_test.go
       - testkit/probe/cassette_test.go
       - testkit/probe/liveexample_test.go
       - testkit/probe/livestatus_test.go
@@ -1037,6 +1038,7 @@ requirements:
       - testkit/probes/transport/probe_091_path_segment_validation.go
       - testkit/probes/versioned/probe_072_contribution_submission_shape.go
       - transport/path_encoding_test.go
+      - transport/query_encoding_test.go
 
   - id: REQ-096
     title: Unambiguous "disable retry"
