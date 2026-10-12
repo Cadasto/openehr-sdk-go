@@ -1745,3 +1745,70 @@ func TestREQ170BareValueAtANodeIsRefused(t *testing.T) {
 	}
 	assertUnmatched(t, wt, rmattrBody(map[string]any{rmattrSection + "|x_note": "n"}), rmattrSection+"|x_note")
 }
+
+// TestREQ170StructuredMetadataWithoutANode — REQ-170 / REQ-053. A Web Template
+// need not carry a `context` node: the decode still reads the metadata
+// spellings below the root and resolves `<root>/context` as the EVENT_CONTEXT
+// without it, so the STRUCTURED rule judges a `context` member by those
+// spellings. Under it the decode reads a longer metadata spelling
+// (`start_time`) and the underscore families an EVENT_CONTEXT carries
+// (`_health_care_facility`); any other member, an unknown family or one
+// EVENT_CONTEXT does not carry among them, is set aside whatever its value
+// holds, reported by its member path and refused under strict. A name it reads
+// keeps the shape refusal in every mode.
+func TestREQ170StructuredMetadataWithoutANode(t *testing.T) {
+	full, _ := conformanceWT(t)
+	wt := *full
+	root := *full.Tree
+	root.Children = slices.DeleteFunc(slices.Clone(root.Children), func(n *webtemplate.Node) bool { return n.ID == "context" })
+	if len(root.Children) == len(full.Tree.Children) {
+		t.Fatal("fixture: the corpus template has no context node to remove")
+	}
+	wt.Tree = &root
+	const secret = "secret-value-0451"
+	body := rmattrBody(map[string]any{
+		rmattrContext + "/start_time":                 "2020-02-03T04:05:06+01:00",
+		rmattrContext + "/_health_care_facility|name": "Hospital",
+	})
+	delete(body, "ctx/time")
+	ref, _ := structuredDoc(t, body)
+	refComp, err := UnmarshalStructured(ref, &wt, WithStrict())
+	if err != nil {
+		t.Fatalf("UnmarshalStructured (reference) = %v", err)
+	}
+	if c := canonical(t, refComp); !bytes.Contains(c, []byte("2020-02-03T04:05:06")) || !bytes.Contains(c, []byte("Hospital")) {
+		t.Fatalf("fixture: the context's start time and facility do not reach the value: %s", c)
+	}
+	contextPath := rmattrRoot + "/context/0"
+	for _, name := range []string{"x_member", "_x_unknown", "_normal_range"} {
+		for _, value := range []any{secret, map[string]any{"y": secret}, []any{secret}} {
+			t.Run(fmt.Sprintf("%s/%T", name, value), func(t *testing.T) {
+				_, doc := structuredDoc(t, body)
+				structuredObject(t, doc, contextPath)[name] = value
+				assertStructuredUnmatched(t, &wt, mustJSON(t, doc), ref, secret, contextPath+"/"+name)
+			})
+		}
+	}
+	for _, name := range []string{"start_time", "_health_care_facility"} {
+		t.Run("refused: "+name+" holding a scalar", func(t *testing.T) {
+			_, doc := structuredDoc(t, body)
+			structuredObject(t, doc, contextPath)[name] = secret
+			b := mustJSON(t, doc)
+			_, def := UnmarshalStructured(b, &wt)
+			if !errors.Is(def, ErrUnknownPath) || !strings.Contains(def.Error(), "expected an array") {
+				t.Fatalf("UnmarshalStructured (default) = %v, want the array-shape refusal", def)
+			}
+			var reported []string
+			_, rep := UnmarshalStructured(b, &wt, WithUnmatched(func(p string) { reported = append(reported, p) }))
+			_, strict := UnmarshalStructured(b, &wt, WithStrict())
+			for mode, err := range map[string]error{"WithUnmatched": rep, "WithStrict": strict} {
+				if err == nil || err.Error() != def.Error() {
+					t.Errorf("UnmarshalStructured (%s) = %v, want %v", mode, err, def)
+				}
+			}
+			if len(reported) != 0 {
+				t.Errorf("WithUnmatched reported %q on a refused decode", reported)
+			}
+		})
+	}
+}
