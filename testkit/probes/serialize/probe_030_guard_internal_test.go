@@ -360,17 +360,40 @@ func floorFindings(r validation.Result) []string {
 // argument binds the bounds to DV_QUANTITY.
 const genericTargetBody = `{"_type":"DV_INTERVAL","lower":{"magnitude":1,"units":"kg"},"upper":{"magnitude":2,"units":"kg"}}`
 
+// zeroBoundBesideOpenFlagBody is a DV_INTERVAL whose lower side is marked
+// unbounded and still carries a DV_COUNT bound holding zero.
+const zeroBoundBesideOpenFlagBody = `{"_type":"DV_INTERVAL","lower":{"_type":"DV_COUNT","magnitude":0},"upper":{"_type":"DV_COUNT","magnitude":5},"lower_unbounded":true,"upper_unbounded":false}`
+
 // TestProbe030PassesAGenericTarget pins that the input leg reads the root
 // from the factory's value, as canjson does (REQ-052, REQ-170): a valid input
 // that a generic target decodes cleanly passes. Built from the class name
 // alone, the expected form refuses the bounds' elided "_type", which no type
 // argument binds, and the probe fails a round trip that holds.
+//
+// The zero bound beside its open flag passes under both bindings, which the
+// encoder spells differently. Bound to the concrete DV_COUNT, the bound is
+// held by value, so a zero one is empty and the encoder drops it. Bound to the
+// abstract DV_ORDERED, it is held by reference, so the encoder keeps it, and
+// the expected form must keep it too.
 func TestProbe030PassesAGenericTarget(t *testing.T) {
-	r, err := probe030RoundTrip([]byte(genericTargetBody), func() any { return new(rm.DVInterval[rm.DVQuantity]) }, canjson.Marshal, canjson.Marshal, false)
-	if err != nil {
-		t.Fatalf("probe framework error: %v", err)
+	cases := []struct {
+		name    string
+		body    string
+		factory func() any
+	}{
+		{name: "elided bound types, DV_INTERVAL<DV_QUANTITY>", body: genericTargetBody, factory: func() any { return new(rm.DVInterval[rm.DVQuantity]) }},
+		{name: "zero bound beside its open flag, DV_INTERVAL<DV_ORDERED>", body: zeroBoundBesideOpenFlagBody, factory: func() any { return new(rm.DVInterval[rm.DVOrdered]) }},
+		{name: "zero bound beside its open flag, DV_INTERVAL<DV_COUNT>", body: zeroBoundBesideOpenFlagBody, factory: func() any { return new(rm.DVInterval[rm.DVCount]) }},
 	}
-	if r.Status != "pass" {
-		t.Errorf("status = %q (detail: %s), want pass: canjson decodes the input into the generic target", r.Status, r.Detail)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r, err := probe030RoundTrip([]byte(tc.body), tc.factory, canjson.Marshal, canjson.Marshal, false)
+			if err != nil {
+				t.Fatalf("probe framework error: %v", err)
+			}
+			if r.Status != "pass" {
+				t.Errorf("status = %q (detail: %s), want pass: canjson decodes the input into the generic target", r.Status, r.Detail)
+			}
+		})
 	}
 }

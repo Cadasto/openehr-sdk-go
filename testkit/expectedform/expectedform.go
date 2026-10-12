@@ -216,6 +216,7 @@ func decode(b []byte) (any, error) {
 type walker struct {
 	model     *rmjsonwalk.Model
 	lookup    rminfo.Lookup
+	hier      rminfo.Hierarchy
 	full      bool
 	unmatched map[string]bool
 }
@@ -228,7 +229,9 @@ func newWalker(l rminfo.Lookup, full bool) (walker, error) {
 	if err != nil {
 		return walker{}, fmt.Errorf("expectedform: %w", err)
 	}
-	return walker{model: m, lookup: l, full: full}, nil
+	// rmjsonwalk.New refuses a Lookup that is not a Hierarchy.
+	h, _ := l.(rminfo.Hierarchy)
+	return walker{model: m, lookup: l, hier: h, full: full}, nil
 }
 
 // object walks one JSON object whose declared RM type is declared. boundType
@@ -431,8 +434,8 @@ func (w walker) isInterval(rmType string) bool {
 
 // settleInterval writes each omitted boundary flag with its default and drops
 // an empty bound on a side marked unbounded. A flag present in the input is
-// kept as written, an included open side among them. boundType is the
-// concrete class the slot binds the bound to, or empty (see isEmptyBound).
+// kept as written, an included open side among them. boundType is the class
+// the slot binds the bound to, or empty (see isEmptyBound).
 func (w walker) settleInterval(obj map[string]any, boundType string) {
 	for _, side := range [...]string{"lower", "upper"} {
 		open := false
@@ -460,14 +463,18 @@ func (w walker) settleInterval(obj map[string]any, boundType string) {
 // holding a zero literal, makes the bound non-empty. The mandatory attributes
 // of every concrete bound type the RM binds (DV_QUANTITY, DV_COUNT,
 // DV_PROPORTION, DV_DATE_TIME, DV_DATE) are all primitives. A bound behind an
-// unbound or abstract parameter, boundType empty, is held by reference, so an
-// object there is never empty.
+// unbound parameter, boundType empty, or one bound to an abstract class, such
+// as the DV_ORDERED of an rm.DVInterval[rm.DVOrdered], is held by reference,
+// so an object there is never empty: the encoder writes whatever it holds.
 func (w walker) isEmptyBound(v any, boundType string) bool {
 	switch x := v.(type) {
 	case nil:
 		return true
 	case map[string]any:
 		if boundType == "" {
+			return false
+		}
+		if abstract, _ := w.hier.IsAbstract(boundType); abstract {
 			return false
 		}
 		rmType := boundType

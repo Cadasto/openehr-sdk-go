@@ -499,6 +499,29 @@ func TestREQ052_BuildForReadsTheRootFromTheTarget(t *testing.T) {
 			t.Errorf("Build(%s, DV_INTERVAL) error = %v, want the elided bound refused: the class name binds nothing", interval, err)
 		}
 	})
+	t.Run("DV_INTERVAL bound to an abstract class keeps a zero bound beside its open flag", func(t *testing.T) {
+		// Bound to DV_ORDERED the SDK holds a bound by reference, so the
+		// encoder keeps a zero one; bound to DV_COUNT it holds the bound by
+		// value, and the encoder drops it as empty.
+		const in = `{"_type":"DV_INTERVAL","lower":{"_type":"DV_COUNT","magnitude":0},"upper":{"_type":"DV_COUNT","magnitude":5},"lower_unbounded":true,"upper_unbounded":false}`
+		const flags = `"lower_unbounded":true,"upper_unbounded":false,"lower_included":false,"upper_included":true}`
+		for _, tc := range []struct {
+			name   string
+			target any
+			want   string
+		}{
+			{name: "DV_ORDERED", target: new(rm.DVInterval[rm.DVOrdered]), want: `{"_type":"DV_INTERVAL","lower":{"_type":"DV_COUNT","magnitude":0},"upper":{"_type":"DV_COUNT","magnitude":5},` + flags},
+			{name: "DV_COUNT", target: new(rm.DVInterval[rm.DVCount]), want: `{"_type":"DV_INTERVAL","upper":{"_type":"DV_COUNT","magnitude":5},` + flags},
+		} {
+			got, err := expectedform.BuildFor([]byte(in), tc.target)
+			if err != nil {
+				t.Fatalf("BuildFor(%s) error: %v", tc.name, err)
+			}
+			if !wireEqual(t, tc.want, got) {
+				t.Errorf("BuildFor(%s, *rm.DVInterval[%s]) = %s, want %s", in, tc.name, got, tc.want)
+			}
+		}
+	})
 	t.Run("targets with no single RM value at the root", func(t *testing.T) {
 		for name, target := range map[string]any{
 			"slice": new([]rm.DVText),
