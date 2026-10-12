@@ -30,6 +30,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **FLAT decode reads `:0`-indexed metadata (REQ-053).** `<root>/language:0|code` and the other indexed metadata spellings read as the unindexed ones instead of losing to `ctx/`, and any other index is refused.
 - **`ToTime` refuses a leap second (REQ-123).** It returns `rm.ErrTemporalConversion` for second 60 instead of converting silently.
 - **Canonical XML needs `xsi:type` on an interface-typed generic member (REQ-056).** An empty `ORIGINAL_VERSION<any>.data` or `Interval<DV_ORDERED>` bound without one fails with `typereg.ErrMissingType` instead of being skipped.
+- **Canonical XML refuses content after the root (REQ-056).** `canxml.Unmarshal` refuses another element, non-whitespace text or a `<!DOCTYPE>` after the root in every mode, wrapping `canxml.ErrInvalidShape`.
+- **The RM floor reports a value that contains itself (REQ-112).** A Go-built cycle is reported as `cyclic_value` instead of walking without end, and a pointer shared by two attributes is checked once.
 
 ## [0.32.0] - 2026-10-08
 
