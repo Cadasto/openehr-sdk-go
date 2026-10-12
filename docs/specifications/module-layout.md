@@ -128,7 +128,8 @@ testkit/  -. helpers for .-→ all of the above
 
 - `transport/` depends on `auth/`, never the reverse.
 - `openehr/client/*` depends on `transport/`, `openehr/rm/`, `openehr/serialize/`, never on `cadasto/…`.
-- `openehr/rm/`'s generated marshal files import `openehr/serialize/canxml/`. That edge does not cycle: `canxml` imports only `openehr/rm/typereg/` and `openehr/serialize/internal/poly` from this module.
+- `openehr/rm/`'s generated marshal files import `openehr/serialize/canxml/` and `openehr/internal/xmlunmatched/`. That edge does not cycle: `canxml` imports only `openehr/rm/typereg/`, `openehr/serialize/internal/poly` and `openehr/internal/xmlunmatched/` from this module, and `xmlunmatched` imports only the standard library ([ADR 0002](../adr/0002-bmm-codegen-decisions.md) D9).
+- `openehr/serialize/canjson/` reaches the RM's attribute tables through `internal/rmjsonwalk/`, which imports `openehr/rm/rminfo/` and `internal/rmjsonwalk/polyreg/`, never `openehr/rm/`; `openehr/rm/`'s generated init registers its interface table into `polyreg`, which imports only the standard library. `TestCanJSONDoesNotImportTheRM` holds this.
 - `cadasto/<X>` may depend on `openehr/client/*`, `transport/`, `openehr/rm/`, etc. — but never on another `cadasto/<Y>`. `cadasto/datamap` is the exception on the wire side: REQ-058 keeps it off `transport/` and `auth/`.
 - `openehr/bmm/` depends on no `transport/`, `auth/` or HTTP package; the rule is [REQ-045](bmm-conformance.md#req-045--bmm-loader-is-a-building-block)'s.
 - `internal/bmmgen` depends on `openehr/bmm/` and the standard `text/template` / `go/format` packages — no SDK runtime packages.
