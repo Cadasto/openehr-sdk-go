@@ -54,7 +54,12 @@ func (e *unknownMemberError) Unwrap() error {
 // caller's own are not checked.
 // The members of a value of a class outside the RM, such as an AOM 1.4
 // archetype, are not checked either (see the package documentation,
-// "Unmatched members").
+// "Unmatched members"). Nor are those of a BASE interval, such as an
+// rm.Interval[rm.Integer], whether v points to one or it is the value of a
+// member: the RM lists that interval among its primitive types, not its
+// classes. Its descendants are classes and are checked: DV_INTERVAL
+// (rm.DVInterval), and the point and proper intervals (rm.PointInterval,
+// rm.ProperInterval).
 //
 // By default the decoder ignores unmatched members: the value it returns
 // holds the rest of the input and none of them. With this option fn receives

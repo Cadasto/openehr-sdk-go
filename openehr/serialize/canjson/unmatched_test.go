@@ -651,33 +651,69 @@ type callerStruct struct {
 // map[string]any and a caller's own struct, which reads the member and holds
 // an RM value whose extension member the walk does not reach, decode an
 // RM-looking input in every mode, report nothing, and get the default's value.
+//
+// A BASE interval is not an RM class either: the BMM lists it among its
+// primitive types. An rm.Interval[rm.Integer] is not checked as the target,
+// nor as the value of a member, here an ORIGINAL_VERSION's data bound to it.
+// The controls show that its descendants are checked: the same members under
+// an rm.PointInterval[rm.Integer] and an rm.DVInterval[rm.DVCount] report the
+// extension member and fail strict.
 func TestREQ170_NonRMTargetsAreNotChecked(t *testing.T) {
-	const in = `{"_type":"DV_TEXT","value":"v","x-a":1,"text":{"value":"t","x-b":1}}`
-	targets := map[string]func() any{
-		"any":            func() any { return new(any) },
-		"map[string]any": func() any { return new(map[string]any) },
-		"caller struct":  func() any { return new(callerStruct) },
+	const (
+		rmLooking = `{"_type":"DV_TEXT","value":"v","x-a":1,"text":{"value":"t","x-b":1}}`
+		interval  = `{"lower":1,"upper":2,"x-ext":"` + plantedValue + `"}`
+	)
+	targets := map[string]struct {
+		in   string
+		into func() any
+	}{
+		"any":                    {in: rmLooking, into: func() any { return new(any) }},
+		"map[string]any":         {in: rmLooking, into: func() any { return new(map[string]any) }},
+		"caller struct":          {in: rmLooking, into: func() any { return new(callerStruct) }},
+		"BASE interval":          {in: interval, into: func() any { return new(rm.Interval[rm.Integer]) }},
+		"BASE interval as value": {in: `{"_type":"ORIGINAL_VERSION","data":` + interval + `}`, into: func() any { return new(rm.OriginalVersion[rm.Interval[rm.Integer]]) }},
 	}
-	for name, into := range targets {
+	for name, target := range targets {
 		t.Run(name, func(t *testing.T) {
-			want := into()
-			if err := canjson.Unmarshal([]byte(in), want); err != nil {
-				t.Fatalf("canjson.Unmarshal(%s) = %v; want nil", in, err)
+			want := target.into()
+			if err := canjson.Unmarshal([]byte(target.in), want); err != nil {
+				t.Fatalf("canjson.Unmarshal(%s) = %v; want nil", target.in, err)
 			}
 			var reported []string
 			for mode, opts := range modes(&reported) {
 				reported = nil
-				got := into()
-				if err := canjson.Unmarshal([]byte(in), got, opts...); err != nil {
-					t.Errorf("canjson.Unmarshal(%s, %s) = %v; want nil: the target decodes as no RM type", in, mode, err)
+				got := target.into()
+				if err := canjson.Unmarshal([]byte(target.in), got, opts...); err != nil {
+					t.Errorf("canjson.Unmarshal(%s, %s) = %v; want nil: the target decodes as no RM type", target.in, mode, err)
 				}
 				if len(reported) != 0 {
-					t.Errorf("canjson.Unmarshal(%s, %s) reported %q; want nothing", in, mode, reported)
+					t.Errorf("canjson.Unmarshal(%s, %s) reported %q; want nothing", target.in, mode, reported)
 				}
 				if !reflect.DeepEqual(got, want) {
-					t.Errorf("canjson.Unmarshal(%s, %s) decoded %#v; want the default's %#v", in, mode, got, want)
+					t.Errorf("canjson.Unmarshal(%s, %s) decoded %#v; want the default's %#v", target.in, mode, got, want)
 				}
 			}
+		})
+	}
+
+	controls := map[string]struct {
+		in   string
+		into func() any
+	}{
+		"Point_interval": {in: interval, into: func() any { return new(rm.PointInterval[rm.Integer]) }},
+		"DV_INTERVAL":    {in: `{"lower":{"magnitude":1},"upper":{"magnitude":2},"x-ext":"` + plantedValue + `"}`, into: func() any { return new(rm.DVInterval[rm.DVCount]) }},
+	}
+	for name, control := range controls {
+		t.Run("control "+name, func(t *testing.T) {
+			var reported []string
+			if err := canjson.Unmarshal([]byte(control.in), control.into(), canjson.WithUnmatched(func(p string) { reported = append(reported, p) })); err != nil {
+				t.Fatalf("canjson.Unmarshal(%s, WithUnmatched) = %v; want nil", control.in, err)
+			}
+			if want := []string{"/x-ext"}; !slices.Equal(reported, want) {
+				t.Errorf("WithUnmatched reported %q; want %q: %s is a class and is checked", reported, want, name)
+			}
+			err := canjson.Unmarshal([]byte(control.in), control.into(), canjson.WithStrict())
+			assertStrictRefusal(t, "canjson.Unmarshal(WithStrict)", err, "/x-ext")
 		})
 	}
 }

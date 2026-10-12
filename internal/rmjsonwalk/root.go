@@ -28,7 +28,11 @@ type rootOf struct {
 // under its pointers, slices, arrays and maps it is neither a Go type that
 // names a class of the model nor a polymorphic RM interface. Such a target,
 // an any, a map[string]any, an AOM 1.4 type or a type of the caller's own,
-// even one with RM fields, gives a walk no RM value to start from.
+// even one with RM fields, gives a walk no RM value to start from. A BASE
+// interval, such as an rm.Interval[rm.Integer], is one too: the RM lists it
+// among its primitive types, not its classes, so it names no class of the
+// model, and a type argument that is one binds nothing. Its descendants
+// DV_INTERVAL, Point_interval and Proper_interval are classes.
 //
 // The Go type tells the declared type a "_type" can override, and nothing
 // else: RootOf reads no JSON. Results are kept per target type.
