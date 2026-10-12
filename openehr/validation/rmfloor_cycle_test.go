@@ -1,12 +1,15 @@
 package validation_test
 
 // rmfloor_cycle_test.go: REQ-112 § Driver — the RM floor visits each value
-// once. A value built in Go can contain itself or share a pointer between two
-// attributes; the floor reports a value that recurs inside itself as
-// cyclic_value where it recurs, walks a shared value at its first path only,
-// and keeps max_depth for a graph that is deep but acyclic. Without these
-// guards such a value made the walk branch at every level, which never ends
-// in practice, so each case runs under a deadline.
+// held by pointer once. A value built in Go can contain itself or share a
+// pointer between two attributes; the floor reports a value that recurs
+// inside itself as cyclic_value where it recurs, walks a shared value at its
+// first path only, and keeps max_depth for a graph that is deep but acyclic.
+// A value held by value can contain itself through a list that shares its own
+// backing array, with no pointer to recognise; the walk stops after a fixed
+// number of visits and reports max_nodes once. Without these guards such a
+// value made the walk branch at every level, which never ends in practice, so
+// each case runs under a deadline.
 
 import (
 	"strings"
@@ -17,23 +20,34 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
-// walkDeadline bounds each validation in this file. The bounded walk takes
-// microseconds; an unbounded one does not finish at all.
+// walkDeadline bounds each validation in this file that the visit record
+// ends. The bounded walk takes microseconds; an unbounded one does not finish
+// at all.
 const walkDeadline = 10 * time.Second
 
+// visitLimitDeadline bounds a validation that only the visit limit ends: the
+// walk runs to the limit first, which takes a fraction of a second, longer
+// under the race detector.
+var visitLimitDeadline = func() time.Duration {
+	if raceEnabled {
+		return 10 * time.Second
+	}
+	return time.Second
+}()
+
 // validateWithin runs validate and returns its result, failing the test when
-// it has not returned within walkDeadline. On that failure the goroutine is
-// left running until the test binary exits: the walk it runs cannot be
-// stopped from outside.
-func validateWithin(t *testing.T, call string, validate func() validation.Result) validation.Result {
+// it has not returned within deadline. On that failure the goroutine is left
+// running until the test binary exits: the walk it runs cannot be stopped
+// from outside.
+func validateWithin(t *testing.T, call string, deadline time.Duration, validate func() validation.Result) validation.Result {
 	t.Helper()
 	done := make(chan validation.Result, 1)
 	go func() { done <- validate() }()
 	select {
 	case r := <-done:
 		return r
-	case <-time.After(walkDeadline):
-		t.Fatalf("%s did not return within %v; want the RM-floor walk bounded", call, walkDeadline)
+	case <-time.After(deadline):
+		t.Fatalf("%s did not return within %v; want the RM-floor walk bounded", call, deadline)
 		return validation.Result{}
 	}
 }
@@ -88,7 +102,7 @@ func TestValidateRM_REQ112_CyclicValue(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			root := tc.root()
-			r := validateWithin(t, "ValidateRM", func() validation.Result { return validation.ValidateRM(root) })
+			r := validateWithin(t, "ValidateRM", walkDeadline, func() validation.Result { return validation.ValidateRM(root) })
 			if got := issueKeys(r.Issues); strings.Join(got, "\n") != strings.Join(tc.want, "\n") {
 				t.Errorf("ValidateRM(%s) issues = %q, want %q", tc.name, got, tc.want)
 			}
@@ -111,7 +125,7 @@ func TestValidateRM_REQ112_SharedValueWalkedOnce(t *testing.T) {
 		root = &rm.Cluster{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "level"}, Items: []rm.Item{root, root}}
 	}
 
-	r := validateWithin(t, "ValidateRM", func() validation.Result { return validation.ValidateRM(root) })
+	r := validateWithin(t, "ValidateRM", walkDeadline, func() validation.Result { return validation.ValidateRM(root) })
 
 	want := []string{"cardinality " + strings.Repeat("/items[1]", levels) + "/items"}
 	if got := issueKeys(r.Issues); strings.Join(got, "\n") != strings.Join(want, "\n") {
@@ -132,7 +146,7 @@ func TestValidateRM_REQ112_SharedLeafCheckedOnce(t *testing.T) {
 		},
 	}
 
-	r := validateWithin(t, "ValidateRM", func() validation.Result { return validation.ValidateRM(ctx) })
+	r := validateWithin(t, "ValidateRM", walkDeadline, func() validation.Result { return validation.ValidateRM(ctx) })
 
 	first := "/participations[1]/performer/external_ref/namespace"
 	second := "/participations[2]/performer/external_ref/namespace"
@@ -153,7 +167,7 @@ func TestValidateRM_REQ112_DeepAcyclicGraphStopsAtMaxDepth(t *testing.T) {
 		root = &rm.Section{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "level"}, Items: []rm.ContentItem{root}}
 	}
 
-	r := validateWithin(t, "ValidateRM", func() validation.Result { return validation.ValidateRM(root) })
+	r := validateWithin(t, "ValidateRM", walkDeadline, func() validation.Result { return validation.ValidateRM(root) })
 
 	deepest := strings.Repeat("/items[at0001]", 256)
 	if !containsIssue(r.Issues, deepest, "max_depth") {
@@ -181,11 +195,104 @@ func TestValidateComposition_REQ112_CyclicValueBounded(t *testing.T) {
 	}
 	device.Items = append(device.Items, device, device)
 
-	r := validateWithin(t, "ValidateComposition", func() validation.Result { return validation.ValidateComposition(comp, c) })
+	r := validateWithin(t, "ValidateComposition", walkDeadline, func() validation.Result { return validation.ValidateComposition(comp, c) })
 
 	const clusterPath = "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/protocol/items[openEHR-EHR-CLUSTER.device.v1]"
 	want := []string{"cyclic_value " + clusterPath + "/items[2]", "cyclic_value " + clusterPath + "/items[3]"}
 	if got := issueKeys(r.Issues); strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("ValidateComposition(device CLUSTER holding itself twice) issues = %q, want %q", got, want)
 	}
+}
+
+// selfSharingSection returns a SECTION held by value whose items list shares
+// its own backing array: each item is a copy of the section, and every copy's
+// items are that same array. The section therefore contains itself twice, on
+// every level, with no pointer the visit record could recognise.
+func selfSharingSection() rm.Section {
+	s := rm.Section{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "s"}}
+	s.Items = make([]rm.ContentItem, 2)
+	s.Items[0], s.Items[1] = s, s
+	return s
+}
+
+// countCode counts the issues that carry code.
+func countCode(issues []validation.Issue, code string) int {
+	n := 0
+	for _, i := range issues {
+		if i.Code == code {
+			n++
+		}
+	}
+	return n
+}
+
+// assertStoppedAtMaxNodes fails the test unless r reports max_nodes exactly
+// once, as its last issue: the limit ends the whole walk, so nothing is
+// reported after it.
+func assertStoppedAtMaxNodes(t *testing.T, call string, r validation.Result) {
+	t.Helper()
+	if n := countCode(r.Issues, "max_nodes"); n != 1 {
+		t.Fatalf("%s reports max_nodes %d times, want once", call, n)
+	}
+	if last := r.Issues[len(r.Issues)-1]; last.Code != "max_nodes" {
+		t.Errorf("%s last issue is %s at %s, want max_nodes: the visit limit ends the walk", call, last.Code, last.Path)
+	}
+	if r.OK {
+		t.Errorf("%s.OK = true, want false: max_nodes is an error", call)
+	}
+}
+
+// REQ-112 — a value held by value that contains itself through its own list
+// is not recognised by the visit record, so the walk stops after its fixed
+// number of visits and reports max_nodes once, within a second. The stop ends
+// the whole walk: the INSTRUCTION's narrative, an RM-mandatory attribute the
+// walk would check after the protocol that holds the loop, is not reported.
+func TestValidateRM_REQ112_SelfSharingValueStopsAtMaxNodes(t *testing.T) {
+	loop := rm.Cluster{ArchetypeNodeID: "at0099", Name: rm.DVText{Value: "loop"}}
+	loop.Items = make([]rm.Item, 2)
+	loop.Items[0], loop.Items[1] = loop, loop
+	tests := []struct {
+		name string
+		root any
+	}{
+		{name: "SECTION holding itself by value", root: selfSharingSection()},
+		{
+			name: "INSTRUCTION whose protocol holds such a CLUSTER, narrative absent",
+			root: &rm.Instruction{
+				ArchetypeNodeID: "openEHR-EHR-INSTRUCTION.request.v0",
+				Name:            rm.DVText{Value: "request"},
+				Protocol:        &rm.ItemTree{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "protocol"}, Items: []rm.Item{loop}},
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			r := validateWithin(t, "ValidateRM", visitLimitDeadline, func() validation.Result { return validation.ValidateRM(tc.root) })
+			assertStoppedAtMaxNodes(t, "ValidateRM("+tc.name+")", r)
+		})
+	}
+}
+
+// REQ-112, REQ-102 — the template-driven entries run the same floor, so a
+// CLUSTER held by value that contains itself through its own items list stops
+// at the visit limit there too. The device CLUSTER fills a slot of
+// vital_signs.opt, so only the floor walks what it holds.
+func TestValidateComposition_REQ112_SelfSharingValueStopsAtMaxNodes(t *testing.T) {
+	c := mustCompile(t, "vital_signs")
+	comp := validVitalSignsComposition()
+	tree, ok := bpObservation(t, comp).Protocol.(*rm.ItemTree)
+	if !ok || len(tree.Items) != 1 {
+		t.Fatalf("fixture protocol is %T, want an ITEM_TREE holding the device CLUSTER", bpObservation(t, comp).Protocol)
+	}
+	device, ok := tree.Items[0].(*rm.Cluster)
+	if !ok {
+		t.Fatalf("fixture protocol item is %T, want *rm.Cluster", tree.Items[0])
+	}
+	loop := rm.Cluster{ArchetypeNodeID: "at0099", Name: rm.DVText{Value: "loop"}}
+	loop.Items = make([]rm.Item, 2)
+	loop.Items[0], loop.Items[1] = loop, loop
+	device.Items = append(device.Items, loop)
+
+	r := validateWithin(t, "ValidateComposition", visitLimitDeadline, func() validation.Result { return validation.ValidateComposition(comp, c) })
+	assertStoppedAtMaxNodes(t, "ValidateComposition(device CLUSTER holding a self-sharing CLUSTER by value)", r)
 }

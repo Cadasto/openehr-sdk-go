@@ -44,6 +44,13 @@ import (
 // far below it.
 const maxWalkDepth = 256
 
+// maxWalkNodes bounds the number of values one RM-floor walk visits. A
+// value held by value whose list shares its own backing array contains
+// itself without a pointer the visit record could recognise, and below
+// maxWalkDepth it can branch on every level; the walk stops after this many
+// visits instead. The largest corpus document, Demonstration.v1, needs 978.
+const maxWalkNodes = 100_000
+
 // ValidateRM validates root against the openEHR Reference Model alone:
 // it is the floor on its own, for a root no operational template applies
 // to. It checks every RM-mandatory attribute on every node
@@ -74,13 +81,17 @@ const maxWalkDepth = 256
 // even on such a value passed as root, an ORIGINAL_VERSION included; nor are
 // those of EXTRACT_PARTICIPATION, a class the SDK's RM types leave out.
 //
-// The floor visits each value once. A value built in Go may hold a pointer
-// in two places, or hold itself; a decoded document holds neither. A value
-// reached again by another path is not walked a second time, so its issues
-// carry the first path only, and a value reached again inside itself is
-// reported as `cyclic_value` at each path where it recurs and is not
-// descended into. A graph nested deeper than the walk's limit stops there,
-// with `max_depth`.
+// The floor visits each value held by pointer once. A value built in Go may
+// hold a pointer in two places, or hold itself; a decoded document holds
+// neither. A value reached again by another path is not walked a second
+// time, so its issues carry the first path only, and a value reached again
+// inside itself is reported as `cyclic_value` at each path where it recurs
+// and is not descended into. A value held by value can hold itself too,
+// through a list that shares its own backing array, and the floor cannot
+// recognise it; so every call stops after a fixed number of visits, far
+// above what a decoded document needs, and reports `max_nodes` once, at the
+// path where it stopped. A graph nested deeper than the walk's depth limit
+// stops there, with `max_depth`.
 //
 // A nil root surfaces a single `nil_root` issue and is reported as
 // not-OK. An unknown RM root type (a Go value outside the closed RM
@@ -184,10 +195,11 @@ func ValidateRMDemographic(party rm.Party) Result {
 // rmFloorWalker accumulates issues as it descends the RM graph driven
 // by rminfo. There is no notion of "OPT-declared attribute" here —
 // every BMM-known attribute is a descend candidate. Each value with an
-// identity is visited once ([rmFloorWalker.walk]), and recursion depth is
-// bounded by maxWalkDepth, so a caller-built graph that shares or cycles
-// through a pointer, or nests too deep, terminates instead of branching
-// without end or overflowing the stack.
+// identity is visited once ([rmFloorWalker.walk]), recursion depth is
+// bounded by maxWalkDepth and the number of visits by maxWalkNodes, so a
+// caller-built graph that shares or cycles through a pointer, holds itself
+// by value, or nests too deep, terminates instead of branching without end
+// or overflowing the stack.
 type rmFloorWalker struct {
 	info   rminfo.Lookup
 	issues []Issue
@@ -196,6 +208,10 @@ type rmFloorWalker struct {
 	// outermost first.
 	reached map[any]struct{}
 	inside  []any
+	// visits counts the values the walk has visited, up to maxWalkNodes;
+	// stopped is set once it reaches that limit, and ends the walk.
+	visits  int
+	stopped bool
 	// names gives the name the OPT pins on the node an item binds to, so
 	// the floor writes an item's path as the template walk does
 	// ([itemPaths]). The floor on its own binds no OPT node, so it leaves
@@ -244,7 +260,7 @@ func (w *rmFloorWalker) emit(i Issue) {
 // has finished, reached again by another path, is shared: walk leaves it,
 // so its issues carry the first path only. Every other value is visited.
 func (w *rmFloorWalker) walk(value any, rmType string, path string, role floorRole, depth int) {
-	if value == nil || rmread.IsTypedNilPointer(value) {
+	if w.stopped || value == nil || rmread.IsTypedNilPointer(value) {
 		return
 	}
 	if !hasIdentity(value) {
@@ -279,8 +295,9 @@ func (w *rmFloorWalker) walk(value any, rmType string, path string, role floorRo
 }
 
 // visit checks value (of declared BMM type rmType, in role role) at the
-// given issue path. It first runs the per-type invariants on the current
-// node, then, for types the floor handles (see [rmread.Handles]), iterates
+// given issue path. A visit past maxWalkNodes checks nothing: it reports
+// `max_nodes` at path and ends the walk. Otherwise visit first runs the
+// per-type invariants on the current node, then, for types the floor handles (see [rmread.Handles]), iterates
 // every BMM-known attribute, emitting `required` for any RM-mandatory
 // attribute that is absent or empty and recursing into every present
 // attribute. The items of a multi-valued attribute are written by the path
@@ -297,6 +314,16 @@ func (w *rmFloorWalker) walk(value any, rmType string, path string, role floorRo
 // directly: CODE_PHRASE.terminology_id comes back as a Go string, which is
 // not an RM node to walk.
 func (w *rmFloorWalker) visit(value any, rmType string, path string, role floorRole, depth int) {
+	if w.visits == maxWalkNodes {
+		w.emit(Issue{
+			Path:   path,
+			Code:   "max_nodes",
+			Detail: fmt.Sprintf("RM-floor walk stopped at %s after visiting %d values, its limit per call", rmType, maxWalkNodes),
+		})
+		w.stopped = true
+		return
+	}
+	w.visits++
 	w.checkInvariants(value, rmType, path, role)
 	// The coded invariants (REQ-112) run as their own pass rather than as
 	// checkInvariants arms: that switch stops at its first match, and a
@@ -333,6 +360,9 @@ func (w *rmFloorWalker) visit(value any, rmType string, path string, role floorR
 	}
 	requiredSet := setFromSlice(w.info.RequiredAttributes(class))
 	for _, attr := range attrs {
+		if w.stopped {
+			return // the visit limit ended the walk below this node
+		}
 		if rminfo.IsNonStorableAttr(class, attr) {
 			continue
 		}
