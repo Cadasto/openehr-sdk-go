@@ -16,10 +16,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- **`canjson.Unmarshal` and `canxml.Unmarshal` take options (REQ-170).** Each now has a trailing `...DecoderOption`, so code that holds either as a `func([]byte, any) error` value needs a wrapper.
 - **Template validation includes the RM floor (REQ-102, ADR 0025).** `ValidateComposition` and the other template-driven entry points also return the floor's findings, each defect once, so an RM-invalid instance no longer passes.
 - **One issue path rule (REQ-102).** Both validators write `[atNNNN]` for an id no sibling shares, `[atNNNN, 'name']` for a name the template pins, and otherwise a 1-based `[n]`; `ValidateRM` used 0-based positions.
 - **FLAT and STRUCTURED decode ignore unmatched keys (REQ-170).** A key the Web Template does not resolve is dropped, not refused, unless `WithStrict` is set; keys naming RM data the codec cannot carry still fail.
-- **Absent interval flags take the RM defaults (REQ-169).** A missing `*_included` reads as true on a bounded side and a missing `*_unbounded` as false, in canonical JSON and XML, FLAT and OPT parsing.
+- **Absent interval flags take the SDK's defaults (REQ-169).** A missing `*_included` reads as true on a bounded side and a missing `*_unbounded` as false, in canonical JSON and XML, FLAT and OPT parsing.
 - **Items sharing an archetype id bind by pinned name (REQ-102, REQ-116).** A template that reuses one archetype under several names now validates a correct composition instead of reporting name and occurrence errors.
 - **Type conformance follows the BMM (REQ-102).** A value conforms to any OPT type it descends from, and among alternatives an exact type binds before a conforming one.
 - **The RM floor checks interval flags (REQ-112).** An open side marked included is reported as `lower_included_valid` or `upper_included_valid`.

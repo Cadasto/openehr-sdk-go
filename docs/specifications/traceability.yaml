@@ -2014,7 +2014,7 @@ requirements:
     title: Interval boundary flag defaults
     canonical: docs/specifications/wire.md#req-169--interval-boundary-flag-defaults
     status: draft
-    implementation: planned
+    implementation: landed
     packages: [openehr/rm, internal/bmmgen, openehr/serialize/canjson, openehr/serialize/canxml, openehr/serialize/simplified, openehr/template, openehr/validation]
     probes: [PROBE-030, PROBE-105]
     tests:
@@ -2033,8 +2033,8 @@ requirements:
     title: Unmatched content on decode
     canonical: docs/specifications/wire.md#req-170--unmatched-content-on-decode
     status: draft
-    implementation: planned
-    packages: [openehr/serialize/canjson, openehr/rm/typereg, openehr/serialize/canxml, internal/bmmgen, openehr/serialize/simplified]
+    implementation: landed
+    packages: [openehr/serialize/canjson, internal/rmjsonwalk, openehr/serialize/canxml, openehr/internal/xmlunmatched, internal/bmmgen, openehr/rm, openehr/serialize/simplified, testkit/expectedform]
     probes: [PROBE-086, PROBE-105, PROBE-030]
     tests:
       - internal/bmmgen/render_walker_test.go

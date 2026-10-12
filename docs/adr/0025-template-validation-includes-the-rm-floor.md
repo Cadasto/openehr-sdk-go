@@ -12,7 +12,8 @@ date: 2026-10-11
 - **Supersedes:** —
 - **Superseded by:** —
 - **Strand:** resolves [STRAND-14](../specifications/research-strands.md#strand-14--should-template-driven-validation-also-run-the-rm-floor-invariants).
-- **Introduces:** —. **Amends:** [REQ-102](../specifications/clinical-modeling.md#req-102--composition-validation) (*RM floor*), [REQ-110](../specifications/clinical-modeling.md#req-110--template-driven-validation-beyond-composition), [REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor) (the composition sentence). **Applies:** REQ-102 *Issue paths* (one path per node, which the single-report rule depends on), [REQ-168](../specifications/clinical-modeling.md#req-168--value-free-validation-diagnostics).
+- **Introduces:** —
+- **Amends:** [REQ-102](../specifications/clinical-modeling.md#req-102--composition-validation) (*RM floor*), [REQ-110](../specifications/clinical-modeling.md#req-110--template-driven-validation-beyond-composition), [REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor) (the composition sentence). **Applies:** REQ-102 *Issue paths* (one path per node, which the single-report rule depends on), [REQ-168](../specifications/clinical-modeling.md#req-168--value-free-validation-diagnostics).
 - **Related:** [ADR 0006](0006-composition-validation-walker-placement.md) placed the template walker in `openehr/validation`, beside the floor.
 
 ## Context
