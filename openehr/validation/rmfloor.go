@@ -765,11 +765,12 @@ func (w *rmFloorWalker) checkObjectRef(value any, path string) {
 // `null` both decode to a nil pointer or a nil slice and read as absent, so
 // only a decoded `"name":""` or `"identifiers":[]` is present and empty. A
 // present external_ref is walked as its own node, where checkObjectRef
-// checks its parts. The terminology-group rules (PARTY_RELATED's
-// Relationship_valid) are not in the floor.
+// checks its parts. PARTY_RELATED's Relationship_valid, a terminology-group
+// rule, is not checked here but with the other coded invariants
+// ([rmFloorWalker.checkCodedInvariants]).
 //
 // Diagnostics name the attribute and the RM rule, never the offending value
-// (REQ-093).
+// (REQ-168).
 func (w *rmFloorWalker) checkPartyIdentified(value any, path string) {
 	p, ok := asPartyIdentified(value)
 	if !ok {

@@ -74,7 +74,7 @@ func (w *walker) emit(i Issue) {
 	w.issues = append(w.issues, i)
 }
 
-// joinPath glues a parent AQL path with a child segment. Mirrors
+// joinPath glues a parent issue path with a child segment. Mirrors
 // the compile-side pathSegment convention: root path is "/" and
 // child deltas already begin with "/" (e.g. "/category",
 // "/content[at0001]"). Centralised here so future tweaks to path

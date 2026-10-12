@@ -177,8 +177,13 @@ type Issue struct {
 // Global guard codes (`nil_composition`, `nil_template`, and the
 // root guards `nil_root` / `nil_party` / `nil_folder` /
 // `nil_ehr_status`) return nil, because they represent caller-side
-// argument errors rather than validation failures. Callers wanting
-// `errors.Is` dispatch go through this method:
+// argument errors rather than validation failures. The RM floor's own
+// codes (`rm_invariant`, `mappings_valid`, `term_mapping_match`,
+// `code_not_in_value_set`, `is_archetype_root`, `rm_version_valid` and the
+// others it mints) return nil too, although they are errors. A nil Err
+// therefore does not mean the issue is harmless: read [Result.OK], or the
+// issue's Severity, for the verdict. Callers wanting `errors.Is` dispatch
+// go through this method:
 //
 //	for _, i := range r.Issues {
 //	    if errors.Is(i.Err(), validation.ErrRequired) { ... }

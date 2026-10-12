@@ -6,7 +6,9 @@ package validation
 // walk's issues come first, in walk order.
 
 import (
+	"encoding/json"
 	"maps"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -14,6 +16,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 // keys writes each issue as "code path", in the order given.
@@ -173,6 +176,83 @@ func TestWalker_REQ102_REQ116_CollectsBoundNames(t *testing.T) {
 	if !maps.Equal(w.names, want) {
 		t.Errorf("walker names = %v, want %v", w.names, want)
 	}
+}
+
+// REQ-102 — a CONSTRAINT_REF leaf constrains nothing the walk can check, so
+// the template walk itself, with no floor, still walks the attributes of the
+// CODE_PHRASE it binds there and reports a blank terminology_id and
+// code_string as `required`. Inside Validate the floor reports the same
+// issues and the repeats are dropped, so only the walk alone shows which
+// walk found them.
+func TestWalker_REQ102_ConstraintRefLeafWalksCodePhrase(t *testing.T) {
+	const code = "/content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0002]/data/items[at0004]/items[at0011]/value/defining_code"
+	opt, err := template.ParseFile(fixtures.TemplateOpt("Demonstration.v1"))
+	if err != nil {
+		t.Fatalf("parse Demonstration.v1: %v", err)
+	}
+	c, err := templatecompile.Compile(opt)
+	if err != nil {
+		t.Fatalf("compile Demonstration.v1: %v", err)
+	}
+	tests := []struct {
+		name  string
+		blank func(*rm.CodePhrase)
+		want  string
+	}{
+		{name: "blank terminology_id", blank: func(cp *rm.CodePhrase) { cp.TerminologyID.Value = "" }, want: code + "/terminology_id"},
+		{name: "blank code_string", blank: func(cp *rm.CodePhrase) { cp.CodeString = "" }, want: code + "/code_string"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			comp, cp := demonstrationConstraintRefCode(t)
+			tc.blank(cp)
+			w := newWalker(c)
+			w.walkNode(c.Root(), comp, "/")
+			if countAt(w.issues, "required", tc.want) != 1 {
+				t.Errorf("template walk alone: no required at %s; issues %q", tc.want, keys(w.issues))
+			}
+		})
+	}
+}
+
+// demonstrationConstraintRefCode decodes the Demonstration.v1 corpus
+// composition and returns it with the defining_code its CONSTRAINT_REF leaf,
+// ELEMENT at0011 of the first event, binds to.
+func demonstrationConstraintRefCode(t *testing.T) (*rm.Composition, *rm.CodePhrase) {
+	t.Helper()
+	raw, err := os.ReadFile(fixtures.CompositionJSON("Demonstration.v1"))
+	if err != nil {
+		t.Fatalf("read Demonstration.v1: %v", err)
+	}
+	var comp rm.Composition
+	if err := json.Unmarshal(raw, &comp); err != nil {
+		t.Fatalf("decode Demonstration.v1: %v", err)
+	}
+	obs, ok := comp.Content[0].(*rm.Observation)
+	if !ok {
+		t.Fatalf("content[0] is %T, want *rm.Observation", comp.Content[0])
+	}
+	event, ok := obs.Data.Events[0].(*rm.PointEvent[rm.ItemStructure])
+	if !ok {
+		t.Fatalf("events[0] is %T, want *rm.PointEvent[rm.ItemStructure]", obs.Data.Events[0])
+	}
+	tree, ok := event.Data.(*rm.ItemTree)
+	if !ok {
+		t.Fatalf("event data is %T, want *rm.ItemTree", event.Data)
+	}
+	cluster, ok := tree.Items[1].(*rm.Cluster)
+	if !ok {
+		t.Fatalf("data items[1] is %T, want *rm.Cluster", tree.Items[1])
+	}
+	element, ok := cluster.Items[2].(*rm.Element)
+	if !ok || element.ArchetypeNodeID != "at0011" {
+		t.Fatalf("cluster items[2] is %T, want the ELEMENT at0011 (fixture drift)", cluster.Items[2])
+	}
+	coded, ok := element.Value.(*rm.DVCodedText)
+	if !ok {
+		t.Fatalf("at0011 value is %T, want *rm.DVCodedText", element.Value)
+	}
+	return &comp, &coded.DefiningCode
 }
 
 // countAt counts the issues that carry code at path.

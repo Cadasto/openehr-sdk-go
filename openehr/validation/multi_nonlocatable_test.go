@@ -3,6 +3,7 @@ package validation_test
 import (
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -209,6 +210,90 @@ func TestValidateComposition_REQ102_ParticipationsBindByRMType(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			r := validation.ValidateComposition(participationsComposition(tc.parts...), c)
+			if got := issueKeys(r.Issues); !slices.Equal(got, tc.want) {
+				t.Errorf("ValidateComposition issues = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// participationsAfterSlotOPT constrains COMPOSITION.context.participations
+// to an ARCHETYPE_SLOT that names PARTICIPATION, then a PARTICIPATION child
+// required once whose function text must be "assistant".
+var participationsAfterSlotOPT = strings.Replace(participationsOPT, `
+          <children xsi:type="C_COMPLEX_OBJECT">
+            <rm_type_name>PARTICIPATION</rm_type_name>
+            <occurrences>
+              <lower_included>true</lower_included>
+              <upper_included>true</upper_included>
+              <lower_unbounded>false</lower_unbounded>
+              <upper_unbounded>false</upper_unbounded>
+              <lower>0</lower>
+              <upper>1</upper>
+            </occurrences>
+            <node_id></node_id>
+          </children>`, `
+          <children xsi:type="ARCHETYPE_SLOT">
+            <rm_type_name>PARTICIPATION</rm_type_name>
+            <node_id>at9000</node_id>
+          </children>
+          <children xsi:type="C_COMPLEX_OBJECT">
+            <rm_type_name>PARTICIPATION</rm_type_name>
+            <occurrences>
+              <lower_included>true</lower_included>
+              <upper_included>true</upper_included>
+              <lower_unbounded>false</lower_unbounded>
+              <upper_unbounded>false</upper_unbounded>
+              <lower>1</lower>
+              <upper>1</upper>
+            </occurrences>
+            <node_id></node_id>
+            <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+              <rm_attribute_name>function</rm_attribute_name>
+              <children xsi:type="C_COMPLEX_OBJECT">
+                <rm_type_name>DV_TEXT</rm_type_name>
+                <node_id></node_id>
+                <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                  <rm_attribute_name>value</rm_attribute_name>
+                  <children xsi:type="C_PRIMITIVE_OBJECT">
+                    <rm_type_name>STRING</rm_type_name>
+                    <node_id></node_id>
+                    <item xsi:type="C_STRING"><list>assistant</list></item>
+                  </children>
+                </attributes>
+              </children>
+            </attributes>
+          </children>`, 1)
+
+// REQ-102 — an item that is not a LOCATABLE binds to a non-slot child: a
+// slot listed first that names the item's RM type does not take it, so the
+// typed PARTICIPATION child after it binds the item and checks it. That
+// child's occurrences and its pinned function text are template rules the
+// RM floor does not check, so only the binding decides these results: an
+// item bound to the slot would leave the child's occurrences unmet and its
+// function unchecked.
+func TestValidateComposition_REQ102_NonLocatableItemSkipsSlot(t *testing.T) {
+	if !strings.Contains(participationsAfterSlotOPT, "ARCHETYPE_SLOT") {
+		t.Fatal("participationsAfterSlotOPT holds no slot: participationsOPT changed, update the replacement")
+	}
+	c := mustCompileSyntheticOPT(t, participationsAfterSlotOPT)
+	surgeon := validParticipation()
+	surgeon.Function = rm.DVText{Value: "surgeon"}
+	tests := []struct {
+		name string
+		part rm.Participation
+		want []string
+	}{
+		{name: "the typed child binds the item", part: validParticipation(), want: []string{}},
+		{
+			name: "the typed child checks the item",
+			part: surgeon,
+			want: []string{"primitive_not_in_list /context/participations[1]/function/value"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			r := validation.ValidateComposition(participationsComposition(tc.part), c)
 			if got := issueKeys(r.Issues); !slices.Equal(got, tc.want) {
 				t.Errorf("ValidateComposition issues = %q, want %q", got, tc.want)
 			}

@@ -630,3 +630,119 @@ func TestValidateDemographic_REQ102_SlotSkippedInConformanceTier(t *testing.T) {
 		t.Errorf("ValidateDemographic(DV_CODED_TEXT language under [DV_TEXT slot, DV_TEXT]) issues = %q, want %q", got, want)
 	}
 }
+
+// orderedIntervalChild admits a DV_INTERVAL<DV_ORDERED> whose bounds are
+// DV_COUNTs of 0 to 100: the type parameter is abstract, and the bounds
+// conform to it.
+var orderedIntervalChild = `
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>DV_INTERVAL&lt;DV_ORDERED&gt;</rm_type_name>
+        <node_id></node_id>` + orderedIntervalBound("lower") + orderedIntervalBound("upper") + `
+      </children>`
+
+// orderedIntervalBound constrains the side attribute of orderedIntervalChild
+// to a DV_COUNT of 0 to 100.
+func orderedIntervalBound(side string) string {
+	return `
+        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+          <rm_attribute_name>` + side + `</rm_attribute_name>
+          <children xsi:type="C_COMPLEX_OBJECT">
+            <rm_type_name>DV_COUNT</rm_type_name>
+            <node_id></node_id>
+            <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+              <rm_attribute_name>magnitude</rm_attribute_name>
+              <children xsi:type="C_PRIMITIVE_OBJECT">
+                <rm_type_name>INTEGER</rm_type_name>
+                <node_id></node_id>
+                <item xsi:type="C_INTEGER">
+                  <range>
+                    <lower_included>true</lower_included><upper_included>true</upper_included>
+                    <lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded>
+                    <lower>0</lower><upper>100</upper>
+                  </range>
+                </item>
+              </children>
+            </attributes>
+          </children>
+        </attributes>`
+}
+
+// REQ-110, REQ-102 (RM type match) — under a DV_INTERVAL<T> whose T is
+// abstract, each present bound has to be a T: a bound of a type that
+// conforms to T, such as a DV_COUNT under DV_ORDERED, is one. That holds for
+// the bare interval a round trip decodes and for a typed one whose parameter
+// conforms to T; a bound that does not conform is still refused.
+func TestValidate_REQ110_IntervalBoundsConformToAbstractParameter(t *testing.T) {
+	t.Parallel()
+	c := mustCompileInline(t, elementValueOPT(orderedIntervalChild))
+	count := func(m int64) *rm.DVCount { return &rm.DVCount{Magnitude: m} }
+	tests := []struct {
+		name  string
+		value rm.DataValue
+		want  []string
+	}{
+		{
+			name:  "bare interval with DV_COUNT bounds",
+			value: &rm.DVInterval[rm.DVOrdered]{Lower: count(1), Upper: count(50), LowerIncluded: true, UpperIncluded: true},
+			want:  []string{},
+		},
+		{
+			name:  "typed DV_INTERVAL<DV_COUNT>",
+			value: &rm.DVInterval[rm.DVCount]{Lower: rm.DVCount{Magnitude: 1}, Upper: rm.DVCount{Magnitude: 50}, LowerIncluded: true, UpperIncluded: true},
+			want:  []string{},
+		},
+		{
+			name: "bare half-open interval with a DV_COUNT lower bound",
+			value: &rm.DVInterval[rm.DVOrdered]{
+				Lower: count(1), LowerIncluded: true, UpperUnbounded: true,
+			},
+			want: []string{},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := issueKeys(validation.Validate(valueElement(tc.value), c).Issues); !slices.Equal(got, tc.want) {
+				t.Errorf("Validate(%s under DV_INTERVAL<DV_ORDERED>) issues = %q, want %q", tc.name, got, tc.want)
+			}
+		})
+	}
+
+	// A bound that does not conform to the parameter is refused. Every bound
+	// a Go interval can hold is a DV_ORDERED, so the refusal is shown under a
+	// DV_INTERVAL<DV_COUNT>, whose parameter a DV_QUANTITY does not conform to.
+	countOnly := mustCompileInline(t, elementValueOPT(countIntervalChild))
+	quantity := &rm.DVQuantity{Magnitude: 1, Units: "1"}
+	for name, v := range map[string]rm.DataValue{
+		"bare interval with DV_QUANTITY bounds": &rm.DVInterval[rm.DVOrdered]{Lower: quantity, Upper: quantity, LowerIncluded: true, UpperIncluded: true},
+		"typed DV_INTERVAL<DV_QUANTITY>":        &rm.DVInterval[rm.DVQuantity]{Lower: *quantity, Upper: *quantity, LowerIncluded: true, UpperIncluded: true},
+	} {
+		want := []string{"rm_type_mismatch /value"}
+		if got := issueKeys(validation.Validate(valueElement(v), countOnly).Issues); !slices.Equal(got, want) {
+			t.Errorf("Validate(%s under DV_INTERVAL<DV_COUNT>) issues = %q, want %q", name, got, want)
+		}
+	}
+}
+
+// REQ-107, REQ-110 — the generator's output for a DV_INTERVAL<DV_ORDERED>
+// with DV_COUNT bounds, under both policies, validates against that OPT.
+func TestGenerate_REQ107_REQ110_AbstractIntervalParameterValidates(t *testing.T) {
+	t.Parallel()
+	c := mustCompileInline(t, elementValueOPT(orderedIntervalChild))
+	for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+		t.Run(policy.String(), func(t *testing.T) {
+			t.Parallel()
+			out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy})
+			if err != nil {
+				t.Fatalf("Generate: %v", err)
+			}
+			el, ok := out.(*rm.Element)
+			if !ok {
+				t.Fatalf("Generate root = %T, want *rm.Element", out)
+			}
+			if got := issueKeys(validation.Validate(el, c).Issues); len(got) != 0 {
+				t.Errorf("Validate(generated %T) issues = %q, want none", el.Value, got)
+			}
+		})
+	}
+}

@@ -49,17 +49,29 @@
 // layer beneath that: a second driver that walks any RM root with
 // rminfo as the sole structural source (no OPT) and enforces
 // RM-mandatory attribute presence plus a small per-RM-type invariant
-// catalogue: a non-empty CODE_PHRASE code_string (a DV_SCALE symbol,
-// which the RM lets carry no code, is exempt), DV_QUANTITY and
-// DV_PROPORTION precision, DV_INTERVAL numeric bounds, OBJECT_REF
-// id/type/namespace, a DV_TEXT mappings list that is not empty when
-// present, a TERM_MAPPING match from its closed set, archetype_details
-// on every archetype root (COMPOSITION, EHR_STATUS, EHR_ACCESS, and
-// every PARTY and ENTRY), a non-empty archetype_id and rm_version
-// on every ARCHETYPED, and a member of its group or code set (reported as
-// `code_not_in_value_set`; see [ValidateRM]) in each attribute the RM codes
-// from the openEHR terminology, apart from those of the change-control and
-// resource-description classes and EXTRACT_PARTICIPATION.
+// catalogue:
+//
+//   - a non-empty CODE_PHRASE code_string (a DV_SCALE symbol, which the
+//     RM lets carry no code, is exempt);
+//   - DV_QUANTITY and DV_PROPORTION precision, and whole-number operands
+//     on a DV_PROPORTION of precision 0;
+//   - DV_INTERVAL numeric bounds in order, and no side both unbounded and
+//     included;
+//   - an ISO 8601 value on DV_DATE, DV_TIME, DV_DATE_TIME and DV_DURATION;
+//   - exactly one of value and null_flavour on an ELEMENT;
+//   - OBJECT_REF id/type/namespace, and the PARTY_IDENTIFIED rules (at
+//     least one of name, identifiers and external_ref; neither of the first
+//     two present but empty);
+//   - a DV_TEXT mappings list that is not empty when present, and a
+//     TERM_MAPPING match from its closed set;
+//   - archetype_details on every archetype root (COMPOSITION, EHR_STATUS,
+//     EHR_ACCESS, and every PARTY and ENTRY), and a non-empty archetype_id
+//     and rm_version on every ARCHETYPED;
+//   - a member of its group or code set (reported as
+//     `code_not_in_value_set`; see [ValidateRM]) in each attribute the RM
+//     codes from the openEHR terminology, apart from those of the
+//     change-control and resource-description classes and
+//     EXTRACT_PARTICIPATION.
 //
 // The template walk covers RM-mandatory presence only on the nodes the
 // template models, and none of the floor's per-type rules. The

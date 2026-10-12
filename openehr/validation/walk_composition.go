@@ -111,8 +111,8 @@ func (w *walker) walkNode(optNode *tcimpl.CompiledNode, rmValue any, path string
 // "one alternative MUST match" semantics, by [bindByRMType]: the most
 // specific child wins, a child of the value's own RM type before the
 // AOM 1.4 short name it wraps, and that before a child the type only
-// conforms to in the pinned BMM, or a typed DV_INTERVAL<T> child for a
-// round-tripped bare DV_INTERVAL with no bound present. When none match
+// conforms to in the pinned BMM, or a typed DV_INTERVAL<T> child for an
+// interval each present bound of which conforms to T. When none match
 // the walker emits a typed issue:
 //   - exactly one child → `rm_type_mismatch` (plain type constraint,
 //     no real alternatives);
@@ -200,8 +200,8 @@ func matchSingleAlternative(children []*tcimpl.CompiledNode, val any) *tcimpl.Co
 //  2. A child that names the AOM 1.4 primitive short name whose
 //     canonical DV wrapper val is ([wrapsShortName]).
 //  3. A child val's type conforms to by BMM descent, or an untyped
-//     child, or, for a round-tripped bare DV_INTERVAL with no bound
-//     present, a typed DV_INTERVAL<T> child ([conformsToChild]).
+//     child, or, for an interval each present bound of which conforms
+//     to T, a typed DV_INTERVAL<T> child ([conformsToChild]).
 //
 // A value therefore meets the constraints of the tightest child that
 // admits it, not those of a looser one listed first: under
@@ -276,8 +276,10 @@ func wrapsShortName(c *tcimpl.CompiledNode, gotType string) bool {
 }
 
 // conformsToChild reports whether the OPT child c declares no RM type,
-// or one the RM type gotType conforms to ([rmTypeIsSubtypeOf]). A
-// round-tripped bare DV_INTERVAL val with no bound present carries no T
+// or one the RM type gotType conforms to ([rmTypeIsSubtypeOf]). Under a
+// typed DV_INTERVAL<T> child each present bound has to be a T, that is,
+// conform to T ([intervalConformsTo]): a DV_COUNT bound is a DV_ORDERED.
+// A round-tripped bare DV_INTERVAL val with no bound present carries no T
 // to check, so a typed DV_INTERVAL<T> child admits it here, after any
 // bare DV_INTERVAL child has named its type ([namesRMType]).
 func conformsToChild(c *tcimpl.CompiledNode, gotType string, val any) bool {
@@ -285,8 +287,7 @@ func conformsToChild(c *tcimpl.CompiledNode, gotType string, val any) bool {
 	if want == "" || rmTypeIsSubtypeOf(gotType, want) {
 		return true
 	}
-	_, typed := typedIntervalBound(want)
-	return typed && gotType == "DV_INTERVAL" && collapsedIntervalUnbounded(val)
+	return intervalConformsTo(gotType, want, val)
 }
 
 // formatAllowedTypes renders the OPT child RM types for inclusion
@@ -916,7 +917,8 @@ func rmTypeIsSubtypeOf(concrete, declared string) bool {
 // reports "DV_INTERVAL" and the OPT's "DV_INTERVAL<DV_QUANTITY>" would
 // spuriously fail. The wire form and the bounds are correct, so when the
 // declared type is a parameterised interval and the value collapsed to a
-// bare one, decide conformance from the bounds' runtime types via `val`.
+// bare one, decide conformance from the bounds' runtime types via `val`
+// ([intervalConformsTo]).
 func intervalRMTypeMatches(got, want string, val any) bool {
 	if got == want {
 		return true
@@ -924,10 +926,27 @@ func intervalRMTypeMatches(got, want string, val any) bool {
 	if _, gotTyped := typedIntervalBound(got); want == "DV_INTERVAL" && gotTyped {
 		return true
 	}
-	if wantBound, wantTyped := typedIntervalBound(want); got == "DV_INTERVAL" && wantTyped {
-		return intervalBoundsSatisfy(val, wantBound)
+	return intervalConformsTo(got, want, val)
+}
+
+// intervalConformsTo reports whether an interval value of RM type got, val,
+// conforms to the typed interval want, DV_INTERVAL<T>: each present bound
+// has to be a T (REQ-110), which a bound of T's own type or of one that
+// descends from T in the pinned BMM is ([rmTypeIsSubtypeOf]). A typed
+// value, DV_INTERVAL<U>, conforms when U does; a round-tripped bare
+// DV_INTERVAL is read by its bounds' runtime types, and one with no bound
+// present conforms to every T. An abstract T such as DV_ORDERED therefore
+// admits DV_COUNT bounds. Any other pair of types does not conform here.
+func intervalConformsTo(got, want string, val any) bool {
+	wantBound, wantTyped := typedIntervalBound(want)
+	if !wantTyped {
+		return false
 	}
-	return false
+	if got == "DV_INTERVAL" {
+		return intervalBoundsConform(val, wantBound)
+	}
+	gotBound, gotTyped := typedIntervalBound(got)
+	return gotTyped && rmTypeIsSubtypeOf(gotBound, wantBound)
 }
 
 // typedIntervalBound returns the bound type of a parameterised interval name,
@@ -942,14 +961,15 @@ func typedIntervalBound(name string) (bound string, ok bool) {
 }
 
 // intervalBoundsSatisfy reports whether a round-trip-collapsed
-// DVInterval[DVOrdered] satisfies DV_INTERVAL<wantInner> by inspecting
-// the runtime types of its bounds (which survive the round-trip via
-// their own `_type`). Every *present* bound must be the wanted element
-// type; a fully unbounded interval carries no bound to key off and
+// DVInterval[DVOrdered] names DV_INTERVAL<wantInner> exactly, by the
+// runtime types of its bounds (which survive the round-trip via their own
+// `_type`). Every *present* bound must be of the wanted element type
+// itself; a fully unbounded interval carries no bound to key off and
 // trivially satisfies any element type. (Requiring agreement rather than
 // accepting on either bound rejects a malformed interval whose lower and
-// upper disagree — well-formed DV_INTERVAL<T> bounds are both T.) See
-// [intervalRMTypeMatches].
+// upper disagree — well-formed DV_INTERVAL<T> bounds are both T.) The
+// first binding tier reads it ([namesRMType]); a bound that only conforms
+// to wantInner is read by [intervalBoundsConform].
 func intervalBoundsSatisfy(val any, wantInner string) bool {
 	bounds, ok := collapsedIntervalBounds(val)
 	if !ok {
@@ -965,20 +985,31 @@ func intervalBoundsSatisfy(val any, wantInner string) bool {
 	return true
 }
 
+// intervalBoundsConform reports whether val is a round-trip-collapsed
+// DVInterval[DVOrdered] each of whose present bounds conforms to wantInner:
+// its type is wantInner or descends from it in the pinned BMM
+// ([rmTypeIsSubtypeOf]). An interval with no bound present conforms. The
+// binding tiers name a type exactly ([intervalBoundsSatisfy]); this is the
+// conformance the third tier and the RM type match read.
+func intervalBoundsConform(val any, wantInner string) bool {
+	bounds, ok := collapsedIntervalBounds(val)
+	if !ok {
+		return false
+	}
+	for _, b := range bounds {
+		if !rmTypeIsSubtypeOf(describeRMType(b), wantInner) {
+			return false
+		}
+	}
+	return true
+}
+
 // collapsedIntervalBounded reports whether val is a round-trip-collapsed
 // DVInterval[DVOrdered] with at least one present bound, a bound that
 // gives the interval its parameterised type ([namesRMType]).
 func collapsedIntervalBounded(val any) bool {
 	bounds, ok := collapsedIntervalBounds(val)
 	return ok && len(bounds) > 0
-}
-
-// collapsedIntervalUnbounded reports whether val is a
-// round-trip-collapsed DVInterval[DVOrdered] with no bound present, so
-// no parameterised type ([conformsToChild]).
-func collapsedIntervalUnbounded(val any) bool {
-	bounds, ok := collapsedIntervalBounds(val)
-	return ok && len(bounds) == 0
 }
 
 // collapsedIntervalBounds returns the present bounds of a
