@@ -6,6 +6,9 @@ harvested_through: 2026-10-07T20:51:26Z
 
 Leftovers of merged branches: suggestions, and findings the maintainer deferred here. Each line is a lead, not a finding: verify it before acting. Lines are grouped by theme so one delivery can take a whole group; the sentence under each heading says what such a delivery is. A delivery whose `Files` touch a line's path verifies it, and fixes it or finds it stale; the next `/sdd-triage --backlog` deletes what is settled. `sdd-pr harvest` and `sdd-pr flip --carry` add new lines under `## Unsorted`, defects first; the next `/sdd-triage --backlog` sorts them into a group. Edit freely.
 
+## Unsorted
+- important · openehr/serialize/canxml/decode.go:201 · canxml.Unmarshal accepts non-whitespace text, a CDATA section or extra DOCTYPEs before the root element in every mode, strict included, because encoding/xml skips every token before the first start element; the mirror of the after-root rule REQ-056 now states. · evidence: canxml worker probe after 434fa259; maintainer chose to leave it for the backlog · by: sdd-implementer · from: feat/decode-validation
+
 ## Template validation: false rm_type_mismatch and paths (REQ-102)
 Code in openehr/validation/walk_composition.go, one delivery with a test per row; the keyword lead is its spec half.
 - openehr/validation/walk_composition.go:845 · tracked in #248: template validation rejects a DV_CODED_TEXT under a DV_TEXT node, and other RM subtypes the bmmSubtypes table lacks
