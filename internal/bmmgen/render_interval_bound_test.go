@@ -593,7 +593,7 @@ func TestREQ169IntervalDecodeReadsFlagsInPlace(t *testing.T) {
 	// returns too, so the search starts at the decode.
 	decode := strings.Index(src, "typereg.DecodeInto(")
 	ret := indexFrom(src, "\t\treturn err\n", decode)
-	defaults := strings.Index(src, "seen.setDefaults(&p.LowerIncluded, &p.LowerUnbounded, &p.UpperIncluded, &p.UpperUnbounded)")
+	defaults := strings.Index(src, intervalFlagSettle("seen", "p"))
 	if decode < 0 || ret < 0 || defaults < 0 || ret >= defaults {
 		t.Errorf("Point_interval decoder does not return a decode error before it gives the defaults (positions %d, %d, %d):\n%s", decode, ret, defaults, src)
 	}
@@ -612,7 +612,7 @@ func TestREQ169IntervalFlagDecodeCopiesOwnMembersBeforeReturning(t *testing.T) {
 	decode := strings.Index(src, "err := typereg.DecodeInto(dec, \"X_INTERVAL\", wire, &wire.Type)")
 	copyBack := strings.Index(src, "x.Extra = wire.Extra")
 	ret := indexFrom(src, "\t\treturn err\n", copyBack)
-	defaults := strings.Index(src, "seen.setDefaults(")
+	defaults := strings.Index(src, "seen.settle(")
 	if decode < 0 || copyBack < 0 || ret < 0 || defaults < 0 || decode >= copyBack || copyBack >= ret || ret >= defaults {
 		t.Errorf("decoder does not decode, copy the own members back, return the error, then give the defaults (positions %d, %d, %d, %d):\n%s", decode, copyBack, ret, defaults, src)
 	}
@@ -668,9 +668,25 @@ func TestREQ169IntervalFlaggedDecoderCensus(t *testing.T) {
 					}
 					got = append(got, pc.BMMName)
 					recv := jsonmarReceiverName(pc.GoName)
-					defaults := intervalFlagSetDefaults("seen", recv)
+					defaults := intervalFlagSettle("seen", recv)
 					if !strings.Contains(jsonSrc, defaults) {
 						t.Errorf("%s JSON decoder does not give the absent flags their defaults (%q):\n%s", pc.BMMName, defaults, jsonSrc)
+					}
+					// A side written closed with no bound held by value is
+					// refused with the shape sentinel of each codec.
+					if want := fmt.Sprintf("return typereg.WrapShapeError(%q, err)", pc.BMMName); !strings.Contains(jsonSrc, want) {
+						t.Errorf("%s JSON decoder does not refuse a closed side with no bound through the shape sentinel (%q):\n%s", pc.BMMName, want, jsonSrc)
+					}
+					if want := "canxml.ErrInvalidShape, _err)"; !strings.Contains(xmlSrc, want) {
+						t.Errorf("%s XML decoder does not refuse a closed side with no bound through the shape sentinel (%q):\n%s", pc.BMMName, want, xmlSrc)
+					}
+					for _, prop := range intervalBoundProps {
+						if want := fmt.Sprintf("%s intervalBoundJSON `json:%q`", FieldName(prop), prop); !strings.Contains(jsonSrc, want) {
+							t.Errorf("%s JSON decoder does not record whether the document carried %s (%q):\n%s", pc.BMMName, prop, want, jsonSrc)
+						}
+						if want := "_seen." + seenFlagField(prop) + " = true"; !strings.Contains(xmlSrc, want) {
+							t.Errorf("%s XML decoder does not record whether the document carried %s (%q):\n%s", pc.BMMName, prop, want, xmlSrc)
+						}
 					}
 					// A null in place of the interval reads as the member
 					// left out (REQ-052): it is consumed before the decode,
@@ -773,15 +789,17 @@ func TestREQ169IntervalFlagHelpersSettleOpenFlagsFirst(t *testing.T) {
 	for _, want := range []string{
 		"type intervalFlagsSeen struct", "type intervalFlagJSON struct", "func (f intervalFlagJSON) UnmarshalJSONFrom(",
 		"func decodeIntervalFlagXML(", "text = strings.TrimSpace(text)",
+		"type intervalBoundJSON struct", "func (f intervalBoundJSON) UnmarshalJSONFrom(",
+		"func intervalBoundHeldByValue[T any](*T) bool", "func errIntervalClosedSide(side string) error",
 	} {
 		if !strings.Contains(src, want) {
 			t.Errorf("interval file lacks %q:\n%s", want, src)
 		}
 	}
-	lastOpen := max(strings.Index(src, "*lowerUnbounded = false"), strings.Index(src, "*upperUnbounded = false"))
+	lastOpen := max(strings.Index(src, "*lowerUnbounded = !s.lower"), strings.Index(src, "*upperUnbounded = !s.upper"))
 	firstIncluded := min(strings.Index(src, "*lowerIncluded = !*lowerUnbounded"), strings.Index(src, "*upperIncluded = !*upperUnbounded"))
 	if lastOpen < 0 || firstIncluded < 0 || lastOpen >= firstIncluded {
-		t.Errorf("setDefaults does not settle the open flags before the included ones (positions %d, %d):\n%s", lastOpen, firstIncluded, src)
+		t.Errorf("settle does not settle the open flags before the included ones (positions %d, %d):\n%s", lastOpen, firstIncluded, src)
 	}
 }
 

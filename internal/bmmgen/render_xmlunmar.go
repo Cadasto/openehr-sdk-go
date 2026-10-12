@@ -187,9 +187,9 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 		b.WriteString("//\n")
 		b.WriteString(legacyIntervalXMLDoc)
 	}
-	// A class that carries the four boundary flags records which of them the
-	// document carried and gives the others their defaults at the closing
-	// tag, once every child has been read (REQ-169).
+	// A class that carries the four boundary flags records which of them and
+	// of its two bounds the document carried, and gives the absent flags their
+	// defaults at the closing tag, once every child has been read (REQ-169).
 	flagged, err := intervalFlagged(fields)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", pc.BMMName, err)
@@ -229,6 +229,11 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 				return "", fmt.Errorf("render UnmarshalXML field %s.%s: %w", pc.BMMName, prop, err)
 			}
 		}
+		if prop := ef.Prop.PropertyName(); flagged && isIntervalBound(prop) {
+			// The bound's presence decides its side's absent `*_unbounded`
+			// (REQ-169).
+			caseBody += unmarshalXMLIntervalBoundSeen(prop)
+		}
 		if legacy {
 			caseBody = withLegacyElementName(caseBody, ef.Prop.PropertyName())
 		}
@@ -242,7 +247,9 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	b.WriteString("\t\t\t}\n") // close inner switch (Name.Local)
 	b.WriteString("\t\tcase xml.EndElement:\n")
 	if flagged {
-		fmt.Fprintf(&b, "\t\t\t%s\n", intervalFlagSetDefaults("_seen", recv))
+		fmt.Fprintf(&b, "\t\t\tif _err := %s; _err != nil {\n", intervalFlagSettle("_seen", recv))
+		fmt.Fprintf(&b, "\t\t\t\treturn fmt.Errorf(\"%%w: %s: %%w\", canxml.ErrInvalidShape, _err)\n", pc.BMMName)
+		b.WriteString("\t\t\t}\n")
 	}
 	b.WriteString("\t\t\treturn nil\n")
 	b.WriteString("\t\t}\n") // close outer switch (token kind)

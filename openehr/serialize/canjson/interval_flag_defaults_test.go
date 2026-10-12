@@ -143,7 +143,10 @@ type jsonIntervalReader struct {
 	doc          string
 	member       string
 	lower, upper string
-	decode       func(doc []byte) (*intervalFlags, error)
+	decode       func(doc []byte, opts ...canjson.DecoderOption) (*intervalFlags, error)
+	// boundByRef is set for a reader whose interval holds its bounds as an
+	// interface, so a side can be decoded with no bound at all.
+	boundByRef bool
 }
 
 const (
@@ -157,19 +160,19 @@ func jsonIntervalReaders() []jsonIntervalReader {
 	return []jsonIntervalReader{
 		{
 			name: "DV_INTERVAL<DV_COUNT>", doc: `{"_type":"DV_INTERVAL",%s}`, lower: jsonCount1, upper: jsonCount5,
-			decode: func(doc []byte) (*intervalFlags, error) {
+			decode: func(doc []byte, opts ...canjson.DecoderOption) (*intervalFlags, error) {
 				var v rm.DVInterval[rm.DVCount]
-				err := canjson.Unmarshal(doc, &v)
+				err := canjson.Unmarshal(doc, &v, opts...)
 				return new(baseFlags(v.Interval)), err
 			},
 		},
 		{
 			name:   "DV_INTERVAL in ELEMENT.value",
 			doc:    `{"_type":"ELEMENT","archetype_node_id":"at0001","name":{"_type":"DV_TEXT","value":"x"},"value":{"_type":"DV_INTERVAL",%s}}`,
-			member: "value", lower: jsonCount1, upper: jsonCount5,
-			decode: func(doc []byte) (*intervalFlags, error) {
+			member: "value", lower: jsonCount1, upper: jsonCount5, boundByRef: true,
+			decode: func(doc []byte, opts ...canjson.DecoderOption) (*intervalFlags, error) {
 				var v rm.Element
-				if err := canjson.Unmarshal(doc, &v); err != nil {
+				if err := canjson.Unmarshal(doc, &v, opts...); err != nil {
 					return nil, err
 				}
 				if v.Value == nil {
@@ -185,10 +188,10 @@ func jsonIntervalReaders() []jsonIntervalReader {
 		{
 			name:   "REFERENCE_RANGE.range",
 			doc:    `{"_type":"REFERENCE_RANGE","meaning":{"_type":"DV_TEXT","value":"normal"},"range":{"_type":"DV_INTERVAL",%s}}`,
-			member: "range", lower: jsonCount1, upper: jsonCount5,
-			decode: func(doc []byte) (*intervalFlags, error) {
+			member: "range", lower: jsonCount1, upper: jsonCount5, boundByRef: true, // range is a DV_INTERVAL<DV_ORDERED>
+			decode: func(doc []byte, opts ...canjson.DecoderOption) (*intervalFlags, error) {
 				var v rm.ReferenceRange[rm.DVCount]
-				err := canjson.Unmarshal(doc, &v)
+				err := canjson.Unmarshal(doc, &v, opts...)
 				return new(baseFlags(v.Range.Interval)), err
 			},
 		},
@@ -196,9 +199,9 @@ func jsonIntervalReaders() []jsonIntervalReader {
 			name:   "DV_QUANTITY.normal_range",
 			doc:    `{"_type":"DV_QUANTITY","magnitude":3,"units":"mm","normal_range":{"_type":"DV_INTERVAL",%s}}`,
 			member: "normal_range", lower: jsonQuantity1, upper: jsonQuantity5,
-			decode: func(doc []byte) (*intervalFlags, error) {
+			decode: func(doc []byte, opts ...canjson.DecoderOption) (*intervalFlags, error) {
 				var v rm.DVQuantity
-				if err := canjson.Unmarshal(doc, &v); err != nil || v.NormalRange == nil {
+				if err := canjson.Unmarshal(doc, &v, opts...); err != nil || v.NormalRange == nil {
 					return nil, err
 				}
 				return new(baseFlags(v.NormalRange.Interval)), nil
@@ -206,17 +209,17 @@ func jsonIntervalReaders() []jsonIntervalReader {
 		},
 		{
 			name: "Proper_interval<Integer>", doc: `{"_type":"Proper_interval",%s}`, lower: "1", upper: "5",
-			decode: func(doc []byte) (*intervalFlags, error) {
+			decode: func(doc []byte, opts ...canjson.DecoderOption) (*intervalFlags, error) {
 				var v rm.ProperInterval[rm.Integer]
-				err := canjson.Unmarshal(doc, &v)
+				err := canjson.Unmarshal(doc, &v, opts...)
 				return new(baseFlags(v.Interval)), err
 			},
 		},
 		{
 			name: "Point_interval<Integer>", doc: `{"_type":"Point_interval",%s}`, lower: "3", upper: "3",
-			decode: func(doc []byte) (*intervalFlags, error) {
+			decode: func(doc []byte, opts ...canjson.DecoderOption) (*intervalFlags, error) {
 				var v rm.PointInterval[rm.Integer]
-				err := canjson.Unmarshal(doc, &v)
+				err := canjson.Unmarshal(doc, &v, opts...)
 				// Point_interval declares the four flags again, so its own
 				// fields carry them.
 				return &intervalFlags{
@@ -227,9 +230,9 @@ func jsonIntervalReaders() []jsonIntervalReader {
 		},
 		{
 			name: "BASE Interval held directly", doc: `{%s}`, lower: "1", upper: "5",
-			decode: func(doc []byte) (*intervalFlags, error) {
+			decode: func(doc []byte, opts ...canjson.DecoderOption) (*intervalFlags, error) {
 				var v rm.Interval[int]
-				err := canjson.Unmarshal(doc, &v)
+				err := canjson.Unmarshal(doc, &v, opts...)
 				return new(baseFlags(v)), err
 			},
 		},
@@ -237,9 +240,9 @@ func jsonIntervalReaders() []jsonIntervalReader {
 			name:   "AOM 1.4 C_COMPLEX_OBJECT.occurrences",
 			doc:    `{"_type":"C_COMPLEX_OBJECT","rm_type_name":"OBSERVATION","node_id":"at0000","occurrences":{%s}}`,
 			member: "occurrences", lower: "0", upper: "5",
-			decode: func(doc []byte) (*intervalFlags, error) {
+			decode: func(doc []byte, opts ...canjson.DecoderOption) (*intervalFlags, error) {
 				var v aom14.CComplexObject
-				err := canjson.Unmarshal(doc, &v)
+				err := canjson.Unmarshal(doc, &v, opts...)
 				return new(baseFlags(v.Occurrences)), err
 			},
 		},
@@ -247,9 +250,9 @@ func jsonIntervalReaders() []jsonIntervalReader {
 			name:   "AOM 1.4 C_SINGLE_ATTRIBUTE.existence",
 			doc:    `{"_type":"C_SINGLE_ATTRIBUTE","rm_attribute_name":"items","existence":{%s}}`,
 			member: "existence", lower: "0", upper: "1",
-			decode: func(doc []byte) (*intervalFlags, error) {
+			decode: func(doc []byte, opts ...canjson.DecoderOption) (*intervalFlags, error) {
 				var v aom14.CSingleAttribute
-				err := canjson.Unmarshal(doc, &v)
+				err := canjson.Unmarshal(doc, &v, opts...)
 				return new(baseFlags(v.Existence)), err
 			},
 		},
@@ -257,17 +260,17 @@ func jsonIntervalReaders() []jsonIntervalReader {
 			name:   "AOM 1.4 C_MULTIPLE_ATTRIBUTE.cardinality.interval",
 			doc:    `{"_type":"C_MULTIPLE_ATTRIBUTE","rm_attribute_name":"items","cardinality":{"_type":"CARDINALITY","is_ordered":true,"is_unique":false,"interval":{%s}}}`,
 			member: "interval", lower: "0", upper: "9",
-			decode: func(doc []byte) (*intervalFlags, error) {
+			decode: func(doc []byte, opts ...canjson.DecoderOption) (*intervalFlags, error) {
 				var v aom14.CMultipleAttribute
-				err := canjson.Unmarshal(doc, &v)
+				err := canjson.Unmarshal(doc, &v, opts...)
 				return new(baseFlags(v.Cardinality.Interval)), err
 			},
 		},
 		{
 			name: "AOM 1.4 C_INTEGER.range", doc: `{"_type":"C_INTEGER","range":{%s}}`, member: "range", lower: "0", upper: "100",
-			decode: func(doc []byte) (*intervalFlags, error) {
+			decode: func(doc []byte, opts ...canjson.DecoderOption) (*intervalFlags, error) {
 				var v aom14.CInteger
-				if err := canjson.Unmarshal(doc, &v); err != nil || v.Range == nil {
+				if err := canjson.Unmarshal(doc, &v, opts...); err != nil || v.Range == nil {
 					return nil, err
 				}
 				return new(baseFlags(*v.Range)), nil
@@ -275,9 +278,9 @@ func jsonIntervalReaders() []jsonIntervalReader {
 		},
 		{
 			name: "AOM 1.4 C_REAL.range", doc: `{"_type":"C_REAL","range":{%s}}`, member: "range", lower: "0.5", upper: "9.5",
-			decode: func(doc []byte) (*intervalFlags, error) {
+			decode: func(doc []byte, opts ...canjson.DecoderOption) (*intervalFlags, error) {
 				var v aom14.CReal
-				if err := canjson.Unmarshal(doc, &v); err != nil || v.Range == nil {
+				if err := canjson.Unmarshal(doc, &v, opts...); err != nil || v.Range == nil {
 					return nil, err
 				}
 				return new(baseFlags(*v.Range)), nil
@@ -286,9 +289,9 @@ func jsonIntervalReaders() []jsonIntervalReader {
 		{
 			name: "AOM 1.4 C_QUANTITY_ITEM.magnitude", doc: `{"_type":"C_QUANTITY_ITEM","magnitude":{%s},"units":"mm"}`,
 			member: "magnitude", lower: "0", upper: "250",
-			decode: func(doc []byte) (*intervalFlags, error) {
+			decode: func(doc []byte, opts ...canjson.DecoderOption) (*intervalFlags, error) {
 				var v aom14.CQuantityItem
-				err := canjson.Unmarshal(doc, &v)
+				err := canjson.Unmarshal(doc, &v, opts...)
 				return new(baseFlags(v.Magnitude)), err
 			},
 		},
@@ -340,8 +343,10 @@ func jsonIntervalBody(members []jsonMember, lower, upper string) string {
 
 // TestREQ169IntervalAbsentFlagDefaults pins how canonical JSON reads an
 // interval boundary flag the document leaves out (REQ-169, REQ-052): an absent
-// `*_unbounded` reads as false, and an absent `*_included` reads as true on a
-// side not marked unbounded and as false on a side marked unbounded. A flag
+// `*_unbounded` beside a bound reads as false, and an absent `*_included`
+// reads as true on a side not marked unbounded and as false on a side marked
+// unbounded (TestREQ169IntervalUnboundedFollowsItsBound covers a side with no
+// bound). A flag
 // that is present is read as written, an included open side among them, and no
 // absent flag is a decode error. The default for `*_included` follows its
 // side's `*_unbounded` wherever that member sits in the object. Every reader
@@ -402,8 +407,8 @@ func sprintFlags(f *intervalFlags) string {
 
 // TestREQ169IntervalAbsentFlagsOverwriteReusedReceiver pins that the defaults
 // of REQ-169 are what the document says, not what the receiver held: an absent
-// `*_unbounded` reads as false and an absent `*_included` as true even when a
-// value decoded into earlier set the opposite.
+// `*_unbounded` beside a bound reads as false and an absent `*_included` as
+// true even when a value decoded into earlier set the opposite.
 //
 // Can-fail control: drop the absent-unbounded default and the open flags the
 // receiver held survive the decode.

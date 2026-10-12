@@ -130,7 +130,10 @@ type xmlIntervalReader struct {
 	name         string
 	doc          string
 	lower, upper string
-	decode       func(doc []byte) (intervalFlags, error)
+	decode       func(doc []byte, opts ...canxml.DecoderOption) (intervalFlags, error)
+	// boundByRef is set for a reader whose interval holds its bounds as an
+	// interface, so a side can be decoded with no bound at all.
+	boundByRef bool
 }
 
 const (
@@ -151,19 +154,19 @@ func xmlIntervalReaders() []xmlIntervalReader {
 	return []xmlIntervalReader{
 		{
 			name: "DV_INTERVAL<DV_COUNT>", doc: `<dv_interval` + xmlNS + `>%s</dv_interval>`, lower: xmlCount1, upper: xmlCount5,
-			decode: func(doc []byte) (intervalFlags, error) {
+			decode: func(doc []byte, opts ...canxml.DecoderOption) (intervalFlags, error) {
 				var v rm.DVInterval[rm.DVCount]
-				err := canxml.Unmarshal(doc, &v)
+				err := canxml.Unmarshal(doc, &v, opts...)
 				return baseFlags(v.Interval), err
 			},
 		},
 		{
 			name:  "DV_INTERVAL in ELEMENT.value",
 			doc:   `<element` + xmlNS + ` archetype_node_id="at0001"><name><value>x</value></name><value xsi:type="DV_INTERVAL">%s</value></element>`,
-			lower: xmlCount1, upper: xmlCount5,
-			decode: func(doc []byte) (intervalFlags, error) {
+			lower: xmlCount1, upper: xmlCount5, boundByRef: true,
+			decode: func(doc []byte, opts ...canxml.DecoderOption) (intervalFlags, error) {
 				var v rm.Element
-				if err := canxml.Unmarshal(doc, &v); err != nil {
+				if err := canxml.Unmarshal(doc, &v, opts...); err != nil {
 					return intervalFlags{}, err
 				}
 				iv, ok := v.Value.(*rm.DVInterval[rm.DVOrdered])
@@ -176,10 +179,10 @@ func xmlIntervalReaders() []xmlIntervalReader {
 		{
 			name:  "REFERENCE_RANGE.range",
 			doc:   `<reference_range` + xmlNS + `><meaning><value>normal</value></meaning><range>%s</range></reference_range>`,
-			lower: xmlCount1, upper: xmlCount5,
-			decode: func(doc []byte) (intervalFlags, error) {
+			lower: xmlCount1, upper: xmlCount5, boundByRef: true, // range is a DV_INTERVAL<DV_ORDERED>
+			decode: func(doc []byte, opts ...canxml.DecoderOption) (intervalFlags, error) {
 				var v rm.ReferenceRange[rm.DVCount]
-				err := canxml.Unmarshal(doc, &v)
+				err := canxml.Unmarshal(doc, &v, opts...)
 				return baseFlags(v.Range.Interval), err
 			},
 		},
@@ -187,9 +190,9 @@ func xmlIntervalReaders() []xmlIntervalReader {
 			name:  "DV_QUANTITY.normal_range",
 			doc:   `<dv_quantity` + xmlNS + `><normal_range>%s</normal_range><magnitude>3</magnitude><units>mm</units></dv_quantity>`,
 			lower: xmlQuantity1, upper: xmlQuantity5,
-			decode: func(doc []byte) (intervalFlags, error) {
+			decode: func(doc []byte, opts ...canxml.DecoderOption) (intervalFlags, error) {
 				var v rm.DVQuantity
-				if err := canxml.Unmarshal(doc, &v); err != nil {
+				if err := canxml.Unmarshal(doc, &v, opts...); err != nil {
 					return intervalFlags{}, err
 				}
 				if v.NormalRange == nil {
@@ -200,17 +203,17 @@ func xmlIntervalReaders() []xmlIntervalReader {
 		},
 		{
 			name: "Proper_interval<Integer>", doc: `<proper_interval` + xmlNS + `>%s</proper_interval>`, lower: xmlIntLower0, upper: xmlIntUpper5,
-			decode: func(doc []byte) (intervalFlags, error) {
+			decode: func(doc []byte, opts ...canxml.DecoderOption) (intervalFlags, error) {
 				var v rm.ProperInterval[rm.Integer]
-				err := canxml.Unmarshal(doc, &v)
+				err := canxml.Unmarshal(doc, &v, opts...)
 				return baseFlags(v.Interval), err
 			},
 		},
 		{
 			name: "Point_interval<Integer>", doc: `<point_interval` + xmlNS + `>%s</point_interval>`, lower: xmlIntLower3, upper: xmlIntUpper3,
-			decode: func(doc []byte) (intervalFlags, error) {
+			decode: func(doc []byte, opts ...canxml.DecoderOption) (intervalFlags, error) {
 				var v rm.PointInterval[rm.Integer]
-				err := canxml.Unmarshal(doc, &v)
+				err := canxml.Unmarshal(doc, &v, opts...)
 				// Point_interval declares the four flags again, so its own
 				// fields carry them.
 				return intervalFlags{
@@ -221,9 +224,9 @@ func xmlIntervalReaders() []xmlIntervalReader {
 		},
 		{
 			name: "BASE Interval held directly", doc: `<interval` + xmlNS + `>%s</interval>`, lower: xmlIntLower0, upper: xmlIntUpper5,
-			decode: func(doc []byte) (intervalFlags, error) {
+			decode: func(doc []byte, opts ...canxml.DecoderOption) (intervalFlags, error) {
 				var v rm.Interval[int]
-				err := canxml.Unmarshal(doc, &v)
+				err := canxml.Unmarshal(doc, &v, opts...)
 				return baseFlags(v), err
 			},
 		},
@@ -231,9 +234,9 @@ func xmlIntervalReaders() []xmlIntervalReader {
 			name:  "AOM 1.4 C_COMPLEX_OBJECT.occurrences",
 			doc:   `<c_complex_object` + xmlNS + `><rm_type_name>OBSERVATION</rm_type_name><occurrences>%s</occurrences><node_id>at0000</node_id></c_complex_object>`,
 			lower: xmlIntLower0, upper: xmlIntUpper5,
-			decode: func(doc []byte) (intervalFlags, error) {
+			decode: func(doc []byte, opts ...canxml.DecoderOption) (intervalFlags, error) {
 				var v aom14.CComplexObject
-				err := canxml.Unmarshal(doc, &v)
+				err := canxml.Unmarshal(doc, &v, opts...)
 				return baseFlags(v.Occurrences), err
 			},
 		},
@@ -241,9 +244,9 @@ func xmlIntervalReaders() []xmlIntervalReader {
 			name:  "AOM 1.4 C_SINGLE_ATTRIBUTE.existence",
 			doc:   `<c_single_attribute` + xmlNS + `><rm_attribute_name>items</rm_attribute_name><existence>%s</existence></c_single_attribute>`,
 			lower: xmlIntLower0, upper: xmlIntUpper5,
-			decode: func(doc []byte) (intervalFlags, error) {
+			decode: func(doc []byte, opts ...canxml.DecoderOption) (intervalFlags, error) {
 				var v aom14.CSingleAttribute
-				err := canxml.Unmarshal(doc, &v)
+				err := canxml.Unmarshal(doc, &v, opts...)
 				return baseFlags(v.Existence), err
 			},
 		},
@@ -252,17 +255,17 @@ func xmlIntervalReaders() []xmlIntervalReader {
 			doc: `<c_multiple_attribute` + xmlNS + `><rm_attribute_name>items</rm_attribute_name><cardinality>` +
 				`<is_ordered>true</is_ordered><is_unique>false</is_unique><interval>%s</interval></cardinality></c_multiple_attribute>`,
 			lower: xmlIntLower0, upper: xmlIntUpper5,
-			decode: func(doc []byte) (intervalFlags, error) {
+			decode: func(doc []byte, opts ...canxml.DecoderOption) (intervalFlags, error) {
 				var v aom14.CMultipleAttribute
-				err := canxml.Unmarshal(doc, &v)
+				err := canxml.Unmarshal(doc, &v, opts...)
 				return baseFlags(v.Cardinality.Interval), err
 			},
 		},
 		{
 			name: "AOM 1.4 C_INTEGER.range", doc: `<c_integer` + xmlNS + `><range>%s</range></c_integer>`, lower: xmlIntLower0, upper: xmlIntUpper5,
-			decode: func(doc []byte) (intervalFlags, error) {
+			decode: func(doc []byte, opts ...canxml.DecoderOption) (intervalFlags, error) {
 				var v aom14.CInteger
-				if err := canxml.Unmarshal(doc, &v); err != nil {
+				if err := canxml.Unmarshal(doc, &v, opts...); err != nil {
 					return intervalFlags{}, err
 				}
 				if v.Range == nil {
@@ -273,9 +276,9 @@ func xmlIntervalReaders() []xmlIntervalReader {
 		},
 		{
 			name: "AOM 1.4 C_REAL.range", doc: `<c_real` + xmlNS + `><range>%s</range></c_real>`, lower: xmlRealLower, upper: xmlRealUpper,
-			decode: func(doc []byte) (intervalFlags, error) {
+			decode: func(doc []byte, opts ...canxml.DecoderOption) (intervalFlags, error) {
 				var v aom14.CReal
-				if err := canxml.Unmarshal(doc, &v); err != nil {
+				if err := canxml.Unmarshal(doc, &v, opts...); err != nil {
 					return intervalFlags{}, err
 				}
 				if v.Range == nil {
@@ -288,9 +291,9 @@ func xmlIntervalReaders() []xmlIntervalReader {
 			name:  "AOM 1.4 C_QUANTITY_ITEM.magnitude",
 			doc:   `<c_quantity_item` + xmlNS + `><magnitude>%s</magnitude><units>mm</units></c_quantity_item>`,
 			lower: xmlRealLower, upper: xmlRealUpper,
-			decode: func(doc []byte) (intervalFlags, error) {
+			decode: func(doc []byte, opts ...canxml.DecoderOption) (intervalFlags, error) {
 				var v aom14.CQuantityItem
-				err := canxml.Unmarshal(doc, &v)
+				err := canxml.Unmarshal(doc, &v, opts...)
 				return baseFlags(v.Magnitude), err
 			},
 		},
@@ -315,8 +318,10 @@ func xmlIntervalBody(children []xmlChild, lower, upper string) string {
 
 // TestREQ169IntervalAbsentFlagDefaults pins how canonical XML reads an
 // interval boundary flag the document leaves out (REQ-169, REQ-056): an absent
-// `*_unbounded` reads as false, and an absent `*_included` reads as true on a
-// side not marked unbounded and as false on a side marked unbounded. A flag
+// `*_unbounded` beside a bound reads as false, and an absent `*_included`
+// reads as true on a side not marked unbounded and as false on a side marked
+// unbounded (TestREQ169IntervalUnboundedFollowsItsBound covers a side with no
+// bound). A flag
 // that is present is read as written, an included open side among them, and no
 // absent flag is a decode error. The default for `*_included` follows its
 // side's `*_unbounded` wherever that element sits among the children. Every
@@ -364,8 +369,8 @@ func TestREQ169IntervalLegacyXMLFlagNamesCountAsPresent(t *testing.T) {
 
 // TestREQ169IntervalAbsentFlagsOverwriteReusedReceiver pins that the defaults
 // of REQ-169 are what the document says, not what the receiver held: an absent
-// `*_unbounded` reads as false and an absent `*_included` as true even when a
-// value decoded into earlier set the opposite.
+// `*_unbounded` beside a bound reads as false and an absent `*_included` as
+// true even when a value decoded into earlier set the opposite.
 //
 // Can-fail control: drop the absent-unbounded default and the open flags the
 // receiver held survive the decode.

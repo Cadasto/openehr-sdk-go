@@ -97,10 +97,14 @@ func (d *DVCount) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 // reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 //
 // A boundary flag the document leaves out takes its default once the whole
-// value is read: `lower_unbounded` and `upper_unbounded` read as false,
-// and `lower_included` and `upper_included` read as true on a side that is
-// not open and as false on a side that is. A flag the document carries is
-// read as written.
+// value is read: `lower_unbounded` and `upper_unbounded` read as false on a
+// side that carries a bound and as true on a side whose bound is absent or
+// null, and `lower_included` and `upper_included` read as true on a side
+// that is not open and as false on a side that is. A flag the document
+// carries is read as written. A side written `*_unbounded` false with no
+// bound is refused when the interval holds its bounds by value, since a zero
+// bound would stand in for the absent one; held as an interface, the side
+// decodes as written, with no bound.
 // An empty or whitespace-only flag element carries no boolean and reads as
 // a flag the document leaves out.
 func (d *DVInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
@@ -122,12 +126,14 @@ func (d *DVInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 					return _err
 				}
 				d.Lower = _v
+				_seen.lower = true
 			case "upper":
 				_v, _err := canxml.DecodeAs[T](_dec, _t)
 				if _err != nil {
 					return _err
 				}
 				d.Upper = _v
+				_seen.upper = true
 			case "lower_unbounded":
 				if _err := decodeIntervalFlagXML(_dec, &_t, &d.LowerUnbounded, &_seen.lowerUnbounded); _err != nil {
 					return _err
@@ -150,7 +156,9 @@ func (d *DVInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 				}
 			}
 		case xml.EndElement:
-			_seen.setDefaults(&d.LowerIncluded, &d.LowerUnbounded, &d.UpperIncluded, &d.UpperUnbounded)
+			if _err := _seen.settle(intervalBoundHeldByValue(&d.Lower), &d.LowerIncluded, &d.LowerUnbounded, &d.UpperIncluded, &d.UpperUnbounded); _err != nil {
+				return fmt.Errorf("%w: DV_INTERVAL: %w", canxml.ErrInvalidShape, _err)
+			}
 			return nil
 		}
 	}
