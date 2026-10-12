@@ -50,11 +50,11 @@ func (i *Interval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "lower", "Lower":
-				if _err := xmlunmatched.DecodeParam(_dec, &_t, &i.Lower); _err != nil {
+				if _err := xmlunmatched.DecodeParam(_dec, &_t, &i.Lower, canxml.DecodeAs[T]); _err != nil {
 					return _err
 				}
 			case "upper", "Upper":
-				if _err := xmlunmatched.DecodeParam(_dec, &_t, &i.Upper); _err != nil {
+				if _err := xmlunmatched.DecodeParam(_dec, &_t, &i.Upper, canxml.DecodeAs[T]); _err != nil {
 					return _err
 				}
 			case "lower_unbounded", "LowerUnbounded":
@@ -116,11 +116,11 @@ func (p *PointInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "lower":
-				if _err := xmlunmatched.DecodeParam(_dec, &_t, &p.Lower); _err != nil {
+				if _err := xmlunmatched.DecodeParam(_dec, &_t, &p.Lower, canxml.DecodeAs[T]); _err != nil {
 					return _err
 				}
 			case "upper":
-				if _err := xmlunmatched.DecodeParam(_dec, &_t, &p.Upper); _err != nil {
+				if _err := xmlunmatched.DecodeParam(_dec, &_t, &p.Upper, canxml.DecodeAs[T]); _err != nil {
 					return _err
 				}
 			case "lower_unbounded":
@@ -182,11 +182,11 @@ func (p *ProperInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "lower":
-				if _err := xmlunmatched.DecodeParam(_dec, &_t, &p.Lower); _err != nil {
+				if _err := xmlunmatched.DecodeParam(_dec, &_t, &p.Lower, canxml.DecodeAs[T]); _err != nil {
 					return _err
 				}
 			case "upper":
-				if _err := xmlunmatched.DecodeParam(_dec, &_t, &p.Upper); _err != nil {
+				if _err := xmlunmatched.DecodeParam(_dec, &_t, &p.Upper, canxml.DecodeAs[T]); _err != nil {
 					return _err
 				}
 			case "lower_unbounded":

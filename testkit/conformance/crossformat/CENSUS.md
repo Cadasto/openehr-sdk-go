@@ -24,7 +24,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 |---|---|---|
 | alternative_events | canonical-flat | compared 21, missing 4, extra 0, altered 0, excluded 0 |
 | alternative_events | flat-canonical | compared 115, missing 8, extra 4, altered 13, excluded 4 |
-| consult_record | json-xml | refused |
+| consult_record | json-xml | compared 150, missing 0, extra 0, altered 0, excluded 0 |
 | consult_record | canonical-flat | compared 26, missing 5, extra 6, altered 0, excluded 0 |
 | consult_record | flat-canonical | compared 150, missing 40, extra 27, altered 16, excluded 8 |
 | consult_record | flat-structured | compared 40, missing 12, extra 5, altered 0, excluded 0 |
@@ -96,10 +96,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 
 ### json-xml
 
-- Outcome: refused
-- Error: `canonical XML decode: decode /content (_type="ADMIN_ENTRY"): canxml: decode /data (_type="ITEM_TREE"): canxml: decode /items (_type="CLUSTER"): canxml: decode /items (_type="ELEMENT"): canxml: decode /value (_type="DV_MULTIMEDIA"): canxml: strconv.ParseUint: parsing "JVBERi0xLjQKJdPr6eEKMSAwIG9iago8PC9UaXR... invalid syntax`
-- Recorded as an error containing `(_type="DV_MULTIMEDIA"): canxml: strconv.ParseUint`
-- Reason: canxml Array<Octet>: the canonical XML carries the media file's DV_MULTIMEDIA data as base64 text (ITS-XML xs:base64Binary), and canxml reads that attribute as one element per byte, so it fails parsing the base64 text as a byte.
+- Outcome: compared 150, missing 0, extra 0, altered 0, excluded 0
 
 ### canonical-flat
 

@@ -32,16 +32,19 @@
 //   - The generated decoders call the helpers of this package where content
 //     goes unread: [CheckUnmatchedAttrs] on entry, [LocalName] for the name
 //     they switch on, [SkipUnmatched] in the arm for an element they do not
-//     read, [DecodeElement] for an element decoded as text, and
-//     [DecodeParam] for a member typed by an open generic parameter. canxml
+//     read, [DecodeElement] for an element decoded as text, [DecodeBase64]
+//     for an Octet list, and [DecodeParam] for a member typed by an open
+//     generic parameter. canxml
 //     calls [DiscriminatorRead] where its dispatch reads a bare `type`. Each
 //     helper looks the decoder up; an untracked decode finds nothing and
 //     behaves as encoding/xml does.
 package xmlunmatched
 
 import (
+	"encoding/base64"
 	"encoding/xml"
 	"errors"
+	"fmt"
 	"io"
 	"slices"
 	"strconv"
@@ -525,16 +528,28 @@ func DecodeElement(dec *xml.Decoder, start *xml.StartElement, v any) error {
 // start must be the token the decoder read last.
 //
 //   - T is an interface type, such as the `any` of ORIGINAL_VERSION<any> or
-//     the DV_ORDERED of BASE Interval<DV_ORDERED>: see [decodeInterface].
+//     the DV_ORDERED of BASE Interval<DV_ORDERED>: the member is a
+//     polymorphic slot. An empty one decodes through dispatch, the canxml
+//     polymorphic dispatch on `xsi:type` the generated code passes in, so a
+//     missing or unknown `xsi:type` fails as at any polymorphic slot. One
+//     that already holds a value is decoded into ([decodeInterface]).
 //   - T is a pointer to a type with an UnmarshalXML method: encoding/xml
 //     allocates it and that method checks its own content.
 //   - Any other T, a primitive or a type with an UnmarshalXML method on its
 //     pointer, goes to [DecodeElement].
-func DecodeParam[T any](dec *xml.Decoder, start *xml.StartElement, v *T) error {
+func DecodeParam[T any](dec *xml.Decoder, start *xml.StartElement, v *T, dispatch func(*xml.Decoder, xml.StartElement) (T, error)) error {
 	var zero T
 	switch any(zero).(type) {
 	case nil:
-		return decodeInterface(dec, start, any(*v) == nil, v)
+		if any(*v) != nil {
+			return decodeInterface(dec, start, v)
+		}
+		got, err := dispatch(dec, *start)
+		if err != nil {
+			return err
+		}
+		*v = got
+		return nil
 	case xml.Unmarshaler:
 		return dec.DecodeElement(v, start)
 	}
@@ -542,24 +557,19 @@ func DecodeParam[T any](dec *xml.Decoder, start *xml.StartElement, v *T) error {
 }
 
 // decodeInterface decodes the element start opens into v, a pointer to a
-// member of interface type; empty reports whether the member holds nothing.
+// member of interface type that already holds a value.
 //
-// encoding/xml decodes into a member of interface type only when it holds a
-// non-nil pointer, and skips the element otherwise; the default decode does
-// exactly that. An empty member gives it nothing to decode into, so a
-// tracked decode reports or refuses the element as one item before it is
-// skipped ([SkipUnmatched]). A member that holds a value is left to
-// encoding/xml as well: a pointer to an RM type then checks its own content,
-// and when nothing of the SDK checked the element's content, because
-// encoding/xml skipped it or read it into a primitive, a tracked decode
-// reports or refuses the element as one item once it is read.
-func decodeInterface(dec *xml.Decoder, start *xml.StartElement, empty bool, v any) error {
+// encoding/xml decodes into such a member only when it holds a non-nil
+// pointer, and skips the element otherwise; the default decode does exactly
+// that. A tracked decode leaves the choice to encoding/xml as well: a pointer
+// to an RM type then checks its own content, and when nothing of the SDK
+// checked the element's content, because encoding/xml skipped it or read it
+// into a primitive, the element is reported or refused as one item once it is
+// read.
+func decodeInterface(dec *xml.Decoder, start *xml.StartElement, v any) error {
 	t := trackerOf(dec)
 	if t == nil {
 		return dec.DecodeElement(v, start)
-	}
-	if empty {
-		return SkipUnmatched(dec, *start)
 	}
 	path, checked := t.path(), t.checked
 	if err := dec.DecodeElement(v, start); err != nil {
@@ -569,4 +579,38 @@ func decodeInterface(dec *xml.Decoder, start *xml.StartElement, empty bool, v an
 		return t.unmatched(path, isForeign(start.Name))
 	}
 	return nil
+}
+
+// DecodeBase64 decodes the element start opens, an `xs:base64Binary` value
+// such as DV_MULTIMEDIA's `data` and `integrity_check`, into v. The element's
+// text is read as [DecodeElement] reads a primitive's, so a tracked decode
+// reports an attribute or child element on it. XML whitespace inside the
+// text is ignored, as the XML Schema type allows. An empty element leaves v
+// nil, as an empty byte field reads in canonical JSON. A text that is no
+// standard, padded base64 fails; the error names the element and the offset
+// of the first bad byte, never the text.
+func DecodeBase64(dec *xml.Decoder, start *xml.StartElement, v *[]byte) error {
+	var text string
+	if err := DecodeElement(dec, start, &text); err != nil {
+		return err
+	}
+	b, err := base64.StdEncoding.DecodeString(strings.Map(dropXMLSpace, text))
+	if err != nil {
+		return fmt.Errorf("canxml: <%s>: %w", start.Name.Local, err)
+	}
+	if len(b) == 0 {
+		b = nil
+	}
+	*v = b
+	return nil
+}
+
+// dropXMLSpace maps the four XML whitespace characters to -1, which drops
+// them in strings.Map, and keeps every other rune.
+func dropXMLSpace(r rune) rune {
+	switch r {
+	case ' ', '\t', '\n', '\r':
+		return -1
+	}
+	return r
 }

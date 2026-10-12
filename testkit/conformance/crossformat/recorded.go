@@ -194,12 +194,7 @@ var Recorded = map[string]map[Leg]Record{
 		},
 	},
 	"consult_record": {
-		LegJSONXML: {
-			Outcome: Outcome{Refused: `(_type="DV_MULTIMEDIA"): canxml: strconv.ParseUint`},
-			Reason: "canxml Array<Octet>: the canonical XML carries the media file's DV_MULTIMEDIA data as " +
-				"base64 text (ITS-XML xs:base64Binary), and canxml reads that attribute as one element per byte, " +
-				"so it fails parsing the base64 text as a byte.",
-		},
+		LegJSONXML: {Outcome: Outcome{Compared: 150}},
 		LegCanonicalFlat: {
 			Outcome: Outcome{Compared: 26, Missing: 5, Extra: 6},
 			Reason: "body-form composer: FLAT encode writes the composer as ctx/composer_name alone, so " +

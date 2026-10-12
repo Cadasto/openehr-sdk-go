@@ -60,11 +60,9 @@ func (d *DVMultimedia) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 				}
 				d.URI = _v
 			case "data":
-				var _v byte
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeBase64(_dec, &_t, &d.Data); _err != nil {
 					return _err
 				}
-				d.Data = append(d.Data, _v)
 			case "media_type":
 				if _err := _dec.DecodeElement(&d.MediaType, &_t); _err != nil {
 					return _err
@@ -76,11 +74,9 @@ func (d *DVMultimedia) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 				}
 				d.CompressionAlgorithm = _v
 			case "integrity_check":
-				var _v byte
-				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
+				if _err := xmlunmatched.DecodeBase64(_dec, &_t, &d.IntegrityCheck); _err != nil {
 					return _err
 				}
-				d.IntegrityCheck = append(d.IntegrityCheck, _v)
 			case "integrity_check_algorithm":
 				_v := new(CodePhrase)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {

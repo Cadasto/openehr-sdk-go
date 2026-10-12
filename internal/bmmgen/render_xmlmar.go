@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"go/format"
+	"slices"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
@@ -35,6 +36,10 @@ import (
 //     order (identical to the JSON ordering). Nil-pointer optionals
 //     and empty containers are omitted. Polymorphic descendants
 //     receive `xsi:type` via [canxml.EncodePoly].
+//
+// An Octet list (DV_MULTIMEDIA's `data` and `integrity_check`, Go []byte) is
+// one element of standard base64 text, the `xs:base64Binary` the ITS-XML
+// schema gives it and the string canonical JSON writes.
 //
 // # Hash/map XML emission (current limitation)
 //
@@ -78,6 +83,9 @@ func RenderMarshalXMLFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	}
 
 	body.WriteString("import (\n")
+	if slices.ContainsFunc(chunks, func(c string) bool { return strings.Contains(c, "base64.") }) {
+		body.WriteString("\t\"encoding/base64\"\n")
+	}
 	body.WriteString("\t\"encoding/xml\"\n\n")
 	body.WriteString("\t\"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml\"\n")
 	if needsExternalImportForJSONMar(plan, chunks) {
@@ -280,6 +288,12 @@ func renderMarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass, e
 		if innerIsClass {
 			return marshalXMLStructSlice(recv, goField, elemName), nil
 		}
+		if isOctetContainer(p.TypeDef) {
+			// One xs:base64Binary element, as the ITS-XML schema types
+			// DV_MULTIMEDIA.data, matching the base64 string canonical
+			// JSON writes.
+			return marshalXMLBase64(recv, goField, elemName), nil
+		}
 		return marshalXMLPrimitiveSlice(recv, goField, elemName), nil
 
 	case *bmm.GenericProperty:
@@ -361,6 +375,15 @@ func marshalXMLPolySlice(recv, field, elem string) string {
 func marshalXMLStructSlice(recv, field, elem string) string {
 	return fmt.Sprintf(
 		"\tfor _idx := range %s.%s {\n\t\tif err := _e.EncodeElement(&%s.%s[_idx], xml.StartElement{Name: xml.Name{Local: %q}}); err != nil {\n\t\t\treturn err\n\t\t}\n\t}\n",
+		recv, field, recv, field, elem)
+}
+
+// marshalXMLBase64 emits an Octet list, held as a Go []byte, as one element
+// whose text is its standard, padded base64 encoding; an empty list emits no
+// element.
+func marshalXMLBase64(recv, field, elem string) string {
+	return fmt.Sprintf(
+		"\tif len(%s.%s) > 0 {\n\t\tif err := _e.EncodeElement(base64.StdEncoding.EncodeToString(%s.%s), xml.StartElement{Name: xml.Name{Local: %q}}); err != nil {\n\t\t\treturn err\n\t\t}\n\t}\n",
 		recv, field, recv, field, elem)
 }
 

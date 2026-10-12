@@ -291,9 +291,10 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 		if isOpenParam(ef.Owner, p.TypeName) {
 			// Typed by the owner's generic parameter (VERSION<T>.data):
 			// what the element decodes into depends on the instantiation,
-			// so xmlunmatched.DecodeParam chooses at run time.
+			// so xmlunmatched.DecodeParam chooses at run time, dispatching
+			// on `xsi:type` when T is an interface.
 			if p.IsMandatory {
-				return unmarshalXMLOpenParam(recv, goField, elemName), nil
+				return unmarshalXMLOpenParam(recv, goField, elemName, p.TypeName), nil
 			}
 			return unmarshalXMLOpenParamOptional(recv, goField, elemName, p.TypeName), nil
 		}
@@ -338,10 +339,10 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 		// emit a generic decode that chooses at run time, through
 		// xmlunmatched.DecodeParam, so a primitive's attributes and child
 		// elements count as unmatched content and an interface-typed
-		// instantiation's element is one item. The field is declared as
-		// `T` (open param), not `*T`, mandatory or not: we cannot allocate
-		// via new(T) for an unknown layout, so decode in place.
-		return unmarshalXMLOpenParam(recv, goField, elemName), nil
+		// instantiation dispatches on `xsi:type`. The field is declared
+		// as `T` (open param), not `*T`, mandatory or not: we cannot
+		// allocate via new(T) for an unknown layout, so decode in place.
+		return unmarshalXMLOpenParam(recv, goField, elemName, p.TypeName), nil
 
 	case *bmm.ContainerProperty:
 		ifaceName, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
@@ -377,6 +378,12 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 		}
 		if isOpenParam(ef.Owner, containerInnerName(p.TypeDef)) {
 			return unmarshalXMLOpenParamSlice(recv, goField, elemName, innerType), nil
+		}
+		if isOctetContainer(p.TypeDef) {
+			// An Octet list is one xs:base64Binary element in the
+			// ITS-XML schema (DV_MULTIMEDIA.data), as it is one base64
+			// string in canonical JSON, not one element per byte.
+			return unmarshalXMLBase64(recv, goField, elemName), nil
 		}
 		return unmarshalXMLPrimitiveSlice(recv, goField, elemName, innerType), nil
 
@@ -428,15 +435,16 @@ func unmarshalXMLPrimitiveOptionalLit(recv, field, elem, goType string) string {
 		elem, goType, recv, field)
 }
 
-// unmarshalXMLOpenParam emits the decode case of a field typed by an open
-// generic parameter that is not polymorphic. The parameter may be bound to
-// a primitive (BASE Interval<Integer>), to a class, or to an interface
-// (ORIGINAL_VERSION<any>), so the case decodes in place through
-// xmlunmatched.DecodeParam, which chooses by the instantiation.
-func unmarshalXMLOpenParam(recv, field, elem string) string {
+// unmarshalXMLOpenParam emits the decode case of a field typed by the open
+// generic parameter param that is not polymorphic by its bound. The
+// parameter may be bound to a primitive (BASE Interval<Integer>), to a
+// class, or to an interface (ORIGINAL_VERSION<any>), so the case decodes in
+// place through xmlunmatched.DecodeParam, which chooses by the
+// instantiation and dispatches an interface through canxml.DecodeAs.
+func unmarshalXMLOpenParam(recv, field, elem, param string) string {
 	return fmt.Sprintf(
-		"\t\t\tcase %q:\n\t\t\t\tif _err := xmlunmatched.DecodeParam(_dec, &_t, &%s.%s); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
-		elem, recv, field)
+		"\t\t\tcase %q:\n\t\t\t\tif _err := xmlunmatched.DecodeParam(_dec, &_t, &%s.%s, canxml.DecodeAs[%s]); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
+		elem, recv, field, param)
 }
 
 // unmarshalXMLOpenParamOptional emits the decode case of an optional field
@@ -444,8 +452,8 @@ func unmarshalXMLOpenParam(recv, field, elem string) string {
 // value, decodes it through xmlunmatched.DecodeParam and assigns it.
 func unmarshalXMLOpenParamOptional(recv, field, elem, param string) string {
 	return fmt.Sprintf(
-		"\t\t\tcase %q:\n\t\t\t\t_v := new(%s)\n\t\t\t\tif _err := xmlunmatched.DecodeParam(_dec, &_t, _v); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = _v\n",
-		elem, param, recv, field)
+		"\t\t\tcase %q:\n\t\t\t\t_v := new(%s)\n\t\t\t\tif _err := xmlunmatched.DecodeParam(_dec, &_t, _v, canxml.DecodeAs[%s]); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = _v\n",
+		elem, param, param, recv, field)
 }
 
 // unmarshalXMLOpenParamSlice emits the decode case of a container whose
@@ -453,8 +461,35 @@ func unmarshalXMLOpenParamOptional(recv, field, elem, param string) string {
 // xmlunmatched.DecodeParam and is appended.
 func unmarshalXMLOpenParamSlice(recv, field, elem, param string) string {
 	return fmt.Sprintf(
-		"\t\t\tcase %q:\n\t\t\t\tvar _v %s\n\t\t\t\tif _err := xmlunmatched.DecodeParam(_dec, &_t, &_v); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = append(%s.%s, _v)\n",
-		elem, param, recv, field, recv, field)
+		"\t\t\tcase %q:\n\t\t\t\tvar _v %s\n\t\t\t\tif _err := xmlunmatched.DecodeParam(_dec, &_t, &_v, canxml.DecodeAs[%s]); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = append(%s.%s, _v)\n",
+		elem, param, param, recv, field, recv, field)
+}
+
+// unmarshalXMLBase64 emits the decode case of an Octet list, held as a Go
+// []byte: one element whose text is xs:base64Binary, decoded through
+// xmlunmatched.DecodeBase64.
+func unmarshalXMLBase64(recv, field, elem string) string {
+	return fmt.Sprintf(
+		"\t\t\tcase %q:\n\t\t\t\tif _err := xmlunmatched.DecodeBase64(_dec, &_t, &%s.%s); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
+		elem, recv, field)
+}
+
+// isOctetContainer reports whether td is a container of the BMM primitive
+// Octet, which the generator holds as a Go []byte.
+func isOctetContainer(td *bmm.ContainerType) bool {
+	return containerInnerName(td) == bmmOctetType
+}
+
+// bmmOctetType is the BMM name of the byte primitive.
+const bmmOctetType = "Octet"
+
+// handWrittenXMLCodecs names the BMM classes whose canonical-XML codec is
+// written by hand in the target package rather than generated, because the
+// generator emits no codec for their class. TERMINOLOGY_CODE is a BASE
+// primitive class, held by value in AOM 1.4 ARCHETYPE.original_language; its
+// methods live in openehr/rm/terminology_code_xml.go.
+var handWrittenXMLCodecs = map[string]bool{
+	"Terminology_code": true,
 }
 
 // unmarshalXMLNoDecoder emits the case of a property whose class has no
@@ -490,9 +525,13 @@ const (
 // a concrete class that is not a BMM primitive class, or the abstract BASE
 // Interval, which the base schema lists among its primitive types. A class
 // another target owns counts by the same rule, since that target renders its
-// decoder. A class the plan does not hold is rendered as `any`, which
+// decoder. A class whose codec is written by hand ([handWrittenXMLCodecs])
+// has one too. A class the plan does not hold is rendered as `any`, which
 // nothing decodes.
 func xmlClassDecoding(plan *Plan, name string) (xmlDecoding, error) {
+	if handWrittenXMLCodecs[name] {
+		return xmlOwnDecoder, nil
+	}
 	pc, ok := plan.Classes[name]
 	if !ok {
 		return xmlNoDecoder, nil

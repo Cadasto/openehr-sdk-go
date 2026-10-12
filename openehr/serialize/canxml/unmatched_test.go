@@ -13,6 +13,8 @@ package canxml_test
 // canxml.ErrUnknownElement.
 
 import (
+	"bytes"
+	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"io/fs"
@@ -29,6 +31,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
@@ -766,46 +769,62 @@ func TestREQ170_XMLSchemaInstanceAttributesAreNotUnmatched(t *testing.T) {
 
 // TestREQ170_XMLInterfaceTypedParameter pins a member typed by a generic
 // parameter that is instantiated with an interface other than `any`: the
-// bounds of BASE Interval<DV_ORDERED>. encoding/xml decodes into such a member
-// only when it already holds a pointer, and skips the element otherwise.
+// bounds of BASE Interval<DV_ORDERED>. Such a member is a polymorphic slot.
 //
-//   - An empty bound: the default skips it, the report option names each
-//     bound element as one item and returns the default's value, and strict
-//     refuses the first.
+//   - An empty bound dispatches on its `xsi:type`, as at any polymorphic slot,
+//     in every mode; its content is checked like any other, so an extension
+//     inside it is reported at its own path. A bound with no `xsi:type` fails
+//     with typereg.ErrMissingType in every mode.
 //   - A bound that holds a pointer to a DV_QUANTITY: the default decodes into
-//     it, as encoding/xml does, and so do the options, which see its content,
-//     so an extension inside it is reported at its own path.
+//     it, as encoding/xml does, and so do the options, which see its content.
 func TestREQ170_XMLInterfaceTypedParameter(t *testing.T) {
 	const quantity = `<magnitude>1</magnitude><units>kg</units>`
+	lowerOf := func(v any) *rm.DVQuantity {
+		q, _ := v.(*rm.Interval[rm.DVOrdered]).Lower.(*rm.DVQuantity)
+		return q
+	}
 	t.Run("empty bounds", func(t *testing.T) {
-		in := []byte(`<iv ` + ucNS + `><lower xsi:type="DV_QUANTITY">` + quantity + `</lower>` +
+		in := []byte(`<iv ` + ucNS + `><lower xsi:type="DV_QUANTITY">` + quantity + `<x-ext>` + xmlPlanted + `</x-ext></lower>` +
 			`<upper xsi:type="DV_QUANTITY"><magnitude>2</magnitude><units>kg</units></upper></iv>`)
 		into := func() any { return new(rm.Interval[rm.DVOrdered]) }
-		wantPaths := []string{"/iv[1]/lower[1]", "/iv[1]/upper[1]"}
+		const extPath = "/iv[1]/lower[1]/x-ext[1]"
 		want := into()
 		if err := canxml.Unmarshal(in, want); err != nil {
 			t.Fatalf("canxml.Unmarshal = %v; want nil", err)
+		}
+		if q := lowerOf(want); q == nil || float64(q.Magnitude) != 1 || q.Units != "kg" {
+			t.Errorf("canxml.Unmarshal: Lower = %#v; want the DV_QUANTITY its xsi:type names, 1 kg", q)
 		}
 		got, paths, err := unmarshalCollecting(into, in)
 		if err != nil {
 			t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
 		}
-		if !slices.Equal(paths, wantPaths) {
-			t.Errorf("WithUnmatched reported %q; want %q, each bound as one item", paths, wantPaths)
+		if want := []string{extPath}; !slices.Equal(paths, want) {
+			t.Errorf("WithUnmatched reported %q; want %q: the dispatched bound checks its own content", paths, want)
 		}
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("canxml.Unmarshal(WithUnmatched) decoded\n%#v\nwant the default's value\n%#v", got, want)
 		}
 		err = canxml.Unmarshal(in, into(), canxml.WithStrict())
-		assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, wantPaths[0], false)
+		assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, extPath, false)
+	})
+
+	t.Run("empty bound without xsi:type", func(t *testing.T) {
+		in := []byte(`<iv ` + ucNS + `><lower>` + quantity + `</lower></iv>`)
+		for name, opts := range map[string][]canxml.DecoderOption{
+			"default": nil,
+			"report":  {canxml.WithUnmatched(func(string) {})},
+			"strict":  {canxml.WithStrict()},
+		} {
+			err := canxml.Unmarshal(in, new(rm.Interval[rm.DVOrdered]), opts...)
+			if !errors.Is(err, typereg.ErrMissingType) {
+				t.Errorf("canxml.Unmarshal(%s) err = %v; want typereg.ErrMissingType: an interface-typed slot needs xsi:type", name, err)
+			}
+		}
 	})
 
 	t.Run("bound holding a pointer", func(t *testing.T) {
 		held := func() any { return &rm.Interval[rm.DVOrdered]{Lower: &rm.DVQuantity{}} }
-		lowerOf := func(v any) *rm.DVQuantity {
-			q, _ := v.(*rm.Interval[rm.DVOrdered]).Lower.(*rm.DVQuantity)
-			return q
-		}
 		plain := []byte(`<iv ` + ucNS + `><lower xsi:type="DV_QUANTITY">` + quantity + `</lower></iv>`)
 		for name, opts := range map[string][]canxml.DecoderOption{
 			"default": nil,
@@ -837,76 +856,94 @@ func TestREQ170_XMLInterfaceTypedParameter(t *testing.T) {
 	})
 }
 
-// TestREQ170_XMLMembersWithoutADecoder pins the members whose Go type has no
-// canonical-XML decoder of its own, so encoding/xml would read nothing from
-// the element and report nothing either: the AOM 1.4
-// `ARCHETYPE.original_language`, a TERMINOLOGY_CODE held as a plain struct,
-// and the `data` of ORIGINAL_VERSION<any>, whose content type is an
-// interface. Each element is one item: the default decodes as before, the
-// report option names the element once and returns the default's value, and
-// strict refuses it. An enumeration member (C_DATE's `day_validity`) decodes
-// from its text, so an attribute on it is unmatched like on any primitive.
-func TestREQ170_XMLMembersWithoutADecoder(t *testing.T) {
-	for _, tc := range []struct {
-		name string
-		in   string
-		into func() any
-		path string
-	}{
-		{
-			name: "ARCHETYPE.original_language",
-			in: `<archetype ` + ucNS + `><concept>at0000</concept>` +
-				`<original_language x-attr="` + xmlPlanted + `"><terminology_id>ISO_639-1</terminology_id>` +
-				`<code_string>en</code_string><x-ext>` + xmlPlanted + `</x-ext></original_language></archetype>`,
-			into: func() any { return new(aom14.Archetype) },
-			path: "/archetype[1]/original_language[1]",
-		},
-		{
-			name: "ORIGINAL_VERSION<any>.data",
-			in: `<original_version ` + ucNS + `><data xsi:type="COMPOSITION"><x-ext>` + xmlPlanted + `</x-ext></data>` +
-				`<lifecycle_state><value>complete</value></lifecycle_state></original_version>`,
-			into: func() any { return new(rm.OriginalVersion[any]) },
-			path: "/original_version[1]/data[1]",
-		},
-		{
-			name: "enumeration with an attribute",
-			in:   `<c_date ` + ucNS + `><day_validity x-attr="` + xmlPlanted + `">optional</day_validity></c_date>`,
-			into: func() any { return new(aom14.CDate) },
-			path: "/c_date[1]/day_validity[1]/@x-attr",
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			in := []byte(tc.in)
-			want := tc.into()
-			if err := canxml.Unmarshal(in, want); err != nil {
-				t.Fatalf("canxml.Unmarshal = %v; want nil", err)
-			}
-			got, paths, err := unmarshalCollecting(tc.into, in)
-			if err != nil {
-				t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
-			}
-			if want := []string{tc.path}; !slices.Equal(paths, want) {
-				t.Errorf("WithUnmatched reported %q; want %q, one item", paths, want)
-			}
-			if !reflect.DeepEqual(got, want) {
-				t.Errorf("canxml.Unmarshal(WithUnmatched) decoded\n%#v\nwant the default's value\n%#v", got, want)
-			}
-			err = canxml.Unmarshal(in, tc.into(), canxml.WithStrict())
-			assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, tc.path, false)
-		})
+// TestREQ056_XMLOriginalVersionData pins the `data` of ORIGINAL_VERSION, typed
+// by VERSION's generic parameter. The registered ORIGINAL_VERSION<any> holds
+// it as an interface, so `data` is a polymorphic slot: the COMPOSITION its
+// `xsi:type` names is decoded, in every mode, and the options see inside it.
+// A `data` without `xsi:type` fails with typereg.ErrMissingType, and one with
+// an unknown `xsi:type` with typereg.ErrUnknownType. A concrete instantiation
+// decodes into its own type, by value or by pointer, with or without
+// `xsi:type`.
+func TestREQ056_XMLOriginalVersionData(t *testing.T) {
+	composition := `<name><value>c</value></name>` + xLanguage +
+		`<territory><terminology_id><value>ISO_3166-1</value></terminology_id><code_string>GB</code_string></territory>` +
+		`<category><value>event</value><defining_code><terminology_id><value>openehr</value></terminology_id><code_string>433</code_string></defining_code></category>` +
+		`<composer xsi:type="PARTY_SELF"/>`
+	version := func(dataAttrs, ext string) []byte {
+		return []byte(`<original_version ` + ucNS + `><data` + dataAttrs + ` archetype_node_id="openEHR-EHR-COMPOSITION.encounter.v1">` +
+			composition + ext + `</data><lifecycle_state><value>complete</value><defining_code><terminology_id><value>openehr</value></terminology_id>` +
+			`<code_string>532</code_string></defining_code></lifecycle_state></original_version>`)
 	}
-
-	// A concrete instantiation of the generic parameter decodes as before,
-	// by value or by pointer, and its class checks its own content.
 	nameOf := func(c *rm.Composition) string {
 		if c == nil || c.Name == nil {
 			return ""
 		}
 		return c.Name.GetValue()
 	}
+	dataOf := func(v any) *rm.Composition {
+		ov := v.(*rm.OriginalVersion[any])
+		if ov.Data == nil {
+			return nil
+		}
+		c, _ := (*ov.Data).(*rm.Composition)
+		return c
+	}
+
+	t.Run("default", func(t *testing.T) {
+		v := new(rm.OriginalVersion[any])
+		if err := canxml.Unmarshal(version(` xsi:type="COMPOSITION"`, ""), v); err != nil {
+			t.Fatalf("canxml.Unmarshal = %v; want nil", err)
+		}
+		c := dataOf(v)
+		if nameOf(c) != "c" || c.Language.CodeString != "en" {
+			t.Errorf("Data = %#v; want the COMPOSITION named \"c\" in English", v.Data)
+		}
+	})
+
+	t.Run("report and strict see inside", func(t *testing.T) {
+		in := version(` xsi:type="COMPOSITION"`, `<x-ext>`+xmlPlanted+`</x-ext>`)
+		const extPath = "/original_version[1]/data[1]/x-ext[1]"
+		got, paths, err := unmarshalCollecting(func() any { return new(rm.OriginalVersion[any]) }, in)
+		if err != nil {
+			t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
+		}
+		if want := []string{extPath}; !slices.Equal(paths, want) {
+			t.Errorf("WithUnmatched reported %q; want %q", paths, want)
+		}
+		if nameOf(dataOf(got)) != "c" {
+			t.Errorf("WithUnmatched: Data = %#v; want the COMPOSITION named \"c\"", got.(*rm.OriginalVersion[any]).Data)
+		}
+		err = canxml.Unmarshal(in, new(rm.OriginalVersion[any]), canxml.WithStrict())
+		assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, extPath, false)
+		if err := canxml.Unmarshal(version(` xsi:type="COMPOSITION"`, ""), new(rm.OriginalVersion[any]), canxml.WithStrict()); err != nil {
+			t.Errorf("canxml.Unmarshal(WithStrict) = %v; want nil: nothing in the plain version is unmatched", err)
+		}
+	})
+
+	for name, tc := range map[string]struct {
+		attrs string
+		want  error
+	}{
+		"missing xsi:type": {attrs: "", want: typereg.ErrMissingType},
+		"unknown xsi:type": {attrs: ` xsi:type="NO_SUCH_CLASS"`, want: typereg.ErrUnknownType},
+	} {
+		t.Run(name, func(t *testing.T) {
+			for mode, opts := range map[string][]canxml.DecoderOption{
+				"default": nil,
+				"report":  {canxml.WithUnmatched(func(string) {})},
+				"strict":  {canxml.WithStrict()},
+			} {
+				err := canxml.Unmarshal(version(tc.attrs, ""), new(rm.OriginalVersion[any]), opts...)
+				if !errors.Is(err, tc.want) {
+					t.Errorf("canxml.Unmarshal(%s) err = %v; want %v", mode, err, tc.want)
+				}
+			}
+		})
+	}
+
 	data := `<original_version ` + ucNS + `><data><name><value>c</value></name><x-ext>` + xmlPlanted + `</x-ext></data></original_version>`
 	const dataExt = "/original_version[1]/data[1]/x-ext[1]"
-	t.Run("ORIGINAL_VERSION<COMPOSITION>.data", func(t *testing.T) {
+	t.Run("ORIGINAL_VERSION<COMPOSITION>", func(t *testing.T) {
 		got, paths, err := unmarshalCollecting(func() any { return new(rm.OriginalVersion[rm.Composition]) }, []byte(data))
 		if err != nil {
 			t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
@@ -918,7 +955,7 @@ func TestREQ170_XMLMembersWithoutADecoder(t *testing.T) {
 			t.Errorf("WithUnmatched reported %q; want %q", paths, want)
 		}
 	})
-	t.Run("ORIGINAL_VERSION<*COMPOSITION>.data", func(t *testing.T) {
+	t.Run("ORIGINAL_VERSION<*COMPOSITION>", func(t *testing.T) {
 		got, paths, err := unmarshalCollecting(func() any { return new(rm.OriginalVersion[*rm.Composition]) }, []byte(data))
 		if err != nil {
 			t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
@@ -930,8 +967,208 @@ func TestREQ170_XMLMembersWithoutADecoder(t *testing.T) {
 			t.Errorf("WithUnmatched reported %q; want %q", paths, want)
 		}
 	})
+}
 
-	t.Run("enumeration value", func(t *testing.T) {
+// TestREQ056_XMLTerminologyCode pins the canonical-XML codec of the AOM 1.4
+// `ARCHETYPE.original_language`, a TERMINOLOGY_CODE. It reads the CODE_PHRASE
+// shape the AOM 1.4 ITS-XML schema gives the element, with the identifier in a
+// `value` child of `terminology_id`, and the plain text shape that mirrors
+// canonical JSON, both in the default mode; it writes the schema's shape,
+// which decodes back to the same value. The options see inside it like any
+// other content.
+func TestREQ056_XMLTerminologyCode(t *testing.T) {
+	archetype := func(lang string) []byte {
+		return []byte(`<archetype ` + ucNS + `><concept>at0000</concept>` + lang + `</archetype>`)
+	}
+	for name, lang := range map[string]string{
+		"schema shape": `<original_language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></original_language>`,
+		"text shape":   `<original_language><terminology_id>ISO_639-1</terminology_id><code_string>en</code_string></original_language>`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			var a aom14.Archetype
+			if err := canxml.Unmarshal(archetype(lang), &a, canxml.WithStrict()); err != nil {
+				t.Fatalf("canxml.Unmarshal(WithStrict) = %v; want nil", err)
+			}
+			if a.OriginalLanguage.TerminologyID != "ISO_639-1" || a.OriginalLanguage.CodeString != "en" {
+				t.Errorf("OriginalLanguage = %+v; want ISO_639-1::en", a.OriginalLanguage)
+			}
+		})
+	}
+
+	t.Run("round trip", func(t *testing.T) {
+		version, uri := "2026", "http://example.org/lang/en"
+		in := aom14.Archetype{Concept: "at0000", OriginalLanguage: rm.TerminologyCode{
+			TerminologyID: "ISO_639-1", CodeString: "en", TerminologyVersion: &version, URI: &uri,
+		}}
+		b, err := canxml.Marshal(&in)
+		if err != nil {
+			t.Fatalf("canxml.Marshal = %v", err)
+		}
+		if want := `<original_language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string>`; !strings.Contains(string(b), want) {
+			t.Errorf("canxml.Marshal wrote\n%s\nwant the schema's CODE_PHRASE shape %s", b, want)
+		}
+		var out aom14.Archetype
+		if err := canxml.Unmarshal(b, &out, canxml.WithStrict()); err != nil {
+			t.Fatalf("canxml.Unmarshal(own output, WithStrict) = %v; want nil", err)
+		}
+		if !reflect.DeepEqual(out.OriginalLanguage, in.OriginalLanguage) {
+			t.Errorf("round trip OriginalLanguage = %+v; want %+v", out.OriginalLanguage, in.OriginalLanguage)
+		}
+	})
+
+	t.Run("report and strict see inside", func(t *testing.T) {
+		in := archetype(`<original_language x-attr="` + xmlPlanted + `"><terminology_id><value>ISO_639-1</value><x-id>` + xmlPlanted + `</x-id></terminology_id>` +
+			`<code_string>en</code_string><x-ext>` + xmlPlanted + `</x-ext></original_language>`)
+		wantPaths := []string{
+			"/archetype[1]/original_language[1]/@x-attr",
+			"/archetype[1]/original_language[1]/terminology_id[1]/x-id[1]",
+			"/archetype[1]/original_language[1]/x-ext[1]",
+		}
+		want := new(aom14.Archetype)
+		if err := canxml.Unmarshal(in, want); err != nil {
+			t.Fatalf("canxml.Unmarshal = %v; want nil", err)
+		}
+		if want.OriginalLanguage.TerminologyID != "ISO_639-1" || want.OriginalLanguage.CodeString != "en" {
+			t.Errorf("OriginalLanguage = %+v; want ISO_639-1::en", want.OriginalLanguage)
+		}
+		got, paths, err := unmarshalCollecting(func() any { return new(aom14.Archetype) }, in)
+		if err != nil {
+			t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
+		}
+		if !slices.Equal(paths, wantPaths) {
+			t.Errorf("WithUnmatched reported %q; want %q", paths, wantPaths)
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("canxml.Unmarshal(WithUnmatched) decoded\n%#v\nwant the default's value\n%#v", got, want)
+		}
+		err = canxml.Unmarshal(in, new(aom14.Archetype), canxml.WithStrict())
+		assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, wantPaths[0], false)
+	})
+}
+
+// TestREQ056_XMLMultimediaBase64 pins DV_MULTIMEDIA's `data` and
+// `integrity_check`, Octet lists held as Go []byte, as one element of
+// standard base64 text each: the `xs:base64Binary` the ITS-XML schema gives
+// them, and the string canonical JSON writes for them (REQ-052).
+func TestREQ056_XMLMultimediaBase64(t *testing.T) {
+	media := `<media_type><terminology_id><value>IANA_media-types</value></terminology_id><code_string>text/plain</code_string></media_type>`
+	doc := func(data, check string) []byte {
+		return []byte(`<dv_multimedia ` + ucNS + `>` + data + media + check + `<size>5</size></dv_multimedia>`)
+	}
+	payload, digest := []byte("hello"), []byte{0xde, 0xad, 0xbe, 0xef}
+	in := doc(`<data>aGVsbG8=</data>`, `<integrity_check>3q2+7w==</integrity_check>`)
+
+	var fromXML rm.DVMultimedia
+	if err := canxml.Unmarshal(in, &fromXML, canxml.WithStrict()); err != nil {
+		t.Fatalf("canxml.Unmarshal(WithStrict) = %v; want nil", err)
+	}
+	if !bytes.Equal(fromXML.Data, payload) || !bytes.Equal(fromXML.IntegrityCheck, digest) {
+		t.Fatalf("decoded data %q, integrity_check %x; want %q and %x", fromXML.Data, fromXML.IntegrityCheck, payload, digest)
+	}
+
+	t.Run("round trip", func(t *testing.T) {
+		b, err := canxml.Marshal(&fromXML)
+		if err != nil {
+			t.Fatalf("canxml.Marshal = %v", err)
+		}
+		for _, want := range []string{"<data>aGVsbG8=</data>", "<integrity_check>3q2+7w==</integrity_check>"} {
+			if strings.Count(string(b), want) != 1 {
+				t.Errorf("canxml.Marshal wrote\n%s\nwant %s exactly once", b, want)
+			}
+		}
+		var again rm.DVMultimedia
+		if err := canxml.Unmarshal(b, &again, canxml.WithStrict()); err != nil {
+			t.Fatalf("canxml.Unmarshal(own output) = %v; want nil", err)
+		}
+		if !reflect.DeepEqual(again, fromXML) {
+			t.Errorf("decode, encode, decode gave\n%#v\nwant\n%#v", again, fromXML)
+		}
+	})
+
+	t.Run("canonical JSON parity", func(t *testing.T) {
+		js, err := canjson.Marshal(&fromXML)
+		if err != nil {
+			t.Fatalf("canjson.Marshal = %v", err)
+		}
+		var members map[string]any
+		if err := json.Unmarshal(js, &members); err != nil {
+			t.Fatalf("parse canonical JSON: %v", err)
+		}
+		if members["data"] != "aGVsbG8=" || members["integrity_check"] != "3q2+7w==" {
+			t.Errorf("canonical JSON data %v, integrity_check %v; want the base64 text canonical XML carries", members["data"], members["integrity_check"])
+		}
+		var fromJSON rm.DVMultimedia
+		if err := canjson.Unmarshal(js, &fromJSON); err != nil {
+			t.Fatalf("canjson.Unmarshal = %v", err)
+		}
+		x1, err1 := canxml.Marshal(&fromXML)
+		x2, err2 := canxml.Marshal(&fromJSON)
+		if err1 != nil || err2 != nil || !bytes.Equal(x1, x2) {
+			t.Errorf("canonical XML from the XML and the JSON decode differ (%v, %v):\n%s\n%s", err1, err2, x1, x2)
+		}
+	})
+
+	t.Run("whitespace in the base64 text", func(t *testing.T) {
+		var v rm.DVMultimedia
+		if err := canxml.Unmarshal(doc("<data>\n  aGVs\n  bG8=\n</data>", ""), &v); err != nil {
+			t.Fatalf("canxml.Unmarshal = %v; want nil", err)
+		}
+		if !bytes.Equal(v.Data, payload) {
+			t.Errorf("data = %q; want %q: XML whitespace inside xs:base64Binary is ignored", v.Data, payload)
+		}
+	})
+
+	t.Run("empty and absent", func(t *testing.T) {
+		var v rm.DVMultimedia
+		if err := canxml.Unmarshal(doc("<data/>", ""), &v); err != nil {
+			t.Fatalf("canxml.Unmarshal = %v; want nil", err)
+		}
+		if v.Data != nil {
+			t.Errorf("data = %q; want nil from an empty element", v.Data)
+		}
+		b, err := canxml.Marshal(&v)
+		if err != nil {
+			t.Fatalf("canxml.Marshal = %v", err)
+		}
+		if strings.Contains(string(b), "<data") || strings.Contains(string(b), "<integrity_check") {
+			t.Errorf("canxml.Marshal wrote\n%s\nwant no data or integrity_check element for empty bytes", b)
+		}
+	})
+
+	t.Run("not base64", func(t *testing.T) {
+		const bad = "@@@@"
+		err := canxml.Unmarshal(doc("<data>"+bad+"</data>", ""), new(rm.DVMultimedia))
+		if err == nil {
+			t.Fatal("canxml.Unmarshal(data not base64) = nil; want an error")
+		}
+		if strings.Contains(err.Error(), bad) {
+			t.Errorf("err = %q; it carries the element's text", err)
+		}
+	})
+
+	t.Run("report and strict", func(t *testing.T) {
+		withAttr := doc(`<data x-attr="`+xmlPlanted+`">aGVsbG8=</data>`, "")
+		const path = "/dv_multimedia[1]/data[1]/@x-attr"
+		got, paths, err := unmarshalCollecting(func() any { return new(rm.DVMultimedia) }, withAttr)
+		if err != nil {
+			t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
+		}
+		if want := []string{path}; !slices.Equal(paths, want) {
+			t.Errorf("WithUnmatched reported %q; want %q", paths, want)
+		}
+		if !bytes.Equal(got.(*rm.DVMultimedia).Data, payload) {
+			t.Errorf("WithUnmatched: data = %q; want %q", got.(*rm.DVMultimedia).Data, payload)
+		}
+		err = canxml.Unmarshal(withAttr, new(rm.DVMultimedia), canxml.WithStrict())
+		assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, path, false)
+	})
+}
+
+// TestREQ170_XMLEnumerationMembers pins an enumeration member (C_DATE's
+// `day_validity`), which decodes from its text like a primitive: its value is
+// read, and an attribute on it is unmatched like on any primitive.
+func TestREQ170_XMLEnumerationMembers(t *testing.T) {
+	t.Run("value", func(t *testing.T) {
 		var c aom14.CDate
 		in := []byte(`<c_date ` + ucNS + `><day_validity>optional</day_validity></c_date>`)
 		if err := canxml.Unmarshal(in, &c, canxml.WithStrict()); err != nil {
@@ -940,6 +1177,26 @@ func TestREQ170_XMLMembersWithoutADecoder(t *testing.T) {
 		if c.DayValidity == nil || string(*c.DayValidity) != "optional" {
 			t.Errorf("DayValidity = %v; want \"optional\" read from the element's text", c.DayValidity)
 		}
+	})
+	t.Run("attribute", func(t *testing.T) {
+		in := []byte(`<c_date ` + ucNS + `><day_validity x-attr="` + xmlPlanted + `">optional</day_validity></c_date>`)
+		const path = "/c_date[1]/day_validity[1]/@x-attr"
+		want := new(aom14.CDate)
+		if err := canxml.Unmarshal(in, want); err != nil {
+			t.Fatalf("canxml.Unmarshal = %v; want nil", err)
+		}
+		got, paths, err := unmarshalCollecting(func() any { return new(aom14.CDate) }, in)
+		if err != nil {
+			t.Fatalf("canxml.Unmarshal(WithUnmatched) = %v; want nil", err)
+		}
+		if want := []string{path}; !slices.Equal(paths, want) {
+			t.Errorf("WithUnmatched reported %q; want %q", paths, want)
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("canxml.Unmarshal(WithUnmatched) decoded\n%#v\nwant the default's value\n%#v", got, want)
+		}
+		err = canxml.Unmarshal(in, new(aom14.CDate), canxml.WithStrict())
+		assertXMLStrictRefusal(t, "canxml.Unmarshal(WithStrict)", err, path, false)
 	})
 }
 
@@ -1158,37 +1415,39 @@ func TestREQ170_XMLRegisteredTypeCensus(t *testing.T) {
 	}
 }
 
-// xmlCorpusExcluded names the corpus documents the codec cannot decode in any
-// mode, with the reason. Each fails on a defect outside REQ-170, so it says
-// nothing about unmatched content.
-var xmlCorpusExcluded = map[string]string{
-	"compositions/Demonstration.v1.xml":        "DV_MULTIMEDIA `data` (base64 text) does not decode: a known codec defect outside REQ-170",
-	"compositions/TestPerson.v2.xml":           "DV_MULTIMEDIA `data` (base64 text) does not decode: a known codec defect outside REQ-170",
-	"crossformat/consult_record/canonical.xml": "DV_MULTIMEDIA `data` (base64 text) does not decode: a known codec defect outside REQ-170",
-}
-
 // xmlCorpusUnmatched is every unmatched item the vendored canonical-XML
-// corpus carries, by document. The EHRbase family-history export writes the
-// values of ARCHETYPE_ID's functions (`qualifiedRmEntity`, `domainConcept`,
-// …) as child elements; ARCHETYPE_ID declares only `value` as an attribute
-// in the pinned BASE schema, so each is unmatched. The corpus is vendored
-// as-is, so the test pins the set rather than editing the documents.
+// corpus carries, by document. The EHRbase exports write the values of
+// ARCHETYPE_ID's functions (`qualifiedRmEntity`, `domainConcept`, …) as child
+// elements of each `archetype_id`; ARCHETYPE_ID declares only `value` as an
+// attribute in the pinned BASE schema, so each is unmatched. The corpus is
+// vendored as-is, so the test pins the set rather than editing the documents.
 var xmlCorpusUnmatched = func() map[string][]string {
 	derived := []string{"qualifiedRmEntity", "domainConcept", "rmOriginator", "rmName", "rmEntity", "versionId"}
-	var paths []string
-	for _, owner := range []string{"/composition[1]/archetype_details[1]/archetype_id[1]", "/composition[1]/content[1]/archetype_details[1]/archetype_id[1]"} {
-		for _, d := range derived {
-			paths = append(paths, owner+"/"+d+"[1]")
+	under := func(owners ...string) []string {
+		var paths []string
+		for _, owner := range owners {
+			for _, d := range derived {
+				paths = append(paths, owner+"/archetype_details[1]/archetype_id[1]/"+d+"[1]")
+			}
 		}
+		return paths
 	}
-	return map[string][]string{"crossformat/family_history/canonical.xml": paths}
+	return map[string][]string{
+		"crossformat/family_history/canonical.xml": under("/composition[1]", "/composition[1]/content[1]"),
+		"crossformat/consult_record/canonical.xml": under(
+			"/composition[1]",
+			"/composition[1]/context[1]/other_context[1]/items[1]",
+			"/composition[1]/content[1]",
+			"/composition[1]/content[1]/data[1]/items[3]",
+		),
+	}
 }()
 
 // TestREQ170_XMLCorpusUnderReportAndStrict decodes every canonical-XML
-// document of the corpus (compositions/, rm/ and the cross-format sets) with
-// the report option and pins the exact set of unmatched items
-// (xmlCorpusUnmatched). Every other document decodes under strict; each
-// pinned one is refused at its first item.
+// document of the corpus (compositions/, rm/ and the cross-format sets), by
+// default and with the report option, and pins the exact set of unmatched
+// items (xmlCorpusUnmatched). Every other document decodes under strict; each
+// pinned one is refused at its first item. No document is skipped.
 func TestREQ170_XMLCorpusUnderReportAndStrict(t *testing.T) {
 	root := fixtures.CorpusRoot()
 	var rels []string
@@ -1217,9 +1476,6 @@ func TestREQ170_XMLCorpusUnderReportAndStrict(t *testing.T) {
 	for _, rel := range rels {
 		t.Run(rel, func(t *testing.T) {
 			seen[rel] = true
-			if reason, ok := xmlCorpusExcluded[rel]; ok {
-				t.Skip(reason)
-			}
 			body, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
 			if err != nil {
 				t.Fatal(err)
@@ -1227,6 +1483,9 @@ func TestREQ170_XMLCorpusUnderReportAndStrict(t *testing.T) {
 			factory, ok := fixtures.FactoryForXMLBody(body)
 			if !ok {
 				t.Fatalf("no factory for the root element of %s", rel)
+			}
+			if err := canxml.Unmarshal(body, factory()); err != nil {
+				t.Fatalf("canxml.Unmarshal = %v; want nil: every corpus document decodes by default", err)
 			}
 			_, got, err := unmarshalCollecting(factory, body)
 			if err != nil {
@@ -1249,11 +1508,6 @@ func TestREQ170_XMLCorpusUnderReportAndStrict(t *testing.T) {
 	for rel := range xmlCorpusUnmatched {
 		if !seen[rel] {
 			t.Errorf("xmlCorpusUnmatched pins %s, which the corpus no longer holds: remove the entry", rel)
-		}
-	}
-	for rel := range xmlCorpusExcluded {
-		if !seen[rel] {
-			t.Errorf("xmlCorpusExcluded names %s, which the corpus no longer holds: remove the entry", rel)
 		}
 	}
 }

@@ -37,8 +37,7 @@ func (a *Archetype) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 		case xml.StartElement:
 			switch xmlunmatched.LocalName(_t.Name) {
 			case "original_language":
-				// Canonical XML has no decoder for Terminology_code — see canxml/doc.go.
-				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
+				if _err := _dec.DecodeElement(&a.OriginalLanguage, &_t); _err != nil {
 					return _err
 				}
 			case "description":

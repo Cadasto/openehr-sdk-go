@@ -57,6 +57,17 @@
 //   - `xmi:type` is rejected on decode with [ErrInvalidShape]; only
 //     `xsi:type` is recognised (openEHR ITS-XML uses XMI in UML
 //     diagrams, not on the wire).
+//   - An Octet list, DV_MULTIMEDIA's `data` and `integrity_check`, is one
+//     element of standard base64 text, the `xs:base64Binary` the ITS-XML
+//     schema gives it and the string canonical JSON writes; XML
+//     whitespace inside the text is ignored on decode.
+//   - The AOM 1.4 `original_language`, a TERMINOLOGY_CODE, is written in
+//     the CODE_PHRASE shape the AOM 1.4 ITS-XML schema gives it, with the
+//     terminology identifier in a `value` child of `terminology_id`;
+//     decode also reads a plain text `terminology_id`.
+//   - A member typed by a generic parameter that is instantiated with an
+//     interface, such as the `data` of ORIGINAL_VERSION<any>, is a
+//     polymorphic site and needs `xsi:type`.
 //
 // # Strict vs relaxed type dispatch
 //
@@ -160,12 +171,9 @@
 // Nor can the codec decode the content of a BMM `Any` attribute, held as
 // a Go empty interface: the AOM 1.4 `assumed_value` and `EXPR_LEAF.item`.
 // Decode treats such an element the same way, as one item of unmatched
-// content, and leaves the field at its zero value. So it does for a
-// member whose Go type has no canonical-XML decoder of its own, such as
-// the AOM 1.4 `ARCHETYPE.original_language` (a TERMINOLOGY_CODE) and the
-// `data` of a version whose content type is an interface, such as
-// ORIGINAL_VERSION<any>: the report option and strict see that element as
-// one item.
+// content, and leaves the field at its zero value. So it would for a
+// member whose Go type has no canonical-XML decoder of its own; every
+// member of the RM and AOM 1.4 types has one.
 //
 // The canjson codec is unaffected (encoding/json handles maps).
 //

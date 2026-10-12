@@ -52,10 +52,13 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 			}
 		}
 	}
+	for name := range handWrittenXMLCodecs {
+		withDecoder[name] = true
+	}
 
 	for _, target := range []Target{TargetRM, TargetAOM14} {
 		plan := plans[target.GoPackage]
-		hashes, anys, params := 0, 0, 0
+		hashes, anys, params, octets := 0, 0, 0, 0
 		for _, f := range plan.Files {
 			classes, err := codecClassesIn(plan, f)
 			if err != nil {
@@ -95,12 +98,17 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 							t.Errorf("%s.%s is an Any member; its arm must hand the element to xmlunmatched.SkipUnmatched as one item and decode nothing:\n%s", pc.BMMName, prop, arm)
 						}
 					case isOpenParamProperty(ef):
-						if strings.Contains(arm, "canxml.DecodeAs") {
-							continue // a polymorphic slot, dispatched by xsi:type
+						if strings.Contains(arm, "_err := canxml.DecodeAs[") {
+							continue // a polymorphic slot by its bound, dispatched by xsi:type
 						}
 						params++
-						if !strings.Contains(arm, "xmlunmatched.DecodeParam(") {
-							t.Errorf("%s.%s is typed by a generic parameter; its arm must decode through xmlunmatched.DecodeParam, which chooses by the instantiation:\n%s", pc.BMMName, prop, arm)
+						if !strings.Contains(arm, "xmlunmatched.DecodeParam(") || !strings.Contains(arm, ", canxml.DecodeAs[") {
+							t.Errorf("%s.%s is typed by a generic parameter; its arm must decode through xmlunmatched.DecodeParam, which chooses by the instantiation, with canxml.DecodeAs to dispatch an interface:\n%s", pc.BMMName, prop, arm)
+						}
+					case isOctetProperty(ef.Prop):
+						octets++
+						if !strings.Contains(arm, "xmlunmatched.DecodeBase64(") {
+							t.Errorf("%s.%s is an Octet list, one xs:base64Binary element; its arm must decode through xmlunmatched.DecodeBase64:\n%s", pc.BMMName, prop, arm)
 						}
 					case strings.Contains(arm, "xmlunmatched.DecodeElement("):
 						if name := decodedClassName(ef.Prop); !isPrimitive(name) && !isEnumerationClass(plan, name) {
@@ -114,8 +122,8 @@ func TestREQ170_RenderUnmarshalXMLRoutesUnmatchedContent(t *testing.T) {
 				}
 			}
 		}
-		if target.GoPackage == TargetRM.GoPackage && (hashes == 0 || params == 0) {
-			t.Errorf("the RM target rendered %d Hash arms and %d generic-parameter arms; want the resource-metadata Hash members and VERSION<T>.data covered", hashes, params)
+		if target.GoPackage == TargetRM.GoPackage && (hashes == 0 || params == 0 || octets == 0) {
+			t.Errorf("the RM target rendered %d Hash arms, %d generic-parameter arms and %d Octet arms; want the resource-metadata Hash members, VERSION<T>.data and DV_MULTIMEDIA.data covered", hashes, params, octets)
 		}
 		if target.GoPackage == TargetAOM14.GoPackage && anys == 0 {
 			t.Errorf("the AOM 1.4 target rendered no Any arm; want `assumed_value` and `EXPR_LEAF.item` covered")
@@ -171,6 +179,59 @@ func isOpenParamProperty(ef emittedField) bool {
 		return isOpenParam(ef.Owner, containerInnerName(p.TypeDef))
 	}
 	return false
+}
+
+// isOctetProperty reports whether prop is a container of the BMM primitive
+// Octet, held as a Go []byte.
+func isOctetProperty(prop bmm.Property) bool {
+	p, ok := prop.(*bmm.ContainerProperty)
+	return ok && isOctetContainer(p.TypeDef)
+}
+
+// TestREQ056_RenderMarshalXMLOctetListAsBase64 pins that every Octet list the
+// targets encode (DV_MULTIMEDIA's `data` and `integrity_check`) is written as
+// one element of base64 text, the xs:base64Binary of the ITS-XML schema,
+// and never one element per byte.
+func TestREQ056_RenderMarshalXMLOctetListAsBase64(t *testing.T) {
+	octets := 0
+	for _, target := range []Target{TargetRM, TargetAOM14} {
+		plan, err := BuildPlanForTarget(context.Background(), target, bmm.FSResolver{Root: testResources})
+		if err != nil {
+			t.Fatalf("BuildPlanForTarget: %v", err)
+		}
+		for _, f := range plan.Files {
+			classes, err := codecClassesIn(plan, f)
+			if err != nil {
+				t.Fatalf("codecClassesIn(%s): %v", f.FileBase, err)
+			}
+			for _, pc := range classes {
+				fields, err := effectiveFields(plan, pc)
+				if err != nil {
+					t.Fatalf("effectiveFields(%s): %v", pc.BMMName, err)
+				}
+				src, err := renderMarshalXML(plan, pc, fields)
+				if err != nil {
+					t.Fatalf("renderMarshalXML(%s): %v", pc.BMMName, err)
+				}
+				for _, ef := range fields {
+					if !isOctetProperty(ef.Prop) {
+						continue
+					}
+					octets++
+					field := FieldName(ef.Prop.PropertyName())
+					if want := "base64.StdEncoding.EncodeToString(" + jsonmarReceiverName(pc.GoName) + "." + field + ")"; !strings.Contains(src, want) {
+						t.Errorf("%s.%s encoder lacks %q: an Octet list is one base64 element:\n%s", pc.BMMName, ef.Prop.PropertyName(), want, src)
+					}
+					if strings.Contains(src, "range "+jsonmarReceiverName(pc.GoName)+"."+field+" ") {
+						t.Errorf("%s.%s encoder writes one element per byte:\n%s", pc.BMMName, ef.Prop.PropertyName(), src)
+					}
+				}
+			}
+		}
+	}
+	if octets == 0 {
+		t.Error("no Octet list found; want DV_MULTIMEDIA's data and integrity_check covered")
+	}
 }
 
 // isEnumerationClass reports whether the BMM class name is an enumeration,
