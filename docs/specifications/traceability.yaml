@@ -456,6 +456,7 @@ requirements:
       - openehr/serialize/canjson/typednil_slot_test.go
       - openehr/serialize/canjson/unmatched_test.go
       - openehr/serialize/canxml/interval_open_side_test.go
+      - openehr/serialize/canxml/unmatched_test.go
       - openehr/templatecompile/external_test.go
       - openehr/validation/interval_bounds_test.go
       - openehr/validation/noncomposition_test.go
@@ -2048,7 +2049,6 @@ requirements:
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/hardening_test.go
       - openehr/serialize/simplified/index_bound_test.go
-      - openehr/serialize/simplified/metadata_index_test.go
       - openehr/serialize/simplified/rmattr_encapsulated_test.go
       - openehr/serialize/simplified/rmattr_feeder_test.go
       - openehr/serialize/simplified/rmattr_party_test.go
