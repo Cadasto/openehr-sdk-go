@@ -110,18 +110,19 @@ func (w *walker) walkNode(optNode *tcimpl.CompiledNode, rmValue any, path string
 
 // walkSingleAttribute enforces existence on a C_SINGLE_ATTRIBUTE
 // (an attribute the OPT prohibits that holds a value is reported as
-// prohibited and not walked into) and binds the RM value to one of
-// attr.Children() via the AOM 1.4
+// prohibited and not walked into, [isProhibited]) and binds the RM value to
+// one of the children the OPT allows ([allowedChildren]; a child that is
+// not allowed binds no value) via the AOM 1.4
 // "one alternative MUST match" semantics, by [bindByRMType]: the most
 // specific child wins, a child of the value's own RM type before the
 // AOM 1.4 short name it wraps, and that before a child the type only
 // conforms to in the pinned BMM, or a typed DV_INTERVAL<T> child for an
 // interval each present bound of which conforms to T. When none match
 // the walker emits a typed issue:
-//   - exactly one child → `rm_type_mismatch` (plain type constraint,
-//     no real alternatives);
-//   - two or more children → `alternative_mismatch` with the list
-//     of allowed RM types.
+//   - exactly one allowed child → `rm_type_mismatch` (plain type
+//     constraint, no real alternatives);
+//   - two or more allowed children → `alternative_mismatch` with the
+//     list of their RM types.
 func (w *walker) walkSingleAttribute(
 	opt *tcimpl.CompiledNode,
 	attr *tcimpl.CompiledAttribute,
@@ -150,7 +151,9 @@ func (w *walker) walkSingleAttribute(
 		w.emitProhibited(attr, parentRM, attrPath)
 		return
 	}
-	children := attr.Children()
+	// A child the OPT does not allow binds no value; the attribute is
+	// prohibited, above, when it allows none.
+	children := allowedChildren(attr)
 	if len(children) == 0 {
 		// No OPT children → no structural constraint; primitive
 		// constraints fire when walkNode reaches a primitive leaf.
@@ -624,23 +627,47 @@ func requiredBy(attr *tcimpl.CompiledAttribute) (layer Layer, rule string, requi
 }
 
 // isProhibited reports whether the OPT prohibits the compiled attribute:
-// its existence interval has a bounded upper bound of 0.
+// its existence interval has a bounded upper bound of 0, or it declares at
+// least one child and allows none of them ([isAllowed]). An attribute with
+// no child is open, not prohibited.
 func isProhibited(attr *tcimpl.CompiledAttribute) bool {
-	e := attr.Existence()
-	return e != nil && !e.UpperUnbounded() && e.Upper() == 0
+	if e := attr.Existence(); e != nil && !e.UpperUnbounded() && e.Upper() == 0 {
+		return true
+	}
+	children := attr.Children()
+	return len(children) > 0 && !slices.ContainsFunc(children, isAllowed)
+}
+
+// isAllowed reports whether the OPT allows the child: its occurrences
+// upper bound is unbounded, or bounded above 0, or it states none.
+func isAllowed(child *tcimpl.CompiledNode) bool {
+	occ := child.Occurrences()
+	return occ == nil || occ.UpperUnbounded() || occ.Upper() != 0
+}
+
+// allowedChildren returns the children of attr the OPT allows
+// ([isAllowed]), in OPT order.
+func allowedChildren(attr *tcimpl.CompiledAttribute) []*tcimpl.CompiledNode {
+	// Children returns a copy, so deleting from it leaves attr as it is.
+	return slices.DeleteFunc(attr.Children(), func(c *tcimpl.CompiledNode) bool { return !isAllowed(c) })
 }
 
 // emitProhibited reports the attribute attr, which the OPT prohibits, as
 // present on parentRM, at attrPath. The caller then leaves the attribute:
 // the walk checks nothing more on it and does not descend into it. The
-// Detail names the attribute and the parent's RM type, never the value.
+// Detail names the attribute, the parent's RM type and how the template
+// prohibits it, never the value.
 func (w *walker) emitProhibited(attr *tcimpl.CompiledAttribute, parentRM any, attrPath string) {
+	how := "it allows none of the attribute's children"
+	if e := attr.Existence(); e != nil && !e.UpperUnbounded() && e.Upper() == 0 {
+		how = "existence " + formatInterval(e)
+	}
 	w.emit(Issue{
 		Path:     attrPath,
 		Code:     "prohibited",
 		Layer:    LayerTemplate,
 		Rule:     ruleExistence,
-		Detail:   fmt.Sprintf("attribute %q is present on %s, but the template prohibits it (existence %s)", attr.Name(), describeRMType(parentRM), formatInterval(attr.Existence())),
+		Detail:   fmt.Sprintf("attribute %q is present on %s, but the template prohibits it (%s)", attr.Name(), describeRMType(parentRM), how),
 		Severity: Error,
 	})
 }

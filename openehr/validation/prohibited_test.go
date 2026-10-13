@@ -200,3 +200,154 @@ func TestValidate_REQ102_REQ171_ProhibitedAttribute(t *testing.T) {
 		})
 	}
 }
+
+// notAllowedChild is an OPT child of RM type rmType that occurs
+// lower..upper times, with no constraint of its own.
+func notAllowedChild(rmType, lower, upper string) string {
+	return `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>` + rmType + `</rm_type_name>` +
+		`<occurrences>` + fiInterval(lower, upper) + `</occurrences><node_id></node_id></children>`
+}
+
+// textInList is an OPT child DV_TEXT, occurring 0..1 times, whose value
+// must be "allowed".
+const textInList = `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>DV_TEXT</rm_type_name>` +
+	`<occurrences>` + `<lower_included>true</lower_included><upper_included>true</upper_included>` +
+	`<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>0</lower><upper>1</upper>` +
+	`</occurrences><node_id></node_id>` +
+	`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>value</rm_attribute_name>` +
+	`<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>STRING</rm_type_name><node_id></node_id>` +
+	`<item xsi:type="C_STRING"><list>allowed</list></item></children></attributes></children>`
+
+// notAllowedArchetype is the archetype of the root of notAllowedItemsOPT.
+const notAllowedArchetype = "openEHR-EHR-CLUSTER.not_allowed.v1"
+
+// notAllowedItemsOPT returns a CLUSTER template whose items attribute holds
+// the given children and no bound on its count.
+func notAllowedItemsOPT(children ...string) string {
+	return `<?xml version="1.0" encoding="utf-8"?>
+<template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.openehr.org/v1">
+<language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
+<template_id><value>not_allowed</value></template_id><concept>not_allowed</concept>
+<definition><rm_type_name>CLUSTER</rm_type_name><node_id>at0000</node_id>
+<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>items</rm_attribute_name>` + strings.Join(children, "") + `
+<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval>` + unboundedFromZero + `</interval></cardinality>
+</attributes>
+<archetype_id><value>` + notAllowedArchetype + `</value></archetype_id></definition>
+</template>`
+}
+
+// REQ-102 § Structural — prohibited attributes — an OPT child whose
+// occurrences upper bound is 0 is not allowed, and an attribute all of whose
+// children are not allowed is prohibited: present, it draws one `prohibited`
+// at its path and nothing from inside. Under a single-valued attribute a
+// child that is not allowed binds no value: the value binds among the
+// allowed children, or fails as rm_type_mismatch when one is allowed and
+// alternative_mismatch when several are, whose Detail lists the allowed
+// ones alone. A multi-valued attribute with some children allowed binds its
+// items as before, and the occurrences check reports an item bound to a
+// child that is not allowed. An attribute with no children prohibits
+// nothing.
+func TestValidate_REQ102_REQ171_AttributeWithNoAllowedChild(t *testing.T) {
+	t.Parallel()
+	coded := &rm.DVCodedText{Value: "coded", DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "local"}, CodeString: "at0001"}}
+	element := func(nodeID string) *rm.Element {
+		return &rm.Element{ArchetypeNodeID: nodeID, Name: &rm.DVText{Value: "element"}, Value: &rm.DVText{Value: "text"}}
+	}
+	cluster := func(items ...rm.Item) *rm.Cluster {
+		return &rm.Cluster{ArchetypeNodeID: notAllowedArchetype, Name: &rm.DVText{Value: "cluster"}, Items: items}
+	}
+	tests := []struct {
+		name   string
+		root   any
+		opt    string
+		want   []string // the whole template-layer report
+		detail string   // a substring the one issue's Detail carries, or ""
+		absent string   // a substring that Detail must not carry, or ""
+	}{
+		{
+			name: "single-valued, its one child not allowed, holding a value",
+			root: valueElement(&rm.DVText{Value: "text"}),
+			opt:  elementValueOPT(notAllowedChild("DV_TEXT", "0", "0")),
+			want: []string{"prohibited /value template existence"},
+		},
+		{
+			name:   "single-valued, the value's own type not allowed, one other child",
+			root:   valueElement(&rm.DVText{Value: "text"}),
+			opt:    elementValueOPT(notAllowedChild("DV_TEXT", "0", "0"), notAllowedChild("DV_CODED_TEXT", "0", "1")),
+			want:   []string{"rm_type_mismatch /value template type"},
+			detail: "template RM type DV_CODED_TEXT",
+		},
+		{
+			name:   "single-valued, the value's own type not allowed, two other children",
+			root:   valueElement(&rm.DVText{Value: "text"}),
+			opt:    elementValueOPT(notAllowedChild("DV_TEXT", "0", "0"), notAllowedChild("DV_CODED_TEXT", "0", "1"), notAllowedChild("DV_QUANTITY", "0", "1")),
+			want:   []string{"alternative_mismatch /value template type"},
+			detail: "[DV_CODED_TEXT, DV_QUANTITY]",
+			absent: "DV_TEXT,",
+		},
+		{
+			name: "single-valued, binding the allowed child",
+			root: valueElement(coded),
+			opt:  elementValueOPT(notAllowedChild("DV_TEXT", "0", "0"), notAllowedChild("DV_CODED_TEXT", "0", "1")),
+		},
+		{
+			name: "single-valued, the exact child not allowed, a looser child allowed",
+			root: valueElement(coded),
+			// The DV_CODED_TEXT binds the DV_TEXT child it conforms to,
+			// whose value constraint it then fails.
+			opt:  elementValueOPT(notAllowedChild("DV_CODED_TEXT", "0", "0"), textInList),
+			want: []string{"primitive_not_in_list /value/value template not_in_list"},
+		},
+		{
+			name: "single-valued, its one child not allowed, holding nothing",
+			root: valueElement(nil),
+			opt:  elementValueOPT(notAllowedChild("DV_TEXT", "0", "0")),
+		},
+		{
+			name: "multi-valued, every child not allowed, holding an item",
+			root: cluster(element("at0001")),
+			opt:  notAllowedItemsOPT(fiElement("at0001", "0", "0", "", "DV_TEXT"), fiElement("at0002", "0", "0", "", "DV_TEXT")),
+			want: []string{"prohibited /items template existence"},
+		},
+		{
+			name: "multi-valued, every child not allowed, holding no item",
+			root: cluster(),
+			opt:  notAllowedItemsOPT(fiElement("at0001", "0", "0", "", "DV_TEXT")),
+		},
+		{
+			name: "multi-valued, one child allowed, an item bound to the other",
+			root: cluster(element("at0001")),
+			opt:  notAllowedItemsOPT(fiElement("at0001", "0", "0", "", "DV_TEXT"), fiElement("at0002", "0", "1", "", "DV_TEXT")),
+			want: []string{"cardinality /items[at0001] template occurrences"},
+		},
+		{
+			name: "multi-valued, no child at all, holding an item",
+			root: cluster(element("at0001")),
+			opt:  notAllowedItemsOPT(),
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			r := validation.Validate(tc.root, mustCompileInline(t, tc.opt))
+			if got := templateIssues(r); !slices.Equal(got, tc.want) {
+				t.Errorf("Validate(%s) template issues = %q, want %q (REQ-102 § Structural — prohibited attributes)", tc.name, got, tc.want)
+			}
+			if len(tc.want) > 0 && r.OK {
+				t.Errorf("Validate(%s).OK = true, want false: a template issue is an error", tc.name)
+			}
+			for _, i := range r.Issues {
+				if i.Layer != validation.LayerTemplate {
+					continue
+				}
+				if tc.detail != "" && !strings.Contains(i.Detail, tc.detail) {
+					t.Errorf("Validate(%s) %s Detail %q does not carry %q", tc.name, i.Code, i.Detail, tc.detail)
+				}
+				if tc.absent != "" && strings.Contains(i.Detail, tc.absent) {
+					t.Errorf("Validate(%s) %s Detail %q carries %q, a child that is not allowed", tc.name, i.Code, i.Detail, tc.absent)
+				}
+			}
+			assertIdentities(t, "Validate("+tc.name+")", r, mustBMMInvariants(t))
+		})
+	}
+}
