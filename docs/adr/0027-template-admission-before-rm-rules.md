@@ -25,7 +25,7 @@ Three things follow from that shape, and none of them is a bug in the implementa
 - The join sees only an exact code at an exact path, so one defect named under two codes is reported twice. An empty mandatory list is the recorded case: `required` from the template walk, `cardinality` from the floor, at one path.
 - A finding does not say which layer produced it, and `rm_invariant` is one label for several rules. A server that wants to warn on template findings and reject on RM findings cannot tell them apart in one result, and a caller who needs the rule has to read `Detail`, which the package tells it not to do.
 
-Archie and FerroEHR, two independent implementations, each converged on one cascade with the template as an overlay on the RM rules. EHRbase runs two stages because it reuses Archie as a black box, and it stops after RM failures, so a user sees template failures only on a second attempt. The SDK's collect-all is the better property to keep.
+Archie, the openEHR Java reference library, checks the RM rules and the template in one walk over the instance, applying a template constraint wherever one exists. EHRbase runs the RM check and the template check as two stages, the second when the first finds nothing. The SDK keeps collect-all: one run reports every problem, whichever layer finds it.
 
 The fork is irreversible for a consumer, not for the code. The set of issues a result carries is what consumers pin: the conformance probes hold issue-code multisets, and a server's validation policy is built on what a finding says about itself. Taking refused content out of the result changes that set for every consumer at once.
 
