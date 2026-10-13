@@ -390,6 +390,8 @@ Existence and child-count cardinality are **independent constraints**: a multi-v
 - `[atNNNN, 'name']` when another item shares the id and the OPT node the item binds to pins a name ([REQ-116](#req-116--template-level-node-naming-and-name-predicated-paths)) that tells it apart, the name single-quoted with `'` and `\` escaped by a backslash;
 - `[n]`, the item's 1-based position in the attribute, in every other case: an item with no `archetype_node_id`, or one whose id is shared and whose OPT node pins no telling name.
 
+An entry of a hash attribute ([§ REQ-171 *Structural access*](#req-171--validation-engine)) **MUST** be written `[n]`, its 1-based position in ascending key order, and its key **MUST NOT** be written: a key is instance data, and the quoted-key form ODIN shows in its examples (`["en"]`) would carry it into the path.
+
 A node the OPT requires and the instance lacks is written with the OPT child's own predicate, since no item exists to number; a child that declares no id has none and is written at the attribute's path. The floor binds no OPT node, so on its own it never writes a name predicate; where it runs inside a template-driven validation, it takes the names from that validation's bindings, so both report one node by one path.
 
 A path **MUST NOT** carry a value from the instance ([REQ-168](#req-168--value-free-validation-diagnostics)): a name predicate is always a name the OPT pins, never the instance's own `name`. A path with no positional predicate is a valid AQL path; the AQL grammar has no positional predicate, so one with `[n]` is an openEHR path but not AQL.
