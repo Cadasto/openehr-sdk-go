@@ -45,7 +45,10 @@ func NewStaticCatalog(cfg StaticConfig) (*ServiceCatalog, error) {
 		return nil, &DiscoveryError{Reason: ReasonParseError, Inner: errors.New("StaticConfig.Issuer is required")}
 	}
 	baseURL := cmp.Or(cfg.BaseURL, cfg.Issuer)
-	for id, e := range cfg.Services {
+	// cfg.Services is the caller's map, possibly shared between goroutines:
+	// read it once into a copy and set IDs on the copy only.
+	services := cloneServices(cfg.Services)
+	for id, e := range services {
 		if e.BaseURL == nil {
 			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: fmt.Errorf("service %q has nil BaseURL", id)}
 		}
@@ -53,12 +56,12 @@ func NewStaticCatalog(cfg StaticConfig) (*ServiceCatalog, error) {
 			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: fmt.Errorf("service %q BaseURL %q is not absolute", id, e.BaseURL.String())}
 		}
 		e.ID = id
-		cfg.Services[id] = e
+		services[id] = e
 	}
 	return &ServiceCatalog{
 		BaseURL:    baseURL,
 		Issuer:     cfg.Issuer,
-		Services:   cloneServices(cfg.Services),
+		Services:   services,
 		Auth:       cfg.Auth,
 		ResolvedAt: time.Now(),
 		ExpiresAt:  cfg.ExpiresAt,
