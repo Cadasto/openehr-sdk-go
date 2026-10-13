@@ -63,6 +63,12 @@ func (w *walker) walkNode(optNode *tcimpl.CompiledNode, rmValue any, path string
 	if pc := optNode.PrimitiveConstraint(); pc != nil && tcimpl.IsAOMPrimitiveShortName(optNode.RMTypeName()) {
 		if primitiveValueMatchesShortName(optNode.RMTypeName(), rmValue) {
 			w.applyPrimitive(optNode, rmValue, path, pc)
+			// A scalar has no attributes to walk, but a CONSTRAINT_REF
+			// on it is still a value set checked nowhere, so the
+			// coverage names it as below.
+			if _, isRef := pc.(constraints.ConstraintRef); isRef {
+				w.external = append(w.external, path)
+			}
 			return
 		}
 	}

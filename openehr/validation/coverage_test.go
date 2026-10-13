@@ -86,10 +86,46 @@ const constraintRefValueChild = `
         </attributes>
       </children>`
 
+// constraintRefStringChild and constraintRefWrappedChild are an ELEMENT value
+// child DV_TEXT whose value, a STRING, is a CONSTRAINT_REF: once directly and
+// once inside a C_PRIMITIVE_OBJECT, both of which compile to a leaf on the
+// AOM primitive short name STRING.
+const (
+	constraintRefStringChild = `
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>DV_TEXT</rm_type_name>
+        <node_id></node_id>
+        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+          <rm_attribute_name>value</rm_attribute_name>
+          <children xsi:type="CONSTRAINT_REF">
+            <rm_type_name>STRING</rm_type_name>
+            <node_id></node_id>
+            <reference>ac0001</reference>
+          </children>
+        </attributes>
+      </children>`
+	constraintRefWrappedChild = `
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>DV_TEXT</rm_type_name>
+        <node_id></node_id>
+        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+          <rm_attribute_name>value</rm_attribute_name>
+          <children xsi:type="C_PRIMITIVE_OBJECT">
+            <rm_type_name>STRING</rm_type_name>
+            <node_id></node_id>
+            <item xsi:type="CONSTRAINT_REF">
+              <reference>ac0001</reference>
+            </item>
+          </children>
+        </attributes>
+      </children>`
+)
+
 // REQ-171 § Coverage — a leaf the template binds to a CONSTRAINT_REF is listed
 // in Coverage.External at its issue path, and the result is not complete. The
 // same value under a C_CODE_PHRASE, which the validator checks locally, is
-// listed nowhere. In the Demonstration.v1 corpus composition the leaf the
+// listed nowhere. A CONSTRAINT_REF on a primitive short name is listed
+// too. In the Demonstration.v1 corpus composition the leaf the
 // CONSTRAINT_REF walk test breaks is among those listed. The floor alone
 // binds no template, so it lists nothing external.
 func TestValidator_REQ171_ExternalListsConstraintRefLeaves(t *testing.T) {
@@ -104,6 +140,8 @@ func TestValidator_REQ171_ExternalListsConstraintRefLeaves(t *testing.T) {
 	}{
 		{name: "CONSTRAINT_REF", opt: elementValueOPT(constraintRefValueChild), want: []string{"/value/defining_code"}},
 		{name: "C_CODE_PHRASE", opt: elementValueOPT(externalCodeChild)},
+		{name: "CONSTRAINT_REF on STRING", opt: elementValueOPT(constraintRefStringChild), want: []string{"/value/value"}},
+		{name: "CONSTRAINT_REF in C_PRIMITIVE_OBJECT", opt: elementValueOPT(constraintRefWrappedChild), want: []string{"/value/value"}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
