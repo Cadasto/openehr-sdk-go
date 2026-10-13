@@ -342,17 +342,9 @@ func TestCoalescedWaiterWhoseContextEndsAsStarterPanicsDoesNotFetch(t *testing.T
 // the cached entry stays as it was: neither that fetch nor the waiter writes
 // or drops it.
 func TestCoalescedWaiterWhoseContextEndsLeavesExpiredEntry(t *testing.T) { // REQ-026, REQ-071
-	type ending struct {
-		name       string
-		heldStatus int
-		// arm makes the starter's fetch panic; nil means the starter's own
-		// context ends instead.
-		arm func(f *panicFixture)
-	}
-	endings := []ending{{name: "starter's context ends"}}
-	for _, src := range panicSources {
-		endings = append(endings, ending{name: src.name, heldStatus: src.heldStatus, arm: src.arm})
-	}
+	// The first row has no arm: the starter's own context ends its fetch
+	// instead of a panic.
+	endings := append([]panicSource{{name: "starter's context ends"}}, panicSources...)
 	for _, end := range endings {
 		t.Run(end.name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
