@@ -21,6 +21,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
+	"github.com/cadasto/openehr-sdk-go/internal/urlredact"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 )
@@ -303,7 +304,9 @@ func (c *Client) doOnce(ctx context.Context, req *Request, target *url.URL) (*Re
 	}
 	httpReq, err := http.NewRequestWithContext(ctx, req.effectiveMethod(), target.String(), body)
 	if err != nil {
-		return nil, fmt.Errorf("transport: build request: %w", err)
+		// url.Parse's error quotes the URL, whose base URL may carry a
+		// password.
+		return nil, fmt.Errorf("transport: build request: %w", urlredact.Error(err))
 	}
 	if err := c.plumbHeaders(ctx, req, httpReq); err != nil {
 		return nil, err

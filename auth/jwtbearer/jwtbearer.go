@@ -16,6 +16,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/auth"
 	"github.com/cadasto/openehr-sdk-go/internal/noredirect"
+	"github.com/cadasto/openehr-sdk-go/internal/urlredact"
 )
 
 // GrantType is the assertion grant identifier defined by RFC 7523.
@@ -125,7 +126,7 @@ func FromConfig(cfg Config) (*Source, error) {
 	}
 	u, err := url.Parse(cfg.TokenURL)
 	if err != nil || u.Scheme == "" || u.Host == "" {
-		return nil, fmt.Errorf("%w: TokenURL %q is not a valid absolute URL", auth.ErrInvalidConfig, cfg.TokenURL)
+		return nil, fmt.Errorf("%w: TokenURL %q is not a valid absolute URL", auth.ErrInvalidConfig, urlredact.String(cfg.TokenURL))
 	}
 	if cfg.RefreshThreshold == 0 {
 		cfg.RefreshThreshold = 30 * time.Second

@@ -18,6 +18,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/auth"
 	"github.com/cadasto/openehr-sdk-go/auth/jwtbearer"
 	"github.com/cadasto/openehr-sdk-go/internal/noredirect"
+	"github.com/cadasto/openehr-sdk-go/internal/urlredact"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 )
 
@@ -1139,7 +1140,8 @@ func (s *Source) clientRequest(ctx context.Context, endpoint string, form url.Va
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(form.Encode()))
 	if err != nil {
-		return nil, err
+		// url.Parse's error quotes the endpoint, which may carry a password.
+		return nil, urlredact.Error(err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
