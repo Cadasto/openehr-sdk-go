@@ -96,7 +96,7 @@ catalog, err := discovery.NewStaticCatalog(discovery.StaticConfig{
     Services: map[string]discovery.ServiceEntry{
         "org.openehr.rest": {
             ID:          "org.openehr.rest",
-            BaseURL:     mustParse("https://ehrbase.example/rest/openehr/v1"),
+            BaseURL:     discovery.MustParseURL("https://ehrbase.example/rest/openehr/v1"),
             SpecVersion: "1.1.0-development",
         },
     },
@@ -109,7 +109,7 @@ if err != nil {
 }
 ```
 
-The `NewStaticCatalog` constructor **MUST NOT** require a network round trip; the resulting catalog has `ResolvedAt = time.Now()` and `ExpiresAt = time.Time{}` (no TTL). `StaticConfig.BaseURL` is optional: when empty, the catalog's `BaseURL` **MUST** equal `StaticConfig.Issuer`.
+The `NewStaticCatalog` constructor **MUST NOT** require a network round trip; the resulting catalog has `ResolvedAt = time.Now()` and takes `ExpiresAt` from `StaticConfig.ExpiresAt`, so it has no TTL unless the caller sets one. `StaticConfig.BaseURL` is optional: when empty, the catalog's `BaseURL` **MUST** equal `StaticConfig.Issuer`.
 
 ## Resolution flow
 
