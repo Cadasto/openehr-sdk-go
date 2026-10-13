@@ -1354,6 +1354,7 @@ requirements:
       - openehr/template/constraints/example_test.go
       - openehr/validation/binding_by_name_test.go
       - openehr/validation/constraint_fixtures_test.go
+      - openehr/validation/inventory_dispatch_internal_test.go
       - openehr/validation/optional_string_test.go
       - openehr/validation/subtype_conformance_corpus_test.go
       - openehr/validation/subtype_conformance_test.go
@@ -1480,6 +1481,7 @@ requirements:
       - openehr/serialize/canxml/interval_open_side_test.go
       - openehr/validation/coverage_test.go
       - openehr/validation/finding_identity_rules_test.go
+      - openehr/validation/inventory_dispatch_internal_test.go
       - openehr/validation/issuepath_internal_test.go
       - openehr/validation/issuepath_test.go
       - openehr/validation/limits_test.go
@@ -2102,6 +2104,7 @@ requirements:
       - openehr/validation/finding_identity_rules_test.go
       - openehr/validation/finding_identity_test.go
       - openehr/validation/godoc_class_test.go
+      - openehr/validation/inventory_dispatch_internal_test.go
       - openehr/validation/limits_test.go
       - openehr/validation/locatable_attributes_test.go
       - openehr/validation/noncomposition_test.go
