@@ -163,9 +163,12 @@ func rootKeyAbsences(keys map[string]jsontext.Value) []Issue {
 	return out
 }
 
-// replaceAtPaths returns issues without any issue at the path of one of
-// replacements, followed by replacements. A key-presence finding thereby takes
-// the place of the value-based finding at its path.
+// replaceAtPaths returns issues without the value walk's findings at the
+// path of one of replacements, followed by replacements. A key-presence
+// finding thereby takes the place of the value-based finding at its path. A
+// walk condition at such a path is kept: it says where the walk stopped or
+// turned back, not what it found there, and Coverage.Stopped lists the path
+// of each max_depth and max_nodes issue.
 func replaceAtPaths(issues, replacements []Issue) []Issue {
 	replaced := make(map[string]bool, len(replacements))
 	for _, r := range replacements {
@@ -173,7 +176,7 @@ func replaceAtPaths(issues, replacements []Issue) []Issue {
 	}
 	out := make([]Issue, 0, len(issues)+len(replacements))
 	for _, i := range issues {
-		if !replaced[i.Path] {
+		if !replaced[i.Path] || isWalkCondition(i.Code) {
 			out = append(out, i)
 		}
 	}

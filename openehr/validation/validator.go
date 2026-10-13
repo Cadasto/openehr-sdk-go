@@ -14,18 +14,24 @@ const (
 )
 
 // Limits bounds the walk over the Reference Model rules, so that a value
-// built in Go that nests too deep, or holds itself through a list that
-// shares its own backing array, ends the walk instead of exhausting the
-// stack or the time a call may take. A field that is zero or negative
-// stands for its default, so no setting turns a limit off.
+// built in Go that nests without end, or holds itself through a list that
+// shares its own backing array, stops the walk rather than running it
+// without end. A field that is zero or negative stands for its default, so
+// no setting turns a limit off.
 //
 // The walk the template drives is bounded by the compiled template it
 // follows, so the limits apply to the Reference Model walk alone.
 type Limits struct {
-	// Depth is the nesting depth at which the walk stops descending: the
-	// walk checks a node that deep against the rules of its own class, but
-	// walks none of its attributes. The walk reports the first place it
-	// stops as a max_depth issue. 256 by default.
+	// Depth is the nesting depth at which the walk stops descending. On a
+	// node that deep the walk still checks the invariants of the node's
+	// class and its coded terms, but it reports none of the node's absent
+	// mandatory attributes or empty mandatory lists, and walks none of its
+	// attributes. The walk reports the first place it stops as a max_depth
+	// issue. 256 by default.
+	//
+	// There is no upper cap. Raising it raises the cost of walking a deeply
+	// nested value faster than in proportion to the depth, since the path
+	// written for each node grows with its depth.
 	Depth int
 
 	// Nodes is the number of values the walk visits in one call before it
@@ -100,16 +106,16 @@ func (v *Validator) limitsOrDefault() Limits {
 
 // Validate validates root, any Reference Model value the SDK registers.
 //
-// With a nil c it applies the Reference Model rules alone, and returns what
-// [ValidateRM] returns for root, its guards included. With a compiled
-// template it returns what [Validate] returns: the template walk's issues,
-// then those of the Reference Model rules that do not repeat one, under
-// the guards [Validate] describes, with the limits of v bounding the
-// Reference Model walk.
+// With a nil c it applies the Reference Model rules alone. With a compiled
+// template it runs the template walk and then the Reference Model rules,
+// whose issues follow the template walk's less those that repeat one, under
+// the guards [Validate] describes. The limits of v bound the Reference Model
+// walk. Built with no options, v returns what [ValidateRM] returns for a nil
+// c, its guards included, and what [Validate] returns for a compiled
+// template.
 //
 // [Result.Coverage] lists each path where a limit stopped the walk and,
-// with a template, each node the template binds to a value set the
-// validator cannot consult.
+// with a template, each node the template binds to a CONSTRAINT_REF.
 func (v *Validator) Validate(root any, c *templatecompile.Compiled) Result {
 	lim := v.limitsOrDefault()
 	if c == nil {

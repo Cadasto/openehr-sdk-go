@@ -345,16 +345,19 @@ type Coverage struct {
 	Stopped []string
 
 	// External lists, in walk order, the path of each node the template
-	// binds to a constraint that names an external value set, such as a
-	// CONSTRAINT_REF on a coded value. The validator cannot consult such a
-	// value set, so the code at that path was not checked against it; the
-	// node's other attributes were.
+	// binds to a CONSTRAINT_REF: a constraint whose value set is bound
+	// outside the template, which the validator cannot consult, so the code
+	// at that path was not checked against it; the node's other attributes
+	// were. A node bound to a C_CODE_PHRASE that names an external
+	// terminology without listing codes is not listed: the validator checks
+	// it for that terminology, and whether a code exists in an external
+	// terminology is outside every check it makes.
 	External []string
 }
 
 // Complete reports whether the call checked everything it reached: no limit
-// stopped the walk, and no node was bound to a value set the validator
-// cannot consult. It is true exactly when Stopped and External are both
+// stopped the walk, and no node was bound to a CONSTRAINT_REF, whose value
+// set the validator cannot consult. It is true exactly when Stopped and External are both
 // empty, so the zero Coverage is complete.
 func (c Coverage) Complete() bool {
 	return len(c.Stopped) == 0 && len(c.External) == 0

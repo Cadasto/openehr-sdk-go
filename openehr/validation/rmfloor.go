@@ -270,6 +270,17 @@ func childRole(class string, role floorRole, attr string) floorRole {
 	return roleNone
 }
 
+// isWalkCondition reports whether code is a walk condition: max_depth,
+// max_nodes or cyclic_value, an issue that says where the floor's walk
+// stopped or turned back rather than judge the value there.
+func isWalkCondition(code string) bool {
+	switch code {
+	case "max_depth", "max_nodes", "cyclic_value":
+		return true
+	}
+	return false
+}
+
 // emit appends i to the walker's issues. Every floor issue is an [Error],
 // the zero Severity, so no site sets it.
 func (w *rmFloorWalker) emit(i Issue) {

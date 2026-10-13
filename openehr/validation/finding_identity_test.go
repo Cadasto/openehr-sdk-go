@@ -325,37 +325,37 @@ func TestREQ171_GuardsAndWalkConditionsCarryNoIdentity(t *testing.T) {
 	tests := []struct {
 		name string
 		code string // a code the call must report
-		call func() validation.Result
+		call func(t *testing.T) validation.Result
 	}{
-		{name: "ValidateComposition(nil)", code: "nil_composition", call: func() validation.Result { return validation.ValidateComposition(nil, c) }},
-		{name: "Validate(nil root)", code: "nil_root", call: func() validation.Result { return validation.Validate(nil, c) }},
-		{name: "Validate(nil template)", code: "nil_template", call: func() validation.Result { return validation.Validate(validVitalSignsComposition(), nil) }},
-		{name: "Validate(template without a root)", code: "nil_template", call: func() validation.Result {
+		{name: "ValidateComposition(nil)", code: "nil_composition", call: func(*testing.T) validation.Result { return validation.ValidateComposition(nil, c) }},
+		{name: "Validate(nil root)", code: "nil_root", call: func(*testing.T) validation.Result { return validation.Validate(nil, c) }},
+		{name: "Validate(nil template)", code: "nil_template", call: func(*testing.T) validation.Result { return validation.Validate(validVitalSignsComposition(), nil) }},
+		{name: "Validate(template without a root)", code: "nil_template", call: func(*testing.T) validation.Result {
 			return validation.Validate(validVitalSignsComposition(), &templatecompile.Compiled{})
 		}},
-		{name: "ValidateDemographic(nil)", code: "nil_party", call: func() validation.Result { return validation.ValidateDemographic(nil, c) }},
-		{name: "ValidateFolder(nil)", code: "nil_folder", call: func() validation.Result { return validation.ValidateFolder(nil, c) }},
-		{name: "ValidateEHRStatus(nil)", code: "nil_ehr_status", call: func() validation.Result { return validation.ValidateEHRStatus(nil, c) }},
-		{name: "Validate(root outside the RM set)", code: "rm_type_unknown", call: func() validation.Result { return validation.Validate(struct{}{}, c) }},
-		{name: "ValidateRM(nil)", code: "nil_root", call: func() validation.Result { return validation.ValidateRM(nil) }},
-		{name: "ValidateRM(root outside the RM set)", code: "rm_type_unknown", call: func() validation.Result { return validation.ValidateRM(struct{}{}) }},
-		{name: "ValidateRMFolder(nil)", code: "nil_folder", call: func() validation.Result { return validation.ValidateRMFolder(nil) }},
-		{name: "ValidateRMEHRStatus(nil)", code: "nil_ehr_status", call: func() validation.Result { return validation.ValidateRMEHRStatus(nil) }},
-		{name: "ValidateRMEHRAccess(nil)", code: "nil_ehr_access", call: func() validation.Result { return validation.ValidateRMEHRAccess(nil) }},
-		{name: "ValidateRMDemographic(nil)", code: "nil_party", call: func() validation.Result { return validation.ValidateRMDemographic(nil) }},
-		{name: "ValidateRMEHRStatusBytes(array)", code: "invalid_shape", call: func() validation.Result { return validation.ValidateRMEHRStatusBytes([]byte(`[]`)) }},
-		{name: "ValidateRMEHRStatusBytes(undecodable)", code: "invalid_shape", call: func() validation.Result {
+		{name: "ValidateDemographic(nil)", code: "nil_party", call: func(*testing.T) validation.Result { return validation.ValidateDemographic(nil, c) }},
+		{name: "ValidateFolder(nil)", code: "nil_folder", call: func(*testing.T) validation.Result { return validation.ValidateFolder(nil, c) }},
+		{name: "ValidateEHRStatus(nil)", code: "nil_ehr_status", call: func(*testing.T) validation.Result { return validation.ValidateEHRStatus(nil, c) }},
+		{name: "Validate(root outside the RM set)", code: "rm_type_unknown", call: func(*testing.T) validation.Result { return validation.Validate(struct{}{}, c) }},
+		{name: "ValidateRM(nil)", code: "nil_root", call: func(*testing.T) validation.Result { return validation.ValidateRM(nil) }},
+		{name: "ValidateRM(root outside the RM set)", code: "rm_type_unknown", call: func(*testing.T) validation.Result { return validation.ValidateRM(struct{}{}) }},
+		{name: "ValidateRMFolder(nil)", code: "nil_folder", call: func(*testing.T) validation.Result { return validation.ValidateRMFolder(nil) }},
+		{name: "ValidateRMEHRStatus(nil)", code: "nil_ehr_status", call: func(*testing.T) validation.Result { return validation.ValidateRMEHRStatus(nil) }},
+		{name: "ValidateRMEHRAccess(nil)", code: "nil_ehr_access", call: func(*testing.T) validation.Result { return validation.ValidateRMEHRAccess(nil) }},
+		{name: "ValidateRMDemographic(nil)", code: "nil_party", call: func(*testing.T) validation.Result { return validation.ValidateRMDemographic(nil) }},
+		{name: "ValidateRMEHRStatusBytes(array)", code: "invalid_shape", call: func(*testing.T) validation.Result { return validation.ValidateRMEHRStatusBytes([]byte(`[]`)) }},
+		{name: "ValidateRMEHRStatusBytes(undecodable)", code: "invalid_shape", call: func(*testing.T) validation.Result {
 			return validation.ValidateRMEHRStatusBytes([]byte(`{"_type": "EHR_STATUS", "is_queryable": "yes"}`))
 		}},
-		{name: "ValidateRM(SECTION holding itself)", code: "cyclic_value", call: func() validation.Result { return validation.ValidateRM(cyclic) }},
-		{name: "ValidateRM(300 nested SECTIONs)", code: "max_depth", call: func() validation.Result { return validation.ValidateRM(deep) }},
-		{name: "ValidateRM(SECTION holding itself by value)", code: "max_nodes", call: func() validation.Result {
+		{name: "ValidateRM(SECTION holding itself)", code: "cyclic_value", call: func(*testing.T) validation.Result { return validation.ValidateRM(cyclic) }},
+		{name: "ValidateRM(300 nested SECTIONs)", code: "max_depth", call: func(*testing.T) validation.Result { return validation.ValidateRM(deep) }},
+		{name: "ValidateRM(SECTION holding itself by value)", code: "max_nodes", call: func(t *testing.T) validation.Result {
 			return validateWithin(t, "ValidateRM", visitLimitDeadline, func() validation.Result { return validation.ValidateRM(selfSharingSection()) })
 		}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			r := tc.call()
+			r := tc.call(t)
 			if !containsCode(r.Issues, tc.code) {
 				t.Fatalf("%s issues = %q, want one with code %s", tc.name, issueKeys(r.Issues), tc.code)
 			}

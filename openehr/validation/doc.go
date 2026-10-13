@@ -146,9 +146,9 @@
 // [Result.OK] reports that no error was found in what the validator
 // checked; [Result.Coverage] says what it did not check. [Coverage.Stopped]
 // lists each path where a limit stopped the walk, and [Coverage.External]
-// each node the template binds to a value set the validator cannot consult,
-// such as a CONSTRAINT_REF. [Coverage.Complete] is true when both lists are
-// empty.
+// each node the template binds to a CONSTRAINT_REF, whose value set is bound
+// outside the template and which the validator therefore cannot consult.
+// [Coverage.Complete] is true when both lists are empty.
 //
 //	if r.OK && !r.Coverage.Complete() {
 //	    // valid as far as checked; see r.Coverage for what was not

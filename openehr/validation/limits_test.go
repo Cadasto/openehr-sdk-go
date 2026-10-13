@@ -216,25 +216,44 @@ func TestNew_REQ171_OptionsInOrder(t *testing.T) {
 	}
 }
 
+// brokenChain returns nestedSections(levels) whose bottom SECTION holds an
+// OBSERVATION that lacks every attribute the RM makes mandatory on it, so a
+// walk that reaches the bottom reports several issues there.
+func brokenChain(levels int) *rm.Section {
+	root := nestedSections(levels)
+	bottom := root
+	for range levels {
+		bottom = bottom.Items[0].(*rm.Section)
+	}
+	bottom.Items = []rm.ContentItem{&rm.Observation{ArchetypeNodeID: "at0099", Name: rm.DVText{Value: "broken"}}}
+	return root
+}
+
 // REQ-112 § Driver, REQ-171 § One walk — past the depth limit the walk does
 // not descend, and it reports max_depth once per walk, at the first path where
 // it stopped, not once for each node at that depth. A SECTION held by value
 // that holds itself through its own list reaches the limit on every branch:
 // before max_nodes ended the walk it reported 33,006 max_depth issues. A
 // fan-out of 50 SECTIONs just above the limit reaches it 100 times, and 20
-// chains under a depth of 3 reach it on each chain.
+// chains under a depth of 3 reach it on each chain. Every chain of those two
+// ends below the limit in an OBSERVATION that breaks RM rules, so a walk that
+// descends past the limit on any branch, the first or a later one, reports
+// more than the one max_depth.
 func TestValidateRM_REQ112_REQ171_MaxDepthOncePerWalk(t *testing.T) {
+	if r := validation.ValidateRM(brokenChain(3)); len(r.Issues) < 2 {
+		t.Fatalf("precondition: ValidateRM(chain ending in a broken OBSERVATION) issues = %q, want several", issueKeys(r.Issues))
+	}
 	fan := nestedSections(defaultDepth - 2)
 	bottom := fan
 	for range defaultDepth - 2 {
 		bottom = bottom.Items[0].(*rm.Section)
 	}
 	for range 50 {
-		bottom.Items = append(bottom.Items, nestedSections(3))
+		bottom.Items = append(bottom.Items, brokenChain(3))
 	}
 	chains := &rm.Section{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "chains"}}
 	for range 20 {
-		chains.Items = append(chains.Items, nestedSections(5))
+		chains.Items = append(chains.Items, brokenChain(5))
 	}
 	tests := []struct {
 		name     string
@@ -242,14 +261,6 @@ func TestValidateRM_REQ112_REQ171_MaxDepthOncePerWalk(t *testing.T) {
 		root     any
 		first    string // the path of the one max_depth
 	}{
-		{
-			name:     "SECTION holding itself by value",
-			validate: validation.ValidateRM,
-			root:     selfSharingSection(),
-			// Both items are copies of the section, so each is written by
-			// its position.
-			first: firstDepthStop("/items[1]", defaultDepth),
-		},
 		{
 			name:     "50 SECTIONs, each 3 deep, at depth 255",
 			validate: validation.ValidateRM,
@@ -267,15 +278,31 @@ func TestValidateRM_REQ112_REQ171_MaxDepthOncePerWalk(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			r := validateWithin(t, "ValidateRM", visitLimitDeadline, func() validation.Result { return tc.validate(tc.root) })
+			r := tc.validate(tc.root)
 			if got := pathsOf(r.Issues, "max_depth"); len(got) != 1 || got[0] != tc.first {
 				t.Fatalf("Validate(%s) reports max_depth %d times, first at %q; want once, at %q", tc.name, len(got), firstOf(got), tc.first)
 			}
-			if !slices.Contains(r.Coverage.Stopped, tc.first) {
-				t.Errorf("Validate(%s) Coverage.Stopped = %q, want it to hold %q", tc.name, r.Coverage.Stopped, tc.first)
+			if len(r.Issues) != 1 {
+				t.Errorf("Validate(%s) issues = %q, want the max_depth alone: nothing below the limit is walked, on any branch", tc.name, issueKeys(r.Issues))
+			}
+			if !slices.Equal(r.Coverage.Stopped, []string{tc.first}) {
+				t.Errorf("Validate(%s) Coverage.Stopped = %q, want [%q]", tc.name, r.Coverage.Stopped, tc.first)
 			}
 		})
 	}
+
+	t.Run("SECTION holding itself by value", func(t *testing.T) {
+		r := validateWithin(t, "ValidateRM", visitLimitDeadline, func() validation.Result { return validation.ValidateRM(selfSharingSection()) })
+		// Both items are copies of the section, so each is written by its
+		// position.
+		first := firstDepthStop("/items[1]", defaultDepth)
+		if got := pathsOf(r.Issues, "max_depth"); len(got) != 1 || got[0] != first {
+			t.Fatalf("ValidateRM(SECTION holding itself by value) reports max_depth %d times, first at %q; want once, at %q", len(got), firstOf(got), first)
+		}
+		if !slices.Contains(r.Coverage.Stopped, first) {
+			t.Errorf("ValidateRM(SECTION holding itself by value) Coverage.Stopped = %q, want it to hold %q", r.Coverage.Stopped, first)
+		}
+	})
 }
 
 // firstOf returns the first of paths, or "" when there is none.

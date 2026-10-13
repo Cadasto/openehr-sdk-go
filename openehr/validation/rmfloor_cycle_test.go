@@ -27,12 +27,15 @@ const walkDeadline = 10 * time.Second
 
 // visitLimitDeadline bounds a validation that only the visit limit ends: the
 // walk runs to the limit first, which takes a fraction of a second, longer
-// under the race detector.
+// under the race detector. The deadline stops a walk the limit fails to end;
+// it is wide, so a loaded machine running many tests at once does not miss
+// it. What the walk visits is pinned by the visit count elsewhere, not by
+// this deadline.
 var visitLimitDeadline = func() time.Duration {
 	if raceEnabled {
-		return 10 * time.Second
+		return 30 * time.Second
 	}
-	return time.Second
+	return 10 * time.Second
 }()
 
 // validateWithin runs validate and returns its result, failing the test when
@@ -243,7 +246,7 @@ func assertStoppedAtMaxNodes(t *testing.T, call string, r validation.Result) {
 
 // REQ-112 — a value held by value that contains itself through its own list
 // is not recognised by the visit record, so the walk stops after its fixed
-// number of visits and reports max_nodes once, within a second. The stop ends
+// number of visits and reports max_nodes once, within the deadline. The stop ends
 // the whole walk: the INSTRUCTION's narrative, an RM-mandatory attribute the
 // walk would check after the protocol that holds the loop, is not reported.
 func TestValidateRM_REQ112_SelfSharingValueStopsAtMaxNodes(t *testing.T) {

@@ -70,3 +70,33 @@ func TestFloorWalker_REQ171_VisitsExactlyTheNodeLimit(t *testing.T) {
 		}
 	}
 }
+
+// REQ-171 § Surface, REQ-112 § Driver — the walk visits nothing below the
+// depth limit, on the first branch that reaches it or any later one: under a
+// depth of 3, twenty chains five deep and twenty chains fifty deep take the
+// same number of visits, and report one stop.
+func TestFloorWalker_REQ171_VisitsNothingBelowTheDepthLimit(t *testing.T) {
+	chains := func(levels int) *rm.Section {
+		root := &rm.Section{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "chains"}}
+		for range 20 {
+			chain := &rm.Section{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "bottom"}}
+			for range levels {
+				chain = &rm.Section{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "level"}, Items: []rm.ContentItem{chain}}
+			}
+			root.Items = append(root.Items, chain)
+		}
+		return root
+	}
+	visits := map[int]int{}
+	for _, levels := range []int{5, 50} {
+		w := newFloorWalker(nil, Limits{Depth: 3})
+		w.walk(chains(levels), "SECTION", "/", roleNone, 0)
+		if len(w.stoppedAt) != 1 || w.stopped {
+			t.Fatalf("chains %d deep under Depth 3: stopped at %q (visit limit reached: %t), want one depth stop", levels, w.stoppedAt, w.stopped)
+		}
+		visits[levels] = w.visits
+	}
+	if visits[5] != visits[50] {
+		t.Errorf("under Depth 3 the walk visits %d values for chains 5 deep and %d for chains 50 deep, want the same: nothing below the limit is visited", visits[5], visits[50])
+	}
+}

@@ -300,3 +300,41 @@ func TestValidateRMEHRStatusBytes_REQ171_KeepsCoverage(t *testing.T) {
 		t.Errorf("ValidateRMEHRStatusBytes(no subject, 20,001 ELEMENTs) Coverage = %+v, want Stopped %q, not complete", r.Coverage, stopped)
 	}
 }
+
+// subjectStopStatus is an EHR_STATUS that omits subject and whose name holds
+// enough TERM_MAPPINGs, with a formatting, a template_id and one
+// preferred_term beside them, that the default visit limit falls exactly on
+// the zero subject the decode leaves: the path the key-presence check
+// reports as required.
+func subjectStopStatus() []byte {
+	const mapping = `{"_type": "TERM_MAPPING", "match": "=", "target": {"_type": "CODE_PHRASE", "terminology_id": {"_type": "TERMINOLOGY_ID", "value": "SNOMED-CT"}, "code_string": "1"}}`
+	const preferred = `{"_type": "TERM_MAPPING", "match": "=", "target": {"_type": "CODE_PHRASE", "terminology_id": {"_type": "TERMINOLOGY_ID", "value": "SNOMED-CT"}, "code_string": "1", "preferred_term": "p"}}`
+	return []byte(`{
+		"_type": "EHR_STATUS",
+		"name": {"_type": "DV_TEXT", "value": "EHR Status", "formatting": "plain", "mappings": [` + preferred + strings.Repeat(","+mapping, 19_997) + `]},
+		"archetype_node_id": "openEHR-EHR-EHR_STATUS.generic.v1",
+		"archetype_details": {"_type": "ARCHETYPED",
+			"archetype_id": {"_type": "ARCHETYPE_ID", "value": "openEHR-EHR-EHR_STATUS.generic.v1"},
+			"template_id": {"_type": "TEMPLATE_ID", "value": "t"},
+			"rm_version": "1.1.0"},
+		"is_modifiable": true,
+		"is_queryable": true
+	}`)
+}
+
+// REQ-171 § Coverage, REQ-112 — when the visit limit falls on the path of an
+// absent key, the presence-aware EHR_STATUS entry keeps the max_nodes issue
+// there beside its own required, so the issue and Coverage.Stopped agree and
+// max_nodes is reported once.
+func TestValidateRMEHRStatusBytes_REQ171_KeepsAStopOnAnAbsentKey(t *testing.T) {
+	r := validation.ValidateRMEHRStatusBytes(subjectStopStatus())
+	if !slices.Equal(r.Coverage.Stopped, []string{"/subject"}) {
+		t.Fatalf("precondition: Coverage.Stopped = %q, want [/subject]; the visit count of the recipe drifted, adjust the number of mappings", r.Coverage.Stopped)
+	}
+	if got := pathsOf(r.Issues, "max_nodes"); !slices.Equal(got, r.Coverage.Stopped) {
+		t.Errorf("ValidateRMEHRStatusBytes(visit limit on /subject) reports max_nodes at %q, want once, at each path Coverage.Stopped lists (%q)", got, r.Coverage.Stopped)
+	}
+	if !containsIssue(r.Issues, "/subject", "required") {
+		t.Errorf("ValidateRMEHRStatusBytes(visit limit on /subject) issues = %q, want required at /subject", issueKeys(r.Issues))
+	}
+}
