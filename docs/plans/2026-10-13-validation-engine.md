@@ -19,7 +19,7 @@ One validator value and one walk replace the template walk, the floor walk and t
 
 ## What stays and what changes
 
-The review after PR 256 judged each decision that PR took. These stay, with no work in this plan: template validation includes the RM rules with no switch to turn them off (ADR 0025); one path rule for both layers; type conformance by inheritance and binding reused archetypes by name; the three decode modes for unmatched content (ignore, report, refuse) and the rule that reference spellings the SDK cannot carry fail in every mode; the interval boundary flag defaults.
+Each decision PR 256 took was reassessed. These stay, with no work in this plan: template validation includes the RM rules with no switch to turn them off (ADR 0025); one path rule for both layers; type conformance by inheritance and binding reused archetypes by name; the three decode modes for unmatched content (ignore, report, refuse) and the rule that reference spellings the SDK cannot carry fail in every mode; the interval boundary flag defaults.
 
 These change: two walks joined by code and path become one walk with the template's admission first (ADR 0027); `rm_invariant` as one label for several rules becomes one rule name per invariant, taken from the BMM, beside a layer on every finding; readers that cover 71 of the 110 registered classes become generated access that covers all of them (ADR 0028); the report of unmatched members, which costs a second and a third read of the bytes today, comes out of the decode itself (STRAND-15).
 
@@ -55,7 +55,7 @@ Agreed with the maintainer on 2026-10-13. They are the test each phase is held t
 
 ## Phases
 
-The sizes are the review's: S under a day, M days, L a week or more. Phases 1 and 2 are independent of each other and of Phase 3; Phase 4 needs all three; Phase 5 needs its strand resolved and can run beside Phases 3 and 4; Phase 6 is a study.
+Sizes: S under a day, M days, L a week or more. Phases 1 and 2 are independent of each other and of Phase 3; Phase 4 needs all three; Phase 5 needs its strand resolved and can run beside Phases 3 and 4; Phase 6 is a study.
 
 ### Phase 0 — Definition layer (this branch)
 
@@ -111,7 +111,7 @@ The two small items with no dependency, delivered first so that the single walk 
 - Where the template reaches, precompute at compile time what is resolved once per template rather than once per instance: the accessor for each declared attribute and the conformance answer for each alternative. Measure before and after.
 - Remove the floor as a separate driver, `withoutRepeats`, the `reached` record and the pinned-name bookkeeping the merge needed; the path rule stays.
 - Spec: rewrite § REQ-102 *RM floor* to cite § REQ-171 and state the admitted-node scope; amend § REQ-112 *Driver* (one walk, a shared value validated at each place); the ADR 0025 header already names ADR 0027 as its amendment.
-- Re-baseline PROBE-025, PROBE-026 and PROBE-074 as a reviewed change, each changed multiset explained in the PR body by the three kinds above.
+- Re-baseline PROBE-025, PROBE-026 and PROBE-074 as a reviewed change, each changed multiset explained in the PR body by the kinds § REQ-171 *Acceptance* allows (refused content, a second code for one defect, a shared value's second path, a class or attribute the readers did not read).
 - Benchmark acceptance: the engine over the largest corpus composition and over a synthetic one an order of magnitude larger, with allocation counts, costs no more than today's template walk plus the floor. The figures in ADR 0025 come from two small fixtures and say nothing about large documents or allocations, so the synthetic case is part of the acceptance, not an extra.
 
 **Definition of done:** the comparison harness reports only allowed differences; `make ci` green; CHANGELOG `### Changed` marks the smaller result as a break; map: REQ-171 `implementation: landed`, REQ-112 updated.

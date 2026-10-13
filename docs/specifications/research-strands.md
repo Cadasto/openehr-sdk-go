@@ -288,7 +288,7 @@ This is a pre-existing emission gap, not a REQ-048 regression — REQ-048 only m
 
 ## STRAND-15 — Decode-time presence and unmatched-member capture on the generated types
 
-**Status:** Open. Opened 2026-10-13 from the design review that followed [PR 256](https://github.com/Cadasto/openehr-sdk-go/pull/256).
+**Status:** Open. Opened 2026-10-13, after [PR 256](https://github.com/Cadasto/openehr-sdk-go/pull/256).
 
 **Question:** do the generated RM types record, at decode, which by-value mandatory members the input left out, and the members the decoder matched to nothing? And when they capture unmatched members, are those kept on the value so a read, modify and write round trip is lossless, or discarded once reported?
 
@@ -311,7 +311,7 @@ This is a pre-existing emission gap, not a REQ-048 regression — REQ-048 only m
 
 ## STRAND-16 — Validator policy beyond the limits
 
-**Status:** Open. Opened 2026-10-13 from the design review that followed [PR 256](https://github.com/Cadasto/openehr-sdk-go/pull/256).
+**Status:** Open. Opened 2026-10-13, after [PR 256](https://github.com/Cadasto/openehr-sdk-go/pull/256).
 
 **Question:** which settings, beyond the depth and visit limits, does the validator of [REQ-171](clinical-modeling.md#req-171--validation-engine) take as options, and which stay outside the SDK as the caller's policy over a result?
 
