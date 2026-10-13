@@ -372,8 +372,14 @@ func (w *walker) walkMultipleAttribute(
 		w.emitProhibited(attr, parentRM, attrPath)
 		return
 	}
-	// Existence: lower ≥ 1 with zero items is "required".
+	// Existence: lower ≥ 1 with zero items is "required". When only the RM
+	// makes the attribute mandatory, the list is there and empty, which the
+	// RM's own rule names cardinality, as the floor does for the same list;
+	// when the template's existence requires it, it is that existence rule.
 	if layer, rule, required := requiredBy(attr); required && len(items) == 0 {
+		if layer == LayerRM {
+			rule = ruleCardinality
+		}
 		w.emit(Issue{
 			Path:     attrPath,
 			Code:     "required",

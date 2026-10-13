@@ -22,10 +22,12 @@ import (
 // result does not guarantee execution success, and the SDK grammar
 // profile admits some non-conformant forms by design.
 //
-// A nil compiled template runs Layers 1 and 2 only: syntax, shape,
+// A nil compiled template runs lint layers 1 and 2 only: syntax, shape,
 // parameter binding, and the containment and portability semantic group.
-// Pass a [templatecompile.Compiled] to add the Layer 3
-// archetype-in-template and path checks. The semantic group does not
+// Pass a [templatecompile.Compiled] to add lint layer 3, the
+// archetype-in-template and path checks. These are the layers of
+// openehr/aql/lint, not [Issue.Layer], which is [LayerNone] on every
+// issue this function returns. The semantic group does not
 // depend on c: it judges FROM / CONTAINS against the built-in RM
 // containment relation (openehr/aql/contain's default), so a nil template
 // can still yield Error-severity issues (aql_impossible_containment,
@@ -66,8 +68,8 @@ func ValidateAQL(q aql.Query, c *templatecompile.Compiled) Result {
 //	res := validation.ValidateAQLWithTypeRelation(q, nil, rel)
 //
 // A relation widens or narrows only the five containment codes. The
-// scope is by code, not by layer, since those codes are themselves
-// Layer 2. The three portability advisories consult no relation, and no
+// scope is by code, not by lint layer, although the five codes all belong
+// to lint layer 2. The three portability advisories consult no relation, and no
 // other check reads it, so an overlay cannot retire a syntax, shape,
 // parameter-binding, or template finding.
 func ValidateAQLWithTypeRelation(q aql.Query, c *templatecompile.Compiled, rel *contain.TypeRelation) Result {

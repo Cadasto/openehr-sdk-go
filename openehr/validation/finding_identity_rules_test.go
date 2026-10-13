@@ -175,6 +175,29 @@ func TestValidate_REQ171_TemplateLayerRules(t *testing.T) {
 		})
 	}
 
+	t.Run("a single-valued slot fill the slot does not admit", func(t *testing.T) {
+		t.Parallel()
+		comp := validSingleAttributeSlotComposition("openEHR-EHR-ITEM_TREE.rejected.v1")
+		assertHasIdentities(t, "ValidateComposition(protocol slot holding ITEM_TREE.rejected)", validation.ValidateComposition(comp, mustCompileSyntheticOPT(t, singleAttributeSlotOPT)),
+			"slot_fill /content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/protocol template slot")
+	})
+
+	for _, tc := range []struct {
+		name, languages, want string
+	}{
+		{name: "an item that is not a LOCATABLE under one child it does not fit", languages: languagesChild("DV_CODED_TEXT"), want: "rm_type_mismatch /languages[1] template type"},
+		{
+			name:      "an item that is not a LOCATABLE under two alternatives it does not fit",
+			languages: languagesChild("DV_CODED_TEXT") + languagesChild("DV_CODED_TEXT"),
+			want:      "alternative_mismatch /languages[1] template type",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assertHasIdentities(t, "ValidateDemographic(ACTOR with a DV_TEXT language)", validation.ValidateDemographic(validActor(), mustCompileInline(t, actorOPT(tc.languages))), tc.want)
+		})
+	}
+
 	t.Run("a node id the template does not pin", func(t *testing.T) {
 		t.Parallel()
 		comp := validVitalSignsComposition()
@@ -212,6 +235,77 @@ func TestValidate_REQ171_TemplateLayerRules(t *testing.T) {
 			}
 			assertHasIdentities(t, "ValidateComposition("+tc.template+")", validation.ValidateComposition(&comp, mustCompile(t, tc.template)), tc.want)
 		})
+	}
+}
+
+// bareClusterOPT is a CLUSTER template that declares no attribute: the
+// compiled node carries the attributes the RM makes mandatory on a CLUSTER,
+// items among them, and nothing of the template's own.
+const bareClusterOPT = `<?xml version="1.0" encoding="utf-8"?>
+<template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.openehr.org/v1">
+<language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
+<template_id><value>bare_cluster</value></template_id><concept>bare_cluster</concept>
+<definition><rm_type_name>CLUSTER</rm_type_name><node_id>at0000</node_id>
+<archetype_id><value>openEHR-EHR-CLUSTER.bare.v1</value></archetype_id></definition>
+</template>`
+
+// paragraphChild is an ELEMENT value child DV_PARAGRAPH with no attribute:
+// the compiled node carries DV_PARAGRAPH's RM-mandatory items, which the
+// reader for DV_PARAGRAPH does not read.
+const paragraphChild = `
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>DV_PARAGRAPH</rm_type_name>
+        <node_id></node_id>
+      </children>`
+
+// REQ-171 § Finding identity — the template walk's `required` for a
+// multi-valued attribute names the rule that requires it. One the template's
+// own existence requires and the instance holds empty is template
+// existence. One only the RM makes mandatory and the instance holds empty is
+// RM cardinality, the rule the floor's `cardinality` at the same path also
+// names. One the reader for its parent's class cannot address at all is
+// absent as far as the walk sees, so it is RM mandatory: a DV_PARAGRAPH's
+// items, though the instance carries them (REQ-110 § Known limitations).
+func TestValidate_REQ171_EmptyMandatoryListRule(t *testing.T) {
+	t.Parallel()
+	empty := &rm.Cluster{ArchetypeNodeID: "openEHR-EHR-CLUSTER.bare.v1", Name: &rm.DVText{Value: "cluster"}, Items: []rm.Item{}}
+	paragraph := valueElement(&rm.DVParagraph{Items: []rm.DVTextLike{&rm.DVText{Value: "line"}}})
+	tests := []struct {
+		name string
+		r    validation.Result
+		want []string // the whole result, as identityKeys writes it
+	}{
+		{
+			name: "empty items only the RM makes mandatory",
+			r:    validation.Validate(empty, mustCompileInline(t, bareClusterOPT)),
+			want: []string{"cardinality /items rm cardinality", "required /items rm cardinality"},
+		},
+		{
+			name: "empty items the template requires",
+			r: validation.Validate(func() *rm.Cluster {
+				c := fiCluster()
+				c.Items = []rm.Item{}
+				return c
+			}(), mustCompileInline(t, findingIdentityOPT)),
+			// The floor's cardinality at /items repeats the template
+			// walk's code at that path, so it is carried once.
+			want: []string{
+				"cardinality /items template cardinality",
+				"cardinality /items[at0003] template occurrences",
+				"required /items template existence",
+			},
+		},
+		{
+			name: "items the reader cannot address",
+			r:    validation.Validate(paragraph, mustCompileInline(t, elementValueOPT(paragraphChild))),
+			want: []string{"required /value/items rm mandatory"},
+		},
+	}
+	for _, tc := range tests {
+		if got := identityKeys(tc.r.Issues); !slices.Equal(got, tc.want) {
+			t.Errorf("Validate(%s) issues (code path layer rule) = %q, want %q", tc.name, got, tc.want)
+		}
+		assertIdentities(t, "Validate("+tc.name+")", tc.r, mustBMMInvariants(t))
 	}
 }
 

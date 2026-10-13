@@ -64,8 +64,13 @@ var fixedRuleCodes = map[string]string{
 	"rm_version_valid":     "ARCHETYPED.Rm_version_valid",
 }
 
-// classInvariant is the shape of a rule the BMM names: CLASS.Invariant.
-var classInvariant = regexp.MustCompile(`^[A-Z][A-Za-z_]*\.[A-Z][a-z][A-Za-z_]*$`)
+// ruleCandidate is the shape of a string the source scan takes for a rule
+// written CLASS.Invariant: a class name, a dot, and an invariant name. It is
+// loose on purpose, so that every invariant the pinned BMMs declare matches
+// it, those with a digit, a lower-case first letter or a space in their name
+// included; whether a candidate is a real rule is decided by looking it up in
+// the BMMs, never by its shape.
+var ruleCandidate = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*\.[A-Za-z0-9_][A-Za-z0-9_ ]*$`)
 
 // bmmInvariants holds every invariant the pinned RM and BASE BMMs declare.
 var bmmInvariants = sync.OnceValues(loadBMMInvariants)
@@ -118,8 +123,8 @@ func mustBMMInvariants(t *testing.T) map[string]bool {
 // identityProblem returns what is wrong with the Layer and the Rule of i, or
 // "" when they are what REQ-171 § Finding identity gives an issue of its
 // code: none on a guard or a walk condition; otherwise a layer, and a rule of
-// that layer's vocabulary that fits the code, a CLASS.Invariant rule spelt as
-// the pinned BMMs spell it.
+// that layer's vocabulary that fits the code, a CLASS.Invariant rule being
+// one of the names the pinned BMMs declare (bmm), spelt as they spell it.
 func identityProblem(i validation.Issue, bmm map[string]bool) string {
 	if noIdentityCodes[i.Code] {
 		if i.Layer != validation.LayerNone || i.Rule != "" {
@@ -130,14 +135,18 @@ func identityProblem(i validation.Issue, bmm map[string]bool) string {
 	if i.Layer == validation.LayerNone || i.Rule == "" {
 		return fmt.Sprintf("carries layer %q and rule %q, want both", i.Layer, i.Rule)
 	}
-	if classInvariant.MatchString(i.Rule) && !bmm[i.Rule] {
+	// No rule word and no violation code holds a dot, so a rule that does
+	// is meant as CLASS.Invariant and must be one the BMMs declare.
+	if strings.Contains(i.Rule, ".") && !bmm[i.Rule] {
 		return fmt.Sprintf("rule %q is not an invariant of the pinned BMMs", i.Rule)
 	}
 	tmpl, rmLayer := i.Layer == validation.LayerTemplate, i.Layer == validation.LayerRM
 	var ok bool
 	switch code := i.Code; {
 	case code == "required":
-		ok = tmpl && i.Rule == "existence" || rmLayer && i.Rule == "mandatory"
+		// On the RM layer: absent (mandatory), or a mandatory list the
+		// template walk found present and empty (cardinality).
+		ok = tmpl && i.Rule == "existence" || rmLayer && (i.Rule == "mandatory" || i.Rule == "cardinality")
 	case code == "prohibited":
 		ok = tmpl && i.Rule == "existence"
 	case code == "cardinality":
@@ -151,11 +160,11 @@ func identityProblem(i validation.Issue, bmm map[string]bool) string {
 	case strings.HasPrefix(code, "primitive_"):
 		ok = tmpl && i.Rule == strings.TrimPrefix(code, "primitive_")
 	case code == "rm_invariant":
-		ok = rmLayer && (i.Rule == "mandatory" || i.Rule == "precision_range" || classInvariant.MatchString(i.Rule))
+		ok = rmLayer && (i.Rule == "mandatory" || i.Rule == "precision_range" || bmm[i.Rule])
 	case code == "is_archetype_root":
-		ok = rmLayer && classInvariant.MatchString(i.Rule) && strings.HasSuffix(i.Rule, ".Is_archetype_root")
+		ok = rmLayer && bmm[i.Rule] && strings.HasSuffix(i.Rule, ".Is_archetype_root")
 	case code == "code_not_in_value_set":
-		ok = rmLayer && classInvariant.MatchString(i.Rule)
+		ok = rmLayer && bmm[i.Rule]
 	case fixedRuleCodes[code] != "":
 		ok = rmLayer && i.Rule == fixedRuleCodes[code]
 	default:
@@ -648,8 +657,9 @@ func TestREQ171_IssueLiteralCheckFailsOnEachGap(t *testing.T) {
 }
 
 // namedRulesInSource returns every rule the package's non-test source names
-// as CLASS.Invariant: each string literal of that shape, and each row of the
-// coded invariants table, whose owner and invariant make one.
+// as CLASS.Invariant: each string literal ruleCandidate matches, outside the
+// Detail of an Issue literal, and each row of the coded invariants table,
+// whose owner and invariant make one.
 func namedRulesInSource(dir string) ([]string, error) {
 	files, err := parseNonTestFiles(dir)
 	if err != nil {
@@ -659,8 +669,12 @@ func namedRulesInSource(dir string) ([]string, error) {
 	for _, file := range files {
 		ast.Inspect(file, func(n ast.Node) bool {
 			switch x := n.(type) {
+			case *ast.KeyValueExpr:
+				// A Detail is prose for a reader, which may name a class and
+				// an attribute with a dot; it sets no rule.
+				return !isIdent(x.Key, "Detail")
 			case *ast.BasicLit:
-				if s, ok := stringLiteral(x); ok && classInvariant.MatchString(s) {
+				if s, ok := stringLiteral(x); ok && ruleCandidate.MatchString(s) {
 					seen[s] = true
 				}
 			case *ast.CompositeLit:
@@ -714,6 +728,49 @@ func TestREQ171_NamedRulesAreInvariantsOfThePinnedBMMs(t *testing.T) {
 	} {
 		if !slices.Contains(rules, want) {
 			t.Errorf("the source names no rule %q; the scan has gone blind, or the rule was renamed (found %q)", want, rules)
+		}
+	}
+}
+
+// REQ-171 — the identity check reads CLASS.Invariant names from the pinned
+// BMMs, not from their shape: every invariant they declare is a candidate for
+// the source scan, and an rm_invariant issue naming any of them passes, those
+// with a digit, a lower-case first letter or a space in their name included,
+// while a misspelt one, or one of a class that does not declare it, fails.
+func TestREQ171_IdentityCheckReadsRuleNamesFromTheBMMs(t *testing.T) {
+	t.Parallel()
+	bmm := mustBMMInvariants(t)
+	for name := range bmm {
+		if !ruleCandidate.MatchString(name) {
+			t.Errorf("ruleCandidate does not match the BMM invariant %q, so the source scan would miss it", name)
+		}
+	}
+	rmInvariant := func(rule string) validation.Issue {
+		return validation.Issue{Path: "/", Code: "rm_invariant", Layer: validation.LayerRM, Rule: rule}
+	}
+	for _, tc := range []struct {
+		rule string
+		ok   bool
+	}{
+		{rule: "DV_INTERVAL.Limits_consistent", ok: true},
+		{rule: "EVENT_CONTEXT.location_valid", ok: true},
+		{rule: "EVENT.Offset_validity1", ok: true},
+		{rule: "VERSION.Lifecycle_state_ valid", ok: true},
+		{rule: "Iso8601_date.Year_valid", ok: true},
+		{rule: "DV_INTERVAL.Limits_consistnt"},
+		{rule: "EVENT_CONTEXT.Location_valid"},
+		{rule: "ELEMENT.Limits_consistent"},
+		{rule: "mandatory", ok: true},
+		{rule: "precision"},
+	} {
+		got := identityProblem(rmInvariant(tc.rule), bmm)
+		if got == "" != tc.ok {
+			t.Errorf("identityProblem(rm_invariant with rule %q) = %q, want ok %t", tc.rule, got, tc.ok)
+		}
+	}
+	for _, name := range []string{"EVENT_CONTEXT.location_valid", "VERSION.Lifecycle_state_ valid", "Iso8601_date.Year_valid"} {
+		if !bmm[name] {
+			t.Errorf("the pinned BMMs no longer declare %q; pick another name of that spelling for this test", name)
 		}
 	}
 }

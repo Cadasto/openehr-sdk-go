@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
@@ -32,7 +33,17 @@ const localAt0001 = `<children xsi:type="C_CODE_PHRASE"><rm_type_name>CODE_PHRAS
 // template admits only local::at0001: as the null flavour's defining_code,
 // and as a mapping's target. The value itself is optional.
 func prohibitedOPT(lower, upper string) string {
-	existence := `<existence>` + fiInterval(lower, upper) + `</existence>`
+	return existenceOPT(fiInterval(lower, upper))
+}
+
+// unboundedFromZero is an AOM interval body from 0 with no upper bound: the
+// upper is marked unbounded and carries no value.
+const unboundedFromZero = `<lower_included>true</lower_included><upper_included>false</upper_included>` +
+	`<lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>0</lower>`
+
+// existenceOPT is prohibitedOPT with the existence interval body given whole.
+func existenceOPT(interval string) string {
+	existence := `<existence>` + interval + `</existence>`
 	return `<?xml version="1.0" encoding="utf-8"?>
 <template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.openehr.org/v1">
 <language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
@@ -82,20 +93,26 @@ func templateIssues(r validation.Result) []string {
 // nothing from inside it. An absent prohibited attribute, and a multi-valued
 // one that holds no item, draw nothing from the template walk. Under a
 // template that allows the attributes, the same instances draw the finding
-// from inside each, which the prohibition hides.
+// from inside each, which the prohibition hides. An existence whose upper
+// bound is unbounded prohibits nothing, though it carries no upper value:
+// the walk enters the attributes and reports what is inside.
 func TestValidate_REQ102_REQ171_ProhibitedAttribute(t *testing.T) {
 	t.Parallel()
 	prohibits := mustCompileInline(t, prohibitedOPT("0", "0"))
 	allows := mustCompileInline(t, prohibitedOPT("0", "1"))
+	unbounded := mustCompileInline(t, existenceOPT(unboundedFromZero))
 	snomed := rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}, CodeString: "271649006"}
 	noInformation := &rm.DVCodedText{Value: "no information", DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}, CodeString: "271"}}
 	mapped := &rm.DVText{Value: "text", Mappings: []rm.TermMapping{{Match: rm.Character("="), Target: snomed}}}
 	tests := []struct {
 		name string
 		root *rm.Element
-		// want is the whole template-layer report under the template that
-		// prohibits the attributes; inside is what the template walk reports
-		// under the one that allows them.
+		// under is the template validated against; nil is the one that
+		// prohibits the attributes.
+		under *templatecompile.Compiled
+		// want is the whole template-layer report under that template;
+		// inside is what the template walk reports under the one that
+		// allows the attributes.
 		want, inside []string
 	}{
 		{
@@ -117,6 +134,23 @@ func TestValidate_REQ102_REQ171_ProhibitedAttribute(t *testing.T) {
 			},
 		},
 		{
+			name:  "both present under an existence with no upper bound",
+			root:  prohibitedElement(mapped, noInformation),
+			under: unbounded,
+			want: []string{
+				"primitive_invalid_value /null_flavour/defining_code template invalid_value",
+				"primitive_invalid_value /value/mappings[1]/target template invalid_value",
+				"primitive_not_in_list /null_flavour/defining_code template not_in_list",
+				"primitive_not_in_list /value/mappings[1]/target template not_in_list",
+			},
+			inside: []string{
+				"primitive_invalid_value /null_flavour/defining_code template invalid_value",
+				"primitive_invalid_value /value/mappings[1]/target template invalid_value",
+				"primitive_not_in_list /null_flavour/defining_code template not_in_list",
+				"primitive_not_in_list /value/mappings[1]/target template not_in_list",
+			},
+		},
+		{
 			name: "both absent",
 			root: prohibitedElement(&rm.DVText{Value: "text"}, nil),
 		},
@@ -131,7 +165,11 @@ func TestValidate_REQ102_REQ171_ProhibitedAttribute(t *testing.T) {
 			if got := templateIssues(validation.Validate(tc.root, allows)); !slices.Equal(got, tc.inside) {
 				t.Fatalf("precondition: under a template that allows the attributes, template issues = %q, want %q", got, tc.inside)
 			}
-			r := validation.Validate(tc.root, prohibits)
+			under := prohibits
+			if tc.under != nil {
+				under = tc.under
+			}
+			r := validation.Validate(tc.root, under)
 			if got := templateIssues(r); !slices.Equal(got, tc.want) {
 				t.Errorf("Validate(%s) template issues = %q, want %q (REQ-102 § Structural — prohibited attributes)", tc.name, got, tc.want)
 			}

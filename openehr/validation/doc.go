@@ -44,9 +44,11 @@
 // [github.com/cadasto/openehr-sdk-go/openehr/validation/rmread],
 // enforces existence (an attribute the template requires, and one it
 // prohibits) / cardinality / alternatives / RM-type match / archetype-id
-// identity, and recurses into matched RM children. An attribute the
-// template prohibits that is present is reported once, and not walked
-// into.
+// identity, and recurses into matched RM children. The template walk
+// reports an attribute the template prohibits, when it is present, once,
+// and does not enter it; the Reference Model rules still apply to what it
+// holds. The template walk sees only the attributes the package reads for
+// each class, and an attribute it does not read counts as absent.
 //
 // The RM floor ([ValidateRM] and its typed wrappers) is the RM-only
 // layer beneath that: a second driver that walks any RM root with
