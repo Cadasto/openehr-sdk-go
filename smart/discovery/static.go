@@ -54,7 +54,7 @@ func NewStaticCatalog(cfg StaticConfig) (*ServiceCatalog, error) {
 			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: fmt.Errorf("service %q has nil BaseURL", id)}
 		}
 		if !e.BaseURL.IsAbs() {
-			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: fmt.Errorf("service %q BaseURL %q is not absolute", id, e.BaseURL.String())}
+			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: fmt.Errorf("service %q BaseURL %q is not absolute", id, e.BaseURL.Redacted())}
 		}
 		e.ID = id
 		services[id] = e
