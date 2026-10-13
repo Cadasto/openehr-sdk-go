@@ -2091,6 +2091,7 @@ requirements:
     implementation: partial
     packages: [openehr/validation, internal/rmaccess, internal/bmmgen]
     tests:
+      - internal/bmmgen/render_inventory_test.go
       - internal/bmmgen/render_rmaccess_test.go
       - internal/rmaccess/coverage_test.go
       - internal/rmaccess/presence_test.go

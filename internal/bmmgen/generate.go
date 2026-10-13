@@ -23,8 +23,12 @@
 // from the root schema's rm_release; the two rminfo tables,
 // openehr/rm/rminfo/lookup_gen.go and absence_gen.go; and
 // internal/rmaccess/access_gen.go, the attribute access the validators
-// read an instance through. Its jsonhooks_gen.go
-// also registers the JSON walker's interface table into
+// read an instance through; and openehr/validation/inventory_gen.go, the
+// inventory of every invariant the RM and BASE schemas declare, classified by
+// the checked-in openehr/validation/invariants.json, which fails generation
+// when an invariant has no classification (an output tree without the
+// validation package, such as a test's scratch tree, gets no inventory). Its
+// jsonhooks_gen.go also registers the JSON walker's interface table into
 // internal/rmjsonwalk/polyreg.
 //
 // # Targets
@@ -488,6 +492,12 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, result *Result)
 
 	// The RM release constant (rm.Release), from the root schema's rm_release.
 	if err := emitReleaseFile(opts, plan, outDir, &tr, result); err != nil {
+		return tr, err
+	}
+
+	// The invariant inventory (REQ-171), into the validation package, with
+	// the classification read from beside it; nil for non-RM targets.
+	if err := emitInventoryFile(opts, plan, resolver, &tr, result); err != nil {
 		return tr, err
 	}
 
