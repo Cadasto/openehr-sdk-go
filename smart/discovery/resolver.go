@@ -456,11 +456,12 @@ func (r *Resolver) fetch(ctx context.Context, baseURL string, cached *ServiceCat
 	if !r.cfg.allowInsecure && docURL.Scheme == "http" {
 		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonInsecureURL, Inner: errors.New("plaintext base URL rejected; use WithAllowInsecure for development")}
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, docURL.String(), nil)
+	rawDocURL := docURL.String()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawDocURL, nil)
 	if err != nil {
 		// url.Parse can refuse docURL.String() even though it accepted
 		// baseURL, and its error quotes that URL with any password in it.
-		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonFetchFailed, Inner: urlredact.Error(err)}
+		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonFetchFailed, Inner: urlredact.Error(err, rawDocURL)}
 	}
 	req.Header.Set("Accept", "application/json")
 	if etag != "" {
@@ -585,9 +586,10 @@ func (r *Resolver) checkOpenIDConfiguration(ctx context.Context, cat *ServiceCat
 	if err != nil {
 		return fail(ReasonMalformedURL, err)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, docURL.String(), nil)
+	rawDocURL := docURL.String()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawDocURL, nil)
 	if err != nil {
-		return fail(ReasonFetchFailed, urlredact.Error(err))
+		return fail(ReasonFetchFailed, urlredact.Error(err, rawDocURL))
 	}
 	req.Header.Set("Accept", "application/json")
 	resp, err := r.cfg.httpClient.Do(req)
@@ -629,7 +631,7 @@ func (r *Resolver) checkOpenIDConfiguration(ctx context.Context, cat *ServiceCat
 func joinURL(rawBase, path string) (*url.URL, error) {
 	base, err := url.Parse(rawBase)
 	if err != nil {
-		return nil, urlredact.Error(err)
+		return nil, urlredact.Error(err, rawBase)
 	}
 	// Hostname, not Host: url.Parse keeps a lone port such as ":8443" in
 	// Host, which leaves no host name to connect to.
@@ -764,7 +766,7 @@ func validateIssuer(baseURL, raw string, allowInsecure bool) error {
 	}
 	u, err := url.Parse(raw)
 	if err != nil {
-		return malformed(fmt.Errorf("issuer: %w", urlredact.Error(err)))
+		return malformed(fmt.Errorf("issuer: %w", urlredact.Error(err, raw)))
 	}
 	// url.Parse lowercases the scheme, so these comparisons ignore case.
 	if u.Scheme != "https" && u.Scheme != "http" {

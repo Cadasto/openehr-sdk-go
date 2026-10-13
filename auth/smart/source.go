@@ -1141,7 +1141,7 @@ func (s *Source) clientRequest(ctx context.Context, endpoint string, form url.Va
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(form.Encode()))
 	if err != nil {
 		// url.Parse's error quotes the endpoint, which may carry a password.
-		return nil, urlredact.Error(err)
+		return nil, urlredact.Error(err, endpoint)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")

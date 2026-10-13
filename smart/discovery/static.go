@@ -93,7 +93,7 @@ func MustParseURL(raw string) *url.URL {
 	if err != nil {
 		// raw may carry a password in its userinfo, and url.Parse's error
 		// quotes raw too; the panic value must not carry it.
-		panic(fmt.Sprintf("MustParseURL(%q): %v", urlredact.String(raw), urlredact.Error(err)))
+		panic(fmt.Sprintf("MustParseURL(%q): %v", urlredact.String(raw), urlredact.Error(err, raw)))
 	}
 	return u
 }

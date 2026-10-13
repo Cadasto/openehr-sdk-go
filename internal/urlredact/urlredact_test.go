@@ -39,6 +39,13 @@ func TestString(t *testing.T) {
 			want: "https://svc:xxxxx@x.example/token",
 		},
 		{
+			// The "/" ends the authority, which url.Parse accepts as the
+			// host "svc:1234": there is no userinfo, so no password.
+			name: "parsed, digits then / then @",
+			raw:  "https://svc:1234/secret@x.example/token",
+			want: "https://svc:1234/secret@x.example/token",
+		},
+		{
 			name: "parsed, user name only",
 			raw:  "https://svc@x.example/token",
 			want: "https://svc@x.example/token",
@@ -120,6 +127,7 @@ func TestStringParsesAsDocumented(t *testing.T) {
 		"https://svc:s3cret@x.example/token",
 		"//svc:s3cret@x.example/token",
 		"https://svc:s3@cret@x.example/token",
+		"https://svc:1234/secret@x.example/token",
 	}
 	for _, raw := range parsed {
 		if _, err := url.Parse(raw); err != nil {
@@ -145,18 +153,20 @@ func TestStringParsesAsDocumented(t *testing.T) {
 }
 
 // TestError checks that Error masks the URL of the *url.Error in err's
-// chain in place, keeps its Op and Err, and returns err itself; that an
-// error with no *url.Error comes back as it was; and that a typed-nil
-// *url.Error does not panic.
+// chain in place, keeps its Op, keeps its Err when the cause quotes nothing
+// from the password, and returns err itself; that an error with no
+// *url.Error comes back as it was; and that a typed-nil *url.Error does
+// not panic.
 func TestError(t *testing.T) {
 	t.Parallel()
 
 	t.Run("url.Parse error", func(t *testing.T) {
 		t.Parallel()
-		ue := parseError(t, "https://svc:s3cret@[::1")
+		const raw = "https://svc:s3cret@[::1"
+		ue := parseError(t, raw)
 		err := error(ue)
 		op, inner := ue.Op, ue.Err
-		if got := urlredact.Error(err); got != err { //nolint:errorlint // identity is the point
+		if got := urlredact.Error(err, raw); got != err { //nolint:errorlint // identity is the point
 			t.Errorf("Error(err) = %v, want err itself", got)
 		}
 		if want := "https://svc:xxxxx@[::1"; ue.URL != want {
@@ -172,9 +182,10 @@ func TestError(t *testing.T) {
 		// The *url.Error is masked wherever it sits in the chain. A
 		// wrapper made by fmt.Errorf has its text already, so callers
 		// mask before they wrap; the wrapper here only shows the search.
-		perr := parseError(t, "https://svc:s3cret@x%zz.example/token")
+		const raw = "https://svc:s3cret@x%zz.example/token"
+		perr := parseError(t, raw)
 		err := fmt.Errorf("issuer: %w", perr)
-		if got := urlredact.Error(err); got != err { //nolint:errorlint // identity is the point
+		if got := urlredact.Error(err, raw); got != err { //nolint:errorlint // identity is the point
 			t.Errorf("Error(err) = %v, want err itself", got)
 		}
 		want := `parse "https://svc:xxxxx@x%zz.example/token": invalid URL escape "%zz"`
@@ -183,13 +194,49 @@ func TestError(t *testing.T) {
 		}
 	})
 
+	t.Run("url.Parse error, no password", func(t *testing.T) {
+		t.Parallel()
+		// Without a password the IP literal url.Parse quotes unescaped,
+		// as "u:pé", stays in the cause.
+		const raw = "https://[u:p%C3%A9]/x"
+		ue := parseError(t, raw)
+		err := error(ue)
+		inner := ue.Err
+		if got := urlredact.Error(err, raw); got != err { //nolint:errorlint // identity is the point
+			t.Errorf("Error(err) = %v, want err itself", got)
+		}
+		if ue.Err != inner { //nolint:errorlint // identity is the point
+			t.Errorf("url.Error.Err = %v, want %v unchanged", ue.Err, inner)
+		}
+		if got, want := ue.Error(), `ParseAddr("u:pé")`; !strings.Contains(got, want) {
+			t.Errorf("url.Error text = %q, want it to keep %q", got, want)
+		}
+	})
+
+	t.Run("url.Error without a cause", func(t *testing.T) {
+		t.Parallel()
+		const raw = "https://svc:s3cret@[::1"
+		ue := &url.Error{Op: "parse", URL: raw}
+		err := error(ue)
+		if got := urlredact.Error(err, raw); got != err { //nolint:errorlint // identity is the point
+			t.Errorf("Error(err) = %v, want err itself", got)
+		}
+		if want := "https://svc:xxxxx@[::1"; ue.URL != want {
+			t.Errorf("url.Error.URL = %q, want %q", ue.URL, want)
+		}
+		if ue.Err != nil {
+			t.Errorf("url.Error.Err = %v, want nil", ue.Err)
+		}
+	})
+
 	t.Run("no url.Error", func(t *testing.T) {
 		t.Parallel()
-		err := errors.New("https://svc:s3cret@x.example")
-		if got := urlredact.Error(err); got != err { //nolint:errorlint // identity is the point
+		const raw = "https://svc:s3cret@x.example"
+		err := errors.New(raw)
+		if got := urlredact.Error(err, raw); got != err { //nolint:errorlint // identity is the point
 			t.Errorf("Error(%v) = %v, want it unchanged", err, got)
 		}
-		if got := urlredact.Error(nil); got != nil {
+		if got := urlredact.Error(nil, raw); got != nil {
 			t.Errorf("Error(nil) = %v, want nil", got)
 		}
 	})
@@ -198,7 +245,7 @@ func TestError(t *testing.T) {
 		t.Parallel()
 		var ue *url.Error
 		err := error(ue)
-		if got := urlredact.Error(err); got != err { //nolint:errorlint // identity is the point
+		if got := urlredact.Error(err, "https://svc:s3cret@[::1"); got != err { //nolint:errorlint // identity is the point
 			t.Errorf("Error(typed nil) = %v, want it unchanged", got)
 		}
 	})
@@ -280,7 +327,7 @@ func TestErrorMasksPasswordInCause(t *testing.T) {
 			t.Parallel()
 			ue := parseError(t, tc.raw)
 			op, cause := ue.Op, ue.Err
-			err := urlredact.Error(ue)
+			err := urlredact.Error(ue, tc.raw)
 			text := err.Error()
 			for _, leak := range tc.leak {
 				if strings.Contains(text, leak) {

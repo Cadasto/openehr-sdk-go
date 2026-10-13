@@ -167,7 +167,7 @@ func (j *JWKS) fetch(ctx context.Context) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, j.URI, nil)
 	if err != nil {
 		// url.Parse's error quotes the URI, which may carry a password.
-		return urlredact.Error(err)
+		return urlredact.Error(err, j.URI)
 	}
 	req.Header.Set("Accept", "application/json")
 	resp, err := j.HTTPClient.Do(req)

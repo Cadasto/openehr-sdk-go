@@ -259,9 +259,12 @@ func (s *Source) fetch(ctx context.Context) (auth.Token, error) {
 		form.Set("client_id", s.cfg.ClientID)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.tokenURL.String(), strings.NewReader(form.Encode()))
+	tokenURL := s.tokenURL.String()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURL, strings.NewReader(form.Encode()))
 	if err != nil {
-		return auth.Token{}, &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, Inner: err}
+		// url.Parse can refuse tokenURL even though it accepted
+		// cfg.TokenURL, and its error quotes tokenURL with the password.
+		return auth.Token{}, &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, Inner: urlredact.Error(err, tokenURL)}
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
