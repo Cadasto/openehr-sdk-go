@@ -5,7 +5,8 @@
 // The API is small:
 //
 //	Single(parent any, attr string) (value any, present bool)
-//	Multiple(parent any, attr string) (items []any, ok bool)
+//	Multiple(parent any, attr string) (items []any, present bool)
+//	Hash(parent any, attr string) (keys []string, values []any, present bool)
 //	Covers(v any) bool
 //	IsTypedNilPointer(v any) bool
 //
@@ -13,27 +14,31 @@
 // alike, through a type switch generated from the pinned BMMs
 // (access_gen.go, written by internal/bmmgen). A reader answers every
 // attribute the class declares, its own and those it inherits, by plain field
-// access, so no registered class is a leaf for want of a reader. What the
-// attributes are, their declared RM types, which are containers and which
-// are RM-mandatory is openehr/rm/rminfo's to say; this package holds only the
-// access.
+// access, so no registered class is a leaf for want of a reader, and Hash
+// hands over the entries of every Hash attribute in ascending key order, so a
+// walk can go below them. What the attributes are, their declared RM types,
+// which are containers and which are RM-mandatory is openehr/rm/rminfo's to
+// say, and so is whether a class declares an attribute at all: each function
+// reads an undeclared pair as absent. This package holds only the access.
 //
 // # Presence
 //
 // Whether an attribute is present is decided from its declared type and the
 // Go value alone. A pointer is present when it is not nil; an interface when
 // it holds a value that is not a nil pointer; a string when it is not empty;
-// a number or a boolean always; a list when it is not nil. A value held by
+// a number or a boolean always; a list or a hash when it is not nil, and it
+// is empty when it is present and holds no item or entry. A value held by
 // value is present when it is not empty: a DV_TEXT, held directly or through
 // an interface, when its value is not empty; a DV_CODED_TEXT when its value
 // or its defining code is not empty; a CODE_PHRASE when its code_string or
-// its terminology is not empty; an OBJECT_REF or a PARTY_REF when its id,
-// namespace and type are all there; any other class when it is not its zero
-// value. Three readings are fixed: an interval bound is absent only when its
-// side is marked unbounded and the bound is empty; EHR_STATUS subject is
-// always present; ARCHETYPED archetype_id and rm_version are always present.
-// The content rules and the fixed readings are in presence.go; the reading by
-// Go kind and the zero tests are generated.
+// its terminology is not empty; an OBJECT_REF or any of its subtypes
+// (PARTY_REF, LOCATABLE_REF, ACCESS_GROUP_REF) when its id, namespace and
+// type are all there; any other class when it is not its zero value. Three
+// readings are fixed: an interval bound is absent only when its side is
+// marked unbounded and the bound is empty; EHR_STATUS subject is always
+// present; ARCHETYPED archetype_id and rm_version are always present.
+// The content rules, the object-reference reading and the fixed readings are
+// in presence.go; the reading by Go kind and the zero tests are generated.
 //
 // # Dependencies
 //

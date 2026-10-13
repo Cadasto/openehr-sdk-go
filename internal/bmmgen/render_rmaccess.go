@@ -17,7 +17,8 @@ import (
 // concrete class the type registry decodes, in every instantiation the
 // reverse registry recognises (ADR 0013), a reader that answers each
 // attribute the class declares, own and inherited, with its value and
-// whether it is present, by plain field access. The Go type of each field is
+// whether it is present, by plain field access, and a reader of the entries of
+// each Hash attribute in ascending key order. The Go type of each field is
 // read from the line the struct renderer writes for it ([renderField]), so
 // the access cannot drift from the struct declarations; a field whose Go type
 // the access misreads fails to compile in the generated file.
@@ -25,11 +26,13 @@ import (
 // Presence is decided as § REQ-171 *Structural access* states it: by the
 // field's Go kind (pointer, interface, string, number or boolean, list,
 // value); for a value held by value, by a content rule keyed by the
-// attribute's declared RM type, or else by a generated zero test; and, for
-// the three readings § REQ-112 fixes, by the hand-written functions
-// [fixedPresence] and [intervalBoundPresence] name. The content rules and
-// the fixed readings are hand-written in internal/rmaccess/presence.go; this
-// file names them, so a renamed or retyped function fails to compile.
+// attribute's declared RM type, by the object-reference reading for OBJECT_REF
+// and every class the BMM places below it, or else by a generated zero test;
+// and, for the three readings § REQ-112 fixes, by the hand-written functions
+// [fixedPresence] and [intervalBoundPresence] name. The content rules, the
+// object-reference reading and the fixed readings are hand-written in
+// internal/rmaccess/presence.go; this file names them, so a renamed or
+// retyped function fails to compile.
 
 // rmaccessRMImport is the import path of the RM package the access reads.
 const rmaccessRMImport = "github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -59,9 +62,8 @@ const intervalBoundPresence = "presentIntervalBound"
 // for a value held by value (and, for DV_TEXT, held through an interface):
 // a DV_TEXT is empty when its value is; a DV_CODED_TEXT when its value and
 // its defining code are; a CODE_PHRASE when its code_string and terminology
-// are; an OBJECT_REF or a PARTY_REF when its id, namespace or type is
-// missing. A pointer, and an interface for any other type, take the reading
-// of their Go kind.
+// are. A pointer, and an interface for any other type, take the reading of
+// their Go kind.
 var contentPresence = map[string]struct {
 	fn    string
 	kinds []accessKind
@@ -69,9 +71,24 @@ var contentPresence = map[string]struct {
 	"DV_TEXT":       {"presentText", []accessKind{accessInterface, accessStruct}},
 	"DV_CODED_TEXT": {"presentCodedText", []accessKind{accessStruct}},
 	"CODE_PHRASE":   {"presentCodePhrase", []accessKind{accessStruct}},
-	"OBJECT_REF":    {"presentObjectRef", []accessKind{accessStruct}},
-	"PARTY_REF":     {"presentPartyRef", []accessKind{accessStruct}},
 }
+
+// objectRefClass is the root of the classes the object-reference reading
+// applies to: OBJECT_REF and every class the BMM places below it (PARTY_REF,
+// LOCATABLE_REF and ACCESS_GROUP_REF at RM 1.2.0), read from the plan's
+// hierarchy ([rmaccessGen.isObjectRef]) so a new subtype takes it too.
+const objectRefClass = "OBJECT_REF"
+
+// objectRefPresence is the hand-written object-reference reading for a
+// reference held by value: empty when its id, namespace or type is missing.
+// The access hands it the reference's parts, the id being the one the class
+// itself declares (LOCATABLE_REF redefines it as a UID_BASED_ID).
+const objectRefPresence = "presentObjectRef"
+
+// hashType is the declared RM type of a Hash attribute, as the fold rminfo is
+// generated from names a BMM Hash<K, V> ([effectiveProperties]). Its Go field
+// is a map keyed by string, or a pointer to one.
+const hashType = "Hash"
 
 // accessShape is how the access hands back an attribute's value when that is
 // not the field itself.
@@ -90,15 +107,15 @@ const (
 	shapeValueMember
 )
 
-// accessShapes keeps, for five attributes, the shape the validation walks
-// and the composition builder read today, where it differs from the field's
-// own: ITEM_SINGLE item and REFERENCE_RANGE range come back as a pointer into
-// the parent (the builder writes through the first); ISM_TRANSITION
-// careflow_step and transition come back as the DV_CODED_TEXT they point to,
-// and DV_PROPORTION precision as its Integer, which the primitive binding
-// reads; CODE_PHRASE terminology_id comes back as the string its
-// TERMINOLOGY_ID holds, which the walks treat as a leaf. Presence is read
-// from the field either way.
+// accessShapes keeps, for six attributes of five classes, the shape the
+// validation walks and the composition builder read today, where it differs
+// from the field's own: ITEM_SINGLE item and REFERENCE_RANGE range come back
+// as a pointer into the parent (the builder writes through the first);
+// ISM_TRANSITION careflow_step and transition come back as the DV_CODED_TEXT
+// they point to, and DV_PROPORTION precision as its Integer, which the
+// primitive binding reads; CODE_PHRASE terminology_id comes back as the
+// string its TERMINOLOGY_ID holds, which the walks treat as a leaf. Presence
+// is read from the field either way.
 var accessShapes = map[string]map[string]accessShape{
 	"ITEM_SINGLE":     {"item": shapeAddress},
 	"REFERENCE_RANGE": {"range": shapeAddress},
@@ -149,10 +166,11 @@ var goPredeclaredKinds = map[string]accessKind{
 // It emits, for every class in [Plan.ConcreteClasses] and every instantiation
 // [reverseRegistryArms] lists for it, a reader of the single-valued
 // attributes and a reader of the containers the class declares, the type
-// switches single, multiple and covers that dispatch on a value's Go type
-// (pointer and value form alike), and a field-by-field zero test for every
-// class an attribute holds by value. Which attributes a class has, and
-// whether each is a container, is read from the same fold rminfo is
+// switches single, multiple, hash and covers that dispatch on a value's Go
+// type (pointer and value form alike), a reader of the entries of every Hash
+// attribute, and a field-by-field zero test for every class an attribute
+// holds by value. Which attributes a class has, whether each is a container
+// and which are Hash attributes is read from the same fold rminfo is
 // generated from ([effectiveProperties]).
 //
 // Returns nil for every target but RM. Output is deterministic and gofmt'd.
@@ -170,10 +188,11 @@ func RenderRMAccessFile(plan *Plan) ([]byte, error) {
 // rmaccessGen holds the indexes one rendering reads.
 type rmaccessGen struct {
 	plan       *Plan
-	structs    map[string]*PlannedClass // Go name → class rendered as a Go struct
-	interfaces map[string]bool          // Go names rendered as Go interfaces
-	enums      map[string]accessKind    // Go name → kind of an enumeration
-	zeroTests  map[string]*goType       // zero test name → the type it tests
+	structs    map[string]*PlannedClass          // Go name → class rendered as a Go struct
+	interfaces map[string]bool                   // Go names rendered as Go interfaces
+	enums      map[string]accessKind             // Go name → kind of an enumeration
+	zeroTests  map[string]*goType                // zero test name → the type it tests
+	shapes     map[string]map[string]accessShape // class → attribute → shape: [accessShapes]
 }
 
 func newRMAccessGen(plan *Plan) (*rmaccessGen, error) {
@@ -183,6 +202,7 @@ func newRMAccessGen(plan *Plan) (*rmaccessGen, error) {
 		interfaces: map[string]bool{},
 		enums:      map[string]accessKind{},
 		zeroTests:  map[string]*goType{},
+		shapes:     accessShapes,
 	}
 	for _, name := range sortedStringKeys(plan.Classes) {
 		pc := plan.Classes[name]
@@ -440,11 +460,59 @@ func (g *rmaccessGen) classify(t *goType) (accessKind, error) {
 }
 
 // armAttrs is one arm with its attributes, split by the reader that answers
-// them.
+// them: a Hash attribute is in single and in hash.
 type armAttrs struct {
 	arm    *accessArm
 	single []*accessAttr
 	multi  []*accessAttr
+	hash   []*accessAttr
+}
+
+// split sorts the attributes of arm by the reader that answers them: a
+// container by multiple, any other attribute by single, and a Hash attribute
+// by hash as well, so a walk can enter its entries. It refuses a container
+// that is not a Go slice, a Hash that is not a map keyed by string, held
+// directly or through a pointer, and a Go map on an attribute not declared
+// Hash: a map whose entries no reader serves would reach a walk as one opaque
+// value.
+func (g *rmaccessGen) split(arm *accessArm, attrs []*accessAttr) (armAttrs, error) {
+	entry := armAttrs{arm: arm}
+	for _, a := range attrs {
+		if a.container {
+			if a.typ.kind != goSlice {
+				// A container held as a Go map would need its items' order
+				// decided before the access boxes them; no container of the
+				// pinned RM is one.
+				return armAttrs{}, fmt.Errorf("bmmgen: rmaccess: container %s.%s has Go type %s, not a slice", arm.class.BMMName, a.name, a.typ.qualified())
+			}
+			entry.multi = append(entry.multi, a)
+			continue
+		}
+		entry.single = append(entry.single, a)
+		m, isMap := hashMap(a.typ)
+		switch {
+		case a.declared == hashType:
+			if !isMap || m.key.kind != goNamed || m.key.name != "string" {
+				return armAttrs{}, fmt.Errorf("bmmgen: rmaccess: Hash %s.%s has Go type %s, not a map keyed by string", arm.class.BMMName, a.name, a.typ.qualified())
+			}
+			entry.hash = append(entry.hash, a)
+		case isMap:
+			return armAttrs{}, fmt.Errorf("bmmgen: rmaccess: %s.%s is declared %s, but its Go type %s is a map", arm.class.BMMName, a.name, a.declared, a.typ.qualified())
+		}
+	}
+	return entry, nil
+}
+
+// hashMap returns the map t holds a Hash in: t itself, or the map t points
+// to. ok is false when t is neither a map nor a pointer to one.
+func hashMap(t *goType) (m *goType, ok bool) {
+	switch {
+	case t.kind == goMap:
+		return t, true
+	case t.kind == goPointer && t.elem.kind == goMap:
+		return t.elem, true
+	}
+	return nil, false
 }
 
 // render writes the file.
@@ -460,13 +528,9 @@ func (g *rmaccessGen) render() ([]byte, error) {
 			if err != nil {
 				return nil, err
 			}
-			entry := armAttrs{arm: arm}
-			for _, a := range attrs {
-				if a.container {
-					entry.multi = append(entry.multi, a)
-				} else {
-					entry.single = append(entry.single, a)
-				}
+			entry, err := g.split(arm, attrs)
+			if err != nil {
+				return nil, err
 			}
 			all = append(all, entry)
 		}
@@ -494,11 +558,13 @@ func (g *rmaccessGen) render() ([]byte, error) {
 	b.WriteString(strings.Join(forms, ",\n\t\t"))
 	b.WriteString(":\n\t\treturn true\n\t}\n\treturn false\n}\n")
 
-	// single and multiple dispatch.
-	writeDispatch(&b, "single", "the single-valued attribute attr of parent: its value, whether it is\n// present, and whether parent's class declares attr as a single-valued\n// attribute at all", "any",
+	// single, multiple and hash dispatch.
+	writeDispatch(&b, "single", "the single-valued attribute attr of parent: its value, whether it is\n// present, and whether parent's class declares attr as a single-valued\n// attribute at all", "any, bool, bool", "nil, false, false",
 		all, func(e armAttrs) bool { return len(e.single) > 0 })
-	writeDispatch(&b, "multiple", "the container attribute attr of parent: its items, whether the list\n// is present, and whether parent's class declares attr as a container at\n// all", "[]any",
+	writeDispatch(&b, "multiple", "the container attribute attr of parent: its items, whether the list\n// is present, and whether parent's class declares attr as a container at\n// all", "[]any, bool, bool", "nil, false, false",
 		all, func(e armAttrs) bool { return len(e.multi) > 0 })
+	writeDispatch(&b, "hash", "the Hash attribute attr of parent: the keys of its entries in\n// ascending order, their values, whether the hash is present, and whether\n// parent's class declares attr as a Hash at all", "[]string, []any, bool, bool", "nil, nil, false, false",
+		all, func(e armAttrs) bool { return len(e.hash) > 0 })
 
 	for _, e := range all {
 		if len(e.single) > 0 {
@@ -508,6 +574,11 @@ func (g *rmaccessGen) render() ([]byte, error) {
 		}
 		if len(e.multi) > 0 {
 			if err := g.writeMultiple(&b, e.arm, e.multi); err != nil {
+				return nil, err
+			}
+		}
+		if len(e.hash) > 0 {
+			if err := g.writeHash(&b, e.arm, e.hash); err != nil {
 				return nil, err
 			}
 		}
@@ -525,10 +596,11 @@ func (g *rmaccessGen) render() ([]byte, error) {
 }
 
 // writeDispatch writes the type switch fn that hands parent to the reader of
-// its arm, for every arm that has such a reader.
-func writeDispatch(b *bytes.Buffer, fn, doc, result string, all []armAttrs, has func(armAttrs) bool) {
+// its arm, for every arm that has such a reader; results are the readers'
+// result types and zero what fn returns for any other parent.
+func writeDispatch(b *bytes.Buffer, fn, doc, results, zero string, all []armAttrs, has func(armAttrs) bool) {
 	fmt.Fprintf(b, "\n// %s reads %s.\n", fn, doc)
-	fmt.Fprintf(b, "func %s(parent any, attr string) (%s, bool, bool) {\n", fn, result)
+	fmt.Fprintf(b, "func %s(parent any, attr string) (%s) {\n", fn, results)
 	b.WriteString("\tswitch p := parent.(type) {\n")
 	for _, e := range all {
 		if !has(e) {
@@ -539,7 +611,7 @@ func writeDispatch(b *bytes.Buffer, fn, doc, result string, all []armAttrs, has 
 		fmt.Fprintf(b, "\tcase *%s:\n\t\treturn %s(p, attr)\n", q, name)
 		fmt.Fprintf(b, "\tcase %s:\n\t\treturn %s(&p, attr)\n", q, name)
 	}
-	b.WriteString("\t}\n\treturn nil, false, false\n}\n")
+	fmt.Fprintf(b, "\t}\n\treturn %s\n}\n", zero)
 }
 
 // writeSingle writes the reader of arm's single-valued attributes.
@@ -560,7 +632,7 @@ func (g *rmaccessGen) writeSingle(b *bytes.Buffer, arm *accessArm, attrs []*acce
 		}
 		field := "x." + a.field
 		fmt.Fprintf(b, "\tcase %q:\n", a.name)
-		switch shape := accessShapes[arm.class.BMMName][a.name]; shape {
+		switch shape := g.shapes[arm.class.BMMName][a.name]; shape {
 		case shapeField:
 			fmt.Fprintf(b, "\t\treturn %s, %s, true\n", field, present)
 		case shapeAddress:
@@ -579,15 +651,18 @@ func (g *rmaccessGen) writeSingle(b *bytes.Buffer, arm *accessArm, attrs []*acce
 				return fmt.Errorf("bmmgen: rmaccess: %s.%s is handed back as its value member, but its field is not held by value", arm.class.BMMName, a.name)
 			}
 			fmt.Fprintf(b, "\t\treturn %s.Value, %s, true\n", field, present)
+		default:
+			return fmt.Errorf("bmmgen: rmaccess: %s.%s has shape %d, which the generator does not know", arm.class.BMMName, a.name, shape)
 		}
 	}
 	b.WriteString("\t}\n\treturn nil, false, false\n}\n")
 	return nil
 }
 
-// writeMultiple writes the reader of arm's containers. The items of a list of
-// values are boxed as pointers into the backing array, those of a list of
-// interfaces or pointers as they are.
+// writeMultiple writes the reader of arm's containers, each a Go slice
+// ([rmaccessGen.split] refuses any other). The items of a list of values are
+// boxed as pointers into the backing array, those of a list of interfaces or
+// pointers as they are.
 func (g *rmaccessGen) writeMultiple(b *bytes.Buffer, arm *accessArm, attrs []*accessAttr) error {
 	q := arm.typ.qualified()
 	fmt.Fprintf(b, "\n// multiple%s reads the containers of %s.\n", arm.typ.suffix(), q)
@@ -596,11 +671,6 @@ func (g *rmaccessGen) writeMultiple(b *bytes.Buffer, arm *accessArm, attrs []*ac
 	b.WriteString("\tswitch attr {\n")
 	for _, a := range attrs {
 		field := "x." + a.field
-		if a.typ.kind != goSlice {
-			// No container of the pinned RM is a Go map; one that appears
-			// needs its items' order decided before the access boxes them.
-			return fmt.Errorf("bmmgen: rmaccess: container %s.%s has Go type %s, not a slice", arm.class.BMMName, a.name, a.typ.qualified())
-		}
 		elem, err := g.classify(a.typ.elem)
 		if err != nil {
 			return fmt.Errorf("bmmgen: rmaccess: %s.%s: %w", arm.class.BMMName, a.name, err)
@@ -613,6 +683,52 @@ func (g *rmaccessGen) writeMultiple(b *bytes.Buffer, arm *accessArm, attrs []*ac
 	}
 	b.WriteString("\t}\n\treturn nil, false, false\n}\n")
 	return nil
+}
+
+// writeHash writes the reader of arm's Hash attributes, each a map keyed by
+// string or a pointer to one ([rmaccessGen.split] refuses any other): the
+// keys in ascending order and the values, a value of a class or a primitive
+// boxed as a pointer to a copy (entryPointers), one held as an interface or
+// a pointer as it is (entryValues). Presence is the one single reads: a map
+// is present when it is not nil, a pointer to a map when the pointer is not
+// nil, whatever map it points to.
+func (g *rmaccessGen) writeHash(b *bytes.Buffer, arm *accessArm, attrs []*accessAttr) error {
+	q := arm.typ.qualified()
+	fmt.Fprintf(b, "\n// hash%s reads the Hash attributes of %s.\n", arm.typ.suffix(), q)
+	fmt.Fprintf(b, "func hash%s(x *%s, attr string) ([]string, []any, bool, bool) {\n", arm.typ.suffix(), q)
+	b.WriteString("\tif x == nil {\n\t\treturn nil, nil, false, false\n\t}\n")
+	b.WriteString("\tswitch attr {\n")
+	for _, a := range attrs {
+		field := "x." + a.field
+		m, _ := hashMap(a.typ)
+		elem, err := g.classify(m.elem)
+		if err != nil {
+			return fmt.Errorf("bmmgen: rmaccess: %s.%s: %w", arm.class.BMMName, a.name, err)
+		}
+		box := "entryPointers"
+		if elem == accessInterface || elem == accessPointer {
+			box = "entryValues"
+		}
+		fmt.Fprintf(b, "\tcase %q:\n", a.name)
+		if a.typ.kind == goPointer {
+			fmt.Fprintf(b, "\t\tif %s == nil {\n\t\t\treturn nil, nil, false, true\n\t\t}\n", field)
+			fmt.Fprintf(b, "\t\tkeys, values := %s(*%s)\n\t\treturn keys, values, true, true\n", box, field)
+			continue
+		}
+		present, err := g.presence(arm, a, false)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(b, "\t\tkeys, values := %s(%s)\n\t\treturn keys, values, %s, true\n", box, field, present)
+	}
+	b.WriteString("\t}\n\treturn nil, nil, false, false\n}\n")
+	return nil
+}
+
+// isObjectRef reports whether the RM class name is OBJECT_REF or a class the
+// plan's BMM hierarchy places below it.
+func (g *rmaccessGen) isObjectRef(name string) bool {
+	return name == objectRefClass || slices.Contains(AncestorChain(g.plan, name), objectRefClass)
 }
 
 // presence returns the Go expression that reports whether attribute a of arm
@@ -629,6 +745,10 @@ func (g *rmaccessGen) presence(arm *accessArm, a *accessAttr, interval bool) (st
 	}
 	if rule, ok := contentPresence[a.declared]; ok && slices.Contains(rule.kinds, a.kind) {
 		return fmt.Sprintf("%s(%s)", rule.fn, field), nil
+	}
+	if a.kind == accessStruct && g.isObjectRef(a.declared) {
+		return fmt.Sprintf("%s(%s.%s, %s.%s, %s.%s)", objectRefPresence,
+			field, FieldName("id"), field, FieldName("namespace"), field, FieldName("type")), nil
 	}
 	switch a.kind {
 	case accessPointer, accessList:

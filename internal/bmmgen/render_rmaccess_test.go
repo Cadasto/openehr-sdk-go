@@ -5,6 +5,7 @@ package bmmgen
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"go/ast"
 	"go/format"
 	"go/parser"
@@ -119,7 +120,7 @@ func TestRenderRMAccessFile_REQ171_Deterministic(t *testing.T) {
 // recognises for the classes the type registry decodes, and that every arm's
 // readers answer exactly the attributes the class declares (the fold rminfo
 // is generated from), containers through multiple and every other attribute
-// through single.
+// through single, and every Hash attribute through hash as well.
 func TestRenderRMAccessFile_REQ171_CoversTheRegistry(t *testing.T) {
 	plan, _, file := rmAccessOutput(t)
 
@@ -127,6 +128,7 @@ func TestRenderRMAccessFile_REQ171_CoversTheRegistry(t *testing.T) {
 		suffix string
 		single []string
 		multi  []string
+		hash   []string
 	}
 	want := map[string]bool{}
 	var arms []armWant
@@ -136,12 +138,15 @@ func TestRenderRMAccessFile_REQ171_CoversTheRegistry(t *testing.T) {
 			t.Fatalf("reverseRegistryArms(%s): %v", pc.BMMName, err)
 		}
 		attrs, _ := effectiveProperties(plan, pc.BMMName)
-		var single, multi []string
+		var single, multi, hash []string
 		for _, name := range sortedStringKeys(attrs) {
 			if attrs[name].container {
 				multi = append(multi, name)
 			} else {
 				single = append(single, name)
+			}
+			if attrs[name].typeName == "Hash" {
+				hash = append(hash, name)
 			}
 		}
 		for _, arm := range names {
@@ -151,7 +156,7 @@ func TestRenderRMAccessFile_REQ171_CoversTheRegistry(t *testing.T) {
 			}
 			want[typ.qualified()] = true
 			want["*"+typ.qualified()] = true
-			arms = append(arms, armWant{suffix: typ.suffix(), single: single, multi: multi})
+			arms = append(arms, armWant{suffix: typ.suffix(), single: single, multi: multi, hash: hash})
 		}
 	}
 	if len(plan.ConcreteClasses) < 100 || len(arms) <= len(plan.ConcreteClasses) {
@@ -186,7 +191,7 @@ func TestRenderRMAccessFile_REQ171_CoversTheRegistry(t *testing.T) {
 		for _, reader := range []struct {
 			prefix string
 			attrs  []string
-		}{{"single", arm.single}, {"multiple", arm.multi}} {
+		}{{"single", arm.single}, {"multiple", arm.multi}, {"hash", arm.hash}} {
 			fd := funcDecl(file, reader.prefix+arm.suffix)
 			if fd == nil {
 				if len(reader.attrs) > 0 {
@@ -204,8 +209,9 @@ func TestRenderRMAccessFile_REQ171_CoversTheRegistry(t *testing.T) {
 
 // TestRenderRMAccessFile_REQ171_Readings pins, on the pinned RM, which
 // reading the generator chooses for one attribute of each kind: the reading
-// by Go kind, a content rule by declared type, a zero test, the three fixed
-// readings and the five attributes handed back in another shape.
+// by Go kind, a content rule by declared type, the object-reference reading
+// of an OBJECT_REF subtype, a zero test, the three fixed readings, the six
+// attributes handed back in another shape, and the entries of a hash.
 func TestRenderRMAccessFile_REQ171_Readings(t *testing.T) {
 	_, _, file := rmAccessOutput(t)
 	cases := []struct {
@@ -219,7 +225,9 @@ func TestRenderRMAccessFile_REQ171_Readings(t *testing.T) {
 		{"singleComposition", "name", "return x.Name, presentText(x.Name), true"},
 		{"singleComposition", "category", "return x.Category, presentCodedText(x.Category), true"},
 		{"singleComposition", "language", "return x.Language, presentCodePhrase(x.Language), true"},
-		{"singleRole", "performer", "return x.Performer, presentPartyRef(x.Performer), true"},
+		{"singleRole", "performer", "return x.Performer, presentObjectRef(x.Performer.ID, x.Performer.Namespace, x.Performer.Type), true"},
+		{"singlePartyRelationship", "source", "return x.Source, presentObjectRef(x.Source.ID, x.Source.Namespace, x.Source.Type), true"},
+		{"singleInstructionDetails", "instruction_id", "return x.InstructionID, presentObjectRef(x.InstructionID.ID, x.InstructionID.Namespace, x.InstructionID.Type), true"},
 		{"singleEventContext", "start_time", "return x.StartTime, !isZeroDVDateTime(x.StartTime), true"},
 		{"singleObservation", "data", "return x.Data, !isZeroHistoryItemStructure(x.Data), true"},
 		{"singleDVIntervalDVQuantity", "lower", "return x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true"},
@@ -234,6 +242,11 @@ func TestRenderRMAccessFile_REQ171_Readings(t *testing.T) {
 		{"singleCodePhrase", "terminology_id", "return x.TerminologyID.Value, !isZeroTerminologyID(x.TerminologyID), true"},
 		{"multipleComposition", "content", "return boxValues(x.Content), x.Content != nil, true"},
 		{"multipleItemList", "items", "return boxPointers(x.Items), x.Items != nil, true"},
+		{"singleResourceDescription", "details", "return x.Details, x.Details != nil, true"},
+		{"singleResourceDescription", "other_details", "return x.OtherDetails, x.OtherDetails != nil, true"},
+		{"hashResourceDescription", "details", "keys, values := entryPointers(x.Details)\nreturn keys, values, x.Details != nil, true"},
+		{"hashResourceDescription", "other_details", "if x.OtherDetails == nil {\n\treturn nil, nil, false, true\n}\nkeys, values := entryPointers(*x.OtherDetails)\nreturn keys, values, true, true"},
+		{"hashResourceAnnotations", "documentation", "keys, values := entryValues(x.Documentation)\nreturn keys, values, x.Documentation != nil, true"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.reader+"/"+tc.attr, func(t *testing.T) {
@@ -247,6 +260,146 @@ func TestRenderRMAccessFile_REQ171_Readings(t *testing.T) {
 			}
 			if strings.TrimSpace(got) != tc.want {
 				t.Errorf("%s case %q:\n%s\nwant:\n%s", tc.reader, tc.attr, strings.TrimSpace(got), tc.want)
+			}
+		})
+	}
+}
+
+// TestRenderRMAccessFile_REQ171_ListAndHashReadings pins the list and hash
+// readings on every reader the generator writes: a container is present when
+// its slice is not nil and a Hash when its map is not nil, or, held through a
+// pointer, when the pointer is not nil, whatever it holds. A container is
+// never read through anything but its own field, so an empty slice that is
+// not nil reads present.
+func TestRenderRMAccessFile_REQ171_ListAndHashReadings(t *testing.T) {
+	_, _, file := rmAccessOutput(t)
+	containers, hashes := 0, 0
+	for _, d := range file.Decls {
+		fd, ok := d.(*ast.FuncDecl)
+		if !ok {
+			continue
+		}
+		switch {
+		case strings.HasPrefix(fd.Name.Name, "multiple") && fd.Name.Name != "multiple":
+			for attr, body := range caseBodies(t, fd) {
+				containers++
+				field := "x." + FieldName(attr)
+				want := fmt.Sprintf("return boxPointers(%s), %s != nil, true", field, field)
+				alt := fmt.Sprintf("return boxValues(%s), %s != nil, true", field, field)
+				if got := strings.TrimSpace(body); got != want && got != alt {
+					t.Errorf("%s case %q:\n%s\nwant the list reading %s != nil", fd.Name.Name, attr, got, field)
+				}
+			}
+		case strings.HasPrefix(fd.Name.Name, "hash") && fd.Name.Name != "hash":
+			for attr, body := range caseBodies(t, fd) {
+				hashes++
+				field := "x." + FieldName(attr)
+				got := strings.TrimSpace(body)
+				byValue := fmt.Sprintf("return keys, values, %s != nil, true", field)
+				byPointer := fmt.Sprintf("if %s == nil {\n\treturn nil, nil, false, true\n}", field)
+				if !strings.HasSuffix(got, byValue) && !strings.HasPrefix(got, byPointer) {
+					t.Errorf("%s case %q:\n%s\nwant the hash reading %s != nil", fd.Name.Name, attr, got, field)
+				}
+			}
+		}
+	}
+	if containers < 100 || hashes < 8 {
+		t.Fatalf("checked %d container and %d hash readings, want the full RM set", containers, hashes)
+	}
+}
+
+// TestRMAccessGen_REQ171_ObjectRefSubtypes pins that the object-reference
+// reading follows the BMM hierarchy: OBJECT_REF and every class below it,
+// ACCESS_GROUP_REF included though no attribute of the pinned RM holds one
+// by value, and nothing else.
+func TestRMAccessGen_REQ171_ObjectRefSubtypes(t *testing.T) {
+	plan, _, _ := rmAccessOutput(t)
+	g, err := newRMAccessGen(plan)
+	if err != nil {
+		t.Fatalf("newRMAccessGen: %v", err)
+	}
+	for _, name := range []string{"OBJECT_REF", "PARTY_REF", "LOCATABLE_REF", "ACCESS_GROUP_REF"} {
+		if !g.isObjectRef(name) {
+			t.Errorf("isObjectRef(%s) = false, want true", name)
+		}
+	}
+	for _, name := range []string{"OBJECT_ID", "HIER_OBJECT_ID", "PARTY_SELF", "DV_EHR_URI", "LOCATABLE", "Hash", ""} {
+		if g.isObjectRef(name) {
+			t.Errorf("isObjectRef(%q) = true, want false", name)
+		}
+	}
+}
+
+// TestRMAccessGen_REQ171_Refusals pins that the generator refuses what it
+// cannot read rather than emit a wrong reader: a shape on a field of the
+// wrong kind, a shape it does not know, a container held as a Go map, a
+// Hash attribute not held as a map keyed by string, and a Go map on an
+// attribute not declared Hash.
+func TestRMAccessGen_REQ171_Refusals(t *testing.T) {
+	plan, _, _ := rmAccessOutput(t)
+	shapes := []struct {
+		name    string
+		shapes  map[string]map[string]accessShape
+		wantErr string
+	}{
+		{name: "address of a pointer field", shapes: map[string]map[string]accessShape{"COMPOSITION": {"context": shapeAddress}}, wantErr: "COMPOSITION.context is handed back by address, but its field is not held by value"},
+		{name: "dereference of a value field", shapes: map[string]map[string]accessShape{"COMPOSITION": {"category": shapeDeref}}, wantErr: "COMPOSITION.category is handed back dereferenced, but its field is not a pointer"},
+		{name: "value member of a string field", shapes: map[string]map[string]accessShape{"COMPOSITION": {"archetype_node_id": shapeValueMember}}, wantErr: "COMPOSITION.archetype_node_id is handed back as its value member, but its field is not held by value"},
+		{name: "a shape the generator does not know", shapes: map[string]map[string]accessShape{"COMPOSITION": {"name": accessShape(99)}}, wantErr: "COMPOSITION.name has shape 99, which the generator does not know"},
+	}
+	for _, tc := range shapes {
+		t.Run(tc.name, func(t *testing.T) {
+			g, err := newRMAccessGen(plan)
+			if err != nil {
+				t.Fatalf("newRMAccessGen: %v", err)
+			}
+			g.shapes = tc.shapes
+			if _, err := g.render(); err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Errorf("render with shapes %v = %v, want an error containing %q", tc.shapes, err, tc.wantErr)
+			}
+		})
+	}
+
+	g, err := newRMAccessGen(plan)
+	if err != nil {
+		t.Fatalf("newRMAccessGen: %v", err)
+	}
+	var arm *accessArm
+	for _, pc := range plan.ConcreteClasses {
+		if pc.BMMName == "RESOURCE_DESCRIPTION" {
+			arms, err := g.arms(pc)
+			if err != nil {
+				t.Fatalf("arms(RESOURCE_DESCRIPTION): %v", err)
+			}
+			arm = arms[0]
+		}
+	}
+	if arm == nil {
+		t.Fatal("no RESOURCE_DESCRIPTION among the concrete classes")
+	}
+	attr := func(declared string, container bool, typ string) *accessAttr {
+		gt := mustParseGoType(t, typ)
+		kind, err := g.classify(gt)
+		if err != nil {
+			t.Fatalf("classify(%s): %v", typ, err)
+		}
+		return &accessAttr{name: "doctored", field: "Doctored", declared: declared, container: container, typ: gt, kind: kind}
+	}
+	attrs := []struct {
+		name    string
+		attr    *accessAttr
+		wantErr string
+	}{
+		{name: "container held as a map", attr: attr("RESOURCE_DESCRIPTION_ITEM", true, "map[string]ResourceDescriptionItem"), wantErr: "container RESOURCE_DESCRIPTION.doctored has Go type map[string]rm.ResourceDescriptionItem, not a slice"},
+		{name: "Hash held as a slice", attr: attr("Hash", false, "[]string"), wantErr: "Hash RESOURCE_DESCRIPTION.doctored has Go type []string, not a map keyed by string"},
+		{name: "Hash keyed by a number", attr: attr("Hash", false, "map[int]string"), wantErr: "Hash RESOURCE_DESCRIPTION.doctored has Go type map[int]string, not a map keyed by string"},
+		{name: "map not declared Hash", attr: attr("String", false, "map[string]string"), wantErr: "RESOURCE_DESCRIPTION.doctored is declared String, but its Go type map[string]string is a map"},
+		{name: "pointer to a map not declared Hash", attr: attr("String", false, "*map[string]string"), wantErr: "RESOURCE_DESCRIPTION.doctored is declared String, but its Go type *map[string]string is a map"},
+	}
+	for _, tc := range attrs {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := g.split(arm, []*accessAttr{tc.attr}); err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Errorf("split(%s: %s %s) = %v, want an error containing %q", tc.attr.name, tc.attr.declared, tc.attr.typ.qualified(), err, tc.wantErr)
 			}
 		})
 	}

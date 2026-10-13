@@ -3,9 +3,9 @@ package rmaccess_test
 // Transitional parity with the hand-written readers (REQ-171 Structural
 // access, ADR 0028). The validators move from openehr/validation/rmread to
 // this package in one swap; this test pins that, on every vendored corpus
-// document and on the zero value of every registered class, the generated
-// access answers what rmread answers wherever rmread reads, apart from the
-// three named divergences below. It goes with rmread.
+// document, on the zero value of every registered class and on hand-built
+// samples, the generated access answers what rmread answers wherever rmread
+// reads, apart from the four named divergences below. It goes with rmread.
 //
 // The test package imports rmread, canjson and testkit/fixtures, none of which
 // the package itself may import.
@@ -27,25 +27,38 @@ import (
 )
 
 // The divergences the swap is allowed, each a reading the generated access
-// makes on purpose. Every other difference in presence or in the Go type of
-// a value is a defect.
+// makes on purpose, as Structural access states it. Every other difference
+// in presence or in the Go type of a value is a defect.
 const (
 	// allowUnread: rmread has no row for the attribute, so it answers the
 	// untyped (nil, false) it gives an unknown pair, while the access finds
 	// the attribute present. This is the gap ADR 0028 closes. It never covers
 	// a DV_INTERVAL bound or a REFERENCE_RANGE range: rmread reads both and
 	// can give that same answer for a set field, so a difference there is a
-	// defect.
+	// defect unless allowSpecReading names the pair.
 	allowUnread = "an attribute rmread does not read"
 	// allowEmptyString: EVENT_CONTEXT location and CODE_PHRASE preferred_term
 	// read a set but empty string as absent in rmread; a pointer that is not
 	// nil is present.
 	allowEmptyString = "a pointer to an empty string"
-	// allowNamedHistory: rmread reads an OBSERVATION's HISTORY, held by
-	// value, as absent when it has no events, no origin and no node id,
-	// whatever else it holds; a value held by value is absent only when it is
-	// its zero value.
-	allowNamedHistory = "a HISTORY held by value with no events, origin or node id"
+	// allowSpecReading: for the pairs [specReadings] lists, and only those,
+	// rmread decides presence by one or two members of the value (a
+	// DV_DATE_TIME by its value, an ISM_TRANSITION by its current_state, an
+	// ELEMENT by its node id and value, a DV_CODED_TEXT by its value and code
+	// string, an interval by its bounds read as Void) or a pointer by what it
+	// points to, where the spec reads the whole Go value: a value held by
+	// value is absent only when it is empty, which for these classes means
+	// its zero value, and a pointer is present when it is not nil. On such a
+	// value the access reads the attribute present and rmread absent.
+	allowSpecReading = "the spec's reading differs from rmread's single-member check"
+	// allowNilList: a nil list is absent in the access, while rmread reads
+	// every container it serves as there, with no item. It covers only a
+	// container the access reads absent with no item where rmread finds no
+	// item either; that the access reads absent only a nil slice, never an
+	// empty one, is pinned by TestPresence_REQ171_ListReadings and by the
+	// generator's own test of every container's reading, and here by the
+	// empty-list sample, which must not take this allowance.
+	allowNilList = "a nil list is absent"
 )
 
 // emptyStringAttrs are the two attributes allowEmptyString covers.
@@ -54,6 +67,70 @@ var emptyStringAttrs = map[string]string{
 	"CODE_PHRASE":   "preferred_term",
 }
 
+// pairDivergence is one allowance taken on one attribute.
+type pairDivergence struct {
+	allowance   string
+	class, attr string
+}
+
+// specReading is one attribute allowSpecReading covers, with a sample: a
+// parent, built by hand, on which the access reads the attribute present
+// and rmread absent. The corpus does not reach any of these values.
+type specReading struct {
+	class, attr string
+	sample      any
+}
+
+// specReadings lists every attribute allowSpecReading covers: the by-value
+// attributes rmread reads by a member, and ISM_TRANSITION careflow_step and
+// transition, which it reads by what the pointer holds. Each sample must
+// diverge, so a pair whose divergence disappears fails the test.
+func specReadings() []specReading {
+	status := "unknown"
+	coded := rm.DVCodedText{
+		Value:        "planned",
+		DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}, CodeString: "526"},
+	}
+	return []specReading{
+		// A DV_DATE_TIME or DV_DURATION with no value but another member set.
+		{class: "EVENT_CONTEXT", attr: "start_time", sample: &rm.EventContext{StartTime: rm.DVDateTime{MagnitudeStatus: &status}}},
+		{class: "ACTION", attr: "time", sample: &rm.Action{Time: rm.DVDateTime{Accuracy: &rm.DVDuration{}}, IsmTransition: rm.IsmTransition{CurrentState: coded}}},
+		{class: "HISTORY", attr: "origin", sample: &rm.History[rm.ItemStructure]{Origin: rm.DVDateTime{MagnitudeStatus: &status}}},
+		{class: "POINT_EVENT", attr: "time", sample: &rm.PointEvent[rm.ItemStructure]{Time: rm.DVDateTime{MagnitudeStatus: &status}}},
+		{class: "INTERVAL_EVENT", attr: "time", sample: &rm.IntervalEvent[rm.ItemStructure]{Time: rm.DVDateTime{MagnitudeStatus: &status}}},
+		{class: "INTERVAL_EVENT", attr: "width", sample: &rm.IntervalEvent[rm.ItemStructure]{Time: rm.DVDateTime{Value: "2026-10-13T10:00:00Z"}, Width: rm.DVDuration{MagnitudeStatus: &status}}},
+		// A DV_CODED_TEXT whose defining code has a terminology only.
+		{class: "EVENT_CONTEXT", attr: "setting", sample: &rm.EventContext{
+			StartTime: rm.DVDateTime{Value: "2026-10-13T10:00:00Z"},
+			Setting:   rm.DVCodedText{DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}}},
+		}},
+		// An ISM_TRANSITION with no current_state but a careflow_step.
+		{class: "ACTION", attr: "ism_transition", sample: &rm.Action{Time: rm.DVDateTime{Value: "2026-10-13T10:00:00Z"}, IsmTransition: rm.IsmTransition{CareflowStep: &coded}}},
+		// A pointer to an empty DV_CODED_TEXT.
+		{class: "ISM_TRANSITION", attr: "careflow_step", sample: &rm.IsmTransition{CurrentState: coded, CareflowStep: &rm.DVCodedText{}}},
+		{class: "ISM_TRANSITION", attr: "transition", sample: &rm.IsmTransition{CurrentState: coded, Transition: &rm.DVCodedText{}}},
+		// An ELEMENT with a name but no node id and no value.
+		{class: "ITEM_SINGLE", attr: "item", sample: &rm.ItemSingle{Item: rm.Element{Name: &rm.DVText{Value: "name"}}}},
+		// A range whose lower bound is a nil pointer, every flag false.
+		{class: "REFERENCE_RANGE", attr: "range", sample: &rm.ReferenceRange[rm.DVOrdered]{
+			Meaning: &rm.DVText{Value: "normal"},
+			Range:   rm.DVInterval[rm.DVOrdered]{Interval: rm.Interval[rm.DVOrdered]{Lower: (*rm.DVCount)(nil)}},
+		}},
+		// A HISTORY with a name but no events, origin or node id.
+		{class: "OBSERVATION", attr: "data", sample: &rm.Observation{Data: rm.History[rm.ItemStructure]{Name: &rm.DVText{Value: "history"}}}},
+	}
+}
+
+// specReadingPairs is the set of class and attribute pairs specReadings
+// lists.
+var specReadingPairs = func() map[[2]string]bool {
+	out := map[[2]string]bool{}
+	for _, r := range specReadings() {
+		out[[2]string{r.class, r.attr}] = true
+	}
+	return out
+}()
+
 // parityWalk walks one value through the generated access, comparing every
 // attribute with rmread on the way down.
 type parityWalk struct {
@@ -61,6 +138,17 @@ type parityWalk struct {
 	doc      string
 	compared int
 	allowed  map[string]int
+	pairs    map[pairDivergence]int
+}
+
+func newParityWalk(t *testing.T, doc string, allowed map[string]int) *parityWalk {
+	return &parityWalk{t: t, doc: doc, allowed: allowed, pairs: map[pairDivergence]int{}}
+}
+
+// allow records one divergence of attr of class under allowance.
+func (w *parityWalk) allow(allowance, class, attr string) {
+	w.allowed[allowance]++
+	w.pairs[pairDivergence{allowance: allowance, class: class, attr: attr}]++
 }
 
 func (w *parityWalk) node(v any, path string, depth int) {
@@ -77,8 +165,8 @@ func (w *parityWalk) node(v any, path string, depth int) {
 		}
 		at := path + "/" + attr
 		if container, _ := rminfo.Default.IsContainer(class, attr); container {
-			items, ok := rmaccess.Multiple(v, attr)
-			w.multiple(class, attr, at, items, ok, v)
+			items, present := rmaccess.Multiple(v, attr)
+			w.multiple(class, attr, at, items, present, v)
 			for i, item := range items {
 				w.node(item, fmt.Sprintf("%s[%d]", at, i), depth+1)
 			}
@@ -106,7 +194,7 @@ func (w *parityWalk) single(class, attr, path string, value any, present bool, p
 		return
 	}
 	if allowance := allowedSingle(class, attr, present, old, oldOK); allowance != "" {
-		w.allowed[allowance]++
+		w.allow(allowance, class, attr)
 		return
 	}
 	w.t.Errorf("%s %s: Single(%s, %q) present = %t, rmread.ReadSingle gives %t (value %T)", w.doc, path, class, attr, present, oldOK, old)
@@ -126,10 +214,8 @@ func allowedSingle(class, attr string, present bool, old any, oldOK bool) string
 			return allowEmptyString
 		}
 	}
-	if class == "OBSERVATION" && attr == "data" {
-		if h, ok := old.(rm.History[rm.ItemStructure]); ok && len(h.Events) == 0 && h.Origin.Value == "" && h.ArchetypeNodeID == "" {
-			return allowNamedHistory
-		}
+	if specReadingPairs[[2]string{class, attr}] {
+		return allowSpecReading
 	}
 	return ""
 }
@@ -148,19 +234,26 @@ func readsNil(class, attr string) bool {
 }
 
 // multiple compares one container.
-func (w *parityWalk) multiple(class, attr, path string, items []any, ok bool, parent any) {
+func (w *parityWalk) multiple(class, attr, path string, items []any, present bool, parent any) {
 	old, oldOK := rmread.ReadMultiple(parent, class, attr)
-	w.compared++
-	if !ok {
-		w.t.Errorf("%s %s: Multiple(%s, %q) ok = false for a container rminfo declares", w.doc, path, class, attr)
+	if !oldOK && old != nil {
+		w.t.Errorf("%s %s: rmread.ReadMultiple(%s, %q) = (%d items, false)", w.doc, path, class, attr, len(old))
 		return
 	}
-	if !oldOK {
-		if old != nil {
-			w.t.Errorf("%s %s: rmread.ReadMultiple(%s, %q) = (%d items, false)", w.doc, path, class, attr, len(old))
+	if !present && !oldOK {
+		return // an absent list rmread does not read, or a typed-nil parent
+	}
+	w.compared++
+	switch {
+	case !oldOK:
+		w.allow(allowUnread, class, attr)
+		return
+	case !present:
+		if items == nil && len(old) == 0 {
+			w.allow(allowNilList, class, attr)
 			return
 		}
-		w.allowed[allowUnread]++
+		w.t.Errorf("%s %s: Multiple(%s, %q) = (%d items, false), rmread.ReadMultiple has %d items", w.doc, path, class, attr, len(items), len(old))
 		return
 	}
 	if len(items) != len(old) {
@@ -174,10 +267,18 @@ func (w *parityWalk) multiple(class, attr, path string, items []any, ok bool, pa
 	}
 }
 
-// paritySamples are hand-built values for the attributes rmread reads that
-// the corpus does not reach: the five whose value comes back in another shape
-// than the field's own, and the two narrow divergences.
-func paritySamples() map[string]any {
+// paritySample is a hand-built value for an attribute rmread reads that the
+// corpus does not reach, with the divergences it must and must not show.
+type paritySample struct {
+	value    any
+	diverges []pairDivergence // each must be taken at least once
+	agrees   []pairDivergence // none may be taken
+}
+
+// paritySamples are the hand-built values: the six attributes whose value
+// comes back in another shape than the field's own, which must agree with
+// rmread, the empty-string divergence, and the two list readings.
+func paritySamples() map[string]paritySample {
 	coded := func(code string) rm.DVCodedText {
 		return rm.DVCodedText{
 			Value:        "text " + code,
@@ -187,24 +288,39 @@ func paritySamples() map[string]any {
 	step, transition := coded("245"), coded("540")
 	empty := ""
 	precision := rm.Integer(2)
-	return map[string]any{
-		"ISM_TRANSITION careflow_step and transition": &rm.Action{IsmTransition: rm.IsmTransition{
+	section := &rm.Section{ArchetypeNodeID: "openEHR-EHR-SECTION.adhoc.v1", Name: &rm.DVText{Value: "section"}}
+	return map[string]paritySample{
+		"ISM_TRANSITION careflow_step and transition": {value: &rm.Action{IsmTransition: rm.IsmTransition{
 			CurrentState: coded("524"), CareflowStep: &step, Transition: &transition,
-		}},
-		"REFERENCE_RANGE range": &rm.DVCount{Magnitude: 1, OtherReferenceRanges: []rm.ReferenceRange[rm.DVCount]{{
+		}}},
+		"REFERENCE_RANGE range": {value: &rm.DVCount{Magnitude: 1, OtherReferenceRanges: []rm.ReferenceRange[rm.DVCount]{{
 			Meaning: &rm.DVText{Value: "normal"},
 			Range: rm.DVInterval[rm.DVOrdered]{
 				Lower: &rm.DVCount{Magnitude: 1}, LowerIncluded: true, UpperUnbounded: true,
 			},
-		}}},
-		"DV_PROPORTION precision": &rm.DVProportion{Numerator: 1, Denominator: 2, Precision: &precision},
-		"ITEM_SINGLE item":        &rm.ItemSingle{ArchetypeNodeID: "at1", Item: rm.Element{ArchetypeNodeID: "at2"}},
-		"EVENT_CONTEXT location":  &rm.EventContext{Location: &empty, Setting: coded("238")},
-		"CODE_PHRASE preferred_term": &rm.CodePhrase{
-			TerminologyID: rm.TerminologyID{Value: "local"}, CodeString: "at1", PreferredTerm: &empty,
+		}}}},
+		"DV_PROPORTION precision":    {value: &rm.DVProportion{Numerator: 1, Denominator: 2, Precision: &precision}},
+		"ITEM_SINGLE item":           {value: &rm.ItemSingle{ArchetypeNodeID: "at1", Item: rm.Element{ArchetypeNodeID: "at2"}}},
+		"CODE_PHRASE terminology_id": {value: &rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "local"}, CodeString: "at1"}},
+		"EVENT_CONTEXT location": {
+			value:    &rm.EventContext{Location: &empty, Setting: coded("238")},
+			diverges: []pairDivergence{{allowance: allowEmptyString, class: "EVENT_CONTEXT", attr: "location"}},
 		},
-		"OBSERVATION data with a name only": &rm.Observation{
-			Data: rm.History[rm.ItemStructure]{Name: &rm.DVText{Value: "history"}},
+		"CODE_PHRASE preferred_term": {
+			value:    &rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "local"}, CodeString: "at1", PreferredTerm: &empty},
+			diverges: []pairDivergence{{allowance: allowEmptyString, class: "CODE_PHRASE", attr: "preferred_term"}},
+		},
+		"COMPOSITION content, a nil list": {
+			value:    &rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"},
+			diverges: []pairDivergence{{allowance: allowNilList, class: "COMPOSITION", attr: "content"}},
+		},
+		"COMPOSITION content, an empty list": {
+			value:  &rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1", Content: []rm.ContentItem{}},
+			agrees: []pairDivergence{{allowance: allowNilList, class: "COMPOSITION", attr: "content"}},
+		},
+		"COMPOSITION content, a list with an item": {
+			value:  &rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1", Content: []rm.ContentItem{section}},
+			agrees: []pairDivergence{{allowance: allowNilList, class: "COMPOSITION", attr: "content"}},
 		},
 	}
 }
@@ -213,7 +329,8 @@ func paritySamples() map[string]any {
 // the zero value of every registered class and the hand-built samples
 // through the generated access and through rmread, and fails on any
 // difference in presence or in the Go type of a value outside the named
-// divergences.
+// divergences, and on a sample that no longer shows the divergence it is
+// there for.
 func TestAccess_REQ171_ParityWithRMRead(t *testing.T) {
 	allowed := map[string]int{}
 	compared := 0
@@ -237,7 +354,7 @@ func TestAccess_REQ171_ParityWithRMRead(t *testing.T) {
 			continue // a decode failure is the codec's tests' concern
 		}
 		decoded++
-		w := &parityWalk{t: t, doc: rel.Rel, allowed: allowed}
+		w := newParityWalk(t, rel.Rel, allowed)
 		w.node(root, "", 0)
 		compared += w.compared
 	}
@@ -247,22 +364,42 @@ func TestAccess_REQ171_ParityWithRMRead(t *testing.T) {
 
 	for _, name := range typereg.Default.Names() {
 		ctor, _ := typereg.Default.Lookup(name)
-		w := &parityWalk{t: t, doc: "zero " + name, allowed: allowed}
+		w := newParityWalk(t, "zero "+name, allowed)
 		w.node(ctor(), "", 0)
 		compared += w.compared
 	}
 
 	samples := paritySamples()
 	for _, name := range slices.Sorted(maps.Keys(samples)) {
-		w := &parityWalk{t: t, doc: "sample " + name, allowed: allowed}
-		w.node(samples[name], "", 0)
+		sample := samples[name]
+		w := newParityWalk(t, "sample "+name, allowed)
+		w.node(sample.value, "", 0)
 		compared += w.compared
+		for _, d := range sample.diverges {
+			if w.pairs[d] == 0 {
+				t.Errorf("sample %s: %s.%s no longer diverges from rmread as %s", name, d.class, d.attr, d.allowance)
+			}
+		}
+		for _, d := range sample.agrees {
+			if w.pairs[d] != 0 {
+				t.Errorf("sample %s: %s.%s took the allowance %s, want agreement with rmread", name, d.class, d.attr, d.allowance)
+			}
+		}
+	}
+
+	for _, r := range specReadings() {
+		w := newParityWalk(t, "spec reading "+r.class+"."+r.attr, allowed)
+		w.node(r.sample, "", 0)
+		compared += w.compared
+		if w.pairs[pairDivergence{allowance: allowSpecReading, class: r.class, attr: r.attr}] == 0 {
+			t.Errorf("spec reading %s.%s: the sample no longer diverges from rmread; drop the pair from specReadings", r.class, r.attr)
+		}
 	}
 
 	if compared == 0 {
 		t.Fatal("compared no attribute; the walk has gone blind")
 	}
-	for _, allowance := range []string{allowUnread, allowEmptyString, allowNamedHistory} {
+	for _, allowance := range []string{allowUnread, allowEmptyString, allowSpecReading, allowNilList} {
 		if allowed[allowance] == 0 {
 			t.Errorf("no attribute was allowed as %s; the walk no longer reaches it", allowance)
 		}

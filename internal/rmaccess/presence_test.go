@@ -1,6 +1,7 @@
 package rmaccess
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -9,8 +10,8 @@ import (
 // TestPresence_REQ171_EachReading pins REQ-171 Structural access,
 // Acceptance: a test pins each presence reading Structural access names and
 // fails when one changes. Each row reads one attribute through Single and
-// names the reading it pins; the list readings, which Multiple does not
-// report, are read through multiple's presence answer.
+// names the reading it pins. The list and hash readings are pinned by
+// TestPresence_REQ171_ListReadings and TestPresence_REQ171_HashReadings.
 func TestPresence_REQ171_EachReading(t *testing.T) {
 	empty := ""
 	text := "text"
@@ -18,6 +19,10 @@ func TestPresence_REQ171_EachReading(t *testing.T) {
 	hierID := &rm.HierObjectID{Value: "9fcf1d0e-0000-4000-8000-000000000001"}
 	partyRef := func(id rm.ObjectID, namespace, typ string) rm.PartyRef {
 		return rm.PartyRef{ID: id, Namespace: namespace, Type: typ}
+	}
+	versionID := &rm.ObjectVersionID{Value: "9fcf1d0e-0000-4000-8000-000000000002::local::1"}
+	locatableRef := func(id rm.UIDBasedID, namespace, typ string) rm.LocatableRef {
+		return rm.LocatableRef{ID: id, Namespace: namespace, Type: typ}
 	}
 	quantityInterval := func(unbounded bool, lower rm.DVQuantity) *rm.DVInterval[rm.DVQuantity] {
 		return &rm.DVInterval[rm.DVQuantity]{Lower: lower, LowerUnbounded: unbounded, UpperUnbounded: true}
@@ -75,12 +80,22 @@ func TestPresence_REQ171_EachReading(t *testing.T) {
 		{reading: "CODE_PHRASE with a code_string only", parent: &rm.Composition{Language: rm.CodePhrase{CodeString: "en"}}, attr: "language", want: true},
 		{reading: "CODE_PHRASE with a terminology only", parent: &rm.Composition{Language: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}}}, attr: "language", want: true},
 
-		// PARTY_REF held by value: empty when its id, namespace or type is missing.
+		// An OBJECT_REF subtype held by value: empty when its id, namespace or
+		// type is missing. PARTY_REF (ROLE performer):
 		{reading: "PARTY_REF complete", parent: &rm.Role{Performer: partyRef(hierID, "local", "PERSON")}, attr: "performer", want: true},
 		{reading: "PARTY_REF without an id", parent: &rm.Role{Performer: partyRef(nil, "local", "PERSON")}, attr: "performer", want: false},
 		{reading: "PARTY_REF with a nil-pointer id", parent: &rm.Role{Performer: partyRef((*rm.HierObjectID)(nil), "local", "PERSON")}, attr: "performer", want: false},
 		{reading: "PARTY_REF without a namespace", parent: &rm.Role{Performer: partyRef(hierID, "", "PERSON")}, attr: "performer", want: false},
 		{reading: "PARTY_REF without a type", parent: &rm.Role{Performer: partyRef(hierID, "local", "")}, attr: "performer", want: false},
+		// LOCATABLE_REF (INSTRUCTION_DETAILS instruction_id), whose id is the
+		// UID_BASED_ID it redefines, not the OBJECT_REF id it embeds:
+		{reading: "LOCATABLE_REF complete", parent: &rm.InstructionDetails{InstructionID: locatableRef(versionID, "local", "INSTRUCTION")}, attr: "instruction_id", want: true},
+		{reading: "LOCATABLE_REF without an id", parent: &rm.InstructionDetails{InstructionID: locatableRef(nil, "local", "INSTRUCTION")}, attr: "instruction_id", want: false},
+		{reading: "LOCATABLE_REF with a nil-pointer id", parent: &rm.InstructionDetails{InstructionID: locatableRef((*rm.ObjectVersionID)(nil), "local", "INSTRUCTION")}, attr: "instruction_id", want: false},
+		{reading: "LOCATABLE_REF without a namespace", parent: &rm.InstructionDetails{InstructionID: locatableRef(versionID, "", "INSTRUCTION")}, attr: "instruction_id", want: false},
+		{reading: "LOCATABLE_REF without a type", parent: &rm.InstructionDetails{InstructionID: locatableRef(versionID, "local", "")}, attr: "instruction_id", want: false},
+		{reading: "LOCATABLE_REF with only a path", parent: &rm.InstructionDetails{InstructionID: rm.LocatableRef{Path: &text}}, attr: "instruction_id", want: false},
+		{reading: "LOCATABLE_REF with only the embedded OBJECT_REF id", parent: &rm.InstructionDetails{InstructionID: rm.LocatableRef{ObjectRef: rm.ObjectRef{ID: hierID, Namespace: "local", Type: "INSTRUCTION"}}}, attr: "instruction_id", want: false},
 
 		// Any other class held by value: empty when it is its zero value.
 		{reading: "DV_DATE_TIME zero", parent: &rm.EventContext{}, attr: "start_time", want: false},
@@ -120,9 +135,9 @@ func TestPresence_REQ171_EachReading(t *testing.T) {
 	}
 }
 
-// TestPresence_REQ171_ListReadings pins the list readings: a list is present
-// when it is not nil, and empty when it is present and holds no item. Multiple
-// answers ok for all three, as the RM floor reads it.
+// TestPresence_REQ171_ListReadings pins the list readings through Multiple:
+// a list is present when it is not nil, and empty when it is present and
+// holds no item.
 func TestPresence_REQ171_ListReadings(t *testing.T) {
 	cases := []struct {
 		reading     string
@@ -136,20 +151,123 @@ func TestPresence_REQ171_ListReadings(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.reading, func(t *testing.T) {
-			items, present, served := multiple(tc.parent, "content")
-			if !served || present != tc.wantPresent || len(items) != tc.wantItems {
-				t.Errorf("multiple(COMPOSITION, content) = (%d items, present %t, served %t), want (%d, %t, true)",
-					len(items), present, served, tc.wantItems, tc.wantPresent)
+			items, present := Multiple(tc.parent, "content")
+			if present != tc.wantPresent || len(items) != tc.wantItems {
+				t.Errorf("Multiple(COMPOSITION, content) = (%d items, %t), want (%d, %t)", len(items), present, tc.wantItems, tc.wantPresent)
 			}
-			if items, ok := Multiple(tc.parent, "content"); !ok || len(items) != tc.wantItems {
-				t.Errorf("Multiple(COMPOSITION, content) = (%d items, %t), want (%d, true)", len(items), ok, tc.wantItems)
+			if !present && items != nil {
+				t.Errorf("Multiple(COMPOSITION, content) = (%v, false), want nil items when absent", items)
 			}
 		})
 	}
+	if items, present := Multiple(&rm.Composition{Content: []rm.ContentItem{}}, "name"); items != nil || present {
+		t.Errorf("Multiple(COMPOSITION, name) = (%v, %t), want (nil, false) for a single-valued attribute", items, present)
+	}
 }
 
-// TestPresence_REQ171_ObjectRef pins the OBJECT_REF content rule, which no
-// attribute of the pinned RM holds by value, so no Single row reaches it.
+// TestPresence_REQ171_HashReadings pins the hash readings through Hash: a
+// hash is present when it is not nil, held directly or through a pointer that
+// is not nil, and empty when it is present and holds no entry. Its entries
+// come back in ascending key order, a value of a class or a primitive as a
+// pointer to a copy that the access covers, a value held as an interface as
+// it is. Single serves the same attribute as the whole map, with the same
+// presence.
+func TestPresence_REQ171_HashReadings(t *testing.T) {
+	var nilMap map[string]string
+	type want struct {
+		present bool
+		keys    []string
+	}
+	cases := []struct {
+		reading string
+		parent  any
+		attr    string
+		want    want
+	}{
+		{reading: "nil map", parent: &rm.ResourceDescription{}, attr: "details", want: want{present: false}},
+		{reading: "nil pointer to a map", parent: &rm.ResourceDescription{}, attr: "other_details", want: want{present: false}},
+		{reading: "empty map", parent: &rm.ResourceDescription{Details: map[string]rm.ResourceDescriptionItem{}}, attr: "details", want: want{present: true}},
+		{reading: "pointer to an empty map", parent: &rm.ResourceDescriptionItem{OtherDetails: &map[string]string{}}, attr: "other_details", want: want{present: true}},
+		{reading: "pointer to a nil map", parent: &rm.TranslationDetails{OtherDetails: &nilMap}, attr: "other_details", want: want{present: true}},
+		{
+			reading: "map with entries",
+			parent:  &rm.TranslationDetails{Author: map[string]string{"organisation": "o", "name": "n", "email": "e"}},
+			attr:    "author",
+			want:    want{present: true, keys: []string{"email", "name", "organisation"}},
+		},
+		{
+			reading: "pointer to a map with entries",
+			parent:  &rm.ResourceDescription{OtherDetails: &map[string]string{"b": "2", "a": "1"}},
+			attr:    "other_details",
+			want:    want{present: true, keys: []string{"a", "b"}},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.reading, func(t *testing.T) {
+			keys, values, present := Hash(tc.parent, tc.attr)
+			if present != tc.want.present || !slices.Equal(keys, tc.want.keys) || len(values) != len(keys) {
+				t.Errorf("Hash(%T, %q) = (%q, %d values, %t), want (%q, %d values, %t)",
+					tc.parent, tc.attr, keys, len(values), present, tc.want.keys, len(tc.want.keys), tc.want.present)
+			}
+			if _, singlePresent := Single(tc.parent, tc.attr); singlePresent != present {
+				t.Errorf("Single(%T, %q) present = %t, Hash present = %t; one attribute has one presence", tc.parent, tc.attr, singlePresent, present)
+			}
+		})
+	}
+
+	// Entries of an RM class: pointers to copies, in key order, that a walk
+	// can enter.
+	desc := &rm.ResourceDescription{Details: map[string]rm.ResourceDescriptionItem{
+		"nl": {Purpose: "doel"},
+		"en": {Purpose: "purpose"},
+	}}
+	keys, values, present := Hash(desc, "details")
+	if !present || !slices.Equal(keys, []string{"en", "nl"}) || len(values) != 2 {
+		t.Fatalf("Hash(RESOURCE_DESCRIPTION, details) = (%q, %d values, %t), want ([en nl], 2 values, true)", keys, len(values), present)
+	}
+	for i, v := range values {
+		item, ok := v.(*rm.ResourceDescriptionItem)
+		if !ok || item.Purpose != desc.Details[keys[i]].Purpose || !Covers(v) {
+			t.Errorf("Hash(RESOURCE_DESCRIPTION, details) value %d = %#v (covered %t), want a *rm.ResourceDescriptionItem for key %q", i, v, Covers(v), keys[i])
+			continue
+		}
+		item.Purpose = "changed"
+		if desc.Details[keys[i]].Purpose == "changed" {
+			t.Errorf("a change through Hash value %q reached the map; a value is a copy", keys[i])
+		}
+	}
+
+	// Entries of a primitive: pointers to copies.
+	_, values, _ = Hash(&rm.TranslationDetails{Author: map[string]string{"name": "n"}}, "author")
+	if len(values) != 1 {
+		t.Fatalf("Hash(TRANSLATION_DETAILS, author) has %d values, want 1", len(values))
+	}
+	if s, ok := values[0].(*string); !ok || *s != "n" {
+		t.Errorf("Hash(TRANSLATION_DETAILS, author) value = %#v, want a *string holding %q", values[0], "n")
+	}
+
+	// Entries held as an interface: as they are.
+	nested := map[string]any{"ui": "passthrough"}
+	_, values, _ = Hash(&rm.ResourceAnnotations{Documentation: map[string]any{"en": nested}}, "documentation")
+	if len(values) != 1 {
+		t.Fatalf("Hash(RESOURCE_ANNOTATIONS, documentation) has %d values, want 1", len(values))
+	}
+	if m, ok := values[0].(map[string]any); !ok || m["ui"] != "passthrough" {
+		t.Errorf("Hash(RESOURCE_ANNOTATIONS, documentation) value = %#v, want the map[string]any as it is", values[0])
+	}
+
+	// A pair the class does not declare as a Hash.
+	for _, attr := range []string{"lifecycle_state", "other_contributors", "no_such_attribute"} {
+		if keys, values, present := Hash(&rm.ResourceDescription{LifecycleState: "draft", OtherContributors: []string{"x"}}, attr); keys != nil || values != nil || present {
+			t.Errorf("Hash(RESOURCE_DESCRIPTION, %q) = (%q, %v, %t), want (nil, nil, false)", attr, keys, values, present)
+		}
+	}
+}
+
+// TestPresence_REQ171_ObjectRef pins the object-reference reading on the
+// parts of a reference, as the generated access hands them over: an
+// OBJECT_REF and an ACCESS_GROUP_REF, which no attribute of the pinned RM
+// holds by value, so no Single row reaches them.
 func TestPresence_REQ171_ObjectRef(t *testing.T) {
 	id := &rm.HierObjectID{Value: "9fcf1d0e-0000-4000-8000-000000000001"}
 	cases := []struct {
@@ -165,15 +283,19 @@ func TestPresence_REQ171_ObjectRef(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.reading, func(t *testing.T) {
-			if got := presentObjectRef(tc.ref); got != tc.want {
-				t.Errorf("presentObjectRef(%+v) = %t, want %t", tc.ref, got, tc.want)
+			if got := presentObjectRef(tc.ref.ID, tc.ref.Namespace, tc.ref.Type); got != tc.want {
+				t.Errorf("presentObjectRef(OBJECT_REF %+v) = %t, want %t", tc.ref, got, tc.want)
+			}
+			group := rm.AccessGroupRef{ObjectRef: tc.ref}
+			if got := presentObjectRef(group.ID, group.Namespace, group.Type); got != tc.want {
+				t.Errorf("presentObjectRef(ACCESS_GROUP_REF %+v) = %t, want %t", group, got, tc.want)
 			}
 		})
 	}
 }
 
-// TestAccess_REQ171_Shapes pins the five attributes whose value comes back in
-// another shape than the field's own, and the boxing of list items: a list of
+// TestAccess_REQ171_Shapes pins the six attributes, of five classes, whose
+// value comes back in another shape than the field's own, and the boxing of list items: a list of
 // values as pointers into its backing array, a list of interfaces as it is.
 func TestAccess_REQ171_Shapes(t *testing.T) {
 	precision := rm.Integer(2)

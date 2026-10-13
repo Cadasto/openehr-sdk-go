@@ -969,6 +969,31 @@ func multiple(parent any, attr string) ([]any, bool, bool) {
 	return nil, false, false
 }
 
+// hash reads the Hash attribute attr of parent: the keys of its entries in
+// ascending order, their values, whether the hash is present, and whether
+// parent's class declares attr as a Hash at all.
+func hash(parent any, attr string) ([]string, []any, bool, bool) {
+	switch p := parent.(type) {
+	case *rm.ResourceAnnotations:
+		return hashResourceAnnotations(p, attr)
+	case rm.ResourceAnnotations:
+		return hashResourceAnnotations(&p, attr)
+	case *rm.ResourceDescription:
+		return hashResourceDescription(p, attr)
+	case rm.ResourceDescription:
+		return hashResourceDescription(&p, attr)
+	case *rm.ResourceDescriptionItem:
+		return hashResourceDescriptionItem(p, attr)
+	case rm.ResourceDescriptionItem:
+		return hashResourceDescriptionItem(&p, attr)
+	case *rm.TranslationDetails:
+		return hashTranslationDetails(p, attr)
+	case rm.TranslationDetails:
+		return hashTranslationDetails(&p, attr)
+	}
+	return nil, nil, false, false
+}
+
 // singleAccessGroupRef reads the single-valued attributes of rm.AccessGroupRef.
 func singleAccessGroupRef(x *rm.AccessGroupRef, attr string) (any, bool, bool) {
 	if x == nil {
@@ -2967,7 +2992,7 @@ func singleInstructionDetails(x *rm.InstructionDetails, attr string) (any, bool,
 	case "activity_id":
 		return x.ActivityID, x.ActivityID != "", true
 	case "instruction_id":
-		return x.InstructionID, !isZeroLocatableRef(x.InstructionID), true
+		return x.InstructionID, presentObjectRef(x.InstructionID.ID, x.InstructionID.Namespace, x.InstructionID.Type), true
 	case "wf_details":
 		return x.WfDetails, x.WfDetails != nil && !rm.IsTypedNil(x.WfDetails), true
 	}
@@ -3743,9 +3768,9 @@ func singlePartyRelationship(x *rm.PartyRelationship, attr string) (any, bool, b
 	case "name":
 		return x.Name, presentText(x.Name), true
 	case "source":
-		return x.Source, presentPartyRef(x.Source), true
+		return x.Source, presentObjectRef(x.Source.ID, x.Source.Namespace, x.Source.Type), true
 	case "target":
-		return x.Target, presentPartyRef(x.Target), true
+		return x.Target, presentObjectRef(x.Target.ID, x.Target.Namespace, x.Target.Type), true
 	case "time_validity":
 		return x.TimeValidity, x.TimeValidity != nil, true
 	case "uid":
@@ -4208,6 +4233,19 @@ func singleResourceAnnotations(x *rm.ResourceAnnotations, attr string) (any, boo
 	return nil, false, false
 }
 
+// hashResourceAnnotations reads the Hash attributes of rm.ResourceAnnotations.
+func hashResourceAnnotations(x *rm.ResourceAnnotations, attr string) ([]string, []any, bool, bool) {
+	if x == nil {
+		return nil, nil, false, false
+	}
+	switch attr {
+	case "documentation":
+		keys, values := entryValues(x.Documentation)
+		return keys, values, x.Documentation != nil, true
+	}
+	return nil, nil, false, false
+}
+
 // singleResourceDescription reads the single-valued attributes of rm.ResourceDescription.
 func singleResourceDescription(x *rm.ResourceDescription, attr string) (any, bool, bool) {
 	if x == nil {
@@ -4240,6 +4278,28 @@ func multipleResourceDescription(x *rm.ResourceDescription, attr string) ([]any,
 		return boxPointers(x.OtherContributors), x.OtherContributors != nil, true
 	}
 	return nil, false, false
+}
+
+// hashResourceDescription reads the Hash attributes of rm.ResourceDescription.
+func hashResourceDescription(x *rm.ResourceDescription, attr string) ([]string, []any, bool, bool) {
+	if x == nil {
+		return nil, nil, false, false
+	}
+	switch attr {
+	case "details":
+		keys, values := entryPointers(x.Details)
+		return keys, values, x.Details != nil, true
+	case "original_author":
+		keys, values := entryPointers(x.OriginalAuthor)
+		return keys, values, x.OriginalAuthor != nil, true
+	case "other_details":
+		if x.OtherDetails == nil {
+			return nil, nil, false, true
+		}
+		keys, values := entryPointers(*x.OtherDetails)
+		return keys, values, true, true
+	}
+	return nil, nil, false, false
 }
 
 // singleResourceDescriptionItem reads the single-valued attributes of rm.ResourceDescriptionItem.
@@ -4276,6 +4336,28 @@ func multipleResourceDescriptionItem(x *rm.ResourceDescriptionItem, attr string)
 		return boxPointers(x.Keywords), x.Keywords != nil, true
 	}
 	return nil, false, false
+}
+
+// hashResourceDescriptionItem reads the Hash attributes of rm.ResourceDescriptionItem.
+func hashResourceDescriptionItem(x *rm.ResourceDescriptionItem, attr string) ([]string, []any, bool, bool) {
+	if x == nil {
+		return nil, nil, false, false
+	}
+	switch attr {
+	case "original_resource_uri":
+		if x.OriginalResourceURI == nil {
+			return nil, nil, false, true
+		}
+		keys, values := entryPointers(*x.OriginalResourceURI)
+		return keys, values, true, true
+	case "other_details":
+		if x.OtherDetails == nil {
+			return nil, nil, false, true
+		}
+		keys, values := entryPointers(*x.OtherDetails)
+		return keys, values, true, true
+	}
+	return nil, nil, false, false
 }
 
 // multipleRevisionHistory reads the containers of rm.RevisionHistory.
@@ -4331,7 +4413,7 @@ func singleRole(x *rm.Role, attr string) (any, bool, bool) {
 	case "name":
 		return x.Name, presentText(x.Name), true
 	case "performer":
-		return x.Performer, presentPartyRef(x.Performer), true
+		return x.Performer, presentObjectRef(x.Performer.ID, x.Performer.Namespace, x.Performer.Type), true
 	case "time_validity":
 		return x.TimeValidity, x.TimeValidity != nil, true
 	case "uid":
@@ -4450,6 +4532,25 @@ func singleTranslationDetails(x *rm.TranslationDetails, attr string) (any, bool,
 		return x.OtherDetails, x.OtherDetails != nil, true
 	}
 	return nil, false, false
+}
+
+// hashTranslationDetails reads the Hash attributes of rm.TranslationDetails.
+func hashTranslationDetails(x *rm.TranslationDetails, attr string) ([]string, []any, bool, bool) {
+	if x == nil {
+		return nil, nil, false, false
+	}
+	switch attr {
+	case "author":
+		keys, values := entryPointers(x.Author)
+		return keys, values, x.Author != nil, true
+	case "other_details":
+		if x.OtherDetails == nil {
+			return nil, nil, false, true
+		}
+		keys, values := entryPointers(*x.OtherDetails)
+		return keys, values, true, true
+	}
+	return nil, nil, false, false
 }
 
 // singleUuid reads the single-valued attributes of rm.Uuid.
@@ -4743,20 +4844,6 @@ func isZeroItemTree(v rm.ItemTree) bool {
 		v.Links == nil &&
 		v.Name == nil &&
 		v.UID == nil
-}
-
-// isZeroLocatableRef reports whether v is the zero rm.LocatableRef, field by field.
-func isZeroLocatableRef(v rm.LocatableRef) bool {
-	return isZeroObjectRef(v.ObjectRef) &&
-		v.ID == nil &&
-		v.Path == nil
-}
-
-// isZeroObjectRef reports whether v is the zero rm.ObjectRef, field by field.
-func isZeroObjectRef(v rm.ObjectRef) bool {
-	return v.ID == nil &&
-		v.Namespace == "" &&
-		v.Type == ""
 }
 
 // isZeroObjectVersionID reports whether v is the zero rm.ObjectVersionID, field by field.

@@ -3,12 +3,12 @@ package rmaccess
 import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 
 // The presence readings the generated access calls by name. The reading by Go
-// kind (pointer, interface, string, number or boolean, list) and the zero test
-// of a class held by value are generated; these are the readings that depend
-// on what an attribute is, not on how Go holds it. internal/bmmgen names each
-// one (fixedPresence, intervalBoundPresence and contentPresence in
-// render_rmaccess.go), so a function renamed or retyped here fails to compile
-// in access_gen.go.
+// kind (pointer, interface, string, number or boolean, list or hash) and the
+// zero test of a class held by value are generated; these are the readings
+// that depend on what an attribute is, not on how Go holds it. internal/bmmgen
+// names each one (fixedPresence, intervalBoundPresence, contentPresence and
+// objectRefPresence in render_rmaccess.go), so a function renamed or retyped
+// here fails to compile in access_gen.go.
 
 // The three readings § REQ-112 fixes. Each replaces the reading the field's Go
 // kind or class would give.
@@ -45,7 +45,8 @@ func presentArchetypedID(rm.ArchetypeID) bool { return true }
 func presentArchetypedRMVersion(string) bool { return true }
 
 // The content rules for a value held by value, keyed by the attribute's
-// declared RM type.
+// declared RM type, and the object-reference reading, which the generator
+// applies to OBJECT_REF and every class the BMM places below it.
 
 // presentText reports whether a DV_TEXT, held directly or through an interface,
 // is present: it is not nil, not a nil pointer, and its value is not empty. A
@@ -70,15 +71,12 @@ func presentCodePhrase(v rm.CodePhrase) bool {
 	return v.CodeString != "" || v.TerminologyID.Value != ""
 }
 
-// presentObjectRef reports whether an OBJECT_REF held by value is present:
-// its id is there and is not a nil pointer, and its namespace and its type
-// are not empty.
-func presentObjectRef(v rm.ObjectRef) bool {
-	return v.ID != nil && !rm.IsTypedNil(v.ID) && v.Namespace != "" && v.Type != ""
-}
-
-// presentPartyRef reports whether a PARTY_REF held by value is present, by
-// the OBJECT_REF it extends.
-func presentPartyRef(v rm.PartyRef) bool {
-	return presentObjectRef(v.ObjectRef)
+// presentObjectRef reports whether an OBJECT_REF, or any of its subtypes
+// (PARTY_REF, LOCATABLE_REF, ACCESS_GROUP_REF), held by value is present from
+// its parts: its id is there and is not a nil pointer, and its namespace and
+// its type are not empty. The generated access hands over the id the class
+// itself declares, so a LOCATABLE_REF is read by the UID_BASED_ID it
+// redefines id as, not by the OBJECT_REF id it embeds.
+func presentObjectRef(id any, namespace, typ string) bool {
+	return id != nil && !rm.IsTypedNil(id) && namespace != "" && typ != ""
 }

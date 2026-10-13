@@ -1,6 +1,11 @@
 package rmaccess
 
-import "github.com/cadasto/openehr-sdk-go/openehr/rm"
+import (
+	"maps"
+	"slices"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+)
 
 // Single returns the value of the single-valued attribute attr on parent and
 // whether it is present, by the readings the package documentation lists. An
@@ -10,11 +15,13 @@ import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 // by an interface, on a closed side, is present whatever it holds.
 //
 // A pointer, an interface and a value held by value come back as the field
-// holds them, with five exceptions the validation walks read in another
-// shape: ITEM_SINGLE item and REFERENCE_RANGE range come back as a pointer
-// into parent, ISM_TRANSITION careflow_step and transition as the
+// holds them, with six exceptions, of five classes, the validation walks read
+// in another shape: ITEM_SINGLE item and REFERENCE_RANGE range come back as a
+// pointer into parent, ISM_TRANSITION careflow_step and transition as the
 // DV_CODED_TEXT they point to, DV_PROPORTION precision as its Integer, and
-// CODE_PHRASE terminology_id as the string its TERMINOLOGY_ID holds.
+// CODE_PHRASE terminology_id as the string its TERMINOLOGY_ID holds. A Hash
+// attribute comes back as its Go map, or the pointer to it, whole; [Hash]
+// reads its entries, with the same presence.
 func Single(parent any, attr string) (value any, present bool) {
 	v, present, _ := single(parent, attr)
 	if !present {
@@ -23,18 +30,45 @@ func Single(parent any, attr string) (value any, present bool) {
 	return v, true
 }
 
-// Multiple returns the items of the container attribute attr on parent, and
-// ok true whenever parent's class declares attr as a container, whether the
-// list is nil, empty or holds items. A caller that needs "empty" reads
-// len(items) == 0. A pair the class does not declare as a container, a nil
-// parent and a typed-nil pointer parent read as (nil, false).
+// Multiple returns the items of the container attribute attr on parent and
+// whether the list is present: it is present when it is not nil, and empty
+// when it is present and holds no item, which reads as (nil, true). An
+// absent list reads as (nil, false), and so does a pair parent's class does
+// not declare as a container, a nil parent and a typed-nil pointer parent;
+// whether a class declares a pair at all is openehr/rm/rminfo's to say.
 //
 // The items of a list of values are pointers into its backing array, so a
 // walk can descend into each and change it in place; the items of a list of
 // interfaces or pointers come back as they are.
-func Multiple(parent any, attr string) (items []any, ok bool) {
-	items, _, ok = multiple(parent, attr)
-	return items, ok
+func Multiple(parent any, attr string) (items []any, present bool) {
+	items, present, _ = multiple(parent, attr)
+	if !present {
+		return nil, false
+	}
+	return items, true
+}
+
+// Hash returns the entries of a Hash attribute in ascending key order:
+// keys[i] holds values[i]. present is false for a nil map, and for a pair the
+// class does not declare as a Hash.
+//
+// A hash is present when its map is not nil, or, held through a pointer, when
+// the pointer is not nil, whatever map it points to, as [Single] reads it; it
+// is empty when it is present and holds no entry, which reads as
+// (nil, nil, true). A nil parent and a typed-nil pointer parent read as
+// absent too.
+//
+// A map's values are not addressable, so a value of an RM class or a
+// primitive comes back as a pointer to a copy of the entry, the form
+// [Multiple] gives an item of a list of values: a walk can descend into it,
+// but a change made through it does not reach the map. A value held as an
+// interface or a pointer comes back as it is.
+func Hash(parent any, attr string) (keys []string, values []any, present bool) {
+	keys, values, present, _ = hash(parent, attr)
+	if !present {
+		return nil, nil, false
+	}
+	return keys, values, true
 }
 
 // Covers reports whether v's Go type is one the access reads: every concrete
@@ -76,4 +110,35 @@ func boxValues[T any](xs []T) []any {
 		out[i] = x
 	}
 	return out
+}
+
+// entryPointers returns the keys of a Hash of values in ascending order and,
+// for each, a pointer to a copy of its value. It returns nil slices for an
+// empty map.
+func entryPointers[V any](m map[string]V) ([]string, []any) {
+	if len(m) == 0 {
+		return nil, nil
+	}
+	keys := slices.Sorted(maps.Keys(m))
+	values := make([]any, len(keys))
+	for i, k := range keys {
+		v := m[k]
+		values[i] = &v
+	}
+	return keys, values
+}
+
+// entryValues returns the keys of a Hash of interfaces or pointers in
+// ascending order and, for each, its value as it is. It returns nil slices
+// for an empty map.
+func entryValues[V any](m map[string]V) ([]string, []any) {
+	if len(m) == 0 {
+		return nil, nil
+	}
+	keys := slices.Sorted(maps.Keys(m))
+	values := make([]any, len(keys))
+	for i, k := range keys {
+		values[i] = m[k]
+	}
+	return keys, values
 }
