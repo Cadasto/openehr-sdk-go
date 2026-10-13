@@ -14,9 +14,11 @@
 //	import "github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 //
 // The codec is usable without the HTTP client, auth, transport, or any
-// other SDK subsystem. The only dependencies are the generated RM types
-// and the type registry under
-// [github.com/cadasto/openehr-sdk-go/openehr/rm/typereg].
+// other SDK subsystem. The only dependencies are the generated RM types,
+// the type registry under
+// [github.com/cadasto/openehr-sdk-go/openehr/rm/typereg], and the RM's
+// attribute lists in [github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo],
+// which the options for unmatched members read.
 //
 // # Wire profile
 //
@@ -64,6 +66,12 @@
 //     Two encodes of one value therefore agree on member order; this is
 //     a determinism property, not a byte-level promise to a consumer.
 //
+//   - A member whose name is neither `_type` nor an attribute of the RM
+//     type its object decodes as is unmatched, and the decoder ignores it
+//     by default: the decoded value holds the rest of the input and none
+//     of the unmatched members, so a read, change and write drops a
+//     producer's extension members. See "Unmatched members" below.
+//
 //   - Nil-pointer optional fields are emitted as absent (no key), not
 //     as `null`. Both absent and `null` are accepted on decode.
 //
@@ -100,8 +108,9 @@
 //
 // # Error classification
 //
-// The package keeps its two sentinels one-directional, so a
-// caller can classify a failure with errors.Is alone:
+// The package keeps its three sentinels apart, so a caller can classify a
+// failure with errors.Is alone, and errors.Is against one never matches an
+// error raised for another:
 //
 //   - [ErrInvalidValue] is encode only. Every [Marshal] / [MarshalIndent]
 //     failure wraps it, over the encoder's own error (a
@@ -114,8 +123,11 @@
 //     reachable through unwrapping; a duplicate member name wraps it too
 //     (see below). The other decode outcomes described below do not
 //     carry it.
+//   - [ErrUnknownMember] is decode only, and only a decode given
+//     [WithStrict] raises it, for the first unmatched member. The error
+//     names the member's JSON Pointer and nothing else from the input.
 //
-// Both are distinct from the transport-level transport.ErrInvalidShape,
+// They are distinct from the transport-level transport.ErrInvalidShape,
 // which classifies a response body rather than a codec operation.
 // Do not confuse [ErrInvalidShape] with canxml.ErrInvalidShape either:
 // they share a name and a subtree but are different values, and canxml's
@@ -125,9 +137,10 @@
 //
 //   - Malformed JSON is refused by the tokenizer as the value it
 //     malforms is decoded, except where a value is buffered first: a
-//     polymorphic slot is read whole before it is decoded, so malformed
-//     bytes anywhere inside it are reported ahead of a shape failure
-//     inside it.
+//     polymorphic slot is read whole before it is decoded, and so is each
+//     value a [Decoder] given [WithUnmatched] or [WithStrict] reads, so
+//     malformed bytes anywhere inside such a value are reported ahead of a
+//     shape failure inside it.
 //     No sentinel: the codec reports its own syntax or truncated-input
 //     error (a *jsontext.SyntacticError), except that [Decoder.Decode]
 //     reports an empty stream as io.EOF and a truncated value wraps
@@ -176,7 +189,55 @@
 //     receiver on any of them, as on every generated type, is a
 //     typereg.ErrNilReceiver error.
 //
-// # Strict vs relaxed decode
+// # Unmatched members
+//
+// A member is unmatched when its name is neither `_type` nor an attribute
+// of the RM type its object decodes as. An object decodes as the class its
+// `_type` names, or else as the type the RM declares where it sits: the
+// declared type of the attribute that holds it, the class an interval slot
+// binds its bounds to, the class of a `Hash` attribute's values, and at the
+// root the RM type of the decode target, or of the elements of a slice,
+// array or map target, with the class a generic target binds its type
+// parameter to. That holds at any depth: inside a polymorphic slot, an
+// interval and its bounds, and a `Hash` of RM values too. A member the
+// decoder reads but refuses is not unmatched: an unknown `_type` is a
+// dispatch failure in every mode, and a member of the wrong shape is a
+// shape failure.
+//
+// [Unmarshal] and [NewDecoder] take two options for unmatched members:
+//
+//   - [WithUnmatched] passes each one to a function, in the order it
+//     appears in the input, as a JSON Pointer (RFC 6901) from the root of
+//     the value, such as "/content/0/x-note". The decode returns the same
+//     value as the default.
+//   - [WithStrict] refuses the decode at the first one, with an error that
+//     wraps [ErrUnknownMember] and names its pointer. An absent member is
+//     never refused.
+//
+// The options check the members once the decode has succeeded, in a second
+// pass over the same input that reads the RM's own attribute lists. So a
+// decode error, such as an unknown `_type`, is returned as itself in every
+// mode, wherever it sits in the input, and a decode that fails reports no
+// member.
+//
+// The walk starts from the decode target's own RM shape: an RM class or a
+// polymorphic RM interface, or a slice, array or map of one, a generic class
+// taking its type parameter from the target's type argument. A target of any
+// other shape, such as a pointer to any, to a map[string]any or to a type of
+// the caller's own, is not walked, so RM values held inside a type of the
+// caller's own are not checked. The pass does not look inside a value it
+// cannot read as an RM class either: a value of a class outside the RM, such
+// as an AOM 1.4 archetype, decodes as by default and none of its members is
+// checked, the RM values it holds included; nor does the pass check a generic
+// payload the decoder holds as plain JSON (the data of an
+// rm.OriginalVersion[any]), a `Hash` of strings, or an object whose type
+// neither its `_type` nor its position names.
+//
+// Neither option changes what the decoder reads, and neither is available
+// on REST reads through the transport and client packages, which decode
+// with the default.
+//
+// # Strict vs relaxed type dispatch
 //
 // The decoder defaults to strict polymorphism: at any field whose
 // declared type is an abstract RM class or interface, the input

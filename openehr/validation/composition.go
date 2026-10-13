@@ -13,13 +13,18 @@ import (
 // against a compiled OPT and returns every issue in one pass.
 //
 // The walk is template-driven (see package doc): the compiled OPT
-// drives traversal and the composition is the value source. Path
-// strings are built incrementally as the walker descends: OPT-side
-// attribute names contribute the segments and matched RM children
-// contribute the bracket predicates. The composition's at-codes
-// therefore appear in [Issue.Path] only on nodes the walker actually
-// bound to an OPT child; missing required nodes report at the parent
-// attribute path without a composition-side predicate.
+// drives traversal and the composition is the value source. Each
+// issue's path is written as [Issue.Path] describes, by the same rule
+// [ValidateRM] uses: a required attribute that is absent is reported at
+// the attribute's own path, and a required node the composition lacks
+// at the path the template gives it.
+//
+// The result includes the Reference Model floor ([ValidateRM]), run over
+// the whole composition after the template walk, as [Validate] describes:
+// the floor's findings follow the template walk's, and one that repeats a
+// template issue's code at its path is dropped, so each defect is reported
+// once. A composition that passes is valid against the template and the
+// RM rules the floor checks.
 //
 // Returns a [Result] whose Issues slice is never nil (zero-length
 // allocation when no issues fire).
@@ -48,6 +53,12 @@ func ValidateComposition(comp *rm.Composition, c *templatecompile.Compiled) Resu
 type walker struct {
 	compiled *templatecompile.Compiled
 	issues   []Issue
+	// names collects, over the whole walk, the name the OPT pins on the
+	// node each item binds to, for the items whose archetype_node_id a
+	// sibling shares: the only items whose path a pinned name changes
+	// ([itemPaths]). The floor takes it, so it writes the path this walk
+	// writes for the same node. Nil until a walk records a name.
+	names pinnedNames
 }
 
 func newWalker(c *templatecompile.Compiled) *walker {
@@ -63,7 +74,7 @@ func (w *walker) emit(i Issue) {
 	w.issues = append(w.issues, i)
 }
 
-// joinPath glues a parent AQL path with a child segment. Mirrors
+// joinPath glues a parent issue path with a child segment. Mirrors
 // the compile-side pathSegment convention: root path is "/" and
 // child deltas already begin with "/" (e.g. "/category",
 // "/content[at0001]"). Centralised here so future tweaks to path

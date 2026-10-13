@@ -13,24 +13,33 @@ import (
 // C_INTEGER, C_REAL, and the magnitude / precision sub-intervals of
 // C_DV_QUANTITY. Distinct from xmlInterval (which models
 // existence / occurrences as integer cardinalities) — primitive
-// ranges are float-typed and carry inclusivity flags.
+// ranges are float-typed and keep their inclusivity flags, where a
+// Multiplicity closes an excluded end instead. All four flags are
+// xmlBoolFlag values, so an omitted, empty or whitespace-only element
+// stays unset and is never a decode error. unboundedFlag reads an unset
+// unbounded flag by its side's bound, and includedFlag gives an unset
+// included flag the default for its side.
 type xmlNumericInterval struct {
-	LowerIncluded  *bool `xml:"lower_included"`
-	UpperIncluded  *bool `xml:"upper_included"`
-	LowerUnbounded bool  `xml:"lower_unbounded"`
-	UpperUnbounded bool  `xml:"upper_unbounded"`
+	LowerIncluded  xmlBoolFlag `xml:"lower_included"`
+	UpperIncluded  xmlBoolFlag `xml:"upper_included"`
+	LowerUnbounded xmlBoolFlag `xml:"lower_unbounded"`
+	UpperUnbounded xmlBoolFlag `xml:"upper_unbounded"`
 	// Lower / Upper are decoded as string and parsed to float lazily
 	// in numericRange. AOM 1.4 reuses the same `<range>` element name
 	// for both numeric ranges (C_INTEGER / C_REAL / C_DV_QUANTITY)
 	// and temporal ranges (C_DURATION / C_DATE / etc.); the latter
 	// carry ISO 8601 strings (e.g. `PT0S`) that strconv.ParseFloat
 	// cannot read. Lazy parse keeps decode infallible regardless of
-	// which xsi:type owns the range.
-	Lower string `xml:"lower"`
-	Upper string `xml:"upper"`
+	// which xsi:type owns the range. A nil pointer is a bound the OPT
+	// omits.
+	Lower *string `xml:"lower"`
+	Upper *string `xml:"upper"`
 }
 
-// xmlBoolFlag is the true_valid or false_valid element of a C_BOOLEAN.
+// xmlBoolFlag is the true_valid or false_valid element of a C_BOOLEAN,
+// or one of the four boundary flags (lower_included, upper_included,
+// lower_unbounded, upper_unbounded) of an interval: an occurrences,
+// existence or cardinality interval, or a numeric range.
 // A plain bool field would read an empty element as false. This type
 // leaves an empty or whitespace-only element unset instead, so it reads
 // exactly like an omitted one. Any other text is parsed with
@@ -63,6 +72,15 @@ func (f *xmlBoolFlag) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 // or empty.
 func (f xmlBoolFlag) orTrue() bool {
 	return !f.set || f.value
+}
+
+// ptr returns a pointer to the flag's value, or nil when the element was
+// omitted or empty.
+func (f xmlBoolFlag) ptr() *bool {
+	if !f.set {
+		return nil
+	}
+	return &f.value
 }
 
 // xmlPrimitiveListItem captures one <list> entry inside a primitive
@@ -140,9 +158,11 @@ func buildPrimitive(o *xmlCObject, strict bool) (constraints.PrimitiveConstraint
 	case "C_CODE_PHRASE":
 		return buildCodePhrase(o), nil
 	case "C_DV_QUANTITY":
-		return buildDvQuantity(o), nil
+		return buildDvQuantity(o)
 	case "C_DV_ORDINAL":
 		return buildDvOrdinal(o), nil
+	case "CONSTRAINT_REF":
+		return buildConstraintRef(o, strict)
 	case "C_PRIMITIVE_OBJECT":
 		// The wrapper carries the AOM 1.4 primitive short name on
 		// `rm_type_name` (DURATION / DATE / BOOLEAN / etc.); the
@@ -260,7 +280,7 @@ func buildCodePhrase(o *xmlCObject) constraints.CodePhrase {
 	return c
 }
 
-func buildDvQuantity(o *xmlCObject) constraints.DvQuantity {
+func buildDvQuantity(o *xmlCObject) (constraints.DvQuantity, error) {
 	c := constraints.DvQuantity{}
 	if o.Property != nil {
 		ref := constraints.CodedTermRef{}
@@ -277,8 +297,16 @@ func buildDvQuantity(o *xmlCObject) constraints.DvQuantity {
 		// scope of the strict numericRange path is C_INTEGER / C_REAL
 		// (the primary numeric scalar types). Tightening DV_QUANTITY
 		// would require threading strict through buildDvQuantity.
-		mag, _ := numericRange(item.Magnitude, false, "DV_QUANTITY.magnitude")
-		prec, _ := numericRange(item.Precision, false, "DV_QUANTITY.precision")
+		// In lenient mode numericRange fails only on a side written bounded
+		// with no bound, which every mode refuses (REQ-169).
+		mag, err := numericRange(item.Magnitude, false, "DV_QUANTITY.magnitude")
+		if err != nil {
+			return c, err
+		}
+		prec, err := numericRange(item.Precision, false, "DV_QUANTITY.precision")
+		if err != nil {
+			return c, err
+		}
 		unit := constraints.QuantityUnit{
 			Units:     strings.TrimSpace(item.Units),
 			Magnitude: mag,
@@ -289,7 +317,7 @@ func buildDvQuantity(o *xmlCObject) constraints.DvQuantity {
 		}
 		c.Units = append(c.Units, unit)
 	}
-	return c
+	return c, nil
 }
 
 func buildDvOrdinal(o *xmlCObject) constraints.CDvOrdinal {
@@ -311,10 +339,26 @@ func buildDvOrdinal(o *xmlCObject) constraints.CDvOrdinal {
 	return c
 }
 
+// buildConstraintRef reads a CONSTRAINT_REF: the reference (an ac code)
+// that names a value set outside the archetype. The node's rm_type_name,
+// which the caller keeps on the leaf, is the RM type the value set
+// constrains. A reference is required, so a missing or blank one is
+// refused in strict mode; lenient mode keeps the leaf with an empty
+// reference, as it keeps a partly broken primitive with a weaker
+// constraint.
+func buildConstraintRef(o *xmlCObject, strict bool) (constraints.ConstraintRef, error) {
+	ref := strings.TrimSpace(o.Reference)
+	if ref == "" && strict {
+		return constraints.ConstraintRef{}, fmt.Errorf("%w: CONSTRAINT_REF for %q has no <reference>", ErrInvalidOPT, o.RMTypeName)
+	}
+	return constraints.ConstraintRef{Reference: ref}, nil
+}
+
 // numericRange folds a wire numeric interval into the public range
-// shape, defaulting LowerIncluded / UpperIncluded to true when the
-// OPT omits them (AOM convention). xmlNumericInterval.Lower / Upper
-// are decoded as strings (AOM 1.4 reuses `<range>` for both numeric
+// shape. A LowerIncluded / UpperIncluded flag the OPT omits or leaves
+// empty defaults by its side's unbounded flag as written: true on a
+// bounded side, false on an unbounded one. xmlNumericInterval.Lower /
+// Upper are decoded as strings (AOM 1.4 reuses `<range>` for both numeric
 // and temporal types); parsed to float64 lazily here.
 //
 // In lenient mode an unparseable bound falls through as the unbounded
@@ -326,31 +370,49 @@ func numericRange(i *xmlNumericInterval, strict bool, ctx string) (constraints.N
 	if i == nil {
 		return constraints.NumericRange{LowerUnbounded: true, UpperUnbounded: true}, nil
 	}
+	lowerUnbounded, err := unboundedFlag(i.LowerUnbounded, i.Lower != nil, "lower")
+	if err != nil {
+		return constraints.NumericRange{}, fmt.Errorf("%w: %s range: %w", ErrInvalidOPT, ctx, err)
+	}
+	upperUnbounded, err := unboundedFlag(i.UpperUnbounded, i.Upper != nil, "upper")
+	if err != nil {
+		return constraints.NumericRange{}, fmt.Errorf("%w: %s range: %w", ErrInvalidOPT, ctx, err)
+	}
+	lower, upper := stringOrEmpty(i.Lower), stringOrEmpty(i.Upper)
 	r := constraints.NumericRange{
-		LowerUnbounded: i.LowerUnbounded,
-		UpperUnbounded: i.UpperUnbounded,
-		LowerInclusive: i.LowerIncluded == nil || *i.LowerIncluded,
-		UpperInclusive: i.UpperIncluded == nil || *i.UpperIncluded,
+		LowerUnbounded: lowerUnbounded,
+		UpperUnbounded: upperUnbounded,
+		LowerInclusive: includedFlag(i.LowerIncluded.ptr(), lowerUnbounded),
+		UpperInclusive: includedFlag(i.UpperIncluded.ptr(), upperUnbounded),
 	}
 	if !r.LowerUnbounded {
-		if f, err := strconv.ParseFloat(strings.TrimSpace(i.Lower), 64); err == nil {
+		if f, err := strconv.ParseFloat(strings.TrimSpace(lower), 64); err == nil {
 			r.Lower = f
 		} else if strict {
-			return r, fmt.Errorf("%w: %s range.lower=%q is not a valid number", ErrInvalidOPT, ctx, i.Lower)
+			return r, fmt.Errorf("%w: %s range.lower=%q is not a valid number", ErrInvalidOPT, ctx, lower)
 		} else {
 			r.LowerUnbounded = true
 		}
 	}
 	if !r.UpperUnbounded {
-		if f, err := strconv.ParseFloat(strings.TrimSpace(i.Upper), 64); err == nil {
+		if f, err := strconv.ParseFloat(strings.TrimSpace(upper), 64); err == nil {
 			r.Upper = f
 		} else if strict {
-			return r, fmt.Errorf("%w: %s range.upper=%q is not a valid number", ErrInvalidOPT, ctx, i.Upper)
+			return r, fmt.Errorf("%w: %s range.upper=%q is not a valid number", ErrInvalidOPT, ctx, upper)
 		} else {
 			r.UpperUnbounded = true
 		}
 	}
 	return r, nil
+}
+
+// stringOrEmpty returns the bound p points to, or "" for a bound the OPT
+// omits.
+func stringOrEmpty(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
 }
 
 // parseBool reads the AOM XSD-style boolean strings ("true" /

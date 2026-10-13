@@ -20,7 +20,10 @@ import (
 // the snake-cased element local name back to the matching struct
 // field. Polymorphic fields are routed through
 // [canxml.DecodeAs] which consults [typereg.Default] for the
-// `xsi:type` discriminator.
+// `xsi:type` discriminator. Content the method does not read is handed
+// to the helpers of openehr/internal/xmlunmatched, which apply the
+// decode's policy for unmatched content: ignore it (the default), report
+// it, or refuse it.
 //
 // Returns (nil, nil) when the file has no concrete classes.
 //
@@ -28,29 +31,45 @@ import (
 //
 // For each concrete class C:
 //
-//  1. Initialise a flat switch on the child element's local name
-//     covering every effective property (in any order: XML decode
-//     is name-keyed, unlike encode which is order-pinned).
+//  1. On entry, hand the start element's attributes to
+//     `xmlunmatched.CheckUnmatchedAttrs`, naming the ones the class reads as
+//     XML attributes: every other attribute, bar the XML Schema instance
+//     attributes (`xsi:type` among them) and the namespace declarations,
+//     is unmatched.
 //
-//  2. Per property:
-//     - Mandatory / optional primitive → `dec.DecodeElement(&v.Field, &t)`
+//  2. Initialise a flat switch on `xmlunmatched.LocalName` of the child
+//     element covering every effective property (in any order: XML
+//     decode is name-keyed, unlike encode which is order-pinned).
+//     LocalName answers "" for an element in a foreign namespace, so
+//     such an element matches no property.
+//
+//  3. Per property:
+//     - Mandatory / optional primitive → `xmlunmatched.DecodeElement(dec, &t, &v.Field)`
 //     - Mandatory struct → `dec.DecodeElement(&v.Field, &t)` (or `v.Field, ...` for pointer)
 //     - Optional struct (pointer) → allocate, decode, assign
+//     - Open generic parameter → `xmlunmatched.DecodeParam`, which chooses
+//     by the instantiation: a primitive, a struct or an interface
+//     - Class with no generated decoder (a BMM primitive class such as
+//     TERMINOLOGY_CODE) → `xmlunmatched.SkipUnmatched`, one item
 //     - Polymorphic single → `canxml.DecodeAs[Iface](dec, t)` + assign
 //     - Slice of primitive/struct → append per occurrence
 //     - Slice of polymorphic → append result of `canxml.DecodeAs[Iface]`
 //
-//  3. Unknown elements are skipped via `dec.Skip()` so foreign-namespace
-//     additions don't trip strict decode.
+//  4. Every other element, a foreign one included, reaches the default
+//     arm, `xmlunmatched.SkipUnmatched`, which skips it, reports it or refuses
+//     it as the decode's options say.
 //
-//  4. Unknown attributes are tolerated; `xmi:type` is rejected via
-//     [canxml.XSITypeOf] (centralised in the helper).
+//  5. `xmi:type` is rejected via [canxml.XSITypeOf] (centralised in the
+//     helper).
 //
-// # Hash/map decoding
+// # Hash/map and Any decoding
 //
-// Same limitation as the encoder: Hash<K,V> properties are
-// skipped at decode time. The receiver field is left at its zero
-// value. Documented in canxml/doc.go.
+// Same limitation as the encoder: Hash<K,V> properties are not
+// decoded, and neither is the content of a property typed by the BMM
+// root type Any. Their element goes to `xmlunmatched.SkipUnmatched` as one
+// item of unmatched content, so it is skipped by default, reported or
+// refused on request, and the receiver field is left at its zero value.
+// Documented in canxml/doc.go.
 func RenderUnmarshalXMLFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	emitting, err := codecClassesIn(plan, file)
 	if err != nil {
@@ -84,6 +103,7 @@ func RenderUnmarshalXMLFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	body.WriteString("import (\n")
 	body.WriteString("\t\"encoding/xml\"\n")
 	body.WriteString("\t\"fmt\"\n\n")
+	body.WriteString("\t\"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched\"\n")
 	body.WriteString("\t\"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg\"\n")
 	body.WriteString("\t\"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml\"\n")
 	if needsExternalImportForJSONMar(plan, chunks) {
@@ -160,16 +180,35 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	b.WriteString("// sentinels inside *canxml.DecodeError for errors.Is / errors.As.\n")
 	b.WriteString("// Properties typed as XML attributes per the openEHR ITS-XML XSDs\n")
 	b.WriteString("// (currently `archetype_node_id`) are read from _start.Attr.\n")
+	b.WriteString("// Content the method does not read is unmatched: it is skipped, or\n")
+	b.WriteString("// reported or refused under canxml.WithUnmatched and canxml.WithStrict.\n")
 	legacy := sc.IsAbstract() && hasIntervalShape(fields)
 	if legacy {
 		b.WriteString("//\n")
 		b.WriteString(legacyIntervalXMLDoc)
 	}
+	// A class that carries the four boundary flags records which of them and
+	// of its two bounds the document carried, and gives the absent flags their
+	// defaults at the closing tag, once every child has been read (REQ-169).
+	flagged, err := intervalFlagged(fields)
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", pc.BMMName, err)
+	}
+	if flagged {
+		b.WriteString("//\n")
+		b.WriteString(intervalFlagDecodeDoc())
+		b.WriteString(intervalFlagXMLDoc)
+	}
 	fmt.Fprintf(&b, "func (%s *%s%s) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {\n", recv, pc.GoName, typeArgs)
+	// Every attribute the class does not read is unmatched content.
+	b.WriteString(checkUnmatchedXMLAttrs(attrFields))
 	// Read attribute-typed properties from _start.Attr.
 	for _, ef := range attrFields {
 		line := unmarshalXMLAttribute(recv, FieldName(ef.Prop.PropertyName()), ef.Prop.PropertyName())
 		b.WriteString(line)
+	}
+	if flagged {
+		b.WriteString("\tvar _seen intervalFlagsSeen\n")
 	}
 	b.WriteString("\tfor {\n")
 	b.WriteString("\t\t_tok, _err := _dec.Token()\n")
@@ -178,12 +217,22 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	b.WriteString("\t\t}\n")
 	b.WriteString("\t\tswitch _t := _tok.(type) {\n")
 	b.WriteString("\t\tcase xml.StartElement:\n")
-	b.WriteString("\t\t\tswitch _t.Name.Local {\n")
+	b.WriteString("\t\t\tswitch xmlunmatched.LocalName(_t.Name) {\n")
 
 	for _, ef := range elemFields {
-		caseBody, err := renderUnmarshalXMLField(plan, recv, sc, ef)
-		if err != nil {
-			return "", fmt.Errorf("render UnmarshalXML field %s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
+		var caseBody string
+		if prop := ef.Prop.PropertyName(); flagged && isIntervalFlag(prop) {
+			caseBody = unmarshalXMLIntervalFlag(recv, prop)
+		} else {
+			caseBody, err = renderUnmarshalXMLField(plan, recv, sc, ef)
+			if err != nil {
+				return "", fmt.Errorf("render UnmarshalXML field %s.%s: %w", pc.BMMName, prop, err)
+			}
+		}
+		if prop := ef.Prop.PropertyName(); flagged && isIntervalBound(prop) {
+			// The bound's presence decides its side's absent `*_unbounded`
+			// (REQ-169).
+			caseBody += unmarshalXMLIntervalBoundSeen(prop)
 		}
 		if legacy {
 			caseBody = withLegacyElementName(caseBody, ef.Prop.PropertyName())
@@ -192,11 +241,16 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	}
 
 	b.WriteString("\t\t\tdefault:\n")
-	b.WriteString("\t\t\t\tif _err := _dec.Skip(); _err != nil {\n")
+	b.WriteString("\t\t\t\tif _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {\n")
 	b.WriteString("\t\t\t\t\treturn _err\n")
 	b.WriteString("\t\t\t\t}\n")
 	b.WriteString("\t\t\t}\n") // close inner switch (Name.Local)
 	b.WriteString("\t\tcase xml.EndElement:\n")
+	if flagged {
+		fmt.Fprintf(&b, "\t\t\tif _err := %s; _err != nil {\n", intervalFlagSettle("_seen", recv))
+		fmt.Fprintf(&b, "\t\t\t\treturn fmt.Errorf(\"%%w: %s: %%w\", canxml.ErrInvalidShape, _err)\n", pc.BMMName)
+		b.WriteString("\t\t\t}\n")
+	}
 	b.WriteString("\t\t\treturn nil\n")
 	b.WriteString("\t\t}\n") // close outer switch (token kind)
 	b.WriteString("\t}\n")   // close for
@@ -216,6 +270,11 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 
 	switch p := ef.Prop.(type) {
 	case *bmm.SingleProperty:
+		if p.TypeName == bmmAnyType {
+			// The codec cannot decode the content of an Any member: the
+			// element goes to xmlunmatched.SkipUnmatched, like a Hash member's.
+			return unmarshalXMLAnyContent(elemName), nil
+		}
 		ifaceName, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
 		if kind == polySingle {
 			return unmarshalXMLPolySingle(recv, goField, elemName, ifaceName), nil
@@ -235,6 +294,31 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 			// branch above; this defensive fall-through covers any
 			// other interface-typed shape.
 			return unmarshalXMLPolySingle(recv, goField, elemName, p.TypeName), nil
+		}
+		if isOpenParam(ef.Owner, p.TypeName) {
+			// Typed by the owner's generic parameter (VERSION<T>.data):
+			// what the element decodes into depends on the instantiation,
+			// so xmlunmatched.DecodeParam chooses at run time, dispatching
+			// on `xsi:type` when T is an interface.
+			if p.IsMandatory {
+				return unmarshalXMLOpenParam(recv, goField, elemName, p.TypeName), nil
+			}
+			return unmarshalXMLOpenParamOptional(recv, goField, elemName, p.TypeName), nil
+		}
+		if isClass {
+			decoding, err := xmlClassDecoding(plan, p.TypeName)
+			if err != nil {
+				return "", err
+			}
+			switch decoding {
+			case xmlNoDecoder:
+				return unmarshalXMLNoDecoder(elemName, p.TypeName), nil
+			case xmlTextDecoder:
+				// An enumeration's Go type is a named string or integer,
+				// which decodes from the element's text like a primitive.
+				isClass = false
+			case xmlOwnDecoder:
+			}
 		}
 		if p.IsMandatory {
 			if isClass {
@@ -259,13 +343,13 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 			return unmarshalXMLPolySingle(recv, goField, elemName, ifaceName), nil
 		}
 		// Open generic param bound to a concrete primitive or struct —
-		// emit a generic decode that defers to encoding/xml at runtime.
-		if p.IsMandatory {
-			return unmarshalXMLStructMandatory(recv, goField, elemName), nil
-		}
-		// Field is declared as `T` (open param), not `*T`. We cannot
-		// allocate via new(T) for an unknown layout — decode in place.
-		return unmarshalXMLStructMandatory(recv, goField, elemName), nil
+		// emit a generic decode that chooses at run time, through
+		// xmlunmatched.DecodeParam, so a primitive's attributes and child
+		// elements count as unmatched content and an interface-typed
+		// instantiation dispatches on `xsi:type`. The field is declared
+		// as `T` (open param), not `*T`, mandatory or not: we cannot
+		// allocate via new(T) for an unknown layout, so decode in place.
+		return unmarshalXMLOpenParam(recv, goField, elemName, p.TypeName), nil
 
 	case *bmm.ContainerProperty:
 		ifaceName, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
@@ -286,7 +370,27 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 			return "", err
 		}
 		if innerIsClass {
+			decoding, err := xmlClassDecoding(plan, containerInnerName(p.TypeDef))
+			if err != nil {
+				return "", err
+			}
+			switch decoding {
+			case xmlNoDecoder:
+				return unmarshalXMLNoDecoder(elemName, containerInnerName(p.TypeDef)), nil
+			case xmlTextDecoder:
+				return unmarshalXMLPrimitiveSlice(recv, goField, elemName, innerType), nil
+			case xmlOwnDecoder:
+			}
 			return unmarshalXMLStructSlice(recv, goField, elemName, innerType), nil
+		}
+		if isOpenParam(ef.Owner, containerInnerName(p.TypeDef)) {
+			return unmarshalXMLOpenParamSlice(recv, goField, elemName, innerType), nil
+		}
+		if isOctetContainer(p.TypeDef) {
+			// An Octet list is one xs:base64Binary element in the
+			// ITS-XML schema (DV_MULTIMEDIA.data), as it is one base64
+			// string in canonical JSON, not one element per byte.
+			return unmarshalXMLBase64(recv, goField, elemName), nil
 		}
 		return unmarshalXMLPrimitiveSlice(recv, goField, elemName, innerType), nil
 
@@ -295,6 +399,15 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 		// map[K]V. v1 defers XML emission/decoding (see canxml/doc.go).
 		if p.TypeDef != nil && containerKinds[p.TypeDef.RootType] {
 			return unmarshalXMLHashTODO(elemName), nil
+		}
+		if p.TypeDef != nil {
+			decoding, err := xmlClassDecoding(plan, p.TypeDef.RootType)
+			if err != nil {
+				return "", err
+			}
+			if decoding != xmlOwnDecoder {
+				return unmarshalXMLNoDecoder(elemName, p.TypeDef.RootType), nil
+			}
 		}
 		if p.IsMandatory {
 			return unmarshalXMLStructMandatory(recv, goField, elemName), nil
@@ -312,16 +425,168 @@ func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass,
 
 // --- Per-shape decode helpers ------------------------------------------
 
+// The primitive helpers decode through xmlunmatched.DecodeElement rather
+// than the decoder's own DecodeElement: encoding/xml reads a primitive from
+// its text and ignores any attribute or child element on it, and the helper
+// hands those to the decode's policy for unmatched content.
+
 func unmarshalXMLPrimitiveMandatory(recv, field, elem string) string {
 	return fmt.Sprintf(
-		"\t\t\tcase %q:\n\t\t\t\tif _err := _dec.DecodeElement(&%s.%s, &_t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
+		"\t\t\tcase %q:\n\t\t\t\tif _err := xmlunmatched.DecodeElement(_dec, &_t, &%s.%s); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
 		elem, recv, field)
 }
 
 func unmarshalXMLPrimitiveOptionalLit(recv, field, elem, goType string) string {
 	return fmt.Sprintf(
-		"\t\t\tcase %q:\n\t\t\t\tvar _v %s\n\t\t\t\tif _err := _dec.DecodeElement(&_v, &_t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = &_v\n",
+		"\t\t\tcase %q:\n\t\t\t\tvar _v %s\n\t\t\t\tif _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = &_v\n",
 		elem, goType, recv, field)
+}
+
+// unmarshalXMLOpenParam emits the decode case of a field typed by the open
+// generic parameter param that is not polymorphic by its bound. The
+// parameter may be bound to a primitive (BASE Interval<Integer>), to a
+// class, or to an interface (ORIGINAL_VERSION<any>), so the case decodes in
+// place through xmlunmatched.DecodeParam, which chooses by the
+// instantiation and dispatches an interface through canxml.DecodeAs.
+func unmarshalXMLOpenParam(recv, field, elem, param string) string {
+	return fmt.Sprintf(
+		"\t\t\tcase %q:\n\t\t\t\tif _err := xmlunmatched.DecodeParam(_dec, &_t, &%s.%s, canxml.DecodeAs[%s]); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
+		elem, recv, field, param)
+}
+
+// unmarshalXMLOpenParamOptional emits the decode case of an optional field
+// typed by an open generic parameter, held as a pointer: it allocates the
+// value, decodes it through xmlunmatched.DecodeParam and assigns it.
+func unmarshalXMLOpenParamOptional(recv, field, elem, param string) string {
+	return fmt.Sprintf(
+		"\t\t\tcase %q:\n\t\t\t\t_v := new(%s)\n\t\t\t\tif _err := xmlunmatched.DecodeParam(_dec, &_t, _v, canxml.DecodeAs[%s]); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = _v\n",
+		elem, param, param, recv, field)
+}
+
+// unmarshalXMLOpenParamSlice emits the decode case of a container whose
+// items are typed by an open generic parameter: each item decodes through
+// xmlunmatched.DecodeParam and is appended.
+func unmarshalXMLOpenParamSlice(recv, field, elem, param string) string {
+	return fmt.Sprintf(
+		"\t\t\tcase %q:\n\t\t\t\tvar _v %s\n\t\t\t\tif _err := xmlunmatched.DecodeParam(_dec, &_t, &_v, canxml.DecodeAs[%s]); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = append(%s.%s, _v)\n",
+		elem, param, param, recv, field, recv, field)
+}
+
+// unmarshalXMLBase64 emits the decode case of an Octet list, held as a Go
+// []byte: one element whose text is xs:base64Binary, decoded through
+// xmlunmatched.DecodeBase64.
+func unmarshalXMLBase64(recv, field, elem string) string {
+	return fmt.Sprintf(
+		"\t\t\tcase %q:\n\t\t\t\tif _err := xmlunmatched.DecodeBase64(_dec, &_t, &%s.%s); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
+		elem, recv, field)
+}
+
+// isOctetContainer reports whether td is a container of the BMM primitive
+// Octet, which the generator holds as a Go []byte.
+func isOctetContainer(td *bmm.ContainerType) bool {
+	return containerInnerName(td) == bmmOctetType
+}
+
+// bmmOctetType is the BMM name of the byte primitive.
+const bmmOctetType = "Octet"
+
+// handWrittenXMLCodecs names the BMM classes whose canonical-XML codec is
+// written by hand in the target package rather than generated, because the
+// generator emits no codec for their class. TERMINOLOGY_CODE is a BASE
+// primitive class, held by value in AOM 1.4 ARCHETYPE.original_language; its
+// methods live in openehr/rm/terminology_code_xml.go.
+var handWrittenXMLCodecs = map[string]bool{
+	"Terminology_code": true,
+}
+
+// unmarshalXMLNoDecoder emits the case of a property whose class has no
+// canonical-XML decoder of its own, such as a BMM primitive class like
+// TERMINOLOGY_CODE: encoding/xml would read nothing from it and report
+// nothing either. The element is handed to xmlunmatched.SkipUnmatched as one
+// item, like a Hash member's: skipped by default, reported or refused on
+// request, and the field is left at its zero value.
+func unmarshalXMLNoDecoder(elem, bmmType string) string {
+	return fmt.Sprintf(
+		"\t\t\tcase %q:\n\t\t\t\t// Canonical XML has no decoder for %s — see canxml/doc.go.\n\t\t\t\tif _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
+		elem, bmmType)
+}
+
+// xmlDecoding says how the Go type of a BMM class decodes from canonical XML.
+type xmlDecoding int
+
+const (
+	// xmlNoDecoder: nothing reads the element, such as a BMM primitive
+	// class like TERMINOLOGY_CODE, held as a struct with no XML decoder.
+	xmlNoDecoder xmlDecoding = iota
+	// xmlOwnDecoder: the type has a generated UnmarshalXML, which reads its
+	// own content and hands what it does not read to the unmatched-content
+	// helpers.
+	xmlOwnDecoder
+	// xmlTextDecoder: the type is a named string or integer (an
+	// enumeration) and decodes from the element's text like a primitive.
+	xmlTextDecoder
+)
+
+// xmlClassDecoding reports how the Go type of the BMM class name decodes.
+// A class has a generated UnmarshalXML by the rule [codecClassesIn] applies:
+// a concrete class that is not a BMM primitive class, or the abstract BASE
+// Interval, which the base schema lists among its primitive types. A class
+// another target owns counts by the same rule, since that target renders its
+// decoder. A class whose codec is written by hand ([handWrittenXMLCodecs])
+// has one too. A class the plan does not hold is rendered as `any`, which
+// nothing decodes.
+func xmlClassDecoding(plan *Plan, name string) (xmlDecoding, error) {
+	if handWrittenXMLCodecs[name] {
+		return xmlOwnDecoder, nil
+	}
+	pc, ok := plan.Classes[name]
+	if !ok {
+		return xmlNoDecoder, nil
+	}
+	switch cls := pc.Class.(type) {
+	case *bmm.Enumeration:
+		return xmlTextDecoder, nil
+	case *bmm.SimpleClass:
+		if cls.IsAbstract() {
+			if !cls.IsGeneric() || codecPolymorphicAbstractGeneric(plan, pc) {
+				return xmlNoDecoder, nil
+			}
+			shaped, err := intervalShaped(plan, pc)
+			if err != nil || !shaped {
+				return xmlNoDecoder, err
+			}
+			return xmlOwnDecoder, nil
+		}
+		if pc.IsPrimitive {
+			return xmlNoDecoder, nil
+		}
+		return xmlOwnDecoder, nil
+	}
+	return xmlNoDecoder, nil
+}
+
+// isOpenParam reports whether name is one of owner's generic parameters.
+func isOpenParam(owner *bmm.SimpleClass, name string) bool {
+	if owner == nil || owner.GenericParameterDefs == nil {
+		return false
+	}
+	_, ok := owner.GenericParameterDefs[name]
+	return ok
+}
+
+// containerInnerName returns the BMM name of a container's item type: the
+// class name, or the root type of a generic class.
+func containerInnerName(td *bmm.ContainerType) string {
+	if td == nil || td.TypeDef == nil {
+		return ""
+	}
+	switch inner := td.TypeDef.(type) {
+	case *bmm.SimpleType:
+		return inner.TypeName
+	case *bmm.GenericType:
+		return inner.RootType
+	}
+	return ""
 }
 
 func unmarshalXMLStructMandatory(recv, field, elem string) string {
@@ -367,7 +632,7 @@ func unmarshalXMLStructSlice(recv, field, elem, innerType string) string {
 
 func unmarshalXMLPrimitiveSlice(recv, field, elem, innerType string) string {
 	return fmt.Sprintf(
-		"\t\t\tcase %q:\n\t\t\t\tvar _v %s\n\t\t\t\tif _err := _dec.DecodeElement(&_v, &_t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = append(%s.%s, _v)\n",
+		"\t\t\tcase %q:\n\t\t\t\tvar _v %s\n\t\t\t\tif _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = append(%s.%s, _v)\n",
 		elem, innerType, recv, field, recv, field)
 }
 
@@ -384,8 +649,40 @@ func unmarshalXMLAttribute(recv, goField, attrName string) string {
 		attrName, recv, goField)
 }
 
+// checkUnmatchedXMLAttrs emits the call that hands the start element's
+// attributes to xmlunmatched.CheckUnmatchedAttrs at the head of UnmarshalXML,
+// naming the properties the class reads as XML attributes.
+func checkUnmatchedXMLAttrs(attrFields []emittedField) string {
+	var known strings.Builder
+	for _, ef := range attrFields {
+		fmt.Fprintf(&known, ", %q", ef.Prop.PropertyName())
+	}
+	return fmt.Sprintf(
+		"\tif _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start%s); _err != nil {\n\t\treturn _err\n\t}\n",
+		known.String())
+}
+
+// bmmAnyType is the BMM name of the root type, which the generator maps to
+// the Go empty interface.
+const bmmAnyType = "Any"
+
+// unmarshalXMLAnyContent emits the case of a property typed by the BMM root
+// type Any, such as the AOM 1.4 `assumed_value` and `EXPR_LEAF.item`. The
+// codec cannot decode its content, so the element is handed to
+// xmlunmatched.SkipUnmatched as one item, like a Hash member's: skipped by
+// default, reported or refused on request, and the field is left at its
+// zero value.
+func unmarshalXMLAnyContent(elem string) string {
+	return fmt.Sprintf(
+		"\t\t\tcase %q:\n\t\t\t\t// Canonical XML does not model the content of an Any member — see canxml/doc.go.\n\t\t\t\tif _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
+		elem)
+}
+
+// unmarshalXMLHashTODO emits the case of a Hash<K,V> property. Canonical XML
+// does not model Hash, so the element is handed to xmlunmatched.SkipUnmatched
+// like unmatched content: skipped by default, reported or refused on request.
 func unmarshalXMLHashTODO(elem string) string {
 	return fmt.Sprintf(
-		"\t\t\tcase %q:\n\t\t\t\t// TODO(canxml): Hash<K,V> XML decode deferred — see canxml/doc.go.\n\t\t\t\tif _err := _dec.Skip(); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
+		"\t\t\tcase %q:\n\t\t\t\t// TODO(canxml): Hash<K,V> XML decode deferred — see canxml/doc.go.\n\t\t\t\tif _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n",
 		elem)
 }

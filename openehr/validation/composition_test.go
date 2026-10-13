@@ -524,7 +524,7 @@ func TestValidateComposition_AlternativeMismatch_Positive(t *testing.T) {
 }
 
 // REQ-102 v2 Phase 4 — alternative mismatch NEGATIVE case. An RM
-// value whose type matches none of the OPT's C_SINGLE_ATTRIBUTE
+// value whose type conforms to none of the OPT's C_SINGLE_ATTRIBUTE
 // alternatives surfaces `alternative_mismatch` at the attribute
 // path. Uses Composer (PartyProxy interface) since Go's static
 // typing forbids assigning a DV_QUANTITY where Name expects DVText.
@@ -548,7 +548,7 @@ func TestValidateComposition_AlternativeMismatch_Negative(t *testing.T) {
         <node_id />
       </children>
       <children xsi:type="C_COMPLEX_OBJECT">
-        <rm_type_name>PARTY_IDENTIFIED</rm_type_name>
+        <rm_type_name>PARTY_RELATED</rm_type_name>
         <node_id />
       </children>
     </attributes>
@@ -562,17 +562,16 @@ func TestValidateComposition_AlternativeMismatch_Negative(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Compile: %v", err)
 	}
-	// PartyRelated satisfies neither alternative (PARTY_SELF /
-	// PARTY_IDENTIFIED) → alternative_mismatch at /composer.
+	// PartyIdentified conforms to neither alternative: it is not a
+	// PARTY_SELF, and it is the supertype of PARTY_RELATED, not a
+	// descendant → alternative_mismatch at /composer.
 	comp := &rm.Composition{
 		ArchetypeNodeID: "at0000",
-		Composer: &rm.PartyRelated{
-			PartyIdentified: rm.PartyIdentified{},
-		},
+		Composer:        &rm.PartyIdentified{Name: new("Dr. Jones")},
 	}
 	r := validation.ValidateComposition(comp, c)
 	if r.OK {
-		t.Fatal("expected alternative_mismatch for PartyRelated under PARTY_SELF|PARTY_IDENTIFIED alternatives, got OK")
+		t.Fatal("expected alternative_mismatch for PartyIdentified under PARTY_SELF|PARTY_RELATED alternatives, got OK")
 	}
 	if !containsIssue(r.Issues, "/composer", "alternative_mismatch") {
 		t.Errorf("expected alternative_mismatch at /composer, got %+v", r.Issues)
@@ -768,8 +767,9 @@ func TestValidateComposition_SectionEmptyNoPanic(t *testing.T) {
 // "valid" test asserts a zero-issue result.
 func validVitalSignsComposition() *rm.Composition {
 	return &rm.Composition{
-		ArchetypeNodeID: "openEHR-EHR-COMPOSITION.encounter.v1",
-		Name:            rm.DVText{Value: "Encounter"},
+		ArchetypeNodeID:  "openEHR-EHR-COMPOSITION.encounter.v1",
+		Name:             rm.DVText{Value: "Encounter"},
+		ArchetypeDetails: archetypeDetails("openEHR-EHR-COMPOSITION.encounter.v1"),
 		Category: rm.DVCodedText{
 			DVText: rm.DVText{Value: "event"},
 			DefiningCode: rm.CodePhrase{
@@ -799,8 +799,9 @@ func validVitalSignsComposition() *rm.Composition {
 // (language, encoding, subject, name).
 func validBloodPressureObservation() *rm.Observation {
 	return &rm.Observation{
-		ArchetypeNodeID: "openEHR-EHR-OBSERVATION.blood_pressure.v1",
-		Name:            rm.DVText{Value: "Blood pressure"},
+		ArchetypeNodeID:  "openEHR-EHR-OBSERVATION.blood_pressure.v1",
+		Name:             rm.DVText{Value: "Blood pressure"},
+		ArchetypeDetails: archetypeDetails("openEHR-EHR-OBSERVATION.blood_pressure.v1"),
 		Language: rm.CodePhrase{
 			TerminologyID: rm.TerminologyID{Value: "ISO_639-1"},
 			CodeString:    "en",
@@ -861,10 +862,22 @@ func validBloodPressureObservation() *rm.Observation {
 				&rm.Cluster{
 					ArchetypeNodeID: "openEHR-EHR-CLUSTER.device.v1",
 					Name:            rm.DVText{Value: "Device"},
+					// The RM requires a CLUSTER to hold at least one item.
+					Items: []rm.Item{&rm.Element{
+						ArchetypeNodeID: "at0001",
+						Name:            rm.DVText{Value: "Device name"},
+						Value:           &rm.DVText{Value: "Cuff"},
+					}},
 				},
 			},
 		},
 	}
+}
+
+// archetypeDetails returns the archetype_details the RM requires on an
+// archetype root of archetypeID (RM Is_archetype_root).
+func archetypeDetails(archetypeID string) *rm.Archetyped {
+	return &rm.Archetyped{ArchetypeID: rm.ArchetypeID{Value: archetypeID}, RMVersion: "1.1.0"}
 }
 
 func validSingleAttributeSlotComposition(protocolID string) *rm.Composition {

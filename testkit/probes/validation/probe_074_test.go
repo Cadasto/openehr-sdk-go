@@ -97,9 +97,14 @@ func TestProbe074NonCompositionValidate(t *testing.T) {
 			Name: "person_under_organisation_opt",
 			OPT:  []byte(probe074OrganisationOPT),
 			Root: &rm.Person{
-				ArchetypeNodeID: "openEHR-DEMOGRAPHIC-ORGANISATION.organisation.v1",
-				Name:            rm.DVText{Value: "P"},
-				Identities:      []rm.PartyIdentity{{ArchetypeNodeID: "at0001"}},
+				ArchetypeNodeID:  "openEHR-DEMOGRAPHIC-ORGANISATION.organisation.v1",
+				Name:             rm.DVText{Value: "P"},
+				ArchetypeDetails: archetyped("openEHR-DEMOGRAPHIC-ORGANISATION.organisation.v1"),
+				Identities: []rm.PartyIdentity{{
+					ArchetypeNodeID: "at0001",
+					Name:            rm.DVText{Value: "Identity"},
+					Details:         &rm.ItemTree{ArchetypeNodeID: "at0002", Name: rm.DVText{Value: "Details"}},
+				}},
 			},
 			WantCodes: []string{"rm_type_mismatch"},
 		},
@@ -108,8 +113,9 @@ func TestProbe074NonCompositionValidate(t *testing.T) {
 			Name: "person_missing_identities",
 			OPT:  []byte(probe074PersonIdentitiesOPT),
 			Root: &rm.Person{
-				ArchetypeNodeID: "openEHR-DEMOGRAPHIC-PERSON.person.v1",
-				Name:            rm.DVText{Value: "P"},
+				ArchetypeNodeID:  "openEHR-DEMOGRAPHIC-PERSON.person.v1",
+				Name:             rm.DVText{Value: "P"},
+				ArchetypeDetails: archetyped("openEHR-DEMOGRAPHIC-PERSON.person.v1"),
 			},
 			// existence lower >= 1 → required; cardinality interval
 			// lower >= 1 with zero children → cardinality (both clauses
@@ -131,11 +137,12 @@ func TestProbe074NonCompositionValidate(t *testing.T) {
 			Name: "ehr_status_clean",
 			OPT:  []byte(probe074EHRStatusOPT),
 			Root: &rm.EHRStatus{
-				ArchetypeNodeID: "openEHR-EHR-EHR_STATUS.generic.v1",
-				Name:            rm.DVText{Value: "EHR Status"},
-				Subject:         rm.PartySelf{},
-				IsModifiable:    true,
-				IsQueryable:     true,
+				ArchetypeNodeID:  "openEHR-EHR-EHR_STATUS.generic.v1",
+				Name:             rm.DVText{Value: "EHR Status"},
+				ArchetypeDetails: archetyped("openEHR-EHR-EHR_STATUS.generic.v1"),
+				Subject:          rm.PartySelf{},
+				IsModifiable:     true,
+				IsQueryable:      true,
 			},
 			WantCodes: nil,
 		},

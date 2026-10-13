@@ -12,6 +12,62 @@ import (
 
 // BMM package org.openehr.base.foundation_types.interval: canonical-JSON UnmarshalJSONFrom companions
 
+// UnmarshalJSONFrom decodes canonical openEHR JSON into Interval, which is abstract
+// and so reads no `_type`: a `_type` member is skipped like any other member
+// the class does not declare. A nil receiver is refused with
+// typereg.ErrNilReceiver rather than dereferenced. The shared helper threads
+// the polymorphic decode hooks and wraps a shape failure through
+// typereg.WrapShapeError. The receiver is a pointer, so an Interval held by
+// value in a struct field takes this decoder.
+//
+// A boundary flag the document leaves out takes its default once the whole
+// value is read: `lower_unbounded` and `upper_unbounded` read as false on a
+// side that carries a bound and as true on a side whose bound is absent or
+// null, and `lower_included` and `upper_included` read as true on a side
+// that is not open and as false on a side that is. A flag the document
+// carries is read as written. A side written `*_unbounded` false with no
+// bound is refused when the interval holds its bounds by value, since a zero
+// bound would stand in for the absent one; held as an interface, the side
+// decodes as written, with no bound.
+func (i *Interval[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if i == nil {
+		return fmt.Errorf("canjson: Interval: %w", typereg.ErrNilReceiver)
+	}
+	// A null in place of the interval reads as the member left out: the
+	// receiver keeps what it holds and no flag takes a default.
+	if dec.PeekKind() == 'n' {
+		_, err := dec.ReadToken()
+		return err
+	}
+	var seen intervalFlagsSeen
+	// No `_type` is declared, so the discriminator stays empty and is not checked.
+	var noType string
+	wire := &struct {
+		*rawInterval[T]
+		LowerIncluded  intervalFlagJSON  `json:"lower_included"`
+		LowerUnbounded intervalFlagJSON  `json:"lower_unbounded"`
+		UpperIncluded  intervalFlagJSON  `json:"upper_included"`
+		UpperUnbounded intervalFlagJSON  `json:"upper_unbounded"`
+		Lower          intervalBoundJSON `json:"lower"`
+		Upper          intervalBoundJSON `json:"upper"`
+	}{
+		rawInterval:    (*rawInterval[T])(i),
+		LowerIncluded:  intervalFlagJSON{field: &i.LowerIncluded, seen: &seen.lowerIncluded},
+		LowerUnbounded: intervalFlagJSON{field: &i.LowerUnbounded, seen: &seen.lowerUnbounded},
+		UpperIncluded:  intervalFlagJSON{field: &i.UpperIncluded, seen: &seen.upperIncluded},
+		UpperUnbounded: intervalFlagJSON{field: &i.UpperUnbounded, seen: &seen.upperUnbounded},
+		Lower:          intervalBoundJSON{field: &i.Lower, seen: &seen.lower},
+		Upper:          intervalBoundJSON{field: &i.Upper, seen: &seen.upper},
+	}
+	if err := typereg.DecodeInto(dec, "Interval", wire, &noType); err != nil {
+		return err
+	}
+	if err := seen.settle(intervalBoundHeldByValue(&i.Lower), &i.LowerIncluded, &i.LowerUnbounded, &i.UpperIncluded, &i.UpperUnbounded); err != nil {
+		return typereg.WrapShapeError("Interval", err)
+	}
+	return nil
+}
+
 // UnmarshalJSONFrom decodes canonical openEHR JSON into PointInterval.
 // A nil receiver is refused with typereg.ErrNilReceiver rather than
 // dereferenced. The shared helper checks the `_type`
@@ -19,17 +75,51 @@ import (
 // slot resolves, and wraps a whole-value shape failure through
 // typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
 // adding typereg.ErrInvalidShape.
+//
+// A boundary flag the document leaves out takes its default once the whole
+// value is read: `lower_unbounded` and `upper_unbounded` read as false on a
+// side that carries a bound and as true on a side whose bound is absent or
+// null, and `lower_included` and `upper_included` read as true on a side
+// that is not open and as false on a side that is. A flag the document
+// carries is read as written. A side written `*_unbounded` false with no
+// bound is refused when the interval holds its bounds by value, since a zero
+// bound would stand in for the absent one; held as an interface, the side
+// decodes as written, with no bound.
 func (p *PointInterval[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if p == nil {
 		return fmt.Errorf("canjson: Point_interval: %w", typereg.ErrNilReceiver)
 	}
-	wire := &jsonWirePointInterval[T]{rawInterval: (*rawInterval[T])(&p.Interval), LowerIncluded: p.LowerIncluded, LowerUnbounded: p.LowerUnbounded, UpperIncluded: p.UpperIncluded, UpperUnbounded: p.UpperUnbounded}
-	err := typereg.DecodeInto(dec, "Point_interval", wire, &wire.Type)
-	p.LowerIncluded = wire.LowerIncluded
-	p.LowerUnbounded = wire.LowerUnbounded
-	p.UpperIncluded = wire.UpperIncluded
-	p.UpperUnbounded = wire.UpperUnbounded
-	return err
+	// A null in place of the interval reads as the member left out: the
+	// receiver keeps what it holds and no flag takes a default.
+	if dec.PeekKind() == 'n' {
+		_, err := dec.ReadToken()
+		return err
+	}
+	var seen intervalFlagsSeen
+	wire := &struct {
+		*jsonWirePointInterval[T]
+		LowerIncluded  intervalFlagJSON  `json:"lower_included"`
+		LowerUnbounded intervalFlagJSON  `json:"lower_unbounded"`
+		UpperIncluded  intervalFlagJSON  `json:"upper_included"`
+		UpperUnbounded intervalFlagJSON  `json:"upper_unbounded"`
+		Lower          intervalBoundJSON `json:"lower"`
+		Upper          intervalBoundJSON `json:"upper"`
+	}{
+		jsonWirePointInterval: &jsonWirePointInterval[T]{rawInterval: (*rawInterval[T])(&p.Interval)},
+		LowerIncluded:         intervalFlagJSON{field: &p.LowerIncluded, seen: &seen.lowerIncluded},
+		LowerUnbounded:        intervalFlagJSON{field: &p.LowerUnbounded, seen: &seen.lowerUnbounded},
+		UpperIncluded:         intervalFlagJSON{field: &p.UpperIncluded, seen: &seen.upperIncluded},
+		UpperUnbounded:        intervalFlagJSON{field: &p.UpperUnbounded, seen: &seen.upperUnbounded},
+		Lower:                 intervalBoundJSON{field: &p.Lower, seen: &seen.lower},
+		Upper:                 intervalBoundJSON{field: &p.Upper, seen: &seen.upper},
+	}
+	if err := typereg.DecodeInto(dec, "Point_interval", wire, &wire.Type); err != nil {
+		return err
+	}
+	if err := seen.settle(intervalBoundHeldByValue(&p.Lower), &p.LowerIncluded, &p.LowerUnbounded, &p.UpperIncluded, &p.UpperUnbounded); err != nil {
+		return typereg.WrapShapeError("Point_interval", err)
+	}
+	return nil
 }
 
 // UnmarshalJSONFrom decodes canonical openEHR JSON into ProperInterval.
@@ -39,10 +129,49 @@ func (p *PointInterval[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // slot resolves, and wraps a whole-value shape failure through
 // typereg.WrapShapeError, keeping the `canjson: <RM_TYPE>:` text and
 // adding typereg.ErrInvalidShape.
+//
+// A boundary flag the document leaves out takes its default once the whole
+// value is read: `lower_unbounded` and `upper_unbounded` read as false on a
+// side that carries a bound and as true on a side whose bound is absent or
+// null, and `lower_included` and `upper_included` read as true on a side
+// that is not open and as false on a side that is. A flag the document
+// carries is read as written. A side written `*_unbounded` false with no
+// bound is refused when the interval holds its bounds by value, since a zero
+// bound would stand in for the absent one; held as an interface, the side
+// decodes as written, with no bound.
 func (p *ProperInterval[T]) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if p == nil {
 		return fmt.Errorf("canjson: Proper_interval: %w", typereg.ErrNilReceiver)
 	}
-	wire := &jsonWireProperInterval[T]{rawInterval: (*rawInterval[T])(&p.Interval)}
-	return typereg.DecodeInto(dec, "Proper_interval", wire, &wire.Type)
+	// A null in place of the interval reads as the member left out: the
+	// receiver keeps what it holds and no flag takes a default.
+	if dec.PeekKind() == 'n' {
+		_, err := dec.ReadToken()
+		return err
+	}
+	var seen intervalFlagsSeen
+	wire := &struct {
+		*jsonWireProperInterval[T]
+		LowerIncluded  intervalFlagJSON  `json:"lower_included"`
+		LowerUnbounded intervalFlagJSON  `json:"lower_unbounded"`
+		UpperIncluded  intervalFlagJSON  `json:"upper_included"`
+		UpperUnbounded intervalFlagJSON  `json:"upper_unbounded"`
+		Lower          intervalBoundJSON `json:"lower"`
+		Upper          intervalBoundJSON `json:"upper"`
+	}{
+		jsonWireProperInterval: &jsonWireProperInterval[T]{rawInterval: (*rawInterval[T])(&p.Interval)},
+		LowerIncluded:          intervalFlagJSON{field: &p.LowerIncluded, seen: &seen.lowerIncluded},
+		LowerUnbounded:         intervalFlagJSON{field: &p.LowerUnbounded, seen: &seen.lowerUnbounded},
+		UpperIncluded:          intervalFlagJSON{field: &p.UpperIncluded, seen: &seen.upperIncluded},
+		UpperUnbounded:         intervalFlagJSON{field: &p.UpperUnbounded, seen: &seen.upperUnbounded},
+		Lower:                  intervalBoundJSON{field: &p.Lower, seen: &seen.lower},
+		Upper:                  intervalBoundJSON{field: &p.Upper, seen: &seen.upper},
+	}
+	if err := typereg.DecodeInto(dec, "Proper_interval", wire, &wire.Type); err != nil {
+		return err
+	}
+	if err := seen.settle(intervalBoundHeldByValue(&p.Lower), &p.LowerIncluded, &p.LowerUnbounded, &p.UpperIncluded, &p.UpperUnbounded); err != nil {
+		return typereg.WrapShapeError("Proper_interval", err)
+	}
+	return nil
 }

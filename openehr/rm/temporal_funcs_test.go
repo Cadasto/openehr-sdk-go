@@ -638,6 +638,96 @@ func TestREQ123_DurationComponentPastIntIsUnparseable(t *testing.T) {
 	}
 }
 
+// REQ-123: ToTime refuses a leap second (second 60) on a DV_TIME or a
+// DV_DATE_TIME rather than letting time.Date move it into the next minute.
+// The value stays valid ISO 8601: the accessors read second 60 as written
+// and IsPartial is false. Second 59 still converts.
+func TestREQ123_ToTimeRefusesLeapSecond(t *testing.T) {
+	times := []string{
+		"23:59:60",
+		"23:59:60.5",
+		"23:59:60,25",
+		"23:59:60Z",
+		"23:59:60+01:00",
+		"23:59:60-0500",
+		"235960",
+		"235960.5Z",
+	}
+	for _, value := range times {
+		t.Run("DV_TIME "+value, func(t *testing.T) {
+			d := &rm.DVTime{Value: value}
+			got, err := d.ToTime()
+			if !errors.Is(err, rm.ErrTemporalConversion) {
+				t.Errorf("DVTime{%q}.ToTime() = %v, %v, want ErrTemporalConversion", value, got, err)
+			}
+			if !got.IsZero() {
+				t.Errorf("DVTime{%q}.ToTime() = %v, want the zero time", value, got)
+			}
+			if d.Second() != 60 || d.Minute() != 59 || d.Hour() != 23 {
+				t.Errorf("DVTime{%q} components = %d:%d:%d, want 23:59:60", value, d.Hour(), d.Minute(), d.Second())
+			}
+			if d.IsPartial() {
+				t.Errorf("DVTime{%q}.IsPartial() = true, want false", value)
+			}
+			if !d.ValidISO8601() {
+				t.Errorf("DVTime{%q}.ValidISO8601() = false, want true", value)
+			}
+		})
+	}
+
+	dateTimes := []string{
+		"2016-12-31T23:59:60Z",
+		"2016-12-31T23:59:60.5Z",
+		"2016-12-31T23:59:60",
+		"2017-01-01T00:59:60+01:00",
+		"2016-12-31T18:59:60-05:00",
+		"20161231T235960Z",
+		"20161231T235960,5+0000",
+	}
+	for _, value := range dateTimes {
+		t.Run("DV_DATE_TIME "+value, func(t *testing.T) {
+			d := &rm.DVDateTime{Value: value}
+			got, err := d.ToTime()
+			if !errors.Is(err, rm.ErrTemporalConversion) {
+				t.Errorf("DVDateTime{%q}.ToTime() = %v, %v, want ErrTemporalConversion", value, got, err)
+			}
+			if !got.IsZero() {
+				t.Errorf("DVDateTime{%q}.ToTime() = %v, want the zero time", value, got)
+			}
+			if d.Second() != 60 || d.Minute() != 59 {
+				t.Errorf("DVDateTime{%q} minute:second = %d:%d, want 59:60", value, d.Minute(), d.Second())
+			}
+			if d.IsPartial() {
+				t.Errorf("DVDateTime{%q}.IsPartial() = true, want false", value)
+			}
+			if !d.ValidISO8601() {
+				t.Errorf("DVDateTime{%q}.ValidISO8601() = false, want true", value)
+			}
+		})
+	}
+
+	t.Run("DV_TIME 23:59:59 converts", func(t *testing.T) {
+		got, err := (&rm.DVTime{Value: "23:59:59.5"}).ToTime()
+		if err != nil {
+			t.Fatalf("DVTime{23:59:59.5}.ToTime() err = %v, want nil", err)
+		}
+		want := time.Date(0, 1, 1, 23, 59, 59, 500_000_000, time.UTC)
+		if !got.Equal(want) {
+			t.Errorf("DVTime{23:59:59.5}.ToTime() = %v, want %v", got, want)
+		}
+	})
+	t.Run("DV_DATE_TIME 23:59:59 converts", func(t *testing.T) {
+		got, err := (&rm.DVDateTime{Value: "2016-12-31T23:59:59Z"}).ToTime()
+		if err != nil {
+			t.Fatalf("DVDateTime{2016-12-31T23:59:59Z}.ToTime() err = %v, want nil", err)
+		}
+		want := time.Date(2016, 12, 31, 23, 59, 59, 0, time.UTC)
+		if !got.Equal(want) {
+			t.Errorf("DVDateTime{2016-12-31T23:59:59Z}.ToTime() = %v, want %v", got, want)
+		}
+	})
+}
+
 // REQ-123: magnitude of a duration scales each component in floating point,
 // so PT9999999999999999H is that length in seconds and not the wrapped int product.
 func TestREQ123_DurationMagnitudeNoIntOverflow(t *testing.T) {

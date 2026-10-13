@@ -64,9 +64,10 @@ builder, the synthesiser, the validator, and AQL lint all accept.
 :material-check-decagram:
 
 ### Check before you send
-`validation.ValidateRM` checks the Reference Model's own rules with no
-template. `ValidateComposition` checks the compiled OPT's constraints. The two
-checks are separate, so a Composition you send should pass both.
+`validation.ValidateComposition` checks the compiled OPT's constraints and the
+Reference Model's own rules in one call, and reports a defect both find once.
+`ValidateRM` checks the Reference Model's rules alone, for data no template
+governs.
 
 </div>
 

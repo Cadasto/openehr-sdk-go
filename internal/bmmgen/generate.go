@@ -21,7 +21,9 @@
 //
 // The RM target also gets release_gen.go, the constant Release taken
 // from the root schema's rm_release, and the two rminfo tables,
-// openehr/rm/rminfo/lookup_gen.go and absence_gen.go.
+// openehr/rm/rminfo/lookup_gen.go and absence_gen.go. Its jsonhooks_gen.go
+// also registers the JSON walker's interface table into
+// internal/rmjsonwalk/polyreg.
 //
 // # Targets
 //

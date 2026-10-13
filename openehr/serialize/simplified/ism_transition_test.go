@@ -308,7 +308,7 @@ func TestIsmTransitionCanonicalJSONCarriesOnlyRMMembers(t *testing.T) {
 		"with a template":    buildNameIndex(compiled),
 	} {
 		t.Run(name, func(t *testing.T) {
-			compJSON, err := decodeFlat(rmattrBody(ismTransitionKeys("transition", "524", "at0005")), wt, names)
+			compJSON, err := decodeFlat(rmattrBody(ismTransitionKeys("transition", "524", "at0005")), wt, names, nil)
 			if err != nil {
 				t.Fatalf("decodeFlat: %v", err)
 			}

@@ -33,6 +33,7 @@ package simplified
 // refusal naming the key rather than a silent drop.
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -84,11 +85,19 @@ var feederAuditDetailsParties = map[string]bool{"location": true, "subject": tru
 // a real FLAT key, and what lets the party and datatype decoders be reused verbatim.
 //
 // The `:index` rules are the ones [checkRMAttrIndexes] applies to a `_family:N`
-// sequence, for the same reasons: bounded by [maxRepeatIndex], no two spellings of
-// one slot, no gaps (a gap would fabricate an empty instance out of a malformed
-// payload). Whether a segment may be a list at all is the caller's judgement — a
-// single-valued segment simply has exactly one instance.
-func rmattrChildGroups(g rmattrGroup) (map[string]any, map[string][]rmattrGroup, error) {
+// sequence, for the same reasons: bounded by [maxRepeatIndex] and no gaps (a gap
+// would fabricate an empty instance out of a malformed payload). The index-less
+// spelling and `:0` name one slot, so their tails merge into one instance; a
+// tail spelled under both is two spellings of one sub-path, judged once the
+// decode knows whether it reads it ([rmattrGroup.settleDups]). Whether a
+// segment may be a list at all is the caller's judgement — a single-valued
+// segment simply has exactly one instance.
+//
+// known names the sub-path segments the level's grammar reads. A tail under any
+// other segment is unmatched content (REQ-170): it goes to the group's sink
+// before its index is judged. A malformed index spelling is refused whatever
+// segment it is on.
+func rmattrChildGroups(g rmattrGroup, known map[string]bool) (map[string]any, map[string][]rmattrGroup, error) {
 	own := make(map[string]any)
 	bySeg := make(map[string]map[int]*rmattrGroup)
 	for _, tail := range slices.Sorted(maps.Keys(g.tails)) {
@@ -107,6 +116,10 @@ func rmattrChildGroups(g rmattrGroup) (map[string]any, map[string][]rmattrGroup,
 		if err != nil {
 			return nil, nil, err
 		}
+		if !known[id] {
+			g.sink.add(g.key(tail))
+			continue
+		}
 		slot := max(idx, 0)
 		if slot > maxRepeatIndex {
 			return nil, nil, fmt.Errorf("%w: %q :index %d exceeds bound %d", ErrUnknownPath, g.key(tail), slot, maxRepeatIndex)
@@ -114,19 +127,25 @@ func rmattrChildGroups(g rmattrGroup) (map[string]any, map[string][]rmattrGroup,
 		if bySeg[id] == nil {
 			bySeg[id] = make(map[int]*rmattrGroup)
 		}
+		// The index-less spelling and `:0` are one slot (REQ-053), so their
+		// tails merge into one instance, each keeping the key as written.
 		child := bySeg[id][slot]
 		if child == nil {
-			child = &rmattrGroup{base: g.prefix(), family: id, index: idx, tails: make(map[string]any)}
+			child = newRMAttrGroup(g.prefix(), id, idx, g.sink)
+			child.dups = g.dups
 			bySeg[id][slot] = child
-		} else if child.index != idx {
-			return nil, nil, fmt.Errorf("%w: %q collides with another spelling of :index %d; remove one",
-				ErrUnknownPath, g.key(tail), slot)
 		}
-		if _, taken := child.tails[remainder]; taken {
-			return nil, nil, fmt.Errorf("%w: %q collides with another spelling of the same sub-path; remove one",
-				ErrUnsupportedDatatype, g.key(tail))
+		if held, taken := child.tails[remainder]; taken {
+			if g.dups == nil {
+				return nil, nil, fmt.Errorf("%w: %q collides with another spelling of the same sub-path; remove one",
+					ErrUnsupportedDatatype, g.key(tail))
+			}
+			// Judged once the decode knows whether it reads the sub-path
+			// ([rmattrGroup.settleDups]).
+			*g.dups = append(*g.dups, tailDup{first: child.key(remainder), second: g.key(tail), firstVal: held, secondVal: val})
+			continue
 		}
-		child.tails[remainder] = val
+		child.put(remainder, val, g.key(tail))
 	}
 	children := make(map[string][]rmattrGroup, len(bySeg))
 	for id, slots := range bySeg {
@@ -163,19 +182,18 @@ func rmattrChildSingle(g rmattrGroup, seg string, insts []rmattrGroup) (rmattrGr
 // decodeRMAttrFeederAudit decodes one `_feeder_audit` instance into a canonical
 // FEEDER_AUDIT.
 //
-// FEEDER_AUDIT has no scalar attribute at all, so the family carries no own suffix
-// and a bare value or a `|suffix` on it is refused. `originating_system_audit` is
-// RM-mandatory and required rather than defaulted: fabricating an empty
+// FEEDER_AUDIT has no scalar attribute at all, so the family carries no own
+// suffix: a bare value or a `|suffix` on it is unmatched content, as is a
+// sub-path FEEDER_AUDIT has no attribute for (REQ-170). `originating_system_audit`
+// is RM-mandatory and required rather than defaulted: fabricating an empty
 // FEEDER_AUDIT_DETAILS would put a system id of "" on the wire.
 func decodeRMAttrFeederAudit(g rmattrGroup, _ string) (any, error) {
-	own, children, err := rmattrChildGroups(g)
+	own, children, err := rmattrChildGroups(g, feederAuditSegs)
 	if err != nil {
 		return nil, err
 	}
-	if len(own) > 0 {
-		suffix := slices.Sorted(maps.Keys(own))[0]
-		return nil, fmt.Errorf("%w: %q is not part of the %s grammar (REQ-140); every FEEDER_AUDIT attribute is a sub-path",
-			ErrUnsupportedDatatype, g.key(ownTail(suffix)), g.family)
+	for _, suffix := range slices.Sorted(maps.Keys(own)) {
+		g.sink.add(g.key(ownTail(suffix)))
 	}
 	fa := map[string]any{"_type": "FEEDER_AUDIT"}
 	var contentSeg string
@@ -186,18 +204,26 @@ func decodeRMAttrFeederAudit(g rmattrGroup, _ string) (any, error) {
 			ids := make([]any, 0, len(insts))
 			for _, in := range insts {
 				dv, err := feederLeafValue(in, "DV_IDENTIFIER")
+				if errors.Is(err, errNothingMatched) {
+					continue
+				}
 				if err != nil {
 					return nil, err
 				}
 				ids = append(ids, dv)
 			}
-			fa[feederAuditItemIDLists[seg]] = ids
+			if len(ids) > 0 {
+				fa[feederAuditItemIDLists[seg]] = ids
+			}
 		case feederAuditDetailSegs[seg]:
 			in, err := rmattrChildSingle(g, seg, insts)
 			if err != nil {
 				return nil, err
 			}
 			details, err := decodeFeederAuditDetails(in)
+			if errors.Is(err, errNothingMatched) {
+				continue
+			}
 			if err != nil {
 				return nil, err
 			}
@@ -213,13 +239,17 @@ func decodeRMAttrFeederAudit(g rmattrGroup, _ string) (any, error) {
 				return nil, err
 			}
 			content, err := feederLeafValue(in, feederAuditContentSegs[seg])
+			if errors.Is(err, errNothingMatched) {
+				continue
+			}
 			if err != nil {
 				return nil, err
 			}
 			fa["original_content"] = content
-		default:
-			return nil, feederUnknownSegment(g, insts[0], seg, "FEEDER_AUDIT")
 		}
+	}
+	if len(fa) == 1 {
+		return nil, errNothingMatched
 	}
 	if _, ok := fa["originating_system_audit"]; !ok {
 		return nil, fmt.Errorf("%w: %s is missing the required /originating_system_audit (RM-mandatory on FEEDER_AUDIT)",
@@ -228,19 +258,51 @@ func decodeRMAttrFeederAudit(g rmattrGroup, _ string) (any, error) {
 	return fa, nil
 }
 
+// feederAuditSegs are the sub-path segments FEEDER_AUDIT's grammar reads.
+var feederAuditSegs = func() map[string]bool {
+	out := maps.Clone(feederAuditDetailSegs)
+	for seg := range feederAuditItemIDLists {
+		out[seg] = true
+	}
+	for seg := range feederAuditContentSegs {
+		out[seg] = true
+	}
+	return out
+}()
+
+// feederAuditDetailsSegs are the sub-path segments FEEDER_AUDIT_DETAILS'
+// grammar reads: its three parties. `other_details` never reaches it; it is
+// refused first.
+var feederAuditDetailsSegs = feederAuditDetailsParties
+
+// feederAuditOtherDetails is FEEDER_AUDIT_DETAILS.other_details, the one
+// attribute of the family the reference's grammar has no channel for.
+const feederAuditOtherDetails = "other_details"
+
 // decodeFeederAuditDetails decodes one `originating_system_audit` /
 // `feeder_system_audit` sub-object: its three own suffixes and its three party
-// positions, each through C2's party grammar.
+// positions, each through C2's party grammar. Any other suffix or sub-path is
+// unmatched content (REQ-170), except `other_details`, which resolves but has
+// no carrier and is refused.
 func decodeFeederAuditDetails(g rmattrGroup) (any, error) {
-	own, children, err := rmattrChildGroups(g)
+	// other_details is refused in every spelling, an own suffix as much as a
+	// sub-path.
+	if tail, named := tailNaming(g, feederAuditOtherDetails); named {
+		return nil, fmt.Errorf("%w: %q addresses FEEDER_AUDIT_DETAILS.other_details, an ITEM_STRUCTURE the reference's suffix set has no channel for and the pinned corpus never writes — deferred rather than dropped (REQ-140, see deviations.md)",
+			ErrUnsupportedDatatype, g.key(tail))
+	}
+	own, children, err := rmattrChildGroups(g, feederAuditDetailsSegs)
 	if err != nil {
 		return nil, err
 	}
 	for _, suffix := range slices.Sorted(maps.Keys(own)) {
 		if !feederAuditDetailsOwnTails[suffix] {
-			return nil, fmt.Errorf("%w: %q is not part of the %s grammar (REQ-140)",
-				ErrUnsupportedDatatype, g.key(ownTail(suffix)), g.family)
+			g.sink.add(g.key(ownTail(suffix)))
+			delete(own, suffix)
 		}
+	}
+	if len(own) == 0 && len(children) == 0 {
+		return nil, errNothingMatched
 	}
 	systemID, present, err := feederOwnString(g, own, "system_id")
 	if err != nil {
@@ -262,14 +324,14 @@ func decodeFeederAuditDetails(g rmattrGroup) (any, error) {
 		details["time"] = map[string]any{"_type": "DV_DATE_TIME", "value": when}
 	}
 	for _, seg := range slices.Sorted(maps.Keys(children)) {
-		if !feederAuditDetailsParties[seg] {
-			return nil, feederUnknownSegment(g, children[seg][0], seg, "FEEDER_AUDIT_DETAILS")
-		}
 		in, err := rmattrChildSingle(g, seg, children[seg])
 		if err != nil {
 			return nil, err
 		}
 		party, err := feederParty(in, seg == "subject")
+		if errors.Is(err, errNothingMatched) {
+			continue
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -299,18 +361,22 @@ func feederParty(g rmattrGroup, proxy bool) (map[string]any, error) {
 
 // feederLeafValue decodes a re-rooted child group whose whole value is one datatype
 // in its own suffix form — an item id, an `original_content`. The child's tails
-// *are* the suffix map, so a sub-path of its own is refused naming the key: the
-// grammar stops here, and a value the suffix set cannot capture rides that key's
-// `|raw` instead (which is how a charset-carrying `original_content` stays
-// lossless).
+// *are* the suffix map, so a sub-path of its own, like a suffix outside the
+// datatype's set, is unmatched content (REQ-170): the grammar stops here, and a
+// value the suffix set cannot capture rides that key's `|raw` instead (which is
+// how a charset-carrying `original_content` stays lossless).
 func feederLeafValue(g rmattrGroup, rmType string) (map[string]any, error) {
 	sfx := make(map[string]any, len(g.tails))
 	for _, tail := range slices.Sorted(maps.Keys(g.tails)) {
 		if strings.HasPrefix(tail, "/") {
-			return nil, fmt.Errorf("%w: %q is not part of the %s grammar (REQ-140)",
-				ErrUnsupportedDatatype, g.key(tail), g.family)
+			g.sink.add(g.key(tail))
+			continue
 		}
 		sfx[strings.TrimPrefix(tail, "|")] = g.tails[tail]
+	}
+	sfx = matchedSuffixes(rmType, sfx, func(suffix string) string { return g.key(ownTail(suffix)) }, g.sink)
+	if len(sfx) == 0 {
+		return nil, errNothingMatched
 	}
 	dv, err := dvFromSuffixes(rmType, false, sfx)
 	if err != nil {
@@ -334,20 +400,6 @@ func feederOwnString(g rmattrGroup, own map[string]any, suffix string) (string, 
 			ErrUnsupportedDatatype, g.key(ownTail(suffix)), v)
 	}
 	return s, true, nil
-}
-
-// feederUnknownSegment is the refusal for a sub-path segment outside a level's
-// grammar. `other_details` gets its own message: it is a **named RM attribute this
-// codec defers** (an ITEM_STRUCTURE with no channel in the reference's suffix set
-// and no corpus fixture), not a typo, and the census reads the distinction.
-func feederUnknownSegment(g rmattrGroup, child rmattrGroup, seg, owner string) error {
-	tail := slices.Sorted(maps.Keys(child.tails))[0]
-	key := child.key(tail)
-	if seg == "other_details" {
-		return fmt.Errorf("%w: %q addresses %s.other_details, an ITEM_STRUCTURE the reference's suffix set has no channel for and the pinned corpus never writes — deferred rather than dropped (REQ-140, see deviations.md)",
-			ErrUnsupportedDatatype, key, owner)
-	}
-	return fmt.Errorf("%w: %q is not part of the %s grammar (REQ-140)", ErrUnsupportedDatatype, key, g.family)
 }
 
 // feederItemIDPath is the FLAT prefix of one DV_IDENTIFIER list slot, shared by the

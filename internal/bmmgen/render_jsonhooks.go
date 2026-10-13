@@ -20,6 +20,10 @@ type polyInterface struct {
 	GoName   string // unqualified interface name owned by this target
 	Narrow   bool
 	ParentGo string // for a narrow interface: the parent concrete Go type
+	// Class is the BMM class the interface stands for: the abstract class
+	// (DATA_VALUE for DataValue), or a narrow interface's parent class
+	// (DV_TEXT for DVTextLike), which is also its fallback.
+	Class string
 }
 
 // RenderJSONHooksFile renders <pkg>/jsonhooks_gen.go: one json.UnmarshalFromFunc
@@ -27,6 +31,14 @@ type polyInterface struct {
 // aggregate at init. Every nested decode threads the
 // aggregate through [typereg.Unmarshalers], so a polymorphic slot resolves from
 // any entry point, including a bare encoding/json/v2 Unmarshal with no options.
+//
+// For the RM target it also renders polymorphicClass, an unexported type
+// switch naming the BMM class each interface stands for, and registers it
+// into internal/rmjsonwalk/polyreg at init. The canonical-JSON walker reads a
+// decode target's Go type through that table (REQ-170) without importing
+// openehr/rm, which canjson must not import, and without reflecting over the
+// registry (REQ-024). The AOM 1.4 target gets no table: the JSON walk does not
+// check AOM 1.4 classes.
 //
 // Returns (nil, nil) when the target has no polymorphic interfaces.
 func RenderJSONHooksFile(plan *Plan) ([]byte, error) {
@@ -44,6 +56,10 @@ func RenderJSONHooksFile(plan *Plan) ([]byte, error) {
 	b.WriteString("import (\n")
 	b.WriteString("\t\"encoding/json/jsontext\"\n")
 	b.WriteString("\tjson \"encoding/json/v2\"\n\n")
+	walkerTable := plan.Target.GoPackage == "rm"
+	if walkerTable {
+		fmt.Fprintf(&b, "\t%q\n", polyregImport)
+	}
 	fmt.Fprintf(&b, "\t%q\n", plan.Target.RegistryImport)
 	b.WriteString(")\n\n")
 	b.WriteString("// init registers one decode hook per polymorphic interface owned by this\n")
@@ -61,13 +77,76 @@ func RenderJSONHooksFile(plan *Plan) ([]byte, error) {
 		}
 		b.WriteString("\t}))\n")
 	}
+	if walkerTable {
+		b.WriteString("\tpolyreg.Register(polymorphicClass)\n")
+	}
 	b.WriteString("}\n")
+	if walkerTable {
+		renderPolymorphicClass(&b, ifaces)
+	}
+	return formatGenerated(b.Bytes(), "jsonhooks_gen.go")
+}
 
-	formatted, err := format.Source(b.Bytes())
+// polyregImport is the import path of the seam the RM package registers its
+// interface table into for the canonical-JSON walker.
+const polyregImport = "github.com/cadasto/openehr-sdk-go/internal/rmjsonwalk/polyreg"
+
+// renderPolymorphicClass writes polymorphicClass, the type switch naming the
+// BMM class behind each polymorphic interface: the abstract class, or for a
+// narrow interface its parent class, which is also the class its hook falls
+// back to.
+func renderPolymorphicClass(b *bytes.Buffer, ifaces []polyInterface) {
+	b.WriteString("\n// polymorphicClass names the BMM class behind the polymorphic interface p\n")
+	b.WriteString("// points to: the abstract class the interface stands for, or for a narrow\n")
+	b.WriteString("// interface (<Parent>Like) its parent class. ok is false when p points to no\n")
+	b.WriteString("// polymorphic interface of this package. init registers it into\n")
+	b.WriteString("// internal/rmjsonwalk/polyreg for the canonical-JSON walker, which reads a\n")
+	b.WriteString("// decode target's Go type without importing this package.\n")
+	b.WriteString("func polymorphicClass(p any) (string, bool) {\n")
+	b.WriteString("\tswitch p.(type) {\n")
+	for _, pi := range ifaces {
+		fmt.Fprintf(b, "\tcase *%s:\n\t\treturn %q, true\n", pi.GoName, pi.Class)
+	}
+	b.WriteString("\t}\n")
+	b.WriteString("\treturn \"\", false\n")
+	b.WriteString("}\n")
+}
+
+// formatGenerated gofmts the rendered source of the generated file name.
+func formatGenerated(src []byte, name string) ([]byte, error) {
+	formatted, err := format.Source(src)
 	if err != nil {
-		return b.Bytes(), fmt.Errorf("gofmt jsonhooks_gen.go: %w", err)
+		return src, fmt.Errorf("gofmt %s: %w", name, err)
 	}
 	return formatted, nil
+}
+
+// interfaceClassNames maps the Go name of every polymorphic interface the
+// plan can emit to the BMM class it stands for: an abstract class or BMM
+// interface, or the concrete parent of a narrow interface.
+func interfaceClassNames(plan *Plan) (map[string]string, error) {
+	out := map[string]string{}
+	add := func(goName, class string, ok bool) error {
+		if !ok {
+			return nil
+		}
+		if prev, seen := out[goName]; seen && prev != class {
+			return fmt.Errorf("polymorphic interface %s stands for both %s and %s", goName, prev, class)
+		}
+		out[goName] = class
+		return nil
+	}
+	for _, name := range sortedStringKeys(plan.Classes) {
+		abstract, isAbstract := abstractGoName(plan, name)
+		if err := add(abstract, name, isAbstract); err != nil {
+			return nil, err
+		}
+		narrow, isNarrow := narrowInterfaceGoName(plan, name)
+		if err := add(narrow, name, isNarrow); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
 // polymorphicInterfaces returns the distinct polymorphic interfaces owned by the
@@ -94,8 +173,17 @@ func polymorphicInterfaces(plan *Plan) ([]polyInterface, error) {
 			seen[name] = polyInterface{GoName: name, Narrow: narrow, ParentGo: parent}
 		}
 	}
+	classes, err := interfaceClassNames(plan)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]polyInterface, 0, len(seen))
 	for _, v := range seen {
+		class, ok := classes[v.GoName]
+		if !ok {
+			return nil, fmt.Errorf("polymorphic interface %s stands for no BMM class", v.GoName)
+		}
+		v.Class = class
 		out = append(out, v)
 	}
 	slices.SortFunc(out, func(a, b polyInterface) int { return cmp.Compare(a.GoName, b.GoName) })

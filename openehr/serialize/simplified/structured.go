@@ -34,21 +34,36 @@ func MarshalStructured(comp *rm.Composition, wt *webtemplate.WebTemplate) ([]byt
 }
 
 // UnmarshalStructured decodes STRUCTURED JSON into a canonical COMPOSITION
-// using wt. It restructures to FLAT and delegates to UnmarshalFlat.
+// using wt. It restructures to FLAT and decodes that as [UnmarshalFlat] does.
+//
+// A member the decode does not read is ignored by default, and the value
+// holds the rest of the body. [WithUnmatched] reports each such member by its
+// path of members from the root, and [WithStrict] refuses the first, wrapping
+// [ErrUnknownPath].
 func UnmarshalStructured(data []byte, wt *webtemplate.WebTemplate, opts ...Option) (*rm.Composition, error) {
 	s, err := unmarshalObject(data)
 	if err != nil {
 		return nil, err
 	}
-	flatMap, err := structuredToFlat(s)
+	var judge *webtemplate.WebTemplate
+	if wt != nil && wt.Tree != nil {
+		judge = wt
+	}
+	flat, skipped, err := structuredToFlatJudged(s, judge)
 	if err != nil {
 		return nil, err
 	}
-	flat, err := json.Marshal(flatMap)
-	if err != nil {
-		return nil, err
+	if judge == nil {
+		return nil, ErrNoTemplate
 	}
-	return UnmarshalFlat(flat, wt, opts...)
+	cfg := newDecodeConfig(opts)
+	var loc locator
+	if cfg.tracked() {
+		if loc, err = structuredLocations(data); err != nil {
+			return nil, err
+		}
+	}
+	return decodeFlatMap(flat, wt, cfg, loc, memberKeys(skipped))
 }
 
 // FlatToStructured restructures FLAT JSON into STRUCTURED JSON (no OPT needed).
@@ -84,6 +99,13 @@ func StructuredToFlat(data []byte) ([]byte, error) {
 // with another key's (scalar vs object at one slot) is an error, never a
 // last-write-wins overwrite.
 func flatToStructured(flat map[string]any) (map[string]any, error) {
+	// `x|` spells the bare value of `x`: the two are one key here, and differing
+	// values are refused, since restructuring cannot tell which one a decode
+	// would read.
+	flat, fold := foldEmptySuffix(flat)
+	if err := fold.settle(nil); err != nil {
+		return nil, err
+	}
 	root := make(map[string]any)
 	budget := &allocBudget{limit: maxTotalNodes}
 	var ctxObj map[string]any
@@ -233,71 +255,133 @@ func insertStructured(obj map[string]any, segs []flatSeg, suffix string, val any
 // shape (non-object root, non-array clinical child, null array hole) is an error
 // rather than a silent drop (REQ-053).
 func structuredToFlat(s map[string]any) (map[string]any, error) {
-	out := make(map[string]any)
+	out, _, err := structuredToFlatJudged(s, nil)
+	return out, err
+}
+
+// structuredToFlatJudged is [structuredToFlat] for a decode against wt. At
+// every level of the body a member whose name the FLAT grammar does not read
+// there is unmatched content whatever the JSON shape of its value (REQ-170):
+// it is set aside, not flattened, and skipped returns its member path,
+// slash-joined with each array position as a segment of its own. A name the
+// grammar reads keeps the shape refusals. [memberLevel] holds the rule. With a
+// nil wt nothing is judged, as OPT-free conversion needs.
+func structuredToFlatJudged(s map[string]any, wt *webtemplate.WebTemplate) (map[string]any, []string, error) {
+	w := structuredWalker{out: make(map[string]any), wt: wt}
 	for rootID, v := range s {
+		if wt != nil && rootID != wt.Tree.ID && rootID != "ctx" {
+			w.skipped = append(w.skipped, rootID)
+			continue
+		}
 		obj, ok := v.(map[string]any)
 		if !ok {
-			return nil, fmt.Errorf("%w: structured root %q is not an object (%T)", ErrUnknownPath, rootID, v)
+			return nil, nil, fmt.Errorf("%w: structured root %q is not an object (%T)", ErrUnknownPath, rootID, v)
 		}
 		// The ctx object holds direct values (no arrays / :index), inverse of
 		// the ctx grouping in flatToStructured.
 		if rootID == "ctx" {
-			for _, k := range slices.Sorted(maps.Keys(obj)) {
-				cv := obj[k]
-				// Inverse of the suffix nesting above: a ctx field carrying |suffix
-				// members flattens back to one piped FLAT key per member. Only
-				// |-prefixed members are legal there — anything else would be a
-				// nested structure no ctx/ field can hold, and silently dropping it
-				// is what the REQ-053 fail-loud contract forbids.
-				if leaf, nested := cv.(map[string]any); nested {
-					// An empty leaf object is refused, not skipped: flattening it to
-					// nothing turns an explicit `"setting": {}` into an absent field,
-					// which a WithTemplate decode then completes with the
-					// 238|other care default the body plainly did not ask for — the
-					// same "explicit empty is not absent" rule parseCtx enforces for
-					// the FLAT pair (REQ-053).
-					if len(leaf) == 0 {
-						return nil, fmt.Errorf("%w: ctx/%s is an empty object; omit the field for an absent value",
-							ErrUnsupportedDatatype, k)
-					}
-					for _, sk := range slices.Sorted(maps.Keys(leaf)) {
-						if !strings.HasPrefix(sk, "|") {
-							return nil, fmt.Errorf("%w: ctx/%s carries member %q; a suffixed ctx leaf holds only |suffix members",
-								ErrUnknownPath, k, sk)
-						}
-						out["ctx/"+k+sk] = leaf[sk]
-					}
-					continue
-				}
-				out["ctx/"+k] = cv
+			if err := w.ctx(obj); err != nil {
+				return nil, nil, err
 			}
 			continue
 		}
-		if err := structWalk(out, rootID, obj); err != nil {
-			return nil, err
+		level := opaqueLevel
+		if wt != nil {
+			level = nodeLevel(wt.Tree, "")
+		}
+		if err := w.walk(rootID, rootID, level, obj); err != nil {
+			return nil, nil, err
 		}
 	}
-	return out, nil
+	return w.out, w.skipped, nil
 }
 
-// structWalk descends an object whose keys are either child ids (mapping to
-// arrays) or |-prefixed leaf suffixes, accumulating FLAT entries under path. An
-// element that contributes no FLAT entry at all ("{}", or an object holding
-// only empty arrays) would vanish from the conversion — it is an error, per the
-// fail-loud posture.
-func structWalk(out map[string]any, path string, obj map[string]any) error {
+// structuredWalker accumulates the FLAT entries of a STRUCTURED body and,
+// against a Web Template, the member paths it set aside as unmatched.
+type structuredWalker struct {
+	out     map[string]any
+	wt      *webtemplate.WebTemplate
+	skipped []string
+}
+
+// ctxFieldNames are the ctx/ fields the decode reads, by member name: the
+// fields of [ctxFields], each suffix pair under its one field. A ctx member
+// is judged by its base ([memberBase]), so `"setting|code"` is the setting's.
+var ctxFieldNames = func() map[string]bool {
+	names := make(map[string]bool, len(ctxFields))
+	for key := range ctxFields {
+		name, _, _ := strings.Cut(strings.TrimPrefix(key, "ctx/"), "|")
+		names[name] = true
+	}
+	return names
+}()
+
+// ctx flattens the fields of the ctx object. A field the decode does not read
+// is set aside whatever it holds; so is a member of a field's object that is
+// not a suffix, since a ctx/ field reads its suffixes and nothing else.
+func (w *structuredWalker) ctx(obj map[string]any) error {
+	for _, k := range slices.Sorted(maps.Keys(obj)) {
+		cv := obj[k]
+		if w.wt != nil && !ctxFieldNames[memberBase(k)] {
+			w.skipped = append(w.skipped, "ctx/"+k)
+			continue
+		}
+		// Inverse of the suffix nesting above: a ctx field carrying |suffix
+		// members flattens back to one piped FLAT key per member.
+		if leaf, nested := cv.(map[string]any); nested {
+			// An empty leaf object is refused, not skipped: flattening it to
+			// nothing turns an explicit `"setting": {}` into an absent field,
+			// which a WithTemplate decode then completes with the
+			// 238|other care default the body plainly did not ask for — the
+			// same "explicit empty is not absent" rule parseCtx enforces for
+			// the FLAT pair (REQ-053).
+			if len(leaf) == 0 {
+				return fmt.Errorf("%w: ctx/%s is an empty object; omit the field for an absent value",
+					ErrUnsupportedDatatype, k)
+			}
+			for _, sk := range slices.Sorted(maps.Keys(leaf)) {
+				if strings.HasPrefix(sk, "|") {
+					w.out["ctx/"+k+sk] = leaf[sk]
+					continue
+				}
+				if w.wt == nil {
+					return fmt.Errorf("%w: ctx/%s carries member %q; a suffixed ctx leaf holds only |suffix members",
+						ErrUnknownPath, k, sk)
+				}
+				w.skipped = append(w.skipped, "ctx/"+k+"/"+sk)
+			}
+			continue
+		}
+		w.out["ctx/"+k] = cv
+	}
+	return nil
+}
+
+// walk descends an object whose keys are either member names (mapping to
+// arrays) or |-prefixed suffixes, accumulating FLAT entries under path.
+// member is the object's member path and level what the FLAT grammar reads
+// among its members ([memberLevel.judge]). An element that contributes no
+// FLAT entry at all ("{}", or an object holding only empty arrays) would
+// vanish from the conversion — it is an error, per the fail-loud posture —
+// unless what it held was set aside as unmatched.
+func (w *structuredWalker) walk(path, member string, level memberLevel, obj map[string]any) error {
 	for k, v := range obj {
 		if k == bareStructuredKey {
 			// The leaf's bare value, spelled as a member because the element also
 			// carries suffixes or nested `_` attributes (see [bareStructuredKey]).
-			if _, taken := out[path]; taken {
+			if _, taken := w.out[path]; taken {
 				return fmt.Errorf("%w: structured: %q is spelled twice", ErrUnknownPath, path)
 			}
-			out[path] = v
+			w.out[path] = v
 			continue
 		}
 		if strings.HasPrefix(k, "|") {
-			out[path+k] = v
+			w.out[path+k] = v
+			continue
+		}
+		below, read := level.judge(k)
+		if !read {
+			w.skipped = append(w.skipped, member+"/"+k)
 			continue
 		}
 		arr, ok := v.([]any)
@@ -305,20 +389,25 @@ func structWalk(out map[string]any, path string, obj map[string]any) error {
 			return fmt.Errorf("%w: structured: expected an array at %q, got %T", ErrUnknownPath, path+"/"+k, v)
 		}
 		for i, el := range arr {
+			// The position is judged before what the element holds, as the
+			// FLAT decode judges a key's segments from the left (REQ-170).
+			if err := below.bound.check(path, k, i); err != nil {
+				return err
+			}
 			seg := path + "/" + k + ":" + strconv.Itoa(i)
-			switch child := el.(type) {
+			switch obj := el.(type) {
 			case map[string]any:
-				before := len(out)
-				if err := structWalk(out, seg, child); err != nil {
+				before, skippedBefore := len(w.out), len(w.skipped)
+				if err := w.walk(seg, member+"/"+k+"/"+strconv.Itoa(i), below, obj); err != nil {
 					return err
 				}
-				if len(out) == before {
+				if len(w.out) == before && len(w.skipped) == skippedBefore {
 					return fmt.Errorf("%w: structured: element at %q carries no entries", ErrUnknownPath, seg)
 				}
 			case nil:
 				return fmt.Errorf("%w: structured: null element at %q", ErrUnknownPath, seg)
 			default:
-				out[seg] = el
+				w.out[seg] = el
 			}
 		}
 	}

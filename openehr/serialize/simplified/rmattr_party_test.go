@@ -184,9 +184,11 @@ func TestRMAttrOtherParticipationRoundTrip(t *testing.T) {
 	}
 }
 
-// TestRMAttrParticipationRefusals — REQ-140. The two identifier spellings are
-// position-specific and the vendored mode vocabulary is closed, so each wrong
-// shape is a typed refusal naming the key.
+// TestRMAttrParticipationRefusals — REQ-140 / REQ-170. The two identifier
+// spellings are position-specific and the vendored mode vocabulary is closed. A
+// spelling the position does not read, and a participation on an owner that
+// declares none, are unmatched content, refused under strict naming the key; a
+// malformed index or an unknown rubric is a typed refusal in every mode.
 func TestRMAttrParticipationRefusals(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	base := map[string]any{
@@ -202,12 +204,12 @@ func TestRMAttrParticipationRefusals(t *testing.T) {
 		// would give one RM list two FLAT surfaces.
 		"nested identifier on a participation": {
 			keys: map[string]any{rmattrContext + "/_participation:0/_identifier:0|id": "122"},
-			want: ErrUnsupportedDatatype,
+			want: errUnmatched,
 			name: rmattrContext + "/_participation:0/_identifier:0|id",
 		},
 		"unindexed inline identifier": {
 			keys: map[string]any{rmattrContext + "/_participation:0|identifiers_id": "122"},
-			want: ErrUnsupportedDatatype,
+			want: errUnmatched,
 			name: rmattrContext + "/_participation:0|identifiers_id",
 		},
 		"sparse inline identifier index": {
@@ -222,22 +224,19 @@ func TestRMAttrParticipationRefusals(t *testing.T) {
 		},
 		"participation on an entry": {
 			keys: map[string]any{rmattrObs + "/_participation:0|function": "requester"},
-			want: ErrUnknownPath,
+			want: errUnmatched,
 			name: rmattrObs + "/_participation:0",
 		},
 		"other participation on a section": {
 			keys: map[string]any{rmattrSection + "/_other_participation:0|function": "requester"},
-			want: ErrUnknownPath,
+			want: errUnmatched,
 			name: rmattrSection + "/_other_participation:0",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			body := rmattrBody(base)
 			maps.Copy(body, tc.keys)
-			err := decodeRMAttrErr(t, wt, body)
-			if !errors.Is(err, tc.want) {
-				t.Errorf("err = %v, want %v", err, tc.want)
-			}
+			err := refusalLegs(t, wt, body, tc.keys, tc.want)
 			if !strings.Contains(err.Error(), tc.name) {
 				t.Errorf("err = %v, want it to name %q", err, tc.name)
 			}
@@ -467,43 +466,48 @@ func TestSubjectLeafPartySelfEmitsNothing(t *testing.T) {
 	}
 }
 
-// TestSubjectLeafRefusals — REQ-053 / REQ-140. The leaf carries the same closed
-// grammar as every other party position, and a party leaf is single-valued.
+// TestSubjectLeafRefusals — REQ-053 / REQ-140 / REQ-170. The leaf carries the same
+// closed grammar as every other party position, so a key outside it is unmatched
+// content; a party leaf is single-valued, so an index past :0 is refused in every
+// mode.
 func TestSubjectLeafRefusals(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	for name, tc := range map[string]struct {
 		keys map[string]any
 		want error
 		name string
+		// says is a further phrase the refusal must carry.
+		says string
 	}{
 		"unknown suffix": {
 			keys: map[string]any{rmattrObs + "/subject|id_typo": "x"},
-			want: ErrUnsupportedDatatype,
+			want: errUnmatched,
 			name: rmattrObs + "/subject|id_typo",
 		},
 		"unknown sub-path": {
 			keys: map[string]any{rmattrObs + "/subject/relation|code": "10"},
-			want: ErrUnsupportedDatatype,
+			want: errUnmatched,
 			name: rmattrObs + "/subject/relation|code",
 		},
 		"indexed party leaf": {
 			keys: map[string]any{rmattrObs + "/subject:1|name": "Silvia Blake"},
 			want: ErrUnknownPath,
 			name: rmattrObs + "/subject:1",
+			says: "single-valued RM attribute",
 		},
 		"raw fragment": {
 			keys: map[string]any{rmattrObs + "/subject|raw": map[string]any{"_type": "PARTY_SELF"}},
-			want: ErrUnsupportedDatatype,
+			want: errUnmatched,
 			name: rmattrObs + "/subject|raw",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			err := decodeRMAttrErr(t, wt, rmattrBody(tc.keys))
-			if !errors.Is(err, tc.want) {
-				t.Errorf("err = %v, want %v", err, tc.want)
-			}
+			err := refusalLegs(t, wt, rmattrBody(tc.keys), tc.keys, tc.want)
 			if !strings.Contains(err.Error(), tc.name) {
 				t.Errorf("err = %v, want it to name %q", err, tc.name)
+			}
+			if !strings.Contains(err.Error(), tc.says) {
+				t.Errorf("err = %v, want it to say %q", err, tc.says)
 			}
 		})
 	}
@@ -534,9 +538,11 @@ func TestRMAttrPartyRefTypeRoundTrip(t *testing.T) {
 	}
 }
 
-// TestRMAttrPartyRefusals — REQ-140. The party grammar is closed: a suffix
-// outside it, an `external_ref` missing its RM-mandatory namespace, and a scheme
-// with no id to qualify are all typed refusals naming the offending FLAT key.
+// TestRMAttrPartyRefusals — REQ-140 / REQ-170. The party grammar is closed: a
+// suffix or sub-path outside it is unmatched content, refused under strict
+// naming the key; an `external_ref` missing its RM-mandatory namespace and a
+// scheme with no id to qualify are typed refusals in every mode naming the
+// offending FLAT key.
 func TestRMAttrPartyRefusals(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	for name, tc := range map[string]struct {
@@ -546,12 +552,12 @@ func TestRMAttrPartyRefusals(t *testing.T) {
 	}{
 		"unknown suffix": {
 			keys: map[string]any{rmattrContext + "/_health_care_facility|id_typo": "9091"},
-			want: ErrUnsupportedDatatype,
+			want: errUnmatched,
 			name: rmattrContext + "/_health_care_facility|id_typo",
 		},
 		"unknown sub-path": {
 			keys: map[string]any{rmattrContext + "/_health_care_facility/relation|code": "10"},
-			want: ErrUnsupportedDatatype,
+			want: errUnmatched,
 			name: rmattrContext + "/_health_care_facility/relation|code",
 		},
 		"external ref without namespace": {
@@ -576,15 +582,12 @@ func TestRMAttrPartyRefusals(t *testing.T) {
 		},
 		"health care facility on an entry": {
 			keys: map[string]any{rmattrObs + "/_health_care_facility|name": "Hospital"},
-			want: ErrUnknownPath,
+			want: errUnmatched,
 			name: rmattrObs + "/_health_care_facility",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			err := decodeRMAttrErr(t, wt, rmattrBody(tc.keys))
-			if !errors.Is(err, tc.want) {
-				t.Errorf("err = %v, want %v", err, tc.want)
-			}
+			err := refusalLegs(t, wt, rmattrBody(tc.keys), tc.keys, tc.want)
 			if !strings.Contains(err.Error(), tc.name) {
 				t.Errorf("err = %v, want it to name %q", err, tc.name)
 			}

@@ -2,6 +2,7 @@ package serializeprobes
 
 import (
 	"encoding/json"
+	"errors"
 	"maps"
 	"os"
 	"slices"
@@ -26,7 +27,7 @@ import (
 // lost on re-encode must fail the probe.
 func TestProbe030GuardCatchesDroppedFieldOnReEncode(t *testing.T) {
 	body := []byte(`{"_type":"DV_QUANTITY","magnitude":80.5,"units":"kg"}`)
-	r, err := probe030RoundTrip(body, func() any { return new(rm.DVQuantity) }, dropMemberReEncoder("units"), false)
+	r, err := probe030RoundTrip(body, func() any { return new(rm.DVQuantity) }, canjson.Marshal, dropMemberReEncoder("units"), false)
 	if err != nil {
 		t.Fatalf("probe framework error: %v", err)
 	}
@@ -88,7 +89,7 @@ func TestProbe030GuardCatchesMissingValidateRM(t *testing.T) {
 func TestProbe030GuardCatchesNarrowedPolymorphicSlot(t *testing.T) {
 	body := []byte(`{"_type":"ELEMENT","archetype_node_id":"at0001","name":{"_type":"DV_TEXT","value":"n"},"value":{"_type":"DV_QUANTITY","magnitude":120,"units":"mm[Hg]"}}`)
 	double := retypeSlotReEncoder("value", map[string]any{"_type": "DV_TEXT", "value": "120 mm[Hg]"})
-	r, err := probe030RoundTrip(body, func() any { return new(rm.Element) }, double, false)
+	r, err := probe030RoundTrip(body, func() any { return new(rm.Element) }, canjson.Marshal, double, false)
 	if err != nil {
 		t.Fatalf("probe framework error: %v", err)
 	}
@@ -98,6 +99,129 @@ func TestProbe030GuardCatchesNarrowedPolymorphicSlot(t *testing.T) {
 	if !strings.Contains(r.Detail, "A and B differ") {
 		t.Fatalf("detail = %q; want the typed deep comparison to fire, so the A-versus-B guard is what caught the changed dynamic type", r.Detail)
 	}
+}
+
+// TestProbe030InputLegCatchesAWronglyDefaultedFlag is the can-fail control
+// for PROBE-030's input leg (REQ-052, REQ-169). The input interval omits both
+// included flags, which REQ-169 reads as closed ends. The encode double writes
+// b1 with both ends excluded, the reading the decoder gave such an interval
+// before REQ-169, so A and B are both decoded from that wrong reading and
+// agree, b1 and b2 are wire-equivalent, and the excluded interval is RM-valid.
+// Only the comparison with the input's expected form, which spells the two
+// defaulted flags true, can catch it. Remove the input leg from
+// probe030RoundTrip and this test reddens with Status == "pass".
+func TestProbe030InputLegCatchesAWronglyDefaultedFlag(t *testing.T) {
+	body := []byte(`{"_type":"ELEMENT","archetype_node_id":"at0001","name":{"_type":"DV_TEXT","value":"n"},` +
+		`"value":{"_type":"DV_INTERVAL","lower":{"_type":"DV_COUNT","magnitude":1},"upper":{"_type":"DV_COUNT","magnitude":5},"lower_unbounded":false,"upper_unbounded":false}}`)
+	r, err := probe030RoundTrip(body, func() any { return new(rm.Element) }, excludeIntervalEndsEncoder, canjson.Marshal, false)
+	if err != nil {
+		t.Fatalf("probe framework error: %v", err)
+	}
+	if r.Status != "fail" {
+		t.Fatalf("status = %q (detail: %s), want fail: an interval flag read with the wrong default must fail the input leg", r.Status, r.Detail)
+	}
+	if !strings.Contains(r.Detail, "expected form") || !strings.Contains(r.Detail, "_included") {
+		t.Fatalf("detail = %q; want the input leg to name an included flag", r.Detail)
+	}
+}
+
+// TestProbe030InputLegFailsWhenTheExpectedFormCannotBeBuilt pins that an input
+// the expected form refuses fails the probe rather than skipping the input leg
+// (REQ-052, PROBE-030). The decoder reads an empty "_type" as an elided one, so
+// the round trip itself succeeds, while expectedform.Build refuses a "_type"
+// that names no RM class. Set Status to "pass" on that branch of
+// probe030RoundTrip and this test reddens.
+func TestProbe030InputLegFailsWhenTheExpectedFormCannotBeBuilt(t *testing.T) {
+	body := []byte(`{"_type":"ELEMENT","archetype_node_id":"at0001","name":{"_type":"","value":"n"},` +
+		`"value":{"_type":"DV_COUNT","magnitude":1}}`)
+	r, err := probe030RoundTrip(body, func() any { return new(rm.Element) }, canjson.Marshal, canjson.Marshal, false)
+	if err != nil {
+		t.Fatalf("probe framework error: %v", err)
+	}
+	if r.Status != "fail" {
+		t.Fatalf("status = %q (detail: %s), want fail: an input whose expected form cannot be built must fail the probe", r.Status, r.Detail)
+	}
+	if !strings.HasPrefix(r.Detail, "the input's expected form: ") {
+		t.Fatalf("detail = %q; want the expected-form refusal, after the round-trip legs passed", r.Detail)
+	}
+}
+
+// TestProbe030AcceptsAnIntervalWithOnlyAnUpperBound pins that PROBE-030 passes
+// an interval that gives only an upper bound (REQ-169, REQ-052): canjson reads
+// its lower side as open and writes `lower_unbounded` true and
+// `lower_included` false with no lower, and the input's expected form spells
+// the same defaults. It holds whether the target holds its bounds by value or
+// by reference.
+func TestProbe030AcceptsAnIntervalWithOnlyAnUpperBound(t *testing.T) {
+	const body = `{"_type":"DV_INTERVAL","upper":{"_type":"DV_COUNT","magnitude":5}}`
+	for _, tc := range []struct {
+		name    string
+		factory func() any
+	}{
+		{name: "DV_INTERVAL<DV_ORDERED>, by reference", factory: func() any { return new(rm.DVInterval[rm.DVOrdered]) }},
+		{name: "DV_INTERVAL<DV_COUNT>, by value", factory: func() any { return new(rm.DVInterval[rm.DVCount]) }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r, err := Probe030CanjsonRoundTrip([]byte(body), tc.factory)
+			if err != nil {
+				t.Fatalf("probe framework error: %v", err)
+			}
+			if r.Status != "pass" {
+				t.Errorf("Probe030CanjsonRoundTrip(%s) status = %q (detail: %s), want pass", body, r.Status, r.Detail)
+			}
+		})
+	}
+}
+
+// TestProbe030AcceptsANullMandatoryNumberOrBoolean pins that PROBE-030 passes
+// an input that gives a mandatory Integer64, Real or Boolean member a null
+// (REQ-052). canjson decodes the null to the Go zero and writes that zero back,
+// so the input leg expects it there: the input's expected form spells the
+// member as 0 or false. Read such a null as absent in the expected form, as
+// before, and the input leg fails each case with the member present in b1
+// only.
+func TestProbe030AcceptsANullMandatoryNumberOrBoolean(t *testing.T) {
+	cases := []struct {
+		name    string
+		body    string
+		factory func() any
+	}{
+		{name: "DV_COUNT magnitude", body: `{"_type":"DV_COUNT","magnitude":null}`, factory: func() any { return new(rm.DVCount) }},
+		{name: "DV_QUANTITY magnitude", body: `{"_type":"DV_QUANTITY","magnitude":null,"units":"kg"}`, factory: func() any { return new(rm.DVQuantity) }},
+		{name: "DV_BOOLEAN value", body: `{"_type":"DV_BOOLEAN","value":null}`, factory: func() any { return new(rm.DVBoolean) }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r, err := Probe030CanjsonRoundTrip([]byte(tc.body), tc.factory)
+			if err != nil {
+				t.Fatalf("probe framework error: %v", err)
+			}
+			if r.Status != "pass" {
+				t.Errorf("Probe030CanjsonRoundTrip(%s) status = %q (detail: %s), want pass", tc.body, r.Status, r.Detail)
+			}
+		})
+	}
+}
+
+// excludeIntervalEndsEncoder canjson-encodes the value and then sets both
+// included flags of the top-level value's interval to false, standing in for a
+// decoder that reads an omitted included flag as false.
+func excludeIntervalEndsEncoder(v any) ([]byte, error) {
+	b, err := canjson.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		return nil, err
+	}
+	interval, ok := m["value"].(map[string]any)
+	if !ok {
+		return nil, errors.New("the encoded value has no interval at /value")
+	}
+	interval["lower_included"] = false
+	interval["upper_included"] = false
+	return json.Marshal(m)
 }
 
 // dropMemberReEncoder is a lossy re-encode double: it canjson-encodes the value
@@ -256,4 +380,47 @@ func floorFindings(r validation.Result) []string {
 		out = append(out, is.Code+" "+is.Path)
 	}
 	return out
+}
+
+// genericTargetBody is a DV_INTERVAL whose bounds elide their "_type", which
+// canjson decodes into an rm.DVInterval[rm.DVQuantity]: the target's type
+// argument binds the bounds to DV_QUANTITY.
+const genericTargetBody = `{"_type":"DV_INTERVAL","lower":{"magnitude":1,"units":"kg"},"upper":{"magnitude":2,"units":"kg"}}`
+
+// zeroBoundBesideOpenFlagBody is a DV_INTERVAL whose lower side is marked
+// unbounded and still carries a DV_COUNT bound holding zero.
+const zeroBoundBesideOpenFlagBody = `{"_type":"DV_INTERVAL","lower":{"_type":"DV_COUNT","magnitude":0},"upper":{"_type":"DV_COUNT","magnitude":5},"lower_unbounded":true,"upper_unbounded":false}`
+
+// TestProbe030PassesAGenericTarget pins that the input leg reads the root
+// from the factory's value, as canjson does (REQ-052, REQ-170): a valid input
+// that a generic target decodes cleanly passes. Built from the class name
+// alone, the expected form refuses the bounds' elided "_type", which no type
+// argument binds, and the probe fails a round trip that holds.
+//
+// The zero bound beside its open flag passes under both bindings, which the
+// encoder spells differently. Bound to the concrete DV_COUNT, the bound is
+// held by value, so a zero one is empty and the encoder drops it. Bound to the
+// abstract DV_ORDERED, it is held by reference, so the encoder keeps it, and
+// the expected form must keep it too.
+func TestProbe030PassesAGenericTarget(t *testing.T) {
+	cases := []struct {
+		name    string
+		body    string
+		factory func() any
+	}{
+		{name: "elided bound types, DV_INTERVAL<DV_QUANTITY>", body: genericTargetBody, factory: func() any { return new(rm.DVInterval[rm.DVQuantity]) }},
+		{name: "zero bound beside its open flag, DV_INTERVAL<DV_ORDERED>", body: zeroBoundBesideOpenFlagBody, factory: func() any { return new(rm.DVInterval[rm.DVOrdered]) }},
+		{name: "zero bound beside its open flag, DV_INTERVAL<DV_COUNT>", body: zeroBoundBesideOpenFlagBody, factory: func() any { return new(rm.DVInterval[rm.DVCount]) }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r, err := probe030RoundTrip([]byte(tc.body), tc.factory, canjson.Marshal, canjson.Marshal, false)
+			if err != nil {
+				t.Fatalf("probe framework error: %v", err)
+			}
+			if r.Status != "pass" {
+				t.Errorf("status = %q (detail: %s), want pass: canjson decodes the input into the generic target", r.Status, r.Detail)
+			}
+		})
+	}
 }

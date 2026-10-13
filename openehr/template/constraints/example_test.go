@@ -8,7 +8,7 @@ import (
 
 // REQ-107 — every bounded PrimitiveConstraint MUST round-trip
 // Validate(ExampleValue()) to zero violations. The table covers all
-// 11 implementations with at least one bounded subcase apiece, plus
+// 12 implementations with at least one bounded subcase apiece, plus
 // unbounded sentinels where the contract documents one.
 func TestPrimitiveConstraint_ExampleValueValidates(t *testing.T) {
 	cases := []struct {
@@ -86,6 +86,10 @@ func TestPrimitiveConstraint_ExampleValueValidates(t *testing.T) {
 			{Value: 0, Symbol: constraints.CodedTermRef{Terminology: "local", CodeString: "at0001"}},
 			{Value: 1, Symbol: constraints.CodedTermRef{Terminology: "local", CodeString: "at0002"}},
 		}}},
+
+		// ConstraintRef — external value set, with and without a reference.
+		{"ConstraintRef/reference", constraints.ConstraintRef{Reference: "ac0001"}},
+		{"ConstraintRef/no-reference", constraints.ConstraintRef{}},
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
@@ -97,16 +101,16 @@ func TestPrimitiveConstraint_ExampleValueValidates(t *testing.T) {
 	}
 }
 
-// REQ-107 — the sealing contract still holds: only the 11 known
+// REQ-107 — the sealing contract still holds: only the 12 known
 // types in this package implement PrimitiveConstraint. A new
 // external implementer would break the closed type-switch the
 // validator relies on, which stays free of reflection.
 //
-// REQ-103: each of the eleven OPT primitive xsi:type values has its
+// REQ-103: each of the twelve OPT primitive xsi:type values has its
 // PrimitiveConstraint implementation.
 func TestPrimitiveConstraint_ExampleValueSeal(_ *testing.T) {
 	// Each entry asserts the type satisfies the full interface
-	// (Validate + ExampleValue + isPrimitive). Adding a 12th type
+	// (Validate + ExampleValue + isPrimitive). Adding a 13th type
 	// to this list MUST coincide with a new REQ row + spec entry.
 	var _ constraints.PrimitiveConstraint = constraints.CBoolean{}
 	var _ constraints.PrimitiveConstraint = constraints.CInteger{}
@@ -119,6 +123,7 @@ func TestPrimitiveConstraint_ExampleValueSeal(_ *testing.T) {
 	var _ constraints.PrimitiveConstraint = constraints.CodePhrase{}
 	var _ constraints.PrimitiveConstraint = constraints.DvQuantity{}
 	var _ constraints.PrimitiveConstraint = constraints.CDvOrdinal{}
+	var _ constraints.PrimitiveConstraint = constraints.ConstraintRef{}
 }
 
 // TestREQ107_CodePhraseEmptyListPlaceholder is the REQ-107 check that a

@@ -27,10 +27,11 @@ func optOptionalSingleOver(name string, children ...string) string {
 // terminology local, wherever it sits: the empty TERMINOLOGY_ID the
 // generator builds from the BMM for the code phrase's own terminology_id
 // must not replace that local. It holds under both policies, both value
-// fills and both compile modes. The template validator reports nothing on
-// the code phrase, and neither does the RM floor, except where an RM rule
-// ties the attribute to a code set: there local::at0000 is no member, and
-// the floor reports exactly one code_not_in_value_set on the code phrase
+// fills and both compile modes. Neither the template validator nor the RM
+// floor reports anything on the code phrase, except where an RM rule ties
+// the attribute to a code set: there local::at0000 is no member, and the
+// floor, alone or inside template validation, reports exactly one
+// code_not_in_value_set on the code phrase
 // (REQ-107 § Exceptions and known gaps, "A placeholder code on an attribute
 // an RM rule ties to a code set or terminology group for which § Contract
 // gives no default").
@@ -119,10 +120,21 @@ func TestREQ107_BareCodePhraseKeepsLocal(t *testing.T) {
 					if outsideCodeSet != want {
 						t.Errorf("ValidateRM: %d code_not_in_value_set @ %s, want %d", outsideCodeSet, tc.path, want)
 					}
+					// Template validation includes the floor, so it carries
+					// the same one code_not_in_value_set, and nothing else.
+					var templateOutside int
 					for _, iss := range templateErrors(out, c) {
-						if strings.HasPrefix(iss.Path, tc.path) {
-							t.Errorf("template validator: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+						if !strings.HasPrefix(iss.Path, tc.path) {
+							continue
 						}
+						if tc.codeSet && iss.Code == "code_not_in_value_set" && iss.Path == tc.path {
+							templateOutside++
+							continue
+						}
+						t.Errorf("template validator: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+					}
+					if templateOutside != want {
+						t.Errorf("template validator: %d code_not_in_value_set @ %s, want %d", templateOutside, tc.path, want)
 					}
 				})
 			}

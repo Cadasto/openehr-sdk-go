@@ -4,6 +4,7 @@
 package rm
 
 import (
+	"encoding/base64"
 	"encoding/xml"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
@@ -51,8 +52,8 @@ func (d *DVMultimedia) MarshalXML(_e *xml.Encoder, _start xml.StartElement) erro
 			return err
 		}
 	}
-	for _, _item := range d.Data {
-		if err := _e.EncodeElement(_item, xml.StartElement{Name: xml.Name{Local: "data"}}); err != nil {
+	if len(d.Data) > 0 {
+		if err := _e.EncodeElement(base64.StdEncoding.EncodeToString(d.Data), xml.StartElement{Name: xml.Name{Local: "data"}}); err != nil {
 			return err
 		}
 	}
@@ -64,8 +65,8 @@ func (d *DVMultimedia) MarshalXML(_e *xml.Encoder, _start xml.StartElement) erro
 			return err
 		}
 	}
-	for _, _item := range d.IntegrityCheck {
-		if err := _e.EncodeElement(_item, xml.StartElement{Name: xml.Name{Local: "integrity_check"}}); err != nil {
+	if len(d.IntegrityCheck) > 0 {
+		if err := _e.EncodeElement(base64.StdEncoding.EncodeToString(d.IntegrityCheck), xml.StartElement{Name: xml.Name{Local: "integrity_check"}}); err != nil {
 			return err
 		}
 	}

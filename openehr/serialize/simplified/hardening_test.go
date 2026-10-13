@@ -9,6 +9,7 @@ import (
 	"errors"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -16,13 +17,33 @@ import (
 )
 
 // TestDecodeRejectsUnknownPath: a key that does not resolve to a Web Template
-// node (wrong template / typo) is ErrUnknownPath, not a silently-empty comp.
+// node (wrong template / typo) is unmatched content (REQ-170). Under strict it
+// is ErrUnknownPath naming the key, not a silently-empty comp; by default the
+// decode ignores it and still requires the mandatory context; the report option
+// names it.
 func TestDecodeRejectsUnknownPath(t *testing.T) {
 	_, wt := genComposition(t, minimalObsOPT)
-	bogus := []byte(`{"not_this_template/nope/leaf": "x"}`)
-	_, err := simplified.UnmarshalFlat(bogus, wt)
+	const key = "not_this_template/nope/leaf"
+	bogus := []byte(`{"` + key + `": "x"}`)
+	_, err := simplified.UnmarshalFlat(bogus, wt, simplified.WithStrict())
 	if !errors.Is(err, simplified.ErrUnknownPath) {
-		t.Fatalf("UnmarshalFlat(unknown path) err = %v, want ErrUnknownPath", err)
+		t.Fatalf("UnmarshalFlat(unknown path, WithStrict) err = %v, want ErrUnknownPath", err)
+	}
+	if !strings.Contains(err.Error(), strconv.Quote(key)) {
+		t.Errorf("UnmarshalFlat(unknown path, WithStrict) err = %v, want it to name %q", err, key)
+	}
+	// By default the key is ignored, so the body is an empty one: the missing
+	// mandatory context is what fails it, not the key.
+	if _, err := simplified.UnmarshalFlat(bogus, wt); !errors.Is(err, simplified.ErrMissingContext) {
+		t.Errorf("UnmarshalFlat(unknown path) err = %v, want ErrMissingContext", err)
+	}
+	withCtx := []byte(`{"ctx/language": "en", "ctx/territory": "NL", "` + key + `": "x"}`)
+	var reported []string
+	if _, err := simplified.UnmarshalFlat(withCtx, wt, simplified.WithUnmatched(func(p string) { reported = append(reported, p) })); err != nil {
+		t.Fatalf("UnmarshalFlat(unknown path, WithUnmatched) err = %v, want the key ignored", err)
+	}
+	if !slices.Equal(reported, []string{key}) {
+		t.Errorf("WithUnmatched reported %q, want [%q]", reported, key)
 	}
 }
 

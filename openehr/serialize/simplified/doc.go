@@ -21,4 +21,54 @@
 //
 // Context output-form and exotic-datatype fallbacks are documented in
 // deviations.md beside the package tests.
+//
+// # Unmatched content
+//
+// Input the decode does not read is unmatched: a key whose path the Web
+// Template does not resolve, an underscore-prefixed segment that names no RM
+// attribute this codec carries at that node, a suffix outside the suffix set
+// of its datatype or underscore family, and a ctx/ field the codec does not
+// read. STRUCTURED applies one rule at every level of the body: a member
+// whose name the FLAT grammar does not read at that level is unmatched
+// whatever its value holds, and is reported as that member; a name it reads
+// keeps the shape refusals. A key
+// the decode reads is never unmatched, even where the decode then
+// refuses it: the composer's `external_ref` suffixes and party sub-structure,
+// a PARTICIPATION `time`, a FEEDER_AUDIT_DETAILS `other_details`,
+// `_instruction_details` and `_wf_definition` have no carrier and fail the
+// decode in every mode. So do, in the reference's in-context spelling and
+// where the Web Template does not resolve them, an ACTION's ISM transition and
+// time (a `current_state`, `transition` or `careflow_step` leaf or a `_reason`
+// family under an `ism_transition` node, and the ACTION's own `time` leaf), an
+// INTERVAL_EVENT's `math_function`, `width` and `sample_count` and an
+// OBSERVATION's `history_origin` (a leaf under the node or a suffix on it),
+// which name RM data decode would otherwise drop or replace. A leaf whose
+// datatype has neither a suffix set nor a sub-path grammar, in practice the
+// composer's PARTY_PROXY, refuses its bare value and any suffix naming an
+// attribute of its RM class (for the composer, a suffix of the party grammar).
+// So does malformed content: a value of the wrong shape, a missing required
+// suffix (a lone bare value where the datatype has no bare spelling, a bare
+// ctx/setting), two spellings of one field the decode reads that disagree
+// (such as `x` and `x|`; a lone `x|` reads as `x`), an index past its bound.
+// Two spellings of a key the decode does not read are two unmatched keys. A
+// key is judged segment by segment from the left: an index past the bound of a
+// segment that resolves makes the key malformed, whatever follows it. In
+// STRUCTURED the same holds for an element's position in its member's array,
+// whatever the element holds.
+//
+// By default the decoder ignores unmatched content: the value holds the rest
+// of the input and none of it, exactly as if the input had left those keys
+// out. [WithUnmatched] passes each item, in the order the input gives it, to
+// a caller function as its path: the key as written for FLAT, such as
+// "vital_signs/body_temperature:0/any_event:0/temperature|x-note", and for
+// STRUCTURED the member names from the root joined by "/", with each array
+// element's position as a segment, such as
+// "vital_signs/body_temperature/0/any_event/0/temperature/0/|x-note". The
+// path names the item and carries none of its value. [WithStrict] refuses the
+// decode at the first item with an error wrapping [ErrUnknownPath]. Strict
+// never refuses an absent key.
+//
+// The options belong to one decode: concurrent decodes with different options
+// do not see each other's policy. [FlatToStructured] and [StructuredToFlat]
+// take no options; they restructure every key whatever it names.
 package simplified

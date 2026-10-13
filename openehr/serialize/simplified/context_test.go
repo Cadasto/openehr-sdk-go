@@ -1080,6 +1080,8 @@ func TestContextOwnedLeafUnacceptedSpellingRefused(t *testing.T) {
 			},
 		}},
 		{"setting formatting", root + "/context/setting|formatting", "plain"},
+		// A bare value spells the coded setting missing its required |code and
+		// |value: malformed, refused in every mode (REQ-170).
 		{"setting bare", root + "/context/setting", "other care"},
 		{"start_time raw beside ctx/time", root + "/context/start_time|raw", map[string]any{
 			"_type": "DV_DATE_TIME", "value": "2026-08-05T10:00:00Z",
@@ -1096,12 +1098,24 @@ func TestContextOwnedLeafUnacceptedSpellingRefused(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, err = simplified.UnmarshalFlat(raw, wt, simplified.WithTemplate(compiled))
-			if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
-				t.Fatalf("err = %v, want ErrUnsupportedDatatype (the value must not be silently dropped)", err)
+			// The suffix is one the leaf's datatype has, so the key is matched
+			// content the ctx/ form cannot carry: refused in every mode (REQ-170).
+			var reported []string
+			for name, opts := range map[string][]simplified.Option{
+				"default":       nil,
+				"WithUnmatched": {simplified.WithUnmatched(func(p string) { reported = append(reported, p) })},
+				"WithStrict":    {simplified.WithStrict()},
+			} {
+				_, err = simplified.UnmarshalFlat(raw, wt, append(opts, simplified.WithTemplate(compiled))...)
+				if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
+					t.Fatalf("%s: err = %v, want ErrUnsupportedDatatype (the value must not be silently dropped)", name, err)
+				}
+				if !strings.Contains(err.Error(), tc.key) {
+					t.Errorf("%s: error %q does not name the offending key %q", name, err, tc.key)
+				}
 			}
-			if !strings.Contains(err.Error(), tc.key) {
-				t.Errorf("error %q does not name the offending key %q", err, tc.key)
+			if len(reported) != 0 {
+				t.Errorf("WithUnmatched reported %q, want nothing for a matched key", reported)
 			}
 		})
 	}

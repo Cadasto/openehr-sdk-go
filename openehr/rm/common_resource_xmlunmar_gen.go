@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"fmt"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
@@ -20,7 +21,12 @@ import (
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (r *ResourceDescription) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -28,31 +34,31 @@ func (r *ResourceDescription) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEl
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "original_author":
 				// TODO(canxml): Hash<K,V> XML decode deferred — see canxml/doc.go.
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			case "other_contributors":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				r.OtherContributors = append(r.OtherContributors, _v)
 			case "lifecycle_state":
-				if _err := _dec.DecodeElement(&r.LifecycleState, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &r.LifecycleState); _err != nil {
 					return _err
 				}
 			case "resource_package_uri":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				r.ResourcePackageURI = &_v
 			case "other_details":
 				// TODO(canxml): Hash<K,V> XML decode deferred — see canxml/doc.go.
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			case "parent_resource":
@@ -63,11 +69,11 @@ func (r *ResourceDescription) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEl
 				r.ParentResource = _v
 			case "details":
 				// TODO(canxml): Hash<K,V> XML decode deferred — see canxml/doc.go.
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -84,7 +90,12 @@ func (r *ResourceDescription) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEl
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (r *ResourceDescriptionItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -92,51 +103,51 @@ func (r *ResourceDescriptionItem) UnmarshalXML(_dec *xml.Decoder, _start xml.Sta
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "language":
 				if _err := _dec.DecodeElement(&r.Language, &_t); _err != nil {
 					return _err
 				}
 			case "purpose":
-				if _err := _dec.DecodeElement(&r.Purpose, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &r.Purpose); _err != nil {
 					return _err
 				}
 			case "keywords":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				r.Keywords = append(r.Keywords, _v)
 			case "use":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				r.Use = &_v
 			case "misuse":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				r.Misuse = &_v
 			case "copyright":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				r.Copyright = &_v
 			case "original_resource_uri":
 				// TODO(canxml): Hash<K,V> XML decode deferred — see canxml/doc.go.
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			case "other_details":
 				// TODO(canxml): Hash<K,V> XML decode deferred — see canxml/doc.go.
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -153,7 +164,12 @@ func (r *ResourceDescriptionItem) UnmarshalXML(_dec *xml.Decoder, _start xml.Sta
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (t *TranslationDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -161,29 +177,29 @@ func (t *TranslationDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "language":
 				if _err := _dec.DecodeElement(&t.Language, &_t); _err != nil {
 					return _err
 				}
 			case "author":
 				// TODO(canxml): Hash<K,V> XML decode deferred — see canxml/doc.go.
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			case "accreditaton":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				t.Accreditaton = &_v
 			case "other_details":
 				// TODO(canxml): Hash<K,V> XML decode deferred — see canxml/doc.go.
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}

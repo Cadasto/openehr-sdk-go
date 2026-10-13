@@ -98,11 +98,12 @@ func TestValidateComposition_TypedOpenIntervalSide(t *testing.T) {
 }
 
 // TestValidateComposition_BuiltBoundBesideOpenFlag covers a bound the
-// composition builder sets on an interval it seeded with both sides open
-// (REQ-102). The builder leaves `lower_unbounded` set, so the real lower
-// bound stands beside its own flag. It is not empty, so the walker checks
-// it against the OPT like any bound: a magnitude of 500 breaks the OPT's
-// 0..100 range.
+// composition builder sets on an interval it seeded (REQ-102). The built
+// interval has `lower_unbounded` false and an upper bound of 0, so the bound
+// set here is an ordinary lower bound. The walker checks it against the OPT
+// like any bound: a magnitude of 500 breaks the OPT's 0..100 range. Template
+// validation includes the RM floor, which reports the interval too, because
+// its lower bound of 500 lies above its upper bound of 0.
 func TestValidateComposition_BuiltBoundBesideOpenFlag(t *testing.T) {
 	c := mustCompile(t, "Test_dv_interval_dv_count_lower_upper_constraint.v0")
 	name := "Test Composer"
@@ -121,7 +122,13 @@ func TestValidateComposition_BuiltBoundBesideOpenFlag(t *testing.T) {
 		t.Fatalf("Build: %v", err)
 	}
 	r := validation.ValidateComposition(comp, c)
-	want := []pathCode{{intervalValuePath + "/lower/magnitude", "primitive_out_of_range"}}
+	// The template walk reports the bound outside the OPT's range, then the
+	// RM floor reports the interval whose lower bound now lies above its
+	// upper one.
+	want := []pathCode{
+		{intervalValuePath + "/lower/magnitude", "primitive_out_of_range"},
+		{intervalValuePath, "rm_invariant"},
+	}
 	if got := pathCodes(r.Issues); !slices.Equal(got, want) {
 		t.Errorf("ValidateComposition(built, lower 500) issues = %v, want %v\nfull issues: %+v", got, want, r.Issues)
 	}

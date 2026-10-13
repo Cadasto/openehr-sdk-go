@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"fmt"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
@@ -20,7 +21,12 @@ import (
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *ArchetypeOntology) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -28,16 +34,16 @@ func (a *ArchetypeOntology) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "term_codes":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				a.TermCodes = append(a.TermCodes, _v)
 			case "constraint_codes":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				a.ConstraintCodes = append(a.ConstraintCodes, _v)
@@ -47,22 +53,22 @@ func (a *ArchetypeOntology) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 				}
 			case "terminologies_available":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				a.TerminologiesAvailable = append(a.TerminologiesAvailable, _v)
 			case "specialisation_depth":
-				if _err := _dec.DecodeElement(&a.SpecialisationDepth, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &a.SpecialisationDepth); _err != nil {
 					return _err
 				}
 			case "term_attribute_names":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				a.TermAttributeNames = append(a.TermAttributeNames, _v)
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -79,7 +85,12 @@ func (a *ArchetypeOntology) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (a *ArchetypeTerm) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -87,18 +98,18 @@ func (a *ArchetypeTerm) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "code":
-				if _err := _dec.DecodeElement(&a.Code, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &a.Code); _err != nil {
 					return _err
 				}
 			case "items":
 				// TODO(canxml): Hash<K,V> XML decode deferred — see canxml/doc.go.
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}

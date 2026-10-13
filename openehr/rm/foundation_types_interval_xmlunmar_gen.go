@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"fmt"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
@@ -20,12 +21,30 @@ import (
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 //
 // BASE Interval also reads the Go field names (Lower, LowerIncluded, ...) that
 // SDK v0.28.0 and earlier wrote for it, onto the same fields, so a stored
 // document does not decode to an empty interval without an error. The encoder
 // writes the snake_case names only.
+//
+// A boundary flag the document leaves out takes its default once the whole
+// value is read: `lower_unbounded` and `upper_unbounded` read as false on a
+// side that carries a bound and as true on a side whose bound is absent or
+// null, and `lower_included` and `upper_included` read as true on a side
+// that is not open and as false on a side that is. A flag the document
+// carries is read as written. A side written `*_unbounded` false with no
+// bound is refused when the interval holds its bounds by value, since a zero
+// bound would stand in for the absent one; held as an interface, the side
+// decodes as written, with no bound.
+// An empty or whitespace-only flag element carries no boolean and reads as
+// a flag the document leaves out.
 func (i *Interval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
+	var _seen intervalFlagsSeen
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -33,37 +52,42 @@ func (i *Interval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "lower", "Lower":
-				if _err := _dec.DecodeElement(&i.Lower, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeParam(_dec, &_t, &i.Lower, canxml.DecodeAs[T]); _err != nil {
 					return _err
 				}
+				_seen.lower = true
 			case "upper", "Upper":
-				if _err := _dec.DecodeElement(&i.Upper, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeParam(_dec, &_t, &i.Upper, canxml.DecodeAs[T]); _err != nil {
 					return _err
 				}
+				_seen.upper = true
 			case "lower_unbounded", "LowerUnbounded":
-				if _err := _dec.DecodeElement(&i.LowerUnbounded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &i.LowerUnbounded, &_seen.lowerUnbounded); _err != nil {
 					return _err
 				}
 			case "upper_unbounded", "UpperUnbounded":
-				if _err := _dec.DecodeElement(&i.UpperUnbounded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &i.UpperUnbounded, &_seen.upperUnbounded); _err != nil {
 					return _err
 				}
 			case "lower_included", "LowerIncluded":
-				if _err := _dec.DecodeElement(&i.LowerIncluded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &i.LowerIncluded, &_seen.lowerIncluded); _err != nil {
 					return _err
 				}
 			case "upper_included", "UpperIncluded":
-				if _err := _dec.DecodeElement(&i.UpperIncluded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &i.UpperIncluded, &_seen.upperIncluded); _err != nil {
 					return _err
 				}
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
 		case xml.EndElement:
+			if _err := _seen.settle(intervalBoundHeldByValue(&i.Lower), &i.LowerIncluded, &i.LowerUnbounded, &i.UpperIncluded, &i.UpperUnbounded); _err != nil {
+				return fmt.Errorf("%w: Interval: %w", canxml.ErrInvalidShape, _err)
+			}
 			return nil
 		}
 	}
@@ -76,7 +100,25 @@ func (i *Interval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
+//
+// A boundary flag the document leaves out takes its default once the whole
+// value is read: `lower_unbounded` and `upper_unbounded` read as false on a
+// side that carries a bound and as true on a side whose bound is absent or
+// null, and `lower_included` and `upper_included` read as true on a side
+// that is not open and as false on a side that is. A flag the document
+// carries is read as written. A side written `*_unbounded` false with no
+// bound is refused when the interval holds its bounds by value, since a zero
+// bound would stand in for the absent one; held as an interface, the side
+// decodes as written, with no bound.
+// An empty or whitespace-only flag element carries no boolean and reads as
+// a flag the document leaves out.
 func (p *PointInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
+	var _seen intervalFlagsSeen
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -84,37 +126,42 @@ func (p *PointInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "lower":
-				if _err := _dec.DecodeElement(&p.Lower, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeParam(_dec, &_t, &p.Lower, canxml.DecodeAs[T]); _err != nil {
 					return _err
 				}
+				_seen.lower = true
 			case "upper":
-				if _err := _dec.DecodeElement(&p.Upper, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeParam(_dec, &_t, &p.Upper, canxml.DecodeAs[T]); _err != nil {
 					return _err
 				}
+				_seen.upper = true
 			case "lower_unbounded":
-				if _err := _dec.DecodeElement(&p.LowerUnbounded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &p.LowerUnbounded, &_seen.lowerUnbounded); _err != nil {
 					return _err
 				}
 			case "upper_unbounded":
-				if _err := _dec.DecodeElement(&p.UpperUnbounded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &p.UpperUnbounded, &_seen.upperUnbounded); _err != nil {
 					return _err
 				}
 			case "lower_included":
-				if _err := _dec.DecodeElement(&p.LowerIncluded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &p.LowerIncluded, &_seen.lowerIncluded); _err != nil {
 					return _err
 				}
 			case "upper_included":
-				if _err := _dec.DecodeElement(&p.UpperIncluded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &p.UpperIncluded, &_seen.upperIncluded); _err != nil {
 					return _err
 				}
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
 		case xml.EndElement:
+			if _err := _seen.settle(intervalBoundHeldByValue(&p.Lower), &p.LowerIncluded, &p.LowerUnbounded, &p.UpperIncluded, &p.UpperUnbounded); _err != nil {
+				return fmt.Errorf("%w: Point_interval: %w", canxml.ErrInvalidShape, _err)
+			}
 			return nil
 		}
 	}
@@ -127,7 +174,25 @@ func (p *PointInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
+//
+// A boundary flag the document leaves out takes its default once the whole
+// value is read: `lower_unbounded` and `upper_unbounded` read as false on a
+// side that carries a bound and as true on a side whose bound is absent or
+// null, and `lower_included` and `upper_included` read as true on a side
+// that is not open and as false on a side that is. A flag the document
+// carries is read as written. A side written `*_unbounded` false with no
+// bound is refused when the interval holds its bounds by value, since a zero
+// bound would stand in for the absent one; held as an interface, the side
+// decodes as written, with no bound.
+// An empty or whitespace-only flag element carries no boolean and reads as
+// a flag the document leaves out.
 func (p *ProperInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
+	var _seen intervalFlagsSeen
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -135,37 +200,42 @@ func (p *ProperInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "lower":
-				if _err := _dec.DecodeElement(&p.Lower, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeParam(_dec, &_t, &p.Lower, canxml.DecodeAs[T]); _err != nil {
 					return _err
 				}
+				_seen.lower = true
 			case "upper":
-				if _err := _dec.DecodeElement(&p.Upper, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeParam(_dec, &_t, &p.Upper, canxml.DecodeAs[T]); _err != nil {
 					return _err
 				}
+				_seen.upper = true
 			case "lower_unbounded":
-				if _err := _dec.DecodeElement(&p.LowerUnbounded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &p.LowerUnbounded, &_seen.lowerUnbounded); _err != nil {
 					return _err
 				}
 			case "upper_unbounded":
-				if _err := _dec.DecodeElement(&p.UpperUnbounded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &p.UpperUnbounded, &_seen.upperUnbounded); _err != nil {
 					return _err
 				}
 			case "lower_included":
-				if _err := _dec.DecodeElement(&p.LowerIncluded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &p.LowerIncluded, &_seen.lowerIncluded); _err != nil {
 					return _err
 				}
 			case "upper_included":
-				if _err := _dec.DecodeElement(&p.UpperIncluded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &p.UpperIncluded, &_seen.upperIncluded); _err != nil {
 					return _err
 				}
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
 		case xml.EndElement:
+			if _err := _seen.settle(intervalBoundHeldByValue(&p.Lower), &p.LowerIncluded, &p.LowerUnbounded, &p.UpperIncluded, &p.UpperUnbounded); _err != nil {
+				return fmt.Errorf("%w: Proper_interval: %w", canxml.ErrInvalidShape, _err)
+			}
 			return nil
 		}
 	}

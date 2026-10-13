@@ -19,6 +19,7 @@
 //   - C_CODE_PHRASE   → [CodePhrase]
 //   - C_DV_QUANTITY   → [DvQuantity]
 //   - C_DV_ORDINAL    → [CDvOrdinal]
+//   - CONSTRAINT_REF  → [ConstraintRef]
 //
 // Every type implements the sealed [PrimitiveConstraint] interface,
 // so validators can pattern-match the closed set:

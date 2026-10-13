@@ -148,6 +148,11 @@ func TestCensus(t *testing.T) {
 		for _, m := range rep.Mismatched {
 			lines = append(lines, "      MISMATCH "+m)
 		}
+		for _, r := range rep.Refusals {
+			if r.Unmatched() {
+				lines = append(lines, "      UNMATCHED "+r.Key)
+			}
+		}
 	}
 
 	var b strings.Builder

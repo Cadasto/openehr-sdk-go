@@ -52,11 +52,12 @@ func (s Severity) String() string {
 // [ValidateRMEHRStatus], [ValidateRMEHRAccess], [ValidateRMDemographic]
 // and [ValidateRMEHRStatusBytes]. On their issues Path, Code, Detail and
 // Severity never contain a value taken from the instance: not the content
-// of a data value, a code, units, a precision, an interval bound, nor the
-// text of an error raised while decoding it. They may name RM types and
-// attributes, archetype and node ids, and the template's own constraint,
-// so such an issue can be logged or returned to a client as it is. The
-// value the failed check read is kept only in Value.
+// of a data value (a node's own name included), a code, units, a
+// precision, an interval bound, nor the text of an error raised while
+// decoding it. They may name RM types and attributes, archetype and node
+// ids, the names the template gives its nodes, and the template's own
+// constraint, so such an issue can be logged or returned to a client as it
+// is. The value the failed check read is kept only in Value.
 //
 // On an issue from [ValidateAQL] or [ValidateAQLWithTypeRelation], Code
 // and Severity never contain text from the query, but Detail and Path
@@ -69,10 +70,30 @@ func (s Severity) String() string {
 // or a map, is held by reference, so it equals only copies of the same
 // [constraints.Redacted].
 type Issue struct {
-	// Path is the AQL path of the offending node. Empty for global
-	// issues that do not localise to a specific node (e.g. root
-	// archetype-id mismatch). On an issue from [ValidateAQL] or
-	// [ValidateAQLWithTypeRelation] it is the lint path.
+	// Path is the openEHR path of the offending node, from the validated
+	// root: RM attribute names joined by "/", with "/" alone for the root.
+	// Each item of a multi-valued attribute carries a predicate in square
+	// brackets, and an attribute that holds a single value carries none.
+	// The predicate is the item's archetype node id (an archetype id on an
+	// archetype root) when no other item of that attribute carries it. When
+	// several items share the id, it is the id followed by the name the
+	// template gives the item's node, as in [at0004, 'Systolic'], provided
+	// that name tells the item apart; otherwise it is the item's position,
+	// counted from 1. An item with no id is always written by its position.
+	// A node the template requires and the instance lacks is written with
+	// the template's own predicate for it, since there is no item to count.
+	// The template-driven validators and [ValidateRM] write one node's path
+	// the same way, although [ValidateRM] alone has no template names, so it
+	// writes a position where a template-driven validator may write a name.
+	//
+	// A path with no position in it is also a valid AQL path. AQL has no
+	// positional predicate, so a path with one, such as /items[2], is an
+	// openEHR path but not an AQL path.
+	//
+	// Empty for global issues that do not localise to a specific node,
+	// such as nil_composition or nil_template for a nil argument. On an
+	// issue from [ValidateAQL] or [ValidateAQLWithTypeRelation] it is the
+	// lint path.
 	//
 	// Value-free on issues from the instance validators: never contains a
 	// value from the instance. Value-bearing on issues from [ValidateAQL]
@@ -156,8 +177,13 @@ type Issue struct {
 // Global guard codes (`nil_composition`, `nil_template`, and the
 // root guards `nil_root` / `nil_party` / `nil_folder` /
 // `nil_ehr_status`) return nil, because they represent caller-side
-// argument errors rather than validation failures. Callers wanting
-// `errors.Is` dispatch go through this method:
+// argument errors rather than validation failures. The RM floor's own
+// codes (`rm_invariant`, `mappings_valid`, `term_mapping_match`,
+// `code_not_in_value_set`, `is_archetype_root`, `rm_version_valid` and the
+// others it mints) return nil too, although they are errors. A nil Err
+// therefore does not mean the issue is harmless: read [Result.OK], or the
+// issue's Severity, for the verdict. Callers wanting `errors.Is` dispatch
+// go through this method:
 //
 //	for _, i := range r.Issues {
 //	    if errors.Is(i.Err(), validation.ErrRequired) { ... }

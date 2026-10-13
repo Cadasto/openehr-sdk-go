@@ -229,8 +229,8 @@ func TestREQ112_ElementNullFlavourIndicated(t *testing.T) {
 	}{
 		{"both, root by value", *both(), "/"},
 		{"neither, root by value", *validElement(), "/"},
-		{"both, by value in CLUSTER.items", inCluster(both()), "/items[0]"},
-		{"neither, by value in CLUSTER.items", inCluster(validElement()), "/items[0]"},
+		{"both, by value in CLUSTER.items", inCluster(both()), "/items[at0001]"},
+		{"neither, by value in CLUSTER.items", inCluster(validElement()), "/items[at0001]"},
 	}
 	for _, tc := range byValue {
 		t.Run(tc.name, func(t *testing.T) {

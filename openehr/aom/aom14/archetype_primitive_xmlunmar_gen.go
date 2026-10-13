@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"fmt"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
@@ -21,7 +22,12 @@ import (
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CBoolean) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -29,23 +35,23 @@ func (c *CBoolean) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "true_valid":
-				if _err := _dec.DecodeElement(&c.TrueValid, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.TrueValid); _err != nil {
 					return _err
 				}
 			case "false_valid":
-				if _err := _dec.DecodeElement(&c.FalseValid, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.FalseValid); _err != nil {
 					return _err
 				}
 			case "assumed_value":
 				var _v bool
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.AssumedValue = &_v
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -62,7 +68,12 @@ func (c *CBoolean) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -70,19 +81,19 @@ func (c *CDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "day_validity":
-				_v := new(rm.ValidityKind)
-				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+				var _v rm.ValidityKind
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
-				c.DayValidity = _v
+				c.DayValidity = &_v
 			case "month_validity":
-				_v := new(rm.ValidityKind)
-				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+				var _v rm.ValidityKind
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
-				c.MonthValidity = _v
+				c.MonthValidity = &_v
 			case "range":
 				_v := new(rm.Interval[string])
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
@@ -91,12 +102,12 @@ func (c *CDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 				c.Range = _v
 			case "assumed_value":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.AssumedValue = &_v
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -113,7 +124,12 @@ func (c *CDate) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -121,49 +137,49 @@ func (c *CDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "month_validity":
-				_v := new(rm.ValidityKind)
-				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+				var _v rm.ValidityKind
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
-				c.MonthValidity = _v
+				c.MonthValidity = &_v
 			case "day_validity":
-				_v := new(rm.ValidityKind)
-				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+				var _v rm.ValidityKind
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
-				c.DayValidity = _v
+				c.DayValidity = &_v
 			case "hour_validity":
-				_v := new(rm.ValidityKind)
-				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+				var _v rm.ValidityKind
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
-				c.HourValidity = _v
+				c.HourValidity = &_v
 			case "minute_validity":
-				_v := new(rm.ValidityKind)
-				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+				var _v rm.ValidityKind
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
-				c.MinuteValidity = _v
+				c.MinuteValidity = &_v
 			case "second_validity":
-				_v := new(rm.ValidityKind)
-				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+				var _v rm.ValidityKind
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
-				c.SecondValidity = _v
+				c.SecondValidity = &_v
 			case "millisecond_validity":
-				_v := new(rm.ValidityKind)
-				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+				var _v rm.ValidityKind
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
-				c.MillisecondValidity = _v
+				c.MillisecondValidity = &_v
 			case "timezone_validity":
-				_v := new(rm.ValidityKind)
-				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+				var _v rm.ValidityKind
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
-				c.TimezoneValidity = _v
+				c.TimezoneValidity = &_v
 			case "range":
 				_v := new(rm.Interval[string])
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
@@ -172,12 +188,12 @@ func (c *CDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 				c.Range = _v
 			case "assumed_value":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.AssumedValue = &_v
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -194,7 +210,12 @@ func (c *CDateTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -202,52 +223,52 @@ func (c *CDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "years_allowed":
 				var _v bool
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.YearsAllowed = &_v
 			case "months_allowed":
 				var _v bool
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.MonthsAllowed = &_v
 			case "weeks_allowed":
 				var _v bool
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.WeeksAllowed = &_v
 			case "days_allowed":
 				var _v bool
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.DaysAllowed = &_v
 			case "hours_allowed":
 				var _v bool
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.HoursAllowed = &_v
 			case "minutes_allowed":
 				var _v bool
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.MinutesAllowed = &_v
 			case "seconds_allowed":
 				var _v bool
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.SecondsAllowed = &_v
 			case "fractional_seconds_allowed":
 				var _v bool
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.FractionalSecondsAllowed = &_v
@@ -259,12 +280,12 @@ func (c *CDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 				c.Range = _v
 			case "assumed_value":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.AssumedValue = &_v
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -281,7 +302,12 @@ func (c *CDuration) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CInteger) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -289,10 +315,10 @@ func (c *CInteger) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "list":
 				var _v Integer
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.List = append(c.List, _v)
@@ -304,12 +330,12 @@ func (c *CInteger) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 				c.Range = _v
 			case "assumed_value":
 				var _v Integer
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.AssumedValue = &_v
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -326,7 +352,12 @@ func (c *CInteger) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CReal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -334,10 +365,10 @@ func (c *CReal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "list":
 				var _v Real
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.List = append(c.List, _v)
@@ -349,12 +380,12 @@ func (c *CReal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 				c.Range = _v
 			case "assumed_value":
 				var _v Real
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.AssumedValue = &_v
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -371,7 +402,12 @@ func (c *CReal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CString) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -379,31 +415,31 @@ func (c *CString) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "pattern":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.Pattern = &_v
 			case "list":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.List = append(c.List, _v)
 			case "list_open":
-				if _err := _dec.DecodeElement(&c.ListOpen, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &c.ListOpen); _err != nil {
 					return _err
 				}
 			case "assumed_value":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.AssumedValue = &_v
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -420,7 +456,12 @@ func (c *CString) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (c *CTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -428,31 +469,31 @@ func (c *CTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "minute_validity":
-				_v := new(rm.ValidityKind)
-				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+				var _v rm.ValidityKind
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
-				c.MinuteValidity = _v
+				c.MinuteValidity = &_v
 			case "second_validity":
-				_v := new(rm.ValidityKind)
-				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+				var _v rm.ValidityKind
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
-				c.SecondValidity = _v
+				c.SecondValidity = &_v
 			case "millisecond_validity":
-				_v := new(rm.ValidityKind)
-				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+				var _v rm.ValidityKind
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
-				c.MillisecondValidity = _v
+				c.MillisecondValidity = &_v
 			case "timezone_validity":
-				_v := new(rm.ValidityKind)
-				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+				var _v rm.ValidityKind
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
-				c.TimezoneValidity = _v
+				c.TimezoneValidity = &_v
 			case "range":
 				_v := new(rm.Interval[string])
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
@@ -461,12 +502,12 @@ func (c *CTime) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 				c.Range = _v
 			case "assumed_value":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				c.AssumedValue = &_v
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}

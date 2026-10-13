@@ -1,25 +1,24 @@
 // Validate a COMPOSITION that arrives as canonical JSON, the way a CI check or
 // an inbound gateway would: read the bytes, decode them into RM structs,
-// compile an operational template (OPT), and run two validation passes, each
-// listing every issue it finds. No HTTP is involved.
+// compile an operational template (OPT), and validate with one call that lists
+// every issue it finds. No HTTP is involved.
 //
-// The two passes check different things:
+// validation.ValidateComposition checks two things in that one call:
 //
-//   - RM floor (validation.ValidateRM): the openEHR Reference Model alone, with
-//     no template. It checks the attributes the RM makes mandatory on every
-//     node, and the RM's own rules for each type, such as an ELEMENT carrying
-//     exactly one of a value or a null flavour, and every COMPOSITION and
-//     ENTRY carrying archetype_details.
-//   - Template constraints (validation.ValidateComposition): what the OPT
-//     declares, node by node: existence, cardinality, RM type, archetype
-//     identity and value constraints.
+//   - the template constraints: what the OPT declares, node by node:
+//     existence, cardinality, RM type, archetype identity and value
+//     constraints;
+//   - the RM floor: the openEHR Reference Model itself, over the whole
+//     composition: the attributes the RM makes mandatory on every node, and
+//     the RM's own rules for each type, such as an ELEMENT carrying exactly
+//     one of a value or a null flavour, and every COMPOSITION and ENTRY
+//     carrying archetype_details.
 //
-// Today ValidateComposition checks the template's constraints and does not
-// run the RM floor's per-type rules, so a composition can satisfy its template
-// and still break the Reference Model. This program runs both passes.
+// A defect both find is reported once. validation.ValidateRM is the floor
+// alone, for a root no template applies to.
 //
 // By default it validates testdata/minimal_blood_pressure.json, a hand-made
-// composition that passes both against the vendored vital_signs.opt. With
+// composition that is valid against the vendored vital_signs.opt. With
 // -corpus it validates the vendored testkit/corpus vital_signs.json instead,
 // which is demo data and reports issues, so you can see what a failing run
 // looks like. Two positional arguments validate your own files.
@@ -28,8 +27,8 @@
 //	go run ./cmd/examples/validate-from-json -corpus
 //	go run ./cmd/examples/validate-from-json composition.json template.opt
 //
-// The exit status is 0 when neither pass reports an error. It is 1 when either
-// pass does, or when the program cannot run: a missing or
+// The exit status is 0 when validation reports no error. It is 1 when it
+// does, or when the program cannot run: a missing or
 // unreadable file, a composition or OPT that does not parse, or the wrong
 // number of file arguments. A bad flag exits with status 2.
 package main
@@ -63,8 +62,8 @@ func main() {
 	}
 }
 
-// run validates the chosen composition and reports whether it passed both
-// passes. An error means the program could not do its job (bad path,
+// run validates the chosen composition and reports whether it is valid. An
+// error means the program could not do its job (bad path,
 // unreadable OPT); a false result means the composition was checked and has
 // issues.
 func run() (valid bool, err error) {
@@ -107,20 +106,14 @@ func run() (valid bool, err error) {
 	}
 	fmt.Printf("template             : %s (%s)\n", opt.TemplateID(), filepath.Base(optPath))
 
-	// Step 3: the RM floor. ValidateRM walks the composition with the
-	// Reference Model as its only guide, no template involved.
-	rmOK := reportPass("RM floor", validation.ValidateRM(&composition))
-
-	// Step 4: the template constraints. The template drives this walk: for
-	// each node the OPT declares, the validator reads the matching part of
-	// the composition and checks existence, cardinality, RM type and value
-	// constraints. Both passes collect every issue instead of stopping at the
-	// first, and the second runs whatever the first found: they check
-	// different things, so neither result stands in for the other.
-	templateOK := reportPass("template constraints", validation.ValidateComposition(&composition, compiled))
-
-	if rmOK && templateOK {
-		fmt.Println("result               : valid, both passes found no error")
+	// Step 3: validate. The template drives the first walk: for each node the
+	// OPT declares, the validator reads the matching part of the composition
+	// and checks existence, cardinality, RM type and value constraints. The
+	// RM floor then walks the whole composition with the Reference Model as
+	// its guide. Both walks collect every issue instead of stopping at the
+	// first, and the result carries a defect both find once.
+	if report("validation", validation.ValidateComposition(&composition, compiled)) {
+		fmt.Println("result               : valid, no error found")
 		return true, nil
 	}
 	fmt.Println("result               : not valid")
@@ -130,11 +123,11 @@ func run() (valid bool, err error) {
 	return false, nil
 }
 
-// reportPass prints one validation pass under its name: the verdict, then one
-// line per issue. Path points at the offending node, Code is the stable
-// identifier to dispatch on, Detail is the explanation for a human. It returns
-// result.OK, which is false exactly when the pass found an error.
-func reportPass(name string, result validation.Result) bool {
+// report prints the validation result under name: the verdict, then one line
+// per issue. Path points at the offending node, Code is the stable identifier
+// to dispatch on, Detail is the explanation for a human. It returns
+// result.OK, which is false exactly when an error was found.
+func report(name string, result validation.Result) bool {
 	verdict := "OK"
 	if !result.OK {
 		verdict = "failed"
@@ -187,7 +180,7 @@ func resolvePaths(useCorpus bool, args []string) (jsonPath, optPath string, err 
 // defaultCompositionPath locates testdata/minimal_blood_pressure.json
 // relative to this source file, so `go run` works from any directory. The
 // fixture is written by gen_fixture.go, which refuses to write one that fails
-// either validation pass.
+// validation.
 func defaultCompositionPath() (string, error) {
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {

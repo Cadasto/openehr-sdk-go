@@ -61,6 +61,11 @@ var reflectReviewed = map[string]struct {
 	classes []string
 	reason  string
 }{
+	"internal/rmjsonwalk/root.go": {
+		[]string{"Array", "Map", "New", "Pointer", "Slice", "Struct", "Type", "TypeOf", "VisibleFields"},
+		[]string{reflectAddressableCopy, reflectFieldMapping},
+		"reads the RM class a decode target's root is declared as: peels the target's pointers, slices, arrays and maps to the element type and asks a reflect.New copy of it through BMMName or the interface table openehr/rm registers in internal/rmjsonwalk/polyreg; binds a generic class's type parameter by finding the field whose JSON tag is the parameter's attribute; no Go type is chosen from _type",
+	},
 	"openehr/aql/parse/ast.go": {
 		[]string{"Pointer", "ValueOf"},
 		[]string{reflectNilOrZeroCheck},

@@ -84,14 +84,15 @@ var corpusCompileFailures = []string{
 // with no code. REQ-107 § Exceptions and known gaps, "An OPT constraint that
 // admits no value an RM rule accepts, such as an RM default that yields to
 // the OPT (§ Precedence 1)": the generator keeps the openEHR code the OPT
-// gives (items[10]/items[0]) or the at0000 placeholder in openEHR
-// (items[11]/items[5]) over the text/plain default, so Media_type_valid
-// (REQ-112 Coded invariants) breaks.
+// gives (the person_identifier_multimedia cluster's at0001) or the at0000
+// placeholder in openEHR (the person_identifier_wid cluster's at0006) over
+// the text/plain default, so Media_type_valid (REQ-112 Coded invariants)
+// breaks.
 var corpusRatchet = []ratchetFailure{
-	{template: "templates/TestPerson.v2", entry: "generate", policy: "example", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[10]/items[0]/value/media_type"},
-	{template: "templates/TestPerson.v2", entry: "generate", policy: "example", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[11]/items[5]/value/media_type"},
-	{template: "templates/TestPerson.v2", entry: "generate", policy: "example", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[10]/items[0]/value/media_type"},
-	{template: "templates/TestPerson.v2", entry: "generate", policy: "example", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[11]/items[5]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "example", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "example", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "example", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "example", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
 	{template: "templates/clinical_content_validation", entry: "builder", policy: "minimal", fill: "example", reason: "hollow_body:/"},
 	{template: "templates/clinical_content_validation", entry: "generate", policy: "minimal", fill: "example", reason: "hollow_body:/"},
 	{template: "templates/clinical_content_validation", entry: "generate", policy: "minimal", fill: "random", reason: "hollow_body:/"},

@@ -105,8 +105,8 @@ Only files that describe the same instance form a set. The Robot canonical JSON 
 | `test_template_rename_node_2` | yes | yes | yes | round-trip |
 | `Episode.v2` | yes | yes | yes | round-trip |
 | `Address.v2` | yes | yes | yes | round-trip |
-| `Demonstration.v1` | yes | yes | yes | JSON round-trip, RM floor held out (inverted `DV_INTERVAL` bounds); XML not exercised |
-| `TestPerson.v2` | yes | yes | yes | JSON round-trip, RM floor held out (null `CODE_PHRASE.code_string`); XML not exercised |
+| `Demonstration.v1` | yes | yes | yes | JSON and XML round-trip, RM floor held out (inverted `DV_INTERVAL` bounds) |
+| `TestPerson.v2` | yes | yes | yes | JSON and XML round-trip, RM floor held out (null `CODE_PHRASE.code_string`) |
 | `SocialeAnamnese.v1` | yes (`social.opt`) | — | — | no patient data |
 | `Referral Request.v1` | yes | — | — | OPT only: instance generation (PROBE-027) and the polymorphic round trip in `openehr/instance` |
 

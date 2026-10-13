@@ -374,9 +374,57 @@ func allowedChildren(attr *tcimpl.CompiledAttribute) []*tcimpl.CompiledNode {
 	return allowed
 }
 
+// bindingAlternative returns the allowed alternative of a single-valued
+// attribute whose constraints the walk builds under. built is the RM
+// type the walk builds: the type the first alternative names, or its
+// concrete substitute ([builtRMType]). The template validator
+// binds a value of that type to the first alternative that names the
+// type exactly, else to the first that is the AOM 1.4 primitive short
+// name the type wraps, else to the first alternative (REQ-102
+// alternatives rule, REQ-107 What a visit writes). Under
+// [DATA_VALUE, DV_TEXT] the walk therefore builds a DV_TEXT under the
+// DV_TEXT alternative's constraints, not the open DATA_VALUE's.
+func bindingAlternative(children []*tcimpl.CompiledNode, built string) *tcimpl.CompiledNode {
+	for _, c := range children {
+		if strings.TrimSpace(c.RMTypeName()) == built {
+			return c
+		}
+	}
+	for _, c := range children {
+		name := strings.TrimSpace(c.RMTypeName())
+		if tcimpl.IsAOMPrimitiveShortName(name) && concreteFor(name) == built {
+			return c
+		}
+	}
+	return children[0]
+}
+
+// builtRMType is the RM type the walk builds for an alternative: the
+// type it names, or its concrete substitute (concreteFor).
+func builtRMType(alternative *tcimpl.CompiledNode) string {
+	return concreteFor(strings.TrimSpace(alternative.RMTypeName()))
+}
+
+// attrTypedByRMClass reports whether the pinned BMM types attr of
+// optNode by an RM class (ELEMENT.value, a DATA_VALUE), rather than by
+// a primitive such as String or Boolean (DV_DURATION.value,
+// ITEM_TABLE.rotated) or not at all.
+func attrTypedByRMClass(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
+	h, ok := rminfo.Default.(rminfo.Hierarchy)
+	if !ok {
+		return false
+	}
+	_, known := h.IsAbstract(bmmtype.Class(attrType(optNode.RMTypeName(), attr.RMTypeName())))
+	return known
+}
+
 // materialiseSingle synthesises and attaches one child under a
-// C_SINGLE_ATTRIBUTE. For OPT alternatives (multiple children) the
-// first wins — same convention validation uses for matchSingleAlternative.
+// C_SINGLE_ATTRIBUTE. The built value takes the RM type the first
+// allowed alternative names, or that alternative's concrete
+// substitute, and is built under the constraints of the alternative
+// the validator binds a value of that type to ([bindingAlternative]),
+// so validation checks what the generator built against the child
+// whose constraints built it (REQ-107, What a visit writes).
 //
 // Implicit BMM-mandatory attributes (no OPT children) get a default
 // RM value materialised from the attribute's BMM type so the
@@ -400,7 +448,6 @@ func (g *generator) materialiseSingle(
 		// .start_time) overwrite the placeholder afterwards.
 		return g.materialiseImplicitSingle(optNode, attr, parentRM)
 	}
-	child := children[0]
 	// AOM 1.4 primitive short name (DURATION, DATE, BOOLEAN, …)
 	// under a BMM-primitive attribute (e.g. DV_DURATION.value): the
 	// parent is itself the DV wrapper; populatePrimitiveDefault has
@@ -412,13 +459,16 @@ func (g *generator) materialiseSingle(
 	// default sentinel on the parent. When the constraint is absent
 	// (a C_PRIMITIVE_OBJECT wrapper whose inner item the OPT author
 	// omitted, or an unknown xsi:type the parser admitted leniently),
-	// the populatePrimitiveDefault sentinel holds.
-	if tcimpl.IsAOMPrimitiveShortName(child.RMTypeName()) {
-		if pc := child.PrimitiveConstraint(); pc != nil {
-			return g.applyPrimitiveExample(child, parentRM, attr.Name(), pc)
+	// the populatePrimitiveDefault sentinel holds. Under an attribute
+	// an RM class types (ELEMENT.value) the short name is built below
+	// as its DV wrapper, which concreteFor names.
+	if first := children[0]; tcimpl.IsAOMPrimitiveShortName(first.RMTypeName()) && !attrTypedByRMClass(optNode, attr) {
+		if pc := first.PrimitiveConstraint(); pc != nil {
+			return g.applyPrimitiveExample(first, parentRM, attr.Name(), pc)
 		}
 		return nil
 	}
+	child := bindingAlternative(children, builtRMType(children[0]))
 	rmChild, err := g.makeChild(child)
 	if err != nil {
 		return err
@@ -1320,17 +1370,20 @@ func (g *generator) makeChild(child *tcimpl.CompiledNode) (any, error) {
 
 // concreteFor maps abstract RM class names the OPT may declare on
 // child constraints to the documented concrete substitute the
-// generator materialises. Mirrors the validation walker's
-// bmmSubtypes "first concrete" pick — POINT_EVENT for EVENT,
-// ITEM_TREE for ITEM_STRUCTURE, ELEMENT for ITEM, etc. Concrete RM
-// types pass through unchanged.
+// generator materialises — POINT_EVENT for EVENT, ITEM_TREE for
+// ITEM_STRUCTURE, ELEMENT for ITEM, etc. Each substitute descends
+// from the abstract class in the pinned BMM, and the validation
+// walker admits a value by that class hierarchy, so the substitute
+// passes its type check. Concrete RM types pass through unchanged.
 //
 // AOM 1.4 primitive short names (DURATION, DATE, TIME, DATE_TIME,
-// BOOLEAN) appear under C_PRIMITIVE_OBJECT in some OPTs where the
-// modeller constrains the primitive directly rather than its DV
-// wrapper. The generator materialises the canonical DV wrapper for
-// each; the validator's bmmSubtypes carries the lockstep admission
-// rule so checkRMType does not reject the substitute.
+// BOOLEAN, INTEGER) appear under C_PRIMITIVE_OBJECT in some OPTs
+// where the modeller constrains the primitive directly rather than
+// its DV wrapper. The generator materialises the canonical DV
+// wrapper for each. The short names are no BMM classes, so the
+// validator keeps its own short-name → wrapper table,
+// aomPrimitiveWrappers, in lockstep with these cases so checkRMType
+// does not reject the substitute.
 func concreteFor(rmType string) string {
 	switch rmType {
 	case "EVENT":
@@ -1694,7 +1747,7 @@ func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 		}
 		c.Context = &rm.EventContext{}
 	}
-	contextNode := firstChild(root, "context")
+	contextNode := bindingChild(root, "context")
 	if c.Context.StartTime.Value == "" && !prohibited(contextNode, "start_time") {
 		c.Context.StartTime = rm.DVDateTime{Value: g.opts.Now.Format(time.RFC3339)}
 	}
@@ -1939,9 +1992,9 @@ func codedTextAdmits(node *tcimpl.CompiledNode, ct rm.DVCodedText) bool {
 }
 
 // defaultAdmitted reports whether the OPT's own constraint on attrName of
-// opt admits an RM default, as admits says of the first OPT child the OPT
-// does not prohibit, the one the walk builds the attribute from. An
-// attribute the OPT prohibits admits nothing. opt is nil for a value built
+// opt admits an RM default, as admits says of the alternative the walk
+// builds the attribute under ([bindingChild]), among those the OPT does
+// not prohibit. An attribute the OPT prohibits admits nothing. opt is nil for a value built
 // from the BMM alone, and an attribute the OPT does not name, or names
 // with no child, admits any default, as does a mandatory one whose
 // children the OPT all prohibits.
@@ -1956,7 +2009,7 @@ func defaultAdmitted(opt *tcimpl.CompiledNode, attrName string, admits func(*tci
 	if attrProhibited(attr) {
 		return false
 	}
-	if node := firstChild(opt, attrName); node != nil {
+	if node := bindingChild(opt, attrName); node != nil {
 		return admits(node)
 	}
 	return true
@@ -1967,20 +2020,20 @@ func defaultAdmitted(opt *tcimpl.CompiledNode, attrName string, admits func(*tci
 // reads the two shapes an OPT gives that constraint, as the template
 // validator does: a C_CODE_PHRASE, and a CODE_PHRASE node whose
 // code_string, or whose terminology_id's value, carries a C_STRING. Below
-// node it reads, like the walk, the first alternative the OPT does not
-// prohibit.
+// node it reads, like the walk, the alternative the walk builds under
+// ([bindingChild]), among those the OPT does not prohibit.
 func phraseAdmitted(node *tcimpl.CompiledNode, phrase rm.CodePhrase) bool {
 	if cp, ok := node.PrimitiveConstraint().(constraints.CodePhrase); ok {
 		ref := constraints.CodedTermRef{Terminology: phrase.TerminologyID.Value, CodeString: phrase.CodeString}
 		return len(cp.Validate(ref)) == 0
 	}
-	if dc := firstChild(node, "defining_code"); dc != nil {
+	if dc := bindingChild(node, "defining_code"); dc != nil {
 		return phraseAdmitted(dc, phrase)
 	}
 	if !stringAdmitted(node.Attribute("code_string"), phrase.CodeString) {
 		return false
 	}
-	if tid := firstChild(node, "terminology_id"); tid != nil {
+	if tid := bindingChild(node, "terminology_id"); tid != nil {
 		return stringAdmitted(tid.Attribute("value"), phrase.TerminologyID.Value)
 	}
 	return true
@@ -2059,7 +2112,7 @@ func (g *generator) settleElement(opt *tcimpl.CompiledNode, e *rm.Element) {
 		// The OPT prohibits value and null_flavour, and the RM rule needs
 		// the null flavour: the walk wrote it as if the OPT allowed it, and
 		// the default goes where its own child admits it.
-		if codedTextAdmits(firstChild(opt, "null_flavour"), *nf) {
+		if codedTextAdmits(bindingChild(opt, "null_flavour"), *nf) {
 			e.NullFlavour = nf
 		}
 		return

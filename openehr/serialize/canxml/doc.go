@@ -24,6 +24,10 @@
 //
 // The codec produces deterministic canonical XML:
 //
+//   - One root element per document. [Unmarshal] refuses an element, or
+//     text other than whitespace, after the root, in every mode, with
+//     [ErrInvalidShape]; comments, processing instructions and whitespace
+//     after the root are accepted, as XML allows them.
 //   - Default namespace: `http://schemas.openehr.org/v1`.
 //   - `xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"` is
 //     declared on the document root whenever any descendant carries
@@ -31,8 +35,9 @@
 //   - Polymorphic discrimination: `xsi:type="<BMM_CLASS_NAME>"`
 //     (unprefixed openEHR class name). The encoder emits it as the
 //     first attribute on every concrete element at a polymorphic
-//     site. The decoder requires it at polymorphic sites unless
-//     [WithRelaxedTypeDispatch] is set. Discriminator values are
+//     site. The decoder requires it at polymorphic sites;
+//     [WithRelaxedTypeDispatch], which would relax that, is accepted but
+//     not yet enforced. Discriminator values are
 //     matched unprefixed; namespace-prefixed values (the Better/Marand
 //     `xsi:type="ns2:DV_QUANTITY"` dialect) are not supported and fail
 //     closed with [typereg.ErrUnknownType].
@@ -44,7 +49,8 @@
 //   - Nil-pointer optional fields and empty containers with
 //     `cardinality.lower == 0` are emitted as absent (no element).
 //     Both absent and an empty self-closing element are accepted on
-//     decode.
+//     decode, for optionals and containers; an interface-typed member
+//     (below) needs its `xsi:type` even when empty.
 //   - ISO 8601 dates/times/durations are passed through as element
 //     text content; the codec does not parse them.
 //   - Numeric magnitudes use IEEE 754 double-precision (same as
@@ -56,18 +62,75 @@
 //   - `xmi:type` is rejected on decode with [ErrInvalidShape]; only
 //     `xsi:type` is recognised (openEHR ITS-XML uses XMI in UML
 //     diagrams, not on the wire).
+//   - An Octet list, DV_MULTIMEDIA's `data` and `integrity_check`, is one
+//     element of standard base64 text, the `xs:base64Binary` the ITS-XML
+//     schema gives it and the string canonical JSON writes; XML
+//     whitespace inside the text is ignored on decode.
+//   - The AOM 1.4 `original_language`, a TERMINOLOGY_CODE, is written in
+//     the CODE_PHRASE shape the AOM 1.4 ITS-XML schema gives it, with the
+//     terminology identifier in a `value` child of `terminology_id`;
+//     decode also reads a plain text `terminology_id`.
+//   - A member typed by a generic parameter that is instantiated with an
+//     interface, such as the `data` of ORIGINAL_VERSION<any>, is a
+//     polymorphic site and needs `xsi:type`, even when its element is
+//     empty. With no element at all, the member stays nil.
 //
-// # Strict vs relaxed decode
+// # Strict vs relaxed type dispatch
 //
 // The decoder defaults to strict polymorphism: at any element whose
 // declared type is an abstract RM class or interface, the input
 // element must carry `xsi:type` or the decode fails with
 // [typereg.ErrMissingType] wrapped in [DecodeError].
 //
-// [NewDecoder] accepts [WithRelaxedTypeDispatch] to opt into relaxed
-// dispatch (as in canjson): when the declared abstract field
-// has exactly one concrete descendant in the merged BMM, the decoder
-// instantiates that descendant without `xsi:type`. The default is off.
+// [Unmarshal] and [NewDecoder] accept [WithRelaxedTypeDispatch], which
+// names relaxed dispatch (as in canjson): when the declared abstract
+// field has exactly one concrete descendant in the merged BMM, the
+// decoder would instantiate that descendant without `xsi:type`. The
+// option is accepted but not yet enforced, so dispatch stays strict.
+//
+// # Unmatched content
+//
+// Content the decode does not read is unmatched: an element or attribute
+// that names no attribute of the RM type its element decodes as; an
+// element in a namespace other than the openEHR one ([ErrNamespace]); and
+// the element of a `Hash` member or of a BMM `Any` member (see below).
+// Two kinds of attribute are never unmatched: a namespace declaration,
+// and an attribute in the XML Schema instance namespace, whether the
+// `xsi:type` discriminator, `xsi:schemaLocation`, `xsi:nil` or another.
+// A bare `type` attribute, in no namespace, is read as the discriminator
+// only where dispatch reads it, at a polymorphic slot; anywhere else it is
+// unmatched. An element in no namespace is read as an openEHR element,
+// since many producers leave the declaration out. The root element is not
+// matched by name, since the value decoded into says what it is, so its
+// own namespace is not checked.
+//
+// The check covers every class the generated decoders read, the AOM 1.4
+// classes included.
+//
+// By default the decoder ignores unmatched content: the value holds the
+// rest of the input and none of it. [WithUnmatched] passes each item, in
+// document order, to a caller function as its path from the root of the
+// value, such as "/composition[1]/content[2]/x-note[1]" or
+// "/composition[1]/@x-flag"; the path names the item and carries none of
+// its value. [WithStrict] refuses the decode at the first item with an
+// error wrapping [ErrUnknownElement] (and [ErrNamespace] for a foreign
+// element). Strict never refuses an absent element.
+//
+// An unknown `xsi:type` fails in every mode. The decoder reads the input
+// as a stream and checks content as it goes, so strict returns the first
+// problem in document order: an unmatched item that comes before an
+// unknown `xsi:type` refuses the decode with [ErrUnknownElement], and an
+// unknown `xsi:type` that comes first fails as itself. Without strict, the
+// same input fails on the unknown `xsi:type`.
+//
+// The options reach the generated UnmarshalXML methods, which encoding/xml
+// calls with nothing but the *xml.Decoder, through the decoder itself: a
+// decode given either option reads its input through a token source that
+// tracks the open elements, and registers its decoder with its own policy
+// while it runs. Concurrent decodes each have their own decoder and so
+// their own policy. The generated methods hand the content they do not
+// read to helpers in an internal package of the SDK, which look the
+// decoder up and, for an untracked decode, behave as encoding/xml does.
 //
 // # Polymorphic dispatch
 //
@@ -91,7 +154,7 @@
 // perform XSD validation at the wire layer; OPT-driven validation is
 // available under openehr/template/.
 //
-// # Unsupported: Hash<K,V> elements
+// # Unsupported: Hash<K,V> elements and Any content
 //
 // BMM Hash<K,V> (map-typed) RM attributes are not supported by this
 // codec, and concrete RM types hit this limit. Resource-metadata types
@@ -100,7 +163,9 @@
 // TranslationDetails (author, other_details), all map[string]…
 // attributes.
 //
-// Decode skips these elements (via xml.Decoder.Skip). Encode cannot
+// Decode does not read these elements: it treats each as one item of
+// unmatched content, so it skips it by default, [WithUnmatched] reports it
+// and [WithStrict] refuses it, and the map field stays nil. Encode cannot
 // emit them at all: the generated codec hands the Go map to
 // encoding/xml, which rejects map types, so [Marshal] of any
 // AuthoredResource / ResourceDescription fails with
@@ -108,6 +173,13 @@
 // since original_author is always encoded. Canonical XML for these
 // resource-metadata types is therefore unavailable until a Hash codec
 // exists.
+//
+// Nor can the codec decode the content of a BMM `Any` attribute, held as
+// a Go empty interface: the AOM 1.4 `assumed_value` and `EXPR_LEAF.item`.
+// Decode treats such an element the same way, as one item of unmatched
+// content, and leaves the field at its zero value. So it would for a
+// member whose Go type has no canonical-XML decoder of its own; every
+// member of the RM and AOM 1.4 types has one.
 //
 // The canjson codec is unaffected (encoding/json handles maps).
 //

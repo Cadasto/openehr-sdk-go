@@ -25,8 +25,8 @@ var floorGapExceptions = map[string][]string{
 	// value an RM rule accepts, such as an RM default that yields to the OPT
 	// (§ Precedence 1)".
 	"templates/TestPerson.v2": {
-		"code_not_in_value_set /details/items[10]/items[0]/value/media_type",
-		"code_not_in_value_set /details/items[11]/items[5]/value/media_type",
+		"code_not_in_value_set /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type",
+		"code_not_in_value_set /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type",
 	},
 }
 
@@ -104,6 +104,9 @@ func TestREQ107_FloorGapsFilled(t *testing.T) {
 			} else {
 				templ = validation.Validate(out, c)
 			}
+			// Template validation includes the RM floor, so it carries the
+			// floor findings REQ-107 excepts too, each once.
+			var templExcepted []string
 			for _, iss := range templ.Issues {
 				if iss.Severity != validation.Error {
 					continue
@@ -112,7 +115,14 @@ func TestREQ107_FloorGapsFilled(t *testing.T) {
 				if iss.Path == "/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rotated" {
 					continue
 				}
+				if f := iss.Code + " " + iss.Path; slices.Contains(allowed, f) {
+					templExcepted = append(templExcepted, f)
+					continue
+				}
 				t.Errorf("template %s %s (%s)", iss.Code, iss.Path, iss.Detail)
+			}
+			if !slices.Equal(templExcepted, allowed) {
+				t.Errorf("template findings REQ-107 excepts = %q, want %q", templExcepted, allowed)
 			}
 		})
 	}

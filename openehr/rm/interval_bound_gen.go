@@ -3,6 +3,149 @@
 
 package rm
 
+import (
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
+	"encoding/xml"
+	"errors"
+	"strconv"
+	"strings"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
+)
+
+// intervalFlagsSeen records which of an interval's four boundary flags and
+// two bounds a canonical document carried, so a decoder can tell an absent
+// flag from one written as false, and an absent or null bound from a bound
+// that holds a zero value.
+type intervalFlagsSeen struct {
+	lowerIncluded  bool
+	lowerUnbounded bool
+	upperIncluded  bool
+	upperUnbounded bool
+	lower          bool
+	upper          bool
+}
+
+// settle gives every boundary flag the document left out the value an absent
+// flag reads as, and refuses a side the document writes closed but gives no
+// bound. An absent `lower_unbounded` or `upper_unbounded` reads as false on a
+// side that carries a bound and as true on a side whose bound is absent or
+// null too, so an interval that gives only an upper bound is open below. An
+// absent `lower_included` or `upper_included` reads as true on a side that is not
+// open and as false on a side that is, the only value an open side admits. A
+// flag the document carried keeps the value it was read as. The open flags
+// are settled first, so an included default sees its side's open flag
+// whatever order the members came in.
+//
+// A side written `*_unbounded` false whose bound is absent or null names a
+// closed end with no value. byValue says whether the interval holds its
+// bounds by value, where a zero bound would stand in for the absent one, so
+// settle refuses such a side; an interval that holds its bounds as an
+// interface keeps the side as written, with no bound.
+func (s intervalFlagsSeen) settle(byValue bool, lowerIncluded, lowerUnbounded, upperIncluded, upperUnbounded *bool) error {
+	if !s.lowerUnbounded {
+		*lowerUnbounded = !s.lower
+	} else if !*lowerUnbounded && !s.lower && byValue {
+		return errIntervalClosedSide("lower")
+	}
+	if !s.upperUnbounded {
+		*upperUnbounded = !s.upper
+	} else if !*upperUnbounded && !s.upper && byValue {
+		return errIntervalClosedSide("upper")
+	}
+	if !s.lowerIncluded {
+		*lowerIncluded = !*lowerUnbounded
+	}
+	if !s.upperIncluded {
+		*upperIncluded = !*upperUnbounded
+	}
+	return nil
+}
+
+// errIntervalClosedSide is the refusal of a side, "lower" or "upper", that a
+// document writes closed with no bound, where the interval holds its bound by
+// value. It names the flag and the bound, never a value.
+func errIntervalClosedSide(side string) error {
+	return errors.New(side + "_unbounded is false but the interval gives no " + side + " bound, which a bound held by value cannot leave out")
+}
+
+// intervalBoundHeldByValue reports whether an interval holds the bound its
+// argument points to by value: a concrete type, whose zero value would stand in for an
+// absent bound, rather than an interface, which holds no value at all.
+func intervalBoundHeldByValue[T any](*T) bool {
+	var zero T
+	return any(zero) != nil
+}
+
+// intervalBoundJSON is the canonical-JSON decode target of one interval
+// bound. It decodes the member straight into the interval's own bound field,
+// as the field's own decoder would, and marks the bound seen when the member
+// is not null.
+type intervalBoundJSON struct {
+	field any
+	seen  *bool
+}
+
+// UnmarshalJSONFrom decodes one bound into its field and records whether the
+// document carried a value for it.
+func (f intervalBoundJSON) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	null := dec.PeekKind() == 'n'
+	if err := json.UnmarshalDecode(dec, f.field, dec.Options()); err != nil {
+		return err
+	}
+	*f.seen = !null
+	return nil
+}
+
+// intervalFlagJSON is the canonical-JSON decode target of one interval
+// boundary flag. It decodes the member straight into the interval's own flag
+// field, so a failed decode leaves the field as an in-place decode would, and
+// marks the flag seen once it is read. A null member reads as an absent one.
+type intervalFlagJSON struct {
+	field *bool
+	seen  *bool
+}
+
+// UnmarshalJSONFrom decodes one boundary flag into its field and records that
+// the document carried it.
+func (f intervalFlagJSON) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if dec.PeekKind() == 'n' {
+		_, err := dec.ReadToken()
+		return err
+	}
+	if err := json.UnmarshalDecode(dec, f.field, dec.Options()); err != nil {
+		return err
+	}
+	*f.seen = true
+	return nil
+}
+
+// decodeIntervalFlagXML reads one interval boundary flag element of canonical
+// XML into field and marks it seen. An empty or whitespace-only element
+// carries no boolean: it leaves field alone and the flag unmarked, so the
+// flag takes its default like one the document leaves out. Any other text,
+// trimmed, is parsed as a boolean, and a text that is none is an error.
+// The text is read through xmlunmatched.DecodeElement, so an attribute or child
+// element on the flag is unmatched content like any other.
+func decodeIntervalFlagXML(dec *xml.Decoder, start *xml.StartElement, field, seen *bool) error {
+	var text string
+	if err := xmlunmatched.DecodeElement(dec, start, &text); err != nil {
+		return err
+	}
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return nil
+	}
+	v, err := strconv.ParseBool(text)
+	if err != nil {
+		return err
+	}
+	*field = v
+	*seen = true
+	return nil
+}
+
 // omitIntervalBound reports whether the canonical encoders leave out an
 // interval side's bound: the side is open (its `lower_unbounded` or
 // `upper_unbounded` flag is set) and its bound is empty. A non-empty bound

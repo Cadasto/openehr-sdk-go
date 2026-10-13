@@ -230,8 +230,8 @@ func TestValidateRMFolder_ObjectRefItemMissingType(t *testing.T) {
 	if r.OK {
 		t.Fatalf("ValidateRMFolder with OBJECT_REF missing type/namespace should not be OK; issues=%+v", r.Issues)
 	}
-	if !containsIssue(r.Issues, "/items[0]/type", "rm_invariant") {
-		t.Errorf("expected rm_invariant at /items[0]/type, got %+v", r.Issues)
+	if !containsIssue(r.Issues, "/items[1]/type", "rm_invariant") {
+		t.Errorf("expected rm_invariant at /items[1]/type, got %+v", r.Issues)
 	}
 }
 
@@ -346,8 +346,8 @@ func TestRMFloorTermMappingMatchValueSet(t *testing.T) {
 			if r.OK {
 				t.Fatalf("expected an invariant issue for match=%q", tc.match)
 			}
-			if !containsIssue(r.Issues, "/mappings[0]/match", "term_mapping_match") {
-				t.Errorf("expected term_mapping_match at /mappings[0]/match, got %+v", r.Issues)
+			if !containsIssue(r.Issues, "/mappings[1]/match", "term_mapping_match") {
+				t.Errorf("expected term_mapping_match at /mappings[1]/match, got %+v", r.Issues)
 			}
 		})
 	}
@@ -448,8 +448,8 @@ func TestRMFloorDVCodedTextBadMatch(t *testing.T) {
 	if r.OK {
 		t.Fatalf("expected a term_mapping_match issue for DV_CODED_TEXT with match=%q", badMatch)
 	}
-	if !containsIssue(r.Issues, "/mappings[0]/match", "term_mapping_match") {
-		t.Errorf("expected term_mapping_match at /mappings[0]/match, got %+v", r.Issues)
+	if !containsIssue(r.Issues, "/mappings[1]/match", "term_mapping_match") {
+		t.Errorf("expected term_mapping_match at /mappings[1]/match, got %+v", r.Issues)
 	}
 }
 
@@ -504,8 +504,8 @@ func TestValidateRM_TermMappingMissingTarget(t *testing.T) {
 	if r.OK {
 		t.Fatalf("ValidateRM(DV_TEXT with a mapping missing target) should not be OK; issues=%+v", r.Issues)
 	}
-	if !containsIssue(r.Issues, "/mappings[0]/target", "required") {
-		t.Errorf("expected required at /mappings[0]/target, got %+v", r.Issues)
+	if !containsIssue(r.Issues, "/mappings[1]/target", "required") {
+		t.Errorf("expected required at /mappings[1]/target, got %+v", r.Issues)
 	}
 }
 
@@ -531,7 +531,7 @@ func TestValidateRM_NestedPurposeMappingBadMatch(t *testing.T) {
 	if r.OK {
 		t.Fatalf("ValidateRM(DV_TEXT with a bad nested purpose mapping) should not be OK; issues=%+v", r.Issues)
 	}
-	const want = "/mappings[0]/purpose/mappings[0]/match"
+	const want = "/mappings[1]/purpose/mappings[1]/match"
 	if !containsIssue(r.Issues, want, "term_mapping_match") {
 		t.Errorf("expected term_mapping_match at %s, got %+v", want, r.Issues)
 	}
@@ -571,7 +571,7 @@ func TestValidateRM_TermMappingEmptyMatchReportsBoth(t *testing.T) {
 		Target: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}, CodeString: "73211009"},
 	}}}
 	r := validation.ValidateRM(txt)
-	const path = "/mappings[0]/match"
+	const path = "/mappings[1]/match"
 	if !containsIssue(r.Issues, path, "term_mapping_match") {
 		t.Errorf("expected term_mapping_match at %s, got %+v", path, r.Issues)
 	}

@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"fmt"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
@@ -20,7 +21,12 @@ import (
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVMultimedia) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -28,7 +34,7 @@ func (d *DVMultimedia) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "charset":
 				_v := new(CodePhrase)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
@@ -43,7 +49,7 @@ func (d *DVMultimedia) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 				d.Language = _v
 			case "alternate_text":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.AlternateText = &_v
@@ -54,11 +60,9 @@ func (d *DVMultimedia) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 				}
 				d.URI = _v
 			case "data":
-				var _v byte
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeBase64(_dec, &_t, &d.Data); _err != nil {
 					return _err
 				}
-				d.Data = append(d.Data, _v)
 			case "media_type":
 				if _err := _dec.DecodeElement(&d.MediaType, &_t); _err != nil {
 					return _err
@@ -70,11 +74,9 @@ func (d *DVMultimedia) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 				}
 				d.CompressionAlgorithm = _v
 			case "integrity_check":
-				var _v byte
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeBase64(_dec, &_t, &d.IntegrityCheck); _err != nil {
 					return _err
 				}
-				d.IntegrityCheck = append(d.IntegrityCheck, _v)
 			case "integrity_check_algorithm":
 				_v := new(CodePhrase)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
@@ -88,11 +90,11 @@ func (d *DVMultimedia) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 				}
 				d.Thumbnail = _v
 			case "size":
-				if _err := _dec.DecodeElement(&d.Size, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Size); _err != nil {
 					return _err
 				}
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -109,7 +111,12 @@ func (d *DVMultimedia) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVParsable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -117,7 +124,7 @@ func (d *DVParsable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "charset":
 				_v := new(CodePhrase)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
@@ -131,15 +138,15 @@ func (d *DVParsable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 				}
 				d.Language = _v
 			case "value":
-				if _err := _dec.DecodeElement(&d.Value, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Value); _err != nil {
 					return _err
 				}
 			case "formalism":
-				if _err := _dec.DecodeElement(&d.Formalism, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Formalism); _err != nil {
 					return _err
 				}
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}

@@ -33,7 +33,7 @@ func ExampleValidateRM() {
 	}
 	// Output:
 	// OK: false
-	// rm_invariant at /items[0]
+	// rm_invariant at /items[at0004]
 }
 
 // reportOPT is a minimal operational template: a COMPOSITION whose content
@@ -62,9 +62,9 @@ const reportOPT = `<?xml version="1.0" encoding="UTF-8"?>
   </definition>
 </template>`
 
-// Check a composition against a template, then against the Reference Model.
-// The two checks are separate calls that report their own findings: run both
-// when you want both.
+// Check a composition against a template. The result includes the Reference
+// Model floor, so one call reports what the template requires and what the
+// Reference Model requires; ValidateRM reports the floor alone.
 func ExampleValidateComposition() {
 	opt, err := template.ParseOPTStrict(strings.NewReader(reportOPT))
 	if err != nil {
@@ -75,13 +75,13 @@ func ExampleValidateComposition() {
 		log.Fatal(err)
 	}
 
-	// The composition has every attribute the Reference Model requires, but
-	// the template requires content and the composition has none.
+	// The template requires content and the composition has none. The
+	// composition also leaves its rm_version empty, which the Reference
+	// Model forbids.
 	composition := &rm.Composition{
 		ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1",
 		ArchetypeDetails: &rm.Archetyped{
 			ArchetypeID: rm.ArchetypeID{Value: "openEHR-EHR-COMPOSITION.report.v1"},
-			RMVersion:   "1.1.0",
 		},
 		Name: rm.DVText{Value: "Report"},
 		Category: rm.DVCodedText{
@@ -114,7 +114,9 @@ func ExampleValidateComposition() {
 		fmt.Printf("  %s at %s\n", issue.Code, issue.Path)
 	}
 	// Output:
-	// template: OK=false issues=1
+	// template: OK=false issues=2
 	//   required at /content
-	// reference model: OK=true issues=0
+	//   rm_version_valid at /archetype_details/rm_version
+	// reference model: OK=false issues=1
+	//   rm_version_valid at /archetype_details/rm_version
 }

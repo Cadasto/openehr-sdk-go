@@ -1,18 +1,18 @@
 // Example: build a composition in memory as plain Reference Model structs,
-// compile an operational template (OPT), and validate the composition in two
-// passes. This is the smallest validation path: no JSON, no HTTP, just typed
-// RM values, a compiled template, and the list of issues each pass returns.
+// compile an operational template (OPT), and validate the composition with one
+// call. This is the smallest validation path: no JSON, no HTTP, just typed RM
+// values, a compiled template, and the list of issues the call returns.
 //
-// The two passes are the RM floor (validation.ValidateRM), which checks the
-// composition against the openEHR Reference Model alone, and the template
-// constraints (validation.ValidateComposition), which check it against the
-// OPT. Today ValidateComposition checks the template's constraints and does
-// not run the RM floor's per-type rules, so a composition can satisfy its
-// template and still break the Reference Model. This program runs both passes.
+// validation.ValidateComposition checks the composition against the OPT's
+// constraints and against the RM floor, the rules of the openEHR Reference
+// Model itself, in the same call. A defect both find is reported once. A
+// composition that passes is valid against the template and the Reference
+// Model rules the floor checks. validation.ValidateRM is the floor alone, for
+// a root no template applies to.
 //
 // Runs offline. With no argument it uses the vendored vital_signs.opt fixture
-// and a hand-built composition that passes both; -invalid clears a required
-// attribute first, so both passes have something to report:
+// and a hand-built composition that passes; -invalid clears a required
+// attribute first, so the validator has something to report:
 //
 //	go run ./cmd/examples/validate-composition
 //	go run ./cmd/examples/validate-composition path/to/template.opt
@@ -41,7 +41,7 @@ func main() {
 }
 
 func run() error {
-	invalid := flag.Bool("invalid", false, "clear the composition's category first, so both passes report a missing required attribute")
+	invalid := flag.Bool("invalid", false, "clear the composition's category first, so the validator reports a missing required attribute")
 	flag.Parse()
 	optPath := fixtures.TemplateOptForName("vital_signs")
 	if args := flag.Args(); len(args) > 0 {
@@ -56,7 +56,7 @@ func run() error {
 		return fmt.Errorf("parse OPT %s: %w", optPath, err)
 	}
 
-	// Step 2: compile it. The template pass works from the compiled template.
+	// Step 2: compile it. The validator works from the compiled template.
 	compiled, err := templatecompile.Compile(opt)
 	if err != nil {
 		return fmt.Errorf("compile template: %w", err)
@@ -76,30 +76,25 @@ func run() error {
 		fmt.Println("mutation             : cleared Category (expect required at /category)")
 	}
 
-	// Step 4: the RM floor. ValidateRM walks the composition with the
-	// Reference Model as its only guide: RM-mandatory attributes on every
-	// node, and the RM's own rules for each type.
-	rmOK := reportPass("RM floor", validation.ValidateRM(comp))
-
-	// Step 5: the template constraints. The template drives this walk: for
-	// every node it declares, the validator reads the matching RM attribute
-	// and checks presence, cardinality, RM type and archetype identity. Both
-	// passes collect every issue in one walk rather than stopping at the
-	// first, and both always run, because neither result stands in for the
-	// other.
-	templateOK := reportPass("template constraints", validation.ValidateComposition(comp, compiled))
-
-	if !rmOK || !templateOK {
-		return errors.New("composition fails at least one validation pass")
+	// Step 4: validate. The template drives the first walk: for every node
+	// it declares, the validator reads the matching RM attribute and checks
+	// presence, cardinality, RM type, archetype identity and value
+	// constraints. The RM floor then walks the whole composition with the
+	// Reference Model as its guide: RM-mandatory attributes on every node, and
+	// the RM's own rules for each type. Both walks collect every issue rather
+	// than stopping at the first, and the result carries a defect both find
+	// once.
+	if !report("validation", validation.ValidateComposition(comp, compiled)) {
+		return errors.New("composition is not valid")
 	}
 	return nil
 }
 
-// reportPass prints one validation pass under its name: the verdict, then one
-// line per issue. Path says where, Code is the stable identifier a program
-// branches on, and Detail is the explanation for people. It returns result.OK,
-// which is false exactly when the pass found an error.
-func reportPass(name string, result validation.Result) bool {
+// report prints the validation result under name: the verdict, then one line
+// per issue. Path says where, Code is the stable identifier a program
+// branches on, and Detail is the explanation for people. It returns
+// result.OK, which is false exactly when an error was found.
+func report(name string, result validation.Result) bool {
 	verdict := "OK"
 	if !result.OK {
 		verdict = "failed"
@@ -115,8 +110,8 @@ func reportPass(name string, result validation.Result) bool {
 	return result.OK
 }
 
-// vitalSignsComposition builds by hand a composition that passes both the RM
-// floor and vital_signs.opt: an encounter holding one blood-pressure
+// vitalSignsComposition builds by hand a composition that passes
+// vital_signs.opt and the RM floor: an encounter holding one blood-pressure
 // OBSERVATION with a systolic reading, the patient's position and the device
 // used. It matches the default fixture of the validate-from-json example.
 // Compare the nesting with the structure tree the template-explore example
@@ -135,8 +130,8 @@ func vitalSignsComposition() (*rm.Composition, error) {
 		ArchetypeNodeID: "openEHR-EHR-COMPOSITION.encounter.v1",
 		Name:            rm.DVText{Value: "Encounter"},
 		// The Reference Model requires archetype_details on every archetype
-		// root (the COMPOSITION and each ENTRY); the template pass does not
-		// check it, the RM floor does.
+		// root (the COMPOSITION and each ENTRY); the template does not ask for
+		// it, the RM floor inside ValidateComposition does.
 		ArchetypeDetails: &rm.Archetyped{
 			ArchetypeID: rm.ArchetypeID{Value: "openEHR-EHR-COMPOSITION.encounter.v1"},
 			TemplateID:  &rm.TemplateID{Value: "vital_signs"},

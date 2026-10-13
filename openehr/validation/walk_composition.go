@@ -18,19 +18,22 @@ import (
 // walkNode is the lockstep visitor: it enters the OPT node `optNode`
 // bound to the RM value `rmValue`, emits structural issues at this
 // node, then descends each OPT-declared attribute into its matched
-// RM child(ren). The `path` argument is the OPT-authoritative AQL
-// path of `optNode` (root = "/").
+// RM child(ren). The `path` argument is the issue path of `rmValue`
+// (root = "/"), written by the rule the floor shares (see
+// [itemPaths]).
 //
 // Per-node behaviour:
 //   - Identity (LOCATABLE.archetype_node_id ↔ OPT pin) and RM-type
-//     match (with BMM abstract-supertype admission) fire at every
-//     node.
+//     match (conformance in the pinned BMM's class hierarchy) fire at
+//     every node.
 //   - Slot leaves: no descent (slot-fit was decided by the parent
 //     attribute when binding RM items to OPT children).
 //   - Primitive constraint leaves (PrimitiveConstraint() != nil):
 //     the REQ-103 typed validator runs against the bound RM value;
 //     no descent into implicit RM-mandatory attrs of the
-//     primitive's RM type.
+//     primitive's RM type. A CONSTRAINT_REF leaf is the exception:
+//     its value set is external, so the attributes of the bound
+//     value are still walked, as below.
 //   - Otherwise: iterate every attribute (explicit OPT-declared
 //     and BMM-mandatory implicits), enforce existence + cardinality,
 //     match RM child(ren), recurse.
@@ -76,11 +79,18 @@ func (w *walker) walkNode(optNode *tcimpl.CompiledNode, rmValue any, path string
 		// DataValue (or RM-typed primitive Go value) to the
 		// constraint's expected input via dataValueInput, then
 		// fan Violations out as Issues. The structural walker
-		// MUST NOT descend further: implicit RM attrs of the
+		// does not descend further: implicit RM attrs of the
 		// primitive's RM type (e.g. DV_QUANTITY.magnitude / .units)
 		// are the primitive validator's territory.
 		w.applyPrimitive(optNode, rmValue, path, pc)
-		return
+		// REQ-102: a CONSTRAINT_REF names an external value set and
+		// checks nothing locally, so the bound value's RM-mandatory
+		// attributes (a CODE_PHRASE's terminology_id and code_string)
+		// are still walked below, as at a node the OPT leaves
+		// unconstrained.
+		if _, isRef := pc.(constraints.ConstraintRef); !isRef {
+			return
+		}
 	}
 
 	for _, attr := range optNode.Attributes() {
@@ -98,10 +108,12 @@ func (w *walker) walkNode(optNode *tcimpl.CompiledNode, rmValue any, path string
 
 // walkSingleAttribute enforces existence on a C_SINGLE_ATTRIBUTE
 // and binds the RM value to one of attr.Children() via the AOM 1.4
-// "one alternative MUST match" semantics. Tries each OPT child in
-// order; first that fits the RM value's concrete type (with BMM
-// abstract-supertype admission) wins. When none match the walker
-// emits a typed issue:
+// "one alternative MUST match" semantics, by [bindByRMType]: the most
+// specific child wins, a child of the value's own RM type before the
+// AOM 1.4 short name it wraps, and that before a child the type only
+// conforms to in the pinned BMM, or a typed DV_INTERVAL<T> child for an
+// interval each present bound of which conforms to T. When none match
+// the walker emits a typed issue:
 //   - exactly one child → `rm_type_mismatch` (plain type constraint,
 //     no real alternatives);
 //   - two or more children → `alternative_mismatch` with the list
@@ -167,38 +179,84 @@ func (w *walker) walkSingleAttribute(
 		}
 		return
 	}
-	w.walkNode(child, val, joinPath(parentPath, segmentForChild(attr, child, 0)))
+	w.walkNode(child, val, attrPath)
 }
 
-// matchSingleAlternative picks the OPT child whose declared
-// RMTypeName admits the RM value (concrete equality + BMM
-// supertype expansion). Returns nil when no child fits. With
-// exactly one child the function is effectively "does the child
-// fit?"; the alternative_mismatch case fires only when the OPT
-// declared more than one alternative.
+// matchSingleAlternative picks the OPT child of a single-valued
+// attribute that binds the RM value, slot children included, by
+// [bindByRMType]. Returns nil when no child fits. With exactly one
+// child the function is effectively "does the child fit?"; the
+// alternative_mismatch case fires only when the OPT declared more
+// than one alternative.
 func matchSingleAlternative(children []*tcimpl.CompiledNode, val any) *tcimpl.CompiledNode {
+	return bindByRMType(children, val, func(*tcimpl.CompiledNode) bool { return true })
+}
+
+// bindByRMType picks, among the children eligible accepts, the one
+// that binds the RM value val: the most specific child, in three
+// tiers (REQ-102). Within a tier the first child in OPT order wins.
+//
+//  1. A child that names val's own RM type ([namesRMType]).
+//  2. A child that names the AOM 1.4 primitive short name whose
+//     canonical DV wrapper val is ([wrapsShortName]).
+//  3. A child val's type conforms to by BMM descent, or an untyped
+//     child, or, for an interval each present bound of which conforms
+//     to T, a typed DV_INTERVAL<T> child ([conformsToChild]).
+//
+// A value therefore meets the constraints of the tightest child that
+// admits it, not those of a looser one listed first: under
+// [DV_TEXT, DV_CODED_TEXT] a DV_CODED_TEXT meets the DV_CODED_TEXT
+// child's code list, and under [DATA_VALUE, DURATION] a DV_DURATION
+// meets the DURATION child's C_DURATION. Both the single-valued
+// alternatives and the multi-valued items without an
+// archetype_node_id bind by this rule. Returns nil when no child
+// admits val.
+func bindByRMType(children []*tcimpl.CompiledNode, val any, eligible func(*tcimpl.CompiledNode) bool) *tcimpl.CompiledNode {
 	gotType := describeRMType(val)
 	for _, c := range children {
-		if admitsRMValue(c, gotType, val) {
+		if eligible(c) && namesRMType(c, gotType, val) {
+			return c
+		}
+	}
+	for _, c := range children {
+		if eligible(c) && wrapsShortName(c, gotType) {
+			return c
+		}
+	}
+	for _, c := range children {
+		if eligible(c) && conformsToChild(c, gotType, val) {
 			return c
 		}
 	}
 	return nil
 }
 
-// admitsRMValue reports whether the OPT child c admits the RM value
-// val, whose RM type name is gotType: an untyped child, the exact
-// type, a BMM subtype, a collapsed DV_INTERVAL whose bounds fit, or a
-// Go primitive under an AOM 1.4 primitive short name. Both the
-// single-valued alternatives and the multi-valued items without an
-// archetype_node_id (REQ-102) bind by this rule.
-func admitsRMValue(c *tcimpl.CompiledNode, gotType string, val any) bool {
+// namesRMType reports whether the OPT child c names the RM value val's
+// own type, gotType. That is the same name, with one refinement for an
+// interval that went through a canonical-JSON round-trip and decoded
+// as the bare DV_INTERVAL: its type is the parameterised
+// DV_INTERVAL<T> its bounds give (REQ-102, REQ-110), so a typed child
+// whose T every present bound is names it. One with no bound present
+// has no parameter, so only a bare DV_INTERVAL child names its type,
+// and a typed child admits it in the third tier ([conformsToChild]).
+// An AOM 1.4 primitive short name over a Go primitive val (an int64
+// under INTEGER, a string under DURATION) also names val's type. An
+// untyped child names no type.
+func namesRMType(c *tcimpl.CompiledNode, gotType string, val any) bool {
 	want := c.RMTypeName()
 	if want == "" {
-		// Wildcard / not-typed OPT child: accept.
-		return true
+		return false
 	}
-	if gotType == want || rmTypeIsSubtypeOf(gotType, want) || intervalRMTypeMatches(gotType, want, val) {
+	if gotType == "DV_INTERVAL" {
+		bounded := collapsedIntervalBounded(val)
+		if bound, typed := typedIntervalBound(want); typed {
+			return bounded && intervalBoundsSatisfy(val, bound)
+		}
+		if want == "DV_INTERVAL" {
+			return !bounded
+		}
+	}
+	if gotType == want {
 		return true
 	}
 	// AOM 1.4 primitive short name (DURATION, DATE, INTEGER, …)
@@ -207,6 +265,29 @@ func admitsRMValue(c *tcimpl.CompiledNode, gotType string, val any) bool {
 	// RM wrapper type.
 	return tcimpl.IsAOMPrimitiveShortName(want) && c.PrimitiveConstraint() != nil &&
 		primitiveValueMatchesShortName(want, val)
+}
+
+// wrapsShortName reports whether the OPT child c names an AOM 1.4
+// primitive short name whose canonical DV wrapper
+// ([aomPrimitiveWrappers]) is the RM type gotType.
+func wrapsShortName(c *tcimpl.CompiledNode, gotType string) bool {
+	wrapper, ok := aomPrimitiveWrappers[c.RMTypeName()]
+	return ok && wrapper == gotType
+}
+
+// conformsToChild reports whether the OPT child c declares no RM type,
+// or one the RM type gotType conforms to ([rmTypeIsSubtypeOf]). Under a
+// typed DV_INTERVAL<T> child each present bound has to be a T, that is,
+// conform to T ([intervalConformsTo]): a DV_COUNT bound is a DV_ORDERED.
+// A round-tripped bare DV_INTERVAL val with no bound present carries no T
+// to check, so a typed DV_INTERVAL<T> child admits it here, after any
+// bare DV_INTERVAL child has named its type ([namesRMType]).
+func conformsToChild(c *tcimpl.CompiledNode, gotType string, val any) bool {
+	want := c.RMTypeName()
+	if want == "" || rmTypeIsSubtypeOf(gotType, want) {
+		return true
+	}
+	return intervalConformsTo(gotType, want, val)
 }
 
 // formatAllowedTypes renders the OPT child RM types for inclusion
@@ -222,13 +303,20 @@ func formatAllowedTypes(children []*tcimpl.CompiledNode) string {
 // walkMultipleAttribute enforces existence + cardinality on a
 // multi-valued attribute and binds each RM item to an OPT child.
 // A LOCATABLE binds by archetype_node_id: exact archetype/node ids
-// first, then the parsed REQ-104 slot grammar (see [matchChildByID]);
+// first, picked by the template-level name where several children share
+// the id, then the parsed REQ-104 slot grammar (see [matchChildByID]);
 // one that matches no child is a slot_fill. An item that is not a
 // LOCATABLE has no archetype_node_id and binds by RM type instead
 // (REQ-102, see [matchChildByRMType]); one that no child admits is an
 // rm_type_mismatch or alternative_mismatch, never a slot_fill (see
 // [unboundItemIssue]). Every bound item counts toward its child's
 // occurrences.
+//
+// Each item is written in Issue.Path by the shared path rule
+// ([itemPaths]): the binding comes first, because an item's predicate
+// depends on its siblings' ids and on the names their bound OPT nodes
+// pin. A child whose occurrences the items miss is written with its own
+// predicate ([optChildPaths]).
 func (w *walker) walkMultipleAttribute(
 	opt *tcimpl.CompiledNode,
 	attr *tcimpl.CompiledAttribute,
@@ -285,22 +373,19 @@ func (w *walker) walkMultipleAttribute(
 	if len(children) == 0 {
 		return
 	}
+	bound, byNodeID := bindItems(opt.RMTypeName(), attr.Name(), children, items)
+	pathItems := boundPathItems(items, bound)
+	w.recordNames(attrPath, pathItems)
+	itemPath := itemPaths(attrPath, pathItems)
 	perChildCount := make(map[*tcimpl.CompiledNode]int, len(children))
 	for idx, item := range items {
-		itemPath := joinPath(parentPath, segmentForRMItem(attr, item, idx))
-		byNodeID := bindsByNodeID(item, opt.RMTypeName(), attr.Name())
-		var matched *tcimpl.CompiledNode
-		if byNodeID {
-			matched = matchChildByID(children, item)
-		} else {
-			matched = matchChildByRMType(children, item)
-		}
+		matched := bound[idx]
 		if matched == nil {
-			w.emit(unboundItemIssue(attr, children, item, byNodeID, itemPath))
+			w.emit(unboundItemIssue(attr, children, item, byNodeID[idx], itemPath[idx]))
 			continue
 		}
 		perChildCount[matched]++
-		w.walkNode(matched, item, itemPath)
+		w.walkNode(matched, item, itemPath[idx])
 	}
 	// AOM 1.4 occurrences upper bound on each OPT child: when the
 	// OPT pins a child's `<occurrences>` interval, the count of
@@ -310,20 +395,80 @@ func (w *walker) walkMultipleAttribute(
 	// check above when the attribute itself is empty, but we still
 	// fire here per-child when the attribute is non-empty and a
 	// specific OPT child is missing or over-represented.
-	for _, c := range children {
+	var childPath []string
+	for i, c := range children {
 		occ := c.Occurrences()
 		if occ == nil {
 			continue
 		}
 		got := perChildCount[c]
 		if outOfMultiplicityInterval(got, occ) {
+			if childPath == nil {
+				childPath = optChildPaths(attrPath, children)
+			}
 			w.emit(Issue{
-				Path:     joinPath(parentPath, segmentForChild(attr, c, 0)),
+				Path:     childPath[i],
 				Code:     "cardinality",
 				Detail:   fmt.Sprintf("OPT child %s appears %d times under %q; occurrences %s", childIdentity(c), got, attr.Name(), formatInterval(occ)),
 				Severity: Error,
 			})
 		}
+	}
+}
+
+// bindItems binds each of the items of the multi-valued attribute
+// attrName, on a node of RM type parentRMType, to one of its OPT
+// children: a LOCATABLE by its archetype_node_id ([matchChildByID]),
+// any other item by its RM type ([matchChildByRMType]). bound holds the
+// child each item binds to, nil when none does, and byNodeID whether the
+// item binds by its id.
+func bindItems(parentRMType, attrName string, children []*tcimpl.CompiledNode, items []any) (bound []*tcimpl.CompiledNode, byNodeID []bool) {
+	bound = make([]*tcimpl.CompiledNode, len(items))
+	byNodeID = make([]bool, len(items))
+	for idx, item := range items {
+		byNodeID[idx] = bindsByNodeID(item, parentRMType, attrName)
+		if byNodeID[idx] {
+			bound[idx] = matchChildByID(children, item)
+		} else {
+			bound[idx] = matchChildByRMType(children, item)
+		}
+	}
+	return bound, byNodeID
+}
+
+// boundPathItems returns what the path rule reads of each item: its
+// archetype_node_id and the name pinned on the child it binds to. These
+// names, keyed by the attribute's path and each item's index, are the
+// bindings the floor takes to write the same paths ([pinnedNames]).
+func boundPathItems(items []any, bound []*tcimpl.CompiledNode) []pathItem {
+	out := make([]pathItem, len(items))
+	for idx, item := range items {
+		out[idx].id = locatableArchetypeNodeID(item)
+		if bound[idx] != nil {
+			out[idx].name = bound[idx].NodeName()
+		}
+	}
+	return out
+}
+
+// recordNames keeps, in w.names, the pinned name of each of the items of
+// the multi-valued attribute at attrPath whose id a sibling shares, keyed
+// by attrPath and the item's index. The name of an item whose id is its
+// own never reaches its path, so it is not kept: the floor, fed what is
+// kept, writes every item as this walk does.
+func (w *walker) recordNames(attrPath string, items []pathItem) {
+	if !slices.ContainsFunc(items, func(it pathItem) bool { return it.name != "" }) {
+		return
+	}
+	s := newIDSharing(items)
+	for i, it := range items {
+		if it.name == "" || !s.shared(it.id) {
+			continue
+		}
+		if w.names == nil {
+			w.names = pinnedNames{}
+		}
+		w.names[itemKey{attrPath: attrPath, index: i}] = it.name
 	}
 }
 
@@ -462,37 +607,6 @@ func formatInterval(m *template.Multiplicity) string {
 	return "[" + lo + ".." + hi + "]"
 }
 
-// segmentForChild computes the path delta from a single-attribute
-// descent. For Single attrs the delta is "/attr"; for Multiple
-// attrs (rare on this code path — walkMultipleAttribute uses
-// segmentForRMItem instead) we fall back to the child's
-// id-or-index segment.
-func segmentForChild(attr *tcimpl.CompiledAttribute, child *tcimpl.CompiledNode, idx int) string {
-	seg := "/" + attr.Name()
-	if attr.Cardinality() != template.Multiple {
-		return seg
-	}
-	if id := child.ArchetypeID(); id != "" {
-		return seg + "[" + id + "]"
-	}
-	if id := child.NodeID(); id != "" {
-		return seg + "[" + id + "]"
-	}
-	return seg + fmt.Sprintf("[@%d]", idx+1)
-}
-
-// segmentForRMItem computes the path delta for an RM item under a
-// Multiple attribute. Predicate is the RM item's
-// archetype_node_id when available; otherwise a 1-based sibling
-// index ("@1", "@2", ...).
-func segmentForRMItem(attr *tcimpl.CompiledAttribute, item any, idx int) string {
-	seg := "/" + attr.Name()
-	if id := locatableArchetypeNodeID(item); id != "" {
-		return seg + "[" + id + "]"
-	}
-	return seg + fmt.Sprintf("[@%d]", idx+1)
-}
-
 // bindsByNodeID reports whether an item of the multi-valued attribute
 // attrName, on a node of type parentRMType, is bound by its
 // archetype_node_id. It holds for every LOCATABLE, a typed-nil one
@@ -535,25 +649,30 @@ func isNilItem(item any) bool {
 // matchChildByID picks the OPT child whose ArchetypeID (for
 // archetype-root pins) or NodeID (for at-code pins) matches the RM
 // item's archetype_node_id, then the first slot whose parsed
-// assertions admit it. It serves only items that [bindsByNodeID]
-// accepts. Returns nil when none match, and always for an empty or
-// unreadable id (a typed-nil LOCATABLE, a nil under a LOCATABLE
-// attribute); the caller then emits slot_fill.
+// assertions admit it. Where several non-slot children carry the id,
+// as when a template reuses one archetype under distinct names, the
+// item's name picks among them ([matchChildByPinnedName]). It serves
+// only items that [bindsByNodeID] accepts. Returns nil when none
+// match, and always for an empty or unreadable id (a typed-nil
+// LOCATABLE, a nil under a LOCATABLE attribute); the caller then
+// emits slot_fill.
 func matchChildByID(children []*tcimpl.CompiledNode, item any) *tcimpl.CompiledNode {
 	id := locatableArchetypeNodeID(item)
 	if id == "" {
 		return nil
 	}
+	var first *tcimpl.CompiledNode
 	for _, c := range children {
-		if c.IsSlot() {
+		if c.IsSlot() || !carriesID(c, id) {
 			continue
 		}
-		if c.ArchetypeID() != "" && c.ArchetypeID() == id {
-			return c
+		if first != nil {
+			return matchChildByPinnedName(children, id, locatableName(item))
 		}
-		if c.NodeID() != "" && c.NodeID() == id {
-			return c
-		}
+		first = c
+	}
+	if first != nil {
+		return first
 	}
 	for _, c := range children {
 		if c.IsSlot() && slotFitsArchetypeID(c, id) {
@@ -563,23 +682,71 @@ func matchChildByID(children []*tcimpl.CompiledNode, item any) *tcimpl.CompiledN
 	return nil
 }
 
+// carriesID reports whether the OPT child c pins id: as its archetype id
+// (an archetype root) or as its at-code.
+func carriesID(c *tcimpl.CompiledNode, id string) bool {
+	return (c.ArchetypeID() != "" && c.ArchetypeID() == id) || (c.NodeID() != "" && c.NodeID() == id)
+}
+
+// matchChildByPinnedName picks, among the non-slot children that carry
+// id, the one an item named name binds to: the child whose pinned name
+// (the template-level node name) is name; failing that, the first that
+// pins no name; failing that, the first, whose name constraint then
+// reports the mismatch. The name only decides the binding; no issue
+// path or message carries it.
+func matchChildByPinnedName(children []*tcimpl.CompiledNode, id, name string) *tcimpl.CompiledNode {
+	var first, unnamed *tcimpl.CompiledNode
+	for _, c := range children {
+		if c.IsSlot() || !carriesID(c, id) {
+			continue
+		}
+		pinned := c.NodeName()
+		if pinned != "" && pinned == name {
+			return c
+		}
+		if first == nil {
+			first = c
+		}
+		if pinned == "" && unnamed == nil {
+			unnamed = c
+		}
+	}
+	if unnamed != nil {
+		return unnamed
+	}
+	return first
+}
+
+// locatableName returns the value of a LOCATABLE item's name, a DV_TEXT
+// or a DV_CODED_TEXT, read as the walk reads the name it checks against
+// the template, or "" when the item has none.
+func locatableName(item any) string {
+	v, ok := rmread.ReadSingle(item, describeRMType(item), "name")
+	if !ok {
+		return ""
+	}
+	like, ok := v.(rm.DVTextLike)
+	if !ok {
+		return ""
+	}
+	text, ok := rm.AsDVText(like)
+	if !ok {
+		return ""
+	}
+	return text.Value
+}
+
 // matchChildByRMType binds an item that carries no archetype_node_id
-// (REQ-102) to the first non-slot child whose RMTypeName admits the
-// item's RM type, by the rule a single-valued attribute uses
-// ([admitsRMValue]). A nil or typed-nil item has no value to bind, so
-// no child takes it, not even an untyped one. Returns nil when no
-// child admits the item.
+// (REQ-102) to a non-slot child whose RMTypeName admits the item's RM
+// type, by the three tiers a single-valued attribute uses
+// ([bindByRMType]); a slot child is skipped in every tier. A nil or
+// typed-nil item has no value to bind, so no child takes it, not even
+// an untyped one. Returns nil when no child admits the item.
 func matchChildByRMType(children []*tcimpl.CompiledNode, item any) *tcimpl.CompiledNode {
 	if isNilItem(item) {
 		return nil
 	}
-	gotType := describeRMType(item)
-	for _, c := range children {
-		if !c.IsSlot() && admitsRMValue(c, gotType, item) {
-			return c
-		}
-	}
-	return nil
+	return bindByRMType(children, item, func(c *tcimpl.CompiledNode) bool { return !c.IsSlot() })
 }
 
 // unboundItemIssue reports an item of a multi-valued attribute that
@@ -668,7 +835,7 @@ func (w *walker) checkLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, p
 	if want := opt.ArchetypeID(); want != "" {
 		if id != want {
 			w.emit(Issue{
-				Path:     path + "/archetype_node_id",
+				Path:     joinPath(path, "/archetype_node_id"),
 				Code:     "archetype_id_mismatch",
 				Detail:   fmt.Sprintf("archetype_node_id %q does not match template archetype id %q at %s", id, want, path),
 				Severity: Error,
@@ -678,7 +845,7 @@ func (w *walker) checkLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, p
 	}
 	if want := opt.NodeID(); want != "" && id != want {
 		w.emit(Issue{
-			Path:     path + "/archetype_node_id",
+			Path:     joinPath(path, "/archetype_node_id"),
 			Code:     "node_id_mismatch",
 			Detail:   fmt.Sprintf("archetype_node_id %q does not match template node_id %q at %s", id, want, path),
 			Severity: Error,
@@ -686,10 +853,12 @@ func (w *walker) checkLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, p
 	}
 }
 
-// checkRMType emits rm_type_mismatch when the concrete RM Go type
-// disagrees with the compiled OPT node's RMTypeName. Honours BMM
-// abstract supertypes: an OPT slot constrained to ITEM_STRUCTURE
-// admits ITEM_TREE / ITEM_LIST / ITEM_SINGLE / ITEM_TABLE, etc.
+// checkRMType emits rm_type_mismatch when the concrete RM type does
+// not conform to the compiled OPT node's RMTypeName. Conformance is
+// the pinned BMM's class hierarchy ([rmTypeIsSubtypeOf]), for an
+// abstract and a concrete ancestor alike: a node declared as
+// ITEM_STRUCTURE admits ITEM_TREE, one declared as DV_TEXT admits
+// DV_CODED_TEXT.
 func (w *walker) checkRMType(opt *tcimpl.CompiledNode, rmValue any, path string) {
 	want := opt.RMTypeName()
 	if want == "" {
@@ -710,18 +879,33 @@ func (w *walker) checkRMType(opt *tcimpl.CompiledNode, rmValue any, path string)
 	})
 }
 
-// rmTypeIsSubtypeOf encodes the BMM supertype relations the
-// validator exercises. Restricted to the abstract slots the OPT
-// can name (LOCATABLE, ITEM, ITEM_STRUCTURE, DATA_VALUE, EVENT,
-// CONTENT_ITEM, ENTRY, CARE_ENTRY, PARTY_PROXY); concrete
-// subtypes admitted under each.
+// rmTypeIsSubtypeOf reports whether the RM type concrete conforms to
+// the OPT-declared RM type declared: equal to it, or a descendant of
+// it in the pinned BMM's class hierarchy (rminfo), whether declared is
+// abstract or concrete (REQ-102, REQ-110). A newly covered RM class
+// therefore needs no admission row here. What the walker reads below
+// a node still comes from rmread, so an OPT that constrains attributes
+// of a newly covered class also needs rmread readers for them.
 //
-// A parameterised name such as "DV_INTERVAL<DV_COUNT>" is looked up by
-// its class, "DV_INTERVAL", because the generic parameter does not
-// change which abstract types the class conforms to.
-func rmTypeIsSubtypeOf(concrete, abstract string) bool {
-	subtypes := bmmSubtypes[abstract]
-	return slices.Contains(subtypes, bmmtype.Class(concrete))
+// A parameterised value type such as "DV_INTERVAL<DV_COUNT>" is looked
+// up by its class, "DV_INTERVAL", because the generic parameter does
+// not change which classes it descends from. The declared type is
+// looked up as written: a parameterised DV_INTERVAL<T> is no BMM class
+// name, so the hierarchy does not know it, and [intervalRMTypeMatches]
+// decides it instead.
+//
+// When the hierarchy does not know one of the two names, an AOM 1.4
+// primitive short name in declared still admits its canonical DV
+// wrapper ([aomPrimitiveWrappers]).
+func rmTypeIsSubtypeOf(concrete, declared string) bool {
+	class := bmmtype.Class(concrete)
+	if h, ok := rminfo.Default.(rminfo.Hierarchy); ok {
+		if conforms, known := h.ConformsTo(class, declared); known {
+			return conforms
+		}
+	}
+	wrapper, ok := aomPrimitiveWrappers[declared]
+	return ok && wrapper == class
 }
 
 // intervalRMTypeMatches reports whether a concrete interval RM type
@@ -733,7 +917,8 @@ func rmTypeIsSubtypeOf(concrete, abstract string) bool {
 // reports "DV_INTERVAL" and the OPT's "DV_INTERVAL<DV_QUANTITY>" would
 // spuriously fail. The wire form and the bounds are correct, so when the
 // declared type is a parameterised interval and the value collapsed to a
-// bare one, decide conformance from the bounds' runtime types via `val`.
+// bare one, decide conformance from the bounds' runtime types via `val`
+// ([intervalConformsTo]).
 func intervalRMTypeMatches(got, want string, val any) bool {
 	if got == want {
 		return true
@@ -741,10 +926,27 @@ func intervalRMTypeMatches(got, want string, val any) bool {
 	if _, gotTyped := typedIntervalBound(got); want == "DV_INTERVAL" && gotTyped {
 		return true
 	}
-	if wantBound, wantTyped := typedIntervalBound(want); got == "DV_INTERVAL" && wantTyped {
-		return intervalBoundsSatisfy(val, wantBound)
+	return intervalConformsTo(got, want, val)
+}
+
+// intervalConformsTo reports whether an interval value of RM type got, val,
+// conforms to the typed interval want, DV_INTERVAL<T>: each present bound
+// has to be a T (REQ-110), which a bound of T's own type or of one that
+// descends from T in the pinned BMM is ([rmTypeIsSubtypeOf]). A typed
+// value, DV_INTERVAL<U>, conforms when U does; a round-tripped bare
+// DV_INTERVAL is read by its bounds' runtime types, and one with no bound
+// present conforms to every T. An abstract T such as DV_ORDERED therefore
+// admits DV_COUNT bounds. Any other pair of types does not conform here.
+func intervalConformsTo(got, want string, val any) bool {
+	wantBound, wantTyped := typedIntervalBound(want)
+	if !wantTyped {
+		return false
 	}
-	return false
+	if got == "DV_INTERVAL" {
+		return intervalBoundsConform(val, wantBound)
+	}
+	gotBound, gotTyped := typedIntervalBound(got)
+	return gotTyped && rmTypeIsSubtypeOf(gotBound, wantBound)
 }
 
 // typedIntervalBound returns the bound type of a parameterised interval name,
@@ -759,15 +961,62 @@ func typedIntervalBound(name string) (bound string, ok bool) {
 }
 
 // intervalBoundsSatisfy reports whether a round-trip-collapsed
-// DVInterval[DVOrdered] satisfies DV_INTERVAL<wantInner> by inspecting
-// the runtime types of its bounds (which survive the round-trip via
-// their own `_type`). Every *present* bound must be the wanted element
-// type; a fully unbounded interval carries no bound to key off and
+// DVInterval[DVOrdered] names DV_INTERVAL<wantInner> exactly, by the
+// runtime types of its bounds (which survive the round-trip via their own
+// `_type`). Every *present* bound must be of the wanted element type
+// itself; a fully unbounded interval carries no bound to key off and
 // trivially satisfies any element type. (Requiring agreement rather than
 // accepting on either bound rejects a malformed interval whose lower and
-// upper disagree — well-formed DV_INTERVAL<T> bounds are both T.) See
-// [intervalRMTypeMatches].
+// upper disagree — well-formed DV_INTERVAL<T> bounds are both T.) The
+// first binding tier reads it ([namesRMType]); a bound that only conforms
+// to wantInner is read by [intervalBoundsConform].
 func intervalBoundsSatisfy(val any, wantInner string) bool {
+	bounds, ok := collapsedIntervalBounds(val)
+	if !ok {
+		return false
+	}
+	for _, b := range bounds {
+		if describeRMType(b) != wantInner {
+			return false
+		}
+	}
+	// Every present bound matched (or the interval is fully unbounded):
+	// an unbounded interval satisfies any DV_INTERVAL<T>.
+	return true
+}
+
+// intervalBoundsConform reports whether val is a round-trip-collapsed
+// DVInterval[DVOrdered] each of whose present bounds conforms to wantInner:
+// its type is wantInner or descends from it in the pinned BMM
+// ([rmTypeIsSubtypeOf]). An interval with no bound present conforms. The
+// binding tiers name a type exactly ([intervalBoundsSatisfy]); this is the
+// conformance the third tier and the RM type match read.
+func intervalBoundsConform(val any, wantInner string) bool {
+	bounds, ok := collapsedIntervalBounds(val)
+	if !ok {
+		return false
+	}
+	for _, b := range bounds {
+		if !rmTypeIsSubtypeOf(describeRMType(b), wantInner) {
+			return false
+		}
+	}
+	return true
+}
+
+// collapsedIntervalBounded reports whether val is a round-trip-collapsed
+// DVInterval[DVOrdered] with at least one present bound, a bound that
+// gives the interval its parameterised type ([namesRMType]).
+func collapsedIntervalBounded(val any) bool {
+	bounds, ok := collapsedIntervalBounds(val)
+	return ok && len(bounds) > 0
+}
+
+// collapsedIntervalBounds returns the present bounds of a
+// round-trip-collapsed DVInterval[DVOrdered], lower first; a side that
+// is unbounded or carries no bound is absent. ok is false when val is
+// no such interval.
+func collapsedIntervalBounds(val any) (bounds []rm.DVOrdered, ok bool) {
 	var iv *rm.DVInterval[rm.DVOrdered]
 	switch v := val.(type) {
 	case *rm.DVInterval[rm.DVOrdered]:
@@ -775,19 +1024,15 @@ func intervalBoundsSatisfy(val any, wantInner string) bool {
 	case rm.DVInterval[rm.DVOrdered]:
 		iv = &v
 	default:
-		return false
+		return nil, false
 	}
-	lowerPresent := !iv.LowerUnbounded && iv.Lower != nil
-	upperPresent := !iv.UpperUnbounded && iv.Upper != nil
-	if lowerPresent && describeRMType(iv.Lower) != wantInner {
-		return false
+	if !iv.LowerUnbounded && iv.Lower != nil {
+		bounds = append(bounds, iv.Lower)
 	}
-	if upperPresent && describeRMType(iv.Upper) != wantInner {
-		return false
+	if !iv.UpperUnbounded && iv.Upper != nil {
+		bounds = append(bounds, iv.Upper)
 	}
-	// Every present bound matched (or the interval is fully unbounded):
-	// an unbounded interval satisfies any DV_INTERVAL<T>.
-	return true
+	return bounds, true
 }
 
 // primitiveValueMatchesShortName reports whether an RM-side Go value
@@ -819,88 +1064,22 @@ func primitiveValueMatchesShortName(shortName string, val any) bool {
 	}
 }
 
-// bmmSubtypes is the closed lookup of abstract → concrete RM type
-// admission rules used by checkRMType. Sourced from
-// openehr_rm_1.2.0.bmm: concrete classes that satisfy each
-// abstract slot. Every row is written by hand.
+// aomPrimitiveWrappers maps each AOM 1.4 primitive short name an OPT
+// may declare as an RM type, typically under C_PRIMITIVE_OBJECT, to the
+// canonical DV wrapper that carries its value. The short names are no
+// BMM classes, so the class hierarchy cannot admit the wrapper; this
+// table does (REQ-102, Validation dimensions: RM type match). Each
+// wrapper is the type instance.concreteFor builds for the short name,
+// so the generator's output passes checkRMType.
 //
-// A concrete class missing from its abstract row is refused with a
-// false rm_type_mismatch wherever an OPT node declares that abstract
-// type. Adding a class to a row needs no naming table elsewhere:
-// describeRMType names every class the generated type registry holds
-// (rm.RMTypeName), and locatableArchetypeNodeID reads
-// archetype_node_id through rm.Locatable. What the walker reads below
-// a node still comes from rmread, so an OPT that constrains attributes
-// of a newly admitted class also needs rmread readers for them. Extend
-// the rows in lock-step with the BMM and with rmread.
-//
-// The DATA_VALUE row holds every concrete DATA_VALUE descendant of the
-// pinned BMM. TestDataValueSubtypesMatchBMM compares it with rminfo, so
-// a BMM bump that adds or drops a data value type fails that test until
-// the row follows it.
-//
-// REQ-110 added the demographic PARTY hierarchy (+ sub-components) and
-// the EHR-IM roots FOLDER / EHR_STATUS so non-COMPOSITION OPTs validate
-// through the same walker.
-var bmmSubtypes = map[string][]string{
-	"LOCATABLE": {
-		"COMPOSITION", "OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION",
-		"ADMIN_ENTRY", "GENERIC_ENTRY", "SECTION", "ACTIVITY",
-		"HISTORY", "POINT_EVENT", "INTERVAL_EVENT",
-		"ITEM_TREE", "ITEM_LIST", "ITEM_SINGLE", "ITEM_TABLE",
-		"CLUSTER", "ELEMENT",
-		// REQ-110: demographic + EHR-IM LOCATABLE concretes.
-		"PERSON", "ORGANISATION", "GROUP", "AGENT", "ROLE",
-		"ADDRESS", "CONTACT", "PARTY_IDENTITY", "PARTY_RELATIONSHIP", "CAPABILITY",
-		"FOLDER", "EHR_STATUS",
-	},
-	// PARTY hierarchy (org.openehr.rm.demographic): PARTY is the common
-	// ancestor; ACTOR adds the real-world-entity subtypes (PERSON,
-	// ORGANISATION, GROUP, AGENT). ROLE is a PARTY but not an ACTOR.
-	"PARTY": {
-		"PERSON", "ORGANISATION", "GROUP", "AGENT", "ROLE",
-	},
-	"ACTOR": {
-		"PERSON", "ORGANISATION", "GROUP", "AGENT",
-	},
-	"CONTENT_ITEM": {
-		"OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION",
-		"ADMIN_ENTRY", "GENERIC_ENTRY", "SECTION",
-	},
-	"ENTRY": {
-		"OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION", "ADMIN_ENTRY",
-	},
-	"CARE_ENTRY": {
-		"OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION",
-	},
-	"ITEM_STRUCTURE": {
-		"ITEM_TREE", "ITEM_LIST", "ITEM_SINGLE", "ITEM_TABLE",
-	},
-	"ITEM": {
-		"CLUSTER", "ELEMENT",
-	},
-	"EVENT": {
-		"POINT_EVENT", "INTERVAL_EVENT",
-	},
-	"PARTY_PROXY": {
-		"PARTY_SELF", "PARTY_IDENTIFIED", "PARTY_RELATED",
-	},
-	"DATA_VALUE": {
-		"DV_BOOLEAN", "DV_CODED_TEXT", "DV_COUNT", "DV_DATE",
-		"DV_DATE_TIME", "DV_DURATION", "DV_EHR_URI",
-		"DV_GENERAL_TIME_SPECIFICATION", "DV_IDENTIFIER", "DV_INTERVAL",
-		"DV_MULTIMEDIA", "DV_ORDINAL", "DV_PARAGRAPH", "DV_PARSABLE",
-		"DV_PERIODIC_TIME_SPECIFICATION", "DV_PROPORTION", "DV_QUANTITY",
-		"DV_SCALE", "DV_STATE", "DV_TEXT", "DV_TIME", "DV_URI",
-	},
-	// AOM 1.4 primitive short names (used under C_PRIMITIVE_OBJECT)
-	// admit the canonical DV wrapper carrying the primitive value.
-	// Lockstep with instance.concreteFor — surfaced by clinical_note.opt
-	// where DURATION appears as the rm_type_name of a primitive-
-	// constrained ELEMENT.value child.
-	"DURATION":  {"DV_DURATION"},
-	"DATE":      {"DV_DATE"},
-	"TIME":      {"DV_TIME"},
-	"DATE_TIME": {"DV_DATE_TIME"},
-	"BOOLEAN":   {"DV_BOOLEAN"},
+// A Go primitive under a short name (an int64 under INTEGER, a string
+// under DURATION) is admitted apart from this table, by
+// primitiveValueMatchesShortName.
+var aomPrimitiveWrappers = map[string]string{
+	"DURATION":  "DV_DURATION",
+	"DATE":      "DV_DATE",
+	"TIME":      "DV_TIME",
+	"DATE_TIME": "DV_DATE_TIME",
+	"BOOLEAN":   "DV_BOOLEAN",
+	"INTEGER":   "DV_COUNT",
 }

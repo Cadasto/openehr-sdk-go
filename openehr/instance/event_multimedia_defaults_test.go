@@ -187,10 +187,13 @@ var multimediaPlacements = []struct {
 	name       string
 	opt        func(attrs []string) string
 	multimedia func(t *testing.T, out any) *rm.DVMultimedia
+	// mediaTypePath is the issue path of the generated media_type.
+	mediaTypePath string
 }{
 	{
-		name: "root",
-		opt:  func(attrs []string) string { return optTemplate("DV_MULTIMEDIA", attrs...) },
+		name:          "root",
+		mediaTypePath: "/media_type",
+		opt:           func(attrs []string) string { return optTemplate("DV_MULTIMEDIA", attrs...) },
 		multimedia: func(t *testing.T, out any) *rm.DVMultimedia {
 			t.Helper()
 			mm, ok := out.(*rm.DVMultimedia)
@@ -201,7 +204,8 @@ var multimediaPlacements = []struct {
 		},
 	},
 	{
-		name: "ELEMENT value",
+		name:          "ELEMENT value",
+		mediaTypePath: "/value/media_type",
 		opt: func(attrs []string) string {
 			return optTemplate("ELEMENT", optSingle("value", optNode("DV_MULTIMEDIA", "", attrs...)))
 		},
@@ -299,8 +303,10 @@ func TestREQ107_MultimediaKeepsPinnedMediaType(t *testing.T) {
 // OPT's C_CODE_PHRASE names: the generated value must satisfy the OPT's
 // primitive constraints, and text/plain in IANA_media-types does not
 // satisfy a C_CODE_PHRASE that names the terminology openEHR. The media
-// type keeps that terminology, the uri default still applies, and the
-// template validator finds no error.
+// type keeps that terminology and the uri default still applies. The
+// template validator finds no error apart from the RM floor's one
+// code_not_in_value_set on the media type: no openEHR code is an IANA media
+// type, which REQ-107 § Exceptions and known gaps excepts.
 func TestREQ107_MultimediaMediaTypeKeepsTheOPTTerminology(t *testing.T) {
 	named := []string{optSingle("media_type", optCodePhrase("openEHR"))}
 	for _, place := range multimediaPlacements {
@@ -317,10 +323,19 @@ func TestREQ107_MultimediaMediaTypeKeepsTheOPTTerminology(t *testing.T) {
 						t.Errorf("DV_MULTIMEDIA.media_type = %+v, want the OPT's terminology openEHR", mm.MediaType)
 					}
 					checkExampleURI(t, mm)
+					var coded int
 					for _, iss := range validation.Validate(out, c).Issues {
-						if iss.Severity == validation.Error {
-							t.Errorf("Validate: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+						if iss.Severity != validation.Error {
+							continue
 						}
+						if iss.Code == "code_not_in_value_set" && iss.Path == place.mediaTypePath {
+							coded++
+							continue
+						}
+						t.Errorf("Validate: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+					}
+					if coded != 1 {
+						t.Errorf("Validate: %d code_not_in_value_set @ %s, want 1", coded, place.mediaTypePath)
 					}
 				})
 			}

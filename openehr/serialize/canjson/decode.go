@@ -21,7 +21,10 @@ import (
 //   - A shape failure raised inside a generated RM type's decode (the
 //     `canjson: <RM_TYPE>:` family), where the bytes are valid JSON but
 //     the wrong shape for the target. The cause is the codec's own error,
-//     a *encoding/json/v2.SemanticError. When the failure happens inside
+//     a *encoding/json/v2.SemanticError, except that an interval side
+//     written bounded with no bound, refused where the bound is held by
+//     value, has a plain error naming the flag as its cause when the
+//     interval is the decode root. When the failure happens inside
 //     the concrete type selected at a polymorphic slot the error is also
 //     a [DecodeError] naming that slot, so both classifications hold: the
 //     path from the [DecodeError], the kind from this sentinel.
@@ -69,16 +72,30 @@ var ErrInvalidShape = typereg.ErrInvalidShape
 // importing internal packages.
 type DecodeError = poly.DecodeError
 
-// DecoderOption configures a [Decoder]. Use [WithRelaxedTypeDispatch]
-// to switch the polymorphic-dispatch policy from strict (default)
-// to relaxed.
+// DecoderOption configures a decode, through [Unmarshal] or a [Decoder].
+// [WithUnmatched] and [WithStrict] say what happens to members the decode
+// does not read; [WithRelaxedTypeDispatch] switches the polymorphic-dispatch
+// policy from strict (default) to relaxed.
 type DecoderOption func(*decoderConfig)
 
-// decoderConfig holds the option-driven state of a Decoder. Kept
+// decoderConfig holds the option-driven state of a decode. Kept
 // unexported so the option list can grow without churning the
 // [Decoder] type.
 type decoderConfig struct {
 	relaxedTypeDispatch bool
+	unmatched           func(pointer string)
+	strict              bool
+}
+
+// newDecoderConfig applies opts in order, skipping a nil option.
+func newDecoderConfig(opts []DecoderOption) decoderConfig {
+	var c decoderConfig
+	for _, o := range opts {
+		if o != nil {
+			o(&c)
+		}
+	}
+	return c
 }
 
 // WithRelaxedTypeDispatch toggles the polymorphic-dispatch policy
@@ -113,7 +130,8 @@ func WithRelaxedTypeDispatch(enabled bool) DecoderOption {
 // duplicate the same way. canjson keeps its own application here because
 // [Unmarshal] and [Decoder.Decode] accept non-RM targets, which never
 // travel through the registry, so the registry gate alone would not cover
-// them.
+// them. [WithUnmatched] and [WithStrict] check nothing in a target whose
+// own shape is no RM class; a duplicate name in it is refused all the same.
 func classifyDecode(err error) error {
 	return typereg.ClassifyDuplicate(err)
 }
@@ -138,10 +156,20 @@ func classifyDecode(err error) error {
 // sentinel and a [DecodeError]. See the sentinel's own documentation for
 // where the lines fall.
 //
+// A member the target does not read is ignored by default. [WithUnmatched]
+// reports each such member and [WithStrict] refuses the first, wrapping
+// [ErrUnknownMember]. Either option checks the members once the decode has
+// succeeded and changes nothing about the decode itself; with neither, no
+// member is checked.
+//
 // The value v points to is unspecified after an error: a failed decode may
 // leave it partly written.
-func Unmarshal(data []byte, v any) error {
-	return classifyDecode(json.Unmarshal(data, v, typereg.Unmarshalers()))
+func Unmarshal(data []byte, v any, opts ...DecoderOption) error {
+	err := classifyDecode(json.Unmarshal(data, v, typereg.Unmarshalers()))
+	if err != nil || len(opts) == 0 {
+		return err
+	}
+	return checkUnmatched(data, v, opts)
 }
 
 // Decoder reads and decodes canonical-JSON values from a stream.
@@ -154,15 +182,11 @@ type Decoder struct {
 }
 
 // NewDecoder returns a [Decoder] that reads canonical-JSON values
-// from r. Apply options to configure dispatch policy.
+// from r. The options apply to every value it decodes; a JSON Pointer that
+// [WithUnmatched] or [WithStrict] reports is relative to the value being
+// decoded.
 func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
-	d := &Decoder{dec: jsontext.NewDecoder(r)}
-	for _, o := range opts {
-		if o != nil {
-			o(&d.cfg)
-		}
-	}
-	return d
+	return &Decoder{dec: jsontext.NewDecoder(r), cfg: newDecoderConfig(opts)}
 }
 
 // Decode reads the next JSON value from the stream and stores it in
@@ -175,10 +199,28 @@ func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 // value is a *jsontext.SyntacticError wrapping io.ErrUnexpectedEOF in
 // both.
 //
+// With [WithUnmatched] or [WithStrict], Decode first reads the whole next
+// value into the decoder's read buffer, then decodes those bytes as
+// [Unmarshal] does and checks their members, with no copy of its own.
+// Reading the value whole first changes which failure a bad value reports:
+// malformed bytes anywhere in the value come back ahead of a shape failure
+// earlier in it, and a shape failure's byte offset counts from the start of
+// the value, not of the stream.
+//
 // The value v points to is unspecified after an error: a failed decode may
 // leave it partly written.
 func (d *Decoder) Decode(v any) error {
-	return classifyDecode(json.UnmarshalDecode(d.dec, v, typereg.Unmarshalers()))
+	if !d.cfg.checksMembers() {
+		return classifyDecode(json.UnmarshalDecode(d.dec, v, typereg.Unmarshalers()))
+	}
+	raw, err := d.dec.ReadValue()
+	if err != nil {
+		return classifyDecode(err)
+	}
+	if err := classifyDecode(json.Unmarshal(raw, v, typereg.Unmarshalers())); err != nil {
+		return err
+	}
+	return d.cfg.walkUnmatched(raw, v)
 }
 
 // RelaxedTypeDispatch reports whether the decoder was configured with

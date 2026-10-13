@@ -1,15 +1,11 @@
 // Example: the whole clinical pipeline through public SDK packages only. It
 // parses an operational template (OPT), compiles it, builds a composition that
 // follows it, serialises that composition to canonical JSON and back, and
-// validates the result in two passes: the RM floor (validation.ValidateRM),
-// against the openEHR Reference Model alone, and the template constraints
-// (validation.ValidateComposition), against the same compiled template.
-// Nothing here imports an internal/ package, so a program in another Go
-// module can do exactly the same.
-//
-// Today ValidateComposition checks the template's constraints and does not
-// run the RM floor's per-type rules, so a composition can satisfy its template
-// and still break the Reference Model. This program runs both passes.
+// validates the result with validation.ValidateComposition, against the same
+// compiled template. That one call checks the template constraints and the
+// RM floor, the rules of the openEHR Reference Model itself, and reports a
+// defect both find once. Nothing here imports an internal/ package, so a
+// program in another Go module can do exactly the same.
 //
 // Runs offline. With no argument it uses the vendored vital_signs.opt fixture:
 //
@@ -86,15 +82,12 @@ func run() error {
 	}
 	fmt.Printf("composition          : %d bytes canonical JSON, round-tripped\n", size)
 
-	// Step 5: validate the decoded copy, the one a server would receive, in
-	// both passes. The RM floor walks it with the Reference Model as its
-	// only guide; the template pass checks it against the same compiled
-	// template the builder used. Both always run, because neither result
-	// stands in for the other.
-	rmOK := reportPass("RM floor", validation.ValidateRM(decoded))
-	templateOK := reportPass("template constraints", validation.ValidateComposition(decoded, compiled))
-	if !rmOK || !templateOK {
-		return errors.New("round-tripped composition fails at least one validation pass")
+	// Step 5: validate the decoded copy, the one a server would receive,
+	// against the same compiled template the builder used. The call checks
+	// the template constraints and then the RM floor over the whole
+	// composition.
+	if !report("validation", validation.ValidateComposition(decoded, compiled)) {
+		return errors.New("round-tripped composition is not valid")
 	}
 	return nil
 }
@@ -147,11 +140,11 @@ func roundTrip(comp *rm.Composition) (*rm.Composition, int, error) {
 	return &decoded, len(encoded), nil
 }
 
-// reportPass prints one validation pass under its name: the verdict, then one
-// line per issue. Each pass lists every issue it finds rather than stopping at
+// report prints the validation result under name: the verdict, then one line
+// per issue. Validation lists every issue it finds rather than stopping at
 // the first, so a caller can show the whole list at once. It returns
-// result.OK, which is false exactly when the pass found an error.
-func reportPass(name string, result validation.Result) bool {
+// result.OK, which is false exactly when an error was found.
+func report(name string, result validation.Result) bool {
 	verdict := "OK"
 	if !result.OK {
 		verdict = "failed"

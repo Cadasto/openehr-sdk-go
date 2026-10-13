@@ -558,13 +558,14 @@ func TestIntervalBaseReadsLegacyXMLNames(t *testing.T) {
 	}
 }
 
-// TestIntervalDerivedDecodeCopiesOwnMembersBeforeReturning pins the generator
-// side of the failed-decode state (REQ-052): the decoder of a class with
-// members of its own (Point_interval's flags) copies them back before it
-// returns the decode error, so a failed decode leaves what was read, as an
-// in-place decode does. A copy placed after an early `return err` would leave
-// the flags behind.
-func TestIntervalDerivedDecodeCopiesOwnMembersBeforeReturning(t *testing.T) {
+// TestREQ169IntervalDecodeReadsFlagsInPlace pins the generator side of the
+// flag defaults (REQ-169) and of the failed-decode state (REQ-052) on
+// Point_interval, whose own members are the four flags. Its decoder reads each
+// flag straight into the receiver's own field through an intervalFlagJSON, so
+// nothing is copied back from the wire, and it gives the absent flags their
+// defaults only after a decode that succeeds: a failed decode returns first
+// and leaves what was read, as an in-place decode does.
+func TestREQ169IntervalDecodeReadsFlagsInPlace(t *testing.T) {
 	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
 	if err != nil {
 		t.Fatalf("BuildPlanForTarget(RM): %v", err)
@@ -578,14 +579,227 @@ func TestIntervalDerivedDecodeCopiesOwnMembersBeforeReturning(t *testing.T) {
 	if err != nil {
 		t.Fatalf("renderUnmarshalJSON: %v", err)
 	}
-	decode := strings.Index(src, "err := typereg.DecodeInto(")
-	copyBack := strings.Index(src, "p.LowerIncluded = wire.LowerIncluded")
-	ret := strings.Index(src, "return err")
-	if decode < 0 || copyBack < 0 || ret < 0 || decode >= copyBack || copyBack >= ret {
-		t.Errorf("decoder does not decode, copy the own members back, then return the error (positions %d, %d, %d):\n%s", decode, copyBack, ret, src)
+	for _, prop := range intervalFlagProps {
+		fn := FieldName(prop)
+		want := fmt.Sprintf("%s: intervalFlagJSON{field: &p.%s, seen: &seen.%s}", fn, fn, seenFlagField(prop))
+		if !strings.Contains(src, want) {
+			t.Errorf("Point_interval decoder does not read %s in place, want %q:\n%s", prop, want, src)
+		}
+		if copyBack := "p." + fn + " = wire." + fn; strings.Contains(src, copyBack) {
+			t.Errorf("Point_interval decoder still copies %s back from the wire (%q):\n%s", prop, copyBack, src)
+		}
 	}
-	if strings.Contains(src, "err != nil") {
-		t.Errorf("decoder returns early on an error before copying the own members back:\n%s", src)
+	// The error branch that follows the decode; the null branch before it
+	// returns too, so the search starts at the decode.
+	decode := strings.Index(src, "typereg.DecodeInto(")
+	ret := indexFrom(src, "\t\treturn err\n", decode)
+	defaults := strings.Index(src, intervalFlagSettle("seen", "p"))
+	if decode < 0 || ret < 0 || defaults < 0 || ret >= defaults {
+		t.Errorf("Point_interval decoder does not return a decode error before it gives the defaults (positions %d, %d, %d):\n%s", decode, ret, defaults, src)
+	}
+}
+
+// TestREQ169IntervalFlagDecodeCopiesOwnMembersBeforeReturning pins the order
+// the shared flag decoder keeps for a class with own members besides the
+// flags (REQ-052, REQ-169): it copies them back whether or not the decode
+// fails, then returns a decode error, and only then gives the absent flags
+// their defaults. No pinned class has such members today, so the renderer is
+// driven directly.
+func TestREQ169IntervalFlagDecodeCopiesOwnMembersBeforeReturning(t *testing.T) {
+	var b strings.Builder
+	renderIntervalFlagJSONDecode(&b, "x", "X_INTERVAL", "*jsonWireXInterval[T]", "&jsonWireXInterval[T]{}", "", "&wire.Type", []string{"Extra"})
+	src := b.String()
+	decode := strings.Index(src, "err := typereg.DecodeInto(dec, \"X_INTERVAL\", wire, &wire.Type)")
+	copyBack := strings.Index(src, "x.Extra = wire.Extra")
+	ret := indexFrom(src, "\t\treturn err\n", copyBack)
+	defaults := strings.Index(src, "seen.settle(")
+	if decode < 0 || copyBack < 0 || ret < 0 || defaults < 0 || decode >= copyBack || copyBack >= ret || ret >= defaults {
+		t.Errorf("decoder does not decode, copy the own members back, return the error, then give the defaults (positions %d, %d, %d, %d):\n%s", decode, copyBack, ret, defaults, src)
+	}
+}
+
+// TestREQ169IntervalFlaggedDecoderCensus pins which generated classes carry
+// the four boundary flags and so get decoders that give an absent flag its
+// default (REQ-169, REQ-052, REQ-056), and that each of them does, in JSON
+// and in XML. AOM 1.4 owns no interval class: its constraint intervals are
+// `rm.Interval` and decode through BASE Interval's methods. A class without
+// the flags gets neither the wrapper nor the record.
+func TestREQ169IntervalFlaggedDecoderCensus(t *testing.T) {
+	for _, tc := range []struct {
+		target Target
+		want   []string
+	}{
+		{target: TargetRM, want: []string{"DV_INTERVAL", "Interval", "Point_interval", "Proper_interval"}},
+		{target: TargetAOM14, want: nil},
+	} {
+		t.Run(tc.target.RootID, func(t *testing.T) {
+			plan, err := BuildPlanForTarget(context.Background(), tc.target, bmm.FSResolver{Root: testResources})
+			if err != nil {
+				t.Fatalf("BuildPlanForTarget(%s): %v", tc.target.RootID, err)
+			}
+			var got []string
+			for _, f := range plan.Files {
+				classes, err := codecClassesIn(plan, f)
+				if err != nil {
+					t.Fatalf("codecClassesIn(%s): %v", f.FileBase, err)
+				}
+				for _, pc := range classes {
+					fields, err := effectiveFields(plan, pc)
+					if err != nil {
+						t.Fatalf("effectiveFields(%s): %v", pc.BMMName, err)
+					}
+					flagged, err := intervalFlagged(fields)
+					if err != nil {
+						t.Fatalf("intervalFlagged(%s): %v", pc.BMMName, err)
+					}
+					jsonSrc, err := renderUnmarshalJSON(plan, pc, fields)
+					if err != nil {
+						t.Fatalf("renderUnmarshalJSON(%s): %v", pc.BMMName, err)
+					}
+					xmlSrc, err := renderUnmarshalXML(plan, pc, fields)
+					if err != nil {
+						t.Fatalf("renderUnmarshalXML(%s): %v", pc.BMMName, err)
+					}
+					if !flagged {
+						if strings.Contains(jsonSrc, "intervalFlag") || strings.Contains(xmlSrc, "intervalFlagsSeen") {
+							t.Errorf("%s carries no boundary flags but its decoders read them as flags", pc.BMMName)
+						}
+						continue
+					}
+					got = append(got, pc.BMMName)
+					recv := jsonmarReceiverName(pc.GoName)
+					defaults := intervalFlagSettle("seen", recv)
+					if !strings.Contains(jsonSrc, defaults) {
+						t.Errorf("%s JSON decoder does not give the absent flags their defaults (%q):\n%s", pc.BMMName, defaults, jsonSrc)
+					}
+					// A side written closed with no bound held by value is
+					// refused with the shape sentinel of each codec.
+					if want := fmt.Sprintf("return typereg.WrapShapeError(%q, err)", pc.BMMName); !strings.Contains(jsonSrc, want) {
+						t.Errorf("%s JSON decoder does not refuse a closed side with no bound through the shape sentinel (%q):\n%s", pc.BMMName, want, jsonSrc)
+					}
+					if want := "canxml.ErrInvalidShape, _err)"; !strings.Contains(xmlSrc, want) {
+						t.Errorf("%s XML decoder does not refuse a closed side with no bound through the shape sentinel (%q):\n%s", pc.BMMName, want, xmlSrc)
+					}
+					for _, prop := range intervalBoundProps {
+						if want := fmt.Sprintf("%s intervalBoundJSON `json:%q`", FieldName(prop), prop); !strings.Contains(jsonSrc, want) {
+							t.Errorf("%s JSON decoder does not record whether the document carried %s (%q):\n%s", pc.BMMName, prop, want, jsonSrc)
+						}
+						if want := "_seen." + seenFlagField(prop) + " = true"; !strings.Contains(xmlSrc, want) {
+							t.Errorf("%s XML decoder does not record whether the document carried %s (%q):\n%s", pc.BMMName, prop, want, xmlSrc)
+						}
+					}
+					// A null in place of the interval reads as the member
+					// left out (REQ-052): it is consumed before the decode,
+					// so no default is given.
+					null := strings.Index(jsonSrc, "if dec.PeekKind() == 'n' {")
+					decode := strings.Index(jsonSrc, "typereg.DecodeInto(")
+					if null < 0 || decode < 0 || null >= decode {
+						t.Errorf("%s JSON decoder does not consume a null interval before the decode (positions %d, %d):\n%s", pc.BMMName, null, decode, jsonSrc)
+					}
+					if !strings.Contains(xmlSrc, "var _seen intervalFlagsSeen") || !strings.Contains(xmlSrc, "_"+defaults) {
+						t.Errorf("%s XML decoder does not record the flags and give the absent ones their defaults:\n%s", pc.BMMName, xmlSrc)
+					}
+					for _, prop := range intervalFlagProps {
+						if want := fmt.Sprintf("%s intervalFlagJSON `json:%q`", FieldName(prop), prop); !strings.Contains(jsonSrc, want) {
+							t.Errorf("%s JSON decoder does not read %s through the flag wrapper (%q):\n%s", pc.BMMName, prop, want, jsonSrc)
+						}
+						fn := FieldName(prop)
+						want := fmt.Sprintf("decodeIntervalFlagXML(_dec, &_t, &%s.%s, &_seen.%s)", recv, fn, seenFlagField(prop))
+						if !strings.Contains(xmlSrc, want) {
+							t.Errorf("%s XML decoder does not read %s through the shared flag reader (%q):\n%s", pc.BMMName, prop, want, xmlSrc)
+						}
+					}
+				}
+			}
+			slices.Sort(got)
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("classes with the four boundary flags = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestREQ169IntervalFlaggedRefusals pins that the generator refuses a class
+// whose boundary flags it cannot default (REQ-169): one that carries some of
+// the four but not all, and one whose flag is not a mandatory Boolean. Either
+// would otherwise get a decoder that reads an absent flag as false, or
+// generated code that does not compile.
+func TestREQ169IntervalFlaggedRefusals(t *testing.T) {
+	flag := func(name, typ string, mandatory bool) emittedField {
+		p := &bmm.SingleProperty{TypeName: typ}
+		p.Name = name
+		p.IsMandatory = mandatory
+		return emittedField{Prop: p, OwnerName: "X_INTERVAL"}
+	}
+	openFlag := func(name string) emittedField {
+		p := &bmm.SinglePropertyOpen{TypeName: "T"}
+		p.Name = name
+		p.IsMandatory = true
+		return emittedField{Prop: p, OwnerName: "X_INTERVAL"}
+	}
+	all := func() []emittedField {
+		out := make([]emittedField, 0, len(intervalFlagProps))
+		for _, prop := range intervalFlagProps {
+			out = append(out, flag(prop, "Boolean", true))
+		}
+		return out
+	}
+	for _, tc := range []struct {
+		name        string
+		fields      []emittedField
+		wantFlagged bool
+		wantErr     string
+	}{
+		{name: "all four mandatory Booleans", fields: all(), wantFlagged: true},
+		{name: "no flags", fields: []emittedField{flag("lower", "Integer", false)}},
+		{name: "two of the four", fields: all()[:2], wantErr: "not all four"},
+		{name: "an optional flag", fields: append(all()[:3], flag(propUpperUnbounded, "Boolean", false)), wantErr: "not a mandatory Boolean"},
+		{name: "a flag of another type", fields: append(all()[:3], flag(propUpperUnbounded, "String", true)), wantErr: "not a mandatory Boolean"},
+		{name: "a flag that is no single property", fields: append(all()[:3], openFlag(propUpperUnbounded)), wantErr: "not a mandatory Boolean"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := intervalFlagged(tc.fields)
+			if tc.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("intervalFlagged = %v, %v; want an error containing %q", got, err, tc.wantErr)
+				}
+				return
+			}
+			if err != nil || got != tc.wantFlagged {
+				t.Fatalf("intervalFlagged = %v, %v; want %v, nil", got, err, tc.wantFlagged)
+			}
+		})
+	}
+}
+
+// TestREQ169IntervalFlagHelpersSettleOpenFlagsFirst pins the shared default
+// (REQ-169) in the generated interval file: the open flags take their
+// defaults before the included flags, which read them, so an included default
+// follows its side's final open flag whatever the member order.
+func TestREQ169IntervalFlagHelpersSettleOpenFlagsFirst(t *testing.T) {
+	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	if err != nil {
+		t.Fatalf("BuildPlanForTarget(RM): %v", err)
+	}
+	body, err := RenderIntervalBoundFile(plan)
+	if err != nil {
+		t.Fatalf("RenderIntervalBoundFile: %v", err)
+	}
+	src := string(body)
+	for _, want := range []string{
+		"type intervalFlagsSeen struct", "type intervalFlagJSON struct", "func (f intervalFlagJSON) UnmarshalJSONFrom(",
+		"func decodeIntervalFlagXML(", "text = strings.TrimSpace(text)",
+		"type intervalBoundJSON struct", "func (f intervalBoundJSON) UnmarshalJSONFrom(",
+		"func intervalBoundHeldByValue[T any](*T) bool", "func errIntervalClosedSide(side string) error",
+	} {
+		if !strings.Contains(src, want) {
+			t.Errorf("interval file lacks %q:\n%s", want, src)
+		}
+	}
+	lastOpen := max(strings.Index(src, "*lowerUnbounded = !s.lower"), strings.Index(src, "*upperUnbounded = !s.upper"))
+	firstIncluded := min(strings.Index(src, "*lowerIncluded = !*lowerUnbounded"), strings.Index(src, "*upperIncluded = !*upperUnbounded"))
+	if lastOpen < 0 || firstIncluded < 0 || lastOpen >= firstIncluded {
+		t.Errorf("settle does not settle the open flags before the included ones (positions %d, %d):\n%s", lastOpen, firstIncluded, src)
 	}
 }
 
@@ -616,4 +830,17 @@ func TestJSONWireShapeCensus(t *testing.T) {
 	if _, _, err := classJSONWireShape(plan, plan.Classes["Multiplicity_interval"]); err == nil {
 		t.Error("classJSONWireShape(Multiplicity_interval) succeeded, want a refusal")
 	}
+}
+
+// indexFrom returns the index of the first substr in s at or after from, or
+// -1 when from is negative or substr does not occur there.
+func indexFrom(s, substr string, from int) int {
+	if from < 0 {
+		return -1
+	}
+	i := strings.Index(s[from:], substr)
+	if i < 0 {
+		return -1
+	}
+	return from + i
 }

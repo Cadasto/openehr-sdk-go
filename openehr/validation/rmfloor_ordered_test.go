@@ -100,8 +100,8 @@ func TestValidateRM_ReferenceRangesWalked(t *testing.T) {
 				Range:   openUpper(rm.DVQuantity{Magnitude: 3, Units: "mmol/L", Precision: &badPrecision}),
 			}}},
 			want: []string{
-				"required /other_reference_ranges[0]/meaning",
-				"rm_invariant /other_reference_ranges[0]/range/lower",
+				"required /other_reference_ranges[1]/meaning",
+				"rm_invariant /other_reference_ranges[1]/range/lower",
 			},
 		},
 		{
@@ -109,7 +109,7 @@ func TestValidateRM_ReferenceRangesWalked(t *testing.T) {
 			root: &rm.DVQuantity{Magnitude: 5, Units: "mmol/L", OtherReferenceRanges: []rm.ReferenceRange[rm.DVQuantity]{{
 				Meaning: rm.DVText{Value: "critical"},
 			}}},
-			want: []string{"required /other_reference_ranges[0]/range"},
+			want: []string{"required /other_reference_ranges[1]/range"},
 		},
 		{
 			name: "DV_COUNT, range bounds inverted",
@@ -120,7 +120,7 @@ func TestValidateRM_ReferenceRangesWalked(t *testing.T) {
 					Upper: rm.DVCount{Magnitude: 5}, UpperIncluded: true,
 				},
 			}}},
-			want: []string{"rm_invariant /other_reference_ranges[0]/range"},
+			want: []string{"rm_invariant /other_reference_ranges[1]/range"},
 		},
 		{
 			name: "DV_DATE in an ELEMENT, empty date inside the range bound",
@@ -129,8 +129,8 @@ func TestValidateRM_ReferenceRangesWalked(t *testing.T) {
 				Range:   openUpper(rm.DVDate{}),
 			}}}),
 			want: []string{
-				"required /value/other_reference_ranges[0]/range/lower/value",
-				"rm_invariant /value/other_reference_ranges[0]/range/lower",
+				"required /value/other_reference_ranges[1]/range/lower/value",
+				"rm_invariant /value/other_reference_ranges[1]/range/lower",
 			},
 		},
 		{
@@ -155,7 +155,7 @@ func TestValidateRM_ReferenceRangesWalked(t *testing.T) {
 				}}}, LowerIncluded: true,
 				Upper: rm.DVCount{Magnitude: 5}, UpperIncluded: true,
 			}},
-			want: []string{"required /normal_range/lower/other_reference_ranges[0]/meaning"},
+			want: []string{"required /normal_range/lower/other_reference_ranges[1]/meaning"},
 		},
 		{
 			name: "DV_ORDINAL, a complete reference range",
@@ -189,7 +189,7 @@ func TestValidateRM_ReferenceRangeOnDecodedBound(t *testing.T) {
 	if err := canjson.Unmarshal([]byte(body), &count); err != nil {
 		t.Fatalf("canjson.Unmarshal: %v", err)
 	}
-	want := []string{"required /normal_range/lower/other_reference_ranges[0]/meaning"}
+	want := []string{"required /normal_range/lower/other_reference_ranges[1]/meaning"}
 	if got := findingsOf(validation.ValidateRM(&count)); !slices.Equal(got, want) {
 		t.Errorf("ValidateRM(decoded DV_COUNT) findings = %q, want %q", got, want)
 	}
@@ -243,7 +243,7 @@ func TestValidateRM_ReferenceRangeOnEveryValueFormBound(t *testing.T) {
 			Lower: rm.DVDuration{Value: "P1D", OtherReferenceRanges: bare},
 		}},
 	}
-	want := []string{"required /lower/other_reference_ranges[0]/meaning"}
+	want := []string{"required /lower/other_reference_ranges[1]/meaning"}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := findingsOf(validation.ValidateRM(tc.root)); !slices.Equal(got, want) {
@@ -310,6 +310,12 @@ func TestValidateRM_ScaleSymbolMayHaveNoCode(t *testing.T) {
 	blankTarget := rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}}
 	withBlankMapping := noCode("very slight")
 	withBlankMapping.Mappings = []rm.TermMapping{{Match: "=", Target: blankTarget}}
+	withBlankPurpose := codedSymbol("at1")
+	withBlankPurpose.Mappings = []rm.TermMapping{{
+		Match:   "=",
+		Target:  rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}, CodeString: "40917007"},
+		Purpose: &rm.DVCodedText{Value: "billing", DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}}},
+	}}
 	cases := []struct {
 		name string
 		root any
@@ -365,8 +371,21 @@ func TestValidateRM_ScaleSymbolMayHaveNoCode(t *testing.T) {
 			name: "a mapping target with a blank code_string under a DV_SCALE symbol",
 			root: scoreElement(&rm.DVScale{Value: 0.5, Symbol: withBlankMapping}),
 			want: []string{
-				"required /value/symbol/mappings[0]/target/code_string",
-				"rm_invariant /value/symbol/mappings[0]/target",
+				"required /value/symbol/mappings[1]/target/code_string",
+				"rm_invariant /value/symbol/mappings[1]/target",
+			},
+		},
+		{
+			// The exemption stops at the symbol's own defining_code: a
+			// DV_CODED_TEXT deeper under the symbol, here a mapping's
+			// purpose, also has a defining_code, and its blank code is
+			// reported.
+			name: "a mapping purpose with a blank code_string under a DV_SCALE symbol",
+			root: scoreElement(&rm.DVScale{Value: 0.5, Symbol: withBlankPurpose}),
+			want: []string{
+				"code_not_in_value_set /value/symbol/mappings[1]/purpose/defining_code",
+				"required /value/symbol/mappings[1]/purpose/defining_code/code_string",
+				"rm_invariant /value/symbol/mappings[1]/purpose/defining_code",
 			},
 		},
 		{
@@ -379,8 +398,8 @@ func TestValidateRM_ScaleSymbolMayHaveNoCode(t *testing.T) {
 				Range:   rm.DVInterval[rm.DVOrdered]{Lower: rm.DVOrdinal{Value: 1, Symbol: noCode("mild")}, LowerIncluded: true, UpperUnbounded: true},
 			}}}),
 			want: []string{
-				"required /value/other_reference_ranges[0]/range/lower/symbol/defining_code/code_string",
-				"rm_invariant /value/other_reference_ranges[0]/range/lower/symbol/defining_code",
+				"required /value/other_reference_ranges[1]/range/lower/symbol/defining_code/code_string",
+				"rm_invariant /value/other_reference_ranges[1]/range/lower/symbol/defining_code",
 			},
 		},
 		{
@@ -390,6 +409,23 @@ func TestValidateRM_ScaleSymbolMayHaveNoCode(t *testing.T) {
 				scoreElement(&rm.DVOrdinal{Value: 1, Symbol: noCode("mild")}),
 			}},
 			want: []string{
+				"required /items[2]/value/symbol/defining_code/code_string",
+				"rm_invariant /items[2]/value/symbol/defining_code",
+			},
+		},
+		{
+			// REQ-102 § Issue paths: an item with no id is written by its
+			// position and an item with a unique id by that id, so an id that
+			// reads as a position gives both items one path. The exemption
+			// follows the DV_SCALE's own symbol, not that path, so the
+			// DV_ORDINAL's blank code is still reported.
+			name: "DV_ORDINAL with no code at the same path as a DV_SCALE with no code",
+			root: &rm.Cluster{ArchetypeNodeID: "at0002", Name: rm.DVText{Value: "scores"}, Items: []rm.Item{
+				&rm.Element{Name: rm.DVText{Value: "scale"}, Value: &rm.DVScale{Value: 0.5, Symbol: noCode("slight")}},
+				&rm.Element{ArchetypeNodeID: "1", Name: rm.DVText{Value: "ordinal"}, Value: &rm.DVOrdinal{Value: 1, Symbol: noCode("mild")}},
+			}},
+			want: []string{
+				"required /items[1]/archetype_node_id",
 				"required /items[1]/value/symbol/defining_code/code_string",
 				"rm_invariant /items[1]/value/symbol/defining_code",
 			},

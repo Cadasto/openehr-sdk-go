@@ -169,6 +169,12 @@ type ObjectNode interface {
 // existence and occurrences blocks. Fields are unexported to keep
 // parsed intervals immutable from outside the package; only the
 // parser constructs values (there is no public constructor).
+//
+// A Multiplicity counts whole items, so every bounded side of a parsed
+// Multiplicity is closed: the parser turns an end the OPT excludes into
+// the closed end it stands for. An OPT interval ">0..<3" gives Lower 1
+// and Upper 2, and the bound of any side that is not unbounded is
+// always inclusive.
 type Multiplicity struct {
 	lower          int
 	upper          int
@@ -263,9 +269,11 @@ func (c *ComplexObject) Attributes() []*Attribute { return slices.Clone(c.attrib
 // PrimitiveConstraint returns the typed constraint payload
 // when the wire xsi:type was a primitive (C_BOOLEAN, C_INTEGER,
 // C_REAL, C_STRING, C_DATE, C_TIME, C_DATE_TIME, C_DURATION,
-// C_CODE_PHRASE, C_DV_QUANTITY, C_DV_ORDINAL). Returns nil for
-// non-primitive nodes (C_COMPLEX_OBJECT proper, archetype roots,
-// slots, attribute containers).
+// C_CODE_PHRASE, C_DV_QUANTITY, C_DV_ORDINAL) or a CONSTRAINT_REF,
+// whose [constraints.ConstraintRef] names an external value set for
+// the node's RMTypeName. Returns nil for non-primitive nodes
+// (C_COMPLEX_OBJECT proper, archetype roots, slots, attribute
+// containers).
 //
 // The returned value is one of the concrete types in the
 // [constraints] package; pattern-match on it via a type switch.

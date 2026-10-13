@@ -3,6 +3,7 @@ package validation_test
 import (
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -11,11 +12,12 @@ import (
 
 // REQ-102 — an item of a multi-valued attribute that is not a LOCATABLE
 // (a PARTICIPATION, a DV_TEXT in ACTOR.languages, a PARTY_REF in
-// ACTOR.roles) carries no archetype_node_id. The walker binds it to the
-// first non-slot OPT child whose RM type admits it, walks it, and counts
-// it toward that child's occurrences; it never reports such an item as
-// slot_fill. The vendored OPTs constrain none of these attributes, so
-// the tests build small synthetic ones.
+// ACTOR.roles) carries no archetype_node_id. The walker binds it to a
+// non-slot OPT child whose RM type admits it (a child of the item's own
+// type first, then one naming the AOM 1.4 short name it wraps, then one
+// the type conforms to or an untyped one), walks it, and counts it toward
+// that child's occurrences; it never reports such an item as slot_fill. The vendored OPTs constrain none of these
+// attributes, so the tests build small synthetic ones.
 
 // participationsOPT constrains COMPOSITION.context.participations to one
 // PARTICIPATION child with occurrences 0..1. The child declares no
@@ -105,8 +107,9 @@ func languagesChild(rmType string) string {
 // participationsOPT apart from what parts carries.
 func participationsComposition(parts ...rm.Participation) *rm.Composition {
 	return &rm.Composition{
-		ArchetypeNodeID: "openEHR-EHR-COMPOSITION.participations.v1",
-		Name:            rm.DVText{Value: "Encounter"},
+		ArchetypeNodeID:  "openEHR-EHR-COMPOSITION.participations.v1",
+		Name:             rm.DVText{Value: "Encounter"},
+		ArchetypeDetails: archetypeDetails("openEHR-EHR-COMPOSITION.participations.v1"),
 		Category: rm.DVCodedText{
 			DVText: rm.DVText{Value: "event"},
 			DefiningCode: rm.CodePhrase{
@@ -141,8 +144,9 @@ func participationsComposition(parts ...rm.Participation) *rm.Composition {
 // languages child.
 func validActor() *rm.Person {
 	return &rm.Person{
-		ArchetypeNodeID: "openEHR-DEMOGRAPHIC-PERSON.person.v1",
-		Name:            rm.DVText{Value: "Person"},
+		ArchetypeNodeID:  "openEHR-DEMOGRAPHIC-PERSON.person.v1",
+		Name:             rm.DVText{Value: "Person"},
+		ArchetypeDetails: archetypeDetails("openEHR-DEMOGRAPHIC-PERSON.person.v1"),
 		Identities: []rm.PartyIdentity{{
 			ArchetypeNodeID: "at0001",
 			Name:            rm.DVText{Value: "Identity"},
@@ -174,7 +178,9 @@ func issueKeys(issues []validation.Issue) []string {
 // REQ-102 — a PARTICIPATION under EVENT_CONTEXT.participations binds to
 // the PARTICIPATION child by RM type: a valid one passes, one without
 // its function is walked and gets `required` at …/function, and a
-// second one exceeds the child's occurrences 0..1.
+// second one exceeds the child's occurrences 0..1. That child declares no
+// id, so its cardinality is written at the attribute (REQ-102 § Issue
+// paths).
 func TestValidateComposition_REQ102_ParticipationsBindByRMType(t *testing.T) {
 	c := mustCompileSyntheticOPT(t, participationsOPT)
 	noFunction := validParticipation()
@@ -193,12 +199,12 @@ func TestValidateComposition_REQ102_ParticipationsBindByRMType(t *testing.T) {
 		{
 			name:  "bound participation is walked",
 			parts: []rm.Participation{noFunction},
-			want:  []string{"required /context/participations[@1]/function"},
+			want:  []string{"required /context/participations[1]/function"},
 		},
 		{
 			name:  "bound participations count toward occurrences",
 			parts: []rm.Participation{validParticipation(), validParticipation()},
-			want:  []string{"cardinality /context/participations[@1]"},
+			want:  []string{"cardinality /context/participations"},
 		},
 	}
 	for _, tc := range tests {
@@ -211,10 +217,96 @@ func TestValidateComposition_REQ102_ParticipationsBindByRMType(t *testing.T) {
 	}
 }
 
+// participationsAfterSlotOPT constrains COMPOSITION.context.participations
+// to an ARCHETYPE_SLOT that names PARTICIPATION, then a PARTICIPATION child
+// required once whose function text must be "assistant".
+var participationsAfterSlotOPT = strings.Replace(participationsOPT, `
+          <children xsi:type="C_COMPLEX_OBJECT">
+            <rm_type_name>PARTICIPATION</rm_type_name>
+            <occurrences>
+              <lower_included>true</lower_included>
+              <upper_included>true</upper_included>
+              <lower_unbounded>false</lower_unbounded>
+              <upper_unbounded>false</upper_unbounded>
+              <lower>0</lower>
+              <upper>1</upper>
+            </occurrences>
+            <node_id></node_id>
+          </children>`, `
+          <children xsi:type="ARCHETYPE_SLOT">
+            <rm_type_name>PARTICIPATION</rm_type_name>
+            <node_id>at9000</node_id>
+          </children>
+          <children xsi:type="C_COMPLEX_OBJECT">
+            <rm_type_name>PARTICIPATION</rm_type_name>
+            <occurrences>
+              <lower_included>true</lower_included>
+              <upper_included>true</upper_included>
+              <lower_unbounded>false</lower_unbounded>
+              <upper_unbounded>false</upper_unbounded>
+              <lower>1</lower>
+              <upper>1</upper>
+            </occurrences>
+            <node_id></node_id>
+            <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+              <rm_attribute_name>function</rm_attribute_name>
+              <children xsi:type="C_COMPLEX_OBJECT">
+                <rm_type_name>DV_TEXT</rm_type_name>
+                <node_id></node_id>
+                <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+                  <rm_attribute_name>value</rm_attribute_name>
+                  <children xsi:type="C_PRIMITIVE_OBJECT">
+                    <rm_type_name>STRING</rm_type_name>
+                    <node_id></node_id>
+                    <item xsi:type="C_STRING"><list>assistant</list></item>
+                  </children>
+                </attributes>
+              </children>
+            </attributes>
+          </children>`, 1)
+
+// REQ-102 — an item that is not a LOCATABLE binds to a non-slot child: a
+// slot listed first that names the item's RM type does not take it, so the
+// typed PARTICIPATION child after it binds the item and checks it. That
+// child's occurrences and its pinned function text are template rules the
+// RM floor does not check, so only the binding decides these results: an
+// item bound to the slot would leave the child's occurrences unmet and its
+// function unchecked.
+func TestValidateComposition_REQ102_NonLocatableItemSkipsSlot(t *testing.T) {
+	if !strings.Contains(participationsAfterSlotOPT, "ARCHETYPE_SLOT") {
+		t.Fatal("participationsAfterSlotOPT holds no slot: participationsOPT changed, update the replacement")
+	}
+	c := mustCompileSyntheticOPT(t, participationsAfterSlotOPT)
+	surgeon := validParticipation()
+	surgeon.Function = rm.DVText{Value: "surgeon"}
+	tests := []struct {
+		name string
+		part rm.Participation
+		want []string
+	}{
+		{name: "the typed child binds the item", part: validParticipation(), want: []string{}},
+		{
+			name: "the typed child checks the item",
+			part: surgeon,
+			want: []string{"primitive_not_in_list /context/participations[1]/function/value"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			r := validation.ValidateComposition(participationsComposition(tc.part), c)
+			if got := issueKeys(r.Issues); !slices.Equal(got, tc.want) {
+				t.Errorf("ValidateComposition issues = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 // REQ-102 — ACTOR.languages and ACTOR.roles items are not LOCATABLE: a
-// matching DV_TEXT or PARTY_REF binds by RM type to the first non-slot
-// child that admits it, by the admission a single-valued attribute uses
-// (an untyped child, the exact type, an abstract supertype). One no
+// matching DV_TEXT or PARTY_REF binds by RM type to a non-slot child that
+// admits it, by the three tiers a single-valued attribute uses: a child
+// of the item's own type first, then one naming the AOM 1.4 short name
+// the type wraps, then the first that is untyped or whose type the
+// item's type descends from in the BMM, abstract or concrete. One no
 // child admits is an rm_type_mismatch (one child) or an
 // alternative_mismatch (two or more) at the item's own path, never a
 // slot_fill. A LOCATABLE that matches no child still gets slot_fill. A
@@ -261,7 +353,9 @@ func TestValidateDemographic_REQ102_ActorListsBindByRMType(t *testing.T) {
 			name:      "bound role is walked",
 			languages: dvText,
 			mutate:    func(p *rm.Person) { p.Roles[0].Namespace = "" },
-			want:      []string{"required /roles[@1]/namespace"},
+			// The template walk reports the absent namespace, and the RM
+			// floor its own OBJECT_REF rule under another code.
+			want: []string{"required /roles[1]/namespace", "rm_invariant /roles[1]/namespace"},
 		},
 		{
 			name:      "an abstract supertype child admits the item",
@@ -276,58 +370,60 @@ func TestValidateDemographic_REQ102_ActorListsBindByRMType(t *testing.T) {
 		{
 			name:      "one child that does not admit the item",
 			languages: dvCodedText,
-			want:      []string{"rm_type_mismatch /languages[@1]"},
+			want:      []string{"rm_type_mismatch /languages[1]"},
 		},
 		{
 			name:      "two children that do not admit the item",
 			languages: dvCodedText + dvCodedText,
-			want:      []string{"alternative_mismatch /languages[@1]"},
+			want:      []string{"alternative_mismatch /languages[1]"},
 		},
 		{
 			// Both children admit a DV_TEXT; binding to the first puts two
 			// items on a child that allows one, binding to the last does not.
+			// The child declares no id, so its cardinality is written at the
+			// attribute (REQ-102 § Issue paths).
 			name:      "the first child that admits the item binds it",
 			languages: dvTextAtMostOnce + dataValue,
 			mutate: func(p *rm.Person) {
 				p.Languages = []rm.DVTextLike{rm.DVText{Value: "en"}, rm.DVText{Value: "nl"}}
 			},
-			want: []string{"cardinality /languages[@1]"},
+			want: []string{"cardinality /languages"},
 		},
 		{
 			name:      "a slot child is skipped for the next non-slot child",
 			languages: dvTextSlot + dvText,
 			mutate:    func(p *rm.Person) { p.Languages = []rm.DVTextLike{rm.DVText{}} },
-			want:      []string{"required /languages[@1]/value"},
+			want:      []string{"required /languages[1]/value"},
 		},
 		{
 			name:      "nil item is not bound",
 			languages: dvText,
 			mutate:    nilLanguage,
-			want:      []string{"rm_type_mismatch /languages[@1]"},
+			want:      []string{"rm_type_mismatch /languages[1]"},
 		},
 		{
 			name:      "nil item is not bound to an untyped child",
 			languages: untyped,
 			mutate:    nilLanguage,
-			want:      []string{"rm_type_mismatch /languages[@1]"},
+			want:      []string{"rm_type_mismatch /languages[1]"},
 		},
 		{
 			name:      "nil item under two children",
 			languages: dvText + dvCodedText,
 			mutate:    nilLanguage,
-			want:      []string{"alternative_mismatch /languages[@1]"},
+			want:      []string{"alternative_mismatch /languages[1]"},
 		},
 		{
 			name:      "typed-nil item is not bound",
 			languages: dvText,
 			mutate:    typedNilLanguage,
-			want:      []string{"rm_type_mismatch /languages[@1]"},
+			want:      []string{"rm_type_mismatch /languages[1]"},
 		},
 		{
 			name:      "typed-nil item is not bound to an untyped child",
 			languages: untyped,
 			mutate:    typedNilLanguage,
-			want:      []string{"rm_type_mismatch /languages[@1]"},
+			want:      []string{"rm_type_mismatch /languages[1]"},
 		},
 		{
 			name:      "LOCATABLE with an unknown node id is a slot_fill",
@@ -339,7 +435,8 @@ func TestValidateDemographic_REQ102_ActorListsBindByRMType(t *testing.T) {
 			name:      "LOCATABLE without a node id is a slot_fill",
 			languages: dvText,
 			mutate:    func(p *rm.Person) { p.Identities[0].ArchetypeNodeID = "" },
-			want:      []string{"slot_fill /identities[@1]"},
+			// The RM floor reports the RM-mandatory archetype_node_id too.
+			want: []string{"required /identities[1]/archetype_node_id", "slot_fill /identities[1]"},
 		},
 	}
 	for _, tc := range tests {
@@ -411,7 +508,7 @@ func TestValidateComposition_REQ102_NilContentItemKeepsSlotFill(t *testing.T) {
 	comp.Content = []rm.ContentItem{nil}
 
 	r := validation.ValidateComposition(comp, c)
-	want := []string{"slot_fill /content[@1]"}
+	want := []string{"slot_fill /content[1]"}
 	if got := issueKeys(r.Issues); !slices.Equal(got, want) {
 		t.Errorf("ValidateComposition issues = %q, want %q", got, want)
 	}
@@ -435,7 +532,7 @@ func TestValidateComposition_REQ102_NilItemUnderOpenAttributePasses(t *testing.T
         <rm_type_name>OBSERVATION</rm_type_name>
         <node_id>at0001</node_id>
       </children>`,
-			want: []string{"slot_fill /content[@1]"},
+			want: []string{"slot_fill /content[1]"},
 		},
 	}
 	for _, tc := range tests {
@@ -521,7 +618,9 @@ func TestValidateFolder_REQ102_ItemsBindByRMType(t *testing.T) {
 			name:     "OBJECT_REF without namespace is walked",
 			itemType: "OBJECT_REF",
 			items:    []rm.ObjectRefLike{noNamespace},
-			want:     []string{"required /items[@1]/namespace"},
+			// The template walk reports the absent namespace, and the RM
+			// floor its own OBJECT_REF rule under another code.
+			want: []string{"required /items[1]/namespace", "rm_invariant /items[1]/namespace"},
 		},
 		{
 			name:     "full LOCATABLE_REF binds",
@@ -533,7 +632,7 @@ func TestValidateFolder_REQ102_ItemsBindByRMType(t *testing.T) {
 			name:     "nil item is a type mismatch",
 			itemType: "OBJECT_REF",
 			items:    []rm.ObjectRefLike{nil},
-			want:     []string{"rm_type_mismatch /items[@1]"},
+			want:     []string{"rm_type_mismatch /items[1]"},
 		},
 	}
 	for _, tc := range tests {

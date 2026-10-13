@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
@@ -44,7 +43,7 @@ const dataValueSlotOPT = `<?xml version="1.0"?>
 
 // REQ-102: an OPT node declared as the abstract DATA_VALUE admits every
 // concrete DATA_VALUE descendant the pinned BMM (openehr_rm_1.2.0) defines.
-// The rows are the descendants the type check used to refuse with a false
+// The rows are the descendants the type check once refused with a false
 // rm_type_mismatch; a parameterised interval is admitted by its class.
 func TestDataValueSlotAdmitsEveryConcreteDescendant(t *testing.T) {
 	t.Parallel()
@@ -87,39 +86,5 @@ func TestDataValueSlotAdmitsEveryConcreteDescendant(t *testing.T) {
 				t.Errorf("Validate(ELEMENT with %s value) against a DATA_VALUE slot: got rm_type_mismatch, want none; issues=%+v", tc.name, r.Issues)
 			}
 		})
-	}
-}
-
-// REQ-102: the DATA_VALUE row of bmmSubtypes is written by hand, and it must
-// hold exactly the concrete DATA_VALUE descendants rminfo reads from the
-// pinned BMM. A BMM bump that adds or drops a data value type fails here
-// until the row follows it.
-func TestDataValueSubtypesMatchBMM(t *testing.T) {
-	t.Parallel()
-	h, ok := rminfo.Default.(rminfo.Hierarchy)
-	if !ok {
-		t.Fatal("rminfo.Default does not implement rminfo.Hierarchy")
-	}
-	bmm, known := h.ConcreteDescendants("DATA_VALUE")
-	if !known || len(bmm) == 0 {
-		t.Fatalf(`rminfo ConcreteDescendants("DATA_VALUE") = %q, known=%v; want the BMM's concrete data value types`, bmm, known)
-	}
-	row := bmmSubtypes["DATA_VALUE"]
-	var missing, extra []string
-	for _, name := range bmm {
-		if !slices.Contains(row, name) {
-			missing = append(missing, name)
-		}
-	}
-	for _, name := range row {
-		if !slices.Contains(bmm, name) {
-			extra = append(extra, name)
-		}
-	}
-	if len(missing) > 0 {
-		t.Errorf(`bmmSubtypes["DATA_VALUE"] lacks %q, which the pinned BMM defines as concrete DATA_VALUE descendants`, missing)
-	}
-	if len(extra) > 0 {
-		t.Errorf(`bmmSubtypes["DATA_VALUE"] holds %q, which the pinned BMM does not define as concrete DATA_VALUE descendants`, extra)
 	}
 }

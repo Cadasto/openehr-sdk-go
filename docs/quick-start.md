@@ -98,7 +98,7 @@ A typical CI pipeline runs bytes → RM → compiled OPT → validation issues.
 go run ./cmd/examples/validate-from-json
 ```
 
-This decodes `testdata/minimal_blood_pressure.json`, compiles `vital_signs.opt`, and runs two checks: the RM floor, which needs no template, and the template constraints. Each check prints its verdict and any issues it found, and the program exits 1 when either one fails. On the bundled fixture both report `OK, no issues`. See [examples.md](examples.md#validate-from-json) for flags and custom file paths.
+This decodes `testdata/minimal_blood_pressure.json`, compiles `vital_signs.opt`, and validates with one call, `validation.ValidateComposition`. That call checks the template constraints and the RM floor, the Reference Model's own rules, and reports a defect both find once. The program prints the verdict and any issues found, and exits 1 when validation reports an error. On the bundled fixture it reports `OK, no issues`. See [examples.md](examples.md#validate-from-json) for flags and custom file paths.
 
 ---
 

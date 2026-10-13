@@ -119,9 +119,9 @@ func TestREQ112_PartyProxyAndParticipationFindings(t *testing.T) {
 				c.Context.Participations = []rm.Participation{{Performer: &rm.PartyIdentified{}}}
 			},
 			want: []string{
-				"required /context/participations[0]/function",
+				"required /context/participations[1]/function",
 				"rm_invariant /composer/external_ref/namespace",
-				"rm_invariant /context/participations[0]/performer",
+				"rm_invariant /context/participations[1]/performer",
 			},
 		},
 		{
@@ -153,45 +153,45 @@ func TestREQ112_PartyProxyAndParticipationFindings(t *testing.T) {
 		{
 			name:   "ENTRY provider with no name, identifiers or external_ref",
 			mutate: func(c *rm.Composition) { evaluationOf(c).Provider = &rm.PartyIdentified{} },
-			want:   []string{"rm_invariant /content[0]/provider"},
+			want:   []string{"rm_invariant /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/provider"},
 		},
 		{
 			name:   "participation performer with no name, identifiers or external_ref",
 			mutate: func(c *rm.Composition) { c.Context.Participations[0].Performer = &rm.PartyIdentified{} },
-			want:   []string{"rm_invariant /context/participations[0]/performer"},
+			want:   []string{"rm_invariant /context/participations[1]/performer"},
 		},
 		{
 			name:   "context participation without function",
 			mutate: func(c *rm.Composition) { c.Context.Participations[0].Function = nil },
-			want:   []string{"required /context/participations[0]/function"},
+			want:   []string{"required /context/participations[1]/function"},
 		},
 		{
 			name:   "context participation whose function value is empty",
 			mutate: func(c *rm.Composition) { c.Context.Participations[0].Function = rm.DVText{} },
-			want:   []string{"required /context/participations[0]/function"},
+			want:   []string{"required /context/participations[1]/function"},
 		},
 		{
 			name:   "context participation without performer",
 			mutate: func(c *rm.Composition) { c.Context.Participations[0].Performer = nil },
-			want:   []string{"required /context/participations[0]/performer"},
+			want:   []string{"required /context/participations[1]/performer"},
 		},
 		{
 			name:   "ENTRY other_participation without function",
 			mutate: func(c *rm.Composition) { evaluationOf(c).OtherParticipations[0].Function = nil },
-			want:   []string{"required /content[0]/other_participations[0]/function"},
+			want:   []string{"required /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/other_participations[1]/function"},
 		},
 		{
 			name:   "ENTRY other_participation without performer",
 			mutate: func(c *rm.Composition) { evaluationOf(c).OtherParticipations[0].Performer = nil },
-			want:   []string{"required /content[0]/other_participations[0]/performer"},
+			want:   []string{"required /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/other_participations[1]/performer"},
 		},
 		{
 			name:   "participation mode with an empty code_string",
 			mutate: func(c *rm.Composition) { c.Context.Participations[0].Mode.DefiningCode.CodeString = "" },
 			want: []string{
-				"code_not_in_value_set /context/participations[0]/mode/defining_code",
-				"required /context/participations[0]/mode/defining_code/code_string",
-				"rm_invariant /context/participations[0]/mode/defining_code",
+				"code_not_in_value_set /context/participations[1]/mode/defining_code",
+				"required /context/participations[1]/mode/defining_code/code_string",
+				"rm_invariant /context/participations[1]/mode/defining_code",
 			},
 		},
 		{
@@ -199,7 +199,7 @@ func TestREQ112_PartyProxyAndParticipationFindings(t *testing.T) {
 			mutate: func(c *rm.Composition) {
 				c.Context.Participations[0].Time.Upper = rm.DVDateTime{Value: "example"}
 			},
-			want: []string{"rm_invariant /context/participations[0]/time/upper"},
+			want: []string{"rm_invariant /context/participations[1]/time/upper"},
 		},
 		{
 			name:   "composer name present but empty",
@@ -218,7 +218,7 @@ func TestREQ112_PartyProxyAndParticipationFindings(t *testing.T) {
 			mutate: func(c *rm.Composition) {
 				c.Composer = &rm.PartyIdentified{Identifiers: []rm.DVIdentifier{{}}}
 			},
-			want: []string{"required /composer/identifiers[0]/id"},
+			want: []string{"required /composer/identifiers[1]/id"},
 		},
 		{
 			name: "composer identifier with an id",
@@ -232,8 +232,8 @@ func TestREQ112_PartyProxyAndParticipationFindings(t *testing.T) {
 				evaluationOf(c).Subject = &rm.PartyRelated{Name: new("Jane")}
 			},
 			want: []string{
-				"code_not_in_value_set /content[0]/subject/relationship/defining_code",
-				"required /content[0]/subject/relationship",
+				"code_not_in_value_set /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/subject/relationship/defining_code",
+				"required /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/subject/relationship",
 			},
 		},
 		{
@@ -241,7 +241,7 @@ func TestREQ112_PartyProxyAndParticipationFindings(t *testing.T) {
 			mutate: func(c *rm.Composition) {
 				evaluationOf(c).Subject = &rm.PartyRelated{Relationship: codedText("mother", "10")}
 			},
-			want: []string{"rm_invariant /content[0]/subject"},
+			want: []string{"rm_invariant /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/subject"},
 		},
 		{
 			name: "ENTRY subject PARTY_RELATED with an empty name and empty identifiers",
@@ -252,8 +252,8 @@ func TestREQ112_PartyProxyAndParticipationFindings(t *testing.T) {
 				}
 			},
 			want: []string{
-				"rm_invariant /content[0]/subject/identifiers",
-				"rm_invariant /content[0]/subject/name",
+				"rm_invariant /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/subject/identifiers",
+				"rm_invariant /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/subject/name",
 			},
 		},
 		{
@@ -270,7 +270,7 @@ func TestREQ112_PartyProxyAndParticipationFindings(t *testing.T) {
 			mutate: func(c *rm.Composition) {
 				evaluationOf(c).Subject = &rm.PartySelf{ExternalRef: refWithoutNamespace()}
 			},
-			want: []string{"rm_invariant /content[0]/subject/external_ref/namespace"},
+			want: []string{"rm_invariant /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/subject/external_ref/namespace"},
 		},
 		{
 			name:   "ENTRY subject PARTY_SELF in value form",
@@ -331,9 +331,9 @@ func TestREQ112_PartyProxyDetailsAreValueFree(t *testing.T) {
 		"required /composer/relationship",
 		"rm_invariant /composer/external_ref/namespace",
 		"rm_invariant /composer/identifiers",
-		"rm_invariant /content[0]/subject/external_ref/namespace",
-		"rm_invariant /content[0]/subject/name",
-		"rm_invariant /context/participations[0]/performer",
+		"rm_invariant /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/subject/external_ref/namespace",
+		"rm_invariant /content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/subject/name",
+		"rm_invariant /context/participations[1]/performer",
 	})
 	if got := findingsOf(r); !slices.Equal(got, want) {
 		t.Fatalf("ValidateRM(COMPOSITION with marked party proxies) findings = %q, want %q", got, want)

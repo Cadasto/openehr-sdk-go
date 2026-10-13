@@ -5,8 +5,9 @@
 // FLAT to STRUCTURED does not. The program builds the Web Template from the
 // OPT, encodes a vendored composition as FLAT, restructures it as
 // STRUCTURED, decodes the FLAT back into a composition, and finally shows the
-// template-aware decode whose result passes both validation passes: the RM
-// floor and the OPT's constraints. Nothing here imports an internal/ package.
+// template-aware decode whose result is valid: validation.ValidateComposition
+// checks the OPT's constraints and the RM floor in one call. Nothing here
+// imports an internal/ package.
 //
 // Runs offline on the vendored Test_dv_quantity_open_constraint.v0 fixtures:
 //
@@ -110,26 +111,23 @@ func run() error {
 		return fmt.Errorf("decode FLAT with template: %w", err)
 	}
 
-	// Step 7: validate it in both passes. The RM floor checks it against the
-	// Reference Model alone; the template pass checks the OPT's constraints.
-	// Today the template pass does not run the RM floor's per-type rules,
-	// so a program that wants both guarantees calls both.
-	rmOK := reportPass("RM floor", validation.ValidateRM(conformant))
-	templateOK := reportPass("template constraints", validation.ValidateComposition(conformant, compiled))
-	if !rmOK || !templateOK {
-		return errors.New("template-aware decode fails at least one validation pass")
+	// Step 7: validate it. One call checks the OPT's constraints and the RM
+	// floor, the Reference Model's own rules, over the whole composition, and
+	// reports a defect both find once.
+	if !report(validation.ValidateComposition(conformant, compiled)) {
+		return errors.New("template-aware decode is not valid")
 	}
 	return nil
 }
 
-// reportPass prints one validation pass of the template-aware decode: the
-// verdict under the pass's name, then one line per issue. It returns
-// result.OK, which is false exactly when the pass found an error.
-func reportPass(name string, result validation.Result) bool {
+// report prints the validation result of the template-aware decode: the
+// verdict, then one line per issue. It returns result.OK, which is false
+// exactly when an error was found.
+func report(result validation.Result) bool {
 	if result.OK {
-		fmt.Printf("OK: WithTemplate decode passes the %s\n", name)
+		fmt.Println("OK: WithTemplate decode passes the template constraints and the RM floor")
 	} else {
-		fmt.Printf("FAILED: WithTemplate decode fails the %s, %d issue(s)\n", name, len(result.Issues))
+		fmt.Printf("FAILED: WithTemplate decode is not valid, %d issue(s)\n", len(result.Issues))
 	}
 	for _, issue := range result.Issues {
 		fmt.Printf("  %s [%s] %s\n", issue.Path, issue.Code, issue.Detail)

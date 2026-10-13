@@ -112,7 +112,9 @@ func templateErrors(out any, c *templatecompile.Compiled) []validation.Issue {
 // phrase's code_string or terminology id, or an existence of 0..0, the
 // generator keeps what the walk wrote, which that constraint admits: the
 // at0000 placeholder under the OPT's terminology, or nothing. The template
-// validator then finds no error. Where the OPT's constraint admits the
+// validator then finds no error, apart from the RM floor's one
+// code_not_in_value_set where the placeholder sits on an attribute the RM
+// ties to a code set or group (REQ-107 § Exceptions and known gaps). Where the OPT's constraint admits the
 // default, the default is written; the rows marked admit check that for
 // the cases other tests do not cover. Each row runs under both policies,
 // both value fills and both compile modes.
@@ -132,46 +134,57 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 		// it reports rm_type_mismatch on a code phrase's terminology_id
 		// whatever the value, because it reads that attribute as a string.
 		validatorBlind bool
-		check          func(t *testing.T, out any)
+		// floorCoded is the path of the code phrase whose placeholder the
+		// RM floor, which template validation includes, reports as
+		// code_not_in_value_set: the OPT admits no member of the code set
+		// or group the RM ties the attribute to, which REQ-107 excepts.
+		floorCoded string
+		check      func(t *testing.T, out any)
 	}{
 		{
-			name: "ENTRY language, C_CODE_PHRASE local",
-			opt:  yieldAction(optCodePhrase("local"), "", ""),
+			name:       "ENTRY language, C_CODE_PHRASE local",
+			floorCoded: "/language",
+			opt:        yieldAction(optCodePhrase("local"), "", ""),
 			check: func(t *testing.T, out any) {
 				checkCode(t, "ACTION.language", out.(*rm.Action).Language, localAt0000)
 			},
 		},
 		{
-			name: "ENTRY encoding, C_CODE_PHRASE local",
-			opt:  yieldAction("", optCodePhrase("local"), ""),
+			name:       "ENTRY encoding, C_CODE_PHRASE local",
+			floorCoded: "/encoding",
+			opt:        yieldAction("", optCodePhrase("local"), ""),
 			check: func(t *testing.T, out any) {
 				checkCode(t, "ACTION.encoding", out.(*rm.Action).Encoding, localAt0000)
 			},
 		},
 		{
-			name: "ISM_TRANSITION current_state, C_CODE_PHRASE local",
-			opt:  yieldAction("", "", optCodedText("local")),
+			name:       "ISM_TRANSITION current_state, C_CODE_PHRASE local",
+			floorCoded: "/ism_transition/current_state/defining_code",
+			opt:        yieldAction("", "", optCodedText("local")),
 			check: func(t *testing.T, out any) {
 				checkCode(t, "ISM_TRANSITION.current_state", out.(*rm.Action).IsmTransition.CurrentState.DefiningCode, localAt0000)
 			},
 		},
 		{
-			name: "COMPOSITION category, C_CODE_PHRASE local",
-			opt:  optTemplate("COMPOSITION", optSingle("category", optCodedText("local"))),
+			name:       "COMPOSITION category, C_CODE_PHRASE local",
+			floorCoded: "/category/defining_code",
+			opt:        optTemplate("COMPOSITION", optSingle("category", optCodedText("local"))),
 			check: func(t *testing.T, out any) {
 				checkCode(t, "COMPOSITION.category", generatedComposition(t, out).Category.DefiningCode, localAt0000)
 			},
 		},
 		{
-			name: "COMPOSITION language, C_CODE_PHRASE local",
-			opt:  optTemplate("COMPOSITION", optSingle("language", optCodePhrase("local"))),
+			name:       "COMPOSITION language, C_CODE_PHRASE local",
+			floorCoded: "/language",
+			opt:        optTemplate("COMPOSITION", optSingle("language", optCodePhrase("local"))),
 			check: func(t *testing.T, out any) {
 				checkCode(t, "COMPOSITION.language", generatedComposition(t, out).Language, localAt0000)
 			},
 		},
 		{
-			name: "COMPOSITION territory, C_CODE_PHRASE local",
-			opt:  optTemplate("COMPOSITION", optSingle("territory", optCodePhrase("local"))),
+			name:       "COMPOSITION territory, C_CODE_PHRASE local",
+			floorCoded: "/territory",
+			opt:        optTemplate("COMPOSITION", optSingle("territory", optCodePhrase("local"))),
 			check: func(t *testing.T, out any) {
 				checkCode(t, "COMPOSITION.territory", generatedComposition(t, out).Territory, localAt0000)
 			},
@@ -186,8 +199,9 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 			},
 		},
 		{
-			name: "EVENT_CONTEXT setting, C_CODE_PHRASE local",
-			opt:  optTemplate("COMPOSITION", optSingle("context", optNode("EVENT_CONTEXT", "", optSingle("setting", optCodedText("local"))))),
+			name:       "EVENT_CONTEXT setting, C_CODE_PHRASE local",
+			floorCoded: "/context/setting/defining_code",
+			opt:        optTemplate("COMPOSITION", optSingle("context", optNode("EVENT_CONTEXT", "", optSingle("setting", optCodedText("local"))))),
 			check: func(t *testing.T, out any) {
 				checkCode(t, "EVENT_CONTEXT.setting", setting(out).DefiningCode, localAt0000)
 			},
@@ -239,8 +253,9 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 			},
 		},
 		{
-			name: "ELEMENT null_flavour, C_CODE_PHRASE local",
-			opt:  optTemplate("ELEMENT", optSingle("null_flavour", optCodedText("local"))),
+			name:       "ELEMENT null_flavour, C_CODE_PHRASE local",
+			floorCoded: "/null_flavour/defining_code",
+			opt:        optTemplate("ELEMENT", optSingle("null_flavour", optCodedText("local"))),
 			check: func(t *testing.T, out any) {
 				el := out.(*rm.Element)
 				if el.NullFlavour == nil {
@@ -250,7 +265,8 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 			},
 		},
 		{
-			name: "INTERVAL_EVENT math_function, C_CODE_PHRASE local",
+			name:       "INTERVAL_EVENT math_function, C_CODE_PHRASE local",
+			floorCoded: "/math_function/defining_code",
 			opt: optTemplate("INTERVAL_EVENT", append([]string{optSingle("math_function", optCodedText("local"))},
 				intervalEventAttrs...)...),
 			check: func(t *testing.T, out any) {
@@ -393,15 +409,17 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 			},
 		},
 		{
-			name: "COMPOSITION category, value C_STRING visit",
-			opt:  optTemplate("COMPOSITION", optSingle("category", codedTextWithValue("visit"))),
+			name:       "COMPOSITION category, value C_STRING visit",
+			floorCoded: "/category/defining_code",
+			opt:        optTemplate("COMPOSITION", optSingle("category", codedTextWithValue("visit"))),
 			check: func(t *testing.T, out any) {
 				checkCodedText(t, "COMPOSITION.category", generatedComposition(t, out).Category, "visit", openehrAt0000)
 			},
 		},
 		{
-			name: "EVENT_CONTEXT setting, value C_STRING home",
-			opt:  optTemplate("COMPOSITION", optSingle("context", optNode("EVENT_CONTEXT", "", optSingle("setting", codedTextWithValue("home"))))),
+			name:       "EVENT_CONTEXT setting, value C_STRING home",
+			floorCoded: "/context/setting/defining_code",
+			opt:        optTemplate("COMPOSITION", optSingle("context", optNode("EVENT_CONTEXT", "", optSingle("setting", codedTextWithValue("home"))))),
 			check: func(t *testing.T, out any) {
 				checkCodedText(t, "EVENT_CONTEXT.setting", setting(out), "home", openehrAt0000)
 			},
@@ -415,14 +433,16 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 			},
 		},
 		{
-			name: "ISM_TRANSITION current_state, value C_STRING planned",
-			opt:  yieldAction("", "", codedTextWithValue("planned")),
+			name:       "ISM_TRANSITION current_state, value C_STRING planned",
+			floorCoded: "/ism_transition/current_state/defining_code",
+			opt:        yieldAction("", "", codedTextWithValue("planned")),
 			check: func(t *testing.T, out any) {
 				checkCodedText(t, "ISM_TRANSITION.current_state", out.(*rm.Action).IsmTransition.CurrentState, "planned", openehrAt0000)
 			},
 		},
 		{
-			name: "INTERVAL_EVENT math_function, value C_STRING maximum",
+			name:       "INTERVAL_EVENT math_function, value C_STRING maximum",
+			floorCoded: "/math_function/defining_code",
 			opt: optTemplate("INTERVAL_EVENT", append([]string{optSingle("math_function", codedTextWithValue("maximum"))},
 				intervalEventAttrs...)...),
 			check: func(t *testing.T, out any) {
@@ -430,8 +450,9 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 			},
 		},
 		{
-			name: "ELEMENT null_flavour, value C_STRING unknown",
-			opt:  optTemplate("ELEMENT", optSingle("null_flavour", codedTextWithValue("unknown"))),
+			name:       "ELEMENT null_flavour, value C_STRING unknown",
+			floorCoded: "/null_flavour/defining_code",
+			opt:        optTemplate("ELEMENT", optSingle("null_flavour", codedTextWithValue("unknown"))),
 			check: func(t *testing.T, out any) {
 				el := out.(*rm.Element)
 				if el.NullFlavour == nil {
@@ -441,8 +462,9 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 			},
 		},
 		{
-			name: "DV_MULTIMEDIA media_type, C_CODE_PHRASE openEHR",
-			opt:  yieldMultimedia(optSingle("media_type", optCodePhrase("openEHR"))),
+			name:       "DV_MULTIMEDIA media_type, C_CODE_PHRASE openEHR",
+			floorCoded: "/value/media_type",
+			opt:        yieldMultimedia(optSingle("media_type", optCodePhrase("openEHR"))),
 			check: func(t *testing.T, out any) {
 				want := rm.CodePhrase{CodeString: "at0000", TerminologyID: rm.TerminologyID{Value: "openEHR"}}
 				checkCode(t, "DV_MULTIMEDIA.media_type", rootElementValue[*rm.DVMultimedia](t, out).MediaType, want)
@@ -467,8 +489,9 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 			},
 		},
 		{
-			name: "DV_MULTIMEDIA media_type, code_string C_STRING at-code pattern",
-			opt:  yieldMultimedia(optSingle("media_type", optNode("CODE_PHRASE", "", optStringAttr("code_string", "<pattern>at[0-9]{4}</pattern>")))),
+			name:       "DV_MULTIMEDIA media_type, code_string C_STRING at-code pattern",
+			floorCoded: "/value/media_type",
+			opt:        yieldMultimedia(optSingle("media_type", optNode("CODE_PHRASE", "", optStringAttr("code_string", "<pattern>at[0-9]{4}</pattern>")))),
 			check: func(t *testing.T, out any) {
 				if got := rootElementValue[*rm.DVMultimedia](t, out).MediaType.CodeString; !atPattern.MatchString(got) {
 					t.Errorf("DV_MULTIMEDIA.media_type code = %q, want a code the at-code pattern accepts", got)
@@ -509,8 +532,20 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 					if tc.validatorBlind {
 						return
 					}
+					var coded int
 					for _, iss := range templateErrors(out, c) {
+						if tc.floorCoded != "" && iss.Code == "code_not_in_value_set" && iss.Path == tc.floorCoded {
+							coded++
+							continue
+						}
 						t.Errorf("template validator: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+					}
+					want := 0
+					if tc.floorCoded != "" {
+						want = 1
+					}
+					if coded != want {
+						t.Errorf("template validator: %d code_not_in_value_set @ %q, want %d", coded, tc.floorCoded, want)
 					}
 				})
 			}

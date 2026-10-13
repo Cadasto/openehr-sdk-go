@@ -62,6 +62,10 @@ func (b *allocBudget) add(k int) error {
 // node's id, rm_version is [rm.Release], and the COMPOSITION alone also
 // gets the Web Template's template id. Whatever the original composition
 // held there is not recovered.
+//
+// A key the decode does not read is ignored by default, and the value holds
+// the rest of the body. [WithUnmatched] reports each such key and
+// [WithStrict] refuses the first, wrapping [ErrUnknownPath].
 func UnmarshalFlat(data []byte, wt *webtemplate.WebTemplate, opts ...Option) (*rm.Composition, error) {
 	if wt == nil || wt.Tree == nil {
 		return nil, ErrNoTemplate
@@ -71,11 +75,33 @@ func UnmarshalFlat(data []byte, wt *webtemplate.WebTemplate, opts ...Option) (*r
 		return nil, err
 	}
 	cfg := newDecodeConfig(opts)
+	var loc locator
+	if cfg.tracked() {
+		if loc, err = flatLocations(data); err != nil {
+			return nil, err
+		}
+	}
+	return decodeFlatMap(flat, wt, cfg, loc, nil)
+}
+
+// decodeFlatMap is the decode both entry points share once the body is a FLAT
+// map: it decodes the map without its unmatched keys, applies the caller's
+// policy for them (loc places each key in the input), and builds the
+// COMPOSITION through canjson. skipped are unmatched items set aside before
+// the map was made, as [memberKeys] of STRUCTURED member paths; the policy
+// takes them with the keys the decode sets aside.
+func decodeFlatMap(flat map[string]any, wt *webtemplate.WebTemplate, cfg decodeConfig, loc locator, skipped []string) (*rm.Composition, error) {
 	var names map[string]string
 	if cfg.template != nil {
 		names = buildNameIndex(cfg.template)
 	}
-	compJSON, err := decodeFlat(flat, wt, names)
+	compJSON, unmatched, err := decodeFlatIgnoring(flat, wt, names, cfg.strict)
+	unmatched = slices.Concat(skipped, unmatched)
+	if cfg.strict {
+		if refusal := applyUnmatchedPolicy(cfg, loc, unmatched); refusal != nil {
+			return nil, refusal
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -87,27 +113,49 @@ func UnmarshalFlat(data []byte, wt *webtemplate.WebTemplate, opts ...Option) (*r
 	if err := canjson.Unmarshal(b, &comp); err != nil {
 		return nil, err
 	}
+	if !cfg.strict {
+		// The report waits for the decode to succeed, so a decode that fails
+		// passes the caller nothing.
+		if err := applyUnmatchedPolicy(cfg, loc, unmatched); err != nil {
+			return nil, err
+		}
+	}
 	return &comp, nil
 }
 
 // decodeFlat builds the canonical-JSON object for the COMPOSITION from the
 // FLAT map, driven by the Web Template. names (optional; nil unless a template
-// was supplied) maps a node's compiled aqlPath to its LOCATABLE.name.
-func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[string]string) (map[string]any, error) {
+// was supplied) maps a node's compiled aqlPath to its LOCATABLE.name. Every
+// key it does not read goes to sink, and the decode carries on without it.
+func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[string]string, sink *unmatchedSink) (map[string]any, error) {
 	root := wt.Tree
 	compJSON := map[string]any{
 		"_type":             "COMPOSITION",
 		"archetype_node_id": root.NodeID,
 		"name":              textJSON(cmp.Or(root.Name, wt.TemplateID)),
 	}
+	// A key ending in a bare `|` spells the key without it; both at once are two
+	// spellings of one field (REQ-170), judged once the decode knows whether it
+	// reads that field.
+	flat, fold := foldEmptySuffix(flat)
+	if sink != nil {
+		sink.spellings = fold.spellings
+	}
 	// Separate composition-level context from clinical content; context is
 	// rebuilt from RM attributes, not from a Web Template leaf path.
-	ctx, ctxOrigin, content, err := siphonContext(flat, root.ID)
+	ctx, ctxOrigin, content, err := siphonContext(flat, root.ID, sink)
 	if err != nil {
 		return nil, err
 	}
 	budget := &allocBudget{limit: maxTotalNodes}
 	ambiguous := ambiguousBarePaths(wt)
+	// The reference's in-context keys for RM attributes the Web Template this
+	// SDK builds does not model name RM data decode would drop: refused in every
+	// mode, before anything could set them aside as unmatched or the
+	// WithTemplate defaults replace them (REQ-170).
+	if err := refuseInContextKeys(content, wt, ambiguous); err != nil {
+		return nil, err
+	}
 	// Siphon off the composite leaves first — the ones whose FLAT form has
 	// sub-paths of its own rather than a suffix set (REQ-053's ENTRY `subject` and
 	// the DV_INTERVAL leaf, REQ-140's party and interval grammars). A party leaf's
@@ -119,7 +167,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	// grammar has. It has to run before the `_` router, which would otherwise claim
 	// `subject/_identifier:0` as a family whose owner is a leaf the grammar cannot
 	// judge.
-	compositeGroups, err := compositeLeafGroups(content, wt)
+	compositeGroups, err := compositeLeafGroups(content, wt, sink)
 	if err != nil {
 		return nil, err
 	}
@@ -128,40 +176,55 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	// before it, so those keys are grouped per (owner path, family, :index) and
 	// routed by the owner's RM class instead of resolving to a leaf. What stays
 	// in content is ordinary template-constrained leaf data.
-	attrGroups, attrIndexes, err := rmattrGroups(content)
+	attrGroups, err := rmattrGroups(content, sink)
 	if err != nil {
 		return nil, err
 	}
 	// Group the remaining FLAT keys by leaf instance (key minus the |suffix);
-	// each group's suffix->value pairs build one DataValue.
+	// each group's suffix->value pairs build one DataValue. keys keeps the key
+	// each suffix arrived under, which is the one an unmatched suffix reports.
 	groups := make(map[string]map[string]any)
+	keys := make(map[string]map[string]string)
 	for key, val := range content {
 		base, suffix := splitSuffix(key)
 		if groups[base] == nil {
 			groups[base] = make(map[string]any)
+			keys[base] = make(map[string]string)
 		}
 		groups[base][suffix] = val
+		keys[base][suffix] = key
 	}
 	// Process leaf groups in a stable (sorted) order so the reconstructed tree
 	// is deterministic: distinct-node-id siblings with no explicit :index
 	// (e.g. multiple content items, or elements under one ITEM_TREE) are
 	// appended in this order, which must not depend on Go map iteration.
 	for _, base := range slices.Sorted(maps.Keys(groups)) {
-		sfx := groups[base]
+		keyOf := func(suffix string) string { return keys[base][suffix] }
 		pk, err := parseFlatKey(base)
 		if err != nil {
 			return nil, err
 		}
 		leaf, predIndex, predType, err := resolveLeaf(wt, pk.segs, ambiguous)
 		if errors.Is(err, errSegNotFound) {
-			// A key that does not resolve to a WT node is a wrong template, a
-			// typo, or an unsupported _-prefixed RM attribute (see deviations.md
-			// — ctx/ is siphoned off above and |raw is a suffix, so neither
-			// reaches this branch). Fail loudly, never drop silently (REQ-053).
-			return nil, fmt.Errorf("%w: %q", ErrUnknownPath, base)
+			// A key that does not resolve to a Web Template node is a wrong
+			// template, a typo, or an unsupported _-prefixed RM attribute (ctx/
+			// is siphoned off above and |raw is a suffix, so neither reaches this
+			// branch): unmatched content, which the decode does not read
+			// (REQ-170).
+			for _, suffix := range slices.Sorted(maps.Keys(groups[base])) {
+				sink.add(keyOf(suffix))
+			}
+			continue
 		}
 		if err != nil {
 			return nil, fmt.Errorf("simplified: %q: %w", base, err)
+		}
+		sfx, err := leafSuffixes(leaf, groups[base], keyOf, sink)
+		if err != nil {
+			return nil, err
+		}
+		if len(sfx) == 0 {
+			continue
 		}
 		dv, err := leafFromSuffixes(nodeRMType(leaf), leafListOpen(leaf), sfx)
 		if err != nil {
@@ -181,17 +244,8 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	// Underscore RM attributes come after the clinical leaves, so their owners
 	// are decorated onto nodes the content walk has already materialised rather
 	// than gap-filling their own (REQ-140).
-	for _, g := range attrGroups {
-		owner, err := rmattrOwnerAt(wt, compJSON, g.base, ambiguous, budget, names)
-		if errors.Is(err, errSegNotFound) {
-			return nil, fmt.Errorf("%w: %q", ErrUnknownPath, g.prefix())
-		}
-		if err != nil {
-			return nil, fmt.Errorf("simplified: %q: %w", g.prefix(), err)
-		}
-		if err := rmattrDecode(owner, g, attrIndexes[g.base+"\x00"+g.family], budget); err != nil {
-			return nil, err
-		}
+	if err := decodeRMAttrGroups(compJSON, wt, attrGroups, ambiguous, budget, names); err != nil {
+		return nil, err
 	}
 	// Every key is placed, so each rebuilt ISM transition can now get the careflow
 	// step its node names, or have the body's checked against it (REQ-053).
@@ -205,7 +259,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 		return nil, err
 	}
 	// Context: parse once, then apply (with the mandatory-field check) after
-	// content, so an unresolvable content key surfaces as ErrUnknownPath first.
+	// content, so a refused content key surfaces first.
 	ci, err := parseCtx(ctx, ctxOrigin)
 	if err != nil {
 		return nil, err
@@ -222,7 +276,98 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	// Both modes: archetype_details has no FLAT key, and the Web Template
 	// alone holds what it records (REQ-053).
 	rebuildArchetypeDetails(compJSON, wt)
+	if err := fold.settle(sink); err != nil {
+		return nil, err
+	}
 	return compJSON, nil
+}
+
+// leafSuffixes returns the suffixes of one leaf group that the decode reads,
+// handing the key of every other one to sink (REQ-170). keyOf gives the key a
+// suffix arrived under.
+//
+//   - A node with children is structure, not a value: the decode reads a |raw
+//     fragment there and its bare value, which names the node and so is
+//     matched content of the wrong shape, refused where the value is built
+//     (REQ-170). Every other suffix is unmatched (an extension suffix such as
+//     `|x_note`, say). The RM attributes the reference spells as a suffix on
+//     such a node never get here: [refuseInContextKeys] refuses them first.
+//   - A leaf whose datatype has a suffix set keeps the suffixes in that set
+//     ([leafSuffixMatched]); the rest are unmatched.
+//   - A leaf whose datatype has neither a suffix set nor a sub-path grammar
+//     resolves but has no carrier other than |raw: in practice the composer's
+//     PARTY_PROXY, whose party grammar the ctx/ forms own. Its bare value, and
+//     a suffix that names something the datatype has, are refused in every
+//     mode with ErrUnsupportedDatatype, as the other carrier-less keys at a
+//     leaf are, naming the first such key: an attribute of its RM class, or
+//     for a party the party grammar's suffixes (the composer's `external_ref`
+//     among them). Any other suffix is unmatched (REQ-170).
+//   - An unparameterised `DV_INTERVAL` leaf has a sub-path grammar, the
+//     interval grammar, but names no bound datatype to read it with, so it
+//     reads its |raw fragment alone; every other key is unmatched.
+func leafSuffixes(leaf *webtemplate.Node, sfx map[string]any, keyOf func(string) string, sink *unmatchedSink) (map[string]any, error) {
+	if len(leaf.Children) > 0 {
+		var out map[string]any
+		for _, suffix := range slices.Sorted(maps.Keys(sfx)) {
+			if suffix == "raw" || suffix == "" {
+				continue
+			}
+			if out == nil {
+				out = maps.Clone(sfx)
+			}
+			delete(out, suffix)
+			sink.add(keyOf(suffix))
+		}
+		if out == nil {
+			return sfx, nil
+		}
+		return out, nil
+	}
+	rmType := nodeRMType(leaf)
+	if _, judged := leafSuffixMatched(rmType, ""); judged {
+		return matchedSuffixes(rmType, sfx, keyOf, sink), nil
+	}
+	subPathGrammar := bmmtype.Class(rmType) == "DV_INTERVAL"
+	var out map[string]any
+	for _, suffix := range slices.Sorted(maps.Keys(sfx)) {
+		switch {
+		case suffix == "raw":
+			// |raw is the carrier of an unmapped datatype; dvFromSuffixes refuses
+			// it beside any other suffix.
+		case !subPathGrammar && (suffix == "" || unmappedReads(rmType, suffix)):
+			if _, raw := sfx["raw"]; raw {
+				break
+			}
+			if suffix == "" {
+				// Named as the allowlist refusals name a bare value, so a caller
+				// reading the refusal removes the bare key alone.
+				return nil, fmt.Errorf("simplified: decode %q: %w: unexpected bare value for %s", keyOf(suffix), ErrUnsupportedDatatype, rmType)
+			}
+			return nil, fmt.Errorf("simplified: decode %q: %w: %s", keyOf(suffix), ErrUnsupportedDatatype, rmType)
+		default:
+			if out == nil {
+				out = maps.Clone(sfx)
+			}
+			delete(out, suffix)
+			sink.add(keyOf(suffix))
+		}
+	}
+	if out == nil {
+		return sfx, nil
+	}
+	return out, nil
+}
+
+// unmappedReads reports whether suffix names something a leaf of rmType, a
+// datatype with neither a suffix set nor a sub-path grammar, has: for a party,
+// a suffix of the party grammar (the composer's `external_ref` suffixes and
+// `|name`); otherwise an attribute of its RM class.
+func unmappedReads(rmType, suffix string) bool {
+	if isPartyLeafType(rmType) {
+		return partyProxyOwnTails[suffix]
+	}
+	_, declared := rminfo.Default.AttributeRMType(bmmtype.Class(rmType), suffix)
+	return declared
 }
 
 // metadataAliases maps the reference implementation's real-path spelling of
@@ -246,6 +391,11 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 //     the RM attribute directly, where applyContext (which runs after content and
 //     assigns from the ctx/ values) overwrote it; a body carrying only the real
 //     path failed the mandatory-context check instead.
+//
+// Each entry is keyed on the unindexed spelling. [metadataRel] reads a key
+// whose metadata segments carry `:0` as that spelling and reports any other
+// index, which [siphonContext] refuses (REQ-053); [cutRoot] does the same for
+// the template root's own segment.
 //
 // Entries here are respellings *only* — same information, different surface.
 // `context/setting|code` / `|value` joined on 2026-08-05 (the amended REQ-053):
@@ -284,32 +434,286 @@ var metadataAliasTerminology = map[string]string{
 	"context/setting|terminology": terminology.ID,
 }
 
-// contextMetaOwnedBases are the EVENT_CONTEXT leaves the ctx/ short forms own
-// outright: the Web Template carries a node for them, so an unaccepted spelling
-// would resolve as an ordinary leaf and then be silently overwritten by
-// [applyContext], which writes the ctx/ values last. Refusing every other
-// spelling of these two bases in [siphonContext] is what keeps that unreachable.
+// contextMetaOwnedBases are the composition-metadata leaves the ctx/ short
+// forms own outright: COMPOSITION `language` and `territory`, and EVENT_CONTEXT
+// `setting` and `start_time`. The Web Template carries a node for them, so an
+// unaccepted spelling would resolve as an ordinary leaf and then be silently
+// overwritten by [applyContext], which writes the ctx/ values last, or fail
+// there for a reason that is not the real one (`language|preferred_term` alone
+// is a CODE_PHRASE with no `|code`). Refusing every other spelling of these
+// bases that their datatype has, in [siphonContext], naming the ctx/ form that
+// owns the leaf, is what keeps that unreachable; a suffix their datatype does
+// not have is unmatched content and is never placed.
 //
-// Only these two. `language`, `territory` and `composer` are deliberately absent:
-// the composer external_ref suffixes (`composer|id` / `|id_scheme` /
-// `|id_namespace`) must keep flowing through to decode so they are refused there
-// and counted in the PROBE-086 census as the real PARTY_PROXY data loss they are
-// (ADR 0015). Both bases here are held out of that census by the harness
-// (`IsCompositionMeta`), so refusing extra suffixes early moves no count.
+// `composer` is deliberately absent: the composer external_ref suffixes
+// (`composer|id` / `|id_scheme` / `|id_namespace`) must keep flowing through to
+// decode so they are refused there and counted in the PROBE-086 census as the
+// real PARTY_PROXY data loss they are (ADR 0015). Every base here is held out of
+// that census by the harness (`IsCompositionMeta`), so refusing extra suffixes
+// early moves no count.
 var contextMetaOwnedBases = map[string]bool{
 	"context/setting": true, "context/start_time": true,
+	"language": true, "territory": true,
 }
 
 // metadataOwnedBaseCtx names the ctx/ short form that owns each base, so the
 // refusal points at the spelling the payload should have used.
 var metadataOwnedBaseCtx = map[string]string{
 	"context/setting": "ctx/setting|code + ctx/setting|value", "context/start_time": "ctx/time",
+	"language": "ctx/language", "territory": "ctx/territory",
+}
+
+// metadataOwnedBaseType is the RM type of each ctx/-owned base, EVENT_CONTEXT's
+// own attribute type, whether or not the template carries a node for it. A
+// suffix in that type's suffix set is one the decode reads, and the ctx/ form
+// cannot carry it; any other suffix is unmatched content (REQ-170).
+var metadataOwnedBaseType = map[string]string{
+	"context/setting": "DV_CODED_TEXT", "context/start_time": "DV_DATE_TIME",
+	"language": "CODE_PHRASE", "territory": "CODE_PHRASE",
+}
+
+// ctxSettingBare is the bare spelling of ctx/setting, which the decode reads as
+// a pair of suffixes only, and ctxSettingTerminology the witness of the
+// terminology that pair implies.
+const (
+	ctxSettingBare        = "ctx/setting"
+	ctxSettingTerminology = "ctx/setting|terminology"
+)
+
+// ctxFields are the ctx/ keys the decode reads into context (REQ-053). Any
+// other ctx/ key is unmatched content (REQ-170), except [ctxSettingBare] and
+// [ctxSettingTerminology], which the decode also reads.
+var ctxFields = map[string]bool{
+	"ctx/language": true, "ctx/territory": true,
+	"ctx/composer_name": true, "ctx/composer_self": true,
+	"ctx/time":         true,
+	"ctx/setting|code": true, "ctx/setting|value": true,
+}
+
+// metadataSegPaths are the root-relative segment paths the metadata spellings
+// run through: every leading run of segments of an alias, a witness or a
+// ctx/-owned base, plus `composer` for its party sub-structure. Each names a
+// single-valued RM attribute (COMPOSITION.language, .composer, .context,
+// EVENT_CONTEXT.start_time, …). The set is read off those tables, so an alias
+// added there brings its segments with it.
+var metadataSegPaths = func() map[string]bool {
+	paths := map[string]bool{"composer": true}
+	add := func(spelling string) {
+		base, _, _ := strings.Cut(spelling, "|")
+		for i := range len(base) {
+			if base[i] == '/' {
+				paths[base[:i]] = true
+			}
+		}
+		paths[base] = true
+	}
+	for _, s := range slices.Concat(slices.Collect(maps.Keys(metadataAliases)),
+		slices.Collect(maps.Keys(metadataAliasTerminology)),
+		slices.Collect(maps.Keys(contextMetaOwnedBases))) {
+		add(s)
+	}
+	return paths
+}()
+
+// metadataRel rewrites a root-relative FLAT key into the unindexed spelling the
+// metadata tables are keyed on. Every segment on a metadata path is a
+// single-valued attribute, and OPT-free STRUCTURED → FLAT conversion writes
+// each segment with an explicit index, so REQ-053 makes `language:0|code` the
+// same real path as `language|code`, and `context:0/start_time:0` the same as
+// `context/start_time`. Only the leading run of metadata segments loses its
+// index: what follows keeps it, such as a party's `_identifier:0` or the
+// archetyped content under `context:0/other_context`. The suffix is kept as
+// written.
+//
+// overIndexed reports a metadata segment that carries an index other than :0.
+// That index addresses a list slot a single-valued attribute does not have.
+// The segment is rewritten without it all the same, so the caller can tell
+// whether the key is a metadata spelling at all. A malformed index comes back
+// unchanged, for the leaf loop to refuse.
+func metadataRel(rel string) (norm string, overIndexed bool) {
+	path, suffix, piped := strings.Cut(rel, "|")
+	pk, err := parseFlatKey(path)
+	if err != nil {
+		return rel, false
+	}
+	var b strings.Builder
+	var seen string
+	onMeta := true
+	for i, s := range pk.segs {
+		if i > 0 {
+			b.WriteByte('/')
+		}
+		if onMeta {
+			p := s.id
+			if seen != "" {
+				p = seen + "/" + s.id
+			}
+			if metadataSegPaths[p] {
+				seen = p
+				b.WriteString(s.id)
+				overIndexed = overIndexed || s.idx > 0
+				continue
+			}
+			onMeta = false
+		}
+		writeFlatSeg(&b, s)
+	}
+	if piped {
+		b.WriteByte('|')
+		b.WriteString(suffix)
+	}
+	return b.String(), overIndexed
+}
+
+// overIndexedMetadataSeg returns the first segment of the leading run of
+// metadata segments of rel, a root-relative path, that carries an index past
+// :0. [metadataRel] reports that one exists.
+func overIndexedMetadataSeg(rel string) flatSeg {
+	path, _, _ := strings.Cut(rel, "|")
+	pk, err := parseFlatKey(path)
+	if err != nil {
+		return flatSeg{}
+	}
+	var seen string
+	for _, s := range pk.segs {
+		p := strings.TrimPrefix(seen+"/"+s.id, "/")
+		if !metadataSegPaths[p] {
+			break
+		}
+		if s.idx > 0 {
+			return s
+		}
+		seen = p
+	}
+	return flatSeg{}
+}
+
+// composerSubStructure reports whether sub, the path below `composer/`, opens
+// with a segment of the party grammar's sub-structure: the nested
+// `_identifier:N` list or PARTY_RELATED's `relationship`.
+func composerSubStructure(sub string) bool {
+	seg := sub
+	if cut := strings.IndexAny(seg, "/|"); cut >= 0 {
+		seg = seg[:cut]
+	}
+	id, _, _ := strings.Cut(seg, ":")
+	return partyListTails[id] || partySubTails[id]
+}
+
+// isMetadataSpelling reports whether an unindexed root-relative spelling is one
+// [siphonContext] handles itself: an alias, a terminology witness, a suffix of
+// a leaf the ctx/ short form owns, or the composer's party sub-structure.
+func isMetadataSpelling(rel string) bool {
+	if _, isAlias := metadataAliases[rel]; isAlias {
+		return true
+	}
+	if _, isWitness := metadataAliasTerminology[rel]; isWitness {
+		return true
+	}
+	if base, _, _ := strings.Cut(rel, "|"); contextMetaOwnedBases[base] {
+		return true
+	}
+	return strings.HasPrefix(rel, "composer/")
+}
+
+// cutRoot splits a FLAT key at its template-root segment and returns the path
+// below it. The root segment may carry an explicit index (`<root>:0/…`, the
+// form REQ-053 reads as `<root>/…`), so it is parsed rather than matched as a
+// literal prefix; rootSeg reports the index it carries. rooted is false for a
+// key whose first segment is not the root, has nothing below it, or carries a
+// malformed index (the leaf loop refuses that one).
+func cutRoot(key, rootID string) (rel string, rootSeg flatSeg, rooted bool) {
+	first, rel, found := strings.Cut(key, "/")
+	if !found {
+		return "", flatSeg{}, false
+	}
+	pk, err := parseFlatKey(first)
+	if err != nil || pk.suffix != "" || len(pk.segs) != 1 || pk.segs[0].id != rootID {
+		return "", flatSeg{}, false
+	}
+	return rel, pk.segs[0], true
+}
+
+// rootSegmentAlone parses a key that has no `/` as one segment and its
+// suffix, and reports the segment when it is the template root's.
+func rootSegmentAlone(key, rootID string) (flatSeg, bool) {
+	if strings.Contains(key, "/") {
+		return flatSeg{}, false
+	}
+	pk, err := parseFlatKey(key)
+	if err != nil || len(pk.segs) != 1 || pk.segs[0].id != rootID {
+		return flatSeg{}, false
+	}
+	return pk.segs[0], true
+}
+
+// errRootIndex refuses an index past the bound of the template root's own
+// segment. The root is the one COMPOSITION, so `:0` is its explicit-index
+// spelling and anything higher names a composition that does not exist; reading
+// the key as the root's would merge it in with no error. REQ-170 lists an index
+// past its bound as malformed matched content. The message names the segment
+// and carries no value; the caller names the key.
+func errRootIndex(seg flatSeg) error {
+	return fmt.Errorf("%w: FLAT id %q carries :%d, but the template root is the one COMPOSITION, not an indexed list",
+		ErrUnknownPath, seg.id, seg.idx)
+}
+
+// errSingleValuedIndex refuses an index past the bound of a segment that
+// addresses a single-valued RM attribute (COMPOSITION.context,
+// ACTION.ism_transition, ENTRY.language, …). `:0` is the one value's
+// explicit-index spelling, which OPT-free STRUCTURED → FLAT conversion writes;
+// anything higher names a list slot the attribute does not have, and ignoring
+// the index would merge the key into the one value with no error (REQ-170: an
+// index past its bound). The message names the segment and carries no value;
+// the caller names the key.
+func errSingleValuedIndex(seg flatSeg) error {
+	return fmt.Errorf("%w: FLAT id %q carries :%d, but it addresses a single-valued RM attribute, not an indexed list",
+		ErrUnknownPath, seg.id, seg.idx)
+}
+
+// holdsOneValue reports whether the Web Template node child, reached from its
+// parent node, stands on a single-valued RM attribute: the one its FLAT
+// segment's :index addresses. That is judged against the RM, not the Web
+// Template's occurrences: the attribute chain from the parent's canonical path
+// to the child's is walked with rminfo, so a node the Web Template reaches
+// through folded structures (an EVENT under OBSERVATION/data/events) is judged
+// on the attribute that actually holds it. For a collapsed ELEMENT leaf the
+// index belongs to the ELEMENT the leaf folds away, so the attribute judged is
+// the one before `/value`, as [resolveLeaf] stores it. An attribute rminfo does
+// not know is not judged.
+func holdsOneValue(parent, child *webtemplate.Node) bool {
+	parentSegs, childSegs := parseAQL(parent.AQLPath), parseAQL(child.AQLPath)
+	if len(childSegs) <= len(parentSegs) {
+		return false
+	}
+	rel := childSegs[len(parentSegs):]
+	target := len(rel) - 1
+	if child.NodeID != "" && len(child.Children) == 0 && rel[target].attr == "value" && target > 0 {
+		target--
+	}
+	curType := nodeRMType(parent)
+	for i, seg := range rel[:target] {
+		curType = concreteType(curType, seg.attr, "", rel[i+1].attr)
+		if curType == "" {
+			return false
+		}
+	}
+	container, known := rminfo.Default.IsContainer(curType, rel[target].attr)
+	return known && !container
 }
 
 // MetadataAliasSpellings returns the root-relative FLAT spellings the decoder
 // accepts as aliases of the ctx/ composition-metadata short forms,
 // sorted. `"language|code"`, for instance, is accepted at
 // `<root>/language|code` and normalised to `ctx/language`.
+//
+// Each spelling is listed once, unindexed. Every segment on it is a
+// single-valued attribute, so the decoder reads the same spelling with `:0`
+// on any of its segments (`<root>/language:0|code`,
+// `<root>/context:0/start_time:0`, the form OPT-free STRUCTURED → FLAT
+// conversion writes) exactly as the unindexed one, and refuses any other
+// index there. The template root's own segment is read the same way
+// (`<root>:0/composer:0|name`). The same holds for [MetadataWitnessSpellings].
 //
 // This is informative public surface for conformance tooling, not a decode knob.
 // A harness that has to hold composition metadata out of a like-for-like FLAT
@@ -344,7 +748,10 @@ func MetadataWitnessSpellings() []string {
 // A real path that contradicts an explicit ctx/ entry is an error rather than a
 // precedence rule: preferring either silently would corrupt composition
 // metadata, the same stance the codec already takes on an index collision.
-func siphonContext(flat map[string]any, rootID string) (ctx map[string]any, ctxOrigin map[string]string, content map[string]any, err error) {
+//
+// A ctx/ field the decode does not read, and a suffix of a ctx/-owned leaf
+// outside that leaf's datatype, go to sink as unmatched content (REQ-170).
+func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx map[string]any, ctxOrigin map[string]string, content map[string]any, err error) {
 	ctx, ctxOrigin, content = make(map[string]any), make(map[string]string), make(map[string]any)
 	// Sorted so a body carrying two conflicting real-path spellings reports the
 	// same key first on every run — a map-order-dependent error message is not
@@ -352,24 +759,68 @@ func siphonContext(flat map[string]any, rootID string) (ctx map[string]any, ctxO
 	for _, key := range slices.Sorted(maps.Keys(flat)) {
 		val := flat[key]
 		if strings.HasPrefix(key, "ctx/") {
+			if key == ctxSettingBare {
+				// ctx/setting is read as its |code + |value pair; a bare value is
+				// the field missing both (REQ-170: a missing required suffix).
+				return nil, nil, nil, fmt.Errorf("%w: %q spells the setting without its |code and |value, the pair ctx/setting travels as",
+					ErrUnsupportedDatatype, key)
+			}
+			if key == ctxSettingTerminology {
+				// The setting's terminology is implied, never carried: a witness
+				// naming it is read and dropped, and one naming any other
+				// terminology is a typed error, not a silent rewrite (REQ-053),
+				// exactly as the real-path witness below.
+				if err := checkTerminologyWitness(key, val, terminology.ID); err != nil {
+					return nil, nil, nil, err
+				}
+				continue
+			}
+			if !ctxFields[key] {
+				sink.add(key)
+				continue
+			}
 			if err := putCtx(ctx, ctxOrigin, key, val, key); err != nil {
 				return nil, nil, nil, err
 			}
 			continue
 		}
-		rel, isRooted := strings.CutPrefix(key, rootID+"/")
+		// A key that is the root segment alone, with or without a suffix,
+		// is judged from the left like any other: an index past :0 on it is
+		// past its bound (REQ-170).
+		if seg, alone := rootSegmentAlone(key, rootID); alone && seg.idx > 0 {
+			return nil, nil, nil, fmt.Errorf("simplified: %q: %w", key, errRootIndex(seg))
+		}
+		rel, rootSeg, isRooted := cutRoot(key, rootID)
 		if !isRooted {
 			content[key] = val
 			continue
 		}
+		// The template root is the one COMPOSITION: `<root>:0/` is `<root>/`
+		// (REQ-053), and any other index is past its bound, refused whatever
+		// follows it (REQ-170).
+		if rootSeg.idx > 0 {
+			return nil, nil, nil, fmt.Errorf("simplified: %q: %w", key, errRootIndex(rootSeg))
+		}
+		// The tables below are keyed on the unindexed spelling. An indexed
+		// metadata path is read exactly as that spelling, and only `:0` is an
+		// index a single-valued attribute has (REQ-053), so any other is
+		// refused. A key that is no metadata spelling once its `:0` is gone
+		// keeps flowing as content under the key it arrived with.
+		raw := rel
+		rel, overIndexed := metadataRel(rel)
+		if overIndexed && isMetadataSpelling(rel) {
+			return nil, nil, nil, fmt.Errorf("%w: %q (a composition metadata path runs through single-valued attributes, so :0 is the only index it takes)",
+				ErrUnknownPath, key)
+		}
+		// Any other key that runs through a metadata segment past :0 is past
+		// that segment's bound whatever follows it, whether or not the Web
+		// Template carries a node for the segment (REQ-170).
+		if overIndexed {
+			return nil, nil, nil, fmt.Errorf("simplified: %q: %w", key, errSingleValuedIndex(overIndexedMetadataSeg(raw)))
+		}
 		if want, isWitness := metadataAliasTerminology[rel]; isWitness {
-			got, err := ctxString(key, val)
-			if err != nil {
+			if err := checkTerminologyWitness(key, val, want); err != nil {
 				return nil, nil, nil, err
-			}
-			if got != want {
-				return nil, nil, nil, fmt.Errorf("%w: %s = %q, but the ctx/ form implies %q (a differing terminology cannot be carried)",
-					ErrUnsupportedDatatype, key, got, want)
 			}
 			continue
 		}
@@ -386,8 +837,16 @@ func siphonContext(flat map[string]any, rootID string) (ctx map[string]any, ctxO
 		// checked witness, or refused here naming the key (REQ-053) — the
 		// composer external_ref suffixes stay out of this set deliberately, so
 		// they keep flowing to decode and stay visible in the PROBE-086 census.
-		if base, _, _ := strings.Cut(rel, "|"); contextMetaOwnedBases[base] {
-			return nil, nil, nil, fmt.Errorf("%w: %s is not a spelling the ctx/ short form can carry — %q owns this leaf, so only its accepted suffixes travel (see deviations.md)",
+		// A suffix the leaf's datatype does not have at all is not such a
+		// spelling: the decode does not read it, so it is unmatched (REQ-170).
+		// A bare value is not such a suffix but a spelling of the field missing
+		// its required suffixes: refused, as below.
+		if base, suffix, _ := strings.Cut(rel, "|"); contextMetaOwnedBases[base] {
+			if matched, _ := leafSuffixMatched(metadataOwnedBaseType[base], suffix); !matched && suffix != "" {
+				sink.add(key)
+				continue
+			}
+			return nil, nil, nil, fmt.Errorf("%w: %q is not a spelling the ctx/ short form can carry — %s owns this leaf, so only its accepted suffixes travel (see deviations.md)",
 				ErrUnsupportedDatatype, key, metadataOwnedBaseCtx[base])
 		}
 		// The ADR 0015 boundary, REQ-140 edition. REQ-140's party grammar reaches
@@ -401,13 +860,32 @@ func siphonContext(flat map[string]any, rootID string) (ctx map[string]any, ctxO
 		// reach the leaf loop and are refused there as PARTY_PROXY). Closing this
 		// means giving the composer's reference a `ctx/` carrier, which is an
 		// ADR-level decision, not a codec one.
-		if _, isComposerSub := strings.CutPrefix(rel, "composer/"); isComposerSub {
+		// Only the party grammar's sub-structure is the composer's: any other
+		// sub-path names nothing a party has, and is unmatched content where the
+		// leaf loop finds no node for it.
+		if sub, isComposerSub := strings.CutPrefix(rel, "composer/"); isComposerSub && composerSubStructure(sub) {
 			return nil, nil, nil, fmt.Errorf("%w: %q is composer party sub-structure, which no ctx/ short form can carry (ADR 0015 boundary)",
 				ErrUnsupportedDatatype, key)
 		}
 		content[key] = val
 	}
 	return ctx, ctxOrigin, content, nil
+}
+
+// checkTerminologyWitness reads a terminology witness of a coded metadata
+// field: a key that names the terminology the ctx/ form implies, which matches
+// and is dropped, or names another, which the ctx/ form cannot carry and is
+// refused (REQ-053).
+func checkTerminologyWitness(key string, val any, want string) error {
+	got, err := ctxString(key, val)
+	if err != nil {
+		return err
+	}
+	if got != want {
+		return fmt.Errorf("%w: %s = %q, but the ctx/ form implies %q (a differing terminology cannot be carried)",
+			ErrUnsupportedDatatype, key, got, want)
+	}
+	return nil
 }
 
 // putCtx records a context value under its normalised ctx/ key, tracking in
@@ -486,8 +964,9 @@ type ctxInfo struct {
 	haveSettingCode, haveSettingValue bool
 }
 
-// parseCtx decodes the ctx/ entries. Only the core context fields are supported;
-// any other ctx/ field is ErrUnknownPath (see deviations.md). Values of the
+// parseCtx decodes the ctx/ entries. Only the core context fields reach it:
+// [siphonContext] sets every other ctx/ field aside as unmatched content
+// ([ctxFields]), so the default arm is a broken invariant. Values of the
 // wrong JSON type are rejected — coercing them would silently corrupt
 // composition metadata (e.g. a numeric composer_name becoming an empty
 // PARTY_IDENTIFIED name). origin (from [siphonContext]) names the body key each
@@ -524,7 +1003,7 @@ func parseCtx(ctx map[string]any, origin map[string]string) (ctxInfo, error) {
 			ci.settingValue, err = ctxString(label, val)
 			ci.haveSettingValue = true
 		default:
-			err = fmt.Errorf("%w: %q (context field not supported — see deviations.md)", ErrUnknownPath, key)
+			err = fmt.Errorf("simplified: %q reached the ctx/ parser, which reads only the fields in ctxFields", key)
 		}
 		if err != nil {
 			return ci, err
@@ -766,6 +1245,12 @@ func resolveLeaf(wt *webtemplate.WebTemplate, segs []flatSeg, ambiguous map[stri
 		}
 		if next == nil {
 			return nil, nil, nil, errSegNotFound
+		}
+		// Placement reads an index only where the attribute is a list, so on a
+		// single-valued one an index past :0 would be dropped and the key merged
+		// into the one value (REQ-170).
+		if seg.idx > 0 && holdsOneValue(node, next) {
+			return nil, nil, nil, errSingleValuedIndex(seg)
 		}
 		if next.NodeID != "" {
 			bare := bareAQLPath(next.AQLPath)
@@ -1138,6 +1623,167 @@ func settleIsmTransition(tr map[string]any, n ismNode) error {
 // localTerminology is the terminology an archetype's own at-codes belong to.
 const localTerminology = "local"
 
+// The reference's in-context spelling of RM attributes the Web Template this SDK
+// builds does not model, which REQ-170 refuses in every mode: an ACTION's ISM
+// transition (a `current_state`, `transition` or `careflow_step` leaf or a
+// `_reason` family under an ISM transition node) and its own `time` leaf, an
+// INTERVAL_EVENT's `math_function`, `width` and `sample_count`, and an
+// OBSERVATION's `history_origin`. ismReferenceSeg is the FLAT id the reference
+// gives the ISM transition node when it writes it in context.
+const (
+	ismReasonFamily = "_reason"
+	ismReferenceSeg = "ism_transition"
+)
+
+// ismLeaves are the ISM_TRANSITION leaves the reference writes under its ISM
+// transition node, by FLAT id.
+var ismLeaves = map[string]bool{"current_state": true, "transition": true, "careflow_step": true}
+
+// intervalEventAttrs are the INTERVAL_EVENT attributes the reference writes in
+// context.
+var intervalEventAttrs = map[string]bool{"math_function": true, "width": true, "sample_count": true}
+
+// inContextAttrs names, per Web Template node RM type, the RM attributes the
+// reference writes in context under such a node and REQ-170 refuses where the
+// Web Template does not resolve them. leaf holds those spelled as a leaf under
+// the node, suffix those also spelled as a suffix on it, and owner is the RM
+// class the message names. An EVENT node is the abstract slot a Web Template
+// gives an event; the attributes are INTERVAL_EVENT's, and a body that spells
+// one is an interval event.
+var inContextAttrs = map[string]struct {
+	owner        string
+	leaf, suffix map[string]bool
+}{
+	"ACTION":         {owner: "ACTION", leaf: map[string]bool{"time": true}},
+	"EVENT":          {owner: "INTERVAL_EVENT", leaf: intervalEventAttrs, suffix: intervalEventAttrs},
+	"INTERVAL_EVENT": {owner: "INTERVAL_EVENT", leaf: intervalEventAttrs, suffix: intervalEventAttrs},
+	"OBSERVATION": {
+		owner: "OBSERVATION", leaf: map[string]bool{"history_origin": true},
+		suffix: map[string]bool{"history_origin": true},
+	},
+}
+
+// inContextCite names the section a refusal of an in-context attribute cites:
+// REQ-140's fourth out-of-scope class lists an ISM transition's `transition`
+// and `reason`; REQ-170 alone binds the rest (`current_state`,
+// `careflow_step`, the ACTION's `time`, and the INTERVAL_EVENT and OBSERVATION
+// attributes).
+func inContextCite(attr string) string {
+	switch attr {
+	case "ISM transition transition", "ISM transition reason":
+		return "REQ-140"
+	}
+	return "REQ-170"
+}
+
+// refuseInContextKeys refuses, in every mode, the reference's in-context
+// spelling of the RM attributes in [inContextAttrs] and of an ACTION's ISM
+// transition, wherever the Web Template does not resolve it (REQ-170; REQ-140's
+// fourth out-of-scope class covers `transition` and `reason`):
+//
+//   - a `current_state`, `transition` or `careflow_step` leaf, with any suffix,
+//     under an ISM transition node: the reference's in-context `ism_transition`
+//     node, which this SDK's Web Template does not project, or an archetyped
+//     `ism_transition[atNNNN]` node that has no child of that id (the Web
+//     Template models `current_state` and `careflow_step` there, never
+//     `transition`);
+//   - a `_reason` family under either node;
+//   - the ACTION's own `time` leaf, with any suffix;
+//   - an INTERVAL_EVENT's `math_function`, `width` or `sample_count`, and an
+//     OBSERVATION's `history_origin`, each as a leaf under the node, with any
+//     suffix, or as a suffix on the node.
+//
+// Each names RM data the decode would otherwise drop, or replace with a
+// default, so it is refused rather than ignored. A key the Web Template
+// resolves is decoded as usual, and any other unresolved key under those nodes
+// is unmatched content. A key that walks through one of several reused siblings
+// is left to the refusal that path gets.
+//
+// Keys are checked in sorted order, so a body with several names the same one on
+// every run. The error names the key, or the `_reason` family instance, and
+// carries no value.
+func refuseInContextKeys(content map[string]any, wt *webtemplate.WebTemplate, ambiguous map[string]bool) error {
+	for _, key := range slices.Sorted(maps.Keys(content)) {
+		pk, err := parseFlatKey(key)
+		if err != nil {
+			// A malformed index is refused where the key is decoded.
+			continue
+		}
+		named, owner, attr, ok := inContextKey(wt, key, pk, ambiguous)
+		if !ok {
+			continue
+		}
+		return fmt.Errorf("%w: %q is the reference's in-context spelling of an %s's %s, which the Web Template this SDK builds does not model — refused rather than dropped or replaced (%s, see deviations.md)",
+			ErrUnknownPath, named, owner, attr, inContextCite(attr))
+	}
+	return nil
+}
+
+// inContextKey reports whether key, parsed as pk, is one of the key shapes
+// [refuseInContextKeys] refuses: named is what the refusal names (the key, or
+// the family instance for `_reason`), owner the RM class and attr the
+// attribute it spells.
+func inContextKey(wt *webtemplate.WebTemplate, key string, pk parsedKey, ambiguous map[string]bool) (named, owner, attr string, ok bool) {
+	segs := pk.segs
+	node := wt.Tree
+	if len(segs) < 2 || segs[0].id != node.ID {
+		return "", "", "", false
+	}
+	for i := 1; i < len(segs); i++ {
+		child := childByID(node, segs[i].id)
+		rmType := nodeRMType(node)
+		attrs := inContextAttrs[rmType]
+		last := i == len(segs)-1
+		if last && child == nil && attrs.leaf[segs[i].id] {
+			return key, attrs.owner, segs[i].id, true
+		}
+		if rmType == "ACTION" && !last && isIsmTransitionSeg(child, segs[i].id) {
+			named, attr, ok := ismAttrKey(key, segs, i, child)
+			return named, "ACTION", attr, ok
+		}
+		if child == nil || (child.NodeID != "" && ambiguous[bareAQLPath(child.AQLPath)]) {
+			return "", "", "", false
+		}
+		node = child
+	}
+	if attrs := inContextAttrs[nodeRMType(node)]; attrs.suffix[pk.suffix] && childByID(node, pk.suffix) == nil {
+		return key, attrs.owner, pk.suffix, true
+	}
+	return "", "", "", false
+}
+
+// ismAttrKey judges the key below the ISM transition segment segs[i], whose Web
+// Template node is ism (nil for the reference's in-context node): an
+// ISM_TRANSITION leaf the node does not model, or a `_reason` family.
+func ismAttrKey(key string, segs []flatSeg, i int, ism *webtemplate.Node) (named, attr string, ok bool) {
+	rest := segs[i+1:]
+	switch {
+	case len(rest) == 1 && ismLeaves[rest[0].id] && (ism == nil || childByID(ism, rest[0].id) == nil):
+		return key, "ISM transition " + rest[0].id, true
+	case rest[0].id == ismReasonFamily:
+		var b strings.Builder
+		for j, s := range segs[:i+2] {
+			if j > 0 {
+				b.WriteByte('/')
+			}
+			writeFlatSeg(&b, s)
+		}
+		return b.String(), "ISM transition reason", true
+	}
+	return "", "", false
+}
+
+// isIsmTransitionSeg reports whether a FLAT segment under an ACTION addresses its
+// ISM transition: a Web Template child of RM type ISM_TRANSITION, or, where the
+// Web Template has no child of that id, the reference's in-context
+// `ism_transition` node.
+func isIsmTransitionSeg(child *webtemplate.Node, id string) bool {
+	if child != nil {
+		return nodeRMType(child) == "ISM_TRANSITION"
+	}
+	return id == ismReferenceSeg
+}
+
 // definingCodeOf returns the defining_code of a rebuilt DV_CODED_TEXT, or nil
 // when the value carries none (a DV_TEXT, a |raw fragment of another shape);
 // reading a nil map yields no code, so such a step is refused before anything
@@ -1162,8 +1808,9 @@ func definingCodeOf(v any) map[string]any {
 // party / interval grammars decode it with no second mechanism (REQ-140 design
 // constraint 5).
 //
-// Keys are consumed from content: what stays behind is ordinary leaf data.
-func compositeLeafGroups(content map[string]any, wt *webtemplate.WebTemplate) ([]rmattrGroup, error) {
+// Keys are consumed from content: what stays behind is ordinary leaf data. Each
+// group carries sink, which takes the keys its grammar does not read.
+func compositeLeafGroups(content map[string]any, wt *webtemplate.WebTemplate, sink *unmatchedSink) ([]rmattrGroup, error) {
 	byLeaf := make(map[string]*rmattrGroup)
 	for _, key := range slices.Sorted(maps.Keys(content)) {
 		pk, err := parseFlatKey(key)
@@ -1179,10 +1826,10 @@ func compositeLeafGroups(content map[string]any, wt *webtemplate.WebTemplate) ([
 		id := base + "\x00" + family + "\x00" + strconv.Itoa(index)
 		g := byLeaf[id]
 		if g == nil {
-			g = &rmattrGroup{base: base, family: family, index: index, tails: make(map[string]any)}
+			g = newRMAttrGroup(base, family, index, sink)
 			byLeaf[id] = g
 		}
-		g.tails[tail] = val
+		g.put(tail, val, key)
 	}
 	groups := make([]rmattrGroup, 0, len(byLeaf))
 	for _, g := range byLeaf {
@@ -1294,24 +1941,31 @@ func compositeLeafOwnsSub(rmType, seg string) bool {
 func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g rmattrGroup,
 	ambiguous map[string]bool, budget *allocBudget, names map[string]string,
 ) error {
-	// A composite leaf is single-valued at every position the reference spells one,
-	// so `:0` is the interconversion's explicit-index spelling and anything higher
-	// addresses a list slot the RM attribute does not have.
-	if g.index > 0 {
-		return fmt.Errorf("%w: %q (%s addresses a single-valued RM attribute, not an indexed list)",
-			ErrUnknownPath, g.prefix(), g.family)
-	}
 	pk, err := parseFlatKey(g.prefix())
 	if err != nil {
 		return err
 	}
+	// resolveLeaf judges the leaf's own index as it judges any other leaf's:
+	// a party leaf stands on a single-valued RM attribute, so `:0` is the
+	// interconversion's explicit-index spelling and anything higher is refused;
+	// a DV_INTERVAL leaf's index belongs to the ELEMENT the Web Template folded
+	// away, which may repeat, and the placement reads it.
 	node, predIndex, predType, err := resolveLeaf(wt, pk.segs, ambiguous)
 	if err != nil {
-		// splitCompositeLeafKey resolved this path already, so the only way here is
-		// the reused-sibling refusal, which carries its own message.
+		// splitCompositeLeafKey resolved this path already, so the only ways
+		// here are an index past the bound of a single-valued attribute and the
+		// reused-sibling refusal, each with its own message.
 		return fmt.Errorf("simplified: %q: %w", g.prefix(), err)
 	}
 	value, err := compositeLeafValue(g, nodeRMType(node))
+	if err == nil || errors.Is(err, errNothingMatched) {
+		if dupErr := g.settleDups(); dupErr != nil {
+			return dupErr
+		}
+	}
+	if errors.Is(err, errNothingMatched) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -1377,9 +2031,14 @@ func rmattrOwnerAt(wt *webtemplate.WebTemplate, compJSON map[string]any, base st
 			return node, err
 		}
 	}
-	// segs[1].idx <= 0: the OPT-free STRUCTURED interconversion re-spells every
-	// segment with an explicit index, so `context` and `context:0` are one node.
-	if len(segs) == 2 && segs[1].id == "context" && segs[1].idx <= 0 {
+	// The OPT-free STRUCTURED interconversion re-spells every segment with an
+	// explicit index, so `context` and `context:0` are one node. COMPOSITION.context
+	// is single-valued, so any other index is past its bound (REQ-170), whether or
+	// not the template carries a `context` node.
+	if len(segs) == 2 && segs[1].id == "context" {
+		if segs[1].idx > 0 {
+			return rmattrOwner{}, errSingleValuedIndex(segs[1])
+		}
 		return rmattrOwner{kind: "EVENT_CONTEXT", resolve: walk("/context", nil, nil)}, nil
 	}
 	if len(segs) == 1 {
@@ -2124,6 +2783,73 @@ func requireSuffix(rmType string, sfx map[string]any, name string) (any, error) 
 // textJSON is a canonical DV_TEXT object.
 func textJSON(value string) map[string]any {
 	return map[string]any{"_type": "DV_TEXT", "value": value}
+}
+
+// emptySuffixFold is what [foldEmptySuffix] made of a body's keys ending in a
+// bare `|`.
+type emptySuffixFold struct {
+	// spellings maps a key of the folded body to every key as written that it
+	// stands for, where that is not just itself.
+	spellings map[string][]string
+	// conflicts maps a key x to the `x|` beside it whose value differs; `x|` is
+	// out of the folded body until [emptySuffixFold.settle] judges the pair.
+	conflicts map[string]string
+}
+
+// foldEmptySuffix reads a key that ends in a bare `|` as the spelling of the key
+// without it: the empty suffix is the bare value, so `x|` is `x`. A lone `x|`
+// is renamed `x`; beside an `x` of the same value it is read once. Beside an
+// `x` of another value it is held out, and the pair is judged once the decode
+// knows whether it reads `x` ([emptySuffixFold.settle]): two spellings of one
+// field the decode reads disagree, and a pair it does not read is two
+// unmatched keys (REQ-170). Either way the sink reports every spelling as
+// written. The map returned is flat itself when nothing was folded.
+func foldEmptySuffix(flat map[string]any) (map[string]any, emptySuffixFold) {
+	var out map[string]any
+	var fold emptySuffixFold
+	for _, key := range slices.Sorted(maps.Keys(flat)) {
+		bare, piped := strings.CutSuffix(key, "|")
+		if !piped {
+			continue
+		}
+		if out == nil {
+			out = maps.Clone(flat)
+			fold.spellings = make(map[string][]string)
+		}
+		delete(out, key)
+		other, both := flat[bare]
+		switch {
+		case !both:
+			out[bare] = flat[key]
+			fold.spellings[bare] = []string{key}
+		case sameCtxValue(other, flat[key]):
+			fold.spellings[bare] = []string{bare, key}
+		default:
+			fold.spellings[bare] = []string{bare, key}
+			if fold.conflicts == nil {
+				fold.conflicts = make(map[string]string)
+			}
+			fold.conflicts[bare] = key
+		}
+	}
+	if out == nil {
+		return flat, fold
+	}
+	return out, fold
+}
+
+// settle refuses a held-out `x|` whose `x` the decode read: sink reports the
+// spellings of every key it did not read, so a pair it did not report is two
+// spellings of one read field that disagree. The refusal names both keys and
+// neither value.
+func (f emptySuffixFold) settle(sink *unmatchedSink) error {
+	for _, bare := range slices.Sorted(maps.Keys(f.conflicts)) {
+		if piped := f.conflicts[bare]; !sink.reported(piped) {
+			return fmt.Errorf("%w: %q and %q spell one bare value twice and disagree; remove one",
+				ErrUnknownPath, bare, piped)
+		}
+	}
+	return nil
 }
 
 // splitSuffix splits a FLAT key at its trailing pipe attribute — the one place

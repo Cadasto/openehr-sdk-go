@@ -347,6 +347,7 @@ func emptyValueCases() []emptyValueCase {
 		{name: "DvQuantity without units, wrong type", constraint: constraints.DvQuantity{}, input: markerString, wantCode: constraints.CodeWrongType},
 		{name: "CDvOrdinal wrong type", constraint: ordinalConstraint, input: markerString, wantCode: constraints.CodeWrongType},
 		{name: "CDvOrdinal without values, wrong type", constraint: constraints.CDvOrdinal{}, input: markerString, wantCode: constraints.CodeWrongType},
+		{name: "ConstraintRef wrong type", constraint: constraints.ConstraintRef{Reference: "ac0001"}, input: markerInt, wantCode: constraints.CodeWrongType},
 		{name: "CString unparseable pattern", constraint: constraints.CString{Pattern: "("}, input: markerString, wantCode: constraints.CodeInvalidValue},
 		{name: "CString unparseable pattern from NewCString", constraint: constraints.NewCString("(", nil, ""), input: markerString, wantCode: constraints.CodeInvalidValue},
 	}

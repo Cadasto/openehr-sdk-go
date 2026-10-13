@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"fmt"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/xmlunmatched"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 )
@@ -20,7 +21,12 @@ import (
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVCount) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -28,22 +34,22 @@ func (d *DVCount) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "accuracy_is_percent":
 				var _v bool
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.AccuracyIsPercent = &_v
 			case "magnitude_status":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.MagnitudeStatus = &_v
 			case "accuracy":
 				var _v Real
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.Accuracy = &_v
@@ -54,7 +60,7 @@ func (d *DVCount) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 				}
 				d.NormalStatus = _v
 			case "magnitude":
-				if _err := _dec.DecodeElement(&d.Magnitude, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Magnitude); _err != nil {
 					return _err
 				}
 			case "normal_range":
@@ -70,7 +76,7 @@ func (d *DVCount) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 				}
 				d.OtherReferenceRanges = append(d.OtherReferenceRanges, _v)
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -87,7 +93,25 @@ func (d *DVCount) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
+//
+// A boundary flag the document leaves out takes its default once the whole
+// value is read: `lower_unbounded` and `upper_unbounded` read as false on a
+// side that carries a bound and as true on a side whose bound is absent or
+// null, and `lower_included` and `upper_included` read as true on a side
+// that is not open and as false on a side that is. A flag the document
+// carries is read as written. A side written `*_unbounded` false with no
+// bound is refused when the interval holds its bounds by value, since a zero
+// bound would stand in for the absent one; held as an interface, the side
+// decodes as written, with no bound.
+// An empty or whitespace-only flag element carries no boolean and reads as
+// a flag the document leaves out.
 func (d *DVInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
+	var _seen intervalFlagsSeen
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -95,41 +119,46 @@ func (d *DVInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "lower":
 				_v, _err := canxml.DecodeAs[T](_dec, _t)
 				if _err != nil {
 					return _err
 				}
 				d.Lower = _v
+				_seen.lower = true
 			case "upper":
 				_v, _err := canxml.DecodeAs[T](_dec, _t)
 				if _err != nil {
 					return _err
 				}
 				d.Upper = _v
+				_seen.upper = true
 			case "lower_unbounded":
-				if _err := _dec.DecodeElement(&d.LowerUnbounded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &d.LowerUnbounded, &_seen.lowerUnbounded); _err != nil {
 					return _err
 				}
 			case "upper_unbounded":
-				if _err := _dec.DecodeElement(&d.UpperUnbounded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &d.UpperUnbounded, &_seen.upperUnbounded); _err != nil {
 					return _err
 				}
 			case "lower_included":
-				if _err := _dec.DecodeElement(&d.LowerIncluded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &d.LowerIncluded, &_seen.lowerIncluded); _err != nil {
 					return _err
 				}
 			case "upper_included":
-				if _err := _dec.DecodeElement(&d.UpperIncluded, &_t); _err != nil {
+				if _err := decodeIntervalFlagXML(_dec, &_t, &d.UpperIncluded, &_seen.upperIncluded); _err != nil {
 					return _err
 				}
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
 		case xml.EndElement:
+			if _err := _seen.settle(intervalBoundHeldByValue(&d.Lower), &d.LowerIncluded, &d.LowerUnbounded, &d.UpperIncluded, &d.UpperUnbounded); _err != nil {
+				return fmt.Errorf("%w: DV_INTERVAL: %w", canxml.ErrInvalidShape, _err)
+			}
 			return nil
 		}
 	}
@@ -142,7 +171,12 @@ func (d *DVInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVOrdinal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -150,7 +184,7 @@ func (d *DVOrdinal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "normal_status":
 				_v := new(CodePhrase)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
@@ -174,11 +208,11 @@ func (d *DVOrdinal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 					return _err
 				}
 			case "value":
-				if _err := _dec.DecodeElement(&d.Value, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Value); _err != nil {
 					return _err
 				}
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -195,7 +229,12 @@ func (d *DVOrdinal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVProportion) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -203,22 +242,22 @@ func (d *DVProportion) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "accuracy_is_percent":
 				var _v bool
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.AccuracyIsPercent = &_v
 			case "magnitude_status":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.MagnitudeStatus = &_v
 			case "accuracy":
 				var _v Real
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.Accuracy = &_v
@@ -229,20 +268,20 @@ func (d *DVProportion) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 				}
 				d.NormalStatus = _v
 			case "numerator":
-				if _err := _dec.DecodeElement(&d.Numerator, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Numerator); _err != nil {
 					return _err
 				}
 			case "denominator":
-				if _err := _dec.DecodeElement(&d.Denominator, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Denominator); _err != nil {
 					return _err
 				}
 			case "type":
-				if _err := _dec.DecodeElement(&d.Type, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Type); _err != nil {
 					return _err
 				}
 			case "precision":
 				var _v Integer
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.Precision = &_v
@@ -259,7 +298,7 @@ func (d *DVProportion) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 				}
 				d.OtherReferenceRanges = append(d.OtherReferenceRanges, _v)
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -276,7 +315,12 @@ func (d *DVProportion) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVQuantity) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -284,22 +328,22 @@ func (d *DVQuantity) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "accuracy_is_percent":
 				var _v bool
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.AccuracyIsPercent = &_v
 			case "magnitude_status":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.MagnitudeStatus = &_v
 			case "accuracy":
 				var _v Real
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.Accuracy = &_v
@@ -310,17 +354,17 @@ func (d *DVQuantity) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 				}
 				d.NormalStatus = _v
 			case "magnitude":
-				if _err := _dec.DecodeElement(&d.Magnitude, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Magnitude); _err != nil {
 					return _err
 				}
 			case "precision":
 				var _v Integer
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.Precision = &_v
 			case "units":
-				if _err := _dec.DecodeElement(&d.Units, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Units); _err != nil {
 					return _err
 				}
 			case "normal_range":
@@ -337,18 +381,18 @@ func (d *DVQuantity) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 				d.OtherReferenceRanges = append(d.OtherReferenceRanges, _v)
 			case "units_system":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.UnitsSystem = &_v
 			case "units_display_name":
 				var _v string
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &_v); _err != nil {
 					return _err
 				}
 				d.UnitsDisplayName = &_v
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -365,7 +409,12 @@ func (d *DVQuantity) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (d *DVScale) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -373,7 +422,7 @@ func (d *DVScale) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "normal_status":
 				_v := new(CodePhrase)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
@@ -397,11 +446,11 @@ func (d *DVScale) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 					return _err
 				}
 			case "value":
-				if _err := _dec.DecodeElement(&d.Value, &_t); _err != nil {
+				if _err := xmlunmatched.DecodeElement(_dec, &_t, &d.Value); _err != nil {
 					return _err
 				}
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}
@@ -418,7 +467,12 @@ func (d *DVScale) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
 // Properties typed as XML attributes per the openEHR ITS-XML XSDs
 // (currently `archetype_node_id`) are read from _start.Attr.
+// Content the method does not read is unmatched: it is skipped, or
+// reported or refused under canxml.WithUnmatched and canxml.WithStrict.
 func (r *ReferenceRange[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	if _err := xmlunmatched.CheckUnmatchedAttrs(_dec, _start); _err != nil {
+		return _err
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -426,7 +480,7 @@ func (r *ReferenceRange[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 		}
 		switch _t := _tok.(type) {
 		case xml.StartElement:
-			switch _t.Name.Local {
+			switch xmlunmatched.LocalName(_t.Name) {
 			case "meaning":
 				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
@@ -438,7 +492,7 @@ func (r *ReferenceRange[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 					return _err
 				}
 			default:
-				if _err := _dec.Skip(); _err != nil {
+				if _err := xmlunmatched.SkipUnmatched(_dec, _t); _err != nil {
 					return _err
 				}
 			}

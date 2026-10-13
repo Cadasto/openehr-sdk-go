@@ -34,12 +34,10 @@ func excludedRMJSONStem(stem string) bool {
 		slices.ContainsFunc(rmJSONExcludedPrefixes, func(p string) bool { return strings.HasPrefix(stem, p) })
 }
 
-// compositionXMLExcluded composition XML on disk but not exercised by canxml
-// round-trip probes (DV_MULTIMEDIA wire shape, etc.).
-var compositionXMLExcluded = map[string]bool{
-	"Demonstration.v1": true,
-	"TestPerson.v2":    true,
-}
+// compositionXMLExcluded lists composition XML on disk that the canxml
+// round-trip probes skip. It is empty: every composition XML in the corpus
+// decodes and round-trips.
+var compositionXMLExcluded = map[string]bool{}
 
 // ListCompositionJSON returns every top-level *.json in compositions/ and rm/.
 // A subdirectory of either is not walked.

@@ -14,12 +14,15 @@
 // whole-body comparison would be all noise. Instead [Run] establishes the
 // modelled subset and asserts on that:
 //
-//  1. Decode the upstream body. The codec refuses a key it does not model
-//     with an error and never drops it silently. Record the refusal and its
-//     reason, remove exactly what that refusal covers (see [dropRefused]: one
-//     suffix, one leaf, or a whole subtree, depending on the shape), and
-//     retry. The resulting [Report.Excluded] count is the unmodelled surface,
-//     derived from the codec's own errors instead of from a hand-kept table
+//  1. Decode the upstream body with the codec's report option. The codec
+//     ignores a key it does not read and reports it as unmatched content
+//     (see simplified.WithUnmatched); it refuses, with an error, a key it
+//     reads but cannot carry, and never drops one silently. Exclude each
+//     reported key, and for each refusal record it and its reason, remove
+//     exactly what that refusal names (see [dropRefused]: one key, one suffix,
+//     one leaf, or a whole subtree, depending on the shape), and retry. The
+//     resulting [Report.Excluded] count is the unmodelled surface, derived
+//     from the codec's own report and errors instead of from a hand-kept table
 //     that would go stale as gaps close.
 //  2. Re-encode what decoded, and compare against the surviving upstream
 //     keys. Inside that subset a missing key, an extra key, or a changed
@@ -160,6 +163,14 @@ var contextMetaLeaves = map[string]bool{
 // key that survives decode does not resurface as a phantom "missing" when
 // re-encode writes it back in ctx/ form.
 //
+// The match reads a key through [unindexedSpelling] first, because the codec
+// does: a metadata path whose segments carry `:0` (`<root>/language:0|code`,
+// `<root>:0/composer:0|name`, `<root>/context:0/start_time:0`, the spelling
+// OPT-free STRUCTURED → FLAT conversion writes) is the same real path as the
+// unindexed one, the template root's own segment included, as the codec reads
+// it. Any other index is refused by the codec, so it is not held out: it
+// reaches decode and is counted there.
+//
 // This creates an asymmetry on the emitted side: the `ctx/` prefix test is
 // unbounded, so every ctx/ key the encoder writes is skipped and a bogus one
 // would be invisible here. The decode leg of the FLAT round-trip probe covers
@@ -170,11 +181,16 @@ func IsCompositionMeta(key, root string) bool {
 	}
 	rel, rooted := strings.CutPrefix(key, root+"/")
 	if !rooted {
+		// The template root's own segment takes `:0` too (REQ-053).
+		rel, rooted = strings.CutPrefix(key, root+zeroIndex+"/")
+	}
+	if !rooted {
 		return false
 	}
-	// Suffix-aware first, on the spelling as written: `composer|name` is a
-	// respelling, `composer|id` is refused data loss, and only an exact match can
-	// tell them apart.
+	rel = unindexedSpelling(rel)
+	// Suffix-aware first, on the spelling as written once its `:0` indexes are
+	// gone: `composer|name` is a respelling, `composer|id` is refused data loss,
+	// and only an exact match can tell them apart.
 	if metaSpellings[rel] {
 		return true
 	}
@@ -189,6 +205,29 @@ func IsCompositionMeta(key, root string) bool {
 		return segs[0] == "context" && contextMetaLeaves[segs[1]]
 	}
 	return false
+}
+
+// zeroIndex is the one index a composition metadata segment takes. Each such
+// segment is a single-valued RM attribute, so the codec reads `:0` as no index
+// at all and refuses any other.
+const zeroIndex = ":0"
+
+// unindexedSpelling drops a `:0` index from every segment of a root-relative
+// FLAT key's path and keeps the |suffix as written: `context:0/start_time:0`
+// becomes `context/start_time` and `language:0|code` becomes `language|code`,
+// the spellings simplified.MetadataAliasSpellings reports. Any other index is
+// left in place, so the key matches no metadata spelling.
+func unindexedSpelling(rel string) string {
+	path, suffix, piped := strings.Cut(rel, "|")
+	segs := strings.Split(path, "/")
+	for i, s := range segs {
+		segs[i] = strings.TrimSuffix(s, zeroIndex)
+	}
+	out := strings.Join(segs, "/")
+	if piped {
+		out += "|" + suffix
+	}
+	return out
 }
 
 // baseOf strips the |suffix from a FLAT key, leaving the leaf path that all

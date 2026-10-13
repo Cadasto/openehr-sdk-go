@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,6 +30,11 @@ import (
 // Both spellings give the same *ArchetypeRoot, with its archetype id,
 // optional template id, term definitions and full subtree, so neither
 // is an unknown type.
+//
+// Nor is xsi:type="CONSTRAINT_REF": it is read as a leaf
+// *ComplexObject whose PrimitiveConstraint is a
+// [constraints.ConstraintRef] carrying its <reference>. A missing or
+// blank reference leaves that constraint with an empty Reference.
 func ParseOPT(r io.Reader) (*OperationalTemplate, error) {
 	return parseOPT(r, false)
 }
@@ -41,11 +47,17 @@ func ParseOPT(r io.Reader) (*OperationalTemplate, error) {
 // taxonomy (e.g. AOM 2 / ADL 2 inputs, primitive constraint trees).
 // Returns ErrUnsupportedNode (wrapped) on the first such occurrence.
 // It also refuses an unparseable C_INTEGER or C_REAL bound, an
-// unparseable C_INTEGER or C_REAL list item, and a C_PRIMITIVE_OBJECT
-// with no <item> child, returning an error that wraps ErrInvalidOPT.
+// unparseable C_INTEGER or C_REAL list item, a C_PRIMITIVE_OBJECT
+// with no <item> child, and a CONSTRAINT_REF with no <reference> or
+// a blank one, returning an error that wraps ErrInvalidOPT.
 //
-// T_ARCHETYPE_ROOT is not such a value. Strict mode reads it as an
-// archetype root, exactly as ParseOPT does, and accepts it.
+// T_ARCHETYPE_ROOT and CONSTRAINT_REF are not unknown values, so
+// strict mode never refuses them as unsupported. It reads
+// T_ARCHETYPE_ROOT exactly as ParseOPT does. It reads a
+// CONSTRAINT_REF as ParseOPT does, as a leaf carrying a
+// [constraints.ConstraintRef], with one difference: where the
+// reference is missing or blank, ParseOPT keeps the leaf with an
+// empty Reference and strict mode refuses the template.
 func ParseOPTStrict(r io.Reader) (*OperationalTemplate, error) {
 	return parseOPT(r, true)
 }
@@ -265,6 +277,10 @@ type xmlCObject struct {
 	// `C_DURATION`, …). buildPrimitive recurses into Item when the
 	// wrapper is named. Empty for all other shapes.
 	Item *xmlCObject `xml:"item"`
+	// Reference is the constraint code (e.g. "ac0001") of a
+	// CONSTRAINT_REF, which names a value set outside the archetype.
+	// Empty for all other shapes.
+	Reference string `xml:"reference"`
 }
 
 // xmlTermDefSection is one <term_definitions code="..."> block on a
@@ -313,11 +329,19 @@ type xmlCAttribute struct {
 	Children    []*xmlCObject   `xml:"children"`
 }
 
+// xmlInterval is the whole-number interval of an occurrences, existence
+// or cardinality block. All four flags are xmlBoolFlag values, so an
+// omitted, empty or whitespace-only element stays unset and is never a
+// decode error. The bounds are pointers, nil when the OPT omits them, so
+// unboundedFlag can read an unset unbounded flag by its side's bound and
+// includedFlag gives an unset included flag the default for its side.
 type xmlInterval struct {
-	Lower          int  `xml:"lower"`
-	Upper          int  `xml:"upper"`
-	LowerUnbounded bool `xml:"lower_unbounded"`
-	UpperUnbounded bool `xml:"upper_unbounded"`
+	Lower          *int        `xml:"lower"`
+	Upper          *int        `xml:"upper"`
+	LowerIncluded  xmlBoolFlag `xml:"lower_included"`
+	UpperIncluded  xmlBoolFlag `xml:"upper_included"`
+	LowerUnbounded xmlBoolFlag `xml:"lower_unbounded"`
+	UpperUnbounded xmlBoolFlag `xml:"upper_unbounded"`
 }
 
 // xmlCardinality maps the AOM 1.4 CARDINALITY type — the
@@ -417,11 +441,11 @@ func buildNode(o *xmlCObject, strict bool, depth int) (Node, error) {
 			parsedExcludes: parseSlotAssertions(excludes),
 		}, nil
 	default:
-		// REQ-103 primitive constraint types map to leaf
-		// ComplexObject nodes carrying a typed PrimitiveConstraint.
-		// Unknown xsi:type values (outside the v1 closed set) still
-		// fall through as bare leaf ComplexObject — the
-		// forward-compatibility escape hatch from REQ-100.
+		// REQ-103 primitive constraint types, CONSTRAINT_REF among
+		// them, map to leaf ComplexObject nodes carrying a typed
+		// PrimitiveConstraint. Unknown xsi:type values (outside the
+		// closed set) still fall through as bare leaf ComplexObject —
+		// the forward-compatibility escape hatch from REQ-100.
 		//
 		// In strict mode, an unknown xsi:type that carries nested
 		// <attributes> means lenient mode would silently drop a
@@ -569,23 +593,108 @@ func buildAttribute(a *xmlCAttribute, strict bool, depth int) (*Attribute, error
 	return attr, nil
 }
 
+// unboundedFlag reads the lower_unbounded or upper_unbounded flag of the
+// interval side named side, whose bound the OPT gives when hasBound
+// (REQ-169). A flag the OPT writes is read as written. An omitted flag reads
+// as false beside a bound and as true where the bound is omitted too, so an
+// interval that gives only an upper bound is open below. A side the OPT
+// writes bounded but gives no bound is refused: the parser holds every bound
+// by value, so it has no value to give that side.
+func unboundedFlag(flag xmlBoolFlag, hasBound bool, side string) (bool, error) {
+	if !flag.set {
+		return !hasBound, nil
+	}
+	if !flag.value && !hasBound {
+		return false, fmt.Errorf("%s_unbounded is false but the interval gives no %s bound", side, side)
+	}
+	return flag.value, nil
+}
+
+// includedFlag reads the lower_included or upper_included flag of an
+// interval. A flag the OPT writes is read as written. An omitted flag is
+// a closed end on a bounded side and an open end on an unbounded side,
+// the only value the BASE interval invariants allow there.
+func includedFlag(flag *bool, unbounded bool) bool {
+	if flag != nil {
+		return *flag
+	}
+	return !unbounded
+}
+
+// intervalToMultiplicity returns the interval with each bounded side
+// closed, or nil when the OPT omits the interval.
 func intervalToMultiplicity(i *xmlInterval) (*Multiplicity, error) {
 	if i == nil {
 		return nil, nil
 	}
+	lowerUnbounded, err := unboundedFlag(i.LowerUnbounded, i.Lower != nil, "lower")
+	if err != nil {
+		return nil, err
+	}
+	upperUnbounded, err := unboundedFlag(i.UpperUnbounded, i.Upper != nil, "upper")
+	if err != nil {
+		return nil, err
+	}
+	lowerIncluded := includedFlag(i.LowerIncluded.ptr(), lowerUnbounded)
+	upperIncluded := includedFlag(i.UpperIncluded.ptr(), upperUnbounded)
+	lower, upper := intOrZero(i.Lower), intOrZero(i.Upper)
+	m := &Multiplicity{
+		lower:          lower,
+		upper:          upper,
+		lowerUnbounded: lowerUnbounded,
+		upperUnbounded: upperUnbounded,
+	}
+	// A Multiplicity counts whole items, so an excluded end on a bounded
+	// side becomes the closed end it stands for: ">0" is 1 and "<3" is 2.
+	// An unbounded side has no bound to move, whatever its included flag
+	// says. An int cannot hold the closed end of "> the largest int" or
+	// "< the smallest int", so such an end is refused instead of being
+	// left to wrap around to the other end of the int range.
+	if !lowerUnbounded && !lowerIncluded {
+		if m.lower == math.MaxInt {
+			return nil, fmt.Errorf("closed lower bound overflows int: excluded lower=%d", lower)
+		}
+		m.lower++
+	}
+	if !upperUnbounded && !upperIncluded {
+		if m.upper == math.MinInt {
+			return nil, fmt.Errorf("closed upper bound overflows int: excluded upper=%d", upper)
+		}
+		m.upper--
+	}
 	// Reject inverted intervals at parse time so downstream walkers
 	// can assume `Lower <= Upper` whenever both bounds are present.
-	// Unbounded sides are skipped — by definition they have no
-	// concrete value to compare.
-	if !i.LowerUnbounded && !i.UpperUnbounded && i.Lower > i.Upper {
-		return nil, fmt.Errorf("inverted interval lower=%d > upper=%d", i.Lower, i.Upper)
+	// The check runs on the closed ends, so an interval that closing
+	// leaves empty, such as ">2..<3", is refused here too; the message
+	// adds the interval as written so the reader recognises it.
+	// Unbounded sides are skipped: they have no concrete value to compare.
+	if !m.lowerUnbounded && !m.upperUnbounded && m.lower > m.upper {
+		return nil, fmt.Errorf("inverted interval lower=%d > upper=%d (written %s)",
+			m.lower, m.upper, writtenBounds(lower, upper, lowerIncluded, upperIncluded))
 	}
-	return &Multiplicity{
-		lower:          i.Lower,
-		upper:          i.Upper,
-		lowerUnbounded: i.LowerUnbounded,
-		upperUnbounded: i.UpperUnbounded,
-	}, nil
+	return m, nil
+}
+
+// intOrZero returns the bound p points to, or 0 for a bound the OPT omits.
+func intOrZero(p *int) int {
+	if p == nil {
+		return 0
+	}
+	return *p
+}
+
+// writtenBounds spells a bounded interval in ADL notation, with the
+// bounds the OPT wrote and each end marked by its included flag:
+// ">2..<3" when both ends are excluded, "2..3" when both are closed.
+func writtenBounds(lower, upper int, lowerIncluded, upperIncluded bool) string {
+	lowerMark, upperMark := "", ""
+	if !lowerIncluded {
+		lowerMark = ">"
+	}
+	if !upperIncluded {
+		upperMark = "<"
+	}
+	return fmt.Sprintf("%s%d..%s%d", lowerMark, lower, upperMark, upper)
 }
 
 func collectAssertions(xs []xmlAssertion) []string {
