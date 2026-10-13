@@ -85,18 +85,18 @@ func (l Layer) String() string {
 // The class of Path and Detail depends on the entry point that returned
 // the issue.
 //
-// The instance validators are [ValidateComposition], [Validate],
-// [ValidateDemographic], [ValidateFolder] and [ValidateEHRStatus], and the
-// template-less floor [ValidateRM], [ValidateRMFolder],
-// [ValidateRMEHRStatus], [ValidateRMEHRAccess], [ValidateRMDemographic]
-// and [ValidateRMEHRStatusBytes]. On their issues Path, Code, Layer, Rule,
-// Detail and Severity never contain a value taken from the instance: not
-// the content of a data value (a node's own name included), a code, units,
-// a precision, an interval bound, nor the text of an error raised while
-// decoding it. They may name RM types and attributes, archetype and node
-// ids, the names the template gives its nodes, and the template's own
-// constraint, so such an issue can be logged or returned to a client as it
-// is. The value the failed check read is kept only in Value.
+// The instance validators are [Validator.Validate], [ValidateComposition],
+// [Validate], [ValidateDemographic], [ValidateFolder] and
+// [ValidateEHRStatus], and the template-less floor [ValidateRM],
+// [ValidateRMFolder], [ValidateRMEHRStatus], [ValidateRMEHRAccess],
+// [ValidateRMDemographic] and [ValidateRMEHRStatusBytes]. On their issues
+// Path, Code, Layer, Rule, Detail and Severity never contain a value taken
+// from the instance: not the content of a data value (a node's own name
+// included), a code, units, a precision, an interval bound, nor the text of
+// an error raised while decoding it. They may name RM types and attributes,
+// archetype and node ids, the names the template gives its nodes, and the
+// template's own constraint, so such an issue can be logged or returned to
+// a client as it is. The value the failed check read is kept only in Value.
 //
 // On an issue from [ValidateAQL] or [ValidateAQLWithTypeRelation], Code,
 // Layer, Rule and Severity never contain text from the query, but Detail
@@ -323,6 +323,41 @@ type Result struct {
 	// after a validator call (zero-length allocation is acceptable). May be
 	// non-empty while OK is true when it holds only Warning-severity issues.
 	Issues []Issue
+
+	// Coverage says what the validator did not check, so a caller can tell
+	// "no issue found" from "everything checked". Its zero value, which a
+	// guard and [ValidateAQL] return, is complete.
+	Coverage Coverage
+}
+
+// Coverage lists the parts of the instance a validator call did not check.
+// OK only reports that no error was found in what was checked; Coverage says
+// how much that was. Each path is written as [Issue.Path] describes and holds
+// no value from the instance.
+type Coverage struct {
+	// Stopped lists the path of each place where a limit stopped the walk:
+	// the path of the max_depth issue, the first place the walk reached its
+	// depth limit (it walked nothing deeper, there or on any other branch),
+	// and the path of the max_nodes issue, where it reached its visit limit
+	// and ended. It holds at most one of each, in the order the walk met
+	// them. The limits are those of the [Validator] that ran the call
+	// ([Limits]).
+	Stopped []string
+
+	// External lists, in walk order, the path of each node the template
+	// binds to a constraint that names an external value set, such as a
+	// CONSTRAINT_REF on a coded value. The validator cannot consult such a
+	// value set, so the code at that path was not checked against it; the
+	// node's other attributes were.
+	External []string
+}
+
+// Complete reports whether the call checked everything it reached: no limit
+// stopped the walk, and no node was bound to a value set the validator
+// cannot consult. It is true exactly when Stopped and External are both
+// empty, so the zero Coverage is complete.
+func (c Coverage) Complete() bool {
+	return len(c.Stopped) == 0 && len(c.External) == 0
 }
 
 // resultFromIssues builds a [Result] from a slice of issues. Used by

@@ -12,7 +12,6 @@ import (
 
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
@@ -123,7 +122,7 @@ func pinnedCluster() *rm.Cluster {
 // each issue, sorted.
 func floorPaths(root any, names pinnedNames) []string {
 	rmType, _, _ := rmTypeInfo(root)
-	w := &rmFloorWalker{info: rminfo.Default, names: names}
+	w := newFloorWalker(names, Limits{})
 	w.walk(root, rmType, "/", roleNone, 0)
 	paths := make([]string, 0, len(w.issues))
 	for _, iss := range w.issues {
@@ -321,7 +320,7 @@ func TestBindings_REQ102_REQ112_HandOffGivesOnePath(t *testing.T) {
 
 	w := newWalker(c)
 	w.walkNode(c.Root(), comp, "/")
-	floor := &rmFloorWalker{info: rminfo.Default, names: names}
+	floor := newFloorWalker(names, Limits{})
 	floor.walk(comp, "COMPOSITION", "/", roleNone, 0)
 
 	for _, want := range []string{

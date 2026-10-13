@@ -59,6 +59,10 @@ type walker struct {
 	// ([itemPaths]). The floor takes it, so it writes the path this walk
 	// writes for the same node. Nil until a walk records a name.
 	names pinnedNames
+	// external holds, in walk order, the path of each node bound to a
+	// CONSTRAINT_REF: its value set is outside the SDK, so the walk could
+	// not check the code there ([Coverage.External]). Nil until one is met.
+	external []string
 }
 
 func newWalker(c *templatecompile.Compiled) *walker {

@@ -382,7 +382,7 @@ func TestREQ168_EmptyValue(t *testing.T) {
 			name:  "nil_root guard",
 			run:   floor(nil),
 			code:  "nil_root",
-			paths: []string{"/"},
+			paths: []string{""},
 		},
 		{
 			name: "nil_composition guard",

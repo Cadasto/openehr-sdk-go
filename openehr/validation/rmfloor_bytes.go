@@ -107,7 +107,9 @@ func ValidateRMEHRStatusBytes(data []byte) Result {
 	if len(absent) == 0 {
 		return r
 	}
-	return resultFromIssues(replaceAtPaths(r.Issues, absent))
+	out := resultFromIssues(replaceAtPaths(r.Issues, absent))
+	out.Coverage = r.Coverage
+	return out
 }
 
 // rootKeyAbsences returns the `required` findings for the value-typed

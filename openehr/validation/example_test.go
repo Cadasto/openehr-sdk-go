@@ -120,3 +120,27 @@ func ExampleValidateComposition() {
 	// reference model: OK=false issues=1
 	//   rm_version_valid at /archetype_details/rm_version
 }
+
+// Build a validator with a lower depth limit and read what the result did
+// not check. The SECTIONs below nest three deep; under a depth limit of 2 the
+// walk stops at the name of the second, reports it once as max_depth, and
+// lists that path in the result's coverage.
+func ExampleNew() {
+	bottom := &rm.Section{ArchetypeNodeID: "at0003", Name: rm.DVText{Value: "Bottom"}}
+	middle := &rm.Section{ArchetypeNodeID: "at0002", Name: rm.DVText{Value: "Middle"}, Items: []rm.ContentItem{bottom}}
+	top := &rm.Section{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "Top"}, Items: []rm.ContentItem{middle}}
+
+	v := validation.New(validation.WithLimits(validation.Limits{Depth: 2}))
+	result := v.Validate(top, nil)
+	fmt.Println("OK:", result.OK)
+	for _, issue := range result.Issues {
+		fmt.Println(issue.Code, "at", issue.Path)
+	}
+	fmt.Println("complete:", result.Coverage.Complete())
+	fmt.Println("stopped at:", result.Coverage.Stopped)
+	// Output:
+	// OK: false
+	// max_depth at /items[at0002]/name
+	// complete: false
+	// stopped at: [/items[at0002]/name]
+}

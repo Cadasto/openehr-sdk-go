@@ -36,21 +36,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
 )
 
-// maxWalkDepth bounds the RM-floor descent. RM graphs decoded from the
-// wire are acyclic trees, but ValidateRM accepts any caller-built value.
-// The walk's visit record stops a cycle through a pointer
-// ([rmFloorWalker.walk]); this bound stops a graph that is merely too deep,
-// rather than overflowing the stack. The deepest legitimate RM nesting is
-// far below it.
-const maxWalkDepth = 256
-
-// maxWalkNodes bounds the number of values one RM-floor walk visits. A
-// value held by value whose list shares its own backing array contains
-// itself without a pointer the visit record could recognise, and below
-// maxWalkDepth it can branch on every level; the walk stops after this many
-// visits instead. The largest corpus document, Demonstration.v1, needs 978.
-const maxWalkNodes = 100_000
-
 // ValidateRM validates root against the openEHR Reference Model alone:
 // it is the floor on its own, for a root no operational template applies
 // to. It checks every RM-mandatory attribute on every node
@@ -88,19 +73,31 @@ const maxWalkNodes = 100_000
 // inside itself is reported as `cyclic_value` at each path where it recurs
 // and is not descended into. A value held by value can hold itself too,
 // through a list that shares its own backing array, and the floor cannot
-// recognise it; so every call stops after a fixed number of visits, far
-// above what a decoded document needs, and reports `max_nodes` once, at the
-// path where it stopped. A graph nested deeper than the walk's depth limit
-// stops there, with `max_depth`.
+// recognise it; so every call stops after a number of visits, by default
+// far above what a decoded document needs, and reports `max_nodes` once, at
+// the path where it stopped. A graph nested deeper than the walk's depth limit
+// is not walked below it; the walk reports `max_depth` once, at the first
+// path where it stopped. [Result.Coverage] lists the path of each of the
+// two, and the [Limits] of a [Validator] set both.
 //
-// A nil root surfaces a single `nil_root` issue and is reported as
-// not-OK. An unknown RM root type (a Go value outside the closed RM
-// set) surfaces `rm_type_unknown` at "/"; the floor cannot descend
+// ValidateRM returns what a [Validator] built with no options returns from
+// Validate(root, nil).
+//
+// A nil root surfaces a single `nil_root` issue with an empty path and is
+// reported as not-OK. An unknown RM root type (a Go value outside the
+// closed RM set) surfaces `rm_type_unknown` at "/"; the floor cannot descend
 // further but does not panic.
 func ValidateRM(root any) Result {
+	var v Validator
+	return v.Validate(root, nil)
+}
+
+// validateRM runs the floor alone over root, within lim, guarding a nil root
+// and one outside the closed RM set.
+func validateRM(root any, lim Limits) Result {
 	if root == nil || rmread.IsTypedNilPointer(root) {
 		return resultFromIssues([]Issue{{
-			Path:     "/",
+			Path:     "",
 			Code:     "nil_root",
 			Detail:   "ValidateRM: root is nil",
 			Severity: Error,
@@ -115,25 +112,38 @@ func ValidateRM(root any) Result {
 			Severity: Error,
 		}})
 	}
-	return resultFromIssues(walkFloor(root, rmType, nil))
+	issues, stopped := walkFloor(root, rmType, nil, lim)
+	r := resultFromIssues(issues)
+	r.Coverage.Stopped = stopped
+	return r
 }
 
-// walkFloor runs the floor over root, of RM type rmType, and returns its
-// issues. names gives the name the OPT pins on each item a template walk
-// bound, so the floor writes that walk's path for the node; nil writes no
-// name predicate.
-func walkFloor(root any, rmType string, names pinnedNames) []Issue {
-	w := &rmFloorWalker{info: rminfo.Default, names: names}
+// walkFloor runs the floor over root, of RM type rmType, within lim, and
+// returns its issues and the path of each place where a limit stopped it.
+// names gives the name the OPT pins on each item a template walk bound, so
+// the floor writes that walk's path for the node; nil writes no name
+// predicate.
+func walkFloor(root any, rmType string, names pinnedNames, lim Limits) (issues []Issue, stopped []string) {
+	w := newFloorWalker(names, lim)
 	w.walk(root, rmType, "/", roleNone, 0)
-	return w.issues
+	return w.issues, w.stoppedAt
 }
 
-// floorIssues runs the floor over the root a template-driven validation
-// walked, with the names that walk bound. A root outside the closed RM set,
-// which the template walk reports as a type mismatch, is one the floor
-// cannot descend: it reports it as `rm_type_unknown` at "/", as [ValidateRM]
-// does.
-func floorIssues(root any, names pinnedNames) []Issue {
+// newFloorWalker returns a floor walker that writes the names the OPT pins
+// (nil for none) and stops at lim, each zero or negative field of which
+// stands for its default.
+func newFloorWalker(names pinnedNames, lim Limits) *rmFloorWalker {
+	lim = lim.withDefaults()
+	return &rmFloorWalker{info: rminfo.Default, names: names, maxDepth: lim.Depth, maxNodes: lim.Nodes}
+}
+
+// floorIssues runs the floor, within lim, over the root a template-driven
+// validation walked, with the names that walk bound, and returns its issues
+// and the path of each place where a limit stopped it. A root outside the
+// closed RM set, which the template walk reports as a type mismatch, is one
+// the floor cannot descend: it reports it as `rm_type_unknown` at "/", as
+// [ValidateRM] does.
+func floorIssues(root any, names pinnedNames, lim Limits) (issues []Issue, stopped []string) {
 	rmType, _, ok := rmTypeInfo(root)
 	if !ok {
 		return []Issue{{
@@ -141,22 +151,24 @@ func floorIssues(root any, names pinnedNames) []Issue {
 			Code:     "rm_type_unknown",
 			Detail:   fmt.Sprintf("root Go type %T is outside the closed RM set; the RM floor cannot descend", root),
 			Severity: Error,
-		}}
+		}}, nil
 	}
-	return walkFloor(root, rmType, names)
+	return walkFloor(root, rmType, names, lim)
 }
 
 // ValidateRMFolder is the typed convenience wrapper for FOLDER roots.
-// Delegates to [ValidateRM]; a nil folder surfaces `nil_folder`.
+// Delegates to [ValidateRM]; a nil folder surfaces `nil_folder`, with an
+// empty path.
 func ValidateRMFolder(folder *rm.Folder) Result {
 	if folder == nil {
-		return resultFromIssues([]Issue{{Path: "/", Code: "nil_folder", Detail: "ValidateRMFolder: folder is nil", Severity: Error}})
+		return resultFromIssues([]Issue{{Path: "", Code: "nil_folder", Detail: "ValidateRMFolder: folder is nil", Severity: Error}})
 	}
 	return ValidateRM(folder)
 }
 
 // ValidateRMEHRStatus is the typed convenience wrapper for EHR_STATUS.
-// Delegates to [ValidateRM]; a nil status surfaces `nil_ehr_status`.
+// Delegates to [ValidateRM]; a nil status surfaces `nil_ehr_status`, with an
+// empty path.
 //
 // It cannot flag an omitted value-typed mandatory `subject` (typed
 // rm.PartySelf, whose zero value is indistinguishable from an absent one):
@@ -168,26 +180,28 @@ func ValidateRMFolder(folder *rm.Folder) Result {
 // without the Bytes entry's `required` at `archetype_id`.
 func ValidateRMEHRStatus(status *rm.EHRStatus) Result {
 	if status == nil {
-		return resultFromIssues([]Issue{{Path: "/", Code: "nil_ehr_status", Detail: "ValidateRMEHRStatus: status is nil", Severity: Error}})
+		return resultFromIssues([]Issue{{Path: "", Code: "nil_ehr_status", Detail: "ValidateRMEHRStatus: status is nil", Severity: Error}})
 	}
 	return ValidateRM(status)
 }
 
 // ValidateRMEHRAccess is the typed convenience wrapper for EHR_ACCESS.
-// Delegates to [ValidateRM]; a nil access surfaces `nil_ehr_access`.
+// Delegates to [ValidateRM]; a nil access surfaces `nil_ehr_access`, with an
+// empty path.
 func ValidateRMEHRAccess(access *rm.EHRAccess) Result {
 	if access == nil {
-		return resultFromIssues([]Issue{{Path: "/", Code: "nil_ehr_access", Detail: "ValidateRMEHRAccess: access is nil", Severity: Error}})
+		return resultFromIssues([]Issue{{Path: "", Code: "nil_ehr_access", Detail: "ValidateRMEHRAccess: access is nil", Severity: Error}})
 	}
 	return ValidateRM(access)
 }
 
 // ValidateRMDemographic is the typed convenience wrapper for the
 // demographic PARTY hierarchy (PERSON / ORGANISATION / GROUP / AGENT /
-// ROLE). Delegates to [ValidateRM]; a nil party surfaces `nil_party`.
+// ROLE). Delegates to [ValidateRM]; a nil party surfaces `nil_party`, with
+// an empty path.
 func ValidateRMDemographic(party rm.Party) Result {
 	if party == nil || rmread.IsTypedNilPointer(party) {
-		return resultFromIssues([]Issue{{Path: "/", Code: "nil_party", Detail: "ValidateRMDemographic: party is nil", Severity: Error}})
+		return resultFromIssues([]Issue{{Path: "", Code: "nil_party", Detail: "ValidateRMDemographic: party is nil", Severity: Error}})
 	}
 	return ValidateRM(party)
 }
@@ -196,19 +210,29 @@ func ValidateRMDemographic(party rm.Party) Result {
 // by rminfo. There is no notion of "OPT-declared attribute" here —
 // every BMM-known attribute is a descend candidate. Each value with an
 // identity is visited once ([rmFloorWalker.walk]), recursion depth is
-// bounded by maxWalkDepth and the number of visits by maxWalkNodes, so a
+// bounded by maxDepth and the number of visits by maxNodes, so a
 // caller-built graph that shares or cycles through a pointer, holds itself
 // by value, or nests too deep, terminates instead of branching without end
 // or overflowing the stack.
 type rmFloorWalker struct {
 	info   rminfo.Lookup
 	issues []Issue
+	// maxDepth and maxNodes are the [Limits] of the call, defaults filled
+	// in. RM graphs decoded from the wire are acyclic trees far shallower
+	// and smaller than either, but a value built in Go may nest without end
+	// or hold itself by value, which the visit record cannot recognise.
+	maxDepth, maxNodes int
+	// stoppedAt holds the path of the max_depth issue and of the max_nodes
+	// issue, in the order the walk reported them; depthStopped is set once
+	// the first depth stop is reported, so later ones are silent.
+	stoppedAt    []string
+	depthStopped bool
 	// reached holds each value with an identity ([hasIdentity]) the walk has
 	// reached; walk allocates it. inside holds those the walk is inside,
 	// outermost first.
 	reached map[any]struct{}
 	inside  []any
-	// visits counts the values the walk has visited, up to maxWalkNodes;
+	// visits counts the values the walk has visited, up to maxNodes;
 	// stopped is set once it reaches that limit, and ends the walk.
 	visits  int
 	stopped bool
@@ -246,10 +270,9 @@ func childRole(class string, role floorRole, attr string) floorRole {
 	return roleNone
 }
 
+// emit appends i to the walker's issues. Every floor issue is an [Error],
+// the zero Severity, so no site sets it.
 func (w *rmFloorWalker) emit(i Issue) {
-	if i.Severity == 0 {
-		i.Severity = Error
-	}
 	w.issues = append(w.issues, i)
 }
 
@@ -295,7 +318,7 @@ func (w *rmFloorWalker) walk(value any, rmType string, path string, role floorRo
 }
 
 // visit checks value (of declared BMM type rmType, in role role) at the
-// given issue path. A visit past maxWalkNodes checks nothing: it reports
+// given issue path. A visit past maxNodes checks nothing: it reports
 // `max_nodes` at path and ends the walk. Otherwise visit first runs the
 // per-type invariants on the current node, then, for types the floor handles (see [rmread.Handles]), iterates
 // every BMM-known attribute, emitting `required` for any RM-mandatory
@@ -314,12 +337,13 @@ func (w *rmFloorWalker) walk(value any, rmType string, path string, role floorRo
 // directly: CODE_PHRASE.terminology_id comes back as a Go string, which is
 // not an RM node to walk.
 func (w *rmFloorWalker) visit(value any, rmType string, path string, role floorRole, depth int) {
-	if w.visits == maxWalkNodes {
+	if w.visits == w.maxNodes {
 		w.emit(Issue{
 			Path:   path,
 			Code:   "max_nodes",
-			Detail: fmt.Sprintf("RM-floor walk stopped at %s after visiting %d values, its limit per call", rmType, maxWalkNodes),
+			Detail: fmt.Sprintf("RM-floor walk stopped at %s after visiting %d values, its limit per call", rmType, w.maxNodes),
 		})
+		w.stoppedAt = append(w.stoppedAt, path)
 		w.stopped = true
 		return
 	}
@@ -335,12 +359,19 @@ func (w *rmFloorWalker) visit(value any, rmType string, path string, role floorR
 	if !rmread.Handles(value) {
 		return
 	}
-	if depth >= maxWalkDepth {
-		w.emit(Issue{
-			Path:   path,
-			Code:   "max_depth",
-			Detail: fmt.Sprintf("RM-floor walk exceeded max depth %d at %s (possible cyclic graph)", maxWalkDepth, rmType),
-		})
+	if depth >= w.maxDepth {
+		// The first stop is reported; a later one, on another branch, is
+		// not walked below either, and is silent, so a value that reaches
+		// the limit on many branches yields one issue.
+		if !w.depthStopped {
+			w.depthStopped = true
+			w.emit(Issue{
+				Path:   path,
+				Code:   "max_depth",
+				Detail: fmt.Sprintf("RM-floor walk reached its depth limit %d at %s; nothing below that depth is walked, and later stops there are not reported again", w.maxDepth, rmType),
+			})
+			w.stoppedAt = append(w.stoppedAt, path)
+		}
 		return
 	}
 

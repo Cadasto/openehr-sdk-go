@@ -159,19 +159,18 @@ func TestValidateRM_REQ112_SharedLeafCheckedOnce(t *testing.T) {
 }
 
 // REQ-112 — a graph that is deep but has no cycle still stops at max_depth,
-// at the node the limit is reached on, and is not reported as cyclic.
+// once, at the first node the limit is reached on, and is not reported as
+// cyclic. That node is the name of the SECTION 255 levels down, which the
+// walk reaches before the SECTION 256 levels down.
 func TestValidateRM_REQ112_DeepAcyclicGraphStopsAtMaxDepth(t *testing.T) {
 	const levels = 300 // past the walk's depth limit of 256
-	root := &rm.Section{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "bottom"}}
-	for range levels {
-		root = &rm.Section{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "level"}, Items: []rm.ContentItem{root}}
-	}
+	root := nestedSections(levels)
 
 	r := validateWithin(t, "ValidateRM", walkDeadline, func() validation.Result { return validation.ValidateRM(root) })
 
-	deepest := strings.Repeat("/items[at0001]", 256)
-	if !containsIssue(r.Issues, deepest, "max_depth") {
-		t.Errorf("ValidateRM(%d nested SECTIONs) has no max_depth at the SECTION 256 levels down; issues %q", levels, issueKeys(r.Issues))
+	first := firstDepthStop("/items[at0001]", defaultDepth)
+	if got := pathsOf(r.Issues, "max_depth"); len(got) != 1 || got[0] != first {
+		t.Errorf("ValidateRM(%d nested SECTIONs) reports max_depth at %q, want once, at the name of the SECTION 255 levels down; issues %q", levels, got, issueKeys(r.Issues))
 	}
 	if containsCode(r.Issues, "cyclic_value") {
 		t.Errorf("ValidateRM(%d nested SECTIONs) reports cyclic_value, want none: no SECTION holds itself; issues %q", levels, issueKeys(r.Issues))

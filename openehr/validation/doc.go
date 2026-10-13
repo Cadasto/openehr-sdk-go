@@ -102,8 +102,8 @@
 //
 // # Collect-all
 //
-// Every failing clause emits one [Issue]; neither walk ever
-// short-circuits, so UIs and CI runners get the full list. A defect the
+// Every failing clause emits one [Issue]; neither walk stops at a
+// finding, so UIs and CI runners get the full list. A defect the
 // template walk and the floor both find, under one code at one path, is
 // one issue.
 //
@@ -118,6 +118,39 @@
 // that share a code, such as the rm_invariant issues, are told apart by
 // Rule. A guard, a walk condition and an AQL lint issue carry [LayerNone]
 // and an empty Rule.
+//
+// # Validator and limits
+//
+// A [Validator] is the value behind the entry points: [New] builds one
+// from options, and its [Validator.Validate] takes any Reference Model value
+// with a compiled template, or with nil to apply the Reference Model rules
+// alone. It holds no state between calls, so one value can serve every
+// goroutine of a server. The package-level functions behave as a Validator
+// built with no options.
+//
+// [WithLimits] sets the two [Limits] of the Reference Model walk: the
+// nesting depth below which it does not descend (256 by default) and the
+// number of values it visits in one call (100,000 by default). No decoded
+// document comes near either; they stop a value built in Go that nests
+// without end or holds itself. A walk that reaches the depth limit reports
+// one max_depth issue, at the first place it stopped, and one that reaches
+// the visit limit reports max_nodes and ends.
+//
+//	v := validation.New(validation.WithLimits(validation.Limits{Depth: 64}))
+//	r := v.Validate(comp, compiled)
+//
+// # Coverage
+//
+// [Result.OK] reports that no error was found in what the validator
+// checked; [Result.Coverage] says what it did not check. [Coverage.Stopped]
+// lists each path where a limit stopped the walk, and [Coverage.External]
+// each node the template binds to a value set the validator cannot consult,
+// such as a CONSTRAINT_REF. [Coverage.Complete] is true when both lists are
+// empty.
+//
+//	if r.OK && !r.Coverage.Complete() {
+//	    // valid as far as checked; see r.Coverage for what was not
+//	}
 //
 // # Dependencies
 //

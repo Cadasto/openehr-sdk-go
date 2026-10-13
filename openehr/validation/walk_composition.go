@@ -87,10 +87,12 @@ func (w *walker) walkNode(optNode *tcimpl.CompiledNode, rmValue any, path string
 		// checks nothing locally, so the bound value's RM-mandatory
 		// attributes (a CODE_PHRASE's terminology_id and code_string)
 		// are still walked below, as at a node the OPT leaves
-		// unconstrained.
+		// unconstrained. The result's coverage names the node, since the
+		// code there was checked against no value set.
 		if _, isRef := pc.(constraints.ConstraintRef); !isRef {
 			return
 		}
+		w.external = append(w.external, path)
 	}
 
 	for _, attr := range optNode.Attributes() {
