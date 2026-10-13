@@ -27,6 +27,21 @@ func withUserinfo(rawURL string) string {
 	return strings.Replace(rawURL, "://", "://"+userinfo, 1)
 }
 
+// authorityEnds are the characters that end a URL's authority. A password
+// that holds one unescaped makes url.Parse refuse the URL and quote the
+// part of the password before it.
+var authorityEnds = []struct{ name, char string }{
+	{name: "slash", char: "/"},
+	{name: "question mark", char: "?"},
+	{name: "hash", char: "#"},
+}
+
+// cutUserinfo is userinfo with end, one of authorityEnds, in the password
+// after secret.
+func cutUserinfo(end string) string {
+	return "svc:" + secret + end + "tail@"
+}
+
 // maskCase is one way the package refuses a URL that carries a password.
 // call makes the refused call and returns the base URL it was for, which
 // the DiscoveryError's Issuer field must still hold as given, and the
@@ -138,7 +153,7 @@ func refreshCachedError(t *testing.T, cached func(baseURL string) *discovery.Ser
 // a hand-built catalog and a resolved one, while its Issuer field keeps the
 // URL as given.
 func TestREQ070_ErrorTextMasksBaseURLPassword(t *testing.T) { // REQ-070
-	runMaskCases(t, []maskCase{
+	cases := []maskCase{
 		{
 			name: "DiscoveryError with a password in Issuer",
 			call: func(*testing.T) (string, error) {
@@ -152,15 +167,6 @@ func TestREQ070_ErrorTextMasksBaseURLPassword(t *testing.T) { // REQ-070
 			name: "DiscoveryError with an unparseable Issuer",
 			call: func(*testing.T) (string, error) {
 				const base = "https://" + userinfo + "x.example/%zz"
-				return base, &discovery.DiscoveryError{Issuer: base, Reason: discovery.ReasonMalformedURL}
-			},
-			reason: discovery.ReasonMalformedURL,
-			keep:   "x.example",
-		},
-		{
-			name: "DiscoveryError with a slash in the password",
-			call: func(*testing.T) (string, error) {
-				const base = "https://svc:pa/" + secret + "@x.example/"
 				return base, &discovery.DiscoveryError{Issuer: base, Reason: discovery.ReasonMalformedURL}
 			},
 			reason: discovery.ReasonMalformedURL,
@@ -197,7 +203,19 @@ func TestREQ070_ErrorTextMasksBaseURLPassword(t *testing.T) { // REQ-070
 			reason: discovery.ReasonFetchFailed,
 			keep:   "127.0.0.1",
 		},
-	})
+	}
+	for _, end := range authorityEnds {
+		cases = append(cases, maskCase{
+			name: "DiscoveryError with a " + end.name + " in the password",
+			call: func(*testing.T) (string, error) {
+				base := "https://" + cutUserinfo(end.char) + "x.example/"
+				return base, &discovery.DiscoveryError{Issuer: base, Reason: discovery.ReasonMalformedURL}
+			},
+			reason: discovery.ReasonMalformedURL,
+			keep:   "x.example",
+		})
+	}
+	runMaskCases(t, cases)
 }
 
 // TestREQ072_ErrorTextMasksURLPassword pins REQ-072: a malformed base URL,
@@ -205,7 +223,7 @@ func TestREQ070_ErrorTextMasksBaseURLPassword(t *testing.T) { // REQ-070
 // text masks the URL's password.
 func TestREQ072_ErrorTextMasksURLPassword(t *testing.T) { // REQ-072
 	const apiBaseURL = "https://api.example.com/openehr/v1"
-	runMaskCases(t, []maskCase{
+	cases := []maskCase{
 		{
 			name: "base URL url.Parse refuses",
 			call: func(t *testing.T) (string, error) {
@@ -266,7 +284,18 @@ func TestREQ072_ErrorTextMasksURLPassword(t *testing.T) { // REQ-072
 			reason: discovery.ReasonMalformedURL,
 			keep:   "svc:xxxxx@:8443",
 		},
-	})
+	}
+	for _, end := range authorityEnds {
+		cases = append(cases, maskCase{
+			name: "base URL with a " + end.name + " in the password",
+			call: func(t *testing.T) (string, error) {
+				return resolveError(t, nil, nil, fixed("https://"+cutUserinfo(end.char)+"x.example/"))
+			},
+			reason: discovery.ReasonMalformedURL,
+			keep:   "x.example",
+		})
+	}
+	runMaskCases(t, cases)
 }
 
 // TestREQ073_ErrorTextMasksURLPassword pins REQ-073: a plaintext base URL,
@@ -284,7 +313,7 @@ func TestREQ073_ErrorTextMasksURLPassword(t *testing.T) { // REQ-073
 			keep:   keep,
 		}
 	}
-	runMaskCases(t, []maskCase{
+	cases := []maskCase{
 		{
 			name: "plaintext base URL",
 			call: func(t *testing.T) (string, error) {
@@ -353,7 +382,11 @@ func TestREQ073_ErrorTextMasksURLPassword(t *testing.T) { // REQ-073
 			reason: discovery.ReasonInsecureURL,
 			keep:   "auth.example",
 		},
-	})
+	}
+	for _, end := range authorityEnds {
+		cases = append(cases, issuerCase("with a "+end.name+" in the password", "https://"+cutUserinfo(end.char)+"idp.example/", discovery.ReasonMalformedURL, "idp.example"))
+	}
+	runMaskCases(t, cases)
 }
 
 // failingCache is a MemoryCache whose Put and Invalidate fail.

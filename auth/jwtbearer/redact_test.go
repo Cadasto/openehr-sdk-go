@@ -3,6 +3,7 @@ package jwtbearer_test
 import (
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -46,5 +47,35 @@ func TestREQ068_InvalidTokenURLErrorMasksPassword(t *testing.T) { // REQ-068
 				t.Errorf("FromConfig(TokenURL %q) error = %q, want it to name the host %q", tc.tokenURL, msg, tc.host)
 			}
 		})
+	}
+}
+
+// TestREQ068_TokenRequestErrorMasksPassword checks that Token reports a
+// TokenURL the constructor accepts but cannot be requested with
+// auth.ErrTokenExchangeFailed and url.Parse's *url.Error, and that the error
+// names the host but not the password in the URL's userinfo.
+func TestREQ068_TokenRequestErrorMasksPassword(t *testing.T) { // REQ-068
+	t.Parallel()
+	const secret = "s3cret"
+	// url.Parse accepts the zone's é, but not the %C3%A9 that the request
+	// URL, built from the parsed one, escapes it as.
+	tokenURL := "https://svc:" + secret + "@[fe80::1%25é]/token"
+	src, err := jwtbearer.New(tokenURL, jwtbearer.StaticAssertion("header.claims.signature"), jwtbearer.WithHTTPClient(http.DefaultClient))
+	if err != nil {
+		t.Fatalf("New(TokenURL %q) error = %v, want nil", tokenURL, err)
+	}
+	_, err = src.Token(t.Context())
+	if !errors.Is(err, auth.ErrTokenExchangeFailed) {
+		t.Fatalf("Token() error = %v, want auth.ErrTokenExchangeFailed", err)
+	}
+	if ue, ok := errors.AsType[*url.Error](err); !ok || ue == nil {
+		t.Errorf("Token() error = %v, want url.Parse's *url.Error in its chain", err)
+	}
+	msg := err.Error()
+	if strings.Contains(msg, secret) {
+		t.Errorf("Token() error = %q, want no password", msg)
+	}
+	if !strings.Contains(msg, "fe80::1") {
+		t.Errorf("Token() error = %q, want it to name the host %q", msg, "fe80::1")
 	}
 }

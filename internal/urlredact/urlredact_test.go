@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/urlredact"
@@ -201,6 +202,108 @@ func TestError(t *testing.T) {
 			t.Errorf("Error(typed nil) = %v, want it unchanged", got)
 		}
 	})
+}
+
+// TestErrorMasksPasswordInCause checks that Error masks the password both
+// in the URL a *url.Error quotes and in what url.Parse's cause quotes from
+// it, and that the error keeps its Op and its cause: errors.Is still finds
+// the cause, and errors.AsType still finds a url.EscapeError or a
+// url.InvalidHostError where url.Parse returned one.
+func TestErrorMasksPasswordInCause(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		raw         string
+		leak        []string // text the error must not carry
+		keep        string   // text the error must still carry
+		escape      bool     // url.Parse's cause is a url.EscapeError
+		invalidHost bool     // url.Parse's cause is a url.InvalidHostError
+	}{
+		{
+			// The "/" ends the authority, so url.Parse reads the part of
+			// the password before it as a port and quotes it.
+			name: "password with /",
+			raw:  "https://svc:topsecret/tail@x.example/",
+			leak: []string{"topsecret", "tail"},
+			keep: "x.example",
+		},
+		{
+			name: "password with ?",
+			raw:  "https://svc:topsecret?query@x.example/",
+			leak: []string{"topsecret", "query"},
+			keep: "x.example",
+		},
+		{
+			// url.Parse also cuts the URL it quotes at the "#".
+			name: "password with #",
+			raw:  "https://svc:topsecret#frag@x.example/",
+			leak: []string{"topsecret", "frag"},
+			keep: "x.example",
+		},
+		{
+			// url.EscapeError quotes three characters of the password.
+			name:   "bad escape in the password",
+			raw:    "https://svc:%zzpw@x.example/",
+			leak:   []string{"%zz", "zz", "pw"},
+			keep:   "x.example",
+			escape: true,
+		},
+		{
+			// The space url.Parse quotes is the host's, but the password
+			// holds one too, so it cannot be told apart.
+			name:        "space in the password and in the host",
+			raw:         "https://svc:a b@x y.example/",
+			leak:        []string{`" "`},
+			keep:        "x y.example",
+			invalidHost: true,
+		},
+		{
+			// The first "%zz" is in the user name, the second in the
+			// password; url.Parse quotes the host's.
+			name:   "bad escape in the user name, the password and the host",
+			raw:    "https://u%zz:%zz@x%zz.example/",
+			leak:   []string{`"%zz"`},
+			keep:   "x%zz.example",
+			escape: true,
+		},
+		{
+			// url.Parse quotes the IP literal unescaped, as "u:pé", which
+			// the URL does not hold as written.
+			name: "quoted text not in the URL",
+			raw:  "https://[u:p%C3%A9]/x@h.example/",
+			leak: []string{"pé", "u:p"},
+			keep: "h.example",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ue := parseError(t, tc.raw)
+			op, cause := ue.Op, ue.Err
+			err := urlredact.Error(ue)
+			text := err.Error()
+			for _, leak := range tc.leak {
+				if strings.Contains(text, leak) {
+					t.Errorf("Error(url.Parse(%q)) text = %q, want no %q", tc.raw, text, leak)
+				}
+			}
+			if !strings.Contains(text, tc.keep) {
+				t.Errorf("Error(url.Parse(%q)) text = %q, want it to name %q", tc.raw, text, tc.keep)
+			}
+			if got, ok := errors.AsType[*url.Error](err); !ok || got == nil || got.Op != op {
+				t.Errorf("Error(url.Parse(%q)) = %v, want a *url.Error with Op %q", tc.raw, err, op)
+			}
+			if !errors.Is(err, cause) {
+				t.Errorf("errors.Is(Error(url.Parse(%q)), %v) = false, want true", tc.raw, cause)
+			}
+			if _, ok := errors.AsType[url.EscapeError](err); ok != tc.escape {
+				t.Errorf("errors.AsType[url.EscapeError](Error(url.Parse(%q))) ok = %t, want %t", tc.raw, ok, tc.escape)
+			}
+			if _, ok := errors.AsType[url.InvalidHostError](err); ok != tc.invalidHost {
+				t.Errorf("errors.AsType[url.InvalidHostError](Error(url.Parse(%q))) ok = %t, want %t", tc.raw, ok, tc.invalidHost)
+			}
+		})
+	}
 }
 
 // parseError returns the *url.Error url.Parse returns for raw, which must be
