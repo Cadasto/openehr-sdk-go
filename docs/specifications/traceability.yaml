@@ -2095,7 +2095,7 @@ requirements:
     title: Validation engine
     canonical: docs/specifications/clinical-modeling.md#req-171--validation-engine
     status: draft
-    implementation: planned
+    implementation: partial
     packages: [openehr/validation]
     tests:
       - openehr/instance/rm_defaults_yield_test.go
