@@ -1428,6 +1428,7 @@ requirements:
     probes: [PROBE-074]
     tests:
       - openehr/validation/constraint_fixtures_test.go
+      - openehr/validation/finding_identity_rules_test.go
       - openehr/validation/noncomposition_test.go
       - openehr/validation/primitive_input_test.go
       - openehr/validation/rmfloor_chained_test.go
@@ -1435,6 +1436,7 @@ requirements:
       - openehr/validation/rmread/read_datavalues_test.go
       - openehr/validation/rmread/read_demographic_test.go
       - openehr/validation/subtype_conformance_test.go
+      - openehr/validation/unread_attribute_test.go
       - testkit/probes/instance/corpus_ratchet_test.go
       - testkit/probes/validation/probe_074_noncomposition_validate.go
       - testkit/probes/validation/probe_074_test.go
@@ -2105,4 +2107,5 @@ requirements:
       - openehr/validation/prohibited_test.go
       - openehr/validation/rmfloor_coded_test.go
       - openehr/validation/rmfloor_limit_internal_test.go
+      - openehr/validation/unread_attribute_test.go
       - openehr/validation/validator_test.go
