@@ -2080,3 +2080,10 @@ requirements:
       - testkit/probes/serialize/probe_030_guard_internal_test.go
       - testkit/probes/serialize/probe_038_guard_internal_test.go
       - testkit/probes/serialize/probe_089_underscore_round_trip.go
+
+  - id: REQ-171
+    title: Validation engine
+    canonical: docs/specifications/clinical-modeling.md#req-171--validation-engine
+    status: draft
+    implementation: planned
+    packages: [openehr/validation]
