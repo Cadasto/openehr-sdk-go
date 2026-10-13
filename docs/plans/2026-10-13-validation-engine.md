@@ -80,7 +80,7 @@ The two small items with no dependency, delivered first so that the single walk 
 
 **Tasks:**
 - `validation.New(opts ...Option)`, `WithLimits`, `(*Validator).Validate(root, c)`, with a nil `c` meaning the RM rules alone; the package-level functions delegate to a validator built with no options and keep their nil guards. The hard-coded depth and visit limits become the defaults of `Limits`.
-- `Coverage` on `Result`, with `Stopped` and `External` and the method `Complete`; `External` lists each `CONSTRAINT_REF` leaf the walk binds. `Unevaluated` arrives in Phase 3 with the generated inventory: a hand-kept list of the 177 invariants would be thrown away there, and `Complete` does not read it.
+- `Coverage` on `Result`, with `Stopped` and `External` and the method `Complete`; `External` lists each `CONSTRAINT_REF` leaf the walk binds. `Unevaluated` arrives in Phase 3 with the generated inventory: a hand-kept list of the 215 invariants (155 RM, 22 BASE classes, 38 BASE primitive types) would be thrown away there, and `Complete` does not read it.
 - `max_depth` reported once per walk, at the first path where the walk stopped, instead of once per node at the limit.
 - Spec: amend § REQ-112 *Surface* to say the typed wrappers delegate to the validator, and the `Result` block of § REQ-102 *Contract* to carry `Coverage`.
 - Tests: limits honoured and a zero or negative limit read as the default; each `Coverage` list filled and `Complete` false for its case; a corpus composition with `Complete` true; the floor's nil guards report an empty path.
