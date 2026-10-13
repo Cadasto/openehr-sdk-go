@@ -222,11 +222,6 @@ Documentation only, in docs/adr and research-strands.md.
 - docs/specifications/research-strands.md:283 · The Resolution records a corpus measurement, "no floor finding survived beside a template finding with a different code at the same path", that neither ADR 0025 nor rmfloor_chained_corpus_test.go states; cite its source or drop the sentence · from: #256
 - docs/specifications/research-strands.md:267 · The resolved strand retains plan-edit provenance in a durable specification · from: #256
 
-## Release notes for the next version
-Documentation only, in CHANGELOG.md [Unreleased], before the version is cut.
-- CHANGELOG.md:17 · The Changed section carries sixteen per-REQ bullets, five on canonical XML and five on validation, where AGENTS.md:68 asks one single-sentence bullet per artefact class and "never API inventories or per-REQ breakdowns (those live in traceability.yaml, commits, and PR bodies)"; fold each artefact class into one bullet before the release is cut · from: #256
-- CHANGELOG.md:34 · "instead of walking without end" overstates the old behaviour: the floor already had a recursion-depth limit reported as max_depth at e9f6adc2 (rmfloor.go, clinical-modeling.md:366), so say "instead of walking to the depth limit" · from: #256
-
 ## Specification hygiene (audit-2026-09)
 Documentation and spec-gate leads; check each against the current spec first, the audit dates from September.
 - docs/specifications/traceability.yaml · test files may still cite a REQ they do not pin and so appear in its generated tests list; a sweep over all test files is still to do (the audit estimated 45 to 50 files, not re-counted) · from: audit-2026-09

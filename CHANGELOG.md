@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+Thirty-third `v0.x` minor: template validation includes the RM floor and binds reused archetypes by name, the codecs ignore content they do not model unless asked to report or refuse it, and interval flags read alike in every format. **Breaking:** `canjson.Unmarshal` and `canxml.Unmarshal` take options, template validation reports RM-floor findings with new issue paths, FLAT and STRUCTURED ignore unmatched keys, interval flags take new defaults, canonical XML refuses per-byte DV_MULTIMEDIA and trailing content, and `ToTime` refuses a leap second.
+
 ### Added
 
 - **Decode options for unmatched content (REQ-170).** The canonical JSON, canonical XML and FLAT/STRUCTURED codecs gain `WithUnmatched`, which passes each unmatched member, element or key to a function by path, and `WithStrict`, which refuses the first.
@@ -18,20 +20,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - **`canjson.Unmarshal` and `canxml.Unmarshal` take options (REQ-170).** Each now has a trailing `...DecoderOption`, so code that holds either as a `func([]byte, any) error` value needs a wrapper.
 - **Template validation includes the RM floor (REQ-102, ADR 0025).** `ValidateComposition` and the other template-driven entry points also return the floor's findings, each defect once, so an RM-invalid instance no longer passes.
+- **Template validation binds by name and BMM conformance (REQ-102, REQ-116).** Items reusing one archetype bind to the node pinning their name, and a value conforms to any OPT type it descends from.
 - **One issue path rule (REQ-102).** Both validators write `[atNNNN]` for an unshared id, `[atNNNN, 'name']` where siblings share it, else a 1-based `[n]`; `ValidateRM` was 0-based and template validation named every pinned node.
-- **FLAT and STRUCTURED decode ignore unmatched keys (REQ-170).** A key the Web Template does not resolve is dropped, not refused, unless `WithStrict` is set; keys naming RM data the codec cannot carry still fail.
+- **The RM floor checks interval flags and bounds its walk (REQ-112).** An included open side is reported, a Go-built cycle gets `cyclic_value`, and a walk stops at 100,000 visits with `max_nodes`.
+- **FLAT and STRUCTURED decode ignore unmatched keys (REQ-170, REQ-053).** An unresolved key is dropped unless `WithStrict` is set, RM data the codec cannot carry still fails, and `:0`-indexed metadata reads as unindexed.
 - **Interval flags default by REQ-169.** A missing `*_included` reads true on a closed side, a missing `*_unbounded` follows its bound, a by-value closed side without a bound is refused, and OPT excluded ends count.
-- **Items sharing an archetype id bind by pinned name (REQ-102, REQ-116).** A template that reuses one archetype under several names now validates a correct composition instead of reporting name and occurrence errors.
-- **Type conformance follows the BMM (REQ-102).** A value conforms to any OPT type it descends from, and among alternatives an exact type binds before a conforming one.
-- **The RM floor checks interval flags (REQ-112).** An open side marked included is reported as `lower_included_valid` or `upper_included_valid`.
-- **Canonical XML reads only the openEHR namespace (REQ-170).** An element in a foreign namespace is ignored even when its local name matches an RM attribute.
-- **Canonical XML writes DV_MULTIMEDIA bytes as base64 (REQ-056).** `data` and `integrity_check` are one base64 element each, so XML an earlier version wrote with one element per byte no longer decodes.
-- **Canonical XML decodes members it dropped (REQ-056).** The AOM 1.4 `original_language` and the `data` of an `ORIGINAL_VERSION<any>` now decode instead of reading as empty.
-- **FLAT decode reads `:0`-indexed metadata (REQ-053).** `<root>/language:0|code` and the other indexed metadata spellings read as the unindexed ones instead of losing to `ctx/`, and any other index is refused.
+- **Canonical XML follows the ITS-XML schema (REQ-056, REQ-170).** DV_MULTIMEDIA bytes are one base64 element, `original_language` and `ORIGINAL_VERSION<any>.data` decode, and foreign-namespace elements are ignored.
+- **Canonical XML refuses what it used to skip (REQ-056).** Per-byte DV_MULTIMEDIA XML, content after the root and an empty interface-typed member without `xsi:type` now fail.
 - **`ToTime` refuses a leap second (REQ-123).** It returns `rm.ErrTemporalConversion` for second 60 instead of converting silently.
-- **Canonical XML needs `xsi:type` on an interface-typed generic member (REQ-056).** An empty `ORIGINAL_VERSION<any>.data` or `Interval<DV_ORDERED>` bound without one fails with `typereg.ErrMissingType` instead of being skipped.
-- **Canonical XML refuses content after the root (REQ-056).** `canxml.Unmarshal` refuses another element, non-whitespace text or a `<!DOCTYPE>` after the root in every mode, wrapping `canxml.ErrInvalidShape`.
-- **The RM floor reports a value that contains itself (REQ-112).** A Go-built cycle is reported as `cyclic_value` instead of walking without end, and a pointer shared by two attributes is checked once.
+- **The transport sends a query-string space as `%20` (REQ-095).** An AQL GET with a space reaches an RFC 3986 server intact, a base URL's own query pairs are kept, and form bodies keep `+`.
 
 ## [0.32.0] - 2026-10-08
 
