@@ -25,9 +25,9 @@ The fork is irreversible on two counts. It changes what the generator emits, whi
 
 ## Decision
 
-The generator emits, for every concrete RM class the registry knows, access that lists the class's attributes: for each one its name, declared RM type, whether it is a container, whether it is present on the value, and the value, by plain field access. The validators, and the composition builder where it navigates a path, read an instance through that access and through nothing else, and `openehr/validation/rmread` is retired. [REQ-171 *Structural access*](../specifications/clinical-modeling.md#req-171--validation-engine) carries the contract; a test pins that the set of classes the access covers equals the set the registry decodes, so a BMM bump that adds a class fails `make codegen-verify` until the generator is run.
+The generator emits, for every concrete RM class the registry knows, the attribute access [REQ-171 *Structural access*](../specifications/clinical-modeling.md#req-171--validation-engine) specifies. The validators, and the composition builder where it navigates a path, read an instance through that access and through nothing else, and `openehr/validation/rmread` is retired. A test pins that the set of classes the access covers equals the set the registry decodes, so a BMM bump that adds a class fails `make codegen-verify` until the generator is run.
 
-The emitted access lives in a module-internal package unless a consumer need for it appears, so it adds no permanent API to the `rm` types; the alternative, methods on each generated type as [ADR 0013](0013-generated-locatable-identity-surface.md) chose for identity, stays open to the implementing change if the internal placement proves awkward for the walker. Where the template reaches, the compiled node may hold what is resolved once per template rather than once per instance: the accessor for each declared attribute and the conformance answer for each alternative. That precomputation is an optimisation the implementing change measures, not part of this decision.
+The emitted access lives in a module-internal package, so it adds no API to the `rm` types; exposing it to consumers is a later decision, taken when one asks for it. Where the template reaches, the compiled node may hold what is resolved once per template rather than once per instance: the accessor for each declared attribute and the conformance answer for each alternative. That precomputation is an optimisation the implementing change measures, not part of this decision.
 
 ## Consequences
 
@@ -40,6 +40,7 @@ The emitted access lives in a module-internal package unless a consumer need for
 ## Alternatives considered
 
 - **Complete the hand-written readers to 110 classes.** Closes today's gap and reopens it at the next BMM bump; more lock-step, the opposite of what ADR 0013 chose.
+- **Methods on each generated RM type**, as [ADR 0013](0013-generated-locatable-identity-surface.md) chose for identity. Rejected: the validators sit in another package, so the methods would have to be exported, and API added to every `rm` type cannot be withdrawn once a consumer calls it.
 - **Reflection.** Rejected outright under REQ-024.
 - **Read through the generated JSON encoders.** Wrong layer: it serialises to find attributes, allocates per node, and loses the Go value the rules need.
 - **Generate Go types per template.** Useful tooling for a fixed application; unsuitable as the SDK's core, since templates are run-time data.

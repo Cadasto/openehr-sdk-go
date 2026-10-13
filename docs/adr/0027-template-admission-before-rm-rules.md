@@ -52,4 +52,5 @@ Like ADR 0025, this record binds the contract and not the mechanism. One walk is
 ## Traceability
 
 - **Amends:** ADR-0025 (clause 1), REQ-102, REQ-112
-- **Applies:** REQ-171
+- **Introduces:** REQ-171
+- **Applies:** REQ-110, REQ-168
