@@ -1,8 +1,11 @@
 package discovery_test
 
 import (
+	"errors"
+	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 )
@@ -72,4 +75,42 @@ func TestREQ026_NewStaticCatalogConcurrentSharedConfig(t *testing.T) { // REQ-02
 		})
 	}
 	wg.Wait()
+}
+
+// TestREQ070_NewStaticCatalogRefusesRelativeServiceURLRedacted pins the
+// refusal of a service BaseURL that is not absolute, and that the refusal
+// names the URL without the password its userinfo carries.
+func TestREQ070_NewStaticCatalogRefusesRelativeServiceURLRedacted(t *testing.T) { // REQ-070
+	const secret = "s3cret"
+	cfg := discovery.StaticConfig{
+		Issuer:   "https://x.example/",
+		Services: map[string]discovery.ServiceEntry{"org.example.svc": {BaseURL: discovery.MustParseURL("//svc:" + secret + "@x.example/rest")}},
+	}
+
+	_, err := discovery.NewStaticCatalog(cfg)
+	derr, ok := errors.AsType[*discovery.DiscoveryError](err)
+	if !ok || derr.Reason != discovery.ReasonMalformedURL {
+		t.Fatalf("NewStaticCatalog(relative service BaseURL) error = %v, want a *DiscoveryError with reason %q", err, discovery.ReasonMalformedURL)
+	}
+	if msg := err.Error(); strings.Contains(msg, secret) {
+		t.Errorf("error text %q carries the URL's password", msg)
+	} else if !strings.Contains(msg, "x.example/rest") {
+		t.Errorf("error text %q does not name the refused URL", msg)
+	}
+}
+
+// TestREQ070_NewStaticCatalogKeepsExpiresAt pins that a hand-built catalog
+// takes its expiry from StaticConfig.ExpiresAt: none when it is zero, the
+// caller's time when it is set.
+func TestREQ070_NewStaticCatalogKeepsExpiresAt(t *testing.T) { // REQ-070
+	expiry := time.Date(2030, 1, 2, 3, 4, 5, 0, time.UTC)
+	for _, want := range []time.Time{{}, expiry} {
+		cat, err := discovery.NewStaticCatalog(discovery.StaticConfig{Issuer: "https://x.example/", ExpiresAt: want})
+		if err != nil {
+			t.Fatalf("NewStaticCatalog(ExpiresAt %v) error = %v", want, err)
+		}
+		if !cat.ExpiresAt.Equal(want) {
+			t.Errorf("catalog.ExpiresAt = %v, want %v", cat.ExpiresAt, want)
+		}
+	}
 }
