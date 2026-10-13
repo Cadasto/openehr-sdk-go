@@ -1256,7 +1256,7 @@ Binding now, for *Surface*, *Finding identity*, *Where the RM rules come from*, 
 - A test **MUST** fail when an invariant of the pinned BMMs has no classification, and when the registry knows a class the generated access does not cover.
 - A test **MUST** pin each presence reading *Structural access* names, and fail when one changes.
 - A root of a class with a not-evaluated invariant **MUST** list it in `Coverage.Unevaluated`.
-- A change to the issue-code multisets PROBE-025, PROBE-026 and PROBE-074 pin **MUST** be re-baselined as a reviewed change, never skipped, and each difference from the earlier result **MUST** be one of: an issue from inside refused content, a second code for one defect at one path, a shared value's second path, or a finding on a class or attribute the validators did not read before *Structural access*.
+- A change to the issue-code multisets PROBE-025, PROBE-026 and PROBE-074 pin **MUST** be re-baselined as a reviewed change, never skipped, and each difference from the earlier result **MUST** be one of: an issue from inside refused content, a second code for one defect at one path, a shared value's second path, a finding on a class or attribute the validators did not read before *Structural access*, or a finding the presence reading of *Structural access* moves: a value held by value that was read as absent and is now entered, so its own absent members are reported below it, or a nil list on an RM-mandatory container, whose `cardinality` becomes the `required` § REQ-112 *Driver* names.
 
 When the engine lands, for *One walk*:
 
