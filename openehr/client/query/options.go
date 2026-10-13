@@ -16,15 +16,19 @@ type executeConfig struct {
 // ExecuteOption mutates ad-hoc or stored query execution.
 type ExecuteOption func(*executeConfig)
 
-// WithOffset sets the 0-based row offset. An explicit WithOffset(0) is
-// honoured (sent on the wire), not silently dropped.
+// WithOffset sets the 0-based row offset. When unset, no offset is sent
+// and the server applies its default; an explicit WithOffset(0) is sent.
+// On a stored query EHRbase refuses an offset without a fetch (HTTP 422),
+// so set both when paging against EHRbase.
 func WithOffset(n int) ExecuteOption {
 	return func(c *executeConfig) { c.offset = n; c.offsetSet = true }
 }
 
-// WithFetch limits the number of rows returned. An explicit WithFetch(0)
-// requests zero rows; when unset the server applies its implementation-
-// defined default (the openEHR Fetch schema has no fixed default).
+// WithFetch limits the number of rows returned. When unset, no fetch is
+// sent and the server applies its own default (the openEHR Fetch schema
+// defines none); an explicit WithFetch(0) requests zero rows. On a stored
+// query EHRbase refuses an offset without a fetch (HTTP 422), so set both
+// when paging against EHRbase.
 func WithFetch(n int) ExecuteOption {
 	return func(c *executeConfig) { c.fetch = n; c.fetchSet = true }
 }

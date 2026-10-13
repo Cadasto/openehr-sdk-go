@@ -79,8 +79,8 @@ func storedQueryLiveEntries(id openehrclient.EHRID, qualifiedName string, out *s
 				if out.name == "" {
 					return probe.Result{Status: probe.StatusSkip, Detail: "no stored query was registered to execute"}, nil
 				}
-				// A fetch bound is required: EHRbase rejects a stored execution
-				// that sends offset without fetch (422). offset defaults to 0.
+				// The fetch bound caps the rows this live check reads. No offset
+				// is set, so none is sent and the server applies its default.
 				rs, _, err := query.RunStored(ctx, c, out.name, map[string]any{"target_ehr": string(id)}, query.WithFetch(100))
 				if err != nil {
 					return liveFail(err), nil

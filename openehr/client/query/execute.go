@@ -171,11 +171,16 @@ func adhocQueryValues(q aql.Query, cfg executeConfig) (url.Values, error) {
 }
 
 // storedQueryValues builds the GET query string for a stored query: offset
-// (always, default 0) plus the optional fetch and form/explode
+// and fetch when the caller set them, plus the form/explode
 // query_parameters.
 func storedQueryValues(params map[string]any, cfg executeConfig) (url.Values, error) {
+	// REQ-057, ADR 0026: an unset field stays off the wire, so the server
+	// applies its own default; an explicit 0 is sent. offset without fetch
+	// goes out as asked: refusing it is the server's call, not the SDK's.
 	v := url.Values{}
-	v.Set("offset", strconv.Itoa(cfg.offset))
+	if cfg.offsetSet {
+		v.Set("offset", strconv.Itoa(cfg.offset))
+	}
 	if cfg.fetchSet {
 		v.Set("fetch", strconv.Itoa(cfg.fetch))
 	}
@@ -281,13 +286,17 @@ func adhocBody(q aql.Query, cfg executeConfig) map[string]any {
 }
 
 func storedBody(params map[string]any, cfg executeConfig) map[string]any {
-	// The stored Query schema marks offset, fetch, and query_parameters as
-	// required. `offset` has a documented default of 0, so it is always
-	// emitted. `fetch` has no fixed default ("depends on the
-	// implementation") — emitting fetch:0 would request zero rows — so it
-	// is sent only when the caller set it explicitly; otherwise the field
-	// is omitted to let the server apply its default.
-	body := map[string]any{"offset": cfg.offset}
+	// The stored Query schema lists offset, fetch and query_parameters as
+	// required, but gives fetch no default, and fetch:0 asks for zero rows.
+	// So offset and fetch are sent only when the caller set them (an
+	// explicit 0 included), and an unset one is left to the server's
+	// default. Leaving them out departs from the schema: REQ-057 states the
+	// rule, REQ-095 keys the exception and ADR 0026 decides it.
+	// query_parameters is always sent, as {} when there are none.
+	body := map[string]any{}
+	if cfg.offsetSet {
+		body["offset"] = cfg.offset
+	}
 	if cfg.fetchSet {
 		body["fetch"] = cfg.fetch
 	}
