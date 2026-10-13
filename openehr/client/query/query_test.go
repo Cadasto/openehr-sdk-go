@@ -219,14 +219,13 @@ func TestRunStored(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The stored Query schema requires offset + query_parameters; both must
-	// be present even with no paging options. fetch is omitted (no spec
-	// default — letting the server choose).
-	if _, ok := body["offset"]; !ok {
-		t.Errorf("stored body missing required offset: %v", body)
-	}
+	// REQ-057: with no paging option neither offset nor fetch is sent, so
+	// the server applies its own defaults; query_parameters is always sent.
 	if _, ok := body["query_parameters"]; !ok {
 		t.Errorf("stored body missing required query_parameters: %v", body)
+	}
+	if _, ok := body["offset"]; ok {
+		t.Errorf("stored body should omit offset when unset, got %v", body["offset"])
 	}
 	if _, ok := body["fetch"]; ok {
 		t.Errorf("stored body should omit fetch when unset, got %v", body["fetch"])
@@ -314,9 +313,9 @@ func TestRunStoredGET(t *testing.T) {
 		t.Errorf("path = %q", captured.URL.Path)
 	}
 	q := captured.URL.Query()
-	// offset is always present (schema default 0); fetch omitted when unset.
-	if q.Get("offset") != "0" {
-		t.Errorf("offset = %q, want 0 (always present on stored GET)", q.Get("offset"))
+	// REQ-057: offset and fetch are both omitted when unset.
+	if _, ok := q["offset"]; ok {
+		t.Errorf("offset should be omitted when unset, got %q", q.Get("offset"))
 	}
 	if _, ok := q["fetch"]; ok {
 		t.Errorf("fetch should be omitted when unset, got %q", q.Get("fetch"))

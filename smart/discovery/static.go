@@ -30,8 +30,9 @@ type StaticConfig struct {
 
 // NewStaticCatalog builds a ServiceCatalog without a network round
 // trip. Used for static EHRbase deployments, local development, and
-// tests. It validates that every Services entry has a parseable BaseURL;
-// callers should pre-parse URLs when possible.
+// tests. It checks that every Services entry has a BaseURL that is
+// non-nil and absolute. It copies the Services map and sets each copied
+// entry's ID to its key, leaving the caller's StaticConfig unchanged.
 //
 // The catalog's BaseURL is StaticConfig.BaseURL, or StaticConfig.Issuer
 // when BaseURL is empty.
@@ -45,20 +46,23 @@ func NewStaticCatalog(cfg StaticConfig) (*ServiceCatalog, error) {
 		return nil, &DiscoveryError{Reason: ReasonParseError, Inner: errors.New("StaticConfig.Issuer is required")}
 	}
 	baseURL := cmp.Or(cfg.BaseURL, cfg.Issuer)
-	for id, e := range cfg.Services {
+	// cfg.Services is the caller's map, possibly shared between goroutines:
+	// read it once into a copy and set IDs on the copy only.
+	services := cloneServices(cfg.Services)
+	for id, e := range services {
 		if e.BaseURL == nil {
 			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: fmt.Errorf("service %q has nil BaseURL", id)}
 		}
 		if !e.BaseURL.IsAbs() {
-			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: fmt.Errorf("service %q BaseURL %q is not absolute", id, e.BaseURL.String())}
+			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: fmt.Errorf("service %q BaseURL %q is not absolute", id, e.BaseURL.Redacted())}
 		}
 		e.ID = id
-		cfg.Services[id] = e
+		services[id] = e
 	}
 	return &ServiceCatalog{
 		BaseURL:    baseURL,
 		Issuer:     cfg.Issuer,
-		Services:   cloneServices(cfg.Services),
+		Services:   services,
 		Auth:       cfg.Auth,
 		ResolvedAt: time.Now(),
 		ExpiresAt:  cfg.ExpiresAt,

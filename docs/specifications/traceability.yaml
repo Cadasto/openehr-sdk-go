@@ -212,6 +212,7 @@ requirements:
       - sandbox/roundtrip_test.go
       - smart/discovery/coalesce_cancel_test.go
       - smart/discovery/coalesce_panic_test.go
+      - smart/discovery/static_test.go
 
   - id: REQ-030
     title: Concrete RM structs
@@ -603,6 +604,7 @@ requirements:
       - openehr/client/definition/stored_query_test.go
       - openehr/client/definition/version_trim_test.go
       - openehr/client/query/query_test.go
+      - openehr/client/query/stored_paging_test.go
       - openehr/client/query/version_trim_test.go
       - testkit/probe/cassette_test.go
       - testkit/probe/livestoredquery_test.go
@@ -817,6 +819,7 @@ requirements:
       - smart/discovery/issuer_test.go
       - smart/discovery/resolver_test.go
       - smart/discovery/service_entry_test.go
+      - smart/discovery/static_test.go
       - testkit/probes/auth/probe_002_openehr_rest_service.go
       - testkit/probes/auth/probes_test.go
       - testkit/probes/discovery/probe_040_catalog_ttl.go

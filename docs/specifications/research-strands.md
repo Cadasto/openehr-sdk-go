@@ -176,13 +176,13 @@ The budget line used for both runs: a benchmark regresses materially when its v2
 
 ## STRAND-09 — ITS-REST conformance follow-ups
 
-**Status:** Open (item 2) — opened by the ITS-REST conformance remediation ([PR 53](https://github.com/Cadasto/openehr-sdk-go/pull/53)).
+**Status:** Resolved 2026-10-13: item 1 by the dedicated probes, item 2 by [ADR 0026](../adr/0026-stored-query-paging-fields-only-when-set.md). Opened by the ITS-REST conformance remediation ([PR 53](https://github.com/Cadasto/openehr-sdk-go/pull/53)).
 
 **Two follow-ups carried out of that plan:**
 
 1. **Dedicated REST conformance probes (resolved 2026-09-09).** The plan called for four `testkit/probes/rest/*` probes (audit-details header grammar, System `OPTIONS`, Admin bulk-delete, Definition `/example`). They are dedicated Sandbox probes in [`testkit/probes/rest/`](../../testkit/probes/rest/) — PROBE-062 (`openehr-audit-details` grammar + Contribution round-trip, REQ-059), PROBE-102 (System `OPTIONS`, REQ-095), PROBE-103 (Admin bulk-delete, REQ-099), PROBE-104 (Definition `/example`, REQ-095) — promoted from the package `httptest` request-capture assertions, each with can-fail controls. They follow the request-capture idiom (driven by their package tests against a `sandbox.Scripted` route with a captured-request accessor); wiring them into the REQ-082 runner's catalog-wide entries is open REQ-082 runner work, so the gate this item originally waited for is the dedicated catalog probe, not the runner. Affects REQ-059, REQ-095, REQ-099.
 
-2. **Stored-query `fetch` omission vs OpenAPI `required` (open; ADR pending).** The Definition/Query `Query` schema marks `offset`, `fetch`, and `query_parameters` `required`, but `fetch` has no spec default ("depends on the implementation") and `fetch: 0` means *zero rows*. Today the SDK emits `offset` (documented default 0) and `query_parameters` and omits `fetch` unless the caller sets it (`storedBody` in `openehr/client/query/execute.go`), a documented deviation from the literal `required` list. **Observed (2026-09-09):** EHRbase 2.35.1 returns `422 Unprocessable Entity` ("Query parameter for offset provided, but no fetch parameter") for a stored-query POST carrying `offset` without `fetch`; the Live snapshot sets `WithFetch` explicitly. That meets the revisit condition this item set (a conformant backend rejects a body without `fetch`). **Resolution form:** an ADR choosing between always emitting `fetch`, emitting a sentinel, or sending the server's advertised default; not yet written.
+2. **Stored-query `fetch` omission vs OpenAPI `required` (resolved 2026-10-13 by [ADR 0026](../adr/0026-stored-query-paging-fields-only-when-set.md)).** The pin's `Query` schema marks `offset`, `fetch` and `query_parameters` required, but `fetch` has no default ("depends on the implementation") and `fetch: 0` means zero rows. EHRbase refuses `offset` without `fetch` with `422` (2.35.1 on POST, 2026-09-09; 2.36.0 on POST and GET, [#261](https://github.com/Cadasto/openehr-sdk-go/issues/261)), which met the revisit condition this item set. Stored-query execution now sends each paging field only when the caller sets it, on both verbs ([§ REQ-057](wire.md#req-057) *Paging*), and the POST omission is keyed in [§ REQ-095](wire.md#req-095). Affects REQ-057, REQ-095.
 
 ---
 
@@ -298,7 +298,7 @@ This is a pre-existing emission gap, not a REQ-048 regression — REQ-048 only m
 | [STRAND-06](#strand-06--concurrency-and-transport-hygiene) | Concurrency / transport hygiene | Open | REQ-021, REQ-026 |
 | [STRAND-07](#strand-07--versioning-and-module-path) | Versioning + module path | **Resolved** | REQ-001, REQ-004, REQ-005 |
 | [STRAND-08](#strand-08--cadasto-extras-boundary-criteria-conditional-extraction) | Cadasto-extras extraction | Open (long-term) | REQ-010, REQ-011 |
-| [STRAND-09](#strand-09--its-rest-conformance-follow-ups) | ITS-REST conformance follow-ups (REST probes **done**; stored-query `fetch` ADR pending) | Open (item 2) | REQ-059, REQ-095, REQ-099 |
+| [STRAND-09](#strand-09--its-rest-conformance-follow-ups) | ITS-REST conformance follow-ups (REST probes; stored-query paging) | **Resolved** ([ADR 0026](../adr/0026-stored-query-paging-fields-only-when-set.md)) | REQ-057, REQ-059, REQ-095, REQ-099 |
 | [STRAND-10](#strand-10--rmpath-one-sentinel-for-two-not-found-conditions) | rmpath not-found sentinel split | Open | REQ-053, REQ-121 |
 | [STRAND-11](#strand-11--probe-recording-format-har-or-a-purpose-built-yaml) | Probe recording format (HAR vs YAML) | **Resolved** ([ADR 0020](../adr/0020-cassette-recording-har.md)) | REQ-082 |
 | [STRAND-12](#strand-12--bmm-interface-classes-carry-no-is_abstract-flag) | BMM interface classes carry no `is_abstract` | Open | REQ-047, REQ-048 |
