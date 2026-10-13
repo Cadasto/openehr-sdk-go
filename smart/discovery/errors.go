@@ -74,7 +74,7 @@ type DiscoveryError struct {
 	// passed to Resolver.Resolve or Resolver.Refresh, or the base URL of a
 	// hand-built catalog. Despite its name it is not the OpenID Connect
 	// issuer; ServiceCatalog explains the difference. Error prints it as
-	// "base_url=".
+	// "base_url=", with any password in its userinfo masked.
 	Issuer string
 	// Reason classifies the failure.
 	Reason DiscoveryErrorReason
@@ -104,7 +104,9 @@ func (e *DiscoveryError) Error() string {
 	}
 	fmt.Fprintf(&b, "discovery: %s", reason)
 	if e.Issuer != "" {
-		fmt.Fprintf(&b, " base_url=%s", e.Issuer)
+		// The base URL may carry a password in its userinfo; the text an
+		// error prints must not.
+		fmt.Fprintf(&b, " base_url=%s", redactURL(e.Issuer))
 	}
 	switch e.Reason {
 	case ReasonMissingService:
