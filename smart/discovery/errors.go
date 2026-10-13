@@ -3,6 +3,8 @@ package discovery
 import (
 	"fmt"
 	"strings"
+
+	"github.com/cadasto/openehr-sdk-go/internal/urlredact"
 )
 
 // DiscoveryErrorReason classifies a discovery failure.
@@ -106,7 +108,7 @@ func (e *DiscoveryError) Error() string {
 	if e.Issuer != "" {
 		// The base URL may carry a password in its userinfo; the text an
 		// error prints must not.
-		fmt.Fprintf(&b, " base_url=%s", redactURL(e.Issuer))
+		fmt.Fprintf(&b, " base_url=%s", urlredact.String(e.Issuer))
 	}
 	switch e.Reason {
 	case ReasonMissingService:
