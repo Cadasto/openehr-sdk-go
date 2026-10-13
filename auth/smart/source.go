@@ -1153,25 +1153,30 @@ func (s *Source) clientRequest(ctx context.Context, endpoint string, form url.Va
 	return req, nil
 }
 
+// postToken redeems form at the token endpoint. Every failure is an
+// *auth.ExchangeError of the grant's own class: auth.ErrRefreshFailed for a
+// refresh_token grant, auth.ErrTokenExchangeFailed for any other. That holds
+// whether the request cannot be built or sent, or its answer is an error or
+// carries no token.
 func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, TokenResponse, string, error) {
+	sentinel := auth.ErrTokenExchangeFailed
+	if form.Get("grant_type") == "refresh_token" {
+		sentinel = auth.ErrRefreshFailed
+	}
 	req, err := s.clientRequest(ctx, s.cfg.Auth.TokenEndpoint.String(), form)
 	if err != nil {
-		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, Inner: err}
+		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: sentinel, Inner: err}
 	}
 	resp, err := s.credClient.Do(req)
 	if err != nil {
-		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, Inner: err}
+		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: sentinel, Inner: err}
 	}
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
 	if err != nil {
-		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, StatusCode: resp.StatusCode, Inner: err}
+		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: sentinel, StatusCode: resp.StatusCode, Inner: err}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		sentinel := auth.ErrTokenExchangeFailed
-		if form.Get("grant_type") == "refresh_token" {
-			sentinel = auth.ErrRefreshFailed
-		}
 		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{
 			Sentinel:   sentinel,
 			StatusCode: resp.StatusCode,
@@ -1181,10 +1186,10 @@ func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, To
 	}
 	parsed, err := ParseTokenResponse(body)
 	if err != nil {
-		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, StatusCode: resp.StatusCode, Inner: err}
+		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: sentinel, StatusCode: resp.StatusCode, Inner: err}
 	}
 	if parsed.AccessToken == "" {
-		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, StatusCode: resp.StatusCode, Inner: errors.New("empty access_token")}
+		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: sentinel, StatusCode: resp.StatusCode, Inner: errors.New("empty access_token")}
 	}
 	tok := tokenFromResponse(parsed, s.cfg.Issuer)
 	return tok, parsed, parsed.RefreshToken, nil
