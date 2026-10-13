@@ -2,13 +2,13 @@
 kind: adr
 id: ADR-0027
 title: "Template admission precedes the RM rules at every node"
-status: proposed
+status: accepted
 date: 2026-10-13
 ---
 
 # ADR 0027 — Template admission precedes the RM rules at every node
 
-- **Status:** Proposed, 2026-10-13, after [PR 256](https://github.com/Cadasto/openehr-sdk-go/pull/256); accepted when the maintainer confirms, before the single walk depends on it. Finding identity, which REQ-171 carries and which has landed, is additive and does not depend on this decision.
+- **Status:** Accepted, 2026-10-13 — maintainer decision, after [PR 256](https://github.com/Cadasto/openehr-sdk-go/pull/256). It takes effect with the single walk of REQ-171; until then the two walks keep ADR 0025 clause 1 and REQ-102 *RM floor* as written. Finding identity, which REQ-171 carries and which has landed, is additive and does not depend on this decision.
 - **Supersedes:** —
 - **Superseded by:** —
 - **Strand:** none — a direct decision.
@@ -19,11 +19,10 @@ date: 2026-10-13
 
 [ADR 0025](0025-template-validation-includes-the-rm-floor.md) made template-driven validation include the Reference Model floor and left the mechanism open: a template walk followed by a floor walk, with exact repeats removed, or one fused walk. [PR 256](https://github.com/Cadasto/openehr-sdk-go/pull/256) shipped the first. The template walk runs, the floor then runs over the whole root, content the template refused included, and a floor finding is dropped when a template finding already carries the same code at the same path. To make that comparison hold, both walks were taught one path grammar.
 
-Three things follow from that shape, and none of them is a bug in the implementation; they are properties of two walks joined after the fact.
+Two things follow from that shape, and neither is a bug in the implementation; they are properties of two walks joined after the fact.
 
 - The floor walks into, and reports from, subtrees the template has refused. The findings inside are noise: the subtree has to go anyway. The maintainer's own objection to the two-walk build is this one, and no comparison after the fact can meet it, because the floor as a separate walk does not know what the template refused.
 - The join sees only an exact code at an exact path, so one defect named under two codes is reported twice. An empty mandatory list is the recorded case: `required` from the template walk, `cardinality` from the floor, at one path.
-- A finding does not say which layer produced it, and `rm_invariant` is one label for several rules. A server that wants to warn on template findings and reject on RM findings cannot tell them apart in one result, and a caller who needs the rule has to read `Detail`, which the package tells it not to do.
 
 Archie, the openEHR Java reference library, checks the RM rules and the template in one walk over the instance, applying a template constraint wherever one exists. EHRbase runs the RM check and the template check as two stages, the second when the first finds nothing. The SDK keeps collect-all: one run reports every problem, whichever layer finds it.
 
@@ -33,7 +32,7 @@ The fork is irreversible for a consumer, not for the code. The set of issues a r
 
 At every node, the template's admission is decided before any Reference Model rule is evaluated. Content the template does not admit, an attribute it prohibits or a list item that binds to no child, is reported once and not entered: no RM rule runs on it and no finding comes from inside it. Content the template does not constrain is visited with the RM rules alone. [REQ-171](../specifications/clinical-modeling.md#req-171--validation-engine) carries the walk order and the union rule. The single walk relies on REQ-171's finding identity, the layer and rule every finding names, so it can be compared with the two walks finding by finding before they go.
 
-Clause 1 of [ADR 0025](0025-template-validation-includes-the-rm-floor.md) reads, from this decision on, "over every admitted node, the nodes the template does not constrain included". Clauses 2 and 3 stand as written; clause 2, each defect once, is met by construction rather than by a merge, and the shared path rule of REQ-102 stays for the reader's sake, since one node still has one path whichever layer reports it.
+Clause 1 of [ADR 0025](0025-template-validation-includes-the-rm-floor.md) reads, once the single walk lands, "over every admitted node, the nodes the template does not constrain included". Clauses 2 and 3 stand as written; clause 2, each defect once, is met by construction rather than by a merge, and the shared path rule of REQ-102 stays for the reader's sake, since one node still has one path whichever layer reports it.
 
 Like ADR 0025, this record binds the contract and not the mechanism. One walk is the implementation it expects, because only one walk can ask the template before spending RM work; a two-walk build that recorded the template's refusals for the floor to honour would meet the contract too, at the cost of the bookkeeping this decision removes.
 
@@ -46,7 +45,7 @@ Like ADR 0025, this record binds the contract and not the mechanism. One walk is
 
 ## Alternatives considered
 
-- **Keep the two walks and fuse only if profiling demands it.** Cheapest now. Rejected: the reasons to fuse are ordering, finding identity and coverage, not speed; a second walk cannot honour a refusal it never saw.
+- **Keep the two walks and fuse only if profiling demands it.** Cheapest now. Rejected: the reasons to fuse are ordering and one finding per defect, not speed; a second walk cannot honour a refusal it never saw.
 - **Two public calls, the template walk and the floor, left to the caller to combine.** Rejected by [ADR 0025](0025-template-validation-includes-the-rm-floor.md) already: the gap is reached by default.
 - **An option on the two-walk build that drops floor findings under refused subtrees.** Rejected: it needs the template walk to export its refusals and the floor to consult them, which is the fused walk with an extra data structure, and it still reports one defect under two codes.
 

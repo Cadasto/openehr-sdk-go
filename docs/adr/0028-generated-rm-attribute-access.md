@@ -2,13 +2,13 @@
 kind: adr
 id: ADR-0028
 title: "Generated attribute access replaces the hand-written RM readers"
-status: proposed
+status: accepted
 date: 2026-10-13
 ---
 
 # ADR 0028 — Generated attribute access replaces the hand-written RM readers
 
-- **Status:** Proposed, 2026-10-13, after [PR 256](https://github.com/Cadasto/openehr-sdk-go/pull/256); accepted when the maintainer confirms, before any code depends on it.
+- **Status:** Accepted, 2026-10-13 — maintainer decision, after [PR 256](https://github.com/Cadasto/openehr-sdk-go/pull/256). It takes effect with the generated access of REQ-171 *Structural access*; until then the hand-written readers stay, with the gap § REQ-112 records.
 - **Supersedes:** —
 - **Superseded by:** —
 - **Strand:** none — a direct decision: validation serves any archetypable root and any node, so its coverage of RM classes comes from generated code, never from a hand-maintained list.
