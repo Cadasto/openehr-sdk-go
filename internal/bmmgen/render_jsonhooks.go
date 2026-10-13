@@ -34,10 +34,11 @@ type polyInterface struct {
 //
 // For the RM target it also renders polymorphicClass, an unexported type
 // switch naming the BMM class each interface stands for, and registers it
-// into internal/rmjsonwalk/polyreg at init. The canonical-JSON walker reads a
-// decode target's Go type through that table (REQ-170) without importing
-// openehr/rm, which canjson must not import, and without reflecting over the
-// registry (REQ-024). The AOM 1.4 target gets no table: the JSON walk does not
+// into internal/rmjsonwalk/polyreg at init. The canonical-JSON walker behind
+// the unmatched-member options reads a decode target's Go type through that
+// table without importing openehr/rm, which canjson must not import, and
+// without reflecting over the registry, which the SDK's reflection policy
+// rules out. The AOM 1.4 target gets no table: the JSON walk does not
 // check AOM 1.4 classes.
 //
 // Returns (nil, nil) when the target has no polymorphic interfaces.

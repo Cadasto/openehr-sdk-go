@@ -12,7 +12,7 @@ import (
 // RenderUnmarshalJSONFile renders the canonical-JSON UnmarshalJSONFrom
 // companions (encoding/json/v2) for every concrete class in `file`, and for
 // the abstract BASE Interval struct ([codecClassesIn]), whose decoder gives a
-// boundary flag the document leaves out its default (REQ-169).
+// boundary flag the document leaves out the SDK's default.
 //
 // Returns (nil, nil) when the file has no such classes.
 //

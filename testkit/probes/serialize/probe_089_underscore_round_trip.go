@@ -454,8 +454,8 @@ type Probe089Refusal struct {
 	// the citation that says why it is refused where a boundary decision owns
 	// it.
 	Names []string
-	// Unmatched marks keys the codec does not read at all, unmatched content
-	// (REQ-170): the default decode ignores them and the report option names
+	// Unmatched marks keys the codec does not read at all, which are unmatched
+	// content: the default decode ignores them and the report option names
 	// each, so the refusal is asserted under simplified.WithStrict. Every other
 	// case is a key the codec reads and refuses, so it must fail by default,
 	// under the report option and under strict alike.
@@ -466,8 +466,7 @@ type Probe089Refusal struct {
 // reads must fail on decode in every mode, so a decode-and-drop satisfies no
 // assertion here: these are the shapes a permissive codec loses silently. A
 // key the codec does not read at all is the one exception: it is unmatched
-// content, ignored by default, reported on request and refused under strict
-// (REQ-170).
+// content, ignored by default, reported on request and refused under strict.
 var Probe089Refusals = []Probe089Refusal{
 	{
 		// ADR 0015: no `ctx/` short form can carry the composer's external_ref,
@@ -674,8 +673,7 @@ func Probe089UnderscoreRoundTrip(target *conformance.Target, c Probe089Case) (Re
 // successful decode is a failure however faithful the rest of the body is,
 // because that is the forbidden decode-and-drop. A key marked Unmatched must
 // instead decode, by default and under the report option, to the value of the
-// body without it, be reported, each key once, and fail under strict
-// (REQ-170).
+// body without it, be reported, each key once, and fail under strict.
 func Probe089RefusedFamilies(target *conformance.Target, ref Probe089Refusal) (Result, error) { // PROBE-089 (REQ-053, REQ-080, REQ-140, REQ-170)
 	r := Result{Probe: "PROBE-089"}
 	if target == nil || target.Web == nil {
