@@ -5,7 +5,7 @@ kind: plan
 # Plan: REQ-107 generator, the gaps PR 235 leaves
 
 **Date:** 2026-10-06
-**Status:** Draft, written when the maintainer stopped the PR 235 triage
+**Status:** Draft, written when the maintainer stopped the PR 235 triage. Re-checked on `main` at `6ba94eaf` (v0.33.0): two Phase 2 rows moved to the backlog, which already held them, and the validator half of the ACTOR row landed in v0.32.0.
 **Covers:** REQ-107 ([clinical-modeling.md § REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator)), REQ-102 ([§ REQ-102](../specifications/clinical-modeling.md#req-102--composition-validation)), REQ-103 ([§ REQ-103](../specifications/clinical-modeling.md#req-103--primitive-constraint-introspection))
 **Probes:** PROBE-027
 **Depends on:** [PR 235](https://github.com/Cadasto/openehr-sdk-go/pull/235), merged
@@ -43,8 +43,7 @@ At the stop, every critical and important finding on PR 235 was fixed or decline
 | The walk still builds the party the OPT names under `composer`, then replaces it with `Options.Composer`. An unsatisfiable constraint inside that party still makes `Generate` fail. Skip the walk of `composer` at a COMPOSITION root. | report on `1494f331` |
 | The builder entry of `TestREQ107_CorpusRatchet` runs `ExampleFill` only. Add a `RandomFill` entry. | `testkit/probes/instance/corpus_ratchet_test.go` |
 | An optional attribute the OPT names with no children and that has no writer is visited but left unset: DV_TEXT `language`, `accuracy` on DV_QUANTITY, DV_DATE_TIME and DV_COUNT, OBSERVATION `workflow_id`. `formatting` and `magnitude_status` are fixed (`7851404d`). | suggestion #6c61c on PR 235 |
-| A coded value the OPT pins in openEHR terms may keep the text `example` instead of its rubric; the rubric rule covers defaults. Verify first. | suggestion #36792 on PR 235 |
-| A DV_MULTIMEDIA `media_type` named as a bare CODE_PHRASE under `WithoutImplicitAttributes` may still come out as `local::at0000`. Verify against `39ad4756` and `9a4c96bf` first. | suggestion #6a371 on PR 235 |
+| ACTOR `languages` and `roles` have no generator writer. This is part of § REQ-107's *Known gap: attributes the generator cannot write*. The validator side landed in v0.32.0: a list item without an `archetype_node_id` binds by RM type (§ REQ-102 *Items that are not a LOCATABLE*). | § REQ-107; `6558c9cc` |
 | Unreachable code: the node-id branch of `fillPartyRelationship`, and the `finishNode` fallbacks for DV_EHR_URI, DV_ORDINAL and DV_SCALE. Keep them as named safety nets or remove them. | suggestions #ad9e3 and #3ef26 on PR 235 |
 | No test may pin terminology `local` on a closed-list C_CODE_PHRASE that names no terminology. Check whether `TestREQ107_BareCodePhraseKeepsLocal` covers it. | suggestion #88b28 on PR 235 |
 
@@ -58,12 +57,11 @@ These sit outside `openehr/instance`, but they limit what PROBE-027 can check th
 
 | Gap | Evidence |
 |---|---|
-| `matchSingleAlternative` binds a single-valued attribute to the first alternative of its RM type, a prohibited one included, so a valid slot fill after a prohibited ITEM_TREE is reported as `node_id_mismatch`. | `openehr/validation/walk_composition.go` |
+| `bindByRMType`, behind `matchSingleAlternative`, binds a single-valued attribute to the most specific alternative in three tiers, but it does not skip a prohibited child, and within a tier the first child in OPT order wins. So a valid slot fill after a prohibited ITEM_TREE can still bind to the prohibited one and be reported as `node_id_mismatch`. Verify with a fixture first. | `openehr/validation/walk_composition.go:191-226` |
 | `readCodePhraseSingle` reads `CODE_PHRASE.terminology_id` as a string, not a TERMINOLOGY_ID, so a template constraining it through a TERMINOLOGY_ID node gets `rm_type_mismatch` whatever the value. | `openehr/validation/rmread/read.go`; suggestion #bcf7e |
 | rmread reads only `value` and `formalism` on DV_PARSABLE, and no `compression_algorithm`, `charset`, `language`, `uri` or `data` on DV_MULTIMEDIA, so the template validator reports them absent although the generator writes them. | `openehr/validation/rmread/read_data_values.go`; suggestion #10bf4 |
 | A slot's occurrences are not parsed: `template.Slot` carries none and compile copies none. This is § REQ-107's *Known gap: slot occurrences*. | `openehr/template/template.go`; suggestion #4e66a |
 | A C_DATE_TIME, C_DATE or C_TIME range is dropped at parse, since `CDateTime` models only a pattern, so neither the validator nor `RandomFill` sees it. | `openehr/template/parse_primitives.go`; suggestion #3b121 |
-| ACTOR `languages` and `roles`: the validator matches a member of a multi-valued attribute by `archetype_node_id`, which a DV_TEXT or a PARTY_REF lacks. This is part of § REQ-107's *Known gap: attributes the generator cannot write*. | § REQ-107 |
 | A generic `rm_type_name` other than a DV_INTERVAL instantiation, such as `POINT_EVENT<ITEM_TREE>`, cannot be built. This is § REQ-107's *Known gap: other generic types*. | § REQ-107 |
 
 **Definition of done:** each gap is fixed with a can-fail test, and the matching Known gap is removed from § REQ-107; or it stays recorded there; `make ci` is green.
