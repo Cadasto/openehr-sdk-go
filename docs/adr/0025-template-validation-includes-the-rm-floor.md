@@ -11,6 +11,7 @@ date: 2026-10-11
 - **Status:** Accepted, 2026-10-11 — maintainer decision, taken with the decode-leniency and validation work for issues 238, 242, 248 and 249.
 - **Supersedes:** —
 - **Superseded by:** —
+- **Amended by:** [ADR 0027](0027-template-admission-before-rm-rules.md) (proposed): clause 1's "over the whole root" becomes "over every admitted node" once that decision is accepted.
 - **Strand:** resolves [STRAND-14](../specifications/research-strands.md#strand-14--should-template-driven-validation-also-run-the-rm-floor-invariants).
 - **Introduces:** —
 - **Amends:** [REQ-102](../specifications/clinical-modeling.md#req-102--composition-validation) (*RM floor*), [REQ-110](../specifications/clinical-modeling.md#req-110--template-driven-validation-beyond-composition), [REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor) (the composition sentence). **Applies:** REQ-102 *Issue paths* (one path per node, which the single-report rule depends on), [REQ-168](../specifications/clinical-modeling.md#req-168--value-free-validation-diagnostics).
