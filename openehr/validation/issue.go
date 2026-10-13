@@ -182,7 +182,8 @@ type Issue struct {
 	// a precision below -1.
 	//
 	// On [LayerTemplate], it is "existence" (an attribute the template
-	// requires and the instance lacks), "cardinality" (the number of items an attribute holds),
+	// requires and the instance lacks, or one it prohibits and the instance
+	// carries), "cardinality" (the number of items an attribute holds),
 	// "occurrences" (the number of items bound to one node of the
 	// template), "slot" (an item that fits no node or slot), "type" (the RM
 	// type of a value, or the alternatives it may take) or "identity" (an
@@ -236,8 +237,8 @@ type Issue struct {
 	// calls over the same bytes give invalid_shape issues that are not
 	// equal under ==.
 	//
-	// Value is empty on every other issue (something absent, a count, a
-	// type or identity mismatch, a guard).
+	// Value is empty on every other issue (something absent or prohibited,
+	// a count, a type or identity mismatch, a guard).
 	//
 	// Value-bearing: holds a value from the instance. It prints as
 	// "[redacted]", as [constraints.Redacted] describes, and is left out
@@ -251,6 +252,7 @@ type Issue struct {
 // nil when no sentinel maps. The mapping is:
 //
 //   - "required"                                          → [ErrRequired]
+//   - "prohibited"                                        → [ErrProhibited]
 //   - "cardinality"                                       → [ErrCardinality]
 //   - "rm_type_mismatch" / "alternative_mismatch" /
 //     "archetype_id_mismatch" / "node_id_mismatch"        → [ErrTypeMismatch]
@@ -281,6 +283,8 @@ func (i Issue) Err() error {
 	switch i.Code {
 	case "required":
 		return ErrRequired
+	case "prohibited":
+		return ErrProhibited
 	case "cardinality":
 		return ErrCardinality
 	case "rm_type_mismatch",

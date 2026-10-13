@@ -20,6 +20,12 @@ var (
 	// zero-valued.
 	ErrRequired = errors.New("validation: required attribute missing")
 
+	// ErrProhibited fires when an attribute the OPT prohibits (an
+	// existence whose upper bound is 0) is present: a single-valued
+	// attribute holds a value, or a multi-valued one holds at least one
+	// item.
+	ErrProhibited = errors.New("validation: prohibited attribute present")
+
 	// ErrTypeMismatch fires when the RM type of a composition node
 	// disagrees with the template's declared RMTypeName at the
 	// matching compiled node.

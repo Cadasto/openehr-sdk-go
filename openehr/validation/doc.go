@@ -42,8 +42,11 @@
 // and the composition as the value source. For each compiled OPT node
 // the walker reads the corresponding RM property via
 // [github.com/cadasto/openehr-sdk-go/openehr/validation/rmread],
-// enforces existence / cardinality / alternatives / RM-type match /
-// archetype-id identity, and recurses into matched RM children.
+// enforces existence (an attribute the template requires, and one it
+// prohibits) / cardinality / alternatives / RM-type match / archetype-id
+// identity, and recurses into matched RM children. An attribute the
+// template prohibits that is present is reported once, and not walked
+// into.
 //
 // The RM floor ([ValidateRM] and its typed wrappers) is the RM-only
 // layer beneath that: a second driver that walks any RM root with

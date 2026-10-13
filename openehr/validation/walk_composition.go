@@ -107,7 +107,9 @@ func (w *walker) walkNode(optNode *tcimpl.CompiledNode, rmValue any, path string
 }
 
 // walkSingleAttribute enforces existence on a C_SINGLE_ATTRIBUTE
-// and binds the RM value to one of attr.Children() via the AOM 1.4
+// (an attribute the OPT prohibits that holds a value is reported as
+// prohibited and not walked into) and binds the RM value to one of
+// attr.Children() via the AOM 1.4
 // "one alternative MUST match" semantics, by [bindByRMType]: the most
 // specific child wins, a child of the value's own RM type before the
 // AOM 1.4 short name it wraps, and that before a child the type only
@@ -137,6 +139,13 @@ func (w *walker) walkSingleAttribute(
 				Severity: Error,
 			})
 		}
+		return
+	}
+	// An attribute the OPT prohibits is reported once when it holds a
+	// value (ReadSingle reads nil and typed-nil as absent), and the walk
+	// goes no further into it.
+	if isProhibited(attr) {
+		w.emitProhibited(attr, parentRM, attrPath)
 		return
 	}
 	children := attr.Children()
@@ -309,7 +318,9 @@ func formatAllowedTypes(children []*tcimpl.CompiledNode) string {
 }
 
 // walkMultipleAttribute enforces existence + cardinality on a
-// multi-valued attribute and binds each RM item to an OPT child.
+// multi-valued attribute and binds each RM item to an OPT child. An
+// attribute the OPT prohibits that holds an item is reported as
+// prohibited and not walked into.
 // A LOCATABLE binds by archetype_node_id: exact archetype/node ids
 // first, picked by the template-level name where several children share
 // the id, then the parsed REQ-104 slot grammar (see [matchChildByID]);
@@ -351,6 +362,12 @@ func (w *walker) walkMultipleAttribute(
 				Severity: Error,
 			})
 		}
+		return
+	}
+	// An attribute the OPT prohibits is reported once when it holds at
+	// least one item, and the walk goes no further into it.
+	if len(items) > 0 && isProhibited(attr) {
+		w.emitProhibited(attr, parentRM, attrPath)
 		return
 	}
 	// Existence: lower ≥ 1 with zero items is "required".
@@ -596,6 +613,28 @@ func requiredBy(attr *tcimpl.CompiledAttribute) (layer Layer, rule string, requi
 		return LayerRM, ruleMandatory, true
 	}
 	return LayerNone, "", false
+}
+
+// isProhibited reports whether the OPT prohibits the compiled attribute:
+// its existence interval has a bounded upper bound of 0.
+func isProhibited(attr *tcimpl.CompiledAttribute) bool {
+	e := attr.Existence()
+	return e != nil && !e.UpperUnbounded() && e.Upper() == 0
+}
+
+// emitProhibited reports the attribute attr, which the OPT prohibits, as
+// present on parentRM, at attrPath. The caller then leaves the attribute:
+// the walk checks nothing more on it and does not descend into it. The
+// Detail names the attribute and the parent's RM type, never the value.
+func (w *walker) emitProhibited(attr *tcimpl.CompiledAttribute, parentRM any, attrPath string) {
+	w.emit(Issue{
+		Path:     attrPath,
+		Code:     "prohibited",
+		Layer:    LayerTemplate,
+		Rule:     ruleExistence,
+		Detail:   fmt.Sprintf("attribute %q is present on %s, but the template prohibits it (existence %s)", attr.Name(), describeRMType(parentRM), formatInterval(attr.Existence())),
+		Severity: Error,
+	})
 }
 
 // outOfMultiplicityInterval reports whether `count` falls outside the

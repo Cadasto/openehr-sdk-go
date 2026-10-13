@@ -11,7 +11,7 @@ package validation
 // evaluates.
 const (
 	// ruleExistence is an attribute the template requires and the instance
-	// lacks.
+	// lacks, or one the template prohibits and the instance carries.
 	ruleExistence = "existence"
 	// ruleCardinality is the number of items a multi-valued attribute holds.
 	// On the RM layer it is a mandatory list that is present and empty.

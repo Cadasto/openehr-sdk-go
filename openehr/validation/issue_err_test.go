@@ -19,6 +19,7 @@ func TestIssueErr_REQ102_Sentinels(t *testing.T) {
 		want error // nil when no sentinel maps
 	}{
 		{code: "required", want: validation.ErrRequired},
+		{code: "prohibited", want: validation.ErrProhibited},
 		{code: "cardinality", want: validation.ErrCardinality},
 		{code: "rm_type_mismatch", want: validation.ErrTypeMismatch},
 		{code: "alternative_mismatch", want: validation.ErrTypeMismatch},
