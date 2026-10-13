@@ -15,7 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
-- **Template validation reports an attribute the OPT prohibits (REQ-102).** A present attribute whose OPT existence is 0..0 draws `prohibited`, matched by `ErrProhibited`, also where the instance generator writes one the RM requires.
+- **Template validation reports an attribute the OPT prohibits (REQ-102).** A present attribute with existence 0..0, or whose children all have occurrences 0..0, draws `prohibited` (`ErrProhibited`), also where the instance generator writes one the RM requires.
 - **The RM floor reports `max_depth` once per walk and its nil guards at an empty path (REQ-112).** A deep Go-built value no longer yields one issue per node at the limit.
 
 ## [0.33.0] - 2026-10-13
