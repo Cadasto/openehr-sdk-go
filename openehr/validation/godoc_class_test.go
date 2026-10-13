@@ -39,10 +39,14 @@ type fieldClass struct {
 
 // issueFieldClasses is the class of every exported field of Issue. Path and
 // Detail open with the class they have on issues from the instance
-// validators and name the one they have on issues from ValidateAQL.
+// validators and name the one they have on issues from ValidateAQL. Layer and
+// Rule (REQ-171 § Finding identity) carry structure only, so they are
+// value-free on every issue.
 var issueFieldClasses = map[string]fieldClass{
 	"Path":     {opens: valueFree, names: valueBearing},
 	"Code":     {opens: valueFree},
+	"Layer":    {opens: valueFree},
+	"Rule":     {opens: valueFree},
 	"Detail":   {opens: valueFree, names: valueBearing},
 	"Severity": {opens: valueFree},
 	"Value":    {opens: valueBearing},

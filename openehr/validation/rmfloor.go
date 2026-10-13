@@ -381,6 +381,8 @@ func (w *rmFloorWalker) visit(value any, rmType string, path string, role floorR
 					w.emit(Issue{
 						Path:   attrPath,
 						Code:   "required",
+						Layer:  LayerRM,
+						Rule:   ruleMandatory,
 						Detail: fmt.Sprintf("RM-mandatory multi-valued attribute %q absent on %s", attr, rmType),
 					})
 				}
@@ -390,6 +392,8 @@ func (w *rmFloorWalker) visit(value any, rmType string, path string, role floorR
 				w.emit(Issue{
 					Path:   attrPath,
 					Code:   "cardinality",
+					Layer:  LayerRM,
+					Rule:   ruleCardinality,
 					Detail: fmt.Sprintf("RM-mandatory multi-valued attribute %q must be non-empty on %s", attr, rmType),
 				})
 			}
@@ -407,6 +411,8 @@ func (w *rmFloorWalker) visit(value any, rmType string, path string, role floorR
 				w.emit(Issue{
 					Path:   attrPath,
 					Code:   "required",
+					Layer:  LayerRM,
+					Rule:   ruleMandatory,
 					Detail: fmt.Sprintf("RM-mandatory attribute %q absent on %s", attr, rmType),
 				})
 			}
@@ -515,6 +521,8 @@ func (w *rmFloorWalker) checkArchetypeRoot(value any, rmType, path string) {
 		w.emit(Issue{
 			Path:   joinPath(path, "/archetype_details"),
 			Code:   "is_archetype_root",
+			Layer:  LayerRM,
+			Rule:   archetypeRootRules[rmType],
 			Detail: rmType + " is an archetype root, so archetype_details must be present (RM Is_archetype_root, LOCATABLE.Archetyped_valid)",
 		})
 	}
@@ -542,6 +550,8 @@ func (w *rmFloorWalker) checkArchetyped(value any, path string) {
 		w.emit(Issue{
 			Path:   joinPath(path, "/archetype_id/value"),
 			Code:   "required",
+			Layer:  LayerRM,
+			Rule:   ruleMandatory,
 			Detail: "ARCHETYPED.archetype_id must carry a non-empty value",
 		})
 	}
@@ -549,6 +559,8 @@ func (w *rmFloorWalker) checkArchetyped(value any, path string) {
 		w.emit(Issue{
 			Path:   joinPath(path, "/rm_version"),
 			Code:   "rm_version_valid",
+			Layer:  LayerRM,
+			Rule:   ruleRMVersionValid,
 			Detail: "ARCHETYPED.rm_version must be non-empty (RM Rm_version_valid)",
 		})
 	}
@@ -568,6 +580,8 @@ func (w *rmFloorWalker) checkCodePhrase(value any, path string, role floorRole) 
 		w.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   ruleCodeStringValid,
 			Detail: "CODE_PHRASE.code_string must be non-empty",
 		})
 	}
@@ -613,6 +627,8 @@ func (w *rmFloorWalker) checkDVQuantity(value any, path string) {
 		w.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   rulePrecisionRange,
 			Detail: "DV_QUANTITY.precision must be ≥ -1 (-1 = no limit)",
 			Value:  constraints.Redact(*q.Precision),
 		})
@@ -657,6 +673,8 @@ func (w *rmFloorWalker) checkDVProportion(value any, path string) {
 		w.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   rulePrecisionRange,
 			Detail: "DV_PROPORTION.precision must be ≥ -1 (-1 = no limit)",
 			Value:  constraints.Redact(*p.Precision),
 		})
@@ -672,6 +690,8 @@ func (w *rmFloorWalker) checkDVProportion(value any, path string) {
 			w.emit(Issue{
 				Path:   path,
 				Code:   "rm_invariant",
+				Layer:  LayerRM,
+				Rule:   ruleProportionPrecision,
 				Detail: "DV_PROPORTION.precision is 0, which requires a whole-number numerator and denominator (RM Precision_validity); not integral: " + strings.Join(fractional, ", "),
 				Value:  constraints.Redact([2]float64{float64(p.Numerator), float64(p.Denominator)}),
 			})
@@ -704,6 +724,8 @@ func (w *rmFloorWalker) checkTemporalValue(value any, rmType, path string) {
 	w.emit(Issue{
 		Path:   path,
 		Code:   "rm_invariant",
+		Layer:  LayerRM,
+		Rule:   valueValidRules[rmType],
 		Detail: rmType + ".value must be a valid ISO 8601 value (RM Value_valid)",
 		Value:  constraints.Redact(text),
 	})
@@ -726,12 +748,16 @@ func (w *rmFloorWalker) checkElementNullFlavour(value any, path string) {
 		w.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   ruleNullFlavourIndicated,
 			Detail: "ELEMENT carries both value and null_flavour; exactly one must be present (RM Inv_null_flavour_indicated)",
 		})
 	case !hasValue && !hasNullFlavour:
 		w.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   ruleNullFlavourIndicated,
 			Detail: "ELEMENT carries neither value nor null_flavour; exactly one must be present (RM Inv_null_flavour_indicated)",
 		})
 	}
@@ -758,6 +784,8 @@ func (w *rmFloorWalker) checkDVInterval(value any, rmType, path string) {
 		w.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   ruleIntervalLimits,
 			Detail: "DV_INTERVAL: lower must be ≤ upper",
 			Value:  constraints.Redact([2]float64{lower, upper}),
 		})
@@ -777,9 +805,9 @@ func (w *rmFloorWalker) checkDVInterval(value any, rmType, path string) {
 // check reads only the two flags, which the code already states, so the
 // issue's Value stays empty.
 func (w *rmFloorWalker) checkIntervalFlags(value any, rmType, path string) {
-	for _, side := range [...]struct{ end, code, invariant string }{
-		{end: "lower", code: "lower_included_valid", invariant: "Lower_included_valid"},
-		{end: "upper", code: "upper_included_valid", invariant: "Upper_included_valid"},
+	for _, side := range [...]struct{ end, code, invariant, rule string }{
+		{end: "lower", code: "lower_included_valid", invariant: "Lower_included_valid", rule: ruleLowerIncludedValid},
+		{end: "upper", code: "upper_included_valid", invariant: "Upper_included_valid", rule: ruleUpperIncludedValid},
 	} {
 		if !intervalFlagSet(value, rmType, side.end+"_unbounded") || !intervalFlagSet(value, rmType, side.end+"_included") {
 			continue
@@ -787,6 +815,8 @@ func (w *rmFloorWalker) checkIntervalFlags(value any, rmType, path string) {
 		w.emit(Issue{
 			Path:   path,
 			Code:   side.code,
+			Layer:  LayerRM,
+			Rule:   side.rule,
 			Detail: "DV_INTERVAL." + side.end + "_included must be false when " + side.end + "_unbounded is true (BASE " + side.invariant + ")",
 		})
 	}
@@ -818,6 +848,8 @@ func (w *rmFloorWalker) checkObjectRef(value any, path string) {
 		w.emit(Issue{
 			Path:   joinPath(path, "/id"),
 			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   ruleMandatory,
 			Detail: "OBJECT_REF.id must be present",
 		})
 	}
@@ -825,6 +857,8 @@ func (w *rmFloorWalker) checkObjectRef(value any, path string) {
 		w.emit(Issue{
 			Path:   joinPath(path, "/type"),
 			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   ruleMandatory,
 			Detail: "OBJECT_REF.type must be non-empty",
 		})
 	}
@@ -832,6 +866,8 @@ func (w *rmFloorWalker) checkObjectRef(value any, path string) {
 		w.emit(Issue{
 			Path:   joinPath(path, "/namespace"),
 			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   ruleMandatory,
 			Detail: "OBJECT_REF.namespace must be non-empty",
 		})
 	}
@@ -866,6 +902,8 @@ func (w *rmFloorWalker) checkPartyIdentified(value any, path string) {
 		w.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   rulePartyBasicValidity,
 			Detail: "PARTY_IDENTIFIED has none of name, identifiers and external_ref; at least one must be present (RM Basic_validity)",
 		})
 	}
@@ -873,6 +911,8 @@ func (w *rmFloorWalker) checkPartyIdentified(value any, path string) {
 		w.emit(Issue{
 			Path:   joinPath(path, "/name"),
 			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   rulePartyNameValid,
 			Detail: "PARTY_IDENTIFIED.name is present but empty (RM Name_valid)",
 		})
 	}
@@ -880,6 +920,8 @@ func (w *rmFloorWalker) checkPartyIdentified(value any, path string) {
 		w.emit(Issue{
 			Path:   joinPath(path, "/identifiers"),
 			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   rulePartyIdentifiersValid,
 			Detail: "PARTY_IDENTIFIED.identifiers is present but empty (RM Identifiers_valid)",
 		})
 	}
@@ -911,6 +953,8 @@ func (w *rmFloorWalker) checkTermMappings(value any, path string) {
 		w.emit(Issue{
 			Path:   joinPath(path, "/mappings"),
 			Code:   "mappings_valid",
+			Layer:  LayerRM,
+			Rule:   ruleMappingsValid,
 			Detail: "DV_TEXT.mappings present but empty",
 		})
 	}
@@ -936,6 +980,8 @@ func (w *rmFloorWalker) checkTermMapping(value any, path string) {
 		w.emit(Issue{
 			Path:   joinPath(path, "/match"),
 			Code:   "term_mapping_match",
+			Layer:  LayerRM,
+			Rule:   ruleTermMappingMatch,
 			Detail: "TERM_MAPPING.match must be one of {'>', '=', '<', '?'}",
 			Value:  constraints.Redact(m.Match),
 		})

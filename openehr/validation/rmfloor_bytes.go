@@ -123,6 +123,8 @@ func rootKeyAbsences(keys map[string]jsontext.Value) []Issue {
 		out = append(out, Issue{
 			Path:     "/subject",
 			Code:     "required",
+			Layer:    LayerRM,
+			Rule:     ruleMandatory,
 			Detail:   `RM-mandatory attribute "subject" is absent or null on EHR_STATUS`,
 			Severity: Error,
 		})
@@ -149,6 +151,8 @@ func rootKeyAbsences(keys map[string]jsontext.Value) []Issue {
 			out = append(out, Issue{
 				Path:     "/archetype_details/" + attr,
 				Code:     "required",
+				Layer:    LayerRM,
+				Rule:     ruleMandatory,
 				Detail:   `RM-mandatory attribute "` + attr + `" is absent or null on ARCHETYPED`,
 				Severity: Error,
 			})

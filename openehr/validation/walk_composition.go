@@ -127,10 +127,12 @@ func (w *walker) walkSingleAttribute(
 	attrPath := joinPath(parentPath, "/"+attr.Name())
 	val, ok := rmread.ReadSingle(parentRM, opt.RMTypeName(), attr.Name())
 	if !ok {
-		if isRequired(attr) {
+		if layer, rule, required := requiredBy(attr); required {
 			w.emit(Issue{
 				Path:     attrPath,
 				Code:     "required",
+				Layer:    layer,
+				Rule:     rule,
 				Detail:   fmt.Sprintf("required attribute %q absent on %s", attr.Name(), describeRMType(parentRM)),
 				Severity: Error,
 			})
@@ -150,6 +152,8 @@ func (w *walker) walkSingleAttribute(
 			w.emit(Issue{
 				Path:     attrPath,
 				Code:     "slot_fill",
+				Layer:    LayerTemplate,
+				Rule:     ruleSlot,
 				Detail:   fmt.Sprintf("RM value %s under %q does not satisfy slot %s", describeLocatableID(val), attr.Name(), child.NodeID()),
 				Severity: Error,
 			})
@@ -166,6 +170,8 @@ func (w *walker) walkSingleAttribute(
 			w.emit(Issue{
 				Path:     attrPath,
 				Code:     "rm_type_mismatch",
+				Layer:    LayerTemplate,
+				Rule:     ruleType,
 				Detail:   fmt.Sprintf("RM value of type %s under %q does not satisfy template RM type %s", describeRMType(val), attr.Name(), children[0].RMTypeName()),
 				Severity: Error,
 			})
@@ -173,6 +179,8 @@ func (w *walker) walkSingleAttribute(
 			w.emit(Issue{
 				Path:     attrPath,
 				Code:     "alternative_mismatch",
+				Layer:    LayerTemplate,
+				Rule:     ruleType,
 				Detail:   fmt.Sprintf("RM value of type %s under %q matches none of the OPT alternatives %s", describeRMType(val), attr.Name(), formatAllowedTypes(children)),
 				Severity: Error,
 			})
@@ -333,10 +341,12 @@ func (w *walker) walkMultipleAttribute(
 		// Silent skip would let a missing rmread row (or a
 		// composition with an unhandled parent RM type) hide a real
 		// structural failure.
-		if isRequired(attr) {
+		if layer, rule, required := requiredBy(attr); required {
 			w.emit(Issue{
 				Path:     attrPath,
 				Code:     "required",
+				Layer:    layer,
+				Rule:     rule,
 				Detail:   fmt.Sprintf("required multi-valued attribute %q absent on %s", attr.Name(), describeRMType(parentRM)),
 				Severity: Error,
 			})
@@ -344,10 +354,12 @@ func (w *walker) walkMultipleAttribute(
 		return
 	}
 	// Existence: lower ≥ 1 with zero items is "required".
-	if isRequired(attr) && len(items) == 0 {
+	if layer, rule, required := requiredBy(attr); required && len(items) == 0 {
 		w.emit(Issue{
 			Path:     attrPath,
 			Code:     "required",
+			Layer:    layer,
+			Rule:     rule,
 			Detail:   fmt.Sprintf("required multi-valued attribute %q is empty on %s", attr.Name(), describeRMType(parentRM)),
 			Severity: Error,
 		})
@@ -358,6 +370,8 @@ func (w *walker) walkMultipleAttribute(
 			w.emit(Issue{
 				Path:     attrPath,
 				Code:     "cardinality",
+				Layer:    LayerTemplate,
+				Rule:     ruleCardinality,
 				Detail:   fmt.Sprintf("attribute %q has %d children; OPT cardinality %s", attr.Name(), len(items), formatInterval(cm)),
 				Severity: Error,
 			})
@@ -409,6 +423,8 @@ func (w *walker) walkMultipleAttribute(
 			w.emit(Issue{
 				Path:     childPath[i],
 				Code:     "cardinality",
+				Layer:    LayerTemplate,
+				Rule:     ruleOccurrences,
 				Detail:   fmt.Sprintf("OPT child %s appears %d times under %q; occurrences %s", childIdentity(c), got, attr.Name(), formatInterval(occ)),
 				Severity: Error,
 			})
@@ -505,6 +521,8 @@ func (w *walker) applyPrimitive(
 		w.emit(Issue{
 			Path:     path,
 			Code:     "primitive_" + string(v.Code),
+			Layer:    LayerTemplate,
+			Rule:     string(v.Code),
 			Detail:   v.Detail,
 			Severity: Error,
 			Value:    v.Value,
@@ -562,23 +580,22 @@ func primitiveInput(rmValue any) any {
 	return rmValue
 }
 
-// isRequired reports whether the compiled attribute carries an
-// existence interval with lower bound ≥ 1 — i.e. the OPT mandates
-// presence. Also honours the BMM-mandatory bit (Required()): some
-// attributes are mandatory by RM even when the OPT existence
-// element is silent (e.g. COMPOSITION.category).
-func isRequired(attr *tcimpl.CompiledAttribute) bool {
+// requiredBy reports whether the compiled attribute must be present, and
+// which layer and rule require it. An OPT existence interval with lower
+// bound ≥ 1 is the template's own requirement: the template layer, rule
+// existence. Failing that, the BMM-mandatory bit (Required()) makes some
+// attributes mandatory even when the OPT existence element is silent (e.g.
+// COMPOSITION.category): the RM layer, rule mandatory. When both hold, the
+// template's own requirement is the one reported. required is false, with
+// no layer or rule, when neither holds.
+func requiredBy(attr *tcimpl.CompiledAttribute) (layer Layer, rule string, required bool) {
+	if e := attr.Existence(); e != nil && !e.LowerUnbounded() && e.Lower() >= 1 {
+		return LayerTemplate, ruleExistence, true
+	}
 	if attr.Required() {
-		return true
+		return LayerRM, ruleMandatory, true
 	}
-	e := attr.Existence()
-	if e == nil {
-		return false
-	}
-	if e.LowerUnbounded() {
-		return false
-	}
-	return e.Lower() >= 1
+	return LayerNone, "", false
 }
 
 // outOfMultiplicityInterval reports whether `count` falls outside the
@@ -768,23 +785,33 @@ func unboundItemIssue(
 		return Issue{
 			Path:     itemPath,
 			Code:     "slot_fill",
+			Layer:    LayerTemplate,
+			Rule:     ruleSlot,
 			Detail:   fmt.Sprintf("RM item %s does not match any OPT child of %q (archetype/at-code mismatch)", describeLocatableID(item), attr.Name()),
 			Severity: Error,
 		}
 	}
-	iss := Issue{Path: itemPath, Code: "alternative_mismatch", Severity: Error}
+	code := "alternative_mismatch"
 	if len(children) == 1 {
-		iss.Code = "rm_type_mismatch"
+		code = "rm_type_mismatch"
 	}
+	var detail string
 	switch {
 	case isNilItem(item):
-		iss.Detail = fmt.Sprintf("nil item under %q has no RM value for an OPT child to bind", attr.Name())
+		detail = fmt.Sprintf("nil item under %q has no RM value for an OPT child to bind", attr.Name())
 	case len(children) == 1:
-		iss.Detail = fmt.Sprintf("RM value of type %s under %q does not satisfy template RM type %s", describeRMType(item), attr.Name(), children[0].RMTypeName())
+		detail = fmt.Sprintf("RM value of type %s under %q does not satisfy template RM type %s", describeRMType(item), attr.Name(), children[0].RMTypeName())
 	default:
-		iss.Detail = fmt.Sprintf("RM value of type %s under %q matches none of the OPT alternatives %s", describeRMType(item), attr.Name(), formatAllowedTypes(children))
+		detail = fmt.Sprintf("RM value of type %s under %q matches none of the OPT alternatives %s", describeRMType(item), attr.Name(), formatAllowedTypes(children))
 	}
-	return iss
+	return Issue{
+		Path:     itemPath,
+		Code:     code,
+		Layer:    LayerTemplate,
+		Rule:     ruleType,
+		Detail:   detail,
+		Severity: Error,
+	}
 }
 
 // slotFitsArchetypeID checks whether archetypeID satisfies the
@@ -837,6 +864,8 @@ func (w *walker) checkLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, p
 			w.emit(Issue{
 				Path:     joinPath(path, "/archetype_node_id"),
 				Code:     "archetype_id_mismatch",
+				Layer:    LayerTemplate,
+				Rule:     ruleIdentity,
 				Detail:   fmt.Sprintf("archetype_node_id %q does not match template archetype id %q at %s", id, want, path),
 				Severity: Error,
 			})
@@ -847,6 +876,8 @@ func (w *walker) checkLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, p
 		w.emit(Issue{
 			Path:     joinPath(path, "/archetype_node_id"),
 			Code:     "node_id_mismatch",
+			Layer:    LayerTemplate,
+			Rule:     ruleIdentity,
 			Detail:   fmt.Sprintf("archetype_node_id %q does not match template node_id %q at %s", id, want, path),
 			Severity: Error,
 		})
@@ -874,6 +905,8 @@ func (w *walker) checkRMType(opt *tcimpl.CompiledNode, rmValue any, path string)
 	w.emit(Issue{
 		Path:     path,
 		Code:     "rm_type_mismatch",
+		Layer:    LayerTemplate,
+		Rule:     ruleType,
 		Detail:   fmt.Sprintf("RM type %s does not satisfy template RM type %s at %s", got, want, path),
 		Severity: Error,
 	})

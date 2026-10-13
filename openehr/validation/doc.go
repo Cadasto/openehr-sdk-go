@@ -104,6 +104,18 @@
 // template walk and the floor both find, under one code at one path, is
 // one issue.
 //
+// # Finding identity
+//
+// Every issue says where it comes from. [Issue.Layer] is [LayerTemplate]
+// for a clause of the operational template and [LayerRM] for a rule of the
+// Reference Model, and [Issue.Rule] names the clause: a word such as
+// "existence", "occurrences" or "type" for a template clause, and, for a
+// Reference Model rule, the class invariant it evaluates, as in
+// "DV_INTERVAL.Limits_consistent", or a word such as "mandatory". Issues
+// that share a code, such as the rm_invariant issues, are told apart by
+// Rule. A guard, a walk condition and an AQL lint issue carry [LayerNone]
+// and an empty Rule.
+//
 // # Dependencies
 //
 // The package is importable without `transport/`, `auth/`,
