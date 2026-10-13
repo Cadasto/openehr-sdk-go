@@ -1478,8 +1478,10 @@ requirements:
       - openehr/serialize/canjson/interval_open_side_test.go
       - openehr/serialize/canjson/mappings_presence_test.go
       - openehr/serialize/canxml/interval_open_side_test.go
+      - openehr/validation/coverage_test.go
       - openehr/validation/issuepath_internal_test.go
       - openehr/validation/issuepath_test.go
+      - openehr/validation/limits_test.go
       - openehr/validation/nonstorable_generic_test.go
       - openehr/validation/rmfloor_archetype_test.go
       - openehr/validation/rmfloor_bytes_test.go
@@ -1508,6 +1510,7 @@ requirements:
       - openehr/validation/rmread/read_ordered_test.go
       - openehr/validation/rmread/read_party_proxy_test.go
       - openehr/validation/rmread/read_test.go
+      - openehr/validation/validator_test.go
       - sandbox/rmvalid_test.go
       - testkit/conformance/webtemplate/archetype_details_test.go
       - testkit/probes/instance/corpus_ratchet_test.go
@@ -2094,8 +2097,12 @@ requirements:
     packages: [openehr/validation]
     tests:
       - openehr/instance/rm_defaults_yield_test.go
+      - openehr/validation/coverage_test.go
       - openehr/validation/finding_identity_rules_test.go
       - openehr/validation/finding_identity_test.go
       - openehr/validation/godoc_class_test.go
+      - openehr/validation/limits_test.go
       - openehr/validation/prohibited_test.go
       - openehr/validation/rmfloor_coded_test.go
+      - openehr/validation/rmfloor_limit_internal_test.go
+      - openehr/validation/validator_test.go
