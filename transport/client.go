@@ -303,7 +303,13 @@ func (c *Client) doOnce(ctx context.Context, req *Request, target *url.URL) (*Re
 	}
 	httpReq, err := http.NewRequestWithContext(ctx, req.effectiveMethod(), target.String(), body)
 	if err != nil {
-		return nil, fmt.Errorf("transport: build request: %w", err)
+		// A URL that does not parse arrives as url.Parse's own *url.Error,
+		// which quotes the resolved URL: its path may hold a caller-supplied
+		// identifier and its base URL a password. Name the request by its
+		// route slot instead, as the network-failure arm below does
+		// (REQ-093).
+		route := req.routeOrPlaceholder()
+		return nil, fmt.Errorf("transport: build request %s %s: %w", req.effectiveMethod(), route, sanitiseURLError(err, route))
 	}
 	if err := c.plumbHeaders(ctx, req, httpReq); err != nil {
 		return nil, err
@@ -320,9 +326,10 @@ func (c *Client) doOnce(ctx context.Context, req *Request, target *url.URL) (*Re
 		// Error() prints the resolved URL it was dialling — so this arm's
 		// value-free prefix is not enough on its own (REQ-093).
 		// sanitiseURLError substitutes the same route slot into that URL
-		// field while keeping the error's type and cause intact. The other
-		// two doOnce diagnostics wrap body-read errors, which carry no
-		// request URL of their own.
+		// field while keeping the error's type and cause intact. The
+		// build-request arm above does the same; the two body-read
+		// diagnostics below wrap errors that carry no request URL of their
+		// own.
 		route := req.routeOrPlaceholder()
 		return nil, fmt.Errorf("transport: %s %s: %w", req.effectiveMethod(), route, sanitiseURLError(err, route))
 	}
@@ -662,10 +669,10 @@ func sanitisedURL(u *url.URL) string {
 
 // sanitiseURLError replaces the resolved URL a wrapped net/http
 // *url.Error prints with route — the caller's route template, or the
-// "(unrouted)" placeholder — so a network failure's diagnostic stays
-// value-free (REQ-093). The resolved URL carries the expanded request
-// path, which may hold a caller-supplied identifier such as a live
-// ehr_id.
+// "(unrouted)" placeholder — so the diagnostic of a request that cannot be
+// built or sent stays value-free (REQ-093). The resolved URL carries the
+// expanded request path, which may hold a caller-supplied identifier such
+// as a live ehr_id, and the base URL, which may carry a password.
 //
 // What it guarantees the caller: the substitution is a shallow copy, so
 // the error is still a *url.Error under errors.AsType, with Op and Err
@@ -674,7 +681,8 @@ func sanitisedURL(u *url.URL) string {
 // text differs.
 //
 // *http.Client.Do documents that it always returns a *url.Error at the
-// top of the chain, so only a top-level match is substituted; anything
+// top of the chain, and http.NewRequestWithContext returns url.Parse's
+// *url.Error as it is, so only a top-level match is substituted; anything
 // else is returned unchanged rather than rewritten mid-chain, where a
 // *url.Error could belong to a cause the transport did not build.
 func sanitiseURLError(err error, route string) error {

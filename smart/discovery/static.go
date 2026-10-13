@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"slices"
 	"time"
+
+	"github.com/cadasto/openehr-sdk-go/internal/urlredact"
 )
 
 // StaticConfig is the input to NewStaticCatalog, a hand-built catalog
@@ -89,7 +91,9 @@ func cloneServices(in map[string]ServiceEntry) map[string]ServiceEntry {
 func MustParseURL(raw string) *url.URL {
 	u, err := url.Parse(raw)
 	if err != nil {
-		panic(fmt.Sprintf("MustParseURL(%q): %v", raw, err))
+		// raw may carry a password in its userinfo, and url.Parse's error
+		// quotes raw too; the panic value must not carry it.
+		panic(fmt.Sprintf("MustParseURL(%q): %v", urlredact.String(raw), urlredact.Error(err, raw)))
 	}
 	return u
 }

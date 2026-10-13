@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/cadasto/openehr-sdk-go/internal/urlredact"
 )
 
 // SpecVersionPin is the SDK's pinned openEHR REST contract version.
@@ -386,14 +388,14 @@ func (r *Resolver) runCall(ctx context.Context, baseURL string, cached *ServiceC
 		// longer vouches for. The caller's context may have ended after the
 		// failure, so it must not stop the invalidation.
 		if ierr := r.cache.Invalidate(context.WithoutCancel(ctx), baseURL); ierr != nil {
-			r.cfg.logger.Warn("discovery: cache invalidate failed", "base_url", baseURL, "err", ierr)
+			r.cfg.logger.Warn("discovery: cache invalidate failed", "base_url", urlredact.String(baseURL), "err", ierr)
 		}
 	case cat != nil:
 		// The caller may have cancelled after the fetch succeeded. The
 		// write still has to land, or the entry from before this fetch
 		// stays. Cancellation must not refuse it, as with Invalidate above.
 		if perr := r.cache.Put(context.WithoutCancel(ctx), baseURL, cat); perr != nil {
-			r.cfg.logger.Warn("discovery: cache put failed", "base_url", baseURL, "err", perr)
+			r.cfg.logger.Warn("discovery: cache put failed", "base_url", urlredact.String(baseURL), "err", perr)
 		}
 	}
 
@@ -454,9 +456,12 @@ func (r *Resolver) fetch(ctx context.Context, baseURL string, cached *ServiceCat
 	if !r.cfg.allowInsecure && docURL.Scheme == "http" {
 		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonInsecureURL, Inner: errors.New("plaintext base URL rejected; use WithAllowInsecure for development")}
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, docURL.String(), nil)
+	rawDocURL := docURL.String()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawDocURL, nil)
 	if err != nil {
-		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonFetchFailed, Inner: err}
+		// url.Parse can refuse docURL.String() even though it accepted
+		// baseURL, and its error quotes that URL with any password in it.
+		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonFetchFailed, Inner: urlredact.Error(err, rawDocURL)}
 	}
 	req.Header.Set("Accept", "application/json")
 	if etag != "" {
@@ -581,9 +586,10 @@ func (r *Resolver) checkOpenIDConfiguration(ctx context.Context, cat *ServiceCat
 	if err != nil {
 		return fail(ReasonMalformedURL, err)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, docURL.String(), nil)
+	rawDocURL := docURL.String()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawDocURL, nil)
 	if err != nil {
-		return fail(ReasonFetchFailed, err)
+		return fail(ReasonFetchFailed, urlredact.Error(err, rawDocURL))
 	}
 	req.Header.Set("Accept", "application/json")
 	resp, err := r.cfg.httpClient.Do(req)
@@ -612,23 +618,25 @@ func (r *Resolver) checkOpenIDConfiguration(ctx context.Context, cat *ServiceCat
 		return fail(ReasonFetchFailed, errors.New("openid-configuration has no issuer"))
 	}
 	if doc.Issuer != cat.Issuer {
-		return fail(ReasonIssuerMismatch, fmt.Errorf("openid-configuration issuer %q does not equal the declared issuer %q", doc.Issuer, cat.Issuer))
+		return fail(ReasonIssuerMismatch, fmt.Errorf("openid-configuration issuer %q does not equal the declared issuer %q", urlredact.String(doc.Issuer), urlredact.String(cat.Issuer)))
 	}
 	if doc.JWKSURI != "" && smartJWKSURI != "" && !sameJWKSURI(doc.JWKSURI, smartJWKSURI, parsed) {
-		return fail(ReasonIssuerMismatch, fmt.Errorf("openid-configuration jwks_uri %q does not equal the smart-configuration jwks_uri %q", doc.JWKSURI, smartJWKSURI))
+		return fail(ReasonIssuerMismatch, fmt.Errorf("openid-configuration jwks_uri %q does not equal the smart-configuration jwks_uri %q", urlredact.String(doc.JWKSURI), urlredact.String(smartJWKSURI)))
 	}
 	return nil
 }
 
+// joinURL appends path to the URL rawBase. Its errors mask a password in
+// rawBase's userinfo.
 func joinURL(rawBase, path string) (*url.URL, error) {
 	base, err := url.Parse(rawBase)
 	if err != nil {
-		return nil, err
+		return nil, urlredact.Error(err, rawBase)
 	}
 	// Hostname, not Host: url.Parse keeps a lone port such as ":8443" in
 	// Host, which leaves no host name to connect to.
 	if base.Scheme == "" || base.Hostname() == "" {
-		return nil, fmt.Errorf("%q is not an absolute URL with a host", rawBase)
+		return nil, fmt.Errorf("%q is not an absolute URL with a host", urlredact.String(rawBase))
 	}
 	ref, err := url.Parse(path)
 	if err != nil {
@@ -714,7 +722,7 @@ func (r *Resolver) parse(baseURL string, wire *smartConfigWire) (*ServiceCatalog
 	for id, s := range wire.Services {
 		u, err := url.Parse(s.BaseURL)
 		if err != nil || u.Scheme == "" || u.Hostname() == "" {
-			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: fmt.Errorf("service %q baseUrl %q invalid", id, s.BaseURL)}
+			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: fmt.Errorf("service %q baseUrl %q invalid", id, urlredact.String(s.BaseURL))}
 		}
 		services[id] = ServiceEntry{
 			ID:            id,
@@ -750,31 +758,32 @@ func (r *Resolver) parse(baseURL string, wire *smartConfigWire) (*ServiceCatalog
 
 // validateIssuer checks the shape OpenID Connect Core 1.0 §2 gives an
 // issuer: an absolute https URL with a host and without a query or
-// fragment. An http issuer passes only with allowInsecure.
+// fragment. An http issuer passes only with allowInsecure. Its errors mask
+// a password in the issuer's userinfo.
 func validateIssuer(baseURL, raw string, allowInsecure bool) error {
 	malformed := func(err error) error {
 		return &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: err}
 	}
 	u, err := url.Parse(raw)
 	if err != nil {
-		return malformed(fmt.Errorf("issuer: %w", err))
+		return malformed(fmt.Errorf("issuer: %w", urlredact.Error(err, raw)))
 	}
 	// url.Parse lowercases the scheme, so these comparisons ignore case.
 	if u.Scheme != "https" && u.Scheme != "http" {
-		return malformed(fmt.Errorf("issuer %q is not an https URL", raw))
+		return malformed(fmt.Errorf("issuer %q is not an https URL", urlredact.String(raw)))
 	}
 	if u.Hostname() == "" {
-		return malformed(fmt.Errorf("issuer %q has no host", raw))
+		return malformed(fmt.Errorf("issuer %q has no host", urlredact.String(raw)))
 	}
 	if u.RawQuery != "" || u.ForceQuery {
-		return malformed(fmt.Errorf("issuer %q has a query", raw))
+		return malformed(fmt.Errorf("issuer %q has a query", urlredact.String(raw)))
 	}
 	// A "#" can only open a fragment, and url.Parse drops an empty one.
 	if strings.Contains(raw, "#") {
-		return malformed(fmt.Errorf("issuer %q has a fragment", raw))
+		return malformed(fmt.Errorf("issuer %q has a fragment", urlredact.String(raw)))
 	}
 	if u.Scheme == "http" && !allowInsecure {
-		return &DiscoveryError{Issuer: baseURL, Reason: ReasonInsecureURL, Inner: fmt.Errorf("issuer %q uses http; https required (use WithAllowInsecure for development)", raw)}
+		return &DiscoveryError{Issuer: baseURL, Reason: ReasonInsecureURL, Inner: fmt.Errorf("issuer %q uses http; https required (use WithAllowInsecure for development)", urlredact.String(raw))}
 	}
 	return nil
 }
@@ -787,7 +796,7 @@ func parseAuthEndpoints(baseURL string, w *smartConfigWire, allowInsecure bool) 
 		}
 		u, err := url.Parse(raw)
 		if err != nil || u.Hostname() == "" {
-			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: fmt.Errorf("%s %q invalid", name, raw)}
+			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: fmt.Errorf("%s %q invalid", name, urlredact.String(raw))}
 		}
 		// url.Parse lowercases the scheme. https is always accepted, http
 		// only with allowInsecure, and anything else is not an endpoint.
@@ -946,7 +955,7 @@ func (r *Resolver) warnInsecure(cat *ServiceCatalog) {
 			return
 		}
 		if u.Scheme == "http" {
-			r.cfg.logger.Warn("discovery: plaintext URL in catalog (REQ-092)", "base_url", cat.BaseURL, "field", name, "url", u.Redacted())
+			r.cfg.logger.Warn("discovery: plaintext URL in catalog (REQ-092)", "base_url", urlredact.String(cat.BaseURL), "field", name, "url", u.Redacted())
 		}
 	}
 	for _, e := range authURLs(cat.Auth) {
@@ -966,7 +975,7 @@ func (r *Resolver) refusePlaintext(cat *ServiceCatalog) error {
 		return nil
 	}
 	refuse := func(name, raw string) error {
-		return &DiscoveryError{Issuer: cat.BaseURL, Reason: ReasonInsecureURL, Inner: fmt.Errorf("%s %q uses http; https required (use WithAllowInsecure for development)", name, raw)}
+		return &DiscoveryError{Issuer: cat.BaseURL, Reason: ReasonInsecureURL, Inner: fmt.Errorf("%s %q uses http; https required (use WithAllowInsecure for development)", name, urlredact.String(raw))}
 	}
 	if u, err := url.Parse(cat.Issuer); err == nil && u.Scheme == "http" {
 		return refuse("issuer", cat.Issuer)
