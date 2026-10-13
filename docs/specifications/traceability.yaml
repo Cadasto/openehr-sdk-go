@@ -1500,6 +1500,7 @@ requirements:
       - openehr/validation/rmfloor_ordered_test.go
       - openehr/validation/rmfloor_party_proxy_test.go
       - openehr/validation/rmfloor_party_ref_test.go
+      - openehr/validation/rmfloor_primitive_list_internal_test.go
       - openehr/validation/rmfloor_proportion_test.go
       - openehr/validation/rmfloor_temporal_element_test.go
       - openehr/validation/rmfloor_test.go
@@ -2109,6 +2110,7 @@ requirements:
       - openehr/validation/rmfloor_coded_test.go
       - openehr/validation/rmfloor_generated_access_test.go
       - openehr/validation/rmfloor_limit_internal_test.go
+      - openehr/validation/rmfloor_primitive_list_internal_test.go
       - openehr/validation/validator_test.go
       - testkit/conformance/webtemplate/archetype_details_test.go
       - testkit/probes/validation/probe_074_test.go

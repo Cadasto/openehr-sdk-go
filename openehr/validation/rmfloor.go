@@ -341,7 +341,9 @@ func (w *rmFloorWalker) walk(value any, rmType string, path string, role floorRo
 // class ([rmaccess.Covers]), reads every BMM-known attribute through the
 // generated access, emitting `required` for any RM-mandatory attribute that
 // is absent and `cardinality` for an RM-mandatory container that is present
-// and empty, and recursing into every present attribute. The items of a
+// and empty, and recursing into every present attribute. A list of a
+// primitive type ([isPrimitiveType]) is counted ([rmaccess.Len]) and never
+// read item by item, since nothing is below its items. The items of a
 // multi-valued attribute are written by the path rule the template walk
 // shares ([itemPaths]); the entries of a Hash attribute by their position in
 // ascending key order, never by their key.
@@ -425,7 +427,7 @@ func (w *rmFloorWalker) visit(value any, rmType string, path string, role floorR
 
 		switch {
 		case isContainer:
-			kids, present := rmaccess.Multiple(value, attr)
+			n, present := rmaccess.Len(value, attr)
 			if !present {
 				if required {
 					w.emit(Issue{
@@ -438,7 +440,7 @@ func (w *rmFloorWalker) visit(value any, rmType string, path string, role floorR
 				}
 				continue
 			}
-			if required && len(kids) == 0 {
+			if required && n == 0 {
 				w.emit(Issue{
 					Path:   attrPath,
 					Code:   "cardinality",
@@ -448,7 +450,12 @@ func (w *rmFloorWalker) visit(value any, rmType string, path string, role floorR
 				})
 			}
 			// A list of a primitive type (DV_MULTIMEDIA data, an Array of
-			// Octet, holds one item per byte) has nothing below it to walk.
+			// Octet, holds one item per byte) has nothing below it to walk:
+			// it is counted above and never read item by item.
+			if n == 0 || isPrimitiveType(w.info, attrType) {
+				continue
+			}
+			kids, _ := rmaccess.Multiple(value, attr)
 			if !slices.ContainsFunc(kids, rmaccess.Covers) {
 				continue
 			}
@@ -503,6 +510,15 @@ func (w *rmFloorWalker) visit(value any, rmType string, path string, role floorR
 // hashType is the RM type rminfo declares for every Hash attribute, whatever
 // its key and value types.
 const hashType = "Hash"
+
+// isPrimitiveType reports whether info knows rmType, the declared type of an
+// attribute or of the items of a list, as a primitive type (an Octet, a
+// String), which has nothing below it to walk. A Lookup that reports no
+// absence reasons ([rminfo.AbsenceReporter]) knows none.
+func isPrimitiveType(info rminfo.Lookup, rmType string) bool {
+	ar, ok := info.(rminfo.AbsenceReporter)
+	return ok && ar.AbsenceReason(rmType) == rminfo.AbsencePrimitive
+}
 
 // hashEntryPath returns the issue path of the entry at index i, in ascending
 // key order, of the Hash attribute at attrPath: its 1-based position, never
@@ -946,9 +962,11 @@ func intervalFlagSet(value any, attr string) bool {
 // id, type, and namespace are RM-mandatory. The walk goes below a reference
 // like any node, but its required-set check leaves the three parts out
 // ([isReferencePart]), so this evaluator is the floor's only check of a
-// missing part, which keeps it from being reported twice. It reads the
-// fields through the [rm.ObjectRefLike] interface (REQ-052), so any BMM
-// subtype is covered.
+// missing part, which keeps it from being reported twice. It reads the id
+// as the walk does, through the generated access, which reads the id the
+// class itself declares: a LOCATABLE_REF's own UID_BASED_ID, not the
+// OBJECT_REF id it embeds. It reads type and namespace through the
+// [rm.ObjectRefLike] interface (REQ-052), so any BMM subtype is covered.
 func (w *rmFloorWalker) checkObjectRef(value any, path string) {
 	if value == nil || rmaccess.IsTypedNilPointer(value) {
 		return
@@ -957,7 +975,7 @@ func (w *rmFloorWalker) checkObjectRef(value any, path string) {
 	if !ok {
 		return
 	}
-	if id := ref.GetID(); id == nil || rmaccess.IsTypedNilPointer(id) {
+	if _, present := rmaccess.Single(value, "id"); !present {
 		w.emit(Issue{
 			Path:   joinPath(path, "/id"),
 			Code:   "rm_invariant",

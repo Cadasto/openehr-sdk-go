@@ -354,7 +354,7 @@ func (w *walker) walkMultipleAttribute(
 	parentPath string,
 ) {
 	attrPath := joinPath(parentPath, "/"+attr.Name())
-	items, isHash, ok := readItems(parentRM, attr.Name())
+	items, n, isHash, ok := readItems(parentRM, attr.Name())
 	if !ok {
 		// The attribute is absent: a nil list, a nil hash, or one the
 		// parent's RM class does not declare. If the OPT pinned existence
@@ -376,7 +376,7 @@ func (w *walker) walkMultipleAttribute(
 	}
 	// An attribute the OPT prohibits is reported once when it holds at
 	// least one item, and the walk goes no further into it.
-	if len(items) > 0 && isProhibited(attr) {
+	if n > 0 && isProhibited(attr) {
 		w.emitProhibited(attr, parentRM, attrPath)
 		return
 	}
@@ -385,7 +385,7 @@ func (w *walker) walkMultipleAttribute(
 	// RM's own rule names cardinality, as the floor does for the same list;
 	// when the template's existence requires it, it is that existence rule.
 	// A nil list is absent and was reported above.
-	if layer, rule, required := requiredBy(attr); required && len(items) == 0 {
+	if layer, rule, required := requiredBy(attr); required && n == 0 {
 		if layer == LayerRM {
 			rule = ruleCardinality
 		}
@@ -400,13 +400,13 @@ func (w *walker) walkMultipleAttribute(
 	}
 	// Child-count cardinality interval (when the OPT pinned one).
 	if cm := attr.ChildMultiplicity(); cm != nil {
-		if outOfMultiplicityInterval(len(items), cm) {
+		if outOfMultiplicityInterval(n, cm) {
 			w.emit(Issue{
 				Path:     attrPath,
 				Code:     "cardinality",
 				Layer:    LayerTemplate,
 				Rule:     ruleCardinality,
-				Detail:   fmt.Sprintf("attribute %q has %d children; OPT cardinality %s", attr.Name(), len(items), formatInterval(cm)),
+				Detail:   fmt.Sprintf("attribute %q has %d children; OPT cardinality %s", attr.Name(), n, formatInterval(cm)),
 				Severity: Error,
 			})
 		}
@@ -419,6 +419,11 @@ func (w *walker) walkMultipleAttribute(
 	// occurrences upper-bound check.
 	children := attr.Children()
 	if len(children) == 0 {
+		return
+	}
+	if len(items) != n {
+		// A list of a primitive type is counted, never read item by item
+		// (readItems): it has no item an OPT child could bind.
 		return
 	}
 	bound, byNodeID := bindItems(opt.RMTypeName(), attr.Name(), children, items)
@@ -477,29 +482,37 @@ func (w *walker) walkMultipleAttribute(
 }
 
 // readItems reads the items of the attribute attr on parent, which the
-// template walk treats as multi-valued: the items of a list, in order, or,
-// where parent's RM class declares attr as a Hash, the entries of the hash
-// in ascending key order (isHash). present is false for a nil list or hash
-// and for an attribute the class does not declare; a present one may hold
-// no item.
-func readItems(parent any, attr string) (items []any, isHash, present bool) {
-	if declaresHash(parent, attr) {
+// template walk treats as multi-valued, and their number n: the items of a
+// list, in order, or, where parent's RM class declares attr as a Hash, the
+// entries of the hash in ascending key order (isHash). A list whose items
+// the pinned BMM declares of a primitive type ([isPrimitiveType]), such as
+// DV_MULTIMEDIA data, an Array of Octet, is counted ([rmaccess.Len]) and
+// never read item by item: items is nil whatever n is. present is false for
+// a nil list or hash and for an attribute the class does not declare; a
+// present one may hold no item.
+func readItems(parent any, attr string) (items []any, n int, isHash, present bool) {
+	switch declared := declaredItemType(parent, attr); {
+	case declared == hashType:
 		_, items, present = rmaccess.Hash(parent, attr)
-		return items, true, present
+		return items, len(items), true, present
+	case isPrimitiveType(rminfo.Default, declared):
+		n, present = rmaccess.Len(parent, attr)
+		return nil, n, false, present
 	}
 	items, present = rmaccess.Multiple(parent, attr)
-	return items, false, present
+	return items, len(items), false, present
 }
 
-// declaresHash reports whether the RM class of parent declares attr as a
-// Hash attribute in the pinned BMM.
-func declaresHash(parent any, attr string) bool {
+// declaredItemType returns the RM type the pinned BMM declares for the
+// attribute attr of parent's RM class, the type of its items for a list, or
+// "" when parent's class is not one the walk knows or does not declare attr.
+func declaredItemType(parent any, attr string) string {
 	rmType, _, ok := rmTypeInfo(parent)
 	if !ok {
-		return false
+		return ""
 	}
-	t, ok := rminfo.Default.AttributeRMType(bmmtype.Class(rmType), attr)
-	return ok && t == hashType
+	t, _ := rminfo.Default.AttributeRMType(bmmtype.Class(rmType), attr)
+	return t
 }
 
 // bindItems binds each of the items of the multi-valued attribute

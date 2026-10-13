@@ -5,10 +5,12 @@ package validation_test
 // Structural access): an RM-mandatory list that is nil is absent and one that
 // is set and empty is present and empty (REQ-112 Driver), the entries of a
 // Hash attribute are walked in ascending key order and written by their
-// position (REQ-102 Issue paths), a list of a primitive type is not walked
-// item by item, and the parts of a reference are reported once.
+// position (REQ-102 Issue paths), a list of a primitive type is counted and
+// never read item by item, by the floor and by the template walk, and the
+// parts of a reference are reported once.
 
 import (
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -101,22 +103,103 @@ func TestValidateRM_REQ171_HashEntriesWalkedInKeyOrder(t *testing.T) {
 }
 
 // TestValidateRM_REQ171_PrimitiveListNotWalked pins that the floor does not
-// visit the items of a list of a primitive type: DV_MULTIMEDIA data and
-// integrity_check are Arrays of Octet, which the generated access hands over
-// one byte at a time, with nothing below them. A payload larger than the
-// default visit limit (100,000) validates with no `max_nodes` and nothing in
-// Coverage.Stopped.
+// read the items of a list of a primitive type: DV_MULTIMEDIA data and
+// integrity_check are Arrays of Octet, one item per byte, with nothing below
+// them. A payload larger than the default visit limit (100,000) validates
+// with no `max_nodes` and nothing in Coverage.Stopped, and the validation
+// allocates less than the payload's size: a walk that boxed each byte as an
+// item would allocate many times that.
 func TestValidateRM_REQ171_PrimitiveListNotWalked(t *testing.T) {
-	const size = 150_000
+	const size = 1 << 20
 	root := &rm.DVMultimedia{
 		MediaType:      rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "IANA_media-types"}, CodeString: "image/png"},
 		Size:           size,
 		Data:           make([]byte, size),
 		IntegrityCheck: make([]byte, size),
 	}
-	r := validation.ValidateRM(root)
+	var r validation.Result
+	allocated := allocatedBytes(func() { r = validation.ValidateRM(root) })
 	if containsCode(r.Issues, "max_nodes") || len(r.Coverage.Stopped) != 0 {
 		t.Errorf("ValidateRM(DV_MULTIMEDIA with %d bytes of data) issues = %q, Coverage.Stopped = %q; want no max_nodes and nothing stopped", size, issueKeys(r.Issues), r.Coverage.Stopped)
+	}
+	if allocated >= size {
+		t.Errorf("ValidateRM(DV_MULTIMEDIA with %d bytes of data and of integrity_check) allocated %d bytes, want fewer than %d: the bytes are read one item at a time", size, allocated, size)
+	}
+}
+
+// allocatedBytes returns the bytes the heap allocated while f ran. A test
+// that calls it does not run in parallel, so no other test's allocations are
+// counted.
+func allocatedBytes(f func()) uint64 {
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	f()
+	runtime.ReadMemStats(&after)
+	return after.TotalAlloc - before.TotalAlloc
+}
+
+// multimediaOPT constrains a DV_MULTIMEDIA's data, an Array of Octet, to
+// exist.
+const multimediaOPT = `<?xml version="1.0" encoding="utf-8"?>
+<template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.openehr.org/v1">
+<language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
+<template_id><value>multimedia</value></template_id><concept>multimedia</concept>
+<definition><rm_type_name>DV_MULTIMEDIA</rm_type_name><node_id>at0000</node_id>
+<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>data</rm_attribute_name>
+<existence><lower_included>true</lower_included><upper_included>true</upper_included><lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>1</lower><upper>1</upper></existence>
+<cardinality><is_ordered>true</is_ordered><is_unique>false</is_unique><interval><lower_included>true</lower_included><lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>0</lower></interval></cardinality>
+</attributes>
+</definition>
+</template>`
+
+// TestValidate_REQ171_PrimitiveListCountedNotRead pins, in the template walk,
+// that a list of a primitive type the template constrains is counted and
+// never read item by item: DV_MULTIMEDIA data that the template requires is
+// reported `required` when it is absent and when it is present and empty,
+// and a present payload of a mebibyte draws no template issue while the
+// validation allocates less than the payload's size.
+func TestValidate_REQ171_PrimitiveListCountedNotRead(t *testing.T) {
+	c := mustCompileInline(t, multimediaOPT)
+	media := func(data []byte) *rm.DVMultimedia {
+		return &rm.DVMultimedia{
+			MediaType: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "IANA_media-types"}, CodeString: "image/png"},
+			Size:      rm.Integer(len(data)),
+			Data:      data,
+		}
+	}
+	for _, tc := range []struct {
+		name string
+		data []byte
+		want []string
+	}{
+		{name: "absent data", data: nil, want: []string{"required /data template existence"}},
+		{name: "present and empty data", data: []byte{}, want: []string{"required /data template existence"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := templateIssues(validation.Validate(media(tc.data), c)); !slices.Equal(got, tc.want) {
+				t.Errorf("Validate(DV_MULTIMEDIA with %s) template issues = %q, want %q", tc.name, got, tc.want)
+			}
+		})
+	}
+	const size = 1 << 20
+	root := media(make([]byte, size))
+	var r validation.Result
+	allocated := allocatedBytes(func() { r = validation.Validate(root, c) })
+	if got := templateIssues(r); len(got) != 0 {
+		t.Errorf("Validate(DV_MULTIMEDIA with %d bytes of data) template issues = %q, want none", size, got)
+	}
+	if allocated >= size {
+		t.Errorf("Validate(DV_MULTIMEDIA with %d bytes of data) allocated %d bytes, want fewer than %d: the bytes are read one item at a time", size, allocated, size)
+	}
+}
+
+// refFolder returns a FOLDER whose items hold the one reference item.
+func refFolder(item rm.ObjectRefLike) *rm.Folder {
+	return &rm.Folder{
+		ArchetypeNodeID:  "openEHR-EHR-FOLDER.generic.v1",
+		Name:             rm.DVText{Value: "folder"},
+		ArchetypeDetails: &rm.Archetyped{ArchetypeID: rm.ArchetypeID{Value: "openEHR-EHR-FOLDER.generic.v1"}, RMVersion: "1.1.0"},
+		Items:            []rm.ObjectRefLike{item},
 	}
 }
 
@@ -128,14 +211,6 @@ func TestValidateRM_REQ171_PrimitiveListNotWalked(t *testing.T) {
 // walk goes below a reference, but each missing id, namespace or type is
 // reported exactly once, as rm_invariant, at or below its path.
 func TestREQ112_FloorReportsAMissingReferencePartOfEveryReferenceOnce(t *testing.T) {
-	folder := func(item rm.ObjectRefLike) *rm.Folder {
-		return &rm.Folder{
-			ArchetypeNodeID:  "openEHR-EHR-FOLDER.generic.v1",
-			Name:             rm.DVText{Value: "folder"},
-			ArchetypeDetails: &rm.Archetyped{ArchetypeID: rm.ArchetypeID{Value: "openEHR-EHR-FOLDER.generic.v1"}, RMVersion: "1.1.0"},
-			Items:            []rm.ObjectRefLike{item},
-		}
-	}
 	cases := []struct {
 		name string
 		root any
@@ -144,9 +219,9 @@ func TestREQ112_FloorReportsAMissingReferencePartOfEveryReferenceOnce(t *testing
 		{name: "OBJECT_REF root", root: &rm.ObjectRef{}, at: ""},
 		{name: "LOCATABLE_REF root", root: &rm.LocatableRef{}, at: ""},
 		{name: "ACCESS_GROUP_REF root", root: &rm.AccessGroupRef{}, at: ""},
-		{name: "OBJECT_REF in FOLDER.items", root: folder(rm.ObjectRef{}), at: "/items[1]"},
-		{name: "LOCATABLE_REF in FOLDER.items", root: folder(rm.LocatableRef{}), at: "/items[1]"},
-		{name: "ACCESS_GROUP_REF in FOLDER.items", root: folder(rm.AccessGroupRef{}), at: "/items[1]"},
+		{name: "OBJECT_REF in FOLDER.items", root: refFolder(rm.ObjectRef{}), at: "/items[1]"},
+		{name: "LOCATABLE_REF in FOLDER.items", root: refFolder(rm.LocatableRef{}), at: "/items[1]"},
+		{name: "ACCESS_GROUP_REF in FOLDER.items", root: refFolder(rm.AccessGroupRef{}), at: "/items[1]"},
 		{name: "PARTY_REF a PARTY_SELF points to", root: &rm.PartySelf{ExternalRef: &rm.PartyRef{}}, at: "/external_ref"},
 	}
 	for _, tc := range cases {
@@ -163,6 +238,41 @@ func TestREQ112_FloorReportsAMissingReferencePartOfEveryReferenceOnce(t *testing
 				if len(at) != 1 || at[0].Code != "rm_invariant" || at[0].Rule != "mandatory" {
 					t.Errorf("ValidateRM(%s) issues at %s = %+v, want exactly one rm_invariant, rule mandatory", tc.name, path, at)
 				}
+			}
+		})
+	}
+}
+
+// TestREQ112_FloorReportsALocatableRefsOwnMissingID pins the OBJECT_REF
+// entry of REQ-112 on a LOCATABLE_REF whose own id, the UID_BASED_ID it
+// redefines id as, is unset while the OBJECT_REF id it embeds is set: the id
+// is missing, as the generated access reads it, and it is reported exactly
+// once, as rm_invariant, rule mandatory, at the reference's id, as the root
+// and as a member of a FOLDER's items. Its namespace and type are there, so
+// nothing is reported at them.
+func TestREQ112_FloorReportsALocatableRefsOwnMissingID(t *testing.T) {
+	ref := rm.LocatableRef{ObjectRef: rm.ObjectRef{
+		ID:        &rm.HierObjectID{Value: "6f2d7a10-3c4b-4e5f-8a9b-0c1d2e3f4a5b"},
+		Namespace: "local",
+		Type:      "COMPOSITION",
+	}}
+	for _, tc := range []struct {
+		name string
+		root any
+		at   string // the reference's path
+	}{
+		{name: "LOCATABLE_REF root", root: &ref, at: ""},
+		{name: "LOCATABLE_REF in FOLDER.items", root: refFolder(ref), at: "/items[1]"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var got []string
+			for _, issue := range validation.ValidateRM(tc.root).Issues {
+				if issue.Path == tc.at || strings.HasPrefix(issue.Path, tc.at+"/") {
+					got = append(got, issue.Code+" "+issue.Path+" "+issue.Rule)
+				}
+			}
+			if want := []string{"rm_invariant " + tc.at + "/id mandatory"}; !slices.Equal(got, want) {
+				t.Errorf("ValidateRM(%s with only the embedded OBJECT_REF id) issues at or below %q = %q, want %q", tc.name, tc.at, got, want)
 			}
 		})
 	}
