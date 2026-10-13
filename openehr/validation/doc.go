@@ -96,8 +96,10 @@
 // the template gives its node or by its position. Inside a
 // template-driven validation the floor takes those names from the
 // template walk, so it writes the same path for the same node; on its
-// own it knows no template names and writes the position. A composition missing
-// an OPT-required attribute is flagged at the attribute's path, and one
+// own it knows no template names and writes the position. An entry of a
+// Hash attribute is written by its 1-based position in ascending key
+// order, as in /details[2], never by its key. A composition missing an
+// OPT-required attribute is flagged at the attribute's path, and one
 // missing an OPT-required node at the path the template gives that node,
 // rather than silently bypassed.
 //
