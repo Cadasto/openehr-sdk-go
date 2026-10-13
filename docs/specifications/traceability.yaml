@@ -1486,6 +1486,7 @@ requirements:
       - openehr/validation/limits_test.go
       - openehr/validation/nonstorable_generic_test.go
       - openehr/validation/rmfloor_archetype_test.go
+      - openehr/validation/rmfloor_bytes_internal_test.go
       - openehr/validation/rmfloor_bytes_test.go
       - openehr/validation/rmfloor_chained_corpus_test.go
       - openehr/validation/rmfloor_chained_internal_test.go
@@ -2105,6 +2106,7 @@ requirements:
       - openehr/validation/godoc_class_test.go
       - openehr/validation/limits_test.go
       - openehr/validation/prohibited_test.go
+      - openehr/validation/rmfloor_bytes_internal_test.go
       - openehr/validation/rmfloor_coded_test.go
       - openehr/validation/rmfloor_limit_internal_test.go
       - openehr/validation/unread_attribute_test.go
