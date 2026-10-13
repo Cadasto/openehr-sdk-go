@@ -20,7 +20,7 @@ func staticServicesWithoutIDs() map[string]discovery.ServiceEntry {
 // a hand-built catalog never writes into the caller's StaticConfig.Services:
 // the catalog sets each entry's ID on its own copy, and the caller's map
 // keeps its entries and their empty IDs.
-func TestREQ070_NewStaticCatalogLeavesCallerConfigUntouched(t *testing.T) {
+func TestREQ070_NewStaticCatalogLeavesCallerConfigUntouched(t *testing.T) { // REQ-070
 	services := staticServicesWithoutIDs()
 	cfg := discovery.StaticConfig{Issuer: "https://x.example/", Services: services}
 
@@ -53,7 +53,7 @@ func TestREQ070_NewStaticCatalogLeavesCallerConfigUntouched(t *testing.T) {
 // goroutines may build catalogs from one shared StaticConfig at once. Run
 // under -race: a constructor that writes into the shared Services map is a
 // data race.
-func TestREQ026_NewStaticCatalogConcurrentSharedConfig(t *testing.T) {
+func TestREQ026_NewStaticCatalogConcurrentSharedConfig(t *testing.T) { // REQ-026
 	cfg := discovery.StaticConfig{Issuer: "https://x.example/", Services: staticServicesWithoutIDs()}
 
 	const builders = 8

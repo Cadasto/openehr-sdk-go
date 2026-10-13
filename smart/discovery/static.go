@@ -30,8 +30,9 @@ type StaticConfig struct {
 
 // NewStaticCatalog builds a ServiceCatalog without a network round
 // trip. Used for static EHRbase deployments, local development, and
-// tests. It validates that every Services entry has a parseable BaseURL;
-// callers should pre-parse URLs when possible.
+// tests. It checks that every Services entry has a BaseURL that is
+// non-nil and absolute. It copies the Services map and sets each copied
+// entry's ID to its key, leaving the caller's StaticConfig unchanged.
 //
 // The catalog's BaseURL is StaticConfig.BaseURL, or StaticConfig.Issuer
 // when BaseURL is empty.
