@@ -114,8 +114,10 @@ func (v *Validator) limitsOrDefault() Limits {
 // c, its guards included, and what [Validate] returns for a compiled
 // template.
 //
-// [Result.Coverage] lists each path where a limit stopped the walk and,
-// with a template, each node the template binds to a CONSTRAINT_REF.
+// [Result.Coverage] lists each path where a limit stopped the walk, with a
+// template each node the template binds to a CONSTRAINT_REF, and the
+// Reference Model invariants of the classes either walk visited that the
+// validator does not evaluate.
 func (v *Validator) Validate(root any, c *templatecompile.Compiled) Result {
 	lim := v.limitsOrDefault()
 	if c == nil {
@@ -135,8 +137,8 @@ func (v *Validator) Validate(root any, c *templatecompile.Compiled) Result {
 
 	w := newWalker(c)
 	w.walkNode(c.Root(), root, "/")
-	floor, stopped := floorIssues(root, w.names, lim)
+	floor, stopped, visited := floorIssues(root, w.names, lim)
 	r := resultFromIssues(withoutRepeats(w.issues, floor))
-	r.Coverage = Coverage{Stopped: stopped, External: w.external}
+	r.Coverage = Coverage{Stopped: stopped, External: w.external, Unevaluated: unevaluatedIn(visited, w.visited)}
 	return r
 }

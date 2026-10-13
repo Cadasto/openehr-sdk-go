@@ -325,8 +325,9 @@ type Result struct {
 	Issues []Issue
 
 	// Coverage says what the validator did not check, so a caller can tell
-	// "no issue found" from "everything checked". Its zero value, which a
-	// guard and [ValidateAQL] return, is complete.
+	// "no issue found" from "everything checked", and which Reference Model
+	// invariants of the classes it visited it does not evaluate. Its zero
+	// value, which a guard and [ValidateAQL] return, is complete.
 	Coverage Coverage
 }
 
@@ -353,12 +354,25 @@ type Coverage struct {
 	// it for that terminology, and whether a code exists in an external
 	// terminology is outside every check it makes.
 	External []string
+
+	// Unevaluated lists, sorted and once each, the Reference Model
+	// invariants the validator does not evaluate on the classes the walk
+	// visited, those their ancestors declare included, each written
+	// CLASS.Invariant as [Issue.Rule] writes a rule, as in
+	// "DV_AMOUNT.Accuracy_validity" on a DV_QUANTITY. An invariant is listed
+	// whatever the instance holds: it is a rule the validator does not
+	// evaluate on any instance, because it needs a terminology service or
+	// stored history, or for another reason the SDK records beside it. A
+	// call that visits no value, such as a guard, lists none. [Complete] does
+	// not read it.
+	Unevaluated []string
 }
 
 // Complete reports whether the call checked everything it reached: no limit
 // stopped the walk, and no node was bound to a CONSTRAINT_REF, whose value
-// set the validator cannot consult. It is true exactly when Stopped and External are both
-// empty, so the zero Coverage is complete.
+// set the validator cannot consult. It is true exactly when Stopped and
+// External are both empty, so the zero Coverage is complete. It says nothing
+// of Unevaluated, which lists rules the validator evaluates on no instance.
 func (c Coverage) Complete() bool {
 	return len(c.Stopped) == 0 && len(c.External) == 0
 }

@@ -186,6 +186,17 @@ func (s indexSet) with(i int) indexSet {
 	return s
 }
 
+// union adds every member of t to s, growing it as needed, and returns it.
+func (s indexSet) union(t indexSet) indexSet {
+	if len(t) > len(s) {
+		s = append(s, make(indexSet, len(t)-len(s))...)
+	}
+	for w, word := range t {
+		s[w] |= word
+	}
+	return s
+}
+
 // each calls f with every member of s, in ascending order.
 func (s indexSet) each(f func(i int)) {
 	for w, word := range s {
@@ -346,4 +357,36 @@ func rulesFor(rmType string) (*classRules, string) {
 		class = bmmtype.Class(rmType)
 	}
 	return floorRules.byClass[class], class
+}
+
+// recordClass adds the class of value, as the closed RM set names it, to
+// visited, and returns the set. A value of no registered class leaves it as
+// it is.
+func recordClass(visited indexSet, value any) indexSet {
+	rmType, _, ok := rmTypeInfo(value)
+	if !ok {
+		return visited
+	}
+	if r, _ := rulesFor(rmType); r != nil {
+		return visited.with(r.index)
+	}
+	return visited
+}
+
+// unevaluatedIn returns, sorted and once each, the invariants the classes of
+// the visited sets are subject to, their ancestors' included, that the floor
+// does not evaluate, for [Coverage.Unevaluated]. It returns nil when the sets
+// hold no class subject to one.
+func unevaluatedIn(visited ...indexSet) []string {
+	keys := make(indexSet, (len(floorRules.unevaluated)+63)/64)
+	for _, set := range visited {
+		set.each(func(i int) {
+			keys = keys.union(floorRules.byIndex[i].unevaluated)
+		})
+	}
+	var out []string
+	keys.each(func(i int) {
+		out = append(out, floorRules.unevaluated[i])
+	})
+	return out
 }

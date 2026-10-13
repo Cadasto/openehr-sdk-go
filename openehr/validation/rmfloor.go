@@ -112,9 +112,10 @@ func validateRM(root any, lim Limits) Result {
 			Severity: Error,
 		}})
 	}
-	issues, stopped := walkFloor(root, rmType, nil, lim)
-	r := resultFromIssues(issues)
-	r.Coverage.Stopped = stopped
+	w := runFloor(root, rmType, nil, lim)
+	r := resultFromIssues(w.issues)
+	r.Coverage.Stopped = w.stoppedAt
+	r.Coverage.Unevaluated = unevaluatedIn(w.visited)
 	return r
 }
 
@@ -124,9 +125,16 @@ func validateRM(root any, lim Limits) Result {
 // the floor writes that walk's path for the node; nil writes no name
 // predicate.
 func walkFloor(root any, rmType string, names pinnedNames, lim Limits) (issues []Issue, stopped []string) {
+	w := runFloor(root, rmType, names, lim)
+	return w.issues, w.stoppedAt
+}
+
+// runFloor runs the floor over root, as [walkFloor] does, and returns the
+// walker, which holds the issues, the stops and the classes it visited.
+func runFloor(root any, rmType string, names pinnedNames, lim Limits) *rmFloorWalker {
 	w := newFloorWalker(names, lim)
 	w.walk(root, rmType, "/", roleNone, 0)
-	return w.issues, w.stoppedAt
+	return w
 }
 
 // newFloorWalker returns a floor walker that writes the names the OPT pins
@@ -138,12 +146,12 @@ func newFloorWalker(names pinnedNames, lim Limits) *rmFloorWalker {
 }
 
 // floorIssues runs the floor, within lim, over the root a template-driven
-// validation walked, with the names that walk bound, and returns its issues
-// and the path of each place where a limit stopped it. A root outside the
-// closed RM set, which the template walk reports as a type mismatch, is one
-// the floor cannot descend: it reports it as `rm_type_unknown` at "/", as
-// [ValidateRM] does.
-func floorIssues(root any, names pinnedNames, lim Limits) (issues []Issue, stopped []string) {
+// validation walked, with the names that walk bound, and returns its issues,
+// the path of each place where a limit stopped it and the classes it visited.
+// A root outside the closed RM set, which the template walk reports as a type
+// mismatch, is one the floor cannot descend: it reports it as
+// `rm_type_unknown` at "/", as [ValidateRM] does.
+func floorIssues(root any, names pinnedNames, lim Limits) (issues []Issue, stopped []string, visited indexSet) {
 	rmType, _, ok := rmTypeInfo(root)
 	if !ok {
 		return []Issue{{
@@ -151,9 +159,10 @@ func floorIssues(root any, names pinnedNames, lim Limits) (issues []Issue, stopp
 			Code:     "rm_type_unknown",
 			Detail:   fmt.Sprintf("root Go type %T is outside the closed RM set; the RM floor cannot descend", root),
 			Severity: Error,
-		}}, nil
+		}}, nil, nil
 	}
-	return walkFloor(root, rmType, names, lim)
+	w := runFloor(root, rmType, names, lim)
+	return w.issues, w.stoppedAt, w.visited
 }
 
 // ValidateRMFolder is the typed convenience wrapper for FOLDER roots.
@@ -241,6 +250,9 @@ type rmFloorWalker struct {
 	// ([itemPaths]). The floor on its own binds no OPT node, so it leaves
 	// names nil and writes no name predicate.
 	names pinnedNames
+	// visited holds the class of every node the walk visited, by its index
+	// in the inventory's rules ([classRules]), for [Coverage.Unevaluated].
+	visited indexSet
 }
 
 // floorRole is what the floor knows of a node from where it sits, beyond
@@ -336,16 +348,17 @@ func (w *rmFloorWalker) walk(value any, rmType string, path string, role floorRo
 // visit checks value (of declared BMM type rmType, in role role) at the
 // given issue path. A visit past maxNodes checks nothing: it reports
 // `max_nodes` at path and ends the walk. Otherwise visit first runs the RM
-// rules of the node's class ([rmFloorWalker.checkInvariants]), then, for
-// every registered RM class ([rmaccess.Covers]), reads every BMM-known
-// attribute through the generated access, emitting `required` for any
-// RM-mandatory attribute that is absent and `cardinality` for an
-// RM-mandatory container that is present and empty, and recursing into
-// every present attribute. A list of a primitive type ([isPrimitiveType]) is
-// counted ([rmaccess.Len]) and never read item by item, since nothing is
-// below its items. The items of a multi-valued attribute are written by the
-// path rule the template walk shares ([itemPaths]); the entries of a Hash
-// attribute by their position in ascending key order, never by their key.
+// rules of the node's class ([rmFloorWalker.checkInvariants]) and records
+// the class as visited, then, for every registered RM class
+// ([rmaccess.Covers]), reads every BMM-known attribute through the generated
+// access, emitting `required` for any RM-mandatory attribute that is absent
+// and `cardinality` for an RM-mandatory container that is present and
+// empty, and recursing into every present attribute. A list of a
+// primitive type ([isPrimitiveType]) is counted ([rmaccess.Len]) and never
+// read item by item, since nothing is below its items. The items of a
+// multi-valued attribute are written by the path rule the template walk
+// shares ([itemPaths]); the entries of a Hash attribute by their position in
+// ascending key order, never by their key.
 //
 // A value of no registered class is a leaf here, validated solely by the RM
 // rules of its declared type (run above): a flattened scalar the access
@@ -577,7 +590,8 @@ func setFromSlice(s []string) map[string]bool {
 }
 
 // checkInvariants runs the RM rules of the class of the node value, of RM
-// type rmType, at path, in role role. The rules are the inventory's ([floorRules]): the evaluators of the evaluated
+// type rmType, at path, in role role, and records the class as visited. The
+// rules are the inventory's ([floorRules]): the evaluators of the evaluated
 // invariants the class and its ancestors declare, the coded ones included,
 // and the attribute checks that apply to the class. A type no registered
 // class has runs nothing (this is a floor, not an exhaustive RM check). It
@@ -588,6 +602,7 @@ func (w *rmFloorWalker) checkInvariants(value any, rmType, path string, role flo
 	if rules == nil {
 		return class
 	}
+	w.visited = w.visited.with(rules.index)
 	n := floorNode{value: value, rmType: rmType, path: path, role: role}
 	for _, c := range rules.checks {
 		c.run(w, n, c.rule)

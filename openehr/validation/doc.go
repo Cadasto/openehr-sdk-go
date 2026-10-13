@@ -155,6 +155,15 @@
 //	    // valid as far as checked; see r.Coverage for what was not
 //	}
 //
+// [Coverage.Unevaluated] lists, as CLASS.Invariant, the invariants of the
+// classes the walk visited that the validator evaluates on no instance, such
+// as a rule that needs a terminology service or stored history. Every
+// invariant of the pinned Reference Model and BASE schemas is classified in
+// the file invariants.json beside this package's source, with the reason the
+// SDK does not evaluate it, and the classes' rules are dispatched from that
+// classification, so the list is what the validator really skipped.
+// Complete does not read it.
+//
 // # Dependencies
 //
 // The package is importable without `transport/`, `auth/`,

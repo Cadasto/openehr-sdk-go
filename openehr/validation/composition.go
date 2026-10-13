@@ -63,6 +63,9 @@ type walker struct {
 	// CONSTRAINT_REF: its value set is outside the SDK, so the walk could
 	// not check the code there ([Coverage.External]). Nil until one is met.
 	external []string
+	// visited holds the class of every value the walk entered, by its index
+	// in the inventory's rules ([classRules]), for [Coverage.Unevaluated].
+	visited indexSet
 }
 
 func newWalker(c *templatecompile.Compiled) *walker {

@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - **Validation findings name their layer and rule (REQ-171).** Each `Issue` from the instance validators carries `Layer`, template or RM, and `Rule`, the BMM invariant or template clause it evaluates, so callers need not parse `Detail`.
 - **A reusable validator with limits as options (REQ-171).** `validation.New` with `WithLimits` sets the depth and visit limits, and `Result.Coverage` lists where a limit stopped the walk and which leaves need an external value set.
+- **`Coverage.Unevaluated` names the RM invariants the validator skips (REQ-171).** It lists, as `CLASS.Invariant`, those of the visited classes; `openehr/validation/invariants.json` classifies every pinned BMM invariant, and codegen fails on an unclassified one.
 
 ### Changed
 

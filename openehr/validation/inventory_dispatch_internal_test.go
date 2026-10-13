@@ -404,6 +404,39 @@ func TestFloor_REQ171_EveryEvaluatedInvariantRunsOnEachClass(t *testing.T) {
 	}
 }
 
+// REQ-171 Coverage — a root of every class the registry decodes lists, in
+// Coverage.Unevaluated, every invariant of its class and its ancestors the
+// floor does not evaluate, sorted and once each, and no invariant it
+// evaluates.
+func TestCoverage_REQ171_EveryRootListsItsUnevaluatedInvariants(t *testing.T) {
+	t.Parallel()
+	listed := 0
+	for _, name := range typereg.Default.Names() {
+		ctor, _ := typereg.Default.Lookup(name)
+		got := ValidateRM(ctor()).Coverage.Unevaluated
+		for i, key := range got {
+			if i > 0 && got[i-1] >= key {
+				t.Errorf("ValidateRM(%s) Coverage.Unevaluated = %q, want it sorted with no repeat", name, got)
+				break
+			}
+			if pinnedSource.evaluated(key) {
+				t.Errorf("ValidateRM(%s) Coverage.Unevaluated lists %s, which the floor evaluates", name, key)
+			}
+		}
+		for _, key := range classInvariants[name] {
+			if !pinnedSource.evaluated(key) && !slices.Contains(got, key) {
+				t.Errorf("ValidateRM(%s) Coverage.Unevaluated = %q, want it to list %s", name, got, key)
+			}
+		}
+		if len(got) > 0 {
+			listed++
+		}
+	}
+	if listed == 0 {
+		t.Error("no registered root lists an unevaluated invariant; the check has gone blind")
+	}
+}
+
 // REQ-171 Where the RM rules come from — the dispatch runs, on a node of a
 // class, the attribute checks that apply to it, then the evaluator of each
 // evaluated invariant the class is subject to, once for a node however many

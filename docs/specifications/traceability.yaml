@@ -1480,6 +1480,7 @@ requirements:
       - openehr/serialize/canjson/mappings_presence_test.go
       - openehr/serialize/canxml/interval_open_side_test.go
       - openehr/validation/coverage_test.go
+      - openehr/validation/coverage_unevaluated_test.go
       - openehr/validation/finding_identity_rules_test.go
       - openehr/validation/inventory_dispatch_internal_test.go
       - openehr/validation/issuepath_internal_test.go
@@ -2101,6 +2102,7 @@ requirements:
       - openehr/instance/rm_defaults_yield_test.go
       - openehr/validation/composition_test.go
       - openehr/validation/coverage_test.go
+      - openehr/validation/coverage_unevaluated_test.go
       - openehr/validation/finding_identity_rules_test.go
       - openehr/validation/finding_identity_test.go
       - openehr/validation/godoc_class_test.go

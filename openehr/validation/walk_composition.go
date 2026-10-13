@@ -53,6 +53,9 @@ func (w *walker) walkNode(optNode *tcimpl.CompiledNode, rmValue any, path string
 	if rmaccess.IsTypedNilPointer(rmValue) {
 		return
 	}
+	// The class the walk entered, whose invariants the floor may not reach
+	// when a limit stops it first ([Coverage.Unevaluated]).
+	w.visited = recordClass(w.visited, rmValue)
 
 	// Identity + RM-type checks at this node. At the composition
 	// root, identity is checked inline against COMPOSITION's
