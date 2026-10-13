@@ -50,7 +50,7 @@ Rules:
 - Retries **MUST** respect `ctx` cancellation.
 - The retry budget **MUST** be observable via the OTel span (`retry.attempt`, `retry.backoff_ms`).
 
-The SDK checks the method before it looks at the error or the status, so a token or network failure on a non-idempotent request is not retried either.
+The SDK checks the method before it looks at the error or the status, so a token or network failure on a non-idempotent request is not retried either. A request refused for a redirect from `https` to a URL that is not `https` is never retried: [§ REQ-092](#req-092--tls-posture) *No downgrade with a credential* holds that rule.
 
 - **Lives in:** [`transport/`](../../transport)
 
