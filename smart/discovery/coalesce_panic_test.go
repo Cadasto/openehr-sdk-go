@@ -60,6 +60,15 @@ func (p *panickingTransport) RoundTrip(req *http.Request) (*http.Response, error
 	return resp, err
 }
 
+// CloseIdleConnections closes the idle connections of the wrapped transport.
+// Without it, neither http.Client.CloseIdleConnections nor the test server's
+// Close reaches the wrapped transport's connection pool.
+func (p *panickingTransport) CloseIdleConnections() {
+	if c, ok := p.next.(interface{ CloseIdleConnections() }); ok {
+		c.CloseIdleConnections()
+	}
+}
+
 // panicFixture is a held platform and a Resolver whose Cache and HTTP
 // transport can each be armed to panic with value.
 type panicFixture struct {
@@ -78,6 +87,16 @@ func startPanicFixture(t *testing.T, holdAt int32, heldStatus int) *panicFixture
 	value := &testPanic{source: t.Name()}
 	tr := &panickingTransport{next: p.client.Transport, value: value}
 	p.client.Transport = tr
+	// A round trip that panics closes its response body early. The
+	// transport then drains that connection in the background before it
+	// reuses it, so the next request can also dial a connection it ends up
+	// not needing. When that dial lands after the server has closed, nothing
+	// closes the connection, and its read and write loops outlive the
+	// bubble. After CloseIdleConnections the transport closes every
+	// connection that becomes idle until the next request, a late dial
+	// included. Cleanups run inside the bubble, and this one runs before the
+	// server's.
+	t.Cleanup(p.client.CloseIdleConnections)
 	cache := &panickingCache{MemoryCache: discovery.NewMemoryCache(), value: value}
 	res, err := discovery.NewResolver(cache, discovery.WithHTTPClient(p.client), discovery.WithAllowInsecure())
 	if err != nil {
