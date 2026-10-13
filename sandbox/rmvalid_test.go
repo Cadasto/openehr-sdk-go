@@ -18,17 +18,14 @@ import (
 // and the vendored fixture testkit/corpus/its_rest/ehr/ehr.json
 // carries it — so a sandbox-created EHR must too.
 //
-// Two assertions, because openehr/validation's rmread does not
-// currently model rm.EHR itself ([rmread.Handles] has no case for
-// *rm.EHR): ValidateRM on the decoded *rm.EHR root always reports OK
-// regardless of content, so it alone would not be can-fail (verified:
-// removing ehr_access from the wire body does not flip it). The
-// second assertion validates the extracted ehr_access value directly
-// — OBJECT_REF is a modeled leaf type (checkObjectRef enforces its
-// id/type/namespace floor even though rmread does not descend into
-// it) — and a nil root is the [validation.Result] "nil_root" issue, so
-// this half genuinely distinguishes present from absent. See
-// TestCreateEHRIsRMValid_CanFail for the mutation-detection proof.
+// Two assertions. ValidateRM on the decoded *rm.EHR root reads every
+// attribute of EHR through the generated access, so it reports an absent
+// ehr_access as `required` at /ehr_access. The second validates the
+// extracted ehr_access value directly: the floor checks an OBJECT_REF's
+// id/type/namespace (checkObjectRef), and a nil root is the
+// [validation.Result] "nil_root" issue, so this half distinguishes present
+// from absent too. See TestCreateEHRIsRMValid_CanFail for the
+// mutation-detection proof of both.
 func TestCreateEHRIsRMValid(t *testing.T) {
 	t.Parallel()
 	body := createEHRBody(t)
@@ -46,11 +43,12 @@ func TestCreateEHRIsRMValid(t *testing.T) {
 }
 
 // TestCreateEHRIsRMValid_CanFail is the can-fail control: it proves
-// the ehr_access assertion above is load-bearing rather than
-// vacuously true. It strips ehr_access from the wire body and
-// confirms ValidateRM(decoded.EHRAccess) flips to not-OK (a nil
-// ObjectRefLike is a nil interface, which ValidateRM reports as
-// "nil_root" before ever consulting the RM floor).
+// both assertions above are load-bearing rather than vacuously true. It
+// strips ehr_access from the wire body and confirms that ValidateRM on the
+// decoded EHR reports `required` at /ehr_access, and that
+// ValidateRM(decoded.EHRAccess) flips to not-OK (a nil ObjectRefLike is a
+// nil interface, which ValidateRM reports as "nil_root" before ever
+// consulting the RM floor).
 func TestCreateEHRIsRMValid_CanFail(t *testing.T) {
 	t.Parallel()
 	body := createEHRBody(t)
@@ -72,9 +70,22 @@ func TestCreateEHRIsRMValid_CanFail(t *testing.T) {
 	if decoded.EHRAccess != nil {
 		t.Fatalf("decoded.EHRAccess = %#v, want nil after stripping ehr_access from the wire body", decoded.EHRAccess)
 	}
+	if r := validation.ValidateRM(&decoded); !hasIssue(r, "/ehr_access", "required") {
+		t.Fatalf("ValidateRM(sandbox EHR without ehr_access) issues = %+v, want required at /ehr_access — guard is not can-fail", r.Issues)
+	}
 	if r := validation.ValidateRM(decoded.EHRAccess); r.OK {
 		t.Fatal("ValidateRM(decoded.EHRAccess) reported OK after ehr_access was stripped — guard is not can-fail")
 	}
+}
+
+// hasIssue reports whether r carries an issue of code at path.
+func hasIssue(r validation.Result, path, code string) bool {
+	for _, i := range r.Issues {
+		if i.Path == path && i.Code == code {
+			return true
+		}
+	}
+	return false
 }
 
 // createEHRBody drives one POST /ehr through a fresh Backend and

@@ -340,10 +340,9 @@ func TestValidateRMEHRStatusBytes_REQ171_KeepsCoverage(t *testing.T) {
 }
 
 // subjectStopStatus is an EHR_STATUS that omits subject and whose name holds
-// enough TERM_MAPPINGs, with a formatting, a template_id and one
-// preferred_term beside them, that the default visit limit falls exactly on
-// the zero subject the decode leaves: the path the key-presence check
-// reports as required.
+// enough TERM_MAPPINGs, with a formatting and one preferred_term beside
+// them, that the default visit limit falls exactly on the zero subject the
+// decode leaves: the path the key-presence check reports as required.
 func subjectStopStatus() []byte {
 	const mapping = `{"_type": "TERM_MAPPING", "match": "=", "target": {"_type": "CODE_PHRASE", "terminology_id": {"_type": "TERMINOLOGY_ID", "value": "SNOMED-CT"}, "code_string": "1"}}`
 	const preferred = `{"_type": "TERM_MAPPING", "match": "=", "target": {"_type": "CODE_PHRASE", "terminology_id": {"_type": "TERMINOLOGY_ID", "value": "SNOMED-CT"}, "code_string": "1", "preferred_term": "p"}}`
@@ -353,7 +352,6 @@ func subjectStopStatus() []byte {
 		"archetype_node_id": "openEHR-EHR-EHR_STATUS.generic.v1",
 		"archetype_details": {"_type": "ARCHETYPED",
 			"archetype_id": {"_type": "ARCHETYPE_ID", "value": "openEHR-EHR-EHR_STATUS.generic.v1"},
-			"template_id": {"_type": "TEMPLATE_ID", "value": "t"},
 			"rm_version": "1.1.0"},
 		"is_modifiable": true,
 		"is_queryable": true

@@ -3,10 +3,10 @@ package validation
 import (
 	"fmt"
 
+	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/rmnames"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
-	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
 )
 
 // ValidateComposition validates an in-memory RM Composition
@@ -107,7 +107,7 @@ func joinPath(parent, segment string) string {
 // Returns ("", "", false) for nil, typed-nil, and non-RM Go values.
 // REQ-024 — no reflection.
 func rmTypeInfo(v any) (rmType string, archetypeNodeID string, ok bool) {
-	if v == nil || rmread.IsTypedNilPointer(v) {
+	if v == nil || rmaccess.IsTypedNilPointer(v) {
 		return "", "", false
 	}
 	// Typed DV_INTERVAL instantiations keep their parameterised names:

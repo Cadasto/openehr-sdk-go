@@ -74,10 +74,11 @@ func mustCompileInline(t *testing.T, body string) *templatecompile.Compiled {
 // REQ-110 — a real demographic OPT (PERSON root, 174 compiled nodes) +
 // its instance walk end-to-end through ValidateDemographic. The walk
 // descends the full PARTY hierarchy (identities / contacts → addresses /
-// details → cluster trees); the only residual issue is a genuine
-// `relationships` cardinality finding — the instance has no relationships
-// while the template pins >= 1 (the validator correctly catching a real
-// violation).
+// details → cluster trees) and the template walk reports nothing. The
+// instance has no relationships: the attribute is absent (REQ-171 §
+// Structural access), which the template's existence 0..1 allows, so its
+// cardinality 1..*, which counts the items of a present list, is not
+// checked.
 //
 // REQ-052 sub-gap B regression guard: the fixture's DV_INTERVAL<DV_DATE>
 // bounds previously surfaced a spurious rm_type_mismatch — a round-tripped
@@ -92,16 +93,15 @@ func TestValidateDemographic_PersonFixture(t *testing.T) {
 
 	r := validation.ValidateDemographic(&person, c)
 
-	// The template walk finds only the genuine /relationships cardinality
-	// (instance has none; template pins >= 1). After REQ-052 sub-gap B no
-	// spurious DV_INTERVAL rm_type_mismatch remains. The RM floor, which
+	// The template walk finds nothing: relationships is absent, which its
+	// existence allows. After REQ-052 sub-gap B no spurious DV_INTERVAL
+	// rm_type_mismatch remains. The RM floor, which
 	// template validation includes, adds the fixture's two DV_MULTIMEDIA
 	// media types: both are coded in openEHR rather than the IANA media
 	// types, and the second carries no code at all.
 	const multimedia = "/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"
 	const wid = "/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"
 	want := []string{
-		"cardinality /relationships",
 		"code_not_in_value_set " + multimedia,
 		"code_not_in_value_set " + wid,
 		"required " + wid + "/code_string",

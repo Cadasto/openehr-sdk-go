@@ -5,16 +5,15 @@ package validation
 // checked by the RM floor on every node it visits. The rule table below is
 // the catalogue's table, one rule per row; codedValues reads the coded
 // attributes each class carries, by value or by pointer, straight from the
-// typed RM value (rmread reads neither DV_TEXT language/encoding nor the
-// DV_ENCAPSULATED codes). The group, the code set and
-// the membership verdict come from openehr/terminology (REQ-034).
+// typed RM value. The group, the code set and the membership verdict come
+// from openehr/terminology (REQ-034).
 
 import (
 	"fmt"
 
+	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
-	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
 )
 
 // codedRule is one RM invariant over a coded attribute: the attribute's
@@ -147,7 +146,7 @@ func (w *rmFloorWalker) checkCodedInvariants(value any, rmType, path string) {
 // so a concrete added there that is missing here, in either form, fails
 // loudly.
 func codedValues(value any) []codedValue {
-	if value == nil || rmread.IsTypedNilPointer(value) {
+	if value == nil || rmaccess.IsTypedNilPointer(value) {
 		return nil
 	}
 	switch v := value.(type) {
@@ -311,7 +310,7 @@ func entryCoded(language, encoding rm.CodePhrase) []codedValue {
 // the RM states Inv_null_flavour_valid as `is_null implies …`. A typed-nil
 // value counts as absent, as it does in [rmFloorWalker.checkElementNullFlavour].
 func elementCoded(e *rm.Element) []codedValue {
-	if e.Value != nil && !rmread.IsTypedNilPointer(e.Value) {
+	if e.Value != nil && !rmaccess.IsTypedNilPointer(e.Value) {
 		return nil
 	}
 	return appendCodedText(nil, &ruleElementNullFlavour, e.NullFlavour)

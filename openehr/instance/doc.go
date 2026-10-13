@@ -49,7 +49,8 @@
 // attached via rmwrite EnsureSingle / AppendMultiple, and decorated
 // with LOCATABLE bookkeeping (archetype_node_id, name, uid,
 // archetype_details) here in the instance package. rmwrite stays
-// focused on the inverse-of-rmread attribute setter contract.
+// focused on the attribute setter contract, the inverse of the
+// generated attribute access the validators read through.
 //
 // # Dependencies
 //

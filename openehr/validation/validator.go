@@ -1,8 +1,8 @@
 package validation
 
 import (
+	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
-	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
 )
 
 // The limits a [Validator] built with no options applies. No decoded
@@ -121,7 +121,7 @@ func (v *Validator) Validate(root any, c *templatecompile.Compiled) Result {
 	if c == nil {
 		return validateRM(root, lim)
 	}
-	if root == nil || rmread.IsTypedNilPointer(root) {
+	if root == nil || rmaccess.IsTypedNilPointer(root) {
 		return nilRootResult()
 	}
 	if c.Root() == nil {

@@ -1030,7 +1030,7 @@ func assignVia[T any](child any, set func(T), attr, rmName string) error {
 }
 
 // coerceDVText accepts both value- and pointer-receiver shapes; the
-// typereg ctor yields *DVText but rmread / hand-built code may pass
+// typereg ctor yields *DVText but a reader / hand-built code may pass
 // value-typed equivalents.
 func coerceDVText(child any) (rm.DVText, bool) {
 	return coerceValueOrPtr[rm.DVText](child)

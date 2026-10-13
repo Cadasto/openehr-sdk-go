@@ -7,13 +7,13 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/rmwrite"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
-	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
 )
 
 // Builder accumulates path assignments over a skeleton. Returned by
@@ -299,8 +299,8 @@ func findAttributeContaining(parent, target *tcimpl.CompiledNode) (*tcimpl.Compi
 
 // navigateTo follows segs from rmRoot, returning the RM value at the
 // terminal segment. Each step:
-//   - Single attr: rmread.ReadSingle(parent, attr) → descend.
-//   - Multi attr: rmread.ReadMultiple(parent, attr) → first child
+//   - Single attr: rmaccess.Single(parent, attr) → descend.
+//   - Multi attr: rmaccess.Multiple(parent, attr) → first child
 //     whose archetype_node_id matches the segment's matchID, else
 //     the first child when matchID is empty (covers OPT-silent or
 //     non-archetype-keyed multi-attrs).
@@ -322,13 +322,13 @@ func navigateTo(rmRoot any, segs []pathSegment) (any, error) {
 func descendOne(cur any, s pathSegment) (any, error) {
 	switch s.cardinality {
 	case template.Single:
-		v, ok := rmread.ReadSingle(cur, parentRMType(cur), s.attrName)
+		v, ok := rmaccess.Single(cur, s.attrName)
 		if !ok {
 			return nil, fmt.Errorf("%w: attribute %q absent on %T", ErrInvalidPath, s.attrName, cur)
 		}
 		return v, nil
 	case template.Multiple:
-		items, ok := rmread.ReadMultiple(cur, parentRMType(cur), s.attrName)
+		items, ok := rmaccess.Multiple(cur, s.attrName)
 		if !ok {
 			return nil, fmt.Errorf("%w: multi-attribute %q absent on %T", ErrInvalidPath, s.attrName, cur)
 		}
@@ -360,9 +360,9 @@ func descendOne(cur any, s pathSegment) (any, error) {
 }
 
 // parentRMType returns the RM class name for the supplied parent
-// value. rmread / rmwrite carry the parentType arg for future
-// string-keyed dispatch; v1 uses Go concrete type only, so the value
-// here is a diagnostic-only hint.
+// value. rmwrite carries the parentType arg for future string-keyed
+// dispatch; v1 uses Go concrete type only, so the value here is a
+// diagnostic-only hint.
 func parentRMType(v any) string {
 	switch v.(type) {
 	case *rm.Composition, rm.Composition:

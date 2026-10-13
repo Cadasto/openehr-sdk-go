@@ -1,8 +1,8 @@
 // Package rmwrite writes RM attribute values by name without
-// reflection. It is the inverse of openehr/validation/rmread: where
-// rmread answers "give me the RM value at attribute `name` on this
-// parent", rmwrite answers "attach `child` to attribute `name` on
-// this parent".
+// reflection. It is the inverse of the generated attribute access in
+// internal/rmaccess: where rmaccess answers "give me the RM value at
+// attribute `name` on this parent", rmwrite answers "attach `child` to
+// attribute `name` on this parent".
 //
 // The API is intentionally small:
 //
@@ -15,8 +15,7 @@
 // `parentType` is the OPT-declared RM class name
 // (e.g. "OBSERVATION", "ITEM_LIST"); it is currently ignored for
 // routing, but the parameter is kept so a future string-keyed dispatch
-// can land without an API break, mirroring the rmread.ReadSingle
-// signature.
+// can land without an API break.
 //
 // # Scope
 //
@@ -30,10 +29,10 @@
 //
 // # Coverage
 //
-// Rows cover every (RMType, attr) pair the template-driven
-// validator's rmread side handles, plus the inverse for write
-// access. The closed taxonomy is asserted by table-driven tests in
-// this package.
+// Rows cover the (RMType, attr) pairs the validators' hand-written
+// readers covered before generated access replaced them, plus the
+// inverse for write access. The closed taxonomy is asserted by
+// table-driven tests in this package.
 //
 // # Dependencies
 //
@@ -42,6 +41,6 @@
 // internal/templatecompile, openehr/validation, or any wire / auth /
 // transport layer; rmwrite is infrastructure shared with validation
 // and does not depend on it. Adding a new RM type means adding
-// one switch case in each of the three exports and one rmread row
-// in parallel.
+// one switch case in each of the three exports; the read side is
+// generated.
 package rmwrite

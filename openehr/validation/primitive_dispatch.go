@@ -36,9 +36,10 @@ const noPrecision rm.Integer = -1
 
 func dataValueInput(dv rm.DataValue) (any, bool) {
 	// Belt-and-suspenders typed-nil guard. The walker's primary
-	// defence is `rmread.ifacePresent` (gates ReadSingle) plus
-	// `walker.walkNode`'s top-level `IsTypedNilPointer` check; both
-	// reject typed-nil before reaching this dispatcher. A bare-nil
+	// defence is the generated access, which reads an interface holding
+	// a nil pointer as absent, plus `walker.walkNode`'s top-level
+	// `IsTypedNilPointer` check; both reject typed-nil before reaching
+	// this dispatcher. A bare-nil
 	// interface still bypasses both (rare on the bound-RM-value
 	// path but cheap to guard here).
 	if dv == nil {

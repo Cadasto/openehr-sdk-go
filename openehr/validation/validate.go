@@ -3,9 +3,9 @@ package validation
 import (
 	"slices"
 
+	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
-	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
 )
 
 // Validate validates an in-memory archetypeable RM root against a
@@ -43,7 +43,7 @@ import (
 // compiled template: Validate reports it, where [Validator.Validate] applies
 // the Reference Model rules alone.
 func Validate(root any, c *templatecompile.Compiled) Result {
-	if root == nil || rmread.IsTypedNilPointer(root) {
+	if root == nil || rmaccess.IsTypedNilPointer(root) {
 		return nilRootResult()
 	}
 	if c == nil {
@@ -115,7 +115,7 @@ func withoutRepeats(template, floor []Issue) []Issue {
 // interface and a typed-nil concrete behind it (e.g. a (*rm.Person)(nil)
 // argument). Both yield nil_party rather than the generic nil_root.
 func ValidateDemographic(party rm.Party, c *templatecompile.Compiled) Result {
-	if party == nil || rmread.IsTypedNilPointer(party) {
+	if party == nil || rmaccess.IsTypedNilPointer(party) {
 		return resultFromIssues([]Issue{{
 			Path:     "",
 			Code:     "nil_party",

@@ -7,12 +7,12 @@ import (
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
+	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
-	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
 )
 
 // walkNode is the lockstep visitor: it enters the OPT node `optNode`
@@ -44,13 +44,13 @@ func (w *walker) walkNode(optNode *tcimpl.CompiledNode, rmValue any, path string
 	// Defence-in-depth typed-nil guard. The matchers (matchChildByID
 	// and matchChildByRMType for multi-valued attrs,
 	// matchSingleAlternative for single) already reject typed-nil
-	// before descent; ifacePresent /
-	// readItemSingleSingle reject it at the rmread layer. This
+	// before descent; the generated access reads an interface holding a
+	// nil pointer as absent. This
 	// belt-and-suspenders check costs one type-switch and prevents
 	// any future descent path from re-introducing the panic class
 	// the v2 reviewers caught twice (Element.Value, then slice
 	// elements).
-	if rmread.IsTypedNilPointer(rmValue) {
+	if rmaccess.IsTypedNilPointer(rmValue) {
 		return
 	}
 
@@ -136,7 +136,7 @@ func (w *walker) walkSingleAttribute(
 	parentPath string,
 ) {
 	attrPath := joinPath(parentPath, "/"+attr.Name())
-	val, ok := rmread.ReadSingle(parentRM, opt.RMTypeName(), attr.Name())
+	val, ok := rmaccess.Single(parentRM, attr.Name())
 	if !ok {
 		if layer, rule, required := requiredBy(attr); required {
 			w.emit(Issue{
@@ -151,7 +151,7 @@ func (w *walker) walkSingleAttribute(
 		return
 	}
 	// An attribute the OPT prohibits is reported once when it holds a
-	// value (ReadSingle reads nil and typed-nil as absent), and the walk
+	// value (the access reads nil and typed-nil as absent), and the walk
 	// goes no further into it.
 	if isProhibited(attr) {
 		w.emitProhibited(attr, parentRM, attrPath)
@@ -354,15 +354,14 @@ func (w *walker) walkMultipleAttribute(
 	parentPath string,
 ) {
 	attrPath := joinPath(parentPath, "/"+attr.Name())
-	items, ok := rmread.ReadMultiple(parentRM, opt.RMTypeName(), attr.Name())
+	items, isHash, ok := readItems(parentRM, attr.Name())
 	if !ok {
-		// rmread cannot address the attribute on this RM type. If
-		// the OPT pinned existence ≥ 1 (or BMM marks the attribute
-		// required), the composition has no way to satisfy the
-		// constraint — mirror walkSingleAttribute's `required` emit.
-		// Silent skip would let a missing rmread row (or a
-		// composition with an unhandled parent RM type) hide a real
-		// structural failure.
+		// The attribute is absent: a nil list, a nil hash, or one the
+		// parent's RM class does not declare. If the OPT pinned existence
+		// ≥ 1 (or BMM marks the attribute required), the instance does not
+		// satisfy it, and it is reported as absent, as walkSingleAttribute
+		// reports a single-valued one. The count of its items is a matter
+		// for a present attribute only.
 		if layer, rule, required := requiredBy(attr); required {
 			w.emit(Issue{
 				Path:     attrPath,
@@ -385,6 +384,7 @@ func (w *walker) walkMultipleAttribute(
 	// makes the attribute mandatory, the list is there and empty, which the
 	// RM's own rule names cardinality, as the floor does for the same list;
 	// when the template's existence requires it, it is that existence rule.
+	// A nil list is absent and was reported above.
 	if layer, rule, required := requiredBy(attr); required && len(items) == 0 {
 		if layer == LayerRM {
 			rule = ruleCardinality
@@ -422,9 +422,19 @@ func (w *walker) walkMultipleAttribute(
 		return
 	}
 	bound, byNodeID := bindItems(opt.RMTypeName(), attr.Name(), children, items)
-	pathItems := boundPathItems(items, bound)
-	w.recordNames(attrPath, pathItems)
-	itemPath := itemPaths(attrPath, pathItems)
+	var itemPath []string
+	if isHash {
+		// An entry of a Hash attribute is written by its position in
+		// ascending key order, never by its key (REQ-102 Issue paths).
+		itemPath = make([]string, len(items))
+		for idx := range items {
+			itemPath[idx] = hashEntryPath(attrPath, idx)
+		}
+	} else {
+		pathItems := boundPathItems(items, bound)
+		w.recordNames(attrPath, pathItems)
+		itemPath = itemPaths(attrPath, pathItems)
+	}
 	perChildCount := make(map[*tcimpl.CompiledNode]int, len(children))
 	for idx, item := range items {
 		matched := bound[idx]
@@ -464,6 +474,32 @@ func (w *walker) walkMultipleAttribute(
 			})
 		}
 	}
+}
+
+// readItems reads the items of the attribute attr on parent, which the
+// template walk treats as multi-valued: the items of a list, in order, or,
+// where parent's RM class declares attr as a Hash, the entries of the hash
+// in ascending key order (isHash). present is false for a nil list or hash
+// and for an attribute the class does not declare; a present one may hold
+// no item.
+func readItems(parent any, attr string) (items []any, isHash, present bool) {
+	if declaresHash(parent, attr) {
+		_, items, present = rmaccess.Hash(parent, attr)
+		return items, true, present
+	}
+	items, present = rmaccess.Multiple(parent, attr)
+	return items, false, present
+}
+
+// declaresHash reports whether the RM class of parent declares attr as a
+// Hash attribute in the pinned BMM.
+func declaresHash(parent any, attr string) bool {
+	rmType, _, ok := rmTypeInfo(parent)
+	if !ok {
+		return false
+	}
+	t, ok := rminfo.Default.AttributeRMType(bmmtype.Class(rmType), attr)
+	return ok && t == hashType
 }
 
 // bindItems binds each of the items of the multi-valued attribute
@@ -740,7 +776,7 @@ func declaresLocatableItems(parentRMType, attrName string) bool {
 // isNilItem reports whether item carries no RM value: nil, or a
 // typed-nil pointer.
 func isNilItem(item any) bool {
-	return item == nil || rmread.IsTypedNilPointer(item)
+	return item == nil || rmaccess.IsTypedNilPointer(item)
 }
 
 // matchChildByID picks the OPT child whose ArchetypeID (for
@@ -818,7 +854,7 @@ func matchChildByPinnedName(children []*tcimpl.CompiledNode, id, name string) *t
 // or a DV_CODED_TEXT, read as the walk reads the name it checks against
 // the template, or "" when the item has none.
 func locatableName(item any) string {
-	v, ok := rmread.ReadSingle(item, describeRMType(item), "name")
+	v, ok := rmaccess.Single(item, "name")
 	if !ok {
 		return ""
 	}
@@ -996,9 +1032,8 @@ func (w *walker) checkRMType(opt *tcimpl.CompiledNode, rmValue any, path string)
 // the OPT-declared RM type declared: equal to it, or a descendant of
 // it in the pinned BMM's class hierarchy (rminfo), whether declared is
 // abstract or concrete (REQ-102, REQ-110). A newly covered RM class
-// therefore needs no admission row here. What the walker reads below
-// a node still comes from rmread, so an OPT that constrains attributes
-// of a newly covered class also needs rmread readers for them.
+// therefore needs no admission row here, and the generated access reads
+// its attributes below the node.
 //
 // A parameterised value type such as "DV_INTERVAL<DV_COUNT>" is looked
 // up by its class, "DV_INTERVAL", because the generic parameter does

@@ -355,7 +355,7 @@ func TestREQ168_EmptyValue(t *testing.T) {
 		},
 		{
 			name:  "cardinality through the template walker",
-			run:   vitalSigns(func(c *rm.Composition) { c.Content[0].(*rm.Observation).Data.Events = nil }),
+			run:   vitalSigns(func(c *rm.Composition) { c.Content[0].(*rm.Observation).Data.Events = []rm.Event{} }),
 			code:  "cardinality",
 			paths: []string{bloodPressure + "/data/events"},
 		},

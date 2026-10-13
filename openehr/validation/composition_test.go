@@ -35,7 +35,7 @@ func TestValidateComposition_Valid(t *testing.T) {
 // REQ-102 v2 — empty Category triggers required at /category. The
 // composition's Category is the BMM-mandatory DV_CODED_TEXT
 // channel — wiping it makes both DefiningCode and Value empty,
-// which rmread reports as ok=false.
+// which the generated access reads as absent.
 func TestValidateComposition_RequiredCategory(t *testing.T) {
 	c := mustCompile(t, "vital_signs")
 	comp := validVitalSignsComposition()
@@ -62,7 +62,8 @@ func TestValidateComposition_RequiredCategory(t *testing.T) {
 }
 
 // REQ-102 v2 — nil Composer surfaces required at /composer.
-// Composer is a PartyProxy interface; rmread returns ok=false on nil.
+// Composer is a PartyProxy interface; the generated access reads nil as
+// absent.
 func TestValidateComposition_RequiredComposer(t *testing.T) {
 	c := mustCompile(t, "vital_signs")
 	comp := validVitalSignsComposition()
@@ -220,8 +221,8 @@ func TestValidateComposition_IssuesNeverNilOnSuccess(t *testing.T) {
 // REQ-102 v2 — wrong RM type under a single attribute surfaces
 // rm_type_mismatch. Replace COMPOSITION's category (declared
 // DV_CODED_TEXT) with an empty DV_TEXT struct by zeroing the
-// DefiningCode but keeping the Value — the rmread layer reports
-// ok=true (DVCodedText non-zero) and the structural walker
+// DefiningCode but keeping the Value — the generated access reads it
+// present (DVCodedText non-zero) and the structural walker
 // descends into the DV_CODED_TEXT OPT child. Without an
 // rm_type_mismatch case at the leaf we exercise this via the
 // COMPOSITION /content slot: build an Evaluation where the slot
@@ -334,27 +335,38 @@ func TestValidateComposition_ArchetypeIDMismatch(t *testing.T) {
 	}
 }
 
-// REQ-102 v2 Phase 2 — empty Observation.Data.Events (zero events
-// where the OPT pins existence ≥ 1) surfaces a `required` issue
-// at /content[…]/data/events.
+// REQ-102, REQ-171 — Observation.Data.Events where vital_signs.opt pins
+// both existence ≥ 1 and cardinality lower ≥ 1. A list that is present and
+// empty breaks both clauses, so the walk reports both codes at the
+// attribute's path (REQ-102 § Issue codes). A nil list is absent (REQ-171 §
+// Structural access): it breaks existence, reported as `required` on the
+// template layer, and has no item count to check, so no `cardinality` is
+// reported for it.
 func TestValidateComposition_EmptyEvents(t *testing.T) {
 	c := mustCompile(t, "vital_signs")
-	comp := validVitalSignsComposition()
-	obs := comp.Content[0].(*rm.Observation)
-	obs.Data.Events = nil
-	r := validation.ValidateComposition(comp, c)
-	if r.OK {
-		t.Fatal("expected required + cardinality issues for empty events, got OK")
+	const wantPath = "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events"
+	tests := []struct {
+		name   string
+		events []rm.Event
+		want   []string
+	}{
+		{name: "present and empty", events: []rm.Event{}, want: []string{"cardinality " + wantPath, "required " + wantPath}},
+		{name: "nil", events: nil, want: []string{"required " + wantPath}},
 	}
-	// vital_signs.opt pins both existence ≥ 1 AND cardinality lower ≥ 1
-	// on /data/events. Both constraints are independent — the spec
-	// (clinical-modeling.md § REQ-102) and PROBE-026 expect both codes.
-	wantPath := "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events"
-	if !containsIssue(r.Issues, wantPath, "required") {
-		t.Errorf("expected required at %s, got %+v", wantPath, r.Issues)
-	}
-	if !containsIssue(r.Issues, wantPath, "cardinality") {
-		t.Errorf("expected cardinality at %s (OPT pins child-count lower ≥ 1), got %+v", wantPath, r.Issues)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			comp := validVitalSignsComposition()
+			comp.Content[0].(*rm.Observation).Data.Events = tc.events
+			r := validation.ValidateComposition(comp, c)
+			if got := issueKeys(r.Issues); !slices.Equal(got, tc.want) {
+				t.Errorf("ValidateComposition(events %s) issues = %q, want %q", tc.name, got, tc.want)
+			}
+			for _, issue := range r.Issues {
+				if issue.Code == "required" && (issue.Layer != validation.LayerTemplate || issue.Rule != "existence") {
+					t.Errorf("ValidateComposition(events %s) required at %s is %s %s, want template existence", tc.name, issue.Path, issue.Layer, issue.Rule)
+				}
+			}
+		})
 	}
 }
 

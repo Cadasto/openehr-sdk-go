@@ -195,9 +195,10 @@ func TestValidateRM_CodePhraseValid(t *testing.T) {
 
 // TestValidateRMFolder_ObjectRefItemValid is the regression guard for the
 // OBJECT_REF false-positive: a FOLDER carrying a fully-populated OBJECT_REF
-// item validates cleanly. rmread does not model OBJECT_REF, so the walker
-// formerly read its id/type/namespace back as absent and emitted three
-// spurious `required` issues.
+// item validates cleanly. The walker once read its id/type/namespace back
+// as absent and emitted three spurious `required` issues; the generated
+// access reads all three, and the walk leaves a missing part to the
+// reference's own evaluator.
 func TestValidateRMFolder_ObjectRefItemValid(t *testing.T) {
 	folder := &rm.Folder{
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
