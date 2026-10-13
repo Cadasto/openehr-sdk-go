@@ -97,6 +97,7 @@ func codedFindings(issues []validation.Issue) []string {
 // that CODE_PHRASE sits.
 type codedRow struct {
 	name      string
+	owner     string // the class that declares the invariant
 	invariant string
 	group     *terminology.Group
 	codeSet   *terminology.CodeSet
@@ -131,7 +132,7 @@ func (r codedRow) namedID() string {
 func codedRows() []codedRow {
 	return []codedRow{
 		{
-			name: "COMPOSITION category", invariant: "Category_validity", group: terminology.CompositionCategory,
+			name: "COMPOSITION category", owner: "COMPOSITION", invariant: "Category_validity", group: terminology.CompositionCategory,
 			root: func(c rm.CodePhrase) any {
 				comp := codedComposition()
 				comp.Category = codedTextOf(c)
@@ -140,7 +141,7 @@ func codedRows() []codedRow {
 			path: "/category/defining_code", valid: openEHRCode("433"), breach: openEHRCode("9999"),
 		},
 		{
-			name: "COMPOSITION language", invariant: "Language_valid", codeSet: terminology.Languages,
+			name: "COMPOSITION language", owner: "COMPOSITION", invariant: "Language_valid", codeSet: terminology.Languages,
 			root: func(c rm.CodePhrase) any {
 				comp := codedComposition()
 				comp.Language = c
@@ -149,7 +150,7 @@ func codedRows() []codedRow {
 			path: "/language", valid: phrase("ISO_639-1", "en"), breach: phrase("ISO_639-1", "xx"),
 		},
 		{
-			name: "COMPOSITION territory", invariant: "Territory_valid", codeSet: terminology.Countries,
+			name: "COMPOSITION territory", owner: "COMPOSITION", invariant: "Territory_valid", codeSet: terminology.Countries,
 			root: func(c rm.CodePhrase) any {
 				comp := codedComposition()
 				comp.Territory = c
@@ -158,7 +159,7 @@ func codedRows() []codedRow {
 			path: "/territory", valid: phrase("ISO_3166-1", "NL"), breach: phrase("ISO_3166-1", "ZZ"),
 		},
 		{
-			name: "EVENT_CONTEXT setting", invariant: "Setting_valid", group: terminology.Setting,
+			name: "EVENT_CONTEXT setting", owner: "EVENT_CONTEXT", invariant: "Setting_valid", group: terminology.Setting,
 			root: func(c rm.CodePhrase) any {
 				comp := codedComposition()
 				comp.Context = codedContext()
@@ -168,7 +169,7 @@ func codedRows() []codedRow {
 			path: "/context/setting/defining_code", valid: openEHRCode("238"), breach: openEHRCode("9999"),
 		},
 		{
-			name: "ENTRY language", invariant: "Language_valid", codeSet: terminology.Languages,
+			name: "ENTRY language", owner: "ENTRY", invariant: "Language_valid", codeSet: terminology.Languages,
 			root: func(c rm.CodePhrase) any {
 				ev := codedEvaluation()
 				ev.Language = c
@@ -177,7 +178,7 @@ func codedRows() []codedRow {
 			path: "/language", valid: phrase("ISO_639-1", "en"), breach: phrase("ISO_639-1", "xx"),
 		},
 		{
-			name: "ENTRY encoding", invariant: "Encoding_valid", codeSet: terminology.CharacterSets,
+			name: "ENTRY encoding", owner: "ENTRY", invariant: "Encoding_valid", codeSet: terminology.CharacterSets,
 			root: func(c rm.CodePhrase) any {
 				ev := codedEvaluation()
 				ev.Encoding = c
@@ -186,7 +187,7 @@ func codedRows() []codedRow {
 			path: "/encoding", valid: phrase("IANA_character-sets", "UTF-8"), breach: phrase("IANA_character-sets", "UTF-99"),
 		},
 		{
-			name: "ELEMENT null_flavour", invariant: "Inv_null_flavour_valid", group: terminology.NullFlavours,
+			name: "ELEMENT null_flavour", owner: "ELEMENT", invariant: "Inv_null_flavour_valid", group: terminology.NullFlavours,
 			root: func(c rm.CodePhrase) any {
 				nf := codedTextOf(c)
 				return &rm.Element{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "item"}, NullFlavour: &nf}
@@ -194,21 +195,21 @@ func codedRows() []codedRow {
 			path: "/null_flavour/defining_code", valid: openEHRCode("253"), breach: openEHRCode("999"),
 		},
 		{
-			name: "INTERVAL_EVENT math_function", invariant: "Math_function_validity", group: terminology.EventMathFunction,
+			name: "INTERVAL_EVENT math_function", owner: "INTERVAL_EVENT", invariant: "Math_function_validity", group: terminology.EventMathFunction,
 			root: func(c rm.CodePhrase) any {
 				return &rm.IntervalEvent[rm.ItemStructure]{MathFunction: codedTextOf(c)}
 			},
 			path: "/math_function/defining_code", valid: openEHRCode("146"), breach: openEHRCode("9999"),
 		},
 		{
-			name: "ISM_TRANSITION current_state", invariant: "Current_state_valid", group: terminology.InstructionStates,
+			name: "ISM_TRANSITION current_state", owner: "ISM_TRANSITION", invariant: "Current_state_valid", group: terminology.InstructionStates,
 			root: func(c rm.CodePhrase) any {
 				return &rm.IsmTransition{CurrentState: codedTextOf(c)}
 			},
 			path: "/current_state/defining_code", valid: openEHRCode("532"), breach: openEHRCode("9999"),
 		},
 		{
-			name: "ISM_TRANSITION transition", invariant: "Transition_valid", group: terminology.InstructionTransitions,
+			name: "ISM_TRANSITION transition", owner: "ISM_TRANSITION", invariant: "Transition_valid", group: terminology.InstructionTransitions,
 			root: func(c rm.CodePhrase) any {
 				tr := codedTextOf(c)
 				return &rm.IsmTransition{CurrentState: codedTextOf(openEHRCode("532")), Transition: &tr}
@@ -216,7 +217,7 @@ func codedRows() []codedRow {
 			path: "/transition/defining_code", valid: openEHRCode("541"), breach: openEHRCode("9999"),
 		},
 		{
-			name: "PARTICIPATION function", invariant: "Function_valid", group: terminology.ParticipationFunction,
+			name: "PARTICIPATION function", owner: "PARTICIPATION", invariant: "Function_valid", group: terminology.ParticipationFunction,
 			root: func(c rm.CodePhrase) any {
 				ev := codedEvaluation()
 				ev.OtherParticipations = []rm.Participation{{Function: codedTextOf(c), Performer: rm.PartySelf{}}}
@@ -225,7 +226,7 @@ func codedRows() []codedRow {
 			path: "/other_participations[1]/function/defining_code", valid: openEHRCode("253"), breach: openEHRCode("999"),
 		},
 		{
-			name: "PARTICIPATION mode", invariant: "Mode_valid", group: terminology.ParticipationMode,
+			name: "PARTICIPATION mode", owner: "PARTICIPATION", invariant: "Mode_valid", group: terminology.ParticipationMode,
 			root: func(c rm.CodePhrase) any {
 				mode := codedTextOf(c)
 				ev := codedEvaluation()
@@ -235,7 +236,7 @@ func codedRows() []codedRow {
 			path: "/other_participations[1]/mode/defining_code", valid: openEHRCode("193"), breach: openEHRCode("9999"),
 		},
 		{
-			name: "PARTY_RELATED relationship", invariant: "Relationship_valid", group: terminology.SubjectRelationship,
+			name: "PARTY_RELATED relationship", owner: "PARTY_RELATED", invariant: "Relationship_valid", group: terminology.SubjectRelationship,
 			root: func(c rm.CodePhrase) any {
 				ev := codedEvaluation()
 				ev.Subject = rm.PartyRelated{Relationship: codedTextOf(c)}
@@ -244,7 +245,7 @@ func codedRows() []codedRow {
 			path: "/subject/relationship/defining_code", valid: openEHRCode("10"), breach: openEHRCode("9999"),
 		},
 		{
-			name: "TERM_MAPPING purpose", invariant: "Purpose_valid", group: terminology.TermMappingPurpose,
+			name: "TERM_MAPPING purpose", owner: "TERM_MAPPING", invariant: "Purpose_valid", group: terminology.TermMappingPurpose,
 			root: func(c rm.CodePhrase) any {
 				purpose := codedTextOf(c)
 				return &rm.DVText{Value: "x", Mappings: []rm.TermMapping{{Match: "=", Target: phrase("SNOMED-CT", "123"), Purpose: &purpose}}}
@@ -252,12 +253,12 @@ func codedRows() []codedRow {
 			path: "/mappings[1]/purpose/defining_code", valid: openEHRCode("669"), breach: openEHRCode("9999"),
 		},
 		{
-			name: "DV_TEXT language", invariant: "Language_valid", codeSet: terminology.Languages,
+			name: "DV_TEXT language", owner: "DV_TEXT", invariant: "Language_valid", codeSet: terminology.Languages,
 			root: func(c rm.CodePhrase) any { return &rm.DVText{Value: "x", Language: &c} },
 			path: "/language", valid: phrase("ISO_639-1", "en"), breach: phrase("ISO_639-1", "xx"),
 		},
 		{
-			name: "DV_CODED_TEXT language", invariant: "Language_valid", codeSet: terminology.Languages,
+			name: "DV_CODED_TEXT language", owner: "DV_TEXT", invariant: "Language_valid", codeSet: terminology.Languages,
 			root: func(c rm.CodePhrase) any {
 				ct := codedTextOf(phrase("local", "at1"))
 				ct.Language = &c
@@ -266,12 +267,12 @@ func codedRows() []codedRow {
 			path: "/language", valid: phrase("ISO_639-1", "en"), breach: phrase("ISO_639-1", "xx"),
 		},
 		{
-			name: "DV_TEXT encoding", invariant: "Encoding_valid", codeSet: terminology.CharacterSets,
+			name: "DV_TEXT encoding", owner: "DV_TEXT", invariant: "Encoding_valid", codeSet: terminology.CharacterSets,
 			root: func(c rm.CodePhrase) any { return &rm.DVText{Value: "x", Encoding: &c} },
 			path: "/encoding", valid: phrase("IANA_character-sets", "UTF-8"), breach: phrase("IANA_character-sets", "UTF-99"),
 		},
 		{
-			name: "DV_CODED_TEXT encoding", invariant: "Encoding_valid", codeSet: terminology.CharacterSets,
+			name: "DV_CODED_TEXT encoding", owner: "DV_TEXT", invariant: "Encoding_valid", codeSet: terminology.CharacterSets,
 			root: func(c rm.CodePhrase) any {
 				ct := codedTextOf(phrase("local", "at1"))
 				ct.Encoding = &c
@@ -280,12 +281,12 @@ func codedRows() []codedRow {
 			path: "/encoding", valid: phrase("IANA_character-sets", "UTF-8"), breach: phrase("IANA_character-sets", "UTF-99"),
 		},
 		{
-			name: "DV_ORDERED normal_status", invariant: "Normal_status_validity", codeSet: terminology.NormalStatuses,
+			name: "DV_ORDERED normal_status", owner: "DV_ORDERED", invariant: "Normal_status_validity", codeSet: terminology.NormalStatuses,
 			root: func(c rm.CodePhrase) any { return &rm.DVQuantity{Magnitude: 1, Units: "mg", NormalStatus: &c} },
 			path: "/normal_status", valid: phrase("openehr_normal_statuses", "N"), breach: phrase("openehr_normal_statuses", "HHHH"),
 		},
 		{
-			name: "DV_MULTIMEDIA language", invariant: "Language_valid", codeSet: terminology.Languages,
+			name: "DV_MULTIMEDIA language", owner: "DV_ENCAPSULATED", invariant: "Language_valid", codeSet: terminology.Languages,
 			root: func(c rm.CodePhrase) any {
 				mm := codedMultimedia()
 				mm.Language = &c
@@ -294,12 +295,12 @@ func codedRows() []codedRow {
 			path: "/language", valid: phrase("ISO_639-1", "en"), breach: phrase("ISO_639-1", "xx"),
 		},
 		{
-			name: "DV_PARSABLE language", invariant: "Language_valid", codeSet: terminology.Languages,
+			name: "DV_PARSABLE language", owner: "DV_ENCAPSULATED", invariant: "Language_valid", codeSet: terminology.Languages,
 			root: func(c rm.CodePhrase) any { return &rm.DVParsable{Value: "x", Formalism: "text", Language: &c} },
 			path: "/language", valid: phrase("ISO_639-1", "en"), breach: phrase("ISO_639-1", "xx"),
 		},
 		{
-			name: "DV_MULTIMEDIA charset", invariant: "Charset_valid", codeSet: terminology.CharacterSets,
+			name: "DV_MULTIMEDIA charset", owner: "DV_ENCAPSULATED", invariant: "Charset_valid", codeSet: terminology.CharacterSets,
 			root: func(c rm.CodePhrase) any {
 				mm := codedMultimedia()
 				mm.Charset = &c
@@ -308,12 +309,12 @@ func codedRows() []codedRow {
 			path: "/charset", valid: phrase("IANA_character-sets", "UTF-8"), breach: phrase("IANA_character-sets", "UTF-99"),
 		},
 		{
-			name: "DV_PARSABLE charset", invariant: "Charset_valid", codeSet: terminology.CharacterSets,
+			name: "DV_PARSABLE charset", owner: "DV_ENCAPSULATED", invariant: "Charset_valid", codeSet: terminology.CharacterSets,
 			root: func(c rm.CodePhrase) any { return rm.DVParsable{Value: "x", Formalism: "text", Charset: &c} },
 			path: "/charset", valid: phrase("IANA_character-sets", "UTF-8"), breach: phrase("IANA_character-sets", "UTF-99"),
 		},
 		{
-			name: "DV_MULTIMEDIA media_type", invariant: "Media_type_valid", codeSet: terminology.MediaTypes,
+			name: "DV_MULTIMEDIA media_type", owner: "DV_MULTIMEDIA", invariant: "Media_type_valid", codeSet: terminology.MediaTypes,
 			root: func(c rm.CodePhrase) any {
 				mm := codedMultimedia()
 				mm.MediaType = c
@@ -322,7 +323,7 @@ func codedRows() []codedRow {
 			path: "/media_type", valid: phrase("IANA_media-types", "text/plain"), breach: phrase("IANA_media-types", "text/nonsense"),
 		},
 		{
-			name: "DV_MULTIMEDIA compression_algorithm", invariant: "Compression_algorithm_validity", codeSet: terminology.CompressionAlgorithms,
+			name: "DV_MULTIMEDIA compression_algorithm", owner: "DV_MULTIMEDIA", invariant: "Compression_algorithm_validity", codeSet: terminology.CompressionAlgorithms,
 			root: func(c rm.CodePhrase) any {
 				mm := codedMultimedia()
 				mm.CompressionAlgorithm = &c
@@ -331,7 +332,7 @@ func codedRows() []codedRow {
 			path: "/compression_algorithm", valid: phrase("openehr_compression_algorithms", "gzip"), breach: phrase("openehr_compression_algorithms", "rar"),
 		},
 		{
-			name: "DV_MULTIMEDIA integrity_check_algorithm", invariant: "Integrity_check_algorithm_validity", codeSet: terminology.IntegrityCheckAlgorithms,
+			name: "DV_MULTIMEDIA integrity_check_algorithm", owner: "DV_MULTIMEDIA", invariant: "Integrity_check_algorithm_validity", codeSet: terminology.IntegrityCheckAlgorithms,
 			root: func(c rm.CodePhrase) any {
 				mm := codedMultimedia()
 				mm.IntegrityCheckAlgorithm = &c
@@ -348,7 +349,7 @@ func codedRows() []codedRow {
 func rootRows() []codedRow {
 	return []codedRow{
 		{
-			name: "EVENT_CONTEXT setting, as the root", invariant: "Setting_valid", group: terminology.Setting,
+			name: "EVENT_CONTEXT setting, as the root", owner: "EVENT_CONTEXT", invariant: "Setting_valid", group: terminology.Setting,
 			root: func(c rm.CodePhrase) any {
 				ec := codedContext()
 				ec.Setting = codedTextOf(c)
@@ -357,19 +358,19 @@ func rootRows() []codedRow {
 			path: "/setting/defining_code", valid: openEHRCode("238"), breach: openEHRCode("9999"),
 		},
 		{
-			name: "PARTICIPATION function, as the root", invariant: "Function_valid", group: terminology.ParticipationFunction,
+			name: "PARTICIPATION function, as the root", owner: "PARTICIPATION", invariant: "Function_valid", group: terminology.ParticipationFunction,
 			root: func(c rm.CodePhrase) any {
 				return &rm.Participation{Function: codedTextOf(c), Performer: rm.PartySelf{}}
 			},
 			path: "/function/defining_code", valid: openEHRCode("253"), breach: openEHRCode("999"),
 		},
 		{
-			name: "PARTY_RELATED relationship, as the root", invariant: "Relationship_valid", group: terminology.SubjectRelationship,
+			name: "PARTY_RELATED relationship, as the root", owner: "PARTY_RELATED", invariant: "Relationship_valid", group: terminology.SubjectRelationship,
 			root: func(c rm.CodePhrase) any { return &rm.PartyRelated{Relationship: codedTextOf(c)} },
 			path: "/relationship/defining_code", valid: openEHRCode("10"), breach: openEHRCode("9999"),
 		},
 		{
-			name: "TERM_MAPPING purpose, as the root", invariant: "Purpose_valid", group: terminology.TermMappingPurpose,
+			name: "TERM_MAPPING purpose, as the root", owner: "TERM_MAPPING", invariant: "Purpose_valid", group: terminology.TermMappingPurpose,
 			root: func(c rm.CodePhrase) any {
 				purpose := codedTextOf(c)
 				return &rm.TermMapping{Match: "=", Target: phrase("SNOMED-CT", "123"), Purpose: &purpose}
@@ -464,7 +465,9 @@ func TestREQ112_CodedInvariantsEmptyCode(t *testing.T) {
 // assertCodedDetail checks the Detail of the row's finding: it names the
 // invariant, the group or code set and, for an ISO or IANA code set, its
 // external id, and it carries neither the code string nor the terminology id
-// of code, unless that id is the one the rule itself names.
+// of code, unless that id is the one the rule itself names. The finding is on
+// the RM layer, and its Rule is the row's invariant as CLASS.Invariant, the
+// class being the one that declares it (REQ-171 § Finding identity).
 func assertCodedDetail(t *testing.T, row codedRow, issues []validation.Issue, code rm.CodePhrase) {
 	t.Helper()
 	i := slices.IndexFunc(issues, func(i validation.Issue) bool { return i.Code == codeNotInValueSet })
@@ -489,6 +492,9 @@ func assertCodedDetail(t *testing.T, row codedRow, issues []validation.Issue, co
 	}
 	if issues[i].Severity != validation.Error {
 		t.Errorf("%s: Severity = %v, want Error", row.name, issues[i].Severity)
+	}
+	if want := row.owner + "." + row.invariant; issues[i].Layer != validation.LayerRM || issues[i].Rule != want {
+		t.Errorf("%s: Layer, Rule = %q, %q, want %q, %q (REQ-171)", row.name, issues[i].Layer, issues[i].Rule, validation.LayerRM, want)
 	}
 }
 

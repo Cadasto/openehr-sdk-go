@@ -38,6 +38,45 @@ func (s Severity) String() string {
 	return fmt.Sprintf("severity(%d)", int(s))
 }
 
+// Layer names the body of rules an [Issue] comes from: the operational
+// template, or the openEHR Reference Model. The zero value, [LayerNone], is
+// the layer of an issue that judges the call or the walk rather than the
+// instance.
+type Layer uint8
+
+const (
+	// LayerNone marks an issue that judges the call or the walk rather than
+	// the instance: a guard, such as nil_composition or invalid_shape, a
+	// walk condition, such as max_depth or cyclic_value, and every issue
+	// from [ValidateAQL] and [ValidateAQLWithTypeRelation]. Its Rule is
+	// empty.
+	LayerNone Layer = iota
+
+	// LayerTemplate marks an issue that a clause of the operational
+	// template produces.
+	LayerTemplate
+
+	// LayerRM marks an issue that a rule of the openEHR Reference Model
+	// produces, an attribute the Reference Model makes mandatory and the
+	// instance lacks included.
+	LayerRM
+)
+
+// String returns "" for [LayerNone], "template" for [LayerTemplate] and
+// "rm" for [LayerRM]; out-of-range values render as `layer(N)` with the
+// numeric form, so callers logging issues see both the name and the value.
+func (l Layer) String() string {
+	switch l {
+	case LayerNone:
+		return ""
+	case LayerTemplate:
+		return "template"
+	case LayerRM:
+		return "rm"
+	}
+	return fmt.Sprintf("layer(%d)", uint8(l))
+}
+
 // Issue is one failing clause from a validator. Validators emit one
 // Issue per failure (collect-all, not fail-fast). The zero value is
 // not useful; the validators in this package build issues themselves.
@@ -46,29 +85,29 @@ func (s Severity) String() string {
 // The class of Path and Detail depends on the entry point that returned
 // the issue.
 //
-// The instance validators are [ValidateComposition], [Validate],
-// [ValidateDemographic], [ValidateFolder] and [ValidateEHRStatus], and the
-// template-less floor [ValidateRM], [ValidateRMFolder],
-// [ValidateRMEHRStatus], [ValidateRMEHRAccess], [ValidateRMDemographic]
-// and [ValidateRMEHRStatusBytes]. On their issues Path, Code, Detail and
-// Severity never contain a value taken from the instance: not the content
-// of a data value (a node's own name included), a code, units, a
-// precision, an interval bound, nor the text of an error raised while
-// decoding it. They may name RM types and attributes, archetype and node
-// ids, the names the template gives its nodes, and the template's own
-// constraint, so such an issue can be logged or returned to a client as it
-// is. The value the failed check read is kept only in Value.
+// The instance validators are [Validator.Validate], [ValidateComposition],
+// [Validate], [ValidateDemographic], [ValidateFolder] and
+// [ValidateEHRStatus], and the template-less floor [ValidateRM],
+// [ValidateRMFolder], [ValidateRMEHRStatus], [ValidateRMEHRAccess],
+// [ValidateRMDemographic] and [ValidateRMEHRStatusBytes]. On their issues
+// Path, Code, Layer, Rule, Detail and Severity never contain a value taken
+// from the instance: not the content of a data value (a node's own name
+// included), a code, units, a precision, an interval bound, nor the text of
+// an error raised while decoding it. They may name RM types and attributes,
+// archetype and node ids, the names the template gives its nodes, and the
+// template's own constraint, so such an issue can be logged or returned to
+// a client as it is. The value the failed check read is kept only in Value.
 //
-// On an issue from [ValidateAQL] or [ValidateAQLWithTypeRelation], Code
-// and Severity never contain text from the query, but Detail and Path
-// carry the lint text and may quote the query, its literals included.
-// Value is empty.
+// On an issue from [ValidateAQL] or [ValidateAQLWithTypeRelation], Code,
+// Layer, Rule and Severity never contain text from the query, but Detail
+// and Path carry the lint text and may quote the query, its literals
+// included. Layer is [LayerNone], and Rule and Value are empty.
 //
-// Two issues compare equal under == when their paths, codes, details and
-// severities are equal and their held values are equal under ==, and the
-// comparison never panics. A value that == cannot compare, such as a slice
-// or a map, is held by reference, so it equals only copies of the same
-// [constraints.Redacted].
+// Two issues compare equal under == when their paths, codes, layers,
+// rules, details and severities are equal and their held values are equal
+// under ==, and the comparison never panics. A value that == cannot
+// compare, such as a slice or a map, is held by reference, so it equals
+// only copies of the same [constraints.Redacted].
 type Issue struct {
 	// Path is the openEHR path of the offending node, from the validated
 	// root: RM attribute names joined by "/", with "/" alone for the root.
@@ -109,6 +148,52 @@ type Issue struct {
 	// Value-free: never carries a value from the instance or text from
 	// the query.
 	Code string
+
+	// Layer says which rules the issue comes from: [LayerTemplate] for a
+	// clause of the operational template, [LayerRM] for a rule of the
+	// openEHR Reference Model. An absent attribute is on the template layer
+	// when the template's own existence constraint requires it, and on the
+	// RM layer when only the Reference Model makes it mandatory. [LayerNone]
+	// marks an issue that judges the call or the walk rather than the
+	// instance: a guard (nil_composition, nil_template, nil_root and the
+	// other nil_ codes, rm_type_unknown, and invalid_shape on input that
+	// does not decode), a walk condition (max_depth, max_nodes,
+	// cyclic_value), and every issue from [ValidateAQL] and
+	// [ValidateAQLWithTypeRelation].
+	//
+	// Value-free: names a layer, never a value from the instance or text
+	// from the query.
+	Layer Layer
+
+	// Rule names the clause the issue evaluates, so that issues sharing a
+	// Code, such as the rm_invariant issues, are told apart without reading
+	// Detail. It is empty exactly when Layer is [LayerNone].
+	//
+	// On [LayerRM], a rule the openEHR Reference Model or Base types name as
+	// a class invariant is written CLASS.Invariant: the class that declares
+	// the invariant and the invariant's name, both spelt as the published
+	// model spells them, as in "DV_INTERVAL.Limits_consistent",
+	// "ELEMENT.Inv_null_flavour_indicated", "ENTRY.Language_valid" on any
+	// entry, or "Interval.Lower_included_valid" on any interval. A rule the
+	// model states in an attribute's definition rather than as a named
+	// invariant is a lower-case word: "mandatory" for a mandatory attribute
+	// the instance lacks, or a mandatory string left empty; "cardinality"
+	// for a mandatory list that is present and empty; "precision_range" for
+	// a precision below -1.
+	//
+	// On [LayerTemplate], it is "existence" (an attribute the template
+	// requires and the instance lacks, or one it prohibits and the instance
+	// carries), "cardinality" (the number of items an attribute holds),
+	// "occurrences" (the number of items bound to one node of the
+	// template), "slot" (an item that fits no node or slot), "type" (the RM
+	// type of a value, or the alternatives it may take) or "identity" (an
+	// archetype id or a node id); at a constrained leaf, it is the code of
+	// the [constraints.Violation] the leaf's constraint reported, such as
+	// "out_of_range" or "pattern_mismatch".
+	//
+	// Value-free: names a rule, never a value from the instance or text
+	// from the query.
+	Rule string
 
 	// Detail is a human-readable message describing the failure; it is
 	// not localised. From an instance validator it names the check that
@@ -152,8 +237,8 @@ type Issue struct {
 	// calls over the same bytes give invalid_shape issues that are not
 	// equal under ==.
 	//
-	// Value is empty on every other issue (something absent, a count, a
-	// type or identity mismatch, a guard).
+	// Value is empty on every other issue (something absent or prohibited,
+	// a count, a type or identity mismatch, a guard).
 	//
 	// Value-bearing: holds a value from the instance. It prints as
 	// "[redacted]", as [constraints.Redacted] describes, and is left out
@@ -167,6 +252,7 @@ type Issue struct {
 // nil when no sentinel maps. The mapping is:
 //
 //   - "required"                                          → [ErrRequired]
+//   - "prohibited"                                        → [ErrProhibited]
 //   - "cardinality"                                       → [ErrCardinality]
 //   - "rm_type_mismatch" / "alternative_mismatch" /
 //     "archetype_id_mismatch" / "node_id_mismatch"        → [ErrTypeMismatch]
@@ -174,16 +260,21 @@ type Issue struct {
 //   - "slot_fill"                                         → [ErrSlotFill]
 //   - "aql_syntax" / "aql_empty"                          → [ErrAQLSyntax]
 //
-// Global guard codes (`nil_composition`, `nil_template`, and the
-// root guards `nil_root` / `nil_party` / `nil_folder` /
-// `nil_ehr_status`) return nil, because they represent caller-side
-// argument errors rather than validation failures. The RM floor's own
-// codes (`rm_invariant`, `mappings_valid`, `term_mapping_match`,
-// `code_not_in_value_set`, `is_archetype_root`, `rm_version_valid` and the
-// others it mints) return nil too, although they are errors. A nil Err
-// therefore does not mean the issue is harmless: read [Result.OK], or the
-// issue's Severity, for the verdict. Callers wanting `errors.Is` dispatch
-// go through this method:
+// Every other code returns nil, although most of them are errors. That
+// covers the guards (`nil_composition`, `nil_template`, `nil_root`,
+// `nil_party`, `nil_folder`, `nil_ehr_status`, `nil_ehr_access`,
+// `rm_type_unknown` and `invalid_shape`), which report an argument the
+// validator could not take; the walk conditions (`max_depth`, `max_nodes`
+// and `cyclic_value`), which report where the walk stopped or turned back;
+// and the codes of the Reference Model rules (`rm_invariant`,
+// `mappings_valid`, `term_mapping_match`, `lower_included_valid`,
+// `upper_included_valid`, `code_not_in_value_set`, `is_archetype_root` and
+// `rm_version_valid`). The template-driven validators report those rule
+// codes as well as [ValidateRM], since they include the Reference Model
+// rules. A nil Err therefore does not mean the issue is harmless: read
+// [Result.OK], or the issue's Severity, for the verdict, and [Issue.Rule]
+// to tell the Reference Model rules apart. Callers wanting `errors.Is`
+// dispatch go through this method:
 //
 //	for _, i := range r.Issues {
 //	    if errors.Is(i.Err(), validation.ErrRequired) { ... }
@@ -192,6 +283,8 @@ func (i Issue) Err() error {
 	switch i.Code {
 	case "required":
 		return ErrRequired
+	case "prohibited":
+		return ErrProhibited
 	case "cardinality":
 		return ErrCardinality
 	case "rm_type_mismatch",
@@ -230,6 +323,44 @@ type Result struct {
 	// after a validator call (zero-length allocation is acceptable). May be
 	// non-empty while OK is true when it holds only Warning-severity issues.
 	Issues []Issue
+
+	// Coverage says what the validator did not check, so a caller can tell
+	// "no issue found" from "everything checked". Its zero value, which a
+	// guard and [ValidateAQL] return, is complete.
+	Coverage Coverage
+}
+
+// Coverage lists the parts of the instance a validator call did not check.
+// OK only reports that no error was found in what was checked; Coverage says
+// how much that was. Each path is written as [Issue.Path] describes and holds
+// no value from the instance.
+type Coverage struct {
+	// Stopped lists the path of each place where a limit stopped the walk:
+	// the path of the max_depth issue, the first place the walk reached its
+	// depth limit (it walked nothing deeper, there or on any other branch),
+	// and the path of the max_nodes issue, where it reached its visit limit
+	// and ended. It holds at most one of each, in the order the walk met
+	// them. The limits are those of the [Validator] that ran the call
+	// ([Limits]).
+	Stopped []string
+
+	// External lists, in walk order, the path of each node the template
+	// binds to a CONSTRAINT_REF: a constraint whose value set is bound
+	// outside the template, which the validator cannot consult, so the code
+	// at that path was not checked against it; the node's other attributes
+	// were. A node bound to a C_CODE_PHRASE that names an external
+	// terminology without listing codes is not listed: the validator checks
+	// it for that terminology, and whether a code exists in an external
+	// terminology is outside every check it makes.
+	External []string
+}
+
+// Complete reports whether the call checked everything it reached: no limit
+// stopped the walk, and no node was bound to a CONSTRAINT_REF, whose value
+// set the validator cannot consult. It is true exactly when Stopped and External are both
+// empty, so the zero Coverage is complete.
+func (c Coverage) Complete() bool {
+	return len(c.Stopped) == 0 && len(c.External) == 0
 }
 
 // resultFromIssues builds a [Result] from a slice of issues. Used by

@@ -105,6 +105,14 @@ func templateErrors(out any, c *templatecompile.Compiled) []validation.Issue {
 	return errs
 }
 
+// isProhibitedAt reports whether iss is the template validator's report of
+// an attribute the OPT prohibits, at path: code prohibited, on the template
+// layer, rule existence (REQ-102, REQ-171). An empty path matches nothing.
+func isProhibitedAt(iss validation.Issue, path string) bool {
+	return path != "" && iss.Path == path && iss.Code == "prohibited" &&
+		iss.Layer == validation.LayerTemplate && iss.Rule == "existence"
+}
+
 // TestREQ107_RMDefaultsYieldToTheOPT is the REQ-107 check that every RM
 // default yields to the OPT. Where the OPT's own constraint on the
 // attribute rejects the default, through a C_CODE_PHRASE that names
@@ -114,7 +122,9 @@ func templateErrors(out any, c *templatecompile.Compiled) []validation.Issue {
 // at0000 placeholder under the OPT's terminology, or nothing. The template
 // validator then finds no error, apart from the RM floor's one
 // code_not_in_value_set where the placeholder sits on an attribute the RM
-// ties to a code set or group (REQ-107 § Exceptions and known gaps). Where the OPT's constraint admits the
+// ties to a code set or group (REQ-107 § Exceptions and known gaps), and,
+// on a row marked RM wins, the one prohibited at the attribute the OPT
+// prohibits and the RM needs (REQ-102). Where the OPT's constraint admits the
 // default, the default is written; the rows marked admit check that for
 // the cases other tests do not cover. Each row runs under both policies,
 // both value fills and both compile modes.
@@ -139,6 +149,12 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 		// code_not_in_value_set: the OPT admits no member of the code set
 		// or group the RM ties the attribute to, which REQ-107 excepts.
 		floorCoded string
+		// prohibited is the path of the attribute an RM-wins row's OPT
+		// prohibits and the generator writes anyway (REQ-107 § Exceptions
+		// and known gaps): the template validator reports it there as
+		// prohibited, once, on the template layer with the rule existence
+		// (REQ-102 § Structural — prohibited attributes).
+		prohibited string
 		check      func(t *testing.T, out any)
 	}{
 		{
@@ -275,10 +291,14 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 		},
 		// The rows marked RM wins prohibit an attribute the BMM marks
 		// mandatory: the RM rule wins over the prohibition, and the
-		// generator writes the attribute as it writes a silent one.
+		// generator writes the attribute as it writes a silent one. The
+		// instance therefore breaks the OPT's prohibition (REQ-107 §
+		// Exceptions and known gaps), and the template validator reports
+		// that attribute as prohibited (REQ-102).
 		{
-			name: "RM wins: EVENT_CONTEXT start_time, prohibited",
-			opt:  optTemplate("COMPOSITION", optSingle("context", optNode("EVENT_CONTEXT", "", optProhibitedSingle("start_time")))),
+			name:       "RM wins: EVENT_CONTEXT start_time, prohibited",
+			prohibited: "/context/start_time",
+			opt:        optTemplate("COMPOSITION", optSingle("context", optNode("EVENT_CONTEXT", "", optProhibitedSingle("start_time")))),
 			check: func(t *testing.T, out any) {
 				if got, want := generatedComposition(t, out).Context.StartTime.Value, defaultsNow.Format(time.RFC3339); got != want {
 					t.Errorf("EVENT_CONTEXT.start_time = %q, want the clock %q", got, want)
@@ -286,7 +306,8 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 			},
 		},
 		{
-			name: "RM wins: ACTION time, prohibited",
+			name:       "RM wins: ACTION time, prohibited",
+			prohibited: "/time",
 			opt: optTemplate("ACTION", optSingle("language"), optSingle("encoding"), optSingle("subject"),
 				optSingle("ism_transition", optNode("ISM_TRANSITION", "")), optSingle("description", emptyTree),
 				optProhibitedSingle("time")),
@@ -297,7 +318,8 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 			},
 		},
 		{
-			name: "RM wins: ENTRY language, prohibited",
+			name:       "RM wins: ENTRY language, prohibited",
+			prohibited: "/language",
 			opt: optTemplate("ACTION", optProhibitedSingle("language"), optSingle("encoding"), optSingle("subject"),
 				optSingle("ism_transition", optNode("ISM_TRANSITION", "")), optSingle("description", emptyTree)),
 			check: func(t *testing.T, out any) {
@@ -305,7 +327,8 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 			},
 		},
 		{
-			name: "RM wins: ENTRY encoding, prohibited",
+			name:       "RM wins: ENTRY encoding, prohibited",
+			prohibited: "/encoding",
 			opt: optTemplate("ACTION", optSingle("language"), optProhibitedSingle("encoding"), optSingle("subject"),
 				optSingle("ism_transition", optNode("ISM_TRANSITION", "")), optSingle("description", emptyTree)),
 			check: func(t *testing.T, out any) {
@@ -313,7 +336,8 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 			},
 		},
 		{
-			name: "RM wins: ISM_TRANSITION current_state, prohibited",
+			name:       "RM wins: ISM_TRANSITION current_state, prohibited",
+			prohibited: "/ism_transition/current_state",
 			opt: optTemplate("ACTION", optSingle("language"), optSingle("encoding"), optSingle("subject"),
 				optSingle("ism_transition", optNode("ISM_TRANSITION", "", optProhibitedSingle("current_state"))),
 				optSingle("description", emptyTree)),
@@ -322,29 +346,33 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 			},
 		},
 		{
-			name: "RM wins: COMPOSITION category, prohibited",
-			opt:  optTemplate("COMPOSITION", optProhibitedSingle("category")),
+			name:       "RM wins: COMPOSITION category, prohibited",
+			prohibited: "/category",
+			opt:        optTemplate("COMPOSITION", optProhibitedSingle("category")),
 			check: func(t *testing.T, out any) {
 				checkOpenEHRCode(t, "COMPOSITION.category", generatedComposition(t, out).Category, terminology.CompositionCategory, "433")
 			},
 		},
 		{
-			name: "RM wins: COMPOSITION language, prohibited",
-			opt:  optTemplate("COMPOSITION", optProhibitedSingle("language")),
+			name:       "RM wins: COMPOSITION language, prohibited",
+			prohibited: "/language",
+			opt:        optTemplate("COMPOSITION", optProhibitedSingle("language")),
 			check: func(t *testing.T, out any) {
 				checkCode(t, "COMPOSITION.language", generatedComposition(t, out).Language, rm.CodePhrase{CodeString: "en", TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}})
 			},
 		},
 		{
-			name: "RM wins: COMPOSITION territory, prohibited",
-			opt:  optTemplate("COMPOSITION", optProhibitedSingle("territory")),
+			name:       "RM wins: COMPOSITION territory, prohibited",
+			prohibited: "/territory",
+			opt:        optTemplate("COMPOSITION", optProhibitedSingle("territory")),
 			check: func(t *testing.T, out any) {
 				checkCode(t, "COMPOSITION.territory", generatedComposition(t, out).Territory, rm.CodePhrase{CodeString: "NL", TerminologyID: rm.TerminologyID{Value: "ISO_3166-1"}})
 			},
 		},
 		{
-			name: "RM wins: COMPOSITION composer, prohibited",
-			opt:  optTemplate("COMPOSITION", optProhibitedSingle("composer")),
+			name:       "RM wins: COMPOSITION composer, prohibited",
+			prohibited: "/composer",
+			opt:        optTemplate("COMPOSITION", optProhibitedSingle("composer")),
 			check: func(t *testing.T, out any) {
 				if p, ok := generatedComposition(t, out).Composer.(*rm.PartyIdentified); !ok || p.Name == nil || *p.Name != *testComposer().Name {
 					t.Errorf("COMPOSITION.composer = %#v, want the Options composer", generatedComposition(t, out).Composer)
@@ -352,14 +380,16 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 			},
 		},
 		{
-			name: "RM wins: EVENT_CONTEXT setting, prohibited",
-			opt:  optTemplate("COMPOSITION", optSingle("context", optNode("EVENT_CONTEXT", "", optProhibitedSingle("setting")))),
+			name:       "RM wins: EVENT_CONTEXT setting, prohibited",
+			prohibited: "/context/setting",
+			opt:        optTemplate("COMPOSITION", optSingle("context", optNode("EVENT_CONTEXT", "", optProhibitedSingle("setting")))),
 			check: func(t *testing.T, out any) {
 				checkOpenEHRCode(t, "EVENT_CONTEXT.setting", setting(out), terminology.Setting, "238")
 			},
 		},
 		{
-			name: "RM wins: INTERVAL_EVENT math_function, prohibited",
+			name:       "RM wins: INTERVAL_EVENT math_function, prohibited",
+			prohibited: "/math_function",
 			opt: optTemplate("INTERVAL_EVENT", append([]string{optProhibitedSingle("math_function")},
 				intervalEventAttrs...)...),
 			check: func(t *testing.T, out any) {
@@ -367,16 +397,18 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 			},
 		},
 		{
-			name: "RM wins: DV_MULTIMEDIA media_type, prohibited",
-			opt:  yieldMultimedia(optProhibitedSingle("media_type")),
+			name:       "RM wins: DV_MULTIMEDIA media_type, prohibited",
+			prohibited: "/value/media_type",
+			opt:        yieldMultimedia(optProhibitedSingle("media_type")),
 			check: func(t *testing.T, out any) {
 				want := rm.CodePhrase{CodeString: "text/plain", TerminologyID: rm.TerminologyID{Value: "IANA_media-types"}}
 				checkCode(t, "DV_MULTIMEDIA.media_type", rootElementValue[*rm.DVMultimedia](t, out).MediaType, want)
 			},
 		},
 		{
-			name: "RM wins: HISTORY origin, prohibited",
-			opt:  optTemplate("OBSERVATION", optSingle("data", optNode("HISTORY", "at0001", optProhibitedSingle("origin")))),
+			name:       "RM wins: HISTORY origin, prohibited",
+			prohibited: "/data/origin",
+			opt:        optTemplate("OBSERVATION", optSingle("data", optNode("HISTORY", "at0001", optProhibitedSingle("origin")))),
 			check: func(t *testing.T, out any) {
 				if got, want := out.(*rm.Observation).Data.Origin.Value, defaultsNow.Format(time.RFC3339); got != want {
 					t.Errorf("HISTORY.origin = %q, want the clock %q", got, want)
@@ -384,8 +416,9 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 			},
 		},
 		{
-			name: "RM wins: DV_TEXT value, prohibited",
-			opt:  optTemplate("ELEMENT", optSingle("value", optNode("DV_TEXT", "", optProhibitedSingle("value")))),
+			name:       "RM wins: DV_TEXT value, prohibited",
+			prohibited: "/value/value",
+			opt:        optTemplate("ELEMENT", optSingle("value", optNode("DV_TEXT", "", optProhibitedSingle("value")))),
 			check: func(t *testing.T, out any) {
 				if got := rootElementValue[*rm.DVText](t, out).Value; got == "" {
 					t.Errorf("DV_TEXT.value is empty, want the silent default")
@@ -395,8 +428,9 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 		{
 			// value and null_flavour are both prohibited: the RM rule that
 			// an ELEMENT carry one of them wins, with the null flavour.
-			name: "RM wins: ELEMENT value and null_flavour, prohibited",
-			opt:  optTemplate("ELEMENT", optProhibitedSingle("null_flavour"), optProhibitedSingle("value")),
+			name:       "RM wins: ELEMENT value and null_flavour, prohibited",
+			prohibited: "/null_flavour",
+			opt:        optTemplate("ELEMENT", optProhibitedSingle("null_flavour"), optProhibitedSingle("value")),
 			check: func(t *testing.T, out any) {
 				el := out.(*rm.Element)
 				if el.Value != nil {
@@ -532,13 +566,24 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 					if tc.validatorBlind {
 						return
 					}
-					var coded int
+					var coded, prohibited int
 					for _, iss := range templateErrors(out, c) {
 						if tc.floorCoded != "" && iss.Code == "code_not_in_value_set" && iss.Path == tc.floorCoded {
 							coded++
 							continue
 						}
+						if isProhibitedAt(iss, tc.prohibited) {
+							prohibited++
+							continue
+						}
 						t.Errorf("template validator: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+					}
+					wantProhibited := 0
+					if tc.prohibited != "" {
+						wantProhibited = 1
+					}
+					if prohibited != wantProhibited {
+						t.Errorf("template validator: %d prohibited (template, existence) @ %q, want %d: REQ-107 writes the attribute the RM needs, and REQ-102 reports it", prohibited, tc.prohibited, wantProhibited)
 					}
 					want := 0
 					if tc.floorCoded != "" {

@@ -107,7 +107,9 @@ func ValidateRMEHRStatusBytes(data []byte) Result {
 	if len(absent) == 0 {
 		return r
 	}
-	return resultFromIssues(replaceAtPaths(r.Issues, absent))
+	out := resultFromIssues(replaceAtPaths(r.Issues, absent))
+	out.Coverage = r.Coverage
+	return out
 }
 
 // rootKeyAbsences returns the `required` findings for the value-typed
@@ -123,6 +125,8 @@ func rootKeyAbsences(keys map[string]jsontext.Value) []Issue {
 		out = append(out, Issue{
 			Path:     "/subject",
 			Code:     "required",
+			Layer:    LayerRM,
+			Rule:     ruleMandatory,
 			Detail:   `RM-mandatory attribute "subject" is absent or null on EHR_STATUS`,
 			Severity: Error,
 		})
@@ -149,6 +153,8 @@ func rootKeyAbsences(keys map[string]jsontext.Value) []Issue {
 			out = append(out, Issue{
 				Path:     "/archetype_details/" + attr,
 				Code:     "required",
+				Layer:    LayerRM,
+				Rule:     ruleMandatory,
 				Detail:   `RM-mandatory attribute "` + attr + `" is absent or null on ARCHETYPED`,
 				Severity: Error,
 			})
@@ -157,9 +163,12 @@ func rootKeyAbsences(keys map[string]jsontext.Value) []Issue {
 	return out
 }
 
-// replaceAtPaths returns issues without any issue at the path of one of
-// replacements, followed by replacements. A key-presence finding thereby takes
-// the place of the value-based finding at its path.
+// replaceAtPaths returns issues without the value walk's findings at the
+// path of one of replacements, followed by replacements. A key-presence
+// finding thereby takes the place of the value-based finding at its path. A
+// walk condition at such a path is kept: it says where the walk stopped or
+// turned back, not what it found there, and Coverage.Stopped lists the path
+// of each max_depth and max_nodes issue.
 func replaceAtPaths(issues, replacements []Issue) []Issue {
 	replaced := make(map[string]bool, len(replacements))
 	for _, r := range replacements {
@@ -167,7 +176,7 @@ func replaceAtPaths(issues, replacements []Issue) []Issue {
 	}
 	out := make([]Issue, 0, len(issues)+len(replacements))
 	for _, i := range issues {
-		if !replaced[i.Path] {
+		if !replaced[i.Path] || isWalkCondition(i.Code) {
 			out = append(out, i)
 		}
 	}

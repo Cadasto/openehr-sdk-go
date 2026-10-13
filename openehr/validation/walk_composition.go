@@ -63,6 +63,12 @@ func (w *walker) walkNode(optNode *tcimpl.CompiledNode, rmValue any, path string
 	if pc := optNode.PrimitiveConstraint(); pc != nil && tcimpl.IsAOMPrimitiveShortName(optNode.RMTypeName()) {
 		if primitiveValueMatchesShortName(optNode.RMTypeName(), rmValue) {
 			w.applyPrimitive(optNode, rmValue, path, pc)
+			// A scalar has no attributes to walk, but a CONSTRAINT_REF
+			// on it is still a value set checked nowhere, so the
+			// coverage names it as below.
+			if _, isRef := pc.(constraints.ConstraintRef); isRef {
+				w.external = append(w.external, path)
+			}
 			return
 		}
 	}
@@ -87,10 +93,12 @@ func (w *walker) walkNode(optNode *tcimpl.CompiledNode, rmValue any, path string
 		// checks nothing locally, so the bound value's RM-mandatory
 		// attributes (a CODE_PHRASE's terminology_id and code_string)
 		// are still walked below, as at a node the OPT leaves
-		// unconstrained.
+		// unconstrained. The result's coverage names the node, since the
+		// code there was checked against no value set.
 		if _, isRef := pc.(constraints.ConstraintRef); !isRef {
 			return
 		}
+		w.external = append(w.external, path)
 	}
 
 	for _, attr := range optNode.Attributes() {
@@ -107,17 +115,20 @@ func (w *walker) walkNode(optNode *tcimpl.CompiledNode, rmValue any, path string
 }
 
 // walkSingleAttribute enforces existence on a C_SINGLE_ATTRIBUTE
-// and binds the RM value to one of attr.Children() via the AOM 1.4
+// (an attribute the OPT prohibits that holds a value is reported as
+// prohibited and not walked into, [isProhibited]) and binds the RM value to
+// one of the children the OPT allows ([allowedChildren]; a child that is
+// not allowed binds no value) via the AOM 1.4
 // "one alternative MUST match" semantics, by [bindByRMType]: the most
 // specific child wins, a child of the value's own RM type before the
 // AOM 1.4 short name it wraps, and that before a child the type only
 // conforms to in the pinned BMM, or a typed DV_INTERVAL<T> child for an
 // interval each present bound of which conforms to T. When none match
 // the walker emits a typed issue:
-//   - exactly one child → `rm_type_mismatch` (plain type constraint,
-//     no real alternatives);
-//   - two or more children → `alternative_mismatch` with the list
-//     of allowed RM types.
+//   - exactly one allowed child → `rm_type_mismatch` (plain type
+//     constraint, no real alternatives);
+//   - two or more allowed children → `alternative_mismatch` with the
+//     list of their RM types.
 func (w *walker) walkSingleAttribute(
 	opt *tcimpl.CompiledNode,
 	attr *tcimpl.CompiledAttribute,
@@ -127,17 +138,28 @@ func (w *walker) walkSingleAttribute(
 	attrPath := joinPath(parentPath, "/"+attr.Name())
 	val, ok := rmread.ReadSingle(parentRM, opt.RMTypeName(), attr.Name())
 	if !ok {
-		if isRequired(attr) {
+		if layer, rule, required := requiredBy(attr); required {
 			w.emit(Issue{
 				Path:     attrPath,
 				Code:     "required",
+				Layer:    layer,
+				Rule:     rule,
 				Detail:   fmt.Sprintf("required attribute %q absent on %s", attr.Name(), describeRMType(parentRM)),
 				Severity: Error,
 			})
 		}
 		return
 	}
-	children := attr.Children()
+	// An attribute the OPT prohibits is reported once when it holds a
+	// value (ReadSingle reads nil and typed-nil as absent), and the walk
+	// goes no further into it.
+	if isProhibited(attr) {
+		w.emitProhibited(attr, parentRM, attrPath)
+		return
+	}
+	// A child the OPT does not allow binds no value; the attribute is
+	// prohibited, above, when it allows none.
+	children := allowedChildren(attr)
 	if len(children) == 0 {
 		// No OPT children → no structural constraint; primitive
 		// constraints fire when walkNode reaches a primitive leaf.
@@ -150,6 +172,8 @@ func (w *walker) walkSingleAttribute(
 			w.emit(Issue{
 				Path:     attrPath,
 				Code:     "slot_fill",
+				Layer:    LayerTemplate,
+				Rule:     ruleSlot,
 				Detail:   fmt.Sprintf("RM value %s under %q does not satisfy slot %s", describeLocatableID(val), attr.Name(), child.NodeID()),
 				Severity: Error,
 			})
@@ -166,6 +190,8 @@ func (w *walker) walkSingleAttribute(
 			w.emit(Issue{
 				Path:     attrPath,
 				Code:     "rm_type_mismatch",
+				Layer:    LayerTemplate,
+				Rule:     ruleType,
 				Detail:   fmt.Sprintf("RM value of type %s under %q does not satisfy template RM type %s", describeRMType(val), attr.Name(), children[0].RMTypeName()),
 				Severity: Error,
 			})
@@ -173,6 +199,8 @@ func (w *walker) walkSingleAttribute(
 			w.emit(Issue{
 				Path:     attrPath,
 				Code:     "alternative_mismatch",
+				Layer:    LayerTemplate,
+				Rule:     ruleType,
 				Detail:   fmt.Sprintf("RM value of type %s under %q matches none of the OPT alternatives %s", describeRMType(val), attr.Name(), formatAllowedTypes(children)),
 				Severity: Error,
 			})
@@ -301,7 +329,9 @@ func formatAllowedTypes(children []*tcimpl.CompiledNode) string {
 }
 
 // walkMultipleAttribute enforces existence + cardinality on a
-// multi-valued attribute and binds each RM item to an OPT child.
+// multi-valued attribute and binds each RM item to an OPT child. An
+// attribute the OPT prohibits that holds an item is reported as
+// prohibited and not walked into.
 // A LOCATABLE binds by archetype_node_id: exact archetype/node ids
 // first, picked by the template-level name where several children share
 // the id, then the parsed REQ-104 slot grammar (see [matchChildByID]);
@@ -333,21 +363,37 @@ func (w *walker) walkMultipleAttribute(
 		// Silent skip would let a missing rmread row (or a
 		// composition with an unhandled parent RM type) hide a real
 		// structural failure.
-		if isRequired(attr) {
+		if layer, rule, required := requiredBy(attr); required {
 			w.emit(Issue{
 				Path:     attrPath,
 				Code:     "required",
+				Layer:    layer,
+				Rule:     rule,
 				Detail:   fmt.Sprintf("required multi-valued attribute %q absent on %s", attr.Name(), describeRMType(parentRM)),
 				Severity: Error,
 			})
 		}
 		return
 	}
-	// Existence: lower ≥ 1 with zero items is "required".
-	if isRequired(attr) && len(items) == 0 {
+	// An attribute the OPT prohibits is reported once when it holds at
+	// least one item, and the walk goes no further into it.
+	if len(items) > 0 && isProhibited(attr) {
+		w.emitProhibited(attr, parentRM, attrPath)
+		return
+	}
+	// Existence: lower ≥ 1 with zero items is "required". When only the RM
+	// makes the attribute mandatory, the list is there and empty, which the
+	// RM's own rule names cardinality, as the floor does for the same list;
+	// when the template's existence requires it, it is that existence rule.
+	if layer, rule, required := requiredBy(attr); required && len(items) == 0 {
+		if layer == LayerRM {
+			rule = ruleCardinality
+		}
 		w.emit(Issue{
 			Path:     attrPath,
 			Code:     "required",
+			Layer:    layer,
+			Rule:     rule,
 			Detail:   fmt.Sprintf("required multi-valued attribute %q is empty on %s", attr.Name(), describeRMType(parentRM)),
 			Severity: Error,
 		})
@@ -358,6 +404,8 @@ func (w *walker) walkMultipleAttribute(
 			w.emit(Issue{
 				Path:     attrPath,
 				Code:     "cardinality",
+				Layer:    LayerTemplate,
+				Rule:     ruleCardinality,
 				Detail:   fmt.Sprintf("attribute %q has %d children; OPT cardinality %s", attr.Name(), len(items), formatInterval(cm)),
 				Severity: Error,
 			})
@@ -409,6 +457,8 @@ func (w *walker) walkMultipleAttribute(
 			w.emit(Issue{
 				Path:     childPath[i],
 				Code:     "cardinality",
+				Layer:    LayerTemplate,
+				Rule:     ruleOccurrences,
 				Detail:   fmt.Sprintf("OPT child %s appears %d times under %q; occurrences %s", childIdentity(c), got, attr.Name(), formatInterval(occ)),
 				Severity: Error,
 			})
@@ -505,6 +555,8 @@ func (w *walker) applyPrimitive(
 		w.emit(Issue{
 			Path:     path,
 			Code:     "primitive_" + string(v.Code),
+			Layer:    LayerTemplate,
+			Rule:     string(v.Code),
 			Detail:   v.Detail,
 			Severity: Error,
 			Value:    v.Value,
@@ -562,23 +614,68 @@ func primitiveInput(rmValue any) any {
 	return rmValue
 }
 
-// isRequired reports whether the compiled attribute carries an
-// existence interval with lower bound ≥ 1 — i.e. the OPT mandates
-// presence. Also honours the BMM-mandatory bit (Required()): some
-// attributes are mandatory by RM even when the OPT existence
-// element is silent (e.g. COMPOSITION.category).
-func isRequired(attr *tcimpl.CompiledAttribute) bool {
+// requiredBy reports whether the compiled attribute must be present, and
+// which layer and rule require it. An OPT existence interval with lower
+// bound ≥ 1 is the template's own requirement: the template layer, rule
+// existence. Failing that, the BMM-mandatory bit (Required()) makes some
+// attributes mandatory even when the OPT existence element is silent (e.g.
+// COMPOSITION.category): the RM layer, rule mandatory. When both hold, the
+// template's own requirement is the one reported. required is false, with
+// no layer or rule, when neither holds.
+func requiredBy(attr *tcimpl.CompiledAttribute) (layer Layer, rule string, required bool) {
+	if e := attr.Existence(); e != nil && !e.LowerUnbounded() && e.Lower() >= 1 {
+		return LayerTemplate, ruleExistence, true
+	}
 	if attr.Required() {
+		return LayerRM, ruleMandatory, true
+	}
+	return LayerNone, "", false
+}
+
+// isProhibited reports whether the OPT prohibits the compiled attribute:
+// its existence interval has a bounded upper bound of 0, or it declares at
+// least one child and allows none of them ([isAllowed]). An attribute with
+// no child is open, not prohibited.
+func isProhibited(attr *tcimpl.CompiledAttribute) bool {
+	if e := attr.Existence(); e != nil && !e.UpperUnbounded() && e.Upper() == 0 {
 		return true
 	}
-	e := attr.Existence()
-	if e == nil {
-		return false
+	children := attr.Children()
+	return len(children) > 0 && !slices.ContainsFunc(children, isAllowed)
+}
+
+// isAllowed reports whether the OPT allows the child: its occurrences
+// upper bound is unbounded, or bounded above 0, or it states none.
+func isAllowed(child *tcimpl.CompiledNode) bool {
+	occ := child.Occurrences()
+	return occ == nil || occ.UpperUnbounded() || occ.Upper() != 0
+}
+
+// allowedChildren returns the children of attr the OPT allows
+// ([isAllowed]), in OPT order.
+func allowedChildren(attr *tcimpl.CompiledAttribute) []*tcimpl.CompiledNode {
+	// Children returns a copy, so deleting from it leaves attr as it is.
+	return slices.DeleteFunc(attr.Children(), func(c *tcimpl.CompiledNode) bool { return !isAllowed(c) })
+}
+
+// emitProhibited reports the attribute attr, which the OPT prohibits, as
+// present on parentRM, at attrPath. The caller then leaves the attribute:
+// the walk checks nothing more on it and does not descend into it. The
+// Detail names the attribute, the parent's RM type and how the template
+// prohibits it, never the value.
+func (w *walker) emitProhibited(attr *tcimpl.CompiledAttribute, parentRM any, attrPath string) {
+	how := "it allows none of the attribute's children"
+	if e := attr.Existence(); e != nil && !e.UpperUnbounded() && e.Upper() == 0 {
+		how = "existence " + formatInterval(e)
 	}
-	if e.LowerUnbounded() {
-		return false
-	}
-	return e.Lower() >= 1
+	w.emit(Issue{
+		Path:     attrPath,
+		Code:     "prohibited",
+		Layer:    LayerTemplate,
+		Rule:     ruleExistence,
+		Detail:   fmt.Sprintf("attribute %q is present on %s, but the template prohibits it (%s)", attr.Name(), describeRMType(parentRM), how),
+		Severity: Error,
+	})
 }
 
 // outOfMultiplicityInterval reports whether `count` falls outside the
@@ -768,23 +865,33 @@ func unboundItemIssue(
 		return Issue{
 			Path:     itemPath,
 			Code:     "slot_fill",
+			Layer:    LayerTemplate,
+			Rule:     ruleSlot,
 			Detail:   fmt.Sprintf("RM item %s does not match any OPT child of %q (archetype/at-code mismatch)", describeLocatableID(item), attr.Name()),
 			Severity: Error,
 		}
 	}
-	iss := Issue{Path: itemPath, Code: "alternative_mismatch", Severity: Error}
+	code := "alternative_mismatch"
 	if len(children) == 1 {
-		iss.Code = "rm_type_mismatch"
+		code = "rm_type_mismatch"
 	}
+	var detail string
 	switch {
 	case isNilItem(item):
-		iss.Detail = fmt.Sprintf("nil item under %q has no RM value for an OPT child to bind", attr.Name())
+		detail = fmt.Sprintf("nil item under %q has no RM value for an OPT child to bind", attr.Name())
 	case len(children) == 1:
-		iss.Detail = fmt.Sprintf("RM value of type %s under %q does not satisfy template RM type %s", describeRMType(item), attr.Name(), children[0].RMTypeName())
+		detail = fmt.Sprintf("RM value of type %s under %q does not satisfy template RM type %s", describeRMType(item), attr.Name(), children[0].RMTypeName())
 	default:
-		iss.Detail = fmt.Sprintf("RM value of type %s under %q matches none of the OPT alternatives %s", describeRMType(item), attr.Name(), formatAllowedTypes(children))
+		detail = fmt.Sprintf("RM value of type %s under %q matches none of the OPT alternatives %s", describeRMType(item), attr.Name(), formatAllowedTypes(children))
 	}
-	return iss
+	return Issue{
+		Path:     itemPath,
+		Code:     code,
+		Layer:    LayerTemplate,
+		Rule:     ruleType,
+		Detail:   detail,
+		Severity: Error,
+	}
 }
 
 // slotFitsArchetypeID checks whether archetypeID satisfies the
@@ -837,6 +944,8 @@ func (w *walker) checkLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, p
 			w.emit(Issue{
 				Path:     joinPath(path, "/archetype_node_id"),
 				Code:     "archetype_id_mismatch",
+				Layer:    LayerTemplate,
+				Rule:     ruleIdentity,
 				Detail:   fmt.Sprintf("archetype_node_id %q does not match template archetype id %q at %s", id, want, path),
 				Severity: Error,
 			})
@@ -847,6 +956,8 @@ func (w *walker) checkLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, p
 		w.emit(Issue{
 			Path:     joinPath(path, "/archetype_node_id"),
 			Code:     "node_id_mismatch",
+			Layer:    LayerTemplate,
+			Rule:     ruleIdentity,
 			Detail:   fmt.Sprintf("archetype_node_id %q does not match template node_id %q at %s", id, want, path),
 			Severity: Error,
 		})
@@ -874,6 +985,8 @@ func (w *walker) checkRMType(opt *tcimpl.CompiledNode, rmValue any, path string)
 	w.emit(Issue{
 		Path:     path,
 		Code:     "rm_type_mismatch",
+		Layer:    LayerTemplate,
+		Rule:     ruleType,
 		Detail:   fmt.Sprintf("RM type %s does not satisfy template RM type %s at %s", got, want, path),
 		Severity: Error,
 	})

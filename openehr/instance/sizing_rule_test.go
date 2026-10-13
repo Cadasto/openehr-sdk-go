@@ -84,6 +84,12 @@ func TestREQ107_ProhibitedChildGetsNoMember(t *testing.T) {
 		// valid says the template validator must find no error; the
 		// CLUSTER whose only child is prohibited contradicts the RM.
 		valid bool
+		// prohibited is the path of the attribute the OPT prohibits and the
+		// RM requires, which the generator fills anyway (REQ-107 §
+		// Exceptions and known gaps): the template validator's one error
+		// is prohibited there, on the template layer with the rule
+		// existence (REQ-102 § Structural — prohibited attributes).
+		prohibited string
 	}{
 		{
 			name: "per-child fill",
@@ -109,10 +115,13 @@ func TestREQ107_ProhibitedChildGetsNoMember(t *testing.T) {
 		{
 			// The OPT prohibits items, which the RM requires: the RM rule
 			// wins, and the walk fills the list as it would an allowed one.
-			name:  "CLUSTER items prohibited, an ELEMENT child",
-			opt:   optTemplate("CLUSTER", optProhibitedMultiple("items", optNode("ELEMENT", "at0001"))),
-			want:  []string{"at0001"},
-			valid: true,
+			// The list breaks the prohibition (REQ-107), so the template
+			// validator reports it as prohibited (REQ-102).
+			name:       "CLUSTER items prohibited, an ELEMENT child",
+			opt:        optTemplate("CLUSTER", optProhibitedMultiple("items", optNode("ELEMENT", "at0001"))),
+			want:       []string{"at0001"},
+			valid:      true,
+			prohibited: "/items",
 		},
 	}
 	for _, tc := range cases {
@@ -131,8 +140,20 @@ func TestREQ107_ProhibitedChildGetsNoMember(t *testing.T) {
 					if !tc.valid {
 						return
 					}
+					prohibited := 0
 					for _, iss := range templateErrors(out, c) {
+						if isProhibitedAt(iss, tc.prohibited) {
+							prohibited++
+							continue
+						}
 						t.Errorf("template validator: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+					}
+					wantProhibited := 0
+					if tc.prohibited != "" {
+						wantProhibited = 1
+					}
+					if prohibited != wantProhibited {
+						t.Errorf("template validator: %d prohibited (template, existence) @ %q, want %d: REQ-107 fills the list the RM needs, and REQ-102 reports it", prohibited, tc.prohibited, wantProhibited)
 					}
 				})
 			}

@@ -286,6 +286,51 @@ This is a pre-existing emission gap, not a REQ-048 regression — REQ-048 only m
 
 ---
 
+## STRAND-15 — Decode-time presence and unmatched-member capture on the generated types
+
+**Status:** Open. Opened 2026-10-13, after [PR 256](https://github.com/Cadasto/openehr-sdk-go/pull/256).
+
+**Question:** do the generated RM types record, at decode, which by-value mandatory members the input left out, and the members the decoder matched to nothing? And when they capture unmatched members, are those kept on the value so a read, modify and write round trip is lossless, or discarded once reported?
+
+**Why it is open:** two costs of today's design meet here. [REQ-170](wire.md#req-170--unmatched-content-on-decode)'s report and strict options for canonical JSON read the bytes again after the decode, once to find every `_type` and once to compare each member name with the class's attribute list, and that name pass links the RM attribute tables into every program that imports `canjson` (measured at 339 KB in the PR 256 review). And a by-value mandatory attribute, `EHR_STATUS.subject` the case in point, cannot be told absent from zero after the decode, which is why `ValidateRMEHRStatusBytes` exists ([REQ-112 § Value-typed mandatory presence](clinical-modeling.md#value-typed-mandatory-presence)) and why no other root has such an entry. The standard library can do both in one pass: `encoding/json/v2`'s embedded fallback (the `embed` option on a `jsontext.Value` or `map[string]T` field) receives every member the struct does not match, and the generated decoders know, as they read, which members they saw.
+
+**The trade-off:**
+
+- **Capture and discard.** The report option reads the fallback instead of the bytes, the second and third read go, and the value stays as REQ-170 defines it: no unmatched content anywhere in it. Against it: a producer's extension members are still lost on a round trip, which is the interoperability case the capture could serve.
+- **Capture and keep.** The value carries the captured members and the encoder writes them back, so a read, modify and write is lossless. Against it: it reverses REQ-170's rule that a decoded value holds no unmatched content, touches [REQ-052](wire.md#req-052)'s expected form, and puts one more field on every generated class that the validators, the builder and the generator then have to leave alone.
+- **Presence as a record of absence.** A record set only by a decoder, and only for a by-value mandatory member the input left out, lets the floor report the omission on a decoded value and leaves a value built in Go, which has no record, read as present, as today. A record of presence instead would make every Go-built value report its by-value mandatory members absent. The direction of the record is part of the question.
+- **The other codecs.** Canonical XML already streams through the generated decoders and a runtime, so a presence record is cheap there; FLAT and STRUCTURED resolve keys against a Web Template, and a mistyped key there is indistinguishable from an extension and vanishes before any validator sees the value. On a write path the report is therefore needed beside the validation result whatever the answer here.
+
+**Evidence needed:** the size and decode cost of one fallback field per class across the 110 registered classes, on the `canjson` benchmarks; the link-size saving once the name pass goes; whether any consumer needs the lossless round trip; and the shape of the absence record that costs least on a decoded composition.
+
+**Resolution form:** an ADR amending REQ-170 and REQ-052, and REQ-112 for the presence rule; a new requirement for the capture contract, allocated when the ADR lands, so `ValidateRMEHRStatusBytes` can retire. [REQ-171](clinical-modeling.md#req-171--validation-engine) keeps decode-time checks out of its scope until then.
+
+**Affects:** REQ-040, REQ-052, REQ-112, REQ-170.
+
+---
+
+## STRAND-16 — Validator policy beyond the limits
+
+**Status:** Open. Opened 2026-10-13, after [PR 256](https://github.com/Cadasto/openehr-sdk-go/pull/256).
+
+**Question:** which settings, beyond the depth and visit limits, does the validator of [REQ-171](clinical-modeling.md#req-171--validation-engine) take as options, and which stay outside the SDK as the caller's policy over a result?
+
+Three candidates are named and none is built:
+
+1. **Descent under refused content.** Once REQ-171's *One walk* binds, content the template does not admit is reported once and not entered; until then the floor still walks it. An authoring tool that shows a form in progress may want the full detail under a refused node anyway. The default is to stop; whether an option may ask for the descent, and whether its findings carry a mark that tells them from a normal result, is open.
+2. **A severity policy per rule.** A server that applies a policy to template findings (warn) and another to RM findings (reject) can do so from the `Layer` each finding carries. Whether that is enough, or whether a policy per rule inside the SDK (this rule warns, that one rejects) is wanted so the result's `OK` already reflects it, is open. RM validation stays on whatever the answer: the policy chooses what to do with a finding, never whether to look.
+3. **A partial-instance mode.** A form in progress holds values on some nodes and nothing yet on others. An option that keeps every value check and suppresses the presence and lower-bound count findings of both layers would serve that case without any switch that turns the RM rules off, which [ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md) refuses. It is additive; what it means for `Result.OK` and `Coverage` is the open part.
+
+**Why it is open:** each candidate is additive on REQ-171's options and cheap to add, and each changes what a `Result` means to the caller who reads it. None has a consumer asking for it yet except the warn-or-reject policy, which a server that validates on commit needs in some form. Adding an option nobody uses is the second kind of waste ADR 0025 named.
+
+**Evidence needed:** a consumer for each candidate, with the result shape it needs; for the partial mode, whether the generator's `Minimal` output and the composition builder's intermediate states are the instances it would serve.
+
+**Resolution form:** each candidate resolves on its own, by an amendment to REQ-171's *Surface* and *Coverage* with the option's contract; an ADR only where an option changes what an existing result means.
+
+**Affects:** REQ-102, REQ-110, REQ-171.
+
+---
+
 ## Index
 
 | Strand | Title | Status | Affects |
@@ -304,3 +349,5 @@ This is a pre-existing emission gap, not a REQ-048 regression — REQ-048 only m
 | [STRAND-12](#strand-12--bmm-interface-classes-carry-no-is_abstract-flag) | BMM interface classes carry no `is_abstract` | Open | REQ-047, REQ-048 |
 | [STRAND-13](#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped) | Properties inherited from a primitive-mapped ancestor are dropped | Open | REQ-042, REQ-043, REQ-046, REQ-048 |
 | [STRAND-14](#strand-14--should-template-driven-validation-also-run-the-rm-floor-invariants) | Template-driven validation and the RM floor | **Resolved** ([ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md)) | REQ-102, REQ-110, REQ-112 |
+| [STRAND-15](#strand-15--decode-time-presence-and-unmatched-member-capture-on-the-generated-types) | Decode-time presence and unmatched-member capture | Open | REQ-040, REQ-052, REQ-112, REQ-170 |
+| [STRAND-16](#strand-16--validator-policy-beyond-the-limits) | Validator policy beyond the limits | Open | REQ-102, REQ-110, REQ-171 |

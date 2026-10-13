@@ -382,7 +382,7 @@ func TestREQ168_EmptyValue(t *testing.T) {
 			name:  "nil_root guard",
 			run:   floor(nil),
 			code:  "nil_root",
-			paths: []string{"/"},
+			paths: []string{""},
 		},
 		{
 			name: "nil_composition guard",
@@ -625,6 +625,8 @@ func assertValueFree(t *testing.T, r validation.Result, markers ...string) {
 		fields := []struct{ name, text string }{
 			{name: "Path", text: issue.Path},
 			{name: "Code", text: issue.Code},
+			{name: "Layer", text: issue.Layer.String()},
+			{name: "Rule", text: issue.Rule},
 			{name: "Detail", text: issue.Detail},
 			{name: "Severity", text: issue.Severity.String()},
 		}
@@ -647,11 +649,14 @@ func assertNoMarker(t *testing.T, what string, out []byte) {
 }
 
 // assertSameButEmptyValue fails the test unless got has want's Path, Code,
-// Detail and Severity and an empty Value.
+// Layer, Rule, Detail and Severity and an empty Value.
 func assertSameButEmptyValue(t *testing.T, what string, got, want validation.Issue) {
 	t.Helper()
-	if got.Path != want.Path || got.Code != want.Code || got.Detail != want.Detail || got.Severity != want.Severity {
-		t.Errorf("%s = {%q %q %q %v}, want {%q %q %q %v}", what, got.Path, got.Code, got.Detail, got.Severity, want.Path, want.Code, want.Detail, want.Severity)
+	if got.Path != want.Path || got.Code != want.Code || got.Layer != want.Layer || got.Rule != want.Rule ||
+		got.Detail != want.Detail || got.Severity != want.Severity {
+		t.Errorf("%s = {%q %q %v %q %q %v}, want {%q %q %v %q %q %v}", what,
+			got.Path, got.Code, got.Layer, got.Rule, got.Detail, got.Severity,
+			want.Path, want.Code, want.Layer, want.Rule, want.Detail, want.Severity)
 	}
 	if v := got.Value.Reveal(); v != nil {
 		t.Errorf("%s: Value.Reveal() = %T, want nil", what, v)

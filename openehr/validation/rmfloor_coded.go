@@ -72,12 +72,19 @@ func (r *codedRule) holds(code rm.CodePhrase) bool {
 	return r.codeSet.Has(code.CodeString)
 }
 
+// name is the rule's name, CLASS.Invariant: the class that declares the
+// invariant and the invariant's name, as the BMM spells them. It is the Rule
+// a breach carries.
+func (r *codedRule) name() string {
+	return r.owner + "." + r.invariant
+}
+
 // detail is the diagnostic for a breach on a node of class: it names the
 // class, the attribute, the invariant and the group or code set (with the
 // external id of an ISO or IANA set), and never the code the node carries or
 // its terminology id (REQ-093).
 func (r *codedRule) detail(class string) string {
-	invariant := r.owner + "." + r.invariant
+	invariant := r.name()
 	switch {
 	case r.group != nil:
 		return fmt.Sprintf("%s.%s must be coded in the openEHR terminology with a code of its group %q (RM %s)",
@@ -122,6 +129,8 @@ func (w *rmFloorWalker) checkCodedInvariants(value any, rmType, path string) {
 		w.emit(Issue{
 			Path:   v.path(path),
 			Code:   "code_not_in_value_set",
+			Layer:  LayerRM,
+			Rule:   v.rule.name(),
 			Detail: v.rule.detail(rmType),
 		})
 	}

@@ -36,21 +36,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
 )
 
-// maxWalkDepth bounds the RM-floor descent. RM graphs decoded from the
-// wire are acyclic trees, but ValidateRM accepts any caller-built value.
-// The walk's visit record stops a cycle through a pointer
-// ([rmFloorWalker.walk]); this bound stops a graph that is merely too deep,
-// rather than overflowing the stack. The deepest legitimate RM nesting is
-// far below it.
-const maxWalkDepth = 256
-
-// maxWalkNodes bounds the number of values one RM-floor walk visits. A
-// value held by value whose list shares its own backing array contains
-// itself without a pointer the visit record could recognise, and below
-// maxWalkDepth it can branch on every level; the walk stops after this many
-// visits instead. The largest corpus document, Demonstration.v1, needs 978.
-const maxWalkNodes = 100_000
-
 // ValidateRM validates root against the openEHR Reference Model alone:
 // it is the floor on its own, for a root no operational template applies
 // to. It checks every RM-mandatory attribute on every node
@@ -88,19 +73,31 @@ const maxWalkNodes = 100_000
 // inside itself is reported as `cyclic_value` at each path where it recurs
 // and is not descended into. A value held by value can hold itself too,
 // through a list that shares its own backing array, and the floor cannot
-// recognise it; so every call stops after a fixed number of visits, far
-// above what a decoded document needs, and reports `max_nodes` once, at the
-// path where it stopped. A graph nested deeper than the walk's depth limit
-// stops there, with `max_depth`.
+// recognise it; so every call stops after a number of visits, by default
+// far above what a decoded document needs, and reports `max_nodes` once, at
+// the path where it stopped. A graph nested deeper than the walk's depth limit
+// is not walked below it; the walk reports `max_depth` once, at the first
+// path where it stopped. [Result.Coverage] lists the path of each of the
+// two, and the [Limits] of a [Validator] set both.
 //
-// A nil root surfaces a single `nil_root` issue and is reported as
-// not-OK. An unknown RM root type (a Go value outside the closed RM
-// set) surfaces `rm_type_unknown` at "/"; the floor cannot descend
+// ValidateRM returns what a [Validator] built with no options returns from
+// Validate(root, nil).
+//
+// A nil root surfaces a single `nil_root` issue with an empty path and is
+// reported as not-OK. An unknown RM root type (a Go value outside the
+// closed RM set) surfaces `rm_type_unknown` at "/"; the floor cannot descend
 // further but does not panic.
 func ValidateRM(root any) Result {
+	var v Validator
+	return v.Validate(root, nil)
+}
+
+// validateRM runs the floor alone over root, within lim, guarding a nil root
+// and one outside the closed RM set.
+func validateRM(root any, lim Limits) Result {
 	if root == nil || rmread.IsTypedNilPointer(root) {
 		return resultFromIssues([]Issue{{
-			Path:     "/",
+			Path:     "",
 			Code:     "nil_root",
 			Detail:   "ValidateRM: root is nil",
 			Severity: Error,
@@ -115,25 +112,38 @@ func ValidateRM(root any) Result {
 			Severity: Error,
 		}})
 	}
-	return resultFromIssues(walkFloor(root, rmType, nil))
+	issues, stopped := walkFloor(root, rmType, nil, lim)
+	r := resultFromIssues(issues)
+	r.Coverage.Stopped = stopped
+	return r
 }
 
-// walkFloor runs the floor over root, of RM type rmType, and returns its
-// issues. names gives the name the OPT pins on each item a template walk
-// bound, so the floor writes that walk's path for the node; nil writes no
-// name predicate.
-func walkFloor(root any, rmType string, names pinnedNames) []Issue {
-	w := &rmFloorWalker{info: rminfo.Default, names: names}
+// walkFloor runs the floor over root, of RM type rmType, within lim, and
+// returns its issues and the path of each place where a limit stopped it.
+// names gives the name the OPT pins on each item a template walk bound, so
+// the floor writes that walk's path for the node; nil writes no name
+// predicate.
+func walkFloor(root any, rmType string, names pinnedNames, lim Limits) (issues []Issue, stopped []string) {
+	w := newFloorWalker(names, lim)
 	w.walk(root, rmType, "/", roleNone, 0)
-	return w.issues
+	return w.issues, w.stoppedAt
 }
 
-// floorIssues runs the floor over the root a template-driven validation
-// walked, with the names that walk bound. A root outside the closed RM set,
-// which the template walk reports as a type mismatch, is one the floor
-// cannot descend: it reports it as `rm_type_unknown` at "/", as [ValidateRM]
-// does.
-func floorIssues(root any, names pinnedNames) []Issue {
+// newFloorWalker returns a floor walker that writes the names the OPT pins
+// (nil for none) and stops at lim, each zero or negative field of which
+// stands for its default.
+func newFloorWalker(names pinnedNames, lim Limits) *rmFloorWalker {
+	lim = lim.withDefaults()
+	return &rmFloorWalker{info: rminfo.Default, names: names, maxDepth: lim.Depth, maxNodes: lim.Nodes}
+}
+
+// floorIssues runs the floor, within lim, over the root a template-driven
+// validation walked, with the names that walk bound, and returns its issues
+// and the path of each place where a limit stopped it. A root outside the
+// closed RM set, which the template walk reports as a type mismatch, is one
+// the floor cannot descend: it reports it as `rm_type_unknown` at "/", as
+// [ValidateRM] does.
+func floorIssues(root any, names pinnedNames, lim Limits) (issues []Issue, stopped []string) {
 	rmType, _, ok := rmTypeInfo(root)
 	if !ok {
 		return []Issue{{
@@ -141,22 +151,24 @@ func floorIssues(root any, names pinnedNames) []Issue {
 			Code:     "rm_type_unknown",
 			Detail:   fmt.Sprintf("root Go type %T is outside the closed RM set; the RM floor cannot descend", root),
 			Severity: Error,
-		}}
+		}}, nil
 	}
-	return walkFloor(root, rmType, names)
+	return walkFloor(root, rmType, names, lim)
 }
 
 // ValidateRMFolder is the typed convenience wrapper for FOLDER roots.
-// Delegates to [ValidateRM]; a nil folder surfaces `nil_folder`.
+// Delegates to [ValidateRM]; a nil folder surfaces `nil_folder`, with an
+// empty path.
 func ValidateRMFolder(folder *rm.Folder) Result {
 	if folder == nil {
-		return resultFromIssues([]Issue{{Path: "/", Code: "nil_folder", Detail: "ValidateRMFolder: folder is nil", Severity: Error}})
+		return resultFromIssues([]Issue{{Path: "", Code: "nil_folder", Detail: "ValidateRMFolder: folder is nil", Severity: Error}})
 	}
 	return ValidateRM(folder)
 }
 
 // ValidateRMEHRStatus is the typed convenience wrapper for EHR_STATUS.
-// Delegates to [ValidateRM]; a nil status surfaces `nil_ehr_status`.
+// Delegates to [ValidateRM]; a nil status surfaces `nil_ehr_status`, with an
+// empty path.
 //
 // It cannot flag an omitted value-typed mandatory `subject` (typed
 // rm.PartySelf, whose zero value is indistinguishable from an absent one):
@@ -168,26 +180,28 @@ func ValidateRMFolder(folder *rm.Folder) Result {
 // without the Bytes entry's `required` at `archetype_id`.
 func ValidateRMEHRStatus(status *rm.EHRStatus) Result {
 	if status == nil {
-		return resultFromIssues([]Issue{{Path: "/", Code: "nil_ehr_status", Detail: "ValidateRMEHRStatus: status is nil", Severity: Error}})
+		return resultFromIssues([]Issue{{Path: "", Code: "nil_ehr_status", Detail: "ValidateRMEHRStatus: status is nil", Severity: Error}})
 	}
 	return ValidateRM(status)
 }
 
 // ValidateRMEHRAccess is the typed convenience wrapper for EHR_ACCESS.
-// Delegates to [ValidateRM]; a nil access surfaces `nil_ehr_access`.
+// Delegates to [ValidateRM]; a nil access surfaces `nil_ehr_access`, with an
+// empty path.
 func ValidateRMEHRAccess(access *rm.EHRAccess) Result {
 	if access == nil {
-		return resultFromIssues([]Issue{{Path: "/", Code: "nil_ehr_access", Detail: "ValidateRMEHRAccess: access is nil", Severity: Error}})
+		return resultFromIssues([]Issue{{Path: "", Code: "nil_ehr_access", Detail: "ValidateRMEHRAccess: access is nil", Severity: Error}})
 	}
 	return ValidateRM(access)
 }
 
 // ValidateRMDemographic is the typed convenience wrapper for the
 // demographic PARTY hierarchy (PERSON / ORGANISATION / GROUP / AGENT /
-// ROLE). Delegates to [ValidateRM]; a nil party surfaces `nil_party`.
+// ROLE). Delegates to [ValidateRM]; a nil party surfaces `nil_party`, with
+// an empty path.
 func ValidateRMDemographic(party rm.Party) Result {
 	if party == nil || rmread.IsTypedNilPointer(party) {
-		return resultFromIssues([]Issue{{Path: "/", Code: "nil_party", Detail: "ValidateRMDemographic: party is nil", Severity: Error}})
+		return resultFromIssues([]Issue{{Path: "", Code: "nil_party", Detail: "ValidateRMDemographic: party is nil", Severity: Error}})
 	}
 	return ValidateRM(party)
 }
@@ -196,19 +210,29 @@ func ValidateRMDemographic(party rm.Party) Result {
 // by rminfo. There is no notion of "OPT-declared attribute" here —
 // every BMM-known attribute is a descend candidate. Each value with an
 // identity is visited once ([rmFloorWalker.walk]), recursion depth is
-// bounded by maxWalkDepth and the number of visits by maxWalkNodes, so a
+// bounded by maxDepth and the number of visits by maxNodes, so a
 // caller-built graph that shares or cycles through a pointer, holds itself
 // by value, or nests too deep, terminates instead of branching without end
 // or overflowing the stack.
 type rmFloorWalker struct {
 	info   rminfo.Lookup
 	issues []Issue
+	// maxDepth and maxNodes are the [Limits] of the call, defaults filled
+	// in. RM graphs decoded from the wire are acyclic trees far shallower
+	// and smaller than either, but a value built in Go may nest without end
+	// or hold itself by value, which the visit record cannot recognise.
+	maxDepth, maxNodes int
+	// stoppedAt holds the path of the max_depth issue and of the max_nodes
+	// issue, in the order the walk reported them; depthStopped is set once
+	// the first depth stop is reported, so later ones are silent.
+	stoppedAt    []string
+	depthStopped bool
 	// reached holds each value with an identity ([hasIdentity]) the walk has
 	// reached; walk allocates it. inside holds those the walk is inside,
 	// outermost first.
 	reached map[any]struct{}
 	inside  []any
-	// visits counts the values the walk has visited, up to maxWalkNodes;
+	// visits counts the values the walk has visited, up to maxNodes;
 	// stopped is set once it reaches that limit, and ends the walk.
 	visits  int
 	stopped bool
@@ -246,10 +270,20 @@ func childRole(class string, role floorRole, attr string) floorRole {
 	return roleNone
 }
 
-func (w *rmFloorWalker) emit(i Issue) {
-	if i.Severity == 0 {
-		i.Severity = Error
+// isWalkCondition reports whether code is a walk condition: max_depth,
+// max_nodes or cyclic_value, an issue that says where the floor's walk
+// stopped or turned back rather than judge the value there.
+func isWalkCondition(code string) bool {
+	switch code {
+	case "max_depth", "max_nodes", "cyclic_value":
+		return true
 	}
+	return false
+}
+
+// emit appends i to the walker's issues. Every floor issue is an [Error],
+// the zero Severity, so no site sets it.
+func (w *rmFloorWalker) emit(i Issue) {
 	w.issues = append(w.issues, i)
 }
 
@@ -295,7 +329,7 @@ func (w *rmFloorWalker) walk(value any, rmType string, path string, role floorRo
 }
 
 // visit checks value (of declared BMM type rmType, in role role) at the
-// given issue path. A visit past maxWalkNodes checks nothing: it reports
+// given issue path. A visit past maxNodes checks nothing: it reports
 // `max_nodes` at path and ends the walk. Otherwise visit first runs the
 // per-type invariants on the current node, then, for types the floor handles (see [rmread.Handles]), iterates
 // every BMM-known attribute, emitting `required` for any RM-mandatory
@@ -314,12 +348,13 @@ func (w *rmFloorWalker) walk(value any, rmType string, path string, role floorRo
 // directly: CODE_PHRASE.terminology_id comes back as a Go string, which is
 // not an RM node to walk.
 func (w *rmFloorWalker) visit(value any, rmType string, path string, role floorRole, depth int) {
-	if w.visits == maxWalkNodes {
+	if w.visits == w.maxNodes {
 		w.emit(Issue{
 			Path:   path,
 			Code:   "max_nodes",
-			Detail: fmt.Sprintf("RM-floor walk stopped at %s after visiting %d values, its limit per call", rmType, maxWalkNodes),
+			Detail: fmt.Sprintf("RM-floor walk stopped at %s after visiting %d values, its limit per call", rmType, w.maxNodes),
 		})
+		w.stoppedAt = append(w.stoppedAt, path)
 		w.stopped = true
 		return
 	}
@@ -335,12 +370,19 @@ func (w *rmFloorWalker) visit(value any, rmType string, path string, role floorR
 	if !rmread.Handles(value) {
 		return
 	}
-	if depth >= maxWalkDepth {
-		w.emit(Issue{
-			Path:   path,
-			Code:   "max_depth",
-			Detail: fmt.Sprintf("RM-floor walk exceeded max depth %d at %s (possible cyclic graph)", maxWalkDepth, rmType),
-		})
+	if depth >= w.maxDepth {
+		// The first stop is reported; a later one, on another branch, is
+		// not walked below either, and is silent, so a value that reaches
+		// the limit on many branches yields one issue.
+		if !w.depthStopped {
+			w.depthStopped = true
+			w.emit(Issue{
+				Path:   path,
+				Code:   "max_depth",
+				Detail: fmt.Sprintf("RM-floor walk reached its depth limit %d at %s; nothing below that depth is walked, and later stops there are not reported again", w.maxDepth, rmType),
+			})
+			w.stoppedAt = append(w.stoppedAt, path)
+		}
 		return
 	}
 
@@ -381,6 +423,8 @@ func (w *rmFloorWalker) visit(value any, rmType string, path string, role floorR
 					w.emit(Issue{
 						Path:   attrPath,
 						Code:   "required",
+						Layer:  LayerRM,
+						Rule:   ruleMandatory,
 						Detail: fmt.Sprintf("RM-mandatory multi-valued attribute %q absent on %s", attr, rmType),
 					})
 				}
@@ -390,6 +434,8 @@ func (w *rmFloorWalker) visit(value any, rmType string, path string, role floorR
 				w.emit(Issue{
 					Path:   attrPath,
 					Code:   "cardinality",
+					Layer:  LayerRM,
+					Rule:   ruleCardinality,
 					Detail: fmt.Sprintf("RM-mandatory multi-valued attribute %q must be non-empty on %s", attr, rmType),
 				})
 			}
@@ -407,6 +453,8 @@ func (w *rmFloorWalker) visit(value any, rmType string, path string, role floorR
 				w.emit(Issue{
 					Path:   attrPath,
 					Code:   "required",
+					Layer:  LayerRM,
+					Rule:   ruleMandatory,
 					Detail: fmt.Sprintf("RM-mandatory attribute %q absent on %s", attr, rmType),
 				})
 			}
@@ -515,6 +563,8 @@ func (w *rmFloorWalker) checkArchetypeRoot(value any, rmType, path string) {
 		w.emit(Issue{
 			Path:   joinPath(path, "/archetype_details"),
 			Code:   "is_archetype_root",
+			Layer:  LayerRM,
+			Rule:   archetypeRootRules[rmType],
 			Detail: rmType + " is an archetype root, so archetype_details must be present (RM Is_archetype_root, LOCATABLE.Archetyped_valid)",
 		})
 	}
@@ -542,6 +592,8 @@ func (w *rmFloorWalker) checkArchetyped(value any, path string) {
 		w.emit(Issue{
 			Path:   joinPath(path, "/archetype_id/value"),
 			Code:   "required",
+			Layer:  LayerRM,
+			Rule:   ruleMandatory,
 			Detail: "ARCHETYPED.archetype_id must carry a non-empty value",
 		})
 	}
@@ -549,6 +601,8 @@ func (w *rmFloorWalker) checkArchetyped(value any, path string) {
 		w.emit(Issue{
 			Path:   joinPath(path, "/rm_version"),
 			Code:   "rm_version_valid",
+			Layer:  LayerRM,
+			Rule:   ruleRMVersionValid,
 			Detail: "ARCHETYPED.rm_version must be non-empty (RM Rm_version_valid)",
 		})
 	}
@@ -568,6 +622,8 @@ func (w *rmFloorWalker) checkCodePhrase(value any, path string, role floorRole) 
 		w.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   ruleCodeStringValid,
 			Detail: "CODE_PHRASE.code_string must be non-empty",
 		})
 	}
@@ -613,6 +669,8 @@ func (w *rmFloorWalker) checkDVQuantity(value any, path string) {
 		w.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   rulePrecisionRange,
 			Detail: "DV_QUANTITY.precision must be ≥ -1 (-1 = no limit)",
 			Value:  constraints.Redact(*q.Precision),
 		})
@@ -657,6 +715,8 @@ func (w *rmFloorWalker) checkDVProportion(value any, path string) {
 		w.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   rulePrecisionRange,
 			Detail: "DV_PROPORTION.precision must be ≥ -1 (-1 = no limit)",
 			Value:  constraints.Redact(*p.Precision),
 		})
@@ -672,6 +732,8 @@ func (w *rmFloorWalker) checkDVProportion(value any, path string) {
 			w.emit(Issue{
 				Path:   path,
 				Code:   "rm_invariant",
+				Layer:  LayerRM,
+				Rule:   ruleProportionPrecision,
 				Detail: "DV_PROPORTION.precision is 0, which requires a whole-number numerator and denominator (RM Precision_validity); not integral: " + strings.Join(fractional, ", "),
 				Value:  constraints.Redact([2]float64{float64(p.Numerator), float64(p.Denominator)}),
 			})
@@ -704,6 +766,8 @@ func (w *rmFloorWalker) checkTemporalValue(value any, rmType, path string) {
 	w.emit(Issue{
 		Path:   path,
 		Code:   "rm_invariant",
+		Layer:  LayerRM,
+		Rule:   valueValidRules[rmType],
 		Detail: rmType + ".value must be a valid ISO 8601 value (RM Value_valid)",
 		Value:  constraints.Redact(text),
 	})
@@ -726,12 +790,16 @@ func (w *rmFloorWalker) checkElementNullFlavour(value any, path string) {
 		w.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   ruleNullFlavourIndicated,
 			Detail: "ELEMENT carries both value and null_flavour; exactly one must be present (RM Inv_null_flavour_indicated)",
 		})
 	case !hasValue && !hasNullFlavour:
 		w.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   ruleNullFlavourIndicated,
 			Detail: "ELEMENT carries neither value nor null_flavour; exactly one must be present (RM Inv_null_flavour_indicated)",
 		})
 	}
@@ -758,6 +826,8 @@ func (w *rmFloorWalker) checkDVInterval(value any, rmType, path string) {
 		w.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   ruleIntervalLimits,
 			Detail: "DV_INTERVAL: lower must be ≤ upper",
 			Value:  constraints.Redact([2]float64{lower, upper}),
 		})
@@ -777,9 +847,9 @@ func (w *rmFloorWalker) checkDVInterval(value any, rmType, path string) {
 // check reads only the two flags, which the code already states, so the
 // issue's Value stays empty.
 func (w *rmFloorWalker) checkIntervalFlags(value any, rmType, path string) {
-	for _, side := range [...]struct{ end, code, invariant string }{
-		{end: "lower", code: "lower_included_valid", invariant: "Lower_included_valid"},
-		{end: "upper", code: "upper_included_valid", invariant: "Upper_included_valid"},
+	for _, side := range [...]struct{ end, code, invariant, rule string }{
+		{end: "lower", code: "lower_included_valid", invariant: "Lower_included_valid", rule: ruleLowerIncludedValid},
+		{end: "upper", code: "upper_included_valid", invariant: "Upper_included_valid", rule: ruleUpperIncludedValid},
 	} {
 		if !intervalFlagSet(value, rmType, side.end+"_unbounded") || !intervalFlagSet(value, rmType, side.end+"_included") {
 			continue
@@ -787,6 +857,8 @@ func (w *rmFloorWalker) checkIntervalFlags(value any, rmType, path string) {
 		w.emit(Issue{
 			Path:   path,
 			Code:   side.code,
+			Layer:  LayerRM,
+			Rule:   side.rule,
 			Detail: "DV_INTERVAL." + side.end + "_included must be false when " + side.end + "_unbounded is true (BASE " + side.invariant + ")",
 		})
 	}
@@ -818,6 +890,8 @@ func (w *rmFloorWalker) checkObjectRef(value any, path string) {
 		w.emit(Issue{
 			Path:   joinPath(path, "/id"),
 			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   ruleMandatory,
 			Detail: "OBJECT_REF.id must be present",
 		})
 	}
@@ -825,6 +899,8 @@ func (w *rmFloorWalker) checkObjectRef(value any, path string) {
 		w.emit(Issue{
 			Path:   joinPath(path, "/type"),
 			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   ruleMandatory,
 			Detail: "OBJECT_REF.type must be non-empty",
 		})
 	}
@@ -832,6 +908,8 @@ func (w *rmFloorWalker) checkObjectRef(value any, path string) {
 		w.emit(Issue{
 			Path:   joinPath(path, "/namespace"),
 			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   ruleMandatory,
 			Detail: "OBJECT_REF.namespace must be non-empty",
 		})
 	}
@@ -866,6 +944,8 @@ func (w *rmFloorWalker) checkPartyIdentified(value any, path string) {
 		w.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   rulePartyBasicValidity,
 			Detail: "PARTY_IDENTIFIED has none of name, identifiers and external_ref; at least one must be present (RM Basic_validity)",
 		})
 	}
@@ -873,6 +953,8 @@ func (w *rmFloorWalker) checkPartyIdentified(value any, path string) {
 		w.emit(Issue{
 			Path:   joinPath(path, "/name"),
 			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   rulePartyNameValid,
 			Detail: "PARTY_IDENTIFIED.name is present but empty (RM Name_valid)",
 		})
 	}
@@ -880,6 +962,8 @@ func (w *rmFloorWalker) checkPartyIdentified(value any, path string) {
 		w.emit(Issue{
 			Path:   joinPath(path, "/identifiers"),
 			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   rulePartyIdentifiersValid,
 			Detail: "PARTY_IDENTIFIED.identifiers is present but empty (RM Identifiers_valid)",
 		})
 	}
@@ -911,6 +995,8 @@ func (w *rmFloorWalker) checkTermMappings(value any, path string) {
 		w.emit(Issue{
 			Path:   joinPath(path, "/mappings"),
 			Code:   "mappings_valid",
+			Layer:  LayerRM,
+			Rule:   ruleMappingsValid,
 			Detail: "DV_TEXT.mappings present but empty",
 		})
 	}
@@ -936,6 +1022,8 @@ func (w *rmFloorWalker) checkTermMapping(value any, path string) {
 		w.emit(Issue{
 			Path:   joinPath(path, "/match"),
 			Code:   "term_mapping_match",
+			Layer:  LayerRM,
+			Rule:   ruleTermMappingMatch,
 			Detail: "TERM_MAPPING.match must be one of {'>', '=', '<', '?'}",
 			Value:  constraints.Redact(m.Match),
 		})

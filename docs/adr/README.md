@@ -38,6 +38,8 @@ Open decisions (those that would be ADRs once resolved) live in this repo as **r
 | ADR-0024 | A contribution deletion built without a payload carries no data, departing from the pinned UpdateVersion schema | Accepted | 2026-10-07 | Amends: REQ-095, REQ-130 |
 | ADR-0025 | Template-driven validation includes the RM floor | Accepted | 2026-10-11 | — |
 | ADR-0026 | Stored-query execution sends offset and fetch only when the caller sets them, departing from the pinned Query schema | Accepted | 2026-10-13 | Resolves: STRAND-09 (item 2); Amends: REQ-057, REQ-095 |
+| ADR-0027 | Template admission precedes the RM rules at every node | Accepted | 2026-10-13 | Amends: ADR-0025 (clause 1), REQ-102, REQ-112 |
+| ADR-0028 | Generated attribute access replaces the hand-written RM readers | Accepted | 2026-10-13 | Amends: REQ-101, REQ-102, REQ-110, REQ-112, REQ-013 |
 
 <!-- /sdd:generated -->
 
