@@ -31,9 +31,9 @@ func unrequestableEndpoint(path string) *url.URL {
 // TestREQ060_EndpointRequestErrorMasksPassword checks the credential-bearing
 // requests of REQ-060: the code exchange (REQ-061), the refresh (REQ-063)
 // and the revocation (REQ-167). When the request to the endpoint cannot be
-// built, the error is still an *auth.ExchangeError, of the request's own
-// class for the code exchange and the revocation, and it names the
-// endpoint's host but not the password in its userinfo.
+// built, the error is still an *auth.ExchangeError of the request's own
+// class, and it names the endpoint's host but not the password in its
+// userinfo.
 func TestREQ060_EndpointRequestErrorMasksPassword(t *testing.T) { // REQ-060
 	t.Parallel()
 	for _, path := range []string{"/token", "/revoke"} {
@@ -55,10 +55,7 @@ func TestREQ060_EndpointRequestErrorMasksPassword(t *testing.T) { // REQ-060
 			_, _, err = src.ExchangeAuthorizationCode(t.Context(), "code", req.State, req)
 			return err
 		}},
-		// No class for the refresh: postToken classes a request it cannot
-		// build as a token-exchange failure whatever the grant, and which
-		// class it should be is not what this test checks.
-		{"refresh", nil, func(t *testing.T, src *smart.Source) error {
+		{"refresh", auth.ErrRefreshFailed, func(t *testing.T, src *smart.Source) error {
 			t.Helper()
 			src.SetTokens(auth.Token{Value: "at-0"}, "rt-0")
 			return src.Reauth(t.Context())
@@ -90,7 +87,7 @@ func TestREQ060_EndpointRequestErrorMasksPassword(t *testing.T) { // REQ-060
 			if ee, ok := errors.AsType[*auth.ExchangeError](err); !ok || ee == nil {
 				t.Fatalf("%s error = %v, want an *auth.ExchangeError", kind.name, err)
 			}
-			if kind.sentinel != nil && !errors.Is(err, kind.sentinel) {
+			if !errors.Is(err, kind.sentinel) {
 				t.Errorf("%s error = %v, want it to match %v", kind.name, err, kind.sentinel)
 			}
 			msg := err.Error()
