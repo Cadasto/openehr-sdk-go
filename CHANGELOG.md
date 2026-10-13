@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **Validation findings name their layer and rule (REQ-171).** Each `Issue` from the instance validators carries `Layer`, template or RM, and `Rule`, the BMM invariant or template clause it evaluates, so callers need not parse `Detail`.
+- **A reusable validator with limits as options (REQ-171).** `validation.New` with `WithLimits` sets the depth and visit limits, and `Result.Coverage` lists where a limit stopped the walk and which leaves need an external value set.
+
+### Changed
+
+- **Template validation reports an attribute the OPT prohibits (REQ-102).** A present attribute whose OPT existence is 0..0 draws `prohibited`, matched by `ErrProhibited`, also where the instance generator writes one the RM requires.
+- **The RM floor reports `max_depth` once per walk and its nil guards at an empty path (REQ-112).** A deep Go-built value no longer yields one issue per node at the limit.
+
 ## [0.33.0] - 2026-10-13
 
 Thirty-third `v0.x` minor: template validation includes the RM floor and binds reused archetypes by name, the codecs ignore content they do not model unless asked to report or refuse it, and interval flags read alike in every format. **Breaking:** `canjson.Unmarshal` and `canxml.Unmarshal` take options, template validation reports RM-floor findings with new issue paths, FLAT and STRUCTURED ignore unmatched keys, interval flags take new defaults, canonical XML refuses per-byte DV_MULTIMEDIA and trailing content, and `ToTime` refuses a leap second.
