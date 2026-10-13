@@ -20,8 +20,10 @@
 // produce one of them fails generation instead of being overwritten.
 //
 // The RM target also gets release_gen.go, the constant Release taken
-// from the root schema's rm_release, and the two rminfo tables,
-// openehr/rm/rminfo/lookup_gen.go and absence_gen.go. Its jsonhooks_gen.go
+// from the root schema's rm_release; the two rminfo tables,
+// openehr/rm/rminfo/lookup_gen.go and absence_gen.go; and
+// internal/rmaccess/access_gen.go, the attribute access the validators
+// read an instance through. Its jsonhooks_gen.go
 // also registers the JSON walker's interface table into
 // internal/rmjsonwalk/polyreg.
 //
@@ -457,6 +459,29 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, result *Result)
 			continue
 		}
 		if err := writeAtomic(gen.path, gen.body); err != nil {
+			return tr, err
+		}
+	}
+
+	// The generated RM attribute access (REQ-171, ADR 0028), one file in the
+	// module-internal internal/rmaccess package; nil for non-RM targets.
+	accessBody, err := RenderRMAccessFile(plan)
+	if err != nil {
+		return tr, err
+	}
+	if accessBody != nil {
+		accessPath := filepath.Join(opts.OutDir, "internal", "rmaccess", rmaccessFile)
+		tr.Files = append(tr.Files, accessPath)
+		result.Files = append(result.Files, accessPath)
+		if opts.Verify {
+			drift, err := compareFile(accessPath, accessBody)
+			if err != nil {
+				return tr, err
+			}
+			if drift != nil {
+				result.Drifts = append(result.Drifts, *drift)
+			}
+		} else if err := writeAtomic(accessPath, accessBody); err != nil {
 			return tr, err
 		}
 	}
