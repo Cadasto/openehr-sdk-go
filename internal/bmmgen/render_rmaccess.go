@@ -561,7 +561,7 @@ func (g *rmaccessGen) render() ([]byte, error) {
 	// single, multiple and hash dispatch.
 	writeDispatch(&b, "single", "the single-valued attribute attr of parent: its value, whether it is\n// present, and whether parent's class declares attr as a single-valued\n// attribute at all", "any, bool, bool", "nil, false, false",
 		all, func(e armAttrs) bool { return len(e.single) > 0 })
-	writeDispatch(&b, "multiple", "the container attribute attr of parent: its items, whether the list\n// is present, and whether parent's class declares attr as a container at\n// all", "[]any, bool, bool", "nil, false, false",
+	writeDispatch(&b, "multiple", "the container attribute attr of parent: its list, whether the list\n// is present, and whether parent's class declares attr as a container at\n// all", "list, bool, bool", "nil, false, false",
 		all, func(e armAttrs) bool { return len(e.multi) > 0 })
 	writeDispatch(&b, "hash", "the Hash attribute attr of parent: the keys of its entries in\n// ascending order, their values, whether the hash is present, and whether\n// parent's class declares attr as a Hash at all", "[]string, []any, bool, bool", "nil, nil, false, false",
 		all, func(e armAttrs) bool { return len(e.hash) > 0 })
@@ -660,13 +660,15 @@ func (g *rmaccessGen) writeSingle(b *bytes.Buffer, arm *accessArm, attrs []*acce
 }
 
 // writeMultiple writes the reader of arm's containers, each a Go slice
-// ([rmaccessGen.split] refuses any other). The items of a list of values are
-// boxed as pointers into the backing array, those of a list of interfaces or
-// pointers as they are.
+// ([rmaccessGen.split] refuses any other), handed over as a list whose items
+// are boxed only when they are read: those of a list of values as pointers
+// into the backing array (boxPointers), those of a list of interfaces or
+// pointers as they are (boxValues). A list is counted without boxing an
+// item.
 func (g *rmaccessGen) writeMultiple(b *bytes.Buffer, arm *accessArm, attrs []*accessAttr) error {
 	q := arm.typ.qualified()
 	fmt.Fprintf(b, "\n// multiple%s reads the containers of %s.\n", arm.typ.suffix(), q)
-	fmt.Fprintf(b, "func multiple%s(x *%s, attr string) ([]any, bool, bool) {\n", arm.typ.suffix(), q)
+	fmt.Fprintf(b, "func multiple%s(x *%s, attr string) (list, bool, bool) {\n", arm.typ.suffix(), q)
 	b.WriteString("\tif x == nil {\n\t\treturn nil, false, false\n\t}\n")
 	b.WriteString("\tswitch attr {\n")
 	for _, a := range attrs {

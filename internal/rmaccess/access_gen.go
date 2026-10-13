@@ -684,10 +684,10 @@ func single(parent any, attr string) (any, bool, bool) {
 	return nil, false, false
 }
 
-// multiple reads the container attribute attr of parent: its items, whether the list
+// multiple reads the container attribute attr of parent: its list, whether the list
 // is present, and whether parent's class declares attr as a container at
 // all.
-func multiple(parent any, attr string) ([]any, bool, bool) {
+func multiple(parent any, attr string) (list, bool, bool) {
 	switch p := parent.(type) {
 	case *rm.Action:
 		return multipleAction(p, attr)
@@ -1053,7 +1053,7 @@ func singleAction(x *rm.Action, attr string) (any, bool, bool) {
 }
 
 // multipleAction reads the containers of rm.Action.
-func multipleAction(x *rm.Action, attr string) ([]any, bool, bool) {
+func multipleAction(x *rm.Action, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1093,7 +1093,7 @@ func singleActivity(x *rm.Activity, attr string) (any, bool, bool) {
 }
 
 // multipleActivity reads the containers of rm.Activity.
-func multipleActivity(x *rm.Activity, attr string) ([]any, bool, bool) {
+func multipleActivity(x *rm.Activity, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1127,7 +1127,7 @@ func singleAddress(x *rm.Address, attr string) (any, bool, bool) {
 }
 
 // multipleAddress reads the containers of rm.Address.
-func multipleAddress(x *rm.Address, attr string) ([]any, bool, bool) {
+func multipleAddress(x *rm.Address, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1171,7 +1171,7 @@ func singleAdminEntry(x *rm.AdminEntry, attr string) (any, bool, bool) {
 }
 
 // multipleAdminEntry reads the containers of rm.AdminEntry.
-func multipleAdminEntry(x *rm.AdminEntry, attr string) ([]any, bool, bool) {
+func multipleAdminEntry(x *rm.AdminEntry, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1207,7 +1207,7 @@ func singleAgent(x *rm.Agent, attr string) (any, bool, bool) {
 }
 
 // multipleAgent reads the containers of rm.Agent.
-func multipleAgent(x *rm.Agent, attr string) ([]any, bool, bool) {
+func multipleAgent(x *rm.Agent, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1285,7 +1285,7 @@ func singleAttestation(x *rm.Attestation, attr string) (any, bool, bool) {
 }
 
 // multipleAttestation reads the containers of rm.Attestation.
-func multipleAttestation(x *rm.Attestation, attr string) ([]any, bool, bool) {
+func multipleAttestation(x *rm.Attestation, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1341,7 +1341,7 @@ func singleCapability(x *rm.Capability, attr string) (any, bool, bool) {
 }
 
 // multipleCapability reads the containers of rm.Capability.
-func multipleCapability(x *rm.Capability, attr string) ([]any, bool, bool) {
+func multipleCapability(x *rm.Capability, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1373,7 +1373,7 @@ func singleCluster(x *rm.Cluster, attr string) (any, bool, bool) {
 }
 
 // multipleCluster reads the containers of rm.Cluster.
-func multipleCluster(x *rm.Cluster, attr string) ([]any, bool, bool) {
+func multipleCluster(x *rm.Cluster, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1433,7 +1433,7 @@ func singleComposition(x *rm.Composition, attr string) (any, bool, bool) {
 }
 
 // multipleComposition reads the containers of rm.Composition.
-func multipleComposition(x *rm.Composition, attr string) ([]any, bool, bool) {
+func multipleComposition(x *rm.Composition, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1469,7 +1469,7 @@ func singleContact(x *rm.Contact, attr string) (any, bool, bool) {
 }
 
 // multipleContact reads the containers of rm.Contact.
-func multipleContact(x *rm.Contact, attr string) ([]any, bool, bool) {
+func multipleContact(x *rm.Contact, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1497,7 +1497,7 @@ func singleContribution(x *rm.Contribution, attr string) (any, bool, bool) {
 }
 
 // multipleContribution reads the containers of rm.Contribution.
-func multipleContribution(x *rm.Contribution, attr string) ([]any, bool, bool) {
+func multipleContribution(x *rm.Contribution, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1543,7 +1543,7 @@ func singleDVCodedText(x *rm.DVCodedText, attr string) (any, bool, bool) {
 }
 
 // multipleDVCodedText reads the containers of rm.DVCodedText.
-func multipleDVCodedText(x *rm.DVCodedText, attr string) ([]any, bool, bool) {
+func multipleDVCodedText(x *rm.DVCodedText, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1577,7 +1577,7 @@ func singleDVCount(x *rm.DVCount, attr string) (any, bool, bool) {
 }
 
 // multipleDVCount reads the containers of rm.DVCount.
-func multipleDVCount(x *rm.DVCount, attr string) ([]any, bool, bool) {
+func multipleDVCount(x *rm.DVCount, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1609,7 +1609,7 @@ func singleDVDate(x *rm.DVDate, attr string) (any, bool, bool) {
 }
 
 // multipleDVDate reads the containers of rm.DVDate.
-func multipleDVDate(x *rm.DVDate, attr string) ([]any, bool, bool) {
+func multipleDVDate(x *rm.DVDate, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1641,7 +1641,7 @@ func singleDVDateTime(x *rm.DVDateTime, attr string) (any, bool, bool) {
 }
 
 // multipleDVDateTime reads the containers of rm.DVDateTime.
-func multipleDVDateTime(x *rm.DVDateTime, attr string) ([]any, bool, bool) {
+func multipleDVDateTime(x *rm.DVDateTime, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1675,7 +1675,7 @@ func singleDVDuration(x *rm.DVDuration, attr string) (any, bool, bool) {
 }
 
 // multipleDVDuration reads the containers of rm.DVDuration.
-func multipleDVDuration(x *rm.DVDuration, attr string) ([]any, bool, bool) {
+func multipleDVDuration(x *rm.DVDuration, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -1977,7 +1977,7 @@ func singleDVMultimedia(x *rm.DVMultimedia, attr string) (any, bool, bool) {
 }
 
 // multipleDVMultimedia reads the containers of rm.DVMultimedia.
-func multipleDVMultimedia(x *rm.DVMultimedia, attr string) ([]any, bool, bool) {
+func multipleDVMultimedia(x *rm.DVMultimedia, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2009,7 +2009,7 @@ func singleDVOrdinal(x *rm.DVOrdinal, attr string) (any, bool, bool) {
 }
 
 // multipleDVOrdinal reads the containers of rm.DVOrdinal.
-func multipleDVOrdinal(x *rm.DVOrdinal, attr string) ([]any, bool, bool) {
+func multipleDVOrdinal(x *rm.DVOrdinal, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2021,7 +2021,7 @@ func multipleDVOrdinal(x *rm.DVOrdinal, attr string) ([]any, bool, bool) {
 }
 
 // multipleDVParagraph reads the containers of rm.DVParagraph.
-func multipleDVParagraph(x *rm.DVParagraph, attr string) ([]any, bool, bool) {
+func multipleDVParagraph(x *rm.DVParagraph, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2094,7 +2094,7 @@ func singleDVProportion(x *rm.DVProportion, attr string) (any, bool, bool) {
 }
 
 // multipleDVProportion reads the containers of rm.DVProportion.
-func multipleDVProportion(x *rm.DVProportion, attr string) ([]any, bool, bool) {
+func multipleDVProportion(x *rm.DVProportion, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2136,7 +2136,7 @@ func singleDVQuantity(x *rm.DVQuantity, attr string) (any, bool, bool) {
 }
 
 // multipleDVQuantity reads the containers of rm.DVQuantity.
-func multipleDVQuantity(x *rm.DVQuantity, attr string) ([]any, bool, bool) {
+func multipleDVQuantity(x *rm.DVQuantity, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2166,7 +2166,7 @@ func singleDVScale(x *rm.DVScale, attr string) (any, bool, bool) {
 }
 
 // multipleDVScale reads the containers of rm.DVScale.
-func multipleDVScale(x *rm.DVScale, attr string) ([]any, bool, bool) {
+func multipleDVScale(x *rm.DVScale, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2212,7 +2212,7 @@ func singleDVText(x *rm.DVText, attr string) (any, bool, bool) {
 }
 
 // multipleDVText reads the containers of rm.DVText.
-func multipleDVText(x *rm.DVText, attr string) ([]any, bool, bool) {
+func multipleDVText(x *rm.DVText, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2244,7 +2244,7 @@ func singleDVTime(x *rm.DVTime, attr string) (any, bool, bool) {
 }
 
 // multipleDVTime reads the containers of rm.DVTime.
-func multipleDVTime(x *rm.DVTime, attr string) ([]any, bool, bool) {
+func multipleDVTime(x *rm.DVTime, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2290,7 +2290,7 @@ func singleEHR(x *rm.EHR, attr string) (any, bool, bool) {
 }
 
 // multipleEHR reads the containers of rm.EHR.
-func multipleEHR(x *rm.EHR, attr string) ([]any, bool, bool) {
+func multipleEHR(x *rm.EHR, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2330,7 +2330,7 @@ func singleEHRAccess(x *rm.EHRAccess, attr string) (any, bool, bool) {
 }
 
 // multipleEHRAccess reads the containers of rm.EHRAccess.
-func multipleEHRAccess(x *rm.EHRAccess, attr string) ([]any, bool, bool) {
+func multipleEHRAccess(x *rm.EHRAccess, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2370,7 +2370,7 @@ func singleEHRStatus(x *rm.EHRStatus, attr string) (any, bool, bool) {
 }
 
 // multipleEHRStatus reads the containers of rm.EHRStatus.
-func multipleEHRStatus(x *rm.EHRStatus, attr string) ([]any, bool, bool) {
+func multipleEHRStatus(x *rm.EHRStatus, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2408,7 +2408,7 @@ func singleElement(x *rm.Element, attr string) (any, bool, bool) {
 }
 
 // multipleElement reads the containers of rm.Element.
-func multipleElement(x *rm.Element, attr string) ([]any, bool, bool) {
+func multipleElement(x *rm.Element, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2456,7 +2456,7 @@ func singleEvaluation(x *rm.Evaluation, attr string) (any, bool, bool) {
 }
 
 // multipleEvaluation reads the containers of rm.Evaluation.
-func multipleEvaluation(x *rm.Evaluation, attr string) ([]any, bool, bool) {
+func multipleEvaluation(x *rm.Evaluation, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2492,7 +2492,7 @@ func singleEventContext(x *rm.EventContext, attr string) (any, bool, bool) {
 }
 
 // multipleEventContext reads the containers of rm.EventContext.
-func multipleEventContext(x *rm.EventContext, attr string) ([]any, bool, bool) {
+func multipleEventContext(x *rm.EventContext, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2520,7 +2520,7 @@ func singleFeederAudit(x *rm.FeederAudit, attr string) (any, bool, bool) {
 }
 
 // multipleFeederAudit reads the containers of rm.FeederAudit.
-func multipleFeederAudit(x *rm.FeederAudit, attr string) ([]any, bool, bool) {
+func multipleFeederAudit(x *rm.FeederAudit, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2580,7 +2580,7 @@ func singleFolder(x *rm.Folder, attr string) (any, bool, bool) {
 }
 
 // multipleFolder reads the containers of rm.Folder.
-func multipleFolder(x *rm.Folder, attr string) ([]any, bool, bool) {
+func multipleFolder(x *rm.Folder, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2618,7 +2618,7 @@ func singleGenericEntry(x *rm.GenericEntry, attr string) (any, bool, bool) {
 }
 
 // multipleGenericEntry reads the containers of rm.GenericEntry.
-func multipleGenericEntry(x *rm.GenericEntry, attr string) ([]any, bool, bool) {
+func multipleGenericEntry(x *rm.GenericEntry, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2666,7 +2666,7 @@ func singleGroup(x *rm.Group, attr string) (any, bool, bool) {
 }
 
 // multipleGroup reads the containers of rm.Group.
-func multipleGroup(x *rm.Group, attr string) ([]any, bool, bool) {
+func multipleGroup(x *rm.Group, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2728,7 +2728,7 @@ func singleHistoryItemStructure(x *rm.History[rm.ItemStructure], attr string) (a
 }
 
 // multipleHistoryItemStructure reads the containers of rm.History[rm.ItemStructure].
-func multipleHistoryItemStructure(x *rm.History[rm.ItemStructure], attr string) ([]any, bool, bool) {
+func multipleHistoryItemStructure(x *rm.History[rm.ItemStructure], attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2770,7 +2770,7 @@ func singleHistoryItemList(x *rm.History[rm.ItemList], attr string) (any, bool, 
 }
 
 // multipleHistoryItemList reads the containers of rm.History[rm.ItemList].
-func multipleHistoryItemList(x *rm.History[rm.ItemList], attr string) ([]any, bool, bool) {
+func multipleHistoryItemList(x *rm.History[rm.ItemList], attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2812,7 +2812,7 @@ func singleHistoryItemSingle(x *rm.History[rm.ItemSingle], attr string) (any, bo
 }
 
 // multipleHistoryItemSingle reads the containers of rm.History[rm.ItemSingle].
-func multipleHistoryItemSingle(x *rm.History[rm.ItemSingle], attr string) ([]any, bool, bool) {
+func multipleHistoryItemSingle(x *rm.History[rm.ItemSingle], attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2854,7 +2854,7 @@ func singleHistoryItemTable(x *rm.History[rm.ItemTable], attr string) (any, bool
 }
 
 // multipleHistoryItemTable reads the containers of rm.History[rm.ItemTable].
-func multipleHistoryItemTable(x *rm.History[rm.ItemTable], attr string) ([]any, bool, bool) {
+func multipleHistoryItemTable(x *rm.History[rm.ItemTable], attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2896,7 +2896,7 @@ func singleHistoryItemTree(x *rm.History[rm.ItemTree], attr string) (any, bool, 
 }
 
 // multipleHistoryItemTree reads the containers of rm.History[rm.ItemTree].
-func multipleHistoryItemTree(x *rm.History[rm.ItemTree], attr string) ([]any, bool, bool) {
+func multipleHistoryItemTree(x *rm.History[rm.ItemTree], attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -2968,7 +2968,7 @@ func singleInstruction(x *rm.Instruction, attr string) (any, bool, bool) {
 }
 
 // multipleInstruction reads the containers of rm.Instruction.
-func multipleInstruction(x *rm.Instruction, attr string) ([]any, bool, bool) {
+func multipleInstruction(x *rm.Instruction, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3044,7 +3044,7 @@ func singleIntervalEventItemStructure(x *rm.IntervalEvent[rm.ItemStructure], att
 }
 
 // multipleIntervalEventItemStructure reads the containers of rm.IntervalEvent[rm.ItemStructure].
-func multipleIntervalEventItemStructure(x *rm.IntervalEvent[rm.ItemStructure], attr string) ([]any, bool, bool) {
+func multipleIntervalEventItemStructure(x *rm.IntervalEvent[rm.ItemStructure], attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3088,7 +3088,7 @@ func singleIntervalEventItemList(x *rm.IntervalEvent[rm.ItemList], attr string) 
 }
 
 // multipleIntervalEventItemList reads the containers of rm.IntervalEvent[rm.ItemList].
-func multipleIntervalEventItemList(x *rm.IntervalEvent[rm.ItemList], attr string) ([]any, bool, bool) {
+func multipleIntervalEventItemList(x *rm.IntervalEvent[rm.ItemList], attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3132,7 +3132,7 @@ func singleIntervalEventItemSingle(x *rm.IntervalEvent[rm.ItemSingle], attr stri
 }
 
 // multipleIntervalEventItemSingle reads the containers of rm.IntervalEvent[rm.ItemSingle].
-func multipleIntervalEventItemSingle(x *rm.IntervalEvent[rm.ItemSingle], attr string) ([]any, bool, bool) {
+func multipleIntervalEventItemSingle(x *rm.IntervalEvent[rm.ItemSingle], attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3176,7 +3176,7 @@ func singleIntervalEventItemTable(x *rm.IntervalEvent[rm.ItemTable], attr string
 }
 
 // multipleIntervalEventItemTable reads the containers of rm.IntervalEvent[rm.ItemTable].
-func multipleIntervalEventItemTable(x *rm.IntervalEvent[rm.ItemTable], attr string) ([]any, bool, bool) {
+func multipleIntervalEventItemTable(x *rm.IntervalEvent[rm.ItemTable], attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3220,7 +3220,7 @@ func singleIntervalEventItemTree(x *rm.IntervalEvent[rm.ItemTree], attr string) 
 }
 
 // multipleIntervalEventItemTree reads the containers of rm.IntervalEvent[rm.ItemTree].
-func multipleIntervalEventItemTree(x *rm.IntervalEvent[rm.ItemTree], attr string) ([]any, bool, bool) {
+func multipleIntervalEventItemTree(x *rm.IntervalEvent[rm.ItemTree], attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3254,7 +3254,7 @@ func singleIsmTransition(x *rm.IsmTransition, attr string) (any, bool, bool) {
 }
 
 // multipleIsmTransition reads the containers of rm.IsmTransition.
-func multipleIsmTransition(x *rm.IsmTransition, attr string) ([]any, bool, bool) {
+func multipleIsmTransition(x *rm.IsmTransition, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3298,7 +3298,7 @@ func singleItemList(x *rm.ItemList, attr string) (any, bool, bool) {
 }
 
 // multipleItemList reads the containers of rm.ItemList.
-func multipleItemList(x *rm.ItemList, attr string) ([]any, bool, bool) {
+func multipleItemList(x *rm.ItemList, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3334,7 +3334,7 @@ func singleItemSingle(x *rm.ItemSingle, attr string) (any, bool, bool) {
 }
 
 // multipleItemSingle reads the containers of rm.ItemSingle.
-func multipleItemSingle(x *rm.ItemSingle, attr string) ([]any, bool, bool) {
+func multipleItemSingle(x *rm.ItemSingle, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3366,7 +3366,7 @@ func singleItemTable(x *rm.ItemTable, attr string) (any, bool, bool) {
 }
 
 // multipleItemTable reads the containers of rm.ItemTable.
-func multipleItemTable(x *rm.ItemTable, attr string) ([]any, bool, bool) {
+func multipleItemTable(x *rm.ItemTable, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3420,7 +3420,7 @@ func singleItemTree(x *rm.ItemTree, attr string) (any, bool, bool) {
 }
 
 // multipleItemTree reads the containers of rm.ItemTree.
-func multipleItemTree(x *rm.ItemTree, attr string) ([]any, bool, bool) {
+func multipleItemTree(x *rm.ItemTree, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3534,7 +3534,7 @@ func singleObservation(x *rm.Observation, attr string) (any, bool, bool) {
 }
 
 // multipleObservation reads the containers of rm.Observation.
-func multipleObservation(x *rm.Observation, attr string) ([]any, bool, bool) {
+func multipleObservation(x *rm.Observation, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3570,7 +3570,7 @@ func singleOrganisation(x *rm.Organisation, attr string) (any, bool, bool) {
 }
 
 // multipleOrganisation reads the containers of rm.Organisation.
-func multipleOrganisation(x *rm.Organisation, attr string) ([]any, bool, bool) {
+func multipleOrganisation(x *rm.Organisation, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3616,7 +3616,7 @@ func singleOriginalVersionAny(x *rm.OriginalVersion[any], attr string) (any, boo
 }
 
 // multipleOriginalVersionAny reads the containers of rm.OriginalVersion[any].
-func multipleOriginalVersionAny(x *rm.OriginalVersion[any], attr string) ([]any, bool, bool) {
+func multipleOriginalVersionAny(x *rm.OriginalVersion[any], attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3662,7 +3662,7 @@ func singlePartyIdentified(x *rm.PartyIdentified, attr string) (any, bool, bool)
 }
 
 // multiplePartyIdentified reads the containers of rm.PartyIdentified.
-func multiplePartyIdentified(x *rm.PartyIdentified, attr string) ([]any, bool, bool) {
+func multiplePartyIdentified(x *rm.PartyIdentified, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3696,7 +3696,7 @@ func singlePartyIdentity(x *rm.PartyIdentity, attr string) (any, bool, bool) {
 }
 
 // multiplePartyIdentity reads the containers of rm.PartyIdentity.
-func multiplePartyIdentity(x *rm.PartyIdentity, attr string) ([]any, bool, bool) {
+func multiplePartyIdentity(x *rm.PartyIdentity, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3740,7 +3740,7 @@ func singlePartyRelated(x *rm.PartyRelated, attr string) (any, bool, bool) {
 }
 
 // multiplePartyRelated reads the containers of rm.PartyRelated.
-func multiplePartyRelated(x *rm.PartyRelated, attr string) ([]any, bool, bool) {
+func multiplePartyRelated(x *rm.PartyRelated, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3780,7 +3780,7 @@ func singlePartyRelationship(x *rm.PartyRelationship, attr string) (any, bool, b
 }
 
 // multiplePartyRelationship reads the containers of rm.PartyRelationship.
-func multiplePartyRelationship(x *rm.PartyRelationship, attr string) ([]any, bool, bool) {
+func multiplePartyRelationship(x *rm.PartyRelationship, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3826,7 +3826,7 @@ func singlePerson(x *rm.Person, attr string) (any, bool, bool) {
 }
 
 // multiplePerson reads the containers of rm.Person.
-func multiplePerson(x *rm.Person, attr string) ([]any, bool, bool) {
+func multiplePerson(x *rm.Person, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3874,7 +3874,7 @@ func singlePointEventItemStructure(x *rm.PointEvent[rm.ItemStructure], attr stri
 }
 
 // multiplePointEventItemStructure reads the containers of rm.PointEvent[rm.ItemStructure].
-func multiplePointEventItemStructure(x *rm.PointEvent[rm.ItemStructure], attr string) ([]any, bool, bool) {
+func multiplePointEventItemStructure(x *rm.PointEvent[rm.ItemStructure], attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3912,7 +3912,7 @@ func singlePointEventItemList(x *rm.PointEvent[rm.ItemList], attr string) (any, 
 }
 
 // multiplePointEventItemList reads the containers of rm.PointEvent[rm.ItemList].
-func multiplePointEventItemList(x *rm.PointEvent[rm.ItemList], attr string) ([]any, bool, bool) {
+func multiplePointEventItemList(x *rm.PointEvent[rm.ItemList], attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3950,7 +3950,7 @@ func singlePointEventItemSingle(x *rm.PointEvent[rm.ItemSingle], attr string) (a
 }
 
 // multiplePointEventItemSingle reads the containers of rm.PointEvent[rm.ItemSingle].
-func multiplePointEventItemSingle(x *rm.PointEvent[rm.ItemSingle], attr string) ([]any, bool, bool) {
+func multiplePointEventItemSingle(x *rm.PointEvent[rm.ItemSingle], attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -3988,7 +3988,7 @@ func singlePointEventItemTable(x *rm.PointEvent[rm.ItemTable], attr string) (any
 }
 
 // multiplePointEventItemTable reads the containers of rm.PointEvent[rm.ItemTable].
-func multiplePointEventItemTable(x *rm.PointEvent[rm.ItemTable], attr string) ([]any, bool, bool) {
+func multiplePointEventItemTable(x *rm.PointEvent[rm.ItemTable], attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4026,7 +4026,7 @@ func singlePointEventItemTree(x *rm.PointEvent[rm.ItemTree], attr string) (any, 
 }
 
 // multiplePointEventItemTree reads the containers of rm.PointEvent[rm.ItemTree].
-func multiplePointEventItemTree(x *rm.PointEvent[rm.ItemTree], attr string) ([]any, bool, bool) {
+func multiplePointEventItemTree(x *rm.PointEvent[rm.ItemTree], attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4269,7 +4269,7 @@ func singleResourceDescription(x *rm.ResourceDescription, attr string) (any, boo
 }
 
 // multipleResourceDescription reads the containers of rm.ResourceDescription.
-func multipleResourceDescription(x *rm.ResourceDescription, attr string) ([]any, bool, bool) {
+func multipleResourceDescription(x *rm.ResourceDescription, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4327,7 +4327,7 @@ func singleResourceDescriptionItem(x *rm.ResourceDescriptionItem, attr string) (
 }
 
 // multipleResourceDescriptionItem reads the containers of rm.ResourceDescriptionItem.
-func multipleResourceDescriptionItem(x *rm.ResourceDescriptionItem, attr string) ([]any, bool, bool) {
+func multipleResourceDescriptionItem(x *rm.ResourceDescriptionItem, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4361,7 +4361,7 @@ func hashResourceDescriptionItem(x *rm.ResourceDescriptionItem, attr string) ([]
 }
 
 // multipleRevisionHistory reads the containers of rm.RevisionHistory.
-func multipleRevisionHistory(x *rm.RevisionHistory, attr string) ([]any, bool, bool) {
+func multipleRevisionHistory(x *rm.RevisionHistory, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4385,7 +4385,7 @@ func singleRevisionHistoryItem(x *rm.RevisionHistoryItem, attr string) (any, boo
 }
 
 // multipleRevisionHistoryItem reads the containers of rm.RevisionHistoryItem.
-func multipleRevisionHistoryItem(x *rm.RevisionHistoryItem, attr string) ([]any, bool, bool) {
+func multipleRevisionHistoryItem(x *rm.RevisionHistoryItem, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4423,7 +4423,7 @@ func singleRole(x *rm.Role, attr string) (any, bool, bool) {
 }
 
 // multipleRole reads the containers of rm.Role.
-func multipleRole(x *rm.Role, attr string) ([]any, bool, bool) {
+func multipleRole(x *rm.Role, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}
@@ -4463,7 +4463,7 @@ func singleSection(x *rm.Section, attr string) (any, bool, bool) {
 }
 
 // multipleSection reads the containers of rm.Section.
-func multipleSection(x *rm.Section, attr string) ([]any, bool, bool) {
+func multipleSection(x *rm.Section, attr string) (list, bool, bool) {
 	if x == nil {
 		return nil, false, false
 	}

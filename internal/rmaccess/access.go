@@ -41,11 +41,24 @@ func Single(parent any, attr string) (value any, present bool) {
 // walk can descend into each and change it in place; the items of a list of
 // interfaces or pointers come back as they are.
 func Multiple(parent any, attr string) (items []any, present bool) {
-	items, present, _ = multiple(parent, attr)
+	l, present, _ := multiple(parent, attr)
 	if !present {
 		return nil, false
 	}
-	return items, true
+	return l.boxed(), true
+}
+
+// Len returns the number of items of the container attribute attr on parent
+// and whether the list is present, as [Multiple] reads them, without reading
+// a single item: a list of a primitive type, such as DV_MULTIMEDIA data, an
+// Array of Octet, is counted, not boxed one byte at a time. An absent list,
+// and any pair [Multiple] reads as absent, reads as (0, false).
+func Len(parent any, attr string) (n int, present bool) {
+	l, present, _ := multiple(parent, attr)
+	if !present {
+		return 0, false
+	}
+	return l.length(), true
 }
 
 // Hash returns the entries of a Hash attribute in ascending key order:
@@ -86,9 +99,30 @@ func IsTypedNilPointer(v any) bool {
 	return rm.IsTypedNil(v)
 }
 
-// boxPointers boxes each element of a list of values as a pointer into the
-// backing array. It returns nil for an empty list.
-func boxPointers[T any](xs []T) []any {
+// list is a container attribute as the generated access hands it over: the
+// Go slice the field holds, its length read without touching an item, and its
+// items boxed only when [Multiple] asks for them.
+type list interface {
+	length() int
+	boxed() []any
+}
+
+// boxPointers hands over a list of values, whose items are boxed, when they
+// are read, as pointers into the backing array.
+func boxPointers[T any](xs []T) list { return valueList[T](xs) }
+
+// boxValues hands over a list of interfaces or pointers, whose items are
+// boxed, when they are read, as they are.
+func boxValues[T any](xs []T) list { return refList[T](xs) }
+
+// valueList is a list of values.
+type valueList[T any] []T
+
+func (xs valueList[T]) length() int { return len(xs) }
+
+// boxed boxes each item as a pointer into the backing array. It returns nil
+// for an empty list.
+func (xs valueList[T]) boxed() []any {
 	if len(xs) == 0 {
 		return nil
 	}
@@ -99,9 +133,13 @@ func boxPointers[T any](xs []T) []any {
 	return out
 }
 
-// boxValues boxes each element of a list of interfaces or pointers as it is.
-// It returns nil for an empty list.
-func boxValues[T any](xs []T) []any {
+// refList is a list of interfaces or pointers.
+type refList[T any] []T
+
+func (xs refList[T]) length() int { return len(xs) }
+
+// boxed boxes each item as it is. It returns nil for an empty list.
+func (xs refList[T]) boxed() []any {
 	if len(xs) == 0 {
 		return nil
 	}

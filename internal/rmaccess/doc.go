@@ -6,6 +6,7 @@
 //
 //	Single(parent any, attr string) (value any, present bool)
 //	Multiple(parent any, attr string) (items []any, present bool)
+//	Len(parent any, attr string) (n int, present bool)
 //	Hash(parent any, attr string) (keys []string, values []any, present bool)
 //	Covers(v any) bool
 //	IsTypedNilPointer(v any) bool

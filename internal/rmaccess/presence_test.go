@@ -1,6 +1,7 @@
 package rmaccess
 
 import (
+	"runtime"
 	"slices"
 	"testing"
 
@@ -135,9 +136,9 @@ func TestPresence_REQ171_EachReading(t *testing.T) {
 	}
 }
 
-// TestPresence_REQ171_ListReadings pins the list readings through Multiple:
-// a list is present when it is not nil, and empty when it is present and
-// holds no item.
+// TestPresence_REQ171_ListReadings pins the list readings through Multiple
+// and Len: a list is present when it is not nil, and empty when it is present
+// and holds no item. Len counts what Multiple reads.
 func TestPresence_REQ171_ListReadings(t *testing.T) {
 	cases := []struct {
 		reading     string
@@ -158,10 +159,58 @@ func TestPresence_REQ171_ListReadings(t *testing.T) {
 			if !present && items != nil {
 				t.Errorf("Multiple(COMPOSITION, content) = (%v, false), want nil items when absent", items)
 			}
+			if n, present := Len(tc.parent, "content"); n != tc.wantItems || present != tc.wantPresent {
+				t.Errorf("Len(COMPOSITION, content) = (%d, %t), want (%d, %t)", n, present, tc.wantItems, tc.wantPresent)
+			}
 		})
 	}
 	if items, present := Multiple(&rm.Composition{Content: []rm.ContentItem{}}, "name"); items != nil || present {
 		t.Errorf("Multiple(COMPOSITION, name) = (%v, %t), want (nil, false) for a single-valued attribute", items, present)
+	}
+	if n, present := Len(&rm.Composition{Content: []rm.ContentItem{}}, "name"); n != 0 || present {
+		t.Errorf("Len(COMPOSITION, name) = (%d, %t), want (0, false) for a single-valued attribute", n, present)
+	}
+}
+
+// TestLen_REQ171_CountsAListOfAPrimitiveTypeWithoutBoxing pins that Len
+// reads a list of a primitive type, DV_MULTIMEDIA data, an Array of Octet,
+// as Multiple does, absent, empty or holding its bytes, and counts a
+// mebibyte of it while allocating less than the list's size: it boxes no
+// byte, where Multiple hands each one back as an item.
+func TestLen_REQ171_CountsAListOfAPrimitiveTypeWithoutBoxing(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		data        []byte
+		wantN       int
+		wantPresent bool
+	}{
+		{name: "absent", data: nil, wantN: 0, wantPresent: false},
+		{name: "empty", data: []byte{}, wantN: 0, wantPresent: true},
+		{name: "three bytes", data: []byte{1, 2, 3}, wantN: 3, wantPresent: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			parent := &rm.DVMultimedia{Data: tc.data}
+			n, present := Len(parent, "data")
+			items, mPresent := Multiple(parent, "data")
+			if n != tc.wantN || present != tc.wantPresent {
+				t.Errorf("Len(DV_MULTIMEDIA, data) = (%d, %t), want (%d, %t)", n, present, tc.wantN, tc.wantPresent)
+			}
+			if len(items) != n || mPresent != present {
+				t.Errorf("Multiple(DV_MULTIMEDIA, data) = (%d items, %t), want what Len reads, (%d, %t)", len(items), mPresent, n, present)
+			}
+		})
+	}
+	const size = 1 << 20
+	parent := &rm.DVMultimedia{Data: make([]byte, size)}
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	n, present := Len(parent, "data")
+	runtime.ReadMemStats(&after)
+	if n != size || !present {
+		t.Errorf("Len(DV_MULTIMEDIA with %d bytes of data, data) = (%d, %t), want (%d, true)", size, n, present, size)
+	}
+	if allocated := after.TotalAlloc - before.TotalAlloc; allocated >= size {
+		t.Errorf("Len(DV_MULTIMEDIA with %d bytes of data, data) allocated %d bytes, want fewer than %d: it boxes the bytes", size, allocated, size)
 	}
 }
 
