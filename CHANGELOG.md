@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-10-13
+
 Thirty-third `v0.x` minor: template validation includes the RM floor and binds reused archetypes by name, the codecs ignore content they do not model unless asked to report or refuse it, and interval flags read alike in every format. **Breaking:** `canjson.Unmarshal` and `canxml.Unmarshal` take options, template validation reports RM-floor findings with new issue paths, FLAT and STRUCTURED ignore unmatched keys, interval flags take new defaults, canonical XML refuses per-byte DV_MULTIMEDIA and trailing content, and `ToTime` refuses a leap second.
 
 ### Added
