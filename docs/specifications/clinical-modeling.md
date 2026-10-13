@@ -301,12 +301,15 @@ The SDK **MUST** ship a `ValidateComposition(comp *rm.Composition, c *templateco
 - **Result shape:**
   ```go
   type Result struct {
-      OK     bool      // true when no Error-severity issue (Warnings alone leave OK true)
-      Issues []Issue
+      OK       bool      // true when no Error-severity issue (Warnings alone leave OK true)
+      Issues   []Issue
+      Coverage Coverage  // what the result does not prove; § REQ-171 Coverage
   }
   type Issue struct {
       Path     string               // openEHR path of the offending node, § Issue paths (empty for global issues)
       Code     string               // stable programmatic identifier — see code taxonomy below
+      Layer    Layer                // template or RM; § REQ-171 Finding identity
+      Rule     string               // the clause evaluated; § REQ-171 Finding identity
       Detail   string               // human-readable message; field class in REQ-168
       Severity Severity             // Error for normative violations; Warning for advisories
       Value    constraints.Redacted // value-bearing field; see REQ-168
@@ -332,6 +335,7 @@ An RM-guided intermediate (v1) landed on a sibling branch as a stepping stone: i
 |---|---|
 | **Structural — root archetype match** | comp.ArchetypeNodeID matches the OPT root's archetype id |
 | **Structural — required attributes (composition root + recursive)** | RM-mandatory attrs at the root (Category, Composer, Language, Territory); template-driven existence checks at every OPT node whose attribute interval lower ≥ 1 |
+| **Structural — prohibited attributes** | an attribute whose OPT existence has an upper bound of 0 is reported as `prohibited` at the attribute's path when present (a single-valued attribute that holds a value, a multi-valued one that holds at least one item), and the template walk does not walk into it |
 | **Structural — child cardinality** | for each C_MULTIPLE_ATTRIBUTE, the RM child count is checked against the parsed `CompiledAttribute.ChildMultiplicity()` interval and each child's `Occurrences()` |
 | **Structural — alternatives (C_SINGLE_ATTRIBUTE)** | RM value must match one of the attribute's child constraints. Binding prefers the most specific child, in three tiers: a child whose `RMTypeName` equals the value's RM type (for a round-tripped bare `DV_INTERVAL`, the parameterised type its bounds give; one with no bound present has no parameter, so only a bare `DV_INTERVAL` child names its type, and a `DV_INTERVAL<T>` child admits it in the third tier, as § REQ-110 *Known limitations* says); then a child naming the AOM 1.4 primitive short name whose canonical DV wrapper the value is; then a child the type only conforms to by BMM descent, or an untyped child. Within a tier the first child in OPT order wins. Exactly one child → `rm_type_mismatch` on failure; two or more children → `alternative_mismatch` |
 | **Structural — RM type match** | the RM instance's concrete type must conform to the OPT child's `RMTypeName`: equal to it, or a descendant of it in the pinned RM BMM's class hierarchy, whether that ancestor is abstract or concrete (a `DV_CODED_TEXT` satisfies `DV_TEXT`, a `PARTY_REF` satisfies `OBJECT_REF`). A parameterised `DV_INTERVAL<T>` is matched as [§ REQ-110](#req-110--template-driven-validation-beyond-composition) says, and an AOM 1.4 primitive short name admits its canonical DV wrapper, the type the [REQ-107](#req-107--template-driven-rm-instance-example-generator) generator builds for it (`DURATION` → `DV_DURATION`, `DATE` → `DV_DATE`, `TIME` → `DV_TIME`, `DATE_TIME` → `DV_DATE_TIME`, `BOOLEAN` → `DV_BOOLEAN`, `INTEGER` → `DV_COUNT`). Single-child attributes surface failures as `rm_type_mismatch` at the attribute path |
@@ -350,6 +354,7 @@ An RM-guided intermediate (v1) landed on a sibling branch as a stepping stone: i
 |---|---|
 | `required` | a required attribute (OPT-declared or RM-mandatory) is absent / zero-valued |
 | `cardinality` | a multi-valued attribute's child count violates the OPT-declared cardinality / occurrences interval |
+| `prohibited` | an attribute the OPT prohibits (existence upper bound 0) is present (*Structural — prohibited attributes* above) |
 | `alternative_mismatch` | no child of a C_SINGLE_ATTRIBUTE with **two or more** alternatives matches the RM value, or no child of a C_MULTIPLE_ATTRIBUTE with two or more children admits an item that is not a LOCATABLE |
 | `rm_type_mismatch` | the RM instance's concrete type does not conform to the OPT child's declared `RMTypeName` (*RM type match* above), including single-child C_SINGLE_ATTRIBUTE type constraints and an item that is not a LOCATABLE that a single-child C_MULTIPLE_ATTRIBUTE does not admit |
 | `archetype_id_mismatch` | LOCATABLE.archetype_node_id does not equal the OPT-pinned archetype id at the matched node |
@@ -401,6 +406,7 @@ The package **MUST** expose typed sentinels callers compare via `errors.Is` for 
 |---|---|
 | `ErrCardinality` | `cardinality` code |
 | `ErrRequired` | `required` code |
+| `ErrProhibited` | `prohibited` code |
 | `ErrTypeMismatch` | `rm_type_mismatch`, `alternative_mismatch`, `archetype_id_mismatch`, `node_id_mismatch` |
 | `ErrPrimitive` | any `primitive_*` code |
 | `ErrSlotFill` | `slot_fill` code |
@@ -930,7 +936,7 @@ func ValidateRMDemographic(party rm.Party) Result   // PERSON / ORGANISATION / G
 func ValidateRMEHRStatusBytes(data []byte) Result
 ```
 
-The typed wrappers carry the same nil-guard contract REQ-110 introduced: `nil_folder` / `nil_ehr_status` / `nil_ehr_access` / `nil_party` distinguish wrapper-side guards from the generic `nil_root` that `ValidateRM(nil)` emits. A Go value outside the v2 closed RM set surfaces `rm_type_unknown` at `/`; the floor cannot descend further but does not panic.
+The typed wrappers carry the same nil-guard contract REQ-110 introduced: `nil_folder` / `nil_ehr_status` / `nil_ehr_access` / `nil_party` distinguish wrapper-side guards from the generic `nil_root` that `ValidateRM(nil)` emits. A guard is a global issue, so its `Path` **MUST** be empty, as on the template-driven guards. `ValidateRM` and the typed wrappers **MUST** return what a [§ REQ-171](#req-171--validation-engine) `Validator` built with no options returns from `Validate(root, nil)`; a caller who needs other limits builds one. A Go value outside the v2 closed RM set surfaces `rm_type_unknown` at `/`; the floor cannot descend further but does not panic.
 
 ### Driver
 
@@ -939,7 +945,7 @@ The floor walker is a **second driver** alongside the template-driven walker —
 - `RequiredAttributes(rmType)` drives the per-node required-set check. A single-valued attribute absent (or typed-nil) emits `required`; a multi-valued attribute absent emits `required`, present-but-empty emits `cardinality`.
 - `AttributeNames(rmType)` enumerates the descend candidates (the per-type attribute list extends `Lookup` with this method — additive on the existing surface).
 - `AttributeRMType` / `IsContainer` carry the declared shape for each attribute. The walker recurses into every present attribute of a class rmread models (see *Known gap — classes rmread does not model* below), using the value's *runtime* RM type (from `rmTypeInfo`) when known so the invariant evaluators dispatch correctly across Liskov substitution (`DV_TEXT` carrying `DV_CODED_TEXT`, a `CONTENT_ITEM` slot carrying an `OBSERVATION`, etc.). BASE `Interval` defines `lower_unbounded` / `upper_unbounded` as marking that boundary open (-infinity / +infinity), so an open side carries no bound value, and every BASE invariant that reads a bound (`Limits_consistent`, `Limits_comparable`) is guarded by the flags. The walk therefore skips an open side whose bound is empty, as [wire.md § REQ-052](wire.md#req-052) defines "empty" (`rm.IsEmptyIntervalBound`), the reading [wire.md § REQ-140](wire.md#req-140--underscore-prefixed-rm-attributes) gives a concrete-typed bound. A non-empty bound on an open side is walked like any bound.
-- The walk visits each value held by pointer once. A value it reaches again inside itself is a cycle: each place it recurs is reported as `cyclic_value` at that path and not descended into. A value it reaches again by another path, a pointer shared between two attributes, is not walked a second time, so its issues carry the first path only. A decoded document holds neither; only a value built in Go can. A value held by value whose list shares its own backing array has no pointer for the walk to recognise, so the walk also stops after a fixed number of visits per call, reporting `max_nodes` once at the path where it stops; no decoded document comes near that number.
+- The walk visits each value held by pointer once. A value it reaches again inside itself is a cycle: each place it recurs is reported as `cyclic_value` at that path and not descended into. A value it reaches again by another path, a pointer shared between two attributes, is not walked a second time, so its issues carry the first path only. A decoded document holds neither; only a value built in Go can. A value held by value whose list shares its own backing array has no pointer for the walk to recognise, so the walk also stops after a number of visits per call, reporting `max_nodes` once at the path where it stops; no decoded document comes near the default. Past a nesting depth the walk does not descend, and it **MUST** report `max_depth` once per walk, at the first path where it stopped, not once for each node at that depth. Both limits are the `Limits` of [§ REQ-171 *Surface*](#req-171--validation-engine), with its defaults, and each path where one stopped the walk is listed in `Coverage.Stopped`.
 
 ### Per-RM-type invariant catalogue (v1 first cycle)
 
@@ -1051,8 +1057,8 @@ A field's class is fixed by its type and, for an `Issue`, by the entry point tha
 | Type and entry point | Value-free | Value-bearing |
 |---|---|---|
 | `constraints.Violation` | `Code`, `Detail`: **MUST NOT** carry a submitted value | `Value` |
-| `validation.Issue` from `ValidateComposition`, the REQ-110 entries and the REQ-112 floor entries | `Path`, `Code`, `Detail`, `Severity`: **MUST NOT** carry a submitted value | `Value` |
-| `validation.Issue` from `ValidateAQL` and `ValidateAQLWithTypeRelation` | `Code`, `Severity`: **MUST NOT** carry source text ([§ REQ-109 § Value-free lint diagnostics](#value-free-lint-diagnostics)) | `Detail` and `Path`, as § REQ-109 classifies them |
+| `validation.Issue` from `ValidateComposition`, the REQ-110 entries and the REQ-112 floor entries | `Path`, `Code`, `Layer`, `Rule`, `Detail`, `Severity`: **MUST NOT** carry a submitted value | `Value` |
+| `validation.Issue` from `ValidateAQL` and `ValidateAQLWithTypeRelation` | `Code`, `Layer`, `Rule`, `Severity`: **MUST NOT** carry source text ([§ REQ-109 § Value-free lint diagnostics](#value-free-lint-diagnostics)) | `Detail` and `Path`, as § REQ-109 classifies them |
 
 A value-free field **MUST NOT** fall back to quoting the value where a value-free wording is hard to find ([§ REQ-113](#value-free-structured-drop-records)'s no-fallback clause). What cannot be said without the value goes in `Value`, or nowhere.
 
@@ -1128,7 +1134,7 @@ Every other `Issue` (an absence, a count, a type or identity mismatch, a guard) 
 
 Template-driven validation ([§ REQ-102](#req-102--composition-validation), [§ REQ-110](#req-110--template-driven-validation-beyond-composition)) and the Reference Model floor ([§ REQ-112](#req-112--template-less-reference-model-validation-floor)) are built today as two walks over the instance, run one after the other and joined by comparing issue codes at issue paths, which [ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md) allows as one of two mechanisms. That build cannot refuse content the template forbids before the floor spends RM checks on it, reports one defect twice when the two walks name it under two codes, and reads values through hand-written readers that reach 71 of the 110 concrete RM classes. This requirement states the engine both walks are replaced by: one validator value, one walk, the template's admission decided before any RM rule at every node, one finding per defect that names its layer and its rule, and a result that says what it did not check ([ADR 0027](../adr/0027-template-admission-before-rm-rules.md), [ADR 0028](../adr/0028-generated-rm-attribute-access.md)).
 
-The engine is planned. Until it lands, the entry points keep the contract of [§ REQ-102 *RM floor*](#rm-floor) and [§ REQ-112 *Driver*](#driver); the change that lands the engine amends those sections to cite this one, so one home holds each rule at every point in time.
+The engine lands in stages. *Surface*, *Finding identity* and *Coverage* (its `Stopped` and `External` lists) bind now, over the two walks that exist. *One walk*, *Where the RM rules come from*, *Structural access* and `Coverage.Unevaluated` bind when the engine lands; until then the entry points keep the contract of [§ REQ-102 *RM floor*](#rm-floor) and [§ REQ-112 *Driver*](#driver), and the change that lands the engine amends those sections to cite this one, so one home holds each rule at every point in time.
 
 ### Surface
 
@@ -1147,7 +1153,7 @@ type Limits struct {
 func WithLimits(l Limits) Option
 ```
 
-- `New` **MUST** take functional options ([idiom.md § Functional options](idiom.md#functional-options-req-022)); the limits are the first options, and a later setting is added as an option, never as a parameter. A `Limits` field that is zero or negative **MUST** be read as its default, so no option disables a limit.
+- `New` **MUST** take functional options ([idiom.md § Functional options](idiom.md#functional-options-req-022)); the limits are the first options, and a later setting is added as an option, never as a parameter. A `Limits` field that is zero or negative **MUST** be read as its default, so no option disables a limit, and the zero `Validator` behaves as one built with no options. Until the engine lands, the limits bound the floor's walk; the template walk is bounded by the compiled template it follows.
 - The value **MUST** hold no per-call state after `New`, so one instance serves every goroutine of a server ([idiom.md § Concurrency](idiom.md#concurrency-req-026)); the compiled template is built once per template and shared, as today.
 - `Validate` **MUST** accept any RM value the registry knows ([rm-modeling.md § REQ-040](rm-modeling.md#type-registry-req-040)) and, given a nil `c`, **MUST** apply the RM rules alone, so a root that binds to no template is validated by the same walk.
 - The package-level entry points of § REQ-102, § REQ-110 and § REQ-112 **MUST** remain and **MUST** behave as a `Validator` built with no options, keeping their nil guards: `Validate(root, nil)` still reports `nil_template`, and `ValidateRM` is the package-level entry for the RM rules alone.
@@ -1175,20 +1181,29 @@ A root with no template has every attribute unconstrained, so the walk is the fl
 type Issue struct {
     Path     string               // § REQ-102 Issue paths
     Code     string               // § REQ-102 Issue codes
-    Layer    Layer                // LayerTemplate, LayerRM, or none on a guard
-    Rule     string               // the clause this issue evaluates; empty on a guard
+    Layer    Layer                // LayerTemplate, LayerRM, or LayerNone
+    Rule     string               // the clause this issue evaluates; empty with LayerNone
     Detail   string
     Severity Severity
     Value    constraints.Redacted // § REQ-168
 }
+
+type Layer uint8
+const (
+    LayerNone     Layer = iota // a guard, a walk condition, or an issue from ValidateAQL
+    LayerTemplate              // a template clause
+    LayerRM                    // an RM rule or an RM-mandatory presence
+)
+func (l Layer) String() string // "", "template", "rm"; any other value "layer(N)"
 ```
 
-Every issue the engine reports at a node **MUST** name its `Layer`: the template layer for an issue a template clause produces, the RM layer for one an RM rule or an RM-mandatory presence produces. A global guard (`nil_root`, `nil_template`, `rm_type_unknown` and the nil wrappers' codes) carries no layer and an empty `Rule`; every other issue **MUST** carry a non-empty `Rule`.
+Every issue the instance validators report **MUST** name its `Layer` and carry a non-empty `Rule`, except the issues that judge the call or the walk rather than the instance: the guards (`nil_root`, `nil_template`, `nil_composition`, the nil wrappers' codes, `rm_type_unknown`, and `invalid_shape` on undecodable input) and the walk conditions (`max_depth`, `max_nodes`, `cyclic_value`) carry no layer and an empty `Rule`. An issue a template clause produces is on the template layer; one an RM rule or an RM-mandatory presence produces is on the RM layer. An attribute the template walk finds absent is on the template layer when the template's own existence constraint requires it, and on the RM layer when only the RM marks it mandatory. An issue from `ValidateAQL` or `ValidateAQLWithTypeRelation` is not an instance finding and carries neither.
 
 `Rule` names the clause the issue evaluates:
 
-- on the RM layer, the invariant's name as the pinned BMM spells it (`Limits_consistent`, `Inv_null_flavour_indicated`, `Language_valid`, `Match_valid`, `Rm_version_valid`), or `mandatory` for an attribute the RM declares mandatory and the instance lacks;
-- on the template layer, one of `existence` (presence and the prohibited attribute), `cardinality`, `occurrences`, `slot` (slot assertions), `type` (type conformance and alternatives), `identity` (archetype and node ids), or, at a primitive leaf, the `Violation.Code` of § REQ-103.
+- on the RM layer, for a rule the pinned BMM names, `CLASS.Invariant`: the class that declares the invariant in the pinned RM or BASE BMM and the invariant's name as that BMM spells it (`DV_INTERVAL.Limits_consistent`, `ELEMENT.Inv_null_flavour_indicated`, `ENTRY.Language_valid` on any concrete entry, `Interval.Lower_included_valid` on any interval, `TERM_MAPPING.Match_valid`). That is the key the inventory of *Where the RM rules come from* uses;
+- on the RM layer, for a rule the SDK applies that the BMM states in an attribute's definition rather than as a named invariant, a lower-case name with no class: `mandatory` for an RM-mandatory attribute the instance lacks, a mandatory string left empty included; `cardinality` for an RM-mandatory container that is present and empty; `precision_range` for a `precision` below -1;
+- on the template layer, one of `existence` (an attribute the template requires and the instance lacks, or one it prohibits and the instance carries), `cardinality` (the attribute's item count), `occurrences` (a child's count of bound items), `slot` (an item that fits no child or slot), `type` (type conformance and alternatives), `identity` (archetype and node ids), or, at a primitive leaf, the `Violation.Code` of § REQ-103.
 
 `Code` keeps the vocabulary of § REQ-102 *Issue codes*, so a caller that dispatches on it today keeps working. An issue whose code is already specific to a rule (`lower_included_valid`, `is_archetype_root`, `rm_version_valid`, `mappings_valid`, `term_mapping_match`, `code_not_in_value_set`) **MUST** carry both that code and the rule's name. `rm_invariant` stays the code of every other RM rule; `Rule` is what tells them apart, so a caller **MUST NOT** need `Detail` to learn which rule failed. `Layer` and `Rule` carry structure, never a submitted value ([§ REQ-168 *Field classes*](#field-classes)).
 
@@ -1212,14 +1227,14 @@ type Result struct {
 }
 
 type Coverage struct {
-    Complete    bool     // true when the three lists below are empty
     Stopped     []string // paths where a limit stopped the walk
     External    []string // paths of leaves whose value set is outside the SDK (a CONSTRAINT_REF)
-    Unevaluated []string // "CLASS.Invariant" entries, of classes the walk visited, the inventory does not evaluate
+    Unevaluated []string // "CLASS.Invariant" entries, of classes the walk visited, the SDK does not evaluate
 }
+func (c Coverage) Complete() bool // Stopped and External are both empty
 ```
 
-`OK` reports the absence of error findings and nothing more. `Coverage` **MUST** say what the result does not prove: each path where a limit stopped the walk, each path of a leaf whose value set the validator cannot consult ([§ REQ-103](#req-103--primitive-constraint-introspection)'s `CONSTRAINT_REF`, [§ REQ-105](#req-105--terminology-bindings)), and each invariant of a visited class that the inventory classifies as not evaluated. `Complete` **MUST** be true exactly when the three lists are empty, so a caller can tell "no findings" from "everything was checked" without reading the documentation.
+`OK` reports the absence of error findings and nothing more. `Coverage` **MUST** say what the result does not prove: `Stopped` lists the path of each `max_depth` and `max_nodes` issue, so at most one per limit; `External` lists, in walk order, the path of each leaf the template binds to a constraint whose value set the validator cannot consult ([§ REQ-103](#req-103--primitive-constraint-introspection)'s `CONSTRAINT_REF`, [§ REQ-105](#req-105--terminology-bindings)); `Unevaluated` lists, sorted and once each, the invariants of the classes the walk visited that the inventory does not classify as evaluated. `Complete` **MUST** report true exactly when `Stopped` and `External` are both empty: every node was reached and every constraint reached could be checked locally. It says nothing of `Unevaluated`, which lists RM rules the SDK does not evaluate on any instance, so it is reported beside `Complete` rather than folded into it. The zero `Coverage`, which a guard and `ValidateAQL` return, is complete. A coverage path is written by § REQ-102 *Issue paths* and is value-free.
 
 ### Out of scope
 
@@ -1234,9 +1249,10 @@ type Coverage struct {
 - An attribute the template does not mention, carrying an RM breach, **MUST** draw that breach on the RM layer.
 - A Go value with one defect, held from two places, **MUST** draw two issues, one at each path.
 - `Validate(root, nil)` on a `Validator` and `ValidateRM(root)` **MUST** return the same issues for every root of the vendored corpus.
-- Every issue of a run over the vendored corpus **MUST** carry a `Layer` and a non-empty `Rule`, and a test **MUST** fail when one emit site stops setting either.
+- Every issue of a run over the vendored corpus and the constraint-fixture matrix **MUST** carry a `Layer` and a non-empty `Rule`, and a test **MUST** fail when one emit site stops setting either; a guard and a walk condition **MUST** carry neither.
 - A test **MUST** fail when an invariant of the pinned BMMs has no classification, and when the registry knows a class the generated access does not cover.
-- A walk stopped at a limit **MUST** list the path in `Coverage.Stopped` and report `max_depth` or `max_nodes` once; a `CONSTRAINT_REF` leaf **MUST** list its path in `Coverage.External`; a root of a class with a not-evaluated invariant **MUST** list it in `Coverage.Unevaluated`; `Complete` **MUST** be false in each case and true for a corpus composition that meets none of them.
+- A walk stopped at a limit **MUST** list the path in `Coverage.Stopped` and report `max_depth` or `max_nodes` once; a `CONSTRAINT_REF` leaf **MUST** list its path in `Coverage.External`; `Complete` **MUST** be false in both cases and true for a corpus composition that meets neither. A root of a class with a not-evaluated invariant **MUST** list it in `Coverage.Unevaluated`.
+- `WithLimits` with a depth or a node count below what a root needs **MUST** stop the walk there; a zero or negative field **MUST** behave as the default, and a test **MUST** fail when it disables the limit instead.
 - The issue-code multisets PROBE-025, PROBE-026 and PROBE-074 pin **MUST** be re-baselined as a reviewed change, never skipped, and each difference from the two-walk result **MUST** be one of: an issue from inside refused content, a second code for one defect at one path, or a shared value's second path.
 
 - **Lives in:** [`openehr/validation/`](../../openehr/validation/) (planned); the inventory and the structural access in `internal/bmmgen` (planned).

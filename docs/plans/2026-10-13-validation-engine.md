@@ -5,7 +5,7 @@ kind: plan
 # Plan — Validation engine: one walk, admission first, generated access
 
 **Date:** 2026-10-13
-**Status:** Draft — the definition layer is on this branch; no code yet
+**Status:** In progress — Phases 0 to 2 on branch `feat/validation-engine`; Phases 3 and 4 wait on their ADRs
 **Covers:** REQ-171 ([clinical-modeling.md § REQ-171](../specifications/clinical-modeling.md#req-171--validation-engine), planned); amends REQ-102 ([§ REQ-102](../specifications/clinical-modeling.md#req-102--composition-validation)), REQ-110 ([§ REQ-110](../specifications/clinical-modeling.md#req-110--template-driven-validation-beyond-composition)), REQ-112 ([§ REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor)), REQ-168 ([§ REQ-168](../specifications/clinical-modeling.md#req-168--value-free-validation-diagnostics)) and, in its last phase, REQ-170 ([wire.md § REQ-170](../specifications/wire.md#req-170--unmatched-content-on-decode))
 **Probes:** PROBE-025, PROBE-026, PROBE-074 (re-baselined in Phase 4), PROBE-077 (buildable from Phase 3), PROBE-081 (re-homed in Phase 5)
 **Depends on:** [PR 256](https://github.com/Cadasto/openehr-sdk-go/pull/256), merged, and [ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md); [ADR 0028](../adr/0028-generated-rm-attribute-access.md) accepted before Phase 3; [ADR 0027](../adr/0027-template-admission-before-rm-rules.md) accepted before Phase 4; [STRAND-15](../specifications/research-strands.md#strand-15--decode-time-presence-and-unmatched-member-capture-on-the-generated-types) resolved before Phase 5
@@ -70,7 +70,7 @@ The two small items with no dependency, delivered first so that the single walk 
 
 **Tasks:**
 - Add `Layer` and `Rule` to `Issue` as [§ REQ-171 *Finding identity*](../specifications/clinical-modeling.md#req-171--validation-engine) defines them: amend the `Issue` block of § REQ-102 *Contract* and the field-class row of § REQ-168 so both name the two fields; set them at every emit site in `walk_composition.go`, `rmfloor.go`, `rmfloor_coded.go`, `rmfloor_adapters.go` and `rmfloor_bytes.go`.
-- Report an attribute the template prohibits (existence upper bound 0) when present, under the code `prohibited`, and amend § REQ-102 *Validation dimensions* and *Issue codes* with the row. No vendored OPT prohibits an attribute, so the test builds its own compiled template.
+- Report an attribute the template prohibits (existence upper bound 0) when present, under the code `prohibited` with the sentinel `ErrProhibited`, and amend § REQ-102 *Validation dimensions*, *Issue codes* and *Sentinels* with the rows. No vendored OPT prohibits an attribute, so the test builds its own compiled template.
 - Tests: a census over the vendored corpus that every issue carries a layer and a non-empty rule, one table test per rule name over the existing fixture matrix, and an extension of the godoc field-class test. Each guard has a can-fail control: removing the assignment at one emit site fails a named test.
 - Map: REQ-171 `implementation: partial`.
 
@@ -80,10 +80,10 @@ The two small items with no dependency, delivered first so that the single walk 
 
 **Tasks:**
 - `validation.New(opts ...Option)`, `WithLimits`, `(*Validator).Validate(root, c)`, with a nil `c` meaning the RM rules alone; the package-level functions delegate to a validator built with no options and keep their nil guards. The hard-coded depth and visit limits become the defaults of `Limits`.
-- `Coverage` on `Result`, with `Stopped`, `External`, `Unevaluated` and `Complete`. In this phase `Unevaluated` is filled from a hand-kept list that Phase 3 replaces with the generated inventory; `External` lists each `CONSTRAINT_REF` leaf the walk binds.
+- `Coverage` on `Result`, with `Stopped` and `External` and the method `Complete`; `External` lists each `CONSTRAINT_REF` leaf the walk binds. `Unevaluated` arrives in Phase 3 with the generated inventory: a hand-kept list of the 177 invariants would be thrown away there, and `Complete` does not read it.
 - `max_depth` reported once per walk, at the first path where the walk stopped, instead of once per node at the limit.
 - Spec: amend § REQ-112 *Surface* to say the typed wrappers delegate to the validator, and the `Result` block of § REQ-102 *Contract* to carry `Coverage`.
-- Tests: limits honoured and a zero or negative limit read as the default; each `Coverage` list filled and `Complete` false for its case; a corpus composition with `Complete` true.
+- Tests: limits honoured and a zero or negative limit read as the default; each `Coverage` list filled and `Complete` false for its case; a corpus composition with `Complete` true; the floor's nil guards report an empty path.
 
 **Definition of done:** `make ci` green; the benchmark `BenchmarkValidateComposition` shows no regression past the budget line of [STRAND-04](../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance) (more than 20 percent worse at p < 0.05).
 
@@ -94,7 +94,7 @@ The two small items with no dependency, delivered first so that the single walk 
 **Tasks:**
 - `internal/bmmgen` emits, into a module-internal package, per-class attribute access for every registered concrete class: name, declared RM type, container flag, presence, value, by plain field access. A test pins that the set of classes covered equals the set the registry decodes, so `make codegen-verify` fails on a BMM bump until the generator runs.
 - Both walks read through the generated access; `openehr/validation/rmread` is removed, with its `Handles` pin and its reader tests. The REQ-013 import guard and the block list in `module-layout.md` stop naming it; the architecture narrative records the generator change, as ADR 0013 did.
-- `internal/bmmgen` emits the invariant inventory from the `invariants` maps of the pinned RM and BASE BMMs, keyed by class and name, with a checked-in classification file (evaluated with its Go function, not mechanical with its reason, out of scope with its reason). `make codegen-verify` fails when an invariant has no classification. The floor dispatches its rules through the inventory, and `Coverage.Unevaluated` reads from it.
+- `internal/bmmgen` emits the invariant inventory from the `invariants` maps of the pinned RM and BASE BMMs (BASE's interval invariants sit under `primitive_types`), keyed by class and name, with a checked-in classification file (evaluated with its Go function, not mechanical with its reason, out of scope with its reason). `make codegen-verify` fails when an invariant has no classification. The floor dispatches its rules through the inventory, and `Coverage.Unevaluated` is added to `Result`, filled from it.
 - Spec: replace the *Known gap — classes rmread does not model* paragraph of § REQ-112 with a sentence pointing at the generated coverage table, and fold the other known-gap paragraphs into inventory entries (`Limits_comparable`, a bound beside its own open flag, the change-control and resource-description coded invariants, `Other_reference_ranges_validity`, `Range_is_simple`, `Scheme_valid`, the DV_AMOUNT accuracy rules, `Magnitude_status_valid`, `Participations_validity`, `Other_participations_valid`). Amend § REQ-110 *Implementation* and § REQ-112 *Driver* where they describe the readers.
 - PROBE-077, the RM-floor invariant matrix, becomes buildable from the inventory: implement it over the fixture matrix, or re-scope its catalogue entry to say what the inventory now proves.
 - Expect new findings: the walk now enters classes and optional attributes it never read (INSTRUCTION_DETAILS, LINK, FEEDER_AUDIT, DV_STATE, DV_PARAGRAPH, the time-specification types; LOCATABLE `uid`, `links` and `feeder_audit`; ENTRY `workflow_id`; DV_TEXT `hyperlink`, `language`, `encoding`). Every new corpus-ratchet row is reviewed, and the generator (REQ-107) is fixed where it is the cause.
