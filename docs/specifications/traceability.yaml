@@ -79,6 +79,7 @@ requirements:
     tests:
       - internal/importguard/anybuild_internal_test.go
       - internal/importguard/importguard_test.go
+      - internal/rmaccess/imports_test.go
       - openehr/aql/contain/imports_test.go
       - openehr/aql/imports_test.go
       - openehr/aql/internal/semcheck/imports_test.go
@@ -2097,8 +2098,12 @@ requirements:
     canonical: docs/specifications/clinical-modeling.md#req-171--validation-engine
     status: draft
     implementation: partial
-    packages: [openehr/validation]
+    packages: [openehr/validation, internal/rmaccess, internal/bmmgen]
     tests:
+      - internal/bmmgen/render_rmaccess_test.go
+      - internal/rmaccess/coverage_test.go
+      - internal/rmaccess/presence_test.go
+      - internal/rmaccess/rmread_parity_test.go
       - openehr/instance/rm_defaults_yield_test.go
       - openehr/validation/coverage_test.go
       - openehr/validation/finding_identity_rules_test.go
