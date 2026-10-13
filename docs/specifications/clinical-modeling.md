@@ -936,7 +936,7 @@ func ValidateRMDemographic(party rm.Party) Result   // PERSON / ORGANISATION / G
 func ValidateRMEHRStatusBytes(data []byte) Result
 ```
 
-The typed wrappers carry the same nil-guard contract REQ-110 introduced: `nil_folder` / `nil_ehr_status` / `nil_ehr_access` / `nil_party` distinguish wrapper-side guards from the generic `nil_root` that `ValidateRM(nil)` emits. A guard is a global issue, so its `Path` **MUST** be empty, as on the template-driven guards. `ValidateRM` and the typed wrappers **MUST** return what a [§ REQ-171](#req-171--validation-engine) `Validator` built with no options returns from `Validate(root, nil)`; a caller who needs other limits builds one. A Go value outside the v2 closed RM set surfaces `rm_type_unknown` at `/`; the floor cannot descend further but does not panic.
+The typed wrappers carry the same nil-guard contract REQ-110 introduced: `nil_folder` / `nil_ehr_status` / `nil_ehr_access` / `nil_party` distinguish wrapper-side guards from the generic `nil_root` that `ValidateRM(nil)` emits. A nil guard is a global issue, so its `Path` **MUST** be empty, as on the template-driven guards; `rm_type_unknown` stays at `/`, the root it could not descend. `ValidateRM` and the typed wrappers **MUST** return what a [§ REQ-171](#req-171--validation-engine) `Validator` built with no options returns from `Validate(root, nil)`; a caller who needs other limits builds one. A Go value outside the v2 closed RM set surfaces `rm_type_unknown` at `/`; the floor cannot descend further but does not panic.
 
 ### Driver
 
