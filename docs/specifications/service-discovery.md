@@ -91,7 +91,7 @@ Each `ServiceEntry` **MUST** surface the canonical `version`, `description`, `do
 For non-discovering openEHR backends (a static EHRbase deployment, a Cadasto deployment with a pinned configuration, a local CDR for testing), consumers **MUST** be able to construct a `ServiceCatalog` directly without going through a discovery transport:
 
 ```go
-catalog := discovery.NewStaticCatalog(discovery.StaticConfig{
+catalog, err := discovery.NewStaticCatalog(discovery.StaticConfig{
     Issuer: "https://ehrbase.example/",
     Services: map[string]discovery.ServiceEntry{
         "org.openehr.rest": {
@@ -104,6 +104,9 @@ catalog := discovery.NewStaticCatalog(discovery.StaticConfig{
         // ... or zero value if backend doesn't use OAuth2
     },
 })
+if err != nil {
+    return err // a missing Issuer, or a nil or relative service BaseURL
+}
 ```
 
 The `NewStaticCatalog` constructor **MUST NOT** require a network round trip; the resulting catalog has `ResolvedAt = time.Now()` and `ExpiresAt = time.Time{}` (no TTL). `StaticConfig.BaseURL` is optional: when empty, the catalog's `BaseURL` **MUST** equal `StaticConfig.Issuer`.
