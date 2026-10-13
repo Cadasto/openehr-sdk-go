@@ -529,7 +529,7 @@ client scenarios to SDK coverage:
 
 - **Title:** Sharpens PROBE-025 with negative structural cases — missing required nodes, empty multi-valued attributes with `existence ≥ 1`, occurrences upper-bound violations, RM-type mismatches under C_SINGLE_ATTRIBUTE alternatives — and asserts the issue-code multiset (`required`, `cardinality`, `rm_type_mismatch`, `alternative_mismatch`) is stable across conformant implementations.
 - **Preconditions:** Same OPT + composition tuple shape as PROBE-025; cases focus on the v2 template-driven structural completion surface that the RM-guided intermediate could not detect.
-- **Wire assertion:** In-repo property — same pipeline as PROBE-025. A composition with the systolic ELEMENT removed surfaces `required` at the ITEM_LIST `/items` path; an empty `events` slice surfaces `required` + `cardinality`; an unmatched alternative surfaces `alternative_mismatch`.
+- **Wire assertion:** In-repo property — same pipeline as PROBE-025. A composition with the systolic ELEMENT removed surfaces `required` at the ITEM_LIST `/items` path; an empty `events` list surfaces `required` + `cardinality`, and an absent one `required` alone; an unmatched alternative surfaces `alternative_mismatch`.
 - **Modes:** In-repo (issue-code multiset against a fixture OPT; no backend).
 - **Status:** Implemented (inline) — see [`testkit/probes/validation/probe_025_composition_validate.go`](../../testkit/probes/validation/probe_025_composition_validate.go).
 - **Satisfies:** REQ-102
@@ -547,7 +547,7 @@ client scenarios to SDK coverage:
 
 - **Title:** `validation.Validate(root, c)` over a fixture-defined list of (OPT, RM root, expected codes) tuples returns the expected [`validation.Issue.Code`](../../openehr/validation/issue.go) multiset for archetypeable roots outside the COMPOSITION content set — the demographic PARTY hierarchy (`PERSON`/`ORGANISATION`/`GROUP`/`AGENT`/`ROLE` + sub-components) and the EHR-IM roots (`FOLDER`/`EHR_STATUS`).
 - **Preconditions:** An OPT body rooted at the target RM type (real `Address.v2.opt` / `TestPerson.v2.opt`, or a synthetic root) and an in-memory or fixture-decoded RM root; each case carries a `WantCodes []string` multiset.
-- **Wire assertion:** In-repo property — `template.ParseOPT` + `templatecompile.Compile` + `validation.Validate` MUST produce an `Issue.Code` multiset matching each case's `WantCodes`. A conformant ADDRESS instance validates clean; a `PERSON` under an `ORGANISATION` OPT surfaces `rm_type_mismatch`; a `PERSON` missing its OPT-pinned `identities` surfaces `required` + `cardinality`; a `FOLDER` whose archetype id differs surfaces `archetype_id_mismatch`.
+- **Wire assertion:** In-repo property — `template.ParseOPT` + `templatecompile.Compile` + `validation.Validate` MUST produce an `Issue.Code` multiset matching each case's `WantCodes`. A conformant ADDRESS instance validates clean; a `PERSON` under an `ORGANISATION` OPT surfaces `rm_type_mismatch`; a `PERSON` whose OPT-pinned `identities` list is empty surfaces `required` + `cardinality`, and one without the list `required` alone; a `FOLDER` whose archetype id differs surfaces `archetype_id_mismatch`.
 - **Modes:** In-repo (issue-code multiset against fixture OPTs; no backend).
 - **Status:** Implemented (inline) — see [`testkit/probes/validation/probe_074_noncomposition_validate.go`](../../testkit/probes/validation/probe_074_noncomposition_validate.go).
 - **Satisfies:** REQ-110, REQ-102, REQ-103.
