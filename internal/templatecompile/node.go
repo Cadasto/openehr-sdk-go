@@ -60,6 +60,18 @@ type CompiledNode struct {
 	// can have different meanings under sibling roots. See [Term] for
 	// the parent-walk lookup that respects scope.
 	terms map[string]template.ArchetypeTerm
+
+	// walkClass, rest, conforming and conformingResolved hold what a
+	// validation walk asks of the node, set by [Compile] once its
+	// attributes are compiled and never changed after (walkfacts.go):
+	// the bare class of rmTypeName, the attributes of that class the
+	// node does not declare that a walk visits, and the classes that
+	// conform to rmTypeName, nil when the class hierarchy does not know
+	// it.
+	walkClass          string
+	rest               []AttributeFacts
+	conforming         classBits
+	conformingResolved bool
 }
 
 // AQLPath returns the canonical openEHR path string of this node.
@@ -199,6 +211,15 @@ type CompiledAttribute struct {
 	implicit          bool   // true when injected from rminfo, not declared by OPT
 	required          bool   // BMM is_mandatory (true even when OPT silent)
 	children          []*CompiledNode
+
+	// facts, allowed and prohibited hold what a validation walk asks of
+	// the attribute, set by [Compile] and never changed after
+	// (walkfacts.go): the facts of the Reference Model about it for the
+	// class of the node that holds it, the children the template allows,
+	// and whether the template prohibits it.
+	facts      AttributeFacts
+	allowed    []*CompiledNode
+	prohibited bool
 }
 
 // Name returns the RM attribute name (e.g. "content", "data").

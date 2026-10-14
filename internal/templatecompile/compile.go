@@ -176,6 +176,7 @@ func (w *walker) compileNode(n template.Node, parent *CompiledNode, segment stri
 	if err != nil {
 		return nil, err
 	}
+	resolveWalkFacts(cn)
 
 	if err := w.registerPath(cn); err != nil {
 		return nil, err

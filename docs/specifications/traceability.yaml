@@ -1173,6 +1173,7 @@ requirements:
       - internal/rmaccess/reads_test.go
       - internal/templatecompile/compile_test.go
       - internal/templatecompile/node_primitive_test.go
+      - internal/templatecompile/walkfacts_test.go
       - openehr/instance/binding_alternative_internal_test.go
       - openehr/instance/binding_alternative_test.go
       - openehr/instance/party_attribute_test.go
@@ -2134,10 +2135,12 @@ requirements:
       - internal/rmaccess/imports_test.go
       - internal/rmaccess/presence_test.go
       - internal/rmaccess/reads_test.go
+      - internal/templatecompile/walkfacts_test.go
       - openehr/instance/rm_defaults_yield_test.go
       - openehr/validation/composition_test.go
       - openehr/validation/coverage_test.go
       - openehr/validation/coverage_unevaluated_test.go
+      - openehr/validation/engine_bench_test.go
       - openehr/validation/engine_compare_test.go
       - openehr/validation/engine_template_test.go
       - openehr/validation/engine_walk_test.go
