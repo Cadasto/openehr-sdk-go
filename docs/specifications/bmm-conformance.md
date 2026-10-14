@@ -313,7 +313,7 @@ The wire format JSON does not distinguish List/Set/Array — they all serialise 
 
 ### Cardinality
 
-`P_BMM_CONTAINER_PROPERTY.cardinality` (with `lower`, `upper`, `upper_unbounded`) is preserved as a generated constant on the package or as a generated `Validate()` rule — the exact shape is up to the generator's emission strategy and is documented in [`../docs/plans/`](../plans).
+`P_BMM_CONTAINER_PROPERTY.cardinality` (with `lower`, `upper`, `upper_unbounded`) reaches the SDK through the generated attribute metadata in `openehr/rm/rminfo`: `AttrMeta.Container` marks a container property, and `AttrMeta.Required` is true when `cardinality.lower` is 1 or more, which the validation floor checks ([REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)). The upper bound is not kept: no container in the pinned RM and BASE BMMs has a finite one.
 
 ### Functions
 
@@ -323,7 +323,7 @@ The wire format JSON does not distinguish List/Set/Array — they all serialise 
 - The generator does **not** emit the function body — implementations are hand-written in non-generated files (REQ-044) where they are needed.
 - Functions that have not been hand-implemented **SHOULD** panic with a clear message (e.g. `panic("not implemented: DV_QUANTITY.add — implement in a non-generated file")`); this is one of the rare allowed panics in SDK code, justified by the fact that the function is documented in the BMM but not yet wired in.
 
-For SDK v1, the priority is the **types**, not the **methods** — most consumers do not need RM-level arithmetic. The method-body backlog is tracked in [`../docs/plans/`](../plans).
+For SDK v1, the priority is the **types**, not the **methods** — most consumers do not need RM-level arithmetic. The RM functions the SDK implements, and those it leaves out, are specified in [rm-functions.md](rm-functions.md).
 
 ## Primitive type mapping
 
@@ -360,8 +360,8 @@ The 29 primitives in `openehr_base_1.3.0.bmm.json` map to Go types per the table
 | `Array` | `[]T` | See § Container mapping |
 | `Hash` | `map[string]V` | See § Container mapping |
 | `Container` | abstract; not directly used | |
-| `Terminology_code` | `rm.TerminologyCode` (struct or alias) | TBD by generator; see plan |
-| `Terminology_term` | `rm.TerminologyTerm` (struct or alias) | TBD by generator; see plan |
+| `Terminology_code` | `rm.TerminologyCode` (struct) | Generated from base BMM |
+| `Terminology_term` | `rm.TerminologyTerm` (struct) | Generated from base BMM |
 
 ### ISO 8601 types
 
