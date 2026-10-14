@@ -196,6 +196,7 @@ requirements:
       - testkit/probe/run_test.go
       - testkit/probes/aql/probe_097_semantic_lint.go
       - testkit/probes/aql/probes_test.go
+      - transport/body_read_error_test.go
       - transport/challenge_test.go
       - transport/client_test.go
       - transport/decode_error_test.go
@@ -724,6 +725,7 @@ requirements:
       - testkit/probes/auth/probe_007_proactive_refresh.go
       - testkit/probes/auth/probe_007_transport_refresh.go
       - testkit/probes/auth/probes_test.go
+      - transport/body_read_error_test.go
       - transport/client_test.go
       - transport/reauth_backend_test.go
       - transport/reauth_challenge_test.go
@@ -978,6 +980,7 @@ requirements:
     implementation: landed
     packages: [transport]
     tests:
+      - transport/body_read_error_test.go
       - transport/client_test.go
       - transport/reauth_challenge_test.go
       - transport/redirect_test.go
@@ -1011,6 +1014,7 @@ requirements:
       - testkit/probe/run_test.go
       - testkit/probes/versioned/probe_010_put_without_if_match.go
       - testkit/probes/versioned/probe_011_put_stale_if_match.go
+      - transport/body_read_error_test.go
       - transport/client_test.go
       - transport/decode_error_test.go
       - transport/error_envelope_test.go
@@ -1028,6 +1032,7 @@ requirements:
     probes: [PROBE-061, PROBE-065, PROBE-071]
     tests:
       - openehr/client/demographic/party_test.go
+      - openehr/client/ehr/composition/body_read_error_test.go
       - openehr/client/ehr/composition/composition_test.go
       - openehr/client/ehr/composition/decode_error_test.go
       - openehr/client/ehr/contribution/decode_error_test.go
@@ -1097,6 +1102,7 @@ requirements:
     implementation: landed
     packages: [transport]
     tests:
+      - transport/body_read_error_test.go
       - transport/errors_test.go
       - transport/observer_test.go
 
@@ -2023,6 +2029,7 @@ requirements:
     implementation: landed
     packages: [transport]
     tests:
+      - transport/body_read_error_test.go
       - transport/challenge_test.go
       - transport/reauth_challenge_test.go
 
@@ -2167,3 +2174,8 @@ requirements:
     status: draft
     implementation: planned
     packages: [transport]
+    tests:
+      - openehr/client/ehr/composition/body_read_error_test.go
+      - transport/body_read_error_test.go
+      - transport/errors_test.go
+      - transport/nilwiredereference_internal_test.go
