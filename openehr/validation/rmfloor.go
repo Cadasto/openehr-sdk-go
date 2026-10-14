@@ -765,11 +765,11 @@ func (w *rmFloorWalker) checkDVQuantity(value any, path string) {
 //     fractional numerator or denominator breaches the RM even though the
 //     precision value itself is in range.
 //
-// The remaining DV_PROPORTION invariants are type-specific denominator
-// rules (`Valid_denominator`, `Unitary_validity`, `Percent_validity`,
-// `Fraction_validity`, `Type_validity`) and are NOT in the floor: they
-// turn on the `type` proportion-kind code, a different axis from
-// precision.
+// The remaining DV_PROPORTION invariants are NOT in the floor: the
+// type-kind rules (`Type_validity`, `Unitary_validity`, `Percent_validity`,
+// `Fraction_validity`), which turn on the `type` proportion-kind code, a
+// different axis from precision, and `Valid_denominator`
+// (`denominator /= 0.0`), which reads the denominator alone.
 //
 // Diagnostics name the attribute and the offending operand, never a value
 // from the instance: neither the precision nor an operand (REQ-168). The
