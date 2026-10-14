@@ -6,12 +6,14 @@ package validation_test
 // constraint-fixture matrix, every probe input and the roots the floor's own
 // tests pin, a walk with no template reports the issues ValidateRM reports,
 // finding by finding on path, code, layer and rule. Decoded documents, zero
-// values, the generator's Example instances and the probe inputs hold no
-// shared pointer, so the one walk's only difference from the floor, a shared
-// value validated at each place, cannot arise, and the two must agree
-// exactly. A root that reaches a walk condition (a cycle, the depth limit,
-// the visit limit) is compared the same way, apart from the wording of the
-// condition's Detail.
+// values and the generator's Example instances hold no shared pointer. One
+// probe input does, SystolicTwice, whose two systolic ELEMENTs hold one
+// DV_QUANTITY, but that value breaks no rule, so the one walk's only
+// difference from the floor, a defect in a shared value reported at each
+// place, cannot arise on these roots, and the two must agree exactly. A root
+// that reaches a walk condition (a cycle, the depth limit, the visit limit)
+// is compared the same way, apart from the wording of the condition's
+// Detail.
 //
 // With a template the one walk is compared with Validate, the two walks it
 // replaces, over the corpus documents with their OPTs, the generator's
@@ -28,9 +30,11 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
@@ -212,8 +216,9 @@ func comparisonRoots(t *testing.T) map[string][]comparedRoot {
 // REQ-171 § One walk — with no template the one walk is the floor: over every
 // root the harness loads, it reports the issues ValidateRM reports, as
 // multisets keyed by path, code, layer and rule, and in the same order, with
-// the same coverage. None of these roots holds a shared pointer, so no
-// difference is allowed; the test lists each one it finds.
+// the same coverage. The one shared pointer these roots hold, in the probe
+// input SystolicTwice, breaks no rule, so no difference is allowed; the test
+// lists each one it finds.
 func TestREQ171_EngineMatchesTheFloorWithNoTemplate(t *testing.T) {
 	groups := comparisonRoots(t)
 	for _, group := range slices.Sorted(maps.Keys(groups)) {
@@ -387,7 +392,7 @@ var minTemplatedRoots = map[string]int{
 	"generated":           49,
 	"constraint_fixtures": 25,
 	"probes":              17,
-	"acceptance":          11,
+	"acceptance":          18,
 	"guards":              4,
 }
 
@@ -396,9 +401,16 @@ var minTemplatedRoots = map[string]int{
 // OPT the corpus holds, the Example instance the generator builds for each
 // such template, the instances of the constraint-fixture matrix with their
 // templates, the probe inputs with the templates their cases compile, the
-// roots of the acceptance tests of the one walk but the one that shares a
-// value, and the roots the guards refuse or cannot descend. It fails the test when a group
-// holds fewer pairs than [minTemplatedRoots] says.
+// roots of the acceptance tests of the one walk, and the roots the guards
+// refuse or cannot descend. It leaves out two acceptance roots whose
+// difference is none of the kinds REQ-171 § Acceptance allows, each pinned by
+// its own test: an empty Hash the two walks read as `required` from the BMM
+// bit the template carries, which the RM rules alone do not report
+// ([TestREQ171_EngineReadsAnEmptyHashAsTheRMRulesDo]), and a reference's
+// missing part, which the two walks report as `required` beside the
+// reference's own rule ([TestREQ171_EngineReportsAMissingReferencePartOnce]).
+// It fails the test when a group holds fewer pairs than [minTemplatedRoots]
+// says.
 func templatedRoots(t *testing.T) map[string][]templatedRoot {
 	t.Helper()
 	groups := map[string][]templatedRoot{}
@@ -445,8 +457,14 @@ func templatedRoots(t *testing.T) map[string][]templatedRoot {
 	for _, tc := range emptyContainerCases(t) {
 		groups["acceptance"] = append(groups["acceptance"], templatedRoot{name: "an empty container " + tc.name, root: tc.root, c: tc.c})
 	}
+	for _, tc := range rmMandatoryCases(t) {
+		groups["acceptance"] = append(groups["acceptance"], templatedRoot{name: tc.name, root: tc.root, c: tc.c})
+	}
 	vitalSigns := mustCompile(t, "vital_signs")
-	groups["acceptance"] = append(groups["acceptance"], templatedRoot{name: "an OBSERVATION whose guideline_id lacks its namespace", root: guidelineWithoutNamespace(t), c: vitalSigns})
+	groups["acceptance"] = append(groups["acceptance"],
+		templatedRoot{name: "an OBSERVATION whose guideline_id lacks its namespace", root: guidelineWithoutNamespace(t), c: vitalSigns},
+		templatedRoot{name: "two systolic ELEMENTs holding one DV_QUANTITY whose precision is below -1", root: sharedPrecision(t), c: vitalSigns},
+	)
 
 	groups["guards"] = []templatedRoot{
 		{name: "nil", c: vitalSigns},
@@ -472,7 +490,9 @@ const (
 	// refused: the engine does not enter it.
 	insideRefused differenceKind = iota
 	// secondCode is a second code for one defect at one path: the two walks
-	// carry two codes there, and the engine one of them.
+	// carry two codes there, and the engine one of them. The harness knows
+	// one such pair, the presence and the count of a container (see
+	// [classifyTwoWalkOnly]).
 	secondCode
 	// sharedSecondPath is a shared value's second path: the engine validates
 	// a value two places hold at each. A decoded document holds none.
@@ -513,16 +533,19 @@ func isAtOrBelow(path, under string) bool {
 // classifyDifferences returns, sorted, each finding the two walks' issues and
 // the engine's do not hold the same number of times, one entry per surplus
 // occurrence, classified by the kinds REQ-171 § Acceptance allows. refused
-// holds the paths of the content the engine did not admit and did not enter.
+// holds the paths of the content the engine did not admit and did not enter;
+// sameValue reports whether two issue paths of the root reach one Go value,
+// and may be nil, which reports none.
 //
 // A finding only the two walks hold is inside refused content when it is an
 // RM finding or a walk condition at or below a refused path: the floor
 // walked into content the engine reported once and left. It is a second code
-// for one defect at one path when, at its path, the two walks hold another
-// code that the engine holds too, and the engine does not hold its code
-// there. A finding only the engine holds has no allowed kind on these roots,
-// which share no value.
-func classifyDifferences(twoWalks, engine []validation.Issue, refused []string) []classifiedDifference {
+// for one defect at one path as [classifyTwoWalkOnly] says. A finding only
+// the engine holds is a shared value's second path when the two walks hold a
+// finding of the same code, layer and rule at a sibling item path, one that
+// differs from its path in one item's predicate alone, and the two paths
+// reach one Go value: the floor walked that value once, at the first path.
+func classifyDifferences(twoWalks, engine []validation.Issue, refused []string, sameValue func(p, q string) bool) []classifiedDifference {
 	counts := map[findingKey][2]int{}
 	codesAt := [2]map[string]map[string]bool{{}, {}}
 	for side, issues := range [2][]validation.Issue{twoWalks, engine} {
@@ -543,7 +566,13 @@ func classifyDifferences(twoWalks, engine []validation.Issue, refused []string) 
 			out = append(out, classifiedDifference{key: k, inTwoWalks: true, kind: classifyTwoWalkOnly(k, codesAt, refused)})
 		}
 		for range max(c[1]-c[0], 0) {
-			out = append(out, classifiedDifference{key: k, kind: unexplained})
+			kind := unexplained
+			if sameValue != nil && slices.ContainsFunc(findingKeys(twoWalks), func(o findingKey) bool {
+				return o.code == k.code && o.layer == k.layer && o.rule == k.rule && siblingItemPaths(k.path, o.path) && sameValue(k.path, o.path)
+			}) {
+				kind = sharedSecondPath
+			}
+			out = append(out, classifiedDifference{key: k, kind: kind})
 		}
 	}
 	return out
@@ -552,20 +581,188 @@ func classifyDifferences(twoWalks, engine []validation.Issue, refused []string) 
 // classifyTwoWalkOnly returns the kind of k, a finding the two walks hold
 // more often than the engine, given the codes each side holds at each path
 // (two walks first) and the paths the engine refused.
+//
+// The one second code it allows is the presence and the count of one
+// container: k is the RM layer's `required` or `cardinality` by the rule
+// cardinality, an empty container the RM requires, and the engine holds,
+// at k's path, a `required` or a `cardinality` the two walks hold too, and
+// not k's code. Any other finding the engine drops at a path where it holds
+// another code, an RM rule's finding beside a template one among them, is
+// unexplained: it is a rule the engine lost.
 func classifyTwoWalkOnly(k findingKey, codesAt [2]map[string]map[string]bool, refused []string) differenceKind {
 	if k.layer != validation.LayerTemplate && slices.ContainsFunc(refused, func(r string) bool { return isAtOrBelow(k.path, r) }) {
 		return insideRefused
+	}
+	presenceOrCount := func(code string) bool { return code == "required" || code == "cardinality" }
+	if k.layer != validation.LayerRM || k.rule != "cardinality" || !presenceOrCount(k.code) {
+		return unexplained
 	}
 	twoWalks, engine := codesAt[0][k.path], codesAt[1][k.path]
 	if engine[k.code] {
 		return unexplained
 	}
 	for code := range engine {
-		if code != k.code && twoWalks[code] {
+		if presenceOrCount(code) && twoWalks[code] {
 			return secondCode
 		}
 	}
 	return unexplained
+}
+
+// pathSegments splits an issue path into its segments, each an attribute
+// name and the predicate that follows it, if any: "/a[x]/b" is "a[x]" and
+// "b". A slash inside a predicate, in a quoted name, does not split it. The
+// root path "/" has no segment.
+func pathSegments(path string) []string {
+	var out []string
+	depth, quoted, start := 0, false, 1
+	for i := 1; i < len(path); i++ {
+		switch c := path[i]; {
+		case quoted && c == '\\':
+			i++
+		case c == '\'' && depth > 0:
+			quoted = !quoted
+		case quoted:
+		case c == '[':
+			depth++
+		case c == ']':
+			depth--
+		case c == '/' && depth == 0:
+			out = append(out, path[start:i])
+			start = i + 1
+		}
+	}
+	if start < len(path) {
+		out = append(out, path[start:])
+	}
+	return out
+}
+
+// siblingItemPaths reports whether the issue paths p and q differ in one
+// segment alone, and there in the predicate of one attribute's item: two
+// items of one list, or what lies at one place below each.
+func siblingItemPaths(p, q string) bool {
+	ps, qs := pathSegments(p), pathSegments(q)
+	if len(ps) != len(qs) {
+		return false
+	}
+	differ := 0
+	for i := range ps {
+		if ps[i] == qs[i] {
+			continue
+		}
+		differ++
+		pa, _, pPredicated := strings.Cut(ps[i], "[")
+		qa, _, qPredicated := strings.Cut(qs[i], "[")
+		if pa != qa || !pPredicated || !qPredicated {
+			return false
+		}
+	}
+	return differ == 1
+}
+
+// valuesAlong returns the Go value each segment of the issue path reaches
+// from root, read through the generated access as the walks read it: a
+// single value by its attribute, an item of a list or an entry of a Hash by
+// its predicate, which is its 1-based position, or the archetype_node_id the
+// item carries, with the name it carries when the predicate pins one. ok is
+// false when a segment reaches nothing.
+func valuesAlong(root any, path string) (values []any, ok bool) {
+	cur := root
+	for _, seg := range pathSegments(path) {
+		attr, pred, hasPred := strings.Cut(seg, "[")
+		if !hasPred {
+			v, present := rmaccess.Single(cur, attr)
+			if !present {
+				return nil, false
+			}
+			cur = v
+			values = append(values, cur)
+			continue
+		}
+		items, present := rmaccess.Multiple(cur, attr)
+		if !present {
+			if _, items, present = rmaccess.Hash(cur, attr); !present {
+				return nil, false
+			}
+		}
+		item, found := itemByPredicate(items, strings.TrimSuffix(pred, "]"))
+		if !found {
+			return nil, false
+		}
+		cur = item
+		values = append(values, cur)
+	}
+	return values, true
+}
+
+// itemByPredicate returns the item of items a path predicate names: its
+// 1-based position, or the first item that carries the archetype_node_id the
+// predicate names and, when the predicate pins one, the name.
+func itemByPredicate(items []any, pred string) (any, bool) {
+	if n, err := strconv.Atoi(pred); err == nil {
+		if n < 1 || n > len(items) {
+			return nil, false
+		}
+		return items[n-1], true
+	}
+	id, name, named := strings.Cut(pred, ",'")
+	if named {
+		name = strings.TrimSuffix(name, "'")
+		name = strings.NewReplacer(`\'`, `'`, `\\`, `\`).Replace(name)
+	}
+	for _, item := range items {
+		l, isLocatable := item.(rm.Locatable)
+		if !isLocatable || rmaccess.IsTypedNilPointer(item) || l.GetArchetypeNodeID() != id {
+			continue
+		}
+		if !named || itemName(item) == name {
+			return item, true
+		}
+	}
+	return nil, false
+}
+
+// itemName returns the value of a LOCATABLE item's name, or "" when it has
+// none.
+func itemName(item any) string {
+	v, ok := rmaccess.Single(item, "name")
+	if !ok {
+		return ""
+	}
+	like, ok := v.(rm.DVTextLike)
+	if !ok {
+		return ""
+	}
+	text, ok := rm.AsDVText(like)
+	if !ok {
+		return ""
+	}
+	return text.Value
+}
+
+// reachSameValue reports whether the issue paths p and q of root, sibling
+// item paths ([siblingItemPaths]), reach one Go value: from the segment
+// where they differ down, at some segment both reach the same pointer, so
+// everything below it is one value.
+func reachSameValue(root any, p, q string) bool {
+	pv, okP := valuesAlong(root, p)
+	qv, okQ := valuesAlong(root, q)
+	if !okP || !okQ || len(pv) != len(qv) {
+		return false
+	}
+	ps, qs := pathSegments(p), pathSegments(q)
+	from := 0
+	for from < len(ps) && ps[from] == qs[from] {
+		from++
+	}
+	for i := from; i < len(pv); i++ {
+		v := reflect.ValueOf(pv[i])
+		if v.Kind() == reflect.Pointer && !v.IsNil() && pv[i] == qv[i] {
+			return true
+		}
+	}
+	return false
 }
 
 // REQ-171 § One walk, § Acceptance — with a template the one walk reports
@@ -573,27 +770,30 @@ func classifyTwoWalkOnly(k findingKey, codesAt [2]map[string]map[string]bool, re
 // floor's repeats), finding by finding on path, code, layer and rule, apart
 // from the differences REQ-171 § Acceptance allows: a finding from inside
 // content the template refused, a second code for one defect at one path,
-// and a shared value's second path, which no root here holds. Any other
-// difference fails the test, listed. The coverage agrees: the same Stopped,
-// the same External paths, and Unevaluated invariants the two walks list too,
-// all of them unless the engine refused content. The test logs, per group,
-// the pairs and issues compared, the count of each kind and every second
-// code, and how many results list their findings, or their External paths,
-// in another order, which is reported, not failed: the one walk visits a
-// node's attributes in the class's order, the template walk in the
-// template's.
+// and a shared value's second path. Any other difference fails the test,
+// listed, and so does a second code outside the acceptance roots, which are
+// the only roots built to hold one. The coverage agrees: the same Stopped,
+// the same External paths, and Unevaluated invariants the two walks list
+// too, all of them unless the engine refused content. The test logs, per
+// group, the pairs and issues compared, the count of each kind and every
+// second code, and how many results list their findings, their template
+// findings, or their External paths in another order, which is reported,
+// not failed: the one walk reports a node's RM rules beside its template
+// findings, where the two walks report every RM finding last, and it
+// reports a list's counts before the findings of its items, by the step
+// order of REQ-171 § One walk.
 func TestREQ171_EngineWithATemplateMatchesTheTwoWalks(t *testing.T) {
 	groups := templatedRoots(t)
 	var secondCodes []string
 	for _, group := range slices.Sorted(maps.Keys(groups)) {
-		pairs, issues, reordered, externalReordered := 0, 0, 0, 0
+		pairs, issues, reordered, templateReordered, externalReordered := 0, 0, 0, 0, 0
 		var kinds [unexplained + 1]int
 		for _, tr := range groups[group] {
 			twoWalks := validation.Validate(tr.root, tr.c)
 			engine, refused := validation.RunEngineRefusing(tr.root, tr.c, validation.Limits{})
 			pairs++
 			issues += len(twoWalks.Issues)
-			diffs := classifyDifferences(twoWalks.Issues, engine.Issues, refused)
+			diffs := classifyDifferences(twoWalks.Issues, engine.Issues, refused, func(p, q string) bool { return reachSameValue(tr.root, p, q) })
 			var bad []string
 			for _, d := range diffs {
 				kinds[d.kind]++
@@ -611,6 +811,9 @@ func TestREQ171_EngineWithATemplateMatchesTheTwoWalks(t *testing.T) {
 			if len(diffs) == 0 && !slices.Equal(findingKeys(twoWalks.Issues), findingKeys(engine.Issues)) {
 				reordered++
 			}
+			if len(diffs) == 0 && !slices.Equal(templateFindingKeys(twoWalks.Issues), templateFindingKeys(engine.Issues)) {
+				templateReordered++
+			}
 			if !slices.Equal(engine.Coverage.Stopped, twoWalks.Coverage.Stopped) {
 				t.Errorf("%s %s: engine Coverage.Stopped = %q, Validate's %q", group, tr.name, engine.Coverage.Stopped, twoWalks.Coverage.Stopped)
 			}
@@ -624,12 +827,27 @@ func TestREQ171_EngineWithATemplateMatchesTheTwoWalks(t *testing.T) {
 				t.Errorf("%s %s: engine Coverage.Unevaluated = %q, Validate's %q (refused %q)", group, tr.name, unevaluated, want, refused)
 			}
 		}
-		t.Logf("%s: compared %d pairs, %d two-walk issues; differences: %d inside refused content, %d second codes, %d shared second paths, %d unexplained; %d results list their findings, %d their External paths, in another order",
-			group, pairs, issues, kinds[insideRefused], kinds[secondCode], kinds[sharedSecondPath], kinds[unexplained], reordered, externalReordered)
+		t.Logf("%s: compared %d pairs, %d two-walk issues; differences: %d inside refused content, %d second codes, %d shared second paths, %d unexplained; %d results list their findings, %d their template findings, %d their External paths, in another order",
+			group, pairs, issues, kinds[insideRefused], kinds[secondCode], kinds[sharedSecondPath], kinds[unexplained], reordered, templateReordered, externalReordered)
+		if group != "acceptance" && kinds[secondCode] > 0 {
+			t.Errorf("%s: %d second codes, where only the acceptance roots are built to hold one; a second code here hides a rule the engine lost", group, kinds[secondCode])
+		}
 	}
 	for _, s := range secondCodes {
 		t.Logf("second code: %s", s)
 	}
+}
+
+// templateFindingKeys returns the key of each issue on the template layer,
+// in result order.
+func templateFindingKeys(issues []validation.Issue) []findingKey {
+	var out []findingKey
+	for _, k := range findingKeys(issues) {
+		if k.layer == validation.LayerTemplate {
+			out = append(out, k)
+		}
+	}
+	return out
 }
 
 // REQ-171 § Acceptance — the classification can fail: a finding only the
@@ -638,20 +856,40 @@ func TestREQ171_EngineWithATemplateMatchesTheTwoWalks(t *testing.T) {
 // and a code the engine also holds at that path are each unexplained; an RM
 // finding at or below a refused path is inside refused content, and one the
 // two walks hold beside a code the engine keeps at that path is a second
-// code.
+// code only for the presence and the count of one container. An RM rule's
+// finding the engine drops beside a template finding at its path is
+// unexplained: COMPOSITION.Category_validity lost beside the category's code
+// list is the defect the classification exists to catch, and so is a
+// reference part's `required` dropped beside the reference's own rule. A
+// finding only the engine holds is a shared value's second path only where
+// the two walks hold its code, layer and rule at a sibling item path that
+// reaches the same Go value.
 func TestREQ171_DifferenceClassificationFailsOnEachUnexplainedDifference(t *testing.T) {
 	t.Parallel()
 	required := validation.Issue{Path: "/a/items", Code: "required", Layer: validation.LayerTemplate, Rule: "existence"}
 	rmCardinality := validation.Issue{Path: "/a/items", Code: "cardinality", Layer: validation.LayerRM, Rule: "cardinality"}
+	rmRequiredEmpty := validation.Issue{Path: "/a/items", Code: "required", Layer: validation.LayerRM, Rule: "cardinality"}
+	occurrences := validation.Issue{Path: "/a/items", Code: "cardinality", Layer: validation.LayerTemplate, Rule: "occurrences"}
 	slotFill := validation.Issue{Path: "/a/items[2]", Code: "slot_fill", Layer: validation.LayerTemplate, Rule: "slot"}
 	inside := validation.Issue{Path: "/a/items[2]/name", Code: "required", Layer: validation.LayerRM, Rule: "mandatory"}
 	atRefused := validation.Issue{Path: "/a/items[2]", Code: "rm_invariant", Layer: validation.LayerRM, Rule: "ELEMENT.Inv_null_flavour_indicated"}
 	templateInside := validation.Issue{Path: "/a/items[2]/name", Code: "node_id_mismatch", Layer: validation.LayerTemplate, Rule: "identity"}
 	elsewhere := validation.Issue{Path: "/b", Code: "rm_invariant", Layer: validation.LayerRM, Rule: "DV_TEXT.Mappings_valid"}
+	categoryCoded := validation.Issue{Path: "/category/defining_code", Code: "code_not_in_value_set", Layer: validation.LayerRM, Rule: "COMPOSITION.Category_validity"}
+	categoryList := validation.Issue{Path: "/category/defining_code", Code: "primitive_not_in_list", Layer: validation.LayerTemplate, Rule: "not_in_list"}
+	partRequired := validation.Issue{Path: "/composer/external_ref/namespace", Code: "required", Layer: validation.LayerRM, Rule: "mandatory"}
+	partRule := validation.Issue{Path: "/composer/external_ref/namespace", Code: "rm_invariant", Layer: validation.LayerRM, Rule: "mandatory"}
+	precisionFirst := validation.Issue{Path: "/a/items[1]/value", Code: "rm_invariant", Layer: validation.LayerRM, Rule: "precision_range"}
+	precisionSecond := validation.Issue{Path: "/a/items[2]/value", Code: "rm_invariant", Layer: validation.LayerRM, Rule: "precision_range"}
+	precisionElsewhere := validation.Issue{Path: "/b/items[2]/value", Code: "rm_invariant", Layer: validation.LayerRM, Rule: "precision_range"}
+	otherRuleFirst := validation.Issue{Path: "/a/items[1]/value", Code: "rm_invariant", Layer: validation.LayerRM, Rule: "DV_INTERVAL.Limits_consistent"}
+	shared := func(string, string) bool { return true }
+	unshared := func(string, string) bool { return false }
 	tests := []struct {
 		name             string
 		twoWalks, engine []validation.Issue
 		refused          []string
+		sameValue        func(p, q string) bool
 		want             []differenceKind
 	}{
 		{name: "the same findings", twoWalks: []validation.Issue{required, slotFill}, engine: []validation.Issue{slotFill, required}, refused: []string{"/a/items[2]"}},
@@ -660,18 +898,57 @@ func TestREQ171_DifferenceClassificationFailsOnEachUnexplainedDifference(t *test
 		{name: "a template finding below a refused item", twoWalks: []validation.Issue{slotFill, templateInside}, engine: []validation.Issue{slotFill}, refused: []string{"/a/items[2]"}, want: []differenceKind{unexplained}},
 		{name: "an RM finding below a path the engine did not refuse", twoWalks: []validation.Issue{slotFill, inside}, engine: []validation.Issue{slotFill}, want: []differenceKind{unexplained}},
 		{name: "a second code at one path", twoWalks: []validation.Issue{required, rmCardinality}, engine: []validation.Issue{required}, want: []differenceKind{secondCode}},
+		{name: "the RM's required for an empty list beside the template's occurrences", twoWalks: []validation.Issue{rmRequiredEmpty, occurrences}, engine: []validation.Issue{occurrences}, want: []differenceKind{secondCode}},
 		{name: "the one code at a path dropped", twoWalks: []validation.Issue{rmCardinality}, want: []differenceKind{unexplained}},
 		{name: "an RM finding at a path the engine holds nothing", twoWalks: []validation.Issue{required, elsewhere}, engine: []validation.Issue{required}, want: []differenceKind{unexplained}},
+		{name: "a coded RM rule dropped beside a template finding at its path", twoWalks: []validation.Issue{categoryCoded, categoryList}, engine: []validation.Issue{categoryList}, want: []differenceKind{unexplained}},
+		{name: "a reference part's required dropped beside the reference's rule", twoWalks: []validation.Issue{partRequired, partRule}, engine: []validation.Issue{partRule}, want: []differenceKind{unexplained}},
 		{name: "a finding only the engine holds", twoWalks: []validation.Issue{required}, engine: []validation.Issue{required, rmCardinality}, want: []differenceKind{unexplained}},
 		{name: "a finding the engine repeats", twoWalks: []validation.Issue{required}, engine: []validation.Issue{required, required}, want: []differenceKind{unexplained}},
+		{name: "a finding only the engine holds, at a sibling item of one Go value", twoWalks: []validation.Issue{precisionFirst}, engine: []validation.Issue{precisionFirst, precisionSecond}, sameValue: shared, want: []differenceKind{sharedSecondPath}},
+		{name: "a finding only the engine holds, at a sibling item of another Go value", twoWalks: []validation.Issue{precisionFirst}, engine: []validation.Issue{precisionFirst, precisionSecond}, sameValue: unshared, want: []differenceKind{unexplained}},
+		{name: "a finding only the engine holds, at an item of one Go value that is no sibling", twoWalks: []validation.Issue{precisionFirst}, engine: []validation.Issue{precisionFirst, precisionElsewhere}, sameValue: shared, want: []differenceKind{unexplained}},
+		{name: "a finding only the engine holds, beside another rule at a sibling item of one Go value", twoWalks: []validation.Issue{otherRuleFirst}, engine: []validation.Issue{otherRuleFirst, precisionSecond}, sameValue: shared, want: []differenceKind{unexplained}},
 	}
 	for _, tc := range tests {
 		var got []differenceKind
-		for _, d := range classifyDifferences(tc.twoWalks, tc.engine, tc.refused) {
+		for _, d := range classifyDifferences(tc.twoWalks, tc.engine, tc.refused, tc.sameValue) {
 			got = append(got, d.kind)
 		}
 		if !slices.Equal(got, tc.want) {
 			t.Errorf("classifyDifferences(%s) kinds = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+// REQ-171 § Acceptance — the harness tells a shared value's second path by
+// the Go value two sibling item paths reach: in SystolicTwice the two
+// systolic ELEMENTs are two values that hold one DV_QUANTITY, so their
+// paths reach one value at their value and not at the ELEMENTs themselves;
+// two paths that differ in more than one item's predicate are no siblings;
+// and a path that reaches nothing reaches no value.
+func TestREQ171_SharedValueOfSiblingItemPaths(t *testing.T) {
+	t.Parallel()
+	root := probes.SystolicTwice()
+	const list = "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]/data/items"
+	tests := []struct {
+		name    string
+		p, q    string
+		sibling bool
+		same    bool
+	}{
+		{name: "the shared DV_QUANTITY", p: list + "[1]/value", q: list + "[2]/value", sibling: true, same: true},
+		{name: "the two ELEMENTs, copies of one", p: list + "[1]", q: list + "[2]", sibling: true},
+		{name: "an item that is not there", p: list + "[1]/value", q: list + "[3]/value", sibling: true},
+		{name: "two predicates apart", p: list + "[1]/value", q: "/content[openEHR-EHR-OBSERVATION.other.v1]/data/events[at0006]/data/items[2]/value"},
+		{name: "a name with a slash in its predicate", p: "/content[at0001,'a/b']/value", q: "/content[at0001,'a/c']/value", sibling: true},
+	}
+	for _, tc := range tests {
+		if got := siblingItemPaths(tc.p, tc.q); got != tc.sibling {
+			t.Errorf("siblingItemPaths(%s: %s, %s) = %t, want %t", tc.name, tc.p, tc.q, got, tc.sibling)
+		}
+		if got := reachSameValue(root, tc.p, tc.q); got != tc.same {
+			t.Errorf("reachSameValue(SystolicTwice, %s: %s, %s) = %t, want %t", tc.name, tc.p, tc.q, got, tc.same)
 		}
 	}
 }
@@ -694,6 +971,25 @@ func deviceHolding(t *testing.T, more func(device *rm.Cluster) []rm.Item) *rm.Co
 	return comp
 }
 
+// atVisitStop returns keys and stopped with the path of each max_nodes
+// finding, and of the stop it lists, that lies at or below inside replaced by
+// a mark that names inside, so two results that stop at the visit limit at
+// different nodes of inside compare equal.
+func atVisitStop(keys []findingKey, stopped []string, inside string) ([]findingKey, []string) {
+	mark := "<a node of " + inside + ">"
+	keys, stopped = slices.Clone(keys), slices.Clone(stopped)
+	for i, k := range keys {
+		if k.code != "max_nodes" || !isAtOrBelow(k.path, inside) {
+			continue
+		}
+		if at := slices.Index(stopped, k.path); at >= 0 {
+			stopped[at] = mark
+		}
+		keys[i].path = mark
+	}
+	return keys, stopped
+}
+
 // REQ-171 § One walk — below a slot the template does not constrain, the one
 // walk with a template meets each walk condition where the two walks' floor
 // meets it, and reports the same findings, in the same order, with the same
@@ -701,10 +997,16 @@ func deviceHolding(t *testing.T, more func(device *rm.Cluster) []rm.Item) *rm.Co
 // knows no limit, visits after a visit stop: the device
 // CLUSTER of vital_signs.opt holding itself twice, holding SECTIONs nested
 // deeper than the default depth limit, and holding a CLUSTER that holds
-// itself by value, which only the visit limit stops.
+// itself by value, which only the visit limit stops. The visit limit counts
+// the values visited, and at a node the template binds the one walk visits
+// the declared attributes in the template's order, where the floor visits
+// them in the class's: the one walk reaches the CLUSTER that holds itself
+// after another number of visits, so both stop inside it, once, at nodes
+// that may differ, and they may have visited other classes before the stop.
 func TestREQ171_EngineWithATemplateMatchesTheTwoWalksAtEachWalkCondition(t *testing.T) {
 	t.Parallel()
 	c := mustCompile(t, "vital_signs")
+	const loopPath = bloodPressurePath + "/protocol/items[openEHR-EHR-CLUSTER.device.v1]/items[at0099]"
 	loop := rm.Cluster{ArchetypeNodeID: "at0099", Name: rm.DVText{Value: "loop"}}
 	loop.Items = make([]rm.Item, 2)
 	loop.Items[0], loop.Items[1] = loop, loop
@@ -729,17 +1031,21 @@ func TestREQ171_EngineWithATemplateMatchesTheTwoWalksAtEachWalkCondition(t *test
 			}
 			engine := validateWithin(t, "the engine", visitLimitDeadline, func() validation.Result { return validation.RunEngine(tc.root, c, validation.Limits{}) })
 			twoWalkKeys, engineKeys := findingKeys(twoWalks.Issues), findingKeys(engine.Issues)
+			twoWalkStopped, engineStopped := twoWalks.Coverage.Stopped, engine.Coverage.Stopped
+			if tc.code == "max_nodes" {
+				twoWalkKeys, twoWalkStopped = atVisitStop(twoWalkKeys, twoWalkStopped, loopPath)
+				engineKeys, engineStopped = atVisitStop(engineKeys, engineStopped, loopPath)
+			}
 			if !slices.Equal(twoWalkKeys, engineKeys) {
 				t.Errorf("engine(%s) findings differ from Validate's:\n engine %v\n Validate %v", tc.name, engineKeys, twoWalkKeys)
 			}
-			if engine.OK != twoWalks.OK || !slices.Equal(engine.Coverage.Stopped, twoWalks.Coverage.Stopped) || !slices.Equal(engine.Coverage.External, twoWalks.Coverage.External) {
-				t.Errorf("engine(%s) OK %t, Stopped %q, External %q; Validate's OK %t, Stopped %q, External %q", tc.name, engine.OK, engine.Coverage.Stopped, engine.Coverage.External, twoWalks.OK, twoWalks.Coverage.Stopped, twoWalks.Coverage.External)
+			if engine.OK != twoWalks.OK || !slices.Equal(engineStopped, twoWalkStopped) || !slices.Equal(engine.Coverage.External, twoWalks.Coverage.External) {
+				t.Errorf("engine(%s) OK %t, Stopped %q, External %q; Validate's OK %t, Stopped %q, External %q", tc.name, engine.OK, engineStopped, engine.Coverage.External, twoWalks.OK, twoWalkStopped, twoWalks.Coverage.External)
 			}
-			// The template walk of the two walks knows no limit, so after a
-			// visit stop it still visits the classes the one walk does not
-			// reach: the one walk's Unevaluated is then a part of theirs.
-			unevaluated, want := engine.Coverage.Unevaluated, twoWalks.Coverage.Unevaluated
-			if tc.code != "max_nodes" && !slices.Equal(unevaluated, want) || slices.ContainsFunc(unevaluated, func(u string) bool { return !slices.Contains(want, u) }) {
+			// Which classes a walk visits before a visit stop depends on the
+			// order it visits a bound node's attributes in, so the classes
+			// are compared at the other conditions only.
+			if unevaluated, want := engine.Coverage.Unevaluated, twoWalks.Coverage.Unevaluated; tc.code != "max_nodes" && !slices.Equal(unevaluated, want) {
 				t.Errorf("engine(%s) Coverage.Unevaluated = %q, Validate's %q", tc.name, unevaluated, want)
 			}
 			if tc.code == "max_nodes" {

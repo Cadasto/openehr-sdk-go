@@ -5,12 +5,16 @@ package validation_test
 // draws one `required`, on the template layer; content the template does not
 // admit draws its one admission finding and nothing from inside; an attribute
 // the template does not mention is walked with the RM rules; a value held
-// from two places is validated at each; and an empty RM-mandatory container
+// from two places is validated at each; an empty RM-mandatory container
 // draws one finding, the template's where the template reports it and the
-// RM's `cardinality` where only the RM requires it.
+// RM's `cardinality` where only the RM requires it; an attribute the RM
+// marks mandatory, and the part of a reference, are read as the RM rules
+// read them; and the attributes the template declares are visited in its
+// order.
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -119,12 +123,52 @@ type refusedContentCase struct {
 	want, inside string
 }
 
+// compositionOPT returns a COMPOSITION template, root node at0000, that
+// declares attributes, each an <attributes> element, and nothing else.
+func compositionOPT(attributes ...string) string {
+	return `<?xml version="1.0"?>
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <template_id><value>engine-composition</value></template_id>
+  <concept>engine-composition</concept>
+  <language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
+  <definition>
+    <rm_type_name>COMPOSITION</rm_type_name>
+    <node_id>at0000</node_id>
+    ` + strings.Join(attributes, "\n    ") + `
+  </definition>
+</template>`
+}
+
+// composerAttribute returns a composer attribute the template requires, with
+// child, a <children> element, as its one alternative.
+func composerAttribute(child string) string {
+	return `<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>composer</rm_attribute_name>` +
+		`<existence>` + fiInterval("1", "1") + `</existence>` + child + `</attributes>`
+}
+
+// singleAttribute returns a single-valued attribute name with the existence
+// lower..upper and children, each a <children> element.
+func singleAttribute(name, lower, upper string, children ...string) string {
+	return `<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>` + name + `</rm_attribute_name>` +
+		`<existence>` + fiInterval(lower, upper) + `</existence>` + strings.Join(children, "") + `</attributes>`
+}
+
+// complexChild returns a C_COMPLEX_OBJECT child of RM type rmType, with no
+// node id, that declares attributes.
+func complexChild(rmType string, attributes ...string) string {
+	return `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>` + rmType + `</rm_type_name><node_id></node_id>` +
+		strings.Join(attributes, "") + `</children>`
+}
+
 // refusedContentCases returns an OBSERVATION whose archetype fits no slot of
 // vital_signs.opt, lacking its language; a PARTY_RELATED composer, coded
-// outside its group, where the template allows a PARTY_SELF alone; and an
+// outside its group, where the template allows a PARTY_SELF alone; an
 // ELEMENT under a template that prohibits its null_flavour and its value's
-// mappings, carrying a null flavour whose mappings are present and empty, or
-// a mapping with no valid match.
+// mappings, carrying a null flavour whose mappings are present and empty, a
+// mapping with no valid match, or a null flavour coded outside its group;
+// and a composer whose name the template prohibits, present and empty. The
+// last two carry a breach that a rule of the node holding the refused
+// attribute reports, at or below the attribute's path.
 func refusedContentCases(t *testing.T) []refusedContentCase {
 	t.Helper()
 	unknownArchetype := probes.UnknownArchetypeUnderContent()
@@ -145,6 +189,16 @@ func refusedContentCases(t *testing.T) []refusedContentCase {
 	// "x" is no TERM_MAPPING match.
 	badMatch := &rm.DVText{Value: "text", Mappings: []rm.TermMapping{{Match: rm.Character("x"), Target: snomed}}}
 	prohibits := mustCompileInline(t, prohibitedOPT("0", "0"))
+	// 999 is no null flavour of the openEHR terminology.
+	unknownFlavour := &rm.DVCodedText{
+		Value:        "unknown",
+		DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}, CodeString: "999"},
+	}
+
+	blankName := probes.ComposerPartyIdentified()
+	// A present and empty name breaks PARTY_IDENTIFIED.Name_valid.
+	blankName.Composer.(*rm.PartyIdentified).Name = new("")
+	nameProhibited := compositionOPT(composerAttribute(complexChild("PARTY_IDENTIFIED", singleAttribute("name", "0", "0"))))
 
 	return []refusedContentCase{
 		{
@@ -175,6 +229,20 @@ func refusedContentCases(t *testing.T) []refusedContentCase {
 			want:   "prohibited /value/mappings template existence",
 			inside: "term_mapping_match /value/mappings[1]/match rm TERM_MAPPING.Match_valid",
 		},
+		{
+			name:   "a prohibited null_flavour coded outside its group",
+			root:   prohibitedElement(nil, unknownFlavour),
+			c:      prohibits,
+			want:   "prohibited /null_flavour template existence",
+			inside: "code_not_in_value_set /null_flavour/defining_code rm ELEMENT.Inv_null_flavour_valid",
+		},
+		{
+			name:   "a prohibited composer name, present and empty",
+			root:   blankName,
+			c:      mustCompileInline(t, nameProhibited),
+			want:   "prohibited /composer/name template existence",
+			inside: "rm_invariant /composer/name rm PARTY_IDENTIFIED.Name_valid",
+		},
 	}
 }
 
@@ -184,7 +252,10 @@ func refusedContentCases(t *testing.T) []refusedContentCase {
 // template does not allow, and a present attribute the template prohibits,
 // single-valued or multi-valued. Each carries an RM breach inside, which the
 // two walks report, so a walk that entered the refused content would report
-// it too.
+// it too. A rule of the node that holds the refused attribute reports
+// nothing at or below the attribute's path either: an ELEMENT's coded rule
+// reads its null flavour's defining_code, and a PARTY_IDENTIFIED's rule its
+// name, so the engine evaluated them on content it did not admit.
 func TestREQ171_EngineDoesNotEnterRefusedContent(t *testing.T) {
 	t.Parallel()
 	tests := refusedContentCases(t)
@@ -229,13 +300,11 @@ func TestREQ171_EngineWalksAnUnmentionedAttributeWithTheRMRules(t *testing.T) {
 	}
 }
 
-// REQ-171 § One walk, § Acceptance — a Go value with one defect, held from
-// two places, draws two issues, one at each path, with a template as without
-// one: one DV_QUANTITY whose precision is below -1, held by two systolic
-// ELEMENTs, each bound to the template's systolic node. The two walks report
-// it once, since the floor walks a shared value once.
-func TestREQ171_EngineWithATemplateValidatesASharedValueAtEachPlace(t *testing.T) {
-	t.Parallel()
+// sharedPrecision returns the probe input SystolicTwice, whose two systolic
+// ELEMENTs hold one DV_QUANTITY, with that DV_QUANTITY's precision set below
+// -1, which breaks the RM's precision range.
+func sharedPrecision(t *testing.T) *rm.Composition {
+	t.Helper()
 	root := probes.SystolicTwice()
 	items := root.Content[0].(*rm.Observation).Data.Events[0].(*rm.PointEvent[rm.ItemStructure]).Data.(*rm.ItemList).Items
 	shared := items[0].Value.(*rm.DVQuantity)
@@ -243,6 +312,17 @@ func TestREQ171_EngineWithATemplateValidatesASharedValueAtEachPlace(t *testing.T
 		t.Fatalf("precondition: the two systolic ELEMENTs hold %p and %p, want one DV_QUANTITY", items[0].Value, items[1].Value)
 	}
 	shared.Precision = new(rm.Integer(-5))
+	return root
+}
+
+// REQ-171 § One walk, § Acceptance — a Go value with one defect, held from
+// two places, draws two issues, one at each path, with a template as without
+// one: one DV_QUANTITY whose precision is below -1, held by two systolic
+// ELEMENTs, each bound to the template's systolic node. The two walks report
+// it once, since the floor walks a shared value once.
+func TestREQ171_EngineWithATemplateValidatesASharedValueAtEachPlace(t *testing.T) {
+	t.Parallel()
+	root := sharedPrecision(t)
 	c := mustCompile(t, "vital_signs")
 	const list = bloodPressurePath + "/data/events[at0006]/data/items"
 	want := []string{list + "[1]/value", list + "[2]/value"}
@@ -274,13 +354,49 @@ type emptyContainerCase struct {
 	// twoWalks is what Validate reports at path; want what the engine
 	// reports there.
 	twoWalks, want []string
+	// childPath, when set, is the path of the container's child that the
+	// template's occurrences report, and wantChild what both report there.
+	childPath string
+	wantChild []string
+}
+
+// personIdentityChildOPT returns a PERSON template whose identities, a list
+// the RM marks mandatory, the template leaves optional (existence 0..1), with
+// one PARTY_IDENTITY child, at nodeID, that occurs exactly once. A child with
+// no node id has its occurrences written at the container's own path.
+func personIdentityChildOPT(nodeID string) string {
+	return `<?xml version="1.0"?>
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <template_id><value>person-identity-child</value></template_id>
+  <concept>person-identity-child</concept>
+  <language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
+  <definition>
+    <rm_type_name>PERSON</rm_type_name>
+    <node_id>at0000</node_id>
+    <archetype_id><value>openEHR-DEMOGRAPHIC-PERSON.person.v1</value></archetype_id>
+    <attributes xsi:type="C_MULTIPLE_ATTRIBUTE">
+      <rm_attribute_name>identities</rm_attribute_name>
+      <existence>` + fiInterval("0", "1") + `</existence>
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>PARTY_IDENTITY</rm_type_name>
+        <occurrences>` + fiInterval("1", "1") + `</occurrences>
+        <node_id>` + nodeID + `</node_id>
+      </children>
+      <cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique>
+        <interval><lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>0</lower></interval></cardinality>
+    </attributes>
+  </definition>
+</template>`
 }
 
 // emptyContainerCases returns an ORGANISATION whose identities are empty
 // under a template that declares nothing on them, the vital_signs device
 // CLUSTER, which fills a slot, with empty items, and a PERSON whose
 // identities are empty under a template that requires them by its existence,
-// and under one that requires them by its child count.
+// under one that requires them by its child count, and under two that leave
+// them optional but require one child: one whose child has no node id, so
+// the template's occurrences report the container's own path, and one whose
+// child has a node id, so they report the child's.
 func emptyContainerCases(t *testing.T) []emptyContainerCase {
 	t.Helper()
 	emptyOrganisation := &rm.Organisation{
@@ -330,31 +446,254 @@ func emptyContainerCases(t *testing.T) []emptyContainerCase {
 			twoWalks: []string{"cardinality template cardinality", "required rm cardinality"},
 			want:     []string{"cardinality template cardinality"},
 		},
+		{
+			name:     "under its child's occurrences, written at the container",
+			root:     probes.PersonEmptyIdentities(),
+			c:        mustCompileInline(t, personIdentityChildOPT("")),
+			path:     "/identities",
+			twoWalks: []string{"cardinality template occurrences", "required rm cardinality"},
+			want:     []string{"cardinality template occurrences"},
+		},
+		{
+			name:      "beside its child's occurrences, written at the child",
+			root:      probes.PersonEmptyIdentities(),
+			c:         mustCompileInline(t, personIdentityChildOPT("at0004")),
+			path:      "/identities",
+			twoWalks:  []string{"cardinality rm cardinality", "required rm cardinality"},
+			want:      []string{"cardinality rm cardinality"},
+			childPath: "/identities[at0004]",
+			wantChild: []string{"cardinality template occurrences"},
+		},
 	}
 }
 
-// REQ-171 § One walk (Presence), § Acceptance; REQ-112 § Driver — an
-// RM-mandatory container that is present and empty draws one finding. Where
-// no template clause covers it, it is the RM's `cardinality`: under a
+// REQ-171 § One walk (Presence, Counts), § Acceptance; REQ-112 § Driver —
+// an RM-mandatory container that is present and empty draws one finding.
+// Where no template clause covers it, it is the RM's `cardinality`: under a
 // template node that carries only the BMM's mandatory bit, where the two
 // walks report it twice, as `required` and `cardinality`, and below a slot
 // the template does not constrain. Where the template's existence requires
 // it, it is the template's `required`, which the two walks pair with the RM's
 // `cardinality`; where the template's child count reports it, the template's
 // `cardinality` alone, which the two walks pair with a `required` read from
-// the BMM's mandatory bit.
+// the BMM's mandatory bit; and so where a child's occurrences report it, at
+// the container's own path. Occurrences written at the child's own path
+// report the child, not the container: the RM's `cardinality` stays beside
+// them, and the empty list's child that occurs once is still counted.
 func TestREQ171_EngineReportsAnEmptyMandatoryContainerOnce(t *testing.T) {
 	t.Parallel()
 	tests := emptyContainerCases(t)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := keysAt(validation.Validate(tc.root, tc.c).Issues, tc.path); !slices.Equal(got, tc.twoWalks) {
+			twoWalks := validation.Validate(tc.root, tc.c)
+			if got := keysAt(twoWalks.Issues, tc.path); !slices.Equal(got, tc.twoWalks) {
 				t.Fatalf("precondition: Validate(%s) at %s = %q, want %q", tc.name, tc.path, got, tc.twoWalks)
 			}
 			r := engineWith(t, tc.root, tc.c)
 			if got := keysAt(r.Issues, tc.path); !slices.Equal(got, tc.want) {
 				t.Errorf("engine(%s) at %s = %q, want %q: one finding for one empty container", tc.name, tc.path, got, tc.want)
 			}
+			if tc.childPath == "" {
+				return
+			}
+			if got := keysAt(twoWalks.Issues, tc.childPath); !slices.Equal(got, tc.wantChild) {
+				t.Fatalf("precondition: Validate(%s) at %s = %q, want %q", tc.name, tc.childPath, got, tc.wantChild)
+			}
+			if got := keysAt(r.Issues, tc.childPath); !slices.Equal(got, tc.wantChild) {
+				t.Errorf("engine(%s) at %s = %q, want %q: the occurrences of the empty list's child", tc.name, tc.childPath, got, tc.wantChild)
+			}
 		})
+	}
+}
+
+// resourceDescriptionOPT returns a RESOURCE_DESCRIPTION template that
+// declares original_author, a Hash the RM marks mandatory, as multi-valued,
+// with the existence lower..upper.
+func resourceDescriptionOPT(lower, upper string) string {
+	return `<?xml version="1.0"?>
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <template_id><value>resource-description</value></template_id>
+  <concept>resource-description</concept>
+  <language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
+  <definition>
+    <rm_type_name>RESOURCE_DESCRIPTION</rm_type_name>
+    <node_id>at0000</node_id>
+    <attributes xsi:type="C_MULTIPLE_ATTRIBUTE">
+      <rm_attribute_name>original_author</rm_attribute_name>
+      <existence>` + fiInterval(lower, upper) + `</existence>
+      <cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique>
+        <interval><lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>0</lower></interval></cardinality>
+    </attributes>
+  </definition>
+</template>`
+}
+
+// REQ-171 § One walk (Presence), § Structural access — a Hash the RM marks
+// mandatory that is present and empty breaks no mandatory rule, as the RM
+// rules alone read it, however the template declares it: a template that
+// declares RESOURCE_DESCRIPTION original_author multi-valued and leaves its
+// existence open draws nothing from the engine, where the two walks read the
+// BMM bit the template carries as a `required`. Where the template's
+// existence requires it, the template's `required` stays.
+func TestREQ171_EngineReadsAnEmptyHashAsTheRMRulesDo(t *testing.T) {
+	t.Parallel()
+	const path = "/original_author"
+	tests := []struct {
+		name           string
+		c              *templatecompile.Compiled
+		twoWalks, want []string
+	}{
+		{name: "existence open", c: mustCompileInline(t, resourceDescriptionOPT("0", "1")), twoWalks: []string{"required rm cardinality"}},
+		{name: "existence required", c: mustCompileInline(t, resourceDescriptionOPT("1", "1")), twoWalks: []string{"required template existence"}, want: []string{"required template existence"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			root := describedResource([]string{"en"}, "")
+			root.OriginalAuthor = map[string]string{}
+			if got := keysAt(validation.ValidateRM(root).Issues, path); len(got) != 0 {
+				t.Fatalf("precondition: ValidateRM(RESOURCE_DESCRIPTION with an empty original_author) at %s = %q, want nothing", path, got)
+			}
+			if got := keysAt(validation.Validate(root, tc.c).Issues, path); !slices.Equal(got, tc.twoWalks) {
+				t.Fatalf("precondition: Validate(RESOURCE_DESCRIPTION with an empty original_author, %s) at %s = %q, want %q", tc.name, path, got, tc.twoWalks)
+			}
+			if got := keysAt(engineWith(t, root, tc.c).Issues, path); !slices.Equal(got, tc.want) {
+				t.Errorf("engine(RESOURCE_DESCRIPTION with an empty original_author, %s) at %s = %q, want %q", tc.name, path, got, tc.want)
+			}
+		})
+	}
+}
+
+// rmMandatoryCase is a root that lacks an attribute the RM marks mandatory
+// for the value's class, at path, which a template node of a class above it
+// declares and leaves optional.
+type rmMandatoryCase struct {
+	name string
+	root any
+	c    *templatecompile.Compiled
+	path string
+}
+
+// rmMandatoryCases returns a PARTY_RELATED composer with an empty
+// relationship, bound to a PARTY_PROXY node that declares relationship with
+// the existence 0..1, and a CLUSTER root with no items, bound to an ITEM
+// node that declares items, multi-valued, with the existence 0..1. Neither
+// node's class declares the attribute, so the template carries no BMM bit
+// for it.
+func rmMandatoryCases(t *testing.T) []rmMandatoryCase {
+	t.Helper()
+	related := probes.ComposerPartyRelated()
+	related.Composer.(*rm.PartyRelated).Relationship = rm.DVCodedText{}
+	itemOPT := `<?xml version="1.0"?>
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <template_id><value>item-root</value></template_id>
+  <concept>item-root</concept>
+  <language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
+  <definition>
+    <rm_type_name>ITEM</rm_type_name>
+    <node_id>at0000</node_id>
+    <attributes xsi:type="C_MULTIPLE_ATTRIBUTE">
+      <rm_attribute_name>items</rm_attribute_name>
+      <existence>` + fiInterval("0", "1") + `</existence>
+      <cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique>
+        <interval><lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>0</lower></interval></cardinality>
+    </attributes>
+  </definition>
+</template>`
+	return []rmMandatoryCase{
+		{
+			name: "a PARTY_RELATED composer with no relationship, under a PARTY_PROXY node",
+			root: related,
+			c:    mustCompileInline(t, compositionOPT(composerAttribute(complexChild("PARTY_PROXY", singleAttribute("relationship", "0", "1"))))),
+			path: "/composer/relationship",
+		},
+		{
+			name: "a CLUSTER root with no items, under an ITEM node",
+			root: &rm.Cluster{ArchetypeNodeID: "at0000", Name: rm.DVText{Value: "cluster"}},
+			c:    mustCompileInline(t, itemOPT),
+			path: "/items",
+		},
+	}
+}
+
+// REQ-171 § One walk (Presence), § Acceptance — an attribute a template node
+// declares and leaves optional, which the RM marks mandatory for the class of
+// the value bound there, is reported once, as the RM's `required`, when the
+// instance lacks it, single-valued or multi-valued, as the RM rules alone and
+// the two walks report it. The node's class does not declare the attribute,
+// so the template carries no BMM bit for it: the engine reads it from the
+// value's class.
+func TestREQ171_EngineReportsAnRMMandatoryAttributeATemplateNodeLeavesOptional(t *testing.T) {
+	t.Parallel()
+	want := []string{"required rm mandatory"}
+	for _, tc := range rmMandatoryCases(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := keysAt(validation.ValidateRM(tc.root).Issues, tc.path); !slices.Equal(got, want) {
+				t.Fatalf("precondition: ValidateRM(%s) at %s = %q, want %q", tc.name, tc.path, got, want)
+			}
+			if got := keysAt(validation.Validate(tc.root, tc.c).Issues, tc.path); !slices.Equal(got, want) {
+				t.Fatalf("precondition: Validate(%s) at %s = %q, want %q", tc.name, tc.path, got, want)
+			}
+			if got := keysAt(engineWith(t, tc.root, tc.c).Issues, tc.path); !slices.Equal(got, want) {
+				t.Errorf("engine(%s) at %s = %q, want %q", tc.name, tc.path, got, want)
+			}
+		})
+	}
+}
+
+// REQ-171 § One walk (Presence) — a part of a reference the instance lacks,
+// where the template binds the reference to a node, is reported once: by the
+// reference's own rule, as the RM rules alone report it. The compiled node
+// carries the RM's mandatory bit for the part, which the two walks also read
+// as a `required` at the same path; the engine reads the part as the RM rules
+// do, and they leave the parts of a reference to the reference's rule.
+func TestREQ171_EngineReportsAMissingReferencePartOnce(t *testing.T) {
+	t.Parallel()
+	root := probes.ComposerPartyIdentified()
+	// The reference lacks its namespace.
+	root.Composer.(*rm.PartyIdentified).ExternalRef = &rm.PartyRef{ID: &rm.HierObjectID{Value: "a3e8b1c2-0d4f-4e5a-9b6c-7d8e9f0a1b2c"}, Type: "PERSON"}
+	c := mustCompileInline(t, compositionOPT(composerAttribute(complexChild("PARTY_IDENTIFIED", singleAttribute("external_ref", "0", "1", complexChild("PARTY_REF"))))))
+	const path = "/composer/external_ref/namespace"
+	want := []string{"rm_invariant rm mandatory"}
+	if got := keysAt(validation.ValidateRM(root).Issues, path); !slices.Equal(got, want) {
+		t.Fatalf("precondition: ValidateRM(a composer reference lacking its namespace) at %s = %q, want %q", path, got, want)
+	}
+	if got, twoWalks := keysAt(validation.Validate(root, c).Issues, path), []string{"required rm mandatory", "rm_invariant rm mandatory"}; !slices.Equal(got, twoWalks) {
+		t.Fatalf("precondition: Validate(a composer reference lacking its namespace) at %s = %q, want %q", path, got, twoWalks)
+	}
+	if got := keysAt(engineWith(t, root, c).Issues, path); !slices.Equal(got, want) {
+		t.Errorf("engine(a composer reference lacking its namespace) at %s = %q, want %q: one absence, one finding", path, got, want)
+	}
+}
+
+// REQ-171 § One walk, § Coverage — at a node the template binds, the engine
+// visits the attributes the template's node declares in the template's
+// order, then the other attributes it visits in the order of the class, as
+// the template walk visits the declared ones: a composition lacking the
+// composer and the context a template requires, in that order, and carrying
+// a link with none of its mandatory parts, which the template does not
+// mention, draws the composer's `required`, then the context's, then the
+// link's findings. The class lists links first, and context before composer.
+func TestREQ171_EngineVisitsTheDeclaredAttributesInTheTemplatesOrder(t *testing.T) {
+	t.Parallel()
+	c := mustCompileInline(t, compositionOPT(
+		composerAttribute(complexChild("PARTY_SELF")),
+		singleAttribute("context", "1", "1"),
+	))
+	root := probes.ComposerPartyIdentified()
+	root.Composer = nil
+	root.Links = []rm.Link{{}}
+	issues := engineWith(t, root, c).Issues
+	var paths []string
+	for _, i := range issues {
+		paths = append(paths, i.Path)
+	}
+	if len(paths) < 3 || paths[0] != "/composer" || paths[1] != "/context" {
+		t.Fatalf("engine(a composition lacking the composer and the context) paths = %q, want /composer, then /context, then the link's", paths)
+	}
+	for _, p := range paths[2:] {
+		if !strings.HasPrefix(p, "/links[1]/") {
+			t.Errorf("engine(a composition lacking the composer and the context) paths = %q, want the link's findings after the template's", paths)
+			break
+		}
 	}
 }
