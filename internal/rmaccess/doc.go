@@ -29,17 +29,19 @@
 // it holds a value that is not a nil pointer; a string when it is not empty;
 // a number or a boolean always; a list or a hash when it is not nil, and it
 // is empty when it is present and holds no item or entry. A value held by
-// value is present when it is not empty: a DV_TEXT, held directly or through
-// an interface, when its value is not empty; a DV_CODED_TEXT when its value
-// or its defining code is not empty; a CODE_PHRASE when its code_string or
-// its terminology is not empty; an OBJECT_REF or any of its subtypes
-// (PARTY_REF, LOCATABLE_REF, ACCESS_GROUP_REF) when its id, namespace and
-// type are all there; any other class when it is not its zero value. Three
-// readings are fixed: an interval bound is absent only when its side is
-// marked unbounded and the bound is empty; EHR_STATUS subject is always
-// present; ARCHETYPED archetype_id and rm_version are always present.
-// The content rules, the object-reference reading and the fixed readings are
-// in presence.go; the reading by Go kind and the zero tests are generated.
+// value is present when it is not its type's zero value, an interface field
+// holding a nil pointer counting as zero. At an attribute the RM marks
+// mandatory, three types are also empty when their content is missing: a
+// DV_TEXT whose value is empty, whether held directly or through an
+// interface; a DV_CODED_TEXT with an empty value and an empty defining code;
+// a CODE_PHRASE with an empty code_string and an empty terminology. At an
+// optional attribute such a value is present, so a walk enters it and reports
+// what it lacks; an object reference held by value is likewise present unless
+// it is its zero value. Three readings are fixed: an interval bound is absent
+// only when its side is marked unbounded and the bound is empty; EHR_STATUS
+// subject is always present; ARCHETYPED archetype_id and rm_version are always
+// present. The content rules and the fixed readings are in presence.go; the
+// reading by Go kind and the zero tests are generated.
 //
 // # Dependencies
 //

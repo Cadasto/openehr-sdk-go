@@ -209,8 +209,9 @@ func TestRenderRMAccessFile_REQ171_CoversTheRegistry(t *testing.T) {
 
 // TestRenderRMAccessFile_REQ171_Readings pins, on the pinned RM, which
 // reading the generator chooses for one attribute of each kind: the reading
-// by Go kind, a content rule by declared type, the object-reference reading
-// of an OBJECT_REF subtype, a zero test, the three fixed readings, the six
+// by Go kind, a content rule by declared type at a mandatory attribute and the
+// reading by Go kind at an optional one, the zero test of an object reference
+// and of any other class held by value, the three fixed readings, the six
 // attributes handed back in another shape, and the entries of a hash.
 func TestRenderRMAccessFile_REQ171_Readings(t *testing.T) {
 	_, _, file := rmAccessOutput(t)
@@ -225,9 +226,11 @@ func TestRenderRMAccessFile_REQ171_Readings(t *testing.T) {
 		{"singleComposition", "name", "return x.Name, presentText(x.Name), true"},
 		{"singleComposition", "category", "return x.Category, presentCodedText(x.Category), true"},
 		{"singleComposition", "language", "return x.Language, presentCodePhrase(x.Language), true"},
-		{"singleRole", "performer", "return x.Performer, presentObjectRef(x.Performer.ID, x.Performer.Namespace, x.Performer.Type), true"},
-		{"singlePartyRelationship", "source", "return x.Source, presentObjectRef(x.Source.ID, x.Source.Namespace, x.Source.Type), true"},
-		{"singleInstructionDetails", "instruction_id", "return x.InstructionID, presentObjectRef(x.InstructionID.ID, x.InstructionID.Namespace, x.InstructionID.Type), true"},
+		{"singleElement", "null_reason", "return x.NullReason, x.NullReason != nil && !rm.IsTypedNil(x.NullReason), true"},
+		{"singleAuditDetails", "description", "return x.Description, x.Description != nil && !rm.IsTypedNil(x.Description), true"},
+		{"singleRole", "performer", "return x.Performer, !isZeroPartyRef(x.Performer), true"},
+		{"singlePartyRelationship", "source", "return x.Source, !isZeroPartyRef(x.Source), true"},
+		{"singleInstructionDetails", "instruction_id", "return x.InstructionID, !isZeroLocatableRef(x.InstructionID), true"},
 		{"singleEventContext", "start_time", "return x.StartTime, !isZeroDVDateTime(x.StartTime), true"},
 		{"singleObservation", "data", "return x.Data, !isZeroHistoryItemStructure(x.Data), true"},
 		{"singleDVIntervalDVQuantity", "lower", "return x.Lower, presentIntervalBound(x.LowerUnbounded, x.Lower), true"},
@@ -308,26 +311,214 @@ func TestRenderRMAccessFile_REQ171_ListAndHashReadings(t *testing.T) {
 	}
 }
 
-// TestRMAccessGen_REQ171_ObjectRefSubtypes pins that the object-reference
-// reading follows the BMM hierarchy: OBJECT_REF and every class below it,
-// ACCESS_GROUP_REF included though no attribute of the pinned RM holds one
-// by value, and nothing else.
-func TestRMAccessGen_REQ171_ObjectRefSubtypes(t *testing.T) {
-	plan, _, _ := rmAccessOutput(t)
+// renderedSingle is one case of a generated single reader: the arm's class,
+// its Go type, the attribute as the generator reads it, and the case body.
+type renderedSingle struct {
+	class, arm string
+	attr       *accessAttr
+	body       string
+}
+
+// renderedSingles renders the access for the pinned RM and returns a
+// generator over the same plan, which reads each attribute as the rendering
+// did, and every case of every single reader the rendered file holds.
+func renderedSingles(t *testing.T) (*rmaccessGen, []renderedSingle) {
+	t.Helper()
+	plan, _, file := rmAccessOutput(t)
 	g, err := newRMAccessGen(plan)
 	if err != nil {
 		t.Fatalf("newRMAccessGen: %v", err)
 	}
-	for _, name := range []string{"OBJECT_REF", "PARTY_REF", "LOCATABLE_REF", "ACCESS_GROUP_REF"} {
-		if !g.isObjectRef(name) {
-			t.Errorf("isObjectRef(%s) = false, want true", name)
+	var out []renderedSingle
+	for _, pc := range plan.ConcreteClasses {
+		arms, err := g.arms(pc)
+		if err != nil {
+			t.Fatalf("arms(%s): %v", pc.BMMName, err)
+		}
+		for _, arm := range arms {
+			attrs, err := g.attributes(arm)
+			if err != nil {
+				t.Fatalf("attributes(%s): %v", arm.typ.qualified(), err)
+			}
+			var bodies map[string]string
+			if fd := funcDecl(file, "single"+arm.typ.suffix()); fd != nil {
+				bodies = caseBodies(t, fd)
+			}
+			for _, a := range attrs {
+				if a.container {
+					continue
+				}
+				body, ok := bodies[a.name]
+				if !ok {
+					t.Fatalf("single%s has no case %q", arm.typ.suffix(), a.name)
+				}
+				out = append(out, renderedSingle{class: pc.BMMName, arm: arm.typ.qualified(), attr: a, body: strings.TrimSpace(body)})
+			}
 		}
 	}
-	for _, name := range []string{"OBJECT_ID", "HIER_OBJECT_ID", "PARTY_SELF", "DV_EHR_URI", "LOCATABLE", "Hash", ""} {
-		if g.isObjectRef(name) {
-			t.Errorf("isObjectRef(%q) = true, want false", name)
+	return g, out
+}
+
+// TestRenderRMAccessFile_REQ171_ContentReadingsOnlyAtMandatoryAttributes pins
+// REQ-171 Structural access on every reader the generator writes: the
+// DV_TEXT, DV_CODED_TEXT and CODE_PHRASE content rules decide an attribute's
+// presence exactly where the attribute is declared with that type, the RM
+// marks it mandatory and Go holds it by value or, for DV_TEXT, through an
+// interface. At an optional attribute the reading of the field's Go kind
+// decides it.
+func TestRenderRMAccessFile_REQ171_ContentReadingsOnlyAtMandatoryAttributes(t *testing.T) {
+	_, singles := renderedSingles(t)
+	rules := []struct {
+		declared, fn string
+		kinds        []accessKind
+	}{
+		{declared: "DV_TEXT", fn: "presentText", kinds: []accessKind{accessInterface, accessStruct}},
+		{declared: "DV_CODED_TEXT", fn: "presentCodedText", kinds: []accessKind{accessStruct}},
+		{declared: "CODE_PHRASE", fn: "presentCodePhrase", kinds: []accessKind{accessStruct}},
+	}
+	mandatory, optional := 0, 0
+	for _, s := range singles {
+		for _, r := range rules {
+			applied := strings.Contains(s.body, r.fn+"(x."+s.attr.field+")")
+			want := s.attr.declared == r.declared && s.attr.required && slices.Contains(r.kinds, s.attr.kind)
+			if applied != want {
+				t.Errorf("single %s case %q (declared %s, required %t):\n%s\napplies %s: %t, want %t", s.arm, s.attr.name, s.attr.declared, s.attr.required, s.body, r.fn, applied, want)
+			}
+			if s.attr.declared == r.declared && slices.Contains(r.kinds, s.attr.kind) {
+				if s.attr.required {
+					mandatory++
+				} else {
+					optional++
+				}
+			}
 		}
 	}
+	if mandatory < 60 || optional < 3 {
+		t.Fatalf("checked %d mandatory and %d optional attributes a content rule could read, want the full RM set (ELEMENT null_reason, AUDIT_DETAILS and ATTESTATION description optional)", mandatory, optional)
+	}
+}
+
+// TestRenderRMAccessFile_REQ171_ReferencesReadByTheirZeroTest pins REQ-171
+// Structural access: an object reference held by value, of OBJECT_REF or any
+// class the BMM places below it, is present unless it is its zero value, so
+// the generator reads it by its zero test, never by its parts.
+func TestRenderRMAccessFile_REQ171_ReferencesReadByTheirZeroTest(t *testing.T) {
+	g, singles := renderedSingles(t)
+	var checked []string
+	for _, s := range singles {
+		ref := s.attr.declared == "OBJECT_REF" || slices.Contains(AncestorChain(g.plan, s.attr.declared), "OBJECT_REF")
+		if !ref || s.attr.kind != accessStruct {
+			continue
+		}
+		checked = append(checked, s.class+"."+s.attr.name)
+		field := "x." + s.attr.field
+		if want := fmt.Sprintf("return %s, !isZero%s(%s), true", field, s.attr.typ.suffix(), field); s.body != want {
+			t.Errorf("single %s case %q:\n%s\nwant the zero test of %s:\n%s", s.arm, s.attr.name, s.body, s.attr.declared, want)
+		}
+	}
+	slices.Sort(checked)
+	if want := []string{"INSTRUCTION_DETAILS.instruction_id", "PARTY_RELATIONSHIP.source", "PARTY_RELATIONSHIP.target", "ROLE.performer"}; !slices.Equal(checked, want) {
+		t.Errorf("checked the references held by value %q, want %q", checked, want)
+	}
+}
+
+// TestRenderRMAccessFile_REQ171_ZeroTestsReadANilPointerAsZero pins REQ-171
+// Structural access on every zero test the generator writes: an interface
+// field holding a nil pointer counts as zero, so a value held by value whose
+// only content is a nil pointer reads absent. Each field the Go struct
+// declares as an interface is compared with nil and with a nil pointer; a
+// pointer, a slice or a map with nil alone.
+func TestRenderRMAccessFile_REQ171_ZeroTestsReadANilPointerAsZero(t *testing.T) {
+	_, _, file := rmAccessOutput(t)
+	interfaces := rmInterfaceFields(t)
+	checked := 0
+	for _, d := range file.Decls {
+		fd, ok := d.(*ast.FuncDecl)
+		if !ok || !strings.HasPrefix(fd.Name.Name, "isZero") {
+			continue
+		}
+		sel, ok := genericBase(fd.Type.Params.List[0].Type).(*ast.SelectorExpr)
+		if !ok {
+			t.Fatalf("%s tests a %s, want an rm type", fd.Name.Name, types.ExprString(fd.Type.Params.List[0].Type))
+		}
+		var b bytes.Buffer
+		if err := printer.Fprint(&b, token.NewFileSet(), fd.Body); err != nil {
+			t.Fatalf("print %s: %v", fd.Name.Name, err)
+		}
+		body := b.String()
+		for _, field := range interfaces[sel.Sel.Name] {
+			checked++
+			if want := fmt.Sprintf("(v.%s == nil || rm.IsTypedNil(v.%s))", field, field); !strings.Contains(body, want) {
+				t.Errorf("%s reads the interface field %s of rm.%s as\n%s\nwant %s", fd.Name.Name, field, sel.Sel.Name, body, want)
+			}
+		}
+	}
+	// ELEMENT name, null_reason, uid and value; INTERVAL<DV_ORDERED> lower and
+	// upper; OBJECT_REF id; LOCATABLE_REF id; and the others.
+	if checked < 20 {
+		t.Fatalf("checked %d interface fields of the zero tests, want every one of the pinned RM", checked)
+	}
+}
+
+// rmInterfaceFields reads the RM package from source and returns, per struct
+// type name, the fields it declares with an interface type: one of the
+// package's interface types, generated or hand-written (DVTextLike), or any.
+// A generic struct's field typed by a type parameter is left out, since its
+// kind depends on the instantiation.
+func rmInterfaceFields(t *testing.T) map[string][]string {
+	t.Helper()
+	paths, err := filepath.Glob("../../openehr/rm/*.go")
+	if err != nil || len(paths) == 0 {
+		t.Fatalf("list openehr/rm/*.go: %d files, %v", len(paths), err)
+	}
+	var files []*ast.File
+	ifaces := map[string]bool{"any": true}
+	for _, path := range paths {
+		if strings.HasSuffix(path, "_test.go") {
+			continue
+		}
+		f, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+		if err != nil {
+			t.Fatalf("parse %s: %v", path, err)
+		}
+		files = append(files, f)
+		for _, d := range f.Decls {
+			if gd, ok := d.(*ast.GenDecl); ok && gd.Tok == token.TYPE {
+				for _, spec := range gd.Specs {
+					ts := spec.(*ast.TypeSpec)
+					if _, ok := ts.Type.(*ast.InterfaceType); ok {
+						ifaces[ts.Name.Name] = true
+					}
+				}
+			}
+		}
+	}
+	out := map[string][]string{}
+	for _, f := range files {
+		for _, d := range f.Decls {
+			gd, ok := d.(*ast.GenDecl)
+			if !ok || gd.Tok != token.TYPE {
+				continue
+			}
+			for _, spec := range gd.Specs {
+				ts := spec.(*ast.TypeSpec)
+				st, ok := ts.Type.(*ast.StructType)
+				if !ok {
+					continue
+				}
+				for _, field := range st.Fields.List {
+					id, ok := field.Type.(*ast.Ident)
+					if !ok || !ifaces[id.Name] {
+						continue
+					}
+					for _, n := range field.Names {
+						out[ts.Name.Name] = append(out[ts.Name.Name], n.Name)
+					}
+				}
+			}
+		}
+	}
+	return out
 }
 
 // TestRMAccessGen_REQ171_Refusals pins that the generator refuses what it

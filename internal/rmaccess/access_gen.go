@@ -1269,7 +1269,7 @@ func singleAttestation(x *rm.Attestation, attr string) (any, bool, bool) {
 	case "committer":
 		return x.Committer, x.Committer != nil && !rm.IsTypedNil(x.Committer), true
 	case "description":
-		return x.Description, presentText(x.Description), true
+		return x.Description, x.Description != nil && !rm.IsTypedNil(x.Description), true
 	case "is_pending":
 		return x.IsPending, true, true
 	case "proof":
@@ -1307,7 +1307,7 @@ func singleAuditDetails(x *rm.AuditDetails, attr string) (any, bool, bool) {
 	case "committer":
 		return x.Committer, x.Committer != nil && !rm.IsTypedNil(x.Committer), true
 	case "description":
-		return x.Description, presentText(x.Description), true
+		return x.Description, x.Description != nil && !rm.IsTypedNil(x.Description), true
 	case "system_id":
 		return x.SystemID, x.SystemID != "", true
 	case "time_committed":
@@ -2398,7 +2398,7 @@ func singleElement(x *rm.Element, attr string) (any, bool, bool) {
 	case "null_flavour":
 		return x.NullFlavour, x.NullFlavour != nil, true
 	case "null_reason":
-		return x.NullReason, presentText(x.NullReason), true
+		return x.NullReason, x.NullReason != nil && !rm.IsTypedNil(x.NullReason), true
 	case "uid":
 		return x.UID, x.UID != nil && !rm.IsTypedNil(x.UID), true
 	case "value":
@@ -2992,7 +2992,7 @@ func singleInstructionDetails(x *rm.InstructionDetails, attr string) (any, bool,
 	case "activity_id":
 		return x.ActivityID, x.ActivityID != "", true
 	case "instruction_id":
-		return x.InstructionID, presentObjectRef(x.InstructionID.ID, x.InstructionID.Namespace, x.InstructionID.Type), true
+		return x.InstructionID, !isZeroLocatableRef(x.InstructionID), true
 	case "wf_details":
 		return x.WfDetails, x.WfDetails != nil && !rm.IsTypedNil(x.WfDetails), true
 	}
@@ -3768,9 +3768,9 @@ func singlePartyRelationship(x *rm.PartyRelationship, attr string) (any, bool, b
 	case "name":
 		return x.Name, presentText(x.Name), true
 	case "source":
-		return x.Source, presentObjectRef(x.Source.ID, x.Source.Namespace, x.Source.Type), true
+		return x.Source, !isZeroPartyRef(x.Source), true
 	case "target":
-		return x.Target, presentObjectRef(x.Target.ID, x.Target.Namespace, x.Target.Type), true
+		return x.Target, !isZeroPartyRef(x.Target), true
 	case "time_validity":
 		return x.TimeValidity, x.TimeValidity != nil, true
 	case "uid":
@@ -4413,7 +4413,7 @@ func singleRole(x *rm.Role, attr string) (any, bool, bool) {
 	case "name":
 		return x.Name, presentText(x.Name), true
 	case "performer":
-		return x.Performer, presentObjectRef(x.Performer.ID, x.Performer.Namespace, x.Performer.Type), true
+		return x.Performer, !isZeroPartyRef(x.Performer), true
 	case "time_validity":
 		return x.TimeValidity, x.TimeValidity != nil, true
 	case "uid":
@@ -4729,7 +4729,7 @@ func isZeroDVParsable(v rm.DVParsable) bool {
 func isZeroDVText(v rm.DVText) bool {
 	return v.Encoding == nil &&
 		v.Formatting == nil &&
-		v.Hyperlink == nil &&
+		(v.Hyperlink == nil || rm.IsTypedNil(v.Hyperlink)) &&
 		v.Language == nil &&
 		v.Mappings == nil &&
 		v.Value == ""
@@ -4746,19 +4746,19 @@ func isZeroElement(v rm.Element) bool {
 		v.ArchetypeNodeID == "" &&
 		v.FeederAudit == nil &&
 		v.Links == nil &&
-		v.Name == nil &&
+		(v.Name == nil || rm.IsTypedNil(v.Name)) &&
 		v.NullFlavour == nil &&
-		v.NullReason == nil &&
-		v.UID == nil &&
-		v.Value == nil
+		(v.NullReason == nil || rm.IsTypedNil(v.NullReason)) &&
+		(v.UID == nil || rm.IsTypedNil(v.UID)) &&
+		(v.Value == nil || rm.IsTypedNil(v.Value))
 }
 
 // isZeroFeederAuditDetails reports whether v is the zero rm.FeederAuditDetails, field by field.
 func isZeroFeederAuditDetails(v rm.FeederAuditDetails) bool {
-	return v.Location == nil &&
-		v.OtherDetails == nil &&
-		v.Provider == nil &&
-		v.Subject == nil &&
+	return (v.Location == nil || rm.IsTypedNil(v.Location)) &&
+		(v.OtherDetails == nil || rm.IsTypedNil(v.OtherDetails)) &&
+		(v.Provider == nil || rm.IsTypedNil(v.Provider)) &&
+		(v.Subject == nil || rm.IsTypedNil(v.Subject)) &&
 		v.SystemID == "" &&
 		v.Time == nil &&
 		v.VersionID == nil
@@ -4777,19 +4777,19 @@ func isZeroHistoryItemStructure(v rm.History[rm.ItemStructure]) bool {
 		v.Events == nil &&
 		v.FeederAudit == nil &&
 		v.Links == nil &&
-		v.Name == nil &&
+		(v.Name == nil || rm.IsTypedNil(v.Name)) &&
 		isZeroDVDateTime(v.Origin) &&
 		v.Period == nil &&
-		v.Summary == nil &&
-		v.UID == nil
+		(v.Summary == nil || rm.IsTypedNil(v.Summary)) &&
+		(v.UID == nil || rm.IsTypedNil(v.UID))
 }
 
 // isZeroIntervalDVOrdered reports whether v is the zero rm.Interval[rm.DVOrdered], field by field.
 func isZeroIntervalDVOrdered(v rm.Interval[rm.DVOrdered]) bool {
-	return v.Lower == nil &&
+	return (v.Lower == nil || rm.IsTypedNil(v.Lower)) &&
 		!v.LowerIncluded &&
 		!v.LowerUnbounded &&
-		v.Upper == nil &&
+		(v.Upper == nil || rm.IsTypedNil(v.Upper)) &&
 		!v.UpperIncluded &&
 		!v.UpperUnbounded
 }
@@ -4809,8 +4809,8 @@ func isZeroItemList(v rm.ItemList) bool {
 		v.FeederAudit == nil &&
 		v.Items == nil &&
 		v.Links == nil &&
-		v.Name == nil &&
-		v.UID == nil
+		(v.Name == nil || rm.IsTypedNil(v.Name)) &&
+		(v.UID == nil || rm.IsTypedNil(v.UID))
 }
 
 // isZeroItemSingle reports whether v is the zero rm.ItemSingle, field by field.
@@ -4820,8 +4820,8 @@ func isZeroItemSingle(v rm.ItemSingle) bool {
 		v.FeederAudit == nil &&
 		isZeroElement(v.Item) &&
 		v.Links == nil &&
-		v.Name == nil &&
-		v.UID == nil
+		(v.Name == nil || rm.IsTypedNil(v.Name)) &&
+		(v.UID == nil || rm.IsTypedNil(v.UID))
 }
 
 // isZeroItemTable reports whether v is the zero rm.ItemTable, field by field.
@@ -4830,9 +4830,9 @@ func isZeroItemTable(v rm.ItemTable) bool {
 		v.ArchetypeNodeID == "" &&
 		v.FeederAudit == nil &&
 		v.Links == nil &&
-		v.Name == nil &&
+		(v.Name == nil || rm.IsTypedNil(v.Name)) &&
 		v.Rows == nil &&
-		v.UID == nil
+		(v.UID == nil || rm.IsTypedNil(v.UID))
 }
 
 // isZeroItemTree reports whether v is the zero rm.ItemTree, field by field.
@@ -4842,8 +4842,22 @@ func isZeroItemTree(v rm.ItemTree) bool {
 		v.FeederAudit == nil &&
 		v.Items == nil &&
 		v.Links == nil &&
-		v.Name == nil &&
-		v.UID == nil
+		(v.Name == nil || rm.IsTypedNil(v.Name)) &&
+		(v.UID == nil || rm.IsTypedNil(v.UID))
+}
+
+// isZeroLocatableRef reports whether v is the zero rm.LocatableRef, field by field.
+func isZeroLocatableRef(v rm.LocatableRef) bool {
+	return isZeroObjectRef(v.ObjectRef) &&
+		(v.ID == nil || rm.IsTypedNil(v.ID)) &&
+		v.Path == nil
+}
+
+// isZeroObjectRef reports whether v is the zero rm.ObjectRef, field by field.
+func isZeroObjectRef(v rm.ObjectRef) bool {
+	return (v.ID == nil || rm.IsTypedNil(v.ID)) &&
+		v.Namespace == "" &&
+		v.Type == ""
 }
 
 // isZeroObjectVersionID reports whether v is the zero rm.ObjectVersionID, field by field.
@@ -4862,6 +4876,11 @@ func isZeroOriginalVersionAny(v rm.OriginalVersion[any]) bool {
 		isZeroObjectVersionID(v.UID)
 }
 
+// isZeroPartyRef reports whether v is the zero rm.PartyRef, field by field.
+func isZeroPartyRef(v rm.PartyRef) bool {
+	return isZeroObjectRef(v.ObjectRef)
+}
+
 // isZeroTerminologyID reports whether v is the zero rm.TerminologyID, field by field.
 func isZeroTerminologyID(v rm.TerminologyID) bool {
 	return v.Value == ""
@@ -4869,7 +4888,7 @@ func isZeroTerminologyID(v rm.TerminologyID) bool {
 
 // isZeroVersionAny reports whether v is the zero rm.Version[any], field by field.
 func isZeroVersionAny(v rm.Version[any]) bool {
-	return v.CommitAudit == nil &&
-		v.Contribution == nil &&
+	return (v.CommitAudit == nil || rm.IsTypedNil(v.CommitAudit)) &&
+		(v.Contribution == nil || rm.IsTypedNil(v.Contribution)) &&
 		v.Signature == nil
 }
