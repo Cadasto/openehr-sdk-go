@@ -154,14 +154,11 @@ Each lands as a `v0.x` minor named in the release notes, as ADR 0025's own tight
 
 ## Backlog lines this plan absorbs
 
-Each is a lead in [docs/backlog.md](../backlog.md), verified at the phase that touches its path and deleted when settled; the phase is in brackets.
+Each is a lead in [docs/backlog.md](../backlog.md) under *Validation engine Phase 4*, verified when Phase 4 rewrites its path and deleted when settled:
 
-- `openehr/validation/rmfloor.go:359`, an empty mandatory container reported under two codes at one path [4]; `rmfloor.go:334`, `max_depth` at every node at the limit [2]; `rmfloor.go:250`, the cost of the visit-once record [4]; `rmfloor.go:158` and `:101`, the severity default and the nil-guard path [2].
-- `rmfloor.go:589` and `clinical-modeling.md:929`, invariants the floor does not evaluate, including `Participations_validity` and `Other_participations_valid` [3]; `rmfloor.go:532`, a temporal value reported twice [4]; `clinical-modeling.md:915`, the *Driver* bullet against the known gap [3].
-- `rmread/read.go:455`, `:1589` and `:1019`, reader test gaps and the optional-string presence rule [3, where the readers go].
-- `openehr/rm/rminfo/lookup_gen.go`, the 339 KB linked into every `canjson` importer, and the lazy-linking follow-up [5]; `openehr/serialize/canjson/unmatched.go:105`, `decode.go:217`, `doc.go:138`, `unmatched_test.go:717` and `:763`, the member-check route [5].
-- `openehr/validation/issue.go:166`, `doc.go:48`, `rmfloor.go:768`, package docs that list the floor's rules by hand [3, the inventory replaces the list].
-- The ADR 0025 lines under *ADRs and STRAND-14 after decode-validation*: the release-notes break marker, the benchmark harness the mechanism is measured against, and the lowercase binding word [4, when the mechanism is replaced].
+- `openehr/validation/rmfloor.go:359`, an empty mandatory container reported under two codes at one path; `rmfloor.go:250`, the cost of the visit-once record; `rmfloor.go:532`, a temporal value reported twice; `walk_composition.go:156`, an attribute's children copied on every visit.
+
+The leads Phases 2 and 3 absorbed are settled. The backlog triage of 2026-10-14 dropped the rest: the ADR 0025 lines, settled or wording only, and the Phase 5 leads, the member-check route (settled or trivial) and the `rminfo` link-size follow-up, a cost the maintainer had accepted.
 
 ## Open questions
 
