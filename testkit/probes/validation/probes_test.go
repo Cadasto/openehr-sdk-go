@@ -84,8 +84,8 @@ func TestProbe026MissingNodes_MissingSystolic(t *testing.T) {
 // slot include fails the slot-fit fallback.
 func TestProbe026MissingNodes_SlotFillUnknownArchetype(t *testing.T) {
 	body := loadFixture(t, "vital_signs")
-	// The OBSERVATION is RM-valid apart from its id, so only the slot fit
-	// fails: template validation includes the RM floor, which walks it.
+	// The OBSERVATION fits no slot: the walk reports the slot fit once and
+	// does not enter it, so no RM rule reports anything from inside it.
 	cases := []probes.ValidateCase{
 		{
 			Name:        "unknown_archetype_id_under_content",

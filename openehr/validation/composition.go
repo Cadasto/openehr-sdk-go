@@ -12,17 +12,19 @@ import (
 // ValidateComposition validates an in-memory RM Composition
 // against a compiled OPT and returns every issue in one pass.
 //
-// The walk is template-driven (see package doc): the compiled OPT
-// drives traversal and the composition is the value source. Each
-// issue's path is written as [Issue.Path] describes, by the same rule
-// [ValidateRM] uses: a required attribute that is absent is reported at
-// the attribute's own path, and a required node the composition lacks
-// at the path the template gives it.
+// The walk visits the composition (see package doc): the compiled OPT
+// binds the nodes it reaches and decides which content it admits, and the
+// composition and the Reference Model supply the rest of what the walk
+// visits. Each issue's path is written as [Issue.Path] describes, by the
+// same rule [ValidateRM] uses: a required attribute that is absent is
+// reported at the attribute's own path, and a required node the
+// composition lacks at the path the template gives it.
 //
 // The result includes the Reference Model rules ([ValidateRM]), applied in
-// the same walk, as [Validate] describes, so each defect is reported once.
-// A composition that passes is valid against the template and the RM rules
-// the validator checks.
+// the same walk, as [Validate] describes: an attribute both layers find
+// missing or empty is one finding, and a Reference Model rule's own finding
+// at that path is reported beside it. A composition that passes is valid
+// against the template and the RM rules the validator checks.
 //
 // Returns a [Result] whose Issues slice is never nil (zero-length
 // allocation when no issues fire).

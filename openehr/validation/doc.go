@@ -37,9 +37,10 @@
 //
 // # Trust model
 //
-// The template-driven entries ([ValidateComposition], [Validate], and
-// the typed wrappers) treat the compiled OPT as the authoritative driver
-// and the composition as the value source. One walk visits the instance.
+// The template entries ([ValidateComposition], [Validate], and the typed
+// wrappers) visit the instance in one walk. The compiled OPT binds the
+// instance's nodes to its own and decides which content the walk admits;
+// the value and the Reference Model supply the rest of what it visits.
 // At each node it knows the RM class of the value and, where the template
 // reaches, the template node the value binds to. It reads the node's
 // attributes through access the generator emits for every registered RM
@@ -85,12 +86,15 @@
 // With a template the same rules run on every node the template admits,
 // the nodes it does not constrain included, and on no content it refuses.
 // Their findings come in the one [Result], in the order the walk found
-// them. A defect both layers see is reported once: a node the template
-// requires and the instance lacks is the template's `required`, and an
-// empty list the template counts is the template's finding alone. A value
-// held from two places is validated at each, so a defect in it is reported
-// at each path. No option leaves the Reference Model rules out. Callers
-// without a template run [ValidateRM], which applies them alone.
+// them. An attribute both layers find missing or empty is one finding: a
+// node the template requires and the instance lacks is the template's
+// `required` alone, and an empty list the template counts is the
+// template's finding alone. A Reference Model rule's own finding at that
+// path, such as the terminology check of a coded attribute, is reported
+// beside it. A value held from two places is validated at each, so a
+// defect in it is reported at each path. No option leaves the Reference
+// Model rules out. Callers without a template run [ValidateRM], which
+// applies them alone.
 //
 // The template-driven validators and [ValidateRM] write [Issue.Path] by
 // one rule, so a node has one path whichever of them reports it: an
@@ -107,8 +111,10 @@
 // # Collect-all
 //
 // Every failing clause emits one [Issue]; the walk does not stop at a
-// finding, so UIs and CI runners get the full list. A defect the
-// template and the Reference Model rules both see is one issue.
+// finding, so UIs and CI runners get the full list. An attribute the
+// template and the Reference Model rules both find missing or empty is
+// one issue; a Reference Model rule's own finding at that path, such as a
+// coded attribute's terminology check, is a second.
 //
 // # Finding identity
 //

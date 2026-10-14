@@ -9,15 +9,16 @@ import (
 // Validate validates an in-memory archetypeable RM root against a
 // compiled OPT and returns every issue in one pass.
 //
-// It is the generic form of [ValidateComposition]: the compiled OPT
-// drives the walk and `root` is the value source. `root` must be one of
-// the RM LOCATABLE concretes the walk recognises: the COMPOSITION content
-// closed set plus the demographic PARTY hierarchy (PERSON / ORGANISATION
-// / GROUP / AGENT / ROLE and the archetypeable sub-components ADDRESS /
-// CONTACT / PARTY_IDENTITY / PARTY_RELATIONSHIP / CAPABILITY) and the EHR
-// IM roots FOLDER / EHR_STATUS. A root whose concrete RM type does not
-// match the OPT root surfaces as an rm_type_mismatch at "/", not a silent
-// pass.
+// It is the generic form of [ValidateComposition]. The walk visits `root`:
+// the compiled OPT binds the nodes it reaches to its own and decides which
+// content it admits, and the value and the Reference Model supply the rest
+// of what the walk visits. `root` must be one of the RM LOCATABLE concretes
+// the walk recognises: the COMPOSITION content closed set plus the
+// demographic PARTY hierarchy (PERSON / ORGANISATION / GROUP / AGENT / ROLE
+// and the archetypeable sub-components ADDRESS / CONTACT / PARTY_IDENTITY /
+// PARTY_RELATIONSHIP / CAPABILITY) and the EHR IM roots FOLDER /
+// EHR_STATUS. A root whose concrete RM type does not match the OPT root
+// surfaces as an rm_type_mismatch at "/", not a silent pass.
 //
 // The walk applies the Reference Model rules ([ValidateRM]) as it goes, on
 // every node the template admits, the nodes it does not constrain included,
@@ -25,13 +26,15 @@ import (
 // found them. At each attribute it asks the template first: content the
 // template refuses, an attribute it prohibits or an item that binds to none
 // of its nodes, is reported once and not entered, so no Reference Model
-// rule reports anything from inside it. A defect both the template and the
-// Reference Model see is reported once: a node the template requires and
-// the instance lacks is the template's `required`, and an empty list the
-// template counts is reported by the template alone. A value held from two
-// places is validated at each, so a defect in it is reported at each path.
-// No option leaves the Reference Model rules out; [ValidateRM] applies them
-// alone.
+// rule reports anything from inside it. An attribute both the template and
+// the Reference Model find missing or empty is one finding: a node the
+// template requires and the instance lacks is the template's `required`
+// alone, and an empty list the template counts is reported by the template
+// alone. A Reference Model rule's own finding at that path, such as the
+// terminology check of a coded attribute, is reported beside it. A value
+// held from two places is validated at each, so a defect in it is reported
+// at each path. No option leaves the Reference Model rules out;
+// [ValidateRM] applies them alone.
 //
 // Where a template reuses one archetype under several names, an item is
 // matched to the template node whose name it carries; an item whose name

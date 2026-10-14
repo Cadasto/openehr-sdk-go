@@ -370,10 +370,9 @@ var floorRules = pinnedSource.build()
 
 // classAttributes holds, for each class the pinned class metadata knows, by
 // its bare name, what the metadata says of each attribute it lists for the
-// class ([tcimpl.ClassFacts]), which the one walk reads a node by when no
-// template node of the node's class binds it. Built once, when the package
-// is initialised, and never changed, so the walk asks the metadata nothing
-// per node.
+// class ([tcimpl.ClassFacts]), which the one walk reads every node by.
+// Built once, when the package is initialised, and never changed, so the
+// walk asks the metadata nothing per node.
 var classAttributes = buildClassAttributes(rminfo.Default)
 
 // classAttributeTable is what the class metadata says of the attributes of
