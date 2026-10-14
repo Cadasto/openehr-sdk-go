@@ -162,9 +162,11 @@ func TestCoverage_REQ171_CompleteIgnoresUnevaluated(t *testing.T) {
 	}
 }
 
-// REQ-171 § Coverage, REQ-112 — the presence-aware EHR_STATUS entry lists the
-// unevaluated invariants of the value walk it runs: those ValidateRMEHRStatus
-// lists for the decoded status.
+// REQ-171 § Coverage, REQ-112 — the presence-aware EHR_STATUS entry carries
+// the Coverage of the value walk it runs: what ValidateRMEHRStatus reports for
+// the decoded status. The status omits subject, so the entry replaces the
+// walk's findings with its key-presence finding and rebuilds the Result, and
+// the Coverage must survive that rebuild.
 func TestValidateRMEHRStatusBytes_REQ171_ListsUnevaluated(t *testing.T) {
 	t.Parallel()
 	data := []byte(`{
@@ -174,7 +176,6 @@ func TestValidateRMEHRStatusBytes_REQ171_ListsUnevaluated(t *testing.T) {
 		"archetype_details": {"_type": "ARCHETYPED",
 			"archetype_id": {"_type": "ARCHETYPE_ID", "value": "openEHR-EHR-EHR_STATUS.generic.v1"},
 			"rm_version": "1.1.0"},
-		"subject": {"_type": "PARTY_SELF"},
 		"is_modifiable": true,
 		"is_queryable": true
 	}`)
@@ -182,9 +183,15 @@ func TestValidateRMEHRStatusBytes_REQ171_ListsUnevaluated(t *testing.T) {
 	if err := canjson.Unmarshal(data, &status); err != nil {
 		t.Fatalf("canjson.Unmarshal(EHR_STATUS): %v", err)
 	}
-	want := validation.ValidateRMEHRStatus(&status).Coverage.Unevaluated
-	got := validation.ValidateRMEHRStatusBytes(data).Coverage.Unevaluated
-	if len(want) == 0 || !slices.Equal(got, want) {
-		t.Errorf("ValidateRMEHRStatusBytes(EHR_STATUS) Coverage.Unevaluated = %q, want %q, what ValidateRMEHRStatus lists, and not empty", got, want)
+	want := validation.ValidateRMEHRStatus(&status).Coverage
+	got := validation.ValidateRMEHRStatusBytes(data)
+	if !slices.ContainsFunc(got.Issues, func(i validation.Issue) bool { return i.Path == "/subject" && i.Code == "required" }) {
+		t.Fatalf("precondition: ValidateRMEHRStatusBytes(EHR_STATUS without subject) issues %+v, want required at /subject, so the key-absence path runs", got.Issues)
+	}
+	if len(want.Unevaluated) == 0 || !slices.Equal(got.Coverage.Unevaluated, want.Unevaluated) {
+		t.Errorf("ValidateRMEHRStatusBytes(EHR_STATUS without subject) Coverage.Unevaluated = %q, want %q, what ValidateRMEHRStatus lists, and not empty", got.Coverage.Unevaluated, want.Unevaluated)
+	}
+	if !slices.Equal(got.Coverage.Stopped, want.Stopped) || !slices.Equal(got.Coverage.External, want.External) {
+		t.Errorf("ValidateRMEHRStatusBytes(EHR_STATUS without subject) Coverage Stopped %q External %q, want %q and %q, what ValidateRMEHRStatus reports", got.Coverage.Stopped, got.Coverage.External, want.Stopped, want.External)
 	}
 }
