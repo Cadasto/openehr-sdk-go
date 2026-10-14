@@ -263,16 +263,16 @@ const paragraphChild = `
         <node_id></node_id>
       </children>`
 
-// REQ-171 § Finding identity — the template walk's `required` for a
-// multi-valued attribute names the rule that requires it. One the template's
-// own existence requires and the instance holds empty is template
-// existence. One only the RM makes mandatory and the instance holds empty is
-// RM cardinality, the rule the floor's `cardinality` at the same path also
-// names. One only the RM makes mandatory and the instance leaves nil is
-// absent (§ REQ-171 Structural access), so it is RM mandatory, as the
-// floor's `required` at the same path is (§ REQ-112 Driver): a
-// DV_PARAGRAPH's items. A DV_PARAGRAPH that carries its items draws nothing,
-// now that the generated access reads them.
+// REQ-171 § Finding identity, § One walk (Presence) — an empty or absent
+// multi-valued attribute is reported once, by the rule that requires it. One
+// the template's own existence requires and the instance holds empty is
+// template existence, and the template's counts report it too. One only the
+// RM makes mandatory and the instance holds empty is the RM's `cardinality`,
+// rule cardinality. One only the RM makes mandatory and the instance leaves
+// nil is absent (§ REQ-171 Structural access), so it is the RM's `required`,
+// rule mandatory (§ REQ-112 Driver): a DV_PARAGRAPH's items. A DV_PARAGRAPH
+// that carries its items draws nothing, now that the generated access reads
+// them.
 func TestValidate_REQ171_EmptyMandatoryListRule(t *testing.T) {
 	t.Parallel()
 	empty := &rm.Cluster{ArchetypeNodeID: "openEHR-EHR-CLUSTER.bare.v1", Name: &rm.DVText{Value: "cluster"}, Items: []rm.Item{}}
@@ -286,7 +286,7 @@ func TestValidate_REQ171_EmptyMandatoryListRule(t *testing.T) {
 		{
 			name: "empty items only the RM makes mandatory",
 			r:    validation.Validate(empty, mustCompileInline(t, bareClusterOPT)),
-			want: []string{"cardinality /items rm cardinality", "required /items rm cardinality"},
+			want: []string{"cardinality /items rm cardinality"},
 		},
 		{
 			name: "empty items the template requires",
@@ -295,8 +295,8 @@ func TestValidate_REQ171_EmptyMandatoryListRule(t *testing.T) {
 				c.Items = []rm.Item{}
 				return c
 			}(), mustCompileInline(t, findingIdentityOPT)),
-			// The floor's cardinality at /items repeats the template
-			// walk's code at that path, so it is carried once.
+			// The template reports the empty container, so the RM's
+			// cardinality at /items is not reported beside it.
 			want: []string{
 				"cardinality /items template cardinality",
 				"cardinality /items[at0003] template occurrences",

@@ -1,18 +1,15 @@
 package validation_test
 
-// engine_walk_test.go: REQ-171 § One walk — the rules of the one walk that
-// the floor does not share. A value held from two places is validated at
-// each, so a defect in it is reported at each path; a value that holds itself
-// is a cycle, detected on the active ancestry alone, reported where it recurs
-// and not entered; a value reached again outside its own ancestry is no
-// cycle. The depth and visit limits each stop the walk and are reported once,
-// with the path in Coverage.Stopped, and a zero or negative limit field reads
-// as its default.
+// engine_walk_test.go: REQ-171 § One walk, REQ-112 § Driver — the one walk
+// with no template, through ValidateRM and a Validator. A value held from two
+// places is validated at each, so a defect in it is reported at each path; a
+// value that holds itself is a cycle, detected on the active ancestry alone,
+// reported where it recurs and not entered; a value reached again outside
+// its own ancestry is no cycle. The depth and visit limits each stop the
+// walk and are reported once, with the path in Coverage.Stopped.
 
 import (
 	"fmt"
-	"math"
-	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -22,11 +19,11 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
-// walkEngine runs the one walk with no template within l, failing the test
-// when it has not returned within deadline.
-func walkEngine(t *testing.T, deadline time.Duration, root any, l validation.Limits) validation.Result {
+// validateRMWithin runs a Validator built with the limits l over root with
+// no template, failing the test when it has not returned within deadline.
+func validateRMWithin(t *testing.T, deadline time.Duration, root any, l validation.Limits) validation.Result {
 	t.Helper()
-	return validateWithin(t, "the engine", deadline, func() validation.Result { return validation.RunEngine(root, nil, l) })
+	return validateWithin(t, "Validate(root, nil)", deadline, func() validation.Result { return limited(l).Validate(root, nil) })
 }
 
 // sharedClusterGraph returns a CLUSTER that holds the next level twice, levels
@@ -41,10 +38,10 @@ func sharedClusterGraph(levels int) *rm.Cluster {
 	return root
 }
 
-// REQ-171 § One walk, § Acceptance — a Go value with one defect, held from
-// two places, draws two issues, one at each path; the floor, which walks a
-// shared value once, draws one. The places are two items of one list, two
-// single-valued attributes, and two depths.
+// REQ-171 § One walk, § Acceptance; REQ-112 § Driver — a Go value with one
+// defect, held from two places, draws two issues, one at each path, from
+// ValidateRM. The places are two items of one list, two single-valued
+// attributes, and two depths.
 func TestREQ171_EngineValidatesASharedValueAtEachPlace(t *testing.T) {
 	t.Parallel()
 	emptyItems := &rm.Cluster{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "leaf"}, Items: []rm.Item{}}
@@ -90,15 +87,12 @@ func TestREQ171_EngineValidatesASharedValueAtEachPlace(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := pathsOf(validation.ValidateRM(tc.root).Issues, tc.code); len(got) != 1 {
-				t.Fatalf("precondition: ValidateRM(%s) reports %s at %q, want once: the floor walks a shared value once", tc.name, tc.code, got)
-			}
-			r := walkEngine(t, walkDeadline, tc.root, validation.Limits{})
+			r := validateWithin(t, "ValidateRM", walkDeadline, func() validation.Result { return validation.ValidateRM(tc.root) })
 			if got := issueKeys(r.Issues); len(got) != len(tc.want) {
-				t.Errorf("engine(%s) issues = %q, want %d, the one defect at each place", tc.name, got, len(tc.want))
+				t.Errorf("ValidateRM(%s) issues = %q, want %d, the one defect at each place", tc.name, got, len(tc.want))
 			}
 			if got := pathsOf(r.Issues, tc.code); !slices.Equal(got, tc.want) {
-				t.Errorf("engine(%s) reports %s at %q, want at %q: one issue at each place", tc.name, tc.code, got, tc.want)
+				t.Errorf("ValidateRM(%s) reports %s at %q, want at %q: one issue at each place", tc.name, tc.code, got, tc.want)
 			}
 		})
 	}
@@ -162,12 +156,12 @@ func TestREQ171_EngineReportsACycleWhereItRecurs(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			r := walkEngine(t, walkDeadline, tc.root(), validation.Limits{})
+			r := validateRMWithin(t, walkDeadline, tc.root(), validation.Limits{})
 			if got := issueKeys(r.Issues); strings.Join(got, "\n") != strings.Join(tc.want, "\n") {
-				t.Errorf("engine(%s) issues = %q, want %q", tc.name, got, tc.want)
+				t.Errorf("Validate(%s) issues = %q, want %q", tc.name, got, tc.want)
 			}
 			if len(r.Coverage.Stopped) != 0 {
-				t.Errorf("engine(%s) Coverage.Stopped = %q, want none: the cycle ends the walk there, not a limit", tc.name, r.Coverage.Stopped)
+				t.Errorf("Validate(%s) Coverage.Stopped = %q, want none: the cycle ends the walk there, not a limit", tc.name, r.Coverage.Stopped)
 			}
 		})
 	}
@@ -187,9 +181,9 @@ func TestREQ171_EngineSharedValueIsNoCycle(t *testing.T) {
 		&rm.Cluster{ArchetypeNodeID: "at0004", Name: rm.DVText{Value: "sibling"}, Items: []rm.Item{shared}},
 		shared,
 	}}
-	r := walkEngine(t, walkDeadline, root, validation.Limits{})
+	r := validateRMWithin(t, walkDeadline, root, validation.Limits{})
 	if len(r.Issues) != 0 {
-		t.Errorf("engine(CLUSTER held three times) issues = %q, want none: a value reached outside its own ancestry is no cycle", issueKeys(r.Issues))
+		t.Errorf("Validate(CLUSTER held three times) issues = %q, want none: a value reached outside its own ancestry is no cycle", issueKeys(r.Issues))
 	}
 }
 
@@ -201,10 +195,10 @@ func TestREQ171_EngineDepthLimitStopsTheWalk(t *testing.T) {
 	t.Parallel()
 	root := nestedSections(40)
 	for _, depth := range []int{1, 5, 30} {
-		r := walkEngine(t, walkDeadline, root, validation.Limits{Depth: depth})
-		assertStoppedOnce(t, fmt.Sprintf("engine(40 nested SECTIONs) under Depth %d", depth), r, "max_depth", firstDepthStop("/items[at0001]", depth))
+		r := validateRMWithin(t, walkDeadline, root, validation.Limits{Depth: depth})
+		assertStoppedOnce(t, fmt.Sprintf("Validate(40 nested SECTIONs) under Depth %d", depth), r, "max_depth", firstDepthStop("/items[at0001]", depth))
 		if n := len(pathsOf(r.Issues, "max_nodes")); n != 0 {
-			t.Errorf("engine(40 nested SECTIONs) under Depth %d reports max_nodes %d times, want none", depth, n)
+			t.Errorf("Validate(40 nested SECTIONs) under Depth %d reports max_nodes %d times, want none", depth, n)
 		}
 	}
 
@@ -212,20 +206,19 @@ func TestREQ171_EngineDepthLimitStopsTheWalk(t *testing.T) {
 	for range 20 {
 		chains.Items = append(chains.Items, brokenChain(5))
 	}
-	r := walkEngine(t, walkDeadline, chains, validation.Limits{Depth: 3})
+	r := validateRMWithin(t, walkDeadline, chains, validation.Limits{Depth: 3})
 	const first = "/items[1]/items[at0001]/name"
-	assertStoppedOnce(t, "engine(20 chains, each 5 deep) under Depth 3", r, "max_depth", first)
+	assertStoppedOnce(t, "Validate(20 chains, each 5 deep) under Depth 3", r, "max_depth", first)
 	if len(r.Issues) != 1 {
-		t.Errorf("engine(20 chains, each 5 deep) under Depth 3 issues = %q, want the max_depth alone: nothing below the limit is walked, on any branch", issueKeys(r.Issues))
+		t.Errorf("Validate(20 chains, each 5 deep) under Depth 3 issues = %q, want the max_depth alone: nothing below the limit is walked, on any branch", issueKeys(r.Issues))
 	}
 }
 
-// REQ-171 § One walk — at the visit limit the walk stops and reports
-// max_nodes once, as its last issue, at the path where it stopped, which
-// Coverage.Stopped lists. Over a tree that shares no value the engine stops
-// where the floor stops. A graph that shares one value at each of 40 levels
-// reaches its leaf by 2^40 paths; the engine validates it at each, so only
-// the visit limit ends the walk.
+// REQ-171 § One walk; REQ-112 § Driver — at the visit limit the walk stops
+// and reports max_nodes once, as its last issue, at the path where it
+// stopped, which Coverage.Stopped lists. A graph that shares one value at
+// each of 40 levels reaches its leaf by 2^40 paths; the walk validates it at
+// each, so only the visit limit ends the walk, and it is no cycle.
 func TestREQ171_EngineNodeLimitStopsTheWalk(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -240,53 +233,27 @@ func TestREQ171_EngineNodeLimitStopsTheWalk(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			r := walkEngine(t, visitLimitDeadline, tc.root, tc.l)
-			floor := limited(tc.l).Validate(tc.root, nil)
-			want := pathsOf(floor.Issues, "max_nodes")
-			if len(want) != 1 {
-				t.Fatalf("precondition: Validate(%s, nil) reports max_nodes at %q, want once", tc.name, want)
+			r := validateRMWithin(t, visitLimitDeadline, tc.root, tc.l)
+			got := pathsOf(r.Issues, "max_nodes")
+			if len(got) != 1 {
+				t.Fatalf("Validate(%s, nil) reports max_nodes at %q, want once", tc.name, got)
 			}
-			assertStoppedOnce(t, "engine("+tc.name+")", r, "max_nodes", want[0])
-			assertStoppedAtMaxNodes(t, "engine("+tc.name+")", r)
+			assertStoppedOnce(t, "Validate("+tc.name+")", r, "max_nodes", got[0])
+			assertStoppedAtMaxNodes(t, "Validate("+tc.name+")", r)
 		})
 	}
 
 	t.Run("a value shared at each of 40 levels", func(t *testing.T) {
-		r := walkEngine(t, visitLimitDeadline, sharedClusterGraph(40), validation.Limits{})
-		assertStoppedAtMaxNodes(t, "engine(a value shared at each of 40 levels)", r)
+		r := validateRMWithin(t, visitLimitDeadline, sharedClusterGraph(40), validation.Limits{})
+		assertStoppedAtMaxNodes(t, "Validate(a value shared at each of 40 levels)", r)
 		if got := pathsOf(r.Issues, "max_nodes"); !slices.Equal(r.Coverage.Stopped, got) {
-			t.Errorf("engine(a value shared at each of 40 levels) Coverage.Stopped = %q, want the max_nodes path %q", r.Coverage.Stopped, got)
+			t.Errorf("Validate(a value shared at each of 40 levels) Coverage.Stopped = %q, want the max_nodes path %q", r.Coverage.Stopped, got)
 		}
 		if containsCode(r.Issues, "cyclic_value") {
-			t.Errorf("engine(a value shared at each of 40 levels) reports cyclic_value, want none: no value holds itself; issues %q", issueKeys(r.Issues))
+			t.Errorf("Validate(a value shared at each of 40 levels) reports cyclic_value, want none: no value holds itself; issues %q", issueKeys(r.Issues))
 		}
 		if n := countCode(r.Issues, "cardinality"); n < 2 {
-			t.Errorf("engine(a value shared at each of 40 levels) reports the leaf's cardinality %d times before the limit, want it at each place reached", n)
+			t.Errorf("Validate(a value shared at each of 40 levels) reports the leaf's cardinality %d times before the limit, want it at each place reached", n)
 		}
 	})
-}
-
-// REQ-171 § Surface — a zero or negative limit field reads as its default:
-// the depth limit stops 300 nested SECTIONs where the default depth does, and
-// the visit limit stops 20,000 ELEMENTs where the default count does, never
-// lets a walk run unbounded.
-func TestREQ171_EngineZeroOrNegativeLimitIsTheDefault(t *testing.T) {
-	t.Parallel()
-	deep := nestedSections(300)
-	for _, l := range []validation.Limits{{}, {Depth: 0, Nodes: 1_000_000}, {Depth: -1}, {Depth: math.MinInt}} {
-		r := walkEngine(t, walkDeadline, deep, l)
-		assertStoppedOnce(t, fmt.Sprintf("engine(300 nested SECTIONs) under %+v", l), r, "max_depth", firstDepthStop("/items[at0001]", defaultDepth))
-	}
-
-	wide := wideCluster(20_000)
-	def := walkEngine(t, visitLimitDeadline, wide, validation.Limits{Nodes: defaultNodes})
-	if n := len(pathsOf(def.Issues, "max_nodes")); n != 1 {
-		t.Fatalf("precondition: engine(20,000 ELEMENTs) under Nodes %d reports max_nodes %d times, want once: the cluster needs more than the default", defaultNodes, n)
-	}
-	for _, l := range []validation.Limits{{}, {Nodes: 0, Depth: 1_000}, {Nodes: -1}, {Nodes: math.MinInt}} {
-		r := walkEngine(t, visitLimitDeadline, wide, l)
-		if !reflect.DeepEqual(r, def) {
-			t.Errorf("engine(20,000 ELEMENTs) under %+v: max_nodes at %q, Stopped %q; want the default's, at %q", l, pathsOf(r.Issues, "max_nodes"), r.Coverage.Stopped, def.Coverage.Stopped)
-		}
-	}
 }

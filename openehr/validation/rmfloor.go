@@ -37,16 +37,16 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
 
-// ValidateRM validates root against the openEHR Reference Model alone:
-// it is the floor on its own, for a root no operational template applies
-// to. It checks every RM-mandatory attribute on every node
-// reachable from root, and runs per-RM-type invariants on the leaves it
-// touches. It does not consult any operational template. The
-// template-driven entries, [Validate] / [ValidateComposition] /
-// [ValidateFolder] / [ValidateEHRStatus] / [ValidateDemographic], include
-// this floor, so a caller with a compiled OPT needs only one of them. On its
-// own the floor knows no template names, so an item whose archetype node id
-// a sibling shares is written by its position.
+// ValidateRM validates root against the openEHR Reference Model alone, for
+// a root no operational template applies to. It checks every RM-mandatory
+// attribute on every node reachable from root, and runs per-RM-type
+// invariants on the nodes it visits. It does not consult any operational
+// template. The template-driven entries, [Validate] /
+// [ValidateComposition] / [ValidateFolder] / [ValidateEHRStatus] /
+// [ValidateDemographic], apply the same rules in their own walk, so a
+// caller with a compiled OPT needs only one of them. With no template the
+// walk knows no template names, so an item whose archetype node id a
+// sibling shares is written by its position.
 //
 // The invariants include the RM's coded ones: an attribute the RM codes from
 // a group or a code set of the openEHR terminology, such as a COMPOSITION's
@@ -67,19 +67,19 @@ import (
 // even on such a value passed as root, an ORIGINAL_VERSION included; nor are
 // those of EXTRACT_PARTICIPATION, a class the SDK's RM types leave out.
 //
-// The floor visits each value held by pointer once. A value built in Go may
-// hold a pointer in two places, or hold itself; a decoded document holds
-// neither. A value reached again by another path is not walked a second
-// time, so its issues carry the first path only, and a value reached again
-// inside itself is reported as `cyclic_value` at each path where it recurs
-// and is not descended into. A value held by value can hold itself too,
-// through a list that shares its own backing array, and the floor cannot
-// recognise it; so every call stops after a number of visits, by default
-// far above what a decoded document needs, and reports `max_nodes` once, at
-// the path where it stopped. A graph nested deeper than the walk's depth limit
-// is not walked below it; the walk reports `max_depth` once, at the first
-// path where it stopped. [Result.Coverage] lists the path of each of the
-// two, and the [Limits] of a [Validator] set both.
+// A value built in Go may hold a pointer in two places, or hold itself; a
+// decoded document holds neither. A value reached again by another path is
+// validated at each place, so a defect in it is reported at each path. A
+// value reached again inside itself is reported as `cyclic_value` at each
+// path where it recurs and is not entered again. A value held by value can
+// hold itself too, through a list that shares its own backing array, and
+// the walk cannot recognise it; so every call stops after a number of
+// visits, by default far above what a decoded document needs, and reports
+// `max_nodes` once, at the path where it stopped. A graph nested deeper than
+// the walk's depth limit is not walked below it; the walk reports
+// `max_depth` once, at the first path where it stopped. [Result.Coverage]
+// lists the path of each of the two, and the [Limits] of a [Validator] set
+// both.
 //
 // ValidateRM returns what a [Validator] built with no options returns from
 // Validate(root, nil).

@@ -19,12 +19,10 @@ import (
 // the attribute's own path, and a required node the composition lacks
 // at the path the template gives it.
 //
-// The result includes the Reference Model floor ([ValidateRM]), run over
-// the whole composition after the template walk, as [Validate] describes:
-// the floor's findings follow the template walk's, and one that repeats a
-// template issue's code at its path is dropped, so each defect is reported
-// once. A composition that passes is valid against the template and the
-// RM rules the floor checks.
+// The result includes the Reference Model rules ([ValidateRM]), applied in
+// the same walk, as [Validate] describes, so each defect is reported once.
+// A composition that passes is valid against the template and the RM rules
+// the validator checks.
 //
 // Returns a [Result] whose Issues slice is never nil (zero-length
 // allocation when no issues fire).

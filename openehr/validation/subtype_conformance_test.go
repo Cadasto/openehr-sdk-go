@@ -169,9 +169,8 @@ func TestValidateFolder_REQ102_ReferenceSubtypeUnderObjectRefChild(t *testing.T)
 			name:     "bound PARTY_REF is walked",
 			itemType: "OBJECT_REF",
 			item:     noNamespace,
-			// The template walk reports the absent namespace, and the RM
-			// floor its own OBJECT_REF rule under another code.
-			want: []string{"required /items[1]/namespace", "rm_invariant /items[1]/namespace"},
+			// The reference's own rule reports the absent namespace, once.
+			want: []string{"rm_invariant /items[1]/namespace"},
 		},
 		{
 			name:     "OBJECT_REF under PARTY_REF",

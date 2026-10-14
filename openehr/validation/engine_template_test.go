@@ -1,7 +1,7 @@
 package validation_test
 
-// engine_template_test.go: REQ-171 § One walk, § Acceptance, "when the engine
-// lands" — the one walk with a template. A template node the instance lacks
+// engine_template_test.go: REQ-171 § One walk, § Acceptance — the one walk
+// with a template, through Validate. A template node the instance lacks
 // draws one `required`, on the template layer; content the template does not
 // admit draws its one admission finding and nothing from inside; an attribute
 // the template does not mention is walked with the RM rules; a value held
@@ -25,11 +25,11 @@ import (
 	probes "github.com/cadasto/openehr-sdk-go/testkit/probes/validation"
 )
 
-// engineWith runs the one walk over root with the compiled template c,
-// failing the test when it has not returned within walkDeadline.
-func engineWith(t *testing.T, root any, c *templatecompile.Compiled) validation.Result {
+// validateWith runs Validate over root with the compiled template c, failing
+// the test when it has not returned within walkDeadline.
+func validateWith(t *testing.T, root any, c *templatecompile.Compiled) validation.Result {
 	t.Helper()
-	return validateWithin(t, "the engine", walkDeadline, func() validation.Result { return validation.RunEngine(root, c, validation.Limits{}) })
+	return validateWithin(t, "Validate", walkDeadline, func() validation.Result { return validation.Validate(root, c) })
 }
 
 // keysAt returns, sorted, "code layer rule" for each issue at path.
@@ -106,9 +106,9 @@ func TestREQ171_EngineReportsAMissingTemplateNodeOnce(t *testing.T) {
 			if got := keysAt(validation.ValidateRM(tc.root).Issues, tc.path); !slices.Equal(got, []string{"required rm mandatory"}) {
 				t.Fatalf("precondition: ValidateRM(%s) at %s = %q, want the RM's required", tc.name, tc.path, got)
 			}
-			r := engineWith(t, tc.root, tc.c)
+			r := validateWith(t, tc.root, tc.c)
 			if got, want := keysAt(r.Issues, tc.path), []string{"required template existence"}; !slices.Equal(got, want) {
-				t.Errorf("engine(%s) at %s = %q, want %q: one absence, one finding, on the template layer", tc.name, tc.path, got, want)
+				t.Errorf("Validate(%s) at %s = %q, want %q: one absence, one finding, on the template layer", tc.name, tc.path, got, want)
 			}
 		})
 	}
@@ -121,7 +121,7 @@ type refusedContentCase struct {
 	root any
 	c    *templatecompile.Compiled
 	// want is the one finding, as identityKeys writes it; inside is the
-	// breach inside, which the two walks report.
+	// breach inside, which the RM rules alone report.
 	want, inside string
 }
 
@@ -265,22 +265,23 @@ func refusedContentCases(t *testing.T) []refusedContentCase {
 // inside: an item that binds to no child, a single value of a type the
 // template does not allow, and a present attribute the template prohibits,
 // single-valued or multi-valued. Each carries an RM breach inside, which the
-// two walks report, so a walk that entered the refused content would report
-// it too. A rule of the node that holds the refused attribute reports
+// RM rules alone report, so a walk that entered the refused content would
+// report it too. A rule of the node that holds the refused attribute reports
 // nothing at or below the attribute's path either: an ELEMENT's coded rule
 // reads its null flavour's defining_code, and a PARTY_IDENTIFIED's rule its
-// name, so the engine evaluated them on content it did not admit.
+// name, so a finding of theirs there would be an RM rule evaluated on
+// content the template did not admit.
 func TestREQ171_EngineDoesNotEnterRefusedContent(t *testing.T) {
 	t.Parallel()
 	tests := refusedContentCases(t)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := identityKeys(validation.Validate(tc.root, tc.c).Issues); !slices.Contains(got, tc.inside) || !slices.Contains(got, tc.want) {
-				t.Fatalf("precondition: Validate(%s) = %q, want it to hold %q and the breach inside, %q", tc.name, got, tc.want, tc.inside)
+			if got := identityKeys(validation.ValidateRM(tc.root).Issues); !slices.Contains(got, tc.inside) {
+				t.Fatalf("precondition: ValidateRM(%s) = %q, want it to hold the breach inside, %q", tc.name, got, tc.inside)
 			}
-			r := engineWith(t, tc.root, tc.c)
+			r := validateWith(t, tc.root, tc.c)
 			if got := identityKeys(r.Issues); !slices.Equal(got, []string{tc.want}) {
-				t.Errorf("engine(%s) = %q, want %q alone: nothing from inside refused content", tc.name, got, tc.want)
+				t.Errorf("Validate(%s) = %q, want %q alone: nothing from inside refused content", tc.name, got, tc.want)
 			}
 		})
 	}
@@ -307,10 +308,10 @@ func TestREQ171_EngineWalksAnUnmentionedAttributeWithTheRMRules(t *testing.T) {
 			t.Fatalf("precondition: vital_signs.opt declares guideline_id on %s; the attribute is not unmentioned", node.AQLPath())
 		}
 	}
-	r := engineWith(t, guidelineWithoutNamespace(t), c)
+	r := validateWith(t, guidelineWithoutNamespace(t), c)
 	want := []string{"rm_invariant " + bloodPressurePath + "/guideline_id/namespace rm mandatory"}
 	if got := identityKeys(r.Issues); !slices.Equal(got, want) {
-		t.Errorf("engine(OBSERVATION with a guideline_id lacking its namespace) = %q, want %q: the RM rules walk an attribute the template does not mention", got, want)
+		t.Errorf("Validate(OBSERVATION with a guideline_id lacking its namespace) = %q, want %q: the RM rules walk an attribute the template does not mention", got, want)
 	}
 }
 
@@ -332,8 +333,7 @@ func sharedPrecision(t *testing.T) *rm.Composition {
 // REQ-171 § One walk, § Acceptance — a Go value with one defect, held from
 // two places, draws two issues, one at each path, with a template as without
 // one: one DV_QUANTITY whose precision is below -1, held by two systolic
-// ELEMENTs, each bound to the template's systolic node. The two walks report
-// it once, since the floor walks a shared value once.
+// ELEMENTs, each bound to the template's systolic node.
 func TestREQ171_EngineWithATemplateValidatesASharedValueAtEachPlace(t *testing.T) {
 	t.Parallel()
 	root := sharedPrecision(t)
@@ -350,11 +350,11 @@ func TestREQ171_EngineWithATemplateValidatesASharedValueAtEachPlace(t *testing.T
 		}
 		return out
 	}
-	if got := precisionAt(validation.Validate(root, c).Issues); len(got) != 1 {
-		t.Fatalf("precondition: Validate(two ELEMENTs sharing a DV_QUANTITY) reports precision_range at %q, want once", got)
+	if got := precisionAt(validation.ValidateRM(root).Issues); !slices.Equal(got, want) {
+		t.Errorf("ValidateRM(two ELEMENTs sharing a DV_QUANTITY) reports precision_range at %q, want at %q: once at each place", got, want)
 	}
-	if got := precisionAt(engineWith(t, root, c).Issues); !slices.Equal(got, want) {
-		t.Errorf("engine(two ELEMENTs sharing a DV_QUANTITY) reports precision_range at %q, want at %q: once at each place", got, want)
+	if got := precisionAt(validateWith(t, root, c).Issues); !slices.Equal(got, want) {
+		t.Errorf("Validate(two ELEMENTs sharing a DV_QUANTITY) reports precision_range at %q, want at %q: once at each place", got, want)
 	}
 }
 
@@ -365,9 +365,8 @@ type emptyContainerCase struct {
 	root any
 	c    *templatecompile.Compiled
 	path string
-	// twoWalks is what Validate reports at path; want what the engine
-	// reports there.
-	twoWalks, want []string
+	// want is what Validate reports at path.
+	want []string
 	// childPath, when set, is the path of the container's child that the
 	// template's occurrences report, and wantChild what both report there.
 	childPath string
@@ -429,51 +428,45 @@ func emptyContainerCases(t *testing.T) []emptyContainerCase {
 
 	return []emptyContainerCase{
 		{
-			name:     "under the BMM's mandatory bit alone",
-			root:     emptyOrganisation,
-			c:        mustCompileInline(t, probes.OrganisationOPT),
-			path:     "/identities",
-			twoWalks: []string{"cardinality rm cardinality", "required rm cardinality"},
-			want:     []string{"cardinality rm cardinality"},
+			name: "under the BMM's mandatory bit alone",
+			root: emptyOrganisation,
+			c:    mustCompileInline(t, probes.OrganisationOPT),
+			path: "/identities",
+			want: []string{"cardinality rm cardinality"},
 		},
 		{
-			name:     "below a slot",
-			root:     emptyDevice,
-			c:        mustCompile(t, "vital_signs"),
-			path:     bloodPressurePath + "/protocol/items[openEHR-EHR-CLUSTER.device.v1]/items",
-			twoWalks: []string{"cardinality rm cardinality"},
-			want:     []string{"cardinality rm cardinality"},
+			name: "below a slot",
+			root: emptyDevice,
+			c:    mustCompile(t, "vital_signs"),
+			path: bloodPressurePath + "/protocol/items[openEHR-EHR-CLUSTER.device.v1]/items",
+			want: []string{"cardinality rm cardinality"},
 		},
 		{
-			name:     "under the template's existence",
-			root:     probes.PersonEmptyIdentities(),
-			c:        mustCompileInline(t, personIdentitiesOPT(required, "0")),
-			path:     "/identities",
-			twoWalks: []string{"cardinality rm cardinality", "required template existence"},
-			want:     []string{"required template existence"},
+			name: "under the template's existence",
+			root: probes.PersonEmptyIdentities(),
+			c:    mustCompileInline(t, personIdentitiesOPT(required, "0")),
+			path: "/identities",
+			want: []string{"required template existence"},
 		},
 		{
-			name:     "under the template's child count",
-			root:     probes.PersonEmptyIdentities(),
-			c:        mustCompileInline(t, personIdentitiesOPT(open, "1")),
-			path:     "/identities",
-			twoWalks: []string{"cardinality template cardinality", "required rm cardinality"},
-			want:     []string{"cardinality template cardinality"},
+			name: "under the template's child count",
+			root: probes.PersonEmptyIdentities(),
+			c:    mustCompileInline(t, personIdentitiesOPT(open, "1")),
+			path: "/identities",
+			want: []string{"cardinality template cardinality"},
 		},
 		{
-			name:     "under its child's occurrences, written at the container",
-			root:     probes.PersonEmptyIdentities(),
-			c:        mustCompileInline(t, personIdentityChildOPT("")),
-			path:     "/identities",
-			twoWalks: []string{"cardinality template occurrences", "required rm cardinality"},
-			want:     []string{"cardinality template occurrences"},
+			name: "under its child's occurrences, written at the container",
+			root: probes.PersonEmptyIdentities(),
+			c:    mustCompileInline(t, personIdentityChildOPT("")),
+			path: "/identities",
+			want: []string{"cardinality template occurrences"},
 		},
 		{
 			name:      "beside its child's occurrences, written at the child",
 			root:      probes.PersonEmptyIdentities(),
 			c:         mustCompileInline(t, personIdentityChildOPT("at0004")),
 			path:      "/identities",
-			twoWalks:  []string{"cardinality rm cardinality", "required rm cardinality"},
 			want:      []string{"cardinality rm cardinality"},
 			childPath: "/identities[at0004]",
 			wantChild: []string{"cardinality template occurrences"},
@@ -482,39 +475,33 @@ func emptyContainerCases(t *testing.T) []emptyContainerCase {
 }
 
 // REQ-171 § One walk (Presence, Counts), § Acceptance; REQ-112 § Driver —
-// an RM-mandatory container that is present and empty draws one finding.
-// Where no template clause covers it, it is the RM's `cardinality`: under a
-// template node that carries only the BMM's mandatory bit, where the two
-// walks report it twice, as `required` and `cardinality`, and below a slot
-// the template does not constrain. Where the template's existence requires
-// it, it is the template's `required`, which the two walks pair with the RM's
-// `cardinality`; where the template's child count reports it, the template's
-// `cardinality` alone, which the two walks pair with a `required` read from
-// the BMM's mandatory bit; and so where a child's occurrences report it, at
-// the container's own path. Occurrences written at the child's own path
-// report the child, not the container: the RM's `cardinality` stays beside
-// them, and the empty list's child that occurs once is still counted.
+// an RM-mandatory container that is present and empty, which the RM rules
+// alone report as `cardinality`, draws one finding. Where no template clause
+// covers it, it is the RM's `cardinality`: under a template node that
+// carries only the BMM's mandatory bit, and below a slot the template does
+// not constrain. Where the template's existence requires it, it is the
+// template's `required`; where the template's child count reports it, the
+// template's `cardinality` alone; and so where a child's occurrences report
+// it, at the container's own path. Occurrences written at the child's own
+// path report the child, not the container: the RM's `cardinality` stays
+// beside them, and the empty list's child that occurs once is still counted.
 func TestREQ171_EngineReportsAnEmptyMandatoryContainerOnce(t *testing.T) {
 	t.Parallel()
 	tests := emptyContainerCases(t)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			twoWalks := validation.Validate(tc.root, tc.c)
-			if got := keysAt(twoWalks.Issues, tc.path); !slices.Equal(got, tc.twoWalks) {
-				t.Fatalf("precondition: Validate(%s) at %s = %q, want %q", tc.name, tc.path, got, tc.twoWalks)
+			if got, want := keysAt(validation.ValidateRM(tc.root).Issues, tc.path), []string{"cardinality rm cardinality"}; !slices.Equal(got, want) {
+				t.Fatalf("precondition: ValidateRM(%s) at %s = %q, want %q", tc.name, tc.path, got, want)
 			}
-			r := engineWith(t, tc.root, tc.c)
+			r := validateWith(t, tc.root, tc.c)
 			if got := keysAt(r.Issues, tc.path); !slices.Equal(got, tc.want) {
-				t.Errorf("engine(%s) at %s = %q, want %q: one finding for one empty container", tc.name, tc.path, got, tc.want)
+				t.Errorf("Validate(%s) at %s = %q, want %q: one finding for one empty container", tc.name, tc.path, got, tc.want)
 			}
 			if tc.childPath == "" {
 				return
 			}
-			if got := keysAt(twoWalks.Issues, tc.childPath); !slices.Equal(got, tc.wantChild) {
-				t.Fatalf("precondition: Validate(%s) at %s = %q, want %q", tc.name, tc.childPath, got, tc.wantChild)
-			}
 			if got := keysAt(r.Issues, tc.childPath); !slices.Equal(got, tc.wantChild) {
-				t.Errorf("engine(%s) at %s = %q, want %q: the occurrences of the empty list's child", tc.name, tc.childPath, got, tc.wantChild)
+				t.Errorf("Validate(%s) at %s = %q, want %q: the occurrences of the empty list's child", tc.name, tc.childPath, got, tc.wantChild)
 			}
 		})
 	}
@@ -546,19 +533,19 @@ func resourceDescriptionOPT(lower, upper string) string {
 // mandatory that is present and empty breaks no mandatory rule, as the RM
 // rules alone read it, however the template declares it: a template that
 // declares RESOURCE_DESCRIPTION original_author multi-valued and leaves its
-// existence open draws nothing from the engine, where the two walks read the
-// BMM bit the template carries as a `required`. Where the template's
-// existence requires it, the template's `required` stays.
+// existence open draws nothing, though the template carries the BMM's
+// mandatory bit for it. Where the template's existence requires it, the
+// template's `required` stays.
 func TestREQ171_EngineReadsAnEmptyHashAsTheRMRulesDo(t *testing.T) {
 	t.Parallel()
 	const path = "/original_author"
 	tests := []struct {
-		name           string
-		c              *templatecompile.Compiled
-		twoWalks, want []string
+		name string
+		c    *templatecompile.Compiled
+		want []string
 	}{
-		{name: "existence open", c: mustCompileInline(t, resourceDescriptionOPT("0", "1")), twoWalks: []string{"required rm cardinality"}},
-		{name: "existence required", c: mustCompileInline(t, resourceDescriptionOPT("1", "1")), twoWalks: []string{"required template existence"}, want: []string{"required template existence"}},
+		{name: "existence open", c: mustCompileInline(t, resourceDescriptionOPT("0", "1"))},
+		{name: "existence required", c: mustCompileInline(t, resourceDescriptionOPT("1", "1")), want: []string{"required template existence"}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -567,18 +554,15 @@ func TestREQ171_EngineReadsAnEmptyHashAsTheRMRulesDo(t *testing.T) {
 			if got := keysAt(validation.ValidateRM(root).Issues, path); len(got) != 0 {
 				t.Fatalf("precondition: ValidateRM(RESOURCE_DESCRIPTION with an empty original_author) at %s = %q, want nothing", path, got)
 			}
-			if got := keysAt(validation.Validate(root, tc.c).Issues, path); !slices.Equal(got, tc.twoWalks) {
-				t.Fatalf("precondition: Validate(RESOURCE_DESCRIPTION with an empty original_author, %s) at %s = %q, want %q", tc.name, path, got, tc.twoWalks)
-			}
-			if got := keysAt(engineWith(t, root, tc.c).Issues, path); !slices.Equal(got, tc.want) {
-				t.Errorf("engine(RESOURCE_DESCRIPTION with an empty original_author, %s) at %s = %q, want %q", tc.name, path, got, tc.want)
+			if got := keysAt(validateWith(t, root, tc.c).Issues, path); !slices.Equal(got, tc.want) {
+				t.Errorf("Validate(RESOURCE_DESCRIPTION with an empty original_author, %s) at %s = %q, want %q", tc.name, path, got, tc.want)
 			}
 		})
 	}
 }
 
-// REQ-171 § Surface — the compiled template is built once and shared: the
-// one walk over every corpus composition, against its compiled template,
+// REQ-171 § Surface — the compiled template is built once and shared:
+// Validate over every corpus composition, against its compiled template,
 // run from several goroutines at once over one compiled template and one
 // root, returns what it returns run alone. Everything the compile resolves
 // for the walk is set before Compile returns, and the walk only reads it; a
@@ -591,16 +575,16 @@ func TestREQ171_EngineSharesOneCompiledTemplateBetweenGoroutines(t *testing.T) {
 		if doc.c == nil {
 			continue
 		}
-		want := validation.RunEngine(doc.root, doc.c, validation.Limits{})
+		want := validation.Validate(doc.root, doc.c)
 		results := make([]validation.Result, goroutines)
 		var wg sync.WaitGroup
 		for i := range results {
-			wg.Go(func() { results[i] = validation.RunEngine(doc.root, doc.c, validation.Limits{}) })
+			wg.Go(func() { results[i] = validation.Validate(doc.root, doc.c) })
 		}
 		wg.Wait()
 		for i, got := range results {
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("engine(%s) in goroutine %d = %+v, want %+v, its result run alone", doc.rel.Rel, i, got, want)
+				t.Errorf("Validate(%s) in goroutine %d = %+v, want %+v, its result run alone", doc.rel.Rel, i, got, want)
 			}
 		}
 	}
@@ -661,10 +645,10 @@ func rmMandatoryCases(t *testing.T) []rmMandatoryCase {
 // REQ-171 § One walk (Presence), § Acceptance — an attribute a template node
 // declares and leaves optional, which the RM marks mandatory for the class of
 // the value bound there, is reported once, as the RM's `required`, when the
-// instance lacks it, single-valued or multi-valued, as the RM rules alone and
-// the two walks report it. The node's class does not declare the attribute,
-// so the template carries no BMM bit for it: the engine reads it from the
-// value's class.
+// instance lacks it, single-valued or multi-valued, as the RM rules alone
+// report it. The node's class does not declare the attribute, so the
+// template carries no BMM bit for it: the walk reads it from the value's
+// class.
 func TestREQ171_EngineReportsAnRMMandatoryAttributeATemplateNodeLeavesOptional(t *testing.T) {
 	t.Parallel()
 	want := []string{"required rm mandatory"}
@@ -673,11 +657,8 @@ func TestREQ171_EngineReportsAnRMMandatoryAttributeATemplateNodeLeavesOptional(t
 			if got := keysAt(validation.ValidateRM(tc.root).Issues, tc.path); !slices.Equal(got, want) {
 				t.Fatalf("precondition: ValidateRM(%s) at %s = %q, want %q", tc.name, tc.path, got, want)
 			}
-			if got := keysAt(validation.Validate(tc.root, tc.c).Issues, tc.path); !slices.Equal(got, want) {
-				t.Fatalf("precondition: Validate(%s) at %s = %q, want %q", tc.name, tc.path, got, want)
-			}
-			if got := keysAt(engineWith(t, tc.root, tc.c).Issues, tc.path); !slices.Equal(got, want) {
-				t.Errorf("engine(%s) at %s = %q, want %q", tc.name, tc.path, got, want)
+			if got := keysAt(validateWith(t, tc.root, tc.c).Issues, tc.path); !slices.Equal(got, want) {
+				t.Errorf("Validate(%s) at %s = %q, want %q", tc.name, tc.path, got, want)
 			}
 		})
 	}
@@ -686,9 +667,9 @@ func TestREQ171_EngineReportsAnRMMandatoryAttributeATemplateNodeLeavesOptional(t
 // REQ-171 § One walk (Presence) — a part of a reference the instance lacks,
 // where the template binds the reference to a node, is reported once: by the
 // reference's own rule, as the RM rules alone report it. The compiled node
-// carries the RM's mandatory bit for the part, which the two walks also read
-// as a `required` at the same path; the engine reads the part as the RM rules
-// do, and they leave the parts of a reference to the reference's rule.
+// carries the RM's mandatory bit for the part; the walk reads the part as
+// the RM rules do, and they leave the parts of a reference to the
+// reference's rule.
 func TestREQ171_EngineReportsAMissingReferencePartOnce(t *testing.T) {
 	t.Parallel()
 	root := probes.ComposerPartyIdentified()
@@ -700,11 +681,8 @@ func TestREQ171_EngineReportsAMissingReferencePartOnce(t *testing.T) {
 	if got := keysAt(validation.ValidateRM(root).Issues, path); !slices.Equal(got, want) {
 		t.Fatalf("precondition: ValidateRM(a composer reference lacking its namespace) at %s = %q, want %q", path, got, want)
 	}
-	if got, twoWalks := keysAt(validation.Validate(root, c).Issues, path), []string{"required rm mandatory", "rm_invariant rm mandatory"}; !slices.Equal(got, twoWalks) {
-		t.Fatalf("precondition: Validate(a composer reference lacking its namespace) at %s = %q, want %q", path, got, twoWalks)
-	}
-	if got := keysAt(engineWith(t, root, c).Issues, path); !slices.Equal(got, want) {
-		t.Errorf("engine(a composer reference lacking its namespace) at %s = %q, want %q: one absence, one finding", path, got, want)
+	if got := keysAt(validateWith(t, root, c).Issues, path); !slices.Equal(got, want) {
+		t.Errorf("Validate(a composer reference lacking its namespace) at %s = %q, want %q: one absence, one finding", path, got, want)
 	}
 }
 
@@ -807,9 +785,9 @@ func TestREQ171_EngineVisitsTheDeclaredAttributesInTheTemplatesOrder(t *testing.
 	t.Parallel()
 	for _, tc := range attributeOrderCases(t) {
 		t.Run(tc.name, func(t *testing.T) {
-			r := engineWith(t, tc.root, tc.c)
+			r := validateWith(t, tc.root, tc.c)
 			if got := pathGroups(r.Issues, tc.want); !slices.Equal(got, tc.want) {
-				t.Errorf("engine(%s) reports its findings under %q, want under %q in that order; issues %q", tc.name, got, tc.want, identityKeys(r.Issues))
+				t.Errorf("Validate(%s) reports its findings under %q, want under %q in that order; issues %q", tc.name, got, tc.want, identityKeys(r.Issues))
 			}
 		})
 	}
@@ -847,8 +825,8 @@ func TestREQ171_EngineKeepsAFindingBesideRefusedContent(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := identityKeys(engineWith(t, tc.root, tc.c).Issues); !slices.Equal(got, tc.want) {
-				t.Errorf("engine(%s) = %q, want %q", tc.name, got, tc.want)
+			if got := identityKeys(validateWith(t, tc.root, tc.c).Issues); !slices.Equal(got, tc.want) {
+				t.Errorf("Validate(%s) = %q, want %q", tc.name, got, tc.want)
 			}
 		})
 	}

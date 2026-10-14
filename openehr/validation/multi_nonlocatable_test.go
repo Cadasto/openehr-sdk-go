@@ -353,9 +353,8 @@ func TestValidateDemographic_REQ102_ActorListsBindByRMType(t *testing.T) {
 			name:      "bound role is walked",
 			languages: dvText,
 			mutate:    func(p *rm.Person) { p.Roles[0].Namespace = "" },
-			// The template walk reports the absent namespace, and the RM
-			// floor its own OBJECT_REF rule under another code.
-			want: []string{"required /roles[1]/namespace", "rm_invariant /roles[1]/namespace"},
+			// The reference's own rule reports the absent namespace, once.
+			want: []string{"rm_invariant /roles[1]/namespace"},
 		},
 		{
 			name:      "an abstract supertype child admits the item",
@@ -435,8 +434,10 @@ func TestValidateDemographic_REQ102_ActorListsBindByRMType(t *testing.T) {
 			name:      "LOCATABLE without a node id is a slot_fill",
 			languages: dvText,
 			mutate:    func(p *rm.Person) { p.Identities[0].ArchetypeNodeID = "" },
-			// The RM floor reports the RM-mandatory archetype_node_id too.
-			want: []string{"required /identities[1]/archetype_node_id", "slot_fill /identities[1]"},
+			// The slot_fill is the whole report for the item the template
+			// does not admit: its own RM-mandatory archetype_node_id is not
+			// reported from inside it.
+			want: []string{"slot_fill /identities[1]"},
 		},
 	}
 	for _, tc := range tests {
@@ -618,9 +619,8 @@ func TestValidateFolder_REQ102_ItemsBindByRMType(t *testing.T) {
 			name:     "OBJECT_REF without namespace is walked",
 			itemType: "OBJECT_REF",
 			items:    []rm.ObjectRefLike{noNamespace},
-			// The template walk reports the absent namespace, and the RM
-			// floor its own OBJECT_REF rule under another code.
-			want: []string{"required /items[1]/namespace", "rm_invariant /items[1]/namespace"},
+			// The reference's own rule reports the absent namespace, once.
+			want: []string{"rm_invariant /items[1]/namespace"},
 		},
 		{
 			name:     "full LOCATABLE_REF binds",

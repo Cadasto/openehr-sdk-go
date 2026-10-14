@@ -1,11 +1,11 @@
 // Package validation checks in-memory openEHR Reference Model
 // artefacts against a compiled OPT and reports every issue in one
 // pass, for COMPOSITION and for any other archetypeable root. That
-// pass includes the Reference Model floor, so a result that is OK is
-// valid against both the template and the RM rules the floor checks.
-// The floor on its own, [ValidateRM] and its typed wrappers, covers
-// resources that bind to no operational template (FOLDER,
-// EHR_STATUS, EHR_ACCESS, untemplated demographic PARTY).
+// pass applies the Reference Model rules too, so a result that is OK
+// is valid against both the template and the RM rules the validator
+// checks. The Reference Model rules alone, [ValidateRM] and its typed
+// wrappers, cover resources that bind to no operational template
+// (FOLDER, EHR_STATUS, EHR_ACCESS, untemplated demographic PARTY).
 //
 // The package also validates AQL query text:
 // [ValidateAQL] and [ValidateAQLWithTypeRelation] run the
@@ -16,7 +16,7 @@
 // to supply the RM containment relation.
 //
 // Public entry: one call checks the template constraints and the RM
-// floor together.
+// rules together.
 //
 //	r := validation.ValidateComposition(comp, compiled)
 //	for _, issue := range r.Issues {
@@ -25,9 +25,9 @@
 //	valid := r.OK
 //
 // A root that no template applies to is checked with [ValidateRM]
-// instead, which runs the floor alone.
+// instead, which applies the RM rules alone.
 //
-// The walker works over any value source: [Validate] runs it over any
+// The walk works over any value source: [Validate] runs it over any
 // RM root the closed RM set recognises, and the typed wrappers
 // [ValidateComposition], [ValidateDemographic] (PERSON / ORGANISATION /
 // GROUP / AGENT / ROLE), [ValidateFolder], and [ValidateEHRStatus]
@@ -39,21 +39,26 @@
 //
 // The template-driven entries ([ValidateComposition], [Validate], and
 // the typed wrappers) treat the compiled OPT as the authoritative driver
-// and the composition as the value source. For each compiled OPT node
-// the walker reads the corresponding RM property through access the
-// generator emits for every registered RM class, enforces existence (an
-// attribute the template requires, and one it prohibits) / cardinality /
-// alternatives / RM-type match / archetype-id identity, and recurses into
-// matched RM children. The template walk reports an attribute the template
-// prohibits, when it is present, once, and does not enter it; the Reference
-// Model rules still apply to what it holds. A list attribute that is nil is
-// absent, and one that is set and holds no item is present and empty.
+// and the composition as the value source. One walk visits the instance.
+// At each node it knows the RM class of the value and, where the template
+// reaches, the template node the value binds to. It reads the node's
+// attributes through access the generator emits for every registered RM
+// class: those the template declares, those the value holds, and those the
+// Reference Model marks mandatory for the class. At each attribute it
+// applies, in order, the template's admission (an attribute the template
+// prohibits, or an item that binds to none of its nodes, is reported once
+// and not entered), presence (existence), counts (cardinality and
+// occurrences), and then, for each admitted item, its archetype-id identity
+// and RM-type match, the Reference Model rules of its class, the template's
+// value constraint at a leaf, and the same steps one level down. A list
+// attribute that is nil is absent, and one that is set and holds no item is
+// present and empty.
 //
-// The RM floor ([ValidateRM] and its typed wrappers) is the RM-only
-// layer beneath that: a second driver that walks any RM root with
-// rminfo as the sole structural source (no OPT) and enforces
-// RM-mandatory attribute presence plus a small per-RM-type invariant
-// catalogue:
+// The Reference Model rules are the RM-only layer of that walk. With no
+// template ([ValidateRM] and its typed wrappers) every attribute is
+// unconstrained and the walk applies them alone, with the class metadata of
+// the pinned Reference Model as the sole structural source: RM-mandatory
+// attribute presence plus a small per-RM-type invariant catalogue:
 //
 //   - a non-empty CODE_PHRASE code_string (a DV_SCALE symbol, which the
 //     RM lets carry no code, is exempt);
@@ -77,26 +82,22 @@
 //     change-control and resource-description classes and
 //     EXTRACT_PARTICIPATION.
 //
-// The template walk covers RM-mandatory presence only on the nodes the
-// template models, and none of the floor's per-type rules. The
-// template-driven entries therefore run the floor after the template walk,
-// over the whole root, the nodes the template does not model included, and
-// return both sets of findings in one [Result]: the template walk's issues
-// first, then the floor's, each in the order its walk found them. Where the
-// floor reports the same code at the same path as the template walk, the
-// result keeps the template walk's issue and drops the floor's copy, so a
-// defect both layers find is reported once. Issues under different codes,
-// or at different paths, are all kept. No option leaves the floor out.
-// Callers without a template run [ValidateRM], which is the floor alone.
+// With a template the same rules run on every node the template admits,
+// the nodes it does not constrain included, and on no content it refuses.
+// Their findings come in the one [Result], in the order the walk found
+// them. A defect both layers see is reported once: a node the template
+// requires and the instance lacks is the template's `required`, and an
+// empty list the template counts is the template's finding alone. A value
+// held from two places is validated at each, so a defect in it is reported
+// at each path. No option leaves the Reference Model rules out. Callers
+// without a template run [ValidateRM], which applies them alone.
 //
 // The template-driven validators and [ValidateRM] write [Issue.Path] by
 // one rule, so a node has one path whichever of them reports it: an
 // item of a multi-valued attribute is written by its archetype node id
 // when that id is unique among its siblings, and otherwise by the name
-// the template gives its node or by its position. Inside a
-// template-driven validation the floor takes those names from the
-// template walk, so it writes the same path for the same node; on its
-// own it knows no template names and writes the position. An entry of a
+// the template gives its node or by its position. With no template the
+// walk knows no template names and writes the position. An entry of a
 // Hash attribute is written by its 1-based position in ascending key
 // order, as in /details[2], never by its key. A composition missing an
 // OPT-required attribute is flagged at the attribute's path, and one
@@ -105,10 +106,9 @@
 //
 // # Collect-all
 //
-// Every failing clause emits one [Issue]; neither walk stops at a
+// Every failing clause emits one [Issue]; the walk does not stop at a
 // finding, so UIs and CI runners get the full list. A defect the
-// template walk and the floor both find, under one code at one path, is
-// one issue.
+// template and the Reference Model rules both see is one issue.
 //
 // # Finding identity
 //
@@ -131,8 +131,8 @@
 // goroutine of a server. The package-level functions behave as a Validator
 // built with no options.
 //
-// [WithLimits] sets the two [Limits] of the Reference Model walk: the
-// nesting depth below which it does not descend (256 by default) and the
+// [WithLimits] sets the two [Limits] of the walk: the nesting depth below
+// which it does not descend (256 by default) and the
 // number of values it visits in one call (100,000 by default). No decoded
 // document comes near either; they stop a value built in Go that nests
 // without end or holds itself. A walk that reaches the depth limit reports

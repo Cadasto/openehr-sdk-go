@@ -113,6 +113,38 @@ func TestValidator_REQ171_REQ112_DepthLimitStopsTheWalk(t *testing.T) {
 	}
 }
 
+// REQ-171 § One walk — the depth limit bounds the walk with a template as
+// without one: below the device CLUSTER of vital_signs.opt, which fills a
+// slot, 300 nested CLUSTERs stop the walk at the default depth, reported
+// once, as max_depth at the first path where it stopped, which
+// Coverage.Stopped lists.
+func TestValidator_REQ171_DepthLimitStopsTheWalkWithATemplate(t *testing.T) {
+	t.Parallel()
+	c := mustCompile(t, "vital_signs")
+	comp := validVitalSignsComposition()
+	tree, ok := bpObservation(t, comp).Protocol.(*rm.ItemTree)
+	if !ok || len(tree.Items) != 1 {
+		t.Fatalf("fixture protocol is %T, want an ITEM_TREE holding the device CLUSTER", bpObservation(t, comp).Protocol)
+	}
+	device, ok := tree.Items[0].(*rm.Cluster)
+	if !ok {
+		t.Fatalf("fixture protocol item is %T, want *rm.Cluster", tree.Items[0])
+	}
+	deep := &rm.Cluster{ArchetypeNodeID: "at0098", Name: rm.DVText{Value: "bottom"}}
+	for range 300 {
+		deep = &rm.Cluster{ArchetypeNodeID: "at0098", Name: rm.DVText{Value: "level"}, Items: []rm.Item{deep}}
+	}
+	device.Items = append(device.Items, deep)
+
+	r := validation.Validate(comp, c)
+	got := pathsOf(r.Issues, "max_depth")
+	const nested = bloodPressurePath + "/protocol/items[openEHR-EHR-CLUSTER.device.v1]/items[at0098]"
+	if len(got) != 1 || !strings.HasPrefix(got[0], nested+"/") {
+		t.Fatalf("Validate(device CLUSTER holding 300 nested CLUSTERs) reports max_depth at %q, want once, below the device CLUSTER", got)
+	}
+	assertStoppedOnce(t, "Validate(device CLUSTER holding 300 nested CLUSTERs)", r, "max_depth", got[0])
+}
+
 // REQ-171 Acceptance, REQ-112 § Driver — WithLimits with a node count below
 // what a root needs stops the walk there: max_nodes once, as the last issue,
 // and its path in Coverage.Stopped. It bounds the floor inside a

@@ -1,7 +1,6 @@
 package validation
 
 import (
-	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
@@ -13,21 +12,19 @@ const (
 	defaultNodes = 100_000
 )
 
-// Limits bounds the walk over the Reference Model rules, so that a value
+// Limits bounds the walk, with a template as without one, so that a value
 // built in Go that nests without end, or holds itself through a list that
 // shares its own backing array, stops the walk rather than running it
 // without end. A field that is zero or negative stands for its default, so
 // no setting turns a limit off.
-//
-// The walk the template drives is bounded by the compiled template it
-// follows, so the limits apply to the Reference Model walk alone.
 type Limits struct {
 	// Depth is the nesting depth at which the walk stops descending. On a
-	// node that deep the walk still checks the invariants of the node's
-	// class and its coded terms, but it reports none of the node's absent
-	// mandatory attributes or empty mandatory lists, and walks none of its
-	// attributes. The walk reports the first place it stops as a max_depth
-	// issue. 256 by default.
+	// node that deep the walk still checks the node itself: its identity
+	// and type against the template node it binds to, the invariants of
+	// its class and its coded terms, and the template's value constraint.
+	// But it reports none of the node's absent attributes or empty lists,
+	// and walks none of its attributes. The walk reports the first place it
+	// stops as a max_depth issue. 256 by default.
 	//
 	// There is no upper cap. Raising it raises the cost of walking a deeply
 	// nested value faster than in proportion to the depth, since the path
@@ -60,8 +57,8 @@ type config struct {
 // Option configures a [Validator]; pass options to [New].
 type Option func(*config)
 
-// WithLimits sets the limits of the Reference Model walk. Each field that
-// is zero or negative keeps its default. When WithLimits is passed more than
+// WithLimits sets the limits of the walk. Each field that is zero or
+// negative keeps its default. When WithLimits is passed more than
 // once, the last one wins, its fields replacing all of those set before.
 func WithLimits(l Limits) Option {
 	return func(c *config) { c.limits = l }
@@ -107,38 +104,16 @@ func (v *Validator) limitsOrDefault() Limits {
 // Validate validates root, any Reference Model value the SDK registers.
 //
 // With a nil c it applies the Reference Model rules alone. With a compiled
-// template it runs the template walk and then the Reference Model rules,
-// whose issues follow the template walk's less those that repeat one, under
-// the guards [Validate] describes. The limits of v bound the Reference Model
-// walk. Built with no options, v returns what [ValidateRM] returns for a nil
-// c, its guards included, and what [Validate] returns for a compiled
-// template.
+// template it walks root against the template and applies the Reference
+// Model rules in the same walk, as [Validate] describes, under the guards
+// [Validate] describes. The limits of v bound the walk. Built with no
+// options, v returns what [ValidateRM] returns for a nil c, its guards
+// included, and what [Validate] returns for a compiled template.
 //
 // [Result.Coverage] lists each path where a limit stopped the walk, with a
 // template each node the template binds to a CONSTRAINT_REF, and the
-// Reference Model invariants of the classes either walk visited that the
+// Reference Model invariants of the classes the walk visited that the
 // validator does not evaluate.
 func (v *Validator) Validate(root any, c *templatecompile.Compiled) Result {
-	lim := v.limitsOrDefault()
-	if c == nil {
-		return validateRM(root, lim)
-	}
-	if root == nil || rmaccess.IsTypedNilPointer(root) {
-		return nilRootResult()
-	}
-	if c.Root() == nil {
-		return resultFromIssues([]Issue{{
-			Path:     "",
-			Code:     "nil_template",
-			Detail:   "compiled template has no root node",
-			Severity: Error,
-		}})
-	}
-
-	w := newWalker(c)
-	w.walkNode(c.Root(), root, "/")
-	floor, stopped, visited := floorIssues(root, w.names, lim)
-	r := resultFromIssues(withoutRepeats(w.issues, floor))
-	r.Coverage = Coverage{Stopped: stopped, External: w.external, Unevaluated: unevaluatedIn(visited, w.visited)}
-	return r
+	return runEngine(root, c, v.limitsOrDefault())
 }

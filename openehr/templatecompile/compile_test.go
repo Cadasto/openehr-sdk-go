@@ -2,11 +2,15 @@ package templatecompile_test
 
 import (
 	"errors"
+	"slices"
+	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -111,6 +115,92 @@ func TestCompile_WithRMInfo_DrivesImplicitInjection(t *testing.T) {
 	}
 	if len(custom.Root().Attributes()) >= len(def.Root().Attributes()) {
 		t.Error("WithRMInfo(no-required) should inject fewer attributes than the default lookup")
+	}
+}
+
+// moreRequiredLookup wraps the default RM info but also marks OBSERVATION's
+// uid and links mandatory, which the pinned Reference Model leaves optional.
+type moreRequiredLookup struct {
+	rminfo.Lookup
+}
+
+func (l moreRequiredLookup) RequiredAttributes(rmType string) []string {
+	required := l.Lookup.RequiredAttributes(rmType)
+	if rmType == "OBSERVATION" {
+		return append(slices.Clone(required), "uid", "links")
+	}
+	return required
+}
+
+// observationLinksOPT is a template rooted at an OBSERVATION that declares
+// its links, optional, and nothing else.
+const observationLinksOPT = `<?xml version="1.0"?>
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <template_id><value>observation-links</value></template_id>
+  <concept>observation-links</concept>
+  <language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
+  <definition>
+    <rm_type_name>OBSERVATION</rm_type_name>
+    <node_id>at0000</node_id>
+    <attributes xsi:type="C_MULTIPLE_ATTRIBUTE">
+      <rm_attribute_name>links</rm_attribute_name>
+      <existence><lower_included>true</lower_included><upper_included>true</upper_included><lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>0</lower><upper>1</upper></existence>
+      <cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique>
+        <interval><lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>0</lower></interval></cardinality>
+    </attributes>
+    <archetype_id><value>openEHR-EHR-OBSERVATION.links.v1</value></archetype_id>
+  </definition>
+</template>`
+
+// REQ-112 § Driver, REQ-111 — WithRMInfo shapes the compiled template, not
+// the Reference Model rules the validators apply. A lookup that marks
+// OBSERVATION's uid and links mandatory makes the compile inject uid and
+// mark the declared links required; an OBSERVATION without a uid, whose
+// links are present and empty, still draws neither a required at /uid nor a
+// cardinality at /links from Validate, as ValidateRM, which no lookup
+// reaches, draws neither.
+func TestCompile_WithRMInfo_ShapesTheTemplateNotTheRMRules(t *testing.T) {
+	opt, err := template.ParseOPT(strings.NewReader(observationLinksOPT))
+	if err != nil {
+		t.Fatalf("ParseOPT: %v", err)
+	}
+	def, err := templatecompile.Compile(opt)
+	if err != nil {
+		t.Fatalf("Compile (default): %v", err)
+	}
+	custom, err := templatecompile.Compile(opt, templatecompile.WithRMInfo(moreRequiredLookup{rminfo.Default}))
+	if err != nil {
+		t.Fatalf("Compile (custom RM info): %v", err)
+	}
+	if def.Root().Attribute("uid") != nil || def.Root().Attribute("links").Required() {
+		t.Fatal("precondition: the default compile injects uid or marks links required; the pinned RM leaves both optional")
+	}
+	if uid := custom.Root().Attribute("uid"); uid == nil || !uid.Implicit() || !custom.Root().Attribute("links").Required() {
+		t.Fatal("precondition: WithRMInfo(uid and links mandatory) does not inject uid and mark links required; the lookup does not shape the template")
+	}
+
+	const id = "openEHR-EHR-OBSERVATION.links.v1"
+	obs := &rm.Observation{
+		ArchetypeNodeID:  id,
+		Name:             rm.DVText{Value: "links"},
+		ArchetypeDetails: &rm.Archetyped{ArchetypeID: rm.ArchetypeID{Value: id}, RMVersion: "1.1.0"},
+		Language:         rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}, CodeString: "en"},
+		Encoding:         rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "IANA_character-sets"}, CodeString: "UTF-8"},
+		Subject:          &rm.PartySelf{},
+		Links:            []rm.Link{},
+	}
+	for _, path := range []string{"/uid", "/links"} {
+		for name, r := range map[string]validation.Result{
+			"ValidateRM":                         validation.ValidateRM(obs),
+			"Validate, the default compile":      validation.Validate(obs, def),
+			"Validate, compiled with WithRMInfo": validation.Validate(obs, custom),
+		} {
+			for _, iss := range r.Issues {
+				if iss.Path == path {
+					t.Errorf("%s(OBSERVATION without a uid, links empty) reports %s %s %s at %s, want nothing there: the RM leaves it optional", name, iss.Code, iss.Layer, iss.Rule, path)
+				}
+			}
+		}
 	}
 }
 
