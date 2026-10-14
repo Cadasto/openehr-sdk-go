@@ -5,7 +5,8 @@ package validation_test
 // strictly comparable as the RM defines is_strictly_comparable_to for their
 // type, by the RM's less_than for that type, and it orders no other pair. Two
 // DV_TIME or DV_DATE_TIME values in different time zones are ordered as
-// instants, and one with a zone is not ordered against one without.
+// instants, partial values and leap seconds included, and one with a zone is
+// not ordered against one without.
 // Whether two bounds are comparable is Interval.Limits_comparable, which the
 // floor does not evaluate, so Coverage.Unevaluated lists it (REQ-171
 // Coverage). PROBE-077 holds a breaking and a conforming interval of each
@@ -172,11 +173,12 @@ func TestValidateRM_REQ112_IntervalOrderEveryBoundType(t *testing.T) {
 	checkOrder(t, "DV_DATE_TIME in zones -0330 and +05", "DV_DATE_TIME",
 		rm.DVDateTime{Value: "2025-01-01T10:00:00-0330"}, rm.DVDateTime{Value: "2025-01-01T18:00:00+05"}, [2]float64{63871335000, 63871333200})
 	// Each pair below is out of order both by its clocks and as instants:
-	// 10:00+01:00 is 09:00Z, after 08:00Z; and 2017-01-01T01:30:00+01:00 is
-	// 00:30Z, after the leap second 2016-12-31T23:59:60Z. Its counterpart is
-	// in order as instants although its clocks are not: 10:00+01:00 is before
-	// 09:30Z, and 2017-01-01T00:30:00+01:00, which is 2016-12-31T23:30:00Z,
-	// before the leap second.
+	// 10:00+01:00 is 09:00Z, after 08:00Z, as a DV_TIME and on one date as a
+	// DV_DATE_TIME; and 2017-01-01T01:30:00+01:00 is 00:30Z, after the leap
+	// second 2016-12-31T23:59:60Z. Its counterpart is in order as instants
+	// although its clocks are not: 10:00+01:00 is before 09:30Z, and
+	// 2017-01-01T00:30:00+01:00, which is 2016-12-31T23:30:00Z, is before the
+	// leap second.
 	checkOrder(t, "DV_TIME in different zones, lower partial", "DV_TIME",
 		rm.DVTime{Value: "10:00+01:00"}, rm.DVTime{Value: "08:00:00Z"}, [2]float64{32400, 28800})
 	checkInOrder(t, "DV_TIME in different zones, lower partial, in order as instants",
@@ -210,8 +212,9 @@ func TestValidateRM_REQ112_IntervalOrderEveryBoundType(t *testing.T) {
 // REQ-112, REQ-171 — the floor orders no pair the RM does not make strictly
 // comparable, none whose bound has no magnitude to order, and none with an
 // unbounded side. Nor does it order a DV_TIME or DV_DATE_TIME with a time
-// zone against one without, or two in different zones when either is not an
-// instant ToTime can give: a partial value or a leap second. DV_ORDINAL and
+// zone against one without, although it orders two in different zones,
+// partial values and leap seconds included
+// ([TestValidateRM_REQ112_IntervalOrderEveryBoundType]). DV_ORDINAL and
 // DV_SCALE symbols are comparable only when they are coded in one named
 // terminology, so a symbol with an empty terminology id, on either side, is
 // not ordered. In each row the lower bound reads above the upper one, so
@@ -253,16 +256,12 @@ func TestValidateRM_REQ112_REQ171_IntervalOrderSkipsUnorderedPairs(t *testing.T)
 		{name: "DV_DATE_TIME, upper not a date-time", root: new(rm.NewClosedDVInterval(rm.DVDateTime{Value: "2025-01-01T00:00:00Z"}, rm.DVDateTime{Value: "example"}))},
 		{name: "DV_DATE_TIME, lower not a date-time", root: new(rm.NewClosedDVInterval(rm.DVDateTime{Value: "example"}, rm.DVDateTime{Value: "0000-01-01T00:00:00"}))},
 		// Each pair below reads lower above upper by the clocks, and also as
-		// instants with a value without a zone taken as UTC (as ToTime takes
-		// it) and a partial value's clock moved to UTC, so a floor that
+		// instants with the value without a zone read as UTC, so a floor that
 		// ordered the pair either way would report it.
 		{name: "DV_TIME with a zone over one without", root: new(rm.NewClosedDVInterval(rm.DVTime{Value: "10:00:00Z"}, rm.DVTime{Value: "08:00:00"}))},
 		{name: "DV_TIME without a zone over one with", root: new(rm.NewClosedDVInterval(rm.DVTime{Value: "10:00:00"}, rm.DVTime{Value: "08:00:00+01:00"}))},
 		{name: "DV_DATE_TIME with a zone over one without", root: new(rm.NewClosedDVInterval(rm.DVDateTime{Value: "2025-01-01T10:00:00+01:00"}, rm.DVDateTime{Value: "2025-01-01T08:00:00"}))},
 		{name: "DV_DATE_TIME without a zone over one with", root: new(rm.NewClosedDVInterval(rm.DVDateTime{Value: "2025-01-01T10:00:00"}, rm.DVDateTime{Value: "2025-01-01T08:00:00Z"}))},
-		{name: "DV_TIME in different zones, lower partial", root: new(rm.NewClosedDVInterval(rm.DVTime{Value: "10:00+01:00"}, rm.DVTime{Value: "08:00:00Z"}))},
-		{name: "DV_DATE_TIME in different zones, upper partial", root: new(rm.NewClosedDVInterval(rm.DVDateTime{Value: "2025-01-01T10:00:00+01:00"}, rm.DVDateTime{Value: "2025-01-01T08:00Z"}))},
-		{name: "DV_DATE_TIME in different zones, upper a leap second", root: new(rm.NewClosedDVInterval(rm.DVDateTime{Value: "2017-01-01T01:30:00+01:00"}, rm.DVDateTime{Value: "2016-12-31T23:59:60Z"}))},
 		{name: "DV_DURATION, upper not a duration", root: new(rm.NewClosedDVInterval(rm.DVDuration{Value: "P2D"}, rm.DVDuration{Value: "example"}))},
 		{name: "DV_DURATION, lower not a duration", root: new(rm.NewClosedDVInterval(rm.DVDuration{Value: "example"}, rm.DVDuration{Value: "-P1D"}))},
 		{name: "DV_COUNT over a unitless DV_QUANTITY", root: closed(rm.DVCount{Magnitude: 10}, rm.DVQuantity{Magnitude: 5})},

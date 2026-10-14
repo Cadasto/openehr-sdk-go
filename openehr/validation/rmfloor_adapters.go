@@ -6,11 +6,7 @@ package validation
 // rmTypeInfo/describeRMType in composition.go — adding a new BMM
 // concrete means editing one switch.
 
-import (
-	"time"
-
-	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-)
+import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 
 // asCodePhrase recovers a CODE_PHRASE value (by value or by pointer)
 // from any concrete carrying it. Returns ok=false when value is not a
@@ -324,11 +320,12 @@ func boundsOf[T rm.DVOrdered](iv *rm.DVInterval[T]) (lower, upper rm.DVOrdered, 
 //     one is not ordered and reports nothing here.
 //   - DV_DATE and DV_DURATION: always comparable; ordered by their Compare,
 //     which reads the magnitude of each parsed value ([temporalOrder]).
-//   - DV_TIME and DV_DATE_TIME: always comparable. Two values that carry one
-//     time zone, or that both carry none, are ordered by their Compare
-//     ([temporalOrder]); two values that each carry a zone, in different
-//     zones, are ordered as instants ([instantOrder]). A value with a zone is
-//     not ordered against one without.
+//   - DV_TIME and DV_DATE_TIME: always comparable. Two values written with
+//     one time zone designator, or both with none, are ordered by their
+//     Compare ([temporalOrder]). Two values whose designators differ are
+//     ordered as instants, each by its magnitude less its zone's offset from
+//     UTC, partial values and leap seconds included ([instantOrder]). A value
+//     with a zone is not ordered against one without.
 //
 // The generated IsStrictlyComparableTo and LessThan of the non-temporal types
 // are not called: they are stubs that panic.
@@ -371,14 +368,14 @@ func orderBounds(lower, upper rm.DVOrdered) (intervalOrder, bool) {
 		return temporalOrder(class, lo.Compare(hi), float64(lo.Magnitude()), float64(hi.Magnitude()), lo.ValidISO8601(), hi.ValidISO8601())
 	case "DV_TIME":
 		lo, hi := boundAs[rm.DVTime](lower), boundAs[rm.DVTime](upper)
-		if lo.Timezone() != hi.Timezone() {
-			return instantOrder(class, &lo, &hi, float64(lo.Magnitude()), float64(hi.Magnitude()))
+		if loZone, hiZone := lo.Timezone(), hi.Timezone(); loZone != hiZone {
+			return instantOrder(class, loZone, hiZone, float64(lo.Magnitude()), float64(hi.Magnitude()))
 		}
 		return temporalOrder(class, lo.Compare(hi), float64(lo.Magnitude()), float64(hi.Magnitude()), lo.ValidISO8601(), hi.ValidISO8601())
 	case "DV_DATE_TIME":
 		lo, hi := boundAs[rm.DVDateTime](lower), boundAs[rm.DVDateTime](upper)
-		if lo.Timezone() != hi.Timezone() {
-			return instantOrder(class, &lo, &hi, lo.Magnitude(), hi.Magnitude())
+		if loZone, hiZone := lo.Timezone(), hi.Timezone(); loZone != hiZone {
+			return instantOrder(class, loZone, hiZone, lo.Magnitude(), hi.Magnitude())
 		}
 		return temporalOrder(class, lo.Compare(hi), lo.Magnitude(), hi.Magnitude(), lo.ValidISO8601(), hi.ValidISO8601())
 	case "DV_DURATION":
@@ -417,12 +414,12 @@ func numberOrder[N ~int32 | ~int64 | ~float64](class string, lower, upper N) int
 // temporalOrder orders two temporal bounds of class. sign is the Compare of
 // lower with upper ([rm.DVDate.Compare] and its kin), which reads the
 // magnitude of each parsed value, and lowerMag and upperMag are those
-// magnitudes. A value the parse
-// refuses has no magnitude (Compare would read it as zero), so a pair that
-// holds one is not ordered; the bound's own Value_valid reports it. The
-// magnitude of a DV_TIME or a DV_DATE_TIME reads the clock in the value's own
-// time zone, so [orderBounds] sends two of them here only when their zones
-// are the same, or when neither has one.
+// magnitudes. A value the parse refuses has no magnitude (Compare would read
+// it as zero), so a pair that holds one is not ordered; the bound's own
+// Value_valid reports it. The magnitude of a DV_TIME or a DV_DATE_TIME reads
+// the clock in the value's own time zone, so [orderBounds] sends two of them
+// here only when they are written with one zone designator, or both with
+// none, and sends the others to [instantOrder].
 func temporalOrder(class string, sign int, lowerMag, upperMag float64, lowerValid, upperValid bool) (intervalOrder, bool) {
 	if !lowerValid || !upperValid {
 		return intervalOrder{}, false
@@ -430,46 +427,46 @@ func temporalOrder(class string, sign int, lowerMag, upperMag float64, lowerVali
 	return intervalOrder{class: class, inverted: sign > 0, magnitudes: [2]float64{lowerMag, upperMag}}, true
 }
 
-// zonedValue is a DV_TIME or a DV_DATE_TIME: a temporal value that can carry
-// a time zone, and that ToTime places in time.
-type zonedValue interface {
-	Timezone() string
-	ToTime() (time.Time, error)
-}
-
 // instantOrder orders two DV_TIME or two DV_DATE_TIME bounds of class whose
-// time zones differ. Their magnitudes, lowerMag and upperMag, read each
-// clock in its own zone, so the two are not compared by magnitude: they
-// are ordered as the instants ToTime gives, which places two DV_TIME values
-// on one reference day. The magnitudes the order compares are each value's
-// magnitude less its zone's offset from UTC.
-//
-// The zones are told apart by their designators, so Z and +00:00, or +05:00
-// and +0500, are two zones here although each pair names one offset. Two
-// full values in them order as instants just as their clocks would; a
-// partial value among them is not ordered (below), although its clock would
-// order it.
+// time zone designators, lowerZone and upperZone, differ. Their magnitudes,
+// lowerMag and upperMag, read each clock in its own zone, so they are not
+// compared as they stand: each value is ordered by its magnitude less its
+// zone's offset from UTC, which is its clock read in UTC, and those are the
+// magnitudes the order compares. That holds for every value the parse
+// accepts: a partial value is ordered by its magnitude, as it is in one zone,
+// and so is a value that holds a leap second. Two designators of one offset,
+// Z and +00:00 or +05:00 and +0500, order a pair as its clocks would.
 //
 // The pair is not ordered when either value has no zone: a value without one
-// names no instant to set against a value with one. Nor is it ordered when
-// ToTime cannot place a value: a partial value, a leap second, or a value the
-// parse refuses (which also reads as having no zone).
-func instantOrder(class string, lower, upper zonedValue, lowerMag, upperMag float64) (intervalOrder, bool) {
-	if lower.Timezone() == "" || upper.Timezone() == "" {
+// names no instant to set against a value with one. A value the parse refuses
+// reads as having no zone, so it is not ordered either; its own Value_valid
+// reports it.
+func instantOrder(class, lowerZone, upperZone string, lowerMag, upperMag float64) (intervalOrder, bool) {
+	lowerOffset, lowerZoned := zoneOffset(lowerZone)
+	upperOffset, upperZoned := zoneOffset(upperZone)
+	if !lowerZoned || !upperZoned {
 		return intervalOrder{}, false
 	}
-	lowerAt, lowerErr := lower.ToTime()
-	upperAt, upperErr := upper.ToTime()
-	if lowerErr != nil || upperErr != nil {
-		return intervalOrder{}, false
+	lowerUTC, upperUTC := lowerMag-float64(lowerOffset), upperMag-float64(upperOffset)
+	return intervalOrder{class: class, inverted: lowerUTC > upperUTC, magnitudes: [2]float64{lowerUTC, upperUTC}}, true
+}
+
+// zoneOffset returns the offset from UTC, in seconds east, of a time zone
+// designator that the REQ-123 parse read from a DV_TIME or a DV_DATE_TIME: Z,
+// ±hh, ±hhmm or ±hh:mm. It reads the offset through that same parse, as the
+// zone of a full DV_TIME at midnight. ok is false when tz is empty, since the
+// value then names no zone. It is false as well if the parse refuses tz,
+// which it does not do for a designator it has read.
+func zoneOffset(tz string) (offset int, ok bool) {
+	if tz == "" {
+		return 0, false
 	}
-	_, lowerOffset := lowerAt.Zone()
-	_, upperOffset := upperAt.Zone()
-	return intervalOrder{
-		class:      class,
-		inverted:   lowerAt.After(upperAt),
-		magnitudes: [2]float64{lowerMag - float64(lowerOffset), upperMag - float64(upperOffset)},
-	}, true
+	midnight, err := (&rm.DVTime{Value: "00:00:00" + tz}).ToTime()
+	if err != nil {
+		return 0, false
+	}
+	_, offset = midnight.Zone()
+	return offset, true
 }
 
 // codedInOneTerminology reports whether the symbols of two DV_ORDINAL or
