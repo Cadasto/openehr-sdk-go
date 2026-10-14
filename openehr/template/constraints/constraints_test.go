@@ -36,11 +36,12 @@ func TestNumericRange_Contains(t *testing.T) {
 	}
 }
 
-// REQ-103 — a NaN is inside no NumericRange, bounded or not. Every
-// comparison with a NaN is false, so a range that only refuses values
-// below its lower or above its upper bound lets one through; a
-// bounded C_REAL or DV_QUANTITY magnitude range must then report it
-// as CodeOutOfRange.
+// REQ-103 — a bounded NumericRange contains no NaN. Every comparison
+// with a NaN is false, so a range that only refuses values below its
+// lower or above its upper bound would let one through; a bounded
+// C_REAL or DV_QUANTITY magnitude range must report it as
+// CodeOutOfRange. A range that constrains nothing accepts a NaN
+// (TestREQ103_NumericRangeWithNoBoundsAcceptsNaN).
 func TestREQ103_NumericRangeRefusesNaN(t *testing.T) {
 	nan := math.NaN()
 	ranges := []struct {

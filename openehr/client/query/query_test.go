@@ -639,6 +639,9 @@ func TestREQ057_StoredGETSendsAParameterNamedQ(t *testing.T) {
 				method, path string
 				query        url.Values
 			}
+			// Read the fixture here: readFixture may stop the test, which
+			// only the test's own goroutine may do, not the handler's.
+			body := readFixture(t, "result_set.json")
 			seen := make(chan wireRequest, 1)
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				select {
@@ -647,7 +650,7 @@ func TestREQ057_StoredGETSendsAParameterNamedQ(t *testing.T) {
 					t.Errorf("server received a second request %s %s, want one", r.Method, r.URL.Path)
 				}
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write(readFixture(t, "result_set.json"))
+				_, _ = w.Write(body)
 			}))
 			defer srv.Close()
 
