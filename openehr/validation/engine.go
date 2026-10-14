@@ -22,10 +22,12 @@ import (
 // field of which stands for its default.
 //
 // With a nil c the walk applies the Reference Model rules alone and returns
-// what [validateRM] returns for root: the same guards, the same issues in the
-// same order, and the same coverage, except that a value held from two
-// places is validated at each of them. The template side is not built yet:
-// runEngine panics when c is not nil.
+// what [validateRM] returns for root: the same guards, the same findings by
+// path, code, layer and rule, in the same order, and the same coverage,
+// except that a value held from two places is validated at each of them. A
+// walk condition (`cyclic_value`, `max_depth`, `max_nodes`) is worded in its
+// Detail as the engine's own. The template side is not built yet: runEngine
+// panics when c is not nil.
 func runEngine(root any, c *templatecompile.Compiled, lim Limits) Result {
 	if c != nil {
 		panic("validation: runEngine does not walk a compiled template yet")

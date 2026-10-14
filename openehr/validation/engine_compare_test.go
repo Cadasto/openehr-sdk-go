@@ -2,13 +2,16 @@ package validation_test
 
 // engine_compare_test.go: REQ-171 § One walk, § Acceptance — the comparison
 // harness. The one walk runs beside the floor until the comparison is done:
-// over the vendored corpus, a root of every class the registry knows and the
-// constraint-fixture matrix, a walk with no template reports the issues
-// ValidateRM reports, finding by finding on path, code, layer and rule.
-// Decoded documents, zero values and the generator's Example instances hold
-// no shared pointer, so the one walk's only difference from the floor, a
-// shared value validated at each place, cannot arise, and the two must agree
-// exactly.
+// over the vendored corpus, a root of every class the registry knows, the
+// constraint-fixture matrix, every probe input and the roots the floor's own
+// tests pin, a walk with no template reports the issues ValidateRM reports,
+// finding by finding on path, code, layer and rule. Decoded documents, zero
+// values, the generator's Example instances and the probe inputs hold no
+// shared pointer, so the one walk's only difference from the floor, a shared
+// value validated at each place, cannot arise, and the two must agree
+// exactly. A root that reaches a walk condition (a cycle, the depth limit,
+// the visit limit) is compared the same way, apart from the wording of the
+// condition's Detail.
 
 import (
 	"fmt"
@@ -25,6 +28,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
+	probes "github.com/cadasto/openehr-sdk-go/testkit/probes/validation"
 )
 
 // findingKey is what makes two issues the same finding for the comparison:
@@ -80,12 +84,27 @@ type comparedRoot struct {
 	root any
 }
 
+// minComparedRoots is the number of roots each group of the harness held
+// when it was last counted. A group that holds fewer has lost roots, a
+// document that no longer decodes or an Example the generator no longer
+// builds, and the harness would pass for that reason rather than for the
+// walk it compares.
+var minComparedRoots = map[string]int{
+	"corpus":              79,
+	"generated":           49,
+	"ehr_status":          20,
+	"constraint_fixtures": 25,
+	"probes":              17,
+	"floor_pinned":        2,
+}
+
 // comparisonRoots returns every root the harness compares, by the group it
 // comes from: the vendored corpus documents, the Example instance the
 // generator builds for each corpus template, the corpus EHR_STATUS samples,
 // the zero value of every RM class the registry knows, the instances of the
-// constraint-fixture matrix, and the roots the guards refuse. It fails the
-// test when a group is empty.
+// constraint-fixture matrix, the probe inputs, the roots the floor's own
+// tests pin, and the roots the guards refuse. It fails the test when a group
+// holds fewer roots than [minComparedRoots] says.
 func comparisonRoots(t *testing.T) map[string][]comparedRoot {
 	t.Helper()
 	groups := map[string][]comparedRoot{}
@@ -148,15 +167,31 @@ func comparisonRoots(t *testing.T) map[string][]comparedRoot {
 		groups["constraint_fixtures"] = append(groups["constraint_fixtures"], comparedRoot{name: id, root: &comp})
 	}
 
+	inputs, err := probes.Inputs()
+	if err != nil {
+		t.Fatalf("probes.Inputs: %v", err)
+	}
+	for _, in := range inputs {
+		groups["probes"] = append(groups["probes"], comparedRoot{name: in.Probe + " " + in.Name, root: in.Root})
+	}
+
+	// The floor's own tests pin these: the entries of a Hash attribute,
+	// walked in key order and written by their position, one of them broken;
+	// and a list of a primitive type, counted and never read item by item.
+	groups["floor_pinned"] = []comparedRoot{
+		{name: "RESOURCE_DESCRIPTION whose fourth details entry lacks its purpose", root: describedResource([]string{"key-echo", "key-alpha", "key-delta", "key-charlie", "key-bravo"}, "key-delta")},
+		{name: "DV_MULTIMEDIA with 1 MiB of data", root: largeMultimedia()},
+	}
+
 	groups["guards"] = []comparedRoot{
 		{name: "nil"},
 		{name: "a typed-nil COMPOSITION", root: (*rm.Composition)(nil)},
 		{name: "a value outside the closed RM set", root: struct{ Name string }{Name: "not RM"}},
 	}
 
-	for _, group := range []string{"corpus", "generated", "ehr_status", "registry", "constraint_fixtures"} {
-		if len(groups[group]) == 0 {
-			t.Fatalf("the harness found no %s root; its listing has gone blind", group)
+	for group, want := range minComparedRoots {
+		if n := len(groups[group]); n < want {
+			t.Fatalf("the harness found %d %s roots, want at least %d; its listing has lost roots", n, group, want)
 		}
 	}
 	if n := len(groups["registry"]); n != registeredRMClasses {
@@ -220,5 +255,109 @@ func TestREQ171_EngineComparisonFailsOnEachDifference(t *testing.T) {
 		if got := multisetDiff(tc.floor, tc.engine); (len(got) > 0) != tc.differs {
 			t.Errorf("multisetDiff(%s) = %q, want a difference: %t", tc.name, got, tc.differs)
 		}
+	}
+}
+
+// largeMultimediaSize is the size of the data and of the integrity check of
+// [largeMultimedia]: more bytes than the default visit limit counts visits.
+const largeMultimediaSize = 1 << 20
+
+// largeMultimedia returns a DV_MULTIMEDIA whose data and integrity_check are
+// Arrays of Octet of [largeMultimediaSize] bytes each, one item per byte.
+func largeMultimedia() *rm.DVMultimedia {
+	return &rm.DVMultimedia{
+		MediaType:      rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "IANA_media-types"}, CodeString: "image/png"},
+		Size:           largeMultimediaSize,
+		Data:           make([]byte, largeMultimediaSize),
+		IntegrityCheck: make([]byte, largeMultimediaSize),
+	}
+}
+
+// REQ-171 § Structural access — the one walk counts a list of a primitive
+// type and never reads it item by item, as the floor does: a DV_MULTIMEDIA
+// with a megabyte of data validates with no max_nodes, and the walk
+// allocates less than the payload's size, where boxing each byte as an item
+// would allocate many times that.
+func TestREQ171_EngineCountsAPrimitiveListWithoutReadingIt(t *testing.T) {
+	root := largeMultimedia()
+	var r validation.Result
+	allocated := allocatedBytes(func() { r = validation.RunEngine(root, nil, validation.Limits{}) })
+	if containsCode(r.Issues, "max_nodes") || len(r.Coverage.Stopped) != 0 {
+		t.Errorf("engine(DV_MULTIMEDIA with %d bytes of data) issues = %q, Coverage.Stopped = %q; want no max_nodes and nothing stopped", largeMultimediaSize, issueKeys(r.Issues), r.Coverage.Stopped)
+	}
+	if allocated >= largeMultimediaSize {
+		t.Errorf("engine(DV_MULTIMEDIA with %d bytes of data and of integrity_check) allocated %d bytes, want fewer than %d: the bytes are read one item at a time", largeMultimediaSize, allocated, largeMultimediaSize)
+	}
+}
+
+// walkConditionRoot is a root the harness compares whose walk reaches a
+// walk condition, the one code ValidateRM reports for it.
+type walkConditionRoot struct {
+	name string
+	root any
+	code string
+}
+
+// walkConditionRoots returns one root for each walk condition: a SECTION
+// that holds itself, SECTIONs nested deeper than the default depth limit,
+// and an INSTRUCTION whose protocol holds a CLUSTER that holds itself by
+// value, which only the visit limit stops, before the walk reaches the
+// INSTRUCTION's absent narrative.
+func walkConditionRoots() []walkConditionRoot {
+	cyclic := &rm.Section{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "s"}}
+	cyclic.Items = []rm.ContentItem{cyclic}
+	loop := rm.Cluster{ArchetypeNodeID: "at0099", Name: rm.DVText{Value: "loop"}}
+	loop.Items = make([]rm.Item, 2)
+	loop.Items[0], loop.Items[1] = loop, loop
+	return []walkConditionRoot{
+		{name: "a SECTION holding itself", root: cyclic, code: "cyclic_value"},
+		{name: "300 nested SECTIONs", root: nestedSections(300), code: "max_depth"},
+		{
+			name: "an INSTRUCTION whose protocol holds a CLUSTER holding itself by value, narrative absent",
+			root: &rm.Instruction{
+				ArchetypeNodeID: "openEHR-EHR-INSTRUCTION.request.v0",
+				Name:            rm.DVText{Value: "request"},
+				Protocol:        &rm.ItemTree{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "protocol"}, Items: []rm.Item{loop}},
+			},
+			code: "max_nodes",
+		},
+	}
+}
+
+// withoutDetail returns r with the Detail of each issue cleared, so two
+// results compare on everything else.
+func withoutDetail(r validation.Result) validation.Result {
+	r.Issues = slices.Clone(r.Issues)
+	for i := range r.Issues {
+		r.Issues[i].Detail = ""
+	}
+	return r
+}
+
+// REQ-171 § One walk — at each walk condition the one walk with no template
+// reports what ValidateRM reports: the same findings, in the same order, with
+// the same coverage, apart from the wording of the condition's Detail. The
+// visit limit ends the whole walk, so the INSTRUCTION's absent narrative,
+// which the walk would check after the protocol, is reported by neither.
+func TestREQ171_EngineMatchesTheFloorAtEachWalkCondition(t *testing.T) {
+	t.Parallel()
+	for _, tc := range walkConditionRoots() {
+		t.Run(tc.name, func(t *testing.T) {
+			floor := validateWithin(t, "ValidateRM", visitLimitDeadline, func() validation.Result { return validation.ValidateRM(tc.root) })
+			if n := countCode(floor.Issues, tc.code); n != 1 {
+				t.Fatalf("precondition: ValidateRM(%s) reports %s %d times, want once: the root no longer reaches the condition", tc.name, tc.code, n)
+			}
+			engine := walkEngine(t, visitLimitDeadline, tc.root, validation.Limits{})
+			floorKeys, engineKeys := findingKeys(floor.Issues), findingKeys(engine.Issues)
+			if !slices.Equal(floorKeys, engineKeys) {
+				t.Errorf("engine(%s) findings differ from ValidateRM's:\n engine %v\n floor  %v", tc.name, engineKeys, floorKeys)
+			}
+			if !reflect.DeepEqual(withoutDetail(engine), withoutDetail(floor)) {
+				t.Errorf("engine(%s) result differs from ValidateRM's beyond the Detail:\n engine %+v\n floor  %+v", tc.name, engine, floor)
+			}
+			if tc.code == "max_nodes" {
+				assertStoppedAtMaxNodes(t, "engine("+tc.name+")", engine)
+			}
+		})
 	}
 }
