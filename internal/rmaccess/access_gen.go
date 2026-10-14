@@ -1397,7 +1397,7 @@ func singleCodePhrase(x *rm.CodePhrase, attr string) (any, bool, bool) {
 	case "preferred_term":
 		return x.PreferredTerm, x.PreferredTerm != nil, true
 	case "terminology_id":
-		return x.TerminologyID.Value, !isZeroTerminologyID(x.TerminologyID), true
+		return x.TerminologyID, !isZeroTerminologyID(x.TerminologyID), true
 	}
 	return nil, false, false
 }
@@ -3602,7 +3602,10 @@ func singleOriginalVersionAny(x *rm.OriginalVersion[any], attr string) (any, boo
 	case "contribution":
 		return x.Contribution, x.Contribution != nil && !rm.IsTypedNil(x.Contribution), true
 	case "data":
-		return x.Data, x.Data != nil, true
+		if x.Data == nil {
+			return nil, false, true
+		}
+		return *x.Data, true, true
 	case "lifecycle_state":
 		return x.LifecycleState, presentCodedText(x.LifecycleState), true
 	case "preceding_version_uid":

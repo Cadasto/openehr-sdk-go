@@ -94,26 +94,26 @@ const (
 	shapeAddress
 	// shapeDeref hands back the value an optional field points to.
 	shapeDeref
-	// shapeValueMember hands back the `value` member of an identifier held
-	// by value.
-	shapeValueMember
 )
 
 // accessShapes keeps, for six attributes of five classes, the shape the
-// validation walks and the composition builder read today, where it differs
-// from the field's own: ITEM_SINGLE item and REFERENCE_RANGE range come back
-// as a pointer into the parent (the builder writes through the first);
+// validation walks and the composition builder read, where it differs from
+// the field's own: ITEM_SINGLE item and REFERENCE_RANGE range come back as a
+// pointer into the parent (the builder writes through the first);
 // ISM_TRANSITION careflow_step and transition come back as the DV_CODED_TEXT
 // they point to, and DV_PROPORTION precision as its Integer, which the
-// primitive binding reads; CODE_PHRASE terminology_id comes back as the
-// string its TERMINOLOGY_ID holds, which the walks treat as a leaf. Presence
-// is read from the field either way.
+// primitive binding reads; ORIGINAL_VERSION data comes back as the value its
+// pointer holds, the payload of a version built in Go. That field is a
+// pointer to the type parameter, which the one instantiation the registry
+// recognises binds to any, and no walk can enter a *any. Presence is read
+// from the field either way, so a pointer that is not nil and holds a nil
+// interface comes back as nil and present.
 var accessShapes = map[string]map[string]accessShape{
-	"ITEM_SINGLE":     {"item": shapeAddress},
-	"REFERENCE_RANGE": {"range": shapeAddress},
-	"ISM_TRANSITION":  {"careflow_step": shapeDeref, "transition": shapeDeref},
-	"DV_PROPORTION":   {"precision": shapeDeref},
-	"CODE_PHRASE":     {"terminology_id": shapeValueMember},
+	"ITEM_SINGLE":      {"item": shapeAddress},
+	"REFERENCE_RANGE":  {"range": shapeAddress},
+	"ISM_TRANSITION":   {"careflow_step": shapeDeref, "transition": shapeDeref},
+	"DV_PROPORTION":    {"precision": shapeDeref},
+	"ORIGINAL_VERSION": {"data": shapeDeref},
 }
 
 // accessKind is the Go kind of a field, which decides its reading by kind.
@@ -640,11 +640,6 @@ func (g *rmaccessGen) writeSingle(b *bytes.Buffer, arm *accessArm, attrs []*acce
 			}
 			fmt.Fprintf(b, "\t\tif %s == nil {\n\t\t\treturn nil, false, true\n\t\t}\n", field)
 			fmt.Fprintf(b, "\t\treturn *%s, true, true\n", field)
-		case shapeValueMember:
-			if a.kind != accessStruct {
-				return fmt.Errorf("bmmgen: rmaccess: %s.%s is handed back as its value member, but its field is not held by value", arm.class.BMMName, a.name)
-			}
-			fmt.Fprintf(b, "\t\treturn %s.Value, %s, true\n", field, present)
 		default:
 			return fmt.Errorf("bmmgen: rmaccess: %s.%s has shape %d, which the generator does not know", arm.class.BMMName, a.name, shape)
 		}

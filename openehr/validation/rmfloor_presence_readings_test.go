@@ -5,8 +5,10 @@ package validation_test
 // them. A DV_TEXT at an optional attribute is entered whatever it holds, so
 // what it lacks is reported below it; an object reference held by value with
 // a part missing is entered, so the reference entry reports the part at its
-// own path; and a value held by value whose only content is a nil pointer is
-// absent.
+// own path; a value held by value whose only content is a nil pointer is
+// absent; the payload of a version built in Go is walked; and the template
+// walk binds a CODE_PHRASE's terminology_id to the TERMINOLOGY_ID node that
+// constrains it.
 
 import (
 	"slices"
@@ -158,6 +160,94 @@ func TestValidateRM_REQ171_NilPointerOnlyValueIsAbsent(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := identityKeys(validation.ValidateRM(tc.root).Issues); !slices.Equal(got, tc.want) {
 				t.Errorf("ValidateRM(%s) issues (code path layer rule) = %q, want %q", tc.name, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestValidateRM_REQ171_VersionPayloadWalked pins REQ-171 Structural access on
+// the floor: the walk goes below ORIGINAL_VERSION data, the payload a version
+// built in Go holds behind a pointer to an interface. Every issue the payload
+// draws alone is reported under /data, with its code, layer and rule. A
+// version whose data points to a nil interface draws nothing under /data.
+func TestValidateRM_REQ171_VersionPayloadWalked(t *testing.T) {
+	alone := validation.ValidateRM(&rm.Composition{}).Issues
+	if len(alone) == 0 {
+		t.Fatal("precondition: ValidateRM(empty COMPOSITION) reports no issue")
+	}
+	var payload any = &rm.Composition{}
+	r := validation.ValidateRM(&rm.OriginalVersion[any]{Data: &payload})
+	var under []validation.Issue
+	for _, i := range r.Issues {
+		if strings.HasPrefix(i.Path, "/data/") {
+			under = append(under, i)
+		}
+	}
+	want := make([]validation.Issue, 0, len(alone))
+	for _, i := range alone {
+		i.Path = "/data" + i.Path
+		want = append(want, i)
+	}
+	if got, w := identityKeys(under), identityKeys(want); !slices.Equal(got, w) {
+		t.Errorf("ValidateRM(ORIGINAL_VERSION holding an empty COMPOSITION) issues under /data = %q, want those of the COMPOSITION alone %q", got, w)
+	}
+
+	var nothing any
+	for _, i := range validation.ValidateRM(&rm.OriginalVersion[any]{Data: &nothing}).Issues {
+		if i.Path == "/data" || strings.HasPrefix(i.Path, "/data/") {
+			t.Errorf("ValidateRM(ORIGINAL_VERSION whose data points to a nil interface) reports %s at %s, want nothing at /data", i.Code, i.Path)
+		}
+	}
+}
+
+// terminologyIDOPT constrains a DV_MULTIMEDIA's media_type, a CODE_PHRASE,
+// through a TERMINOLOGY_ID node whose value is one of a list.
+const terminologyIDOPT = `<?xml version="1.0" encoding="utf-8"?>
+<template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.openehr.org/v1">
+<language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
+<template_id><value>media</value></template_id><concept>media</concept>
+<definition><rm_type_name>DV_MULTIMEDIA</rm_type_name><node_id>at0000</node_id>
+<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>media_type</rm_attribute_name>
+<existence><lower_included>true</lower_included><upper_included>true</upper_included><lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>1</lower><upper>1</upper></existence>
+<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>CODE_PHRASE</rm_type_name><node_id></node_id>
+<occurrences><lower_included>true</lower_included><upper_included>true</upper_included><lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>1</lower><upper>1</upper></occurrences>
+<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>terminology_id</rm_attribute_name>
+<existence><lower_included>true</lower_included><upper_included>true</upper_included><lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>1</lower><upper>1</upper></existence>
+<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>TERMINOLOGY_ID</rm_type_name><node_id></node_id>
+<occurrences><lower_included>true</lower_included><upper_included>true</upper_included><lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>1</lower><upper>1</upper></occurrences>
+<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>value</rm_attribute_name>
+<existence><lower_included>true</lower_included><upper_included>true</upper_included><lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>1</lower><upper>1</upper></existence>
+<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>STRING</rm_type_name><node_id></node_id>
+<occurrences><lower_included>true</lower_included><upper_included>true</upper_included><lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>1</lower><upper>1</upper></occurrences>
+<item xsi:type="C_STRING"><list>IANA_media-types</list></item>
+</children>
+</attributes>
+</children>
+</attributes>
+</children>
+</attributes>
+</definition>
+</template>`
+
+// TestValidate_REQ171_TerminologyIDBoundToItsNode pins REQ-171 Structural
+// access in the template walk: CODE_PHRASE terminology_id is read as the
+// TERMINOLOGY_ID it holds, so it binds to the TERMINOLOGY_ID node that
+// constrains it and the walk goes below it. A terminology the node's value
+// list admits draws no template issue, and one it does not is reported at
+// the TERMINOLOGY_ID's value.
+func TestValidate_REQ171_TerminologyIDBoundToItsNode(t *testing.T) {
+	c := mustCompileInline(t, terminologyIDOPT)
+	for _, tc := range []struct {
+		terminology string
+		want        []string // code path layer rule
+	}{
+		{terminology: "IANA_media-types", want: nil},
+		{terminology: "openEHR", want: []string{"primitive_not_in_list /media_type/terminology_id/value template not_in_list"}},
+	} {
+		t.Run(tc.terminology, func(t *testing.T) {
+			media := &rm.DVMultimedia{MediaType: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: tc.terminology}, CodeString: "text/plain"}, Size: 1}
+			if got := templateIssues(validation.Validate(media, c)); !slices.Equal(got, tc.want) {
+				t.Errorf("Validate(DV_MULTIMEDIA, media_type under terminology %s) template issues = %q, want %q", tc.terminology, got, tc.want)
 			}
 		})
 	}

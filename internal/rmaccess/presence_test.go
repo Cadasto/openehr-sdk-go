@@ -512,8 +512,11 @@ func TestPresence_REQ171_ReferencesHeldByValue(t *testing.T) {
 }
 
 // TestAccess_REQ171_Shapes pins the six attributes, of five classes, whose
-// value comes back in another shape than the field's own, and the boxing of list items: a list of
-// values as pointers into its backing array, a list of interfaces as it is.
+// value comes back in another shape than the field's own, and the boxing of
+// list items: a list of values as pointers into its backing array, a list of
+// interfaces as it is. CODE_PHRASE terminology_id comes back as the
+// TERMINOLOGY_ID it holds, as any other value held by value, so a walk goes
+// below it.
 func TestAccess_REQ171_Shapes(t *testing.T) {
 	precision := rm.Integer(2)
 	step := rm.DVCodedText{Value: "step"}
@@ -535,8 +538,28 @@ func TestAccess_REQ171_Shapes(t *testing.T) {
 	if v, _ := Single(&rm.DVProportion{Precision: &precision}, "precision"); v != any(precision) {
 		t.Errorf("Single(DV_PROPORTION, precision) = %#v, want the Integer it points to", v)
 	}
-	if v, _ := Single(&rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}}, "terminology_id"); v != any("openehr") {
-		t.Errorf("Single(CODE_PHRASE, terminology_id) = %#v, want the string its TERMINOLOGY_ID holds", v)
+
+	// ORIGINAL_VERSION data, a pointer to the type parameter, comes back as
+	// the value it points to, which a walk can enter; a pointer to a nil
+	// interface comes back as nil and present, a nil pointer as absent.
+	var payload any = &rm.Composition{}
+	if v, present := Single(&rm.OriginalVersion[any]{Data: &payload}, "data"); v != payload || !present || !Covers(v) {
+		t.Errorf("Single(ORIGINAL_VERSION, data) = (%T, %t), want the *rm.Composition its pointer holds, present", v, present)
+	}
+	var nothing any
+	if v, present := Single(&rm.OriginalVersion[any]{Data: &nothing}, "data"); v != nil || !present {
+		t.Errorf("Single(ORIGINAL_VERSION holding a pointer to a nil interface, data) = (%#v, %t), want (nil, true)", v, present)
+	}
+	if v, present := Single(&rm.OriginalVersion[any]{}, "data"); v != nil || present {
+		t.Errorf("Single(ORIGINAL_VERSION without data, data) = (%#v, %t), want (nil, false)", v, present)
+	}
+
+	terminology := rm.TerminologyID{Value: "openehr"}
+	if v, present := Single(&rm.CodePhrase{TerminologyID: terminology}, "terminology_id"); v != any(terminology) || !present || !Covers(v) {
+		t.Errorf("Single(CODE_PHRASE, terminology_id) = (%#v, %t), want the TERMINOLOGY_ID it holds, present", v, present)
+	}
+	if v, present := Single(&rm.CodePhrase{}, "terminology_id"); v != nil || present {
+		t.Errorf("Single(CODE_PHRASE without a terminology, terminology_id) = (%#v, %t), want (nil, false)", v, present)
 	}
 
 	tree := &rm.ItemList{Items: []rm.Element{{ArchetypeNodeID: "at1"}}}

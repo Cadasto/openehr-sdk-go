@@ -242,7 +242,8 @@ func TestRenderRMAccessFile_REQ171_Readings(t *testing.T) {
 		{"singleReferenceRangeDVQuantity", "range", "return &x.Range, !isZeroDVIntervalDVOrdered(x.Range), true"},
 		{"singleIsmTransition", "careflow_step", "if x.CareflowStep == nil {\n\treturn nil, false, true\n}\nreturn *x.CareflowStep, true, true"},
 		{"singleDVProportion", "precision", "if x.Precision == nil {\n\treturn nil, false, true\n}\nreturn *x.Precision, true, true"},
-		{"singleCodePhrase", "terminology_id", "return x.TerminologyID.Value, !isZeroTerminologyID(x.TerminologyID), true"},
+		{"singleOriginalVersionAny", "data", "if x.Data == nil {\n\treturn nil, false, true\n}\nreturn *x.Data, true, true"},
+		{"singleCodePhrase", "terminology_id", "return x.TerminologyID, !isZeroTerminologyID(x.TerminologyID), true"},
 		{"multipleComposition", "content", "return boxValues(x.Content), x.Content != nil, true"},
 		{"multipleItemList", "items", "return boxPointers(x.Items), x.Items != nil, true"},
 		{"singleResourceDescription", "details", "return x.Details, x.Details != nil, true"},
@@ -535,7 +536,6 @@ func TestRMAccessGen_REQ171_Refusals(t *testing.T) {
 	}{
 		{name: "address of a pointer field", shapes: map[string]map[string]accessShape{"COMPOSITION": {"context": shapeAddress}}, wantErr: "COMPOSITION.context is handed back by address, but its field is not held by value"},
 		{name: "dereference of a value field", shapes: map[string]map[string]accessShape{"COMPOSITION": {"category": shapeDeref}}, wantErr: "COMPOSITION.category is handed back dereferenced, but its field is not a pointer"},
-		{name: "value member of a string field", shapes: map[string]map[string]accessShape{"COMPOSITION": {"archetype_node_id": shapeValueMember}}, wantErr: "COMPOSITION.archetype_node_id is handed back as its value member, but its field is not held by value"},
 		{name: "a shape the generator does not know", shapes: map[string]map[string]accessShape{"COMPOSITION": {"name": accessShape(99)}}, wantErr: "COMPOSITION.name has shape 99, which the generator does not know"},
 	}
 	for _, tc := range shapes {

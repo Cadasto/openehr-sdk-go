@@ -140,10 +140,6 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 	cases := []struct {
 		name string
 		opt  string
-		// validatorBlind marks a row the template validator cannot check:
-		// it reports rm_type_mismatch on a code phrase's terminology_id
-		// whatever the value, because it reads that attribute as a string.
-		validatorBlind bool
 		// floorCoded is the path of the code phrase whose placeholder the
 		// RM floor, which template validation includes, reports as
 		// code_not_in_value_set: the OPT admits no member of the code set
@@ -505,18 +501,17 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 			},
 		},
 		{
-			name:           "DV_MULTIMEDIA media_type, terminology id C_STRING openEHR",
-			opt:            yieldMultimedia(optSingle("media_type", optNode("CODE_PHRASE", "", optTerminologyIDValue("openEHR")))),
-			validatorBlind: true,
+			name:       "DV_MULTIMEDIA media_type, terminology id C_STRING openEHR",
+			floorCoded: "/value/media_type",
+			opt:        yieldMultimedia(optSingle("media_type", optNode("CODE_PHRASE", "", optTerminologyIDValue("openEHR")))),
 			check: func(t *testing.T, out any) {
 				want := rm.CodePhrase{CodeString: "at0000", TerminologyID: rm.TerminologyID{Value: "openEHR"}}
 				checkCode(t, "DV_MULTIMEDIA.media_type", rootElementValue[*rm.DVMultimedia](t, out).MediaType, want)
 			},
 		},
 		{
-			name:           "admit: DV_MULTIMEDIA media_type, terminology id C_STRING IANA_media-types",
-			opt:            yieldMultimedia(optSingle("media_type", optNode("CODE_PHRASE", "", optTerminologyIDValue("IANA_media-types")))),
-			validatorBlind: true,
+			name: "admit: DV_MULTIMEDIA media_type, terminology id C_STRING IANA_media-types",
+			opt:  yieldMultimedia(optSingle("media_type", optNode("CODE_PHRASE", "", optTerminologyIDValue("IANA_media-types")))),
 			check: func(t *testing.T, out any) {
 				want := rm.CodePhrase{CodeString: "text/plain", TerminologyID: rm.TerminologyID{Value: "IANA_media-types"}}
 				checkCode(t, "DV_MULTIMEDIA.media_type", rootElementValue[*rm.DVMultimedia](t, out).MediaType, want)
@@ -563,9 +558,6 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 						t.Fatalf("Generate: %v", err)
 					}
 					tc.check(t, out)
-					if tc.validatorBlind {
-						return
-					}
 					var coded, prohibited int
 					for _, iss := range templateErrors(out, c) {
 						if tc.floorCoded != "" && iss.Code == "code_not_in_value_set" && iss.Path == tc.floorCoded {
