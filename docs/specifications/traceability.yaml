@@ -2120,7 +2120,9 @@ requirements:
       - internal/bmmgen/render_inventory_test.go
       - internal/bmmgen/render_rmaccess_test.go
       - internal/bmmgen/sim_bump_test.go
+      - internal/importguard/importguard_test.go
       - internal/rmaccess/coverage_test.go
+      - internal/rmaccess/imports_test.go
       - internal/rmaccess/presence_test.go
       - internal/rmaccess/reads_test.go
       - openehr/instance/rm_defaults_yield_test.go
@@ -2130,6 +2132,7 @@ requirements:
       - openehr/validation/finding_identity_rules_test.go
       - openehr/validation/finding_identity_test.go
       - openehr/validation/godoc_class_test.go
+      - openehr/validation/imports_test.go
       - openehr/validation/inventory_dispatch_internal_test.go
       - openehr/validation/limits_test.go
       - openehr/validation/locatable_attributes_test.go
