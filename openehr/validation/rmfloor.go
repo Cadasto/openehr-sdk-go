@@ -96,28 +96,40 @@ func ValidateRM(root any) Result {
 // validateRM runs the floor alone over root, within lim, guarding a nil root
 // and one outside the closed RM set.
 func validateRM(root any, lim Limits) Result {
-	if root == nil || rmaccess.IsTypedNilPointer(root) {
-		return resultFromIssues([]Issue{{
-			Path:     "",
-			Code:     "nil_root",
-			Detail:   "ValidateRM: root is nil",
-			Severity: Error,
-		}})
-	}
-	rmType, _, ok := rmTypeInfo(root)
+	rmType, guard, ok := rmRootGuard(root)
 	if !ok {
-		return resultFromIssues([]Issue{{
-			Path:     "/",
-			Code:     "rm_type_unknown",
-			Detail:   fmt.Sprintf("ValidateRM: root Go type %T is outside the closed RM set; cannot descend", root),
-			Severity: Error,
-		}})
+		return guard
 	}
 	w := runFloor(root, rmType, nil, lim)
 	r := resultFromIssues(w.issues)
 	r.Coverage.Stopped = w.stoppedAt
 	r.Coverage.Unevaluated = unevaluatedIn(w.visited)
 	return r
+}
+
+// rmRootGuard returns the RM type of root, the type the RM rules alone read
+// it as, with ok set. For a nil root, and for one outside the closed RM set,
+// it returns instead the result those rules report for it, a single
+// `nil_root` or `rm_type_unknown` issue, with ok unset.
+func rmRootGuard(root any) (rmType string, guard Result, ok bool) {
+	if root == nil || rmaccess.IsTypedNilPointer(root) {
+		return "", resultFromIssues([]Issue{{
+			Path:     "",
+			Code:     "nil_root",
+			Detail:   "ValidateRM: root is nil",
+			Severity: Error,
+		}}), false
+	}
+	rmType, _, ok = rmTypeInfo(root)
+	if !ok {
+		return "", resultFromIssues([]Issue{{
+			Path:     "/",
+			Code:     "rm_type_unknown",
+			Detail:   fmt.Sprintf("ValidateRM: root Go type %T is outside the closed RM set; cannot descend", root),
+			Severity: Error,
+		}}), false
+	}
+	return rmType, Result{}, true
 }
 
 // runFloor runs the floor over root, of RM type rmType, within lim, and

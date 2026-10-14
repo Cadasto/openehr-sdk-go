@@ -2137,6 +2137,8 @@ requirements:
       - openehr/validation/composition_test.go
       - openehr/validation/coverage_test.go
       - openehr/validation/coverage_unevaluated_test.go
+      - openehr/validation/engine_compare_test.go
+      - openehr/validation/engine_walk_test.go
       - openehr/validation/finding_identity_rules_test.go
       - openehr/validation/finding_identity_test.go
       - openehr/validation/godoc_class_test.go
