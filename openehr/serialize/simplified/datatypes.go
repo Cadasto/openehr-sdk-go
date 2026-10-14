@@ -335,13 +335,28 @@ var codePhraseLeafKeys = map[string]bool{
 // against a bare-code FLAT spelling.
 const mediaTypeTerminology = "IANA_media-types"
 
-// multimediaBareCodeAttrs are the DV_MULTIMEDIA attributes whose CODE_PHRASE the
-// suffix set reduces to a bare code with **no** terminology to imply: the openEHR
-// code sets behind `compression algorithms` and `integrity check algorithms` have
-// no identifier this codec can source the way media_type's is sourced above, so
-// decode writes the code alone and encode refuses the suffix form for a value that
-// carries a terminology (it rides |raw). Recorded in deviations.md.
-var multimediaBareCodeAttrs = []string{"integrity_check_algorithm", "compression_algorithm"}
+// multimediaAlgorithmCode is one of the two optional DV_MULTIMEDIA attributes
+// whose CODE_PHRASE the suffix set reduces to a bare code: the RM attribute,
+// which is also its suffix, and the code set the RM draws its code from.
+type multimediaAlgorithmCode struct {
+	attr    string
+	codeSet *terminology.CodeSet
+}
+
+// multimediaAlgorithmCodes are `|integrity_check_algorithm` and
+// `|compression_algorithm`. Each carries the code alone, so the terminology is
+// implied as [mediaTypeTerminology] is: the openEHR code set the RM names for the
+// attribute, identified by the external id the pinned openEHR terminology gives
+// it (`openehr_integrity_check_algorithms`, `openehr_compression_algorithms`).
+// The codec reads that id from the pin rather than spelling it, and reads
+// nothing else: decode does not check membership, as it does not for
+// |normal_status. Encode refuses the suffix form for a value coded in any other
+// terminology, or carrying a preferred_term; that value rides |raw whole.
+// Recorded in deviations.md.
+var multimediaAlgorithmCodes = []multimediaAlgorithmCode{
+	{attr: "integrity_check_algorithm", codeSet: terminology.IntegrityCheckAlgorithms},
+	{attr: "compression_algorithm", codeSet: terminology.CompressionAlgorithms},
+}
 
 // capturedFully reports whether the canonical form m is fully representable by
 // rmType's FLAT suffix set. Beyond the top-level key check it descends into the
@@ -382,9 +397,10 @@ func capturedFully(rmType string, m map[string]any, captured map[string]bool) bo
 		return codePhraseCapturedIn(m, codePhraseLeafKeys)
 	case "DV_MULTIMEDIA":
 		// media_type is RM-mandatory and travels as a bare code in the implied
-		// [mediaTypeTerminology]; the two algorithm codes travel with no implied
-		// terminology at all. A value the rebuild would re-terminologise, or one
-		// carrying a preferred_term the suffix has no room for, rides |raw whole.
+		// [mediaTypeTerminology]; the two algorithm codes travel as bare codes in
+		// the code sets [multimediaAlgorithmCodes] names. A value the rebuild
+		// would re-terminologise, or one carrying a preferred_term the suffix has
+		// no room for, rides |raw whole.
 		mt, ok := m["media_type"].(map[string]any)
 		if !ok || !codePhraseCaptured(mt) {
 			return false
@@ -395,12 +411,17 @@ func capturedFully(rmType string, m map[string]any, captured map[string]bool) bo
 		if tv := codePhraseTerminology(mt); tv != "" && tv != mediaTypeTerminology {
 			return false
 		}
-		for _, attr := range multimediaBareCodeAttrs {
-			cp, present := m[attr].(map[string]any)
+		for _, a := range multimediaAlgorithmCodes {
+			cp, present := m[a.attr].(map[string]any)
 			if !present {
 				continue
 			}
-			if !codePhraseCaptured(cp) || codePhraseTerminology(cp) != "" {
+			if !codePhraseCaptured(cp) {
+				return false
+			}
+			// An absent terminology contradicts nothing decode implies, as for
+			// media_type above.
+			if tv := codePhraseTerminology(cp); tv != "" && tv != a.codeSet.ExternalID() {
 				return false
 			}
 		}
@@ -626,8 +647,9 @@ func emitCoreLeaf(out map[string]any, flatPath string, v any, rmType string, lis
 
 // multimediaToFlat emits the DV_MULTIMEDIA suffix set: the bare `uri`, the
 // RM-mandatory `|mediatype` + `|size`, and the optional octet / text / coded
-// attributes. Only reached for values [capturedFully] has already bounded, so the
-// three CODE_PHRASEs are code-only and the uri a plain DV_URI.
+// attributes. Only reached for values [capturedFully] has already bounded, so
+// each of the three CODE_PHRASEs is a code in its implied terminology, or in
+// none, with nothing else to lose, and the uri is a plain DV_URI.
 //
 // The two Byte[] attributes are written as the base64 their canonical JSON form
 // carries (encoding/json's []byte convention), which is exactly what the corpus

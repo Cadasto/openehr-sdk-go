@@ -17,19 +17,15 @@ import (
 const minDecodedCorpusBodies = 24
 
 // flatFormFloorBreaches lists, per corpus body, the RM floor findings the FLAT
-// form itself causes, as "code path" sorted. `|compression_algorithm` and
-// `|integrity_check_algorithm` carry a bare code and no terminology the
-// specification can source (REQ-140), so the decoded CODE_PHRASE has no
-// terminology_id, which the RM makes mandatory. The floor reads DV_MULTIMEDIA's
-// optional attributes through the generated access (REQ-171 § Structural
-// access), so it reports both. A finding that is not listed fails the test,
-// and so does a listed one that no longer appears.
-var flatFormFloorBreaches = map[string][]string{
-	"ehrbase_conformance_data_types_dv_multimedia": {
-		"required /content[openEHR-EHR-SECTION.conformance_section.v0]/items[openEHR-EHR-OBSERVATION.conformance_observation.v0]/data/events[at0002]/data/items[at0026]/value/compression_algorithm/terminology_id",
-		"required /content[openEHR-EHR-SECTION.conformance_section.v0]/items[openEHR-EHR-OBSERVATION.conformance_observation.v0]/data/events[at0002]/data/items[at0026]/value/integrity_check_algorithm/terminology_id",
-	},
-}
+// form itself causes, as "code path" sorted: an attribute the RM requires that
+// the body's spelling does not carry and the specification does not let decode
+// imply. The table is empty. The bare `|compression_algorithm` and
+// `|integrity_check_algorithm` codes decode in the code set REQ-140 implies for
+// each, so `ehrbase_conformance_data_types_dv_multimedia` passes the floor as
+// written, although the floor reads DV_MULTIMEDIA's optional attributes
+// (REQ-171 § Structural access). For a listed body, a finding that is not listed
+// fails the test, and so does a listed one that no longer appears.
+var flatFormFloorBreaches = map[string][]string{}
 
 // TestREQ053_REQ112_DecodedCorpusPassesRMFloor decodes every body of the
 // upstream FLAT corpus as written, with the template attached, and requires

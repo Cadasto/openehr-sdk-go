@@ -2529,10 +2529,11 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (map[strin
 // rather than defaulted; the bare key is the **uri**, and the two Byte[]
 // attributes carry the base64 their canonical form uses.
 //
-// The three CODE_PHRASE-valued attributes reachable here travel as a bare code:
-// media_type in the implied [mediaTypeTerminology], the two algorithms with no
-// terminology at all (see there). `charset`, `language` and `thumbnail` are not
-// suffixes — they ride the REQ-140 underscore members.
+// The three CODE_PHRASE-valued attributes reachable here travel as a bare code,
+// each in an implied terminology: media_type in [mediaTypeTerminology], the two
+// algorithms in the code sets [multimediaAlgorithmCodes] names. `charset`,
+// `language` and `thumbnail` are not suffixes — they ride the REQ-140 underscore
+// members.
 func multimediaFromSuffixes(sfx map[string]any) (map[string]any, error) {
 	mediaType, err := requireSuffix("DV_MULTIMEDIA", sfx, "mediatype")
 	if err != nil {
@@ -2561,19 +2562,20 @@ func multimediaFromSuffixes(sfx map[string]any) (map[string]any, error) {
 			dv[attr] = v
 		}
 	}
-	for _, attr := range multimediaBareCodeAttrs {
-		v, ok := sfx[attr]
+	for _, a := range multimediaAlgorithmCodes {
+		v, ok := sfx[a.attr]
 		if !ok {
 			continue
 		}
-		algo, err := ctxString("|"+attr, v)
+		algo, err := ctxString("|"+a.attr, v)
 		if err != nil {
 			return nil, err
 		}
-		// No terminology: the wire carries the code alone and this codec has no
-		// openEHR code-set identifier to imply for either algorithm group, so
-		// inventing one would put a terminology on the RM the author never wrote.
-		dv[attr] = map[string]any{"_type": "CODE_PHRASE", "code_string": algo}
+		// The bare code in the code set the RM names for the attribute (REQ-140),
+		// by the identifier the pinned terminology gives it (REQ-034). Membership
+		// is not checked here: the validation floor reports a code outside the
+		// set, as it does for |normal_status.
+		dv[a.attr] = codePhraseJSON(algo, a.codeSet.ExternalID())
 	}
 	return dv, nil
 }
