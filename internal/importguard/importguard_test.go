@@ -34,6 +34,21 @@ func TestWireLayers(t *testing.T) {
 	}
 }
 
+// TestRuleLoaders pins the packages the REQ-171 guards refuse in the
+// validators' own files, entry by entry.
+func TestRuleLoaders(t *testing.T) {
+	t.Parallel()
+	want := []string{"os", "io/fs", "io/ioutil", "embed", "plugin", mod + "/openehr/bmm"}
+	got := importguard.RuleLoaders()
+	if !slices.Equal(got, want) {
+		t.Fatalf("RuleLoaders() = %q, want %q", got, want)
+	}
+	got[0] = "changed-by-caller"
+	if again := importguard.RuleLoaders(); !slices.Equal(again, want) {
+		t.Errorf("RuleLoaders() after a caller changed an earlier result = %q, want %q", again, want)
+	}
+}
+
 // TestScan is the can-fail control for the import-closure walk every REQ-013
 // building-block guard runs. Each fixture under testdata/ fails if the part of
 // Scan it pins is removed: the direct match, the walk into packages of this

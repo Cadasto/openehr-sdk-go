@@ -28,6 +28,9 @@ func TestRMAccessImports(t *testing.T) {
 		if !importguard.Standard(imp) && !allowed[imp] {
 			t.Errorf("internal/rmaccess MUST NOT import %q in its own files: it imports only the standard library and openehr/rm (ADR 0028)", imp)
 		}
+		if p, ok := importguard.Matches(imp, importguard.RuleLoaders()); ok {
+			t.Errorf("internal/rmaccess MUST NOT import %q in its own files (forbidden entry %q; REQ-171: the access the validators read through loads nothing at run time)", imp, p)
+		}
 	}
 	violations, err := importguard.Scan(".", importguard.WireLayers())
 	if err != nil {

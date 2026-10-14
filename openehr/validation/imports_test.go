@@ -18,6 +18,10 @@ import (
 //   - The package's own non-test files do not import openehr/serialize. This
 //     rule cannot cover what they pull in, since openehr/rm's generated
 //     marshal files import openehr/serialize/canxml.
+//   - The package's own non-test files import nothing that reads a file,
+//     embeds one, loads a plugin or reads a BMM: the RM rules are compiled in
+//     and the invariant inventory is generated, so no rule is loaded or
+//     interpreted at run time (§ REQ-171 Where the RM rules come from).
 //
 // Test files may import anything, for fixture decoding for instance.
 func TestValidationForbiddenImports(t *testing.T) {
@@ -37,6 +41,9 @@ func TestValidationForbiddenImports(t *testing.T) {
 	for _, imp := range imports {
 		if p, ok := importguard.Matches(imp, serialize); ok {
 			t.Errorf("openehr/validation MUST NOT import %q in its own files (forbidden entry %q; REQ-013: a template-side building block never imports openehr/serialize)", imp, p)
+		}
+		if p, ok := importguard.Matches(imp, importguard.RuleLoaders()); ok {
+			t.Errorf("openehr/validation MUST NOT import %q in its own files (forbidden entry %q; REQ-171: the validators load no rule from outside the binary and interpret no BMM expression at run time)", imp, p)
 		}
 	}
 }
