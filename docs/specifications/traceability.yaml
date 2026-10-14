@@ -972,6 +972,7 @@ requirements:
       - openehr/client/route_guard_test.go
       - transport/client_test.go
       - transport/errors_test.go
+      - transport/span_status_test.go
 
   - id: REQ-091
     title: Retry policy
@@ -1035,6 +1036,7 @@ requirements:
       - openehr/client/ehr/composition/body_read_error_test.go
       - openehr/client/ehr/composition/composition_test.go
       - openehr/client/ehr/composition/decode_error_test.go
+      - openehr/client/ehr/contribution/body_read_error_test.go
       - openehr/client/ehr/contribution/decode_error_test.go
       - openehr/client/ehr/contribution/representation_test.go
       - openehr/client/ehr/decode_error_test.go
@@ -2175,7 +2177,13 @@ requirements:
     implementation: planned
     packages: [transport]
     tests:
+      - openehr/client/definition/body_read_error_test.go
+      - openehr/client/demographic/body_read_error_test.go
       - openehr/client/ehr/composition/body_read_error_test.go
+      - openehr/client/ehr/contribution/body_read_error_test.go
+      - openehr/client/query/body_read_error_test.go
+      - openehr/client/system/body_read_error_test.go
       - transport/body_read_error_test.go
       - transport/errors_test.go
       - transport/nilwiredereference_internal_test.go
+      - transport/span_status_test.go
