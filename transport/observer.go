@@ -32,11 +32,12 @@ type Observation struct {
 	// Attempts is the number of HTTP attempts actually issued; 1 when
 	// retries were disabled or the first attempt succeeded.
 	Attempts int
-	// Err is nil on a 2xx outcome whose body was read, and a
+	// Err is nil on a 2xx outcome whose body was read, and is, or wraps, a
 	// *BodyReadError on a 2xx whose body could not be read. For non-2xx
-	// outcomes it is, or wraps, a *WireError carrying the typed sentinel
-	// (it wraps the read failure too when the body could not be read); for
-	// pre-response failures it is the wrapped underlying error.
+	// outcomes it is, or wraps, a *WireError carrying the typed sentinel;
+	// when the body could not be read, Err also wraps the read failure
+	// beside that *WireError. For pre-response failures it is the wrapped
+	// underlying error.
 	Err error
 	// Tags carries per-call observer tags attached via
 	// WithObservationTag. It is read-only; observers must not mutate it.

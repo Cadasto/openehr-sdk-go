@@ -316,7 +316,9 @@ func (e *DecodeError) Unwrap() error {
 // [Client.Do] returns it beside a non-nil [Response] that carries the
 // StatusCode, the Header and the parsed Metadata, so the ETag and Location of
 // a committed write survive, and whose Body is empty. The error carries no
-// body bytes: a partial body is not the representation.
+// body bytes: a partial body is not the representation. Its text does not
+// carry the read failure's own text either, which can quote bytes the server
+// sent; reach the read failure through Inner or Unwrap.
 type BodyReadError struct {
 	// Method is the HTTP method of the request.
 	Method string
@@ -334,10 +336,13 @@ type BodyReadError struct {
 	Inner error
 }
 
-// Error names the method, the route, the status and the read failure. It
-// never includes a header value or a body byte; the read failure's text is a
-// transport-level diagnostic (a connection error, a content-coding error, or
-// the ceiling, which it names).
+// Error names the method, the route, the status and the kind of read failure.
+// For a body over the [WithMaxResponseBody] ceiling it names the limit, which
+// is the caller's own setting; any other failure gets one fixed phrase. It
+// never includes a header value, a body byte, or the read failure's own text,
+// because that text can quote bytes the server sent: net/http quotes a
+// malformed chunked trailer line in it. Callers that need the read failure
+// unwrap the error.
 //
 // Error works on a nil receiver instead of panicking, so the typed nil a
 // failed errors.As leaves behind is safe to print.
@@ -347,11 +352,7 @@ func (e *BodyReadError) Error() string {
 	}
 	// The unroutedRoute fallback matches DecodeError.Error(): doOnce always
 	// sets Route, so this is for a BodyReadError a caller constructs directly.
-	msg := fmt.Sprintf("transport: %s %s: status %d: read body", e.Method, cmp.Or(e.Route, unroutedRoute), e.StatusCode)
-	if e.Inner == nil {
-		return msg
-	}
-	return msg + ": " + e.Inner.Error()
+	return fmt.Sprintf("transport: %s %s: status %d: read body: %s", e.Method, cmp.Or(e.Route, unroutedRoute), e.StatusCode, readFailureText(e.Inner))
 }
 
 // Unwrap exposes the read failure, so errors.Is reaches io.ErrUnexpectedEOF,
@@ -375,3 +376,25 @@ func (e responseTooLargeError) Error() string {
 }
 
 func (responseTooLargeError) Unwrap() error { return ErrResponseTooLarge }
+
+// readFailureText names the kind of a body read failure without its own text,
+// which can quote bytes the server sent. A body over the ceiling is named with
+// the limit, the caller's own setting; any other failure, a nil one included,
+// gets one fixed phrase.
+func readFailureText(cause error) string {
+	if tl, ok := errors.AsType[responseTooLargeError](cause); ok {
+		return tl.Error()
+	}
+	return "body could not be read"
+}
+
+// bodyReadFailure is the read failure of a response that is not 2xx, as doOnce
+// wraps it beside the WireError the status gives. Its text is readFailureText's,
+// so the text added to the WireError's own stays value-free, and Unwrap returns
+// the read failure itself, so errors.Is reaches the same causes as on the 2xx
+// arm.
+type bodyReadFailure struct{ cause error }
+
+func (e *bodyReadFailure) Error() string { return "read body: " + readFailureText(e.cause) }
+
+func (e *bodyReadFailure) Unwrap() error { return e.cause }

@@ -120,19 +120,25 @@ func (c *Client) HTTPClient() *http.Client {
 
 // Do executes req and returns the captured Response. Status codes in
 // 2xx surface as a non-nil Response with err=nil; non-2xx surface as
-// err of type *WireError plus a possibly-non-nil Response carrying the
-// raw body. Network errors surface as the wrapped underlying error.
+// an err from which errors.AsType recovers a *WireError, plus a
+// possibly-non-nil Response carrying the raw body. Network errors
+// surface as the wrapped underlying error.
 //
 // A response whose status and headers arrived but whose body could not
 // be read (the connection dropped mid-body, the body did not match its
 // Content-Encoding, or it was over the WithMaxResponseBody ceiling) still
 // returns a non-nil Response carrying StatusCode, Header and Metadata,
-// with an empty Body. On a 2xx the error is a *BodyReadError; with retries
-// enabled, such a request is sent again only when its method is GET, HEAD
-// or OPTIONS, because the server has acted on any other. On any other
-// status the error is the *WireError the status gives, which wraps the
-// read failure as well. Either way errors.Is reaches the read failure:
+// with an empty Body. On a 2xx the error is, or wraps, a *BodyReadError.
+// With retries enabled, such a request is sent again only when its method
+// is GET, HEAD or OPTIONS, because the server has acted on any other, and
+// never once ctx has ended; when ctx ends during the backoff, the error
+// wraps the *BodyReadError and ctx's error. On any other status the error
+// wraps two errors side by side: the *WireError the status gives and the
+// read failure. The *WireError itself does not wrap the read failure.
+// Either way errors.Is on the returned error reaches the read failure:
 // io.ErrUnexpectedEOF, the content-coding error, or ErrResponseTooLarge.
+// The error's text names the kind of read failure, and the limit for a
+// body over the ceiling, but never the read failure's own text.
 //
 // The lifecycle:
 //
@@ -223,7 +229,7 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		otelAttempt++
 		span.SetAttributes(attribute.Int("retry.attempt", otelAttempt-1))
 		resp, lastErr = c.doOnce(ctx, req, target)
-		if !c.shouldRetry(req, resp, lastErr, attempt) {
+		if !c.shouldRetry(ctx, req, resp, lastErr, attempt) {
 			// 401→reauth safety net (REQ-063, opt-in): if the final error is
 			// a wire 401, a Reauther is configured, this Do call has not yet
 			// reauthed, and the 401's Bearer challenge allows it (REQ-166),
@@ -255,7 +261,16 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		wait := c.cfg.retry.backoff(attempt)
 		span.SetAttributes(attribute.Int64("retry.backoff_ms", wait.Milliseconds()))
 		if err := retryWait(ctx, wait); err != nil {
-			lastErr = err
+			// REQ-172: a 2xx whose body could not be read keeps its
+			// *BodyReadError when ctx ends during the backoff, so the status
+			// the server sent is not reported as a bare context error; ctx's
+			// error is wrapped beside it (REQ-091). Any other error is
+			// replaced by ctx's, as before.
+			if _, ok := errors.AsType[*BodyReadError](lastErr); ok {
+				lastErr = fmt.Errorf("%w: retry wait: %w", lastErr, err)
+			} else {
+				lastErr = err
+			}
 			break
 		}
 	}
@@ -308,8 +323,9 @@ func (c *Client) emitObservation(ctx context.Context, req *Request, target *url.
 // non-nil for wire-level failures or transport errors. resp is nil only
 // when no response arrived (the request could not be built or sent);
 // once the status and headers arrived it is non-nil even on err, and its
-// Body is empty when the body could not be read: a *BodyReadError on a
-// 2xx, or the *WireError wrapping the read failure on any other status.
+// Body is empty when the body could not be read. The error is then a
+// *BodyReadError on a 2xx, and on any other status an error that wraps
+// both the *WireError and the read failure.
 func (c *Client) doOnce(ctx context.Context, req *Request, target *url.URL) (*Response, error) {
 	var body io.Reader
 	if len(req.Body) > 0 {
@@ -383,8 +399,9 @@ func (c *Client) doOnce(ctx context.Context, req *Request, target *url.URL) (*Re
 		// body, mapWireError finds no envelope and keeps no RawBody. The
 		// read failure is wrapped beside the WireError, so errors.AsType
 		// still reaches the WireError for the status sentinel, the retry
-		// policy and the 401 safety net.
-		return resp, fmt.Errorf("%w: read body: %w", c.mapWireError(req, target, resp), readErr)
+		// policy and the 401 safety net. bodyReadFailure keeps the read
+		// failure's own text out of the message, as BodyReadError does.
+		return resp, fmt.Errorf("%w: %w", c.mapWireError(req, target, resp), &bodyReadFailure{cause: readErr})
 	}
 	resp.Body = respBody
 	if is2xx {
@@ -587,8 +604,9 @@ func challengePermitsReauth(err error) bool {
 
 // shouldRetry consults the configured RetryPolicy. Network errors are
 // retried in addition to retriable HTTP statuses (mirroring the
-// "transport-level transient failures" rationale of REQ-091).
-func (c *Client) shouldRetry(req *Request, resp *Response, err error, attempt int) bool {
+// "transport-level transient failures" rationale of REQ-091). ctx is read
+// only for a 2xx whose body could not be read.
+func (c *Client) shouldRetry(ctx context.Context, req *Request, resp *Response, err error, attempt int) bool {
 	if !c.cfg.retry.enabled() || attempt >= c.cfg.retry.MaxAttempts {
 		return false
 	}
@@ -610,8 +628,14 @@ func (c *Client) shouldRetry(req *Request, resp *Response, err error, attempt in
 		// the same If-Match would fail as stale and hide the version the
 		// first one made. The decision reads the request's method, never a
 		// field of the error, so a boxed typed-nil *BodyReadError takes
-		// the same gate.
+		// the same gate. Once ctx has ended, the read was most likely
+		// stopped by it, and another attempt could only fail before a
+		// response arrives and lose the status and headers kept here
+		// (REQ-091: retries respect ctx cancellation).
 		if _, ok := errors.AsType[*BodyReadError](err); ok {
+			if ctx.Err() != nil {
+				return false
+			}
 			switch req.effectiveMethod() {
 			case http.MethodGet, http.MethodHead, http.MethodOptions:
 				return true

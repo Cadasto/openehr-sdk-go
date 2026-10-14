@@ -54,14 +54,14 @@ func TestShouldRetryToleratesABoxedNilWireError(t *testing.T) {
 	// A boxed typed nil carries no status. It falls through to the generic
 	// "network / transient" arm, which retries an idempotent method — the same
 	// answer any other unclassifiable error gets.
-	if got := c.shouldRetry(req, nil, boxedNilWireError(), 0); !got {
+	if got := c.shouldRetry(t.Context(), req, nil, boxedNilWireError(), 0); !got {
 		t.Errorf("shouldRetry(boxed typed-nil WireError) = false, want true — an unclassifiable error retries like any other transient failure")
 	}
 	// A real *WireError still routes through the status gate.
-	if got := c.shouldRetry(req, nil, &WireError{StatusCode: 503, Sentinel: ErrServerError}, 0); !got {
+	if got := c.shouldRetry(t.Context(), req, nil, &WireError{StatusCode: 503, Sentinel: ErrServerError}, 0); !got {
 		t.Errorf("shouldRetry(503 WireError) = false, want true")
 	}
-	if got := c.shouldRetry(req, nil, &WireError{StatusCode: 404, Sentinel: ErrNotFound}, 0); got {
+	if got := c.shouldRetry(t.Context(), req, nil, &WireError{StatusCode: 404, Sentinel: ErrNotFound}, 0); got {
 		t.Errorf("shouldRetry(404 WireError) = true, want false")
 	}
 }
@@ -96,7 +96,7 @@ func TestShouldRetryGatesABoxedNilBodyReadErrorByMethod(t *testing.T) { // REQ-1
 	}
 	for _, tc := range cases {
 		req := &Request{Method: tc.method, Path: "/"}
-		if got := c.shouldRetry(req, nil, boxed, 0); got != tc.want {
+		if got := c.shouldRetry(t.Context(), req, nil, boxed, 0); got != tc.want {
 			t.Errorf("shouldRetry(%s, boxed typed-nil BodyReadError) = %v, want %v", tc.method, got, tc.want)
 		}
 	}

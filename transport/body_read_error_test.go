@@ -5,10 +5,11 @@ package transport_test
 // A response can arrive with its status line and headers and then fail while
 // its body is read. These tests pin both arms of what Client.Do returns then:
 // on a 2xx, a *transport.Response carrying the status, the headers and the
-// parsed Metadata beside a *transport.BodyReadError; on any other status, the
-// *transport.WireError the status classifies, wrapping the read failure too.
-// They also pin the retry gate (a 2xx whose body was lost is sent again only
-// for a safe method) and the value-free Error() text.
+// parsed Metadata beside a *transport.BodyReadError; on any other status, an
+// error that wraps the *transport.WireError the status classifies and, beside
+// it, the read failure. They also pin the retry gate (a 2xx whose body was
+// lost is sent again only for a safe method, and never once the caller's
+// context has ended) and the value-free Error() text.
 //
 // External, like decode_error_test.go, so every assertion goes through the
 // surface a consumer sees. The servers are real httptest servers, so the read
