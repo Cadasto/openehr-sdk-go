@@ -65,9 +65,40 @@ if [[ -n "$canon" ]]; then
   if [[ -f "$specfile" ]]; then
     start="$(grep -nE "^#+ .*${REQ}([^0-9]|$)" "$specfile" | head -1 | cut -d: -f1 || true)"
     if [[ -n "$start" ]]; then
-      printf '```markdown\n'
-      awk -v s="$start" 'NR>=s { if (NR>s && /^#+ /) exit; print; if (NR-s>=44) { print "… (truncated — open the spec for the rest)"; exit } }' "$specfile"
-      printf '```\n'
+      # The excerpt is the span `sdd-check.py context` prints: from the REQ's
+      # heading to the next heading of the same or a higher level, so its
+      # deeper subsections stay in. A line inside a fenced code block is never
+      # a heading; a fence closes on a run of its own character at least as
+      # long as the opener, with nothing after it. Trailing blank lines go.
+      excerpt="$(awk -v s="$start" '
+        function emit(line) {
+          if (line == "") { blanks++; return }
+          for (; blanks > 0; blanks--) print ""
+          print line
+        }
+        function closes(line,   t) {
+          t = line; sub(/^[ \t]+/, "", t); sub(/[ \t]+$/, "", t)
+          if (length(t) < flen) return 0
+          gsub(fch, "", t)
+          return t == ""
+        }
+        NR < s { next }
+        NR == s { match($0, /^#+/); level = RLENGTH; print; next }
+        fch != "" { if (closes($0)) fch = ""; emit($0); next }
+        {
+          t = $0; sub(/^[ \t]+/, "", t)
+          if (match(t, /^(```+|~~~+)/)) { fch = substr(t, 1, 1); flen = RLENGTH; emit($0); next }
+          if (match($0, /^#+[ \t]/) && RLENGTH - 1 <= 6 && RLENGTH - 1 <= level) exit
+          emit($0)
+        }
+      ' "$specfile")"
+      # The bundle wraps the excerpt in a fence longer than any backtick run
+      # that starts one of its lines, so a code block inside the excerpt
+      # cannot close it early.
+      longest="$(printf '%s\n' "$excerpt" | awk '{ sub(/^[ \t]+/, ""); if (match($0, /^`+/) && RLENGTH > n) n = RLENGTH } END { print n + 0 }')"
+      fence='```'
+      while (( ${#fence} <= longest )); do fence+='`'; done
+      printf '%smarkdown\n%s\n%s\n' "$fence" "$excerpt" "$fence"
     else
       echo "_(heading for ${REQ} not auto-located — open the link above)_"
     fi
