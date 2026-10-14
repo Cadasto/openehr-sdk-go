@@ -115,13 +115,14 @@ func TestUploadTemplate(t *testing.T) {
 	var captured *http.Request
 	var capturedBody []byte
 	opt := readFixture(t, "body_weight.opt")
+	metadataBody := readFixture(t, "template_metadata.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		capturedBody, _ = io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Location", "/openehr/v1/definition/template/adl1.4/body_weight.v1")
 		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write(readFixture(t, "template_metadata.json"))
+		_, _ = w.Write(metadataBody)
 	}))
 	defer srv.Close()
 
@@ -293,9 +294,10 @@ func TestUploadRejectsInvalidInputs(t *testing.T) {
 func TestUploadTemplateWithVersion(t *testing.T) {
 	var captured *http.Request
 	opt := readFixture(t, "body_weight.opt")
+	metadataBody := readFixture(t, "template_metadata.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
-		_, _ = w.Write(readFixture(t, "template_metadata.json"))
+		_, _ = w.Write(metadataBody)
 	}))
 	defer srv.Close()
 	if _, _, err := definition.UploadTemplate(
@@ -336,9 +338,10 @@ func TestGetTemplateRejectsEmpty(t *testing.T) {
 }
 
 func TestListTemplates(t *testing.T) {
+	listBody := readFixture(t, "template_list.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(readFixture(t, "template_list.json"))
+		_, _ = w.Write(listBody)
 	}))
 	defer srv.Close()
 	list, _, err := definition.ListTemplates(t.Context(), newClient(t, srv), definition.FormatADL14)
@@ -652,10 +655,11 @@ func TestTemplateMetadataRoundTrip(t *testing.T) {
 
 func TestRepository(t *testing.T) {
 	opt := readFixture(t, "body_weight.opt")
+	metadataBody := readFixture(t, "template_metadata.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			_, _ = w.Write(readFixture(t, "template_metadata.json"))
+			_, _ = w.Write(metadataBody)
 		case http.MethodGet:
 			_, _ = w.Write(opt)
 		}
@@ -744,10 +748,11 @@ func TestListTemplatesFilters(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			var captured *http.Request
+			listBody := readFixture(t, "template_list.json")
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				captured = r.Clone(r.Context())
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write(readFixture(t, "template_list.json"))
+				_, _ = w.Write(listBody)
 			}))
 			defer srv.Close()
 
@@ -803,10 +808,11 @@ func TestListTemplatesRejectsNegativePaging(t *testing.T) {
 // the same filters as the package function (REQ-143).
 func TestRepositoryListTemplatesCarriesOptions(t *testing.T) {
 	var captured *http.Request
+	listBody := readFixture(t, "template_list.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(readFixture(t, "template_list.json"))
+		_, _ = w.Write(listBody)
 	}))
 	defer srv.Close()
 

@@ -79,12 +79,13 @@ func readFixture(t *testing.T, name string) []byte {
 func TestExecuteAdhoc(t *testing.T) {
 	var captured *http.Request
 	var body map[string]any
+	resultSetBody := readFixture(t, "result_set.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		b, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(b, &body)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(readFixture(t, "result_set.json"))
+		_, _ = w.Write(resultSetBody)
 	}))
 	defer srv.Close()
 
@@ -117,10 +118,11 @@ func TestExecuteAdhoc(t *testing.T) {
 // not declared on the canonical POST operations).
 func TestExecuteWithEHRID(t *testing.T) {
 	var captured *http.Request
+	resultSetBody := readFixture(t, "result_set.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(readFixture(t, "result_set.json"))
+		_, _ = w.Write(resultSetBody)
 	}))
 	defer srv.Close()
 
@@ -147,10 +149,11 @@ func TestExecuteWithEHRID(t *testing.T) {
 // POST path (REQ-055 — verb-aware EHR scoping).
 func TestRunStoredWithEHRID(t *testing.T) {
 	var captured *http.Request
+	resultSetBody := readFixture(t, "result_set.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(readFixture(t, "result_set.json"))
+		_, _ = w.Write(resultSetBody)
 	}))
 	defer srv.Close()
 
@@ -178,10 +181,11 @@ func TestRunStoredWithEHRID(t *testing.T) {
 // GET operations) and MUST NOT send the `openehr-ehr-id` header.
 func TestExecuteGETWithEHRID(t *testing.T) {
 	var captured *http.Request
+	resultSetBody := readFixture(t, "result_set.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(readFixture(t, "result_set.json"))
+		_, _ = w.Write(resultSetBody)
 	}))
 	defer srv.Close()
 
@@ -205,6 +209,7 @@ func TestExecuteGETWithEHRID(t *testing.T) {
 
 func TestRunStored(t *testing.T) {
 	var body map[string]any
+	resultSetBody := readFixture(t, "result_set.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/openehr/v1/query/org.openehr::compositions" {
 			t.Errorf("path = %q", r.URL.Path)
@@ -212,7 +217,7 @@ func TestRunStored(t *testing.T) {
 		b, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(b, &body)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(readFixture(t, "result_set.json"))
+		_, _ = w.Write(resultSetBody)
 	}))
 	defer srv.Close()
 
@@ -237,10 +242,11 @@ func TestRunStored(t *testing.T) {
 
 func TestExecuteGET(t *testing.T) {
 	var captured *http.Request
+	resultSetBody := readFixture(t, "result_set.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(readFixture(t, "result_set.json"))
+		_, _ = w.Write(resultSetBody)
 	}))
 	defer srv.Close()
 
@@ -271,10 +277,11 @@ func TestExecuteGET(t *testing.T) {
 
 func TestExecuteGETEncodesScalarsLikeJSON(t *testing.T) {
 	var captured *http.Request
+	resultSetBody := readFixture(t, "result_set.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(readFixture(t, "result_set.json"))
+		_, _ = w.Write(resultSetBody)
 	}))
 	defer srv.Close()
 
@@ -297,10 +304,11 @@ func TestExecuteGETEncodesScalarsLikeJSON(t *testing.T) {
 
 func TestRunStoredGET(t *testing.T) {
 	var captured *http.Request
+	resultSetBody := readFixture(t, "result_set.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(readFixture(t, "result_set.json"))
+		_, _ = w.Write(resultSetBody)
 	}))
 	defer srv.Close()
 
@@ -330,11 +338,12 @@ func TestRunStoredGET(t *testing.T) {
 
 func TestRunStoredPOSTExplicitZeroOffset(t *testing.T) {
 	var body map[string]any
+	resultSetBody := readFixture(t, "result_set.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(b, &body)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(readFixture(t, "result_set.json"))
+		_, _ = w.Write(resultSetBody)
 	}))
 	defer srv.Close()
 
@@ -421,10 +430,11 @@ func TestRunStoredReservedNameIsByteExact(t *testing.T) {
 	for _, name := range []string{"AQL", "Aql", "aql.reports", "org.example.aql", "aqlx", "ehr::aql", "ehr::AQL"} {
 		t.Run(name, func(t *testing.T) {
 			var gotPath string
+			resultSetBody := readFixture(t, "result_set.json")
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				gotPath = r.URL.Path
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write(readFixture(t, "result_set.json"))
+				_, _ = w.Write(resultSetBody)
 			}))
 			defer srv.Close()
 
@@ -453,10 +463,11 @@ func TestRunStoredVersionPathConstruction(t *testing.T) {
 	} {
 		t.Run(tc.label, func(t *testing.T) {
 			var captured *http.Request
+			resultSetBody := readFixture(t, "result_set.json")
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				captured = r.Clone(r.Context())
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write(readFixture(t, "result_set.json"))
+				_, _ = w.Write(resultSetBody)
 			}))
 			defer srv.Close()
 
@@ -571,10 +582,11 @@ func TestRunStoredDiagnosticsNameTheOperationOnParamErrors(t *testing.T) {
 
 func TestExecuteGETExplicitZeroOffset(t *testing.T) {
 	var captured *http.Request
+	resultSetBody := readFixture(t, "result_set.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		captured = r.Clone(r.Context())
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(readFixture(t, "result_set.json"))
+		_, _ = w.Write(resultSetBody)
 	}))
 	defer srv.Close()
 
@@ -1140,11 +1152,12 @@ func TestStoredQueryEngineCapabilityError(t *testing.T) {
 // (Offset/Fetch), and bound parameters.
 func TestExecuteBuiltQueryEnvelope(t *testing.T) {
 	var body map[string]any
+	resultSetBody := readFixture(t, "result_set.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(b, &body)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(readFixture(t, "result_set.json"))
+		_, _ = w.Write(resultSetBody)
 	}))
 	defer srv.Close()
 
