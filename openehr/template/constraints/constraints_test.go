@@ -104,6 +104,58 @@ func TestREQ103_NumericRangeZeroValueAcceptsAnyValue(t *testing.T) {
 	}
 }
 
+// REQ-103 — IsValid and String read the zero NumericRange as if both
+// sides were unbounded, as IsBounded and Contains do: it is valid, and
+// it prints as (*..*). Read field by field, its zero bounds would form
+// the empty interval (0..0). A range with both sides explicitly
+// unbounded keeps the brackets its inclusivity flags give it. One flag
+// away from the zero value, the zero bounds are real bounds again.
+func TestREQ103_NumericRangeZeroValueReadsAsUnbounded(t *testing.T) {
+	tests := []struct {
+		name      string
+		r         constraints.NumericRange
+		wantValid bool
+		wantText  string
+	}{
+		{name: "zero-value", r: constraints.NumericRange{}, wantValid: true, wantText: "(*..*)"},
+		{
+			name:      "unbounded-exclusive",
+			r:         constraints.NumericRange{LowerUnbounded: true, UpperUnbounded: true},
+			wantValid: true, wantText: "(*..*)",
+		},
+		{
+			name:      "unbounded-inclusive",
+			r:         constraints.NumericRange{LowerUnbounded: true, UpperUnbounded: true, LowerInclusive: true, UpperInclusive: true},
+			wantValid: true, wantText: "[*..*]",
+		},
+		{
+			name:      "unbounded-lower-inclusive",
+			r:         constraints.NumericRange{LowerUnbounded: true, UpperUnbounded: true, LowerInclusive: true},
+			wantValid: true, wantText: "[*..*)",
+		},
+		{
+			name:      "unbounded-upper-inclusive",
+			r:         constraints.NumericRange{LowerUnbounded: true, UpperUnbounded: true, UpperInclusive: true},
+			wantValid: true, wantText: "(*..*]",
+		},
+		{
+			name:      "zero-bounds-upper-inclusive",
+			r:         constraints.NumericRange{UpperInclusive: true},
+			wantValid: false, wantText: "(0..0]",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.r.IsValid(); got != tc.wantValid {
+				t.Errorf("%#v.IsValid() = %v, want %v", tc.r, got, tc.wantValid)
+			}
+			if got := tc.r.String(); got != tc.wantText {
+				t.Errorf("%#v.String() = %q, want %q", tc.r, got, tc.wantText)
+			}
+		})
+	}
+}
+
 func TestNumericRange_IsValid(t *testing.T) {
 	tests := []struct {
 		name string
