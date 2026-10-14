@@ -106,8 +106,8 @@ func (w *walker) walkNode(optNode *tcimpl.CompiledNode, rmValue any, path string
 		w.external = append(w.external, path)
 	}
 
-	for _, attr := range optNode.Attributes() {
-		if rminfo.IsNonStorableAttr(bmmtype.Class(optNode.RMTypeName()), attr.Name()) {
+	for _, attr := range tcimpl.NodeAttributes(optNode) {
+		if tcimpl.Facts(attr).NonStorable {
 			continue
 		}
 		switch attr.Cardinality() {
@@ -334,7 +334,7 @@ func wrapsShortName(c *tcimpl.CompiledNode, gotType string) bool {
 }
 
 // conformsToChild reports whether the OPT child c declares no RM type,
-// or one the RM type gotType conforms to ([rmTypeIsSubtypeOf]). Under a
+// or one the RM type gotType conforms to ([conformsToNode]). Under a
 // typed DV_INTERVAL<T> child each present bound has to be a T, that is,
 // conform to T ([intervalConformsTo]): a DV_COUNT bound is a DV_ORDERED.
 // A round-tripped bare DV_INTERVAL val with no bound present carries no T
@@ -342,10 +342,23 @@ func wrapsShortName(c *tcimpl.CompiledNode, gotType string) bool {
 // bare DV_INTERVAL child has named its type ([namesRMType]).
 func conformsToChild(c *tcimpl.CompiledNode, gotType string, val any) bool {
 	want := c.RMTypeName()
-	if want == "" || rmTypeIsSubtypeOf(gotType, want) {
+	if want == "" || conformsToNode(c, gotType) {
 		return true
 	}
 	return intervalConformsTo(gotType, want, val)
+}
+
+// conformsToNode reports whether the RM type concrete conforms to the RM
+// type the compiled node c declares, as [rmTypeIsSubtypeOf] decides it, from
+// the classes the compile found to conform to that type
+// ([tcimpl.ConformsTo]) rather than from the class hierarchy at each call.
+func conformsToNode(c *tcimpl.CompiledNode, concrete string) bool {
+	class := bmmtype.Class(concrete)
+	if conforms, known := tcimpl.ConformsTo(c, class); known {
+		return conforms
+	}
+	wrapper, ok := aomPrimitiveWrappers[c.RMTypeName()]
+	return ok && wrapper == class
 }
 
 // formatAllowedTypes renders the OPT child RM types for inclusion
@@ -420,7 +433,7 @@ func (w *walker) walkMultipleAttribute(
 	// item passes; the OPT pinned only existence / cardinality, not
 	// membership). Tally per-child occurrences for the AOM 1.4
 	// occurrences upper-bound check.
-	children := attr.Children()
+	children := tcimpl.ChildNodes(attr)
 	if len(children) == 0 {
 		return
 	}
@@ -768,28 +781,19 @@ func requiredBy(attr *tcimpl.CompiledAttribute) (layer Layer, rule string, requi
 
 // isProhibited reports whether the OPT prohibits the compiled attribute:
 // its existence interval has a bounded upper bound of 0, or it declares at
-// least one child and allows none of them ([isAllowed]). An attribute with
-// no child is open, not prohibited.
+// least one child and allows none of them ([allowedChildren]). An attribute
+// with no child is open, not prohibited. The compile decides it once per
+// attribute ([tcimpl.Prohibited]).
 func isProhibited(attr *tcimpl.CompiledAttribute) bool {
-	if e := attr.Existence(); e != nil && !e.UpperUnbounded() && e.Upper() == 0 {
-		return true
-	}
-	children := attr.Children()
-	return len(children) > 0 && !slices.ContainsFunc(children, isAllowed)
+	return tcimpl.Prohibited(attr)
 }
 
-// isAllowed reports whether the OPT allows the child: its occurrences
-// upper bound is unbounded, or bounded above 0, or it states none.
-func isAllowed(child *tcimpl.CompiledNode) bool {
-	occ := child.Occurrences()
-	return occ == nil || occ.UpperUnbounded() || occ.Upper() != 0
-}
-
-// allowedChildren returns the children of attr the OPT allows
-// ([isAllowed]), in OPT order.
+// allowedChildren returns the children of attr the OPT allows, in OPT
+// order: those whose occurrences upper bound is unbounded, or bounded above
+// 0, or that state none. The compile resolves them once per attribute
+// ([tcimpl.AllowedChildNodes]); the caller must not change the slice.
 func allowedChildren(attr *tcimpl.CompiledAttribute) []*tcimpl.CompiledNode {
-	// Children returns a copy, so deleting from it leaves attr as it is.
-	return slices.DeleteFunc(attr.Children(), func(c *tcimpl.CompiledNode) bool { return !isAllowed(c) })
+	return tcimpl.AllowedChildNodes(attr)
 }
 
 // prohibitedIssue returns the issue that reports the attribute attr, which
@@ -1101,10 +1105,10 @@ func identityIssue(opt *tcimpl.CompiledNode, rmValue any, path string) (iss Issu
 
 // rmTypeIssue returns rm_type_mismatch, with ok set, when the concrete RM
 // type does not conform to the compiled OPT node's RMTypeName. Conformance is
-// the pinned BMM's class hierarchy ([rmTypeIsSubtypeOf]), for an
-// abstract and a concrete ancestor alike: a node declared as
-// ITEM_STRUCTURE admits ITEM_TREE, one declared as DV_TEXT admits
-// DV_CODED_TEXT.
+// the pinned BMM's class hierarchy ([rmTypeIsSubtypeOf], read through
+// [conformsToNode]), for an abstract and a concrete ancestor alike: a node
+// declared as ITEM_STRUCTURE admits ITEM_TREE, one declared as DV_TEXT
+// admits DV_CODED_TEXT.
 func rmTypeIssue(opt *tcimpl.CompiledNode, rmValue any, path string) (iss Issue, ok bool) {
 	want := opt.RMTypeName()
 	if want == "" {
@@ -1114,7 +1118,7 @@ func rmTypeIssue(opt *tcimpl.CompiledNode, rmValue any, path string) (iss Issue,
 	if got == want {
 		return iss, false
 	}
-	if rmTypeIsSubtypeOf(got, want) || intervalRMTypeMatches(got, want, rmValue) {
+	if conformsToNode(opt, got) || intervalRMTypeMatches(got, want, rmValue) {
 		return iss, false
 	}
 	return Issue{

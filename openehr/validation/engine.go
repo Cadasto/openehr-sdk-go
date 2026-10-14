@@ -17,7 +17,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
@@ -96,11 +95,6 @@ type engine struct {
 	// through it, reports the template's issues into it too, so they keep
 	// walk order, and uses none of its own walk state.
 	rules rmFloorWalker
-	// info is the class metadata the walk reads each node's attributes by,
-	// and lister the part of it that lists a class's attributes; a nil lister
-	// lists none.
-	info   rminfo.Lookup
-	lister rminfo.AttributeLister
 	// maxDepth and maxNodes are the [Limits] of the call, defaults filled in.
 	maxDepth, maxNodes int
 	// stoppedAt holds the path of the max_depth issue and of the max_nodes
@@ -129,12 +123,8 @@ type engine struct {
 // field of which stands for its default.
 func newEngine(lim Limits) *engine {
 	lim = lim.withDefaults()
-	info := rminfo.Default
-	lister, _ := info.(rminfo.AttributeLister)
 	return &engine{
-		rules:    rmFloorWalker{info: info},
-		info:     info,
-		lister:   lister,
+		rules:    rmFloorWalker{info: rminfo.Default},
 		maxDepth: lim.Depth,
 		maxNodes: lim.Nodes,
 		ancestry: make([]any, 0, 16),
@@ -449,82 +439,108 @@ func (e *engine) checkLeaf(n engineNode, scalar bool) *tcimpl.CompiledNode {
 // that the template does not declare. A value of no registered RM class
 // ([rmaccess.Covers]) has no attributes the access reads, so only those the
 // template declares are visited on it, each read as absent.
+//
+// What the class metadata says of each attribute is resolved before the
+// walk: where the value's class is the class of the bound template node's
+// RM type, when the template was compiled ([tcimpl.Facts],
+// [tcimpl.RestFacts]); elsewhere, once per class, when the package is
+// initialised ([classAttributes]). Both read the metadata the walk would.
 func (e *engine) visitAttributes(n engineNode, class string, rules *classRules) {
-	var names []string
-	if e.lister != nil && rmaccess.Covers(n.value) {
-		names = e.lister.AttributeNames(class)
-	}
-	required := e.info.RequiredAttributes(class)
-	if n.bound != nil {
-		boundClass := bmmtype.Class(n.bound.RMTypeName())
-		for _, decl := range n.bound.Attributes() {
+	covered := rmaccess.Covers(n.value)
+	if n.bound != nil && class == tcimpl.WalkClass(n.bound) {
+		for _, decl := range tcimpl.NodeAttributes(n.bound) {
 			if e.stopped {
 				return // the visit limit ended the walk below this node
 			}
-			var a engineAttr
-			name := decl.Name()
-			if attrType, listed := e.classLists(class, names, name); listed {
-				a = e.classAttr(n, class, name, attrType, required, rules)
-				a.decl = decl
-			} else {
-				if rminfo.IsNonStorableAttr(boundClass, name) {
-					continue
-				}
-				a = engineAttr{name: name, rmType: decl.RMTypeName(), shape: shapeSingle, decl: decl}
-				if decl.Cardinality() == template.Multiple {
-					a.shape = shapeList
-				}
+			f := tcimpl.Facts(decl)
+			if a, visited := declaredAttr(n, decl, f, covered && f.Listed, rules); visited {
+				e.visitAttribute(n, class, a)
 			}
-			e.visitAttribute(n, class, a)
+		}
+		if !covered {
+			return // a value the access does not read lists no attribute
+		}
+		for _, f := range tcimpl.RestFacts(n.bound) {
+			if e.stopped {
+				return
+			}
+			e.visitAttribute(n, class, attrFromFacts(n, f, rules))
+		}
+		return
+	}
+	var table *classAttributeTable
+	if covered {
+		table = classAttributes[class]
+	}
+	if n.bound != nil {
+		for _, decl := range tcimpl.NodeAttributes(n.bound) {
+			if e.stopped {
+				return
+			}
+			f, listed := table.lookup(decl.Name())
+			if a, visited := declaredAttr(n, decl, f, listed, rules); visited {
+				e.visitAttribute(n, class, a)
+			}
 		}
 	}
-	for _, name := range names {
+	if table == nil {
+		return
+	}
+	for _, f := range table.listed {
 		if e.stopped {
 			return
 		}
-		if rminfo.IsNonStorableAttr(class, name) || n.declared(name) != nil {
+		if f.NonStorable || !f.Typed || n.declared(f.Name) != nil {
 			continue // not visited, or visited above in the template's order
 		}
-		attrType, typed := e.info.AttributeRMType(class, name)
-		if !typed {
-			continue
-		}
-		e.visitAttribute(n, class, e.classAttr(n, class, name, attrType, required, rules))
+		e.visitAttribute(n, class, attrFromFacts(n, f, rules))
 	}
 }
 
-// classAttr returns the attribute name of node n, of class class, whose
-// declared RM type is attrType, as the class metadata gives it, with no
-// template declaration; required are the class's RM-mandatory attributes
-// and rules its rules.
-func (e *engine) classAttr(n engineNode, class, name, attrType string, required []string, rules *classRules) engineAttr {
-	a := engineAttr{name: name, rmType: attrType, shape: e.shapeOf(class, name, attrType), classRead: true}
-	a.mandatory = slices.Contains(required, name) && !rules.leavesOut(name) &&
-		(a.shape != shapeSingle || !mayBeBlank(n.role, name))
+// declaredAttr returns the attribute decl the bound template node of n
+// declares, as the walk visits it, with visited set, given f, what the class
+// metadata says of the attribute for the value's class, which lists it when
+// listed is set. An attribute the class lists, a serialization carries and
+// the metadata types is read as the class metadata gives it. Any other is
+// read as the template declares it, single-valued or a list; it is not
+// visited when no serialization of the bound node's class carries it.
+func declaredAttr(n engineNode, decl *tcimpl.CompiledAttribute, f tcimpl.AttributeFacts, listed bool, rules *classRules) (a engineAttr, visited bool) {
+	if listed && !f.NonStorable && f.Typed {
+		a = attrFromFacts(n, f, rules)
+		a.decl = decl
+		return a, true
+	}
+	if tcimpl.Facts(decl).NonStorable {
+		return a, false
+	}
+	a = engineAttr{name: decl.Name(), rmType: decl.RMTypeName(), shape: shapeSingle, decl: decl}
+	if decl.Cardinality() == template.Multiple {
+		a.shape = shapeList
+	}
+	return a, true
+}
+
+// attrFromFacts returns the attribute of node n, whose rules are rules,
+// that f describes, as the class metadata gives it, with no template
+// declaration. It is mandatory when the metadata marks it mandatory for the
+// class, no rule of the class reports its absence itself and, for a
+// single-valued one, the node's role does not let it be blank.
+func attrFromFacts(n engineNode, f tcimpl.AttributeFacts, rules *classRules) engineAttr {
+	a := engineAttr{name: f.Name, rmType: f.RMType, shape: shapeFrom(f.Container, f.PrimitiveItems, f.Hash), classRead: true}
+	a.mandatory = f.Mandatory && !rules.leavesOut(f.Name) && (a.shape != shapeSingle || !mayBeBlank(n.role, f.Name))
 	return a
 }
 
-// classLists returns the declared RM type of the attribute name of class
-// class, with listed set, when the walk visits it as the class metadata
-// gives it: names, the attributes the metadata lists for class, holds it, a
-// serialization carries it, and the metadata gives it a type.
-func (e *engine) classLists(class string, names []string, name string) (attrType string, listed bool) {
-	if !slices.Contains(names, name) || rminfo.IsNonStorableAttr(class, name) {
-		return "", false
-	}
-	return e.info.AttributeRMType(class, name)
-}
-
-// shapeOf returns how the walk reads the attribute name of the class class,
-// whose declared RM type, or its items' for a list, is attrType.
-func (e *engine) shapeOf(class, name, attrType string) attrShape {
-	if isContainer, _ := e.info.IsContainer(class, name); isContainer {
-		if isPrimitiveType(e.info, attrType) {
-			return shapeCounted
-		}
+// shapeFrom returns how the walk reads an attribute that is a container or
+// not, whose items, for a container, are of a primitive type or not, and
+// that is a Hash or not.
+func shapeFrom(container, primitiveItems, hash bool) attrShape {
+	switch {
+	case container && primitiveItems:
+		return shapeCounted
+	case container:
 		return shapeList
-	}
-	if attrType == hashType {
+	case hash:
 		return shapeHash
 	}
 	return shapeSingle
@@ -654,7 +670,7 @@ func (e *engine) visitDeclaredItems(n engineNode, a engineAttr, r attrReading, a
 		e.refuse(prohibitedIssue(a.decl, n.value, attrPath))
 		return
 	}
-	children := a.decl.Children()
+	children := tcimpl.ChildNodes(a.decl)
 	var bound []*tcimpl.CompiledNode
 	var paths []string
 	if len(children) > 0 && a.shape != shapeCounted {

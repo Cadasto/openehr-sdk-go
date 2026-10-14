@@ -17,6 +17,7 @@ import (
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
+	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 )
 
@@ -366,6 +367,50 @@ func hierarchyOf(l rminfo.Lookup) rminfo.Hierarchy {
 
 // floorRules is the floor's dispatch.
 var floorRules = pinnedSource.build()
+
+// classAttributes holds, for each class the pinned class metadata knows, by
+// its bare name, what the metadata says of each attribute it lists for the
+// class ([tcimpl.ClassFacts]), which the one walk reads a node by when no
+// template node of the node's class binds it. Built once, when the package
+// is initialised, and never changed, so the walk asks the metadata nothing
+// per node.
+var classAttributes = buildClassAttributes(rminfo.Default)
+
+// classAttributeTable is what the class metadata says of the attributes of
+// one class: each attribute it lists, in its order, and the position of each
+// by name.
+type classAttributeTable struct {
+	listed []tcimpl.AttributeFacts
+	byName map[string]int
+}
+
+// lookup returns the facts of the attribute name the table lists, with ok
+// set; ok is unset when it lists none by that name. A nil table lists none.
+func (t *classAttributeTable) lookup(name string) (f tcimpl.AttributeFacts, ok bool) {
+	if t == nil {
+		return f, false
+	}
+	i, ok := t.byName[name]
+	if !ok {
+		return f, false
+	}
+	return t.listed[i], true
+}
+
+// buildClassAttributes builds [classAttributes] for every class l knows.
+func buildClassAttributes(l rminfo.Lookup) map[string]*classAttributeTable {
+	known := l.KnownRMTypes()
+	out := make(map[string]*classAttributeTable, len(known))
+	for _, class := range known {
+		listed := tcimpl.ClassFacts(class)
+		byName := make(map[string]int, len(listed))
+		for i, f := range listed {
+			byName[f.Name] = i
+		}
+		out[class] = &classAttributeTable{listed: listed, byName: byName}
+	}
+	return out
+}
 
 // build builds the floor's dispatch. On a node of a class it runs, in this
 // order: the attribute checks that apply to the class; the evaluator of each

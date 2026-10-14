@@ -13,8 +13,10 @@ package validation_test
 // order.
 
 import (
+	"reflect"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -560,6 +562,35 @@ func TestREQ171_EngineReadsAnEmptyHashAsTheRMRulesDo(t *testing.T) {
 				t.Errorf("engine(RESOURCE_DESCRIPTION with an empty original_author, %s) at %s = %q, want %q", tc.name, path, got, tc.want)
 			}
 		})
+	}
+}
+
+// REQ-171 § Surface — the compiled template is built once and shared: the
+// one walk over every corpus composition, against its compiled template,
+// run from several goroutines at once over one compiled template and one
+// root, returns what it returns run alone. Everything the compile resolves
+// for the walk is set before Compile returns, and the walk only reads it; a
+// walk that wrote to the compiled template, an answer filled in on first
+// use, would fail this test under the race detector.
+func TestREQ171_EngineSharesOneCompiledTemplateBetweenGoroutines(t *testing.T) {
+	t.Parallel()
+	const goroutines = 4
+	for _, doc := range corpusDocuments(t) {
+		if doc.c == nil {
+			continue
+		}
+		want := validation.RunEngine(doc.root, doc.c, validation.Limits{})
+		results := make([]validation.Result, goroutines)
+		var wg sync.WaitGroup
+		for i := range results {
+			wg.Go(func() { results[i] = validation.RunEngine(doc.root, doc.c, validation.Limits{}) })
+		}
+		wg.Wait()
+		for i, got := range results {
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("engine(%s) in goroutine %d = %+v, want %+v, its result run alone", doc.rel.Rel, i, got, want)
+			}
+		}
 	}
 }
 
