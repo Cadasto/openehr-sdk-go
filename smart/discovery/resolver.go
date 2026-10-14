@@ -253,9 +253,11 @@ func requestFailure(err error) DiscoveryErrorReason {
 // the authorization-server members, and the https rule for the base URL,
 // the issuer and the auth endpoints. A catalog that fails them yields the
 // DiscoveryError a newly fetched document would, and stays cached for the
-// Resolvers that accept it. The issuer's OpenID configuration is not
-// fetched for a fresh cached catalog; it is checked when the document is
-// fetched or renewed.
+// Resolvers that accept it. Two checks are not made on a fresh cached
+// catalog. The issuer's OpenID configuration is not fetched; it is checked
+// when the document is fetched or renewed. Nor is the document path
+// compared: the cache keys a catalog by baseURL alone, so a catalog fetched
+// by a Resolver with another WithWellKnownPath is returned as it stands.
 //
 // When the cached catalog has expired and carries an ETag, the fetch is
 // conditional, as for Refresh: a 304 Not Modified renews the cached
@@ -557,7 +559,8 @@ func (r *Resolver) documentURL(baseURL string) (*url.URL, error) {
 // rule for the issuer and the auth endpoints, and validate. The catalog may
 // have been cached by a Resolver built with other options, so it must not
 // skip them. The OpenID configuration check is left to the next fetch or
-// renewal, since it needs a request.
+// renewal, since it needs a request. The document path is not compared:
+// the cache keys entries by base URL alone (the REQ-071 known gap).
 //
 // REQ-071, REQ-072, REQ-073: a failure is the DiscoveryError a new document
 // would get, and the caller leaves the entry cached, because it says

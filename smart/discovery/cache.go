@@ -12,9 +12,22 @@ import (
 // The Resolver keys every entry by the Platform base URL the caller
 // resolved (ServiceCatalog.BaseURL), never by the OpenID Connect issuer.
 //
-// Resolvers built with different options may share one Cache. Each checks
-// a fresh entry against its own options before returning it, and an entry
-// one Resolver refuses stays cached for the others.
+// Resolvers built with different options may share one Cache. Before a
+// Resolver returns a fresh entry, it runs those of its own checks that send
+// no request: the required services, the accepted spec versions, the
+// authorization-server members, and the https rule for the base URL, the
+// issuer and the auth endpoints. Two things are not checked on a fresh
+// entry. The issuer's OpenID configuration is not fetched, so an entry that
+// a Resolver built with WithoutOpenIDConfigurationCheck cached reaches a
+// Resolver that wants the issuer confirmed, until the entry expires or is
+// refreshed. Nor is the document path compared: entries are keyed by the
+// base URL alone, so an entry fetched from one Resolver's WithWellKnownPath
+// reaches a Resolver configured with another path.
+//
+// Only a fresh entry that a Resolver refuses stays cached for the others.
+// When a Resolver fetches again, because the entry has expired or Refresh
+// was called, and the fetch or the checks on its result fail, the entry is
+// dropped, unless only the caller's own context ended.
 //
 // The Resolver logs an error from Put or Invalidate at warning level and
 // carries on: it does not reach the caller of Resolve or Refresh. A failed
