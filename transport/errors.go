@@ -62,8 +62,9 @@ var (
 	// redirect from an https URL to a URL that is not https, because the
 	// request carried a credential header (Authorization,
 	// Proxy-Authorization, Cookie or Cookie2), which net/http forwards to a
-	// redirect target on the same host or a subdomain whatever its scheme. The request never reached
-	// that URL, and the retry policy does not retry it.
+	// redirect target on the same host or a subdomain whatever its scheme.
+	// The request never reached that URL, and the retry policy does not
+	// retry it.
 	ErrInsecureRedirect = errors.New("transport: redirect from https to a URL that is not https refused")
 )
 
