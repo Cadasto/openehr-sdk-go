@@ -1498,9 +1498,11 @@ requirements:
       - openehr/serialize/canjson/interval_open_side_test.go
       - openehr/serialize/canjson/mappings_presence_test.go
       - openehr/serialize/canxml/interval_open_side_test.go
+      - openehr/templatecompile/compile_test.go
       - openehr/validation/coverage_test.go
       - openehr/validation/coverage_unevaluated_test.go
       - openehr/validation/engine_template_test.go
+      - openehr/validation/engine_walk_test.go
       - openehr/validation/finding_identity_rules_test.go
       - openehr/validation/inventory_dispatch_internal_test.go
       - openehr/validation/issuepath_internal_test.go
@@ -1600,7 +1602,6 @@ requirements:
       - openehr/template/webtemplate/paths_rmpath_test.go
       - openehr/template/webtemplate/req116_gap_test.go
       - openehr/validation/binding_by_name_test.go
-      - openehr/validation/issuepath_internal_test.go
       - openehr/validation/rmfloor_chained_internal_test.go
       - openehr/validation/rmfloor_chained_test.go
 
@@ -2141,7 +2142,7 @@ requirements:
       - openehr/validation/coverage_test.go
       - openehr/validation/coverage_unevaluated_test.go
       - openehr/validation/engine_bench_test.go
-      - openehr/validation/engine_compare_test.go
+      - openehr/validation/engine_internal_test.go
       - openehr/validation/engine_template_test.go
       - openehr/validation/engine_walk_test.go
       - openehr/validation/finding_identity_rules_test.go
@@ -2155,6 +2156,8 @@ requirements:
       - openehr/validation/prohibited_test.go
       - openehr/validation/registry_roots_test.go
       - openehr/validation/rmfloor_bytes_internal_test.go
+      - openehr/validation/rmfloor_chained_corpus_test.go
+      - openehr/validation/rmfloor_chained_internal_test.go
       - openehr/validation/rmfloor_coded_test.go
       - openehr/validation/rmfloor_generated_access_test.go
       - openehr/validation/rmfloor_interval_class_test.go

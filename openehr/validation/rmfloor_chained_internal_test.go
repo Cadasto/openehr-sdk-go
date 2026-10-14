@@ -27,14 +27,15 @@ func keys(issues []Issue) []string {
 	return out
 }
 
-// REQ-102 § RM floor, § Issue paths; REQ-171 § One walk — through Validate,
-// the empty language of two OBSERVATIONs that reuse one archetype under the
-// names Erste and Zweite is reported once at each, as the RM's `required`,
-// beside the coded rule's own code: at the name-predicated path the walk
-// that binds the template writes, since the RM rules run in that walk. The
-// findings come in the walk's step order: at each node the RM rules of its
-// class, then its attributes, those the template declares first.
-func TestValidate_REQ102_REQ171_EachDefectOnceAtTheWalksPath(t *testing.T) {
+// REQ-102 § RM floor, § Issue paths; REQ-112; REQ-116; REQ-171 § One walk —
+// through Validate, the empty language of two OBSERVATIONs that reuse one
+// archetype under the names Erste and Zweite is reported once at each, as
+// the RM's `required`, beside the coded rule's own code: at the
+// name-predicated path the walk that binds the template writes, since the RM
+// rules run in that walk. The findings come in the walk's step order: at
+// each node the RM rules of its class, then its attributes, those the
+// template declares first.
+func TestValidate_REQ102_REQ112_REQ116_REQ171_EachDefectOnceAtTheWalksPath(t *testing.T) {
 	opt, err := template.ParseOPT(strings.NewReader(handoffOPT))
 	if err != nil {
 		t.Fatalf("ParseOPT: %v", err)
