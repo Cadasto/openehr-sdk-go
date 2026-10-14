@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
+	"github.com/cadasto/openehr-sdk-go/internal/urlredact"
 )
 
 const defaultJWKSTTL = 5 * time.Minute
@@ -165,7 +166,8 @@ func (j *JWKS) refresh(ctx context.Context) error {
 func (j *JWKS) fetch(ctx context.Context) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, j.URI, nil)
 	if err != nil {
-		return err
+		// url.Parse's error quotes the URI, which may carry a password.
+		return urlredact.Error(err, j.URI)
 	}
 	req.Header.Set("Accept", "application/json")
 	resp, err := j.HTTPClient.Do(req)

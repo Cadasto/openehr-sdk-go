@@ -120,6 +120,7 @@ requirements:
     implementation: landed
     packages: [transport]
     tests:
+      - smart/discovery/refuse_downgrade_internal_test.go
       - transport/client_test.go
       - transport/redirect_internal_test.go
       - transport/redirect_test.go
@@ -648,6 +649,7 @@ requirements:
       - auth/clientcreds/token_type_test.go
       - auth/jwtbearer/redirect_test.go
       - auth/jwtbearer/token_type_test.go
+      - auth/smart/redact_test.go
       - auth/smart/redirect_test.go
       - auth/smart/smart_test.go
       - auth/tokensource_test.go
@@ -668,6 +670,7 @@ requirements:
       - auth/smart/complete_test.go
       - auth/smart/exchange_idtoken_test.go
       - auth/smart/launch_test.go
+      - auth/smart/redact_test.go
       - auth/smart/smart_test.go
       - auth/tokensource_test.go
       - smart/discovery/iss_parameter_test.go
@@ -687,6 +690,7 @@ requirements:
       - auth/smart/idtoken_subject_test.go
       - auth/smart/idtoken_test.go
       - auth/smart/jwks_kidless_test.go
+      - auth/smart/redact_test.go
       - auth/smart/smart_test.go
       - smart/discovery/resolver_test.go
       - smart/idtoken_test.go
@@ -706,8 +710,10 @@ requirements:
       - auth/errors_test.go
       - auth/jwtbearer/reauth_test.go
       - auth/smart/reauth_test.go
+      - auth/smart/redact_test.go
       - auth/smart/redirect_test.go
       - auth/smart/refresh_carry_test.go
+      - auth/smart/refresh_failure_test.go
       - auth/smart/refresh_idtoken_test.go
       - auth/smart/restored_scope_test.go
       - auth/smart/revoke_test.go
@@ -786,8 +792,10 @@ requirements:
     tests:
       - auth/clientcreds/catalog_test.go
       - auth/clientcreds/clientcreds_test.go
+      - auth/clientcreds/redact_test.go
       - auth/jwtbearer/client_assertion_test.go
       - auth/jwtbearer/jwtbearer_test.go
+      - auth/jwtbearer/redact_test.go
       - auth/smart/client_assertion_test.go
       - auth/smart/client_id_test.go
       - auth/smart/confidential_pkce_test.go
@@ -818,6 +826,8 @@ requirements:
       - smart/discovery/iss_parameter_test.go
       - smart/discovery/issuer_path_test.go
       - smart/discovery/issuer_test.go
+      - smart/discovery/mustparse_test.go
+      - smart/discovery/redact_test.go
       - smart/discovery/resolver_test.go
       - smart/discovery/service_entry_test.go
       - smart/discovery/static_test.go
@@ -837,6 +847,7 @@ requirements:
       - smart/discovery/coalesce_panic_test.go
       - smart/discovery/issuer_test.go
       - smart/discovery/not_modified_test.go
+      - smart/discovery/redact_test.go
       - testkit/probes/discovery/probe_041_catalog_refresh_on_401.go
 
   - id: REQ-072
@@ -848,6 +859,7 @@ requirements:
     probes: [PROBE-002, PROBE-003, PROBE-040, PROBE-041]
     tests:
       - smart/discovery/auth_members_test.go
+      - smart/discovery/redact_test.go
       - smart/discovery/resolver_test.go
       - smart/discovery/service_entry_test.go
       - smart/discovery/url_shape_test.go
@@ -866,7 +878,9 @@ requirements:
       - smart/discovery/diagnostics_test.go
       - smart/discovery/insecure_baseurl_test.go
       - smart/discovery/issuer_test.go
+      - smart/discovery/redact_test.go
       - smart/discovery/redirect_test.go
+      - smart/discovery/refuse_downgrade_internal_test.go
       - smart/discovery/resolver_test.go
       - smart/discovery/url_shape_test.go
 
@@ -1001,6 +1015,7 @@ requirements:
       - transport/error_envelope_test.go
       - transport/errors_test.go
       - transport/reauth_challenge_test.go
+      - transport/redact_test.go
       - transport/redirect_test.go
 
   - id: REQ-094
@@ -2010,6 +2025,7 @@ requirements:
     packages: [auth/smart, auth, testkit/probes/auth]
     probes: [PROBE-106]
     tests:
+      - auth/smart/redact_test.go
       - auth/smart/redirect_test.go
       - auth/smart/revoke_test.go
       - auth/smart/token_change_test.go
