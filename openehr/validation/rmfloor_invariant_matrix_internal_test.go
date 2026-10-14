@@ -10,13 +10,18 @@ package validation
 // Finding identity). The generated inventory supplies the pairs: an
 // invariant newly called evaluated that has no row fails the probe, and so
 // does a class newly subject to an invariant whose row does not fit the
-// class.
+// class. DV_INTERVAL.Limits_consistent is ordered by the type of the bounds,
+// so its row breaks it with bounds of every concrete DV_ORDERED the pinned
+// RM declares, and a type newly declared fails the probe until its pair is
+// added.
 
 import (
 	"maps"
 	"slices"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
@@ -43,6 +48,12 @@ func codedTextJSON(code string) string {
 	return `{"_type":"DV_CODED_TEXT","value":"x","defining_code":` + codePhraseJSON("openehr", code) + `}`
 }
 
+// localSymbolJSON returns a DV_CODED_TEXT symbol holding code in the local
+// terminology.
+func localSymbolJSON(code string) string {
+	return `{"_type":"DV_CODED_TEXT","value":"x","defining_code":` + codePhraseJSON("local", code) + `}`
+}
+
 // matrixRow is the row of one evaluated invariant. breaking holds the JSON
 // members that break the invariant on a value of any class subject to it;
 // empty, the class's zero value breaks it. conforming holds the members of a
@@ -50,10 +61,51 @@ func codedTextJSON(code string) string {
 // breaks the invariant changed, or with the member that keeps it added. For
 // an invariant another evaluated check decides, rule and path name the issue
 // that check reports for the break: its rule is the rule of the check
-// (REQ-171 Finding identity), not the invariant's.
+// (REQ-171 Finding identity), not the invariant's. more holds further pairs
+// of breaking and conforming members, each checked like the row's own, for
+// an invariant whose evaluator reads values of one class in more than one
+// way: Limits_consistent orders the bounds of a DV_INTERVAL by their type.
 type matrixRow struct {
 	breaking, conforming string
 	rule, path           string
+	more                 []matrixPair
+}
+
+// matrixPair is one further pair of a row: the members of a value that
+// breaks the invariant and of one that keeps it.
+type matrixPair struct {
+	breaking, conforming string
+}
+
+// boundPair returns the pair of a DV_INTERVAL whose bounds are of class, from
+// the members of a high and a low bound of that class: breaking holds high as
+// the lower bound and low as the upper one, and conforming the two in order.
+func boundPair(class, high, low string) matrixPair {
+	bound := func(members string) string { return `{"_type":"` + class + `",` + members + `}` }
+	return matrixPair{
+		breaking:   `"lower":` + bound(high) + `,"upper":` + bound(low),
+		conforming: `"lower":` + bound(low) + `,"upper":` + bound(high),
+	}
+}
+
+// intervalOrderPairs are the further pairs of DV_INTERVAL.Limits_consistent,
+// one for each bound type but DV_COUNT, whose pair is the row's own. Each
+// breaking interval holds two bounds the RM makes strictly comparable, lower
+// above upper by the RM's less_than for their type (REQ-112).
+var intervalOrderPairs = []matrixPair{
+	boundPair("DV_QUANTITY", `"magnitude":5,"units":"mm"`, `"magnitude":1,"units":"mm"`),
+	boundPair("DV_ORDINAL", `"value":3,"symbol":`+localSymbolJSON("at3"), `"value":1,"symbol":`+localSymbolJSON("at1")),
+	boundPair("DV_SCALE", `"value":2.5,"symbol":`+localSymbolJSON("at3"), `"value":0.5,"symbol":`+localSymbolJSON("at1")),
+	boundPair("DV_PROPORTION", `"numerator":3,"denominator":4,"type":0`, `"numerator":1,"denominator":4,"type":0`),
+	boundPair("DV_DATE", `"value":"2025-01-01"`, `"value":"2024-01-01"`),
+	boundPair("DV_TIME", `"value":"10:00:00"`, `"value":"08:00:00"`),
+	boundPair("DV_DATE_TIME", `"value":"2025-01-01T00:00:00Z"`, `"value":"2024-01-01T00:00:00Z"`),
+	boundPair("DV_DURATION", `"value":"P2D"`, `"value":"P1D"`),
+}
+
+// pairs returns the row's own pair followed by its further pairs.
+func (r matrixRow) pairs() []matrixPair {
+	return append([]matrixPair{{breaking: r.breaking, conforming: r.conforming}}, r.more...)
 }
 
 // invariantMatrix holds the row of every invariant the inventory calls
@@ -70,7 +122,7 @@ var invariantMatrix = map[string]matrixRow{
 	"DV_DATE.Value_valid":                {breaking: `"value":"example"`, conforming: `"value":"2024-01-01"`},
 	"DV_DATE_TIME.Value_valid":           {breaking: `"value":"example"`, conforming: `"value":"2024-01-01T10:30:00Z"`},
 	"DV_DURATION.Value_valid":            {breaking: `"value":"example"`, conforming: `"value":"P1D"`},
-	"DV_INTERVAL.Limits_consistent":      {breaking: `"lower":{"_type":"DV_COUNT","magnitude":5},"upper":{"_type":"DV_COUNT","magnitude":1}`, conforming: `"lower":{"_type":"DV_COUNT","magnitude":5},"upper":{"_type":"DV_COUNT","magnitude":5}`},
+	"DV_INTERVAL.Limits_consistent":      {breaking: `"lower":{"_type":"DV_COUNT","magnitude":5},"upper":{"_type":"DV_COUNT","magnitude":1}`, conforming: `"lower":{"_type":"DV_COUNT","magnitude":5},"upper":{"_type":"DV_COUNT","magnitude":5}`, more: intervalOrderPairs},
 	"DV_PROPORTION.Precision_validity":   {breaking: `"numerator":1.5,"denominator":2,"type":0,"precision":0`, conforming: `"numerator":1,"denominator":2,"type":0,"precision":0`},
 	"DV_TEXT.Mappings_valid":             {breaking: `"value":"x","mappings":[]`, conforming: `"value":"x","mappings":[{"_type":"TERM_MAPPING","match":"="}]`},
 	"DV_TIME.Value_valid":                {breaking: `"value":"example"`, conforming: `"value":"10:30:00"`},
@@ -168,17 +220,19 @@ func validateMembers(class, members string) (Result, string, error) {
 
 // TestPROBE077_REQ112_REQ171_InvariantMatrix is PROBE-077. Each subtest is
 // one pair of an invariant the inventory calls evaluated and a registered
-// class subject to it. The row's breaking value must draw the invariant's
-// finding: an issue whose rule is the invariant, or, for an invariant another
-// evaluated check decides, the issue that check reports, at its path and with
-// its rule, and the invariant must not be listed as unevaluated. The row's
-// conforming value must draw no such issue. The probe fails for an evaluated
-// invariant without a row, for a row that names no conforming value or
-// misstates which check decides its invariant, for a row of an invariant that
-// is not evaluated, and for an evaluated invariant no class is subject to. It
-// also fails for an invariant bound but never dispatched, dispatched to an
+// class subject to it. Each breaking value of the row must draw the
+// invariant's finding: an issue whose rule is the invariant, or, for an
+// invariant another evaluated check decides, the issue that check reports, at
+// its path and with its rule, and the invariant must not be listed as
+// unevaluated. Each conforming value of the row must draw no such issue. The
+// probe fails for an evaluated invariant without a row, for a row that names
+// no conforming value, holds a further pair short of a value, or misstates
+// which check decides its invariant, for a row of an invariant that is not
+// evaluated, and for an evaluated invariant no class is subject to. It also
+// fails for an invariant bound but never dispatched, dispatched to an
 // evaluator that cannot read the class, or decided by a check that does not
-// run on the class.
+// run on the class, and when the row of DV_INTERVAL.Limits_consistent breaks
+// it with no bounds of a concrete DV_ORDERED.
 func TestPROBE077_REQ112_REQ171_InvariantMatrix(t *testing.T) {
 	t.Parallel()
 	subject := map[string]int{}
@@ -202,6 +256,8 @@ func TestPROBE077_REQ112_REQ171_InvariantMatrix(t *testing.T) {
 					t.Fatalf("the row for %s names the issue %s at %s, but %s evaluates %s itself and no other check decides it", key, row.rule, row.path, fn, key)
 				case row.conforming == "":
 					t.Fatalf("the row for %s names no value that keeps it; add one", key)
+				case slices.ContainsFunc(row.more, func(p matrixPair) bool { return p.breaking == "" || p.conforming == "" }):
+					t.Fatalf("the row for %s holds a further pair without a value that breaks it and one that keeps it; complete it", key)
 				}
 				finding := func(i Issue) bool { return i.Rule == key }
 				want := "whose rule is " + key
@@ -209,28 +265,30 @@ func TestPROBE077_REQ112_REQ171_InvariantMatrix(t *testing.T) {
 					finding = func(i Issue) bool { return i.Rule == row.rule && i.Path == row.path }
 					want = "whose rule is " + row.rule + " at " + row.path
 				}
-				if r, body, err := validateMembers(class, row.breaking); err != nil {
-					t.Errorf("typereg.Decode(%s): %v", body, err)
-				} else {
-					if !slices.ContainsFunc(r.Issues, finding) {
-						t.Errorf("ValidateRM(%s) issues %q, want one %s: %s does not decide %s on %s", body, keys(r.Issues), want, fn, key, class)
+				for _, pair := range row.pairs() {
+					if r, body, err := validateMembers(class, pair.breaking); err != nil {
+						t.Errorf("typereg.Decode(%s): %v", body, err)
+					} else {
+						if !slices.ContainsFunc(r.Issues, finding) {
+							t.Errorf("ValidateRM(%s) issues %q, want one %s: %s does not decide %s on %s", body, keys(r.Issues), want, fn, key, class)
+						}
+						if covered && slices.Contains(r.Coverage.Unevaluated, key) {
+							t.Errorf("ValidateRM(%s) Coverage.Unevaluated lists %s: the dispatch does not count %s as run on %s", body, key, fn, class)
+						}
 					}
-					if covered && slices.Contains(r.Coverage.Unevaluated, key) {
-						t.Errorf("ValidateRM(%s) Coverage.Unevaluated lists %s: the dispatch does not count %s as run on %s", body, key, fn, class)
+					r, body, err := validateMembers(class, pair.conforming)
+					if err != nil {
+						t.Fatalf("typereg.Decode(%s): %v", body, err)
 					}
-				}
-				r, body, err := validateMembers(class, row.conforming)
-				if err != nil {
-					t.Fatalf("typereg.Decode(%s): %v", body, err)
-				}
-				var found []Issue
-				for _, i := range r.Issues {
-					if finding(i) {
-						found = append(found, i)
+					var found []Issue
+					for _, i := range r.Issues {
+						if finding(i) {
+							found = append(found, i)
+						}
 					}
-				}
-				if len(found) > 0 {
-					t.Errorf("ValidateRM(%s) issues %q, want none %s: %s reports %s on a value of %s that keeps it", body, keys(found), want, fn, key, class)
+					if len(found) > 0 {
+						t.Errorf("ValidateRM(%s) issues %q, want none %s: %s reports %s on a value of %s that keeps it", body, keys(found), want, fn, key, class)
+					}
 				}
 			})
 		}
@@ -250,4 +308,44 @@ func TestPROBE077_REQ112_REQ171_InvariantMatrix(t *testing.T) {
 			t.Errorf("invariantMatrix holds a row for %s, which the inventory does not call evaluated", key)
 		}
 	}
+	for _, class := range uncoveredBoundTypes(t) {
+		t.Errorf("the row for %s breaks it with no %s bounds; add a pair whose bounds are two strictly comparable %s", ruleIntervalLimits, class, class)
+	}
+}
+
+// uncoveredBoundTypes returns the concrete DV_ORDERED classes of the pinned
+// RM that no breaking value of the DV_INTERVAL.Limits_consistent row holds as
+// its lower bound. Any of them can bound a DV_INTERVAL, and the floor orders
+// two strictly comparable bounds of each (REQ-112).
+func uncoveredBoundTypes(t *testing.T) []string {
+	t.Helper()
+	h, ok := rminfo.Default.(rminfo.Hierarchy)
+	if !ok {
+		t.Fatalf("rminfo.Default is %T, which answers no class-graph question", rminfo.Default)
+	}
+	ordered, known := h.ConcreteDescendants("DV_ORDERED")
+	if !known || len(ordered) == 0 {
+		t.Fatalf("rminfo.Default.ConcreteDescendants(DV_ORDERED) = %v, %v; want the classes the pinned RM declares", ordered, known)
+	}
+	held := map[string]bool{}
+	for _, pair := range invariantMatrix[ruleIntervalLimits].pairs() {
+		body := `{"_type":"DV_INTERVAL",` + pair.breaking + `}`
+		v, err := typereg.Default.Decode([]byte(body))
+		if err != nil {
+			t.Fatalf("typereg.Decode(%s): %v", body, err)
+		}
+		iv, ok := v.(*rm.DVInterval[rm.DVOrdered])
+		if !ok {
+			t.Fatalf("typereg.Decode(%s) = %T, want *rm.DVInterval[rm.DVOrdered]", body, v)
+		}
+		class, _ := rm.RMTypeName(iv.Lower)
+		held[class] = true
+	}
+	var missing []string
+	for _, class := range ordered {
+		if !held[class] {
+			missing = append(missing, class)
+		}
+	}
+	return missing
 }

@@ -7,6 +7,8 @@ package validation
 // concrete means editing one switch.
 
 import (
+	"time"
+
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
 
@@ -206,111 +208,275 @@ func asArchetyped(value any) (rm.Archetyped, bool) {
 	return rm.Archetyped{}, false
 }
 
-// dvIntervalNumericBounds returns the lower/upper magnitudes of a DV_INTERVAL
-// when neither side is unbounded and the floor can order the two bounds. The
-// RM states the rule as DV_INTERVAL.Limits_consistent: with neither side
-// open, lower.is_strictly_comparable_to(upper) and lower <= upper. `<=` is
-// defined per type: DV_COUNT.less_than takes a DV_COUNT and
-// DV_QUANTITY.less_than a DV_QUANTITY, each under the precondition
-// Pre_comparable (is_strictly_comparable_to(other)). So the floor orders two
-// DV_COUNT bounds, or two DV_QUANTITY bounds with the same units. It handles
-// the monomorphised instantiations RM data actually carries
-// (DVInterval[DVQuantity], e.g. DV_QUANTITY.normal_range; DVInterval[DVCount])
-// and the bare DVInterval[DVOrdered] collapsed form. Returns ok=false
-// otherwise:
-//
-//   - an unbounded side (the comparison is undefined);
-//   - bounds of different RM types, such as a DV_COUNT beside a DV_QUANTITY
-//     on the bare form: no less_than takes both, so the pair has no ordering,
-//     even when the quantity is unitless;
-//   - DV_QUANTITY bounds with different units, which are not strictly
-//     comparable, so a cross-unit interval has no magnitude ordering and the
-//     floor must not assert one;
-//   - non-numeric bound types (DV_DATE / DV_TIME / … — richer comparison
-//     deferred to a follow-up cycle, see REQ-123's temporal helpers).
-//
-// The check is a conservative subset of Limits_consistent: it tests
-// lower <= upper only where that comparison is defined, and reports nothing
-// for a pair it cannot order, although the invariant cannot hold for one.
-// The comparability half is not checked on its own. DV_QUANTITY's
-// is_strictly_comparable_to also needs a matching units_system where one is
-// set, which is not compared: a same-units pair with different units_systems
-// is ordered by magnitude, and a lower > upper found there breaks the
-// invariant all the same.
-func dvIntervalNumericBounds(value any) (lower, upper float64, ok bool) {
-	lo, hi, bounded := intervalBounds(value)
-	if !bounded {
-		return 0, 0, false
-	}
-	loMag, loClass, loUnit, loOK := numericMagnitude(lo)
-	hiMag, hiClass, hiUnit, hiOK := numericMagnitude(hi)
-	if !loOK || !hiOK || loClass != hiClass || loUnit != hiUnit {
-		return 0, 0, false
-	}
-	return loMag, hiMag, true
+// intervalOrder is how the floor reads the two bounds of a DV_INTERVAL that
+// it orders.
+type intervalOrder struct {
+	// class is the RM type of the two bounds.
+	class string
+	// inverted reports that lower is above upper by the RM's less_than for
+	// class.
+	inverted bool
+	// magnitudes are the two values the order compares, lower first.
+	magnitudes [2]float64
 }
 
-// intervalBounds extracts the lower/upper bounds of a DV_INTERVAL as DVOrdered
-// values when neither side is unbounded, across the typed instantiations and
-// the bare collapsed form. bounded is false for an unbounded or unknown shape.
+// dvIntervalOrder reads the order of the two bounds of a DV_INTERVAL when
+// neither side is unbounded and the floor orders the pair. The RM states the
+// rule as DV_INTERVAL.Limits_consistent: with neither side open,
+// lower.is_strictly_comparable_to(upper) and lower <= upper, where `<=` is
+// the less_than of the bounds' type, whose precondition Pre_comparable is
+// is_strictly_comparable_to(other). So the floor orders two bounds only when
+// the RM makes them strictly comparable ([orderBounds] says when). It reads
+// every DV_INTERVAL the RM types hold, typed (DVInterval[DVQuantity] is a
+// DV_QUANTITY's normal_range, DVInterval[DVDate] a PARTY's time_validity) or
+// bare (DVInterval[DVOrdered], which the registry decodes), by value or by
+// pointer. ok is false for an unbounded side, where the comparison is
+// undefined, and for a pair the floor does not order.
+//
+// The check is a conservative subset of Limits_consistent: it tests
+// lower <= upper only where the RM defines that comparison, and reports
+// nothing for a pair that is not strictly comparable, although the invariant
+// cannot hold for one. That half is Interval.Limits_comparable, which the
+// floor does not evaluate, so Coverage lists it.
+func dvIntervalOrder(value any) (order intervalOrder, ok bool) {
+	lower, upper, bounded := intervalBounds(value)
+	if !bounded {
+		return intervalOrder{}, false
+	}
+	return orderBounds(lower, upper)
+}
+
+// intervalBounds returns the lower and upper bounds of a DV_INTERVAL when
+// neither side is unbounded, for each instantiation the RM types hold, typed
+// or bare, by value or by pointer. bounded is false for an unbounded side, a
+// nil interval and any other value.
 func intervalBounds(value any) (lower, upper rm.DVOrdered, bounded bool) {
 	switch v := value.(type) {
-	case *rm.DVInterval[rm.DVQuantity]:
-		if v == nil || v.LowerUnbounded || v.UpperUnbounded {
-			return nil, nil, false
-		}
-		return v.Lower, v.Upper, true
-	case rm.DVInterval[rm.DVQuantity]:
-		if v.LowerUnbounded || v.UpperUnbounded {
-			return nil, nil, false
-		}
-		return v.Lower, v.Upper, true
-	case *rm.DVInterval[rm.DVCount]:
-		if v == nil || v.LowerUnbounded || v.UpperUnbounded {
-			return nil, nil, false
-		}
-		return v.Lower, v.Upper, true
-	case rm.DVInterval[rm.DVCount]:
-		if v.LowerUnbounded || v.UpperUnbounded {
-			return nil, nil, false
-		}
-		return v.Lower, v.Upper, true
 	case *rm.DVInterval[rm.DVOrdered]:
-		if v == nil || v.LowerUnbounded || v.UpperUnbounded {
-			return nil, nil, false
-		}
-		return v.Lower, v.Upper, true
+		return boundsOf(v)
 	case rm.DVInterval[rm.DVOrdered]:
-		if v.LowerUnbounded || v.UpperUnbounded {
-			return nil, nil, false
-		}
-		return v.Lower, v.Upper, true
+		return boundsOf(&v)
+	case *rm.DVInterval[rm.DVCount]:
+		return boundsOf(v)
+	case rm.DVInterval[rm.DVCount]:
+		return boundsOf(&v)
+	case *rm.DVInterval[rm.DVQuantity]:
+		return boundsOf(v)
+	case rm.DVInterval[rm.DVQuantity]:
+		return boundsOf(&v)
+	case *rm.DVInterval[rm.DVOrdinal]:
+		return boundsOf(v)
+	case rm.DVInterval[rm.DVOrdinal]:
+		return boundsOf(&v)
+	case *rm.DVInterval[rm.DVScale]:
+		return boundsOf(v)
+	case rm.DVInterval[rm.DVScale]:
+		return boundsOf(&v)
+	case *rm.DVInterval[rm.DVProportion]:
+		return boundsOf(v)
+	case rm.DVInterval[rm.DVProportion]:
+		return boundsOf(&v)
+	case *rm.DVInterval[rm.DVDate]:
+		return boundsOf(v)
+	case rm.DVInterval[rm.DVDate]:
+		return boundsOf(&v)
+	case *rm.DVInterval[rm.DVTime]:
+		return boundsOf(v)
+	case rm.DVInterval[rm.DVTime]:
+		return boundsOf(&v)
+	case *rm.DVInterval[rm.DVDateTime]:
+		return boundsOf(v)
+	case rm.DVInterval[rm.DVDateTime]:
+		return boundsOf(&v)
+	case *rm.DVInterval[rm.DVDuration]:
+		return boundsOf(v)
+	case rm.DVInterval[rm.DVDuration]:
+		return boundsOf(&v)
 	}
 	return nil, nil, false
 }
 
-// numericMagnitude lifts a DVOrdered bound to (magnitude, class, unit, ok).
-// class is the bound's RM type; unit is the DV_QUANTITY units string (empty
-// for the dimensionless DV_COUNT). Two bounds are comparable only when both
-// their class and their units match. Returns ok=false for any other DVOrdered
-// concrete (DV_DATE/TIME/DURATION/ORDINAL/…), which need RM-spec-aware
-// comparison handled by REQ-123 follow-ups.
-func numericMagnitude(v rm.DVOrdered) (mag float64, class, unit string, ok bool) {
-	switch x := v.(type) {
-	case rm.DVQuantity:
-		return float64(x.Magnitude), "DV_QUANTITY", x.Units, true
-	case *rm.DVQuantity:
-		if x == nil {
-			return 0, "", "", false
-		}
-		return float64(x.Magnitude), "DV_QUANTITY", x.Units, true
-	case rm.DVCount:
-		return float64(x.Magnitude), "DV_COUNT", "", true
-	case *rm.DVCount:
-		if x == nil {
-			return 0, "", "", false
-		}
-		return float64(x.Magnitude), "DV_COUNT", "", true
+// boundsOf returns the two bounds of iv when neither side is unbounded.
+func boundsOf[T rm.DVOrdered](iv *rm.DVInterval[T]) (lower, upper rm.DVOrdered, bounded bool) {
+	if iv == nil || iv.LowerUnbounded || iv.UpperUnbounded {
+		return nil, nil, false
 	}
-	return 0, "", "", false
+	return iv.Lower, iv.Upper, true
+}
+
+// orderBounds reads the order of two bounds that the RM makes strictly
+// comparable, by the RM's less_than for their type, and returns ok=false for
+// any other pair. Two bounds of different types are never ordered, a DV_COUNT
+// beside a unitless DV_QUANTITY included: no less_than takes both. A nil
+// bound names no type, so it is not ordered either. For two bounds of one
+// type:
+//
+//   - DV_COUNT: always comparable; ordered by magnitude.
+//   - DV_QUANTITY: comparable when the units are equal; ordered by
+//     magnitude. The RM's is_strictly_comparable_to also needs a matching
+//     units_system where one is set, which is not compared, so a same-units
+//     pair is ordered whatever its units_system.
+//   - DV_ORDINAL and DV_SCALE: comparable when both symbols are coded in one
+//     named terminology ([codedInOneTerminology]); ordered by value.
+//   - DV_PROPORTION: comparable when the type is the same; ordered by
+//     magnitude, numerator / denominator. A zero denominator gives no
+//     magnitude (the RM's Valid_denominator forbids it), so a pair holding
+//     one is not ordered and reports nothing here.
+//   - DV_DATE and DV_DURATION: always comparable; ordered by their Compare,
+//     which reads the magnitude of each parsed value ([temporalOrder]).
+//   - DV_TIME and DV_DATE_TIME: always comparable. Two values that carry one
+//     time zone, or that both carry none, are ordered by their Compare
+//     ([temporalOrder]); two values that each carry a zone, in different
+//     zones, are ordered as instants ([instantOrder]). A value with a zone is
+//     not ordered against one without.
+//
+// The generated IsStrictlyComparableTo and LessThan of the non-temporal types
+// are not called: they are stubs that panic.
+func orderBounds(lower, upper rm.DVOrdered) (intervalOrder, bool) {
+	// A nil or typed-nil bound reads as "", which no case below takes.
+	class, _ := rm.RMTypeName(lower)
+	if upperClass, _ := rm.RMTypeName(upper); upperClass != class {
+		return intervalOrder{}, false
+	}
+	switch class {
+	case "DV_COUNT":
+		lo, hi := boundAs[rm.DVCount](lower), boundAs[rm.DVCount](upper)
+		return numberOrder(class, lo.Magnitude, hi.Magnitude), true
+	case "DV_QUANTITY":
+		lo, hi := boundAs[rm.DVQuantity](lower), boundAs[rm.DVQuantity](upper)
+		if lo.Units != hi.Units {
+			return intervalOrder{}, false
+		}
+		return numberOrder(class, lo.Magnitude, hi.Magnitude), true
+	case "DV_ORDINAL":
+		lo, hi := boundAs[rm.DVOrdinal](lower), boundAs[rm.DVOrdinal](upper)
+		if !codedInOneTerminology(lo.Symbol, hi.Symbol) {
+			return intervalOrder{}, false
+		}
+		return numberOrder(class, lo.Value, hi.Value), true
+	case "DV_SCALE":
+		lo, hi := boundAs[rm.DVScale](lower), boundAs[rm.DVScale](upper)
+		if !codedInOneTerminology(lo.Symbol, hi.Symbol) {
+			return intervalOrder{}, false
+		}
+		return numberOrder(class, lo.Value, hi.Value), true
+	case "DV_PROPORTION":
+		lo, hi := boundAs[rm.DVProportion](lower), boundAs[rm.DVProportion](upper)
+		if lo.Type != hi.Type || lo.Denominator == 0 || hi.Denominator == 0 {
+			return intervalOrder{}, false
+		}
+		return numberOrder(class, lo.Numerator/lo.Denominator, hi.Numerator/hi.Denominator), true
+	case "DV_DATE":
+		lo, hi := boundAs[rm.DVDate](lower), boundAs[rm.DVDate](upper)
+		return temporalOrder(class, lo.Compare(hi), float64(lo.Magnitude()), float64(hi.Magnitude()), lo.ValidISO8601(), hi.ValidISO8601())
+	case "DV_TIME":
+		lo, hi := boundAs[rm.DVTime](lower), boundAs[rm.DVTime](upper)
+		if lo.Timezone() != hi.Timezone() {
+			return instantOrder(class, &lo, &hi, float64(lo.Magnitude()), float64(hi.Magnitude()))
+		}
+		return temporalOrder(class, lo.Compare(hi), float64(lo.Magnitude()), float64(hi.Magnitude()), lo.ValidISO8601(), hi.ValidISO8601())
+	case "DV_DATE_TIME":
+		lo, hi := boundAs[rm.DVDateTime](lower), boundAs[rm.DVDateTime](upper)
+		if lo.Timezone() != hi.Timezone() {
+			return instantOrder(class, &lo, &hi, lo.Magnitude(), hi.Magnitude())
+		}
+		return temporalOrder(class, lo.Compare(hi), lo.Magnitude(), hi.Magnitude(), lo.ValidISO8601(), hi.ValidISO8601())
+	case "DV_DURATION":
+		lo, hi := boundAs[rm.DVDuration](lower), boundAs[rm.DVDuration](upper)
+		return temporalOrder(class, lo.Compare(hi), lo.Magnitude(), hi.Magnitude(), lo.ValidISO8601(), hi.ValidISO8601())
+	}
+	return intervalOrder{}, false
+}
+
+// boundAs returns a DV_INTERVAL bound as the T it holds, whether the interval
+// holds it by value, as a typed interval does, or by pointer, as the bare
+// form the registry decodes does. Any other bound reads as the zero T;
+// [orderBounds] asks only for the type the bound names.
+func boundAs[T rm.DVOrdered](bound rm.DVOrdered) T {
+	// The switch is on any: Go does not count *T as a DVOrdered, although
+	// every *T the bound can hold is one.
+	switch b := any(bound).(type) {
+	case T:
+		return b
+	case *T:
+		if b != nil {
+			return *b
+		}
+	}
+	var zero T
+	return zero
+}
+
+// numberOrder orders two numbers of class, lower against upper. A NaN is
+// neither above nor below another number, so a pair holding one is read as
+// in order.
+func numberOrder[N ~int32 | ~int64 | ~float64](class string, lower, upper N) intervalOrder {
+	return intervalOrder{class: class, inverted: lower > upper, magnitudes: [2]float64{float64(lower), float64(upper)}}
+}
+
+// temporalOrder orders two temporal bounds of class. sign is the Compare of
+// lower with upper ([rm.DVDate.Compare] and its kin), which reads the
+// magnitude of each parsed value, and lowerMag and upperMag are those
+// magnitudes. A value the parse
+// refuses has no magnitude (Compare would read it as zero), so a pair that
+// holds one is not ordered; the bound's own Value_valid reports it. The
+// magnitude of a DV_TIME or a DV_DATE_TIME reads the clock in the value's own
+// time zone, so [orderBounds] sends two of them here only when their zones
+// are the same, or when neither has one.
+func temporalOrder(class string, sign int, lowerMag, upperMag float64, lowerValid, upperValid bool) (intervalOrder, bool) {
+	if !lowerValid || !upperValid {
+		return intervalOrder{}, false
+	}
+	return intervalOrder{class: class, inverted: sign > 0, magnitudes: [2]float64{lowerMag, upperMag}}, true
+}
+
+// zonedValue is a DV_TIME or a DV_DATE_TIME: a temporal value that can carry
+// a time zone, and that ToTime places in time.
+type zonedValue interface {
+	Timezone() string
+	ToTime() (time.Time, error)
+}
+
+// instantOrder orders two DV_TIME or two DV_DATE_TIME bounds of class whose
+// time zones differ. Their magnitudes, lowerMag and upperMag, read each
+// clock in its own zone, so the two are not compared by magnitude: they
+// are ordered as the instants ToTime gives, which places two DV_TIME values
+// on one reference day. The magnitudes the order compares are each value's
+// magnitude less its zone's offset from UTC.
+//
+// The zones are told apart by their designators, so Z and +00:00, or +05:00
+// and +0500, are two zones here although each pair names one offset. Two
+// full values in them order as instants just as their clocks would; a
+// partial value among them is not ordered (below), although its clock would
+// order it.
+//
+// The pair is not ordered when either value has no zone: a value without one
+// names no instant to set against a value with one. Nor is it ordered when
+// ToTime cannot place a value: a partial value, a leap second, or a value the
+// parse refuses (which also reads as having no zone).
+func instantOrder(class string, lower, upper zonedValue, lowerMag, upperMag float64) (intervalOrder, bool) {
+	if lower.Timezone() == "" || upper.Timezone() == "" {
+		return intervalOrder{}, false
+	}
+	lowerAt, lowerErr := lower.ToTime()
+	upperAt, upperErr := upper.ToTime()
+	if lowerErr != nil || upperErr != nil {
+		return intervalOrder{}, false
+	}
+	_, lowerOffset := lowerAt.Zone()
+	_, upperOffset := upperAt.Zone()
+	return intervalOrder{
+		class:      class,
+		inverted:   lowerAt.After(upperAt),
+		magnitudes: [2]float64{lowerMag - float64(lowerOffset), upperMag - float64(upperOffset)},
+	}, true
+}
+
+// codedInOneTerminology reports whether the symbols of two DV_ORDINAL or
+// DV_SCALE bounds are coded in one named terminology: their terminology ids
+// are equal and not empty. A symbol with an empty terminology id is coded in
+// none, so it is comparable with no symbol, another such symbol included.
+func codedInOneTerminology(a, b rm.DVCodedText) bool {
+	id := a.DefiningCode.TerminologyID.Value
+	return id != "" && id == b.DefiningCode.TerminologyID.Value
 }

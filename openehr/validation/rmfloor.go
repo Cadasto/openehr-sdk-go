@@ -880,32 +880,32 @@ func (w *rmFloorWalker) checkElementNullFlavour(value any, path string) {
 
 // checkDVInterval enforces the spec floor on DV_INTERVAL. The boundary
 // flags are checked on every interval ([rmFloorWalker.checkIntervalFlags]).
-// The bound order is checked when both bounds are numerically comparable
-// (DV_QUANTITY / DV_COUNT) and neither side is unbounded: lower magnitude
-// MUST be ≤ upper magnitude. Other DVOrdered bound types (DV_DATE, DV_TIME,
-// …) carry richer comparison semantics — those are deferred from the first
-// cycle and will land alongside the REQ-123 temporal helpers' interval
-// support.
+// The bound order is checked when neither side is unbounded and the two
+// bounds are strictly comparable as the RM defines is_strictly_comparable_to
+// for their type ([dvIntervalOrder]): lower MUST be ≤ upper by the RM's
+// less_than for that type, except that two times or date-times in different
+// time zones are ordered as instants. A pair the RM does not make strictly
+// comparable is not ordered, nor is a time or date-time with a zone against
+// one without.
 //
-// The Detail names the rule, never the bounds; the two compared magnitudes
-// are carried in Issue.Value, lower first, as a [2]float64 (REQ-168). rmType
-// is the node's RM type, which the flag check names.
+// The Detail names the rule and the type of the bounds, never the bounds; the
+// two compared magnitudes are carried in Issue.Value, lower first, as a
+// [2]float64 (REQ-168), each in UTC for two values ordered as instants.
+// rmType is the node's RM type, which the flag check names.
 func (w *rmFloorWalker) checkDVInterval(value any, rmType, path string) {
 	w.checkIntervalFlags(value, rmType, path)
-	lower, upper, ok := dvIntervalNumericBounds(value)
-	if !ok {
+	order, ok := dvIntervalOrder(value)
+	if !ok || !order.inverted {
 		return
 	}
-	if lower > upper {
-		w.emit(Issue{
-			Path:   path,
-			Code:   "rm_invariant",
-			Layer:  LayerRM,
-			Rule:   ruleIntervalLimits,
-			Detail: "DV_INTERVAL: lower must be ≤ upper",
-			Value:  constraints.Redact([2]float64{lower, upper}),
-		})
-	}
+	w.emit(Issue{
+		Path:   path,
+		Code:   "rm_invariant",
+		Layer:  LayerRM,
+		Rule:   ruleIntervalLimits,
+		Detail: "DV_INTERVAL<" + order.class + ">: lower must be ≤ upper",
+		Value:  constraints.Redact(order.magnitudes),
+	})
 }
 
 // checkIntervalFlags enforces BASE Interval's Lower_included_valid and
