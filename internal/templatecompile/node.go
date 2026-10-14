@@ -61,15 +61,11 @@ type CompiledNode struct {
 	// the parent-walk lookup that respects scope.
 	terms map[string]template.ArchetypeTerm
 
-	// walkClass, rest, conforming and conformingResolved hold what a
-	// validation walk asks of the node, set by [Compile] once its
-	// attributes are compiled and never changed after (walkfacts.go):
-	// the bare class of rmTypeName, the attributes of that class the
-	// node does not declare that a walk visits, and the classes that
+	// conforming and conformingResolved hold what a validation walk asks
+	// of the node's type, set by [Compile] once its attributes are
+	// compiled and never changed after (walkfacts.go): the classes that
 	// conform to rmTypeName, nil when the class hierarchy does not know
 	// it.
-	walkClass          string
-	rest               []AttributeFacts
 	conforming         classBits
 	conformingResolved bool
 }
@@ -212,12 +208,10 @@ type CompiledAttribute struct {
 	required          bool   // BMM is_mandatory (true even when OPT silent)
 	children          []*CompiledNode
 
-	// facts, allowed and prohibited hold what a validation walk asks of
-	// the attribute, set by [Compile] and never changed after
-	// (walkfacts.go): the facts of the Reference Model about it for the
-	// class of the node that holds it, the children the template allows,
-	// and whether the template prohibits it.
-	facts      AttributeFacts
+	// allowed and prohibited hold what a validation walk asks of the
+	// attribute, set by [Compile] and never changed after (walkfacts.go):
+	// the children the template allows, and whether the template
+	// prohibits it.
 	allowed    []*CompiledNode
 	prohibited bool
 }

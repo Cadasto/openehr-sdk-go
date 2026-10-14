@@ -128,15 +128,27 @@ type refusedContentCase struct {
 // compositionOPT returns a COMPOSITION template, root node at0000, that
 // declares attributes, each an <attributes> element, and nothing else.
 func compositionOPT(attributes ...string) string {
+	return rootOPT("COMPOSITION", "", attributes...)
+}
+
+// rootOPT returns a template whose root node, of RM type rmType and node id
+// at0000, pins the archetype id archetypeID when it is not empty and
+// declares attributes, each an <attributes> element, and nothing else.
+func rootOPT(rmType, archetypeID string, attributes ...string) string {
+	archetype := ""
+	if archetypeID != "" {
+		archetype = `<archetype_id><value>` + archetypeID + `</value></archetype_id>`
+	}
 	return `<?xml version="1.0"?>
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <template_id><value>engine-composition</value></template_id>
-  <concept>engine-composition</concept>
+  <template_id><value>engine-` + strings.ToLower(rmType) + `</value></template_id>
+  <concept>engine-` + strings.ToLower(rmType) + `</concept>
   <language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
   <definition>
-    <rm_type_name>COMPOSITION</rm_type_name>
+    <rm_type_name>` + rmType + `</rm_type_name>
     <node_id>at0000</node_id>
     ` + strings.Join(attributes, "\n    ") + `
+    ` + archetype + `
   </definition>
 </template>`
 }
@@ -696,35 +708,148 @@ func TestREQ171_EngineReportsAMissingReferencePartOnce(t *testing.T) {
 	}
 }
 
-// REQ-171 § One walk, § Coverage — at a node the template binds, the engine
-// visits the attributes the template's node declares in the template's
-// order, then the other attributes it visits in the order of the class, as
-// the template walk visits the declared ones: a composition lacking the
-// composer and the context a template requires, in that order, and carrying
+// attributeOrderCase is a root whose findings, in the order the walk reports
+// them, fall under the paths want, each path's findings together and the
+// paths in want's order.
+type attributeOrderCase struct {
+	name string
+	root any
+	c    *templatecompile.Compiled
+	want []string
+}
+
+// attributeOrderCases returns three roots whose findings fall under several
+// attributes, with the order of those attributes. A composition lacks the
+// composer and the context a template requires, in that order, and carries
 // a link with none of its mandatory parts, which the template does not
-// mention, draws the composer's `required`, then the context's, then the
-// link's findings. The class lists links first, and context before composer.
+// mention: the class lists links first, and context before composer. A
+// PARTY_RELATED composer, bound to a PARTY_PROXY node that requires its
+// relationship, lacks it, and its external_ref lacks its namespace: the
+// value is of a class below the node's, whose order lists external_ref
+// first. An OBSERVATION, bound to a node that declares its protocol alone,
+// lacks its subject and its data, which the compile injects into the node
+// because the RM marks them mandatory, and carries a link with none of its
+// mandatory parts: no template clause constrains the injected attributes,
+// so they come in the class's order, after the link.
+func attributeOrderCases(t *testing.T) []attributeOrderCase {
+	t.Helper()
+	noComposer := probes.ComposerPartyIdentified()
+	noComposer.Composer = nil
+	noComposer.Links = []rm.Link{{}}
+
+	related := probes.ComposerPartyRelated()
+	composer := related.Composer.(*rm.PartyRelated)
+	composer.Relationship = rm.DVCodedText{}
+	composer.ExternalRef = &rm.PartyRef{ID: &rm.HierObjectID{Value: "a3e8b1c2-0d4f-4e5a-9b6c-7d8e9f0a1b2c"}, Type: "PERSON"} // namespace missing
+
+	const observationID = "openEHR-EHR-OBSERVATION.order.v1"
+	observation := &rm.Observation{
+		ArchetypeNodeID:  observationID,
+		Name:             rm.DVText{Value: "order"},
+		ArchetypeDetails: archetypeDetails(observationID),
+		Language:         rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}, CodeString: "en"},
+		Encoding:         rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "IANA_character-sets"}, CodeString: "UTF-8"},
+		Links:            []rm.Link{{}},
+	}
+
+	return []attributeOrderCase{
+		{
+			name: "a composition lacking the composer and the context a template requires",
+			root: noComposer,
+			c: mustCompileInline(t, compositionOPT(
+				composerAttribute(complexChild("PARTY_SELF")),
+				singleAttribute("context", "1", "1"),
+			)),
+			want: []string{"/composer", "/context", "/links[1]"},
+		},
+		{
+			name: "a PARTY_RELATED composer under a PARTY_PROXY node requiring its relationship",
+			root: related,
+			c:    mustCompileInline(t, compositionOPT(composerAttribute(complexChild("PARTY_PROXY", singleAttribute("relationship", "1", "1"))))),
+			want: []string{"/composer/relationship", "/composer/external_ref"},
+		},
+		{
+			name: "an OBSERVATION lacking the subject and the data the compile injects",
+			root: observation,
+			c:    mustCompileInline(t, rootOPT("OBSERVATION", observationID, singleAttribute("protocol", "0", "1"))),
+			want: []string{"/links[1]", "/subject", "/data"},
+		},
+	}
+}
+
+// pathGroups returns, for each of issues in order, the first of under its
+// path is at or below, with a run of one path written once; an issue under
+// none of them is written by its own path.
+func pathGroups(issues []validation.Issue, under []string) []string {
+	var out []string
+	for _, iss := range issues {
+		group := iss.Path
+		for _, u := range under {
+			if iss.Path == u || strings.HasPrefix(iss.Path, u+"/") || strings.HasPrefix(iss.Path, u+"[") {
+				group = u
+				break
+			}
+		}
+		if len(out) == 0 || out[len(out)-1] != group {
+			out = append(out, group)
+		}
+	}
+	return out
+}
+
+// REQ-171 § One walk, § Coverage — at a node the template binds, the engine
+// visits the attributes the template declares in the template's order, then
+// the other attributes it visits in the order of the value's class, the
+// attributes the compile injects because the RM marks them mandatory among
+// them: they are no template clause. That holds where the value is of the
+// bound node's class and where it is of a class below it.
 func TestREQ171_EngineVisitsTheDeclaredAttributesInTheTemplatesOrder(t *testing.T) {
 	t.Parallel()
-	c := mustCompileInline(t, compositionOPT(
-		composerAttribute(complexChild("PARTY_SELF")),
-		singleAttribute("context", "1", "1"),
-	))
-	root := probes.ComposerPartyIdentified()
-	root.Composer = nil
-	root.Links = []rm.Link{{}}
-	issues := engineWith(t, root, c).Issues
-	var paths []string
-	for _, i := range issues {
-		paths = append(paths, i.Path)
+	for _, tc := range attributeOrderCases(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			r := engineWith(t, tc.root, tc.c)
+			if got := pathGroups(r.Issues, tc.want); !slices.Equal(got, tc.want) {
+				t.Errorf("engine(%s) reports its findings under %q, want under %q in that order; issues %q", tc.name, got, tc.want, identityKeys(r.Issues))
+			}
+		})
 	}
-	if len(paths) < 3 || paths[0] != "/composer" || paths[1] != "/context" {
-		t.Fatalf("engine(a composition lacking the composer and the context) paths = %q, want /composer, then /context, then the link's", paths)
+}
+
+// REQ-171 § One walk (Admission) — content the template refuses withdraws
+// only the findings at or below its own path. A DV_MULTIMEDIA whose template
+// prohibits its integrity_check carries one, and an
+// integrity_check_algorithm coded outside its code set: the prohibition is
+// reported once, and the class's coded rule still reports the algorithm,
+// whose path begins with the refused attribute's name but is no path below
+// it.
+func TestREQ171_EngineKeepsAFindingBesideRefusedContent(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		root any
+		c    *templatecompile.Compiled
+		want []string
+	}{
+		{
+			name: "a DV_MULTIMEDIA whose prohibited integrity_check sits beside an algorithm coded outside its code set",
+			root: &rm.DVMultimedia{
+				MediaType:               rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "IANA_media-types"}, CodeString: "image/png"},
+				Size:                    3,
+				IntegrityCheck:          []byte{1, 2, 3},
+				IntegrityCheckAlgorithm: &rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr_integrity_check_algorithms"}, CodeString: "NOPE"},
+			},
+			c: mustCompileInline(t, rootOPT("DV_MULTIMEDIA", "", singleAttribute("integrity_check", "0", "0"))),
+			want: []string{
+				"code_not_in_value_set /integrity_check_algorithm rm DV_MULTIMEDIA.Integrity_check_algorithm_validity",
+				"prohibited /integrity_check template existence",
+			},
+		},
 	}
-	for _, p := range paths[2:] {
-		if !strings.HasPrefix(p, "/links[1]/") {
-			t.Errorf("engine(a composition lacking the composer and the context) paths = %q, want the link's findings after the template's", paths)
-			break
-		}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := identityKeys(engineWith(t, tc.root, tc.c).Issues); !slices.Equal(got, tc.want) {
+				t.Errorf("engine(%s) = %q, want %q", tc.name, got, tc.want)
+			}
+		})
 	}
 }

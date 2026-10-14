@@ -17,6 +17,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
@@ -430,52 +431,36 @@ func (e *engine) checkLeaf(n engineNode, scalar bool) *tcimpl.CompiledNode {
 }
 
 // visitAttributes visits the attributes of node n, of the bare RM class
-// class whose rules are rules. At a node the template binds, it visits
-// first the attributes the bound template node declares, in the template's
-// order, as the template walk does, then the other attributes the class
-// metadata lists, in the class's order; at any other node, those the class
-// metadata lists, in its order. It leaves out an attribute no serialization
-// carries ([rminfo.IsNonStorableAttr]), and one the metadata gives no type
-// that the template does not declare. A value of no registered RM class
-// ([rmaccess.Covers]) has no attributes the access reads, so only those the
-// template declares are visited on it, each read as absent.
+// class whose rules are rules. At a node the template binds it visits first
+// the attributes the template declares, in the template's order. Then it
+// visits the other attributes the class metadata lists for class, in the
+// class's order, among them those the compile injected into the bound node
+// because the RM marks them mandatory ([tcimpl.CompiledAttribute.Implicit]):
+// no template clause constrains those, so they are visited with the RM
+// rules alone. Last come the injected attributes the value's class does not
+// list, as a value of no registered RM class has none, read as the template
+// declares them. It leaves out an attribute no serialization carries
+// ([rminfo.IsNonStorableAttr]), and one the metadata gives no type that the
+// template does not declare. A value of no registered RM class
+// ([rmaccess.Covers]) has no attributes the access reads, so the attributes
+// of the template node it binds to are each read as absent.
 //
-// What the class metadata says of each attribute is resolved before the
-// walk: where the value's class is the class of the bound template node's
-// RM type, when the template was compiled ([tcimpl.Facts],
-// [tcimpl.RestFacts]); elsewhere, once per class, when the package is
-// initialised ([classAttributes]). Both read the metadata the walk would.
+// What the class metadata says of each attribute is read from the table
+// built once per class when the package is initialised ([classAttributes]),
+// never from the template, so the RM rules read the pinned Reference Model
+// whatever lookup compiled the template.
 func (e *engine) visitAttributes(n engineNode, class string, rules *classRules) {
-	covered := rmaccess.Covers(n.value)
-	if n.bound != nil && class == tcimpl.WalkClass(n.bound) {
-		for _, decl := range tcimpl.NodeAttributes(n.bound) {
-			if e.stopped {
-				return // the visit limit ended the walk below this node
-			}
-			f := tcimpl.Facts(decl)
-			if a, visited := declaredAttr(n, decl, f, covered && f.Listed, rules); visited {
-				e.visitAttribute(n, class, a)
-			}
-		}
-		if !covered {
-			return // a value the access does not read lists no attribute
-		}
-		for _, f := range tcimpl.RestFacts(n.bound) {
-			if e.stopped {
-				return
-			}
-			e.visitAttribute(n, class, attrFromFacts(n, f, rules))
-		}
-		return
-	}
 	var table *classAttributeTable
-	if covered {
+	if rmaccess.Covers(n.value) {
 		table = classAttributes[class]
 	}
 	if n.bound != nil {
 		for _, decl := range tcimpl.NodeAttributes(n.bound) {
 			if e.stopped {
-				return
+				return // the visit limit ended the walk below this node
+			}
+			if decl.Implicit() {
+				continue // no template clause: visited below
 			}
 			f, listed := table.lookup(decl.Name())
 			if a, visited := declaredAttr(n, decl, f, listed, rules); visited {
@@ -483,18 +468,42 @@ func (e *engine) visitAttributes(n engineNode, class string, rules *classRules) 
 			}
 		}
 	}
-	if table == nil {
+	if table != nil {
+		for _, f := range table.listed {
+			if e.stopped {
+				return
+			}
+			if f.NonStorable || !f.Typed || templateDeclares(n.bound, f.Name) {
+				continue // not visited, or visited above in the template's order
+			}
+			e.visitAttribute(n, class, attrFromFacts(n, f, rules))
+		}
+	}
+	if n.bound == nil {
 		return
 	}
-	for _, f := range table.listed {
+	for _, decl := range tcimpl.NodeAttributes(n.bound) {
 		if e.stopped {
 			return
 		}
-		if f.NonStorable || !f.Typed || n.declared(f.Name) != nil {
-			continue // not visited, or visited above in the template's order
+		if _, listed := table.lookup(decl.Name()); !decl.Implicit() || listed {
+			continue // visited above
 		}
-		e.visitAttribute(n, class, attrFromFacts(n, f, rules))
+		if a, visited := declaredAttr(n, decl, tcimpl.AttributeFacts{}, false, rules); visited {
+			e.visitAttribute(n, class, a)
+		}
 	}
+}
+
+// templateDeclares reports whether the template node bound declares the
+// attribute name, as the template wrote it rather than as the compile
+// injected it; a nil bound declares none.
+func templateDeclares(bound *tcimpl.CompiledNode, name string) bool {
+	if bound == nil {
+		return false
+	}
+	a := bound.Attribute(name)
+	return a != nil && !a.Implicit()
 }
 
 // declaredAttr returns the attribute decl the bound template node of n
@@ -510,7 +519,7 @@ func declaredAttr(n engineNode, decl *tcimpl.CompiledAttribute, f tcimpl.Attribu
 		a.decl = decl
 		return a, true
 	}
-	if tcimpl.Facts(decl).NonStorable {
+	if rminfo.IsNonStorableAttr(bmmtype.Class(n.bound.RMTypeName()), decl.Name()) {
 		return a, false
 	}
 	a = engineAttr{name: decl.Name(), rmType: decl.RMTypeName(), shape: shapeSingle, decl: decl}
@@ -564,7 +573,7 @@ func (e *engine) visitAttribute(n engineNode, class string, a engineAttr) {
 	if !visitedAt(a, r.present) {
 		return
 	}
-	attrPath := joinPath(n.path, "/"+a.name)
+	attrPath := attributePath(n.path, a.name)
 	role := childRole(class, n.role, a.name)
 	if a.decl != nil {
 		if a.shape == shapeSingle {
@@ -742,17 +751,19 @@ func (e *engine) checkAbsent(n engineNode, a engineAttr, attrPath string) {
 // checkEmpty reports the multi-valued attribute a of node n, at attrPath,
 // which is present and holds no item, once. Where the template's existence
 // requires it, it is the template's `required`. Where only the RM requires
-// it, by the class's own rule or the BMM bit the template carries, it is
-// the RM's `cardinality`, rule cardinality, unless the template reports the
-// same container itself (reported), and only for a list: a Hash that is
-// present and empty breaks no mandatory rule, as the RM rules alone read it,
-// however the template declares it.
+// it, it is the RM's `cardinality`, rule cardinality, unless the template
+// reports the same container itself (reported), and only for a list: a Hash
+// that is present and empty breaks no mandatory rule, as the RM rules alone
+// read it, however the template declares it. Whether the RM requires it is
+// read as [engine.checkAbsent] reads it: from the value's class, and from
+// the mandatory bit the template carries only where that class does not
+// list the attribute.
 func (e *engine) checkEmpty(n engineNode, a engineAttr, attrPath string, reported bool) {
 	iss, required := emptyIssue(a.decl, n.value, attrPath)
 	switch {
 	case required && iss.Layer == LayerTemplate:
 		e.rules.emit(iss)
-	case (required || a.mandatory) && a.shape.multiValued() && !reported:
+	case (a.mandatory || required && !a.classRead) && a.shape.multiValued() && !reported:
 		e.rules.checkMandatory(n.rmType, a.name, attrPath, true, true, 0)
 	}
 }

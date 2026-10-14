@@ -4,17 +4,17 @@ package templatecompile_test
 // validation walk equals what the walk would read at run time. Over every
 // vendored OPT, at every compiled node and attribute, each precomputed
 // answer is compared with the answer rminfo.Default, or the attribute's own
-// children, give when asked directly: the facts of each attribute, the other
-// attributes of the node's class, the allowed children and the prohibition,
-// and whether each class the hierarchy knows, and some it does not, conforms
-// to the node's RM type.
+// children, give when asked directly: the allowed children and the
+// prohibition, and whether each class the hierarchy knows, and some it does
+// not, conforms to the node's RM type. The facts of each class's attributes,
+// which the walk reads per class, are compared the same way, and every slice
+// the compiled template hands out has no room to append into.
 
 import (
 	"slices"
 	"strings"
 	"testing"
 
-	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
@@ -29,13 +29,15 @@ func runtimeFacts(t *testing.T, class, name string) templatecompile.AttributeFac
 	if !ok {
 		t.Fatal("rminfo.Default lists no attributes")
 	}
+	if !slices.Contains(lister.AttributeNames(class), name) {
+		t.Fatalf("rminfo.Default does not list %s on %s", name, class)
+	}
 	absence, ok := rminfo.Default.(rminfo.AbsenceReporter)
 	if !ok {
 		t.Fatal("rminfo.Default reports no absence reasons")
 	}
 	f := templatecompile.AttributeFacts{
 		Name:        name,
-		Listed:      slices.Contains(lister.AttributeNames(class), name),
 		NonStorable: rminfo.IsNonStorableAttr(class, name),
 		Mandatory:   slices.Contains(rminfo.Default.RequiredAttributes(class), name),
 	}
@@ -44,24 +46,6 @@ func runtimeFacts(t *testing.T, class, name string) templatecompile.AttributeFac
 	f.PrimitiveItems = absence.AbsenceReason(f.RMType) == rminfo.AbsencePrimitive
 	f.Hash = f.RMType == "Hash"
 	return f
-}
-
-// runtimeRest returns the attributes rminfo.Default lists for the class of
-// n that n does not declare, that a serialization carries and that the
-// metadata types, in the order it lists them.
-func runtimeRest(t *testing.T, n *templatecompile.CompiledNode) []templatecompile.AttributeFacts {
-	t.Helper()
-	class := bmmtype.Class(n.RMTypeName())
-	lister, _ := rminfo.Default.(rminfo.AttributeLister)
-	var out []templatecompile.AttributeFacts
-	for _, name := range lister.AttributeNames(class) {
-		f := runtimeFacts(t, class, name)
-		if f.NonStorable || !f.Typed || n.Attribute(name) != nil {
-			continue
-		}
-		out = append(out, f)
-	}
-	return out
 }
 
 // runtimeAllowed returns the children of a whose occurrences state no upper
@@ -85,19 +69,17 @@ func conformanceProbes() []string {
 	return append(rminfo.Default.KnownRMTypes(), "string", "DV_INTERVAL<DV_QUANTITY>", "INTEGER", "")
 }
 
+// clipped reports whether s leaves no room to append into: an append to it
+// allocates a new array rather than write into the compiled template's.
+func clipped[T any](s []T) bool { return cap(s) == len(s) }
+
 // checkNode compares every precomputed answer of n and of its attributes with
-// the runtime one, then does the same below each attribute's children, and
-// returns the number of nodes and of attributes it checked.
+// the runtime one, checks that each slice it hands out is clipped, then does
+// the same below each attribute's children, and returns the number of nodes
+// and of attributes it checked.
 func checkNode(t *testing.T, opt string, n *templatecompile.CompiledNode) (nodes, attributes int) {
 	t.Helper()
 	nodes = 1
-	class := bmmtype.Class(n.RMTypeName())
-	if got := templatecompile.WalkClass(n); got != class {
-		t.Errorf("%s %s: WalkClass = %q, want %q", opt, n.AQLPath(), got, class)
-	}
-	if got, want := templatecompile.RestFacts(n), runtimeRest(t, n); !slices.Equal(got, want) {
-		t.Errorf("%s %s: RestFacts = %+v, want %+v", opt, n.AQLPath(), got, want)
-	}
 	h, _ := rminfo.Default.(rminfo.Hierarchy)
 	for _, probe := range conformanceProbes() {
 		gotConforms, gotKnown := templatecompile.ConformsTo(n, probe)
@@ -109,17 +91,20 @@ func checkNode(t *testing.T, opt string, n *templatecompile.CompiledNode) (nodes
 	if !slices.Equal(templatecompile.NodeAttributes(n), n.Attributes()) {
 		t.Errorf("%s %s: NodeAttributes differ from Attributes", opt, n.AQLPath())
 	}
+	if !clipped(templatecompile.NodeAttributes(n)) {
+		t.Errorf("%s %s: NodeAttributes has room to append into", opt, n.AQLPath())
+	}
 	for _, a := range n.Attributes() {
 		attributes++
-		if got, want := templatecompile.Facts(a), runtimeFacts(t, class, a.Name()); got != want {
-			t.Errorf("%s %s/%s: Facts = %+v, want %+v", opt, n.AQLPath(), a.Name(), got, want)
-		}
 		if !slices.Equal(templatecompile.ChildNodes(a), a.Children()) {
 			t.Errorf("%s %s/%s: ChildNodes differ from Children", opt, n.AQLPath(), a.Name())
 		}
 		allowed, prohibited := runtimeAllowed(a)
 		if got := templatecompile.AllowedChildNodes(a); !slices.Equal(got, allowed) {
 			t.Errorf("%s %s/%s: AllowedChildNodes = %d nodes, want %d", opt, n.AQLPath(), a.Name(), len(got), len(allowed))
+		}
+		if !clipped(templatecompile.ChildNodes(a)) || !clipped(templatecompile.AllowedChildNodes(a)) {
+			t.Errorf("%s %s/%s: ChildNodes or AllowedChildNodes has room to append into", opt, n.AQLPath(), a.Name())
 		}
 		if got := templatecompile.Prohibited(a); got != prohibited {
 			t.Errorf("%s %s/%s: Prohibited = %t, want %t", opt, n.AQLPath(), a.Name(), got, prohibited)

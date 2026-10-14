@@ -3,10 +3,12 @@ package templatecompile
 // walkfacts.go: what a validation walk asks of a compiled node and of a
 // compiled attribute on every visit, resolved once when the template is
 // compiled: the children an attribute allows and whether it is prohibited,
-// the facts of the pinned Reference Model about each attribute of a node's
-// class, and which RM classes conform to a node's RM type. Everything here
-// is set by [Compile] and never changed after it returns, so a compiled
-// template is read by any number of goroutines with no lock.
+// and which RM classes conform to a node's RM type. What the pinned
+// Reference Model says of the attributes of a class depends on the class
+// alone, so it is not stored on each node: [ClassFacts] gives it per class,
+// for a table the walk builds once. Everything here is set by [Compile] and
+// never changed after it returns, so a compiled template is read by any
+// number of goroutines with no lock.
 //
 // The functions below are package-level, not methods, so that the public
 // alias of [CompiledNode] and [CompiledAttribute] in openehr/templatecompile
@@ -15,7 +17,6 @@ package templatecompile
 import (
 	"slices"
 
-	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 )
@@ -31,9 +32,6 @@ type AttributeFacts struct {
 	RMType string
 	// Typed is set when the class metadata gives the attribute a type.
 	Typed bool
-	// Listed is set when the class metadata lists the attribute among the
-	// class's attributes.
-	Listed bool
 	// NonStorable is set for an attribute no serialization carries
 	// ([rminfo.IsNonStorableAttr]).
 	NonStorable bool
@@ -55,12 +53,10 @@ type AttributeFacts struct {
 const hashType = "Hash"
 
 // attributeFacts returns the facts [rminfo.Default] gives of the attribute
-// name of the bare RM class class, whose listed attributes are names and
-// mandatory ones required.
-func attributeFacts(class, name string, names, required []string) AttributeFacts {
+// name of the bare RM class class, whose mandatory attributes are required.
+func attributeFacts(class, name string, required []string) AttributeFacts {
 	f := AttributeFacts{
 		Name:        name,
-		Listed:      slices.Contains(names, name),
 		NonStorable: rminfo.IsNonStorableAttr(class, name),
 		Mandatory:   slices.Contains(required, name),
 	}
@@ -74,48 +70,36 @@ func attributeFacts(class, name string, names, required []string) AttributeFacts
 }
 
 // ClassFacts returns the facts [rminfo.Default] gives of each attribute it
-// lists for the bare RM class class, in its order, as [Facts] gives them of
-// a compiled attribute; nil for a class it does not know. Each call builds
-// them afresh.
+// lists for the bare RM class class, in its order; nil for a class it does
+// not know. Each call builds them afresh, so a caller that reads them on
+// every node builds them once per class.
 func ClassFacts(class string) []AttributeFacts {
-	names, required := classAttributes(class)
+	var names []string
+	if lister, ok := rminfo.Default.(rminfo.AttributeLister); ok {
+		names = lister.AttributeNames(class)
+	}
 	if len(names) == 0 {
 		return nil
 	}
+	required := rminfo.Default.RequiredAttributes(class)
 	out := make([]AttributeFacts, len(names))
 	for i, name := range names {
-		out[i] = attributeFacts(class, name, names, required)
+		out[i] = attributeFacts(class, name, required)
 	}
 	return out
 }
 
-// classAttributes returns the attributes [rminfo.Default] lists for the
-// bare RM class class, in its order, and those it marks mandatory; both nil
-// for a class it does not know.
-func classAttributes(class string) (names, required []string) {
-	if lister, ok := rminfo.Default.(rminfo.AttributeLister); ok {
-		names = lister.AttributeNames(class)
-	}
-	return names, rminfo.Default.RequiredAttributes(class)
-}
-
 // resolveWalkFacts sets what a validation walk asks of cn, whose attributes
-// are compiled: the bare class of its RM type, the facts of each of its
-// attributes for that class, the class's other attributes a walk visits,
-// and the classes that conform to its RM type.
+// are compiled: the children each attribute allows and whether it is
+// prohibited, and the classes that conform to cn's RM type, which the
+// package resolved once per class. It clips the attributes and the children
+// it hands out, so a caller that appends to one cannot write into the
+// compiled template.
 func resolveWalkFacts(cn *CompiledNode) {
-	cn.walkClass = bmmtype.Class(cn.rmTypeName)
-	names, required := classAttributes(cn.walkClass)
+	cn.attributes = slices.Clip(cn.attributes)
 	for _, a := range cn.attributes {
-		a.facts = attributeFacts(cn.walkClass, a.name, names, required)
+		a.children = slices.Clip(a.children)
 		a.allowed, a.prohibited = allowedChildren(a.existence, a.children)
-	}
-	for _, name := range names {
-		f := attributeFacts(cn.walkClass, name, names, required)
-		if f.NonStorable || !f.Typed || cn.Attribute(name) != nil {
-			continue
-		}
-		cn.rest = append(cn.rest, f)
 	}
 	cn.conforming = conformingClasses[cn.rmTypeName]
 	cn.conformingResolved = true
@@ -130,7 +114,7 @@ func resolveWalkFacts(cn *CompiledNode) {
 func allowedChildren(existence *template.Multiplicity, children []*CompiledNode) (allowed []*CompiledNode, prohibited bool) {
 	allowed = children
 	if slices.ContainsFunc(children, func(c *CompiledNode) bool { return !childAllowed(c) }) {
-		allowed = slices.DeleteFunc(slices.Clone(children), func(c *CompiledNode) bool { return !childAllowed(c) })
+		allowed = slices.Clip(slices.DeleteFunc(slices.Clone(children), func(c *CompiledNode) bool { return !childAllowed(c) }))
 	}
 	prohibited = len(children) > 0 && len(allowed) == 0
 	if existence != nil && !existence.UpperUnbounded() && existence.Upper() == 0 {
@@ -157,29 +141,15 @@ func NodeAttributes(n *CompiledNode) []*CompiledAttribute { return n.attributes 
 func ChildNodes(a *CompiledAttribute) []*CompiledNode { return a.children }
 
 // AllowedChildNodes returns the children of a the template allows, in their
-// order: those whose occurrences state no upper bound of 0. The caller must
-// not change the slice.
+// order: those whose occurrences state no upper bound of 0. When it allows
+// every child the slice is [ChildNodes]'s own. The caller must not change
+// the slice.
 func AllowedChildNodes(a *CompiledAttribute) []*CompiledNode { return a.allowed }
 
 // Prohibited reports whether the template prohibits a: its existence has a
 // bounded upper bound of 0, or it has a child and allows none of them
 // ([AllowedChildNodes]). An attribute with no child is open, not prohibited.
 func Prohibited(a *CompiledAttribute) bool { return a.prohibited }
-
-// Facts returns what [rminfo.Default] says of a as an attribute of the bare
-// RM class of the node that holds it ([WalkClass]).
-func Facts(a *CompiledAttribute) AttributeFacts { return a.facts }
-
-// WalkClass returns the bare RM class of n's RM type, the class [Facts] and
-// [RestFacts] describe: "DV_INTERVAL" for "DV_INTERVAL<DV_QUANTITY>".
-func WalkClass(n *CompiledNode) string { return n.walkClass }
-
-// RestFacts returns, in the order [rminfo.Default] lists them, the
-// attributes of n's class ([WalkClass]) that n does not declare, that a
-// serialization carries and that the class metadata gives a type: the
-// attributes a walk reads from the class alone. The caller must not change
-// the slice.
-func RestFacts(n *CompiledNode) []AttributeFacts { return n.rest }
 
 // ConformsTo reports whether the bare RM class class conforms to n's RM
 // type, which is that type or descends from it, as the pinned class

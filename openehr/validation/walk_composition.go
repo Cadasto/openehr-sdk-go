@@ -107,7 +107,7 @@ func (w *walker) walkNode(optNode *tcimpl.CompiledNode, rmValue any, path string
 	}
 
 	for _, attr := range tcimpl.NodeAttributes(optNode) {
-		if tcimpl.Facts(attr).NonStorable {
+		if rminfo.IsNonStorableAttr(bmmtype.Class(optNode.RMTypeName()), attr.Name()) {
 			continue
 		}
 		switch attr.Cardinality() {

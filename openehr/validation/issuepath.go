@@ -54,6 +54,16 @@ func itemPaths(attrPath string, items []pathItem) []string {
 	return preds
 }
 
+// attributePath returns the issue path of the attribute name of the node at
+// the issue path parent: the root's attribute is "/name", any other
+// parent's parent + "/name", built in one step.
+func attributePath(parent, name string) string {
+	if parent == "/" {
+		return "/" + name
+	}
+	return parent + "/" + name
+}
+
 // optChildPaths returns, for each OPT child of the multi-valued attribute at
 // attrPath, the path of the node it constrains: the path a node the instance
 // lacks is reported at. No item exists to number, so a child is never
