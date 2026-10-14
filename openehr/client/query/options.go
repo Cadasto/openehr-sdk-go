@@ -47,8 +47,9 @@ func WithEHRID(id string) ExecuteOption {
 // subject to URL-length limits; use GET for short, cacheable queries.
 //
 // Named AQL parameters are flattened to top-level query keys (style=form,
-// explode=true), so avoid parameter names that collide with the reserved
-// keys q, offset, fetch, and ehr_id when using GET.
+// explode=true), so over GET a parameter may not share its name with a key
+// the request sends itself: offset, fetch and ehr_id, and q on an ad hoc
+// query. Such a name is refused with ErrInvalidConfig.
 func WithGET() ExecuteOption {
 	return func(c *executeConfig) { c.useGET = true }
 }

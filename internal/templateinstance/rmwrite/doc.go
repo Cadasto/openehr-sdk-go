@@ -15,12 +15,12 @@
 //
 // # Scope
 //
-// rmwrite is a low-level setter. It does not set LOCATABLE
-// bookkeeping (`archetype_node_id`, `name`, `uid`,
-// `archetype_details`); that is the caller's (`openehr/instance/`)
-// responsibility. rmwrite binds one RM value into one named slot on
-// a parent RM value. Higher-level identity,
-// terminology, and template-id wiring live in the instance
+// rmwrite is a low-level setter: it binds one RM value into the one
+// named slot a caller asks for on a parent RM value. Of the LOCATABLE
+// bookkeeping it writes only `name`, and only when asked; it never
+// stamps `archetype_node_id`, `uid` or `archetype_details`, which are
+// the caller's (`openehr/instance/`) responsibility. Higher-level
+// identity, terminology, and template-id wiring live in the instance
 // generator above.
 //
 // # Coverage

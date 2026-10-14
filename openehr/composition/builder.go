@@ -208,12 +208,10 @@ func (b *Builder) applyAssignment(p pendingAssignment) error {
 		return err
 	}
 	leaf := segs[len(segs)-1]
-	// Single attrs → EnsureSingle. Multi attrs hosting a child element
-	// → the path identifies an existing instance; we replace via
-	// EnsureSingle on its parent attribute (semantics: overwrite the
-	// pre-allocated default slot). For the common leaf assignment
-	// (DV_QUANTITY at ELEMENT.value) the parent is single, so this
-	// path is the routine case.
+	// Single attrs → EnsureSingle. A path ending in a multi-valued
+	// attribute is refused with ErrInvalidPath (below). For the common
+	// leaf assignment (DV_QUANTITY at ELEMENT.value) the parent is
+	// single, so this path is the routine case.
 	switch leaf.cardinality {
 	case template.Single:
 		if err := rmwrite.EnsureSingle(rmParent, leaf.attrName, p.rawValue); err != nil {
