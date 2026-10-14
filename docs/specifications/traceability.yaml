@@ -258,6 +258,7 @@ requirements:
       - openehr/client/ehr/version_header_test.go
       - openehr/instance/instance_test.go
       - openehr/serialize/simplified/flat_decode_test.go
+      - openehr/serialize/simplified/rmattr_encapsulated_test.go
       - openehr/serialize/simplified/rmattr_party_test.go
       - openehr/terminology/imports_test.go
       - openehr/terminology/tables_test.go
@@ -1482,7 +1483,7 @@ requirements:
       - internal/rmaccess
       - openehr/internal/rmnames
       - internal/rmroots
-    probes: [PROBE-081]
+    probes: [PROBE-077, PROBE-081]
     tests:
       - internal/rmaccess/interval_test.go
       - internal/rmaccess/reads_test.go
@@ -1514,6 +1515,7 @@ requirements:
       - openehr/validation/rmfloor_identity_internal_test.go
       - openehr/validation/rmfloor_interval_class_test.go
       - openehr/validation/rmfloor_interval_flags_test.go
+      - openehr/validation/rmfloor_invariant_matrix_internal_test.go
       - openehr/validation/rmfloor_ism_transition_test.go
       - openehr/validation/rmfloor_limit_internal_test.go
       - openehr/validation/rmfloor_ordered_test.go
@@ -1735,7 +1737,7 @@ requirements:
       - openehr/rm/temporal_funcs_test.go
       - openehr/rm/temporal_iso_test.go
       - openehr/validation/coverage_unevaluated_test.go
-      - openehr/validation/inventory_dispatch_internal_test.go
+      - openehr/validation/rmfloor_invariant_matrix_internal_test.go
       - openehr/validation/rmfloor_temporal_element_test.go
 
   - id: REQ-130
@@ -2113,6 +2115,7 @@ requirements:
     status: draft
     implementation: partial
     packages: [openehr/validation, internal/rmaccess, internal/bmmgen]
+    probes: [PROBE-077]
     tests:
       - internal/bmmgen/render_inventory_test.go
       - internal/bmmgen/render_rmaccess_test.go
@@ -2137,6 +2140,7 @@ requirements:
       - openehr/validation/rmfloor_coded_test.go
       - openehr/validation/rmfloor_generated_access_test.go
       - openehr/validation/rmfloor_interval_class_test.go
+      - openehr/validation/rmfloor_invariant_matrix_internal_test.go
       - openehr/validation/rmfloor_limit_internal_test.go
       - openehr/validation/rmfloor_primitive_list_internal_test.go
       - openehr/validation/validator_test.go
