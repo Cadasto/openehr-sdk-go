@@ -45,9 +45,9 @@ The generator **MUST** skip the BMM package `org.openehr.rm.ehr_extract` (and it
 
 The CI pipeline **MUST** include a "drift check" step that re-runs the generator and fails the build if the working tree diverges from the regenerated output. This is the mechanical guarantee against hand-edits silently diverging from the BMM.
 
-Hand-written packages (`openehr/serialize`, `openehr/validation`, `openehr/template/<parser>`, `openehr/bmm/`, etc.) **MAY** consume the generated types but **MUST NOT** be regenerated. The generator's output and hand-written code live in clearly separated files (see § Generator output conventions below).
+Hand-written files (in `openehr/serialize`, `openehr/validation`, `openehr/template/<parser>`, `openehr/bmm/`, etc.) **MAY** consume the generated types but **MUST NOT** be regenerated. A hand-written package may hold a generated `*_gen.go` file beside them, which the drift check covers like any other output: `openehr/validation/inventory_gen.go`, the invariant inventory, classified by the hand-kept `openehr/validation/invariants.json`. The generator's output and hand-written code live in clearly separated files (see § Generator output conventions below).
 
-- **Lives in:** `internal/bmmgen/`, `cmd/bmmgen/`, generated files under `openehr/rm/`, `openehr/rm/typereg/`, `openehr/aom/aom14/`
+- **Lives in:** `internal/bmmgen/`, `cmd/bmmgen/`, generated files under `openehr/rm/`, `openehr/rm/typereg/`, `openehr/rm/rminfo/`, `openehr/aom/aom14/`, `internal/rmaccess/` (`access_gen.go`) and `openehr/validation/` (`inventory_gen.go`)
 
 ### REQ-043 — Mapping rules: P_BMM → Go
 
