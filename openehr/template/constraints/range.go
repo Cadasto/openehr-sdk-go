@@ -9,8 +9,9 @@ import (
 // uses for primitive numeric constraints (C_INTEGER / C_REAL ranges,
 // DV_QUANTITY magnitude / precision ranges).
 //
-// The zero value represents an "any value accepted" range: both
-// sides unbounded, which [Contains] returns true for.
+// The zero value represents an "any value accepted" range, read as if
+// both sides were unbounded: [NumericRange.IsBounded] reports false for
+// it, and [NumericRange.Contains] reports true for every value but NaN.
 type NumericRange struct {
 	// Lower / Upper are the numeric bounds. Float64 covers both
 	// C_INTEGER (lossless up to 2^53) and C_REAL.
@@ -54,15 +55,22 @@ func (r NumericRange) IsValid() bool {
 }
 
 // Contains reports whether v is inside the range under the configured
-// inclusivity. Unbounded sides accept any value on that side. A NaN is
-// inside no range, so Contains returns false for it even when both
-// sides are unbounded.
+// inclusivity. Unbounded sides accept any value on that side, and the
+// zero value accepts any value, as if both sides were unbounded. A NaN
+// is inside no range, so Contains returns false for it even on the zero
+// value or when both sides are unbounded.
 func (r NumericRange) Contains(v float64) bool {
 	// Only a NaN is unequal to itself. The check is spelled out instead
 	// of calling math.IsNaN because math is not on the package's list
 	// of pure imports (pure_imports_test.go).
 	if v != v {
 		return false
+	}
+	// A range that constrains nothing accepts every value. That covers
+	// the zero value, whose bounds would otherwise read as the empty
+	// interval (0..0).
+	if !r.IsBounded() {
+		return true
 	}
 	if !r.LowerUnbounded {
 		if r.LowerInclusive {
