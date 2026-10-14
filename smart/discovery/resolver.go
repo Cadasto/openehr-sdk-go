@@ -831,9 +831,24 @@ func validateIssuer(baseURL, raw string, allowInsecure bool) error {
 		return malformed(fmt.Errorf("issuer %q has a fragment", urlredact.String(raw)))
 	}
 	if u.Scheme == "http" && !allowInsecure {
-		return &DiscoveryError{Issuer: baseURL, Reason: ReasonInsecureURL, Inner: fmt.Errorf("issuer %q uses http; https required (use WithAllowInsecure for development)", urlredact.String(raw))}
+		return insecureIssuer(baseURL, raw)
 	}
 	return nil
+}
+
+// insecureIssuer is the refusal of an http issuer, raw as the document
+// wrote it, by a Resolver that does not allow insecure URLs. The parser and
+// refusePlaintext share it, so a catalog refused on a fresh hit or a 304
+// renewal gets the text a new document gets.
+func insecureIssuer(baseURL, raw string) error {
+	return &DiscoveryError{Issuer: baseURL, Reason: ReasonInsecureURL, Inner: fmt.Errorf("issuer %q uses http; https required (use WithAllowInsecure for development)", urlredact.String(raw))}
+}
+
+// insecureEndpoint is the refusal of the auth endpoint named name, which
+// uses http, by a Resolver that does not allow insecure URLs. Shared as
+// insecureIssuer is.
+func insecureEndpoint(baseURL, name string) error {
+	return &DiscoveryError{Issuer: baseURL, Reason: ReasonInsecureURL, Inner: fmt.Errorf("%s uses scheme %q; https required (use WithAllowInsecure for development)", name, "http")}
 }
 
 func parseAuthEndpoints(baseURL string, w *smartConfigWire, allowInsecure bool) (AuthEndpoints, error) {
@@ -852,7 +867,7 @@ func parseAuthEndpoints(baseURL string, w *smartConfigWire, allowInsecure bool) 
 		case "https":
 		case "http":
 			if !allowInsecure {
-				return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonInsecureURL, Inner: fmt.Errorf("%s uses scheme %q; https required (use WithAllowInsecure for development)", name, u.Scheme)}
+				return nil, insecureEndpoint(baseURL, name)
 			}
 		default:
 			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: fmt.Errorf("%s uses scheme %q; https required", name, u.Scheme)}
@@ -1019,20 +1034,21 @@ func (r *Resolver) warnInsecure(cat *ServiceCatalog) {
 // endpoint is a ReasonInsecureURL. A 304 renewal and a fresh cache hit need
 // it, because the cached catalog may come from a Resolver built with
 // WithAllowInsecure.
+//
+// REQ-071: the refusal is the DiscoveryError a new document would get. It
+// checks in the parser's order, the auth endpoints in document order before
+// the issuer, and words each refusal with the parser's own helper.
 func (r *Resolver) refusePlaintext(cat *ServiceCatalog) error {
 	if r.cfg.allowInsecure {
 		return nil
 	}
-	refuse := func(name, raw string) error {
-		return &DiscoveryError{Issuer: cat.BaseURL, Reason: ReasonInsecureURL, Inner: fmt.Errorf("%s %q uses http; https required (use WithAllowInsecure for development)", name, urlredact.String(raw))}
-	}
-	if u, err := url.Parse(cat.Issuer); err == nil && u.Scheme == "http" {
-		return refuse("issuer", cat.Issuer)
-	}
 	for _, e := range authURLs(cat.Auth) {
 		if e.url != nil && e.url.Scheme == "http" {
-			return refuse(e.name, e.url.Redacted())
+			return insecureEndpoint(cat.BaseURL, e.name)
 		}
+	}
+	if u, err := url.Parse(cat.Issuer); err == nil && u.Scheme == "http" {
+		return insecureIssuer(cat.BaseURL, cat.Issuer)
 	}
 	return nil
 }
