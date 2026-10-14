@@ -682,9 +682,11 @@ func TestBodyReadErrorRetryGateHEAD(t *testing.T) { // REQ-172
 // REQ-091's "Retries MUST respect ctx cancellation". A GET whose 200 body
 // read is stopped by the caller's own deadline is not sent again, so Do
 // returns the Response and the *BodyReadError rather than a later attempt's
-// token or dial failure. Both backoffs are covered: with none, the next
-// attempt would start at once and fail with no response; with one, the wait
-// would fail and replace the error with the context's.
+// token or dial failure. Only the "no backoff" case pins the ctx guard in
+// shouldRetry: with no wait, a retry would start at once and fail with no
+// response. The "20ms backoff" case pins the outcome only, because Do's
+// retry-wait branch keeps the *BodyReadError even when the guard is gone;
+// keep both, and never drop the first as a duplicate of the second.
 func TestBodyReadErrorCallerDeadlineIsNotRetried(t *testing.T) { // REQ-172, REQ-091
 	cases := []struct {
 		name    string
