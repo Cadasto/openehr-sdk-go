@@ -221,14 +221,14 @@ go run ./cmd/examples/validate-from-json -corpus           # demo data with expe
 go run ./cmd/examples/validate-from-json comp.json tmpl.opt # your own files
 ```
 
-**What the call checks:** `validation.ValidateComposition(&composition, compiled)` runs two checks and returns their findings in one result.
+**What the call checks:** `validation.ValidateComposition(&composition, compiled)` applies two layers of checks in one walk over the composition and returns their findings in one result.
 
 | Check | What it checks |
 |---|---|
 | Template constraints | What the OPT declares, node by node: existence, cardinality, RM type, archetype identity and value constraints |
-| RM floor | The openEHR Reference Model itself, over the whole composition, the parts the OPT does not model included: the attributes the RM makes mandatory on every node, and the RM's own rules for each type, such as an ELEMENT carrying exactly one of a value or a null flavour, and every COMPOSITION and ENTRY carrying `archetype_details` |
+| RM floor | The openEHR Reference Model itself, over every part of the composition the template admits, the parts the OPT does not model included: the attributes the RM makes mandatory on every node, and the RM's own rules for each type, such as an ELEMENT carrying exactly one of a value or a null flavour, and every COMPOSITION and ENTRY carrying `archetype_details` |
 
-The template constraints come first in the result, then the RM floor's findings. Where both checks find the same defect, the same code at the same path, the result carries it once. A composition that passes is valid against the template and the Reference Model rules the floor checks. `validation.ValidateRM` runs the floor alone, for a root no template applies to.
+At each node the walk first asks whether the template admits the content there, then applies both layers, so the findings follow the document. Content the template refuses, such as an entry a slot does not allow, is reported once and not checked further. A defect both layers see is reported once, and each issue's `Layer` says which layer reported it. A composition that passes is valid against the template and the Reference Model rules the floor checks. `validation.ValidateRM` runs the floor alone, for a root no template applies to.
 
 **Flags:**
 
