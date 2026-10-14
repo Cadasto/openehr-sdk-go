@@ -36,9 +36,6 @@ func TestAccess_REQ171_CoversEveryRegisteredClass(t *testing.T) {
 			continue
 		}
 		for _, attr := range lister.AttributeNames(name) {
-			if rminfo.IsNonStorableAttr(name, attr) {
-				continue
-			}
 			attrs++
 			container, ok := rminfo.Default.IsContainer(name, attr)
 			if !ok {

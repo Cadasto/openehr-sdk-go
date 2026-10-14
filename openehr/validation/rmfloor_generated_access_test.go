@@ -85,8 +85,8 @@ func TestValidateRM_REQ171_HashEntriesWalkedInKeyOrder(t *testing.T) {
 			"Validate(root, nil)": validation.New().Validate(root, nil),
 		} {
 			got := identityKeys(r.Issues)
-			if !slices.Contains(got, want) {
-				t.Fatalf("%s(RESOURCE_DESCRIPTION, delta lacks purpose) issues = %q, want %q", name, got, want)
+			if !slices.Equal(got, []string{want}) {
+				t.Fatalf("%s(RESOURCE_DESCRIPTION, delta lacks purpose) issues = %q, want [%q]", name, got, want)
 			}
 			for _, issue := range r.Issues {
 				for _, k := range keys {
@@ -342,7 +342,10 @@ const hashTemplateOPT = `<?xml version="1.0" encoding="utf-8"?>
 // its 1-based position there, never by its key. Of three items, the second
 // by key order lacks the `use` the template requires, so `required` is
 // reported at /details[2]/use on the template layer, whatever order the map
-// holds them in, and no issue path carries a key.
+// holds them in, and no issue path carries a key. It is the only issue: the
+// floor and the template walk both leave out parent_resource, which the
+// compiled template carries as an RM-mandatory attribute of the root and no
+// value can hold (REQ-112 Driver).
 func TestValidate_REQ102_HashEntriesBoundByPosition(t *testing.T) {
 	c := mustCompileInline(t, hashTemplateOPT)
 	use := "use"
@@ -358,6 +361,9 @@ func TestValidate_REQ102_HashEntriesBoundByPosition(t *testing.T) {
 		got := templateIssues(r)
 		if !slices.Equal(got, []string{want}) {
 			t.Fatalf("Validate(RESOURCE_DESCRIPTION, bravo lacks use) template issues = %q, want [%q]", got, want)
+		}
+		if all := identityKeys(r.Issues); !slices.Equal(all, []string{want}) {
+			t.Fatalf("Validate(RESOURCE_DESCRIPTION, bravo lacks use) issues = %q, want only [%q]", all, want)
 		}
 		for _, issue := range r.Issues {
 			if strings.Contains(issue.Path, "key-") {
