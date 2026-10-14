@@ -794,6 +794,171 @@ func TestBodyReadErrorSurvivesCancelledBackoff(t *testing.T) { // REQ-172, REQ-0
 	})
 }
 
+// stallMidBodyHandler answers every request with status, announces a
+// Content-Length of cutContentLength, writes and flushes cutPartialBody, and
+// then stalls mid-body until the client gives up or release is closed. It
+// counts each request in hits.
+func stallMidBodyHandler(status int, hits *atomic.Int32, release <-chan struct{}) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		w.Header().Set("ETag", `"`+cutBodyETag+`"`)
+		w.Header().Set("Content-Length", strconv.Itoa(cutContentLength))
+		w.WriteHeader(status)
+		_, _ = io.WriteString(w, cutPartialBody)
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		select {
+		case <-r.Context().Done():
+		case <-release:
+		}
+	}
+}
+
+// TestBodyReadErrorNonTwoXXCallerDeadlineIsNotRetried pins REQ-172 § Retry on
+// the non-2xx arm, beside REQ-091's "Retries MUST respect ctx cancellation". A
+// GET whose 503 body read is stopped by the caller's own deadline is not sent
+// again by its status, so Do returns the 503 Response and the *WireError
+// rather than a later attempt's token failure or the bare context error. Only
+// the "no backoff" case pins the ctx guard in shouldRetry: with no wait, a
+// retry would start at once and fail with no response. The "20ms backoff"
+// case pins the outcome only, because Do's retry-wait branch keeps the
+// non-2xx arm's error even when the guard is gone; keep both, and never drop
+// the first as a duplicate of the second.
+func TestBodyReadErrorNonTwoXXCallerDeadlineIsNotRetried(t *testing.T) { // REQ-172, REQ-091
+	cases := []struct {
+		name    string
+		backoff time.Duration
+	}{
+		{name: "no backoff", backoff: 0},
+		{name: "20ms backoff", backoff: 20 * time.Millisecond},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var hits atomic.Int32
+			release := make(chan struct{})
+			c := newBodyReadClient(t, stallMidBodyHandler(http.StatusServiceUnavailable, &hits, release),
+				transport.WithRetry(transport.RetryPolicy{
+					MaxAttempts:     3,
+					InitialBackoff:  tc.backoff,
+					MaxBackoff:      tc.backoff,
+					RetriableStatus: []int{http.StatusServiceUnavailable},
+				}))
+			// Cleanups run last-in first-out, so the handler is released
+			// before the server closes and waits for it.
+			t.Cleanup(func() { close(release) })
+
+			ctx, cancel := context.WithTimeout(t.Context(), 150*time.Millisecond)
+			defer cancel()
+			resp, err := c.Do(ctx, &transport.Request{Method: http.MethodGet, Path: "/ehr/abc", Route: "/ehr/{ehr_id}"})
+			if err == nil {
+				t.Fatal("Do of a stalled 503 under a deadline succeeded; the premise of this test is gone")
+			}
+			if resp == nil {
+				t.Fatalf("Do returned a nil *Response beside %v; REQ-172 requires the status and headers survive on the non-2xx arm", err)
+			}
+			if resp.StatusCode != http.StatusServiceUnavailable {
+				t.Errorf("Response.StatusCode = %d, want %d", resp.StatusCode, http.StatusServiceUnavailable)
+			}
+			if len(resp.Body) != 0 {
+				t.Errorf("Response.Body = %q, want empty", resp.Body)
+			}
+			we, ok := errors.AsType[*transport.WireError](err)
+			if !ok {
+				t.Fatalf("errors.AsType[*transport.WireError] did not match %T (%v); the status must still classify the failure", err, err)
+			}
+			if we.StatusCode != http.StatusServiceUnavailable {
+				t.Errorf("WireError.StatusCode = %d, want %d", we.StatusCode, http.StatusServiceUnavailable)
+			}
+			if !errors.Is(err, transport.ErrServerError) {
+				t.Errorf("errors.Is(err, transport.ErrServerError) = false for %v", err)
+			}
+			if !errors.Is(err, context.DeadlineExceeded) {
+				t.Errorf("errors.Is(err, context.DeadlineExceeded) = false for %v; the read failure stays reachable", err)
+			}
+			if got := hits.Load(); got != 1 {
+				t.Errorf("server hit %d times, want 1: a read the caller's deadline stopped is not sent again", got)
+			}
+		})
+	}
+}
+
+// TestBodyReadErrorNonTwoXXSurvivesCancelledBackoff pins the other half of
+// REQ-172 § Retry on the non-2xx arm: a GET whose 503 body could not be read is
+// due to be sent again by its status, and the caller's deadline ends during the
+// backoff. Do then returns the Response and an error that still carries the
+// *WireError and the read failure, with the context's error reachable beside
+// them. The "503 read in full" case is the control: a *WireError whose body was
+// read is still replaced by the context's error, as before. The fake clock of
+// testing/synctest runs the hour-long backoff past the deadline at once.
+func TestBodyReadErrorNonTwoXXSurvivesCancelledBackoff(t *testing.T) { // REQ-172, REQ-091
+	cases := []struct {
+		name string
+		body func() io.ReadCloser
+		// keepsWireError is whether the returned error still carries the
+		// *WireError, the read failure and the 503 Response.
+		keepsWireError bool
+	}{
+		{name: "503 body cut", body: func() io.ReadCloser { return errReadCloser{err: io.ErrUnexpectedEOF} }, keepsWireError: true},
+		{name: "503 read in full", body: func() io.ReadCloser { return http.NoBody }, keepsWireError: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				hits := 0
+				c := newBrokenTransportClient(t, func(*http.Request) (*http.Response, error) {
+					hits++
+					return &http.Response{
+						StatusCode: http.StatusServiceUnavailable,
+						Header:     http.Header{"Etag": {`"` + cutBodyETag + `"`}},
+						Body:       tc.body(),
+					}, nil
+				}, transport.WithRetry(transport.RetryPolicy{
+					MaxAttempts:     3,
+					InitialBackoff:  time.Hour,
+					MaxBackoff:      time.Hour,
+					RetriableStatus: []int{http.StatusServiceUnavailable},
+				}))
+
+				ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+				defer cancel()
+				resp, err := c.Do(ctx, &transport.Request{Method: http.MethodGet, Path: "/ehr/abc", Route: "/ehr/{ehr_id}"})
+				if hits != 1 {
+					t.Fatalf("RoundTripper reached %d times, want 1: the deadline ends during the first backoff; the premise of this test is gone", hits)
+				}
+				if !errors.Is(err, context.DeadlineExceeded) {
+					t.Errorf("errors.Is(err, context.DeadlineExceeded) = false for %v; the context's error stays reachable", err)
+				}
+				we, ok := errors.AsType[*transport.WireError](err)
+				if !tc.keepsWireError {
+					if ok {
+						t.Errorf("errors.AsType[*transport.WireError] matched %v; a 503 read in full still gives way to the context's error", we)
+					}
+					return
+				}
+				if !ok {
+					t.Fatalf("errors.AsType[*transport.WireError] did not match %T (%v); the backoff's failure must not replace it", err, err)
+				}
+				if we.StatusCode != http.StatusServiceUnavailable {
+					t.Errorf("WireError.StatusCode = %d, want %d", we.StatusCode, http.StatusServiceUnavailable)
+				}
+				if !errors.Is(err, transport.ErrServerError) {
+					t.Errorf("errors.Is(err, transport.ErrServerError) = false for %v", err)
+				}
+				if !errors.Is(err, io.ErrUnexpectedEOF) {
+					t.Errorf("errors.Is(err, io.ErrUnexpectedEOF) = false for %v; the read failure stays reachable", err)
+				}
+				if resp == nil || resp.StatusCode != http.StatusServiceUnavailable {
+					t.Fatalf("Do returned Response %+v, want a non-nil 503", resp)
+				}
+				if len(resp.Body) != 0 {
+					t.Errorf("Response.Body = %q, want empty", resp.Body)
+				}
+			})
+		})
+	}
+}
+
 // TestBodyReadErrorObservation pins REQ-172's REQ-098 sentence: the
 // observation of a call whose 2xx body could not be read carries the response
 // status beside the error.
