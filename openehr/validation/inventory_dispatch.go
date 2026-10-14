@@ -35,9 +35,10 @@ const (
 	invariantNotMechanical
 	// invariantOutOfScope is an invariant the SDK does not check on an
 	// instance, for the reason the classification gives: most are not
-	// evaluated yet; others hold by definition on the SDK's types, belong to
-	// a class no registered type is subject to, or are read otherwise by a
-	// documented deviation of the REQ-123 ISO 8601 parse.
+	// evaluated yet; others hold by definition on the SDK's types, are
+	// declared on a class no registered type is or descends from, or are
+	// read otherwise by a documented deviation of the REQ-123 ISO 8601
+	// parse.
 	invariantOutOfScope
 )
 
