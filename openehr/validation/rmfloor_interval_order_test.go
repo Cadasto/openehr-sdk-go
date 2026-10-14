@@ -118,7 +118,8 @@ func checkInOrder[T rm.DVOrdered](t *testing.T, name string, lower, upper T) {
 // types the magnitude the REQ-123 parse gives (days since 0001-01-01 for a
 // date, seconds for the others). That magnitude reads the clock, so two
 // DV_TIME or DV_DATE_TIME values in different time zones are ordered as
-// instants instead, and Value holds each one's magnitude in UTC. The floor
+// instants instead, each by its magnitude less its zone's offset from UTC,
+// partial values and leap seconds included, and Value holds those. The floor
 // does not compare units_system, so a same-units pair is ordered whatever its
 // units_system.
 func TestValidateRM_REQ112_IntervalOrderEveryBoundType(t *testing.T) {
@@ -153,6 +154,45 @@ func TestValidateRM_REQ112_IntervalOrderEveryBoundType(t *testing.T) {
 		rm.DVTime{Value: "08:00:00Z"}, rm.DVTime{Value: "10:00:00+05:00"}, [2]float64{28800, 18000})
 	checkOrder(t, "DV_DATE_TIME in different zones", "DV_DATE_TIME",
 		rm.DVDateTime{Value: "2025-01-01T23:00:00-05:00"}, rm.DVDateTime{Value: "2025-01-02T01:00:00Z"}, [2]float64{63871387200, 63871376400})
+	// Partial values and leap seconds are ordered the same way, each by its
+	// magnitude less its zone's offset. A missing minute or second reads as
+	// zero, and the leap second 23:59:60 as the midnight that ends its day.
+	// The zone may be written Z, ±hh, ±hhmm or ±hh:mm. Each pair below is out
+	// of order as instants although its clocks read in order:
+	// 2025-01-01T23:30-05:00 is 2025-01-02T04:30Z, after 01:00Z; 23:30-01:00
+	// is 00:30Z on the next day, after 23:59:60Z; 10:00-03 is 13:00Z, after
+	// 18:00+0530, which is 12:30Z; and 10:00-0330 is 13:30Z, after 18:00+05,
+	// which is 13:00Z.
+	checkOrder(t, "DV_DATE_TIME in different zones, both partial", "DV_DATE_TIME",
+		rm.DVDateTime{Value: "2025-01-01T23:30-05:00"}, rm.DVDateTime{Value: "2025-01-02T01Z"}, [2]float64{63871389000, 63871376400})
+	checkOrder(t, "DV_TIME in different zones, upper a leap second", "DV_TIME",
+		rm.DVTime{Value: "23:30:00-01:00"}, rm.DVTime{Value: "23:59:60Z"}, [2]float64{88200, 86400})
+	checkOrder(t, "DV_TIME in zones -03 and +0530, both partial", "DV_TIME",
+		rm.DVTime{Value: "10:00-03"}, rm.DVTime{Value: "18:00+0530"}, [2]float64{46800, 45000})
+	checkOrder(t, "DV_DATE_TIME in zones -0330 and +05", "DV_DATE_TIME",
+		rm.DVDateTime{Value: "2025-01-01T10:00:00-0330"}, rm.DVDateTime{Value: "2025-01-01T18:00:00+05"}, [2]float64{63871335000, 63871333200})
+	// Each pair below is out of order both by its clocks and as instants:
+	// 10:00+01:00 is 09:00Z, after 08:00Z; and 2017-01-01T01:30:00+01:00 is
+	// 00:30Z, after the leap second 2016-12-31T23:59:60Z. Its counterpart is
+	// in order as instants although its clocks are not: 10:00+01:00 is before
+	// 09:30Z, and 2017-01-01T00:30:00+01:00, which is 2016-12-31T23:30:00Z,
+	// before the leap second.
+	checkOrder(t, "DV_TIME in different zones, lower partial", "DV_TIME",
+		rm.DVTime{Value: "10:00+01:00"}, rm.DVTime{Value: "08:00:00Z"}, [2]float64{32400, 28800})
+	checkInOrder(t, "DV_TIME in different zones, lower partial, in order as instants",
+		rm.DVTime{Value: "10:00+01:00"}, rm.DVTime{Value: "09:30:00Z"})
+	checkOrder(t, "DV_DATE_TIME in different zones, upper partial", "DV_DATE_TIME",
+		rm.DVDateTime{Value: "2025-01-01T10:00:00+01:00"}, rm.DVDateTime{Value: "2025-01-01T08:00Z"}, [2]float64{63871318800, 63871315200})
+	checkInOrder(t, "DV_DATE_TIME in different zones, upper partial, in order as instants",
+		rm.DVDateTime{Value: "2025-01-01T10:00:00+01:00"}, rm.DVDateTime{Value: "2025-01-01T09:30Z"})
+	checkOrder(t, "DV_DATE_TIME in different zones, upper a leap second", "DV_DATE_TIME",
+		rm.DVDateTime{Value: "2017-01-01T01:30:00+01:00"}, rm.DVDateTime{Value: "2016-12-31T23:59:60Z"}, [2]float64{63618827400, 63618825600})
+	checkInOrder(t, "DV_DATE_TIME in different zones, upper a leap second, in order as instants",
+		rm.DVDateTime{Value: "2017-01-01T00:30:00+01:00"}, rm.DVDateTime{Value: "2016-12-31T23:59:60Z"})
+	// Z and +00:00 name one offset in two spellings, so two partial values
+	// in them are ordered as their clocks are.
+	checkOrder(t, "DV_TIME in Z and +00:00, both partial", "DV_TIME",
+		rm.DVTime{Value: "10:30Z"}, rm.DVTime{Value: "08:00+00:00"}, [2]float64{37800, 28800})
 	// Two values in one zone are ordered by their clocks, as two values with
 	// no zone are, and Value holds the clock magnitudes.
 	checkOrder(t, "DV_TIME in one zone", "DV_TIME",
