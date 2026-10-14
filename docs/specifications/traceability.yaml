@@ -315,6 +315,7 @@ requirements:
       - internal/bmmgen/aom14_test.go
       - internal/bmmgen/plan_test.go
       - internal/bmmgen/render_interface_test.go
+      - internal/bmmgen/render_mandatory_tag_test.go
       - internal/bmmgen/render_test.go
       - internal/bmmgen/sim_bump_test.go
 
@@ -442,6 +443,7 @@ requirements:
       - openehr/rm/quoted_literal_test.go
       - openehr/rm/real_test.go
       - openehr/rm/typereg/registry_test.go
+      - openehr/serialize/canjson/absent_mandatory_test.go
       - openehr/serialize/canjson/bare_v2_decode_test.go
       - openehr/serialize/canjson/corpus_parity_test.go
       - openehr/serialize/canjson/decode_test.go
