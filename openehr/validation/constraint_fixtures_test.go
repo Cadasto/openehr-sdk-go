@@ -38,7 +38,7 @@ func TestValidateComposition_ConstraintFixtures_NoPrimitiveViolations(t *testing
 		"Test_dv_multimedia_open_constraint.v0": "DV_MULTIMEDIA media_type outside the closed C_CODE_PHRASE list",
 		// OPT pins false_valid=false while the instance carries false.
 		// Surfaced once INTEGER/BOOLEAN AOM short-name channels validate
-		// through DV wrapper scalar attrs (REQ-110 rmread path).
+		// through DV wrapper scalar attrs (REQ-110 attribute access path).
 		"Test_dv_boolean_true_false.v0": "DV_BOOLEAN value the C_BOOLEAN does not allow",
 		// OPT pins magnitude range [10..20] while the instance carries 25.
 		"Test_dv_count_range_constraint.v0": "DV_COUNT magnitude outside the C_INTEGER range",

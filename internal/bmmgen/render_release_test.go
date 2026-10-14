@@ -156,7 +156,7 @@ func TestREQ041_RenderReleaseFileSkipsNonRMTargets(t *testing.T) {
 // the RM package and nowhere else, and verify mode checks it for drift.
 func TestREQ042_RunEmitsReleaseFile(t *testing.T) {
 	out := t.TempDir()
-	res, err := Run(Options{ResourcesDir: testResources, OutDir: out})
+	res, err := Run(Options{ResourcesDir: testResources, OutDir: out, SkipInventory: true})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -184,7 +184,7 @@ func TestREQ042_RunEmitsReleaseFile(t *testing.T) {
 	if err := os.WriteFile(want, []byte("package rm\n"), 0o644); err != nil {
 		t.Fatalf("tamper %s: %v", want, err)
 	}
-	vres, err := Run(Options{ResourcesDir: testResources, OutDir: out, Verify: true})
+	vres, err := Run(Options{ResourcesDir: testResources, OutDir: out, Verify: true, SkipInventory: true})
 	if err != nil {
 		t.Fatalf("Run(verify): %v", err)
 	}

@@ -27,9 +27,9 @@ import (
 // DV_PROPORTION: an out-of-range precision, and a precision of 0 over a
 // fractional operand, each surface exactly one `rm_invariant` issue whose
 // Detail names DV_PROPORTION; -1, 0 over whole-number operands, another
-// in-range precision, and an absent precision report OK. The
-// type-specific denominator invariants (Valid_denominator,
-// Unitary_validity, Percent_validity, Fraction_validity) are deliberately
+// in-range precision, and an absent precision report OK. The type-kind
+// invariants (Unitary_validity, Percent_validity, Fraction_validity) and
+// Valid_denominator are deliberately
 // outside this test — they are not in the floor.
 func TestValidateRM_DVProportionPrecision(t *testing.T) {
 	t.Parallel()

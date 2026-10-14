@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
-	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -68,8 +68,8 @@ func generateCanonical(t *testing.T, c *templatecompile.Compiled, opts instance.
 }
 
 // valueAt returns the Go value at a canonical-JSON path in root, read
-// through rmread: an object key is an RM attribute, and an array index
-// picks one item of a multiple attribute.
+// through the generated attribute access: an object key is an RM attribute,
+// and an array index picks one item of a multiple attribute.
 func valueAt(t *testing.T, root any, path string) any {
 	t.Helper()
 	segs := strings.Split(strings.TrimPrefix(path, "/"), "/")
@@ -78,39 +78,40 @@ func valueAt(t *testing.T, root any, path string) any {
 		attr := segs[i]
 		if i+1 < len(segs) {
 			if idx, err := strconv.Atoi(segs[i+1]); err == nil {
-				items, ok := rmread.ReadMultiple(cur, "", attr)
+				items, ok := rmaccess.Multiple(cur, attr)
 				if !ok || idx >= len(items) {
-					t.Fatalf("rmread.ReadMultiple(%T, %q) at %s: no item %d", cur, attr, path, idx)
+					t.Fatalf("rmaccess.Multiple(%T, %q) at %s: no item %d", cur, attr, path, idx)
 				}
 				cur = items[idx]
 				i++
 				continue
 			}
 		}
-		v, ok := rmread.ReadSingle(cur, "", attr)
+		v, ok := rmaccess.Single(cur, attr)
 		if !ok {
-			t.Fatalf("rmread.ReadSingle(%T, %q) at %s: absent", cur, attr, path)
+			t.Fatalf("rmaccess.Single(%T, %q) at %s: absent", cur, attr, path)
 		}
 		cur = v
 	}
 	return cur
 }
 
-// hasBound reports whether rmread reads a bound on the interval's side. A
-// Void bound reads as absent beside its open flag, and so does a concrete
-// bound equal to its type's zero.
+// hasBound reports whether the generated attribute access reads a bound on
+// the interval's side. A Void bound reads as absent beside its open flag,
+// and so does a concrete bound equal to its type's zero.
 func hasBound(iv any, side string) bool {
-	_, ok := rmread.ReadSingle(iv, "DV_INTERVAL", side)
+	_, ok := rmaccess.Single(iv, side)
 	return ok
 }
 
-// flag reads one of the interval's four boundary flags through rmread.
+// flag reads one of the interval's four boundary flags through the generated
+// attribute access.
 func flag(t *testing.T, iv any, name string) bool {
 	t.Helper()
-	v, ok := rmread.ReadSingle(iv, "DV_INTERVAL", name)
+	v, ok := rmaccess.Single(iv, name)
 	b, isBool := v.(bool)
 	if !ok || !isBool {
-		t.Fatalf("rmread.ReadSingle(%T, %q) = (%v, %v), want a bool", iv, name, v, ok)
+		t.Fatalf("rmaccess.Single(%T, %q) = (%v, %v), want a bool", iv, name, v, ok)
 	}
 	return b
 }
@@ -162,7 +163,7 @@ func forEachGeneratedInterval(t *testing.T, check func(t *testing.T, path string
 // The generator seeds both flags true and then writes the bounds the OPT
 // constrains, so every side it fills must come out closed.
 //
-// The check reads the Go value through rmread, where a concrete bound equal
+// The check reads the Go value through the generated attribute access, where a concrete bound equal
 // to its type's zero beside its open flag reads as absent: that is the
 // state of a side the OPT gives no bound. It does not check the canonical
 // JSON, which still writes such a zero bound beside the flag.

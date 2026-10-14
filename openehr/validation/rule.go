@@ -1,11 +1,13 @@
 package validation
 
 // rule.go: the names an Issue carries in Rule. Every rule an emit site sets
-// is one of the constants or table entries below, or, at a constrained leaf,
-// the code of the violation the leaf's constraint reported, or, for a coded
-// invariant, the name its codedRule row gives (rmfloor_coded.go). Keeping
-// them here lets a test check each CLASS.Invariant name against the pinned
-// BMMs.
+// is one of the constants below, or, at a constrained leaf, the code of the
+// violation the leaf's constraint reported, or, for a coded invariant, the
+// name its codedRule row gives (rmfloor_coded.go), or, for an evaluator that
+// serves one invariant on several classes (Is_archetype_root, Value_valid),
+// the key of the invariant inventory that dispatched it
+// (inventory_dispatch.go). Keeping them here lets a test check each
+// CLASS.Invariant name against the pinned BMMs.
 
 // The template-layer rules: the clause of the operational template an issue
 // evaluates.
@@ -56,31 +58,3 @@ const (
 	ruleTermMappingMatch      = "TERM_MAPPING.Match_valid"
 	ruleRMVersionValid        = "ARCHETYPED.Rm_version_valid"
 )
-
-// valueValidRules gives, for each ISO 8601 data value the floor checks, the
-// Value_valid invariant of that class: each of the four declares its own.
-var valueValidRules = map[string]string{
-	"DV_DATE":      "DV_DATE.Value_valid",
-	"DV_TIME":      "DV_TIME.Value_valid",
-	"DV_DATE_TIME": "DV_DATE_TIME.Value_valid",
-	"DV_DURATION":  "DV_DURATION.Value_valid",
-}
-
-// archetypeRootRules gives, for each class that is always an archetype root,
-// the Is_archetype_root invariant it is bound by: the one the class itself
-// declares, or the one its ancestor PARTY or ENTRY declares.
-var archetypeRootRules = map[string]string{
-	"COMPOSITION":  "COMPOSITION.Is_archetype_root",
-	"EHR_STATUS":   "EHR_STATUS.Is_archetype_root",
-	"EHR_ACCESS":   "EHR_ACCESS.Is_archetype_root",
-	"PERSON":       "PARTY.Is_archetype_root",
-	"ORGANISATION": "PARTY.Is_archetype_root",
-	"GROUP":        "PARTY.Is_archetype_root",
-	"AGENT":        "PARTY.Is_archetype_root",
-	"ROLE":         "PARTY.Is_archetype_root",
-	"OBSERVATION":  "ENTRY.Is_archetype_root",
-	"EVALUATION":   "ENTRY.Is_archetype_root",
-	"INSTRUCTION":  "ENTRY.Is_archetype_root",
-	"ACTION":       "ENTRY.Is_archetype_root",
-	"ADMIN_ENTRY":  "ENTRY.Is_archetype_root",
-}

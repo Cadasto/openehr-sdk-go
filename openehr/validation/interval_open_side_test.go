@@ -2,7 +2,7 @@ package validation_test
 
 // interval_open_side_test.go: the template-driven walker on an interval
 // side whose `*_unbounded` flag is set. The walker reads interval bounds
-// through the shared rmread readers, so it follows the same open-side rule
+// through the generated access the floor shares, so it follows the same open-side rule
 // as the RM floor: an empty bound on an open side is absent, and a real
 // bound beside the flag is checked against the OPT like any bound.
 

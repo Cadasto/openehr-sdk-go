@@ -109,18 +109,36 @@ func TestProbe074NonCompositionValidate(t *testing.T) {
 			WantCodes: []string{"rm_type_mismatch"},
 		},
 		{
-			// PERSON with no identities under an OPT pinning identities >= 1.
-			Name: "person_missing_identities",
+			// PERSON whose identities is present and empty, under an OPT
+			// pinning identities >= 1.
+			Name: "person_empty_identities",
+			OPT:  []byte(probe074PersonIdentitiesOPT),
+			Root: &rm.Person{
+				ArchetypeNodeID:  "openEHR-DEMOGRAPHIC-PERSON.person.v1",
+				Name:             rm.DVText{Value: "P"},
+				ArchetypeDetails: archetyped("openEHR-DEMOGRAPHIC-PERSON.person.v1"),
+				Identities:       []rm.PartyIdentity{},
+			},
+			// existence lower >= 1 → required; cardinality interval
+			// lower >= 1 with zero children → cardinality (both clauses
+			// independent, mirroring PROBE-026 empty-events).
+			WantCodes: []string{"required", "cardinality"},
+		},
+		{
+			// PERSON with no identities list at all under the same OPT.
+			Name: "person_absent_identities",
 			OPT:  []byte(probe074PersonIdentitiesOPT),
 			Root: &rm.Person{
 				ArchetypeNodeID:  "openEHR-DEMOGRAPHIC-PERSON.person.v1",
 				Name:             rm.DVText{Value: "P"},
 				ArchetypeDetails: archetyped("openEHR-DEMOGRAPHIC-PERSON.person.v1"),
 			},
-			// existence lower >= 1 → required; cardinality interval
-			// lower >= 1 with zero children → cardinality (both clauses
-			// independent, mirroring PROBE-026 empty-events).
-			WantCodes: []string{"required", "cardinality"},
+			// identities is absent (REQ-171 § Structural access): existence
+			// lower >= 1 → required, which the RM floor's required for the
+			// RM-mandatory list repeats at the same path, so it is carried
+			// once. An absent list has no item count to check, so no
+			// cardinality (mirroring PROBE-026 absent-events).
+			WantCodes: []string{"required"},
 		},
 		{
 			// FOLDER whose archetype id differs from the OPT pin.

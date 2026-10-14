@@ -180,21 +180,30 @@ func TestProbe026MissingNodes_PrimitiveNotInList(t *testing.T) {
 }
 
 // PROBE-026 — empty events. An OBSERVATION whose Data.Events slice
-// is empty fires BOTH `required` (existence lower ≥ 1) AND
+// is present and empty fires BOTH `required` (existence lower ≥ 1) AND
 // `cardinality` (the OPT pins child-count lower ≥ 1) at
 // /data/events. Both constraints are independent — multiset
-// reflects both for openEHR conformance.
+// reflects both for openEHR conformance. A nil Data.Events is absent
+// (REQ-171 § Structural access): it breaks existence and has no item
+// count to check, so it fires `required` alone.
 func TestProbe026MissingNodes_EmptyEvents(t *testing.T) {
 	body := loadFixture(t, "vital_signs")
-	comp := validBloodPressureComposition()
-	obs := comp.Content[0].(*rm.Observation)
-	obs.Data.Events = nil
+	empty := validBloodPressureComposition()
+	empty.Content[0].(*rm.Observation).Data.Events = []rm.Event{}
+	absent := validBloodPressureComposition()
+	absent.Content[0].(*rm.Observation).Data.Events = nil
 	cases := []probes.ValidateCase{
 		{
 			Name:        "empty_events",
 			OPT:         body,
-			Composition: comp,
+			Composition: empty,
 			WantCodes:   []string{"required", "cardinality"},
+		},
+		{
+			Name:        "absent_events",
+			OPT:         body,
+			Composition: absent,
+			WantCodes:   []string{"required"},
 		},
 	}
 	r, err := probes.Probe026MissingNodes(cases)

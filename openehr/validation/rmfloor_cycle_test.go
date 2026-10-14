@@ -122,7 +122,7 @@ func TestValidateRM_REQ112_CyclicValue(t *testing.T) {
 // defect once, at the first of them, and never calls it a cycle.
 func TestValidateRM_REQ112_SharedValueWalkedOnce(t *testing.T) {
 	const levels = 40
-	leaf := &rm.Cluster{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "leaf"}} // no items: a cardinality breach
+	leaf := &rm.Cluster{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "leaf"}, Items: []rm.Item{}} // items present and empty: a cardinality breach
 	root := leaf
 	for range levels {
 		root = &rm.Cluster{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "level"}, Items: []rm.Item{root, root}}

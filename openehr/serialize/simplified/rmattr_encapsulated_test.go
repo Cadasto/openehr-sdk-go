@@ -12,11 +12,17 @@ package simplified
 // constraint 6).
 
 import (
+	"encoding/json"
 	"errors"
+	"maps"
+	"os"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 // FLAT path fragments for the leaves this phase closes.
@@ -466,20 +472,46 @@ func TestDVMultimediaPreferredTermRidesRaw(t *testing.T) {
 
 // TestDVMultimediaAlgorithmTerminologyRidesRaw — REQ-140.
 // `|integrity_check_algorithm` and `|compression_algorithm` carry a bare code
-// with **no** implied terminology this specification can source, so a value that
-// names one must ride `|raw` rather than be silently re-terminologised on the
-// way back. Unpinned until now.
+// whose terminology decode implies: the openEHR code set the RM names for the
+// attribute. A value coded in any other terminology, or carrying a
+// preferred_term, must ride `|raw` whole rather than be silently
+// re-terminologised or stripped on the way back. `openehr`, the openEHR
+// terminology's own id, names neither code set, and each algorithm's code set
+// is the wrong one for the other.
 func TestDVMultimediaAlgorithmTerminologyRidesRaw(t *testing.T) {
+	pt := "Secure Hash Algorithm 2, 256 bits"
 	for name, m := range map[string]rm.DVMultimedia{
-		"integrity_check_algorithm": {
+		"integrity_check_algorithm in openehr": {
 			MediaType:               rm.CodePhrase{CodeString: "image/png"},
 			Size:                    31,
 			IntegrityCheckAlgorithm: &rm.CodePhrase{CodeString: "SHA-256", TerminologyID: rm.TerminologyID{Value: "openehr"}},
 		},
-		"compression_algorithm": {
+		"compression_algorithm in openehr": {
 			MediaType:            rm.CodePhrase{CodeString: "image/png"},
 			Size:                 31,
 			CompressionAlgorithm: &rm.CodePhrase{CodeString: "zlib", TerminologyID: rm.TerminologyID{Value: "openehr"}},
+		},
+		"integrity_check_algorithm in the compression code set": {
+			MediaType:               rm.CodePhrase{CodeString: "image/png"},
+			Size:                    31,
+			IntegrityCheckAlgorithm: &rm.CodePhrase{CodeString: "SHA-256", TerminologyID: rm.TerminologyID{Value: "openehr_compression_algorithms"}},
+		},
+		"compression_algorithm in the integrity check code set": {
+			MediaType:            rm.CodePhrase{CodeString: "image/png"},
+			Size:                 31,
+			CompressionAlgorithm: &rm.CodePhrase{CodeString: "zlib", TerminologyID: rm.TerminologyID{Value: "openehr_integrity_check_algorithms"}},
+		},
+		"integrity_check_algorithm with a preferred_term in its implied code set": {
+			MediaType: rm.CodePhrase{CodeString: "image/png"},
+			Size:      31,
+			IntegrityCheckAlgorithm: &rm.CodePhrase{
+				CodeString: "SHA-256", TerminologyID: rm.TerminologyID{Value: "openehr_integrity_check_algorithms"}, PreferredTerm: &pt,
+			},
+		},
+		"compression_algorithm with a preferred_term and no terminology": {
+			MediaType:            rm.CodePhrase{CodeString: "image/png"},
+			Size:                 31,
+			CompressionAlgorithm: &rm.CodePhrase{CodeString: "zlib", PreferredTerm: &pt},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -488,8 +520,185 @@ func TestDVMultimediaAlgorithmTerminologyRidesRaw(t *testing.T) {
 				t.Fatalf("leafToFlat: %v", err)
 			}
 			if _, raw := out["p/mm|raw"]; !raw {
-				t.Errorf("a %s carrying a terminology should ride |raw, got %#v", name, out)
+				t.Errorf("leafToFlat(%s) = %#v, want the whole value under p/mm|raw", name, out)
 			}
 		})
+	}
+}
+
+// TestREQ140_DVMultimediaAlgorithmsTakeTheSuffixFormInTheirImpliedCodeSet —
+// REQ-140. An algorithm coded in the code set decode implies for it carries
+// nothing the bare code loses, so it takes the suffix form: decode writes that
+// same terminology back. An absent terminology contradicts nothing the
+// implication asserts and takes the suffix form too, as it does for
+// `|mediatype`.
+func TestREQ140_DVMultimediaAlgorithmsTakeTheSuffixFormInTheirImpliedCodeSet(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		mm        rm.DVMultimedia
+		key, code string
+	}{
+		{
+			name: "integrity_check_algorithm in openehr_integrity_check_algorithms",
+			mm: rm.DVMultimedia{
+				MediaType:               rm.CodePhrase{CodeString: "image/png"},
+				Size:                    31,
+				IntegrityCheckAlgorithm: &rm.CodePhrase{CodeString: "SHA-256", TerminologyID: rm.TerminologyID{Value: "openehr_integrity_check_algorithms"}},
+			},
+			key: "p/mm|integrity_check_algorithm", code: "SHA-256",
+		},
+		{
+			name: "compression_algorithm in openehr_compression_algorithms",
+			mm: rm.DVMultimedia{
+				MediaType:            rm.CodePhrase{CodeString: "image/png"},
+				Size:                 31,
+				CompressionAlgorithm: &rm.CodePhrase{CodeString: "zlib", TerminologyID: rm.TerminologyID{Value: "openehr_compression_algorithms"}},
+			},
+			key: "p/mm|compression_algorithm", code: "zlib",
+		},
+		{
+			name: "integrity_check_algorithm in no terminology",
+			mm: rm.DVMultimedia{
+				MediaType:               rm.CodePhrase{CodeString: "image/png"},
+				Size:                    31,
+				IntegrityCheckAlgorithm: &rm.CodePhrase{CodeString: "SHA-256"},
+			},
+			key: "p/mm|integrity_check_algorithm", code: "SHA-256",
+		},
+		{
+			name: "compression_algorithm in no terminology",
+			mm: rm.DVMultimedia{
+				MediaType:            rm.CodePhrase{CodeString: "image/png"},
+				Size:                 31,
+				CompressionAlgorithm: &rm.CodePhrase{CodeString: "zlib"},
+			},
+			key: "p/mm|compression_algorithm", code: "zlib",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out := map[string]any{}
+			if err := leafToFlat(out, "p/mm", tc.mm, "DV_MULTIMEDIA", false); err != nil {
+				t.Fatalf("leafToFlat: %v", err)
+			}
+			if _, raw := out["p/mm|raw"]; raw {
+				t.Fatalf("leafToFlat(%s) = %#v, want the suffix form, not |raw", tc.name, out)
+			}
+			if out[tc.key] != tc.code {
+				t.Errorf("leafToFlat(%s)[%q] = %#v, want the bare code %q", tc.name, tc.key, out[tc.key], tc.code)
+			}
+		})
+	}
+}
+
+// TestREQ140_DVMultimediaAlgorithmsDecodeInTheirImpliedCodeSet — REQ-140/REQ-034.
+// `|compression_algorithm` and `|integrity_check_algorithm` carry the code
+// alone, so decode implies the terminology: the openEHR code set the RM names
+// for the attribute, by the external identifier the pinned openEHR terminology
+// gives it. A code-only CODE_PHRASE would lack the terminology_id the RM makes
+// mandatory. Decode does not check membership, as `|normal_status` does not: a
+// code outside the set still decodes in the implied code set, and the
+// validation floor is what reports it.
+func TestREQ140_DVMultimediaAlgorithmsDecodeInTheirImpliedCodeSet(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	for _, tc := range []struct {
+		name                   string
+		compression, integrity string
+	}{
+		{name: "corpus codes", compression: "zlib", integrity: "SHA-256"},
+		{name: "codes outside the code sets", compression: "rar", integrity: "MD5"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			comp := decodeRMAttr(t, wt, rmattrBody(map[string]any{
+				rmattrMultimedia + "|mediatype":                 "video/H261",
+				rmattrMultimedia + "|size":                      504903212,
+				rmattrMultimedia + "|compression_algorithm":     tc.compression,
+				rmattrMultimedia + "|integrity_check_algorithm": tc.integrity,
+			}))
+			m := elementValueAt[rm.DVMultimedia](t, comp, "dv_multimedia")
+			for _, a := range []struct {
+				attr, code, terminology string
+				got                     *rm.CodePhrase
+			}{
+				{"compression_algorithm", tc.compression, "openehr_compression_algorithms", m.CompressionAlgorithm},
+				{"integrity_check_algorithm", tc.integrity, "openehr_integrity_check_algorithms", m.IntegrityCheckAlgorithm},
+			} {
+				if a.got == nil {
+					t.Errorf("|%s %q decoded to no %s", a.attr, a.code, a.attr)
+					continue
+				}
+				if a.got.CodeString != a.code || a.got.TerminologyID.Value != a.terminology {
+					t.Errorf("|%s %q decoded to code %q in terminology %q, want code %q in the implied %q",
+						a.attr, a.code, a.got.CodeString, a.got.TerminologyID.Value, a.code, a.terminology)
+				}
+			}
+		})
+	}
+}
+
+// TestREQ140_DVMultimediaCorpusBodyRoundTripsThroughCanonical — REQ-140/REQ-053.
+// `ehrbase_conformance_data_types_dv_multimedia`, the corpus body that spells
+// both algorithms, decoded, written to canonical JSON, read back and
+// re-encoded, spells its multimedia leaf exactly as the corpus wrote it. The
+// canonical JSON carries each algorithm in its implied code set, so the leaf
+// comes back as bare codes only while encode takes the suffix form for the
+// terminology decode implied.
+func TestREQ140_DVMultimediaCorpusBodyRoundTripsThroughCanonical(t *testing.T) {
+	const name = "ehrbase_conformance_data_types_dv_multimedia"
+	wt, compiled := conformanceWT(t)
+	raw, err := os.ReadFile(fixtures.FlatConformanceFlat(name))
+	if err != nil {
+		t.Fatalf("read %s: %v", name, err)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(raw, &body); err != nil {
+		t.Fatalf("parse %s: %v", name, err)
+	}
+	comp, err := UnmarshalFlat(raw, wt, WithTemplate(compiled), WithStrict())
+	if err != nil {
+		t.Fatalf("UnmarshalFlat(%s): %v", name, err)
+	}
+	canonical, err := canjson.Marshal(comp)
+	if err != nil {
+		t.Fatalf("canjson.Marshal(UnmarshalFlat(%s)): %v", name, err)
+	}
+	var back rm.Composition
+	if err := canjson.Unmarshal(canonical, &back); err != nil {
+		t.Fatalf("canjson.Unmarshal of the canonical form of %s: %v", name, err)
+	}
+
+	m := elementValueAt[rm.DVMultimedia](t, &back, "dv_multimedia")
+	for _, a := range []struct {
+		attr, terminology string
+		got               *rm.CodePhrase
+	}{
+		{"compression_algorithm", "openehr_compression_algorithms", m.CompressionAlgorithm},
+		{"integrity_check_algorithm", "openehr_integrity_check_algorithms", m.IntegrityCheckAlgorithm},
+	} {
+		if a.got == nil || a.got.TerminologyID.Value != a.terminology {
+			t.Errorf("canonical %s of %s = %+v, want it in the implied %q", a.attr, name, a.got, a.terminology)
+		}
+	}
+
+	got := reencodeRMAttr(t, wt, &back)
+	leaf := func(k string) bool {
+		return k == rmattrMultimedia || strings.HasPrefix(k, rmattrMultimedia+"|") || strings.HasPrefix(k, rmattrMultimedia+"/")
+	}
+	for _, k := range slices.Sorted(maps.Keys(body)) {
+		if !leaf(k) {
+			continue
+		}
+		have, ok := got[k]
+		if !ok {
+			t.Errorf("re-encode of %s dropped %q", name, k)
+			continue
+		}
+		if !sameCtxValue(body[k], have) {
+			t.Errorf("re-encode of %s: %q = %#v, want the corpus value %#v", name, k, have, body[k])
+		}
+	}
+	for _, k := range slices.Sorted(maps.Keys(got)) {
+		if _, inCorpus := body[k]; leaf(k) && !inCorpus {
+			t.Errorf("re-encode of %s emitted %q = %#v, which the corpus does not spell", name, k, got[k])
+		}
 	}
 }

@@ -119,6 +119,11 @@ func TestValidate_REQ171_TemplateLayerRules(t *testing.T) {
 		{
 			name: "items absent",
 			root: fiCluster(),
+			want: []string{"required /items template existence"},
+		},
+		{
+			name: "items present and empty",
+			root: &rm.Cluster{ArchetypeNodeID: findingIdentityArchetype, Name: &rm.DVText{Value: "cluster"}, Items: []rm.Item{}},
 			want: []string{
 				"required /items template existence",
 				"cardinality /items template cardinality",
@@ -263,13 +268,16 @@ const paragraphChild = `
 // own existence requires and the instance holds empty is template
 // existence. One only the RM makes mandatory and the instance holds empty is
 // RM cardinality, the rule the floor's `cardinality` at the same path also
-// names. One the reader for its parent's class cannot address at all is
-// absent as far as the walk sees, so it is RM mandatory: a DV_PARAGRAPH's
-// items, though the instance carries them (REQ-110 § Known limitations).
+// names. One only the RM makes mandatory and the instance leaves nil is
+// absent (§ REQ-171 Structural access), so it is RM mandatory, as the
+// floor's `required` at the same path is (§ REQ-112 Driver): a
+// DV_PARAGRAPH's items. A DV_PARAGRAPH that carries its items draws nothing,
+// now that the generated access reads them.
 func TestValidate_REQ171_EmptyMandatoryListRule(t *testing.T) {
 	t.Parallel()
 	empty := &rm.Cluster{ArchetypeNodeID: "openEHR-EHR-CLUSTER.bare.v1", Name: &rm.DVText{Value: "cluster"}, Items: []rm.Item{}}
-	paragraph := valueElement(&rm.DVParagraph{Items: []rm.DVTextLike{&rm.DVText{Value: "line"}}})
+	paragraph := valueElement(&rm.DVParagraph{})
+	fullParagraph := valueElement(&rm.DVParagraph{Items: []rm.DVTextLike{&rm.DVText{Value: "line"}}})
 	tests := []struct {
 		name string
 		r    validation.Result
@@ -296,9 +304,14 @@ func TestValidate_REQ171_EmptyMandatoryListRule(t *testing.T) {
 			},
 		},
 		{
-			name: "items the reader cannot address",
+			name: "a nil items list only the RM makes mandatory",
 			r:    validation.Validate(paragraph, mustCompileInline(t, elementValueOPT(paragraphChild))),
 			want: []string{"required /value/items rm mandatory"},
+		},
+		{
+			name: "a DV_PARAGRAPH whose items are there",
+			r:    validation.Validate(fullParagraph, mustCompileInline(t, elementValueOPT(paragraphChild))),
+			want: nil,
 		},
 	}
 	for _, tc := range tests {

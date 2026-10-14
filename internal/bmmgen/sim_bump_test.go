@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -22,8 +23,13 @@ import (
 //  1. Stage a temp resources dir containing the original BMM files
 //     plus a synthesised `openehr_rm_1.2.1.bmm.json` whose only
 //     semantic delta vs the 1.2.0 baseline is: DV_QUANTITY gains an
-//     optional SingleProperty `test_property` of type String.
-//  2. Generate into a fresh out dir using -target rm.
+//     optional SingleProperty `test_property` of type String and an
+//     invariant `Test_property_valid` on it.
+//  2. Generate into a fresh out dir holding the pinned invariant
+//     classification, using -target rm. The run fails naming the new
+//     invariant (REQ-171: a BMM bump cannot add an unchecked rule
+//     silently); once the invariant is classified it succeeds, and the
+//     inventory carries it on DV_QUANTITY.
 //  3. Assert: data_types_quantity_gen.go now contains a
 //     TestProperty *string `json:"test_property,omitzero"` field on
 //     DV_QUANTITY; typereg_gen.go is unchanged vs the baseline (no
@@ -53,19 +59,41 @@ func TestSimulatedVersionBump(t *testing.T) {
 		t.Fatalf("write bumped: %v", err)
 	}
 
-	// --- 2. Generate into a fresh out dir using only the RM target.
-	outDir := t.TempDir()
-	result, err := Run(Options{
+	// --- 2. Generate into a fresh out dir that holds the pinned
+	//        classification, using only the RM target: the bump's new
+	//        invariant fails the run until it is classified.
+	raw, classes := pinnedClassification(t)
+	outDir := writeValidationTree(t, raw)
+	bumpOpts := Options{
 		ResourcesDir: stage,
 		OutDir:       outDir,
 		Targets:      []Target{TargetRM},
 		RootID:       "openehr_rm_1.2.1",
-	})
+	}
+	if _, err := Run(bumpOpts); err == nil || !strings.Contains(err.Error(), bumpedInvariant) {
+		t.Fatalf("Run regen with %s unclassified = %v, want an error naming it", bumpedInvariant, err)
+	}
+	classes[bumpedInvariant] = invariantClassification{Kind: kindOutOfScope, Reason: "Added by the simulated version bump."}
+	classified, err := json.Marshal(classes)
 	if err != nil {
-		t.Fatalf("Run regen: %v", err)
+		t.Fatalf("marshal the classification: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(outDir, inventoryDir, classificationFile), classified, 0o644); err != nil {
+		t.Fatalf("write the classification: %v", err)
+	}
+	result, err := Run(bumpOpts)
+	if err != nil {
+		t.Fatalf("Run regen with %s classified: %v", bumpedInvariant, err)
 	}
 	if len(result.Files) == 0 {
 		t.Fatalf("no files emitted")
+	}
+	entries, classSets := parseInventory(t, mustReadFile(t, filepath.Join(outDir, inventoryDir, inventoryFile)))
+	if got := entries[bumpedInvariant][0]; got != kindIdents[kindOutOfScope] {
+		t.Errorf("inventory kind of %s = %q, want %s", bumpedInvariant, got, kindIdents[kindOutOfScope])
+	}
+	if !slices.Contains(classSets["DV_QUANTITY"], bumpedInvariant) {
+		t.Errorf("inventory classInvariants[DV_QUANTITY] = %q, want it to hold %s", classSets["DV_QUANTITY"], bumpedInvariant)
 	}
 
 	// --- 3a. data_types_quantity_gen.go must contain the new field.
@@ -90,10 +118,11 @@ func TestSimulatedVersionBump(t *testing.T) {
 	//        regeneration (same DV_QUANTITY etc., no new class).
 	baselineOutDir := t.TempDir()
 	if _, err := Run(Options{
-		ResourcesDir: testResources,
-		OutDir:       baselineOutDir,
-		Targets:      []Target{TargetRM},
-		RootID:       "openehr_rm_1.2.0",
+		ResourcesDir:  testResources,
+		OutDir:        baselineOutDir,
+		Targets:       []Target{TargetRM},
+		RootID:        "openehr_rm_1.2.0",
+		SkipInventory: true,
 	}); err != nil {
 		t.Fatalf("Run baseline: %v", err)
 	}
@@ -153,10 +182,15 @@ func TestSimulatedVersionBump(t *testing.T) {
 	t.Logf("simulated-bump CHANGELOG entry:\n  %s", suggestion)
 }
 
+// bumpedInvariant is the invariant the simulated bump adds, as the
+// inventory keys it.
+const bumpedInvariant = "DV_QUANTITY.Test_property_valid"
+
 // bumpRMWithTestProperty parses the 1.2.0 BMM JSON, switches its
 // rm_release to "1.2.1", and adds an optional SingleProperty
-// `test_property` (type String, is_mandatory absent) to DV_QUANTITY.
-// Returns the re-marshalled bytes.
+// `test_property` (type String, is_mandatory absent) to DV_QUANTITY,
+// with an invariant Test_property_valid on it. Returns the
+// re-marshalled bytes.
 //
 // We operate on the raw JSON (rather than the loader's
 // in-memory model) to keep the test independent of any further
@@ -186,6 +220,12 @@ func bumpRMWithTestProperty(in []byte) ([]byte, error) {
 		"type":          "String",
 		"documentation": "Synthetic property introduced by the Phase 5 simulated-bump test.",
 	}
+	invariants, ok := dvq["invariants"].(map[string]any)
+	if !ok {
+		invariants = map[string]any{}
+		dvq["invariants"] = invariants
+	}
+	invariants["Test_property_valid"] = "test_property /= Void implies not test_property.is_empty"
 	return json.MarshalIndent(doc, "", "  ")
 }
 

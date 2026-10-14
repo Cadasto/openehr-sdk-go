@@ -45,9 +45,9 @@ The generator **MUST** skip the BMM package `org.openehr.rm.ehr_extract` (and it
 
 The CI pipeline **MUST** include a "drift check" step that re-runs the generator and fails the build if the working tree diverges from the regenerated output. This is the mechanical guarantee against hand-edits silently diverging from the BMM.
 
-Hand-written packages (`openehr/serialize`, `openehr/validation`, `openehr/template/<parser>`, `openehr/bmm/`, etc.) **MAY** consume the generated types but **MUST NOT** be regenerated. The generator's output and hand-written code live in clearly separated files (see § Generator output conventions below).
+Hand-written files (in `openehr/serialize`, `openehr/validation`, `openehr/template/<parser>`, `openehr/bmm/`, etc.) **MAY** consume the generated types but **MUST NOT** be regenerated. A hand-written package may hold a generated `*_gen.go` file beside them, which the drift check covers like any other output: `internal/rmaccess/access_gen.go`, the attribute access, beside the hand-written `access.go` and `presence.go`; and `openehr/validation/inventory_gen.go`, the invariant inventory, classified by the hand-kept `openehr/validation/invariants.json`. The generator's output and hand-written code live in clearly separated files (see § Generator output conventions below).
 
-- **Lives in:** `internal/bmmgen/`, `cmd/bmmgen/`, generated files under `openehr/rm/`, `openehr/rm/typereg/`, `openehr/aom/aom14/`
+- **Lives in:** `internal/bmmgen/`, `cmd/bmmgen/`, generated files under `openehr/rm/`, `openehr/rm/typereg/`, `openehr/rm/rminfo/`, `openehr/aom/aom14/`, `internal/rmaccess/` (`access_gen.go`) and `openehr/validation/` (`inventory_gen.go`)
 
 ### REQ-043 — Mapping rules: P_BMM → Go
 
@@ -405,6 +405,8 @@ The BMM `documentation` field on classes, properties, and functions **MUST** be 
 - `openehr/rm/` from `openehr_rm_1.2.0` (excluding `ehr_extract`) + `openehr_base_1.3.0`.
 - `openehr/rm/typereg/` from the same.
 - `openehr/rm/rminfo/` from the same — the flattened attribute tables, the REQ-048 class graph, and the REQ-049 absence table.
+- `internal/rmaccess/access_gen.go` from the same — the attribute access of every registered class (REQ-171).
+- `openehr/validation/inventory_gen.go` from the same and the hand-kept `invariants.json` — the invariant inventory (REQ-171).
 - `openehr/aom/aom14/` from `openehr_am_1.4.0` + `openehr_base_1.3.0`.
 
 **Deferred (BMM file kept, no v1 generation):**

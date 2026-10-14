@@ -49,7 +49,7 @@ func ismTransitionIssues(issues []validation.Issue) []validation.Issue {
 // careflow_step is optional on ISM_TRANSITION, but once present it is a
 // DV_CODED_TEXT whose defining_code is RM-mandatory. A careflow_step with a
 // value and no defining_code must surface `required` at that path. The
-// floor reaches it only because rmread models ISM_TRANSITION.
+// floor reaches it through the generated access to ISM_TRANSITION.
 func TestValidateRMAction_IsmTransitionCareflowStepMissingDefiningCode(t *testing.T) {
 	act := ismAction(&rm.DVCodedText{Value: "Medication administered"})
 	r := validation.ValidateRM(act)

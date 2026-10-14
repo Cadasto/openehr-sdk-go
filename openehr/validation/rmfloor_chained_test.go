@@ -189,9 +189,10 @@ func TestValidateComposition_REQ102_REQ112_FloorTakesBoundNames(t *testing.T) {
 }
 
 // REQ-102 — the template walk may report one code twice at one path for two
-// clauses, and both stay: an empty participations breaks the attribute's own
-// cardinality, and the PARTICIPATION child it requires once, which declares no
-// id and is written at the attribute's path, occurs too seldom.
+// clauses, and both stay: a participations that is present and empty breaks
+// the attribute's own cardinality, and the PARTICIPATION child it requires
+// once, which declares no id and is written at the attribute's path, occurs
+// too seldom.
 func TestValidateComposition_REQ102_TemplateRepeatsStay(t *testing.T) {
 	c := mustCompileSyntheticOPT(t, strings.Replace(
 		strings.Replace(participationsOPT, "<lower>0</lower>", "<lower>1</lower>", 1),
@@ -200,7 +201,7 @@ func TestValidateComposition_REQ102_TemplateRepeatsStay(t *testing.T) {
 			"<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique>"+
 			"<interval><lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>1</lower></interval></cardinality>",
 		1))
-	r := validation.ValidateComposition(participationsComposition(), c)
+	r := validation.ValidateComposition(participationsComposition([]rm.Participation{}...), c)
 	want := []string{"cardinality /context/participations", "cardinality /context/participations"}
 	if !equalKeys(r.Issues, want) {
 		t.Errorf("ValidateComposition issues = %q, want %q", issueKeys(r.Issues), want)

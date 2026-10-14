@@ -3,10 +3,12 @@
 //
 // An object of such a class must carry archetype_details: the class
 // invariant Is_archetype_root fixes is_archetype_root true, and LOCATABLE's
-// Archetyped_valid invariant then requires the details. The RM floor in
-// openehr/validation reports an object that lacks them, and the instance
-// generator in openehr/instance refuses to build one the template names no
-// archetype for. Both read the class list from here, so they cannot drift
+// Archetyped_valid invariant then requires the details. This is the list
+// the REQ-107 instance generator in openehr/instance reads, to refuse to
+// build such an object the template names no archetype for. The RM floor in
+// openehr/validation, which reports an object that lacks the details, takes
+// its classes from the Is_archetype_root entries of its invariant inventory
+// instead, and a test there pins the two sets equal, so they cannot drift
 // apart. The package uses the standard library only, so the generator can
 // import it without depending on the validator.
 package rmroots

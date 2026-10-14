@@ -10,11 +10,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
-	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
 )
 
 // REQ-102 — the predicate of each item of one multi-valued attribute.
@@ -308,9 +308,9 @@ func TestBindings_REQ102_REQ112_HandOffGivesOnePath(t *testing.T) {
 	if content == nil {
 		t.Fatal("compiled root has no content attribute")
 	}
-	items, ok := rmread.ReadMultiple(comp, "COMPOSITION", "content")
+	items, ok := rmaccess.Multiple(comp, "content")
 	if !ok {
-		t.Fatal("rmread cannot read COMPOSITION.content")
+		t.Fatal("rmaccess.Multiple cannot read COMPOSITION.content")
 	}
 	bound, _ := bindItems("COMPOSITION", "content", content.Children(), items)
 	names := pinnedNames{}

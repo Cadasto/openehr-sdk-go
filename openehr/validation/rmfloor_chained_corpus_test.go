@@ -194,8 +194,9 @@ func TestValidateComposition_REQ102_REQ112_CorpusFloorBreaches(t *testing.T) {
 // demonstrationFloorIssues is the whole result of ValidateComposition on the
 // Demonstration.v1 corpus composition, sorted as issueKeys sorts it: in each
 // event, the ELEMENT at0016 carries both value and null_flavour, and the
-// DV_INTERVALs at0022 and at0023 have their lower bound above their upper
-// one. All are the floor's; the template walk reports nothing.
+// DV_INTERVALs at0022 (DV_COUNT), at0023 (DV_QUANTITY) and at0024
+// (DV_DATE_TIME) have their lower bound above their upper one. All are the
+// floor's; the template walk reports nothing.
 var demonstrationFloorIssues = func() []string {
 	const obs = "/content[openEHR-EHR-OBSERVATION.demo.v1]/data/events"
 	var out []string
@@ -203,8 +204,10 @@ var demonstrationFloorIssues = func() []string {
 		path      string
 		intervals []string
 	}{
-		{path: "[at0002]/data/items[at0004]", intervals: []string{"at0022", "at0023"}},
-		{path: "[at0033]/data/items[at0004]", intervals: []string{"at0022", "at0023"}},
+		// at0024: inverted DV_INTERVAL<DV_DATE_TIME> in the vendored fixture (DV_INTERVAL.Limits_consistent).
+		{path: "[at0002]/data/items[at0004]", intervals: []string{"at0022", "at0023", "at0024"}},
+		// at0024: inverted DV_INTERVAL<DV_DATE_TIME> in the vendored fixture (DV_INTERVAL.Limits_consistent).
+		{path: "[at0033]/data/items[at0004]", intervals: []string{"at0022", "at0023", "at0024"}},
 		{path: "[at0034]/data/items[at0004]", intervals: []string{"at0022"}},
 		{path: "[at0035]/data/items[2]", intervals: []string{"at0023"}},
 		{path: "[at0035]/data/items[3]", intervals: []string{"at0023"}},

@@ -5,7 +5,7 @@ kind: plan
 # Plan — Validation engine: one walk, admission first, generated access
 
 **Date:** 2026-10-13
-**Status:** In progress — Phases 0 to 2 on branch `feat/validation-engine`; ADR 0027 and ADR 0028 accepted 2026-10-13, so Phase 3 is open and Phase 4 waits on Phase 3
+**Status:** In progress — Phases 0 to 2 merged with [PR 263](https://github.com/Cadasto/openehr-sdk-go/pull/263); Phase 3 in [PR 265](https://github.com/Cadasto/openehr-sdk-go/pull/265), closed out and awaiting merge; Phase 4 waits on it
 **Covers:** REQ-171 ([clinical-modeling.md § REQ-171](../specifications/clinical-modeling.md#req-171--validation-engine), planned); amends REQ-102 ([§ REQ-102](../specifications/clinical-modeling.md#req-102--composition-validation)), REQ-110 ([§ REQ-110](../specifications/clinical-modeling.md#req-110--template-driven-validation-beyond-composition)), REQ-112 ([§ REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor)), REQ-168 ([§ REQ-168](../specifications/clinical-modeling.md#req-168--value-free-validation-diagnostics)) and, in its last phase, REQ-170 ([wire.md § REQ-170](../specifications/wire.md#req-170--unmatched-content-on-decode))
 **Probes:** PROBE-025, PROBE-026, PROBE-074 (re-baselined in Phase 4), PROBE-077 (buildable from Phase 3), PROBE-081 (re-homed in Phase 5)
 **Depends on:** [PR 256](https://github.com/Cadasto/openehr-sdk-go/pull/256), merged, and [ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md); [ADR 0028](../adr/0028-generated-rm-attribute-access.md) accepted before Phase 3; [ADR 0027](../adr/0027-template-admission-before-rm-rules.md) accepted before Phase 4; [STRAND-15](../specifications/research-strands.md#strand-15--decode-time-presence-and-unmatched-member-capture-on-the-generated-types) resolved before Phase 5
@@ -80,7 +80,7 @@ The two small items with no dependency, delivered first so that the single walk 
 
 **Tasks:**
 - `validation.New(opts ...Option)`, `WithLimits`, `(*Validator).Validate(root, c)`, with a nil `c` meaning the RM rules alone; the package-level functions delegate to a validator built with no options and keep their nil guards. The hard-coded depth and visit limits become the defaults of `Limits`.
-- `Coverage` on `Result`, with `Stopped` and `External` and the method `Complete`; `External` lists each `CONSTRAINT_REF` leaf the walk binds. `Unevaluated` arrives in Phase 3 with the generated inventory: a hand-kept list of the 177 invariants would be thrown away there, and `Complete` does not read it.
+- `Coverage` on `Result`, with `Stopped` and `External` and the method `Complete`; `External` lists each `CONSTRAINT_REF` leaf the walk binds. `Unevaluated` arrives in Phase 3 with the generated inventory: a hand-kept list of the 215 invariants (155 RM, 22 BASE classes, 38 BASE primitive types) would be thrown away there, and `Complete` does not read it.
 - `max_depth` reported once per walk, at the first path where the walk stopped, instead of once per node at the limit.
 - Spec: amend § REQ-112 *Surface* to say the typed wrappers delegate to the validator, and the `Result` block of § REQ-102 *Contract* to carry `Coverage`.
 - Tests: limits honoured and a zero or negative limit read as the default; each `Coverage` list filled and `Complete` false for its case; a corpus composition with `Complete` true; the floor's nil guards report an empty path.

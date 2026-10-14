@@ -5,11 +5,11 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/rmwrite"
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/rmnames"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
-	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
 )
 
 // REQ-107: the generator materialises each OPT rm_type_name, generic
@@ -76,16 +76,15 @@ func TestNewRMForOPTType_genericSpellings(t *testing.T) {
 }
 
 // TestIntervalInstantiationParity checks that the generator builds and
-// seeds every DV_INTERVAL instantiation the reader covers (REQ-107). The
-// canonical set is the one TestTypedIntervalReaderParity
-// (openehr/validation/rmread) derives: one DV_INTERVAL<X> per registered
-// type X that implements rm.DVOrdered, plus the bare
-// DV_INTERVAL<DV_ORDERED>. For each name, newRMForOPTType must build the
+// seeds every DV_INTERVAL instantiation the validators read (REQ-107). The
+// canonical set is one DV_INTERVAL<X> per registered type X that implements
+// rm.DVOrdered, plus the bare DV_INTERVAL<DV_ORDERED>. For each name, newRMForOPTType must build the
 // instantiation rmnames gives that name, and populatePrimitiveDefault must
 // seed it open on both sides: the state the bound writes and the endpoint
 // pass start from. A new DV_ORDERED descendant fails here until the
-// generator gains it. The flags are read back through rmread so the check
-// does not share the generator's own interval switch.
+// generator gains it. The flags are read back through the generated
+// attribute access so the check does not share the generator's own interval
+// switch.
 func TestIntervalInstantiationParity(t *testing.T) {
 	const bare = "DV_INTERVAL<DV_ORDERED>"
 	names := []string{bare}
@@ -116,9 +115,9 @@ func TestIntervalInstantiationParity(t *testing.T) {
 			}
 			g.populatePrimitiveDefault(v)
 			for _, attr := range []string{"lower_unbounded", "upper_unbounded"} {
-				got, ok := rmread.ReadSingle(v, "DV_INTERVAL", attr)
+				got, ok := rmaccess.Single(v, attr)
 				if !ok || got != true {
-					t.Errorf("after populatePrimitiveDefault, ReadSingle(%T, %q) = (%v, %v), want (true, true)", v, attr, got, ok)
+					t.Errorf("after populatePrimitiveDefault, rmaccess.Single(%T, %q) = (%v, %v), want (true, true)", v, attr, got, ok)
 				}
 			}
 		})

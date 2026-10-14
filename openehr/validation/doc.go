@@ -40,15 +40,14 @@
 // The template-driven entries ([ValidateComposition], [Validate], and
 // the typed wrappers) treat the compiled OPT as the authoritative driver
 // and the composition as the value source. For each compiled OPT node
-// the walker reads the corresponding RM property via
-// [github.com/cadasto/openehr-sdk-go/openehr/validation/rmread],
-// enforces existence (an attribute the template requires, and one it
-// prohibits) / cardinality / alternatives / RM-type match / archetype-id
-// identity, and recurses into matched RM children. The template walk
-// reports an attribute the template prohibits, when it is present, once,
-// and does not enter it; the Reference Model rules still apply to what it
-// holds. The template walk sees only the attributes the package reads for
-// each class, and an attribute it does not read counts as absent.
+// the walker reads the corresponding RM property through access the
+// generator emits for every registered RM class, enforces existence (an
+// attribute the template requires, and one it prohibits) / cardinality /
+// alternatives / RM-type match / archetype-id identity, and recurses into
+// matched RM children. The template walk reports an attribute the template
+// prohibits, when it is present, once, and does not enter it; the Reference
+// Model rules still apply to what it holds. A list attribute that is nil is
+// absent, and one that is set and holds no item is present and empty.
 //
 // The RM floor ([ValidateRM] and its typed wrappers) is the RM-only
 // layer beneath that: a second driver that walks any RM root with
@@ -97,8 +96,10 @@
 // the template gives its node or by its position. Inside a
 // template-driven validation the floor takes those names from the
 // template walk, so it writes the same path for the same node; on its
-// own it knows no template names and writes the position. A composition missing
-// an OPT-required attribute is flagged at the attribute's path, and one
+// own it knows no template names and writes the position. An entry of a
+// Hash attribute is written by its 1-based position in ascending key
+// order, as in /details[2], never by its key. A composition missing an
+// OPT-required attribute is flagged at the attribute's path, and one
 // missing an OPT-required node at the path the template gives that node,
 // rather than silently bypassed.
 //
@@ -153,6 +154,18 @@
 //	if r.OK && !r.Coverage.Complete() {
 //	    // valid as far as checked; see r.Coverage for what was not
 //	}
+//
+// [Coverage.Unevaluated] lists, as CLASS.Invariant, the invariants of the
+// classes the walk visited that the validator evaluates on no instance: most
+// because it does not evaluate them yet, some because they need a record the
+// instance does not carry, such as the versions stored for a versioned
+// object. Every invariant of the pinned Reference Model and BASE schemas is
+// classified in the file invariants.json beside this package's source, with
+// the reason the SDK does not evaluate it, and the classes' rules are
+// dispatched from that classification, so the list is what the validator
+// really skipped. An invariant another check already decides, such as one
+// that a mandatory attribute be not empty, counts as evaluated and is not
+// listed. Complete does not read it.
 //
 // # Dependencies
 //

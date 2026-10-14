@@ -20,9 +20,16 @@
 // produce one of them fails generation instead of being overwritten.
 //
 // The RM target also gets release_gen.go, the constant Release taken
-// from the root schema's rm_release, and the two rminfo tables,
-// openehr/rm/rminfo/lookup_gen.go and absence_gen.go. Its jsonhooks_gen.go
-// also registers the JSON walker's interface table into
+// from the root schema's rm_release; the two rminfo tables,
+// openehr/rm/rminfo/lookup_gen.go and absence_gen.go; and
+// internal/rmaccess/access_gen.go, the attribute access the validators
+// read an instance through; and openehr/validation/inventory_gen.go, the
+// inventory of every invariant the RM and BASE schemas declare, classified by
+// the checked-in openehr/validation/invariants.json, which fails generation
+// when an invariant has no classification or the file is missing (a run with
+// [Options].SkipInventory, such as a test's into a scratch tree, gets no
+// inventory). Its
+// jsonhooks_gen.go also registers the JSON walker's interface table into
 // internal/rmjsonwalk/polyreg.
 //
 // # Targets
@@ -91,6 +98,14 @@ type Options struct {
 	// be written against what is already on disk and report drift
 	// rather than mutating the tree.
 	Verify bool
+	// SkipInventory, when true, leaves out the invariant inventory,
+	// openehr/validation/inventory_gen.go. By default the RM target
+	// emits it, reading the classification from invariants.json in the
+	// validation package under OutDir, and a missing classification
+	// fails the run, so a run over the module cannot leave the
+	// inventory out. A test that generates into a scratch tree holding
+	// no validation package sets it.
+	SkipInventory bool
 	// Verbose enables extra diagnostic output to Stderr.
 	Verbose bool
 	// Stderr is the writer for diagnostic output. Defaults to
@@ -461,8 +476,37 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, result *Result)
 		}
 	}
 
+	// The generated RM attribute access (REQ-171, ADR 0028), one file in the
+	// module-internal internal/rmaccess package; nil for non-RM targets.
+	accessBody, err := RenderRMAccessFile(plan)
+	if err != nil {
+		return tr, err
+	}
+	if accessBody != nil {
+		accessPath := filepath.Join(opts.OutDir, "internal", "rmaccess", rmaccessFile)
+		tr.Files = append(tr.Files, accessPath)
+		result.Files = append(result.Files, accessPath)
+		if opts.Verify {
+			drift, err := compareFile(accessPath, accessBody)
+			if err != nil {
+				return tr, err
+			}
+			if drift != nil {
+				result.Drifts = append(result.Drifts, *drift)
+			}
+		} else if err := writeAtomic(accessPath, accessBody); err != nil {
+			return tr, err
+		}
+	}
+
 	// The RM release constant (rm.Release), from the root schema's rm_release.
 	if err := emitReleaseFile(opts, plan, outDir, &tr, result); err != nil {
+		return tr, err
+	}
+
+	// The invariant inventory (REQ-171), into the validation package, with
+	// the classification read from beside it; nil for non-RM targets.
+	if err := emitInventoryFile(opts, plan, resolver, &tr, result); err != nil {
 		return tr, err
 	}
 

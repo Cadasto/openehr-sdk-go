@@ -13,9 +13,9 @@
 // OPT-driven recursive walk and primitive defaults. This package owns
 // the composition-specific options (`WithLanguage`, `WithTerritory`,
 // `WithComposer`, `WithCategory`, `WithNow`) and the path-assigning
-// API. There is no second OPT walker here: `rmread` (read side) and
-// `rmwrite` (write side) provide the closed-dispatch attribute access
-// the path navigator needs.
+// API. There is no second OPT walker here: the generated attribute
+// access of `internal/rmaccess` (read side) and `rmwrite` (write side)
+// provide the closed-dispatch attribute access the path navigator needs.
 //
 // Per-template typed builders (vital-signs-shaped struct setters) are
 // not provided.
@@ -35,7 +35,7 @@
 // The exported NewBuilder / NewSkeleton signatures take the public
 // compiled template openehr/templatecompile.Compiled; this
 // package also imports openehr/rm, openehr/rm/typereg, openehr/template,
-// openehr/template/constraints, openehr/instance, openehr/validation/rmread,
+// openehr/template/constraints, openehr/instance, internal/rmaccess,
 // internal/templatecompile (engine node types), and
 // internal/templateinstance/rmwrite. It does not import
 // openehr/serialize, openehr/client, transport, auth, or

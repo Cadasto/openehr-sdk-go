@@ -54,6 +54,22 @@ func WireLayers() []string {
 	}
 }
 
+// RuleLoaders returns the packages through which a validator could load a rule
+// from outside the binary or interpret one at run time: file access, embedded
+// files, plugins and the BMM reader. The validators and the attribute access
+// they read through import none of them in their own files (REQ-171 § Where
+// the RM rules come from). Each call returns a new slice.
+func RuleLoaders() []string {
+	return []string{
+		"os",
+		"io/fs",
+		"io/ioutil",
+		"embed",
+		"plugin",
+		"github.com/cadasto/openehr-sdk-go/openehr/bmm",
+	}
+}
+
 // Violation is one forbidden import found in the closure.
 type Violation struct {
 	Importer string // import path of the package whose non-test files import it

@@ -340,20 +340,22 @@ func TestValidateRMEHRStatusBytes_REQ171_KeepsCoverage(t *testing.T) {
 }
 
 // subjectStopStatus is an EHR_STATUS that omits subject and whose name holds
-// enough TERM_MAPPINGs, with a formatting, a template_id and one
-// preferred_term beside them, that the default visit limit falls exactly on
-// the zero subject the decode leaves: the path the key-presence check
-// reports as required.
+// enough TERM_MAPPINGs, with a formatting and one preferred_term beside
+// them, that the default visit limit falls exactly on the zero subject the
+// decode leaves: the path the key-presence check reports as required. Each
+// mapping costs the walk six visits: the mapping, its match, its target, the
+// target's code_string and terminology_id, and the value of that
+// TERMINOLOGY_ID, which the walk enters (REQ-171 Structural access); the
+// preferred mapping costs one more, for its preferred_term.
 func subjectStopStatus() []byte {
 	const mapping = `{"_type": "TERM_MAPPING", "match": "=", "target": {"_type": "CODE_PHRASE", "terminology_id": {"_type": "TERMINOLOGY_ID", "value": "SNOMED-CT"}, "code_string": "1"}}`
 	const preferred = `{"_type": "TERM_MAPPING", "match": "=", "target": {"_type": "CODE_PHRASE", "terminology_id": {"_type": "TERMINOLOGY_ID", "value": "SNOMED-CT"}, "code_string": "1", "preferred_term": "p"}}`
 	return []byte(`{
 		"_type": "EHR_STATUS",
-		"name": {"_type": "DV_TEXT", "value": "EHR Status", "formatting": "plain", "mappings": [` + preferred + strings.Repeat(","+mapping, 19_997) + `]},
+		"name": {"_type": "DV_TEXT", "value": "EHR Status", "formatting": "plain", "mappings": [` + preferred + strings.Repeat(","+mapping, 16_664) + `]},
 		"archetype_node_id": "openEHR-EHR-EHR_STATUS.generic.v1",
 		"archetype_details": {"_type": "ARCHETYPED",
 			"archetype_id": {"_type": "ARCHETYPE_ID", "value": "openEHR-EHR-EHR_STATUS.generic.v1"},
-			"template_id": {"_type": "TEMPLATE_ID", "value": "t"},
 			"rm_version": "1.1.0"},
 		"is_modifiable": true,
 		"is_queryable": true

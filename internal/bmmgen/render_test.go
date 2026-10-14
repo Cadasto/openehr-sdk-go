@@ -65,9 +65,10 @@ func TestIdempotent(t *testing.T) {
 	dir2 := t.TempDir()
 	for _, dir := range []string{dir1, dir2} {
 		if _, err := Run(Options{
-			ResourcesDir: testResources,
-			OutDir:       dir,
-			RootID:       "openehr_rm_1.2.0",
+			ResourcesDir:  testResources,
+			OutDir:        dir,
+			RootID:        "openehr_rm_1.2.0",
+			SkipInventory: true,
 		}); err != nil {
 			t.Fatalf("Run %s: %v", dir, err)
 		}
@@ -84,9 +85,10 @@ func TestIdempotent(t *testing.T) {
 func TestDriftDetection(t *testing.T) {
 	dir := t.TempDir()
 	if _, err := Run(Options{
-		ResourcesDir: testResources,
-		OutDir:       dir,
-		RootID:       "openehr_rm_1.2.0",
+		ResourcesDir:  testResources,
+		OutDir:        dir,
+		RootID:        "openehr_rm_1.2.0",
+		SkipInventory: true,
 	}); err != nil {
 		t.Fatalf("initial Run: %v", err)
 	}
@@ -109,10 +111,11 @@ func TestDriftDetection(t *testing.T) {
 		t.Fatalf("write mutated: %v", err)
 	}
 	result, err := Run(Options{
-		ResourcesDir: testResources,
-		OutDir:       dir,
-		RootID:       "openehr_rm_1.2.0",
-		Verify:       true,
+		ResourcesDir:  testResources,
+		OutDir:        dir,
+		RootID:        "openehr_rm_1.2.0",
+		Verify:        true,
+		SkipInventory: true,
 	})
 	if err != nil {
 		t.Fatalf("verify Run: %v", err)
@@ -493,17 +496,19 @@ func TestFieldDeclIgnoresAlignment(t *testing.T) {
 func TestVerifyOnFreshTreeIsClean(t *testing.T) {
 	dir := t.TempDir()
 	if _, err := Run(Options{
-		ResourcesDir: testResources,
-		OutDir:       dir,
-		RootID:       "openehr_rm_1.2.0",
+		ResourcesDir:  testResources,
+		OutDir:        dir,
+		RootID:        "openehr_rm_1.2.0",
+		SkipInventory: true,
 	}); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	result, err := Run(Options{
-		ResourcesDir: testResources,
-		OutDir:       dir,
-		RootID:       "openehr_rm_1.2.0",
-		Verify:       true,
+		ResourcesDir:  testResources,
+		OutDir:        dir,
+		RootID:        "openehr_rm_1.2.0",
+		Verify:        true,
+		SkipInventory: true,
 	})
 	if err != nil {
 		t.Fatalf("verify Run: %v", err)

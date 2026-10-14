@@ -402,10 +402,9 @@ func typedIntervalWriterCase[T rm.DVOrdered]() intervalWriterCase {
 // DV_INTERVAL instantiation the reader covers. REQ-101's builder and the
 // REQ-107 generator both attach interval attributes through it, so a
 // missing instantiation fails them. rmwrite sits outside openehr/ and so
-// cannot import openehr/internal/rmnames; the canonical set is derived the
-// way TestTypedIntervalReaderParity (openehr/validation/rmread) derives
-// it, one DV_INTERVAL<X> per registered type X that implements
-// rm.DVOrdered. A new DV_ORDERED descendant fails here until the case list
+// cannot import openehr/internal/rmnames; the canonical set is derived
+// from the registry, one DV_INTERVAL<X> per registered type X that
+// implements rm.DVOrdered. A new DV_ORDERED descendant fails here until the case list
 // and the writer both gain it, and a dropped writer arm fails the writes.
 // The bare DV_INTERVAL<DV_ORDERED> is reached through its own
 // registration.
