@@ -94,8 +94,9 @@ func run() (valid bool, err error) {
 	// ParseFileStrict rejects an unknown node type that has attributes under
 	// it, where the lenient ParseFile would keep it as a leaf and silently
 	// drop the constraints beneath it, which a validator must not do.
-	// Compile turns the parsed XML into the driver that the validator (and
-	// the composition builder, the instance generator, the AQL lint) walks.
+	// Compile turns the parsed XML into the compiled template that the
+	// validator, the composition builder, the instance generator and the
+	// AQL lint all read.
 	opt, err := template.ParseFileStrict(optPath)
 	if err != nil {
 		return false, fmt.Errorf("parse OPT %q: %w", optPath, err)
