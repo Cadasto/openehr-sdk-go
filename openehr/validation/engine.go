@@ -426,12 +426,13 @@ func (e *engine) checkLeaf(n engineNode, scalar bool) *tcimpl.CompiledNode {
 // because the RM marks them mandatory ([tcimpl.CompiledAttribute.Implicit]):
 // no template clause constrains those, so they are visited with the RM
 // rules alone. Last come the injected attributes the value's class does not
-// list, as a value of no registered RM class has none, read as the template
-// declares them. It leaves out an attribute no serialization carries
-// ([rminfo.IsNonStorableAttr]), and one the metadata gives no type that the
-// template does not declare. A value of no registered RM class
-// ([rmaccess.Covers]) has no attributes the access reads, so the attributes
-// of the template node it binds to are each read as absent.
+// list, every one of them on a value of no registered RM class: they are
+// read as the template declares them. It leaves out an attribute no
+// serialization carries ([rminfo.IsNonStorableAttr]), and one the metadata
+// gives no type that the template does not declare. A value of no
+// registered RM class ([rmaccess.Covers]) has no attributes the access
+// reads, so the attributes of the template node it binds to are each read
+// as absent.
 //
 // What the class metadata says of each attribute is read from the table
 // built once per class when the package is initialised ([classAttributes]),
