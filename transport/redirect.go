@@ -13,12 +13,13 @@ const maxRedirects = 10
 // downgrade-refusing client copy. net/http copies each of them to a redirect
 // target on the same host or a subdomain whatever its scheme, and drops them
 // only for another domain.
-var credentialHeaders = [...]string{"Authorization", "Cookie", "Cookie2"}
+var credentialHeaders = [...]string{"Authorization", "Proxy-Authorization", "Cookie", "Cookie2"}
 
 // httpClientFor returns the client doOnce sends httpReq with. A request
-// carrying an Authorization, Cookie or Cookie2 header gets a fresh shallow
-// copy of the injected client whose redirect policy refuses an https to
-// non-https hop; any other request gets the injected client as it is.
+// carrying an Authorization, Proxy-Authorization, Cookie or Cookie2 header
+// gets a fresh shallow copy of the injected client whose redirect policy
+// refuses an https to non-https hop; any other request gets the injected
+// client as it is.
 //
 // REQ-092, REQ-021: the copy is taken per request, never at New, so a change
 // the caller makes to the injected client later (its Transport,
@@ -41,12 +42,12 @@ func (c *Client) httpClientFor(httpReq *http.Request) *http.Client {
 // net/http's default limit when hc has none. It mirrors the discovery
 // resolver's refuseDowngrade and internal/noredirect's copy idiom.
 //
-// net/http copies an Authorization, Cookie or Cookie2 header to a redirect
-// target on the same host or a subdomain whatever its scheme, so without this
-// check a 3xx from https://host to http://host would carry the token or the
-// session cookie in clear text. The hop is judged from the request just
-// before this one (via's last entry), so an https hop anywhere in the chain
-// is protected.
+// net/http copies an Authorization, Proxy-Authorization, Cookie or Cookie2
+// header to a redirect target on the same host or a subdomain whatever its
+// scheme, so without this check a 3xx from https://host to http://host would
+// carry the token, the proxy credential or the session cookie in clear text.
+// The hop is judged from the request just before this one (via's last
+// entry), so an https hop anywhere in the chain is protected.
 func refuseDowngrade(hc *http.Client) *http.Client {
 	cp := *hc
 	callerPolicy := hc.CheckRedirect

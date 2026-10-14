@@ -107,9 +107,10 @@ func (c *Client) Catalog() *discovery.ServiceCatalog {
 // always has an HTTP client.
 //
 // The client comes back as it was injected. It lacks the refusal Do applies
-// to a request that carries an Authorization header, which stops it
-// following a redirect from https to a URL that is not https, so a caller
-// that sends a credential through it must refuse that redirect itself.
+// to a request that carries a credential header (Authorization,
+// Proxy-Authorization, Cookie or Cookie2), which stops it following a
+// redirect from https to a URL that is not https, so a caller that sends a
+// credential through it must refuse that redirect itself.
 func (c *Client) HTTPClient() *http.Client {
 	// REQ-025: a nil Client is caller-constructible — see Do.
 	if c == nil {
@@ -129,9 +130,9 @@ func (c *Client) HTTPClient() *http.Client {
 //  2. Build the http.Request, plumb headers, attach the bearer token.
 //  3. Emit an OTel span and propagate traceparent.
 //  4. Execute via the injected *http.Client, or, for a request carrying
-//     an Authorization header, via a per-request copy of it that refuses
-//     a redirect from https to a URL that is not https (see
-//     WithHTTPClient).
+//     a credential header (Authorization, Proxy-Authorization, Cookie or
+//     Cookie2), via a per-request copy of it that refuses a redirect from
+//     https to a URL that is not https (see WithHTTPClient).
 //  5. Retry per RetryPolicy on retriable statuses.
 //  6. Parse the response body into Body + Metadata; map the wire
 //     error envelope onto the typed-sentinel hierarchy.
