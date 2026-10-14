@@ -261,7 +261,11 @@ func (w *walker) attachAttributes(cn *CompiledNode, declared []*template.Attribu
 	// generic instantiation (DV_INTERVAL<DV_QUANTITY>) that it does not.
 	class := bmmtype.Class(cn.rmTypeName)
 	// Walk RM declaration order so implicit attributes appear in
-	// BMM-stable order regardless of OPT walk path.
+	// BMM-stable order regardless of OPT walk path. Only the attributes
+	// the RM mandates are injected: the composition builder needs
+	// implicit entries for required-but-OPT-silent fields alone, and
+	// optional ones would inflate every node with RM metadata that
+	// walker code does not need.
 	for _, attrName := range allAttributesInOrder(w.lookup, class) {
 		if declaredByName[attrName] {
 			continue
@@ -271,14 +275,6 @@ func (w *walker) attachAttributes(cn *CompiledNode, declared []*template.Attribu
 			continue
 		}
 		container, _ := w.lookup.IsContainer(class, attrName)
-		// Skip implicit attributes the RM declares but does NOT
-		// mandate — the composition builder only needs implicit
-		// entries for required-but-OPT-silent fields. Non-required
-		// implicit entries would inflate every node with optional
-		// RM metadata that walker code does not need.
-		if !slices.Contains(w.lookup.RequiredAttributes(class), attrName) {
-			continue
-		}
 		card := template.Single
 		if container {
 			card = template.Multiple
