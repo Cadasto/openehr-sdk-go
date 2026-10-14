@@ -28,7 +28,7 @@ func TestValidateRM_REQ112_IntervalFlagsNameTheClass(t *testing.T) {
 	}{
 		{name: "Point_interval", root: &rm.PointInterval[any]{LowerUnbounded: true, LowerIncluded: true}, class: "Point_interval"},
 		{name: "Proper_interval", root: &rm.ProperInterval[any]{Interval: open}, class: "Proper_interval"},
-		{name: "DV_INTERVAL<DV_QUANTITY>", root: &rm.DVInterval[rm.DVQuantity]{Interval: rm.Interval[rm.DVQuantity]{LowerUnbounded: true, LowerIncluded: true}}, class: "DV_INTERVAL"},
+		{name: "DV_INTERVAL<DV_QUANTITY>", root: &rm.DVInterval[rm.DVQuantity]{LowerUnbounded: true, LowerIncluded: true}, class: "DV_INTERVAL"},
 	} {
 		var flags []validation.Issue
 		for _, i := range validation.ValidateRM(tc.root).Issues {
