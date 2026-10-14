@@ -156,9 +156,9 @@ const observationLinksOPT = `<?xml version="1.0"?>
 // the Reference Model rules the validators apply. A lookup that marks
 // OBSERVATION's uid and links mandatory makes the compile inject uid and
 // mark the declared links required; an OBSERVATION without a uid, whose
-// links are present and empty, still draws neither a required at /uid nor a
-// cardinality at /links from Validate, as ValidateRM, which no lookup
-// reaches, draws neither.
+// links are present and empty or absent, still draws nothing at /uid and
+// nothing at /links from Validate, neither a required nor a cardinality, as
+// ValidateRM, which no lookup reaches, draws nothing there.
 func TestCompile_WithRMInfo_ShapesTheTemplateNotTheRMRules(t *testing.T) {
 	opt, err := template.ParseOPT(strings.NewReader(observationLinksOPT))
 	if err != nil {
@@ -180,24 +180,34 @@ func TestCompile_WithRMInfo_ShapesTheTemplateNotTheRMRules(t *testing.T) {
 	}
 
 	const id = "openEHR-EHR-OBSERVATION.links.v1"
-	obs := &rm.Observation{
-		ArchetypeNodeID:  id,
-		Name:             rm.DVText{Value: "links"},
-		ArchetypeDetails: &rm.Archetyped{ArchetypeID: rm.ArchetypeID{Value: id}, RMVersion: "1.1.0"},
-		Language:         rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}, CodeString: "en"},
-		Encoding:         rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "IANA_character-sets"}, CodeString: "UTF-8"},
-		Subject:          &rm.PartySelf{},
-		Links:            []rm.Link{},
+	observation := func(links []rm.Link) *rm.Observation {
+		return &rm.Observation{
+			ArchetypeNodeID:  id,
+			Name:             rm.DVText{Value: "links"},
+			ArchetypeDetails: &rm.Archetyped{ArchetypeID: rm.ArchetypeID{Value: id}, RMVersion: "1.1.0"},
+			Language:         rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}, CodeString: "en"},
+			Encoding:         rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "IANA_character-sets"}, CodeString: "UTF-8"},
+			Subject:          &rm.PartySelf{},
+			Links:            links,
+		}
 	}
-	for _, path := range []string{"/uid", "/links"} {
-		for name, r := range map[string]validation.Result{
-			"ValidateRM":                         validation.ValidateRM(obs),
-			"Validate, the default compile":      validation.Validate(obs, def),
-			"Validate, compiled with WithRMInfo": validation.Validate(obs, custom),
-		} {
-			for _, iss := range r.Issues {
-				if iss.Path == path {
-					t.Errorf("%s(OBSERVATION without a uid, links empty) reports %s %s %s at %s, want nothing there: the RM leaves it optional", name, iss.Code, iss.Layer, iss.Rule, path)
+	for _, tc := range []struct {
+		name string
+		obs  *rm.Observation
+	}{
+		{name: "links empty", obs: observation([]rm.Link{})},
+		{name: "links absent", obs: observation(nil)},
+	} {
+		for _, path := range []string{"/uid", "/links"} {
+			for call, r := range map[string]validation.Result{
+				"ValidateRM":                         validation.ValidateRM(tc.obs),
+				"Validate, the default compile":      validation.Validate(tc.obs, def),
+				"Validate, compiled with WithRMInfo": validation.Validate(tc.obs, custom),
+			} {
+				for _, iss := range r.Issues {
+					if iss.Path == path {
+						t.Errorf("%s(OBSERVATION without a uid, %s) reports %s %s %s at %s, want nothing there: the RM leaves it optional", call, tc.name, iss.Code, iss.Layer, iss.Rule, path)
+					}
 				}
 			}
 		}
