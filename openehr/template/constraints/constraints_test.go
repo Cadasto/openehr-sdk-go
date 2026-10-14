@@ -1,6 +1,7 @@
 package constraints_test
 
 import (
+	"math"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
@@ -30,6 +31,55 @@ func TestNumericRange_Contains(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.r.Contains(tt.v); got != tt.want {
 				t.Errorf("Contains(%v) = %v, want %v (range %s)", tt.v, got, tt.want, tt.r)
+			}
+		})
+	}
+}
+
+// REQ-103 — a NaN is inside no NumericRange, bounded or not. Every
+// comparison with a NaN is false, so a range that only refuses values
+// below its lower or above its upper bound lets one through; a
+// bounded C_REAL or DV_QUANTITY magnitude range must then report it
+// as CodeOutOfRange.
+func TestREQ103_NumericRangeRefusesNaN(t *testing.T) {
+	nan := math.NaN()
+	ranges := []struct {
+		name string
+		r    constraints.NumericRange
+	}{
+		{"closed", constraints.NumericRange{Lower: 0, Upper: 10, LowerInclusive: true, UpperInclusive: true}},
+		{"half-open", constraints.NumericRange{Lower: 0, Upper: 10, LowerInclusive: true}},
+		{"exclusive", constraints.NumericRange{Lower: 0, Upper: 10}},
+		{"lower-bounded-only", constraints.NumericRange{Lower: 0, LowerInclusive: true, UpperUnbounded: true}},
+		{"upper-bounded-only", constraints.NumericRange{Upper: 10, UpperInclusive: true, LowerUnbounded: true}},
+		{"fully-unbounded", constraints.NumericRange{LowerUnbounded: true, UpperUnbounded: true}},
+	}
+	for _, tc := range ranges {
+		t.Run("Contains/"+tc.name, func(t *testing.T) {
+			if tc.r.Contains(nan) {
+				t.Errorf("Contains(NaN) = true, want false (range %s)", tc.r)
+			}
+		})
+	}
+
+	closed := constraints.NumericRange{Lower: 0, Upper: 300, LowerInclusive: true, UpperInclusive: true}
+	validators := []struct {
+		name  string
+		c     constraints.PrimitiveConstraint
+		value any
+	}{
+		{"CReal", constraints.CReal{Range: closed}, nan},
+		{
+			"DvQuantity",
+			constraints.DvQuantity{Units: []constraints.QuantityUnit{{Units: "mm[Hg]", Magnitude: closed}}},
+			constraints.QuantityValue{Magnitude: nan, Units: "mm[Hg]", Precision: -1},
+		},
+	}
+	for _, tc := range validators {
+		t.Run("Validate/"+tc.name, func(t *testing.T) {
+			v := tc.c.Validate(tc.value)
+			if len(v) != 1 || v[0].Code != constraints.CodeOutOfRange {
+				t.Errorf("%s.Validate(NaN) against %s = %v, want one CodeOutOfRange", tc.name, closed, v)
 			}
 		})
 	}
