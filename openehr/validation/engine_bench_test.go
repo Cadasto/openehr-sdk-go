@@ -1,12 +1,10 @@
 package validation
 
-// engine_bench_test.go: the cost of the one walk against the walks it
-// replaces, on the corpus compositions BenchmarkValidateComposition measures
+// engine_bench_test.go: the cost of the one walk, on two corpus compositions
 // and on a synthetic composition an order of magnitude larger than the
-// largest of them: with no template, against the floor; with a template,
-// against the template walk and the floor run one after the other. The
-// composition is decoded, and its template compiled, before the timer
-// starts.
+// largest of them, with its template and with the Reference Model rules
+// alone. The composition is decoded, and its template compiled, before the
+// timer starts.
 
 import (
 	"encoding/json"
@@ -130,41 +128,21 @@ func TestREQ171_SyntheticCompositionIsTenTimesTheLargestCorpusComposition(t *tes
 	}
 }
 
-// BenchmarkEngineWithoutTemplate measures, per composition, the floor alone
-// (ValidateRM) and the one walk with no template, which returns the same
-// result.
-func BenchmarkEngineWithoutTemplate(b *testing.B) {
+// BenchmarkValidateComposition measures, per composition, the one walk with
+// the composition's template (ValidateComposition) and with the Reference
+// Model rules alone (ValidateRM).
+func BenchmarkValidateComposition(b *testing.B) {
 	for _, bc := range benchCases(b) {
-		b.Run(bc.name+"/floor", func(b *testing.B) {
+		b.Run(bc.name+"/template", func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				_ = ValidateComposition(bc.comp, bc.c)
+			}
+		})
+		b.Run(bc.name+"/rm", func(b *testing.B) {
 			b.ReportAllocs()
 			for b.Loop() {
 				_ = ValidateRM(bc.comp)
-			}
-		})
-		b.Run(bc.name+"/engine", func(b *testing.B) {
-			b.ReportAllocs()
-			for b.Loop() {
-				_ = runEngine(bc.comp, nil, Limits{})
-			}
-		})
-	}
-}
-
-// BenchmarkEngineWithTemplate measures, per composition and its template,
-// the two walks (Validate: the template walk, then the floor) and the one
-// walk with the template.
-func BenchmarkEngineWithTemplate(b *testing.B) {
-	for _, bc := range benchCases(b) {
-		b.Run(bc.name+"/two-walks", func(b *testing.B) {
-			b.ReportAllocs()
-			for b.Loop() {
-				_ = Validate(bc.comp, bc.c)
-			}
-		})
-		b.Run(bc.name+"/engine", func(b *testing.B) {
-			b.ReportAllocs()
-			for b.Loop() {
-				_ = runEngine(bc.comp, bc.c, Limits{})
 			}
 		})
 	}

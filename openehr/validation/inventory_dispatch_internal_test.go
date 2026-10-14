@@ -34,7 +34,7 @@ const dispatchFile = "inventory_dispatch.go"
 // each key of the invariantChecks literal, the name of the function the
 // entry binds; the keys bound through coveredCheck; one line per entry whose
 // recorded name is not the function it binds, or that names no method of
-// rmFloorWalker; and the methods of rmFloorWalker the source declares.
+// findings; and the methods of findings the source declares.
 type dispatchSource struct {
 	bound    map[string]string
 	covered  map[string]bool
@@ -49,9 +49,9 @@ const codedEvaluator = "checkCodedInvariants"
 // dispatchBindings parses the non-test Go files in dir and reads the
 // invariantChecks literal of file. Each entry must be a call of nodeCheck,
 // roleCheck, typeCheck, ruleCheck or coveredCheck whose first argument, a string literal, is the name
-// of the method expression (*rmFloorWalker).name its second argument is, or
+// of the method expression (*findings).name its second argument is, or
 // a call of codedCheck, which binds checkCodedInvariants. Every function an
-// entry binds must be a method of rmFloorWalker the source declares. It
+// entry binds must be a method of findings the source declares. It
 // returns an error when the literal is missing, so the check cannot pass over
 // nothing.
 func dispatchBindings(dir, file string) (dispatchSource, error) {
@@ -74,7 +74,7 @@ func dispatchBindings(dir, file string) (dispatchSource, error) {
 		for _, decl := range f.Decls {
 			switch d := decl.(type) {
 			case *ast.FuncDecl:
-				if d.Recv != nil && len(d.Recv.List) == 1 && isWalkerPointer(d.Recv.List[0].Type) {
+				if d.Recv != nil && len(d.Recv.List) == 1 && isFindingsPointer(d.Recv.List[0].Type) {
 					out.methods[d.Name.Name] = true
 				}
 			case *ast.GenDecl:
@@ -119,7 +119,7 @@ func dispatchBindings(dir, file string) (dispatchSource, error) {
 	}
 	for key, fn := range out.bound {
 		if !out.methods[fn] {
-			out.problems = append(out.problems, fmt.Sprintf("%s: binds %s, which is no method of rmFloorWalker", key, fn))
+			out.problems = append(out.problems, fmt.Sprintf("%s: binds %s, which is no method of findings", key, fn))
 		}
 	}
 	slices.Sort(out.problems)
@@ -156,11 +156,11 @@ func boundFunction(e ast.Expr) (fn string, covered bool, problem string) {
 	}
 	sel, ok := call.Args[1].(*ast.SelectorExpr)
 	if !ok {
-		return "", false, "binds no method expression of *rmFloorWalker"
+		return "", false, "binds no method expression of *findings"
 	}
 	paren, ok := sel.X.(*ast.ParenExpr)
-	if !ok || !isWalkerPointer(paren.X) {
-		return "", false, "binds no method expression of *rmFloorWalker"
+	if !ok || !isFindingsPointer(paren.X) {
+		return "", false, "binds no method expression of *findings"
 	}
 	if sel.Sel.Name != name {
 		return "", false, fmt.Sprintf("records the name %q beside the method %s", name, sel.Sel.Name)
@@ -168,14 +168,14 @@ func boundFunction(e ast.Expr) (fn string, covered bool, problem string) {
 	return name, covered, ""
 }
 
-// isWalkerPointer reports whether e is the type *rmFloorWalker.
-func isWalkerPointer(e ast.Expr) bool {
+// isFindingsPointer reports whether e is the type *findings.
+func isFindingsPointer(e ast.Expr) bool {
 	star, ok := e.(*ast.StarExpr)
 	if !ok {
 		return false
 	}
 	id, ok := star.X.(*ast.Ident)
-	return ok && id.Name == "rmFloorWalker"
+	return ok && id.Name == "findings"
 }
 
 // stringLit returns the value of e when e is a string literal.
@@ -206,13 +206,13 @@ func TestInventory_REQ171_DispatchMatchesTheClassification(t *testing.T) {
 		t.Errorf("%s: %s", dispatchFile, p)
 	}
 	if !src.methods[codedEvaluator] {
-		t.Errorf("rmFloorWalker declares no %s, which every codedCheck entry binds", codedEvaluator)
+		t.Errorf("findings declares no %s, which every codedCheck entry binds", codedEvaluator)
 	}
 	if got := codedCheck(&ruleEntryLanguage).function; got != codedEvaluator {
 		t.Errorf("codedCheck records the function %q, want %q", got, codedEvaluator)
 	}
 	if !src.methods[mandatoryCheck] {
-		t.Errorf("rmFloorWalker declares no %s, the mandatory-presence check build counts as run on every class", mandatoryCheck)
+		t.Errorf("findings declares no %s, the mandatory-presence check build counts as run on every class", mandatoryCheck)
 	}
 	dispatched := map[string]bool{}
 	for _, c := range invariantChecks {
@@ -275,18 +275,18 @@ func btoi(b bool) int {
 // to catch, and to pass an entry that binds the function it names.
 func TestInventory_REQ171_DispatchCheckFailsOnEachGap(t *testing.T) {
 	t.Parallel()
-	const header = "package p\n\ntype rmFloorWalker struct{}\n\nfunc (w *rmFloorWalker) checkA(any, string) {}\nfunc (w *rmFloorWalker) checkCodedInvariants() {}\n\n"
+	const header = "package p\n\ntype findings struct{}\n\nfunc (f *findings) checkA(any, string) {}\nfunc (f *findings) checkCodedInvariants() {}\n\n"
 	for _, tc := range []struct {
 		name, body, want string
 	}{
-		{name: "a function bound under its own name", body: `var invariantChecks = map[string]invariantCheck{"A.x": nodeCheck("checkA", (*rmFloorWalker).checkA), "A.y": codedCheck(&ruleY), "A.z": coveredCheck("checkA", (*rmFloorWalker).checkA)}`},
-		{name: "a covering function under another name", body: `var invariantChecks = map[string]invariantCheck{"A.z": coveredCheck("checkB", (*rmFloorWalker).checkA)}`, want: `records the name "checkB" beside the method checkA`},
-		{name: "a covering function the walker does not declare", body: `var invariantChecks = map[string]invariantCheck{"A.z": coveredCheck("checkB", (*rmFloorWalker).checkB)}`, want: "checkB, which is no method"},
-		{name: "a name beside another method", body: `var invariantChecks = map[string]invariantCheck{"A.x": nodeCheck("checkB", (*rmFloorWalker).checkA)}`, want: `records the name "checkB" beside the method checkA`},
-		{name: "a method the walker does not declare", body: `var invariantChecks = map[string]invariantCheck{"A.x": nodeCheck("checkB", (*rmFloorWalker).checkB)}`, want: "checkB, which is no method"},
-		{name: "a name that is no literal", body: `var invariantChecks = map[string]invariantCheck{"A.x": nodeCheck(name, (*rmFloorWalker).checkA)}`, want: "other than a string literal"},
+		{name: "a function bound under its own name", body: `var invariantChecks = map[string]invariantCheck{"A.x": nodeCheck("checkA", (*findings).checkA), "A.y": codedCheck(&ruleY), "A.z": coveredCheck("checkA", (*findings).checkA)}`},
+		{name: "a covering function under another name", body: `var invariantChecks = map[string]invariantCheck{"A.z": coveredCheck("checkB", (*findings).checkA)}`, want: `records the name "checkB" beside the method checkA`},
+		{name: "a covering function findings does not declare", body: `var invariantChecks = map[string]invariantCheck{"A.z": coveredCheck("checkB", (*findings).checkB)}`, want: "checkB, which is no method"},
+		{name: "a name beside another method", body: `var invariantChecks = map[string]invariantCheck{"A.x": nodeCheck("checkB", (*findings).checkA)}`, want: `records the name "checkB" beside the method checkA`},
+		{name: "a method findings does not declare", body: `var invariantChecks = map[string]invariantCheck{"A.x": nodeCheck("checkB", (*findings).checkB)}`, want: "checkB, which is no method"},
+		{name: "a name that is no literal", body: `var invariantChecks = map[string]invariantCheck{"A.x": nodeCheck(name, (*findings).checkA)}`, want: "other than a string literal"},
 		{name: "a function that is no method expression", body: `var invariantChecks = map[string]invariantCheck{"A.x": nodeCheck("checkA", checkA)}`, want: "no method expression"},
-		{name: "an unknown binder", body: `var invariantChecks = map[string]invariantCheck{"A.x": bind("checkA", (*rmFloorWalker).checkA)}`, want: "bind, which is no binder"},
+		{name: "an unknown binder", body: `var invariantChecks = map[string]invariantCheck{"A.x": bind("checkA", (*findings).checkA)}`, want: "bind, which is no binder"},
 		{name: "a value that is no call", body: `var invariantChecks = map[string]invariantCheck{"A.x": check}`, want: "not a call"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -315,7 +315,7 @@ func TestInventory_REQ171_DispatchCheckFailsOnEachGap(t *testing.T) {
 		t.Errorf("dispatchBindings(no invariantChecks) succeeded, want an error: the check would pass over nothing")
 	}
 	both := t.TempDir()
-	body := `var invariantChecks = map[string]invariantCheck{"A.x": nodeCheck("checkA", (*rmFloorWalker).checkA), "A.z": coveredCheck("checkA", (*rmFloorWalker).checkA)}`
+	body := `var invariantChecks = map[string]invariantCheck{"A.x": nodeCheck("checkA", (*findings).checkA), "A.z": coveredCheck("checkA", (*findings).checkA)}`
 	if err := os.WriteFile(filepath.Join(both, dispatchFile), []byte(header+body+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -393,8 +393,8 @@ func TestCoverage_REQ171_EveryRootListsItsUnevaluatedInvariants(t *testing.T) {
 func TestInventory_REQ171_BuildDispatchesTheEvaluatedInvariants(t *testing.T) {
 	t.Parallel()
 	var ran []string
-	record := func(name string) func(*rmFloorWalker, floorNode, string) {
-		return func(_ *rmFloorWalker, _ floorNode, rule string) { ran = append(ran, name+" "+rule) }
+	record := func(name string) func(*findings, floorNode, string) {
+		return func(_ *findings, _ floorNode, rule string) { ran = append(ran, name+" "+rule) }
 	}
 	rowA, rowB := codedRule{owner: "P", invariant: "c1"}, codedRule{owner: "P", invariant: "c2"}
 	src := inventorySource{
@@ -484,10 +484,10 @@ func TestFloor_REQ171_CodedPassChecksOnlyTheRowsItIsGiven(t *testing.T) {
 		{name: "encoding only", rules: []*codedRule{&ruleEntryEncoding}, want: []string{"ENTRY.Encoding_valid"}},
 		{name: "no row", rules: nil},
 	} {
-		w := newFloorWalker(nil, Limits{})
-		w.checkCodedInvariants(obs, "OBSERVATION", "/", tc.rules)
+		var f findings
+		f.checkCodedInvariants(obs, "OBSERVATION", "/", tc.rules)
 		var got []string
-		for _, i := range w.issues {
+		for _, i := range f.issues {
 			got = append(got, i.Rule)
 		}
 		if !slices.Equal(got, tc.want) {

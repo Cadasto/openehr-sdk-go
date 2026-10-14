@@ -2,7 +2,6 @@ package validation
 
 import (
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -14,110 +13,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
-
-// walkNode is the lockstep visitor: it enters the OPT node `optNode`
-// bound to the RM value `rmValue`, emits structural issues at this
-// node, then descends each OPT-declared attribute into its matched
-// RM child(ren). The `path` argument is the issue path of `rmValue`
-// (root = "/"), written by the rule the floor shares (see
-// [itemPaths]).
-//
-// Per-node behaviour:
-//   - Identity (LOCATABLE.archetype_node_id ↔ OPT pin) and RM-type
-//     match (conformance in the pinned BMM's class hierarchy) fire at
-//     every node.
-//   - Slot leaves: no descent (slot-fit was decided by the parent
-//     attribute when binding RM items to OPT children).
-//   - Primitive constraint leaves (PrimitiveConstraint() != nil):
-//     the REQ-103 typed validator runs against the bound RM value;
-//     no descent into implicit RM-mandatory attrs of the
-//     primitive's RM type. A CONSTRAINT_REF leaf is the exception:
-//     its value set is external, so the attributes of the bound
-//     value are still walked, as below.
-//   - Otherwise: iterate every attribute (explicit OPT-declared
-//     and BMM-mandatory implicits), enforce existence + cardinality,
-//     match RM child(ren), recurse.
-func (w *walker) walkNode(optNode *tcimpl.CompiledNode, rmValue any, path string) {
-	if optNode == nil || rmValue == nil {
-		return
-	}
-	// Defence-in-depth typed-nil guard. The matchers (matchChildByID
-	// and matchChildByRMType for multi-valued attrs,
-	// matchSingleAlternative for single) already reject typed-nil
-	// before descent; the generated access reads an interface holding a
-	// nil pointer as absent. This
-	// belt-and-suspenders check costs one type-switch and prevents
-	// any future descent path from re-introducing the panic class
-	// the v2 reviewers caught twice (Element.Value, then slice
-	// elements).
-	if rmaccess.IsTypedNilPointer(rmValue) {
-		return
-	}
-	// The class the walk entered, whose invariants the floor may not reach
-	// when a limit stops it first ([Coverage.Unevaluated]).
-	w.visited = recordClass(w.visited, rmValue)
-
-	// Identity + RM-type checks at this node. At the composition
-	// root, identity is checked inline against COMPOSITION's
-	// archetype_node_id (not via a separate attribute descent).
-	if iss, ok := identityIssue(optNode, rmValue, path); ok {
-		w.emit(iss)
-	}
-	// AOM 1.4 primitive short-name leaf on a BMM scalar channel
-	// (e.g. DV_COUNT.magnitude ← INTEGER, DV_DURATION.value ← string).
-	if pc, ok := scalarLeaf(optNode, rmValue); ok {
-		w.issues = appendPrimitiveIssues(w.issues, rmValue, path, pc)
-		// A scalar has no attributes to walk, but a CONSTRAINT_REF
-		// on it is still a value set checked nowhere, so the
-		// coverage names it as below.
-		if isConstraintRef(pc) {
-			w.external = append(w.external, path)
-		}
-		return
-	}
-	if iss, ok := rmTypeIssue(optNode, rmValue, path); ok {
-		w.emit(iss)
-	}
-
-	if optNode.IsSlot() {
-		// Slot leaves carry no descendable structure — slot-fill
-		// matching is the parent attribute's responsibility (see
-		// walkMultipleAttribute).
-		return
-	}
-	if pc := optNode.PrimitiveConstraint(); pc != nil {
-		// REQ-103 primitive constraint leaf. Convert the RM
-		// DataValue (or RM-typed primitive Go value) to the
-		// constraint's expected input via dataValueInput, then
-		// fan Violations out as Issues. The structural walker
-		// does not descend further: implicit RM attrs of the
-		// primitive's RM type (e.g. DV_QUANTITY.magnitude / .units)
-		// are the primitive validator's territory.
-		w.issues = appendPrimitiveIssues(w.issues, rmValue, path, pc)
-		// REQ-102: a CONSTRAINT_REF names an external value set and
-		// checks nothing locally, so the bound value's RM-mandatory
-		// attributes (a CODE_PHRASE's terminology_id and code_string)
-		// are still walked below, as at a node the OPT leaves
-		// unconstrained. The result's coverage names the node, since the
-		// code there was checked against no value set.
-		if !isConstraintRef(pc) {
-			return
-		}
-		w.external = append(w.external, path)
-	}
-
-	for _, attr := range tcimpl.NodeAttributes(optNode) {
-		if rminfo.IsNonStorableAttr(bmmtype.Class(optNode.RMTypeName()), attr.Name()) {
-			continue
-		}
-		switch attr.Cardinality() {
-		case template.Single:
-			w.walkSingleAttribute(optNode, attr, rmValue, path)
-		case template.Multiple:
-			w.walkMultipleAttribute(optNode, attr, rmValue, path)
-		}
-	}
-}
 
 // scalarLeaf reports whether optNode is an AOM 1.4 primitive short-name leaf
 // on a BMM scalar channel (DV_COUNT.magnitude under INTEGER, DV_DURATION.value
@@ -137,58 +32,6 @@ func scalarLeaf(optNode *tcimpl.CompiledNode, rmValue any) (constraints.Primitiv
 func isConstraintRef(pc constraints.PrimitiveConstraint) bool {
 	_, isRef := pc.(constraints.ConstraintRef)
 	return isRef
-}
-
-// walkSingleAttribute enforces existence on a C_SINGLE_ATTRIBUTE
-// (an attribute the OPT prohibits that holds a value is reported as
-// prohibited and not walked into, [isProhibited]) and binds the RM value to
-// one of the children the OPT allows ([allowedChildren]; a child that is
-// not allowed binds no value) via the AOM 1.4
-// "one alternative MUST match" semantics, by [bindByRMType]: the most
-// specific child wins, a child of the value's own RM type before the
-// AOM 1.4 short name it wraps, and that before a child the type only
-// conforms to in the pinned BMM, or a typed DV_INTERVAL<T> child for an
-// interval each present bound of which conforms to T. When none match
-// the walker emits a typed issue:
-//   - exactly one allowed child → `rm_type_mismatch` (plain type
-//     constraint, no real alternatives);
-//   - two or more allowed children → `alternative_mismatch` with the
-//     list of their RM types.
-func (w *walker) walkSingleAttribute(
-	opt *tcimpl.CompiledNode,
-	attr *tcimpl.CompiledAttribute,
-	parentRM any,
-	parentPath string,
-) {
-	attrPath := joinPath(parentPath, "/"+attr.Name())
-	val, ok := rmaccess.Single(parentRM, attr.Name())
-	if !ok {
-		if iss, required := absentIssue(attr, parentRM, attrPath, false); required {
-			w.emit(iss)
-		}
-		return
-	}
-	// An attribute the OPT prohibits is reported once when it holds a
-	// value (the access reads nil and typed-nil as absent), and the walk
-	// goes no further into it.
-	if isProhibited(attr) {
-		w.emit(prohibitedIssue(attr, parentRM, attrPath))
-		return
-	}
-	// A child the OPT does not allow binds no value; the attribute is
-	// prohibited, above, when it allows none.
-	children := allowedChildren(attr)
-	if len(children) == 0 {
-		// No OPT children → no structural constraint; primitive
-		// constraints fire when walkNode reaches a primitive leaf.
-		return
-	}
-	child, refusal, admitted := admitSingle(attr, children, val, attrPath)
-	if !admitted {
-		w.emit(refusal)
-		return
-	}
-	w.walkNode(child, val, attrPath)
 }
 
 // admitSingle binds val, the value of the single-valued attribute attr at
@@ -371,93 +214,6 @@ func formatAllowedTypes(children []*tcimpl.CompiledNode) string {
 	return "[" + strings.Join(names, ", ") + "]"
 }
 
-// walkMultipleAttribute enforces existence + cardinality on a
-// multi-valued attribute and binds each RM item to an OPT child. An
-// attribute the OPT prohibits that holds an item is reported as
-// prohibited and not walked into.
-// A LOCATABLE binds by archetype_node_id: exact archetype/node ids
-// first, picked by the template-level name where several children share
-// the id, then the parsed REQ-104 slot grammar (see [matchChildByID]);
-// one that matches no child is a slot_fill. An item that is not a
-// LOCATABLE has no archetype_node_id and binds by RM type instead
-// (REQ-102, see [matchChildByRMType]); one that no child admits is an
-// rm_type_mismatch or alternative_mismatch, never a slot_fill (see
-// [unboundItemIssue]). Every bound item counts toward its child's
-// occurrences.
-//
-// Each item is written in Issue.Path by the shared path rule
-// ([itemPaths]): the binding comes first, because an item's predicate
-// depends on its siblings' ids and on the names their bound OPT nodes
-// pin. A child whose occurrences the items miss is written with its own
-// predicate ([optChildPaths]).
-func (w *walker) walkMultipleAttribute(
-	opt *tcimpl.CompiledNode,
-	attr *tcimpl.CompiledAttribute,
-	parentRM any,
-	parentPath string,
-) {
-	attrPath := joinPath(parentPath, "/"+attr.Name())
-	items, n, isHash, ok := readItems(parentRM, attr.Name())
-	if !ok {
-		// The attribute is absent: a nil list, a nil hash, or one the
-		// parent's RM class does not declare. If the OPT pinned existence
-		// ≥ 1 (or BMM marks the attribute required), the instance does not
-		// satisfy it, and it is reported as absent, as walkSingleAttribute
-		// reports a single-valued one. The count of its items is a matter
-		// for a present attribute only.
-		if iss, required := absentIssue(attr, parentRM, attrPath, true); required {
-			w.emit(iss)
-		}
-		return
-	}
-	// An attribute the OPT prohibits is reported once when it holds at
-	// least one item, and the walk goes no further into it.
-	if n > 0 && isProhibited(attr) {
-		w.emit(prohibitedIssue(attr, parentRM, attrPath))
-		return
-	}
-	// Existence: lower ≥ 1 with zero items is "required" ([emptyIssue]). A
-	// nil list is absent and was reported above.
-	if n == 0 {
-		if iss, required := emptyIssue(attr, parentRM, attrPath); required {
-			w.emit(iss)
-		}
-	}
-	// Child-count cardinality interval (when the OPT pinned one).
-	if iss, out := childCountIssue(attr, n, attrPath); out {
-		w.emit(iss)
-	}
-	// Recurse into each matched item. An item no OPT child binds
-	// contributes one issue, unless the OPT declared no children for
-	// this attribute, in which case the attribute is "open" (any RM
-	// item passes; the OPT pinned only existence / cardinality, not
-	// membership). Tally per-child occurrences for the AOM 1.4
-	// occurrences upper-bound check.
-	children := tcimpl.ChildNodes(attr)
-	if len(children) == 0 {
-		return
-	}
-	if len(items) != n {
-		// A list of a primitive type is counted, never read item by item
-		// (readItems): it has no item an OPT child could bind.
-		return
-	}
-	bound, byNodeID := bindItems(opt.RMTypeName(), attr.Name(), children, items)
-	itemPath, pathItems := boundItemPaths(attrPath, items, bound, isHash)
-	w.recordNames(attrPath, pathItems)
-	for idx, item := range items {
-		matched := bound[idx]
-		if matched == nil {
-			w.emit(unboundItemIssue(attr, children, item, byNodeID[idx], itemPath[idx]))
-			continue
-		}
-		w.walkNode(matched, item, itemPath[idx])
-	}
-	// AOM 1.4 occurrences on each OPT child: the count of the items bound to
-	// it must fall within the interval the OPT pins.
-	w.issues = appendOccurrenceIssues(w.issues, attr, children, bound, attrPath)
-}
-
 // absentIssue returns the issue the template reports for the attribute attr
 // of parentRM, at attrPath, when the instance lacks it: `required`, on the
 // layer and by the rule [requiredBy] names, with required set. A
@@ -525,24 +281,22 @@ func childCountIssue(attr *tcimpl.CompiledAttribute, n int, attrPath string) (is
 }
 
 // boundItemPaths returns the issue path of each of the items of the
-// multi-valued attribute at attrPath, bound to the OPT children bound holds,
-// and what the path rule read of them. The items of a list are written by
-// the shared path rule ([itemPaths]), which reads each item's id and the
-// name pinned on the child it binds to ([boundPathItems]): the binding comes
-// first, because an item's predicate depends on its siblings' ids and on the
-// names their bound OPT nodes pin. An entry of a Hash attribute (isHash) is
-// written by its position in ascending key order, never by its key (REQ-102
-// Issue paths), and pathItems is nil.
-func boundItemPaths(attrPath string, items []any, bound []*tcimpl.CompiledNode, isHash bool) (paths []string, pathItems []pathItem) {
+// multi-valued attribute at attrPath, bound to the OPT children bound holds.
+// The items of a list are written by the shared path rule ([itemPaths]),
+// which reads each item's id and the name pinned on the child it binds to
+// ([boundPathItems]): the binding comes first, because an item's predicate
+// depends on its siblings' ids and on the names their bound OPT nodes pin.
+// An entry of a Hash attribute (isHash) is written by its position in
+// ascending key order, never by its key (REQ-102 Issue paths).
+func boundItemPaths(attrPath string, items []any, bound []*tcimpl.CompiledNode, isHash bool) []string {
 	if isHash {
-		paths = make([]string, len(items))
+		paths := make([]string, len(items))
 		for idx := range items {
 			paths[idx] = hashEntryPath(attrPath, idx)
 		}
-		return paths, nil
+		return paths
 	}
-	pathItems = boundPathItems(items, bound)
-	return itemPaths(attrPath, pathItems), pathItems
+	return itemPaths(attrPath, boundPathItems(items, bound))
 }
 
 // appendOccurrenceIssues appends to issues a `cardinality` issue, rule
@@ -582,40 +336,6 @@ func appendOccurrenceIssues(issues []Issue, attr *tcimpl.CompiledAttribute, chil
 	return issues
 }
 
-// readItems reads the items of the attribute attr on parent, which the
-// template walk treats as multi-valued, and their number n: the items of a
-// list, in order, or, where parent's RM class declares attr as a Hash, the
-// entries of the hash in ascending key order (isHash). A list whose items
-// the pinned BMM declares of a primitive type ([isPrimitiveType]), such as
-// DV_MULTIMEDIA data, an Array of Octet, is counted ([rmaccess.Len]) and
-// never read item by item: items is nil whatever n is. present is false for
-// a nil list or hash and for an attribute the class does not declare; a
-// present one may hold no item.
-func readItems(parent any, attr string) (items []any, n int, isHash, present bool) {
-	switch declared := declaredItemType(parent, attr); {
-	case declared == hashType:
-		_, items, present = rmaccess.Hash(parent, attr)
-		return items, len(items), true, present
-	case isPrimitiveType(rminfo.Default, declared):
-		n, present = rmaccess.Len(parent, attr)
-		return nil, n, false, present
-	}
-	items, present = rmaccess.Multiple(parent, attr)
-	return items, len(items), false, present
-}
-
-// declaredItemType returns the RM type the pinned BMM declares for the
-// attribute attr of parent's RM class, the type of its items for a list, or
-// "" when parent's class is not one the walk knows or does not declare attr.
-func declaredItemType(parent any, attr string) string {
-	rmType, _, ok := rmTypeInfo(parent)
-	if !ok {
-		return ""
-	}
-	t, _ := rminfo.Default.AttributeRMType(bmmtype.Class(rmType), attr)
-	return t
-}
-
 // bindItems binds each of the items of the multi-valued attribute
 // attrName, on a node of RM type parentRMType, to one of its OPT
 // children: a LOCATABLE by its archetype_node_id ([matchChildByID]),
@@ -637,9 +357,7 @@ func bindItems(parentRMType, attrName string, children []*tcimpl.CompiledNode, i
 }
 
 // boundPathItems returns what the path rule reads of each item: its
-// archetype_node_id and the name pinned on the child it binds to. These
-// names, keyed by the attribute's path and each item's index, are the
-// bindings the floor takes to write the same paths ([pinnedNames]).
+// archetype_node_id and the name pinned on the child it binds to.
 func boundPathItems(items []any, bound []*tcimpl.CompiledNode) []pathItem {
 	out := make([]pathItem, len(items))
 	for idx, item := range items {
@@ -649,27 +367,6 @@ func boundPathItems(items []any, bound []*tcimpl.CompiledNode) []pathItem {
 		}
 	}
 	return out
-}
-
-// recordNames keeps, in w.names, the pinned name of each of the items of
-// the multi-valued attribute at attrPath whose id a sibling shares, keyed
-// by attrPath and the item's index. The name of an item whose id is its
-// own never reaches its path, so it is not kept: the floor, fed what is
-// kept, writes every item as this walk does.
-func (w *walker) recordNames(attrPath string, items []pathItem) {
-	if !slices.ContainsFunc(items, func(it pathItem) bool { return it.name != "" }) {
-		return
-	}
-	s := newIDSharing(items)
-	for i, it := range items {
-		if it.name == "" || !s.shared(it.id) {
-			continue
-		}
-		if w.names == nil {
-			w.names = pinnedNames{}
-		}
-		w.names[itemKey{attrPath: attrPath, index: i}] = it.name
-	}
 }
 
 // childIdentity describes an OPT child for inclusion in cardinality

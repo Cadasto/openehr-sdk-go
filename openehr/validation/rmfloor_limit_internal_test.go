@@ -1,8 +1,10 @@
 package validation
 
 // rmfloor_limit_internal_test.go: REQ-112 § Driver, REQ-171 § Surface — the
-// floor's default visit limit sits far above what a decoded document needs,
-// so it stops only a value built in Go that holds itself by value.
+// walk's default visit limit sits far above what a decoded document needs,
+// so it stops only a value built in Go that holds itself by value. Under a
+// node limit the walk visits exactly that many values; under a depth limit
+// it visits nothing below it.
 
 import (
 	"os"
@@ -36,15 +38,13 @@ func TestDefaultLimits_REQ112_REQ171_FarAboveTheCorpus(t *testing.T) {
 		if err := canjson.Unmarshal(body, root); err != nil {
 			continue // a decode failure is the codec's tests' concern
 		}
-		rmType, _, ok := rmTypeInfo(root)
-		if !ok {
+		_, e := engineWalk(root, nil, Limits{})
+		if e == nil {
 			continue
 		}
-		w := newFloorWalker(nil, Limits{})
-		w.walk(root, rmType, "/", roleNone, 0)
 		walked++
-		if w.stopped || w.depthStopped || w.visits*10 > w.maxNodes {
-			t.Errorf("%s: the floor visits %d values (stopped: %t, depth limit reached: %t), want under a tenth of the default limit %d", rel.Rel, w.visits, w.stopped, w.depthStopped, w.maxNodes)
+		if e.stopped || e.depthStopped || e.visits*10 > e.maxNodes {
+			t.Errorf("%s: the walk visits %d values (stopped: %t, depth limit reached: %t), want under a tenth of the default limit %d", rel.Rel, e.visits, e.stopped, e.depthStopped, e.maxNodes)
 		}
 	}
 	if walked == 0 {
@@ -52,21 +52,21 @@ func TestDefaultLimits_REQ112_REQ171_FarAboveTheCorpus(t *testing.T) {
 	}
 }
 
-// REQ-171 § Surface — the floor walker visits exactly the number of values
-// its node limit allows, then stops and reports max_nodes once.
-func TestFloorWalker_REQ171_VisitsExactlyTheNodeLimit(t *testing.T) {
+// REQ-171 § Surface — the walk visits exactly the number of values its node
+// limit allows, then stops and reports max_nodes once, as its last issue.
+func TestEngine_REQ171_VisitsExactlyTheNodeLimit(t *testing.T) {
 	root := &rm.Section{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "bottom"}}
 	for range 100 {
 		root = &rm.Section{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "level"}, Items: []rm.ContentItem{root}}
 	}
 	for _, n := range []int{1, 7, 100} {
-		w := newFloorWalker(nil, Limits{Nodes: n})
-		w.walk(root, "SECTION", "/", roleNone, 0)
-		if !w.stopped || w.visits != n {
-			t.Errorf("under Nodes %d the walk visits %d values (stopped: %t), want %d and stopped", n, w.visits, w.stopped, n)
+		_, e := engineWalk(root, nil, Limits{Nodes: n})
+		if !e.stopped || e.visits != n {
+			t.Errorf("under Nodes %d the walk visits %d values (stopped: %t), want %d and stopped", n, e.visits, e.stopped, n)
 		}
-		if len(w.stoppedAt) != 1 || len(w.issues) == 0 || w.issues[len(w.issues)-1].Code != "max_nodes" {
-			t.Errorf("under Nodes %d the walk stopped at %q with issues %v, want one stop, reported last as max_nodes", n, w.stoppedAt, w.issues)
+		issues := e.found.issues
+		if len(e.stoppedAt) != 1 || len(issues) == 0 || issues[len(issues)-1].Code != "max_nodes" {
+			t.Errorf("under Nodes %d the walk stopped at %q with issues %v, want one stop, reported last as max_nodes", n, e.stoppedAt, issues)
 		}
 	}
 }
@@ -75,7 +75,7 @@ func TestFloorWalker_REQ171_VisitsExactlyTheNodeLimit(t *testing.T) {
 // depth limit, on the first branch that reaches it or any later one: under a
 // depth of 3, twenty chains five deep and twenty chains fifty deep take the
 // same number of visits, and report one stop.
-func TestFloorWalker_REQ171_VisitsNothingBelowTheDepthLimit(t *testing.T) {
+func TestEngine_REQ171_VisitsNothingBelowTheDepthLimit(t *testing.T) {
 	chains := func(levels int) *rm.Section {
 		root := &rm.Section{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "chains"}}
 		for range 20 {
@@ -89,12 +89,11 @@ func TestFloorWalker_REQ171_VisitsNothingBelowTheDepthLimit(t *testing.T) {
 	}
 	visits := map[int]int{}
 	for _, levels := range []int{5, 50} {
-		w := newFloorWalker(nil, Limits{Depth: 3})
-		w.walk(chains(levels), "SECTION", "/", roleNone, 0)
-		if len(w.stoppedAt) != 1 || w.stopped {
-			t.Fatalf("chains %d deep under Depth 3: stopped at %q (visit limit reached: %t), want one depth stop", levels, w.stoppedAt, w.stopped)
+		_, e := engineWalk(chains(levels), nil, Limits{Depth: 3})
+		if len(e.stoppedAt) != 1 || e.stopped {
+			t.Fatalf("chains %d deep under Depth 3: stopped at %q (visit limit reached: %t), want one depth stop", levels, e.stoppedAt, e.stopped)
 		}
-		visits[levels] = w.visits
+		visits[levels] = e.visits
 	}
 	if visits[5] != visits[50] {
 		t.Errorf("under Depth 3 the walk visits %d values for chains 5 deep and %d for chains 50 deep, want the same: nothing below the limit is visited", visits[5], visits[50])

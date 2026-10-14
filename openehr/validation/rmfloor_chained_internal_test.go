@@ -7,7 +7,6 @@ package validation
 
 import (
 	"encoding/json"
-	"maps"
 	"os"
 	"slices"
 	"strings"
@@ -70,40 +69,12 @@ func TestValidate_REQ102_REQ171_EachDefectOnceAtTheWalksPath(t *testing.T) {
 	}
 }
 
-// REQ-102, REQ-116 — the template walk collects, over the whole walk, the
-// names it binds to items that share an id, keyed as the floor reads them.
-func TestWalker_REQ102_REQ116_CollectsBoundNames(t *testing.T) {
-	opt, err := template.ParseOPT(strings.NewReader(handoffOPT))
-	if err != nil {
-		t.Fatalf("ParseOPT: %v", err)
-	}
-	c, err := templatecompile.Compile(opt)
-	if err != nil {
-		t.Fatalf("Compile: %v", err)
-	}
-	comp := &rm.Composition{
-		ArchetypeNodeID: "openEHR-EHR-COMPOSITION.reused.v1",
-		Name:            rm.DVText{Value: "Reused"},
-		Content:         []rm.ContentItem{handoffObservation("Zweite"), handoffObservation("Erste")},
-	}
-	w := newWalker(c)
-	w.walkNode(c.Root(), comp, "/")
-	want := pinnedNames{
-		{attrPath: "/content", index: 0}: "Zweite",
-		{attrPath: "/content", index: 1}: "Erste",
-	}
-	if !maps.Equal(w.names, want) {
-		t.Errorf("walker names = %v, want %v", w.names, want)
-	}
-}
-
-// REQ-102 — a CONSTRAINT_REF leaf constrains nothing the walk can check, so
-// the template walk itself, with no floor, still walks the attributes of the
+// REQ-102 Primitive constraints — a CONSTRAINT_REF leaf constrains nothing
+// the walk can check locally, so Validate still walks the attributes of the
 // CODE_PHRASE it binds there and reports a blank terminology_id and
-// code_string as `required`. Inside Validate the floor reports the same
-// issues and the repeats are dropped, so only the walk alone shows which
-// walk found them.
-func TestWalker_REQ102_ConstraintRefLeafWalksCodePhrase(t *testing.T) {
+// code_string as `required`, once each, as at a node the template leaves
+// unconstrained.
+func TestValidate_REQ102_ConstraintRefLeafWalksCodePhrase(t *testing.T) {
 	const code = "/content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0002]/data/items[at0004]/items[at0011]/value/defining_code"
 	opt, err := template.ParseFile(fixtures.TemplateOpt("Demonstration.v1"))
 	if err != nil {
@@ -125,10 +96,9 @@ func TestWalker_REQ102_ConstraintRefLeafWalksCodePhrase(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			comp, cp := demonstrationConstraintRefCode(t)
 			tc.blank(cp)
-			w := newWalker(c)
-			w.walkNode(c.Root(), comp, "/")
-			if countAt(w.issues, "required", tc.want) != 1 {
-				t.Errorf("template walk alone: no required at %s; issues %q", tc.want, keys(w.issues))
+			issues := Validate(comp, c).Issues
+			if countAt(issues, "required", tc.want) != 1 {
+				t.Errorf("Validate: want one required at %s; issues %q", tc.want, keys(issues))
 			}
 		})
 	}

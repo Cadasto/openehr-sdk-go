@@ -44,41 +44,6 @@ func ValidateComposition(comp *rm.Composition, c *templatecompile.Compiled) Resu
 	return Validate(comp, c)
 }
 
-// walker carries the issue accumulator and any per-call state for
-// a single ValidateComposition invocation. Constructed via
-// newWalker so callers do not see the zero value (which has a nil
-// issues slice — never returned to callers).
-type walker struct {
-	compiled *templatecompile.Compiled
-	issues   []Issue
-	// names collects, over the whole walk, the name the OPT pins on the
-	// node each item binds to, for the items whose archetype_node_id a
-	// sibling shares: the only items whose path a pinned name changes
-	// ([itemPaths]). The floor takes it, so it writes the path this walk
-	// writes for the same node. Nil until a walk records a name.
-	names pinnedNames
-	// external holds, in walk order, the path of each node bound to a
-	// CONSTRAINT_REF: its value set is outside the SDK, so the walk could
-	// not check the code there ([Coverage.External]). Nil until one is met.
-	external []string
-	// visited holds the class of every value the walk entered, by its index
-	// in the inventory's rules ([classRules]), for [Coverage.Unevaluated].
-	visited indexSet
-}
-
-func newWalker(c *templatecompile.Compiled) *walker {
-	// Pre-allocate a non-nil issues slice so resultFromIssues
-	// returns a non-nil slice on the OK path.
-	return &walker{compiled: c, issues: []Issue{}}
-}
-
-// emit appends one Issue to the walker's accumulator. Small helper
-// kept for symmetry with later code that may want to deduplicate
-// or sort issues; right now it is a direct append.
-func (w *walker) emit(i Issue) {
-	w.issues = append(w.issues, i)
-}
-
 // joinPath glues a parent issue path with a child segment. Mirrors
 // the compile-side pathSegment convention: root path is "/" and
 // child deltas already begin with "/" (e.g. "/category",

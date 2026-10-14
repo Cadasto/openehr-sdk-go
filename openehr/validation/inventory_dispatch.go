@@ -67,12 +67,12 @@ type invariantCheck struct {
 	function string
 	// run calls the evaluator on a node; rule is the invariant that
 	// dispatched it.
-	run func(w *rmFloorWalker, n floorNode, rule string)
+	run func(into *findings, n floorNode, rule string)
 	// perRule is set for an evaluator that reports the invariant that
 	// dispatched it, so it serves each of them.
 	perRule bool
 	// coded is set, in place of run, for a coded invariant, which
-	// [rmFloorWalker.checkCodedInvariants] evaluates from its row.
+	// [findings.checkCodedInvariants] evaluates from its row.
 	coded *codedRule
 	// covered is set, in place of run and coded, for an invariant that the
 	// check function names already decides: the binding dispatches nothing
@@ -82,30 +82,30 @@ type invariantCheck struct {
 }
 
 // mandatoryCheck is the function that applies the mandatory-presence rule,
-// [rmFloorWalker.checkMandatory]. The walk runs it on the RM-mandatory
+// [findings.checkMandatory]. The walk runs it on the RM-mandatory
 // attributes of every node it visits, so [inventorySource.build] counts it as
 // run on every class.
 const mandatoryCheck = "checkMandatory"
 
 // nodeCheck binds an evaluator that reads the node's value and path.
-func nodeCheck(function string, f func(*rmFloorWalker, any, string)) invariantCheck {
-	return invariantCheck{function: function, run: func(w *rmFloorWalker, n floorNode, _ string) {
-		f(w, n.value, n.path)
+func nodeCheck(function string, f func(*findings, any, string)) invariantCheck {
+	return invariantCheck{function: function, run: func(into *findings, n floorNode, _ string) {
+		f(into, n.value, n.path)
 	}}
 }
 
 // roleCheck binds an evaluator that also reads the node's role.
-func roleCheck(function string, f func(*rmFloorWalker, any, string, floorRole)) invariantCheck {
-	return invariantCheck{function: function, run: func(w *rmFloorWalker, n floorNode, _ string) {
-		f(w, n.value, n.path, n.role)
+func roleCheck(function string, f func(*findings, any, string, floorRole)) invariantCheck {
+	return invariantCheck{function: function, run: func(into *findings, n floorNode, _ string) {
+		f(into, n.value, n.path, n.role)
 	}}
 }
 
 // typeCheck binds an evaluator that also reads the node's RM type, to name
 // the class it reports on.
-func typeCheck(function string, f func(*rmFloorWalker, any, string, string)) invariantCheck {
-	return invariantCheck{function: function, run: func(w *rmFloorWalker, n floorNode, _ string) {
-		f(w, n.value, n.rmType, n.path)
+func typeCheck(function string, f func(*findings, any, string, string)) invariantCheck {
+	return invariantCheck{function: function, run: func(into *findings, n floorNode, _ string) {
+		f(into, n.value, n.rmType, n.path)
 	}}
 }
 
@@ -114,9 +114,9 @@ func typeCheck(function string, f func(*rmFloorWalker, any, string, string)) inv
 // several classes (Value_valid), or one invariant declared on an ancestor of
 // several (Is_archetype_root), and the rule it reports is always the
 // inventory's key.
-func ruleCheck(function string, f func(*rmFloorWalker, any, string, string, string)) invariantCheck {
-	return invariantCheck{function: function, perRule: true, run: func(w *rmFloorWalker, n floorNode, rule string) {
-		f(w, n.value, n.rmType, n.path, rule)
+func ruleCheck(function string, f func(*findings, any, string, string, string)) invariantCheck {
+	return invariantCheck{function: function, perRule: true, run: func(into *findings, n floorNode, rule string) {
+		f(into, n.value, n.rmType, n.path, rule)
 	}}
 }
 
@@ -150,27 +150,27 @@ func coveredCheck(function string, _ any) invariantCheck {
 // as a precision of 0, under which that check reports an operand that is not
 // whole as DV_PROPORTION.Precision_validity.
 var invariantChecks = map[string]invariantCheck{
-	"ARCHETYPED.Rm_version_valid":        nodeCheck("checkArchetyped", (*rmFloorWalker).checkArchetyped),
-	"CODE_PHRASE.Code_string_valid":      roleCheck("checkCodePhrase", (*rmFloorWalker).checkCodePhrase),
-	"COMPOSITION.Is_archetype_root":      ruleCheck("checkArchetypeRoot", (*rmFloorWalker).checkArchetypeRoot),
-	"DV_DATE.Value_valid":                ruleCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
-	"DV_DATE_TIME.Value_valid":           ruleCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
-	"DV_DURATION.Value_valid":            ruleCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
-	"DV_INTERVAL.Limits_consistent":      typeCheck("checkDVInterval", (*rmFloorWalker).checkDVInterval),
-	"DV_PROPORTION.Precision_validity":   nodeCheck("checkDVProportion", (*rmFloorWalker).checkDVProportion),
-	"DV_TEXT.Mappings_valid":             nodeCheck("checkTermMappings", (*rmFloorWalker).checkTermMappings),
-	"DV_TIME.Value_valid":                ruleCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
-	"EHR_ACCESS.Is_archetype_root":       ruleCheck("checkArchetypeRoot", (*rmFloorWalker).checkArchetypeRoot),
-	"EHR_STATUS.Is_archetype_root":       ruleCheck("checkArchetypeRoot", (*rmFloorWalker).checkArchetypeRoot),
-	"ELEMENT.Inv_null_flavour_indicated": nodeCheck("checkElementNullFlavour", (*rmFloorWalker).checkElementNullFlavour),
-	"ENTRY.Is_archetype_root":            ruleCheck("checkArchetypeRoot", (*rmFloorWalker).checkArchetypeRoot),
-	"Interval.Lower_included_valid":      typeCheck("checkDVInterval", (*rmFloorWalker).checkDVInterval),
-	"Interval.Upper_included_valid":      typeCheck("checkDVInterval", (*rmFloorWalker).checkDVInterval),
-	"PARTY.Is_archetype_root":            ruleCheck("checkArchetypeRoot", (*rmFloorWalker).checkArchetypeRoot),
-	"PARTY_IDENTIFIED.Basic_validity":    nodeCheck("checkPartyIdentified", (*rmFloorWalker).checkPartyIdentified),
-	"PARTY_IDENTIFIED.Identifiers_valid": nodeCheck("checkPartyIdentified", (*rmFloorWalker).checkPartyIdentified),
-	"PARTY_IDENTIFIED.Name_valid":        nodeCheck("checkPartyIdentified", (*rmFloorWalker).checkPartyIdentified),
-	"TERM_MAPPING.Match_valid":           nodeCheck("checkTermMapping", (*rmFloorWalker).checkTermMapping),
+	"ARCHETYPED.Rm_version_valid":        nodeCheck("checkArchetyped", (*findings).checkArchetyped),
+	"CODE_PHRASE.Code_string_valid":      roleCheck("checkCodePhrase", (*findings).checkCodePhrase),
+	"COMPOSITION.Is_archetype_root":      ruleCheck("checkArchetypeRoot", (*findings).checkArchetypeRoot),
+	"DV_DATE.Value_valid":                ruleCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"DV_DATE_TIME.Value_valid":           ruleCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"DV_DURATION.Value_valid":            ruleCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"DV_INTERVAL.Limits_consistent":      typeCheck("checkDVInterval", (*findings).checkDVInterval),
+	"DV_PROPORTION.Precision_validity":   nodeCheck("checkDVProportion", (*findings).checkDVProportion),
+	"DV_TEXT.Mappings_valid":             nodeCheck("checkTermMappings", (*findings).checkTermMappings),
+	"DV_TIME.Value_valid":                ruleCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"EHR_ACCESS.Is_archetype_root":       ruleCheck("checkArchetypeRoot", (*findings).checkArchetypeRoot),
+	"EHR_STATUS.Is_archetype_root":       ruleCheck("checkArchetypeRoot", (*findings).checkArchetypeRoot),
+	"ELEMENT.Inv_null_flavour_indicated": nodeCheck("checkElementNullFlavour", (*findings).checkElementNullFlavour),
+	"ENTRY.Is_archetype_root":            ruleCheck("checkArchetypeRoot", (*findings).checkArchetypeRoot),
+	"Interval.Lower_included_valid":      typeCheck("checkDVInterval", (*findings).checkDVInterval),
+	"Interval.Upper_included_valid":      typeCheck("checkDVInterval", (*findings).checkDVInterval),
+	"PARTY.Is_archetype_root":            ruleCheck("checkArchetypeRoot", (*findings).checkArchetypeRoot),
+	"PARTY_IDENTIFIED.Basic_validity":    nodeCheck("checkPartyIdentified", (*findings).checkPartyIdentified),
+	"PARTY_IDENTIFIED.Identifiers_valid": nodeCheck("checkPartyIdentified", (*findings).checkPartyIdentified),
+	"PARTY_IDENTIFIED.Name_valid":        nodeCheck("checkPartyIdentified", (*findings).checkPartyIdentified),
+	"TERM_MAPPING.Match_valid":           nodeCheck("checkTermMapping", (*findings).checkTermMapping),
 
 	"COMPOSITION.Category_validity":                    codedCheck(&ruleCompositionCategory),
 	"COMPOSITION.Language_valid":                       codedCheck(&ruleCompositionLanguage),
@@ -195,46 +195,46 @@ var invariantChecks = map[string]invariantCheck{
 	"PARTY_RELATED.Relationship_valid":                 codedCheck(&rulePartyRelationship),
 	"TERM_MAPPING.Purpose_valid":                       codedCheck(&ruleTermMappingPurpose),
 
-	"ACTIVITY.Action_archetype_id_valid":         coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
-	"AUDIT_DETAILS.System_id_valid":              coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
-	"DV_IDENTIFIER.Id_valid":                     coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
-	"DV_PARAGRAPH.Items_valid":                   coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
-	"DV_PARSABLE.Formalism_valid":                coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
-	"DV_TEXT.Valid_value":                        coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
-	"DV_URI.Value_valid":                         coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
-	"FEEDER_AUDIT_DETAILS.System_id_valid":       coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
-	"INSTRUCTION_DETAILS.Activity_path_valid":    coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
-	"LOCATABLE.Archetype_node_id_valid":          coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
-	"PARTY.Identities_valid":                     coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
-	"RESOURCE_DESCRIPTION.Lifecycle_state_valid": coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
-	"RESOURCE_DESCRIPTION_ITEM.Purpose_valid":    coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
-	"REVISION_HISTORY_ITEM.Audit_valid":          coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
-	"UID.Value_valid":                            coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
-	"VERSION_TREE_ID.Value_valid":                coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
+	"ACTIVITY.Action_archetype_id_valid":         coveredCheck("checkMandatory", (*findings).checkMandatory),
+	"AUDIT_DETAILS.System_id_valid":              coveredCheck("checkMandatory", (*findings).checkMandatory),
+	"DV_IDENTIFIER.Id_valid":                     coveredCheck("checkMandatory", (*findings).checkMandatory),
+	"DV_PARAGRAPH.Items_valid":                   coveredCheck("checkMandatory", (*findings).checkMandatory),
+	"DV_PARSABLE.Formalism_valid":                coveredCheck("checkMandatory", (*findings).checkMandatory),
+	"DV_TEXT.Valid_value":                        coveredCheck("checkMandatory", (*findings).checkMandatory),
+	"DV_URI.Value_valid":                         coveredCheck("checkMandatory", (*findings).checkMandatory),
+	"FEEDER_AUDIT_DETAILS.System_id_valid":       coveredCheck("checkMandatory", (*findings).checkMandatory),
+	"INSTRUCTION_DETAILS.Activity_path_valid":    coveredCheck("checkMandatory", (*findings).checkMandatory),
+	"LOCATABLE.Archetype_node_id_valid":          coveredCheck("checkMandatory", (*findings).checkMandatory),
+	"PARTY.Identities_valid":                     coveredCheck("checkMandatory", (*findings).checkMandatory),
+	"RESOURCE_DESCRIPTION.Lifecycle_state_valid": coveredCheck("checkMandatory", (*findings).checkMandatory),
+	"RESOURCE_DESCRIPTION_ITEM.Purpose_valid":    coveredCheck("checkMandatory", (*findings).checkMandatory),
+	"REVISION_HISTORY_ITEM.Audit_valid":          coveredCheck("checkMandatory", (*findings).checkMandatory),
+	"UID.Value_valid":                            coveredCheck("checkMandatory", (*findings).checkMandatory),
+	"VERSION_TREE_ID.Value_valid":                coveredCheck("checkMandatory", (*findings).checkMandatory),
 
-	"Iso8601_date.Day_valid":                    coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
-	"Iso8601_date.Month_valid":                  coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
-	"Iso8601_date.Partial_validity":             coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
-	"Iso8601_date.Year_valid":                   coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
-	"Iso8601_date_time.Fractional_second_valid": coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
-	"Iso8601_date_time.Hour_valid":              coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
-	"Iso8601_date_time.Minute_valid":            coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
-	"Iso8601_date_time.Partial_validity_minute": coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
-	"Iso8601_date_time.Year_valid":              coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
-	"Iso8601_duration.Days_valid":               coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
-	"Iso8601_duration.Fractional_second_valid":  coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
-	"Iso8601_duration.Hours_valid":              coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
-	"Iso8601_duration.Minutes_valid":            coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
-	"Iso8601_duration.Months_valid":             coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
-	"Iso8601_duration.Seconds_valid":            coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
-	"Iso8601_duration.Weeks_valid":              coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
-	"Iso8601_duration.Years_valid":              coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
-	"Iso8601_time.Fractional_second_valid":      coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
-	"Iso8601_time.Hour_valid":                   coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
-	"Iso8601_time.Minute_valid":                 coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
-	"Iso8601_time.Partial_validity":             coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
+	"Iso8601_date.Day_valid":                    coveredCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"Iso8601_date.Month_valid":                  coveredCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"Iso8601_date.Partial_validity":             coveredCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"Iso8601_date.Year_valid":                   coveredCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"Iso8601_date_time.Fractional_second_valid": coveredCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"Iso8601_date_time.Hour_valid":              coveredCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"Iso8601_date_time.Minute_valid":            coveredCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"Iso8601_date_time.Partial_validity_minute": coveredCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"Iso8601_date_time.Year_valid":              coveredCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"Iso8601_duration.Days_valid":               coveredCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"Iso8601_duration.Fractional_second_valid":  coveredCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"Iso8601_duration.Hours_valid":              coveredCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"Iso8601_duration.Minutes_valid":            coveredCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"Iso8601_duration.Months_valid":             coveredCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"Iso8601_duration.Seconds_valid":            coveredCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"Iso8601_duration.Weeks_valid":              coveredCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"Iso8601_duration.Years_valid":              coveredCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"Iso8601_time.Fractional_second_valid":      coveredCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"Iso8601_time.Hour_valid":                   coveredCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"Iso8601_time.Minute_valid":                 coveredCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"Iso8601_time.Partial_validity":             coveredCheck("checkTemporalValue", (*findings).checkTemporalValue),
 
-	"DV_PROPORTION.Is_integral_validity": coveredCheck("checkDVProportion", (*rmFloorWalker).checkDVProportion),
+	"DV_PROPORTION.Is_integral_validity": coveredCheck("checkDVProportion", (*findings).checkDVProportion),
 }
 
 // attributeCheck is an evaluator the floor runs on a node of class and of
@@ -251,14 +251,14 @@ type attributeCheck struct {
 // attributeChecks are the floor's evaluators of the two rules the BMM states
 // in an attribute's definition rather than as a named invariant, so the
 // inventory does not list them: the mandatory parts of a reference
-// ([rmFloorWalker.checkObjectRef], part of the mandatory-presence rule) and
-// the precision range of a DV_QUANTITY ([rmFloorWalker.checkDVQuantity]).
+// ([findings.checkObjectRef], part of the mandatory-presence rule) and
+// the precision range of a DV_QUANTITY ([findings.checkDVQuantity]).
 // Each runs on the class it names and on every class the rminfo hierarchy
 // places below it; the reference check owns the three parts it reports, so
 // the required-set check leaves them out on exactly the classes it runs on.
 var attributeChecks = []attributeCheck{
-	{class: "OBJECT_REF", check: nodeCheck("checkObjectRef", (*rmFloorWalker).checkObjectRef), owns: []string{"id", "namespace", "type"}},
-	{class: "DV_QUANTITY", check: nodeCheck("checkDVQuantity", (*rmFloorWalker).checkDVQuantity)},
+	{class: "OBJECT_REF", check: nodeCheck("checkObjectRef", (*findings).checkObjectRef), owns: []string{"id", "namespace", "type"}},
+	{class: "DV_QUANTITY", check: nodeCheck("checkDVQuantity", (*findings).checkDVQuantity)},
 }
 
 // indexSet is a set of small integers: the classes a walk visited, by their
@@ -300,7 +300,7 @@ func (s indexSet) each(f func(i int)) {
 // boundCheck is one evaluator the floor runs on a node, with the invariant
 // that dispatched it.
 type boundCheck struct {
-	run  func(w *rmFloorWalker, n floorNode, rule string)
+	run  func(into *findings, n floorNode, rule string)
 	rule string
 }
 
@@ -416,7 +416,7 @@ func buildClassAttributes(l rminfo.Lookup) map[string]*classAttributeTable {
 // order: the attribute checks that apply to the class; the evaluator of each
 // evaluated invariant the class is subject to, in key order, once per node
 // unless it reports the invariant that dispatched it; then the coded
-// invariants, which [rmFloorWalker.checkCodedInvariants] checks in the order
+// invariants, which [findings.checkCodedInvariants] checks in the order
 // [codedValues] lists the node's coded attributes (an ENTRY's language
 // before its encoding), whatever the order of their keys. An invariant the
 // classification calls evaluated that has no binding is treated as not
@@ -526,31 +526,15 @@ func rulesFor(rmType string) (*classRules, string) {
 	return floorRules.byClass[class], class
 }
 
-// recordClass adds the class of value, as the closed RM set names it, to
-// visited, and returns the set. A value of no registered class leaves it as
-// it is.
-func recordClass(visited indexSet, value any) indexSet {
-	rmType, _, ok := rmTypeInfo(value)
-	if !ok {
-		return visited
-	}
-	if r, _ := rulesFor(rmType); r != nil {
-		return visited.with(r.index)
-	}
-	return visited
-}
-
 // unevaluatedIn returns, sorted and once each, the invariants the classes of
-// the visited sets are subject to, their ancestors' included, that the floor
-// does not evaluate, for [Coverage.Unevaluated]. It returns nil when the sets
-// hold no class subject to one.
-func unevaluatedIn(visited ...indexSet) []string {
+// visited are subject to, their ancestors' included, that the RM rules do
+// not evaluate, for [Coverage.Unevaluated]. It returns nil when visited
+// holds no class subject to one.
+func unevaluatedIn(visited indexSet) []string {
 	keys := make(indexSet, (len(floorRules.unevaluated)+63)/64)
-	for _, set := range visited {
-		set.each(func(i int) {
-			keys = keys.union(floorRules.byIndex[i].unevaluated)
-		})
-	}
+	visited.each(func(i int) {
+		keys = keys.union(floorRules.byIndex[i].unevaluated)
+	})
 	var out []string
 	keys.each(func(i int) {
 		out = append(out, floorRules.unevaluated[i])

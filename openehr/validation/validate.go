@@ -1,8 +1,6 @@
 package validation
 
 import (
-	"slices"
-
 	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
@@ -74,39 +72,6 @@ func nilRootResult() Result {
 		Detail:   "Validate called with a nil RM root argument",
 		Severity: Error,
 	}})
-}
-
-// issueAt is what makes two issues the same finding: the code, at the path.
-type issueAt struct {
-	code, path string
-}
-
-// withoutRepeats returns the template walk's issues, in walk order, followed
-// by each of the floor's issues, in walk order, that does not repeat a
-// template issue's code at its path. Both walkers write one path per node,
-// so an exact match is one defect seen twice; nothing is stripped from a
-// path before comparing, which would merge siblings. Neither list is
-// deduplicated against itself: the template walk may report one code twice
-// at one path for two clauses, and both stay.
-func withoutRepeats(template, floor []Issue) []Issue {
-	switch {
-	case len(floor) == 0:
-		return template
-	case len(template) == 0:
-		return floor
-	}
-	seen := make(map[issueAt]struct{}, len(template))
-	for _, i := range template {
-		seen[issueAt{code: i.Code, path: i.Path}] = struct{}{}
-	}
-	out := slices.Grow(template, len(floor))
-	for _, i := range floor {
-		if _, repeat := seen[issueAt{code: i.Code, path: i.Path}]; repeat {
-			continue
-		}
-		out = append(out, i)
-	}
-	return out
 }
 
 // ValidateDemographic validates an in-memory demographic PARTY (PERSON,

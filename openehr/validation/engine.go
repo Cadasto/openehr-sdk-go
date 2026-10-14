@@ -77,7 +77,7 @@ func engineWalk(root any, c *templatecompile.Compiled, lim Limits) (Result, *eng
 	rmType, _, known := rmTypeInfo(root)
 	e.walk(engineNode{value: root, rmType: rmType, path: "/", bound: c.Root()})
 	if !known {
-		e.rules.emit(Issue{
+		e.found.emit(Issue{
 			Path:     "/",
 			Code:     "rm_type_unknown",
 			Detail:   fmt.Sprintf("root Go type %T is outside the closed RM set; the RM rules cannot descend", root),
@@ -91,11 +91,11 @@ func engineWalk(root any, c *templatecompile.Compiled, lim Limits) (Result, *eng
 // finished: a value with an identity is checked against the values the walk
 // is inside, and only them, so a value two places hold is validated at each.
 type engine struct {
-	// rules is what the Reference Model rules report into: the issues, in
-	// walk order, and the classes the walk visited. The engine runs the rules
-	// through it, reports the template's issues into it too, so they keep
-	// walk order, and uses none of its own walk state.
-	rules rmFloorWalker
+	// found is what the walk found: the issues, in walk order, and the
+	// classes whose Reference Model rules ran. The engine runs the rules
+	// through it and reports the template's issues into it too, so they
+	// keep walk order.
+	found findings
 	// maxDepth and maxNodes are the [Limits] of the call, defaults filled in.
 	maxDepth, maxNodes int
 	// stoppedAt holds the path of the max_depth issue and of the max_nodes
@@ -125,7 +125,6 @@ type engine struct {
 func newEngine(lim Limits) *engine {
 	lim = lim.withDefaults()
 	return &engine{
-		rules:    rmFloorWalker{info: rminfo.Default},
 		maxDepth: lim.Depth,
 		maxNodes: lim.Nodes,
 		ancestry: make([]any, 0, 16),
@@ -135,8 +134,8 @@ func newEngine(lim Limits) *engine {
 // result returns what the walk found: its issues, in walk order, and its
 // coverage.
 func (e *engine) result() Result {
-	r := resultFromIssues(e.rules.issues)
-	r.Coverage = Coverage{Stopped: e.stoppedAt, External: e.external, Unevaluated: unevaluatedIn(e.rules.visited)}
+	r := resultFromIssues(e.found.issues)
+	r.Coverage = Coverage{Stopped: e.stoppedAt, External: e.external, Unevaluated: unevaluatedIn(e.found.visited)}
 	return r
 }
 
@@ -158,16 +157,6 @@ type engineNode struct {
 	// template does not reach, and so on every node of a walk with no
 	// template.
 	bound *tcimpl.CompiledNode
-}
-
-// declared returns the template's declaration of the attribute attr at node
-// n, or nil where the template does not constrain it: the bound node does
-// not declare it, or nothing binds the node.
-func (n engineNode) declared(attr string) *tcimpl.CompiledAttribute {
-	if n.bound == nil {
-		return nil
-	}
-	return n.bound.Attribute(attr)
 }
 
 // engineAttr is one attribute the walk visits at a node.
@@ -280,7 +269,7 @@ func (e *engine) walk(n engineNode) {
 		return
 	}
 	if slices.Contains(e.ancestry, n.value) {
-		e.rules.emit(Issue{
+		e.found.emit(Issue{
 			Path:   n.path,
 			Code:   "cyclic_value",
 			Detail: fmt.Sprintf("the walk reached this %s again inside itself; it is not entered again", n.rmType),
@@ -313,7 +302,7 @@ func (e *engine) walk(n engineNode) {
 // ([engine.withdrawInside]).
 func (e *engine) visit(n engineNode) {
 	if e.visits == e.maxNodes {
-		e.rules.emit(Issue{
+		e.found.emit(Issue{
 			Path:   n.path,
 			Code:   "max_nodes",
 			Detail: fmt.Sprintf("the walk stopped at %s after visiting %d values, its limit per call", n.rmType, e.maxNodes),
@@ -327,9 +316,9 @@ func (e *engine) visit(n engineNode) {
 	if n.bound != nil {
 		scalar = e.checkIdentityAndType(n)
 	}
-	rulesFrom := len(e.rules.issues)
-	rules, class := e.rules.checkInvariants(n.value, n.rmType, n.path, n.role)
-	rulesTo := len(e.rules.issues)
+	rulesFrom := len(e.found.issues)
+	rules, class := e.found.checkInvariants(n.value, n.rmType, n.path, n.role)
+	rulesTo := len(e.found.issues)
 	if n.bound != nil {
 		n.bound = e.checkLeaf(n, scalar)
 	}
@@ -339,7 +328,7 @@ func (e *engine) visit(n engineNode) {
 	if n.depth >= e.maxDepth {
 		if !e.depthStopped {
 			e.depthStopped = true
-			e.rules.emit(Issue{
+			e.found.emit(Issue{
 				Path:   n.path,
 				Code:   "max_depth",
 				Detail: fmt.Sprintf("the walk reached its depth limit %d at %s; nothing below that depth is walked, and later stops there are not reported again", e.maxDepth, n.rmType),
@@ -360,7 +349,7 @@ func (e *engine) visit(n engineNode) {
 // paths of content the template refused ([isAtOrBelow]); the issues after
 // to keep their order.
 func (e *engine) withdrawInside(from, to int, refusals []string) {
-	issues := e.rules.issues
+	issues := e.found.issues
 	kept := issues[:from]
 	for _, iss := range issues[from:to] {
 		if !slices.ContainsFunc(refusals, func(r string) bool { return isAtOrBelow(iss.Path, r) }) {
@@ -372,7 +361,7 @@ func (e *engine) withdrawInside(from, to int, refusals []string) {
 	}
 	kept = append(kept, issues[to:]...)
 	clear(issues[len(kept):])
-	e.rules.issues = kept
+	e.found.issues = kept
 }
 
 // isAtOrBelow reports whether the issue path path is under, or lies below
@@ -390,13 +379,13 @@ func isAtOrBelow(path, under string) bool {
 // which has no RM type to match.
 func (e *engine) checkIdentityAndType(n engineNode) (scalar bool) {
 	if iss, ok := identityIssue(n.bound, n.value, n.path); ok {
-		e.rules.emit(iss)
+		e.found.emit(iss)
 	}
 	if _, scalar = scalarLeaf(n.bound, n.value); scalar {
 		return true
 	}
 	if iss, ok := rmTypeIssue(n.bound, n.value, n.path); ok {
-		e.rules.emit(iss)
+		e.found.emit(iss)
 	}
 	return false
 }
@@ -419,7 +408,7 @@ func (e *engine) checkLeaf(n engineNode, scalar bool) *tcimpl.CompiledNode {
 	if pc == nil {
 		return n.bound
 	}
-	e.rules.issues = appendPrimitiveIssues(e.rules.issues, n.value, n.path, pc)
+	e.found.issues = appendPrimitiveIssues(e.found.issues, n.value, n.path, pc)
 	if !isConstraintRef(pc) {
 		return nil
 	}
@@ -584,7 +573,7 @@ func (e *engine) visitAttribute(n engineNode, class string, a engineAttr) {
 		return
 	}
 	if a.mandatory {
-		e.rules.checkMandatory(n.rmType, a.name, attrPath, a.shape.multiValued(), r.present, r.count)
+		e.found.checkMandatory(n.rmType, a.name, attrPath, a.shape.multiValued(), r.present, r.count)
 	}
 	if r.present {
 		e.walkUnconstrained(n, a, r, attrPath, role)
@@ -685,7 +674,7 @@ func (e *engine) visitDeclaredItems(n engineNode, a engineAttr, r attrReading, a
 	if len(children) > 0 && a.shape != shapeCounted {
 		var byNodeID []bool
 		bound, byNodeID = bindItems(n.bound.RMTypeName(), a.name, children, r.items)
-		paths, _ = boundItemPaths(attrPath, r.items, bound, a.shape == shapeHash)
+		paths = boundItemPaths(attrPath, r.items, bound, a.shape == shapeHash)
 		for i, item := range r.items {
 			if bound[i] == nil {
 				e.refuse(unboundItemIssue(a.decl, children, item, byNodeID[i], paths[i]))
@@ -705,9 +694,9 @@ func (e *engine) visitDeclaredItems(n engineNode, a engineAttr, r attrReading, a
 		e.checkEmpty(n, a, attrPath, reported)
 	}
 	if countOut {
-		e.rules.emit(countIssue)
+		e.found.emit(countIssue)
 	}
-	e.rules.issues = append(e.rules.issues, occurrences...)
+	e.found.issues = append(e.found.issues, occurrences...)
 	switch {
 	case len(children) == 0:
 		e.walkUnconstrained(n, a, r, attrPath, role)
@@ -724,7 +713,7 @@ func (e *engine) visitDeclaredItems(n engineNode, a engineAttr, r attrReading, a
 // refuse reports iss, the one issue for content the template does not admit,
 // at the path of that content, which the walk does not enter.
 func (e *engine) refuse(iss Issue) {
-	e.rules.emit(iss)
+	e.found.emit(iss)
 	e.refused = append(e.refused, iss.Path)
 }
 
@@ -740,11 +729,11 @@ func (e *engine) refuse(iss Issue) {
 func (e *engine) checkAbsent(n engineNode, a engineAttr, attrPath string) {
 	multiValued := a.shape != shapeSingle
 	if iss, required := absentIssue(a.decl, n.value, attrPath, multiValued); required && (iss.Layer == LayerTemplate || !a.classRead) {
-		e.rules.emit(iss)
+		e.found.emit(iss)
 		return
 	}
 	if a.mandatory {
-		e.rules.checkMandatory(n.rmType, a.name, attrPath, a.shape.multiValued(), false, 0)
+		e.found.checkMandatory(n.rmType, a.name, attrPath, a.shape.multiValued(), false, 0)
 	}
 }
 
@@ -762,9 +751,9 @@ func (e *engine) checkEmpty(n engineNode, a engineAttr, attrPath string, reporte
 	iss, required := emptyIssue(a.decl, n.value, attrPath)
 	switch {
 	case required && iss.Layer == LayerTemplate:
-		e.rules.emit(iss)
+		e.found.emit(iss)
 	case (a.mandatory || required && !a.classRead) && a.shape.multiValued() && !reported:
-		e.rules.checkMandatory(n.rmType, a.name, attrPath, true, true, 0)
+		e.found.checkMandatory(n.rmType, a.name, attrPath, true, true, 0)
 	}
 }
 

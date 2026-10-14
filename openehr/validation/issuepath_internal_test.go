@@ -7,14 +7,9 @@ package validation
 import (
 	"fmt"
 	"slices"
-	"strings"
 	"testing"
 
-	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
-	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template"
-	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
 // REQ-102 — the predicate of each item of one multi-valued attribute.
@@ -109,8 +104,8 @@ func TestPredicates_REQ102_OPTChildrenAreNeverNumbered(t *testing.T) {
 }
 
 // pinnedCluster is a CLUSTER whose two ELEMENTs share at0004 and each carry
-// neither value nor null_flavour, so the floor reports each one on its own
-// path. Their instance names are not the names a test pins.
+// neither value nor null_flavour, so the RM rules report each one on its own
+// path. Their instance names are not names a template pins.
 func pinnedCluster() *rm.Cluster {
 	return &rm.Cluster{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "group"}, Items: []rm.Item{
 		&rm.Element{ArchetypeNodeID: "at0004", Name: rm.DVText{Value: "instance one"}},
@@ -118,114 +113,16 @@ func pinnedCluster() *rm.Cluster {
 	}}
 }
 
-// floorPaths runs the floor over root with names and returns the path of
-// each issue, sorted.
-func floorPaths(root any, names pinnedNames) []string {
-	rmType, _, _ := rmTypeInfo(root)
-	w := newFloorWalker(names, Limits{})
-	w.walk(root, rmType, "/", roleNone, 0)
-	paths := make([]string, 0, len(w.issues))
-	for _, iss := range w.issues {
+// REQ-102 Issue paths, REQ-112 — the RM rules alone bind no template node,
+// so they never write a name predicate: two items that share at0004 are
+// written by their positions, whatever names the instance gives them.
+func TestValidateRM_REQ112_REQ102_WritesNoNamePredicate(t *testing.T) {
+	var paths []string
+	for _, iss := range ValidateRM(pinnedCluster()).Issues {
 		paths = append(paths, iss.Path)
 	}
-	slices.Sort(paths)
-	return paths
-}
-
-// REQ-112, REQ-102 — the floor takes, per item, the name the template walk
-// bound, so inside a template-driven validation it writes the name
-// predicate the template walk writes; on its own it has no names and writes
-// positions.
-func TestRMFloor_REQ112_REQ102_TakesPinnedNames(t *testing.T) {
-	tests := []struct {
-		name  string
-		names pinnedNames
-		want  []string
-	}{
-		{
-			name: "alone",
-			want: []string{"/items[1]", "/items[2]"},
-		},
-		{
-			name: "with names that tell the items apart",
-			names: pinnedNames{
-				{attrPath: "/items", index: 0}: "Systolic",
-				{attrPath: "/items", index: 1}: "Diastolic",
-			},
-			want: []string{"/items[at0004, 'Diastolic']", "/items[at0004, 'Systolic']"},
-		},
-		{
-			name: "with names keyed to another attribute",
-			names: pinnedNames{
-				{attrPath: "/other", index: 0}: "Systolic",
-				{attrPath: "/other", index: 1}: "Diastolic",
-			},
-			want: []string{"/items[1]", "/items[2]"},
-		},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := floorPaths(pinnedCluster(), tc.names); !slices.Equal(got, tc.want) {
-				t.Errorf("floor paths = %q, want %q", got, tc.want)
-			}
-		})
-	}
-}
-
-// nestedPinnedCluster is a CLUSTER holding two CLUSTERs that share at0002,
-// each holding two ELEMENTs that share at0004 and carry neither value nor
-// null_flavour.
-func nestedPinnedCluster() *rm.Cluster {
-	inner := func() *rm.Cluster {
-		c := pinnedCluster()
-		c.ArchetypeNodeID = "at0002"
-		return c
-	}
-	return &rm.Cluster{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "outer"}, Items: []rm.Item{inner(), inner()}}
-}
-
-// REQ-112, REQ-102 — a pinned name is found by the whole path of its
-// attribute, not by the attribute's name: names given to the items of the
-// outer /items reach neither inner /items, and names given to the items of
-// one inner /items reach only those.
-func TestRMFloor_REQ112_REQ102_PinnedNamesKeyedByWholePath(t *testing.T) {
-	const first, second = "/items[at0002, 'Erste']", "/items[at0002, 'Zweite']"
-	outer := pinnedNames{
-		{attrPath: "/items", index: 0}: "Erste",
-		{attrPath: "/items", index: 1}: "Zweite",
-	}
-	tests := []struct {
-		name  string
-		names pinnedNames
-		want  []string
-	}{
-		{
-			name:  "names for the outer items",
-			names: outer,
-			want:  []string{first + "/items[1]", first + "/items[2]", second + "/items[1]", second + "/items[2]"},
-		},
-		{
-			name: "names for the outer items and the first inner items",
-			names: pinnedNames{
-				{attrPath: "/items", index: 0}:         "Erste",
-				{attrPath: "/items", index: 1}:         "Zweite",
-				{attrPath: first + "/items", index: 0}: "Systolic",
-				{attrPath: first + "/items", index: 1}: "Diastolic",
-			},
-			want: []string{
-				first + "/items[at0004, 'Diastolic']",
-				first + "/items[at0004, 'Systolic']",
-				second + "/items[1]",
-				second + "/items[2]",
-			},
-		},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := floorPaths(nestedPinnedCluster(), tc.names); !slices.Equal(got, tc.want) {
-				t.Errorf("floor paths = %q, want %q", got, tc.want)
-			}
-		})
+	if want := []string{"/items[1]", "/items[2]"}; !slices.Equal(paths, want) {
+		t.Errorf("ValidateRM(two ELEMENTs sharing at0004) paths = %q, want %q", paths, want)
 	}
 }
 
@@ -272,65 +169,12 @@ func handoffChild(name string) string {
 }
 
 // handoffObservation returns a reused OBSERVATION named name whose
-// RM-mandatory language is empty, a defect both walkers report.
+// RM-mandatory language is empty, a defect the RM rules report.
 func handoffObservation(name string) *rm.Observation {
 	return &rm.Observation{
 		ArchetypeNodeID: "openEHR-EHR-OBSERVATION.reused.v1",
 		Name:            rm.DVText{Value: name},
 		Encoding:        rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "IANA_character-sets"}, CodeString: "UTF-8"},
 		Subject:         rm.PartySelf{},
-	}
-}
-
-// REQ-102, REQ-112, REQ-116 — the names the template walk binds, recorded
-// by the attribute's path and each item's index, make the floor write the
-// path the template walk writes for the same node.
-func TestBindings_REQ102_REQ112_HandOffGivesOnePath(t *testing.T) {
-	opt, err := template.ParseOPT(strings.NewReader(handoffOPT))
-	if err != nil {
-		t.Fatalf("ParseOPT: %v", err)
-	}
-	c, err := templatecompile.Compile(opt)
-	if err != nil {
-		t.Fatalf("Compile: %v", err)
-	}
-	comp := &rm.Composition{
-		ArchetypeNodeID: "openEHR-EHR-COMPOSITION.reused.v1",
-		Name:            rm.DVText{Value: "Reused"},
-		Content:         []rm.ContentItem{handoffObservation("Zweite"), handoffObservation("Erste")},
-	}
-	var content *tcimpl.CompiledAttribute
-	for _, a := range c.Root().Attributes() {
-		if a.Name() == "content" {
-			content = a
-		}
-	}
-	if content == nil {
-		t.Fatal("compiled root has no content attribute")
-	}
-	items, ok := rmaccess.Multiple(comp, "content")
-	if !ok {
-		t.Fatal("rmaccess.Multiple cannot read COMPOSITION.content")
-	}
-	bound, _ := bindItems("COMPOSITION", "content", content.Children(), items)
-	names := pinnedNames{}
-	for i, it := range boundPathItems(items, bound) {
-		names[itemKey{attrPath: "/content", index: i}] = it.name
-	}
-
-	w := newWalker(c)
-	w.walkNode(c.Root(), comp, "/")
-	floor := newFloorWalker(names, Limits{})
-	floor.walk(comp, "COMPOSITION", "/", roleNone, 0)
-
-	for _, want := range []string{
-		"/content[openEHR-EHR-OBSERVATION.reused.v1, 'Zweite']/language",
-		"/content[openEHR-EHR-OBSERVATION.reused.v1, 'Erste']/language",
-	} {
-		for name, issues := range map[string][]Issue{"template walk": w.issues, "floor": floor.issues} {
-			if !slices.ContainsFunc(issues, func(i Issue) bool { return i.Code == "required" && i.Path == want }) {
-				t.Errorf("%s: no required at %s; got %+v", name, want, issues)
-			}
-		}
 	}
 }

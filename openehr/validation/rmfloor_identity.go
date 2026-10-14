@@ -3,7 +3,7 @@ package validation
 // rmfloor_identity.go: REQ-112 § Driver — which values the RM-floor walk can
 // reach twice. A pointer to an RM value has an identity: two attributes can
 // hold the same one, and a value built in Go can hold itself. The walk keys
-// what it has reached ([rmFloorWalker.walk]) by that pointer.
+// what it has reached ([findings.walk]) by that pointer.
 
 import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 

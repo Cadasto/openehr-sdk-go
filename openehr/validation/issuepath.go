@@ -24,20 +24,6 @@ type pathItem struct {
 	name string
 }
 
-// itemKey locates one item of a multi-valued attribute: the path of the
-// attribute and the item's 0-based index in it. Both walkers write the same
-// attribute path for the same node, so a name the template walk records
-// under a key is found under that key by the floor. The key holds no RM
-// value, so it is safe as a map key whatever the item's Go type.
-type itemKey struct {
-	attrPath string
-	index    int
-}
-
-// pinnedNames maps an item, by its [itemKey], to the name the OPT pins on
-// the node it binds to. A nil map pins no name.
-type pinnedNames map[itemKey]string
-
 // itemPaths returns the path of each item of the multi-valued attribute at
 // attrPath. An item is written:
 //
