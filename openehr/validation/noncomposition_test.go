@@ -98,13 +98,26 @@ func TestValidateDemographic_PersonFixture(t *testing.T) {
 	// rm_type_mismatch remains. The RM floor, which
 	// template validation includes, adds the fixture's two DV_MULTIMEDIA
 	// media types: both are coded in openEHR rather than the IANA media
-	// types, and the second carries no code at all.
+	// types, and the second carries no code at all. It also adds five
+	// DV_INTERVAL<DV_DATE> values whose lower date is after their upper
+	// one (REQ-112 Limits_consistent), one under contacts and four under
+	// details.
 	const multimedia = "/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"
 	const wid = "/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"
 	want := []string{
 		"code_not_in_value_set " + multimedia,
 		"code_not_in_value_set " + wid,
 		"required " + wid + "/code_string",
+		// Inverted DV_INTERVAL<DV_DATE> in the vendored fixture (DV_INTERVAL.Limits_consistent).
+		"rm_invariant /contacts[at0003]/addresses[5]/details/items[at2502]/value",
+		// Inverted DV_INTERVAL<DV_DATE> in the vendored fixture (DV_INTERVAL.Limits_consistent).
+		"rm_invariant /details/items[10]/items[at0006]/value",
+		// Inverted DV_INTERVAL<DV_DATE> in the vendored fixture (DV_INTERVAL.Limits_consistent).
+		"rm_invariant /details/items[11]/items[at0006]/value",
+		// Inverted DV_INTERVAL<DV_DATE> in the vendored fixture (DV_INTERVAL.Limits_consistent).
+		"rm_invariant /details/items[12]/items[at0006]/value",
+		// Inverted DV_INTERVAL<DV_DATE> in the vendored fixture (DV_INTERVAL.Limits_consistent).
+		"rm_invariant /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_insurance.v2]/items[at0006]/value",
 		"rm_invariant " + wid,
 	}
 	if got := issueKeys(r.Issues); !slices.Equal(got, want) {

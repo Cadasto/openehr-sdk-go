@@ -261,8 +261,9 @@ var probe030SkipFloor = map[string][]string{
 		"rm_invariant /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/description/items[openEHR-EHR-CLUSTER.therapeutic_direction.v1]/items[at0179]/value",
 		"required /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/description/items[openEHR-EHR-CLUSTER.therapeutic_direction.v1]/items[at0179]/value/value",
 	},
-	// Demonstration.v1: seven DV_INTERVAL values (DV_QUANTITY and DV_COUNT
-	// bounds) have lower greater than upper, for example 30 over 12.25 cm.
+	// Demonstration.v1: nine DV_INTERVAL values (DV_QUANTITY, DV_COUNT and
+	// DV_DATE_TIME bounds) have lower greater than upper, for example 30 over
+	// 12.25 cm.
 	// Five ELEMENTs at items[at0016] ("Boolean") carry both a DV_BOOLEAN
 	// value and a null_flavour, which breaks Inv_null_flavour_indicated
 	// (exactly one of the two is present). The last event holds two at0004
@@ -271,9 +272,13 @@ var probe030SkipFloor = map[string][]string{
 	"compositions/Demonstration.v1.json": {
 		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0002]/data/items[at0004]/items[at0023]/value",
 		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0002]/data/items[at0004]/items[at0022]/value",
+		// Inverted DV_INTERVAL<DV_DATE_TIME> in the vendored fixture (DV_INTERVAL.Limits_consistent).
+		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0002]/data/items[at0004]/items[at0024]/value",
 		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0002]/data/items[at0004]/items[at0016]",
 		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0033]/data/items[at0004]/items[at0023]/value",
 		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0033]/data/items[at0004]/items[at0022]/value",
+		// Inverted DV_INTERVAL<DV_DATE_TIME> in the vendored fixture (DV_INTERVAL.Limits_consistent).
+		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0033]/data/items[at0004]/items[at0024]/value",
 		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0033]/data/items[at0004]/items[at0016]",
 		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0034]/data/items[at0004]/items[at0022]/value",
 		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0034]/data/items[at0004]/items[at0016]",
@@ -286,12 +291,24 @@ var probe030SkipFloor = map[string][]string{
 	// Media_type_valid (REQ-112 Coded invariants), since neither is an IANA
 	// media type: one is openEHR::425, the other a CODE_PHRASE whose
 	// code_string is null. The null one is also reported as an empty
-	// CODE_PHRASE and as an absent mandatory attribute.
+	// CODE_PHRASE and as an absent mandatory attribute. Five
+	// DV_INTERVAL<DV_DATE> values have their lower date after their upper
+	// one.
 	"compositions/TestPerson.v2.json": {
+		// Inverted DV_INTERVAL<DV_DATE> in the vendored fixture (DV_INTERVAL.Limits_consistent).
+		"rm_invariant /contacts[at0003]/addresses[5]/details/items[at2502]/value",
+		// Inverted DV_INTERVAL<DV_DATE> in the vendored fixture (DV_INTERVAL.Limits_consistent).
+		"rm_invariant /details/items[10]/items[at0006]/value",
+		// Inverted DV_INTERVAL<DV_DATE> in the vendored fixture (DV_INTERVAL.Limits_consistent).
+		"rm_invariant /details/items[11]/items[at0006]/value",
+		// Inverted DV_INTERVAL<DV_DATE> in the vendored fixture (DV_INTERVAL.Limits_consistent).
+		"rm_invariant /details/items[12]/items[at0006]/value",
 		"code_not_in_value_set /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type",
 		"code_not_in_value_set /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type",
 		"rm_invariant /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type",
 		"required /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type/code_string",
+		// Inverted DV_INTERVAL<DV_DATE> in the vendored fixture (DV_INTERVAL.Limits_consistent).
+		"rm_invariant /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_insurance.v2]/items[at0006]/value",
 	},
 	// Test_dv_interval_dv_count_open_constraint.v0: a DV_INTERVAL<DV_COUNT>
 	// with lower 200 over upper 100, in the first of events that share one
