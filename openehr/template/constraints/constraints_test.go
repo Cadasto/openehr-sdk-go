@@ -85,6 +85,25 @@ func TestREQ103_NumericRangeRefusesNaN(t *testing.T) {
 	}
 }
 
+// REQ-103 — the zero NumericRange means "no constraint": IsBounded
+// reports false for it, and Contains accepts every value but a NaN, as
+// on a range with both sides unbounded. Read field by field, its zero
+// bounds would form the empty interval (0..0) and refuse every value.
+func TestREQ103_NumericRangeZeroValueAcceptsAnyValue(t *testing.T) {
+	zero := constraints.NumericRange{}
+	if zero.IsBounded() {
+		t.Error("NumericRange{}.IsBounded() = true, want false")
+	}
+	for _, v := range []float64{math.Inf(-1), -1e6, -1, 0, 1, 1e6, math.Inf(1)} {
+		if !zero.Contains(v) {
+			t.Errorf("NumericRange{}.Contains(%v) = false, want true", v)
+		}
+	}
+	if zero.Contains(math.NaN()) {
+		t.Error("NumericRange{}.Contains(NaN) = true, want false")
+	}
+}
+
 func TestNumericRange_IsValid(t *testing.T) {
 	tests := []struct {
 		name string
