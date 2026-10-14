@@ -60,22 +60,24 @@ func (w *walker) walkNode(optNode *tcimpl.CompiledNode, rmValue any, path string
 	// Identity + RM-type checks at this node. At the composition
 	// root, identity is checked inline against COMPOSITION's
 	// archetype_node_id (not via a separate attribute descent).
-	w.checkLocatableIdentity(optNode, rmValue, path)
+	if iss, ok := identityIssue(optNode, rmValue, path); ok {
+		w.emit(iss)
+	}
 	// AOM 1.4 primitive short-name leaf on a BMM scalar channel
 	// (e.g. DV_COUNT.magnitude ← INTEGER, DV_DURATION.value ← string).
-	if pc := optNode.PrimitiveConstraint(); pc != nil && tcimpl.IsAOMPrimitiveShortName(optNode.RMTypeName()) {
-		if primitiveValueMatchesShortName(optNode.RMTypeName(), rmValue) {
-			w.applyPrimitive(optNode, rmValue, path, pc)
-			// A scalar has no attributes to walk, but a CONSTRAINT_REF
-			// on it is still a value set checked nowhere, so the
-			// coverage names it as below.
-			if _, isRef := pc.(constraints.ConstraintRef); isRef {
-				w.external = append(w.external, path)
-			}
-			return
+	if pc, ok := scalarLeaf(optNode, rmValue); ok {
+		w.issues = appendPrimitiveIssues(w.issues, rmValue, path, pc)
+		// A scalar has no attributes to walk, but a CONSTRAINT_REF
+		// on it is still a value set checked nowhere, so the
+		// coverage names it as below.
+		if isConstraintRef(pc) {
+			w.external = append(w.external, path)
 		}
+		return
 	}
-	w.checkRMType(optNode, rmValue, path)
+	if iss, ok := rmTypeIssue(optNode, rmValue, path); ok {
+		w.emit(iss)
+	}
 
 	if optNode.IsSlot() {
 		// Slot leaves carry no descendable structure — slot-fill
@@ -91,14 +93,14 @@ func (w *walker) walkNode(optNode *tcimpl.CompiledNode, rmValue any, path string
 		// does not descend further: implicit RM attrs of the
 		// primitive's RM type (e.g. DV_QUANTITY.magnitude / .units)
 		// are the primitive validator's territory.
-		w.applyPrimitive(optNode, rmValue, path, pc)
+		w.issues = appendPrimitiveIssues(w.issues, rmValue, path, pc)
 		// REQ-102: a CONSTRAINT_REF names an external value set and
 		// checks nothing locally, so the bound value's RM-mandatory
 		// attributes (a CODE_PHRASE's terminology_id and code_string)
 		// are still walked below, as at a node the OPT leaves
 		// unconstrained. The result's coverage names the node, since the
 		// code there was checked against no value set.
-		if _, isRef := pc.(constraints.ConstraintRef); !isRef {
+		if !isConstraintRef(pc) {
 			return
 		}
 		w.external = append(w.external, path)
@@ -115,6 +117,26 @@ func (w *walker) walkNode(optNode *tcimpl.CompiledNode, rmValue any, path string
 			w.walkMultipleAttribute(optNode, attr, rmValue, path)
 		}
 	}
+}
+
+// scalarLeaf reports whether optNode is an AOM 1.4 primitive short-name leaf
+// on a BMM scalar channel (DV_COUNT.magnitude under INTEGER, DV_DURATION.value
+// under DURATION) whose short name rmValue, a Go primitive, matches, and
+// returns its primitive constraint. Such a node is checked by its constraint
+// alone: it has no RM type to match and no attributes to walk.
+func scalarLeaf(optNode *tcimpl.CompiledNode, rmValue any) (constraints.PrimitiveConstraint, bool) {
+	pc := optNode.PrimitiveConstraint()
+	if pc == nil || !tcimpl.IsAOMPrimitiveShortName(optNode.RMTypeName()) {
+		return nil, false
+	}
+	return pc, primitiveValueMatchesShortName(optNode.RMTypeName(), rmValue)
+}
+
+// isConstraintRef reports whether pc is a CONSTRAINT_REF: a value set bound
+// outside the template, which the SDK cannot consult ([Coverage.External]).
+func isConstraintRef(pc constraints.PrimitiveConstraint) bool {
+	_, isRef := pc.(constraints.ConstraintRef)
+	return isRef
 }
 
 // walkSingleAttribute enforces existence on a C_SINGLE_ATTRIBUTE
@@ -141,15 +163,8 @@ func (w *walker) walkSingleAttribute(
 	attrPath := joinPath(parentPath, "/"+attr.Name())
 	val, ok := rmaccess.Single(parentRM, attr.Name())
 	if !ok {
-		if layer, rule, required := requiredBy(attr); required {
-			w.emit(Issue{
-				Path:     attrPath,
-				Code:     "required",
-				Layer:    layer,
-				Rule:     rule,
-				Detail:   fmt.Sprintf("required attribute %q absent on %s", attr.Name(), describeRMType(parentRM)),
-				Severity: Error,
-			})
+		if iss, required := absentIssue(attr, parentRM, attrPath, false); required {
+			w.emit(iss)
 		}
 		return
 	}
@@ -157,7 +172,7 @@ func (w *walker) walkSingleAttribute(
 	// value (the access reads nil and typed-nil as absent), and the walk
 	// goes no further into it.
 	if isProhibited(attr) {
-		w.emitProhibited(attr, parentRM, attrPath)
+		w.emit(prohibitedIssue(attr, parentRM, attrPath))
 		return
 	}
 	// A child the OPT does not allow binds no value; the attribute is
@@ -168,49 +183,61 @@ func (w *walker) walkSingleAttribute(
 		// constraints fire when walkNode reaches a primitive leaf.
 		return
 	}
-	child := matchSingleAlternative(children, val)
+	child, refusal, admitted := admitSingle(attr, children, val, attrPath)
+	if !admitted {
+		w.emit(refusal)
+		return
+	}
+	w.walkNode(child, val, attrPath)
+}
+
+// admitSingle binds val, the value of the single-valued attribute attr at
+// attrPath, to one of children, the children the OPT allows, by
+// [matchSingleAlternative]. It returns the child, with admitted set, or the
+// one issue that refuses the value, which is then not walked: a slot child
+// whose assertions the value's archetype id does not satisfy is a
+// `slot_fill`; no child at all is an `rm_type_mismatch` when the attribute
+// allows one child (a plain type constraint) and an `alternative_mismatch`
+// when it allows more, listing their RM types.
+func admitSingle(attr *tcimpl.CompiledAttribute, children []*tcimpl.CompiledNode, val any, attrPath string) (child *tcimpl.CompiledNode, refusal Issue, admitted bool) {
+	child = matchSingleAlternative(children, val)
 	if child != nil && child.IsSlot() {
 		archetypeID := locatableArchetypeNodeID(val)
 		if archetypeID == "" || !child.AllowsArchetypeID(archetypeID) {
-			w.emit(Issue{
+			return nil, Issue{
 				Path:     attrPath,
 				Code:     "slot_fill",
 				Layer:    LayerTemplate,
 				Rule:     ruleSlot,
 				Detail:   fmt.Sprintf("RM value %s under %q does not satisfy slot %s", describeLocatableID(val), attr.Name(), child.NodeID()),
 				Severity: Error,
-			})
-			return
+			}, false
 		}
 	}
-	if child == nil {
-		// With multiple OPT children the OPT declared AnyOf
-		// alternatives; with a single child it is a plain type
-		// constraint. Disambiguate the Issue.Code so consumers can
-		// distinguish "wrong type" from "didn't match any of N
-		// allowed types".
-		if len(children) == 1 {
-			w.emit(Issue{
-				Path:     attrPath,
-				Code:     "rm_type_mismatch",
-				Layer:    LayerTemplate,
-				Rule:     ruleType,
-				Detail:   fmt.Sprintf("RM value of type %s under %q does not satisfy template RM type %s", describeRMType(val), attr.Name(), children[0].RMTypeName()),
-				Severity: Error,
-			})
-		} else {
-			w.emit(Issue{
-				Path:     attrPath,
-				Code:     "alternative_mismatch",
-				Layer:    LayerTemplate,
-				Rule:     ruleType,
-				Detail:   fmt.Sprintf("RM value of type %s under %q matches none of the OPT alternatives %s", describeRMType(val), attr.Name(), formatAllowedTypes(children)),
-				Severity: Error,
-			})
-		}
-		return
+	if child != nil {
+		return child, refusal, true
 	}
-	w.walkNode(child, val, attrPath)
+	// With multiple OPT children the OPT declared AnyOf alternatives; with
+	// a single child it is a plain type constraint. The Issue.Code tells
+	// "wrong type" from "didn't match any of N allowed types".
+	if len(children) == 1 {
+		return nil, Issue{
+			Path:     attrPath,
+			Code:     "rm_type_mismatch",
+			Layer:    LayerTemplate,
+			Rule:     ruleType,
+			Detail:   fmt.Sprintf("RM value of type %s under %q does not satisfy template RM type %s", describeRMType(val), attr.Name(), children[0].RMTypeName()),
+			Severity: Error,
+		}, false
+	}
+	return nil, Issue{
+		Path:     attrPath,
+		Code:     "alternative_mismatch",
+		Layer:    LayerTemplate,
+		Rule:     ruleType,
+		Detail:   fmt.Sprintf("RM value of type %s under %q matches none of the OPT alternatives %s", describeRMType(val), attr.Name(), formatAllowedTypes(children)),
+		Severity: Error,
+	}, false
 }
 
 // matchSingleAlternative picks the OPT child of a single-valued
@@ -365,54 +392,27 @@ func (w *walker) walkMultipleAttribute(
 		// satisfy it, and it is reported as absent, as walkSingleAttribute
 		// reports a single-valued one. The count of its items is a matter
 		// for a present attribute only.
-		if layer, rule, required := requiredBy(attr); required {
-			w.emit(Issue{
-				Path:     attrPath,
-				Code:     "required",
-				Layer:    layer,
-				Rule:     rule,
-				Detail:   fmt.Sprintf("required multi-valued attribute %q absent on %s", attr.Name(), describeRMType(parentRM)),
-				Severity: Error,
-			})
+		if iss, required := absentIssue(attr, parentRM, attrPath, true); required {
+			w.emit(iss)
 		}
 		return
 	}
 	// An attribute the OPT prohibits is reported once when it holds at
 	// least one item, and the walk goes no further into it.
 	if n > 0 && isProhibited(attr) {
-		w.emitProhibited(attr, parentRM, attrPath)
+		w.emit(prohibitedIssue(attr, parentRM, attrPath))
 		return
 	}
-	// Existence: lower ≥ 1 with zero items is "required". When only the RM
-	// makes the attribute mandatory, the list is there and empty, which the
-	// RM's own rule names cardinality, as the floor does for the same list;
-	// when the template's existence requires it, it is that existence rule.
-	// A nil list is absent and was reported above.
-	if layer, rule, required := requiredBy(attr); required && n == 0 {
-		if layer == LayerRM {
-			rule = ruleCardinality
+	// Existence: lower ≥ 1 with zero items is "required" ([emptyIssue]). A
+	// nil list is absent and was reported above.
+	if n == 0 {
+		if iss, required := emptyIssue(attr, parentRM, attrPath); required {
+			w.emit(iss)
 		}
-		w.emit(Issue{
-			Path:     attrPath,
-			Code:     "required",
-			Layer:    layer,
-			Rule:     rule,
-			Detail:   fmt.Sprintf("required multi-valued attribute %q is empty on %s", attr.Name(), describeRMType(parentRM)),
-			Severity: Error,
-		})
 	}
 	// Child-count cardinality interval (when the OPT pinned one).
-	if cm := attr.ChildMultiplicity(); cm != nil {
-		if outOfMultiplicityInterval(n, cm) {
-			w.emit(Issue{
-				Path:     attrPath,
-				Code:     "cardinality",
-				Layer:    LayerTemplate,
-				Rule:     ruleCardinality,
-				Detail:   fmt.Sprintf("attribute %q has %d children; OPT cardinality %s", attr.Name(), n, formatInterval(cm)),
-				Severity: Error,
-			})
-		}
+	if iss, out := childCountIssue(attr, n, attrPath); out {
+		w.emit(iss)
 	}
 	// Recurse into each matched item. An item no OPT child binds
 	// contributes one issue, unless the OPT declared no children for
@@ -430,58 +430,143 @@ func (w *walker) walkMultipleAttribute(
 		return
 	}
 	bound, byNodeID := bindItems(opt.RMTypeName(), attr.Name(), children, items)
-	var itemPath []string
-	if isHash {
-		// An entry of a Hash attribute is written by its position in
-		// ascending key order, never by its key (REQ-102 Issue paths).
-		itemPath = make([]string, len(items))
-		for idx := range items {
-			itemPath[idx] = hashEntryPath(attrPath, idx)
-		}
-	} else {
-		pathItems := boundPathItems(items, bound)
-		w.recordNames(attrPath, pathItems)
-		itemPath = itemPaths(attrPath, pathItems)
-	}
-	perChildCount := make(map[*tcimpl.CompiledNode]int, len(children))
+	itemPath, pathItems := boundItemPaths(attrPath, items, bound, isHash)
+	w.recordNames(attrPath, pathItems)
 	for idx, item := range items {
 		matched := bound[idx]
 		if matched == nil {
 			w.emit(unboundItemIssue(attr, children, item, byNodeID[idx], itemPath[idx]))
 			continue
 		}
-		perChildCount[matched]++
 		w.walkNode(matched, item, itemPath[idx])
 	}
-	// AOM 1.4 occurrences upper bound on each OPT child: when the
-	// OPT pins a child's `<occurrences>` interval, the count of
-	// matching RM items must fall within it. A zero count + lower
-	// ≥ 1 surfaces as `cardinality` at the attribute level — that
-	// case is already covered by the multi-attribute existence
-	// check above when the attribute itself is empty, but we still
-	// fire here per-child when the attribute is non-empty and a
-	// specific OPT child is missing or over-represented.
+	// AOM 1.4 occurrences on each OPT child: the count of the items bound to
+	// it must fall within the interval the OPT pins.
+	w.issues = appendOccurrenceIssues(w.issues, attr, children, bound, attrPath)
+}
+
+// absentIssue returns the issue the template reports for the attribute attr
+// of parentRM, at attrPath, when the instance lacks it: `required`, on the
+// layer and by the rule [requiredBy] names, with required set. A
+// multi-valued attribute is described as one. required is false when
+// neither the template nor the BMM bit the template carries requires attr.
+func absentIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath string, multiValued bool) (iss Issue, required bool) {
+	layer, rule, required := requiredBy(attr)
+	if !required {
+		return iss, false
+	}
+	detail := fmt.Sprintf("required attribute %q absent on %s", attr.Name(), describeRMType(parentRM))
+	if multiValued {
+		detail = fmt.Sprintf("required multi-valued attribute %q absent on %s", attr.Name(), describeRMType(parentRM))
+	}
+	return Issue{
+		Path:     attrPath,
+		Code:     "required",
+		Layer:    layer,
+		Rule:     rule,
+		Detail:   detail,
+		Severity: Error,
+	}, true
+}
+
+// emptyIssue returns the issue the template walk reports for the
+// multi-valued attribute attr of parentRM, at attrPath, when it is present
+// and holds no item: `required`, with required set, when [requiredBy] says
+// attr is required. When the template's existence requires it, the rule is
+// that existence; when only the RM makes it mandatory, the list is there and
+// empty, which the RM's own rule names cardinality.
+func emptyIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath string) (iss Issue, required bool) {
+	layer, rule, required := requiredBy(attr)
+	if !required {
+		return iss, false
+	}
+	if layer == LayerRM {
+		rule = ruleCardinality
+	}
+	return Issue{
+		Path:     attrPath,
+		Code:     "required",
+		Layer:    layer,
+		Rule:     rule,
+		Detail:   fmt.Sprintf("required multi-valued attribute %q is empty on %s", attr.Name(), describeRMType(parentRM)),
+		Severity: Error,
+	}, true
+}
+
+// childCountIssue returns the `cardinality` issue for the multi-valued
+// attribute attr at attrPath, which holds n items, when the OPT pins a
+// child-count interval n falls outside, with out set.
+func childCountIssue(attr *tcimpl.CompiledAttribute, n int, attrPath string) (iss Issue, out bool) {
+	cm := attr.ChildMultiplicity()
+	if cm == nil || !outOfMultiplicityInterval(n, cm) {
+		return iss, false
+	}
+	return Issue{
+		Path:     attrPath,
+		Code:     "cardinality",
+		Layer:    LayerTemplate,
+		Rule:     ruleCardinality,
+		Detail:   fmt.Sprintf("attribute %q has %d children; OPT cardinality %s", attr.Name(), n, formatInterval(cm)),
+		Severity: Error,
+	}, true
+}
+
+// boundItemPaths returns the issue path of each of the items of the
+// multi-valued attribute at attrPath, bound to the OPT children bound holds,
+// and what the path rule read of them. The items of a list are written by
+// the shared path rule ([itemPaths]), which reads each item's id and the
+// name pinned on the child it binds to ([boundPathItems]): the binding comes
+// first, because an item's predicate depends on its siblings' ids and on the
+// names their bound OPT nodes pin. An entry of a Hash attribute (isHash) is
+// written by its position in ascending key order, never by its key (REQ-102
+// Issue paths), and pathItems is nil.
+func boundItemPaths(attrPath string, items []any, bound []*tcimpl.CompiledNode, isHash bool) (paths []string, pathItems []pathItem) {
+	if isHash {
+		paths = make([]string, len(items))
+		for idx := range items {
+			paths[idx] = hashEntryPath(attrPath, idx)
+		}
+		return paths, nil
+	}
+	pathItems = boundPathItems(items, bound)
+	return itemPaths(attrPath, pathItems), pathItems
+}
+
+// appendOccurrenceIssues appends to issues a `cardinality` issue, rule
+// occurrences, for each of children, the OPT children of the multi-valued
+// attribute attr at attrPath, that pins an occurrences interval the number
+// of items bound to it falls outside; bound holds the child each item binds
+// to. A child whose occurrences the items miss is written with its own
+// predicate ([optChildPaths]).
+func appendOccurrenceIssues(issues []Issue, attr *tcimpl.CompiledAttribute, children, bound []*tcimpl.CompiledNode, attrPath string) []Issue {
 	var childPath []string
 	for i, c := range children {
 		occ := c.Occurrences()
 		if occ == nil {
 			continue
 		}
-		got := perChildCount[c]
-		if outOfMultiplicityInterval(got, occ) {
-			if childPath == nil {
-				childPath = optChildPaths(attrPath, children)
+		got := 0
+		for _, b := range bound {
+			if b == c {
+				got++
 			}
-			w.emit(Issue{
-				Path:     childPath[i],
-				Code:     "cardinality",
-				Layer:    LayerTemplate,
-				Rule:     ruleOccurrences,
-				Detail:   fmt.Sprintf("OPT child %s appears %d times under %q; occurrences %s", childIdentity(c), got, attr.Name(), formatInterval(occ)),
-				Severity: Error,
-			})
 		}
+		if !outOfMultiplicityInterval(got, occ) {
+			continue
+		}
+		if childPath == nil {
+			childPath = optChildPaths(attrPath, children)
+		}
+		issues = append(issues, Issue{
+			Path:     childPath[i],
+			Code:     "cardinality",
+			Layer:    LayerTemplate,
+			Rule:     ruleOccurrences,
+			Detail:   fmt.Sprintf("OPT child %s appears %d times under %q; occurrences %s", childIdentity(c), got, attr.Name(), formatInterval(occ)),
+			Severity: Error,
+		})
 	}
+	return issues
 }
 
 // readItems reads the items of the attribute attr on parent, which the
@@ -587,8 +672,9 @@ func childIdentity(c *tcimpl.CompiledNode) string {
 	return c.RMTypeName()
 }
 
-// applyPrimitive runs the REQ-103 primitive constraint against the
-// RM value bound to `optNode` and emits one Issue per Violation.
+// appendPrimitiveIssues runs the REQ-103 primitive constraint pc against
+// the RM value bound to its node, at path, and appends to issues one Issue
+// per Violation.
 // The constraint's expected input is computed via dataValueInput;
 // for non-DataValue RM types that map to a primitive (e.g.
 // CODE_PHRASE directly under category/defining_code → C_CODE_PHRASE),
@@ -596,15 +682,10 @@ func childIdentity(c *tcimpl.CompiledNode) string {
 //
 // The violation's Detail is value-free, and the value it read moves
 // over to Issue.Value unchanged, still redacted (REQ-168).
-func (w *walker) applyPrimitive(
-	optNode *tcimpl.CompiledNode,
-	rmValue any,
-	path string,
-	pc constraints.PrimitiveConstraint,
-) {
+func appendPrimitiveIssues(issues []Issue, rmValue any, path string, pc constraints.PrimitiveConstraint) []Issue {
 	input := primitiveInput(rmValue)
 	for _, v := range pc.Validate(input) {
-		w.emit(Issue{
+		issues = append(issues, Issue{
 			Path:     path,
 			Code:     "primitive_" + string(v.Code),
 			Layer:    LayerTemplate,
@@ -614,6 +695,7 @@ func (w *walker) applyPrimitive(
 			Value:    v.Value,
 		})
 	}
+	return issues
 }
 
 // primitiveInput converts an RM value into the Go value the typed
@@ -710,24 +792,24 @@ func allowedChildren(attr *tcimpl.CompiledAttribute) []*tcimpl.CompiledNode {
 	return slices.DeleteFunc(attr.Children(), func(c *tcimpl.CompiledNode) bool { return !isAllowed(c) })
 }
 
-// emitProhibited reports the attribute attr, which the OPT prohibits, as
-// present on parentRM, at attrPath. The caller then leaves the attribute:
-// the walk checks nothing more on it and does not descend into it. The
-// Detail names the attribute, the parent's RM type and how the template
-// prohibits it, never the value.
-func (w *walker) emitProhibited(attr *tcimpl.CompiledAttribute, parentRM any, attrPath string) {
+// prohibitedIssue returns the issue that reports the attribute attr, which
+// the OPT prohibits, as present on parentRM, at attrPath. The caller then
+// leaves the attribute: the walk checks nothing more on it and does not
+// descend into it. The Detail names the attribute, the parent's RM type and
+// how the template prohibits it, never the value.
+func prohibitedIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath string) Issue {
 	how := "it allows none of the attribute's children"
 	if e := attr.Existence(); e != nil && !e.UpperUnbounded() && e.Upper() == 0 {
 		how = "existence " + formatInterval(e)
 	}
-	w.emit(Issue{
+	return Issue{
 		Path:     attrPath,
 		Code:     "prohibited",
 		Layer:    LayerTemplate,
 		Rule:     ruleExistence,
 		Detail:   fmt.Sprintf("attribute %q is present on %s, but the template prohibits it (%s)", attr.Name(), describeRMType(parentRM), how),
 		Severity: Error,
-	})
+	}
 }
 
 // outOfMultiplicityInterval reports whether `count` falls outside the
@@ -972,11 +1054,11 @@ func describeLocatableID(v any) string {
 	return describeRMType(v)
 }
 
-// checkLocatableIdentity emits node_id_mismatch / archetype_id_mismatch
-// when the RM's archetype_node_id disagrees with the OPT-pinned id
-// at this node. Archetype-root nodes compare against ArchetypeID();
-// inner nodes (at-code-pinned) compare against NodeID().
-func (w *walker) checkLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, path string) {
+// identityIssue returns node_id_mismatch / archetype_id_mismatch, with ok
+// set, when the RM's archetype_node_id disagrees with the OPT-pinned id at
+// this node. Archetype-root nodes compare against ArchetypeID(); inner nodes
+// (at-code-pinned) compare against NodeID().
+func identityIssue(opt *tcimpl.CompiledNode, rmValue any, path string) (iss Issue, ok bool) {
 	if opt.IsSlot() {
 		// Slot fit is by the parsed REQ-104 archetype-id assertion
 		// grammar (RM-type-prefix fallback when no includes parsed).
@@ -985,63 +1067,64 @@ func (w *walker) checkLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, p
 		// is not expected to match the filling archetype's
 		// archetype_node_id, so a direct identity check here would
 		// false-positive on every legitimate slot fill.
-		return
+		return iss, false
 	}
 	id := locatableArchetypeNodeID(rmValue)
 	if id == "" {
-		return
+		return iss, false
 	}
 	if want := opt.ArchetypeID(); want != "" {
-		if id != want {
-			w.emit(Issue{
-				Path:     joinPath(path, "/archetype_node_id"),
-				Code:     "archetype_id_mismatch",
-				Layer:    LayerTemplate,
-				Rule:     ruleIdentity,
-				Detail:   fmt.Sprintf("archetype_node_id %q does not match template archetype id %q at %s", id, want, path),
-				Severity: Error,
-			})
+		if id == want {
+			return iss, false
 		}
-		return
+		return Issue{
+			Path:     joinPath(path, "/archetype_node_id"),
+			Code:     "archetype_id_mismatch",
+			Layer:    LayerTemplate,
+			Rule:     ruleIdentity,
+			Detail:   fmt.Sprintf("archetype_node_id %q does not match template archetype id %q at %s", id, want, path),
+			Severity: Error,
+		}, true
 	}
 	if want := opt.NodeID(); want != "" && id != want {
-		w.emit(Issue{
+		return Issue{
 			Path:     joinPath(path, "/archetype_node_id"),
 			Code:     "node_id_mismatch",
 			Layer:    LayerTemplate,
 			Rule:     ruleIdentity,
 			Detail:   fmt.Sprintf("archetype_node_id %q does not match template node_id %q at %s", id, want, path),
 			Severity: Error,
-		})
+		}, true
 	}
+	return iss, false
 }
 
-// checkRMType emits rm_type_mismatch when the concrete RM type does
-// not conform to the compiled OPT node's RMTypeName. Conformance is
+// rmTypeIssue returns rm_type_mismatch, with ok set, when the concrete RM
+// type does not conform to the compiled OPT node's RMTypeName. Conformance is
 // the pinned BMM's class hierarchy ([rmTypeIsSubtypeOf]), for an
 // abstract and a concrete ancestor alike: a node declared as
 // ITEM_STRUCTURE admits ITEM_TREE, one declared as DV_TEXT admits
 // DV_CODED_TEXT.
-func (w *walker) checkRMType(opt *tcimpl.CompiledNode, rmValue any, path string) {
+func rmTypeIssue(opt *tcimpl.CompiledNode, rmValue any, path string) (iss Issue, ok bool) {
 	want := opt.RMTypeName()
 	if want == "" {
-		return
+		return iss, false
 	}
 	got := describeRMType(rmValue)
 	if got == want {
-		return
+		return iss, false
 	}
 	if rmTypeIsSubtypeOf(got, want) || intervalRMTypeMatches(got, want, rmValue) {
-		return
+		return iss, false
 	}
-	w.emit(Issue{
+	return Issue{
 		Path:     path,
 		Code:     "rm_type_mismatch",
 		Layer:    LayerTemplate,
 		Rule:     ruleType,
 		Detail:   fmt.Sprintf("RM type %s does not satisfy template RM type %s at %s", got, want, path),
 		Severity: Error,
-	})
+	}, true
 }
 
 // rmTypeIsSubtypeOf reports whether the RM type concrete conforms to
@@ -1234,7 +1317,7 @@ func primitiveValueMatchesShortName(shortName string, val any) bool {
 // BMM classes, so the class hierarchy cannot admit the wrapper; this
 // table does (REQ-102, Validation dimensions: RM type match). Each
 // wrapper is the type instance.concreteFor builds for the short name,
-// so the generator's output passes checkRMType.
+// so the generator's output passes the RM type match ([rmTypeIssue]).
 //
 // A Go primitive under a short name (an int64 under INTEGER, a string
 // under DURATION) is admitted apart from this table, by
