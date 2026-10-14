@@ -226,22 +226,26 @@ func TestREQ071_FreshCacheHitPassesTheCallingResolversChecks(t *testing.T) { // 
 // endpoint is left out of the document and is nil in the catalog. The issuer
 // is built from the test server's origin, so a request for its OpenID
 // configuration reaches the test server; a nil issuer is left out of the
-// document, and the catalog's Issuer is then the base URL. The service base
-// URL is written as it stands, and an empty one is nil in the catalog.
+// document, and the catalog's Issuer is then the base URL. The openEHR REST
+// service's base URL is written as it stands, and an empty one is nil in the
+// catalog. The FHIR service is declared only when its base URL is not empty.
 type cachedMembers struct {
 	issuer                func(origin string) string
 	authorizationEndpoint string
 	tokenEndpoint         string
 	serviceBaseURL        string
+	fhirBaseURL           string
 }
 
 // document is the SMART configuration that declares m.
 func (m cachedMembers) document(origin string) string {
-	doc := map[string]any{
-		"services": map[string]any{
-			discovery.ServiceIDOpenEHRRest: map[string]any{"baseUrl": m.serviceBaseURL},
-		},
+	services := map[string]any{
+		discovery.ServiceIDOpenEHRRest: map[string]any{"baseUrl": m.serviceBaseURL},
 	}
+	if m.fhirBaseURL != "" {
+		services[discovery.ServiceIDFHIRRest] = map[string]any{"baseUrl": m.fhirBaseURL}
+	}
+	doc := map[string]any{"services": services}
 	if m.issuer != nil {
 		doc["issuer"] = m.issuer(origin)
 	}
@@ -273,13 +277,17 @@ func (m cachedMembers) catalog(t *testing.T, origin, baseURL, etag string) *disc
 	if m.issuer != nil {
 		issuer = m.issuer(origin)
 	}
+	services := map[string]discovery.ServiceEntry{
+		discovery.ServiceIDOpenEHRRest: {ID: discovery.ServiceIDOpenEHRRest, BaseURL: parse(m.serviceBaseURL)},
+	}
+	if m.fhirBaseURL != "" {
+		services[discovery.ServiceIDFHIRRest] = discovery.ServiceEntry{ID: discovery.ServiceIDFHIRRest, BaseURL: parse(m.fhirBaseURL)}
+	}
 	now := time.Now()
 	return &discovery.ServiceCatalog{
-		BaseURL: baseURL,
-		Issuer:  issuer,
-		Services: map[string]discovery.ServiceEntry{
-			discovery.ServiceIDOpenEHRRest: {ID: discovery.ServiceIDOpenEHRRest, BaseURL: parse(m.serviceBaseURL)},
-		},
+		BaseURL:  baseURL,
+		Issuer:   issuer,
+		Services: services,
 		Auth: discovery.AuthEndpoints{
 			AuthorizationEndpoint: parse(m.authorizationEndpoint),
 			TokenEndpoint:         parse(m.tokenEndpoint),
@@ -300,8 +308,9 @@ func (m cachedMembers) catalog(t *testing.T, origin, baseURL, etag string) *disc
 // a new document, to the same text, sends no request and leaves the entry
 // cached. A Refresh answered 304 returns that error too, before any request
 // for the issuer's OpenID configuration. Where a catalog has two refused
-// members, each path names the one the parser checks first. A well-formed
-// catalog is still returned on a fresh hit.
+// members, each path names the one the parser checks first: the auth
+// endpoints in document order, then the service base URLs by id, then the
+// issuer. A well-formed catalog is still returned on a fresh hit.
 func TestREQ071_CachedCatalogPassesTheParsersURLChecks(t *testing.T) { // REQ-071, REQ-072, REQ-073
 	t.Parallel()
 	const (
@@ -384,6 +393,14 @@ func TestREQ071_CachedCatalogPassesTheParsersURLChecks(t *testing.T) { // REQ-07
 			},
 			wantReason: discovery.ReasonInsecureURL,
 			wantText:   `authorization_endpoint uses scheme "http"`,
+		},
+		{
+			// The parser checks the service base URLs by id, so
+			// "org.fhir.rest" before "org.openehr.rest".
+			name:       "two service base URLs without a scheme",
+			members:    cachedMembers{tokenEndpoint: tokenURL, serviceBaseURL: noScheme, fhirBaseURL: "//fhir.example.com/r4"},
+			wantReason: discovery.ReasonMalformedURL,
+			wantText:   `service "org.fhir.rest" baseUrl "//fhir.example.com/r4" invalid`,
 		},
 		{
 			// The parser checks the auth endpoints before the issuer.

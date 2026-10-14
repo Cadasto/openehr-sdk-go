@@ -247,25 +247,31 @@ func requestFailure(err error) DiscoveryErrorReason {
 // WithoutOpenIDConfigurationCheck, the issuer must first be confirmed by
 // its own OpenID configuration.
 //
-// One Cache may serve Resolvers built with different options, so a fresh
-// cached catalog is returned only once it passes this Resolver's own checks
-// that send no request: the required services, the accepted spec versions,
-// the authorization-server members, and the https rule for the base URL,
-// the issuer and the auth endpoints. A catalog that fails them yields the
-// DiscoveryError a newly fetched document would, and stays cached for the
-// Resolvers that accept it. Two checks are not made on a fresh cached
-// catalog. The issuer's OpenID configuration is not fetched; it is checked
-// when the document is fetched or renewed. Nor is the document path
-// compared: the cache keys a catalog by baseURL alone, so a catalog fetched
-// by a Resolver with another WithWellKnownPath is returned as it stands.
+// One Cache may serve Resolvers built with different options, and may hold
+// catalogs that this Resolver did not fetch, so a fresh cached catalog is
+// returned only once it passes this Resolver's own checks that send no
+// request. They are the checks a newly fetched document gets: every URL in
+// the catalog is well formed (the base URL, the issuer, the auth endpoints
+// and the service base URLs), the base URL, the issuer and the auth
+// endpoints use https unless the Resolver allows insecure URLs, and the
+// catalog has the required services, the accepted spec versions and the
+// authorization-server members. A catalog that fails them yields the
+// DiscoveryError a new document with the same members would, and stays
+// cached for the Resolvers that accept it. Two checks are not made on a
+// fresh cached catalog. The issuer's OpenID configuration is not fetched;
+// it is checked when the document is fetched or renewed. Nor is the
+// document path compared: the cache keys a catalog by baseURL alone, so a
+// catalog fetched by a Resolver with another WithWellKnownPath is returned
+// as it stands.
 //
 // When the cached catalog has expired and carries an ETag, the fetch is
 // conditional, as for Refresh: a 304 Not Modified renews the cached
-// catalog once it passes the same checks as a new document, the issuer
-// check included. A failed fetch or check drops the cached catalog, unless
-// only the caller's own cancelled or expired context caused the failure,
-// which leaves it in place. An error from the Cache is logged and does not
-// fail the call.
+// catalog once it passes the same checks as a new document, the issuer's
+// OpenID configuration included. A successful fetch or renewal is cached.
+// A failed fetch, renewal or check drops the cached catalog, with two
+// exceptions that leave it as it was: a failure that only the caller's own
+// cancelled or expired context caused, and a panic in the fetch. An error
+// from the Cache is logged and does not fail the call.
 func (r *Resolver) Resolve(ctx context.Context, baseURL string) (*ServiceCatalog, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -292,10 +298,11 @@ func (r *Resolver) Resolve(ctx context.Context, baseURL string) (*ServiceCatalog
 // the issuer's OpenID configuration. A new document replaces the cached
 // catalog. When the refresh fails, the cached catalog is dropped, so the
 // next Resolve fetches again and reports the error if that fetch fails
-// too. The exception is a refresh that failed only because the caller's own
-// context ended: that says nothing about the Platform, so the cached catalog
-// stays. Until the refresh completes, Resolve keeps returning the cached
-// catalog while it is fresh.
+// too. There are two exceptions, which leave the cached catalog as it was: a
+// refresh that failed only because the caller's own context ended, which
+// says nothing about the Platform, and a refresh that panicked. Until the
+// refresh completes, Resolve keeps returning the cached catalog while it is
+// fresh.
 func (r *Resolver) Refresh(ctx context.Context, baseURL string) (*ServiceCatalog, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -492,13 +499,11 @@ func (r *Resolver) fetch(ctx context.Context, baseURL string, cached *ServiceCat
 		}
 		// The document is the one cached was built from, but it still goes
 		// through this Resolver's checks, as on a 200: the catalog may have
-		// been cached by a Resolver with other options, and the issuer's
-		// OpenID configuration may have changed since it was confirmed.
+		// been cached by a Resolver with other options, or reached the Cache
+		// without this Resolver's parser, and the issuer's OpenID
+		// configuration may have changed since it was confirmed.
 		c := renewed(cached, resp.Header, r.cfg.defaultTTL)
-		if err := r.refusePlaintext(c); err != nil {
-			return nil, err
-		}
-		if err := r.validate(c); err != nil {
+		if err := r.checkCached(baseURL, c); err != nil {
 			return nil, err
 		}
 		smartJWKSURI, parsed := renewedJWKSURI(c)
@@ -555,12 +560,12 @@ func (r *Resolver) documentURL(baseURL string) (*url.URL, error) {
 }
 
 // checkFreshHit runs, on a fresh catalog cached under baseURL, this
-// Resolver's checks that send no request: the Platform base URL, the https
-// rule for the issuer and the auth endpoints, and validate. The catalog may
-// have been cached by a Resolver built with other options, so it must not
-// skip them. The OpenID configuration check is left to the next fetch or
-// renewal, since it needs a request. The document path is not compared:
-// the cache keys entries by base URL alone (the REQ-071 known gap).
+// Resolver's checks that send no request, in the order a new document gets
+// them: the Platform base URL, then checkCached. The catalog may have been
+// cached by a Resolver built with other options, so it must not skip them.
+// The OpenID configuration check is left to the next fetch or renewal,
+// since it needs a request. The document path is not compared: the cache
+// keys entries by base URL alone (the REQ-071 known gap).
 //
 // REQ-071, REQ-072, REQ-073: a failure is the DiscoveryError a new document
 // would get, and the caller leaves the entry cached, because it says
@@ -569,7 +574,14 @@ func (r *Resolver) checkFreshHit(baseURL string, cat *ServiceCatalog) error {
 	if _, err := r.documentURL(baseURL); err != nil {
 		return err
 	}
-	if err := r.refusePlaintext(cat); err != nil {
+	return r.checkCached(baseURL, cat)
+}
+
+// checkCached runs the checks a new document gets between its fetch and the
+// OpenID configuration check, the parser's URL checks and then validate, on
+// a catalog cached under baseURL: on a fresh hit, and on a 304 renewal.
+func (r *Resolver) checkCached(baseURL string, cat *ServiceCatalog) error {
+	if err := r.checkURLs(baseURL, cat); err != nil {
 		return err
 	}
 	return r.validate(cat)
@@ -767,10 +779,13 @@ func (r *Resolver) parse(baseURL string, wire *smartConfigWire) (*ServiceCatalog
 		return nil, err
 	}
 	services := map[string]ServiceEntry{}
-	for id, s := range wire.Services {
-		u, err := url.Parse(s.BaseURL)
-		if err != nil || u.Scheme == "" || u.Hostname() == "" {
-			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: fmt.Errorf("service %q baseUrl %q invalid", id, urlredact.String(s.BaseURL))}
+	// In id order, so a document with two malformed base URLs is refused for
+	// the same one every time, as checkURLs refuses a cached catalog.
+	for _, id := range slices.Sorted(maps.Keys(wire.Services)) {
+		s := wire.Services[id]
+		u, err := serviceBaseURL(baseURL, id, s.BaseURL)
+		if err != nil {
+			return nil, err
 		}
 		services[id] = ServiceEntry{
 			ID:            id,
@@ -831,71 +846,107 @@ func validateIssuer(baseURL, raw string, allowInsecure bool) error {
 		return malformed(fmt.Errorf("issuer %q has a fragment", urlredact.String(raw)))
 	}
 	if u.Scheme == "http" && !allowInsecure {
-		return insecureIssuer(baseURL, raw)
+		return &DiscoveryError{Issuer: baseURL, Reason: ReasonInsecureURL, Inner: fmt.Errorf("issuer %q uses http; https required (use WithAllowInsecure for development)", urlredact.String(raw))}
 	}
 	return nil
 }
 
-// insecureIssuer is the refusal of an http issuer, raw as the document
-// wrote it, by a Resolver that does not allow insecure URLs. The parser and
-// refusePlaintext share it, so a catalog refused on a fresh hit or a 304
-// renewal gets the text a new document gets.
-func insecureIssuer(baseURL, raw string) error {
-	return &DiscoveryError{Issuer: baseURL, Reason: ReasonInsecureURL, Inner: fmt.Errorf("issuer %q uses http; https required (use WithAllowInsecure for development)", urlredact.String(raw))}
+// serviceBaseURL parses raw, the baseUrl of the service id, which must be
+// an absolute URL with a host. Its errors mask a password in raw's userinfo.
+func serviceBaseURL(baseURL, id, raw string) (*url.URL, error) {
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme == "" || u.Hostname() == "" {
+		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: fmt.Errorf("service %q baseUrl %q invalid", id, urlredact.String(raw))}
+	}
+	return u, nil
 }
 
-// insecureEndpoint is the refusal of the auth endpoint named name, which
-// uses http, by a Resolver that does not allow insecure URLs. Shared as
-// insecureIssuer is.
-func insecureEndpoint(baseURL, name string) error {
-	return &DiscoveryError{Issuer: baseURL, Reason: ReasonInsecureURL, Inner: fmt.Errorf("%s uses scheme %q; https required (use WithAllowInsecure for development)", name, "http")}
+// authEndpointURL parses raw, the auth endpoint member name, which must be a
+// URL with a host and the https scheme, or http when allowInsecure. Its
+// errors mask a password in raw's userinfo.
+func authEndpointURL(baseURL, name, raw string, allowInsecure bool) (*url.URL, error) {
+	u, err := url.Parse(raw)
+	if err != nil || u.Hostname() == "" {
+		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: fmt.Errorf("%s %q invalid", name, urlredact.String(raw))}
+	}
+	// url.Parse lowercases the scheme. https is always accepted, http only
+	// with allowInsecure, and anything else is not an endpoint.
+	switch u.Scheme {
+	case "https":
+	case "http":
+		if !allowInsecure {
+			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonInsecureURL, Inner: fmt.Errorf("%s uses scheme %q; https required (use WithAllowInsecure for development)", name, "http")}
+		}
+	default:
+		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: fmt.Errorf("%s uses scheme %q; https required", name, u.Scheme)}
+	}
+	return u, nil
+}
+
+// authMember is one auth endpoint member of the SMART configuration: its
+// name in the document, its value in the wire document, and the field of
+// AuthEndpoints that holds it.
+type authMember struct {
+	name     string
+	wire     func(*smartConfigWire) string
+	endpoint func(*AuthEndpoints) **url.URL
+}
+
+// authMembers lists the auth endpoint members in the order the resolver
+// checks them. The parser reads a new document's endpoints in this order,
+// and checkURLs a cached catalog's, so both refuse a document or catalog
+// with two refused endpoints for the same one.
+var authMembers = [...]authMember{
+	{
+		name:     "authorization_endpoint",
+		wire:     func(w *smartConfigWire) string { return w.AuthorizationEndpoint },
+		endpoint: func(a *AuthEndpoints) **url.URL { return &a.AuthorizationEndpoint },
+	},
+	{
+		name:     "token_endpoint",
+		wire:     func(w *smartConfigWire) string { return w.TokenEndpoint },
+		endpoint: func(a *AuthEndpoints) **url.URL { return &a.TokenEndpoint },
+	},
+	{
+		name:     "jwks_uri",
+		wire:     func(w *smartConfigWire) string { return w.JWKSURI },
+		endpoint: func(a *AuthEndpoints) **url.URL { return &a.JWKSURI },
+	},
+	{
+		name:     "registration_endpoint",
+		wire:     func(w *smartConfigWire) string { return w.RegistrationEndpoint },
+		endpoint: func(a *AuthEndpoints) **url.URL { return &a.RegistrationEndpoint },
+	},
+	{
+		name:     "introspection_endpoint",
+		wire:     func(w *smartConfigWire) string { return w.IntrospectionEndpoint },
+		endpoint: func(a *AuthEndpoints) **url.URL { return &a.IntrospectionEndpoint },
+	},
+	{
+		name:     "revocation_endpoint",
+		wire:     func(w *smartConfigWire) string { return w.RevocationEndpoint },
+		endpoint: func(a *AuthEndpoints) **url.URL { return &a.RevocationEndpoint },
+	},
+	{
+		name:     "management_endpoint",
+		wire:     func(w *smartConfigWire) string { return w.ManagementEndpoint },
+		endpoint: func(a *AuthEndpoints) **url.URL { return &a.ManagementEndpoint },
+	},
 }
 
 func parseAuthEndpoints(baseURL string, w *smartConfigWire, allowInsecure bool) (AuthEndpoints, error) {
 	var out AuthEndpoints
-	parse := func(name, raw string) (*url.URL, error) {
+	for _, m := range authMembers {
+		raw := m.wire(w)
+		// An absent or empty member leaves its endpoint nil.
 		if raw == "" {
-			return nil, nil
+			continue
 		}
-		u, err := url.Parse(raw)
-		if err != nil || u.Hostname() == "" {
-			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: fmt.Errorf("%s %q invalid", name, urlredact.String(raw))}
+		u, err := authEndpointURL(baseURL, m.name, raw, allowInsecure)
+		if err != nil {
+			return out, err
 		}
-		// url.Parse lowercases the scheme. https is always accepted, http
-		// only with allowInsecure, and anything else is not an endpoint.
-		switch u.Scheme {
-		case "https":
-		case "http":
-			if !allowInsecure {
-				return nil, insecureEndpoint(baseURL, name)
-			}
-		default:
-			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: fmt.Errorf("%s uses scheme %q; https required", name, u.Scheme)}
-		}
-		return u, nil
-	}
-	var err error
-	if out.AuthorizationEndpoint, err = parse("authorization_endpoint", w.AuthorizationEndpoint); err != nil {
-		return out, err
-	}
-	if out.TokenEndpoint, err = parse("token_endpoint", w.TokenEndpoint); err != nil {
-		return out, err
-	}
-	if out.JWKSURI, err = parse("jwks_uri", w.JWKSURI); err != nil {
-		return out, err
-	}
-	if out.RegistrationEndpoint, err = parse("registration_endpoint", w.RegistrationEndpoint); err != nil {
-		return out, err
-	}
-	// Optional endpoints: absence (empty string) → nil, no error.
-	if out.IntrospectionEndpoint, err = parse("introspection_endpoint", w.IntrospectionEndpoint); err != nil {
-		return out, err
-	}
-	if out.RevocationEndpoint, err = parse("revocation_endpoint", w.RevocationEndpoint); err != nil {
-		return out, err
-	}
-	if out.ManagementEndpoint, err = parse("management_endpoint", w.ManagementEndpoint); err != nil {
-		return out, err
+		*m.endpoint(&out) = u
 	}
 	out.ScopesSupported = append([]string(nil), w.ScopesSupported...)
 	out.ResponseTypesSupported = append([]string(nil), w.ResponseTypesSupported...)
@@ -1021,54 +1072,51 @@ func (r *Resolver) warnInsecure(cat *ServiceCatalog) {
 			r.cfg.logger.Warn("discovery: plaintext URL in catalog (REQ-092)", "base_url", urlredact.String(cat.BaseURL), "field", name, "url", u.Redacted())
 		}
 	}
-	for _, e := range authURLs(cat.Auth) {
-		check(e.name, e.url)
+	for _, m := range authMembers {
+		check(m.name, *m.endpoint(&cat.Auth))
 	}
 	for id, s := range cat.Services {
 		check("services["+id+"].baseUrl", s.BaseURL)
 	}
 }
 
-// refusePlaintext applies the parser's https rule to a catalog this Resolver
-// did not parse: unless it allows insecure URLs, an http issuer or auth
-// endpoint is a ReasonInsecureURL. A 304 renewal and a fresh cache hit need
-// it, because the cached catalog may come from a Resolver built with
-// WithAllowInsecure.
+// checkURLs runs the parser's URL checks on a catalog this Resolver did not
+// parse, cached under baseURL, the base URL the caller resolved. Each member
+// goes through the parser's own function for its kind, written back as the
+// text a document would carry, in the parser's order: the auth endpoints in
+// authMembers order, the service base URLs by id, then the issuer. So a
+// catalog refused here gets the DiscoveryError, text included, that a new
+// document with the same members gets. A fresh cache hit and a 304 renewal
+// need it, because the catalog may come from a Resolver built with other
+// options or from a Cache this Resolver's parser did not fill.
 //
-// REQ-071: the refusal is the DiscoveryError a new document would get. It
-// checks in the parser's order, the auth endpoints in document order before
-// the issuer, and words each refusal with the parser's own helper.
-func (r *Resolver) refusePlaintext(cat *ServiceCatalog) error {
-	if r.cfg.allowInsecure {
-		return nil
-	}
-	for _, e := range authURLs(cat.Auth) {
-		if e.url != nil && e.url.Scheme == "http" {
-			return insecureEndpoint(cat.BaseURL, e.name)
+// An absent auth endpoint is skipped, as an absent member is. So is an empty
+// issuer, and an issuer equal to baseURL: the parser takes the base URL as
+// the issuer when the document declares none, and the base URL's own check
+// covers it.
+//
+// REQ-071, REQ-072, REQ-073.
+func (r *Resolver) checkURLs(baseURL string, cat *ServiceCatalog) error {
+	for _, m := range authMembers {
+		u := *m.endpoint(&cat.Auth)
+		if u == nil {
+			continue
+		}
+		if _, err := authEndpointURL(cat.BaseURL, m.name, u.String(), r.cfg.allowInsecure); err != nil {
+			return err
 		}
 	}
-	if u, err := url.Parse(cat.Issuer); err == nil && u.Scheme == "http" {
-		return insecureIssuer(cat.BaseURL, cat.Issuer)
+	for _, id := range slices.Sorted(maps.Keys(cat.Services)) {
+		var raw string
+		if u := cat.Services[id].BaseURL; u != nil {
+			raw = u.String()
+		}
+		if _, err := serviceBaseURL(cat.BaseURL, id, raw); err != nil {
+			return err
+		}
+	}
+	if cat.Issuer != "" && cat.Issuer != baseURL {
+		return validateIssuer(cat.BaseURL, cat.Issuer, r.cfg.allowInsecure)
 	}
 	return nil
-}
-
-// authURLs lists the auth endpoints of a, each with the name of its member
-// in the SMART configuration document; an absent endpoint is nil.
-func authURLs(a AuthEndpoints) []struct {
-	name string
-	url  *url.URL
-} {
-	return []struct {
-		name string
-		url  *url.URL
-	}{
-		{"authorization_endpoint", a.AuthorizationEndpoint},
-		{"token_endpoint", a.TokenEndpoint},
-		{"jwks_uri", a.JWKSURI},
-		{"registration_endpoint", a.RegistrationEndpoint},
-		{"introspection_endpoint", a.IntrospectionEndpoint},
-		{"revocation_endpoint", a.RevocationEndpoint},
-		{"management_endpoint", a.ManagementEndpoint},
-	}
 }

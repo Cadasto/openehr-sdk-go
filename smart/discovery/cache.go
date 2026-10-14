@@ -12,22 +12,32 @@ import (
 // The Resolver keys every entry by the Platform base URL the caller
 // resolved (ServiceCatalog.BaseURL), never by the OpenID Connect issuer.
 //
-// Resolvers built with different options may share one Cache. Before a
-// Resolver returns a fresh entry, it runs those of its own checks that send
-// no request: the required services, the accepted spec versions, the
-// authorization-server members, and the https rule for the base URL, the
-// issuer and the auth endpoints. Two things are not checked on a fresh
-// entry. The issuer's OpenID configuration is not fetched, so an entry that
-// a Resolver built with WithoutOpenIDConfigurationCheck cached reaches a
-// Resolver that wants the issuer confirmed, until the entry expires or is
-// refreshed. Nor is the document path compared: entries are keyed by the
-// base URL alone, so an entry fetched from one Resolver's WithWellKnownPath
-// reaches a Resolver configured with another path.
+// Resolvers built with different options may share one Cache, and a Cache
+// may hold entries that no Resolver in this process fetched, such as one
+// read from a file or shared between processes. Before a Resolver returns a
+// fresh entry, it runs those of its own checks that send no request, the
+// same as on a newly fetched document: every URL in the entry is well
+// formed (the base URL, the issuer, the auth endpoints and the service base
+// URLs), the base URL, the issuer and the auth endpoints use https unless
+// the Resolver allows insecure URLs, and the entry has the required
+// services, the accepted spec versions and the authorization-server
+// members. An entry that fails them gets the error a new document with the
+// same members gets. Two things are not checked on a fresh entry. The
+// issuer's OpenID configuration is not fetched, so an entry that a Resolver
+// built with WithoutOpenIDConfigurationCheck cached reaches a Resolver that
+// wants the issuer confirmed, until the entry expires or is refreshed. Nor
+// is the document path compared: entries are keyed by the base URL alone,
+// so an entry fetched from one Resolver's WithWellKnownPath reaches a
+// Resolver configured with another path.
 //
-// Only a fresh entry that a Resolver refuses stays cached for the others.
-// When a Resolver fetches again, because the entry has expired or Refresh
-// was called, and the fetch or the checks on its result fail, the entry is
-// dropped, unless only the caller's own context ended.
+// A fresh entry stays cached whether a Resolver returns it or refuses it: a
+// refusal says only that this Resolver's options do not accept it, so the
+// entry stays for the Resolvers that do. When a Resolver fetches again,
+// because the entry has expired or Refresh was called, a successful fetch
+// or 304 renewal replaces the entry, and a failed one, or one whose result
+// fails the checks, drops it. Two failures leave the entry as it was: one
+// that only the caller's own context ending caused, and a panic in the
+// fetch.
 //
 // The Resolver logs an error from Put or Invalidate at warning level and
 // carries on: it does not reach the caller of Resolve or Refresh. A failed
