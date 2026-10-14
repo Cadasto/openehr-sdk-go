@@ -540,7 +540,9 @@ func TestExecuteGETExplicitZeroOffset(t *testing.T) {
 }
 
 func TestExecuteGETRejectsReservedParamName(t *testing.T) {
-	_, _, err := query.ExecuteString(t.Context(), newClient(t, httptest.NewServer(nil)),
+	srv := httptest.NewServer(nil)
+	defer srv.Close()
+	_, _, err := query.ExecuteString(t.Context(), newClient(t, srv),
 		"SELECT c FROM EHR e", map[string]any{"offset": 5}, query.WithGET())
 	if !errors.Is(err, query.ErrInvalidConfig) {
 		t.Errorf("expected ErrInvalidConfig for reserved-key collision, got %v", err)
@@ -669,7 +671,9 @@ func TestREQ057_StoredGETSendsAParameterNamedQ(t *testing.T) {
 }
 
 func TestExecuteEmptyQuery(t *testing.T) {
-	_, _, err := query.Execute(t.Context(), newClient(t, httptest.NewServer(nil)), aql.Query{})
+	srv := httptest.NewServer(nil)
+	defer srv.Close()
+	_, _, err := query.Execute(t.Context(), newClient(t, srv), aql.Query{})
 	if err == nil {
 		t.Fatal("expected error")
 	}
