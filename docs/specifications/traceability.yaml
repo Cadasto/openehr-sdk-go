@@ -1486,6 +1486,7 @@ requirements:
     probes: [PROBE-077, PROBE-081]
     tests:
       - internal/rmaccess/interval_test.go
+      - internal/rmaccess/presence_test.go
       - internal/rmaccess/reads_test.go
       - internal/rmroots/rmroots_test.go
       - openehr/instance/code_phrase_terminology_test.go
@@ -1521,6 +1522,7 @@ requirements:
       - openehr/validation/rmfloor_ordered_test.go
       - openehr/validation/rmfloor_party_proxy_test.go
       - openehr/validation/rmfloor_party_ref_test.go
+      - openehr/validation/rmfloor_presence_readings_test.go
       - openehr/validation/rmfloor_primitive_list_internal_test.go
       - openehr/validation/rmfloor_proportion_test.go
       - openehr/validation/rmfloor_reference_part_internal_test.go
@@ -2145,6 +2147,7 @@ requirements:
       - openehr/validation/rmfloor_interval_class_test.go
       - openehr/validation/rmfloor_invariant_matrix_internal_test.go
       - openehr/validation/rmfloor_limit_internal_test.go
+      - openehr/validation/rmfloor_presence_readings_test.go
       - openehr/validation/rmfloor_primitive_list_internal_test.go
       - openehr/validation/validator_test.go
       - testkit/conformance/webtemplate/archetype_details_test.go
