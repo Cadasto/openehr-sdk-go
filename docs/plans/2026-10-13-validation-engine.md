@@ -154,9 +154,7 @@ Each lands as a `v0.x` minor named in the release notes, as ADR 0025's own tight
 
 ## Backlog lines this plan absorbs
 
-Each is a lead in [docs/backlog.md](../backlog.md) under *Validation engine Phase 4*, verified when Phase 4 rewrites its path and deleted when settled:
-
-- `openehr/validation/rmfloor.go:359`, an empty mandatory container reported under two codes at one path; `rmfloor.go:250`, the cost of the visit-once record; `rmfloor.go:532`, a temporal value reported twice; `walk_composition.go:156`, an attribute's children copied on every visit.
+Phase 4 verified the four leads its rewrite reached and deleted the three it settled from [docs/backlog.md](../backlog.md): an empty mandatory container reported under two codes at one path, the cost of the visit-once record, and an attribute's children copied on every visit. The fourth, an empty temporal value reported at two paths, is unchanged by the one walk and stays in the backlog as a § REQ-112 question.
 
 The leads Phases 2 and 3 absorbed are settled. The backlog triage of 2026-10-14 dropped the rest: the ADR 0025 lines, settled or wording only, and the Phase 5 leads, the member-check route (settled or trivial) and the `rminfo` link-size follow-up, a cost the maintainer had accepted.
 
