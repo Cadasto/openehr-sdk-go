@@ -1,8 +1,8 @@
 package validation
 
 // rmfloor_adapters.go: type-switch adapters that lift a polymorphic RM
-// value into the concrete shape the [findings]'s invariant
-// evaluators need. Mirrors the closed-set discipline of
+// value into the concrete shape the RM rules' invariant evaluators
+// ([findings]) need. Mirrors the closed-set discipline of
 // rmTypeInfo/describeRMType in composition.go — adding a new BMM
 // concrete means editing one switch.
 

@@ -58,7 +58,7 @@ func joinPath(parent, segment string) string {
 
 // rmTypeInfo is the single source of truth for "what RM class is
 // this Go value and (when LOCATABLE) what is its archetype_node_id".
-// All v2 walker code routes through this function — describeRMType
+// The walk and the rules route through this function — describeRMType
 // and locatableArchetypeNodeID are thin wrappers.
 //
 // Since ADR 0013 it decomposes onto the generated surface: the name

@@ -74,7 +74,7 @@ func mustCompileInline(t *testing.T, body string) *templatecompile.Compiled {
 // REQ-110 — a real demographic OPT (PERSON root, 174 compiled nodes) +
 // its instance walk end-to-end through ValidateDemographic. The walk
 // descends the full PARTY hierarchy (identities / contacts → addresses /
-// details → cluster trees) and the template walk reports nothing. The
+// details → cluster trees) and the template reports nothing. The
 // instance has no relationships: the attribute is absent (REQ-171 §
 // Structural access), which the template's existence 0..1 allows, so its
 // cardinality 1..*, which counts the items of a present list, is not
@@ -93,10 +93,10 @@ func TestValidateDemographic_PersonFixture(t *testing.T) {
 
 	r := validation.ValidateDemographic(&person, c)
 
-	// The template walk finds nothing: relationships is absent, which its
+	// The template finds nothing: relationships is absent, which its
 	// existence allows. After REQ-052 sub-gap B no spurious DV_INTERVAL
-	// rm_type_mismatch remains. The RM floor, which
-	// template validation includes, adds the fixture's two DV_MULTIMEDIA
+	// rm_type_mismatch remains. The RM rules, which template validation
+	// applies, add the fixture's two DV_MULTIMEDIA
 	// media types: both are coded in openEHR rather than the IANA media
 	// types, and the second carries no code at all. It also adds five
 	// DV_INTERVAL<DV_DATE> values whose lower date is after their upper

@@ -36,13 +36,12 @@ func constraintRefCode(t *testing.T) (*rm.Composition, *rm.CodePhrase) {
 }
 
 // REQ-102 / REQ-103: a CONSTRAINT_REF leaf names an external value set, so
-// its ConstraintRef constrains nothing the walker can check locally. The
-// template walk still checks the RM-mandatory attributes of the CODE_PHRASE
-// it binds there, as at a node the OPT leaves unconstrained: a blank
-// terminology_id or code_string is `required` at that attribute's path.
-// Template validation includes the RM floor (REQ-102 RM floor), which
-// reports the same `required` there, carried once, and a blank code_string
-// also as its own CODE_PHRASE rule at the code.
+// its ConstraintRef constrains nothing the walk can check locally. The walk
+// still checks the RM-mandatory attributes of the CODE_PHRASE it binds
+// there, as at a node the OPT leaves unconstrained: a blank terminology_id
+// or code_string is `required` at that attribute's path, once, and a blank
+// code_string also draws its own CODE_PHRASE rule at the code (REQ-102 RM
+// floor).
 func TestREQ102_REQ103_ConstraintRefLeafChecksCodePhraseAttributes(t *testing.T) {
 	t.Parallel()
 	c := mustCompile(t, "Demonstration.v1")

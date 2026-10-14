@@ -1,7 +1,7 @@
 package validation_test
 
 // limits_test.go: REQ-171 § Surface, REQ-112 § Driver — the limits that bound
-// the floor's walk. The depth limit stops descent and is reported once per
+// the walk, with a template and without one. The depth limit stops descent and is reported once per
 // walk, at the first path where it stopped; the visit limit ends the walk and
 // is reported once. Both are the Limits of a Validator, a zero or negative
 // field reads as its default, and each path where a limit stopped the walk is
@@ -147,9 +147,8 @@ func TestValidator_REQ171_DepthLimitStopsTheWalkWithATemplate(t *testing.T) {
 
 // REQ-171 Acceptance, REQ-112 § Driver — WithLimits with a node count below
 // what a root needs stops the walk there: max_nodes once, as the last issue,
-// and its path in Coverage.Stopped. It bounds the floor inside a
-// template-driven validation too. The same roots under the default limit
-// are walked to the end.
+// and its path in Coverage.Stopped. It bounds a template-driven validation
+// too. The same roots under the default limit are walked to the end.
 func TestValidator_REQ171_REQ112_NodeLimitStopsTheWalk(t *testing.T) {
 	bmi, _, _, _ := bmiSkeleton(t)
 	c := mustCompile(t, "BMI")

@@ -121,8 +121,8 @@ func (v codedValue) path(nodePath string) string {
 
 // checkCodedInvariants runs, of the coded invariants, those in rules on the
 // node value, whose runtime class is rmType, at path. rules are the coded
-// invariants the inventory says the class is subject to and the floor
-// evaluates ([classRules]); [codedValues] reads the coded attributes the
+// invariants the inventory says the class is subject to and the RM rules
+// evaluate ([classRules]); [codedValues] reads the coded attributes the
 // value carries. It reports each breach as `code_not_in_value_set` at the
 // CODE_PHRASE the invariant reads.
 func (f *findings) checkCodedInvariants(value any, rmType, path string, rules []*codedRule) {

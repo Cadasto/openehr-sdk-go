@@ -1,11 +1,11 @@
 package validation_test
 
 // rmfloor_chained_corpus_test.go: REQ-102 § RM floor, REQ-112 — the cases
-// issue 238 measured. Each one-defect copy of the BMI skeleton passed the
-// template walk and broke an RM rule; template validation now reports the
-// floor's code at the node's path. Three corpus compositions that were
+// issue 238 measured. Each one-defect copy of the BMI skeleton met the
+// template and broke an RM rule; template validation now reports the RM
+// rule's code at the node's path. Three corpus compositions that were
 // template-valid and RM-invalid are now not OK, and the findings both layers
-// report in clinical_notes.v0 appear once each.
+// see in clinical_notes.v0 appear once each.
 
 import (
 	"testing"
@@ -196,7 +196,7 @@ func TestValidateComposition_REQ102_REQ112_CorpusFloorBreaches(t *testing.T) {
 // event, the ELEMENT at0016 carries both value and null_flavour, and the
 // DV_INTERVALs at0022 (DV_COUNT), at0023 (DV_QUANTITY) and at0024
 // (DV_DATE_TIME) have their lower bound above their upper one. All are the
-// floor's; the template walk reports nothing.
+// RM rules'; the template reports nothing.
 var demonstrationFloorIssues = func() []string {
 	const obs = "/content[openEHR-EHR-OBSERVATION.demo.v1]/data/events"
 	var out []string
@@ -220,9 +220,9 @@ var demonstrationFloorIssues = func() []string {
 	return out
 }()
 
-// REQ-102, REQ-112 — clinical_notes.v0 is where the template walk and the
-// floor both reported findings; under the shared path rule each is one
-// issue at one path, so no code and path appears twice in the result.
+// REQ-102, REQ-112, REQ-171 — clinical_notes.v0 is where the template and the
+// RM rules both see defects; each is one issue at one path, so no code and
+// path appears twice in the result.
 func TestValidateComposition_REQ102_REQ112_ClinicalNotesOnce(t *testing.T) {
 	r := decodedCorpus(t, "clinical_notes.v0")
 	if !equalKeys(r.Issues, clinicalNotesIssues) {
@@ -238,12 +238,11 @@ func TestValidateComposition_REQ102_REQ112_ClinicalNotesOnce(t *testing.T) {
 
 // clinicalNotesIssues is the whole result of ValidateComposition on the
 // clinical_notes.v0 corpus composition, sorted as issueKeys sorts it. The
-// template walk reports the seven `required` findings marked below, and the
-// floor reports them too, at the same paths; each is carried once. The other
-// five are the floor's alone: three are each value's RM rule beside its
-// absent `value/value`, and two are the timing's attributes. Issue 238
-// counted the same seven as duplicates, before the two layers shared one
-// path rule.
+// seven `required` findings marked below are absences both the template and
+// the RM rules see, each reported once. The other five are the RM rules'
+// alone: three are each value's RM rule beside its absent `value/value`, and
+// two are the timing's attributes. Issue 238 counted the same seven as
+// duplicates, when the template and the RM rules ran in two walks.
 var clinicalNotesIssues = func() []string {
 	const order = "/content[openEHR-EHR-INSTRUCTION.medication_order.v3]"
 	const direction = order + "/activities[at0001]/description/items[openEHR-EHR-CLUSTER.therapeutic_direction.v1]"
@@ -266,7 +265,7 @@ var clinicalNotesIssues = func() []string {
 
 // externalCodeChild is an ELEMENT value child DV_CODED_TEXT whose
 // defining_code is a C_CODE_PHRASE of an external terminology with no code
-// list, so the template walk checks no code against it.
+// list, so the template checks no code against it.
 const externalCodeChild = `
       <children xsi:type="C_COMPLEX_OBJECT">
         <rm_type_name>DV_CODED_TEXT</rm_type_name>
@@ -282,8 +281,8 @@ const externalCodeChild = `
       </children>`
 
 // REQ-102, REQ-112 — a blank code_string under an external C_CODE_PHRASE
-// with no code list passes the template walk, which has no code to check it
-// against; the floor, which template validation includes, reports the
+// with no code list meets the template, which has no code to check it
+// against; the RM rules, which template validation applies, report the
 // CODE_PHRASE's RM-mandatory code_string and its non-empty rule.
 func TestValidate_REQ102_REQ112_ExternalCodePhraseBlankCode(t *testing.T) {
 	c := mustCompileInline(t, elementValueOPT(externalCodeChild))

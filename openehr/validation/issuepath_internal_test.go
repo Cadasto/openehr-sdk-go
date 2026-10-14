@@ -1,8 +1,8 @@
 package validation
 
 // issuepath_internal_test.go: REQ-102 § Issue paths, REQ-112 — the shared
-// path rule on its own, and the floor fed the names a template walk would
-// bind, which the floor alone never has.
+// path rule on its own, and the RM rules alone, which bind no template node
+// and so write no name predicate.
 
 import (
 	"fmt"

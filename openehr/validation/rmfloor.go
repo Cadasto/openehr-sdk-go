@@ -1,27 +1,23 @@
 package validation
 
-// rmfloor.go: REQ-112 — the template-less Reference Model validation
-// floor. ValidateRM walks an RM root using the BMM (via rminfo) as the
-// driver — no compiled OPT — and reports:
+// rmfloor.go: REQ-112 — the template-less Reference Model validation floor:
+// its entries and its rules. The one walk (engine.go, REQ-171) applies the
+// rules, with no template at ValidateRM and its typed wrappers, and inside
+// the walk that binds the template at the REQ-102/110 entries (ADR 0025,
+// ADR 0027). The rules here report into [findings]:
 //
-//   - RM-mandatory attribute absences (rminfo.RequiredAttributes per type
-//     plus the container "lower bound ≥ 1" reading);
+//   - RM-mandatory attribute absences (checkMandatory, which the walk calls
+//     for each mandatory attribute it reads absent or empty);
 //   - the per-RM-type invariant catalogue of § REQ-112 in
-//     docs/specifications/clinical-modeling.md, on every node it reaches.
-//     checkInvariants dispatches it through the invariant inventory
+//     docs/specifications/clinical-modeling.md, on every node the walk
+//     visits. checkInvariants dispatches it through the invariant inventory
 //     (REQ-171, inventory_dispatch.go): on a node of a class, the
 //     evaluators of the evaluated invariants the class is subject to, the
 //     Coded invariants entry (rmfloor_coded.go) among them; invariants.json,
 //     not this comment, is the list to keep current.
 //
-// REQ-112 surface. ValidateRM runs it alone; the REQ-102/110
-// template-driven entries run it after their own walk over the same root
-// and merge its findings (validate.go, ADR 0025).
-//
-// Sign-off (2026-06-29): Option A — second driver alongside the
-// template-driven walker. Walker + invariant evaluators live in this
-// file; the closed RM-type set is shared with the template-driven path
-// via the existing rmTypeInfo/describeRMType helpers (composition.go).
+// The closed RM-type set is shared with the template rules through the
+// rmTypeInfo and describeRMType helpers (composition.go).
 
 import (
 	"fmt"
@@ -84,7 +80,7 @@ import (
 //
 // A nil root surfaces a single `nil_root` issue with an empty path and is
 // reported as not-OK. An unknown RM root type (a Go value outside the
-// closed RM set) surfaces `rm_type_unknown` at "/"; the floor cannot descend
+// closed RM set) surfaces `rm_type_unknown` at "/"; the walk cannot descend
 // further but does not panic.
 func ValidateRM(root any) Result {
 	var v Validator
@@ -177,7 +173,7 @@ type findings struct {
 	visited indexSet
 }
 
-// floorRole is what the floor knows of a node from where it sits, beyond
+// floorRole is what the RM rules know of a node from where it sits, beyond
 // its RM type. It is carried down the walk, never looked up by path, so two
 // nodes that share a path cannot share a role.
 type floorRole uint8
@@ -210,8 +206,8 @@ func childRole(class string, role floorRole, attr string) floorRole {
 }
 
 // isWalkCondition reports whether code is a walk condition: max_depth,
-// max_nodes or cyclic_value, an issue that says where the floor's walk
-// stopped or turned back rather than judge the value there.
+// max_nodes or cyclic_value, an issue that says where the walk stopped or
+// turned back rather than judge the value there.
 func isWalkCondition(code string) bool {
 	switch code {
 	case "max_depth", "max_nodes", "cyclic_value":
@@ -220,8 +216,8 @@ func isWalkCondition(code string) bool {
 	return false
 }
 
-// emit appends i to the walker's issues. Every floor issue is an [Error],
-// the zero Severity, so no site sets it.
+// emit appends i to the issues found. Every issue of an RM rule is an
+// [Error], the zero Severity, so no site sets it.
 func (f *findings) emit(i Issue) {
 	f.issues = append(f.issues, i)
 }
@@ -233,7 +229,8 @@ func (f *findings) emit(i Issue) {
 // cardinality. present and items are the walk's reading through the generated
 // access, under which a mandatory string left empty is absent too; items
 // counts a multi-valued attribute's items and is read for no other. The walk
-// calls it for every RM-mandatory attribute of every node it visits but a
+// calls it for every RM-mandatory attribute of every node it visits, where
+// no template clause reports the same absence first, but a
 // part of a reference, which [findings.checkObjectRef] reports, and a
 // value the node's role lets be blank ([mayBeBlank]). No invariant the
 // inventory says this rule decides, such as LOCATABLE.Archetype_node_id_valid,
@@ -295,7 +292,7 @@ func runtimeRMType(val any, declared string) string {
 // and the attribute checks that apply to the class. A type no registered
 // class has runs nothing (this is a floor, not an exhaustive RM check). It
 // returns the class's rules, nil for such a type, and the bare class name of
-// rmType, which the walk reads the class's attributes by.
+// rmType, which the walk reads the class's attributes by ([classAttributes]).
 func (f *findings) checkInvariants(value any, rmType, path string, role floorRole) (*classRules, string) {
 	rules, class := rulesFor(rmType)
 	if rules == nil {
@@ -382,8 +379,8 @@ func (f *findings) checkArchetyped(value any, path string) {
 // checkCodePhrase enforces the RM spec floor on CODE_PHRASE: the
 // code_string MUST be non-empty when the value is present, except on a
 // DV_SCALE symbol's defining_code (see [scaleSymbolMayHaveNoCode]). (The
-// terminology_id absence is already RM-required and caught by the floor's
-// required-set walk.)
+// terminology_id absence is already RM-required and caught by the
+// mandatory-presence rule.)
 func (f *findings) checkCodePhrase(value any, path string, role floorRole) {
 	cp, ok := asCodePhrase(value)
 	if !ok {
@@ -433,7 +430,7 @@ func mayBeBlank(role floorRole, attr string) bool {
 // set, must be ≥ -1. Per the RM, precision is a number of decimal places
 // where 0 means integral and -1 means "no limit" (any number of decimal
 // places) — so -1 is valid and only precision < -1 is out of range. units
-// is RM-required (caught by the floor's required-set walk); magnitude is
+// is RM-required (caught by the mandatory-presence rule); magnitude is
 // always a number on the wire so needs no separate presence check.
 //
 // The Detail names the attribute and the allowed range, never the
@@ -657,10 +654,10 @@ func intervalFlagSet(value any, attr string) bool {
 
 // checkObjectRef enforces the spec floor on OBJECT_REF (and subtypes):
 // id, type, and namespace are RM-mandatory. The walk goes below a reference
-// like any node, but its required-set check leaves the three parts out on
-// every class this evaluator runs on ([classRules.leavesOut]), so this
-// evaluator is the floor's only check of a missing part, which keeps it from
-// being reported twice. It reads the id
+// like any node, but its mandatory-presence check leaves the three parts out
+// on every class this evaluator runs on ([classRules.leavesOut]), with a
+// template as without one, so this evaluator is the only check of a missing
+// part, which keeps it from being reported twice. It reads the id
 // as the walk does, through the generated access, which reads the id the
 // class itself declares: a LOCATABLE_REF's own UID_BASED_ID, not the
 // OBJECT_REF id it embeds. It reads type and namespace through the

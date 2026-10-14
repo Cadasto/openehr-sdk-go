@@ -1,14 +1,14 @@
 package validation
 
 // inventory_dispatch.go: REQ-171 *Where the RM rules come from*. The RM rules
-// the floor applies are the evaluated entries of the invariant inventory
+// the walk applies are the evaluated entries of the invariant inventory
 // together with the mandatory-presence rule. The inventory (inventory_gen.go)
 // is generated from the pinned RM and BASE BMMs and classified in
 // invariants.json; this file binds each evaluated entry to the Go function
 // that evaluates it, or, for an entry another evaluated check already
 // decides, to that check's function, and builds from both, once, what the
-// floor runs on a node of each class the type registry decodes and which of
-// the invariants that class is subject to the floor does not evaluate.
+// walk runs on a node of each class the type registry decodes and which of
+// the invariants that class is subject to the walk does not evaluate.
 
 import (
 	"maps"
@@ -26,7 +26,7 @@ import (
 type invariantKind uint8
 
 const (
-	// invariantEvaluated is an invariant the floor evaluates, with the Go
+	// invariantEvaluated is an invariant the RM rules evaluate, with the Go
 	// function that evaluates it or the check that already decides it.
 	invariantEvaluated invariantKind = iota + 1
 	// invariantNotMechanical is an invariant no check of the instance alone
@@ -237,7 +237,7 @@ var invariantChecks = map[string]invariantCheck{
 	"DV_PROPORTION.Is_integral_validity": coveredCheck("checkDVProportion", (*findings).checkDVProportion),
 }
 
-// attributeCheck is an evaluator the floor runs on a node of class and of
+// attributeCheck is an evaluator the walk runs on a node of class and of
 // every class below it.
 type attributeCheck struct {
 	class string
@@ -248,7 +248,7 @@ type attributeCheck struct {
 	owns []string
 }
 
-// attributeChecks are the floor's evaluators of the two rules the BMM states
+// attributeChecks are the evaluators of the two rules the BMM states
 // in an attribute's definition rather than as a named invariant, so the
 // inventory does not list them: the mandatory parts of a reference
 // ([findings.checkObjectRef], part of the mandatory-presence rule) and
@@ -262,8 +262,8 @@ var attributeChecks = []attributeCheck{
 }
 
 // indexSet is a set of small integers: the classes a walk visited, by their
-// [classRules] index, or the invariants a class is subject to and the floor
-// does not evaluate, by their position in [inventoryRules].unevaluated.
+// [classRules] index, or the invariants a class is subject to and the RM rules
+// do not evaluate, by their position in [inventoryRules].unevaluated.
 type indexSet []uint64
 
 // with returns s with i added, growing it as needed.
@@ -297,17 +297,17 @@ func (s indexSet) each(f func(i int)) {
 	}
 }
 
-// boundCheck is one evaluator the floor runs on a node, with the invariant
+// boundCheck is one evaluator the walk runs on a node, with the invariant
 // that dispatched it.
 type boundCheck struct {
 	run  func(into *findings, n floorNode, rule string)
 	rule string
 }
 
-// classRules is what the floor runs on a node of one class, built once from
+// classRules is what the walk runs on a node of one class, built once from
 // the inventory: the evaluators, in a fixed order, the coded invariants, the
 // attributes an evaluator reports absent itself, and the invariants of the
-// class the floor does not evaluate.
+// class the RM rules do not evaluate.
 type classRules struct {
 	index       int
 	checks      []boundCheck
@@ -324,7 +324,7 @@ func (r *classRules) leavesOut(attr string) bool {
 	return r != nil && slices.Contains(r.owned, attr)
 }
 
-// inventoryRules is the floor's dispatch, built once from the inventory.
+// inventoryRules is the RM rules' dispatch, built once from the inventory.
 type inventoryRules struct {
 	// byClass holds the rules of every class the type registry decodes, by
 	// its bare BMM name.
@@ -332,12 +332,12 @@ type inventoryRules struct {
 	// byIndex holds the same rules, each at its index.
 	byIndex []*classRules
 	// unevaluated holds, sorted, every invariant some class of byClass is
-	// subject to that the floor does not evaluate; a class's unevaluated set
+	// subject to that the RM rules do not evaluate; a class's unevaluated set
 	// indexes into it.
 	unevaluated []string
 }
 
-// inventorySource is what the floor's dispatch is built from: the classes
+// inventorySource is what the RM rules' dispatch is built from: the classes
 // the type registry decodes with the invariants each is subject to, the
 // classification of every invariant, the bindings of the evaluated ones, the
 // attribute checks, and the class hierarchy the attribute checks follow.
@@ -365,7 +365,7 @@ func hierarchyOf(l rminfo.Lookup) rminfo.Hierarchy {
 	return h
 }
 
-// floorRules is the floor's dispatch.
+// floorRules is the RM rules' dispatch.
 var floorRules = pinnedSource.build()
 
 // classAttributes holds, for each class the pinned class metadata knows, by
@@ -412,7 +412,7 @@ func buildClassAttributes(l rminfo.Lookup) map[string]*classAttributeTable {
 	return out
 }
 
-// build builds the floor's dispatch. On a node of a class it runs, in this
+// build builds the RM rules' dispatch. On a node of a class it runs, in this
 // order: the attribute checks that apply to the class; the evaluator of each
 // evaluated invariant the class is subject to, in key order, once per node
 // unless it reports the invariant that dispatched it; then the coded
@@ -490,7 +490,7 @@ func (src inventorySource) build() inventoryRules {
 	return inventoryRules{byClass: byClass, byIndex: byIndex, unevaluated: unevaluated}
 }
 
-// evaluated reports whether the floor evaluates the invariant key: the
+// evaluated reports whether the RM rules evaluate the invariant key: the
 // classification calls it evaluated, and a binding names its evaluator or the
 // check that decides it. For an invariant another check decides, [build]
 // also requires that check to run on the class.
@@ -515,7 +515,7 @@ func conformsTo(h rminfo.Hierarchy, class, ancestor string) bool {
 	return ok && known
 }
 
-// rulesFor returns the floor's rules for a node of RM type rmType, which may
+// rulesFor returns the RM rules for a node of RM type rmType, which may
 // carry a generic bound (DV_INTERVAL<DV_QUANTITY>), and the bare class name;
 // nil rules for a type no registered class has.
 func rulesFor(rmType string) (*classRules, string) {

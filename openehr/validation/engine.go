@@ -1,16 +1,16 @@
 package validation
 
-// engine.go: the one walk. One walk over the instance visits each node once
-// per place that holds it. At a node it knows the RM class of the value and,
-// where a template reaches, the compiled node the value binds to. At the node
-// it checks identity and type against that node, runs the RM rules of the
-// class and the template's value constraint at a leaf; then, at each of the
-// node's attributes, those the template declares first and in its order, it
-// applies in order admission, presence, counts, and for each admitted item
-// the same steps one level down. The template rules
-// are the template walk's own bodies (walk_composition.go) and the RM rules
-// the floor's (rmfloor.go), dispatched through the inventory; the engine is
-// the driver only.
+// engine.go: the one walk, which every entry point runs. The walk over the
+// instance visits each node once per place that holds it. At a node it knows
+// the RM class of the value and, where a template reaches, the compiled node
+// the value binds to. At the node it checks identity and type against that
+// node, runs the RM rules of the class and the template's value constraint
+// at a leaf; then, at each of the node's attributes, those the template
+// declares first and in its order, it applies in order admission, presence,
+// counts, and for each admitted item the same steps one level down. The
+// template rules are the bodies in walk_composition.go and the RM rules those
+// in rmfloor.go and rmfloor_coded.go, dispatched through the inventory; the
+// engine is the driver only.
 
 import (
 	"fmt"
@@ -29,12 +29,10 @@ import (
 // is not nil, within lim, each zero or negative field of which stands for its
 // default.
 //
-// With a nil c the walk applies the Reference Model rules alone and returns
-// what [validateRM] returns for root: the same guards, the same findings by
-// path, code, layer and rule, in the same order, and the same coverage,
-// except that a value held from two places is validated at each of them. A
-// walk condition (`cyclic_value`, `max_depth`, `max_nodes`) is worded in its
-// Detail as the engine's own.
+// With a nil c the walk applies the Reference Model rules alone, every
+// attribute unconstrained, under the guards [ValidateRM] describes: a nil
+// root is `nil_root`, and a root outside the closed RM set `rm_type_unknown`
+// at "/".
 //
 // With a compiled template the root binds to the template's root node, under
 // the guards [Validator.Validate] applies (a nil root, a template with no
@@ -191,9 +189,10 @@ const (
 	shapeSingle attrShape = iota
 	// shapeList is a list of RM values, read item by item.
 	shapeList
-	// shapeCounted is a list of a primitive type ([isPrimitiveType]), such
-	// as DV_MULTIMEDIA data, an Array of Octet: nothing is below its items,
-	// so it is counted and never read item by item.
+	// shapeCounted is a list whose items the class metadata knows as a
+	// primitive type ([tcimpl.AttributeFacts].PrimitiveItems), such as
+	// DV_MULTIMEDIA data, an Array of Octet: nothing is below its items, so
+	// it is counted and never read item by item.
 	shapeCounted
 	// shapeHash is a Hash attribute, read entry by entry in ascending key
 	// order.
@@ -372,9 +371,9 @@ func isAtOrBelow(path, under string) bool {
 	return ok && (rest == "" || rest[0] == '/' || rest[0] == '[')
 }
 
-// checkIdentityAndType checks node n against the template node it binds to,
-// as the template walk does: its archetype_node_id against the node's pin,
-// then its RM type against the node's. It reports whether the node is a
+// checkIdentityAndType checks node n against the template node it binds to:
+// its archetype_node_id against the node's pin, then its RM type against the
+// node's. It reports whether the node is a
 // scalar leaf ([scalarLeaf]), a Go primitive under an AOM 1.4 short name,
 // which has no RM type to match.
 func (e *engine) checkIdentityAndType(n engineNode) (scalar bool) {
@@ -657,8 +656,10 @@ func (e *engine) visitDeclaredSingle(n engineNode, a engineAttr, r attrReading, 
 // reported as [engine.checkAbsent] says, and one that is present and holds
 // no item as [engine.checkEmpty] says. Counts: the template's child count and
 // each child's occurrences. Then each admitted item is walked against the
-// child it binds to, at the path the template walk writes for it; where the
-// template declares no child, each item is walked with the RM rules alone.
+// child it binds to, at the path the shared path rule writes for it, with
+// the name the child pins where a sibling shares its id ([boundItemPaths]);
+// where the template declares no child, each item is walked with the RM
+// rules alone.
 func (e *engine) visitDeclaredItems(n engineNode, a engineAttr, r attrReading, attrPath string, role floorRole) {
 	if !r.present {
 		e.checkAbsent(n, a, attrPath)

@@ -1,5 +1,13 @@
 package validation
 
+// walk_composition.go: the template's rules the one walk (engine.go) applies
+// at a node and at an attribute: identity and RM type against the bound
+// template node, admission of a single value and binding of a list's items
+// to the template's children, the existence, cardinality and occurrences
+// findings, and the template's value constraint at a primitive leaf. Each
+// returns or appends its issues; the walk decides where they run and in
+// which order.
+
 import (
 	"fmt"
 	"strconv"
@@ -219,6 +227,9 @@ func formatAllowedTypes(children []*tcimpl.CompiledNode) string {
 // layer and by the rule [requiredBy] names, with required set. A
 // multi-valued attribute is described as one. required is false when
 // neither the template nor the BMM bit the template carries requires attr.
+// The walk reports an RM layer issue only where the value's class does not
+// list the attribute; elsewhere the RM rules read the class
+// ([engine.checkAbsent]).
 func absentIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath string, multiValued bool) (iss Issue, required bool) {
 	layer, rule, required := requiredBy(attr)
 	if !required {
@@ -238,12 +249,13 @@ func absentIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath string, 
 	}, true
 }
 
-// emptyIssue returns the issue the template walk reports for the
-// multi-valued attribute attr of parentRM, at attrPath, when it is present
-// and holds no item: `required`, with required set, when [requiredBy] says
-// attr is required. When the template's existence requires it, the rule is
-// that existence; when only the RM makes it mandatory, the list is there and
-// empty, which the RM's own rule names cardinality.
+// emptyIssue returns the issue for the multi-valued attribute attr of
+// parentRM, at attrPath, when it is present and holds no item: `required`,
+// with required set, when [requiredBy] says attr is required. When the
+// template's existence requires it, the issue is on the template layer, rule
+// existence; when only the RM's mandatory bit the template carries does, it
+// is on the RM layer, rule cardinality, which the walk reads only where the
+// value's class does not list the attribute ([engine.checkEmpty]).
 func emptyIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath string) (iss Issue, required bool) {
 	layer, rule, required := requiredBy(attr)
 	if !required {

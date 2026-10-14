@@ -4,7 +4,7 @@ package validation_test
 // prohibited attributes. An attribute whose OPT existence has an upper bound
 // of 0 is reported once, as `prohibited` at the attribute's path, when it is
 // present: a single-valued attribute that holds a value, a multi-valued one
-// that holds at least one item. The template walk does not walk into it. No
+// that holds at least one item. The walk does not walk into it. No
 // vendored OPT prohibits an attribute, so the template here is built inline;
 // the same instances under a template that allows the attributes draw a
 // finding from inside each, so "nothing from inside" is a claim that can fail.
@@ -89,9 +89,9 @@ func templateIssues(r validation.Result) []string {
 // REQ-102, REQ-171 — a prohibited attribute that is present draws one
 // `prohibited` issue at its path, on the template layer with the rule
 // existence, an error whose sentinel is ErrProhibited and whose Detail
-// names the attribute and the RM type but no value; the template walk reports
+// names the attribute and the RM type but no value; the template reports
 // nothing from inside it. An absent prohibited attribute, and a multi-valued
-// one that holds no item, draw nothing from the template walk. Under a
+// one that holds no item, draw nothing from the template. Under a
 // template that allows the attributes, the same instances draw the finding
 // from inside each, which the prohibition hides. An existence whose upper
 // bound is unbounded prohibits nothing, though it carries no upper value:
@@ -111,8 +111,8 @@ func TestValidate_REQ102_REQ171_ProhibitedAttribute(t *testing.T) {
 		// prohibits the attributes.
 		under *templatecompile.Compiled
 		// want is the whole template-layer report under that template;
-		// inside is what the template walk reports under the one that
-		// allows the attributes.
+		// inside is what the template reports under the one that allows
+		// the attributes.
 		want, inside []string
 	}{
 		{

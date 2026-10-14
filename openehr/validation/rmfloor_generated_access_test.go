@@ -6,8 +6,8 @@ package validation_test
 // is set and empty is present and empty (REQ-112 Driver), the entries of a
 // Hash attribute are walked in ascending key order and written by their
 // position (REQ-102 Issue paths), a list of a primitive type is counted and
-// never read item by item, by the floor and by the template walk, and the
-// parts of a reference are reported once.
+// never read item by item, with a template and without, and the parts of a
+// reference are reported once.
 
 import (
 	"runtime"
@@ -152,7 +152,7 @@ const multimediaOPT = `<?xml version="1.0" encoding="utf-8"?>
 </definition>
 </template>`
 
-// TestValidate_REQ171_PrimitiveListCountedNotRead pins, in the template walk,
+// TestValidate_REQ171_PrimitiveListCountedNotRead pins, under a template,
 // that a list of a primitive type the template constrains is counted and
 // never read item by item: DV_MULTIMEDIA data that the template requires is
 // reported `required` when it is absent and when it is present and empty,
@@ -337,15 +337,14 @@ const hashTemplateOPT = `<?xml version="1.0" encoding="utf-8"?>
 </template>`
 
 // TestValidate_REQ102_HashEntriesBoundByPosition pins REQ-102 Issue paths and
-// REQ-171 Structural access in the template walk: a template that constrains
+// REQ-171 Structural access under a template: a template that constrains
 // a Hash attribute binds each entry, in ascending key order, and writes it by
 // its 1-based position there, never by its key. Of three items, the second
 // by key order lacks the `use` the template requires, so `required` is
 // reported at /details[2]/use on the template layer, whatever order the map
 // holds them in, and no issue path carries a key. It is the only issue: the
-// floor and the template walk both leave out parent_resource, which the
-// compiled template carries as an RM-mandatory attribute of the root and no
-// value can hold (REQ-112 Driver).
+// walk leaves out parent_resource, which the compiled template carries as an
+// RM-mandatory attribute of the root and no value can hold (REQ-112 Driver).
 func TestValidate_REQ102_HashEntriesBoundByPosition(t *testing.T) {
 	c := mustCompileInline(t, hashTemplateOPT)
 	use := "use"

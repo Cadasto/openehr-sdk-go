@@ -7,10 +7,11 @@ import (
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 )
 
-// issuepath.go: the one rule both walkers use to write the predicate of an
-// item of a multi-valued attribute in [Issue.Path]. The template walk
-// (walk_composition.go) and the floor (rmfloor.go) call the same functions,
-// so one node gets one path whichever of them reports it.
+// issuepath.go: the one rule the walk uses to write the predicate of an
+// item of a multi-valued attribute in [Issue.Path], with a template and
+// without one. The template rules (walk_composition.go) and the RM rules
+// (rmfloor.go) report at the paths the walk writes, so one node gets one
+// path whichever of them reports it.
 
 // pathItem is what the path rule reads of one item of a multi-valued
 // attribute.

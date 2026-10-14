@@ -144,8 +144,9 @@ func identityProblem(i validation.Issue, bmm map[string]bool) string {
 	var ok bool
 	switch code := i.Code; {
 	case code == "required":
-		// On the RM layer: absent (mandatory), or a mandatory list the
-		// template walk found present and empty (cardinality).
+		// On the RM layer: absent (mandatory), or a mandatory list read
+		// from the BMM bit a template carries, present and empty
+		// (cardinality).
 		ok = tmpl && i.Rule == "existence" || rmLayer && (i.Rule == "mandatory" || i.Rule == "cardinality")
 	case code == "prohibited":
 		ok = tmpl && i.Rule == "existence"

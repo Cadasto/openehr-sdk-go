@@ -1,6 +1,6 @@
 package validation_test
 
-// locatable_attributes_test.go: REQ-110 — the template walk reads an RM
+// locatable_attributes_test.go: REQ-110 — the walk reads an RM
 // attribute through the access the generator emits for every registered
 // class (REQ-171 § Structural access), so LOCATABLE's uid, links and
 // feeder_audit on an ELEMENT are read like any other attribute: one the
@@ -65,8 +65,8 @@ func locatableElement(full bool) *rm.Element {
 // and nothing under a template that requires them. An ELEMENT that carries
 // none of them draws `required` at each under the template that requires
 // them, and nothing under the one that prohibits them. Each result is the
-// whole set of template-layer issues, and the floor reports nothing on either
-// ELEMENT.
+// whole set of template-layer issues, and the RM rules alone report nothing
+// on either ELEMENT.
 func TestREQ110_LocatableUIDLinksAndFeederAuditAreRead(t *testing.T) {
 	t.Parallel()
 	prohibits := mustCompileInline(t, locatableAttributesOPT("0", "0"))
