@@ -75,10 +75,22 @@ func TestREQ071_FreshCacheHitPassesTheCallingResolversChecks(t *testing.T) { // 
 			wantReason: discovery.ReasonInsecureURL,
 		},
 		{
+			// The document names no issuer, so the catalog's issuer is the
+			// http base URL too.
 			name:       "http Platform base URL",
 			plaintext:  true,
 			doc:        smartDocument("", ""),
 			lenient:    []discovery.Option{discovery.WithAllowInsecure()},
+			wantReason: discovery.ReasonInsecureURL,
+		},
+		{
+			// The https issuer passes, so only the base URL's own check
+			// refuses the catalog.
+			name:       "http Platform base URL with an https issuer",
+			plaintext:  true,
+			doc:        smartDocument("https://idp.example.com", ""),
+			lenient:    []discovery.Option{discovery.WithAllowInsecure(), discovery.WithoutOpenIDConfigurationCheck()},
+			strict:     []discovery.Option{discovery.WithoutOpenIDConfigurationCheck()},
 			wantReason: discovery.ReasonInsecureURL,
 		},
 	}

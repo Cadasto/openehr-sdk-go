@@ -12,6 +12,10 @@ import (
 // The Resolver keys every entry by the Platform base URL the caller
 // resolved (ServiceCatalog.BaseURL), never by the OpenID Connect issuer.
 //
+// Resolvers built with different options may share one Cache. Each checks
+// a fresh entry against its own options before returning it, and an entry
+// one Resolver refuses stays cached for the others.
+//
 // The Resolver logs an error from Put or Invalidate at warning level and
 // carries on: it does not reach the caller of Resolve or Refresh. A failed
 // Put or Invalidate leaves the cache as it was, so the next Resolve fetches

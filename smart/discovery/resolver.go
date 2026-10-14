@@ -247,6 +247,16 @@ func requestFailure(err error) DiscoveryErrorReason {
 // WithoutOpenIDConfigurationCheck, the issuer must first be confirmed by
 // its own OpenID configuration.
 //
+// One Cache may serve Resolvers built with different options, so a fresh
+// cached catalog is returned only once it passes this Resolver's own checks
+// that send no request: the required services, the accepted spec versions,
+// the authorization-server members, and the https rule for the base URL,
+// the issuer and the auth endpoints. A catalog that fails them yields the
+// DiscoveryError a newly fetched document would, and stays cached for the
+// Resolvers that accept it. The issuer's OpenID configuration is not
+// fetched for a fresh cached catalog; it is checked when the document is
+// fetched or renewed.
+//
 // When the cached catalog has expired and carries an ETag, the fetch is
 // conditional, as for Refresh: a 304 Not Modified renews the cached
 // catalog once it passes the same checks as a new document, the issuer
@@ -260,6 +270,9 @@ func (r *Resolver) Resolve(ctx context.Context, baseURL string) (*ServiceCatalog
 	}
 	cached, ok := r.cache.Get(ctx, baseURL)
 	if ok && !cached.Stale(time.Now()) {
+		if err := r.checkFreshHit(baseURL, cached); err != nil {
+			return nil, err
+		}
 		return cached, nil
 	}
 	return r.fetchCoalesced(ctx, baseURL, cached)
@@ -447,14 +460,9 @@ func (r *Resolver) fetch(ctx context.Context, baseURL string, cached *ServiceCat
 	if cached != nil {
 		etag = cached.ETag
 	}
-	docURL, err := joinURL(baseURL, r.cfg.wellKnownPath)
+	docURL, err := r.documentURL(baseURL)
 	if err != nil {
-		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: err}
-	}
-	// Decide on the parsed scheme, which url.Parse lowercases: URL schemes
-	// are case-insensitive, so "HTTP://" is as plaintext as "http://".
-	if !r.cfg.allowInsecure && docURL.Scheme == "http" {
-		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonInsecureURL, Inner: errors.New("plaintext base URL rejected; use WithAllowInsecure for development")}
+		return nil, err
 	}
 	rawDocURL := docURL.String()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawDocURL, nil)
@@ -525,6 +533,43 @@ func (r *Resolver) fetch(ctx context.Context, baseURL string, cached *ServiceCat
 	}
 	r.warnInsecure(cat)
 	return cat, nil
+}
+
+// documentURL returns the URL of the SMART configuration for the Platform at
+// baseURL. A base URL that does not join with the well-known path is a
+// ReasonMalformedURL, and, unless the Resolver allows insecure URLs, a
+// plaintext one is a ReasonInsecureURL. It sends no request.
+func (r *Resolver) documentURL(baseURL string) (*url.URL, error) {
+	docURL, err := joinURL(baseURL, r.cfg.wellKnownPath)
+	if err != nil {
+		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonMalformedURL, Inner: err}
+	}
+	// Decide on the parsed scheme, which url.Parse lowercases: URL schemes
+	// are case-insensitive, so "HTTP://" is as plaintext as "http://".
+	if !r.cfg.allowInsecure && docURL.Scheme == "http" {
+		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonInsecureURL, Inner: errors.New("plaintext base URL rejected; use WithAllowInsecure for development")}
+	}
+	return docURL, nil
+}
+
+// checkFreshHit runs, on a fresh catalog cached under baseURL, this
+// Resolver's checks that send no request: the Platform base URL, the https
+// rule for the issuer and the auth endpoints, and validate. The catalog may
+// have been cached by a Resolver built with other options, so it must not
+// skip them. The OpenID configuration check is left to the next fetch or
+// renewal, since it needs a request.
+//
+// REQ-071, REQ-072, REQ-073: a failure is the DiscoveryError a new document
+// would get, and the caller leaves the entry cached, because it says
+// nothing new about the Platform.
+func (r *Resolver) checkFreshHit(baseURL string, cat *ServiceCatalog) error {
+	if _, err := r.documentURL(baseURL); err != nil {
+		return err
+	}
+	if err := r.refusePlaintext(cat); err != nil {
+		return err
+	}
+	return r.validate(cat)
 }
 
 // renewed returns a copy of cached that is fresh again after a 304 Not
@@ -968,8 +1013,9 @@ func (r *Resolver) warnInsecure(cat *ServiceCatalog) {
 
 // refusePlaintext applies the parser's https rule to a catalog this Resolver
 // did not parse: unless it allows insecure URLs, an http issuer or auth
-// endpoint is a ReasonInsecureURL. A 304 renewal needs it, because the
-// cached catalog may come from a Resolver built with WithAllowInsecure.
+// endpoint is a ReasonInsecureURL. A 304 renewal and a fresh cache hit need
+// it, because the cached catalog may come from a Resolver built with
+// WithAllowInsecure.
 func (r *Resolver) refusePlaintext(cat *ServiceCatalog) error {
 	if r.cfg.allowInsecure {
 		return nil
