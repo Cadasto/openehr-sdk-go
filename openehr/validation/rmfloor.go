@@ -120,18 +120,11 @@ func validateRM(root any, lim Limits) Result {
 	return r
 }
 
-// walkFloor runs the floor over root, of RM type rmType, within lim, and
-// returns its issues and the path of each place where a limit stopped it.
-// names gives the name the OPT pins on each item a template walk bound, so
-// the floor writes that walk's path for the node; nil writes no name
-// predicate.
-func walkFloor(root any, rmType string, names pinnedNames, lim Limits) (issues []Issue, stopped []string) {
-	w := runFloor(root, rmType, names, lim)
-	return w.issues, w.stoppedAt
-}
-
-// runFloor runs the floor over root, as [walkFloor] does, and returns the
-// walker, which holds the issues, the stops and the classes it visited.
+// runFloor runs the floor over root, of RM type rmType, within lim, and
+// returns the walker, which holds the issues, the path of each place where a
+// limit stopped it and the classes it visited. names gives the name the OPT
+// pins on each item a template walk bound, so the floor writes that walk's
+// path for the node; nil writes no name predicate.
 func runFloor(root any, rmType string, names pinnedNames, lim Limits) *rmFloorWalker {
 	w := newFloorWalker(names, lim)
 	w.walk(root, rmType, "/", roleNone, 0)

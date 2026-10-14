@@ -115,7 +115,7 @@ func TestValidate_REQ102_REQ112_EachDefectOnce(t *testing.T) {
 
 	w := newWalker(c)
 	w.walkNode(c.Root(), comp, "/")
-	floor, _ := walkFloor(comp, "COMPOSITION", w.names, Limits{})
+	floor := runFloor(comp, "COMPOSITION", w.names, Limits{}).issues
 	got := Validate(comp, c).Issues
 
 	for _, name := range []string{"Erste", "Zweite"} {
