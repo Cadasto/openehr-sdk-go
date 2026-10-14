@@ -148,7 +148,9 @@ func TestREQ052_MandatoryJSONTagByGoType(t *testing.T) {
 // TestREQ052_IsOwnTypeParameter pins [isOwnTypeParameter], which makes a
 // mandatory single property typed by its class's own generic parameter
 // polymorphic, so its field takes omitempty. No field generated today
-// depends on it alone, so only these rows hold the rule.
+// depends on it alone. These rows hold what the helper returns, and
+// [TestREQ052_RenderFieldPolymorphicMandatoryTag] holds that [renderField]
+// asks it.
 func TestREQ052_IsOwnTypeParameter(t *testing.T) {
 	// holder builds a class named name with a mandatory property "item"
 	// typed T, declaring the generic parameters params.
@@ -187,7 +189,9 @@ func TestREQ052_IsOwnTypeParameter(t *testing.T) {
 // real RM plan. A mandatory generic property whose root is EVENT is held as
 // a Go interface and takes omitempty; one whose root is a generic struct
 // (HISTORY) or a container (Hash) is not. No field generated today depends
-// on it alone, so only these rows hold the rule.
+// on it alone. These rows hold what the helper returns, and
+// [TestREQ052_RenderFieldPolymorphicMandatoryTag] holds that [renderField]
+// asks it.
 func TestREQ052_GenericRootIsInterface(t *testing.T) {
 	rmPlan, err := BuildPlanForTarget(t.Context(), TargetRM, bmm.FSResolver{Root: testResources})
 	if err != nil {
@@ -209,5 +213,75 @@ func TestREQ052_GenericRootIsInterface(t *testing.T) {
 		if got := genericRootIsInterface(rmPlan, gt); got != tc.want {
 			t.Errorf("genericRootIsInterface(RM plan, %s<ITEM_STRUCTURE>) = %t, want %t", tc.root, got, tc.want)
 		}
+	}
+}
+
+// TestREQ052_RenderFieldPolymorphicMandatoryTag renders a mandatory field
+// with [renderField] itself, for the two property kinds whose polymorphic
+// check lives in renderField rather than in [mandatoryJSONTag]: a
+// P_BMM_SINGLE_PROPERTY that names its class's own generic parameter, and a
+// P_BMM_GENERIC_PROPERTY whose root class is held as a Go interface. Each
+// field takes omitempty, so a typed-nil pointer it holds, which encodes as
+// null, is left out. No field generated today takes either path, so `make
+// codegen-verify` shows no diff when renderField stops asking.
+//
+// REQ-043: § Mapping rules, Property → Go field. REQ-052 § An absent
+// mandatory member: a mandatory member with no value is left out on encode,
+// never written as null.
+func TestREQ052_RenderFieldPolymorphicMandatoryTag(t *testing.T) {
+	rmPlan, err := BuildPlanForTarget(t.Context(), TargetRM, bmm.FSResolver{Root: testResources})
+	if err != nil {
+		t.Fatalf("BuildPlanForTarget(RM): %v", err)
+	}
+
+	// item is a mandatory single property typed T, on a class that declares
+	// the generic parameter T.
+	item := &bmm.SingleProperty{TypeName: "T"}
+	item.Name = "item"
+	item.IsMandatory = true
+	itemHolder := &bmm.SimpleClass{}
+	itemHolder.Name = "GENERIC_HOLDER"
+	itemHolder.GenericParameterDefs = map[string]*bmm.GenericParameterDef{"T": {Name: "T"}}
+	itemHolder.Properties = map[string]bmm.Property{"item": item}
+
+	// event is a mandatory generic property over EVENT<ITEM_STRUCTURE>, which
+	// the RM plan holds as the Go interface Event.
+	event := &bmm.GenericProperty{TypeDef: &bmm.GenericType{
+		RootType:          "EVENT",
+		GenericParameters: []bmm.Type{&bmm.SimpleType{TypeName: "ITEM_STRUCTURE"}},
+	}}
+	event.Name = "event"
+	event.IsMandatory = true
+	eventHolder := &bmm.SimpleClass{}
+	eventHolder.Name = "EVENT_HOLDER"
+	eventHolder.Properties = map[string]bmm.Property{"event": event}
+
+	for _, tc := range []struct {
+		name  string
+		plan  *Plan
+		owner *bmm.SimpleClass
+		prop  bmm.Property
+		want  string
+	}{
+		{
+			name: "single property typed by its class's own generic parameter",
+			plan: &Plan{}, owner: itemHolder, prop: item,
+			want: "\tItem T `json:\"item,omitempty\"`\n",
+		},
+		{
+			name: "generic property over EVENT<ITEM_STRUCTURE>",
+			plan: rmPlan, owner: eventHolder, prop: event,
+			want: "\tEvent Event `json:\"event,omitempty\"`\n",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := renderField(tc.plan, tc.owner, tc.owner.Name, tc.prop)
+			if err != nil {
+				t.Fatalf("renderField(%s.%s): %v", tc.owner.Name, tc.prop.PropertyName(), err)
+			}
+			if got != tc.want {
+				t.Errorf("renderField(%s.%s) = %q, want %q", tc.owner.Name, tc.prop.PropertyName(), got, tc.want)
+			}
+		})
 	}
 }

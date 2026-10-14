@@ -20,6 +20,9 @@ const codePhraseNL = `{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOL
 // LOCATABLE with no name. The re-encode must also be wire-equivalent to the
 // input's expected form, which treats a null member as absent and keeps
 // everything else.
+//
+// REQ-052 § An absent mandatory member: a mandatory member with no value is
+// left out on encode, never written as null.
 func TestREQ052_AbsentMandatoryMemberIsOmitted(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
@@ -99,6 +102,9 @@ func TestREQ052_AbsentMandatoryMemberIsOmitted(t *testing.T) {
 // TestREQ052_PresentEmptyMandatoryContainerIsWritten is the control for the
 // test above: a mandatory list or map that the input carries empty is a
 // value, so the re-encode writes it as it is, `[]` or `{}`.
+//
+// REQ-052 § An absent mandatory member: a present empty mandatory list or
+// map is written as it is.
 func TestREQ052_PresentEmptyMandatoryContainerIsWritten(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
@@ -146,6 +152,10 @@ func TestREQ052_PresentEmptyMandatoryContainerIsWritten(t *testing.T) {
 // field holds no value: a nil interface, a typed-nil pointer in an interface,
 // a nil type-parameter field instantiated with an interface, a nil pointer
 // and a nil `any`. Each member must be left out.
+//
+// REQ-052 § An absent mandatory member: a nil list, map, pointer or
+// interface, or a polymorphic RM slot holding a typed-nil pointer, is left
+// out on encode.
 func TestREQ052_GoBuiltAbsentMandatoryMember(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
@@ -201,6 +211,9 @@ func TestREQ052_GoBuiltAbsentMandatoryMember(t *testing.T) {
 // still written; a struct or primitive held by value, and a type-parameter
 // field instantiated by value, have no absent form; and an `any` holding an
 // empty string or object holds a value.
+//
+// REQ-052 § An absent mandatory member: a mandatory member held by value
+// has no absent form and is written.
 func TestREQ052_MandatoryMemberWithAValueIsWritten(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
