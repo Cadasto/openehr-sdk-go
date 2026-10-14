@@ -2,6 +2,8 @@ package bmmgen
 
 import (
 	"context"
+	"maps"
+	"slices"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
@@ -129,6 +131,8 @@ func TestREQ052_MandatoryJSONTagByGoType(t *testing.T) {
 		{goType: "*ArchetypeOntology", want: "`json:\"m,omitzero\"`"},
 		{goType: "*Archetype", polymorphic: true, want: "`json:\"m,omitzero\"`"},
 		{goType: "any", want: "`json:\"m,omitzero\"`"},
+		{goType: "any /* TODO: unmapped X */", want: "`json:\"m,omitzero\"`"},
+		{goType: "any /* TODO: unknown type X */", want: "`json:\"m,omitzero\"`"},
 		{goType: "DVTextLike", polymorphic: true, want: "`json:\"m,omitempty\"`"},
 		{goType: "T", polymorphic: true, want: "`json:\"m,omitempty\"`"},
 		{goType: "HierObjectID", want: "`json:\"m\"`"},
@@ -137,6 +141,73 @@ func TestREQ052_MandatoryJSONTagByGoType(t *testing.T) {
 	} {
 		if got := mandatoryJSONTag("m", tc.goType, tc.polymorphic); got != tc.want {
 			t.Errorf("mandatoryJSONTag(%q, %q, %t) = %s, want %s", "m", tc.goType, tc.polymorphic, got, tc.want)
+		}
+	}
+}
+
+// TestREQ052_IsOwnTypeParameter pins [isOwnTypeParameter], which makes a
+// mandatory single property typed by its class's own generic parameter
+// polymorphic, so its field takes omitempty. No field generated today
+// depends on it alone, so only these rows hold the rule.
+func TestREQ052_IsOwnTypeParameter(t *testing.T) {
+	// holder builds a class named name with a mandatory property "item"
+	// typed T, declaring the generic parameters params.
+	holder := func(name string, params ...string) *bmm.SimpleClass {
+		item := &bmm.SingleProperty{TypeName: "T"}
+		item.Name = "item"
+		item.IsMandatory = true
+		c := &bmm.SimpleClass{}
+		c.Name = name
+		c.Properties = map[string]bmm.Property{"item": item}
+		for _, p := range params {
+			if c.GenericParameterDefs == nil {
+				c.GenericParameterDefs = map[string]*bmm.GenericParameterDef{}
+			}
+			c.GenericParameterDefs[p] = &bmm.GenericParameterDef{Name: p}
+		}
+		return c
+	}
+
+	for _, tc := range []struct {
+		owner *bmm.SimpleClass
+		want  bool
+	}{
+		{owner: holder("GENERIC_HOLDER", "T"), want: true},
+		{owner: holder("PLAIN_HOLDER"), want: false},
+	} {
+		typeName := tc.owner.Properties["item"].(*bmm.SingleProperty).TypeName
+		if got := isOwnTypeParameter(tc.owner, typeName); got != tc.want {
+			t.Errorf("isOwnTypeParameter(%s with generic parameters %v, %q) = %t, want %t",
+				tc.owner.Name, slices.Sorted(maps.Keys(tc.owner.GenericParameterDefs)), typeName, got, tc.want)
+		}
+	}
+}
+
+// TestREQ052_GenericRootIsInterface pins [genericRootIsInterface] on the
+// real RM plan. A mandatory generic property whose root is EVENT is held as
+// a Go interface and takes omitempty; one whose root is a generic struct
+// (HISTORY) or a container (Hash) is not. No field generated today depends
+// on it alone, so only these rows hold the rule.
+func TestREQ052_GenericRootIsInterface(t *testing.T) {
+	rmPlan, err := BuildPlanForTarget(t.Context(), TargetRM, bmm.FSResolver{Root: testResources})
+	if err != nil {
+		t.Fatalf("BuildPlanForTarget(RM): %v", err)
+	}
+
+	for _, tc := range []struct {
+		root string
+		want bool
+	}{
+		{root: "EVENT", want: true},
+		{root: "HISTORY", want: false},
+		{root: "Hash", want: false},
+	} {
+		gt := &bmm.GenericType{
+			RootType:          tc.root,
+			GenericParameters: []bmm.Type{&bmm.SimpleType{TypeName: "ITEM_STRUCTURE"}},
+		}
+		if got := genericRootIsInterface(rmPlan, gt); got != tc.want {
+			t.Errorf("genericRootIsInterface(RM plan, %s<ITEM_STRUCTURE>) = %t, want %t", tc.root, got, tc.want)
 		}
 	}
 }

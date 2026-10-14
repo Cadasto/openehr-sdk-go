@@ -620,9 +620,14 @@ func genericInstantiationFromDescendant(sc *bmm.SimpleClass) string {
 //     mandatory member with no value is left out rather than written as
 //     null (REQ-052, an absent mandatory member).
 //
-// Every JSON tag the generator writes for a class member comes from here:
-// the struct declarations, the flat wire structs ([renderMarshalFlat]) and
-// the interval wire structs ([renderIntervalDerivedWire]).
+// Every JSON tag on a field that carries a member's value on encode comes
+// from here: the struct declarations, the flat wire structs
+// ([renderMarshalFlat]) and the interval wire structs
+// ([renderIntervalDerivedWire]). Two kinds of generated field are the
+// exceptions and write their own tags: the struct{} shadow fields an
+// interval encoder adds to leave out its lower or upper bound, and the
+// intervalFlagJSON and intervalBoundJSON fields of an interval decoder's
+// wrapper.
 func renderField(plan *Plan, owner *bmm.SimpleClass, ownerName string, prop bmm.Property) (string, error) {
 	name := prop.PropertyName()
 	goName := FieldName(name)
@@ -691,7 +696,9 @@ func renderField(plan *Plan, owner *bmm.SimpleClass, ownerName string, prop bmm.
 //
 //   - A list, map, pointer or any field takes omitzero, which leaves out
 //     only nil. A present empty list or map is still written as [] or {},
-//     and an any holding "" or {} is still written.
+//     and an any holding "" or {} is still written. An any field counts
+//     whether goType is plain "any" or the "any /* TODO: … */" form the
+//     generator writes for an unmapped or unknown type ([singleTypeRef]).
 //   - An interface or type-parameter field takes omitempty. A typed-nil
 //     pointer in an interface is not the zero value, so omitzero would
 //     keep it, but it encodes as null, and omitempty leaves that out.
@@ -704,7 +711,7 @@ func renderField(plan *Plan, owner *bmm.SimpleClass, ownerName string, prop bmm.
 func mandatoryJSONTag(name, goType string, polymorphic bool) string {
 	switch {
 	case strings.HasPrefix(goType, "[]"), strings.HasPrefix(goType, "map["),
-		strings.HasPrefix(goType, "*"), goType == "any":
+		strings.HasPrefix(goType, "*"), goType == "any", strings.HasPrefix(goType, "any /*"):
 		return fmt.Sprintf("`json:%q`", name+",omitzero")
 	case polymorphic:
 		return fmt.Sprintf("`json:%q`", name+",omitempty")
