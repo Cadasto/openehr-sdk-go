@@ -364,11 +364,11 @@ func (w *rmFloorWalker) walk(value any, rmType string, path string, role floorRo
 // A value of no registered class is a leaf here, validated solely by the RM
 // rules of its declared type (run above): a flattened scalar the access
 // surfaces directly, such as CODE_PHRASE.terminology_id, which comes back as
-// a Go string, or a primitive value. The parts of a reference (OBJECT_REF and
-// its subtypes) are the reference's own evaluator's to report
-// ([rmFloorWalker.checkObjectRef]), so the required-set check leaves them
-// out and a missing part is reported once; the walk still goes below a
-// present id.
+// a Go string, or a primitive value. The parts of a reference, on every class
+// the rminfo hierarchy places at or below OBJECT_REF, are the reference's own
+// evaluator's to report ([rmFloorWalker.checkObjectRef]), so the required-set
+// check leaves them out ([classRules.leavesOut]) and a missing part is
+// reported once; the walk still goes below a present id.
 func (w *rmFloorWalker) visit(value any, rmType string, path string, role floorRole, depth int) {
 	if w.visits == w.maxNodes {
 		w.emit(Issue{
@@ -383,7 +383,7 @@ func (w *rmFloorWalker) visit(value any, rmType string, path string, role floorR
 	w.visits++
 	// The rules run before the Covers gate below, so they see every node the
 	// walk visits.
-	class := w.checkInvariants(value, rmType, path, role)
+	rules, class := w.checkInvariants(value, rmType, path, role)
 
 	if !rmaccess.Covers(value) {
 		return
@@ -430,7 +430,7 @@ func (w *rmFloorWalker) visit(value any, rmType string, path string, role floorR
 			continue
 		}
 		isContainer, _ := w.info.IsContainer(class, attr)
-		required := requiredSet[attr] && !isReferencePart(rmType, attr)
+		required := requiredSet[attr] && !rules.leavesOut(attr)
 		attrPath := joinPath(path, "/"+attr)
 
 		switch {
@@ -535,21 +535,6 @@ func hashEntryPath(attrPath string, i int) string {
 	return attrPath + "[" + strconv.Itoa(i+1) + "]"
 }
 
-// isReferencePart reports whether attr is one of the three parts of a
-// reference (id, namespace and type of OBJECT_REF and its subtypes) on a node
-// of RM type rmType. [rmFloorWalker.checkObjectRef] reports a missing part,
-// so the required-set check leaves the three out and each is reported once.
-func isReferencePart(rmType, attr string) bool {
-	switch rmType {
-	case "OBJECT_REF", "PARTY_REF", "LOCATABLE_REF", "ACCESS_GROUP_REF":
-		switch attr {
-		case "id", "namespace", "type":
-			return true
-		}
-	}
-	return false
-}
-
 // itemPaths returns the issue path of each of the items kids of the
 // multi-valued attribute at attrPath: the shared path rule ([itemPaths]),
 // fed each item's archetype_node_id and the name w.names pins for it.
@@ -596,12 +581,12 @@ func setFromSlice(s []string) map[string]bool {
 // invariants the class and its ancestors declare, the coded ones included,
 // and the attribute checks that apply to the class. A type no registered
 // class has runs nothing (this is a floor, not an exhaustive RM check). It
-// returns the bare class name of rmType, which the walk reads the class's
-// attributes by.
-func (w *rmFloorWalker) checkInvariants(value any, rmType, path string, role floorRole) string {
+// returns the class's rules, nil for such a type, and the bare class name of
+// rmType, which the walk reads the class's attributes by.
+func (w *rmFloorWalker) checkInvariants(value any, rmType, path string, role floorRole) (*classRules, string) {
 	rules, class := rulesFor(rmType)
 	if rules == nil {
-		return class
+		return nil, class
 	}
 	w.visited = w.visited.with(rules.index)
 	n := floorNode{value: value, rmType: rmType, path: path, role: role}
@@ -611,7 +596,7 @@ func (w *rmFloorWalker) checkInvariants(value any, rmType, path string, role flo
 	if len(rules.coded) > 0 {
 		w.checkCodedInvariants(value, rmType, path, rules.coded)
 	}
-	return class
+	return rules, class
 }
 
 // checkArchetypeRoot enforces the archetype-root rule on a node whose class
@@ -959,9 +944,10 @@ func intervalFlagSet(value any, attr string) bool {
 
 // checkObjectRef enforces the spec floor on OBJECT_REF (and subtypes):
 // id, type, and namespace are RM-mandatory. The walk goes below a reference
-// like any node, but its required-set check leaves the three parts out
-// ([isReferencePart]), so this evaluator is the floor's only check of a
-// missing part, which keeps it from being reported twice. It reads the id
+// like any node, but its required-set check leaves the three parts out on
+// every class this evaluator runs on ([classRules.leavesOut]), so this
+// evaluator is the floor's only check of a missing part, which keeps it from
+// being reported twice. It reads the id
 // as the walk does, through the generated access, which reads the id the
 // class itself declares: a LOCATABLE_REF's own UID_BASED_ID, not the
 // OBJECT_REF id it embeds. It reads type and namespace through the

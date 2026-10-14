@@ -165,6 +165,10 @@ var invariantChecks = map[string]invariantCheck{
 type attributeCheck struct {
 	class string
 	check invariantCheck
+	// owns names the RM-mandatory attributes the evaluator reports absent
+	// itself, so the required-set check leaves them out on every class the
+	// evaluator runs on and each absence is reported once.
+	owns []string
 }
 
 // attributeChecks are the floor's evaluators of the two rules the BMM states
@@ -173,9 +177,10 @@ type attributeCheck struct {
 // ([rmFloorWalker.checkObjectRef], part of the mandatory-presence rule) and
 // the precision range of a DV_QUANTITY ([rmFloorWalker.checkDVQuantity]).
 // Each runs on the class it names and on every class the rminfo hierarchy
-// places below it.
+// places below it; the reference check owns the three parts it reports, so
+// the required-set check leaves them out on exactly the classes it runs on.
 var attributeChecks = []attributeCheck{
-	{class: "OBJECT_REF", check: nodeCheck("checkObjectRef", (*rmFloorWalker).checkObjectRef)},
+	{class: "OBJECT_REF", check: nodeCheck("checkObjectRef", (*rmFloorWalker).checkObjectRef), owns: []string{"id", "namespace", "type"}},
 	{class: "DV_QUANTITY", check: nodeCheck("checkDVQuantity", (*rmFloorWalker).checkDVQuantity)},
 }
 
@@ -223,13 +228,23 @@ type boundCheck struct {
 }
 
 // classRules is what the floor runs on a node of one class, built once from
-// the inventory: the evaluators, in a fixed order, the coded invariants, and
-// the invariants of the class the floor does not evaluate.
+// the inventory: the evaluators, in a fixed order, the coded invariants, the
+// attributes an evaluator reports absent itself, and the invariants of the
+// class the floor does not evaluate.
 type classRules struct {
 	index       int
 	checks      []boundCheck
 	coded       []*codedRule
+	owned       []string
 	unevaluated indexSet
+}
+
+// leavesOut reports whether the required-set check leaves the RM-mandatory
+// attr out on a node of the class, because an attribute check that runs on
+// the class reports it absent itself. Nil rules, those of a type no
+// registered class has, leave nothing out.
+func (r *classRules) leavesOut(attr string) bool {
+	return r != nil && slices.Contains(r.owned, attr)
 }
 
 // inventoryRules is the floor's dispatch, built once from the inventory.
@@ -305,6 +320,7 @@ func (src inventorySource) build() inventoryRules {
 		for _, ac := range src.attributes {
 			if conformsTo(src.hierarchy, class, ac.class) {
 				r.checks = append(r.checks, boundCheck{run: ac.check.run})
+				r.owned = append(r.owned, ac.owns...)
 			}
 		}
 		served := map[string]bool{}
