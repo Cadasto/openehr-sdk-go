@@ -13,7 +13,7 @@ import (
 // both sides were unbounded: [NumericRange.IsBounded] reports false for
 // it, [NumericRange.IsValid] reports true, [NumericRange.String] renders
 // it as `(*..*)`, and [NumericRange.Contains] reports true for every
-// value but NaN.
+// value.
 type NumericRange struct {
 	// Lower / Upper are the numeric bounds. Float64 covers both
 	// C_INTEGER (lossless up to 2^53) and C_REAL.
@@ -64,22 +64,24 @@ func (r NumericRange) IsValid() bool {
 }
 
 // Contains reports whether v is inside the range under the configured
-// inclusivity. Unbounded sides accept any value on that side, and the
-// zero value accepts any value, as if both sides were unbounded. A NaN
-// is inside no range, so Contains returns false for it even on the zero
-// value or when both sides are unbounded.
+// inclusivity. A range that constrains nothing, with both sides
+// unbounded or the zero value read the same way, accepts every value, a
+// NaN included. A bounded range contains no NaN; on it, an unbounded
+// side accepts any value on that side.
 func (r NumericRange) Contains(v float64) bool {
-	// Only a NaN is unequal to itself. The check is spelled out instead
-	// of calling math.IsNaN because math is not on the package's list
-	// of pure imports (pure_imports_test.go).
-	if v != v {
-		return false
-	}
-	// A range that constrains nothing accepts every value. That covers
-	// the zero value, whose bounds would otherwise read as the empty
-	// interval (0..0).
+	// A range that constrains nothing accepts every value, a NaN
+	// included. That covers the zero value, whose bounds would otherwise
+	// read as the empty interval (0..0).
 	if !r.IsBounded() {
 		return true
+	}
+	// A bounded range contains no NaN: every comparison with a NaN is
+	// false, so the bound checks below would let one through. Only a
+	// NaN is unequal to itself; the check is spelled out instead of
+	// calling math.IsNaN because math is not on the package's list of
+	// pure imports (pure_imports_test.go).
+	if v != v {
+		return false
 	}
 	if !r.LowerUnbounded {
 		if r.LowerInclusive {

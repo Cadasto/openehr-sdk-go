@@ -52,7 +52,6 @@ func TestREQ103_NumericRangeRefusesNaN(t *testing.T) {
 		{"exclusive", constraints.NumericRange{Lower: 0, Upper: 10}},
 		{"lower-bounded-only", constraints.NumericRange{Lower: 0, LowerInclusive: true, UpperUnbounded: true}},
 		{"upper-bounded-only", constraints.NumericRange{Upper: 10, UpperInclusive: true, LowerUnbounded: true}},
-		{"fully-unbounded", constraints.NumericRange{LowerUnbounded: true, UpperUnbounded: true}},
 	}
 	for _, tc := range ranges {
 		t.Run("Contains/"+tc.name, func(t *testing.T) {
@@ -86,8 +85,8 @@ func TestREQ103_NumericRangeRefusesNaN(t *testing.T) {
 }
 
 // REQ-103 — the zero NumericRange means "no constraint": IsBounded
-// reports false for it, and Contains accepts every value but a NaN, as
-// on a range with both sides unbounded. Read field by field, its zero
+// reports false for it, and Contains accepts every value, a NaN
+// included, as on a range with both sides unbounded. Read field by field, its zero
 // bounds would form the empty interval (0..0) and refuse every value.
 func TestREQ103_NumericRangeZeroValueAcceptsAnyValue(t *testing.T) {
 	zero := constraints.NumericRange{}
@@ -99,8 +98,37 @@ func TestREQ103_NumericRangeZeroValueAcceptsAnyValue(t *testing.T) {
 			t.Errorf("NumericRange{}.Contains(%v) = false, want true", v)
 		}
 	}
-	if zero.Contains(math.NaN()) {
-		t.Error("NumericRange{}.Contains(NaN) = true, want false")
+	if !zero.Contains(math.NaN()) {
+		t.Error("NumericRange{}.Contains(NaN) = false, want true")
+	}
+}
+
+// REQ-103 — a range that constrains nothing (the zero value, or both
+// sides unbounded) accepts a NaN, and so do the validators, which skip
+// such a range: Contains and Validate agree. Only a bounded range
+// refuses a NaN (TestREQ103_NumericRangeRefusesNaN).
+func TestREQ103_NumericRangeWithNoBoundsAcceptsNaN(t *testing.T) {
+	nan := math.NaN()
+	for _, tc := range []struct {
+		name string
+		r    constraints.NumericRange
+	}{
+		{"zero-value", constraints.NumericRange{}},
+		{"fully-unbounded", constraints.NumericRange{LowerUnbounded: true, UpperUnbounded: true}},
+		{"fully-unbounded-inclusive", constraints.NumericRange{LowerUnbounded: true, UpperUnbounded: true, LowerInclusive: true, UpperInclusive: true}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if !tc.r.Contains(nan) {
+				t.Errorf("Contains(NaN) = false, want true (range %s constrains nothing)", tc.r)
+			}
+			if v := (constraints.CReal{Range: tc.r}).Validate(nan); len(v) != 0 {
+				t.Errorf("CReal{Range: %s}.Validate(NaN) = %v, want no violation", tc.r, v)
+			}
+			q := constraints.DvQuantity{Units: []constraints.QuantityUnit{{Units: "mm[Hg]", Magnitude: tc.r}}}
+			if v := q.Validate(constraints.QuantityValue{Magnitude: nan, Units: "mm[Hg]", Precision: -1}); len(v) != 0 {
+				t.Errorf("DvQuantity magnitude %s Validate(NaN) = %v, want no violation", tc.r, v)
+			}
+		})
 	}
 }
 

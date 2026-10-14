@@ -223,7 +223,7 @@ Every `Violation` carries a typed `ViolationCode`. The closed set is:
 - `LowerInclusive` / `UpperInclusive` (the parser reads a flag the OPT omits by [wire.md § REQ-169](wire.md#req-169--interval-boundary-flag-defaults): true on a bounded side, false on an unbounded one; consumers constructing ranges manually MUST set the flags explicitly — the struct zero value is *exclusive* on both sides)
 - `LowerUnbounded` / `UpperUnbounded` (when true, the corresponding bound is ignored)
 
-The zero-value `NumericRange{}` (no fields set) is a no-op constraint, read as both sides unbounded: `IsBounded` reports false for it and `Contains` accepts every value but NaN, which no range contains. AOM 1.4 also models `C_DURATION.range` (as `Interval<Iso8601_duration>`) plus eight per-component allowed-flags (`years_allowed`, `months_allowed`, …, `fractional_seconds_allowed`); v1 captures none of them — `CDuration` exposes the raw `Pattern` only. The richer surface is deferred to a follow-up REQ (calendar conversion is out of scope for v1).
+The zero-value `NumericRange{}` (no fields set) is treated as "any value accepted" by `Contains` and `IsBounded` — a no-op constraint. AOM 1.4 also models `C_DURATION.range` (as `Interval<Iso8601_duration>`) plus eight per-component allowed-flags (`years_allowed`, `months_allowed`, …, `fractional_seconds_allowed`); v1 captures none of them — `CDuration` exposes the raw `Pattern` only. The richer surface is deferred to a follow-up REQ (calendar conversion is out of scope for v1).
 
 ### Out of scope (this REQ)
 
