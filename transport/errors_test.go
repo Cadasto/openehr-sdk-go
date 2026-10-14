@@ -181,7 +181,7 @@ func TestErrorStringsValueFreeWhenRouteUnset(t *testing.T) { // REQ-093
 
 // errReadCloser is an io.ReadCloser whose Read always fails with err —
 // simulating a connection that drops mid-body, the doOnce read-body-failure
-// arm (client.go's second "transport: %s %s: …" diagnostic).
+// arm (a *BodyReadError on a 2xx, REQ-172).
 type errReadCloser struct{ err error }
 
 func (e errReadCloser) Read([]byte) (int, error) { return 0, e.err }
