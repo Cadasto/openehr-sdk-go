@@ -2174,8 +2174,8 @@ requirements:
     title: Typed 2xx body-read failure
     canonical: docs/specifications/transport.md#req-172--typed-2xx-body-read-failure
     status: draft
-    implementation: planned
-    packages: [transport]
+    implementation: landed
+    packages: [transport, openehr/client/definition, openehr/client/demographic, openehr/client/ehr/composition, openehr/client/ehr/contribution, openehr/client/query, openehr/client/system]
     tests:
       - openehr/client/definition/body_read_error_test.go
       - openehr/client/demographic/body_read_error_test.go
