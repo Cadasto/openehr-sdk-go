@@ -475,6 +475,56 @@ func TestRunStoredVersionPathConstruction(t *testing.T) {
 	}
 }
 
+// TestREQ057_RepositoryRunStoredVersion pins that the Repository mirrors the
+// package's RunStoredVersion: through NewRepository the call reaches the
+// versioned route /query/{qualified_query_name}/{version}, and an empty
+// version is refused before any request, as the package function refuses it.
+func TestREQ057_RepositoryRunStoredVersion(t *testing.T) {
+	t.Run("versioned route", func(t *testing.T) {
+		type wireRequest struct{ method, path string }
+		// Read the fixture here: readFixture may stop the test, which only
+		// the test's own goroutine may do, not the handler's.
+		body := readFixture(t, "result_set.json")
+		seen := make(chan wireRequest, 1)
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			select {
+			case seen <- wireRequest{method: r.Method, path: r.URL.Path}:
+			default:
+				t.Errorf("server received a second request %s %s, want one", r.Method, r.URL.Path)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write(body)
+		}))
+		defer srv.Close()
+
+		repo := query.NewRepository(newClient(t, srv))
+		if _, _, err := repo.RunStoredVersion(t.Context(), "org.openehr::vitals", "1.2.3", nil); err != nil {
+			t.Fatalf("Repository.RunStoredVersion(org.openehr::vitals, 1.2.3) error = %v", err)
+		}
+		var req wireRequest
+		select {
+		case req = <-seen:
+		default:
+			t.Fatal("Repository.RunStoredVersion sent no request")
+		}
+		if want := "/openehr/v1/query/org.openehr::vitals/1.2.3"; req.method != http.MethodPost || req.path != want {
+			t.Errorf("Repository.RunStoredVersion request = %s %s, want POST %s", req.method, req.path, want)
+		}
+	})
+
+	t.Run("empty version refused", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.Errorf("server received %s %s, want no request for an empty version", r.Method, r.URL.Path)
+		}))
+		defer srv.Close()
+
+		_, _, err := query.NewRepository(newClient(t, srv)).RunStoredVersion(t.Context(), "org.openehr::vitals", "  ", nil)
+		if !errors.Is(err, query.ErrInvalidConfig) {
+			t.Errorf("Repository.RunStoredVersion(version %q) error = %v, want one matching query.ErrInvalidConfig", "  ", err)
+		}
+	})
+}
+
 // TestRunStoredDiagnosticsNameTheOperation pins that the shared stored-path
 // implementation reports the operation the caller actually invoked, not its
 // sibling — the prefix is the caller's first breadcrumb.
