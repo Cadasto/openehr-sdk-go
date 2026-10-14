@@ -11,7 +11,9 @@ import (
 //
 // The zero value represents an "any value accepted" range, read as if
 // both sides were unbounded: [NumericRange.IsBounded] reports false for
-// it, and [NumericRange.Contains] reports true for every value but NaN.
+// it, [NumericRange.IsValid] reports true, [NumericRange.String] renders
+// it as `(*..*)`, and [NumericRange.Contains] reports true for every
+// value but NaN.
 type NumericRange struct {
 	// Lower / Upper are the numeric bounds. Float64 covers both
 	// C_INTEGER (lossless up to 2^53) and C_REAL.
@@ -43,8 +45,15 @@ func (r NumericRange) IsBounded() bool {
 
 // IsValid reports whether the range is internally consistent: the
 // lower bound is less than (or equal to, when both sides are
-// inclusive) the upper bound. Unbounded sides are skipped.
+// inclusive) the upper bound. Unbounded sides are skipped, and the zero
+// value is valid, as if both sides were unbounded.
 func (r NumericRange) IsValid() bool {
+	// A range that constrains nothing has no bounds to compare. That
+	// covers the zero value, whose bounds would otherwise read as the
+	// empty interval (0..0).
+	if !r.IsBounded() {
+		return true
+	}
 	if r.LowerUnbounded || r.UpperUnbounded {
 		return true
 	}
@@ -99,21 +108,27 @@ func (r NumericRange) Contains(v float64) bool {
 
 // String renders the range in standard interval notation: `[a..b]`
 // for fully-closed, `(a..b)` for open, `[a..*)` for half-unbounded,
-// etc. Convenient for Violation.Detail messages.
+// etc. The zero value renders as `(*..*)`, as if both sides were
+// unbounded. Convenient for Violation.Detail messages.
 func (r NumericRange) String() string {
+	// A range that constrains nothing prints both sides as unbounded.
+	// That covers the zero value, whose bounds would otherwise print as
+	// the empty interval (0..0). The brackets still follow the
+	// inclusivity flags.
+	unbounded := !r.IsBounded()
 	var sb strings.Builder
 	if r.LowerInclusive {
 		sb.WriteByte('[')
 	} else {
 		sb.WriteByte('(')
 	}
-	if r.LowerUnbounded {
+	if r.LowerUnbounded || unbounded {
 		sb.WriteByte('*')
 	} else {
 		fmt.Fprintf(&sb, "%v", r.Lower)
 	}
 	sb.WriteString("..")
-	if r.UpperUnbounded {
+	if r.UpperUnbounded || unbounded {
 		sb.WriteByte('*')
 	} else {
 		fmt.Fprintf(&sb, "%v", r.Upper)
