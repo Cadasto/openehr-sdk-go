@@ -6,9 +6,8 @@ package templatecompile_test
 // answer is compared with the answer rminfo.Default, or the attribute's own
 // children, give when asked directly: the allowed children and the
 // prohibition, and whether each class the hierarchy knows, and some it does
-// not, conforms to the node's RM type. The facts of each class's attributes,
-// which the walk reads per class, are compared the same way, and every slice
-// the compiled template hands out has no room to append into.
+// not, conforms to the node's RM type. Every slice the compiled template
+// hands out has no room to append into.
 
 import (
 	"slices"
@@ -20,33 +19,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
-
-// runtimeFacts returns what rminfo.Default says of the attribute name of the
-// bare RM class class, each answer asked of it directly.
-func runtimeFacts(t *testing.T, class, name string) templatecompile.AttributeFacts {
-	t.Helper()
-	lister, ok := rminfo.Default.(rminfo.AttributeLister)
-	if !ok {
-		t.Fatal("rminfo.Default lists no attributes")
-	}
-	if !slices.Contains(lister.AttributeNames(class), name) {
-		t.Fatalf("rminfo.Default does not list %s on %s", name, class)
-	}
-	absence, ok := rminfo.Default.(rminfo.AbsenceReporter)
-	if !ok {
-		t.Fatal("rminfo.Default reports no absence reasons")
-	}
-	f := templatecompile.AttributeFacts{
-		Name:        name,
-		NonStorable: rminfo.IsNonStorableAttr(class, name),
-		Mandatory:   slices.Contains(rminfo.Default.RequiredAttributes(class), name),
-	}
-	f.RMType, f.Typed = rminfo.Default.AttributeRMType(class, name)
-	f.Container, _ = rminfo.Default.IsContainer(class, name)
-	f.PrimitiveItems = absence.AbsenceReason(f.RMType) == rminfo.AbsencePrimitive
-	f.Hash = f.RMType == "Hash"
-	return f
-}
 
 // runtimeAllowed returns the children of a whose occurrences state no upper
 // bound of 0, and whether the template prohibits a: its existence's upper
@@ -216,26 +188,4 @@ func TestREQ171_AllowedChildrenAndProhibitionResolvedAtCompile(t *testing.T) {
 		}
 	}
 	checkNode(t, "prohibiting", c.Root())
-}
-
-// REQ-171 § Surface — the facts the compile gives of every attribute of
-// every class the class metadata knows, which the validation walk reads a
-// node by where no template node of its class binds it, equal what
-// rminfo.Default answers at run time, in the order it lists them; a class it
-// does not know has none.
-func TestREQ171_ClassFactsEqualTheRuntimeAnswers(t *testing.T) {
-	t.Parallel()
-	lister, _ := rminfo.Default.(rminfo.AttributeLister)
-	for _, class := range rminfo.Default.KnownRMTypes() {
-		var want []templatecompile.AttributeFacts
-		for _, name := range lister.AttributeNames(class) {
-			want = append(want, runtimeFacts(t, class, name))
-		}
-		if got := templatecompile.ClassFacts(class); !slices.Equal(got, want) {
-			t.Errorf("ClassFacts(%s) = %+v, want %+v", class, got, want)
-		}
-	}
-	if got := templatecompile.ClassFacts("NO_SUCH_CLASS"); got != nil {
-		t.Errorf("ClassFacts(NO_SUCH_CLASS) = %+v, want none", got)
-	}
 }

@@ -5,8 +5,8 @@ package templatecompile
 // compiled: the children an attribute allows and whether it is prohibited,
 // and which RM classes conform to a node's RM type. What the pinned
 // Reference Model says of the attributes of a class depends on the class
-// alone, so it is not stored on each node: [ClassFacts] gives it per class,
-// for a table the walk builds once. Everything here is set by [Compile] and
+// alone, so it is not stored on each node: the walk reads it from a table of
+// its own, built once per class. Everything here is set by [Compile] and
 // never changed after it returns, so a compiled template is read by any
 // number of goroutines with no lock.
 //
@@ -20,74 +20,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 )
-
-// AttributeFacts is what the pinned Reference Model says of one attribute of
-// one class, as a validation walk reads it from [rminfo.Default].
-type AttributeFacts struct {
-	// Name is the attribute's name.
-	Name string
-	// RMType is the RM type the class metadata declares for the attribute,
-	// the type of its items for a container, as the metadata writes it: a
-	// formal generic parameter stays as written. Empty when Typed is unset.
-	RMType string
-	// Typed is set when the class metadata gives the attribute a type.
-	Typed bool
-	// NonStorable is set for an attribute no serialization carries
-	// ([rminfo.IsNonStorableAttr]).
-	NonStorable bool
-	// Container is set for a multi-valued attribute.
-	Container bool
-	// PrimitiveItems is set when the metadata knows RMType as a primitive
-	// type, such as an Octet or a String, which has nothing below it.
-	PrimitiveItems bool
-	// Hash is set when RMType is the Hash the metadata declares for every
-	// Hash attribute.
-	Hash bool
-	// Mandatory is set when the class metadata marks the attribute
-	// mandatory for the class.
-	Mandatory bool
-}
-
-// hashType is the RM type the class metadata declares for every Hash
-// attribute.
-const hashType = "Hash"
-
-// attributeFacts returns the facts [rminfo.Default] gives of the attribute
-// name of the bare RM class class, whose mandatory attributes are required.
-func attributeFacts(class, name string, required []string) AttributeFacts {
-	f := AttributeFacts{
-		Name:        name,
-		NonStorable: rminfo.IsNonStorableAttr(class, name),
-		Mandatory:   slices.Contains(required, name),
-	}
-	f.RMType, f.Typed = rminfo.Default.AttributeRMType(class, name)
-	f.Container, _ = rminfo.Default.IsContainer(class, name)
-	if ar, ok := rminfo.Default.(rminfo.AbsenceReporter); ok {
-		f.PrimitiveItems = ar.AbsenceReason(f.RMType) == rminfo.AbsencePrimitive
-	}
-	f.Hash = f.RMType == hashType
-	return f
-}
-
-// ClassFacts returns the facts [rminfo.Default] gives of each attribute it
-// lists for the bare RM class class, in its order; nil for a class it does
-// not know. Each call builds them afresh, so a caller that reads them on
-// every node builds them once per class.
-func ClassFacts(class string) []AttributeFacts {
-	var names []string
-	if lister, ok := rminfo.Default.(rminfo.AttributeLister); ok {
-		names = lister.AttributeNames(class)
-	}
-	if len(names) == 0 {
-		return nil
-	}
-	required := rminfo.Default.RequiredAttributes(class)
-	out := make([]AttributeFacts, len(names))
-	for i, name := range names {
-		out[i] = attributeFacts(class, name, required)
-	}
-	return out
-}
 
 // resolveWalkFacts sets what a validation walk asks of cn, whose attributes
 // are compiled: the children each attribute allows and whether it is

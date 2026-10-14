@@ -185,7 +185,7 @@ const (
 	// shapeList is a list of RM values, read item by item.
 	shapeList
 	// shapeCounted is a list whose items the class metadata knows as a
-	// primitive type ([tcimpl.AttributeFacts].PrimitiveItems), such as
+	// primitive type ([attributeFacts].PrimitiveItems), such as
 	// DV_MULTIMEDIA data, an Array of Octet: nothing is below its items, so
 	// it is counted and never read item by item.
 	shapeCounted
@@ -484,7 +484,7 @@ func templateDeclares(bound *tcimpl.CompiledNode, name string) bool {
 // the metadata types is read as the class metadata gives it. Any other is
 // read as the template declares it, single-valued or a list; it is not
 // visited when no serialization of the bound node's class carries it.
-func declaredAttr(n engineNode, decl *tcimpl.CompiledAttribute, f tcimpl.AttributeFacts, listed bool, rules *classRules) (a engineAttr, visited bool) {
+func declaredAttr(n engineNode, decl *tcimpl.CompiledAttribute, f attributeFacts, listed bool, rules *classRules) (a engineAttr, visited bool) {
 	if listed && !f.NonStorable && f.Typed {
 		a = attrFromFacts(n, f, rules)
 		a.decl = decl
@@ -505,7 +505,7 @@ func declaredAttr(n engineNode, decl *tcimpl.CompiledAttribute, f tcimpl.Attribu
 // declaration. It is mandatory when the metadata marks it mandatory for the
 // class, no rule of the class reports its absence itself and, for a
 // single-valued one, the node's role does not let it be blank.
-func attrFromFacts(n engineNode, f tcimpl.AttributeFacts, rules *classRules) engineAttr {
+func attrFromFacts(n engineNode, f attributeFacts, rules *classRules) engineAttr {
 	a := engineAttr{name: f.Name, rmType: f.RMType, shape: shapeFrom(f.Container, f.PrimitiveItems, f.Hash)}
 	a.mandatory = f.Mandatory && !rules.leavesOut(f.Name) && (a.shape != shapeSingle || !mayBeBlank(n.role, f.Name))
 	return a

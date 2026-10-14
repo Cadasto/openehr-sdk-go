@@ -17,7 +17,6 @@ import (
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
-	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 )
 
@@ -370,7 +369,7 @@ var floorRules = pinnedSource.build()
 
 // classAttributes holds, for each class the pinned class metadata knows, by
 // its bare name, what the metadata says of each attribute it lists for the
-// class ([tcimpl.ClassFacts]), which the one walk reads every node by.
+// class ([classFacts]), which the one walk reads every node by.
 // Built once, when the package is initialised, and never changed, so the
 // walk asks the metadata nothing per node.
 var classAttributes = buildClassAttributes(rminfo.Default)
@@ -379,13 +378,13 @@ var classAttributes = buildClassAttributes(rminfo.Default)
 // one class: each attribute it lists, in its order, and the position of each
 // by name.
 type classAttributeTable struct {
-	listed []tcimpl.AttributeFacts
+	listed []attributeFacts
 	byName map[string]int
 }
 
 // lookup returns the facts of the attribute name the table lists, with ok
 // set; ok is unset when it lists none by that name. A nil table lists none.
-func (t *classAttributeTable) lookup(name string) (f tcimpl.AttributeFacts, ok bool) {
+func (t *classAttributeTable) lookup(name string) (f attributeFacts, ok bool) {
 	if t == nil {
 		return f, false
 	}
@@ -401,12 +400,80 @@ func buildClassAttributes(l rminfo.Lookup) map[string]*classAttributeTable {
 	known := l.KnownRMTypes()
 	out := make(map[string]*classAttributeTable, len(known))
 	for _, class := range known {
-		listed := tcimpl.ClassFacts(class)
+		listed := classFacts(class)
 		byName := make(map[string]int, len(listed))
 		for i, f := range listed {
 			byName[f.Name] = i
 		}
 		out[class] = &classAttributeTable{listed: listed, byName: byName}
+	}
+	return out
+}
+
+// attributeFacts is what the pinned Reference Model says of one attribute of
+// one class, as the walk reads it from [rminfo.Default].
+type attributeFacts struct {
+	// Name is the attribute's name.
+	Name string
+	// RMType is the RM type the class metadata declares for the attribute,
+	// the type of its items for a container, as the metadata writes it: a
+	// formal generic parameter stays as written. Empty when Typed is unset.
+	RMType string
+	// Typed is set when the class metadata gives the attribute a type.
+	Typed bool
+	// NonStorable is set for an attribute no serialization carries
+	// ([rminfo.IsNonStorableAttr]).
+	NonStorable bool
+	// Container is set for a multi-valued attribute.
+	Container bool
+	// PrimitiveItems is set when the metadata knows RMType as a primitive
+	// type, such as an Octet or a String, which has nothing below it.
+	PrimitiveItems bool
+	// Hash is set when RMType is the Hash the metadata declares for every
+	// Hash attribute.
+	Hash bool
+	// Mandatory is set when the class metadata marks the attribute
+	// mandatory for the class.
+	Mandatory bool
+}
+
+// hashType is the RM type the class metadata declares for every Hash
+// attribute.
+const hashType = "Hash"
+
+// factsOf returns the facts [rminfo.Default] gives of the attribute name of
+// the bare RM class class, whose mandatory attributes are required.
+func factsOf(class, name string, required []string) attributeFacts {
+	f := attributeFacts{
+		Name:        name,
+		NonStorable: rminfo.IsNonStorableAttr(class, name),
+		Mandatory:   slices.Contains(required, name),
+	}
+	f.RMType, f.Typed = rminfo.Default.AttributeRMType(class, name)
+	f.Container, _ = rminfo.Default.IsContainer(class, name)
+	if ar, ok := rminfo.Default.(rminfo.AbsenceReporter); ok {
+		f.PrimitiveItems = ar.AbsenceReason(f.RMType) == rminfo.AbsencePrimitive
+	}
+	f.Hash = f.RMType == hashType
+	return f
+}
+
+// classFacts returns the facts [rminfo.Default] gives of each attribute it
+// lists for the bare RM class class, in its order; nil for a class it does
+// not know. Each call builds them afresh; [classAttributes] holds them, built
+// once per class.
+func classFacts(class string) []attributeFacts {
+	var names []string
+	if lister, ok := rminfo.Default.(rminfo.AttributeLister); ok {
+		names = lister.AttributeNames(class)
+	}
+	if len(names) == 0 {
+		return nil
+	}
+	required := rminfo.Default.RequiredAttributes(class)
+	out := make([]attributeFacts, len(names))
+	for i, name := range names {
+		out[i] = factsOf(class, name, required)
 	}
 	return out
 }
