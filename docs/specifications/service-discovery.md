@@ -137,7 +137,7 @@ The discovery cache **MUST**:
 - Key every entry by the Platform base URL the caller resolved, never by the document's `issuer` ([ADR 0023](../adr/0023-smart-platform-base-url-and-oidc-issuer.md)).
 - Return a fresh cached catalog only once it passes the calling resolver's REQ-072 checks and those REQ-073 checks that send no request (the issuer, the Platform base URL and the auth endpoints' `https` scheme), because one `Cache` may serve resolvers built with different options. A catalog that fails them **MUST** produce the `DiscoveryError` a new document would, and the entry **MUST** stay cached: the failure says nothing new about the Platform. The OIDC cross-check is not run on a fresh hit; it runs when the document is fetched or renewed (REQ-073).
 
-**Known gap.** Through a shared `Cache`, a catalog that a resolver built with `WithoutOpenIDConfigurationCheck()` cached reaches a resolver that requires the OIDC cross-check unchecked, until the entry expires or is refreshed.
+**Known gap.** Through a shared `Cache`, a catalog that a resolver built with `WithoutOpenIDConfigurationCheck()` cached reaches a resolver that requires the OIDC cross-check unchecked, until the entry expires or is refreshed. Entries are keyed by the Platform base URL alone, so a catalog fetched from one resolver's `WithWellKnownPath` document likewise reaches a resolver configured with another path.
 
 The resolver defers closing the response body before it branches on the status, so the `304` path closes it too.
 
