@@ -56,7 +56,8 @@ func TestDeleteEHRHappyPath(t *testing.T) {
 
 func TestDeleteEHRMissingEHRID(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Fatalf("server should not be called for empty EHRID")
+		t.Error("server should not be called for empty EHRID")
+		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer srv.Close()
 	c := newClient(t, srv)

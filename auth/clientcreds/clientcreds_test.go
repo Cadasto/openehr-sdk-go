@@ -58,7 +58,9 @@ func TestTokenSuccess(t *testing.T) {
 			t.Error("expected Basic auth header")
 		}
 		if err := r.ParseForm(); err != nil {
-			t.Fatal(err)
+			t.Error(err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
 		if g := r.PostForm.Get("grant_type"); g != "client_credentials" {
 			t.Errorf("grant_type = %q, want client_credentials", g)
@@ -150,7 +152,9 @@ func TestTokenAuthBasicOAuth2FormEncoding(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, pass, ok := r.BasicAuth()
 		if !ok {
-			t.Fatal("expected Basic auth")
+			t.Error("expected Basic auth")
+			http.Error(w, "expected Basic auth", http.StatusUnauthorized)
+			return
 		}
 		if user != url.QueryEscape("client:id") {
 			t.Errorf("Basic user = %q, want %q", user, url.QueryEscape("client:id"))
@@ -176,7 +180,9 @@ func TestTokenAuthMethodPost(t *testing.T) {
 			t.Errorf("did not expect Basic auth, got user=%q", user)
 		}
 		if err := r.ParseForm(); err != nil {
-			t.Fatal(err)
+			t.Error(err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
 		if id := r.PostForm.Get("client_id"); id != "c" {
 			t.Errorf("client_id = %q, want c", id)
@@ -313,7 +319,9 @@ func TestClientCredentialsWithClientAssertion(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hdr := r.Header.Get("Authorization")
 		if err := r.ParseForm(); err != nil {
-			t.Fatalf("parse form: %v", err)
+			t.Errorf("parse form: %v", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
 		form := r.PostForm
 		capMu.Lock()
