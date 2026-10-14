@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -271,9 +272,13 @@ func TestBodyReadErrorOverLimit(t *testing.T) { // REQ-172
 // WithRawErrorBodies, beside a non-nil Response with an empty Body. The
 // returned error also wraps the read failure, and is never a *BodyReadError.
 func TestBodyReadErrorNonTwoXXStaysWireError(t *testing.T) { // REQ-172
-	// An envelope's start, so a RawBody or an OpenEHR detail built from the
-	// bytes before the cut would show.
+	// An envelope's start, so a RawBody built from the bytes before the cut
+	// would show.
 	const partialEnvelope = `{"code":"VERSION_CONFLICT","message":"` + bodyReadBodyMarker
+	// A whole envelope one byte over the ceiling. The transport reads one
+	// byte past the limit to detect the overflow, so it holds every byte of
+	// this envelope, and an OpenEHR detail built from them would decode.
+	const wholeEnvelope = `{"code":"NOT_FOUND"}`
 
 	cases := []struct {
 		name     string
@@ -300,14 +305,12 @@ func TestBodyReadErrorNonTwoXXStaysWireError(t *testing.T) { // REQ-172
 			header: http.Header{"ETag": {`"` + cutBodyETag + `"`}},
 			handler: func(status int, header http.Header) http.Handler {
 				return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-					for k, vs := range header {
-						w.Header()[k] = vs
-					}
+					maps.Copy(w.Header(), header)
 					w.WriteHeader(status)
-					_, _ = io.WriteString(w, partialEnvelope+`"}`)
+					_, _ = io.WriteString(w, wholeEnvelope)
 				})
 			},
-			opts:     []transport.Option{transport.WithMaxResponseBody(16)},
+			opts:     []transport.Option{transport.WithMaxResponseBody(int64(len(wholeEnvelope) - 1))},
 			sentinel: transport.ErrNotFound,
 			cause:    transport.ErrResponseTooLarge,
 		},

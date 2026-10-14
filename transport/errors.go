@@ -65,6 +65,12 @@ var (
 	// scheme. The request never reached that URL, and the retry policy
 	// does not retry it.
 	ErrInsecureRedirect = errors.New("transport: redirect from https to a URL that is not https refused")
+	// ErrResponseTooLarge indicates the response body was longer than the
+	// [WithMaxResponseBody] ceiling, so the transport stopped reading it. The
+	// error that wraps it names the limit. On a 2xx it is the cause inside a
+	// [BodyReadError]; on any other status it is wrapped beside the
+	// [WireError].
+	ErrResponseTooLarge = errors.New("transport: response body too large")
 )
 
 // OpenEHRErrorDetail is the parsed openEHR REST error envelope. It is
@@ -296,3 +302,76 @@ func (e *DecodeError) Unwrap() error {
 	}
 	return e.Inner
 }
+
+// BodyReadError reports a 2xx response whose body could not be read: the
+// connection dropped mid-body, the body did not match its Content-Encoding,
+// or it was longer than the [WithMaxResponseBody] ceiling. The status is then
+// the only trustworthy signal of what the server did; on a write it says the
+// server committed. It is distinct from a wire failure ([WireError]), which a
+// status that is not 2xx gives even when its body cannot be read, and from a
+// body that was read but does not decode ([DecodeError]). Extract it with
+// errors.AsType[*transport.BodyReadError](err); the operation-name wrap a
+// leaf package adds does not hide it.
+//
+// [Client.Do] returns it beside a non-nil [Response] that carries the
+// StatusCode, the Header and the parsed Metadata, so the ETag and Location of
+// a committed write survive, and whose Body is empty. The error carries no
+// body bytes: a partial body is not the representation.
+type BodyReadError struct {
+	// Method is the HTTP method of the request.
+	Method string
+	// Route is the route template (e.g. "/ehr/{ehr_id}"), or the stable
+	// "(unrouted)" placeholder when the request carried no Route. It is
+	// never the expanded URL or Path, which may hold a caller-supplied
+	// identifier.
+	Route string
+	// StatusCode is the 2xx status the server sent before the body failed.
+	StatusCode int
+	// Inner is the read failure, reachable via Unwrap: io.ErrUnexpectedEOF
+	// for a connection cut mid-body, the content-coding error (such as
+	// gzip.ErrHeader) for a body that does not match its encoding, or an
+	// error wrapping [ErrResponseTooLarge] for a body over the ceiling.
+	Inner error
+}
+
+// Error names the method, the route, the status and the read failure. It
+// never includes a header value or a body byte; the read failure's text is a
+// transport-level diagnostic (a connection error, a content-coding error, or
+// the ceiling, which it names).
+//
+// Error works on a nil receiver instead of panicking, so the typed nil a
+// failed errors.As leaves behind is safe to print.
+func (e *BodyReadError) Error() string {
+	if e == nil {
+		return "transport: read body: response body could not be read"
+	}
+	// The unroutedRoute fallback matches DecodeError.Error(): doOnce always
+	// sets Route, so this is for a BodyReadError a caller constructs directly.
+	msg := fmt.Sprintf("transport: %s %s: status %d: read body", e.Method, cmp.Or(e.Route, unroutedRoute), e.StatusCode)
+	if e.Inner == nil {
+		return msg
+	}
+	return msg + ": " + e.Inner.Error()
+}
+
+// Unwrap exposes the read failure, so errors.Is reaches io.ErrUnexpectedEOF,
+// the content-coding error or [ErrResponseTooLarge]. It returns nil on a nil
+// receiver.
+func (e *BodyReadError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Inner
+}
+
+// responseTooLargeError is the read failure of a body over the
+// WithMaxResponseBody ceiling. Its text names the limit, without the
+// "transport:" prefix, because it is always printed inside an error that
+// already carries one, and it unwraps to ErrResponseTooLarge.
+type responseTooLargeError struct{ limit int64 }
+
+func (e responseTooLargeError) Error() string {
+	return fmt.Sprintf("response exceeds limit of %d bytes", e.limit)
+}
+
+func (responseTooLargeError) Unwrap() error { return ErrResponseTooLarge }

@@ -23,7 +23,8 @@ type Observation struct {
 	URL string
 	// StatusCode is the final HTTP status returned by the server, or 0
 	// if the call terminated before a response (network error,
-	// ctx-cancellation, token failure).
+	// ctx-cancellation, token failure). It is set when the status and
+	// headers arrived but the body could not be read.
 	StatusCode int
 	// Duration is the total wall-clock time including all retries and
 	// backoff sleeps, that is, the latency of the logical call.
@@ -31,9 +32,11 @@ type Observation struct {
 	// Attempts is the number of HTTP attempts actually issued; 1 when
 	// retries were disabled or the first attempt succeeded.
 	Attempts int
-	// Err is nil on 2xx outcomes. For non-2xx outcomes it is a
-	// *WireError carrying the typed sentinel; for pre-response
-	// failures it is the wrapped underlying error.
+	// Err is nil on a 2xx outcome whose body was read, and a
+	// *BodyReadError on a 2xx whose body could not be read. For non-2xx
+	// outcomes it is, or wraps, a *WireError carrying the typed sentinel
+	// (it wraps the read failure too when the body could not be read); for
+	// pre-response failures it is the wrapped underlying error.
 	Err error
 	// Tags carries per-call observer tags attached via
 	// WithObservationTag. It is read-only; observers must not mutate it.
