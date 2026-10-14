@@ -115,17 +115,80 @@ func (n engineNode) declares(attr string) bool {
 	return n.bound != nil && n.bound.Attribute(attr) != nil
 }
 
-// engineAttr is one attribute of a node's class, as the class metadata
-// declares it.
+// engineAttr is one attribute the walk visits at a node, as the class
+// metadata declares it.
 type engineAttr struct {
 	name string
 	// rmType is the attribute's declared RM type, or its items' for a list.
 	rmType string
+	// shape is how the walk reads the attribute from the value.
+	shape attrShape
 	// mandatory is set when the RM marks the attribute mandatory for the
-	// class and no rule of the class reports its absence itself
-	// ([classRules.leavesOut]), so the walk applies the mandatory-presence
-	// rule to it.
+	// class, no rule of the class reports its absence itself
+	// ([classRules.leavesOut]) and, for a single-valued one, the node's role
+	// does not let it be blank ([mayBeBlank]): the walk then applies the
+	// mandatory-presence rule to it.
 	mandatory bool
+}
+
+// attrShape is how the walk reads an attribute from a value.
+type attrShape uint8
+
+const (
+	// shapeSingle is a single-valued attribute: one value or none.
+	shapeSingle attrShape = iota
+	// shapeList is a list of RM values, read item by item.
+	shapeList
+	// shapeCounted is a list of a primitive type ([isPrimitiveType]), such
+	// as DV_MULTIMEDIA data, an Array of Octet: nothing is below its items,
+	// so it is counted and never read item by item.
+	shapeCounted
+	// shapeHash is a Hash attribute, read entry by entry in ascending key
+	// order.
+	shapeHash
+)
+
+// multiValued reports whether an attribute of the shape holds items: a list,
+// counted or not. A Hash is no list: present and empty, it breaks no
+// mandatory rule.
+func (s attrShape) multiValued() bool {
+	return s == shapeList || s == shapeCounted
+}
+
+// attrReading is an attribute as the walk reads it from a value, once.
+type attrReading struct {
+	// present is the attribute's presence, as the generated access decides
+	// it; a single value that is nil or a typed-nil pointer is absent.
+	present bool
+	// count is the number of items of a list, counted or not, or of entries
+	// of a Hash.
+	count int
+	// items holds the items of a list or the entries of a Hash, in key
+	// order; nil for a counted list and a single-valued attribute.
+	items []any
+	// value is the value of a present single-valued attribute.
+	value any
+}
+
+// readAttribute reads the attribute a of value, by its shape.
+func readAttribute(value any, a engineAttr) attrReading {
+	switch a.shape {
+	case shapeList:
+		items, present := rmaccess.Multiple(value, a.name)
+		return attrReading{present: present, count: len(items), items: items}
+	case shapeCounted:
+		n, present := rmaccess.Len(value, a.name)
+		return attrReading{present: present, count: n}
+	case shapeHash:
+		_, entries, present := rmaccess.Hash(value, a.name)
+		return attrReading{present: present, count: len(entries), items: entries}
+	case shapeSingle:
+		v, present := rmaccess.Single(value, a.name)
+		if present && v != nil && !rmaccess.IsTypedNilPointer(v) {
+			return attrReading{present: true, value: v}
+		}
+	}
+	return attrReading{}
 }
 
 // visitedAt reports whether the walk visits a at node n, which it reads as
@@ -228,96 +291,78 @@ func (e *engine) visitAttributes(n engineNode, class string, rules *classRules) 
 		if !ok {
 			continue
 		}
-		a := engineAttr{
-			name:      name,
-			rmType:    attrType,
-			mandatory: slices.Contains(required, name) && !rules.leavesOut(name),
-		}
-		isContainer, _ := e.info.IsContainer(class, name)
-		switch {
-		case isContainer:
-			e.visitList(n, class, a)
-		case attrType == hashType:
-			e.visitHash(n, a)
-		default:
-			e.visitSingle(n, class, a)
-		}
+		a := engineAttr{name: name, rmType: attrType, shape: e.shapeOf(class, name, attrType)}
+		a.mandatory = slices.Contains(required, name) && !rules.leavesOut(name) &&
+			(a.shape != shapeSingle || !mayBeBlank(n.role, name))
+		e.visitAttribute(n, class, a)
 	}
 }
 
-// visitList visits the multi-valued attribute a of node n, of class class.
-// Absent, a mandatory list is `required`; present and empty, `cardinality`.
-// A list of a primitive type ([isPrimitiveType]) is counted and never read
-// item by item, since nothing is below its items. Each item of a registered
-// RM class is walked at the path the shared path rule writes for it
-// ([itemPaths]).
-func (e *engine) visitList(n engineNode, class string, a engineAttr) {
-	count, present := rmaccess.Len(n.value, a.name)
-	if !n.visitedAt(a, present) {
+// shapeOf returns how the walk reads the attribute name of the class class,
+// whose declared RM type, or its items' for a list, is attrType.
+func (e *engine) shapeOf(class, name, attrType string) attrShape {
+	if isContainer, _ := e.info.IsContainer(class, name); isContainer {
+		if isPrimitiveType(e.info, attrType) {
+			return shapeCounted
+		}
+		return shapeList
+	}
+	if attrType == hashType {
+		return shapeHash
+	}
+	return shapeSingle
+}
+
+// visitAttribute visits the attribute a of node n, of class class: it reads
+// the attribute once, and, when the attribute is one the walk visits
+// ([engineNode.visitedAt]), applies the steps in order. Presence: absent, a
+// mandatory attribute is `required`; a mandatory list that is present and
+// empty is `cardinality`. Then each item: a single value is walked at the
+// attribute's path, each item of a list of RM values at the path the shared
+// path rule writes for it ([itemPaths]), and each entry of a Hash at its
+// position in ascending key order ([hashEntryPath]), never at its key. Only a
+// value of a registered RM class ([rmaccess.Covers]) is walked as an item of
+// a list or a Hash; a counted list is never read item by item.
+func (e *engine) visitAttribute(n engineNode, class string, a engineAttr) {
+	r := readAttribute(n.value, a)
+	if !n.visitedAt(a, r.present) {
 		return
 	}
 	attrPath := joinPath(n.path, "/"+a.name)
 	if a.mandatory {
-		e.rules.checkMandatory(n.rmType, a.name, attrPath, true, present, count)
+		e.rules.checkMandatory(n.rmType, a.name, attrPath, a.shape.multiValued(), r.present, r.count)
 	}
-	if !present || count == 0 || isPrimitiveType(e.info, a.rmType) {
-		return
-	}
-	items, _ := rmaccess.Multiple(n.value, a.name)
-	if !slices.ContainsFunc(items, rmaccess.Covers) {
+	if !r.present {
 		return
 	}
 	role := childRole(class, n.role, a.name)
-	for i, path := range e.itemPaths(attrPath, items) {
-		item := items[i]
-		if !rmaccess.Covers(item) {
-			continue
+	switch a.shape {
+	case shapeSingle:
+		e.walk(engineNode{value: r.value, rmType: runtimeRMType(r.value, a.rmType), path: attrPath, role: role, depth: n.depth + 1})
+	case shapeList:
+		if !slices.ContainsFunc(r.items, rmaccess.Covers) {
+			return
 		}
-		e.walk(engineNode{value: item, rmType: runtimeRMType(item, a.rmType), path: path, role: role, depth: n.depth + 1})
+		for i, path := range e.itemPaths(attrPath, r.items) {
+			e.walkItem(n, r.items[i], a.rmType, path, role)
+		}
+	case shapeHash:
+		for i, entry := range r.items {
+			e.walkItem(n, entry, a.rmType, hashEntryPath(attrPath, i), role)
+		}
+	case shapeCounted:
+		// Nothing is below the items of a list of a primitive type.
 	}
 }
 
-// visitHash visits the Hash attribute a of node n. Absent, a mandatory one
-// is `required`. Each entry of a registered RM class is walked at its
-// position in ascending key order ([hashEntryPath]), never at its key.
-func (e *engine) visitHash(n engineNode, a engineAttr) {
-	_, entries, present := rmaccess.Hash(n.value, a.name)
-	if !n.visitedAt(a, present) {
+// walkItem walks item, an item of a list or an entry of a Hash of node n
+// whose declared RM type is rmType, at path, in role, when it is a value of a
+// registered RM class; any other item has nothing below it to walk.
+func (e *engine) walkItem(n engineNode, item any, rmType, path string, role floorRole) {
+	if !rmaccess.Covers(item) {
 		return
 	}
-	attrPath := joinPath(n.path, "/"+a.name)
-	if a.mandatory {
-		e.rules.checkMandatory(n.rmType, a.name, attrPath, false, present, len(entries))
-	}
-	if !present {
-		return
-	}
-	for i, entry := range entries {
-		if !rmaccess.Covers(entry) {
-			continue
-		}
-		e.walk(engineNode{value: entry, rmType: runtimeRMType(entry, a.rmType), path: hashEntryPath(attrPath, i), depth: n.depth + 1})
-	}
-}
-
-// visitSingle visits the single-valued attribute a of node n, of class
-// class. A nil or typed-nil value is absent; absent, a mandatory one is
-// `required`, unless the node's role lets it be blank ([mayBeBlank]). A
-// present value is walked at the attribute's path.
-func (e *engine) visitSingle(n engineNode, class string, a engineAttr) {
-	value, present := rmaccess.Single(n.value, a.name)
-	present = present && value != nil && !rmaccess.IsTypedNilPointer(value)
-	if !n.visitedAt(a, present) {
-		return
-	}
-	attrPath := joinPath(n.path, "/"+a.name)
-	if a.mandatory && !mayBeBlank(n.role, a.name) {
-		e.rules.checkMandatory(n.rmType, a.name, attrPath, false, present, 0)
-	}
-	if !present {
-		return
-	}
-	e.walk(engineNode{value: value, rmType: runtimeRMType(value, a.rmType), path: attrPath, role: childRole(class, n.role, a.name), depth: n.depth + 1})
+	e.walk(engineNode{value: item, rmType: runtimeRMType(item, rmType), path: path, role: role, depth: n.depth + 1})
 }
 
 // itemPaths returns the issue path of each of the items of the multi-valued
