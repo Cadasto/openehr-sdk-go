@@ -355,9 +355,8 @@ func (w *rmFloorWalker) walk(value any, rmType string, path string, role floorRo
 // ascending key order, never by their key.
 //
 // A value of no registered class is a leaf here, validated solely by the RM
-// rules of its declared type (run above): a flattened scalar the access
-// surfaces directly, such as CODE_PHRASE.terminology_id, which comes back as
-// a Go string, or a primitive value. The parts of a reference, on every class
+// rules of its declared type (run above): a primitive value, such as a string
+// or a number. The parts of a reference, on every class
 // the rminfo hierarchy places at or below OBJECT_REF, are the reference's own
 // evaluator's to report ([rmFloorWalker.checkObjectRef]), so the required-set
 // check leaves them out ([classRules.leavesOut]) and a missing part is

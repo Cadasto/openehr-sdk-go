@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **A nil RM-mandatory list is `required` (REQ-112).** The floor reported it as `cardinality`; an empty list still is, and the template walk counts only a present list's items.
 - **A set but empty optional string pointer is present (REQ-171).** EVENT_CONTEXT `location` and CODE_PHRASE `preferred_term` set to `""` now read as present, not absent.
 - **Optional text and partly filled references are entered (REQ-171).** An optional DV_TEXT with an empty value and a by-value object reference missing a part report what they lack, and a Go-built version's payload is walked.
+- **The floor orders every strictly comparable interval (REQ-112).** `DV_INTERVAL` bounds of dates, times, durations, ordinals, scales and proportions are now checked for `lower` ≤ `upper`, not only counts and quantities.
 - **FLAT and STRUCTURED decode the multimedia algorithm codes in their openEHR code sets (REQ-140).** `|compression_algorithm` and `|integrity_check_algorithm` gain the code set's terminology id, and encode keeps that terminology on the bare suffix.
 
 ### Removed

@@ -1503,6 +1503,7 @@ requirements:
       - openehr/validation/issuepath_internal_test.go
       - openehr/validation/issuepath_test.go
       - openehr/validation/limits_test.go
+      - openehr/validation/noncomposition_test.go
       - openehr/validation/nonstorable_generic_test.go
       - openehr/validation/rmfloor_archetype_test.go
       - openehr/validation/rmfloor_bytes_internal_test.go
@@ -1516,6 +1517,7 @@ requirements:
       - openehr/validation/rmfloor_identity_internal_test.go
       - openehr/validation/rmfloor_interval_class_test.go
       - openehr/validation/rmfloor_interval_flags_test.go
+      - openehr/validation/rmfloor_interval_order_test.go
       - openehr/validation/rmfloor_invariant_matrix_internal_test.go
       - openehr/validation/rmfloor_ism_transition_test.go
       - openehr/validation/rmfloor_limit_internal_test.go
@@ -1739,6 +1741,7 @@ requirements:
       - openehr/rm/temporal_funcs_test.go
       - openehr/rm/temporal_iso_test.go
       - openehr/validation/coverage_unevaluated_test.go
+      - openehr/validation/rmfloor_interval_order_test.go
       - openehr/validation/rmfloor_invariant_matrix_internal_test.go
       - openehr/validation/rmfloor_temporal_element_test.go
 
@@ -2051,6 +2054,7 @@ requirements:
       - openehr/validation/issuepath_test.go
       - openehr/validation/prohibited_test.go
       - openehr/validation/rmfloor_interval_flags_test.go
+      - openehr/validation/rmfloor_interval_order_test.go
       - openehr/validation/rmfloor_proportion_test.go
       - openehr/validation/value_free_test.go
   - id: REQ-169
@@ -2145,6 +2149,7 @@ requirements:
       - openehr/validation/rmfloor_coded_test.go
       - openehr/validation/rmfloor_generated_access_test.go
       - openehr/validation/rmfloor_interval_class_test.go
+      - openehr/validation/rmfloor_interval_order_test.go
       - openehr/validation/rmfloor_invariant_matrix_internal_test.go
       - openehr/validation/rmfloor_limit_internal_test.go
       - openehr/validation/rmfloor_presence_readings_test.go

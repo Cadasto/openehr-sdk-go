@@ -543,7 +543,7 @@ A required slot whose includes cannot be satisfied makes `Generate` return `ErrS
 
 A root `Generate` returns can break § Contract's output rule in these cases, and in no other:
 
-- **An interval pair left as generated** (§ Contract *Intervals*) can break `Limits_consistent`, which the floor checks for two DV_COUNT and for two DV_QUANTITY of equal `units`.
+- **An interval pair left as generated** (§ Contract *Intervals*) can break `Limits_consistent`, which the floor checks for every pair of bounds the RM makes strictly comparable (§ REQ-112 *DV_INTERVAL*).
 - **An OPT constraint that admits no value an RM rule accepts**, such as an RM default that yields to the OPT (§ [Precedence](#precedence) 1), or a PARTICIPATION `mode` the OPT codes in `local`, breaks that RM rule.
 - **An OPT that contradicts itself**, such as one that requires an attribute and prohibits every child of it, gets whichever side § Contract writes.
 - **A value the caller supplies** through `Options` (a language, a territory, a composer, a uid from `UIDSource`) is written as given, valid or not.
