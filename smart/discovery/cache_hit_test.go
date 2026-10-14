@@ -6,9 +6,13 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"slices"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 )
@@ -212,6 +216,284 @@ func TestREQ071_FreshCacheHitPassesTheCallingResolversChecks(t *testing.T) { // 
 			}
 			if n := notModified.Load(); n != wantNotModified {
 				t.Errorf("server answered %d conditional request(s) with 304, want %d", n, wantNotModified)
+			}
+		})
+	}
+}
+
+// cachedMembers are the URL members of a SMART configuration that a test
+// serves as a document and puts in a Cache as a catalog. An empty auth
+// endpoint is left out of the document and is nil in the catalog. The issuer
+// is built from the test server's origin, so a request for its OpenID
+// configuration reaches the test server; a nil issuer is left out of the
+// document, and the catalog's Issuer is then the base URL. The service base
+// URL is written as it stands, and an empty one is nil in the catalog.
+type cachedMembers struct {
+	issuer                func(origin string) string
+	authorizationEndpoint string
+	tokenEndpoint         string
+	serviceBaseURL        string
+}
+
+// document is the SMART configuration that declares m.
+func (m cachedMembers) document(origin string) string {
+	doc := map[string]any{
+		"services": map[string]any{
+			discovery.ServiceIDOpenEHRRest: map[string]any{"baseUrl": m.serviceBaseURL},
+		},
+	}
+	if m.issuer != nil {
+		doc["issuer"] = m.issuer(origin)
+	}
+	if m.authorizationEndpoint != "" {
+		doc["authorization_endpoint"] = m.authorizationEndpoint
+	}
+	if m.tokenEndpoint != "" {
+		doc["token_endpoint"] = m.tokenEndpoint
+	}
+	return mustJSON(doc)
+}
+
+// catalog is a fresh catalog for baseURL that carries m, with the ETag the
+// test server sends, as a Cache this Resolver's parser did not fill may hold
+// it.
+func (m cachedMembers) catalog(t *testing.T, origin, baseURL, etag string) *discovery.ServiceCatalog {
+	t.Helper()
+	parse := func(raw string) *url.URL {
+		if raw == "" {
+			return nil
+		}
+		u, err := url.Parse(raw)
+		if err != nil {
+			t.Fatalf("url.Parse(%q) error = %v", raw, err)
+		}
+		return u
+	}
+	issuer := baseURL
+	if m.issuer != nil {
+		issuer = m.issuer(origin)
+	}
+	now := time.Now()
+	return &discovery.ServiceCatalog{
+		BaseURL: baseURL,
+		Issuer:  issuer,
+		Services: map[string]discovery.ServiceEntry{
+			discovery.ServiceIDOpenEHRRest: {ID: discovery.ServiceIDOpenEHRRest, BaseURL: parse(m.serviceBaseURL)},
+		},
+		Auth: discovery.AuthEndpoints{
+			AuthorizationEndpoint: parse(m.authorizationEndpoint),
+			TokenEndpoint:         parse(m.tokenEndpoint),
+		},
+		ResolvedAt: now,
+		ExpiresAt:  now.Add(time.Hour),
+		ETag:       etag,
+	}
+}
+
+// TestREQ071_CachedCatalogPassesTheParsersURLChecks pins REQ-071 with REQ-072
+// and REQ-073 for a catalog that reached the Cache without this Resolver's
+// parser, as from a file-backed or distributed Cache. Each catalog carries a
+// URL member a new document is refused for: an auth endpoint with a scheme
+// other than http or https or without a host, an issuer with a query or a
+// fragment or that is not absolute, a service base URL that is not absolute.
+// On a fresh hit, Resolve returns the DiscoveryError the same members get in
+// a new document, to the same text, sends no request and leaves the entry
+// cached. A Refresh answered 304 returns that error too, before any request
+// for the issuer's OpenID configuration. Where a catalog has two refused
+// members, each path names the one the parser checks first. A well-formed
+// catalog is still returned on a fresh hit.
+func TestREQ071_CachedCatalogPassesTheParsersURLChecks(t *testing.T) { // REQ-071, REQ-072, REQ-073
+	t.Parallel()
+	const (
+		etag         = `"v1"`
+		authorizeURL = "https://auth.example.com/authorize"
+		tokenURL     = "https://auth.example.com/token"
+		apiURL       = "https://api.example.com/openehr/v1"
+		noScheme     = "//api.example.com/openehr/v1"
+	)
+	issuerWithQuery := func(o string) string { return o + idpPath + "?tenant=a" }
+	quiet := discovery.WithLogger(slog.New(slog.DiscardHandler))
+	tests := []struct {
+		name    string
+		members cachedMembers
+		// wantReason is the refusal's Reason; empty means the fresh hit
+		// returns the cached catalog.
+		wantReason discovery.DiscoveryErrorReason
+		// wantText is part of the refusal's text: the member it names and
+		// why.
+		wantText string
+	}{
+		{
+			name: "well-formed members",
+			members: cachedMembers{
+				issuer:                func(o string) string { return o + idpPath },
+				authorizationEndpoint: authorizeURL,
+				tokenEndpoint:         tokenURL,
+				serviceBaseURL:        apiURL,
+			},
+		},
+		{
+			name:       "ftp token endpoint",
+			members:    cachedMembers{authorizationEndpoint: authorizeURL, tokenEndpoint: "ftp://auth.example.com/token", serviceBaseURL: apiURL},
+			wantReason: discovery.ReasonMalformedURL,
+			wantText:   `token_endpoint uses scheme "ftp"`,
+		},
+		{
+			name:       "token endpoint without a host",
+			members:    cachedMembers{authorizationEndpoint: authorizeURL, tokenEndpoint: "https:///token", serviceBaseURL: apiURL},
+			wantReason: discovery.ReasonMalformedURL,
+			wantText:   `token_endpoint "https:///token" invalid`,
+		},
+		{
+			name:       "issuer with a query",
+			members:    cachedMembers{issuer: issuerWithQuery, tokenEndpoint: tokenURL, serviceBaseURL: apiURL},
+			wantReason: discovery.ReasonMalformedURL,
+			wantText:   "has a query",
+		},
+		{
+			name:       "issuer with a fragment",
+			members:    cachedMembers{issuer: func(o string) string { return o + idpPath + "#a" }, tokenEndpoint: tokenURL, serviceBaseURL: apiURL},
+			wantReason: discovery.ReasonMalformedURL,
+			wantText:   "has a fragment",
+		},
+		{
+			name:       "issuer that is not absolute",
+			members:    cachedMembers{issuer: func(string) string { return idpPath }, tokenEndpoint: tokenURL, serviceBaseURL: apiURL},
+			wantReason: discovery.ReasonMalformedURL,
+			wantText:   `issuer "/idp" is not an https URL`,
+		},
+		{
+			name:       "service base URL without a scheme",
+			members:    cachedMembers{tokenEndpoint: tokenURL, serviceBaseURL: noScheme},
+			wantReason: discovery.ReasonMalformedURL,
+			wantText:   `baseUrl "` + noScheme + `" invalid`,
+		},
+		{
+			name:       "service without a base URL",
+			members:    cachedMembers{tokenEndpoint: tokenURL},
+			wantReason: discovery.ReasonMalformedURL,
+			wantText:   `baseUrl "" invalid`,
+		},
+		{
+			// The parser checks authorization_endpoint before token_endpoint.
+			name: "two http auth endpoints",
+			members: cachedMembers{
+				authorizationEndpoint: "http://auth.example.com/authorize",
+				tokenEndpoint:         "http://auth.example.com/token",
+				serviceBaseURL:        apiURL,
+			},
+			wantReason: discovery.ReasonInsecureURL,
+			wantText:   `authorization_endpoint uses scheme "http"`,
+		},
+		{
+			// The parser checks the auth endpoints before the issuer.
+			name:       "ftp token endpoint and an issuer with a query",
+			members:    cachedMembers{issuer: issuerWithQuery, tokenEndpoint: "ftp://auth.example.com/token", serviceBaseURL: apiURL},
+			wantReason: discovery.ReasonMalformedURL,
+			wantText:   `token_endpoint uses scheme "ftp"`,
+		},
+		{
+			// The parser checks the service base URLs before the issuer.
+			name:       "service base URL without a scheme and an issuer with a query",
+			members:    cachedMembers{issuer: issuerWithQuery, tokenEndpoint: tokenURL, serviceBaseURL: noScheme},
+			wantReason: discovery.ReasonMalformedURL,
+			wantText:   `baseUrl "` + noScheme + `" invalid`,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var (
+				mu          sync.Mutex
+				others      []string // paths requested other than the SMART configuration
+				hits        atomic.Int32
+				notModified atomic.Int32
+			)
+			srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != smartDocPath {
+					mu.Lock()
+					others = append(others, r.URL.Path)
+					mu.Unlock()
+					http.NotFound(w, r)
+					return
+				}
+				hits.Add(1)
+				w.Header().Set("ETag", etag)
+				if r.Header.Get("If-None-Match") == etag {
+					notModified.Add(1)
+					w.WriteHeader(http.StatusNotModified)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = io.WriteString(w, tc.members.document("https://"+r.Host))
+			}))
+			t.Cleanup(srv.Close)
+			baseURL := srv.URL + platformPath
+			newResolver := func(cache discovery.Cache) *discovery.Resolver {
+				t.Helper()
+				res, err := discovery.NewResolver(cache, discovery.WithHTTPClient(srv.Client()), quiet)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return res
+			}
+			cache := discovery.NewMemoryCache()
+			cached := tc.members.catalog(t, srv.URL, baseURL, etag)
+			if err := cache.Put(t.Context(), baseURL, cached); err != nil {
+				t.Fatalf("cache.Put(%q) error = %v", baseURL, err)
+			}
+			strict := newResolver(cache)
+
+			got, err := strict.Resolve(t.Context(), baseURL)
+			if n := hits.Load(); n != 0 {
+				t.Errorf("server received %d SMART configuration request(s) on the fresh hit, want 0", n)
+			}
+			if tc.wantReason == "" {
+				if err != nil || got != cached {
+					t.Fatalf("Resolve(%q) on a fresh hit = (%p, %v), want the cached catalog %p", baseURL, got, err, cached)
+				}
+				return
+			}
+
+			// The refusal a new document with the same members gets.
+			_, newErr := newResolver(nil).Resolve(t.Context(), baseURL)
+			nerr, ok := errors.AsType[*discovery.DiscoveryError](newErr)
+			if !ok || nerr == nil || nerr.Reason != tc.wantReason {
+				t.Fatalf("Resolve(%q) of a new document error = %v, want a DiscoveryError with Reason %q", baseURL, newErr, tc.wantReason)
+			}
+			if !strings.Contains(nerr.Error(), tc.wantText) {
+				t.Errorf("Resolve(%q) of a new document error text = %q, want it to contain %q", baseURL, nerr.Error(), tc.wantText)
+			}
+
+			// The fresh hit gets that refusal, and the entry stays cached.
+			if derr, ok := errors.AsType[*discovery.DiscoveryError](err); !ok || derr == nil ||
+				derr.Reason != nerr.Reason || derr.Issuer != nerr.Issuer || derr.Error() != nerr.Error() {
+				t.Errorf("Resolve(%q) on a fresh hit = (catalog %p, %v), want the error a new document gets, %q", baseURL, got, err, nerr.Error())
+			}
+			if got != nil {
+				t.Errorf("Resolve(%q) on a fresh hit returned catalog %p, want nil", baseURL, got)
+			}
+			if held, ok := cache.Get(t.Context(), baseURL); !ok || held != cached {
+				t.Errorf("cache.Get(%q) after the refusal = (%p, %v), want the catalog %p still cached", baseURL, held, ok, cached)
+			}
+
+			// A 304 renewal of the cached catalog gets it too, and the failed
+			// renewal drops the entry.
+			_, renewErr := strict.Refresh(t.Context(), baseURL)
+			if rerr, ok := errors.AsType[*discovery.DiscoveryError](renewErr); !ok || rerr == nil ||
+				rerr.Reason != nerr.Reason || rerr.Error() != nerr.Error() {
+				t.Errorf("Refresh(%q) answered 304 error = %v, want the error a new document gets, %q", baseURL, renewErr, nerr.Error())
+			}
+			if n := notModified.Load(); n != 1 {
+				t.Errorf("server answered %d conditional request(s) with 304, want 1", n)
+			}
+			if held, ok := cache.Get(t.Context(), baseURL); ok {
+				t.Errorf("cache.Get(%q) after the refused renewal = (%p, true), want the entry dropped", baseURL, held)
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			if len(others) != 0 {
+				t.Errorf("server received requests for %q, want none: the URL checks refuse the catalog before the issuer's OpenID configuration is fetched", others)
 			}
 		})
 	}
