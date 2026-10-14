@@ -76,14 +76,14 @@ func run() error {
 		fmt.Println("mutation             : cleared Category (expect required at /category)")
 	}
 
-	// Step 4: validate. The template drives the first walk: for every node
-	// it declares, the validator reads the matching RM attribute and checks
-	// presence, cardinality, RM type, archetype identity and value
-	// constraints. The RM floor then walks the whole composition with the
-	// Reference Model as its guide: RM-mandatory attributes on every node, and
-	// the RM's own rules for each type. Both walks collect every issue rather
-	// than stopping at the first, and the result carries a defect both find
-	// once.
+	// Step 4: validate. One walk visits the composition. Where a node binds
+	// to a node of the template, the validator checks the template's clauses
+	// there: presence, cardinality, RM type, archetype identity and value
+	// constraints. On every node the template admits it also applies the
+	// Reference Model's rules: RM-mandatory attributes, and the RM's own rules
+	// for each type. The walk collects every issue rather than stopping at the
+	// first, and an attribute both the template and the Reference Model find
+	// missing is one issue.
 	if !report("validation", validation.ValidateComposition(comp, compiled)) {
 		return errors.New("composition is not valid")
 	}
