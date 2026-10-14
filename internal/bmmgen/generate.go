@@ -26,8 +26,9 @@
 // read an instance through; and openehr/validation/inventory_gen.go, the
 // inventory of every invariant the RM and BASE schemas declare, classified by
 // the checked-in openehr/validation/invariants.json, which fails generation
-// when an invariant has no classification (an output tree without the
-// validation package, such as a test's scratch tree, gets no inventory). Its
+// when an invariant has no classification or the file is missing (a run with
+// [Options].SkipInventory, such as a test's into a scratch tree, gets no
+// inventory). Its
 // jsonhooks_gen.go also registers the JSON walker's interface table into
 // internal/rmjsonwalk/polyreg.
 //
@@ -97,6 +98,14 @@ type Options struct {
 	// be written against what is already on disk and report drift
 	// rather than mutating the tree.
 	Verify bool
+	// SkipInventory, when true, leaves out the invariant inventory,
+	// openehr/validation/inventory_gen.go. By default the RM target
+	// emits it, reading the classification from invariants.json in the
+	// validation package under OutDir, and a missing classification
+	// fails the run, so a run over the module cannot leave the
+	// inventory out. A test that generates into a scratch tree holding
+	// no validation package sets it.
+	SkipInventory bool
 	// Verbose enables extra diagnostic output to Stderr.
 	Verbose bool
 	// Stderr is the writer for diagnostic output. Defaults to

@@ -261,6 +261,15 @@ func renderedInventory(t *testing.T) (plan *Plan, entries map[string][2]string, 
 	if err != nil {
 		t.Fatalf("RenderInventoryFile: %v", err)
 	}
+	entries, classes = parseInventory(t, out)
+	return plan, entries, classes
+}
+
+// parseInventory parses a rendered inventory and returns each key of
+// invariantInventory with its kind identifier and function, and each class
+// of classInvariants with its keys.
+func parseInventory(t *testing.T, out []byte) (entries map[string][2]string, classes map[string][]string) {
+	t.Helper()
 	file, err := parser.ParseFile(token.NewFileSet(), inventoryFile, out, 0)
 	if err != nil {
 		t.Fatalf("parse rendered %s: %v", inventoryFile, err)
@@ -315,7 +324,7 @@ func renderedInventory(t *testing.T) (plan *Plan, entries map[string][2]string, 
 			}
 		}
 	}
-	return plan, entries, classes
+	return entries, classes
 }
 
 // REQ-171 — the rendered inventory carries every invariant with the kind and
@@ -393,7 +402,9 @@ func writeValidationTree(t *testing.T, raw []byte) string {
 // invariant of the pinned BMMs has no classification: [Run], in both modes,
 // over a tree whose classification lacks one, fails naming it. Over a tree
 // with the full classification it writes the inventory and then verifies it
-// clean; over a tree with no validation package it writes none.
+// clean. Over a tree with no validation package it fails, in both modes,
+// naming the classification file, so a run cannot leave the inventory out
+// by accident; only with SkipInventory set does it pass and write none.
 func TestRun_REQ171_FailsOnAnUnclassifiedInvariant(t *testing.T) {
 	raw, classes := pinnedClassification(t)
 	delete(classes, "ELEMENT.Inv_null_reason_valid")
@@ -426,11 +437,18 @@ func TestRun_REQ171_FailsOnAnUnclassifiedInvariant(t *testing.T) {
 	}
 
 	bare := t.TempDir()
-	if _, err := Run(Options{ResourcesDir: testResources, OutDir: bare, Targets: []Target{TargetRM}}); err != nil {
-		t.Fatalf("Run(tree with no validation package) = %v", err)
+	for _, verify := range []bool{false, true} {
+		_, err := Run(Options{ResourcesDir: testResources, OutDir: bare, Targets: []Target{TargetRM}, Verify: verify})
+		if err == nil || !strings.Contains(err.Error(), classificationFile) {
+			t.Errorf("Run(verify %t, tree with no validation package) = %v, want an error naming %s", verify, err, classificationFile)
+		}
 	}
-	if _, err := os.Stat(filepath.Join(bare, inventoryDir, inventoryFile)); err == nil {
-		t.Errorf("Run(tree with no validation package) wrote an inventory, want none")
+	skipped := t.TempDir()
+	if _, err := Run(Options{ResourcesDir: testResources, OutDir: skipped, Targets: []Target{TargetRM}, SkipInventory: true}); err != nil {
+		t.Fatalf("Run(SkipInventory, tree with no validation package) = %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(skipped, inventoryDir, inventoryFile)); err == nil {
+		t.Errorf("Run(SkipInventory, tree with no validation package) wrote an inventory, want none")
 	}
 }
 

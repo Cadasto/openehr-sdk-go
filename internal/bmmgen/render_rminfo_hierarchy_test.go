@@ -273,9 +273,10 @@ func classEntry(t *testing.T, src, class string) string {
 func TestDriftDetectionCoversHierarchyFields(t *testing.T) {
 	dir := t.TempDir()
 	opts := Options{
-		ResourcesDir: testResources,
-		OutDir:       dir,
-		RootID:       "openehr_rm_1.2.0",
+		ResourcesDir:  testResources,
+		OutDir:        dir,
+		RootID:        "openehr_rm_1.2.0",
+		SkipInventory: true,
 	}
 	if _, err := Run(opts); err != nil {
 		t.Fatalf("initial Run: %v", err)

@@ -207,8 +207,9 @@ func TestAOM14IdempotentAndVerifyClean(t *testing.T) {
 	dir2 := t.TempDir()
 	for _, dir := range []string{dir1, dir2} {
 		if _, err := Run(Options{
-			ResourcesDir: testResources,
-			OutDir:       dir,
+			ResourcesDir:  testResources,
+			OutDir:        dir,
+			SkipInventory: true,
 		}); err != nil {
 			t.Fatalf("Run %s: %v", dir, err)
 		}
@@ -217,9 +218,10 @@ func TestAOM14IdempotentAndVerifyClean(t *testing.T) {
 
 	// Verify cleanly after the second run.
 	result, err := Run(Options{
-		ResourcesDir: testResources,
-		OutDir:       dir2,
-		Verify:       true,
+		ResourcesDir:  testResources,
+		OutDir:        dir2,
+		Verify:        true,
+		SkipInventory: true,
 	})
 	if err != nil {
 		t.Fatalf("verify Run: %v", err)

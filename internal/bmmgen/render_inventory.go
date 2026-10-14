@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"go/format"
 	"go/token"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -48,14 +47,18 @@ var inventoryDir = filepath.Join("openehr", "validation")
 // The three kinds a classification gives an invariant.
 const (
 	// kindEvaluated is an invariant the SDK evaluates, with the Go function
-	// that evaluates it.
+	// that evaluates it or the check that already decides it.
 	kindEvaluated = "evaluated"
 	// kindNotMechanical is an invariant no check on the instance alone can
-	// decide: it needs a terminology service, stored history, or a
-	// comparison the RM leaves undefined.
+	// decide, because it needs a record the instance does not carry: in the
+	// pinned BMMs, the versions stored for a versioned object, or the other
+	// party of a demographic relationship.
 	kindNotMechanical = "not_mechanical"
 	// kindOutOfScope is an invariant the SDK does not check on an instance
-	// for another stated reason.
+	// for another stated reason: most are not evaluated yet; others hold by
+	// definition on the SDK's types, are declared on a class no registered
+	// type is or descends from, or are read otherwise by a documented
+	// deviation of the REQ-123 ISO 8601 parse.
 	kindOutOfScope = "out_of_scope"
 )
 
@@ -324,24 +327,18 @@ func RenderInventoryFile(plan *Plan, declared []string, classes map[string]invar
 // validation package under the output root, or, in verify mode, records drift
 // against what is on disk. It reads the classification from that package.
 //
-// It is a no-op for a target [RenderInventoryFile] does not emit for, and for
-// an output tree that holds no validation package, such as the scratch tree a
-// generator test writes into. In a tree that holds one, a missing
-// classification file fails.
+// It is a no-op for a target [RenderInventoryFile] does not emit for, and when
+// [Options].SkipInventory is set, as a generator test that writes into a
+// scratch tree sets it. Otherwise a missing classification file fails, so a
+// run over the module cannot leave the inventory out.
 func emitInventoryFile(opts Options, plan *Plan, resolver bmm.Resolver, tr *TargetResult, result *Result) error {
-	if plan.Target.GoPackage != "rm" {
+	if plan.Target.GoPackage != "rm" || opts.SkipInventory {
 		return nil
 	}
 	dir := filepath.Join(opts.OutDir, inventoryDir)
-	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
-		if err == nil || errors.Is(err, fs.ErrNotExist) {
-			return nil
-		}
-		return fmt.Errorf("bmmgen: stat %s: %w", dir, err)
-	}
 	data, err := os.ReadFile(filepath.Join(dir, classificationFile))
 	if err != nil {
-		return fmt.Errorf("bmmgen: read the invariant classification: %w", err)
+		return fmt.Errorf("bmmgen: read the invariant classification (set Options.SkipInventory for a tree without the validation package): %w", err)
 	}
 	classes, err := parseClassification(data)
 	if err != nil {
