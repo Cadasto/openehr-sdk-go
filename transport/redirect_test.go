@@ -277,10 +277,11 @@ func TestREQ092_DoFollowsHTTPSToHTTPSRedirectWithCredentialHeader(t *testing.T) 
 	}
 }
 
-// TestDoFollowsHTTPSToHTTPRedirectWithoutAuthorization pins that a request
-// carrying no Authorization header follows the injected client's policy
-// unchanged, even across an https to http hop.
-func TestDoFollowsHTTPSToHTTPRedirectWithoutAuthorization(t *testing.T) { // REQ-092
+// TestDoFollowsHTTPSToHTTPRedirectWithoutCredentialHeader pins that a request
+// carrying none of Authorization, Proxy-Authorization, Cookie or Cookie2
+// follows the injected client's policy unchanged, even across an https to
+// http hop.
+func TestDoFollowsHTTPSToHTTPRedirectWithoutCredentialHeader(t *testing.T) { // REQ-092
 	t.Parallel()
 	for _, tc := range []struct {
 		name string
