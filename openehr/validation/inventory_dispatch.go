@@ -83,6 +83,14 @@ func roleCheck(function string, f func(*rmFloorWalker, any, string, floorRole)) 
 	}}
 }
 
+// typeCheck binds an evaluator that also reads the node's RM type, to name
+// the class it reports on.
+func typeCheck(function string, f func(*rmFloorWalker, any, string, string)) invariantCheck {
+	return invariantCheck{function: function, run: func(w *rmFloorWalker, n floorNode, _ string) {
+		f(w, n.value, n.rmType, n.path)
+	}}
+}
+
 // ruleCheck binds an evaluator that reads the node's RM type and reports
 // the invariant that dispatched it: one Go function serves an invariant of
 // several classes (Value_valid), or one invariant declared on an ancestor of
@@ -112,7 +120,7 @@ var invariantChecks = map[string]invariantCheck{
 	"DV_DATE.Value_valid":                ruleCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
 	"DV_DATE_TIME.Value_valid":           ruleCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
 	"DV_DURATION.Value_valid":            ruleCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
-	"DV_INTERVAL.Limits_consistent":      nodeCheck("checkDVInterval", (*rmFloorWalker).checkDVInterval),
+	"DV_INTERVAL.Limits_consistent":      typeCheck("checkDVInterval", (*rmFloorWalker).checkDVInterval),
 	"DV_PROPORTION.Precision_validity":   nodeCheck("checkDVProportion", (*rmFloorWalker).checkDVProportion),
 	"DV_TEXT.Mappings_valid":             nodeCheck("checkTermMappings", (*rmFloorWalker).checkTermMappings),
 	"DV_TIME.Value_valid":                ruleCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
@@ -120,8 +128,8 @@ var invariantChecks = map[string]invariantCheck{
 	"EHR_STATUS.Is_archetype_root":       ruleCheck("checkArchetypeRoot", (*rmFloorWalker).checkArchetypeRoot),
 	"ELEMENT.Inv_null_flavour_indicated": nodeCheck("checkElementNullFlavour", (*rmFloorWalker).checkElementNullFlavour),
 	"ENTRY.Is_archetype_root":            ruleCheck("checkArchetypeRoot", (*rmFloorWalker).checkArchetypeRoot),
-	"Interval.Lower_included_valid":      nodeCheck("checkDVInterval", (*rmFloorWalker).checkDVInterval),
-	"Interval.Upper_included_valid":      nodeCheck("checkDVInterval", (*rmFloorWalker).checkDVInterval),
+	"Interval.Lower_included_valid":      typeCheck("checkDVInterval", (*rmFloorWalker).checkDVInterval),
+	"Interval.Upper_included_valid":      typeCheck("checkDVInterval", (*rmFloorWalker).checkDVInterval),
 	"PARTY.Is_archetype_root":            ruleCheck("checkArchetypeRoot", (*rmFloorWalker).checkArchetypeRoot),
 	"PARTY_IDENTIFIED.Basic_validity":    nodeCheck("checkPartyIdentified", (*rmFloorWalker).checkPartyIdentified),
 	"PARTY_IDENTIFIED.Identifiers_valid": nodeCheck("checkPartyIdentified", (*rmFloorWalker).checkPartyIdentified),

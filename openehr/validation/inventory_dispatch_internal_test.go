@@ -44,7 +44,7 @@ const codedEvaluator = "checkCodedInvariants"
 
 // dispatchBindings parses the non-test Go files in dir and reads the
 // invariantChecks literal of file. Each entry must be a call of nodeCheck,
-// roleCheck or ruleCheck whose first argument, a string literal, is the name
+// roleCheck, typeCheck or ruleCheck whose first argument, a string literal, is the name
 // of the method expression (*rmFloorWalker).name its second argument is, or
 // a call of codedCheck, which binds checkCodedInvariants. Every function an
 // entry binds must be a method of rmFloorWalker the source declares. It
@@ -133,7 +133,7 @@ func boundFunction(e ast.Expr) (fn, problem string) {
 	switch binder.Name {
 	case "codedCheck":
 		return codedEvaluator, ""
-	case "nodeCheck", "roleCheck", "ruleCheck":
+	case "nodeCheck", "roleCheck", "typeCheck", "ruleCheck":
 	default:
 		return "", "binds through " + binder.Name + ", which is no binder"
 	}

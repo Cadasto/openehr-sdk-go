@@ -30,6 +30,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
@@ -896,9 +897,10 @@ func (w *rmFloorWalker) checkElementNullFlavour(value any, path string) {
 // support.
 //
 // The Detail names the rule, never the bounds; the two compared magnitudes
-// are carried in Issue.Value, lower first, as a [2]float64 (REQ-168).
-func (w *rmFloorWalker) checkDVInterval(value any, path string) {
-	w.checkIntervalFlags(value, path)
+// are carried in Issue.Value, lower first, as a [2]float64 (REQ-168). rmType
+// is the node's RM type, which the flag check names.
+func (w *rmFloorWalker) checkDVInterval(value any, rmType, path string) {
+	w.checkIntervalFlags(value, rmType, path)
 	lower, upper, ok := dvIntervalNumericBounds(value)
 	if !ok {
 		return
@@ -922,12 +924,14 @@ func (w *rmFloorWalker) checkDVInterval(value any, path string) {
 // both sides wrong give both issues. Decode reads such a side as written, and
 // a value built in Go can carry it too, so the floor is where it is reported.
 //
-// The flags are read through [rmaccess.Single], which serves every
-// DV_INTERVAL instantiation, the typed ones and the bare one, as a pointer or
-// a value. The Detail names the flags and the invariant, never a bound. The
-// check reads only the two flags, which the code already states, so the
-// issue's Value stays empty.
-func (w *rmFloorWalker) checkIntervalFlags(value any, path string) {
+// The flags are read through [rmaccess.Single], which serves every class
+// below BASE Interval: each DV_INTERVAL instantiation, the typed ones and the
+// bare one, Point_interval and Proper_interval, as a pointer or a value. The
+// Detail names the class of the node, rmType without its generic parameters,
+// the flags and the invariant, never a bound. The check reads only the two
+// flags, which the code already states, so the issue's Value stays empty.
+func (w *rmFloorWalker) checkIntervalFlags(value any, rmType, path string) {
+	class := bmmtype.Class(rmType)
 	for _, side := range [...]struct{ end, code, invariant, rule string }{
 		{end: "lower", code: "lower_included_valid", invariant: "Lower_included_valid", rule: ruleLowerIncludedValid},
 		{end: "upper", code: "upper_included_valid", invariant: "Upper_included_valid", rule: ruleUpperIncludedValid},
@@ -940,7 +944,7 @@ func (w *rmFloorWalker) checkIntervalFlags(value any, path string) {
 			Code:   side.code,
 			Layer:  LayerRM,
 			Rule:   side.rule,
-			Detail: "DV_INTERVAL." + side.end + "_included must be false when " + side.end + "_unbounded is true (BASE " + side.invariant + ")",
+			Detail: class + "." + side.end + "_included must be false when " + side.end + "_unbounded is true (BASE " + side.invariant + ")",
 		})
 	}
 }
