@@ -9,20 +9,30 @@ import (
 // injected client has no CheckRedirect of its own.
 const maxRedirects = 10
 
+// credentialHeaders are the request headers that make a request take the
+// downgrade-refusing client copy. net/http copies each of them to a redirect
+// target on the same host or a subdomain whatever its scheme, and drops them
+// only for another domain.
+var credentialHeaders = [...]string{"Authorization", "Cookie", "Cookie2"}
+
 // httpClientFor returns the client doOnce sends httpReq with. A request
-// carrying an Authorization header gets a fresh shallow copy of the injected
-// client whose redirect policy refuses an https to non-https hop; any other
-// request gets the injected client as it is.
+// carrying an Authorization, Cookie or Cookie2 header gets a fresh shallow
+// copy of the injected client whose redirect policy refuses an https to
+// non-https hop; any other request gets the injected client as it is.
 //
 // REQ-092, REQ-021: the copy is taken per request, never at New, so a change
 // the caller makes to the injected client later (its Transport,
 // CheckRedirect, Timeout or Jar) reaches the next request. The injected
-// client itself is never written to.
+// client itself is never written to. The headers are read before the client
+// sends the request, so a cookie the injected client's Jar adds does not
+// count: the jar scopes its own cookies by their Secure attribute.
 func (c *Client) httpClientFor(httpReq *http.Request) *http.Client {
-	if len(httpReq.Header.Values("Authorization")) == 0 {
-		return c.cfg.httpClient
+	for _, h := range credentialHeaders {
+		if len(httpReq.Header.Values(h)) > 0 {
+			return refuseDowngrade(c.cfg.httpClient)
+		}
 	}
-	return refuseDowngrade(c.cfg.httpClient)
+	return c.cfg.httpClient
 }
 
 // refuseDowngrade returns a shallow copy of hc whose redirect policy refuses a
@@ -31,11 +41,12 @@ func (c *Client) httpClientFor(httpReq *http.Request) *http.Client {
 // net/http's default limit when hc has none. It mirrors the discovery
 // resolver's refuseDowngrade and internal/noredirect's copy idiom.
 //
-// net/http copies an Authorization header to a redirect target on the same
-// host or a subdomain whatever its scheme, so without this check a 3xx from
-// https://host to http://host would carry the token in clear text. The hop
-// is judged from the request just before this one (via's last entry), so an
-// https hop anywhere in the chain is protected.
+// net/http copies an Authorization, Cookie or Cookie2 header to a redirect
+// target on the same host or a subdomain whatever its scheme, so without this
+// check a 3xx from https://host to http://host would carry the token or the
+// session cookie in clear text. The hop is judged from the request just
+// before this one (via's last entry), so an https hop anywhere in the chain
+// is protected.
 func refuseDowngrade(hc *http.Client) *http.Client {
 	cp := *hc
 	callerPolicy := hc.CheckRedirect
