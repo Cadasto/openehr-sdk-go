@@ -69,3 +69,46 @@ func TestSaveCutBodyKeepsVersionMetadata(t *testing.T) { // REQ-172
 		t.Errorf("errors.AsType[*ehr.NoRepresentationError] matched a body-read failure (%v)", nre)
 	}
 }
+
+// TestGetCutBodyKeepsVersionMetadata is the read side of the same rule:
+// composition.Get against a 200 whose body is cut returns no composition,
+// the version metadata the ETag names, and the *transport.BodyReadError.
+// The ETag is the only part of the response that arrived intact, so it is
+// what the caller must still receive.
+func TestGetCutBodyKeepsVersionMetadata(t *testing.T) { // REQ-172
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("ETag", `"`+string(compositionVUID)+`"`)
+		// Announce more bytes than are written, then drop the connection.
+		w.Header().Set("Content-Length", "100")
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, `{"_type":"COMPOSITION","name":{"value":"`)
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		panic(http.ErrAbortHandler)
+	}))
+	defer srv.Close()
+
+	comp, meta, err := composition.Get(t.Context(), newClient(t, srv), ehrIDFixture,
+		openehrclient.LatestOf(compositionVOID))
+	if err == nil {
+		t.Fatal("Get against a 200 whose body is cut succeeded; the premise of this test is gone")
+	}
+	if comp != nil {
+		t.Errorf("Get returned %+v beside a body-read failure; a partial body is not the representation", comp)
+	}
+	if meta == nil {
+		t.Fatal("Get returned nil version metadata; REQ-172 requires the response metadata come back beside the error")
+	}
+	if meta.VersionUID != compositionVUID {
+		t.Errorf("VersionMetadata.VersionUID = %q, want %q, the version the ETag names", meta.VersionUID, compositionVUID)
+	}
+
+	bre, ok := errors.AsType[*transport.BodyReadError](err)
+	if !ok {
+		t.Fatalf("errors.AsType[*transport.BodyReadError] did not match %T (%v)", err, err)
+	}
+	if bre.StatusCode != http.StatusOK {
+		t.Errorf("BodyReadError.StatusCode = %d, want %d", bre.StatusCode, http.StatusOK)
+	}
+}
