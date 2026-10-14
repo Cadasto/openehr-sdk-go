@@ -61,7 +61,7 @@ For an exact attribute list, invariant, or signature, call the MCP tool `type_sp
 
 The full editing rules (idiomatic surface, the `cadasto/` boundary contract, and the do-not-touch list) are canonical in [AGENTS.md](../AGENTS.md) and [specifications/idiom.md](specifications/idiom.md). Follow those; this file does not repeat them.
 
-`/sdd-deliver` runs this loop as a pipeline: workers per task, the per-task gate, the first review pass, the PR. `/sdd-deliver <PR> --close-out` then updates the requirement status and writes the PR body, in the same PR. After merges, `/sdd-triage --backlog` on `main` carries the merged PRs' suggestions to `docs/backlog.md`.
+`/sdd-deliver` runs this loop as a pipeline: workers per task, the per-task gate, the first review pass, the PR. `/sdd-close <PR>` then closes out in the same PR: it updates the requirement status, writes the PR body and asks once whether to carry the suggestions left to `docs/backlog.md`. After the merge, `/sdd-close` again cleans up the branch; now and then, `/sdd-triage --backlog` on `main` picks up what was not carried and consolidates the backlog.
 
 ## Orchestration
 
@@ -89,7 +89,7 @@ Findings for a branch live in one file in the clone's git directory, `<git-commo
 
 There are three severities, graded by harm. **Critical** and **important** findings carry evidence: the command run, the failing test, or the two sentences that disagree, quoted. A claim of wrong code behaviour is settled by running it, or by a named input, then graded by its harm; a missing specification sentence never lowers it. Those about the change are resolved before merge, either fixed or declined with the reason on the finding's line, and they are the only ones that get inline threads on the PR. One about code or a document the change did not touch keeps its severity, is marked `outside`, blocks nothing and is carried after merge unless fixed here. **Suggestions** never block and stay on the PR in its suggestion comments; after merge, `/sdd-triage --backlog` carries them to `docs/backlog.md`. A suggestion is written down only when it outlives the change; taste (naming, wording, style) never does. In anything posted to the PR, never write a number with a leading hash sign, which GitHub turns into a link to an unrelated issue.
 
-A reviewer that runs outside this repository gets this request, filled in by `/sdd-review --panel`:
+A panel host that loads the sdd plugin runs `/sdd-review --pr <N>`, which `/sdd-review --panel` prints as one line. A reviewer named in `agents.review_panel.external` never loads the plugin, so `--panel` prints this request for it instead, filled in:
 
 ```text
 ── review request · <branch> · range <a>..<b> · profile formal ──
