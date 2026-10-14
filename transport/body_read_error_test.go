@@ -25,10 +25,12 @@ import (
 	"maps"
 	"net/http"
 	"net/http/httptest"
+	"net/textproto"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
@@ -288,6 +290,9 @@ func TestBodyReadErrorNonTwoXXStaysWireError(t *testing.T) { // REQ-172
 		opts     []transport.Option
 		sentinel error
 		cause    error
+		// limit, when not zero, is the WithMaxResponseBody ceiling the error
+		// text must name (REQ-093).
+		limit int
 	}{
 		{
 			name:   "409 cut mid-body",
@@ -313,6 +318,7 @@ func TestBodyReadErrorNonTwoXXStaysWireError(t *testing.T) { // REQ-172
 			opts:     []transport.Option{transport.WithMaxResponseBody(int64(len(wholeEnvelope) - 1))},
 			sentinel: transport.ErrNotFound,
 			cause:    transport.ErrResponseTooLarge,
+			limit:    len(wholeEnvelope) - 1,
 		},
 	}
 	for _, tc := range cases {
@@ -362,6 +368,9 @@ func TestBodyReadErrorNonTwoXXStaysWireError(t *testing.T) { // REQ-172
 			}
 			if !errors.Is(err, tc.cause) {
 				t.Errorf("errors.Is(err, %v) = false for %v; the read failure must stay reachable", tc.cause, err)
+			}
+			if tc.limit != 0 && !strings.Contains(err.Error(), strconv.Itoa(tc.limit)) {
+				t.Errorf("err.Error() = %q, want it to name the limit %d (REQ-093)", err.Error(), tc.limit)
 			}
 
 			// REQ-172 § Disjoint classifications.
@@ -480,6 +489,96 @@ func TestBodyReadErrorStringIsValueFree(t *testing.T) { // REQ-172
 	})
 }
 
+// trailerSecretMarker is the line a malformed chunked trailer carries. It has
+// no colon, so net/http fails the body read on it and quotes it in the read
+// failure's own text.
+const trailerSecretMarker = "PATIENT-SECRET-4711"
+
+// malformedTrailerHandler takes over the connection and writes a raw chunked
+// response with status: one five-byte chunk, the last chunk, and then the
+// trailer line trailerSecretMarker. It closes the connection after.
+func malformedTrailerHandler(t *testing.T, status int) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		hj, ok := w.(http.Hijacker)
+		if !ok {
+			t.Error("the test server's ResponseWriter is not an http.Hijacker; the premise of this test is gone")
+			return
+		}
+		conn, buf, err := hj.Hijack()
+		if err != nil {
+			t.Errorf("Hijack: %v", err)
+			return
+		}
+		defer func() { _ = conn.Close() }()
+		_, _ = fmt.Fprintf(buf, "HTTP/1.1 %d %s\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n0\r\n%s\r\n\r\n",
+			status, http.StatusText(status), trailerSecretMarker)
+		_ = buf.Flush()
+	}
+}
+
+// TestBodyReadErrorTrailerTextStaysOut pins REQ-172 § Error() stays value-free
+// on the read failure's own text: net/http quotes a malformed chunked trailer
+// line in its read error, so a server can put any value there. That value
+// appears nowhere in the error text on either arm, and the read failure is
+// still reached by unwrapping.
+func TestBodyReadErrorTrailerTextStaysOut(t *testing.T) { // REQ-172
+	req := func() *transport.Request {
+		return &transport.Request{Method: http.MethodGet, Path: "/ehr/abc", Route: "/ehr/{ehr_id}"}
+	}
+
+	t.Run("2xx", func(t *testing.T) {
+		c := newBodyReadClient(t, malformedTrailerHandler(t, http.StatusOK))
+		resp, err := c.Do(t.Context(), req())
+		bre, ok := errors.AsType[*transport.BodyReadError](err)
+		if !ok {
+			t.Fatalf("errors.AsType[*transport.BodyReadError] did not match %T (%v); the premise of this test is gone", err, err)
+		}
+		if bre.Inner == nil || !strings.Contains(bre.Inner.Error(), trailerSecretMarker) {
+			t.Fatalf("BodyReadError.Inner = %v, want net/http's read error quoting %q; the premise of this test is gone", bre.Inner, trailerSecretMarker)
+		}
+		assertTwoXXResponseKept(t, resp, http.StatusOK)
+
+		for what, got := range map[string]string{"BodyReadError.Error()": bre.Error(), "err.Error()": err.Error()} {
+			if strings.Contains(got, trailerSecretMarker) {
+				t.Errorf("%s = %q carries the read failure's own text, which quotes the server's trailer", what, got)
+			}
+		}
+		for _, want := range []string{http.MethodGet, "/ehr/{ehr_id}", "200"} {
+			if !strings.Contains(bre.Error(), want) {
+				t.Errorf("BodyReadError.Error() = %q, want it to name %q", bre.Error(), want)
+			}
+		}
+		if !errors.Is(err, bre.Inner) {
+			t.Errorf("errors.Is(err, %v) = false; the read failure must stay reachable by unwrapping", bre.Inner)
+		}
+	})
+
+	t.Run("non-2xx", func(t *testing.T) {
+		c := newBodyReadClient(t, malformedTrailerHandler(t, http.StatusConflict))
+		resp, err := c.Do(t.Context(), req())
+		we, ok := errors.AsType[*transport.WireError](err)
+		if !ok {
+			t.Fatalf("errors.AsType[*transport.WireError] did not match %T (%v); the premise of this test is gone", err, err)
+		}
+		cause, ok := errors.AsType[textproto.ProtocolError](err)
+		if !ok || !strings.Contains(cause.Error(), trailerSecretMarker) {
+			t.Fatalf("errors.AsType[textproto.ProtocolError] = (%v, %v), want net/http's read error quoting %q; the premise of this test is gone", cause, ok, trailerSecretMarker)
+		}
+		if resp == nil || resp.StatusCode != http.StatusConflict {
+			t.Fatalf("Do returned Response %+v, want a non-nil 409", resp)
+		}
+		if !errors.Is(err, transport.ErrVersionConflict) {
+			t.Errorf("errors.Is(err, transport.ErrVersionConflict) = false for %v", err)
+		}
+		if got := err.Error(); strings.Contains(got, trailerSecretMarker) {
+			t.Errorf("err.Error() = %q carries the read failure's own text, which quotes the server's trailer", got)
+		}
+		if got := err.Error(); !strings.HasPrefix(got, we.Error()) {
+			t.Errorf("err.Error() = %q, want it to start with the WireError's own text %q", got, we.Error())
+		}
+	})
+}
+
 // TestBodyReadErrorRetryGate pins REQ-172 § Retry. With retries enabled, a 2xx
 // whose body could not be read is sent again only for GET, HEAD or OPTIONS:
 // the server acted on any other method, so a second send would repeat it. The
@@ -534,6 +633,162 @@ func TestBodyReadErrorRetryGate(t *testing.T) { // REQ-172
 			}
 		})
 	}
+}
+
+// TestBodyReadErrorRetryGateHEAD pins HEAD in REQ-172 § Retry's list of safe
+// methods. net/http never reads the body of a response to HEAD, so an
+// httptest server cannot make that read fail; a RoundTripper hands back a 2xx
+// whose Body fails instead. A PUT through the same RoundTripper is the
+// contrast that shows the gate is what decides.
+func TestBodyReadErrorRetryGateHEAD(t *testing.T) { // REQ-172
+	const attempts = 3
+	cases := []struct {
+		method   string
+		wantHits int
+	}{
+		{method: http.MethodHead, wantHits: attempts},
+		{method: http.MethodPut, wantHits: 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.method, func(t *testing.T) {
+			hits := 0
+			c := newBrokenTransportClient(t, func(*http.Request) (*http.Response, error) {
+				hits++
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     http.Header{"Etag": {`"` + cutBodyETag + `"`}},
+					Body:       errReadCloser{err: io.ErrUnexpectedEOF},
+				}, nil
+			}, transport.WithRetry(transport.RetryPolicy{
+				MaxAttempts:    attempts,
+				InitialBackoff: time.Millisecond,
+				MaxBackoff:     time.Millisecond,
+			}))
+
+			resp, err := c.Do(t.Context(), &transport.Request{Method: tc.method, Path: "/ehr/abc", Route: "/ehr/{ehr_id}"})
+			if _, ok := errors.AsType[*transport.BodyReadError](err); !ok {
+				t.Fatalf("errors.AsType[*transport.BodyReadError] did not match %T (%v); the premise of this test is gone", err, err)
+			}
+			assertTwoXXResponseKept(t, resp, http.StatusOK)
+			if hits != tc.wantHits {
+				t.Errorf("%s with a 200 body that cannot be read reached the RoundTripper %d times, want %d", tc.method, hits, tc.wantHits)
+			}
+		})
+	}
+}
+
+// TestBodyReadErrorCallerDeadlineIsNotRetried pins REQ-172 § Retry beside
+// REQ-091's "Retries MUST respect ctx cancellation". A GET whose 200 body
+// read is stopped by the caller's own deadline is not sent again, so Do
+// returns the Response and the *BodyReadError rather than a later attempt's
+// token or dial failure. Both backoffs are covered: with none, the next
+// attempt would start at once and fail with no response; with one, the wait
+// would fail and replace the error with the context's.
+func TestBodyReadErrorCallerDeadlineIsNotRetried(t *testing.T) { // REQ-172, REQ-091
+	cases := []struct {
+		name    string
+		backoff time.Duration
+	}{
+		{name: "no backoff", backoff: 0},
+		{name: "20ms backoff", backoff: 20 * time.Millisecond},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var hits atomic.Int32
+			release := make(chan struct{})
+			c := newBodyReadClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				hits.Add(1)
+				w.Header().Set("ETag", `"`+cutBodyETag+`"`)
+				w.Header().Set("Content-Length", strconv.Itoa(cutContentLength))
+				w.WriteHeader(http.StatusOK)
+				_, _ = io.WriteString(w, cutPartialBody)
+				if f, ok := w.(http.Flusher); ok {
+					f.Flush()
+				}
+				// Stall mid-body until the client gives up or the test ends.
+				select {
+				case <-r.Context().Done():
+				case <-release:
+				}
+			}), transport.WithRetry(transport.RetryPolicy{
+				MaxAttempts:    3,
+				InitialBackoff: tc.backoff,
+				MaxBackoff:     tc.backoff,
+			}))
+			// Cleanups run last-in first-out, so the handler is released
+			// before the server closes and waits for it.
+			t.Cleanup(func() { close(release) })
+
+			ctx, cancel := context.WithTimeout(t.Context(), 150*time.Millisecond)
+			defer cancel()
+			resp, err := c.Do(ctx, &transport.Request{Method: http.MethodGet, Path: "/ehr/abc", Route: "/ehr/{ehr_id}"})
+			if err == nil {
+				t.Fatal("Do of a stalled 200 under a deadline succeeded; the premise of this test is gone")
+			}
+			if resp == nil {
+				t.Fatalf("Do returned a nil *Response beside %v; REQ-172 requires the status and headers survive", err)
+			}
+			if resp.StatusCode != http.StatusOK {
+				t.Errorf("Response.StatusCode = %d, want %d", resp.StatusCode, http.StatusOK)
+			}
+			if resp.Metadata == nil || resp.Metadata.ETag != cutBodyETag {
+				t.Errorf("Response.Metadata = %+v, want the ETag %q", resp.Metadata, cutBodyETag)
+			}
+			if _, ok := errors.AsType[*transport.BodyReadError](err); !ok {
+				t.Errorf("errors.AsType[*transport.BodyReadError] did not match %T (%v)", err, err)
+			}
+			if !errors.Is(err, context.DeadlineExceeded) {
+				t.Errorf("errors.Is(err, context.DeadlineExceeded) = false for %v", err)
+			}
+			if got := hits.Load(); got != 1 {
+				t.Errorf("server hit %d times, want 1: a read the caller's deadline stopped is not sent again", got)
+			}
+		})
+	}
+}
+
+// TestBodyReadErrorSurvivesCancelledBackoff pins the other half of the same
+// rule: a GET whose 200 body could not be read is due to be sent again, and the
+// caller's deadline ends during the backoff. Do then returns the Response and
+// an error that still carries the *BodyReadError, with the context's error
+// reachable beside it. The fake clock of testing/synctest runs the hour-long
+// backoff past the deadline at once.
+func TestBodyReadErrorSurvivesCancelledBackoff(t *testing.T) { // REQ-172, REQ-091
+	synctest.Test(t, func(t *testing.T) {
+		hits := 0
+		c := newBrokenTransportClient(t, func(*http.Request) (*http.Response, error) {
+			hits++
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Etag": {`"` + cutBodyETag + `"`}},
+				Body:       errReadCloser{err: io.ErrUnexpectedEOF},
+			}, nil
+		}, transport.WithRetry(transport.RetryPolicy{
+			MaxAttempts:    3,
+			InitialBackoff: time.Hour,
+			MaxBackoff:     time.Hour,
+		}))
+
+		ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+		defer cancel()
+		resp, err := c.Do(ctx, &transport.Request{Method: http.MethodGet, Path: "/ehr/abc", Route: "/ehr/{ehr_id}"})
+		if hits != 1 {
+			t.Fatalf("RoundTripper reached %d times, want 1: the deadline ends during the first backoff; the premise of this test is gone", hits)
+		}
+		assertTwoXXResponseKept(t, resp, http.StatusOK)
+		if resp.Metadata.ETag != cutBodyETag {
+			t.Errorf("Metadata.ETag = %q, want %q", resp.Metadata.ETag, cutBodyETag)
+		}
+		if _, ok := errors.AsType[*transport.BodyReadError](err); !ok {
+			t.Errorf("errors.AsType[*transport.BodyReadError] did not match %T (%v); the backoff's failure must not replace it", err, err)
+		}
+		if !errors.Is(err, io.ErrUnexpectedEOF) {
+			t.Errorf("errors.Is(err, io.ErrUnexpectedEOF) = false for %v", err)
+		}
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Errorf("errors.Is(err, context.DeadlineExceeded) = false for %v; the context's error stays reachable", err)
+		}
+	})
 }
 
 // TestBodyReadErrorObservation pins REQ-172's REQ-098 sentence: the
