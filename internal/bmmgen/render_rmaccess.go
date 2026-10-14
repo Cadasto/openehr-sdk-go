@@ -152,8 +152,8 @@ var goPredeclaredKinds = map[string]accessKind{
 }
 
 // RenderRMAccessFile produces internal/rmaccess/access_gen.go from a planned
-// RM emission: the generated half of the attribute access REQ-171
-// *Structural access* specifies.
+// RM emission: the generated half of the attribute access the validators
+// read RM values through.
 //
 // It emits, for every class in [Plan.ConcreteClasses] and every instantiation
 // [reverseRegistryArms] lists for it, a reader of the single-valued
