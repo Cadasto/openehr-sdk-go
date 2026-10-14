@@ -5,9 +5,10 @@ package validation
 // together with the mandatory-presence rule. The inventory (inventory_gen.go)
 // is generated from the pinned RM and BASE BMMs and classified in
 // invariants.json; this file binds each evaluated entry to the Go function
-// that evaluates it, and builds from both, once, what the floor runs on a
-// node of each class the type registry decodes and which of the invariants
-// that class is subject to the floor does not evaluate.
+// that evaluates it, or, for an entry another evaluated check already
+// decides, to that check's function, and builds from both, once, what the
+// floor runs on a node of each class the type registry decodes and which of
+// the invariants that class is subject to the floor does not evaluate.
 
 import (
 	"maps"
@@ -52,7 +53,7 @@ type floorNode struct {
 }
 
 // invariantCheck binds an evaluated invariant to the evaluator that
-// evaluates it.
+// evaluates it, or to the check that already decides it.
 type invariantCheck struct {
 	// function is the evaluator's name, as invariants.json names it. The
 	// evaluator serves the node once, however many of the node's invariants
@@ -67,7 +68,18 @@ type invariantCheck struct {
 	// coded is set, in place of run, for a coded invariant, which
 	// [rmFloorWalker.checkCodedInvariants] evaluates from its row.
 	coded *codedRule
+	// covered is set, in place of run and coded, for an invariant that the
+	// check function names already decides: the binding dispatches nothing
+	// of its own, and the invariant is evaluated on a class only where that
+	// check runs.
+	covered bool
 }
+
+// mandatoryCheck is the function that applies the mandatory-presence rule,
+// [rmFloorWalker.checkMandatory]. The walk runs it on the RM-mandatory
+// attributes of every node it visits, so [inventorySource.build] counts it as
+// run on every class.
+const mandatoryCheck = "checkMandatory"
 
 // nodeCheck binds an evaluator that reads the node's value and path.
 func nodeCheck(function string, f func(*rmFloorWalker, any, string)) invariantCheck {
@@ -108,11 +120,26 @@ func codedCheck(row *codedRule) invariantCheck {
 	return invariantCheck{function: "checkCodedInvariants", coded: row}
 }
 
+// coveredCheck binds an invariant that another evaluated check already
+// decides to that check's function, handed in by value beside its name so
+// that a renamed or removed function fails to build. It dispatches nothing:
+// the check runs on the node already, the mandatory-presence check on every
+// node the walk visits and any other where an invariant of the node's class
+// dispatches it, and a finding carries the rule of the check that reports it
+// (REQ-171 Finding identity).
+func coveredCheck(function string, _ any) invariantCheck {
+	return invariantCheck{function: function, covered: true}
+}
+
 // invariantChecks binds every evaluated invariant of the inventory to the Go
 // function that evaluates it, by value, so a renamed or removed evaluator
 // fails to build. The names recorded beside the functions are checked against
 // the functions and against invariants.json by a test, which also fails when
 // an evaluated invariant is missing here or one listed here is not evaluated.
+// The last group binds the invariants another evaluated check decides: the
+// mandatory-presence rule, for a mandatory string or list the invariant says
+// is not empty, and the REQ-123 parse a temporal Value_valid applies, for
+// the parts of the ISO 8601 value it refuses.
 var invariantChecks = map[string]invariantCheck{
 	"ARCHETYPED.Rm_version_valid":        nodeCheck("checkArchetyped", (*rmFloorWalker).checkArchetyped),
 	"CODE_PHRASE.Code_string_valid":      roleCheck("checkCodePhrase", (*rmFloorWalker).checkCodePhrase),
@@ -158,6 +185,45 @@ var invariantChecks = map[string]invariantCheck{
 	"PARTICIPATION.Mode_valid":                         codedCheck(&ruleParticipationMode),
 	"PARTY_RELATED.Relationship_valid":                 codedCheck(&rulePartyRelationship),
 	"TERM_MAPPING.Purpose_valid":                       codedCheck(&ruleTermMappingPurpose),
+
+	"ACTIVITY.Action_archetype_id_valid":         coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
+	"AUDIT_DETAILS.System_id_valid":              coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
+	"DV_IDENTIFIER.Id_valid":                     coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
+	"DV_PARAGRAPH.Items_valid":                   coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
+	"DV_PARSABLE.Formalism_valid":                coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
+	"DV_TEXT.Valid_value":                        coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
+	"DV_URI.Value_valid":                         coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
+	"FEEDER_AUDIT_DETAILS.System_id_valid":       coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
+	"INSTRUCTION_DETAILS.Activity_path_valid":    coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
+	"LOCATABLE.Archetype_node_id_valid":          coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
+	"PARTY.Identities_valid":                     coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
+	"RESOURCE_DESCRIPTION.Lifecycle_state_valid": coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
+	"RESOURCE_DESCRIPTION_ITEM.Purpose_valid":    coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
+	"REVISION_HISTORY_ITEM.Audit_valid":          coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
+	"UID.Value_valid":                            coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
+	"VERSION_TREE_ID.Value_valid":                coveredCheck("checkMandatory", (*rmFloorWalker).checkMandatory),
+
+	"Iso8601_date.Day_valid":                    coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
+	"Iso8601_date.Month_valid":                  coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
+	"Iso8601_date.Partial_validity":             coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
+	"Iso8601_date.Year_valid":                   coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
+	"Iso8601_date_time.Fractional_second_valid": coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
+	"Iso8601_date_time.Hour_valid":              coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
+	"Iso8601_date_time.Minute_valid":            coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
+	"Iso8601_date_time.Partial_validity_minute": coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
+	"Iso8601_date_time.Year_valid":              coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
+	"Iso8601_duration.Days_valid":               coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
+	"Iso8601_duration.Fractional_second_valid":  coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
+	"Iso8601_duration.Hours_valid":              coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
+	"Iso8601_duration.Minutes_valid":            coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
+	"Iso8601_duration.Months_valid":             coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
+	"Iso8601_duration.Seconds_valid":            coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
+	"Iso8601_duration.Weeks_valid":              coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
+	"Iso8601_duration.Years_valid":              coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
+	"Iso8601_time.Fractional_second_valid":      coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
+	"Iso8601_time.Hour_valid":                   coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
+	"Iso8601_time.Minute_valid":                 coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
+	"Iso8601_time.Partial_validity":             coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
 }
 
 // attributeCheck is an evaluator the floor runs on a node of class and of
@@ -297,43 +363,41 @@ var floorRules = pinnedSource.build()
 // unless it reports the invariant that dispatched it; then the coded
 // invariants, in the class's key order. An invariant the classification
 // calls evaluated that has no binding is treated as not evaluated, so
-// Coverage still names it.
+// Coverage still names it; so is one another check decides, on a class that
+// check does not run on.
 func (src inventorySource) build() inventoryRules {
 	classes := slices.Sorted(maps.Keys(src.classes))
-	notEvaluated := map[string]bool{}
-	for _, class := range classes {
-		for _, key := range src.classes[class] {
-			if !src.evaluated(key) {
-				notEvaluated[key] = true
-			}
-		}
-	}
-	unevaluated := slices.Sorted(maps.Keys(notEvaluated))
-	position := make(map[string]int, len(unevaluated))
-	for i, key := range unevaluated {
-		position[key] = i
-	}
-	byClass := make(map[string]*classRules, len(classes))
 	byIndex := make([]*classRules, len(classes))
+	notEvaluated := make([][]string, len(classes))
+	listed := map[string]bool{}
 	for i, class := range classes {
 		r := &classRules{index: i}
+		runs := map[string]bool{mandatoryCheck: true}
 		for _, ac := range src.attributes {
 			if conformsTo(src.hierarchy, class, ac.class) {
 				r.checks = append(r.checks, boundCheck{run: ac.check.run})
 				r.owned = append(r.owned, ac.owns...)
+				runs[ac.check.function] = true
 			}
 		}
 		served := map[string]bool{}
+		var covered []string
 		for _, key := range src.classes[class] {
 			if !src.evaluated(key) {
-				r.unevaluated = r.unevaluated.with(position[key])
+				notEvaluated[i] = append(notEvaluated[i], key)
 				continue
 			}
 			c := src.checks[key]
-			if c.coded != nil {
+			switch {
+			case c.covered:
+				covered = append(covered, key)
+				continue
+			case c.coded != nil:
 				r.coded = append(r.coded, c.coded)
+				runs[c.function] = true
 				continue
 			}
+			runs[c.function] = true
 			id := c.function
 			if c.perRule {
 				id += " " + key
@@ -343,20 +407,42 @@ func (src inventorySource) build() inventoryRules {
 				r.checks = append(r.checks, boundCheck{run: c.run, rule: key})
 			}
 		}
-		byClass[class] = r
+		for _, key := range covered {
+			if !runs[src.checks[key].function] {
+				notEvaluated[i] = append(notEvaluated[i], key)
+			}
+		}
+		for _, key := range notEvaluated[i] {
+			listed[key] = true
+		}
 		byIndex[i] = r
+	}
+	unevaluated := slices.Sorted(maps.Keys(listed))
+	position := make(map[string]int, len(unevaluated))
+	for i, key := range unevaluated {
+		position[key] = i
+	}
+	byClass := make(map[string]*classRules, len(classes))
+	for i, class := range classes {
+		r := byIndex[i]
+		for _, key := range notEvaluated[i] {
+			r.unevaluated = r.unevaluated.with(position[key])
+		}
+		byClass[class] = r
 	}
 	return inventoryRules{byClass: byClass, byIndex: byIndex, unevaluated: unevaluated}
 }
 
 // evaluated reports whether the floor evaluates the invariant key: the
-// classification calls it evaluated, and a binding names its evaluator.
+// classification calls it evaluated, and a binding names its evaluator or the
+// check that decides it. For an invariant another check decides, [build]
+// also requires that check to run on the class.
 func (src inventorySource) evaluated(key string) bool {
 	if src.inventory[key].kind != invariantEvaluated {
 		return false
 	}
 	c, ok := src.checks[key]
-	return ok && (c.run != nil || c.coded != nil)
+	return ok && (c.run != nil || c.coded != nil || c.covered)
 }
 
 // conformsTo reports whether class is ancestor or descends from it in the

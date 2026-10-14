@@ -61,9 +61,52 @@ func TestCoverage_REQ171_UnevaluatedListsARootsInvariants(t *testing.T) {
 	}
 }
 
+// REQ-171 Where the RM rules come from, § Coverage — an invariant another
+// evaluated check decides is evaluated, so a root of a class subject to it
+// does not list it: DV_TEXT.Valid_value and DV_PARAGRAPH.Items_valid, which
+// the mandatory-presence rule decides, and the parts of an ISO 8601 value the
+// REQ-123 parse of DV_DATE_TIME.Value_valid or DV_TIME.Value_valid refuses,
+// such as Iso8601_date_time.Hour_valid. The parts that parse accepts against
+// the BASE rule, a date-time without its day or month, a leap second, are
+// still listed.
+func TestCoverage_REQ171_UnevaluatedLeavesOutWhatAnotherCheckDecides(t *testing.T) {
+	t.Parallel()
+	ordered := []string{
+		"DV_ORDERED.Is_simple_validity",
+		"DV_ORDERED.Normal_range_and_status_consistency",
+		"DV_ORDERED.Other_reference_ranges_validity",
+		"DV_QUANTIFIED.Magnitude_status_valid",
+	}
+	for _, tc := range []struct {
+		name string
+		root any
+		want []string
+	}{
+		{name: "DV_TEXT", root: &rm.DVText{Value: "Blood pressure"}, want: []string{"DV_TEXT.Formatting_valid"}},
+		{name: "DV_PARAGRAPH", root: &rm.DVParagraph{Items: []rm.DVTextLike{&rm.DVText{Value: "Blood pressure"}}}, want: []string{"DV_TEXT.Formatting_valid"}},
+		{name: "DV_DATE", root: &rm.DVDate{Value: "2024-03-15"}, want: ordered},
+		{name: "DV_TIME", root: &rm.DVTime{Value: "10:30:00"}, want: append(slices.Clone(ordered), "Iso8601_time.Second_valid")},
+		{name: "DV_DATE_TIME", root: &rm.DVDateTime{Value: "2024-03-15T10:30:00Z"}, want: append(slices.Clone(ordered),
+			"Iso8601_date_time.Day_valid",
+			"Iso8601_date_time.Month_valid",
+			"Iso8601_date_time.Partial_validity_day",
+			"Iso8601_date_time.Partial_validity_hour",
+			"Iso8601_date_time.Partial_validity_month",
+			"Iso8601_date_time.Partial_validity_year",
+			"Iso8601_date_time.Second_valid",
+		)},
+	} {
+		r := validation.ValidateRM(tc.root)
+		if !r.OK || !slices.Equal(r.Coverage.Unevaluated, tc.want) {
+			t.Errorf("ValidateRM(%s) OK = %t, Coverage.Unevaluated = %q, want OK and %q", tc.name, r.OK, r.Coverage.Unevaluated, tc.want)
+		}
+	}
+}
+
 // REQ-171 § Coverage — over every vendored corpus document, Unevaluated is
 // sorted with no repeat, lists invariants of LOCATABLE and DV_TEXT the SDK
-// does not evaluate and none of the RM rules it does, and is the same with
+// does not evaluate and none of the RM rules it does, those the
+// mandatory-presence rule decides included, and is the same with
 // the template as without: with no limit met, the floor visits every class
 // the template walk enters.
 func TestCoverage_REQ171_UnevaluatedOverTheCorpus(t *testing.T) {
@@ -74,7 +117,7 @@ func TestCoverage_REQ171_UnevaluatedOverTheCorpus(t *testing.T) {
 		if !sortedOnce(floor) {
 			t.Errorf("ValidateRM(%s) Coverage.Unevaluated = %q, want it sorted with no repeat", doc.rel.Rel, floor)
 		}
-		for _, evaluated := range []string{"DV_TEXT.Mappings_valid", "ELEMENT.Inv_null_flavour_indicated", "CODE_PHRASE.Code_string_valid"} {
+		for _, evaluated := range []string{"DV_TEXT.Mappings_valid", "ELEMENT.Inv_null_flavour_indicated", "CODE_PHRASE.Code_string_valid", "LOCATABLE.Archetype_node_id_valid", "DV_TEXT.Valid_value"} {
 			if slices.Contains(floor, evaluated) {
 				t.Errorf("ValidateRM(%s) Coverage.Unevaluated lists %s, which the floor evaluates", doc.rel.Rel, evaluated)
 			}

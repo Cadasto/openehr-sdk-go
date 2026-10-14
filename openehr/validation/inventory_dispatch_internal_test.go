@@ -4,7 +4,9 @@ package validation
 // REQ-112. The floor dispatches its rules through the invariant inventory:
 // every invariant invariants.json calls evaluated is bound to the Go function
 // it names, and to no other, and that function runs on a node of every class
-// the inventory says is subject to the invariant.
+// the inventory says is subject to the invariant. An invariant another
+// evaluated check decides is bound to that check's function, which reports a
+// value that breaks it on every such class.
 
 import (
 	"fmt"
@@ -29,11 +31,12 @@ const dispatchFile = "inventory_dispatch.go"
 
 // dispatchSource is what [dispatchBindings] finds in a package's source: for
 // each key of the invariantChecks literal, the name of the function the
-// entry binds; one line per entry whose recorded name is not the function it
-// binds, or that names no method of rmFloorWalker; and the methods of
-// rmFloorWalker the source declares.
+// entry binds; the keys bound through coveredCheck; one line per entry whose
+// recorded name is not the function it binds, or that names no method of
+// rmFloorWalker; and the methods of rmFloorWalker the source declares.
 type dispatchSource struct {
 	bound    map[string]string
+	covered  map[string]bool
 	problems []string
 	methods  map[string]bool
 }
@@ -44,14 +47,14 @@ const codedEvaluator = "checkCodedInvariants"
 
 // dispatchBindings parses the non-test Go files in dir and reads the
 // invariantChecks literal of file. Each entry must be a call of nodeCheck,
-// roleCheck, typeCheck or ruleCheck whose first argument, a string literal, is the name
+// roleCheck, typeCheck, ruleCheck or coveredCheck whose first argument, a string literal, is the name
 // of the method expression (*rmFloorWalker).name its second argument is, or
 // a call of codedCheck, which binds checkCodedInvariants. Every function an
 // entry binds must be a method of rmFloorWalker the source declares. It
 // returns an error when the literal is missing, so the check cannot pass over
 // nothing.
 func dispatchBindings(dir, file string) (dispatchSource, error) {
-	out := dispatchSource{bound: map[string]string{}, methods: map[string]bool{}}
+	out := dispatchSource{bound: map[string]string{}, covered: map[string]bool{}, methods: map[string]bool{}}
 	fset := token.NewFileSet()
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -103,12 +106,15 @@ func dispatchBindings(dir, file string) (dispatchSource, error) {
 			out.problems = append(out.problems, "an invariantChecks entry whose key is not a string literal")
 			continue
 		}
-		fn, problem := boundFunction(kv.Value)
+		fn, covered, problem := boundFunction(kv.Value)
 		if problem != "" {
 			out.problems = append(out.problems, key+": "+problem)
 			continue
 		}
 		out.bound[key] = fn
+		if covered {
+			out.covered[key] = true
+		}
 	}
 	for key, fn := range out.bound {
 		if !out.methods[fn] {
@@ -120,42 +126,45 @@ func dispatchBindings(dir, file string) (dispatchSource, error) {
 }
 
 // boundFunction returns the name of the function an invariantChecks entry
-// value binds, or what is wrong with it.
-func boundFunction(e ast.Expr) (fn, problem string) {
+// value binds and whether it binds it through coveredCheck, or what is wrong
+// with it.
+func boundFunction(e ast.Expr) (fn string, covered bool, problem string) {
 	call, ok := e.(*ast.CallExpr)
 	if !ok {
-		return "", "not a call of a binder"
+		return "", false, "not a call of a binder"
 	}
 	binder, ok := call.Fun.(*ast.Ident)
 	if !ok {
-		return "", "not a call of a binder"
+		return "", false, "not a call of a binder"
 	}
 	switch binder.Name {
 	case "codedCheck":
-		return codedEvaluator, ""
+		return codedEvaluator, false, ""
 	case "nodeCheck", "roleCheck", "typeCheck", "ruleCheck":
+	case "coveredCheck":
+		covered = true
 	default:
-		return "", "binds through " + binder.Name + ", which is no binder"
+		return "", false, "binds through " + binder.Name + ", which is no binder"
 	}
 	if len(call.Args) != 2 {
-		return "", binder.Name + " with other than two arguments"
+		return "", false, binder.Name + " with other than two arguments"
 	}
 	name, ok := stringLit(call.Args[0])
 	if !ok {
-		return "", "records its function's name as other than a string literal"
+		return "", false, "records its function's name as other than a string literal"
 	}
 	sel, ok := call.Args[1].(*ast.SelectorExpr)
 	if !ok {
-		return "", "binds no method expression of *rmFloorWalker"
+		return "", false, "binds no method expression of *rmFloorWalker"
 	}
 	paren, ok := sel.X.(*ast.ParenExpr)
 	if !ok || !isWalkerPointer(paren.X) {
-		return "", "binds no method expression of *rmFloorWalker"
+		return "", false, "binds no method expression of *rmFloorWalker"
 	}
 	if sel.Sel.Name != name {
-		return "", fmt.Sprintf("records the name %q beside the method %s", name, sel.Sel.Name)
+		return "", false, fmt.Sprintf("records the name %q beside the method %s", name, sel.Sel.Name)
 	}
-	return name, ""
+	return name, covered, ""
 }
 
 // isWalkerPointer reports whether e is the type *rmFloorWalker.
@@ -182,7 +191,10 @@ func stringLit(e ast.Expr) (string, bool) {
 // invariants.json calls evaluated, and only those, each to the function the
 // classification names: the name recorded beside each function is the method
 // it binds, every such method is declared, and a coded entry binds the row
-// whose class and invariant are its key.
+// whose class and invariant are its key. An invariant another evaluated check
+// decides is bound through coveredCheck, and only such a one, and names the
+// mandatory-presence check or a function the dispatch runs for an invariant
+// of its own, since a covering function nothing runs would decide nothing.
 func TestInventory_REQ171_DispatchMatchesTheClassification(t *testing.T) {
 	t.Parallel()
 	src, err := dispatchBindings(".", dispatchFile)
@@ -197,6 +209,15 @@ func TestInventory_REQ171_DispatchMatchesTheClassification(t *testing.T) {
 	}
 	if got := codedCheck(&ruleEntryLanguage).function; got != codedEvaluator {
 		t.Errorf("codedCheck records the function %q, want %q", got, codedEvaluator)
+	}
+	if !src.methods[mandatoryCheck] {
+		t.Errorf("rmFloorWalker declares no %s, the mandatory-presence check build counts as run on every class", mandatoryCheck)
+	}
+	dispatched := map[string]bool{}
+	for _, c := range invariantChecks {
+		if c.run != nil {
+			dispatched[c.function] = true
+		}
 	}
 	for _, key := range slices.Sorted(maps.Keys(invariantInventory)) {
 		e := invariantInventory[key]
@@ -225,10 +246,27 @@ func TestInventory_REQ171_DispatchMatchesTheClassification(t *testing.T) {
 		if c.coded != nil && c.coded.name() != key {
 			t.Errorf("invariantChecks[%s] binds the coded row %s", key, c.coded.name())
 		}
-		if (c.run == nil) == (c.coded == nil) {
-			t.Errorf("invariantChecks[%s] binds a function and a coded row, or neither", key)
+		if kinds := btoi(c.run != nil) + btoi(c.coded != nil) + btoi(c.covered); kinds != 1 {
+			t.Errorf("invariantChecks[%s] binds %d of a function, a coded row and a covering check, want one", key, kinds)
+		}
+		if c.covered != src.covered[key] {
+			t.Errorf("invariantChecks[%s] covered = %t, but the source binds it through coveredCheck: %t", key, c.covered, src.covered[key])
+		}
+		if c.covered && c.function != mandatoryCheck && !dispatched[c.function] {
+			t.Errorf("invariantChecks[%s] is covered by %s, which the dispatch runs for no invariant of its own, so nothing decides it", key, c.function)
 		}
 	}
+	if len(src.covered) == 0 {
+		t.Error("the source binds no invariant through coveredCheck; the covered checks have gone blind")
+	}
+}
+
+// btoi returns 1 for true and 0 for false.
+func btoi(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 // TestInventory_REQ171_DispatchCheckFailsOnEachGap runs the source check over
@@ -240,7 +278,9 @@ func TestInventory_REQ171_DispatchCheckFailsOnEachGap(t *testing.T) {
 	for _, tc := range []struct {
 		name, body, want string
 	}{
-		{name: "a function bound under its own name", body: `var invariantChecks = map[string]invariantCheck{"A.x": nodeCheck("checkA", (*rmFloorWalker).checkA), "A.y": codedCheck(&ruleY)}`},
+		{name: "a function bound under its own name", body: `var invariantChecks = map[string]invariantCheck{"A.x": nodeCheck("checkA", (*rmFloorWalker).checkA), "A.y": codedCheck(&ruleY), "A.z": coveredCheck("checkA", (*rmFloorWalker).checkA)}`},
+		{name: "a covering function under another name", body: `var invariantChecks = map[string]invariantCheck{"A.z": coveredCheck("checkB", (*rmFloorWalker).checkA)}`, want: `records the name "checkB" beside the method checkA`},
+		{name: "a covering function the walker does not declare", body: `var invariantChecks = map[string]invariantCheck{"A.z": coveredCheck("checkB", (*rmFloorWalker).checkB)}`, want: "checkB, which is no method"},
 		{name: "a name beside another method", body: `var invariantChecks = map[string]invariantCheck{"A.x": nodeCheck("checkB", (*rmFloorWalker).checkA)}`, want: `records the name "checkB" beside the method checkA`},
 		{name: "a method the walker does not declare", body: `var invariantChecks = map[string]invariantCheck{"A.x": nodeCheck("checkB", (*rmFloorWalker).checkB)}`, want: "checkB, which is no method"},
 		{name: "a name that is no literal", body: `var invariantChecks = map[string]invariantCheck{"A.x": nodeCheck(name, (*rmFloorWalker).checkA)}`, want: "other than a string literal"},
@@ -273,6 +313,18 @@ func TestInventory_REQ171_DispatchCheckFailsOnEachGap(t *testing.T) {
 	if _, err := dispatchBindings(dir, dispatchFile); err == nil {
 		t.Errorf("dispatchBindings(no invariantChecks) succeeded, want an error: the check would pass over nothing")
 	}
+	both := t.TempDir()
+	body := `var invariantChecks = map[string]invariantCheck{"A.x": nodeCheck("checkA", (*rmFloorWalker).checkA), "A.z": coveredCheck("checkA", (*rmFloorWalker).checkA)}`
+	if err := os.WriteFile(filepath.Join(both, dispatchFile), []byte(header+body+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := dispatchBindings(both, dispatchFile)
+	if err != nil {
+		t.Fatalf("dispatchBindings(an evaluator and a covered binding) error = %v", err)
+	}
+	if !got.covered["A.z"] || got.covered["A.x"] || got.bound["A.z"] != "checkA" {
+		t.Errorf("dispatchBindings(an evaluator and a covered binding) covered %v bound %v, want A.z alone covered, by checkA", got.covered, got.bound)
+	}
 }
 
 // REQ-171 Acceptance — the inventory covers every class the registry
@@ -301,9 +353,9 @@ const (
 	bogusCoded  = `{"_type":"DV_CODED_TEXT","value":"x","defining_code":` + bogusPhrase + `}`
 )
 
-// breakingMembers gives, for each evaluated invariant, the JSON members that
-// break it on a value of any class subject to it; the empty string breaks it
-// with the class's zero value.
+// breakingMembers gives, for each invariant the floor dispatches an
+// evaluator for, the JSON members that break it on a value of any class
+// subject to it; the empty string breaks it with the class's zero value.
 var breakingMembers = map[string]string{
 	"ARCHETYPED.Rm_version_valid":        `"archetype_id":{"_type":"ARCHETYPE_ID","value":"openEHR-EHR-OBSERVATION.x.v1"}`,
 	"CODE_PHRASE.Code_string_valid":      `"terminology_id":{"_type":"TERMINOLOGY_ID","value":"local"},"code_string":""`,
@@ -351,34 +403,115 @@ var breakingMembers = map[string]string{
 	"TERM_MAPPING.Purpose_valid":                       `"purpose":` + bogusCoded,
 }
 
+// coveredBreak is a value that breaks an invariant another evaluated check
+// decides, and the issue that check reports for it: its rule, the rule of the
+// check (REQ-171 Finding identity), and its path.
+type coveredBreak struct {
+	members, rule, path string
+}
+
+// coveredBreaks gives, for each invariant another evaluated check decides,
+// the JSON members that break it on a value of any class subject to it, and
+// the issue the covering check reports for them: the mandatory-presence rule
+// for an empty mandatory string or list, and the class's Value_valid, at the
+// value itself, for an ISO 8601 value the REQ-123 parse refuses.
+var coveredBreaks = map[string]coveredBreak{
+	"ACTIVITY.Action_archetype_id_valid":         {members: `"action_archetype_id":""`, rule: ruleMandatory, path: "/action_archetype_id"},
+	"AUDIT_DETAILS.System_id_valid":              {members: `"system_id":""`, rule: ruleMandatory, path: "/system_id"},
+	"DV_IDENTIFIER.Id_valid":                     {members: `"id":""`, rule: ruleMandatory, path: "/id"},
+	"DV_PARAGRAPH.Items_valid":                   {members: `"items":[]`, rule: ruleCardinality, path: "/items"},
+	"DV_PARSABLE.Formalism_valid":                {members: `"formalism":""`, rule: ruleMandatory, path: "/formalism"},
+	"DV_TEXT.Valid_value":                        {members: `"value":""`, rule: ruleMandatory, path: "/value"},
+	"DV_URI.Value_valid":                         {members: `"value":""`, rule: ruleMandatory, path: "/value"},
+	"FEEDER_AUDIT_DETAILS.System_id_valid":       {members: `"system_id":""`, rule: ruleMandatory, path: "/system_id"},
+	"INSTRUCTION_DETAILS.Activity_path_valid":    {members: `"activity_id":""`, rule: ruleMandatory, path: "/activity_id"},
+	"LOCATABLE.Archetype_node_id_valid":          {members: `"archetype_node_id":""`, rule: ruleMandatory, path: "/archetype_node_id"},
+	"PARTY.Identities_valid":                     {members: `"identities":[]`, rule: ruleCardinality, path: "/identities"},
+	"RESOURCE_DESCRIPTION.Lifecycle_state_valid": {members: `"lifecycle_state":""`, rule: ruleMandatory, path: "/lifecycle_state"},
+	"RESOURCE_DESCRIPTION_ITEM.Purpose_valid":    {members: `"purpose":""`, rule: ruleMandatory, path: "/purpose"},
+	"REVISION_HISTORY_ITEM.Audit_valid":          {members: `"audits":[]`, rule: ruleCardinality, path: "/audits"},
+	"UID.Value_valid":                            {members: `"value":""`, rule: ruleMandatory, path: "/value"},
+	"VERSION_TREE_ID.Value_valid":                {members: `"value":""`, rule: ruleMandatory, path: "/value"},
+
+	"Iso8601_date.Day_valid":                    {members: `"value":"2023-02-29"`, rule: "DV_DATE.Value_valid", path: "/"},
+	"Iso8601_date.Month_valid":                  {members: `"value":"2024-13-01"`, rule: "DV_DATE.Value_valid", path: "/"},
+	"Iso8601_date.Partial_validity":             {members: `"value":"2024--15"`, rule: "DV_DATE.Value_valid", path: "/"},
+	"Iso8601_date.Year_valid":                   {members: `"value":"-2024-01-01"`, rule: "DV_DATE.Value_valid", path: "/"},
+	"Iso8601_date_time.Fractional_second_valid": {members: `"value":"2024-01-01T10:30.5"`, rule: "DV_DATE_TIME.Value_valid", path: "/"},
+	"Iso8601_date_time.Hour_valid":              {members: `"value":"2024-01-01T25:00:00"`, rule: "DV_DATE_TIME.Value_valid", path: "/"},
+	"Iso8601_date_time.Minute_valid":            {members: `"value":"2024-01-01T10:60:00"`, rule: "DV_DATE_TIME.Value_valid", path: "/"},
+	"Iso8601_date_time.Partial_validity_minute": {members: `"value":"2024-01-01T10::30"`, rule: "DV_DATE_TIME.Value_valid", path: "/"},
+	"Iso8601_date_time.Year_valid":              {members: `"value":"-2024-01-01T10:00:00"`, rule: "DV_DATE_TIME.Value_valid", path: "/"},
+	"Iso8601_duration.Days_valid":               {members: `"value":"P-1D"`, rule: "DV_DURATION.Value_valid", path: "/"},
+	"Iso8601_duration.Fractional_second_valid":  {members: `"value":"PT-0.5S"`, rule: "DV_DURATION.Value_valid", path: "/"},
+	"Iso8601_duration.Hours_valid":              {members: `"value":"PT-1H"`, rule: "DV_DURATION.Value_valid", path: "/"},
+	"Iso8601_duration.Minutes_valid":            {members: `"value":"PT-1M"`, rule: "DV_DURATION.Value_valid", path: "/"},
+	"Iso8601_duration.Months_valid":             {members: `"value":"P-1M"`, rule: "DV_DURATION.Value_valid", path: "/"},
+	"Iso8601_duration.Seconds_valid":            {members: `"value":"PT-1S"`, rule: "DV_DURATION.Value_valid", path: "/"},
+	"Iso8601_duration.Weeks_valid":              {members: `"value":"P-1W"`, rule: "DV_DURATION.Value_valid", path: "/"},
+	"Iso8601_duration.Years_valid":              {members: `"value":"P-1Y"`, rule: "DV_DURATION.Value_valid", path: "/"},
+	"Iso8601_time.Fractional_second_valid":      {members: `"value":"10:30.5"`, rule: "DV_TIME.Value_valid", path: "/"},
+	"Iso8601_time.Hour_valid":                   {members: `"value":"25:00:00"`, rule: "DV_TIME.Value_valid", path: "/"},
+	"Iso8601_time.Minute_valid":                 {members: `"value":"10:60:00"`, rule: "DV_TIME.Value_valid", path: "/"},
+	"Iso8601_time.Partial_validity":             {members: `"value":"10::30"`, rule: "DV_TIME.Value_valid", path: "/"},
+}
+
 // REQ-171, REQ-112 — the floor runs the evaluator of every evaluated
 // invariant on a node of every class the inventory says is subject to it: a
 // value of the class that breaks the invariant draws an issue whose rule is
-// the invariant. An invariant bound but never dispatched, or dispatched to an
-// evaluator that cannot read the class, fails here, and so does an evaluated
-// invariant that no class is subject to.
+// the invariant. For an invariant another evaluated check decides, the issue
+// is the one that check reports, at the path it reports it, with its rule. An
+// invariant bound but never dispatched, dispatched to an evaluator that cannot
+// read the class, or covered by a check that does not run on the class, fails
+// here, and so does an evaluated invariant that no class is subject to.
 func TestFloor_REQ171_EveryEvaluatedInvariantRunsOnEachClass(t *testing.T) {
 	t.Parallel()
 	subject := map[string]int{}
+	decode := func(class, members string) (any, string, bool) {
+		body := `{"_type":"` + class + `"`
+		if members != "" {
+			body += "," + members
+		}
+		body += "}"
+		v, err := typereg.Default.Decode([]byte(body))
+		if err != nil {
+			t.Errorf("typereg.Decode(%s): %v", body, err)
+			return nil, body, false
+		}
+		return v, body, true
+	}
 	for _, class := range slices.Sorted(maps.Keys(classInvariants)) {
 		for _, key := range classInvariants[class] {
 			if invariantInventory[key].kind != invariantEvaluated {
 				continue
 			}
 			subject[key]++
+			if invariantChecks[key].covered {
+				b, ok := coveredBreaks[key]
+				if !ok {
+					t.Errorf("coveredBreaks holds no value breaking %s, which %s decides on %s; add one", key, invariantChecks[key].function, class)
+					continue
+				}
+				v, body, ok := decode(class, b.members)
+				if !ok {
+					continue
+				}
+				r := ValidateRM(v)
+				if !slices.ContainsFunc(r.Issues, func(i Issue) bool { return i.Rule == b.rule && i.Path == b.path }) {
+					t.Errorf("ValidateRM(%s) issues %q, want one whose rule is %s at %s: %s does not decide %s on %s", body, keys(r.Issues), b.rule, b.path, invariantChecks[key].function, key, class)
+				}
+				if slices.Contains(r.Coverage.Unevaluated, key) {
+					t.Errorf("ValidateRM(%s) Coverage.Unevaluated lists %s: the dispatch does not count %s as run on %s", body, key, invariantChecks[key].function, class)
+				}
+				continue
+			}
 			members, ok := breakingMembers[key]
 			if !ok {
 				t.Errorf("breakingMembers holds no value breaking %s, which the floor evaluates on %s; add one", key, class)
 				continue
 			}
-			body := `{"_type":"` + class + `"`
-			if members != "" {
-				body += "," + members
-			}
-			body += "}"
-			v, err := typereg.Default.Decode([]byte(body))
-			if err != nil {
-				t.Errorf("typereg.Decode(%s): %v", body, err)
+			v, body, ok := decode(class, members)
+			if !ok {
 				continue
 			}
 			r := ValidateRM(v)
@@ -398,8 +531,13 @@ func TestFloor_REQ171_EveryEvaluatedInvariantRunsOnEachClass(t *testing.T) {
 		}
 	}
 	for key := range breakingMembers {
-		if invariantInventory[key].kind != invariantEvaluated {
-			t.Errorf("breakingMembers breaks %s, which the floor does not evaluate", key)
+		if invariantInventory[key].kind != invariantEvaluated || invariantChecks[key].covered {
+			t.Errorf("breakingMembers breaks %s, for which the floor dispatches no evaluator", key)
+		}
+	}
+	for key := range coveredBreaks {
+		if invariantInventory[key].kind != invariantEvaluated || !invariantChecks[key].covered {
+			t.Errorf("coveredBreaks breaks %s, which no other evaluated check decides", key)
 		}
 	}
 }
@@ -443,7 +581,10 @@ func TestCoverage_REQ171_EveryRootListsItsUnevaluatedInvariants(t *testing.T) {
 // invariants it serves and once per invariant for one that reports the
 // invariant that dispatched it, and hands the class's evaluated coded rows to
 // the coded pass. An invariant that is not evaluated, or that is evaluated
-// and bound to nothing, runs nothing and is listed as unevaluated, sorted.
+// and bound to nothing, runs nothing and is listed as unevaluated, sorted. An
+// invariant another check decides runs nothing either: it is evaluated on a
+// class where that check runs, the mandatory-presence check running on every
+// class, and listed as unevaluated on one where it does not.
 func TestInventory_REQ171_BuildDispatchesTheEvaluatedInvariants(t *testing.T) {
 	t.Parallel()
 	var ran []string
@@ -453,8 +594,8 @@ func TestInventory_REQ171_BuildDispatchesTheEvaluatedInvariants(t *testing.T) {
 	rowA, rowB := codedRule{owner: "P", invariant: "c1"}, codedRule{owner: "P", invariant: "c2"}
 	src := inventorySource{
 		classes: map[string][]string{
-			"A": {"A.e1", "A.e2", "A.n", "P.c1", "P.c2", "P.r1", "P.r2"},
-			"B": {"B.unbound"},
+			"A": {"A.ca", "A.cm", "A.cs", "A.e1", "A.e2", "A.n", "P.c1", "P.c2", "P.r1", "P.r2"},
+			"B": {"A.ca", "A.cm", "A.cs", "B.unbound"},
 			"C": nil,
 		},
 		inventory: map[string]inventoryEntry{
@@ -466,6 +607,9 @@ func TestInventory_REQ171_BuildDispatchesTheEvaluatedInvariants(t *testing.T) {
 			"P.r1":      {kind: invariantEvaluated, function: "perRule"},
 			"P.r2":      {kind: invariantEvaluated, function: "perRule"},
 			"B.unbound": {kind: invariantEvaluated, function: "missing"},
+			"A.ca":      {kind: invariantEvaluated, function: "attribute"},
+			"A.cm":      {kind: invariantEvaluated, function: mandatoryCheck},
+			"A.cs":      {kind: invariantEvaluated, function: "shared"},
 		},
 		checks: map[string]invariantCheck{
 			"A.e1": {function: "shared", run: record("shared")},
@@ -474,6 +618,9 @@ func TestInventory_REQ171_BuildDispatchesTheEvaluatedInvariants(t *testing.T) {
 			"P.c2": {function: "checkCodedInvariants", coded: &rowB},
 			"P.r1": {function: "perRule", perRule: true, run: record("perRule")},
 			"P.r2": {function: "perRule", perRule: true, run: record("perRule")},
+			"A.ca": {function: "attribute", covered: true},
+			"A.cm": {function: mandatoryCheck, covered: true},
+			"A.cs": {function: "shared", covered: true},
 		},
 		attributes: []attributeCheck{
 			{class: "A", check: invariantCheck{function: "attribute", run: record("attribute")}},
@@ -481,7 +628,7 @@ func TestInventory_REQ171_BuildDispatchesTheEvaluatedInvariants(t *testing.T) {
 		},
 	}
 	rules := src.build()
-	if want := []string{"A.n", "B.unbound"}; !slices.Equal(rules.unevaluated, want) {
+	if want := []string{"A.cs", "A.n", "B.unbound"}; !slices.Equal(rules.unevaluated, want) {
 		t.Errorf("build().unevaluated = %q, want %q", rules.unevaluated, want)
 	}
 	for _, tc := range []struct {
@@ -491,7 +638,7 @@ func TestInventory_REQ171_BuildDispatchesTheEvaluatedInvariants(t *testing.T) {
 		unevaluated []string
 	}{
 		{class: "A", ran: []string{"attribute ", "shared A.e1", "perRule P.r1", "perRule P.r2"}, coded: []*codedRule{&rowA, &rowB}, unevaluated: []string{"A.n"}},
-		{class: "B", ran: []string{"attribute "}, unevaluated: []string{"B.unbound"}},
+		{class: "B", ran: []string{"attribute "}, unevaluated: []string{"A.cs", "B.unbound"}},
 		{class: "C"},
 	} {
 		r := rules.byClass[tc.class]

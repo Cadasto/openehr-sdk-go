@@ -436,31 +436,13 @@ func (w *rmFloorWalker) visit(value any, rmType string, path string, role floorR
 		switch {
 		case isContainer:
 			n, present := rmaccess.Len(value, attr)
-			if !present {
-				if required {
-					w.emit(Issue{
-						Path:   attrPath,
-						Code:   "required",
-						Layer:  LayerRM,
-						Rule:   ruleMandatory,
-						Detail: fmt.Sprintf("RM-mandatory multi-valued attribute %q absent on %s", attr, rmType),
-					})
-				}
-				continue
-			}
-			if required && n == 0 {
-				w.emit(Issue{
-					Path:   attrPath,
-					Code:   "cardinality",
-					Layer:  LayerRM,
-					Rule:   ruleCardinality,
-					Detail: fmt.Sprintf("RM-mandatory multi-valued attribute %q must be non-empty on %s", attr, rmType),
-				})
+			if required {
+				w.checkMandatory(rmType, attr, attrPath, true, present, n)
 			}
 			// A list of a primitive type (DV_MULTIMEDIA data, an Array of
 			// Octet, holds one item per byte) has nothing below it to walk:
 			// it is counted above and never read item by item.
-			if n == 0 || isPrimitiveType(w.info, attrType) {
+			if !present || n == 0 || isPrimitiveType(w.info, attrType) {
 				continue
 			}
 			kids, _ := rmaccess.Multiple(value, attr)
@@ -476,16 +458,10 @@ func (w *rmFloorWalker) visit(value any, rmType string, path string, role floorR
 			}
 		case attrType == hashType:
 			_, entries, present := rmaccess.Hash(value, attr)
+			if required {
+				w.checkMandatory(rmType, attr, attrPath, false, present, len(entries))
+			}
 			if !present {
-				if required {
-					w.emit(Issue{
-						Path:   attrPath,
-						Code:   "required",
-						Layer:  LayerRM,
-						Rule:   ruleMandatory,
-						Detail: fmt.Sprintf("RM-mandatory attribute %q absent on %s", attr, rmType),
-					})
-				}
 				continue
 			}
 			// An entry of a Hash of a primitive type has nothing below it;
@@ -498,20 +474,57 @@ func (w *rmFloorWalker) visit(value any, rmType string, path string, role floorR
 			}
 		default:
 			val, present := rmaccess.Single(value, attr)
-			if !present || val == nil || rmaccess.IsTypedNilPointer(val) {
-				if required && !mayBeBlank(role, attr) {
-					w.emit(Issue{
-						Path:   attrPath,
-						Code:   "required",
-						Layer:  LayerRM,
-						Rule:   ruleMandatory,
-						Detail: fmt.Sprintf("RM-mandatory attribute %q absent on %s", attr, rmType),
-					})
-				}
+			present = present && val != nil && !rmaccess.IsTypedNilPointer(val)
+			if required && !mayBeBlank(role, attr) {
+				w.checkMandatory(rmType, attr, attrPath, false, present, 0)
+			}
+			if !present {
 				continue
 			}
 			w.walk(val, runtimeRMType(val, attrType), attrPath, childRole(class, role, attr), depth+1)
 		}
+	}
+}
+
+// checkMandatory applies the mandatory-presence rule to the RM-mandatory
+// attribute attr of a node of RM type rmType, as the walk read it at
+// attrPath: absent, it is reported as `required`, rule mandatory; a
+// multi-valued one that is present and holds no item, as `cardinality`, rule
+// cardinality. present and items are the walk's reading through the generated
+// access, under which a mandatory string left empty is absent too; items
+// counts a multi-valued attribute's items and is read for no other. The walk
+// calls it for every RM-mandatory attribute of every node it visits but a
+// part of a reference, which [rmFloorWalker.checkObjectRef] reports, and a
+// value the node's role lets be blank ([mayBeBlank]). No invariant the
+// inventory says this rule decides, such as LOCATABLE.Archetype_node_id_valid,
+// is about one of those, so each is decided on every class subject to it
+// ([invariantChecks]).
+func (w *rmFloorWalker) checkMandatory(rmType, attr, attrPath string, multiValued, present bool, items int) {
+	switch {
+	case !present && multiValued:
+		w.emit(Issue{
+			Path:   attrPath,
+			Code:   "required",
+			Layer:  LayerRM,
+			Rule:   ruleMandatory,
+			Detail: fmt.Sprintf("RM-mandatory multi-valued attribute %q absent on %s", attr, rmType),
+		})
+	case !present:
+		w.emit(Issue{
+			Path:   attrPath,
+			Code:   "required",
+			Layer:  LayerRM,
+			Rule:   ruleMandatory,
+			Detail: fmt.Sprintf("RM-mandatory attribute %q absent on %s", attr, rmType),
+		})
+	case multiValued && items == 0:
+		w.emit(Issue{
+			Path:   attrPath,
+			Code:   "cardinality",
+			Layer:  LayerRM,
+			Rule:   ruleCardinality,
+			Detail: fmt.Sprintf("RM-mandatory multi-valued attribute %q must be non-empty on %s", attr, rmType),
+		})
 	}
 }
 
