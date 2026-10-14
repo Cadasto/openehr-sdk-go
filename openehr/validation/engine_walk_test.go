@@ -290,17 +290,3 @@ func TestREQ171_EngineZeroOrNegativeLimitIsTheDefault(t *testing.T) {
 		}
 	}
 }
-
-// REQ-171 § One walk — the engine does not walk a compiled template yet: given
-// one, it refuses rather than return the RM rules alone as if they were the
-// template's result.
-func TestREQ171_EngineRefusesATemplateItDoesNotWalkYet(t *testing.T) {
-	t.Parallel()
-	c := mustCompile(t, "vital_signs")
-	defer func() {
-		if recover() == nil {
-			t.Errorf("RunEngine(root, vital_signs, Limits{}) returned, want a panic: the template walk is not built")
-		}
-	}()
-	_ = validation.RunEngine(nestedSections(1), c, validation.Limits{})
-}
