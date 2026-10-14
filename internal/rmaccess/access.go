@@ -11,17 +11,20 @@ import (
 // whether it is present, by the readings the package documentation lists. An
 // absent attribute reads as (nil, false), and so does a pair parent's class
 // does not declare as a single-valued attribute, a nil parent and a typed-nil
-// pointer parent. One present attribute can hold nil: an interval bound typed
-// by an interface, on a closed side, is present whatever it holds.
+// pointer parent. Two present attributes can hold nil: an interval bound
+// typed by an interface, on a closed side, is present whatever it holds, and
+// ORIGINAL_VERSION data, whose pointer is present when it is not nil, comes
+// back as nil when that pointer holds a nil interface.
 //
 // A pointer, an interface and a value held by value come back as the field
 // holds them, with six exceptions, of five classes, the validation walks read
 // in another shape: ITEM_SINGLE item and REFERENCE_RANGE range come back as a
 // pointer into parent, ISM_TRANSITION careflow_step and transition as the
 // DV_CODED_TEXT they point to, DV_PROPORTION precision as its Integer, and
-// CODE_PHRASE terminology_id as the string its TERMINOLOGY_ID holds. A Hash
-// attribute comes back as its Go map, or the pointer to it, whole; [Hash]
-// reads its entries, with the same presence.
+// ORIGINAL_VERSION data as the value its pointer holds, so a walk can enter
+// the payload of a version built in Go. A Hash attribute comes back as its Go
+// map, or the pointer to it, whole; [Hash] reads its entries, with the same
+// presence.
 func Single(parent any, attr string) (value any, present bool) {
 	v, present, _ := single(parent, attr)
 	if !present {

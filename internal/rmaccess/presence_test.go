@@ -1,11 +1,16 @@
 package rmaccess
 
 import (
+	"maps"
+	"reflect"
 	"runtime"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
 // TestPresence_REQ171_EachReading pins REQ-171 Structural access,
@@ -60,7 +65,8 @@ func TestPresence_REQ171_EachReading(t *testing.T) {
 		{reading: "number zero", parent: &rm.DVCount{}, attr: "magnitude", want: true},
 		{reading: "boolean false", parent: &rm.DVBoolean{}, attr: "value", want: true},
 
-		// DV_TEXT, held directly or through an interface: empty when its value is.
+		// At an attribute the RM marks mandatory (COMPOSITION name), a DV_TEXT,
+		// held directly or through an interface, is empty when its value is.
 		{reading: "DV_TEXT nil", parent: &rm.Composition{}, attr: "name", want: false},
 		{reading: "DV_TEXT nil pointer", parent: &rm.Composition{Name: (*rm.DVText)(nil)}, attr: "name", want: false},
 		{reading: "DV_TEXT pointer with an empty value", parent: &rm.Composition{Name: &rm.DVText{}}, attr: "name", want: false},
@@ -70,38 +76,64 @@ func TestPresence_REQ171_EachReading(t *testing.T) {
 		{reading: "DV_CODED_TEXT as a DV_TEXT, a code but an empty value", parent: &rm.Composition{Name: &rm.DVCodedText{DefiningCode: code}}, attr: "name", want: false},
 		{reading: "DV_CODED_TEXT as a DV_TEXT with a value", parent: &rm.Composition{Name: &rm.DVCodedText{Value: text}}, attr: "name", want: true},
 
-		// DV_CODED_TEXT held by value: empty when its value and its defining code are.
+		// At an optional attribute (ELEMENT null_reason, AUDIT_DETAILS
+		// description), a DV_TEXT takes the reading of an interface: present
+		// whatever it holds, unless nil or a nil pointer, so the walk enters it.
+		{reading: "optional DV_TEXT nil", parent: &rm.Element{}, attr: "null_reason", want: false},
+		{reading: "optional DV_TEXT nil pointer", parent: &rm.Element{NullReason: (*rm.DVText)(nil)}, attr: "null_reason", want: false},
+		{reading: "optional DV_TEXT pointer with an empty value", parent: &rm.Element{NullReason: &rm.DVText{}}, attr: "null_reason", want: true},
+		{reading: "optional DV_TEXT held as a value with an empty value", parent: &rm.AuditDetails{Description: rm.DVText{}}, attr: "description", want: true},
+		{reading: "optional DV_CODED_TEXT as a DV_TEXT, a code but an empty value", parent: &rm.Element{NullReason: &rm.DVCodedText{DefiningCode: code}}, attr: "null_reason", want: true},
+
+		// At an attribute the RM marks mandatory (COMPOSITION category), a
+		// DV_CODED_TEXT held by value is empty when its value and its defining
+		// code are.
 		{reading: "DV_CODED_TEXT empty", parent: &rm.Composition{}, attr: "category", want: false},
+		{reading: "DV_CODED_TEXT empty but not zero", parent: &rm.Composition{Category: rm.DVCodedText{Formatting: &text}}, attr: "category", want: false},
 		{reading: "DV_CODED_TEXT with a value only", parent: &rm.Composition{Category: rm.DVCodedText{Value: "event"}}, attr: "category", want: true},
 		{reading: "DV_CODED_TEXT with a code_string only", parent: &rm.Composition{Category: rm.DVCodedText{DefiningCode: rm.CodePhrase{CodeString: "433"}}}, attr: "category", want: true},
 		{reading: "DV_CODED_TEXT with a terminology only", parent: &rm.Composition{Category: rm.DVCodedText{DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}}}}, attr: "category", want: true},
 
-		// CODE_PHRASE held by value: empty when its code_string and its terminology are.
+		// At an attribute the RM marks mandatory (COMPOSITION language), a
+		// CODE_PHRASE held by value is empty when its code_string and its
+		// terminology are.
 		{reading: "CODE_PHRASE empty", parent: &rm.Composition{}, attr: "language", want: false},
+		{reading: "CODE_PHRASE empty but not zero", parent: &rm.Composition{Language: rm.CodePhrase{PreferredTerm: &text}}, attr: "language", want: false},
 		{reading: "CODE_PHRASE with a code_string only", parent: &rm.Composition{Language: rm.CodePhrase{CodeString: "en"}}, attr: "language", want: true},
 		{reading: "CODE_PHRASE with a terminology only", parent: &rm.Composition{Language: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}}}, attr: "language", want: true},
 
-		// An OBJECT_REF subtype held by value: empty when its id, namespace or
-		// type is missing. PARTY_REF (ROLE performer):
+		// An object reference held by value is present unless it is its zero
+		// value, so the walk enters one with a part missing and the reference
+		// entry reports the part. PARTY_REF (ROLE performer):
 		{reading: "PARTY_REF complete", parent: &rm.Role{Performer: partyRef(hierID, "local", "PERSON")}, attr: "performer", want: true},
-		{reading: "PARTY_REF without an id", parent: &rm.Role{Performer: partyRef(nil, "local", "PERSON")}, attr: "performer", want: false},
-		{reading: "PARTY_REF with a nil-pointer id", parent: &rm.Role{Performer: partyRef((*rm.HierObjectID)(nil), "local", "PERSON")}, attr: "performer", want: false},
-		{reading: "PARTY_REF without a namespace", parent: &rm.Role{Performer: partyRef(hierID, "", "PERSON")}, attr: "performer", want: false},
-		{reading: "PARTY_REF without a type", parent: &rm.Role{Performer: partyRef(hierID, "local", "")}, attr: "performer", want: false},
-		// LOCATABLE_REF (INSTRUCTION_DETAILS instruction_id), whose id is the
-		// UID_BASED_ID it redefines, not the OBJECT_REF id it embeds:
+		{reading: "PARTY_REF zero", parent: &rm.Role{}, attr: "performer", want: false},
+		{reading: "PARTY_REF holding only a nil-pointer id", parent: &rm.Role{Performer: partyRef((*rm.HierObjectID)(nil), "", "")}, attr: "performer", want: false},
+		{reading: "PARTY_REF without an id", parent: &rm.Role{Performer: partyRef(nil, "local", "PERSON")}, attr: "performer", want: true},
+		{reading: "PARTY_REF with a nil-pointer id", parent: &rm.Role{Performer: partyRef((*rm.HierObjectID)(nil), "local", "PERSON")}, attr: "performer", want: true},
+		{reading: "PARTY_REF without a namespace", parent: &rm.Role{Performer: partyRef(hierID, "", "PERSON")}, attr: "performer", want: true},
+		{reading: "PARTY_REF without a type", parent: &rm.Role{Performer: partyRef(hierID, "local", "")}, attr: "performer", want: true},
+		// LOCATABLE_REF (INSTRUCTION_DETAILS instruction_id), which redefines id
+		// as a UID_BASED_ID beside the OBJECT_REF id it embeds:
 		{reading: "LOCATABLE_REF complete", parent: &rm.InstructionDetails{InstructionID: locatableRef(versionID, "local", "INSTRUCTION")}, attr: "instruction_id", want: true},
-		{reading: "LOCATABLE_REF without an id", parent: &rm.InstructionDetails{InstructionID: locatableRef(nil, "local", "INSTRUCTION")}, attr: "instruction_id", want: false},
-		{reading: "LOCATABLE_REF with a nil-pointer id", parent: &rm.InstructionDetails{InstructionID: locatableRef((*rm.ObjectVersionID)(nil), "local", "INSTRUCTION")}, attr: "instruction_id", want: false},
-		{reading: "LOCATABLE_REF without a namespace", parent: &rm.InstructionDetails{InstructionID: locatableRef(versionID, "", "INSTRUCTION")}, attr: "instruction_id", want: false},
-		{reading: "LOCATABLE_REF without a type", parent: &rm.InstructionDetails{InstructionID: locatableRef(versionID, "local", "")}, attr: "instruction_id", want: false},
-		{reading: "LOCATABLE_REF with only a path", parent: &rm.InstructionDetails{InstructionID: rm.LocatableRef{Path: &text}}, attr: "instruction_id", want: false},
-		{reading: "LOCATABLE_REF with only the embedded OBJECT_REF id", parent: &rm.InstructionDetails{InstructionID: rm.LocatableRef{ObjectRef: rm.ObjectRef{ID: hierID, Namespace: "local", Type: "INSTRUCTION"}}}, attr: "instruction_id", want: false},
+		{reading: "LOCATABLE_REF zero", parent: &rm.InstructionDetails{}, attr: "instruction_id", want: false},
+		{reading: "LOCATABLE_REF without an id", parent: &rm.InstructionDetails{InstructionID: locatableRef(nil, "local", "INSTRUCTION")}, attr: "instruction_id", want: true},
+		{reading: "LOCATABLE_REF with a nil-pointer id", parent: &rm.InstructionDetails{InstructionID: locatableRef((*rm.ObjectVersionID)(nil), "local", "INSTRUCTION")}, attr: "instruction_id", want: true},
+		{reading: "LOCATABLE_REF without a namespace", parent: &rm.InstructionDetails{InstructionID: locatableRef(versionID, "", "INSTRUCTION")}, attr: "instruction_id", want: true},
+		{reading: "LOCATABLE_REF without a type", parent: &rm.InstructionDetails{InstructionID: locatableRef(versionID, "local", "")}, attr: "instruction_id", want: true},
+		{reading: "LOCATABLE_REF with only a path", parent: &rm.InstructionDetails{InstructionID: rm.LocatableRef{Path: &text}}, attr: "instruction_id", want: true},
+		{reading: "LOCATABLE_REF with only the embedded OBJECT_REF id", parent: &rm.InstructionDetails{InstructionID: rm.LocatableRef{ObjectRef: rm.ObjectRef{ID: hierID}}}, attr: "instruction_id", want: true},
 
 		// Any other class held by value: empty when it is its zero value.
 		{reading: "DV_DATE_TIME zero", parent: &rm.EventContext{}, attr: "start_time", want: false},
 		{reading: "DV_DATE_TIME with a value", parent: &rm.EventContext{StartTime: rm.DVDateTime{Value: "2026-10-13T10:00:00Z"}}, attr: "start_time", want: true},
 		{reading: "DV_DATE_TIME with an empty value but not zero", parent: &rm.EventContext{StartTime: rm.DVDateTime{MagnitudeStatus: &text}}, attr: "start_time", want: true},
+		// An interface field holding a nil pointer counts as zero: an
+		// ELEMENT whose only content is a nil-pointer value, and an interval
+		// whose bounds are nil pointers, are zero values.
+		{reading: "ELEMENT held by value holding only a nil-pointer value", parent: &rm.ItemSingle{Item: rm.Element{Value: (*rm.DVQuantity)(nil)}}, attr: "item", want: false},
+		{reading: "ELEMENT held by value holding a value", parent: &rm.ItemSingle{Item: rm.Element{Value: &rm.DVQuantity{}}}, attr: "item", want: true},
+		{reading: "interval held by value with nil-pointer bounds", parent: &rm.ReferenceRange[rm.DVCount]{Range: rm.DVInterval[rm.DVOrdered]{Lower: (*rm.DVCount)(nil), Upper: (*rm.DVCount)(nil)}}, attr: "range", want: false},
+		{reading: "interval held by value with a bound", parent: &rm.ReferenceRange[rm.DVCount]{Range: rm.DVInterval[rm.DVOrdered]{Lower: &rm.DVCount{}, Upper: (*rm.DVCount)(nil)}}, attr: "range", want: true},
 		{reading: "HISTORY zero", parent: &rm.Observation{}, attr: "data", want: false},
 		{reading: "HISTORY with a name only", parent: &rm.Observation{Data: rm.History[rm.ItemStructure]{Name: &rm.DVText{Value: text}}}, attr: "data", want: true},
 
@@ -313,39 +345,178 @@ func TestPresence_REQ171_HashReadings(t *testing.T) {
 	}
 }
 
-// TestPresence_REQ171_ObjectRef pins the object-reference reading on the
-// parts of a reference, as the generated access hands them over: an
-// OBJECT_REF and an ACCESS_GROUP_REF, which no attribute of the pinned RM
-// holds by value, so no Single row reaches them.
-func TestPresence_REQ171_ObjectRef(t *testing.T) {
-	id := &rm.HierObjectID{Value: "9fcf1d0e-0000-4000-8000-000000000001"}
-	cases := []struct {
-		reading string
-		ref     rm.ObjectRef
-		want    bool
-	}{
-		{reading: "complete", ref: rm.ObjectRef{ID: id, Namespace: "local", Type: "PERSON"}, want: true},
-		{reading: "without an id", ref: rm.ObjectRef{Namespace: "local", Type: "PERSON"}, want: false},
-		{reading: "with a nil-pointer id", ref: rm.ObjectRef{ID: (*rm.HierObjectID)(nil), Namespace: "local", Type: "PERSON"}, want: false},
-		{reading: "without a namespace", ref: rm.ObjectRef{ID: id, Type: "PERSON"}, want: false},
-		{reading: "without a type", ref: rm.ObjectRef{ID: id, Namespace: "local"}, want: false},
+// fieldByAttr returns the field of the struct v that holds the attribute
+// attr, found by its JSON name among the fields a selector reaches, so a
+// field the class declares shadows one an embedded class declares under the
+// same name (LOCATABLE_REF id). v must be addressable for the field to be
+// set.
+func fieldByAttr(v reflect.Value, attr string) (reflect.Value, bool) {
+	for _, f := range reflect.VisibleFields(v.Type()) {
+		if f.Anonymous || !f.IsExported() {
+			continue
+		}
+		if name, _, _ := strings.Cut(f.Tag.Get("json"), ","); name == attr {
+			return v.FieldByIndex(f.Index), true
+		}
 	}
-	for _, tc := range cases {
-		t.Run(tc.reading, func(t *testing.T) {
-			if got := presentObjectRef(tc.ref.ID, tc.ref.Namespace, tc.ref.Type); got != tc.want {
-				t.Errorf("presentObjectRef(OBJECT_REF %+v) = %t, want %t", tc.ref, got, tc.want)
+	return reflect.Value{}, false
+}
+
+// TestPresence_REQ171_ContentReadingsOnlyAtMandatoryAttributes pins REQ-171
+// Structural access on every registered class: the content readings apply at
+// an attribute the RM marks mandatory, and only there. Each single-valued
+// attribute declared DV_TEXT, DV_CODED_TEXT or CODE_PHRASE is set to a value
+// of its type that is not its zero value but whose content is missing: a
+// DV_TEXT with an empty value and a formatting, a DV_CODED_TEXT with that and
+// an empty defining code, a CODE_PHRASE with an empty code_string and
+// terminology and a preferred term. Held by value or through an interface,
+// it reads absent where rminfo marks the attribute required and present where
+// it does not, so the walk enters it there; held by pointer, it reads present
+// everywhere.
+func TestPresence_REQ171_ContentReadingsOnlyAtMandatoryAttributes(t *testing.T) {
+	formatting := "plain"
+	contentless := map[string]any{
+		"DV_TEXT":       rm.DVText{Formatting: &formatting},
+		"DV_CODED_TEXT": rm.DVCodedText{Formatting: &formatting},
+		"CODE_PHRASE":   rm.CodePhrase{PreferredTerm: &formatting},
+	}
+	lister, ok := rminfo.Default.(rminfo.AttributeLister)
+	if !ok {
+		t.Fatal("rminfo.Default does not list attribute names")
+	}
+	var mandatory, optional, pointers []string
+	for _, name := range typereg.Default.Names() {
+		ctor, _ := typereg.Default.Lookup(name)
+		required := rminfo.Default.RequiredAttributes(name)
+		for _, attr := range lister.AttributeNames(name) {
+			rmType, _ := rminfo.Default.AttributeRMType(name, attr)
+			value, ok := contentless[rmType]
+			if container, _ := rminfo.Default.IsContainer(name, attr); !ok || container {
+				continue
 			}
-			group := rm.AccessGroupRef{ObjectRef: tc.ref}
-			if got := presentObjectRef(group.ID, group.Namespace, group.Type); got != tc.want {
-				t.Errorf("presentObjectRef(ACCESS_GROUP_REF %+v) = %t, want %t", group, got, tc.want)
+			parent := ctor()
+			field, ok := fieldByAttr(reflect.ValueOf(parent).Elem(), attr)
+			if !ok {
+				t.Fatalf("%T has no field for %s.%s", parent, name, attr)
 			}
-		})
+			pair := name + "." + attr
+			want := !slices.Contains(required, attr)
+			switch field.Kind() {
+			case reflect.Pointer:
+				// A pointer takes the reading of its Go kind wherever it is.
+				p := reflect.New(reflect.TypeOf(value))
+				p.Elem().Set(reflect.ValueOf(value))
+				field.Set(p)
+				want = true
+				pointers = append(pointers, pair)
+			case reflect.Interface:
+				p := reflect.New(reflect.TypeOf(value))
+				p.Elem().Set(reflect.ValueOf(value))
+				field.Set(p)
+			default:
+				field.Set(reflect.ValueOf(value))
+			}
+			if field.Kind() != reflect.Pointer {
+				if want {
+					optional = append(optional, pair)
+				} else {
+					mandatory = append(mandatory, pair)
+				}
+			}
+			if _, present := Single(parent, attr); present != want {
+				t.Errorf("Single(%T with a %s whose content is missing, %q) present = %t, want %t (required: %t)", parent, rmType, attr, present, want, !want)
+			}
+		}
+	}
+	if len(mandatory) < 60 {
+		t.Errorf("checked %d mandatory attributes, want the full RM set; rminfo has gone blind", len(mandatory))
+	}
+	for _, pair := range []string{"ELEMENT.null_reason", "AUDIT_DETAILS.description", "ATTESTATION.description"} {
+		if !slices.Contains(optional, pair) {
+			t.Errorf("the optional attributes checked, %q, lack %s", optional, pair)
+		}
+	}
+	if !slices.Contains(pointers, "ELEMENT.null_flavour") {
+		t.Errorf("the attributes held by pointer checked, %q, lack ELEMENT.null_flavour", pointers)
+	}
+}
+
+// TestPresence_REQ171_ReferencesHeldByValue pins REQ-171 Structural access on
+// every registered class: an object reference held by value is present unless
+// it is its zero value, so the walk enters one with a part missing and
+// REQ-112's reference entry reports the part. Each single-valued attribute
+// whose declared type is OBJECT_REF, or a class rminfo places below it, held
+// by value, reads absent when it is its zero value and when it holds only a
+// nil-pointer id, and present with any one of its id, namespace and type set.
+func TestPresence_REQ171_ReferencesHeldByValue(t *testing.T) {
+	h, ok := rminfo.Default.(rminfo.Hierarchy)
+	if !ok {
+		t.Fatal("rminfo.Default answers no class hierarchy")
+	}
+	lister, ok := rminfo.Default.(rminfo.AttributeLister)
+	if !ok {
+		t.Fatal("rminfo.Default does not list attribute names")
+	}
+	id := &rm.HierObjectID{Value: "9fcf1d0e-0000-4000-8000-000000000001"}
+	parts := map[string]any{"id": id, "namespace": "local", "type": "PERSON"}
+	var checked []string
+	for _, name := range typereg.Default.Names() {
+		ctor, _ := typereg.Default.Lookup(name)
+		for _, attr := range lister.AttributeNames(name) {
+			rmType, _ := rminfo.Default.AttributeRMType(name, attr)
+			isRef, _ := h.ConformsTo(rmType, "OBJECT_REF")
+			if container, _ := rminfo.Default.IsContainer(name, attr); !isRef || container {
+				continue
+			}
+			// holding returns a fresh parent and its reference field.
+			holding := func() (any, reflect.Value) {
+				parent := ctor()
+				field, ok := fieldByAttr(reflect.ValueOf(parent).Elem(), attr)
+				if !ok {
+					t.Fatalf("%T has no field for %s.%s", parent, name, attr)
+				}
+				return parent, field
+			}
+			if _, field := holding(); field.Kind() != reflect.Struct {
+				continue // a pointer or an interface takes the reading of its Go kind
+			}
+			checked = append(checked, name+"."+attr)
+			parent, _ := holding()
+			if _, present := Single(parent, attr); present {
+				t.Errorf("Single(%T holding a zero %s, %q) present = true, want false", parent, rmType, attr)
+			}
+			parent, field := holding()
+			nilID, _ := fieldByAttr(field, "id")
+			nilID.Set(reflect.Zero(reflect.TypeOf(id)))
+			if _, present := Single(parent, attr); present {
+				t.Errorf("Single(%T holding a %s with only a nil-pointer id, %q) present = true, want false", parent, rmType, attr)
+			}
+			for _, part := range slices.Sorted(maps.Keys(parts)) {
+				parent, field := holding()
+				f, ok := fieldByAttr(field, part)
+				if !ok {
+					t.Fatalf("%s has no field for its %s", rmType, part)
+				}
+				f.Set(reflect.ValueOf(parts[part]))
+				if _, present := Single(parent, attr); !present {
+					t.Errorf("Single(%T holding a %s with only its %s, %q) present = false, want true", parent, rmType, part, attr)
+				}
+			}
+		}
+	}
+	for _, pair := range []string{"ROLE.performer", "PARTY_RELATIONSHIP.source", "PARTY_RELATIONSHIP.target", "INSTRUCTION_DETAILS.instruction_id"} {
+		if !slices.Contains(checked, pair) {
+			t.Errorf("the references held by value checked, %q, lack %s", checked, pair)
+		}
 	}
 }
 
 // TestAccess_REQ171_Shapes pins the six attributes, of five classes, whose
-// value comes back in another shape than the field's own, and the boxing of list items: a list of
-// values as pointers into its backing array, a list of interfaces as it is.
+// value comes back in another shape than the field's own, and the boxing of
+// list items: a list of values as pointers into its backing array, a list of
+// interfaces as it is. CODE_PHRASE terminology_id comes back as the
+// TERMINOLOGY_ID it holds, as any other value held by value, so a walk goes
+// below it.
 func TestAccess_REQ171_Shapes(t *testing.T) {
 	precision := rm.Integer(2)
 	step := rm.DVCodedText{Value: "step"}
@@ -367,8 +538,28 @@ func TestAccess_REQ171_Shapes(t *testing.T) {
 	if v, _ := Single(&rm.DVProportion{Precision: &precision}, "precision"); v != any(precision) {
 		t.Errorf("Single(DV_PROPORTION, precision) = %#v, want the Integer it points to", v)
 	}
-	if v, _ := Single(&rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}}, "terminology_id"); v != any("openehr") {
-		t.Errorf("Single(CODE_PHRASE, terminology_id) = %#v, want the string its TERMINOLOGY_ID holds", v)
+
+	// ORIGINAL_VERSION data, a pointer to the type parameter, comes back as
+	// the value it points to, which a walk can enter; a pointer to a nil
+	// interface comes back as nil and present, a nil pointer as absent.
+	var payload any = &rm.Composition{}
+	if v, present := Single(&rm.OriginalVersion[any]{Data: &payload}, "data"); v != payload || !present || !Covers(v) {
+		t.Errorf("Single(ORIGINAL_VERSION, data) = (%T, %t), want the *rm.Composition its pointer holds, present", v, present)
+	}
+	var nothing any
+	if v, present := Single(&rm.OriginalVersion[any]{Data: &nothing}, "data"); v != nil || !present {
+		t.Errorf("Single(ORIGINAL_VERSION holding a pointer to a nil interface, data) = (%#v, %t), want (nil, true)", v, present)
+	}
+	if v, present := Single(&rm.OriginalVersion[any]{}, "data"); v != nil || present {
+		t.Errorf("Single(ORIGINAL_VERSION without data, data) = (%#v, %t), want (nil, false)", v, present)
+	}
+
+	terminology := rm.TerminologyID{Value: "openehr"}
+	if v, present := Single(&rm.CodePhrase{TerminologyID: terminology}, "terminology_id"); v != any(terminology) || !present || !Covers(v) {
+		t.Errorf("Single(CODE_PHRASE, terminology_id) = (%#v, %t), want the TERMINOLOGY_ID it holds, present", v, present)
+	}
+	if v, present := Single(&rm.CodePhrase{}, "terminology_id"); v != nil || present {
+		t.Errorf("Single(CODE_PHRASE without a terminology, terminology_id) = (%#v, %t), want (nil, false)", v, present)
 	}
 
 	tree := &rm.ItemList{Items: []rm.Element{{ArchetypeNodeID: "at1"}}}

@@ -24,13 +24,12 @@ import (
 // the access misreads fails to compile in the generated file.
 //
 // Presence is decided as § REQ-171 *Structural access* states it: by the
-// field's Go kind (pointer, interface, string, number or boolean, list,
-// value); for a value held by value, by a content rule keyed by the
-// attribute's declared RM type, by the object-reference reading for OBJECT_REF
-// and every class the BMM places below it, or else by a generated zero test;
-// and, for the three readings § REQ-112 fixes, by the hand-written functions
-// [fixedPresence] and [intervalBoundPresence] name. The content rules, the
-// object-reference reading and the fixed readings are hand-written in
+// field's Go kind (pointer, interface, string, number or boolean, list), and
+// for a value held by value by a generated zero test; at an attribute the RM
+// marks mandatory, by a content rule keyed by the attribute's declared RM
+// type ([contentPresence]); and, for the three readings § REQ-112 fixes, by
+// the hand-written functions [fixedPresence] and [intervalBoundPresence]
+// name. The content rules and the fixed readings are hand-written in
 // internal/rmaccess/presence.go; this file names them, so a renamed or
 // retyped function fails to compile.
 
@@ -59,11 +58,16 @@ var fixedPresence = map[string]map[string]string{
 const intervalBoundPresence = "presentIntervalBound"
 
 // contentPresence names, by declared RM type, the hand-written content rule
-// for a value held by value (and, for DV_TEXT, held through an interface):
-// a DV_TEXT is empty when its value is; a DV_CODED_TEXT when its value and
-// its defining code are; a CODE_PHRASE when its code_string and terminology
-// are. A pointer, and an interface for any other type, take the reading of
-// their Go kind.
+// that decides presence at an attribute the RM marks mandatory, for a value
+// held by value (and, for DV_TEXT, held through an interface): a DV_TEXT is
+// empty when its value is; a DV_CODED_TEXT when its value and its defining
+// code are; a CODE_PHRASE when its code_string and terminology are. At an
+// optional attribute the reading of the field's Go kind decides instead, so
+// the walk enters such a value and reports what it lacks. A pointer, and an
+// interface for any other type, take the reading of their Go kind
+// everywhere. An object reference has no content rule: held by value, it is
+// present unless it is its zero value, so § REQ-112's reference entry reports
+// each missing part at its own path.
 var contentPresence = map[string]struct {
 	fn    string
 	kinds []accessKind
@@ -72,18 +76,6 @@ var contentPresence = map[string]struct {
 	"DV_CODED_TEXT": {"presentCodedText", []accessKind{accessStruct}},
 	"CODE_PHRASE":   {"presentCodePhrase", []accessKind{accessStruct}},
 }
-
-// objectRefClass is the root of the classes the object-reference reading
-// applies to: OBJECT_REF and every class the BMM places below it (PARTY_REF,
-// LOCATABLE_REF and ACCESS_GROUP_REF at RM 1.2.0), read from the plan's
-// hierarchy ([rmaccessGen.isObjectRef]) so a new subtype takes it too.
-const objectRefClass = "OBJECT_REF"
-
-// objectRefPresence is the hand-written object-reference reading for a
-// reference held by value: empty when its id, namespace or type is missing.
-// The access hands it the reference's parts, the id being the one the class
-// itself declares (LOCATABLE_REF redefines it as a UID_BASED_ID).
-const objectRefPresence = "presentObjectRef"
 
 // hashType is the declared RM type of a Hash attribute, as the fold rminfo is
 // generated from names a BMM Hash<K, V> ([effectiveProperties]). Its Go field
@@ -102,26 +94,26 @@ const (
 	shapeAddress
 	// shapeDeref hands back the value an optional field points to.
 	shapeDeref
-	// shapeValueMember hands back the `value` member of an identifier held
-	// by value.
-	shapeValueMember
 )
 
 // accessShapes keeps, for six attributes of five classes, the shape the
-// validation walks and the composition builder read today, where it differs
-// from the field's own: ITEM_SINGLE item and REFERENCE_RANGE range come back
-// as a pointer into the parent (the builder writes through the first);
+// validation walks and the composition builder read, where it differs from
+// the field's own: ITEM_SINGLE item and REFERENCE_RANGE range come back as a
+// pointer into the parent (the builder writes through the first);
 // ISM_TRANSITION careflow_step and transition come back as the DV_CODED_TEXT
 // they point to, and DV_PROPORTION precision as its Integer, which the
-// primitive binding reads; CODE_PHRASE terminology_id comes back as the
-// string its TERMINOLOGY_ID holds, which the walks treat as a leaf. Presence
-// is read from the field either way.
+// primitive binding reads; ORIGINAL_VERSION data comes back as the value its
+// pointer holds, the payload of a version built in Go. That field is a
+// pointer to the type parameter, which the one instantiation the registry
+// recognises binds to any, and no walk can enter a *any. Presence is read
+// from the field either way, so a pointer that is not nil and holds a nil
+// interface comes back as nil and present.
 var accessShapes = map[string]map[string]accessShape{
-	"ITEM_SINGLE":     {"item": shapeAddress},
-	"REFERENCE_RANGE": {"range": shapeAddress},
-	"ISM_TRANSITION":  {"careflow_step": shapeDeref, "transition": shapeDeref},
-	"DV_PROPORTION":   {"precision": shapeDeref},
-	"CODE_PHRASE":     {"terminology_id": shapeValueMember},
+	"ITEM_SINGLE":      {"item": shapeAddress},
+	"REFERENCE_RANGE":  {"range": shapeAddress},
+	"ISM_TRANSITION":   {"careflow_step": shapeDeref, "transition": shapeDeref},
+	"DV_PROPORTION":    {"precision": shapeDeref},
+	"ORIGINAL_VERSION": {"data": shapeDeref},
 }
 
 // accessKind is the Go kind of a field, which decides its reading by kind.
@@ -258,6 +250,7 @@ type accessAttr struct {
 	field     string // Go field name
 	declared  string // declared RM type
 	container bool
+	required  bool    // the RM marks it mandatory, as rminfo's Required
 	typ       *goType // the field's Go type at the arm's instantiation
 	kind      accessKind
 }
@@ -392,6 +385,7 @@ func (g *rmaccessGen) attributes(arm *accessArm) ([]*accessAttr, error) {
 			field:     FieldName(name),
 			declared:  declared[name].typeName,
 			container: declared[name].container,
+			required:  declared[name].required,
 			typ:       typ,
 			kind:      kind,
 		})
@@ -646,11 +640,6 @@ func (g *rmaccessGen) writeSingle(b *bytes.Buffer, arm *accessArm, attrs []*acce
 			}
 			fmt.Fprintf(b, "\t\tif %s == nil {\n\t\t\treturn nil, false, true\n\t\t}\n", field)
 			fmt.Fprintf(b, "\t\treturn *%s, true, true\n", field)
-		case shapeValueMember:
-			if a.kind != accessStruct {
-				return fmt.Errorf("bmmgen: rmaccess: %s.%s is handed back as its value member, but its field is not held by value", arm.class.BMMName, a.name)
-			}
-			fmt.Fprintf(b, "\t\treturn %s.Value, %s, true\n", field, present)
 		default:
 			return fmt.Errorf("bmmgen: rmaccess: %s.%s has shape %d, which the generator does not know", arm.class.BMMName, a.name, shape)
 		}
@@ -727,14 +716,11 @@ func (g *rmaccessGen) writeHash(b *bytes.Buffer, arm *accessArm, attrs []*access
 	return nil
 }
 
-// isObjectRef reports whether the RM class name is OBJECT_REF or a class the
-// plan's BMM hierarchy places below it.
-func (g *rmaccessGen) isObjectRef(name string) bool {
-	return name == objectRefClass || slices.Contains(AncestorChain(g.plan, name), objectRefClass)
-}
-
 // presence returns the Go expression that reports whether attribute a of arm
-// is present, read from x.
+// is present, read from x: a fixed reading first, then, at an attribute the
+// RM marks mandatory, the content rule of its declared type, and otherwise the
+// reading of the field's Go kind, a value held by value through its zero
+// test.
 func (g *rmaccessGen) presence(arm *accessArm, a *accessAttr, interval bool) (string, error) {
 	field := "x." + a.field
 	if fn, ok := fixedPresence[arm.class.BMMName][a.name]; ok {
@@ -745,12 +731,8 @@ func (g *rmaccessGen) presence(arm *accessArm, a *accessAttr, interval bool) (st
 			return fmt.Sprintf("%s(x.%s, %s)", intervalBoundPresence, flag, field), nil
 		}
 	}
-	if rule, ok := contentPresence[a.declared]; ok && slices.Contains(rule.kinds, a.kind) {
+	if rule, ok := contentPresence[a.declared]; ok && a.required && slices.Contains(rule.kinds, a.kind) {
 		return fmt.Sprintf("%s(%s)", rule.fn, field), nil
-	}
-	if a.kind == accessStruct && g.isObjectRef(a.declared) {
-		return fmt.Sprintf("%s(%s.%s, %s.%s, %s.%s)", objectRefPresence,
-			field, FieldName("id"), field, FieldName("namespace"), field, FieldName("type")), nil
 	}
 	switch a.kind {
 	case accessPointer, accessList:
@@ -786,9 +768,10 @@ func (g *rmaccessGen) zeroTest(t *goType) (string, error) {
 
 // writeZeroTests writes every registered zero test, and those they call,
 // sorted by name. A zero test compares every field of the Go struct with its
-// zero value: an embedded struct through its own test, a pointer, interface,
-// slice or map with nil, a string with "", a boolean with false, a number
-// with 0, and a struct held by value through its own test.
+// zero value: an embedded struct through its own test, a pointer, slice or
+// map with nil, an interface with nil or a nil pointer, which § REQ-171
+// *Structural access* counts as zero, a string with "", a boolean with false,
+// a number with 0, and a struct held by value through its own test.
 func (g *rmaccessGen) writeZeroTests(b *bytes.Buffer) error {
 	rendered := map[string]string{}
 	for {
@@ -853,8 +836,10 @@ func (g *rmaccessGen) renderZeroTest(name string, t *goType) (string, error) {
 		}
 		field := "v." + FieldName(prop)
 		switch kind {
-		case accessPointer, accessInterface, accessList:
+		case accessPointer, accessList:
 			conds = append(conds, field+" == nil")
+		case accessInterface:
+			conds = append(conds, fmt.Sprintf("(%s == nil || rm.IsTypedNil(%s))", field, field))
 		case accessString:
 			conds = append(conds, field+` == ""`)
 		case accessBool:

@@ -315,7 +315,8 @@ func TestAccess_REQ102_REQ110_REQ112_ReadsTheContainers(t *testing.T) {
 // path reads present only when set. The value of every OBJECT_ID a
 // reference's id can hold reads present when set and absent when empty. A
 // ROLE's performer and a PARTY_RELATIONSHIP's source and target read as the
-// PARTY_REF they hold, present when its id, namespace and type are there.
+// PARTY_REF they hold, present unless it is the zero PARTY_REF, so a walk
+// enters one with a part missing and the reference entry reports the part.
 func TestAccess_REQ102_REQ112_ReadsReferenceParts(t *testing.T) {
 	id := &rm.HierObjectID{Value: "6f1d3a52-9c0e-4b7a-8f21-3d5e7a9b1c04"}
 	path := "/content[at0001]"
@@ -362,7 +363,7 @@ func TestAccess_REQ102_REQ112_ReadsReferenceParts(t *testing.T) {
 	}
 
 	full := rm.PartyRef{ID: id, Namespace: "local", Type: "PERSON"}
-	partial := []rm.PartyRef{{}, {Namespace: "local", Type: "PERSON"}, {ID: id, Type: "PERSON"}, {ID: id, Namespace: "local"}}
+	partial := []rm.PartyRef{{Namespace: "local", Type: "PERSON"}, {ID: id, Type: "PERSON"}, {ID: id, Namespace: "local"}}
 	holders := []struct {
 		name    string
 		attr    string
@@ -376,8 +377,9 @@ func TestAccess_REQ102_REQ112_ReadsReferenceParts(t *testing.T) {
 		t.Run(h.name+" "+h.attr, func(t *testing.T) {
 			checkSingle(t, readCase{attr: h.attr, present: true, want: full}, bothForms(h.holding(full)))
 			for _, ref := range partial {
-				checkSingle(t, readCase{attr: h.attr}, bothForms(h.holding(ref)))
+				checkSingle(t, readCase{attr: h.attr, present: true, want: ref}, bothForms(h.holding(ref)))
 			}
+			checkSingle(t, readCase{attr: h.attr}, bothForms(h.holding(rm.PartyRef{})))
 		})
 	}
 }
