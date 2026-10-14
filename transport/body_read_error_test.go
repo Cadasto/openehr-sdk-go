@@ -8,8 +8,9 @@ package transport_test
 // parsed Metadata beside a *transport.BodyReadError; on any other status, an
 // error that wraps the *transport.WireError the status classifies and, beside
 // it, the read failure. They also pin the retry gate (a 2xx whose body was
-// lost is sent again only for a safe method, and never once the caller's
-// context has ended) and the value-free Error() text.
+// lost is sent again only for a safe method, and a body lost on either arm is
+// never sent again once the caller's context has ended) and the value-free
+// Error() text.
 //
 // External, like decode_error_test.go, so every assertion goes through the
 // surface a consumer sees. The servers are real httptest servers, so the read
