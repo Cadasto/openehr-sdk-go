@@ -23,13 +23,14 @@ import (
 )
 
 // landing is a redirect target. It answers 200 with an empty JSON object and
-// records how many requests reached it and the Authorization header each one
-// carried.
+// records how many requests reached it and the Authorization, Cookie and
+// Cookie2 headers each one carried.
 type landing struct {
-	srv  *httptest.Server
-	hits atomic.Int32
-	mu   sync.Mutex
-	auth []string
+	srv     *httptest.Server
+	hits    atomic.Int32
+	mu      sync.Mutex
+	auth    []string
+	cookies []string
 }
 
 // newLanding starts a landing server on 127.0.0.1, over TLS when useTLS is
@@ -42,6 +43,7 @@ func newLanding(t *testing.T, useTLS bool) *landing {
 		l.hits.Add(1)
 		l.mu.Lock()
 		l.auth = append(l.auth, r.Header.Get("Authorization"))
+		l.cookies = append(l.cookies, strings.Join(append(r.Header.Values("Cookie"), r.Header.Values("Cookie2")...), "; "))
 		l.mu.Unlock()
 		_, _ = w.Write([]byte(`{}`))
 	})
@@ -59,6 +61,14 @@ func (l *landing) authHeaders() []string {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return append([]string(nil), l.auth...)
+}
+
+// cookieHeaders returns, for each request the landing server saw, its Cookie
+// and Cookie2 values joined by "; ".
+func (l *landing) cookieHeaders() []string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return append([]string(nil), l.cookies...)
 }
 
 // newRedirector starts a server on 127.0.0.1, over TLS when useTLS is true,
@@ -181,6 +191,73 @@ func TestDoRefusesHTTPSToHTTPRedirectWithCallerAuthorization(t *testing.T) { // 
 	}
 	if !errors.Is(err, transport.ErrInsecureRedirect) {
 		t.Fatalf("Do() error = %v, want one matching transport.ErrInsecureRedirect", err)
+	}
+}
+
+// TestREQ092_DoRefusesHTTPSToHTTPRedirectWithCookieHeader pins that Cookie and
+// Cookie2 are credentials too: net/http copies a caller-set Cookie or Cookie2
+// header to a redirect target on the same host whatever its scheme, so a
+// session cookie set through Request.Headers, with no Authorization header at
+// all, would follow a 302 from https to http in clear text. The refusal is
+// final: a retry policy that retries a GET's network errors does not ask the
+// origin again.
+func TestREQ092_DoRefusesHTTPSToHTTPRedirectWithCookieHeader(t *testing.T) {
+	t.Parallel()
+	for _, header := range []string{"Cookie", "Cookie2"} {
+		t.Run(header, func(t *testing.T) {
+			t.Parallel()
+			plain := newLanding(t, false)
+			var originHits atomic.Int32
+			origin := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				originHits.Add(1)
+				http.Redirect(w, r, plain.srv.URL+"/landing", http.StatusFound)
+			}))
+			t.Cleanup(origin.Close)
+			c := newRedirectClient(t, origin, origin.Client(),
+				transport.WithTokenSource(auth.AnonymousTokenSource()),
+				transport.WithRetry(transport.RetryPolicy{
+					MaxAttempts:    3,
+					InitialBackoff: time.Millisecond,
+					MaxBackoff:     5 * time.Millisecond,
+				}))
+
+			_, err := c.Do(t.Context(), &transport.Request{
+				Method:  http.MethodGet,
+				Path:    "/ehr",
+				Headers: http.Header{header: {"session=s3cr3t-5e55"}},
+			})
+			if got := plain.hits.Load(); got != 0 {
+				t.Errorf("plain-http target received %d request(s) carrying %s %q, want none", got, header, plain.cookieHeaders())
+			}
+			if !errors.Is(err, transport.ErrInsecureRedirect) {
+				t.Fatalf("Do() with a %s header error = %v, want one matching transport.ErrInsecureRedirect", header, err)
+			}
+			if got := originHits.Load(); got != 1 {
+				t.Errorf("https origin received %d request(s), want 1: a refused redirect is not retried", got)
+			}
+		})
+	}
+}
+
+// TestREQ092_DoFollowsHTTPSToHTTPSRedirectWithCookieHeader pins the scope of
+// the cookie refusal: a redirect that stays on https follows the injected
+// client's policy, and the target receives the caller's cookie as net/http
+// would send it.
+func TestREQ092_DoFollowsHTTPSToHTTPSRedirectWithCookieHeader(t *testing.T) {
+	t.Parallel()
+	secure := newLanding(t, true)
+	origin, _ := newRedirector(t, true, secure.srv.URL+"/landing")
+	c := newRedirectClient(t, origin, origin.Client(), transport.WithTokenSource(auth.AnonymousTokenSource()))
+
+	_, err := c.Do(t.Context(), &transport.Request{
+		Path:    "/ehr",
+		Headers: http.Header{"Cookie": {"session=s3cr3t-5e55"}},
+	})
+	if err != nil {
+		t.Fatalf("Do() error = %v, want the https to https redirect followed", err)
+	}
+	if got := secure.cookieHeaders(); len(got) != 1 || got[0] != "session=s3cr3t-5e55" {
+		t.Errorf("https target saw cookies %q, want one request with %q", got, "session=s3cr3t-5e55")
 	}
 }
 
