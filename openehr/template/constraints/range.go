@@ -54,8 +54,16 @@ func (r NumericRange) IsValid() bool {
 }
 
 // Contains reports whether v is inside the range under the configured
-// inclusivity. Unbounded sides accept any value on that side.
+// inclusivity. Unbounded sides accept any value on that side. A NaN is
+// inside no range, so Contains returns false for it even when both
+// sides are unbounded.
 func (r NumericRange) Contains(v float64) bool {
+	// Only a NaN is unequal to itself. The check is spelled out instead
+	// of calling math.IsNaN because math is not on the package's list
+	// of pure imports (pure_imports_test.go).
+	if v != v {
+		return false
+	}
 	if !r.LowerUnbounded {
 		if r.LowerInclusive {
 			if v < r.Lower {
