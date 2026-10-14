@@ -117,8 +117,9 @@ func TestAOM14ConcreteRegistry(t *testing.T) {
 //
 // REQ-043: § Mapping rules, Property → Go field. A mandatory property that
 // closes a cycle of mandatory struct-typed properties becomes a pointer,
-// since Go cannot declare a struct that contains itself by value. Its tag
-// carries no omit option.
+// since Go cannot declare a struct that contains itself by value. Like any
+// mandatory pointer, its tag carries omitzero, so a nil one is left out of
+// canonical JSON rather than written as null.
 func TestAOM14CyclicSinglePropDetection(t *testing.T) {
 	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, bmm.FSResolver{Root: testResources})
 	if err != nil {
@@ -127,8 +128,8 @@ func TestAOM14CyclicSinglePropDetection(t *testing.T) {
 	for _, tc := range []struct {
 		owner, prop, fileBase, field string
 	}{
-		{"ARCHETYPE", "ontology", "archetype", "Ontology *ArchetypeOntology `json:\"ontology\"`"},
-		{"ARCHETYPE_ONTOLOGY", "parent_archetype", "archetype_ontology", "ParentArchetype *Archetype `json:\"parent_archetype\"`"},
+		{"ARCHETYPE", "ontology", "archetype", "Ontology *ArchetypeOntology `json:\"ontology,omitzero\"`"},
+		{"ARCHETYPE_ONTOLOGY", "parent_archetype", "archetype_ontology", "ParentArchetype *Archetype `json:\"parent_archetype,omitzero\"`"},
 	} {
 		if !plan.CyclicSingleProps[tc.owner][tc.prop] {
 			t.Errorf("%s.%s is not marked cyclic; got CyclicSingleProps=%v", tc.owner, tc.prop, plan.CyclicSingleProps)

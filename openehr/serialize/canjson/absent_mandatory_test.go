@@ -198,8 +198,9 @@ func TestREQ052_GoBuiltAbsentMandatoryMember(t *testing.T) {
 // TestREQ052_MandatoryMemberWithAValueIsWritten is the control for the test
 // above: a mandatory field that holds a value is written, even when the value
 // is empty. A concrete RM value encodes with its `_type`, so a zero one is
-// still written; a type-parameter field instantiated by value has no absent
-// form; and an `any` holding an empty string or object holds a value.
+// still written; a struct or primitive held by value, and a type-parameter
+// field instantiated by value, have no absent form; and an `any` holding an
+// empty string or object holds a value.
 func TestREQ052_MandatoryMemberWithAValueIsWritten(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
@@ -215,6 +216,18 @@ func TestREQ052_MandatoryMemberWithAValueIsWritten(t *testing.T) {
 			value:    &rm.Element{ArchetypeNodeID: "at0001", Name: rm.DVText{}},
 			member:   "name",
 			wantType: "DV_TEXT",
+		},
+		{
+			name:     "a zero HIER_OBJECT_ID held by value in CONTRIBUTION.uid",
+			value:    &rm.Contribution{Versions: []rm.ObjectRefLike{}},
+			member:   "uid",
+			wantType: "HIER_OBJECT_ID",
+		},
+		{
+			name:   "an empty string held by value in ELEMENT.archetype_node_id",
+			value:  &rm.Element{Name: rm.DVText{Value: "n"}},
+			member: "archetype_node_id",
+			want:   `""`,
 		},
 		{
 			name:     "a zero data in POINT_EVENT[ItemTree]",

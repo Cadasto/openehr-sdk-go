@@ -605,17 +605,28 @@ func genericInstantiationFromDescendant(sc *bmm.SimpleClass) string {
 // renderField emits one struct-field line for one BMM property.
 // ownerName is the BMM name of the class that owns this field (used
 // for cyclic-pointer lookup).
+//
+// The JSON tag keeps the BMM property name. Its omit option depends on
+// whether the property is mandatory and on the Go type of the field:
+//
+//   - An optional pointer field takes omitzero. Under encoding/json/v2,
+//     omitempty leaves out any value that encodes empty, including a
+//     non-nil pointer to an empty string. omitzero leaves out only the nil
+//     pointer, so a pointer to "" is still written (REQ-052, Q6).
+//   - Any other optional field takes omitempty. On a list or map this
+//     leaves out a nil and an empty value alike, on purpose: it is the
+//     DV_TEXT.mappings re-encode collapse REQ-052 documents.
+//   - A mandatory field takes the tag [mandatoryJSONTag] chooses, so a
+//     mandatory member with no value is left out rather than written as
+//     null (REQ-052, an absent mandatory member).
+//
+// Every JSON tag the generator writes for a class member comes from here:
+// the struct declarations, the flat wire structs ([renderMarshalFlat]) and
+// the interval wire structs ([renderIntervalDerivedWire]).
 func renderField(plan *Plan, owner *bmm.SimpleClass, ownerName string, prop bmm.Property) (string, error) {
 	name := prop.PropertyName()
 	goName := FieldName(name)
-	jsonTag := fmt.Sprintf("`json:%q`", name)
 	jsonTagOpt := fmt.Sprintf("`json:%q`", name+",omitempty")
-	// omitzero, not omitempty, on a POINTER field: under encoding/json/v2
-	// omitempty omits any value that encodes empty, including a non-nil
-	// pointer to an empty string, whereas omitzero omits only the nil
-	// pointer, restoring the v1 spelling where a pointer to "" still emits
-	// (REQ-052, Q6). Container fields keep omitempty (their nil/empty
-	// collapse is intended, e.g. DV_TEXT.mappings, wire.md:112).
 	jsonTagOptZero := fmt.Sprintf("`json:%q`", name+",omitzero")
 
 	docLines := propertyDoc(goName, propertyDocText(prop))
@@ -627,7 +638,8 @@ func renderField(plan *Plan, owner *bmm.SimpleClass, ownerName string, prop bmm.
 			return "", err
 		}
 		if p.IsMandatory {
-			return docLines + fmt.Sprintf("\t%s %s %s\n", goName, ref, jsonTag), nil
+			polymorphic := isInterfaceTypeRef(plan, p.TypeName) || isOwnTypeParameter(owner, p.TypeName)
+			return docLines + fmt.Sprintf("\t%s %s %s\n", goName, ref, mandatoryJSONTag(name, ref, polymorphic)), nil
 		}
 		tag := jsonTagOpt
 		if strings.HasPrefix(ref, "*") {
@@ -639,9 +651,9 @@ func renderField(plan *Plan, owner *bmm.SimpleClass, ownerName string, prop bmm.
 		// Open generic parameter: emit the type name verbatim — it
 		// refers to a class-level type parameter.
 		typ := p.TypeName
-		tag := jsonTag
-		if !p.IsMandatory {
-			tag = jsonTagOpt
+		tag := jsonTagOpt
+		if p.IsMandatory {
+			tag = mandatoryJSONTag(name, typ, true)
 		}
 		return docLines + fmt.Sprintf("\t%s %s %s\n", goName, typ, tag), nil
 
@@ -650,7 +662,7 @@ func renderField(plan *Plan, owner *bmm.SimpleClass, ownerName string, prop bmm.
 		if err != nil {
 			return "", err
 		}
-		fieldType, tag := containerFieldShape(p.TypeDef, inner, jsonTag, jsonTagOpt, p.Cardinality)
+		fieldType, tag := containerFieldShape(p.TypeDef, inner, name, p.Cardinality)
 		return docLines + fmt.Sprintf("\t%s %s %s\n", goName, fieldType, tag), nil
 
 	case *bmm.GenericProperty:
@@ -658,43 +670,90 @@ func renderField(plan *Plan, owner *bmm.SimpleClass, ownerName string, prop bmm.
 		if err != nil {
 			return "", err
 		}
-		tag := jsonTag
-		ref := typ
-		if !p.IsMandatory {
-			tag = jsonTagOptZero
-			ref = "*" + typ
+		if p.IsMandatory {
+			tag := mandatoryJSONTag(name, typ, genericRootIsInterface(plan, p.TypeDef))
+			return docLines + fmt.Sprintf("\t%s %s %s\n", goName, typ, tag), nil
 		}
-		return docLines + fmt.Sprintf("\t%s %s %s\n", goName, ref, tag), nil
+		return docLines + fmt.Sprintf("\t%s *%s %s\n", goName, typ, jsonTagOptZero), nil
 
 	default:
 		return "", fmt.Errorf("unhandled property kind %T for %s", p, name)
 	}
 }
 
+// mandatoryJSONTag returns the JSON tag of a mandatory field named name
+// whose Go type is goType. polymorphic is true when goType is a Go
+// interface or a type parameter.
+//
+// A field that can hold no value is tagged so that, when it holds none,
+// the member is left out on encode and never written as null (REQ-052, an
+// absent mandatory member):
+//
+//   - A list, map, pointer or any field takes omitzero, which leaves out
+//     only nil. A present empty list or map is still written as [] or {},
+//     and an any holding "" or {} is still written.
+//   - An interface or type-parameter field takes omitempty. A typed-nil
+//     pointer in an interface is not the zero value, so omitzero would
+//     keep it, but it encodes as null, and omitempty leaves that out.
+//     Every concrete RM value encodes with its _type and so is never
+//     empty, which keeps a zero value held by an interface, and a type
+//     parameter instantiated with a struct type, on the wire.
+//
+// Any other field, a struct or a primitive held by value, has no absent
+// form and takes the bare tag.
+func mandatoryJSONTag(name, goType string, polymorphic bool) string {
+	switch {
+	case strings.HasPrefix(goType, "[]"), strings.HasPrefix(goType, "map["),
+		strings.HasPrefix(goType, "*"), goType == "any":
+		return fmt.Sprintf("`json:%q`", name+",omitzero")
+	case polymorphic:
+		return fmt.Sprintf("`json:%q`", name+",omitempty")
+	default:
+		return fmt.Sprintf("`json:%q`", name)
+	}
+}
+
+// isOwnTypeParameter reports whether typeName names a generic parameter of
+// owner, which a field then holds as a Go type parameter.
+func isOwnTypeParameter(owner *bmm.SimpleClass, typeName string) bool {
+	if owner == nil {
+		return false
+	}
+	_, ok := owner.GenericParameterDefs[typeName]
+	return ok
+}
+
+// genericRootIsInterface reports whether [genericTypeRef] renders gt as a
+// Go interface: the root class is one the codec handles polymorphically
+// (ADR 0003), not a container and not a generic struct.
+func genericRootIsInterface(plan *Plan, gt *bmm.GenericType) bool {
+	if gt == nil || containerKinds[gt.RootType] {
+		return false
+	}
+	pc, ok := plan.Classes[gt.RootType]
+	return ok && codecPolymorphicAbstractGeneric(plan, pc)
+}
+
 // containerFieldShape converts a BMM container TypeDef + cardinality
-// into a Go field-type string (either []T or map[K]V) and chooses
-// the appropriate JSON tag. omitempty is applied when the container
-// is optional (cardinality.lower == 0 or absent).
-func containerFieldShape(td *bmm.ContainerType, inner, mandatoryTag, optTag string, card *bmm.Cardinality) (string, string) {
-	tag := mandatoryTag
-	if card == nil || card.Lower == 0 {
-		tag = optTag
-	}
-	if td == nil {
-		return "[]" + inner, tag
-	}
-	switch td.ContainerType {
-	case "Hash":
+// into a Go field-type string (either []T or map[K]V) and the JSON tag
+// of the field named name. An optional container (cardinality lower
+// bound 0 or absent) takes omitempty, so a nil and an empty one are both
+// left out. A mandatory one takes omitzero ([mandatoryJSONTag]), so only
+// a nil one is left out and a present empty one is written as [] or {}.
+func containerFieldShape(td *bmm.ContainerType, inner, name string, card *bmm.Cardinality) (string, string) {
+	fieldType := "[]" + inner
+	if td != nil && td.ContainerType == "Hash" {
 		// Hash<K,V> in the BMM has K = string typically. We emit
 		// map[string]V because BMM Hash keys are not richly typed in
 		// the property's type_def — they're parameterised in the
-		// generic class. inner is the value type.
-		return "map[string]" + inner, tag
-	case "List", "Set", "Array":
-		return "[]" + inner, tag
-	default:
-		return "[]" + inner, tag
+		// generic class. inner is the value type. List, Set, Array
+		// and any other container kind are slices.
+		fieldType = "map[string]" + inner
 	}
+	if card == nil || card.Lower == 0 {
+		return fieldType, fmt.Sprintf("`json:%q`", name+",omitempty")
+	}
+	return fieldType, mandatoryJSONTag(name, fieldType, false)
 }
 
 // containerInner resolves the Go type expression for the *element*

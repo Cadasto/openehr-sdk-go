@@ -168,11 +168,15 @@ func TestPolymorphicSlotEncoding(t *testing.T) {
 			alsoV1:   true,
 		},
 		{
-			// jsonpoly.go:29-33: "under a mandatory field encoding/json
-			// re-emits it as JSON null."
-			name:     "a nil interface in a mandatory slot encodes JSON null",
+			// jsonpoly.go:29-33 said that "under a mandatory field
+			// encoding/json re-emits it as JSON null." REQ-052 § An absent
+			// mandatory member now requires the member to be left out
+			// instead: ELEMENT.name is DVTextLike `json:"name,omitempty"`
+			// (data_structures_representation_gen.go).
+			name:     "a nil interface in a mandatory slot is omitted",
 			value:    &rm.Element{ArchetypeNodeID: "at0000"}, // Name left nil
-			contains: []string{`"name":null`},
+			contains: []string{`"_type":"ELEMENT"`, `"archetype_node_id":"at0000"`},
+			absent:   []string{`"name":`},
 		},
 		{
 			// jsonpoly.go:29-33, the omitempty half: "under an omitempty
@@ -199,7 +203,7 @@ func TestPolymorphicSlotEncoding(t *testing.T) {
 		{
 			// jsonpoly_test.go TestMarshal_typedNilPointerInInterface: a
 			// typed-nil pointer takes the pointer path, not the nil-interface
-			// path, and must marshal to null without dereferencing. Under
+			// path, and must encode without being dereferenced. Under
 			// encoding/json/v2 that guarantee is the stdlib's own, and
 			// unconditional: "Functions or methods that operate on *T are
 			// only called ... [for] a non-nil value of *T", and "A Go
@@ -212,12 +216,18 @@ func TestPolymorphicSlotEncoding(t *testing.T) {
 			// green; that option is scoped to the legacy Marshaler
 			// interface, not MarshalerTo. canjson does not implement or
 			// configure this guarantee itself, so no in-repo mutation turns
-			// it red; it is pinned here because it is the exact case
-			// jsonpoly_test.go guarded and the Task 4 reviewer named as
-			// still holding after jsonpoly's deletion.
-			name:     "a typed-nil pointer in a polymorphic slot marshals to null, not a panic",
+			// the no-panic half red; it is pinned here because it is the
+			// exact case jsonpoly_test.go guarded and the Task 4 reviewer
+			// named as still holding after jsonpoly's deletion. The pointer
+			// encodes as null, and REQ-052 § An absent mandatory member
+			// requires that null to be left out: the omitempty on
+			// ELEMENT.name drops it, so the member is absent. That half does
+			// turn red when the generator tags ELEMENT.name omitzero, which
+			// keeps a typed-nil pointer.
+			name:     "a typed-nil pointer in a polymorphic slot is omitted, not a panic",
 			value:    &rm.Element{ArchetypeNodeID: "at0000", Name: (*rm.DVCodedText)(nil)},
-			contains: []string{`"name":null`},
+			contains: []string{`"_type":"ELEMENT"`, `"archetype_node_id":"at0000"`},
+			absent:   []string{`"name":`},
 		},
 		{
 			// The real can-fail control behind item 2: since Go 1.27, v1

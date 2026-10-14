@@ -24,7 +24,7 @@ type ItemList struct {
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name DVTextLike `json:"name,omitempty"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
 	UID UIDBasedID `json:"uid,omitempty"`
 }
@@ -68,7 +68,7 @@ type ItemSingle struct {
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name DVTextLike `json:"name,omitempty"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
 	UID UIDBasedID `json:"uid,omitempty"`
 }
@@ -110,7 +110,7 @@ type ItemTable struct {
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name DVTextLike `json:"name,omitempty"`
 	// Rows Physical representation of the table as a list of `CLUSTERs`, each containing the data of one row of the table.
 	Rows []Cluster `json:"rows,omitempty"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
@@ -192,7 +192,7 @@ type ItemTree struct {
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name DVTextLike `json:"name,omitempty"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
 	UID UIDBasedID `json:"uid,omitempty"`
 }

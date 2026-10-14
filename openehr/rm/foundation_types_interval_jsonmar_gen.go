@@ -19,9 +19,10 @@ import (
 type rawInterval[T any] Interval[T]
 
 // MarshalJSONTo emits canonical openEHR JSON for Interval, which is abstract and
-// so carries no `_type`. Field order follows the struct declaration;
-// json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// so carries no `_type`. Field order follows the struct declaration,
+// and json.Deterministic sorts any Hash keys. A nil list or map field is
+// left out by its omit option. The FormatNil* options write any other nil
+// slice or map, such as one held in an any field, as `null`.
 // The receiver is a value so an Interval held by value in a struct field
 // takes this encoder.
 //
@@ -71,8 +72,10 @@ type jsonWirePointInterval[T any] struct {
 
 // MarshalJSONTo emits canonical openEHR JSON for PointInterval with `_type`
 // (value "Point_interval") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
@@ -118,8 +121,10 @@ type jsonWireProperInterval[T any] struct {
 
 // MarshalJSONTo emits canonical openEHR JSON for ProperInterval with `_type`
 // (value "Proper_interval") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.

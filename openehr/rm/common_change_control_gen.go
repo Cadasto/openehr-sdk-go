@@ -8,11 +8,11 @@ package rm
 // Contribution Documents a Contribution (change set) of one or more versions added to a change-controlled repository.
 type Contribution struct {
 	// Audit Audit trail corresponding to the committal of this Contribution.
-	Audit AuditDetailsLike `json:"audit"`
+	Audit AuditDetailsLike `json:"audit,omitempty"`
 	// UID Unique identifier for this Contribution.
 	UID HierObjectID `json:"uid"`
 	// Versions Set of references to Versions causing changes to this EHR. Each contribution contains a list of versions, which may include paths pointing to any number of versionable items, i.e. items of types such as `COMPOSITION` and `FOLDER`.
-	Versions []ObjectRefLike `json:"versions"`
+	Versions []ObjectRefLike `json:"versions,omitzero"`
 }
 
 // ImportedVersion Versions whose content is an `ORIGINAL_VERSION` copied from another location; this class inherits `_commit_audit_` and `_contribution_` from `VERSION<T>`, providing imported versions with their own audit trail and Contribution, distinct from those of the imported `ORIGINAL_VERSION`.
@@ -71,9 +71,9 @@ func (o *OriginalVersion[T]) IsMerged() bool {
 // Version Abstract model of one Version within a Version container, containing data, commit audit trail, and the identifier of its Contribution.
 type Version[T any] struct {
 	// CommitAudit Audit trail corresponding to the committal of this version to the `VERSIONED_OBJECT`.
-	CommitAudit AuditDetailsLike `json:"commit_audit"`
+	CommitAudit AuditDetailsLike `json:"commit_audit,omitempty"`
 	// Contribution Contribution in which this version was added.
-	Contribution ObjectRefLike `json:"contribution"`
+	Contribution ObjectRefLike `json:"contribution,omitempty"`
 	// Signature OpenPGP digital signature or digest of content committed in this Version.
 	Signature *string `json:"signature,omitzero"`
 }
@@ -113,7 +113,7 @@ func (v *Version[T]) UID() ObjectVersionID {
 // VersionedObject Version control abstraction, defining semantics for versioning one complex object.
 type VersionedObject[T any] struct {
 	// OwnerID Reference to object to which this version container belongs, e.g. the id of the containing EHR or other relevant owning entity.
-	OwnerID ObjectRefLike `json:"owner_id"`
+	OwnerID ObjectRefLike `json:"owner_id,omitempty"`
 	// TimeCreated Time of initial creation of this versioned object.
 	TimeCreated DVDateTime `json:"time_created"`
 	// UID Unique identifier of this version container in the form of a UID with no extension. This id will be the same in all instances of the same container in a distributed environment, meaning that it can be understood as the uid of the  virtual version tree.
