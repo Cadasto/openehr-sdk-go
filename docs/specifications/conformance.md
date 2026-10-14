@@ -209,7 +209,7 @@ The catalog is the normative list. Each entry has:
 #### PROBE-003 — Spec-version mismatch fails fast
 
 - **Title:** A discovery document advertising an incompatible spec version is rejected at resolution, not at first request.
-- **Preconditions:** SDK is configured to require `1.1.0-development`; deployment advertises `1.0.3`.
+- **Preconditions:** SDK is configured to require `1.1.0`; deployment advertises `1.0.3`.
 - **Wire assertion:** Construction-time discovery returns a `DiscoveryError` with reason `spec_version_mismatch`. No request to the openEHR REST endpoint is made.
 - **Modes:** Sandbox, Cassette (constructed-mismatch cassette).
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/auth/probe_003_spec_version_mismatch.go`](../../testkit/probes/auth/probe_003_spec_version_mismatch.go). Serves a fixture whose `org.openehr.rest` declares `1.0.3` and asserts the resolver fails fast with `DiscoveryError(spec_version_mismatch)`, returning no catalog.
@@ -699,7 +699,7 @@ client scenarios to SDK coverage:
 
 ### REST binding
 
-The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract above `transport/` and the typed leaf clients under `openehr/client/`. PROBE-040 and PROBE-041 are taken by the service-discovery range; the REST-binding range starts at PROBE-060 (next free range after Observability 050–059) per the [Adding probes](#adding-probes) rule.
+The REST-binding probes assert the openEHR-REST 1.1.0 wire contract above `transport/` and the typed leaf clients under `openehr/client/`. PROBE-040 and PROBE-041 are taken by the service-discovery range; the REST-binding range starts at PROBE-060 (next free range after Observability 050–059) per the [Adding probes](#adding-probes) rule.
 
 #### PROBE-060 — EHR creation round-trip
 

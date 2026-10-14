@@ -1,6 +1,6 @@
 # testkit/corpus/its_rest
 
-Vendored fixtures for openEHR REST 1.1.0-development (REQ-050, REQ-095) and the SMART discovery contract (REQ-070..072). They are checked in so CI does not need a live deployment.
+Vendored fixtures for openEHR REST 1.1.0 (REQ-050, REQ-095) and the SMART discovery contract (REQ-070..072). They are checked in so CI does not need a live deployment.
 
 These are request and response **bodies**, not REQ-082 Cassette-mode recordings; see the [parent README](../README.md).
 
@@ -12,7 +12,7 @@ Endpoint shapes track the upstream OpenAPI YAML (REQ-095):
 https://github.com/openEHR/specifications-ITS-REST/tree/master/computable/OAS
 ```
 
-Pinned commit: `8e0a2a5d04ddb91cfa6c0c7ed68b9c89b9e3ad6c` (2026-04, ITS-REST 1.1.0-development WIP). Update this line, and the affected fixtures, when bumping the pin.
+Pinned: the ITS-REST `Release-1.1.0` tag, commit `24058992d5fa96e8dfbd855d9c133f328387fc09`, as [`resources/its-rest/MANIFEST.txt`](../../../resources/its-rest/MANIFEST.txt) records. The fixtures were first written against the development commit `8e0a2a5d04ddb91cfa6c0c7ed68b9c89b9e3ad6c` (2026-04). Update this line, and the affected fixtures, when the pin moves.
 
 ## Layout
 
@@ -48,11 +48,11 @@ The envelopes are deliberately small and language-agnostic openEHR wire records 
 
 ### `system/`
 
-Hand-crafted capabilities response matching the openEHR REST 1.1.0-development System API shape (REQ-095). Its fields exercise `ServiceCapabilities` decode, including the `Extras` forward-compat path: `support_email`, `documentation_url` and `supported_formats` are deployment-specific, so they land in `Extras` instead of the typed fields.
+Hand-crafted capabilities response matching the openEHR REST 1.1.0 System API shape (REQ-095). Its fields exercise `ServiceCapabilities` decode, including the `Extras` forward-compat path: `support_email`, `documentation_url` and `supported_formats` are deployment-specific, so they land in `Extras` instead of the typed fields.
 
 | File | Notes |
 |---|---|
-| `capabilities.json` | Reference capabilities advertising `restapi_specs_version: 1.1.0-development` and a representative endpoint set. |
+| `capabilities.json` | Reference capabilities advertising `restapi_specs_version: 1.1.0` and a representative endpoint set. |
 
 ### `definition/`
 
@@ -80,7 +80,7 @@ Hand-crafted SMART configuration document that satisfies the openEHR SMART disco
 
 | File | Notes |
 |---|---|
-| `smart-configuration.json` | Reference SMART config advertising `org.openehr.rest` at spec_version `1.1.0-development`. |
+| `smart-configuration.json` | Reference SMART config advertising `org.openehr.rest` at spec_version `1.1.0`. |
 | `smart-configuration-mismatch.json` | Variant advertising `1.0.3`. Exercises PROBE-003 (spec-version mismatch fails fast at discovery). |
 | `jwks.json` | Reference JWKS document with two RS256 keys; used to exercise JWKS rotation (PROBE-006). |
 

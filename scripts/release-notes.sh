@@ -61,7 +61,7 @@ fi
   printf '|---|---|\n'
   printf '| SDK semver | `v%s` |\n' "$version"
   printf '| Go toolchain (minimum) | `%s` |\n' "$go_min"
-  printf '| openEHR REST | `1.1.0-development` |\n'
+  printf '| openEHR REST | `1.1.0` |\n'
   printf '| BMM corpus | %s |\n' "$bmm_pins"
   printf '| Git revision | `%s` |\n' "$short_sha"
 } > "$out"

@@ -1,4 +1,4 @@
-// Package definition is the openEHR REST 1.1.0-development Definition
+// Package definition is the openEHR REST 1.1.0 Definition
 // API client. It covers ADL 1.4 templates (Operational Templates, OPT
 // XML) and stored AQL queries. ADL 2 source-form templates are not
 // implemented.

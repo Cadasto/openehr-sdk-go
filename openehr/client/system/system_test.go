@@ -145,7 +145,7 @@ func TestCapabilitiesDecodesFixture(t *testing.T) {
 	if caps.Vendor != "Cadasto" {
 		t.Errorf("Vendor = %q", caps.Vendor)
 	}
-	if caps.RESTAPISpecsVersion != "1.1.0-development" {
+	if caps.RESTAPISpecsVersion != "1.1.0" {
 		t.Errorf("RESTAPISpecsVersion = %q", caps.RESTAPISpecsVersion)
 	}
 	if caps.ConformanceProfile != "default" {
@@ -337,8 +337,8 @@ func TestVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v != "1.1.0-development" {
-		t.Errorf("Version = %q, want 1.1.0-development", v)
+	if v != "1.1.0" {
+		t.Errorf("Version = %q, want 1.1.0", v)
 	}
 }
 
@@ -492,7 +492,7 @@ func TestRepositoryMirrorsPackageFunctions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v != "1.1.0-development" {
+	if v != "1.1.0" {
 		t.Errorf("Repository.Version = %q", v)
 	}
 	h, err := repo.Health(t.Context())

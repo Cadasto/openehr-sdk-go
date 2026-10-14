@@ -22,7 +22,7 @@ const capabilitiesBody = `{
   "solution": "Example CDR",
   "solution_version": "1.4.2",
   "vendor": "Example vendor",
-  "restapi_specs_version": "1.1.0-development",
+  "restapi_specs_version": "1.1.0",
   "conformance_profile": "STANDARD",
   "endpoints": ["/ehr", "/query", "/definition"]
 }`

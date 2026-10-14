@@ -115,7 +115,7 @@ func TestDoPlumbsHeaders(t *testing.T) {
 		WithHTTPClient(srv.Client()),
 		WithTokenSource(auth.StaticTokenSource(auth.Token{Value: "tok-1", Type: "Bearer"})),
 		WithUserAgent("sdk-test/1.0"),
-		WithSpecVersion("1.1.0-development"),
+		WithSpecVersion("1.1.0"),
 		WithCadastoSpecVersionHeader(true),
 	)
 	resp, err := c.Do(t.Context(), &Request{
@@ -134,7 +134,7 @@ func TestDoPlumbsHeaders(t *testing.T) {
 	tests := []struct{ name, want string }{
 		{"Authorization", "Bearer tok-1"},
 		{"User-Agent", "sdk-test/1.0"},
-		{"Cadasto-Openehr-Spec-Version", "1.1.0-development"},
+		{"Cadasto-Openehr-Spec-Version", "1.1.0"},
 		{"Prefer", "return=representation"},
 		{"Openehr-Audit-Details", `committer.name="alice"`},
 		{"Openehr-Version", "1.1.0"},

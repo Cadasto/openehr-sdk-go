@@ -312,7 +312,7 @@ func TestSubmissionValidateRejectsTypedNilElement(t *testing.T) {
 	}
 }
 
-// REQ-050: a submission encodes as the 1.1.0-development contribution body,
+// REQ-050: a submission encodes as the 1.1.0 contribution body,
 // top-level audit and versions with no class envelope.
 func TestSubmissionMarshalJSONCanonical(t *testing.T) {
 	sub := &contribution.Submission{

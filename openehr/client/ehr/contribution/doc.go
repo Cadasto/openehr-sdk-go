@@ -1,4 +1,4 @@
-// Package contribution is the openEHR REST 1.1.0-development
+// Package contribution is the openEHR REST 1.1.0
 // Contribution sub-resource client: multi-version atomic commits
 // against an EHR ([Commit]) and reads of a persisted contribution by
 // uid ([Get]), the two operations ITS-REST declares.

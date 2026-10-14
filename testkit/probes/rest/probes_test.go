@@ -78,7 +78,7 @@ func setBody(r *http.Request, body string) {
 
 // --- shared response fixtures ------------------------------------------------
 
-const capsBody = `{"solution":"test","vendor":"test","restapi_specs_version":"1.1.0-development"}`
+const capsBody = `{"solution":"test","vendor":"test","restapi_specs_version":"1.1.0"}`
 
 const exampleCompositionBody = `{"_type":"COMPOSITION","name":{"_type":"DV_TEXT","value":"example"},"archetype_node_id":"openEHR-EHR-COMPOSITION.report.v1","language":{"_type":"CODE_PHRASE","code_string":"en","terminology_id":{"_type":"TERMINOLOGY_ID","value":"ISO_639-1"}},"territory":{"_type":"CODE_PHRASE","code_string":"GB","terminology_id":{"_type":"TERMINOLOGY_ID","value":"ISO_3166-1"}},"category":{"_type":"DV_CODED_TEXT","value":"event","defining_code":{"_type":"CODE_PHRASE","code_string":"433","terminology_id":{"_type":"TERMINOLOGY_ID","value":"openehr"}}}}`
 

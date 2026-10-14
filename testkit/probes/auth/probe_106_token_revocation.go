@@ -45,7 +45,7 @@ func (p *probe106Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
   "code_challenge_methods_supported": ["S256"],
   "grant_types_supported": ["authorization_code", "refresh_token"],
   "capabilities": ["launch-standalone", "client-public"],
-  "services": {"org.openehr.rest": {"baseUrl": %[4]q, "spec_version": "1.1.0-development", "capabilities": ["composition"]}}
+  "services": {"org.openehr.rest": {"baseUrl": %[4]q, "spec_version": "1.1.0", "capabilities": ["composition"]}}
 }`, base+"/authorize", base+"/token", base+"/revoke", base+"/openehr/v1")
 		return
 	}

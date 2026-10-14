@@ -172,14 +172,14 @@ func TestResolveVersionGate(t *testing.T) { // REQ-072
 		{
 			// The list replaces the pinned target rather than adding to it.
 			name:     "strict: a list without the pin refuses the pin",
-			accepted: []string{"1.1.0"},
+			accepted: []string{"1.1.1"},
 			members:  map[string]any{"spec_version": discovery.SpecVersionPin},
 			refused:  true,
 			wantGot:  discovery.SpecVersionPin,
 		},
 		{
 			name:     "strict: a list naming the pin accepts it",
-			accepted: []string{discovery.SpecVersionPin, "1.1.0"},
+			accepted: []string{discovery.SpecVersionPin, "1.1.1"},
 			members:  map[string]any{"spec_version": discovery.SpecVersionPin},
 		},
 		{

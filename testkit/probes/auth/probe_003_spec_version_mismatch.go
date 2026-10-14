@@ -17,7 +17,7 @@ import (
 //
 // The probe serves a SMART configuration whose org.openehr.rest entry
 // declares spec_version "1.0.3" while the resolver requires the SDK pin
-// (1.1.0-development), and asserts the resolver fails fast with the
+// (1.1.0), and asserts the resolver fails fast with the
 // typed reason, never returning a usable catalog.
 func Probe003SpecVersionMismatch(ctx context.Context, mismatchedFixture []byte) (Result, error) { // PROBE-003 (REQ-072)
 	r := Result{Probe: "PROBE-003"}

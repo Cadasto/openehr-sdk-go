@@ -96,7 +96,7 @@ type ServiceEntry struct {
 	// caller set WithAcceptedSpecVersions.
 	Version string
 	// SpecVersion is the entry's "spec_version" member, verbatim (e.g.
-	// "1.1.0-development"); empty when absent. This member is not part of
+	// "1.1.0"); empty when absent. This member is not part of
 	// the SMART on openEHR document, but the resolver reads it when present
 	// and, on a required service, checks it against the accepted versions
 	// at resolution time.

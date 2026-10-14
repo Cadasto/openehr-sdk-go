@@ -1,6 +1,6 @@
 // Package ehr is the openEHR REST client for the EHR resource and its
 // sub-resources: Composition, Contribution, Directory, EHR_STATUS, and
-// ItemTags. Aligned with openEHR REST 1.1.0-development.
+// ItemTags. Aligned with openEHR REST 1.1.0.
 //
 // Write responses follow the Prefer header negotiation. A successful
 // minimal or identifier write returns a zero resource. Do not rely on

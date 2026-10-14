@@ -852,8 +852,8 @@ OPENEHR_CLIENT_ID=... OPENEHR_CLIENT_SECRET=... go run ./cmd/examples/service-au
 **Sample output:**
 
 ```text
-call 1: Example CDR 1.4.2, openEHR REST 1.1.0-development
-call 2: Example CDR 1.4.2, openEHR REST 1.1.0-development
+call 1: Example CDR 1.4.2, openEHR REST 1.1.0
+call 2: Example CDR 1.4.2, openEHR REST 1.1.0
 token requests: 1 for 2 calls
 OK: both calls carried a client credentials token
 ```

@@ -43,7 +43,7 @@ func TestProbe091PathSegmentValidation(t *testing.T) {
 		switch r.Method {
 		case http.MethodOptions:
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"solution":"test","vendor":"test","restapi_specs_version":"1.1.0-development"}`))
+			_, _ = w.Write([]byte(`{"solution":"test","vendor":"test","restapi_specs_version":"1.1.0"}`))
 		default:
 			w.Header().Set("Content-Type", "application/xml")
 			_, _ = w.Write([]byte(`<template/>`))

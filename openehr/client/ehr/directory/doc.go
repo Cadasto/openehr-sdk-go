@@ -1,4 +1,4 @@
-// Package directory is the openEHR REST 1.1.0-development Directory
+// Package directory is the openEHR REST 1.1.0 Directory
 // (folder hierarchy) sub-resource client. It covers reads and the
 // versioned writes (Save / Update / Delete).
 //

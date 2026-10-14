@@ -66,7 +66,7 @@ SDK constructors **SHOULD** accept configuration via functional options:
 client, err := ehr.New(catalog,
     transport.WithHTTPClient(httpClient),
     transport.WithTokenSource(ts),
-    transport.WithSpecVersion("1.1.0-development"),
+    transport.WithSpecVersion("1.1.0"),
     transport.WithUserAgent("my-app/1.0"),
     transport.WithRetry(retry.Policy{...}),
 )

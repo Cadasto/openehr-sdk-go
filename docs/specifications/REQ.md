@@ -51,7 +51,7 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-047 | BMM authoritative on divergence | [bmm-conformance.md](bmm-conformance.md#req-047--bmm-spec-divergence-resolution) | draft | landed |
 | REQ-048 | RM meta-model introspection | [bmm-conformance.md](bmm-conformance.md#req-048--rm-meta-model-introspection-surface) | draft | landed |
 | REQ-049 | RM class-universe absence reasons | [bmm-conformance.md](bmm-conformance.md#req-049--rm-class-universe-absence-reasons) | draft | landed |
-| REQ-050 | REST 1.1.0-development pin | [wire.md](wire.md#req-050) | draft | landed |
+| REQ-050 | REST 1.1.0 pin | [wire.md](wire.md#req-050) | draft | landed |
 | REQ-051 | Cadasto spec-version header | [wire.md](wire.md#req-051) | draft | landed |
 | REQ-052 | Canonical JSON | [wire.md](wire.md#req-052) | draft | landed |
 | REQ-053 | FLAT and STRUCTURED | [wire.md](wire.md#req-053) | draft | landed |

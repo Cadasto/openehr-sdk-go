@@ -10,7 +10,7 @@ import (
 
 // MarshalAuditDetails encodes an openEHR AUDIT_DETAILS into the
 // `openehr-audit-details` request-header value defined by openEHR REST
-// 1.1.0-development: a comma-separated list of dotted-attribute
+// 1.1.0: a comma-separated list of dotted-attribute
 // assignments, e.g.
 //
 //	change_type.code_string="249",committer.name="Alice",committer.external_ref.id="…",system_id="…"

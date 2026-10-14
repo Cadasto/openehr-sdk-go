@@ -2,7 +2,7 @@
   "solution": "Cadasto",
   "solution_version": "2.4.0",
   "vendor": "Cadasto",
-  "restapi_specs_version": "1.1.0-development",
+  "restapi_specs_version": "1.1.0",
   "conformance_profile": "default",
   "endpoints": [
     "/ehr",

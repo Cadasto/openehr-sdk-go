@@ -12,7 +12,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
-// ServiceCapabilities is the openEHR REST 1.1.0-development service-
+// ServiceCapabilities is the openEHR REST 1.1.0 service-
 // capabilities response per the System API. The exact shape varies
 // across deployments; documented fields are typed and unknown fields
 // are preserved verbatim in Extras for forward-compatibility.
@@ -160,7 +160,7 @@ const (
 // Capabilities issues OPTIONS against the openEHR REST service base URL
 // and returns the typed service capabilities response.
 //
-// openEHR REST 1.1.0-development defines the System API's single operation
+// openEHR REST 1.1.0 defines the System API's single operation
 // as `OPTIONS /` (operationId `options`). Call this once at startup to
 // confirm the deployment's declared spec version matches the ITS-REST
 // version the SDK targets. Capabilities respects the transport's

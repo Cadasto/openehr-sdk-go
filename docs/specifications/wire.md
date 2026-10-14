@@ -12,7 +12,7 @@ The premise: correctness is wire-level (REQ-080). The bytes on the wire and the 
 
 ## Functional API areas
 
-openEHR REST 1.1.0-development partitions the surface into **six** functional areas. The SDK provides a typed leaf package per area under `openehr/client/`:
+openEHR REST 1.1.0 partitions the surface into **six** functional areas. The SDK provides a typed leaf package per area under `openehr/client/`:
 
 | Area | Scope | SDK package |
 |---|---|---|
@@ -43,9 +43,9 @@ When the OpenAPI files and any in-repo prose disagree, the OpenAPI wins; the pro
 
 ### REQ-050
 
-The SDK targets **openEHR REST `1.1.0-development`** as its primary contract surface. Concretely:
+The SDK targets **openEHR REST `1.1.0`** as its primary contract surface. Concretely:
 
-- Endpoint shapes, request/response envelopes, and status-code semantics follow the 1.1.0-development specification.
+- Endpoint shapes, request/response envelopes, and status-code semantics follow the 1.1.0 specification, the ITS-REST `Release-1.1.0` tag vendored in [`resources/its-rest/`](../../resources/its-rest/README.md).
 - The `Cadasto-OpenEhr-Spec-Version` header (REQ-051) is the wire signal that distinguishes Cadasto deployments from generic openEHR backends; it does not change the request bodies or paths.
 - Earlier versions (1.0.3, 1.0.2) are not targeted. A consumer who needs to talk to a 1.0.3 deployment can do so against a build of the SDK that has the 1.0.3 quirks documented; v1 does not promise backwards compatibility across REST major/minor versions.
 
@@ -60,7 +60,7 @@ The version pin is enforced at discovery time (REQ-072), not on the first reques
 The SDK **MAY** send a `Cadasto-OpenEhr-Spec-Version` header on outgoing requests:
 
 ```
-Cadasto-OpenEhr-Spec-Version: 1.1.0-development
+Cadasto-OpenEhr-Spec-Version: 1.1.0
 ```
 
 This is a **Cadasto-platform-specific** signal. The SDK **MUST**:
@@ -75,7 +75,7 @@ Sending this header to a non-Cadasto openEHR backend **MUST NOT** happen automat
 
 ### REQ-059
 
-openEHR REST 1.1.0-development defines a family of `openehr-*` custom headers carrying RM and template-level metadata at the wire layer. The SDK **MUST** support them via **typed per-call options**, never via raw header maps on the consumer's surface.
+openEHR REST 1.1.0 defines a family of `openehr-*` custom headers carrying RM and template-level metadata at the wire layer. The SDK **MUST** support them via **typed per-call options**, never via raw header maps on the consumer's surface.
 
 | Header | Direction | Carries | Typed option |
 |---|---|---|---|
@@ -192,7 +192,7 @@ Canonical ordering for XML is its own deterministic profile, set out in the bull
 - `xmi:type` is **rejected** on decode with `ErrInvalidShape` and an explicit message — only `xsi:type` is recognised.
 - `xsi:type` discriminator **values** **MUST** be matched as **unprefixed** RM class names; a leading `xsd:` on a foundation-primitive value (`xsd:string`) is stripped to the BMM primitive name. A **namespace-prefixed** discriminator value — the Better/Marand `xsi:type="ns2:DV_QUANTITY"` form, where the RM namespace is bound to a prefix rather than being the default — is **out of v1 scope**: the decoder **MUST NOT** resolve it and **MUST** fail closed with `ErrUnknownType` (never silently mis-resolved). The `xsi:type` attribute itself is recognised only when the `xsi` prefix is bound to the XSI namespace; an `xsi:type` written with no in-scope `xmlns:xsi` declaration is treated as a **missing** discriminator (`encoding/xml` yields the unresolved prefix, not a match). Supporting the prefixed form later means resolving the value's prefix against its in-scope `xmlns` binding (not a blind strip) plus a focused decode fixture — the boundary is pinned by `TestUnmarshalRejectsPrefixedXSIType`.
 
-XML is a second-class format on the wire today (REST 1.1.0-development is JSON-first), but several integration scenarios pin to XML for legacy reasons. The SDK supports it without forcing it.
+XML is a second-class format on the wire today (REST 1.1.0 is JSON-first), but several integration scenarios pin to XML for legacy reasons. The SDK supports it without forcing it.
 
 Golden canonical-XML inputs for codec and PROBE-033 live under `testkit/corpus/compositions/` and `testkit/corpus/rm/` (same layout as REQ-052; see [Vendored fixtures](conformance.md#vendored-fixtures-testkitcorpus)).
 
@@ -375,13 +375,13 @@ Verified by [PROBE-089](conformance.md#probe-089--underscore-attribute-round-tri
 
 ## ITS-REST envelopes
 
-The openEHR REST 1.1.0-development specification defines envelope shapes for typical responses (collections, errors, version metadata). The SDK **MUST**:
+The openEHR REST 1.1.0 specification defines envelope shapes for typical responses (collections, errors, version metadata). The SDK **MUST**:
 
 - Decode well-formed envelopes into typed Go structs.
 - Surface envelope-level metadata (e.g. paging hints, conformance hints) on the typed response, not as a parallel `map[string]any`.
 - Reject malformed envelopes with a typed `WireError` carrying the parse failure.
 
-The exact envelope shapes are openEHR REST 1.1.0-development; this spec does not re-define them, it pins to them.
+The exact envelope shapes are openEHR REST 1.1.0; this spec does not re-define them, it pins to them.
 
 ### Request vs response shape asymmetry
 
@@ -597,7 +597,7 @@ REQ-090 (OpenTelemetry), REQ-091 (retry), REQ-092 (TLS posture), REQ-093 (error 
 Out of v1 scope:
 
 - Streaming response bodies. v1 reads complete responses into memory. Streaming **MAY** be added when a documented consumer needs it.
-- Multipart uploads beyond what openEHR REST 1.1.0-development requires.
+- Multipart uploads beyond what openEHR REST 1.1.0 requires.
 - Range requests, partial reads.
 
 ## Coverage matrix

@@ -97,7 +97,7 @@ catalog, err := discovery.NewStaticCatalog(discovery.StaticConfig{
         "org.openehr.rest": {
             ID:          "org.openehr.rest",
             BaseURL:     discovery.MustParseURL("https://ehrbase.example/rest/openehr/v1"),
-            SpecVersion: "1.1.0-development",
+            SpecVersion: "1.1.0",
         },
     },
     Auth: discovery.AuthEndpoints{
@@ -176,7 +176,7 @@ On every resolution and every refresh, the SDK **MUST**:
 Soft compatibility (forward-compatible spec micro-versions) **MAY** be allowed via a functional option:
 
 ```go
-discovery.WithAcceptedSpecVersions("1.1.0-development", "1.1.0", "1.1.1")
+discovery.WithAcceptedSpecVersions("1.1.0", "1.1.1")
 ```
 
 The default is **strict** — only the pinned version is accepted.

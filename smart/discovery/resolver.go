@@ -22,7 +22,7 @@ import (
 // The Resolver checks the spec_version a required service advertises
 // against this version, unless the caller sets WithAcceptedSpecVersions,
 // whose list then replaces it.
-const SpecVersionPin = "1.1.0-development"
+const SpecVersionPin = "1.1.0"
 
 // WellKnownPath is the standard SMART configuration path appended to
 // the Platform base URL, per SMART App Launch §4.1. Some deployments
@@ -105,7 +105,7 @@ func WithRequiredServices(ids ...string) Option {
 // required service, which are {SpecVersionPin} by default. The list
 // replaces the pinned version rather than adding to it, so a caller who
 // still accepts SpecVersionPin names it too:
-// WithAcceptedSpecVersions(SpecVersionPin, "1.1.0").
+// WithAcceptedSpecVersions(SpecVersionPin, "1.1.1").
 //
 // Without this option the resolver compares a required service's
 // spec_version only when the entry advertises one, and never compares its

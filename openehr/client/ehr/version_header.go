@@ -41,7 +41,7 @@ func (s LifecycleState) Rubric() (string, bool) {
 
 // FormatLifecycleStateHeader encodes a committed VERSION lifecycle_state
 // code into the `openehr-version` request-header value defined by openEHR
-// REST 1.1.0-development:
+// REST 1.1.0:
 //
 //	lifecycle_state.code_string="<code>"
 //

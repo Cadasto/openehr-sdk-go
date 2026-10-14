@@ -110,5 +110,5 @@ Documented to prevent scope-creep PRs:
 
 - **Browser-side openEHR client.** The SDK is server-side / CLI; no browser-side bindings, no WebAssembly export, no fetch-API polyfill. A consumer needing this can build it on top of `openehr/rm/` and `openehr/serialize/`, but the SDK doesn't ship a browser shape.
 - **Mobile SDKs.** Not a Go consumer pattern. iOS / Android need different SDKs (Swift / Kotlin) which are out of scope.
-- **Realtime / streaming.** No openEHR REST 1.1.0-development streaming endpoints in v1. Server-Sent Events for outbox publication is an openEHR-side concern, not an SDK concern in v1.
+- **Realtime / streaming.** No openEHR REST 1.1.0 streaming endpoints in v1. Server-Sent Events for outbox publication is an openEHR-side concern, not an SDK concern in v1.
 - **CLI for end-users.** The SDK ships `cmd/examples/` for illustration only. A "Cadasto CLI" is a separate downstream product that *consumes* this SDK.

@@ -1,4 +1,4 @@
-// Package system is the openEHR REST 1.1.0-development System API
+// Package system is the openEHR REST 1.1.0 System API
 // client. It exposes the deployment's service capabilities, declared
 // spec version, and a coarse health probe.
 //

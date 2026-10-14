@@ -53,7 +53,7 @@ sdd:
   # "Look it up, never guess" — the authoritative sources for this repo's domain facts:
   ground_truth: >-
     openEHR specifications and the vendored machine-readable contracts in resources/ —
-    resources/its-rest/*.openapi.yaml (REST 1.1.0-development) and resources/bmm/*.bmm.json
+    resources/its-rest/*.openapi.yaml (ITS-REST Release-1.1.0) and resources/bmm/*.bmm.json
     (RM/AM/BASE/LANG/TERM) — plus the openEHR MCP skills/assistant. Agents MUST look up RM
     paths, terminology codes, ITS-JSON/REST request-response shapes, and class invariants
     rather than guess. The conformance probe suite (testkit/probes, catalogued in

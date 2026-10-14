@@ -1,4 +1,4 @@
-// Package composition is the openEHR REST 1.1.0-development
+// Package composition is the openEHR REST 1.1.0
 // Composition sub-resource client. It covers reads and the versioned
 // writes (Save / Update / Delete). Update carries If-Match / ETag
 // optimistic concurrency; Delete names the version to delete in its

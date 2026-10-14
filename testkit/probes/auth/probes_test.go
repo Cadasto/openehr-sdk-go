@@ -35,7 +35,7 @@ func smartConfigFixture(t *testing.T) []byte {
 func mismatchedSpecFixture(t *testing.T) []byte {
 	t.Helper()
 	b := smartConfigFixture(t)
-	out := bytes.ReplaceAll(b, []byte(`"spec_version": "1.1.0-development"`), []byte(`"spec_version": "1.0.3"`))
+	out := bytes.ReplaceAll(b, []byte(`"spec_version": "1.1.0"`), []byte(`"spec_version": "1.0.3"`))
 	if bytes.Equal(out, b) {
 		t.Fatal("mismatchedSpecFixture: spec_version replacement did not match the fixture")
 	}

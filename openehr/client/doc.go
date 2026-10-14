@@ -1,5 +1,5 @@
 // Package client groups REST clients per openEHR resource. Each
-// sub-package corresponds to an openEHR REST 1.1.0-development surface:
+// sub-package corresponds to an openEHR REST 1.1.0 surface:
 //
 //   - client/ehr: EHR and sub-resources (Composition, Contribution,
 //     Directory, EHR_STATUS, ItemTags)

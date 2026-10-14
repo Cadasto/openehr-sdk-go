@@ -77,7 +77,7 @@ net/http forwards an `Authorization` header to a redirect target on the same hos
 
 ## REQ-093 — openEHR error envelope mapping
 
-openEHR REST 1.1.0-development returns a structured JSON body on non-2xx responses:
+openEHR REST 1.1.0 returns a structured JSON body on non-2xx responses:
 
 ```json
 {
@@ -108,7 +108,7 @@ The SDK **MUST**:
 
 ## REQ-094 — `Prefer` response-shape negotiation
 
-openEHR REST 1.1.0-development uses `Prefer: return=<mode>` on write paths. The SDK **MUST** support:
+openEHR REST 1.1.0 uses `Prefer: return=<mode>` on write paths. The SDK **MUST** support:
 
 | Mode | Server response | SDK return |
 |---|---|---|

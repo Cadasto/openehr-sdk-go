@@ -49,7 +49,7 @@ The openEHR demographic side — `PARTY`, `PERSON`, `ORGANISATION`, `AGENT`, `RO
 The openEHR query language. Path-based, archetype-aware; structurally similar to SQL but operating on Compositions and demographic resources. The SDK exposes AQL via `openehr/aql` (builders + models) and `openehr/client/query` (executor).
 
 **Canonical JSON**
-The openEHR ITS-JSON canonical serialization of an RM instance. Distinguished from `FLAT` and `STRUCTURED` by retaining full RM structure (every `_type` discriminator, every nested object). The wire format for openEHR REST 1.1.0-development.
+The openEHR ITS-JSON canonical serialization of an RM instance. Distinguished from `FLAT` and `STRUCTURED` by retaining full RM structure (every `_type` discriminator, every nested object). The wire format for openEHR REST 1.1.0.
 
 **FLAT format**
 A path-keyed, value-flat serialization optimised for end-user input forms — keys are openEHR paths, values are leaf scalars. The SDK supports it as an input/output format on the composition surface.
@@ -58,7 +58,7 @@ A path-keyed, value-flat serialization optimised for end-user input forms — ke
 A nested-JSON serialization that preserves RM structure but omits `_type` discriminators where the path is unambiguous. Intermediate between canonical JSON and FLAT.
 
 **ITS-REST**
-"Implementation Technology Specification — REST" — the openEHR REST API specification family. The SDK targets the `1.1.0-development` release line; the term "REST" without further qualification in these specs refers to ITS-REST. The per-endpoint **OpenAPI YAML** files at `github.com/openEHR/specifications-ITS-REST` are the authoritative source for paths, parameters, and status codes (REQ-095).
+"Implementation Technology Specification — REST" — the openEHR REST API specification family. The SDK targets the `1.1.0` release line; the term "REST" without further qualification in these specs refers to ITS-REST. The per-endpoint **OpenAPI YAML** files at `github.com/openEHR/specifications-ITS-REST` are the authoritative source for paths, parameters, and status codes (REQ-095).
 
 **ItemTags / `openehr-item-tag`**
 A small key-value annotation surface attached to versioned resources, introduced in openEHR REST 1.1.0. The SDK exposes it under `openehr/client/ehr/itemtags/` and carries the `openehr-item-tag` header (REQ-059) on the relevant operations.

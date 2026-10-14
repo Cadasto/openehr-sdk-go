@@ -75,7 +75,7 @@ func TestResolveFixture(t *testing.T) {
 	if !ok {
 		t.Fatal("OpenEHRRest service missing")
 	}
-	if rest.SpecVersion != "1.1.0-development" {
+	if rest.SpecVersion != "1.1.0" {
 		t.Errorf("spec_version = %q", rest.SpecVersion)
 	}
 	if rest.BaseURL.String() != "https://api.example.com/openehr/v1" {
@@ -481,7 +481,7 @@ func TestResolveIssuerMismatch(t *testing.T) {
 				"issuer":"`+srv.URL+`/idp",
 				"authorization_endpoint":"https://evil.example.com/auth",
 				"token_endpoint":"https://evil.example.com/token",
-				"services":{"org.openehr.rest":{"baseUrl":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}}
+				"services":{"org.openehr.rest":{"baseUrl":"https://api.example.com/openehr/v1","spec_version":"1.1.0"}}
 			}`)
 		case "/idp" + openIDConfigurationPath:
 			_, _ = io.WriteString(w, `{"issuer":"https://evil.example.com"}`)
@@ -516,7 +516,7 @@ func TestResolveIssuerMatch(t *testing.T) {
 			"issuer":"` + srv.URL + `",
 			"authorization_endpoint":"https://auth.example.com/auth",
 			"token_endpoint":"https://auth.example.com/token",
-			"services":{"org.openehr.rest":{"baseUrl":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}}
+			"services":{"org.openehr.rest":{"baseUrl":"https://api.example.com/openehr/v1","spec_version":"1.1.0"}}
 		}`
 		_, _ = io.WriteString(w, body)
 	}))
@@ -548,7 +548,7 @@ func TestResolveInsecureEndpointRejectedStrict(t *testing.T) {
 		"authorization_endpoint":"http://attacker.example/auth",
 		"token_endpoint":"http://attacker.example/token",
 		"jwks_uri":"http://attacker.example/keys",
-		"services":{"org.openehr.rest":{"baseUrl":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}}
+		"services":{"org.openehr.rest":{"baseUrl":"https://api.example.com/openehr/v1","spec_version":"1.1.0"}}
 	}`
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, body)
@@ -578,7 +578,7 @@ func TestResolveInsecureEndpointAllowedWhenAllowInsecure(t *testing.T) {
 		"authorization_endpoint":"http://dev.example/auth",
 		"token_endpoint":"http://dev.example/token",
 		"jwks_uri":"http://dev.example/keys",
-		"services":{"org.openehr.rest":{"baseUrl":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}}
+		"services":{"org.openehr.rest":{"baseUrl":"https://api.example.com/openehr/v1","spec_version":"1.1.0"}}
 	}`
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, body)

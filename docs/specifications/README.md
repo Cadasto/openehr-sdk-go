@@ -113,7 +113,7 @@ Identifiers MUST be stable once published — they are referenced from outside t
 | [rm-functions.md](rm-functions.md) | RM behavioural functions — identifier parsing/derivation, locatable path read access, version-derived helpers, temporal DV_* helpers (REQ-120–123) |
 | [bmm-conformance.md](bmm-conformance.md) | Pinned BMM sources, generator, P_BMM → Go mapping rules, primitive type mapping |
 | [auth.md](auth.md) | `auth.TokenSource` contract and the SMART-on-openEHR provider flow |
-| [wire.md](wire.md) | openEHR REST 1.1.0-development pin, AQL wire, canonical JSON / FLAT / STRUCTURED |
+| [wire.md](wire.md) | openEHR REST 1.1.0 pin, AQL wire, canonical JSON / FLAT / STRUCTURED |
 | [service-discovery.md](service-discovery.md) | Service catalog resolution and refresh |
 | [conformance.md](conformance.md) | openEHR wire-conformance probe catalog |
 | [clinical-modeling.md](clinical-modeling.md) | Clinical-modeling artefacts — OPT parse and paths (REQ-100); composition, validation, AQL paths follow in later REQs |
