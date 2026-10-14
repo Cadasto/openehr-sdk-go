@@ -360,11 +360,13 @@ type Coverage struct {
 	// visited, those their ancestors declare included, each written
 	// CLASS.Invariant as [Issue.Rule] writes a rule, as in
 	// "DV_AMOUNT.Accuracy_validity" on a DV_QUANTITY. An invariant is listed
-	// whatever the instance holds: it is a rule the validator does not
-	// evaluate on any instance, because it needs a terminology service or
-	// stored history, or for another reason the SDK records beside it. A
-	// call that visits no value, such as a guard, lists none. [Complete] does
-	// not read it.
+	// whatever the instance holds: it is a rule the validator evaluates on
+	// no instance. Most are rules it does not evaluate yet; others need a
+	// record the instance does not carry, such as the versions stored for a
+	// versioned object, hold by definition on the SDK's types, or are read
+	// otherwise by a documented deviation of the ISO 8601 parse. The SDK
+	// records the reason beside each. A call that visits no value, such as a
+	// guard, lists none. [Complete] does not read it.
 	Unevaluated []string
 }
 

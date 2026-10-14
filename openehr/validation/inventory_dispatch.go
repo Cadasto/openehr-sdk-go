@@ -26,14 +26,18 @@ type invariantKind uint8
 
 const (
 	// invariantEvaluated is an invariant the floor evaluates, with the Go
-	// function that evaluates it.
+	// function that evaluates it or the check that already decides it.
 	invariantEvaluated invariantKind = iota + 1
 	// invariantNotMechanical is an invariant no check of the instance alone
-	// can decide: it needs a terminology service, stored history, or a
-	// comparison the RM leaves undefined.
+	// can decide, because it needs a record the instance does not carry: in
+	// the pinned BMMs, the versions stored for a versioned object, or the
+	// other party of a demographic relationship.
 	invariantNotMechanical
 	// invariantOutOfScope is an invariant the SDK does not check on an
-	// instance, for the reason the classification gives.
+	// instance, for the reason the classification gives: most are not
+	// evaluated yet; others hold by definition on the SDK's types, belong to
+	// a class no registered type is subject to, or are read otherwise by a
+	// documented deviation of the REQ-123 ISO 8601 parse.
 	invariantOutOfScope
 )
 
@@ -361,10 +365,12 @@ var floorRules = pinnedSource.build()
 // order: the attribute checks that apply to the class; the evaluator of each
 // evaluated invariant the class is subject to, in key order, once per node
 // unless it reports the invariant that dispatched it; then the coded
-// invariants, in the class's key order. An invariant the classification
-// calls evaluated that has no binding is treated as not evaluated, so
-// Coverage still names it; so is one another check decides, on a class that
-// check does not run on.
+// invariants, which [rmFloorWalker.checkCodedInvariants] checks in the order
+// [codedValues] lists the node's coded attributes (an ENTRY's language
+// before its encoding), whatever the order of their keys. An invariant the
+// classification calls evaluated that has no binding is treated as not
+// evaluated, so Coverage still names it; so is one another check decides, on
+// a class that check does not run on.
 func (src inventorySource) build() inventoryRules {
 	classes := slices.Sorted(maps.Keys(src.classes))
 	byIndex := make([]*classRules, len(classes))

@@ -156,13 +156,16 @@
 //	}
 //
 // [Coverage.Unevaluated] lists, as CLASS.Invariant, the invariants of the
-// classes the walk visited that the validator evaluates on no instance, such
-// as a rule that needs a terminology service or stored history. Every
-// invariant of the pinned Reference Model and BASE schemas is classified in
-// the file invariants.json beside this package's source, with the reason the
-// SDK does not evaluate it, and the classes' rules are dispatched from that
-// classification, so the list is what the validator really skipped.
-// Complete does not read it.
+// classes the walk visited that the validator evaluates on no instance: most
+// because it does not evaluate them yet, some because they need a record the
+// instance does not carry, such as the versions stored for a versioned
+// object. Every invariant of the pinned Reference Model and BASE schemas is
+// classified in the file invariants.json beside this package's source, with
+// the reason the SDK does not evaluate it, and the classes' rules are
+// dispatched from that classification, so the list is what the validator
+// really skipped. An invariant another check already decides, such as one
+// that a mandatory attribute be not empty, counts as evaluated and is not
+// listed. Complete does not read it.
 //
 // # Dependencies
 //
