@@ -6,7 +6,7 @@ kind: specification
 
 **Status:** Draft
 
-Normative contract for `transport/` — HTTP wrapping around an injected `*http.Client`, cross-cutting wire hygiene, and REST binding helpers shared by all `openehr/client/*` leaf packages. Covers REQ-090 through REQ-094, the REQ-096..098 extension range, REQ-150 (path-parameter segment validation), and REQ-151 (typed 2xx decode failure).
+Normative contract for `transport/` — HTTP wrapping around an injected `*http.Client`, cross-cutting wire hygiene, and REST binding helpers shared by all `openehr/client/*` leaf packages. Covers REQ-090 through REQ-094, the REQ-096..098 extension range, REQ-150 (path-parameter segment validation), REQ-151 (typed 2xx decode failure), REQ-166 (Bearer challenge on 401 and 403), and REQ-172 (typed 2xx body-read failure).
 
 openEHR resource semantics (Compositions, AQL, canonical codecs) live in [wire.md](wire.md). Service catalog resolution lives in [service-discovery.md](service-discovery.md).
 
@@ -50,7 +50,7 @@ Rules:
 - Retries **MUST** respect `ctx` cancellation.
 - The retry budget **MUST** be observable via the OTel span (`retry.attempt`, `retry.backoff_ms`).
 
-The SDK checks the method before it looks at the error or the status, so a token or network failure on a non-idempotent request is not retried either. A request carrying an `Authorization` header that `Client.Do` refuses with `transport.ErrInsecureRedirect` is never retried either: [§ REQ-092](#req-092--tls-posture) *No downgrade with a credential* holds that rule.
+The SDK checks the method before it looks at the error or the status, so a token or network failure on a non-idempotent request is not retried either. A request carrying an `Authorization` header that `Client.Do` refuses with `transport.ErrInsecureRedirect` is never retried either: [§ REQ-092](#req-092--tls-posture) *No downgrade with a credential* holds that rule. A request whose 2xx body could not be read is sent again only for a safe method: [§ REQ-172](#req-172--typed-2xx-body-read-failure) *Retry* holds that rule.
 
 - **Lives in:** [`transport/`](../../transport)
 
@@ -98,7 +98,7 @@ The SDK **MUST**:
 - Map the HTTP status to typed sentinels per [idiom.md § Errors](idiom.md#errors-req-025): `ErrNotFound` (404), `ErrUnauthorized` (401), `ErrForbidden` (403), `ErrVersionConflict` (409), `ErrPreconditionFailed` (412), `ErrUnprocessable` (422), `ErrPreconditionRequired` (428). The status set follows the openEHR contract: a **422** signals a well-formed-but-semantically-invalid request (validation / template failure — `resources/its-rest/overview-validation.openapi.yaml` line 400; used on EHR and demographic writes) and **MUST** map to `ErrUnprocessable`. A **409** spans a conflict with the resource's current state (the Composition delete of a version that is not the latest) and a resource-already-exists collision; the openEHR error `code` on `OpenEHRErrorDetail` disambiguates and `ErrVersionConflict` remains the sentinel for both. openEHR signals a stale `If-Match` as **412** and a missing-but-expected `If-Match` as **400** (overview line 370) — **not** 428; `ErrPreconditionRequired` (428) is retained only as a defensive mapping for non-conformant servers and is **not** an openEHR-canonical status. A **400** with no more specific sentinel surfaces as a bare `WireError` whose openEHR `code` remains reachable via `errors.As`.
 - **PHI-safe error surfaces by default.** openEHR error bodies routinely carry patient identifiers and clinical detail. `WireError.Error()` **MUST NOT** interpolate `OpenEHR.Message` or the raw response bytes. It **MUST** carry HTTP status, route template, and the openEHR error *code* (codes are not PHI). Callers that need the full server payload for diagnostics **MUST** opt in via `transport.WithRawErrorBodies(true)`; only then are `OpenEHR.Message`, `OpenEHR.ValidationErrors` (free text, like the message) and `WireError.RawBody` populated. `OpenEHR.Code` and `OpenEHR.CodedText` remain available via `errors.As` regardless of the opt-in (structured codes, not free-text clinical narrative).
 - **Unrouted requests render a placeholder.** Where a diagnostic string names the request's route, it **MUST** carry the caller's route template, or — when the request carried none — the stable placeholder `(unrouted)`; it **MUST NOT** fall back to the expanded request path or the resolved URL, either of which may hold a caller-supplied identifier. The placeholder's exact text is part of this contract, not an implementation detail: a caller may match on it. The obligation reaches inside a wrapped error: where a network failure arrives as a net/http `*url.Error`, whose own text prints the resolved URL, the SDK **MUST** substitute the same route slot for that URL. That substitution **MUST** leave the error's type, its `Op`, and its cause unchanged, so `errors.AsType[*url.Error]`, `Timeout()`, `Temporary()` and `errors.Is` against the cause all answer as before. The telemetry surfaces resolve the route their own way (REQ-090 span naming and the `http.route` attribute, REQ-098 `Observation.Route`) and this clause does not bind them.
-- **Bounded response reads.** Every `Client.Do` **MUST** cap how many bytes are read from the response body. The default limit is `transport.DefaultMaxResponseBody` (64 MiB). `transport.WithMaxResponseBody(n)` overrides the cap: `0` means default, a positive value sets an explicit limit, a negative value disables the cap (documented escape hatch for trusted backends). Exceeding the limit **MUST** fail the request with an error mentioning the limit — not an unbounded `io.ReadAll`.
+- **Bounded response reads.** Every `Client.Do` **MUST** cap how many bytes are read from the response body. The default limit is `transport.DefaultMaxResponseBody` (64 MiB). `transport.WithMaxResponseBody(n)` overrides the cap: `0` means default, a positive value sets an explicit limit, a negative value disables the cap (documented escape hatch for trusted backends). Exceeding the limit **MUST** fail the request with an error mentioning the limit — not an unbounded `io.ReadAll`. What that failure returns beside the error is [§ REQ-172](#req-172--typed-2xx-body-read-failure)'s.
 
 `WireError.Error()` values flow into REQ-098 observers and REQ-090 OTel span status; the PHI-safe default applies there too unless the consumer opts into raw bodies.
 
@@ -391,6 +391,44 @@ type BearerChallenge struct {
 
 ---
 
+## REQ-172 — Typed 2xx body-read failure
+
+A response can arrive with its status line and headers and then fail while its body is read: the connection drops mid-body, a `Content-Encoding` header does not match the body, or the body is longer than the [§ REQ-093](#req-093--openehr-error-envelope-mapping) *Bounded response reads* ceiling. The status is then the only trustworthy signal of what the server did. For a write, a 2xx status and its `ETag` and `Location` are the proof that the server committed and the name of the version it made, so a caller that loses them cannot tell whether to retry. The SDK **MUST NOT** discard the status and headers because the body could not be read.
+
+**The 2xx arm.** When the status is 2xx and the body cannot be read, `Client.Do` **MUST** return a non-nil `*transport.Response` carrying `StatusCode`, `Header` and `Metadata` as it does for any 2xx, beside a `*transport.BodyReadError`. `Response.Body` **MUST** be empty, and the error **MUST NOT** carry the bytes read before the failure: a partial body is not the representation. The error **MUST**:
+
+- be recoverable from the returned error with `errors.AsType[*transport.BodyReadError]`, through any `fmt.Errorf` operation-name wrapping a leaf package adds;
+- carry the request's HTTP method, its route template (under § REQ-093's *Unrouted requests render a placeholder* rule) and the response status;
+- wrap the read failure and expose it through `Unwrap`, so `errors.Is` reaches the cause: `io.ErrUnexpectedEOF` for a connection cut mid-body, the content-coding error (such as `gzip.ErrHeader`) for a body that does not match its encoding, and `transport.ErrResponseTooLarge` for a body over the ceiling.
+
+**`Error()` stays value-free.** `BodyReadError.Error()` **MUST** name the method, the route template and the status, and **MUST NOT** interpolate a header value or a body byte. It also carries the cause's text, which is a transport-level diagnostic (a connection error, a content-coding error, or the ceiling) and holds no payload value. For a body over the ceiling that text **MUST** name the limit, as § REQ-093 requires.
+
+**The non-2xx arm.** When the status is not 2xx and the body cannot be read, `Client.Do` **MUST** still return the `*transport.WireError` that the status and headers classify (its status sentinel, its route and, on a 401 or 403, its Bearer challenge under [§ REQ-166](#req-166--bearer-challenge-on-401-and-403)), with no openEHR envelope and no `RawBody`, beside a non-nil `*Response` whose `Body` is empty. The returned error **MUST** also wrap the read failure, so `errors.Is` reaches the same causes as on the 2xx arm. A body that cannot be read leaves the failure classified by its status, as a body that is not an error envelope already does.
+
+**Disjoint classifications.** `Client.Do` **MUST** return a `*BodyReadError` only on the 2xx arm. Recovering a `*BodyReadError` **MUST NOT** recover a `*WireError` or a `*transport.DecodeError`, and recovering either of those **MUST NOT** recover a `*BodyReadError`. A body that could not be read is never decoded, so it is never a [§ REQ-151](#req-151--typed-2xx-decode-failure) decode failure.
+
+**Retry.** With retries enabled ([§ REQ-091](#req-091--retry-policy)), a request whose 2xx body could not be read **MUST** be sent again only when its method is `GET`, `HEAD` or `OPTIONS`, which RFC 9110 §9.2.1 defines as safe, and **MUST NOT** be sent again for any other method, even when `RetryNonIdempotent` is set. The server has acted on such a request, and a second `PUT` carrying the same `If-Match` would fail as a stale precondition and hide the version the first one made. The non-2xx arm is retried by its status, as any `*WireError` is.
+
+**Metadata still arrives.** The `(*T, *Metadata, error)` triples the leaf packages return **MUST** populate `*Metadata` from the response on both arms, as § REQ-151 *Metadata still arrives* requires for a decode failure. That includes the write-result funnel of [§ REQ-094](#req-094--prefer-response-shape-negotiation), whose version metadata comes back beside the error. A leaf whose return has no metadata slot returns the error alone.
+
+The [§ REQ-098](#req-098--request-level-observer-hook) observation of such a call carries the response status beside the error.
+
+**Acceptance.**
+
+- A `201` with an `ETag` whose body is cut mid-read returns a `*Response` with status `201`, the headers, the parsed `Metadata` and an empty `Body`. Beside it is an error from which `errors.AsType[*transport.BodyReadError]` recovers status `201`, and `errors.Is(err, io.ErrUnexpectedEOF)` holds.
+- A `Content-Encoding: gzip` header over a plain body gives the same shape with `errors.Is(err, gzip.ErrHeader)`. A body over `WithMaxResponseBody` gives it with `errors.Is(err, transport.ErrResponseTooLarge)` and a message that names the limit.
+- `composition.Save` against such a `201` returns no composition, the version metadata the `ETag` names, and the `*BodyReadError`.
+- A `409` whose body is cut matches `transport.ErrVersionConflict`; `errors.AsType[*transport.WireError]` recovers status `409`, and `errors.Is(err, io.ErrUnexpectedEOF)` holds. `errors.AsType[*transport.BodyReadError]` does not match.
+- A value placed in a response header and in the bytes read before the cut appears nowhere in `BodyReadError.Error()`.
+- With retries enabled, a `GET` whose 2xx body is cut is sent again. A `PUT`, a `DELETE`, and a `POST` under `RetryNonIdempotent`, each with its 2xx body cut, are sent once.
+
+Out of scope: the bytes read before the failure, which the SDK does not keep; and a body that was read in full but does not decode, which is § REQ-151's.
+
+- **Lives in:** [`transport/`](../../transport), with the leaf triples in [`openehr/client/`](../../openehr/client)
+- **Probes:** none; unit tests pin both arms, the retry gate and the leaf metadata.
+
+---
+
 ## Coverage
 
 | REQ | Package |
@@ -405,3 +443,4 @@ type BearerChallenge struct {
 | REQ-150 | `transport/`, `openehr/client/*` |
 | REQ-151 | `transport/`, `openehr/client/*` |
 | REQ-166 | `transport/` |
+| REQ-172 | `transport/`, `openehr/client/*` |

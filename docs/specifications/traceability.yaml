@@ -2160,3 +2160,10 @@ requirements:
       - testkit/conformance/webtemplate/archetype_details_test.go
       - testkit/probes/validation/probe_074_test.go
       - testkit/probes/validation/probes_test.go
+
+  - id: REQ-172
+    title: Typed 2xx body-read failure
+    canonical: docs/specifications/transport.md#req-172--typed-2xx-body-read-failure
+    status: draft
+    implementation: planned
+    packages: [transport]
