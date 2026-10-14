@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-10-14
+
+Thirty-fourth `v0.x` minor: validation findings name their layer and rule, a reusable `Validator` takes limits and lists what it did not check, both validators read every RM class through generated access, and the openEHR REST pin moves to `1.1.0`. **Breaking:** `openehr/validation/rmread` is removed, the validators report prohibited attributes and findings on classes and attributes they never read (a nil RM-mandatory list is now `required`), FLAT and STRUCTURED decode the multimedia algorithm codes in their code sets, and discovery refuses a deployment that advertises `1.1.0-development` unless the caller widens the accepted versions.
+
 ### Added
 
 - **Validation findings name their layer and rule (REQ-171).** Each `Issue` from the instance validators carries `Layer`, template or RM, and `Rule`, the BMM invariant or template clause it evaluates, so callers need not parse `Detail`.
@@ -19,13 +23,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Template validation reports an attribute the OPT prohibits (REQ-102).** A present attribute with existence 0..0, or whose children all have occurrences 0..0, draws `prohibited` (`ErrProhibited`), also where the instance generator writes one the RM requires.
 - **The RM floor reports `max_depth` once per walk and its nil guards at an empty path (REQ-112).** A deep Go-built value no longer yields one issue per node at the limit.
 - **Validation reads every RM class through generated access (REQ-171, ADR 0028).** The floor and template walk now check LINK, FEEDER_AUDIT, INSTRUCTION_DETAILS, DV_PARAGRAPH, LOCATABLE `uid`, `links` and `feeder_audit` and other attributes they never read.
-- **The pinned openEHR REST version is `1.1.0` (REQ-050).** `discovery.SpecVersionPin` follows the ITS-REST Release-1.1.0 tag; a deployment that still advertises `1.1.0-development` needs `discovery.WithAcceptedSpecVersions`.
 - **`rminfo.IsNonStorableAttr` names RESOURCE_DESCRIPTION `parent_resource` (REQ-112).** No serialization carries that back-reference and no Go value can hold it, so the validators and the instance generator leave it out.
 - **A nil RM-mandatory list is `required` (REQ-112).** The floor reported it as `cardinality`; an empty list still is, and the template walk counts only a present list's items.
 - **A set but empty optional string pointer is present (REQ-171).** EVENT_CONTEXT `location` and CODE_PHRASE `preferred_term` set to `""` now read as present, not absent.
 - **Optional text and partly filled references are entered (REQ-171).** An optional DV_TEXT with an empty value and a by-value object reference missing a part report what they lack, and a Go-built version's payload is walked.
 - **The floor orders every strictly comparable interval (REQ-112).** `DV_INTERVAL` bounds of dates, times, durations, ordinals, scales and proportions are now checked for `lower` ≤ `upper`, not only counts and quantities.
 - **FLAT and STRUCTURED decode the multimedia algorithm codes in their openEHR code sets (REQ-140).** `|compression_algorithm` and `|integrity_check_algorithm` gain the code set's terminology id, and encode keeps that terminology on the bare suffix.
+- **The pinned openEHR REST version is `1.1.0` (REQ-050).** `discovery.SpecVersionPin` follows the ITS-REST Release-1.1.0 tag; a deployment that still advertises `1.1.0-development` needs `discovery.WithAcceptedSpecVersions`.
 
 ### Removed
 
