@@ -664,6 +664,75 @@ func TestREQ171_EngineReportsAnRMMandatoryAttributeATemplateNodeLeavesOptional(t
 	}
 }
 
+// foreignClassCase is a root whose value's class does not list attributes
+// the root node of the template c carries, with the findings Validate
+// reports, as identityKeys writes them.
+type foreignClassCase struct {
+	name string
+	root any
+	c    *templatecompile.Compiled
+	want []string
+}
+
+// foreignClassCases returns an RM-valid COMPOSITION and a root outside the
+// closed RM set, each bound to an OBSERVATION node that declares subject,
+// which the RM marks mandatory for an OBSERVATION, with the existence 0..1,
+// and data with the existence 1..1. The compile injects the other attributes
+// the RM marks mandatory for an OBSERVATION, its encoding among them. A
+// COMPOSITION lists none of subject, data and encoding; a value of no RM
+// class lists no attribute.
+func foreignClassCases(t *testing.T) []foreignClassCase {
+	t.Helper()
+	type notRM struct{ Name string }
+	const observationID = "openEHR-EHR-OBSERVATION.order.v1"
+	c := mustCompileInline(t, rootOPT("OBSERVATION", observationID,
+		singleAttribute("subject", "0", "1"),
+		singleAttribute("data", "1", "1"),
+	))
+	return []foreignClassCase{
+		{
+			name: "a COMPOSITION under an OBSERVATION node",
+			root: probes.ComposerPartyIdentified(),
+			c:    c,
+			want: []string{
+				"archetype_id_mismatch /archetype_node_id template identity",
+				"required /data template existence",
+				"rm_type_mismatch / template type",
+			},
+		},
+		{
+			name: "a root outside the RM set under an OBSERVATION node",
+			root: &notRM{Name: "root"},
+			c:    c,
+			want: []string{
+				"required /data template existence",
+				"rm_type_mismatch / template type",
+				"rm_type_unknown /  ",
+			},
+		},
+	}
+}
+
+// REQ-112 § Driver; REQ-171 § One walk (Presence) — the RM layer reports an
+// attribute absent only from the pinned Reference Model's reading of the
+// value's own class. A value whose class does not list an attribute the
+// template node carries draws no RM-layer finding for it: not for one the
+// node declares and leaves optional though the RM marks it mandatory for
+// the node's class (subject), nor for one the compile injects because it
+// does (encoding, language, name). The template's own existence finding
+// stays (data), beside the type mismatch at the root.
+func TestREQ112_REQ171_EngineReadsRMPresenceFromTheValuesClassAlone(t *testing.T) {
+	t.Parallel()
+	for _, tc := range foreignClassCases(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			r := validateWith(t, tc.root, tc.c)
+			if got := identityKeys(r.Issues); !slices.Equal(got, tc.want) {
+				t.Errorf("Validate(%s) = %q, want %q: no RM-layer finding for an attribute the value's class does not list", tc.name, got, tc.want)
+			}
+		})
+	}
+}
+
 // REQ-171 § One walk (Presence) — a part of a reference the instance lacks,
 // where the template binds the reference to a node, is reported once: by the
 // reference's own rule, as the RM rules alone report it. The compiled node

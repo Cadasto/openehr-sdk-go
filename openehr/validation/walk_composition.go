@@ -223,16 +223,13 @@ func formatAllowedTypes(children []*tcimpl.CompiledNode) string {
 }
 
 // absentIssue returns the issue the template reports for the attribute attr
-// of parentRM, at attrPath, when the instance lacks it: `required`, on the
-// layer and by the rule [requiredBy] names, with required set. A
-// multi-valued attribute is described as one. required is false when
-// neither the template nor the BMM bit the template carries requires attr.
-// The walk reports an RM layer issue only where the value's class does not
-// list the attribute; elsewhere the RM rules read the class
-// ([engine.checkAbsent]).
+// of parentRM, at attrPath, when the instance lacks it and the template's
+// existence requires it ([templateRequires]): `required`, on the template
+// layer, rule existence, with required set. A multi-valued attribute is
+// described as one. The RM's requirement is not read here: the walk reads it
+// from the value's class ([engine.checkAbsent]).
 func absentIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath string, multiValued bool) (iss Issue, required bool) {
-	layer, rule, required := requiredBy(attr)
-	if !required {
+	if !templateRequires(attr) {
 		return iss, false
 	}
 	detail := fmt.Sprintf("required attribute %q absent on %s", attr.Name(), describeRMType(parentRM))
@@ -242,33 +239,28 @@ func absentIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath string, 
 	return Issue{
 		Path:     attrPath,
 		Code:     "required",
-		Layer:    layer,
-		Rule:     rule,
+		Layer:    LayerTemplate,
+		Rule:     ruleExistence,
 		Detail:   detail,
 		Severity: Error,
 	}, true
 }
 
-// emptyIssue returns the issue for the multi-valued attribute attr of
-// parentRM, at attrPath, when it is present and holds no item: `required`,
-// with required set, when [requiredBy] says attr is required. When the
-// template's existence requires it, the issue is on the template layer, rule
-// existence; when only the RM's mandatory bit the template carries does, it
-// is on the RM layer, rule cardinality, which the walk reads only where the
-// value's class does not list the attribute ([engine.checkEmpty]).
+// emptyIssue returns the issue the template reports for the multi-valued
+// attribute attr of parentRM, at attrPath, when it is present and holds no
+// item and the template's existence requires it ([templateRequires]):
+// `required`, on the template layer, rule existence, with required set. The
+// RM's requirement is not read here: the walk reads it from the value's
+// class ([engine.checkEmpty]).
 func emptyIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath string) (iss Issue, required bool) {
-	layer, rule, required := requiredBy(attr)
-	if !required {
+	if !templateRequires(attr) {
 		return iss, false
-	}
-	if layer == LayerRM {
-		rule = ruleCardinality
 	}
 	return Issue{
 		Path:     attrPath,
 		Code:     "required",
-		Layer:    layer,
-		Rule:     rule,
+		Layer:    LayerTemplate,
+		Rule:     ruleExistence,
 		Detail:   fmt.Sprintf("required multi-valued attribute %q is empty on %s", attr.Name(), describeRMType(parentRM)),
 		Severity: Error,
 	}, true
@@ -470,22 +462,15 @@ func primitiveInput(rmValue any) any {
 	return rmValue
 }
 
-// requiredBy reports whether the compiled attribute must be present, and
-// which layer and rule require it. An OPT existence interval with lower
-// bound ≥ 1 is the template's own requirement: the template layer, rule
-// existence. Failing that, the BMM-mandatory bit (Required()) makes some
-// attributes mandatory even when the OPT existence element is silent (e.g.
-// COMPOSITION.category): the RM layer, rule mandatory. When both hold, the
-// template's own requirement is the one reported. required is false, with
-// no layer or rule, when neither holds.
-func requiredBy(attr *tcimpl.CompiledAttribute) (layer Layer, rule string, required bool) {
-	if e := attr.Existence(); e != nil && !e.LowerUnbounded() && e.Lower() >= 1 {
-		return LayerTemplate, ruleExistence, true
-	}
-	if attr.Required() {
-		return LayerRM, ruleMandatory, true
-	}
-	return LayerNone, "", false
+// templateRequires reports whether the template's own existence requires
+// the compiled attribute: an OPT existence interval with a lower bound of 1
+// or more. The mandatory bit the compile carries from the lookup it was
+// given ([tcimpl.CompiledAttribute.Required]) is not the template's
+// requirement and is not read: the RM rules read the pinned Reference
+// Model, from the value's class.
+func templateRequires(attr *tcimpl.CompiledAttribute) bool {
+	e := attr.Existence()
+	return e != nil && !e.LowerUnbounded() && e.Lower() >= 1
 }
 
 // isProhibited reports whether the OPT prohibits the compiled attribute:

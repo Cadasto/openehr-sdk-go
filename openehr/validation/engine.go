@@ -170,11 +170,6 @@ type engineAttr struct {
 	// does not let it be blank ([mayBeBlank]): the walk then applies the
 	// mandatory-presence rule to it.
 	mandatory bool
-	// classRead is set when the class metadata lists the attribute for the
-	// value's class, so the walk reads its RM presence, mandatory, from the
-	// class. An attribute the template declares that the value's class does
-	// not list has no such reading.
-	classRead bool
 	// decl is the bound template node's declaration of the attribute, nil
 	// where the template does not constrain it: the attribute is then
 	// visited with the RM rules alone.
@@ -422,17 +417,17 @@ func (e *engine) checkLeaf(n engineNode, scalar bool) *tcimpl.CompiledNode {
 // class whose rules are rules. At a node the template binds it visits first
 // the attributes the template declares, in the template's order. Then it
 // visits the other attributes the class metadata lists for class, in the
-// class's order, among them those the compile injected into the bound node
-// because the RM marks them mandatory ([tcimpl.CompiledAttribute.Implicit]):
-// no template clause constrains those, so they are visited with the RM
-// rules alone. Last come the injected attributes the value's class does not
-// list, every one of them on a value of no registered RM class: they are
-// read as the template declares them. It leaves out an attribute no
-// serialization carries ([rminfo.IsNonStorableAttr]), and one the metadata
-// gives no type that the template does not declare. A value of no
-// registered RM class ([rmaccess.Covers]) has no attributes the access
-// reads, so the attributes of the template node it binds to are each read
-// as absent.
+// class's order, with the RM rules alone: no template clause constrains
+// them. Among them are those the compile injected into the bound node
+// because the RM marks them mandatory for the node's class
+// ([tcimpl.CompiledAttribute.Implicit]); an injected attribute the value's
+// class does not list is not visited, so it draws no finding. It leaves out
+// an attribute no serialization carries ([rminfo.IsNonStorableAttr]), and
+// one the metadata gives no type that the template does not declare. A
+// value of no registered RM class ([rmaccess.Covers]) has no attributes the
+// access reads and no class the metadata lists attributes for: the
+// attributes the template declares on the node it binds to are each read
+// as absent, and only the template's existence reports one.
 //
 // What the class metadata says of each attribute is read from the table
 // built once per class when the package is initialised ([classAttributes]),
@@ -449,7 +444,7 @@ func (e *engine) visitAttributes(n engineNode, class string, rules *classRules) 
 				return // the visit limit ended the walk below this node
 			}
 			if decl.Implicit() {
-				continue // no template clause: visited below
+				continue // no template clause: visited below, if the class lists it
 			}
 			f, listed := table.lookup(decl.Name())
 			if a, visited := declaredAttr(n, decl, f, listed, rules); visited {
@@ -457,30 +452,17 @@ func (e *engine) visitAttributes(n engineNode, class string, rules *classRules) 
 			}
 		}
 	}
-	if table != nil {
-		for _, f := range table.listed {
-			if e.stopped {
-				return
-			}
-			if f.NonStorable || !f.Typed || templateDeclares(n.bound, f.Name) {
-				continue // not visited, or visited above in the template's order
-			}
-			e.visitAttribute(n, class, attrFromFacts(n, f, rules))
-		}
-	}
-	if n.bound == nil {
+	if table == nil {
 		return
 	}
-	for _, decl := range tcimpl.NodeAttributes(n.bound) {
+	for _, f := range table.listed {
 		if e.stopped {
 			return
 		}
-		if _, listed := table.lookup(decl.Name()); !decl.Implicit() || listed {
-			continue // visited above
+		if f.NonStorable || !f.Typed || templateDeclares(n.bound, f.Name) {
+			continue // not visited, or visited above in the template's order
 		}
-		if a, visited := declaredAttr(n, decl, tcimpl.AttributeFacts{}, false, rules); visited {
-			e.visitAttribute(n, class, a)
-		}
+		e.visitAttribute(n, class, attrFromFacts(n, f, rules))
 	}
 }
 
@@ -524,7 +506,7 @@ func declaredAttr(n engineNode, decl *tcimpl.CompiledAttribute, f tcimpl.Attribu
 // class, no rule of the class reports its absence itself and, for a
 // single-valued one, the node's role does not let it be blank.
 func attrFromFacts(n engineNode, f tcimpl.AttributeFacts, rules *classRules) engineAttr {
-	a := engineAttr{name: f.Name, rmType: f.RMType, shape: shapeFrom(f.Container, f.PrimitiveItems, f.Hash), classRead: true}
+	a := engineAttr{name: f.Name, rmType: f.RMType, shape: shapeFrom(f.Container, f.PrimitiveItems, f.Hash)}
 	a.mandatory = f.Mandatory && !rules.leavesOut(f.Name) && (a.shape != shapeSingle || !mayBeBlank(n.role, f.Name))
 	return a
 }
@@ -725,12 +707,12 @@ func (e *engine) refuse(iss Issue) {
 // `required` where the RM marks it mandatory for the value's class, as the
 // RM rules alone read it (a.mandatory), which leave out the part of a
 // reference, whose own rule reports it, and a value the node's role lets be
-// blank. Only where the value's class does not list the attribute, so the
-// walk has no RM reading of it, is the RM's mandatory bit the template
-// carries read instead ([requiredBy]).
+// blank. The RM's requirement is read from the value's class alone: an
+// attribute that class does not list draws no RM finding, whatever
+// mandatory bit the compiled template carries for it.
 func (e *engine) checkAbsent(n engineNode, a engineAttr, attrPath string) {
 	multiValued := a.shape != shapeSingle
-	if iss, required := absentIssue(a.decl, n.value, attrPath, multiValued); required && (iss.Layer == LayerTemplate || !a.classRead) {
+	if iss, required := absentIssue(a.decl, n.value, attrPath, multiValued); required {
 		e.found.emit(iss)
 		return
 	}
@@ -742,19 +724,17 @@ func (e *engine) checkAbsent(n engineNode, a engineAttr, attrPath string) {
 // checkEmpty reports the multi-valued attribute a of node n, at attrPath,
 // which is present and holds no item, once. Where the template's existence
 // requires it, it is the template's `required`. Where only the RM requires
-// it, it is the RM's `cardinality`, rule cardinality, unless the template
-// reports the same container itself (reported), and only for a list: a Hash
-// that is present and empty breaks no mandatory rule, as the RM rules alone
-// read it, however the template declares it. Whether the RM requires it is
-// read as [engine.checkAbsent] reads it: from the value's class, and from
-// the mandatory bit the template carries only where that class does not
-// list the attribute.
+// it, read from the value's class alone as [engine.checkAbsent] reads it, it
+// is the RM's `cardinality`, rule cardinality, unless the template reports
+// the same container itself (reported), and only for a list: a Hash that is
+// present and empty breaks no mandatory rule, as the RM rules alone read
+// it, however the template declares it.
 func (e *engine) checkEmpty(n engineNode, a engineAttr, attrPath string, reported bool) {
-	iss, required := emptyIssue(a.decl, n.value, attrPath)
-	switch {
-	case required && iss.Layer == LayerTemplate:
+	if iss, required := emptyIssue(a.decl, n.value, attrPath); required {
 		e.found.emit(iss)
-	case (a.mandatory || required && !a.classRead) && a.shape.multiValued() && !reported:
+		return
+	}
+	if a.mandatory && a.shape.multiValued() && !reported {
 		e.found.checkMandatory(n.rmType, a.name, attrPath, true, true, 0)
 	}
 }
