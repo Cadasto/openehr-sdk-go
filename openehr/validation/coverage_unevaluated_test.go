@@ -68,13 +68,29 @@ func TestCoverage_REQ171_UnevaluatedListsARootsInvariants(t *testing.T) {
 // REQ-123 parse of DV_DATE_TIME.Value_valid or DV_TIME.Value_valid refuses,
 // such as Iso8601_date_time.Hour_valid. The parts that parse accepts against
 // the BASE rule, a date-time without its day or month, a leap second, are
-// still listed.
+// still listed. DV_PROPORTION.Is_integral_validity, which the DV_PROPORTION
+// precision check decides as DV_PROPORTION.Precision_validity, is not listed
+// on any DV_PROPORTION root, whatever its precision; the proportion-kind rules
+// and Valid_denominator are.
 func TestCoverage_REQ171_UnevaluatedLeavesOutWhatAnotherCheckDecides(t *testing.T) {
 	t.Parallel()
 	ordered := []string{
 		"DV_ORDERED.Is_simple_validity",
 		"DV_ORDERED.Normal_range_and_status_consistency",
 		"DV_ORDERED.Other_reference_ranges_validity",
+		"DV_QUANTIFIED.Magnitude_status_valid",
+	}
+	proportion := []string{
+		"DV_AMOUNT.Accuracy_is_percent_validity",
+		"DV_AMOUNT.Accuracy_validity",
+		"DV_ORDERED.Is_simple_validity",
+		"DV_ORDERED.Normal_range_and_status_consistency",
+		"DV_ORDERED.Other_reference_ranges_validity",
+		"DV_PROPORTION.Fraction_validity",
+		"DV_PROPORTION.Percent_validity",
+		"DV_PROPORTION.Type_validity",
+		"DV_PROPORTION.Unitary_validity",
+		"DV_PROPORTION.Valid_denominator",
 		"DV_QUANTIFIED.Magnitude_status_valid",
 	}
 	for _, tc := range []struct {
@@ -95,6 +111,9 @@ func TestCoverage_REQ171_UnevaluatedLeavesOutWhatAnotherCheckDecides(t *testing.
 			"Iso8601_date_time.Partial_validity_year",
 			"Iso8601_date_time.Second_valid",
 		)},
+		{name: "DV_PROPORTION, precision 0 over whole operands", root: &rm.DVProportion{Numerator: 1, Denominator: 2, Precision: new(rm.Integer(0))}, want: proportion},
+		{name: "DV_PROPORTION, precision -1 over fractional operands", root: &rm.DVProportion{Numerator: 1.5, Denominator: 2.5, Precision: new(rm.Integer(-1))}, want: proportion},
+		{name: "DV_PROPORTION, no precision", root: &rm.DVProportion{Numerator: 1.5, Denominator: 2}, want: proportion},
 	} {
 		r := validation.ValidateRM(tc.root)
 		if !r.OK || !slices.Equal(r.Coverage.Unevaluated, tc.want) {

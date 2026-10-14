@@ -58,7 +58,7 @@ var invariantInventory = map[string]inventoryEntry{
 	"DV_PARSABLE.Size_valid":                               {kind: invariantOutOfScope},
 	"DV_PERIODIC_TIME_SPECIFICATION.Value_valid":           {kind: invariantOutOfScope},
 	"DV_PROPORTION.Fraction_validity":                      {kind: invariantOutOfScope},
-	"DV_PROPORTION.Is_integral_validity":                   {kind: invariantOutOfScope},
+	"DV_PROPORTION.Is_integral_validity":                   {kind: invariantEvaluated, function: "checkDVProportion"},
 	"DV_PROPORTION.Percent_validity":                       {kind: invariantOutOfScope},
 	"DV_PROPORTION.Precision_validity":                     {kind: invariantEvaluated, function: "checkDVProportion"},
 	"DV_PROPORTION.Type_validity":                          {kind: invariantOutOfScope},

@@ -111,10 +111,12 @@ func (r matrixRow) pairs() []matrixPair {
 // invariantMatrix holds the row of every invariant the inventory calls
 // evaluated, by its key. The first group holds the invariants the floor
 // dispatches an evaluator of their own for, and the second the coded ones,
-// which the coded pass evaluates. The last two hold those another evaluated
+// which the coded pass evaluates. The last three hold those another evaluated
 // check decides: the mandatory-presence rule, for an empty mandatory string
-// or list, and the class's Value_valid, at the value itself, for an ISO 8601
-// value the REQ-123 parse refuses.
+// or list; the class's Value_valid, at the value itself, for an ISO 8601
+// value the REQ-123 parse refuses; and DV_PROPORTION's Precision_validity, at
+// the value itself, for a numerator or denominator that is not whole under
+// the precision of 0 the RM reads is_integral as.
 var invariantMatrix = map[string]matrixRow{
 	"ARCHETYPED.Rm_version_valid":        {breaking: `"archetype_id":{"_type":"ARCHETYPE_ID","value":"openEHR-EHR-OBSERVATION.x.v1"}`, conforming: `"archetype_id":{"_type":"ARCHETYPE_ID","value":"openEHR-EHR-OBSERVATION.x.v1"},"rm_version":"1.1.0"`},
 	"CODE_PHRASE.Code_string_valid":      {breaking: `"terminology_id":{"_type":"TERMINOLOGY_ID","value":"local"},"code_string":""`, conforming: `"terminology_id":{"_type":"TERMINOLOGY_ID","value":"local"},"code_string":"at0001"`},
@@ -199,6 +201,8 @@ var invariantMatrix = map[string]matrixRow{
 	"Iso8601_time.Hour_valid":                   {breaking: `"value":"25:00:00"`, conforming: `"value":"23:00:00"`, rule: "DV_TIME.Value_valid", path: "/"},
 	"Iso8601_time.Minute_valid":                 {breaking: `"value":"10:60:00"`, conforming: `"value":"10:59:00"`, rule: "DV_TIME.Value_valid", path: "/"},
 	"Iso8601_time.Partial_validity":             {breaking: `"value":"10::30"`, conforming: `"value":"10"`, rule: "DV_TIME.Value_valid", path: "/"},
+
+	"DV_PROPORTION.Is_integral_validity": {breaking: `"numerator":1.5,"denominator":2,"type":0,"precision":0`, conforming: `"numerator":1,"denominator":2,"type":0,"precision":0`, rule: ruleProportionPrecision, path: "/"},
 }
 
 // validateMembers decodes, through the type registry, the canonical JSON

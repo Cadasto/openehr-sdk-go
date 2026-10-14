@@ -49,7 +49,7 @@
   "DV_PARSABLE.Size_valid": {"kind": "out_of_scope", "reason": "size is a function, the length of value, which cannot be negative, so the rule holds on every DV_PARSABLE."},
   "DV_PERIODIC_TIME_SPECIFICATION.Value_valid": {"kind": "out_of_scope", "reason": "Not yet evaluated: the floor does not report a DV_PERIODIC_TIME_SPECIFICATION whose value has a formalism other than HL7:PIVL or HL7:EIVL."},
   "DV_PROPORTION.Fraction_validity": {"kind": "out_of_scope", "reason": "Not yet evaluated: the floor does not apply the rules of DV_PROPORTION that turn on its proportion kind, a different axis from the precision it checks."},
-  "DV_PROPORTION.Is_integral_validity": {"kind": "out_of_scope", "reason": "The floor reads is_integral as a precision of 0, so it reports a fractional numerator or denominator under that reading as DV_PROPORTION.Precision_validity."},
+  "DV_PROPORTION.Is_integral_validity": {"kind": "evaluated", "function": "checkDVProportion"},
   "DV_PROPORTION.Percent_validity": {"kind": "out_of_scope", "reason": "Not yet evaluated: the floor does not apply the rules of DV_PROPORTION that turn on its proportion kind, a different axis from the precision it checks."},
   "DV_PROPORTION.Precision_validity": {"kind": "evaluated", "function": "checkDVProportion"},
   "DV_PROPORTION.Type_validity": {"kind": "out_of_scope", "reason": "Not yet evaluated: the floor does not apply the rules of DV_PROPORTION that turn on its proportion kind, a different axis from the precision it checks."},

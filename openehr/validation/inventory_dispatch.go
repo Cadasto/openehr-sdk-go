@@ -141,10 +141,13 @@ func coveredCheck(function string, _ any) invariantCheck {
 // fails to build. The names recorded beside the functions are checked against
 // the functions and against invariants.json by a test, which also fails when
 // an evaluated invariant is missing here or one listed here is not evaluated.
-// The last group binds the invariants another evaluated check decides: the
-// mandatory-presence rule, for a mandatory string or list the invariant says
-// is not empty, and the REQ-123 parse a temporal Value_valid applies, for
-// the parts of the ISO 8601 value it refuses.
+// The last three groups bind the invariants another evaluated check decides:
+// the mandatory-presence rule, for a mandatory string or list the invariant
+// says is not empty; the REQ-123 parse a temporal Value_valid applies, for
+// the parts of the ISO 8601 value it refuses; and the DV_PROPORTION
+// precision check, for Is_integral_validity, whose is_integral the RM reads
+// as a precision of 0, under which that check reports an operand that is not
+// whole as DV_PROPORTION.Precision_validity.
 var invariantChecks = map[string]invariantCheck{
 	"ARCHETYPED.Rm_version_valid":        nodeCheck("checkArchetyped", (*rmFloorWalker).checkArchetyped),
 	"CODE_PHRASE.Code_string_valid":      roleCheck("checkCodePhrase", (*rmFloorWalker).checkCodePhrase),
@@ -229,6 +232,8 @@ var invariantChecks = map[string]invariantCheck{
 	"Iso8601_time.Hour_valid":                   coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
 	"Iso8601_time.Minute_valid":                 coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
 	"Iso8601_time.Partial_validity":             coveredCheck("checkTemporalValue", (*rmFloorWalker).checkTemporalValue),
+
+	"DV_PROPORTION.Is_integral_validity": coveredCheck("checkDVProportion", (*rmFloorWalker).checkDVProportion),
 }
 
 // attributeCheck is an evaluator the floor runs on a node of class and of
