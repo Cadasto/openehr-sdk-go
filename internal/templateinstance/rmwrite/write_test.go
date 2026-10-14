@@ -36,20 +36,18 @@ func TestNewRMUnknown(t *testing.T) {
 // vital_signs OPT asks it to build.
 func TestEnsureSingleVitalSignsCoverage(t *testing.T) {
 	type singleCase struct {
-		name       string
-		parent     any
-		parentType string
-		attr       string
-		child      any
-		check      func(t *testing.T, parent any)
+		name   string
+		parent any
+		attr   string
+		child  any
+		check  func(t *testing.T, parent any)
 	}
 	cases := []singleCase{
 		{
-			name:       "Composition.context",
-			parent:     &rm.Composition{},
-			parentType: "COMPOSITION",
-			attr:       "context",
-			child:      &rm.EventContext{},
+			name:   "Composition.context",
+			parent: &rm.Composition{},
+			attr:   "context",
+			child:  &rm.EventContext{},
 			check: func(t *testing.T, parent any) {
 				if parent.(*rm.Composition).Context == nil {
 					t.Error("Context still nil after EnsureSingle")
@@ -57,11 +55,10 @@ func TestEnsureSingleVitalSignsCoverage(t *testing.T) {
 			},
 		},
 		{
-			name:       "Observation.data",
-			parent:     &rm.Observation{},
-			parentType: "OBSERVATION",
-			attr:       "data",
-			child:      &rm.History[rm.ItemStructure]{ArchetypeNodeID: "at0001"},
+			name:   "Observation.data",
+			parent: &rm.Observation{},
+			attr:   "data",
+			child:  &rm.History[rm.ItemStructure]{ArchetypeNodeID: "at0001"},
 			check: func(t *testing.T, parent any) {
 				if got := parent.(*rm.Observation).Data.ArchetypeNodeID; got != "at0001" {
 					t.Errorf("Data.ArchetypeNodeID = %q, want at0001", got)
@@ -69,11 +66,10 @@ func TestEnsureSingleVitalSignsCoverage(t *testing.T) {
 			},
 		},
 		{
-			name:       "Element.name (DV_TEXT)",
-			parent:     &rm.Element{},
-			parentType: "ELEMENT",
-			attr:       "name",
-			child:      &rm.DVText{Value: "foo"},
+			name:   "Element.name (DV_TEXT)",
+			parent: &rm.Element{},
+			attr:   "name",
+			child:  &rm.DVText{Value: "foo"},
 			check: func(t *testing.T, parent any) {
 				name, ok := parent.(*rm.Element).Name.(rm.DVText)
 				if !ok {
@@ -85,11 +81,10 @@ func TestEnsureSingleVitalSignsCoverage(t *testing.T) {
 			},
 		},
 		{
-			name:       "Element.value (DV_QUANTITY)",
-			parent:     &rm.Element{},
-			parentType: "ELEMENT",
-			attr:       "value",
-			child:      &rm.DVQuantity{Magnitude: 120, Units: "mm[Hg]"},
+			name:   "Element.value (DV_QUANTITY)",
+			parent: &rm.Element{},
+			attr:   "value",
+			child:  &rm.DVQuantity{Magnitude: 120, Units: "mm[Hg]"},
 			check: func(t *testing.T, parent any) {
 				e := parent.(*rm.Element)
 				dv, ok := e.Value.(*rm.DVQuantity)
@@ -104,7 +99,7 @@ func TestEnsureSingleVitalSignsCoverage(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if err := EnsureSingle(tc.parent, tc.parentType, tc.attr, tc.child); err != nil {
+			if err := EnsureSingle(tc.parent, tc.attr, tc.child); err != nil {
 				t.Fatalf("EnsureSingle: %v", err)
 			}
 			tc.check(t, tc.parent)
@@ -116,7 +111,7 @@ func TestAppendMultipleVitalSignsCoverage(t *testing.T) {
 	t.Run("Composition.content", func(t *testing.T) {
 		c := &rm.Composition{}
 		obs := &rm.Observation{ArchetypeNodeID: "openEHR-EHR-OBSERVATION.blood_pressure.v1"}
-		if err := AppendMultiple(c, "COMPOSITION", "content", obs); err != nil {
+		if err := AppendMultiple(c, "content", obs); err != nil {
 			t.Fatalf("AppendMultiple: %v", err)
 		}
 		if len(c.Content) != 1 {
@@ -126,7 +121,7 @@ func TestAppendMultipleVitalSignsCoverage(t *testing.T) {
 	t.Run("History.events", func(t *testing.T) {
 		h := &rm.History[rm.ItemStructure]{}
 		ev := &rm.PointEvent[rm.ItemStructure]{ArchetypeNodeID: "at0006"}
-		if err := AppendMultiple(h, "HISTORY", "events", ev); err != nil {
+		if err := AppendMultiple(h, "events", ev); err != nil {
 			t.Fatalf("AppendMultiple: %v", err)
 		}
 		if len(h.Events) != 1 {
@@ -136,7 +131,7 @@ func TestAppendMultipleVitalSignsCoverage(t *testing.T) {
 	t.Run("ItemList.items", func(t *testing.T) {
 		l := &rm.ItemList{}
 		el := &rm.Element{ArchetypeNodeID: "at0004"}
-		if err := AppendMultiple(l, "ITEM_LIST", "items", el); err != nil {
+		if err := AppendMultiple(l, "items", el); err != nil {
 			t.Fatalf("AppendMultiple: %v", err)
 		}
 		if len(l.Items) != 1 {
@@ -146,7 +141,7 @@ func TestAppendMultipleVitalSignsCoverage(t *testing.T) {
 	t.Run("Cluster.items", func(t *testing.T) {
 		cl := &rm.Cluster{}
 		el := &rm.Element{ArchetypeNodeID: "at0010"}
-		if err := AppendMultiple(cl, "CLUSTER", "items", el); err != nil {
+		if err := AppendMultiple(cl, "items", el); err != nil {
 			t.Fatalf("AppendMultiple: %v", err)
 		}
 		if len(cl.Items) != 1 {
@@ -161,7 +156,7 @@ func TestAppendMultipleVitalSignsCoverage(t *testing.T) {
 	t.Run("Section.items", func(t *testing.T) {
 		s := &rm.Section{}
 		obs := &rm.Observation{ArchetypeNodeID: "openEHR-EHR-OBSERVATION.encounter.v1"}
-		if err := AppendMultiple(s, "SECTION", "items", obs); err != nil {
+		if err := AppendMultiple(s, "items", obs); err != nil {
 			t.Fatalf("AppendMultiple: %v", err)
 		}
 		if len(s.Items) != 1 {
@@ -171,7 +166,7 @@ func TestAppendMultipleVitalSignsCoverage(t *testing.T) {
 	t.Run("Instruction.activities", func(t *testing.T) {
 		i := &rm.Instruction{}
 		act := &rm.Activity{ArchetypeNodeID: "at0001"}
-		if err := AppendMultiple(i, "INSTRUCTION", "activities", act); err != nil {
+		if err := AppendMultiple(i, "activities", act); err != nil {
 			t.Fatalf("AppendMultiple: %v", err)
 		}
 		if len(i.Activities) != 1 {
@@ -181,7 +176,7 @@ func TestAppendMultipleVitalSignsCoverage(t *testing.T) {
 	t.Run("ItemTable.rows", func(t *testing.T) {
 		tab := &rm.ItemTable{}
 		cl := &rm.Cluster{ArchetypeNodeID: "at0007"}
-		if err := AppendMultiple(tab, "ITEM_TABLE", "rows", cl); err != nil {
+		if err := AppendMultiple(tab, "rows", cl); err != nil {
 			t.Fatalf("AppendMultiple: %v", err)
 		}
 		if len(tab.Rows) != 1 {
@@ -209,7 +204,7 @@ func TestEnsureSingleDVTemporal(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			p := tc.ctor()
-			if err := EnsureSingle(p, tc.name, "value", tc.want); err != nil {
+			if err := EnsureSingle(p, "value", tc.want); err != nil {
 				t.Fatalf("EnsureSingle: %v", err)
 			}
 			if got := tc.get(p); got != tc.want {
@@ -223,7 +218,7 @@ func TestEnsureSingleDVTemporal(t *testing.T) {
 // the temporal set — bool primitive, not string.
 func TestEnsureSingleDVBoolean(t *testing.T) {
 	b := &rm.DVBoolean{}
-	if err := EnsureSingle(b, "DV_BOOLEAN", "value", true); err != nil {
+	if err := EnsureSingle(b, "value", true); err != nil {
 		t.Fatalf("EnsureSingle: %v", err)
 	}
 	if !b.Value {
@@ -232,7 +227,7 @@ func TestEnsureSingleDVBoolean(t *testing.T) {
 }
 
 func TestEnsureSingleUnknownParent(t *testing.T) {
-	err := EnsureSingle(struct{}{}, "FOO", "bar", "baz")
+	err := EnsureSingle(struct{}{}, "bar", "baz")
 	if !errors.Is(err, ErrUnknownAttribute) {
 		t.Fatalf("want ErrUnknownAttribute, got %v", err)
 	}
@@ -240,7 +235,7 @@ func TestEnsureSingleUnknownParent(t *testing.T) {
 
 func TestEnsureSingleTypeMismatch(t *testing.T) {
 	e := &rm.Element{}
-	err := EnsureSingle(e, "ELEMENT", "value", "not a DataValue")
+	err := EnsureSingle(e, "value", "not a DataValue")
 	if !errors.Is(err, ErrTypeMismatch) {
 		t.Fatalf("want ErrTypeMismatch, got %v", err)
 	}
@@ -248,7 +243,7 @@ func TestEnsureSingleTypeMismatch(t *testing.T) {
 
 func TestAppendMultipleUnknownAttr(t *testing.T) {
 	c := &rm.Composition{}
-	err := AppendMultiple(c, "COMPOSITION", "no_such_attr", &rm.Observation{})
+	err := AppendMultiple(c, "no_such_attr", &rm.Observation{})
 	if !errors.Is(err, ErrUnknownAttribute) {
 		t.Fatalf("want ErrUnknownAttribute, got %v", err)
 	}

@@ -134,7 +134,7 @@ func TestEnsureSingleNumericAndInterval(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if err := EnsureSingle(tc.parent, "", tc.attr, tc.child); err != nil {
+			if err := EnsureSingle(tc.parent, tc.attr, tc.child); err != nil {
 				t.Fatalf("EnsureSingle: %v", err)
 			}
 			tc.check(t, tc.parent)
@@ -158,7 +158,7 @@ func TestEnsureSingleNumericIntervalMismatch(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := EnsureSingle(tc.parent, "", tc.attr, tc.child)
+			err := EnsureSingle(tc.parent, tc.attr, tc.child)
 			if !errors.Is(err, ErrTypeMismatch) {
 				t.Fatalf("want ErrTypeMismatch, got %v", err)
 			}
@@ -337,7 +337,7 @@ func TestEnsureSingleIntervalBoundClosesItsSide(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			parent := tc.parent()
 			for _, w := range tc.writes {
-				err := EnsureSingle(parent, "", w.attr, w.child)
+				err := EnsureSingle(parent, w.attr, w.child)
 				if w.wantErr == nil && err != nil {
 					t.Fatalf("EnsureSingle(%T, %q, %#v) = %v, want nil", parent, w.attr, w.child, err)
 				}
@@ -461,7 +461,7 @@ func TestIntervalWriterParity(t *testing.T) {
 				{attr: "lower_included", child: true},
 				{attr: "upper_included", child: true},
 			} {
-				if err := EnsureSingle(parent, "DV_INTERVAL", w.attr, w.child); err != nil {
+				if err := EnsureSingle(parent, w.attr, w.child); err != nil {
 					t.Errorf("EnsureSingle(%T, %q, %T) = %v, want nil", parent, w.attr, w.child, err)
 				}
 			}

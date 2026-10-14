@@ -490,7 +490,7 @@ func (g *generator) materialiseSingle(
 	if replacesTerminology(parentRM, attr.Name(), rmChild) {
 		return nil
 	}
-	if err := rmwrite.EnsureSingle(parentRM, optNode.RMTypeName(), attr.Name(), rmChild); err != nil {
+	if err := rmwrite.EnsureSingle(parentRM, attr.Name(), rmChild); err != nil {
 		return fmt.Errorf("attach %s.%s: %w", optNode.RMTypeName(), attr.Name(), err)
 	}
 	return nil
@@ -542,7 +542,7 @@ func (g *generator) materialiseImplicitSingle(
 	if rmType == "String" {
 		// BMM String. Write only when the field is still empty, so a
 		// clock or code already stored on the parent is left alone.
-		g.writeBMMString(parentRM, optNode.RMTypeName(), attr.Name())
+		g.writeBMMString(parentRM, attr.Name())
 		return nil
 	}
 	rmChild, err := newRMForOPTType(rmType)
@@ -581,7 +581,7 @@ func (g *generator) materialiseImplicitSingle(
 	// Best-effort attach; if the slot rejects the default (e.g. type
 	// mismatch on a polymorphic attr), let downstream defaults
 	// (applyCompositionDefaults) own the field.
-	_ = rmwrite.EnsureSingle(parentRM, optNode.RMTypeName(), attr.Name(), rmChild)
+	_ = rmwrite.EnsureSingle(parentRM, attr.Name(), rmChild)
 	return nil
 }
 
@@ -626,7 +626,7 @@ func (g *generator) fillBMMAttr(parent any, parentRMType, attrName string, depth
 	}
 	isContainer, _ := rminfo.Default.IsContainer(parentRMType, attrName)
 	if rmType == "String" {
-		g.writeBMMString(parent, parentRMType, attrName)
+		g.writeBMMString(parent, attrName)
 		return
 	}
 	concrete := concreteFor(rmType)
@@ -648,9 +648,9 @@ func (g *generator) fillBMMAttr(parent any, parentRMType, attrName string, depth
 	// materialiseImplicitSingle.
 	switch {
 	case isContainer:
-		_ = rmwrite.AppendMultiple(parent, parentRMType, attrName, rmChild)
+		_ = rmwrite.AppendMultiple(parent, attrName, rmChild)
 	case !replacesTerminology(parent, attrName, rmChild):
-		_ = rmwrite.EnsureSingle(parent, parentRMType, attrName, rmChild)
+		_ = rmwrite.EnsureSingle(parent, attrName, rmChild)
 	}
 }
 
@@ -807,7 +807,7 @@ func (g *generator) temporalSentinel(v any) string {
 // writer has no field for (a text's formatting, a code phrase's
 // preferred_term, a quantity's magnitude_status, a party's name), and
 // through the writer otherwise.
-func (g *generator) writeBMMString(parent any, parentType, attr string) {
+func (g *generator) writeBMMString(parent any, attr string) {
 	get, set, covered := stringField(parent, attr)
 	if covered && get() != "" {
 		return
@@ -824,7 +824,7 @@ func (g *generator) writeBMMString(parent any, parentType, attr string) {
 	// attribute rmwrite does not address (a locatable's
 	// archetype_node_id), which another default fills or the validator
 	// reports. Returning the error would fail Generate on every OPT.
-	_ = rmwrite.EnsureSingle(parent, parentType, attr, val)
+	_ = rmwrite.EnsureSingle(parent, attr, val)
 }
 
 // bmmStringDefault is the value writeBMMString gives an empty String
@@ -1002,7 +1002,7 @@ func (g *generator) fillEntryCode(opt *tcimpl.CompiledNode, parent any, parentTy
 	}
 	// Best-effort: every ENTRY parent type is addressed by rmwrite, and an
 	// entry the walk builds is checked by the validator afterwards.
-	_ = rmwrite.EnsureSingle(parent, parentType, attr, phrase)
+	_ = rmwrite.EnsureSingle(parent, attr, phrase)
 	return true
 }
 
@@ -1183,7 +1183,7 @@ func (g *generator) materialiseMultiple(
 			if err := g.walkNode(child, rmChild); err != nil {
 				return err
 			}
-			if err := rmwrite.AppendMultiple(parentRM, optNode.RMTypeName(), attr.Name(), rmChild); err != nil {
+			if err := rmwrite.AppendMultiple(parentRM, attr.Name(), rmChild); err != nil {
 				return fmt.Errorf("append %s.%s: %w", optNode.RMTypeName(), attr.Name(), err)
 			}
 			total++
@@ -1218,7 +1218,7 @@ func (g *generator) materialiseMultiple(
 			if err := g.walkNode(seed, rmChild); err != nil {
 				return err
 			}
-			if err := rmwrite.AppendMultiple(parentRM, optNode.RMTypeName(), attr.Name(), rmChild); err != nil {
+			if err := rmwrite.AppendMultiple(parentRM, attr.Name(), rmChild); err != nil {
 				// Silent skip — the BMM-fallback child may not satisfy
 				// the OPT-pinned attribute slot (e.g. an ELEMENT
 				// fallback into ITEM_TREE.items where the attribute
@@ -1311,7 +1311,7 @@ func (g *generator) materialiseImplicitMultiple(
 			g.fillPartyRelationship(nil, rel)
 		}
 		g.populateBMMRequiredAttrs(rmChild, concreteFor(rmType), 0)
-		_ = rmwrite.AppendMultiple(parentRM, optNode.RMTypeName(), attr.Name(), rmChild)
+		_ = rmwrite.AppendMultiple(parentRM, attr.Name(), rmChild)
 	}
 	return nil
 }
@@ -2170,7 +2170,7 @@ func (g *generator) fillElementValue(e *rm.Element) bool {
 	}
 	g.populatePrimitiveDefault(value)
 	g.populateBMMRequiredAttrs(value, concreteFor(rmType), 0)
-	return rmwrite.EnsureSingle(e, "ELEMENT", "value", value) == nil
+	return rmwrite.EnsureSingle(e, "value", value) == nil
 }
 
 // useGroupRubric sets the text of a coded text to the pinned rubric of its

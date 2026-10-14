@@ -24,7 +24,7 @@ func TestREQ107_EnsureSingleRefusedParents(t *testing.T) {
 				TerminologyID: rm.TerminologyID{Value: "openehr"},
 			},
 		}
-		if err := EnsureSingle(parent, "ISM_TRANSITION", "current_state", child); err != nil {
+		if err := EnsureSingle(parent, "current_state", child); err != nil {
 			t.Fatalf("EnsureSingle(current_state) = %v", err)
 		}
 		if parent.CurrentState.Value != "planned" || parent.CurrentState.DefiningCode.CodeString != "524" {
@@ -36,7 +36,7 @@ func TestREQ107_EnsureSingleRefusedParents(t *testing.T) {
 		t.Parallel()
 		parent := &rm.Person{}
 		child := &rm.ItemTree{ArchetypeNodeID: "at0001"}
-		if err := EnsureSingle(parent, "PERSON", "details", child); err != nil {
+		if err := EnsureSingle(parent, "details", child); err != nil {
 			t.Fatalf("EnsureSingle(details) = %v", err)
 		}
 		tree, ok := parent.Details.(*rm.ItemTree)
@@ -49,7 +49,7 @@ func TestREQ107_EnsureSingleRefusedParents(t *testing.T) {
 		t.Parallel()
 		parent := &rm.Action{}
 		when := rm.DVDateTime{Value: "2020-01-02T03:04:05Z"}
-		if err := EnsureSingle(parent, "ACTION", "time", &when); err != nil {
+		if err := EnsureSingle(parent, "time", &when); err != nil {
 			t.Fatalf("EnsureSingle(time) = %v", err)
 		}
 		if parent.Time.Value != when.Value {
@@ -61,7 +61,7 @@ func TestREQ107_EnsureSingleRefusedParents(t *testing.T) {
 		t.Parallel()
 		parent := &rm.Person{}
 		child := &rm.PartyRelationship{ArchetypeNodeID: "at0001"}
-		if err := AppendMultiple(parent, "PERSON", "relationships", child); err != nil {
+		if err := AppendMultiple(parent, "relationships", child); err != nil {
 			t.Fatalf("AppendMultiple(relationships) = %v", err)
 		}
 		if len(parent.Relationships) != 1 || parent.Relationships[0].ArchetypeNodeID != "at0001" {
@@ -79,7 +79,7 @@ func TestREQ107_EnsureSingleRefusedParents(t *testing.T) {
 				TerminologyID: rm.TerminologyID{Value: "local"},
 			},
 		}
-		if err := EnsureSingle(parent, "ADDRESS", "name", child); err != nil {
+		if err := EnsureSingle(parent, "name", child); err != nil {
 			t.Fatalf("EnsureSingle(name) = %v", err)
 		}
 		if parent.Name == nil || parent.Name.GetValue() != "home" {
@@ -98,7 +98,7 @@ func TestREQ107_EnsureSingleRefusedParentsUnknownAttribute(t *testing.T) {
 	t.Parallel()
 	parents := []any{&rm.IsmTransition{}, &rm.Person{}, &rm.Address{}}
 	for _, parent := range parents {
-		if err := EnsureSingle(parent, "", "not_an_attribute", &rm.DVText{Value: "x"}); !errors.Is(err, ErrUnknownAttribute) {
+		if err := EnsureSingle(parent, "not_an_attribute", &rm.DVText{Value: "x"}); !errors.Is(err, ErrUnknownAttribute) {
 			t.Errorf("EnsureSingle(%T, not_an_attribute) = %v, want ErrUnknownAttribute", parent, err)
 		}
 	}

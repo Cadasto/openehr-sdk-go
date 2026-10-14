@@ -20,14 +20,13 @@ func NewRM(rmTypeName string) (any, error) {
 }
 
 // EnsureSingle sets the single-valued attribute named `attrName` on
-// `parent` to `child`. The `parentType` string is retained for
-// forward compatibility with a future string-keyed dispatch; today
-// dispatch is purely on the Go concrete type of `parent`.
+// `parent` to `child`. Dispatch is on the Go concrete type of
+// `parent`.
 //
 // Returns ErrUnknownAttribute for unaddressable (parent, attrName)
 // pairs and ErrTypeMismatch when child's Go type does not satisfy
 // the slot.
-func EnsureSingle(parent any, _ /* parentType */, attrName string, child any) error {
+func EnsureSingle(parent any, attrName string, child any) error {
 	switch p := parent.(type) {
 	case *rm.Composition:
 		return writeCompositionSingle(p, attrName, child)
@@ -142,7 +141,7 @@ func EnsureSingle(parent any, _ /* parentType */, attrName string, child any) er
 // AppendMultiple appends `child` to the multi-valued slice
 // attribute on `parent`. Same dispatch / error contract as
 // EnsureSingle.
-func AppendMultiple(parent any, _ /* parentType */, attrName string, child any) error {
+func AppendMultiple(parent any, attrName string, child any) error {
 	switch p := parent.(type) {
 	case *rm.Composition:
 		return writeCompositionMultiple(p, attrName, child)

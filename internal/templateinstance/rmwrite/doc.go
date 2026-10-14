@@ -6,16 +6,12 @@
 //
 // The API is intentionally small:
 //
-//	EnsureSingle(parent any, parentType, attrName string, child any) error
-//	AppendMultiple(parent any, parentType, attrName string, child any) error
+//	EnsureSingle(parent any, attrName string, child any) error
+//	AppendMultiple(parent any, attrName string, child any) error
 //	NewRM(rmTypeName string) (any, error)
 //
 // All three are pure structural setters. Dispatch is a closed type
 // switch on the Go concrete type of `parent`, with no reflection.
-// `parentType` is the OPT-declared RM class name
-// (e.g. "OBSERVATION", "ITEM_LIST"); it is currently ignored for
-// routing, but the parameter is kept so a future string-keyed dispatch
-// can land without an API break.
 //
 // # Scope
 //
@@ -29,18 +25,44 @@
 //
 // # Coverage
 //
-// Rows cover the (RMType, attr) pairs the validators' hand-written
-// readers covered before generated access replaced them, plus the
-// inverse for write access. The closed taxonomy is asserted by
-// table-driven tests in this package.
+// EnsureSingle writes single-valued attributes on these parents:
+//
+//   - COMPOSITION, EVENT_CONTEXT, SECTION and GENERIC_ENTRY;
+//   - the entries OBSERVATION, EVALUATION, INSTRUCTION, ACTION and
+//     ADMIN_ENTRY, and the ACTIVITY and ISM_TRANSITION they hold;
+//   - HISTORY, POINT_EVENT and INTERVAL_EVENT;
+//   - the item structures ITEM_TREE, ITEM_LIST, ITEM_SINGLE and
+//     ITEM_TABLE, and CLUSTER and ELEMENT;
+//   - the data values DV_TEXT, DV_CODED_TEXT, DV_URI, DV_EHR_URI,
+//     DV_PARSABLE, DV_IDENTIFIER, DV_DATE, DV_TIME, DV_DATE_TIME,
+//     DV_DURATION, DV_BOOLEAN, DV_COUNT, DV_QUANTITY and DV_MULTIMEDIA,
+//     and CODE_PHRASE;
+//   - DV_INTERVAL over each concrete ordered data value and over
+//     DV_ORDERED itself;
+//   - the parties PERSON, AGENT, GROUP, ORGANISATION and ROLE, and
+//     CAPABILITY, ADDRESS and PARTY_IDENTITY.
+//
+// AppendMultiple adds a member to multi-valued attributes on
+// COMPOSITION, SECTION, INSTRUCTION, HISTORY, ITEM_TREE, ITEM_LIST,
+// ITEM_TABLE, CLUSTER, the five parties and CONTACT.
+//
+// Each parent's writer lists the attributes it fills. Any other parent
+// or attribute returns ErrUnknownAttribute, and a child of the wrong Go
+// type returns ErrTypeMismatch. Table-driven tests in this package
+// write through most of these parents, and check the DV_INTERVAL cases
+// against the type registry, so an ordered data value the registry
+// gains fails them until it has a case.
 //
 // # Dependencies
 //
 // This package imports only the standard library, openehr/rm, and
 // openehr/rm/typereg. It does not import openehr/template,
 // internal/templatecompile, openehr/validation, or any wire / auth /
-// transport layer; rmwrite is infrastructure shared with validation
-// and does not depend on it. Adding a new RM type means adding
-// one switch case in each of the three exports; the read side is
-// generated.
+// transport layer. openehr/instance and openehr/composition import it,
+// and so do the tests of testkit/probes/instance, which sort generator
+// failures by its errors. Adding a new RM type means adding a case,
+// and a writer for its attributes, to EnsureSingle, and to
+// AppendMultiple when the type has a multi-valued attribute to fill.
+// NewRM needs no change: it finds the type in the typereg registry,
+// which the generated RM code fills. The read side is generated.
 package rmwrite

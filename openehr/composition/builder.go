@@ -181,9 +181,10 @@ func (b *Builder) Build() (*rm.Composition, error) {
 
 // applyAssignment navigates the skeleton along the compiled path's
 // parent chain, then routes the assignment through rmwrite.EnsureSingle
-// (single-attr leaves) or AppendMultiple (when the path resolves to
-// a multi-attr container element — v1 leaves that path to a future
-// follow-up since the common authoring case is leaf assignment).
+// when the path's last attribute is single-valued. A path that resolves
+// to a member of a multi-valued attribute returns ErrInvalidPath: v1
+// leaves container assignment to a future follow-up, since the common
+// authoring case is leaf assignment.
 func (b *Builder) applyAssignment(p pendingAssignment) error {
 	parent := p.node.Parent()
 	if parent == nil {
@@ -215,7 +216,7 @@ func (b *Builder) applyAssignment(p pendingAssignment) error {
 	// path is the routine case.
 	switch leaf.cardinality {
 	case template.Single:
-		if err := rmwrite.EnsureSingle(rmParent, parentRMType(rmParent), leaf.attrName, p.rawValue); err != nil {
+		if err := rmwrite.EnsureSingle(rmParent, leaf.attrName, p.rawValue); err != nil {
 			return fmt.Errorf("%w: %w", ErrInvalidPath, err)
 		}
 	case template.Multiple:
@@ -357,60 +358,6 @@ func descendOne(cur any, s pathSegment) (any, error) {
 			ErrInvalidPath, s.attrName, s.matchID, siblingIDs(items))
 	}
 	return nil, fmt.Errorf("%w: unsupported cardinality %v on attribute %q", ErrInvalidPath, s.cardinality, s.attrName)
-}
-
-// parentRMType returns the RM class name for the supplied parent
-// value. rmwrite carries the parentType arg for future string-keyed
-// dispatch; v1 uses Go concrete type only, so the value here is a
-// diagnostic-only hint.
-func parentRMType(v any) string {
-	switch v.(type) {
-	case *rm.Composition, rm.Composition:
-		return "COMPOSITION"
-	case *rm.Observation, rm.Observation:
-		return "OBSERVATION"
-	case *rm.Evaluation, rm.Evaluation:
-		return "EVALUATION"
-	case *rm.Instruction, rm.Instruction:
-		return "INSTRUCTION"
-	case *rm.Action, rm.Action:
-		return "ACTION"
-	case *rm.AdminEntry, rm.AdminEntry:
-		return "ADMIN_ENTRY"
-	case *rm.GenericEntry, rm.GenericEntry:
-		return "GENERIC_ENTRY"
-	case *rm.Section, rm.Section:
-		return "SECTION"
-	case *rm.Activity, rm.Activity:
-		return "ACTIVITY"
-	case *rm.EventContext, rm.EventContext:
-		return "EVENT_CONTEXT"
-	case *rm.History[rm.ItemStructure], rm.History[rm.ItemStructure]:
-		return "HISTORY"
-	case *rm.PointEvent[rm.ItemStructure], rm.PointEvent[rm.ItemStructure]:
-		return "POINT_EVENT"
-	case *rm.IntervalEvent[rm.ItemStructure], rm.IntervalEvent[rm.ItemStructure]:
-		return "INTERVAL_EVENT"
-	case *rm.ItemTree, rm.ItemTree:
-		return "ITEM_TREE"
-	case *rm.ItemList, rm.ItemList:
-		return "ITEM_LIST"
-	case *rm.ItemSingle, rm.ItemSingle:
-		return "ITEM_SINGLE"
-	case *rm.ItemTable, rm.ItemTable:
-		return "ITEM_TABLE"
-	case *rm.Cluster, rm.Cluster:
-		return "CLUSTER"
-	case *rm.Element, rm.Element:
-		return "ELEMENT"
-	case *rm.DVText, rm.DVText:
-		return "DV_TEXT"
-	case *rm.DVCodedText, rm.DVCodedText:
-		return "DV_CODED_TEXT"
-	case *rm.CodePhrase, rm.CodePhrase:
-		return "CODE_PHRASE"
-	}
-	return ""
 }
 
 // archetypeNodeID returns the LOCATABLE.archetype_node_id of the

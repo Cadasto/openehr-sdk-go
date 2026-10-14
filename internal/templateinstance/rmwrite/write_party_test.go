@@ -86,7 +86,7 @@ func TestREQ107_PartyParentsAddressTheirAttributes(t *testing.T) {
 				if w.multi {
 					write, call = AppendMultiple, "AppendMultiple"
 				}
-				if err := write(parent, tc.class, w.attr, w.child); err != nil {
+				if err := write(parent, w.attr, w.child); err != nil {
 					t.Errorf("%s(%s, %q) = %v, want nil", call, tc.class, w.attr, err)
 					continue
 				}
@@ -98,13 +98,13 @@ func TestREQ107_PartyParentsAddressTheirAttributes(t *testing.T) {
 					t.Errorf("%s(%s, %q): %s is empty, want the child", call, tc.class, w.attr, w.field)
 				}
 			}
-			for _, write := range []func(any, string, string, any) error{EnsureSingle, AppendMultiple} {
-				if err := write(tc.parent(), tc.class, "not_an_attribute", &rm.DVText{Value: "x"}); !errors.Is(err, ErrUnknownAttribute) {
+			for _, write := range []func(any, string, any) error{EnsureSingle, AppendMultiple} {
+				if err := write(tc.parent(), "not_an_attribute", &rm.DVText{Value: "x"}); !errors.Is(err, ErrUnknownAttribute) {
 					t.Errorf("write(%s, not_an_attribute) = %v, want ErrUnknownAttribute", tc.class, err)
 				}
 			}
 			for _, w := range tc.refused {
-				if err := AppendMultiple(tc.parent(), tc.class, w.attr, w.child); !errors.Is(err, ErrUnknownAttribute) {
+				if err := AppendMultiple(tc.parent(), w.attr, w.child); !errors.Is(err, ErrUnknownAttribute) {
 					t.Errorf("AppendMultiple(%s, %q) = %v, want ErrUnknownAttribute", tc.class, w.attr, err)
 				}
 			}
