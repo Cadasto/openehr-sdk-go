@@ -142,10 +142,18 @@ func runStoredAtVersion(ctx context.Context, c *transport.Client, op, qualifiedN
 	return doResultSet(ctx, c, req)
 }
 
-// reservedQueryKeys are the top-level GET query keys the SDK controls; a
-// named AQL parameter colliding with one would silently corrupt the
-// request under the spec's style=form, explode=true flattening.
-var reservedQueryKeys = map[string]bool{"q": true, "offset": true, "fetch": true, "ehr_id": true}
+// adhocReservedKeys and storedReservedKeys are the top-level query keys each
+// kind of GET sends itself: the parameters its operations in the vendored
+// query OpenAPI declare besides query_parameters, which are also the keys
+// adhocQueryValues, storedQueryValues and applyEHRScope set. A named AQL
+// parameter colliding with one would silently corrupt the request under the
+// spec's style=form, explode=true flattening, so it is refused. Only the
+// ad-hoc GET carries the AQL text in q, so a stored query may name a
+// parameter q.
+var (
+	adhocReservedKeys  = map[string]bool{"q": true, "offset": true, "fetch": true, "ehr_id": true}
+	storedReservedKeys = map[string]bool{"offset": true, "fetch": true, "ehr_id": true}
+)
 
 // adhocQueryValues builds the GET query string for an ad-hoc query: q plus
 // the optional offset/fetch and the form/explode query_parameters.
@@ -164,7 +172,7 @@ func adhocQueryValues(q aql.Query, cfg executeConfig) (url.Values, error) {
 	case q.Fetch != 0:
 		v.Set("fetch", strconv.Itoa(q.Fetch))
 	}
-	if err := addQueryParamValues(v, q.Parameters); err != nil {
+	if err := addQueryParamValues(v, q.Parameters, adhocReservedKeys); err != nil {
 		return nil, err
 	}
 	return v, nil
@@ -184,7 +192,7 @@ func storedQueryValues(params map[string]any, cfg executeConfig) (url.Values, er
 	if cfg.fetchSet {
 		v.Set("fetch", strconv.Itoa(cfg.fetch))
 	}
-	if err := addQueryParamValues(v, params); err != nil {
+	if err := addQueryParamValues(v, params, storedReservedKeys); err != nil {
 		return nil, err
 	}
 	return v, nil
@@ -195,11 +203,11 @@ func storedQueryValues(params map[string]any, cfg executeConfig) (url.Values, er
 // Values are encoded consistently with the POST body's JSON rendering — a
 // float reaches the wire as 1234567, not fmt.Sprint's "1.234567e+06" — so
 // the same params produce the same value over GET and POST. A parameter
-// whose name collides with a reserved key, or whose value cannot be
-// JSON-encoded, is a caller error (ErrInvalidConfig).
-func addQueryParamValues(v url.Values, params map[string]any) error {
+// whose name is one of the request's reserved keys, or whose value cannot
+// be JSON-encoded, is a caller error (ErrInvalidConfig).
+func addQueryParamValues(v url.Values, params map[string]any, reserved map[string]bool) error {
 	for k, val := range params {
-		if reservedQueryKeys[k] {
+		if reserved[k] {
 			return fmt.Errorf("%w: query parameter %q collides with reserved GET query key", ErrInvalidConfig, k)
 		}
 		s, err := queryParamString(val)
