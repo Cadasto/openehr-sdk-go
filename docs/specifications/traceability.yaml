@@ -1492,6 +1492,7 @@ requirements:
       - openehr/instance/code_phrase_terminology_test.go
       - openehr/instance/phase4_test.go
       - openehr/rm/interval_bound_test.go
+      - openehr/rm/rminfo/nonstorable_test.go
       - openehr/rm/temporal_iso_test.go
       - openehr/serialize/canjson/interval_open_side_test.go
       - openehr/serialize/canjson/mappings_presence_test.go
@@ -1521,6 +1522,7 @@ requirements:
       - openehr/validation/rmfloor_invariant_matrix_internal_test.go
       - openehr/validation/rmfloor_ism_transition_test.go
       - openehr/validation/rmfloor_limit_internal_test.go
+      - openehr/validation/rmfloor_nonstorable_test.go
       - openehr/validation/rmfloor_ordered_test.go
       - openehr/validation/rmfloor_party_proxy_test.go
       - openehr/validation/rmfloor_party_ref_test.go
