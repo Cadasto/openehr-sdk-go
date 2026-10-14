@@ -34,10 +34,9 @@
 //
 // The exported NewBuilder / NewSkeleton signatures take the public
 // compiled template openehr/templatecompile.Compiled; this
-// package also imports openehr/rm, openehr/rm/typereg, openehr/template,
-// openehr/template/constraints, openehr/instance, internal/rmaccess,
-// internal/templatecompile (engine node types), and
-// internal/templateinstance/rmwrite. It does not import
-// openehr/serialize, openehr/client, transport, auth, or
+// package also imports openehr/rm, openehr/template, openehr/instance,
+// openehr/internal/rmnames, internal/rmaccess, internal/templatecompile
+// (engine node types), and internal/templateinstance/rmwrite. It does
+// not import openehr/serialize, openehr/client, transport, auth, or
 // openehr/validation (callers run validation separately).
 package composition

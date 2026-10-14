@@ -1,6 +1,7 @@
 package constraints_test
 
 import (
+	"math"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
@@ -30,6 +31,155 @@ func TestNumericRange_Contains(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.r.Contains(tt.v); got != tt.want {
 				t.Errorf("Contains(%v) = %v, want %v (range %s)", tt.v, got, tt.want, tt.r)
+			}
+		})
+	}
+}
+
+// REQ-103 — a bounded NumericRange contains no NaN. Every comparison
+// with a NaN is false, so a range that only refuses values below its
+// lower or above its upper bound would let one through; a bounded
+// C_REAL or DV_QUANTITY magnitude range must report it as
+// CodeOutOfRange. A range that constrains nothing accepts a NaN
+// (TestREQ103_NumericRangeWithNoBoundsAcceptsNaN).
+func TestREQ103_NumericRangeRefusesNaN(t *testing.T) {
+	nan := math.NaN()
+	ranges := []struct {
+		name string
+		r    constraints.NumericRange
+	}{
+		{"closed", constraints.NumericRange{Lower: 0, Upper: 10, LowerInclusive: true, UpperInclusive: true}},
+		{"half-open", constraints.NumericRange{Lower: 0, Upper: 10, LowerInclusive: true}},
+		{"exclusive", constraints.NumericRange{Lower: 0, Upper: 10}},
+		{"lower-bounded-only", constraints.NumericRange{Lower: 0, LowerInclusive: true, UpperUnbounded: true}},
+		{"upper-bounded-only", constraints.NumericRange{Upper: 10, UpperInclusive: true, LowerUnbounded: true}},
+	}
+	for _, tc := range ranges {
+		t.Run("Contains/"+tc.name, func(t *testing.T) {
+			if tc.r.Contains(nan) {
+				t.Errorf("Contains(NaN) = true, want false (range %s)", tc.r)
+			}
+		})
+	}
+
+	closed := constraints.NumericRange{Lower: 0, Upper: 300, LowerInclusive: true, UpperInclusive: true}
+	validators := []struct {
+		name  string
+		c     constraints.PrimitiveConstraint
+		value any
+	}{
+		{"CReal", constraints.CReal{Range: closed}, nan},
+		{
+			"DvQuantity",
+			constraints.DvQuantity{Units: []constraints.QuantityUnit{{Units: "mm[Hg]", Magnitude: closed}}},
+			constraints.QuantityValue{Magnitude: nan, Units: "mm[Hg]", Precision: -1},
+		},
+	}
+	for _, tc := range validators {
+		t.Run("Validate/"+tc.name, func(t *testing.T) {
+			v := tc.c.Validate(tc.value)
+			if len(v) != 1 || v[0].Code != constraints.CodeOutOfRange {
+				t.Errorf("%s.Validate(NaN) against %s = %v, want one CodeOutOfRange", tc.name, closed, v)
+			}
+		})
+	}
+}
+
+// REQ-103 — the zero NumericRange means "no constraint": IsBounded
+// reports false for it, and Contains accepts every value, a NaN
+// included, as on a range with both sides unbounded. Read field by field, its zero
+// bounds would form the empty interval (0..0) and refuse every value.
+func TestREQ103_NumericRangeZeroValueAcceptsAnyValue(t *testing.T) {
+	zero := constraints.NumericRange{}
+	if zero.IsBounded() {
+		t.Error("NumericRange{}.IsBounded() = true, want false")
+	}
+	for _, v := range []float64{math.Inf(-1), -1e6, -1, 0, 1, 1e6, math.Inf(1)} {
+		if !zero.Contains(v) {
+			t.Errorf("NumericRange{}.Contains(%v) = false, want true", v)
+		}
+	}
+	if !zero.Contains(math.NaN()) {
+		t.Error("NumericRange{}.Contains(NaN) = false, want true")
+	}
+}
+
+// REQ-103 — a range that constrains nothing (the zero value, or both
+// sides unbounded) accepts a NaN, and so do the validators, which skip
+// such a range: Contains and Validate agree. Only a bounded range
+// refuses a NaN (TestREQ103_NumericRangeRefusesNaN).
+func TestREQ103_NumericRangeWithNoBoundsAcceptsNaN(t *testing.T) {
+	nan := math.NaN()
+	for _, tc := range []struct {
+		name string
+		r    constraints.NumericRange
+	}{
+		{"zero-value", constraints.NumericRange{}},
+		{"fully-unbounded", constraints.NumericRange{LowerUnbounded: true, UpperUnbounded: true}},
+		{"fully-unbounded-inclusive", constraints.NumericRange{LowerUnbounded: true, UpperUnbounded: true, LowerInclusive: true, UpperInclusive: true}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if !tc.r.Contains(nan) {
+				t.Errorf("Contains(NaN) = false, want true (range %s constrains nothing)", tc.r)
+			}
+			if v := (constraints.CReal{Range: tc.r}).Validate(nan); len(v) != 0 {
+				t.Errorf("CReal{Range: %s}.Validate(NaN) = %v, want no violation", tc.r, v)
+			}
+			q := constraints.DvQuantity{Units: []constraints.QuantityUnit{{Units: "mm[Hg]", Magnitude: tc.r}}}
+			if v := q.Validate(constraints.QuantityValue{Magnitude: nan, Units: "mm[Hg]", Precision: -1}); len(v) != 0 {
+				t.Errorf("DvQuantity magnitude %s Validate(NaN) = %v, want no violation", tc.r, v)
+			}
+		})
+	}
+}
+
+// REQ-103 — IsValid and String read the zero NumericRange as if both
+// sides were unbounded, as IsBounded and Contains do: it is valid, and
+// it prints as (*..*). Read field by field, its zero bounds would form
+// the empty interval (0..0). A range with both sides explicitly
+// unbounded keeps the brackets its inclusivity flags give it. One flag
+// away from the zero value, the zero bounds are real bounds again.
+func TestREQ103_NumericRangeZeroValueReadsAsUnbounded(t *testing.T) {
+	tests := []struct {
+		name      string
+		r         constraints.NumericRange
+		wantValid bool
+		wantText  string
+	}{
+		{name: "zero-value", r: constraints.NumericRange{}, wantValid: true, wantText: "(*..*)"},
+		{
+			name:      "unbounded-exclusive",
+			r:         constraints.NumericRange{LowerUnbounded: true, UpperUnbounded: true},
+			wantValid: true, wantText: "(*..*)",
+		},
+		{
+			name:      "unbounded-inclusive",
+			r:         constraints.NumericRange{LowerUnbounded: true, UpperUnbounded: true, LowerInclusive: true, UpperInclusive: true},
+			wantValid: true, wantText: "[*..*]",
+		},
+		{
+			name:      "unbounded-lower-inclusive",
+			r:         constraints.NumericRange{LowerUnbounded: true, UpperUnbounded: true, LowerInclusive: true},
+			wantValid: true, wantText: "[*..*)",
+		},
+		{
+			name:      "unbounded-upper-inclusive",
+			r:         constraints.NumericRange{LowerUnbounded: true, UpperUnbounded: true, UpperInclusive: true},
+			wantValid: true, wantText: "(*..*]",
+		},
+		{
+			name:      "zero-bounds-upper-inclusive",
+			r:         constraints.NumericRange{UpperInclusive: true},
+			wantValid: false, wantText: "(0..0]",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.r.IsValid(); got != tc.wantValid {
+				t.Errorf("%#v.IsValid() = %v, want %v", tc.r, got, tc.wantValid)
+			}
+			if got := tc.r.String(); got != tc.wantText {
+				t.Errorf("%#v.String() = %q, want %q", tc.r, got, tc.wantText)
 			}
 		})
 	}

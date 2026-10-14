@@ -25,7 +25,7 @@ Reading order — the specialized docs are **canonical**; defer to them rather t
 | 2 | [docs/architecture.md](docs/architecture.md) | Design narrative — package organization, dependencies, integration, mermaid diagrams |
 | 3 | [docs/ai-workflow.md](docs/ai-workflow.md) | **AI conventions** — the working loop, recommended plugins/skills, openEHR ground-truth lookups, hooks |
 | 4 | [docs/adr/](docs/adr/) | Closed architectural decisions |
-| 5 | [docs/plans/](docs/plans/) + [docs/roadmap.md](docs/roadmap.md) + [docs/backlog.md](docs/backlog.md) | Implementation plans, the open-work roadmap, and merged PRs' leftover suggestions (leads to verify, refreshed by `/sdd-triage --backlog` on `main`) |
+| 5 | [docs/plans/](docs/plans/) + [docs/roadmap.md](docs/roadmap.md) + [docs/backlog.md](docs/backlog.md) | Implementation plans, the open-work roadmap, and merged PRs' leftover suggestions (leads to verify, carried in at close-out by `/sdd-close` or later by `/sdd-triage --backlog` on `main`) |
 | 6 | [CHANGELOG.md](CHANGELOG.md) + [docs/releases.md](docs/releases.md) | Release log and version policy |
 | 7 | [CONTRIBUTING.md](CONTRIBUTING.md) + [SECURITY.md](SECURITY.md) | Contributor flow and vulnerability reporting |
 | 8 | [LICENSING.md](LICENSING.md) | MIT grant plus in-tree third-party inventory |

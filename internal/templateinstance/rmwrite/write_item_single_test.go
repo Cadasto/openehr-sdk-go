@@ -17,7 +17,7 @@ func TestREQ107_EnsureSingleItemSingleName(t *testing.T) {
 	}
 	for _, child := range []any{&rm.DVText{Value: "plain name"}, coded} {
 		parent := &rm.ItemSingle{}
-		if err := EnsureSingle(parent, "ITEM_SINGLE", "name", child); err != nil {
+		if err := EnsureSingle(parent, "name", child); err != nil {
 			t.Fatalf("EnsureSingle(ITEM_SINGLE, name, %T) = %v, want nil", child, err)
 		}
 		if parent.Name == nil {

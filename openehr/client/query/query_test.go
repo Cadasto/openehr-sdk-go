@@ -1,14 +1,17 @@
 package query_test
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -537,15 +540,143 @@ func TestExecuteGETExplicitZeroOffset(t *testing.T) {
 }
 
 func TestExecuteGETRejectsReservedParamName(t *testing.T) {
-	_, _, err := query.ExecuteString(t.Context(), newClient(t, httptest.NewServer(nil)),
+	srv := httptest.NewServer(nil)
+	defer srv.Close()
+	_, _, err := query.ExecuteString(t.Context(), newClient(t, srv),
 		"SELECT c FROM EHR e", map[string]any{"offset": 5}, query.WithGET())
 	if !errors.Is(err, query.ErrInvalidConfig) {
 		t.Errorf("expected ErrInvalidConfig for reserved-key collision, got %v", err)
 	}
 }
 
+// getRun runs one GET query entry point with the given named AQL
+// parameters.
+type getRun func(ctx context.Context, c *transport.Client, params map[string]any) error
+
+// TestREQ057_GETReservesTheKeysItSends pins which named AQL parameters a GET
+// refuses before any request is issued: those named like a query key the
+// request sends itself, which the server would read as that key. The
+// ad-hoc GET sends q, offset, fetch and ehr_id (REQ-055); a stored-query
+// GET sends offset, fetch and ehr_id, and carries no AQL text in q.
+func TestREQ057_GETReservesTheKeysItSends(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("server received %s %s; a reserved parameter name must be refused before any request", r.Method, r.URL)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+	c := newClient(t, srv)
+
+	for _, call := range []struct {
+		name     string
+		reserved []string
+		run      getRun
+	}{
+		{
+			name:     "ExecuteString",
+			reserved: []string{"q", "offset", "fetch", "ehr_id"},
+			run: func(ctx context.Context, c *transport.Client, params map[string]any) error {
+				_, _, err := query.ExecuteString(ctx, c, "SELECT c FROM EHR e CONTAINS COMPOSITION c", params, query.WithGET())
+				return err
+			},
+		},
+		{
+			name:     "RunStored",
+			reserved: []string{"offset", "fetch", "ehr_id"},
+			run: func(ctx context.Context, c *transport.Client, params map[string]any) error {
+				_, _, err := query.RunStored(ctx, c, "org.example::q", params, query.WithGET())
+				return err
+			},
+		},
+		{
+			name:     "RunStoredVersion",
+			reserved: []string{"offset", "fetch", "ehr_id"},
+			run: func(ctx context.Context, c *transport.Client, params map[string]any) error {
+				_, _, err := query.RunStoredVersion(ctx, c, "org.example::q", "1.0.0", params, query.WithGET())
+				return err
+			},
+		},
+	} {
+		for _, key := range call.reserved {
+			t.Run(call.name+"/"+key, func(t *testing.T) {
+				err := call.run(t.Context(), c, map[string]any{key: 5})
+				if !errors.Is(err, query.ErrInvalidConfig) || !strings.Contains(err.Error(), "collides with reserved GET query key") {
+					t.Errorf("%s(GET, {%s: 5}) = %v, want ErrInvalidConfig naming the reserved-key collision", call.name, key, err)
+				}
+			})
+		}
+	}
+}
+
+// TestREQ057_StoredGETSendsAParameterNamedQ pins the other side of
+// TestREQ057_GETReservesTheKeysItSends: a stored-query GET sends no q of
+// its own, so a stored query's parameter named q is sent as a form query
+// parameter, exactly once and with its value, instead of being refused.
+func TestREQ057_StoredGETSendsAParameterNamedQ(t *testing.T) {
+	for _, call := range []struct {
+		name     string
+		wantPath string
+		run      getRun
+	}{
+		{
+			name:     "RunStored",
+			wantPath: "/openehr/v1/query/org.example::q",
+			run: func(ctx context.Context, c *transport.Client, params map[string]any) error {
+				_, _, err := query.RunStored(ctx, c, "org.example::q", params, query.WithGET())
+				return err
+			},
+		},
+		{
+			name:     "RunStoredVersion",
+			wantPath: "/openehr/v1/query/org.example::q/1.0.0",
+			run: func(ctx context.Context, c *transport.Client, params map[string]any) error {
+				_, _, err := query.RunStoredVersion(ctx, c, "org.example::q", "1.0.0", params, query.WithGET())
+				return err
+			},
+		},
+	} {
+		t.Run(call.name, func(t *testing.T) {
+			type wireRequest struct {
+				method, path string
+				query        url.Values
+			}
+			// Read the fixture here: readFixture may stop the test, which
+			// only the test's own goroutine may do, not the handler's.
+			body := readFixture(t, "result_set.json")
+			seen := make(chan wireRequest, 1)
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				select {
+				case seen <- wireRequest{method: r.Method, path: r.URL.Path, query: r.URL.Query()}:
+				default:
+					t.Errorf("server received a second request %s %s, want one", r.Method, r.URL.Path)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write(body)
+			}))
+			defer srv.Close()
+
+			if err := call.run(t.Context(), newClient(t, srv), map[string]any{"q": 1}); err != nil {
+				t.Fatalf("%s(GET, {q: 1}) = %v, want the request sent", call.name, err)
+			}
+			var req wireRequest
+			select {
+			case req = <-seen:
+			default:
+				t.Fatalf("%s(GET, {q: 1}) sent no request", call.name)
+			}
+			if req.method != http.MethodGet || req.path != call.wantPath {
+				t.Errorf("request = %s %s, want GET %s", req.method, req.path, call.wantPath)
+			}
+			if got := req.query["q"]; !slices.Equal(got, []string{"1"}) {
+				t.Errorf("%s(GET, {q: 1}) sent query key q = %q, want [\"1\"]", call.name, got)
+			}
+		})
+	}
+}
+
 func TestExecuteEmptyQuery(t *testing.T) {
-	_, _, err := query.Execute(t.Context(), newClient(t, httptest.NewServer(nil)), aql.Query{})
+	srv := httptest.NewServer(nil)
+	defer srv.Close()
+	_, _, err := query.Execute(t.Context(), newClient(t, srv), aql.Query{})
 	if err == nil {
 		t.Fatal("expected error")
 	}

@@ -21,7 +21,8 @@
 
 <!-- `make ci`: what the output said, or "n/a" for docs-only.
      Red before green: the tests that failed before the change.
-     Can-fail proof: the guards removed and the tests that then failed. -->
+     Can-fail proof: the guards removed and the tests that then failed.
+     Per-task review: the tasks reviewed; findings fixed in-task, by severity. -->
 
 ## Notes for review
 

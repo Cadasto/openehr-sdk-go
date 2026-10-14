@@ -40,7 +40,7 @@ func TestREQ107_EnsureSingleTextLikeParents(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if err := EnsureSingle(tc.parent, "", tc.attr, tc.child); err != nil {
+			if err := EnsureSingle(tc.parent, tc.attr, tc.child); err != nil {
 				t.Fatalf("EnsureSingle(%T, %q) = %v", tc.parent, tc.attr, err)
 			}
 			if got := tc.got(); got != tc.want {
@@ -69,7 +69,7 @@ func TestREQ107_EnsureSingleTextLikeParents(t *testing.T) {
 			{&rm.DVIdentifier{}, "type"},
 		}
 		for _, tc := range cases {
-			if err := EnsureSingle(tc.parent, "", tc.attr, 42); !errors.Is(err, ErrTypeMismatch) {
+			if err := EnsureSingle(tc.parent, tc.attr, 42); !errors.Is(err, ErrTypeMismatch) {
 				t.Errorf("EnsureSingle(%T, %q, 42) = %v, want ErrTypeMismatch", tc.parent, tc.attr, err)
 			}
 		}
@@ -78,7 +78,7 @@ func TestREQ107_EnsureSingleTextLikeParents(t *testing.T) {
 	t.Run("unknown attribute", func(t *testing.T) {
 		t.Parallel()
 		for _, parent := range []any{&rm.DVURI{}, &rm.DVEHRURI{}, &rm.DVParsable{}, &rm.DVIdentifier{}} {
-			if err := EnsureSingle(parent, "", "no_such_attr", "x"); !errors.Is(err, ErrUnknownAttribute) {
+			if err := EnsureSingle(parent, "no_such_attr", "x"); !errors.Is(err, ErrUnknownAttribute) {
 				t.Errorf("EnsureSingle(%T, no_such_attr) = %v, want ErrUnknownAttribute", parent, err)
 			}
 		}
