@@ -21,7 +21,7 @@ package rminfo_test
 // AbsenceTable, and holds the stored key set to a set identity against the
 // reduction. Nothing about the table's CONTENTS is delegated elsewhere. What is
 // left to another check is a different question — whether the committed file is
-// what the generator emits, which is `make codegen-verify`'s.
+// what the generator emits, which is `make codegen-check`'s.
 
 import (
 	"maps"

@@ -23,9 +23,9 @@ Jobs run in parallel. All use Go 1.27.x (`actions/setup-go@v7` with module cache
 
 | Job | Makefile targets | Purpose |
 |---|---|---|
-| **Verify** | `fmt-check`, `mod-tidy-check`, `codegen-verify`, `aqlgen-verify`, `termgen-verify`, `vet`, `spec-check`, `flat-conformance-verify`, `terminology-verify`, `build` | Static checks and compile-all without running tests |
-| **Test** | `test` | Unit tests; `test` already depends on `codegen-verify`, `aqlgen-verify` and `termgen-verify` |
-| **Lint** | (via `golangci-lint-action` v2.14.0, config [`.golangci.yml`](../.golangci.yml)) | Same rules as `make lint` / `make lint-ci` |
+| **Verify** | `fmt-check`, `mod-tidy-check`, `codegen-check`, `aqlgen-check`, `termgen-check`, `vet`, `spec-check`, `flat-check`, `terminology-check`, `build` | Static checks and compile-all without running tests |
+| **Test** | `test` | Unit tests; `test` already depends on `codegen-check`, `aqlgen-check` and `termgen-check` |
+| **Lint** | (via `golangci-lint-action` v2.14.0, config [`.golangci.yml`](../.golangci.yml)) | Same rules as `make lint` |
 | **Race** | `test-race` | **Push to `main` only**, because `-race` is slower. Catches data races in `typereg` and codecs. The runner has a C compiler, so the race run uses the host `go` |
 
 PRs do not run the **Race** job. Merge to `main` triggers it on the post-merge push.
@@ -38,7 +38,7 @@ An in-repo advanced workflow was tried and dropped: an advanced configuration an
 
 ### Codegen drift bot
 
-The weekly workflow re-runs `make codegen-verify` on a clean checkout. On failure it opens or comments on a single tracking issue labelled `bmm-drift`, then fails the workflow run. Follow [ADR 0001 (BMM version-bump runbook)](adr/0001-bmm-version-bump-runbook.md) when triaging. The workflow complements PR CI by catching generator-template drift between human-driven PRs.
+The weekly workflow re-runs `make codegen-check` on a clean checkout. On failure it opens or comments on a single tracking issue labelled `bmm-drift`, then fails the workflow run. Follow [ADR 0001 (BMM version-bump runbook)](adr/0001-bmm-version-bump-runbook.md) when triaging. The workflow complements PR CI by catching generator-template drift between human-driven PRs.
 
 ## Local reproduction
 
@@ -54,23 +54,23 @@ Run `make help` for the full grouped list. Common targets:
 
 | Group | Target | What it does |
 |---|---|---|
-| CI | `make ci` | Full PR gate (fmt, mod tidy, vet, test, lint, spec-check, flat-conformance-verify, terminology-verify, build) |
-| Test | `make test` | Unit tests; depends on `codegen-verify`, `aqlgen-verify` and `termgen-verify` |
-| Test | `make test-race` | `-race` detector (main-branch job only). The detector needs cgo, so it runs on host Go 1.27.x only when the C compiler `go env CC` names is on `PATH`. Otherwise it runs in the dev container with cgo turned on for that run only (`make image-dev` builds the image) |
+| CI | `make ci` | Full PR gate (fmt, mod tidy, vet, test, lint, spec-check, flat-check, terminology-check, build) |
+| Test | `make test` | Unit tests; depends on `codegen-check`, `aqlgen-check` and `termgen-check` |
+| Test | `make test-race` | `-race` detector (main-branch job only). The detector needs cgo, so it runs on host Go 1.27.x only when the C compiler `go env CC` names is on `PATH`. Otherwise it runs in the dev container with cgo turned on for that run only (`make build-dev` builds the image) |
 | Format | `make fmt-check` | Fail if `golangci-lint fmt --diff` (gofumpt + goimports) would change any file |
 | Modules | `make mod-tidy-check` | Fail if `go mod tidy` would change `go.mod` / `go.sum` |
-| Codegen | `make codegen-verify` | BMM-generated tree matches `resources/bmm/` |
-| Codegen | `make aqlgen-verify` | Committed AQL parser matches `resources/aql/grammar/active/` (needs Docker) |
-| Codegen | `make termgen-verify` | `openehr/terminology/openehr_gen.go` matches the pinned `resources/terminology/openehr_terminology.xml` and `openehr_external_terminologies.xml`; regenerate with `make termgen` |
+| Codegen | `make codegen-check` | BMM-generated tree matches `resources/bmm/` |
+| Codegen | `make aqlgen-check` | Committed AQL parser matches `resources/aql/grammar/active/` (needs Docker) |
+| Codegen | `make termgen-check` | `openehr/terminology/openehr_gen.go` matches the pinned `resources/terminology/openehr_terminology.xml` and `openehr_external_terminologies.xml`; regenerate with `make termgen` |
 | Specs | `make spec-check` | `docs/specifications/traceability.yaml` paths and probes match the tree, and the generated REQ.md registry and `tests:` lists are current; also runs the vendored `sdd-check` gate (`scripts/sdd-check.py`) |
 | Specs | `make sdd-check` | Prints the vendored gate's full report, warnings included (`spec-check` runs it too) |
-| Specs | `make spec-gen` | Regenerate the REQ.md registry and the map's `tests:` lists (not a gate; `spec-check` fails until it is run) |
+| Specs | `make spec-generate` | Regenerate the REQ.md registry and the map's `tests:` lists (not a gate; `spec-check` fails until it is run) |
 | Docs | `make docs-check` | Strict MkDocs build plus published-output assertions (needs Docker; fetches docs-theme). The `go get` tag it asserts on the install and landing pages is read from the first release heading in [`CHANGELOG.md`](../CHANGELOG.md); `DOCS_SYNC=docs-sync-offline` builds from the cached brand layer instead of refetching |
 | Docs | `make docs-serve` | Live preview on `http://127.0.0.1:8000` |
-| Fixtures | `make flat-conformance-verify` | Offline `sha256` integrity of the pinned upstream FLAT corpus against its `MANIFEST.txt`; no network and no `curl`/`jq` needed, so it is safe in the gate. Catches a hand-edit to a vendored fixture whose whole value is being byte-identical to upstream. `make crossformat-verify` does the same for the PROBE-105 cross-format sets, whose integrity also runs in `make test` |
-| Fixtures | `make flat-conformance-check` | The above **plus** a best-effort upstream-drift report (needs network; degrades with a note when offline). Dev helper, not a CI gate |
-| Fixtures | `make terminology-verify` | Offline `sha256` integrity of the pinned openEHR Terminology against its `MANIFEST.txt` |
-| Fixtures | `make terminology-check` | The above **plus** a best-effort report of a newer upstream TERM release (needs network). Dev helper, not a CI gate |
+| Fixtures | `make flat-check` | Offline `sha256` integrity of the pinned upstream FLAT corpus against its `MANIFEST.txt`; no network and no `curl`/`jq` needed, so it is safe in the gate. Catches a hand-edit to a vendored fixture whose whole value is being byte-identical to upstream. `make crossformat-check` does the same for the PROBE-105 cross-format sets, whose integrity also runs in `make test` |
+| Fixtures | `make flat-drift` | The above **plus** a best-effort upstream-drift report (needs network; degrades with a note when offline). Dev helper, not a CI gate |
+| Fixtures | `make terminology-check` | Offline `sha256` integrity of the pinned openEHR Terminology against its `MANIFEST.txt` |
+| Fixtures | `make terminology-drift` | The above **plus** a best-effort report of a newer upstream TERM release (needs network). Dev helper, not a CI gate |
 | Specs | `make spec-context REQ=NNN` | Assemble the SDD context bundle for a REQ (dev/agent helper; not a CI gate) |
 | Specs | `make probe-status` | Each PROBE's status and whether its test file exists (dev helper; not a CI gate) |
 | Lint | `make lint` | `golangci-lint` on host if the binary was built with Go 1.27, else Docker (`LINT_IMAGE`) |

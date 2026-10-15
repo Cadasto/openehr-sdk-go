@@ -47,7 +47,7 @@ func TestRenderEmitsTheGeneratedTable(t *testing.T) {
 		"// Source: openEHR TERM Release-9.9.9 (terminology version 9.9.9):",
 		"resources/terminology/openehr_terminology.xml (sha256 abc)",
 		"resources/terminology/openehr_external_terminologies.xml (sha256 def)",
-		"// Regenerate: make termgen. Verify: make termgen-verify.",
+		"// Regenerate: make termgen. Verify: make termgen-check.",
 		"package terminology",
 		`const Version = "9.9.9"`,
 		`const SourceSHA256 = "abc"`,

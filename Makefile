@@ -9,7 +9,7 @@
 # Race       : `make test-race` also needs the C compiler `go env CC` names,
 #              because -race needs cgo; without one it takes the fallback
 #              with cgo on.
-.DEFAULT_GOAL := help
+include make/help.mk
 
 # ---- variables -----------------------------------------------------------
 
@@ -61,70 +61,61 @@ else
              $(LINT_IMAGE) golangci-lint
 endif
 
-# Grouped help (##@ section, target: ## description). Keep targets in this
-# order so `make help` lists them in the same sequence.
-define PRINT_HELP
-	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} \
-		/^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5); next } \
-		/^[a-zA-Z0-9_-]+:.*?##/ && $$1 != "help" { printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2 }' \
-		$(MAKEFILE_LIST)
-endef
+# `make help` (make/help.mk) prints these around the annotated targets below.
+HELP_TITLE     = openehr-sdk-go $(DOCS_RELEASE) · openEHR SDK for Go
+HELP_TOOLCHAIN = $(if $(HOST_GO_OK),host Go 1.27 (fast path),Docker fallback (run make build-dev once)) · lint $(if $(HOST_GLCI_OK),host binary,in Docker) · details: make doctor
+HELP_FOOTER    = Before a pull request: make ci · docs site: make docs-serve (http://127.0.0.1:8000)
 
-.PHONY: help doctor go-version image-dev \
-        fmt fmt-check vet \
-        codegen codegen-verify antlr-image aqlgen aqlgen-verify \
-        termgen termgen-verify \
-        its-rest-sync its-rest-check \
-        terminology-sync terminology-check terminology-verify \
-        test test-race \
-        lint lint-ci \
-        mod-tidy mod-tidy-check \
-        spec-check sdd-check spec-gen spec-context probe-status probe-record \
+##= REQ=094 | the requirement spec-context bundles
+##= ARGS='-base URL -deployment NAME ...' | probe-record flags
+##= ITS_REST_REF= TERMINOLOGY_REF= ... | pin a Vendor sync (FLAT_CONFORMANCE_REF too)
+##= DOCS_SYNC=docs-sync-offline | build the docs site from the cached brand files
+
+.PHONY: help doctor go-version build-dev build-antlr \
         build clean \
-        docs-sync docs-sync-offline docs-build docs-check docs-serve docs-clean \
-        ci
+        fmt fmt-check vet lint mod-tidy \
+        test test-race \
+        codegen termgen aqlgen spec-generate \
+        its-rest-sync its-rest-drift flat-sync flat-drift crossformat-sync \
+        terminology-sync terminology-drift \
+        mod-tidy-check codegen-check termgen-check aqlgen-check flat-check crossformat-check terminology-check \
+        spec-check sdd-check ci \
+        spec-context probe-status probe-record \
+        docs-sync docs-sync-offline docs-build docs-check docs-serve docs-clean
 
-# ---- help & toolchain ----------------------------------------------------
+##@ Setup
 
-help: ## Show grouped targets and tooling policy
-	@echo "openehr-sdk-go"
-	@echo ""
-	@if [ "$(HOST_GO_OK)" = "yes" ]; then \
-		echo "Toolchain : host Go 1.27.x (fast path)"; \
-		echo "  $$(go version 2>/dev/null)"; \
-	else \
-		echo "Toolchain : Docker fallback (compose profile dev)"; \
-		echo "  run once: make image-dev"; \
-		echo "  shim    : $(DOCKER_GO) <cmd>"; \
-	fi
-	@echo "Lint image: $(LINT_IMAGE)"
-	$(PRINT_HELP)
-	@echo ""
-	@echo "PR gate   : make ci"
-	@echo "Docs site : make docs-serve   (http://127.0.0.1:8000)"
-	@echo ""
-
-##@ Toolchain
-
-doctor: ## Diagnose host Go, Docker, and active toolchain shim
+doctor: ## Show host Go, Docker, the active toolchain and the pins
 	@echo "host go         : $$(command -v go || echo 'not installed')"
 	@echo "host go version : $$(go version 2>/dev/null || echo 'n/a')"
 	@echo "docker          : $$(command -v docker || echo 'not installed')"
 	@echo "docker compose  : $$(docker compose version 2>/dev/null | head -1 || echo 'n/a')"
 	@echo "active GO       : $(GO)"
+	@echo "pinned          : LINT_IMAGE=$(LINT_IMAGE)  ANTLR_VERSION=$(ANTLR_VERSION)  MKDOCS_IMAGE=$(MKDOCS_IMAGE)"
 
-go-version: ## Print Go version from the active toolchain
+go-version: ## Print the Go version of the active toolchain
 	@$(GO) version
 
-image-dev: ## Build the dev toolchain image (Dockerfile dev stage)
+build-dev: ## Build the dev toolchain image (Dockerfile dev stage)
 	@$(COMPOSE) -p $(COMPOSE_PROJECT) --profile dev build go
 
-##@ Format & analyze
+build-antlr: ## Build the ANTLR codegen image (maintainers; network)
+	@docker build --target antlr --build-arg ANTLR_VERSION=$(ANTLR_VERSION) -t $(ANTLR_IMAGE) .
 
-fmt: ## Apply gofumpt + goimports via golangci-lint (formatters in .golangci.yml)
+##@ Build
+
+build: ## Compile all packages
+	@$(GO) build ./...
+
+clean: ## Remove bin/, coverage files and *.out files
+	@rm -rf bin/ coverage.* *.out
+
+##@ Code
+
+fmt: ## Format the tree (gofumpt + goimports)
 	@$(GOLANGCI) fmt ./...
 
-fmt-check: ## Fail if any file needs formatting (gofumpt/goimports)
+fmt-check: ## Fail if any file needs formatting
 	@# Key off the exit code, not captured output: `fmt --diff` exits non-zero
 	@# and writes the diff to stdout when reformatting is needed. Capturing
 	@# stderr here would also swallow Docker image-pull progress (cold runner)
@@ -134,7 +125,7 @@ fmt-check: ## Fail if any file needs formatting (gofumpt/goimports)
 		exit 1; \
 	}
 
-vet: ## Run go vet (generated ANTLR parser's unreachable code suppressed)
+vet: ## Run go vet (the ANTLR parser's unreachable code aside)
 	@# The generated parser (openehr/aql/parse/gen) emits unreachable code after
 	@# panics — inherent to ANTLR's Go target, not a defect. Go 1.27's `go vet`
 	@# surfaces those diagnostics through the importing openehr/aql/parse package,
@@ -143,130 +134,115 @@ vet: ## Run go vet (generated ANTLR parser's unreachable code suppressed)
 	@# keeps `unreachable` on hand-written code.
 	@$(GO) vet -unreachable=false ./...
 
-##@ Codegen
+lint: ## Run golangci-lint (host binary or the pinned image)
+	@$(GOLANGCI) run ./...
 
-codegen: ## Regenerate RM and AOM 1.4 from pinned BMM sources
+mod-tidy: ## Tidy go.mod and go.sum
+	@$(GO) mod tidy
+
+##@ Test
+
+test: codegen-check aqlgen-check termgen-check ## Run the unit tests (after the codegen checks)
+	@$(GO) test ./... -count=1
+
+test-race: ## Run the unit tests under the race detector
+	@$(RACE_GO) test -race -count=1 ./...
+
+##@ Generate
+
+codegen: ## Regenerate RM and AOM 1.4 from the pinned BMM
 	@$(GO) run ./cmd/bmmgen -resources ./resources/bmm -out .
 
-codegen-verify: ## Fail if generated code drifts from resources/bmm
-	@$(GO) run ./cmd/bmmgen -resources ./resources/bmm -out . -verify
-
-termgen: ## Regenerate openehr/terminology from the pinned resources/terminology/ (openehr_terminology.xml + openehr_external_terminologies.xml)
+termgen: ## Regenerate openehr/terminology from the pinned XML
 	@$(GO) run ./cmd/termgen -resources ./resources/terminology -out .
 
-termgen-verify: ## Fail if openehr/terminology drifts from resources/terminology
-	@$(GO) run ./cmd/termgen -resources ./resources/terminology -out . -verify
-
-antlr-image: ## Build the ANTLR codegen image (maintainer-only; needs Docker + network)
-	@docker build --target antlr --build-arg ANTLR_VERSION=$(ANTLR_VERSION) -t $(ANTLR_IMAGE) .
-
-aqlgen: antlr-image ## Regenerate the AQL parser from active/ grammar (maintainer-only; needs Docker)
+aqlgen: build-antlr ## Regenerate the AQL parser from the active/ grammar
 	@docker run --rm -v $(CURDIR):/app -w /app/$(AQL_GRAMMAR_DIR) --user $$(id -u):$$(id -g) \
 	  $(ANTLR_IMAGE) -Dlanguage=Go -o /app/$(AQL_GEN_DIR).tmp -package gen AqlLexer.g4 AqlParser.g4
 	@rm -f $(AQL_GEN_DIR)/*.go && cp $(AQL_GEN_DIR).tmp/*.go $(AQL_GEN_DIR)/ && rm -rf $(AQL_GEN_DIR).tmp
 	@echo "regenerated $(AQL_GEN_DIR)/ from $(AQL_GRAMMAR_DIR)/"
 
-aqlgen-verify: antlr-image ## Fail if the committed AQL parser drifts from active/ grammar
-	@docker run --rm -v $(CURDIR):/app -w /app/$(AQL_GRAMMAR_DIR) --user $$(id -u):$$(id -g) \
-	  $(ANTLR_IMAGE) -Dlanguage=Go -o /app/$(AQL_GEN_DIR).verify -package gen AqlLexer.g4 AqlParser.g4
-	@status=0; for f in $(AQL_GEN_DIR)/*.go; do \
-	  diff -u "$$f" "$(AQL_GEN_DIR).verify/$$(basename $$f)" || status=1; \
-	done; \
-	rm -rf $(AQL_GEN_DIR).verify; \
-	if [ $$status -ne 0 ]; then echo "aqlgen-verify: AQL parser drifts from active/ — run 'make aqlgen'"; exit 1; fi; \
-	echo "aqlgen-verify: OK"
+spec-generate: ## Regenerate the map's tests lists and the REQ.md registry
+	@bash scripts/spec-gen.sh
 
-##@ Resources
+##@ Vendor | refreshes the vendored upstream files
 
-its-rest-sync: ## Vendor openEHR ITS-REST OpenAPI specs into resources/its-rest/ (needs network; ITS_REST_REF to pin)
+its-rest-sync: ## Vendor the ITS-REST OpenAPI specs (network; ITS_REST_REF)
 	@./scripts/sync-its-rest-specs.sh sync
 
-its-rest-check: ## Verify vendored ITS-REST specs match MANIFEST + report upstream drift (needs network)
+its-rest-drift: ## Verify the ITS-REST specs; report upstream drift (network)
 	@./scripts/sync-its-rest-specs.sh check
 
-flat-conformance-sync: ## Vendor the upstream EHRbase FLAT conformance corpus into testkit/corpus/flat-conformance/ (needs network; FLAT_CONFORMANCE_REF to pin)
+flat-sync: ## Vendor the EHRbase FLAT conformance corpus (network)
 	@./scripts/sync-flat-conformance.sh sync
 
-flat-conformance-check: ## Verify the vendored FLAT conformance corpus matches MANIFEST + report upstream drift (offline integrity; network for drift)
+flat-drift: ## Verify the FLAT corpus; report upstream drift (network)
 	@./scripts/sync-flat-conformance.sh check
 
-flat-conformance-verify: ## Offline sha256 integrity of the vendored FLAT corpus (no network, no curl/jq) — run by `make ci`
-	@./scripts/sync-flat-conformance.sh verify
-
-crossformat-ingest: ## Vendor the upstream cross-format sets into testkit/corpus/crossformat/ from the pinned local EHRbase clones (PROBE-105)
+crossformat-sync: ## Vendor the cross-format sets from local EHRbase clones
 	@./scripts/ingest-crossformat.sh ingest
 
-crossformat-verify: ## Offline sha256 integrity of the vendored cross-format sets (the same check runs in `make test`)
-	@./scripts/ingest-crossformat.sh verify
-
-terminology-sync: ## Vendor the openEHR Terminology (openehr_terminology.xml + openehr_external_terminologies.xml) into resources/terminology/ and regenerate the accessor (needs network; TERMINOLOGY_REF to pin)
+terminology-sync: ## Vendor the openEHR terminology and regenerate it (network)
 	@./scripts/sync-terminology.sh sync
 
-terminology-check: ## Verify the vendored terminology matches MANIFEST + report a newer upstream release (offline integrity; network for drift)
+terminology-drift: ## Verify the terminology; report a newer release (network)
 	@./scripts/sync-terminology.sh check
 
-terminology-verify: ## Offline sha256 integrity of the vendored openEHR Terminology (no network, no curl/jq) — run by `make ci`
-	@./scripts/sync-terminology.sh verify
-
-##@ Test
-
-test: codegen-verify aqlgen-verify termgen-verify ## Run unit tests (includes codegen drift checks)
-	@$(GO) test ./... -count=1
-
-test-race: ## Run unit tests with -race (main-branch CI job)
-	@$(RACE_GO) test -race -count=1 ./...
-
-##@ Lint
-
-lint-ci: ## Run golangci-lint (host binary or pinned Docker image)
-	@$(GOLANGCI) run ./...
-
-lint: lint-ci ## Alias for lint-ci
-
-##@ Modules
-
-mod-tidy: ## Run go mod tidy
-	@$(GO) mod tidy
+##@ Gates
 
 mod-tidy-check: ## Fail if go mod tidy would change go.mod or go.sum
 	@$(GO) mod tidy
 	@git diff --exit-code go.mod
 	@if test -f go.sum; then git diff --exit-code go.sum; fi
 
-##@ Specs
+codegen-check: ## Fail if the generated RM and AOM drift from the BMM
+	@$(GO) run ./cmd/bmmgen -resources ./resources/bmm -out . -verify
 
-spec-check: ## Verify docs/specifications/traceability.yaml against repo artefacts; also runs the vendored sdd-check gate
+termgen-check: ## Fail if openehr/terminology drifts from its XML
+	@$(GO) run ./cmd/termgen -resources ./resources/terminology -out . -verify
+
+aqlgen-check: build-antlr ## Fail if the AQL parser drifts from its grammar
+	@docker run --rm -v $(CURDIR):/app -w /app/$(AQL_GRAMMAR_DIR) --user $$(id -u):$$(id -g) \
+	  $(ANTLR_IMAGE) -Dlanguage=Go -o /app/$(AQL_GEN_DIR).verify -package gen AqlLexer.g4 AqlParser.g4
+	@status=0; for f in $(AQL_GEN_DIR)/*.go; do \
+	  diff -u "$$f" "$(AQL_GEN_DIR).verify/$$(basename $$f)" || status=1; \
+	done; \
+	rm -rf $(AQL_GEN_DIR).verify; \
+	if [ $$status -ne 0 ]; then echo "aqlgen-check: AQL parser drifts from active/ — run 'make aqlgen'"; exit 1; fi; \
+	echo "aqlgen-check: OK"
+
+flat-check: ## Verify the vendored FLAT corpus (offline sha256)
+	@./scripts/sync-flat-conformance.sh verify
+
+crossformat-check: ## Verify the vendored cross-format sets (offline)
+	@./scripts/ingest-crossformat.sh verify
+
+terminology-check: ## Verify the vendored terminology (offline sha256)
+	@./scripts/sync-terminology.sh verify
+
+spec-check: ## Check the traceability map and run the SDD gate
 	@bash scripts/spec-check-selftest.sh
 	@bash scripts/spec-check.sh
 	@out="$$(python3 scripts/sdd-check.py selftest 2>&1)" || { printf '%s\n' "$$out"; exit 1; }; printf '%s\n' "$$out" | grep '^selftest:'
 	@out="$$(python3 scripts/sdd-check.py check --root . 2>&1)" || { printf '%s\n' "$$out"; exit 1; }; printf '%s\n' "$$out" | grep '^sdd-check:'
 
-sdd-check: ## Print the vendored SDD gate's full report, warnings included (spec-check also runs it)
+sdd-check: ## Print the SDD gate's full report, warnings included
 	@python3 scripts/sdd-check.py selftest && python3 scripts/sdd-check.py check --root .
 
-spec-gen: ## Regenerate the map's tests lists and the REQ.md registry from their sources
-	@bash scripts/spec-gen.sh
+##@ Run
 
-spec-context: ## Assemble the SDD context bundle for a REQ (usage: make spec-context REQ=094)
+spec-context: ## Print the SDD context bundle of one REQ (REQ=094)
 	@bash scripts/spec-context.sh $(REQ)
 
-probe-status: ## Show each PROBE's status and whether its test file exists
+probe-status: ## Show each PROBE's status and whether its test exists
 	@bash scripts/probe-status.sh
 
-probe-record: ## Capture a REQ-082 Cassette recording from a live CDR (usage: make probe-record ARGS="-base URL -deployment NAME -scenario ehr-lifecycle"; see testkit/recordings/README.md)
+probe-record: ## Record a REQ-082 cassette from a live CDR (ARGS=)
 	@rev="$$(git rev-parse HEAD 2>/dev/null)"; \
 	 if [ -n "$$(git status --porcelain 2>/dev/null)" ]; then rev="$$rev-dirty"; fi; \
 	 $(GO) run ./cmd/probe-record -sdk-commit "$$rev" $(ARGS)
 
-##@ Build
-
-build: ## Compile all packages (cmd/examples when present)
-	@$(GO) build ./...
-
-clean: ## Remove bin/, coverage artefacts, and *.out files
-	@rm -rf bin/ coverage.* *.out
-
-##@ Documentation site
+##@ Docs
 
 # Pinned: the published site is built from this image without human review.
 MKDOCS_IMAGE ?= squidfunk/mkdocs-material:9.7.6
@@ -310,10 +286,10 @@ docs-sync-offline: ## Reuse the cached brand files instead of fetching
 # undone by the very next `docs-check`.
 DOCS_SYNC ?= docs-sync
 
-docs-build: $(DOCS_SYNC) ## Build the site to site/ (DOCS_SYNC=docs-sync-offline builds from the cache)
+docs-build: $(DOCS_SYNC) ## Build the site to site/
 	$(MKDOCS_RUN) build -d /docs/$(DOCS_BUILD)
 
-docs-check: docs-build ## Build the site and assert the published output is complete (honours DOCS_SYNC)
+docs-check: docs-build ## Build the site and check the output is complete
 	@set -e; \
 	test -s "$(DOCS_BUILD)/index.html" \
 	  || { echo "docs-check: no index.html in $(DOCS_BUILD)/"; exit 1; }; \
@@ -446,16 +422,16 @@ docs-check: docs-build ## Build the site and assert the published output is comp
 	@$(PYTHON_DOCS) scripts/check_brand_paths.py
 	@echo "docs-check: OK"
 
-docs-serve: docs-sync ## Preview the documentation site on http://127.0.0.1:8000
+docs-serve: docs-sync ## Preview the site on http://127.0.0.1:8000
 	docker run --rm -it -u $(DOCKER_USER) -e PYTHONDONTWRITEBYTECODE=1 \
 	  -p 127.0.0.1:8000:8000 -v "$(CURDIR):/docs" -w /docs \
 	  $(MKDOCS_IMAGE) serve -a 0.0.0.0:8000
 
-docs-clean: ## Remove the site build, fetched brand layer, and MkDocs plugin cache
+docs-clean: ## Remove the site build, brand layer and caches
 	@test -n "$(DOCS_BUILD)" || { echo "docs-clean: DOCS_BUILD must not be empty"; exit 1; }
 	rm -rf "$(CURDIR)/$(DOCS_BUILD)" "$(CURDIR)/$(FETCHED)" "$(CURDIR)/.cache"
 	rm -f $(THEME_FETCHED)
 
-##@ CI
+##@ Gates
 
-ci: fmt-check mod-tidy-check vet test lint spec-check flat-conformance-verify terminology-verify build ## Full local PR gate (see docs/ci.md)
+ci: fmt-check mod-tidy-check vet test lint spec-check flat-check terminology-check build ## Run the full PR gate (docs/ci.md)

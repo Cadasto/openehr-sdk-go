@@ -223,7 +223,7 @@ func TestREQ052_GenericRootIsInterface(t *testing.T) {
 // P_BMM_GENERIC_PROPERTY whose root class is held as a Go interface. Each
 // field takes omitempty, so a typed-nil pointer it holds, which encodes as
 // null, is left out. No field generated today takes either path, so `make
-// codegen-verify` shows no diff when renderField stops asking.
+// codegen-check` shows no diff when renderField stops asking.
 //
 // REQ-043: § Mapping rules, Property → Go field. REQ-052 § An absent
 // mandatory member: a mandatory member with no value is left out on encode,

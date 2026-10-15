@@ -20,7 +20,7 @@ import (
 func TestCompile_UpstreamFlatConformanceOPT(t *testing.T) {
 	path := fixtures.FlatConformanceOpt()
 	if _, err := os.Stat(path); err != nil {
-		t.Skipf("FLAT conformance corpus absent (run 'make flat-conformance-sync'): %v", err)
+		t.Skipf("FLAT conformance corpus absent (run 'make flat-sync'): %v", err)
 	}
 
 	opt, err := template.ParseFile(path)

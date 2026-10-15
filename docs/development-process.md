@@ -16,7 +16,7 @@ Ask one question of every change: **does it alter a normative statement?** That 
 |---|---|---|
 | Typical change | New capability; an API, behaviour or error-contract change; a bug fix that shows the spec was wrong | Refactor, package move, performance, dependency bump, tooling, doc polish; a bug fix that brings code back in line with the existing spec |
 | Spec, registry, ADR | Updated in the same PR (spec-first for new capability) | Not touched. Needing to touch one means the change is full lane |
-| `traceability.yaml` | Updated to the landed packages and probes; `make spec-gen` writes the tests | Only the package paths `make spec-check` names, when paths moved |
+| `traceability.yaml` | Updated to the landed packages and probes; `make spec-generate` writes the tests | Only the package paths `make spec-check` names, when paths moved |
 | Gate | `make ci` | `make ci` |
 | PR body | The REQ / PROBE ids touched | One line: `Lane: maintenance (no normative change)` |
 
@@ -29,13 +29,13 @@ REQ  (capability + acceptance)                  [gate: worth doing]
  └─ SPEC §  (RFC-2119, Status: Draft)            [gate: single canonical home]
      └─ ADR  (only if an irreversible fork)      [gate: Accepted before code]
          └─ CODE + TESTS  (tests cite REQ/PROBE)   [gate: Definition of Ready, then tests green]
-             └─ traceability.yaml + make spec-gen  [gate: Definition of Done, same PR]
+             └─ traceability.yaml + make spec-generate  [gate: Definition of Done, same PR]
 ```
 
 For new capability the spec leads (spec-first). When work on shipped code shows the spec itself was wrong, the code change and the spec correction land in the same PR (implementation-aligned): code wins until the spec is updated, never later than that PR.
 
-- The registry in [REQ.md](specifications/REQ.md) is generated (`make spec-gen`); `make spec-check` fails when it is stale. Edit its source, never the table.
-- Each `traceability.yaml` row's `tests:` list is generated too: `make spec-gen` writes the sorted list of test files that cite the row's REQ, and `make spec-check` fails when a list is stale. A test file is a `*_test.go` file or a probe implementation under `testkit/probes/`; it cites `REQ-NNN` when that token appears with no letter, digit or underscore right before or after it, so a hyphen or a dot is a boundary and `pre-REQ-117` counts. So cite the REQ in the test that pins it, and never edit the list by hand.
+- The registry in [REQ.md](specifications/REQ.md) is generated (`make spec-generate`); `make spec-check` fails when it is stale. Edit its source, never the table.
+- Each `traceability.yaml` row's `tests:` list is generated too: `make spec-generate` writes the sorted list of test files that cite the row's REQ, and `make spec-check` fails when a list is stale. A test file is a `*_test.go` file or a probe implementation under `testkit/probes/`; it cites `REQ-NNN` when that token appears with no letter, digit or underscore right before or after it, so a hyphen or a dot is a boundary and `pre-REQ-117` counts. So cite the REQ in the test that pins it, and never edit the list by hand.
 - A plan in [`plans/`](plans/) is optional, for work that spans several PRs. It is a committed working note outside this ladder: no generator or map reads it, but the drift gate checks it like any other document ([plans/README.md](plans/README.md)).
 
 There is no `SDK-GAP` identifier. `REQ`/`PROBE` is the feature register, and a newly found gap is worked under a REQ with a `PROBE` for wire conformance ([ADR 0012](adr/0012-retire-sdk-gap-identifier.md)).
@@ -55,7 +55,7 @@ Implementation may start when:
 All in the implementing PR:
 
 - Code and tests land; tests cite the `REQ-` / `PROBE-` they pin.
-- The canonical spec text is current, and `traceability.yaml` lists the landed packages and probes (`make spec-gen` writes its tests lists from the tests' REQ citations).
+- The canonical spec text is current, and `traceability.yaml` lists the landed packages and probes (`make spec-generate` writes its tests lists from the tests' REQ citations).
 - `docs/roadmap.md` is updated when the change lands a roadmap row or opens new tracked work ([roadmap.md § Updating this page](roadmap.md#updating-this-page)).
 - `make ci` passes (it includes `make spec-check`).
 

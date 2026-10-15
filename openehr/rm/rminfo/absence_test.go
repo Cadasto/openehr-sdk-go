@@ -175,7 +175,7 @@ func TestAbsenceReasonString(t *testing.T) {
 // reason, rather than with the nil table that reports undeclared for
 // everything. Whether the whole table agrees with the pinned BMM is
 // PROBE-098's question; whether it is what the generator emits is
-// `make codegen-verify`'s.
+// `make codegen-check`'s.
 func TestDefaultImplementsAbsenceReporter(t *testing.T) {
 	r := reporter(t, rminfo.Default)
 	cases := map[string]rminfo.AbsenceReason{

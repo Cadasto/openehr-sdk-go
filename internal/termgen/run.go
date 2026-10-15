@@ -63,7 +63,7 @@ type Result struct {
 //
 // The sha256 the generated file carries is computed here, over the very bytes
 // that were parsed: the manifest's own hashes are the sync script's integrity
-// check (`make terminology-verify`), not an input to the tables.
+// check (`make terminology-check`), not an input to the tables.
 func Run(opts Options) (Result, error) {
 	res := Result{Path: filepath.Join(opts.OutDir, outPath)}
 

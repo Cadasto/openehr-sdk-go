@@ -7,7 +7,7 @@ package rminfo_test
 // and re-derives every answer from the raw BMM. It deliberately does
 // NOT call internal/bmmgen: comparing the table against the walk that produced
 // it would pass on a generator whose walk is itself wrong, which is the one
-// failure this probe exists to catch. `make codegen-verify` already covers the
+// failure this probe exists to catch. `make codegen-check` already covers the
 // other direction — that the committed table is what the generator emits.
 
 import (

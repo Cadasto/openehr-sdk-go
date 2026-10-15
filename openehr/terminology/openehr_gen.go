@@ -2,7 +2,7 @@
 // Source: openEHR TERM Release-3.0.0 (terminology version 3.0.0):
 // resources/terminology/openehr_terminology.xml (sha256 a1a64cc8665afff3992b4c511997e8a8acd1a3706efc32b775894aaf601f0bcf) and
 // resources/terminology/openehr_external_terminologies.xml (sha256 8db29f67f6f8efc15fe85f30e18d67349edc87819e6fb918291dd306d6a77842).
-// Regenerate: make termgen. Verify: make termgen-verify.
+// Regenerate: make termgen. Verify: make termgen-check.
 
 package terminology
 

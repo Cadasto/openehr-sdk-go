@@ -2,7 +2,7 @@
 #
 # Re-runs the BMM-driven generator on a fresh checkout on a weekly
 # schedule (Mondays 06:00 UTC) and on manual dispatch. If
-# `make codegen-verify` reports drift, the workflow either creates a
+# `make codegen-check` reports drift, the workflow either creates a
 # new tracking issue with label `bmm-drift` or comments on the
 # existing one. The body carries the `bmmgen -verify` output verbatim
 # so reviewers can triage without running the tool locally.
@@ -45,13 +45,13 @@ jobs:
           go-version: '1.27.x'
           cache: true
 
-      - name: Run codegen-verify
+      - name: Run codegen-check
         id: verify
         run: |
           set -o pipefail
           # Capture verifier output to a file so we can post it as
           # an issue comment on failure. Tee for live log visibility.
-          if make codegen-verify 2>&1 | tee codegen-verify.out; then
+          if make codegen-check 2>&1 | tee codegen-check.out; then
             echo "drift=false" >> "$GITHUB_OUTPUT"
           else
             echo "drift=true" >> "$GITHUB_OUTPUT"
@@ -84,10 +84,10 @@ jobs:
             echo "**Run:** [${{ github.workflow }} #${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
             echo "**SHA:** ${{ github.sha }}"
             echo ""
-            echo "Output of \`make codegen-verify\`:"
+            echo "Output of \`make codegen-check\`:"
             echo ""
             echo '```'
-            tail -200 codegen-verify.out
+            tail -200 codegen-check.out
             echo '```'
             echo ""
             echo "See [docs/adr/0001-bmm-version-bump-runbook.md](../blob/main/docs/adr/0001-bmm-version-bump-runbook.md) for the procedure."

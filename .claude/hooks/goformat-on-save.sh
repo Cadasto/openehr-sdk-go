@@ -40,7 +40,7 @@ fi
 [[ -f "$f" ]] || exit 0
 
 # Generated files belong to bmmgen — reformatting here would diverge from
-# `make codegen-verify`. golangci-lint excludes them too (Code generated marker).
+# `make codegen-check`. golangci-lint excludes them too (Code generated marker).
 case "$f" in
   *_gen.go) exit 0 ;;
 esac

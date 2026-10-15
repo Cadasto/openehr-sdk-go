@@ -44,7 +44,7 @@
 // group and per code set plus the release version and each file's sha256
 // ([SourceSHA256], [ExternalSourceSHA256]). Those exported table variables are
 // read-only: reassigning one changes validity across the whole SDK, so treat
-// them as constants. Regenerate with `make termgen`; `make termgen-verify`
+// them as constants. Regenerate with `make termgen`; `make termgen-check`
 // fails the build when the table drifts from either pinned file. The
 // hand-written surface is the [Group] and [CodeSet] types, their nil-safe
 // lookup methods, the [Concept] data type, the [ID] constant and the four

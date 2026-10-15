@@ -7,7 +7,7 @@
 // vocabulary, [Render] emits one gofmt-clean openehr_gen.go, and [Run]
 // either writes that file or, in verify mode, reports how it drifts from
 // the pin without touching it. cmd/termgen is the CLI; `make termgen` and
-// `make termgen-verify` are the entry points.
+// `make termgen-check` are the entry points.
 package termgen
 
 import (

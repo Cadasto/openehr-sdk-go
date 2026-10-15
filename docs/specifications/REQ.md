@@ -8,15 +8,15 @@ kind: specification
 
 Index of the normative `REQ-NNN` identifiers for `github.com/cadasto/openehr-sdk-go`. Each requirement's normative text lives in the linked topic spec, never here.
 
-The table is generated from [`traceability.yaml`](traceability.yaml) by `make spec-gen`, and `make spec-check` fails when it is stale. To change a title, a canonical link, the spec stability or the implementation status, edit the map and regenerate; do not edit the table.
+The table is generated from [`traceability.yaml`](traceability.yaml) by `make spec-generate`, and `make spec-check` fails when it is stale. To change a title, a canonical link, the spec stability or the implementation status, edit the map and regenerate; do not edit the table.
 
-**Adding a requirement:** take the next free number (see [Numbering policy](#numbering-policy)), write the normative text in the canonical topic spec, add an entry to `traceability.yaml`, then run `make spec-gen`.
+**Adding a requirement:** take the next free number (see [Numbering policy](#numbering-policy)), write the normative text in the canonical topic spec, add an entry to `traceability.yaml`, then run `make spec-generate`.
 
 ---
 
 ## Registry
 
-<!-- BEGIN GENERATED: registry (make spec-gen — edit traceability.yaml, not this table) -->
+<!-- BEGIN GENERATED: registry (make spec-generate — edit traceability.yaml, not this table) -->
 | ID | Title | Canonical | Stability | Impl. |
 |---|---|---|---|---|
 | REQ-001 | Module path | [packaging.md](packaging.md#req-001--module-path) | draft | landed |

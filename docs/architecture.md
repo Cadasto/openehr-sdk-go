@@ -169,14 +169,14 @@ The RM and AOM 1.4 types are generated from the pinned BMM corpus, the one part 
 |---|---|---|
 | Pinned BMM corpus | [`resources/bmm/`](../resources/bmm/) | `openehr_*.bmm.json` files; see [ADR 0001](adr/0001-bmm-version-bump-runbook.md) |
 | BMM loader | [`openehr/bmm/`](../openehr/bmm/) | `LoadAll`, `FSResolver`, descendant-shadows-ancestor merge |
-| Code generator | [`internal/bmmgen/`](../internal/bmmgen/), [`cmd/bmmgen`](../cmd/bmmgen) | `make codegen` / `make codegen-verify` (chained in `make test`) |
+| Code generator | [`internal/bmmgen/`](../internal/bmmgen/), [`cmd/bmmgen`](../cmd/bmmgen) | `make codegen` / `make codegen-check` (chained in `make test`) |
 | Generated RM | [`openehr/rm/`](../openehr/rm/) | `*_gen.go`, `*_jsonmar_gen.go`, `*_jsonunmar_gen.go`, `typereg_gen.go` |
 | Generated AOM 1.4 | [`openehr/aom/aom14/`](../openehr/aom/aom14/) | One-way import of `rm` for base types |
 | Type registry | [`openehr/rm/typereg/`](../openehr/rm/typereg/) | Hand-written `Registry`; registrations in `typereg_gen.go` per [ADR 0002](adr/0002-bmm-codegen-decisions.md) |
 | RM structural lookup | [`openehr/rm/rminfo/`](../openehr/rm/rminfo/) | Two BMM-derived tables emitted by one run: `lookup_gen.go` (the class universe) and `absence_gen.go` (the declared names outside it); [ADR 0005](adr/0005-compiled-template-foundation.md) |
 | Generated attribute access | [`internal/rmaccess/`](../internal/rmaccess/) | `access_gen.go`: per-class attribute reads for every registered class; [ADR 0028](adr/0028-generated-rm-attribute-access.md) |
 | Invariant inventory | [`openehr/validation/`](../openehr/validation/) | `inventory_gen.go`: every invariant of the pinned RM and BASE BMMs, keyed `CLASS.Invariant`, with the kind `invariants.json` classifies it as; the RM floor dispatches its rules through it ([§ REQ-171](specifications/clinical-modeling.md#req-171--validation-engine)) |
-| Terminology generator | [`internal/termgen/`](../internal/termgen/), [`cmd/termgen`](../cmd/termgen) | `make termgen` / `make termgen-verify` (chained in `make test`) |
+| Terminology generator | [`internal/termgen/`](../internal/termgen/), [`cmd/termgen`](../cmd/termgen) | `make termgen` / `make termgen-check` (chained in `make test`) |
 | Generated terminology | [`openehr/terminology/`](../openehr/terminology/) | `openehr_gen.go`: groups and code sets from `resources/terminology/` |
 
 ```mermaid

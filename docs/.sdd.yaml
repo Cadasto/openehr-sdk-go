@@ -28,7 +28,7 @@ sdd:
     adr: docs/adr
     constitution: docs/architecture.md   # informative profile only; not read on this formal repository
 
-  # Single sources and what is generated from them (`make spec-gen`; `make spec-check` fails
+  # Single sources and what is generated from them (`make spec-generate`; `make spec-check` fails
   # when a generated block is stale). Edit the source, never the generated table.
   #   REQ citations in tests   -> each traceability.yaml row's tests: list
   #   traceability.yaml        -> docs/specifications/REQ.md registry table
@@ -42,7 +42,7 @@ sdd:
   build_entrypoint: make            # single entry point — extend the Makefile, no ad-hoc scripts
   ci_target: ci                     # full PR gate: `make ci` (includes spec-check)
   spec_check_target: spec-check     # traceability drift gate: `make spec-check`
-  # Also: `make spec-gen` (regenerate the indexes). Two lanes — a change that alters no
+  # Also: `make spec-generate` (regenerate the indexes). Two lanes — a change that alters no
   # normative statement owes no spec/plan edits: docs/development-process.md § Two lanes.
   # Also available: `make spec-context REQ=NNN` (one-shot bundle) and `make probe-status`.
 

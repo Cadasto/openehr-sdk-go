@@ -23,7 +23,7 @@ import (
 // declarations. Getter signatures resolve once at the LOCATABLE level
 // (uniformity is required for interface satisfaction); descendant
 // field values convert implicitly, and a descendant whose field type
-// ever diverged would fail the setter assignment at codegen-verify
+// ever diverged would fail the setter assignment at codegen-check
 // time — loudly, by construction.
 
 // locatableClassName is the BMM class whose descendants carry the

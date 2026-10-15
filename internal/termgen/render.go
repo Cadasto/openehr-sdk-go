@@ -28,7 +28,7 @@ type SourceInfo struct {
 //
 // The output is run through go/format, so it is gofmt-clean, and it depends
 // on nothing but t and src, so it is byte-deterministic. Together these let
-// `make termgen-verify` treat any difference from the committed file as
+// `make termgen-check` treat any difference from the committed file as
 // drift.
 func Render(t *Terminology, src SourceInfo) ([]byte, error) {
 	var b bytes.Buffer
@@ -36,7 +36,7 @@ func Render(t *Terminology, src SourceInfo) ([]byte, error) {
 	fmt.Fprintf(&b, "// Source: openEHR TERM %s (terminology version %s):\n", src.Ref, t.Version)
 	fmt.Fprintf(&b, "// %s (sha256 %s) and\n", src.Path, src.SHA256)
 	fmt.Fprintf(&b, "// %s (sha256 %s).\n", src.ExternalPath, src.ExternalSHA256)
-	b.WriteString("// Regenerate: make termgen. Verify: make termgen-verify.\n\n")
+	b.WriteString("// Regenerate: make termgen. Verify: make termgen-check.\n\n")
 	b.WriteString("package terminology\n\n")
 
 	b.WriteString("// Version is the openEHR Terminology release the tables below are generated from.\n")

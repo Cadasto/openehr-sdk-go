@@ -506,7 +506,7 @@ func TestListCrossFormatSetsOverScratchCorpus_PROBE105_REQ080(t *testing.T) {
 
 // TestIngestCrossFormatVerifyReadsTheLastRecord_PROBE105_REQ080 pins the
 // offline integrity check of scripts/ingest-crossformat.sh verify, which
-// `make crossformat-verify` runs: a MANIFEST.txt whose last record has no
+// `make crossformat-check` runs: a MANIFEST.txt whose last record has no
 // final newline must still have that record checked. The last record here is
 // an opt pointer, which the subtree closure check cannot catch, so a verify
 // that drops the line passes over the altered OPT.

@@ -34,8 +34,8 @@ Reading order — the specialized docs are **canonical**; defer to them rather t
 
 **Start with `make spec-context REQ=NNN`** — one bundle with the registry row, traceability block, canonical excerpt, and touching strands. **Finish with `make spec-check`** (`make ci` includes it). The step-by-step loop lives in [ai-workflow.md § The loop](docs/ai-workflow.md#the-loop); the rules that bind regardless of how you got there:
 
-- New normative text goes in the **canonical topic spec** first, then its `traceability.yaml` entry (`make spec-gen` writes the registry row) — never as duplicate prose in `REQ.md`, and never as a rule that exists only in code.
-- Cite `REQ-NNN` / `PROBE-NNN` in tests and maintainer comments (function bodies, unexported code); update `traceability.yaml` in the same change that lands the code, then `make spec-gen`. The REQ.md registry and each map row's `tests:` list (from the tests' REQ citations, [development-process.md § The ladder](docs/development-process.md#the-ladder-full-lane)) are generated, so never edit them by hand, and the map is a pure index: no notes, no comments.
+- New normative text goes in the **canonical topic spec** first, then its `traceability.yaml` entry (`make spec-generate` writes the registry row) — never as duplicate prose in `REQ.md`, and never as a rule that exists only in code.
+- Cite `REQ-NNN` / `PROBE-NNN` in tests and maintainer comments (function bodies, unexported code); update `traceability.yaml` in the same change that lands the code, then `make spec-generate`. The REQ.md registry and each map row's `tests:` list (from the tests' REQ citations, [development-process.md § The ladder](docs/development-process.md#the-ladder-full-lane)) are generated, so never edit them by hand, and the map is a pure index: no notes, no comments.
 - **Two lanes.** A change that alters no normative statement (refactor, move, perf, tooling, a fix that restores the spec'd behaviour) owes no spec, registry or plan edits — green `make ci` and one PR-body line. See [development-process.md § Two lanes](docs/development-process.md#two-lanes).
 - **Godoc is for SDK users.** Package docs and doc comments on exported identifiers carry no spec-process identifiers (REQ, ADR, STRAND, plan or spec paths) and no RFC-2119 capitals. State the behaviour a caller needs in plain English. A probe's own `PROBE-NNN` id and public openEHR specification citations are fine.
 - **`REQ`/`PROBE` is the feature register; there is no `SDK-GAP` identifier.** A discovered gap is worked under a REQ (extend or create via `sdd-specify`) with a `PROBE` for wire conformance. No GAP-style label appears anywhere — not in plan filenames, `traceability.yaml`, test names, `doc.go`, or normative prose ([ADR 0012](docs/adr/0012-retire-sdk-gap-identifier.md)).
@@ -73,28 +73,28 @@ Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev
 
 | Task | Command |
 |---|---|
-| Discover all targets | `make help` |
+| Discover all targets | `make help` — by section, from the Makefile's `##@ Section` and `target: ## description` annotations ([`make/help.mk`](make/help.mk) renders them) |
 | Diagnose the environment | `make doctor` — host Go, Docker, and which toolchain the Makefile will actually use |
 | **Full PR / CI gate** | `make ci` — see [docs/ci.md](docs/ci.md) |
 | Format / check | `make fmt` / `make fmt-check` |
 | Vet / lint | `make vet` / `make lint` |
 | Unit / race tests | `make test` / `make test-race` |
-| BMM codegen verify | `make codegen-verify` |
-| AQL parser codegen verify | `make aqlgen-verify` — fails if `openehr/aql/parse/gen/` drifts from the `active/` grammar (needs Docker, not a host JRE); regenerate with `make aqlgen` |
+| BMM codegen verify | `make codegen-check` |
+| AQL parser codegen verify | `make aqlgen-check` — fails if `openehr/aql/parse/gen/` drifts from the `active/` grammar (needs Docker, not a host JRE); regenerate with `make aqlgen` |
 | Spec traceability | `make spec-check` |
-| Regenerate spec indexes | `make spec-gen`: the map's `tests:` lists from the tests' REQ citations, the REQ.md registry from `traceability.yaml` |
+| Regenerate spec indexes | `make spec-generate`: the map's `tests:` lists from the tests' REQ citations, the REQ.md registry from `traceability.yaml` |
 | Spec context bundle | `make spec-context REQ=NNN` — registry row + traceability + canonical excerpt + strands |
 | Probe status | `make probe-status` — each PROBE's status and whether its test file exists |
-| FLAT corpus integrity | `make flat-conformance-verify` — offline `sha256` of the vendored EHRbase FLAT corpus (PROBE-086's input); `…-check` adds a network drift report (dev helper, not a gate) |
-| Build Docker dev image | `make image-dev` (when host Go is missing, or for `make test-race` on a host without a C compiler; rebuild an image made before the dev stage gained gcc) |
+| FLAT corpus integrity | `make flat-check` — offline `sha256` of the vendored EHRbase FLAT corpus (PROBE-086's input); `make flat-drift` adds a network drift report (dev helper, not a gate) |
+| Build Docker dev image | `make build-dev` (when host Go is missing, or for `make test-race` on a host without a C compiler; rebuild an image made before the dev stage gained gcc) |
 | Docs site | `make docs-check` builds the site from `pages/` and asserts its output; `make docs-serve` previews it. The docs-theme brand layer is pinned by commit + sha256 in `sources.json` (bump recipe in its `$comment`) |
 
 **Gotchas worth the reading:**
 
 - **Never hand-edit a vendored fixture** under `resources/` or `testkit/corpus/` — being byte-identical to upstream is its whole value. Re-sync instead.
 - `make probe-status` prints `MISSING` for any probe covered inline or in a sibling's file. That is the filename heuristic, **not** drift — `make spec-check` is the real gate.
-- **`make ci` cannot complete without Docker:** `test` → `aqlgen-verify` → `antlr-image` always needs it. Everything else uses Docker only when host tooling is missing (host Go `1.27.x`; a host `golangci-lint` **built with Go 1.27**; for `make test-race`, a host C compiler; routing in [ci.md](docs/ci.md)).
-  Without Docker, run `fmt-check`, `vet`, `spec-check`, `flat-conformance-verify`, `build` and `go test ./... -count=1`, and let PR CI be the gate.
+- **`make ci` cannot complete without Docker:** `test` → `aqlgen-check` → `build-antlr` always needs it. Everything else uses Docker only when host tooling is missing (host Go `1.27.x`; a host `golangci-lint` **built with Go 1.27**; for `make test-race`, a host C compiler; routing in [ci.md](docs/ci.md)).
+  Without Docker, run `fmt-check`, `vet`, `spec-check`, `flat-check`, `build` and `go test ./... -count=1`, and let PR CI be the gate.
 - After `git worktree remove`, run `golangci-lint cache clean`; otherwise lint reports phantom issues under the removed `.worktrees/` path.
 - **Public docs never name downstream consuming projects.** Describe what a consumer needs, not who the consumer is.
 - **Release cut** follows [releases.md § Tag checklist](docs/releases.md#tag-checklist) and commits straight to `main`, no branch or PR. The same commit moves the `go get …@vX.Y.Z` pin in `README.md`, `docs/quick-start.md`, `pages/install.md` and `pages/index.md`; `make docs-check` fails until all four match the newest `## [X.Y.Z]` heading in `CHANGELOG.md`.
@@ -118,7 +118,7 @@ Rationale and the wider picture: [architecture.md § Dependencies](docs/architec
 
 Use the openEHR MCP skills before guessing RM paths, terminology codes, or ITS-JSON shapes — see [ai-workflow.md § openEHR ground truth](docs/ai-workflow.md#openehr-ground-truth-mcp--skills). The openEHR conformance probe suite is the source of truth for wire-level semantics; the openEHR spec is authoritative for class invariants.
 
-**REST API schema.** For any endpoint path, request/response body, header, or status code, read the vendored OpenAPI pin in [`resources/its-rest/`](resources/its-rest/README.md) (`*-validation.openapi.yaml`) rather than guessing — it is the machine-readable contract. Refresh/verify with `make its-rest-sync` / `make its-rest-check`. EHRbase-specific deployment extensions that a call still uses (for example `PurgeTemplates`) are documented on that call and in REQ-099, not by a second OpenAPI pin. In-tree third-party licences are inventoried in [`LICENSING.md`](LICENSING.md).
+**REST API schema.** For any endpoint path, request/response body, header, or status code, read the vendored OpenAPI pin in [`resources/its-rest/`](resources/its-rest/README.md) (`*-validation.openapi.yaml`) rather than guessing — it is the machine-readable contract. Refresh/verify with `make its-rest-sync` / `make its-rest-drift`. EHRbase-specific deployment extensions that a call still uses (for example `PurgeTemplates`) are documented on that call and in REQ-099, not by a second OpenAPI pin. In-tree third-party licences are inventoried in [`LICENSING.md`](LICENSING.md).
 
 ## Do not touch (yet)
 
