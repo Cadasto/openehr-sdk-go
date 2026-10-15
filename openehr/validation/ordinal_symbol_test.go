@@ -57,10 +57,13 @@ type ordinalIssue struct {
 // REQ-102 / REQ-103: at a DV_ORDINAL bound to a C_DV_ORDINAL the template
 // validator checks the value and the symbol's defining code together, so a
 // symbol that does not match its value, or names another terminology, is
-// reported as primitive_not_in_list on the template layer. A symbol whose
-// defining code is incomplete is left to the RM rules, which report it, so
-// it is reported once and draws no primitive_* issue. Each row runs with the
-// ordinal held by pointer, as decoded, and by value.
+// reported as primitive_not_in_list on the template layer. A defining code
+// with no code string is left to the RM rules, which report it, and draws no
+// primitive_* issue. A defining code with no terminology_id is still checked
+// by its code, which matches a listed pair under REQ-103's rule, while the
+// RM rules report the missing terminology; so a swapped code there is
+// reported beside it. Each row runs with the ordinal held by pointer, as
+// decoded, and by value.
 func TestValidateComposition_REQ102_REQ103_OrdinalSymbolPair(t *testing.T) {
 	t.Parallel()
 	c := mustCompile(t, "Demonstration.v1")
@@ -112,6 +115,17 @@ func TestValidateComposition_REQ102_REQ103_OrdinalSymbolPair(t *testing.T) {
 			name:   "defining code with no terminology_id",
 			change: func(o *rm.DVOrdinal) { o.Symbol.DefiningCode.TerminologyID.Value = "" },
 			want: []ordinalIssue{
+				{Code: "required", Path: ordinalValuePath + "/symbol/defining_code/terminology_id", Layer: validation.LayerRM, Rule: "mandatory"},
+			},
+		},
+		{
+			name: "no terminology_id and the symbol code of value 2",
+			change: func(o *rm.DVOrdinal) {
+				o.Symbol.DefiningCode.TerminologyID.Value = ""
+				o.Symbol.DefiningCode.CodeString = "at0040"
+			},
+			want: []ordinalIssue{
+				notInList,
 				{Code: "required", Path: ordinalValuePath + "/symbol/defining_code/terminology_id", Layer: validation.LayerRM, Rule: "mandatory"},
 			},
 		},

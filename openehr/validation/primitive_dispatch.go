@@ -107,17 +107,19 @@ func dataValueInput(dv rm.DataValue) (any, bool) {
 }
 
 // ordinalInput returns the value [constraints.CDvOrdinal.Validate] checks
-// for o. When the symbol's defining_code carries both a terminology and a
-// code string, it returns the value and that code as one
-// [constraints.OrdinalSymbol], so a symbol that does not match its value is
-// reported. Otherwise it returns the value alone: the RM rules report the
-// incomplete code, so it is reported once.
+// for o. When the symbol's defining_code carries a code string, it returns
+// the value and that code as one [constraints.OrdinalSymbol], so a symbol
+// that does not match its value is reported; a code naming no terminology
+// matches a listed pair by its code (REQ-103) while the RM rules report the
+// missing terminology. When the code string is empty it returns the value
+// alone: the RM rules report the empty code, and the template adds no
+// finding for it.
 //
 // DV_ORDINAL.value is Integer (int32) per the RM; widening it to int is
 // safe on every supported Go platform.
 func ordinalInput(o *rm.DVOrdinal) any {
 	code := o.Symbol.DefiningCode
-	if code.TerminologyID.Value == "" || code.CodeString == "" {
+	if code.CodeString == "" {
 		return int(o.Value)
 	}
 	return constraints.OrdinalSymbol{
