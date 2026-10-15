@@ -84,7 +84,7 @@ func run() error {
 
 	// Step 5: validate the decoded copy, the one a server would receive,
 	// against the same compiled template the builder used. The call checks
-	// the template constraints and then the RM floor over the whole
+	// the template constraints and the RM floor in one walk over the
 	// composition.
 	if !report("validation", validation.ValidateComposition(decoded, compiled)) {
 		return errors.New("round-tripped composition is not valid")

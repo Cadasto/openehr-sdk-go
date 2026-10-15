@@ -8,11 +8,11 @@
 //   - the template constraints: what the OPT declares, node by node:
 //     existence, cardinality, RM type, archetype identity and value
 //     constraints;
-//   - the RM floor: the openEHR Reference Model itself, over the whole
-//     composition: the attributes the RM makes mandatory on every node, and
-//     the RM's own rules for each type, such as an ELEMENT carrying exactly
-//     one of a value or a null flavour, and every COMPOSITION and ENTRY
-//     carrying archetype_details.
+//   - the RM floor: the openEHR Reference Model itself, over every part of
+//     the composition the template admits: the attributes the RM makes
+//     mandatory on every node, and the RM's own rules for each type, such
+//     as an ELEMENT carrying exactly one of a value or a null flavour, and
+//     every COMPOSITION and ENTRY carrying archetype_details.
 //
 // A defect both find is reported once. validation.ValidateRM is the floor
 // alone, for a root no template applies to.

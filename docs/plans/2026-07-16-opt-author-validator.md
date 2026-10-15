@@ -5,7 +5,7 @@ kind: plan
 # Plan — OPT author validator + CLI
 
 **Date:** 2026-07-16
-**Status:** Draft — not started
+**Status:** Draft — not started. Re-checked at `aad783b7` (after v0.34.0): what exists stops at the first problem and serves the SDK, not an author. `template.ParseOPTStrict` / `ParseFileStrict` refuse an unknown node type that carries nested attributes and a `CONSTRAINT_REF` with no reference ([§ REQ-100 *Strict parse mode*](../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths)); `templatecompile.Compile` refuses input it cannot compile; `webtemplate.Build` refuses an id collision; each returns one error. `openehr/validation` checks instances and AQL against a compiled template, not the template itself. Nothing collects author-facing issues with codes, checks term definitions or the lifecycle state, or ships a CLI. REQ-114 stays reserved.
 **Owner:** SDK maintainers
 **Covers:** **REQ-114** (OPT author validator) — proposed; canonical home to be authored at `clinical-modeling.md` § REQ-114 in Phase 0. The number is reserved in [REQ.md § Numbering policy](../specifications/REQ.md#numbering-policy).
 **Builds on:** landed [REQ-100](../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths) (OPT parse), [REQ-104](../specifications/clinical-modeling.md#req-104--slot-assertion-grammar) (slot assertions), [REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export) (Web Template export), [REQ-108](../specifications/clinical-modeling.md#req-108--untrusted-document-bounds) (document bounds); complementary to [REQ-102](../specifications/clinical-modeling.md#req-102--composition-validation) (composition validation)

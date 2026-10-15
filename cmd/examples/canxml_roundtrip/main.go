@@ -90,10 +90,10 @@ func preview(doc []byte, n int) string {
 	return string(doc[:n]) + "..."
 }
 
-// sameJSON reports whether two JSON documents describe the same value tree.
-// Null members are dropped before comparing because the SDK treats a null
-// member and an absent member as the same thing, and the two codecs may pick
-// either spelling for an empty optional field.
+// sameJSON reports whether two JSON documents describe the same value tree,
+// whatever their member order. Both sides come from canjson, which leaves out
+// a member that holds no value instead of writing it as null, so the two trees
+// compare as they are.
 func sameJSON(a, b []byte) (bool, error) {
 	var treeA, treeB any
 	if err := json.Unmarshal(a, &treeA); err != nil {
@@ -102,28 +102,5 @@ func sameJSON(a, b []byte) (bool, error) {
 	if err := json.Unmarshal(b, &treeB); err != nil {
 		return false, fmt.Errorf("parse JSON for comparison: %w", err)
 	}
-	return reflect.DeepEqual(withoutNulls(treeA), withoutNulls(treeB)), nil
-}
-
-// withoutNulls returns a copy of a generic JSON tree with every null object
-// member removed, at any depth.
-func withoutNulls(v any) any {
-	switch node := v.(type) {
-	case map[string]any:
-		out := make(map[string]any, len(node))
-		for key, val := range node {
-			if val != nil {
-				out[key] = withoutNulls(val)
-			}
-		}
-		return out
-	case []any:
-		out := make([]any, len(node))
-		for i, item := range node {
-			out[i] = withoutNulls(item)
-		}
-		return out
-	default:
-		return v
-	}
+	return reflect.DeepEqual(treeA, treeB), nil
 }
