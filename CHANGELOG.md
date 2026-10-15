@@ -31,7 +31,7 @@ Template validation and the RM floor run as one walk, a response whose body cann
 - **Breaking: FLAT carries the whole composer at its real path (REQ-053, ADR 0029).** Decode reads the composer's reference and identifiers at `<root>/composer`, and encode writes there a composer that `ctx/composer_name` or `ctx/composer_self` cannot carry whole.
 - **Breaking: FLAT carries a renamed composition as `<root>/_name` (REQ-140).** Decode names the composition from it, and encode writes it when the name differs from the template's.
 - **Breaking: FLAT and STRUCTURED read a `null` as absent (REQ-053).** `|magnitude: null` beside a unit is refused as a missing magnitude instead of decoding as 0.
-- **A FLAT value that does not fit its attribute is refused naming its key (REQ-053).** The error wraps `simplified.ErrUnsupportedDatatype`, for required and optional suffixes alike.
+- **A FLAT value that does not fit its attribute is refused naming its key (REQ-053).** The error wraps `simplified.ErrUnsupportedDatatype`, a `|raw` fragment included, and a `|raw` at a node with children is refused, not dropped.
 - **An `Integer` accepts a whole number written `1.0` or `1e0` (REQ-052, ADR 0004).** A fraction is still refused, and an out-of-range value carries `strconv.ErrRange`.
 
 ## [0.34.0] - 2026-10-14
