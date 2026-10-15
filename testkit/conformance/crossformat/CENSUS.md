@@ -45,7 +45,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 | persistent_minimal | canonical-flat | compared 11, missing 2, extra 0, altered 1, excluded 0 |
 | persistent_minimal | flat-canonical | compared 72, missing 7, extra 0, altered 4, excluded 2 |
 | test_all_types | canonical-flat | compared 83, missing 11, extra 5, altered 11, excluded 0 |
-| test_all_types | flat-canonical | refused |
+| test_all_types | flat-canonical | compared 423, missing 353, extra 332, altered 14, excluded 14 |
 
 ## alternative_events
 
@@ -62,7 +62,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 ### flat-canonical
 
 - Outcome: compared 115, missing 8, extra 4, altered 13, excluded 4
-- Reason: INTERVAL_EVENT attributes: decode refuses math_function and width in every mode (the 4 excluded keys), so the interval event loses both and decodes as a POINT_EVENT. Sibling order: FLAT carries no order between the birth_en and any_event_en events; decode lists them in Web Template order, the canonical lists Birth first, so the leaves of all three events compare at shifted positions. HISTORY.origin: the FLAT has no origin key and decode fills it from the context start time (openehr/serialize/simplified/deviations.md), where the canonical sets it to the Birth time. RM-FLOOR archetype_details: the canonical OBSERVATION has none, decode adds it (4 extra leaves), and rm_version is 1.2.0 against 1.0.4.
+- Reason: INTERVAL_EVENT attributes: decode refuses math_function and width in every mode (the 4 excluded keys), so the interval event loses both and decodes as a POINT_EVENT. Sibling order: FLAT carries no order between the birth_en and any_event_en events; decode lists them in the sorted order of their FLAT keys, any_event_en before birth_en, the canonical lists Birth first, so the leaves of all three events compare at shifted positions. HISTORY.origin: the FLAT has no origin key and decode fills it from the context start time (openehr/serialize/simplified/deviations.md), where the canonical sets it to the Birth time. RM-FLOOR archetype_details: the canonical OBSERVATION has none, decode adds it (4 extra leaves), and rm_version is 1.2.0 against 1.0.4.
 - Missing (8):
   - `/content/0/data/events/2/math_function/_type`
   - `/content/0/data/events/2/math_function/defining_code/_type`
@@ -480,12 +480,44 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 
 ### flat-canonical
 
-- Outcome: refused
-- Error: `FLAT decode: json: cannot unmarshal into Go rm.Composition within "/content": canjson: COMPOSITION: decode /content/2 (_type="OBSERVATION"): json: cannot unmarshal into Go rm.Observation within "/data/events": canjson: OBSERVATION: json: cannot unmarshal into Go rm.History[github.com/cadasto/openehr-sdk-go/openehr/rm.ItemStructure] within "/data/events": canjson: HISTORY: decode /data/events/0 (_type="POINT_EVENT"): json: cannot unmarshal into Go rm.PointEvent[github.com/cadasto/openehr-sdk-go/openehr/rm.ItemStructure] after offset 59: canjson: POINT_EVENT: decode /data (_type="ITEM_TREE"): json: cannot unmarshal into Go rm.ItemTree within "/items": canjson: ITEM_TREE: decode /items/11 (_type="ELEMENT"): json: cannot unmarshal into Go rm.Element after offset 108: canjson: ELEMENT: decode /value (_type="DV_PROPORTION"): json: cannot unmarshal into Go rm.DVProportion after offset 66: canjson: DV_PROPORTION: json: cannot unmarshal JSON number into Go rm.Integer within "/type": rm.Integer: json: cannot unmarshal JSON number 1.0 into Go int32: invalid syntax`
-- Recorded as an error containing `unmarshal JSON number 1.0 into Go int32`
-- Reason: DV_PROPORTION type: the upstream FLAT writes proportion_any|type as 1.0, decode passes it to canjson, and canjson refuses 1.0 for the Integer type with an error that names no FLAT key, so the reducing decode cannot remove the key and the leg ends. Web Template projection: before that, the reducing decode removes the section_3 ACTION's in-context ism_transition/current_state (3 keys) and time (1), which decode refuses in every mode as RM data it would otherwise drop or replace (REQ-170).
-- Reducing decode removed 11 keys from the upstream FLAT:
+- Outcome: compared 423, missing 353, extra 332, altered 14, excluded 14
+- Reason: The 14 excluded keys are the section_3 ACTION's in-context ism_transition/current_state (3) and time (1), the composer's external_ref (3) and the identifier keys (4), refused, and choice/quantity_value|magnitude and |unit (2) and the bare proportion_any (1), reported as unmatched content, as follows. Web Template projection: decode refuses the ACTION's in-context ism_transition and time in every mode as RM data it would otherwise drop or replace (REQ-170), so the decoded ACTION has an empty current_state (3 leaves) and the context start time as its time. body-form composer: decode refuses the composer's external_ref keys, so the external_ref is missing; composer|name decodes. DV_IDENTIFIER: the FLAT writes the id as the bare value, and decode refuses the four identifier keys as missing the required |id, so the identifier element is missing. Choice element: decode does not read choice/quantity_value (the SDK spells it choice), so the choice element is missing. DV_PROPORTION: decode reports the bare proportion_any, the derived magnitude, as unmatched content, and reads |type 1.0 as the Integer 1 (wire.md § Floating-point precision). Upstream conversion differences: a DV_URI and the proportion's precision only the canonical carries, and duration_any (P1Y2M10DT2H30M against PT30M). Upstream date and time spelling: the canonical writes dates in the basic format (20190114) and date-times with a comma and +00:00, the FLAT in the extended format with a full stop and Z (9 leaves). HISTORY.origin: the FLAT has no origin key and decode fills it from the context start time (openehr/serialize/simplified/deviations.md), where the canonical sets it otherwise. ITEM_TREE vs ITEM_LIST: decode builds the INSTRUCTION activity's description as an ITEM_TREE, the canonical has the ITEM_LIST the OPT constrains (openehr/serialize/simplified/deviations.md). Sibling order: FLAT carries no order between siblings, and decode lists them in the sorted order of their FLAT keys, so the content entries (EVALUATION, SECTION, OBSERVATION against the canonical's OBSERVATION, EVALUATION, SECTION), the OBSERVATION's and the EVALUATION's elements, and section_3's ACTION and INSTRUCTION compare at shifted positions; this accounts for most of the missing, extra and altered leaves. RM-FLOOR archetype_details: the canonical SECTION and the ACTION's description CLUSTER have none, decode adds them (8 extra leaves), and rm_version is 1.2.0 against 1.0.2 and 1.0.4.
+- Missing (353, first 10 shown):
+  - `/composer/external_ref/_type`
+  - `/composer/external_ref/id/_type`
+  - `/composer/external_ref/id/scheme`
+  - `/composer/external_ref/id/value`
+  - `/composer/external_ref/namespace`
+  - `/composer/external_ref/type`
+  - `/content/0/data/events/0/_type`
+  - `/content/0/data/events/0/archetype_node_id`
+  - `/content/0/data/events/0/data/_type`
+  - `/content/0/data/events/0/data/archetype_node_id`
+- Extra (332, first 10 shown):
+  - `/content/0/data/items/0/_type`
+  - `/content/0/data/items/0/archetype_node_id`
+  - `/content/0/data/items/0/items/0/_type`
+  - `/content/0/data/items/0/items/0/archetype_node_id`
+  - `/content/0/data/items/0/items/0/items/0/_type`
+  - `/content/0/data/items/0/items/0/items/0/archetype_node_id`
+  - `/content/0/data/items/0/items/0/items/0/items/0/_type`
+  - `/content/0/data/items/0/items/0/items/0/items/0/archetype_node_id`
+  - `/content/0/data/items/0/items/0/items/0/items/0/name/_type`
+  - `/content/0/data/items/0/items/0/items/0/items/0/name/value`
+- Altered (14, first 10 shown):
+  - `/archetype_details/rm_version`: reference `"1.0.2"`, ours `"1.2.0"`
+  - `/content/0/_type`: reference `"OBSERVATION"`, ours `"EVALUATION"`
+  - `/content/0/archetype_details/archetype_id/value`: reference `"openEHR-EHR-OBSERVATION.test_all_types.v1"`, ours `"openEHR-EHR-EVALUATION.test_all_types.v1"`
+  - `/content/0/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
+  - `/content/0/archetype_node_id`: reference `"openEHR-EHR-OBSERVATION.test_all_types.v1"`, ours `"openEHR-EHR-EVALUATION.test_all_types.v1"`
+  - `/content/0/data/_type`: reference `"HISTORY"`, ours `"ITEM_TREE"`
+  - `/content/0/data/name/value`: reference `"Event Series"`, ours `"Arbol"`
+  - `/content/1/_type`: reference `"EVALUATION"`, ours `"SECTION"`
+  - `/content/1/archetype_details/archetype_id/value`: reference `"openEHR-EHR-EVALUATION.test_all_types.v1"`, ours `"openEHR-EHR-SECTION.test_all_types.v1"`
+  - `/content/1/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
+- Reducing decode removed 14 keys from the upstream FLAT:
   - 4: `simplified: decode "<key>": simplified: unsupported datatype: DV_IDENTIFIER missing required |id`
+  - 3: `reported as unmatched content`
   - 3: `simplified: decode "<key>": simplified: unsupported datatype: PARTY_PROXY`
   - 3: `simplified: path not in web template: "<key>" is the reference's in-context spelling of an ACTION's ISM transition current_state, which the Web Template this SDK builds does not model - refused rather than dropped or replaced (REQ-170, see deviations.md)`
   - 1: `simplified: path not in web template: "<key>" is the reference's in-context spelling of an ACTION's time, which the Web Template this SDK builds does not model - refused rather than dropped or replaced (REQ-170, see deviations.md)`

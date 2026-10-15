@@ -186,8 +186,9 @@ var Recorded = map[string]map[Leg]Record{
 			Reason: "INTERVAL_EVENT attributes: decode refuses math_function and width in every mode (the 4 " +
 				"excluded keys), so the interval event loses both and decodes as a POINT_EVENT. Sibling order: FLAT " +
 				"carries no order " +
-				"between the birth_en and any_event_en events; decode lists them in Web Template order, the canonical lists " +
-				"Birth first, so the leaves of all three events compare at shifted positions. HISTORY.origin: the " +
+				"between the birth_en and any_event_en events; decode lists them in the sorted order of their FLAT " +
+				"keys, any_event_en before birth_en, the canonical lists Birth first, so the leaves of all three " +
+				"events compare at shifted positions. HISTORY.origin: the " +
 				"FLAT has no origin key and decode fills it from the context start time (openehr/serialize/simplified/deviations.md), where the " +
 				"canonical sets it to the Birth time. RM-FLOOR archetype_details: the canonical OBSERVATION has none, " +
 				"decode adds it (4 extra leaves), and rm_version is 1.2.0 against 1.0.4.",
@@ -374,13 +375,34 @@ var Recorded = map[string]map[Leg]Record{
 				"and proportion type spellings above.",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Refused: "unmarshal JSON number 1.0 into Go int32"},
-			Reason: "DV_PROPORTION type: the upstream FLAT writes proportion_any|type as 1.0, decode passes it to " +
-				"canjson, and canjson refuses 1.0 for the Integer type with an error that names no FLAT key, so the " +
-				"reducing decode cannot remove the key and the leg ends. Web Template projection: before that, the " +
-				"reducing decode removes the section_3 ACTION's in-context ism_transition/current_state (3 keys) and " +
-				"time (1), which decode refuses in every mode as RM data it would otherwise drop or replace " +
-				"(REQ-170).",
+			Outcome: Outcome{Compared: 423, Missing: 353, Extra: 332, Altered: 14, Excluded: 14},
+			Reason: "The 14 excluded keys are the section_3 ACTION's in-context ism_transition/current_state (3) " +
+				"and time (1), the composer's external_ref (3) and the identifier keys (4), refused, and " +
+				"choice/quantity_value|magnitude and |unit (2) and the bare proportion_any (1), reported as " +
+				"unmatched content, as follows. Web Template projection: decode refuses the ACTION's in-context " +
+				"ism_transition and time in every mode as RM data it would otherwise drop or replace (REQ-170), so " +
+				"the decoded ACTION has an empty current_state (3 leaves) and the context start time as its time. " +
+				"body-form composer: decode refuses the composer's external_ref keys, so the external_ref is " +
+				"missing; composer|name decodes. DV_IDENTIFIER: the FLAT writes the id as the bare value, and " +
+				"decode refuses the four identifier keys as missing the required |id, so the identifier element " +
+				"is missing. Choice element: decode does not read choice/quantity_value (the SDK spells it choice), " +
+				"so the choice element is missing. DV_PROPORTION: decode reports the bare proportion_any, the " +
+				"derived magnitude, as unmatched content, and reads |type 1.0 as the Integer 1 (wire.md " +
+				"§ Floating-point precision). Upstream conversion differences: a DV_URI and the proportion's " +
+				"precision only the canonical carries, and duration_any (P1Y2M10DT2H30M against PT30M). Upstream " +
+				"date and time spelling: the canonical writes dates in the basic format (20190114) and date-times " +
+				"with a comma and +00:00, the FLAT in the extended format with a full stop and Z (9 leaves). " +
+				"HISTORY.origin: the FLAT has no origin key and decode fills it from the context start time " +
+				"(openehr/serialize/simplified/deviations.md), where the canonical sets it otherwise. ITEM_TREE vs " +
+				"ITEM_LIST: decode builds the INSTRUCTION activity's description as an ITEM_TREE, the canonical " +
+				"has the ITEM_LIST the OPT constrains (openehr/serialize/simplified/deviations.md). Sibling order: " +
+				"FLAT carries no order between siblings, and decode lists them in the sorted order of their FLAT " +
+				"keys, so the content entries (EVALUATION, SECTION, OBSERVATION against the canonical's " +
+				"OBSERVATION, EVALUATION, SECTION), the OBSERVATION's and the EVALUATION's elements, and " +
+				"section_3's ACTION and INSTRUCTION compare at shifted positions; this accounts for most of the " +
+				"missing, extra and altered leaves. RM-FLOOR archetype_details: the canonical SECTION and the " +
+				"ACTION's description CLUSTER have none, decode adds them (8 extra leaves), and rm_version is " +
+				"1.2.0 against 1.0.2 and 1.0.4.",
 		},
 	},
 }

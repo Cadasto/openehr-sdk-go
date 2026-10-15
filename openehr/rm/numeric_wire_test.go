@@ -1,6 +1,8 @@
 package rm_test
 
 import (
+	"errors"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -88,6 +90,40 @@ func TestIntegerWholeNumberWithFractionDecodes(t *testing.T) { // REQ-052, PROBE
 			}
 			if int32(p.Type) != tc.want {
 				t.Errorf("canjson.Unmarshal(type %s): Type = %d, want %d", tc.lit, p.Type, tc.want)
+			}
+		})
+	}
+}
+
+// TestIntegerRefusalThroughCanjsonKeepsShapeSentinel pins that accepting a
+// whole number written with a fraction leaves the refusals through a
+// generated RM type classified as they were (REQ-052, wire.md § Decode-side
+// shape sentinel and § Floating-point precision). A non-zero fraction or an
+// out-of-range value on DV_PROPORTION.type is refused, the generated funnel
+// wraps the refusal in canjson.ErrInvalidShape, never in the encode-only
+// canjson.ErrInvalidValue, and a quoted literal keeps its *strconv.NumError
+// cause reachable.
+func TestIntegerRefusalThroughCanjsonKeepsShapeSentinel(t *testing.T) { // REQ-052
+	t.Parallel()
+	for _, lit := range []string{`1.5`, `1e10`, `"1.5"`, `"1e10"`} {
+		t.Run(lit, func(t *testing.T) {
+			t.Parallel()
+			in := []byte(`{"_type":"DV_PROPORTION","numerator":1.5,"denominator":1.0,"type":` + lit + `}`)
+			var p rm.DVProportion
+			err := canjson.Unmarshal(in, &p)
+			if err == nil {
+				t.Fatalf("canjson.Unmarshal(type %s) = nil error, Type = %d; want a refusal", lit, p.Type)
+			}
+			if !errors.Is(err, canjson.ErrInvalidShape) {
+				t.Errorf("canjson.Unmarshal(type %s) err = %v; want it to wrap canjson.ErrInvalidShape", lit, err)
+			}
+			if errors.Is(err, canjson.ErrInvalidValue) {
+				t.Errorf("canjson.Unmarshal(type %s) err = %v; canjson.ErrInvalidValue must not appear on a decode path", lit, err)
+			}
+			if strings.HasPrefix(lit, `"`) {
+				if _, ok := errors.AsType[*strconv.NumError](err); !ok {
+					t.Errorf("canjson.Unmarshal(type %s) err = %v; want the *strconv.NumError cause reachable", lit, err)
+				}
 			}
 		})
 	}
