@@ -230,6 +230,15 @@ func suffixErr(base, label, rmType string) error {
 	return fmt.Errorf("simplified: decode %q: %w", base, inner)
 }
 
+// fitErr reproduces the shape a value that does not fit its RM attribute
+// takes (REQ-053): the refusal names the key it read the value from, quoted,
+// and the decode-site wrapper names the leaf's *base* path first.
+func fitErr(base, key string) error {
+	inner := fmt.Errorf("%w: %q does not fit DV_QUANTITY.precision (Integer), which takes a whole number in the Integer range, bare or quoted; got a JSON number",
+		simplified.ErrUnsupportedDatatype, key)
+	return fmt.Errorf("simplified: decode %q: %w", base, inner)
+}
+
 func TestRefusedSuffix(t *testing.T) {
 	tests := []struct {
 		name string
@@ -268,6 +277,8 @@ func TestDropRefusedScope(t *testing.T) {
 	const (
 		qty   = "c/obs/quantity"
 		event = "c/obs/data/any_event:0"
+		count = "c/obs/count"
+		rate  = "c/obs/rate"
 	)
 	body := func() map[string]any {
 		return map[string]any{
@@ -277,6 +288,10 @@ func TestDropRefusedScope(t *testing.T) {
 			event + "|sample_count":          3.0,
 			event + "/temperature|magnitude": 37.0,
 			event + "/temperature|unit":      "Cel",
+			count:                            1.5,
+			count + "|magnitude_status":      "=",
+			rate + "|":                       2.5,
+			rate + "|magnitude_status":       "=",
 			"c/obs/_uid":                     "x",
 			"c/obs/_uid/whatever":            "y",
 			// A string-prefix sibling, not a child: it must survive a subtree
@@ -328,6 +343,34 @@ func TestDropRefusedScope(t *testing.T) {
 			err:     fmt.Errorf("%w: conflicting spellings: %q", simplified.ErrUnknownPath, qty+"|magnitude"),
 			removed: 1,
 			gone:    []string{qty + "|magnitude"},
+		},
+		{
+			// A value that does not fit its attribute is refused naming its own
+			// key after the leaf's base (REQ-053): that key alone goes, and the
+			// modelled suffixes beside it stay (PROBE-086).
+			name:    "a value that does not fit takes only its key",
+			key:     qty,
+			err:     fitErr(qty, qty+"|precision"),
+			removed: 1,
+			gone:    []string{qty + "|precision"},
+		},
+		{
+			// A bare value that does not fit names the leaf's base as its own
+			// key: the bare key alone goes, not the suffixes sharing the base.
+			name:    "a bare value that does not fit takes only the bare key",
+			key:     count,
+			err:     fitErr(count, count),
+			removed: 1,
+			gone:    []string{count},
+		},
+		{
+			// `x|` spells the bare value of `x`, and the refusal names `x`, the
+			// key it spells: the spelling as written goes.
+			name:    "a bare value spelled x| that does not fit takes only that key",
+			key:     rate,
+			err:     fitErr(rate, rate),
+			removed: 1,
+			gone:    []string{rate + "|"},
 		},
 		{
 			// Nothing below a refused path decodes either, so the subtree goes
@@ -770,6 +813,29 @@ func TestRealCodecRefusal(t *testing.T) {
 		}
 		if _, err := decodeSubset(target, body, nil); err != nil {
 			t.Errorf("body decodes only with the refused suffix removed, but still fails: %v", err)
+		}
+	})
+
+	t.Run("value that does not fit is removed alone", func(t *testing.T) {
+		// REQ-053: a |precision with a fraction does not fit the Integer it
+		// fills. The codec refuses it naming the leaf's base first and the key
+		// itself in the refusal, and the harness removes that one key: the
+		// modelled |magnitude and |unit beside it stay in the comparison
+		// (PROBE-086).
+		body := maps.Clone(leaf)
+		body[base+"|precision"] = 1.5
+		_, refusals, err := DecodeReducing(target, body, InjectContext)
+		if err != nil {
+			t.Fatalf("DecodeReducing: %v", err)
+		}
+		if len(refusals) != 1 || refusals[0].Key != base || refusals[0].Keys != 1 {
+			t.Fatalf("DecodeReducing refusals = %+v, want one refusal of the leaf %q removing 1 key", refusals, base)
+		}
+		if !strings.Contains(refusals[0].Message, `"<key>|precision" does not fit`) {
+			t.Errorf("refusal message = %q, want the fit refusal naming the |precision key", refusals[0].Message)
+		}
+		if !maps.Equal(body, leaf) {
+			t.Errorf("DecodeReducing left %v, want exactly the modelled leaf %v", slices.Sorted(maps.Keys(body)), slices.Sorted(maps.Keys(leaf)))
 		}
 	})
 

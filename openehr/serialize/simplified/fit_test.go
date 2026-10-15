@@ -93,6 +93,42 @@ func TestREQ053ValueMustFitItsAttribute(t *testing.T) {
 	}
 }
 
+// TestREQ053CodeThatDoesNotFitAtATextLeafNamesItsKey — REQ-053: a `|code` at
+// a DV_TEXT leaf selects the DV_CODED_TEXT it carries whatever its JSON kind,
+// so one that is not a string is refused as a value that does not fit the
+// coded text's code_string, naming the `|code` key, never the `|value` beside
+// it nor the leaf alone. `|code: ""` stays a plain DV_TEXT
+// (TestEmptyCodeDoesNotPromoteTextLeaf).
+func TestREQ053CodeThatDoesNotFitAtATextLeafNamesItsKey(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	key := rmattrText + "|code"
+	for name, code := range map[string]any{"a number": 5, "a Boolean": true} {
+		t.Run(name, func(t *testing.T) {
+			body := rmattrBody(map[string]any{key: code, rmattrText + "|value": "x"})
+			want := `|code" does not fit DV_CODED_TEXT.defining_code.code_string`
+			flat := refusedInEveryMode(t, wt, body)
+			if !errors.Is(flat, ErrUnsupportedDatatype) || !strings.Contains(flat.Error(), `"`+rmattrText+want) {
+				t.Errorf("FLAT: decode = %v, want ErrUnsupportedDatatype naming %q", flat, key)
+			}
+			structured := structuredRefusedInEveryMode(t, wt, body)
+			if !errors.Is(structured, ErrUnsupportedDatatype) || !strings.Contains(structured.Error(), want) {
+				t.Errorf("STRUCTURED: decode = %v, want ErrUnsupportedDatatype naming the |code key", structured)
+			}
+		})
+	}
+}
+
+// TestREQ053FitNamesTheBareKeyAnEmptySuffixSpells — REQ-053: `x|` spells the
+// bare value of `x`, so a bare value written `x|` that does not fit is refused
+// naming `x`, the key it spells.
+func TestREQ053FitNamesTheBareKeyAnEmptySuffixSpells(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	err := refusedInEveryMode(t, wt, rmattrBody(map[string]any{rmattrCount + "|": 1.5}))
+	if !errors.Is(err, ErrUnsupportedDatatype) || !strings.Contains(err.Error(), `"`+rmattrCount+`" does not fit DV_COUNT.magnitude`) {
+		t.Errorf("decode = %v, want ErrUnsupportedDatatype naming %q", err, rmattrCount)
+	}
+}
+
 // TestREQ053FitAdmitsWhatCanonicalJSONAdmits — REQ-053: the check adds no
 // strictness beyond naming the key. A whole number written with a fraction
 // fits an Integer (REQ-052 § Floating-point precision), a quoted decimal fits

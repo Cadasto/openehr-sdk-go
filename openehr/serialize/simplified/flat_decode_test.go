@@ -93,6 +93,19 @@ func TestDvFromSuffixesStrict(t *testing.T) {
 	}
 }
 
+// TestCheckSuffixAllowlistNamesTheFirstSuffix — REQ-170: a leaf carrying more
+// than one suffix its datatype does not read is refused naming the first in
+// sorted order, the same one on every run, never one chosen by Go's map order.
+func TestCheckSuffixAllowlistNamesTheFirstSuffix(t *testing.T) {
+	sfx := map[string]any{"": "text", "value": "x", "terminology": "local"}
+	for range 64 {
+		err := checkSuffixAllowlist("DV_TEXT", sfx)
+		if !errors.Is(err, ErrUnsupportedDatatype) || !strings.Contains(err.Error(), "unexpected |terminology for DV_TEXT") {
+			t.Fatalf("checkSuffixAllowlist(DV_TEXT, %v) = %v, want |terminology, the first unexpected suffix, named", sfx, err)
+		}
+	}
+}
+
 func TestParseFlatKey(t *testing.T) {
 	tests := []struct {
 		key        string

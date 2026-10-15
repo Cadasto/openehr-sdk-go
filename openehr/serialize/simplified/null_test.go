@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"maps"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -175,6 +176,16 @@ func TestREQ053AllNullKeysReadAsAbsent(t *testing.T) {
 			rmattrRoot + "/_feeder_audit/originating_system_audit|system_id":       "s",
 			rmattrRoot + "/_feeder_audit/originating_system_audit/other_details|x": nil,
 		},
+		// FEEDER_AUDIT_DETAILS' own String and DV_DATE_TIME keys beside its
+		// system_id: a null one is absent, not a value of the wrong kind.
+		"null feeder audit version_id": {
+			rmattrRoot + "/_feeder_audit/originating_system_audit|system_id":  "s",
+			rmattrRoot + "/_feeder_audit/originating_system_audit|version_id": nil,
+		},
+		"null feeder audit time": {
+			rmattrRoot + "/_feeder_audit/originating_system_audit|system_id": "s",
+			rmattrRoot + "/_feeder_audit/originating_system_audit|time":      nil,
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			body := rmattrBody(extra)
@@ -269,6 +280,44 @@ func TestREQ053InterconversionCarriesNull(t *testing.T) {
 	want := map[string]any{"t/leaf:0": nil, "t/other": nil}
 	if !maps.Equal(flat, want) {
 		t.Errorf("StructuredToFlat = %s, want %s", out, mustJSON(t, want))
+	}
+}
+
+// TestREQ053FlatToStructuredCarriesNull — REQ-053: OPT-free FLAT → STRUCTURED
+// conversion is a mechanical restructuring, so a key holding null comes across
+// holding null in every shape: a lone bare value as a null array element, a
+// suffix as a null `|suffix` member, and a bare value beside the leaf's
+// suffixes or children as the null `"|"` member, as a bare value that is not
+// null is. A slot no key fills, before a higher :index, gains no `"|"`.
+func TestREQ053FlatToStructuredCarriesNull(t *testing.T) {
+	for name, tc := range map[string]struct{ flat, want string }{
+		"lone bare value":         {`{"t/x": null}`, `{"t":{"x":[null]}}`},
+		"suffix":                  {`{"t/x|unit": null}`, `{"t":{"x":[{"|unit":null}]}}`},
+		"bare beside a suffix":    {`{"t/x": null, "t/x|unit": "mg"}`, `{"t":{"x":[{"|":null,"|unit":"mg"}]}}`},
+		"bare beside a child":     {`{"t/x": null, "t/x/y": 1}`, `{"t":{"x":[{"|":null,"y":[1]}]}}`},
+		"bare beside a family":    {`{"t/x:0": null, "t/x:0/_uid": "u"}`, `{"t":{"x":[{"|":null,"_uid":["u"]}]}}`},
+		"two spellings, one null": {`{"t/x": null, "t/x:0": "a"}`, `{"t":{"x":["a"]}}`},
+		"slot filled after a higher :index": {
+			`{"t/x:10|unit": "a", "t/x:2|unit": "b"}`,
+			`{"t":{"x":[null,null,{"|unit":"b"},null,null,null,null,null,null,null,{"|unit":"a"}]}}`,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			out, err := FlatToStructured([]byte(tc.flat))
+			if err != nil {
+				t.Fatalf("FlatToStructured(%s) = %v, want the null carried", tc.flat, err)
+			}
+			var got, want any
+			if err := json.Unmarshal(out, &got); err != nil {
+				t.Fatal(err)
+			}
+			if err := json.Unmarshal([]byte(tc.want), &want); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("FlatToStructured(%s) = %s, want %s", tc.flat, out, tc.want)
+			}
+		})
 	}
 }
 
