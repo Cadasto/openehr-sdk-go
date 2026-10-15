@@ -404,14 +404,14 @@ func decodeSubset(t *Target, keys map[string]any, opt simplified.Option) (*rm.Co
 //     …`, or `"<base>" does not fit …` for the bare value): that one key
 //     goes, and the leaf's other suffixes stay. `x|` spells the bare value
 //     of `x` and the codec names it `x`, so the spelling as written goes.
-//   - A whole key, suffix and all (`<root>/composer|id`, the composer's
-//     `external_ref`): that one entry goes. `composer|name` beside it is an
-//     accepted alias and stays.
+//   - A whole key, suffix and all (`<root>/language|preferred_term`, a suffix
+//     the `ctx/language` short form cannot carry): that one entry goes.
+//     `language|code` beside it is an accepted alias and stays.
 //   - A suffix of a leaf named by its base ("unexpected |value for DV_TEXT",
 //     a DV_TEXT `|value` without the `|code` that selects the coded subtype),
-//     or its bare value ("unexpected bare value for PARTY_PROXY", the
-//     composer's bare value): only that one entry goes, and the rest of the
-//     leaf stays.
+//     or its bare value ("unexpected bare value for DV_STATE", at a leaf
+//     whose datatype has neither a suffix set nor a sub-path grammar): only
+//     that one entry goes, and the rest of the leaf stays.
 //   - Any other ErrUnsupportedDatatype refusal naming a leaf's base (a
 //     missing required suffix): the leaf's own entries go, but *not* the
 //     subtree beneath it, which belongs to other nodes or families.

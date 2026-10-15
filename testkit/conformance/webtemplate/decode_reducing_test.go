@@ -108,13 +108,12 @@ func TestDecodeReducingKeepsRefusalsOnError(t *testing.T) {
 
 	_, leaf := modelledQuantityLeaf(t, target)
 	stringKey, stringValue := emptyStringLeaf(target)
-	// Decode reads leaf groups in sorted key order and checks the context
-	// after them, so the composer's external_ref, sorting first, is refused and
-	// removed before the irreducible error stops the loop.
-	refused := target.Root + "/composer|id"
-	if refused >= stringKey {
-		t.Fatalf("refused key %q does not sort before the leaf %q; pick another", refused, stringKey)
-	}
+	// Decode judges the template root's index while it separates the
+	// composition context, before it reads a leaf or checks the context, so a
+	// key under `<root>:1/` is refused and removed before the irreducible
+	// error stops the loop. (The composer's external_ref served here until its
+	// real path became its carrier, ADR 0029.)
+	refused := target.Root + ":1/no_such_node"
 	irreducible := []struct {
 		name    string
 		mode    ContextMode
@@ -136,7 +135,7 @@ func TestDecodeReducingKeepsRefusalsOnError(t *testing.T) {
 	for _, tt := range irreducible {
 		t.Run(tt.name, func(t *testing.T) {
 			body := maps.Clone(leaf)
-			body[refused] = "1234-5678"
+			body[refused] = "x"
 			tt.change(body)
 
 			_, refusals, err := DecodeReducing(target, body, tt.mode)
@@ -144,10 +143,11 @@ func TestDecodeReducingKeepsRefusalsOnError(t *testing.T) {
 				t.Fatalf("DecodeReducing() error = %v, want an *IrreducibleError with key %q", err, tt.wantKey)
 			}
 			want := []Refusal{{
-				Key:     refused,
-				Reason:  "unsupported datatype: PARTY_PROXY",
-				Message: `simplified: decode "<key>": simplified: unsupported datatype: PARTY_PROXY`,
-				Keys:    1,
+				Key:    refused,
+				Reason: "path not in web template",
+				Message: `simplified: "<key>": simplified: path not in web template: FLAT id "` + target.Root +
+					`" carries :1, but the template root is the one COMPOSITION, not an indexed list`,
+				Keys: 1,
 			}}
 			if !slices.Equal(refusals, want) {
 				t.Errorf("DecodeReducing() refusals = %+v, want %+v", refusals, want)

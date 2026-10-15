@@ -91,12 +91,13 @@ var metaLeaves = map[string]bool{
 //
 // `composer` cannot be base-matched the way `language` can, because its suffixes
 // do not all mean the same thing: `|name` is a respelling (`ctx/composer_name`),
-// while `|id` / `|id_scheme` / `|id_namespace` are the PARTY_PROXY
-// `external_ref`, which no `ctx/` short form can carry. ADR 0015 refuses those
-// three rather than silently dropping them, so they must reach decode and land in
-// the census as an excluded PARTY_PROXY family. Base-matching `composer` absorbed
-// all four into the hold-out and hid 12 corpus keys of real data loss (PR #86
-// review, round 3).
+// while `|id` / `|id_scheme` / `|id_namespace` / `|type` (the composer's
+// `external_ref`) and its `_identifier:N` and `/relationship` sub-paths are no
+// respelling: no `ctx/` short form carries them. Decode reads them and encode
+// writes them at the same real path (ADR 0029), so they reach the comparison and
+// the census compares them. Base-matching `composer` once absorbed the
+// external_ref into the hold-out and hid 12 corpus keys the codec then refused
+// (PR #86 review, round 3).
 //
 // This set MUST stay in step with simplified.MetadataAliasSpellings and
 // simplified.MetadataWitnessSpellings (ADR 0015): those tables decide which
@@ -152,12 +153,12 @@ var contextMetaLeaves = map[string]bool{
 //     same information on a different surface, a documented codec deviation
 //     with no data lost. Comparing across the two spellings would report every
 //     such key as both missing and extra.
-//   - `composer|id`, `|id_scheme` and `|id_namespace` are not held out, which
-//     is why the match is suffix-aware. They are the PARTY_PROXY
-//     `external_ref`, which the `ctx/` short forms cannot carry, so the codec
-//     refuses them on decode. They flow through to the codec, are refused
-//     there, and are counted as an excluded PARTY_PROXY family: real data
-//     loss, visible in the census, instead of being absorbed by a base match.
+//   - `composer|id`, `|id_scheme`, `|id_namespace` and `|type`, and the
+//     composer's `_identifier:N` and `/relationship`, are not held out, which
+//     is why the match is suffix-aware. No `ctx/` short form carries them:
+//     they carry the rest of the composer at its real path, which decode
+//     reads and encode writes (ADR 0029), so they are compared like any
+//     content key instead of being absorbed by a base match.
 //
 // Keys are held out even when decode happens to accept them, so a metadata
 // key that survives decode does not resurface as a phantom "missing" when
@@ -189,8 +190,9 @@ func IsCompositionMeta(key, root string) bool {
 	}
 	rel = unindexedSpelling(rel)
 	// Suffix-aware first, on the spelling as written once its `:0` indexes are
-	// gone: `composer|name` is a respelling, `composer|id` is refused data loss,
-	// and only an exact match can tell them apart.
+	// gone: `composer|name` is a respelling, `composer|id` is the composer's
+	// external_ref at its real path, and only an exact match can tell them
+	// apart.
 	if metaSpellings[rel] {
 		return true
 	}
