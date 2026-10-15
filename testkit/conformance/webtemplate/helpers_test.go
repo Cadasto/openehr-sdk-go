@@ -300,6 +300,10 @@ func TestDropRefusedScope(t *testing.T) {
 			// drop of `c/obs/_uid`. strings.HasPrefix on the bare base — without
 			// the "/" — would take it too.
 			"c/obs/_uid_based_id": "z",
+			// A metadata leaf: `|code` is the ctx/language alias the decode
+			// reads, `|preferred_term` a suffix the short form cannot carry.
+			"c/language|code":           "en",
+			"c/language|preferred_term": "English",
 		}
 	}
 
@@ -331,13 +335,15 @@ func TestDropRefusedScope(t *testing.T) {
 		{
 			// A refusal naming a whole key covers that key alone, whichever
 			// sentinel it carries: `language|preferred_term` is refused, the
-			// `language|code` beside it is an accepted alias (PROBE-086: each
-			// refusal removes only what it names).
-			name:    "a whole key takes only that entry",
-			key:     qty + "|unit",
-			err:     fmt.Errorf("simplified: decode %q: %w: PARTY_PROXY", qty+"|unit", simplified.ErrUnsupportedDatatype),
+			// `language|code` beside it is an accepted alias and stays
+			// (PROBE-086: each refusal removes only what it names). The error
+			// is the codec's own refusal of that suffix.
+			name: "a whole key takes only that entry",
+			key:  "c/language|preferred_term",
+			err: fmt.Errorf("%w: %q is not a spelling the ctx/ short form can carry — ctx/language owns this leaf, so only its accepted suffixes travel (see deviations.md)",
+				simplified.ErrUnsupportedDatatype, "c/language|preferred_term"),
 			removed: 1,
-			gone:    []string{qty + "|unit"},
+			gone:    []string{"c/language|preferred_term"},
 		},
 		{
 			name:    "a whole key under ErrUnknownPath takes only that entry",
