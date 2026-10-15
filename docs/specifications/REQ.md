@@ -147,5 +147,5 @@ A plan may reserve a number before its spec text exists; record the reservation 
 
 - REQ-114: reserved for the OPT author validator.
 - REQ-115: reserved for the FLAT author linter.
-- REQ-124 and REQ-125: reserved for the deferred RM-function stubs.
+- REQ-124 and REQ-125: retired, never reused; they were reserved for the deferred RM-function stubs, which [rm-functions.md](rm-functions.md) records as out of scope.
 - REQ-141: retired, never reused.

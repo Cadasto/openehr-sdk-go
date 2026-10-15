@@ -5,7 +5,7 @@ kind: plan
 # Plan — FLAT author linter (pre-submit path validation)
 
 **Date:** 2026-07-16
-**Status:** Draft — not started
+**Status:** Draft — not started. Re-checked at `aad783b7` (after v0.34.0): the FLAT decode now covers much of the goal. With `WithUnmatched`, `UnmarshalFlat` reports every key that matches nothing (an unknown path, a suffix outside its datatype's set, an unread `ctx/` field) by its path and value-free, and `WithStrict` refuses the first ([wire.md § REQ-170](../specifications/wire.md#req-170--unmatched-content-on-decode)). A malformed value, a missing required suffix, a disagreeing pair of spellings and an index past its bound fail the decode in every mode, and `WithTemplate` completes the RM-mandatory attributes so the result can be validated against the OPT. Not covered: a collect-all report with codes (the decode stops at the first key it refuses), the required composition-level key check (the decode never refuses an absent key), typo suggestions, and a CLI. REQ-115 stays reserved; Phase 0 would now scope it to what REQ-170 leaves out, or the maintainer retires it.
 **Owner:** SDK maintainers
 **Covers:** **REQ-115** (FLAT author linter) — proposed; canonical home to be authored at `clinical-modeling.md` § REQ-115 in Phase 0. The number is reserved in [REQ.md § Numbering policy](../specifications/REQ.md#numbering-policy).
 **Related:** sits next to the REQ-109 (AQL static lint) and REQ-110 (template-driven validation) tooling.
