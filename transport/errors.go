@@ -69,8 +69,9 @@ var (
 	// ErrResponseTooLarge indicates the response body was longer than the
 	// [WithMaxResponseBody] ceiling, so the transport stopped reading it. The
 	// error that wraps it names the limit. On a 2xx it is the cause inside a
-	// [BodyReadError]; on any other status it is wrapped beside the
-	// [WireError].
+	// [BodyReadError], and the retry policy does not send the request again,
+	// since every attempt would stop at the same ceiling; on any other status
+	// it is wrapped beside the [WireError], which is retried by its status.
 	ErrResponseTooLarge = errors.New("transport: response body too large")
 )
 

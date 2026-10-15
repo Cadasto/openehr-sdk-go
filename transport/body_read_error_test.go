@@ -8,9 +8,9 @@ package transport_test
 // parsed Metadata beside a *transport.BodyReadError; on any other status, an
 // error that wraps the *transport.WireError the status classifies and, beside
 // it, the read failure. They also pin the retry gate (a 2xx whose body was
-// lost is sent again only for a safe method, and a body lost on either arm is
-// never sent again once the caller's context has ended) and the value-free
-// Error() text.
+// lost is sent again only for a safe method and never when it was over the
+// ceiling, and a body lost on either arm is never sent again once the
+// caller's context has ended) and the value-free Error() text.
 //
 // External, like decode_error_test.go, so every assertion goes through the
 // surface a consumer sees. The servers are real httptest servers, so the read
@@ -632,6 +632,75 @@ func TestBodyReadErrorRetryGate(t *testing.T) { // REQ-172
 			}
 			if got := hits.Load(); got != tc.wantHits {
 				t.Errorf("%s with a cut %d body hit the server %d times, want %d", tc.method, tc.status, got, tc.wantHits)
+			}
+		})
+	}
+}
+
+// TestBodyReadErrorOverLimitIsNotSentAgain pins a limit inside REQ-172 § Retry,
+// which allows a safe method whose 2xx body could not be read to be sent again
+// but does not require it. A GET whose 200 body is over the
+// WithMaxResponseBody ceiling is sent once: every attempt would read up to the
+// same ceiling again and stop there. The 503 over the ceiling is the contrast:
+// the non-2xx arm is still retried by its status, as any *WireError is.
+func TestBodyReadErrorOverLimitIsNotSentAgain(t *testing.T) { // REQ-172, REQ-091
+	const (
+		attempts = 3
+		limit    = 16
+	)
+	body := strings.Repeat(bodyReadBodyMarker, 4)
+	cases := []struct {
+		name     string
+		status   int
+		wantHits int32
+	}{
+		{name: "GET 200 over the ceiling is sent once", status: http.StatusOK, wantHits: 1},
+		{name: "GET 503 over the ceiling is retried by status", status: http.StatusServiceUnavailable, wantHits: attempts},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var hits atomic.Int32
+			c := newBodyReadClient(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				hits.Add(1)
+				w.Header().Set("ETag", `"`+cutBodyETag+`"`)
+				w.WriteHeader(tc.status)
+				_, _ = io.WriteString(w, body)
+			}),
+				transport.WithMaxResponseBody(limit),
+				transport.WithRetry(transport.RetryPolicy{
+					MaxAttempts:    attempts,
+					InitialBackoff: time.Millisecond,
+					MaxBackoff:     time.Millisecond,
+				}),
+			)
+
+			resp, err := c.Do(t.Context(), &transport.Request{Method: http.MethodGet, Path: "/ehr/abc", Route: "/ehr/{ehr_id}"})
+			if err == nil {
+				t.Fatalf("Do of a %d-byte body under a %d-byte limit succeeded; the premise of this test is gone", len(body), limit)
+			}
+			if !errors.Is(err, transport.ErrResponseTooLarge) {
+				t.Errorf("errors.Is(err, transport.ErrResponseTooLarge) = false for %v", err)
+			}
+			if resp == nil || resp.StatusCode != tc.status {
+				t.Errorf("Do returned Response %+v, want a non-nil %d", resp, tc.status)
+			}
+			if tc.status == http.StatusOK {
+				bre, ok := errors.AsType[*transport.BodyReadError](err)
+				if !ok {
+					t.Errorf("errors.AsType[*transport.BodyReadError] did not match %T (%v)", err, err)
+				} else if bre.StatusCode != tc.status {
+					t.Errorf("BodyReadError.StatusCode = %d, want %d", bre.StatusCode, tc.status)
+				}
+			} else {
+				we, ok := errors.AsType[*transport.WireError](err)
+				if !ok {
+					t.Errorf("errors.AsType[*transport.WireError] did not match %T (%v)", err, err)
+				} else if we.StatusCode != tc.status {
+					t.Errorf("WireError.StatusCode = %d, want %d", we.StatusCode, tc.status)
+				}
+			}
+			if got := hits.Load(); got != tc.wantHits {
+				t.Errorf("GET with a %d body over the ceiling hit the server %d times, want %d", tc.status, got, tc.wantHits)
 			}
 		})
 	}
