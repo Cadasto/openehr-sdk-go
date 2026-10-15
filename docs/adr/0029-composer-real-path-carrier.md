@@ -12,7 +12,7 @@ date: 2026-10-15
 - **Supersedes:** —
 - **Superseded by:** —
 - **Strand:** none — a direct decision.
-- **Amends:** [ADR 0015](0015-flat-metadata-spelling.md) decision 5 (its first bullet, the composer's `external_ref`), [REQ-053](../specifications/wire.md#req-053) (the composition-level metadata rule), [REQ-140](../specifications/wire.md#req-140--underscore-prefixed-rm-attributes) (the out-of-scope classes and the deliberate exclusions), [REQ-170](../specifications/wire.md#req-170--unmatched-content-on-decode) (the carrier-less keys). **Applies:** PROBE-086, PROBE-089, PROBE-105.
+- **Amends:** [ADR 0015](0015-flat-metadata-spelling.md) decision 5 (its first bullet, the composer's `external_ref`) and decision 2 (encode writes `ctx/` only, now except a composer those forms cannot carry), [REQ-053](../specifications/wire.md#req-053) (the composition-level metadata rule), [REQ-140](../specifications/wire.md#req-140--underscore-prefixed-rm-attributes) (the out-of-scope classes and the deliberate exclusions), [REQ-170](../specifications/wire.md#req-170--unmatched-content-on-decode) (the carrier-less keys). **Applies:** PROBE-086, PROBE-089, PROBE-105.
 - **Related:** [ADR 0014](0014-webtemplate-reference-implementation-lock.md) pins the reference whose spelling this adopts; [ADR 0016](0016-event-context-optionals-underscore-spelling.md) took the same route for the EVENT_CONTEXT optionals, a real path rather than new `ctx/` short forms.
 
 ## Context
@@ -27,7 +27,7 @@ The choice of carrier fixes what decode accepts and what encode writes for a com
 
 The composer's real path is the carrier of the whole composer, in the party grammar § REQ-140 already gives every other party position. Decode reads it beside the two `ctx/` short forms, and a field given in both spellings must agree. Encode writes a composer that one `ctx/` short form carries whole in that form, as before, and any other composer whole at its real path with no `ctx/` composer key, so a body spells its composer one way. The mechanics are [wire.md § REQ-053](../specifications/wire.md#req-053)'s composer rule.
 
-ADR 0015's other decisions stand: the `ctx/` form remains the only spelling encode writes for the five other respelled fields, and for a composer that form carries whole.
+ADR 0015's other decisions stand, and decision 2 still holds for the four other respelled fields (`language`, `territory`, `time`, `setting`) and for a composer a `ctx/` form carries whole: the `ctx/` form remains the only spelling encode writes for them.
 
 ## Consequences
 
