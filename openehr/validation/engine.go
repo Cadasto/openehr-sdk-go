@@ -22,6 +22,7 @@ import (
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
@@ -328,10 +329,10 @@ func (e *engine) visit(n engineNode) {
 		scalar = e.checkIdentityAndType(n)
 	}
 	rulesFrom := len(e.found.issues)
-	rules, class := e.found.checkInvariants(n.value, n.rmType, n.path, n.role)
+	rules, class := e.found.checkInvariants(n.value, n.rmType, n.path)
 	rulesTo := len(e.found.issues)
 	if n.bound != nil {
-		n.bound = e.checkLeaf(n, scalar)
+		n.bound = e.checkLeaf(n, scalar, class, rules)
 	}
 	if n.bound == nil && !rmaccess.Covers(n.value) {
 		return
@@ -401,17 +402,19 @@ func (e *engine) checkIdentityAndType(n engineNode) (scalar bool) {
 	return false
 }
 
-// checkLeaf applies the template's value constraint to node n, at a leaf of
-// the template, and returns the template node n's attributes are visited
-// against: n.bound itself, or nil where the template constrains nothing below
-// the node. A slot leaf carries no structure below it, and a leaf with a
-// primitive constraint checks the value by that constraint
-// ([appendPrimitiveIssues]); below either, the node's attributes are walked
+// checkLeaf applies the template's value constraint to node n, of the bare
+// RM class class whose rules are rules, at a leaf of the template, and
+// returns the template node n's attributes are visited against: n.bound
+// itself, or nil where the template constrains nothing below the node. A
+// slot leaf carries no structure below it, and a leaf with a primitive
+// constraint checks the value by that constraint ([appendPrimitiveIssues]),
+// leaving out the part of the value the RM rules report as absent or empty
+// ([engine.leafConstraint]); below either, the node's attributes are walked
 // with the RM rules alone. A CONSTRAINT_REF names a value set outside the
 // SDK and checks nothing locally: its path is listed in
 // [Coverage.External], and the bound value's attributes are visited against
 // the node as at any other.
-func (e *engine) checkLeaf(n engineNode, scalar bool) *tcimpl.CompiledNode {
+func (e *engine) checkLeaf(n engineNode, scalar bool, class string, rules *classRules) *tcimpl.CompiledNode {
 	if n.bound.IsSlot() {
 		return nil
 	}
@@ -419,7 +422,9 @@ func (e *engine) checkLeaf(n engineNode, scalar bool) *tcimpl.CompiledNode {
 	if pc == nil {
 		return n.bound
 	}
-	e.found.issues = appendPrimitiveIssues(e.found.issues, n.value, n.path, pc)
+	if judged := e.leafConstraint(n, class, rules, pc); judged != nil {
+		e.found.issues = appendPrimitiveIssues(e.found.issues, n.value, n.path, judged)
+	}
 	if !isConstraintRef(pc) {
 		return nil
 	}
@@ -428,6 +433,62 @@ func (e *engine) checkLeaf(n engineNode, scalar bool) *tcimpl.CompiledNode {
 		return nil // a scalar has no attributes to visit
 	}
 	return n.bound
+}
+
+// constrainedPart names, for each RM class whose value a primitive
+// constraint reads by its parts, the part the constraint reads that the RM
+// requires: a CODE_PHRASE's code_string, a DV_QUANTITY's units, and the
+// value of the DV_DATE, DV_TIME, DV_DATE_TIME and DV_DURATION an AOM 1.4
+// short name binds. A DV_ORDINAL's symbol code lies two levels down, and
+// [ordinalInput] leaves it out when it is empty.
+var constrainedPart = map[string]string{
+	"CODE_PHRASE":  "code_string",
+	"DV_QUANTITY":  "units",
+	"DV_DATE":      "value",
+	"DV_TIME":      "value",
+	"DV_DATE_TIME": "value",
+	"DV_DURATION":  "value",
+}
+
+// leafConstraint returns the primitive constraint pc, bound to node n of
+// the bare RM class class whose rules are rules, as it judges the value:
+// pc itself, unless the RM rules report the part of the value pc reads as
+// absent or empty ([engine.reportsEmptyPart]). The RM's `required` at that
+// part is then the one finding for it, and pc judges only what the part
+// leaves: a C_CODE_PHRASE, its code list set aside, still judges the
+// terminology by its own rule, and any other constraint is left nothing,
+// so leafConstraint returns nil. A C_DV_QUANTITY's ranges are per unit,
+// and a temporal short name reads the value alone.
+func (e *engine) leafConstraint(n engineNode, class string, rules *classRules, pc constraints.PrimitiveConstraint) constraints.PrimitiveConstraint {
+	if !e.reportsEmptyPart(n, class, rules) {
+		return pc
+	}
+	if cp, ok := pc.(constraints.CodePhrase); ok {
+		return constraints.CodePhrase{Terminology: cp.Terminology}
+	}
+	return nil
+}
+
+// reportsEmptyPart reports whether the RM rules report the part of node n's
+// value a primitive constraint reads ([constrainedPart]) as absent or empty,
+// n being of the bare RM class class whose rules are rules. They do when
+// the walk visits the node's attributes, which it does on a value of a
+// registered RM class short of the depth limit, and the part is mandatory
+// there as the RM rules read it ([attrFromFacts]) and absent through the
+// generated access, which reads an empty string as absent. A part the
+// node's role lets be blank ([mayBeBlank]), a DV_SCALE symbol's
+// code_string, is not mandatory there, so the constraint still judges it.
+func (e *engine) reportsEmptyPart(n engineNode, class string, rules *classRules) bool {
+	part, ok := constrainedPart[class]
+	if !ok || n.depth >= e.maxDepth || !rmaccess.Covers(n.value) {
+		return false
+	}
+	f, listed := classAttributes[class].lookup(part)
+	if !listed {
+		return false
+	}
+	a := attrFromFacts(n, f, rules)
+	return a.mandatory && !readAttribute(n.value, a).present
 }
 
 // visitAttributes visits the attributes of node n, of the bare RM class

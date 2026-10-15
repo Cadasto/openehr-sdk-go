@@ -306,20 +306,20 @@ func runtimeRMType(val any, declared string) string {
 }
 
 // checkInvariants runs the RM rules of the class of the node value, of RM
-// type rmType, at path, in role role, and records the class as visited. The
-// rules are the inventory's ([floorRules]): the evaluators of the evaluated
-// invariants the class and its ancestors declare, the coded ones included,
-// and the attribute checks that apply to the class. A type no registered
-// class has runs nothing (this is a floor, not an exhaustive RM check). It
-// returns the class's rules, nil for such a type, and the bare class name of
-// rmType, which the walk reads the class's attributes by ([classAttributes]).
-func (f *findings) checkInvariants(value any, rmType, path string, role floorRole) (*classRules, string) {
+// type rmType, at path, and records the class as visited. The rules are the
+// inventory's ([floorRules]): the evaluators of the evaluated invariants the
+// class and its ancestors declare, the coded ones included, and the
+// attribute checks that apply to the class. A type no registered class has
+// runs nothing (this is a floor, not an exhaustive RM check). It returns the
+// class's rules, nil for such a type, and the bare class name of rmType,
+// which the walk reads the class's attributes by ([classAttributes]).
+func (f *findings) checkInvariants(value any, rmType, path string) (*classRules, string) {
 	rules, class := rulesFor(rmType)
 	if rules == nil {
 		return nil, class
 	}
 	f.visited = f.visited.with(rules.index)
-	n := floorNode{value: value, rmType: rmType, path: path, role: role}
+	n := floorNode{value: value, rmType: rmType, path: path}
 	for _, c := range rules.checks {
 		c.run(f, n, c.rule)
 	}

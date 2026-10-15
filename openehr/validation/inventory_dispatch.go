@@ -54,7 +54,6 @@ type floorNode struct {
 	value  any
 	rmType string
 	path   string
-	role   floorRole
 }
 
 // invariantCheck binds an evaluated invariant to the evaluator that
