@@ -12,6 +12,7 @@ package simplified
 import (
 	"errors"
 	"maps"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -26,10 +27,43 @@ var (
 	}
 )
 
+// Values a misfit `|raw` member holds, which no refusal may echo: a string
+// where the attribute takes a number, and a number where it takes a string.
+const (
+	rawSecretText   = "secret-raw-0451"
+	rawSecretNumber = 4510451
+)
+
+// Fragments whose `_type` fits the attribute each fills but whose members
+// canonical JSON does not decode as that `_type`, for the member-misfit cases
+// below.
+var (
+	misfitText       = map[string]any{"_type": "DV_TEXT", "value": rawSecretNumber}
+	misfitCodePhrase = map[string]any{
+		"_type": "CODE_PHRASE", "code_string": rawSecretNumber,
+		"terminology_id": map[string]any{"_type": "TERMINOLOGY_ID", "value": "local"},
+	}
+	misfitCodedText = map[string]any{"_type": "DV_CODED_TEXT", "value": "x", "defining_code": misfitCodePhrase}
+	misfitQuantity  = map[string]any{"_type": "DV_QUANTITY", "magnitude": rawSecretText, "units": "kg"}
+	misfitCount     = map[string]any{"_type": "DV_COUNT", "magnitude": rawSecretText}
+	misfitDateTime  = map[string]any{"_type": "DV_DATE_TIME", "value": rawSecretNumber}
+	misfitDuration  = map[string]any{"_type": "DV_DURATION", "value": rawSecretNumber}
+	misfitMultimed  = map[string]any{
+		"_type": "DV_MULTIMEDIA", "media_type": rawCodePhr, "size": rawSecretText,
+		"uri": map[string]any{"_type": "DV_URI", "value": "http://x"},
+	}
+	misfitParsable   = map[string]any{"_type": "DV_PARSABLE", "value": "x", "formalism": rawSecretNumber}
+	misfitIdentifier = map[string]any{"_type": "DV_IDENTIFIER", "id": rawSecretNumber}
+)
+
 // TestREQ053RawFragmentMustFitItsAttribute — REQ-053 / REQ-140: a `|raw`
-// fragment whose `_type` the RM attribute it fills does not admit is refused
-// in every mode, wrapping ErrUnsupportedDatatype and naming the `|raw` key, at
-// every position a fragment is placed: the underscore families that are one
+// fragment that canonical JSON would refuse at the RM attribute it fills is
+// refused in every mode, wrapping ErrUnsupportedDatatype and naming the `|raw`
+// key: one whose `_type` the attribute does not admit, one whose `_type` it
+// admits but whose members do not decode as that `_type`, and one naming an
+// abstract class no value can be. The refusal echoes neither a member's value
+// nor the canonical path of the member inside the fragment. It holds at every
+// position a fragment is placed: the underscore families that are one
 // datatype (`_name`, `_null_reason`, `_null_flavour`, `_language`, `_charset`,
 // `_thumbnail`, `_accuracy`), the sub-objects of the recursive grammar (an
 // interval bound held by value and one held as DV_ORDERED, a reference range's
@@ -146,12 +180,119 @@ func TestREQ053RawFragmentMustFitItsAttribute(t *testing.T) {
 			extra: map[string]any{rmattrObs + "|raw": rawQuantity},
 			key:   rmattrObs + "|raw",
 		},
+		// The `_type` fits, but a member does not decode as that `_type`.
+		"_name, a DV_TEXT member that does not fit": {
+			extra: map[string]any{rootNameKey + "|raw": misfitText},
+			key:   rootNameKey + "|raw",
+		},
+		"_null_reason, a DV_TEXT member that does not fit": {
+			extra: map[string]any{
+				rmattrCount:                                nil,
+				rmattrCount + "/_null_flavour|code":        "253",
+				rmattrCount + "/_null_flavour|terminology": "openehr",
+				rmattrCount + "/_null_flavour|value":       "unknown",
+				rmattrCount + "/_null_reason|raw":          misfitText,
+			},
+			key: rmattrCount + "/_null_reason|raw",
+		},
+		"_null_flavour, a DV_CODED_TEXT member that does not fit": {
+			extra: map[string]any{rmattrCount: nil, rmattrCount + "/_null_flavour|raw": misfitCodedText},
+			key:   rmattrCount + "/_null_flavour|raw",
+		},
+		"_language, a CODE_PHRASE member that does not fit": {
+			extra: map[string]any{rmattrText: "t", rmattrText + "/_language|raw": misfitCodePhrase},
+			key:   rmattrText + "/_language|raw",
+		},
+		"_charset, a CODE_PHRASE member that does not fit": {
+			extra: map[string]any{rmattrParsable: "x", rmattrParsable + "|formalism": "f", rmattrParsable + "/_charset|raw": misfitCodePhrase},
+			key:   rmattrParsable + "/_charset|raw",
+		},
+		"_thumbnail, a DV_MULTIMEDIA member that does not fit": {
+			extra: map[string]any{
+				rmattrMultimedia: "http://x", rmattrMultimedia + "|mediatype": "text/plain", rmattrMultimedia + "|size": 1,
+				rmattrMultimedia + "/_thumbnail|raw": misfitMultimed,
+			},
+			key: rmattrMultimedia + "/_thumbnail|raw",
+		},
+		"_accuracy, a DV_DURATION member that does not fit": {
+			extra: map[string]any{rmattrDateTime: "2022-01-12T13:22:34+01:00", rmattrDateTime + "/_accuracy|raw": misfitDuration},
+			key:   rmattrDateTime + "/_accuracy|raw",
+		},
+		"_normal_range bound held by value, a member that does not fit": {
+			extra: map[string]any{rmattrCount: 7, rmattrCount + "/_normal_range/upper": 8, rmattrCount + "/_normal_range/lower|raw": misfitCount},
+			key:   rmattrCount + "/_normal_range/lower|raw",
+		},
+		"_normal_range bound held as DV_ORDERED, a member that does not fit": {
+			extra: map[string]any{rmattrDateTime: "2022-01-12T13:22:34+01:00", rmattrDateTime + "/_normal_range/lower|raw": misfitDateTime},
+			key:   rmattrDateTime + "/_normal_range/lower|raw",
+		},
+		"reference range meaning, a member that does not fit": {
+			extra: map[string]any{rmattrCount: 7, ref + "/lower": 1, ref + "/upper": 2, ref + "/meaning|raw": misfitText},
+			key:   ref + "/meaning|raw",
+		},
+		"reference range bound, a member that does not fit": {
+			extra: map[string]any{rmattrCount: 7, ref + "/lower|raw": misfitCount, ref + "/upper": 2, ref + "/meaning": "normal"},
+			key:   ref + "/lower|raw",
+		},
+		"term mapping target, a member that does not fit": {
+			extra: map[string]any{rmattrText: "t", rmattrText + "/_mapping:0|match": "=", rmattrText + "/_mapping:0/target|raw": misfitCodePhrase},
+			key:   rmattrText + "/_mapping:0/target|raw",
+		},
+		"term mapping purpose, a member that does not fit": {
+			extra: map[string]any{
+				rmattrText: "t", rmattrText + "/_mapping:0|match": "=",
+				rmattrText + "/_mapping:0/target|code": "x", rmattrText + "/_mapping:0/target|terminology": "y",
+				rmattrText + "/_mapping:0/purpose|raw": misfitCodedText,
+			},
+			key: rmattrText + "/_mapping:0/purpose|raw",
+		},
+		"feeder audit original_content, a member that does not fit": {
+			extra: map[string]any{feeder + "/originating_system_audit|system_id": "s", feeder + "/original_content|raw": misfitParsable},
+			key:   feeder + "/original_content|raw",
+		},
+		"feeder audit item id, a member that does not fit": {
+			extra: map[string]any{feeder + "/originating_system_audit|system_id": "s", feeder + "/originating_system_item_id:0|raw": misfitIdentifier},
+			key:   feeder + "/originating_system_item_id:0|raw",
+		},
+		"collapsed ELEMENT value, a member that does not fit": {
+			extra: map[string]any{rmattrElement + "|magnitude": nil, rmattrElement + "|unit": nil, rmattrElement + "|raw": misfitQuantity},
+			key:   rmattrElement + "|raw",
+		},
+		"collapsed ELEMENT value, an abstract class": {
+			extra: map[string]any{rmattrElement + "|magnitude": nil, rmattrElement + "|unit": nil, rmattrElement + "|raw": map[string]any{"_type": "DATA_VALUE"}},
+			key:   rmattrElement + "|raw",
+		},
+		"interval leaf bound, a member that does not fit": {
+			extra: map[string]any{rmattrInterval + "/lower|raw": misfitQuantity, rmattrInterval + "/upper|magnitude": 2.0, rmattrInterval + "/upper|unit": "Unit"},
+			key:   rmattrInterval + "/lower|raw",
+		},
+		"interval leaf bound, an abstract class": {
+			extra: map[string]any{rmattrInterval + "/lower|raw": map[string]any{"_type": "DV_ORDERED"}, rmattrInterval + "/upper|magnitude": 2.0, rmattrInterval + "/upper|unit": "Unit"},
+			key:   rmattrInterval + "/lower|raw",
+		},
+		"in-context EVENT time, a member that does not fit": {
+			extra: map[string]any{rmattrObs + "/any_event:0/time": nil, rmattrObs + "/any_event:0/time|raw": misfitDateTime},
+			key:   rmattrObs + "/any_event:0/time|raw",
+		},
+		"in-context ENTRY language, a member that does not fit": {
+			extra: map[string]any{rmattrObs + "/language|code": nil, rmattrObs + "/language|terminology": nil, rmattrObs + "/language|raw": misfitCodePhrase},
+			key:   rmattrObs + "/language|raw",
+		},
+		"COMPOSITION category, a member that does not fit": {
+			extra: map[string]any{rmattrRoot + "/category|raw": misfitCodedText},
+			key:   rmattrRoot + "/category|raw",
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			body := rmattrBody(tc.extra)
 			err := refusedInEveryMode(t, wt, body)
 			if !errors.Is(err, ErrUnsupportedDatatype) || !strings.Contains(err.Error(), `"`+tc.key+`"`) {
 				t.Errorf("FLAT: decode = %v, want ErrUnsupportedDatatype naming %q", err, tc.key)
+			}
+			for _, unsaid := range []string{rawSecretText, strconv.Itoa(rawSecretNumber), "within", "canjson"} {
+				if strings.Contains(err.Error(), unsaid) {
+					t.Errorf("FLAT: decode = %v, which says %q: a refusal names the key, not a member's value or its canonical path", err, unsaid)
+				}
 			}
 			if _, err := UnmarshalFlat(mustJSON(t, body), wt, WithTemplate(c)); !errors.Is(err, ErrUnsupportedDatatype) {
 				t.Errorf("FLAT WithTemplate: decode = %v, want ErrUnsupportedDatatype", err)

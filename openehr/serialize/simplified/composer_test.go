@@ -566,6 +566,105 @@ func TestREQ053ComposerRealPathIsOneSegment(t *testing.T) {
 	}
 }
 
+// TestREQ053EmptyComposerNameRefused — REQ-053: "An empty composer name, in
+// either spelling, MUST be refused, since PARTY_IDENTIFIED's `Name_valid`
+// forbids it." It is refused alone as well as beside the composer's other
+// keys, in every mode, in FLAT and in STRUCTURED, wrapping
+// ErrUnsupportedDatatype; the FLAT refusal names the key as written. A null
+// name stays absent: the body decodes as the one without it, in both forms.
+func TestREQ053EmptyComposerNameRefused(t *testing.T) {
+	wt, compiled := corpusTarget(t)
+	root := wt.Tree.ID
+	modes := map[string][]simplified.Option{
+		"default":       nil,
+		"WithStrict":    {simplified.WithStrict()},
+		"WithTemplate":  {simplified.WithTemplate(compiled)},
+		"WithUnmatched": {simplified.WithUnmatched(func(string) {})},
+	}
+	for _, tc := range []struct {
+		name string
+		keys map[string]any
+		key  string
+	}{
+		{"ctx/composer_name alone", map[string]any{"ctx/composer_name": ""}, "ctx/composer_name"},
+		{"real-path name alone", map[string]any{root + "/composer|name": ""}, root + "/composer|name"},
+		{
+			"ctx/composer_name beside an identifier",
+			map[string]any{"ctx/composer_name": "", root + "/composer/_identifier:0|id": "122"},
+			"ctx/composer_name",
+		},
+		{
+			"real-path name beside a reference",
+			map[string]any{root + "/composer|name": "", root + "/composer|id": "9f2c", root + "/composer|id_namespace": "demographic"},
+			root + "/composer|name",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body := indexedMetaBase()
+			maps.Copy(body, tc.keys)
+			flat := marshalBody(t, body)
+			structured, err := simplified.FlatToStructured(flat)
+			if err != nil {
+				t.Fatalf("FlatToStructured: %v", err)
+			}
+			for mode, opts := range modes {
+				_, err := simplified.UnmarshalFlat(flat, wt, opts...)
+				if !errors.Is(err, simplified.ErrUnsupportedDatatype) || !strings.Contains(err.Error(), tc.key) ||
+					!strings.Contains(err.Error(), "Name_valid") {
+					t.Errorf("UnmarshalFlat (%s) = %v, want ErrUnsupportedDatatype naming %s and Name_valid", mode, err, tc.key)
+				}
+				_, err = simplified.UnmarshalStructured(structured, wt, opts...)
+				if !errors.Is(err, simplified.ErrUnsupportedDatatype) || !strings.Contains(err.Error(), "Name_valid") {
+					t.Errorf("UnmarshalStructured (%s) = %v, want ErrUnsupportedDatatype naming Name_valid", mode, err)
+				}
+			}
+		})
+	}
+	for _, tc := range []struct {
+		name       string
+		null, rest map[string]any
+	}{
+		{"ctx/composer_name alone", map[string]any{"ctx/composer_name": nil}, nil},
+		{"real-path name alone", map[string]any{root + "/composer|name": nil}, nil},
+		{
+			"real-path name beside a reference",
+			map[string]any{root + "/composer|name": nil},
+			map[string]any{root + "/composer|id": "9f2c", root + "/composer|id_namespace": "demographic"},
+		},
+	} {
+		t.Run("null "+tc.name, func(t *testing.T) {
+			want := indexedMetaBase()
+			maps.Copy(want, tc.rest)
+			body := maps.Clone(want)
+			maps.Copy(body, tc.null)
+			for form, decode := range map[string]func([]byte) (*rm.Composition, error){
+				"FLAT": func(b []byte) (*rm.Composition, error) {
+					return simplified.UnmarshalFlat(b, wt, simplified.WithStrict())
+				},
+				"STRUCTURED": func(b []byte) (*rm.Composition, error) {
+					s, err := simplified.FlatToStructured(b)
+					if err != nil {
+						return nil, err
+					}
+					return simplified.UnmarshalStructured(s, wt, simplified.WithStrict())
+				},
+			} {
+				got, err := decode(marshalBody(t, body))
+				if err != nil {
+					t.Fatalf("%s: decode with a null name = %v, want it read as absent", form, err)
+				}
+				ref, err := decode(marshalBody(t, want))
+				if err != nil {
+					t.Fatalf("%s: decode without the name = %v", form, err)
+				}
+				if !reflect.DeepEqual(composerValue(t, got.Composer), composerValue(t, ref.Composer)) {
+					t.Errorf("%s: composer = %s, want %s", form, canonicalComposer(t, got.Composer), canonicalComposer(t, ref.Composer))
+				}
+			}
+		})
+	}
+}
+
 // TestREQ053ComposerEncodeSpellings — REQ-053, ADR 0029. Encode writes a
 // composer one ctx/ short form carries whole in that form, and every other
 // composer whole at its real path with no ctx/ composer key, so one body spells

@@ -243,16 +243,21 @@ func TestEncodePartyRelatedComposerAtRealPath(t *testing.T) {
 
 // TestEncodeComposerShapesRefused — REQ-053, ADR 0029. Encode refuses a
 // composer PARTY_IDENTIFIED with an empty name (RM invariant `Name_valid`) or
-// with no name, external_ref or identifiers (`Basic_validity`), and a
-// PARTY_RELATED carrying a relationship and nothing else. Unrefused, the
-// empty PARTY_IDENTIFIED would be written as nothing and read back as
-// PARTY_SELF, a silent type substitution; the PARTY_RELATED would write its
-// `/relationship` keys, which decode then refuses under `Basic_validity` as a
-// relationship with nothing it qualifies; and decode reads an absent name
-// where the empty one was. The refusal names the composer. (A PARTY_SELF carrying an external_ref left this test:
-// it now encodes at the real path, TestREQ053ComposerEncodeSpellings.)
+// with no name, external_ref or identifiers (`Basic_validity`), a
+// PARTY_RELATED carrying a relationship and nothing else, and a PARTY_RELATED
+// carrying no relationship. Unrefused, the empty PARTY_IDENTIFIED would be
+// written as nothing and read back as PARTY_SELF, a silent type substitution;
+// the PARTY_RELATED with only a relationship would write its `/relationship`
+// keys, which decode then refuses under `Basic_validity` as a relationship
+// with nothing it qualifies; the PARTY_RELATED with no relationship would
+// write its PARTY_IDENTIFIED keys alone and read back as a PARTY_IDENTIFIED;
+// and decode reads an absent name where the empty one was. The refusal names
+// the composer and carries no value. (A PARTY_SELF carrying an external_ref
+// left this test: it now encodes at the real path,
+// TestREQ053ComposerEncodeSpellings.)
 func TestEncodeComposerShapesRefused(t *testing.T) {
 	empty := ""
+	secret := "secret-composer-0451"
 	ref := &rm.PartyRef{ID: &rm.HierObjectID{Value: "ref-1"}, Namespace: "demographic", Type: "PERSON"}
 	for name, composer := range map[string]rm.PartyProxy{
 		"PARTY_IDENTIFIED with no name":                    &rm.PartyIdentified{},
@@ -262,6 +267,8 @@ func TestEncodeComposerShapesRefused(t *testing.T) {
 			DVText:       rm.DVText{Value: "mother"},
 			DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}, CodeString: "10"},
 		}},
+		"PARTY_RELATED with a name and no relationship":      &rm.PartyRelated{PartyIdentified: rm.PartyIdentified{Name: &secret}},
+		"PARTY_RELATED with a reference and no relationship": &rm.PartyRelated{PartyIdentified: rm.PartyIdentified{ExternalRef: ref}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			comp, wt := genComposition(t, minimalObsOPT)
@@ -272,6 +279,9 @@ func TestEncodeComposerShapesRefused(t *testing.T) {
 			}
 			if !strings.Contains(err.Error(), wt.Tree.ID+"/composer") {
 				t.Errorf("err = %v, want it to name %s/composer", err, wt.Tree.ID)
+			}
+			if strings.Contains(err.Error(), secret) {
+				t.Errorf("err = %v carries the composer's name", err)
 			}
 		})
 	}

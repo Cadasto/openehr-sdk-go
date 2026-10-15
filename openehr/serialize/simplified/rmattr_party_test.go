@@ -620,6 +620,94 @@ func TestEmptyPartyIdentifiedRefused(t *testing.T) {
 	}
 }
 
+// TestREQ140PartyRelatedWithNoRelationshipRefused — REQ-140 / REQ-053. Decode
+// reads PARTY_RELATED off its `/relationship` keys, so a PARTY_RELATED whose
+// relationship writes no key would be spelled by its PARTY_IDENTIFIED keys
+// alone and read back as a PARTY_IDENTIFIED, a silent type substitution. The
+// RM makes the relationship mandatory, so encode refuses it, FLAT and
+// STRUCTURED, wrapping ErrUnsupportedDatatype, naming the party's key and
+// carrying no value, at every position the party grammar writes: the
+// composer, the EVENT_CONTEXT `_health_care_facility` and `_participation`
+// performer, the ENTRY `_other_participation` performer, `_provider` and
+// `subject`, and the feeder audit's `location`, `subject` and `provider`.
+func TestREQ140PartyRelatedWithNoRelationshipRefused(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	secret := "secret-party-0451"
+	related := func() *rm.PartyRelated {
+		return &rm.PartyRelated{PartyIdentified: rm.PartyIdentified{Name: &secret}}
+	}
+	participations := func() []rm.Participation {
+		return []rm.Participation{{Function: rm.DVText{Value: "requester"}, Performer: related()}}
+	}
+	feederAudit := func(details rm.FeederAuditDetails) *rm.FeederAudit {
+		details.SystemID = "s"
+		return &rm.FeederAudit{OriginatingSystemAudit: details}
+	}
+	for name, tc := range map[string]struct {
+		mutate func(*rm.Composition, *rm.Observation)
+		key    string
+	}{
+		"composer": {
+			mutate: func(c *rm.Composition, _ *rm.Observation) { c.Composer = related() },
+			key:    rmattrRoot + "/composer",
+		},
+		"health care facility": {
+			mutate: func(c *rm.Composition, _ *rm.Observation) { c.Context.HealthCareFacility = related() },
+			key:    rmattrContext + "/_health_care_facility",
+		},
+		"participation performer": {
+			mutate: func(c *rm.Composition, _ *rm.Observation) { c.Context.Participations = participations() },
+			key:    rmattrContext + "/_participation:0",
+		},
+		"ENTRY other participation performer": {
+			mutate: func(_ *rm.Composition, o *rm.Observation) { o.OtherParticipations = participations() },
+			key:    rmattrObs + "/_other_participation:0",
+		},
+		"ENTRY provider": {
+			mutate: func(_ *rm.Composition, o *rm.Observation) { o.Provider = related() },
+			key:    rmattrObs + "/_provider",
+		},
+		"ENTRY subject": {
+			mutate: func(_ *rm.Composition, o *rm.Observation) { o.Subject = related() },
+			key:    rmattrObs + "/subject",
+		},
+		"feeder audit location": {
+			mutate: func(_ *rm.Composition, o *rm.Observation) {
+				o.FeederAudit = feederAudit(rm.FeederAuditDetails{Location: related()})
+			},
+			key: rmattrObs + "/_feeder_audit/originating_system_audit/location",
+		},
+		"feeder audit subject": {
+			mutate: func(_ *rm.Composition, o *rm.Observation) {
+				o.FeederAudit = feederAudit(rm.FeederAuditDetails{Subject: related()})
+			},
+			key: rmattrObs + "/_feeder_audit/originating_system_audit/subject",
+		},
+		"feeder audit provider": {
+			mutate: func(_ *rm.Composition, o *rm.Observation) {
+				o.FeederAudit = feederAudit(rm.FeederAuditDetails{Provider: related()})
+			},
+			key: rmattrObs + "/_feeder_audit/originating_system_audit/provider",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			comp := decodeRMAttr(t, wt, rmattrBody(nil))
+			tc.mutate(comp, firstObservation(t, comp))
+			_, flatErr := MarshalFlat(comp, wt)
+			_, structuredErr := MarshalStructured(comp, wt)
+			for form, err := range map[string]error{"MarshalFlat": flatErr, "MarshalStructured": structuredErr} {
+				if !errors.Is(err, ErrUnsupportedDatatype) || !strings.Contains(err.Error(), `"`+tc.key+`"`) {
+					t.Errorf("%s err = %v, want ErrUnsupportedDatatype naming %q", form, err, tc.key)
+					continue
+				}
+				if strings.Contains(err.Error(), secret) {
+					t.Errorf("%s err = %v carries the party's name", form, err)
+				}
+			}
+		})
+	}
+}
+
 // A party carrying any one of the three is fine — the refusal above must not
 // widen into "a party needs a name".
 func TestPartyIdentifiedWithOnlyIdentifierEncodes(t *testing.T) {

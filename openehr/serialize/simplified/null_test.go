@@ -297,6 +297,22 @@ func TestREQ053FlatToStructuredCarriesNull(t *testing.T) {
 		"bare beside a child":     {`{"t/x": null, "t/x/y": 1}`, `{"t":{"x":[{"|":null,"y":[1]}]}}`},
 		"bare beside a family":    {`{"t/x:0": null, "t/x:0/_uid": "u"}`, `{"t":{"x":[{"|":null,"_uid":["u"]}]}}`},
 		"two spellings, one null": {`{"t/x": null, "t/x:0": "a"}`, `{"t":{"x":["a"]}}`},
+		// A null is absent beside a value whichever of the two spellings sorts
+		// first: the sorted key order decides only which one is placed first.
+		"two spellings, the null second": {`{"t/x": "a", "t/x:0": null}`, `{"t":{"x":["a"]}}`},
+		"two spellings beside a child, the null first": {
+			`{"t/x": null, "t/x/y": 1, "t/x:0": "a"}`, `{"t":{"x":[{"|":"a","y":[1]}]}}`,
+		},
+		"two spellings beside a child, the null second": {
+			`{"t/x": "a", "t/x/y": 1, "t/x:0": null}`, `{"t":{"x":[{"|":"a","y":[1]}]}}`,
+		},
+		"two spellings of a suffix, the null first":  {`{"t/x:0|unit": null, "t/x|unit": "mg"}`, `{"t":{"x":[{"|unit":"mg"}]}}`},
+		"two spellings of a suffix, the null second": {`{"t/x:0|unit": "mg", "t/x|unit": null}`, `{"t":{"x":[{"|unit":"mg"}]}}`},
+		"two null spellings of a suffix":             {`{"t/x:0|unit": null, "t/x|unit": null}`, `{"t":{"x":[{"|unit":null}]}}`},
+		"two spellings of a nested suffix, one null": {
+			`{"t/e/_normal_range/lower|magnitude": 20.5, "t/e/_normal_range/lower:0|magnitude": null}`,
+			`{"t":{"e":[{"_normal_range":[{"lower":[{"|magnitude":20.5}]}]}]}}`,
+		},
 		"slot filled after a higher :index": {
 			`{"t/x:10|unit": "a", "t/x:2|unit": "b"}`,
 			`{"t":{"x":[null,null,{"|unit":"b"},null,null,null,null,null,null,null,{"|unit":"a"}]}}`,
@@ -399,8 +415,9 @@ func TestREQ053BareValueBesideOnlyNullSuffixesIsAlone(t *testing.T) {
 // TestREQ053NullSecondSpellingIsAbsent — REQ-053: two spellings of one sub-path
 // (the index-less one and `:0`, which OPT-free conversion writes) must agree,
 // but a null spelling is absent, so it disagrees with nothing, and the other
-// spelling's value is the one read, whichever of the two sorts first. FLAT
-// only: STRUCTURED has one slot for the pair.
+// spelling's value is the one read, whichever of the two sorts first. The
+// STRUCTURED form, which has one slot for the pair, carries the value alone
+// (REQ-140: OPT-free interconversion preserves it) and decodes the same.
 func TestREQ053NullSecondSpellingIsAbsent(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	for name, tc := range map[string]struct{ value, null string }{
@@ -408,9 +425,17 @@ func TestREQ053NullSecondSpellingIsAbsent(t *testing.T) {
 			value: rmattrElement + "/_normal_range/lower|magnitude",
 			null:  rmattrElement + "/_normal_range/lower:0|magnitude",
 		},
+		"interval bound, the null index-less": {
+			value: rmattrElement + "/_normal_range/lower:0|magnitude",
+			null:  rmattrElement + "/_normal_range/lower|magnitude",
+		},
 		"feeder audit details": {
 			value: rmattrRoot + "/_feeder_audit/originating_system_audit|system_id",
 			null:  rmattrRoot + "/_feeder_audit/originating_system_audit:0|system_id",
+		},
+		"feeder audit details, the null index-less": {
+			value: rmattrRoot + "/_feeder_audit/originating_system_audit:0|system_id",
+			null:  rmattrRoot + "/_feeder_audit/originating_system_audit|system_id",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -428,6 +453,7 @@ func TestREQ053NullSecondSpellingIsAbsent(t *testing.T) {
 			if !bytes.Equal(canonical(t, got), canonical(t, decodeRMAttr(t, wt, want))) {
 				t.Errorf("decoded\n%s\nwant the body without the null spelling", canonical(t, got))
 			}
+			assertSameDecodeBothForms(t, wt, body, want)
 		})
 	}
 }
