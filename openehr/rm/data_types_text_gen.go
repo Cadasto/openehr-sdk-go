@@ -35,7 +35,7 @@ type DVCodedText struct {
 // `DV_PARAGRAPH` is the standard way for constructing longer text items in summaries, reports and so on.
 type DVParagraph struct {
 	// Items Items making up the paragraph, each of which is a text item (which may have its own formatting, and/or have hyperlinks).
-	Items []DVTextLike `json:"items"`
+	Items []DVTextLike `json:"items,omitzero"`
 }
 
 // DVText A text item, which may contain any amount of legal characters arranged as e.g. words, sentences etc (i.e. one `DV_TEXT` may be more than one word). Visual formatting and hyperlinks may be included via markdown.

@@ -29,7 +29,7 @@ type jsonWireAccessGroupRef struct {
 	// Type Name of the  class (concrete or abstract) of object to which this identifier type refers, e.g. `PARTY`, `PERSON`,  `GUIDELINE`  etc. These class names are from the relevant reference model. The type name `ANY` can be used to indicate that any type is accepted (e.g. if the type is unknown).
 	Type string `json:"type"`
 	// ID Globally unique id of an object, regardless of where it is stored.
-	ID ObjectID `json:"id"`
+	ID ObjectID `json:"id,omitempty"`
 }
 
 // MarshalJSONTo emits canonical openEHR JSON for AccessGroupRef with `_type`
@@ -52,8 +52,10 @@ type rawArchetypeID ArchetypeID
 
 // MarshalJSONTo emits canonical openEHR JSON for ArchetypeID with `_type`
 // (value "ARCHETYPE_ID") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
@@ -72,8 +74,10 @@ type rawGenericID GenericID
 
 // MarshalJSONTo emits canonical openEHR JSON for GenericID with `_type`
 // (value "GENERIC_ID") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
@@ -92,8 +96,10 @@ type rawHierObjectID HierObjectID
 
 // MarshalJSONTo emits canonical openEHR JSON for HierObjectID with `_type`
 // (value "HIER_OBJECT_ID") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
@@ -112,8 +118,10 @@ type rawISOOID ISOOID
 
 // MarshalJSONTo emits canonical openEHR JSON for ISOOID with `_type`
 // (value "ISO_OID") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
@@ -132,8 +140,10 @@ type rawInternetID InternetID
 
 // MarshalJSONTo emits canonical openEHR JSON for InternetID with `_type`
 // (value "INTERNET_ID") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
@@ -163,7 +173,7 @@ type jsonWireLocatableRef struct {
 	// Path The path to an instance, as an absolute path with respect to the object found at `VERSION._data_`. An empty path means that the object referred to by `_id_` is being specified.
 	Path *string `json:"path,omitzero"`
 	// ID Globally unique id of an object, regardless of where it is stored.
-	ID UIDBasedID `json:"id"`
+	ID UIDBasedID `json:"id,omitempty"`
 }
 
 // MarshalJSONTo emits canonical openEHR JSON for LocatableRef with `_type`
@@ -187,8 +197,10 @@ type rawObjectRef ObjectRef
 
 // MarshalJSONTo emits canonical openEHR JSON for ObjectRef with `_type`
 // (value "OBJECT_REF") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
@@ -207,8 +219,10 @@ type rawObjectVersionID ObjectVersionID
 
 // MarshalJSONTo emits canonical openEHR JSON for ObjectVersionID with `_type`
 // (value "OBJECT_VERSION_ID") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
@@ -236,7 +250,7 @@ type jsonWirePartyRef struct {
 	// Type Name of the  class (concrete or abstract) of object to which this identifier type refers, e.g. `PARTY`, `PERSON`,  `GUIDELINE`  etc. These class names are from the relevant reference model. The type name `ANY` can be used to indicate that any type is accepted (e.g. if the type is unknown).
 	Type string `json:"type"`
 	// ID Globally unique id of an object, regardless of where it is stored.
-	ID ObjectID `json:"id"`
+	ID ObjectID `json:"id,omitempty"`
 }
 
 // MarshalJSONTo emits canonical openEHR JSON for PartyRef with `_type`
@@ -259,8 +273,10 @@ type rawTemplateID TemplateID
 
 // MarshalJSONTo emits canonical openEHR JSON for TemplateID with `_type`
 // (value "TEMPLATE_ID") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
@@ -279,8 +295,10 @@ type rawTerminologyID TerminologyID
 
 // MarshalJSONTo emits canonical openEHR JSON for TerminologyID with `_type`
 // (value "TERMINOLOGY_ID") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
@@ -299,8 +317,10 @@ type rawUuid Uuid
 
 // MarshalJSONTo emits canonical openEHR JSON for Uuid with `_type`
 // (value "UUID") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
@@ -319,8 +339,10 @@ type rawVersionTreeID VersionTreeID
 
 // MarshalJSONTo emits canonical openEHR JSON for VersionTreeID with `_type`
 // (value "VERSION_TREE_ID") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.

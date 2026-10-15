@@ -14,7 +14,7 @@ type Action struct {
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// Description Description of the action that has been performed, in the form of an archetyped structure.
-	Description ItemStructure `json:"description"`
+	Description ItemStructure `json:"description,omitempty"`
 	// Encoding Name of character set in which text values in this Entry are encoded. Coded from openEHR Code Set  character sets.
 	Encoding CodePhrase `json:"encoding"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
@@ -30,7 +30,7 @@ type Action struct {
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name DVTextLike `json:"name,omitempty"`
 	// OtherParticipations Other participations at `ENTRY` level.
 	OtherParticipations []Participation `json:"other_participations,omitempty"`
 	// Protocol Description of the method (i.e. how) the information in this entry was arrived at. For `OBSERVATIONs`, this is a description of the method or instrument used. For `EVALUATIONs`, how the evaluation was arrived at. For `INSTRUCTIONs`, how to execute the Instruction. This may take the form of references to guidelines, including manually followed and executable; knowledge references such as a paper in Medline; clinical reasons within a larger care process.
@@ -50,7 +50,7 @@ type Action struct {
 	// * foetus
 	// * a family member
 	// * another clinically relevant person.
-	Subject PartyProxy `json:"subject"`
+	Subject PartyProxy `json:"subject,omitempty"`
 	// Time Point in time at which this action completed. To indicate an unknown time, use a `DV_DATE_TIME` instance with `_value_` set to the time of creation (or some other known time before which the Action is known to have occurred, e.g. data accession timestamp from integration engine), and `_magnitude_status_` set to `<`.
 	Time DVDateTime `json:"time"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
@@ -72,13 +72,13 @@ type Activity struct {
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// Description Description of the activity, in the form of an archetyped structure.
-	Description ItemStructure `json:"description"`
+	Description ItemStructure `json:"description,omitempty"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
 	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name DVTextLike `json:"name,omitempty"`
 	// Timing Timing of the activity, in the form of a parsable string. If used, the preferred syntax is ISO8601 'R' format, but other formats may be used including HL7 GTS.
 	//
 	// May be omitted if:
@@ -103,7 +103,7 @@ type AdminEntry struct {
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// Data Content of the Admin Entry.
-	Data ItemStructure `json:"data"`
+	Data ItemStructure `json:"data,omitempty"`
 	// Encoding Name of character set in which text values in this Entry are encoded. Coded from openEHR Code Set  character sets.
 	Encoding CodePhrase `json:"encoding"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
@@ -113,7 +113,7 @@ type AdminEntry struct {
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name DVTextLike `json:"name,omitempty"`
 	// OtherParticipations Other participations at `ENTRY` level.
 	OtherParticipations []Participation `json:"other_participations,omitempty"`
 	// Provider Optional identification of provider of the information in this `ENTRY`, which might be:
@@ -131,7 +131,7 @@ type AdminEntry struct {
 	// * foetus
 	// * a family member
 	// * another clinically relevant person.
-	Subject PartyProxy `json:"subject"`
+	Subject PartyProxy `json:"subject,omitempty"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
 	UID UIDBasedID `json:"uid,omitempty"`
 	// WorkflowID Identifier of externally held workflow engine data for this workflow execution, for this subject of care.
@@ -214,7 +214,7 @@ type Evaluation struct {
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// Data The data of this evaluation, in the form of a spatial data structure.
-	Data ItemStructure `json:"data"`
+	Data ItemStructure `json:"data,omitempty"`
 	// Encoding Name of character set in which text values in this Entry are encoded. Coded from openEHR Code Set  character sets.
 	Encoding CodePhrase `json:"encoding"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
@@ -226,7 +226,7 @@ type Evaluation struct {
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name DVTextLike `json:"name,omitempty"`
 	// OtherParticipations Other participations at `ENTRY` level.
 	OtherParticipations []Participation `json:"other_participations,omitempty"`
 	// Protocol Description of the method (i.e. how) the information in this entry was arrived at. For `OBSERVATIONs`, this is a description of the method or instrument used. For `EVALUATIONs`, how the evaluation was arrived at. For `INSTRUCTIONs`, how to execute the Instruction. This may take the form of references to guidelines, including manually followed and executable; knowledge references such as a paper in Medline; clinical reasons within a larger care process.
@@ -246,7 +246,7 @@ type Evaluation struct {
 	// * foetus
 	// * a family member
 	// * another clinically relevant person.
-	Subject PartyProxy `json:"subject"`
+	Subject PartyProxy `json:"subject,omitempty"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
 	UID UIDBasedID `json:"uid,omitempty"`
 	// WorkflowID Identifier of externally held workflow engine data for this workflow execution, for this subject of care.
@@ -278,9 +278,9 @@ type Instruction struct {
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name DVTextLike `json:"name,omitempty"`
 	// Narrative Mandatory human-readable version of what the Instruction is about.
-	Narrative DVTextLike `json:"narrative"`
+	Narrative DVTextLike `json:"narrative,omitempty"`
 	// OtherParticipations Other participations at `ENTRY` level.
 	OtherParticipations []Participation `json:"other_participations,omitempty"`
 	// Protocol Description of the method (i.e. how) the information in this entry was arrived at. For `OBSERVATIONs`, this is a description of the method or instrument used. For `EVALUATIONs`, how the evaluation was arrived at. For `INSTRUCTIONs`, how to execute the Instruction. This may take the form of references to guidelines, including manually followed and executable; knowledge references such as a paper in Medline; clinical reasons within a larger care process.
@@ -300,7 +300,7 @@ type Instruction struct {
 	// * foetus
 	// * a family member
 	// * another clinically relevant person.
-	Subject PartyProxy `json:"subject"`
+	Subject PartyProxy `json:"subject,omitempty"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
 	UID UIDBasedID `json:"uid,omitempty"`
 	// WfDefinition Optional workflow engine executable expression of the Instruction.
@@ -360,7 +360,7 @@ type Observation struct {
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name DVTextLike `json:"name,omitempty"`
 	// OtherParticipations Other participations at `ENTRY` level.
 	OtherParticipations []Participation `json:"other_participations,omitempty"`
 	// Protocol Description of the method (i.e. how) the information in this entry was arrived at. For `OBSERVATIONs`, this is a description of the method or instrument used. For `EVALUATIONs`, how the evaluation was arrived at. For `INSTRUCTIONs`, how to execute the Instruction. This may take the form of references to guidelines, including manually followed and executable; knowledge references such as a paper in Medline; clinical reasons within a larger care process.
@@ -382,7 +382,7 @@ type Observation struct {
 	// * foetus
 	// * a family member
 	// * another clinically relevant person.
-	Subject PartyProxy `json:"subject"`
+	Subject PartyProxy `json:"subject,omitempty"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
 	UID UIDBasedID `json:"uid,omitempty"`
 	// WorkflowID Identifier of externally held workflow engine data for this workflow execution, for this subject of care.

@@ -25,5 +25,5 @@ package rm
 // Other sub-structures might have different keys, e.g.  based on programming languages, UI toolkits etc.
 type ResourceAnnotations struct {
 	// Documentation Documentary annotations in a multi-level keyed structure.
-	Documentation map[string]any `json:"documentation"`
+	Documentation map[string]any `json:"documentation,omitzero"`
 }

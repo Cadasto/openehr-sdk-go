@@ -26,7 +26,7 @@ type Archetype struct {
 	// IsControlled True if this resource is under any kind of change control (even file copying), in which case revision history is created.
 	IsControlled *bool `json:"is_controlled,omitzero"`
 	// Ontology The ontology of the archetype.
-	Ontology *ArchetypeOntology `json:"ontology"`
+	Ontology *ArchetypeOntology `json:"ontology,omitzero"`
 	// OriginalLanguage Language in which this resource was initially authored. Although there is no language primacy of resources overall, the language of original authoring is required to ensure natural language translations can preserve quality. Language is relevant in both the description and ontology sections.
 	OriginalLanguage rm.TerminologyCode `json:"original_language"`
 	// ParentArchetypeID Identifier of the specialisation parent of this archetype.
