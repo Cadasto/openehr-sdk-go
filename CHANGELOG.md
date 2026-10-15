@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-Template validation and the RM floor run as one walk, a response whose body cannot be read keeps its status and headers, canonical JSON omits an absent mandatory member, a request carrying a cookie or proxy credential refuses an https-to-http redirect, and FLAT carries a referenced composer and a renamed composition. **Breaking:** validation returns a smaller result and one finding for an empty part, a Go value shared by two attributes is reported at each path, a nil list item and an ordinal symbol that does not match its value now fail validation, code that implements `query.Repository` must add `RunStoredVersion`, FLAT encode writes a referenced composer and a renamed composition at their real paths, and FLAT decode refuses a `null` required suffix.
+Validation runs as one walk and reports each defect once, a response with an unreadable body keeps its status, canonical JSON omits an absent mandatory member, and FLAT carries a referenced composer, a renamed composition and nulls. **Breaking:** validation reports nil list items, mismatched ordinal symbols and shared values at each path with fewer findings, `query.Repository` gains `RunStoredVersion`, and FLAT encode and null handling change.
 
 ### Added
 
@@ -16,27 +16,21 @@ Template validation and the RM floor run as one walk, a response whose body cann
 
 ### Changed
 
-- **Breaking: a smaller validation result (REQ-171, REQ-102).** Content the template refuses is reported once and not entered, an empty mandatory list or missing reference part draws one finding, and `Coverage.Unevaluated` omits classes seen only there.
-- **Breaking: a Go value shared by two attributes is reported at each path (REQ-112).** The validators reported it at its first path only.
-- **Breaking: a nil list item is reported (REQ-112, REQ-102).** A nil element or nil pointer in a list draws `required` at its own path and counts as one visit; validation used to skip it.
-- **Breaking: an empty part draws one finding (REQ-112, REQ-102).** An empty temporal value, CODE_PHRASE code string or DV_QUANTITY units draws `required` alone, with no `rm_invariant` or template `primitive_*` beside it.
-- **Breaking: template validation checks a DV_ORDINAL's symbol against its value (REQ-102, REQ-103).** A value and symbol pair the template does not list draws `primitive_not_in_list`; a listed symbol naming no terminology admits any.
-- **Validation issues follow the document, and an item bound to a 0..0 child is reported once (REQ-171).** `WithRMInfo` no longer draws RM-layer findings for a lookup's extra mandatory attributes.
-- **Validation with a template is faster (REQ-171).** It ran 2.1 to 2.8 times faster than the two-walk version in benchstat runs on three inputs.
-- **Breaking: `query.Repository` gains `RunStoredVersion` (REQ-057).** Code that implements the interface must add the method.
-- **A stored-query GET accepts an AQL parameter named `q` (REQ-057).** Only the ad hoc GET sends `q`.
-- **A 2xx with an unreadable body is retried only for GET, HEAD and OPTIONS (REQ-172, REQ-091).** A non-2xx with one is now its status's `*WireError`, and neither is retried once the context ends.
+- **Breaking: validation reports each defect once (REQ-171, REQ-102, REQ-112).** Content the template refuses is not entered, and an empty mandatory list, reference part, temporal value, code string or units draws one `required` finding alone.
+- **Breaking: validation reports a nil list item and a Go value shared by two attributes at each path (REQ-112, REQ-102).** A nil item counts as one visit; both used to be skipped or reported once.
+- **Breaking: template validation checks a DV_ORDINAL's symbol against its value (REQ-102, REQ-103).** A pair the template does not list draws `primitive_not_in_list`; a listed symbol naming no terminology admits any.
+- **Validation issues follow the document, and validation with a template is faster (REQ-171).** An item bound to a 0..0 child is reported once; benchstat measured 2.1 to 2.8 times faster than the two-walk version.
+- **Breaking: `query.Repository` gains `RunStoredVersion`, and a stored-query GET accepts an AQL parameter named `q` (REQ-057).** Code that implements the interface must add the method; only the ad hoc GET sends `q`.
+- **A 2xx with an unreadable body is retried only for GET, HEAD and OPTIONS (REQ-172, REQ-091).** A non-2xx with one is its status's `*WireError`, and neither is retried once the context ends.
 - **A failed call's span carries `http.status_code`, and `WithMaxResponseBody(math.MaxInt64)` reads the whole body (REQ-090, REQ-093).** The limit used to overflow into an empty body.
-- **Canonical JSON omits an absent mandatory member instead of writing `null` (REQ-052, REQ-043).** A present empty mandatory list or map is still written, so a re-encoded body is smaller.
-- **A bounded `constraints.NumericRange` contains no NaN, and its zero value is unbounded (REQ-103).** A NaN magnitude draws `CodeOutOfRange`, and the zero value reads as valid `(*..*)`, not as the empty `(0..0)`.
-- **A request with a `Cookie`, `Cookie2` or `Proxy-Authorization` header now refuses an https-to-http redirect (REQ-092, REQ-021).** It fails with `transport.ErrInsecureRedirect` and is not retried.
+- **A request with a `Cookie`, `Cookie2` or `Proxy-Authorization` header refuses an https-to-http redirect (REQ-092, REQ-021).** It fails with `transport.ErrInsecureRedirect` and is not retried.
 - **A fresh discovery cache hit runs the resolver's own checks (REQ-071 to REQ-073).** A refused hit fails as a new document would, keeps its entry, and a catalog for another base URL is a miss.
-- **Breaking: FLAT carries the whole composer at its real path (REQ-053, ADR 0029).** Decode reads the composer's reference and identifiers at `<root>/composer`, and encode writes there a composer that `ctx/composer_name` or `ctx/composer_self` cannot carry whole.
-- **Breaking: FLAT carries a renamed composition as `<root>/_name` (REQ-140).** Decode names the composition from it, and encode writes it when the name differs from the template's.
-- **Breaking: FLAT and STRUCTURED read a `null` as absent (REQ-053).** `|magnitude: null` beside a unit is refused as a missing magnitude instead of decoding as 0.
-- **A FLAT value that does not fit its attribute is refused naming its key (REQ-053).** The error wraps `simplified.ErrUnsupportedDatatype`, a `|raw` fragment included, and a `|raw` at a node with children is refused, not dropped.
-- **FLAT refuses an RM-invalid party instead of changing its type (REQ-140, REQ-053).** Encode refuses a PARTY_RELATED with no relationship at any party position, and decode refuses an empty composer name.
+- **Canonical JSON omits an absent mandatory member instead of writing `null` (REQ-052, REQ-043).** A present empty mandatory list or map is still written.
 - **An `Integer` accepts a whole number written `1.0` or `1e0` (REQ-052, ADR 0004).** A fraction is still refused, and an out-of-range value carries `strconv.ErrRange`.
+- **A bounded `constraints.NumericRange` contains no NaN, and its zero value is unbounded (REQ-103).** A NaN magnitude draws `CodeOutOfRange`, and the zero value reads as `(*..*)`, not `(0..0)`.
+- **Breaking: FLAT carries the whole composer and a renamed composition (REQ-053, REQ-140, ADR 0029).** A composer the `ctx/` forms cannot carry travels at `<root>/composer`, and a name unlike the template's as `<root>/_name`.
+- **Breaking: FLAT and STRUCTURED read a `null` as absent (REQ-053).** `|magnitude: null` beside a unit is refused as a missing magnitude instead of decoding as 0.
+- **FLAT refuses a value that does not fit, naming its key (REQ-053, REQ-140).** The error wraps `simplified.ErrUnsupportedDatatype`; a misplaced `|raw`, an empty composer name and a PARTY_RELATED without relationship are refused too.
 
 ## [0.34.0] - 2026-10-14
 
