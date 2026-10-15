@@ -332,7 +332,8 @@ func TestProbe086CoverageFloor(t *testing.T) {
 // grammar carries, so a refusal here is a defect.
 //
 // The fixture set is checked for completeness first: one case per REQ-140
-// grammar-table row, and the row list is what a reader diffs against the table.
+// grammar-table row, and one per shape of the composer at its real path
+// (ADR 0029), and the row list is what a reader diffs against the table.
 func TestProbe089(t *testing.T) {
 	target, err := serializeprobes.NewProbe089Target()
 	if err != nil {
@@ -362,6 +363,9 @@ func TestProbe089(t *testing.T) {
 		"DV_ORDERED leaf: _normal_range",
 		"DV_TEXT leaf: _mapping:N",
 		"DV_INTERVAL<T> leaf (the interval grammar at a modelled node)",
+		"COMPOSITION: composer at its real path (PARTY_IDENTIFIED: |name, external_ref, _identifier:N)",
+		"COMPOSITION: composer at its real path (PARTY_RELATED: /relationship)",
+		"COMPOSITION: composer at its real path (PARTY_SELF with external_ref)",
 	} {
 		if !rows[want] {
 			t.Errorf("no fixture covers the REQ-140 grammar row %q", want)
