@@ -556,6 +556,84 @@ func TestRetryCtxCancellation(t *testing.T) {
 	}
 }
 
+// cancelAfterResponse is an http.RoundTripper that reads the whole response
+// from next, then cancels the caller's context and hands the response back
+// with its body in memory. The response therefore arrives intact, and the
+// caller has given up by the time Do decides whether to send the request
+// again.
+type cancelAfterResponse struct {
+	next   http.RoundTripper
+	cancel context.CancelFunc
+}
+
+func (rt cancelAfterResponse) RoundTrip(r *http.Request) (*http.Response, error) {
+	resp, err := rt.next.RoundTrip(r)
+	if err != nil {
+		return nil, err
+	}
+	body, err := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+	resp.Body = io.NopCloser(strings.NewReader(string(body)))
+	rt.cancel()
+	return resp, nil
+}
+
+// TestRetryZeroBackoffRespectsCancellation pins REQ-091's "Retries MUST
+// respect ctx cancellation" on a policy with no backoff. A 503 arrives, read
+// in full, and the caller gives up before Do decides to send the request
+// again. Do then makes no further attempt, which could only fail before any
+// response and drop the 503. It returns the 503's Response with the context's
+// error, as it does when the context ends during a timed backoff
+// (TestBodyReadErrorNonTwoXXSurvivesCancelledBackoff, "503 read in full").
+func TestRetryZeroBackoffRespectsCancellation(t *testing.T) { // REQ-091
+	const envelope = `{"code":"UNAVAILABLE"}`
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.Header().Set("Retry-After", "1")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = io.WriteString(w, envelope)
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	c, err := New(
+		newCatalog(t, srv),
+		WithHTTPClient(&http.Client{Transport: cancelAfterResponse{next: srv.Client().Transport, cancel: cancel}}),
+		WithRetry(RetryPolicy{MaxAttempts: 3}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := c.Do(ctx, &Request{Method: http.MethodGet, Path: "/ehr/abc", Route: "/ehr/{ehr_id}"})
+	if got := hits.Load(); got != 1 {
+		t.Errorf("server hit %d times, want 1: no attempt starts after the caller gave up", got)
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("errors.Is(err, context.Canceled) = false for %v", err)
+	}
+	if _, ok := errors.AsType[*WireError](err); ok {
+		t.Errorf("errors.AsType[*WireError] matched %v; a 503 read in full gives way to the context's error, as on a timed backoff", err)
+	}
+	if resp == nil {
+		t.Fatalf("Do returned a nil *Response beside %v; the 503 that arrived before the caller gave up was dropped", err)
+	}
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Errorf("Response.StatusCode = %d, want %d", resp.StatusCode, http.StatusServiceUnavailable)
+	}
+	if got := resp.Header.Get("Retry-After"); got != "1" {
+		t.Errorf("Response.Header Retry-After = %q, want %q", got, "1")
+	}
+	if string(resp.Body) != envelope {
+		t.Errorf("Response.Body = %q, want %q", resp.Body, envelope)
+	}
+}
+
 // REQ-066: caller attribution set at construction reaches the wire as the
 // JSON-encoded default attribution header.
 func TestCallerAttributionDefault(t *testing.T) {

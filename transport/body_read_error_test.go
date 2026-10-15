@@ -752,11 +752,11 @@ func TestBodyReadErrorRetryGateHEAD(t *testing.T) { // REQ-172
 // REQ-091's "Retries MUST respect ctx cancellation". A GET whose 200 body
 // read is stopped by the caller's own deadline is not sent again, so Do
 // returns the Response and the *BodyReadError rather than a later attempt's
-// token or dial failure. Only the "no backoff" case pins the ctx guard in
-// shouldRetry: with no wait, a retry would start at once and fail with no
-// response. The "20ms backoff" case pins the outcome only, because Do's
-// retry-wait branch keeps the *BodyReadError even when the guard is gone;
-// keep both, and never drop the first as a duplicate of the second.
+// token or dial failure. The outcome alone does not show that the ctx guard
+// in shouldRetry decided it: the retry wait reads ctx too, whatever the
+// backoff, and Do's retry-wait branch keeps the *BodyReadError. The span does:
+// it carries retry.backoff_ms only when a retry was scheduled, so its absence
+// in both cases pins the guard. Keep both cases.
 func TestBodyReadErrorCallerDeadlineIsNotRetried(t *testing.T) { // REQ-172, REQ-091
 	cases := []struct {
 		name    string
@@ -769,6 +769,7 @@ func TestBodyReadErrorCallerDeadlineIsNotRetried(t *testing.T) { // REQ-172, REQ
 		t.Run(tc.name, func(t *testing.T) {
 			var hits atomic.Int32
 			release := make(chan struct{})
+			tp := newRecordingTracerProvider()
 			c := newBodyReadClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				hits.Add(1)
 				w.Header().Set("ETag", `"`+cutBodyETag+`"`)
@@ -787,7 +788,7 @@ func TestBodyReadErrorCallerDeadlineIsNotRetried(t *testing.T) { // REQ-172, REQ
 				MaxAttempts:    3,
 				InitialBackoff: tc.backoff,
 				MaxBackoff:     tc.backoff,
-			}))
+			}), transport.WithTracerProvider(tp))
 			// Cleanups run last-in first-out, so the handler is released
 			// before the server closes and waits for it.
 			t.Cleanup(func() { close(release) })
@@ -816,7 +817,18 @@ func TestBodyReadErrorCallerDeadlineIsNotRetried(t *testing.T) { // REQ-172, REQ
 			if got := hits.Load(); got != 1 {
 				t.Errorf("server hit %d times, want 1: a read the caller's deadline stopped is not sent again", got)
 			}
+			assertNoRetryScheduled(t, tp)
 		})
+	}
+}
+
+// assertNoRetryScheduled checks that the one span tp recorded carries no
+// retry.backoff_ms: Do set it only if it decided to send the request again.
+func assertNoRetryScheduled(t *testing.T, tp *recordingTracerProvider) {
+	t.Helper()
+	span := tp.tracer.only(t)
+	if v, ok := span.attr("retry.backoff_ms"); ok {
+		t.Errorf("span %q retry.backoff_ms = %s: a retry was scheduled after the caller's deadline ended", span.name, v.String())
 	}
 }
 
@@ -889,12 +901,12 @@ func stallMidBodyHandler(status int, hits *atomic.Int32, release <-chan struct{}
 // the non-2xx arm, beside REQ-091's "Retries MUST respect ctx cancellation". A
 // GET whose 503 body read is stopped by the caller's own deadline is not sent
 // again by its status, so Do returns the 503 Response and the *WireError
-// rather than a later attempt's token failure or the bare context error. Only
-// the "no backoff" case pins the ctx guard in shouldRetry: with no wait, a
-// retry would start at once and fail with no response. The "20ms backoff"
-// case pins the outcome only, because Do's retry-wait branch keeps the
-// non-2xx arm's error even when the guard is gone; keep both, and never drop
-// the first as a duplicate of the second.
+// rather than a later attempt's token failure or the bare context error. The
+// outcome alone does not show that the ctx guard in shouldRetry decided it:
+// the retry wait reads ctx too, whatever the backoff, and Do's retry-wait
+// branch keeps the non-2xx arm's error. The span does: it carries
+// retry.backoff_ms only when a retry was scheduled, so its absence in both
+// cases pins the guard. Keep both cases.
 func TestBodyReadErrorNonTwoXXCallerDeadlineIsNotRetried(t *testing.T) { // REQ-172, REQ-091
 	cases := []struct {
 		name    string
@@ -907,13 +919,15 @@ func TestBodyReadErrorNonTwoXXCallerDeadlineIsNotRetried(t *testing.T) { // REQ-
 		t.Run(tc.name, func(t *testing.T) {
 			var hits atomic.Int32
 			release := make(chan struct{})
+			tp := newRecordingTracerProvider()
 			c := newBodyReadClient(t, stallMidBodyHandler(http.StatusServiceUnavailable, &hits, release),
 				transport.WithRetry(transport.RetryPolicy{
 					MaxAttempts:     3,
 					InitialBackoff:  tc.backoff,
 					MaxBackoff:      tc.backoff,
 					RetriableStatus: []int{http.StatusServiceUnavailable},
-				}))
+				}),
+				transport.WithTracerProvider(tp))
 			// Cleanups run last-in first-out, so the handler is released
 			// before the server closes and waits for it.
 			t.Cleanup(func() { close(release) })
@@ -949,6 +963,7 @@ func TestBodyReadErrorNonTwoXXCallerDeadlineIsNotRetried(t *testing.T) { // REQ-
 			if got := hits.Load(); got != 1 {
 				t.Errorf("server hit %d times, want 1: a read the caller's deadline stopped is not sent again", got)
 			}
+			assertNoRetryScheduled(t, tp)
 		})
 	}
 }

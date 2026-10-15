@@ -9,8 +9,10 @@ import (
 
 // RetryPolicy configures retry-on-status behaviour. Retries are
 // disabled by default; enable them with transport.WithRetry. Retries
-// respect ctx cancellation immediately. See RetryPolicy.MaxAttempts and
-// Disabled for the precise "no-retry" semantics.
+// respect ctx cancellation immediately: once ctx has ended no further
+// attempt starts, even with no backoff, and Client.Do returns the last
+// Response it received. See RetryPolicy.MaxAttempts and Disabled for the
+// precise "no-retry" semantics.
 type RetryPolicy struct {
 	// Disabled, when true, forces exactly one attempt regardless of
 	// MaxAttempts. Use NoRetry as the canonical zero-config form for
@@ -94,10 +96,14 @@ func (p RetryPolicy) retriableStatuses() []int {
 	return []int{502, 503, 504}
 }
 
-// retryWait sleeps for d honouring ctx cancellation.
+// retryWait waits d before the next attempt. It returns ctx's error instead
+// when ctx ends during the wait, or has already ended. A zero or negative d
+// does not wait but still reads ctx, so a policy with no backoff never starts
+// an attempt after the caller gave up (REQ-091): that attempt could only fail
+// before any response and drop the one Do already has.
 func retryWait(ctx context.Context, d time.Duration) error {
 	if d <= 0 {
-		return nil
+		return ctx.Err()
 	}
 	t := time.NewTimer(d)
 	defer t.Stop()
