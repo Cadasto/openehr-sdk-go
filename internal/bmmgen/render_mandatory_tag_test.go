@@ -303,9 +303,11 @@ func TestREQ052_RenderFieldPolymorphicMandatoryTag(t *testing.T) {
 
 // TestREQ052_GeneratedNilableFieldsCarryOmit type-checks every package that
 // holds generated structs with JSON tags and requires each JSON-tagged field
-// whose type can hold nil (a pointer, slice, map, interface or type
-// parameter) to carry omitempty or omitzero, so that its nil value is left
-// out on encode and never written as null.
+// whose type can hold nil to carry the omit option its kind needs, so that
+// its nil value is left out on encode and never written as null: omitempty
+// on an interface or type-parameter field, so that one holding a nil
+// pointer is left out too, and omitempty or omitzero on a pointer, slice,
+// map or any field.
 //
 // [mandatoryJSONTag] tells field shapes apart by the text of the rendered Go
 // type and gives a shape it does not know the bare tag, and the polymorphic
@@ -350,8 +352,8 @@ func TestREQ052_GeneratedNilableFieldsCarryOmit(t *testing.T) {
 			if audit.nilable == 0 {
 				t.Errorf("%s: no JSON-tagged field of a nilable type found in %d generated files, so the audit checked nothing", dir, len(gen))
 			}
-			for _, f := range audit.bare {
-				t.Errorf("%s: a nil value is written as JSON null; the generator must tag this field shape omitzero (pointer, slice, map, any) or omitempty (interface, type parameter), see mandatoryJSONTag in render.go", f)
+			for _, f := range audit.missing {
+				t.Errorf("%s: a nil value is written as JSON null; a field of kind %s must carry %s, see mandatoryJSONTag in render.go", f, f.rule.kind, strings.Join(f.rule.accepts, " or "))
 			}
 		})
 	}
@@ -361,9 +363,12 @@ func TestREQ052_GeneratedNilableFieldsCarryOmit(t *testing.T) {
 // [TestREQ052_GeneratedNilableFieldsCarryOmit] on a small source with one
 // bare-tagged field of each nilable kind, a named slice type among them,
 // inside a generic struct, a jsonWire* struct and an anonymous struct in a
-// function body. Each one is reported, and the fields that carry an omit
-// option, are held by value, have no json key or are left out of JSON
-// with "-" are not.
+// function body. Each one is reported, and so is an interface or
+// type-parameter field that carries omitzero only, a named interface with no
+// methods and an interface literal among them. A pointer, slice, map or
+// any field that carries either omit option, an interface or type-parameter
+// field that carries omitempty, and the fields held by value, with no json
+// key or left out of JSON with "-" are not.
 func TestREQ052_AuditNilableJSONOmitReportsBareTags(t *testing.T) {
 	const src = `package fixture
 
@@ -374,6 +379,9 @@ type Items []Item
 
 type Shape interface{ Area() float64 }
 
+// Marker is a named interface with no methods: a Go interface, not any.
+type Marker interface{}
+
 type Holder[T any] struct {
 	Pointer   *Item           "json:\"pointer\""
 	Slice     []Item          "json:\"slice\""
@@ -383,12 +391,20 @@ type Holder[T any] struct {
 	Any       any             "json:\"any\""
 	Param     T               "json:\"param\""
 
-	OmitZero  *Item "json:\"omit_zero,omitzero\""
-	OmitEmpty Shape "json:\"omit_empty,omitempty\""
-	Value     Item  "json:\"value\""
-	Skipped   *Item "json:\"-\""
-	XMLOnly   *Item "xml:\"xml_only\""
-	Untagged  *Item
+	InterfaceOmitZero Shape                      "json:\"interface_omit_zero,omitzero\""
+	MarkerOmitZero    Marker                     "json:\"marker_omit_zero,omitzero\""
+	LiteralOmitZero   interface{ Area() float64 } "json:\"literal_omit_zero,omitzero\""
+	ParamOmitZero     T                          "json:\"param_omit_zero,omitzero\""
+
+	OmitZero       *Item  "json:\"omit_zero,omitzero\""
+	SliceOmitEmpty []Item "json:\"slice_omit_empty,omitempty\""
+	AnyOmitZero    any    "json:\"any_omit_zero,omitzero\""
+	OmitEmpty      Shape  "json:\"omit_empty,omitempty\""
+	ParamOmitEmpty T      "json:\"param_omit_empty,omitempty\""
+	Value          Item   "json:\"value\""
+	Skipped        *Item  "json:\"-\""
+	XMLOnly        *Item  "xml:\"xml_only\""
+	Untagged       *Item
 }
 
 type jsonWireHolder struct {
@@ -413,34 +429,46 @@ func (h Holder[T]) wrap() any {
 	}
 
 	audit := auditNilableJSONOmit(fset, []*ast.File{file}, info)
-	got := make([]string, 0, len(audit.bare))
-	for _, f := range audit.bare {
-		got = append(got, f.owner+"."+f.field)
+	got := make([]string, 0, len(audit.missing))
+	for _, f := range audit.missing {
+		got = append(got, fmt.Sprintf("%s.%s (%s: %s)", f.owner, f.field, f.rule.kind, strings.Join(f.rule.accepts, " or ")))
 	}
 	slices.Sort(got)
 	want := []string{
-		"Holder.Any", "Holder.Interface", "Holder.Map", "Holder.Named",
-		"Holder.Param", "Holder.Pointer", "Holder.Slice",
-		"jsonWireHolder.Hyperlink", "struct{…}.Wrapped",
+		"Holder.Any (any: omitempty or omitzero)",
+		"Holder.Interface (interface: omitempty)",
+		"Holder.InterfaceOmitZero (interface: omitempty)",
+		"Holder.LiteralOmitZero (interface: omitempty)",
+		"Holder.Map (map: omitempty or omitzero)",
+		"Holder.MarkerOmitZero (interface: omitempty)",
+		"Holder.Named (slice: omitempty or omitzero)",
+		"Holder.Param (type parameter: omitempty)",
+		"Holder.ParamOmitZero (type parameter: omitempty)",
+		"Holder.Pointer (pointer: omitempty or omitzero)",
+		"Holder.Slice (slice: omitempty or omitzero)",
+		"jsonWireHolder.Hyperlink (interface: omitempty)",
+		"struct{…}.Wrapped (pointer: omitempty or omitzero)",
 	}
 	if !slices.Equal(got, want) {
-		t.Errorf("auditNilableJSONOmit(fixture) reported %v, want %v", got, want)
+		t.Errorf("auditNilableJSONOmit(fixture) reported %q, want %q", got, want)
 	}
-	if audit.nilable != len(want)+2 {
-		t.Errorf("auditNilableJSONOmit(fixture) counted %d nilable JSON-tagged fields, want %d (the bare ones and the two with an omit option)", audit.nilable, len(want)+2)
+	const passing = 5 // OmitZero, SliceOmitEmpty, AnyOmitZero, OmitEmpty, ParamOmitEmpty
+	if audit.nilable != len(want)+passing {
+		t.Errorf("auditNilableJSONOmit(fixture) counted %d nilable JSON-tagged fields, want %d (the %d reported and the %d that carry an accepted omit option)", audit.nilable, len(want)+passing, len(want), passing)
 	}
 }
 
-// bareNilableField is a JSON-tagged field whose type can hold nil and
-// whose tag carries neither omitempty nor omitzero.
-type bareNilableField struct {
+// missingOmitField is a JSON-tagged field whose type can hold nil and
+// whose tag carries none of the omit options its kind accepts.
+type missingOmitField struct {
 	pos          token.Position
 	owner, field string
 	goType       string
 	tag          string
+	rule         omitRule
 }
 
-func (f bareNilableField) String() string {
+func (f missingOmitField) String() string {
 	return fmt.Sprintf("%s:%d: %s.%s %s %s", filepath.Base(f.pos.Filename), f.pos.Line, f.owner, f.field, f.goType, f.tag)
 }
 
@@ -449,14 +477,14 @@ type nilableJSONAudit struct {
 	structs int // struct types, named or anonymous
 	tagged  int // fields with a json key other than "-"
 	nilable int // tagged fields whose type can hold nil
-	bare    []bareNilableField
+	missing []missingOmitField
 }
 
 // auditNilableJSONOmit walks every struct type in files, named or
 // anonymous and inside function bodies too, and reports each field with a
 // json key whose type, as info records it, can hold nil while its tag
-// carries neither omitempty nor omitzero. An anonymous struct is reported
-// under the owner name "struct{…}".
+// carries none of the omit options [nilableOmitRule] accepts for that type.
+// An anonymous struct is reported under the owner name "struct{…}".
 func auditNilableJSONOmit(fset *token.FileSet, files []*ast.File, info *types.Info) nilableJSONAudit {
 	var audit nilableJSONAudit
 	for _, file := range files {
@@ -486,17 +514,19 @@ func auditNilableJSONOmit(fset *token.FileSet, files []*ast.File, info *types.In
 						names = append(names, types.ExprString(field.Type))
 					}
 					audit.tagged += len(names)
-					if !canHoldNil(info.TypeOf(field.Type)) {
+					rule, ok := nilableOmitRule(info.TypeOf(field.Type))
+					if !ok {
 						continue
 					}
 					audit.nilable += len(names)
-					if slices.Contains(opts, "omitempty") || slices.Contains(opts, "omitzero") {
+					if slices.ContainsFunc(rule.accepts, func(opt string) bool { return slices.Contains(opts, opt) }) {
 						continue
 					}
 					for _, name := range names {
-						audit.bare = append(audit.bare, bareNilableField{
+						audit.missing = append(audit.missing, missingOmitField{
 							pos: fset.Position(field.Pos()), owner: owner, field: name,
 							goType: types.ExprString(field.Type), tag: field.Tag.Value,
+							rule: rule,
 						})
 					}
 				}
@@ -507,15 +537,42 @@ func auditNilableJSONOmit(fset *token.FileSet, files []*ast.File, info *types.In
 	return audit
 }
 
-// canHoldNil reports whether a value of type t can be nil: a pointer,
-// slice, map or interface. A type parameter counts too, since its
-// underlying type is its constraint, which is an interface.
-func canHoldNil(t types.Type) bool {
-	switch t.Underlying().(type) {
-	case *types.Pointer, *types.Slice, *types.Map, *types.Interface:
-		return true
+// omitRule names the kind of a nilable field type and the omit options
+// that kind accepts.
+type omitRule struct {
+	kind    string   // pointer, slice, map, any, interface or type parameter
+	accepts []string // a field of this kind must carry one of these
+}
+
+// nilableOmitRule returns the omit rule for a field of type t, and false
+// when a value of type t cannot be nil. bmm-conformance.md § Mapping rules
+// asks for omitempty on a Go interface and on a field typed by its class's
+// own generic parameter: omitzero leaves out only a nil interface, so an
+// interface that holds a nil pointer would still be written as null. A
+// pointer, slice, map or any field may carry either option; the same rule
+// gives an any field omitzero. An any field is one of the unnamed empty
+// interface; a named interface type, even one with no methods, is a Go
+// interface. A type parameter is told apart first, since its underlying
+// type is its constraint, an interface.
+func nilableOmitRule(t types.Type) (omitRule, bool) {
+	either := []string{"omitempty", "omitzero"}
+	if _, ok := types.Unalias(t).(*types.TypeParam); ok {
+		return omitRule{kind: "type parameter", accepts: []string{"omitempty"}}, true
 	}
-	return false
+	switch u := t.Underlying().(type) {
+	case *types.Pointer:
+		return omitRule{kind: "pointer", accepts: either}, true
+	case *types.Slice:
+		return omitRule{kind: "slice", accepts: either}, true
+	case *types.Map:
+		return omitRule{kind: "map", accepts: either}, true
+	case *types.Interface:
+		if _, named := types.Unalias(t).(*types.Named); !named && u.Empty() {
+			return omitRule{kind: "any", accepts: either}, true
+		}
+		return omitRule{kind: "interface", accepts: []string{"omitempty"}}, true
+	}
+	return omitRule{}, false
 }
 
 // jsonTagOptions returns the options after the name in the json key of a
