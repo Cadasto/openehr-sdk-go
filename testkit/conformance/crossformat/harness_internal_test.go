@@ -258,17 +258,19 @@ func refusedAfterRemoval(t *testing.T, sets []fixtures.CrossFormatSet) (fixtures
 // TestProbe105CompareFlatHoldsMetadataOutOnBothSides pins the PROBE-086
 // hold-out on both FLAT sides: a ctx/ short form on one side and the real-path
 // spelling on the other are not a difference, while the composer's
-// external_ref, which no ctx/ form carries, still is. Values compare by their
-// JSON text, so 1 and 1.0 differ.
+// external_ref and party sub-structure, which no ctx/ form carries and both
+// sides write at the composer's real path (ADR 0029), still are. Values
+// compare by their JSON text, so 1 and 1.0 differ.
 func TestProbe105CompareFlatHoldsMetadataOutOnBothSides(t *testing.T) {
 	const root = "r"
 	ref := map[string]any{
-		"r/language|code":      "en",
-		"r/composer|name":      "x",
-		"r/context/start_time": "2020-01-01T00:00:00Z",
-		"r/composer|id":        "c1",
-		"r/obs/q|magnitude":    json.Number("1.0"),
-		"r/obs/text":           "a",
+		"r/language|code":             "en",
+		"r/composer|name":             "x",
+		"r/context/start_time":        "2020-01-01T00:00:00Z",
+		"r/composer|id":               "c1",
+		"r/composer/_identifier:0|id": "i1",
+		"r/obs/q|magnitude":           json.Number("1.0"),
+		"r/obs/text":                  "a",
 	}
 	ours := map[string]any{
 		"ctx/language":      "en",
@@ -281,13 +283,15 @@ func TestProbe105CompareFlatHoldsMetadataOutOnBothSides(t *testing.T) {
 	if err != nil {
 		t.Fatalf("compareFlat() error = %v", err)
 	}
-	want := Outcome{Compared: 3, Missing: 1, Altered: 1}
+	want := Outcome{Compared: 4, Missing: 2, Altered: 1}
 	if got.Outcome != want {
 		t.Errorf("compareFlat().Outcome = %+v, want %+v (missing %v, extra %v, altered %v)",
 			got.Outcome, want, got.MissingKeys, got.ExtraKeys, got.Alterations)
 	}
-	if !slices.Equal(got.MissingKeys, []string{"r/composer|id"}) {
-		t.Errorf("MissingKeys = %v, want only the composer external_ref, which the hold-out must not cover", got.MissingKeys)
+	composerKeys := []string{"r/composer/_identifier:0|id", "r/composer|id"}
+	if !slices.Equal(got.MissingKeys, composerKeys) {
+		t.Errorf("MissingKeys = %v, want only the composer's external_ref and identifier %v, which the hold-out must not cover",
+			got.MissingKeys, composerKeys)
 	}
 
 	// The reverse: metadata only on our side is not extra either.
@@ -295,8 +299,8 @@ func TestProbe105CompareFlatHoldsMetadataOutOnBothSides(t *testing.T) {
 	if err != nil {
 		t.Fatalf("compareFlat() error = %v", err)
 	}
-	if !slices.Equal(rev.ExtraKeys, []string{"r/composer|id"}) {
-		t.Errorf("reversed ExtraKeys = %v, want only the composer external_ref", rev.ExtraKeys)
+	if !slices.Equal(rev.ExtraKeys, composerKeys) {
+		t.Errorf("reversed ExtraKeys = %v, want only the composer's external_ref and identifier %v", rev.ExtraKeys, composerKeys)
 	}
 }
 
