@@ -174,20 +174,46 @@ func complexChild(rmType string, attributes ...string) string {
 		strings.Join(attributes, "") + `</children>`
 }
 
-// refusedContentCases returns an OBSERVATION whose archetype fits no slot of
-// vital_signs.opt, lacking its language; a PARTY_RELATED composer, coded
-// outside its group, where the template allows a PARTY_SELF alone; an
-// ELEMENT under a template that prohibits its null_flavour and its value's
-// mappings, carrying a null flavour whose mappings are present and empty, a
-// mapping with no valid match, or a null flavour coded outside its group;
-// and a composer whose name the template prohibits, present and empty. The
-// last two carry a breach that a rule of the node holding the refused
-// attribute reports, at or below the attribute's path.
+// forbiddenChildArchetype is the archetype of the root of forbiddenChildOPT.
+const forbiddenChildArchetype = "openEHR-EHR-CLUSTER.forbidden_child.v1"
+
+// forbiddenChildOPT is a CLUSTER whose items, open in existence and count,
+// allow an ELEMENT at0001 and declare an ELEMENT at0002 that occurs 0..0,
+// which the template does not allow. Each ELEMENT's value is a DV_TEXT.
+var forbiddenChildOPT = rootOPT("CLUSTER", forbiddenChildArchetype,
+	`<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>items</rm_attribute_name>`+
+		`<existence>`+fiInterval("0", "1")+`</existence>`+
+		fiElement("at0001", "0", "1", "", "DV_TEXT")+
+		fiElement("at0002", "0", "0", "", "DV_TEXT")+
+		`<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval>`+unboundedFromZero+`</interval></cardinality>`+
+		`</attributes>`)
+
+// refusedContentCases returns content the template does not admit, one row
+// for each kind the Admission step names, each carrying an RM breach inside:
+// an OBSERVATION, an item of a list, whose archetype fits no slot of
+// vital_signs.opt, lacking its language; an ELEMENT, an item of a list,
+// bound to a child the template does not allow, whose value's mappings are
+// present and empty; a PARTY_RELATED composer, the value of a single-valued
+// attribute that binds to none of the allowed children, as the template
+// allows a PARTY_SELF alone, coded outside its group; an ELEMENT under a
+// template that prohibits its null_flavour and its value's mappings,
+// carrying a null flavour whose mappings are present and empty, a mapping
+// with no valid match, or a null flavour coded outside its group; and a
+// composer whose name the template prohibits, present and empty. The last
+// two carry a breach that a rule of the node holding the refused attribute
+// reports, at or below the attribute's path.
 func refusedContentCases(t *testing.T) []refusedContentCase {
 	t.Helper()
 	unknownArchetype := probes.UnknownArchetypeUnderContent()
 	// ENTRY.language is RM-mandatory.
 	unknownArchetype.Content[0].(*rm.Observation).Language = rm.CodePhrase{}
+
+	// A present and empty mappings list breaks DV_TEXT.Mappings_valid.
+	forbiddenItem := &rm.Cluster{
+		ArchetypeNodeID: forbiddenChildArchetype,
+		Name:            &rm.DVText{Value: "cluster"},
+		Items:           []rm.Item{fiItem("at0002", "two", &rm.DVText{Value: "text", Mappings: []rm.TermMapping{}})},
+	}
 
 	relatedComposer := probes.ComposerPartyRelated()
 	// 999 is no relationship of the openEHR terminology.
@@ -223,7 +249,16 @@ func refusedContentCases(t *testing.T) []refusedContentCase {
 			inside: "required /content[openEHR-EHR-OBSERVATION.no_such_archetype.v1]/language rm mandatory",
 		},
 		{
-			name:   "a PARTY_RELATED composer under a PARTY_SELF-only composer, coded outside its group",
+			name:   "an ELEMENT bound to a child that occurs 0..0, whose value's mappings are present and empty",
+			root:   forbiddenItem,
+			c:      mustCompileInline(t, forbiddenChildOPT),
+			want:   "cardinality /items[at0002] template occurrences",
+			inside: "mappings_valid /items[at0002]/value/mappings rm DV_TEXT.Mappings_valid",
+		},
+		{
+			// The single-valued sentence of Admission: a value that binds to
+			// none of the allowed children is refused, not entered.
+			name:   "a single-valued composer whose PARTY_RELATED value binds to none of the allowed children, coded outside its group",
 			root:   relatedComposer,
 			c:      mustCompileInline(t, probes.RMTypeMismatchOPT),
 			want:   "rm_type_mismatch /composer template type",
@@ -262,9 +297,11 @@ func refusedContentCases(t *testing.T) []refusedContentCase {
 
 // REQ-171 § One walk (Admission), § Acceptance; ADR 0027 — content the
 // template does not admit draws its one admission finding and nothing from
-// inside: an item that binds to no child, a single value of a type the
-// template does not allow, and a present attribute the template prohibits,
-// single-valued or multi-valued. Each carries an RM breach inside, which the
+// inside: an item that binds to no child, an item bound to a child the
+// template does not allow, whose one finding is that child's occurrences, a
+// single-valued attribute's value that binds to none of the allowed
+// children, and a present attribute the template prohibits, single-valued or
+// multi-valued. Each carries an RM breach inside, which the
 // RM rules alone report, so a walk that entered the refused content would
 // report it too. A rule of the node that holds the refused attribute reports
 // nothing at or below the attribute's path either: an ELEMENT's coded rule
@@ -284,6 +321,33 @@ func TestREQ171_EngineDoesNotEnterRefusedContent(t *testing.T) {
 				t.Errorf("Validate(%s) = %q, want %q alone: nothing from inside refused content", tc.name, got, tc.want)
 			}
 		})
+	}
+}
+
+// REQ-171 § One walk (the paragraph after step 4), § Acceptance — a rule of
+// an admitted node reads the node's attributes as the instance holds them, a
+// refused one included, and its finding at the node's own path is reported
+// beside the admission finding: an ELEMENT carrying both a value and a
+// null_flavour, under a template that prohibits its null_flavour, draws
+// `prohibited` at /null_flavour and the ELEMENT's own null-flavour rule at
+// "/". Only what the rule would report at or below the refused attribute is
+// from inside it; a walk that withdrew the node's own finding too would fail
+// here.
+func TestREQ171_EngineReportsANodeRuleThatReadsARefusedAttribute(t *testing.T) {
+	t.Parallel()
+	unknown := &rm.DVCodedText{
+		Value:        "unknown",
+		DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}, CodeString: "253"},
+	}
+	root := prohibitedElement(&rm.DVText{Value: "x"}, unknown)
+	const nodeRule = "rm_invariant / rm ELEMENT.Inv_null_flavour_indicated"
+	if got := identityKeys(validation.ValidateRM(root).Issues); !slices.Contains(got, nodeRule) {
+		t.Fatalf("precondition: ValidateRM(ELEMENT with a value and a null_flavour) = %q, want it to hold %q", got, nodeRule)
+	}
+	r := validateWith(t, root, mustCompileInline(t, prohibitedOPT("0", "0")))
+	want := []string{"prohibited /null_flavour template existence", nodeRule}
+	if got := identityKeys(r.Issues); !slices.Equal(got, want) {
+		t.Errorf("Validate(ELEMENT with a value and a prohibited null_flavour) = %q, want %q: the admission finding and the node's own rule at its path", got, want)
 	}
 }
 

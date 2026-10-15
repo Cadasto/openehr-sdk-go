@@ -38,9 +38,9 @@ import (
 // the guards [Validator.Validate] applies (a nil root, a template with no
 // root), and the walk applies at every node the template rules and the
 // Reference Model rules together. Content the template does not admit, an
-// attribute it prohibits or an item that binds to no child, is reported once
-// and not entered; content it does not constrain is walked with the
-// Reference Model rules alone. A root outside the closed RM set is checked
+// attribute it prohibits, a value that binds to no child or an item bound to
+// a child it does not allow, is reported once and not entered; content it
+// does not constrain is walked with the Reference Model rules alone. A root outside the closed RM set is checked
 // against the template's root node and then reported as `rm_type_unknown`
 // at "/", as [Validate] reports it.
 func runEngine(root any, c *templatecompile.Compiled, lim Limits) Result {
@@ -105,9 +105,10 @@ type engine struct {
 	// CONSTRAINT_REF, whose value set is outside the SDK
 	// ([Coverage.External]). Nil until one is met.
 	external []string
-	// refused holds, in walk order, the path of each attribute or item the
-	// template did not admit, which the walk reported once and did not
-	// enter.
+	// refused holds, in walk order, the path of each attribute, value or
+	// item the template did not admit, which the walk reported once and did
+	// not enter; an item bound to a child the template does not allow is
+	// reported by that child's occurrences.
 	refused []string
 	// ancestry holds the values with an identity ([hasIdentity]) the walk is
 	// inside, outermost first: the one record a cycle is detected against.
@@ -290,10 +291,12 @@ func (e *engine) walk(n engineNode) {
 //
 // A rule of the node's class may read below the node, into one of its
 // attributes. Where the template refused content below the node, an
-// attribute it prohibits or a value that binds to no child, a finding of the
-// node's rules at or below the refused content's path is withdrawn once the
-// attributes are visited: the refusal is the whole report for that content
-// ([engine.withdrawInside]).
+// attribute it prohibits, a value that binds to no child or an item bound to
+// a child it does not allow, a finding of the node's rules at or below the
+// refused content's path is withdrawn once the attributes are visited: the
+// refusal is the whole report for that content ([engine.withdrawInside]). A
+// finding of theirs at the node's own path stays, though the rule read the
+// refused content to reach it.
 func (e *engine) visit(n engineNode) {
 	if e.visits == e.maxNodes {
 		e.found.emit(Issue{
@@ -635,7 +638,10 @@ func (e *engine) visitDeclaredSingle(n engineNode, a engineAttr, r attrReading, 
 // Admission: a present attribute the template prohibits that holds an item
 // is reported once, as `prohibited`, and not entered; each item that binds to
 // none of the template's children ([bindItems]) is reported once
-// ([unboundItemIssue]) and not entered. Presence: an absent attribute is
+// ([unboundItemIssue]) and not entered; each item bound to a child the
+// template does not allow ([allowedChildren]), one whose occurrences upper
+// bound is 0, is reported by that child's occurrences, among the counts, and
+// not entered. Presence: an absent attribute is
 // reported as [engine.checkAbsent] says, and one that is present and holds
 // no item as [engine.checkEmpty] says. Counts: the template's child count and
 // each child's occurrences. Then each admitted item is walked against the
@@ -655,13 +661,23 @@ func (e *engine) visitDeclaredItems(n engineNode, a engineAttr, r attrReading, a
 	children := tcimpl.ChildNodes(a.decl)
 	var bound []*tcimpl.CompiledNode
 	var paths []string
+	var admitted []bool
 	if len(children) > 0 && a.shape != shapeCounted {
 		var byNodeID []bool
 		bound, byNodeID = bindItems(n.bound.RMTypeName(), a.name, children, r.items)
 		paths = boundItemPaths(attrPath, r.items, bound, a.shape == shapeHash)
+		allowed := allowedChildren(a.decl)
+		admitted = make([]bool, len(r.items))
 		for i, item := range r.items {
-			if bound[i] == nil {
+			switch {
+			case bound[i] == nil:
 				e.refuse(unboundItemIssue(a.decl, children, item, byNodeID[i], paths[i]))
+			case !slices.Contains(allowed, bound[i]):
+				// The child's occurrences, reported with the counts below,
+				// are the one report for the item.
+				e.refused = append(e.refused, paths[i])
+			default:
+				admitted[i] = true
 			}
 		}
 	}
@@ -686,7 +702,7 @@ func (e *engine) visitDeclaredItems(n engineNode, a engineAttr, r attrReading, a
 		e.walkUnconstrained(n, a, r, attrPath, role)
 	case bound != nil:
 		for i, item := range r.items {
-			if bound[i] == nil {
+			if !admitted[i] {
 				continue
 			}
 			e.walk(engineNode{value: item, rmType: runtimeRMType(item, a.rmType), path: paths[i], role: role, depth: n.depth + 1, bound: bound[i]})
