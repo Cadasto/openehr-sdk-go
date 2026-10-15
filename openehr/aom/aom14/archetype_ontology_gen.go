@@ -10,14 +10,14 @@ import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 // ArchetypeOntology Local ontology of an archetype.
 type ArchetypeOntology struct {
 	// ConstraintCodes List of all term codes in the ontology. These correspond to the “ac” codes in an ADL archetype, or equivalently, the CONSTRAINT_REF.reference values in the archetype definition.
-	ConstraintCodes []string `json:"constraint_codes"`
+	ConstraintCodes []string `json:"constraint_codes,omitzero"`
 	// ParentArchetype Archetype which owns this terminology.
-	ParentArchetype *Archetype `json:"parent_archetype"`
+	ParentArchetype *Archetype `json:"parent_archetype,omitzero"`
 	// SpecialisationDepth Specialisation depth of this archetype. Unspecialised archetypes have depth 0, with each additional level of specialisation adding 1 to the specialisation_depth.
 	SpecialisationDepth Integer  `json:"specialisation_depth"`
-	TermAttributeNames  []string `json:"term_attribute_names"`
+	TermAttributeNames  []string `json:"term_attribute_names,omitzero"`
 	// TermCodes List of all term codes in the ontology. Most of these correspond to “at” codes in an ADL archetype, which are the node_ids on C_OBJECT descendants. There may be an extra one, if a different term is used as the overall archetype concept from that used as the node_id of the outermost C_OBJECT in the definition part.
-	TermCodes []string `json:"term_codes"`
+	TermCodes []string `json:"term_codes,omitzero"`
 	// TerminologiesAvailable List of terminologies to which term or constraint bindings exist in this terminology.
 	TerminologiesAvailable []string `json:"terminologies_available,omitempty"`
 }

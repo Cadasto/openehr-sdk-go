@@ -154,13 +154,21 @@ func Unmarshalers() json.Options {
 
 // EncodeOptions returns the encoder-independent canonical-JSON encode option
 // set: json.Deterministic(true) so a map (openEHR Hash) emits its keys in
-// lexicographic order, and FormatNilSliceAsNull / FormatNilMapAsNull
-// so a mandatory nil container keeps its "null" spelling instead of v2's
-// default "[]" / "{}". It is the single home for these three options: an
-// entry point with no encoder in hand (canjson.Marshal / MarshalIndent) joins
-// it directly, and [MarshalOptions] joins it on top of an encoder's own
-// options. The set is rebuilt afresh on every call so the spelling holds no
-// matter which package (encoding/json v1 or v2) drives the encode.
+// lexicographic order, and FormatNilSliceAsNull / FormatNilMapAsNull so a
+// nil slice or map that is written is spelled "null", as encoding/json v1
+// spells it, instead of v2's default "[]" / "{}".
+//
+// A generated list or map field that is nil is never written: its omit
+// option leaves it out (wire.md § REQ-052). The two FormatNil options decide
+// the spelling of a nil slice or map that has no omit option of its own: one
+// held in an any field, one behind a non-nil pointer such as an optional
+// Hash field's *map[string]V, or one passed straight to canjson.Marshal.
+//
+// This is the single home for these three options. An entry point with no
+// encoder in hand (canjson.Marshal / MarshalIndent) joins the set directly,
+// and [MarshalOptions] joins it on top of an encoder's own options. The set
+// is rebuilt afresh on every call so the spelling holds no matter which
+// package (encoding/json v1 or v2) drives the encode.
 func EncodeOptions() json.Options {
 	return json.JoinOptions(
 		json.Deterministic(true),

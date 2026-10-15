@@ -8,7 +8,7 @@ package aom14
 // Assertion Structural model of a typed first order predicate logic assertion, in the form of an expression tree, including optional variable definitions.
 type Assertion struct {
 	// Expression Root of expression tree.
-	Expression ExprItem `json:"expression"`
+	Expression ExprItem `json:"expression,omitempty"`
 	// StringExpression String form of expression, in case an expression evaluator taking String expressions is used for evaluation.
 	StringExpression *string `json:"string_expression,omitzero"`
 	// Tag Expression tag, used for differentiating multiple assertions.
@@ -28,13 +28,13 @@ type AssertionVariable struct {
 // ExprBinaryOperator Binary operator expression node.
 type ExprBinaryOperator struct {
 	// LeftOperand Left operand node.
-	LeftOperand ExprItem `json:"left_operand"`
+	LeftOperand ExprItem `json:"left_operand,omitempty"`
 	// Operator Code of operator.
 	Operator OperatorKind `json:"operator"`
 	// PrecedenceOverridden True if the natural precedence of operators is overridden in the expression represented by this node of the expression tree. If True, parentheses should be introduced around the totality of the syntax expression corresponding to this operator node and its operands.
 	PrecedenceOverridden *bool `json:"precedence_overridden,omitzero"`
 	// RightOperand Right operand node.
-	RightOperand ExprItem `json:"right_operand"`
+	RightOperand ExprItem `json:"right_operand,omitempty"`
 	// Type Type name of this item in the mathematical sense. For leaf nodes, must be the name of a primitive type, or else a reference model type. The type for any relational or boolean operator will be “Boolean”, while the type for any arithmetic operator, will be “Real” or “Integer”.
 	Type string `json:"type"`
 }
@@ -58,7 +58,7 @@ func (ExprUnaryOperator) isExprItem() {}
 // * a variable reference.
 type ExprLeaf struct {
 	// Item The value referred to; a manifest constant, an attribute path (in the form of a String), or for the right-hand side of a ‘matches’ node, a constraint, often a C_PRIMITIVE_OBJECT.
-	Item any `json:"item"`
+	Item any `json:"item,omitzero"`
 	// ReferenceType Type of reference: “constant”, “attribute”, “function”, “constraint”. The first three are used to indicate the referencing mechanism for an operand. The last is used to indicate a constraint operand, as happens in the case of the right-hand operand of the ‘matches’ operator.
 	ReferenceType string `json:"reference_type"`
 	// Type Type name of this item in the mathematical sense. For leaf nodes, must be the name of a primitive type, or else a reference model type. The type for any relational or boolean operator will be “Boolean”, while the type for any arithmetic operator, will be “Real” or “Integer”.
@@ -77,7 +77,7 @@ func (ExprUnaryOperator) isExprOperator() {}
 // ExprUnaryOperator Unary operator expression node.
 type ExprUnaryOperator struct {
 	// Operand Operand node.
-	Operand ExprItem `json:"operand"`
+	Operand ExprItem `json:"operand,omitempty"`
 	// Operator Code of operator.
 	Operator OperatorKind `json:"operator"`
 	// PrecedenceOverridden True if the natural precedence of operators is overridden in the expression represented by this node of the expression tree. If True, parentheses should be introduced around the totality of the syntax expression corresponding to this operator node and its operands.

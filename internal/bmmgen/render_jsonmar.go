@@ -402,8 +402,10 @@ func renderMarshalAlias(pc *PlannedClass, recv, typeParams, typeArgs string) str
 
 	fmt.Fprintf(&b, "// MarshalJSONTo emits canonical openEHR JSON for %s with `_type`\n", pc.GoName)
 	fmt.Fprintf(&b, "// (value %q) as the leading member. Field order otherwise follows the\n", pc.BMMName)
-	b.WriteString("// struct declaration; json.Deterministic sorts any Hash keys and the\n")
-	b.WriteString("// FormatNil* options keep a mandatory nil container's `null` spelling.\n")
+	b.WriteString("// struct declaration, and json.Deterministic sorts any Hash keys. A nil\n")
+	b.WriteString("// list or map field is left out by its omit option. The FormatNil*\n")
+	b.WriteString("// options write any other nil slice or map, such as one held in an any\n")
+	b.WriteString("// field, as `null`.\n")
 	b.WriteString("// The receiver is a value so a concrete instance sitting\n")
 	b.WriteString("// in a polymorphic interface slot by value, the shape the like-interface\n")
 	b.WriteString("// accessors admit, still carries its `_type`.\n")

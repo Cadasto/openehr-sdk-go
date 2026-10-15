@@ -20,8 +20,10 @@ type rawCBoolean CBoolean
 
 // MarshalJSONTo emits canonical openEHR JSON for CBoolean with `_type`
 // (value "C_BOOLEAN") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
@@ -40,8 +42,10 @@ type rawCDate CDate
 
 // MarshalJSONTo emits canonical openEHR JSON for CDate with `_type`
 // (value "C_DATE") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
@@ -60,8 +64,10 @@ type rawCDateTime CDateTime
 
 // MarshalJSONTo emits canonical openEHR JSON for CDateTime with `_type`
 // (value "C_DATE_TIME") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
@@ -80,8 +86,10 @@ type rawCDuration CDuration
 
 // MarshalJSONTo emits canonical openEHR JSON for CDuration with `_type`
 // (value "C_DURATION") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
@@ -100,8 +108,10 @@ type rawCInteger CInteger
 
 // MarshalJSONTo emits canonical openEHR JSON for CInteger with `_type`
 // (value "C_INTEGER") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
@@ -120,8 +130,10 @@ type rawCReal CReal
 
 // MarshalJSONTo emits canonical openEHR JSON for CReal with `_type`
 // (value "C_REAL") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
@@ -140,8 +152,10 @@ type rawCString CString
 
 // MarshalJSONTo emits canonical openEHR JSON for CString with `_type`
 // (value "C_STRING") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
@@ -160,8 +174,10 @@ type rawCTime CTime
 
 // MarshalJSONTo emits canonical openEHR JSON for CTime with `_type`
 // (value "C_TIME") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.

@@ -20,8 +20,10 @@ type rawArchetypeOntology ArchetypeOntology
 
 // MarshalJSONTo emits canonical openEHR JSON for ArchetypeOntology with `_type`
 // (value "ARCHETYPE_ONTOLOGY") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
@@ -40,8 +42,10 @@ type rawArchetypeTerm ArchetypeTerm
 
 // MarshalJSONTo emits canonical openEHR JSON for ArchetypeTerm with `_type`
 // (value "ARCHETYPE_TERM") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.

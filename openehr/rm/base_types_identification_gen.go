@@ -48,7 +48,7 @@ type InternetID struct {
 type LocatableRef struct {
 	ObjectRef
 	// ID Globally unique id of an object, regardless of where it is stored.
-	ID UIDBasedID `json:"id"`
+	ID UIDBasedID `json:"id,omitempty"`
 	// Path The path to an instance, as an absolute path with respect to the object found at `VERSION._data_`. An empty path means that the object referred to by `_id_` is being specified.
 	Path *string `json:"path,omitzero"`
 }
@@ -75,7 +75,7 @@ func (TerminologyID) isObjectID() {}
 // ObjectRef Class describing a reference to another object, which may exist locally or be maintained outside the current namespace, e.g. in another service. Services are usually external, e.g. available in a LAN (including on the same host) or the internet via Corba, SOAP, or some other distributed protocol. However, in small systems they may be part of the same executable as the data containing the Id.
 type ObjectRef struct {
 	// ID Globally unique id of an object, regardless of where it is stored.
-	ID ObjectID `json:"id"`
+	ID ObjectID `json:"id,omitempty"`
 	// Namespace Namespace to which this identifier belongs in the local system context (and possibly in any other openEHR compliant environment) e.g.  terminology ,  demographic . These names are not yet standardised. Legal values for `_namespace_` are:
 	//
 	// * `"local"`
