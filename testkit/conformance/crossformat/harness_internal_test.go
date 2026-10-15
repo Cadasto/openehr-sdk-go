@@ -10,6 +10,8 @@ import (
 	"encoding/json"
 	"errors"
 	"maps"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -161,15 +163,18 @@ const motherPointer = "/content/0/data/items/0/items/1/value/value"
 // number of upstream FLAT keys the reducing decode removed, the keys removed
 // from the STRUCTURED side are kept apart and not counted, the other legs
 // remove nothing, and a refused leg carries no count but keeps the refusals
-// made before it. test_all_types flat-canonical is such a refused leg, and
-// corona structured-flat removes keys from both sides.
+// made before it. corona structured-flat removes keys from both sides. No
+// corpus leg is refused after the reducing decode removed keys, so a
+// synthetic set, [refusedAfterRemoval], runs through [Run] with the corpus
+// and carries such a refused flat-canonical leg.
 func TestProbe105ExcludedCountsTheUpstreamFlat(t *testing.T) {
 	sets, err := fixtures.ListCrossFormatSets()
 	if err != nil {
 		t.Fatalf("ListCrossFormatSets() error = %v", err)
 	}
+	synthetic, planted := refusedAfterRemoval(t, sets)
 	seen := map[string]LegResult{}
-	for _, set := range sets {
+	for _, set := range append(slices.Clip(sets), synthetic) {
 		res, err := Run(set)
 		if err != nil {
 			t.Fatalf("Run(%s) error = %v", set.Name, err)
@@ -193,16 +198,61 @@ func TestProbe105ExcludedCountsTheUpstreamFlat(t *testing.T) {
 		}
 	}
 
-	refused := seen["test_all_types "+string(LegFlatCanonical)]
-	if refused.Outcome.Refused == "" || len(refused.Refusals) == 0 {
-		t.Errorf("test_all_types flat-canonical = %+v with %d refusals, want a refusal that keeps the keys removed before it",
-			refused.Outcome, len(refused.Refusals))
+	refused, ok := seen[synthetic.Name+" "+string(LegFlatCanonical)]
+	switch {
+	case !ok:
+		t.Errorf("%s ran no flat-canonical leg", synthetic.Name)
+	case refused.Outcome != (Outcome{Refused: refused.Outcome.Refused}) || !strings.Contains(refused.Outcome.Refused, "missing mandatory context"):
+		t.Errorf("%s flat-canonical = %#v, want only a refusal for the missing context", synthetic.Name, refused.Outcome)
+	case len(refused.Refusals) != 1 || refused.Refusals[0].Key != planted || refused.Refusals[0].Keys != 1:
+		t.Errorf("%s flat-canonical refusals = %+v, want the one that removed %s before the leg was refused",
+			synthetic.Name, refused.Refusals, planted)
 	}
 	both := seen["corona "+string(LegStructuredFlat)]
 	if len(both.Refusals) == 0 || len(both.StructuredRefusals) == 0 || both.Outcome.Excluded != keysRemoved(both.Refusals) {
 		t.Errorf("corona structured-flat = %+v, removed %d upstream FLAT and %d STRUCTURED keys; want both sides reduced and only the FLAT side counted",
 			both.Outcome, keysRemoved(both.Refusals), keysRemoved(both.StructuredRefusals))
 	}
+}
+
+// refusedAfterRemoval builds a set whose flat-canonical leg is refused after
+// the reducing decode removed a key, and returns it with that key. It takes
+// the OPT and canonical JSON of the first corpus set that runs the leg, and
+// writes a FLAT of one key under a second instance of the template root.
+// Decode refuses that key as a path the Web Template does not have, naming
+// it, so the reducing decode removes it. It then refuses the body for its
+// missing language and territory, an error that names no key, and the leg
+// ends there. Neither refusal depends on how decode reads a suffix value, a
+// composer key or the root's name.
+func refusedAfterRemoval(t *testing.T, sets []fixtures.CrossFormatSet) (fixtures.CrossFormatSet, string) {
+	t.Helper()
+	i := slices.IndexFunc(sets, func(s fixtures.CrossFormatSet) bool {
+		return slices.Contains(Legs(s), LegFlatCanonical)
+	})
+	if i < 0 {
+		t.Fatal("no corpus set runs the flat-canonical leg")
+	}
+	base := sets[i]
+	target, err := webtemplate.NewTargetFromOPT(base.OPT)
+	if err != nil {
+		t.Fatalf("NewTargetFromOPT(%s) error = %v", base.OPT, err)
+	}
+	planted := target.Root + ":1/no_such_node"
+	flat, err := json.Marshal(map[string]string{planted: "x"})
+	if err != nil {
+		t.Fatalf("json.Marshal(FLAT) error = %v", err)
+	}
+	path := filepath.Join(t.TempDir(), "flat.json")
+	if err := os.WriteFile(path, flat, 0o600); err != nil {
+		t.Fatalf("WriteFile(%s) error = %v", path, err)
+	}
+	return fixtures.CrossFormatSet{
+		Name:          "refused after removal (" + base.Name + ")",
+		OPT:           base.OPT,
+		CanonicalJSON: base.CanonicalJSON,
+		CanonicalXML:  base.CanonicalXML,
+		FLAT:          path,
+	}, planted
 }
 
 // TestProbe105CompareFlatHoldsMetadataOutOnBothSides pins the PROBE-086
