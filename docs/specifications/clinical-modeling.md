@@ -354,7 +354,7 @@ An RM-guided intermediate (v1) landed on a sibling branch as a stepping stone: i
 |---|---|
 | `required` | a required attribute (OPT-declared or RM-mandatory) is absent / zero-valued |
 | `cardinality` | a multi-valued attribute's child count violates the OPT-declared cardinality / occurrences interval |
-| `prohibited` | an attribute the OPT prohibits (existence upper bound 0, or no allowed child) is present (*Structural — prohibited attributes* above) |
+| `prohibited` | an attribute the OPT prohibits (existence upper bound 0, or at least one OPT child and none allowed) is present (*Structural — prohibited attributes* above) |
 | `alternative_mismatch` | no child of a C_SINGLE_ATTRIBUTE with **two or more** alternatives matches the RM value, or no child of a C_MULTIPLE_ATTRIBUTE with two or more children admits an item that is not a LOCATABLE |
 | `rm_type_mismatch` | the RM instance's concrete type does not conform to the OPT child's declared `RMTypeName` (*RM type match* above), including single-child C_SINGLE_ATTRIBUTE type constraints and an item that is not a LOCATABLE that a single-child C_MULTIPLE_ATTRIBUTE does not admit |
 | `archetype_id_mismatch` | LOCATABLE.archetype_node_id does not equal the OPT-pinned archetype id at the matched node |
