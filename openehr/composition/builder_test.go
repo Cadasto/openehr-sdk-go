@@ -741,12 +741,13 @@ func TestREQ101_SetAcceptsAnyAlternativeAtPath(t *testing.T) {
 // a DV_BOOLEAN under DV_CODED_TEXT or DV_QUANTITY, and a DV_QUANTITY
 // where the template lists DV_QUANTITY with occurrences 0..0, whether
 // that alternative comes after the allowed DV_CODED_TEXT or before it,
-// where it is the node Compiled.NodeAt returns.
+// where it is the node Compiled.NodeAt returns, or is the only one.
 func TestREQ101_SetRefusesValueNoAlternativeAllows(t *testing.T) {
 	t.Parallel()
 	codedThenQuantity := compileAlternatives(t, valueAlternative("DV_CODED_TEXT", false), valueAlternative("DV_QUANTITY", false))
 	codedThenExcludedQuantity := compileAlternatives(t, valueAlternative("DV_CODED_TEXT", false), valueAlternative("DV_QUANTITY", true))
 	excludedQuantityThenCoded := compileAlternatives(t, valueAlternative("DV_QUANTITY", true), valueAlternative("DV_CODED_TEXT", false))
+	excludedQuantity := compileAlternatives(t, valueAlternative("DV_QUANTITY", true))
 	alternativeTypes := compileFixture(t, "alternative_types.en.v1")
 
 	cases := []struct {
@@ -758,6 +759,7 @@ func TestREQ101_SetRefusesValueNoAlternativeAllows(t *testing.T) {
 		{name: "DV_BOOLEAN under DV_CODED_TEXT or DV_QUANTITY", c: codedThenQuantity, path: abstractValuePath, v: &rm.DVBoolean{Value: true}},
 		{name: "DV_QUANTITY at 0..0 after DV_CODED_TEXT", c: codedThenExcludedQuantity, path: abstractValuePath, v: &rm.DVQuantity{Magnitude: 1, Units: "mm"}},
 		{name: "DV_QUANTITY at 0..0 before DV_CODED_TEXT", c: excludedQuantityThenCoded, path: abstractValuePath, v: &rm.DVQuantity{Magnitude: 1, Units: "mm"}},
+		{name: "DV_QUANTITY, the only alternative, at 0..0", c: excludedQuantity, path: abstractValuePath, v: &rm.DVQuantity{Magnitude: 1, Units: "mm"}},
 		{name: "DV_TEXT under the corpus DV_QUANTITY, DV_COUNT or DV_ORDINAL", c: alternativeTypes, path: alternativeTypesPath, v: &rm.DVText{Value: "x"}},
 	}
 	for _, tc := range cases {

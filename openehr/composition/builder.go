@@ -32,11 +32,12 @@ type Builder struct {
 	errs []error
 }
 
-// pendingAssignment is one queued (path, value) pair plus the
-// resolved compiled node. Pre-resolving the node at Set time means
-// path-not-found is surfaced eagerly; type-checking and RM-side
-// navigation still happen at Build time so the caller can stack Set
-// calls without each one mutating the graph.
+// pendingAssignment is one queued (path, value) pair plus the compiled
+// node the value binds: of the nodes the template allows at the path,
+// the one the value's RM type conforms to ([bindRMType]). Resolving
+// the node and checking the type at Set time surfaces an unknown path or
+// a type mismatch eagerly; RM-side navigation still happens at Build time
+// so the caller can stack Set calls without each one mutating the graph.
 type pendingAssignment struct {
 	path     string
 	rawValue any
@@ -76,15 +77,22 @@ func (b *Builder) TemplateID() string {
 // Set assigns v at path. Path must resolve in the compiled template,
 // or Set returns ErrUnknownPath.
 //
-// v's RM type must be the type the template gives the node at path, or
-// a class that descends from it in the openEHR class hierarchy. So a
+// v's RM type must be the type of a node the template allows at path,
+// or a class that descends from it in the openEHR class hierarchy. So a
 // *rm.DVCodedText is accepted at a DV_TEXT node, and a concrete data
 // value, such as a *rm.DVQuantity, at a node the template types as an
 // abstract class, such as DATA_VALUE. A node typed DV_INTERVAL<T>
-// accepts an interval whose parameter is T. Set returns ErrTypeMismatch
-// for any other value: one whose type does not descend from the node's
-// (a *rm.DVText at a DV_CODED_TEXT node, say), one that is not an RM
-// type, nil, and a nil pointer.
+// accepts an interval whose parameter is T.
+//
+// Where the template lists several alternatives at path under one
+// attribute, v may match any of them, except one whose occurrences are
+// 0..0, which the template does not allow: at an ELEMENT value the
+// template allows as DV_CODED_TEXT or DV_QUANTITY, both a
+// *rm.DVCodedText and a *rm.DVQuantity are accepted.
+//
+// Set returns ErrTypeMismatch for any other value: one whose type
+// matches none of those nodes (a *rm.DVText at a DV_CODED_TEXT node,
+// say), one that is not an RM type, nil, and a nil pointer.
 //
 // Errors are accumulated and surfaced from Build. Set never
 // short-circuits the builder so the caller can stack assignments and
@@ -115,15 +123,20 @@ func (b *Builder) Set(path string, v any) error {
 		b.errs = append(b.errs, wrapped)
 		return wrapped
 	}
-	if e := checkRMType(node, v); e != nil {
-		wrapped := fmt.Errorf("%s: %w", path, e)
+	// The template may list several alternatives at path; NodeAt returns
+	// the first, and the value binds whichever its RM type conforms to.
+	// They share the path, so Build reaches the same RM attribute through
+	// any of them.
+	bound, err := bindRMType(node, v)
+	if err != nil {
+		wrapped := fmt.Errorf("%s: %w", path, err)
 		b.errs = append(b.errs, wrapped)
 		return wrapped
 	}
 	b.pending = append(b.pending, pendingAssignment{
 		path:     path,
 		rawValue: v,
-		node:     node,
+		node:     bound,
 	})
 	return nil
 }

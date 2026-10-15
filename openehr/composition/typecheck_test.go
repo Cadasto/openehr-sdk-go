@@ -121,3 +121,72 @@ func TestREQ101_CheckRMTypeConformance(t *testing.T) {
 		})
 	}
 }
+
+// TestREQ101_BindRMTypeBindsAlternative pins which of the alternatives a
+// template lists at one path a value binds, and that Set records that
+// node for Build: a node that names the value's own type before one the
+// type only descends from, then the first in OPT order. TestPerson.v2
+// lists DV_TEXT then DV_CODED_TEXT at one ELEMENT value, so a
+// DV_CODED_TEXT binds the second although it conforms to the first;
+// alternative_types.en.v1 lists DV_QUANTITY, DV_COUNT then DV_ORDINAL,
+// so a DV_COUNT binds the second.
+func TestREQ101_BindRMTypeBindsAlternative(t *testing.T) {
+	t.Parallel()
+	const countsPath = "/content[openEHR-EHR-OBSERVATION.alternative_types.v1]/data/events[at0002]/data/items[at0004]/value"
+	text := compiledNodeAt(t, "TestPerson.v2", "/details/items[at0034]/value", "DV_TEXT")
+	counts := compiledNodeAt(t, "alternative_types.en.v1", countsPath, "DV_QUANTITY")
+
+	codedText := &rm.DVCodedText{
+		Value:        "Lorem",
+		DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}, CodeString: "12345"},
+	}
+	cases := []struct {
+		name string
+		node *tcimpl.CompiledNode
+		v    any
+		want string
+	}{
+		{name: "DV_CODED_TEXT under DV_TEXT then DV_CODED_TEXT", node: text, v: codedText, want: "DV_CODED_TEXT"},
+		{name: "DV_TEXT under DV_TEXT then DV_CODED_TEXT", node: text, v: &rm.DVText{Value: "x"}, want: "DV_TEXT"},
+		{name: "DV_COUNT under DV_QUANTITY, DV_COUNT then DV_ORDINAL", node: counts, v: &rm.DVCount{Magnitude: 3}, want: "DV_COUNT"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			bound, err := bindRMType(tc.node, tc.v)
+			if err != nil {
+				t.Fatalf("bindRMType(%s node, %T) = %v, want nil", tc.node.RMTypeName(), tc.v, err)
+			}
+			if got := bound.RMTypeName(); got != tc.want || bound.AQLPath() != tc.node.AQLPath() {
+				t.Errorf("bindRMType(%s node, %T) binds %s at %s, want %s at %s",
+					tc.node.RMTypeName(), tc.v, got, bound.AQLPath(), tc.want, tc.node.AQLPath())
+			}
+		})
+	}
+
+	t.Run("Set records the bound node", func(t *testing.T) {
+		t.Parallel()
+		opt, err := template.ParseFile(fixtures.TemplateOptForName("alternative_types.en.v1"))
+		if err != nil {
+			t.Fatalf("ParseFile: %v", err)
+		}
+		c, err := tcimpl.Compile(opt)
+		if err != nil {
+			t.Fatalf("Compile: %v", err)
+		}
+		composer := "Test Composer"
+		b, err := NewBuilder(t.Context(), c, WithTerritory("NL"), WithComposer(&rm.PartyIdentified{Name: &composer}))
+		if err != nil {
+			t.Fatalf("NewBuilder: %v", err)
+		}
+		if err := b.Set(countsPath, &rm.DVCount{Magnitude: 3}); err != nil {
+			t.Fatalf("Set(%s, *rm.DVCount) = %v, want nil", countsPath, err)
+		}
+		if len(b.pending) != 1 {
+			t.Fatalf("Set queued %d assignments, want 1", len(b.pending))
+		}
+		if got := b.pending[0].node.RMTypeName(); got != "DV_COUNT" {
+			t.Errorf("Set(%s, *rm.DVCount) queued the %s node, want the DV_COUNT alternative", countsPath, got)
+		}
+	})
+}
