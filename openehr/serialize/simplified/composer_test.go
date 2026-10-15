@@ -162,8 +162,9 @@ const (
 // `ctx/composer_name` or its `composer|name` alias merges with the rest; a
 // `composer_self: true` in either spelling beside a reference is a PARTY_SELF
 // carrying it; the `:0` spellings read as the unindexed ones; and a null key
-// is absent. Strict decode proves every key is read, and the STRUCTURED form of
-// the same body decodes to the same composer.
+// is absent. Strict decode proves every key is read. The STRUCTURED form of the
+// same body decodes to the same composer, and so does the FLAT that OPT-free
+// conversion writes back from it, so the conversion carries every composer key.
 func TestREQ053ComposerRealPathDecodes(t *testing.T) {
 	wt, compiled := corpusTarget(t)
 	root := wt.Tree.ID
@@ -309,6 +310,17 @@ func TestREQ053ComposerRealPathDecodes(t *testing.T) {
 			}
 			if g := composerValue(t, got.Composer); !reflect.DeepEqual(g, want) {
 				t.Errorf("STRUCTURED composer = %s,\nwant %s", canonicalComposer(t, got.Composer), tc.want)
+			}
+			back, err := simplified.StructuredToFlat(structured)
+			if err != nil {
+				t.Fatalf("StructuredToFlat: %v", err)
+			}
+			got, err = simplified.UnmarshalFlat(back, wt, simplified.WithTemplate(compiled), simplified.WithStrict())
+			if err != nil {
+				t.Fatalf("UnmarshalFlat (strict) of the FLAT converted back: %v", err)
+			}
+			if g := composerValue(t, got.Composer); !reflect.DeepEqual(g, want) {
+				t.Errorf("FLAT -> STRUCTURED -> FLAT composer = %s,\nwant %s", canonicalComposer(t, got.Composer), tc.want)
 			}
 		})
 	}
@@ -461,6 +473,53 @@ func TestREQ053ComposerRealPathUnmatched(t *testing.T) {
 	}
 }
 
+// TestREQ053ComposerRealPathIsOneSegment — REQ-053, ADR 0029. The composer's
+// real path is the `composer` segment itself, followed by a suffix or a
+// sub-path. A Web Template node whose FLAT id only starts with "composer" is
+// content like any other node: strict decode reads its keys at their own path
+// and they re-encode unchanged, none of them taken for a composer key.
+func TestREQ053ComposerRealPathIsOneSegment(t *testing.T) {
+	comp, wt := genComposition(t, minimalObsOPT)
+	var renamed *webtemplate.Node
+	for _, n := range wt.Tree.Children {
+		if n.RMType == "OBSERVATION" {
+			renamed = n
+			break
+		}
+	}
+	if renamed == nil {
+		t.Fatalf("fixture: %s has no OBSERVATION under the template root", minimalObsOPT)
+	}
+	renamed.ID = "composer_notes"
+	flat, err := simplified.MarshalFlat(comp, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat: %v", err)
+	}
+	var want map[string]any
+	if err := json.Unmarshal(flat, &want); err != nil {
+		t.Fatal(err)
+	}
+	prefix := wt.Tree.ID + "/" + renamed.ID
+	if !slices.ContainsFunc(slices.Collect(maps.Keys(want)), func(k string) bool { return strings.HasPrefix(k, prefix) }) {
+		t.Fatalf("fixture: MarshalFlat wrote no key under %s: %v", prefix, slices.Sorted(maps.Keys(want)))
+	}
+	got, err := simplified.UnmarshalFlat(flat, wt, simplified.WithStrict())
+	if err != nil {
+		t.Fatalf("UnmarshalFlat (strict): %v", err)
+	}
+	again, err := simplified.MarshalFlat(got, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat (re-encode): %v", err)
+	}
+	var back map[string]any
+	if err := json.Unmarshal(again, &back); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(back, want) {
+		t.Errorf("re-encoded FLAT = %v,\nwant %v", back, want)
+	}
+}
+
 // TestREQ053ComposerEncodeSpellings — REQ-053, ADR 0029. Encode writes a
 // composer one ctx/ short form carries whole in that form, and every other
 // composer whole at its real path with no ctx/ composer key, so one body spells
@@ -473,7 +532,7 @@ func TestREQ053ComposerEncodeSpellings(t *testing.T) {
 	person := &rm.PartyRef{ID: &rm.HierObjectID{Value: "9f2c"}, Namespace: "demographic", Type: "PERSON"}
 	issuer := "Hospital"
 	relationship := rm.DVCodedText{
-		DVText:       rm.DVText{Value: "mother"},
+		Value:        "mother",
 		DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}, CodeString: "10"},
 	}
 	for _, tc := range []struct {
