@@ -2,6 +2,8 @@ package composition_test
 
 import (
 	"errors"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
@@ -204,6 +206,62 @@ const (
 	countIntervalLowerPath = abstractValuePath + "/lower"
 )
 
+// eventDataOPT is a COMPOSITION template with one OBSERVATION whose
+// history holds one event of the RM type that eventTypeMarker stands for.
+// The event's data, which the RM types with the event's generic parameter
+// T, is allowed as an ITEM_TREE or as an untyped node, at the one path
+// eventDataPath. The event type names no T.
+const (
+	eventTypeMarker = "EVENT_TYPE"
+	eventDataOPT    = `<?xml version="1.0" encoding="utf-8"?>
+<template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.openehr.org/v1">
+<language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
+<template_id><value>event_data</value></template_id><concept>event_data</concept>
+<definition><rm_type_name>COMPOSITION</rm_type_name><node_id>at0000</node_id>
+<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>content</rm_attribute_name>
+<children xsi:type="C_ARCHETYPE_ROOT"><rm_type_name>OBSERVATION</rm_type_name><node_id>at0000</node_id>
+<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>data</rm_attribute_name>
+<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>HISTORY</rm_type_name><node_id>at0001</node_id>
+<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>events</rm_attribute_name>
+<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>` + eventTypeMarker + `</rm_type_name><node_id>at0002</node_id>
+<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>data</rm_attribute_name>
+<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>ITEM_TREE</rm_type_name><node_id>at0003</node_id></children>
+<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name></rm_type_name><node_id>at0003</node_id></children>
+</attributes>
+</children>
+<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval><lower_included>true</lower_included><lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>0</lower></interval></cardinality>
+</attributes>
+</children>
+</attributes>
+<archetype_id><value>openEHR-EHR-OBSERVATION.event_data.v1</value></archetype_id>
+</children>
+<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval><lower_included>true</lower_included><lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>0</lower></interval></cardinality>
+</attributes>
+<archetype_id><value>openEHR-EHR-COMPOSITION.report.v1</value></archetype_id>
+</definition>
+</template>`
+	eventDataPath = "/content[openEHR-EHR-OBSERVATION.event_data.v1]/data/events[at0002]/data"
+)
+
+// compileEventData compiles eventDataOPT with an event of RM type
+// eventType, and checks that the event compiled with that type.
+func compileEventData(t *testing.T, eventType string) *templatecompile.Compiled {
+	t.Helper()
+	if n := strings.Count(eventDataOPT, eventTypeMarker); n != 1 {
+		t.Fatalf("eventDataOPT carries %d event type markers, want 1 (fixture drift)", n)
+	}
+	c := compileInline(t, strings.Replace(eventDataOPT, eventTypeMarker, eventType, 1))
+	const eventPath = "/content[openEHR-EHR-OBSERVATION.event_data.v1]/data/events[at0002]"
+	node, err := c.NodeAt(eventPath)
+	if err != nil {
+		t.Fatalf("NodeAt(%s): %v (fixture drift)", eventPath, err)
+	}
+	if got := node.RMTypeName(); got != eventType {
+		t.Fatalf("NodeAt(%s) has RM type %q, want %q (fixture drift)", eventPath, got, eventType)
+	}
+	return c
+}
+
 // TestREQ101_SetRefusesWhatTheAttributeCannotHold checks, for REQ-101 Type
 // enforcement, that Set returns ErrTypeMismatch, and Build carries it, for a
 // value that binds a node at the path but that the RM attribute the path
@@ -213,12 +271,22 @@ const (
 // an ELEMENT at an untyped alternative of ELEMENT.value, which holds a
 // DATA_VALUE; and a DV_QUANTITY at an untyped alternative of the lower bound
 // of a DV_INTERVAL<DV_COUNT>, which holds a DV_COUNT.
+//
+// Where the attribute's type is a generic parameter the template leaves
+// open, the value must conform to the parameter's constraint: a
+// PARTY_IDENTIFIED and a DV_TEXT at an untyped alternative of the lower
+// bound of a bare DV_INTERVAL, whose T must be a DV_ORDERED; and a DV_TEXT
+// at an untyped alternative of the data of a bare EVENT, whose T must be an
+// ITEM_STRUCTURE, or of a bare POINT_EVENT, whose T is passed to EVENT's.
 func TestREQ101_SetRefusesWhatTheAttributeCannotHold(t *testing.T) {
 	t.Parallel()
 	durationLeaf := compileAlternatives(t, durationValueLeafChild)
 	countLeaf := compileAlternatives(t, countMagnitudeLeafChild)
 	codedThenUntyped := compileAlternatives(t, valueAlternative("DV_CODED_TEXT", false), untypedValueChild)
 	countLower := compileAlternatives(t, countIntervalLowerChild)
+	bareLower := compileAlternatives(t, bareIntervalLowerChild)
+	eventData := compileEventData(t, "EVENT")
+	pointEventData := compileEventData(t, "POINT_EVENT")
 
 	cases := []struct {
 		name string
@@ -247,6 +315,22 @@ func TestREQ101_SetRefusesWhatTheAttributeCannotHold(t *testing.T) {
 		{
 			name: "DV_QUANTITY at an untyped lower alternative of DV_INTERVAL<DV_COUNT>", c: countLower,
 			path: countIntervalLowerPath, nodeAt: "DV_COUNT", v: &rm.DVQuantity{Magnitude: 1, Units: "mm"},
+		},
+		{
+			name: "PARTY_IDENTIFIED at an untyped lower alternative of a bare DV_INTERVAL", c: bareLower,
+			path: countIntervalLowerPath, nodeAt: "DV_COUNT", v: &rm.PartyIdentified{},
+		},
+		{
+			name: "DV_TEXT at an untyped lower alternative of a bare DV_INTERVAL", c: bareLower,
+			path: countIntervalLowerPath, nodeAt: "DV_COUNT", v: &rm.DVText{Value: "x"},
+		},
+		{
+			name: "DV_TEXT at an untyped data alternative of a bare EVENT", c: eventData,
+			path: eventDataPath, nodeAt: "ITEM_TREE", v: &rm.DVText{Value: "x"},
+		},
+		{
+			name: "DV_TEXT at an untyped data alternative of a bare POINT_EVENT", c: pointEventData,
+			path: eventDataPath, nodeAt: "ITEM_TREE", v: &rm.DVText{Value: "x"},
 		},
 	}
 	for _, tc := range cases {
@@ -314,10 +398,11 @@ func TestREQ101_SetAcceptsWhatTheAttributeHolds(t *testing.T) {
 }
 
 // TestREQ101_SetAcceptsWhereTheAttributeTypeIsOpen checks, for REQ-101 Type
-// enforcement, that the attribute check refuses nothing where the RM gives
-// no type to test against: under a bare DV_INTERVAL, whose name binds no T,
-// the lower bound's RM type stays the generic T, and Set accepts a DV_COUNT
-// there, which a DV_INTERVAL's bound can hold, and Build writes it.
+// enforcement, that the attribute check accepts a value that conforms to the
+// constraint of a generic parameter the template leaves open: under a bare
+// DV_INTERVAL, whose name binds no T, the lower bound's RM type stays the
+// generic T, which must be a DV_ORDERED, and Set accepts a DV_COUNT there,
+// which is one, and Build writes it.
 func TestREQ101_SetAcceptsWhereTheAttributeTypeIsOpen(t *testing.T) {
 	t.Parallel()
 	c := compileAlternatives(t, bareIntervalLowerChild)
@@ -346,5 +431,138 @@ func TestREQ101_SetAcceptsWhereTheAttributeTypeIsOpen(t *testing.T) {
 	}
 	if interval.Lower != v {
 		t.Errorf("built interval at %s has lower bound %T %v, want the DV_COUNT Set was given, %T %v", abstractValuePath, interval.Lower, interval.Lower, v, v)
+	}
+}
+
+// TestREQ101_SetAcceptsWhatAnOpenParameterAllows checks, for REQ-101 Type
+// enforcement, that the attribute check reads the constraint a generic
+// parameter takes from the ancestor it is passed to: under a bare
+// POINT_EVENT, whose data the RM types with its T, and whose T EVENT
+// constrains to ITEM_STRUCTURE, Set accepts an ITEM_LIST at an untyped
+// alternative of the data, and Build writes it.
+func TestREQ101_SetAcceptsWhatAnOpenParameterAllows(t *testing.T) {
+	t.Parallel()
+	c := compileEventData(t, "POINT_EVENT")
+	b, err := composition.NewBuilder(t.Context(), c,
+		composition.WithTerritory("NL"),
+		composition.WithComposer(testComposer()),
+	)
+	if err != nil {
+		t.Fatalf("NewBuilder: %v", err)
+	}
+	v := &rm.ItemList{ArchetypeNodeID: "at0003"}
+	if err := b.Set(eventDataPath, v); err != nil {
+		t.Fatalf("Set(%s, %T) = %v, want nil", eventDataPath, v, err)
+	}
+	comp, err := b.Build()
+	if err != nil {
+		t.Fatalf("Build after Set(%s, %T) = %v, want nil", eventDataPath, v, err)
+	}
+	got, err := rmpath.ItemAtPath(comp, eventDataPath)
+	if err != nil {
+		t.Fatalf("ItemAtPath(%s) on the built composition: %v", eventDataPath, err)
+	}
+	if got != v {
+		t.Errorf("built composition holds %T %v at %s, want the ITEM_LIST Set was given", got, got, eventDataPath)
+	}
+}
+
+// TestREQ101_SetRefusesAPathThatWritesNoAttribute checks, for REQ-101 Type
+// enforcement, that Set returns ErrTypeMismatch, and Build carries it, at a
+// template path that writes no RM attribute. Modelling tools constrain BMM
+// functions as if they were attributes, and corpus templates carry three:
+// DV_PROPORTION.is_integral and the offset of a POINT_EVENT in
+// Demonstration.v1, and ITEM_TABLE.rotated in clinical_content_validation.
+// The error names the attribute and the class.
+func TestREQ101_SetRefusesAPathThatWritesNoAttribute(t *testing.T) {
+	t.Parallel()
+	demonstration := compileFixture(t, "Demonstration.v1")
+	contentValidation := compileFixture(t, "clinical_content_validation")
+
+	cases := []struct {
+		name string
+		c    *templatecompile.Compiled
+		path string
+		// nodeAt is the RM type of the node Compiled.NodeAt returns;
+		// owner and attr are the class and the name the path writes.
+		nodeAt, owner, attr string
+		v                   any
+	}{
+		{
+			name: "DV_BOOLEAN at DV_PROPORTION.is_integral", c: demonstration,
+			path:   "/content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0002]/data/items[at0004]/items[at0028]/value/is_integral",
+			nodeAt: "BOOLEAN", owner: "DV_PROPORTION", attr: "is_integral", v: &rm.DVBoolean{Value: true},
+		},
+		{
+			name: "DV_DURATION at POINT_EVENT.offset", c: demonstration,
+			path:   "/content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0035]/offset",
+			nodeAt: "DV_DURATION", owner: "POINT_EVENT", attr: "offset", v: &rm.DVDuration{Value: "PT1M"},
+		},
+		{
+			name: "DV_BOOLEAN at ITEM_TABLE.rotated", c: contentValidation,
+			path:   "/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3,'Validation evaluation test with table']/data/rotated",
+			nodeAt: "BOOLEAN", owner: "ITEM_TABLE", attr: "rotated", v: &rm.DVBoolean{Value: true},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			node, err := tc.c.NodeAt(tc.path)
+			if err != nil {
+				t.Fatalf("NodeAt(%s): %v", tc.path, err)
+			}
+			if got := node.RMTypeName(); got != tc.nodeAt {
+				t.Fatalf("NodeAt(%s) has RM type %q, want %q (fixture drift)", tc.path, got, tc.nodeAt)
+			}
+			if got := node.Parent().RMTypeName(); got != tc.owner {
+				t.Fatalf("node at %s sits under RM type %q, want %q (fixture drift)", tc.path, got, tc.owner)
+			}
+			b, err := composition.NewBuilder(t.Context(), tc.c,
+				composition.WithTerritory("NL"),
+				composition.WithComposer(testComposer()),
+			)
+			if err != nil {
+				t.Fatalf("NewBuilder: %v", err)
+			}
+			err = b.Set(tc.path, tc.v)
+			switch {
+			case !errors.Is(err, composition.ErrTypeMismatch):
+				t.Errorf("Set(%s, %T) = %v, want ErrTypeMismatch", tc.path, tc.v, err)
+			case !strings.Contains(err.Error(), strconv.Quote(tc.attr)) || !strings.Contains(err.Error(), tc.owner):
+				t.Errorf("Set(%s, %T) = %v, want an error naming attribute %q and class %s", tc.path, tc.v, err, tc.attr, tc.owner)
+			}
+			if _, err := b.Build(); !errors.Is(err, composition.ErrTypeMismatch) {
+				t.Errorf("Build after Set(%s, %T) = %v, want ErrTypeMismatch", tc.path, tc.v, err)
+			}
+		})
+	}
+}
+
+// TestREQ101_SetAtTheRootReturns checks, for REQ-101, that Set at the
+// composition root returns rather than panics. The root sits under no RM
+// attribute, so the attribute check has no attribute to read there. Build
+// then reports ErrInvalidPath, since the builder does not replace the root.
+func TestREQ101_SetAtTheRootReturns(t *testing.T) {
+	t.Parallel()
+	c := compileAlternatives(t, valueAlternative("DV_TEXT", false))
+	b, err := composition.NewBuilder(t.Context(), c,
+		composition.WithTerritory("NL"),
+		composition.WithComposer(testComposer()),
+	)
+	if err != nil {
+		t.Fatalf("NewBuilder: %v", err)
+	}
+	const root = "/"
+	v := &rm.Composition{}
+	setErr := func() (err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Fatalf("Set(%s, %T) panicked: %v", root, v, r)
+			}
+		}()
+		return b.Set(root, v)
+	}()
+	if _, err := b.Build(); !errors.Is(err, composition.ErrInvalidPath) {
+		t.Errorf("Build after Set(%s, %T) = %v (Set returned %v), want ErrInvalidPath", root, v, err, setErr)
 	}
 }
