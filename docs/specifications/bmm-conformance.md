@@ -274,7 +274,7 @@ LOCATABLE concrete descendants additionally receive the **generated identity sur
 
 Three cases depart from the single-property rows. A non-mandatory property whose type the generator emits as a Go interface (an abstract class, or a concrete class with subtypes, emitted as a narrow `…Like` interface) stays `T`, because an interface field is already nilable. A mandatory property that closes a cycle of mandatory struct-typed properties, such as AOM 1.4's `ARCHETYPE.ontology` and `ARCHETYPE_ONTOLOGY.parent_archetype`, becomes `*T`, because Go cannot declare a struct that contains itself by value. A non-mandatory property whose BMM type is `Any` **MUST** be emitted as `*any`, because `Any` is a primitive and not a class the interface exception covers. The pinned schemas emit five such fields, each an `assumed_value` on `C_COMPLEX_OBJECT`, `C_PRIMITIVE_OBJECT`, `C_CODED_TEXT`, `C_ORDINAL` or `C_QUANTITY`. A mandatory `Any` property **MUST** be emitted as `any`.
 
-JSON tags **MUST** preserve the original BMM property name (snake_case), with `omitzero` on a non-mandatory single or generic property held as a pointer (`*T`, `*DVInterval[DVQuantity]`, `*[]T`, `*map[string]V`), so that only a nil pointer is omitted, and `omitempty` on a non-mandatory one that is not a pointer (a Go interface, or a `P_BMM_SINGLE_PROPERTY_OPEN` typed by the open generic parameter). A mandatory property carries no omit option, including one held as a pointer to break a cycle. A `P_BMM_CONTAINER_PROPERTY` field (`[]T`) carries `omitempty` when its cardinality lower bound is 0 or absent, and no omit option otherwise. A `P_BMM_GENERIC_PROPERTY` over `Hash` or `List` follows the single-property rule: a mandatory one is `map[string]V` or `[]T` with no omit option, and an optional one is `*map[string]V` or `*[]T` with `omitzero`. Why pointer and container fields differ under `encoding/json/v2` is recorded in [ADR 0002 § D8](../adr/0002-bmm-codegen-decisions.md#d8--the-generator-emits-no-bespoke-json-codec-methods) and [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md). The example below is **conceptual** — it shows the BMM property → Go field mapping and the `DV_AMOUNT` ancestor relationship:
+JSON tags **MUST** preserve the original BMM property name (snake_case), with `omitzero` on a non-mandatory single or generic property held as a pointer (`*T`, `*DVInterval[DVQuantity]`, `*[]T`, `*map[string]V`), so that only a nil pointer is omitted, and `omitempty` on a non-mandatory one that is not a pointer (a Go interface, or a `P_BMM_SINGLE_PROPERTY_OPEN` typed by the open generic parameter). A mandatory property whose Go field can hold no value carries an omit option, so that an absent one is left out of canonical JSON ([REQ-052](wire.md#req-052) § An absent mandatory member): `omitzero` on a list, map or `any` field and on one held as a pointer, a pointer that breaks a cycle included, so that only a nil value is left out and a present empty list or map is still written; and `omitempty` on a Go interface or on a field typed by its class's own generic parameter (a `P_BMM_SINGLE_PROPERTY_OPEN`, or a `P_BMM_SINGLE_PROPERTY` naming that parameter), so that a typed-nil pointer, which encodes as `null`, is left out too. Any other mandatory property, a struct held by value or a primitive, carries no omit option. A `P_BMM_CONTAINER_PROPERTY` field (`[]T`) carries `omitempty` when its cardinality lower bound is 0 or absent, and `omitzero` otherwise. A `P_BMM_GENERIC_PROPERTY` over `Hash` or `List` follows the single-property rule: a mandatory one is `map[string]V` or `[]T` with `omitzero`, and an optional one is `*map[string]V` or `*[]T` with `omitzero`. Why pointer and container fields differ under `encoding/json/v2` is recorded in [ADR 0002 § D8](../adr/0002-bmm-codegen-decisions.md#d8--the-generator-emits-no-bespoke-json-codec-methods) and [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md). The example below is **conceptual** — it shows the BMM property → Go field mapping and the `DV_AMOUNT` ancestor relationship:
 
 ```go
 // Conceptual mapping only — not the generated struct shape.
@@ -313,7 +313,7 @@ The wire format JSON does not distinguish List/Set/Array — they all serialise 
 
 ### Cardinality
 
-`P_BMM_CONTAINER_PROPERTY.cardinality` (with `lower`, `upper`, `upper_unbounded`) is preserved as a generated constant on the package or as a generated `Validate()` rule — the exact shape is up to the generator's emission strategy and is documented in [`../docs/plans/`](../plans).
+`P_BMM_CONTAINER_PROPERTY.cardinality` (with `lower`, `upper`, `upper_unbounded`) reaches the SDK through the generated attribute metadata in `openehr/rm/rminfo`: `AttrMeta.Container` marks a container property, and `AttrMeta.Required` is true when `cardinality.lower` is 1 or more, which the validation floor checks ([REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)). The upper bound is not kept: no container in the pinned RM and BASE BMMs has a finite one.
 
 ### Functions
 
@@ -323,7 +323,7 @@ The wire format JSON does not distinguish List/Set/Array — they all serialise 
 - The generator does **not** emit the function body — implementations are hand-written in non-generated files (REQ-044) where they are needed.
 - Functions that have not been hand-implemented **SHOULD** panic with a clear message (e.g. `panic("not implemented: DV_QUANTITY.add — implement in a non-generated file")`); this is one of the rare allowed panics in SDK code, justified by the fact that the function is documented in the BMM but not yet wired in.
 
-For SDK v1, the priority is the **types**, not the **methods** — most consumers do not need RM-level arithmetic. The method-body backlog is tracked in [`../docs/plans/`](../plans).
+For SDK v1, the priority is the **types**, not the **methods** — most consumers do not need RM-level arithmetic. The RM functions the SDK implements, and those it leaves out, are specified in [rm-functions.md](rm-functions.md).
 
 ## Primitive type mapping
 
@@ -360,8 +360,8 @@ The 29 primitives in `openehr_base_1.3.0.bmm.json` map to Go types per the table
 | `Array` | `[]T` | See § Container mapping |
 | `Hash` | `map[string]V` | See § Container mapping |
 | `Container` | abstract; not directly used | |
-| `Terminology_code` | `rm.TerminologyCode` (struct or alias) | TBD by generator; see plan |
-| `Terminology_term` | `rm.TerminologyTerm` (struct or alias) | TBD by generator; see plan |
+| `Terminology_code` | `rm.TerminologyCode` (struct) | Generated from base BMM |
+| `Terminology_term` | `rm.TerminologyTerm` (struct) | Generated from base BMM |
 
 ### ISO 8601 types
 

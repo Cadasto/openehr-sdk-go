@@ -27,13 +27,13 @@ type Address struct {
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// Details Archetypable structured address.
-	Details ItemStructure `json:"details"`
+	Details ItemStructure `json:"details,omitempty"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
 	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name DVTextLike `json:"name,omitempty"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
 	UID UIDBasedID `json:"uid,omitempty"`
 }
@@ -58,13 +58,13 @@ type Agent struct {
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
 	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// Identities Identities used by the party to identify itself, such as legal name, stage names, aliases, nicknames and so on.
-	Identities []PartyIdentity `json:"identities"`
+	Identities []PartyIdentity `json:"identities,omitzero"`
 	// Languages Languages which can be used to communicate with this actor, in preferred order of use (if known, else order irrelevant).
 	Languages []DVTextLike `json:"languages,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name DVTextLike `json:"name,omitempty"`
 	// Relationships Relationships in which this Party takes part as source.
 	Relationships []PartyRelationship `json:"relationships,omitempty"`
 	// Roles Identifiers of the Version container for each Role played by this Party.
@@ -82,13 +82,13 @@ type Capability struct {
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// Credentials The qualifications of the performer of the role for this capability. This might include professional qualifications and official identifications such as provider numbers etc.
-	Credentials ItemStructure `json:"credentials"`
+	Credentials ItemStructure `json:"credentials,omitempty"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
 	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name DVTextLike `json:"name,omitempty"`
 	// TimeValidity Valid time interval for the credentials of this capability.
 	TimeValidity *DVInterval[DVDate] `json:"time_validity,omitzero"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
@@ -98,7 +98,7 @@ type Capability struct {
 // Contact Description of a means of contact of a Party. Actual structure is archetyped.
 type Contact struct {
 	// Addresses A set of address alternatives for this contact purpose and time validity combination.
-	Addresses []Address `json:"addresses"`
+	Addresses []Address `json:"addresses,omitzero"`
 	// ArchetypeDetails Details of archetyping used on this node.
 	ArchetypeDetails *Archetyped `json:"archetype_details,omitzero"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
@@ -110,7 +110,7 @@ type Contact struct {
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name DVTextLike `json:"name,omitempty"`
 	// TimeValidity Valid time interval for this contact descriptor.
 	TimeValidity *DVInterval[DVDate] `json:"time_validity,omitzero"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
@@ -137,13 +137,13 @@ type Group struct {
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
 	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// Identities Identities used by the party to identify itself, such as legal name, stage names, aliases, nicknames and so on.
-	Identities []PartyIdentity `json:"identities"`
+	Identities []PartyIdentity `json:"identities,omitzero"`
 	// Languages Languages which can be used to communicate with this actor, in preferred order of use (if known, else order irrelevant).
 	Languages []DVTextLike `json:"languages,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name DVTextLike `json:"name,omitempty"`
 	// Relationships Relationships in which this Party takes part as source.
 	Relationships []PartyRelationship `json:"relationships,omitempty"`
 	// Roles Identifiers of the Version container for each Role played by this Party.
@@ -167,13 +167,13 @@ type Organisation struct {
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
 	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// Identities Identities used by the party to identify itself, such as legal name, stage names, aliases, nicknames and so on.
-	Identities []PartyIdentity `json:"identities"`
+	Identities []PartyIdentity `json:"identities,omitzero"`
 	// Languages Languages which can be used to communicate with this actor, in preferred order of use (if known, else order irrelevant).
 	Languages []DVTextLike `json:"languages,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name DVTextLike `json:"name,omitempty"`
 	// Relationships Relationships in which this Party takes part as source.
 	Relationships []PartyRelationship `json:"relationships,omitempty"`
 	// Roles Identifiers of the Version container for each Role played by this Party.
@@ -269,13 +269,13 @@ type PartyIdentity struct {
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// Details The value of the identity. This will often taken the form of a parseable string or a small structure of strings.
-	Details ItemStructure `json:"details"`
+	Details ItemStructure `json:"details,omitempty"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
 	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name DVTextLike `json:"name,omitempty"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
 	UID UIDBasedID `json:"uid,omitempty"`
 }
@@ -300,7 +300,7 @@ type PartyRelationship struct {
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name DVTextLike `json:"name,omitempty"`
 	// Source Source of relationship.
 	Source PartyRef `json:"source"`
 	// Target Target of relationship.
@@ -331,13 +331,13 @@ type Person struct {
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
 	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// Identities Identities used by the party to identify itself, such as legal name, stage names, aliases, nicknames and so on.
-	Identities []PartyIdentity `json:"identities"`
+	Identities []PartyIdentity `json:"identities,omitzero"`
 	// Languages Languages which can be used to communicate with this actor, in preferred order of use (if known, else order irrelevant).
 	Languages []DVTextLike `json:"languages,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name DVTextLike `json:"name,omitempty"`
 	// Relationships Relationships in which this Party takes part as source.
 	Relationships []PartyRelationship `json:"relationships,omitempty"`
 	// Roles Identifiers of the Version container for each Role played by this Party.
@@ -363,11 +363,11 @@ type Role struct {
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
 	FeederAudit *FeederAudit `json:"feeder_audit,omitzero"`
 	// Identities Identities used by the party to identify itself, such as legal name, stage names, aliases, nicknames and so on.
-	Identities []PartyIdentity `json:"identities"`
+	Identities []PartyIdentity `json:"identities,omitzero"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name DVTextLike `json:"name,omitempty"`
 	// Performer Reference to Version container of Actor playing the role.
 	Performer PartyRef `json:"performer"`
 	// Relationships Relationships in which this Party takes part as source.

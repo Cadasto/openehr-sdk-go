@@ -27,7 +27,7 @@ type jsonWireAttestation struct {
 	// Description Reason for committal. This may be used to qualify the value in the `_change_type_` field. For example, if the change affects only the EHR directory, this field might be used to indicate 'Folder "episode 2018-02-16" added' or similar.
 	Description DVTextLike `json:"description,omitempty"`
 	// Committer Identity and optional reference into identity management service, of user who committed the item.
-	Committer PartyProxy `json:"committer"`
+	Committer PartyProxy `json:"committer,omitempty"`
 	// AttestedView Optional visual representation of content attested e.g. screen image.
 	AttestedView *DVMultimedia `json:"attested_view,omitzero"`
 	// Proof Proof of attestation.
@@ -35,7 +35,7 @@ type jsonWireAttestation struct {
 	// Items Items attested, expressed as fully qualified runtime paths to the items in question. Although not recommended, these may include fine-grained items which have been attested in some other system. Otherwise it is assumed to be for the entire VERSION with which it is associated.
 	Items []DVEHRURI `json:"items,omitempty"`
 	// Reason Reason of this attestation. Optionally coded by the openEHR Terminology group  attestation reason ; includes values like  authorisation ,  witness  etc.
-	Reason DVTextLike `json:"reason"`
+	Reason DVTextLike `json:"reason,omitempty"`
 	// IsPending True if this attestation is outstanding; False means it has been completed.
 	IsPending bool `json:"is_pending"`
 }
@@ -67,8 +67,10 @@ type rawAuditDetails AuditDetails
 
 // MarshalJSONTo emits canonical openEHR JSON for AuditDetails with `_type`
 // (value "AUDIT_DETAILS") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
@@ -87,8 +89,10 @@ type rawParticipation Participation
 
 // MarshalJSONTo emits canonical openEHR JSON for Participation with `_type`
 // (value "PARTICIPATION") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
@@ -107,8 +111,10 @@ type rawPartyIdentified PartyIdentified
 
 // MarshalJSONTo emits canonical openEHR JSON for PartyIdentified with `_type`
 // (value "PARTY_IDENTIFIED") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
@@ -156,8 +162,10 @@ type rawPartySelf PartySelf
 
 // MarshalJSONTo emits canonical openEHR JSON for PartySelf with `_type`
 // (value "PARTY_SELF") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
@@ -176,8 +184,10 @@ type rawRevisionHistory RevisionHistory
 
 // MarshalJSONTo emits canonical openEHR JSON for RevisionHistory with `_type`
 // (value "REVISION_HISTORY") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.
@@ -196,8 +206,10 @@ type rawRevisionHistoryItem RevisionHistoryItem
 
 // MarshalJSONTo emits canonical openEHR JSON for RevisionHistoryItem with `_type`
 // (value "REVISION_HISTORY_ITEM") as the leading member. Field order otherwise follows the
-// struct declaration; json.Deterministic sorts any Hash keys and the
-// FormatNil* options keep a mandatory nil container's `null` spelling.
+// struct declaration, and json.Deterministic sorts any Hash keys. A nil
+// list or map field is left out by its omit option. The FormatNil*
+// options write any other nil slice or map, such as one held in an any
+// field, as `null`.
 // The receiver is a value so a concrete instance sitting
 // in a polymorphic interface slot by value, the shape the like-interface
 // accessors admit, still carries its `_type`.

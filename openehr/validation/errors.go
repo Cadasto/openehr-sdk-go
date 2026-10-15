@@ -20,8 +20,9 @@ var (
 	// zero-valued.
 	ErrRequired = errors.New("validation: required attribute missing")
 
-	// ErrProhibited fires when an attribute the OPT prohibits (an
-	// existence whose upper bound is 0) is present: a single-valued
+	// ErrProhibited fires when an attribute the OPT prohibits (its
+	// existence upper bound is 0, or it has at least one OPT child and
+	// allows none of them) is present: a single-valued
 	// attribute holds a value, or a multi-valued one holds at least one
 	// item.
 	ErrProhibited = errors.New("validation: prohibited attribute present")

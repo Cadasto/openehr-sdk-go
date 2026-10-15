@@ -1,8 +1,9 @@
 package transport
 
 // redirect_internal_test.go — REQ-021 and REQ-092: the copy a request
-// carrying an Authorization header is sent with changes only its redirect
-// policy, and the injected client is left as it is. The fields are read off
+// carrying a credential header (Authorization, Proxy-Authorization, Cookie
+// or Cookie2) is sent with changes only its redirect policy, and the
+// injected client is left as it is. The fields are read off
 // the copy itself, so this lives in the internal test package.
 
 import (
@@ -13,9 +14,10 @@ import (
 )
 
 // TestHTTPClientForChangesOnlyTheRedirectPolicy pins that the copy keeps the
-// injected client's Transport, Jar and Timeout, that a request without an
-// Authorization header gets the injected client itself, and that neither
-// call writes to the injected client.
+// injected client's Transport, Jar and Timeout, that a request without a
+// credential header gets the injected client itself, and that neither call
+// writes to the injected client. The requests it builds use Authorization;
+// the other credential headers are covered in redirect_test.go.
 func TestHTTPClientForChangesOnlyTheRedirectPolicy(t *testing.T) { // REQ-021, REQ-092
 	t.Parallel()
 	jar, err := cookiejar.New(nil)

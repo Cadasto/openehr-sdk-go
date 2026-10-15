@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/url"
 	"strings"
@@ -107,9 +108,10 @@ func (c *Client) Catalog() *discovery.ServiceCatalog {
 // always has an HTTP client.
 //
 // The client comes back as it was injected. It lacks the refusal Do applies
-// to a request that carries an Authorization header, which stops it
-// following a redirect from https to a URL that is not https, so a caller
-// that sends a credential through it must refuse that redirect itself.
+// to a request that carries a credential header (Authorization,
+// Proxy-Authorization, Cookie or Cookie2), which stops it following a
+// redirect from https to a URL that is not https, so a caller that sends a
+// credential through it must refuse that redirect itself.
 func (c *Client) HTTPClient() *http.Client {
 	// REQ-025: a nil Client is caller-constructible — see Do.
 	if c == nil {
@@ -120,8 +122,29 @@ func (c *Client) HTTPClient() *http.Client {
 
 // Do executes req and returns the captured Response. Status codes in
 // 2xx surface as a non-nil Response with err=nil; non-2xx surface as
-// err of type *WireError plus a possibly-non-nil Response carrying the
-// raw body. Network errors surface as the wrapped underlying error.
+// an err from which errors.AsType recovers a *WireError, plus a
+// possibly-non-nil Response carrying the raw body. Network errors
+// surface as the wrapped underlying error.
+//
+// A response whose status and headers arrived but whose body could not
+// be read (the connection dropped mid-body, the body did not match its
+// Content-Encoding, or it was over the WithMaxResponseBody ceiling) still
+// returns a non-nil Response carrying StatusCode, Header and Metadata,
+// with an empty Body. On a 2xx the error is, or wraps, a *BodyReadError.
+// On any other status the error wraps two errors side by side: the
+// *WireError the status gives and the read failure. The *WireError itself
+// does not wrap the read failure. Either way errors.Is on the returned
+// error reaches the read failure: io.ErrUnexpectedEOF, the content-coding
+// error, or ErrResponseTooLarge. The error's text names the kind of read
+// failure, and the limit for a body over the ceiling, but never the read
+// failure's own text.
+//
+// With retries enabled, a 2xx whose body could not be read is sent again
+// only when its method is GET, HEAD or OPTIONS, because the server has
+// acted on any other; any other status is retried by its status, as any
+// *WireError is. Neither is sent again once ctx has ended. When ctx ends
+// during the backoff, the error keeps what it wrapped and wraps ctx's
+// error beside it, and the Response is still returned.
 //
 // The lifecycle:
 //
@@ -129,9 +152,9 @@ func (c *Client) HTTPClient() *http.Client {
 //  2. Build the http.Request, plumb headers, attach the bearer token.
 //  3. Emit an OTel span and propagate traceparent.
 //  4. Execute via the injected *http.Client, or, for a request carrying
-//     an Authorization header, via a per-request copy of it that refuses
-//     a redirect from https to a URL that is not https (see
-//     WithHTTPClient).
+//     a credential header (Authorization, Proxy-Authorization, Cookie or
+//     Cookie2), via a per-request copy of it that refuses a redirect from
+//     https to a URL that is not https (see WithHTTPClient).
 //  5. Retry per RetryPolicy on retriable statuses.
 //  6. Parse the response body into Body + Metadata; map the wire
 //     error envelope onto the typed-sentinel hierarchy.
@@ -212,7 +235,7 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		otelAttempt++
 		span.SetAttributes(attribute.Int("retry.attempt", otelAttempt-1))
 		resp, lastErr = c.doOnce(ctx, req, target)
-		if !c.shouldRetry(req, resp, lastErr, attempt) {
+		if !c.shouldRetry(ctx, req, resp, lastErr, attempt) {
 			// 401→reauth safety net (REQ-063, opt-in): if the final error is
 			// a wire 401, a Reauther is configured, this Do call has not yet
 			// reauthed, and the 401's Bearer challenge allows it (REQ-166),
@@ -244,9 +267,24 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		wait := c.cfg.retry.backoff(attempt)
 		span.SetAttributes(attribute.Int64("retry.backoff_ms", wait.Milliseconds()))
 		if err := retryWait(ctx, wait); err != nil {
-			lastErr = err
+			// REQ-172: a response whose body could not be read keeps its
+			// arm's error when ctx ends during the backoff: the *BodyReadError
+			// on a 2xx, the *WireError and the read failure on any other
+			// status. The status the server sent is then not reported as a
+			// bare context error; ctx's error is wrapped beside it (REQ-091).
+			// Any other error is replaced by ctx's, as before.
+			if isBodyReadFailure(lastErr) {
+				lastErr = fmt.Errorf("%w: retry wait: %w", lastErr, err)
+			} else {
+				lastErr = err
+			}
 			break
 		}
+	}
+	// REQ-090: the status code goes on the span whenever a response arrived,
+	// a failed request's included.
+	if resp != nil {
+		span.SetAttributes(attribute.Int("http.status_code", resp.StatusCode))
 	}
 	if lastErr != nil {
 		span.SetStatus(codes.Error, lastErr.Error())
@@ -256,11 +294,8 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		}
 		return resp, lastErr
 	}
-	if resp != nil {
-		span.SetAttributes(attribute.Int("http.status_code", resp.StatusCode))
-		if resp.StatusCode >= 400 {
-			span.SetStatus(codes.Error, http.StatusText(resp.StatusCode))
-		}
+	if resp != nil && resp.StatusCode >= 400 {
+		span.SetStatus(codes.Error, http.StatusText(resp.StatusCode))
 	}
 	if c.cfg.observer != nil {
 		c.emitObservation(ctx, req, target, resp, nil, otelAttempt, time.Since(start))
@@ -294,8 +329,12 @@ func (c *Client) emitObservation(ctx context.Context, req *Request, target *url.
 }
 
 // doOnce performs one HTTP attempt. Returns (resp, err) where err is
-// non-nil for wire-level failures or transport errors; resp.StatusCode
-// can be inspected even on err for diagnostic purposes.
+// non-nil for wire-level failures or transport errors. resp is nil only
+// when no response arrived (the request could not be built or sent);
+// once the status and headers arrived it is non-nil even on err, and its
+// Body is empty when the body could not be read. The error is then a
+// *BodyReadError on a 2xx, and on any other status an error that wraps
+// both the *WireError and the read failure.
 func (c *Client) doOnce(ctx context.Context, req *Request, target *url.URL) (*Response, error) {
 	var body io.Reader
 	if len(req.Body) > 0 {
@@ -327,9 +366,8 @@ func (c *Client) doOnce(ctx context.Context, req *Request, target *url.URL) (*Re
 		// value-free prefix is not enough on its own (REQ-093).
 		// sanitiseURLError substitutes the same route slot into that URL
 		// field while keeping the error's type and cause intact. The
-		// build-request arm above does the same; the two body-read
-		// diagnostics below wrap errors that carry no request URL of their
-		// own.
+		// build-request arm above does the same; the body-read failures
+		// below wrap errors that carry no request URL of their own.
 		route := req.routeOrPlaceholder()
 		return nil, fmt.Errorf("transport: %s %s: %w", req.effectiveMethod(), route, sanitiseURLError(err, route))
 	}
@@ -339,24 +377,48 @@ func (c *Client) doOnce(ctx context.Context, req *Request, target *url.URL) (*Re
 	if limit == 0 {
 		limit = DefaultMaxResponseBody
 	}
+	// The reader stops one byte past the limit, so a body over it is detected
+	// rather than cut short. No body can be longer than math.MaxInt64 bytes,
+	// and the extra byte would overflow that limit into a negative count that
+	// reads nothing, so it gets no reader and no check (REQ-093).
+	bounded := limit > 0 && limit < math.MaxInt64
 	var reader io.Reader = httpResp.Body
-	if limit > 0 {
+	if bounded {
 		reader = io.LimitReader(httpResp.Body, limit+1)
 	}
-	respBody, err := io.ReadAll(reader)
-	if err != nil {
-		return nil, fmt.Errorf("transport: %s %s: read body: %w", req.effectiveMethod(), req.routeOrPlaceholder(), err)
-	}
-	if limit > 0 && int64(len(respBody)) > limit {
-		return nil, fmt.Errorf("transport: %s %s: read body: response exceeds limit of %d bytes", req.effectiveMethod(), req.routeOrPlaceholder(), limit)
+	respBody, readErr := io.ReadAll(reader)
+	if readErr == nil && bounded && int64(len(respBody)) > limit {
+		readErr = responseTooLargeError{limit: limit}
 	}
 	resp := &Response{
 		StatusCode: httpResp.StatusCode,
 		Header:     httpResp.Header.Clone(),
-		Body:       respBody,
 		Metadata:   parseMetadata(httpResp.Header),
 	}
-	if httpResp.StatusCode >= 200 && httpResp.StatusCode < 300 {
+	is2xx := httpResp.StatusCode >= 200 && httpResp.StatusCode < 300
+	if readErr != nil {
+		// REQ-172: the status and headers arrived, so they are kept even
+		// though the body is lost. The bytes read before the failure are
+		// dropped: a partial body is not the representation, and an error
+		// that carried them could leak payload values.
+		if is2xx {
+			return resp, &BodyReadError{
+				Method:     req.effectiveMethod(),
+				Route:      req.routeOrPlaceholder(),
+				StatusCode: httpResp.StatusCode,
+				Inner:      readErr,
+			}
+		}
+		// A status that is not 2xx still classifies the failure. With no
+		// body, mapWireError finds no envelope and keeps no RawBody. The
+		// read failure is wrapped beside the WireError, so errors.AsType
+		// still reaches the WireError for the status sentinel, the retry
+		// policy and the 401 safety net. bodyReadFailure keeps the read
+		// failure's own text out of the message, as BodyReadError does.
+		return resp, fmt.Errorf("%w: %w", c.mapWireError(req, target, resp), &bodyReadFailure{cause: readErr})
+	}
+	resp.Body = respBody
+	if is2xx {
 		return resp, nil
 	}
 	return resp, c.mapWireError(req, target, resp)
@@ -554,10 +616,24 @@ func challengePermitsReauth(err error) bool {
 	return ok && we != nil && we.Challenge.permitsReauth()
 }
 
+// isBodyReadFailure reports whether err is a response whose body could not be
+// read, on either arm: a *BodyReadError on a 2xx, or the bodyReadFailure doOnce
+// wraps beside the *WireError on any other status (REQ-172). A boxed typed-nil
+// *BodyReadError counts too, since the callers read the request and ctx, never
+// a field of the error.
+func isBodyReadFailure(err error) bool {
+	if _, ok := errors.AsType[*BodyReadError](err); ok {
+		return true
+	}
+	_, ok := errors.AsType[*bodyReadFailure](err)
+	return ok
+}
+
 // shouldRetry consults the configured RetryPolicy. Network errors are
 // retried in addition to retriable HTTP statuses (mirroring the
-// "transport-level transient failures" rationale of REQ-091).
-func (c *Client) shouldRetry(req *Request, resp *Response, err error, attempt int) bool {
+// "transport-level transient failures" rationale of REQ-091). ctx is read
+// only for a response whose body could not be read.
+func (c *Client) shouldRetry(ctx context.Context, req *Request, resp *Response, err error, attempt int) bool {
 	if !c.cfg.retry.enabled() || attempt >= c.cfg.retry.MaxAttempts {
 		return false
 	}
@@ -565,6 +641,14 @@ func (c *Client) shouldRetry(req *Request, resp *Response, err error, attempt in
 		return false
 	}
 	if err != nil {
+		// REQ-172: once ctx has ended, a body read that failed was most likely
+		// stopped by it, and another attempt could only fail before a response
+		// arrives and lose the status and headers kept here (REQ-091: retries
+		// respect ctx cancellation). This holds on both arms, so it comes
+		// before the *WireError arm's status-based retry.
+		if ctx.Err() != nil && isBodyReadFailure(err) {
+			return false
+		}
 		// A *WireError carries a status — defer to the status-based
 		// retriable check so RetriableStatus is the single gate. A boxed
 		// typed-nil matches with ok=true and a nil pointer, so the nil
@@ -572,6 +656,22 @@ func (c *Client) shouldRetry(req *Request, resp *Response, err error, attempt in
 		// carries no status and falls through to the generic branch below.
 		if we, ok := errors.AsType[*WireError](err); ok && we != nil {
 			return c.cfg.retry.retriable(req.effectiveMethod(), we.StatusCode)
+		}
+		// REQ-172: a 2xx whose body could not be read means the server
+		// acted on the request, so only a safe method (RFC 9110 §9.2.1) is
+		// sent again, whatever RetryNonIdempotent says. A second PUT with
+		// the same If-Match would fail as stale and hide the version the
+		// first one made. The decision reads the request's method, never a
+		// field of the error, so a boxed typed-nil *BodyReadError takes
+		// the same gate. The ctx guard above has already stopped a retry
+		// once ctx ended.
+		if _, ok := errors.AsType[*BodyReadError](err); ok {
+			switch req.effectiveMethod() {
+			case http.MethodGet, http.MethodHead, http.MethodOptions:
+				return true
+			default:
+				return false
+			}
 		}
 		// Token-source errors that are deterministically terminal (the config
 		// is invalid, or re-authentication is required and nothing can refresh
@@ -708,10 +808,12 @@ func sanitiseURLError(err error, route string) error {
 // targeting Prefer=minimal endpoints typically use Do directly so the
 // empty-body shape does not trip the decoder.
 //
-// The two 2xx failures are distinct. An empty, whitespace-only or
+// The 2xx failures are distinct. An empty, whitespace-only or
 // JSON-null body (no representation, see [IsNoRepresentationBody])
 // fails with [ErrInvalidShape]. A non-empty body that does not decode
 // returns a [DecodeError] carrying the raw bytes the server delivered.
+// A body that could not be read at all returns the [BodyReadError] from
+// [Client.Do], with the Metadata beside it.
 func Decode[T any](ctx context.Context, c *Client, req *Request) (*T, *Metadata, error) {
 	resp, err := c.Do(ctx, req)
 	if err != nil {

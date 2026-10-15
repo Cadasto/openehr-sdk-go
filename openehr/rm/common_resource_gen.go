@@ -13,17 +13,17 @@ type AuthoredResource interface {
 // ResourceDescription Defines the descriptive meta-data of a resource.
 type ResourceDescription struct {
 	// Details Details of all parts of resource description that are natural language-dependent, keyed by language code.
-	Details map[string]ResourceDescriptionItem `json:"details"`
+	Details map[string]ResourceDescriptionItem `json:"details,omitzero"`
 	// LifecycleState Lifecycle state of the resource, typically including states such as: `initial | submitted | experimental | awaiting_approval | approved | superseded | obsolete`.
 	LifecycleState string `json:"lifecycle_state"`
 	// OriginalAuthor Original author of this resource, with all relevant details, including organisation.
-	OriginalAuthor map[string]string `json:"original_author"`
+	OriginalAuthor map[string]string `json:"original_author,omitzero"`
 	// OtherContributors Other contributors to the resource, probably listed in  `'name <email>'`  form.
 	OtherContributors []string `json:"other_contributors,omitempty"`
 	// OtherDetails Additional non language-sensitive resource meta-data, as a list of name/value pairs.
 	OtherDetails *map[string]string `json:"other_details,omitzero"`
 	// ParentResource Reference to owning resource.
-	ParentResource AuthoredResource `json:"parent_resource"`
+	ParentResource AuthoredResource `json:"parent_resource,omitempty"`
 	// ResourcePackageURI URI of package to which this resource belongs.
 	ResourcePackageURI *string `json:"resource_package_uri,omitzero"`
 }
@@ -53,7 +53,7 @@ type TranslationDetails struct {
 	// Accreditaton Accreditation of translator, usually a national translator's registration or association membership id.
 	Accreditaton *string `json:"accreditaton,omitzero"`
 	// Author Translator name and other demographic details.
-	Author map[string]string `json:"author"`
+	Author map[string]string `json:"author,omitzero"`
 	// Language Language of the translation.
 	Language CodePhrase `json:"language"`
 	// OtherDetails Any other meta-data.

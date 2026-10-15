@@ -185,7 +185,7 @@ func Get[T rm.CompositionLike](ctx context.Context, c *Client, id ObjectVersionI
 
 ## What is NOT in scope here
 
-- **Schema generation strategy.** The RM types in `openehr/rm/` are generated from the pinned BMM schemas; see [bmm-conformance.md](bmm-conformance.md) for the generator contract and [`../docs/plans/`](../plans) for the implementation plan. The rules in this document apply to the *output* of the generator.
+- **Schema generation strategy.** The RM types in `openehr/rm/` are generated from the pinned BMM schemas; see [bmm-conformance.md](bmm-conformance.md) for the generator contract. The rules in this document apply to the *output* of the generator.
 - **Template-specific generated structs.** A typed Go struct for a specific OPT (e.g. a vital-signs template) is **not** part of `openehr/rm/` — that belongs in the consuming project (see [scope.md § Out of scope](scope.md#out-of-scope-v1)).
 - **The full RM type list.** The dictionary of types lives in `openehr/rm/` once implemented; this spec defines the *rules*, not the inventory.
 

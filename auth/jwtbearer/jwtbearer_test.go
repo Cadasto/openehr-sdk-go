@@ -373,7 +373,9 @@ func TestSourceExchangesAssertion(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Add(1)
 		if err := r.ParseForm(); err != nil {
-			t.Fatal(err)
+			t.Error(err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
 		if g := r.PostForm.Get("grant_type"); g != GrantType {
 			t.Errorf("grant_type = %q", g)

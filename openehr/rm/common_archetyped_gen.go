@@ -56,11 +56,11 @@ type FeederAuditDetails struct {
 // Links should be between archetyped structures only, i.e. between objects representing complete domain concepts because relationships between sub-elements of whole concepts are not necessarily meaningful, and may be downright confusing. Sensible links only exist between whole `ENTRYs`, `SECTIONs`, `COMPOSITIONs` and so on.
 type Link struct {
 	// Meaning Used to describe the relationship, usually in clinical terms, such as  in response to  (the relationship between test results and an order),  follow-up to  and so on. Such relationships can represent any clinically meaningful connection between pieces of information. Values for meaning include those described in Annex C, ENV 13606 pt 2 under the categories of  generic ,  documenting and reporting ,  organisational ,  clinical ,  circumstancial , and  view management .
-	Meaning DVTextLike `json:"meaning"`
+	Meaning DVTextLike `json:"meaning,omitempty"`
 	// Target The logical  to  object in the link relation, as per the linguistic sense of the meaning attribute.
 	Target DVEHRURI `json:"target"`
 	// Type The type attribute is used to indicate a clinical or domain-level meaning for the kind of link, for example  problem  or  issue . If type values are designed appropriately, they can be used by the requestor of EHR extracts to categorise links which must be followed and which can be broken when the extract is created.
-	Type DVTextLike `json:"type"`
+	Type DVTextLike `json:"type,omitempty"`
 }
 
 // Locatable Root class of all information model classes that can be archetyped. Most classes in the openEHR reference model inherit from the `LOCATABLE` class, which defines the idea of  locatability in an archetyped structure. `LOCATABLE` defines a runtime name and an `_archetype_node_id_`.

@@ -69,7 +69,6 @@
             }
           }
         },
-        "composer": null,
         "language": {
           "_type": "CODE_PHRASE",
           "code_string": "",
@@ -78,7 +77,6 @@
             "value": ""
           }
         },
-        "name": null,
         "territory": {
           "_type": "CODE_PHRASE",
           "code_string": "",
@@ -142,7 +140,6 @@
             }
           }
         },
-        "composer": null,
         "language": {
           "_type": "CODE_PHRASE",
           "code_string": "",
@@ -151,7 +148,6 @@
             "value": ""
           }
         },
-        "name": null,
         "territory": {
           "_type": "CODE_PHRASE",
           "code_string": "",
@@ -209,7 +205,6 @@
         "archetype_node_id": "openEHR-EHR-EHR_STATUS.generic.v1",
         "is_modifiable": true,
         "is_queryable": true,
-        "name": null,
         "subject": {
           "_type": "PARTY_SELF"
         }

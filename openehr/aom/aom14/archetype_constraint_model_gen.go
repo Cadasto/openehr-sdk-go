@@ -523,7 +523,7 @@ type CPrimitiveObject struct {
 	// AssumedValue Value to be assumed if none sent in data.
 	AssumedValue *any `json:"assumed_value,omitzero"`
 	// Item Object actually defining the constraint.
-	Item CPrimitive `json:"item"`
+	Item CPrimitive `json:"item,omitempty"`
 	// NodeID Semantic identifier of this node, used to distinguish sibling nodes. All nodes must have a node_id; for nodes under a container C_ATTRIBUTE, the id must be an id-code must be defined in the archetype terminology. For valid structures, all node ids are at-codes.
 	// For C_PRIMITIVE_OBJECTs, it will have the special value Primitive_node_id.
 	NodeID string `json:"node_id"`
