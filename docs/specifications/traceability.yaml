@@ -508,6 +508,7 @@ requirements:
       - openehr/serialize/simplified/flat_pinned_test.go
       - openehr/serialize/simplified/hardening_test.go
       - openehr/serialize/simplified/index_bound_test.go
+      - openehr/serialize/simplified/interval_unbounded_test.go
       - openehr/serialize/simplified/ism_transition_test.go
       - openehr/serialize/simplified/leaf_rmtype_test.go
       - openehr/serialize/simplified/mediatype_fuzz_test.go
@@ -2125,6 +2126,7 @@ requirements:
       - openehr/serialize/canjson/unmatched_test.go
       - openehr/serialize/canxml/unmatched_test.go
       - openehr/serialize/simplified/context_test.go
+      - openehr/serialize/simplified/flat_decode_test.go
       - openehr/serialize/simplified/hardening_test.go
       - openehr/serialize/simplified/index_bound_test.go
       - openehr/serialize/simplified/null_test.go
