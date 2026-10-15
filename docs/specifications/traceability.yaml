@@ -439,8 +439,10 @@ requirements:
       - openehr/instance/polymorphic_roundtrip_test.go
       - openehr/rm/character_test.go
       - openehr/rm/character_text_test.go
+      - openehr/rm/integer_test.go
       - openehr/rm/interval_bound_test.go
       - openehr/rm/like_interfaces_test.go
+      - openehr/rm/numeric_wire_test.go
       - openehr/rm/quoted_literal_test.go
       - openehr/rm/real_test.go
       - openehr/rm/typereg/registry_test.go
