@@ -245,8 +245,8 @@ var probe030SkipFloor = map[string][]string{
 	// example the empty string at action_archetype_id. Its DV_DURATION and
 	// DV_DATE_TIME elements under the therapeutic_direction cluster of the
 	// activity's description carry a JSON null `value`, which the floor
-	// reports twice: as a missing mandatory attribute and as a Value_valid
-	// failure (the empty string is not an ISO 8601 value).
+	// reports once, as a missing mandatory attribute; Value_valid leaves an
+	// empty value to that rule.
 	"compositions/clinical_notes.v0.json": {
 		"required /content[openEHR-EHR-OBSERVATION.story.v1]/data/origin",
 		"required /content[openEHR-EHR-OBSERVATION.story.v1]/data/events[at0002]/time",
@@ -254,11 +254,8 @@ var probe030SkipFloor = map[string][]string{
 		"required /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/timing/value",
 		"required /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/timing/formalism",
 		"required /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/action_archetype_id",
-		"rm_invariant /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/description/items[openEHR-EHR-CLUSTER.therapeutic_direction.v1]/items[at0066]/value",
 		"required /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/description/items[openEHR-EHR-CLUSTER.therapeutic_direction.v1]/items[at0066]/value/value",
-		"rm_invariant /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/description/items[openEHR-EHR-CLUSTER.therapeutic_direction.v1]/items[at0178]/value",
 		"required /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/description/items[openEHR-EHR-CLUSTER.therapeutic_direction.v1]/items[at0178]/value/value",
-		"rm_invariant /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/description/items[openEHR-EHR-CLUSTER.therapeutic_direction.v1]/items[at0179]/value",
 		"required /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/description/items[openEHR-EHR-CLUSTER.therapeutic_direction.v1]/items[at0179]/value/value",
 	},
 	// Demonstration.v1: nine DV_INTERVAL values (DV_QUANTITY, DV_COUNT and

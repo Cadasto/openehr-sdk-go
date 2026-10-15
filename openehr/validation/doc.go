@@ -53,7 +53,10 @@
 // and RM-type match, the Reference Model rules of its class, the template's
 // value constraint at a leaf, and the same steps one level down. A list
 // attribute that is nil is absent, and one that is set and holds no item is
-// present and empty.
+// present and empty. An item of a list that holds no RM value, a nil
+// element or a nil pointer, still counts toward its list; the Reference
+// Model rules report it as `required` at its own path and do not walk it,
+// unless the template refuses it, which is then the one finding.
 //
 // The Reference Model rules are the RM-only layer of that walk. With no
 // template ([ValidateRM] and its typed wrappers) every attribute is
@@ -67,7 +70,9 @@
 //     on a DV_PROPORTION of precision 0;
 //   - DV_INTERVAL numeric bounds in order, and no side both unbounded and
 //     included;
-//   - an ISO 8601 value on DV_DATE, DV_TIME, DV_DATE_TIME and DV_DURATION;
+//   - an ISO 8601 value on DV_DATE, DV_TIME, DV_DATE_TIME and DV_DURATION
+//     (an empty value is a missing mandatory attribute, reported once, as
+//     `required`);
 //   - exactly one of value and null_flavour on an ELEMENT;
 //   - OBJECT_REF id/type/namespace, and the PARTY_IDENTIFIED rules (at
 //     least one of name, identifiers and external_ref; neither of the first

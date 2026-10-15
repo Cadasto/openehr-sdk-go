@@ -540,8 +540,10 @@ func shapeFrom(container, primitiveItems, hash bool) attrShape {
 // RM values at the path the shared path rule writes for it ([itemPaths]),
 // and each entry of a Hash at its position in ascending key order
 // ([hashEntryPath]), never at its key. Only a value of a registered RM class
-// ([rmaccess.Covers]) is walked as an item of a list or a Hash; a counted
-// list is never read item by item.
+// ([rmaccess.Covers]) is walked as an item of a list or a Hash; an item of a
+// list that holds no RM value is reported at its path instead
+// ([engine.walkUnconstrained]), and a counted list is never read item by
+// item.
 func (e *engine) visitAttribute(n engineNode, class string, a engineAttr) {
 	r := readAttribute(n.value, a)
 	if !visitedAt(a, r.present) {
@@ -567,16 +569,26 @@ func (e *engine) visitAttribute(n engineNode, class string, a engineAttr) {
 
 // walkUnconstrained walks what the present attribute a of node n, read as r,
 // holds, at attrPath, in role, with the RM rules alone: no template node
-// binds it.
+// binds it. An item of a list that holds no RM value, a nil element or a
+// typed-nil pointer ([isNilItem]), is reported at its own path by the
+// mandatory-presence rule ([findings.checkNilItem]) and not walked. This is
+// the one place the RM rules meet a nil item: the walk with no template and
+// an attribute the template leaves open both reach it, while a nil item
+// under an attribute that declares children is the template's to refuse
+// ([engine.visitDeclaredItems]) and never gets here.
 func (e *engine) walkUnconstrained(n engineNode, a engineAttr, r attrReading, attrPath string, role floorRole) {
 	switch a.shape {
 	case shapeSingle:
 		e.walk(engineNode{value: r.value, rmType: runtimeRMType(r.value, a.rmType), path: attrPath, role: role, depth: n.depth + 1})
 	case shapeList:
-		if !slices.ContainsFunc(r.items, rmaccess.Covers) {
+		if !slices.ContainsFunc(r.items, walkedOrNil) {
 			return
 		}
 		for i, path := range e.itemPaths(attrPath, r.items) {
+			if isNilItem(r.items[i]) {
+				e.found.checkNilItem(n.rmType, a.name, path)
+				continue
+			}
 			e.walkItem(n, r.items[i], a.rmType, path, role)
 		}
 	case shapeHash:
@@ -597,6 +609,14 @@ func (e *engine) walkItem(n engineNode, item any, rmType, path string, role floo
 		return
 	}
 	e.walk(engineNode{value: item, rmType: runtimeRMType(item, rmType), path: path, role: role, depth: n.depth + 1})
+}
+
+// walkedOrNil reports whether item, an item of a list no template node
+// binds, is one the walk has something to do with: a value of a registered
+// RM class ([rmaccess.Covers]), which it walks, or an item that holds no RM
+// value ([isNilItem]), which the RM rules report.
+func walkedOrNil(item any) bool {
+	return isNilItem(item) || rmaccess.Covers(item)
 }
 
 // visitDeclaredSingle visits the single-valued attribute a of node n, which
@@ -648,7 +668,10 @@ func (e *engine) visitDeclaredSingle(n engineNode, a engineAttr, r attrReading, 
 // child it binds to, at the path the shared path rule writes for it, with
 // the name the child pins where a sibling shares its id ([boundItemPaths]);
 // where the template declares no child, each item is walked with the RM
-// rules alone.
+// rules alone, which report an item that holds no RM value
+// ([engine.walkUnconstrained]). A nil item under an attribute that declares
+// children binds to none, so it is refused above and the RM rules never
+// see it.
 func (e *engine) visitDeclaredItems(n engineNode, a engineAttr, r attrReading, attrPath string, role floorRole) {
 	if !r.present {
 		e.checkAbsent(n, a, attrPath)

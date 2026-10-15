@@ -7,7 +7,8 @@ package validation
 // ADR 0027). The rules here report into [findings]:
 //
 //   - RM-mandatory attribute absences (checkMandatory, which the walk calls
-//     for each mandatory attribute it reads absent or empty);
+//     for each mandatory attribute it reads absent or empty), and an item of
+//     a list that holds no RM value (checkNilItem);
 //   - the per-RM-type invariant catalogue of § REQ-112 in
 //     docs/specifications/clinical-modeling.md, on every node the walk
 //     visits. checkInvariants dispatches it through the invariant inventory
@@ -263,6 +264,24 @@ func (f *findings) checkMandatory(rmType, attr, attrPath string, multiValued, pr
 			Detail: fmt.Sprintf("RM-mandatory multi-valued attribute %q must be non-empty on %s", attr, rmType),
 		})
 	}
+}
+
+// checkNilItem applies the mandatory-presence rule to an item of the list
+// attribute attr of a node of RM type rmType that holds no RM value, a nil
+// element or a typed-nil pointer ([isNilItem]): it is reported as
+// `required` at the item's own path, itemPath, rule mandatory. The walk
+// calls it for each such item of a list no template node binds, and does
+// not walk the item; the item still counts toward its list, so a list that
+// holds only such items is present and not empty. A nil item the template
+// refuses is reported by the template's rule alone.
+func (f *findings) checkNilItem(rmType, attr, itemPath string) {
+	f.emit(Issue{
+		Path:   itemPath,
+		Code:   "required",
+		Layer:  LayerRM,
+		Rule:   ruleMandatory,
+		Detail: fmt.Sprintf("item of %q on %s holds no RM value", attr, rmType),
+	})
 }
 
 // hashEntryPath returns the issue path of the entry at index i, in ascending
@@ -528,16 +547,19 @@ func isIntegralReal(v rm.Real) bool {
 }
 
 // checkTemporalValue enforces the REQ-112 Value_valid rule on the four ISO
-// 8601-backed data values: `value` must satisfy the type's BASE predicate,
-// decided with the REQ-123 parse so the partial forms it admits and
-// DV_DURATION's documented deviations stay valid. The empty string and a
-// placeholder such as "example" fail it. The diagnostic names the attribute,
-// never the offending value (REQ-168); that value string is carried in
+// 8601-backed data values: a non-empty `value` must satisfy the type's BASE
+// predicate, decided with the REQ-123 parse so the partial forms it admits
+// and DV_DURATION's documented deviations stay valid. A placeholder such as
+// "example" fails it. An empty `value`, which is also what a JSON null
+// decodes to, is an absent RM-mandatory attribute: the mandatory-presence
+// rule reports it once, as `required` at …/value ([findings.checkMandatory]),
+// so this rule leaves it alone. The diagnostic names the attribute, never
+// the offending value (REQ-168); that value string is carried in
 // Issue.Value. The issue's rule is the Value_valid invariant that dispatched
 // the check, the one the node's own class declares.
 func (f *findings) checkTemporalValue(value any, rmType, path, rule string) {
 	text, valid, ok := temporalValue(value)
-	if !ok || valid {
+	if !ok || valid || text == "" {
 		return
 	}
 	f.emit(Issue{

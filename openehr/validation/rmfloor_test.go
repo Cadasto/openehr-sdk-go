@@ -730,12 +730,15 @@ func TestValidateRM_TypedIntervalBoundsWalked(t *testing.T) {
 			want: []issue{{"/normal_range/upper", "rm_invariant"}},
 		},
 		{
+			// An empty temporal value is an absent RM-mandatory attribute,
+			// reported once, at …/value; Value_valid does not report it
+			// again on the bound (REQ-112). So for the three rows below.
 			name: "DV_DATE as root",
 			root: &rm.DVInterval[rm.DVDate]{
 				Lower: rm.DVDate{}, LowerIncluded: true,
 				Upper: rm.DVDate{Value: "2026-12-31"}, UpperIncluded: true,
 			},
-			want: []issue{{"/lower", "rm_invariant"}, {"/lower/value", "required"}},
+			want: []issue{{"/lower/value", "required"}},
 		},
 		{
 			name: "DV_TIME as root, value form",
@@ -743,7 +746,7 @@ func TestValidateRM_TypedIntervalBoundsWalked(t *testing.T) {
 				Lower: rm.DVTime{Value: "08:00:00"}, LowerIncluded: true,
 				Upper: rm.DVTime{}, UpperIncluded: true,
 			},
-			want: []issue{{"/upper", "rm_invariant"}, {"/upper/value", "required"}},
+			want: []issue{{"/upper/value", "required"}},
 		},
 		{
 			name: "DV_DATE_TIME as root",
@@ -751,7 +754,7 @@ func TestValidateRM_TypedIntervalBoundsWalked(t *testing.T) {
 				Lower: rm.DVDateTime{Value: "2026-01-01T00:00:00Z"}, LowerIncluded: true,
 				Upper: rm.DVDateTime{}, UpperIncluded: true,
 			},
-			want: []issue{{"/upper", "rm_invariant"}, {"/upper/value", "required"}},
+			want: []issue{{"/upper/value", "required"}},
 		},
 		{
 			name: "DV_DURATION as root",
@@ -759,7 +762,7 @@ func TestValidateRM_TypedIntervalBoundsWalked(t *testing.T) {
 				Lower: rm.DVDuration{}, LowerIncluded: true,
 				Upper: rm.DVDuration{Value: "P1D"}, UpperIncluded: true,
 			},
-			want: []issue{{"/lower", "rm_invariant"}, {"/lower/value", "required"}},
+			want: []issue{{"/lower/value", "required"}},
 		},
 		{
 			name: "DV_ORDINAL as root",
@@ -825,7 +828,7 @@ func TestValidateRM_TypedIntervalBoundsWalked(t *testing.T) {
 				Lower: rm.DVDate{}, LowerIncluded: true,
 				UpperUnbounded: true,
 			},
-			want: []issue{{"/lower", "rm_invariant"}, {"/lower/value", "required"}},
+			want: []issue{{"/lower/value", "required"}},
 		},
 		{
 			name: "DV_TIME as root, value form, lower unbounded",

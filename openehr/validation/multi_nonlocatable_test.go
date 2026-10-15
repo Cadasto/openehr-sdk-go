@@ -515,25 +515,45 @@ func TestValidateComposition_REQ102_NilContentItemKeepsSlotFill(t *testing.T) {
 	}
 }
 
-// REQ-102 — the nil-item rule applies only where the attribute declares
-// children. An attribute that declares none is open and accepts any item,
-// a nil one included; the same attribute with one child reports the nil
-// item as slot_fill, which shows the attribute is walked.
-func TestValidateComposition_REQ102_NilItemUnderOpenAttributePasses(t *testing.T) {
-	tests := []struct {
-		name     string
-		children string
-		want     []string
-	}{
-		{name: "open attribute accepts a nil item", children: "", want: []string{}},
-		{
-			name: "attribute with a child reports a nil item",
-			children: `
+// REQ-102, REQ-112 — the template's nil-item rule applies only where the
+// attribute declares children. An attribute that declares none is open and
+// admits any item, a nil one included, so the template reports nothing for
+// it and the RM rules report it as `required` at the item's path. The same
+// attribute with one child refuses the nil item as slot_fill, which is then
+// the whole report for it: the RM rules add nothing.
+func TestValidateComposition_REQ102_REQ112_NilItemUnderOpenAttributeReportedByRMRules(t *testing.T) {
+	const observationChild = `
       <children xsi:type="C_COMPLEX_OBJECT">
         <rm_type_name>OBSERVATION</rm_type_name>
         <node_id>at0001</node_id>
-      </children>`,
-			want: []string{"slot_fill /content[1]"},
+      </children>`
+	tests := []struct {
+		name     string
+		children string
+		item     rm.ContentItem
+		want     []string
+	}{
+		{
+			name: "open attribute, nil item reported by the RM rules",
+			item: nil,
+			want: []string{"required /content[1] rm mandatory"},
+		},
+		{
+			name: "open attribute, typed-nil item reported by the RM rules",
+			item: (*rm.Observation)(nil),
+			want: []string{"required /content[1] rm mandatory"},
+		},
+		{
+			name:     "attribute with a child, nil item refused by the template alone",
+			children: observationChild,
+			item:     nil,
+			want:     []string{"slot_fill /content[1] template slot"},
+		},
+		{
+			name:     "attribute with a child, typed-nil item refused by the template alone",
+			children: observationChild,
+			item:     (*rm.Observation)(nil),
+			want:     []string{"slot_fill /content[1] template slot"},
 		},
 	}
 	for _, tc := range tests {
@@ -548,11 +568,11 @@ func TestValidateComposition_REQ102_NilItemUnderOpenAttributePasses(t *testing.T
       <rm_attribute_name>context</rm_attribute_name>`)
 			c := mustCompileSyntheticOPT(t, opt)
 			comp := participationsComposition(validParticipation())
-			comp.Content = []rm.ContentItem{nil}
+			comp.Content = []rm.ContentItem{tc.item}
 
 			r := validation.ValidateComposition(comp, c)
-			if got := issueKeys(r.Issues); !slices.Equal(got, tc.want) {
-				t.Errorf("ValidateComposition issues = %q, want %q", got, tc.want)
+			if got := identityKeys(r.Issues); !slices.Equal(got, tc.want) {
+				t.Errorf("ValidateComposition issues (code path layer rule) = %q, want %q", got, tc.want)
 			}
 		})
 	}
