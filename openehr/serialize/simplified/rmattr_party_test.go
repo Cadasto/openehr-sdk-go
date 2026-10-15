@@ -634,7 +634,7 @@ func TestREQ140PartyRelatedWithNoRelationshipRefused(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	secret := "secret-party-0451"
 	related := func() *rm.PartyRelated {
-		return &rm.PartyRelated{PartyIdentified: rm.PartyIdentified{Name: &secret}}
+		return &rm.PartyRelated{Name: &secret}
 	}
 	participations := func() []rm.Participation {
 		return []rm.Participation{{Function: rm.DVText{Value: "requester"}, Performer: related()}}

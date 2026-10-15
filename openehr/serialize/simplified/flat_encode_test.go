@@ -267,8 +267,8 @@ func TestEncodeComposerShapesRefused(t *testing.T) {
 			DVText:       rm.DVText{Value: "mother"},
 			DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}, CodeString: "10"},
 		}},
-		"PARTY_RELATED with a name and no relationship":      &rm.PartyRelated{PartyIdentified: rm.PartyIdentified{Name: &secret}},
-		"PARTY_RELATED with a reference and no relationship": &rm.PartyRelated{PartyIdentified: rm.PartyIdentified{ExternalRef: ref}},
+		"PARTY_RELATED with a name and no relationship":      &rm.PartyRelated{Name: &secret},
+		"PARTY_RELATED with a reference and no relationship": &rm.PartyRelated{ExternalRef: ref},
 	} {
 		t.Run(name, func(t *testing.T) {
 			comp, wt := genComposition(t, minimalObsOPT)
