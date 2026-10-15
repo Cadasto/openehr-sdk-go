@@ -112,8 +112,8 @@ func run() error {
 	}
 
 	// Step 7: validate it. One call checks the OPT's constraints and the RM
-	// floor, the Reference Model's own rules, over the whole composition, and
-	// reports a defect both find once.
+	// floor, the Reference Model's own rules, over every part of the
+	// composition the template admits, and reports a defect both find once.
 	if !report(validation.ValidateComposition(conformant, compiled)) {
 		return errors.New("template-aware decode is not valid")
 	}

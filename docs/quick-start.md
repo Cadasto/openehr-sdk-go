@@ -190,7 +190,7 @@ Every public API follows these rules, and code that breaks them usually ends up 
 | `context.Context` is always the first parameter on I/O methods | Cancellation, deadlines, per-request auth. |
 | Inject `*http.Client`; the SDK never allocates one | Connection pooling and TLS stay under your control. |
 | Use functional options (`transport.WithHTTPClient`, …) | No large config structs, and options combine freely. |
-| Prefer package-level functions over repository structs | Repositories exist as injection seams, not the primary surface. |
+| Prefer package-level functions over `Repository` interfaces | Repositories exist as injection seams, not the primary surface. Each grows when its package gains an operation, so a fake that implements one has to add the new method. |
 | Import building blocks without `transport/` when you can | Keeps CLI tools and validators lightweight. |
 
 Full normative list: [specifications/idiom.md](specifications/idiom.md).

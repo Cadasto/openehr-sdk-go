@@ -100,9 +100,9 @@ re-encoded JSON: 4626 bytes
 OK: JSON ↔ XML cross-format round-trip preserves the Composition structurally
 ```
 
-The byte counts differ because the fixture is pretty-printed and the SDK's encoders are compact; the comparison is on the decoded content, not on the bytes. In the XML, the JSON `_type` discriminator becomes `xsi:type` and the element names match the JSON keys. Before comparing, the program encodes its starting point through `canjson` too and drops null members on both sides: the SDK treats a null member and an absent member the same, and the two codecs may pick either spelling for an empty optional field.
+The byte counts differ because the fixture is pretty-printed and the SDK's encoders are compact; the comparison is on the decoded content, not on the bytes. In the XML, the JSON `_type` discriminator becomes `xsi:type` and the element names match the JSON keys. Before comparing, the program encodes its starting point through `canjson` too, so both sides are spelled the same way: `canjson` leaves out a member that holds no value instead of writing it as `null`.
 
-**What to copy into your app:** `canxml.Marshal` / `canxml.Unmarshal` are drop-in counterparts of the `canjson` pair. When you compare documents that crossed formats, encode both sides through the same codec and treat null and absent members as equal, as `sameJSON` in the program does.
+**What to copy into your app:** `canxml.Marshal` / `canxml.Unmarshal` are drop-in counterparts of the `canjson` pair. When you compare documents that crossed formats, encode both sides through the same codec and compare the parsed trees rather than the bytes, as `sameJSON` in the program does.
 
 ---
 
@@ -253,7 +253,7 @@ validation           : OK, no issues
 result               : valid, no error found
 ```
 
-With `-corpus` validation reports 12 issues, one `path [code] detail` line each: a magnitude out of range, units the template does not allow, and missing `items` lists the template requires (the issue lines call them empty). All 12 come from the template constraints; the RM floor finds nothing wrong in this document. The result line says the composition is not valid, and a note says the issues are expected. The two checks catch different things: the RM floor accepts those values and missing lists, and the template does not. The reverse holds too: a composition with no `archetype_details` on its COMPOSITION or an ENTRY, or with an ELEMENT that has neither a value nor a null flavour, can meet the template constraints and fail on the RM floor. That is why the one call runs both.
+With `-corpus` validation reports 12 issues, one `path [code] detail` line each: a magnitude out of range, units the template does not allow, and missing `items` lists the template requires. All 12 come from the template constraints; the RM floor finds nothing wrong in this document. The result line says the composition is not valid, and a note says the issues are expected. The two checks catch different things: the RM floor accepts those values and missing lists, and the template does not. The reverse holds too: a composition with no `archetype_details` on its COMPOSITION or an ENTRY, or with an ELEMENT that has neither a value nor a null flavour, can meet the template constraints and fail on the RM floor. That is why the one call runs both.
 
 **What to copy into your app:** the steps in order: `canjson.Unmarshal` (a document that is not well-formed canonical JSON fails here, before any validation runs), `template.ParseFileStrict` plus `templatecompile.Compile` once per template, then `validation.ValidateComposition`. Accept the document when the result is OK, map that to your exit status, and print `result.Issues`. Parse strictly in a validator: on an unknown node type that has attributes under it, `ParseFileStrict` refuses the template, while the lenient `ParseFile` keeps the node as a leaf and drops the constraints beneath it. The same compiled template also feeds the composition builder, the instance generator and the AQL lint.
 
@@ -752,7 +752,7 @@ The fake answers as the pinned ITS-REST contract describes. A create answers `20
 **What to copy into your app:**
 
 1. Inject your own `*http.Client` with a `Timeout`, and pass a context with a deadline to every call.
-2. Take the version uid from the write's metadata (`meta.VersionUID`), not from the body. With the default `return=minimal` there is no body.
+2. Take the version uid from the write's metadata (`meta.VersionUID`), not from the body. With the default `return=minimal` there is no body. When a 2xx body cannot be read, the call still returns that metadata, beside a `*transport.BodyReadError`: the write committed, so do not send it again.
 3. Update with the version uid you last read as `If-Match`. On `errors.Is(err, transport.ErrPreconditionFailed)`, the metadata returned beside the error names the server's latest version: read it again, reapply your change, and update again.
 4. Use `errors.AsType[*transport.WireError](err)` only when you need the status code. Branch on the sentinel, not on the number.
 
@@ -892,7 +892,7 @@ Optional depth: `canxml_roundtrip` (multi-format), `primitive-validate` (leaf co
 
 ## Fixtures and testkit
 
-Examples depend on [`testkit/fixtures`](../testkit/fixtures/) and fixtures under `testkit/corpus/`. These are stable, checked-in artefacts, not generated at runtime. The exception is `validate-from-json/testdata/`, which is checked in but generated: `gen_fixture.go` in that directory writes it. Regenerate it whenever the generator changes, with `go run gen_fixture.go` from `cmd/examples/validate-from-json/`; the generator refuses to write a fixture that fails either validation pass.
+Examples depend on [`testkit/fixtures`](../testkit/fixtures/) and fixtures under `testkit/corpus/`. These are stable, checked-in artefacts, not generated at runtime. The exception is `validate-from-json/testdata/`, which is checked in but generated: `gen_fixture.go` in that directory writes it. Regenerate it whenever the generator changes, with `go run gen_fixture.go` from `cmd/examples/validate-from-json/`; the generator refuses to write a fixture that fails validation.
 
 When writing your own tests, prefer importing fixtures from `testkit` rather than copying paths by hand.
 
