@@ -354,6 +354,7 @@ func TestProbe089(t *testing.T) {
 		"modelled LOCATABLE: _uid",
 		"modelled LOCATABLE: _link:N",
 		"modelled LOCATABLE: _feeder_audit",
+		"COMPOSITION, at the template root: _name",
 		"collapsed ELEMENT: _null_flavour",
 		"ENTRY: _work_flow_id",
 		"ENTRY: _other_participation:N",

@@ -149,6 +149,19 @@ var Probe089Inputs = []Probe089Case{
 		},
 	},
 	{
+		// The composition's own name, a family of the template root alone:
+		// decode names the composition from it in place of the root's name, and
+		// encode writes it back because it is not that name. The value is the
+		// one the cross-format corpus writes at `opconsultation/_name`.
+		Name: "composition_name",
+		Rows: []string{"COMPOSITION, at the template root: _name"},
+		Keys: map[string]any{
+			probe089Root + "/_name":    "Routine checkup",
+			probe089Qty + "|magnitude": 65.9,
+			probe089Qty + "|unit":      "unit",
+		},
+	},
+	{
 		Name: "entry_object_refs",
 		Rows: []string{"ENTRY: _work_flow_id", "ENTRY: _guideline_id"},
 		Keys: map[string]any{
