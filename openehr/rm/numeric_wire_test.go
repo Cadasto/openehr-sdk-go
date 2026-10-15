@@ -60,6 +60,39 @@ func TestIntegerQuotedNumberDecodes(t *testing.T) {
 	}
 }
 
+// TestIntegerWholeNumberWithFractionDecodes pins wire.md § Floating-point
+// precision (REQ-052, ADR 0004 as amended): an `Integer` field accepts a
+// number whose value is a whole number however the literal writes it, with
+// a zero fraction or an exponent, bare or quoted, and reads it as that
+// integer. The reference's test_all_types FLAT writes a DV_PROPORTION
+// `type` as 1.0, which PROBE-105's flat-canonical leg reaches through
+// canjson, so the case runs through canjson on that very field.
+func TestIntegerWholeNumberWithFractionDecodes(t *testing.T) { // REQ-052, PROBE-105
+	t.Parallel()
+	for _, tc := range []struct {
+		lit  string
+		want int32
+	}{
+		{lit: `1.0`, want: 1},
+		{lit: `1e0`, want: 1},
+		{lit: `10.00`, want: 10},
+		{lit: `1E1`, want: 10},
+		{lit: `"1.0"`, want: 1},
+	} {
+		t.Run(tc.lit, func(t *testing.T) {
+			t.Parallel()
+			in := []byte(`{"_type":"DV_PROPORTION","numerator":1.5,"denominator":1.0,"type":` + tc.lit + `}`)
+			var p rm.DVProportion
+			if err := canjson.Unmarshal(in, &p); err != nil {
+				t.Fatalf("canjson.Unmarshal(type %s) = %v, want nil", tc.lit, err)
+			}
+			if int32(p.Type) != tc.want {
+				t.Errorf("canjson.Unmarshal(type %s): Type = %d, want %d", tc.lit, p.Type, tc.want)
+			}
+		})
+	}
+}
+
 // TestIntegerEncodesAsNumber — strict-encode for `Integer`.
 func TestIntegerEncodesAsNumber(t *testing.T) {
 	p := &rm.DVProportion{Numerator: 1, Denominator: 2, Type: rm.Integer(1)}
