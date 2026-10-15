@@ -25,6 +25,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
 // orderedSuffixAttrPaths maps the optional DV_ORDERED / DV_QUANTIFIED /
@@ -311,4 +312,33 @@ func checkRawFits(typ, holds string, keyOf func(string) string) error {
 	}
 	return fmt.Errorf("%w: %s holds a %s fragment, which does not fit the attribute it fills, a %s",
 		ErrUnsupportedDatatype, suffixLabel(keyOf, "raw"), class, holdsClass)
+}
+
+// checkRawDecodes returns nil when canonical JSON decodes frag, a `|raw`
+// fragment whose _type typ has passed [checkRawFits], as that _type. That is
+// the decode canonical JSON gives the fragment where it is placed: it
+// dispatches on _type through [typereg], and the `_type` check has already
+// made typ fit the attribute. Otherwise it refuses the fragment, wrapping
+// [ErrUnsupportedDatatype] and naming the `|raw` key keyOf gives, so a member
+// that does not fit, or a class no value can be, never surfaces as a
+// canonical-JSON error naming a path the caller did not write (REQ-053). The
+// refusal names the class, which [checkRawFits] has found in the RM, and
+// nothing the decode said, since that names the member's path inside the
+// fragment and can quote its value. A _type canonical JSON does not dispatch
+// on (an abstract class, or a class spelled with parameters) is named by its
+// class alone, so no parameter text the caller wrote reaches the message.
+func checkRawDecodes(frag map[string]any, typ string, keyOf func(string) string) error {
+	if _, concrete := typereg.Default.Lookup(typ); !concrete {
+		return fmt.Errorf("%w: %s holds a %s fragment, but canonical JSON decodes a value only as a concrete class spelled without parameters",
+			ErrUnsupportedDatatype, suffixLabel(keyOf, "raw"), bmmtype.Class(typ))
+	}
+	b, err := json.Marshal(frag)
+	if err == nil {
+		_, err = typereg.Default.Decode(b)
+	}
+	if err != nil {
+		return fmt.Errorf("%w: %s holds a %s fragment whose members canonical JSON does not decode as a %s",
+			ErrUnsupportedDatatype, suffixLabel(keyOf, "raw"), typ, typ)
+	}
+	return nil
 }

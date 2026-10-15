@@ -2348,7 +2348,8 @@ var bareLeafAttr = map[string]string{
 // type. Every other value must fit the RM attribute it fills
 // ([checkSuffixFits]); one that does not is refused naming the FLAT key keyOf
 // gives for its suffix (nil names the suffix alone). A |raw fragment fits when
-// its _type is rmType or an RM subtype of it ([checkRawFits]).
+// its _type is rmType or an RM subtype of it ([checkRawFits]) and canonical
+// JSON decodes it as that _type ([checkRawDecodes]).
 func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any, keyOf func(suffix string) string) (map[string]any, error) {
 	return dvFromSuffixesAt(rmType, rmType, listOpen, sfx, keyOf)
 }
@@ -2358,7 +2359,8 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any, keyOf func
 // suffixes are read as: a collapsed ELEMENT's value is a DATA_VALUE, an
 // interval bound the RM holds as an interface is a DV_ORDERED, and the feeder
 // audit's content is a DV_ENCAPSULATED. A |raw fragment there fits when its
-// _type is holds or an RM subtype of it, which is what canonical JSON admits.
+// _type is holds or an RM subtype of it and its members decode as that _type,
+// which is what canonical JSON admits.
 func dvFromSuffixesAt(holds, rmType string, listOpen bool, sfx map[string]any, keyOf func(suffix string) string) (map[string]any, error) {
 	sfx = withoutNulls(sfx)
 	// |raw bypass: a pre-serialised canonical fragment (carrying its own string
@@ -2377,6 +2379,9 @@ func dvFromSuffixesAt(holds, rmType string, listOpen bool, sfx map[string]any, k
 			return nil, fmt.Errorf("%w: |raw fragment missing string _type", ErrUnsupportedDatatype)
 		}
 		if err := checkRawFits(t, holds, keyOf); err != nil {
+			return nil, err
+		}
+		if err := checkRawDecodes(frag, t, keyOf); err != nil {
 			return nil, err
 		}
 		return frag, nil

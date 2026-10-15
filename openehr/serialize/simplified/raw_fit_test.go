@@ -258,6 +258,13 @@ func TestREQ053RawFragmentMustFitItsAttribute(t *testing.T) {
 			extra: map[string]any{rmattrElement + "|magnitude": nil, rmattrElement + "|unit": nil, rmattrElement + "|raw": misfitQuantity},
 			key:   rmattrElement + "|raw",
 		},
+		"collapsed ELEMENT value, a class spelled with parameters": {
+			extra: map[string]any{
+				rmattrElement + "|magnitude": nil, rmattrElement + "|unit": nil,
+				rmattrElement + "|raw": map[string]any{"_type": "DV_INTERVAL<" + rawSecretText + ">"},
+			},
+			key: rmattrElement + "|raw",
+		},
 		"collapsed ELEMENT value, an abstract class": {
 			extra: map[string]any{rmattrElement + "|magnitude": nil, rmattrElement + "|unit": nil, rmattrElement + "|raw": map[string]any{"_type": "DATA_VALUE"}},
 			key:   rmattrElement + "|raw",
