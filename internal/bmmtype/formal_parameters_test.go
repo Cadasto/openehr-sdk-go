@@ -104,3 +104,107 @@ func TestFormalParametersCoverRMInfoTypes(t *testing.T) {
 		t.Fatal("rminfo records no attribute typed by a formal parameter; the tables did not load as expected")
 	}
 }
+
+// REQ-101 — the composition builder checks a value at an attribute that its
+// class types with a formal parameter, on an owner whose type name leaves
+// the parameter open, against the parameter's constraint, which
+// ParameterConstraint reads from parameterConstraints. This holds that table
+// to the vendored BMM: every parameter formalParameters lists must have the
+// conforms_to_type that the BMM's GenericParameterDef sets it, or, where the
+// class sets none, that its generic ancestor sets the parameter of the same
+// name. A schema bump that adds, drops or changes a constraint fails here.
+func TestREQ101_ParameterConstraintsMatchBMM(t *testing.T) {
+	schema := loadPinnedBMM(t)
+	constrained := 0
+	for _, class := range slices.Sorted(maps.Keys(formalParameters)) {
+		for _, param := range formalParameters[class] {
+			want := bmmParameterConstraint(t, schema, class, param)
+			if want != "" {
+				constrained++
+			}
+			if got, ok := ParameterConstraint(class, param); !ok || got != want {
+				t.Errorf("ParameterConstraint(%q, %q) = (%q, %v), want (%q, true) (from the BMM)", class, param, got, ok, want)
+			}
+		}
+	}
+	if constrained == 0 {
+		t.Fatal("the BMM constrains no formal parameter of a class rminfo knows; the schema did not load as expected")
+	}
+	for _, class := range slices.Sorted(maps.Keys(parameterConstraints)) {
+		for _, param := range slices.Sorted(maps.Keys(parameterConstraints[class])) {
+			if !slices.Contains(formalParameters[class], param) {
+				t.Errorf("parameterConstraints has %s.%s, which formalParameters does not list", class, param)
+			}
+			if parameterConstraints[class][param] == "" {
+				t.Errorf("parameterConstraints has %s.%s with an empty constraint; leave an unconstrained parameter out", class, param)
+			}
+		}
+	}
+	for _, tc := range []struct{ class, param string }{
+		{class: "DV_INTERVAL", param: "U"},
+		{class: "DV_TEXT", param: "T"},
+	} {
+		if got, ok := ParameterConstraint(tc.class, tc.param); ok || got != "" {
+			t.Errorf("ParameterConstraint(%q, %q) = (%q, %v), want (\"\", false): %s has no formal parameter %s", tc.class, tc.param, got, ok, tc.class, tc.param)
+		}
+	}
+}
+
+// bmmParameterConstraint returns the conforms_to_type that the schema sets
+// the formal parameter param of class. Where class sets none, it returns the
+// one a generic ancestor sets the parameter of the same name: the RM schema
+// writes a generic ancestor without actual parameters ("EVENT" for
+// POINT_EVENT), so the parameter passes to it by name. It returns "" when no
+// constraint is set.
+func bmmParameterConstraint(t *testing.T, schema *bmm.Schema, class, param string) string {
+	t.Helper()
+	cls, ok := schemaClass(schema, class)
+	if !ok {
+		t.Fatalf("class %q is not in the BMM", class)
+	}
+	def := genericParameterDefs(cls)[param]
+	if def == nil {
+		t.Fatalf("the BMM declares no generic parameter %q on %s", param, class)
+	}
+	if def.ConformsToType != "" {
+		return def.ConformsToType
+	}
+	for _, ancestor := range cls.Ancestors() {
+		name, params, ok := Split(ancestor)
+		if !ok {
+			t.Fatalf("%s has an ancestor %q that is not a type name", class, ancestor)
+		}
+		parent, ok := schemaClass(schema, name)
+		if !ok || genericParameterDefs(parent)[param] == nil {
+			continue
+		}
+		if len(params) > 0 {
+			t.Fatalf("%s names its ancestor as %q, with actual parameters: read the constraint on %s from them and extend this test", class, ancestor, param)
+		}
+		if c := bmmParameterConstraint(t, schema, name, param); c != "" {
+			return c
+		}
+	}
+	return ""
+}
+
+// schemaClass looks name up among the schema's classes and primitive types.
+func schemaClass(schema *bmm.Schema, name string) (bmm.Class, bool) {
+	if cls, ok := schema.ClassDefinitions[name]; ok {
+		return cls, true
+	}
+	cls, ok := schema.PrimitiveTypes[name]
+	return cls, ok
+}
+
+// genericParameterDefs returns the formal generic parameters cls declares,
+// by name, or nil when it declares none.
+func genericParameterDefs(cls bmm.Class) map[string]*bmm.GenericParameterDef {
+	switch c := cls.(type) {
+	case *bmm.SimpleClass:
+		return c.GenericParameterDefs
+	case *bmm.Interface:
+		return c.GenericParameterDefs
+	}
+	return nil
+}
