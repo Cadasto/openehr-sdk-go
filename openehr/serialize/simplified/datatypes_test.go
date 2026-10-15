@@ -1039,12 +1039,13 @@ func TestCodedTextWithFormattingRoundTrips(t *testing.T) {
 	}
 }
 
-// TestOrderedSuffixWrongKindRejected — PR #86 review round 3. The pass-through
-// suffixes hand their value to canjson untouched, so a malformed one used to
-// surface as a bare canjson error naming the canonical path and no FLAT key at
-// all. The kind is checked while the key is still in hand (see
-// TestMalformedOrderedSuffixNamesFlatKey for the surfaced message). No gap
-// sentinel: a malformed value is a payload defect, not a modelled-gap refusal.
+// TestOrderedSuffixWrongKindRejected — PR #86 review round 3, amended by
+// REQ-053 "A value must fit its attribute". The pass-through suffixes hand
+// their value to canjson, so a malformed one used to surface as a bare canjson
+// error naming the canonical path and no FLAT key at all. The value is checked
+// against its RM attribute while the key is still in hand (see
+// TestMalformedOrderedSuffixNamesFlatKey for the surfaced message), and the
+// refusal wraps ErrUnsupportedDatatype.
 func TestOrderedSuffixWrongKindRejected(t *testing.T) {
 	base := map[string]any{"magnitude": 1.0, "unit": "mm"}
 	for _, tc := range []struct {
@@ -1071,8 +1072,8 @@ func TestOrderedSuffixWrongKindRejected(t *testing.T) {
 					t.Errorf("error %q does not mention %q", err, want)
 				}
 			}
-			if errors.Is(err, ErrUnknownPath) || errors.Is(err, ErrUnsupportedDatatype) {
-				t.Errorf("err = %v carries a modelled-gap sentinel; a malformed value is a payload defect", err)
+			if !errors.Is(err, ErrUnsupportedDatatype) {
+				t.Errorf("err = %v, want ErrUnsupportedDatatype (REQ-053: a value must fit its attribute)", err)
 			}
 			// The well-formed value of the same kind still passes through.
 			sfx[tc.suffix] = map[string]any{

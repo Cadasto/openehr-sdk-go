@@ -179,14 +179,18 @@ func TestStringLeafRefusesSuffixes(t *testing.T) {
 }
 
 // TestStringLeafRefusesNonString — REQ-053. The bare value is a JSON string; a
-// number there is a malformed body, refused with the key named.
+// number there does not fit the RM String it carries, so it is refused with
+// ErrUnsupportedDatatype and the key named ("A value must fit its attribute").
 func TestStringLeafRefusesNonString(t *testing.T) {
 	_, err := UnmarshalFlat(stringLeafBody(map[string]any{stringLeafKey: 42}), stringLeafWT())
 	if err == nil {
 		t.Fatal("UnmarshalFlat accepted a number at the STRING leaf")
 	}
-	if !strings.Contains(err.Error(), stringLeafKey) {
+	if !strings.Contains(err.Error(), `"`+stringLeafKey+`"`) {
 		t.Errorf("UnmarshalFlat = %v, want the error to name %q", err, stringLeafKey)
+	}
+	if !errors.Is(err, ErrUnsupportedDatatype) {
+		t.Errorf("UnmarshalFlat = %v, want ErrUnsupportedDatatype", err)
 	}
 }
 
@@ -204,9 +208,10 @@ func TestStringLeafCorpusSpelling(t *testing.T) {
 
 // TestStringLeafRefusesEmpty — REQ-053 § Leaf datatypes. An empty string at the
 // STRING leaf is refused on decode: ACTIVITY's `Action_archetype_id_valid`
-// invariant forbids it, and encode writes nothing for one. The payload breaks
-// an RM invariant, so the refusal is a plain wrapped error like the not-a-string
-// case, not the unsupported-datatype gap sentinel.
+// invariant forbids it, and encode writes nothing for one. An empty string
+// fits the RM String; the payload breaks an RM invariant, so the refusal is a
+// plain wrapped error, not the unsupported-datatype sentinel a value that does
+// not fit its attribute carries.
 func TestStringLeafRefusesEmpty(t *testing.T) {
 	_, err := UnmarshalFlat(stringLeafBody(map[string]any{stringLeafKey: ""}), stringLeafWT())
 	if err == nil {
