@@ -211,10 +211,10 @@ func TestREQ053RawFragmentFitsTheAttributeNotTheDatatype(t *testing.T) {
 	}
 }
 
-// TestCheckRawFitsNamesNoCallerText — REQ-053: a fragment whose `_type` the RM
+// TestREQ053CheckRawFitsNamesNoCallerText — REQ-053: a fragment whose `_type` the RM
 // does not define is refused without echoing that `_type`, which is text the
 // caller wrote; one the RM defines is named by its class.
-func TestCheckRawFitsNamesNoCallerText(t *testing.T) {
+func TestREQ053CheckRawFitsNamesNoCallerText(t *testing.T) {
 	const secret = "secret-value-0451"
 	keyOf := func(string) string { return "p/x|raw" }
 	err := checkRawFits(secret, "DV_TEXT", keyOf)
@@ -227,11 +227,11 @@ func TestCheckRawFitsNamesNoCallerText(t *testing.T) {
 	}
 }
 
-// TestCheckRawFitsLeavesAnUndefinedAttributeToCanonicalJSON — REQ-053: the
+// TestREQ053CheckRawFitsLeavesAnUndefinedAttributeToCanonicalJSON — REQ-053: the
 // check adds no strictness of its own, so where the type the attribute is
 // declared as is no RM class (a Web Template node type spelled outside the
 // BMM), there is nothing to judge a fragment against and it is not refused.
-func TestCheckRawFitsLeavesAnUndefinedAttributeToCanonicalJSON(t *testing.T) {
+func TestREQ053CheckRawFitsLeavesAnUndefinedAttributeToCanonicalJSON(t *testing.T) {
 	if err := checkRawFits("DV_TEXT", "NO_SUCH_CLASS", nil); err != nil {
 		t.Errorf("checkRawFits(DV_TEXT, NO_SUCH_CLASS) = %v, want nil", err)
 	}

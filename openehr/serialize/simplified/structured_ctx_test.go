@@ -42,14 +42,14 @@ func TestREQ053CtxBareMemberIsTheFieldKey(t *testing.T) {
 	}
 }
 
-// TestFlatToStructuredRefusesAnObjectCtxValue — REQ-053: a ctx/ field holds a
+// TestREQ053FlatToStructuredRefusesAnObjectCtxValue — REQ-053: a ctx/ field holds a
 // value, and its suffixes ride keys of their own. A direct value that is a
 // JSON object has the shape STRUCTURED gives those suffixes, so FLAT →
 // STRUCTURED refuses it naming the key, rather than merging it with the
 // field's |suffix keys, where one would silently overwrite the other, or
 // handing it to STRUCTURED → FLAT to read back as suffixes. A scalar direct
 // value beside the field's suffixes stays refused as before.
-func TestFlatToStructuredRefusesAnObjectCtxValue(t *testing.T) {
+func TestREQ053FlatToStructuredRefusesAnObjectCtxValue(t *testing.T) {
 	for name, tc := range map[string]struct {
 		flat  string
 		want  error
@@ -68,11 +68,11 @@ func TestFlatToStructuredRefusesAnObjectCtxValue(t *testing.T) {
 	}
 }
 
-// TestStructuredLocationsMirrorTheConversion — REQ-170: the STRUCTURED
+// TestREQ170StructuredLocationsMirrorTheConversion — REQ-170: the STRUCTURED
 // locator records each FLAT key [structuredToFlat] makes of a body under the
 // key the conversion writes, so a report or a strict refusal of that key can
 // name its member. A ctx field's `"|"` member is its own key, as a leaf's is.
-func TestStructuredLocationsMirrorTheConversion(t *testing.T) {
+func TestREQ170StructuredLocationsMirrorTheConversion(t *testing.T) {
 	body := `{"ctx":{"language":"en","setting":{"|":null,"|code":"238","|value":"other care"}},` +
 		`"root":{"leaf":[{"|":"t","|formatting":"f"}],"other":["x"]}}`
 	var s map[string]any
