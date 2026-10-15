@@ -29,7 +29,7 @@ const noPrecision rm.Integer = -1
 //   - DV_BOOLEAN   → bool
 //   - DV_COUNT     → int (magnitude)
 //   - DV_ORDINAL   → [constraints.OrdinalSymbol] (value, symbol's
-//     defining_code), or int (value) when that code is incomplete
+//     defining_code), or int (value) when its code string is empty
 //   - DV_DATE      → string (value, ISO 8601)
 //   - DV_TIME      → string (value, ISO 8601)
 //   - DV_DATE_TIME → string (value, ISO 8601)
