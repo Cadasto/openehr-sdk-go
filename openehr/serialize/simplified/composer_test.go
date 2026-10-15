@@ -330,10 +330,11 @@ func TestREQ053ComposerRealPathDecodes(t *testing.T) {
 // composer's real path is under the party grammar's refusals and the
 // metadata rules: a `composer_self: true` beside an identifier or a
 // relationship (PARTY_SELF has neither), two spellings of one key that
-// disagree, a reference missing its `|id` or its RM-mandatory namespace, an
-// empty name, a relationship with nothing it qualifies, a value that does not
-// fit its attribute, and an index past its bound. Each refusal names the key
-// and none carries the value.
+// disagree (ErrUnknownPath, as for every other metadata field), a reference
+// missing its `|id` or its RM-mandatory namespace, an empty name, a
+// relationship with nothing it qualifies, a value that does not fit its
+// attribute, and an index past its bound. Each refusal names the key and none
+// carries the value.
 func TestREQ053ComposerRealPathRefusals(t *testing.T) {
 	wt, compiled := corpusTarget(t)
 	root := wt.Tree.ID
@@ -343,6 +344,9 @@ func TestREQ053ComposerRealPathRefusals(t *testing.T) {
 		keys  map[string]any
 		want  error
 		named []string
+		// unsaid are words the refusal must not use: an own suffix such as
+		// `|id` is no sub-path.
+		unsaid []string
 	}{
 		{
 			name:  "ctx/composer_self beside an identifier",
@@ -360,11 +364,48 @@ func TestREQ053ComposerRealPathRefusals(t *testing.T) {
 			want:  simplified.ErrUnknownPath,
 			named: []string{root + "/composer_self", root + "/composer/relationship|code"},
 		},
+		// Two spellings of one composer key that disagree are two accepted
+		// spellings of one composition-metadata field: ErrUnknownPath, whichever
+		// key it is and whichever segment carries the `:0` (REQ-053).
 		{
-			name:  "two spellings of one key that disagree",
-			keys:  map[string]any{root + "/composer|id": secret, root + ":0/composer:0|id": "other", root + "/composer|id_namespace": "demographic"},
-			want:  simplified.ErrUnsupportedDatatype,
-			named: []string{root + "/composer|id", root + ":0/composer:0|id"},
+			name:  "two spellings of the name that disagree",
+			keys:  map[string]any{root + "/composer|name": "Dr A", root + ":0/composer:0|name": "Dr B"},
+			want:  simplified.ErrUnknownPath,
+			named: []string{root + "/composer|name", root + ":0/composer:0|name"},
+		},
+		{
+			name:   "two spellings of the id that disagree",
+			keys:   map[string]any{root + "/composer|id": secret, root + ":0/composer:0|id": "other", root + "/composer|id_namespace": "demographic"},
+			want:   simplified.ErrUnknownPath,
+			named:  []string{root + "/composer|id", root + ":0/composer:0|id"},
+			unsaid: []string{"sub-path"},
+		},
+		{
+			name: "two spellings of an identifier's id that disagree",
+			keys: map[string]any{
+				"ctx/composer_name": "Dr Ctx", root + "/composer/_identifier:0|id": secret,
+				root + ":0/composer:0/_identifier:0|id": "other",
+			},
+			want:  simplified.ErrUnknownPath,
+			named: []string{root + "/composer/_identifier:0|id", root + ":0/composer:0/_identifier:0|id"},
+		},
+		{
+			name: "an identifier with and without its :0 that disagree",
+			keys: map[string]any{
+				"ctx/composer_name": "Dr Ctx", root + "/composer/_identifier|id": secret,
+				root + "/composer/_identifier:0|id": "other",
+			},
+			want:  simplified.ErrUnknownPath,
+			named: []string{root + "/composer/_identifier|id", root + "/composer/_identifier:0|id"},
+		},
+		{
+			name: "a relationship with and without its :0 that disagree",
+			keys: map[string]any{
+				"ctx/composer_name": "Dr Ctx", root + "/composer/relationship|code": "10",
+				root + "/composer/relationship|value": secret, root + "/composer/relationship:0|value": "other",
+			},
+			want:  simplified.ErrUnknownPath,
+			named: []string{root + "/composer/relationship|value", root + "/composer/relationship:0|value"},
 		},
 		{
 			name:  "a reference without its namespace",
@@ -429,6 +470,11 @@ func TestREQ053ComposerRealPathRefusals(t *testing.T) {
 			wantRefusal(t, err, tc.want, tc.named...)
 			if strings.Contains(err.Error(), secret) {
 				t.Errorf("err = %v carries the value", err)
+			}
+			for _, w := range tc.unsaid {
+				if strings.Contains(err.Error(), w) {
+					t.Errorf("err = %v says %q", err, w)
+				}
 			}
 		})
 	}
