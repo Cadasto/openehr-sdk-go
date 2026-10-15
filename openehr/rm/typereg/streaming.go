@@ -38,20 +38,44 @@ import (
 // joined AFTER our aggregate (SDK first: the canonical-JSON polymorphic
 // dispatch wins for the interfaces it covers; the caller's hooks reach every
 // other type, at every depth). A nil caller (json.WithUnmarshalers(nil)) is
-// treated as no caller. The pointer check keeps a nested decode, whose options
-// already carry our aggregate, from re-joining it to itself. The join is
-// memoised on the last caller hook set seen (see [joinCallerUnmarshalers]): a
-// repeat of that set reuses one join, so sibling values at one nesting level and
-// a later decode reusing the same WithUnmarshalers value cost nothing, but a cold
-// decode still joins once per nesting level, because each level's options carry
-// the previous level's joined pointer as that level's caller.
+// treated as no caller. The pointer check keeps a decoder that already carries
+// our aggregate but reports legacy errors (a v1 caller passing [Unmarshalers])
+// from having the aggregate joined to itself. The join is memoised on the last
+// caller hook set seen (see [joinCallerUnmarshalers]): a repeat of that set
+// reuses one join, so sibling values at one nesting level and a later decode
+// reusing the same WithUnmarshalers value cost nothing.
+//
+// The result is nil when dec already carries everything it would add, which is
+// the common case for every value below the outermost: json.UnmarshalDecode and
+// json.Unmarshal apply the options a call passes to the decoder for that call's
+// duration, so a nested value's decoder holds the hooks and error semantics its
+// parent added. That is the case when dec does not report errors with legacy
+// semantics and its hook set is either our aggregate or the join
+// [lastCallerJoin] last produced for it. Recognising the join keeps a cold decode
+// to one join in all, rather than one per nesting level with each level joining
+// our aggregate onto the level above's join. Every json/v2 entry point skips a
+// nil option, so [DecodeInto] passes the result as it is; [DecodePolymorphic]
+// decodes on a fresh decoder and passes dec's own options in its place.
+// Otherwise the result is dec's options with the hooks and v2 error semantics
+// joined on top: the outermost value under a bare v2 or v1 call, or a nested one
+// whose memo entry another caller's decode has displaced, which joins again.
 func decodeOptions(dec *jsontext.Decoder) json.Options {
 	hooks := aggregateUnmarshalers()
-	if caller, ok := json.GetOption(dec.Options(), json.WithUnmarshalers); ok && caller != nil && caller != hooks {
+	opts := dec.Options()
+	caller, ok := json.GetOption(opts, json.WithUnmarshalers)
+	if legacy, _ := json.GetOption(opts, jsonv1.ReportErrorsWithLegacySemantics); !legacy {
+		if caller == hooks {
+			return nil
+		}
+		if e := lastCallerJoin.Load(); e != nil && e.hooks == hooks && e.joined == caller {
+			return nil
+		}
+	}
+	if ok && caller != nil && caller != hooks {
 		hooks = joinCallerUnmarshalers(hooks, caller)
 	}
 	unmarshalers, legacySemantics := hookOptions(hooks)
-	return json.JoinOptions(dec.Options(), unmarshalers, legacySemantics)
+	return json.JoinOptions(opts, unmarshalers, legacySemantics)
 }
 
 // hookOptions returns the SDK's two decode options for a resolved interface-hook
@@ -82,7 +106,9 @@ type joinEntry struct {
 // lastCallerJoin holds the most recent (aggregate, caller) join and only that
 // one: a single-entry, last-seen memo. It retains one caller pointer at a time,
 // never a growing set, so a consumer that builds a fresh hook set per decode
-// does not accumulate an entry per call for the process lifetime.
+// does not accumulate an entry per call for the process lifetime. Its joined
+// pointer is also what [decodeOptions] looks for on a nested value's decoder,
+// which then adds nothing.
 var lastCallerJoin atomic.Pointer[joinEntry]
 
 // callerJoinCount counts the json.JoinUnmarshalers calls [joinCallerUnmarshalers]
@@ -96,9 +122,11 @@ var callerJoinCount atomic.Int64
 // whose two pointers match the stored pair reuses that join; any other pair
 // recomputes and overwrites. A repeat of one caller hook set therefore reuses a
 // single join (sibling values at one nesting level, and a later decode reusing
-// the same WithUnmarshalers value), while a cold decode still joins once per
-// nesting level, because each level's options carry the previous level's joined
-// pointer as that level's caller. Two concurrent misses may both join; the
+// the same WithUnmarshalers value). A nested value's decoder carries the joined
+// pointer itself, which [decodeOptions] recognises from the memo without calling
+// here, so a cold decode joins once, not once per nesting level; only a nested
+// level whose entry another caller displaced meanwhile joins again, taking the
+// joined pointer as its caller. Two concurrent misses may both join; the
 // results are equivalent, so storing either is benign. SDK hooks win for the
 // interfaces they cover; the caller's reach every other type at every depth (see
 // [decodeOptions]).
@@ -166,23 +194,42 @@ func Unmarshalers() json.Options {
 //
 // This is the single home for these three options. An entry point with no
 // encoder in hand (canjson.Marshal / MarshalIndent) joins the set directly,
-// and [MarshalOptions] joins it on top of an encoder's own options. The set
-// is rebuilt afresh on every call so the spelling holds no matter which
-// package (encoding/json v1 or v2) drives the encode.
+// and [MarshalOptions] hands it to every generated MarshalJSONTo, so the
+// spelling holds no matter which package (encoding/json v1 or v2) drives the
+// encode. The set is built once and every call returns that same value: an
+// options value cannot change once built (json/v2 only reads an option passed
+// to Join or JoinOptions, and exports no way to modify one), so sharing it is
+// safe and saves an allocation per call.
 func EncodeOptions() json.Options {
-	return json.JoinOptions(
-		json.Deterministic(true),
-		json.FormatNilSliceAsNull(true),
-		json.FormatNilMapAsNull(true),
-	)
+	return encodeOptions
 }
 
+// encodeOptions is the one value [EncodeOptions] returns.
+var encodeOptions = json.JoinOptions(
+	json.Deterministic(true),
+	json.FormatNilSliceAsNull(true),
+	json.FormatNilMapAsNull(true),
+)
+
 // MarshalOptions returns the encode options every generated MarshalJSONTo
-// joins on top of the encoder's own options: the encoder's own options first,
-// then [EncodeOptions] so the deterministic-map and nil-container spellings
-// hold from any entry point.
+// passes to json.MarshalEncode, so the deterministic-map and nil-container
+// spellings of [EncodeOptions] hold from any entry point. MarshalEncode joins
+// the options it is passed on top of the encoder's own for that call's
+// duration, so once an enclosing value (or the entry point) has applied them,
+// a nested value's encoder already has all three set to true. MarshalOptions
+// then returns nil, which MarshalEncode skips. Otherwise it returns
+// EncodeOptions, which MarshalEncode joins after the encoder's own options:
+// the same result as joining the two here, without building a new set per
+// value.
 func MarshalOptions(enc *jsontext.Encoder) json.Options {
-	return json.JoinOptions(enc.Options(), EncodeOptions())
+	opts := enc.Options()
+	deterministic, _ := json.GetOption(opts, json.Deterministic)
+	nilSliceAsNull, _ := json.GetOption(opts, json.FormatNilSliceAsNull)
+	nilMapAsNull, _ := json.GetOption(opts, json.FormatNilMapAsNull)
+	if deterministic && nilSliceAsNull && nilMapAsNull {
+		return nil
+	}
+	return encodeOptions
 }
 
 // DecodeInto is the shared decode body for a concrete type's
@@ -354,9 +401,14 @@ func DecodePolymorphic[T any](dec *jsontext.Decoder, out *T, fallback func() any
 	// stack depth starts again at zero, so the concrete values inside it
 	// measure their depth from the slot. Adding the enclosing decoder's stack
 	// depth to the slot's own nesting keeps a chain of polymorphic slots, each
-	// shallow on its own, from nesting past the cap in total.
-	if d := dec.StackDepth() + jsonNestingDepth(raw); d > maxDecodeDepth {
-		return &DecodeError{Inner: fmt.Errorf("typereg.Decode: %w (%d > %d)", ErrMaxDepthExceeded, d, maxDecodeDepth)}
+	// shallow on its own, from nesting past the cap in total. A value nested d
+	// levels deep holds d opening and d closing brackets, so d is at most
+	// len(raw)/2; when even that bound stays within the cap the check cannot
+	// fail, and the bracket scan is skipped.
+	if depth := dec.StackDepth(); depth+len(raw)/2 > maxDecodeDepth {
+		if d := depth + jsonNestingDepth(raw); d > maxDecodeDepth {
+			return &DecodeError{Inner: fmt.Errorf("typereg.Decode: %w (%d > %d)", ErrMaxDepthExceeded, d, maxDecodeDepth)}
+		}
 	}
 	// The peek honours the caller's decoder options (REQ-052): ReadValue above
 	// already tokenised the slot under them, so a v1 caller's leniencies
@@ -369,10 +421,15 @@ func DecodePolymorphic[T any](dec *jsontext.Decoder, out *T, fallback func() any
 	// is not a string, or whose `_type` a caller-registered unmarshal hook
 	// refused: a shape failure in each case. Name the interface being
 	// filled so the message reads
-	// `canjson: <Interface>:` rather than a bare colon.
-	name, err := peekType(raw, dec.Options())
-	if err != nil {
-		return WrapShapeError(reflect.TypeFor[T]().Name(), err)
+	// `canjson: <Interface>:` rather than a bare colon. [leadingType] reads a
+	// leading `_type` without the peek's decode when nothing can make the two
+	// disagree; any other slot takes the peek.
+	opts := dec.Options()
+	name, ok := leadingType(raw, opts)
+	if !ok {
+		if name, err = peekType(raw, opts); err != nil {
+			return WrapShapeError(reflect.TypeFor[T]().Name(), err)
+		}
 	}
 	var v any
 	switch {
@@ -387,7 +444,13 @@ func DecodePolymorphic[T any](dec *jsontext.Decoder, out *T, fallback func() any
 		}
 		v = ctor()
 	}
-	if err := json.Unmarshal(raw, v, decodeOptions(dec)); err != nil {
+	// raw decodes on a fresh decoder, which starts with none of dec's options:
+	// when decodeOptions has nothing to add, dec's own options carry it all.
+	slotOpts := decodeOptions(dec)
+	if slotOpts == nil {
+		slotOpts = opts
+	}
+	if err := json.Unmarshal(raw, v, slotOpts); err != nil {
 		// A shape failure inside the concrete type selected at this slot stays a
 		// shape failure (it already carries ErrInvalidShape from the concrete's
 		// own funnel); wrapping it in a DecodeError adds the slot classification
@@ -437,4 +500,71 @@ func peekType(raw jsontext.Value, opts ...json.Options) (string, error) {
 		return "", err
 	}
 	return head.Type, nil
+}
+
+// leadingType reads the _type discriminator straight from raw's bytes, without
+// the decode [peekType] runs, when raw opens with it: _type is the first
+// member, its name is spelled exactly `"_type"` (JSON whitespace allowed around
+// the name, the colon and the value), and its value is a JSON string of plain
+// ASCII with no backslash escape, so its bytes are the string a decode would
+// produce (an escape, or an invalid UTF-8 byte a caller allows, decodes to
+// something else). ADR 0021 makes _type first a SHOULD, so this is the shape
+// canonical-JSON encoders write and most slots carry.
+//
+// ok is false for any other shape, and also whenever opts could make the full
+// decode read a different member as _type, or run a caller's code on it:
+// duplicate names allowed (a later _type wins), case-insensitive name matching
+// (a later _TYPE matches too), or a hook set other than the SDK aggregate (a
+// caller's string hook runs on _type during the peek). The caller then falls
+// back to peekType, so a document that puts _type elsewhere still decodes,
+// through the peek.
+//
+// raw must be a complete JSON value the decoder has already accepted; the scan
+// relies on that and checks syntax only as far as the _type value.
+func leadingType(raw jsontext.Value, opts json.Options) (name string, ok bool) {
+	if dup, _ := json.GetOption(opts, jsontext.AllowDuplicateNames); dup {
+		return "", false
+	}
+	if fold, _ := json.GetOption(opts, json.MatchCaseInsensitiveNames); fold {
+		return "", false
+	}
+	if hooks, _ := json.GetOption(opts, json.WithUnmarshalers); hooks != aggregateUnmarshalers() {
+		return "", false
+	}
+	i := skipWhitespace(raw, 0)
+	if i >= len(raw) || raw[i] != '{' {
+		return "", false
+	}
+	const key = `"_type"`
+	i = skipWhitespace(raw, i+1)
+	if len(raw)-i < len(key) || string(raw[i:i+len(key)]) != key {
+		return "", false
+	}
+	i = skipWhitespace(raw, i+len(key))
+	if i >= len(raw) || raw[i] != ':' {
+		return "", false
+	}
+	i = skipWhitespace(raw, i+1)
+	if i >= len(raw) || raw[i] != '"' {
+		return "", false
+	}
+	start := i + 1
+	for j := start; j < len(raw); j++ {
+		switch c := raw[j]; {
+		case c == '"':
+			return string(raw[start:j]), true
+		case c == '\\' || c >= 0x80:
+			return "", false
+		}
+	}
+	return "", false
+}
+
+// skipWhitespace returns the index of the first byte of b at or after i that is
+// not JSON whitespace (space, tab, line feed or carriage return), or len(b).
+func skipWhitespace(b []byte, i int) int {
+	for i < len(b) && (b[i] == ' ' || b[i] == '\t' || b[i] == '\n' || b[i] == '\r') {
+		i++
+	}
+	return i
 }
