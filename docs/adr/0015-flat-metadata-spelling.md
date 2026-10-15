@@ -11,6 +11,7 @@ date: 2026-08-03
 - **Status:** Accepted, 2026-08-03 — maintainer decision, taken to unblock REQ-115 (the FLAT author linter cannot state its required-key set until the spelling question is settled) and to close a real interop rejection found by PROBE-086.
 - **Supersedes:** —
 - **Superseded by:** —
+- **Amended by:** [ADR 0029](0029-composer-real-path-carrier.md), accepted 2026-10-15: decision 5's first bullet is reversed. The composer's real path now carries the whole composer, decode reads `composer|id`, `|id_scheme` and `|id_namespace` instead of refusing them, and encode writes a composer the `ctx/` short forms cannot carry at its real path; the 2026-08-05 note on the composer below records the state before it.
 - **Strand:** —
 - **Introduces:** —. **Amends:** [REQ-053](../specifications/wire.md#req-053) (FLAT/STRUCTURED codecs — decode input surface). **Applies:** REQ-115 (FLAT author linter — consumes this decision), REQ-080 / PROBE-086 (the probe that surfaced it).
 - **Landed in:** [PR 86](https://github.com/Cadasto/openehr-sdk-go/pull/86) (the FLAT coverage ratchet).

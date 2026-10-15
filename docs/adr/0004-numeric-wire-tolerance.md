@@ -10,6 +10,7 @@ date: 2026-05-16
 
 - **Status:** Accepted, 2026-05-16.
 - **Tracks:** REQ-046 (BMM primitive mapping), REQ-052 (canonical-JSON wire profile), STRAND-04 (RM polymorphism + codec performance).
+- **Amended 2026-10-15** (maintainer decision): `Integer` decode also accepts a whole number written with a zero fraction or an exponent (`1.0`, `1e0`), bare or quoted, as that integer, and refuses one with a non-zero fraction; the reference's own FLAT writes a DV_PROPORTION `type` as `1.0`. The rule's normative home is [wire.md § Floating-point precision](../specifications/wire.md#floating-point-precision); `Integer64` stays out of scope as below.
 
 ## Context
 
