@@ -118,7 +118,10 @@ func (c Probe089Case) Body() map[string]any {
 // Probe089Inputs is one fixture per row of the FLAT underscore-attribute
 // grammar table, including
 // the recursive shapes (`_feeder_audit/…/provider/_identifier:N`,
-// `dv_multimedia/_thumbnail`) and `_null_flavour` beside an absent bare value.
+// `dv_multimedia/_thumbnail`) and `_null_flavour` beside an absent bare value,
+// plus one per shape of the COMPOSITION composer at its real path, where the
+// party grammar carries the whole composer (a referenced PARTY_IDENTIFIED, a
+// PARTY_RELATED, a PARTY_SELF carrying a reference).
 // Values are copied from the pinned corpus bodies wherever the corpus writes
 // the shape, so the vocabulary under test is the reference's.
 var Probe089Inputs = []Probe089Case{
@@ -341,6 +344,56 @@ var Probe089Inputs = []Probe089Case{
 		},
 	},
 	{
+		// ADR 0029: the composer's real path carries the whole composer in the
+		// party grammar. Its name joins its reference and identifiers there,
+		// and no ctx/ composer key is written for it.
+		Name: "composer_referenced_party_identified",
+		Rows: []string{"COMPOSITION: composer at its real path (PARTY_IDENTIFIED: |name, external_ref, _identifier:N)"},
+		Keys: map[string]any{
+			probe089Root + "/composer|name":                   "Silvia Blake",
+			probe089Root + "/composer|id":                     "1234-5678",
+			probe089Root + "/composer|id_scheme":              "UUID",
+			probe089Root + "/composer|id_namespace":           "EHR.NETWORK",
+			probe089Root + "/composer/_identifier:0|id":       "122",
+			probe089Root + "/composer/_identifier:0|issuer":   "issuer",
+			probe089Root + "/composer/_identifier:0|assigner": "assigner",
+			probe089Root + "/composer/_identifier:0|type":     "type",
+			probe089Root + "/composer/_identifier:1|id":       "123",
+			probe089Qty + "|magnitude":                        65.9,
+			probe089Qty + "|unit":                             "unit",
+		},
+	},
+	{
+		Name: "composer_party_related",
+		Rows: []string{"COMPOSITION: composer at its real path (PARTY_RELATED: /relationship)"},
+		Keys: map[string]any{
+			probe089Root + "/composer|name":                     "Silvia Blake",
+			probe089Root + "/composer|id":                       "9091",
+			probe089Root + "/composer|id_namespace":             "HOSPITAL-NS",
+			probe089Root + "/composer|type":                     "PERSON",
+			probe089Root + "/composer/relationship|code":        "10",
+			probe089Root + "/composer/relationship|value":       "mother",
+			probe089Root + "/composer/relationship|terminology": "openehr",
+			probe089Qty + "|magnitude":                          65.9,
+			probe089Qty + "|unit":                               "unit",
+		},
+	},
+	{
+		// `composer_self: true` beside a reference is a PARTY_SELF carrying it;
+		// ctx/composer_self carries no reference, so the real-path spelling
+		// is written for both.
+		Name: "composer_party_self_referenced",
+		Rows: []string{"COMPOSITION: composer at its real path (PARTY_SELF with external_ref)"},
+		Keys: map[string]any{
+			probe089Root + "/composer_self":         true,
+			probe089Root + "/composer|id":           "1234-5678",
+			probe089Root + "/composer|id_scheme":    "UUID",
+			probe089Root + "/composer|id_namespace": "EHR.NETWORK",
+			probe089Qty + "|magnitude":              65.9,
+			probe089Qty + "|unit":                   "unit",
+		},
+	},
+	{
 		Name: "feeder_audit_recursive",
 		Rows: []string{
 			"modelled LOCATABLE: _feeder_audit",
@@ -468,27 +521,6 @@ type Probe089Refusal struct {
 // key the codec does not read at all is the one exception: it is unmatched
 // content, ignored by default, reported on request and refused under strict.
 var Probe089Refusals = []Probe089Refusal{
-	{
-		// ADR 0015: no `ctx/` short form can carry the composer's external_ref,
-		// and encode is `ctx/`-only, so a composer decoded from these keys
-		// could not be re-emitted.
-		Name:  "composer_external_ref",
-		Keys:  map[string]any{probe089Root + "/composer|id": "1234-5678", probe089Root + "/composer|id_scheme": "UUID"},
-		Want:  simplified.ErrUnsupportedDatatype,
-		Names: []string{"composer"},
-	},
-	{
-		Name:  "composer_nested_identifier",
-		Keys:  map[string]any{probe089Root + "/composer/_identifier:0|id": "122"},
-		Want:  simplified.ErrUnsupportedDatatype,
-		Names: []string{probe089Root + "/composer/_identifier:0|id", "ADR 0015"},
-	},
-	{
-		Name:  "composer_relationship",
-		Keys:  map[string]any{probe089Root + "/composer/relationship|code": "10"},
-		Want:  simplified.ErrUnsupportedDatatype,
-		Names: []string{probe089Root + "/composer/relationship|code", "ADR 0015"},
-	},
 	{
 		// Spec-named, corpus-unexercised as a decodable grammar: deferred as a
 		// typed refusal until a pinnable fixture lands, never decoded-and-dropped.
