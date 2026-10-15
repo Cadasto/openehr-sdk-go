@@ -5,6 +5,12 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
 
+// noPrecision is the sentinel passed to
+// [constraints.QuantityValue.Precision] when DV_QUANTITY.Precision
+// is nil on the wire. [constraints.DvQuantity.Validate] treats
+// negative precision as "unspecified" (skips precision checks).
+const noPrecision rm.Integer = -1
+
 // dataValueInput converts an RM DATA_VALUE into the Go value
 // [constraints.PrimitiveConstraint.Validate] expects for the matching
 // primitive type. Returns (input, true) for the supported set and
@@ -28,13 +34,6 @@ import (
 //   - DV_TIME      → string (value, ISO 8601)
 //   - DV_DATE_TIME → string (value, ISO 8601)
 //   - DV_DURATION  → string (value, ISO 8601 duration)
-//
-// noPrecision is the sentinel passed to
-// [constraints.QuantityValue.Precision] when DV_QUANTITY.Precision
-// is nil on the wire. [constraints.DvQuantity.Validate] treats
-// negative precision as "unspecified" (skips precision checks).
-const noPrecision rm.Integer = -1
-
 func dataValueInput(dv rm.DataValue) (any, bool) {
 	// Belt-and-suspenders typed-nil guard. The walk's primary
 	// defence is the generated access, which reads an interface holding

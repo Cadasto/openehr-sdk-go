@@ -571,7 +571,8 @@ func (e *engine) visitAttribute(n engineNode, class string, a engineAttr) {
 // holds, at attrPath, in role, with the RM rules alone: no template node
 // binds it. An item of a list that holds no RM value, a nil element or a
 // typed-nil pointer ([isNilItem]), is reported at its own path by the
-// mandatory-presence rule ([findings.checkNilItem]) and not walked. This is
+// mandatory-presence rule ([findings.checkNilItem]) and not walked; once the
+// visit limit has ended the walk, no later item is reported or walked. This is
 // the one place the RM rules meet a nil item: the walk with no template and
 // an attribute the template leaves open both reach it, while a nil item
 // under an attribute that declares children is the template's to refuse
@@ -585,6 +586,9 @@ func (e *engine) walkUnconstrained(n engineNode, a engineAttr, r attrReading, at
 			return
 		}
 		for i, path := range e.itemPaths(attrPath, r.items) {
+			if e.stopped {
+				return // the visit limit ended the walk at or inside an earlier item
+			}
 			if isNilItem(r.items[i]) {
 				e.found.checkNilItem(n.rmType, a.name, path)
 				continue

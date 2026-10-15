@@ -109,3 +109,82 @@ func TestValidateRM_REQ112_NilListItem(t *testing.T) {
 		})
 	}
 }
+
+// walkOrderKeys renders each issue as "code path layer rule", in the order
+// the walk reported it, so a test can tell what came after a stop.
+func walkOrderKeys(issues []validation.Issue) []string {
+	keys := make([]string, 0, len(issues))
+	for _, i := range issues {
+		keys = append(keys, i.Code+" "+i.Path+" "+i.Layer.String()+" "+i.Rule)
+	}
+	return keys
+}
+
+// valuedElement returns an ELEMENT the RM rules find nothing wrong with.
+func valuedElement() *rm.Element {
+	return &rm.Element{ArchetypeNodeID: "at0002", Name: &rm.DVText{Value: "element"}, Value: &rm.DVText{Value: "text"}}
+}
+
+// TestValidator_REQ112_REQ171_NilListItemAfterVisitLimit pins the REQ-112
+// nil-item rule against the REQ-171 visit limit: once the walk stops, a nil
+// item later in the same list, an untyped nil or a typed-nil pointer, is not
+// reported, so max_nodes is the last issue. The control row walks the same
+// list under the default limits, where both nil items are reported.
+func TestValidator_REQ112_REQ171_NilListItemAfterVisitLimit(t *testing.T) {
+	// Five visits reach the first ELEMENT's name, so the walk stops inside
+	// the first item and every item after it comes after the stop.
+	const nodes = 5
+	tests := []struct {
+		name  string
+		nodes int
+		items []rm.Item
+		// want lists every issue in walk order: nothing may follow
+		// max_nodes.
+		want        []string
+		wantStopped []string
+	}{
+		{
+			name:        "untyped nil after the stop",
+			nodes:       nodes,
+			items:       []rm.Item{valuedElement(), nil},
+			want:        []string{"max_nodes /items[at0002]/name  "},
+			wantStopped: []string{"/items[at0002]/name"},
+		},
+		{
+			name:        "typed-nil pointer after the stop",
+			nodes:       nodes,
+			items:       []rm.Item{valuedElement(), (*rm.Element)(nil)},
+			want:        []string{"max_nodes /items[at0002]/name  "},
+			wantStopped: []string{"/items[at0002]/name"},
+		},
+		{
+			name:        "both nil items, a valued ELEMENT between, after the stop",
+			nodes:       nodes,
+			items:       []rm.Item{valuedElement(), nil, valuedElement(), (*rm.Element)(nil)},
+			want:        []string{"max_nodes /items[1]/name  "},
+			wantStopped: []string{"/items[1]/name"},
+		},
+		{
+			// Control: under the default limits the walk does not stop,
+			// so both nil items of the same list are reported.
+			name:  "the same list under the default limits",
+			items: []rm.Item{valuedElement(), nil, valuedElement(), (*rm.Element)(nil)},
+			want: []string{
+				"required /items[2] rm mandatory",
+				"required /items[4] rm mandatory",
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			v := validation.New(validation.WithLimits(validation.Limits{Nodes: tc.nodes}))
+			r := v.Validate(nilItemCluster(tc.items...), nil)
+			if got := walkOrderKeys(r.Issues); !slices.Equal(got, tc.want) {
+				t.Errorf("Validate(%s, Nodes %d) issues in walk order (code path layer rule) = %q, want %q", tc.name, tc.nodes, got, tc.want)
+			}
+			if !slices.Equal(r.Coverage.Stopped, tc.wantStopped) {
+				t.Errorf("Validate(%s, Nodes %d) Coverage.Stopped = %q, want %q", tc.name, tc.nodes, r.Coverage.Stopped, tc.wantStopped)
+			}
+		})
+	}
+}
