@@ -248,9 +248,9 @@ func requestFailure(err error) DiscoveryErrorReason {
 // its own OpenID configuration.
 //
 // One Cache may serve Resolvers built with different options, and may hold
-// catalogs that this Resolver did not fetch, so a fresh cached catalog is
-// returned only once it passes this Resolver's own checks that send no
-// request. They are the checks a newly fetched document gets: every URL in
+// catalogs that this Resolver did not fetch. A cached catalog whose BaseURL
+// is not baseURL counts as none. A fresh cached catalog is returned only
+// once it passes this Resolver's own checks that send no request. They are the checks a newly fetched document gets: every URL in
 // the catalog is well formed (the base URL, the issuer, the auth endpoints
 // and the service base URLs), the base URL, the issuer and the auth
 // endpoints use https unless the Resolver allows insecure URLs, and the
@@ -276,8 +276,9 @@ func (r *Resolver) Resolve(ctx context.Context, baseURL string) (*ServiceCatalog
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	cached, ok := r.cache.Get(ctx, baseURL)
-	if ok && !cached.Stale(time.Now()) {
+	got, ok := r.cache.Get(ctx, baseURL)
+	cached := ownEntry(baseURL, got, ok)
+	if cached != nil && !cached.Stale(time.Now()) {
 		if err := r.checkFreshHit(baseURL, cached); err != nil {
 			return nil, err
 		}
@@ -307,8 +308,20 @@ func (r *Resolver) Refresh(ctx context.Context, baseURL string) (*ServiceCatalog
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	cached, _ := r.cache.Get(ctx, baseURL)
-	return r.fetchCoalesced(ctx, baseURL, cached)
+	got, ok := r.cache.Get(ctx, baseURL)
+	return r.fetchCoalesced(ctx, baseURL, ownEntry(baseURL, got, ok))
+}
+
+// ownEntry returns the catalog the Cache holds for baseURL, or nil when it
+// holds none, or one whose BaseURL is another base URL. REQ-071 keys every
+// entry by the Platform base URL it was resolved from, so a catalog for
+// another Platform under this key is treated as absent: the caller fetches
+// with a plain request, and the result replaces it.
+func ownEntry(baseURL string, cat *ServiceCatalog, ok bool) *ServiceCatalog {
+	if !ok || cat == nil || cat.BaseURL != baseURL {
+		return nil
+	}
+	return cat
 }
 
 // fetchCoalesced runs at most one in-flight fetch per base URL; other

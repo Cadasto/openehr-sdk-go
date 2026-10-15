@@ -10,7 +10,10 @@ import (
 // implementation for use cases that share catalogs across processes.
 //
 // The Resolver keys every entry by the Platform base URL the caller
-// resolved (ServiceCatalog.BaseURL), never by the OpenID Connect issuer.
+// resolved (ServiceCatalog.BaseURL), never by the OpenID Connect issuer. An
+// entry whose BaseURL is not the base URL it is found under counts as no
+// entry: the Resolver fetches the document with a plain request, as for a
+// miss, and the result replaces it.
 //
 // Resolvers built with different options may share one Cache, and a Cache
 // may hold entries that no Resolver in this process fetched, such as one
