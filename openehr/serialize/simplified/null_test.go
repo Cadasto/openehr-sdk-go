@@ -321,6 +321,43 @@ func TestREQ053FlatToStructuredCarriesNull(t *testing.T) {
 	}
 }
 
+// TestREQ053ConversionCarriesNullCtxFieldBesideSuffixes — REQ-053: FLAT decode
+// reads a null ctx/ field beside its suffixes as absent, so OPT-free
+// conversion carries it as written rather than refusing it as a direct value
+// beside a suffixed leaf. FLAT → STRUCTURED gives it the null `"|"` member of
+// the field's object, as it gives a null bare value beside a leaf's suffixes;
+// STRUCTURED → FLAT gives the key back as written; and each form decodes as
+// the body without the null.
+func TestREQ053ConversionCarriesNullCtxFieldBesideSuffixes(t *testing.T) {
+	flat := `{"ctx/setting":null,"ctx/setting|code":"238"}`
+	out, err := FlatToStructured([]byte(flat))
+	if err != nil {
+		t.Fatalf("FlatToStructured(%s) = %v, want the null carried", flat, err)
+	}
+	var got, want any
+	if err := json.Unmarshal(out, &got); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(`{"ctx":{"setting":{"|":null,"|code":"238"}}}`), &want); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("FlatToStructured(%s) = %s, want %s", flat, out, mustJSON(t, want))
+	}
+	back, err := StructuredToFlat(out)
+	if err != nil {
+		t.Fatalf("StructuredToFlat(%s) = %v", out, err)
+	}
+	if string(back) != flat {
+		t.Errorf("StructuredToFlat(%s) = %s, want %s", out, back, flat)
+	}
+
+	wt, _ := conformanceWT(t)
+	extra := map[string]any{"ctx/setting": nil}
+	body := rmattrBody(map[string]any{"ctx/setting": nil, "ctx/setting|code": "238", "ctx/setting|value": "other care"})
+	assertSameDecodeBothForms(t, wt, body, withoutNullKeys(body, extra))
+}
+
 // TestREQ053DvFromSuffixesReadsNullAsAbsent — REQ-053: the DataValue builder
 // itself reads a null suffix as absent, whoever calls it, so a null required
 // suffix is a missing one and never reaches the canonical tree as the zero of
