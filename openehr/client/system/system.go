@@ -139,17 +139,20 @@ func (s ServiceCapabilities) MarshalJSON() ([]byte, error) {
 // HealthStatus reports a coarse health signal derived from a probe
 // against the deployment's base endpoint.
 type HealthStatus struct {
-	// Status is "up" when the probe returned 2xx, "down" otherwise
-	// (non-2xx HTTP, network failure, or transport error).
+	// Status is "up" when the probe returned a 2xx whose body was read in
+	// full, "down" otherwise: a status that is not 2xx, a 2xx whose body
+	// could not be read, a network failure, or any other transport error.
 	Status string
-	// HTTPStatusCode is the raw HTTP status from the probe response.
-	// Zero on network failure (no response was received).
+	// HTTPStatusCode is the raw HTTP status of the last probe response,
+	// whether the probe was up or down. It is zero when no response
+	// arrived (a network failure, for instance).
 	HTTPStatusCode int
 	// CheckedAt records when the probe ran.
 	CheckedAt time.Time
 }
 
-// IsUp reports whether the deployment was reachable and returned 2xx.
+// IsUp reports whether the deployment was reachable and returned a 2xx
+// whose body was read in full.
 func (h *HealthStatus) IsUp() bool { return h != nil && h.Status == "up" }
 
 const (
@@ -205,10 +208,27 @@ func Version(ctx context.Context, c *transport.Client) (string, error) {
 }
 
 // Health probes the deployment's base endpoint and returns a coarse
-// "up"/"down" signal. A 2xx response yields Status="up"; a wire error
-// (non-2xx HTTP) yields Status="down" with HTTPStatusCode populated
-// from the response; a transport error (network failure, ctx
-// cancellation pre-response) returns a non-nil error.
+// "up"/"down" signal. It always returns a non-nil [HealthStatus]; the
+// outcome depends on how far the probe got:
+//
+//   - A 2xx whose body was read in full gives Status "up", HTTPStatusCode
+//     set to that status, and a nil error.
+//   - A status that is not 2xx gives Status "down", HTTPStatusCode set to
+//     that status, and a nil error: the deployment answered, so the
+//     status is the signal, not a failure of the probe.
+//   - A 2xx whose body could not be read (the connection dropped
+//     mid-body, for instance) gives Status "down", HTTPStatusCode set to
+//     that status, and an error from which
+//     errors.AsType[*transport.BodyReadError] recovers the read failure:
+//     the probe did not complete.
+//   - A failure before any response arrived (a network error, or ctx
+//     ending before the server answered) gives Status "down",
+//     HTTPStatusCode zero, and that error.
+//
+// Any other error after a response arrived, such as ctx ending while a
+// retry waits, also gives Status "down" and that error, with
+// HTTPStatusCode set to the status of that response. With retries
+// enabled, each case describes the last attempt.
 //
 // Health issues an anonymous `OPTIONS /` request (the System API's only
 // operation), so a misconfigured TokenSource cannot skew the health
@@ -233,7 +253,14 @@ func Health(ctx context.Context, c *transport.Client) (*HealthStatus, error) {
 			h.HTTPStatusCode = we.StatusCode
 			return h, nil
 		}
+		// Every other error means the probe did not complete. When a
+		// response arrived first (a 2xx whose body could not be read, which
+		// Do returns beside its *BodyReadError, or ctx ending during a retry
+		// wait), keep the status the server sent; it stays zero otherwise.
 		h.Status = healthDown
+		if resp != nil {
+			h.HTTPStatusCode = resp.StatusCode
+		}
 		return h, err
 	}
 	h.Status = healthUp

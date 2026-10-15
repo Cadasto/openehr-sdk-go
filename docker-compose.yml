@@ -3,7 +3,8 @@
 # Single service, gated behind the `dev` profile so a default
 # `docker compose up` does nothing (this is a library — no runtime
 # service to start). The Makefile shells Go calls through the service
-# via `docker compose run --rm go …` when host Go 1.27.x is missing.
+# via `docker compose run --rm go …` when host Go 1.27.x is missing, and
+# `make test-race` when the host has no C compiler.
 
 services:
   go:
@@ -23,6 +24,8 @@ services:
       - go-mod-cache:/go/pkg/mod
       - go-build-cache:/home/dev/.cache/go-build
     environment:
+      # Static builds and tests by default. `make test-race` passes
+      # `run -e CGO_ENABLED=1`, which takes precedence over this value.
       CGO_ENABLED: "0"
 
 volumes:

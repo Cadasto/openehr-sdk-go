@@ -69,7 +69,7 @@ The elaborate, normative idiom spec is [`idiom.md`](docs/specifications/idiom.md
 
 ## Tooling & workflow
 
-Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev image when host Go is missing ([Dockerfile](Dockerfile), [docker-compose.yml](docker-compose.yml)). **Use the Makefile as the single entry point** — extend it, don't add ad-hoc scripts.
+Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev image when host Go is missing, and `make test-race` also when the host has no C compiler ([Dockerfile](Dockerfile), [docker-compose.yml](docker-compose.yml)). **Use the Makefile as the single entry point** — extend it, don't add ad-hoc scripts.
 
 | Task | Command |
 |---|---|
@@ -86,14 +86,14 @@ Host Go `1.27.x` is the fast path; the Makefile auto-routes through a Docker dev
 | Spec context bundle | `make spec-context REQ=NNN` — registry row + traceability + canonical excerpt + strands |
 | Probe status | `make probe-status` — each PROBE's status and whether its test file exists |
 | FLAT corpus integrity | `make flat-conformance-verify` — offline `sha256` of the vendored EHRbase FLAT corpus (PROBE-086's input); `…-check` adds a network drift report (dev helper, not a gate) |
-| Build Docker dev image | `make image-dev` (only when host Go is missing) |
+| Build Docker dev image | `make image-dev` (when host Go is missing, or for `make test-race` on a host without a C compiler; rebuild an image made before the dev stage gained gcc) |
 | Docs site | `make docs-check` builds the site from `pages/` and asserts its output; `make docs-serve` previews it. The docs-theme brand layer is pinned by commit + sha256 in `sources.json` (bump recipe in its `$comment`) |
 
 **Gotchas worth the reading:**
 
 - **Never hand-edit a vendored fixture** under `resources/` or `testkit/corpus/` — being byte-identical to upstream is its whole value. Re-sync instead.
 - `make probe-status` prints `MISSING` for any probe covered inline or in a sibling's file. That is the filename heuristic, **not** drift — `make spec-check` is the real gate.
-- **`make ci` cannot complete without Docker:** `test` → `aqlgen-verify` → `antlr-image` always needs it. Everything else uses Docker only when host tooling is missing (host Go `1.27.x`; a host `golangci-lint` **built with Go 1.27**; routing in [ci.md](docs/ci.md)).
+- **`make ci` cannot complete without Docker:** `test` → `aqlgen-verify` → `antlr-image` always needs it. Everything else uses Docker only when host tooling is missing (host Go `1.27.x`; a host `golangci-lint` **built with Go 1.27**; for `make test-race`, a host C compiler; routing in [ci.md](docs/ci.md)).
   Without Docker, run `fmt-check`, `vet`, `spec-check`, `flat-conformance-verify`, `build` and `go test ./... -count=1`, and let PR CI be the gate.
 - After `git worktree remove`, run `golangci-lint cache clean`; otherwise lint reports phantom issues under the removed `.worktrees/` path.
 - **Public docs never name downstream consuming projects.** Describe what a consumer needs, not who the consumer is.

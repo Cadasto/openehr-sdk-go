@@ -143,6 +143,11 @@ const DefaultMaxResponseBody int64 = 64 << 20
 // (unbounded read). Large responses, such as bulk EHR exports, may
 // require a higher cap via WithMaxResponseBody(n) or an unbounded read
 // via WithMaxResponseBody(-1).
+//
+// With retries enabled (see WithRetry), a 2xx response whose body is over
+// the limit is not sent again, since every attempt would stop at the same
+// point. A response with any other status is still retried by its status,
+// whatever the size of its body.
 func WithMaxResponseBody(n int64) Option {
 	return func(cfg *config) { cfg.maxResponseBody = n }
 }

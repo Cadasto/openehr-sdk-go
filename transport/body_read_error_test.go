@@ -8,9 +8,9 @@ package transport_test
 // parsed Metadata beside a *transport.BodyReadError; on any other status, an
 // error that wraps the *transport.WireError the status classifies and, beside
 // it, the read failure. They also pin the retry gate (a 2xx whose body was
-// lost is sent again only for a safe method, and a body lost on either arm is
-// never sent again once the caller's context has ended) and the value-free
-// Error() text.
+// lost is sent again only for a safe method and never when it was over the
+// ceiling, and a body lost on either arm is never sent again once the
+// caller's context has ended) and the value-free Error() text.
 //
 // External, like decode_error_test.go, so every assertion goes through the
 // surface a consumer sees. The servers are real httptest servers, so the read
@@ -637,6 +637,75 @@ func TestBodyReadErrorRetryGate(t *testing.T) { // REQ-172
 	}
 }
 
+// TestBodyReadErrorOverLimitIsNotSentAgain pins a limit inside REQ-172 § Retry,
+// which allows a safe method whose 2xx body could not be read to be sent again
+// but does not require it. A GET whose 200 body is over the
+// WithMaxResponseBody ceiling is sent once: every attempt would read up to the
+// same ceiling again and stop there. The 503 over the ceiling is the contrast:
+// the non-2xx arm is still retried by its status, as any *WireError is.
+func TestBodyReadErrorOverLimitIsNotSentAgain(t *testing.T) { // REQ-172, REQ-091
+	const (
+		attempts = 3
+		limit    = 16
+	)
+	body := strings.Repeat(bodyReadBodyMarker, 4)
+	cases := []struct {
+		name     string
+		status   int
+		wantHits int32
+	}{
+		{name: "GET 200 over the ceiling is sent once", status: http.StatusOK, wantHits: 1},
+		{name: "GET 503 over the ceiling is retried by status", status: http.StatusServiceUnavailable, wantHits: attempts},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var hits atomic.Int32
+			c := newBodyReadClient(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				hits.Add(1)
+				w.Header().Set("ETag", `"`+cutBodyETag+`"`)
+				w.WriteHeader(tc.status)
+				_, _ = io.WriteString(w, body)
+			}),
+				transport.WithMaxResponseBody(limit),
+				transport.WithRetry(transport.RetryPolicy{
+					MaxAttempts:    attempts,
+					InitialBackoff: time.Millisecond,
+					MaxBackoff:     time.Millisecond,
+				}),
+			)
+
+			resp, err := c.Do(t.Context(), &transport.Request{Method: http.MethodGet, Path: "/ehr/abc", Route: "/ehr/{ehr_id}"})
+			if err == nil {
+				t.Fatalf("Do of a %d-byte body under a %d-byte limit succeeded; the premise of this test is gone", len(body), limit)
+			}
+			if !errors.Is(err, transport.ErrResponseTooLarge) {
+				t.Errorf("errors.Is(err, transport.ErrResponseTooLarge) = false for %v", err)
+			}
+			if resp == nil || resp.StatusCode != tc.status {
+				t.Errorf("Do returned Response %+v, want a non-nil %d", resp, tc.status)
+			}
+			if tc.status == http.StatusOK {
+				bre, ok := errors.AsType[*transport.BodyReadError](err)
+				if !ok {
+					t.Errorf("errors.AsType[*transport.BodyReadError] did not match %T (%v)", err, err)
+				} else if bre.StatusCode != tc.status {
+					t.Errorf("BodyReadError.StatusCode = %d, want %d", bre.StatusCode, tc.status)
+				}
+			} else {
+				we, ok := errors.AsType[*transport.WireError](err)
+				if !ok {
+					t.Errorf("errors.AsType[*transport.WireError] did not match %T (%v)", err, err)
+				} else if we.StatusCode != tc.status {
+					t.Errorf("WireError.StatusCode = %d, want %d", we.StatusCode, tc.status)
+				}
+			}
+			if got := hits.Load(); got != tc.wantHits {
+				t.Errorf("GET with a %d body over the ceiling hit the server %d times, want %d", tc.status, got, tc.wantHits)
+			}
+		})
+	}
+}
+
 // TestBodyReadErrorRetryGateHEAD pins HEAD in REQ-172 § Retry's list of safe
 // methods. net/http never reads the body of a response to HEAD, so an
 // httptest server cannot make that read fail; a RoundTripper hands back a 2xx
@@ -683,11 +752,11 @@ func TestBodyReadErrorRetryGateHEAD(t *testing.T) { // REQ-172
 // REQ-091's "Retries MUST respect ctx cancellation". A GET whose 200 body
 // read is stopped by the caller's own deadline is not sent again, so Do
 // returns the Response and the *BodyReadError rather than a later attempt's
-// token or dial failure. Only the "no backoff" case pins the ctx guard in
-// shouldRetry: with no wait, a retry would start at once and fail with no
-// response. The "20ms backoff" case pins the outcome only, because Do's
-// retry-wait branch keeps the *BodyReadError even when the guard is gone;
-// keep both, and never drop the first as a duplicate of the second.
+// token or dial failure. The outcome alone does not show that the ctx guard
+// in shouldRetry decided it: the retry wait reads ctx too, whatever the
+// backoff, and Do's retry-wait branch keeps the *BodyReadError. The span does:
+// it carries retry.backoff_ms only when a retry was scheduled, so its absence
+// in both cases pins the guard. Keep both cases.
 func TestBodyReadErrorCallerDeadlineIsNotRetried(t *testing.T) { // REQ-172, REQ-091
 	cases := []struct {
 		name    string
@@ -700,6 +769,7 @@ func TestBodyReadErrorCallerDeadlineIsNotRetried(t *testing.T) { // REQ-172, REQ
 		t.Run(tc.name, func(t *testing.T) {
 			var hits atomic.Int32
 			release := make(chan struct{})
+			tp := newRecordingTracerProvider()
 			c := newBodyReadClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				hits.Add(1)
 				w.Header().Set("ETag", `"`+cutBodyETag+`"`)
@@ -718,7 +788,7 @@ func TestBodyReadErrorCallerDeadlineIsNotRetried(t *testing.T) { // REQ-172, REQ
 				MaxAttempts:    3,
 				InitialBackoff: tc.backoff,
 				MaxBackoff:     tc.backoff,
-			}))
+			}), transport.WithTracerProvider(tp))
 			// Cleanups run last-in first-out, so the handler is released
 			// before the server closes and waits for it.
 			t.Cleanup(func() { close(release) })
@@ -747,7 +817,18 @@ func TestBodyReadErrorCallerDeadlineIsNotRetried(t *testing.T) { // REQ-172, REQ
 			if got := hits.Load(); got != 1 {
 				t.Errorf("server hit %d times, want 1: a read the caller's deadline stopped is not sent again", got)
 			}
+			assertNoRetryScheduled(t, tp)
 		})
+	}
+}
+
+// assertNoRetryScheduled checks that the one span tp recorded carries no
+// retry.backoff_ms: Do set it only if it decided to send the request again.
+func assertNoRetryScheduled(t *testing.T, tp *recordingTracerProvider) {
+	t.Helper()
+	span := tp.tracer.only(t)
+	if v, ok := span.attr("retry.backoff_ms"); ok {
+		t.Errorf("span %q retry.backoff_ms = %s: a retry was scheduled after the caller's deadline ended", span.name, v.String())
 	}
 }
 
@@ -820,12 +901,12 @@ func stallMidBodyHandler(status int, hits *atomic.Int32, release <-chan struct{}
 // the non-2xx arm, beside REQ-091's "Retries MUST respect ctx cancellation". A
 // GET whose 503 body read is stopped by the caller's own deadline is not sent
 // again by its status, so Do returns the 503 Response and the *WireError
-// rather than a later attempt's token failure or the bare context error. Only
-// the "no backoff" case pins the ctx guard in shouldRetry: with no wait, a
-// retry would start at once and fail with no response. The "20ms backoff"
-// case pins the outcome only, because Do's retry-wait branch keeps the
-// non-2xx arm's error even when the guard is gone; keep both, and never drop
-// the first as a duplicate of the second.
+// rather than a later attempt's token failure or the bare context error. The
+// outcome alone does not show that the ctx guard in shouldRetry decided it:
+// the retry wait reads ctx too, whatever the backoff, and Do's retry-wait
+// branch keeps the non-2xx arm's error. The span does: it carries
+// retry.backoff_ms only when a retry was scheduled, so its absence in both
+// cases pins the guard. Keep both cases.
 func TestBodyReadErrorNonTwoXXCallerDeadlineIsNotRetried(t *testing.T) { // REQ-172, REQ-091
 	cases := []struct {
 		name    string
@@ -838,13 +919,15 @@ func TestBodyReadErrorNonTwoXXCallerDeadlineIsNotRetried(t *testing.T) { // REQ-
 		t.Run(tc.name, func(t *testing.T) {
 			var hits atomic.Int32
 			release := make(chan struct{})
+			tp := newRecordingTracerProvider()
 			c := newBodyReadClient(t, stallMidBodyHandler(http.StatusServiceUnavailable, &hits, release),
 				transport.WithRetry(transport.RetryPolicy{
 					MaxAttempts:     3,
 					InitialBackoff:  tc.backoff,
 					MaxBackoff:      tc.backoff,
 					RetriableStatus: []int{http.StatusServiceUnavailable},
-				}))
+				}),
+				transport.WithTracerProvider(tp))
 			// Cleanups run last-in first-out, so the handler is released
 			// before the server closes and waits for it.
 			t.Cleanup(func() { close(release) })
@@ -880,6 +963,7 @@ func TestBodyReadErrorNonTwoXXCallerDeadlineIsNotRetried(t *testing.T) { // REQ-
 			if got := hits.Load(); got != 1 {
 				t.Errorf("server hit %d times, want 1: a read the caller's deadline stopped is not sent again", got)
 			}
+			assertNoRetryScheduled(t, tp)
 		})
 	}
 }

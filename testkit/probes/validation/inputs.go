@@ -1,8 +1,8 @@
 package validationprobes
 
-// inputs.go: the roots the validation probes validate, built in Go, with the
-// templates they are validated against. The probe tests and the validator's
-// own comparison tests read the same values from here.
+// inputs.go: the roots the validation probes validate, built in Go, and the
+// templates they are validated against. The probe tests and the tests of
+// openehr/validation read them from here.
 
 import (
 	"fmt"
@@ -12,59 +12,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
-
-// Input is one root a validation probe validates, with the operational
-// template it is validated against.
-type Input struct {
-	// Probe names the probe whose case this is.
-	Probe string
-	// Name is the probe case's name.
-	Name string
-	// OPT is the operational-template XML body the root is validated
-	// against.
-	OPT []byte
-	// Root is the in-memory RM root under test.
-	Root any
-}
-
-// Inputs returns every root the validation probes validate, each with the
-// template its probe case compiles, in the order the probe tests run them.
-// It reads vital_signs.opt and the Address.v2 template and document from the
-// vendored corpus, and returns an error when one cannot be read or decoded.
-func Inputs() ([]Input, error) {
-	vitalSigns, err := os.ReadFile(fixtures.TemplateOptForName("vital_signs"))
-	if err != nil {
-		return nil, fmt.Errorf("read vital_signs.opt: %w", err)
-	}
-	addrOPT, err := os.ReadFile(fixtures.TemplateOpt("Address.v2"))
-	if err != nil {
-		return nil, fmt.Errorf("read the Address.v2 template: %w", err)
-	}
-	addr, err := AddressFixture()
-	if err != nil {
-		return nil, err
-	}
-	const p025, p026, p074 = "PROBE-025", "PROBE-026", "PROBE-074"
-	return []Input{
-		{Probe: p025, Name: "valid_blood_pressure", OPT: vitalSigns, Root: ValidBloodPressureComposition()},
-		{Probe: p025, Name: "systolic_2000_mmHg", OPT: vitalSigns, Root: SystolicOutOfRange()},
-		{Probe: p026, Name: "missing_systolic_items", OPT: vitalSigns, Root: SystolicItemsAbsent()},
-		{Probe: p026, Name: "unknown_archetype_id_under_content", OPT: vitalSigns, Root: UnknownArchetypeUnderContent()},
-		{Probe: p026, Name: "systolic_units_psi", OPT: vitalSigns, Root: SystolicUnitsPSI()},
-		{Probe: p026, Name: "category_code_999", OPT: vitalSigns, Root: CategoryCode999()},
-		{Probe: p026, Name: "empty_events", OPT: vitalSigns, Root: EventsEmpty()},
-		{Probe: p026, Name: "absent_events", OPT: vitalSigns, Root: EventsAbsent()},
-		{Probe: p026, Name: "duplicate_systolic", OPT: vitalSigns, Root: SystolicTwice()},
-		{Probe: p026, Name: "composer_party_identified", OPT: []byte(AlternativeMismatchOPT), Root: ComposerPartyIdentified()},
-		{Probe: p026, Name: "composer_party_related_single_alt", OPT: []byte(RMTypeMismatchOPT), Root: ComposerPartyRelated()},
-		{Probe: p074, Name: "address_fixture_clean", OPT: addrOPT, Root: addr},
-		{Probe: p074, Name: "person_under_organisation_opt", OPT: []byte(OrganisationOPT), Root: PersonUnderOrganisationTemplate()},
-		{Probe: p074, Name: "person_empty_identities", OPT: []byte(PersonIdentitiesOPT), Root: PersonEmptyIdentities()},
-		{Probe: p074, Name: "person_absent_identities", OPT: []byte(PersonIdentitiesOPT), Root: PersonAbsentIdentities()},
-		{Probe: p074, Name: "folder_archetype_id_mismatch", OPT: []byte(FolderOPT), Root: FolderOtherArchetype()},
-		{Probe: p074, Name: "ehr_status_clean", OPT: []byte(EHRStatusOPT), Root: EHRStatusClean()},
-	}, nil
-}
 
 // AddressFixture returns the vendored Address.v2 document, decoded.
 func AddressFixture() (*rm.Address, error) {

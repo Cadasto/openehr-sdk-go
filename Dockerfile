@@ -5,7 +5,7 @@
 # This is a library module — there is no service binary to ship. The image
 # exists so the Makefile can shell Go toolchain calls (gofmt, go vet, go
 # test, go build, go mod) through it when a host Go 1.27.x install is not
-# available.
+# available, and `make test-race` when the host has no C compiler.
 #
 # golangci-lint is installed from the same pinned image the Makefile uses
 # (LINT_IMAGE), so the dev container carries the full toolchain: go, gofmt,
@@ -50,7 +50,9 @@ FROM golang:${GO_VERSION}-alpine AS dev
 ARG USER_UID=1000
 ARG USER_GID=1000
 
-RUN apk add --no-cache git make ca-certificates tzdata \
+# gcc + musl-dev give cgo a C compiler and the C library to link against.
+# Only `make test-race` uses them, because the race detector needs cgo.
+RUN apk add --no-cache git make ca-certificates tzdata gcc musl-dev \
     && addgroup -g ${USER_GID} dev \
     && adduser -D -u ${USER_UID} -G dev -s /bin/sh dev \
     && mkdir -p /go/pkg/mod /go/bin /home/dev/.cache/go-build /workspace \
@@ -61,6 +63,8 @@ RUN apk add --no-cache git make ca-certificates tzdata \
 # dev container, so the host-missing fallback has the full toolchain.
 COPY --from=golangci /usr/bin/golangci-lint /usr/local/bin/golangci-lint
 
+# CGO_ENABLED=0 keeps container builds and tests static. `make test-race`
+# alone turns cgo on, through `docker compose run -e CGO_ENABLED=1`.
 ENV GOPATH=/go \
     GOCACHE=/home/dev/.cache/go-build \
     GOMODCACHE=/go/pkg/mod \

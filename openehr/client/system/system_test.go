@@ -3,6 +3,7 @@ package system_test
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"maps"
 	"net/http"
 	"net/http/httptest"
@@ -426,6 +427,41 @@ func TestHealthDownOnWireError(t *testing.T) {
 	}
 }
 
+// TestHealthDownOnUnreadableTwoXX pins the arm where OPTIONS answers 200 but
+// the body is cut mid-read: the probe could not complete, so Health reports
+// down, keeps the 200 the server sent, and returns the *transport.BodyReadError.
+func TestHealthDownOnUnreadableTwoXX(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		// Announce more bytes than are written, then drop the connection.
+		w.Header().Set("Content-Length", "100")
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, `{"solution":"`)
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		panic(http.ErrAbortHandler)
+	}))
+	t.Cleanup(srv.Close)
+
+	h, err := system.Health(t.Context(), newClient(t, srv))
+	if err == nil {
+		t.Fatal("Health against a 200 whose body is cut returned a nil error; the probe did not complete")
+	}
+	if h == nil {
+		t.Fatal("Health returned a nil *HealthStatus beside the error")
+	}
+	if h.Status != "down" {
+		t.Errorf("HealthStatus.Status = %q, want %q", h.Status, "down")
+	}
+	if h.HTTPStatusCode != http.StatusOK {
+		t.Errorf("HealthStatus.HTTPStatusCode = %d, want %d (the status the server sent)", h.HTTPStatusCode, http.StatusOK)
+	}
+	if _, ok := errors.AsType[*transport.BodyReadError](err); !ok {
+		t.Errorf("errors.AsType[*transport.BodyReadError] did not match %T (%v)", err, err)
+	}
+}
+
 func TestHealthIsAnonymous(t *testing.T) {
 	// Health MUST NOT emit Authorization even when a TokenSource is
 	// configured. Monitoring tools commonly run without credentials.
@@ -470,6 +506,9 @@ func TestHealthDownOnNetworkError(t *testing.T) {
 	}
 	if h == nil || h.IsUp() {
 		t.Errorf("expected HealthStatus with Status=down, got %+v", h)
+	}
+	if h != nil && h.HTTPStatusCode != 0 {
+		t.Errorf("HTTPStatusCode = %d, want 0: no response arrived", h.HTTPStatusCode)
 	}
 }
 

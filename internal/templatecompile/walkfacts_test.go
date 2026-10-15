@@ -100,13 +100,22 @@ func TestREQ171_WalkFactsEqualTheRuntimeAnswers(t *testing.T) {
 		t.Fatalf("ListAllOPTs: %v", err)
 	}
 	var templates, nodes, attributes int
+	var unparsed []string // "name: error" of each OPT skipped because it does not parse
 	for _, ref := range refs {
 		parsed, err := template.ParseFile(ref.Path)
 		if err != nil {
-			continue // a template that does not parse is the parser's tests' concern
+			// A template that does not parse is the parser's tests' concern,
+			// and TestCompiledPathSnapshot records each one. It is counted and
+			// named in the log, with its parse error, so the comparison never
+			// loses one unseen.
+			unparsed = append(unparsed, ref.Name+": "+err.Error())
+			continue
 		}
 		c, err := templatecompile.Compile(parsed)
 		if err != nil {
+			// Every vendored OPT that parses also compiles, so a compile
+			// failure would drop the template from the comparison.
+			t.Errorf("%s: Compile: %v", ref.Name, err)
 			continue
 		}
 		templates++
@@ -117,7 +126,10 @@ func TestREQ171_WalkFactsEqualTheRuntimeAnswers(t *testing.T) {
 	if templates < 50 {
 		t.Fatalf("compiled %d vendored OPTs, want at least 50: the listing lost templates", templates)
 	}
-	t.Logf("compared %d templates, %d nodes, %d attributes", templates, nodes, attributes)
+	t.Logf("compared %d templates, %d nodes, %d attributes; skipped %d that do not parse", templates, nodes, attributes, len(unparsed))
+	for _, u := range unparsed {
+		t.Logf("skipped %s", u)
+	}
 }
 
 // interval is an AOM interval body from lower to upper.

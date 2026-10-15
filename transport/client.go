@@ -141,10 +141,13 @@ func (c *Client) HTTPClient() *http.Client {
 //
 // With retries enabled, a 2xx whose body could not be read is sent again
 // only when its method is GET, HEAD or OPTIONS, because the server has
-// acted on any other; any other status is retried by its status, as any
-// *WireError is. Neither is sent again once ctx has ended. When ctx ends
-// during the backoff, the error keeps what it wrapped and wraps ctx's
-// error beside it, and the Response is still returned.
+// acted on any other, and never when the body was over the
+// WithMaxResponseBody ceiling, because every attempt would stop at the
+// same point. Any other status is retried by its status, as any
+// *WireError is, a body over the ceiling included. Neither is sent again
+// once ctx has ended. When ctx ends during the backoff, the error keeps
+// what it wrapped and wraps ctx's error beside it, and the Response is
+// still returned.
 //
 // The lifecycle:
 //
@@ -282,9 +285,14 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		}
 	}
 	// REQ-090: the status code goes on the span whenever a response arrived,
-	// a failed request's included.
+	// a failed request's included, and so does the response size when the body
+	// was read in full. A body that could not be read (REQ-172) has no size:
+	// its Response carries an empty Body, so a 0 would be a false value.
 	if resp != nil {
 		span.SetAttributes(attribute.Int("http.status_code", resp.StatusCode))
+		if !isBodyReadFailure(lastErr) {
+			span.SetAttributes(attribute.Int64("http.response_content_length", int64(len(resp.Body))))
+		}
 	}
 	if lastErr != nil {
 		span.SetStatus(codes.Error, lastErr.Error())
@@ -666,6 +674,15 @@ func (c *Client) shouldRetry(ctx context.Context, req *Request, resp *Response, 
 		// the same gate. The ctx guard above has already stopped a retry
 		// once ctx ended.
 		if _, ok := errors.AsType[*BodyReadError](err); ok {
+			// A body over the WithMaxResponseBody ceiling would stop at the
+			// same ceiling on every attempt, after reading up to it again, so
+			// it is not sent again; REQ-172 allows the retry but does not
+			// require it. This sits inside the 2xx arm: the *WireError arm
+			// above has already returned, so a status over the ceiling is
+			// still retried by its status.
+			if errors.Is(err, ErrResponseTooLarge) {
+				return false
+			}
 			switch req.effectiveMethod() {
 			case http.MethodGet, http.MethodHead, http.MethodOptions:
 				return true

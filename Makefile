@@ -6,6 +6,9 @@
 # Fast path  : host Go 1.27.x (recommended for daily development).
 # Fallback   : `docker compose run --rm go …` using the `dev` stage in
 #              Dockerfile (gated behind the `dev` compose profile).
+# Race       : `make test-race` also needs the C compiler `go env CC` names,
+#              because -race needs cgo; without one it takes the fallback
+#              with cgo on.
 .DEFAULT_GOAL := help
 
 # ---- variables -----------------------------------------------------------
@@ -28,12 +31,24 @@ HOST_GO_OK   := $(shell command -v go >/dev/null 2>&1 && go version 2>/dev/null 
 # host binary compiled with an older toolchain cannot load a go 1.27.0 module.
 HOST_GLCI_OK := $(shell command -v golangci-lint >/dev/null 2>&1 && golangci-lint version 2>/dev/null | grep -qE 'built with go1\.27' && echo yes)
 
+DOCKER_RUN = $(COMPOSE) -p $(COMPOSE_PROJECT) --profile dev run --rm --no-deps
+
 ifeq ($(HOST_GO_OK),yes)
   GO = go
 else
-  DOCKER_GO = $(COMPOSE) -p $(COMPOSE_PROJECT) --profile dev run --rm --no-deps go
+  DOCKER_GO = $(DOCKER_RUN) go
   GO        = $(DOCKER_GO) go
 endif
+
+# `make test-race` only. The race detector needs cgo, and cgo needs the C
+# compiler `go env CC` names (its first word) on PATH. With host Go 1.27.x and
+# that compiler, the race run uses the host go (CI's ubuntu runner has gcc);
+# otherwise it runs in the dev container, whose image carries gcc + musl-dev.
+# Either way it turns cgo on for this run only; other targets leave
+# CGO_ENABLED as it is (0 in the container). Lazy (=) so only test-race pays
+# for `go env`.
+HOST_CC_OK = $(if $(HOST_GO_OK),$(shell cc="$$(go env CC 2>/dev/null)"; command -v "$${cc%% *}" >/dev/null 2>&1 && echo yes))
+RACE_GO    = $(if $(HOST_CC_OK),CGO_ENABLED=1 go,$(DOCKER_RUN) -e CGO_ENABLED=1 go go)
 
 # golangci-lint shim — host binary (fast path) or the pinned image, which
 # bundles the v2 formatters (gofumpt + goimports), so `fmt` and `lint` share
@@ -199,7 +214,7 @@ test: codegen-verify aqlgen-verify termgen-verify ## Run unit tests (includes co
 	@$(GO) test ./... -count=1
 
 test-race: ## Run unit tests with -race (main-branch CI job)
-	@$(GO) test -race -count=1 ./...
+	@$(RACE_GO) test -race -count=1 ./...
 
 ##@ Lint
 

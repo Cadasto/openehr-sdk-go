@@ -1,7 +1,8 @@
 package transport_test
 
 // span_status_test.go — REQ-090 § Spans: the span of a request carries the
-// response status code, on a failed request as on a successful one.
+// response status code and the response size, on a failed request as on a
+// successful one.
 //
 // The module takes no dependency on the OTel SDK, so the tracer here is a small
 // recording implementation of the trace API: it keeps the attributes each span
@@ -10,6 +11,7 @@ package transport_test
 import (
 	"context"
 	"net/http"
+	"strings"
 	"sync"
 	"testing"
 
@@ -148,6 +150,116 @@ func TestSpanCarriesStatusCode(t *testing.T) { // REQ-090, REQ-172
 			}
 			if got.Type() != attribute.INT64 || got.AsInt64() != int64(tc.status) {
 				t.Errorf("span %q http.status_code = %v (%s), want %d", span.name, got.String(), got.Type(), tc.status)
+			}
+		})
+	}
+}
+
+// responseSizeKey is the span attribute that carries the response size, named
+// after the older OpenTelemetry HTTP conventions the span's other attributes
+// follow (http.method, http.url, http.status_code).
+const responseSizeKey attribute.Key = "http.response_content_length"
+
+// TestSpanCarriesResponseSize pins REQ-090's "The span MUST carry attributes:
+// … response size". A body read in full puts the number of bytes read on the
+// span, on a failed request as on a successful one; an empty body read in full
+// is a size of 0. A body that could not be read has no size (REQ-172): it was
+// cut, or it was over the WithMaxResponseBody ceiling, and the Response carries
+// an empty Body. Its span carries no size attribute, since a 0 there would be a
+// false value.
+func TestSpanCarriesResponseSize(t *testing.T) { // REQ-090, REQ-172
+	const (
+		okBody       = `{"ehr_id":{"value":"abc"}}`
+		notFoundBody = `{"code":"NOT_FOUND","message":"no such EHR"}`
+		limit        = 16
+	)
+	getEHR := func() *transport.Request {
+		return &transport.Request{Method: http.MethodGet, Path: "/ehr/abc", Route: "/ehr/{ehr_id}"}
+	}
+	cases := []struct {
+		name    string
+		client  func(t *testing.T, tp trace.TracerProvider) *transport.Client
+		req     func() *transport.Request
+		wantErr bool
+		// wantSize is the size the span carries; noSize means it carries none.
+		wantSize int64
+		noSize   bool
+	}{
+		{
+			name: "200 read in full",
+			client: func(t *testing.T, tp trace.TracerProvider) *transport.Client {
+				return newDecodeClient(t, http.StatusOK, okBody, nil, transport.WithTracerProvider(tp))
+			},
+			req:      getEHR,
+			wantSize: int64(len(okBody)),
+		},
+		{
+			name: "204 with no body",
+			client: func(t *testing.T, tp trace.TracerProvider) *transport.Client {
+				return newDecodeClient(t, http.StatusNoContent, "", nil, transport.WithTracerProvider(tp))
+			},
+			req:      getEHR,
+			wantSize: 0,
+		},
+		{
+			name: "404 with an envelope",
+			client: func(t *testing.T, tp trace.TracerProvider) *transport.Client {
+				return newDecodeClient(t, http.StatusNotFound, notFoundBody, nil, transport.WithTracerProvider(tp))
+			},
+			req:      getEHR,
+			wantErr:  true,
+			wantSize: int64(len(notFoundBody)),
+		},
+		{
+			name: "201 cut mid-body",
+			client: func(t *testing.T, tp trace.TracerProvider) *transport.Client {
+				return newBodyReadClient(t, cutBodyHandler(http.StatusCreated, committedHeader(), cutPartialBody, nil), transport.WithTracerProvider(tp))
+			},
+			req:     compositionPost,
+			wantErr: true,
+			noSize:  true,
+		},
+		{
+			name: "404 cut mid-body",
+			client: func(t *testing.T, tp trace.TracerProvider) *transport.Client {
+				return newBodyReadClient(t, cutBodyHandler(http.StatusNotFound, nil, cutPartialBody, nil), transport.WithTracerProvider(tp))
+			},
+			req:     getEHR,
+			wantErr: true,
+			noSize:  true,
+		},
+		{
+			name: "200 over the ceiling",
+			client: func(t *testing.T, tp trace.TracerProvider) *transport.Client {
+				return newDecodeClient(t, http.StatusOK, strings.Repeat(okBody, 2), nil, transport.WithMaxResponseBody(limit), transport.WithTracerProvider(tp))
+			},
+			req:     getEHR,
+			wantErr: true,
+			noSize:  true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tp := newRecordingTracerProvider()
+			c := tc.client(t, tp)
+
+			_, err := c.Do(t.Context(), tc.req())
+			if gotErr := err != nil; gotErr != tc.wantErr {
+				t.Fatalf("Do returned error %v, want an error: %v; the premise of this test is gone", err, tc.wantErr)
+			}
+			span := tp.tracer.only(t)
+			got, ok := span.attr(responseSizeKey)
+			if tc.noSize {
+				if ok {
+					t.Errorf("span %q %s = %v, want no size: the body could not be read", span.name, responseSizeKey, got.String())
+				}
+				return
+			}
+			if !ok {
+				t.Fatalf("span %q carries no %s attribute, want %d", span.name, responseSizeKey, tc.wantSize)
+			}
+			if got.Type() != attribute.INT64 || got.AsInt64() != tc.wantSize {
+				t.Errorf("span %q %s = %v (%s), want %d", span.name, responseSizeKey, got.String(), got.Type(), tc.wantSize)
 			}
 		})
 	}
