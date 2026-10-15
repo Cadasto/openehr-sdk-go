@@ -4,23 +4,25 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/rmbind"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 )
 
 // bindRMType returns the node, among those the template allows at the
 // compiled node's path ([alternativesAt]), that v binds, or
-// ErrTypeMismatch (wrapped with diagnostic context) when v binds none.
+// ErrTypeMismatch (wrapped with diagnostic context) when v binds none or
+// the RM attribute the path writes cannot hold v ([attributeHolds]).
 //
-// It binds as the validator does, by the one rule both read
-// ([rmbind.Bind]), so Set accepts exactly the values the validator binds
-// at the path. The rule tries three tiers in order and returns the first
-// node, in OPT order, of the first tier that admits v:
+// It binds by the rule the validator binds a value with ([rmbind.Bind]),
+// so v binds the node the validator would bind it to. The rule tries
+// three tiers in order and returns the first node, in OPT order, of the
+// first tier that admits v:
 //
 //  1. a node that names v's own RM type, a typed DV_INTERVAL<T> included;
 //  2. a node that names the AOM 1.4 primitive short name whose canonical
-//     DV wrapper v is: a DV_DURATION binds a DURATION node, the value the
-//     generator writes there;
+//     DV wrapper v is: a DV_DURATION binds a DURATION node;
 //  3. a node v's type descends from in the pinned class hierarchy (a
 //     DV_CODED_TEXT at DV_TEXT, a DV_QUANTITY at DATA_VALUE, a
 //     POINT_EVENT at EVENT), a node the OPT leaves untyped, or a typed
@@ -28,16 +30,18 @@ import (
 //     DV_INTERVAL<DV_COUNT> at DV_INTERVAL<DV_ORDERED>).
 //
 // So under DV_TEXT then DV_CODED_TEXT, a DV_CODED_TEXT binds the
-// DV_CODED_TEXT node. Conformance is read from the classes the compile
-// found to conform to each node's type, so this package imports no class
-// hierarchy of its own.
+// DV_CODED_TEXT node. The binding reads conformance from the classes the
+// compile found to conform to each node's type.
 //
-// v must be an RM value: rmbind.TypeName names it, with the ITS-JSON
-// parameterised name for a typed DV_INTERVAL, and a value it cannot name
-// fails as unrecognised. That covers a value that is no RM type, such as a
-// Go string the validator would bind at a DURATION leaf, and an interface
-// carrying a typed-nil pointer: neither is a usable value at a builder Set
-// site.
+// Set accepts less than the rule binds, in two ways. v must be an RM
+// value: rmbind.TypeName names it, with the ITS-JSON parameterised name
+// for a typed DV_INTERVAL, and a value it cannot name fails as
+// unrecognised. That covers a value that is no RM type, such as a Go
+// string the validator would bind at a DURATION leaf, and an interface
+// carrying a typed-nil pointer: neither is a usable value at a builder
+// Set site. And the RM attribute the path writes must be able to hold v,
+// which the rule does not ask: a DV_DURATION binds the DURATION node
+// under a DV_DURATION's value, but that attribute holds a String.
 func bindRMType(node *tcimpl.CompiledNode, v any) (*tcimpl.CompiledNode, error) {
 	got, ok := rmbind.TypeName(v)
 	if !ok {
@@ -45,6 +49,9 @@ func bindRMType(node *tcimpl.CompiledNode, v any) (*tcimpl.CompiledNode, error) 
 	}
 	alternatives := alternativesAt(node)
 	if bound := rmbind.Bind(alternatives, v, anyNode); bound != nil {
+		if err := attributeHolds(bound, v, got); err != nil {
+			return nil, err
+		}
 		return bound, nil
 	}
 	switch len(alternatives) {
@@ -67,6 +74,84 @@ func bindRMType(node *tcimpl.CompiledNode, v any) (*tcimpl.CompiledNode, error) 
 // anyNode admits every node to the binding: a Set value may bind any node
 // the template allows at the path, a slot included.
 func anyNode(*tcimpl.CompiledNode) bool { return true }
+
+// attributeHolds returns nil when the RM attribute that node sits under
+// can hold v, of RM type got, or when the pinned RM metadata
+// ([rminfo.Default]) gives no type to test against; otherwise it returns
+// ErrTypeMismatch, wrapped with the attribute and its type.
+//
+// The attribute's type is the one the metadata gives the attribute,
+// declared or inherited, on the class of node's parent: the type of its
+// items for a container. Where that class types the attribute with a
+// formal generic parameter that the parent's type name binds, the actual
+// parameter takes its place ([bmmtype.Substitute]), so the lower bound of
+// a DV_INTERVAL<DV_COUNT> holds a DV_COUNT. The attribute can hold v when
+// got is that type or descends from it in the pinned class hierarchy
+// ([canHold]).
+//
+// There is nothing to test against, and so no refusal, at the root; under
+// a parent the template leaves untyped; where the metadata does not know
+// the parent's class or the class does not declare the attribute; and
+// where the attribute's type is no class the hierarchy knows and no plain
+// value type ([plainValueTypes]): a formal parameter the parent's name
+// leaves open (the T of a bare DV_INTERVAL or EVENT), or Any.
+func attributeHolds(node *tcimpl.CompiledNode, v any, got string) error {
+	parent := node.Parent()
+	if parent == nil {
+		return nil
+	}
+	owner := parent.RMTypeName()
+	attr, _ := findAttributeContaining(parent, node)
+	if owner == "" || attr == nil {
+		return nil
+	}
+	declared, ok := rminfo.Default.AttributeRMType(bmmtype.Class(owner), attr.Name())
+	if !ok {
+		return nil
+	}
+	held := bmmtype.Substitute(owner, declared)
+	if holds, known := canHold(held, got); holds || !known {
+		return nil
+	}
+	return fmt.Errorf("%w: value type %T (RM %q): the path writes attribute %q of %s, which holds %s",
+		ErrTypeMismatch, v, got, attr.Name(), owner, held)
+}
+
+// canHold reports whether an attribute of RM type held can hold a value of
+// RM type got: got is held or descends from it in the pinned class
+// hierarchy, each looked up by its class, without generic parameters. An
+// attribute of a plain value type ([plainValueTypes]) holds no RM value.
+// known is false when held is no plain value type and the hierarchy does
+// not know held's class or got's.
+func canHold(held, got string) (holds, known bool) {
+	if plainValueTypes[held] {
+		return false, true
+	}
+	h, ok := rminfo.Default.(rminfo.Hierarchy)
+	if !ok {
+		return false, false
+	}
+	return h.ConformsTo(bmmtype.Class(got), bmmtype.Class(held))
+}
+
+// plainValueTypes lists the BASE primitive types whose values are plain:
+// a string, a number, a boolean, a character or a byte. No class an RM
+// value has descends from one, so an attribute of one of these types
+// holds no RM value. The pinned metadata knows them as primitive types,
+// not as classes, and so does not answer conformance to them. The other
+// BASE primitive types are left out, because RM classes descend from some
+// of them in the BMM, as every class does from Any and DV_DURATION does
+// from Iso8601_duration, and the pinned class hierarchy drops those edges.
+var plainValueTypes = map[string]bool{
+	"Boolean":   true,
+	"Character": true,
+	"Double":    true,
+	"Integer":   true,
+	"Integer64": true,
+	"Octet":     true,
+	"Real":      true,
+	"String":    true,
+}
 
 // alternativesAt returns, in OPT order, the nodes the template allows at
 // node's path: node and every other child of node's parent attribute at

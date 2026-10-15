@@ -35,9 +35,14 @@ type Builder struct {
 // pendingAssignment is one queued (path, value) pair plus the compiled
 // node the value binds: of the nodes the template allows at the path,
 // the one the validator would bind it to ([bindRMType]). Resolving
-// the node and checking the type at Set time surfaces an unknown path or
-// a type mismatch eagerly; RM-side navigation still happens at Build time
-// so the caller can stack Set calls without each one mutating the graph.
+// the node and checking the type at Set time surfaces an unknown path
+// eagerly, and a type mismatch wherever the template and the pinned RM
+// give a type to check against. Where they give none, as under an
+// attribute the RM types with a generic parameter that the parent's type
+// name leaves open (the lower bound of a bare DV_INTERVAL), a value of
+// the wrong type fails only when Build writes it, with ErrInvalidPath.
+// RM-side navigation still happens at Build time so the caller can stack
+// Set calls without each one mutating the graph.
 type pendingAssignment struct {
 	path     string
 	rawValue any
@@ -78,14 +83,14 @@ func (b *Builder) TemplateID() string {
 // or Set returns ErrUnknownPath.
 //
 // Set accepts v when v binds a node the template allows at path, by the
-// same rule the validator uses to match a value to the template. v binds
-// a node when:
+// same rule the validator uses to match a value to the template, and the
+// RM attribute that path writes can hold v. v binds a node when:
 //
 //   - v's RM type is the node's type, a typed interval such as
 //     DV_INTERVAL<DV_QUANTITY> included;
 //   - the node names an AOM 1.4 primitive short name and v is the data
-//     value that carries it: a *rm.DVDuration at a DURATION node, the value
-//     NewSkeleton writes there, and likewise DV_DATE at DATE, DV_TIME at
+//     value that carries it: a *rm.DVDuration at an ELEMENT value the
+//     template types DURATION, and likewise DV_DATE at DATE, DV_TIME at
 //     TIME, DV_DATE_TIME at DATE_TIME, DV_BOOLEAN at BOOLEAN and DV_COUNT
 //     at INTEGER;
 //   - v's RM type descends from the node's in the openEHR class
@@ -103,10 +108,20 @@ func (b *Builder) TemplateID() string {
 // template allows as DV_CODED_TEXT or DV_QUANTITY, both a
 // *rm.DVCodedText and a *rm.DVQuantity are accepted.
 //
+// The RM attribute that path writes can hold v when v's RM type is, or
+// descends from, the type the openEHR Reference Model gives that
+// attribute on the RM type of the node above it. An ELEMENT's value
+// holds any data value; the value of a DV_DURATION holds a String, so no
+// RM value at all. Where the model gives no type to test against, as for
+// the bounds of a DV_INTERVAL the template does not parameterise, Set
+// does not refuse v, and Build reports a value of the wrong type with
+// ErrInvalidPath.
+//
 // Set returns ErrTypeMismatch for any other value: one that binds none of
-// those nodes (a *rm.DVText at a DV_CODED_TEXT node, say), one that is not
-// an RM value (a Go string, even at a DURATION node), nil, and a nil
-// pointer.
+// those nodes (a *rm.DVText at a DV_CODED_TEXT node, say), one the RM
+// attribute at path cannot hold (a *rm.DVDuration at the DURATION node
+// under a DV_DURATION's value), one that is not an RM value (a Go string,
+// even at a DURATION node), nil, and a nil pointer.
 //
 // Errors are accumulated and surfaced from Build. Set never
 // short-circuits the builder so the caller can stack assignments and

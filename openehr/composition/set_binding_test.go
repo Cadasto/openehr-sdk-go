@@ -174,7 +174,8 @@ func TestREQ101_SetRefusesWhatTheValidatorDoesNotBind(t *testing.T) {
 // the template types with the AOM 1.4 short name DURATION; a DV_COUNT whose
 // magnitude, an Integer64 in the RM, it types INTEGER; and a
 // DV_INTERVAL<DV_COUNT> whose lower bound, a T in the RM and so a DV_COUNT
-// here, it allows as a DV_COUNT or an untyped node.
+// here, it allows as a DV_COUNT or an untyped node; and a bare DV_INTERVAL,
+// whose name binds no T, with the same lower bound.
 const (
 	durationValueLeafChild = `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>DV_DURATION</rm_type_name><node_id></node_id>` +
 		`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>value</rm_attribute_name>` +
@@ -185,6 +186,11 @@ const (
 		`<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>INTEGER</rm_type_name><node_id></node_id><item xsi:type="C_INTEGER"></item></children>` +
 		`</attributes></children>`
 	countIntervalLowerChild = `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>DV_INTERVAL&lt;DV_COUNT&gt;</rm_type_name><node_id></node_id>` +
+		`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>lower</rm_attribute_name>` +
+		`<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>DV_COUNT</rm_type_name><node_id></node_id></children>` +
+		untypedValueChild +
+		`</attributes></children>`
+	bareIntervalLowerChild = `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>DV_INTERVAL</rm_type_name><node_id></node_id>` +
 		`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>lower</rm_attribute_name>` +
 		`<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>DV_COUNT</rm_type_name><node_id></node_id></children>` +
 		untypedValueChild +
@@ -304,5 +310,41 @@ func TestREQ101_SetAcceptsWhatTheAttributeHolds(t *testing.T) {
 	}
 	if interval.Lower.Magnitude != v.Magnitude {
 		t.Errorf("built interval at %s has lower magnitude %d, want %d, the DV_COUNT Set was given", abstractValuePath, interval.Lower.Magnitude, v.Magnitude)
+	}
+}
+
+// TestREQ101_SetAcceptsWhereTheAttributeTypeIsOpen checks, for REQ-101 Type
+// enforcement, that the attribute check refuses nothing where the RM gives
+// no type to test against: under a bare DV_INTERVAL, whose name binds no T,
+// the lower bound's RM type stays the generic T, and Set accepts a DV_COUNT
+// there, which a DV_INTERVAL's bound can hold, and Build writes it.
+func TestREQ101_SetAcceptsWhereTheAttributeTypeIsOpen(t *testing.T) {
+	t.Parallel()
+	c := compileAlternatives(t, bareIntervalLowerChild)
+	b, err := composition.NewBuilder(t.Context(), c,
+		composition.WithTerritory("NL"),
+		composition.WithComposer(testComposer()),
+	)
+	if err != nil {
+		t.Fatalf("NewBuilder: %v", err)
+	}
+	v := &rm.DVCount{Magnitude: 3}
+	if err := b.Set(countIntervalLowerPath, v); err != nil {
+		t.Fatalf("Set(%s, %T) = %v, want nil", countIntervalLowerPath, v, err)
+	}
+	comp, err := b.Build()
+	if err != nil {
+		t.Fatalf("Build after Set(%s, %T) = %v, want nil", countIntervalLowerPath, v, err)
+	}
+	got, err := rmpath.ItemAtPath(comp, abstractValuePath)
+	if err != nil {
+		t.Fatalf("ItemAtPath(%s) on the built composition: %v", abstractValuePath, err)
+	}
+	interval, ok := got.(*rm.DVInterval[rm.DVOrdered])
+	if !ok {
+		t.Fatalf("built composition holds %T at %s, want a *rm.DVInterval[rm.DVOrdered]", got, abstractValuePath)
+	}
+	if interval.Lower != v {
+		t.Errorf("built interval at %s has lower bound %T %v, want the DV_COUNT Set was given, %T %v", abstractValuePath, interval.Lower, interval.Lower, v, v)
 	}
 }

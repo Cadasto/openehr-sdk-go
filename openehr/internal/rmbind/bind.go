@@ -4,8 +4,11 @@
 //
 // The validator (openehr/validation) binds each value it walks by [Bind],
 // and the composition builder (openehr/composition) binds each value Set is
-// given by the same function, so the builder accepts exactly the values the
-// validator binds at a path. The validator's RM type match also reads
+// given by the same function, so the builder binds an RM value to the node
+// the validator binds it to. The builder accepts less than [Bind] admits: it
+// takes only RM values, where the validator also binds a Go primitive at a
+// leaf, and it checks on its own that the RM attribute at the path can hold
+// the value. The validator's RM type match also reads
 // [ConformsToNode], [TypedIntervalBound] and [IntervalConformsTo], and its
 // primitive leaves read [PrimitiveValueMatchesShortName].
 //

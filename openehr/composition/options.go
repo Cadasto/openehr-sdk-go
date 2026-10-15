@@ -102,9 +102,11 @@ var ErrUnknownPath = errors.New("composition: path not in template")
 // DV_DURATION at DURATION), an untyped node, and a typed interval node
 // DV_INTERVAL<T> when each of its bounds is a T; Builder.Set lists the
 // cases. Every alternative the template lists at the path counts, except
-// one whose occurrences are 0..0. A nil value, a nil pointer and a value
-// that is not an RM value at all are refused the same way. Comparable
-// via errors.Is.
+// one whose occurrences are 0..0. A value that binds a node there but
+// that the RM attribute at the path cannot hold is refused too: a
+// DV_DURATION at the DURATION node under a DV_DURATION's value, which
+// holds a String. A nil value, a nil pointer and a value that is not an
+// RM value at all are refused the same way. Comparable via errors.Is.
 var ErrTypeMismatch = errors.New("composition: value type does not match path RM type")
 
 // ErrInvalidPath signals a structural problem navigating the path

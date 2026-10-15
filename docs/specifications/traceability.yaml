@@ -1170,6 +1170,7 @@ requirements:
     tests:
       - internal/templateinstance/rmwrite/write_datavalue_test.go
       - internal/templateinstance/rmwrite/write_parent_test.go
+      - openehr/composition/attribute_hold_test.go
       - openehr/composition/builder_defaults_test.go
       - openehr/composition/builder_test.go
       - openehr/composition/set_binding_test.go
