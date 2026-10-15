@@ -54,14 +54,16 @@
 // gains fails them until it has a case.
 //
 // Two more tests ask both writers about every class the type registry
-// knows and every attribute name the RM declares, with a child no case
-// accepts. The first checks that each writer case names an attribute
-// its class declares in openehr/rm/rminfo, in the right shape:
-// EnsureSingle for a single-valued attribute, AppendMultiple for a
-// list. The second pins, for each class the writers write into, the
-// declared attributes no case fills, leaving out the LOCATABLE
-// attributes other than name, which the instance generator sets
-// itself. An attribute a BMM update adds, or a case that is removed or
+// knows and every attribute name any class in openehr/rm/rminfo
+// declares, with a child no case accepts. The first checks that each
+// writer case names an attribute its class declares, in the right
+// shape: EnsureSingle for a single-valued attribute, AppendMultiple for
+// a list. The second pins, for each class the writers write into, the
+// declared attributes no case fills. It leaves out the LOCATABLE
+// attributes other than name: the instance generator stamps
+// archetype_node_id, uid and archetype_details itself; links and
+// feeder_audit are optional in the RM, and nothing fills them. An
+// attribute a BMM update adds, or a case that is removed or
 // renamed, fails it until the attribute gets a case or joins the
 // pinned list on purpose. The instance generator drops the error when
 // it fills an RM-required default, so without this pin a missing case

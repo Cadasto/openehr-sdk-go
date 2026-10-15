@@ -3,13 +3,8 @@ package rmwrite
 import (
 	"errors"
 	"fmt"
-	"go/ast"
-	"go/parser"
-	"go/token"
 	"maps"
-	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -123,9 +118,11 @@ func armViolations(arms armTable, model rmModel) []string {
 
 // unwrittenAttributes returns, for each class the writers write into, the
 // attributes the class declares that neither writer has a case for, sorted.
-// It leaves out the LOCATABLE attributes other than name: the instance
-// generator writes archetype_node_id, uid, archetype_details, links and
-// feeder_audit itself, without rmwrite.
+// It leaves out the LOCATABLE attributes other than name. The instance
+// generator stamps archetype_node_id, name, uid and archetype_details
+// itself; name stays in because rmwrite also writes it when an OPT
+// constrains it. links and feeder_audit are optional in the RM, and
+// nothing fills them.
 func unwrittenAttributes(arms armTable, model rmModel) map[string][]string {
 	out := make(map[string][]string, len(arms))
 	for class, written := range arms {
@@ -195,61 +192,22 @@ func registryParents() map[string]func() any {
 	return out
 }
 
-// probeAttrNames returns every attribute name any RM class declares, so each
-// class is also asked about the names it does not declare, and every string
-// literal in this package's source, so a case whose name no class declares
-// (a typo, say) is asked about too.
-func probeAttrNames(t *testing.T, model rmModel) []string {
-	t.Helper()
+// probeAttrNames returns every attribute name any class of model declares,
+// sorted, so each class is also asked about the names it does not declare.
+func probeAttrNames(model rmModel) []string {
 	names := map[string]struct{}{}
 	for _, class := range model.KnownRMTypes() {
 		for _, attr := range model.AttributeNames(class) {
 			names[attr] = struct{}{}
 		}
 	}
-	for _, s := range sourceStrings(t) {
-		names[s] = struct{}{}
-	}
 	return slices.Sorted(maps.Keys(names))
-}
-
-// sourceStrings returns every string literal in this package's non-test Go
-// files.
-func sourceStrings(t *testing.T) []string {
-	t.Helper()
-	files, err := filepath.Glob("*.go")
-	if err != nil {
-		t.Fatalf("list package files: %v", err)
-	}
-	fset := token.NewFileSet()
-	var out []string
-	for _, path := range files {
-		if strings.HasSuffix(path, "_test.go") {
-			continue
-		}
-		file, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
-		if err != nil {
-			t.Fatalf("parse %s: %v", path, err)
-		}
-		ast.Inspect(file, func(n ast.Node) bool {
-			if lit, ok := n.(*ast.BasicLit); ok && lit.Kind == token.STRING {
-				if s, err := strconv.Unquote(lit.Value); err == nil {
-					out = append(out, s)
-				}
-			}
-			return true
-		})
-	}
-	if len(out) == 0 {
-		t.Fatal("no string literal found in the package source; is the working directory the package directory?")
-	}
-	return out
 }
 
 // registryArms probes EnsureSingle and AppendMultiple over the registry.
 func registryArms(t *testing.T, model rmModel) armTable {
 	t.Helper()
-	arms := probeArms(registryParents(), probeAttrNames(t, model), EnsureSingle, AppendMultiple)
+	arms := probeArms(registryParents(), probeAttrNames(model), EnsureSingle, AppendMultiple)
 	if len(arms) == 0 {
 		t.Fatal("no writer case found; is the type registry empty?")
 	}
@@ -260,7 +218,9 @@ func registryArms(t *testing.T, model rmModel) armTable {
 
 // The fixture is a two-class model whose writers break each rule once, so
 // the checks are seen to fail. FIX_PARENT is written into; FIX_OTHER is a
-// class no writer writes into.
+// class no writer writes into, and the only one that declares other. The
+// probe names come from the fixture model, as they do from rminfo for the
+// registry.
 type (
 	fixtureParent struct{}
 	fixtureOther  struct{}
@@ -297,15 +257,13 @@ func fixtureParents() map[string]func() any {
 	}
 }
 
-var fixtureAttrNames = []string{"bogus", "data", "extra", "items", "name", "notes", "other", "uid"}
-
 // fixtureSingle has a correct case for data, a case for the list attribute
-// items, a case for the undeclared bogus, and a case for notes that stores
-// any child.
+// items, a case for other (which only FIX_OTHER declares), and a case for
+// notes that stores any child.
 func fixtureSingle(parent any, attr string, child any) error {
 	if _, ok := parent.(*fixtureParent); ok {
 		switch attr {
-		case "data", "items", "bogus":
+		case "data", "items", "other":
 			return mismatch(attr, child, "ITEM_STRUCTURE")
 		case "notes":
 			return nil
@@ -333,22 +291,21 @@ func fixtureMultiple(parent any, attr string, child any) error {
 // openehr/rm/rminfo, in the shape IsContainer gives it: EnsureSingle for a
 // single-valued attribute, AppendMultiple for a list. Each class the type
 // registry knows is asked about every attribute name the RM declares on any
-// class, and about every string literal in the package source. The registry
-// holds the bare DV_INTERVAL only; the typed instantiations share its writer,
-// and TestIntervalWriterParity covers them.
+// class. The registry holds the bare DV_INTERVAL only; the typed
+// instantiations share its writer, and TestIntervalWriterParity covers them.
 func TestREQ107_WriterArmsDeclaredByRM(t *testing.T) {
 	t.Parallel()
 
 	t.Run("fixture control", func(t *testing.T) {
 		t.Parallel()
 		model := fixtureModel(t)
-		arms := probeArms(fixtureParents(), fixtureAttrNames, fixtureSingle, fixtureMultiple)
+		arms := probeArms(fixtureParents(), probeAttrNames(model), fixtureSingle, fixtureMultiple)
 		got := armViolations(arms, model)
 		want := []string{
-			"FIX_PARENT.bogus: a writer has a case for it, but the class does not declare it",
 			"FIX_PARENT.data: AppendMultiple has a case for it, but it is single-valued",
 			"FIX_PARENT.items: EnsureSingle has a case for it, but it is a list attribute",
 			"FIX_PARENT.notes: a writer stored a child no RM attribute holds",
+			"FIX_PARENT.other: a writer has a case for it, but the class does not declare it",
 		}
 		if !slices.Equal(got, want) {
 			t.Errorf("armViolations(fixture) =\n  %s\nwant\n  %s", strings.Join(got, "\n  "), strings.Join(want, "\n  "))
@@ -370,7 +327,7 @@ func TestREQ107_WriterArmsDeclaredByRM(t *testing.T) {
 
 // pinnedUnwritten lists, for each class rmwrite writes into, the declared
 // attributes neither writer has a case for (LOCATABLE attributes other than
-// name are left out; the generator writes those itself). It is the measured
+// name are left out; unwrittenAttributes says why). It is the measured
 // residual, not a judgement that each one is right to be missing: an
 // attribute here that the generator must fill is a gap in rmwrite. A class
 // with nothing unwritten keeps an empty entry, so a parent dropped from the
@@ -435,7 +392,7 @@ func TestREQ107_WriterParentAttributeParity(t *testing.T) {
 	t.Run("fixture control", func(t *testing.T) {
 		t.Parallel()
 		model := fixtureModel(t)
-		got := unwrittenAttributes(probeArms(fixtureParents(), fixtureAttrNames, fixtureSingle, fixtureMultiple), model)
+		got := unwrittenAttributes(probeArms(fixtureParents(), probeAttrNames(model), fixtureSingle, fixtureMultiple), model)
 		want := map[string][]string{"FIX_PARENT": {"extra", "name"}}
 		if drift := residualDrift(got, want); len(drift) > 0 {
 			t.Errorf("unwrittenAttributes(fixture) drifted from %v:\n  %s", want, strings.Join(drift, "\n  "))
@@ -447,6 +404,12 @@ func TestREQ107_WriterParentAttributeParity(t *testing.T) {
 		}
 		if drift := residualDrift(got, stale); !slices.Equal(drift, wantDrift) {
 			t.Errorf("residualDrift(fixture, stale) =\n  %s\nwant\n  %s", strings.Join(drift, "\n  "), strings.Join(wantDrift, "\n  "))
+		}
+		// A class the writers fill that the pin leaves out gets its own line,
+		// not a diff against an empty pin.
+		wantUnpinned := []string{"FIX_PARENT: a writer writes into it, but it is not pinned (unwritten: [extra name])"}
+		if drift := residualDrift(got, map[string][]string{}); !slices.Equal(drift, wantUnpinned) {
+			t.Errorf("residualDrift(fixture, empty pin) =\n  %s\nwant\n  %s", strings.Join(drift, "\n  "), strings.Join(wantUnpinned, "\n  "))
 		}
 	})
 
