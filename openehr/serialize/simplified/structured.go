@@ -144,9 +144,15 @@ func flatToStructured(flat map[string]any) (map[string]any, error) {
 				leaf["|"+suffix] = val
 				continue
 			}
-			if prev, taken := ctxObj[rest].(map[string]any); taken {
-				return nil, fmt.Errorf("%w: ctx/%s is both a suffixed leaf (%#v) and a direct value (%q)",
-					ErrUnknownPath, rest, prev, key)
+			// A ctx/ field holds a value, and its suffixes ride keys of their
+			// own. An object here has the shape the field's suffixes take, so
+			// it would merge with them above, one overwriting the other, or be
+			// read back as suffixes by STRUCTURED → FLAT: refused instead. Keys
+			// run sorted and `x|` is folded onto `x`, so a direct value always
+			// comes before its field's |suffix keys, which find it above.
+			if _, isObj := val.(map[string]any); isObj {
+				return nil, fmt.Errorf("%w: %q holds a JSON object; a ctx/ field holds a value, and its suffixes ride keys of their own",
+					ErrUnsupportedDatatype, key)
 			}
 			ctxObj[rest] = val
 			continue

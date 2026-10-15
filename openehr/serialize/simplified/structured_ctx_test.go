@@ -7,6 +7,7 @@ package simplified
 
 import (
 	"encoding/json"
+	"errors"
 	"maps"
 	"reflect"
 	"slices"
@@ -36,6 +37,32 @@ func TestREQ053CtxBareMemberIsTheFieldKey(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tc.want) {
 				t.Errorf("StructuredToFlat(%s) = %s, want %s", tc.structured, out, mustJSON(t, tc.want))
+			}
+		})
+	}
+}
+
+// TestFlatToStructuredRefusesAnObjectCtxValue — REQ-053: a ctx/ field holds a
+// value, and its suffixes ride keys of their own. A direct value that is a
+// JSON object has the shape STRUCTURED gives those suffixes, so FLAT →
+// STRUCTURED refuses it naming the key, rather than merging it with the
+// field's |suffix keys, where one would silently overwrite the other, or
+// handing it to STRUCTURED → FLAT to read back as suffixes. A scalar direct
+// value beside the field's suffixes stays refused as before.
+func TestFlatToStructuredRefusesAnObjectCtxValue(t *testing.T) {
+	for name, tc := range map[string]struct {
+		flat  string
+		want  error
+		names string
+	}{
+		"an object beside the field's suffix": {`{"ctx/setting":{"|code":"999"},"ctx/setting|code":"238"}`, ErrUnsupportedDatatype, `"ctx/setting"`},
+		"an object alone":                     {`{"ctx/setting":{"|code":"999"}}`, ErrUnsupportedDatatype, `"ctx/setting"`},
+		"a scalar beside the field's suffix":  {`{"ctx/setting":"x","ctx/setting|code":"238"}`, ErrUnknownPath, `"ctx/setting|code"`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			out, err := FlatToStructured([]byte(tc.flat))
+			if !errors.Is(err, tc.want) || !strings.Contains(err.Error(), tc.names) {
+				t.Errorf("FlatToStructured(%s) = %s, %v; want %v naming %s", tc.flat, out, err, tc.want, tc.names)
 			}
 		})
 	}
