@@ -42,10 +42,10 @@ func encodeFlat(comp *rm.Composition, wt *webtemplate.WebTemplate) (map[string]a
 		return nil, ErrNilComposition
 	}
 	out := make(map[string]any)
-	if err := emitContext(out, comp); err != nil {
+	root := wt.Tree
+	if err := emitContext(out, comp, root.ID); err != nil {
 		return nil, err
 	}
-	root := wt.Tree
 	// Reused siblings (REQ-116) share one bare path, and resolution below
 	// keys on the bare spelling — emitNode refuses to emit through them.
 	ambiguous := ambiguousBarePaths(wt)
@@ -74,50 +74,23 @@ func encodeFlat(comp *rm.Composition, wt *webtemplate.WebTemplate) (map[string]a
 // the mandatory language and territory code strings, the composer, the context
 // start time, and the context setting (ctx/setting|code + |value — the sixth
 // respelled field; ADR 0015's left-open emission gap, closed 2026-08-05). The
-// ctx/ short forms for participations, health-care facility, workflow ids, and
-// the composer external reference are deferred — see deviations.md. (category
-// is not a ctx/ field at all: it is a template-constrained leaf and rides its
-// own Web Template path.)
+// ctx/ short forms for participations, health-care facility and workflow ids
+// are deferred — see deviations.md. (category is not a ctx/ field at all: it
+// is a template-constrained leaf and rides its own Web Template path.)
 //
-// A composer the ctx/ short forms cannot carry (PARTY_RELATED, a
-// PARTY_IDENTIFIED without a name, or a PARTY_SELF carrying an external_ref)
-// is an error, not an omission: a decode of the composer-less output under
-// WithTemplate would default the composer to
-// PARTY_SELF — a silent type substitution (see deviations.md). A setting the
-// ctx/setting pair cannot carry is refused on the same grounds
-// (emitContextSetting).
-func emitContext(out map[string]any, comp *rm.Composition) error {
+// The composer is the one field the ctx/ short forms carry only in part:
+// [emitComposer] writes it there when one of them carries it whole, and at its
+// real path below rootID otherwise. A setting the ctx/setting pair cannot
+// carry is refused rather than omitted (emitContextSetting).
+func emitContext(out map[string]any, comp *rm.Composition, rootID string) error {
 	if comp.Language.CodeString != "" {
 		out["ctx/language"] = comp.Language.CodeString
 	}
 	if comp.Territory.CodeString != "" {
 		out["ctx/territory"] = comp.Territory.CodeString
 	}
-	switch c := comp.Composer.(type) {
-	case nil:
-		// Absent composer: nothing to represent, nothing substituted.
-	case *rm.PartySelf:
-		if c != nil {
-			if err := composerSelfToCtx(out, *c); err != nil {
-				return err
-			}
-		}
-	case rm.PartySelf:
-		if err := composerSelfToCtx(out, c); err != nil {
-			return err
-		}
-	case *rm.PartyIdentified:
-		if c != nil {
-			if err := composerNameToCtx(out, *c); err != nil {
-				return err
-			}
-		}
-	case rm.PartyIdentified:
-		if err := composerNameToCtx(out, c); err != nil {
-			return err
-		}
-	default:
-		return fmt.Errorf("%w: composer %T is not representable in the ctx/ short forms", ErrUnsupportedDatatype, comp.Composer)
+	if err := emitComposer(out, comp.Composer, rootID); err != nil {
+		return err
 	}
 	if comp.Context != nil {
 		if comp.Context.StartTime.Value != "" {
@@ -130,40 +103,51 @@ func emitContext(out map[string]any, comp *rm.Composition) error {
 	return nil
 }
 
-// composerNameToCtx writes the composition's composer as `ctx/composer_name` —
-// the only spelling the ctx/ short form carries for a PARTY_IDENTIFIED (ADR
-// 0015).
+// emitComposer writes the composition's composer (REQ-053, ADR 0029), so that
+// one body spells it one way.
 //
-// A composer that also carries an `external_ref` or `identifiers` keeps only
-// its name. That is a **drop, not a refusal**, and the one place this codec
-// makes that trade deliberately: the ctx/ short form has no key for either, and
-// decode refuses the real-path `composer/…` spellings that would carry them, so
-// no channel exists short of extending the grammar. Refusing instead would make
-// every composition whose composer is properly referenced — most real ones, and
-// one of the vendored corpus bodies — unencodable, which is a worse answer than
-// a documented projection loss for a format that is a lossy projection by
-// design. Registered in deviations.md (§ deferred features, the ctx/ context
-// row); wire.md § REQ-140 names it as one of the two deliberately out-of-scope
-// classes rather than scoping a "none dropped" claim around it.
-func composerNameToCtx(out map[string]any, c rm.PartyIdentified) error {
-	if c.Name == nil || *c.Name == "" {
-		return fmt.Errorf("%w: composer PARTY_IDENTIFIED without a name is not representable as ctx/composer_name", ErrUnsupportedDatatype)
+// A composer one ctx/ short form carries whole is written in that form, as it
+// always was: a PARTY_SELF with no external_ref as `ctx/composer_self: true`,
+// and a PARTY_IDENTIFIED with a name and nothing else as `ctx/composer_name`.
+// Every other composer is written whole at its real path `<root>/composer`, in
+// the party grammar every other party position uses ([partyRMAttr]), and no
+// ctx/ composer key is written for it: a PARTY_IDENTIFIED carrying a reference
+// or identifiers (its name, if any, as `<root>/composer|name`), a
+// PARTY_RELATED, and a PARTY_SELF carrying an external_ref, written as
+// `<root>/composer_self: true` beside the reference's keys. The reference's
+// `|type` is written only when it is not PARTY ([partyRefToFlat]).
+//
+// A PARTY_IDENTIFIED with an empty name, or with no name, external_ref or
+// identifiers, is refused rather than written: the RM forbids both (the
+// invariants `Name_valid` and `Basic_validity`), and written as nothing it
+// would read back as PARTY_SELF ([partyIdentifiedToFlat]).
+func emitComposer(out map[string]any, c rm.PartyProxy, rootID string) error {
+	if c == nil || rm.IsTypedNil(c) {
+		// Absent composer: nothing to represent, nothing substituted.
+		return nil
 	}
-	out["ctx/composer_name"] = *c.Name
-	return nil
-}
-
-// composerSelfToCtx writes a PARTY_SELF composer as `ctx/composer_self`, which
-// is a bare Boolean: an `external_ref` beside it has nowhere to go and is
-// refused rather than dropped, the same policy partyProxyRMAttr applies at every
-// other PARTY_SELF position.
-func composerSelfToCtx(out map[string]any, c rm.PartySelf) error {
-	if c.ExternalRef != nil {
-		return fmt.Errorf("%w: composer PARTY_SELF carries an external_ref, which ctx/composer_self cannot spell — it is a bare Boolean (ADR 0015)",
-			ErrUnsupportedDatatype)
+	path := rootID + "/" + composerSeg
+	if self, ok := as[rm.PartySelf](c); ok {
+		if self.ExternalRef == nil {
+			out["ctx/composer_self"] = true
+			return nil
+		}
+		out[rootID+"/composer_self"] = true
+		return partyRefToFlat(out, path, *self.ExternalRef)
 	}
-	out["ctx/composer_self"] = true
-	return nil
+	if identified, ok := as[rm.PartyIdentified](c); ok &&
+		identified.Name != nil && *identified.Name != "" &&
+		identified.ExternalRef == nil && len(identified.Identifiers) == 0 {
+		out["ctx/composer_name"] = *identified.Name
+		return nil
+	}
+	if _, related := as[rm.PartyRelated](c); !related {
+		if _, identified := as[rm.PartyIdentified](c); !identified {
+			return fmt.Errorf("%w: composer %T is not a party this codec spells; the composer is a PARTY_IDENTIFIED, a PARTY_RELATED or a PARTY_SELF",
+				ErrUnsupportedDatatype, c)
+		}
+	}
+	return partyRMAttr(out, path, c)
 }
 
 // emitContextSetting writes EVENT_CONTEXT.setting as ctx/setting|code +
@@ -210,18 +194,18 @@ func emitContextSetting(out map[string]any, s rm.DVCodedText) error {
 }
 
 // ctxOnlyLeafPaths are the canonical paths of the composition-level metadata
-// leaves ADR 0015 keeps on the `ctx/` surface. [emitNode] skips them: emitting
-// one at its real FLAT path would spell a single value under two keys, and
-// ADR 0015 makes the ctx/-only encode permanent (decode still accepts both
-// spellings — see metadataAliases).
+// leaves [emitContext] writes. [emitNode] skips them: writing one again from
+// the node walk would spell a single value under two keys. Four of them are
+// ctx/-only (ADR 0015; decode still accepts both spellings — see
+// metadataAliases). The composer is written by [emitComposer], in its ctx/
+// short form or at its real path (ADR 0029), whether or not the Web Template
+// carries a composer node, so the node walk never writes it either.
 //
 // The rule is asserted here rather than left to fall out of a gap elsewhere.
-// Three of the five are unreachable today because `rmpath` deliberately does not
-// resolve them, and `composer` was unreachable because [leafToFlat] mapped no
-// PARTY_PROXY — until REQ-140's party grammar gave it one, at which point the
-// composer's `external_ref` would have started being emitted at `<root>/composer`
-// beside `ctx/composer_name`. "The codec cannot write it" is not a spelling
-// decision; this table is.
+// Three of the five are unreachable today because `rmpath` deliberately does
+// not resolve them, and `composer` was unreachable because [leafToFlat] mapped
+// no PARTY_PROXY — until REQ-140's party grammar gave it one. "The codec cannot
+// write it" is not a spelling decision; this table is.
 var ctxOnlyLeafPaths = map[string]bool{
 	"/language":           true,
 	"/territory":          true,

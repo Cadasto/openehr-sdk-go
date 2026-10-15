@@ -678,7 +678,8 @@ func TestMetadataComposerRealPathCarriesTheRest(t *testing.T) {
 // reaches the composer's `_identifier:N` list and a PARTY_RELATED's
 // `/relationship` as it does at every other party position; the corpus writes
 // both (`ehrbase_conformance_party_identified.json` and
-// `…_party_related.json`). They decode beside the name.
+// `…_party_related.json`). They decode beside the name and re-encode at the
+// composer's real path.
 func TestComposerPartySubStructureDecoded(t *testing.T) {
 	comp, wt := genComposition(t, vitalSignsOPT)
 	for _, tc := range []struct {
@@ -725,6 +726,19 @@ func TestComposerPartySubStructureDecoded(t *testing.T) {
 				t.Fatalf("UnmarshalFlat: %v", err)
 			}
 			tc.check(t, got.Composer)
+			out, err := simplified.MarshalFlat(got, wt)
+			if err != nil {
+				t.Fatalf("MarshalFlat: %v", err)
+			}
+			var m map[string]any
+			if err := json.Unmarshal(out, &m); err != nil {
+				t.Fatal(err)
+			}
+			for k, v := range tc.keys {
+				if key := wt.Tree.ID + k; m[key] != v {
+					t.Errorf("re-encoded %q = %#v, want %#v", key, m[key], v)
+				}
+			}
 		})
 	}
 }

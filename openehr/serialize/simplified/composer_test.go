@@ -460,3 +460,115 @@ func TestREQ053ComposerRealPathUnmatched(t *testing.T) {
 		})
 	}
 }
+
+// TestREQ053ComposerEncodeSpellings — REQ-053, ADR 0029. Encode writes a
+// composer one ctx/ short form carries whole in that form, and every other
+// composer whole at its real path with no ctx/ composer key, so one body spells
+// its composer one way: the composer keys of the output are exactly the ones
+// listed. The reference's `|type` is written only when it is not PARTY. FLAT
+// and STRUCTURED decode each output back to the composer encoded.
+func TestREQ053ComposerEncodeSpellings(t *testing.T) {
+	name := "Dr Enc"
+	generic := &rm.PartyRef{ID: &rm.GenericID{Value: "e17fe1c1", Scheme: "Practitioner"}, Namespace: "https://ehr.example", Type: "PARTY"}
+	person := &rm.PartyRef{ID: &rm.HierObjectID{Value: "9f2c"}, Namespace: "demographic", Type: "PERSON"}
+	issuer := "Hospital"
+	relationship := rm.DVCodedText{
+		DVText:       rm.DVText{Value: "mother"},
+		DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}, CodeString: "10"},
+	}
+	for _, tc := range []struct {
+		name     string
+		composer rm.PartyProxy
+		// keys holds the composer keys the output carries, root-relative
+		// where they start with "/".
+		keys map[string]any
+	}{
+		{"PARTY_SELF", &rm.PartySelf{}, map[string]any{"ctx/composer_self": true}},
+		{"PARTY_IDENTIFIED with a name alone", &rm.PartyIdentified{Name: &name}, map[string]any{"ctx/composer_name": name}},
+		{
+			"PARTY_IDENTIFIED with a name and a reference",
+			&rm.PartyIdentified{Name: &name, ExternalRef: generic},
+			map[string]any{
+				"/composer|name": name, "/composer|id": "e17fe1c1",
+				"/composer|id_scheme": "Practitioner", "/composer|id_namespace": "https://ehr.example",
+			},
+		},
+		{
+			"PARTY_IDENTIFIED with a reference alone, typed PERSON",
+			&rm.PartyIdentified{ExternalRef: person},
+			map[string]any{"/composer|id": "9f2c", "/composer|id_namespace": "demographic", "/composer|type": "PERSON"},
+		},
+		{
+			"PARTY_IDENTIFIED with identifiers alone",
+			&rm.PartyIdentified{Identifiers: []rm.DVIdentifier{{ID: "122", Issuer: &issuer}, {ID: "77"}}},
+			map[string]any{
+				"/composer/_identifier:0|id": "122", "/composer/_identifier:0|issuer": issuer,
+				"/composer/_identifier:1|id": "77",
+			},
+		},
+		{
+			"PARTY_RELATED",
+			&rm.PartyRelated{Name: &name, Relationship: relationship},
+			map[string]any{
+				"/composer|name": name, "/composer/relationship|code": "10",
+				"/composer/relationship|value": "mother", "/composer/relationship|terminology": "openehr",
+			},
+		},
+		{
+			"PARTY_SELF carrying a reference",
+			&rm.PartySelf{ExternalRef: person},
+			map[string]any{
+				"/composer_self": true, "/composer|id": "9f2c",
+				"/composer|id_namespace": "demographic", "/composer|type": "PERSON",
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			comp, wt := genComposition(t, minimalObsOPT)
+			comp.Composer = tc.composer
+			root := wt.Tree.ID
+			want := make(map[string]any, len(tc.keys))
+			for k, v := range tc.keys {
+				if strings.HasPrefix(k, "/") {
+					k = root + k
+				}
+				want[k] = v
+			}
+			flat, err := simplified.MarshalFlat(comp, wt)
+			if err != nil {
+				t.Fatalf("MarshalFlat: %v", err)
+			}
+			var m map[string]any
+			if err := json.Unmarshal(flat, &m); err != nil {
+				t.Fatal(err)
+			}
+			got := make(map[string]any)
+			for k, v := range m {
+				if strings.HasPrefix(k, "ctx/composer") || strings.HasPrefix(k, root+"/composer") {
+					got[k] = v
+				}
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("composer keys = %v,\nwant %v", got, want)
+			}
+			back, err := simplified.UnmarshalFlat(flat, wt)
+			if err != nil {
+				t.Fatalf("UnmarshalFlat: %v", err)
+			}
+			if !reflect.DeepEqual(composerValue(t, back.Composer), composerValue(t, tc.composer)) {
+				t.Errorf("FLAT round trip composer = %s, want %s", canonicalComposer(t, back.Composer), canonicalComposer(t, tc.composer))
+			}
+			structured, err := simplified.MarshalStructured(comp, wt)
+			if err != nil {
+				t.Fatalf("MarshalStructured: %v", err)
+			}
+			back, err = simplified.UnmarshalStructured(structured, wt, simplified.WithStrict())
+			if err != nil {
+				t.Fatalf("UnmarshalStructured (strict): %v", err)
+			}
+			if !reflect.DeepEqual(composerValue(t, back.Composer), composerValue(t, tc.composer)) {
+				t.Errorf("STRUCTURED round trip composer = %s, want %s", canonicalComposer(t, back.Composer), canonicalComposer(t, tc.composer))
+			}
+		})
+	}
+}

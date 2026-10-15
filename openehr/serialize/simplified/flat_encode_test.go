@@ -192,12 +192,12 @@ func TestEncodeSkipsEmptyRepeatInstances(t *testing.T) {
 	}
 }
 
-// TestEncodePartyRelatedComposerErrors: ctx/ short forms carry only
-// composer_self / composer_name; a PARTY_RELATED composer (or any other
-// unrepresentable PARTY_PROXY) has no encoding. Silently omitting it would let
-// a WithTemplate decode default the composer to PARTY_SELF — a silent type
-// substitution — so encode must fail loudly instead (see deviations.md).
-func TestEncodePartyRelatedComposerErrors(t *testing.T) {
+// TestEncodePartyRelatedComposerAtRealPath — REQ-053, ADR 0029 (replacing
+// the pin that refused a PARTY_RELATED composer). No ctx/ short form carries a
+// PARTY_RELATED, so encode writes it whole at the composer's real path, its
+// name and its `/relationship`, with no ctx/ composer key, and decode reads it
+// back as the same PARTY_RELATED rather than defaulting the composer.
+func TestEncodePartyRelatedComposerAtRealPath(t *testing.T) {
 	comp, wt := genComposition(t, minimalObsOPT)
 	name := "Related Composer"
 	comp.Composer = &rm.PartyRelated{
@@ -210,36 +210,66 @@ func TestEncodePartyRelatedComposerErrors(t *testing.T) {
 			},
 		},
 	}
-	if _, err := simplified.MarshalFlat(comp, wt); !errors.Is(err, simplified.ErrUnsupportedDatatype) {
-		t.Errorf("MarshalFlat(PARTY_RELATED composer) err = %v, want ErrUnsupportedDatatype", err)
+	m := flatKeys(t, comp, wt)
+	root := wt.Tree.ID
+	for key, want := range map[string]any{
+		root + "/composer|name":                     name,
+		root + "/composer/relationship|code":        "10",
+		root + "/composer/relationship|value":       "mother",
+		root + "/composer/relationship|terminology": "openehr",
+	} {
+		if m[key] != want {
+			t.Errorf("FLAT %q = %#v, want %#v", key, m[key], want)
+		}
+	}
+	for key := range m {
+		if strings.HasPrefix(key, "ctx/composer") {
+			t.Errorf("FLAT carries %q beside the real-path composer", key)
+		}
+	}
+	data, err := json.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := simplified.UnmarshalFlat(data, wt)
+	if err != nil {
+		t.Fatalf("UnmarshalFlat: %v", err)
+	}
+	related, ok := got.Composer.(*rm.PartyRelated)
+	if !ok || related.Name == nil || *related.Name != name || related.Relationship.DefiningCode.CodeString != "10" {
+		t.Errorf("decoded composer = %#v, want the PARTY_RELATED back", got.Composer)
 	}
 }
 
-// The other two composer shapes wire.md § REQ-140 makes typed errors on encode.
-// Only the PARTY_RELATED one above was pinned end-to-end; these two were made
-// normative in the same delta and left unguarded (PR #89 review).
-func TestEncodeComposerShapesCtxCannotCarry(t *testing.T) {
+// TestEncodeComposerShapesRefused — REQ-053, ADR 0029. Encode refuses a
+// composer PARTY_IDENTIFIED with an empty name (RM invariant `Name_valid`) or
+// with no name, external_ref or identifiers (`Basic_validity`), and a
+// PARTY_RELATED carrying a relationship and nothing else: written as nothing,
+// the last two would read back as PARTY_SELF, a silent type substitution, and
+// decode reads an absent name where the first had an empty one. The refusal
+// names the composer. (A PARTY_SELF carrying an external_ref left this test:
+// it now encodes at the real path, TestREQ053ComposerEncodeSpellings.)
+func TestEncodeComposerShapesRefused(t *testing.T) {
 	empty := ""
+	ref := &rm.PartyRef{ID: &rm.HierObjectID{Value: "ref-1"}, Namespace: "demographic", Type: "PERSON"}
 	for name, composer := range map[string]rm.PartyProxy{
-		// `ctx/composer_self` is a bare Boolean — an external_ref beside it has
-		// nowhere to go and must not be dropped.
-		"PARTY_SELF carrying an external_ref": &rm.PartySelf{
-			ExternalRef: &rm.PartyRef{
-				ID:        &rm.HierObjectID{Value: "ref-1"},
-				Namespace: "demographic", Type: "PERSON",
-			},
-		},
-		// A nameless PARTY_IDENTIFIED would write no ctx/ key at all, and a
-		// WithTemplate decode of that output defaults the composer to PARTY_SELF
-		// — a silent type substitution.
-		"PARTY_IDENTIFIED with no name":    &rm.PartyIdentified{},
-		"PARTY_IDENTIFIED with empty name": &rm.PartyIdentified{Name: &empty},
+		"PARTY_IDENTIFIED with no name":                    &rm.PartyIdentified{},
+		"PARTY_IDENTIFIED with empty name":                 &rm.PartyIdentified{Name: &empty},
+		"PARTY_IDENTIFIED with empty name and a reference": &rm.PartyIdentified{Name: &empty, ExternalRef: ref},
+		"PARTY_RELATED with only a relationship": &rm.PartyRelated{Relationship: rm.DVCodedText{
+			DVText:       rm.DVText{Value: "mother"},
+			DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}, CodeString: "10"},
+		}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			comp, wt := genComposition(t, minimalObsOPT)
 			comp.Composer = composer
-			if _, err := simplified.MarshalFlat(comp, wt); !errors.Is(err, simplified.ErrUnsupportedDatatype) {
-				t.Errorf("MarshalFlat err = %v, want ErrUnsupportedDatatype", err)
+			_, err := simplified.MarshalFlat(comp, wt)
+			if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
+				t.Fatalf("MarshalFlat err = %v, want ErrUnsupportedDatatype", err)
+			}
+			if !strings.Contains(err.Error(), wt.Tree.ID+"/composer") {
+				t.Errorf("err = %v, want it to name %s/composer", err, wt.Tree.ID)
 			}
 		})
 	}
