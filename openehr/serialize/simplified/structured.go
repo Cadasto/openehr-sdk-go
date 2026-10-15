@@ -127,11 +127,18 @@ func flatToStructured(flat map[string]any) (map[string]any, error) {
 			if base, suffix, piped := strings.Cut(rest, "|"); piped {
 				leaf, isObj := ctxObj[base].(map[string]any)
 				if !isObj {
-					if prev, taken := ctxObj[base]; taken {
+					prev, taken := ctxObj[base]
+					if taken && prev != nil {
 						return nil, fmt.Errorf("%w: ctx/%s is both a direct value (%#v) and a suffixed leaf (%q)",
 							ErrUnknownPath, base, prev, key)
 					}
 					leaf = make(map[string]any)
+					if taken {
+						// A null direct value is absent beside the field's suffixes
+						// (REQ-053), so it is carried as written, as the null `"|"`
+						// member, as a leaf slot carries one ([heldNull]).
+						leaf[bareStructuredKey] = nil
+					}
 					ctxObj[base] = leaf
 				}
 				leaf["|"+suffix] = val
@@ -368,6 +375,12 @@ func (w *structuredWalker) ctx(obj map[string]any) error {
 					ErrUnsupportedDatatype, k)
 			}
 			for _, sk := range slices.Sorted(maps.Keys(leaf)) {
+				if sk == bareStructuredKey {
+					// The field's direct value, spelled as a member because the
+					// field also carries suffixes, as at a leaf ([bareStructuredKey]).
+					w.out["ctx/"+k] = leaf[sk]
+					continue
+				}
 				if strings.HasPrefix(sk, "|") {
 					w.out["ctx/"+k+sk] = leaf[sk]
 					continue
