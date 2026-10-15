@@ -1168,6 +1168,7 @@ requirements:
       - testkit/probes/composition
     probes: [PROBE-023]
     tests:
+      - internal/bmmtype/formal_parameters_test.go
       - internal/templateinstance/rmwrite/write_datavalue_test.go
       - internal/templateinstance/rmwrite/write_parent_test.go
       - openehr/composition/attribute_hold_test.go
