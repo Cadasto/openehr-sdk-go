@@ -519,6 +519,7 @@ requirements:
       - openehr/serialize/simplified/metadata_index_test.go
       - openehr/serialize/simplified/names_test.go
       - openehr/serialize/simplified/null_test.go
+      - openehr/serialize/simplified/raw_fit_test.go
       - openehr/serialize/simplified/raw_test.go
       - openehr/serialize/simplified/rmattr_encapsulated_test.go
       - openehr/serialize/simplified/rmattr_party_test.go
@@ -526,6 +527,7 @@ requirements:
       - openehr/serialize/simplified/roundtrip_test.go
       - openehr/serialize/simplified/simplified_test.go
       - openehr/serialize/simplified/string_leaf_test.go
+      - openehr/serialize/simplified/structured_ctx_test.go
       - openehr/serialize/simplified/structured_test.go
       - openehr/serialize/simplified/unmatched_test.go
       - openehr/template/webtemplate/incontext_rmpath_test.go
@@ -1810,6 +1812,7 @@ requirements:
       - openehr/serialize/simplified/interval_leaf_anchor_test.go
       - openehr/serialize/simplified/ism_transition_test.go
       - openehr/serialize/simplified/leaf_rmtype_test.go
+      - openehr/serialize/simplified/raw_fit_test.go
       - openehr/serialize/simplified/rmattr_encapsulated_test.go
       - openehr/serialize/simplified/rmattr_feeder_test.go
       - openehr/serialize/simplified/rmattr_party_test.go
@@ -1817,6 +1820,7 @@ requirements:
       - openehr/serialize/simplified/rmattr_test.go
       - openehr/serialize/simplified/rmattr_value_test.go
       - openehr/serialize/simplified/string_leaf_test.go
+      - openehr/serialize/simplified/structured_ctx_test.go
       - openehr/serialize/simplified/structured_test.go
       - openehr/serialize/simplified/unmatched_test.go
       - openehr/serialize/simplified/unspelled_node_test.go
@@ -2138,12 +2142,14 @@ requirements:
       - openehr/serialize/simplified/hardening_test.go
       - openehr/serialize/simplified/index_bound_test.go
       - openehr/serialize/simplified/null_test.go
+      - openehr/serialize/simplified/raw_fit_test.go
       - openehr/serialize/simplified/rmattr_encapsulated_test.go
       - openehr/serialize/simplified/rmattr_feeder_test.go
       - openehr/serialize/simplified/rmattr_party_test.go
       - openehr/serialize/simplified/rmattr_test.go
       - openehr/serialize/simplified/rmattr_value_test.go
       - openehr/serialize/simplified/string_leaf_test.go
+      - openehr/serialize/simplified/structured_ctx_test.go
       - openehr/serialize/simplified/unmatched_test.go
       - testkit/conformance/webtemplate/archetype_details_test.go
       - testkit/conformance/webtemplate/decode_reducing_test.go
