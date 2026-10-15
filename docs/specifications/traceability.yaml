@@ -500,6 +500,7 @@ requirements:
     tests:
       - openehr/serialize/simplified/archetype_details_test.go
       - openehr/serialize/simplified/composer_test.go
+      - openehr/serialize/simplified/composition_name_test.go
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/datatypes_test.go
       - openehr/serialize/simplified/fit_test.go
@@ -1800,6 +1801,8 @@ requirements:
     tests:
       - openehr/serialize/simplified/archetype_details_test.go
       - openehr/serialize/simplified/composer_test.go
+      - openehr/serialize/simplified/composition_name_corpus_test.go
+      - openehr/serialize/simplified/composition_name_test.go
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/datatypes_test.go
       - openehr/serialize/simplified/flat_encode_test.go
@@ -2129,6 +2132,7 @@ requirements:
       - openehr/serialize/canjson/unmatched_test.go
       - openehr/serialize/canxml/unmatched_test.go
       - openehr/serialize/simplified/composer_test.go
+      - openehr/serialize/simplified/composition_name_test.go
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/flat_decode_test.go
       - openehr/serialize/simplified/hardening_test.go
