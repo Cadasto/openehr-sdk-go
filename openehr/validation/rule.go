@@ -45,7 +45,6 @@ const (
 // CLASS.Invariant: the class that declares the invariant and the
 // invariant's name, both as the BMM spells them.
 const (
-	ruleCodeStringValid       = "CODE_PHRASE.Code_string_valid"
 	ruleProportionPrecision   = "DV_PROPORTION.Precision_validity"
 	ruleNullFlavourIndicated  = "ELEMENT.Inv_null_flavour_indicated"
 	ruleIntervalLimits        = "DV_INTERVAL.Limits_consistent"

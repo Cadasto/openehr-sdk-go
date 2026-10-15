@@ -22,6 +22,7 @@ import (
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
@@ -113,8 +114,9 @@ type engine struct {
 	// ancestry holds the values with an identity ([hasIdentity]) the walk is
 	// inside, outermost first: the one record a cycle is detected against.
 	ancestry []any
-	// visits counts the values the walk has visited, up to maxNodes; stopped
-	// is set once it reaches that limit, and ends the walk.
+	// visits counts the values the walk has visited, and the list items
+	// holding none it has reported, up to maxNodes; stopped is set once it
+	// reaches that limit, and ends the walk.
 	visits  int
 	stopped bool
 }
@@ -276,8 +278,29 @@ func (e *engine) walk(n engineNode) {
 	e.ancestry = e.ancestry[:len(e.ancestry)-1]
 }
 
+// spendVisit counts one visit, to a value of RM type rmType or to a list
+// item holding none whose declared type is rmType, at path, and reports
+// whether the walk may go on with it. Past the visit limit it counts
+// nothing: it reports `max_nodes` at path, records path in the stops of
+// [Coverage.Stopped], ends the walk and returns false.
+func (e *engine) spendVisit(path, rmType string) bool {
+	if e.visits == e.maxNodes {
+		e.found.emit(Issue{
+			Path:   path,
+			Code:   "max_nodes",
+			Detail: fmt.Sprintf("the walk stopped at %s after visiting %d values, its limit per call", rmType, e.maxNodes),
+		})
+		e.stoppedAt = append(e.stoppedAt, path)
+		e.stopped = true
+		return false
+	}
+	e.visits++
+	return true
+}
+
 // visit checks node n. A visit past the visit limit checks nothing: it
-// reports `max_nodes` at n's path and ends the walk. Otherwise visit checks
+// reports `max_nodes` at n's path and ends the walk ([engine.spendVisit]).
+// Otherwise visit checks
 // the node against the template node it binds to, if any: its identity and
 // its RM type ([identityIssue], [rmTypeIssue]); then it runs the RM rules of
 // the node's class, recording the class as visited; then, at a template
@@ -297,27 +320,24 @@ func (e *engine) walk(n engineNode) {
 // refusal is the whole report for that content ([engine.withdrawInside]). A
 // finding of theirs at the node's own path stays, though the rule read the
 // refused content to reach it.
+//
+// A value constraint that leaves an empty part of the value to the RM rules
+// is settled once the attributes are visited too ([engine.settle]); its
+// findings are at the node's own path, never at or below refused content.
 func (e *engine) visit(n engineNode) {
-	if e.visits == e.maxNodes {
-		e.found.emit(Issue{
-			Path:   n.path,
-			Code:   "max_nodes",
-			Detail: fmt.Sprintf("the walk stopped at %s after visiting %d values, its limit per call", n.rmType, e.maxNodes),
-		})
-		e.stoppedAt = append(e.stoppedAt, n.path)
-		e.stopped = true
+	if !e.spendVisit(n.path, n.rmType) {
 		return
 	}
-	e.visits++
 	scalar := false
 	if n.bound != nil {
 		scalar = e.checkIdentityAndType(n)
 	}
 	rulesFrom := len(e.found.issues)
-	rules, class := e.found.checkInvariants(n.value, n.rmType, n.path, n.role)
+	rules, class := e.found.checkInvariants(n.value, n.rmType, n.path)
 	rulesTo := len(e.found.issues)
+	var held *heldJudgement
 	if n.bound != nil {
-		n.bound = e.checkLeaf(n, scalar)
+		n.bound, held = e.checkLeaf(n, scalar, class)
 	}
 	if n.bound == nil && !rmaccess.Covers(n.value) {
 		return
@@ -336,6 +356,9 @@ func (e *engine) visit(n engineNode) {
 	}
 	refusedFrom := len(e.refused)
 	e.visitAttributes(n, class, rules)
+	if held != nil {
+		e.settle(held)
+	}
 	if refusals := e.refused[refusedFrom:]; len(refusals) > 0 && rulesTo > rulesFrom {
 		e.withdrawInside(rulesFrom, rulesTo, refusals)
 	}
@@ -387,33 +410,157 @@ func (e *engine) checkIdentityAndType(n engineNode) (scalar bool) {
 	return false
 }
 
-// checkLeaf applies the template's value constraint to node n, at a leaf of
-// the template, and returns the template node n's attributes are visited
-// against: n.bound itself, or nil where the template constrains nothing below
-// the node. A slot leaf carries no structure below it, and a leaf with a
-// primitive constraint checks the value by that constraint
-// ([appendPrimitiveIssues]); below either, the node's attributes are walked
-// with the RM rules alone. A CONSTRAINT_REF names a value set outside the
-// SDK and checks nothing locally: its path is listed in
-// [Coverage.External], and the bound value's attributes are visited against
-// the node as at any other.
-func (e *engine) checkLeaf(n engineNode, scalar bool) *tcimpl.CompiledNode {
+// checkLeaf applies the template's value constraint to node n, of the bare
+// RM class class, at a leaf of the template, and returns the template node
+// n's attributes are visited against: n.bound itself, or nil where the
+// template constrains nothing below the node. A slot leaf carries no
+// structure below it, and a leaf with a primitive constraint checks the
+// value by that constraint ([engine.judgeLeaf]); below either, the node's
+// attributes are walked with the RM rules alone. Where the part of the value
+// the constraint reads is empty, checkLeaf also returns the judgement the
+// walk holds until it has visited the node's attributes, and nil otherwise.
+// A CONSTRAINT_REF names a value set outside the SDK and checks nothing
+// locally: its path is listed in [Coverage.External], and the bound value's
+// attributes are visited against the node as at any other.
+func (e *engine) checkLeaf(n engineNode, scalar bool, class string) (*tcimpl.CompiledNode, *heldJudgement) {
 	if n.bound.IsSlot() {
-		return nil
+		return nil, nil
 	}
 	pc := n.bound.PrimitiveConstraint()
 	if pc == nil {
-		return n.bound
+		return n.bound, nil
 	}
-	e.found.issues = appendPrimitiveIssues(e.found.issues, n.value, n.path, pc)
+	held := e.judgeLeaf(n, class, pc)
 	if !isConstraintRef(pc) {
-		return nil
+		return nil, held
 	}
 	e.external = append(e.external, n.path)
 	if scalar {
-		return nil // a scalar has no attributes to visit
+		return nil, held // a scalar has no attributes to visit
 	}
-	return n.bound
+	return n.bound, held
+}
+
+// constrainedPart names, for each RM class whose value a primitive
+// constraint reads by its parts, the attributes that lead from the value to
+// the part the constraint reads that the RM rules may report as absent or
+// empty: a CODE_PHRASE's code_string, a DV_QUANTITY's units, the value of
+// the DV_DATE, DV_TIME, DV_DATE_TIME and DV_DURATION an AOM 1.4 short name
+// binds, and the code string of a DV_ORDINAL's symbol, two levels down.
+var constrainedPart = map[string][]string{
+	"CODE_PHRASE":  {"code_string"},
+	"DV_QUANTITY":  {"units"},
+	"DV_DATE":      {"value"},
+	"DV_TIME":      {"value"},
+	"DV_DATE_TIME": {"value"},
+	"DV_DURATION":  {"value"},
+	"DV_ORDINAL":   {"symbol", "defining_code", "code_string"},
+}
+
+// heldJudgement is the judgement of a primitive constraint whose part the RM
+// rules may still report as absent or empty, held by the walk until it has
+// visited the node's attributes ([engine.judgeLeaf], [engine.settle]).
+type heldJudgement struct {
+	// part is the issue path of the empty part.
+	part string
+	// from and to bound, in the issues the walk reported, those the
+	// constraint drew on what the part leaves.
+	from, to int
+	// whole holds the issues the constraint draws on the whole value.
+	whole []Issue
+}
+
+// judgeLeaf applies the primitive constraint pc to node n, of the bare RM
+// class class, and reports its issues. Where the walk visits the node's
+// attributes and the part of the value pc reads is absent or empty
+// ([engine.emptyPart]), the RM rules may report that part, and their
+// `required` there then stands for pc's finding: judgeLeaf reports what pc
+// judges of what the part leaves ([appendLeftIssues]) and returns what pc
+// judges of the whole value, which the walk holds until it has visited the
+// attributes and seen whether the part was reported ([engine.settle]).
+// Otherwise pc judges the whole value at once, as at the depth limit, where
+// the attributes are not visited, and judgeLeaf returns nil.
+func (e *engine) judgeLeaf(n engineNode, class string, pc constraints.PrimitiveConstraint) *heldJudgement {
+	part, empty := e.emptyPart(n, class)
+	if !empty {
+		e.found.issues = appendPrimitiveIssues(e.found.issues, n.value, n.path, pc)
+		return nil
+	}
+	from := len(e.found.issues)
+	e.found.issues = appendLeftIssues(e.found.issues, n, class, pc)
+	return &heldJudgement{
+		part:  part,
+		from:  from,
+		to:    len(e.found.issues),
+		whole: appendPrimitiveIssues(nil, n.value, n.path, pc),
+	}
+}
+
+// appendLeftIssues appends to issues what the primitive constraint pc,
+// bound to node n of the bare RM class class, judges of what the empty part
+// of n's value leaves: a C_CODE_PHRASE judges the terminology by its own
+// rule, its code list set aside, and the constraint of a DV_ORDINAL judges
+// the ordinal's value alone, which [primitiveInput] passes on as it is. Any
+// other constraint is left nothing to judge: a C_DV_QUANTITY's ranges are
+// per unit, and a temporal short name reads the value alone.
+func appendLeftIssues(issues []Issue, n engineNode, class string, pc constraints.PrimitiveConstraint) []Issue {
+	switch class {
+	case "CODE_PHRASE":
+		if cp, ok := pc.(constraints.CodePhrase); ok {
+			return appendPrimitiveIssues(issues, n.value, n.path, constraints.CodePhrase{Terminology: cp.Terminology})
+		}
+	case "DV_ORDINAL":
+		if in, ok := primitiveInput(n.value).(constraints.OrdinalSymbol); ok {
+			return appendPrimitiveIssues(issues, in.Value, n.path, pc)
+		}
+	}
+	return issues
+}
+
+// emptyPart returns the issue path of the part of node n's value, of the
+// bare RM class class, that a primitive constraint reads ([constrainedPart])
+// and reports whether the RM rules may report it as absent or empty. They
+// may when the walk visits the node's attributes, which it does on a value
+// of a registered RM class short of the depth limit, and the part is absent
+// through the generated access, which reads an empty string as absent.
+// Whether they do depends on the role of the node that holds the part, a
+// DV_SCALE symbol's code_string being one they let be blank, and on whether
+// the walk reaches the part before a limit stops it: the walk sees that
+// once it has visited the attributes ([engine.settle]).
+func (e *engine) emptyPart(n engineNode, class string) (string, bool) {
+	steps, ok := constrainedPart[class]
+	if !ok || n.depth >= e.maxDepth || !rmaccess.Covers(n.value) {
+		return "", false
+	}
+	value, path := n.value, n.path
+	for i, name := range steps {
+		path = attributePath(path, name)
+		v, present := rmaccess.Single(value, name)
+		if !present || v == nil || rmaccess.IsTypedNilPointer(v) {
+			return path, i == len(steps)-1
+		}
+		value = v
+	}
+	return "", false
+}
+
+// settle settles the judgement h held at a node once the walk has visited
+// the node's attributes. Where the walk reported the empty part as
+// `required`, that finding stands for the constraint's, and the issues the
+// constraint drew on what the part leaves stay as they are. Where it did
+// not, because the part is one the RM rules let be blank or a limit stopped
+// the walk before it reached the part, the issues the constraint draws on
+// the whole value take their place, so the part is reported either way, in
+// walk order. No issue at or before h's was removed while the attributes
+// were visited: a node below withdraws only issues reported after its own
+// visit began ([engine.withdrawInside]).
+func (e *engine) settle(h *heldJudgement) {
+	reported := slices.ContainsFunc(e.found.issues[h.to:], func(iss Issue) bool {
+		return iss.Code == "required" && iss.Path == h.part
+	})
+	if !reported {
+		e.found.issues = slices.Replace(e.found.issues, h.from, h.to, h.whole...)
+	}
 }
 
 // visitAttributes visits the attributes of node n, of the bare RM class
@@ -540,8 +687,10 @@ func shapeFrom(container, primitiveItems, hash bool) attrShape {
 // RM values at the path the shared path rule writes for it ([itemPaths]),
 // and each entry of a Hash at its position in ascending key order
 // ([hashEntryPath]), never at its key. Only a value of a registered RM class
-// ([rmaccess.Covers]) is walked as an item of a list or a Hash; a counted
-// list is never read item by item.
+// ([rmaccess.Covers]) is walked as an item of a list or a Hash; an item of a
+// list that holds no RM value is reported at its path instead
+// ([engine.walkUnconstrained]), and a counted list is never read item by
+// item.
 func (e *engine) visitAttribute(n engineNode, class string, a engineAttr) {
 	r := readAttribute(n.value, a)
 	if !visitedAt(a, r.present) {
@@ -567,16 +716,34 @@ func (e *engine) visitAttribute(n engineNode, class string, a engineAttr) {
 
 // walkUnconstrained walks what the present attribute a of node n, read as r,
 // holds, at attrPath, in role, with the RM rules alone: no template node
-// binds it.
+// binds it. An item of a list that holds no RM value, a nil element or a
+// typed-nil pointer ([isNilItem]), is not walked. It counts as one visit
+// ([engine.spendVisit]): within the visit limit it is reported at its own
+// path by the mandatory-presence rule ([findings.checkNilItem]); past the
+// limit it is reported as `max_nodes` instead, which ends the walk. Once the
+// visit limit has ended the walk, no later item is reported or walked. This is
+// the one place the RM rules meet a nil item: the walk with no template and
+// an attribute the template leaves open both reach it, while a nil item
+// under an attribute that declares children is the template's to refuse
+// ([engine.visitDeclaredItems]) and never gets here.
 func (e *engine) walkUnconstrained(n engineNode, a engineAttr, r attrReading, attrPath string, role floorRole) {
 	switch a.shape {
 	case shapeSingle:
 		e.walk(engineNode{value: r.value, rmType: runtimeRMType(r.value, a.rmType), path: attrPath, role: role, depth: n.depth + 1})
 	case shapeList:
-		if !slices.ContainsFunc(r.items, rmaccess.Covers) {
+		if !slices.ContainsFunc(r.items, walkedOrNil) {
 			return
 		}
 		for i, path := range e.itemPaths(attrPath, r.items) {
+			if e.stopped {
+				return // the visit limit ended the walk at or inside an earlier item
+			}
+			if isNilItem(r.items[i]) {
+				if e.spendVisit(path, a.rmType) {
+					e.found.checkNilItem(n.rmType, a.name, path)
+				}
+				continue
+			}
 			e.walkItem(n, r.items[i], a.rmType, path, role)
 		}
 	case shapeHash:
@@ -597,6 +764,14 @@ func (e *engine) walkItem(n engineNode, item any, rmType, path string, role floo
 		return
 	}
 	e.walk(engineNode{value: item, rmType: runtimeRMType(item, rmType), path: path, role: role, depth: n.depth + 1})
+}
+
+// walkedOrNil reports whether item, an item of a list no template node
+// binds, is one the walk has something to do with: a value of a registered
+// RM class ([rmaccess.Covers]), which it walks, or an item that holds no RM
+// value ([isNilItem]), which the RM rules report.
+func walkedOrNil(item any) bool {
+	return isNilItem(item) || rmaccess.Covers(item)
 }
 
 // visitDeclaredSingle visits the single-valued attribute a of node n, which
@@ -648,7 +823,10 @@ func (e *engine) visitDeclaredSingle(n engineNode, a engineAttr, r attrReading, 
 // child it binds to, at the path the shared path rule writes for it, with
 // the name the child pins where a sibling shares its id ([boundItemPaths]);
 // where the template declares no child, each item is walked with the RM
-// rules alone.
+// rules alone, which report an item that holds no RM value
+// ([engine.walkUnconstrained]). A nil item under an attribute that declares
+// children binds to none, so it is refused above and the RM rules never
+// see it.
 func (e *engine) visitDeclaredItems(n engineNode, a engineAttr, r attrReading, attrPath string, role floorRole) {
 	if !r.present {
 		e.checkAbsent(n, a, attrPath)

@@ -2,6 +2,7 @@ package constraints_test
 
 import (
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
@@ -431,6 +432,83 @@ func TestCDvOrdinal_Validate(t *testing.T) {
 	}
 	if v := open.Validate("nope"); len(v) != 1 || v[0].Code != constraints.CodeWrongType {
 		t.Errorf("Validate(open wrong type) = %v, want CodeWrongType", v)
+	}
+}
+
+// REQ-103 — an OrdinalSymbol matches a listed pair when the values and the
+// code strings are equal and the terminologies are equal or either is empty,
+// as CodePhrase.Validate compares a terminology. A listed symbol whose OPT
+// names no terminology admits the one the instance carries, and a listed
+// terminology admits an instance symbol that names none.
+func TestCDvOrdinal_REQ103_PairTerminologyEqualOrEmpty(t *testing.T) {
+	t.Parallel()
+	c := constraints.CDvOrdinal{Values: []constraints.OrdinalSymbol{
+		{Value: 0, Symbol: constraints.CodedTermRef{CodeString: "at0001"}},
+		{Value: 1, Symbol: constraints.CodedTermRef{Terminology: "local", CodeString: "at0002"}},
+	}}
+	pair := func(value int, terminology, code string) constraints.OrdinalSymbol {
+		return constraints.OrdinalSymbol{Value: value, Symbol: constraints.CodedTermRef{Terminology: terminology, CodeString: code}}
+	}
+	tests := []struct {
+		name  string
+		input constraints.OrdinalSymbol
+		match bool
+	}{
+		{name: "unnamed listed terminology, instance in local", input: pair(0, "local", "at0001"), match: true},
+		{name: "unnamed listed terminology, instance in another terminology", input: pair(0, "SNOMED-CT", "at0001"), match: true},
+		{name: "unnamed listed terminology, instance names none", input: pair(0, "", "at0001"), match: true},
+		{name: "listed local, instance in local", input: pair(1, "local", "at0002"), match: true},
+		{name: "listed local, instance names no terminology", input: pair(1, "", "at0002"), match: true},
+		{name: "unnamed listed terminology, different code", input: pair(0, "local", "at0002"), match: false},
+		{name: "listed local, different code", input: pair(1, "local", "at0001"), match: false},
+		{name: "listed local, different non-empty terminology", input: pair(1, "SNOMED-CT", "at0002"), match: false},
+		{name: "listed code under another value", input: pair(1, "", "at0001"), match: false},
+		{name: "unlisted value", input: pair(2, "local", "at0002"), match: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := c.Validate(tc.input)
+			if tc.match {
+				if len(got) != 0 {
+					t.Errorf("Validate(%d %s) = %+v, want nil", tc.input.Value, tc.input.Symbol, got)
+				}
+				return
+			}
+			if len(got) != 1 || got[0].Code != constraints.CodeNotInList {
+				t.Errorf("Validate(%d %s) = %+v, want one CodeNotInList", tc.input.Value, tc.input.Symbol, got)
+			}
+		})
+	}
+}
+
+// REQ-103, REQ-168 — the pair check's Detail names the allowed pairs from
+// the template, value|terminology::code in list order, as the int check
+// names the allowed values. The submitted pair goes only in Value.
+func TestCDvOrdinal_REQ103_PairDetailNamesAllowedPairs(t *testing.T) {
+	t.Parallel()
+	c := constraints.CDvOrdinal{Values: []constraints.OrdinalSymbol{
+		{Value: 0, Symbol: constraints.CodedTermRef{CodeString: "at0001"}},
+		{Value: 1, Symbol: constraints.CodedTermRef{Terminology: "local", CodeString: "at0002"}},
+		{Value: 2, Symbol: constraints.CodedTermRef{Terminology: "SNOMED-CT", CodeString: "260349002"}},
+	}}
+	submitted := constraints.OrdinalSymbol{
+		Value:  1,
+		Symbol: constraints.CodedTermRef{Terminology: "local", CodeString: "SUBMITTED-CODE"},
+	}
+	got := c.Validate(submitted)
+	if len(got) != 1 || got[0].Code != constraints.CodeNotInList {
+		t.Fatalf("Validate(%+v) = %+v, want one CodeNotInList", submitted, got)
+	}
+	const want = "ordinal (value, symbol) pair not in allowed [0|::at0001 1|local::at0002 2|SNOMED-CT::260349002]"
+	if got[0].Detail != want {
+		t.Errorf("Validate(%+v).Detail = %q, want %q", submitted, got[0].Detail, want)
+	}
+	if strings.Contains(got[0].Detail, submitted.Symbol.CodeString) {
+		t.Errorf("Validate(%+v).Detail = %q, carries the submitted code %q", submitted, got[0].Detail, submitted.Symbol.CodeString)
+	}
+	if rv, ok := got[0].Value.Reveal().(constraints.OrdinalSymbol); !ok || rv != submitted {
+		t.Errorf("Validate(%+v).Value.Reveal() = %#v, want the submitted pair", submitted, got[0].Value.Reveal())
 	}
 }
 

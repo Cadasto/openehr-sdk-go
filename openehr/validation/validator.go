@@ -32,8 +32,9 @@ type Limits struct {
 	Depth int
 
 	// Nodes is the number of values the walk visits in one call before it
-	// stops, reporting a max_nodes issue where it stopped. 100,000 by
-	// default.
+	// stops, reporting a max_nodes issue where it stopped. An item of a list
+	// that holds no value, a nil element or a nil pointer, counts as one
+	// visit too, though the walk does not enter it. 100,000 by default.
 	Nodes int
 }
 

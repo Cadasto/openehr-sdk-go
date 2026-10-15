@@ -217,7 +217,9 @@ func TestValidateRM_REQ112_IntervalOrderEveryBoundType(t *testing.T) {
 // ([TestValidateRM_REQ112_IntervalOrderEveryBoundType]). DV_ORDINAL and
 // DV_SCALE symbols are comparable only when they are coded in one named
 // terminology, so a symbol with an empty terminology id, on either side, is
-// not ordered. In each row the lower bound reads above the upper one, so
+// not ordered. A side marked unbounded is not ordered even where it still
+// holds a bound, and a BASE Proper_interval, which is not a DV_INTERVAL, is
+// not ordered at all. In each row the lower bound reads above the upper one, so
 // ordering the pair would report it; no Limits_consistent issue is reported,
 // and Coverage.Unevaluated lists Interval.Limits_comparable, the rule an
 // incomparable pair breaks, which the floor does not evaluate.
@@ -231,12 +233,25 @@ func TestValidateRM_REQ112_REQ171_IntervalOrderSkipsUnorderedPairs(t *testing.T)
 	upperOpen.UpperIncluded, upperOpen.UpperUnbounded = false, true
 	lowerOpen := rm.NewClosedDVInterval(rm.DVCount{}, rm.DVCount{Magnitude: -5})
 	lowerOpen.LowerIncluded, lowerOpen.LowerUnbounded = false, true
+	// A side marked unbounded that still carries a bound: the generated
+	// access reads that bound as present, so only the flag keeps the pair
+	// from being ordered.
+	upperOpenHeld := rm.NewClosedDVInterval(rm.DVCount{Magnitude: 10}, rm.DVCount{Magnitude: 5})
+	upperOpenHeld.UpperIncluded, upperOpenHeld.UpperUnbounded = false, true
+	lowerOpenHeld := rm.NewClosedDVInterval[rm.DVOrdered](&rm.DVCount{Magnitude: 10}, &rm.DVCount{Magnitude: 5})
+	lowerOpenHeld.LowerIncluded, lowerOpenHeld.LowerUnbounded = false, true
+	// BASE Proper_interval is not a DV_INTERVAL: its Limits_consistent is out
+	// of scope, so it is not ordered whatever bounds it holds.
+	proper := rm.ProperInterval[any]{Interval: rm.NewClosedInterval[any](rm.DVCount{Magnitude: 10}, rm.DVCount{Magnitude: 5})}
 	cases := []struct {
 		name string
 		root any
 	}{
 		{name: "DV_COUNT, upper side unbounded", root: &upperOpen},
 		{name: "DV_COUNT, lower side unbounded", root: &lowerOpen},
+		{name: "DV_COUNT, upper side unbounded with a bound held", root: &upperOpenHeld},
+		{name: "bare DV_COUNT, lower side unbounded with a bound held", root: &lowerOpenHeld},
+		{name: "Proper_interval of DV_COUNT", root: &proper},
 		{name: "DV_QUANTITY, upper magnitude NaN", root: new(rm.NewClosedDVInterval(rm.DVQuantity{Magnitude: 5, Units: "mm"}, rm.DVQuantity{Magnitude: rm.Real(math.NaN()), Units: "mm"}))},
 		{name: "DV_QUANTITY in different units", root: new(rm.NewClosedDVInterval(rm.DVQuantity{Magnitude: 5, Units: "cm"}, rm.DVQuantity{Magnitude: 1, Units: "m"}))},
 		{name: "DV_ORDINAL symbols in different terminologies", root: new(rm.NewClosedDVInterval(rm.DVOrdinal{Value: 3, Symbol: local}, rm.DVOrdinal{Value: 1, Symbol: snomed}))},

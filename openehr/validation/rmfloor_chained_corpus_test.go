@@ -123,7 +123,6 @@ func TestValidateComposition_REQ102_REQ112_BMIOneDefectCopies(t *testing.T) {
 			want: []string{
 				"code_not_in_value_set /language",
 				"required /language/code_string",
-				"rm_invariant /language",
 			},
 		},
 		{
@@ -239,10 +238,12 @@ func TestValidateComposition_REQ102_REQ112_ClinicalNotesOnce(t *testing.T) {
 // clinicalNotesIssues is the whole result of ValidateComposition on the
 // clinical_notes.v0 corpus composition, sorted as issueKeys sorts it. The
 // seven `required` findings marked below are absences both the template and
-// the RM rules see, each reported once. The other five are the RM rules'
-// alone: three are each value's RM rule beside its absent `value/value`, and
-// two are the timing's attributes. Issue 238 counted the same seven as
-// duplicates, when the template and the RM rules ran in two walks.
+// the RM rules see, each reported once. The other two are the RM rules'
+// alone: the timing's attributes. Three of the seven are a temporal value
+// whose `value` is JSON null, which REQ-112 reports once, at its
+// `value/value`, and not again by the value's Value_valid. Issue 238 counted
+// the same seven as duplicates, when the template and the RM rules ran in
+// two walks.
 var clinicalNotesIssues = func() []string {
 	const order = "/content[openEHR-EHR-INSTRUCTION.medication_order.v3]"
 	const direction = order + "/activities[at0001]/description/items[openEHR-EHR-CLUSTER.therapeutic_direction.v1]"
@@ -257,9 +258,6 @@ var clinicalNotesIssues = func() []string {
 		"required " + order + "/narrative",                // both
 		"required " + story + "/data/events[at0002]/time", // both
 		"required " + story + "/data/origin",              // both
-		"rm_invariant " + direction + "/items[at0066]/value",
-		"rm_invariant " + direction + "/items[at0178]/value",
-		"rm_invariant " + direction + "/items[at0179]/value",
 	}
 }()
 
@@ -283,7 +281,7 @@ const externalCodeChild = `
 // REQ-102, REQ-112 — a blank code_string under an external C_CODE_PHRASE
 // with no code list meets the template, which has no code to check it
 // against; the RM rules, which template validation applies, report the
-// CODE_PHRASE's RM-mandatory code_string and its non-empty rule.
+// CODE_PHRASE's RM-mandatory code_string once, as required.
 func TestValidate_REQ102_REQ112_ExternalCodePhraseBlankCode(t *testing.T) {
 	c := mustCompileInline(t, elementValueOPT(externalCodeChild))
 	coded := rm.DVCodedText{
@@ -295,7 +293,7 @@ func TestValidate_REQ102_REQ112_ExternalCodePhraseBlankCode(t *testing.T) {
 	}
 	coded.DefiningCode.CodeString = ""
 	r := validation.Validate(valueElement(coded), c)
-	want := []string{"required /value/defining_code/code_string", "rm_invariant /value/defining_code"}
+	want := []string{"required /value/defining_code/code_string"}
 	if r.OK || !equalKeys(r.Issues, want) {
 		t.Errorf("Validate(blank SNOMED-CT code) OK = %t, issues = %q; want not OK with %q", r.OK, issueKeys(r.Issues), want)
 	}

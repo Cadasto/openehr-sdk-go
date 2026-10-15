@@ -1,28 +1,17 @@
 package validation
 
-// rmfloor_adapters.go: type-switch adapters that lift a polymorphic RM
-// value into the concrete shape the RM rules' invariant evaluators
-// ([findings]) need. Mirrors the closed-set discipline of
-// rmTypeInfo/describeRMType in composition.go — adding a new BMM
-// concrete means editing one switch.
+// rmfloor_adapters.go: adapters that lift a polymorphic RM value into the
+// concrete shape the RM rules' invariant evaluators ([findings]) need. Most
+// are closed type switches, in the discipline of rmTypeInfo/describeRMType
+// in composition.go, so a new BMM concrete they read means editing the
+// switch that reads it. The DV_INTERVAL bound reader ([intervalBounds]) is
+// not a switch: it reads the bounds through the generated access, which
+// covers every DV_INTERVAL instantiation the registry knows.
 
-import "github.com/cadasto/openehr-sdk-go/openehr/rm"
-
-// asCodePhrase recovers a CODE_PHRASE value (by value or by pointer)
-// from any concrete carrying it. Returns ok=false when value is not a
-// CODE_PHRASE.
-func asCodePhrase(value any) (rm.CodePhrase, bool) {
-	switch v := value.(type) {
-	case *rm.CodePhrase:
-		if v == nil {
-			return rm.CodePhrase{}, false
-		}
-		return *v, true
-	case rm.CodePhrase:
-		return v, true
-	}
-	return rm.CodePhrase{}, false
-}
+import (
+	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+)
 
 // asDVQuantity recovers a DV_QUANTITY value (by value or by pointer)
 // from any concrete carrying it.
@@ -243,61 +232,32 @@ func dvIntervalOrder(value any) (order intervalOrder, ok bool) {
 }
 
 // intervalBounds returns the lower and upper bounds of a DV_INTERVAL when
-// neither side is unbounded, for each instantiation the RM types hold, typed
-// or bare, by value or by pointer. bounded is false for an unbounded side, a
-// nil interval and any other value.
+// neither side is unbounded. It reads the flags and the bounds through the
+// generated access ([rmaccess.Single]), which serves every DV_INTERVAL
+// instantiation the registry knows, typed or bare, by value or by pointer, so
+// an instantiation a BMM bump adds is read with no change here. A typed
+// interval gives the T it holds, a bare one whatever its DV_ORDERED interface
+// holds; [orderBounds] reads either, and does not order a typed-nil bound.
+//
+// bounded is false for a value whose class is not DV_INTERVAL, such as a BASE
+// Point_interval or Proper_interval, whose Limits_consistent is out of scope;
+// for a side marked unbounded, even where it still holds a bound; for a nil
+// bound; and for a nil interval.
 func intervalBounds(value any) (lower, upper rm.DVOrdered, bounded bool) {
-	switch v := value.(type) {
-	case *rm.DVInterval[rm.DVOrdered]:
-		return boundsOf(v)
-	case rm.DVInterval[rm.DVOrdered]:
-		return boundsOf(&v)
-	case *rm.DVInterval[rm.DVCount]:
-		return boundsOf(v)
-	case rm.DVInterval[rm.DVCount]:
-		return boundsOf(&v)
-	case *rm.DVInterval[rm.DVQuantity]:
-		return boundsOf(v)
-	case rm.DVInterval[rm.DVQuantity]:
-		return boundsOf(&v)
-	case *rm.DVInterval[rm.DVOrdinal]:
-		return boundsOf(v)
-	case rm.DVInterval[rm.DVOrdinal]:
-		return boundsOf(&v)
-	case *rm.DVInterval[rm.DVScale]:
-		return boundsOf(v)
-	case rm.DVInterval[rm.DVScale]:
-		return boundsOf(&v)
-	case *rm.DVInterval[rm.DVProportion]:
-		return boundsOf(v)
-	case rm.DVInterval[rm.DVProportion]:
-		return boundsOf(&v)
-	case *rm.DVInterval[rm.DVDate]:
-		return boundsOf(v)
-	case rm.DVInterval[rm.DVDate]:
-		return boundsOf(&v)
-	case *rm.DVInterval[rm.DVTime]:
-		return boundsOf(v)
-	case rm.DVInterval[rm.DVTime]:
-		return boundsOf(&v)
-	case *rm.DVInterval[rm.DVDateTime]:
-		return boundsOf(v)
-	case rm.DVInterval[rm.DVDateTime]:
-		return boundsOf(&v)
-	case *rm.DVInterval[rm.DVDuration]:
-		return boundsOf(v)
-	case rm.DVInterval[rm.DVDuration]:
-		return boundsOf(&v)
-	}
-	return nil, nil, false
-}
-
-// boundsOf returns the two bounds of iv when neither side is unbounded.
-func boundsOf[T rm.DVOrdered](iv *rm.DVInterval[T]) (lower, upper rm.DVOrdered, bounded bool) {
-	if iv == nil || iv.LowerUnbounded || iv.UpperUnbounded {
+	if class, _ := rm.RMTypeName(value); class != "DV_INTERVAL" {
 		return nil, nil, false
 	}
-	return iv.Lower, iv.Upper, true
+	if intervalFlagSet(value, "lower_unbounded") || intervalFlagSet(value, "upper_unbounded") {
+		return nil, nil, false
+	}
+	l, _ := rmaccess.Single(value, "lower")
+	u, _ := rmaccess.Single(value, "upper")
+	lower, lowerOK := l.(rm.DVOrdered)
+	upper, upperOK := u.(rm.DVOrdered)
+	if !lowerOK || !upperOK {
+		return nil, nil, false
+	}
+	return lower, upper, true
 }
 
 // orderBounds reads the order of two bounds that the RM makes strictly
@@ -415,11 +375,13 @@ func numberOrder[N ~int32 | ~int64 | ~float64](class string, lower, upper N) int
 // lower with upper ([rm.DVDate.Compare] and its kin), which reads the
 // magnitude of each parsed value, and lowerMag and upperMag are those
 // magnitudes. A value the parse refuses has no magnitude (Compare would read
-// it as zero), so a pair that holds one is not ordered; the bound's own
-// Value_valid reports it. The magnitude of a DV_TIME or a DV_DATE_TIME reads
-// the clock in the value's own time zone, so [orderBounds] sends two of them
-// here only when they are written with one zone designator, or both with
-// none, and sends the others to [instantOrder].
+// it as zero), so a pair that holds one is not ordered. An empty value is
+// reported by the mandatory-presence rule, as `required` at the bound's
+// …/value; any other value the parse refuses, by the bound's own Value_valid.
+// The magnitude of a DV_TIME or a DV_DATE_TIME reads the clock in the value's
+// own time zone, so [orderBounds] sends two of them here only when they are
+// written with one zone designator, or both with none, and sends the others
+// to [instantOrder].
 func temporalOrder(class string, sign int, lowerMag, upperMag float64, lowerValid, upperValid bool) (intervalOrder, bool) {
 	if !lowerValid || !upperValid {
 		return intervalOrder{}, false
@@ -439,8 +401,9 @@ func temporalOrder(class string, sign int, lowerMag, upperMag float64, lowerVali
 //
 // The pair is not ordered when either value has no zone: a value without one
 // names no instant to set against a value with one. A value the parse refuses
-// reads as having no zone, so it is not ordered either; its own Value_valid
-// reports it.
+// reads as having no zone, so it is not ordered either. It is reported as
+// [temporalOrder] says: an empty value as `required` at its …/value, any
+// other by its own Value_valid.
 func instantOrder(class, lowerZone, upperZone string, lowerMag, upperMag float64) (intervalOrder, bool) {
 	lowerOffset, lowerZoned := zoneOffset(lowerZone)
 	upperOffset, upperZoned := zoneOffset(upperZone)

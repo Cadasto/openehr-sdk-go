@@ -119,7 +119,6 @@ func (r matrixRow) pairs() []matrixPair {
 // the precision of 0 the RM reads is_integral as.
 var invariantMatrix = map[string]matrixRow{
 	"ARCHETYPED.Rm_version_valid":        {breaking: `"archetype_id":{"_type":"ARCHETYPE_ID","value":"openEHR-EHR-OBSERVATION.x.v1"}`, conforming: `"archetype_id":{"_type":"ARCHETYPE_ID","value":"openEHR-EHR-OBSERVATION.x.v1"},"rm_version":"1.1.0"`},
-	"CODE_PHRASE.Code_string_valid":      {breaking: `"terminology_id":{"_type":"TERMINOLOGY_ID","value":"local"},"code_string":""`, conforming: `"terminology_id":{"_type":"TERMINOLOGY_ID","value":"local"},"code_string":"at0001"`},
 	"COMPOSITION.Is_archetype_root":      {breaking: ``, conforming: archetypeDetailsMember},
 	"DV_DATE.Value_valid":                {breaking: `"value":"example"`, conforming: `"value":"2024-01-01"`},
 	"DV_DATE_TIME.Value_valid":           {breaking: `"value":"example"`, conforming: `"value":"2024-01-01T10:30:00Z"`},
@@ -165,6 +164,7 @@ var invariantMatrix = map[string]matrixRow{
 
 	"ACTIVITY.Action_archetype_id_valid":         {breaking: `"action_archetype_id":""`, conforming: `"action_archetype_id":"openEHR-EHR-ACTION.x.v1"`, rule: ruleMandatory, path: "/action_archetype_id"},
 	"AUDIT_DETAILS.System_id_valid":              {breaking: `"system_id":""`, conforming: `"system_id":"x"`, rule: ruleMandatory, path: "/system_id"},
+	"CODE_PHRASE.Code_string_valid":              {breaking: `"terminology_id":{"_type":"TERMINOLOGY_ID","value":"local"},"code_string":""`, conforming: `"terminology_id":{"_type":"TERMINOLOGY_ID","value":"local"},"code_string":"at0001"`, rule: ruleMandatory, path: "/code_string"},
 	"DV_IDENTIFIER.Id_valid":                     {breaking: `"id":""`, conforming: `"id":"x"`, rule: ruleMandatory, path: "/id"},
 	"DV_PARAGRAPH.Items_valid":                   {breaking: `"items":[]`, conforming: `"items":[{"_type":"DV_TEXT","value":"x"}]`, rule: ruleCardinality, path: "/items"},
 	"DV_PARSABLE.Formalism_valid":                {breaking: `"formalism":""`, conforming: `"formalism":"x"`, rule: ruleMandatory, path: "/formalism"},

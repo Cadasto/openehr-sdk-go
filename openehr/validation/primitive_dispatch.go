@@ -5,6 +5,12 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
 
+// noPrecision is the sentinel passed to
+// [constraints.QuantityValue.Precision] when DV_QUANTITY.Precision
+// is nil on the wire. [constraints.DvQuantity.Validate] treats
+// negative precision as "unspecified" (skips precision checks).
+const noPrecision rm.Integer = -1
+
 // dataValueInput converts an RM DATA_VALUE into the Go value
 // [constraints.PrimitiveConstraint.Validate] expects for the matching
 // primitive type. Returns (input, true) for the supported set and
@@ -22,18 +28,12 @@ import (
 //   - DV_TEXT      → string (value)
 //   - DV_BOOLEAN   → bool
 //   - DV_COUNT     → int (magnitude)
-//   - DV_ORDINAL   → int (value)
+//   - DV_ORDINAL   → [constraints.OrdinalSymbol] (value, symbol's
+//     defining_code)
 //   - DV_DATE      → string (value, ISO 8601)
 //   - DV_TIME      → string (value, ISO 8601)
 //   - DV_DATE_TIME → string (value, ISO 8601)
 //   - DV_DURATION  → string (value, ISO 8601 duration)
-//
-// noPrecision is the sentinel passed to
-// [constraints.QuantityValue.Precision] when DV_QUANTITY.Precision
-// is nil on the wire. [constraints.DvQuantity.Validate] treats
-// negative precision as "unspecified" (skips precision checks).
-const noPrecision rm.Integer = -1
-
 func dataValueInput(dv rm.DataValue) (any, bool) {
 	// Belt-and-suspenders typed-nil guard. The walk's primary
 	// defence is the generated access, which reads an interface holding
@@ -83,11 +83,9 @@ func dataValueInput(dv rm.DataValue) (any, bool) {
 	case rm.DVCount:
 		return v.Magnitude, true
 	case *rm.DVOrdinal:
-		// DV_ORDINAL.value is Integer (int32) per the RM spec; safe
-		// to widen to int (≥ int32 on every supported Go platform).
-		return int(v.Value), true
+		return ordinalInput(v), true
 	case rm.DVOrdinal:
-		return int(v.Value), true
+		return ordinalInput(&v), true
 	case *rm.DVDate:
 		return v.Value, true
 	case rm.DVDate:
@@ -106,6 +104,28 @@ func dataValueInput(dv rm.DataValue) (any, bool) {
 		return v.Value, true
 	}
 	return nil, false
+}
+
+// ordinalInput returns the value [constraints.CDvOrdinal.Validate] checks
+// for o: the value and the symbol's defining_code as one
+// [constraints.OrdinalSymbol], so a symbol that does not match its value is
+// reported; a code naming no terminology matches a listed pair by its code
+// (REQ-103) while the RM rules report the missing terminology. A code with
+// an empty code string is passed on as it is: where the RM rules report it,
+// the walk has the constraint judge the value alone
+// ([engine.judgeLeaf]).
+//
+// DV_ORDINAL.value is Integer (int32) per the RM; widening it to int is
+// safe on every supported Go platform.
+func ordinalInput(o *rm.DVOrdinal) constraints.OrdinalSymbol {
+	code := o.Symbol.DefiningCode
+	return constraints.OrdinalSymbol{
+		Value: int(o.Value),
+		Symbol: constraints.CodedTermRef{
+			Terminology: code.TerminologyID.Value,
+			CodeString:  code.CodeString,
+		},
+	}
 }
 
 // deref returns *p when non-nil, otherwise fallback. Generic helper

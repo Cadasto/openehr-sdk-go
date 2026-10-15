@@ -26,7 +26,7 @@ var invariantInventory = map[string]inventoryEntry{
 	"Boolean.Completeness":                                 {kind: invariantOutOfScope},
 	"Boolean.Involutive_negation":                          {kind: invariantOutOfScope},
 	"Boolean.Non_contradiction":                            {kind: invariantOutOfScope},
-	"CODE_PHRASE.Code_string_valid":                        {kind: invariantEvaluated, function: "checkCodePhrase"},
+	"CODE_PHRASE.Code_string_valid":                        {kind: invariantEvaluated, function: "checkMandatory"},
 	"COMPOSITION.Category_validity":                        {kind: invariantEvaluated, function: "checkCodedInvariants"},
 	"COMPOSITION.Content_valid":                            {kind: invariantOutOfScope},
 	"COMPOSITION.Is_archetype_root":                        {kind: invariantEvaluated, function: "checkArchetypeRoot"},

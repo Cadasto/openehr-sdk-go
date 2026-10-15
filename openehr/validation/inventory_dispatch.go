@@ -54,7 +54,6 @@ type floorNode struct {
 	value  any
 	rmType string
 	path   string
-	role   floorRole
 }
 
 // invariantCheck binds an evaluated invariant to the evaluator that
@@ -90,13 +89,6 @@ const mandatoryCheck = "checkMandatory"
 func nodeCheck(function string, f func(*findings, any, string)) invariantCheck {
 	return invariantCheck{function: function, run: func(into *findings, n floorNode, _ string) {
 		f(into, n.value, n.path)
-	}}
-}
-
-// roleCheck binds an evaluator that also reads the node's role.
-func roleCheck(function string, f func(*findings, any, string, floorRole)) invariantCheck {
-	return invariantCheck{function: function, run: func(into *findings, n floorNode, _ string) {
-		f(into, n.value, n.path, n.role)
 	}}
 }
 
@@ -150,7 +142,6 @@ func coveredCheck(function string, _ any) invariantCheck {
 // whole as DV_PROPORTION.Precision_validity.
 var invariantChecks = map[string]invariantCheck{
 	"ARCHETYPED.Rm_version_valid":        nodeCheck("checkArchetyped", (*findings).checkArchetyped),
-	"CODE_PHRASE.Code_string_valid":      roleCheck("checkCodePhrase", (*findings).checkCodePhrase),
 	"COMPOSITION.Is_archetype_root":      ruleCheck("checkArchetypeRoot", (*findings).checkArchetypeRoot),
 	"DV_DATE.Value_valid":                ruleCheck("checkTemporalValue", (*findings).checkTemporalValue),
 	"DV_DATE_TIME.Value_valid":           ruleCheck("checkTemporalValue", (*findings).checkTemporalValue),
@@ -196,6 +187,7 @@ var invariantChecks = map[string]invariantCheck{
 
 	"ACTIVITY.Action_archetype_id_valid":         coveredCheck("checkMandatory", (*findings).checkMandatory),
 	"AUDIT_DETAILS.System_id_valid":              coveredCheck("checkMandatory", (*findings).checkMandatory),
+	"CODE_PHRASE.Code_string_valid":              coveredCheck("checkMandatory", (*findings).checkMandatory),
 	"DV_IDENTIFIER.Id_valid":                     coveredCheck("checkMandatory", (*findings).checkMandatory),
 	"DV_PARAGRAPH.Items_valid":                   coveredCheck("checkMandatory", (*findings).checkMandatory),
 	"DV_PARSABLE.Formalism_valid":                coveredCheck("checkMandatory", (*findings).checkMandatory),

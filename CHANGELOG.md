@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-Template validation and the RM floor run as one walk, a response whose body cannot be read keeps its status and headers, canonical JSON omits an absent mandatory member, a request carrying a cookie or proxy credential refuses an https-to-http redirect, and FLAT carries a referenced composer and a renamed composition. **Breaking:** validation returns a smaller result, a Go value shared by two attributes is reported at each path, code that implements `query.Repository` must add `RunStoredVersion`, FLAT encode writes a referenced composer and a renamed composition at their real paths, and FLAT decode refuses a `null` required suffix.
+Template validation and the RM floor run as one walk, a response whose body cannot be read keeps its status and headers, canonical JSON omits an absent mandatory member, a request carrying a cookie or proxy credential refuses an https-to-http redirect, and FLAT carries a referenced composer and a renamed composition. **Breaking:** validation returns a smaller result and one finding for an empty part, a Go value shared by two attributes is reported at each path, a nil list item and an ordinal symbol that does not match its value now fail validation, code that implements `query.Repository` must add `RunStoredVersion`, FLAT encode writes a referenced composer and a renamed composition at their real paths, and FLAT decode refuses a `null` required suffix.
 
 ### Added
 
@@ -18,6 +18,9 @@ Template validation and the RM floor run as one walk, a response whose body cann
 
 - **Breaking: a smaller validation result (REQ-171, REQ-102).** Content the template refuses is reported once and not entered, an empty mandatory list or missing reference part draws one finding, and `Coverage.Unevaluated` omits classes seen only there.
 - **Breaking: a Go value shared by two attributes is reported at each path (REQ-112).** The validators reported it at its first path only.
+- **Breaking: a nil list item is reported (REQ-112, REQ-102).** A nil element or nil pointer in a list draws `required` at its own path and counts as one visit; validation used to skip it.
+- **Breaking: an empty part draws one finding (REQ-112, REQ-102).** An empty temporal value, CODE_PHRASE code string or DV_QUANTITY units draws `required` alone, with no `rm_invariant` or template `primitive_*` beside it.
+- **Breaking: template validation checks a DV_ORDINAL's symbol against its value (REQ-102, REQ-103).** A value and symbol pair the template does not list draws `primitive_not_in_list`; a listed symbol naming no terminology admits any.
 - **Validation issues follow the document, and an item bound to a 0..0 child is reported once (REQ-171).** `WithRMInfo` no longer draws RM-layer findings for a lookup's extra mandatory attributes.
 - **Validation with a template is faster (REQ-171).** It ran 2.1 to 2.8 times faster than the two-walk version in benchstat runs on three inputs.
 - **Breaking: `query.Repository` gains `RunStoredVersion` (REQ-057).** Code that implements the interface must add the method.

@@ -7,7 +7,8 @@ package validation
 // ADR 0027). The rules here report into [findings]:
 //
 //   - RM-mandatory attribute absences (checkMandatory, which the walk calls
-//     for each mandatory attribute it reads absent or empty);
+//     for each mandatory attribute it reads absent or empty), and an item of
+//     a list that holds no RM value (checkNilItem);
 //   - the per-RM-type invariant catalogue of § REQ-112 in
 //     docs/specifications/clinical-modeling.md, on every node the walk
 //     visits. checkInvariants dispatches it through the invariant inventory
@@ -265,6 +266,25 @@ func (f *findings) checkMandatory(rmType, attr, attrPath string, multiValued, pr
 	}
 }
 
+// checkNilItem applies the mandatory-presence rule to an item of the list
+// attribute attr of a node of RM type rmType that holds no RM value, a nil
+// element or a typed-nil pointer ([isNilItem]): it is reported as
+// `required` at the item's own path, itemPath, rule mandatory. The walk
+// calls it for each such item of a list no template node binds that is
+// within the visit limit, and does not walk the item; the item still counts
+// toward its list, so a list that holds only such items is present and not
+// empty, and toward the visit limit as one visit. A nil item the template
+// refuses is reported by the template's rule alone.
+func (f *findings) checkNilItem(rmType, attr, itemPath string) {
+	f.emit(Issue{
+		Path:   itemPath,
+		Code:   "required",
+		Layer:  LayerRM,
+		Rule:   ruleMandatory,
+		Detail: fmt.Sprintf("item of %q on %s holds no RM value", attr, rmType),
+	})
+}
+
 // hashEntryPath returns the issue path of the entry at index i, in ascending
 // key order, of the Hash attribute at attrPath: its 1-based position, never
 // its key, which is instance data (REQ-102 Issue paths).
@@ -286,20 +306,20 @@ func runtimeRMType(val any, declared string) string {
 }
 
 // checkInvariants runs the RM rules of the class of the node value, of RM
-// type rmType, at path, in role role, and records the class as visited. The
-// rules are the inventory's ([floorRules]): the evaluators of the evaluated
-// invariants the class and its ancestors declare, the coded ones included,
-// and the attribute checks that apply to the class. A type no registered
-// class has runs nothing (this is a floor, not an exhaustive RM check). It
-// returns the class's rules, nil for such a type, and the bare class name of
-// rmType, which the walk reads the class's attributes by ([classAttributes]).
-func (f *findings) checkInvariants(value any, rmType, path string, role floorRole) (*classRules, string) {
+// type rmType, at path, and records the class as visited. The rules are the
+// inventory's ([floorRules]): the evaluators of the evaluated invariants the
+// class and its ancestors declare, the coded ones included, and the
+// attribute checks that apply to the class. A type no registered class has
+// runs nothing (this is a floor, not an exhaustive RM check). It returns the
+// class's rules, nil for such a type, and the bare class name of rmType,
+// which the walk reads the class's attributes by ([classAttributes]).
+func (f *findings) checkInvariants(value any, rmType, path string) (*classRules, string) {
 	rules, class := rulesFor(rmType)
 	if rules == nil {
 		return nil, class
 	}
 	f.visited = f.visited.with(rules.index)
-	n := floorNode{value: value, rmType: rmType, path: path, role: role}
+	n := floorNode{value: value, rmType: rmType, path: path}
 	for _, c := range rules.checks {
 		c.run(f, n, c.rule)
 	}
@@ -376,37 +396,17 @@ func (f *findings) checkArchetyped(value any, path string) {
 	}
 }
 
-// checkCodePhrase enforces the RM spec floor on CODE_PHRASE: the
-// code_string MUST be non-empty when the value is present, except on a
-// DV_SCALE symbol's defining_code (see [scaleSymbolMayHaveNoCode]). (The
-// terminology_id absence is already RM-required and caught by the
-// mandatory-presence rule.)
-func (f *findings) checkCodePhrase(value any, path string, role floorRole) {
-	cp, ok := asCodePhrase(value)
-	if !ok {
-		return
-	}
-	if cp.CodeString == "" && !scaleSymbolMayHaveNoCode(role) {
-		f.emit(Issue{
-			Path:   path,
-			Code:   "rm_invariant",
-			Layer:  LayerRM,
-			Rule:   ruleCodeStringValid,
-			Detail: "CODE_PHRASE.code_string must be non-empty",
-		})
-	}
-}
-
 // scaleSymbolMayHaveNoCode reports whether a CODE_PHRASE in role may carry a
 // blank code_string. The RM's DV_SCALE.symbol allows a scale value that has
 // no code: its symbol is then a DV_CODED_TEXT carrying the terminology_id and
-// a blank code_string. The CODE_PHRASE at the symbol's defining_code therefore
-// reports neither the non-empty code_string invariant nor a `required`
-// code_string. The exemption covers that one node only: a blank
-// terminology_id, the symbol's own value, a DV_ORDINAL symbol, and every other
-// CODE_PHRASE under the scale are checked as usual. The walk hands the role
-// down from the DV_SCALE ([childRole]), so the exemption follows the node and
-// not its path, which another node may share.
+// a blank code_string. Elsewhere a blank code_string draws one finding, the
+// `required` of the mandatory-presence rule, which decides the non-empty
+// code_string invariant; the CODE_PHRASE at the symbol's defining_code draws
+// none. The exemption covers that one node only: a blank terminology_id, the
+// symbol's own value, a DV_ORDINAL symbol, and every other CODE_PHRASE under
+// the scale are checked as usual. The walk hands the role down from the
+// DV_SCALE ([childRole]), so the exemption follows the node and not its
+// path, which another node may share.
 func scaleSymbolMayHaveNoCode(role floorRole) bool {
 	return role == roleScaleSymbolCode
 }
@@ -528,16 +528,19 @@ func isIntegralReal(v rm.Real) bool {
 }
 
 // checkTemporalValue enforces the REQ-112 Value_valid rule on the four ISO
-// 8601-backed data values: `value` must satisfy the type's BASE predicate,
-// decided with the REQ-123 parse so the partial forms it admits and
-// DV_DURATION's documented deviations stay valid. The empty string and a
-// placeholder such as "example" fail it. The diagnostic names the attribute,
-// never the offending value (REQ-168); that value string is carried in
+// 8601-backed data values: a non-empty `value` must satisfy the type's BASE
+// predicate, decided with the REQ-123 parse so the partial forms it admits
+// and DV_DURATION's documented deviations stay valid. A placeholder such as
+// "example" fails it. An empty `value`, which is also what a JSON null
+// decodes to, is an absent RM-mandatory attribute: the mandatory-presence
+// rule reports it once, as `required` at …/value ([findings.checkMandatory]),
+// so this rule leaves it alone. The diagnostic names the attribute, never
+// the offending value (REQ-168); that value string is carried in
 // Issue.Value. The issue's rule is the Value_valid invariant that dispatched
 // the check, the one the node's own class declares.
 func (f *findings) checkTemporalValue(value any, rmType, path, rule string) {
 	text, valid, ok := temporalValue(value)
-	if !ok || valid {
+	if !ok || valid || text == "" {
 		return
 	}
 	f.emit(Issue{

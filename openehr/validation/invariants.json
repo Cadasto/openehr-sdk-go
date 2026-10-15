@@ -17,7 +17,7 @@
   "Boolean.Completeness": {"kind": "out_of_scope", "reason": "A law of Boolean logic, which every Go bool obeys; no class the RM type registry decodes inherits Boolean."},
   "Boolean.Involutive_negation": {"kind": "out_of_scope", "reason": "A law of Boolean logic, which every Go bool obeys; no class the RM type registry decodes inherits Boolean."},
   "Boolean.Non_contradiction": {"kind": "out_of_scope", "reason": "A law of Boolean logic, which every Go bool obeys; no class the RM type registry decodes inherits Boolean."},
-  "CODE_PHRASE.Code_string_valid": {"kind": "evaluated", "function": "checkCodePhrase"},
+  "CODE_PHRASE.Code_string_valid": {"kind": "evaluated", "function": "checkMandatory"},
   "COMPOSITION.Category_validity": {"kind": "evaluated", "function": "checkCodedInvariants"},
   "COMPOSITION.Content_valid": {"kind": "out_of_scope", "reason": "Not yet evaluated: the floor does not report a COMPOSITION content list that is present and empty."},
   "COMPOSITION.Is_archetype_root": {"kind": "evaluated", "function": "checkArchetypeRoot"},

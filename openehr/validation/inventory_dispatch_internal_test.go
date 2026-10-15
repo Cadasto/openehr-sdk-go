@@ -48,12 +48,12 @@ const codedEvaluator = "checkCodedInvariants"
 
 // dispatchBindings parses the non-test Go files in dir and reads the
 // invariantChecks literal of file. Each entry must be a call of nodeCheck,
-// roleCheck, typeCheck, ruleCheck or coveredCheck whose first argument, a string literal, is the name
-// of the method expression (*findings).name its second argument is, or
-// a call of codedCheck, which binds checkCodedInvariants. Every function an
-// entry binds must be a method of findings the source declares. It
-// returns an error when the literal is missing, so the check cannot pass over
-// nothing.
+// typeCheck, ruleCheck or coveredCheck whose first argument, a string
+// literal, is the name of the method expression (*findings).name its second
+// argument is, or a call of codedCheck, which binds checkCodedInvariants.
+// Every function an entry binds must be a method of findings the source
+// declares. It returns an error when the literal is missing, so the check
+// cannot pass over nothing.
 func dispatchBindings(dir, file string) (dispatchSource, error) {
 	out := dispatchSource{bound: map[string]string{}, covered: map[string]bool{}, methods: map[string]bool{}}
 	fset := token.NewFileSet()
@@ -141,7 +141,7 @@ func boundFunction(e ast.Expr) (fn string, covered bool, problem string) {
 	switch binder.Name {
 	case "codedCheck":
 		return codedEvaluator, false, ""
-	case "nodeCheck", "roleCheck", "typeCheck", "ruleCheck":
+	case "nodeCheck", "typeCheck", "ruleCheck":
 	case "coveredCheck":
 		covered = true
 	default:

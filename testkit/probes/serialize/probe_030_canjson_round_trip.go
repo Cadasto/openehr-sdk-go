@@ -245,8 +245,8 @@ var probe030SkipFloor = map[string][]string{
 	// example the empty string at action_archetype_id. Its DV_DURATION and
 	// DV_DATE_TIME elements under the therapeutic_direction cluster of the
 	// activity's description carry a JSON null `value`, which the floor
-	// reports twice: as a missing mandatory attribute and as a Value_valid
-	// failure (the empty string is not an ISO 8601 value).
+	// reports once, as a missing mandatory attribute; Value_valid leaves an
+	// empty value to that rule.
 	"compositions/clinical_notes.v0.json": {
 		"required /content[openEHR-EHR-OBSERVATION.story.v1]/data/origin",
 		"required /content[openEHR-EHR-OBSERVATION.story.v1]/data/events[at0002]/time",
@@ -254,11 +254,8 @@ var probe030SkipFloor = map[string][]string{
 		"required /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/timing/value",
 		"required /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/timing/formalism",
 		"required /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/action_archetype_id",
-		"rm_invariant /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/description/items[openEHR-EHR-CLUSTER.therapeutic_direction.v1]/items[at0066]/value",
 		"required /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/description/items[openEHR-EHR-CLUSTER.therapeutic_direction.v1]/items[at0066]/value/value",
-		"rm_invariant /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/description/items[openEHR-EHR-CLUSTER.therapeutic_direction.v1]/items[at0178]/value",
 		"required /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/description/items[openEHR-EHR-CLUSTER.therapeutic_direction.v1]/items[at0178]/value/value",
-		"rm_invariant /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/description/items[openEHR-EHR-CLUSTER.therapeutic_direction.v1]/items[at0179]/value",
 		"required /content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/description/items[openEHR-EHR-CLUSTER.therapeutic_direction.v1]/items[at0179]/value/value",
 	},
 	// Demonstration.v1: nine DV_INTERVAL values (DV_QUANTITY, DV_COUNT and
@@ -290,10 +287,9 @@ var probe030SkipFloor = map[string][]string{
 	// TestPerson.v2: two DV_MULTIMEDIA.media_type values break
 	// Media_type_valid (REQ-112 Coded invariants), since neither is an IANA
 	// media type: one is openEHR::425, the other a CODE_PHRASE whose
-	// code_string is null. The null one is also reported as an empty
-	// CODE_PHRASE and as an absent mandatory attribute. Five
-	// DV_INTERVAL<DV_DATE> values have their lower date after their upper
-	// one.
+	// code_string is null. The null one is also reported, once, as an
+	// absent mandatory code_string. Five DV_INTERVAL<DV_DATE> values have
+	// their lower date after their upper one.
 	"compositions/TestPerson.v2.json": {
 		// Inverted DV_INTERVAL<DV_DATE> in the vendored fixture (DV_INTERVAL.Limits_consistent).
 		"rm_invariant /contacts[at0003]/addresses[5]/details/items[at2502]/value",
@@ -305,7 +301,6 @@ var probe030SkipFloor = map[string][]string{
 		"rm_invariant /details/items[12]/items[at0006]/value",
 		"code_not_in_value_set /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type",
 		"code_not_in_value_set /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type",
-		"rm_invariant /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type",
 		"required /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type/code_string",
 		// Inverted DV_INTERVAL<DV_DATE> in the vendored fixture (DV_INTERVAL.Limits_consistent).
 		"rm_invariant /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_insurance.v2]/items[at0006]/value",
