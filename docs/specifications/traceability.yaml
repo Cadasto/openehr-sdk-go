@@ -1812,6 +1812,7 @@ requirements:
       - openehr/serialize/simplified/interval_leaf_anchor_test.go
       - openehr/serialize/simplified/ism_transition_test.go
       - openehr/serialize/simplified/leaf_rmtype_test.go
+      - openehr/serialize/simplified/null_test.go
       - openehr/serialize/simplified/raw_fit_test.go
       - openehr/serialize/simplified/rmattr_encapsulated_test.go
       - openehr/serialize/simplified/rmattr_feeder_test.go
