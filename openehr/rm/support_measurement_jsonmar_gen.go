@@ -30,6 +30,6 @@ type rawMeasurementService MeasurementService
 func (m MeasurementService) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawMeasurementService
-	}{"MEASUREMENT_SERVICE", (*rawMeasurementService)(&m)}, typereg.MarshalOptions(enc))
+		rawMeasurementService
+	}{"MEASUREMENT_SERVICE", rawMeasurementService(m)}, typereg.MarshalOptions(enc))
 }

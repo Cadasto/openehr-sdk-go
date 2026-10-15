@@ -30,8 +30,8 @@ type rawDVMultimedia DVMultimedia
 func (d DVMultimedia) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawDVMultimedia
-	}{"DV_MULTIMEDIA", (*rawDVMultimedia)(&d)}, typereg.MarshalOptions(enc))
+		rawDVMultimedia
+	}{"DV_MULTIMEDIA", rawDVMultimedia(d)}, typereg.MarshalOptions(enc))
 }
 
 // rawDVParsable is the method-free canonical-JSON alias for DVParsable. The alias
@@ -52,6 +52,6 @@ type rawDVParsable DVParsable
 func (d DVParsable) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawDVParsable
-	}{"DV_PARSABLE", (*rawDVParsable)(&d)}, typereg.MarshalOptions(enc))
+		rawDVParsable
+	}{"DV_PARSABLE", rawDVParsable(d)}, typereg.MarshalOptions(enc))
 }

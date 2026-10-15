@@ -30,6 +30,6 @@ type rawItemTag ItemTag
 func (i ItemTag) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawItemTag
-	}{"ITEM_TAG", (*rawItemTag)(&i)}, typereg.MarshalOptions(enc))
+		rawItemTag
+	}{"ITEM_TAG", rawItemTag(i)}, typereg.MarshalOptions(enc))
 }

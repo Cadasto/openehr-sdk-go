@@ -570,12 +570,14 @@ func omitSwitch(ret func(omitted ...string) string) string {
 }
 
 // renderMarshalAliasInterval is [renderMarshalAlias] for an interval-shaped
-// class that declares the BASE Interval members itself. The alias wrapper
-// stays the wire for every member; when a side is open and its bound empty,
-// the wrapper declares a zero-size field of the bound's name at its own level,
-// shallower than the bound embedded through the alias. The shallower field
-// wins, and it is always omitted, so the member drops out and every other
-// member keeps its place.
+// class that declares the BASE Interval members itself. As there, the wrapper
+// embeds the alias by value, so encode copies the value receiver into it once,
+// and the embedded field's key in the literal is the alias name without type
+// arguments. The alias wrapper stays the wire for every member; when a side is
+// open and its bound empty, the wrapper declares a zero-size field of the
+// bound's name at its own level, shallower than the bound embedded through the
+// alias. The shallower field wins, and it is always omitted, so the member
+// drops out and every other member keeps its place.
 func renderMarshalAliasInterval(pc *PlannedClass, recv, typeParams, typeArgs string) string {
 	alias := aliasTypeName(pc.GoName)
 
@@ -599,11 +601,11 @@ func renderMarshalAliasInterval(pc *PlannedClass, recv, typeParams, typeArgs str
 		var r strings.Builder
 		r.WriteString("\treturn json.MarshalEncode(enc, &struct {\n")
 		r.WriteString("\t\tType string `json:\"_type\"`\n")
-		fmt.Fprintf(&r, "\t\t*%s%s\n", alias, typeArgs)
+		fmt.Fprintf(&r, "\t\t%s%s\n", alias, typeArgs)
 		for _, prop := range omitted {
 			fmt.Fprintf(&r, "\t\t%s struct{} `json:%q`\n", FieldName(prop), prop+",omitzero")
 		}
-		fmt.Fprintf(&r, "\t}{Type: %q, %s: (*%s%s)(&%s)}, typereg.MarshalOptions(enc))\n", pc.BMMName, alias, alias, typeArgs, recv)
+		fmt.Fprintf(&r, "\t}{Type: %q, %s: %s%s(%s)}, typereg.MarshalOptions(enc))\n", pc.BMMName, alias, alias, typeArgs, recv)
 		return r.String()
 	}))
 	b.WriteString("}\n")

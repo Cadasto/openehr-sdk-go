@@ -30,8 +30,8 @@ type rawOpenehrCodeSetIdentifiers OpenehrCodeSetIdentifiers
 func (o OpenehrCodeSetIdentifiers) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawOpenehrCodeSetIdentifiers
-	}{"OPENEHR_CODE_SET_IDENTIFIERS", (*rawOpenehrCodeSetIdentifiers)(&o)}, typereg.MarshalOptions(enc))
+		rawOpenehrCodeSetIdentifiers
+	}{"OPENEHR_CODE_SET_IDENTIFIERS", rawOpenehrCodeSetIdentifiers(o)}, typereg.MarshalOptions(enc))
 }
 
 // rawOpenehrTerminologyGroupIdentifiers is the method-free canonical-JSON alias for OpenehrTerminologyGroupIdentifiers. The alias
@@ -52,12 +52,12 @@ type rawOpenehrTerminologyGroupIdentifiers OpenehrTerminologyGroupIdentifiers
 func (o OpenehrTerminologyGroupIdentifiers) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawOpenehrTerminologyGroupIdentifiers
-	}{"OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS", (*rawOpenehrTerminologyGroupIdentifiers)(&o)}, typereg.MarshalOptions(enc))
+		rawOpenehrTerminologyGroupIdentifiers
+	}{"OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS", rawOpenehrTerminologyGroupIdentifiers(o)}, typereg.MarshalOptions(enc))
 }
 
 // jsonWireTerminologyService is the flat canonical-JSON wire struct for TerminologyService. TerminologyService embeds
-// a marshaler-bearing concrete ancestor, so the zero-copy alias would
+// a marshaler-bearing concrete ancestor, so an alias of the class would
 // promote that ancestor's methods and emit the wrong `_type`; the flat
 // struct embeds nothing and so cannot promote.
 type jsonWireTerminologyService struct {

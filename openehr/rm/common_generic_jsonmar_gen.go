@@ -13,7 +13,7 @@ import (
 // BMM package org.openehr.rm.common.generic: canonical-JSON MarshalJSONTo companions
 
 // jsonWireAttestation is the flat canonical-JSON wire struct for Attestation. Attestation embeds
-// a marshaler-bearing concrete ancestor, so the zero-copy alias would
+// a marshaler-bearing concrete ancestor, so an alias of the class would
 // promote that ancestor's methods and emit the wrong `_type`; the flat
 // struct embeds nothing and so cannot promote.
 type jsonWireAttestation struct {
@@ -77,8 +77,8 @@ type rawAuditDetails AuditDetails
 func (a AuditDetails) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawAuditDetails
-	}{"AUDIT_DETAILS", (*rawAuditDetails)(&a)}, typereg.MarshalOptions(enc))
+		rawAuditDetails
+	}{"AUDIT_DETAILS", rawAuditDetails(a)}, typereg.MarshalOptions(enc))
 }
 
 // rawParticipation is the method-free canonical-JSON alias for Participation. The alias
@@ -99,8 +99,8 @@ type rawParticipation Participation
 func (p Participation) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawParticipation
-	}{"PARTICIPATION", (*rawParticipation)(&p)}, typereg.MarshalOptions(enc))
+		rawParticipation
+	}{"PARTICIPATION", rawParticipation(p)}, typereg.MarshalOptions(enc))
 }
 
 // rawPartyIdentified is the method-free canonical-JSON alias for PartyIdentified. The alias
@@ -121,12 +121,12 @@ type rawPartyIdentified PartyIdentified
 func (p PartyIdentified) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawPartyIdentified
-	}{"PARTY_IDENTIFIED", (*rawPartyIdentified)(&p)}, typereg.MarshalOptions(enc))
+		rawPartyIdentified
+	}{"PARTY_IDENTIFIED", rawPartyIdentified(p)}, typereg.MarshalOptions(enc))
 }
 
 // jsonWirePartyRelated is the flat canonical-JSON wire struct for PartyRelated. PartyRelated embeds
-// a marshaler-bearing concrete ancestor, so the zero-copy alias would
+// a marshaler-bearing concrete ancestor, so an alias of the class would
 // promote that ancestor's methods and emit the wrong `_type`; the flat
 // struct embeds nothing and so cannot promote.
 type jsonWirePartyRelated struct {
@@ -172,8 +172,8 @@ type rawPartySelf PartySelf
 func (p PartySelf) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawPartySelf
-	}{"PARTY_SELF", (*rawPartySelf)(&p)}, typereg.MarshalOptions(enc))
+		rawPartySelf
+	}{"PARTY_SELF", rawPartySelf(p)}, typereg.MarshalOptions(enc))
 }
 
 // rawRevisionHistory is the method-free canonical-JSON alias for RevisionHistory. The alias
@@ -194,8 +194,8 @@ type rawRevisionHistory RevisionHistory
 func (r RevisionHistory) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawRevisionHistory
-	}{"REVISION_HISTORY", (*rawRevisionHistory)(&r)}, typereg.MarshalOptions(enc))
+		rawRevisionHistory
+	}{"REVISION_HISTORY", rawRevisionHistory(r)}, typereg.MarshalOptions(enc))
 }
 
 // rawRevisionHistoryItem is the method-free canonical-JSON alias for RevisionHistoryItem. The alias
@@ -216,6 +216,6 @@ type rawRevisionHistoryItem RevisionHistoryItem
 func (r RevisionHistoryItem) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawRevisionHistoryItem
-	}{"REVISION_HISTORY_ITEM", (*rawRevisionHistoryItem)(&r)}, typereg.MarshalOptions(enc))
+		rawRevisionHistoryItem
+	}{"REVISION_HISTORY_ITEM", rawRevisionHistoryItem(r)}, typereg.MarshalOptions(enc))
 }

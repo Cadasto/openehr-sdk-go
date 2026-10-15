@@ -30,8 +30,8 @@ type rawCCodedText CCodedText
 func (c CCodedText) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawCCodedText
-	}{"C_CODED_TEXT", (*rawCCodedText)(&c)}, typereg.MarshalOptions(enc))
+		rawCCodedText
+	}{"C_CODED_TEXT", rawCCodedText(c)}, typereg.MarshalOptions(enc))
 }
 
 // rawCOrdinal is the method-free canonical-JSON alias for COrdinal. The alias
@@ -52,8 +52,8 @@ type rawCOrdinal COrdinal
 func (c COrdinal) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawCOrdinal
-	}{"C_ORDINAL", (*rawCOrdinal)(&c)}, typereg.MarshalOptions(enc))
+		rawCOrdinal
+	}{"C_ORDINAL", rawCOrdinal(c)}, typereg.MarshalOptions(enc))
 }
 
 // rawCQuantity is the method-free canonical-JSON alias for CQuantity. The alias
@@ -74,8 +74,8 @@ type rawCQuantity CQuantity
 func (c CQuantity) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawCQuantity
-	}{"C_QUANTITY", (*rawCQuantity)(&c)}, typereg.MarshalOptions(enc))
+		rawCQuantity
+	}{"C_QUANTITY", rawCQuantity(c)}, typereg.MarshalOptions(enc))
 }
 
 // rawCQuantityItem is the method-free canonical-JSON alias for CQuantityItem. The alias
@@ -96,8 +96,8 @@ type rawCQuantityItem CQuantityItem
 func (c CQuantityItem) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawCQuantityItem
-	}{"C_QUANTITY_ITEM", (*rawCQuantityItem)(&c)}, typereg.MarshalOptions(enc))
+		rawCQuantityItem
+	}{"C_QUANTITY_ITEM", rawCQuantityItem(c)}, typereg.MarshalOptions(enc))
 }
 
 // rawOrdinal is the method-free canonical-JSON alias for Ordinal. The alias
@@ -118,6 +118,6 @@ type rawOrdinal Ordinal
 func (o Ordinal) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawOrdinal
-	}{"ORDINAL", (*rawOrdinal)(&o)}, typereg.MarshalOptions(enc))
+		rawOrdinal
+	}{"ORDINAL", rawOrdinal(o)}, typereg.MarshalOptions(enc))
 }

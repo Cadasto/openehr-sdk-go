@@ -30,8 +30,8 @@ type rawDVDate DVDate
 func (d DVDate) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawDVDate
-	}{"DV_DATE", (*rawDVDate)(&d)}, typereg.MarshalOptions(enc))
+		rawDVDate
+	}{"DV_DATE", rawDVDate(d)}, typereg.MarshalOptions(enc))
 }
 
 // rawDVDateTime is the method-free canonical-JSON alias for DVDateTime. The alias
@@ -52,8 +52,8 @@ type rawDVDateTime DVDateTime
 func (d DVDateTime) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawDVDateTime
-	}{"DV_DATE_TIME", (*rawDVDateTime)(&d)}, typereg.MarshalOptions(enc))
+		rawDVDateTime
+	}{"DV_DATE_TIME", rawDVDateTime(d)}, typereg.MarshalOptions(enc))
 }
 
 // rawDVDuration is the method-free canonical-JSON alias for DVDuration. The alias
@@ -74,8 +74,8 @@ type rawDVDuration DVDuration
 func (d DVDuration) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawDVDuration
-	}{"DV_DURATION", (*rawDVDuration)(&d)}, typereg.MarshalOptions(enc))
+		rawDVDuration
+	}{"DV_DURATION", rawDVDuration(d)}, typereg.MarshalOptions(enc))
 }
 
 // rawDVTime is the method-free canonical-JSON alias for DVTime. The alias
@@ -96,6 +96,6 @@ type rawDVTime DVTime
 func (d DVTime) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawDVTime
-	}{"DV_TIME", (*rawDVTime)(&d)}, typereg.MarshalOptions(enc))
+		rawDVTime
+	}{"DV_TIME", rawDVTime(d)}, typereg.MarshalOptions(enc))
 }

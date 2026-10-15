@@ -33,9 +33,14 @@ const typeregImportPath = "github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 // [jsonWireShape] picks the shape of a class, for the marshaller and the
 // unmarshaller alike.
 //
-// Most classes take the zero-copy shape: a method-free alias `type rawC C`
-// marshalled through an anonymous `struct{ _type; *rawC }`, so no fields are
-// copied. That shape cannot be used for a class that embeds a marshaler-bearing
+// Most classes take the alias shape, built on a method-free alias
+// `type rawC C`. Decode views the receiver through the alias without copying
+// it. Encode copies the value receiver once into an anonymous
+// `struct{ _type; rawC }`, which embeds the alias by value. Embedding it
+// through a pointer to the receiver would instead move the receiver to the
+// heap, a second allocation per encoded value.
+//
+// The alias shape cannot be used for a class that embeds a marshaler-bearing
 // concrete ancestor, because a defined type over such a struct PROMOTES the
 // ancestor's MarshalJSONTo / UnmarshalJSONFrom: encoding/json/v2 would then
 // dispatch to the ancestor and emit its payload under the wrong `_type`,
@@ -218,7 +223,7 @@ func bearsGeneratedMarshaler(pc *PlannedClass) bool {
 
 // embedsMarshalerBearingConcrete reports whether pc embeds, directly or
 // through a chain of embedded ancestors, a concrete class that bears the
-// generated codec pair. Such a class cannot use the zero-copy `type rawC C`
+// generated codec pair. Such a class cannot use the alias shape's `type rawC C`
 // alias: the defined type promotes the embedded ancestor's MarshalJSONTo /
 // UnmarshalJSONFrom, so v2 encodes through the ancestor and emits the wrong
 // `_type` with no compile error, and cannot decode into it at all (the
@@ -250,7 +255,7 @@ func embedsMarshalerBearingConcrete(plan *Plan, pc *PlannedClass) bool {
 //
 // A flat field list matters for the flat wire struct: it embeds nothing, so it
 // cannot promote any embedded ancestor's MarshalJSONTo / UnmarshalJSONFrom.
-// encoding/json/v2 promotes a marshaler through an embedded pointer and emits
+// encoding/json/v2 promotes a marshaler through an embedded field and emits
 // the inner type's payload instead of the wrapper, which is exactly why a
 // class embedding a marshaler-bearing concrete ancestor takes the flat shape
 // rather than the `type rawC C` alias (ADR 0022, ruling R19). Decoding into a
@@ -310,7 +315,8 @@ func effectiveFields(plan *Plan, pc *PlannedClass) ([]emittedField, error) {
 type jsonWireShape int
 
 const (
-	// shapeAlias is the zero-copy method-free alias.
+	// shapeAlias is the method-free alias: decode views the receiver through
+	// it, and encode copies the receiver once into a wrapper that embeds it.
 	shapeAlias jsonWireShape = iota
 	// shapeFlat is the flat wire struct with explicit field copies.
 	shapeFlat
@@ -393,8 +399,11 @@ func renderMarshalJSON(plan *Plan, pc *PlannedClass) (string, error) {
 	return "", fmt.Errorf("%s: unhandled JSON wire shape %d", pc.BMMName, shape)
 }
 
-// renderMarshalAlias emits the zero-copy shape: a method-free alias and a
-// MarshalJSONTo that marshals it through an anonymous `struct{ _type; *alias }`.
+// renderMarshalAlias emits the alias shape: a method-free alias and a
+// MarshalJSONTo that marshals it through an anonymous `struct{ _type; alias }`.
+// The wrapper embeds the alias by value, so encode copies the value receiver
+// into it once. Converting a pointer to the receiver instead would move the
+// receiver to the heap, which costs a second allocation per encoded value.
 func renderMarshalAlias(pc *PlannedClass, recv, typeParams, typeArgs string) string {
 	alias := aliasTypeName(pc.GoName)
 	var b strings.Builder
@@ -412,14 +421,15 @@ func renderMarshalAlias(pc *PlannedClass, recv, typeParams, typeArgs string) str
 	fmt.Fprintf(&b, "func (%s %s%s) MarshalJSONTo(enc *jsontext.Encoder) error {\n", recv, pc.GoName, typeArgs)
 	b.WriteString("\treturn json.MarshalEncode(enc, &struct {\n")
 	b.WriteString("\t\tType string `json:\"_type\"`\n")
-	fmt.Fprintf(&b, "\t\t*%s%s\n", alias, typeArgs)
-	fmt.Fprintf(&b, "\t}{%q, (*%s%s)(&%s)}, typereg.MarshalOptions(enc))\n", pc.BMMName, alias, typeArgs, recv)
+	fmt.Fprintf(&b, "\t\t%s%s\n", alias, typeArgs)
+	fmt.Fprintf(&b, "\t}{%q, %s%s(%s)}, typereg.MarshalOptions(enc))\n", pc.BMMName, alias, typeArgs, recv)
 	b.WriteString("}\n")
 	return b.String()
 }
 
-// renderMarshalAliasDecl emits the method-free alias the zero-copy shape
-// marshals through, and the UnmarshalJSONFrom companion decodes into.
+// renderMarshalAliasDecl emits the method-free alias of the alias shape: the
+// marshal wrapper embeds it, and the UnmarshalJSONFrom companion decodes into
+// the receiver through it.
 func renderMarshalAliasDecl(pc *PlannedClass, typeParams, typeArgs string) string {
 	alias := aliasTypeName(pc.GoName)
 	var b strings.Builder
@@ -443,7 +453,7 @@ func renderMarshalFlat(plan *Plan, pc *PlannedClass, recv, typeParams, typeArgs 
 	wire := flatWireTypeName(pc.GoName)
 	var b strings.Builder
 	fmt.Fprintf(&b, "// %s is the flat canonical-JSON wire struct for %s. %s embeds\n", wire, pc.GoName, pc.GoName)
-	b.WriteString("// a marshaler-bearing concrete ancestor, so the zero-copy alias would\n")
+	b.WriteString("// a marshaler-bearing concrete ancestor, so an alias of the class would\n")
 	b.WriteString("// promote that ancestor's methods and emit the wrong `_type`; the flat\n")
 	b.WriteString("// struct embeds nothing and so cannot promote.\n")
 	fmt.Fprintf(&b, "type %s%s struct {\n", wire, typeParams)
@@ -472,7 +482,7 @@ func renderMarshalFlat(plan *Plan, pc *PlannedClass, recv, typeParams, typeArgs 
 	return b.String(), nil
 }
 
-// aliasTypeName is the method-free alias type identifier for the zero-copy
+// aliasTypeName is the method-free alias type identifier for the alias
 // shape. Generator-internal: nothing outside the generated files references it.
 func aliasTypeName(goName string) string {
 	return "raw" + goName

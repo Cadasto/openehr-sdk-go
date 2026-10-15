@@ -30,8 +30,8 @@ type rawISO8601Timezone ISO8601Timezone
 func (i ISO8601Timezone) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawISO8601Timezone
-	}{"Iso8601_timezone", (*rawISO8601Timezone)(&i)}, typereg.MarshalOptions(enc))
+		rawISO8601Timezone
+	}{"Iso8601_timezone", rawISO8601Timezone(i)}, typereg.MarshalOptions(enc))
 }
 
 // rawTimeDefinitions is the method-free canonical-JSON alias for TimeDefinitions. The alias
@@ -52,6 +52,6 @@ type rawTimeDefinitions TimeDefinitions
 func (t TimeDefinitions) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawTimeDefinitions
-	}{"Time_Definitions", (*rawTimeDefinitions)(&t)}, typereg.MarshalOptions(enc))
+		rawTimeDefinitions
+	}{"Time_Definitions", rawTimeDefinitions(t)}, typereg.MarshalOptions(enc))
 }

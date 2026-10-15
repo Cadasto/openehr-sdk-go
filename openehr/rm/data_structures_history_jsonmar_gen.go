@@ -30,8 +30,8 @@ type rawHistory[T ItemStructure] History[T]
 func (h History[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawHistory[T]
-	}{"HISTORY", (*rawHistory[T])(&h)}, typereg.MarshalOptions(enc))
+		rawHistory[T]
+	}{"HISTORY", rawHistory[T](h)}, typereg.MarshalOptions(enc))
 }
 
 // rawIntervalEvent is the method-free canonical-JSON alias for IntervalEvent. The alias
@@ -52,8 +52,8 @@ type rawIntervalEvent[T ItemStructure] IntervalEvent[T]
 func (i IntervalEvent[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawIntervalEvent[T]
-	}{"INTERVAL_EVENT", (*rawIntervalEvent[T])(&i)}, typereg.MarshalOptions(enc))
+		rawIntervalEvent[T]
+	}{"INTERVAL_EVENT", rawIntervalEvent[T](i)}, typereg.MarshalOptions(enc))
 }
 
 // rawPointEvent is the method-free canonical-JSON alias for PointEvent. The alias
@@ -74,6 +74,6 @@ type rawPointEvent[T ItemStructure] PointEvent[T]
 func (p PointEvent[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawPointEvent[T]
-	}{"POINT_EVENT", (*rawPointEvent[T])(&p)}, typereg.MarshalOptions(enc))
+		rawPointEvent[T]
+	}{"POINT_EVENT", rawPointEvent[T](p)}, typereg.MarshalOptions(enc))
 }

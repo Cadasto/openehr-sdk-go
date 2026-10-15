@@ -30,12 +30,12 @@ type rawCodePhrase CodePhrase
 func (c CodePhrase) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawCodePhrase
-	}{"CODE_PHRASE", (*rawCodePhrase)(&c)}, typereg.MarshalOptions(enc))
+		rawCodePhrase
+	}{"CODE_PHRASE", rawCodePhrase(c)}, typereg.MarshalOptions(enc))
 }
 
 // jsonWireDVCodedText is the flat canonical-JSON wire struct for DVCodedText. DVCodedText embeds
-// a marshaler-bearing concrete ancestor, so the zero-copy alias would
+// a marshaler-bearing concrete ancestor, so an alias of the class would
 // promote that ancestor's methods and emit the wrong `_type`; the flat
 // struct embeds nothing and so cannot promote.
 type jsonWireDVCodedText struct {
@@ -98,8 +98,8 @@ type rawDVParagraph DVParagraph
 func (d DVParagraph) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawDVParagraph
-	}{"DV_PARAGRAPH", (*rawDVParagraph)(&d)}, typereg.MarshalOptions(enc))
+		rawDVParagraph
+	}{"DV_PARAGRAPH", rawDVParagraph(d)}, typereg.MarshalOptions(enc))
 }
 
 // rawDVText is the method-free canonical-JSON alias for DVText. The alias
@@ -120,8 +120,8 @@ type rawDVText DVText
 func (d DVText) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawDVText
-	}{"DV_TEXT", (*rawDVText)(&d)}, typereg.MarshalOptions(enc))
+		rawDVText
+	}{"DV_TEXT", rawDVText(d)}, typereg.MarshalOptions(enc))
 }
 
 // rawTermMapping is the method-free canonical-JSON alias for TermMapping. The alias
@@ -142,6 +142,6 @@ type rawTermMapping TermMapping
 func (t TermMapping) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawTermMapping
-	}{"TERM_MAPPING", (*rawTermMapping)(&t)}, typereg.MarshalOptions(enc))
+		rawTermMapping
+	}{"TERM_MAPPING", rawTermMapping(t)}, typereg.MarshalOptions(enc))
 }

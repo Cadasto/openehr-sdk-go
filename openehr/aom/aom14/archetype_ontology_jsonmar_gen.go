@@ -30,8 +30,8 @@ type rawArchetypeOntology ArchetypeOntology
 func (a ArchetypeOntology) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawArchetypeOntology
-	}{"ARCHETYPE_ONTOLOGY", (*rawArchetypeOntology)(&a)}, typereg.MarshalOptions(enc))
+		rawArchetypeOntology
+	}{"ARCHETYPE_ONTOLOGY", rawArchetypeOntology(a)}, typereg.MarshalOptions(enc))
 }
 
 // rawArchetypeTerm is the method-free canonical-JSON alias for ArchetypeTerm. The alias
@@ -52,6 +52,6 @@ type rawArchetypeTerm ArchetypeTerm
 func (a ArchetypeTerm) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawArchetypeTerm
-	}{"ARCHETYPE_TERM", (*rawArchetypeTerm)(&a)}, typereg.MarshalOptions(enc))
+		rawArchetypeTerm
+	}{"ARCHETYPE_TERM", rawArchetypeTerm(a)}, typereg.MarshalOptions(enc))
 }

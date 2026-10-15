@@ -30,8 +30,8 @@ type rawAction Action
 func (a Action) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawAction
-	}{"ACTION", (*rawAction)(&a)}, typereg.MarshalOptions(enc))
+		rawAction
+	}{"ACTION", rawAction(a)}, typereg.MarshalOptions(enc))
 }
 
 // rawActivity is the method-free canonical-JSON alias for Activity. The alias
@@ -52,8 +52,8 @@ type rawActivity Activity
 func (a Activity) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawActivity
-	}{"ACTIVITY", (*rawActivity)(&a)}, typereg.MarshalOptions(enc))
+		rawActivity
+	}{"ACTIVITY", rawActivity(a)}, typereg.MarshalOptions(enc))
 }
 
 // rawAdminEntry is the method-free canonical-JSON alias for AdminEntry. The alias
@@ -74,8 +74,8 @@ type rawAdminEntry AdminEntry
 func (a AdminEntry) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawAdminEntry
-	}{"ADMIN_ENTRY", (*rawAdminEntry)(&a)}, typereg.MarshalOptions(enc))
+		rawAdminEntry
+	}{"ADMIN_ENTRY", rawAdminEntry(a)}, typereg.MarshalOptions(enc))
 }
 
 // rawEvaluation is the method-free canonical-JSON alias for Evaluation. The alias
@@ -96,8 +96,8 @@ type rawEvaluation Evaluation
 func (e Evaluation) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawEvaluation
-	}{"EVALUATION", (*rawEvaluation)(&e)}, typereg.MarshalOptions(enc))
+		rawEvaluation
+	}{"EVALUATION", rawEvaluation(e)}, typereg.MarshalOptions(enc))
 }
 
 // rawInstruction is the method-free canonical-JSON alias for Instruction. The alias
@@ -118,8 +118,8 @@ type rawInstruction Instruction
 func (i Instruction) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawInstruction
-	}{"INSTRUCTION", (*rawInstruction)(&i)}, typereg.MarshalOptions(enc))
+		rawInstruction
+	}{"INSTRUCTION", rawInstruction(i)}, typereg.MarshalOptions(enc))
 }
 
 // rawInstructionDetails is the method-free canonical-JSON alias for InstructionDetails. The alias
@@ -140,8 +140,8 @@ type rawInstructionDetails InstructionDetails
 func (i InstructionDetails) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawInstructionDetails
-	}{"INSTRUCTION_DETAILS", (*rawInstructionDetails)(&i)}, typereg.MarshalOptions(enc))
+		rawInstructionDetails
+	}{"INSTRUCTION_DETAILS", rawInstructionDetails(i)}, typereg.MarshalOptions(enc))
 }
 
 // rawIsmTransition is the method-free canonical-JSON alias for IsmTransition. The alias
@@ -162,8 +162,8 @@ type rawIsmTransition IsmTransition
 func (i IsmTransition) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawIsmTransition
-	}{"ISM_TRANSITION", (*rawIsmTransition)(&i)}, typereg.MarshalOptions(enc))
+		rawIsmTransition
+	}{"ISM_TRANSITION", rawIsmTransition(i)}, typereg.MarshalOptions(enc))
 }
 
 // rawObservation is the method-free canonical-JSON alias for Observation. The alias
@@ -184,6 +184,6 @@ type rawObservation Observation
 func (o Observation) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawObservation
-	}{"OBSERVATION", (*rawObservation)(&o)}, typereg.MarshalOptions(enc))
+		rawObservation
+	}{"OBSERVATION", rawObservation(o)}, typereg.MarshalOptions(enc))
 }

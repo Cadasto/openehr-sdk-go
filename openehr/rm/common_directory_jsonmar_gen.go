@@ -30,12 +30,12 @@ type rawFolder Folder
 func (f Folder) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawFolder
-	}{"FOLDER", (*rawFolder)(&f)}, typereg.MarshalOptions(enc))
+		rawFolder
+	}{"FOLDER", rawFolder(f)}, typereg.MarshalOptions(enc))
 }
 
 // jsonWireVersionedFolder is the flat canonical-JSON wire struct for VersionedFolder. VersionedFolder embeds
-// a marshaler-bearing concrete ancestor, so the zero-copy alias would
+// a marshaler-bearing concrete ancestor, so an alias of the class would
 // promote that ancestor's methods and emit the wrong `_type`; the flat
 // struct embeds nothing and so cannot promote.
 type jsonWireVersionedFolder struct {

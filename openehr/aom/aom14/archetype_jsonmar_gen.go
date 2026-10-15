@@ -30,6 +30,6 @@ type rawArchetype Archetype
 func (a Archetype) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawArchetype
-	}{"ARCHETYPE", (*rawArchetype)(&a)}, typereg.MarshalOptions(enc))
+		rawArchetype
+	}{"ARCHETYPE", rawArchetype(a)}, typereg.MarshalOptions(enc))
 }

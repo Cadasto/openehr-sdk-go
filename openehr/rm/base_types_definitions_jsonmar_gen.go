@@ -30,12 +30,12 @@ type rawBasicDefinitions BasicDefinitions
 func (b BasicDefinitions) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawBasicDefinitions
-	}{"BASIC_DEFINITIONS", (*rawBasicDefinitions)(&b)}, typereg.MarshalOptions(enc))
+		rawBasicDefinitions
+	}{"BASIC_DEFINITIONS", rawBasicDefinitions(b)}, typereg.MarshalOptions(enc))
 }
 
 // jsonWireOpenehrDefinitions is the flat canonical-JSON wire struct for OpenehrDefinitions. OpenehrDefinitions embeds
-// a marshaler-bearing concrete ancestor, so the zero-copy alias would
+// a marshaler-bearing concrete ancestor, so an alias of the class would
 // promote that ancestor's methods and emit the wrong `_type`; the flat
 // struct embeds nothing and so cannot promote.
 type jsonWireOpenehrDefinitions struct {
