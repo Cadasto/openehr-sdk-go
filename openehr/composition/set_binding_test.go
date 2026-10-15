@@ -32,14 +32,14 @@ func countInterval() *rm.DVInterval[rm.DVCount] {
 	}
 }
 
-// TestREQ101_SetAcceptsWhatTheValidatorBinds checks that Set accepts a value
-// the validator's alternatives rule (REQ-102) binds at the path beyond the
-// class hierarchy, that Build writes it there, and that the validator reports
-// no finding the composition did not have before: a DV_DURATION at a node
-// typed with the AOM 1.4 short name DURATION, the value NewSkeleton itself
-// writes there; a DV_QUANTITY at an untyped alternative after a DV_CODED_TEXT;
-// and a DV_INTERVAL<DV_COUNT> at a DV_INTERVAL<DV_ORDERED> node, whose bounds
-// conform to DV_ORDERED.
+// TestREQ101_SetAcceptsWhatTheValidatorBinds checks, for REQ-101 Type
+// enforcement, that Set accepts a value the validator's alternatives rule
+// (REQ-102) binds at the path beyond the class hierarchy, that Build writes
+// it there, and that the validator reports no finding the composition did
+// not have before: a DV_DURATION at a node typed with the AOM 1.4 short name
+// DURATION, the value NewSkeleton itself writes there; a DV_QUANTITY at an
+// untyped alternative after a DV_CODED_TEXT; and a DV_INTERVAL<DV_COUNT> at
+// a DV_INTERVAL<DV_ORDERED> node, whose bounds conform to DV_ORDERED.
 //
 // An untyped node that NodeAt returns, the first or only child at the path,
 // is out of reach: NewSkeleton cannot build a value for it, so no Builder
@@ -121,16 +121,16 @@ func TestREQ101_SetAcceptsWhatTheValidatorBinds(t *testing.T) {
 	}
 }
 
-// TestREQ101_SetRefusesWhatTheValidatorDoesNotBind checks that Set returns
-// ErrTypeMismatch, and Build carries it, for a value the alternatives rule
-// (REQ-102) binds to no node at the path, at the nodes the short-name and
-// interval tiers read: a DV_TEXT at DURATION; a DV_DATE, the wrapper of
-// another short name, at DURATION; a DV_QUANTITY, an ordered value but no
-// interval, at DV_INTERVAL<DV_ORDERED>; and a DV_INTERVAL<DV_COUNT> at
-// DV_INTERVAL<DV_QUANTITY>, since a DV_COUNT bound does not conform to
-// DV_QUANTITY. A Go string at DURATION is refused although the validator
-// binds a string at a DURATION leaf: it is no RM value. A typed-nil
-// *rm.DVDuration at DURATION is refused too.
+// TestREQ101_SetRefusesWhatTheValidatorDoesNotBind checks, for REQ-101 Type
+// enforcement, that Set returns ErrTypeMismatch, and Build carries it, for a
+// value the alternatives rule (REQ-102) binds to no node at the path, at the
+// nodes the short-name and interval tiers read: a DV_TEXT at DURATION; a
+// DV_DATE, the wrapper of another short name, at DURATION; a DV_QUANTITY, an
+// ordered value but no interval, at DV_INTERVAL<DV_ORDERED>; and a
+// DV_INTERVAL<DV_COUNT> at DV_INTERVAL<DV_QUANTITY>, since a DV_COUNT bound
+// does not conform to DV_QUANTITY. A Go string at DURATION is refused
+// although the validator binds a string at a DURATION leaf: it is no RM
+// value. A typed-nil *rm.DVDuration at DURATION is refused too.
 func TestREQ101_SetRefusesWhatTheValidatorDoesNotBind(t *testing.T) {
 	t.Parallel()
 	duration := compileAlternatives(t, durationValueChild)

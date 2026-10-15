@@ -1381,9 +1381,10 @@ func (g *generator) makeChild(child *tcimpl.CompiledNode) (any, error) {
 // where the modeller constrains the primitive directly rather than
 // its DV wrapper. The generator materialises the canonical DV
 // wrapper for each. The short names are no BMM classes, so the
-// validator keeps its own short-name → wrapper table,
-// aomPrimitiveWrappers, in lockstep with these cases so its type
-// check does not reject the substitute.
+// binding rule the validator and the composition builder share keeps
+// its own short-name → wrapper table, primitiveWrappers in
+// openehr/internal/rmbind, in lockstep with these cases so neither
+// rejects the substitute.
 func concreteFor(rmType string) string {
 	switch rmType {
 	case "EVENT":

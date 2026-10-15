@@ -5,53 +5,47 @@ import (
 	"strings"
 
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
-	"github.com/cadasto/openehr-sdk-go/openehr/internal/rmnames"
-	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/rmbind"
 )
 
 // bindRMType returns the node, among those the template allows at the
-// compiled node's path ([alternativesAt]), whose RM type v's RM type
-// conforms to, or ErrTypeMismatch (wrapped with diagnostic context) when
-// there is none. The Go→RM-name reverse mapping is the generated
-// rm.RMTypeName (ADR 0013). REQ-024, no reflection.
+// compiled node's path ([alternativesAt]), that v binds, or
+// ErrTypeMismatch (wrapped with diagnostic context) when v binds none.
 //
-// v conforms to a node when its RM type is the node's type, or a class
-// that descends from it in the pinned class hierarchy (REQ-101 Type
-// enforcement, read the way the REQ-102 validator binds an alternative):
-// a DV_CODED_TEXT conforms to a DV_TEXT node, and a concrete class to a
-// node the OPT types as an abstract class, such as a DV_QUANTITY at
-// DATA_VALUE or a POINT_EVENT at EVENT. tcimpl.ConformsTo answers it from
-// the classes the compile found to conform to the node's type, so this
-// package imports no class hierarchy of its own (REQ-013).
+// It binds as the validator does, by the one rule both read
+// ([rmbind.Bind]), so Set accepts exactly the values the validator binds
+// at the path. The rule tries three tiers in order and returns the first
+// node, in OPT order, of the first tier that admits v:
 //
-// As the validator does, bindRMType prefers a node that names v's own
-// type to one v's type only descends from, and within each, the first in
-// OPT order: under DV_TEXT then DV_CODED_TEXT, a DV_CODED_TEXT binds the
-// DV_CODED_TEXT node.
+//  1. a node that names v's own RM type, a typed DV_INTERVAL<T> included;
+//  2. a node that names the AOM 1.4 primitive short name whose canonical
+//     DV wrapper v is: a DV_DURATION binds a DURATION node, the value the
+//     generator writes there;
+//  3. a node v's type descends from in the pinned class hierarchy (a
+//     DV_CODED_TEXT at DV_TEXT, a DV_QUANTITY at DATA_VALUE, a
+//     POINT_EVENT at EVENT), a node the OPT leaves untyped, or a typed
+//     DV_INTERVAL<T> node each present bound of which conforms to T (a
+//     DV_INTERVAL<DV_COUNT> at DV_INTERVAL<DV_ORDERED>).
 //
-// A typed DV_INTERVAL node declares the ITS-JSON parameterised name
-// (DV_INTERVAL<DV_QUANTITY>), which is no class the hierarchy knows; the
-// registry reverses only the bare name, so rmnames.TypedIntervalName
-// supplies the parameterised one, and the interval names the node's type
-// when its parameter is the node's own. An interface carrying a typed-nil
-// pointer fails as unrecognised: a typed-nil is not a usable value at a
-// builder Set site.
+// So under DV_TEXT then DV_CODED_TEXT, a DV_CODED_TEXT binds the
+// DV_CODED_TEXT node. Conformance is read from the classes the compile
+// found to conform to each node's type, so this package imports no class
+// hierarchy of its own.
+//
+// v must be an RM value: rmbind.TypeName names it, with the ITS-JSON
+// parameterised name for a typed DV_INTERVAL, and a value it cannot name
+// fails as unrecognised. That covers a value that is no RM type, such as a
+// Go string the validator would bind at a DURATION leaf, and an interface
+// carrying a typed-nil pointer: neither is a usable value at a builder Set
+// site.
 func bindRMType(node *tcimpl.CompiledNode, v any) (*tcimpl.CompiledNode, error) {
-	got, ok := rm.RMTypeName(v)
+	got, ok := rmbind.TypeName(v)
 	if !ok {
 		return nil, fmt.Errorf("%w: value type %T is not a recognised RM concrete", ErrTypeMismatch, v)
 	}
-	param, typed := rmnames.TypedIntervalName(v)
 	alternatives := alternativesAt(node)
-	for _, alt := range alternatives {
-		if want := alt.RMTypeName(); want == got || (typed && want == param) {
-			return alt, nil
-		}
-	}
-	for _, alt := range alternatives {
-		if conforms, known := tcimpl.ConformsTo(alt, got); known && conforms {
-			return alt, nil
-		}
+	if bound := rmbind.Bind(alternatives, v, anyNode); bound != nil {
+		return bound, nil
 	}
 	switch len(alternatives) {
 	case 0:
@@ -69,6 +63,10 @@ func bindRMType(node *tcimpl.CompiledNode, v any) (*tcimpl.CompiledNode, error) 
 			ErrTypeMismatch, v, got, strings.Join(names, ", "))
 	}
 }
+
+// anyNode admits every node to the binding: a Set value may bind any node
+// the template allows at the path, a slot included.
+func anyNode(*tcimpl.CompiledNode) bool { return true }
 
 // alternativesAt returns, in OPT order, the nodes the template allows at
 // node's path: node and every other child of node's parent attribute at
