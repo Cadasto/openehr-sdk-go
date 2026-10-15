@@ -1382,8 +1382,8 @@ func (g *generator) makeChild(child *tcimpl.CompiledNode) (any, error) {
 // its DV wrapper. The generator materialises the canonical DV
 // wrapper for each. The short names are no BMM classes, so the
 // validator keeps its own short-name → wrapper table,
-// aomPrimitiveWrappers, in lockstep with these cases so checkRMType
-// does not reject the substitute.
+// aomPrimitiveWrappers, in lockstep with these cases so its type
+// check does not reject the substitute.
 func concreteFor(rmType string) string {
 	switch rmType {
 	case "EVENT":
