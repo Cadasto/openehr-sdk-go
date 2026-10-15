@@ -589,3 +589,72 @@ func TestREQ071_CachedCatalogForAnotherBaseURLIsAMiss(t *testing.T) { // REQ-071
 		})
 	}
 }
+
+// TestREQ073_PlaintextServiceWarningOnFetchAndRenewalOnly pins REQ-073's
+// opening: the plaintext services[].base_url warning is logged when the
+// document is fetched and when a cached catalog is renewed on a 304, and not
+// on a fresh cache hit, which would repeat it without news.
+func TestREQ073_PlaintextServiceWarningOnFetchAndRenewalOnly(t *testing.T) { // REQ-073
+	t.Parallel()
+	const etag = `"v1"`
+	members := cachedMembers{
+		tokenEndpoint:  "https://auth.example.com/token",
+		serviceBaseURL: "http://svc.example.com/openehr/v1",
+	}
+	var notModified atomic.Int32
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != smartDocPath {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("ETag", etag)
+		if r.Header.Get("If-None-Match") == etag {
+			notModified.Add(1)
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, members.document("https://"+r.Host))
+	}))
+	t.Cleanup(srv.Close)
+	baseURL := srv.URL + platformPath
+	rec := &fieldRecorder{}
+	res, err := discovery.NewResolver(discovery.NewMemoryCache(), discovery.WithHTTPClient(srv.Client()), discovery.WithLogger(slog.New(rec)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const field = "services[" + discovery.ServiceIDOpenEHRRest + "].baseUrl"
+	warnings := func() int {
+		rec.mu.Lock()
+		defer rec.mu.Unlock()
+		n := 0
+		for _, f := range rec.fields {
+			if f == field {
+				n++
+			}
+		}
+		return n
+	}
+
+	if _, err := res.Resolve(t.Context(), baseURL); err != nil {
+		t.Fatalf("Resolve(%q) error = %v", baseURL, err)
+	}
+	if n := warnings(); n != 1 {
+		t.Errorf("after the fetch, %d warning(s) for %s, want 1", n, field)
+	}
+	if _, err := res.Resolve(t.Context(), baseURL); err != nil {
+		t.Fatalf("Resolve(%q) on a fresh hit error = %v", baseURL, err)
+	}
+	if n := warnings(); n != 1 {
+		t.Errorf("after a fresh cache hit, %d warning(s) for %s, want still 1", n, field)
+	}
+	if _, err := res.Refresh(t.Context(), baseURL); err != nil {
+		t.Fatalf("Refresh(%q) error = %v", baseURL, err)
+	}
+	if n := notModified.Load(); n != 1 {
+		t.Fatalf("server answered %d conditional request(s) with 304, want 1", n)
+	}
+	if n := warnings(); n != 2 {
+		t.Errorf("after a 304 renewal, %d warning(s) for %s, want 2", n, field)
+	}
+}
