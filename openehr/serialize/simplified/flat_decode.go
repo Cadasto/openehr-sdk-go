@@ -1019,6 +1019,14 @@ func parseCtx(ctx map[string]any, origin map[string]string) (ctxInfo, error) {
 		case "composer_name":
 			ci.composerName, err = ctxString(label, val)
 			ci.haveComposerName = true
+			// `Name_valid` — an empty name, in either spelling, is not a composer
+			// without one: alone it would decode to a PARTY_IDENTIFIED the RM
+			// forbids and encode refuses. A null one never gets here; it is
+			// absent (REQ-053).
+			if err == nil && ci.composerName == "" {
+				err = fmt.Errorf("%w: %q is present but empty (RM invariant `Name_valid`); a composer carrying no name is spelled by the key's absence",
+					ErrUnsupportedDatatype, label)
+			}
 		case "composer_self":
 			b, ok := val.(bool)
 			if !ok {

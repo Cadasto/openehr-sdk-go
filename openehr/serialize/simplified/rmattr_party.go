@@ -452,8 +452,9 @@ func ctxComposerJSON(ci ctxInfo) map[string]any {
 
 // composerPartyJSON reads a PARTY_IDENTIFIED or PARTY_RELATED composer from
 // the real-path tails ts of g, with the name ci carries, if any, as its
-// `|name`. The name is checked like any other party name: an empty one is
-// refused (RM invariant `Name_valid`), naming the spelling it arrived under.
+// `|name`. An empty name never gets here: [parseCtx] refuses it in either
+// spelling (RM invariant `Name_valid`), naming the spelling it arrived under,
+// whether or not the composer has other keys.
 func composerPartyJSON(g rmattrGroup, ts rmattrTails, ci ctxInfo, origin map[string]string) (map[string]any, error) {
 	if ci.haveComposerName {
 		ts.own["name"] = ci.composerName
