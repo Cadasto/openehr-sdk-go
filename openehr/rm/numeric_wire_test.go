@@ -102,10 +102,22 @@ func TestIntegerWholeNumberWithFractionDecodes(t *testing.T) { // REQ-052, PROBE
 // out-of-range value on DV_PROPORTION.type is refused, the generated funnel
 // wraps the refusal in canjson.ErrInvalidShape, never in the encode-only
 // canjson.ErrInvalidValue, and a quoted literal keeps its *strconv.NumError
-// cause reachable.
+// cause reachable. The strconv sentinel stays reachable too, so a caller can
+// tell a non-zero fraction (strconv.ErrSyntax) from a whole number outside
+// the range (strconv.ErrRange) through canjson, whether the literal writes it
+// bare or quoted, with an exponent or without.
 func TestIntegerRefusalThroughCanjsonKeepsShapeSentinel(t *testing.T) { // REQ-052
 	t.Parallel()
-	for _, lit := range []string{`1.5`, `1e10`, `"1.5"`, `"1e10"`} {
+	for _, tc := range []struct {
+		lit             string
+		cause, notCause error
+	}{
+		{lit: `1.5`, cause: strconv.ErrSyntax, notCause: strconv.ErrRange},
+		{lit: `1e10`, cause: strconv.ErrRange, notCause: strconv.ErrSyntax},
+		{lit: `"1.5"`, cause: strconv.ErrSyntax, notCause: strconv.ErrRange},
+		{lit: `"1e10"`, cause: strconv.ErrRange, notCause: strconv.ErrSyntax},
+	} {
+		lit := tc.lit
 		t.Run(lit, func(t *testing.T) {
 			t.Parallel()
 			in := []byte(`{"_type":"DV_PROPORTION","numerator":1.5,"denominator":1.0,"type":` + lit + `}`)
@@ -119,6 +131,9 @@ func TestIntegerRefusalThroughCanjsonKeepsShapeSentinel(t *testing.T) { // REQ-0
 			}
 			if errors.Is(err, canjson.ErrInvalidValue) {
 				t.Errorf("canjson.Unmarshal(type %s) err = %v; canjson.ErrInvalidValue must not appear on a decode path", lit, err)
+			}
+			if !errors.Is(err, tc.cause) || errors.Is(err, tc.notCause) {
+				t.Errorf("canjson.Unmarshal(type %s) err = %v; want it to carry %v and not %v", lit, err, tc.cause, tc.notCause)
 			}
 			if strings.HasPrefix(lit, `"`) {
 				if _, ok := errors.AsType[*strconv.NumError](err); !ok {

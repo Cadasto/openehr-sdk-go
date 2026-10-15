@@ -11,23 +11,37 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// Integer is the BMM Integer primitive. Decode accepts a JSON number or a
-// quoted string holding one, and reads a whole number however the literal
-// writes it, so 1, 1.0, 1e0 and "1.0" all decode as 1. Encode always writes
-// the integer form.
+// Integer is the BMM Integer primitive. Decode reads a whole number however
+// the literal writes it, so 1, 1.0, 1e0 and "1.0" all decode as 1;
+// UnmarshalJSON lists the exact literals it accepts. Encode always writes the
+// integer form.
 type Integer int32
 
-// UnmarshalJSON accepts a JSON number, or a quoted string holding one, whose
-// value is a whole number in the int32 range. The literal may write that
-// whole number with a zero fraction or an exponent (1.0, 1e0, 10e-1). The
-// check works on the literal's decimal digits, never through a float.
+// UnmarshalJSON accepts a literal in one of two forms, and its value must be
+// a whole number in the int32 range:
+//
+//   - A bare JSON number. It may write the whole number with a zero fraction
+//     or an exponent (1.0, 1e0, 10e-1).
+//   - A quoted string holding either a decimal integer as strconv.ParseInt
+//     reads it in base 10, which allows a leading sign and leading zeros
+//     ("+1", "01", "007"), or a JSON number whose value is whole ("1.0",
+//     "1e0"). That second reading keeps the JSON number grammar, so "+1.0"
+//     and "01.0" are refused.
+//
+// The whole-number check works on the literal's decimal digits, never
+// through a float.
 //
 // A literal with a non-zero fraction, or one outside the int32 range, is
 // refused, and the receiver keeps its value: nothing is truncated or
 // rounded. The refusal is the parse error beneath it, an encoding/json/v2
 // *json.SemanticError for a bare number and a *strconv.NumError for a
 // quoted one, each reachable with errors.AsType. A quoted literal is named
-// once, by that cause, never again by the prefix.
+// once, by that cause, never again by the prefix. The strconv sentinel the
+// cause carries tells the two refusals apart however the literal writes the
+// number: a non-zero fraction carries strconv.ErrSyntax, whatever the
+// magnitude, and a whole number outside the range carries strconv.ErrRange,
+// so errors.Is(err, strconv.ErrRange) holds for 2147483648, 2147483648.0 and
+// "1e10" alike.
 //
 // A nil receiver is refused with an error rather than dereferenced. That
 // refusal carries typereg.ErrNilReceiver, not typereg.ErrInvalidShape,
@@ -46,8 +60,13 @@ func (i *Integer) UnmarshalJSON(b []byte) error {
 		}
 		n, err := strconv.ParseInt(s, 10, 32)
 		if err != nil {
-			w, ok := wholeInt32(s)
-			if !ok {
+			w, werr := wholeInt32(s)
+			if werr != nil {
+				if errors.Is(werr, strconv.ErrRange) {
+					// ParseInt reports "1e10" as a syntax error; the whole
+					// number it writes is out of range, as for "10000000000".
+					err = &strconv.NumError{Func: "ParseInt", Num: s, Err: strconv.ErrRange}
+				}
 				// The *strconv.NumError already quotes the literal once; a
 				// second echo here would double it (wire.md § REQ-052).
 				return fmt.Errorf("rm.Integer: parse quoted literal: %w", err)
@@ -62,8 +81,17 @@ func (i *Integer) UnmarshalJSON(b []byte) error {
 		// encoding/json/v2 refuses any literal with a fraction or an
 		// exponent for an int32, 1.0 included, so a refused literal is read
 		// again as a whole number before the refusal stands.
-		w, ok := wholeInt32(string(b))
-		if !ok {
+		w, werr := wholeInt32(string(b))
+		if werr != nil {
+			if se, ok := errors.AsType[*json.SemanticError](err); ok && se != nil && errors.Is(werr, strconv.ErrRange) {
+				// encoding/json/v2 reports 1e10 as a syntax error but
+				// 10000000000 as a range error; the same whole number gets
+				// the same cause however the literal writes it. The copy
+				// keeps the codec's own error untouched.
+				ranged := *se
+				ranged.Err = strconv.ErrRange
+				err = &ranged
+			}
 			return fmt.Errorf("rm.Integer: %w", err)
 		}
 		n = w
@@ -80,14 +108,16 @@ const maxExponent = 1 << 40
 
 // wholeInt32 reads lit as an int32 when lit is a JSON number literal (RFC
 // 8259 § 6) whose value is a whole number in the int32 range: 1.0, 1e0,
-// 10e-1 and 0.1e1 all read as 1. It reports false for anything else: a
-// literal that is not a JSON number, one with a non-zero digit after the
-// decimal point once the exponent is applied, and one outside the range.
+// 10e-1 and 0.1e1 all read as 1. Otherwise it returns strconv.ErrSyntax for
+// a literal that is not a JSON number or has a non-zero digit after the
+// decimal point once the exponent is applied, and strconv.ErrRange for a
+// whole number outside the range. A non-zero fraction is reported first, so
+// 2147483648.5 is strconv.ErrSyntax.
 //
 // It never goes through a float, which would round 1.0000000000000001 to 1.
 // Instead it places the decimal point in the literal's digit run and checks
 // that no non-zero digit falls after it.
-func wholeInt32(lit string) (int32, bool) {
+func wholeInt32(lit string) (int32, error) {
 	s, neg := strings.CutPrefix(lit, "-")
 	mant, exp := s, ""
 	hasExp := false
@@ -96,7 +126,7 @@ func wholeInt32(lit string) (int32, bool) {
 	}
 	intPart, frac, hasPoint := strings.Cut(mant, ".")
 	if !isDigits(intPart) || (len(intPart) > 1 && intPart[0] == '0') || (hasPoint && !isDigits(frac)) {
-		return 0, false
+		return 0, strconv.ErrSyntax
 	}
 	var e int64
 	if hasExp {
@@ -105,7 +135,7 @@ func wholeInt32(lit string) (int32, bool) {
 			digits = strings.TrimPrefix(digits, "+")
 		}
 		if !isDigits(digits) {
-			return 0, false
+			return 0, strconv.ErrSyntax
 		}
 		for _, c := range []byte(digits) {
 			if e <= maxExponent {
@@ -127,10 +157,10 @@ func wholeInt32(lit string) (int32, bool) {
 	point -= int64(len(digits) - len(trimmed))
 	trimmed = strings.TrimRight(trimmed, "0")
 	if trimmed == "" {
-		return 0, true // every digit is zero: the value is 0
+		return 0, nil // every digit is zero: the value is 0
 	}
 	if point < int64(len(trimmed)) {
-		return 0, false // a non-zero digit falls after the decimal point
+		return 0, strconv.ErrSyntax // a non-zero digit falls after the decimal point
 	}
 
 	// Build the whole number one integer digit at a time, padding with
@@ -148,13 +178,13 @@ func wholeInt32(lit string) (int32, bool) {
 			v += int64(trimmed[k] - '0')
 		}
 		if v > limit {
-			return 0, false // outside the int32 range
+			return 0, strconv.ErrRange // a whole number outside the int32 range
 		}
 	}
 	if neg {
 		v = -v
 	}
-	return int32(v), true
+	return int32(v), nil
 }
 
 // isDigits reports whether s is one or more ASCII decimal digits.
