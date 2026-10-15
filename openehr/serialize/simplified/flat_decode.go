@@ -142,8 +142,9 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 		sink.spellings = fold.spellings
 	}
 	// Separate composition-level context from clinical content; context is
-	// rebuilt from RM attributes, not from a Web Template leaf path.
-	ctx, ctxOrigin, content, err := siphonContext(flat, root.ID, sink)
+	// rebuilt from RM attributes, not from a Web Template leaf path. The
+	// composer's real-path keys come out as one party group.
+	ctx, ctxOrigin, composer, content, err := siphonContext(flat, root.ID, sink)
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +265,11 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	if err != nil {
 		return nil, err
 	}
-	if err := applyContext(compJSON, ci); err != nil {
+	composerJSON, err := decodeComposer(composer, ci, ctxOrigin)
+	if err != nil {
+		return nil, err
+	}
+	if err := applyContext(compJSON, ci, composerJSON); err != nil {
 		return nil, err
 	}
 	// Conformant mode (a template was supplied, so names is non-nil): fill the
@@ -295,13 +300,13 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 //   - A leaf whose datatype has a suffix set keeps the suffixes in that set
 //     ([leafSuffixMatched]); the rest are unmatched.
 //   - A leaf whose datatype has neither a suffix set nor a sub-path grammar
-//     resolves but has no carrier other than |raw: in practice the composer's
-//     PARTY_PROXY, whose party grammar the ctx/ forms own. Its bare value, and
-//     a suffix that names something the datatype has, are refused in every
-//     mode with ErrUnsupportedDatatype, as the other carrier-less keys at a
-//     leaf are, naming the first such key: an attribute of its RM class, or
-//     for a party the party grammar's suffixes (the composer's `external_ref`
-//     among them). Any other suffix is unmatched (REQ-170).
+//     (an unmapped datatype such as DV_STATE) resolves but has no carrier
+//     other than |raw. Its bare value, and a suffix that names an attribute of
+//     its RM class, are refused in every mode with ErrUnsupportedDatatype, as
+//     the other carrier-less keys at a leaf are, naming the first such key.
+//     Any other suffix is unmatched (REQ-170). A party leaf does not get
+//     here: [siphonContext] reads every key at the composer's real path, and
+//     [compositeLeafGroups] every other party leaf.
 //   - An unparameterised `DV_INTERVAL` leaf has a sub-path grammar, the
 //     interval grammar, but names no bound datatype to read it with, so it
 //     reads its |raw fragment alone; every other key is unmatched.
@@ -351,14 +356,9 @@ func leafSuffixes(leaf *webtemplate.Node, sfx map[string]any, keyOf func(string)
 	return out, nil
 }
 
-// unmappedReads reports whether suffix names something a leaf of rmType, a
-// datatype with neither a suffix set nor a sub-path grammar, has: for a party,
-// a suffix of the party grammar (the composer's `external_ref` suffixes and
-// `|name`); otherwise an attribute of its RM class.
+// unmappedReads reports whether suffix names an attribute of the RM class of
+// rmType, a datatype with neither a suffix set nor a sub-path grammar.
 func unmappedReads(rmType, suffix string) bool {
-	if isPartyLeafType(rmType) {
-		return partyProxyOwnTails[suffix]
-	}
 	_, declared := rminfo.Default.AttributeRMType(bmmtype.Class(rmType), suffix)
 	return declared
 }
@@ -399,13 +399,13 @@ func unmappedReads(rmType, suffix string) bool {
 // Template `setting` node: the same RM attribute either way, and `rmpath`
 // leaves `…/context/setting` unresolvable so encode cannot double-spell it.
 //
-// One composition-level family deliberately stays out, because admitting it
-// would be adding a field rather than accepting a spelling: `composer|id` /
-// `|id_scheme` / `|id_namespace` — the composer's external_ref, which the ctx/
-// short forms structurally cannot carry. Silently dropping it would violate
-// REQ-053's semantics-preserving contract, so those suffixes stay refused and
-// appear in the PROBE-086 census (see deviations.md and
-// docs/specifications/conformance.md § PROBE-086).
+// The composer's other real-path keys stay out, because no ctx/ field carries
+// them: `composer|id` / `|id_scheme` / `|id_namespace` / `|type` (its
+// external_ref), `composer/_identifier:N` and `composer/relationship`. They
+// carry the rest of the composer at its real path, read by the party grammar
+// beside the name the alias gives (ADR 0029, [decodeComposer]), and the
+// PROBE-086 census compares them (docs/specifications/conformance.md
+// § PROBE-086).
 var metadataAliases = map[string]string{
 	"language|code":         "ctx/language",
 	"territory|code":        "ctx/territory",
@@ -438,12 +438,10 @@ var metadataAliasTerminology = map[string]string{
 // owns the leaf, is what keeps that unreachable; a suffix their datatype does
 // not have is unmatched content and is never placed.
 //
-// `composer` is deliberately absent: the composer external_ref suffixes
-// (`composer|id` / `|id_scheme` / `|id_namespace`) must keep flowing through to
-// decode so they are refused there and counted in the PROBE-086 census as the
-// real PARTY_PROXY data loss they are (ADR 0015). Every base here is held out of
-// that census by the harness (`IsCompositionMeta`), so refusing extra suffixes
-// early moves no count.
+// `composer` is absent: its real path carries the whole composer in the party
+// grammar (ADR 0029), so [siphonContext] reads its keys rather than refusing
+// them. Every base here is held out of the PROBE-086 census by the harness
+// (`IsCompositionMeta`), so refusing extra suffixes early moves no count.
 var contextMetaOwnedBases = map[string]bool{
 	"context/setting": true, "context/start_time": true,
 	"language": true, "territory": true,
@@ -485,12 +483,13 @@ var ctxFields = map[string]bool{
 
 // metadataSegPaths are the root-relative segment paths the metadata spellings
 // run through: every leading run of segments of an alias, a witness or a
-// ctx/-owned base, plus `composer` for its party sub-structure. Each names a
-// single-valued RM attribute (COMPOSITION.language, .composer, .context,
-// EVENT_CONTEXT.start_time, …). The set is read off those tables, so an alias
-// added there brings its segments with it.
+// ctx/-owned base, plus `composer`, whose real path carries the whole composer
+// ([siphonContext]). Each names a single-valued RM attribute
+// (COMPOSITION.language, .composer, .context, EVENT_CONTEXT.start_time, …). The
+// set is read off those tables, so an alias added there brings its segments
+// with it.
 var metadataSegPaths = func() map[string]bool {
-	paths := map[string]bool{"composer": true}
+	paths := map[string]bool{composerSeg: true}
 	add := func(spelling string) {
 		base, _, _ := strings.Cut(spelling, "|")
 		for i := range len(base) {
@@ -581,21 +580,25 @@ func overIndexedMetadataSeg(rel string) flatSeg {
 	return flatSeg{}
 }
 
-// composerSubStructure reports whether sub, the path below `composer/`, opens
-// with a segment of the party grammar's sub-structure: the nested
-// `_identifier:N` list or PARTY_RELATED's `relationship`.
-func composerSubStructure(sub string) bool {
-	seg := sub
-	if cut := strings.IndexAny(seg, "/|"); cut >= 0 {
-		seg = seg[:cut]
+// composerSeg is the FLAT id of the composer's real path below the template
+// root, which carries the whole composer in the party grammar (ADR 0029).
+const composerSeg = "composer"
+
+// composerTail returns the tail of rel, an unindexed root-relative spelling,
+// below the composer's own segment: "" for the bare key, "|id" for a suffix,
+// "/_identifier:0|id" for a sub-path. isComposer is false for any other path,
+// a longer segment id such as `composer_self` among them.
+func composerTail(rel string) (tail string, isComposer bool) {
+	rest, ok := strings.CutPrefix(rel, composerSeg)
+	if !ok || (rest != "" && rest[0] != '|' && rest[0] != '/') {
+		return "", false
 	}
-	id, _, _ := strings.Cut(seg, ":")
-	return partyListTails[id] || partySubTails[id]
+	return rest, true
 }
 
 // isMetadataSpelling reports whether an unindexed root-relative spelling is one
 // [siphonContext] handles itself: an alias, a terminology witness, a suffix of
-// a leaf the ctx/ short form owns, or the composer's party sub-structure.
+// a leaf the ctx/ short form owns, or a key at the composer's real path.
 func isMetadataSpelling(rel string) bool {
 	if _, isAlias := metadataAliases[rel]; isAlias {
 		return true
@@ -606,7 +609,8 @@ func isMetadataSpelling(rel string) bool {
 	if base, _, _ := strings.Cut(rel, "|"); contextMetaOwnedBases[base] {
 		return true
 	}
-	return strings.HasPrefix(rel, "composer/")
+	_, isComposer := composerTail(rel)
+	return isComposer
 }
 
 // cutRoot splits a FLAT key at its template-root segment and returns the path
@@ -746,9 +750,18 @@ func MetadataWitnessSpellings() []string {
 // outside that leaf's datatype, go to sink as unmatched content (REQ-170),
 // whatever their value. A ctx/ field, an alias, a witness or a ctx/-owned leaf
 // suffix the decode reads that holds JSON null is absent (REQ-053) and is
-// dropped. The composer's party sub-structure is refused whatever its value.
-func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx map[string]any, ctxOrigin map[string]string, content map[string]any, err error) {
+// dropped.
+//
+// Every other key at the composer's real path (`<root>/composer|id`,
+// `<root>/composer/_identifier:0|id`, …) goes to composer, one party group
+// whose unmatched keys go to sink: the real path carries the whole composer
+// (ADR 0029), and [decodeComposer] reads the group beside the ctx/ composer
+// fields once they are parsed. Two spellings of one composer key, with and
+// without the `:0` of the root or the composer segment, are one key: they must
+// agree, and a null one is absent ([putComposerKey]).
+func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx map[string]any, ctxOrigin map[string]string, composer *rmattrGroup, content map[string]any, err error) {
 	ctx, ctxOrigin, content = make(map[string]any), make(map[string]string), make(map[string]any)
+	composer = newRMAttrGroup(rootID, composerSeg, -1, sink)
 	// Sorted so a body carrying two conflicting real-path spellings reports the
 	// same key first on every run — a map-order-dependent error message is not
 	// reproducible for whoever has to fix the payload.
@@ -767,7 +780,7 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 			if key == ctxSettingBare {
 				// ctx/setting is read as its |code + |value pair; a bare value is
 				// the field missing both (REQ-170: a missing required suffix).
-				return nil, nil, nil, fmt.Errorf("%w: %q spells the setting without its |code and |value, the pair ctx/setting travels as",
+				return nil, nil, nil, nil, fmt.Errorf("%w: %q spells the setting without its |code and |value, the pair ctx/setting travels as",
 					ErrUnsupportedDatatype, key)
 			}
 			if key == ctxSettingTerminology {
@@ -776,12 +789,12 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 				// terminology is a typed error, not a silent rewrite (REQ-053),
 				// exactly as the real-path witness below.
 				if err := checkTerminologyWitness(key, val, terminology.ID); err != nil {
-					return nil, nil, nil, err
+					return nil, nil, nil, nil, err
 				}
 				continue
 			}
 			if err := putCtx(ctx, ctxOrigin, key, val, key); err != nil {
-				return nil, nil, nil, err
+				return nil, nil, nil, nil, err
 			}
 			continue
 		}
@@ -789,7 +802,7 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 		// is judged from the left like any other: an index past :0 on it is
 		// past its bound (REQ-170).
 		if seg, alone := rootSegmentAlone(key, rootID); alone && seg.idx > 0 {
-			return nil, nil, nil, fmt.Errorf("simplified: %q: %w", key, errRootIndex(seg))
+			return nil, nil, nil, nil, fmt.Errorf("simplified: %q: %w", key, errRootIndex(seg))
 		}
 		rel, rootSeg, isRooted := cutRoot(key, rootID)
 		if !isRooted {
@@ -800,7 +813,7 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 		// (REQ-053), and any other index is past its bound, refused whatever
 		// follows it (REQ-170).
 		if rootSeg.idx > 0 {
-			return nil, nil, nil, fmt.Errorf("simplified: %q: %w", key, errRootIndex(rootSeg))
+			return nil, nil, nil, nil, fmt.Errorf("simplified: %q: %w", key, errRootIndex(rootSeg))
 		}
 		// The tables below are keyed on the unindexed spelling. An indexed
 		// metadata path is read exactly as that spelling, and only `:0` is an
@@ -810,14 +823,14 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 		raw := rel
 		rel, overIndexed := metadataRel(rel)
 		if overIndexed && isMetadataSpelling(rel) {
-			return nil, nil, nil, fmt.Errorf("%w: %q (a composition metadata path runs through single-valued attributes, so :0 is the only index it takes)",
+			return nil, nil, nil, nil, fmt.Errorf("%w: %q (a composition metadata path runs through single-valued attributes, so :0 is the only index it takes)",
 				ErrUnknownPath, key)
 		}
 		// Any other key that runs through a metadata segment past :0 is past
 		// that segment's bound whatever follows it, whether or not the Web
 		// Template carries a node for the segment (REQ-170).
 		if overIndexed {
-			return nil, nil, nil, fmt.Errorf("simplified: %q: %w", key, errSingleValuedIndex(overIndexedMetadataSeg(raw)))
+			return nil, nil, nil, nil, fmt.Errorf("simplified: %q: %w", key, errSingleValuedIndex(overIndexedMetadataSeg(raw)))
 		}
 		// A witness, an alias or a suffix of a ctx/-owned leaf that holds null
 		// is absent (REQ-053), so it neither conflicts with another spelling
@@ -827,7 +840,7 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 				continue
 			}
 			if err := checkTerminologyWitness(key, val, want); err != nil {
-				return nil, nil, nil, err
+				return nil, nil, nil, nil, err
 			}
 			continue
 		}
@@ -836,7 +849,7 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 				continue
 			}
 			if err := putCtx(ctx, ctxOrigin, ctxKey, val, key); err != nil {
-				return nil, nil, nil, err
+				return nil, nil, nil, nil, err
 			}
 			continue
 		}
@@ -844,9 +857,8 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 		// travel as an ordinary Web Template leaf: the ctx/ entry is written last
 		// and would overwrite whatever the leaf placed, dropping it with no error.
 		// Every spelling of such a leaf is therefore either an accepted alias, a
-		// checked witness, or refused here naming the key (REQ-053) — the
-		// composer external_ref suffixes stay out of this set deliberately, so
-		// they keep flowing to decode and stay visible in the PROBE-086 census.
+		// checked witness, or refused here naming the key (REQ-053). The
+		// composer is not such a leaf: its real path is read below.
 		// A suffix the leaf's datatype does not have at all is not such a
 		// spelling: the decode does not read it, so it is unmatched (REQ-170).
 		// A bare value is not such a suffix but a spelling of the field missing
@@ -859,30 +871,22 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 			if val == nil {
 				continue
 			}
-			return nil, nil, nil, fmt.Errorf("%w: %q is not a spelling the ctx/ short form can carry — %s owns this leaf, so only its accepted suffixes travel (see deviations.md)",
+			return nil, nil, nil, nil, fmt.Errorf("%w: %q is not a spelling the ctx/ short form can carry — %s owns this leaf, so only its accepted suffixes travel (see deviations.md)",
 				ErrUnsupportedDatatype, key, metadataOwnedBaseCtx[base])
 		}
-		// The ADR 0015 boundary, REQ-140 edition. REQ-140's party grammar reaches
-		// a party's sub-structure — its `_identifier:N` list and, for a
-		// PARTY_RELATED, `/relationship` — everywhere except here: no `ctx/` short
-		// form can carry it, so a composer decoded from those keys could not be
-		// re-emitted (encode is ctx/-only) and the value would vanish on the way
-		// out. That is the silent loss REQ-053 forbids, so the keys are refused by
-		// name and counted in the PROBE-086 census, exactly as the composer's own
-		// `|id` / `|id_scheme` / `|id_namespace` external_ref suffixes are (those
-		// reach the leaf loop and are refused there as PARTY_PROXY). Closing this
-		// means giving the composer's reference a `ctx/` carrier, which is an
-		// ADR-level decision, not a codec one.
-		// Only the party grammar's sub-structure is the composer's: any other
-		// sub-path names nothing a party has, and is unmatched content where the
-		// leaf loop finds no node for it.
-		if sub, isComposerSub := strings.CutPrefix(rel, "composer/"); isComposerSub && composerSubStructure(sub) {
-			return nil, nil, nil, fmt.Errorf("%w: %q is composer party sub-structure, which no ctx/ short form can carry (ADR 0015 boundary)",
-				ErrUnsupportedDatatype, key)
+		// The composer's real path carries the whole composer in the party
+		// grammar REQ-140 gives every other party position (ADR 0029): its
+		// `external_ref` suffixes, its `_identifier:N` list and a PARTY_RELATED's
+		// `/relationship`. Its `|name` is the alias above. The keys are read
+		// whether or not the Web Template carries a composer node, as the
+		// aliases are, and the party grammar sets aside what it does not read.
+		if tail, isComposer := composerTail(rel); isComposer {
+			putComposerKey(composer, tail, val, key)
+			continue
 		}
 		content[key] = val
 	}
-	return ctx, ctxOrigin, content, nil
+	return ctx, ctxOrigin, composer, content, nil
 }
 
 // checkTerminologyWitness reads a terminology witness of a coded metadata
@@ -1081,19 +1085,17 @@ func ctxString(key string, val any) (string, error) {
 }
 
 // applyContext sets the composition-level metadata from the parsed context and
-// enforces that language and territory (mandatory per the Simplified Formats
-// spec) are present.
-func applyContext(compJSON map[string]any, ci ctxInfo) error {
+// the composer [decodeComposer] built (nil for none), and enforces that
+// language and territory (mandatory per the Simplified Formats spec) are
+// present.
+func applyContext(compJSON map[string]any, ci ctxInfo, composer map[string]any) error {
 	if ci.language == "" || ci.territory == "" {
 		return fmt.Errorf("%w: ctx/language and ctx/territory are required", ErrMissingContext)
 	}
 	compJSON["language"] = codePhraseJSON(ci.language, "ISO_639-1")
 	compJSON["territory"] = codePhraseJSON(ci.territory, "ISO_3166-1")
-	switch {
-	case ci.composerSelf:
-		compJSON["composer"] = map[string]any{"_type": "PARTY_SELF"}
-	case ci.haveComposerName:
-		compJSON["composer"] = map[string]any{"_type": "PARTY_IDENTIFIED", "name": ci.composerName}
+	if composer != nil {
+		compJSON["composer"] = composer
 	}
 	if ci.haveTime || ci.haveSettingCode {
 		// Merge into any EVENT_CONTEXT already reconstructed from clinical paths
@@ -1869,9 +1871,9 @@ func compositeLeafGroups(content map[string]any, wt *webtemplate.WebTemplate, si
 // Two kinds of key are deliberately not composite leaves. One whose path reaches
 // an `_`-prefixed segment first belongs to that family — a `_feeder_audit`'s
 // nested `/subject` is inside its tails, not at a Web Template node — and one
-// addressing a `ctx/`-owned metadata leaf is the composer, whose party
-// sub-structure is the ADR 0015 refusal in [siphonContext] and whose own suffixes
-// stay a PARTY_PROXY leaf refusal.
+// addressing a composition-metadata leaf [emitContext] writes is the composer,
+// whose keys [siphonContext] has already taken, whether or not the Web
+// Template carries its node (ADR 0029).
 func splitCompositeLeafKey(wt *webtemplate.WebTemplate, pk parsedKey) (base, family string, index int, tail string, ok bool) {
 	node := wt.Tree
 	if len(pk.segs) == 0 || pk.segs[0].id != node.ID {

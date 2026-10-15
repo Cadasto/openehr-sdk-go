@@ -202,11 +202,12 @@ type rmattrFamily struct {
 //
 // `_identifier` is deliberately **not** a family here, though the corpus writes
 // it: it is only ever reached *inside* a party — nested in
-// `_health_care_facility`'s tails, at the ENTRY `subject` leaf, or (Phase C3)
-// under a FEEDER_AUDIT_DETAILS party — so the one party implementation owns it
-// (rmattr_party.go) and no owner exists for the router to judge it against. The
-// composition's **composer** is the one path that would reach it as a family, and
-// that is the ADR 0015 boundary flat_decode.go refuses by name.
+// `_health_care_facility`'s tails, at the ENTRY `subject` leaf, at the
+// composition's composer, or (Phase C3) under a FEEDER_AUDIT_DETAILS party — so
+// the one party implementation owns it (rmattr_party.go) and no owner exists for
+// the router to judge it against. The composer is the one path that would reach
+// it as a family; [siphonContext] takes the composer's keys before the router
+// sees them (ADR 0029).
 //
 // Which *owners* admit a family is not listed here: it is read off the RM
 // itself (rminfo), so `_work_flow_id` is ENTRY-only because only the five ENTRY

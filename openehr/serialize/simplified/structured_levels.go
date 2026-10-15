@@ -212,18 +212,6 @@ var (
 		"_mapping":                subPathGrammar(mappingSubTails, nil),
 		"_feeder_audit":           feederLevel,
 	}
-	// composerLevel is the composer's party grammar. No ctx/ short form can
-	// carry its sub-structure, so the decode refuses a key that opens with
-	// `relationship` or `_identifier` below the composer whatever follows
-	// ([composerSubStructure], the ADR 0015 boundary): everything below either
-	// is read, for the FLAT decode to refuse.
-	composerLevel = func() memberLevel {
-		l := memberLevel{kind: levelGrammar, sub: map[string]memberLevel{}}
-		for name := range partyLevel.sub {
-			l.sub[name] = opaqueLevel
-		}
-		return l
-	}()
 	// ismReferenceLevel is the reference's in-context `ism_transition` node,
 	// which the decode refuses wherever it reads one of its leaves or its
 	// `_reason` family; any other name below it is unmatched.
@@ -333,22 +321,19 @@ func (l memberLevel) judgeNode(name string) (memberLevel, bool) {
 
 // judgeLeaf judges a member of an element of a Web Template leaf: a sub-path
 // of the leaf's grammar (an interval's `lower` and `upper`, a party's
-// `relationship` and `_identifier`, the composer's read whatever follows, as
-// [composerLevel] says) or an underscore family the leaf's owner carries. A collapsed ELEMENT leaf owns the families of its ELEMENT and, for
-// a value family, of the datatype it holds (REQ-140); a leaf on any other
-// attribute owns none, as [rmattrOwnerAt] resolves no owner for it. An
-// unparameterised DV_INTERVAL reads no sub-path.
+// `relationship` and `_identifier`, the composer's among them) or an
+// underscore family the leaf's owner carries. A collapsed ELEMENT leaf owns
+// the families of its ELEMENT and, for a value family, of the datatype it
+// holds (REQ-140); a leaf on any other attribute owns none, as
+// [rmattrOwnerAt] resolves no owner for it. An unparameterised DV_INTERVAL
+// reads no sub-path.
 func (l memberLevel) judgeLeaf(name string) (memberLevel, bool) {
 	rmType := nodeRMType(l.node)
 	switch {
 	case isIntervalLeafType(rmType) && intervalSubTails[name]:
 		return suffixesOnly.bounded(subPathOne), true
 	case isPartyLeafType(rmType):
-		party := partyLevel
-		if ctxOnlyLeafPaths[bareAQLPath(l.node.AQLPath)] {
-			party = composerLevel
-		}
-		below, read := party.sub[name]
+		below, read := partyLevel.sub[name]
 		return below, read
 	case !strings.HasPrefix(name, "_") || !strings.HasSuffix(bareAQLPath(l.node.AQLPath), "/value"):
 		return memberLevel{}, false
@@ -359,16 +344,17 @@ func (l memberLevel) judgeLeaf(name string) (memberLevel, bool) {
 // judgeMetadata judges a member of an object at a metadata spelling the Web
 // Template has no node for, as the FLAT decode reads it without the Web
 // Template ([siphonContext]): a longer metadata spelling; below `composer`,
-// its party sub-structure, which the decode refuses ([composerLevel]); and
-// below `context`, which the decode resolves as the EVENT_CONTEXT
-// ([rmattrOwnerAt]), the families an EVENT_CONTEXT carries.
+// whose real path carries the whole composer ([decodeComposer], ADR 0029),
+// the party grammar's sub-paths; and below `context`, which the decode
+// resolves as the EVENT_CONTEXT ([rmattrOwnerAt]), the families an
+// EVENT_CONTEXT carries.
 func (l memberLevel) judgeMetadata(name string) (memberLevel, bool) {
 	rel := l.rel + "/" + name
 	switch {
 	case metadataSegPaths[rel]:
 		return memberLevel{kind: levelMetadata, rel: rel, bound: oneValue}, true
-	case l.rel == "composer":
-		below, read := composerLevel.sub[name]
+	case l.rel == composerSeg:
+		below, read := partyLevel.sub[name]
 		return below, read
 	case l.rel == "context" && strings.HasPrefix(name, "_"):
 		return familyLevel("EVENT_CONTEXT", "", name)

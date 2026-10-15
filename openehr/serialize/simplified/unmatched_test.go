@@ -377,9 +377,6 @@ func TestREQ170CarrierlessKeysRefusedInEveryMode(t *testing.T) {
 		keys map[string]any
 		want error
 	}{
-		{"composer external_ref", map[string]any{rmattrRoot + "/composer|id": "1234"}, ErrUnsupportedDatatype},
-		{"composer identifier", map[string]any{rmattrRoot + "/composer/_identifier:0|id": "122"}, ErrUnsupportedDatatype},
-		{"composer relationship", map[string]any{rmattrRoot + "/composer/relationship|code": "10"}, ErrUnsupportedDatatype},
 		{"PARTICIPATION time", map[string]any{
 			rmattrContext + "/_participation:0|function": "requester",
 			rmattrContext + "/_participation:0|time":     "2021-12-21T14:19:31+01:00",
@@ -404,8 +401,6 @@ func TestREQ170CarrierlessKeysRefusedInEveryMode(t *testing.T) {
 			rmattrObs + "/_feeder_audit/originating_system_audit|system_id":     "orig",
 			rmattrObs + "/_feeder_audit/originating_system_audit|other_details": "boom",
 		}, ErrUnsupportedDatatype},
-		{"composer bare value", map[string]any{rmattrRoot + "/composer": "Dr. Who"}, ErrUnsupportedDatatype},
-		{"composer external_ref type", map[string]any{rmattrRoot + "/composer|type": "PERSON"}, ErrUnsupportedDatatype},
 		{"_instruction_details", map[string]any{rmattrAction + "/_instruction_details|activity_id": "activities[at0001]"}, ErrUnknownPath},
 		{"_wf_definition", map[string]any{instruction + "/_wf_definition|value": "wf"}, ErrUnknownPath},
 	} {
@@ -435,11 +430,58 @@ func TestREQ170MalformedMatchedContentRefusedInEveryMode(t *testing.T) {
 		{"missing required suffix", map[string]any{rmattrCount + "|magnitude_status": "="}},
 		{"disagreeing spellings", map[string]any{rmattrRoot + "/language|code": "de"}},
 		{"index past its bound", map[string]any{rmattrRoot + "/context:1/_location": "lab"}},
+		{"composer reference without its namespace", map[string]any{rmattrRoot + "/composer|id": "1234"}},
+		{"composer reference type without an id", map[string]any{rmattrRoot + "/composer|type": "PERSON"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			assertRefusedInEveryMode(t, wt, rmattrBody(tc.keys))
 		})
 	}
+}
+
+// TestREQ170ComposerRealPathIsMatchedContent — REQ-170 / REQ-053, ADR 0029,
+// replacing the composer rows the carrier-less table held while the composer's
+// real path had no carrier. The real path now carries the whole composer, so
+// its external_ref, identifier and relationship keys are matched content the
+// decode reads: strict decodes them and reports nothing. A bare value is not
+// in the party grammar, at the composer as at every other party position, so
+// it is unmatched content.
+func TestREQ170ComposerRealPathIsMatchedContent(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	for _, tc := range []struct {
+		name string
+		keys map[string]any
+	}{
+		{"composer external_ref", map[string]any{
+			rmattrRoot + "/composer|id": "1234", rmattrRoot + "/composer|id_namespace": "demographic",
+			rmattrRoot + "/composer|type": "PERSON",
+		}},
+		{"composer identifier", map[string]any{rmattrRoot + "/composer/_identifier:0|id": "122"}},
+		{"composer relationship", map[string]any{
+			"ctx/composer_name":                         "Dr. Who",
+			rmattrRoot + "/composer/relationship|code":  "10",
+			rmattrRoot + "/composer/relationship|value": "mother",
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var reported []string
+			comp, err := UnmarshalFlat(mustJSON(t, rmattrBody(tc.keys)), wt, WithStrict(),
+				WithUnmatched(func(p string) { reported = append(reported, p) }))
+			if err != nil {
+				t.Fatalf("UnmarshalFlat (strict) = %v, want the composer keys read", err)
+			}
+			if len(reported) != 0 {
+				t.Errorf("reported %q, want nothing", reported)
+			}
+			if comp.Composer == nil {
+				t.Error("composer not decoded")
+			}
+		})
+	}
+	t.Run("composer bare value", func(t *testing.T) {
+		key := rmattrRoot + "/composer"
+		assertUnmatched(t, wt, rmattrBody(map[string]any{key: "Dr. Who"}), key)
+	})
 }
 
 // TestREQ170StrictAcceptsAbsentMandatory — REQ-170. Strict covers unmatched
@@ -1329,13 +1371,14 @@ func TestREQ170RawDecorationIgnoresUnmatchedKey(t *testing.T) {
 
 // TestREQ170UnmappedLeafSplitsRefusedFromUnmatched — REQ-170, which refuses in
 // every mode, "at a leaf whose datatype has neither a suffix set nor a sub-path
-// grammar (the composer's PARTY_PROXY among them), its bare value and a suffix
-// that names an attribute of its RM class". Such a leaf carries nothing but
-// `|raw`; any other suffix or sub-path is unmatched content. For the composer
-// that is the party grammar's suffixes and sub-structure; for any other such
-// datatype, an attribute of its RM class, refused with ErrUnsupportedDatatype
-// as the other carrier-less keys at a leaf are. An unparameterised
-// `DV_INTERVAL` leaf has a sub-path grammar, so the rule does not reach it.
+// grammar, its bare value and a suffix that names an attribute of its RM
+// class". Such a leaf carries nothing but `|raw`; any other suffix or sub-path
+// is unmatched content. An attribute of its RM class is refused with
+// ErrUnsupportedDatatype as the other carrier-less keys at a leaf are. The
+// composer is not such a leaf: its real path has the party grammar (ADR 0029),
+// under which a suffix or a sub-path outside the grammar is unmatched content
+// too. An unparameterised `DV_INTERVAL` leaf has a sub-path grammar, so the
+// rule does not reach it.
 func TestREQ170UnmappedLeafSplitsRefusedFromUnmatched(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	t.Run("composer suffix the party grammar lacks, beside a name", func(t *testing.T) {
@@ -1910,10 +1953,10 @@ func TestREQ170BareValueAtANodeIsRefused(t *testing.T) {
 // keeps the shape refusal in every mode.
 //
 // The composer's party sub-structure (`_identifier`, `relationship`) is read
-// whether or not the Web Template carries a composer node, and so is anything
-// below it: no ctx/ short form can carry it, so FLAT and STRUCTURED alike
-// refuse it in every mode (REQ-170, the ADR 0015 boundary), reporting nothing
-// and naming no value.
+// whether or not the Web Template carries a composer node: its real path
+// carries the whole composer (ADR 0029), so FLAT and STRUCTURED alike decode it
+// to the same composer, and a member below it that the party grammar does not
+// read is set aside and reported by its member path.
 func TestREQ170StructuredMetadataWithoutANode(t *testing.T) {
 	full, _ := conformanceWT(t)
 	without := func(id string) *webtemplate.WebTemplate {
@@ -1978,25 +2021,46 @@ func TestREQ170StructuredMetadataWithoutANode(t *testing.T) {
 		name string
 		wt   *webtemplate.WebTemplate
 	}{{"with a composer node", full}, {"without a composer node", without("composer")}} {
-		for _, key := range []string{
-			rmattrRoot + "/composer/_identifier:0|id",
-			rmattrRoot + "/composer/relationship|code",
-			rmattrRoot + "/composer/_identifier:0/x_member|id",
-			rmattrRoot + "/composer/relationship/x_member|code",
-		} {
-			t.Run("composer sub-structure "+tc.name+"/"+key, func(t *testing.T) {
-				body := rmattrBody(map[string]any{key: secret})
-				for form, err := range map[string]error{
-					"FLAT":       refusedInEveryMode(t, tc.wt, body),
-					"STRUCTURED": structuredRefusedInEveryMode(t, tc.wt, body),
-				} {
-					if !errors.Is(err, ErrUnsupportedDatatype) || !strings.Contains(err.Error(), "composer party sub-structure") ||
-						strings.Contains(err.Error(), secret) {
-						t.Errorf("%s err = %v, want the composer party sub-structure refusal and no value", form, err)
-					}
-				}
+		t.Run("composer sub-structure "+tc.name, func(t *testing.T) {
+			body := rmattrBody(map[string]any{
+				"ctx/composer_name":                           "Dr. Who",
+				rmattrRoot + "/composer/_identifier:0|id":     "122",
+				rmattrRoot + "/composer/relationship|code":    "10",
+				rmattrRoot + "/composer/relationship|value":   "mother",
+				rmattrRoot + "/composer/relationship|x_note":  secret,
+				rmattrRoot + "/composer/_identifier:0/x|id":   secret,
+				rmattrRoot + "/composer/relationship/x|code":  secret,
+				rmattrRoot + "/composer/_identifier:0|x_note": secret,
 			})
-		}
+			flat, err := UnmarshalFlat(mustJSON(t, body), tc.wt)
+			if err != nil {
+				t.Fatalf("UnmarshalFlat = %v, want the composer read", err)
+			}
+			related, ok := flat.Composer.(*rm.PartyRelated)
+			if !ok || len(related.Identifiers) != 1 || related.Identifiers[0].ID != "122" || related.Relationship.Value != "mother" {
+				t.Fatalf("composer = %#v, want a PARTY_RELATED carrying identifier 122 and relationship mother", flat.Composer)
+			}
+			_, doc := structuredDoc(t, body)
+			var reported []string
+			structured, err := UnmarshalStructured(mustJSON(t, doc), tc.wt, WithUnmatched(func(p string) { reported = append(reported, p) }))
+			if err != nil {
+				t.Fatalf("UnmarshalStructured = %v, want the composer read", err)
+			}
+			if !bytes.Equal(canonical(t, structured), canonical(t, flat)) {
+				t.Errorf("STRUCTURED decoded %s,\nFLAT decoded %s", canonical(t, structured), canonical(t, flat))
+			}
+			composerPath := rmattrRoot + "/composer/0"
+			want := []string{
+				composerPath + "/_identifier/0/x",
+				composerPath + "/_identifier/0/|x_note",
+				composerPath + "/relationship/0/x",
+				composerPath + "/relationship/0/|x_note",
+			}
+			slices.Sort(reported)
+			if !slices.Equal(reported, want) {
+				t.Errorf("STRUCTURED reported %q,\nwant %q", reported, want)
+			}
+		})
 	}
 	// A metadata segment is single-valued with or without its node, so an
 	// element past :0 is refused whatever it holds, in STRUCTURED and FLAT.
