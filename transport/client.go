@@ -282,9 +282,14 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		}
 	}
 	// REQ-090: the status code goes on the span whenever a response arrived,
-	// a failed request's included.
+	// a failed request's included, and so does the response size when the body
+	// was read in full. A body that could not be read (REQ-172) has no size:
+	// its Response carries an empty Body, so a 0 would be a false value.
 	if resp != nil {
 		span.SetAttributes(attribute.Int("http.status_code", resp.StatusCode))
+		if !isBodyReadFailure(lastErr) {
+			span.SetAttributes(attribute.Int64("http.response_content_length", int64(len(resp.Body))))
+		}
 	}
 	if lastErr != nil {
 		span.SetStatus(codes.Error, lastErr.Error())
