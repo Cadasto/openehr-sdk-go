@@ -26,7 +26,7 @@ Jobs run in parallel. All use Go 1.27.x (`actions/setup-go@v7` with module cache
 | **Verify** | `fmt-check`, `mod-tidy-check`, `codegen-verify`, `aqlgen-verify`, `termgen-verify`, `vet`, `spec-check`, `flat-conformance-verify`, `terminology-verify`, `build` | Static checks and compile-all without running tests |
 | **Test** | `test` | Unit tests; `test` already depends on `codegen-verify`, `aqlgen-verify` and `termgen-verify` |
 | **Lint** | (via `golangci-lint-action` v2.14.0, config [`.golangci.yml`](../.golangci.yml)) | Same rules as `make lint` / `make lint-ci` |
-| **Race** | `test-race` | **Push to `main` only**, because `-race` is slower. Catches data races in `typereg` and codecs |
+| **Race** | `test-race` | **Push to `main` only**, because `-race` is slower. Catches data races in `typereg` and codecs. The runner has a C compiler, so the race run uses the host `go` |
 
 PRs do not run the **Race** job. Merge to `main` triggers it on the post-merge push.
 
@@ -45,7 +45,7 @@ The weekly workflow re-runs `make codegen-verify` on a clean checkout. On failur
 ```bash
 make doctor      # toolchain diagnosis
 make ci          # full PR gate (fmt, mod tidy, vet, test, lint, spec-check, fixture integrity, build)
-make test-race   # optional; matches main-branch Race job
+make test-race   # optional; matches main-branch Race job (needs a C compiler, else Docker)
 make docs-serve  # documentation site on http://127.0.0.1:8000 (needs Docker)
 make docs-check  # strict MkDocs build plus the published-output assertions
 ```
@@ -56,7 +56,7 @@ Run `make help` for the full grouped list. Common targets:
 |---|---|---|
 | CI | `make ci` | Full PR gate (fmt, mod tidy, vet, test, lint, spec-check, flat-conformance-verify, terminology-verify, build) |
 | Test | `make test` | Unit tests; depends on `codegen-verify`, `aqlgen-verify` and `termgen-verify` |
-| Test | `make test-race` | `-race` detector (main-branch job only) |
+| Test | `make test-race` | `-race` detector (main-branch job only). The detector needs cgo, so it runs on host Go 1.27.x only when the C compiler `go env CC` names is on `PATH`. Otherwise it runs in the dev container with cgo turned on for that run only (`make image-dev` builds the image) |
 | Format | `make fmt-check` | Fail if `golangci-lint fmt --diff` (gofumpt + goimports) would change any file |
 | Modules | `make mod-tidy-check` | Fail if `go mod tidy` would change `go.mod` / `go.sum` |
 | Codegen | `make codegen-verify` | BMM-generated tree matches `resources/bmm/` |
