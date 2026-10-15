@@ -161,7 +161,8 @@ var (
 	// misused, when a key the decode reads has no carrier (a PARTICIPATION
 	// `time`, a FEEDER_AUDIT_DETAILS `other_details`), when a composer cannot
 	// be written (a PARTY_IDENTIFIED with an empty name, or with no name,
-	// reference or identifiers), or when an underscore-prefixed
+	// reference or identifiers), when a PARTY_RELATED at any party position
+	// has no relationship, or when an underscore-prefixed
 	// RM attribute family is missing an RM-mandatory key or holds a value the
 	// family's suffixes cannot express (a coded LINK.meaning, a decorated
 	// `context/_end_time`, an OBJECT_REF id that is neither GENERIC_ID nor

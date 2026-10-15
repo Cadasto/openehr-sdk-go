@@ -445,8 +445,8 @@ output — that comparison is **PROBE-086** (Implemented, Sandbox): its harness 
 inventory in that package's `SKIPPED.md`.
 
 **PROBE-089** (Implemented, Sandbox — `testkit/probes/serialize/probe_089_underscore_round_trip.go`)
-is the per-family view of the REQ-140 grammar, where PROBE-086 is the aggregate one: fourteen
-SDK-authored fixtures, one per grammar-table row, each asserting a byte-exact whole-body
+is the per-family view of the REQ-140 grammar, where PROBE-086 is the aggregate one: eighteen
+SDK-authored fixtures, one per grammar-table row and one per shape of the composer at its real path, each asserting a byte-exact whole-body
 round-trip, an encode leg that takes the decoded composition out through **canonical JSON and
 back** before re-encoding (so an underscore value the canonical form does not model cannot
 survive), the deliberate refusals with the sentinel each boundary declares, and the STRUCTURED

@@ -44,7 +44,8 @@
 // refused. Encode writes a composer one ctx/ short form carries whole in that
 // form, and every other composer whole under the template root with no ctx/
 // composer key. It refuses a PARTY_IDENTIFIED composer with an empty name or
-// with no name, reference or identifiers.
+// with no name, reference or identifiers, and a PARTY_RELATED with no
+// relationship at any party position.
 //
 // The composition's own name travels as "<root>/_name", spelled as a text
 // leaf is: a bare name, beside its "|formatting" if it has one, or a coded

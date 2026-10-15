@@ -44,10 +44,16 @@ PROBE-086 held 318 corpus keys out of its comparison **on both sides** precisely
 
 1. **Decode accepts either spelling** for the five respelled fields in the table above. A real path is normalised onto its `ctx/` equivalent before any Web Template resolution, so the rest of decode sees one vocabulary.
 2. **Encode is unchanged** — `ctx/` only. No consumer's stored FLAT changes shape, and there is exactly one output spelling to test and document.
+
+   > **Amended 2026-10-15** ([ADR 0029](0029-composer-real-path-carrier.md)). A composer the `ctx/` short forms cannot carry whole is written at its real path. The decision text is left as written.
+
 3. **A `|terminology` witness is checked, then discarded.** The `ctx/` form carries only the code, and `applyContext` rebuilds the CODE_PHRASE with a hardcoded terminology (`ISO_639-1`, `ISO_3166-1`). A real path carrying a *different* terminology is therefore an error, not a value to silently rewrite. The rule's normative home is [wire.md § REQ-053](../specifications/wire.md#req-053); this ADR records the decision behind it, not the requirement itself.
 4. **Two spellings that disagree are an error, not a precedence rule.** `ctx/language: en` beside `<root>/language|code: de` fails loudly naming both. Silently preferring either would corrupt composition metadata — the same stance the codec already takes on an index collision.
 5. **Respellings only.** Two composition-level families are deliberately *not* admitted to the alias table, because accepting them would mean adding a field rather than accepting a spelling. They behave differently at the codec boundary, and the difference matters:
    - `composer|id` / `|id_scheme` / `|id_namespace` — the composer's `external_ref`, which the `ctx/` short forms structurally cannot carry. Admitting and dropping it would breach REQ-053's semantics-preserving contract, so decode **refuses** these suffixes (`PARTY_PROXY`). Their 12 corpus keys therefore reach decode, land in the PROBE-086 census's excluded table, and stay visible rather than being quietly absorbed.
+
+     > **Reversed 2026-10-15** ([ADR 0029](0029-composer-real-path-carrier.md)). Decode reads these suffixes at the composer's real path, and encode writes them there.
+
    - `context/setting|*` — what is unimplemented on both surfaces is the **`ctx/setting` short form**: decode does not accept it and encode does not emit it. The real path is a different matter — where the template's Web Template carries the `setting` node, `context/setting|*` decodes through that real path, and the value is then dropped on encode because `ctx/setting` emission does not exist. It is that **drop**, not a spelling difference, that PROBE-086 waives by holding the family's 102 corpus keys out — the suite's one documented waiver.
 
 ## Consequences
@@ -62,6 +68,8 @@ PROBE-086 held 318 corpus keys out of its comparison **on both sides** precisely
 - **The composer's `external_ref` and `identifiers` are dropped on encode, not refused.**
 
   > **Noted 2026-08-05** (REQ-140). This decision routes the composer through `ctx/composer_name`, which carries the name alone; decode refuses the real-path `composer|id*` / `composer/_identifier:N` / `composer/relationship` spellings that would carry the rest. That leaves encode no channel, and it writes the name and drops the two — a *projection loss*, not a refusal. Refusing instead would make every composition whose composer is properly referenced unencodable, including the vendored `clinical_content_validation` body. This is the one exception carved out of the no-silent-loss rule in [wire.md § REQ-140](../specifications/wire.md#req-140--underscore-prefixed-rm-attributes); see also the package [deviations register](../../openehr/serialize/simplified/deviations.md). Closing it needs a `ctx/` or real-path carrier — a new decision, not a codec change.
+
+  > **Superseded 2026-10-15** ([ADR 0029](0029-composer-real-path-carrier.md)). The composer's `external_ref`, `identifiers` and a PARTY_RELATED's `relationship` round-trip at its real path; nothing is dropped.
 
 - **Alias table is load-bearing.** Every accepted alias must be in one table with its `ctx/` target, so adding a sixth is a reviewed edit rather than scattered string comparisons.
 - **A template constraining a COMPOSITION-level `language` node is intercepted.** Such a key routes to `ctx/language` rather than through leaf placement. That is correct — it is the same RM attribute either way — but it means the alias table shadows those Web Template paths, which is why the table is restricted to attributes that genuinely *are* composition metadata.
