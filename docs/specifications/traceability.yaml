@@ -2072,6 +2072,7 @@ requirements:
     implementation: landed
     packages: [openehr/template/constraints, openehr/validation]
     tests:
+      - openehr/template/constraints/constraints_test.go
       - openehr/template/constraints/godoc_class_test.go
       - openehr/template/constraints/redacted_test.go
       - openehr/template/constraints/value_free_test.go
