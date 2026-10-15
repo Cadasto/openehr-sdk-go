@@ -10,14 +10,14 @@ import (
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
-// TestCheckRMTypeTypedInterval pins the bound-aware DV_INTERVAL
+// TestBindRMTypeTypedInterval pins the bound-aware DV_INTERVAL
 // matching of the REQ-101 builder type check (ADR 0013 review round):
 // a compiled node declares the ITS-JSON parameterised name, the
 // registry reverses the bare name, and rmnames.TypedIntervalName
 // bridges the two — bound-checked, so a DV_INTERVAL<DV_COUNT> value
 // cannot pass a DV_INTERVAL<DV_QUANTITY> node. Typed-nil pointers fail
 // as unrecognised.
-func TestCheckRMTypeTypedInterval(t *testing.T) {
+func TestBindRMTypeTypedInterval(t *testing.T) {
 	opt, err := template.ParseFile(fixtures.TemplateOptForName("Demonstration.v1"))
 	if err != nil {
 		t.Fatalf("ParseFile: %v", err)
@@ -32,16 +32,16 @@ func TestCheckRMTypeTypedInterval(t *testing.T) {
 	}
 	node := nodes[0]
 
-	if err := checkRMType(node, rm.DVInterval[rm.DVQuantity]{}); err != nil {
-		t.Errorf("value form: checkRMType = %v, want nil", err)
+	if _, err := bindRMType(node, rm.DVInterval[rm.DVQuantity]{}); err != nil {
+		t.Errorf("value form: bindRMType = %v, want nil", err)
 	}
-	if err := checkRMType(node, &rm.DVInterval[rm.DVQuantity]{}); err != nil {
-		t.Errorf("pointer form: checkRMType = %v, want nil", err)
+	if _, err := bindRMType(node, &rm.DVInterval[rm.DVQuantity]{}); err != nil {
+		t.Errorf("pointer form: bindRMType = %v, want nil", err)
 	}
-	if err := checkRMType(node, rm.DVInterval[rm.DVCount]{}); !errors.Is(err, ErrTypeMismatch) {
+	if _, err := bindRMType(node, rm.DVInterval[rm.DVCount]{}); !errors.Is(err, ErrTypeMismatch) {
 		t.Errorf("bound mismatch (DV_COUNT at DV_QUANTITY node): err = %v, want ErrTypeMismatch", err)
 	}
-	if err := checkRMType(node, (*rm.DVInterval[rm.DVQuantity])(nil)); !errors.Is(err, ErrTypeMismatch) {
+	if _, err := bindRMType(node, (*rm.DVInterval[rm.DVQuantity])(nil)); !errors.Is(err, ErrTypeMismatch) {
 		t.Errorf("typed-nil: err = %v, want ErrTypeMismatch (unrecognised)", err)
 	}
 }
@@ -68,7 +68,7 @@ func compiledNodeAt(t *testing.T, name, path, rmType string) *tcimpl.CompiledNod
 	return node
 }
 
-// TestREQ101_CheckRMTypeConformance pins the conformance rule of the
+// TestREQ101_BindRMTypeConformance pins the conformance rule of the
 // builder type check on corpus nodes: a value whose RM type is the node's
 // type, or descends from it in the pinned class hierarchy, passes, so a
 // DV_CODED_TEXT passes a DV_TEXT node and a POINT_EVENT or an
@@ -76,7 +76,7 @@ func compiledNodeAt(t *testing.T, name, path, rmType string) *tcimpl.CompiledNod
 // refused with ErrTypeMismatch: one whose type does not conform (a DV_TEXT
 // at a DV_CODED_TEXT node, since the inheritance runs the other way), a
 // typed-nil, a nil and a value that is not an RM type.
-func TestREQ101_CheckRMTypeConformance(t *testing.T) {
+func TestREQ101_BindRMTypeConformance(t *testing.T) {
 	t.Parallel()
 	text := compiledNodeAt(t, "Test_dv_text_open_constraint.v0", "/context/other_context/items[at0002]/value", "DV_TEXT")
 	coded := compiledNodeAt(t, "Test_dv_text_open_constraint.v0", "/category", "DV_CODED_TEXT")
@@ -111,12 +111,12 @@ func TestREQ101_CheckRMTypeConformance(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			err := checkRMType(tc.node, tc.v)
+			_, err := bindRMType(tc.node, tc.v)
 			switch {
 			case tc.accept && err != nil:
-				t.Errorf("checkRMType(%s node, %T) = %v, want nil", tc.node.RMTypeName(), tc.v, err)
+				t.Errorf("bindRMType(%s node, %T) = %v, want nil", tc.node.RMTypeName(), tc.v, err)
 			case !tc.accept && !errors.Is(err, ErrTypeMismatch):
-				t.Errorf("checkRMType(%s node, %T) = %v, want ErrTypeMismatch", tc.node.RMTypeName(), tc.v, err)
+				t.Errorf("bindRMType(%s node, %T) = %v, want ErrTypeMismatch", tc.node.RMTypeName(), tc.v, err)
 			}
 		})
 	}

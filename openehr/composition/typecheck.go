@@ -9,15 +9,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
 
-// checkRMType verifies that v's RM type conforms to the RM type of a node
-// the template allows at the compiled node's path, as [bindRMType] decides
-// it. Returns nil when it does, ErrTypeMismatch (wrapped with diagnostic
-// context) otherwise.
-func checkRMType(node *tcimpl.CompiledNode, v any) error {
-	_, err := bindRMType(node, v)
-	return err
-}
-
 // bindRMType returns the node, among those the template allows at the
 // compiled node's path ([alternativesAt]), whose RM type v's RM type
 // conforms to, or ErrTypeMismatch (wrapped with diagnostic context) when
