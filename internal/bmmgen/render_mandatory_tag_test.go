@@ -2,8 +2,23 @@ package bmmgen
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"go/ast"
+	"go/build"
+	"go/importer"
+	"go/parser"
+	"go/token"
+	"go/types"
+	"io/fs"
 	"maps"
+	"os"
+	"path/filepath"
+	"reflect"
+	"runtime"
 	"slices"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
@@ -283,5 +298,367 @@ func TestREQ052_RenderFieldPolymorphicMandatoryTag(t *testing.T) {
 				t.Errorf("renderField(%s.%s) = %q, want %q", tc.owner.Name, tc.prop.PropertyName(), got, tc.want)
 			}
 		})
+	}
+}
+
+// TestREQ052_GeneratedNilableFieldsCarryOmit type-checks every package that
+// holds generated structs with JSON tags and requires each JSON-tagged field
+// whose type can hold nil (a pointer, slice, map, interface or type
+// parameter) to carry omitempty or omitzero, so that its nil value is left
+// out on encode and never written as null.
+//
+// [mandatoryJSONTag] tells field shapes apart by the text of the rendered Go
+// type and gives a shape it does not know the bare tag, and the polymorphic
+// flag its callers pass covers only some interface fields. This test reads
+// each field's type from the type checker instead, so a new nilable field
+// shape the generator misses fails here rather than encoding null. Every
+// struct type in a *_gen.go file counts: the RM and AOM structs, the
+// jsonWire* structs the marshalers encode through, and the anonymous
+// wrapper structs inside generated functions.
+//
+// REQ-052 § An absent mandatory member: a mandatory member with no value is
+// left out on encode, never written as null.
+func TestREQ052_GeneratedNilableFieldsCarryOmit(t *testing.T) {
+	root := moduleRootDir(t)
+	modulePath, err := goModulePath(root)
+	if err != nil {
+		t.Fatalf("goModulePath(%s): %v", root, err)
+	}
+	dirs, err := generatedJSONTaggedDirs(root)
+	if err != nil {
+		t.Fatalf("generatedJSONTaggedDirs(%s): %v", root, err)
+	}
+	// The walk must find the two packages known to hold generated JSON
+	// structs, or a mis-rooted or broken walk would leave nothing to check.
+	for _, want := range []string{"openehr/aom/aom14", "openehr/rm"} {
+		if !slices.Contains(dirs, want) {
+			t.Fatalf("generatedJSONTaggedDirs(%s) = %v, want it to include %s", root, dirs, want)
+		}
+	}
+
+	fset := token.NewFileSet()
+	imp := importer.ForCompiler(fset, "source", nil)
+	for _, dir := range dirs {
+		t.Run(dir, func(t *testing.T) {
+			gen, info, err := typeCheckDir(fset, imp, modulePath+"/"+dir, filepath.Join(root, filepath.FromSlash(dir)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			audit := auditNilableJSONOmit(fset, gen, info)
+			t.Logf("%s: %d generated files, %d struct types, %d JSON-tagged fields, %d nilable",
+				dir, len(gen), audit.structs, audit.tagged, audit.nilable)
+			if audit.nilable == 0 {
+				t.Errorf("%s: no JSON-tagged field of a nilable type found in %d generated files, so the audit checked nothing", dir, len(gen))
+			}
+			for _, f := range audit.bare {
+				t.Errorf("%s: a nil value is written as JSON null; the generator must tag this field shape omitzero (pointer, slice, map, any) or omitempty (interface, type parameter), see mandatoryJSONTag in render.go", f)
+			}
+		})
+	}
+}
+
+// TestREQ052_AuditNilableJSONOmitReportsBareTags runs the check behind
+// [TestREQ052_GeneratedNilableFieldsCarryOmit] on a small source with one
+// bare-tagged field of each nilable kind, a named slice type among them,
+// inside a generic struct, a jsonWire* struct and an anonymous struct in a
+// function body. Each one is reported, and the fields that carry an omit
+// option, are held by value, have no json key or are left out of JSON
+// with "-" are not.
+func TestREQ052_AuditNilableJSONOmitReportsBareTags(t *testing.T) {
+	const src = `package fixture
+
+type Item struct{ Name string }
+
+// Items is a named slice type: its name hides the slice from the text.
+type Items []Item
+
+type Shape interface{ Area() float64 }
+
+type Holder[T any] struct {
+	Pointer   *Item           "json:\"pointer\""
+	Slice     []Item          "json:\"slice\""
+	Named     Items           "json:\"named\""
+	Map       map[string]Item "json:\"map\""
+	Interface Shape           "json:\"interface\""
+	Any       any             "json:\"any\""
+	Param     T               "json:\"param\""
+
+	OmitZero  *Item "json:\"omit_zero,omitzero\""
+	OmitEmpty Shape "json:\"omit_empty,omitempty\""
+	Value     Item  "json:\"value\""
+	Skipped   *Item "json:\"-\""
+	XMLOnly   *Item "xml:\"xml_only\""
+	Untagged  *Item
+}
+
+type jsonWireHolder struct {
+	Hyperlink Shape "json:\"hyperlink\""
+	Name      string "json:\"name\""
+}
+
+func (h Holder[T]) wrap() any {
+	return struct {
+		Wrapped *Item "json:\"wrapped\""
+	}{Wrapped: h.Pointer}
+}
+`
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "fixture_gen.go", src, parser.SkipObjectResolution)
+	if err != nil {
+		t.Fatalf("parse the fixture: %v", err)
+	}
+	info := newTypesInfo()
+	if _, err := (&types.Config{}).Check("example.com/fixture", fset, []*ast.File{file}, info); err != nil {
+		t.Fatalf("type-check the fixture: %v", err)
+	}
+
+	audit := auditNilableJSONOmit(fset, []*ast.File{file}, info)
+	got := make([]string, 0, len(audit.bare))
+	for _, f := range audit.bare {
+		got = append(got, f.owner+"."+f.field)
+	}
+	slices.Sort(got)
+	want := []string{
+		"Holder.Any", "Holder.Interface", "Holder.Map", "Holder.Named",
+		"Holder.Param", "Holder.Pointer", "Holder.Slice",
+		"jsonWireHolder.Hyperlink", "struct{…}.Wrapped",
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("auditNilableJSONOmit(fixture) reported %v, want %v", got, want)
+	}
+	if audit.nilable != len(want)+2 {
+		t.Errorf("auditNilableJSONOmit(fixture) counted %d nilable JSON-tagged fields, want %d (the bare ones and the two with an omit option)", audit.nilable, len(want)+2)
+	}
+}
+
+// bareNilableField is a JSON-tagged field whose type can hold nil and
+// whose tag carries neither omitempty nor omitzero.
+type bareNilableField struct {
+	pos          token.Position
+	owner, field string
+	goType       string
+	tag          string
+}
+
+func (f bareNilableField) String() string {
+	return fmt.Sprintf("%s:%d: %s.%s %s %s", filepath.Base(f.pos.Filename), f.pos.Line, f.owner, f.field, f.goType, f.tag)
+}
+
+// nilableJSONAudit is what [auditNilableJSONOmit] counted and found.
+type nilableJSONAudit struct {
+	structs int // struct types, named or anonymous
+	tagged  int // fields with a json key other than "-"
+	nilable int // tagged fields whose type can hold nil
+	bare    []bareNilableField
+}
+
+// auditNilableJSONOmit walks every struct type in files, named or
+// anonymous and inside function bodies too, and reports each field with a
+// json key whose type, as info records it, can hold nil while its tag
+// carries neither omitempty nor omitzero. An anonymous struct is reported
+// under the owner name "struct{…}".
+func auditNilableJSONOmit(fset *token.FileSet, files []*ast.File, info *types.Info) nilableJSONAudit {
+	var audit nilableJSONAudit
+	for _, file := range files {
+		owners := map[*ast.StructType]string{}
+		ast.Inspect(file, func(n ast.Node) bool {
+			switch n := n.(type) {
+			case *ast.TypeSpec:
+				if st, ok := n.Type.(*ast.StructType); ok {
+					owners[st] = n.Name.Name
+				}
+			case *ast.StructType:
+				audit.structs++
+				owner, ok := owners[n]
+				if !ok {
+					owner = "struct{…}"
+				}
+				for _, field := range n.Fields.List {
+					opts, ok := jsonTagOptions(field.Tag)
+					if !ok {
+						continue
+					}
+					names := make([]string, 0, len(field.Names))
+					for _, name := range field.Names {
+						names = append(names, name.Name)
+					}
+					if len(names) == 0 { // an embedded field
+						names = append(names, types.ExprString(field.Type))
+					}
+					audit.tagged += len(names)
+					if !canHoldNil(info.TypeOf(field.Type)) {
+						continue
+					}
+					audit.nilable += len(names)
+					if slices.Contains(opts, "omitempty") || slices.Contains(opts, "omitzero") {
+						continue
+					}
+					for _, name := range names {
+						audit.bare = append(audit.bare, bareNilableField{
+							pos: fset.Position(field.Pos()), owner: owner, field: name,
+							goType: types.ExprString(field.Type), tag: field.Tag.Value,
+						})
+					}
+				}
+			}
+			return true
+		})
+	}
+	return audit
+}
+
+// canHoldNil reports whether a value of type t can be nil: a pointer,
+// slice, map or interface. A type parameter counts too, since its
+// underlying type is its constraint, which is an interface.
+func canHoldNil(t types.Type) bool {
+	switch t.Underlying().(type) {
+	case *types.Pointer, *types.Slice, *types.Map, *types.Interface:
+		return true
+	}
+	return false
+}
+
+// jsonTagOptions returns the options after the name in the json key of a
+// struct field tag, such as "omitzero". ok is false when the field has no
+// tag, no json key, or the json key "-", which leaves the field out of JSON.
+func jsonTagOptions(tag *ast.BasicLit) (opts []string, ok bool) {
+	if tag == nil {
+		return nil, false
+	}
+	raw, err := strconv.Unquote(tag.Value)
+	if err != nil {
+		return nil, false
+	}
+	value, ok := reflect.StructTag(raw).Lookup("json")
+	if !ok || value == "-" {
+		return nil, false
+	}
+	_, rest, _ := strings.Cut(value, ",")
+	return strings.Split(rest, ","), true
+}
+
+// moduleRootDir returns the absolute path of the module root, two levels
+// above this package.
+func moduleRootDir(t *testing.T) string {
+	t.Helper()
+	_, here, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	root := filepath.Clean(filepath.Join(filepath.Dir(here), "..", ".."))
+	if _, err := os.Stat(filepath.Join(root, "go.mod")); err != nil {
+		t.Fatalf("no go.mod at the resolved module root %s: %v", root, err)
+	}
+	return root
+}
+
+// goModulePath returns the module path the go.mod file in root declares.
+func goModulePath(root string) (string, error) {
+	data, err := os.ReadFile(filepath.Join(root, "go.mod"))
+	if err != nil {
+		return "", err
+	}
+	for line := range strings.Lines(string(data)) {
+		if path, ok := strings.CutPrefix(strings.TrimSpace(line), "module "); ok {
+			return strings.Trim(strings.TrimSpace(path), `"`), nil
+		}
+	}
+	return "", errors.New("go.mod has no module line")
+}
+
+// generatedJSONTaggedDirs returns, relative to the module root and sorted,
+// the package directories in which some *_gen.go file declares a struct
+// field with a json key. The walk skips what the go tool skips when it lists
+// the module's packages: a directory holding its own go.mod, testdata and
+// vendor, and every name that starts with "." or "_".
+func generatedJSONTaggedDirs(root string) ([]string, error) {
+	seen := map[string]bool{}
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		name := d.Name()
+		if d.IsDir() {
+			if path == root {
+				return nil
+			}
+			if strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") || name == "testdata" || name == "vendor" {
+				return fs.SkipDir
+			}
+			if _, err := os.Stat(filepath.Join(path, "go.mod")); err == nil {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(name, "_gen.go") || strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") {
+			return nil
+		}
+		file, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.SkipObjectResolution)
+		if err != nil {
+			return err
+		}
+		if hasJSONTaggedField(file) {
+			rel, err := filepath.Rel(root, filepath.Dir(path))
+			if err != nil {
+				return err
+			}
+			seen[filepath.ToSlash(rel)] = true
+		}
+		return nil
+	})
+	return slices.Sorted(maps.Keys(seen)), err
+}
+
+// hasJSONTaggedField reports whether file declares a struct field with a
+// json key in its tag.
+func hasJSONTaggedField(file *ast.File) bool {
+	found := false
+	ast.Inspect(file, func(n ast.Node) bool {
+		if field, ok := n.(*ast.Field); ok && field.Tag != nil {
+			if raw, err := strconv.Unquote(field.Tag.Value); err == nil {
+				if _, ok := reflect.StructTag(raw).Lookup("json"); ok {
+					found = true
+				}
+			}
+		}
+		return !found
+	})
+	return found
+}
+
+// typeCheckDir parses the non-test Go files the default build context
+// selects in dir, type-checks them as the package importPath with imp, and
+// returns the generated files among them with the type information.
+func typeCheckDir(fset *token.FileSet, imp types.Importer, importPath, dir string) ([]*ast.File, *types.Info, error) {
+	pkg, err := build.ImportDir(dir, 0)
+	if err != nil {
+		return nil, nil, fmt.Errorf("list the Go files of %s: %w", dir, err)
+	}
+	var all, gen []*ast.File
+	for _, name := range pkg.GoFiles {
+		file, err := parser.ParseFile(fset, filepath.Join(dir, name), nil, parser.SkipObjectResolution)
+		if err != nil {
+			return nil, nil, err
+		}
+		all = append(all, file)
+		if strings.HasSuffix(name, "_gen.go") {
+			gen = append(gen, file)
+		}
+	}
+	info := newTypesInfo()
+	conf := types.Config{Importer: imp}
+	if _, err := conf.Check(importPath, fset, all, info); err != nil {
+		return nil, nil, fmt.Errorf("type-check %s: %w", importPath, err)
+	}
+	return gen, info, nil
+}
+
+// newTypesInfo returns a [types.Info] that records the type of every
+// expression and identifier, which [types.Info.TypeOf] reads.
+func newTypesInfo() *types.Info {
+	return &types.Info{
+		Types: map[ast.Expr]types.TypeAndValue{},
+		Defs:  map[*ast.Ident]types.Object{},
+		Uses:  map[*ast.Ident]types.Object{},
 	}
 }
