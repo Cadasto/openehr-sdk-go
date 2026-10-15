@@ -29,7 +29,7 @@ const noPrecision rm.Integer = -1
 //   - DV_BOOLEAN   → bool
 //   - DV_COUNT     → int (magnitude)
 //   - DV_ORDINAL   → [constraints.OrdinalSymbol] (value, symbol's
-//     defining_code), or int (value) when its code string is empty
+//     defining_code)
 //   - DV_DATE      → string (value, ISO 8601)
 //   - DV_TIME      → string (value, ISO 8601)
 //   - DV_DATE_TIME → string (value, ISO 8601)
@@ -107,21 +107,18 @@ func dataValueInput(dv rm.DataValue) (any, bool) {
 }
 
 // ordinalInput returns the value [constraints.CDvOrdinal.Validate] checks
-// for o. When the symbol's defining_code carries a code string, it returns
-// the value and that code as one [constraints.OrdinalSymbol], so a symbol
-// that does not match its value is reported; a code naming no terminology
-// matches a listed pair by its code (REQ-103) while the RM rules report the
-// missing terminology. When the code string is empty it returns the value
-// alone: the RM rules report the empty code, and the template adds no
-// finding for it.
+// for o: the value and the symbol's defining_code as one
+// [constraints.OrdinalSymbol], so a symbol that does not match its value is
+// reported; a code naming no terminology matches a listed pair by its code
+// (REQ-103) while the RM rules report the missing terminology. A code with
+// an empty code string is passed on as it is: where the RM rules report it,
+// the walk has the constraint judge the value alone
+// ([engine.judgeLeaf]).
 //
 // DV_ORDINAL.value is Integer (int32) per the RM; widening it to int is
 // safe on every supported Go platform.
-func ordinalInput(o *rm.DVOrdinal) any {
+func ordinalInput(o *rm.DVOrdinal) constraints.OrdinalSymbol {
 	code := o.Symbol.DefiningCode
-	if code.CodeString == "" {
-		return int(o.Value)
-	}
 	return constraints.OrdinalSymbol{
 		Value: int(o.Value),
 		Symbol: constraints.CodedTermRef{

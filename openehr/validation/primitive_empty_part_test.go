@@ -14,11 +14,15 @@ import (
 // primitive constraint bound to a value with parts does not judge a part the
 // RM rules report as absent or empty, so the RM's `required` at that part is
 // the one finding for it: a CODE_PHRASE's code_string, whose terminology the
-// constraint still judges, a DV_QUANTITY's units, and the value of the
-// temporal type an AOM 1.4 short name binds. A part the RM rules let be
-// blank, a DV_SCALE symbol's code_string, and a part the RM does not
+// constraint still judges, a DV_QUANTITY's units, the value of the temporal
+// type an AOM 1.4 short name binds, and the code string of a DV_ORDINAL's
+// symbol, whose value the constraint still judges alone. A part the RM rules
+// let be blank, a DV_SCALE symbol's code_string, and a part the RM does not
 // require, an optional String, are judged as before; so are a zero number
 // and false, which are values, and a temporal value that is not empty.
+// REQ-171 — where the depth or the visit limit stops the walk before the RM
+// rules reach the part, they report nothing there, and the constraint judges
+// the part as it judges any value, at its place in walk order.
 
 // OPT children for the empty-part cases.
 const (
@@ -61,6 +65,21 @@ const (
           </children>
         </attributes>
       </children>`
+	// ordinalChild admits a DV_ORDINAL of 1 coded as local at0001, or of 2
+	// coded as local at0002.
+	ordinalChild = `
+      <children xsi:type="C_DV_ORDINAL">
+        <rm_type_name>DV_ORDINAL</rm_type_name>
+        <node_id></node_id>
+        <list>
+          <value>1</value>
+          <symbol><value/><defining_code><terminology_id><value>local</value></terminology_id><code_string>at0001</code_string></defining_code></symbol>
+        </list>
+        <list>
+          <value>2</value>
+          <symbol><value/><defining_code><terminology_id><value>local</value></terminology_id><code_string>at0002</code_string></defining_code></symbol>
+        </list>
+      </children>`
 )
 
 // pinnedIssue is the part of an Issue the empty-part rows pin.
@@ -73,11 +92,18 @@ type pinnedIssue struct {
 // pinnedIssues returns what the rows pin of issues, sorted by code, then
 // path.
 func pinnedIssues(issues []validation.Issue) []pinnedIssue {
+	out := walkOrder(issues)
+	sortPinned(out)
+	return out
+}
+
+// walkOrder returns what the rows pin of issues, in the order the walk
+// reported them.
+func walkOrder(issues []validation.Issue) []pinnedIssue {
 	out := make([]pinnedIssue, 0, len(issues))
 	for _, iss := range issues {
 		out = append(out, pinnedIssue{Code: iss.Code, Path: iss.Path, Layer: iss.Layer, Rule: iss.Rule})
 	}
-	sortPinned(out)
 	return out
 }
 
@@ -143,6 +169,22 @@ func TestValidate_REQ102_REQ112_PrimitiveLeavesTheEmptyPartToTheRM(t *testing.T)
 			child: quantityChild,
 			value: &rm.DVQuantity{Magnitude: 500},
 			want:  []pinnedIssue{rmRequired("/value/units")},
+		},
+		{
+			name:  "C_DV_ORDINAL list, blank symbol code",
+			child: ordinalChild,
+			value: &rm.DVOrdinal{Value: 1, Symbol: codedAs("local", "")},
+			want:  []pinnedIssue{rmRequired("/value/symbol/defining_code/code_string")},
+		},
+		{
+			// The constraint still judges the value alone.
+			name:  "C_DV_ORDINAL list, unlisted value with a blank symbol code",
+			child: ordinalChild,
+			value: &rm.DVOrdinal{Value: 3, Symbol: codedAs("local", "")},
+			want: []pinnedIssue{
+				templateFinding("not_in_list", "/value"),
+				rmRequired("/value/symbol/defining_code/code_string"),
+			},
 		},
 		{
 			name:  "DURATION, blank value",
@@ -238,6 +280,141 @@ func TestValidator_REQ102_REQ171_EmptyPartAtTheDepthLimit(t *testing.T) {
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("Validate(blank code_string at the depth limit) issues =\n  %+v\nwant\n  %+v", got, want)
+	}
+}
+
+// REQ-102, REQ-171 — where the walk visits the node's attributes but stops
+// before the RM rules reach its empty part, at the visit limit on an earlier
+// attribute or at the depth limit below the node, the RM rules report
+// nothing there, and the constraint judges the value as it judges any
+// value: its finding comes at the node, in walk order, before the stop. The
+// last rows stop the walk after the RM rules reported the part, whose
+// `required` then stands for the constraint's finding, as with no stop.
+// Each row pins the whole result in walk order.
+func TestValidator_REQ102_REQ171_EmptyPartWhereTheWalkStops(t *testing.T) {
+	t.Parallel()
+	const (
+		code     = "/value/defining_code"
+		symbol   = "/value/symbol"
+		ordCode  = symbol + "/defining_code"
+		ordBlank = ordCode + "/code_string"
+	)
+	stop := func(cond, path string) pinnedIssue { return pinnedIssue{Code: cond, Path: path} }
+	blankOrdinal := &rm.DVOrdinal{Value: 1, Symbol: codedAs("local", "")}
+	tests := []struct {
+		name  string
+		child string
+		value rm.DataValue
+		lim   validation.Limits
+		want  []pinnedIssue
+	}{
+		{
+			name:  "blank code_string, visit limit at terminology_id",
+			child: dvCodedTextChild,
+			value: codedAs("local", ""),
+			lim:   validation.Limits{Nodes: 3},
+			want:  []pinnedIssue{templateFinding("not_in_list", code), stop("max_nodes", code+"/terminology_id")},
+		},
+		{
+			name:  "blank code_string, visit limit below terminology_id",
+			child: dvCodedTextChild,
+			value: codedAs("local", ""),
+			lim:   validation.Limits{Nodes: 4},
+			want:  []pinnedIssue{templateFinding("not_in_list", code), stop("max_nodes", code+"/terminology_id/value")},
+		},
+		{
+			// The terminology finding keeps its place before the code's.
+			name:  "blank code_string in another terminology, visit limit at terminology_id",
+			child: dvCodedTextChild,
+			value: codedAs("SNOMED-CT", ""),
+			lim:   validation.Limits{Nodes: 3},
+			want: []pinnedIssue{
+				templateFinding("invalid_value", code),
+				templateFinding("not_in_list", code),
+				stop("max_nodes", code+"/terminology_id"),
+			},
+		},
+		{
+			name:  "blank units, visit limit at magnitude",
+			child: quantityChild,
+			value: &rm.DVQuantity{Magnitude: 500},
+			lim:   validation.Limits{Nodes: 2},
+			want:  []pinnedIssue{templateFinding("unit_unknown", "/value"), stop("max_nodes", "/value/magnitude")},
+		},
+		{
+			name:  "blank symbol code, visit limit at symbol",
+			child: ordinalChild,
+			value: blankOrdinal,
+			lim:   validation.Limits{Nodes: 2},
+			want:  []pinnedIssue{templateFinding("not_in_list", "/value"), stop("max_nodes", symbol)},
+		},
+		{
+			name:  "blank symbol code, visit limit below terminology_id",
+			child: ordinalChild,
+			value: blankOrdinal,
+			lim:   validation.Limits{Nodes: 6},
+			want:  []pinnedIssue{templateFinding("not_in_list", "/value"), stop("max_nodes", ordCode+"/terminology_id/value")},
+		},
+		{
+			name:  "blank symbol code, depth limit at symbol",
+			child: ordinalChild,
+			value: blankOrdinal,
+			lim:   validation.Limits{Depth: 2},
+			want:  []pinnedIssue{templateFinding("not_in_list", "/value"), stop("max_depth", symbol)},
+		},
+		{
+			name:  "blank symbol code, depth limit at the defining code",
+			child: ordinalChild,
+			value: blankOrdinal,
+			lim:   validation.Limits{Depth: 3},
+			want:  []pinnedIssue{templateFinding("not_in_list", "/value"), stop("max_depth", ordCode)},
+		},
+		{
+			name:  "blank code_string, visit limit after it",
+			child: dvCodedTextChild,
+			value: codedAs("local", ""),
+			lim:   validation.Limits{Nodes: 5},
+			want:  []pinnedIssue{rmRequired(code + "/code_string"), stop("max_nodes", "/value/value")},
+		},
+		{
+			name:  "blank code_string, depth limit at terminology_id",
+			child: dvCodedTextChild,
+			value: codedAs("local", ""),
+			lim:   validation.Limits{Depth: 3},
+			want:  []pinnedIssue{stop("max_depth", code+"/terminology_id"), rmRequired(code + "/code_string")},
+		},
+		{
+			name:  "blank units, visit limit after them",
+			child: quantityChild,
+			value: &rm.DVQuantity{Magnitude: 500},
+			lim:   validation.Limits{Nodes: 3},
+			want:  []pinnedIssue{rmRequired("/value/units"), stop("max_nodes", "/name")},
+		},
+		{
+			name:  "blank symbol code, visit limit after it",
+			child: ordinalChild,
+			value: blankOrdinal,
+			lim:   validation.Limits{Nodes: 7},
+			want:  []pinnedIssue{rmRequired(ordBlank), stop("max_nodes", "/value/value")},
+		},
+		{
+			name:  "blank symbol code, depth limit at terminology_id",
+			child: ordinalChild,
+			value: blankOrdinal,
+			lim:   validation.Limits{Depth: 4},
+			want:  []pinnedIssue{stop("max_depth", ordCode+"/terminology_id"), rmRequired(ordBlank)},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			c := mustCompileInline(t, elementValueOPT(tc.child))
+			v := validation.New(validation.WithLimits(tc.lim))
+			got := walkOrder(v.Validate(valueElement(tc.value), c).Issues)
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("Validate(%s) with limits %+v issues, in walk order =\n  %+v\nwant\n  %+v", tc.name, tc.lim, got, tc.want)
+			}
+		})
 	}
 }
 

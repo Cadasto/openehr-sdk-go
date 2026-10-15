@@ -99,7 +99,8 @@
 // a primitive constraint reads (a code phrase's code string, a quantity's
 // units, the value of a temporal type a short name binds) is the Reference
 // Model rules' `required` alone: the constraint does not judge that part,
-// though it still judges a code phrase's terminology. A Reference Model
+// though it still judges a code phrase's terminology, unless a limit stops
+// the walk before those rules reach the part. A Reference Model
 // rule's own finding at that path, such as the terminology check of a
 // coded attribute, is reported beside it. A value held from two places is
 // validated at each, so a defect in it is reported at each path. No option

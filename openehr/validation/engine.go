@@ -320,6 +320,10 @@ func (e *engine) spendVisit(path, rmType string) bool {
 // refusal is the whole report for that content ([engine.withdrawInside]). A
 // finding of theirs at the node's own path stays, though the rule read the
 // refused content to reach it.
+//
+// A value constraint that leaves an empty part of the value to the RM rules
+// is settled once the attributes are visited too ([engine.settle]); its
+// findings are at the node's own path, never at or below refused content.
 func (e *engine) visit(n engineNode) {
 	if !e.spendVisit(n.path, n.rmType) {
 		return
@@ -331,8 +335,9 @@ func (e *engine) visit(n engineNode) {
 	rulesFrom := len(e.found.issues)
 	rules, class := e.found.checkInvariants(n.value, n.rmType, n.path)
 	rulesTo := len(e.found.issues)
+	var held *heldJudgement
 	if n.bound != nil {
-		n.bound = e.checkLeaf(n, scalar, class, rules)
+		n.bound, held = e.checkLeaf(n, scalar, class)
 	}
 	if n.bound == nil && !rmaccess.Covers(n.value) {
 		return
@@ -351,6 +356,9 @@ func (e *engine) visit(n engineNode) {
 	}
 	refusedFrom := len(e.refused)
 	e.visitAttributes(n, class, rules)
+	if held != nil {
+		e.settle(held)
+	}
 	if refusals := e.refused[refusedFrom:]; len(refusals) > 0 && rulesTo > rulesFrom {
 		e.withdrawInside(rulesFrom, rulesTo, refusals)
 	}
@@ -403,92 +411,156 @@ func (e *engine) checkIdentityAndType(n engineNode) (scalar bool) {
 }
 
 // checkLeaf applies the template's value constraint to node n, of the bare
-// RM class class whose rules are rules, at a leaf of the template, and
-// returns the template node n's attributes are visited against: n.bound
-// itself, or nil where the template constrains nothing below the node. A
-// slot leaf carries no structure below it, and a leaf with a primitive
-// constraint checks the value by that constraint ([appendPrimitiveIssues]),
-// leaving out the part of the value the RM rules report as absent or empty
-// ([engine.leafConstraint]); below either, the node's attributes are walked
-// with the RM rules alone. A CONSTRAINT_REF names a value set outside the
-// SDK and checks nothing locally: its path is listed in
-// [Coverage.External], and the bound value's attributes are visited against
-// the node as at any other.
-func (e *engine) checkLeaf(n engineNode, scalar bool, class string, rules *classRules) *tcimpl.CompiledNode {
+// RM class class, at a leaf of the template, and returns the template node
+// n's attributes are visited against: n.bound itself, or nil where the
+// template constrains nothing below the node. A slot leaf carries no
+// structure below it, and a leaf with a primitive constraint checks the
+// value by that constraint ([engine.judgeLeaf]); below either, the node's
+// attributes are walked with the RM rules alone. Where the part of the value
+// the constraint reads is empty, checkLeaf also returns the judgement the
+// walk holds until it has visited the node's attributes, and nil otherwise.
+// A CONSTRAINT_REF names a value set outside the SDK and checks nothing
+// locally: its path is listed in [Coverage.External], and the bound value's
+// attributes are visited against the node as at any other.
+func (e *engine) checkLeaf(n engineNode, scalar bool, class string) (*tcimpl.CompiledNode, *heldJudgement) {
 	if n.bound.IsSlot() {
-		return nil
+		return nil, nil
 	}
 	pc := n.bound.PrimitiveConstraint()
 	if pc == nil {
-		return n.bound
+		return n.bound, nil
 	}
-	if judged := e.leafConstraint(n, class, rules, pc); judged != nil {
-		e.found.issues = appendPrimitiveIssues(e.found.issues, n.value, n.path, judged)
-	}
+	held := e.judgeLeaf(n, class, pc)
 	if !isConstraintRef(pc) {
-		return nil
+		return nil, held
 	}
 	e.external = append(e.external, n.path)
 	if scalar {
-		return nil // a scalar has no attributes to visit
+		return nil, held // a scalar has no attributes to visit
 	}
-	return n.bound
+	return n.bound, held
 }
 
 // constrainedPart names, for each RM class whose value a primitive
-// constraint reads by its parts, the part the constraint reads that the RM
-// requires: a CODE_PHRASE's code_string, a DV_QUANTITY's units, and the
-// value of the DV_DATE, DV_TIME, DV_DATE_TIME and DV_DURATION an AOM 1.4
-// short name binds. A DV_ORDINAL's symbol code lies two levels down, and
-// [ordinalInput] leaves it out when it is empty.
-var constrainedPart = map[string]string{
-	"CODE_PHRASE":  "code_string",
-	"DV_QUANTITY":  "units",
-	"DV_DATE":      "value",
-	"DV_TIME":      "value",
-	"DV_DATE_TIME": "value",
-	"DV_DURATION":  "value",
+// constraint reads by its parts, the attributes that lead from the value to
+// the part the constraint reads that the RM rules may report as absent or
+// empty: a CODE_PHRASE's code_string, a DV_QUANTITY's units, the value of
+// the DV_DATE, DV_TIME, DV_DATE_TIME and DV_DURATION an AOM 1.4 short name
+// binds, and the code string of a DV_ORDINAL's symbol, two levels down.
+var constrainedPart = map[string][]string{
+	"CODE_PHRASE":  {"code_string"},
+	"DV_QUANTITY":  {"units"},
+	"DV_DATE":      {"value"},
+	"DV_TIME":      {"value"},
+	"DV_DATE_TIME": {"value"},
+	"DV_DURATION":  {"value"},
+	"DV_ORDINAL":   {"symbol", "defining_code", "code_string"},
 }
 
-// leafConstraint returns the primitive constraint pc, bound to node n of
-// the bare RM class class whose rules are rules, as it judges the value:
-// pc itself, unless the RM rules report the part of the value pc reads as
-// absent or empty ([engine.reportsEmptyPart]). The RM's `required` at that
-// part is then the one finding for it, and pc judges only what the part
-// leaves: a C_CODE_PHRASE, its code list set aside, still judges the
-// terminology by its own rule, and any other constraint is left nothing,
-// so leafConstraint returns nil. A C_DV_QUANTITY's ranges are per unit,
-// and a temporal short name reads the value alone.
-func (e *engine) leafConstraint(n engineNode, class string, rules *classRules, pc constraints.PrimitiveConstraint) constraints.PrimitiveConstraint {
-	if !e.reportsEmptyPart(n, class, rules) {
-		return pc
-	}
-	if cp, ok := pc.(constraints.CodePhrase); ok {
-		return constraints.CodePhrase{Terminology: cp.Terminology}
-	}
-	return nil
+// heldJudgement is the judgement of a primitive constraint whose part the RM
+// rules may still report as absent or empty, held by the walk until it has
+// visited the node's attributes ([engine.judgeLeaf], [engine.settle]).
+type heldJudgement struct {
+	// part is the issue path of the empty part.
+	part string
+	// from and to bound, in the issues the walk reported, those the
+	// constraint drew on what the part leaves.
+	from, to int
+	// whole holds the issues the constraint draws on the whole value.
+	whole []Issue
 }
 
-// reportsEmptyPart reports whether the RM rules report the part of node n's
-// value a primitive constraint reads ([constrainedPart]) as absent or empty,
-// n being of the bare RM class class whose rules are rules. They do when
-// the walk visits the node's attributes, which it does on a value of a
-// registered RM class short of the depth limit, and the part is mandatory
-// there as the RM rules read it ([attrFromFacts]) and absent through the
-// generated access, which reads an empty string as absent. A part the
-// node's role lets be blank ([mayBeBlank]), a DV_SCALE symbol's
-// code_string, is not mandatory there, so the constraint still judges it.
-func (e *engine) reportsEmptyPart(n engineNode, class string, rules *classRules) bool {
-	part, ok := constrainedPart[class]
+// judgeLeaf applies the primitive constraint pc to node n, of the bare RM
+// class class, and reports its issues. Where the walk visits the node's
+// attributes and the part of the value pc reads is absent or empty
+// ([engine.emptyPart]), the RM rules may report that part, and their
+// `required` there then stands for pc's finding: judgeLeaf reports what pc
+// judges of what the part leaves ([appendLeftIssues]) and returns what pc
+// judges of the whole value, which the walk holds until it has visited the
+// attributes and seen whether the part was reported ([engine.settle]).
+// Otherwise pc judges the whole value at once, as at the depth limit, where
+// the attributes are not visited, and judgeLeaf returns nil.
+func (e *engine) judgeLeaf(n engineNode, class string, pc constraints.PrimitiveConstraint) *heldJudgement {
+	part, empty := e.emptyPart(n, class)
+	if !empty {
+		e.found.issues = appendPrimitiveIssues(e.found.issues, n.value, n.path, pc)
+		return nil
+	}
+	from := len(e.found.issues)
+	e.found.issues = appendLeftIssues(e.found.issues, n, class, pc)
+	return &heldJudgement{
+		part:  part,
+		from:  from,
+		to:    len(e.found.issues),
+		whole: appendPrimitiveIssues(nil, n.value, n.path, pc),
+	}
+}
+
+// appendLeftIssues appends to issues what the primitive constraint pc,
+// bound to node n of the bare RM class class, judges of what the empty part
+// of n's value leaves: a C_CODE_PHRASE judges the terminology by its own
+// rule, its code list set aside, and the constraint of a DV_ORDINAL judges
+// the ordinal's value alone, which [primitiveInput] passes on as it is. Any
+// other constraint is left nothing to judge: a C_DV_QUANTITY's ranges are
+// per unit, and a temporal short name reads the value alone.
+func appendLeftIssues(issues []Issue, n engineNode, class string, pc constraints.PrimitiveConstraint) []Issue {
+	switch class {
+	case "CODE_PHRASE":
+		if cp, ok := pc.(constraints.CodePhrase); ok {
+			return appendPrimitiveIssues(issues, n.value, n.path, constraints.CodePhrase{Terminology: cp.Terminology})
+		}
+	case "DV_ORDINAL":
+		if in, ok := primitiveInput(n.value).(constraints.OrdinalSymbol); ok {
+			return appendPrimitiveIssues(issues, in.Value, n.path, pc)
+		}
+	}
+	return issues
+}
+
+// emptyPart returns the issue path of the part of node n's value, of the
+// bare RM class class, that a primitive constraint reads ([constrainedPart])
+// and reports whether the RM rules may report it as absent or empty. They
+// may when the walk visits the node's attributes, which it does on a value
+// of a registered RM class short of the depth limit, and the part is absent
+// through the generated access, which reads an empty string as absent.
+// Whether they do depends on the role of the node that holds the part, a
+// DV_SCALE symbol's code_string being one they let be blank, and on whether
+// the walk reaches the part before a limit stops it: the walk sees that
+// once it has visited the attributes ([engine.settle]).
+func (e *engine) emptyPart(n engineNode, class string) (string, bool) {
+	steps, ok := constrainedPart[class]
 	if !ok || n.depth >= e.maxDepth || !rmaccess.Covers(n.value) {
-		return false
+		return "", false
 	}
-	f, listed := classAttributes[class].lookup(part)
-	if !listed {
-		return false
+	value, path := n.value, n.path
+	for i, name := range steps {
+		path = attributePath(path, name)
+		v, present := rmaccess.Single(value, name)
+		if !present || v == nil || rmaccess.IsTypedNilPointer(v) {
+			return path, i == len(steps)-1
+		}
+		value = v
 	}
-	a := attrFromFacts(n, f, rules)
-	return a.mandatory && !readAttribute(n.value, a).present
+	return "", false
+}
+
+// settle settles the judgement h held at a node once the walk has visited
+// the node's attributes. Where the walk reported the empty part as
+// `required`, that finding stands for the constraint's, and the issues the
+// constraint drew on what the part leaves stay as they are. Where it did
+// not, because the part is one the RM rules let be blank or a limit stopped
+// the walk before it reached the part, the issues the constraint draws on
+// the whole value take their place, so the part is reported either way, in
+// walk order. No issue at or before h's was removed while the attributes
+// were visited: a node below withdraws only issues reported after its own
+// visit began ([engine.withdrawInside]).
+func (e *engine) settle(h *heldJudgement) {
+	reported := slices.ContainsFunc(e.found.issues[h.to:], func(iss Issue) bool {
+		return iss.Code == "required" && iss.Path == h.part
+	})
+	if !reported {
+		e.found.issues = slices.Replace(e.found.issues, h.from, h.to, h.whole...)
+	}
 }
 
 // visitAttributes visits the attributes of node n, of the bare RM class
