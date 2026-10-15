@@ -11,8 +11,10 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/rmpath"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -407,4 +409,212 @@ func trim(b []byte) string {
 		return string(b[:400]) + "...(truncated)"
 	}
 	return string(b)
+}
+
+// Paths in the corpus template Test_dv_text_open_constraint.v0: an
+// ELEMENT's DV_TEXT value, an ELEMENT's DV_TEXT name (the template fixes
+// its value to "null") and the DV_CODED_TEXT category.
+const (
+	textValuePath = "/context/other_context/items[at0002]/value"
+	textNamePath  = "/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0031,'null']/name"
+	categoryPath  = "/category"
+)
+
+// abstractValueOPT is a COMPOSITION template whose one ELEMENT, in the
+// context's other_context, types its value as the abstract DATA_VALUE.
+const abstractValueOPT = `<?xml version="1.0" encoding="utf-8"?>
+<template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.openehr.org/v1">
+<language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
+<template_id><value>abstract_value</value></template_id><concept>abstract_value</concept>
+<definition><rm_type_name>COMPOSITION</rm_type_name><node_id>at0000</node_id>
+<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>context</rm_attribute_name>
+<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>EVENT_CONTEXT</rm_type_name><node_id></node_id>
+<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>other_context</rm_attribute_name>
+<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>ITEM_TREE</rm_type_name><node_id>at0001</node_id>
+<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>items</rm_attribute_name>
+<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>ELEMENT</rm_type_name><node_id>at0002</node_id>
+<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>value</rm_attribute_name>
+<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>DATA_VALUE</rm_type_name><node_id></node_id></children>
+</attributes>
+</children>
+<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval><lower_included>true</lower_included><lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>0</lower></interval></cardinality>
+</attributes>
+</children>
+</attributes>
+</children>
+</attributes>
+<archetype_id><value>openEHR-EHR-COMPOSITION.report.v1</value></archetype_id>
+<term_definitions code="at0000"><items id="text">Report</items><items id="description">Report</items></term_definitions>
+<term_definitions code="at0001"><items id="text">Tree</items><items id="description">Tree</items></term_definitions>
+<term_definitions code="at0002"><items id="text">Reading</items><items id="description">Reading</items></term_definitions>
+</definition>
+</template>`
+
+// abstractValuePath is the DATA_VALUE node of abstractValueOPT.
+const abstractValuePath = "/context/other_context/items[at0002]/value"
+
+// compileInline parses and compiles an inline operational template.
+func compileInline(t *testing.T, opt string) *templatecompile.Compiled {
+	t.Helper()
+	parsed, err := template.ParseOPT(strings.NewReader(opt))
+	if err != nil {
+		t.Fatalf("ParseOPT: %v", err)
+	}
+	c, err := templatecompile.Compile(parsed)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	return c
+}
+
+// codedText returns a DV_CODED_TEXT showing value, coded in SNOMED-CT.
+func codedText(value string) *rm.DVCodedText {
+	return &rm.DVCodedText{
+		Value:        value,
+		DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}, CodeString: "12345"},
+	}
+}
+
+// newIssues returns, as "code at path", each issue of after that before
+// does not report as often.
+func newIssues(before, after validation.Result) []string {
+	seen := make(map[string]int, len(before.Issues))
+	for _, is := range before.Issues {
+		seen[is.Code+" at "+is.Path]++
+	}
+	var added []string
+	for _, is := range after.Issues {
+		key := is.Code + " at " + is.Path
+		if seen[key] > 0 {
+			seen[key]--
+			continue
+		}
+		added = append(added, key)
+	}
+	return added
+}
+
+// TestREQ101_SetAcceptsConformingValue checks that Set accepts a value
+// whose RM type descends from the compiled node's, that Build writes it
+// into the composition at that path, and that the validator reports no
+// finding the composition did not have before: a DV_CODED_TEXT at an
+// ELEMENT's DV_TEXT value and at an ELEMENT's DV_TEXT name, and a
+// DV_QUANTITY at a value the template types as the abstract DATA_VALUE.
+func TestREQ101_SetAcceptsConformingValue(t *testing.T) {
+	t.Parallel()
+	text := compileFixture(t, "Test_dv_text_open_constraint.v0")
+	abstract := compileInline(t, abstractValueOPT)
+
+	cases := []struct {
+		name     string
+		c        *templatecompile.Compiled
+		path     string
+		v        any
+		wantType string
+		// same reports whether Build stores v itself, not a copy.
+		same bool
+	}{
+		{
+			name: "DV_CODED_TEXT at an ELEMENT's DV_TEXT value", c: text, path: textValuePath,
+			v: codedText("Lorem"), wantType: "DV_CODED_TEXT", same: true,
+		},
+		{
+			name: "DV_CODED_TEXT at an ELEMENT's DV_TEXT name", c: text, path: textNamePath,
+			v: codedText("null"), wantType: "DV_CODED_TEXT",
+		},
+		{
+			name: "DV_QUANTITY at a DATA_VALUE value", c: abstract, path: abstractValuePath,
+			v: &rm.DVQuantity{Magnitude: 120, Units: "mm[Hg]"}, wantType: "DV_QUANTITY", same: true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			b, err := composition.NewBuilder(t.Context(), tc.c,
+				composition.WithTerritory("NL"),
+				composition.WithComposer(testComposer()),
+			)
+			if err != nil {
+				t.Fatalf("NewBuilder: %v", err)
+			}
+			skeleton, err := b.Build()
+			if err != nil {
+				t.Fatalf("Build of the bare skeleton: %v", err)
+			}
+			before := validation.ValidateComposition(skeleton, tc.c)
+
+			if err := b.Set(tc.path, tc.v); err != nil {
+				t.Fatalf("Set(%s, %T) = %v, want nil", tc.path, tc.v, err)
+			}
+			comp, err := b.Build()
+			if err != nil {
+				t.Fatalf("Build after Set(%s, %T) = %v, want nil", tc.path, tc.v, err)
+			}
+
+			got, err := rmpath.ItemAtPath(comp, tc.path)
+			if err != nil {
+				t.Fatalf("ItemAtPath(%s) on the built composition: %v", tc.path, err)
+			}
+			if name, _ := rm.RMTypeName(got); name != tc.wantType {
+				t.Errorf("built composition holds %T (RM %q) at %s, want %s", got, name, tc.path, tc.wantType)
+			}
+			if tc.same && got != tc.v {
+				t.Errorf("built composition holds %v at %s, want the value Set was given, %v", got, tc.path, tc.v)
+			}
+			if text, ok := got.(rm.DVTextLike); ok {
+				if code, coded := text.GetDefiningCode(); !coded || code.CodeString != "12345" {
+					t.Errorf("built %s defining_code = %+v (coded %v), want SNOMED-CT::12345", tc.path, code, coded)
+				}
+			}
+
+			after := validation.ValidateComposition(comp, tc.c)
+			if added := newIssues(before, after); len(added) > 0 {
+				t.Errorf("ValidateComposition after Set(%s, %T) reports new findings %q, want none", tc.path, tc.v, added)
+			}
+		})
+	}
+}
+
+// TestREQ101_SetRefusesNonConformingValue checks that Set returns
+// ErrTypeMismatch, and Build carries it, for a value whose RM type does
+// not conform to the compiled node's: a DV_TEXT at a DV_QUANTITY node, a
+// DV_TEXT at a DV_CODED_TEXT node (DV_TEXT does not descend from
+// DV_CODED_TEXT), a typed-nil DV_CODED_TEXT, a nil and a value that is not
+// an RM type.
+func TestREQ101_SetRefusesNonConformingValue(t *testing.T) {
+	t.Parallel()
+	text := compileFixture(t, "Test_dv_text_open_constraint.v0")
+	vitals := compileFixture(t, "vital_signs")
+
+	cases := []struct {
+		name string
+		c    *templatecompile.Compiled
+		path string
+		v    any
+	}{
+		{name: "DV_TEXT at DV_QUANTITY", c: vitals, path: systolicPath, v: &rm.DVText{Value: "x"}},
+		{name: "DV_TEXT at DV_CODED_TEXT", c: text, path: categoryPath, v: &rm.DVText{Value: "x"}},
+		{name: "DV_QUANTITY at DV_TEXT", c: text, path: textValuePath, v: &rm.DVQuantity{Magnitude: 1, Units: "mm"}},
+		{name: "typed-nil DV_CODED_TEXT at DV_TEXT", c: text, path: textValuePath, v: (*rm.DVCodedText)(nil)},
+		{name: "nil at DV_TEXT", c: text, path: textValuePath, v: nil},
+		{name: "non-RM value at DV_TEXT", c: text, path: textValuePath, v: "Lorem"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			b, err := composition.NewBuilder(t.Context(), tc.c,
+				composition.WithTerritory("NL"),
+				composition.WithComposer(testComposer()),
+			)
+			if err != nil {
+				t.Fatalf("NewBuilder: %v", err)
+			}
+			if err := b.Set(tc.path, tc.v); !errors.Is(err, composition.ErrTypeMismatch) {
+				t.Errorf("Set(%s, %T) = %v, want ErrTypeMismatch", tc.path, tc.v, err)
+			}
+			if _, err := b.Build(); !errors.Is(err, composition.ErrTypeMismatch) {
+				t.Errorf("Build after Set(%s, %T) = %v, want ErrTypeMismatch", tc.path, tc.v, err)
+			}
+		})
+	}
 }
