@@ -3,6 +3,7 @@ package simplified
 import (
 	"encoding/json"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -500,13 +501,15 @@ func TestREQ140_IncludedOpenSideNamesItsInvariant(t *testing.T) {
 	}
 }
 
-// --- composer projection --------------------------------------------------
+// --- composer at its real path ---------------------------------------------
 
-// The composer's `external_ref` and `identifiers` are dropped on encode by
-// design (ADR 0015 — the ctx/ short form carries the name alone; registered in
-// deviations.md). Prose alone left that untested, so a regression either way —
-// a silent widening or an accidental refusal — would have gone unnoticed.
-func TestComposerExtrasProjectedToNameOnly(t *testing.T) {
+// TestComposerExtrasWrittenAtRealPath — REQ-053 / REQ-140, ADR 0029 (replacing
+// the pin that the composer's `external_ref` and `identifiers` were projected
+// to its name alone). No ctx/ short form carries them, so encode writes the
+// whole composer at its real path, name included, and no ctx/ composer key; a
+// reference typed PERSON keeps its `|type`. Decode reads every one of them
+// back.
+func TestComposerExtrasWrittenAtRealPath(t *testing.T) {
 	name := "Dr Test"
 	comp := repeatingLeafComp(
 		&rm.Element{ArchetypeNodeID: "at0002", Name: rm.DVText{Value: "x"}, Value: &rm.DVText{Value: "one"}},
@@ -516,21 +519,39 @@ func TestComposerExtrasProjectedToNameOnly(t *testing.T) {
 		ExternalRef: &rm.PartyRef{ID: &rm.GenericID{Value: "p-1", Scheme: "local"}, Namespace: "demographic", Type: "PERSON"},
 		Identifiers: []rm.DVIdentifier{{ID: "id-0"}},
 	}
-	b, err := MarshalFlat(comp, repeatingLeafWT())
+	wt := repeatingLeafWT()
+	b, err := MarshalFlat(comp, wt)
 	if err != nil {
 		t.Fatalf("MarshalFlat: %v", err)
 	}
 	flat := flatMap(t, b)
-	if got := flat["ctx/composer_name"]; got != name {
-		t.Errorf("ctx/composer_name = %v, want %q", got, name)
+	want := map[string]any{
+		"root/composer|name":             name,
+		"root/composer|id":               "p-1",
+		"root/composer|id_scheme":        "local",
+		"root/composer|id_namespace":     "demographic",
+		"root/composer|type":             "PERSON",
+		"root/composer/_identifier:0|id": "id-0",
+	}
+	for key, v := range want {
+		if flat[key] != v {
+			t.Errorf("%s = %#v, want %#v", key, flat[key], v)
+		}
 	}
 	for key := range flat {
-		if strings.HasPrefix(key, "ctx/composer") && key != "ctx/composer_name" {
-			t.Errorf("the ctx/ projection emitted %q; it carries the name alone", key)
+		if strings.HasPrefix(key, "ctx/composer") {
+			t.Errorf("emitted %q beside the real-path composer; one body spells its composer one way", key)
 		}
-		if strings.Contains(key, "composer/") {
-			t.Errorf("emitted a real-path composer key %q, which decode refuses", key)
+		if strings.HasPrefix(key, "root/composer") && want[key] == nil {
+			t.Errorf("emitted %q, which the composer does not carry", key)
 		}
+	}
+	got, err := UnmarshalFlat(b, wt)
+	if err != nil {
+		t.Fatalf("UnmarshalFlat: %v", err)
+	}
+	if !reflect.DeepEqual(got.Composer, comp.Composer) {
+		t.Errorf("decoded composer = %#v, want %#v", got.Composer, comp.Composer)
 	}
 }
 
@@ -1161,7 +1182,7 @@ func TestDVScaleRidesTheOrdinalSuffixSet(t *testing.T) {
 	// Decode the same three suffixes back.
 	got, err := dvFromSuffixes("DV_SCALE", false, map[string]any{
 		"code": "at0003", "value": "slight breathlessness", "ordinal": 2.5,
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("dvFromSuffixes: %v", err)
 	}
@@ -1182,7 +1203,7 @@ func TestDVScaleIncompleteSuffixSetRefused(t *testing.T) {
 		"no |ordinal": {"code": "at0003", "value": "x"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			if _, err := dvFromSuffixes("DV_SCALE", false, sfx); !errors.Is(err, ErrUnsupportedDatatype) {
+			if _, err := dvFromSuffixes("DV_SCALE", false, sfx, nil); !errors.Is(err, ErrUnsupportedDatatype) {
 				t.Errorf("err = %v, want ErrUnsupportedDatatype", err)
 			}
 		})

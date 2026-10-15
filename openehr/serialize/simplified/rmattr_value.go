@@ -136,8 +136,16 @@ func splitRMAttrTails(g rmattrGroup, sub, lists map[string]bool) (rmattrTails, e
 					ErrUnsupportedDatatype, g.key(tail))
 			}
 			// Judged once the decode knows whether it reads the sub-path
-			// ([rmattrGroup.settleDups]).
-			*g.dups = append(*g.dups, tailDup{first: ts.key(g, norm), second: g.key(tail), firstVal: held, secondVal: val})
+			// ([rmattrGroup.settleDups]). A held spelling that is null is
+			// absent (REQ-053), so this one carries the value.
+			first := ts.key(g, norm)
+			if held == nil && val != nil {
+				slot[suffix] = val
+				ts.orig[norm] = tail
+				*g.dups = append(*g.dups, tailDup{first: g.key(tail), second: first, firstVal: val, secondVal: held})
+				continue
+			}
+			*g.dups = append(*g.dups, tailDup{first: first, second: g.key(tail), firstVal: held, secondVal: val})
 			continue
 		}
 		slot[suffix] = val
@@ -225,11 +233,16 @@ func rmattrSegIndex(g rmattrGroup, tail, seg string) (id string, idx int, err er
 // checked against separate sets because they are separate positions:
 // `|lower_included` is not `/lower_included`. [splitRMAttrTails] has already
 // set aside a sub-path the grammar does not name, so the sub-path pass is a
-// backstop.
+// backstop. An own suffix inside the grammar that holds JSON null is absent
+// (REQ-053) and is removed; a sub-object's null keys are the filter's
+// ([rmattrTails.filterSub]).
 func (ts rmattrTails) check(g rmattrGroup, own, sub map[string]bool) {
 	for _, suffix := range slices.Sorted(maps.Keys(ts.own)) {
-		if !own[suffix] {
+		switch {
+		case !own[suffix]:
 			g.sink.add(ts.key(g, ownTail(suffix)))
+			delete(ts.own, suffix)
+		case ts.own[suffix] == nil:
 			delete(ts.own, suffix)
 		}
 	}
@@ -250,8 +263,10 @@ func (ts rmattrTails) dropSub(g rmattrGroup, seg string) {
 }
 
 // filterSub keeps, of the sub-object seg, the suffixes a value of rmType
-// reads, handing the key of every other one to the group's sink; a sub-object
-// left with nothing is removed, as if the body did not spell it.
+// reads, handing the key of every other one to the group's sink and dropping
+// those that hold JSON null ([matchedSuffixes]); a sub-object left with
+// nothing is removed, as if the body did not spell it, so a bound whose keys
+// are all null is an absent bound (REQ-169).
 func (ts rmattrTails) filterSub(g rmattrGroup, seg, rmType string) {
 	sfx, ok := ts.sub[seg]
 	if !ok {
@@ -295,20 +310,22 @@ func (ts rmattrTails) empty() bool {
 // `decode "<key>"` with the *base* key — so the census reads the refusal at the
 // same precision it reads a leaf's.
 func (ts rmattrTails) value(g rmattrGroup, seg, rmType string) (map[string]any, error) {
-	return ts.valueAt(g, subTail(seg, ""), rmType, ts.sub[seg])
+	return ts.valueAt(g, func(suffix string) string { return subTail(seg, suffix) }, rmType, rmType, ts.sub[seg])
 }
 
 // listValue is [rmattrTails.value] for one slot of an indexed sub-path list.
 func (ts rmattrTails) listValue(g rmattrGroup, seg string, idx int, rmType string) (map[string]any, error) {
-	return ts.valueAt(g, subListTail(seg, idx, ""), rmType, ts.sublist[seg][idx])
+	return ts.valueAt(g, func(suffix string) string { return subListTail(seg, idx, suffix) }, rmType, rmType, ts.sublist[seg][idx])
 }
 
-// valueAt is the shared body: decode sfx as rmType, naming tail's own FLAT key on
-// failure.
-func (ts rmattrTails) valueAt(g rmattrGroup, tail, rmType string, sfx map[string]any) (map[string]any, error) {
-	dv, err := dvFromSuffixes(rmType, false, sfx)
+// valueAt is the shared body: decode sfx as rmType at an RM attribute declared
+// as holds ([dvFromSuffixesAt]), naming the sub-object's own FLAT key on
+// failure. tailOf spells the tail of one suffix of it, "" for the sub-object
+// itself.
+func (ts rmattrTails) valueAt(g rmattrGroup, tailOf func(suffix string) string, holds, rmType string, sfx map[string]any) (map[string]any, error) {
+	dv, err := dvFromSuffixesAt(holds, rmType, false, sfx, func(suffix string) string { return ts.key(g, tailOf(suffix)) })
 	if err != nil {
-		return nil, fmt.Errorf("simplified: decode %q: %w", ts.key(g, tail), err)
+		return nil, fmt.Errorf("simplified: decode %q: %w", ts.key(g, tailOf("")), err)
 	}
 	return dv, nil
 }
@@ -438,9 +455,18 @@ var normalRangeBoundByValue = map[string]bool{"DV_COUNT": true, "DV_QUANTITY": t
 // refused; held as an interface, it decodes as written, with no bound.
 func intervalSuffixes(g rmattrGroup, ts rmattrTails, anchor string, boundByValue bool) (map[string]any, error) {
 	iv := map[string]any{"_type": "DV_INTERVAL"}
+	// The type a bound is held as, which a `|raw` bound must name or descend
+	// from: the anchor itself where the RM holds the bound by value, and any
+	// DV_ORDERED where it holds an interface.
+	bound := "DV_ORDERED"
+	if boundByValue {
+		bound = anchor
+	}
 	for _, end := range []string{"lower", "upper"} {
-		slot, written := ts.sub[end]
-		bounded := written && !allNull(slot)
+		// [intervalTails] and the reference-range decoder filter each bound
+		// ([rmattrTails.filterSub]), which drops its null keys and then a bound
+		// left with none: a null bound is an absent one.
+		_, bounded := ts.sub[end]
 		unbounded, flagged, err := ts.flagTail(g, end+"_unbounded")
 		if err != nil {
 			return nil, err
@@ -462,7 +488,7 @@ func intervalSuffixes(g rmattrGroup, ts rmattrTails, anchor string, boundByValue
 				ErrUnsupportedDatatype, g.prefix(), end, end, end)
 		}
 		if bounded {
-			dv, err := ts.value(g, end, anchor)
+			dv, err := ts.valueAt(g, func(suffix string) string { return subTail(end, suffix) }, bound, anchor, ts.sub[end])
 			if err != nil {
 				return nil, err
 			}
@@ -484,10 +510,10 @@ func intervalSuffixes(g rmattrGroup, ts rmattrTails, anchor string, boundByValue
 	return iv, nil
 }
 
-// allNull reports whether every key of a bound holds JSON null: a null bound,
-// which REQ-169 reads as an absent one.
-func allNull(slot map[string]any) bool {
-	for _, v := range slot {
+// allNull reports whether every value in m is JSON null, which REQ-053 reads
+// as absent: a family instance all of whose keys are null.
+func allNull(m map[string]any) bool {
+	for _, v := range m {
 		if v != nil {
 			return false
 		}
@@ -736,11 +762,12 @@ func decodeRMAttrLeafValue(g rmattrGroup, rmType string) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	own := matchedSuffixes(rmType, ts.own, func(suffix string) string { return ts.key(g, ownTail(suffix)) }, g.sink)
+	keyOf := func(suffix string) string { return ts.key(g, ownTail(suffix)) }
+	own := matchedSuffixes(rmType, ts.own, keyOf, g.sink)
 	if len(own) == 0 {
 		return nil, errNothingMatched
 	}
-	dv, err := dvFromSuffixes(rmType, false, own)
+	dv, err := dvFromSuffixes(rmType, false, own, keyOf)
 	if err != nil {
 		return nil, fmt.Errorf("simplified: decode %q: %w", g.prefix(), err)
 	}

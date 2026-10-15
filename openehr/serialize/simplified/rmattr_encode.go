@@ -76,6 +76,45 @@ func rmattrEncode(owner any, base string, out map[string]any) error {
 	return participationsRMAttr(out, base, "_other_participation", entryOtherParticipationsOf(owner))
 }
 
+// compositionNameRMAttr writes the composition's own name as `<base>/_name`,
+// base being the template root (REQ-140), in the DV_TEXT leaf form: a plain
+// name as the bare value with any `|formatting`, a coded one in the
+// `|code` + `|value` + `|terminology` substitution form (REQ-053), and one the
+// suffixes cannot carry as `_name|raw`, since no underscore family nests below
+// `_name`. implied is the name decode gives a body without `_name`
+// ([impliedCompositionName]): a plain DV_TEXT of that value, one that is no
+// coded text and sets nothing but its value, writes nothing, so a round trip
+// names the composition the same way and one named after its template carries
+// no extra key. A nil name writes nothing either.
+func compositionNameRMAttr(out map[string]any, base string, name rm.DVTextLike, implied string) error {
+	if name == nil || rm.IsTypedNil(name) {
+		return nil
+	}
+	m, err := canonicalMap(name)
+	if err != nil {
+		return err
+	}
+	if plainText(m) && m["value"] == implied {
+		return nil
+	}
+	_, err = emitLeafValue(out, base+"/_name", name, "DV_TEXT", false, false)
+	return err
+}
+
+// plainText reports whether a canonical object is a DV_TEXT that carries
+// nothing but its value.
+func plainText(m map[string]any) bool {
+	if m["_type"] != "DV_TEXT" {
+		return false
+	}
+	for k := range m {
+		if k != "_type" && k != "value" {
+			return false
+		}
+	}
+	return true
+}
+
 // deferredEntryRMAttrs refuses the two ENTRY attributes whose families stay
 // deferred: ACTION `instruction_details` and INSTRUCTION `wf_definition`. Decode
 // refuses their keys as unknown families, so a value written here could never be

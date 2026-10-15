@@ -132,7 +132,6 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	compJSON := map[string]any{
 		"_type":             "COMPOSITION",
 		"archetype_node_id": root.NodeID,
-		"name":              textJSON(cmp.Or(root.Name, wt.TemplateID)),
 	}
 	// A key ending in a bare `|` spells the key without it; both at once are two
 	// spellings of one field (REQ-170), judged once the decode knows whether it
@@ -142,8 +141,9 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 		sink.spellings = fold.spellings
 	}
 	// Separate composition-level context from clinical content; context is
-	// rebuilt from RM attributes, not from a Web Template leaf path.
-	ctx, ctxOrigin, content, err := siphonContext(flat, root.ID, sink)
+	// rebuilt from RM attributes, not from a Web Template leaf path. The
+	// composer's real-path keys come out as one party group.
+	ctx, ctxOrigin, composer, content, err := siphonContext(flat, root.ID, sink)
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +226,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 		if len(sfx) == 0 {
 			continue
 		}
-		dv, err := leafFromSuffixes(nodeRMType(leaf), leafListOpen(leaf), sfx)
+		dv, err := leafFromSuffixes(leafHolds(leaf), nodeRMType(leaf), leafListOpen(leaf), sfx, keyOf)
 		if err != nil {
 			return nil, fmt.Errorf("simplified: decode %q: %w", base, err)
 		}
@@ -247,6 +247,12 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	if err := decodeRMAttrGroups(compJSON, wt, attrGroups, ambiguous, budget, names); err != nil {
 		return nil, err
 	}
+	// The composition is named by its `<root>/_name` where the body spells one,
+	// which the router has just placed, and otherwise by the Web Template
+	// (REQ-140).
+	if _, named := compJSON["name"]; !named {
+		compJSON["name"] = textJSON(impliedCompositionName(wt))
+	}
 	// Every key is placed, so each rebuilt ISM transition can now get the careflow
 	// step its node names, or have the body's checked against it (REQ-053).
 	if err := settleIsmTransitions(compJSON, wt); err != nil {
@@ -264,7 +270,11 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	if err != nil {
 		return nil, err
 	}
-	if err := applyContext(compJSON, ci); err != nil {
+	composerJSON, err := decodeComposer(composer, ci, ctxOrigin)
+	if err != nil {
+		return nil, err
+	}
+	if err := applyContext(compJSON, ci, composerJSON); err != nil {
 		return nil, err
 	}
 	// Conformant mode (a template was supplied, so names is non-nil): fill the
@@ -287,85 +297,82 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 // suffix arrived under.
 //
 //   - A node with children is structure, not a value: the decode reads a |raw
-//     fragment there and its bare value, which names the node and so is
-//     matched content of the wrong shape, refused where the value is built
-//     (REQ-170). Every other suffix is unmatched (an extension suffix such as
-//     `|x_note`, say). The RM attributes the reference spells as a suffix on
-//     such a node never get here: [refuseInContextKeys] refuses them first.
+//     fragment there and its bare value, which name the node and so are
+//     matched content of the wrong shape (REQ-170). A |raw is refused here
+//     with ErrUnsupportedDatatype naming its key, whatever its fragment's
+//     _type: it carries a datatype (REQ-053), and a fragment placed whole at
+//     the node would be dropped once the node's own keys rebuild it. The bare
+//     value is refused where the value is built. Every other suffix is
+//     unmatched (an extension suffix such as `|x_note`, say). The RM
+//     attributes the reference spells as a suffix on such a node never get
+//     here: [refuseInContextKeys] refuses them first.
 //   - A leaf whose datatype has a suffix set keeps the suffixes in that set
 //     ([leafSuffixMatched]); the rest are unmatched.
 //   - A leaf whose datatype has neither a suffix set nor a sub-path grammar
-//     resolves but has no carrier other than |raw: in practice the composer's
-//     PARTY_PROXY, whose party grammar the ctx/ forms own. Its bare value, and
-//     a suffix that names something the datatype has, are refused in every
-//     mode with ErrUnsupportedDatatype, as the other carrier-less keys at a
-//     leaf are, naming the first such key: an attribute of its RM class, or
-//     for a party the party grammar's suffixes (the composer's `external_ref`
-//     among them). Any other suffix is unmatched (REQ-170).
+//     (an unmapped datatype such as DV_STATE) resolves but has no carrier
+//     other than |raw. Its bare value, and a suffix that names an attribute of
+//     its RM class, are refused in every mode with ErrUnsupportedDatatype, as
+//     the other carrier-less keys at a leaf are, naming the first such key.
+//     Any other suffix is unmatched (REQ-170). A party leaf does not get
+//     here: [siphonContext] reads every key at the composer's real path, and
+//     [compositeLeafGroups] every other party leaf.
 //   - An unparameterised `DV_INTERVAL` leaf has a sub-path grammar, the
 //     interval grammar, but names no bound datatype to read it with, so it
 //     reads its |raw fragment alone; every other key is unmatched.
+//
+// A key the decode reads that holds JSON null is absent (REQ-053): it is
+// dropped without a word, so a leaf whose keys are all null comes back empty,
+// and a null key is never refused for want of a carrier. A key the decode
+// does not read goes to sink whatever its value.
 func leafSuffixes(leaf *webtemplate.Node, sfx map[string]any, keyOf func(string) string, sink *unmatchedSink) (map[string]any, error) {
-	if len(leaf.Children) > 0 {
-		var out map[string]any
-		for _, suffix := range slices.Sorted(maps.Keys(sfx)) {
-			if suffix == "raw" || suffix == "" {
-				continue
-			}
-			if out == nil {
-				out = maps.Clone(sfx)
-			}
-			delete(out, suffix)
-			sink.add(keyOf(suffix))
-		}
-		if out == nil {
-			return sfx, nil
-		}
-		return out, nil
-	}
 	rmType := nodeRMType(leaf)
-	if _, judged := leafSuffixMatched(rmType, ""); judged {
-		return matchedSuffixes(rmType, sfx, keyOf, sink), nil
+	if len(leaf.Children) == 0 {
+		if _, judged := leafSuffixMatched(rmType, ""); judged {
+			return matchedSuffixes(rmType, sfx, keyOf, sink), nil
+		}
+	}
+	out := maps.Clone(sfx)
+	if len(leaf.Children) > 0 {
+		// A null |raw is absent (REQ-053), and falls to withoutNulls below.
+		if sfx["raw"] != nil {
+			return nil, fmt.Errorf("simplified: decode %q: %w: |raw carries a datatype, and the %s it names is a node with children",
+				keyOf("raw"), ErrUnsupportedDatatype, rmType)
+		}
+		for _, suffix := range slices.Sorted(maps.Keys(sfx)) {
+			if suffix != "raw" && suffix != "" {
+				delete(out, suffix)
+				sink.add(keyOf(suffix))
+			}
+		}
+		return withoutNulls(out), nil
 	}
 	subPathGrammar := bmmtype.Class(rmType) == "DV_INTERVAL"
-	var out map[string]any
+	out = withoutNulls(out)
 	for _, suffix := range slices.Sorted(maps.Keys(sfx)) {
+		read := suffix == "raw" || (!subPathGrammar && (suffix == "" || unmappedReads(rmType, suffix)))
 		switch {
-		case suffix == "raw":
-			// |raw is the carrier of an unmapped datatype; dvFromSuffixes refuses
-			// it beside any other suffix.
-		case !subPathGrammar && (suffix == "" || unmappedReads(rmType, suffix)):
-			if _, raw := sfx["raw"]; raw {
-				break
-			}
-			if suffix == "" {
-				// Named as the allowlist refusals name a bare value, so a caller
-				// reading the refusal removes the bare key alone.
-				return nil, fmt.Errorf("simplified: decode %q: %w: unexpected bare value for %s", keyOf(suffix), ErrUnsupportedDatatype, rmType)
-			}
-			return nil, fmt.Errorf("simplified: decode %q: %w: %s", keyOf(suffix), ErrUnsupportedDatatype, rmType)
-		default:
-			if out == nil {
-				out = maps.Clone(sfx)
-			}
+		case !read:
 			delete(out, suffix)
 			sink.add(keyOf(suffix))
+		case suffix == "raw", sfx[suffix] == nil:
+			// |raw is the carrier of an unmapped datatype; dvFromSuffixes refuses
+			// it beside any other suffix. A null key is absent.
+		case out["raw"] != nil:
+			// Kept beside |raw, which dvFromSuffixes then refuses.
+		case suffix == "":
+			// Named as the allowlist refusals name a bare value, so a caller
+			// reading the refusal removes the bare key alone.
+			return nil, fmt.Errorf("simplified: decode %q: %w: unexpected bare value for %s", keyOf(suffix), ErrUnsupportedDatatype, rmType)
+		default:
+			return nil, fmt.Errorf("simplified: decode %q: %w: %s", keyOf(suffix), ErrUnsupportedDatatype, rmType)
 		}
-	}
-	if out == nil {
-		return sfx, nil
 	}
 	return out, nil
 }
 
-// unmappedReads reports whether suffix names something a leaf of rmType, a
-// datatype with neither a suffix set nor a sub-path grammar, has: for a party,
-// a suffix of the party grammar (the composer's `external_ref` suffixes and
-// `|name`); otherwise an attribute of its RM class.
+// unmappedReads reports whether suffix names an attribute of the RM class of
+// rmType, a datatype with neither a suffix set nor a sub-path grammar.
 func unmappedReads(rmType, suffix string) bool {
-	if isPartyLeafType(rmType) {
-		return partyProxyOwnTails[suffix]
-	}
 	_, declared := rminfo.Default.AttributeRMType(bmmtype.Class(rmType), suffix)
 	return declared
 }
@@ -406,13 +413,13 @@ func unmappedReads(rmType, suffix string) bool {
 // Template `setting` node: the same RM attribute either way, and `rmpath`
 // leaves `…/context/setting` unresolvable so encode cannot double-spell it.
 //
-// One composition-level family deliberately stays out, because admitting it
-// would be adding a field rather than accepting a spelling: `composer|id` /
-// `|id_scheme` / `|id_namespace` — the composer's external_ref, which the ctx/
-// short forms structurally cannot carry. Silently dropping it would violate
-// REQ-053's semantics-preserving contract, so those suffixes stay refused and
-// appear in the PROBE-086 census (see deviations.md and
-// docs/specifications/conformance.md § PROBE-086).
+// The composer's other real-path keys stay out, because no ctx/ field carries
+// them: `composer|id` / `|id_scheme` / `|id_namespace` / `|type` (its
+// external_ref), `composer/_identifier:N` and `composer/relationship`. They
+// carry the rest of the composer at its real path, read by the party grammar
+// beside the name the alias gives (ADR 0029, [decodeComposer]), and the
+// PROBE-086 census compares them (docs/specifications/conformance.md
+// § PROBE-086).
 var metadataAliases = map[string]string{
 	"language|code":         "ctx/language",
 	"territory|code":        "ctx/territory",
@@ -445,12 +452,10 @@ var metadataAliasTerminology = map[string]string{
 // owns the leaf, is what keeps that unreachable; a suffix their datatype does
 // not have is unmatched content and is never placed.
 //
-// `composer` is deliberately absent: the composer external_ref suffixes
-// (`composer|id` / `|id_scheme` / `|id_namespace`) must keep flowing through to
-// decode so they are refused there and counted in the PROBE-086 census as the
-// real PARTY_PROXY data loss they are (ADR 0015). Every base here is held out of
-// that census by the harness (`IsCompositionMeta`), so refusing extra suffixes
-// early moves no count.
+// `composer` is absent: its real path carries the whole composer in the party
+// grammar (ADR 0029), so [siphonContext] reads its keys rather than refusing
+// them. Every base here is held out of the PROBE-086 census by the harness
+// (`IsCompositionMeta`), so refusing extra suffixes early moves no count.
 var contextMetaOwnedBases = map[string]bool{
 	"context/setting": true, "context/start_time": true,
 	"language": true, "territory": true,
@@ -492,12 +497,13 @@ var ctxFields = map[string]bool{
 
 // metadataSegPaths are the root-relative segment paths the metadata spellings
 // run through: every leading run of segments of an alias, a witness or a
-// ctx/-owned base, plus `composer` for its party sub-structure. Each names a
-// single-valued RM attribute (COMPOSITION.language, .composer, .context,
-// EVENT_CONTEXT.start_time, …). The set is read off those tables, so an alias
-// added there brings its segments with it.
+// ctx/-owned base, plus `composer`, whose real path carries the whole composer
+// ([siphonContext]). Each names a single-valued RM attribute
+// (COMPOSITION.language, .composer, .context, EVENT_CONTEXT.start_time, …). The
+// set is read off those tables, so an alias added there brings its segments
+// with it.
 var metadataSegPaths = func() map[string]bool {
-	paths := map[string]bool{"composer": true}
+	paths := map[string]bool{composerSeg: true}
 	add := func(spelling string) {
 		base, _, _ := strings.Cut(spelling, "|")
 		for i := range len(base) {
@@ -588,21 +594,25 @@ func overIndexedMetadataSeg(rel string) flatSeg {
 	return flatSeg{}
 }
 
-// composerSubStructure reports whether sub, the path below `composer/`, opens
-// with a segment of the party grammar's sub-structure: the nested
-// `_identifier:N` list or PARTY_RELATED's `relationship`.
-func composerSubStructure(sub string) bool {
-	seg := sub
-	if cut := strings.IndexAny(seg, "/|"); cut >= 0 {
-		seg = seg[:cut]
+// composerSeg is the FLAT id of the composer's real path below the template
+// root, which carries the whole composer in the party grammar (ADR 0029).
+const composerSeg = "composer"
+
+// composerTail returns the tail of rel, an unindexed root-relative spelling,
+// below the composer's own segment: "" for the bare key, "|id" for a suffix,
+// "/_identifier:0|id" for a sub-path. isComposer is false for any other path,
+// a longer segment id such as `composer_self` among them.
+func composerTail(rel string) (tail string, isComposer bool) {
+	rest, ok := strings.CutPrefix(rel, composerSeg)
+	if !ok || (rest != "" && rest[0] != '|' && rest[0] != '/') {
+		return "", false
 	}
-	id, _, _ := strings.Cut(seg, ":")
-	return partyListTails[id] || partySubTails[id]
+	return rest, true
 }
 
 // isMetadataSpelling reports whether an unindexed root-relative spelling is one
 // [siphonContext] handles itself: an alias, a terminology witness, a suffix of
-// a leaf the ctx/ short form owns, or the composer's party sub-structure.
+// a leaf the ctx/ short form owns, or a key at the composer's real path.
 func isMetadataSpelling(rel string) bool {
 	if _, isAlias := metadataAliases[rel]; isAlias {
 		return true
@@ -613,7 +623,8 @@ func isMetadataSpelling(rel string) bool {
 	if base, _, _ := strings.Cut(rel, "|"); contextMetaOwnedBases[base] {
 		return true
 	}
-	return strings.HasPrefix(rel, "composer/")
+	_, isComposer := composerTail(rel)
+	return isComposer
 }
 
 // cutRoot splits a FLAT key at its template-root segment and returns the path
@@ -750,19 +761,41 @@ func MetadataWitnessSpellings() []string {
 // metadata, the same stance the codec already takes on an index collision.
 //
 // A ctx/ field the decode does not read, and a suffix of a ctx/-owned leaf
-// outside that leaf's datatype, go to sink as unmatched content (REQ-170).
-func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx map[string]any, ctxOrigin map[string]string, content map[string]any, err error) {
+// outside that leaf's datatype, go to sink as unmatched content (REQ-170),
+// whatever their value. A ctx/ field, an alias, a witness or a ctx/-owned leaf
+// suffix the decode reads that holds JSON null is absent (REQ-053) and is
+// dropped.
+//
+// Every other key at the composer's real path (`<root>/composer|id`,
+// `<root>/composer/_identifier:0|id`, …) goes to composer, one party group
+// whose unmatched keys go to sink: the real path carries the whole composer
+// (ADR 0029), and [decodeComposer] reads the group beside the ctx/ composer
+// fields once they are parsed. Two spellings of one composer key, with and
+// without the `:0` of the root or the composer segment, are one key: they must
+// agree, and a null one is absent ([putComposerKey]).
+func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx map[string]any, ctxOrigin map[string]string, composer *rmattrGroup, content map[string]any, err error) {
 	ctx, ctxOrigin, content = make(map[string]any), make(map[string]string), make(map[string]any)
+	composer = newRMAttrGroup(rootID, composerSeg, -1, sink)
+	composer.metadata = "the composer"
 	// Sorted so a body carrying two conflicting real-path spellings reports the
 	// same key first on every run — a map-order-dependent error message is not
 	// reproducible for whoever has to fix the payload.
 	for _, key := range slices.Sorted(maps.Keys(flat)) {
 		val := flat[key]
 		if strings.HasPrefix(key, "ctx/") {
+			if key != ctxSettingBare && key != ctxSettingTerminology && !ctxFields[key] {
+				sink.add(key)
+				continue
+			}
+			// A ctx/ field the decode reads that holds null is absent
+			// (REQ-053): a null ctx/language is a missing one.
+			if val == nil {
+				continue
+			}
 			if key == ctxSettingBare {
 				// ctx/setting is read as its |code + |value pair; a bare value is
 				// the field missing both (REQ-170: a missing required suffix).
-				return nil, nil, nil, fmt.Errorf("%w: %q spells the setting without its |code and |value, the pair ctx/setting travels as",
+				return nil, nil, nil, nil, fmt.Errorf("%w: %q spells the setting without its |code and |value, the pair ctx/setting travels as",
 					ErrUnsupportedDatatype, key)
 			}
 			if key == ctxSettingTerminology {
@@ -771,16 +804,12 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 				// terminology is a typed error, not a silent rewrite (REQ-053),
 				// exactly as the real-path witness below.
 				if err := checkTerminologyWitness(key, val, terminology.ID); err != nil {
-					return nil, nil, nil, err
+					return nil, nil, nil, nil, err
 				}
 				continue
 			}
-			if !ctxFields[key] {
-				sink.add(key)
-				continue
-			}
 			if err := putCtx(ctx, ctxOrigin, key, val, key); err != nil {
-				return nil, nil, nil, err
+				return nil, nil, nil, nil, err
 			}
 			continue
 		}
@@ -788,7 +817,7 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 		// is judged from the left like any other: an index past :0 on it is
 		// past its bound (REQ-170).
 		if seg, alone := rootSegmentAlone(key, rootID); alone && seg.idx > 0 {
-			return nil, nil, nil, fmt.Errorf("simplified: %q: %w", key, errRootIndex(seg))
+			return nil, nil, nil, nil, fmt.Errorf("simplified: %q: %w", key, errRootIndex(seg))
 		}
 		rel, rootSeg, isRooted := cutRoot(key, rootID)
 		if !isRooted {
@@ -799,7 +828,7 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 		// (REQ-053), and any other index is past its bound, refused whatever
 		// follows it (REQ-170).
 		if rootSeg.idx > 0 {
-			return nil, nil, nil, fmt.Errorf("simplified: %q: %w", key, errRootIndex(rootSeg))
+			return nil, nil, nil, nil, fmt.Errorf("simplified: %q: %w", key, errRootIndex(rootSeg))
 		}
 		// The tables below are keyed on the unindexed spelling. An indexed
 		// metadata path is read exactly as that spelling, and only `:0` is an
@@ -809,24 +838,33 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 		raw := rel
 		rel, overIndexed := metadataRel(rel)
 		if overIndexed && isMetadataSpelling(rel) {
-			return nil, nil, nil, fmt.Errorf("%w: %q (a composition metadata path runs through single-valued attributes, so :0 is the only index it takes)",
+			return nil, nil, nil, nil, fmt.Errorf("%w: %q (a composition metadata path runs through single-valued attributes, so :0 is the only index it takes)",
 				ErrUnknownPath, key)
 		}
 		// Any other key that runs through a metadata segment past :0 is past
 		// that segment's bound whatever follows it, whether or not the Web
 		// Template carries a node for the segment (REQ-170).
 		if overIndexed {
-			return nil, nil, nil, fmt.Errorf("simplified: %q: %w", key, errSingleValuedIndex(overIndexedMetadataSeg(raw)))
+			return nil, nil, nil, nil, fmt.Errorf("simplified: %q: %w", key, errSingleValuedIndex(overIndexedMetadataSeg(raw)))
 		}
+		// A witness, an alias or a suffix of a ctx/-owned leaf that holds null
+		// is absent (REQ-053), so it neither conflicts with another spelling
+		// nor is refused for want of a ctx/ carrier.
 		if want, isWitness := metadataAliasTerminology[rel]; isWitness {
+			if val == nil {
+				continue
+			}
 			if err := checkTerminologyWitness(key, val, want); err != nil {
-				return nil, nil, nil, err
+				return nil, nil, nil, nil, err
 			}
 			continue
 		}
 		if ctxKey, isAlias := metadataAliases[rel]; isAlias {
+			if val == nil {
+				continue
+			}
 			if err := putCtx(ctx, ctxOrigin, ctxKey, val, key); err != nil {
-				return nil, nil, nil, err
+				return nil, nil, nil, nil, err
 			}
 			continue
 		}
@@ -834,9 +872,8 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 		// travel as an ordinary Web Template leaf: the ctx/ entry is written last
 		// and would overwrite whatever the leaf placed, dropping it with no error.
 		// Every spelling of such a leaf is therefore either an accepted alias, a
-		// checked witness, or refused here naming the key (REQ-053) — the
-		// composer external_ref suffixes stay out of this set deliberately, so
-		// they keep flowing to decode and stay visible in the PROBE-086 census.
+		// checked witness, or refused here naming the key (REQ-053). The
+		// composer is not such a leaf: its real path is read below.
 		// A suffix the leaf's datatype does not have at all is not such a
 		// spelling: the decode does not read it, so it is unmatched (REQ-170).
 		// A bare value is not such a suffix but a spelling of the field missing
@@ -846,30 +883,25 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 				sink.add(key)
 				continue
 			}
-			return nil, nil, nil, fmt.Errorf("%w: %q is not a spelling the ctx/ short form can carry — %s owns this leaf, so only its accepted suffixes travel (see deviations.md)",
+			if val == nil {
+				continue
+			}
+			return nil, nil, nil, nil, fmt.Errorf("%w: %q is not a spelling the ctx/ short form can carry — %s owns this leaf, so only its accepted suffixes travel (see deviations.md)",
 				ErrUnsupportedDatatype, key, metadataOwnedBaseCtx[base])
 		}
-		// The ADR 0015 boundary, REQ-140 edition. REQ-140's party grammar reaches
-		// a party's sub-structure — its `_identifier:N` list and, for a
-		// PARTY_RELATED, `/relationship` — everywhere except here: no `ctx/` short
-		// form can carry it, so a composer decoded from those keys could not be
-		// re-emitted (encode is ctx/-only) and the value would vanish on the way
-		// out. That is the silent loss REQ-053 forbids, so the keys are refused by
-		// name and counted in the PROBE-086 census, exactly as the composer's own
-		// `|id` / `|id_scheme` / `|id_namespace` external_ref suffixes are (those
-		// reach the leaf loop and are refused there as PARTY_PROXY). Closing this
-		// means giving the composer's reference a `ctx/` carrier, which is an
-		// ADR-level decision, not a codec one.
-		// Only the party grammar's sub-structure is the composer's: any other
-		// sub-path names nothing a party has, and is unmatched content where the
-		// leaf loop finds no node for it.
-		if sub, isComposerSub := strings.CutPrefix(rel, "composer/"); isComposerSub && composerSubStructure(sub) {
-			return nil, nil, nil, fmt.Errorf("%w: %q is composer party sub-structure, which no ctx/ short form can carry (ADR 0015 boundary)",
-				ErrUnsupportedDatatype, key)
+		// The composer's real path carries the whole composer in the party
+		// grammar REQ-140 gives every other party position (ADR 0029): its
+		// `external_ref` suffixes, its `_identifier:N` list and a PARTY_RELATED's
+		// `/relationship`. Its `|name` is the alias above. The keys are read
+		// whether or not the Web Template carries a composer node, as the
+		// aliases are, and the party grammar sets aside what it does not read.
+		if tail, isComposer := composerTail(rel); isComposer {
+			putComposerKey(composer, tail, val, key)
+			continue
 		}
 		content[key] = val
 	}
-	return ctx, ctxOrigin, content, nil
+	return ctx, ctxOrigin, composer, content, nil
 }
 
 // checkTerminologyWitness reads a terminology witness of a coded metadata
@@ -987,6 +1019,14 @@ func parseCtx(ctx map[string]any, origin map[string]string) (ctxInfo, error) {
 		case "composer_name":
 			ci.composerName, err = ctxString(label, val)
 			ci.haveComposerName = true
+			// `Name_valid` — an empty name, in either spelling, is not a composer
+			// without one: alone it would decode to a PARTY_IDENTIFIED the RM
+			// forbids and encode refuses. A null one never gets here; it is
+			// absent (REQ-053).
+			if err == nil && ci.composerName == "" {
+				err = fmt.Errorf("%w: %q is present but empty (RM invariant `Name_valid`); a composer carrying no name is spelled by the key's absence",
+					ErrUnsupportedDatatype, label)
+			}
 		case "composer_self":
 			b, ok := val.(bool)
 			if !ok {
@@ -1045,8 +1085,8 @@ func parseCtx(ctx map[string]any, origin map[string]string) (ctxInfo, error) {
 	}
 	// composer_self and a composer name are two mutually exclusive
 	// representations of one RM attribute: PARTY_SELF carries no name, and
-	// PARTY_IDENTIFIED is not the EHR subject. [applyContext] can only build one,
-	// and its switch prefers PARTY_SELF — so accepting the pair would drop the
+	// PARTY_IDENTIFIED is not the EHR subject. [decodeComposer] can only build
+	// one, and it prefers PARTY_SELF — so accepting the pair would drop the
 	// name silently, exactly what refusing two conflicting spellings of one field
 	// prevents. `composer_self: false` beside a name is not a conflict: it denies
 	// nothing the name asserts, and the encoder's own PARTY_IDENTIFIED output
@@ -1068,19 +1108,17 @@ func ctxString(key string, val any) (string, error) {
 }
 
 // applyContext sets the composition-level metadata from the parsed context and
-// enforces that language and territory (mandatory per the Simplified Formats
-// spec) are present.
-func applyContext(compJSON map[string]any, ci ctxInfo) error {
+// the composer [decodeComposer] built (nil for none), and enforces that
+// language and territory (mandatory per the Simplified Formats spec) are
+// present.
+func applyContext(compJSON map[string]any, ci ctxInfo, composer map[string]any) error {
 	if ci.language == "" || ci.territory == "" {
 		return fmt.Errorf("%w: ctx/language and ctx/territory are required", ErrMissingContext)
 	}
 	compJSON["language"] = codePhraseJSON(ci.language, "ISO_639-1")
 	compJSON["territory"] = codePhraseJSON(ci.territory, "ISO_3166-1")
-	switch {
-	case ci.composerSelf:
-		compJSON["composer"] = map[string]any{"_type": "PARTY_SELF"}
-	case ci.haveComposerName:
-		compJSON["composer"] = map[string]any{"_type": "PARTY_IDENTIFIED", "name": ci.composerName}
+	if composer != nil {
+		compJSON["composer"] = composer
 	}
 	if ci.haveTime || ci.haveSettingCode {
 		// Merge into any EVENT_CONTEXT already reconstructed from clinical paths
@@ -1664,7 +1702,7 @@ var inContextAttrs = map[string]struct {
 }
 
 // inContextCite names the section a refusal of an in-context attribute cites:
-// REQ-140's fourth out-of-scope class lists an ISM transition's `transition`
+// REQ-140's third out-of-scope class lists an ISM transition's `transition`
 // and `reason`; REQ-170 alone binds the rest (`current_state`,
 // `careflow_step`, the ACTION's `time`, and the INTERVAL_EVENT and OBSERVATION
 // attributes).
@@ -1679,7 +1717,7 @@ func inContextCite(attr string) string {
 // refuseInContextKeys refuses, in every mode, the reference's in-context
 // spelling of the RM attributes in [inContextAttrs] and of an ACTION's ISM
 // transition, wherever the Web Template does not resolve it (REQ-170; REQ-140's
-// fourth out-of-scope class covers `transition` and `reason`):
+// third out-of-scope class covers `transition` and `reason`):
 //
 //   - a `current_state`, `transition` or `careflow_step` leaf, with any suffix,
 //     under an ISM transition node: the reference's in-context `ism_transition`
@@ -1701,7 +1739,8 @@ func inContextCite(attr string) string {
 //
 // Keys are checked in sorted order, so a body with several names the same one on
 // every run. The error names the key, or the `_reason` family instance, and
-// carries no value.
+// carries no value. Such a key that holds JSON null carries no data to drop:
+// it is absent (REQ-053), and is removed from content.
 func refuseInContextKeys(content map[string]any, wt *webtemplate.WebTemplate, ambiguous map[string]bool) error {
 	for _, key := range slices.Sorted(maps.Keys(content)) {
 		pk, err := parseFlatKey(key)
@@ -1711,6 +1750,11 @@ func refuseInContextKeys(content map[string]any, wt *webtemplate.WebTemplate, am
 		}
 		named, owner, attr, ok := inContextKey(wt, key, pk, ambiguous)
 		if !ok {
+			continue
+		}
+		if content[key] == nil {
+			// A null names no data to drop: the key is absent (REQ-053).
+			delete(content, key)
 			continue
 		}
 		return fmt.Errorf("%w: %q is the reference's in-context spelling of an %s's %s, which the Web Template this SDK builds does not model — refused rather than dropped or replaced (%s, see deviations.md)",
@@ -1850,9 +1894,9 @@ func compositeLeafGroups(content map[string]any, wt *webtemplate.WebTemplate, si
 // Two kinds of key are deliberately not composite leaves. One whose path reaches
 // an `_`-prefixed segment first belongs to that family — a `_feeder_audit`'s
 // nested `/subject` is inside its tails, not at a Web Template node — and one
-// addressing a `ctx/`-owned metadata leaf is the composer, whose party
-// sub-structure is the ADR 0015 refusal in [siphonContext] and whose own suffixes
-// stay a PARTY_PROXY leaf refusal.
+// addressing a composition-metadata leaf [emitContext] writes is the composer,
+// whose keys [siphonContext] has already taken, whether or not the Web
+// Template carries its node (ADR 0029).
 func splitCompositeLeafKey(wt *webtemplate.WebTemplate, pk parsedKey) (base, family string, index int, tail string, ok bool) {
 	node := wt.Tree
 	if len(pk.segs) == 0 || pk.segs[0].id != node.ID {
@@ -2306,10 +2350,30 @@ var bareLeafAttr = map[string]string{
 // suffix (DV_COUNT -> magnitude, DV_BOOLEAN -> value, per the STABLE RM
 // mappings). A required suffix that is absent is an error rather than a coerced
 // zero value; an unmapped datatype is ErrUnsupportedDatatype.
-func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (map[string]any, error) {
+//
+// A suffix holding JSON null is absent (REQ-053), so a null required suffix is
+// a missing one, and no null reaches the canonical tree as the zero of its
+// type. Every other value must fit the RM attribute it fills
+// ([checkSuffixFits]); one that does not is refused naming the FLAT key keyOf
+// gives for its suffix (nil names the suffix alone). A |raw fragment fits when
+// its _type is rmType or an RM subtype of it ([checkRawFits]) and canonical
+// JSON decodes it as that _type ([checkRawDecodes]).
+func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any, keyOf func(suffix string) string) (map[string]any, error) {
+	return dvFromSuffixesAt(rmType, rmType, listOpen, sfx, keyOf)
+}
+
+// dvFromSuffixesAt is [dvFromSuffixes] at a position whose RM attribute is
+// declared as holds, which can be wider than rmType, the datatype the
+// suffixes are read as: a collapsed ELEMENT's value is a DATA_VALUE, an
+// interval bound the RM holds as an interface is a DV_ORDERED, and the feeder
+// audit's content is a DV_ENCAPSULATED. A |raw fragment there fits when its
+// _type is holds or an RM subtype of it and its members decode as that _type,
+// which is what canonical JSON admits.
+func dvFromSuffixesAt(holds, rmType string, listOpen bool, sfx map[string]any, keyOf func(suffix string) string) (map[string]any, error) {
+	sfx = withoutNulls(sfx)
 	// |raw bypass: a pre-serialised canonical fragment (carrying its own string
-	// _type); used directly, regardless of the leaf rmType. Mutually exclusive
-	// with every other suffix.
+	// _type); used directly, whatever the leaf rmType, once the attribute it
+	// fills admits its _type. Mutually exclusive with every other suffix.
 	if raw, ok := sfx["raw"]; ok {
 		if len(sfx) > 1 {
 			return nil, fmt.Errorf("%w: |raw is mutually exclusive with other suffixes", ErrUnsupportedDatatype)
@@ -2318,8 +2382,15 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (map[strin
 		if !ok {
 			return nil, fmt.Errorf("%w: |raw value is not a canonical object", ErrUnsupportedDatatype)
 		}
-		if t, ok := frag["_type"].(string); !ok || t == "" {
+		t, ok := frag["_type"].(string)
+		if !ok || t == "" {
 			return nil, fmt.Errorf("%w: |raw fragment missing string _type", ErrUnsupportedDatatype)
+		}
+		if err := checkRawFits(t, holds, keyOf); err != nil {
+			return nil, err
+		}
+		if err := checkRawDecodes(frag, t, keyOf); err != nil {
+			return nil, err
 		}
 		return frag, nil
 	}
@@ -2332,19 +2403,28 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (map[strin
 	// |terminology is refused by the allowlist below, as before. The encoder is
 	// the exact inverse: leafToFlat routes a fully-captured DV_CODED_TEXT at a
 	// DV_TEXT leaf to the coded suffix set instead of |raw.
-	// The discriminator is a non-empty string |code, not the key's mere presence:
-	// `|code: ""` and `|code: null` are what a form emits for "free text, no code
-	// selected", and promoting those would mint a DV_CODED_TEXT whose
-	// CODE_PHRASE.code_string is empty — RM-invalid, yet stable enough on
-	// re-encode that nothing downstream flags it, and matched by any AQL predicate
-	// testing defining_code/code_string against ''. They stay a plain DV_TEXT, so
-	// the allowlist below refuses the stray |code as it did before this carve-out.
+	// The discriminator is a |code that is not the empty string, not the key's
+	// mere presence: `|code: ""` and `|code: null` are what a form emits for
+	// "free text, no code selected", and promoting those would mint a
+	// DV_CODED_TEXT whose CODE_PHRASE.code_string is empty — RM-invalid, yet
+	// stable enough on re-encode that nothing downstream flags it, and matched by
+	// any AQL predicate testing defining_code/code_string against ''. They stay a
+	// plain DV_TEXT: a null |code is absent (REQ-053, dropped above), and the
+	// allowlist below refuses the stray `|code: ""`, or the |value beside a null
+	// one, as it did before this carve-out. A |code of another JSON kind does
+	// select the coded builder, so the fit check refuses it naming the |code key
+	// (REQ-053), rather than the allowlist refusing the leaf.
 	if rmType == "DV_TEXT" {
-		if code, coded := sfx["code"].(string); coded && code != "" {
-			rmType = "DV_CODED_TEXT"
+		if code, coded := sfx["code"]; coded {
+			if s, isString := code.(string); !isString || s != "" {
+				rmType = "DV_CODED_TEXT"
+			}
 		}
 	}
 	if err := checkSuffixAllowlist(rmType, sfx); err != nil {
+		return nil, err
+	}
+	if err := checkSuffixFits(rmType, sfx, keyOf); err != nil {
 		return nil, err
 	}
 	// The bare-leaf datatypes all rebuild as {_type, <attr>: value} from the ""
@@ -2524,6 +2604,25 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (map[strin
 	return nil, fmt.Errorf("%w: %s", ErrUnsupportedDatatype, rmType)
 }
 
+// withoutNulls returns m without the entries that hold JSON null, which
+// REQ-053 reads as absent: m itself when it holds none.
+func withoutNulls(m map[string]any) map[string]any {
+	var out map[string]any
+	for k, v := range m {
+		if v != nil {
+			continue
+		}
+		if out == nil {
+			out = maps.Clone(m)
+		}
+		delete(out, k)
+	}
+	if out == nil {
+		return m
+	}
+	return out
+}
+
 // multimediaFromSuffixes rebuilds a canonical DV_MULTIMEDIA from its FLAT suffix
 // set (REQ-140). `media_type` and `size` are RM-mandatory, so they are required
 // rather than defaulted; the bare key is the **uri**, and the two Byte[]
@@ -2618,113 +2717,37 @@ var allowedSuffixes = map[string]map[string]bool{
 	},
 }
 
-// suffixKind is the JSON value kind an optional pass-through suffix must carry.
-// The value itself is handed to canjson untouched, so this is the last point at
-// which a wrong kind can be reported against the FLAT key carrying it.
-type suffixKind uint8
-
-const (
-	kindString suffixKind = iota
-	kindNumber
-	kindBool
-)
-
-func (k suffixKind) String() string {
-	switch k {
-	case kindNumber:
-		return "number"
-	case kindBool:
-		return "boolean"
-	case kindString:
-		return "string"
-	default:
-		return fmt.Sprintf("suffixKind(%d)", int(k))
-	}
-}
-
-// holds reports whether v could satisfy this kind. It is a necessary condition,
-// not a full type check: canjson remains the authority on the RM type, and this
-// deliberately admits everything canjson does so that naming the FLAT key never
-// costs a body that decodes today.
-//
-//   - Numbers arrive as json.Number from a decoded body (unmarshalObject
-//     preserves exact magnitudes) but as ordinary Go numerics from in-package
-//     callers, so both spellings count.
-//   - A *quoted* number satisfies kindNumber: canjson parses a numeric string
-//     into Real / Integer, and some producers quote every scalar. Only a string
-//     that is not a number at all (`|accuracy: "abc"`) is refused — the case
-//     canjson would fail on anyway, but too late to name the key.
-func (k suffixKind) holds(v any) bool {
-	switch t := v.(type) {
-	case string:
-		if k == kindString {
-			return true
+// orderedPassThrough are the optional DV_ORDERED / DV_QUANTIFIED / DV_AMOUNT
+// suffixes, and DV_TEXT's `|formatting`, whose value passes through as decoded
+// onto the canonical attribute of the same name (a json.Number keeps its exact
+// lexical form), in sorted order. `|normal_status`, a CODE_PHRASE rebuilt from
+// a bare code, is the one optional suffix that does not pass through.
+var orderedPassThrough = func() []string {
+	var out []string
+	for suffix, path := range orderedSuffixAttrPaths {
+		if path == suffix {
+			out = append(out, suffix)
 		}
-		_, err := strconv.ParseFloat(t, 64)
-		return k == kindNumber && err == nil
-	case bool:
-		return k == kindBool
-	case json.Number, float32, float64, int, int32, int64:
-		return k == kindNumber
 	}
-	return false
-}
-
-// orderedSuffix is one optional pass-through suffix: the canonical RM attribute
-// it rebuilds and the JSON kind its value must carry.
-type orderedSuffix struct {
-	attr string
-	kind suffixKind
-}
-
-// orderedSuffixes maps the optional DV_ORDERED / DV_QUANTIFIED / DV_AMOUNT
-// suffixes onto the canonical RM attribute each rebuilds, for the datatypes
-// whose allowedSuffixes admit them. The value passes through as decoded (a
-// json.Number keeps its exact lexical form), so canjson enforces the RM type; the
-// one exception is normal_status, a CODE_PHRASE rebuilt from a bare code.
-//
-// The kind is carried alongside because canjson enforces the RM type too late to
-// say *which FLAT key* was malformed — see [applyOrderedSuffixes].
-var orderedSuffixes = map[string]orderedSuffix{
-	"magnitude_status":    {"magnitude_status", kindString},
-	"accuracy":            {"accuracy", kindNumber},
-	"accuracy_is_percent": {"accuracy_is_percent", kindBool},
-	"precision":           {"precision", kindNumber},
-	"units_system":        {"units_system", kindString},
-	"units_display_name":  {"units_display_name", kindString},
-	"formatting":          {"formatting", kindString},
-}
-
-// orderedSuffixNames holds the [orderedSuffixes] keys in sorted order, so a leaf
-// carrying two malformed suffixes names the same one on every run.
-var orderedSuffixNames = slices.Sorted(maps.Keys(orderedSuffixes))
+	slices.Sort(out)
+	return out
+}()
 
 // applyOrderedSuffixes copies the optional suffixes present in sfx onto the
 // canonical object dv. An absent suffix sets nothing — the attributes are all
 // optional in the RM, so a missing one must stay absent rather than become a
 // zero value (the same contract requireSuffix enforces for mandatory ones).
 //
-// A value of the wrong JSON kind is refused here, where the caller still has the
-// FLAT key in hand to name it (decode %q). Passed through, it would instead
-// surface from canjson against the *rebuilt tree* — "decode /content/0:
-// typereg.Decode …" — naming a canonical path the payload author never wrote and
-// no FLAT key at all. Deliberately no gap sentinel: a malformed value is a defect
-// in the payload, not a datatype or path this codec declines to model, and the
-// conformance census counts only the latter. The check adds no strictness of its
-// own — it admits everything canjson admits, quoted numbers included (see
-// [suffixKind.holds]) — and the RM's own value constraints (magnitude_status
-// against its code set, …) stay with the validation package.
+// [dvFromSuffixes] has already checked every value against its RM attribute
+// ([checkSuffixFits]) while the FLAT key was in hand to name it, so nothing
+// reaches canjson that would fail there naming a canonical path the payload
+// author never wrote. The RM's own value constraints (magnitude_status against
+// its code set, …) stay with the validation package.
 func applyOrderedSuffixes(dv, sfx map[string]any) error {
-	for _, suffix := range orderedSuffixNames {
-		v, ok := sfx[suffix]
-		if !ok {
-			continue
+	for _, suffix := range orderedPassThrough {
+		if v, ok := sfx[suffix]; ok {
+			dv[suffix] = v
 		}
-		want := orderedSuffixes[suffix]
-		if !want.kind.holds(v) {
-			return fmt.Errorf("|%s must be a %s, got %T", suffix, want.kind, v)
-		}
-		dv[want.attr] = v
 	}
 	if v, ok := sfx["normal_status"]; ok {
 		code, err := ctxString("|normal_status", v)
@@ -2738,34 +2761,53 @@ func applyOrderedSuffixes(dv, sfx map[string]any) error {
 	return nil
 }
 
-// checkSuffixAllowlist rejects any suffix a datatype does not map. An unmapped
-// rmType is left to the switch (ErrUnsupportedDatatype). |other is allowed only
-// for DV_CODED_TEXT (the case then enforces listOpen).
+// checkSuffixAllowlist rejects any suffix a datatype does not map, naming the
+// first such suffix in sorted order, so a leaf with two names the same one on
+// every run. An unmapped rmType is left to the switch (ErrUnsupportedDatatype).
+// |other is allowed only for DV_CODED_TEXT (the case then enforces listOpen).
 func checkSuffixAllowlist(rmType string, sfx map[string]any) error {
 	allowed, known := allowedSuffixes[rmType]
 	if !known {
 		return nil
 	}
-	for k := range sfx {
-		if k == "other" && rmType == "DV_CODED_TEXT" {
-			continue
-		}
-		if allowed[k] {
-			continue
-		}
-		label := "|" + k
-		if k == "" {
-			label = "bare value"
-		}
-		return fmt.Errorf("%w: unexpected %s for %s", ErrUnsupportedDatatype, label, rmType)
+	unexpected := func(k string) bool {
+		return !allowed[k] && (k != "other" || rmType != "DV_CODED_TEXT")
 	}
-	return nil
+	first, refused := "", false
+	for k := range sfx {
+		if unexpected(k) && (!refused || k < first) {
+			first, refused = k, true
+		}
+	}
+	if !refused {
+		return nil
+	}
+	label := "|" + first
+	if first == "" {
+		label = "bare value"
+	}
+	return fmt.Errorf("%w: unexpected %s for %s", ErrUnsupportedDatatype, label, rmType)
 }
 
 // leafListOpen reports whether a Web Template leaf constrains an open value-set
 // (any input with listOpen) — the precondition for the |other free-text form.
 func leafListOpen(node *webtemplate.Node) bool {
 	return slices.ContainsFunc(node.Inputs, func(in webtemplate.Input) bool { return in.ListOpen })
+}
+
+// leafHolds names the RM type of the attribute a Web Template leaf's value
+// fills, the type a `|raw` fragment there must name or descend from (REQ-053).
+// A collapsed ELEMENT's leaf fills ELEMENT.value, a DATA_VALUE, whatever
+// datatype the template names: the encoder writes a substituted value there
+// as `|raw` stamped with its own type. Every other leaf types the attribute
+// it fills itself: an in-context leaf (an EVENT's `time`, an ENTRY's
+// `language`, COMPOSITION `category`), say. A node with children takes no
+// `|raw` at all: [leafSuffixes] refuses one there first.
+func leafHolds(leaf *webtemplate.Node) string {
+	if strings.HasSuffix(bareAQLPath(leaf.AQLPath), "/value") {
+		return "DATA_VALUE"
+	}
+	return nodeRMType(leaf)
 }
 
 // requireSuffix returns sfx[name], or an error if it is absent — a missing
@@ -2780,6 +2822,14 @@ func requireSuffix(rmType string, sfx map[string]any, name string) (any, error) 
 		return nil, fmt.Errorf("%w: %s missing required %s", ErrUnsupportedDatatype, rmType, label)
 	}
 	return v, nil
+}
+
+// impliedCompositionName is the name decode gives a composition whose body
+// spells no `<root>/_name`: the Web Template root's name, or the template id
+// where the root has none. Encode writes no `_name` for a plain DV_TEXT name
+// of this value, so a round trip names the composition the same way (REQ-140).
+func impliedCompositionName(wt *webtemplate.WebTemplate) string {
+	return cmp.Or(wt.Tree.Name, wt.TemplateID)
 }
 
 // textJSON is a canonical DV_TEXT object.
@@ -2805,7 +2855,9 @@ type emptySuffixFold struct {
 // knows whether it reads `x` ([emptySuffixFold.settle]): two spellings of one
 // field the decode reads disagree, and a pair it does not read is two
 // unmatched keys (REQ-170). Either way the sink reports every spelling as
-// written. The map returned is flat itself when nothing was folded.
+// written. A spelling that holds null is absent (REQ-053), so beside the
+// other spelling it is no disagreement: the value is the other one's. The map
+// returned is flat itself when nothing was folded.
 func foldEmptySuffix(flat map[string]any) (map[string]any, emptySuffixFold) {
 	var out map[string]any
 	var fold emptySuffixFold
@@ -2824,7 +2876,12 @@ func foldEmptySuffix(flat map[string]any) (map[string]any, emptySuffixFold) {
 		case !both:
 			out[bare] = flat[key]
 			fold.spellings[bare] = []string{key}
-		case sameCtxValue(other, flat[key]):
+		case sameCtxValue(other, flat[key]), flat[key] == nil:
+			// A null `x|` is absent beside `x` (REQ-053): no second value.
+			fold.spellings[bare] = []string{bare, key}
+		case other == nil:
+			// A null `x` is absent: `x|` carries the one value.
+			out[bare] = flat[key]
 			fold.spellings[bare] = []string{bare, key}
 		default:
 			fold.spellings[bare] = []string{bare, key}

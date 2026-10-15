@@ -18,7 +18,8 @@ package webtemplate
 //
 // Exempted leaves are listed in unserialisableIC. None of them is
 // rmpath-attributable data loss today: each value is deliberately carried on
-// the ctx/ surface instead (see that map's doc). Each exemption records its
+// the ctx/ surface, or the composer at its real path, instead (see that map's
+// doc). Each exemption records its
 // reason and what the encode consequence is; when the blocking condition
 // clears, delete the entry and the guard then enforces resolution. An entry
 // that no longer matches any emitted leaf is reported as stale.
@@ -37,8 +38,8 @@ import (
 // unserialisableIC maps "RMTYPE.attr" to why the leaf is deliberately left
 // unresolved in rmpath, and what that costs on encode. One reason class is
 // left: deliberate deferral — the value is already carried on another surface
-// (the ctx/ short forms, whose encode-only spelling ADR 0015 made permanent),
-// so resolving would double-spell it.
+// (the ctx/ short forms, whose encode-only spelling ADR 0015 made permanent, or
+// for the composer its real path, ADR 0029), so resolving would double-spell it.
 //
 // Datatype is not a reason. The codec-gap class — a non-DV_ datatype the
 // encoder dropped whether or not rmpath resolved it — emptied as each leaf type
@@ -48,10 +49,11 @@ import (
 var unserialisableIC = map[string]string{
 	"COMPOSITION.language":  "carried by ctx/language on encode; resolving here would double-spell it (the CODE_PHRASE leaf mapping exists since the PROBE-086 ratchet, so the datatype is no longer the reason)",
 	"COMPOSITION.territory": "carried by ctx/territory on encode; resolving here would double-spell it (see COMPOSITION.language)",
-	"COMPOSITION.composer": "carried by ctx/composer_name on encode; resolving here would double-spell the value — " +
-		"and since REQ-140 gave PARTY_PROXY a FLAT spelling, the datatype is no longer the reason: " +
-		"simplified/flat_encode.go asserts the ctx/-only rule by name (ctxOnlyLeafPaths). " +
-		"The composer's external_ref stays dropped (the ADR 0015 boundary — known deviation)",
+	"COMPOSITION.composer": "carried on encode by ctx/composer_name or ctx/composer_self when one short form " +
+		"carries it whole, or else whole at its real path <root>/composer (ADR 0029); resolving here would " +
+		"double-spell it — no data loss today. Since REQ-140 gave PARTY_PROXY a FLAT spelling, the datatype " +
+		"is no longer the reason: simplified/flat_encode.go holds the composer back from the node walk by " +
+		"name (ctxOnlyLeafPaths)",
 	"EVENT_CONTEXT.start_time": "carried by ctx/time on encode; resolving here would double-spell the value " +
 		"(ADR 0015 keeps encode ctx/-only) — no data loss today",
 	"EVENT_CONTEXT.setting": "carried by ctx/setting|code + |value on encode (REQ-053 amended 2026-08-05, ADR 0015's " +

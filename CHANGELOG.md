@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-Template validation and the RM floor run as one walk, a response whose body cannot be read keeps its status and headers, canonical JSON omits an absent mandatory member, and a request carrying a cookie or proxy credential refuses an https-to-http redirect. **Breaking:** validation returns a smaller result and one finding for an empty part, a Go value shared by two attributes is reported at each path, a nil list item and an ordinal symbol that does not match its value now fail validation, and code that implements `query.Repository` must add `RunStoredVersion`.
+Template validation and the RM floor run as one walk, a response whose body cannot be read keeps its status and headers, canonical JSON omits an absent mandatory member, a request carrying a cookie or proxy credential refuses an https-to-http redirect, and FLAT carries a referenced composer and a renamed composition. **Breaking:** validation returns a smaller result and one finding for an empty part, a Go value shared by two attributes is reported at each path, a nil list item and an ordinal symbol that does not match its value now fail validation, code that implements `query.Repository` must add `RunStoredVersion`, FLAT encode writes a referenced composer and a renamed composition at their real paths, and FLAT decode refuses a `null` required suffix.
 
 ### Added
 
@@ -31,6 +31,12 @@ Template validation and the RM floor run as one walk, a response whose body cann
 - **A bounded `constraints.NumericRange` contains no NaN, and its zero value is unbounded (REQ-103).** A NaN magnitude draws `CodeOutOfRange`, and the zero value reads as valid `(*..*)`, not as the empty `(0..0)`.
 - **A request with a `Cookie`, `Cookie2` or `Proxy-Authorization` header now refuses an https-to-http redirect (REQ-092, REQ-021).** It fails with `transport.ErrInsecureRedirect` and is not retried.
 - **A fresh discovery cache hit runs the resolver's own checks (REQ-071 to REQ-073).** A refused hit fails as a new document would, keeps its entry, and a catalog for another base URL is a miss.
+- **Breaking: FLAT carries the whole composer at its real path (REQ-053, ADR 0029).** Decode reads the composer's reference and identifiers at `<root>/composer`, and encode writes there a composer that `ctx/composer_name` or `ctx/composer_self` cannot carry whole.
+- **Breaking: FLAT carries a renamed composition as `<root>/_name` (REQ-140).** Decode names the composition from it, and encode writes it when the name differs from the template's.
+- **Breaking: FLAT and STRUCTURED read a `null` as absent (REQ-053).** `|magnitude: null` beside a unit is refused as a missing magnitude instead of decoding as 0.
+- **A FLAT value that does not fit its attribute is refused naming its key (REQ-053).** The error wraps `simplified.ErrUnsupportedDatatype`, a `|raw` fragment included, and a `|raw` at a node with children is refused, not dropped.
+- **FLAT refuses an RM-invalid party instead of changing its type (REQ-140, REQ-053).** Encode refuses a PARTY_RELATED with no relationship at any party position, and decode refuses an empty composer name.
+- **An `Integer` accepts a whole number written `1.0` or `1e0` (REQ-052, ADR 0004).** A fraction is still refused, and an out-of-range value carries `strconv.ErrRange`.
 
 ## [0.34.0] - 2026-10-14
 

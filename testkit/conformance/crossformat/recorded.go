@@ -159,11 +159,12 @@ func Verify(res SetResult, recs map[Leg]Record) []string {
 //   - canxml Array<Octet>: canonical XML reads DV_MULTIMEDIA.data and
 //     integrity_check as one element per byte, where ITS-XML types them
 //     xs:base64Binary.
-//   - body-form composer: FLAT decode refuses the composer's external_ref
-//     keys (composer|id, |id_scheme, |id_namespace) as an unsupported
-//     PARTY_PROXY, one key at a time, while composer|name, an accepted alias of
-//     ctx/composer_name, decodes; FLAT encode writes the composer as
-//     ctx/composer_name alone, without its external_ref.
+//   - party reference type: the reference writes no |type at a party and
+//     hardcodes PARTY, while the codec writes |type only where a reference's
+//     type is not PARTY and reads an absent |type as PARTY. So where the
+//     canonical types the composer's reference PERSON, FLAT encode writes
+//     composer|type, which the upstream FLAT omits, and decode of the upstream
+//     FLAT gives the reference the type PARTY.
 //   - INTERVAL_EVENT attributes: the Web Template has no math_function
 //     or width node for the event, so FLAT encode writes neither and decode
 //     refuses both in every mode, as RM data it would otherwise drop.
@@ -186,8 +187,9 @@ var Recorded = map[string]map[Leg]Record{
 			Reason: "INTERVAL_EVENT attributes: decode refuses math_function and width in every mode (the 4 " +
 				"excluded keys), so the interval event loses both and decodes as a POINT_EVENT. Sibling order: FLAT " +
 				"carries no order " +
-				"between the birth_en and any_event_en events; decode lists them in Web Template order, the canonical lists " +
-				"Birth first, so the leaves of all three events compare at shifted positions. HISTORY.origin: the " +
+				"between the birth_en and any_event_en events; decode lists them in the sorted order of their FLAT " +
+				"keys, any_event_en before birth_en, the canonical lists Birth first, so the leaves of all three " +
+				"events compare at shifted positions. HISTORY.origin: the " +
 				"FLAT has no origin key and decode fills it from the context start time (openehr/serialize/simplified/deviations.md), where the " +
 				"canonical sets it to the Birth time. RM-FLOOR archetype_details: the canonical OBSERVATION has none, " +
 				"decode adds it (4 extra leaves), and rm_version is 1.2.0 against 1.0.4.",
@@ -196,32 +198,26 @@ var Recorded = map[string]map[Leg]Record{
 	"consult_record": {
 		LegJSONXML: {Outcome: Outcome{Compared: 150}},
 		LegCanonicalFlat: {
-			Outcome: Outcome{Compared: 26, Missing: 5, Extra: 6},
-			Reason: "body-form composer: FLAT encode writes the composer as ctx/composer_name alone, so " +
-				"composer|id, |id_scheme and |id_namespace are missing. LOCATABLE name: the upstream FLAT writes the " +
-				"composition's own name as _name, which the codec does not carry (openehr/serialize/simplified/deviations.md, LOCATABLE.name). " +
-				"Choice element: the template lets media_file/created hold a DV_DATE_TIME or a DV_INTERVAL; upstream " +
+			Outcome: Outcome{Compared: 26, Missing: 1, Extra: 6},
+			Reason: "Choice element: the template lets media_file/created hold a DV_DATE_TIME or a DV_INTERVAL; upstream " +
 				"spells the value created/date_time_value, the SDK's Web Template keeps one value leaf, created. " +
 				"ctx/location: upstream spells EVENT_CONTEXT.location ctx/location, which the hold-out removes, and " +
 				"the codec writes context/_location (ADR 0016). ENTRY language and encoding: the upstream FLAT omits " +
 				"them on document_attachment and FLAT encode writes them (4 keys).",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 150, Missing: 40, Extra: 27, Altered: 16, Excluded: 8},
-			Reason: "The 8 excluded keys are the composer's external_ref (3), ctx/time and ctx/setting, refused, " +
-				"and ctx/location, _name and created/date_time_value, reported as unmatched content, as " +
-				"follows. body-form composer: decode refuses the composer's external_ref keys (3), so the " +
-				"external_ref is missing; composer|name decodes, so the composer is the canonical's " +
-				"PARTY_IDENTIFIED. UPSTREAM consult_record ctx conflict: the " +
+			Outcome: Outcome{Compared: 150, Missing: 34, Extra: 27, Altered: 15, Excluded: 4},
+			Reason: "The 4 excluded keys are ctx/time and ctx/setting, refused, " +
+				"and ctx/location and created/date_time_value, reported as unmatched content, as " +
+				"follows. UPSTREAM consult_record ctx conflict: the " +
 				"FLAT gives ctx/time and context/start_time different values, decode refuses the pair and the " +
 				"harness removes ctx/time; the start time left agrees with the canonical. ctx/setting: the FLAT " +
 				"writes ctx/setting as bare text, the setting without the |code and |value the codec reads it as, " +
 				"which decode refuses in every mode as a missing required suffix (REQ-170); the harness removes it, " +
 				"so decode fills the default 238 other care against the canonical 228 primary medical care. " +
 				"ctx/location: the codec does not read ctx/location (it reads context/_location, ADR 0016), so the " +
-				"location is missing. LOCATABLE name: the codec does not read _name, so decode names the composition " +
-				"OPConsultation from the template against the canonical Routine checkup. Choice element: decode " +
-				"does not read media_file/created/date_time_value (the SDK spells it created). Sibling order: FLAT " +
+				"location is missing. Choice element: decode does not read media_file/created/date_time_value " +
+				"(the SDK spells it created). Sibling order: FLAT " +
 				"carries no order between the document_attachment items; decode lists the media_file cluster first, " +
 				"the canonical lists it last, so the item leaves compare at shifted positions. RM-FLOOR " +
 				"archetype_details: rm_version is 1.2.0 against 1.0.4 (3 leaves).",
@@ -234,13 +230,11 @@ var Recorded = map[string]map[Leg]Record{
 				"the ENTRY language and encoding of document_attachment that the upstream STRUCTURED carries.",
 		},
 		LegStructuredFlat: {
-			Outcome: Outcome{Compared: 25, Extra: 1, Excluded: 5},
+			Outcome: Outcome{Compared: 29, Extra: 1, Excluded: 1},
 			Reason: "ctx/location: the upstream FLAT spells the location ctx/location, which the hold-out removes, " +
 				"while the upstream STRUCTURED spells it context/_location (ADR 0016), which decodes and re-encodes, " +
-				"so only our side carries it. Excluded: the same three families drop out of both sides of the " +
-				"comparison: decode refuses the composer's external_ref (3 keys, body-form composer) and reports " +
-				"the composition's _name (LOCATABLE name) and media_file/created/date_time_value (choice element) " +
-				"as unmatched content.",
+				"so only our side carries it. Excluded: one family drops out of both sides of the comparison: " +
+				"decode reports media_file/created/date_time_value (choice element) as unmatched content.",
 		},
 	},
 	"corona": {
@@ -266,21 +260,14 @@ var Recorded = map[string]map[Leg]Record{
 	},
 	"ehrn_abdm": {
 		LegCanonicalFlat: {
-			Outcome: Outcome{Compared: 31, Missing: 5, Extra: 1},
-			Reason: "body-form composer: FLAT encode writes the composer as ctx/composer_name alone, so " +
-				"composer|id, |id_scheme and |id_namespace are missing. LOCATABLE name: the upstream FLAT writes the " +
-				"composition's own name as _name, which the codec does not carry (openehr/serialize/simplified/deviations.md, LOCATABLE.name). " +
-				"Choice element: the template lets media_file/created hold a DV_DATE_TIME or a DV_INTERVAL; upstream " +
+			Outcome: Outcome{Compared: 31, Missing: 1, Extra: 1},
+			Reason: "Choice element: the template lets media_file/created hold a DV_DATE_TIME or a DV_INTERVAL; upstream " +
 				"spells the value created/date_time_value, the SDK's Web Template keeps one value leaf, created.",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 150, Missing: 39, Extra: 27, Altered: 14, Excluded: 5},
-			Reason: "The 5 excluded keys are the composer's external_ref (3), refused, and _name and " +
-				"created/date_time_value, reported as unmatched content, as follows. body-form composer: decode " +
-				"refuses the composer's external_ref keys (3), so the external_ref is missing; composer|name " +
-				"decodes, so the composer is the canonical's PARTY_IDENTIFIED. LOCATABLE name: the codec does not " +
-				"read _name, so decode names the composition OPConsultation from the template against the canonical " +
-				"Routine checkup. Choice element: decode does not read media_file/created/date_time_value (the SDK " +
+			Outcome: Outcome{Compared: 150, Missing: 33, Extra: 27, Altered: 13, Excluded: 1},
+			Reason: "The excluded key is created/date_time_value, reported as unmatched content, as follows. " +
+				"Choice element: decode does not read media_file/created/date_time_value (the SDK " +
 				"spells it created). Sibling order: FLAT carries no order between the document_attachment items; decode lists " +
 				"the media_file cluster first, the canonical lists it last, so the item leaves compare at shifted " +
 				"positions. RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (3 leaves).",
@@ -311,19 +298,18 @@ var Recorded = map[string]map[Leg]Record{
 	},
 	"nested": {
 		LegCanonicalFlat: {
-			Outcome: Outcome{Compared: 19, Missing: 5, Extra: 8},
-			Reason: "body-form composer: FLAT encode writes the composer as ctx/composer_name alone, so " +
-				"composer|id and |id_namespace are missing. DV_ORDINAL terminology: the ordinal's symbol is coded in " +
+			Outcome: Outcome{Compared: 19, Missing: 3, Extra: 9},
+			Reason: "party reference type: the canonical types the composer's reference PERSON, so FLAT encode " +
+				"writes composer|type, which the upstream FLAT omits. DV_ORDINAL terminology: the ordinal's symbol is coded in " +
 				"com.cabolabs.openehr.opt, which the |code form (local implied) cannot carry, so FLAT encode writes " +
 				"ordinal|raw where upstream writes |code, |value and |ordinal and loses the terminology. Upstream " +
 				"FLAT omissions: the upstream FLAT carries neither the context participation (6 keys) nor the " +
 				"ACTIVITY action_archetype_id that the canonical XML holds, and FLAT encode writes both.",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 156, Missing: 83, Extra: 48, Altered: 10, Excluded: 2},
-			Reason: "body-form composer: decode refuses the composer's external_ref keys (the 2 excluded keys), " +
-				"so the external_ref is missing; composer|name decodes, so the composer is the canonical's " +
-				"PARTY_IDENTIFIED. Upstream FLAT " +
+			Outcome: Outcome{Compared: 156, Missing: 78, Extra: 48, Altered: 11},
+			Reason: "party reference type: the upstream FLAT writes no composer|type, so decode gives the " +
+				"composer's reference the type PARTY against the canonical's PERSON. Upstream FLAT " +
 				"omissions: the FLAT carries no context (start time, setting, participation) and no ACTIVITY action_archetype_id, so the decoded " +
 				"composition has no context and an empty action_archetype_id. Sibling order: FLAT carries no order " +
 				"between the ordinal ELEMENT and the nested CLUSTER of the activity description; decode lists the " +
@@ -336,17 +322,16 @@ var Recorded = map[string]map[Leg]Record{
 	},
 	"persistent_minimal": {
 		LegCanonicalFlat: {
-			Outcome: Outcome{Compared: 11, Missing: 2, Altered: 1},
-			Reason: "body-form composer: FLAT encode writes the composer as ctx/composer_name alone, so " +
-				"composer|id and |id_namespace are missing. Upstream date-time spelling: the event time is " +
+			Outcome: Outcome{Compared: 11, Extra: 1, Altered: 1},
+			Reason: "party reference type: the canonical types the composer's reference PERSON, so FLAT encode " +
+				"writes composer|type, which the upstream FLAT omits. Upstream date-time spelling: the event time is " +
 				"21:11:36.700 in the canonical XML and 21:11:36.7 in the upstream FLAT, and the codecs carry the " +
 				"text as written.",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 72, Missing: 7, Altered: 4, Excluded: 2},
-			Reason: "body-form composer: decode refuses the composer's external_ref keys (the 2 excluded keys), " +
-				"so the external_ref is missing; composer|name decodes, so the composer is the canonical's " +
-				"PARTY_IDENTIFIED. Upstream date-time " +
+			Outcome: Outcome{Compared: 72, Missing: 2, Altered: 5},
+			Reason: "party reference type: the upstream FLAT writes no composer|type, so decode gives the " +
+				"composer's reference the type PARTY against the canonical's PERSON. Upstream date-time " +
 				"spelling: the event time is 21:11:36.7 in the FLAT and 21:11:36.700 in the canonical XML. HISTORY.origin: a persistent " +
 				"composition has no context start time, and decode, which fills origin from it (openehr/serialize/simplified/deviations.md), " +
 				"leaves the origin empty. RM-FLOOR archetype_details: the canonical carries template_id on the " +
@@ -355,9 +340,9 @@ var Recorded = map[string]map[Leg]Record{
 	},
 	"test_all_types": {
 		LegCanonicalFlat: {
-			Outcome: Outcome{Compared: 83, Missing: 11, Extra: 5, Altered: 11},
-			Reason: "body-form composer: FLAT encode writes the composer as ctx/composer_name alone (3 missing " +
-				"keys). Web Template projection: the SDK's Web Template has no in-context time or ism_transition " +
+			Outcome: Outcome{Compared: 83, Missing: 8, Extra: 6, Altered: 11},
+			Reason: "party reference type: the canonical types the composer's reference PERSON, so FLAT encode " +
+				"writes composer|type, which the upstream FLAT omits. Web Template projection: the SDK's Web Template has no in-context time or ism_transition " +
 				"node for the section_3 ACTION (openehr/template/webtemplate/deviations.md, inContext coverage), and its " +
 				"per-careflow-step transition nodes do not match a transition without a careflow_step, so FLAT " +
 				"encode writes neither (4 missing keys). Choice element: upstream spells the value of the choice " +
@@ -374,13 +359,34 @@ var Recorded = map[string]map[Leg]Record{
 				"and proportion type spellings above.",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Refused: "unmarshal JSON number 1.0 into Go int32"},
-			Reason: "DV_PROPORTION type: the upstream FLAT writes proportion_any|type as 1.0, decode passes it to " +
-				"canjson, and canjson refuses 1.0 for the Integer type with an error that names no FLAT key, so the " +
-				"reducing decode cannot remove the key and the leg ends. Web Template projection: before that, the " +
-				"reducing decode removes the section_3 ACTION's in-context ism_transition/current_state (3 keys) and " +
-				"time (1), which decode refuses in every mode as RM data it would otherwise drop or replace " +
-				"(REQ-170).",
+			Outcome: Outcome{Compared: 423, Missing: 347, Extra: 332, Altered: 15, Excluded: 11},
+			Reason: "The 11 excluded keys are the section_3 ACTION's in-context ism_transition/current_state (3) " +
+				"and time (1) and the identifier keys (4), refused, and " +
+				"choice/quantity_value|magnitude and |unit (2) and the bare proportion_any (1), reported as " +
+				"unmatched content, as follows. Web Template projection: decode refuses the ACTION's in-context " +
+				"ism_transition and time in every mode as RM data it would otherwise drop or replace (REQ-170), so " +
+				"the decoded ACTION has an empty current_state (3 leaves) and the context start time as its time. " +
+				"party reference type: the upstream FLAT writes no composer|type, so decode gives the composer's " +
+				"reference the type PARTY against the canonical's PERSON. DV_IDENTIFIER: the FLAT writes the id as the bare value, and " +
+				"decode refuses the four identifier keys as missing the required |id, so the identifier element " +
+				"is missing. Choice element: decode does not read choice/quantity_value (the SDK spells it choice), " +
+				"so the choice element is missing. DV_PROPORTION: decode reports the bare proportion_any, the " +
+				"derived magnitude, as unmatched content, and reads |type 1.0 as the Integer 1 (wire.md " +
+				"§ Floating-point precision). Upstream conversion differences: a DV_URI and the proportion's " +
+				"precision only the canonical carries, and duration_any (P1Y2M10DT2H30M against PT30M). Upstream " +
+				"date and time spelling: the canonical writes dates in the basic format (20190114) and date-times " +
+				"with a comma and +00:00, the FLAT in the extended format with a full stop and Z (9 leaves). " +
+				"HISTORY.origin: the FLAT has no origin key and decode fills it from the context start time " +
+				"(openehr/serialize/simplified/deviations.md), where the canonical sets it otherwise. ITEM_TREE vs " +
+				"ITEM_LIST: decode builds the INSTRUCTION activity's description as an ITEM_TREE, the canonical " +
+				"has the ITEM_LIST the OPT constrains (openehr/serialize/simplified/deviations.md). Sibling order: " +
+				"FLAT carries no order between siblings, and decode lists them in the sorted order of their FLAT " +
+				"keys, so the content entries (EVALUATION, SECTION, OBSERVATION against the canonical's " +
+				"OBSERVATION, EVALUATION, SECTION), the OBSERVATION's and the EVALUATION's elements, and " +
+				"section_3's ACTION and INSTRUCTION compare at shifted positions; this accounts for most of the " +
+				"missing, extra and altered leaves. RM-FLOOR archetype_details: the canonical SECTION and the " +
+				"ACTION's description CLUSTER have none, decode adds them (8 extra leaves), and rm_version is " +
+				"1.2.0 against 1.0.2 and 1.0.4.",
 		},
 	},
 }

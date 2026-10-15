@@ -22,6 +22,39 @@
 // Context output-form and exotic-datatype fallbacks are documented in
 // deviations.md beside the package tests.
 //
+// # Composition context
+//
+// Composition-level metadata travels in the ctx/ short forms: ctx/language,
+// ctx/territory, ctx/composer_name, ctx/composer_self, ctx/time and the
+// ctx/setting|code and ctx/setting|value pair. Decode also reads the
+// reference implementation's spelling of each under the template root, such
+// as "<root>/language|code", and two spellings of one field must agree.
+//
+// The composer is the one field those short forms carry only in part:
+// ctx/composer_name carries a party with a name and nothing else, and
+// ctx/composer_self a composer that is the record subject, with no reference.
+// The composer's own path under the template root carries the whole composer,
+// in the party spelling every other party position uses: "<root>/composer|name",
+// "|id", "|id_scheme", "|id_namespace" and "|type" for its external
+// reference, "<root>/composer/_identifier:N" for its identifiers and
+// "<root>/composer/relationship" for a related party's relationship. Decode
+// reads those keys beside the ctx/ fields and merges them into one composer;
+// a composer_self of true beside a reference is a PARTY_SELF carrying that
+// reference, and beside a name, an identifier or a relationship it is
+// refused. Encode writes a composer one ctx/ short form carries whole in that
+// form, and every other composer whole under the template root with no ctx/
+// composer key. It refuses a PARTY_IDENTIFIED composer with an empty name or
+// with no name, reference or identifiers, and a PARTY_RELATED with no
+// relationship at any party position.
+//
+// The composition's own name travels as "<root>/_name", spelled as a text
+// leaf is: a bare name, beside its "|formatting" if it has one, or a coded
+// name as "|code", "|value" and "|terminology". Decode names the composition
+// from it, and after the Web Template root, or the template id where the root
+// has no name, when the body has none. Encode writes it unless the name is
+// plain text, uncoded and with nothing but its value, equal to that root name.
+// A "_name" under any other node is unmatched content.
+//
 // # Unmatched content
 //
 // Input the decode does not read is unmatched: a key whose path the Web
@@ -31,25 +64,32 @@
 // read. STRUCTURED applies one rule at every level of the body: a member
 // whose name the FLAT grammar does not read at that level is unmatched
 // whatever its value holds, and is reported as that member; a name it reads
-// keeps the shape refusals. A key
-// the decode reads is never unmatched, even where the decode then
-// refuses it: the composer's `external_ref` suffixes and party sub-structure,
-// a PARTICIPATION `time`, a FEEDER_AUDIT_DETAILS `other_details`,
-// `_instruction_details` and `_wf_definition` have no carrier and fail the
-// decode in every mode. So do, in the reference's in-context spelling and
+// keeps the shape refusals. A key the decode reads is never unmatched, even
+// where the decode then refuses it: a PARTICIPATION `time`, a
+// FEEDER_AUDIT_DETAILS `other_details`, `_instruction_details` and
+// `_wf_definition` have no carrier and fail the decode in every mode. So do, in the reference's in-context spelling and
 // where the Web Template does not resolve them, an ACTION's ISM transition and
 // time (a `current_state`, `transition` or `careflow_step` leaf or a `_reason`
 // family under an `ism_transition` node, and the ACTION's own `time` leaf), an
 // INTERVAL_EVENT's `math_function`, `width` and `sample_count` and an
 // OBSERVATION's `history_origin` (a leaf under the node or a suffix on it),
 // which name RM data decode would otherwise drop or replace. A leaf whose
-// datatype has neither a suffix set nor a sub-path grammar, in practice the
-// composer's PARTY_PROXY, refuses its bare value and any suffix naming an
-// attribute of its RM class (for the composer, a suffix of the party grammar).
+// datatype has neither a suffix set nor a sub-path grammar refuses its bare
+// value and any suffix naming an attribute of its RM class.
 // So does malformed content: a value of the wrong shape, a missing required
 // suffix (a lone bare value where the datatype has no bare spelling, a bare
-// ctx/setting), two spellings of one field the decode reads that disagree
-// (such as `x` and `x|`; a lone `x|` reads as `x`), an index past its bound.
+// ctx/setting, a null required suffix), two spellings of one field the decode
+// reads that disagree (such as `x` and `x|`; a lone `x|` reads as `x`), an
+// index past its bound. A value that does not fit its RM attribute, one the
+// canonical-JSON decode of that attribute would refuse, is refused with
+// [ErrUnsupportedDatatype] naming the FLAT key.
+//
+// A JSON null held by a key the decode reads is absent, never the zero of its
+// type: a leaf whose keys are all null is not built, a null ctx/ field is a
+// missing one, and a null key the decode would refuse for want of a carrier
+// carries nothing to refuse. A key the decode does not read is unmatched
+// whatever its value. In STRUCTURED a null member or array element reads the
+// same way, and OPT-free conversion carries it to FLAT as a key holding null.
 // Two spellings of a key the decode does not read are two unmatched keys. A
 // key is judged segment by segment from the left: an index past the bound of a
 // segment that resolves makes the key malformed, whatever follows it. In

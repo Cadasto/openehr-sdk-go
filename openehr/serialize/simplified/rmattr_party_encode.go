@@ -83,8 +83,17 @@ func partySuffixesToFlat(out map[string]any, path string, p any) ([]rm.DVIdentif
 		return nil, nil
 	}
 	if related, ok := as[rm.PartyRelated](p); ok {
+		// Decode reads PARTY_RELATED off the `/relationship` keys alone, so a
+		// relationship that writes none would leave the party's PARTY_IDENTIFIED
+		// keys to read back as a PARTY_IDENTIFIED. The RM makes the relationship
+		// mandatory, so such a party is refused rather than retyped.
+		before := len(out)
 		if _, err := emitLeafValue(out, path+"/relationship", related.Relationship, "DV_CODED_TEXT", false, false); err != nil {
 			return nil, err
+		}
+		if len(out) == before {
+			return nil, fmt.Errorf("%w: %q is a PARTY_RELATED with no relationship, which the RM makes mandatory; written without `/relationship` it would read back as a PARTY_IDENTIFIED",
+				ErrUnsupportedDatatype, path)
 		}
 		return partyIdentifiedToFlat(out, path, related.PartyIdentified)
 	}

@@ -626,54 +626,118 @@ func TestMetadataTerminologyWitnessChecked(t *testing.T) {
 	}
 }
 
-// TestMetadataNonRespellingsStillRefused — ADR 0015 admits respellings only.
-// The composer's external_ref suffixes are not aliased onto ctx/ (the short
-// forms structurally cannot carry them), so they are never quietly absorbed
-// into the context — they surface as an error from whatever refuses them.
-// (context/setting left this test on 2026-08-05: the amended REQ-053 aliases it
-// onto ctx/setting|code + |value — see TestMetadataRealPathSpellingAccepted.)
-func TestMetadataNonRespellingsStillRefused(t *testing.T) {
+// TestMetadataComposerRealPathCarriesTheRest — REQ-053, ADR 0029 (replacing
+// the ADR 0015 pin that refused these keys). The composer's external_ref
+// suffixes are not aliased onto ctx/, since no short form carries them, yet
+// they are not dropped either: the composer's real path carries them, and they
+// merge with the name `ctx/composer_name` gives into one PARTY_IDENTIFIED.
+// Without the RM-mandatory namespace they are refused, not absorbed.
+func TestMetadataComposerRealPathCarriesTheRest(t *testing.T) {
 	comp, wt := genComposition(t, vitalSignsOPT)
 	in := reflatten(t, comp, wt, func(root string, m map[string]any) {
+		delete(m, "ctx/composer_self")
+		m["ctx/composer_name"] = "Dr Ctx"
 		m[root+"/composer|id"] = "12345"
 		m[root+"/composer|id_scheme"] = "HOSPITAL-NS"
+		m[root+"/composer|id_namespace"] = "demographic"
 	})
-	if _, err := simplified.UnmarshalFlat(in, wt); err == nil {
-		t.Error("composer external_ref decoded without error; want a refusal (see ADR 0015)")
+	got, err := simplified.UnmarshalFlat(in, wt)
+	if err != nil {
+		t.Fatalf("UnmarshalFlat: %v", err)
 	}
+	party, ok := got.Composer.(*rm.PartyIdentified)
+	if !ok {
+		t.Fatalf("composer = %T, want *rm.PartyIdentified", got.Composer)
+	}
+	if party.Name == nil || *party.Name != "Dr Ctx" {
+		t.Errorf("composer name = %v, want the ctx/composer_name value", party.Name)
+	}
+	if party.ExternalRef == nil {
+		t.Fatal("composer external_ref was dropped")
+	}
+	id, ok := party.ExternalRef.ID.(*rm.GenericID)
+	if !ok || id.Value != "12345" || id.Scheme != "HOSPITAL-NS" ||
+		party.ExternalRef.Namespace != "demographic" || party.ExternalRef.Type != "PARTY" {
+		t.Errorf("composer external_ref = %+v (id %#v), want GENERIC_ID 12345 / HOSPITAL-NS in demographic, type PARTY",
+			party.ExternalRef, party.ExternalRef.ID)
+	}
+
+	t.Run("without a namespace", func(t *testing.T) {
+		in := reflatten(t, comp, wt, func(root string, m map[string]any) {
+			m[root+"/composer|id"] = "12345"
+			m[root+"/composer|id_scheme"] = "HOSPITAL-NS"
+		})
+		if _, err := simplified.UnmarshalFlat(in, wt); !errors.Is(err, simplified.ErrUnsupportedDatatype) {
+			t.Errorf("err = %v, want ErrUnsupportedDatatype for a reference missing its namespace", err)
+		}
+	})
 }
 
-// TestComposerPartySubStructureRefused — REQ-140, the ADR 0015 boundary. REQ-140's
-// party grammar reaches a party's `_identifier:N` list and PARTY_RELATED's
-// `/relationship` everywhere *except* the composition's composer: no `ctx/` short
-// form can carry either, so a composer decoded from those keys could not be
-// re-emitted (ADR 0015 keeps encode ctx/-only) and the value would vanish on the
-// way out — the silent loss REQ-053 forbids. Both are refused by name, with the
-// boundary cited, and counted in the PROBE-086 census; the corpus writes both
-// (`ehrbase_conformance_party_identified.json` and `…_party_related.json`).
-func TestComposerPartySubStructureRefused(t *testing.T) {
+// TestComposerPartySubStructureDecoded — REQ-140 / REQ-053, ADR 0029
+// (replacing the ADR 0015 pin that refused these keys). The party grammar
+// reaches the composer's `_identifier:N` list and a PARTY_RELATED's
+// `/relationship` as it does at every other party position; the corpus writes
+// both (`ehrbase_conformance_party_identified.json` and
+// `…_party_related.json`). They decode beside the name and re-encode at the
+// composer's real path.
+func TestComposerPartySubStructureDecoded(t *testing.T) {
 	comp, wt := genComposition(t, vitalSignsOPT)
-	for name, key := range map[string]string{
-		"nested identifier": "/composer/_identifier:0|id",
-		"relationship":      "/composer/relationship|code",
+	for _, tc := range []struct {
+		name  string
+		keys  map[string]any
+		check func(t *testing.T, c rm.PartyProxy)
+	}{
+		{
+			name: "nested identifier",
+			keys: map[string]any{"/composer/_identifier:0|id": "122", "/composer/_identifier:0|issuer": "Hospital"},
+			check: func(t *testing.T, c rm.PartyProxy) {
+				p, ok := c.(*rm.PartyIdentified)
+				if !ok || len(p.Identifiers) != 1 || p.Identifiers[0].ID != "122" ||
+					p.Identifiers[0].Issuer == nil || *p.Identifiers[0].Issuer != "Hospital" {
+					t.Errorf("composer = %#v, want a PARTY_IDENTIFIED with identifier 122 issued by Hospital", c)
+				}
+			},
+		},
+		{
+			name: "relationship",
+			keys: map[string]any{
+				"/composer/relationship|code": "10", "/composer/relationship|value": "mother",
+				"/composer/relationship|terminology": "openehr",
+			},
+			check: func(t *testing.T, c rm.PartyProxy) {
+				p, ok := c.(*rm.PartyRelated)
+				if !ok || p.Relationship.DefiningCode.CodeString != "10" || p.Relationship.Value != "mother" ||
+					p.Name == nil || *p.Name != "Dr Ctx" {
+					t.Errorf("composer = %#v, want a PARTY_RELATED named Dr Ctx with relationship 10|mother", c)
+				}
+			},
+		},
 	} {
-		t.Run(name, func(t *testing.T) {
-			var full string
+		t.Run(tc.name, func(t *testing.T) {
 			in := reflatten(t, comp, wt, func(root string, m map[string]any) {
-				full = root + key
-				m[full] = "122"
+				delete(m, "ctx/composer_self")
+				m["ctx/composer_name"] = "Dr Ctx"
+				for k, v := range tc.keys {
+					m[root+k] = v
+				}
 			})
-			_, err := simplified.UnmarshalFlat(in, wt)
-			if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
-				t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
+			got, err := simplified.UnmarshalFlat(in, wt)
+			if err != nil {
+				t.Fatalf("UnmarshalFlat: %v", err)
 			}
-			// The census scopes an exclusion by the key the refusal names, and the
-			// message has to say *why* it is refused rather than unsupported.
-			if !strings.Contains(err.Error(), full) {
-				t.Errorf("err = %v, want it to name %q", err, full)
+			tc.check(t, got.Composer)
+			out, err := simplified.MarshalFlat(got, wt)
+			if err != nil {
+				t.Fatalf("MarshalFlat: %v", err)
 			}
-			if !strings.Contains(err.Error(), "ADR 0015") {
-				t.Errorf("err = %v, want it to cite the ADR 0015 boundary", err)
+			var m map[string]any
+			if err := json.Unmarshal(out, &m); err != nil {
+				t.Fatal(err)
+			}
+			for k, v := range tc.keys {
+				if key := wt.Tree.ID + k; m[key] != v {
+					t.Errorf("re-encoded %q = %#v, want %#v", key, m[key], v)
+				}
 			}
 		})
 	}

@@ -54,21 +54,26 @@ func emitStringLeaf(out map[string]any, flatPath string, root rm.Locatable, relP
 
 // leafFromSuffixes builds the canonical-JSON value of a Web Template leaf from
 // its FLAT suffix->value map: the RM String itself for a STRING leaf, and the
-// DataValue [dvFromSuffixes] builds for every other leaf type.
-func leafFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (any, error) {
+// DataValue [dvFromSuffixesAt] builds for every other leaf type, holds being
+// the RM type of the attribute the leaf's value fills ([leafHolds]). keyOf
+// names the FLAT key each suffix arrived under.
+func leafFromSuffixes(holds, rmType string, listOpen bool, sfx map[string]any, keyOf func(suffix string) string) (any, error) {
 	if rmType == stringLeafType {
-		return stringFromSuffixes(sfx)
+		return stringFromSuffixes(sfx, keyOf)
 	}
-	return dvFromSuffixes(rmType, listOpen, sfx)
+	return dvFromSuffixesAt(holds, rmType, listOpen, sfx, keyOf)
 }
 
 // stringFromSuffixes rebuilds a STRING leaf's RM String from its bare value.
 // Any suffix, |raw included, is ErrUnsupportedDatatype: the leaf carries a bare
-// value only. A bare value that is not a JSON string, or is an empty string
-// (REQ-053 § Leaf datatypes), is a malformed body, not a datatype this codec
-// declines to model, so it carries no gap sentinel (the [applyOrderedSuffixes]
-// rule).
-func stringFromSuffixes(sfx map[string]any) (any, error) {
+// value only. A null bare value never gets here: [leafSuffixes] reads it as
+// absent (REQ-053), and a leaf left with nothing is not built. A bare value
+// that is not a JSON string does not fit the RM String, and is refused with
+// ErrUnsupportedDatatype naming the key (REQ-053). An empty string (REQ-053
+// § Leaf datatypes) fits the String but breaks an RM invariant: a malformed
+// body, not a datatype this codec declines to model, so it carries no
+// sentinel.
+func stringFromSuffixes(sfx map[string]any, keyOf func(suffix string) string) (any, error) {
 	for _, k := range slices.Sorted(maps.Keys(sfx)) {
 		if k != "" {
 			return nil, fmt.Errorf("%w: unexpected |%s for %s, which carries a bare value only",
@@ -79,10 +84,10 @@ func stringFromSuffixes(sfx map[string]any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	s, ok := v.(string)
-	if !ok {
-		return nil, fmt.Errorf("the %s bare value must be a string, got %T", stringLeafType, v)
+	if err := stringLeafFit.check(keyOf, "", v); err != nil {
+		return nil, err
 	}
+	s, _ := v.(string)
 	// ACTIVITY's Action_archetype_id_valid invariant forbids an empty String,
 	// and encode writes nothing for one, so an empty bare value is refused
 	// rather than rebuilt into an invalid ACTIVITY.

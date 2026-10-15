@@ -370,8 +370,9 @@ func TestREQ053IndexedMetadataWitness(t *testing.T) {
 
 // TestREQ053IndexedMetadataRefusalsHold: the refusals the unindexed spelling
 // meets apply to the indexed one as well. A suffix the ctx/ form cannot carry on
-// a leaf it owns is refused, the composer's party sub-structure is the ADR 0015
-// boundary, and the composer external_ref stays refused.
+// a leaf it owns is refused; at the composer's real path, which carries the
+// whole composer (ADR 0029), the party grammar's refusals hold, and the indexed
+// external_ref decodes as the unindexed one does.
 func TestREQ053IndexedMetadataRefusalsHold(t *testing.T) {
 	wt, compiled := corpusTarget(t)
 	root := wt.Tree.ID
@@ -385,8 +386,8 @@ func TestREQ053IndexedMetadataRefusalsHold(t *testing.T) {
 		{"setting formatting", "context:0/setting:0|formatting", "plain", simplified.ErrUnsupportedDatatype, nil},
 		{"setting bare", "context:0/setting:0", "other care", simplified.ErrUnsupportedDatatype, nil},
 		{"start_time raw", "context:0/start_time:0|raw", map[string]any{"_type": "DV_DATE_TIME", "value": "2026-08-05T10:00:00Z"}, simplified.ErrUnsupportedDatatype, nil},
-		{"composer nested identifier", "composer:0/_identifier:0|id", "122", simplified.ErrUnsupportedDatatype, []string{"ADR 0015"}},
-		{"composer relationship", "composer:0/relationship|code", "122", simplified.ErrUnsupportedDatatype, []string{"ADR 0015"}},
+		{"composer nested identifier that does not fit", "composer:0/_identifier:0|id", 122, simplified.ErrUnsupportedDatatype, []string{"DV_IDENTIFIER.id"}},
+		{"composer relationship past :0", "composer:0/relationship:1|code", "122", simplified.ErrUnsupportedDatatype, []string{"single-valued"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			body := indexedMetaBase()
@@ -399,9 +400,24 @@ func TestREQ053IndexedMetadataRefusalsHold(t *testing.T) {
 	t.Run("composer external_ref", func(t *testing.T) {
 		body := indexedMetaBase()
 		body[root+"/composer:0|id"] = "12345"
-		if _, err := simplified.UnmarshalFlat(marshalBody(t, body), wt, simplified.WithTemplate(compiled)); err == nil {
-			t.Error("indexed composer external_ref decoded without error; want a refusal (ADR 0015)")
+		body[root+":0/composer:0|id_namespace"] = "demographic"
+		got, err := simplified.UnmarshalFlat(marshalBody(t, body), wt, simplified.WithTemplate(compiled))
+		if err != nil {
+			t.Fatalf("UnmarshalFlat(indexed composer external_ref): %v", err)
 		}
+		party, ok := got.Composer.(*rm.PartyIdentified)
+		if !ok || party.ExternalRef == nil || party.ExternalRef.Namespace != "demographic" {
+			t.Fatalf("composer = %#v, want a PARTY_IDENTIFIED carrying the reference", got.Composer)
+		}
+		if id, ok := party.ExternalRef.ID.(*rm.HierObjectID); !ok || id.Value != "12345" {
+			t.Errorf("external_ref id = %#v, want HIER_OBJECT_ID 12345", party.ExternalRef.ID)
+		}
+	})
+	t.Run("composer external_ref without its namespace", func(t *testing.T) {
+		body := indexedMetaBase()
+		body[root+"/composer:0|id"] = "12345"
+		_, err := simplified.UnmarshalFlat(marshalBody(t, body), wt, simplified.WithTemplate(compiled))
+		wantRefusal(t, err, simplified.ErrUnsupportedDatatype, "|id_namespace")
 	})
 }
 

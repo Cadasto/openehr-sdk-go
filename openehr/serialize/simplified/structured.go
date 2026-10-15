@@ -127,19 +127,32 @@ func flatToStructured(flat map[string]any) (map[string]any, error) {
 			if base, suffix, piped := strings.Cut(rest, "|"); piped {
 				leaf, isObj := ctxObj[base].(map[string]any)
 				if !isObj {
-					if prev, taken := ctxObj[base]; taken {
-						return nil, fmt.Errorf("%w: ctx/%s is both a direct value (%#v) and a suffixed leaf (%q)",
-							ErrUnknownPath, base, prev, key)
-					}
 					leaf = make(map[string]any)
+					if prev, taken := ctxObj[base]; taken {
+						// The field's direct value, placed before its suffixes by
+						// the sorted key order, moves onto the field's object as the
+						// `"|"` member, as a leaf slot's bare value does
+						// ([insertStructured]), so STRUCTURED → FLAT gives it back
+						// as the field's own key (REQ-140). A null one is carried
+						// as written, as the null member, for decode to read as
+						// absent (REQ-053). An object never gets here: it is
+						// refused below, before its field's suffixes.
+						leaf[bareStructuredKey] = prev
+					}
 					ctxObj[base] = leaf
 				}
 				leaf["|"+suffix] = val
 				continue
 			}
-			if prev, taken := ctxObj[rest].(map[string]any); taken {
-				return nil, fmt.Errorf("%w: ctx/%s is both a suffixed leaf (%#v) and a direct value (%q)",
-					ErrUnknownPath, rest, prev, key)
+			// A ctx/ field holds a value, and its suffixes ride keys of their
+			// own. An object here has the shape the field's suffixes take, so
+			// it would merge with them above, one overwriting the other, or be
+			// read back as suffixes by STRUCTURED → FLAT: refused instead. Keys
+			// run sorted and `x|` is folded onto `x`, so a direct value always
+			// comes before its field's |suffix keys, which find it above.
+			if _, isObj := val.(map[string]any); isObj {
+				return nil, fmt.Errorf("%w: %q holds a JSON object; a ctx/ field holds a value, and its suffixes ride keys of their own",
+					ErrUnsupportedDatatype, key)
 			}
 			ctxObj[rest] = val
 			continue
@@ -165,7 +178,10 @@ func flatToStructured(flat map[string]any) (map[string]any, error) {
 				// interconversion silently lossy.
 				return nil, fmt.Errorf("%w: bare value at root segment %q", ErrUnknownPath, key)
 			}
-			obj["|"+pk.suffix] = val
+			// The root segment's `:0` spelling reaches the same member.
+			if err := placeMember(obj, "|"+pk.suffix, val, rootID, 0); err != nil {
+				return nil, fmt.Errorf("simplified: structured %q: %w", key, err)
+			}
 			continue
 		}
 		if err := insertStructured(obj, rest, pk.suffix, val, budget); err != nil {
@@ -190,6 +206,17 @@ func flatToStructured(flat map[string]any) (map[string]any, error) {
 // inverse mapping is unambiguous without an OPT, which `|value` would not be
 // (DV_ORDINAL and DV_CODED_TEXT spell a real `|value`).
 const bareStructuredKey = "|"
+
+// heldNull marks an array slot that a bare FLAT value of JSON null was placed
+// in, so that a suffix or child placed at the same slot later carries the null
+// as the `"|"` member, as it carries a bare value that is not null (REQ-053:
+// OPT-free conversion carries a null as written). A slot no key filled, such
+// as one padded before a higher :index, holds nil instead and gains no `"|"`.
+// The STRUCTURED map is only ever marshalled, and heldNull marshals as null.
+type heldNull struct{}
+
+// MarshalJSON writes the null the slot holds.
+func (heldNull) MarshalJSON() ([]byte, error) { return []byte("null"), nil }
 
 // insertStructured places val at segs (relative to obj), growing arrays by
 // :index. A bare leaf sets the array element to the scalar value, unless the slot
@@ -217,15 +244,21 @@ func insertStructured(obj map[string]any, segs []flatSeg, suffix string, val any
 	isLeaf := len(segs) == 1
 	if isLeaf && suffix == "" {
 		switch cur := arr[idx].(type) {
-		case nil:
+		case nil, heldNull:
+			// A null is absent beside a value, so a second spelling of the slot
+			// that holds a value replaces a held null rather than conflicting.
+			if val == nil {
+				val = heldNull{}
+			}
 			arr[idx] = val
 		case map[string]any:
-			if _, taken := cur[bareStructuredKey]; taken {
+			return placeMember(cur, bareStructuredKey, val, seg.id, idx)
+		default:
+			// A second spelling holding null is absent beside the value the
+			// slot holds, whichever of the two the sorted key order placed first.
+			if val != nil {
 				return fmt.Errorf("%w: conflicting values at %q index %d", ErrUnknownPath, seg.id, idx)
 			}
-			cur[bareStructuredKey] = val
-		default:
-			return fmt.Errorf("%w: conflicting values at %q index %d", ErrUnknownPath, seg.id, idx)
 		}
 		return nil
 	}
@@ -234,26 +267,46 @@ func insertStructured(obj map[string]any, segs []flatSeg, suffix string, val any
 		el = make(map[string]any)
 		// A scalar already at this slot is the same leaf's bare value, placed before
 		// its suffixes by the sorted key order: it moves onto the object rather than
-		// colliding with it.
-		if arr[idx] != nil {
-			el[bareStructuredKey] = arr[idx]
+		// colliding with it, a null one included.
+		switch cur := arr[idx].(type) {
+		case nil:
+		case heldNull:
+			el[bareStructuredKey] = nil
+		default:
+			el[bareStructuredKey] = cur
 		}
 		arr[idx] = el
 	}
 	if isLeaf {
-		if _, taken := el["|"+suffix]; taken {
-			return fmt.Errorf("%w: conflicting values at %q index %d", ErrUnknownPath, seg.id, idx)
-		}
-		el["|"+suffix] = val
-		return nil
+		return placeMember(el, "|"+suffix, val, seg.id, idx)
 	}
 	return insertStructured(el, segs[1:], suffix, val, budget)
 }
 
+// placeMember sets the member name of el, an array element at index idx of
+// id, to val, for a FLAT key that spells it. Two spellings of one slot (`x`
+// and `x:0`) can both reach one member; a null is absent beside a value
+// (REQ-053), so one holding null gives way to the other, whichever the sorted
+// key order placed first, and two that both hold a value conflict.
+func placeMember(el map[string]any, name string, val any, id string, idx int) error {
+	cur, taken := el[name]
+	switch {
+	case !taken, cur == nil:
+		el[name] = val
+	case val != nil:
+		return fmt.Errorf("%w: conflicting values at %q index %d", ErrUnknownPath, id, idx)
+	}
+	return nil
+}
+
 // structuredToFlat flattens a STRUCTURED map into a FLAT map. Each array
 // element takes a :index; |-prefixed keys become the FLAT |suffix. A malformed
-// shape (non-object root, non-array clinical child, null array hole) is an error
-// rather than a silent drop (REQ-053).
+// shape (non-object root, non-array clinical child) is an error rather than a
+// silent drop (REQ-053). A null is absent (REQ-053), and the restructuring
+// carries it as written: a null array element becomes a FLAT key holding null
+// at its :index, and a null member a FLAT key holding null without one, which
+// a decode then reads as absent wherever the key resolves. A null top-level
+// member (the template root, ctx) has no FLAT key to hold it, and is absent.
 func structuredToFlat(s map[string]any) (map[string]any, error) {
 	out, _, err := structuredToFlatJudged(s, nil)
 	return out, err
@@ -271,6 +324,10 @@ func structuredToFlatJudged(s map[string]any, wt *webtemplate.WebTemplate) (map[
 	for rootID, v := range s {
 		if wt != nil && rootID != wt.Tree.ID && rootID != "ctx" {
 			w.skipped = append(w.skipped, rootID)
+			continue
+		}
+		if v == nil {
+			// Absent (REQ-053): no FLAT key holds a root or the ctx object.
 			continue
 		}
 		obj, ok := v.(map[string]any)
@@ -340,6 +397,12 @@ func (w *structuredWalker) ctx(obj map[string]any) error {
 					ErrUnsupportedDatatype, k)
 			}
 			for _, sk := range slices.Sorted(maps.Keys(leaf)) {
+				if sk == bareStructuredKey {
+					// The field's direct value, spelled as a member because the
+					// field also carries suffixes, as at a leaf ([bareStructuredKey]).
+					w.out["ctx/"+k] = leaf[sk]
+					continue
+				}
 				if strings.HasPrefix(sk, "|") {
 					w.out["ctx/"+k+sk] = leaf[sk]
 					continue
@@ -384,6 +447,12 @@ func (w *structuredWalker) walk(path, member string, level memberLevel, obj map[
 			w.skipped = append(w.skipped, member+"/"+k)
 			continue
 		}
+		if v == nil {
+			// A null member is carried as written, for the decode to read as
+			// absent (REQ-053).
+			w.out[path+"/"+k] = nil
+			continue
+		}
 		arr, ok := v.([]any)
 		if !ok {
 			return fmt.Errorf("%w: structured: expected an array at %q, got %T", ErrUnknownPath, path+"/"+k, v)
@@ -404,9 +473,9 @@ func (w *structuredWalker) walk(path, member string, level memberLevel, obj map[
 				if len(w.out) == before && len(w.skipped) == skippedBefore {
 					return fmt.Errorf("%w: structured: element at %q carries no entries", ErrUnknownPath, seg)
 				}
-			case nil:
-				return fmt.Errorf("%w: structured: null element at %q", ErrUnknownPath, seg)
 			default:
+				// A scalar, or a null element carried as written for the
+				// decode to read as absent (REQ-053).
 				w.out[seg] = el
 			}
 		}

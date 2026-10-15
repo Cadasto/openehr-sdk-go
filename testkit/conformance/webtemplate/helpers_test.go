@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
+	wt "github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 )
 
 // TestSameValue pins the comparison's two contracts: scalars compare by their
@@ -230,6 +231,15 @@ func suffixErr(base, label, rmType string) error {
 	return fmt.Errorf("simplified: decode %q: %w", base, inner)
 }
 
+// fitErr reproduces the shape a value that does not fit its RM attribute
+// takes (REQ-053): the refusal names the key it read the value from, quoted,
+// and the decode-site wrapper names the leaf's *base* path first.
+func fitErr(base, key string) error {
+	inner := fmt.Errorf("%w: %q does not fit DV_QUANTITY.precision (Integer), which takes a whole number in the Integer range, bare or quoted; got a JSON number",
+		simplified.ErrUnsupportedDatatype, key)
+	return fmt.Errorf("simplified: decode %q: %w", base, inner)
+}
+
 func TestRefusedSuffix(t *testing.T) {
 	tests := []struct {
 		name string
@@ -263,11 +273,14 @@ func TestRefusedSuffix(t *testing.T) {
 // TestDropRefusedScope pins the drop scopes. Every case here was a real
 // over-drop at some point: the suffix cases used to take the whole leaf with
 // them, the container case the whole subtree, and a refusal naming a whole key
-// every suffix of its leaf (the composer's `|name` beside a refused `|id`).
+// every suffix of its leaf (the composer's `|name` beside its `|id`, while the
+// codec refused the `|id`).
 func TestDropRefusedScope(t *testing.T) {
 	const (
 		qty   = "c/obs/quantity"
 		event = "c/obs/data/any_event:0"
+		count = "c/obs/count"
+		rate  = "c/obs/rate"
 	)
 	body := func() map[string]any {
 		return map[string]any{
@@ -277,12 +290,20 @@ func TestDropRefusedScope(t *testing.T) {
 			event + "|sample_count":          3.0,
 			event + "/temperature|magnitude": 37.0,
 			event + "/temperature|unit":      "Cel",
+			count:                            1.5,
+			count + "|magnitude_status":      "=",
+			rate + "|":                       2.5,
+			rate + "|magnitude_status":       "=",
 			"c/obs/_uid":                     "x",
 			"c/obs/_uid/whatever":            "y",
 			// A string-prefix sibling, not a child: it must survive a subtree
 			// drop of `c/obs/_uid`. strings.HasPrefix on the bare base — without
 			// the "/" — would take it too.
 			"c/obs/_uid_based_id": "z",
+			// A metadata leaf: `|code` is the ctx/language alias the decode
+			// reads, `|preferred_term` a suffix the short form cannot carry.
+			"c/language|code":           "en",
+			"c/language|preferred_term": "English",
 		}
 	}
 
@@ -313,14 +334,16 @@ func TestDropRefusedScope(t *testing.T) {
 		},
 		{
 			// A refusal naming a whole key covers that key alone, whichever
-			// sentinel it carries: the composer's `external_ref` is refused, its
-			// `|name` beside it is an accepted alias (PROBE-086: each refusal
-			// removes only what it names).
-			name:    "a whole key takes only that entry",
-			key:     qty + "|unit",
-			err:     fmt.Errorf("simplified: decode %q: %w: PARTY_PROXY", qty+"|unit", simplified.ErrUnsupportedDatatype),
+			// sentinel it carries: `language|preferred_term` is refused, the
+			// `language|code` beside it is an accepted alias and stays
+			// (PROBE-086: each refusal removes only what it names). The error
+			// is the codec's own refusal of that suffix.
+			name: "a whole key takes only that entry",
+			key:  "c/language|preferred_term",
+			err: fmt.Errorf("%w: %q is not a spelling the ctx/ short form can carry — ctx/language owns this leaf, so only its accepted suffixes travel (see deviations.md)",
+				simplified.ErrUnsupportedDatatype, "c/language|preferred_term"),
 			removed: 1,
-			gone:    []string{qty + "|unit"},
+			gone:    []string{"c/language|preferred_term"},
 		},
 		{
 			name:    "a whole key under ErrUnknownPath takes only that entry",
@@ -328,6 +351,34 @@ func TestDropRefusedScope(t *testing.T) {
 			err:     fmt.Errorf("%w: conflicting spellings: %q", simplified.ErrUnknownPath, qty+"|magnitude"),
 			removed: 1,
 			gone:    []string{qty + "|magnitude"},
+		},
+		{
+			// A value that does not fit its attribute is refused naming its own
+			// key after the leaf's base (REQ-053): that key alone goes, and the
+			// modelled suffixes beside it stay (PROBE-086).
+			name:    "a value that does not fit takes only its key",
+			key:     qty,
+			err:     fitErr(qty, qty+"|precision"),
+			removed: 1,
+			gone:    []string{qty + "|precision"},
+		},
+		{
+			// A bare value that does not fit names the leaf's base as its own
+			// key: the bare key alone goes, not the suffixes sharing the base.
+			name:    "a bare value that does not fit takes only the bare key",
+			key:     count,
+			err:     fitErr(count, count),
+			removed: 1,
+			gone:    []string{count},
+		},
+		{
+			// `x|` spells the bare value of `x`, and the refusal names `x`, the
+			// key it spells: the spelling as written goes.
+			name:    "a bare value spelled x| that does not fit takes only that key",
+			key:     rate,
+			err:     fitErr(rate, rate),
+			removed: 1,
+			gone:    []string{rate + "|"},
 		},
 		{
 			// Nothing below a refused path decodes either, so the subtree goes
@@ -469,10 +520,12 @@ const corpusRoot = "conformance-ehrbase.de.v0"
 // and this direction is what keeps it that way: a hold-out with no codec spelling
 // behind it silently absorbs a **refusal**, so a key the codec loses stops being
 // counted as lost. It is what the base-matched `composer` entry did to
-// `composer|id`/`|id_scheme`/`|id_namespace` — 12 corpus keys of PARTY_PROXY
-// `external_ref` loss, held out as if they were respellings, while SKIPPED.md,
+// `composer|id`/`|id_scheme`/`|id_namespace` — 12 corpus keys of the composer's
+// `external_ref`, held out as if they were respellings, while SKIPPED.md,
 // ADR 0015 and the codec's own doc comments all said they were refused and
-// visible in the census (PR #86 review, round 3). The suite carried exactly one
+// visible in the census (PR #86 review, round 3). Since ADR 0029 decode reads
+// those keys and encode writes them at the same real path, so the census
+// compares them; holding them out would hide a difference there instead. The suite carried exactly one
 // named waiver — `context/setting`, a real encode-side drop while `ctx/setting`
 // emission was deferred — until the amended REQ-053 closed that gap on
 // 2026-08-05 and its keys became ordinary respellings; reintroducing a waiver
@@ -612,7 +665,8 @@ func indexEverySegment(rel, index string) string {
 // TestIsCompositionMeta guards the hold-out's edges. It is the one place the
 // harness excuses a difference on *both* sides, so it has to stay narrow:
 // `context/other_context` carries archetyped data and must never be swallowed,
-// and the composer's `external_ref` must not ride in on its `|name` sibling.
+// and the composer's other real-path keys, which carry the rest of the
+// composer, must not ride in on its `|name` sibling.
 func TestIsCompositionMeta(t *testing.T) {
 	const root = corpusRoot
 	tests := []struct {
@@ -630,12 +684,19 @@ func TestIsCompositionMeta(t *testing.T) {
 		{root + "/context/start_time", true},
 		{root + "/context/setting|code", true},
 		// The composer hold-out is suffix-aware: `|name` is respelled as
-		// `ctx/composer_name`, but the external_ref suffixes are refused by ADR 0015
-		// and must reach the codec so the loss lands in the census. Base-matching
-		// `composer` absorbed all four and hid 12 corpus keys (PR #86 review).
+		// `ctx/composer_name`, but the composer's external_ref and party
+		// sub-structure are no respelling: decode reads them and encode writes
+		// them at the same real path (ADR 0029, conformance.md § PROBE-086), so
+		// the census compares them. Base-matching `composer` once absorbed the
+		// external_ref and hid 12 corpus keys (PR #86 review).
 		{root + "/composer|id", false},
 		{root + "/composer|id_scheme", false},
 		{root + "/composer|id_namespace", false},
+		{root + "/composer|type", false},
+		{root + "/composer/_identifier:0|id", false},
+		{root + "/composer/_identifier:0|assigner", false},
+		{root + "/composer/relationship|code", false},
+		{root + "/composer:0/relationship:0|value", false},
 		// composer_self is an accepted real-path alias (ADR 0015), so it must be
 		// held out on both sides like the other respellings — the present corpus
 		// writes only the ctx/ form, which is why its absence from the hold-out went
@@ -773,36 +834,62 @@ func TestRealCodecRefusal(t *testing.T) {
 		}
 	})
 
-	t.Run("refused key is removed alone", func(t *testing.T) {
-		// The composer's external_ref is read and refused (ADR 0015): the codec
-		// names the key itself, so the harness removes that key and not the
-		// accepted `composer|name` alias beside it.
+	t.Run("value that does not fit is removed alone", func(t *testing.T) {
+		// REQ-053: a |precision with a fraction does not fit the Integer it
+		// fills. The codec refuses it naming the leaf's base first and the key
+		// itself in the refusal, and the harness removes that one key: the
+		// modelled |magnitude and |unit beside it stay in the comparison
+		// (PROBE-086).
 		body := maps.Clone(leaf)
+		body[base+"|precision"] = 1.5
+		_, refusals, err := DecodeReducing(target, body, InjectContext)
+		if err != nil {
+			t.Fatalf("DecodeReducing: %v", err)
+		}
+		if len(refusals) != 1 || refusals[0].Key != base || refusals[0].Keys != 1 {
+			t.Fatalf("DecodeReducing refusals = %+v, want one refusal of the leaf %q removing 1 key", refusals, base)
+		}
+		if !strings.Contains(refusals[0].Message, `"<key>|precision" does not fit`) {
+			t.Errorf("refusal message = %q, want the fit refusal naming the |precision key", refusals[0].Message)
+		}
+		if !maps.Equal(body, leaf) {
+			t.Errorf("DecodeReducing left %v, want exactly the modelled leaf %v", slices.Sorted(maps.Keys(body)), slices.Sorted(maps.Keys(leaf)))
+		}
+	})
+
+	t.Run("refused key is removed alone", func(t *testing.T) {
+		// A suffix of a leaf the ctx/ short form owns that its ctx/ form cannot
+		// carry is read and refused (REQ-053): the codec names the key itself,
+		// so the harness removes that key and not the accepted `language|code`
+		// alias beside it. (The composer's external_ref served here until its
+		// real path became its carrier, ADR 0029.)
+		body := maps.Clone(leaf)
+		key := target.Root + "/language|preferred_term"
 		maps.Copy(body, map[string]any{
 			"ctx/language": "en", "ctx/territory": "US",
-			target.Root + "/composer|name": "Dr. Who",
-			target.Root + "/composer|id":   "1234-5678",
+			target.Root + "/language|code": "en",
+			key:                            "English",
 		})
 		_, err := decodeAsGiven(target, body, nil)
 		if err == nil {
-			t.Fatal("composer|id decoded — the codec now carries the composer's external_ref, so this test needs another refusal")
+			t.Fatal("language|preferred_term decoded — the codec no longer refuses it, so this test needs another refusal")
 		}
 		if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
 			t.Fatalf("real refusal is not ErrUnsupportedDatatype: %v", err)
 		}
-		key := target.Root + "/composer|id"
 		if got := offendingKey(err); got != key {
 			t.Errorf("offendingKey(real refusal) = %q, want the key %q\nrefusal: %v", got, key, err)
 		}
-		if got, want := reasonOf(err, key), "unsupported datatype: PARTY_PROXY"; got != want {
-			t.Errorf("reasonOf(real refusal) = %q, want %q\nrefusal: %v", got, want, err)
+		const reason = `unsupported datatype: "<key>" is not a spelling the ctx/ short form can carry — ctx/language owns this leaf, so only its accepted suffixes travel (see deviations.md)`
+		if got := reasonOf(err, key); got != reason {
+			t.Errorf("reasonOf(real refusal) = %q, want %q\nrefusal: %v", got, reason, err)
 		}
 		removed, gap := dropRefused(body, offendingKey(err), err)
 		if !gap || removed != 1 {
 			t.Fatalf("dropRefused(real refusal) = %d, %v; want 1, true", removed, gap)
 		}
-		if _, ok := body[target.Root+"/composer|name"]; !ok {
-			t.Error("composer|name was dropped by a composer|id refusal — wider than the refusal names")
+		if _, ok := body[target.Root+"/language|code"]; !ok {
+			t.Error("language|code was dropped by a language|preferred_term refusal — wider than the refusal names")
 		}
 		// What remains must decode: otherwise the assertions above passed on an
 		// error raised for some other reason entirely.
@@ -812,37 +899,44 @@ func TestRealCodecRefusal(t *testing.T) {
 	})
 
 	t.Run("refused bare value at an unmapped leaf is removed alone", func(t *testing.T) {
-		// The composer's PARTY_PROXY has neither a suffix set nor a sub-path
-		// grammar, so the codec refuses its bare value (REQ-170) naming the
-		// leaf's base with the allowlist's "unexpected bare value" wording:
-		// the harness removes that one key, not the accepted `composer|name`
-		// alias beside it, which shares the base.
-		body := maps.Clone(leaf)
-		maps.Copy(body, map[string]any{
+		// A leaf whose datatype has neither a suffix set nor a sub-path
+		// grammar refuses its bare value (REQ-170), naming the leaf's base
+		// with the allowlist's "unexpected bare value" wording: the harness
+		// removes that one key, not the `|x_note` sibling sharing the base.
+		// The corpus template has no such leaf since the composer gained the
+		// party grammar (ADR 0029), so a DV_STATE leaf stands in.
+		target := &Target{Root: "root", Web: &wt.WebTemplate{Tree: &wt.Node{
+			ID: "root", RMType: "COMPOSITION", NodeID: "openEHR-EHR-COMPOSITION.t.v1",
+			Children: []*wt.Node{{
+				ID: "state", RMType: "DV_STATE", NodeID: "at0002", Max: 1,
+				AQLPath: "/context/other_context[at0001]/items[at0002]/value",
+			}},
+		}}}
+		key := "root/state"
+		body := map[string]any{
 			"ctx/language": "en", "ctx/territory": "US",
-			target.Root + "/composer|name": "Dr. Who",
-			target.Root + "/composer":      "bare composer",
-		})
+			key:             "bare state",
+			key + "|x_note": "kept",
+		}
 		_, err := decodeAsGiven(target, body, nil)
 		if err == nil {
-			t.Fatal("a bare composer decoded — the codec no longer refuses it, so this test needs another bare refusal")
+			t.Fatal("a bare DV_STATE decoded — the codec no longer refuses it, so this test needs another bare refusal")
 		}
 		if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
 			t.Fatalf("real refusal is not ErrUnsupportedDatatype: %v", err)
 		}
-		key := target.Root + "/composer"
 		if got := offendingKey(err); got != key {
 			t.Errorf("offendingKey(real refusal) = %q, want the leaf base %q\nrefusal: %v", got, key, err)
 		}
-		if got, want := reasonOf(err, key), "unsupported bare value for PARTY_PROXY"; got != want {
+		if got, want := reasonOf(err, key), "unsupported bare value for DV_STATE"; got != want {
 			t.Errorf("reasonOf(real refusal) = %q, want %q\nrefusal: %v", got, want, err)
 		}
 		removed, gap := dropRefused(body, offendingKey(err), err)
 		if !gap || removed != 1 {
 			t.Fatalf("dropRefused(real refusal) = %d, %v; want 1, true", removed, gap)
 		}
-		if _, ok := body[target.Root+"/composer|name"]; !ok {
-			t.Error("composer|name was dropped by a bare composer refusal — wider than the refusal names")
+		if _, ok := body[key+"|x_note"]; !ok {
+			t.Error("the |x_note sibling was dropped by a bare-value refusal — wider than the refusal names")
 		}
 		if _, err := decodeAsGiven(target, body, nil); err != nil {
 			t.Errorf("body decodes only with the refused key removed, but still fails: %v", err)

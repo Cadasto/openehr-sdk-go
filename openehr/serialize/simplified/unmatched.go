@@ -363,6 +363,10 @@ func structuredLocations(data []byte) (locator, error) {
 					}
 					put(seg, elPath)
 				}
+			case !m.value.isObject:
+				// A null member, which the conversion carries as a FLAT key
+				// without an index (REQ-053).
+				put(flatPath+"/"+m.name, memberPath+"/"+m.name)
 			}
 		}
 	}
@@ -376,6 +380,12 @@ func structuredLocations(data []byte) (locator, error) {
 				put(memberKeyPrefix+"ctx/"+field.name, "ctx/"+field.name)
 				if field.value.isObject {
 					for _, sfx := range field.value.members {
+						if sfx.name == bareStructuredKey {
+							// The field's own value, which the conversion writes at
+							// the field's key, as the clinical walk records a leaf's.
+							put("ctx/"+field.name, "ctx/"+field.name+"/"+sfx.name)
+							continue
+						}
 						if strings.HasPrefix(sfx.name, "|") {
 							put("ctx/"+field.name+sfx.name, "ctx/"+field.name+"/"+sfx.name)
 							continue
@@ -460,34 +470,54 @@ func leafSuffixMatched(rmType, suffix string) (matched, judged bool) {
 
 // matchedSuffixes returns sfx without the suffixes a value of rmType does not
 // read, handing the key of each one dropped to sink. keyOf builds the FLAT key
-// a suffix arrived under. For a datatype with no suffix set it returns sfx as
-// it is. The map returned is sfx itself when nothing was dropped.
+// a suffix arrived under. For a datatype with no suffix set it judges no
+// suffix, and returns sfx without its nulls alone. The map returned is sfx
+// itself when nothing was dropped.
 //
 // A bare value at a datatype with no bare spelling is unmatched beside a
 // suffix the datatype reads, as DV_PROPORTION's derived magnitude beside its
 // numerator is. Alone it is a value missing every required suffix, malformed
 // content (REQ-170): it is kept, so the datatype's own decoding refuses it.
+//
+// A suffix the datatype reads that holds JSON null is absent (REQ-053): it is
+// dropped without a word, as if the body did not carry it, so a leaf whose
+// keys are all null comes back empty and a bare value beside nothing but null
+// suffixes is alone. That holds at a datatype with no suffix set too, such as
+// the DV_ORDERED or nested DV_INTERVAL bound of an interval leaf, so a bound
+// whose keys are all null is absent whatever its datatype (REQ-169). A suffix
+// the datatype does not read goes to sink whatever its value.
 func matchedSuffixes(rmType string, sfx map[string]any, keyOf func(suffix string) string, sink *unmatchedSink) map[string]any {
-	var drop []string
+	var drop, absent []string
+	read := 0
 	for _, suffix := range slices.Sorted(maps.Keys(sfx)) {
 		matched, judged := leafSuffixMatched(rmType, suffix)
-		if !judged {
-			return sfx
-		}
-		if !matched {
+		switch {
+		case !judged:
+			return withoutNulls(sfx)
+		case !matched:
 			drop = append(drop, suffix)
+		case sfx[suffix] == nil:
+			absent = append(absent, suffix)
+		default:
+			read++
 		}
 	}
-	if len(drop) == 0 {
+	if len(drop) == 0 && len(absent) == 0 {
 		return sfx
 	}
-	if _, bare := sfx[""]; bare && len(drop) == len(sfx) {
+	if _, bare := sfx[""]; bare && read == 0 && slices.Contains(drop, "") {
 		drop = slices.DeleteFunc(drop, func(suffix string) bool { return suffix == "" })
+		if sfx[""] == nil {
+			absent = append(absent, "")
+		}
 	}
 	out := maps.Clone(sfx)
 	for _, suffix := range drop {
 		delete(out, suffix)
 		sink.add(keyOf(suffix))
+	}
+	for _, suffix := range absent {
+		delete(out, suffix)
 	}
 	return out
 }

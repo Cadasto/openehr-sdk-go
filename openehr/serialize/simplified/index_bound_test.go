@@ -92,7 +92,9 @@ func TestREQ053IndexedRootSegmentRules(t *testing.T) {
 		{"differing witness", root + ":0/language|terminology", "ISO_639-2", simplified.ErrUnsupportedDatatype, nil},
 		{"indexed differing witness", root + ":0/context:0/setting:0|terminology", "SNOMED-CT", simplified.ErrUnsupportedDatatype, nil},
 		{"setting formatting", root + ":0/context/setting|formatting", "plain", simplified.ErrUnsupportedDatatype, nil},
-		{"composer nested identifier", root + ":0/composer/_identifier:0|id", "122", simplified.ErrUnsupportedDatatype, []string{"ADR 0015"}},
+		// The composer's real path carries its identifiers (ADR 0029); a value
+		// that does not fit DV_IDENTIFIER.id is refused under `<root>:0/` too.
+		{"composer nested identifier that does not fit", root + ":0/composer/_identifier:0|id", 122, simplified.ErrUnsupportedDatatype, []string{"DV_IDENTIFIER.id"}},
 		// The metadata values agree with the base ctx/ context, so only the index
 		// can be what refuses them.
 		{"metadata under root :1", root + ":1/language|code", "en", simplified.ErrUnknownPath, []string{"not an indexed list"}},

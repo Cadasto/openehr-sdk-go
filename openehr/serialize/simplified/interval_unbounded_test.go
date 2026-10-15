@@ -9,6 +9,7 @@ package simplified
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"maps"
 	"reflect"
 	"strings"
@@ -158,8 +159,10 @@ func (p intervalPosition) body(keys ...map[string]any) map[string]any {
 }
 
 // structuredForm is the STRUCTURED form of a FLAT body. A null bare bound,
-// which FlatToStructured writes as a null array element (refused in every
-// mode as a hole in the array), is spelled as the null `"|"` member instead.
+// which FlatToStructured writes as a null array element, is spelled as the
+// null `"|"` member instead, the other STRUCTURED spelling of a null bare
+// value; the null array element is pinned by
+// TestREQ053NullStructuredMemberAndElementAreAbsent.
 func structuredForm(t *testing.T, body map[string]any) []byte {
 	t.Helper()
 	s, err := FlatToStructured(mustJSON(t, body))
@@ -279,6 +282,33 @@ func TestREQ169NormalRangeBoundByValueMatchesRM(t *testing.T) {
 		if byValue := lower.Type.Kind() != reflect.Interface; normalRangeBoundByValue[name] != byValue {
 			t.Errorf("normalRangeBoundByValue[%s] = %v, but the RM holds the bound by value: %v", name, normalRangeBoundByValue[name], byValue)
 		}
+	}
+}
+
+// TestREQ169NullBoundAtAnAnchorWithNoSuffixSet — REQ-169: an absent
+// `*_unbounded` is true "when its bound is absent or `null` too", and REQ-053
+// reads a bound whose keys are all null as absent, whatever datatype the bound
+// is spelled with. A DV_INTERVAL leaf whose bound datatype has no suffix set of
+// its own (DV_ORDERED, a nested DV_INTERVAL) included: the leaf decodes, in
+// FLAT and in STRUCTURED, to what the body without the null keys decodes to,
+// alone and beside an upper bound spelled as `|raw`.
+func TestREQ169NullBoundAtAnAnchorWithNoSuffixSet(t *testing.T) {
+	ctx := map[string]any{"ctx/language": "en", "ctx/territory": "US"}
+	null := map[string]any{"root/ev/iv/lower|magnitude": nil}
+	upper := map[string]any{"root/ev/iv/upper|raw": map[string]any{"_type": "DV_COUNT", "magnitude": 3}}
+	for _, tc := range []struct {
+		rmType string
+		other  map[string]any
+	}{
+		{rmType: "DV_INTERVAL<DV_ORDERED>"},
+		{rmType: "DV_INTERVAL<DV_ORDERED>", other: upper},
+		{rmType: "DV_INTERVAL<DV_INTERVAL<DV_COUNT>>"},
+	} {
+		t.Run(tc.rmType+fmt.Sprintf("/%d other keys", len(tc.other)), func(t *testing.T) {
+			wt := intervalLeafOwnerWT()
+			wt.Tree.Children[0].Children[0].RMType = tc.rmType
+			assertSameDecodeBothForms(t, wt, mergeKeys(ctx, null, tc.other), mergeKeys(ctx, tc.other))
+		})
 	}
 }
 

@@ -12,6 +12,8 @@ package simplified
 //     inlined beside the PARTICIPATION's own suffixes on the same key base;
 //   - the ENTRY `subject` in-context leaf (REQ-053, flat_decode.go's party-leaf
 //     siphon) — a party at a Web Template leaf;
+//   - the COMPOSITION `composer` at its real path `<root>/composer` (REQ-053,
+//     ADR 0029), merged with the `ctx/` composer short forms ([decodeComposer]);
 //   - and from Phase C3, FEEDER_AUDIT_DETAILS' `/location`, `/subject` and
 //     `/provider`.
 //
@@ -48,6 +50,7 @@ package simplified
 // (rmattr_party_encode.go) instead of narrowing any of them.
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -79,9 +82,9 @@ const partyRefType = "PARTY"
 // attribute — one nested inside another family's tails rather than routed, which
 // is why it has no entry in [rmattrFamilies]: every position that reaches a party
 // reaches it through this grammar, so the party implementation owns it and there
-// is no owner for the router to resolve it against. (The composition's
-// **composer** is the exception the ADR 0015 boundary refuses — see
-// flat_decode.go's siphonContext.)
+// is no owner for the router to resolve it against. The composition's composer
+// is one of those positions: [siphonContext] collects its real-path keys and
+// [decodeComposer] reads them (ADR 0029).
 const partyIdentifierSeg = "_identifier"
 
 // partyProxyTypeSuffix is the PARTY_PROXY subtype discriminator, and
@@ -363,6 +366,146 @@ func partyIdentifiers(g rmattrGroup, ts rmattrTails) ([]any, error) {
 	return out, nil
 }
 
+// --- the composer --------------------------------------------------------
+
+// putComposerKey records one key at the composer's real path in g, the
+// composer's party group, under tail, its spelling below the composer segment.
+//
+// Two keys reach one tail when they differ only by the `:0` of the template
+// root's or the composer's own segment (`<root>/composer|id` beside
+// `<root>:0/composer:0|id`): two spellings of one field. The second is held
+// as a [tailDup] for [rmattrGroup.settleDups] to judge once the grammar has
+// read the group, exactly as [splitRMAttrTails] holds two spellings of one
+// sub-path, so they must agree and a null one is absent (REQ-053). The group
+// spells composition metadata ([rmattrGroup.metadata]), so a pair that
+// disagrees is refused with [ErrUnknownPath], as the name's two spellings are.
+func putComposerKey(g *rmattrGroup, tail string, val any, key string) {
+	held, taken := g.tails[tail]
+	if !taken {
+		g.put(tail, val, key)
+		return
+	}
+	first := g.key(tail)
+	if held == nil && val != nil {
+		g.put(tail, val, key)
+		*g.dups = append(*g.dups, tailDup{first: key, second: first, firstVal: val, secondVal: held})
+		return
+	}
+	*g.dups = append(*g.dups, tailDup{first: first, second: key, firstVal: held, secondVal: val})
+}
+
+// decodeComposer builds COMPOSITION.composer from the composer's real-path
+// keys in g and the ctx/ composer fields in ci, or returns nil for a body that
+// spells no composer. origin names the body key each ctx/ field arrived under.
+//
+// The real path carries the whole composer in the party grammar every other
+// party position uses (REQ-053, ADR 0029): `|id`, `|id_scheme`,
+// `|id_namespace` and `|type` its external_ref, `/_identifier:N` its
+// identifiers, `/relationship` a PARTY_RELATED's relationship. Its `|name` is
+// the alias of `ctx/composer_name`, so the name arrives in ci, already
+// checked against the other spelling, and joins the real-path keys here:
+// different fields merge into one composer. A `composer_self: true` beside an
+// external_ref reads as a PARTY_SELF carrying that reference; beside an
+// identifier or a relationship it is refused, as it is beside a name
+// ([parseCtx]), since PARTY_SELF has none of them.
+//
+// A body whose real path carries nothing the grammar reads (no key, or only
+// null and unmatched ones) spells its composer in the ctx/ fields alone.
+func decodeComposer(g *rmattrGroup, ci ctxInfo, origin map[string]string) (map[string]any, error) {
+	ts, err := partyTails(*g, partyOwnTails)
+	if errors.Is(err, errNothingMatched) {
+		if err := g.settleDups(); err != nil {
+			return nil, err
+		}
+		return ctxComposerJSON(ci), nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var composer map[string]any
+	if ci.composerSelf {
+		composer, err = composerSelfJSON(*g, ts, ctxSpelling(origin, "ctx/composer_self"))
+	} else {
+		composer, err = composerPartyJSON(*g, ts, ci, origin)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := g.settleDups(); err != nil {
+		return nil, err
+	}
+	return composer, nil
+}
+
+// ctxComposerJSON is the composer the ctx/ fields spell on their own: a
+// PARTY_SELF for `composer_self: true`, a PARTY_IDENTIFIED carrying the name
+// for `composer_name`, or nil for neither.
+func ctxComposerJSON(ci ctxInfo) map[string]any {
+	switch {
+	case ci.composerSelf:
+		return map[string]any{"_type": "PARTY_SELF"}
+	case ci.haveComposerName:
+		return map[string]any{"_type": "PARTY_IDENTIFIED", "name": ci.composerName}
+	}
+	return nil
+}
+
+// composerPartyJSON reads a PARTY_IDENTIFIED or PARTY_RELATED composer from
+// the real-path tails ts of g, with the name ci carries, if any, as its
+// `|name`. An empty name never gets here: [parseCtx] refuses it in either
+// spelling (RM invariant `Name_valid`), naming the spelling it arrived under,
+// whether or not the composer has other keys.
+func composerPartyJSON(g rmattrGroup, ts rmattrTails, ci ctxInfo, origin map[string]string) (map[string]any, error) {
+	if ci.haveComposerName {
+		ts.own["name"] = ci.composerName
+		g.keys["|name"] = ctxSpelling(origin, "ctx/composer_name")
+	}
+	ids, err := partyIdentifiers(g, ts)
+	if err != nil {
+		return nil, err
+	}
+	party, populated, err := partySuffixes(g, ts, ids)
+	if err != nil {
+		return nil, err
+	}
+	if !populated {
+		// Unreachable: [partyTails] left a key the grammar reads, and
+		// [partySuffixes] either builds a party from it or refuses it.
+		return nil, fmt.Errorf("%w: %s carries no party key (PARTY_IDENTIFIED needs at least one of |name, |id or an _identifier)",
+			ErrUnsupportedDatatype, g.prefix())
+	}
+	return party, nil
+}
+
+// composerSelfJSON reads the real-path tails ts of g beside a
+// `composer_self: true`, spelled selfKey: a PARTY_SELF carrying the
+// external_ref the tails decompose. An identifier or a relationship beside it
+// is refused naming the first such key, since PARTY_SELF has neither.
+func composerSelfJSON(g rmattrGroup, ts rmattrTails, selfKey string) (map[string]any, error) {
+	var conflicting []string
+	for suffix := range ts.sub["relationship"] {
+		conflicting = append(conflicting, ts.key(g, subTail("relationship", suffix)))
+	}
+	for idx, sfx := range ts.sublist[partyIdentifierSeg] {
+		for suffix := range sfx {
+			conflicting = append(conflicting, ts.key(g, subListTail(partyIdentifierSeg, idx, suffix)))
+		}
+	}
+	if len(conflicting) > 0 {
+		return nil, fmt.Errorf("%w: conflicting composer spellings: %q makes the composer the EHR subject (PARTY_SELF), which has no identifiers and no relationship, but %q gives it one; remove one",
+			ErrUnknownPath, selfKey, slices.Min(conflicting))
+	}
+	ref, haveRef, err := partyExternalRef(g, ts)
+	if err != nil {
+		return nil, err
+	}
+	self := map[string]any{"_type": partySelfType}
+	if haveRef {
+		self["external_ref"] = ref
+	}
+	return self, nil
+}
+
 // --- PARTICIPATION ------------------------------------------------------
 
 // participationOwnTails is PARTICIPATION's own-suffix grammar: its two suffixes
@@ -385,7 +528,11 @@ var participationOwnTails = func() map[string]bool {
 const participationTimeSuffix = "time"
 
 // tailNaming returns the first of g's tails, in sorted order, whose own suffix
-// or first sub-path segment (its `:index` aside) is name.
+// or first sub-path segment (its `:index` aside) is name and that holds a
+// value. It removes from g every such tail that holds JSON null: a key with no
+// carrier that holds null carries nothing to drop, so it is absent (REQ-053)
+// rather than refused, and it must not reach the grammar, which would set it
+// aside as unmatched.
 func tailNaming(g rmattrGroup, name string) (string, bool) {
 	for _, tail := range slices.Sorted(maps.Keys(g.tails)) {
 		var first string
@@ -403,7 +550,11 @@ func tailNaming(g rmattrGroup, name string) (string, bool) {
 				}
 			}
 		}
-		if first == name {
+		switch {
+		case first != name:
+		case g.tails[tail] == nil:
+			delete(g.tails, tail)
+		default:
 			return tail, true
 		}
 	}
@@ -493,9 +644,11 @@ var inlineIdentifierFields = map[string]string{
 // suffix, so the set is unbounded; what remains in ts is what a fixed allowlist
 // can judge. An `|identifiers_id` with **no** index is left behind on purpose —
 // the reference always indexes, so the allowlist sets it aside as unmatched
-// content instead of this function guessing slot 0.
+// content instead of this function guessing slot 0. One that holds JSON null
+// is absent (REQ-053): it fills no slot.
 func takeInlineIdentifiers(g rmattrGroup, ts rmattrTails) ([]any, error) {
 	slots := make(map[int]map[string]any)
+	keys := make(map[int]map[string]string)
 	for _, suffix := range slices.Sorted(maps.Keys(ts.own)) {
 		stem, index, indexed := strings.Cut(suffix, ":")
 		field, known := inlineIdentifierFields[stem]
@@ -510,11 +663,17 @@ func takeInlineIdentifiers(g rmattrGroup, ts rmattrTails) ([]any, error) {
 		if n > maxRepeatIndex {
 			return nil, fmt.Errorf("%w: %q :index %d exceeds bound %d", ErrUnknownPath, key, n, maxRepeatIndex)
 		}
+		v := ts.own[suffix]
+		delete(ts.own, suffix)
+		if v == nil {
+			continue
+		}
 		if slots[n] == nil {
 			slots[n] = make(map[string]any)
+			keys[n] = make(map[string]string)
 		}
-		slots[n][field] = ts.own[suffix]
-		delete(ts.own, suffix)
+		slots[n][field] = v
+		keys[n][field] = key
 	}
 	out := make([]any, 0, len(slots))
 	for i := range len(slots) {
@@ -523,7 +682,7 @@ func takeInlineIdentifiers(g rmattrGroup, ts rmattrTails) ([]any, error) {
 			return nil, fmt.Errorf("%w: %s's inlined identifiers sit in a sparse :index sequence (no :%d); the occurrences must run 0..%d",
 				ErrUnknownPath, g.prefix(), i, len(slots)-1)
 		}
-		dv, err := dvFromSuffixes("DV_IDENTIFIER", false, sfx)
+		dv, err := dvFromSuffixes("DV_IDENTIFIER", false, sfx, func(field string) string { return keys[i][field] })
 		if err != nil {
 			return nil, fmt.Errorf("simplified: decode %q: %w", g.key("|identifiers_*:"+strconv.Itoa(i)), err)
 		}

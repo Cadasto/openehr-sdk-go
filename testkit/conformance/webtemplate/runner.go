@@ -13,6 +13,7 @@ import (
 	"maps"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -383,26 +384,34 @@ func decodeSubset(t *Target, keys map[string]any, opt simplified.Option) (*rm.Co
 // or a family prefix.
 //
 // Only the two REQ-053 gap sentinels are refusals. Any other keyed error —
-// a bug in the codec, a malformed fixture, a budget breach — returns
-// gap = false so [DecodeReducing] returns an error, because reclassifying an
-// unrecognised error as unmodelled surface would let a genuine regression
-// present as a bigger Excluded count instead of a red test.
+// a bug in the codec, an RM invariant a fixture's value breaks, a budget
+// breach — returns gap = false so [DecodeReducing] returns an error, because
+// reclassifying an unrecognised error as unmodelled surface would let a
+// genuine regression present as a bigger Excluded count instead of a red
+// test. A value that does not fit its RM attribute is not such an error: the
+// codec refuses it with ErrUnsupportedDatatype (REQ-053), so it is a refusal
+// like the others.
 //
 // Precision is the whole game here: every key dropped wider than the refusal
 // names is a key the codec would have round-tripped, silently missing from
 // the compared subset this probe exists to grow (PROBE-086: each refusal
 // MUST remove only what it names). Since REQ-170 the codec reports what it
 // does not read instead of refusing it, so a refusal is always of something
-// it reads. Four shapes, four scopes:
+// it reads. Five shapes, five scopes:
 //
-//   - A whole key, suffix and all (`<root>/composer|id`, the composer's
-//     `external_ref`): that one entry goes. `composer|name` beside it is an
-//     accepted alias and stays.
+//   - A value that does not fit its RM attribute (REQ-053), refused naming
+//     its own key after the leaf's base (`"<base>|precision" does not fit
+//     …`, or `"<base>" does not fit …` for the bare value): that one key
+//     goes, and the leaf's other suffixes stay. `x|` spells the bare value
+//     of `x` and the codec names it `x`, so the spelling as written goes.
+//   - A whole key, suffix and all (`<root>/language|preferred_term`, a suffix
+//     the `ctx/language` short form cannot carry): that one entry goes.
+//     `language|code` beside it is an accepted alias and stays.
 //   - A suffix of a leaf named by its base ("unexpected |value for DV_TEXT",
 //     a DV_TEXT `|value` without the `|code` that selects the coded subtype),
-//     or its bare value ("unexpected bare value for PARTY_PROXY", the
-//     composer's bare value): only that one entry goes, and the rest of the
-//     leaf stays.
+//     or its bare value ("unexpected bare value for DV_STATE", at a leaf
+//     whose datatype has neither a suffix set nor a sub-path grammar): only
+//     that one entry goes, and the rest of the leaf stays.
 //   - Any other ErrUnsupportedDatatype refusal naming a leaf's base (a
 //     missing required suffix): the leaf's own entries go, but *not* the
 //     subtree beneath it, which belongs to other nodes or families.
@@ -412,10 +421,13 @@ func decodeSubset(t *Target, keys map[string]any, opt simplified.Option) (*rm.Co
 //     it.
 func dropRefused(candidate map[string]any, key string, err error) (removed int, gap bool) {
 	unknownPath, unsupported := errors.Is(err, simplified.ErrUnknownPath), errors.Is(err, simplified.ErrUnsupportedDatatype)
-	switch {
-	case !unknownPath && !unsupported:
+	if !unknownPath && !unsupported {
 		return 0, false
-	case strings.Contains(key, "|"):
+	}
+	if named, ok := misfitKey(err); ok {
+		return dropMatching(candidate, func(k string) bool { return k == named || k == named+"|" }), true
+	}
+	if strings.Contains(key, "|") {
 		return dropMatching(candidate, func(k string) bool { return k == key }), true
 	}
 	if sfx, ok := refusedSuffix(err); ok {
@@ -441,6 +453,34 @@ func dropMatching(candidate map[string]any, match func(string) bool) int {
 		}
 	}
 	return removed
+}
+
+// misfitPhrase is what follows the quoted key in the refusal of a value that
+// does not fit its RM attribute (REQ-053).
+const misfitPhrase = `" does not fit `
+
+// misfitKey reads the key out of the refusal of a value that does not fit its
+// RM attribute, the one key whose value it is: the quoted token that
+// [misfitPhrase] follows, which the codec writes after `: `. ok is false for
+// any other refusal shape.
+func misfitKey(err error) (string, bool) {
+	if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
+		return "", false
+	}
+	msg := err.Error()
+	end := strings.Index(msg, misfitPhrase)
+	if end < 0 {
+		return "", false
+	}
+	start := strings.LastIndex(msg[:end], `: "`)
+	if start < 0 {
+		return "", false
+	}
+	key, uerr := strconv.Unquote(msg[start+len(": ") : end+1])
+	if uerr != nil {
+		return "", false
+	}
+	return key, true
 }
 
 // refusedSuffix reads the single offending suffix out of a suffix-allowlist
@@ -513,10 +553,10 @@ func reasonOf(err error, key string) string {
 			return "unsupported datatype"
 		}
 		// A leaf may carry several suffixes the codec does not model, and
-		// which one it names first depends on map iteration order. Collapse
-		// to the datatype so the census is deterministic — the suffixes are
-		// dropped and refused one at a time (see [dropRefused]), so the
-		// aggregate count is stable even though the order is not.
+		// the codec names one per refusal, the first in sorted order.
+		// Collapse to the datatype so the refusals of one datatype share one
+		// reason whichever suffix they name — the suffixes are dropped and
+		// refused one at a time (see [dropRefused]).
 		if _, dt, cut := strings.Cut(detail, " for "); cut {
 			switch {
 			case strings.HasPrefix(detail, "unexpected |"):

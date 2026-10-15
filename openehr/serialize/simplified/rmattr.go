@@ -75,6 +75,11 @@ type rmattrGroup struct {
 	// [rmattrGroup.settleDups] to judge once the decode knows whether it reads
 	// the tail. A nil dups refuses such a pair at once.
 	dups *[]tailDup
+	// metadata names the composition-metadata field the group spells (the
+	// composer, ADR 0029), or is empty. Two spellings of one of its keys that
+	// disagree are then two spellings of that field, refused as every other
+	// metadata field's are (REQ-053), not as a sub-path spelled twice.
+	metadata string
 }
 
 // tailDup is a second spelling of a tail: the key the group holds, the key
@@ -87,7 +92,13 @@ type tailDup struct {
 // settleDups judges every second spelling the family's grammar met: where the
 // decode set the first spelling aside as unmatched, the second is unmatched
 // too; where it read it, the two must hold the same value, or they are two
-// spellings of one field that disagree (REQ-170).
+// spellings of one field that disagree (REQ-170). A spelling that holds JSON
+// null is absent (REQ-053), so it disagrees with nothing; the grammar holds
+// the other spelling's value ([splitRMAttrTails], [rmattrChildGroups]).
+//
+// In a group that spells a composition-metadata field ([rmattrGroup.metadata])
+// the disagreeing pair is two accepted spellings of that field, and the
+// refusal is [ErrUnknownPath], as for every other metadata field (REQ-053).
 func (g rmattrGroup) settleDups() error {
 	if g.dups == nil {
 		return nil
@@ -97,10 +108,15 @@ func (g rmattrGroup) settleDups() error {
 			g.sink.add(d.second)
 			continue
 		}
-		if !sameCtxValue(d.firstVal, d.secondVal) {
-			return fmt.Errorf("%w: %q and %q spell one sub-path twice and disagree; remove one",
-				ErrUnsupportedDatatype, d.first, d.second)
+		if d.firstVal == nil || d.secondVal == nil || sameCtxValue(d.firstVal, d.secondVal) {
+			continue
 		}
+		if g.metadata != "" {
+			return fmt.Errorf("%w: conflicting spellings of %s: %q and %q disagree; remove one",
+				ErrUnknownPath, g.metadata, d.first, d.second)
+		}
+		return fmt.Errorf("%w: %q and %q spell one sub-path twice and disagree; remove one",
+			ErrUnsupportedDatatype, d.first, d.second)
 	}
 	return nil
 }
@@ -181,7 +197,13 @@ type rmattrFamily struct {
 	// so `_accuracy` must reach the temporal types and only them, or one attribute
 	// would have two channels at one owner.
 	attrType string
-	list     bool
+	// owner, when set, is the one RM class that admits the family, wherever
+	// else the RM declares attr. It exists for `_name`: every LOCATABLE declares
+	// `name`, but the grammar carries it at the template root alone, whose class
+	// is COMPOSITION and no other node's (REQ-140). Anywhere else the family
+	// names nothing and is unmatched content.
+	owner string
+	list  bool
 	// value marks a family that decorates the **DataValue** a collapsed ELEMENT
 	// leaf holds rather than the LOCATABLE itself: one FLAT path addresses both
 	// (the Web Template folds ELEMENT.value into its leaf node), so the RM class
@@ -200,11 +222,12 @@ type rmattrFamily struct {
 //
 // `_identifier` is deliberately **not** a family here, though the corpus writes
 // it: it is only ever reached *inside* a party — nested in
-// `_health_care_facility`'s tails, at the ENTRY `subject` leaf, or (Phase C3)
-// under a FEEDER_AUDIT_DETAILS party — so the one party implementation owns it
-// (rmattr_party.go) and no owner exists for the router to judge it against. The
-// composition's **composer** is the one path that would reach it as a family, and
-// that is the ADR 0015 boundary flat_decode.go refuses by name.
+// `_health_care_facility`'s tails, at the ENTRY `subject` leaf, at the
+// composition's composer, or (Phase C3) under a FEEDER_AUDIT_DETAILS party — so
+// the one party implementation owns it (rmattr_party.go) and no owner exists for
+// the router to judge it against. The composer is the one path that would reach
+// it as a family; [siphonContext] takes the composer's keys before the router
+// sees them (ADR 0029).
 //
 // Which *owners* admit a family is not listed here: it is read off the RM
 // itself (rminfo), so `_work_flow_id` is ENTRY-only because only the five ENTRY
@@ -214,9 +237,13 @@ type rmattrFamily struct {
 // Template answers (see deviations.md § folded structural wrappers). That is the spec's own rule ("the node it belongs
 // to") rather than a table that could drift from the BMM. For a `value` family
 // the class consulted is the leaf datatype instead (rmattr_value.go), which is
-// what makes `_normal_range` DV_ORDERED-only and `_mapping` DV_TEXT-only.
+// what makes `_normal_range` DV_ORDERED-only and `_mapping` DV_TEXT-only. The
+// one family the RM alone does not place is `_name`: every LOCATABLE declares
+// `name`, and the grammar carries it at the template root only
+// ([rmattrFamily.owner]).
 var rmattrFamilies = map[string]rmattrFamily{
 	"_uid":                  {attr: "uid", decode: decodeRMAttrUID},
+	"_name":                 {attr: "name", owner: "COMPOSITION", decode: decodeRMAttrName},
 	"_link":                 {attr: "links", list: true, decode: decodeRMAttrLink},
 	"_work_flow_id":         {attr: "workflow_id", decode: decodeRMAttrObjectRef},
 	"_guideline_id":         {attr: "guideline_id", decode: decodeRMAttrObjectRef},
@@ -456,9 +483,14 @@ func decodeRMAttrGroups(compJSON map[string]any, wt *webtemplate.WebTemplate, gr
 // rmattrFamilyAt judges g's family against its owner: the family the decode
 // reads there and the RM class it is judged against. A family that names
 // nothing at this owner hands every key of g to the sink and returns
-// [errNothingMatched]; a deferred family the owner declares is refused.
+// [errNothingMatched]; a deferred family the owner declares is refused, unless
+// every key of it holds JSON null, which carries nothing to drop: then it is
+// absent (REQ-053) and returns [errNothingMatched] too.
 func rmattrFamilyAt(owner rmattrOwner, g rmattrGroup) (rmattrFamily, string, error) {
 	if rmattrDeferredAt(owner.kind, g.family) {
+		if allNull(g.tails) {
+			return rmattrFamily{}, "", errNothingMatched
+		}
 		return rmattrFamily{}, "", fmt.Errorf("%w: %q addresses %s.%s, which this codec defers: the reference's suffix set gives it no channel, so it is refused rather than dropped (REQ-140, see deviations.md)",
 			ErrUnknownPath, g.prefix(), owner.kind, rmattrDeferredFamilies[g.family])
 	}
@@ -487,7 +519,7 @@ func rmattrDeferredAt(kind, family string) bool {
 // the family names nothing there.
 func rmattrFamilyOf(kind, leaf, family string) (fam rmattrFamily, judged string, read bool) {
 	fam, known := rmattrFamilies[family]
-	if !known {
+	if !known || (fam.owner != "" && bmmtype.Class(kind) != fam.owner) {
 		return rmattrFamily{}, "", false
 	}
 	// A value-decoration family is judged against the leaf datatype, not the
@@ -650,12 +682,17 @@ func placeRMAttrList(node map[string]any, attr string, g rmattrGroup, val any, b
 // --- suffix helpers -----------------------------------------------------
 
 // checkRMAttrTails hands every tail outside a family's grammar to the sink as
-// unmatched content and removes it (REQ-170). It returns [errNothingMatched]
-// when no tail is left, so the family instance is skipped as if absent.
+// unmatched content and removes it (REQ-170), and removes every tail inside it
+// that holds JSON null, which is absent (REQ-053). It returns
+// [errNothingMatched] when no tail is left, so the family instance is skipped
+// as if absent.
 func checkRMAttrTails(g rmattrGroup, allowed map[string]bool) error {
 	for _, tail := range slices.Sorted(maps.Keys(g.tails)) {
-		if !allowed[tail] {
+		switch {
+		case !allowed[tail]:
 			g.drop(tail)
+		case g.tails[tail] == nil:
+			delete(g.tails, tail)
 		}
 	}
 	if len(g.tails) == 0 {
@@ -708,6 +745,16 @@ func decodeRMAttrUID(g rmattrGroup, _ string) (any, error) {
 		return nil, err
 	}
 	return map[string]any{"_type": uidBasedIDType(value), "value": value}, nil
+}
+
+// decodeRMAttrName decodes `_name` at the template root: the composition's own
+// name, which takes the place of the Web Template root's name ([decodeFlat]).
+// It is spelled in the DV_TEXT leaf grammar, through the DV_TEXT leaf builder,
+// so `|formatting` rides beside a bare name and a coded name rides the `|code`
+// substitution (REQ-053). A name the suffixes cannot carry rides `_name|raw`,
+// since no underscore family nests below `_name`.
+func decodeRMAttrName(g rmattrGroup, _ string) (any, error) {
+	return decodeRMAttrLeafValue(g, "DV_TEXT")
 }
 
 // uidBasedIDType names the concrete UID_BASED_ID subtype a `_uid` string

@@ -193,9 +193,9 @@ func TestDecodeRejectsWrongTypedCtx(t *testing.T) {
 // no FLAT key at all, which is undiagnosable from the payload side. The refusal
 // now happens while the offending FLAT key is still in hand.
 //
-// Deliberately no sentinel: a malformed value is a defect in the payload, not a
-// datatype or path the codec declines to model, and the PROBE-086 census counts
-// only the latter (a non-sentinel error is a fault there, which is correct here).
+// REQ-053 "A value must fit its attribute" makes the refusal wrap
+// ErrUnsupportedDatatype and name the FLAT key as written, the leaf path and
+// its suffix together.
 func TestMalformedOrderedSuffixNamesFlatKey(t *testing.T) {
 	comp, wt := genComposition(t, vitalSignsOPT)
 	f1, err := simplified.MarshalFlat(comp, wt)
@@ -227,13 +227,13 @@ func TestMalformedOrderedSuffixNamesFlatKey(t *testing.T) {
 	if err == nil {
 		t.Fatal("UnmarshalFlat(|accuracy = \"abc\") = nil error, want a refusal")
 	}
-	for _, want := range []string{base, "|accuracy", "number"} {
+	for _, want := range []string{`"` + base + `|accuracy"`, "number"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error %q does not name %q", err, want)
 		}
 	}
-	if errors.Is(err, simplified.ErrUnknownPath) || errors.Is(err, simplified.ErrUnsupportedDatatype) {
-		t.Errorf("err = %v carries a modelled-gap sentinel; a malformed value is a payload defect", err)
+	if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
+		t.Errorf("err = %v, want ErrUnsupportedDatatype (REQ-053: a value must fit its attribute)", err)
 	}
 	// The same key with a well-formed value decodes, so the check bounds the kind
 	// and nothing more.
@@ -260,14 +260,14 @@ func TestDecodeRejectsTrailingJSON(t *testing.T) {
 	}
 }
 
-// TestStructuredToFlatRejectsMalformed: a non-array clinical child, a null
-// array hole, and an element carrying no entries are errors, not silent drops.
+// TestStructuredToFlatRejectsMalformed: a non-array clinical child and an
+// element carrying no entries are errors, not silent drops. A null array
+// element is no longer among them: REQ-053 reads it as absent, and the
+// interconversion carries it as a FLAT key holding null
+// (TestREQ053InterconversionCarriesNull).
 func TestStructuredToFlatRejectsMalformed(t *testing.T) {
 	if _, err := simplified.StructuredToFlat([]byte(`{"t":{"leaf":"not-an-array"}}`)); err == nil {
 		t.Error("non-array clinical child = nil error, want rejection")
-	}
-	if _, err := simplified.StructuredToFlat([]byte(`{"t":{"leaf":[null]}}`)); err == nil {
-		t.Error("null array hole = nil error, want rejection")
 	}
 	if _, err := simplified.StructuredToFlat([]byte(`{"t":"not-an-object"}`)); err == nil {
 		t.Error("non-object root = nil error, want rejection")
@@ -278,17 +278,22 @@ func TestStructuredToFlatRejectsMalformed(t *testing.T) {
 }
 
 // TestFlatToStructuredRejectsConflicts: two FLAT keys claiming the same
-// STRUCTURED slot with incompatible shapes — two spellings of one bare value, or
-// a bare root value — must error deterministically; last-write-wins would make the
-// output depend on Go map iteration order.
+// STRUCTURED slot with incompatible shapes — two spellings of one bare value,
+// of one suffix, or of one root suffix, or a bare root value — must error
+// deterministically; last-write-wins would make the output depend on Go map
+// iteration order.
 //
 // A bare value *beside* the same leaf's |suffixes or nested members is no longer
 // in this list: it is a legal FLAT shape (a DV_MULTIMEDIA's uri beside its
 // mandatory `|mediatype`) and STRUCTURED spells it with the `"|"` member — see
-// TestBareLeafBesideMembersThroughStructured.
+// TestBareLeafBesideMembersThroughStructured. Nor is a null beside a value: a
+// null is absent (TestREQ053FlatToStructuredCarriesNull).
 func TestFlatToStructuredRejectsConflicts(t *testing.T) {
 	cases := []string{
 		`{"t/leaf": "x", "t/leaf:0": "y"}`,
+		`{"t/leaf|unit": "x", "t/leaf:0|unit": "y"}`,
+		`{"t/leaf": "x", "t/leaf/c": 1, "t/leaf:0": "y"}`,
+		`{"t|x": "a", "t:0|x": "b"}`,
 		`{"t": 5}`,
 	}
 	for _, in := range cases {
