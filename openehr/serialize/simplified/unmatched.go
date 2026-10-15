@@ -380,6 +380,12 @@ func structuredLocations(data []byte) (locator, error) {
 				put(memberKeyPrefix+"ctx/"+field.name, "ctx/"+field.name)
 				if field.value.isObject {
 					for _, sfx := range field.value.members {
+						if sfx.name == bareStructuredKey {
+							// The field's own value, which the conversion writes at
+							// the field's key, as the clinical walk records a leaf's.
+							put("ctx/"+field.name, "ctx/"+field.name+"/"+sfx.name)
+							continue
+						}
 						if strings.HasPrefix(sfx.name, "|") {
 							put("ctx/"+field.name+sfx.name, "ctx/"+field.name+"/"+sfx.name)
 							continue
