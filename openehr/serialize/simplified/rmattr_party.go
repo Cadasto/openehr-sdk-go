@@ -385,7 +385,11 @@ var participationOwnTails = func() map[string]bool {
 const participationTimeSuffix = "time"
 
 // tailNaming returns the first of g's tails, in sorted order, whose own suffix
-// or first sub-path segment (its `:index` aside) is name.
+// or first sub-path segment (its `:index` aside) is name and that holds a
+// value. It removes from g every such tail that holds JSON null: a key with no
+// carrier that holds null carries nothing to drop, so it is absent (REQ-053)
+// rather than refused, and it must not reach the grammar, which would set it
+// aside as unmatched.
 func tailNaming(g rmattrGroup, name string) (string, bool) {
 	for _, tail := range slices.Sorted(maps.Keys(g.tails)) {
 		var first string
@@ -403,7 +407,11 @@ func tailNaming(g rmattrGroup, name string) (string, bool) {
 				}
 			}
 		}
-		if first == name {
+		switch {
+		case first != name:
+		case g.tails[tail] == nil:
+			delete(g.tails, tail)
+		default:
 			return tail, true
 		}
 	}
@@ -493,9 +501,11 @@ var inlineIdentifierFields = map[string]string{
 // suffix, so the set is unbounded; what remains in ts is what a fixed allowlist
 // can judge. An `|identifiers_id` with **no** index is left behind on purpose —
 // the reference always indexes, so the allowlist sets it aside as unmatched
-// content instead of this function guessing slot 0.
+// content instead of this function guessing slot 0. One that holds JSON null
+// is absent (REQ-053): it fills no slot.
 func takeInlineIdentifiers(g rmattrGroup, ts rmattrTails) ([]any, error) {
 	slots := make(map[int]map[string]any)
+	keys := make(map[int]map[string]string)
 	for _, suffix := range slices.Sorted(maps.Keys(ts.own)) {
 		stem, index, indexed := strings.Cut(suffix, ":")
 		field, known := inlineIdentifierFields[stem]
@@ -510,11 +520,17 @@ func takeInlineIdentifiers(g rmattrGroup, ts rmattrTails) ([]any, error) {
 		if n > maxRepeatIndex {
 			return nil, fmt.Errorf("%w: %q :index %d exceeds bound %d", ErrUnknownPath, key, n, maxRepeatIndex)
 		}
+		v := ts.own[suffix]
+		delete(ts.own, suffix)
+		if v == nil {
+			continue
+		}
 		if slots[n] == nil {
 			slots[n] = make(map[string]any)
+			keys[n] = make(map[string]string)
 		}
-		slots[n][field] = ts.own[suffix]
-		delete(ts.own, suffix)
+		slots[n][field] = v
+		keys[n][field] = key
 	}
 	out := make([]any, 0, len(slots))
 	for i := range len(slots) {
@@ -523,7 +539,7 @@ func takeInlineIdentifiers(g rmattrGroup, ts rmattrTails) ([]any, error) {
 			return nil, fmt.Errorf("%w: %s's inlined identifiers sit in a sparse :index sequence (no :%d); the occurrences must run 0..%d",
 				ErrUnknownPath, g.prefix(), i, len(slots)-1)
 		}
-		dv, err := dvFromSuffixes("DV_IDENTIFIER", false, sfx)
+		dv, err := dvFromSuffixes("DV_IDENTIFIER", false, sfx, func(field string) string { return keys[i][field] })
 		if err != nil {
 			return nil, fmt.Errorf("simplified: decode %q: %w", g.key("|identifiers_*:"+strconv.Itoa(i)), err)
 		}

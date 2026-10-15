@@ -1161,7 +1161,7 @@ func TestDVScaleRidesTheOrdinalSuffixSet(t *testing.T) {
 	// Decode the same three suffixes back.
 	got, err := dvFromSuffixes("DV_SCALE", false, map[string]any{
 		"code": "at0003", "value": "slight breathlessness", "ordinal": 2.5,
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("dvFromSuffixes: %v", err)
 	}
@@ -1182,7 +1182,7 @@ func TestDVScaleIncompleteSuffixSetRefused(t *testing.T) {
 		"no |ordinal": {"code": "at0003", "value": "x"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			if _, err := dvFromSuffixes("DV_SCALE", false, sfx); !errors.Is(err, ErrUnsupportedDatatype) {
+			if _, err := dvFromSuffixes("DV_SCALE", false, sfx, nil); !errors.Is(err, ErrUnsupportedDatatype) {
 				t.Errorf("err = %v, want ErrUnsupportedDatatype", err)
 			}
 		})

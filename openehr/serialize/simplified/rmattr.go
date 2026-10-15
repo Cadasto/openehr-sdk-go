@@ -87,7 +87,9 @@ type tailDup struct {
 // settleDups judges every second spelling the family's grammar met: where the
 // decode set the first spelling aside as unmatched, the second is unmatched
 // too; where it read it, the two must hold the same value, or they are two
-// spellings of one field that disagree (REQ-170).
+// spellings of one field that disagree (REQ-170). A spelling that holds JSON
+// null is absent (REQ-053), so it disagrees with nothing; the grammar holds
+// the other spelling's value ([splitRMAttrTails], [rmattrChildGroups]).
 func (g rmattrGroup) settleDups() error {
 	if g.dups == nil {
 		return nil
@@ -97,7 +99,7 @@ func (g rmattrGroup) settleDups() error {
 			g.sink.add(d.second)
 			continue
 		}
-		if !sameCtxValue(d.firstVal, d.secondVal) {
+		if d.firstVal != nil && d.secondVal != nil && !sameCtxValue(d.firstVal, d.secondVal) {
 			return fmt.Errorf("%w: %q and %q spell one sub-path twice and disagree; remove one",
 				ErrUnsupportedDatatype, d.first, d.second)
 		}
@@ -456,9 +458,14 @@ func decodeRMAttrGroups(compJSON map[string]any, wt *webtemplate.WebTemplate, gr
 // rmattrFamilyAt judges g's family against its owner: the family the decode
 // reads there and the RM class it is judged against. A family that names
 // nothing at this owner hands every key of g to the sink and returns
-// [errNothingMatched]; a deferred family the owner declares is refused.
+// [errNothingMatched]; a deferred family the owner declares is refused, unless
+// every key of it holds JSON null, which carries nothing to drop: then it is
+// absent (REQ-053) and returns [errNothingMatched] too.
 func rmattrFamilyAt(owner rmattrOwner, g rmattrGroup) (rmattrFamily, string, error) {
 	if rmattrDeferredAt(owner.kind, g.family) {
+		if allNull(g.tails) {
+			return rmattrFamily{}, "", errNothingMatched
+		}
 		return rmattrFamily{}, "", fmt.Errorf("%w: %q addresses %s.%s, which this codec defers: the reference's suffix set gives it no channel, so it is refused rather than dropped (REQ-140, see deviations.md)",
 			ErrUnknownPath, g.prefix(), owner.kind, rmattrDeferredFamilies[g.family])
 	}
@@ -650,12 +657,17 @@ func placeRMAttrList(node map[string]any, attr string, g rmattrGroup, val any, b
 // --- suffix helpers -----------------------------------------------------
 
 // checkRMAttrTails hands every tail outside a family's grammar to the sink as
-// unmatched content and removes it (REQ-170). It returns [errNothingMatched]
-// when no tail is left, so the family instance is skipped as if absent.
+// unmatched content and removes it (REQ-170), and removes every tail inside it
+// that holds JSON null, which is absent (REQ-053). It returns
+// [errNothingMatched] when no tail is left, so the family instance is skipped
+// as if absent.
 func checkRMAttrTails(g rmattrGroup, allowed map[string]bool) error {
 	for _, tail := range slices.Sorted(maps.Keys(g.tails)) {
-		if !allowed[tail] {
+		switch {
+		case !allowed[tail]:
 			g.drop(tail)
+		case g.tails[tail] == nil:
+			delete(g.tails, tail)
 		}
 	}
 	if len(g.tails) == 0 {

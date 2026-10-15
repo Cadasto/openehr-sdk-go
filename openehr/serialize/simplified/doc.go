@@ -48,8 +48,18 @@
 // attribute of its RM class (for the composer, a suffix of the party grammar).
 // So does malformed content: a value of the wrong shape, a missing required
 // suffix (a lone bare value where the datatype has no bare spelling, a bare
-// ctx/setting), two spellings of one field the decode reads that disagree
-// (such as `x` and `x|`; a lone `x|` reads as `x`), an index past its bound.
+// ctx/setting, a null required suffix), two spellings of one field the decode
+// reads that disagree (such as `x` and `x|`; a lone `x|` reads as `x`), an
+// index past its bound. A value that does not fit its RM attribute, one the
+// canonical-JSON decode of that attribute would refuse, is refused with
+// [ErrUnsupportedDatatype] naming the FLAT key.
+//
+// A JSON null held by a key the decode reads is absent, never the zero of its
+// type: a leaf whose keys are all null is not built, a null ctx/ field is a
+// missing one, and a null key the decode would refuse for want of a carrier
+// carries nothing to refuse. A key the decode does not read is unmatched
+// whatever its value. In STRUCTURED a null member or array element reads the
+// same way, and OPT-free conversion carries it to FLAT as a key holding null.
 // Two spellings of a key the decode does not read are two unmatched keys. A
 // key is judged segment by segment from the left: an index past the bound of a
 // segment that resolves makes the key malformed, whatever follows it. In

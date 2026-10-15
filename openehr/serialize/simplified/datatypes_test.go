@@ -97,7 +97,7 @@ func TestNewDatatypesEncodeDecode(t *testing.T) {
 			if err := leafToFlat(out, "p/x", tc.v, tc.rmType, false); err != nil {
 				t.Fatalf("leafToFlat: %v", err)
 			}
-			dv, err := dvFromSuffixes(tc.rmType, false, suffixesOf(out, "p/x"))
+			dv, err := dvFromSuffixes(tc.rmType, false, suffixesOf(out, "p/x"), nil)
 			if err != nil {
 				t.Fatalf("dvFromSuffixes: %v", err)
 			}
@@ -192,14 +192,14 @@ func TestOtherOpenValueSet(t *testing.T) {
 	if out["p/x|other"] != "free text" {
 		t.Fatalf("expected p/x|other, got %#v", out)
 	}
-	dv, err := dvFromSuffixes("DV_CODED_TEXT", true, map[string]any{"other": "free text"})
+	dv, err := dvFromSuffixes("DV_CODED_TEXT", true, map[string]any{"other": "free text"}, nil)
 	if err != nil {
 		t.Fatalf("dvFromSuffixes(|other): %v", err)
 	}
 	if dv["_type"] != "DV_TEXT" || dv["value"] != "free text" {
 		t.Errorf("|other decode = %#v, want DV_TEXT", dv)
 	}
-	if _, err := dvFromSuffixes("DV_CODED_TEXT", true, map[string]any{"other": "x", "code": "c", "value": "v"}); err == nil {
+	if _, err := dvFromSuffixes("DV_CODED_TEXT", true, map[string]any{"other": "x", "code": "c", "value": "v"}, nil); err == nil {
 		t.Error("|other + |code = nil error, want rejection")
 	}
 }
@@ -259,7 +259,7 @@ func TestCodedTextAtTextLeafRidesSuffixes(t *testing.T) {
 				}
 			}
 			// And back: |code at the DV_TEXT leaf selects the DV_CODED_TEXT builder.
-			dv, err := dvFromSuffixes("DV_TEXT", false, suffixesOf(out, "p/x"))
+			dv, err := dvFromSuffixes("DV_TEXT", false, suffixesOf(out, "p/x"), nil)
 			if err != nil {
 				t.Fatalf("dvFromSuffixes: %v", err)
 			}
@@ -349,14 +349,14 @@ func TestCodedSuffixesAtTextLeafErrors(t *testing.T) {
 		"code beside other refused":   {"code": "21794005", "value": "v", "other": "x"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			if _, err := dvFromSuffixes("DV_TEXT", false, sfx); !errors.Is(err, ErrUnsupportedDatatype) {
+			if _, err := dvFromSuffixes("DV_TEXT", false, sfx, nil); !errors.Is(err, ErrUnsupportedDatatype) {
 				t.Errorf("dvFromSuffixes(DV_TEXT, %v) err = %v, want ErrUnsupportedDatatype", sfx, err)
 			}
 		})
 	}
 	// A plain DV_TEXT leaf (bare value, optional |formatting) is untouched by
 	// the discriminator.
-	dv, err := dvFromSuffixes("DV_TEXT", false, map[string]any{"": "plain text"})
+	dv, err := dvFromSuffixes("DV_TEXT", false, map[string]any{"": "plain text"}, nil)
 	if err != nil {
 		t.Fatalf("plain DV_TEXT rejected: %v", err)
 	}
@@ -588,7 +588,7 @@ func TestCodePhraseTerminologyOptional(t *testing.T) {
 	if _, ok := out["p/x|terminology"]; ok {
 		t.Errorf("empty TERMINOLOGY_ID wrote a |terminology suffix: %v", out)
 	}
-	dv, err := dvFromSuffixes("CODE_PHRASE", false, suffixesOf(out, "p/x"))
+	dv, err := dvFromSuffixes("CODE_PHRASE", false, suffixesOf(out, "p/x"), nil)
 	if err != nil {
 		t.Fatalf("dvFromSuffixes: %v", err)
 	}
@@ -603,7 +603,7 @@ func TestCodePhraseTerminologyOptional(t *testing.T) {
 // TestCodePhraseMissingCodeErrors: |code is what makes a CODE_PHRASE a code, so
 // its absence must fail loudly rather than rebuild an empty-coded value.
 func TestCodePhraseMissingCodeErrors(t *testing.T) {
-	_, err := dvFromSuffixes("CODE_PHRASE", false, map[string]any{"terminology": "ISO_639-1"})
+	_, err := dvFromSuffixes("CODE_PHRASE", false, map[string]any{"terminology": "ISO_639-1"}, nil)
 	if !errors.Is(err, ErrUnsupportedDatatype) {
 		t.Errorf("err = %v, want ErrUnsupportedDatatype", err)
 	}
@@ -768,7 +768,7 @@ func TestOptionalOrderedSuffixesRoundTrip(t *testing.T) {
 			// And back: every emitted suffix must rebuild its RM attribute. Asserted
 			// per suffix rather than on magnitude_status alone — a rebuild that
 			// dropped, say, units_system would otherwise pass while losing data.
-			dv, err := dvFromSuffixes(tc.rmType, false, suffixesOf(out, "p/x"))
+			dv, err := dvFromSuffixes(tc.rmType, false, suffixesOf(out, "p/x"), nil)
 			if err != nil {
 				t.Fatalf("dvFromSuffixes: %v", err)
 			}
@@ -848,7 +848,7 @@ func TestNonOpenehrNormalStatusRidesRaw(t *testing.T) {
 // become a zero value in the canonical RM — "unset" and "zero" are different
 // clinical claims (a magnitude_status of "" is not the same as none).
 func TestOptionalSuffixAbsentStaysAbsent(t *testing.T) {
-	dv, err := dvFromSuffixes("DV_QUANTITY", false, map[string]any{"magnitude": 1.0, "unit": "mm"})
+	dv, err := dvFromSuffixes("DV_QUANTITY", false, map[string]any{"magnitude": 1.0, "unit": "mm"}, nil)
 	if err != nil {
 		t.Fatalf("dvFromSuffixes: %v", err)
 	}
@@ -917,7 +917,7 @@ func TestMappingBesideOtherFreeText(t *testing.T) {
 		t.Errorf("|other + _mapping is expressible and must not ride |raw: %#v", out)
 	}
 	// Decode is the inverse at both positions: |other alone rebuilds the DV_TEXT…
-	dv, err := dvFromSuffixes("DV_CODED_TEXT", true, map[string]any{"other": "free text"})
+	dv, err := dvFromSuffixes("DV_CODED_TEXT", true, map[string]any{"other": "free text"}, nil)
 	if err != nil {
 		t.Fatalf("dvFromSuffixes: %v", err)
 	}
@@ -941,13 +941,13 @@ func TestOtherRejectsCompanionSuffixes(t *testing.T) {
 		{"other": "x", "code": "c", "value": "v"},
 		{"other": "x", "terminology": "local"},
 	} {
-		_, err := dvFromSuffixes("DV_CODED_TEXT", true, sfx)
+		_, err := dvFromSuffixes("DV_CODED_TEXT", true, sfx, nil)
 		if !errors.Is(err, ErrUnsupportedDatatype) {
 			t.Errorf("dvFromSuffixes(%v) err = %v, want ErrUnsupportedDatatype", sfx, err)
 		}
 	}
 	// |other alone still decodes to a DV_TEXT.
-	dv, err := dvFromSuffixes("DV_CODED_TEXT", true, map[string]any{"other": "x"})
+	dv, err := dvFromSuffixes("DV_CODED_TEXT", true, map[string]any{"other": "x"}, nil)
 	if err != nil {
 		t.Fatalf("bare |other rejected: %v", err)
 	}
@@ -982,7 +982,7 @@ func TestTerminologyOnlyCodePhraseRidesRaw(t *testing.T) {
 	}
 	// And back: |raw decodes to the same canonical fragment, so the value survives
 	// the round-trip rather than being reconstructed from suffixes it never had.
-	dv, err := dvFromSuffixes("CODE_PHRASE", false, suffixesOf(out, "p/x"))
+	dv, err := dvFromSuffixes("CODE_PHRASE", false, suffixesOf(out, "p/x"), nil)
 	if err != nil {
 		t.Fatalf("dvFromSuffixes: %v", err)
 	}
@@ -1025,7 +1025,7 @@ func TestCodedTextWithFormattingRoundTrips(t *testing.T) {
 				t.Errorf("listOpen=%v: out[%q] = %#v, want %#v", listOpen, k, out[k], w)
 			}
 		}
-		dv, err := dvFromSuffixes("DV_CODED_TEXT", listOpen, suffixesOf(out, "p/x"))
+		dv, err := dvFromSuffixes("DV_CODED_TEXT", listOpen, suffixesOf(out, "p/x"), nil)
 		if err != nil {
 			t.Fatalf("dvFromSuffixes(listOpen=%v): %v", listOpen, err)
 		}
@@ -1049,21 +1049,24 @@ func TestCodedTextWithFormattingRoundTrips(t *testing.T) {
 func TestOrderedSuffixWrongKindRejected(t *testing.T) {
 	base := map[string]any{"magnitude": 1.0, "unit": "mm"}
 	for _, tc := range []struct {
-		suffix string
-		bad    any
-		want   string
+		suffix    string
+		bad, good any
+		want      string
 	}{
-		{"magnitude_status", 1.0, "string"},
-		{"accuracy", "abc", "number"},
-		{"accuracy_is_percent", "yes", "boolean"},
-		{"precision", true, "number"},
-		{"units_system", 1.0, "string"},
-		{"units_display_name", false, "string"},
+		{"magnitude_status", 1.0, "~", "string"},
+		{"accuracy", "abc", 1.5, "number"},
+		{"accuracy_is_percent", "yes", true, "boolean"},
+		// An Integer: a fraction does not fit it (REQ-052 § Floating-point
+		// precision), so the well-formed value is a whole number.
+		{"precision", true, 2, "number"},
+		{"precision", 1.5, 2, "number"},
+		{"units_system", 1.0, "~", "string"},
+		{"units_display_name", false, "~", "string"},
 	} {
 		t.Run(tc.suffix, func(t *testing.T) {
 			sfx := maps.Clone(base)
 			sfx[tc.suffix] = tc.bad
-			_, err := dvFromSuffixes("DV_QUANTITY", false, sfx)
+			_, err := dvFromSuffixes("DV_QUANTITY", false, sfx, nil)
 			if err == nil {
 				t.Fatalf("|%s = %#v accepted", tc.suffix, tc.bad)
 			}
@@ -1076,22 +1079,20 @@ func TestOrderedSuffixWrongKindRejected(t *testing.T) {
 				t.Errorf("err = %v, want ErrUnsupportedDatatype (REQ-053: a value must fit its attribute)", err)
 			}
 			// The well-formed value of the same kind still passes through.
-			sfx[tc.suffix] = map[string]any{
-				"string": any("~"), "number": any(1.5), "boolean": any(true),
-			}[tc.want]
-			if _, err := dvFromSuffixes("DV_QUANTITY", false, sfx); err != nil {
+			sfx[tc.suffix] = tc.good
+			if _, err := dvFromSuffixes("DV_QUANTITY", false, sfx, nil); err != nil {
 				t.Errorf("well-formed |%s rejected: %v", tc.suffix, err)
 			}
 		})
 	}
 	// |formatting rides the same table on DV_TEXT.
-	if _, err := dvFromSuffixes("DV_TEXT", false, map[string]any{"": "x", "formatting": 1.0}); err == nil {
+	if _, err := dvFromSuffixes("DV_TEXT", false, map[string]any{"": "x", "formatting": 1.0}, nil); err == nil {
 		t.Error("|formatting = 1.0 accepted, want a kind error")
 	}
 	// json.Number is the kind a decoded body actually carries.
 	if _, err := dvFromSuffixes("DV_QUANTITY", false, map[string]any{
 		"magnitude": json.Number("1"), "unit": "mm", "accuracy": json.Number("0.5"),
-	}); err != nil {
+	}, nil); err != nil {
 		t.Errorf("json.Number |accuracy rejected: %v", err)
 	}
 	// The check adds no strictness of its own: canjson parses a *quoted* number
@@ -1101,7 +1102,7 @@ func TestOrderedSuffixWrongKindRejected(t *testing.T) {
 		{"magnitude": 1.0, "unit": "mm", "accuracy": "0.5"},
 		{"magnitude": 1.0, "unit": "mm", "precision": "2"},
 	} {
-		if _, err := dvFromSuffixes("DV_QUANTITY", false, sfx); err != nil {
+		if _, err := dvFromSuffixes("DV_QUANTITY", false, sfx, nil); err != nil {
 			t.Errorf("quoted number rejected (canjson accepts it): %v in %v", err, sfx)
 		}
 	}
@@ -1148,7 +1149,7 @@ func TestEmptyCodeDoesNotPromoteTextLeaf(t *testing.T) {
 		"empty code beside a bare value": {"code": "", "": "free text"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			dv, err := dvFromSuffixes("DV_TEXT", false, sfx)
+			dv, err := dvFromSuffixes("DV_TEXT", false, sfx, nil)
 			if !errors.Is(err, ErrUnsupportedDatatype) {
 				t.Fatalf("dvFromSuffixes(DV_TEXT, %v) = %#v, err = %v; want ErrUnsupportedDatatype (must not promote to DV_CODED_TEXT)", sfx, dv, err)
 			}

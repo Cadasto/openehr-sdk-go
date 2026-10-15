@@ -155,7 +155,9 @@ var (
 	ErrUnknownPath = errors.New("simplified: path not in web template")
 	// ErrUnsupportedDatatype is returned when a leaf's RM datatype is not mapped
 	// to/from a FLAT suffix set and cannot ride |raw, when a suffix or ctx/
-	// value is not valid for its slot, when a |raw / |other suffix is
+	// value is not valid for its slot (a value the canonical-JSON decode of its
+	// RM attribute would refuse, named by its FLAT key, or a required suffix
+	// that is missing or null), when a |raw / |other suffix is
 	// misused, when a key the decode reads has no carrier (the composer's
 	// `external_ref` suffixes and party sub-structure, a PARTICIPATION `time`,
 	// a FEEDER_AUDIT_DETAILS `other_details`), or when an underscore-prefixed

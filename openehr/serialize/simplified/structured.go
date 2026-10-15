@@ -252,8 +252,12 @@ func insertStructured(obj map[string]any, segs []flatSeg, suffix string, val any
 
 // structuredToFlat flattens a STRUCTURED map into a FLAT map. Each array
 // element takes a :index; |-prefixed keys become the FLAT |suffix. A malformed
-// shape (non-object root, non-array clinical child, null array hole) is an error
-// rather than a silent drop (REQ-053).
+// shape (non-object root, non-array clinical child) is an error rather than a
+// silent drop (REQ-053). A null is absent (REQ-053), and the restructuring
+// carries it as written: a null array element becomes a FLAT key holding null
+// at its :index, and a null member a FLAT key holding null without one, which
+// a decode then reads as absent wherever the key resolves. A null top-level
+// member (the template root, ctx) has no FLAT key to hold it, and is absent.
 func structuredToFlat(s map[string]any) (map[string]any, error) {
 	out, _, err := structuredToFlatJudged(s, nil)
 	return out, err
@@ -271,6 +275,10 @@ func structuredToFlatJudged(s map[string]any, wt *webtemplate.WebTemplate) (map[
 	for rootID, v := range s {
 		if wt != nil && rootID != wt.Tree.ID && rootID != "ctx" {
 			w.skipped = append(w.skipped, rootID)
+			continue
+		}
+		if v == nil {
+			// Absent (REQ-053): no FLAT key holds a root or the ctx object.
 			continue
 		}
 		obj, ok := v.(map[string]any)
@@ -384,6 +392,12 @@ func (w *structuredWalker) walk(path, member string, level memberLevel, obj map[
 			w.skipped = append(w.skipped, member+"/"+k)
 			continue
 		}
+		if v == nil {
+			// A null member is carried as written, for the decode to read as
+			// absent (REQ-053).
+			w.out[path+"/"+k] = nil
+			continue
+		}
 		arr, ok := v.([]any)
 		if !ok {
 			return fmt.Errorf("%w: structured: expected an array at %q, got %T", ErrUnknownPath, path+"/"+k, v)
@@ -404,9 +418,9 @@ func (w *structuredWalker) walk(path, member string, level memberLevel, obj map[
 				if len(w.out) == before && len(w.skipped) == skippedBefore {
 					return fmt.Errorf("%w: structured: element at %q carries no entries", ErrUnknownPath, seg)
 				}
-			case nil:
-				return fmt.Errorf("%w: structured: null element at %q", ErrUnknownPath, seg)
 			default:
+				// A scalar, or a null element carried as written for the
+				// decode to read as absent (REQ-053).
 				w.out[seg] = el
 			}
 		}

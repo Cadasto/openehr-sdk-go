@@ -52,6 +52,17 @@ func TestDecodeReducingContextModes(t *testing.T) {
 	}
 }
 
+// emptyStringLeaf is the corpus template's STRING leaf, ACTIVITY
+// `action_archetype_id`, holding an empty string: a keyed codec error outside
+// the two gap sentinels. The empty String fits its attribute but breaks
+// ACTIVITY's `Action_archetype_id_valid` invariant, so the codec refuses it
+// naming the key, with a plain error (REQ-053 § Leaf datatypes). A value that
+// does not fit its attribute is no such example any more: REQ-053 makes that
+// refusal wrap ErrUnsupportedDatatype.
+func emptyStringLeaf(target *Target) (key string, value any) {
+	return target.Root + "/conformance_section/conformance_instruction/current_activity/action_archetype_id", ""
+}
+
 // TestDecodeReducingNotAGap pins the shape PROBE-086 counts as a harness fault
 // and PROBE-105 as a leg's refusal: a keyed codec error outside the two gap
 // sentinels stops the loop with an *IrreducibleError carrying the key and the
@@ -61,19 +72,18 @@ func TestDecodeReducingNotAGap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewTarget() error = %v", err)
 	}
-	base, body := modelledQuantityLeaf(t, target)
-	// |accuracy must be a number; a string that is not one is a payload defect,
-	// refused naming the leaf with no gap sentinel.
-	body[base+"|accuracy"] = "not a number"
+	_, body := modelledQuantityLeaf(t, target)
+	key, value := emptyStringLeaf(target)
+	body[key] = value
 	before := len(body)
 
 	_, _, err = DecodeReducing(target, body, InjectContext)
 	ie, ok := errors.AsType[*IrreducibleError](err)
 	if !ok || ie == nil {
-		t.Fatalf("DecodeReducing(malformed |accuracy) error = %v, want an *IrreducibleError", err)
+		t.Fatalf("DecodeReducing(empty STRING leaf) error = %v, want an *IrreducibleError", err)
 	}
-	if ie.Key != base {
-		t.Errorf("IrreducibleError.Key = %q, want the leaf %q", ie.Key, base)
+	if ie.Key != key {
+		t.Errorf("IrreducibleError.Key = %q, want the leaf %q", ie.Key, key)
 	}
 	if ie.Err == nil || errors.Is(ie.Err, simplified.ErrUnknownPath) || errors.Is(ie.Err, simplified.ErrUnsupportedDatatype) {
 		t.Errorf("IrreducibleError.Err = %v, want the codec's error, outside the gap sentinels", ie.Err)
@@ -96,13 +106,14 @@ func TestDecodeReducingKeepsRefusalsOnError(t *testing.T) {
 		t.Fatalf("NewTarget() error = %v", err)
 	}
 
-	base, leaf := modelledQuantityLeaf(t, target)
+	_, leaf := modelledQuantityLeaf(t, target)
+	stringKey, stringValue := emptyStringLeaf(target)
 	// Decode reads leaf groups in sorted key order and checks the context
 	// after them, so the composer's external_ref, sorting first, is refused and
 	// removed before the irreducible error stops the loop.
 	refused := target.Root + "/composer|id"
-	if refused >= base {
-		t.Fatalf("refused key %q does not sort before the leaf %q; pick another", refused, base)
+	if refused >= stringKey {
+		t.Fatalf("refused key %q does not sort before the leaf %q; pick another", refused, stringKey)
 	}
 	irreducible := []struct {
 		name    string
@@ -113,8 +124,8 @@ func TestDecodeReducingKeepsRefusalsOnError(t *testing.T) {
 		{
 			name:    "keyed error outside the gap sentinels",
 			mode:    InjectContext,
-			change:  func(b map[string]any) { b[base+"|accuracy"] = "not a number" },
-			wantKey: base,
+			change:  func(b map[string]any) { b[stringKey] = stringValue },
+			wantKey: stringKey,
 		},
 		{
 			name:   "error that names no key",

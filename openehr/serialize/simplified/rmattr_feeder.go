@@ -141,8 +141,15 @@ func rmattrChildGroups(g rmattrGroup, known map[string]bool) (map[string]any, ma
 					ErrUnsupportedDatatype, g.key(tail))
 			}
 			// Judged once the decode knows whether it reads the sub-path
-			// ([rmattrGroup.settleDups]).
-			*g.dups = append(*g.dups, tailDup{first: child.key(remainder), second: g.key(tail), firstVal: held, secondVal: val})
+			// ([rmattrGroup.settleDups]). A held spelling that is null is
+			// absent (REQ-053), so this one carries the value.
+			first := child.key(remainder)
+			if held == nil && val != nil {
+				child.put(remainder, val, g.key(tail))
+				*g.dups = append(*g.dups, tailDup{first: g.key(tail), second: first, firstVal: val, secondVal: held})
+				continue
+			}
+			*g.dups = append(*g.dups, tailDup{first: first, second: g.key(tail), firstVal: held, secondVal: val})
 			continue
 		}
 		child.put(remainder, val, g.key(tail))
@@ -296,8 +303,12 @@ func decodeFeederAuditDetails(g rmattrGroup) (any, error) {
 		return nil, err
 	}
 	for _, suffix := range slices.Sorted(maps.Keys(own)) {
-		if !feederAuditDetailsOwnTails[suffix] {
+		switch {
+		case !feederAuditDetailsOwnTails[suffix]:
 			g.sink.add(g.key(ownTail(suffix)))
+			delete(own, suffix)
+		case own[suffix] == nil:
+			// Absent (REQ-053).
 			delete(own, suffix)
 		}
 	}
@@ -374,11 +385,12 @@ func feederLeafValue(g rmattrGroup, rmType string) (map[string]any, error) {
 		}
 		sfx[strings.TrimPrefix(tail, "|")] = g.tails[tail]
 	}
-	sfx = matchedSuffixes(rmType, sfx, func(suffix string) string { return g.key(ownTail(suffix)) }, g.sink)
+	keyOf := func(suffix string) string { return g.key(ownTail(suffix)) }
+	sfx = matchedSuffixes(rmType, sfx, keyOf, g.sink)
 	if len(sfx) == 0 {
 		return nil, errNothingMatched
 	}
-	dv, err := dvFromSuffixes(rmType, false, sfx)
+	dv, err := dvFromSuffixes(rmType, false, sfx, keyOf)
 	if err != nil {
 		return nil, fmt.Errorf("simplified: decode %q: %w", g.prefix(), err)
 	}

@@ -158,8 +158,10 @@ func (p intervalPosition) body(keys ...map[string]any) map[string]any {
 }
 
 // structuredForm is the STRUCTURED form of a FLAT body. A null bare bound,
-// which FlatToStructured writes as a null array element (refused in every
-// mode as a hole in the array), is spelled as the null `"|"` member instead.
+// which FlatToStructured writes as a null array element, is spelled as the
+// null `"|"` member instead, the other STRUCTURED spelling of a null bare
+// value; the null array element is pinned by
+// TestREQ053NullStructuredMemberAndElementAreAbsent.
 func structuredForm(t *testing.T, body map[string]any) []byte {
 	t.Helper()
 	s, err := FlatToStructured(mustJSON(t, body))

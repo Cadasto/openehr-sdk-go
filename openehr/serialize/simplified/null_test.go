@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"maps"
+	"slices"
 	"strings"
 	"testing"
 
@@ -136,6 +137,44 @@ func TestREQ053AllNullKeysReadAsAbsent(t *testing.T) {
 		"null terminology witness": {rmattrRoot + "/language|terminology": nil},
 		"null ctx/time":            {"ctx/time": nil},
 		"null ctx/composer_self":   {"ctx/composer_self": nil},
+		"null bare ctx/setting":    {"ctx/setting": nil},
+		"null ctx/setting witness": {"ctx/setting|terminology": nil},
+		// The real-path alias of ctx/language beside the ctx/ spelling: a null
+		// one is no second, disagreeing spelling.
+		"null alias beside its ctx/ spelling": {rmattrRoot + "/language|code": nil},
+		// The real-path alias of ctx/time, and a suffix of a leaf the ctx/ short
+		// form owns that it cannot carry, which is refused for want of a
+		// carrier; a null one carries nothing.
+		"null alias of ctx/time":      {rmattrRoot + "/context/start_time": nil},
+		"null ctx/-owned leaf suffix": {rmattrRoot + "/language|preferred_term": nil},
+		// The bare value of a node with children names no value, and a suffix of
+		// the composer's party grammar has no carrier; a null one is absent.
+		"null bare value at a node with children": {rmattrObs: nil},
+		"null composer external_ref":              {rmattrRoot + "/composer|id": nil},
+		"null STRING leaf": {
+			rmattrSection + "/conformance_instruction/current_activity/action_archetype_id": nil,
+		},
+		// `x|` spells the bare value of `x`; a null spelling is no disagreement.
+		"null x| beside x": {rmattrText: "text", rmattrText + "|": nil},
+		"null x beside x|": {rmattrText: nil, rmattrText + "|": "text"},
+		// The reference's in-context spelling of RM data the Web Template does
+		// not model is refused, rather than dropped; a null one drops nothing.
+		"null in-context INTERVAL_EVENT width": {rmattrEvent + "/width": nil},
+		// A family this codec defers has no carrier; an all-null one is absent.
+		"null deferred family": {rmattrAction + "/_instruction_details|x": nil},
+		"null inlined participation identifier": {
+			rmattrContext + "/_participation:0|function":         "requester",
+			rmattrContext + "/_participation:0|identifiers_id:0": nil,
+		},
+		"null interval flag": {
+			rmattrElement + "/_normal_range/lower|magnitude": 20.5,
+			rmattrElement + "/_normal_range/lower|unit":      "unit",
+			rmattrElement + "/_normal_range|lower_unbounded": nil,
+		},
+		"null feeder audit other_details": {
+			rmattrRoot + "/_feeder_audit/originating_system_audit|system_id":       "s",
+			rmattrRoot + "/_feeder_audit/originating_system_audit/other_details|x": nil,
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			body := rmattrBody(extra)
@@ -230,5 +269,125 @@ func TestREQ053InterconversionCarriesNull(t *testing.T) {
 	want := map[string]any{"t/leaf:0": nil, "t/other": nil}
 	if !maps.Equal(flat, want) {
 		t.Errorf("StructuredToFlat = %s, want %s", out, mustJSON(t, want))
+	}
+}
+
+// TestREQ053DvFromSuffixesReadsNullAsAbsent — REQ-053: the DataValue builder
+// itself reads a null suffix as absent, whoever calls it, so a null required
+// suffix is a missing one and never reaches the canonical tree as the zero of
+// its type (`|magnitude: null` beside a unit decoded to 0 before).
+func TestREQ053DvFromSuffixesReadsNullAsAbsent(t *testing.T) {
+	dv, err := dvFromSuffixes("DV_QUANTITY", false, map[string]any{"magnitude": nil, "unit": "mg"}, nil)
+	if !errors.Is(err, ErrUnsupportedDatatype) || !strings.Contains(err.Error(), "missing required |magnitude") {
+		t.Errorf("dvFromSuffixes(DV_QUANTITY, magnitude null) = %#v, %v; want the missing |magnitude refused", dv, err)
+	}
+	dv, err = dvFromSuffixes("DV_QUANTITY", false, map[string]any{"magnitude": 1.5, "unit": "mg", "precision": nil}, nil)
+	if err != nil {
+		t.Fatalf("dvFromSuffixes(DV_QUANTITY, precision null) = %v", err)
+	}
+	if _, set := dv["precision"]; set {
+		t.Errorf("dvFromSuffixes(DV_QUANTITY, precision null) = %#v, want no precision", dv)
+	}
+}
+
+// TestREQ053BareValueBesideOnlyNullSuffixesIsAlone — REQ-053 and REQ-170: a
+// bare value at a datatype with no bare spelling is unmatched beside a suffix
+// the datatype reads, and malformed alone. Null suffixes are absent, so a bare
+// value beside nothing else is alone, and refused as a value missing every
+// required suffix, rather than set aside while the null suffixes vanish.
+func TestREQ053BareValueBesideOnlyNullSuffixesIsAlone(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	body := rmattrBody(map[string]any{
+		rmattrProportion: 1.5, rmattrProportion + "|numerator": nil, rmattrProportion + "|denominator": nil,
+	})
+	for form, err := range map[string]error{
+		"FLAT":       refusedInEveryMode(t, wt, body),
+		"STRUCTURED": structuredRefusedInEveryMode(t, wt, body),
+	} {
+		if !errors.Is(err, ErrUnsupportedDatatype) || !strings.Contains(err.Error(), "bare value") {
+			t.Errorf("%s: decode = %v, want the lone bare value refused (ErrUnsupportedDatatype)", form, err)
+		}
+	}
+}
+
+// TestREQ053NullSecondSpellingIsAbsent — REQ-053: two spellings of one sub-path
+// (the index-less one and `:0`, which OPT-free conversion writes) must agree,
+// but a null spelling is absent, so it disagrees with nothing, and the other
+// spelling's value is the one read, whichever of the two sorts first. FLAT
+// only: STRUCTURED has one slot for the pair.
+func TestREQ053NullSecondSpellingIsAbsent(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	for name, tc := range map[string]struct{ value, null string }{
+		"interval bound": {
+			value: rmattrElement + "/_normal_range/lower|magnitude",
+			null:  rmattrElement + "/_normal_range/lower:0|magnitude",
+		},
+		"feeder audit details": {
+			value: rmattrRoot + "/_feeder_audit/originating_system_audit|system_id",
+			null:  rmattrRoot + "/_feeder_audit/originating_system_audit:0|system_id",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			extra := map[string]any{tc.value: "s"}
+			if strings.HasSuffix(tc.value, "|magnitude") {
+				extra = map[string]any{tc.value: 20.5, rmattrElement + "/_normal_range/lower|unit": "unit"}
+			}
+			want := rmattrBody(extra)
+			body := rmattrBody(extra)
+			body[tc.null] = nil
+			got, err := UnmarshalFlat(mustJSON(t, body), wt, WithStrict())
+			if err != nil {
+				t.Fatalf("UnmarshalFlat = %v, want the null spelling read as absent", err)
+			}
+			if !bytes.Equal(canonical(t, got), canonical(t, decodeRMAttr(t, wt, want))) {
+				t.Errorf("decoded\n%s\nwant the body without the null spelling", canonical(t, got))
+			}
+		})
+	}
+}
+
+// TestREQ053NullStructuredTopLevelIsAbsent — REQ-053: a null template root or
+// ctx object is absent. No FLAT key can hold either, so the decode reads the
+// document without it: a null ctx is missing context, and a null root a
+// composition with no content.
+func TestREQ053NullStructuredTopLevelIsAbsent(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	_, doc := structuredDoc(t, rmattrBody(nil))
+	doc["ctx"] = nil
+	if _, err := UnmarshalStructured(mustJSON(t, doc), wt); !errors.Is(err, ErrMissingContext) {
+		t.Errorf("UnmarshalStructured(ctx: null) = %v, want ErrMissingContext", err)
+	}
+	ctxOnly := map[string]any{"ctx/language": "en", "ctx/territory": "US"}
+	ref, err := UnmarshalFlat(mustJSON(t, ctxOnly), wt, WithStrict())
+	if err != nil {
+		t.Fatalf("UnmarshalFlat(ctx only) = %v", err)
+	}
+	got, err := UnmarshalStructured(mustJSON(t, map[string]any{
+		"ctx": map[string]any{"language": "en", "territory": "US"}, rmattrRoot: nil,
+	}), wt, WithStrict())
+	if err != nil {
+		t.Fatalf("UnmarshalStructured(root: null) = %v, want the root read as absent", err)
+	}
+	if !bytes.Equal(canonical(t, got), canonical(t, ref)) {
+		t.Errorf("decoded\n%s\nwant the document with no root\n%s", canonical(t, got), canonical(t, ref))
+	}
+}
+
+// TestREQ053NullMemberUnmatchedIsReportedByItsMemberPath — REQ-170: a null
+// member the conversion carries as a FLAT key is reported, when that key is
+// unmatched, by its member path, as every other STRUCTURED item is, never by
+// the FLAT key the conversion made of it.
+func TestREQ053NullMemberUnmatchedIsReportedByItsMemberPath(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	_, doc := structuredDoc(t, rmattrBody(nil))
+	event := structuredObservation(doc)["any_event"].([]any)[0].(map[string]any)
+	event["dv_quantity|x_note"] = nil
+	var reported []string
+	if _, err := UnmarshalStructured(mustJSON(t, doc), wt, WithUnmatched(func(p string) { reported = append(reported, p) })); err != nil {
+		t.Fatalf("UnmarshalStructured = %v", err)
+	}
+	want := []string{rmattrRoot + "/conformance_section/0/conformance_observation/0/any_event/0/dv_quantity|x_note"}
+	if !slices.Equal(reported, want) {
+		t.Errorf("WithUnmatched reported %q, want %q", reported, want)
 	}
 }

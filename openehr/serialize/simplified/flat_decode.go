@@ -226,7 +226,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 		if len(sfx) == 0 {
 			continue
 		}
-		dv, err := leafFromSuffixes(nodeRMType(leaf), leafListOpen(leaf), sfx)
+		dv, err := leafFromSuffixes(nodeRMType(leaf), leafListOpen(leaf), sfx, keyOf)
 		if err != nil {
 			return nil, fmt.Errorf("simplified: decode %q: %w", base, err)
 		}
@@ -305,55 +305,48 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 //   - An unparameterised `DV_INTERVAL` leaf has a sub-path grammar, the
 //     interval grammar, but names no bound datatype to read it with, so it
 //     reads its |raw fragment alone; every other key is unmatched.
+//
+// A key the decode reads that holds JSON null is absent (REQ-053): it is
+// dropped without a word, so a leaf whose keys are all null comes back empty,
+// and a null key is never refused for want of a carrier. A key the decode
+// does not read goes to sink whatever its value.
 func leafSuffixes(leaf *webtemplate.Node, sfx map[string]any, keyOf func(string) string, sink *unmatchedSink) (map[string]any, error) {
-	if len(leaf.Children) > 0 {
-		var out map[string]any
-		for _, suffix := range slices.Sorted(maps.Keys(sfx)) {
-			if suffix == "raw" || suffix == "" {
-				continue
-			}
-			if out == nil {
-				out = maps.Clone(sfx)
-			}
-			delete(out, suffix)
-			sink.add(keyOf(suffix))
-		}
-		if out == nil {
-			return sfx, nil
-		}
-		return out, nil
-	}
 	rmType := nodeRMType(leaf)
-	if _, judged := leafSuffixMatched(rmType, ""); judged {
-		return matchedSuffixes(rmType, sfx, keyOf, sink), nil
+	if len(leaf.Children) == 0 {
+		if _, judged := leafSuffixMatched(rmType, ""); judged {
+			return matchedSuffixes(rmType, sfx, keyOf, sink), nil
+		}
+	}
+	out := maps.Clone(sfx)
+	if len(leaf.Children) > 0 {
+		for _, suffix := range slices.Sorted(maps.Keys(sfx)) {
+			if suffix != "raw" && suffix != "" {
+				delete(out, suffix)
+				sink.add(keyOf(suffix))
+			}
+		}
+		return withoutNulls(out), nil
 	}
 	subPathGrammar := bmmtype.Class(rmType) == "DV_INTERVAL"
-	var out map[string]any
+	out = withoutNulls(out)
 	for _, suffix := range slices.Sorted(maps.Keys(sfx)) {
+		read := suffix == "raw" || (!subPathGrammar && (suffix == "" || unmappedReads(rmType, suffix)))
 		switch {
-		case suffix == "raw":
-			// |raw is the carrier of an unmapped datatype; dvFromSuffixes refuses
-			// it beside any other suffix.
-		case !subPathGrammar && (suffix == "" || unmappedReads(rmType, suffix)):
-			if _, raw := sfx["raw"]; raw {
-				break
-			}
-			if suffix == "" {
-				// Named as the allowlist refusals name a bare value, so a caller
-				// reading the refusal removes the bare key alone.
-				return nil, fmt.Errorf("simplified: decode %q: %w: unexpected bare value for %s", keyOf(suffix), ErrUnsupportedDatatype, rmType)
-			}
-			return nil, fmt.Errorf("simplified: decode %q: %w: %s", keyOf(suffix), ErrUnsupportedDatatype, rmType)
-		default:
-			if out == nil {
-				out = maps.Clone(sfx)
-			}
+		case !read:
 			delete(out, suffix)
 			sink.add(keyOf(suffix))
+		case suffix == "raw", sfx[suffix] == nil:
+			// |raw is the carrier of an unmapped datatype; dvFromSuffixes refuses
+			// it beside any other suffix. A null key is absent.
+		case out["raw"] != nil:
+			// Kept beside |raw, which dvFromSuffixes then refuses.
+		case suffix == "":
+			// Named as the allowlist refusals name a bare value, so a caller
+			// reading the refusal removes the bare key alone.
+			return nil, fmt.Errorf("simplified: decode %q: %w: unexpected bare value for %s", keyOf(suffix), ErrUnsupportedDatatype, rmType)
+		default:
+			return nil, fmt.Errorf("simplified: decode %q: %w: %s", keyOf(suffix), ErrUnsupportedDatatype, rmType)
 		}
-	}
-	if out == nil {
-		return sfx, nil
 	}
 	return out, nil
 }
@@ -750,7 +743,10 @@ func MetadataWitnessSpellings() []string {
 // metadata, the same stance the codec already takes on an index collision.
 //
 // A ctx/ field the decode does not read, and a suffix of a ctx/-owned leaf
-// outside that leaf's datatype, go to sink as unmatched content (REQ-170).
+// outside that leaf's datatype, go to sink as unmatched content (REQ-170),
+// whatever their value. A ctx/ field, an alias, a witness or a ctx/-owned leaf
+// suffix the decode reads that holds JSON null is absent (REQ-053) and is
+// dropped. The composer's party sub-structure is refused whatever its value.
 func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx map[string]any, ctxOrigin map[string]string, content map[string]any, err error) {
 	ctx, ctxOrigin, content = make(map[string]any), make(map[string]string), make(map[string]any)
 	// Sorted so a body carrying two conflicting real-path spellings reports the
@@ -759,6 +755,15 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 	for _, key := range slices.Sorted(maps.Keys(flat)) {
 		val := flat[key]
 		if strings.HasPrefix(key, "ctx/") {
+			if key != ctxSettingBare && key != ctxSettingTerminology && !ctxFields[key] {
+				sink.add(key)
+				continue
+			}
+			// A ctx/ field the decode reads that holds null is absent
+			// (REQ-053): a null ctx/language is a missing one.
+			if val == nil {
+				continue
+			}
 			if key == ctxSettingBare {
 				// ctx/setting is read as its |code + |value pair; a bare value is
 				// the field missing both (REQ-170: a missing required suffix).
@@ -773,10 +778,6 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 				if err := checkTerminologyWitness(key, val, terminology.ID); err != nil {
 					return nil, nil, nil, err
 				}
-				continue
-			}
-			if !ctxFields[key] {
-				sink.add(key)
 				continue
 			}
 			if err := putCtx(ctx, ctxOrigin, key, val, key); err != nil {
@@ -818,13 +819,22 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 		if overIndexed {
 			return nil, nil, nil, fmt.Errorf("simplified: %q: %w", key, errSingleValuedIndex(overIndexedMetadataSeg(raw)))
 		}
+		// A witness, an alias or a suffix of a ctx/-owned leaf that holds null
+		// is absent (REQ-053), so it neither conflicts with another spelling
+		// nor is refused for want of a ctx/ carrier.
 		if want, isWitness := metadataAliasTerminology[rel]; isWitness {
+			if val == nil {
+				continue
+			}
 			if err := checkTerminologyWitness(key, val, want); err != nil {
 				return nil, nil, nil, err
 			}
 			continue
 		}
 		if ctxKey, isAlias := metadataAliases[rel]; isAlias {
+			if val == nil {
+				continue
+			}
 			if err := putCtx(ctx, ctxOrigin, ctxKey, val, key); err != nil {
 				return nil, nil, nil, err
 			}
@@ -844,6 +854,9 @@ func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx
 		if base, suffix, _ := strings.Cut(rel, "|"); contextMetaOwnedBases[base] {
 			if matched, _ := leafSuffixMatched(metadataOwnedBaseType[base], suffix); !matched && suffix != "" {
 				sink.add(key)
+				continue
+			}
+			if val == nil {
 				continue
 			}
 			return nil, nil, nil, fmt.Errorf("%w: %q is not a spelling the ctx/ short form can carry — %s owns this leaf, so only its accepted suffixes travel (see deviations.md)",
@@ -1701,7 +1714,8 @@ func inContextCite(attr string) string {
 //
 // Keys are checked in sorted order, so a body with several names the same one on
 // every run. The error names the key, or the `_reason` family instance, and
-// carries no value.
+// carries no value. Such a key that holds JSON null carries no data to drop:
+// it is absent (REQ-053), and is removed from content.
 func refuseInContextKeys(content map[string]any, wt *webtemplate.WebTemplate, ambiguous map[string]bool) error {
 	for _, key := range slices.Sorted(maps.Keys(content)) {
 		pk, err := parseFlatKey(key)
@@ -1711,6 +1725,11 @@ func refuseInContextKeys(content map[string]any, wt *webtemplate.WebTemplate, am
 		}
 		named, owner, attr, ok := inContextKey(wt, key, pk, ambiguous)
 		if !ok {
+			continue
+		}
+		if content[key] == nil {
+			// A null names no data to drop: the key is absent (REQ-053).
+			delete(content, key)
 			continue
 		}
 		return fmt.Errorf("%w: %q is the reference's in-context spelling of an %s's %s, which the Web Template this SDK builds does not model — refused rather than dropped or replaced (%s, see deviations.md)",
@@ -2306,7 +2325,14 @@ var bareLeafAttr = map[string]string{
 // suffix (DV_COUNT -> magnitude, DV_BOOLEAN -> value, per the STABLE RM
 // mappings). A required suffix that is absent is an error rather than a coerced
 // zero value; an unmapped datatype is ErrUnsupportedDatatype.
-func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (map[string]any, error) {
+//
+// A suffix holding JSON null is absent (REQ-053), so a null required suffix is
+// a missing one, and no null reaches the canonical tree as the zero of its
+// type. Every other value must fit the RM attribute it fills
+// ([checkSuffixFits]); one that does not is refused naming the FLAT key keyOf
+// gives for its suffix (nil names the suffix alone).
+func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any, keyOf func(suffix string) string) (map[string]any, error) {
+	sfx = withoutNulls(sfx)
 	// |raw bypass: a pre-serialised canonical fragment (carrying its own string
 	// _type); used directly, regardless of the leaf rmType. Mutually exclusive
 	// with every other suffix.
@@ -2337,14 +2363,19 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (map[strin
 	// selected", and promoting those would mint a DV_CODED_TEXT whose
 	// CODE_PHRASE.code_string is empty — RM-invalid, yet stable enough on
 	// re-encode that nothing downstream flags it, and matched by any AQL predicate
-	// testing defining_code/code_string against ''. They stay a plain DV_TEXT, so
-	// the allowlist below refuses the stray |code as it did before this carve-out.
+	// testing defining_code/code_string against ''. They stay a plain DV_TEXT:
+	// a null |code is absent (REQ-053, dropped above), and the allowlist below
+	// refuses the stray `|code: ""`, or the |value beside a null one, as it did
+	// before this carve-out.
 	if rmType == "DV_TEXT" {
 		if code, coded := sfx["code"].(string); coded && code != "" {
 			rmType = "DV_CODED_TEXT"
 		}
 	}
 	if err := checkSuffixAllowlist(rmType, sfx); err != nil {
+		return nil, err
+	}
+	if err := checkSuffixFits(rmType, sfx, keyOf); err != nil {
 		return nil, err
 	}
 	// The bare-leaf datatypes all rebuild as {_type, <attr>: value} from the ""
@@ -2524,6 +2555,25 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (map[strin
 	return nil, fmt.Errorf("%w: %s", ErrUnsupportedDatatype, rmType)
 }
 
+// withoutNulls returns m without the entries that hold JSON null, which
+// REQ-053 reads as absent: m itself when it holds none.
+func withoutNulls(m map[string]any) map[string]any {
+	var out map[string]any
+	for k, v := range m {
+		if v != nil {
+			continue
+		}
+		if out == nil {
+			out = maps.Clone(m)
+		}
+		delete(out, k)
+	}
+	if out == nil {
+		return m
+	}
+	return out
+}
+
 // multimediaFromSuffixes rebuilds a canonical DV_MULTIMEDIA from its FLAT suffix
 // set (REQ-140). `media_type` and `size` are RM-mandatory, so they are required
 // rather than defaulted; the bare key is the **uri**, and the two Byte[]
@@ -2618,113 +2668,37 @@ var allowedSuffixes = map[string]map[string]bool{
 	},
 }
 
-// suffixKind is the JSON value kind an optional pass-through suffix must carry.
-// The value itself is handed to canjson untouched, so this is the last point at
-// which a wrong kind can be reported against the FLAT key carrying it.
-type suffixKind uint8
-
-const (
-	kindString suffixKind = iota
-	kindNumber
-	kindBool
-)
-
-func (k suffixKind) String() string {
-	switch k {
-	case kindNumber:
-		return "number"
-	case kindBool:
-		return "boolean"
-	case kindString:
-		return "string"
-	default:
-		return fmt.Sprintf("suffixKind(%d)", int(k))
-	}
-}
-
-// holds reports whether v could satisfy this kind. It is a necessary condition,
-// not a full type check: canjson remains the authority on the RM type, and this
-// deliberately admits everything canjson does so that naming the FLAT key never
-// costs a body that decodes today.
-//
-//   - Numbers arrive as json.Number from a decoded body (unmarshalObject
-//     preserves exact magnitudes) but as ordinary Go numerics from in-package
-//     callers, so both spellings count.
-//   - A *quoted* number satisfies kindNumber: canjson parses a numeric string
-//     into Real / Integer, and some producers quote every scalar. Only a string
-//     that is not a number at all (`|accuracy: "abc"`) is refused — the case
-//     canjson would fail on anyway, but too late to name the key.
-func (k suffixKind) holds(v any) bool {
-	switch t := v.(type) {
-	case string:
-		if k == kindString {
-			return true
+// orderedPassThrough are the optional DV_ORDERED / DV_QUANTIFIED / DV_AMOUNT
+// suffixes, and DV_TEXT's `|formatting`, whose value passes through as decoded
+// onto the canonical attribute of the same name (a json.Number keeps its exact
+// lexical form), in sorted order. `|normal_status`, a CODE_PHRASE rebuilt from
+// a bare code, is the one optional suffix that does not pass through.
+var orderedPassThrough = func() []string {
+	var out []string
+	for suffix, path := range orderedSuffixAttrPaths {
+		if path == suffix {
+			out = append(out, suffix)
 		}
-		_, err := strconv.ParseFloat(t, 64)
-		return k == kindNumber && err == nil
-	case bool:
-		return k == kindBool
-	case json.Number, float32, float64, int, int32, int64:
-		return k == kindNumber
 	}
-	return false
-}
-
-// orderedSuffix is one optional pass-through suffix: the canonical RM attribute
-// it rebuilds and the JSON kind its value must carry.
-type orderedSuffix struct {
-	attr string
-	kind suffixKind
-}
-
-// orderedSuffixes maps the optional DV_ORDERED / DV_QUANTIFIED / DV_AMOUNT
-// suffixes onto the canonical RM attribute each rebuilds, for the datatypes
-// whose allowedSuffixes admit them. The value passes through as decoded (a
-// json.Number keeps its exact lexical form), so canjson enforces the RM type; the
-// one exception is normal_status, a CODE_PHRASE rebuilt from a bare code.
-//
-// The kind is carried alongside because canjson enforces the RM type too late to
-// say *which FLAT key* was malformed — see [applyOrderedSuffixes].
-var orderedSuffixes = map[string]orderedSuffix{
-	"magnitude_status":    {"magnitude_status", kindString},
-	"accuracy":            {"accuracy", kindNumber},
-	"accuracy_is_percent": {"accuracy_is_percent", kindBool},
-	"precision":           {"precision", kindNumber},
-	"units_system":        {"units_system", kindString},
-	"units_display_name":  {"units_display_name", kindString},
-	"formatting":          {"formatting", kindString},
-}
-
-// orderedSuffixNames holds the [orderedSuffixes] keys in sorted order, so a leaf
-// carrying two malformed suffixes names the same one on every run.
-var orderedSuffixNames = slices.Sorted(maps.Keys(orderedSuffixes))
+	slices.Sort(out)
+	return out
+}()
 
 // applyOrderedSuffixes copies the optional suffixes present in sfx onto the
 // canonical object dv. An absent suffix sets nothing — the attributes are all
 // optional in the RM, so a missing one must stay absent rather than become a
 // zero value (the same contract requireSuffix enforces for mandatory ones).
 //
-// A value of the wrong JSON kind is refused here, where the caller still has the
-// FLAT key in hand to name it (decode %q). Passed through, it would instead
-// surface from canjson against the *rebuilt tree* — "decode /content/0:
-// typereg.Decode …" — naming a canonical path the payload author never wrote and
-// no FLAT key at all. Deliberately no gap sentinel: a malformed value is a defect
-// in the payload, not a datatype or path this codec declines to model, and the
-// conformance census counts only the latter. The check adds no strictness of its
-// own — it admits everything canjson admits, quoted numbers included (see
-// [suffixKind.holds]) — and the RM's own value constraints (magnitude_status
-// against its code set, …) stay with the validation package.
+// [dvFromSuffixes] has already checked every value against its RM attribute
+// ([checkSuffixFits]) while the FLAT key was in hand to name it, so nothing
+// reaches canjson that would fail there naming a canonical path the payload
+// author never wrote. The RM's own value constraints (magnitude_status against
+// its code set, …) stay with the validation package.
 func applyOrderedSuffixes(dv, sfx map[string]any) error {
-	for _, suffix := range orderedSuffixNames {
-		v, ok := sfx[suffix]
-		if !ok {
-			continue
+	for _, suffix := range orderedPassThrough {
+		if v, ok := sfx[suffix]; ok {
+			dv[suffix] = v
 		}
-		want := orderedSuffixes[suffix]
-		if !want.kind.holds(v) {
-			return fmt.Errorf("|%s must be a %s, got %T", suffix, want.kind, v)
-		}
-		dv[want.attr] = v
 	}
 	if v, ok := sfx["normal_status"]; ok {
 		code, err := ctxString("|normal_status", v)
@@ -2805,7 +2779,9 @@ type emptySuffixFold struct {
 // knows whether it reads `x` ([emptySuffixFold.settle]): two spellings of one
 // field the decode reads disagree, and a pair it does not read is two
 // unmatched keys (REQ-170). Either way the sink reports every spelling as
-// written. The map returned is flat itself when nothing was folded.
+// written. A spelling that holds null is absent (REQ-053), so beside the
+// other spelling it is no disagreement: the value is the other one's. The map
+// returned is flat itself when nothing was folded.
 func foldEmptySuffix(flat map[string]any) (map[string]any, emptySuffixFold) {
 	var out map[string]any
 	var fold emptySuffixFold
@@ -2824,7 +2800,12 @@ func foldEmptySuffix(flat map[string]any) (map[string]any, emptySuffixFold) {
 		case !both:
 			out[bare] = flat[key]
 			fold.spellings[bare] = []string{key}
-		case sameCtxValue(other, flat[key]):
+		case sameCtxValue(other, flat[key]), flat[key] == nil:
+			// A null `x|` is absent beside `x` (REQ-053): no second value.
+			fold.spellings[bare] = []string{bare, key}
+		case other == nil:
+			// A null `x` is absent: `x|` carries the one value.
+			out[bare] = flat[key]
 			fold.spellings[bare] = []string{bare, key}
 		default:
 			fold.spellings[bare] = []string{bare, key}
