@@ -46,6 +46,14 @@
 // composer key. It refuses a PARTY_IDENTIFIED composer with an empty name or
 // with no name, reference or identifiers.
 //
+// The composition's own name travels as "<root>/_name", spelled as a text
+// leaf is: a bare name, beside its "|formatting" if it has one, or a coded
+// name as "|code", "|value" and "|terminology". Decode names the composition
+// from it, and after the Web Template root, or the template id where the root
+// has no name, when the body has none. Encode writes it unless the name is
+// plain text, uncoded and with nothing but its value, equal to that root name.
+// A "_name" under any other node is unmatched content.
+//
 // # Unmatched content
 //
 // Input the decode does not read is unmatched: a key whose path the Web
