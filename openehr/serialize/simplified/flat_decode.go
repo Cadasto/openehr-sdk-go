@@ -297,11 +297,15 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 // suffix arrived under.
 //
 //   - A node with children is structure, not a value: the decode reads a |raw
-//     fragment there and its bare value, which names the node and so is
-//     matched content of the wrong shape, refused where the value is built
-//     (REQ-170). Every other suffix is unmatched (an extension suffix such as
-//     `|x_note`, say). The RM attributes the reference spells as a suffix on
-//     such a node never get here: [refuseInContextKeys] refuses them first.
+//     fragment there and its bare value, which name the node and so are
+//     matched content of the wrong shape (REQ-170). A |raw is refused here
+//     with ErrUnsupportedDatatype naming its key, whatever its fragment's
+//     _type: it carries a datatype (REQ-053), and a fragment placed whole at
+//     the node would be dropped once the node's own keys rebuild it. The bare
+//     value is refused where the value is built. Every other suffix is
+//     unmatched (an extension suffix such as `|x_note`, say). The RM
+//     attributes the reference spells as a suffix on such a node never get
+//     here: [refuseInContextKeys] refuses them first.
 //   - A leaf whose datatype has a suffix set keeps the suffixes in that set
 //     ([leafSuffixMatched]); the rest are unmatched.
 //   - A leaf whose datatype has neither a suffix set nor a sub-path grammar
@@ -329,6 +333,11 @@ func leafSuffixes(leaf *webtemplate.Node, sfx map[string]any, keyOf func(string)
 	}
 	out := maps.Clone(sfx)
 	if len(leaf.Children) > 0 {
+		// A null |raw is absent (REQ-053), and falls to withoutNulls below.
+		if sfx["raw"] != nil {
+			return nil, fmt.Errorf("simplified: decode %q: %w: |raw carries a datatype, and the %s it names is a node with children",
+				keyOf("raw"), ErrUnsupportedDatatype, rmType)
+		}
 		for _, suffix := range slices.Sorted(maps.Keys(sfx)) {
 			if suffix != "raw" && suffix != "" {
 				delete(out, suffix)
@@ -2777,9 +2786,10 @@ func leafListOpen(node *webtemplate.Node) bool {
 // fills, the type a `|raw` fragment there must name or descend from (REQ-053).
 // A collapsed ELEMENT's leaf fills ELEMENT.value, a DATA_VALUE, whatever
 // datatype the template names: the encoder writes a substituted value there
-// as `|raw` stamped with its own type. Every other node types the attribute
+// as `|raw` stamped with its own type. Every other leaf types the attribute
 // it fills itself: an in-context leaf (an EVENT's `time`, an ENTRY's
-// `language`, COMPOSITION `category`) and a node with children alike.
+// `language`, COMPOSITION `category`), say. A node with children takes no
+// `|raw` at all: [leafSuffixes] refuses one there first.
 func leafHolds(leaf *webtemplate.Node) string {
 	if strings.HasSuffix(bareAQLPath(leaf.AQLPath), "/value") {
 		return "DATA_VALUE"

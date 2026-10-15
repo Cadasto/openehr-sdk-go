@@ -49,7 +49,8 @@ func TestREQ053CtxBareMemberIsTheFieldKey(t *testing.T) {
 // STRUCTURED refuses it naming the key, rather than merging it with the
 // field's |suffix keys, where one would silently overwrite the other, or
 // handing it to STRUCTURED → FLAT to read back as suffixes. A scalar direct
-// value beside the field's suffixes stays refused as before.
+// value beside the field's suffixes is carried as the `"|"` member instead
+// (TestREQ140CtxValueBesideSuffixesRoundTrips).
 func TestREQ053FlatToStructuredRefusesAnObjectCtxValue(t *testing.T) {
 	for name, tc := range map[string]struct {
 		flat  string
@@ -58,7 +59,6 @@ func TestREQ053FlatToStructuredRefusesAnObjectCtxValue(t *testing.T) {
 	}{
 		"an object beside the field's suffix": {`{"ctx/setting":{"|code":"999"},"ctx/setting|code":"238"}`, ErrUnsupportedDatatype, `"ctx/setting"`},
 		"an object alone":                     {`{"ctx/setting":{"|code":"999"}}`, ErrUnsupportedDatatype, `"ctx/setting"`},
-		"a scalar beside the field's suffix":  {`{"ctx/setting":"x","ctx/setting|code":"238"}`, ErrUnknownPath, `"ctx/setting|code"`},
 	} {
 		t.Run(name, func(t *testing.T) {
 			out, err := FlatToStructured([]byte(tc.flat))

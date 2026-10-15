@@ -127,17 +127,17 @@ func flatToStructured(flat map[string]any) (map[string]any, error) {
 			if base, suffix, piped := strings.Cut(rest, "|"); piped {
 				leaf, isObj := ctxObj[base].(map[string]any)
 				if !isObj {
-					prev, taken := ctxObj[base]
-					if taken && prev != nil {
-						return nil, fmt.Errorf("%w: ctx/%s is both a direct value (%#v) and a suffixed leaf (%q)",
-							ErrUnknownPath, base, prev, key)
-					}
 					leaf = make(map[string]any)
-					if taken {
-						// A null direct value is absent beside the field's suffixes
-						// (REQ-053), so it is carried as written, as the null `"|"`
-						// member, as a leaf slot carries one ([heldNull]).
-						leaf[bareStructuredKey] = nil
+					if prev, taken := ctxObj[base]; taken {
+						// The field's direct value, placed before its suffixes by
+						// the sorted key order, moves onto the field's object as the
+						// `"|"` member, as a leaf slot's bare value does
+						// ([insertStructured]), so STRUCTURED → FLAT gives it back
+						// as the field's own key (REQ-140). A null one is carried
+						// as written, as the null member, for decode to read as
+						// absent (REQ-053). An object never gets here: it is
+						// refused below, before its field's suffixes.
+						leaf[bareStructuredKey] = prev
 					}
 					ctxObj[base] = leaf
 				}
