@@ -316,10 +316,10 @@ func TestREQ168_EmptyValue(t *testing.T) {
 			paths: []string{"/"},
 		},
 		{
-			name:  "rm_invariant CODE_PHRASE with an empty code_string",
+			name:  "required at the empty code_string of a CODE_PHRASE",
 			run:   floor(&rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}}),
-			code:  "rm_invariant",
-			paths: []string{"/"},
+			code:  "required",
+			paths: []string{"/code_string"},
 		},
 		{
 			name: "rm_invariant OBJECT_REF without id, type and namespace",

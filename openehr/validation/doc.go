@@ -64,8 +64,9 @@
 // the pinned Reference Model as the sole structural source: RM-mandatory
 // attribute presence plus a small per-RM-type invariant catalogue:
 //
-//   - a non-empty CODE_PHRASE code_string (a DV_SCALE symbol, which the
-//     RM lets carry no code, is exempt);
+//   - a non-empty CODE_PHRASE code_string (an empty one is a missing
+//     mandatory attribute, reported once, as `required`; a DV_SCALE
+//     symbol, which the RM lets carry no code, is exempt);
 //   - DV_QUANTITY and DV_PROPORTION precision, and whole-number operands
 //     on a DV_PROPORTION of precision 0;
 //   - DV_INTERVAL numeric bounds in order, and no side both unbounded and

@@ -287,10 +287,9 @@ var probe030SkipFloor = map[string][]string{
 	// TestPerson.v2: two DV_MULTIMEDIA.media_type values break
 	// Media_type_valid (REQ-112 Coded invariants), since neither is an IANA
 	// media type: one is openEHR::425, the other a CODE_PHRASE whose
-	// code_string is null. The null one is also reported as an empty
-	// CODE_PHRASE and as an absent mandatory attribute. Five
-	// DV_INTERVAL<DV_DATE> values have their lower date after their upper
-	// one.
+	// code_string is null. The null one is also reported, once, as an
+	// absent mandatory code_string. Five DV_INTERVAL<DV_DATE> values have
+	// their lower date after their upper one.
 	"compositions/TestPerson.v2.json": {
 		// Inverted DV_INTERVAL<DV_DATE> in the vendored fixture (DV_INTERVAL.Limits_consistent).
 		"rm_invariant /contacts[at0003]/addresses[5]/details/items[at2502]/value",
@@ -302,7 +301,6 @@ var probe030SkipFloor = map[string][]string{
 		"rm_invariant /details/items[12]/items[at0006]/value",
 		"code_not_in_value_set /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type",
 		"code_not_in_value_set /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type",
-		"rm_invariant /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type",
 		"required /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type/code_string",
 		// Inverted DV_INTERVAL<DV_DATE> in the vendored fixture (DV_INTERVAL.Limits_consistent).
 		"rm_invariant /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_insurance.v2]/items[at0006]/value",

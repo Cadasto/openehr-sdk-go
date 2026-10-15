@@ -123,7 +123,6 @@ func TestValidateComposition_REQ102_REQ112_BMIOneDefectCopies(t *testing.T) {
 			want: []string{
 				"code_not_in_value_set /language",
 				"required /language/code_string",
-				"rm_invariant /language",
 			},
 		},
 		{
@@ -282,7 +281,7 @@ const externalCodeChild = `
 // REQ-102, REQ-112 — a blank code_string under an external C_CODE_PHRASE
 // with no code list meets the template, which has no code to check it
 // against; the RM rules, which template validation applies, report the
-// CODE_PHRASE's RM-mandatory code_string and its non-empty rule.
+// CODE_PHRASE's RM-mandatory code_string once, as required.
 func TestValidate_REQ102_REQ112_ExternalCodePhraseBlankCode(t *testing.T) {
 	c := mustCompileInline(t, elementValueOPT(externalCodeChild))
 	coded := rm.DVCodedText{
@@ -294,7 +293,7 @@ func TestValidate_REQ102_REQ112_ExternalCodePhraseBlankCode(t *testing.T) {
 	}
 	coded.DefiningCode.CodeString = ""
 	r := validation.Validate(valueElement(coded), c)
-	want := []string{"required /value/defining_code/code_string", "rm_invariant /value/defining_code"}
+	want := []string{"required /value/defining_code/code_string"}
 	if r.OK || !equalKeys(r.Issues, want) {
 		t.Errorf("Validate(blank SNOMED-CT code) OK = %t, issues = %q; want not OK with %q", r.OK, issueKeys(r.Issues), want)
 	}

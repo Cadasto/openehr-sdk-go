@@ -13,22 +13,6 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
 
-// asCodePhrase recovers a CODE_PHRASE value (by value or by pointer)
-// from any concrete carrying it. Returns ok=false when value is not a
-// CODE_PHRASE.
-func asCodePhrase(value any) (rm.CodePhrase, bool) {
-	switch v := value.(type) {
-	case *rm.CodePhrase:
-		if v == nil {
-			return rm.CodePhrase{}, false
-		}
-		return *v, true
-	case rm.CodePhrase:
-		return v, true
-	}
-	return rm.CodePhrase{}, false
-}
-
 // asDVQuantity recovers a DV_QUANTITY value (by value or by pointer)
 // from any concrete carrying it.
 func asDVQuantity(value any) (rm.DVQuantity, bool) {

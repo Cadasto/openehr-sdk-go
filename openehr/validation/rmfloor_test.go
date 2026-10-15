@@ -71,28 +71,82 @@ func TestValidateRMEHRStatus_MinimallyValid(t *testing.T) {
 	}
 }
 
-// TestValidateRM_CodePhraseEmptyCodeString covers the per-type
-// invariant on CODE_PHRASE: an empty code_string surfaces
-// `rm_invariant` with the offending path. Surfaced via a FOLDER whose
-// name carries a DVCodedText with empty defining_code.code_string —
-// the floor recurses into the carried CODE_PHRASE.
-func TestValidateRM_CodePhraseEmptyCodeString(t *testing.T) {
+// TestValidate_REQ112_REQ171_BlankCodeStringReportedOnce pins the REQ-112
+// CODE_PHRASE entry: the mandatory-presence rule decides Code_string_valid
+// (REQ-171 Where the RM rules come from), so a CODE_PHRASE that carries a
+// terminology and a blank code_string draws one finding, `required` at its
+// code_string with the rule mandatory, and none at the CODE_PHRASE itself.
+// It holds with the RM rules alone and under a template that does not
+// constrain the defining code with a C_CODE_PHRASE, an inline one and two
+// vendored ones. Each row lists the whole result.
+func TestValidate_REQ112_REQ171_BlankCodeStringReportedOnce(t *testing.T) {
+	t.Parallel()
+	blank := rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "local"}}
 	folder := &rm.Folder{
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
-		Name: rm.DVCodedText{
-			DVText: rm.DVText{Value: "labelled"},
-			DefiningCode: rm.CodePhrase{
-				TerminologyID: rm.TerminologyID{Value: "openehr"},
-				CodeString:    "", // empty — RM floor violation
-			},
+		Name:            rm.DVCodedText{Value: "labelled", DefiningCode: blank},
+	}
+	// A DV_CODED_TEXT binds to the DV_TEXT child, which declares no
+	// defining_code, so the RM rules alone read the CODE_PHRASE.
+	underText := mustCompileInline(t, elementValueOPT(dvTextChild))
+	// The BMI template leaves its ELEMENT's name open, so a coded name binds
+	// with no C_CODE_PHRASE; the BMI skeleton is otherwise valid.
+	bmi := mustCompile(t, "BMI")
+	bmiComp, _, _, bmiElement := bmiSkeleton(t)
+	bmiElement.Name = rm.DVCodedText{Value: "example", DefiningCode: blank}
+	const bmiName = bmiObservationPath + "/data/events[at0002]/data/items[at0004]/name"
+	// The Demonstration.v1 fixture binds this defining code to a
+	// CONSTRAINT_REF, not a C_CODE_PHRASE. The fixture draws findings of
+	// its own, so the row wants those and the blank code's one finding.
+	demo := mustCompile(t, "Demonstration.v1")
+	demoComp, demoCode := constraintRefCode(t)
+	demoWant := append(identityKeys(validation.ValidateComposition(demoComp, demo).Issues),
+		"required "+constraintRefCodePath+"/code_string rm mandatory")
+	slices.Sort(demoWant)
+	demoCode.CodeString = ""
+	tests := []struct {
+		name string
+		r    validation.Result
+		want []string
+	}{
+		{
+			name: "a CODE_PHRASE root, with the RM rules alone",
+			r:    validation.ValidateRM(&blank),
+			want: []string{"required /code_string rm mandatory"},
+		},
+		{
+			name: "a FOLDER name's defining code, with the RM rules alone",
+			r:    validation.ValidateRMFolder(folder),
+			want: []string{"required /name/defining_code/code_string rm mandatory"},
+		},
+		{
+			name: "an ELEMENT value's defining code, with the RM rules alone",
+			r:    validation.ValidateRM(valueElement(localCoded(""))),
+			want: []string{"required /value/defining_code/code_string rm mandatory"},
+		},
+		{
+			name: "an ELEMENT value's defining code, under a template",
+			r:    validation.Validate(valueElement(localCoded("")), underText),
+			want: []string{"required /value/defining_code/code_string rm mandatory"},
+		},
+		{
+			name: "an ELEMENT name's defining code, under the vendored BMI template",
+			r:    validation.ValidateComposition(bmiComp, bmi),
+			want: []string{"required " + bmiName + "/defining_code/code_string rm mandatory"},
+		},
+		{
+			name: "a CONSTRAINT_REF leaf's defining code, under the vendored Demonstration.v1 template",
+			r:    validation.ValidateComposition(demoComp, demo),
+			want: demoWant,
 		},
 	}
-	r := validation.ValidateRMFolder(folder)
-	if r.OK {
-		t.Fatalf("ValidateRMFolder with empty code_string should not be OK; issues=%+v", r.Issues)
-	}
-	if !containsCode(r.Issues, "rm_invariant") {
-		t.Errorf("expected rm_invariant issue for empty CODE_PHRASE.code_string, got %+v", r.Issues)
+	for _, tc := range tests {
+		if got := identityKeys(tc.r.Issues); !slices.Equal(got, tc.want) {
+			t.Errorf("Validate(%s) issues (code path layer rule) = %q, want %q", tc.name, got, tc.want)
+		}
+		if tc.r.OK {
+			t.Errorf("Validate(%s).OK = true, want false: required is an error", tc.name)
+		}
 	}
 }
 
@@ -717,7 +771,6 @@ func TestValidateRM_TypedIntervalBoundsWalked(t *testing.T) {
 				// An empty code_string is no normal status (REQ-112 Coded
 				// invariants, Normal_status_validity).
 				{"/normal_range/lower/normal_status", "code_not_in_value_set"},
-				{"/normal_range/lower/normal_status", "rm_invariant"},
 				{"/normal_range/lower/normal_status/code_string", "required"},
 			},
 		},

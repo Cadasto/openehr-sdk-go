@@ -360,9 +360,11 @@ func TestValidateRM_REQ171_RMLayerRules(t *testing.T) {
 			want: []string{"rm_version_valid /rm_version rm ARCHETYPED.Rm_version_valid"},
 		},
 		{
-			name: "CODE_PHRASE with a blank code_string",
+			// CODE_PHRASE.Code_string_valid is decided by the mandatory
+			// rule, so its finding carries that rule.
+			name: "CODE_PHRASE with a blank code_string, by the mandatory rule",
 			root: &rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "local"}},
-			want: []string{"rm_invariant / rm CODE_PHRASE.Code_string_valid"},
+			want: []string{"required /code_string rm mandatory"},
 		},
 		{
 			name: "DV_QUANTITY precision -2",

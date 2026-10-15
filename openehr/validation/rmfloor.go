@@ -396,37 +396,17 @@ func (f *findings) checkArchetyped(value any, path string) {
 	}
 }
 
-// checkCodePhrase enforces the RM spec floor on CODE_PHRASE: the
-// code_string MUST be non-empty when the value is present, except on a
-// DV_SCALE symbol's defining_code (see [scaleSymbolMayHaveNoCode]). (The
-// terminology_id absence is already RM-required and caught by the
-// mandatory-presence rule.)
-func (f *findings) checkCodePhrase(value any, path string, role floorRole) {
-	cp, ok := asCodePhrase(value)
-	if !ok {
-		return
-	}
-	if cp.CodeString == "" && !scaleSymbolMayHaveNoCode(role) {
-		f.emit(Issue{
-			Path:   path,
-			Code:   "rm_invariant",
-			Layer:  LayerRM,
-			Rule:   ruleCodeStringValid,
-			Detail: "CODE_PHRASE.code_string must be non-empty",
-		})
-	}
-}
-
 // scaleSymbolMayHaveNoCode reports whether a CODE_PHRASE in role may carry a
 // blank code_string. The RM's DV_SCALE.symbol allows a scale value that has
 // no code: its symbol is then a DV_CODED_TEXT carrying the terminology_id and
-// a blank code_string. The CODE_PHRASE at the symbol's defining_code therefore
-// reports neither the non-empty code_string invariant nor a `required`
-// code_string. The exemption covers that one node only: a blank
-// terminology_id, the symbol's own value, a DV_ORDINAL symbol, and every other
-// CODE_PHRASE under the scale are checked as usual. The walk hands the role
-// down from the DV_SCALE ([childRole]), so the exemption follows the node and
-// not its path, which another node may share.
+// a blank code_string. Elsewhere a blank code_string draws one finding, the
+// `required` of the mandatory-presence rule, which decides the non-empty
+// code_string invariant; the CODE_PHRASE at the symbol's defining_code draws
+// none. The exemption covers that one node only: a blank terminology_id, the
+// symbol's own value, a DV_ORDINAL symbol, and every other CODE_PHRASE under
+// the scale are checked as usual. The walk hands the role down from the
+// DV_SCALE ([childRole]), so the exemption follows the node and not its
+// path, which another node may share.
 func scaleSymbolMayHaveNoCode(role floorRole) bool {
 	return role == roleScaleSymbolCode
 }

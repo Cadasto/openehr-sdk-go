@@ -108,7 +108,6 @@ func TestValidateComposition_REQ102_REQ103_OrdinalSymbolPair(t *testing.T) {
 			change: func(o *rm.DVOrdinal) { o.Symbol.DefiningCode.CodeString = "" },
 			want: []ordinalIssue{
 				{Code: "required", Path: ordinalValuePath + "/symbol/defining_code/code_string", Layer: validation.LayerRM, Rule: "mandatory"},
-				{Code: "rm_invariant", Path: ordinalValuePath + "/symbol/defining_code", Layer: validation.LayerRM, Rule: "CODE_PHRASE.Code_string_valid"},
 			},
 		},
 		{

@@ -54,10 +54,7 @@ func TestValidateRM_OrdinalAndScaleWalked(t *testing.T) {
 		{
 			name: "DV_ORDINAL whose symbol has an empty code_string",
 			root: scoreElement(&rm.DVOrdinal{Value: 2, Symbol: emptyCode}),
-			want: []string{
-				"required /value/symbol/defining_code/code_string",
-				"rm_invariant /value/symbol/defining_code",
-			},
+			want: []string{"required /value/symbol/defining_code/code_string"},
 		},
 		{
 			name: "DV_ORDINAL complete",
@@ -139,7 +136,6 @@ func TestValidateRM_ReferenceRangesWalked(t *testing.T) {
 				// Coded invariants, Normal_status_validity).
 				"code_not_in_value_set /value/normal_status",
 				"required /value/normal_status/code_string",
-				"rm_invariant /value/normal_status",
 			},
 		},
 		{
@@ -297,10 +293,11 @@ func TestValidateRMEHRAccess_Walked(t *testing.T) {
 // TestValidateRM_ScaleSymbolMayHaveNoCode pins the DV_SCALE symbol exemption
 // (REQ-112). The RM lets a scale value have no code: its symbol is then a
 // DV_CODED_TEXT carrying the terminology_id and a blank code_string. So the
-// floor reports neither the CODE_PHRASE row's rm_invariant nor the `required`
-// code_string on a DV_SCALE symbol's defining_code. Nothing else is exempt: a
-// DV_ORDINAL symbol, a blank terminology_id, a CODE_PHRASE anywhere else under
-// the same DV_SCALE, and the symbol's own value are all reported as before.
+// floor reports no `required` code_string on a DV_SCALE symbol's
+// defining_code, the one finding a blank code_string draws elsewhere.
+// Nothing else is exempt: a DV_ORDINAL symbol, a blank terminology_id, a
+// CODE_PHRASE anywhere else under the same DV_SCALE, and the symbol's own
+// value are all reported as before.
 func TestValidateRM_ScaleSymbolMayHaveNoCode(t *testing.T) {
 	noCode := func(text string) rm.DVCodedText {
 		return rm.DVCodedText{Value: text, DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "local"}}}
@@ -338,10 +335,7 @@ func TestValidateRM_ScaleSymbolMayHaveNoCode(t *testing.T) {
 		{
 			name: "DV_ORDINAL symbol with a blank code_string",
 			root: scoreElement(&rm.DVOrdinal{Value: 1, Symbol: noCode("mild")}),
-			want: []string{
-				"required /value/symbol/defining_code/code_string",
-				"rm_invariant /value/symbol/defining_code",
-			},
+			want: []string{"required /value/symbol/defining_code/code_string"},
 		},
 		{
 			name: "DV_SCALE symbol with a blank terminology_id and a blank code_string",
@@ -362,16 +356,12 @@ func TestValidateRM_ScaleSymbolMayHaveNoCode(t *testing.T) {
 				// invariants, Normal_status_validity).
 				"code_not_in_value_set /value/normal_status",
 				"required /value/normal_status/code_string",
-				"rm_invariant /value/normal_status",
 			},
 		},
 		{
 			name: "a mapping target with a blank code_string under a DV_SCALE symbol",
 			root: scoreElement(&rm.DVScale{Value: 0.5, Symbol: withBlankMapping}),
-			want: []string{
-				"required /value/symbol/mappings[1]/target/code_string",
-				"rm_invariant /value/symbol/mappings[1]/target",
-			},
+			want: []string{"required /value/symbol/mappings[1]/target/code_string"},
 		},
 		{
 			// The exemption stops at the symbol's own defining_code: a
@@ -383,7 +373,6 @@ func TestValidateRM_ScaleSymbolMayHaveNoCode(t *testing.T) {
 			want: []string{
 				"code_not_in_value_set /value/symbol/mappings[1]/purpose/defining_code",
 				"required /value/symbol/mappings[1]/purpose/defining_code/code_string",
-				"rm_invariant /value/symbol/mappings[1]/purpose/defining_code",
 			},
 		},
 		{
@@ -395,10 +384,7 @@ func TestValidateRM_ScaleSymbolMayHaveNoCode(t *testing.T) {
 				Meaning: rm.DVText{Value: "normal"},
 				Range:   rm.DVInterval[rm.DVOrdered]{Lower: rm.DVOrdinal{Value: 1, Symbol: noCode("mild")}, LowerIncluded: true, UpperUnbounded: true},
 			}}}),
-			want: []string{
-				"required /value/other_reference_ranges[1]/range/lower/symbol/defining_code/code_string",
-				"rm_invariant /value/other_reference_ranges[1]/range/lower/symbol/defining_code",
-			},
+			want: []string{"required /value/other_reference_ranges[1]/range/lower/symbol/defining_code/code_string"},
 		},
 		{
 			name: "CLUSTER with a DV_SCALE with no code beside a DV_ORDINAL with no code",
@@ -406,10 +392,7 @@ func TestValidateRM_ScaleSymbolMayHaveNoCode(t *testing.T) {
 				scoreElement(&rm.DVScale{Value: 0.5, Symbol: noCode("slight")}),
 				scoreElement(&rm.DVOrdinal{Value: 1, Symbol: noCode("mild")}),
 			}},
-			want: []string{
-				"required /items[2]/value/symbol/defining_code/code_string",
-				"rm_invariant /items[2]/value/symbol/defining_code",
-			},
+			want: []string{"required /items[2]/value/symbol/defining_code/code_string"},
 		},
 		{
 			// REQ-102 § Issue paths: an item with no id is written by its
@@ -425,16 +408,12 @@ func TestValidateRM_ScaleSymbolMayHaveNoCode(t *testing.T) {
 			want: []string{
 				"required /items[1]/archetype_node_id",
 				"required /items[1]/value/symbol/defining_code/code_string",
-				"rm_invariant /items[1]/value/symbol/defining_code",
 			},
 		},
 		{
 			name: "DV_CODED_TEXT value with a blank code_string",
 			root: scoreElement(&rm.DVCodedText{Value: "slight", DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "local"}}}),
-			want: []string{
-				"required /value/defining_code/code_string",
-				"rm_invariant /value/defining_code",
-			},
+			want: []string{"required /value/defining_code/code_string"},
 		},
 	}
 	for _, tc := range cases {

@@ -191,7 +191,6 @@ func TestREQ112_PartyProxyAndParticipationFindings(t *testing.T) {
 			want: []string{
 				"code_not_in_value_set /context/participations[1]/mode/defining_code",
 				"required /context/participations[1]/mode/defining_code/code_string",
-				"rm_invariant /context/participations[1]/mode/defining_code",
 			},
 		},
 		{

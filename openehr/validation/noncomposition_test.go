@@ -118,7 +118,6 @@ func TestValidateDemographic_PersonFixture(t *testing.T) {
 		"rm_invariant /details/items[12]/items[at0006]/value",
 		// Inverted DV_INTERVAL<DV_DATE> in the vendored fixture (DV_INTERVAL.Limits_consistent).
 		"rm_invariant /details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_insurance.v2]/items[at0006]/value",
-		"rm_invariant " + wid,
 	}
 	if got := issueKeys(r.Issues); !slices.Equal(got, want) {
 		t.Errorf("ValidateDemographic(TestPerson.v2) issues = %q, want %q", got, want)
