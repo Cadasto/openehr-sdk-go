@@ -270,9 +270,10 @@ func (f *findings) checkMandatory(rmType, attr, attrPath string, multiValued, pr
 // attribute attr of a node of RM type rmType that holds no RM value, a nil
 // element or a typed-nil pointer ([isNilItem]): it is reported as
 // `required` at the item's own path, itemPath, rule mandatory. The walk
-// calls it for each such item of a list no template node binds, and does
-// not walk the item; the item still counts toward its list, so a list that
-// holds only such items is present and not empty. A nil item the template
+// calls it for each such item of a list no template node binds that is
+// within the visit limit, and does not walk the item; the item still counts
+// toward its list, so a list that holds only such items is present and not
+// empty, and toward the visit limit as one visit. A nil item the template
 // refuses is reported by the template's rule alone.
 func (f *findings) checkNilItem(rmType, attr, itemPath string) {
 	f.emit(Issue{

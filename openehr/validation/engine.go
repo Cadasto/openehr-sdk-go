@@ -113,8 +113,9 @@ type engine struct {
 	// ancestry holds the values with an identity ([hasIdentity]) the walk is
 	// inside, outermost first: the one record a cycle is detected against.
 	ancestry []any
-	// visits counts the values the walk has visited, up to maxNodes; stopped
-	// is set once it reaches that limit, and ends the walk.
+	// visits counts the values the walk has visited, and the list items
+	// holding none it has reported, up to maxNodes; stopped is set once it
+	// reaches that limit, and ends the walk.
 	visits  int
 	stopped bool
 }
@@ -276,8 +277,29 @@ func (e *engine) walk(n engineNode) {
 	e.ancestry = e.ancestry[:len(e.ancestry)-1]
 }
 
+// spendVisit counts one visit, to a value of RM type rmType or to a list
+// item holding none whose declared type is rmType, at path, and reports
+// whether the walk may go on with it. Past the visit limit it counts
+// nothing: it reports `max_nodes` at path, records path in the stops of
+// [Coverage.Stopped], ends the walk and returns false.
+func (e *engine) spendVisit(path, rmType string) bool {
+	if e.visits == e.maxNodes {
+		e.found.emit(Issue{
+			Path:   path,
+			Code:   "max_nodes",
+			Detail: fmt.Sprintf("the walk stopped at %s after visiting %d values, its limit per call", rmType, e.maxNodes),
+		})
+		e.stoppedAt = append(e.stoppedAt, path)
+		e.stopped = true
+		return false
+	}
+	e.visits++
+	return true
+}
+
 // visit checks node n. A visit past the visit limit checks nothing: it
-// reports `max_nodes` at n's path and ends the walk. Otherwise visit checks
+// reports `max_nodes` at n's path and ends the walk ([engine.spendVisit]).
+// Otherwise visit checks
 // the node against the template node it binds to, if any: its identity and
 // its RM type ([identityIssue], [rmTypeIssue]); then it runs the RM rules of
 // the node's class, recording the class as visited; then, at a template
@@ -298,17 +320,9 @@ func (e *engine) walk(n engineNode) {
 // finding of theirs at the node's own path stays, though the rule read the
 // refused content to reach it.
 func (e *engine) visit(n engineNode) {
-	if e.visits == e.maxNodes {
-		e.found.emit(Issue{
-			Path:   n.path,
-			Code:   "max_nodes",
-			Detail: fmt.Sprintf("the walk stopped at %s after visiting %d values, its limit per call", n.rmType, e.maxNodes),
-		})
-		e.stoppedAt = append(e.stoppedAt, n.path)
-		e.stopped = true
+	if !e.spendVisit(n.path, n.rmType) {
 		return
 	}
-	e.visits++
 	scalar := false
 	if n.bound != nil {
 		scalar = e.checkIdentityAndType(n)
@@ -570,8 +584,10 @@ func (e *engine) visitAttribute(n engineNode, class string, a engineAttr) {
 // walkUnconstrained walks what the present attribute a of node n, read as r,
 // holds, at attrPath, in role, with the RM rules alone: no template node
 // binds it. An item of a list that holds no RM value, a nil element or a
-// typed-nil pointer ([isNilItem]), is reported at its own path by the
-// mandatory-presence rule ([findings.checkNilItem]) and not walked; once the
+// typed-nil pointer ([isNilItem]), is not walked. It counts as one visit
+// ([engine.spendVisit]): within the visit limit it is reported at its own
+// path by the mandatory-presence rule ([findings.checkNilItem]); past the
+// limit it is reported as `max_nodes` instead, which ends the walk. Once the
 // visit limit has ended the walk, no later item is reported or walked. This is
 // the one place the RM rules meet a nil item: the walk with no template and
 // an attribute the template leaves open both reach it, while a nil item
@@ -590,7 +606,9 @@ func (e *engine) walkUnconstrained(n engineNode, a engineAttr, r attrReading, at
 				return // the visit limit ended the walk at or inside an earlier item
 			}
 			if isNilItem(r.items[i]) {
-				e.found.checkNilItem(n.rmType, a.name, path)
+				if e.spendVisit(path, a.rmType) {
+					e.found.checkNilItem(n.rmType, a.name, path)
+				}
 				continue
 			}
 			e.walkItem(n, r.items[i], a.rmType, path, role)

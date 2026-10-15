@@ -128,12 +128,19 @@ func valuedElement() *rm.Element {
 // TestValidator_REQ112_REQ171_NilListItemAfterVisitLimit pins the REQ-112
 // nil-item rule against the REQ-171 visit limit: once the walk stops, a nil
 // item later in the same list, an untyped nil or a typed-nil pointer, is not
-// reported, so max_nodes is the last issue. The control row walks the same
-// list under the default limits, where both nil items are reported.
+// reported, so max_nodes is the last issue. A nil item counts as one visit,
+// so a list of nil items alone reaches the limit too, and the item past it
+// is reported as max_nodes, not as required. The control row walks a list
+// under the default limits, where both nil items are reported.
 func TestValidator_REQ112_REQ171_NilListItemAfterVisitLimit(t *testing.T) {
 	// Five visits reach the first ELEMENT's name, so the walk stops inside
 	// the first item and every item after it comes after the stop.
 	const nodes = 5
+	// The walk visits the CLUSTER and three values of its attributes before
+	// its items: its archetype_node_id, its name and the name's value. Under
+	// a limit of seven visits, the first three nil items spend the last three
+	// (4 + 3 = 7), and the fourth is past the limit.
+	const nilOnlyNodes = 7
 	tests := []struct {
 		name  string
 		nodes int
@@ -165,6 +172,18 @@ func TestValidator_REQ112_REQ171_NilListItemAfterVisitLimit(t *testing.T) {
 			wantStopped: []string{"/items[1]/name"},
 		},
 		{
+			name:  "a hundred nil items and nothing else",
+			nodes: nilOnlyNodes,
+			items: slices.Repeat([]rm.Item{nil}, 100),
+			want: []string{
+				"required /items[1] rm mandatory",
+				"required /items[2] rm mandatory",
+				"required /items[3] rm mandatory",
+				"max_nodes /items[4]  ",
+			},
+			wantStopped: []string{"/items[4]"},
+		},
+		{
 			// Control: under the default limits the walk does not stop,
 			// so both nil items of the same list are reported.
 			name:  "the same list under the default limits",
@@ -184,6 +203,9 @@ func TestValidator_REQ112_REQ171_NilListItemAfterVisitLimit(t *testing.T) {
 			}
 			if !slices.Equal(r.Coverage.Stopped, tc.wantStopped) {
 				t.Errorf("Validate(%s, Nodes %d) Coverage.Stopped = %q, want %q", tc.name, tc.nodes, r.Coverage.Stopped, tc.wantStopped)
+			}
+			if got, want := r.Coverage.Complete(), len(tc.wantStopped) == 0; got != want {
+				t.Errorf("Validate(%s, Nodes %d) Coverage.Complete() = %t, want %t", tc.name, tc.nodes, got, want)
 			}
 		})
 	}
