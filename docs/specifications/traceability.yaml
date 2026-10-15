@@ -1174,16 +1174,24 @@ requirements:
     status: draft
     implementation: landed
     packages:
+      - internal/bmmtype
+      - internal/templateinstance/rmwrite
       - openehr/composition
+      - openehr/internal/rmbind
       - openehr/internal/rmnames
       - openehr/templatecompile
       - testkit/probes/composition
     probes: [PROBE-023]
     tests:
+      - internal/bmmtype/formal_parameters_test.go
       - internal/templateinstance/rmwrite/write_datavalue_test.go
+      - internal/templateinstance/rmwrite/write_parent_test.go
+      - openehr/composition/attribute_hold_test.go
       - openehr/composition/builder_defaults_test.go
       - openehr/composition/builder_test.go
+      - openehr/composition/set_binding_test.go
       - openehr/composition/typecheck_test.go
+      - openehr/composition/typecheck_tiers_test.go
       - testkit/probes/composition/probe_023_builder_round_trip.go
       - testkit/probes/composition/probes_test.go
       - testkit/probes/instance/corpus_ratchet_test.go
@@ -1193,7 +1201,7 @@ requirements:
     canonical: docs/specifications/clinical-modeling.md#req-102--composition-validation
     status: draft
     implementation: landed
-    packages: [openehr/validation, internal/rmaccess, openehr/internal/rmnames, openehr/templatecompile, internal/templatecompile, testkit/probes/validation]
+    packages: [openehr/validation, internal/rmaccess, openehr/internal/rmbind, openehr/internal/rmnames, openehr/templatecompile, internal/templatecompile, testkit/probes/validation]
     probes: [PROBE-025, PROBE-026, PROBE-074]
     tests:
       - internal/rmaccess/interval_test.go
@@ -1201,12 +1209,15 @@ requirements:
       - internal/templatecompile/compile_test.go
       - internal/templatecompile/node_primitive_test.go
       - internal/templatecompile/walkfacts_test.go
+      - openehr/composition/set_binding_test.go
+      - openehr/composition/typecheck_tiers_test.go
       - openehr/instance/binding_alternative_internal_test.go
       - openehr/instance/binding_alternative_test.go
       - openehr/instance/party_attribute_test.go
       - openehr/instance/post_walk_binding_test.go
       - openehr/instance/rm_defaults_yield_test.go
       - openehr/instance/sizing_rule_test.go
+      - openehr/internal/rmbind/bind_test.go
       - openehr/validation/aql_test.go
       - openehr/validation/binding_by_name_test.go
       - openehr/validation/composition_test.go
@@ -1228,7 +1239,6 @@ requirements:
       - openehr/validation/rmfloor_ordered_test.go
       - openehr/validation/subtype_conformance_corpus_test.go
       - openehr/validation/subtype_conformance_test.go
-      - openehr/validation/walk_primitive_test.go
       - testkit/probes/validation/probe_025_composition_validate.go
       - testkit/probes/validation/probe_074_noncomposition_validate.go
       - testkit/probes/validation/probes_test.go
@@ -1393,6 +1403,7 @@ requirements:
       - openehr/instance/valuefill_leaves_test.go
       - openehr/instance/valuefill_test.go
       - openehr/instance/visit_rules_test.go
+      - openehr/internal/rmbind/bind_test.go
       - openehr/serialize/simplified/flat_encode_test.go
       - openehr/template/constraints/constraint_ref_test.go
       - openehr/template/constraints/example_test.go
@@ -1467,7 +1478,7 @@ requirements:
     canonical: docs/specifications/clinical-modeling.md#req-110--template-driven-validation-beyond-composition
     status: draft
     implementation: landed
-    packages: [openehr/validation, internal/rmaccess, openehr/internal/rmnames, openehr/templatecompile, internal/templatecompile, testkit/probes/validation]
+    packages: [openehr/validation, internal/rmaccess, openehr/internal/rmbind, openehr/internal/rmnames, openehr/templatecompile, internal/templatecompile, testkit/probes/validation]
     probes: [PROBE-074]
     tests:
       - internal/rmaccess/reads_test.go

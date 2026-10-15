@@ -46,9 +46,15 @@
 // COMPOSITION, SECTION, INSTRUCTION, HISTORY, ITEM_TREE, ITEM_LIST,
 // ITEM_TABLE, CLUSTER, the five parties and CONTACT.
 //
-// Each parent's writer lists the attributes it fills. Any other parent
-// or attribute returns ErrUnknownAttribute, and a child of the wrong Go
-// type returns ErrTypeMismatch. Table-driven tests in this package
+// Each parent's writer lists the attributes it fills. An attribute takes
+// a child of its RM type or of a class that descends from it, wherever
+// the parent's Go field can hold one: a DV_TEXT attribute (every `name`,
+// ELEMENT `null_reason`, INSTRUCTION `narrative`) also takes a
+// DV_CODED_TEXT, EVENT_CONTEXT `health_care_facility` a PARTY_RELATED as
+// well as a PARTY_IDENTIFIED, and an attribute of an abstract class, such
+// as ELEMENT `value` (DATA_VALUE), any concrete class of it. Any other
+// parent or attribute returns ErrUnknownAttribute, and a child of the
+// wrong Go type returns ErrTypeMismatch. Table-driven tests in this package
 // write through most of these parents, and check the DV_INTERVAL cases
 // against the type registry, so an ordered data value the registry
 // gains fails them until it has a case.

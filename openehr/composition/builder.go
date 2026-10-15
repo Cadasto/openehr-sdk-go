@@ -32,11 +32,16 @@ type Builder struct {
 	errs []error
 }
 
-// pendingAssignment is one queued (path, value) pair plus the
-// resolved compiled node. Pre-resolving the node at Set time means
-// path-not-found is surfaced eagerly; type-checking and RM-side
-// navigation still happen at Build time so the caller can stack Set
-// calls without each one mutating the graph.
+// pendingAssignment is one queued (path, value) pair plus the compiled
+// node the value binds: of the nodes the template allows at the path,
+// the one the validator would bind it to ([bindRMType]). Resolving
+// the node and checking the type at Set time surfaces an unknown path
+// and a type mismatch eagerly. Only where the template and the pinned RM
+// give no type to check against, as under a parent the template leaves
+// untyped or whose class the RM does not know, does a value of the wrong
+// type fail later, when Build writes it, with ErrInvalidPath.
+// RM-side navigation still happens at Build time so the caller can stack
+// Set calls without each one mutating the graph.
 type pendingAssignment struct {
 	path     string
 	rawValue any
@@ -73,11 +78,56 @@ func (b *Builder) TemplateID() string {
 	return b.compiled.TemplateID()
 }
 
-// Set assigns v at path. Path must resolve in the compiled template;
-// v must match the compiled-node RM type. Errors are accumulated and
-// surfaced from Build. Set never short-circuits the builder so the
-// caller can stack assignments and recover every faulty path in one
-// round-trip.
+// Set assigns v at path. Path must resolve in the compiled template,
+// or Set returns ErrUnknownPath.
+//
+// Set accepts v when v binds a node the template allows at path, by the
+// same rule the validator uses to match a value to the template, and the
+// RM attribute that path writes can hold v. v binds a node when:
+//
+//   - v's RM type is the node's type, a typed interval such as
+//     DV_INTERVAL<DV_QUANTITY> included;
+//   - the node names an AOM 1.4 primitive short name and v is the data
+//     value that carries it: a *rm.DVDuration at an ELEMENT value the
+//     template types DURATION, and likewise DV_DATE at DATE, DV_TIME at
+//     TIME, DV_DATE_TIME at DATE_TIME, DV_BOOLEAN at BOOLEAN and DV_COUNT
+//     at INTEGER;
+//   - v's RM type descends from the node's in the openEHR class
+//     hierarchy: a *rm.DVCodedText at a DV_TEXT node, or a concrete data
+//     value, such as a *rm.DVQuantity, at a node the template types as an
+//     abstract class, such as DATA_VALUE;
+//   - the template leaves the node untyped; or
+//   - the node is a typed interval DV_INTERVAL<T> and v is an interval
+//     each of whose bounds is a T or descends from T: a
+//     DV_INTERVAL<DV_COUNT> at a DV_INTERVAL<DV_ORDERED> node.
+//
+// Where the template lists several alternatives at path under one
+// attribute, v may bind any of them, except one whose occurrences are
+// 0..0, which the template does not allow: at an ELEMENT value the
+// template allows as DV_CODED_TEXT or DV_QUANTITY, both a
+// *rm.DVCodedText and a *rm.DVQuantity are accepted.
+//
+// The RM attribute that path writes can hold v when v's RM type is, or
+// descends from, the type the openEHR Reference Model gives that
+// attribute on the RM type of the node above it. An ELEMENT's value
+// holds any data value; the value of a DV_DURATION holds a String, so no
+// RM value at all. Where the model types the attribute with a generic
+// parameter that the template leaves open, v must conform to the
+// parameter's constraint: the bounds of a DV_INTERVAL the template does
+// not parameterise hold a DV_ORDERED.
+//
+// Set returns ErrTypeMismatch for any other value: one that binds none of
+// those nodes (a *rm.DVText at a DV_CODED_TEXT node, say), one the RM
+// attribute at path cannot hold (a *rm.DVDuration at the DURATION node
+// under a DV_DURATION's value, or a *rm.DVText at a bound of a bare
+// DV_INTERVAL), one at a path that writes no RM attribute (a template may
+// constrain a function of the model as if it were an attribute, such as
+// DV_PROPORTION.is_integral), one that is not an RM value (a Go string,
+// even at a DURATION node), nil, and a nil pointer.
+//
+// Errors are accumulated and surfaced from Build. Set never
+// short-circuits the builder so the caller can stack assignments and
+// recover every faulty path in one round-trip.
 //
 // Returns the same error it stored, primarily for callers that want
 // to react to the first failure inline.
@@ -104,27 +154,36 @@ func (b *Builder) Set(path string, v any) error {
 		b.errs = append(b.errs, wrapped)
 		return wrapped
 	}
-	if e := checkRMType(node, v); e != nil {
-		wrapped := fmt.Errorf("%s: %w", path, e)
+	// The template may list several alternatives at path; NodeAt returns
+	// the first, and the value binds the one the validator would bind it
+	// to (REQ-101, REQ-102). They share the path, so Build reaches the
+	// same RM attribute through any of them, and bindRMType checks that
+	// the attribute can hold the value.
+	bound, err := bindRMType(node, v)
+	if err != nil {
+		wrapped := fmt.Errorf("%s: %w", path, err)
 		b.errs = append(b.errs, wrapped)
 		return wrapped
 	}
 	b.pending = append(b.pending, pendingAssignment{
 		path:     path,
 		rawValue: v,
-		node:     node,
+		node:     bound,
 	})
 	return nil
 }
 
 // SetText assigns &rm.DVText{Value: value} at path. Path must
-// resolve to a DV_TEXT node in the OPT.
+// resolve to a node the template types as DV_TEXT or DATA_VALUE; a
+// DV_CODED_TEXT node refuses it, since DV_TEXT does not descend from
+// DV_CODED_TEXT.
 func (b *Builder) SetText(path, value string) error {
 	return b.Set(path, &rm.DVText{Value: value})
 }
 
 // SetQuantity assigns a *rm.DVQuantity at path. Path must resolve
-// to a DV_QUANTITY node in the OPT.
+// to a node the template types as DV_QUANTITY or as one of the classes
+// it descends from: DV_AMOUNT, DV_QUANTIFIED, DV_ORDERED or DATA_VALUE.
 func (b *Builder) SetQuantity(path string, magnitude float64, units string) error {
 	return b.Set(path, &rm.DVQuantity{
 		Magnitude: rm.Real(magnitude),
@@ -133,7 +192,7 @@ func (b *Builder) SetQuantity(path string, magnitude float64, units string) erro
 }
 
 // SetCodedText assigns a *rm.DVCodedText at path. Path must resolve
-// to a DV_CODED_TEXT node in the OPT.
+// to a node the template types as DV_CODED_TEXT, DV_TEXT or DATA_VALUE.
 func (b *Builder) SetCodedText(path, terminology, code, display string) error {
 	return b.Set(path, &rm.DVCodedText{
 		Value: display,
