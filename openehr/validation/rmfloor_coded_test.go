@@ -826,7 +826,7 @@ func TestREQ112_CodedInvariantGuards(t *testing.T) {
 		{
 			name: "COMPOSITION language with an empty code_string",
 			root: blankLanguage,
-			want: []string{"code_not_in_value_set /language", "required /language/code_string", "rm_invariant /language"},
+			want: []string{"code_not_in_value_set /language", "required /language/code_string"},
 		},
 		{
 			name: "DV_TEXT without language or encoding",

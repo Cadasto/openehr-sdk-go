@@ -39,9 +39,8 @@ func constraintRefCode(t *testing.T) (*rm.Composition, *rm.CodePhrase) {
 // its ConstraintRef constrains nothing the walk can check locally. The walk
 // still checks the RM-mandatory attributes of the CODE_PHRASE it binds
 // there, as at a node the OPT leaves unconstrained: a blank terminology_id
-// or code_string is `required` at that attribute's path, once, and a blank
-// code_string also draws its own CODE_PHRASE rule at the code (REQ-102 RM
-// floor).
+// or code_string is `required` at that attribute's path, once, and nothing
+// more is reported at the code (REQ-112 CODE_PHRASE).
 func TestREQ102_REQ103_ConstraintRefLeafChecksCodePhraseAttributes(t *testing.T) {
 	t.Parallel()
 	c := mustCompile(t, "Demonstration.v1")
@@ -59,10 +58,7 @@ func TestREQ102_REQ103_ConstraintRefLeafChecksCodePhraseAttributes(t *testing.T)
 		{
 			name:  "blank code_string",
 			blank: func(cp *rm.CodePhrase) { cp.CodeString = "" },
-			want: []string{
-				"required " + constraintRefCodePath + "/code_string",
-				"rm_invariant " + constraintRefCodePath,
-			},
+			want:  []string{"required " + constraintRefCodePath + "/code_string"},
 		},
 	}
 	for _, tc := range tests {

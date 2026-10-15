@@ -53,7 +53,10 @@
 // and RM-type match, the Reference Model rules of its class, the template's
 // value constraint at a leaf, and the same steps one level down. A list
 // attribute that is nil is absent, and one that is set and holds no item is
-// present and empty.
+// present and empty. An item of a list that holds no RM value, a nil
+// element or a nil pointer, still counts toward its list; the Reference
+// Model rules report it as `required` at its own path and do not walk it,
+// unless the template refuses it, which is then the one finding.
 //
 // The Reference Model rules are the RM-only layer of that walk. With no
 // template ([ValidateRM] and its typed wrappers) every attribute is
@@ -61,13 +64,16 @@
 // the pinned Reference Model as the sole structural source: RM-mandatory
 // attribute presence plus a small per-RM-type invariant catalogue:
 //
-//   - a non-empty CODE_PHRASE code_string (a DV_SCALE symbol, which the
-//     RM lets carry no code, is exempt);
+//   - a non-empty CODE_PHRASE code_string (an empty one is a missing
+//     mandatory attribute, reported once, as `required`; a DV_SCALE
+//     symbol, which the RM lets carry no code, is exempt);
 //   - DV_QUANTITY and DV_PROPORTION precision, and whole-number operands
 //     on a DV_PROPORTION of precision 0;
 //   - DV_INTERVAL numeric bounds in order, and no side both unbounded and
 //     included;
-//   - an ISO 8601 value on DV_DATE, DV_TIME, DV_DATE_TIME and DV_DURATION;
+//   - an ISO 8601 value on DV_DATE, DV_TIME, DV_DATE_TIME and DV_DURATION
+//     (an empty value is a missing mandatory attribute, reported once, as
+//     `required`);
 //   - exactly one of value and null_flavour on an ELEMENT;
 //   - OBJECT_REF id/type/namespace, and the PARTY_IDENTIFIED rules (at
 //     least one of name, identifiers and external_ref; neither of the first
@@ -89,12 +95,18 @@
 // them. An attribute both layers find missing or empty is one finding: a
 // node the template requires and the instance lacks is the template's
 // `required` alone, and an empty list the template counts is the
-// template's finding alone. A Reference Model rule's own finding at that
-// path, such as the terminology check of a coded attribute, is reported
-// beside it. A value held from two places is validated at each, so a
-// defect in it is reported at each path. No option leaves the Reference
-// Model rules out. Callers without a template run [ValidateRM], which
-// applies them alone.
+// template's finding alone. The other way round, an empty part of a value
+// a primitive constraint reads (a code phrase's code string, a quantity's
+// units, the value of a temporal type a short name binds, an ordinal
+// symbol's code string) is the Reference Model rules' `required` alone:
+// the constraint does not judge that part, though it still judges a code
+// phrase's terminology and an ordinal's value, unless a limit stops the
+// walk before those rules reach the part. A Reference Model rule's own
+// finding at that path, such as the terminology check of a coded
+// attribute, is reported beside it. A value held from two places is
+// validated at each, so a defect in it is reported at each path. No option
+// leaves the Reference Model rules out. Callers without a template run
+// [ValidateRM], which applies them alone.
 //
 // The template-driven validators and [ValidateRM] write [Issue.Path] by
 // one rule, so a node has one path whichever of them reports it: an
