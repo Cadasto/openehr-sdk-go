@@ -94,9 +94,10 @@ func WithValueSource(src mrand.Source) Option {
 // Build time. Comparable via errors.Is.
 var ErrUnknownPath = errors.New("composition: path not in template")
 
-// ErrTypeMismatch signals that the Go value supplied to Builder.Set
-// does not match the compiled-node RM type at the path. Comparable
-// via errors.Is.
+// ErrTypeMismatch signals that the value supplied to Builder.Set is
+// not one the node at the path accepts: its RM type is neither the
+// node's RM type nor a class that descends from it, or it is nil, a nil
+// pointer or not an RM value at all. Comparable via errors.Is.
 var ErrTypeMismatch = errors.New("composition: value type does not match path RM type")
 
 // ErrInvalidPath signals a structural problem navigating the path

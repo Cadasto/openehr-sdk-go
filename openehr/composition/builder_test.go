@@ -214,7 +214,8 @@ func TestBuilder_SetText_typeMismatch(t *testing.T) {
 }
 
 // TestBuilder_SetCodedText_typeMismatch confirms SetCodedText's
-// wrap surfaces ErrTypeMismatch on a non-DV_CODED_TEXT path.
+// wrap surfaces ErrTypeMismatch on a DV_QUANTITY path, a type
+// DV_CODED_TEXT does not descend from.
 func TestBuilder_SetCodedText_typeMismatch(t *testing.T) {
 	c := compileFixture(t, "vital_signs")
 	b, err := composition.NewBuilder(context.Background(), c,

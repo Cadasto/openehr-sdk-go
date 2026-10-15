@@ -73,11 +73,22 @@ func (b *Builder) TemplateID() string {
 	return b.compiled.TemplateID()
 }
 
-// Set assigns v at path. Path must resolve in the compiled template;
-// v must match the compiled-node RM type. Errors are accumulated and
-// surfaced from Build. Set never short-circuits the builder so the
-// caller can stack assignments and recover every faulty path in one
-// round-trip.
+// Set assigns v at path. Path must resolve in the compiled template,
+// or Set returns ErrUnknownPath.
+//
+// v's RM type must be the type the template gives the node at path, or
+// a class that descends from it in the openEHR class hierarchy. So a
+// *rm.DVCodedText is accepted at a DV_TEXT node, and a concrete data
+// value, such as a *rm.DVQuantity, at a node the template types as an
+// abstract class, such as DATA_VALUE. A node typed DV_INTERVAL<T>
+// accepts an interval whose parameter is T. Set returns ErrTypeMismatch
+// for any other value: one whose type does not descend from the node's
+// (a *rm.DVText at a DV_CODED_TEXT node, say), one that is not an RM
+// type, nil, and a nil pointer.
+//
+// Errors are accumulated and surfaced from Build. Set never
+// short-circuits the builder so the caller can stack assignments and
+// recover every faulty path in one round-trip.
 //
 // Returns the same error it stored, primarily for callers that want
 // to react to the first failure inline.
@@ -118,13 +129,16 @@ func (b *Builder) Set(path string, v any) error {
 }
 
 // SetText assigns &rm.DVText{Value: value} at path. Path must
-// resolve to a DV_TEXT node in the OPT.
+// resolve to a node the template types as DV_TEXT or DATA_VALUE; a
+// DV_CODED_TEXT node refuses it, since DV_TEXT does not descend from
+// DV_CODED_TEXT.
 func (b *Builder) SetText(path, value string) error {
 	return b.Set(path, &rm.DVText{Value: value})
 }
 
 // SetQuantity assigns a *rm.DVQuantity at path. Path must resolve
-// to a DV_QUANTITY node in the OPT.
+// to a node the template types as DV_QUANTITY or as one of the classes
+// it descends from: DV_AMOUNT, DV_QUANTIFIED, DV_ORDERED or DATA_VALUE.
 func (b *Builder) SetQuantity(path string, magnitude float64, units string) error {
 	return b.Set(path, &rm.DVQuantity{
 		Magnitude: rm.Real(magnitude),
@@ -133,7 +147,7 @@ func (b *Builder) SetQuantity(path string, magnitude float64, units string) erro
 }
 
 // SetCodedText assigns a *rm.DVCodedText at path. Path must resolve
-// to a DV_CODED_TEXT node in the OPT.
+// to a node the template types as DV_CODED_TEXT, DV_TEXT or DATA_VALUE.
 func (b *Builder) SetCodedText(path, terminology, code, display string) error {
 	return b.Set(path, &rm.DVCodedText{
 		Value: display,

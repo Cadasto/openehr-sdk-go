@@ -8,21 +8,28 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
 
-// checkRMType verifies v's Go concrete type matches the RM type the
-// compiled node declares. Returns nil on match, ErrTypeMismatch
+// checkRMType verifies that v's RM type conforms to the RM type the
+// compiled node declares. Returns nil when it does, ErrTypeMismatch
 // (wrapped with diagnostic context) otherwise. The Go→RM-name reverse
-// mapping is the generated rm.RMTypeName (ADR 0013) — the previous
-// hand-written mirror of the typereg table is retired. REQ-024, no
+// mapping is the generated rm.RMTypeName (ADR 0013). REQ-024, no
 // reflection.
 //
-// Two deliberate consequences of the generated mapping: typed
-// DV_INTERVAL instantiations (absent from the old table, and rejected
-// as unrecognised) now type-check bound-aware — a compiled node
-// declares the ITS-JSON parameterised name (DV_INTERVAL<DV_QUANTITY>),
-// so the comparison consults rmnames.TypedIntervalName when the bare
-// registry name alone does not match. And an interface carrying a
-// typed-nil pointer now fails as unrecognised instead of matching its
-// type name — a typed-nil is not a usable value at a builder Set site.
+// v conforms when its RM type is the node's type, or a class that
+// descends from it in the pinned class hierarchy (REQ-101 Type
+// enforcement, read the way the REQ-102 validator binds an alternative):
+// a DV_CODED_TEXT conforms to a DV_TEXT node, and a concrete data value
+// to a node the OPT types as an abstract class such as DATA_VALUE or
+// EVENT. tcimpl.ConformsTo answers it from the classes the compile found
+// to conform to the node's type, so this package imports no class
+// hierarchy of its own (REQ-013).
+//
+// A typed DV_INTERVAL node declares the ITS-JSON parameterised name
+// (DV_INTERVAL<DV_QUANTITY>), which is no class the hierarchy knows; the
+// registry reverses only the bare name, so rmnames.TypedIntervalName
+// supplies the parameterised one, and the interval passes when its
+// parameter is the node's own. An interface carrying a typed-nil pointer
+// fails as unrecognised: a typed-nil is not a usable value at a builder
+// Set site.
 func checkRMType(node *tcimpl.CompiledNode, v any) error {
 	want := node.RMTypeName()
 	got, ok := rm.RMTypeName(v)
@@ -35,6 +42,9 @@ func checkRMType(node *tcimpl.CompiledNode, v any) error {
 	if param, ok := rmnames.TypedIntervalName(v); ok && param == want {
 		return nil
 	}
-	return fmt.Errorf("%w: value type %T (RM %q) does not match path RM type %q",
+	if conforms, known := tcimpl.ConformsTo(node, got); known && conforms {
+		return nil
+	}
+	return fmt.Errorf("%w: value type %T (RM %q) does not conform to path RM type %q",
 		ErrTypeMismatch, v, got, want)
 }

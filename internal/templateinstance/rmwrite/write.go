@@ -361,12 +361,7 @@ func writeInstructionSingle(i *rm.Instruction, attr string, child any) error {
 		i.Encoding = v
 		return nil
 	case "narrative":
-		v, ok := coerceDVText(child)
-		if !ok {
-			return mismatch(attr, child, "DV_TEXT")
-		}
-		i.Narrative = v
-		return nil
+		return assignDVTextLike(child, func(v rm.DVTextLike) { i.Narrative = v }, attr)
 	case "protocol":
 		v, ok := child.(rm.ItemStructure)
 		if !ok {
@@ -606,7 +601,8 @@ func writeEventContextSingle(c *rm.EventContext, attr string, child any) error {
 		c.Location = v
 		return nil
 	case "health_care_facility":
-		v, ok := child.(*rm.PartyIdentified)
+		// PARTY_IDENTIFIED or its descendant PARTY_RELATED, stored as given.
+		v, ok := child.(rm.PartyIdentifiedLike)
 		if !ok {
 			return mismatch(attr, child, "PARTY_IDENTIFIED")
 		}
@@ -857,7 +853,8 @@ func writeElementSingle(e *rm.Element, attr string, child any) error {
 		e.NullFlavour = v
 		return nil
 	case "null_reason":
-		v, ok := child.(*rm.DVText)
+		// DV_TEXT or its descendant DV_CODED_TEXT, stored as given.
+		v, ok := child.(rm.DVTextLike)
 		if !ok {
 			return mismatch(attr, child, "DV_TEXT")
 		}
