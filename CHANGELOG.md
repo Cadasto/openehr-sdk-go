@@ -18,6 +18,9 @@ Template validation and the RM floor run as one walk, a response whose body cann
 
 - **Breaking: a smaller validation result (REQ-171, REQ-102).** Content the template refuses is reported once and not entered, an empty mandatory list or missing reference part draws one finding, and `Coverage.Unevaluated` omits classes seen only there.
 - **Breaking: a Go value shared by two attributes is reported at each path (REQ-112).** The validators reported it at its first path only.
+- **A nil list item is reported (REQ-112, REQ-102).** A nil element or nil pointer in a list draws `required` at its own path; validation used to skip it.
+- **An empty temporal value is reported once (REQ-112).** An empty DV_DATE_TIME, DV_DATE, DV_TIME or DV_DURATION `value` draws `required` alone, without `rm_invariant` beside it.
+- **Template validation checks a DV_ORDINAL's symbol against its value (REQ-102, REQ-103).** A value and symbol pair the template does not list draws `primitive_not_in_list`; a listed symbol naming no terminology admits any.
 - **Validation issues follow the document, and an item bound to a 0..0 child is reported once (REQ-171).** `WithRMInfo` no longer draws RM-layer findings for a lookup's extra mandatory attributes.
 - **Validation with a template is faster (REQ-171).** It ran 2.1 to 2.8 times faster than the two-walk version in benchstat runs on three inputs.
 - **Breaking: `query.Repository` gains `RunStoredVersion` (REQ-057).** Code that implements the interface must add the method.
