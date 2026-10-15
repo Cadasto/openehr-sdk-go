@@ -647,6 +647,37 @@ func compileAlternatives(t *testing.T, alternatives ...string) *templatecompile.
 	return compileInline(t, strings.Replace(abstractValueOPT, abstractValueChild, strings.Join(alternatives, ""), 1))
 }
 
+// Paths in abstractValueOPT once compileClusterSibling has added a
+// CLUSTER beside its ELEMENT: the ELEMENT and the CLUSTER, two children of
+// the one multi-valued items attribute, each at its own path.
+const (
+	abstractElementPath = "/context/other_context/items[at0002]"
+	clusterSiblingPath  = "/context/other_context/items[at0003]"
+)
+
+// compileClusterSibling compiles abstractValueOPT with a CLUSTER[at0003]
+// after the ELEMENT[at0002] under items, and checks that the CLUSTER
+// compiled at clusterSiblingPath, a path other than the ELEMENT's.
+func compileClusterSibling(t *testing.T) *templatecompile.Compiled {
+	t.Helper()
+	const (
+		itemsCardinality = "<cardinality>"
+		cluster          = `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>CLUSTER</rm_type_name><node_id>at0003</node_id></children>`
+	)
+	if n := strings.Count(abstractValueOPT, itemsCardinality); n != 1 {
+		t.Fatalf("abstractValueOPT carries %d cardinalities, want 1, the items one (fixture drift)", n)
+	}
+	c := compileInline(t, strings.Replace(abstractValueOPT, itemsCardinality, cluster+itemsCardinality, 1))
+	node, err := c.NodeAt(clusterSiblingPath)
+	if err != nil {
+		t.Fatalf("NodeAt(%s): %v (fixture drift)", clusterSiblingPath, err)
+	}
+	if got := node.RMTypeName(); got != "CLUSTER" {
+		t.Fatalf("NodeAt(%s) has RM type %q, want CLUSTER (fixture drift)", clusterSiblingPath, got)
+	}
+	return c
+}
+
 // alternativeTypesPath is the ELEMENT value of the corpus template
 // alternative_types.en.v1, which the template allows as DV_QUANTITY,
 // DV_COUNT or DV_ORDINAL, in that order.
@@ -741,7 +772,10 @@ func TestREQ101_SetAcceptsAnyAlternativeAtPath(t *testing.T) {
 // a DV_BOOLEAN under DV_CODED_TEXT or DV_QUANTITY, and a DV_QUANTITY
 // where the template lists DV_QUANTITY with occurrences 0..0, whether
 // that alternative comes after the allowed DV_CODED_TEXT or before it,
-// where it is the node Compiled.NodeAt returns, or is the only one.
+// where it is the node Compiled.NodeAt returns, or is the only one. A
+// child of the same attribute at another path is no alternative: a
+// CLUSTER at an ELEMENT's path is refused although the template allows a
+// CLUSTER beside that ELEMENT under the same multi-valued items.
 func TestREQ101_SetRefusesValueNoAlternativeAllows(t *testing.T) {
 	t.Parallel()
 	codedThenQuantity := compileAlternatives(t, valueAlternative("DV_CODED_TEXT", false), valueAlternative("DV_QUANTITY", false))
@@ -749,6 +783,7 @@ func TestREQ101_SetRefusesValueNoAlternativeAllows(t *testing.T) {
 	excludedQuantityThenCoded := compileAlternatives(t, valueAlternative("DV_QUANTITY", true), valueAlternative("DV_CODED_TEXT", false))
 	excludedQuantity := compileAlternatives(t, valueAlternative("DV_QUANTITY", true))
 	alternativeTypes := compileFixture(t, "alternative_types.en.v1")
+	clusterSibling := compileClusterSibling(t)
 
 	cases := []struct {
 		name string
@@ -761,6 +796,10 @@ func TestREQ101_SetRefusesValueNoAlternativeAllows(t *testing.T) {
 		{name: "DV_QUANTITY at 0..0 before DV_CODED_TEXT", c: excludedQuantityThenCoded, path: abstractValuePath, v: &rm.DVQuantity{Magnitude: 1, Units: "mm"}},
 		{name: "DV_QUANTITY, the only alternative, at 0..0", c: excludedQuantity, path: abstractValuePath, v: &rm.DVQuantity{Magnitude: 1, Units: "mm"}},
 		{name: "DV_TEXT under the corpus DV_QUANTITY, DV_COUNT or DV_ORDINAL", c: alternativeTypes, path: alternativeTypesPath, v: &rm.DVText{Value: "x"}},
+		{
+			name: "CLUSTER at an ELEMENT's path, with a CLUSTER sibling at another path under items", c: clusterSibling,
+			path: abstractElementPath, v: &rm.Cluster{ArchetypeNodeID: "at0003"},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
