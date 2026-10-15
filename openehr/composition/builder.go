@@ -112,15 +112,18 @@ func (b *Builder) TemplateID() string {
 // descends from, the type the openEHR Reference Model gives that
 // attribute on the RM type of the node above it. An ELEMENT's value
 // holds any data value; the value of a DV_DURATION holds a String, so no
-// RM value at all. Where the model gives no type to test against, as for
-// the bounds of a DV_INTERVAL the template does not parameterise, Set
-// does not refuse v, and Build reports a value of the wrong type with
-// ErrInvalidPath.
+// RM value at all. Where the model types the attribute with a generic
+// parameter that the template leaves open, v must conform to the
+// parameter's constraint: the bounds of a DV_INTERVAL the template does
+// not parameterise hold a DV_ORDERED.
 //
 // Set returns ErrTypeMismatch for any other value: one that binds none of
 // those nodes (a *rm.DVText at a DV_CODED_TEXT node, say), one the RM
 // attribute at path cannot hold (a *rm.DVDuration at the DURATION node
-// under a DV_DURATION's value), one that is not an RM value (a Go string,
+// under a DV_DURATION's value, or a *rm.DVText at a bound of a bare
+// DV_INTERVAL), one at a path that writes no RM attribute (a template may
+// constrain a function of the model as if it were an attribute, such as
+// DV_PROPORTION.is_integral), one that is not an RM value (a Go string,
 // even at a DURATION node), nil, and a nil pointer.
 //
 // Errors are accumulated and surfaced from Build. Set never
@@ -155,7 +158,8 @@ func (b *Builder) Set(path string, v any) error {
 	// The template may list several alternatives at path; NodeAt returns
 	// the first, and the value binds the one the validator would bind it
 	// to (REQ-101, REQ-102). They share the path, so Build reaches the
-	// same RM attribute through any of them.
+	// same RM attribute through any of them, and bindRMType checks that
+	// the attribute can hold the value.
 	bound, err := bindRMType(node, v)
 	if err != nil {
 		wrapped := fmt.Errorf("%s: %w", path, err)

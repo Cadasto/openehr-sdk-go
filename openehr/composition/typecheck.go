@@ -12,8 +12,9 @@ import (
 
 // bindRMType returns the node, among those the template allows at the
 // compiled node's path ([alternativesAt]), that v binds, or
-// ErrTypeMismatch (wrapped with diagnostic context) when v binds none or
-// the RM attribute the path writes cannot hold v ([attributeHolds]).
+// ErrTypeMismatch (wrapped with diagnostic context) when v binds none, or
+// when the path writes no RM attribute or one that cannot hold v
+// ([attributeHolds]).
 //
 // It binds by the rule the validator binds a value with ([rmbind.Bind]),
 // so v binds the node the validator would bind it to. The rule tries
@@ -39,7 +40,7 @@ import (
 // unrecognised. That covers a value that is no RM type, such as a Go
 // string the validator would bind at a DURATION leaf, and an interface
 // carrying a typed-nil pointer: neither is a usable value at a builder
-// Set site. And the RM attribute the path writes must be able to hold v,
+// Set site. And the path must write an RM attribute that can hold v,
 // which the rule does not ask: a DV_DURATION binds the DURATION node
 // under a DV_DURATION's value, but that attribute holds a String.
 func bindRMType(node *tcimpl.CompiledNode, v any) (*tcimpl.CompiledNode, error) {
@@ -76,25 +77,33 @@ func bindRMType(node *tcimpl.CompiledNode, v any) (*tcimpl.CompiledNode, error) 
 func anyNode(*tcimpl.CompiledNode) bool { return true }
 
 // attributeHolds returns nil when the RM attribute that node sits under
-// can hold v, of RM type got, or when the pinned RM metadata
-// ([rminfo.Default]) gives no type to test against; otherwise it returns
-// ErrTypeMismatch, wrapped with the attribute and its type.
+// can hold v, of RM type got; otherwise it returns ErrTypeMismatch,
+// wrapped with the attribute and the type it holds. The pinned RM
+// metadata ([rminfo.Default]) gives the attribute and its type.
 //
 // The attribute's type is the one the metadata gives the attribute,
 // declared or inherited, on the class of node's parent: the type of its
 // items for a container. Where that class types the attribute with a
-// formal generic parameter that the parent's type name binds, the actual
-// parameter takes its place ([bmmtype.Substitute]), so the lower bound of
-// a DV_INTERVAL<DV_COUNT> holds a DV_COUNT. The attribute can hold v when
-// got is that type or descends from it in the pinned class hierarchy
-// ([canHold]).
+// formal generic parameter, the parent's type name supplies the actual
+// parameter ([bmmtype.Substitute]), so the lower bound of a
+// DV_INTERVAL<DV_COUNT> holds a DV_COUNT. Where the name leaves the
+// parameter open, the parameter's constraint takes its place
+// ([bmmtype.ParameterConstraint]), so the lower bound of a bare
+// DV_INTERVAL holds a DV_ORDERED, and the data of a bare POINT_EVENT an
+// ITEM_STRUCTURE. The attribute can hold v when got is that type or
+// descends from it in the pinned class hierarchy ([canHold]).
 //
-// There is nothing to test against, and so no refusal, at the root; under
-// a parent the template leaves untyped; where the metadata does not know
-// the parent's class or the class does not declare the attribute; and
-// where the attribute's type is no class the hierarchy knows and no plain
-// value type ([plainValueTypes]): a formal parameter the parent's name
-// leaves open (the T of a bare DV_INTERVAL or EVENT), or Any.
+// A path at which the metadata knows the parent's class, but that class
+// has no attribute of the name the template gives, writes no RM
+// attribute, and is refused too: a template may constrain a BMM function,
+// such as DV_PROPORTION.is_integral, as if it were an attribute.
+//
+// There is nothing to test against, and so no refusal, at the root, which
+// sits under no attribute; under a parent the template leaves untyped or
+// whose class the metadata does not know; and where the attribute's type
+// is no class the hierarchy knows and no plain value type
+// ([plainValueTypes]): Any, or a formal parameter left open that the
+// schemas set no constraint, such as the T of VERSION.
 func attributeHolds(node *tcimpl.CompiledNode, v any, got string) error {
 	parent := node.Parent()
 	if parent == nil {
@@ -105,16 +114,36 @@ func attributeHolds(node *tcimpl.CompiledNode, v any, got string) error {
 	if owner == "" || attr == nil {
 		return nil
 	}
-	declared, ok := rminfo.Default.AttributeRMType(bmmtype.Class(owner), attr.Name())
+	class := bmmtype.Class(owner)
+	declared, ok := rminfo.Default.AttributeRMType(class, attr.Name())
 	if !ok {
-		return nil
+		if !classKnown(class) {
+			return nil
+		}
+		return fmt.Errorf("%w: value type %T (RM %q): the path writes %q, which %s does not have as an RM attribute",
+			ErrTypeMismatch, v, got, attr.Name(), owner)
 	}
 	held := bmmtype.Substitute(owner, declared)
+	what := held
+	if constraint, open := bmmtype.ParameterConstraint(class, held); open && constraint != "" {
+		what = fmt.Sprintf("its generic parameter %s, a %s", held, constraint)
+		held = constraint
+	}
 	if holds, known := canHold(held, got); holds || !known {
 		return nil
 	}
 	return fmt.Errorf("%w: value type %T (RM %q): the path writes attribute %q of %s, which holds %s",
-		ErrTypeMismatch, v, got, attr.Name(), owner, held)
+		ErrTypeMismatch, v, got, attr.Name(), owner, what)
+}
+
+// classKnown reports whether the pinned RM metadata knows class.
+func classKnown(class string) bool {
+	h, ok := rminfo.Default.(rminfo.Hierarchy)
+	if !ok {
+		return false
+	}
+	_, known := h.IsAbstract(class)
+	return known
 }
 
 // canHold reports whether an attribute of RM type held can hold a value of

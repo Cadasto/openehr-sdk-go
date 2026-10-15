@@ -105,8 +105,12 @@ var ErrUnknownPath = errors.New("composition: path not in template")
 // one whose occurrences are 0..0. A value that binds a node there but
 // that the RM attribute at the path cannot hold is refused too: a
 // DV_DURATION at the DURATION node under a DV_DURATION's value, which
-// holds a String. A nil value, a nil pointer and a value that is not an
-// RM value at all are refused the same way. Comparable via errors.Is.
+// holds a String, or a DV_TEXT at a bound of a DV_INTERVAL the template
+// does not parameterise, which holds a DV_ORDERED. So is any value at a
+// path that writes no RM attribute, such as a template's constraint on
+// DV_PROPORTION.is_integral, which the model defines as a function. A nil
+// value, a nil pointer and a value that is not an RM value at all are
+// refused the same way. Comparable via errors.Is.
 var ErrTypeMismatch = errors.New("composition: value type does not match path RM type")
 
 // ErrInvalidPath signals a structural problem navigating the path
