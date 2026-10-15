@@ -129,7 +129,7 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-168 | Value-free validation diagnostics | [clinical-modeling.md](clinical-modeling.md#req-168--value-free-validation-diagnostics) | draft | landed |
 | REQ-169 | Interval boundary flag defaults | [wire.md](wire.md#req-169--interval-boundary-flag-defaults) | draft | landed |
 | REQ-170 | Unmatched content on decode | [wire.md](wire.md#req-170--unmatched-content-on-decode) | draft | landed |
-| REQ-171 | Validation engine | [clinical-modeling.md](clinical-modeling.md#req-171--validation-engine) | draft | partial |
+| REQ-171 | Validation engine | [clinical-modeling.md](clinical-modeling.md#req-171--validation-engine) | draft | landed |
 | REQ-172 | Typed 2xx body-read failure | [transport.md](transport.md#req-172--typed-2xx-body-read-failure) | draft | landed |
 <!-- END GENERATED: registry -->
 

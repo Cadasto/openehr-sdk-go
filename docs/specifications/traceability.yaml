@@ -2139,8 +2139,8 @@ requirements:
     title: Validation engine
     canonical: docs/specifications/clinical-modeling.md#req-171--validation-engine
     status: draft
-    implementation: partial
-    packages: [openehr/validation, internal/rmaccess, internal/bmmgen]
+    implementation: landed
+    packages: [openehr/validation, internal/rmaccess, internal/bmmgen, internal/templatecompile]
     probes: [PROBE-077]
     tests:
       - internal/bmmgen/render_inventory_test.go
