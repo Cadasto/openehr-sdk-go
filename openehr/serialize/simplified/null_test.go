@@ -306,9 +306,11 @@ func TestREQ053FlatToStructuredCarriesNull(t *testing.T) {
 		"two spellings beside a child, the null second": {
 			`{"t/x": "a", "t/x/y": 1, "t/x:0": null}`, `{"t":{"x":[{"|":"a","y":[1]}]}}`,
 		},
-		"two spellings of a suffix, the null first":  {`{"t/x:0|unit": null, "t/x|unit": "mg"}`, `{"t":{"x":[{"|unit":"mg"}]}}`},
-		"two spellings of a suffix, the null second": {`{"t/x:0|unit": "mg", "t/x|unit": null}`, `{"t":{"x":[{"|unit":"mg"}]}}`},
-		"two null spellings of a suffix":             {`{"t/x:0|unit": null, "t/x|unit": null}`, `{"t":{"x":[{"|unit":null}]}}`},
+		"two spellings of a suffix, the null first":       {`{"t/x:0|unit": null, "t/x|unit": "mg"}`, `{"t":{"x":[{"|unit":"mg"}]}}`},
+		"two spellings of a suffix, the null second":      {`{"t/x:0|unit": "mg", "t/x|unit": null}`, `{"t":{"x":[{"|unit":"mg"}]}}`},
+		"two null spellings of a suffix":                  {`{"t/x:0|unit": null, "t/x|unit": null}`, `{"t":{"x":[{"|unit":null}]}}`},
+		"two spellings of a root suffix, the null first":  {`{"t:0|x": null, "t|x": "a"}`, `{"t":{"|x":"a"}}`},
+		"two spellings of a root suffix, the null second": {`{"t:0|x": "a", "t|x": null}`, `{"t":{"|x":"a"}}`},
 		"two spellings of a nested suffix, one null": {
 			`{"t/e/_normal_range/lower|magnitude": 20.5, "t/e/_normal_range/lower:0|magnitude": null}`,
 			`{"t":{"e":[{"_normal_range":[{"lower":[{"|magnitude":20.5}]}]}]}}`,

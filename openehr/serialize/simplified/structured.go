@@ -178,7 +178,10 @@ func flatToStructured(flat map[string]any) (map[string]any, error) {
 				// interconversion silently lossy.
 				return nil, fmt.Errorf("%w: bare value at root segment %q", ErrUnknownPath, key)
 			}
-			obj["|"+pk.suffix] = val
+			// The root segment's `:0` spelling reaches the same member.
+			if err := placeMember(obj, "|"+pk.suffix, val, rootID, 0); err != nil {
+				return nil, fmt.Errorf("simplified: structured %q: %w", key, err)
+			}
 			continue
 		}
 		if err := insertStructured(obj, rest, pk.suffix, val, budget); err != nil {
@@ -249,12 +252,13 @@ func insertStructured(obj map[string]any, segs []flatSeg, suffix string, val any
 			}
 			arr[idx] = val
 		case map[string]any:
-			if _, taken := cur[bareStructuredKey]; taken {
+			return placeMember(cur, bareStructuredKey, val, seg.id, idx)
+		default:
+			// A second spelling holding null is absent beside the value the
+			// slot holds, whichever of the two the sorted key order placed first.
+			if val != nil {
 				return fmt.Errorf("%w: conflicting values at %q index %d", ErrUnknownPath, seg.id, idx)
 			}
-			cur[bareStructuredKey] = val
-		default:
-			return fmt.Errorf("%w: conflicting values at %q index %d", ErrUnknownPath, seg.id, idx)
 		}
 		return nil
 	}
@@ -274,13 +278,25 @@ func insertStructured(obj map[string]any, segs []flatSeg, suffix string, val any
 		arr[idx] = el
 	}
 	if isLeaf {
-		if _, taken := el["|"+suffix]; taken {
-			return fmt.Errorf("%w: conflicting values at %q index %d", ErrUnknownPath, seg.id, idx)
-		}
-		el["|"+suffix] = val
-		return nil
+		return placeMember(el, "|"+suffix, val, seg.id, idx)
 	}
 	return insertStructured(el, segs[1:], suffix, val, budget)
+}
+
+// placeMember sets the member name of el, an array element at index idx of
+// id, to val, for a FLAT key that spells it. Two spellings of one slot (`x`
+// and `x:0`) can both reach one member; a null is absent beside a value
+// (REQ-053), so one holding null gives way to the other, whichever the sorted
+// key order placed first, and two that both hold a value conflict.
+func placeMember(el map[string]any, name string, val any, id string, idx int) error {
+	cur, taken := el[name]
+	switch {
+	case !taken, cur == nil:
+		el[name] = val
+	case val != nil:
+		return fmt.Errorf("%w: conflicting values at %q index %d", ErrUnknownPath, id, idx)
+	}
+	return nil
 }
 
 // structuredToFlat flattens a STRUCTURED map into a FLAT map. Each array

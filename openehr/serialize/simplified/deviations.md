@@ -225,7 +225,10 @@ Concretely:
   `leaf:0: null`); a null template root or `ctx` object, which no FLAT key can hold, is absent.
   FLAT → STRUCTURED carries a null as written as well: a lone null bare value as a null array
   element, a null suffix as a null `\|suffix` member, and a null bare value beside its leaf's
-  suffixes or children as the null `"\|"` member, as it carries one that is not null. A null
+  suffixes or children as the null `"\|"` member, as it carries one that is not null. Two
+  spellings that reach one slot (`x` and `x:0`, `x\|unit` and `x:0\|unit`, `<root>\|x` and
+  `<root>:0\|x`) give one value there: a null one is absent beside the other's value,
+  whichever of the two sorts first, and two that both hold a value are refused. A null
   `ctx/` field beside its suffixes (`ctx/setting: null` beside `ctx/setting\|code`) takes the
   null `"\|"` member of the field's object the same way, and STRUCTURED → FLAT reads that
   member back as the field's own key, as it does at a leaf, a member that holds a value
@@ -239,6 +242,9 @@ Concretely:
   was refused as a hole in the array, and FLAT → STRUCTURED refused a `ctx/` field beside
   its suffixes as a direct value beside a suffixed leaf, null or not, echoing the value, and
   merged an object-valued one with its suffixes, the later key overwriting the earlier.
+  FLAT → STRUCTURED also refused a null spelling of a slot beside a value as a conflict
+  unless the null sorted first, and at the template root the later of two spellings
+  overwrote the earlier, a null included.
 
 Consequence: a payload that spells a not-yet-supported feature (below) in keys the codec does
 not read decodes without those keys by default, and the caller learns which they were through
