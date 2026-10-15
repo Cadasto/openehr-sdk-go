@@ -1208,6 +1208,7 @@ requirements:
       - openehr/validation/issuepath_test.go
       - openehr/validation/multi_nonlocatable_test.go
       - openehr/validation/ordinal_symbol_test.go
+      - openehr/validation/primitive_empty_part_test.go
       - openehr/validation/prohibited_test.go
       - openehr/validation/rmfloor_chained_corpus_test.go
       - openehr/validation/rmfloor_chained_internal_test.go
@@ -1530,6 +1531,7 @@ requirements:
       - openehr/validation/multi_nonlocatable_test.go
       - openehr/validation/noncomposition_test.go
       - openehr/validation/nonstorable_generic_test.go
+      - openehr/validation/primitive_empty_part_test.go
       - openehr/validation/rmfloor_archetype_test.go
       - openehr/validation/rmfloor_bytes_internal_test.go
       - openehr/validation/rmfloor_bytes_test.go
@@ -2178,6 +2180,7 @@ requirements:
       - openehr/validation/limits_test.go
       - openehr/validation/locatable_attributes_test.go
       - openehr/validation/noncomposition_test.go
+      - openehr/validation/primitive_empty_part_test.go
       - openehr/validation/prohibited_test.go
       - openehr/validation/registry_roots_test.go
       - openehr/validation/rmfloor_bytes_internal_test.go
