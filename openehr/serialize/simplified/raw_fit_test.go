@@ -35,9 +35,9 @@ var (
 // meaning and bound, a term mapping's target and purpose), the feeder audit's
 // content and item id, and the Web Template's own leaves (a collapsed
 // ELEMENT's value, an interval leaf's bound, an in-context leaf, a node with
-// children). The STRUCTURED form is refused the same way.
+// children). WithTemplate and the STRUCTURED form refuse it the same way.
 func TestREQ053RawFragmentMustFitItsAttribute(t *testing.T) {
-	wt, _ := conformanceWT(t)
+	wt, c := conformanceWT(t)
 	ref := rmattrCount + "/_other_reference_ranges:0"
 	feeder := rmattrObs + "/_feeder_audit"
 	for name, tc := range map[string]struct {
@@ -152,6 +152,9 @@ func TestREQ053RawFragmentMustFitItsAttribute(t *testing.T) {
 			if !errors.Is(err, ErrUnsupportedDatatype) || !strings.Contains(err.Error(), `"`+tc.key+`"`) {
 				t.Errorf("FLAT: decode = %v, want ErrUnsupportedDatatype naming %q", err, tc.key)
 			}
+			if _, err := UnmarshalFlat(mustJSON(t, body), wt, WithTemplate(c)); !errors.Is(err, ErrUnsupportedDatatype) {
+				t.Errorf("FLAT WithTemplate: decode = %v, want ErrUnsupportedDatatype", err)
+			}
 			if structured := structuredRefusedInEveryMode(t, wt, body); !errors.Is(structured, ErrUnsupportedDatatype) {
 				t.Errorf("STRUCTURED: decode = %v, want ErrUnsupportedDatatype", structured)
 			}
@@ -205,5 +208,31 @@ func TestREQ053RawFragmentFitsTheAttributeNotTheDatatype(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			decodeRMAttr(t, wt, rmattrBody(extra))
 		})
+	}
+}
+
+// TestCheckRawFitsNamesNoCallerText — REQ-053: a fragment whose `_type` the RM
+// does not define is refused without echoing that `_type`, which is text the
+// caller wrote; one the RM defines is named by its class.
+func TestCheckRawFitsNamesNoCallerText(t *testing.T) {
+	const secret = "secret-value-0451"
+	keyOf := func(string) string { return "p/x|raw" }
+	err := checkRawFits(secret, "DV_TEXT", keyOf)
+	if !errors.Is(err, ErrUnsupportedDatatype) || strings.Contains(err.Error(), secret) || !strings.Contains(err.Error(), `"p/x|raw"`) {
+		t.Errorf("checkRawFits(%q, DV_TEXT) = %v, want ErrUnsupportedDatatype naming the key and not the _type", secret, err)
+	}
+	err = checkRawFits("DV_QUANTITY", "DV_TEXT", keyOf)
+	if !errors.Is(err, ErrUnsupportedDatatype) || !strings.Contains(err.Error(), "DV_QUANTITY fragment") {
+		t.Errorf("checkRawFits(DV_QUANTITY, DV_TEXT) = %v, want ErrUnsupportedDatatype naming DV_QUANTITY", err)
+	}
+}
+
+// TestCheckRawFitsLeavesAnUndefinedAttributeToCanonicalJSON — REQ-053: the
+// check adds no strictness of its own, so where the type the attribute is
+// declared as is no RM class (a Web Template node type spelled outside the
+// BMM), there is nothing to judge a fragment against and it is not refused.
+func TestCheckRawFitsLeavesAnUndefinedAttributeToCanonicalJSON(t *testing.T) {
+	if err := checkRawFits("DV_TEXT", "NO_SUCH_CLASS", nil); err != nil {
+		t.Errorf("checkRawFits(DV_TEXT, NO_SUCH_CLASS) = %v, want nil", err)
 	}
 }

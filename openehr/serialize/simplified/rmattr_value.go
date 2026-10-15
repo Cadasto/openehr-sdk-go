@@ -310,19 +310,20 @@ func (ts rmattrTails) empty() bool {
 // `decode "<key>"` with the *base* key — so the census reads the refusal at the
 // same precision it reads a leaf's.
 func (ts rmattrTails) value(g rmattrGroup, seg, rmType string) (map[string]any, error) {
-	return ts.valueAt(g, func(suffix string) string { return subTail(seg, suffix) }, rmType, ts.sub[seg])
+	return ts.valueAt(g, func(suffix string) string { return subTail(seg, suffix) }, rmType, rmType, ts.sub[seg])
 }
 
 // listValue is [rmattrTails.value] for one slot of an indexed sub-path list.
 func (ts rmattrTails) listValue(g rmattrGroup, seg string, idx int, rmType string) (map[string]any, error) {
-	return ts.valueAt(g, func(suffix string) string { return subListTail(seg, idx, suffix) }, rmType, ts.sublist[seg][idx])
+	return ts.valueAt(g, func(suffix string) string { return subListTail(seg, idx, suffix) }, rmType, rmType, ts.sublist[seg][idx])
 }
 
-// valueAt is the shared body: decode sfx as rmType, naming the sub-object's own
-// FLAT key on failure. tailOf spells the tail of one suffix of it, "" for the
-// sub-object itself.
-func (ts rmattrTails) valueAt(g rmattrGroup, tailOf func(suffix string) string, rmType string, sfx map[string]any) (map[string]any, error) {
-	dv, err := dvFromSuffixes(rmType, false, sfx, func(suffix string) string { return ts.key(g, tailOf(suffix)) })
+// valueAt is the shared body: decode sfx as rmType at an RM attribute declared
+// as holds ([dvFromSuffixesAt]), naming the sub-object's own FLAT key on
+// failure. tailOf spells the tail of one suffix of it, "" for the sub-object
+// itself.
+func (ts rmattrTails) valueAt(g rmattrGroup, tailOf func(suffix string) string, holds, rmType string, sfx map[string]any) (map[string]any, error) {
+	dv, err := dvFromSuffixesAt(holds, rmType, false, sfx, func(suffix string) string { return ts.key(g, tailOf(suffix)) })
 	if err != nil {
 		return nil, fmt.Errorf("simplified: decode %q: %w", ts.key(g, tailOf("")), err)
 	}
@@ -454,6 +455,13 @@ var normalRangeBoundByValue = map[string]bool{"DV_COUNT": true, "DV_QUANTITY": t
 // refused; held as an interface, it decodes as written, with no bound.
 func intervalSuffixes(g rmattrGroup, ts rmattrTails, anchor string, boundByValue bool) (map[string]any, error) {
 	iv := map[string]any{"_type": "DV_INTERVAL"}
+	// The type a bound is held as, which a `|raw` bound must name or descend
+	// from: the anchor itself where the RM holds the bound by value, and any
+	// DV_ORDERED where it holds an interface.
+	bound := "DV_ORDERED"
+	if boundByValue {
+		bound = anchor
+	}
 	for _, end := range []string{"lower", "upper"} {
 		// [intervalTails] and the reference-range decoder filter each bound
 		// ([rmattrTails.filterSub]), which drops its null keys and then a bound
@@ -480,7 +488,7 @@ func intervalSuffixes(g rmattrGroup, ts rmattrTails, anchor string, boundByValue
 				ErrUnsupportedDatatype, g.prefix(), end, end, end)
 		}
 		if bounded {
-			dv, err := ts.value(g, end, anchor)
+			dv, err := ts.valueAt(g, func(suffix string) string { return subTail(end, suffix) }, bound, anchor, ts.sub[end])
 			if err != nil {
 				return nil, err
 			}

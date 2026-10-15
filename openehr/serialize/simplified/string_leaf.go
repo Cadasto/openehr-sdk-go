@@ -54,13 +54,14 @@ func emitStringLeaf(out map[string]any, flatPath string, root rm.Locatable, relP
 
 // leafFromSuffixes builds the canonical-JSON value of a Web Template leaf from
 // its FLAT suffix->value map: the RM String itself for a STRING leaf, and the
-// DataValue [dvFromSuffixes] builds for every other leaf type. keyOf names the
-// FLAT key each suffix arrived under.
-func leafFromSuffixes(rmType string, listOpen bool, sfx map[string]any, keyOf func(suffix string) string) (any, error) {
+// DataValue [dvFromSuffixesAt] builds for every other leaf type, holds being
+// the RM type of the attribute the leaf's value fills ([leafHolds]). keyOf
+// names the FLAT key each suffix arrived under.
+func leafFromSuffixes(holds, rmType string, listOpen bool, sfx map[string]any, keyOf func(suffix string) string) (any, error) {
 	if rmType == stringLeafType {
 		return stringFromSuffixes(sfx, keyOf)
 	}
-	return dvFromSuffixes(rmType, listOpen, sfx, keyOf)
+	return dvFromSuffixesAt(holds, rmType, listOpen, sfx, keyOf)
 }
 
 // stringFromSuffixes rebuilds a STRING leaf's RM String from its bare value.

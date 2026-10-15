@@ -226,7 +226,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 		if len(sfx) == 0 {
 			continue
 		}
-		dv, err := leafFromSuffixes(nodeRMType(leaf), leafListOpen(leaf), sfx, keyOf)
+		dv, err := leafFromSuffixes(leafHolds(leaf), nodeRMType(leaf), leafListOpen(leaf), sfx, keyOf)
 		if err != nil {
 			return nil, fmt.Errorf("simplified: decode %q: %w", base, err)
 		}
@@ -2338,12 +2338,23 @@ var bareLeafAttr = map[string]string{
 // a missing one, and no null reaches the canonical tree as the zero of its
 // type. Every other value must fit the RM attribute it fills
 // ([checkSuffixFits]); one that does not is refused naming the FLAT key keyOf
-// gives for its suffix (nil names the suffix alone).
+// gives for its suffix (nil names the suffix alone). A |raw fragment fits when
+// its _type is rmType or an RM subtype of it ([checkRawFits]).
 func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any, keyOf func(suffix string) string) (map[string]any, error) {
+	return dvFromSuffixesAt(rmType, rmType, listOpen, sfx, keyOf)
+}
+
+// dvFromSuffixesAt is [dvFromSuffixes] at a position whose RM attribute is
+// declared as holds, which can be wider than rmType, the datatype the
+// suffixes are read as: a collapsed ELEMENT's value is a DATA_VALUE, an
+// interval bound the RM holds as an interface is a DV_ORDERED, and the feeder
+// audit's content is a DV_ENCAPSULATED. A |raw fragment there fits when its
+// _type is holds or an RM subtype of it, which is what canonical JSON admits.
+func dvFromSuffixesAt(holds, rmType string, listOpen bool, sfx map[string]any, keyOf func(suffix string) string) (map[string]any, error) {
 	sfx = withoutNulls(sfx)
 	// |raw bypass: a pre-serialised canonical fragment (carrying its own string
-	// _type); used directly, regardless of the leaf rmType. Mutually exclusive
-	// with every other suffix.
+	// _type); used directly, whatever the leaf rmType, once the attribute it
+	// fills admits its _type. Mutually exclusive with every other suffix.
 	if raw, ok := sfx["raw"]; ok {
 		if len(sfx) > 1 {
 			return nil, fmt.Errorf("%w: |raw is mutually exclusive with other suffixes", ErrUnsupportedDatatype)
@@ -2352,8 +2363,12 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any, keyOf func
 		if !ok {
 			return nil, fmt.Errorf("%w: |raw value is not a canonical object", ErrUnsupportedDatatype)
 		}
-		if t, ok := frag["_type"].(string); !ok || t == "" {
+		t, ok := frag["_type"].(string)
+		if !ok || t == "" {
 			return nil, fmt.Errorf("%w: |raw fragment missing string _type", ErrUnsupportedDatatype)
+		}
+		if err := checkRawFits(t, holds, keyOf); err != nil {
+			return nil, err
 		}
 		return frag, nil
 	}
@@ -2756,6 +2771,20 @@ func checkSuffixAllowlist(rmType string, sfx map[string]any) error {
 // (any input with listOpen) — the precondition for the |other free-text form.
 func leafListOpen(node *webtemplate.Node) bool {
 	return slices.ContainsFunc(node.Inputs, func(in webtemplate.Input) bool { return in.ListOpen })
+}
+
+// leafHolds names the RM type of the attribute a Web Template leaf's value
+// fills, the type a `|raw` fragment there must name or descend from (REQ-053).
+// A collapsed ELEMENT's leaf fills ELEMENT.value, a DATA_VALUE, whatever
+// datatype the template names: the encoder writes a substituted value there
+// as `|raw` stamped with its own type. Every other node types the attribute
+// it fills itself: an in-context leaf (an EVENT's `time`, an ENTRY's
+// `language`, COMPOSITION `category`) and a node with children alike.
+func leafHolds(leaf *webtemplate.Node) string {
+	if strings.HasSuffix(bareAQLPath(leaf.AQLPath), "/value") {
+		return "DATA_VALUE"
+	}
+	return nodeRMType(leaf)
 }
 
 // requireSuffix returns sfx[name], or an error if it is absent — a missing

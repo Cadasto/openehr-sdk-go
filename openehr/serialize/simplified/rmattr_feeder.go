@@ -210,7 +210,7 @@ func decodeRMAttrFeederAudit(g rmattrGroup, _ string) (any, error) {
 		case feederAuditItemIDLists[seg] != "":
 			ids := make([]any, 0, len(insts))
 			for _, in := range insts {
-				dv, err := feederLeafValue(in, "DV_IDENTIFIER")
+				dv, err := feederLeafValue(in, "DV_IDENTIFIER", "DV_IDENTIFIER")
 				if errors.Is(err, errNothingMatched) {
 					continue
 				}
@@ -245,7 +245,10 @@ func decodeRMAttrFeederAudit(g rmattrGroup, _ string) (any, error) {
 			if err != nil {
 				return nil, err
 			}
-			content, err := feederLeafValue(in, feederAuditContentSegs[seg])
+			// The key name picks the datatype the suffixes are read as, but the
+			// attribute is a DV_ENCAPSULATED, so a `|raw` fragment of either
+			// subtype fits under either key.
+			content, err := feederLeafValue(in, "DV_ENCAPSULATED", feederAuditContentSegs[seg])
 			if errors.Is(err, errNothingMatched) {
 				continue
 			}
@@ -375,8 +378,9 @@ func feederParty(g rmattrGroup, proxy bool) (map[string]any, error) {
 // *are* the suffix map, so a sub-path of its own, like a suffix outside the
 // datatype's set, is unmatched content (REQ-170): the grammar stops here, and a
 // value the suffix set cannot capture rides that key's `|raw` instead (which is
-// how a charset-carrying `original_content` stays lossless).
-func feederLeafValue(g rmattrGroup, rmType string) (map[string]any, error) {
+// how a charset-carrying `original_content` stays lossless). holds is the RM type
+// of the attribute the value fills ([dvFromSuffixesAt]).
+func feederLeafValue(g rmattrGroup, holds, rmType string) (map[string]any, error) {
 	sfx := make(map[string]any, len(g.tails))
 	for _, tail := range slices.Sorted(maps.Keys(g.tails)) {
 		if strings.HasPrefix(tail, "/") {
@@ -390,7 +394,7 @@ func feederLeafValue(g rmattrGroup, rmType string) (map[string]any, error) {
 	if len(sfx) == 0 {
 		return nil, errNothingMatched
 	}
-	dv, err := dvFromSuffixes(rmType, false, sfx, keyOf)
+	dv, err := dvFromSuffixesAt(holds, rmType, false, sfx, keyOf)
 	if err != nil {
 		return nil, fmt.Errorf("simplified: decode %q: %w", g.prefix(), err)
 	}

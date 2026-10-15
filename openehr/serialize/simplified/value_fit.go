@@ -280,3 +280,35 @@ func checkSuffixFits(rmType string, sfx map[string]any, keyOf func(string) strin
 	}
 	return fit.refusal(suffixLabel(keyOf, first), sfx[first])
 }
+
+// checkRawFits returns nil when a `|raw` fragment of type typ fits the RM
+// attribute it fills, declared as holds: typ is holds or an RM subtype of it,
+// the test canonical JSON applies when it decodes that attribute. Otherwise it
+// refuses the fragment, wrapping [ErrUnsupportedDatatype] and naming the
+// `|raw` key keyOf gives, so the misfit never surfaces as a canonical-JSON
+// error naming a path the caller did not write (REQ-053). The refusal names
+// the fragment's class only when the RM defines it, so text the caller wrote
+// as a `_type` never reaches the message. A holds the RM does not define (a
+// Web Template node type spelled outside the BMM) gives nothing to judge
+// against, and the fragment is left to canonical JSON.
+func checkRawFits(typ, holds string, keyOf func(string) string) error {
+	h, ok := rminfo.Default.(rminfo.Hierarchy)
+	if !ok {
+		// rminfo.Default implements Hierarchy, so this cannot happen; with no
+		// hierarchy to ask, canonical JSON judges the fragment.
+		return nil
+	}
+	class, holdsClass := bmmtype.Class(typ), bmmtype.Class(holds)
+	if conforms, _ := h.ConformsTo(class, holdsClass); conforms {
+		return nil
+	}
+	if _, defined := h.Ancestors(class); !defined {
+		return fmt.Errorf("%w: %s holds a fragment whose _type the RM does not define, where the attribute it fills takes a %s",
+			ErrUnsupportedDatatype, suffixLabel(keyOf, "raw"), holdsClass)
+	}
+	if _, defined := h.Ancestors(holdsClass); !defined {
+		return nil
+	}
+	return fmt.Errorf("%w: %s holds a %s fragment, which does not fit the attribute it fills, a %s",
+		ErrUnsupportedDatatype, suffixLabel(keyOf, "raw"), class, holdsClass)
+}
