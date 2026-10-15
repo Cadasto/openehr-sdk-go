@@ -376,7 +376,9 @@ func partyIdentifiers(g rmattrGroup, ts rmattrTails) ([]any, error) {
 // `<root>:0/composer:0|id`): two spellings of one field. The second is held
 // as a [tailDup] for [rmattrGroup.settleDups] to judge once the grammar has
 // read the group, exactly as [splitRMAttrTails] holds two spellings of one
-// sub-path, so they must agree and a null one is absent (REQ-053).
+// sub-path, so they must agree and a null one is absent (REQ-053). The group
+// spells composition metadata ([rmattrGroup.metadata]), so a pair that
+// disagrees is refused with [ErrUnknownPath], as the name's two spellings are.
 func putComposerKey(g *rmattrGroup, tail string, val any, key string) {
 	held, taken := g.tails[tail]
 	if !taken {

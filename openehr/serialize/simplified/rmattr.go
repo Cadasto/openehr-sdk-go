@@ -75,6 +75,11 @@ type rmattrGroup struct {
 	// [rmattrGroup.settleDups] to judge once the decode knows whether it reads
 	// the tail. A nil dups refuses such a pair at once.
 	dups *[]tailDup
+	// metadata names the composition-metadata field the group spells (the
+	// composer, ADR 0029), or is empty. Two spellings of one of its keys that
+	// disagree are then two spellings of that field, refused as every other
+	// metadata field's are (REQ-053), not as a sub-path spelled twice.
+	metadata string
 }
 
 // tailDup is a second spelling of a tail: the key the group holds, the key
@@ -90,6 +95,10 @@ type tailDup struct {
 // spellings of one field that disagree (REQ-170). A spelling that holds JSON
 // null is absent (REQ-053), so it disagrees with nothing; the grammar holds
 // the other spelling's value ([splitRMAttrTails], [rmattrChildGroups]).
+//
+// In a group that spells a composition-metadata field ([rmattrGroup.metadata])
+// the disagreeing pair is two accepted spellings of that field, and the
+// refusal is [ErrUnknownPath], as for every other metadata field (REQ-053).
 func (g rmattrGroup) settleDups() error {
 	if g.dups == nil {
 		return nil
@@ -99,10 +108,15 @@ func (g rmattrGroup) settleDups() error {
 			g.sink.add(d.second)
 			continue
 		}
-		if d.firstVal != nil && d.secondVal != nil && !sameCtxValue(d.firstVal, d.secondVal) {
-			return fmt.Errorf("%w: %q and %q spell one sub-path twice and disagree; remove one",
-				ErrUnsupportedDatatype, d.first, d.second)
+		if d.firstVal == nil || d.secondVal == nil || sameCtxValue(d.firstVal, d.secondVal) {
+			continue
 		}
+		if g.metadata != "" {
+			return fmt.Errorf("%w: conflicting spellings of %s: %q and %q disagree; remove one",
+				ErrUnknownPath, g.metadata, d.first, d.second)
+		}
+		return fmt.Errorf("%w: %q and %q spell one sub-path twice and disagree; remove one",
+			ErrUnsupportedDatatype, d.first, d.second)
 	}
 	return nil
 }

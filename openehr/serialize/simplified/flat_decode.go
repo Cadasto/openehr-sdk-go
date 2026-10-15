@@ -762,6 +762,7 @@ func MetadataWitnessSpellings() []string {
 func siphonContext(flat map[string]any, rootID string, sink *unmatchedSink) (ctx map[string]any, ctxOrigin map[string]string, composer *rmattrGroup, content map[string]any, err error) {
 	ctx, ctxOrigin, content = make(map[string]any), make(map[string]string), make(map[string]any)
 	composer = newRMAttrGroup(rootID, composerSeg, -1, sink)
+	composer.metadata = "the composer"
 	// Sorted so a body carrying two conflicting real-path spellings reports the
 	// same key first on every run — a map-order-dependent error message is not
 	// reproducible for whoever has to fix the payload.
