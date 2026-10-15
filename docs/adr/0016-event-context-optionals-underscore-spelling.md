@@ -37,7 +37,7 @@ Deciding now, together with REQ-140's Phase 0, avoids the failure mode ADR 0015 
 
 1. **One spelling, both directions.** `context/_health_care_facility`, `context/_participation:N`, `context/_end_time`, `context/_location` are emitted when populated and accepted on decode — the same recursive, RM-type-keyed grammar every other `_`-attribute uses. They get no special-case machinery.
 2. **REQ-053's ctx-only emission rule is scoped, not weakened.** The rule in [wire.md § REQ-053](../specifications/wire.md#req-053) that encode emits only the `ctx/` short form applies to the six respelled scalar fields (`language`, `territory`, `composer_name`, `composer_self`, `time`, `setting`) — the fields where two spellings of one scalar are in circulation. The EVENT_CONTEXT optionals never had an emitted spelling to preserve, so choosing the underscore form breaks no consumer.
-3. **The `ctx/` sketches stay unaccepted.** `ctx/participation…`, `ctx/health_care_facility…`, `ctx/end_time`, `ctx/location` remain `ErrUnknownPath` on decode. They are recorded as *deferred input-alias candidates*: if a producer that writes them materialises, accepting them is an ADR 0015-style alias-table addition (accept, normalise onto the underscore spelling, error on disagreement) — an additive follow-up, not a blocker.
+3. **The `ctx/` sketches stay unaccepted.** `ctx/participation…`, `ctx/health_care_facility…`, `ctx/end_time`, `ctx/location` are not read as context. They were `ErrUnknownPath` on decode when this ADR was accepted; since [REQ-170](../specifications/wire.md#req-170--unmatched-content-on-decode) they are unknown `ctx/` fields, unmatched content that decode ignores by default and reports or refuses only when the caller asks. They are recorded as *deferred input-alias candidates*: if a producer that writes them materialises, accepting them is an ADR 0015-style alias-table addition (accept, normalise onto the underscore spelling, error on disagreement) — an additive follow-up, not a blocker.
 
 ## Consequences
 
@@ -47,7 +47,7 @@ Deciding now, together with REQ-140's Phase 0, avoids the failure mode ADR 0015 
 
 - **Positive — one grammar, no fork.** PARTICIPATION and PARTY_IDENTIFIED decompose identically at `context/_participation`, `_other_participation` (ENTRY), and inside `_feeder_audit` — a single implementation surface instead of a `ctx/` special case beside a `_` general case.
 - **Consistent with ADR 0015's own reasoning.** ADR 0015 chose `ctx/` for the scalar fields because that was the SDK's *already-emitted* spelling and the ITS-documented one; here the already-documented, reference-emitted spelling is the underscore form. Both decisions preserve the emitted surface consumers can already rely on and admit the other spelling only as input.
-- **Negative — the ITS `ctx/` sketch is not honoured on input.** A hand-authored payload using `ctx/participation…` is refused. Accepted: no known producer emits it, the refusal is loud and typed, and the alias path stays open.
+- **Negative — the ITS `ctx/` sketch is not honoured on input.** A hand-authored payload using `ctx/participation…` loses those fields: decode drops them as unmatched content by default, reports them on request and refuses them under strict decoding (REQ-170). Accepted: no known producer emits it, a caller who needs to know can ask for the report or the refusal, and the alias path stays open.
 - **The REQ-115 FLAT author linter** (draft plan) inherits one vocabulary for context optionals — the underscore spelling — rather than two.
 
 ## Alternatives considered

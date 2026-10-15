@@ -369,6 +369,8 @@ func TestREQ073_ErrorTextMasksURLPassword(t *testing.T) { // REQ-073
 			keep:   "idp.example",
 		},
 		{
+			// The refusal names the member, as a new document's refusal
+			// does (REQ-071), and quotes no URL.
 			name: "304 renewal, plaintext auth endpoint",
 			call: func(t *testing.T) (string, error) {
 				return refreshCachedError(t, func(base string) *discovery.ServiceCatalog {
@@ -380,7 +382,7 @@ func TestREQ073_ErrorTextMasksURLPassword(t *testing.T) { // REQ-073
 				})
 			},
 			reason: discovery.ReasonInsecureURL,
-			keep:   "auth.example",
+			keep:   "token_endpoint",
 		},
 	}
 	for _, end := range authorityEnds {

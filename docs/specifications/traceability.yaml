@@ -849,6 +849,7 @@ requirements:
     packages: [smart/discovery]
     probes: [PROBE-041]
     tests:
+      - smart/discovery/cache_hit_test.go
       - smart/discovery/coalesce_cancel_test.go
       - smart/discovery/coalesce_panic_test.go
       - smart/discovery/issuer_test.go
@@ -865,6 +866,7 @@ requirements:
     probes: [PROBE-002, PROBE-003, PROBE-040, PROBE-041]
     tests:
       - smart/discovery/auth_members_test.go
+      - smart/discovery/cache_hit_test.go
       - smart/discovery/redact_test.go
       - smart/discovery/resolver_test.go
       - smart/discovery/service_entry_test.go
@@ -881,6 +883,7 @@ requirements:
     implementation: landed
     packages: [smart/discovery]
     tests:
+      - smart/discovery/cache_hit_test.go
       - smart/discovery/diagnostics_test.go
       - smart/discovery/insecure_baseurl_test.go
       - smart/discovery/issuer_test.go

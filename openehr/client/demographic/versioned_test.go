@@ -262,15 +262,18 @@ func TestGetVersionAtTimeNoMatch(t *testing.T) {
 // versioned read to the matching package function (catches a mis-delegation).
 func TestVersionedRepositoryWiring(t *testing.T) {
 	var paths []string
+	revisionHistory := fixture(t, "revision_history.json")
+	originalVersion := fixture(t, "original_version.json")
+	versionedParty := fixture(t, "versioned_party.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		paths = append(paths, r.URL.Path)
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/revision_history"):
-			_, _ = w.Write(fixture(t, "revision_history.json"))
+			_, _ = w.Write(revisionHistory)
 		case strings.HasSuffix(r.URL.Path, "/version") || strings.Contains(r.URL.Path, "/version/"):
-			_, _ = w.Write(fixture(t, "original_version.json"))
+			_, _ = w.Write(originalVersion)
 		default:
-			_, _ = w.Write(fixture(t, "versioned_party.json"))
+			_, _ = w.Write(versionedParty)
 		}
 	}))
 	defer srv.Close()

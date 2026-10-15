@@ -23,13 +23,13 @@ import (
 )
 
 // landing is a redirect target. It answers 200 with an empty JSON object and
-// records how many requests reached it and the Authorization header each one
-// carried.
+// records how many requests reached it and the headers each one carried.
 type landing struct {
-	srv  *httptest.Server
-	hits atomic.Int32
-	mu   sync.Mutex
-	auth []string
+	srv     *httptest.Server
+	hits    atomic.Int32
+	mu      sync.Mutex
+	auth    []string
+	headers []http.Header
 }
 
 // newLanding starts a landing server on 127.0.0.1, over TLS when useTLS is
@@ -42,6 +42,7 @@ func newLanding(t *testing.T, useTLS bool) *landing {
 		l.hits.Add(1)
 		l.mu.Lock()
 		l.auth = append(l.auth, r.Header.Get("Authorization"))
+		l.headers = append(l.headers, r.Header.Clone())
 		l.mu.Unlock()
 		_, _ = w.Write([]byte(`{}`))
 	})
@@ -59,6 +60,26 @@ func (l *landing) authHeaders() []string {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return append([]string(nil), l.auth...)
+}
+
+// headerValues returns, for each request the landing server saw, the values
+// of its header name joined by "; ".
+func (l *landing) headerValues(name string) []string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	out := make([]string, 0, len(l.headers))
+	for _, h := range l.headers {
+		out = append(out, strings.Join(h.Values(name), "; "))
+	}
+	return out
+}
+
+// credentialHeaderCases are the credential headers other than Authorization,
+// each with a value a caller might set through Request.Headers.
+var credentialHeaderCases = []struct{ header, value string }{
+	{header: "Cookie", value: "session=s3cr3t-5e55"},
+	{header: "Cookie2", value: "session=s3cr3t-5e55"},
+	{header: "Proxy-Authorization", value: "Basic cHJveHk6czNjcjN0"},
 }
 
 // newRedirector starts a server on 127.0.0.1, over TLS when useTLS is true,
@@ -184,10 +205,83 @@ func TestDoRefusesHTTPSToHTTPRedirectWithCallerAuthorization(t *testing.T) { // 
 	}
 }
 
-// TestDoFollowsHTTPSToHTTPRedirectWithoutAuthorization pins that a request
-// carrying no Authorization header follows the injected client's policy
-// unchanged, even across an https to http hop.
-func TestDoFollowsHTTPSToHTTPRedirectWithoutAuthorization(t *testing.T) { // REQ-092
+// TestREQ092_DoRefusesHTTPSToHTTPRedirectWithCredentialHeader pins that
+// Cookie, Cookie2 and Proxy-Authorization are credentials too: net/http copies
+// each of them, when the caller sets it, to a redirect target on the same host
+// whatever its scheme, so a session cookie or proxy credential set through
+// Request.Headers, with no Authorization header at all, would follow a 302
+// from https to http in clear text. The refusal is final: a retry policy that
+// retries a GET's network errors does not ask the origin again.
+func TestREQ092_DoRefusesHTTPSToHTTPRedirectWithCredentialHeader(t *testing.T) {
+	t.Parallel()
+	for _, hc := range credentialHeaderCases {
+		t.Run(hc.header, func(t *testing.T) {
+			t.Parallel()
+			plain := newLanding(t, false)
+			var originHits atomic.Int32
+			origin := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				originHits.Add(1)
+				http.Redirect(w, r, plain.srv.URL+"/landing", http.StatusFound)
+			}))
+			t.Cleanup(origin.Close)
+			c := newRedirectClient(t, origin, origin.Client(),
+				transport.WithTokenSource(auth.AnonymousTokenSource()),
+				transport.WithRetry(transport.RetryPolicy{
+					MaxAttempts:    3,
+					InitialBackoff: time.Millisecond,
+					MaxBackoff:     5 * time.Millisecond,
+				}))
+
+			_, err := c.Do(t.Context(), &transport.Request{
+				Method:  http.MethodGet,
+				Path:    "/ehr",
+				Headers: http.Header{hc.header: {hc.value}},
+			})
+			if got := plain.hits.Load(); got != 0 {
+				t.Errorf("plain-http target received %d request(s) carrying %s %q, want none", got, hc.header, plain.headerValues(hc.header))
+			}
+			if !errors.Is(err, transport.ErrInsecureRedirect) {
+				t.Fatalf("Do() with a %s header error = %v, want one matching transport.ErrInsecureRedirect", hc.header, err)
+			}
+			if got := originHits.Load(); got != 1 {
+				t.Errorf("https origin received %d request(s), want 1: a refused redirect is not retried", got)
+			}
+		})
+	}
+}
+
+// TestREQ092_DoFollowsHTTPSToHTTPSRedirectWithCredentialHeader pins the scope
+// of the refusal for Cookie, Cookie2 and Proxy-Authorization: a redirect that
+// stays on https follows the injected client's policy, and the target receives
+// the caller's header as net/http would send it.
+func TestREQ092_DoFollowsHTTPSToHTTPSRedirectWithCredentialHeader(t *testing.T) {
+	t.Parallel()
+	for _, hc := range credentialHeaderCases {
+		t.Run(hc.header, func(t *testing.T) {
+			t.Parallel()
+			secure := newLanding(t, true)
+			origin, _ := newRedirector(t, true, secure.srv.URL+"/landing")
+			c := newRedirectClient(t, origin, origin.Client(), transport.WithTokenSource(auth.AnonymousTokenSource()))
+
+			_, err := c.Do(t.Context(), &transport.Request{
+				Path:    "/ehr",
+				Headers: http.Header{hc.header: {hc.value}},
+			})
+			if err != nil {
+				t.Fatalf("Do() with a %s header error = %v, want the https to https redirect followed", hc.header, err)
+			}
+			if got := secure.headerValues(hc.header); len(got) != 1 || got[0] != hc.value {
+				t.Errorf("https target saw %s %q, want one request with %q", hc.header, got, hc.value)
+			}
+		})
+	}
+}
+
+// TestDoFollowsHTTPSToHTTPRedirectWithoutCredentialHeader pins that a request
+// carrying none of Authorization, Proxy-Authorization, Cookie or Cookie2
+// follows the injected client's policy unchanged, even across an https to
+// http hop.
+func TestDoFollowsHTTPSToHTTPRedirectWithoutCredentialHeader(t *testing.T) { // REQ-092
 	t.Parallel()
 	for _, tc := range []struct {
 		name string

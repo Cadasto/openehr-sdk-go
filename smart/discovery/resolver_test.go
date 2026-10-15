@@ -120,10 +120,11 @@ func TestResolveAcceptedVersionsWiden(t *testing.T) {
 
 func TestResolveCacheHit(t *testing.T) {
 	var hits atomic.Int32
+	body := fixtureBytes(t, "smart-configuration.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Add(1)
 		w.Header().Set("Cache-Control", "max-age=300")
-		_, _ = w.Write(fixtureBytes(t, "smart-configuration.json"))
+		_, _ = w.Write(body)
 	}))
 	defer srv.Close()
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
@@ -141,9 +142,10 @@ func TestResolveCacheHit(t *testing.T) {
 func TestResolveCacheExpiry(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var hits atomic.Int32
+		body := fixtureBytes(t, "smart-configuration.json")
 		srv := httptest.NewTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			hits.Add(1)
-			_, _ = w.Write(fixtureBytes(t, "smart-configuration.json"))
+			_, _ = w.Write(body)
 		}))
 		r := mustResolver(
 			t,
@@ -165,10 +167,11 @@ func TestResolveCacheExpiry(t *testing.T) {
 
 func TestResolveRefreshInvalidates(t *testing.T) {
 	var hits atomic.Int32
+	body := fixtureBytes(t, "smart-configuration.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Add(1)
 		w.Header().Set("Cache-Control", "max-age=3600")
-		_, _ = w.Write(fixtureBytes(t, "smart-configuration.json"))
+		_, _ = w.Write(body)
 	}))
 	defer srv.Close()
 	r := mustResolver(t, WithHTTPClient(srv.Client()))

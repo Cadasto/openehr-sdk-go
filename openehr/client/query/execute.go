@@ -331,6 +331,7 @@ type Repository interface {
 	Execute(ctx context.Context, q aql.Query, opts ...ExecuteOption) (*aql.ResultSet, *transport.Metadata, error)
 	ExecuteString(ctx context.Context, aqlText string, params map[string]any, opts ...ExecuteOption) (*aql.ResultSet, *transport.Metadata, error)
 	RunStored(ctx context.Context, qualifiedName string, params map[string]any, opts ...ExecuteOption) (*aql.ResultSet, *transport.Metadata, error)
+	RunStoredVersion(ctx context.Context, qualifiedName, version string, params map[string]any, opts ...ExecuteOption) (*aql.ResultSet, *transport.Metadata, error)
 }
 
 // NewRepository binds c to a Repository.
@@ -348,4 +349,8 @@ func (r *repository) ExecuteString(ctx context.Context, aqlText string, params m
 
 func (r *repository) RunStored(ctx context.Context, qualifiedName string, params map[string]any, opts ...ExecuteOption) (*aql.ResultSet, *transport.Metadata, error) {
 	return RunStored(ctx, r.c, qualifiedName, params, opts...)
+}
+
+func (r *repository) RunStoredVersion(ctx context.Context, qualifiedName, version string, params map[string]any, opts ...ExecuteOption) (*aql.ResultSet, *transport.Metadata, error) {
+	return RunStoredVersion(ctx, r.c, qualifiedName, version, params, opts...)
 }
