@@ -507,6 +507,9 @@ func TestHealthDownOnNetworkError(t *testing.T) {
 	if h == nil || h.IsUp() {
 		t.Errorf("expected HealthStatus with Status=down, got %+v", h)
 	}
+	if h != nil && h.HTTPStatusCode != 0 {
+		t.Errorf("HTTPStatusCode = %d, want 0: no response arrived", h.HTTPStatusCode)
+	}
 }
 
 func TestRepositoryMirrorsPackageFunctions(t *testing.T) {
