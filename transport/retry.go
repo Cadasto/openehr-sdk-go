@@ -97,13 +97,17 @@ func (p RetryPolicy) retriableStatuses() []int {
 }
 
 // retryWait waits d before the next attempt. It returns ctx's error instead
-// when ctx ends during the wait, or has already ended. A zero or negative d
-// does not wait but still reads ctx, so a policy with no backoff never starts
-// an attempt after the caller gave up (REQ-091): that attempt could only fail
-// before any response and drop the one Do already has.
+// when ctx has already ended or ends during the wait, so no attempt starts
+// after the caller gave up (REQ-091): that attempt could only fail before any
+// response and drop the one Do already has. The ended context is read before
+// the wait, because once a short timer has fired a select would pick between
+// it and ctx.Done() at random. A zero or negative d does not wait.
 func retryWait(ctx context.Context, d time.Duration) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if d <= 0 {
-		return ctx.Err()
+		return nil
 	}
 	t := time.NewTimer(d)
 	defer t.Stop()
