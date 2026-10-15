@@ -81,7 +81,9 @@
 //   - A mandatory member that holds no value, a nil list, map, pointer or
 //     interface, or a polymorphic slot holding a typed-nil pointer, is
 //     emitted as absent, not as `null`; a present empty mandatory list or
-//     map is written as `[]` or `{}`.
+//     map is written as `[]` or `{}`. A mandatory `any` field holds a value,
+//     not an RM object, so a nil list, a nil map or a typed-nil pointer it
+//     holds is written as `null`.
 //
 //   - ISO 8601 dates/times/durations are passed through as JSON
 //     strings; the codec does not parse them to time.Time.
