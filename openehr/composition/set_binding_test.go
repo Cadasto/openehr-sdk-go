@@ -168,3 +168,141 @@ func TestREQ101_SetRefusesWhatTheValidatorDoesNotBind(t *testing.T) {
 		})
 	}
 }
+
+// Value children for compileAlternatives whose own attributes hold a value
+// the template constrains: a DV_DURATION whose value, a String in the RM,
+// the template types with the AOM 1.4 short name DURATION; a DV_COUNT whose
+// magnitude, an Integer64 in the RM, it types INTEGER; and a
+// DV_INTERVAL<DV_COUNT> whose lower bound, a T in the RM and so a DV_COUNT
+// here, it allows as a DV_COUNT or an untyped node.
+const (
+	durationValueLeafChild = `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>DV_DURATION</rm_type_name><node_id></node_id>` +
+		`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>value</rm_attribute_name>` +
+		`<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>DURATION</rm_type_name><node_id></node_id><item xsi:type="C_DURATION"></item></children>` +
+		`</attributes></children>`
+	countMagnitudeLeafChild = `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>DV_COUNT</rm_type_name><node_id></node_id>` +
+		`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>magnitude</rm_attribute_name>` +
+		`<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>INTEGER</rm_type_name><node_id></node_id><item xsi:type="C_INTEGER"></item></children>` +
+		`</attributes></children>`
+	countIntervalLowerChild = `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>DV_INTERVAL&lt;DV_COUNT&gt;</rm_type_name><node_id></node_id>` +
+		`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>lower</rm_attribute_name>` +
+		`<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>DV_COUNT</rm_type_name><node_id></node_id></children>` +
+		untypedValueChild +
+		`</attributes></children>`
+)
+
+// Paths below abstractValuePath into the value children above.
+const (
+	durationValueLeafPath  = abstractValuePath + "/value"
+	countMagnitudeLeafPath = abstractValuePath + "/magnitude"
+	countIntervalLowerPath = abstractValuePath + "/lower"
+)
+
+// TestREQ101_SetRefusesWhatTheAttributeCannotHold checks, for REQ-101 Type
+// enforcement, that Set returns ErrTypeMismatch, and Build carries it, for a
+// value that binds a node at the path but that the RM attribute the path
+// writes cannot hold: a DV_DURATION at the DURATION leaf under
+// DV_DURATION.value, which holds a String; a DV_COUNT at the INTEGER leaf
+// under DV_COUNT.magnitude, which holds an Integer64; a PARTY_IDENTIFIED and
+// an ELEMENT at an untyped alternative of ELEMENT.value, which holds a
+// DATA_VALUE; and a DV_QUANTITY at an untyped alternative of the lower bound
+// of a DV_INTERVAL<DV_COUNT>, which holds a DV_COUNT.
+func TestREQ101_SetRefusesWhatTheAttributeCannotHold(t *testing.T) {
+	t.Parallel()
+	durationLeaf := compileAlternatives(t, durationValueLeafChild)
+	countLeaf := compileAlternatives(t, countMagnitudeLeafChild)
+	codedThenUntyped := compileAlternatives(t, valueAlternative("DV_CODED_TEXT", false), untypedValueChild)
+	countLower := compileAlternatives(t, countIntervalLowerChild)
+
+	cases := []struct {
+		name string
+		c    *templatecompile.Compiled
+		path string
+		// nodeAt is the RM type of the node Compiled.NodeAt returns.
+		nodeAt string
+		v      any
+	}{
+		{
+			name: "DV_DURATION at DURATION under DV_DURATION.value", c: durationLeaf,
+			path: durationValueLeafPath, nodeAt: "DURATION", v: &rm.DVDuration{Value: "PT5M"},
+		},
+		{
+			name: "DV_COUNT at INTEGER under DV_COUNT.magnitude", c: countLeaf,
+			path: countMagnitudeLeafPath, nodeAt: "INTEGER", v: &rm.DVCount{Magnitude: 3},
+		},
+		{
+			name: "PARTY_IDENTIFIED at an untyped alternative after DV_CODED_TEXT", c: codedThenUntyped,
+			path: abstractValuePath, nodeAt: "DV_CODED_TEXT", v: &rm.PartyIdentified{},
+		},
+		{
+			name: "ELEMENT at an untyped alternative after DV_CODED_TEXT", c: codedThenUntyped,
+			path: abstractValuePath, nodeAt: "DV_CODED_TEXT", v: &rm.Element{},
+		},
+		{
+			name: "DV_QUANTITY at an untyped lower alternative of DV_INTERVAL<DV_COUNT>", c: countLower,
+			path: countIntervalLowerPath, nodeAt: "DV_COUNT", v: &rm.DVQuantity{Magnitude: 1, Units: "mm"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			node, err := tc.c.NodeAt(tc.path)
+			if err != nil {
+				t.Fatalf("NodeAt(%s): %v", tc.path, err)
+			}
+			if got := node.RMTypeName(); got != tc.nodeAt {
+				t.Fatalf("NodeAt(%s) has RM type %q, want %q (fixture drift)", tc.path, got, tc.nodeAt)
+			}
+			b, err := composition.NewBuilder(t.Context(), tc.c,
+				composition.WithTerritory("NL"),
+				composition.WithComposer(testComposer()),
+			)
+			if err != nil {
+				t.Fatalf("NewBuilder: %v", err)
+			}
+			if err := b.Set(tc.path, tc.v); !errors.Is(err, composition.ErrTypeMismatch) {
+				t.Errorf("Set(%s, %T) = %v, want ErrTypeMismatch", tc.path, tc.v, err)
+			}
+			if _, err := b.Build(); !errors.Is(err, composition.ErrTypeMismatch) {
+				t.Errorf("Build after Set(%s, %T) = %v, want ErrTypeMismatch", tc.path, tc.v, err)
+			}
+		})
+	}
+}
+
+// TestREQ101_SetAcceptsWhatTheAttributeHolds checks, for REQ-101 Type
+// enforcement, that the attribute check reads the attribute's type with the
+// generic parameter its owner names: under a DV_INTERVAL<DV_COUNT>, whose
+// lower bound the RM types T, Set accepts a DV_COUNT at the lower bound and
+// Build writes it there. rmpath does not step into an interval's bounds, so
+// the test reads the interval at abstractValuePath.
+func TestREQ101_SetAcceptsWhatTheAttributeHolds(t *testing.T) {
+	t.Parallel()
+	c := compileAlternatives(t, countIntervalLowerChild)
+	b, err := composition.NewBuilder(t.Context(), c,
+		composition.WithTerritory("NL"),
+		composition.WithComposer(testComposer()),
+	)
+	if err != nil {
+		t.Fatalf("NewBuilder: %v", err)
+	}
+	v := &rm.DVCount{Magnitude: 3}
+	if err := b.Set(countIntervalLowerPath, v); err != nil {
+		t.Fatalf("Set(%s, %T) = %v, want nil", countIntervalLowerPath, v, err)
+	}
+	comp, err := b.Build()
+	if err != nil {
+		t.Fatalf("Build after Set(%s, %T) = %v, want nil", countIntervalLowerPath, v, err)
+	}
+	got, err := rmpath.ItemAtPath(comp, abstractValuePath)
+	if err != nil {
+		t.Fatalf("ItemAtPath(%s) on the built composition: %v", abstractValuePath, err)
+	}
+	interval, ok := got.(*rm.DVInterval[rm.DVCount])
+	if !ok {
+		t.Fatalf("built composition holds %T at %s, want a *rm.DVInterval[rm.DVCount]", got, abstractValuePath)
+	}
+	if interval.Lower.Magnitude != v.Magnitude {
+		t.Errorf("built interval at %s has lower magnitude %d, want %d, the DV_COUNT Set was given", abstractValuePath, interval.Lower.Magnitude, v.Magnitude)
+	}
+}
