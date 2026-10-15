@@ -8,6 +8,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+Template validation and the RM floor run as one walk, a response whose body cannot be read keeps its status and headers, canonical JSON omits an absent mandatory member, and a request carrying a cookie or proxy credential refuses an https-to-http redirect. **Breaking:** validation returns a smaller result, a Go value shared by two attributes is reported at each path, and code that implements `query.Repository` must add `RunStoredVersion`.
+
+### Added
+
+- **A 2xx with an unreadable body keeps its status and headers (REQ-172).** `Do` returns the response beside a new `*transport.BodyReadError`, and `errors.Is` reaches the cause, including the new `transport.ErrResponseTooLarge`.
+
+### Changed
+
+- **Breaking: a smaller validation result (REQ-171, REQ-102).** Content the template refuses is reported once and not entered, an empty mandatory list or missing reference part draws one finding, and `Coverage.Unevaluated` omits classes seen only there.
+- **Breaking: a Go value shared by two attributes is reported at each path (REQ-112).** The validators reported it at its first path only.
+- **Validation issues follow the document, and an item bound to a 0..0 child is reported once (REQ-171).** `WithRMInfo` no longer draws RM-layer findings for a lookup's extra mandatory attributes.
+- **Validation with a template is faster (REQ-171).** It ran 2.1 to 2.8 times faster than the two-walk version in benchstat runs on three inputs.
+- **Breaking: `query.Repository` gains `RunStoredVersion` (REQ-057).** Code that implements the interface must add the method.
+- **A stored-query GET accepts an AQL parameter named `q` (REQ-057).** Only the ad hoc GET sends `q`.
+- **A 2xx with an unreadable body is retried only for GET, HEAD and OPTIONS (REQ-172, REQ-091).** A non-2xx with one is now its status's `*WireError`, and neither is retried once the context ends.
+- **A failed call's span carries `http.status_code`, and `WithMaxResponseBody(math.MaxInt64)` reads the whole body (REQ-090, REQ-093).** The limit used to overflow into an empty body.
+- **Canonical JSON omits an absent mandatory member instead of writing `null` (REQ-052, REQ-043).** A present empty mandatory list or map is still written, so a re-encoded body is smaller.
+- **A bounded `constraints.NumericRange` contains no NaN, and its zero value is unbounded (REQ-103).** A NaN magnitude draws `CodeOutOfRange`, and the zero value reads as valid `(*..*)`, not as the empty `(0..0)`.
+- **A request with a `Cookie`, `Cookie2` or `Proxy-Authorization` header now refuses an https-to-http redirect (REQ-092, REQ-021).** It fails with `transport.ErrInsecureRedirect` and is not retried.
+- **A fresh discovery cache hit runs the resolver's own checks (REQ-071 to REQ-073).** A refused hit fails as a new document would, keeps its entry, and a catalog for another base URL is a miss.
+
 ## [0.34.0] - 2026-10-14
 
 Thirty-fourth `v0.x` minor: validation findings name their layer and rule, a reusable `Validator` takes limits and lists what it did not check, both validators read every RM class through generated access, and the openEHR REST pin moves to `1.1.0`. **Breaking:** `openehr/validation/rmread` is removed, the validators report prohibited attributes and findings on classes and attributes they never read (a nil RM-mandatory list is now `required`), FLAT and STRUCTURED decode the multimedia algorithm codes in their code sets, and discovery refuses a deployment that advertises `1.1.0-development` unless the caller widens the accepted versions.
