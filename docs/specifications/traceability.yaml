@@ -1517,6 +1517,7 @@ requirements:
       - openehr/serialize/canjson/mappings_presence_test.go
       - openehr/serialize/canxml/interval_open_side_test.go
       - openehr/templatecompile/compile_test.go
+      - openehr/validation/constraint_ref_walk_test.go
       - openehr/validation/coverage_test.go
       - openehr/validation/coverage_unevaluated_test.go
       - openehr/validation/engine_template_test.go
@@ -2191,6 +2192,7 @@ requirements:
       - openehr/validation/rmfloor_nil_item_test.go
       - openehr/validation/rmfloor_presence_readings_test.go
       - openehr/validation/rmfloor_primitive_list_internal_test.go
+      - openehr/validation/rmfloor_test.go
       - openehr/validation/validator_test.go
       - testkit/conformance/webtemplate/archetype_details_test.go
       - testkit/probes/validation/probe_074_test.go
