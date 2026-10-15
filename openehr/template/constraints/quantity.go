@@ -158,7 +158,10 @@ func (c CDvOrdinal) ExampleValue() any {
 // [OrdinalSymbol] (value + symbol). When Values is empty the constraint
 // fixes the type only, so any int or OrdinalSymbol is accepted. Otherwise
 // an int must match the value of an entry in Values, and an
-// [OrdinalSymbol] must match both the value and the symbol of one.
+// [OrdinalSymbol] must match both the value and the symbol of one: the
+// code strings must be equal, and the terminologies equal or either one
+// empty, as [CodePhrase.Validate] compares a terminology. A listed symbol
+// that names no terminology therefore admits the one the input carries.
 func (c CDvOrdinal) Validate(value any) []Violation {
 	// An OPT that names DV_ORDINAL and lists no pairs constrains the
 	// type only. A closed list is what rejects a value.
@@ -188,13 +191,18 @@ func (c CDvOrdinal) Validate(value any) []Violation {
 		}}
 	case OrdinalSymbol:
 		for _, s := range c.Values {
-			if s.Value == v.Value && s.Symbol == v.Symbol {
+			if s.Value == v.Value && s.Symbol.CodeString == v.Symbol.CodeString &&
+				(s.Symbol.Terminology == "" || v.Symbol.Terminology == "" || s.Symbol.Terminology == v.Symbol.Terminology) {
 				return nil
 			}
 		}
+		allowed := make([]string, len(c.Values))
+		for i, s := range c.Values {
+			allowed[i] = fmt.Sprintf("%d|%s", s.Value, s.Symbol)
+		}
 		return []Violation{{
 			Code:   CodeNotInList,
-			Detail: "ordinal (value, symbol) pair not in allowed list",
+			Detail: fmt.Sprintf("ordinal (value, symbol) pair not in allowed %v", allowed),
 			Value:  Redact(value),
 		}}
 	default:

@@ -2,11 +2,15 @@ package validation_test
 
 import (
 	"cmp"
+	"os"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
@@ -137,4 +141,90 @@ func TestValidateComposition_REQ102_REQ103_OrdinalSymbolPair(t *testing.T) {
 			})
 		}
 	}
+}
+
+// symbolTerminologyID matches the terminology_id of a C_DV_ORDINAL symbol's
+// defining code in an OPT, with the whitespace after it. The first group is
+// what comes before it inside the symbol, which the replacement keeps.
+var symbolTerminologyID = regexp.MustCompile(`(<symbol>\s*<value\s*/>\s*<defining_code>\s*)<terminology_id>\s*<value>[^<]*</value>\s*</terminology_id>\s*`)
+
+// demonstrationSymbols is the number of ordinal symbols the Demonstration.v1
+// OPT lists: six pairs at each of its four C_DV_ORDINAL nodes.
+const demonstrationSymbols = 24
+
+// mustCompileUnnamedSymbolTerminology compiles Demonstration.v1 with the
+// terminology_id of every ordinal symbol removed from the OPT, as an OPT may
+// leave it out. The parser then lists each pair with an empty terminology.
+func mustCompileUnnamedSymbolTerminology(t *testing.T) *templatecompile.Compiled {
+	t.Helper()
+	raw, err := os.ReadFile(fixtures.TemplateOptForName("Demonstration.v1"))
+	if err != nil {
+		t.Fatalf("read Demonstration.v1 OPT: %v", err)
+	}
+	if n := len(symbolTerminologyID.FindAllIndex(raw, -1)); n != demonstrationSymbols {
+		t.Fatalf("Demonstration.v1 OPT has %d ordinal symbol terminology_id elements, want %d (fixture drift)", n, demonstrationSymbols)
+	}
+	return mustCompileInline(t, string(symbolTerminologyID.ReplaceAll(raw, []byte("$1"))))
+}
+
+// primitiveIssueKeys returns "code path" for each primitive_* issue, sorted.
+func primitiveIssueKeys(issues []validation.Issue) []string {
+	keys := []string{}
+	for _, is := range issues {
+		if strings.HasPrefix(is.Code, "primitive_") {
+			keys = append(keys, is.Code+" "+is.Path)
+		}
+	}
+	slices.Sort(keys)
+	return keys
+}
+
+// dvOrdinalType matches the type of a DV_ORDINAL in canonical JSON.
+var dvOrdinalType = regexp.MustCompile(`"_type"\s*:\s*"DV_ORDINAL"`)
+
+// REQ-102 / REQ-103: an OPT whose ordinal symbols name no terminology lists
+// each pair with an empty terminology, which admits the terminology the
+// instance carries. Under such a template the vendored composition and the
+// generator's Example output, which both write local there, draw no
+// primitive_* issue, and a symbol that does not match its value is still
+// primitive_not_in_list.
+func TestValidateComposition_REQ102_REQ103_OrdinalSymbolUnnamedTerminology(t *testing.T) {
+	t.Parallel()
+	c := mustCompileUnnamedSymbolTerminology(t)
+
+	t.Run("vendored composition", func(t *testing.T) {
+		t.Parallel()
+		comp, _, _ := demonstrationOrdinal(t)
+		if got := primitiveIssueKeys(validation.ValidateComposition(comp, c).Issues); len(got) != 0 {
+			t.Errorf("ValidateComposition(Demonstration.v1) primitive issues = %q, want none", got)
+		}
+	})
+
+	t.Run("generated Example instance", func(t *testing.T) {
+		t.Parallel()
+		root, err := generateExample(t, c)
+		if err != nil {
+			t.Fatalf("Generate(Demonstration.v1, Example): %v", err)
+		}
+		raw, err := canjson.Marshal(root)
+		if err != nil {
+			t.Fatalf("canjson.Marshal(%T): %v", root, err)
+		}
+		if !dvOrdinalType.Match(raw) {
+			t.Fatalf("Generate(Demonstration.v1, Example) built no DV_ORDINAL, so the check below is vacuous")
+		}
+		if got := primitiveIssueKeys(validateRoot(root, c).Issues); len(got) != 0 {
+			t.Errorf("ValidateComposition(generated Demonstration.v1) primitive issues = %q, want none", got)
+		}
+	})
+
+	t.Run("swapped pair", func(t *testing.T) {
+		t.Parallel()
+		comp, _, ord := demonstrationOrdinal(t)
+		ord.Symbol.DefiningCode.CodeString = "at0040"
+		want := []string{"primitive_not_in_list " + ordinalValuePath}
+		if got := primitiveIssueKeys(validation.ValidateComposition(comp, c).Issues); !slices.Equal(got, want) {
+			t.Errorf("ValidateComposition(value 1 with local::at0040) primitive issues = %q, want %q", got, want)
+		}
+	})
 }
