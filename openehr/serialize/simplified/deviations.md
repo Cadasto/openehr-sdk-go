@@ -145,11 +145,16 @@ Concretely:
   [ADR 0004](../../../docs/adr/0004-numeric-wire-tolerance.md) tolerance included: a string
   that is no decimal where the attribute is a number, a number or a Boolean where it is a
   `String`, a number with a non-zero fraction or outside the int32 range where it is an
-  `Integer`; refused with `ErrUnsupportedDatatype` naming the FLAT key as written, required and
-  optional suffixes and the bare value alike, so it never surfaces as a canonical-JSON error
-  naming a path the caller did not write; the check decodes the value with canonical JSON's own
-  decoder for the attribute's RM type, so it admits everything canonical JSON admits, a quoted
-  decimal and a whole number written `1.0` included), a bare value at a key that resolves to a
+  `Integer`; refused with `ErrUnsupportedDatatype` naming the FLAT key, required and optional
+  suffixes and the bare value alike, so it never surfaces as a canonical-JSON error naming a path
+  the caller did not write; the key named is the key as written, except that a bare value
+  spelled `x\|` is named `x`, the key it spells, and a STRUCTURED value is named by the FLAT key
+  its conversion makes, with an `:index` on every segment below the template root; a `\|code`
+  at a DV_TEXT leaf that is present and not `""` selects the DV_CODED_TEXT whatever its JSON
+  kind, so one that is not a string is refused this way, naming the `\|code` key; the check
+  decodes the value with canonical JSON's own decoder for the attribute's RM type, so it admits
+  everything canonical JSON admits, a quoted decimal and a whole number written `1.0` included),
+  a bare value at a key that resolves to a
   node with children (`ErrUnsupportedDatatype` naming the node's RM type, while a suffix such a
   node does not read is unmatched), two spellings of one field the decode
   reads that disagree (including a key and the same key ending in a bare `\|`, the empty suffix
@@ -205,6 +210,9 @@ Concretely:
   member or array element is carried into FLAT as a key holding null, read the same way, and
   OPT-free STRUCTURED → FLAT conversion writes it so (`{"leaf":[null]}` becomes
   `leaf:0: null`); a null template root or `ctx` object, which no FLAT key can hold, is absent.
+  FLAT → STRUCTURED carries a null as written as well: a lone null bare value as a null array
+  element, a null suffix as a null `\|suffix` member, and a null bare value beside its leaf's
+  suffixes or children as the null `"\|"` member, as it carries one that is not null.
   Before 2026-10-15 a null suffix decoded to the zero of its type and a null STRUCTURED element
   was refused as a hole in the array.
 

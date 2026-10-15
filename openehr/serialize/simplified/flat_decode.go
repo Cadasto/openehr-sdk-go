@@ -2358,18 +2358,22 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any, keyOf func
 	// |terminology is refused by the allowlist below, as before. The encoder is
 	// the exact inverse: leafToFlat routes a fully-captured DV_CODED_TEXT at a
 	// DV_TEXT leaf to the coded suffix set instead of |raw.
-	// The discriminator is a non-empty string |code, not the key's mere presence:
-	// `|code: ""` and `|code: null` are what a form emits for "free text, no code
-	// selected", and promoting those would mint a DV_CODED_TEXT whose
-	// CODE_PHRASE.code_string is empty — RM-invalid, yet stable enough on
-	// re-encode that nothing downstream flags it, and matched by any AQL predicate
-	// testing defining_code/code_string against ''. They stay a plain DV_TEXT:
-	// a null |code is absent (REQ-053, dropped above), and the allowlist below
-	// refuses the stray `|code: ""`, or the |value beside a null one, as it did
-	// before this carve-out.
+	// The discriminator is a |code that is not the empty string, not the key's
+	// mere presence: `|code: ""` and `|code: null` are what a form emits for
+	// "free text, no code selected", and promoting those would mint a
+	// DV_CODED_TEXT whose CODE_PHRASE.code_string is empty — RM-invalid, yet
+	// stable enough on re-encode that nothing downstream flags it, and matched by
+	// any AQL predicate testing defining_code/code_string against ''. They stay a
+	// plain DV_TEXT: a null |code is absent (REQ-053, dropped above), and the
+	// allowlist below refuses the stray `|code: ""`, or the |value beside a null
+	// one, as it did before this carve-out. A |code of another JSON kind does
+	// select the coded builder, so the fit check refuses it naming the |code key
+	// (REQ-053), rather than the allowlist refusing the leaf.
 	if rmType == "DV_TEXT" {
-		if code, coded := sfx["code"].(string); coded && code != "" {
-			rmType = "DV_CODED_TEXT"
+		if code, coded := sfx["code"]; coded {
+			if s, isString := code.(string); !isString || s != "" {
+				rmType = "DV_CODED_TEXT"
+			}
 		}
 	}
 	if err := checkSuffixAllowlist(rmType, sfx); err != nil {
@@ -2712,28 +2716,32 @@ func applyOrderedSuffixes(dv, sfx map[string]any) error {
 	return nil
 }
 
-// checkSuffixAllowlist rejects any suffix a datatype does not map. An unmapped
-// rmType is left to the switch (ErrUnsupportedDatatype). |other is allowed only
-// for DV_CODED_TEXT (the case then enforces listOpen).
+// checkSuffixAllowlist rejects any suffix a datatype does not map, naming the
+// first such suffix in sorted order, so a leaf with two names the same one on
+// every run. An unmapped rmType is left to the switch (ErrUnsupportedDatatype).
+// |other is allowed only for DV_CODED_TEXT (the case then enforces listOpen).
 func checkSuffixAllowlist(rmType string, sfx map[string]any) error {
 	allowed, known := allowedSuffixes[rmType]
 	if !known {
 		return nil
 	}
-	for k := range sfx {
-		if k == "other" && rmType == "DV_CODED_TEXT" {
-			continue
-		}
-		if allowed[k] {
-			continue
-		}
-		label := "|" + k
-		if k == "" {
-			label = "bare value"
-		}
-		return fmt.Errorf("%w: unexpected %s for %s", ErrUnsupportedDatatype, label, rmType)
+	unexpected := func(k string) bool {
+		return !allowed[k] && (k != "other" || rmType != "DV_CODED_TEXT")
 	}
-	return nil
+	first, refused := "", false
+	for k := range sfx {
+		if unexpected(k) && (!refused || k < first) {
+			first, refused = k, true
+		}
+	}
+	if !refused {
+		return nil
+	}
+	label := "|" + first
+	if first == "" {
+		label = "bare value"
+	}
+	return fmt.Errorf("%w: unexpected %s for %s", ErrUnsupportedDatatype, label, rmType)
 }
 
 // leafListOpen reports whether a Web Template leaf constrains an open value-set

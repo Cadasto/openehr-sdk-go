@@ -191,6 +191,17 @@ func flatToStructured(flat map[string]any) (map[string]any, error) {
 // (DV_ORDINAL and DV_CODED_TEXT spell a real `|value`).
 const bareStructuredKey = "|"
 
+// heldNull marks an array slot that a bare FLAT value of JSON null was placed
+// in, so that a suffix or child placed at the same slot later carries the null
+// as the `"|"` member, as it carries a bare value that is not null (REQ-053:
+// OPT-free conversion carries a null as written). A slot no key filled, such
+// as one padded before a higher :index, holds nil instead and gains no `"|"`.
+// The STRUCTURED map is only ever marshalled, and heldNull marshals as null.
+type heldNull struct{}
+
+// MarshalJSON writes the null the slot holds.
+func (heldNull) MarshalJSON() ([]byte, error) { return []byte("null"), nil }
+
 // insertStructured places val at segs (relative to obj), growing arrays by
 // :index. A bare leaf sets the array element to the scalar value, unless the slot
 // already holds (or later needs) an object, in which case it takes
@@ -217,7 +228,12 @@ func insertStructured(obj map[string]any, segs []flatSeg, suffix string, val any
 	isLeaf := len(segs) == 1
 	if isLeaf && suffix == "" {
 		switch cur := arr[idx].(type) {
-		case nil:
+		case nil, heldNull:
+			// A null is absent beside a value, so a second spelling of the slot
+			// that holds a value replaces a held null rather than conflicting.
+			if val == nil {
+				val = heldNull{}
+			}
 			arr[idx] = val
 		case map[string]any:
 			if _, taken := cur[bareStructuredKey]; taken {
@@ -234,9 +250,13 @@ func insertStructured(obj map[string]any, segs []flatSeg, suffix string, val any
 		el = make(map[string]any)
 		// A scalar already at this slot is the same leaf's bare value, placed before
 		// its suffixes by the sorted key order: it moves onto the object rather than
-		// colliding with it.
-		if arr[idx] != nil {
-			el[bareStructuredKey] = arr[idx]
+		// colliding with it, a null one included.
+		switch cur := arr[idx].(type) {
+		case nil:
+		case heldNull:
+			el[bareStructuredKey] = nil
+		default:
+			el[bareStructuredKey] = cur
 		}
 		arr[idx] = el
 	}

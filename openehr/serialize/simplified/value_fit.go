@@ -19,7 +19,6 @@ import (
 	jsonv2 "encoding/json/v2"
 	"fmt"
 	"maps"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -198,13 +197,20 @@ func (f valueFit) takes() string {
 	return "nothing this codec can check"
 }
 
-// check returns nil when v fits the attribute, and otherwise the refusal:
-// [ErrUnsupportedDatatype], naming label (the FLAT key) and the attribute,
-// and the JSON kind of v but never v itself.
-func (f valueFit) check(label string, v any) error {
+// check returns nil when v, the value of suffix, fits the attribute, and
+// otherwise its [valueFit.refusal], naming the FLAT key keyOf gives for suffix.
+// The name is built only for a refusal.
+func (f valueFit) check(keyOf func(string) string, suffix string, v any) error {
 	if f.admits(v) {
 		return nil
 	}
+	return f.refusal(suffixLabel(keyOf, suffix), v)
+}
+
+// refusal is the error for a value v that does not fit the attribute:
+// [ErrUnsupportedDatatype], naming label (the FLAT key) and the attribute, and
+// the JSON kind of v but never v itself.
+func (f valueFit) refusal(label string, v any) error {
 	typ := f.bmmType
 	if typ == "" {
 		typ = "an attribute rminfo does not resolve"
@@ -245,24 +251,32 @@ func suffixLabel(keyOf func(string) string, suffix string) string {
 }
 
 // checkSuffixFits checks every value in sfx, a suffix map of rmType that has
-// passed [checkSuffixAllowlist], against the RM attribute it fills, in sorted
-// suffix order so a leaf with two values that do not fit names the same one on
-// every run. keyOf names the FLAT key each suffix arrived under.
+// passed [checkSuffixAllowlist], against the RM attribute it fills. Of the
+// values that do not fit it refuses the first in sorted suffix order, so a
+// leaf with two names the same one on every run. keyOf names the FLAT key each
+// suffix arrived under, and is called only for the refusal.
 func checkSuffixFits(rmType string, sfx map[string]any, keyOf func(string) string) error {
 	fits, known := suffixFits[rmType]
 	if !known {
 		return nil
 	}
-	for _, suffix := range slices.Sorted(maps.Keys(sfx)) {
-		fit, ok := fits[suffix]
-		if !ok {
-			// checkSuffixAllowlist admitted a suffix suffixFits does not hold:
-			// the two tables have drifted apart.
-			return fmt.Errorf("%w: %s has no attribute recorded for %s", ErrUnsupportedDatatype, rmType, suffixLabel(keyOf, suffix))
+	first, refused := "", false
+	for suffix, v := range sfx {
+		if fit, ok := fits[suffix]; ok && fit.admits(v) {
+			continue
 		}
-		if err := fit.check(suffixLabel(keyOf, suffix), sfx[suffix]); err != nil {
-			return err
+		if !refused || suffix < first {
+			first, refused = suffix, true
 		}
 	}
-	return nil
+	if !refused {
+		return nil
+	}
+	fit, ok := fits[first]
+	if !ok {
+		// checkSuffixAllowlist admitted a suffix suffixFits does not hold: the
+		// two tables have drifted apart.
+		return fmt.Errorf("%w: %s has no attribute recorded for %s", ErrUnsupportedDatatype, rmType, suffixLabel(keyOf, first))
+	}
+	return fit.refusal(suffixLabel(keyOf, first), sfx[first])
 }

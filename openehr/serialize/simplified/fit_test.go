@@ -118,6 +118,19 @@ func TestREQ053CodeThatDoesNotFitAtATextLeafNamesItsKey(t *testing.T) {
 	}
 }
 
+// TestCheckSuffixFitsNamesTheFirstMisfit — REQ-053: a leaf carrying more than
+// one value that does not fit is refused naming the first of them in sorted
+// suffix order, the same one on every run, never one chosen by Go's map order.
+func TestCheckSuffixFitsNamesTheFirstMisfit(t *testing.T) {
+	sfx := map[string]any{"unit": 5, "magnitude": "abc", "precision": 1.5, "units_system": "s"}
+	for range 64 {
+		err := checkSuffixFits("DV_QUANTITY", sfx, nil)
+		if !errors.Is(err, ErrUnsupportedDatatype) || !strings.Contains(err.Error(), "|magnitude does not fit") {
+			t.Fatalf("checkSuffixFits(DV_QUANTITY, %v) = %v, want |magnitude, the first value that does not fit, named", sfx, err)
+		}
+	}
+}
+
 // TestREQ053FitNamesTheBareKeyAnEmptySuffixSpells — REQ-053: `x|` spells the
 // bare value of `x`, so a bare value written `x|` that does not fit is refused
 // naming `x`, the key it spells.

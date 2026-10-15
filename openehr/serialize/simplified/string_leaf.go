@@ -65,14 +65,14 @@ func leafFromSuffixes(rmType string, listOpen bool, sfx map[string]any, keyOf fu
 
 // stringFromSuffixes rebuilds a STRING leaf's RM String from its bare value.
 // Any suffix, |raw included, is ErrUnsupportedDatatype: the leaf carries a bare
-// value only. A null bare value is absent (REQ-053), so it is a missing one. A
-// bare value that is not a JSON string does not fit the RM String, and is
-// refused with ErrUnsupportedDatatype naming the key (REQ-053). An empty string
-// (REQ-053 § Leaf datatypes) fits the String but breaks an RM invariant: a
-// malformed body, not a datatype this codec declines to model, so it carries
-// no sentinel.
+// value only. A null bare value never gets here: [leafSuffixes] reads it as
+// absent (REQ-053), and a leaf left with nothing is not built. A bare value
+// that is not a JSON string does not fit the RM String, and is refused with
+// ErrUnsupportedDatatype naming the key (REQ-053). An empty string (REQ-053
+// § Leaf datatypes) fits the String but breaks an RM invariant: a malformed
+// body, not a datatype this codec declines to model, so it carries no
+// sentinel.
 func stringFromSuffixes(sfx map[string]any, keyOf func(suffix string) string) (any, error) {
-	sfx = withoutNulls(sfx)
 	for _, k := range slices.Sorted(maps.Keys(sfx)) {
 		if k != "" {
 			return nil, fmt.Errorf("%w: unexpected |%s for %s, which carries a bare value only",
@@ -83,7 +83,7 @@ func stringFromSuffixes(sfx map[string]any, keyOf func(suffix string) string) (a
 	if err != nil {
 		return nil, err
 	}
-	if err := stringLeafFit.check(suffixLabel(keyOf, ""), v); err != nil {
+	if err := stringLeafFit.check(keyOf, "", v); err != nil {
 		return nil, err
 	}
 	s, _ := v.(string)

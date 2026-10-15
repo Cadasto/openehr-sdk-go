@@ -464,8 +464,9 @@ func leafSuffixMatched(rmType, suffix string) (matched, judged bool) {
 
 // matchedSuffixes returns sfx without the suffixes a value of rmType does not
 // read, handing the key of each one dropped to sink. keyOf builds the FLAT key
-// a suffix arrived under. For a datatype with no suffix set it returns sfx as
-// it is. The map returned is sfx itself when nothing was dropped.
+// a suffix arrived under. For a datatype with no suffix set it judges no
+// suffix, and returns sfx without its nulls alone. The map returned is sfx
+// itself when nothing was dropped.
 //
 // A bare value at a datatype with no bare spelling is unmatched beside a
 // suffix the datatype reads, as DV_PROPORTION's derived magnitude beside its
@@ -475,8 +476,10 @@ func leafSuffixMatched(rmType, suffix string) (matched, judged bool) {
 // A suffix the datatype reads that holds JSON null is absent (REQ-053): it is
 // dropped without a word, as if the body did not carry it, so a leaf whose
 // keys are all null comes back empty and a bare value beside nothing but null
-// suffixes is alone. A suffix the datatype does not read goes to sink whatever
-// its value.
+// suffixes is alone. That holds at a datatype with no suffix set too, such as
+// the DV_ORDERED or nested DV_INTERVAL bound of an interval leaf, so a bound
+// whose keys are all null is absent whatever its datatype (REQ-169). A suffix
+// the datatype does not read goes to sink whatever its value.
 func matchedSuffixes(rmType string, sfx map[string]any, keyOf func(suffix string) string, sink *unmatchedSink) map[string]any {
 	var drop, absent []string
 	read := 0
@@ -484,7 +487,7 @@ func matchedSuffixes(rmType string, sfx map[string]any, keyOf func(suffix string
 		matched, judged := leafSuffixMatched(rmType, suffix)
 		switch {
 		case !judged:
-			return sfx
+			return withoutNulls(sfx)
 		case !matched:
 			drop = append(drop, suffix)
 		case sfx[suffix] == nil:
