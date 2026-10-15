@@ -314,6 +314,7 @@ requirements:
     packages: [internal/bmmgen]
     tests:
       - internal/bmmgen/aom14_test.go
+      - internal/bmmgen/container_bounds_test.go
       - internal/bmmgen/plan_test.go
       - internal/bmmgen/render_interface_test.go
       - internal/bmmgen/render_mandatory_tag_test.go
@@ -1206,6 +1207,7 @@ requirements:
       - openehr/validation/issuepath_internal_test.go
       - openehr/validation/issuepath_test.go
       - openehr/validation/multi_nonlocatable_test.go
+      - openehr/validation/ordinal_symbol_test.go
       - openehr/validation/prohibited_test.go
       - openehr/validation/rmfloor_chained_corpus_test.go
       - openehr/validation/rmfloor_chained_internal_test.go
@@ -1244,6 +1246,7 @@ requirements:
       - openehr/validation/constraint_fixtures_test.go
       - openehr/validation/constraint_ref_walk_test.go
       - openehr/validation/optional_string_test.go
+      - openehr/validation/ordinal_symbol_test.go
       - testkit/probes/template/constraint_fixtures_test.go
       - testkit/probes/template/probe_024_primitive_validate.go
       - testkit/probes/template/probes_test.go
@@ -1500,6 +1503,7 @@ requirements:
       - internal/rmroots
     probes: [PROBE-077, PROBE-081]
     tests:
+      - internal/bmmgen/container_bounds_test.go
       - internal/rmaccess/interval_test.go
       - internal/rmaccess/presence_test.go
       - internal/rmaccess/reads_test.go
@@ -1522,6 +1526,7 @@ requirements:
       - openehr/validation/issuepath_internal_test.go
       - openehr/validation/issuepath_test.go
       - openehr/validation/limits_test.go
+      - openehr/validation/multi_nonlocatable_test.go
       - openehr/validation/noncomposition_test.go
       - openehr/validation/nonstorable_generic_test.go
       - openehr/validation/rmfloor_archetype_test.go
@@ -1540,6 +1545,7 @@ requirements:
       - openehr/validation/rmfloor_invariant_matrix_internal_test.go
       - openehr/validation/rmfloor_ism_transition_test.go
       - openehr/validation/rmfloor_limit_internal_test.go
+      - openehr/validation/rmfloor_nil_item_test.go
       - openehr/validation/rmfloor_nonstorable_test.go
       - openehr/validation/rmfloor_ordered_test.go
       - openehr/validation/rmfloor_party_proxy_test.go
@@ -2181,6 +2187,7 @@ requirements:
       - openehr/validation/rmfloor_interval_order_test.go
       - openehr/validation/rmfloor_invariant_matrix_internal_test.go
       - openehr/validation/rmfloor_limit_internal_test.go
+      - openehr/validation/rmfloor_nil_item_test.go
       - openehr/validation/rmfloor_presence_readings_test.go
       - openehr/validation/rmfloor_primitive_list_internal_test.go
       - openehr/validation/validator_test.go
