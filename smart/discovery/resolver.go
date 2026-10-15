@@ -250,8 +250,9 @@ func requestFailure(err error) DiscoveryErrorReason {
 // One Cache may serve Resolvers built with different options, and may hold
 // catalogs that this Resolver did not fetch. A cached catalog whose BaseURL
 // is not baseURL counts as none. A fresh cached catalog is returned only
-// once it passes this Resolver's own checks that send no request. They are the checks a newly fetched document gets: every URL in
-// the catalog is well formed (the base URL, the issuer, the auth endpoints
+// once it passes this Resolver's own checks that send no request. They are
+// the checks a newly fetched document gets: every URL in the catalog is
+// well formed (the base URL, the issuer, the auth endpoints
 // and the service base URLs), the base URL, the issuer and the auth
 // endpoints use https unless the Resolver allows insecure URLs, and the
 // catalog has the required services, the accepted spec versions and the
@@ -276,8 +277,7 @@ func (r *Resolver) Resolve(ctx context.Context, baseURL string) (*ServiceCatalog
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	got, ok := r.cache.Get(ctx, baseURL)
-	cached := ownEntry(baseURL, got, ok)
+	cached := r.cachedEntry(ctx, baseURL)
 	if cached != nil && !cached.Stale(time.Now()) {
 		if err := r.checkFreshHit(baseURL, cached); err != nil {
 			return nil, err
@@ -308,8 +308,15 @@ func (r *Resolver) Refresh(ctx context.Context, baseURL string) (*ServiceCatalog
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	return r.fetchCoalesced(ctx, baseURL, r.cachedEntry(ctx, baseURL))
+}
+
+// cachedEntry is the only read of the Cache: it returns the entry for
+// baseURL through ownEntry, so no caller can read a catalog cached for
+// another base URL as this one's.
+func (r *Resolver) cachedEntry(ctx context.Context, baseURL string) *ServiceCatalog {
 	got, ok := r.cache.Get(ctx, baseURL)
-	return r.fetchCoalesced(ctx, baseURL, ownEntry(baseURL, got, ok))
+	return ownEntry(baseURL, got, ok)
 }
 
 // ownEntry returns the catalog the Cache holds for baseURL, or nil when it

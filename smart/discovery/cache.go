@@ -13,7 +13,7 @@ import (
 // resolved (ServiceCatalog.BaseURL), never by the OpenID Connect issuer. An
 // entry whose BaseURL is not the base URL it is found under counts as no
 // entry: the Resolver fetches the document with a plain request, as for a
-// miss, and the result replaces it.
+// miss, and the fetch then replaces or drops it as below.
 //
 // Resolvers built with different options may share one Cache, and a Cache
 // may hold entries that no Resolver in this process fetched, such as one
@@ -36,7 +36,8 @@ import (
 // A fresh entry stays cached whether a Resolver returns it or refuses it: a
 // refusal says only that this Resolver's options do not accept it, so the
 // entry stays for the Resolvers that do. When a Resolver fetches again,
-// because the entry has expired or Refresh was called, a successful fetch
+// because the entry has expired, Refresh was called, or the entry's BaseURL
+// is not the base URL it was found under, a successful fetch
 // or 304 renewal replaces the entry, and a failed one, or one whose result
 // fails the checks, drops it. Two failures leave the entry as it was: one
 // that only the caller's own context ending caused, and a panic in the
