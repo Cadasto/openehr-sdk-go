@@ -244,10 +244,12 @@ func TestEncodePartyRelatedComposerAtRealPath(t *testing.T) {
 // TestEncodeComposerShapesRefused — REQ-053, ADR 0029. Encode refuses a
 // composer PARTY_IDENTIFIED with an empty name (RM invariant `Name_valid`) or
 // with no name, external_ref or identifiers (`Basic_validity`), and a
-// PARTY_RELATED carrying a relationship and nothing else: written as nothing,
-// the last two would read back as PARTY_SELF, a silent type substitution, and
-// decode reads an absent name where the first had an empty one. The refusal
-// names the composer. (A PARTY_SELF carrying an external_ref left this test:
+// PARTY_RELATED carrying a relationship and nothing else. Unrefused, the
+// empty PARTY_IDENTIFIED would be written as nothing and read back as
+// PARTY_SELF, a silent type substitution; the PARTY_RELATED would write its
+// `/relationship` keys, which decode then refuses under `Basic_validity` as a
+// relationship with nothing it qualifies; and decode reads an absent name
+// where the empty one was. The refusal names the composer. (A PARTY_SELF carrying an external_ref left this test:
 // it now encodes at the real path, TestREQ053ComposerEncodeSpellings.)
 func TestEncodeComposerShapesRefused(t *testing.T) {
 	empty := ""

@@ -1063,8 +1063,8 @@ func parseCtx(ctx map[string]any, origin map[string]string) (ctxInfo, error) {
 	}
 	// composer_self and a composer name are two mutually exclusive
 	// representations of one RM attribute: PARTY_SELF carries no name, and
-	// PARTY_IDENTIFIED is not the EHR subject. [applyContext] can only build one,
-	// and its switch prefers PARTY_SELF — so accepting the pair would drop the
+	// PARTY_IDENTIFIED is not the EHR subject. [decodeComposer] can only build
+	// one, and it prefers PARTY_SELF — so accepting the pair would drop the
 	// name silently, exactly what refusing two conflicting spellings of one field
 	// prevents. `composer_self: false` beside a name is not a conflict: it denies
 	// nothing the name asserts, and the encoder's own PARTY_IDENTIFIED output
