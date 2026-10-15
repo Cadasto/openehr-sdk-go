@@ -279,7 +279,8 @@ func TestREQ140CompositionNameNullIsAbsent(t *testing.T) {
 // fit the DV_TEXT it decodes into is refused in every mode, wrapping
 // ErrUnsupportedDatatype and naming the key; a `|code` that is not a string
 // promotes the name to a DV_CODED_TEXT and then fails the fit check naming the
-// `|code` key. The STRUCTURED form is refused the same way.
+// `|code` key; a `|raw` fragment of a type that is no DV_TEXT is refused naming
+// the `|raw` key. The STRUCTURED form is refused the same way.
 func TestREQ140CompositionNameMustFit(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	for name, tc := range map[string]struct {
@@ -289,6 +290,10 @@ func TestREQ140CompositionNameMustFit(t *testing.T) {
 		"a number":           {map[string]any{rootNameKey: 5}, rootNameKey},
 		"a Boolean":          {map[string]any{rootNameKey: true}, rootNameKey},
 		"a number for |code": {map[string]any{rootNameKey + "|code": 5, rootNameKey + "|value": "x"}, rootNameKey + "|code"},
+		"a quantity under |raw": {
+			map[string]any{rootNameKey + "|raw": map[string]any{"_type": "DV_QUANTITY", "magnitude": 1, "units": "kg"}},
+			rootNameKey + "|raw",
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			body := rmattrBody(tc.keys)
