@@ -515,3 +515,77 @@ func TestREQ071_CachedCatalogPassesTheParsersURLChecks(t *testing.T) { // REQ-07
 		})
 	}
 }
+
+// TestREQ071_CachedCatalogForAnotherBaseURLIsAMiss pins REQ-071: a catalog
+// the Cache returns under a base URL whose own BaseURL is another is not that
+// base URL's entry. Resolve and Refresh treat it as absent: they fetch the
+// document with a plain request, since the foreign entry's ETag is not this
+// base URL's, return the catalog for the base URL they were asked for, and
+// the fetched catalog replaces the entry.
+func TestREQ071_CachedCatalogForAnotherBaseURLIsAMiss(t *testing.T) { // REQ-071
+	t.Parallel()
+	const etag = `"v1"`
+	members := cachedMembers{
+		tokenEndpoint:  "https://auth.example.com/token",
+		serviceBaseURL: "https://api.example.com/openehr/v1",
+	}
+	quiet := discovery.WithLogger(slog.New(slog.DiscardHandler))
+	for _, name := range []string{"Resolve", "Refresh"} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			var hits, conditional atomic.Int32
+			srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != smartDocPath {
+					http.NotFound(w, r)
+					return
+				}
+				hits.Add(1)
+				if r.Header.Get("If-None-Match") != "" {
+					conditional.Add(1)
+				}
+				w.Header().Set("ETag", etag)
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = io.WriteString(w, members.document("https://"+r.Host))
+			}))
+			t.Cleanup(srv.Close)
+			baseURL := srv.URL + platformPath
+			cache := discovery.NewMemoryCache()
+			foreign := members.catalog(t, srv.URL, baseURL, etag)
+			foreign.BaseURL = "http://other.example/platform"
+			if err := cache.Put(t.Context(), baseURL, foreign); err != nil {
+				t.Fatalf("cache.Put(%q) error = %v", baseURL, err)
+			}
+			res, err := discovery.NewResolver(cache, discovery.WithHTTPClient(srv.Client()), quiet)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			var got *discovery.ServiceCatalog
+			if name == "Resolve" {
+				got, err = res.Resolve(t.Context(), baseURL)
+			} else {
+				got, err = res.Refresh(t.Context(), baseURL)
+			}
+			if err != nil {
+				t.Fatalf("%s(%q) error = %v, want the catalog fetched for it", name, baseURL, err)
+			}
+			if got.BaseURL != baseURL {
+				t.Errorf("%s(%q) returned a catalog for %q, want one for %q", name, baseURL, got.BaseURL, baseURL)
+			}
+			if n := hits.Load(); n != 1 {
+				t.Errorf("server received %d SMART configuration request(s), want 1", n)
+			}
+			if n := conditional.Load(); n != 0 {
+				t.Errorf("server received %d conditional request(s), want a plain one", n)
+			}
+			entry, ok := cache.Get(t.Context(), baseURL)
+			var holds string
+			if entry != nil {
+				holds = entry.BaseURL
+			}
+			if !ok || holds != baseURL {
+				t.Errorf("cache.Get(%q) after %s holds a catalog for %q (found %v), want the one fetched for %q", baseURL, name, holds, ok, baseURL)
+			}
+		})
+	}
+}
