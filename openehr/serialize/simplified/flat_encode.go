@@ -156,7 +156,7 @@ func emitComposer(out map[string]any, c rm.PartyProxy, rootID string) error {
 // populated setting outside that shape is ErrUnsupportedDatatype naming
 // ctx/setting rather than an omission: omitting it would let a WithTemplate
 // decode substitute the 238|other care default silently (the same stance as
-// the composer PARTY_RELATED rule). That refuses a non-openehr terminology
+// [emitComposer] takes on a composer it cannot write). That refuses a non-openehr terminology
 // (including an empty one — rebuilding it as openehr would re-terminologise
 // the value), extras beyond code+value (mappings, formatting, a preferred
 // term, …), and a value carried without a defining code.

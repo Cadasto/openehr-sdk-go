@@ -1679,7 +1679,7 @@ var inContextAttrs = map[string]struct {
 }
 
 // inContextCite names the section a refusal of an in-context attribute cites:
-// REQ-140's fourth out-of-scope class lists an ISM transition's `transition`
+// REQ-140's third out-of-scope class lists an ISM transition's `transition`
 // and `reason`; REQ-170 alone binds the rest (`current_state`,
 // `careflow_step`, the ACTION's `time`, and the INTERVAL_EVENT and OBSERVATION
 // attributes).
@@ -1694,7 +1694,7 @@ func inContextCite(attr string) string {
 // refuseInContextKeys refuses, in every mode, the reference's in-context
 // spelling of the RM attributes in [inContextAttrs] and of an ACTION's ISM
 // transition, wherever the Web Template does not resolve it (REQ-170; REQ-140's
-// fourth out-of-scope class covers `transition` and `reason`):
+// third out-of-scope class covers `transition` and `reason`):
 //
 //   - a `current_state`, `transition` or `careflow_step` leaf, with any suffix,
 //     under an ISM transition node: the reference's in-context `ism_transition`

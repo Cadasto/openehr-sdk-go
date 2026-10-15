@@ -870,7 +870,7 @@ func TestREQ170RepeatableIntervalElement(t *testing.T) {
 // `ism_transition[atNNNN]` node (FLAT id `transition`), which models
 // `current_state` and `careflow_step` but neither of those; and the ACTION's own
 // `time` leaf. The refusal of `transition` and `reason` cites REQ-140, whose
-// fourth out-of-scope class covers them; any other cites REQ-170. The
+// third out-of-scope class covers them; any other cites REQ-170. The
 // STRUCTURED form of each body is refused the same way.
 func TestREQ170IsmTransitionReferenceKeysRefusedInEveryMode(t *testing.T) {
 	wt, _ := conformanceWT(t)

@@ -2,7 +2,7 @@ package simplified
 
 // REQ-053 — decode rebuilds archetype_details from the Web Template on every
 // archetype root, in both decode modes and through STRUCTURED. REQ-140 — the
-// third out-of-scope class: encode writes nothing for it, so a round trip
+// second out-of-scope class: encode writes nothing for it, so a round trip
 // rebuilds it.
 
 import (

@@ -28,15 +28,13 @@ type decodeConfig struct {
 // unmatched whatever its value holds. A key the decode reads is never
 // unmatched, even where the decode then
 // refuses it, and these fail the decode in every mode: the keys with no
-// carrier (the composer's `external_ref` suffixes and party sub-structure, a
-// PARTICIPATION `time`, a FEEDER_AUDIT_DETAILS `other_details`,
+// carrier (a PARTICIPATION `time`, a FEEDER_AUDIT_DETAILS `other_details`,
 // `_instruction_details`, `_wf_definition`); the reference's in-context
 // spelling of RM data this codec's Web Template does not model (an ACTION's
 // ISM transition and time, an INTERVAL_EVENT's `math_function`, `width` and
 // `sample_count`, an OBSERVATION's `history_origin`); at a leaf whose datatype
-// has neither a suffix set nor a sub-path grammar, such as the composer's
-// PARTY_PROXY, its bare value and a suffix naming an attribute of its RM
-// class; and any malformed value, missing required suffix (a lone bare value
+// has neither a suffix set nor a sub-path grammar, its bare value and a suffix
+// naming an attribute of its RM class; and any malformed value, missing required suffix (a lone bare value
 // where the datatype has no bare spelling among them), disagreeing pair of
 // spellings of a key the decode reads, or index past its bound.
 //
@@ -142,8 +140,9 @@ var (
 	// between two keys, a key that walks through one of several reused
 	// siblings, or the decoded-node budget), and for keys that each resolve
 	// but cannot be honoured at once: two accepted spellings of one
-	// composition-metadata field that disagree, ctx/composer_self beside a
-	// composer name (mutually exclusive representations of one RM attribute),
+	// composition-metadata field that disagree, a ctx/composer_self of true
+	// beside a composer name, identifier or relationship (a PARTY_SELF has
+	// none of them),
 	// two spellings of one single-valued underscore attribute, or a key the
 	// decode reads and the same key ending in a bare `|` with differing values.
 	// The codec fails
@@ -158,9 +157,10 @@ var (
 	// value is not valid for its slot (a value the canonical-JSON decode of its
 	// RM attribute would refuse, named by its FLAT key, or a required suffix
 	// that is missing or null), when a |raw / |other suffix is
-	// misused, when a key the decode reads has no carrier (the composer's
-	// `external_ref` suffixes and party sub-structure, a PARTICIPATION `time`,
-	// a FEEDER_AUDIT_DETAILS `other_details`), or when an underscore-prefixed
+	// misused, when a key the decode reads has no carrier (a PARTICIPATION
+	// `time`, a FEEDER_AUDIT_DETAILS `other_details`), when a composer cannot
+	// be written (a PARTY_IDENTIFIED with an empty name, or with no name,
+	// reference or identifiers), or when an underscore-prefixed
 	// RM attribute family is missing an RM-mandatory key or holds a value the
 	// family's suffixes cannot express (a coded LINK.meaning, a decorated
 	// `context/_end_time`, an OBJECT_REF id that is neither GENERIC_ID nor

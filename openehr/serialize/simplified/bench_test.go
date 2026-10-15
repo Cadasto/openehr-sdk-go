@@ -25,20 +25,23 @@ import (
 // must accept before the corpus sweep is worth measuring. It plays the part
 // minParityDocuments plays for the parity net in openehr/serialize/canjson: the
 // per-operation figure is a cost over a set discovered at setup, so the set has
-// to be prevented from shrinking quietly. 24 of the 34 bodies clear it today,
-// and the floor sits just below that because a drop of even one body moves the
-// number and invalidates the comparison the baseline exists for.
-const minFlatCorpusBodies = 24
+// to be prevented from shrinking quietly. 30 of the 34 bodies clear it today,
+// and the floor sits at that count because a drop of even one body moves the
+// number and invalidates the comparison the baseline exists for. (26 cleared
+// it before the composer's real path became its carrier, ADR 0029, which
+// brought in the four bodies whose composer carries a reference, identifiers
+// or a relationship; the floor had stayed at 24.)
+const minFlatCorpusBodies = 30
 
-// benchFlatBody is the largest body in the FLAT conformance corpus that this
-// SDK's codec accepts end to end (10 164 bytes).
+// benchFlatBody is the body the per-body benchmarks measure (10 164 bytes).
 //
 // The migration named ehrbase_conformance_party_related.json, the largest
-// body in the corpus at 17 648 bytes. That body cannot be used: it carries
-// composer party sub-structure (`composer/_identifier:0|assigner`), which no
-// ctx/ short form can express and which the decoder refuses at the ADR 0015
-// boundary, so there is nothing to measure. This is the largest body that both
-// decodes and re-encodes.
+// body in the corpus at 17 648 bytes. When the baseline was recorded that body
+// could not be used: it carries composer party sub-structure
+// (`composer/_identifier:0|assigner`), which the decoder then refused, so this
+// was the largest body that both decoded and re-encoded. The composer's real
+// path now carries it (ADR 0029) and the larger body decodes too; the measured
+// body stays this one, so per-body figures stay comparable with the baseline.
 const benchFlatBody = "ehrbase_conformance_Element_feeder_audit"
 
 // benchFlatTarget builds the one operational template the whole FLAT
@@ -65,12 +68,13 @@ func benchFlatTarget(b *testing.B) (*webtemplate.WebTemplate, *templatecompile.C
 // benchFlatCorpus reads the FLAT conformance corpus and returns the bodies this
 // SDK's codec accepts end to end, together with their total size.
 //
-// The corpus holds 34 bodies and the codec accepts 24 of them today. The other
-// ten exercise upstream key families the codec declines by design: unmodelled
-// Web Template paths, PARTY_PROXY and party sub-structure on the composer, and
-// bare values for EVENT and DV_PROPORTION. The split is discovered here rather
-// than written down, so a codec that learns one of those families widens the
-// sweep on its own.
+// The corpus holds 34 bodies and the codec accepts 30 of them today. The other
+// four exercise upstream key families the codec declines by design: the
+// reference's in-context keys for RM attributes the Web Template this SDK
+// builds does not model (an ISM transition's `_reason`, an interval event's
+// `math_function`, a HISTORY's `origin`) and the deferred `_wf_definition`.
+// The split is discovered here rather than written down, so a codec that
+// learns one of those families widens the sweep on its own.
 //
 // The accepted count is the denominator of every figure the sweep reports, so
 // it is not left implicit: [minFlatCorpusBodies] fails the benchmark if the set
