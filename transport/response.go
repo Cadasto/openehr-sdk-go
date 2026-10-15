@@ -15,7 +15,9 @@ type Response struct {
 	// addition to Metadata so callers can inspect deployment-specific
 	// headers without SDK churn.
 	Header http.Header
-	// Body is the raw response body, fully read.
+	// Body is the raw response body, fully read. It is empty when the
+	// body could not be read, which [Client.Do] reports beside this
+	// Response: the bytes read before the failure are not kept.
 	Body []byte
 	// Metadata carries the openEHR-typed header subset.
 	Metadata *Metadata

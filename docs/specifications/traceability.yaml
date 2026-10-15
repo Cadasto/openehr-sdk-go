@@ -196,6 +196,7 @@ requirements:
       - testkit/probe/run_test.go
       - testkit/probes/aql/probe_097_semantic_lint.go
       - testkit/probes/aql/probes_test.go
+      - transport/body_read_error_test.go
       - transport/challenge_test.go
       - transport/client_test.go
       - transport/decode_error_test.go
@@ -727,6 +728,7 @@ requirements:
       - testkit/probes/auth/probe_007_proactive_refresh.go
       - testkit/probes/auth/probe_007_transport_refresh.go
       - testkit/probes/auth/probes_test.go
+      - transport/body_read_error_test.go
       - transport/client_test.go
       - transport/reauth_backend_test.go
       - transport/reauth_challenge_test.go
@@ -973,6 +975,7 @@ requirements:
       - openehr/client/route_guard_test.go
       - transport/client_test.go
       - transport/errors_test.go
+      - transport/span_status_test.go
 
   - id: REQ-091
     title: Retry policy
@@ -981,6 +984,7 @@ requirements:
     implementation: landed
     packages: [transport]
     tests:
+      - transport/body_read_error_test.go
       - transport/client_test.go
       - transport/reauth_challenge_test.go
       - transport/redirect_test.go
@@ -1014,6 +1018,7 @@ requirements:
       - testkit/probe/run_test.go
       - testkit/probes/versioned/probe_010_put_without_if_match.go
       - testkit/probes/versioned/probe_011_put_stale_if_match.go
+      - transport/body_read_error_test.go
       - transport/client_test.go
       - transport/decode_error_test.go
       - transport/error_envelope_test.go
@@ -1031,8 +1036,10 @@ requirements:
     probes: [PROBE-061, PROBE-065, PROBE-071]
     tests:
       - openehr/client/demographic/party_test.go
+      - openehr/client/ehr/composition/body_read_error_test.go
       - openehr/client/ehr/composition/composition_test.go
       - openehr/client/ehr/composition/decode_error_test.go
+      - openehr/client/ehr/contribution/body_read_error_test.go
       - openehr/client/ehr/contribution/decode_error_test.go
       - openehr/client/ehr/contribution/representation_test.go
       - openehr/client/ehr/decode_error_test.go
@@ -1100,6 +1107,7 @@ requirements:
     implementation: landed
     packages: [transport]
     tests:
+      - transport/body_read_error_test.go
       - transport/errors_test.go
       - transport/observer_test.go
 
@@ -2026,6 +2034,7 @@ requirements:
     implementation: landed
     packages: [transport]
     tests:
+      - transport/body_read_error_test.go
       - transport/challenge_test.go
       - transport/reauth_challenge_test.go
 
@@ -2163,3 +2172,21 @@ requirements:
       - testkit/conformance/webtemplate/archetype_details_test.go
       - testkit/probes/validation/probe_074_test.go
       - testkit/probes/validation/probes_test.go
+
+  - id: REQ-172
+    title: Typed 2xx body-read failure
+    canonical: docs/specifications/transport.md#req-172--typed-2xx-body-read-failure
+    status: draft
+    implementation: landed
+    packages: [transport, openehr/client/definition, openehr/client/demographic, openehr/client/ehr/composition, openehr/client/ehr/contribution, openehr/client/query, openehr/client/system]
+    tests:
+      - openehr/client/definition/body_read_error_test.go
+      - openehr/client/demographic/body_read_error_test.go
+      - openehr/client/ehr/composition/body_read_error_test.go
+      - openehr/client/ehr/contribution/body_read_error_test.go
+      - openehr/client/query/body_read_error_test.go
+      - openehr/client/system/body_read_error_test.go
+      - transport/body_read_error_test.go
+      - transport/errors_test.go
+      - transport/nilwiredereference_internal_test.go
+      - transport/span_status_test.go

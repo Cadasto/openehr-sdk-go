@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -894,6 +895,51 @@ func TestMaxResponseBody(t *testing.T) {
 			t.Error("expected non-empty body")
 		}
 	})
+}
+
+// TestMaxResponseBodyLimitEdges pins REQ-093's "a positive value sets an
+// explicit limit" at its edges. A body exactly at the limit is read whole and
+// one byte over it fails, and the largest limits, math.MaxInt64 included, read
+// the body whole: the one byte the transport reads past the limit to detect an
+// overflow must not overflow the limit itself into a read of nothing.
+func TestMaxResponseBodyLimitEdges(t *testing.T) { // REQ-093
+	const body = `{"ok":true}`
+	cases := []struct {
+		name     string
+		limit    int64
+		tooLarge bool
+	}{
+		{name: "limit equals the body", limit: int64(len(body))},
+		{name: "limit one byte short", limit: int64(len(body) - 1), tooLarge: true},
+		{name: "limit math.MaxInt64 - 1", limit: math.MaxInt64 - 1},
+		{name: "limit math.MaxInt64", limit: math.MaxInt64},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = io.WriteString(w, body)
+			}))
+			t.Cleanup(srv.Close)
+			c, err := New(newCatalog(t, srv), WithHTTPClient(srv.Client()), WithMaxResponseBody(tc.limit))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			resp, err := c.Do(t.Context(), &Request{Path: "/x"})
+			if tc.tooLarge {
+				if !errors.Is(err, ErrResponseTooLarge) {
+					t.Errorf("Do with WithMaxResponseBody(%d) on a %d-byte body = %v, want ErrResponseTooLarge", tc.limit, len(body), err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Do with WithMaxResponseBody(%d) on a %d-byte body = %v, want no error", tc.limit, len(body), err)
+			}
+			if got := string(resp.Body); got != body {
+				t.Errorf("Do with WithMaxResponseBody(%d) returned Body %q, want %q", tc.limit, got, body)
+			}
+		})
+	}
 }
 
 // --- 401→reauth tests (REQ-063) ---

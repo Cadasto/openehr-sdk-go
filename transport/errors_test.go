@@ -8,10 +8,10 @@ package transport_test
 // string (REQ-093's value-free discipline). This file pins the fix across
 // every surface that used to share the leak: the *transport.WireError built
 // by doOnce's non-2xx branch, the *transport.DecodeError built by Decode's
-// 2xx-but-undecodable branch, the two remaining doOnce
-// "transport: %s %s: …" diagnostics (read-body failure, over-limit) that do
-// not carry a typed error at all, and the URL a wrapped net/http *url.Error
-// prints from the network-failure arm.
+// 2xx-but-undecodable branch, the *transport.BodyReadError doOnce returns
+// for a 2xx whose body could not be read (read-body failure, over-limit;
+// REQ-172), and the URL a wrapped net/http *url.Error prints from the
+// network-failure arm.
 //
 // The telemetry half is pinned here too, as the carve-out it is rather than
 // an untested assumption: TestUnroutedObservationKeepsTheResolvedPath holds
@@ -76,9 +76,9 @@ func assertValueFree(t *testing.T, got string) {
 
 // TestErrorStringsValueFreeWhenRouteUnset pins REQ-093 across every surface
 // that shared the effectiveRoute→Path leak: WireError (a non-2xx response),
-// DecodeError (a 2xx body that fails to decode), and the two doOnce
-// diagnostics that return a plain fmt.Errorf rather than a typed error
-// (read-body failure, over-limit). A routed request is checked last as the
+// DecodeError (a 2xx body that fails to decode), and the BodyReadError of a
+// 2xx whose body could not be read (read-body failure, over-limit; REQ-172).
+// A routed request is checked last as the
 // regression guard: the fix must not touch the template a caller did set.
 func TestErrorStringsValueFreeWhenRouteUnset(t *testing.T) { // REQ-093
 	t.Run("WireError (non-2xx)", func(t *testing.T) {
@@ -181,7 +181,7 @@ func TestErrorStringsValueFreeWhenRouteUnset(t *testing.T) { // REQ-093
 
 // errReadCloser is an io.ReadCloser whose Read always fails with err —
 // simulating a connection that drops mid-body, the doOnce read-body-failure
-// arm (client.go's second "transport: %s %s: …" diagnostic).
+// arm (a *BodyReadError on a 2xx, REQ-172).
 type errReadCloser struct{ err error }
 
 func (e errReadCloser) Read([]byte) (int, error) { return 0, e.err }
