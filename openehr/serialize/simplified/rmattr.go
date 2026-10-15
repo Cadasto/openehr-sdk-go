@@ -197,7 +197,13 @@ type rmattrFamily struct {
 	// so `_accuracy` must reach the temporal types and only them, or one attribute
 	// would have two channels at one owner.
 	attrType string
-	list     bool
+	// owner, when set, is the one RM class that admits the family, wherever
+	// else the RM declares attr. It exists for `_name`: every LOCATABLE declares
+	// `name`, but the grammar carries it at the template root alone, whose class
+	// is COMPOSITION and no other node's (REQ-140). Anywhere else the family
+	// names nothing and is unmatched content.
+	owner string
+	list  bool
 	// value marks a family that decorates the **DataValue** a collapsed ELEMENT
 	// leaf holds rather than the LOCATABLE itself: one FLAT path addresses both
 	// (the Web Template folds ELEMENT.value into its leaf node), so the RM class
@@ -231,9 +237,13 @@ type rmattrFamily struct {
 // Template answers (see deviations.md § folded structural wrappers). That is the spec's own rule ("the node it belongs
 // to") rather than a table that could drift from the BMM. For a `value` family
 // the class consulted is the leaf datatype instead (rmattr_value.go), which is
-// what makes `_normal_range` DV_ORDERED-only and `_mapping` DV_TEXT-only.
+// what makes `_normal_range` DV_ORDERED-only and `_mapping` DV_TEXT-only. The
+// one family the RM alone does not place is `_name`: every LOCATABLE declares
+// `name`, and the grammar carries it at the template root only
+// ([rmattrFamily.owner]).
 var rmattrFamilies = map[string]rmattrFamily{
 	"_uid":                  {attr: "uid", decode: decodeRMAttrUID},
+	"_name":                 {attr: "name", owner: "COMPOSITION", decode: decodeRMAttrName},
 	"_link":                 {attr: "links", list: true, decode: decodeRMAttrLink},
 	"_work_flow_id":         {attr: "workflow_id", decode: decodeRMAttrObjectRef},
 	"_guideline_id":         {attr: "guideline_id", decode: decodeRMAttrObjectRef},
@@ -509,7 +519,7 @@ func rmattrDeferredAt(kind, family string) bool {
 // the family names nothing there.
 func rmattrFamilyOf(kind, leaf, family string) (fam rmattrFamily, judged string, read bool) {
 	fam, known := rmattrFamilies[family]
-	if !known {
+	if !known || (fam.owner != "" && bmmtype.Class(kind) != fam.owner) {
 		return rmattrFamily{}, "", false
 	}
 	// A value-decoration family is judged against the leaf datatype, not the
@@ -735,6 +745,16 @@ func decodeRMAttrUID(g rmattrGroup, _ string) (any, error) {
 		return nil, err
 	}
 	return map[string]any{"_type": uidBasedIDType(value), "value": value}, nil
+}
+
+// decodeRMAttrName decodes `_name` at the template root: the composition's own
+// name, which takes the place of the Web Template root's name ([decodeFlat]).
+// It is spelled in the DV_TEXT leaf grammar, through the DV_TEXT leaf builder,
+// so `|formatting` rides beside a bare name and a coded name rides the `|code`
+// substitution (REQ-053). A name the suffixes cannot carry rides `_name|raw`,
+// since no underscore family nests below `_name`.
+func decodeRMAttrName(g rmattrGroup, _ string) (any, error) {
+	return decodeRMAttrLeafValue(g, "DV_TEXT")
 }
 
 // uidBasedIDType names the concrete UID_BASED_ID subtype a `_uid` string

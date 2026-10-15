@@ -213,6 +213,29 @@ func TestREQ140CompositionNameEncodes(t *testing.T) {
 	}
 }
 
+// TestREQ140PlainTextIsADVTextWithAValueAlone — REQ-140: the name encode
+// leaves unwritten is a "plain DV_TEXT": its type is DV_TEXT, not the coded
+// subtype, and it sets nothing but its value. Each of the two halves is
+// judged on its own, so a coded text spelled with a value alone is not plain.
+func TestREQ140PlainTextIsADVTextWithAValueAlone(t *testing.T) {
+	for name, tc := range map[string]struct {
+		m    map[string]any
+		want bool
+	}{
+		"DV_TEXT with a value":          {map[string]any{"_type": "DV_TEXT", "value": "x"}, true},
+		"DV_CODED_TEXT with a value":    {map[string]any{"_type": "DV_CODED_TEXT", "value": "x"}, false},
+		"DV_TEXT with formatting":       {map[string]any{"_type": "DV_TEXT", "value": "x", "formatting": "plain"}, false},
+		"no type":                       {map[string]any{"value": "x"}, false},
+		"DV_TEXT with a mapping beside": {map[string]any{"_type": "DV_TEXT", "value": "x", "mappings": []any{}}, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if got := plainText(tc.m); got != tc.want {
+				t.Errorf("plainText(%v) = %v, want %v", tc.m, got, tc.want)
+			}
+		})
+	}
+}
+
 // TestREQ140CompositionNameWithoutKeyIsTheRootName — REQ-140: a body without
 // `_name` decodes the composition's name from the Web Template root's name,
 // or from the template id where the root has none, as it always has.

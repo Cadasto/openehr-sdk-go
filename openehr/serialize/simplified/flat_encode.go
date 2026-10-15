@@ -56,12 +56,15 @@ func encodeFlat(comp *rm.Composition, wt *webtemplate.WebTemplate) (map[string]a
 	}
 	// REQ-140 — the root COMPOSITION's own underscore attributes (it is a
 	// LOCATABLE the node walk never visits, because the walk starts at its
-	// children), and the EVENT_CONTEXT optionals under the real `context`
-	// segment (ADR 0016). The context prefix is spelled here rather than taken
+	// children), its own name, and the EVENT_CONTEXT optionals under the real
+	// `context` segment (ADR 0016). The context prefix is spelled here rather than taken
 	// from a Web Template node because those attributes are RM-optional and a
 	// template need not constrain `context` at all — decode resolves the same
 	// prefix the same way (rmattrOwnerAt).
 	if err := rmattrEncode(comp, root.ID, out); err != nil {
+		return nil, err
+	}
+	if err := compositionNameRMAttr(out, root.ID, comp.Name, impliedCompositionName(wt)); err != nil {
 		return nil, err
 	}
 	if err := rmattrEncode(comp.Context, root.ID+"/context", out); err != nil {

@@ -198,19 +198,17 @@ var Recorded = map[string]map[Leg]Record{
 	"consult_record": {
 		LegJSONXML: {Outcome: Outcome{Compared: 150}},
 		LegCanonicalFlat: {
-			Outcome: Outcome{Compared: 26, Missing: 2, Extra: 6},
-			Reason: "LOCATABLE name: the upstream FLAT writes the " +
-				"composition's own name as _name, which the codec does not carry (openehr/serialize/simplified/deviations.md, LOCATABLE.name). " +
-				"Choice element: the template lets media_file/created hold a DV_DATE_TIME or a DV_INTERVAL; upstream " +
+			Outcome: Outcome{Compared: 26, Missing: 1, Extra: 6},
+			Reason: "Choice element: the template lets media_file/created hold a DV_DATE_TIME or a DV_INTERVAL; upstream " +
 				"spells the value created/date_time_value, the SDK's Web Template keeps one value leaf, created. " +
 				"ctx/location: upstream spells EVENT_CONTEXT.location ctx/location, which the hold-out removes, and " +
 				"the codec writes context/_location (ADR 0016). ENTRY language and encoding: the upstream FLAT omits " +
 				"them on document_attachment and FLAT encode writes them (4 keys).",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 150, Missing: 34, Extra: 27, Altered: 16, Excluded: 5},
-			Reason: "The 5 excluded keys are ctx/time and ctx/setting, refused, " +
-				"and ctx/location, _name and created/date_time_value, reported as unmatched content, as " +
+			Outcome: Outcome{Compared: 150, Missing: 34, Extra: 27, Altered: 15, Excluded: 4},
+			Reason: "The 4 excluded keys are ctx/time and ctx/setting, refused, " +
+				"and ctx/location and created/date_time_value, reported as unmatched content, as " +
 				"follows. UPSTREAM consult_record ctx conflict: the " +
 				"FLAT gives ctx/time and context/start_time different values, decode refuses the pair and the " +
 				"harness removes ctx/time; the start time left agrees with the canonical. ctx/setting: the FLAT " +
@@ -218,9 +216,8 @@ var Recorded = map[string]map[Leg]Record{
 				"which decode refuses in every mode as a missing required suffix (REQ-170); the harness removes it, " +
 				"so decode fills the default 238 other care against the canonical 228 primary medical care. " +
 				"ctx/location: the codec does not read ctx/location (it reads context/_location, ADR 0016), so the " +
-				"location is missing. LOCATABLE name: the codec does not read _name, so decode names the composition " +
-				"OPConsultation from the template against the canonical Routine checkup. Choice element: decode " +
-				"does not read media_file/created/date_time_value (the SDK spells it created). Sibling order: FLAT " +
+				"location is missing. Choice element: decode does not read media_file/created/date_time_value " +
+				"(the SDK spells it created). Sibling order: FLAT " +
 				"carries no order between the document_attachment items; decode lists the media_file cluster first, " +
 				"the canonical lists it last, so the item leaves compare at shifted positions. RM-FLOOR " +
 				"archetype_details: rm_version is 1.2.0 against 1.0.4 (3 leaves).",
@@ -233,12 +230,11 @@ var Recorded = map[string]map[Leg]Record{
 				"the ENTRY language and encoding of document_attachment that the upstream STRUCTURED carries.",
 		},
 		LegStructuredFlat: {
-			Outcome: Outcome{Compared: 28, Extra: 1, Excluded: 2},
+			Outcome: Outcome{Compared: 29, Extra: 1, Excluded: 1},
 			Reason: "ctx/location: the upstream FLAT spells the location ctx/location, which the hold-out removes, " +
 				"while the upstream STRUCTURED spells it context/_location (ADR 0016), which decodes and re-encodes, " +
-				"so only our side carries it. Excluded: the same two families drop out of both sides of the " +
-				"comparison: decode reports the composition's _name (LOCATABLE name) and " +
-				"media_file/created/date_time_value (choice element) as unmatched content.",
+				"so only our side carries it. Excluded: one family drops out of both sides of the comparison: " +
+				"decode reports media_file/created/date_time_value (choice element) as unmatched content.",
 		},
 	},
 	"corona": {
@@ -264,18 +260,14 @@ var Recorded = map[string]map[Leg]Record{
 	},
 	"ehrn_abdm": {
 		LegCanonicalFlat: {
-			Outcome: Outcome{Compared: 31, Missing: 2, Extra: 1},
-			Reason: "LOCATABLE name: the upstream FLAT writes the " +
-				"composition's own name as _name, which the codec does not carry (openehr/serialize/simplified/deviations.md, LOCATABLE.name). " +
-				"Choice element: the template lets media_file/created hold a DV_DATE_TIME or a DV_INTERVAL; upstream " +
+			Outcome: Outcome{Compared: 31, Missing: 1, Extra: 1},
+			Reason: "Choice element: the template lets media_file/created hold a DV_DATE_TIME or a DV_INTERVAL; upstream " +
 				"spells the value created/date_time_value, the SDK's Web Template keeps one value leaf, created.",
 		},
 		LegFlatCanonical: {
-			Outcome: Outcome{Compared: 150, Missing: 33, Extra: 27, Altered: 14, Excluded: 2},
-			Reason: "The 2 excluded keys are _name and " +
-				"created/date_time_value, reported as unmatched content, as follows. LOCATABLE name: the codec does not " +
-				"read _name, so decode names the composition OPConsultation from the template against the canonical " +
-				"Routine checkup. Choice element: decode does not read media_file/created/date_time_value (the SDK " +
+			Outcome: Outcome{Compared: 150, Missing: 33, Extra: 27, Altered: 13, Excluded: 1},
+			Reason: "The excluded key is created/date_time_value, reported as unmatched content, as follows. " +
+				"Choice element: decode does not read media_file/created/date_time_value (the SDK " +
 				"spells it created). Sibling order: FLAT carries no order between the document_attachment items; decode lists " +
 				"the media_file cluster first, the canonical lists it last, so the item leaves compare at shifted " +
 				"positions. RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (3 leaves).",

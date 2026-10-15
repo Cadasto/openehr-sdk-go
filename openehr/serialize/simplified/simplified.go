@@ -85,8 +85,9 @@ func (c decodeConfig) tracked() bool {
 
 // WithTemplate supplies the compiled template, switching decode into
 // conformant mode. The mandatory LOCATABLE.name is repopulated on every
-// reconstructed node from the archetype terminology (the formats do not
-// carry names, and the Web Template collapses the HISTORY / ITEM_STRUCTURE
+// reconstructed node from the archetype terminology (the formats carry no
+// name but the composition's own, `<root>/_name`, which decode reads in both
+// modes, and the Web Template collapses the HISTORY / ITEM_STRUCTURE
 // wrappers, so the compiled template is the authoritative source). The
 // RM-mandatory attributes the formats omit (HISTORY.origin, EVENT.time,
 // ENTRY language/encoding/subject, EVENT_CONTEXT.setting, …) are completed

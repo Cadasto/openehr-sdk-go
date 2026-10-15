@@ -25,16 +25,16 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 | alternative_events | canonical-flat | compared 21, missing 4, extra 0, altered 0, excluded 0 |
 | alternative_events | flat-canonical | compared 115, missing 8, extra 4, altered 13, excluded 4 |
 | consult_record | json-xml | compared 150, missing 0, extra 0, altered 0, excluded 0 |
-| consult_record | canonical-flat | compared 26, missing 2, extra 6, altered 0, excluded 0 |
-| consult_record | flat-canonical | compared 150, missing 34, extra 27, altered 16, excluded 5 |
+| consult_record | canonical-flat | compared 26, missing 1, extra 6, altered 0, excluded 0 |
+| consult_record | flat-canonical | compared 150, missing 34, extra 27, altered 15, excluded 4 |
 | consult_record | flat-structured | compared 40, missing 12, extra 5, altered 0, excluded 0 |
-| consult_record | structured-flat | compared 28, missing 0, extra 1, altered 0, excluded 2 |
+| consult_record | structured-flat | compared 29, missing 0, extra 1, altered 0, excluded 1 |
 | corona | canonical-flat | refused |
 | corona | flat-canonical | compared 641, missing 565, extra 0, altered 2, excluded 94 |
 | corona | flat-structured | compared 113, missing 0, extra 0, altered 0, excluded 0 |
 | corona | structured-flat | compared 10, missing 0, extra 0, altered 0, excluded 94 |
-| ehrn_abdm | canonical-flat | compared 31, missing 2, extra 1, altered 0, excluded 0 |
-| ehrn_abdm | flat-canonical | compared 150, missing 33, extra 27, altered 14, excluded 2 |
+| ehrn_abdm | canonical-flat | compared 31, missing 1, extra 1, altered 0, excluded 0 |
+| ehrn_abdm | flat-canonical | compared 150, missing 33, extra 27, altered 13, excluded 1 |
 | family_history | json-xml | compared 95, missing 0, extra 0, altered 0, excluded 0 |
 | multi_list | flat-structured | compared 50, missing 0, extra 0, altered 0, excluded 0 |
 | multi_list | structured-flat | compared 41, missing 0, extra 0, altered 0, excluded 0 |
@@ -100,10 +100,9 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 
 ### canonical-flat
 
-- Outcome: compared 26, missing 2, extra 6, altered 0, excluded 0
-- Reason: LOCATABLE name: the upstream FLAT writes the composition's own name as _name, which the codec does not carry (openehr/serialize/simplified/deviations.md, LOCATABLE.name). Choice element: the template lets media_file/created hold a DV_DATE_TIME or a DV_INTERVAL; upstream spells the value created/date_time_value, the SDK's Web Template keeps one value leaf, created. ctx/location: upstream spells EVENT_CONTEXT.location ctx/location, which the hold-out removes, and the codec writes context/_location (ADR 0016). ENTRY language and encoding: the upstream FLAT omits them on document_attachment and FLAT encode writes them (4 keys).
-- Missing (2):
-  - `opconsultation/_name`
+- Outcome: compared 26, missing 1, extra 6, altered 0, excluded 0
+- Reason: Choice element: the template lets media_file/created hold a DV_DATE_TIME or a DV_INTERVAL; upstream spells the value created/date_time_value, the SDK's Web Template keeps one value leaf, created. ctx/location: upstream spells EVENT_CONTEXT.location ctx/location, which the hold-out removes, and the codec writes context/_location (ADR 0016). ENTRY language and encoding: the upstream FLAT omits them on document_attachment and FLAT encode writes them (4 keys).
+- Missing (1):
   - `opconsultation/document_attachment/media_file/created/date_time_value`
 - Extra (6):
   - `opconsultation/context/_location`
@@ -115,8 +114,8 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 
 ### flat-canonical
 
-- Outcome: compared 150, missing 34, extra 27, altered 16, excluded 5
-- Reason: The 5 excluded keys are ctx/time and ctx/setting, refused, and ctx/location, _name and created/date_time_value, reported as unmatched content, as follows. UPSTREAM consult_record ctx conflict: the FLAT gives ctx/time and context/start_time different values, decode refuses the pair and the harness removes ctx/time; the start time left agrees with the canonical. ctx/setting: the FLAT writes ctx/setting as bare text, the setting without the |code and |value the codec reads it as, which decode refuses in every mode as a missing required suffix (REQ-170); the harness removes it, so decode fills the default 238 other care against the canonical 228 primary medical care. ctx/location: the codec does not read ctx/location (it reads context/_location, ADR 0016), so the location is missing. LOCATABLE name: the codec does not read _name, so decode names the composition OPConsultation from the template against the canonical Routine checkup. Choice element: decode does not read media_file/created/date_time_value (the SDK spells it created). Sibling order: FLAT carries no order between the document_attachment items; decode lists the media_file cluster first, the canonical lists it last, so the item leaves compare at shifted positions. RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (3 leaves).
+- Outcome: compared 150, missing 34, extra 27, altered 15, excluded 4
+- Reason: The 4 excluded keys are ctx/time and ctx/setting, refused, and ctx/location and created/date_time_value, reported as unmatched content, as follows. UPSTREAM consult_record ctx conflict: the FLAT gives ctx/time and context/start_time different values, decode refuses the pair and the harness removes ctx/time; the start time left agrees with the canonical. ctx/setting: the FLAT writes ctx/setting as bare text, the setting without the |code and |value the codec reads it as, which decode refuses in every mode as a missing required suffix (REQ-170); the harness removes it, so decode fills the default 238 other care against the canonical 228 primary medical care. ctx/location: the codec does not read ctx/location (it reads context/_location, ADR 0016), so the location is missing. Choice element: decode does not read media_file/created/date_time_value (the SDK spells it created). Sibling order: FLAT carries no order between the document_attachment items; decode lists the media_file cluster first, the canonical lists it last, so the item leaves compare at shifted positions. RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (3 leaves).
 - Missing (34, first 10 shown):
   - `/content/0/data/items/0/value/_type`
   - `/content/0/data/items/0/value/value`
@@ -139,7 +138,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `/content/0/data/items/0/items/0/name/value`
   - `/content/0/data/items/0/items/0/value/_type`
   - `/content/0/data/items/0/items/0/value/data`
-- Altered (16, first 10 shown):
+- Altered (15, first 10 shown):
   - `/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
   - `/content/0/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
   - `/content/0/data/items/0/_type`: reference `"ELEMENT"`, ours `"CLUSTER"`
@@ -150,8 +149,8 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `/content/0/data/items/1/value/_type`: reference `"DV_CODED_TEXT"`, ours `"DV_TEXT"`
   - `/content/0/data/items/1/value/value`: reference `"final"`, ours `"OP consult record"`
   - `/content/0/data/items/2/_type`: reference `"CLUSTER"`, ours `"ELEMENT"`
-- Reducing decode removed 5 keys from the upstream FLAT:
-  - 3: `reported as unmatched content`
+- Reducing decode removed 4 keys from the upstream FLAT:
+  - 2: `reported as unmatched content`
   - 1: `simplified: path not in web template: conflicting spellings of <key>: "<key>" gives "2023-06-02T12:50:00Z", "opconsultation/context/start_time" gives "2022-02-03T04:05:06"; remove one`
   - 1: `simplified: unsupported datatype: "<key>" spells the setting without its |code and |value, the pair <key> travels as`
 
@@ -179,14 +178,14 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 
 ### structured-flat
 
-- Outcome: compared 28, missing 0, extra 1, altered 0, excluded 2
-- Reason: ctx/location: the upstream FLAT spells the location ctx/location, which the hold-out removes, while the upstream STRUCTURED spells it context/_location (ADR 0016), which decodes and re-encodes, so only our side carries it. Excluded: the same two families drop out of both sides of the comparison: decode reports the composition's _name (LOCATABLE name) and media_file/created/date_time_value (choice element) as unmatched content.
+- Outcome: compared 29, missing 0, extra 1, altered 0, excluded 1
+- Reason: ctx/location: the upstream FLAT spells the location ctx/location, which the hold-out removes, while the upstream STRUCTURED spells it context/_location (ADR 0016), which decodes and re-encodes, so only our side carries it. Excluded: one family drops out of both sides of the comparison: decode reports media_file/created/date_time_value (choice element) as unmatched content.
 - Extra (1):
   - `opconsultation/context/_location`
-- Reducing decode removed 2 keys from the upstream FLAT:
-  - 2: `reported as unmatched content`
-- Reducing decode removed 2 keys from the flattened upstream STRUCTURED:
-  - 2: `reported as unmatched content`
+- Reducing decode removed 1 key from the upstream FLAT:
+  - 1: `reported as unmatched content`
+- Reducing decode removed 1 key from the flattened upstream STRUCTURED:
+  - 1: `reported as unmatched content`
 
 ## corona
 
@@ -238,18 +237,17 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
 
 ### canonical-flat
 
-- Outcome: compared 31, missing 2, extra 1, altered 0, excluded 0
-- Reason: LOCATABLE name: the upstream FLAT writes the composition's own name as _name, which the codec does not carry (openehr/serialize/simplified/deviations.md, LOCATABLE.name). Choice element: the template lets media_file/created hold a DV_DATE_TIME or a DV_INTERVAL; upstream spells the value created/date_time_value, the SDK's Web Template keeps one value leaf, created.
-- Missing (2):
-  - `opconsultation/_name`
+- Outcome: compared 31, missing 1, extra 1, altered 0, excluded 0
+- Reason: Choice element: the template lets media_file/created hold a DV_DATE_TIME or a DV_INTERVAL; upstream spells the value created/date_time_value, the SDK's Web Template keeps one value leaf, created.
+- Missing (1):
   - `opconsultation/document_attachment/media_file/created/date_time_value`
 - Extra (1):
   - `opconsultation/document_attachment/media_file/created`
 
 ### flat-canonical
 
-- Outcome: compared 150, missing 33, extra 27, altered 14, excluded 2
-- Reason: The 2 excluded keys are _name and created/date_time_value, reported as unmatched content, as follows. LOCATABLE name: the codec does not read _name, so decode names the composition OPConsultation from the template against the canonical Routine checkup. Choice element: decode does not read media_file/created/date_time_value (the SDK spells it created). Sibling order: FLAT carries no order between the document_attachment items; decode lists the media_file cluster first, the canonical lists it last, so the item leaves compare at shifted positions. RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (3 leaves).
+- Outcome: compared 150, missing 33, extra 27, altered 13, excluded 1
+- Reason: The excluded key is created/date_time_value, reported as unmatched content, as follows. Choice element: decode does not read media_file/created/date_time_value (the SDK spells it created). Sibling order: FLAT carries no order between the document_attachment items; decode lists the media_file cluster first, the canonical lists it last, so the item leaves compare at shifted positions. RM-FLOOR archetype_details: rm_version is 1.2.0 against 1.0.4 (3 leaves).
 - Missing (33, first 10 shown):
   - `/content/0/data/items/0/value/_type`
   - `/content/0/data/items/0/value/value`
@@ -272,7 +270,7 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `/content/0/data/items/0/items/0/name/value`
   - `/content/0/data/items/0/items/0/value/_type`
   - `/content/0/data/items/0/items/0/value/data`
-- Altered (14, first 10 shown):
+- Altered (13, first 10 shown):
   - `/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
   - `/content/0/archetype_details/rm_version`: reference `"1.0.4"`, ours `"1.2.0"`
   - `/content/0/data/items/0/_type`: reference `"ELEMENT"`, ours `"CLUSTER"`
@@ -283,8 +281,8 @@ An outcome is either a refusal, the codec error that ended the leg, or five coun
   - `/content/0/data/items/1/value/_type`: reference `"DV_CODED_TEXT"`, ours `"DV_TEXT"`
   - `/content/0/data/items/1/value/value`: reference `"final"`, ours `"OP consult record"`
   - `/content/0/data/items/2/_type`: reference `"CLUSTER"`, ours `"ELEMENT"`
-- Reducing decode removed 2 keys from the upstream FLAT:
-  - 2: `reported as unmatched content`
+- Reducing decode removed 1 key from the upstream FLAT:
+  - 1: `reported as unmatched content`
 
 ## family_history
 

@@ -132,7 +132,6 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	compJSON := map[string]any{
 		"_type":             "COMPOSITION",
 		"archetype_node_id": root.NodeID,
-		"name":              textJSON(cmp.Or(root.Name, wt.TemplateID)),
 	}
 	// A key ending in a bare `|` spells the key without it; both at once are two
 	// spellings of one field (REQ-170), judged once the decode knows whether it
@@ -247,6 +246,12 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	// than gap-filling their own (REQ-140).
 	if err := decodeRMAttrGroups(compJSON, wt, attrGroups, ambiguous, budget, names); err != nil {
 		return nil, err
+	}
+	// The composition is named by its `<root>/_name` where the body spells one,
+	// which the router has just placed, and otherwise by the Web Template
+	// (REQ-140).
+	if _, named := compJSON["name"]; !named {
+		compJSON["name"] = textJSON(impliedCompositionName(wt))
 	}
 	// Every key is placed, so each rebuilt ISM transition can now get the careflow
 	// step its node names, or have the body's checked against it (REQ-053).
@@ -2765,6 +2770,14 @@ func requireSuffix(rmType string, sfx map[string]any, name string) (any, error) 
 		return nil, fmt.Errorf("%w: %s missing required %s", ErrUnsupportedDatatype, rmType, label)
 	}
 	return v, nil
+}
+
+// impliedCompositionName is the name decode gives a composition whose body
+// spells no `<root>/_name`: the Web Template root's name, or the template id
+// where the root has none. Encode writes no `_name` for a plain DV_TEXT name
+// of this value, so a round trip names the composition the same way (REQ-140).
+func impliedCompositionName(wt *webtemplate.WebTemplate) string {
+	return cmp.Or(wt.Tree.Name, wt.TemplateID)
 }
 
 // textJSON is a canonical DV_TEXT object.
