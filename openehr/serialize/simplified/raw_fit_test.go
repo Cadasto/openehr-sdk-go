@@ -11,6 +11,7 @@ package simplified
 
 import (
 	"errors"
+	"maps"
 	"strings"
 	"testing"
 )
@@ -235,4 +236,69 @@ func TestREQ053CheckRawFitsLeavesAnUndefinedAttributeToCanonicalJSON(t *testing.
 	if err := checkRawFits("DV_TEXT", "NO_SUCH_CLASS", nil); err != nil {
 		t.Errorf("checkRawFits(DV_TEXT, NO_SUCH_CLASS) = %v, want nil", err)
 	}
+}
+
+// TestREQ053RawAtANodeWithChildrenIsRefused — REQ-053 and REQ-170: `|raw`
+// carries a datatype, so a `|raw` key that resolves to a node with children
+// (the composition root, the EVENT_CONTEXT, a SECTION, an ENTRY, an EVENT, a
+// CLUSTER, an ACTIVITY, an ISM_TRANSITION) is matched content of the wrong
+// shape. It is refused in every mode, in FLAT and in STRUCTURED, wrapping
+// ErrUnsupportedDatatype and naming the key, whatever the fragment's `_type`
+// and whether or not the node has keys of its own. Before, a fragment whose
+// `_type` fitted was placed whole at the node and then dropped without a word
+// once the node's own keys rebuilt it, or failed in canonical JSON naming a
+// path the caller did not write.
+func TestREQ053RawAtANodeWithChildrenIsRefused(t *testing.T) {
+	wt, c := conformanceWT(t)
+	frag := func(typ string) map[string]any {
+		return map[string]any{"_type": typ, "archetype_node_id": "at0000", "name": rawText}
+	}
+	ctxOnly := func(extra map[string]any) map[string]any {
+		body := map[string]any{"ctx/language": "en", "ctx/territory": "US", "ctx/time": "2021-12-21T14:19:31.649613+01:00"}
+		maps.Copy(body, extra)
+		return body
+	}
+	instruction := rmattrSection + "/conformance_instruction"
+	for name, tc := range map[string]struct {
+		body map[string]any
+		key  string
+	}{
+		"composition root":                {rmattrBody(map[string]any{rmattrRoot + "|raw": frag("COMPOSITION")}), rmattrRoot + "|raw"},
+		"EVENT_CONTEXT":                   {rmattrBody(map[string]any{rmattrContext + "|raw": frag("EVENT_CONTEXT")}), rmattrContext + "|raw"},
+		"SECTION":                         {rmattrBody(map[string]any{rmattrSection + "|raw": frag("SECTION")}), rmattrSection + "|raw"},
+		"SECTION, a fragment of no fit":   {rmattrBody(map[string]any{rmattrSection + "|raw": rawText}), rmattrSection + "|raw"},
+		"SECTION, no canonical object":    {rmattrBody(map[string]any{rmattrSection + "|raw": "x"}), rmattrSection + "|raw"},
+		"OBSERVATION beside its own keys": {rmattrBody(map[string]any{rmattrObs + "|raw": frag("OBSERVATION")}), rmattrObs + "|raw"},
+		"OBSERVATION alone":               {ctxOnly(map[string]any{rmattrObs + "|raw": frag("OBSERVATION")}), rmattrObs + "|raw"},
+		"ADMIN_ENTRY alone":               {ctxOnly(map[string]any{rmattrSection + "/conformance_admin_entry|raw": frag("ADMIN_ENTRY")}), rmattrSection + "/conformance_admin_entry|raw"},
+		"EVENT":                           {rmattrBody(map[string]any{rmattrEvent + "|raw": frag("POINT_EVENT")}), rmattrEvent + "|raw"},
+		"CLUSTER":                         {rmattrBody(map[string]any{rmattrEvent + "/conformance_cluster|raw": frag("CLUSTER")}), rmattrEvent + "/conformance_cluster|raw"},
+		"ACTIVITY":                        {rmattrBody(map[string]any{instruction + "/current_activity|raw": frag("ACTIVITY")}), instruction + "/current_activity|raw"},
+		"ISM_TRANSITION":                  {rmattrBody(map[string]any{rmattrAction + "/transition|raw": frag("ISM_TRANSITION")}), rmattrAction + "/transition|raw"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := refusedInEveryMode(t, wt, tc.body)
+			if !errors.Is(err, ErrUnsupportedDatatype) || !strings.Contains(err.Error(), `"`+tc.key+`"`) {
+				t.Errorf("FLAT: decode = %v, want ErrUnsupportedDatatype naming %q", err, tc.key)
+			}
+			if _, err := UnmarshalFlat(mustJSON(t, tc.body), wt, WithTemplate(c)); !errors.Is(err, ErrUnsupportedDatatype) {
+				t.Errorf("FLAT WithTemplate: decode = %v, want ErrUnsupportedDatatype", err)
+			}
+			structured := structuredRefusedInEveryMode(t, wt, tc.body)
+			if !errors.Is(structured, ErrUnsupportedDatatype) || !strings.Contains(structured.Error(), `|raw"`) {
+				t.Errorf("STRUCTURED: decode = %v, want ErrUnsupportedDatatype naming the |raw key", structured)
+			}
+		})
+	}
+}
+
+// TestREQ053NullRawAtANodeWithChildrenIsAbsent — REQ-053: a null is absent
+// wherever its key resolves, so a null `|raw` at a node with children is not
+// refused for the datatype it would carry: it decodes, in both forms, as the
+// body without it.
+func TestREQ053NullRawAtANodeWithChildrenIsAbsent(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	extra := map[string]any{rmattrObs + "|raw": nil}
+	body := rmattrBody(extra)
+	assertSameDecodeBothForms(t, wt, body, withoutNullKeys(body, extra))
 }
