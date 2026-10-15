@@ -22,7 +22,8 @@ import (
 //   - DV_TEXT      → string (value)
 //   - DV_BOOLEAN   → bool
 //   - DV_COUNT     → int (magnitude)
-//   - DV_ORDINAL   → int (value)
+//   - DV_ORDINAL   → [constraints.OrdinalSymbol] (value, symbol's
+//     defining_code), or int (value) when that code is incomplete
 //   - DV_DATE      → string (value, ISO 8601)
 //   - DV_TIME      → string (value, ISO 8601)
 //   - DV_DATE_TIME → string (value, ISO 8601)
@@ -83,11 +84,9 @@ func dataValueInput(dv rm.DataValue) (any, bool) {
 	case rm.DVCount:
 		return v.Magnitude, true
 	case *rm.DVOrdinal:
-		// DV_ORDINAL.value is Integer (int32) per the RM spec; safe
-		// to widen to int (≥ int32 on every supported Go platform).
-		return int(v.Value), true
+		return ordinalInput(v), true
 	case rm.DVOrdinal:
-		return int(v.Value), true
+		return ordinalInput(&v), true
 	case *rm.DVDate:
 		return v.Value, true
 	case rm.DVDate:
@@ -106,6 +105,29 @@ func dataValueInput(dv rm.DataValue) (any, bool) {
 		return v.Value, true
 	}
 	return nil, false
+}
+
+// ordinalInput returns the value [constraints.CDvOrdinal.Validate] checks
+// for o. When the symbol's defining_code carries both a terminology and a
+// code string, it returns the value and that code as one
+// [constraints.OrdinalSymbol], so a symbol that does not match its value is
+// reported. Otherwise it returns the value alone: the RM rules report the
+// incomplete code, so it is reported once.
+//
+// DV_ORDINAL.value is Integer (int32) per the RM; widening it to int is
+// safe on every supported Go platform.
+func ordinalInput(o *rm.DVOrdinal) any {
+	code := o.Symbol.DefiningCode
+	if code.TerminologyID.Value == "" || code.CodeString == "" {
+		return int(o.Value)
+	}
+	return constraints.OrdinalSymbol{
+		Value: int(o.Value),
+		Symbol: constraints.CodedTermRef{
+			Terminology: code.TerminologyID.Value,
+			CodeString:  code.CodeString,
+		},
+	}
 }
 
 // deref returns *p when non-nil, otherwise fallback. Generic helper
