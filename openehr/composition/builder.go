@@ -36,11 +36,10 @@ type Builder struct {
 // node the value binds: of the nodes the template allows at the path,
 // the one the validator would bind it to ([bindRMType]). Resolving
 // the node and checking the type at Set time surfaces an unknown path
-// eagerly, and a type mismatch wherever the template and the pinned RM
-// give a type to check against. Where they give none, as under an
-// attribute the RM types with a generic parameter that the parent's type
-// name leaves open (the lower bound of a bare DV_INTERVAL), a value of
-// the wrong type fails only when Build writes it, with ErrInvalidPath.
+// and a type mismatch eagerly. Only where the template and the pinned RM
+// give no type to check against, as under a parent the template leaves
+// untyped or whose class the RM does not know, does a value of the wrong
+// type fail later, when Build writes it, with ErrInvalidPath.
 // RM-side navigation still happens at Build time so the caller can stack
 // Set calls without each one mutating the graph.
 type pendingAssignment struct {
