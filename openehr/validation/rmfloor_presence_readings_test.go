@@ -230,7 +230,7 @@ const terminologyIDOPT = `<?xml version="1.0" encoding="utf-8"?>
 </template>`
 
 // TestValidate_REQ171_TerminologyIDBoundToItsNode pins REQ-171 Structural
-// access in the template walk: CODE_PHRASE terminology_id is read as the
+// access under a template: CODE_PHRASE terminology_id is read as the
 // TERMINOLOGY_ID it holds, so it binds to the TERMINOLOGY_ID node that
 // constrains it and the walk goes below it. A terminology the node's value
 // list admits draws no template issue, and one it does not is reported at

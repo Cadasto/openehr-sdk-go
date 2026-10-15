@@ -121,16 +121,16 @@ func (v codedValue) path(nodePath string) string {
 
 // checkCodedInvariants runs, of the coded invariants, those in rules on the
 // node value, whose runtime class is rmType, at path. rules are the coded
-// invariants the inventory says the class is subject to and the floor
-// evaluates ([classRules]); [codedValues] reads the coded attributes the
+// invariants the inventory says the class is subject to and the RM rules
+// evaluate ([classRules]); [codedValues] reads the coded attributes the
 // value carries. It reports each breach as `code_not_in_value_set` at the
 // CODE_PHRASE the invariant reads.
-func (w *rmFloorWalker) checkCodedInvariants(value any, rmType, path string, rules []*codedRule) {
+func (f *findings) checkCodedInvariants(value any, rmType, path string, rules []*codedRule) {
 	for _, v := range codedValues(value) {
 		if !slices.Contains(rules, v.rule) || v.rule.holds(v.code) {
 			continue
 		}
-		w.emit(Issue{
+		f.emit(Issue{
 			Path:   v.path(path),
 			Code:   "code_not_in_value_set",
 			Layer:  LayerRM,
@@ -313,7 +313,7 @@ func entryCoded(language, encoding rm.CodePhrase) []codedValue {
 
 // elementCoded lists ELEMENT's null_flavour when the ELEMENT has no value:
 // the RM states Inv_null_flavour_valid as `is_null implies …`. A typed-nil
-// value counts as absent, as it does in [rmFloorWalker.checkElementNullFlavour].
+// value counts as absent, as it does in [findings.checkElementNullFlavour].
 func elementCoded(e *rm.Element) []codedValue {
 	if e.Value != nil && !rmaccess.IsTypedNilPointer(e.Value) {
 		return nil

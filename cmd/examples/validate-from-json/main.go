@@ -94,8 +94,9 @@ func run() (valid bool, err error) {
 	// ParseFileStrict rejects an unknown node type that has attributes under
 	// it, where the lenient ParseFile would keep it as a leaf and silently
 	// drop the constraints beneath it, which a validator must not do.
-	// Compile turns the parsed XML into the driver that the validator (and
-	// the composition builder, the instance generator, the AQL lint) walks.
+	// Compile turns the parsed XML into the compiled template that the
+	// validator, the composition builder, the instance generator and the
+	// AQL lint all read.
 	opt, err := template.ParseFileStrict(optPath)
 	if err != nil {
 		return false, fmt.Errorf("parse OPT %q: %w", optPath, err)
@@ -106,12 +107,12 @@ func run() (valid bool, err error) {
 	}
 	fmt.Printf("template             : %s (%s)\n", opt.TemplateID(), filepath.Base(optPath))
 
-	// Step 3: validate. The template drives the first walk: for each node the
-	// OPT declares, the validator reads the matching part of the composition
-	// and checks existence, cardinality, RM type and value constraints. The
-	// RM floor then walks the whole composition with the Reference Model as
-	// its guide. Both walks collect every issue instead of stopping at the
-	// first, and the result carries a defect both find once.
+	// Step 3: validate. One walk visits the composition. Where a node binds
+	// to a node of the OPT, the validator checks the template's clauses there:
+	// existence, cardinality, RM type and value constraints. On every node the
+	// template admits it also applies the Reference Model's own rules. The walk
+	// collects every issue instead of stopping at the first, and an attribute
+	// both the template and the Reference Model find missing is one issue.
 	if report("validation", validation.ValidateComposition(&composition, compiled)) {
 		fmt.Println("result               : valid, no error found")
 		return true, nil

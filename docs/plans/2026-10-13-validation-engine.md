@@ -5,7 +5,7 @@ kind: plan
 # Plan — Validation engine: one walk, admission first, generated access
 
 **Date:** 2026-10-13
-**Status:** In progress — Phases 0 to 2 merged with [PR 263](https://github.com/Cadasto/openehr-sdk-go/pull/263); Phase 3 merged with [PR 265](https://github.com/Cadasto/openehr-sdk-go/pull/265); both shipped in v0.34.0. Phase 4 is next
+**Status:** In progress — Phases 0 to 2 merged with [PR 263](https://github.com/Cadasto/openehr-sdk-go/pull/263); Phase 3 merged with [PR 265](https://github.com/Cadasto/openehr-sdk-go/pull/265); both shipped in v0.34.0. Phase 4 in [PR 271](https://github.com/Cadasto/openehr-sdk-go/pull/271)
 **Covers:** REQ-171 ([clinical-modeling.md § REQ-171](../specifications/clinical-modeling.md#req-171--validation-engine), planned); amends REQ-102 ([§ REQ-102](../specifications/clinical-modeling.md#req-102--composition-validation)), REQ-110 ([§ REQ-110](../specifications/clinical-modeling.md#req-110--template-driven-validation-beyond-composition)), REQ-112 ([§ REQ-112](../specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor)), REQ-168 ([§ REQ-168](../specifications/clinical-modeling.md#req-168--value-free-validation-diagnostics)) and, in its last phase, REQ-170 ([wire.md § REQ-170](../specifications/wire.md#req-170--unmatched-content-on-decode))
 **Probes:** PROBE-025, PROBE-026, PROBE-074 (re-baselined in Phase 4), PROBE-077 (buildable from Phase 3), PROBE-081 (re-homed in Phase 5)
 **Depends on:** [PR 256](https://github.com/Cadasto/openehr-sdk-go/pull/256), merged, and [ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md); [ADR 0028](../adr/0028-generated-rm-attribute-access.md) accepted before Phase 3; [ADR 0027](../adr/0027-template-admission-before-rm-rules.md) accepted before Phase 4; [STRAND-15](../specifications/research-strands.md#strand-15--decode-time-presence-and-unmatched-member-capture-on-the-generated-types) resolved before Phase 5
@@ -154,9 +154,7 @@ Each lands as a `v0.x` minor named in the release notes, as ADR 0025's own tight
 
 ## Backlog lines this plan absorbs
 
-Each is a lead in [docs/backlog.md](../backlog.md) under *Validation engine Phase 4*, verified when Phase 4 rewrites its path and deleted when settled:
-
-- `openehr/validation/rmfloor.go:359`, an empty mandatory container reported under two codes at one path; `rmfloor.go:250`, the cost of the visit-once record; `rmfloor.go:532`, a temporal value reported twice; `walk_composition.go:156`, an attribute's children copied on every visit.
+Phase 4 verified the four leads its rewrite reached and deleted the three it settled from [docs/backlog.md](../backlog.md): an empty mandatory container reported under two codes at one path, the cost of the visit-once record, and an attribute's children copied on every visit. The fourth, an empty temporal value reported at two paths, is unchanged by the one walk and stays in the backlog as a § REQ-112 question.
 
 The leads Phases 2 and 3 absorbed are settled. The backlog triage of 2026-10-14 dropped the rest: the ADR 0025 lines, settled or wording only, and the Phase 5 leads, the member-check route (settled or trivial) and the `rminfo` link-size follow-up, a cost the maintainer had accepted.
 

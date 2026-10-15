@@ -1,12 +1,12 @@
 package validation_test
 
 // rmfloor_chained_test.go: REQ-102 § RM floor, REQ-110, REQ-112 — every
-// template-driven entry point also runs the RM floor over the whole root and
-// returns its findings in the same Result, on the nodes the OPT models and on
-// those it does not (ADR 0025). These tests inject a defect only the floor
-// reports and fail if the floor is not part of the template-driven result.
-// They replace the STRAND-14 pin, which held the opposite while the strand
-// was open.
+// template-driven entry point applies the RM rules in its walk and returns
+// their findings in the same Result, on the nodes the OPT models and on
+// those it does not (ADR 0025, ADR 0027). These tests inject a defect only
+// the RM rules report and fail if the rules are not part of the
+// template-driven result. They replace the STRAND-14 pin, which held the
+// opposite while the strand was open.
 
 import (
 	"strings"
@@ -22,7 +22,7 @@ const systolicPath = bpEventItems + "[at0004]"
 
 // devicePath is the path of the ELEMENT inside the device CLUSTER of
 // validVitalSignsComposition. The CLUSTER fills a slot, so vital_signs.opt
-// does not model the ELEMENT and the template walk does not visit it.
+// does not model the ELEMENT, and the walk visits it with the RM rules alone.
 const devicePath = "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/protocol/items[openEHR-EHR-CLUSTER.device.v1]/items[at0001]"
 
 // REQ-102, REQ-112 — a defect only the floor reports, on a node the OPT
@@ -115,8 +115,8 @@ func TestValidateComposition_REQ102_REQ112_IncludesRMFloor(t *testing.T) {
 	}
 }
 
-// REQ-110, REQ-112 — every template-driven entry point includes the floor,
-// not only ValidateComposition: each reports a defect only the floor finds
+// REQ-110, REQ-112 — every template-driven entry point applies the RM rules,
+// not only ValidateComposition: each reports a defect only the RM rules find
 // on the root it validates.
 func TestValidate_REQ110_REQ112_EveryEntryIncludesRMFloor(t *testing.T) {
 	vital := mustCompile(t, "vital_signs")
@@ -162,11 +162,11 @@ func TestValidate_REQ110_REQ112_EveryEntryIncludesRMFloor(t *testing.T) {
 	}
 }
 
-// REQ-102, REQ-112, REQ-116 — inside template validation the floor takes
-// the names the template walk bound, so a floor finding inside an item bound
-// by its pinned name carries that name in its predicate. The floor alone
-// binds no OPT node and writes the item's position. The defect sits below
-// the reused OBSERVATION, on nodes the reusing OPT does not model.
+// REQ-102, REQ-112, REQ-116 — inside template validation the RM rules run in
+// the walk that binds the template, so an RM finding inside an item bound by
+// its pinned name carries that name in its predicate. The RM rules alone
+// bind no OPT node and write the item's position. The defect sits below the
+// reused OBSERVATION, on nodes the reusing OPT does not model.
 func TestValidateComposition_REQ102_REQ112_FloorTakesBoundNames(t *testing.T) {
 	c := mustCompileSyntheticOPT(t, reusedArchetypeOPT)
 	comp := reusedComposition("Erste", obrienName)
@@ -188,7 +188,7 @@ func TestValidateComposition_REQ102_REQ112_FloorTakesBoundNames(t *testing.T) {
 	}
 }
 
-// REQ-102 — the template walk may report one code twice at one path for two
+// REQ-102 — the template may report one code twice at one path for two
 // clauses, and both stay: a participations that is present and empty breaks
 // the attribute's own cardinality, and the PARTICIPATION child it requires
 // once, which declares no id and is written at the attribute's path, occurs
@@ -208,9 +208,9 @@ func TestValidateComposition_REQ102_TemplateRepeatsStay(t *testing.T) {
 	}
 }
 
-// REQ-102, REQ-112 — a root outside the closed RM set is one the floor
-// cannot descend. Inside template validation the floor reports that as it
-// does alone, beside the template walk's type mismatch at the root.
+// REQ-102, REQ-112 — a root outside the closed RM set is one the RM rules
+// cannot descend. Inside template validation the walk reports that as the
+// RM rules alone do, beside the template's type mismatch at the root.
 func TestValidate_REQ102_REQ112_UnknownRootReportsFloorRefusal(t *testing.T) {
 	type notRM struct{ Name string }
 	c := mustCompileInline(t, rootOnlyOPT("FOLDER", "openEHR-EHR-FOLDER.generic.v1"))

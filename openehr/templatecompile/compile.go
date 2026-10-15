@@ -47,6 +47,10 @@ type config struct {
 
 // WithRMInfo overrides the RM-info source used to inject the implicit
 // attributes an OPT omits. When unset, the SDK's default RM info is used.
+// The lookup shapes the compiled template only: the validators in
+// openehr/validation read which attributes the Reference Model makes
+// mandatory from the SDK's own RM info, whatever lookup compiled the
+// template.
 func WithRMInfo(l rminfo.Lookup) Option {
 	return func(c *config) { c.lookup = l }
 }

@@ -46,7 +46,7 @@ type valueCase struct {
 }
 
 // valueCases returns the rows of REQ-168's table that hold a comparable
-// value: the RM-floor rows and a primitive through the template walker.
+// value: the RM-floor rows and a primitive under a template.
 // The decode-error row is TestREQ168_DecodeErrorInValue.
 //
 // The temporal row has one case for each of the four types, held by
@@ -189,7 +189,7 @@ func valueCases() []valueCase {
 			want:    rm.Character("Ω"),
 		},
 		{
-			name: "primitive_out_of_range through the template walker",
+			name: "primitive_out_of_range under a template",
 			run: func(t *testing.T) validation.Result {
 				comp := validVitalSignsComposition()
 				systolicElement(t, comp).Value = &rm.DVQuantity{Magnitude: 98765.25, Units: "mm[Hg]"}
@@ -290,7 +290,7 @@ func TestREQ168_EmptyValue(t *testing.T) {
 		paths []string
 	}{
 		{
-			name:  "required through the template walker",
+			name:  "required under a template",
 			run:   vitalSigns(func(c *rm.Composition) { itemList(c).Items = nil }),
 			code:  "required",
 			paths: []string{bloodPressure + "/data/events[at0006]/data/items"},
@@ -354,7 +354,7 @@ func TestREQ168_EmptyValue(t *testing.T) {
 			paths: []string{"/rm_version"},
 		},
 		{
-			name:  "cardinality through the template walker",
+			name:  "cardinality under a template",
 			run:   vitalSigns(func(c *rm.Composition) { c.Content[0].(*rm.Observation).Data.Events = []rm.Event{} }),
 			code:  "cardinality",
 			paths: []string{bloodPressure + "/data/events"},

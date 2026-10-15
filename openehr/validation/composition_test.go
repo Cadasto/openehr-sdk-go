@@ -675,7 +675,7 @@ func TestValidateComposition_DuplicateSystolicOccurrences(t *testing.T) {
 // REQ-102 v2 — wrong at-code on a nested LOCATABLE bound by RM
 // type via C_SINGLE_ATTRIBUTE triggers `node_id_mismatch` at the
 // matched node. The single-attribute matcher binds by RM type
-// (not at-code), then walkNode descends and checkLocatableIdentity
+// (not at-code), then the walk visits the bound node and identityIssue
 // catches the at-code disagreement. Multi-valued attributes use
 // the OR-accept matchChildByID and surface unbindable at-codes as
 // `slot_fill` at the parent attribute path — different code, same

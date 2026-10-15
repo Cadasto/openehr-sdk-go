@@ -1,15 +1,17 @@
 package validation
 
-// rmfloor_identity.go: REQ-112 § Driver — which values the RM-floor walk can
-// reach twice. A pointer to an RM value has an identity: two attributes can
-// hold the same one, and a value built in Go can hold itself. The walk keys
-// what it has reached ([rmFloorWalker.walk]) by that pointer.
+// rmfloor_identity.go: REQ-112 § Driver, REQ-171 § One walk — which values
+// the walk can reach twice. A pointer to an RM value has an identity: two
+// attributes can hold the same one, and a value built in Go can hold itself.
+// The walk checks a value with an identity against the values it is inside
+// ([engine.walk]), so a value inside itself is a cycle, and a value two
+// places hold is validated at each.
 
 import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 
 // hasIdentity reports whether v is a pointer to an RM value, the only kind of
-// value the walk can reach again: by two attributes that share it, or from
-// inside itself. A value held by value has no identity the walk can see. The
+// value the walk can recognise when it reaches it again from inside itself.
+// A value held by value has no identity the walk can see. The
 // cases are the pointer types [rm.IsTypedNil] lists, and a test keeps the two
 // lists equal; a type switch keeps the check free of reflection.
 func hasIdentity(v any) bool {

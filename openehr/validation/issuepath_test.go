@@ -58,8 +58,8 @@ func vitalSignsWithEventItems(t *testing.T, items ...rm.Element) *rm.Composition
 	return comp
 }
 
-// assertBothReport fails unless the template walk and the floor each report
-// code at path.
+// assertBothReport fails unless the template-driven validation and the RM
+// rules alone each report code at path.
 func assertBothReport(t *testing.T, byTemplate, byFloor validation.Result, code, path string) {
 	t.Helper()
 	if !containsIssue(byTemplate.Issues, path, code) {
@@ -71,8 +71,9 @@ func assertBothReport(t *testing.T, byTemplate, byFloor validation.Result, code,
 }
 
 // REQ-102, REQ-112 — an item whose archetype_node_id no sibling shares is
-// written by its id, an archetype root by its archetype id, and the template
-// walk and the floor report the same node at the same path.
+// written by its id, an archetype root by its archetype id, and the
+// template-driven validation and the RM rules alone report the same node at
+// the same path.
 func TestIssuePath_REQ102_REQ112_UniqueIDs(t *testing.T) {
 	c := mustCompile(t, "vital_signs")
 	comp := vitalSignsWithEventItems(t, systolicItem(""))
@@ -82,7 +83,7 @@ func TestIssuePath_REQ102_REQ112_UniqueIDs(t *testing.T) {
 }
 
 // REQ-102, REQ-112 — an attribute of the root is written below "/" with one
-// slash in both walkers: a wrong root archetype id is reported at
+// slash, with a template and without: a wrong root archetype id is reported at
 // /archetype_node_id, where the floor reports an absent one, and that path
 // is valid AQL. Below the root the attribute follows its node's path.
 func TestIssuePath_REQ102_REQ112_RootAttribute(t *testing.T) {
@@ -114,9 +115,9 @@ func TestIssuePath_REQ102_REQ112_RootAttribute(t *testing.T) {
 }
 
 // REQ-102, REQ-112 — two items that share an archetype_node_id, bound to OPT
-// nodes that pin no name, are written by their 1-based position, the same in
-// both walkers. The OPT child they bind to, whose occurrences they exceed,
-// keeps its own predicate.
+// nodes that pin no name, are written by their 1-based position, the same
+// with a template and without. The OPT child they bind to, whose
+// occurrences they exceed, keeps its own predicate.
 func TestIssuePath_REQ102_REQ112_SharedIDWithoutNames(t *testing.T) {
 	c := mustCompile(t, "vital_signs")
 	comp := vitalSignsWithEventItems(t, systolicItem("Systolic"), systolicItem(""))
@@ -137,8 +138,9 @@ func TestIssuePath_REQ102_REQ112_SharedIDWithoutNames(t *testing.T) {
 }
 
 // REQ-102, REQ-112 — an item with no archetype_node_id is written by its
-// 1-based position, the same in both walkers. The OPT child declares no id,
-// so the cardinality of the node it constrains is written at the attribute.
+// 1-based position, the same with a template and without. The OPT child
+// declares no id, so the cardinality of the node it constrains is written at
+// the attribute.
 func TestIssuePath_REQ102_REQ112_NoIDIsPositional(t *testing.T) {
 	c := mustCompileSyntheticOPT(t, participationsOPT)
 	noFunction := validParticipation()
@@ -260,9 +262,9 @@ func TestIssuePath_REQ102_MissingNodeKeepsNamedOPTPredicate(t *testing.T) {
 
 // REQ-102, REQ-112, REQ-168 — a path never carries a value from the
 // instance: sibling items that share an id and carry distinct instance names
-// are written by position in both walkers, and the names appear in no path.
-// Each item carries a defect the floor reports, so the floor alone has paths
-// under both items to inspect.
+// are written by position with a template and without, and the names appear
+// in no path. Each item carries a defect the RM rules report, so the RM
+// rules alone have paths under both items to inspect.
 func TestIssuePath_REQ102_REQ112_NoInstanceNameInPath(t *testing.T) {
 	const planted = "PLANTED-SIBLING"
 	vital := mustCompile(t, "vital_signs")

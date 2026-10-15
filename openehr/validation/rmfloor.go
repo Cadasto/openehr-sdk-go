@@ -1,52 +1,46 @@
 package validation
 
-// rmfloor.go: REQ-112 — the template-less Reference Model validation
-// floor. ValidateRM walks an RM root using the BMM (via rminfo) as the
-// driver — no compiled OPT — and reports:
+// rmfloor.go: REQ-112 — the template-less Reference Model validation floor:
+// its entries and its rules. The one walk (engine.go, REQ-171) applies the
+// rules, with no template at ValidateRM and its typed wrappers, and inside
+// the walk that binds the template at the REQ-102/110 entries (ADR 0025,
+// ADR 0027). The rules here report into [findings]:
 //
-//   - RM-mandatory attribute absences (rminfo.RequiredAttributes per type
-//     plus the container "lower bound ≥ 1" reading);
+//   - RM-mandatory attribute absences (checkMandatory, which the walk calls
+//     for each mandatory attribute it reads absent or empty);
 //   - the per-RM-type invariant catalogue of § REQ-112 in
-//     docs/specifications/clinical-modeling.md, on every node it reaches.
-//     checkInvariants dispatches it through the invariant inventory
+//     docs/specifications/clinical-modeling.md, on every node the walk
+//     visits. checkInvariants dispatches it through the invariant inventory
 //     (REQ-171, inventory_dispatch.go): on a node of a class, the
 //     evaluators of the evaluated invariants the class is subject to, the
 //     Coded invariants entry (rmfloor_coded.go) among them; invariants.json,
 //     not this comment, is the list to keep current.
 //
-// REQ-112 surface. ValidateRM runs it alone; the REQ-102/110
-// template-driven entries run it after their own walk over the same root
-// and merge its findings (validate.go, ADR 0025).
-//
-// Sign-off (2026-06-29): Option A — second driver alongside the
-// template-driven walker. Walker + invariant evaluators live in this
-// file; the closed RM-type set is shared with the template-driven path
-// via the existing rmTypeInfo/describeRMType helpers (composition.go).
+// The closed RM-type set is shared with the template rules through the
+// rmTypeInfo and describeRMType helpers (composition.go).
 
 import (
 	"fmt"
 	"math"
-	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
 
-// ValidateRM validates root against the openEHR Reference Model alone:
-// it is the floor on its own, for a root no operational template applies
-// to. It checks every RM-mandatory attribute on every node
-// reachable from root, and runs per-RM-type invariants on the leaves it
-// touches. It does not consult any operational template. The
-// template-driven entries, [Validate] / [ValidateComposition] /
-// [ValidateFolder] / [ValidateEHRStatus] / [ValidateDemographic], include
-// this floor, so a caller with a compiled OPT needs only one of them. On its
-// own the floor knows no template names, so an item whose archetype node id
-// a sibling shares is written by its position.
+// ValidateRM validates root against the openEHR Reference Model alone, for
+// a root no operational template applies to. It checks every RM-mandatory
+// attribute on every node reachable from root, and runs per-RM-type
+// invariants on the nodes it visits. It does not consult any operational
+// template. The template-driven entries, [Validate] /
+// [ValidateComposition] / [ValidateFolder] / [ValidateEHRStatus] /
+// [ValidateDemographic], apply the same rules in their own walk, so a
+// caller with a compiled OPT needs only one of them. With no template the
+// walk knows no template names, so an item whose archetype node id a
+// sibling shares is written by its position.
 //
 // The invariants include the RM's coded ones: an attribute the RM codes from
 // a group or a code set of the openEHR terminology, such as a COMPOSITION's
@@ -67,96 +61,55 @@ import (
 // even on such a value passed as root, an ORIGINAL_VERSION included; nor are
 // those of EXTRACT_PARTICIPATION, a class the SDK's RM types leave out.
 //
-// The floor visits each value held by pointer once. A value built in Go may
-// hold a pointer in two places, or hold itself; a decoded document holds
-// neither. A value reached again by another path is not walked a second
-// time, so its issues carry the first path only, and a value reached again
-// inside itself is reported as `cyclic_value` at each path where it recurs
-// and is not descended into. A value held by value can hold itself too,
-// through a list that shares its own backing array, and the floor cannot
-// recognise it; so every call stops after a number of visits, by default
-// far above what a decoded document needs, and reports `max_nodes` once, at
-// the path where it stopped. A graph nested deeper than the walk's depth limit
-// is not walked below it; the walk reports `max_depth` once, at the first
-// path where it stopped. [Result.Coverage] lists the path of each of the
-// two, and the [Limits] of a [Validator] set both.
+// A value built in Go may hold a pointer in two places, or hold itself; a
+// decoded document holds neither. A value reached again by another path is
+// validated at each place, so a defect in it is reported at each path. A
+// value reached again inside itself is reported as `cyclic_value` at each
+// path where it recurs and is not entered again. A value held by value can
+// hold itself too, through a list that shares its own backing array, and
+// the walk cannot recognise it; so every call stops after a number of
+// visits, by default far above what a decoded document needs, and reports
+// `max_nodes` once, at the path where it stopped. A graph nested deeper than
+// the walk's depth limit is not walked below it; the walk reports
+// `max_depth` once, at the first path where it stopped. [Result.Coverage]
+// lists the path of each of the two, and the [Limits] of a [Validator] set
+// both.
 //
 // ValidateRM returns what a [Validator] built with no options returns from
 // Validate(root, nil).
 //
 // A nil root surfaces a single `nil_root` issue with an empty path and is
 // reported as not-OK. An unknown RM root type (a Go value outside the
-// closed RM set) surfaces `rm_type_unknown` at "/"; the floor cannot descend
+// closed RM set) surfaces `rm_type_unknown` at "/"; the walk cannot descend
 // further but does not panic.
 func ValidateRM(root any) Result {
 	var v Validator
 	return v.Validate(root, nil)
 }
 
-// validateRM runs the floor alone over root, within lim, guarding a nil root
-// and one outside the closed RM set.
-func validateRM(root any, lim Limits) Result {
+// rmRootGuard returns the RM type of root, the type the RM rules alone read
+// it as, with ok set. For a nil root, and for one outside the closed RM set,
+// it returns instead the result those rules report for it, a single
+// `nil_root` or `rm_type_unknown` issue, with ok unset.
+func rmRootGuard(root any) (rmType string, guard Result, ok bool) {
 	if root == nil || rmaccess.IsTypedNilPointer(root) {
-		return resultFromIssues([]Issue{{
+		return "", resultFromIssues([]Issue{{
 			Path:     "",
 			Code:     "nil_root",
 			Detail:   "ValidateRM: root is nil",
 			Severity: Error,
-		}})
+		}}), false
 	}
-	rmType, _, ok := rmTypeInfo(root)
+	rmType, _, ok = rmTypeInfo(root)
 	if !ok {
-		return resultFromIssues([]Issue{{
+		return "", resultFromIssues([]Issue{{
 			Path:     "/",
 			Code:     "rm_type_unknown",
 			Detail:   fmt.Sprintf("ValidateRM: root Go type %T is outside the closed RM set; cannot descend", root),
 			Severity: Error,
-		}})
+		}}), false
 	}
-	w := runFloor(root, rmType, nil, lim)
-	r := resultFromIssues(w.issues)
-	r.Coverage.Stopped = w.stoppedAt
-	r.Coverage.Unevaluated = unevaluatedIn(w.visited)
-	return r
-}
-
-// runFloor runs the floor over root, of RM type rmType, within lim, and
-// returns the walker, which holds the issues, the path of each place where a
-// limit stopped it and the classes it visited. names gives the name the OPT
-// pins on each item a template walk bound, so the floor writes that walk's
-// path for the node; nil writes no name predicate.
-func runFloor(root any, rmType string, names pinnedNames, lim Limits) *rmFloorWalker {
-	w := newFloorWalker(names, lim)
-	w.walk(root, rmType, "/", roleNone, 0)
-	return w
-}
-
-// newFloorWalker returns a floor walker that writes the names the OPT pins
-// (nil for none) and stops at lim, each zero or negative field of which
-// stands for its default.
-func newFloorWalker(names pinnedNames, lim Limits) *rmFloorWalker {
-	lim = lim.withDefaults()
-	return &rmFloorWalker{info: rminfo.Default, names: names, maxDepth: lim.Depth, maxNodes: lim.Nodes}
-}
-
-// floorIssues runs the floor, within lim, over the root a template-driven
-// validation walked, with the names that walk bound, and returns its issues,
-// the path of each place where a limit stopped it and the classes it visited.
-// A root outside the closed RM set, which the template walk reports as a type
-// mismatch, is one the floor cannot descend: it reports it as
-// `rm_type_unknown` at "/", as [ValidateRM] does.
-func floorIssues(root any, names pinnedNames, lim Limits) (issues []Issue, stopped []string, visited indexSet) {
-	rmType, _, ok := rmTypeInfo(root)
-	if !ok {
-		return []Issue{{
-			Path:     "/",
-			Code:     "rm_type_unknown",
-			Detail:   fmt.Sprintf("root Go type %T is outside the closed RM set; the RM floor cannot descend", root),
-			Severity: Error,
-		}}, nil, nil
-	}
-	w := runFloor(root, rmType, names, lim)
-	return w.issues, w.stoppedAt, w.visited
+	return rmType, Result{}, true
 }
 
 // ValidateRMFolder is the typed convenience wrapper for FOLDER roots.
@@ -209,47 +162,18 @@ func ValidateRMDemographic(party rm.Party) Result {
 	return ValidateRM(party)
 }
 
-// rmFloorWalker accumulates issues as it descends the RM graph driven
-// by rminfo. There is no notion of "OPT-declared attribute" here —
-// every BMM-known attribute is a descend candidate. Each value with an
-// identity is visited once ([rmFloorWalker.walk]), recursion depth is
-// bounded by maxDepth and the number of visits by maxNodes, so a
-// caller-built graph that shares or cycles through a pointer, holds itself
-// by value, or nests too deep, terminates instead of branching without end
-// or overflowing the stack.
-type rmFloorWalker struct {
-	info   rminfo.Lookup
+// findings is what the Reference Model rules report into during one walk:
+// the issues, in the order the walk found them, and the class of every node
+// whose rules ran. The rule bodies are its methods, so each reports where the
+// walk is; it holds no walk state of its own.
+type findings struct {
 	issues []Issue
-	// maxDepth and maxNodes are the [Limits] of the call, defaults filled
-	// in. RM graphs decoded from the wire are acyclic trees far shallower
-	// and smaller than either, but a value built in Go may nest without end
-	// or hold itself by value, which the visit record cannot recognise.
-	maxDepth, maxNodes int
-	// stoppedAt holds the path of the max_depth issue and of the max_nodes
-	// issue, in the order the walk reported them; depthStopped is set once
-	// the first depth stop is reported, so later ones are silent.
-	stoppedAt    []string
-	depthStopped bool
-	// reached holds each value with an identity ([hasIdentity]) the walk has
-	// reached; walk allocates it. inside holds those the walk is inside,
-	// outermost first.
-	reached map[any]struct{}
-	inside  []any
-	// visits counts the values the walk has visited, up to maxNodes;
-	// stopped is set once it reaches that limit, and ends the walk.
-	visits  int
-	stopped bool
-	// names gives the name the OPT pins on the node an item binds to, so
-	// the floor writes an item's path as the template walk does
-	// ([itemPaths]). The floor on its own binds no OPT node, so it leaves
-	// names nil and writes no name predicate.
-	names pinnedNames
-	// visited holds the class of every node the walk visited, by its index
+	// visited holds the class of every node whose rules ran, by its index
 	// in the inventory's rules ([classRules]), for [Coverage.Unevaluated].
 	visited indexSet
 }
 
-// floorRole is what the floor knows of a node from where it sits, beyond
+// floorRole is what the RM rules know of a node from where it sits, beyond
 // its RM type. It is carried down the walk, never looked up by path, so two
 // nodes that share a path cannot share a role.
 type floorRole uint8
@@ -263,7 +187,7 @@ const (
 	// code_string may be blank (see [scaleSymbolMayHaveNoCode]).
 	roleScaleSymbolCode
 	// roleArchetypedID is the archetype_id of an ARCHETYPED, whose empty
-	// value the ARCHETYPED entry reports ([rmFloorWalker.checkArchetyped]).
+	// value the ARCHETYPED entry reports ([findings.checkArchetyped]).
 	roleArchetypedID
 )
 
@@ -282,8 +206,8 @@ func childRole(class string, role floorRole, attr string) floorRole {
 }
 
 // isWalkCondition reports whether code is a walk condition: max_depth,
-// max_nodes or cyclic_value, an issue that says where the floor's walk
-// stopped or turned back rather than judge the value there.
+// max_nodes or cyclic_value, an issue that says where the walk stopped or
+// turned back rather than judge the value there.
 func isWalkCondition(code string) bool {
 	switch code {
 	case "max_depth", "max_nodes", "cyclic_value":
@@ -292,190 +216,10 @@ func isWalkCondition(code string) bool {
 	return false
 }
 
-// emit appends i to the walker's issues. Every floor issue is an [Error],
-// the zero Severity, so no site sets it.
-func (w *rmFloorWalker) emit(i Issue) {
-	w.issues = append(w.issues, i)
-}
-
-// walk descends value (of declared BMM type rmType, in role role) at the
-// given issue path, once per value. A value with an identity
-// ([hasIdentity]) that the walk is inside, reached again, is a cycle:
-// walk reports `cyclic_value` at path and does not descend. One the walk
-// has finished, reached again by another path, is shared: walk leaves it,
-// so its issues carry the first path only. Every other value is visited.
-func (w *rmFloorWalker) walk(value any, rmType string, path string, role floorRole, depth int) {
-	if w.stopped || value == nil || rmaccess.IsTypedNilPointer(value) {
-		return
-	}
-	if !hasIdentity(value) {
-		w.visit(value, rmType, path, role, depth)
-		return
-	}
-	if w.reached == nil {
-		// Sized for a small composition, so the common walk grows them
-		// rarely.
-		w.reached = make(map[any]struct{}, 64)
-		w.inside = make([]any, 0, 16)
-	}
-	// One map operation records value and tells whether it was there: the
-	// set grows only for a value reached for the first time.
-	before := len(w.reached)
-	w.reached[value] = struct{}{}
-	if len(w.reached) == before {
-		// The inside list is searched only for a value reached again, which
-		// a decoded document never holds.
-		if slices.Contains(w.inside, value) {
-			w.emit(Issue{
-				Path:   path,
-				Code:   "cyclic_value",
-				Detail: fmt.Sprintf("RM-floor walk reached this %s again inside itself; it is not descended into again", rmType),
-			})
-		}
-		return
-	}
-	w.inside = append(w.inside, value)
-	w.visit(value, rmType, path, role, depth)
-	w.inside = w.inside[:len(w.inside)-1]
-}
-
-// visit checks value (of declared BMM type rmType, in role role) at the
-// given issue path. A visit past maxNodes checks nothing: it reports
-// `max_nodes` at path and ends the walk. Otherwise visit first runs the RM
-// rules of the node's class ([rmFloorWalker.checkInvariants]) and records
-// the class as visited, then, for every registered RM class
-// ([rmaccess.Covers]), reads every BMM-known attribute through the generated
-// access, emitting `required` for any RM-mandatory attribute that is absent
-// and `cardinality` for an RM-mandatory container that is present and
-// empty, and recursing into every present attribute. A list of a
-// primitive type ([isPrimitiveType]) is counted ([rmaccess.Len]) and never
-// read item by item, since nothing is below its items. The items of a
-// multi-valued attribute are written by the path rule the template walk
-// shares ([itemPaths]); the entries of a Hash attribute by their position in
-// ascending key order, never by their key.
-//
-// A value of no registered class is a leaf here, validated solely by the RM
-// rules of its declared type (run above): a primitive value, such as a string
-// or a number. The parts of a reference, on every class
-// the rminfo hierarchy places at or below OBJECT_REF, are the reference's own
-// evaluator's to report ([rmFloorWalker.checkObjectRef]), so the required-set
-// check leaves them out ([classRules.leavesOut]) and a missing part is
-// reported once; the walk still goes below a present id.
-func (w *rmFloorWalker) visit(value any, rmType string, path string, role floorRole, depth int) {
-	if w.visits == w.maxNodes {
-		w.emit(Issue{
-			Path:   path,
-			Code:   "max_nodes",
-			Detail: fmt.Sprintf("RM-floor walk stopped at %s after visiting %d values, its limit per call", rmType, w.maxNodes),
-		})
-		w.stoppedAt = append(w.stoppedAt, path)
-		w.stopped = true
-		return
-	}
-	w.visits++
-	// The rules run before the Covers gate below, so they see every node the
-	// walk visits.
-	rules, class := w.checkInvariants(value, rmType, path, role)
-
-	if !rmaccess.Covers(value) {
-		return
-	}
-	if depth >= w.maxDepth {
-		// The first stop is reported; a later one, on another branch, is
-		// not walked below either, and is silent, so a value that reaches
-		// the limit on many branches yields one issue.
-		if !w.depthStopped {
-			w.depthStopped = true
-			w.emit(Issue{
-				Path:   path,
-				Code:   "max_depth",
-				Detail: fmt.Sprintf("RM-floor walk reached its depth limit %d at %s; nothing below that depth is walked, and later stops there are not reported again", w.maxDepth, rmType),
-			})
-			w.stoppedAt = append(w.stoppedAt, path)
-		}
-		return
-	}
-
-	// AttributeNames is an optional rminfo extension (kept off the stable
-	// rminfo.Lookup interface per idiom.md § public-API stability). Default
-	// implements it; absence would only mean "cannot enumerate" → no descend.
-	lister, ok := w.info.(rminfo.AttributeLister)
-	if !ok {
-		return
-	}
-	// rminfo knows each class by its bare BMM name, class above; rmType may
-	// carry a generic bound (DV_INTERVAL<DV_QUANTITY>) that it does not.
-	attrs := lister.AttributeNames(class)
-	if attrs == nil {
-		return
-	}
-	requiredSet := setFromSlice(w.info.RequiredAttributes(class))
-	for _, attr := range attrs {
-		if w.stopped {
-			return // the visit limit ended the walk below this node
-		}
-		if rminfo.IsNonStorableAttr(class, attr) {
-			continue
-		}
-		attrType, ok := w.info.AttributeRMType(class, attr)
-		if !ok {
-			continue
-		}
-		isContainer, _ := w.info.IsContainer(class, attr)
-		required := requiredSet[attr] && !rules.leavesOut(attr)
-		attrPath := joinPath(path, "/"+attr)
-
-		switch {
-		case isContainer:
-			n, present := rmaccess.Len(value, attr)
-			if required {
-				w.checkMandatory(rmType, attr, attrPath, true, present, n)
-			}
-			// A list of a primitive type (DV_MULTIMEDIA data, an Array of
-			// Octet, holds one item per byte) has nothing below it to walk:
-			// it is counted above and never read item by item.
-			if !present || n == 0 || isPrimitiveType(w.info, attrType) {
-				continue
-			}
-			kids, _ := rmaccess.Multiple(value, attr)
-			if !slices.ContainsFunc(kids, rmaccess.Covers) {
-				continue
-			}
-			kidRole := childRole(class, role, attr)
-			for i, kidPath := range w.itemPaths(attrPath, kids) {
-				if !rmaccess.Covers(kids[i]) {
-					continue
-				}
-				w.walk(kids[i], runtimeRMType(kids[i], attrType), kidPath, kidRole, depth+1)
-			}
-		case attrType == hashType:
-			_, entries, present := rmaccess.Hash(value, attr)
-			if required {
-				w.checkMandatory(rmType, attr, attrPath, false, present, len(entries))
-			}
-			if !present {
-				continue
-			}
-			// An entry of a Hash of a primitive type has nothing below it;
-			// one of an RM class is walked at its position in key order.
-			for i, entry := range entries {
-				if !rmaccess.Covers(entry) {
-					continue
-				}
-				w.walk(entry, runtimeRMType(entry, attrType), hashEntryPath(attrPath, i), roleNone, depth+1)
-			}
-		default:
-			val, present := rmaccess.Single(value, attr)
-			present = present && val != nil && !rmaccess.IsTypedNilPointer(val)
-			if required && !mayBeBlank(role, attr) {
-				w.checkMandatory(rmType, attr, attrPath, false, present, 0)
-			}
-			if !present {
-				continue
-			}
-			w.walk(val, runtimeRMType(val, attrType), attrPath, childRole(class, role, attr), depth+1)
-		}
-	}
+// emit appends i to the issues found. Every issue of an RM rule is an
+// [Error], the zero Severity, so no site sets it.
+func (f *findings) emit(i Issue) {
+	f.issues = append(f.issues, i)
 }
 
 // checkMandatory applies the mandatory-presence rule to the RM-mandatory
@@ -485,16 +229,17 @@ func (w *rmFloorWalker) visit(value any, rmType string, path string, role floorR
 // cardinality. present and items are the walk's reading through the generated
 // access, under which a mandatory string left empty is absent too; items
 // counts a multi-valued attribute's items and is read for no other. The walk
-// calls it for every RM-mandatory attribute of every node it visits but a
-// part of a reference, which [rmFloorWalker.checkObjectRef] reports, and a
+// calls it for every RM-mandatory attribute of every node it visits, where
+// no template clause reports the same absence first, but a
+// part of a reference, which [findings.checkObjectRef] reports, and a
 // value the node's role lets be blank ([mayBeBlank]). No invariant the
 // inventory says this rule decides, such as LOCATABLE.Archetype_node_id_valid,
 // is about one of those, so each is decided on every class subject to it
 // ([invariantChecks]).
-func (w *rmFloorWalker) checkMandatory(rmType, attr, attrPath string, multiValued, present bool, items int) {
+func (f *findings) checkMandatory(rmType, attr, attrPath string, multiValued, present bool, items int) {
 	switch {
 	case !present && multiValued:
-		w.emit(Issue{
+		f.emit(Issue{
 			Path:   attrPath,
 			Code:   "required",
 			Layer:  LayerRM,
@@ -502,7 +247,7 @@ func (w *rmFloorWalker) checkMandatory(rmType, attr, attrPath string, multiValue
 			Detail: fmt.Sprintf("RM-mandatory multi-valued attribute %q absent on %s", attr, rmType),
 		})
 	case !present:
-		w.emit(Issue{
+		f.emit(Issue{
 			Path:   attrPath,
 			Code:   "required",
 			Layer:  LayerRM,
@@ -510,7 +255,7 @@ func (w *rmFloorWalker) checkMandatory(rmType, attr, attrPath string, multiValue
 			Detail: fmt.Sprintf("RM-mandatory attribute %q absent on %s", attr, rmType),
 		})
 	case multiValued && items == 0:
-		w.emit(Issue{
+		f.emit(Issue{
 			Path:   attrPath,
 			Code:   "cardinality",
 			Layer:  LayerRM,
@@ -520,38 +265,11 @@ func (w *rmFloorWalker) checkMandatory(rmType, attr, attrPath string, multiValue
 	}
 }
 
-// hashType is the RM type rminfo declares for every Hash attribute, whatever
-// its key and value types.
-const hashType = "Hash"
-
-// isPrimitiveType reports whether info knows rmType, the declared type of an
-// attribute or of the items of a list, as a primitive type (an Octet, a
-// String), which has nothing below it to walk. A Lookup that reports no
-// absence reasons ([rminfo.AbsenceReporter]) knows none.
-func isPrimitiveType(info rminfo.Lookup, rmType string) bool {
-	ar, ok := info.(rminfo.AbsenceReporter)
-	return ok && ar.AbsenceReason(rmType) == rminfo.AbsencePrimitive
-}
-
 // hashEntryPath returns the issue path of the entry at index i, in ascending
 // key order, of the Hash attribute at attrPath: its 1-based position, never
 // its key, which is instance data (REQ-102 Issue paths).
 func hashEntryPath(attrPath string, i int) string {
 	return attrPath + "[" + strconv.Itoa(i+1) + "]"
-}
-
-// itemPaths returns the issue path of each of the items kids of the
-// multi-valued attribute at attrPath: the shared path rule ([itemPaths]),
-// fed each item's archetype_node_id and the name w.names pins for it.
-func (w *rmFloorWalker) itemPaths(attrPath string, kids []any) []string {
-	items := make([]pathItem, len(kids))
-	for i, k := range kids {
-		items[i] = pathItem{
-			id:   locatableArchetypeNodeID(k),
-			name: w.names[itemKey{attrPath: attrPath, index: i}],
-		}
-	}
-	return itemPaths(attrPath, items)
 }
 
 // runtimeRMType resolves the RM type to descend into: the value's runtime
@@ -567,19 +285,6 @@ func runtimeRMType(val any, declared string) string {
 	return declared
 }
 
-// setFromSlice is a small helper that turns a (possibly-nil) slice into
-// a set for O(1) attribute-required lookup during the walk.
-func setFromSlice(s []string) map[string]bool {
-	if len(s) == 0 {
-		return nil
-	}
-	out := make(map[string]bool, len(s))
-	for _, x := range s {
-		out[x] = true
-	}
-	return out
-}
-
 // checkInvariants runs the RM rules of the class of the node value, of RM
 // type rmType, at path, in role role, and records the class as visited. The
 // rules are the inventory's ([floorRules]): the evaluators of the evaluated
@@ -587,19 +292,19 @@ func setFromSlice(s []string) map[string]bool {
 // and the attribute checks that apply to the class. A type no registered
 // class has runs nothing (this is a floor, not an exhaustive RM check). It
 // returns the class's rules, nil for such a type, and the bare class name of
-// rmType, which the walk reads the class's attributes by.
-func (w *rmFloorWalker) checkInvariants(value any, rmType, path string, role floorRole) (*classRules, string) {
+// rmType, which the walk reads the class's attributes by ([classAttributes]).
+func (f *findings) checkInvariants(value any, rmType, path string, role floorRole) (*classRules, string) {
 	rules, class := rulesFor(rmType)
 	if rules == nil {
 		return nil, class
 	}
-	w.visited = w.visited.with(rules.index)
+	f.visited = f.visited.with(rules.index)
 	n := floorNode{value: value, rmType: rmType, path: path, role: role}
 	for _, c := range rules.checks {
-		c.run(w, n, c.rule)
+		c.run(f, n, c.rule)
 	}
 	if len(rules.coded) > 0 {
-		w.checkCodedInvariants(value, rmType, path, rules.coded)
+		f.checkCodedInvariants(value, rmType, path, rules.coded)
 	}
 	return rules, class
 }
@@ -617,13 +322,13 @@ func (w *rmFloorWalker) checkInvariants(value any, rmType, path string, role flo
 // concrete implements. The issue's rule is the Is_archetype_root invariant
 // that dispatched the check: the one the class declares, or the one its
 // ancestor PARTY or ENTRY declares.
-func (w *rmFloorWalker) checkArchetypeRoot(value any, rmType, path, rule string) {
+func (f *findings) checkArchetypeRoot(value any, rmType, path, rule string) {
 	l, ok := value.(rm.Locatable)
 	if !ok || rmaccess.IsTypedNilPointer(value) {
 		return
 	}
 	if l.GetArchetypeDetails() == nil {
-		w.emit(Issue{
+		f.emit(Issue{
 			Path:   joinPath(path, "/archetype_details"),
 			Code:   "is_archetype_root",
 			Layer:  LayerRM,
@@ -646,13 +351,13 @@ func (w *rmFloorWalker) checkArchetypeRoot(value any, rmType, path, rule string)
 //
 // The ARCHETYPE_ID grammar is not checked, and template_id is optional.
 // Diagnostics name the attribute, never its value.
-func (w *rmFloorWalker) checkArchetyped(value any, path string) {
+func (f *findings) checkArchetyped(value any, path string) {
 	a, ok := asArchetyped(value)
 	if !ok {
 		return
 	}
 	if a.ArchetypeID.Value == "" {
-		w.emit(Issue{
+		f.emit(Issue{
 			Path:   joinPath(path, "/archetype_id/value"),
 			Code:   "required",
 			Layer:  LayerRM,
@@ -661,7 +366,7 @@ func (w *rmFloorWalker) checkArchetyped(value any, path string) {
 		})
 	}
 	if a.RMVersion == "" {
-		w.emit(Issue{
+		f.emit(Issue{
 			Path:   joinPath(path, "/rm_version"),
 			Code:   "rm_version_valid",
 			Layer:  LayerRM,
@@ -674,15 +379,15 @@ func (w *rmFloorWalker) checkArchetyped(value any, path string) {
 // checkCodePhrase enforces the RM spec floor on CODE_PHRASE: the
 // code_string MUST be non-empty when the value is present, except on a
 // DV_SCALE symbol's defining_code (see [scaleSymbolMayHaveNoCode]). (The
-// terminology_id absence is already RM-required and caught by the floor's
-// required-set walk.)
-func (w *rmFloorWalker) checkCodePhrase(value any, path string, role floorRole) {
+// terminology_id absence is already RM-required and caught by the
+// mandatory-presence rule.)
+func (f *findings) checkCodePhrase(value any, path string, role floorRole) {
 	cp, ok := asCodePhrase(value)
 	if !ok {
 		return
 	}
 	if cp.CodeString == "" && !scaleSymbolMayHaveNoCode(role) {
-		w.emit(Issue{
+		f.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
 			Layer:  LayerRM,
@@ -710,7 +415,7 @@ func scaleSymbolMayHaveNoCode(role floorRole) bool {
 // exempt from the required-set check. Two are: the code_string of a DV_SCALE
 // symbol's defining_code (see [scaleSymbolMayHaveNoCode]), and the value of
 // an ARCHETYPED's archetype_id, whose emptiness the ARCHETYPED entry reports
-// at the same path ([rmFloorWalker.checkArchetyped]), so it is reported once.
+// at the same path ([findings.checkArchetyped]), so it is reported once.
 func mayBeBlank(role floorRole, attr string) bool {
 	switch attr {
 	case "code_string":
@@ -725,19 +430,19 @@ func mayBeBlank(role floorRole, attr string) bool {
 // set, must be ≥ -1. Per the RM, precision is a number of decimal places
 // where 0 means integral and -1 means "no limit" (any number of decimal
 // places) — so -1 is valid and only precision < -1 is out of range. units
-// is RM-required (caught by the floor's required-set walk); magnitude is
+// is RM-required (caught by the mandatory-presence rule); magnitude is
 // always a number on the wire so needs no separate presence check.
 //
 // The Detail names the attribute and the allowed range, never the
 // precision the instance carries; that precision is carried in Issue.Value
 // (REQ-168).
-func (w *rmFloorWalker) checkDVQuantity(value any, path string) {
+func (f *findings) checkDVQuantity(value any, path string) {
 	q, ok := asDVQuantity(value)
 	if !ok {
 		return
 	}
 	if q.Precision != nil && int(*q.Precision) < -1 {
-		w.emit(Issue{
+		f.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
 			Layer:  LayerRM,
@@ -776,14 +481,14 @@ func (w *rmFloorWalker) checkDVQuantity(value any, path string) {
 // value the check read is carried in Issue.Value: the precision on the
 // range arm, and the numerator and the denominator, as a [2]float64, on
 // the integrality arm.
-func (w *rmFloorWalker) checkDVProportion(value any, path string) {
+func (f *findings) checkDVProportion(value any, path string) {
 	p, ok := asDVProportion(value)
 	if !ok || p.Precision == nil {
 		return
 	}
 	switch prec := int(*p.Precision); {
 	case prec < -1:
-		w.emit(Issue{
+		f.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
 			Layer:  LayerRM,
@@ -800,7 +505,7 @@ func (w *rmFloorWalker) checkDVProportion(value any, path string) {
 			fractional = append(fractional, "denominator")
 		}
 		if len(fractional) > 0 {
-			w.emit(Issue{
+			f.emit(Issue{
 				Path:   path,
 				Code:   "rm_invariant",
 				Layer:  LayerRM,
@@ -830,12 +535,12 @@ func isIntegralReal(v rm.Real) bool {
 // never the offending value (REQ-168); that value string is carried in
 // Issue.Value. The issue's rule is the Value_valid invariant that dispatched
 // the check, the one the node's own class declares.
-func (w *rmFloorWalker) checkTemporalValue(value any, rmType, path, rule string) {
+func (f *findings) checkTemporalValue(value any, rmType, path, rule string) {
 	text, valid, ok := temporalValue(value)
 	if !ok || valid {
 		return
 	}
-	w.emit(Issue{
+	f.emit(Issue{
 		Path:   path,
 		Code:   "rm_invariant",
 		Layer:  LayerRM,
@@ -850,7 +555,7 @@ func (w *rmFloorWalker) checkTemporalValue(value any, rmType, path, rule string)
 // ELEMENT. is_null() means there is no `value`, so exactly one of `value` and
 // `null_flavour` must be present. A typed-nil `value` counts as absent, as it
 // does everywhere else in the walk. The rule is reported on the ELEMENT.
-func (w *rmFloorWalker) checkElementNullFlavour(value any, path string) {
+func (f *findings) checkElementNullFlavour(value any, path string) {
 	e, ok := asElement(value)
 	if !ok {
 		return
@@ -859,7 +564,7 @@ func (w *rmFloorWalker) checkElementNullFlavour(value any, path string) {
 	hasNullFlavour := e.NullFlavour != nil
 	switch {
 	case hasValue && hasNullFlavour:
-		w.emit(Issue{
+		f.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
 			Layer:  LayerRM,
@@ -867,7 +572,7 @@ func (w *rmFloorWalker) checkElementNullFlavour(value any, path string) {
 			Detail: "ELEMENT carries both value and null_flavour; exactly one must be present (RM Inv_null_flavour_indicated)",
 		})
 	case !hasValue && !hasNullFlavour:
-		w.emit(Issue{
+		f.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
 			Layer:  LayerRM,
@@ -878,7 +583,7 @@ func (w *rmFloorWalker) checkElementNullFlavour(value any, path string) {
 }
 
 // checkDVInterval enforces the spec floor on DV_INTERVAL. The boundary
-// flags are checked on every interval ([rmFloorWalker.checkIntervalFlags]).
+// flags are checked on every interval ([findings.checkIntervalFlags]).
 // The bound order is checked when neither side is unbounded and the two
 // bounds are strictly comparable as the RM defines is_strictly_comparable_to
 // for their type ([dvIntervalOrder]): lower MUST be ≤ upper by the RM's
@@ -891,13 +596,13 @@ func (w *rmFloorWalker) checkElementNullFlavour(value any, path string) {
 // two compared magnitudes are carried in Issue.Value, lower first, as a
 // [2]float64 (REQ-168), each in UTC for two values ordered as instants.
 // rmType is the node's RM type, which the flag check names.
-func (w *rmFloorWalker) checkDVInterval(value any, rmType, path string) {
-	w.checkIntervalFlags(value, rmType, path)
+func (f *findings) checkDVInterval(value any, rmType, path string) {
+	f.checkIntervalFlags(value, rmType, path)
 	order, ok := dvIntervalOrder(value)
 	if !ok || !order.inverted {
 		return
 	}
-	w.emit(Issue{
+	f.emit(Issue{
 		Path:   path,
 		Code:   "rm_invariant",
 		Layer:  LayerRM,
@@ -920,7 +625,7 @@ func (w *rmFloorWalker) checkDVInterval(value any, rmType, path string) {
 // Detail names the class of the node, rmType without its generic parameters,
 // the flags and the invariant, never a bound. The check reads only the two
 // flags, which the code already states, so the issue's Value stays empty.
-func (w *rmFloorWalker) checkIntervalFlags(value any, rmType, path string) {
+func (f *findings) checkIntervalFlags(value any, rmType, path string) {
 	class := bmmtype.Class(rmType)
 	for _, side := range [...]struct{ end, code, invariant, rule string }{
 		{end: "lower", code: "lower_included_valid", invariant: "Lower_included_valid", rule: ruleLowerIncludedValid},
@@ -929,7 +634,7 @@ func (w *rmFloorWalker) checkIntervalFlags(value any, rmType, path string) {
 		if !intervalFlagSet(value, side.end+"_unbounded") || !intervalFlagSet(value, side.end+"_included") {
 			continue
 		}
-		w.emit(Issue{
+		f.emit(Issue{
 			Path:   path,
 			Code:   side.code,
 			Layer:  LayerRM,
@@ -949,15 +654,15 @@ func intervalFlagSet(value any, attr string) bool {
 
 // checkObjectRef enforces the spec floor on OBJECT_REF (and subtypes):
 // id, type, and namespace are RM-mandatory. The walk goes below a reference
-// like any node, but its required-set check leaves the three parts out on
-// every class this evaluator runs on ([classRules.leavesOut]), so this
-// evaluator is the floor's only check of a missing part, which keeps it from
-// being reported twice. It reads the id
+// like any node, but its mandatory-presence check leaves the three parts out
+// on every class this evaluator runs on ([classRules.leavesOut]), with a
+// template as without one, so this evaluator is the only check of a missing
+// part, which keeps it from being reported twice. It reads the id
 // as the walk does, through the generated access, which reads the id the
 // class itself declares: a LOCATABLE_REF's own UID_BASED_ID, not the
 // OBJECT_REF id it embeds. It reads type and namespace through the
 // [rm.ObjectRefLike] interface (REQ-052), so any BMM subtype is covered.
-func (w *rmFloorWalker) checkObjectRef(value any, path string) {
+func (f *findings) checkObjectRef(value any, path string) {
 	if value == nil || rmaccess.IsTypedNilPointer(value) {
 		return
 	}
@@ -966,7 +671,7 @@ func (w *rmFloorWalker) checkObjectRef(value any, path string) {
 		return
 	}
 	if _, present := rmaccess.Single(value, "id"); !present {
-		w.emit(Issue{
+		f.emit(Issue{
 			Path:   joinPath(path, "/id"),
 			Code:   "rm_invariant",
 			Layer:  LayerRM,
@@ -975,7 +680,7 @@ func (w *rmFloorWalker) checkObjectRef(value any, path string) {
 		})
 	}
 	if ref.GetType() == "" {
-		w.emit(Issue{
+		f.emit(Issue{
 			Path:   joinPath(path, "/type"),
 			Code:   "rm_invariant",
 			Layer:  LayerRM,
@@ -984,7 +689,7 @@ func (w *rmFloorWalker) checkObjectRef(value any, path string) {
 		})
 	}
 	if ref.GetNamespace() == "" {
-		w.emit(Issue{
+		f.emit(Issue{
 			Path:   joinPath(path, "/namespace"),
 			Code:   "rm_invariant",
 			Layer:  LayerRM,
@@ -1004,23 +709,23 @@ func (w *rmFloorWalker) checkObjectRef(value any, path string) {
 //     identifiers.
 //
 // Presence is read from Go nilness, as for DV_TEXT mappings (see
-// [rmFloorWalker.checkTermMappings]): an absent key and an explicit JSON
+// [findings.checkTermMappings]): an absent key and an explicit JSON
 // `null` both decode to a nil pointer or a nil slice and read as absent, so
 // only a decoded `"name":""` or `"identifiers":[]` is present and empty. A
 // present external_ref is walked as its own node, where checkObjectRef
 // checks its parts. PARTY_RELATED's Relationship_valid, a terminology-group
 // rule, is not checked here but with the other coded invariants
-// ([rmFloorWalker.checkCodedInvariants]).
+// ([findings.checkCodedInvariants]).
 //
 // Diagnostics name the attribute and the RM rule, never the offending value
 // (REQ-168).
-func (w *rmFloorWalker) checkPartyIdentified(value any, path string) {
+func (f *findings) checkPartyIdentified(value any, path string) {
 	p, ok := asPartyIdentified(value)
 	if !ok {
 		return
 	}
 	if p.Name == nil && p.Identifiers == nil && p.ExternalRef == nil {
-		w.emit(Issue{
+		f.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
 			Layer:  LayerRM,
@@ -1029,7 +734,7 @@ func (w *rmFloorWalker) checkPartyIdentified(value any, path string) {
 		})
 	}
 	if p.Name != nil && *p.Name == "" {
-		w.emit(Issue{
+		f.emit(Issue{
 			Path:   joinPath(path, "/name"),
 			Code:   "rm_invariant",
 			Layer:  LayerRM,
@@ -1038,7 +743,7 @@ func (w *rmFloorWalker) checkPartyIdentified(value any, path string) {
 		})
 	}
 	if p.Identifiers != nil && len(p.Identifiers) == 0 {
-		w.emit(Issue{
+		f.emit(Issue{
 			Path:   joinPath(path, "/identifiers"),
 			Code:   "rm_invariant",
 			Layer:  LayerRM,
@@ -1060,18 +765,18 @@ func (w *rmFloorWalker) checkPartyIdentified(value any, path string) {
 // literal `"mappings":[]` produces the non-nil empty slice this check
 // flags. The element-level match check is NOT here — `mappings` is a
 // walked container, so each TERM_MAPPING is a node of
-// its own and [rmFloorWalker.checkTermMapping] evaluates it there.
+// its own and [findings.checkTermMapping] evaluates it there.
 //
 // Diagnostics name the attribute only, never a value from the instance
 // (REQ-168). The check reads no value, only the list's length, so the
 // issue's Value stays empty.
-func (w *rmFloorWalker) checkTermMappings(value any, path string) {
+func (f *findings) checkTermMappings(value any, path string) {
 	ms, ok := asMappings(value)
 	if !ok {
 		return
 	}
 	if ms != nil && len(ms) == 0 {
-		w.emit(Issue{
+		f.emit(Issue{
 			Path:   joinPath(path, "/mappings"),
 			Code:   "mappings_valid",
 			Layer:  LayerRM,
@@ -1090,7 +795,7 @@ func (w *rmFloorWalker) checkTermMappings(value any, path string) {
 //
 // The diagnostic names the attribute and the allowed set only — never the
 // offending value (REQ-168); the match is carried in Issue.Value.
-func (w *rmFloorWalker) checkTermMapping(value any, path string) {
+func (f *findings) checkTermMapping(value any, path string) {
 	m, ok := asTermMapping(value)
 	if !ok {
 		return
@@ -1098,7 +803,7 @@ func (w *rmFloorWalker) checkTermMapping(value any, path string) {
 	switch m.Match {
 	case ">", "=", "<", "?":
 	default:
-		w.emit(Issue{
+		f.emit(Issue{
 			Path:   joinPath(path, "/match"),
 			Code:   "term_mapping_match",
 			Layer:  LayerRM,

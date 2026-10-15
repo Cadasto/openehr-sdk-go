@@ -122,15 +122,20 @@ func TestCoverage_REQ171_UnevaluatedLeavesOutWhatAnotherCheckDecides(t *testing.
 	}
 }
 
-// REQ-171 § Coverage — over every vendored corpus document, Unevaluated is
-// sorted with no repeat, lists invariants of LOCATABLE and DV_TEXT the SDK
-// does not evaluate and none of the RM rules it does, those the
-// mandatory-presence rule decides included, and is the same with
-// the template as without: with no limit met, the floor visits every class
-// the template walk enters.
+// admissionCodes are the codes of the findings by which a template refuses
+// content: the walk reports the content once and does not enter it.
+var admissionCodes = []string{"prohibited", "slot_fill", "rm_type_mismatch", "alternative_mismatch"}
+
+// REQ-171 § Coverage, § One walk — over every vendored corpus document,
+// Unevaluated is sorted with no repeat, lists invariants of LOCATABLE and
+// DV_TEXT the SDK does not evaluate and none of the RM rules it does, those
+// the mandatory-presence rule decides included. With the template it lists
+// the invariants of the classes the walk visited: what the RM rules alone
+// list, where the template refuses nothing, and no more than that where it
+// refuses content, whose classes the walk does not enter.
 func TestCoverage_REQ171_UnevaluatedOverTheCorpus(t *testing.T) {
 	v := validation.New()
-	templated := 0
+	templated, refusing := 0, 0
 	for _, doc := range corpusDocuments(t) {
 		floor := validation.ValidateRM(doc.root).Coverage.Unevaluated
 		if !sortedOnce(floor) {
@@ -138,7 +143,7 @@ func TestCoverage_REQ171_UnevaluatedOverTheCorpus(t *testing.T) {
 		}
 		for _, evaluated := range []string{"DV_TEXT.Mappings_valid", "ELEMENT.Inv_null_flavour_indicated", "CODE_PHRASE.Code_string_valid", "LOCATABLE.Archetype_node_id_valid", "DV_TEXT.Valid_value"} {
 			if slices.Contains(floor, evaluated) {
-				t.Errorf("ValidateRM(%s) Coverage.Unevaluated lists %s, which the floor evaluates", doc.rel.Rel, evaluated)
+				t.Errorf("ValidateRM(%s) Coverage.Unevaluated lists %s, which the RM rules evaluate", doc.rel.Rel, evaluated)
 			}
 		}
 		for _, want := range []string{"DV_TEXT.Formatting_valid", "LOCATABLE.Links_valid"} {
@@ -151,38 +156,50 @@ func TestCoverage_REQ171_UnevaluatedOverTheCorpus(t *testing.T) {
 		}
 		templated++
 		r := v.Validate(doc.root, doc.c)
-		if !slices.Equal(r.Coverage.Unevaluated, floor) {
-			t.Errorf("Validate(%s) Coverage.Unevaluated = %q, want what ValidateRM lists, %q", doc.rel.Rel, r.Coverage.Unevaluated, floor)
+		refused := slices.ContainsFunc(r.Issues, func(i validation.Issue) bool { return slices.Contains(admissionCodes, i.Code) })
+		if refused {
+			refusing++
+		}
+		if !sortedOnce(r.Coverage.Unevaluated) {
+			t.Errorf("Validate(%s) Coverage.Unevaluated = %q, want it sorted with no repeat", doc.rel.Rel, r.Coverage.Unevaluated)
+		}
+		if extra := slices.DeleteFunc(slices.Clone(r.Coverage.Unevaluated), func(u string) bool { return slices.Contains(floor, u) }); len(extra) > 0 {
+			t.Errorf("Validate(%s) Coverage.Unevaluated lists %q, which ValidateRM does not: the walk with the template visited a class the walk without it did not", doc.rel.Rel, extra)
+		}
+		if !refused && !slices.Equal(r.Coverage.Unevaluated, floor) {
+			t.Errorf("Validate(%s) Coverage.Unevaluated = %q, want what ValidateRM lists, %q: the template refuses nothing", doc.rel.Rel, r.Coverage.Unevaluated, floor)
 		}
 	}
-	if templated == 0 {
-		t.Fatal("no corpus document was validated against its OPT; the check has gone blind")
+	if templated == 0 || refusing == 0 {
+		t.Fatalf("validated %d corpus documents against their OPTs, %d of them with refused content; want some of each, or the check has gone blind", templated, refusing)
 	}
 }
 
-// REQ-171 § Coverage — with a template, Unevaluated covers the classes either
-// walk visited: when the visit limit stops the floor at the root, the classes
-// the template walk entered below it are still listed.
-func TestCoverage_REQ171_UnevaluatedUnitesTheTemplateWalk(t *testing.T) {
+// REQ-171 § Coverage, § Surface — the limits bound the walk with a template
+// as without one, so Unevaluated lists the classes of the values the walk
+// visited before a limit stopped it, and no class below: with a visit limit
+// of 1 the walk stops at the root of a vital signs composition, with its
+// template as with none, and lists no invariant of the OBSERVATION below.
+func TestCoverage_REQ171_UnevaluatedListsTheClassesTheWalkVisited(t *testing.T) {
 	t.Parallel()
 	c := mustCompile(t, "vital_signs")
 	v := validation.New(validation.WithLimits(validation.Limits{Nodes: 1}))
-	floor := v.Validate(validVitalSignsComposition(), nil)
-	if len(floor.Coverage.Stopped) != 1 {
-		t.Fatalf("precondition: Validate(vital signs, nil) with a visit limit of 1 Coverage.Stopped = %q, want one stop", floor.Coverage.Stopped)
-	}
 	const entry = "ENTRY.Other_participations_valid"
-	if slices.Contains(floor.Coverage.Unevaluated, entry) {
-		t.Fatalf("precondition: Validate(vital signs, nil) with a visit limit of 1 lists %s, want the floor stopped before any ENTRY", entry)
+	if full := validation.Validate(validVitalSignsComposition(), c); !slices.Contains(full.Coverage.Unevaluated, entry) {
+		t.Fatalf("precondition: Validate(vital signs, c) Coverage.Unevaluated = %q, want it to list %s, from the OBSERVATION the walk enters", full.Coverage.Unevaluated, entry)
 	}
+	floor := v.Validate(validVitalSignsComposition(), nil)
 	r := v.Validate(validVitalSignsComposition(), c)
-	if !slices.Contains(r.Coverage.Unevaluated, entry) || !sortedOnce(r.Coverage.Unevaluated) {
-		t.Errorf("Validate(vital signs, c) with a visit limit of 1 Coverage.Unevaluated = %q, want it sorted and to list %s, from the OBSERVATION the template walk entered", r.Coverage.Unevaluated, entry)
-	}
-	for _, key := range floor.Coverage.Unevaluated {
-		if !slices.Contains(r.Coverage.Unevaluated, key) {
-			t.Errorf("Validate(vital signs, c) with a visit limit of 1 Coverage.Unevaluated = %q, want it to keep %s, which the floor lists", r.Coverage.Unevaluated, key)
+	for name, res := range map[string]validation.Result{"nil": floor, "c": r} {
+		if len(res.Coverage.Stopped) != 1 {
+			t.Errorf("Validate(vital signs, %s) with a visit limit of 1 Coverage.Stopped = %q, want one stop", name, res.Coverage.Stopped)
 		}
+		if slices.Contains(res.Coverage.Unevaluated, entry) || !sortedOnce(res.Coverage.Unevaluated) {
+			t.Errorf("Validate(vital signs, %s) with a visit limit of 1 Coverage.Unevaluated = %q, want it sorted and without %s: the walk stopped before any ENTRY", name, res.Coverage.Unevaluated, entry)
+		}
+	}
+	if !slices.Equal(r.Coverage.Unevaluated, floor.Coverage.Unevaluated) {
+		t.Errorf("Validate(vital signs, c) with a visit limit of 1 Coverage.Unevaluated = %q, want what the walk with no template lists, %q", r.Coverage.Unevaluated, floor.Coverage.Unevaluated)
 	}
 }
 

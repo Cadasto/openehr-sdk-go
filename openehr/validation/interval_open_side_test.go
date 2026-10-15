@@ -102,7 +102,7 @@ func TestValidateComposition_TypedOpenIntervalSide(t *testing.T) {
 // interval has `lower_unbounded` false and an upper bound of 0, so the bound
 // set here is an ordinary lower bound. The walker checks it against the OPT
 // like any bound: a magnitude of 500 breaks the OPT's 0..100 range. Template
-// validation includes the RM floor, which reports the interval too, because
+// validation includes the RM rules, which report the interval too, because
 // its lower bound of 500 lies above its upper bound of 0.
 func TestValidateComposition_BuiltBoundBesideOpenFlag(t *testing.T) {
 	c := mustCompile(t, "Test_dv_interval_dv_count_lower_upper_constraint.v0")
@@ -122,12 +122,12 @@ func TestValidateComposition_BuiltBoundBesideOpenFlag(t *testing.T) {
 		t.Fatalf("Build: %v", err)
 	}
 	r := validation.ValidateComposition(comp, c)
-	// The template walk reports the bound outside the OPT's range, then the
-	// RM floor reports the interval whose lower bound now lies above its
-	// upper one.
+	// The RM rules of the interval run at the interval, before the walk
+	// goes below it, so the interval whose lower bound now lies above its
+	// upper one is reported first, then the bound outside the OPT's range.
 	want := []pathCode{
-		{intervalValuePath + "/lower/magnitude", "primitive_out_of_range"},
 		{intervalValuePath, "rm_invariant"},
+		{intervalValuePath + "/lower/magnitude", "primitive_out_of_range"},
 	}
 	if got := pathCodes(r.Issues); !slices.Equal(got, want) {
 		t.Errorf("ValidateComposition(built, lower 500) issues = %v, want %v\nfull issues: %+v", got, want, r.Issues)

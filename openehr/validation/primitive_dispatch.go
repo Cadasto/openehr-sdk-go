@@ -35,13 +35,12 @@ import (
 const noPrecision rm.Integer = -1
 
 func dataValueInput(dv rm.DataValue) (any, bool) {
-	// Belt-and-suspenders typed-nil guard. The walker's primary
+	// Belt-and-suspenders typed-nil guard. The walk's primary
 	// defence is the generated access, which reads an interface holding
-	// a nil pointer as absent, plus `walker.walkNode`'s top-level
-	// `IsTypedNilPointer` check; both reject typed-nil before reaching
-	// this dispatcher. A bare-nil
-	// interface still bypasses both (rare on the bound-RM-value
-	// path but cheap to guard here).
+	// a nil pointer as absent, plus the walk's own `IsTypedNilPointer`
+	// check before it visits a node; both reject typed-nil before
+	// reaching this dispatcher. A bare-nil interface still bypasses both
+	// (rare on the bound-RM-value path but cheap to guard here).
 	if dv == nil {
 		return nil, false
 	}

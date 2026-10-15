@@ -29,8 +29,8 @@ const (
 )
 
 // withoutLanguage returns comp with the RM-mandatory language of its content
-// item at index i left empty, a defect the template walk reports at that
-// item's path.
+// item at index i left empty, a defect the RM rules report at that item's
+// path.
 func withoutLanguage(t *testing.T, comp *rm.Composition, i int) *rm.Composition {
 	t.Helper()
 	obs, ok := comp.Content[i].(*rm.Observation)

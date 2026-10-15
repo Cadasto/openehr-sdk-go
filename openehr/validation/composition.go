@@ -12,19 +12,19 @@ import (
 // ValidateComposition validates an in-memory RM Composition
 // against a compiled OPT and returns every issue in one pass.
 //
-// The walk is template-driven (see package doc): the compiled OPT
-// drives traversal and the composition is the value source. Each
-// issue's path is written as [Issue.Path] describes, by the same rule
-// [ValidateRM] uses: a required attribute that is absent is reported at
-// the attribute's own path, and a required node the composition lacks
-// at the path the template gives it.
+// The walk visits the composition (see package doc): the compiled OPT
+// binds the nodes it reaches and decides which content it admits, and the
+// composition and the Reference Model supply the rest of what the walk
+// visits. Each issue's path is written as [Issue.Path] describes, by the
+// same rule [ValidateRM] uses: a required attribute that is absent is
+// reported at the attribute's own path, and a required node the
+// composition lacks at the path the template gives it.
 //
-// The result includes the Reference Model floor ([ValidateRM]), run over
-// the whole composition after the template walk, as [Validate] describes:
-// the floor's findings follow the template walk's, and one that repeats a
-// template issue's code at its path is dropped, so each defect is reported
-// once. A composition that passes is valid against the template and the
-// RM rules the floor checks.
+// The result includes the Reference Model rules ([ValidateRM]), applied in
+// the same walk, as [Validate] describes: an attribute both layers find
+// missing or empty is one finding, and a Reference Model rule's own finding
+// at that path is reported beside it. A composition that passes is valid
+// against the template and the RM rules the validator checks.
 //
 // Returns a [Result] whose Issues slice is never nil (zero-length
 // allocation when no issues fire).
@@ -46,41 +46,6 @@ func ValidateComposition(comp *rm.Composition, c *templatecompile.Compiled) Resu
 	return Validate(comp, c)
 }
 
-// walker carries the issue accumulator and any per-call state for
-// a single ValidateComposition invocation. Constructed via
-// newWalker so callers do not see the zero value (which has a nil
-// issues slice — never returned to callers).
-type walker struct {
-	compiled *templatecompile.Compiled
-	issues   []Issue
-	// names collects, over the whole walk, the name the OPT pins on the
-	// node each item binds to, for the items whose archetype_node_id a
-	// sibling shares: the only items whose path a pinned name changes
-	// ([itemPaths]). The floor takes it, so it writes the path this walk
-	// writes for the same node. Nil until a walk records a name.
-	names pinnedNames
-	// external holds, in walk order, the path of each node bound to a
-	// CONSTRAINT_REF: its value set is outside the SDK, so the walk could
-	// not check the code there ([Coverage.External]). Nil until one is met.
-	external []string
-	// visited holds the class of every value the walk entered, by its index
-	// in the inventory's rules ([classRules]), for [Coverage.Unevaluated].
-	visited indexSet
-}
-
-func newWalker(c *templatecompile.Compiled) *walker {
-	// Pre-allocate a non-nil issues slice so resultFromIssues
-	// returns a non-nil slice on the OK path.
-	return &walker{compiled: c, issues: []Issue{}}
-}
-
-// emit appends one Issue to the walker's accumulator. Small helper
-// kept for symmetry with later code that may want to deduplicate
-// or sort issues; right now it is a direct append.
-func (w *walker) emit(i Issue) {
-	w.issues = append(w.issues, i)
-}
-
 // joinPath glues a parent issue path with a child segment. Mirrors
 // the compile-side pathSegment convention: root path is "/" and
 // child deltas already begin with "/" (e.g. "/category",
@@ -95,7 +60,7 @@ func joinPath(parent, segment string) string {
 
 // rmTypeInfo is the single source of truth for "what RM class is
 // this Go value and (when LOCATABLE) what is its archetype_node_id".
-// All v2 walker code routes through this function — describeRMType
+// The walk and the rules route through this function — describeRMType
 // and locatableArchetypeNodeID are thin wrappers.
 //
 // Since ADR 0013 it decomposes onto the generated surface: the name
