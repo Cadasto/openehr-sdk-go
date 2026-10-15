@@ -1161,6 +1161,8 @@ requirements:
     status: draft
     implementation: landed
     packages:
+      - internal/bmmtype
+      - internal/templateinstance/rmwrite
       - openehr/composition
       - openehr/internal/rmbind
       - openehr/internal/rmnames
