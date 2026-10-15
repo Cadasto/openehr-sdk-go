@@ -8,7 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-Validation runs as one walk and reports each defect once, a response with an unreadable body keeps its status, canonical JSON omits an absent mandatory member, and FLAT carries a referenced composer, a renamed composition and nulls. **Breaking:** validation reports nil list items, mismatched ordinal symbols and shared values at each path with fewer findings, `query.Repository` gains `RunStoredVersion`, and FLAT encode and null handling change.
+## [0.35.0] - 2026-10-16
+
+Thirty-fifth `v0.x` minor: validation runs as one walk and reports each defect once, a response with an unreadable body keeps its status, canonical JSON omits an absent mandatory member, `composition.Builder.Set` binds a value as the validator does, and FLAT carries a referenced composer, a renamed composition and nulls. **Breaking:** validation reports nil list items, mismatched ordinal symbols and shared values at each path with fewer findings, `query.Repository` gains `RunStoredVersion`, `Set` refuses a value its attribute cannot hold, and FLAT encode and null handling change.
 
 ### Added
 
@@ -20,8 +22,10 @@ Validation runs as one walk and reports each defect once, a response with an unr
 - **Breaking: validation reports a nil list item and a Go value shared by two attributes at each path (REQ-112, REQ-102).** A nil item counts as one visit; both used to be skipped or reported once.
 - **Breaking: template validation checks a DV_ORDINAL's symbol against its value (REQ-102, REQ-103).** A pair the template does not list draws `primitive_not_in_list`; a listed symbol naming no terminology admits any.
 - **Validation issues follow the document, and validation with a template is faster (REQ-171).** An item bound to a 0..0 child is reported once; benchstat measured 2.1 to 2.8 times faster than the two-walk version.
+- **Breaking: `composition.Builder.Set` binds a value as the validator does (REQ-101).** It accepts a subtype, a concrete value at an abstract or untyped node and any listed alternative, and refuses with `ErrTypeMismatch` what the attribute cannot hold.
 - **Breaking: `query.Repository` gains `RunStoredVersion`, and a stored-query GET accepts an AQL parameter named `q` (REQ-057).** Code that implements the interface must add the method; only the ad hoc GET sends `q`.
-- **A 2xx with an unreadable body is retried only for GET, HEAD and OPTIONS (REQ-172, REQ-091).** A non-2xx with one is its status's `*WireError`, and neither is retried once the context ends.
+- **A 2xx with an unreadable body is retried only for GET, HEAD and OPTIONS, and never over the size limit (REQ-172, REQ-091).** An ended context stops every retry, and a non-2xx with an unreadable body is its status's `*WireError`.
+- **The request span carries the response size, and `system.Health` keeps the status of a 2xx it cannot read (REQ-090).** `http.response_content_length` holds the bytes read; `HTTPStatusCode` is 0 only when no response arrived.
 - **A failed call's span carries `http.status_code`, and `WithMaxResponseBody(math.MaxInt64)` reads the whole body (REQ-090, REQ-093).** The limit used to overflow into an empty body.
 - **A request with a `Cookie`, `Cookie2` or `Proxy-Authorization` header refuses an https-to-http redirect (REQ-092, REQ-021).** It fails with `transport.ErrInsecureRedirect` and is not retried.
 - **A fresh discovery cache hit runs the resolver's own checks (REQ-071 to REQ-073).** A refused hit fails as a new document would, keeps its entry, and a catalog for another base URL is a miss.
