@@ -33,8 +33,8 @@ corpus/
 
 Everything under `flat-conformance/` is a pinned subtree, machine-synced from
 upstream at a recorded commit, so do not hand-edit it. Refresh with
-`make flat-conformance-sync` and verify integrity with `make flat-conformance-verify`
-(an offline `sha256` check that `make ci` runs as a gate). `make flat-conformance-check`
+`make flat-sync` and verify integrity with `make flat-check`
+(an offline `sha256` check that `make ci` runs as a gate). `make flat-drift`
 adds an upstream-drift report; it needs network and is a dev helper, not a gate. Resolve paths via
 [`fixtures.FlatConformanceOpt`](../fixtures/paths.go) /
 `fixtures.FlatConformanceFlat` / `fixtures.ListFlatConformance`. The rest of
@@ -79,7 +79,7 @@ JSON and XML here are the canonical formats. Inside a set the files have fixed n
 
 Only files that describe the same instance form a set. The Robot canonical JSON for `nested` and `persistent_minimal`, and the Robot FLAT and STRUCTURED for `family_history`, are other instances of those templates, so they are not vendored.
 
-[`crossformat/MANIFEST.txt`](crossformat/MANIFEST.txt) records both pins, and for every file its source, upstream path and `sha256`. To refresh, check out the pinned commits in local clones of both upstreams, point `CROSSFORMAT_SDK_CLONE` and `CROSSFORMAT_ROBOT_CLONE` at them, and run `make crossformat-ingest`. It refuses a clone that is not at its pin. `make crossformat-verify` checks the vendored bytes offline. The tests in [`crossformat_test.go`](../fixtures/crossformat_test.go) check the same integrity under `make ci`. Resolve the sets with [`fixtures.ListCrossFormatSets`](../fixtures/crossformat.go).
+[`crossformat/MANIFEST.txt`](crossformat/MANIFEST.txt) records both pins, and for every file its source, upstream path and `sha256`. To refresh, check out the pinned commits in local clones of both upstreams, point `CROSSFORMAT_SDK_CLONE` and `CROSSFORMAT_ROBOT_CLONE` at them, and run `make crossformat-sync`. It refuses a clone that is not at its pin. `make crossformat-check` checks the vendored bytes offline. The tests in [`crossformat_test.go`](../fixtures/crossformat_test.go) check the same integrity under `make ci`. Resolve the sets with [`fixtures.ListCrossFormatSets`](../fixtures/crossformat.go).
 
 ## Index by vendor
 

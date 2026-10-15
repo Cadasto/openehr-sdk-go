@@ -39,7 +39,7 @@ Specify new behaviour before you write it, in this loop:
    and the tests.
 3. Cite `REQ-NNN` and `PROBE-NNN` in the tests, update
    `docs/specifications/traceability.yaml` in the same change, and run
-   `make spec-gen` to refresh the generated registry.
+   `make spec-generate` to refresh the generated registry.
 4. Run `make spec-check`, which `make ci` includes anyway.
 
 A refactor or a bug fix that brings the code back in line with the existing

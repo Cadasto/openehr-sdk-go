@@ -21,7 +21,7 @@ schemas of every REST resource.
   extensions and are intentionally not vendored.
 - **Pin + integrity:** the exact upstream commit and a per-file `sha256` are recorded
   in [`MANIFEST.txt`](MANIFEST.txt). Regenerate with `make its-rest-sync`; verify with
-  `make its-rest-check` (see [the sync script](../../scripts/sync-its-rest-specs.sh)).
+  `make its-rest-drift` (see [the sync script](../../scripts/sync-its-rest-specs.sh)).
 
 These are **reference assets, not code-generation inputs**. The SDK generates no code
 from them, so drift is reported for information and does not break the build. They are
@@ -48,7 +48,7 @@ SDK clients for those ship as **Draft** and may change between minor versions.
 ```bash
 make its-rest-sync          # fetch latest from master, rewrite MANIFEST.txt
 ITS_REST_REF=Release-1.1.0 make its-rest-sync   # pin a tag / branch / commit instead
-make its-rest-check         # verify local copies + report if upstream advanced
+make its-rest-drift         # verify local copies + report if upstream advanced
 ```
 
 A version bump is an explicit, reviewable commit (diff the YAML + `MANIFEST.txt`).

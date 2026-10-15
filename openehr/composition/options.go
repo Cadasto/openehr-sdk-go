@@ -94,9 +94,23 @@ func WithValueSource(src mrand.Source) Option {
 // Build time. Comparable via errors.Is.
 var ErrUnknownPath = errors.New("composition: path not in template")
 
-// ErrTypeMismatch signals that the Go value supplied to Builder.Set
-// does not match the compiled-node RM type at the path. Comparable
-// via errors.Is.
+// ErrTypeMismatch signals that the value supplied to Builder.Set is
+// not one the template allows at the path: it binds none of the nodes
+// the template allows there, by the rule the validator binds a value
+// with. A value binds a node whose RM type it has or descends from, a
+// node typed with an AOM 1.4 primitive short name it carries (a
+// DV_DURATION at DURATION), an untyped node, and a typed interval node
+// DV_INTERVAL<T> when each of its bounds is a T; Builder.Set lists the
+// cases. Every alternative the template lists at the path counts, except
+// one whose occurrences are 0..0. A value that binds a node there but
+// that the RM attribute at the path cannot hold is refused too: a
+// DV_DURATION at the DURATION node under a DV_DURATION's value, which
+// holds a String, or a DV_TEXT at a bound of a DV_INTERVAL the template
+// does not parameterise, which holds a DV_ORDERED. So is any value at a
+// path that writes no RM attribute, such as a template's constraint on
+// DV_PROPORTION.is_integral, which the model defines as a function. A nil
+// value, a nil pointer and a value that is not an RM value at all are
+// refused the same way. Comparable via errors.Is.
 var ErrTypeMismatch = errors.New("composition: value type does not match path RM type")
 
 // ErrInvalidPath signals a structural problem navigating the path

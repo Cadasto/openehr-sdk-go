@@ -29,7 +29,7 @@ import (
 //
 // Every invariant of the pinned BMMs must have a classification, and every
 // classification must name an invariant the pinned BMMs declare: either gap
-// fails generation, and so `make codegen` and `make codegen-verify`, naming
+// fails generation, and so `make codegen` and `make codegen-check`, naming
 // the key, so a BMM bump cannot add an unchecked rule silently.
 
 // inventoryFile is the generated inventory, written into the validation

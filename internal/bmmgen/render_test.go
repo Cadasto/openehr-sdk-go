@@ -313,7 +313,7 @@ func TestOptionalFieldsThatAreNotPointers(t *testing.T) {
 // over Hash, take omitzero, and a mandatory P_BMM_SINGLE_PROPERTY_OPEN takes
 // omitempty. A mandatory generic class held by value has no absent form and
 // carries no omit option. Without these rows a flip in the generator shows
-// only as a `make codegen-verify` diff.
+// only as a `make codegen-check` diff.
 func TestMandatoryFieldsOmitOnlyWhatCanBeAbsent(t *testing.T) {
 	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
 	if err != nil {

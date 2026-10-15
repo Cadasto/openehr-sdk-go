@@ -41,7 +41,7 @@ fetched at build time and not looked up in a terminology service at run time. Co
 The exact upstream commit, each file's `sha256` and the fetch timestamp
 are recorded in [`MANIFEST.txt`](MANIFEST.txt), and nowhere else. The sync
 script generates it, so do not edit it by hand. Regenerate with `make terminology-sync`; verify
-with `make terminology-verify` (see [the sync script](../../scripts/sync-terminology.sh)).
+with `make terminology-check` (see [the sync script](../../scripts/sync-terminology.sh)).
 
 ## Provenance
 
@@ -74,7 +74,7 @@ It lives in-tree rather than behind an upstream URL for the same three reasons t
 | Consumer | Relationship |
 |---|---|
 | `openehr/terminology` | The generated, stdlib-only accessor. It exposes every group and code set of this pin as typed, closed, source-ordered values: groups with code → rubric, rubric → code, and membership lookups; code sets with membership lookups and the issuer and external id the pin gives each; plus the pinned release version (§ REQ-034). |
-| `cmd/termgen` | The generator: reads both files of this pin, emits those tables. `make termgen` regenerates them; `make termgen-verify` fails the gate when they drift from either file (the [REQ-042](../../docs/specifications/bmm-conformance.md#req-042--generated-code-drift-detected) rule). |
+| `cmd/termgen` | The generator: reads both files of this pin, emits those tables. `make termgen` regenerates them; `make termgen-check` fails the gate when they drift from either file (the [REQ-042](../../docs/specifications/bmm-conformance.md#req-042--generated-code-drift-detected) rule). |
 
 The generator and the accessor land with the rest of the REQ-034 work; this pin is their
 only input. Nothing else in the SDK parses these XML files at build or run time.
@@ -83,7 +83,7 @@ only input. Nothing else in the SDK parses these XML files at build or run time.
 
 ```bash
 TERMINOLOGY_REF=Release-X.Y.Z make terminology-sync   # pin a named TERM release
-make terminology-check                                # integrity + "is there a newer release?"
+make terminology-drift                                # integrity + "is there a newer release?"
 ```
 
 `terminology-sync` rewrites both XML files and `MANIFEST.txt`, then runs `make termgen` so
@@ -107,10 +107,10 @@ With no `TERMINOLOGY_REF`, `sync` re-fetches the ref already pinned in `MANIFEST
 ## Integrity
 
 ```bash
-make terminology-verify   # offline sha256 against MANIFEST.txt; run by `make ci`
+make terminology-check   # offline sha256 against MANIFEST.txt; run by `make ci`
 ```
 
-`terminology-verify` needs no network and no `curl`/`jq`, only `sha256sum` or `shasum`,
+`terminology-check` needs no network and no `curl`/`jq`, only `sha256sum` or `shasum`,
 so it is safe inside the gate. It checks both files. It reports `FAILED … (sha256 mismatch)`
 on any edit to a vendored file, `MISSING` when a file is gone, `NOT PINNED` when the manifest
 has no hash line for one of the two files, and `UNTRACKED` for an XML in this directory that

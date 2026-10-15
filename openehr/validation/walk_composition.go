@@ -16,6 +16,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/rmbind"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
@@ -32,7 +33,7 @@ func scalarLeaf(optNode *tcimpl.CompiledNode, rmValue any) (constraints.Primitiv
 	if pc == nil || !tcimpl.IsAOMPrimitiveShortName(optNode.RMTypeName()) {
 		return nil, false
 	}
-	return pc, primitiveValueMatchesShortName(optNode.RMTypeName(), rmValue)
+	return pc, rmbind.PrimitiveValueMatchesShortName(optNode.RMTypeName(), rmValue)
 }
 
 // isConstraintRef reports whether pc is a CONSTRAINT_REF: a value set bound
@@ -92,124 +93,13 @@ func admitSingle(attr *tcimpl.CompiledAttribute, children []*tcimpl.CompiledNode
 }
 
 // matchSingleAlternative picks the OPT child of a single-valued
-// attribute that binds the RM value, slot children included, by
-// [bindByRMType]. Returns nil when no child fits. With exactly one
-// child the function is effectively "does the child fit?"; the
-// alternative_mismatch case fires only when the OPT declared more
-// than one alternative.
+// attribute that binds the RM value, slot children included, by the
+// three binding tiers of [rmbind.Bind] (REQ-102). Returns nil when no
+// child fits. With exactly one child the function is effectively "does
+// the child fit?"; the alternative_mismatch case fires only when the
+// OPT declared more than one alternative.
 func matchSingleAlternative(children []*tcimpl.CompiledNode, val any) *tcimpl.CompiledNode {
-	return bindByRMType(children, val, func(*tcimpl.CompiledNode) bool { return true })
-}
-
-// bindByRMType picks, among the children eligible accepts, the one
-// that binds the RM value val: the most specific child, in three
-// tiers (REQ-102). Within a tier the first child in OPT order wins.
-//
-//  1. A child that names val's own RM type ([namesRMType]).
-//  2. A child that names the AOM 1.4 primitive short name whose
-//     canonical DV wrapper val is ([wrapsShortName]).
-//  3. A child val's type conforms to by BMM descent, or an untyped
-//     child, or, for an interval each present bound of which conforms
-//     to T, a typed DV_INTERVAL<T> child ([conformsToChild]).
-//
-// A value therefore meets the constraints of the tightest child that
-// admits it, not those of a looser one listed first: under
-// [DV_TEXT, DV_CODED_TEXT] a DV_CODED_TEXT meets the DV_CODED_TEXT
-// child's code list, and under [DATA_VALUE, DURATION] a DV_DURATION
-// meets the DURATION child's C_DURATION. Both the single-valued
-// alternatives and the multi-valued items without an
-// archetype_node_id bind by this rule. Returns nil when no child
-// admits val.
-func bindByRMType(children []*tcimpl.CompiledNode, val any, eligible func(*tcimpl.CompiledNode) bool) *tcimpl.CompiledNode {
-	gotType := describeRMType(val)
-	for _, c := range children {
-		if eligible(c) && namesRMType(c, gotType, val) {
-			return c
-		}
-	}
-	for _, c := range children {
-		if eligible(c) && wrapsShortName(c, gotType) {
-			return c
-		}
-	}
-	for _, c := range children {
-		if eligible(c) && conformsToChild(c, gotType, val) {
-			return c
-		}
-	}
-	return nil
-}
-
-// namesRMType reports whether the OPT child c names the RM value val's
-// own type, gotType. That is the same name, with one refinement for an
-// interval that went through a canonical-JSON round-trip and decoded
-// as the bare DV_INTERVAL: its type is the parameterised
-// DV_INTERVAL<T> its bounds give (REQ-102, REQ-110), so a typed child
-// whose T every present bound is names it. One with no bound present
-// has no parameter, so only a bare DV_INTERVAL child names its type,
-// and a typed child admits it in the third tier ([conformsToChild]).
-// An AOM 1.4 primitive short name over a Go primitive val (an int64
-// under INTEGER, a string under DURATION) also names val's type. An
-// untyped child names no type.
-func namesRMType(c *tcimpl.CompiledNode, gotType string, val any) bool {
-	want := c.RMTypeName()
-	if want == "" {
-		return false
-	}
-	if gotType == "DV_INTERVAL" {
-		bounded := collapsedIntervalBounded(val)
-		if bound, typed := typedIntervalBound(want); typed {
-			return bounded && intervalBoundsSatisfy(val, bound)
-		}
-		if want == "DV_INTERVAL" {
-			return !bounded
-		}
-	}
-	if gotType == want {
-		return true
-	}
-	// AOM 1.4 primitive short name (DURATION, DATE, INTEGER, …)
-	// pinned under a BMM-typed attribute channel: the RM value
-	// may be a Go string, integer, real, or bool rather than an
-	// RM wrapper type.
-	return tcimpl.IsAOMPrimitiveShortName(want) && c.PrimitiveConstraint() != nil &&
-		primitiveValueMatchesShortName(want, val)
-}
-
-// wrapsShortName reports whether the OPT child c names an AOM 1.4
-// primitive short name whose canonical DV wrapper
-// ([aomPrimitiveWrappers]) is the RM type gotType.
-func wrapsShortName(c *tcimpl.CompiledNode, gotType string) bool {
-	wrapper, ok := aomPrimitiveWrappers[c.RMTypeName()]
-	return ok && wrapper == gotType
-}
-
-// conformsToChild reports whether the OPT child c declares no RM type,
-// or one the RM type gotType conforms to ([conformsToNode]). Under a
-// typed DV_INTERVAL<T> child each present bound has to be a T, that is,
-// conform to T ([intervalConformsTo]): a DV_COUNT bound is a DV_ORDERED.
-// A round-tripped bare DV_INTERVAL val with no bound present carries no T
-// to check, so a typed DV_INTERVAL<T> child admits it here, after any
-// bare DV_INTERVAL child has named its type ([namesRMType]).
-func conformsToChild(c *tcimpl.CompiledNode, gotType string, val any) bool {
-	want := c.RMTypeName()
-	if want == "" || conformsToNode(c, gotType) {
-		return true
-	}
-	return intervalConformsTo(gotType, want, val)
-}
-
-// conformsToNode reports whether the RM type concrete conforms to the RM
-// type the compiled node c declares, as [rmTypeIsSubtypeOf] decides it, from
-// the classes the compile found to conform to that type
-// ([tcimpl.ConformsTo]) rather than from the class hierarchy at each call.
-func conformsToNode(c *tcimpl.CompiledNode, concrete string) bool {
-	class := bmmtype.Class(concrete)
-	if conforms, known := tcimpl.ConformsTo(c, class); known {
-		return conforms
-	}
-	wrapper, ok := aomPrimitiveWrappers[c.RMTypeName()]
-	return ok && wrapper == class
+	return rmbind.Bind(children, val, func(*tcimpl.CompiledNode) bool { return true })
 }
 
 // formatAllowedTypes renders the OPT child RM types for inclusion
@@ -668,14 +558,14 @@ func locatableName(item any) string {
 // matchChildByRMType binds an item that carries no archetype_node_id
 // (REQ-102) to a non-slot child whose RMTypeName admits the item's RM
 // type, by the three tiers a single-valued attribute uses
-// ([bindByRMType]); a slot child is skipped in every tier. A nil or
+// ([rmbind.Bind]); a slot child is skipped in every tier. A nil or
 // typed-nil item has no value to bind, so no child takes it, not even
 // an untyped one. Returns nil when no child admits the item.
 func matchChildByRMType(children []*tcimpl.CompiledNode, item any) *tcimpl.CompiledNode {
 	if isNilItem(item) {
 		return nil
 	}
-	return bindByRMType(children, item, func(c *tcimpl.CompiledNode) bool { return !c.IsSlot() })
+	return rmbind.Bind(children, item, func(c *tcimpl.CompiledNode) bool { return !c.IsSlot() })
 }
 
 // unboundItemIssue reports an item of a multi-valued attribute that
@@ -799,8 +689,8 @@ func identityIssue(opt *tcimpl.CompiledNode, rmValue any, path string) (iss Issu
 
 // rmTypeIssue returns rm_type_mismatch, with ok set, when the concrete RM
 // type does not conform to the compiled OPT node's RMTypeName. Conformance is
-// the pinned BMM's class hierarchy ([rmTypeIsSubtypeOf], read through
-// [conformsToNode]), for an abstract and a concrete ancestor alike: a node
+// the pinned BMM's class hierarchy, as the compile recorded it for the node
+// ([rmbind.ConformsToNode]), for an abstract and a concrete ancestor alike: a node
 // declared as ITEM_STRUCTURE admits ITEM_TREE, one declared as DV_TEXT
 // admits DV_CODED_TEXT.
 func rmTypeIssue(opt *tcimpl.CompiledNode, rmValue any, path string) (iss Issue, ok bool) {
@@ -812,7 +702,7 @@ func rmTypeIssue(opt *tcimpl.CompiledNode, rmValue any, path string) (iss Issue,
 	if got == want {
 		return iss, false
 	}
-	if conformsToNode(opt, got) || intervalRMTypeMatches(got, want, rmValue) {
+	if rmbind.ConformsToNode(opt, got) || intervalRMTypeMatches(got, want, rmValue) {
 		return iss, false
 	}
 	return Issue{
@@ -825,34 +715,6 @@ func rmTypeIssue(opt *tcimpl.CompiledNode, rmValue any, path string) (iss Issue,
 	}, true
 }
 
-// rmTypeIsSubtypeOf reports whether the RM type concrete conforms to
-// the OPT-declared RM type declared: equal to it, or a descendant of
-// it in the pinned BMM's class hierarchy (rminfo), whether declared is
-// abstract or concrete (REQ-102, REQ-110). A newly covered RM class
-// therefore needs no admission row here, and the generated access reads
-// its attributes below the node.
-//
-// A parameterised value type such as "DV_INTERVAL<DV_COUNT>" is looked
-// up by its class, "DV_INTERVAL", because the generic parameter does
-// not change which classes it descends from. The declared type is
-// looked up as written: a parameterised DV_INTERVAL<T> is no BMM class
-// name, so the hierarchy does not know it, and [intervalRMTypeMatches]
-// decides it instead.
-//
-// When the hierarchy does not know one of the two names, an AOM 1.4
-// primitive short name in declared still admits its canonical DV
-// wrapper ([aomPrimitiveWrappers]).
-func rmTypeIsSubtypeOf(concrete, declared string) bool {
-	class := bmmtype.Class(concrete)
-	if h, ok := rminfo.Default.(rminfo.Hierarchy); ok {
-		if conforms, known := h.ConformsTo(class, declared); known {
-			return conforms
-		}
-	}
-	wrapper, ok := aomPrimitiveWrappers[declared]
-	return ok && wrapper == class
-}
-
 // intervalRMTypeMatches reports whether a concrete interval RM type
 // name satisfies an OPT-declared generic interval type (REQ-052 / REQ-110).
 //
@@ -863,168 +725,13 @@ func rmTypeIsSubtypeOf(concrete, declared string) bool {
 // spuriously fail. The wire form and the bounds are correct, so when the
 // declared type is a parameterised interval and the value collapsed to a
 // bare one, decide conformance from the bounds' runtime types via `val`
-// ([intervalConformsTo]).
+// ([rmbind.IntervalConformsTo]).
 func intervalRMTypeMatches(got, want string, val any) bool {
 	if got == want {
 		return true
 	}
-	if _, gotTyped := typedIntervalBound(got); want == "DV_INTERVAL" && gotTyped {
+	if _, gotTyped := rmbind.TypedIntervalBound(got); want == "DV_INTERVAL" && gotTyped {
 		return true
 	}
-	return intervalConformsTo(got, want, val)
-}
-
-// intervalConformsTo reports whether an interval value of RM type got, val,
-// conforms to the typed interval want, DV_INTERVAL<T>: each present bound
-// has to be a T (REQ-110), which a bound of T's own type or of one that
-// descends from T in the pinned BMM is ([rmTypeIsSubtypeOf]). A typed
-// value, DV_INTERVAL<U>, conforms when U does; a round-tripped bare
-// DV_INTERVAL is read by its bounds' runtime types, and one with no bound
-// present conforms to every T. An abstract T such as DV_ORDERED therefore
-// admits DV_COUNT bounds. Any other pair of types does not conform here.
-func intervalConformsTo(got, want string, val any) bool {
-	wantBound, wantTyped := typedIntervalBound(want)
-	if !wantTyped {
-		return false
-	}
-	if got == "DV_INTERVAL" {
-		return intervalBoundsConform(val, wantBound)
-	}
-	gotBound, gotTyped := typedIntervalBound(got)
-	return gotTyped && rmTypeIsSubtypeOf(gotBound, wantBound)
-}
-
-// typedIntervalBound returns the bound type of a parameterised interval name,
-// "DV_QUANTITY" for "DV_INTERVAL<DV_QUANTITY>". ok is false for any other
-// name, the bare "DV_INTERVAL" and a malformed spelling included.
-func typedIntervalBound(name string) (bound string, ok bool) {
-	class, params, ok := bmmtype.Split(name)
-	if !ok || class != "DV_INTERVAL" || len(params) != 1 {
-		return "", false
-	}
-	return params[0], true
-}
-
-// intervalBoundsSatisfy reports whether a round-trip-collapsed
-// DVInterval[DVOrdered] names DV_INTERVAL<wantInner> exactly, by the
-// runtime types of its bounds (which survive the round-trip via their own
-// `_type`). Every *present* bound must be of the wanted element type
-// itself; a fully unbounded interval carries no bound to key off and
-// trivially satisfies any element type. (Requiring agreement rather than
-// accepting on either bound rejects a malformed interval whose lower and
-// upper disagree — well-formed DV_INTERVAL<T> bounds are both T.) The
-// first binding tier reads it ([namesRMType]); a bound that only conforms
-// to wantInner is read by [intervalBoundsConform].
-func intervalBoundsSatisfy(val any, wantInner string) bool {
-	bounds, ok := collapsedIntervalBounds(val)
-	if !ok {
-		return false
-	}
-	for _, b := range bounds {
-		if describeRMType(b) != wantInner {
-			return false
-		}
-	}
-	// Every present bound matched (or the interval is fully unbounded):
-	// an unbounded interval satisfies any DV_INTERVAL<T>.
-	return true
-}
-
-// intervalBoundsConform reports whether val is a round-trip-collapsed
-// DVInterval[DVOrdered] each of whose present bounds conforms to wantInner:
-// its type is wantInner or descends from it in the pinned BMM
-// ([rmTypeIsSubtypeOf]). An interval with no bound present conforms. The
-// binding tiers name a type exactly ([intervalBoundsSatisfy]); this is the
-// conformance the third tier and the RM type match read.
-func intervalBoundsConform(val any, wantInner string) bool {
-	bounds, ok := collapsedIntervalBounds(val)
-	if !ok {
-		return false
-	}
-	for _, b := range bounds {
-		if !rmTypeIsSubtypeOf(describeRMType(b), wantInner) {
-			return false
-		}
-	}
-	return true
-}
-
-// collapsedIntervalBounded reports whether val is a round-trip-collapsed
-// DVInterval[DVOrdered] with at least one present bound, a bound that
-// gives the interval its parameterised type ([namesRMType]).
-func collapsedIntervalBounded(val any) bool {
-	bounds, ok := collapsedIntervalBounds(val)
-	return ok && len(bounds) > 0
-}
-
-// collapsedIntervalBounds returns the present bounds of a
-// round-trip-collapsed DVInterval[DVOrdered], lower first; a side that
-// is unbounded or carries no bound is absent. ok is false when val is
-// no such interval.
-func collapsedIntervalBounds(val any) (bounds []rm.DVOrdered, ok bool) {
-	var iv *rm.DVInterval[rm.DVOrdered]
-	switch v := val.(type) {
-	case *rm.DVInterval[rm.DVOrdered]:
-		iv = v
-	case rm.DVInterval[rm.DVOrdered]:
-		iv = &v
-	default:
-		return nil, false
-	}
-	if !iv.LowerUnbounded && iv.Lower != nil {
-		bounds = append(bounds, iv.Lower)
-	}
-	if !iv.UpperUnbounded && iv.Upper != nil {
-		bounds = append(bounds, iv.Upper)
-	}
-	return bounds, true
-}
-
-// primitiveValueMatchesShortName reports whether an RM-side Go value
-// satisfies an AOM 1.4 primitive short-name OPT child (INTEGER,
-// REAL, DURATION, STRING, …) bound to a BMM scalar attribute slot.
-func primitiveValueMatchesShortName(shortName string, val any) bool {
-	switch shortName {
-	case "BOOLEAN":
-		_, ok := val.(bool)
-		return ok
-	case "INTEGER":
-		return rm.IsInt64(val)
-	case "REAL":
-		return rm.IsReal(val)
-	case "DATE", "TIME", "DATE_TIME", "DURATION":
-		_, ok := val.(string)
-		return ok
-	case "STRING":
-		// An optional String attribute (DV_TEXT.formatting,
-		// DV_IDENTIFIER.issuer, …) is a *string in the RM; the reader
-		// returns it only when set, so a nil pointer is absent.
-		if p, isPtr := val.(*string); isPtr {
-			return p != nil
-		}
-		_, ok := val.(string)
-		return ok
-	default:
-		return false
-	}
-}
-
-// aomPrimitiveWrappers maps each AOM 1.4 primitive short name an OPT
-// may declare as an RM type, typically under C_PRIMITIVE_OBJECT, to the
-// canonical DV wrapper that carries its value. The short names are no
-// BMM classes, so the class hierarchy cannot admit the wrapper; this
-// table does (REQ-102, Validation dimensions: RM type match). Each
-// wrapper is the type instance.concreteFor builds for the short name,
-// so the generator's output passes the RM type match ([rmTypeIssue]).
-//
-// A Go primitive under a short name (an int64 under INTEGER, a string
-// under DURATION) is admitted apart from this table, by
-// primitiveValueMatchesShortName.
-var aomPrimitiveWrappers = map[string]string{
-	"DURATION":  "DV_DURATION",
-	"DATE":      "DV_DATE",
-	"TIME":      "DV_TIME",
-	"DATE_TIME": "DV_DATE_TIME",
-	"BOOLEAN":   "DV_BOOLEAN",
-	"INTEGER":   "DV_COUNT",
+	return rmbind.IntervalConformsTo(got, want, val)
 }

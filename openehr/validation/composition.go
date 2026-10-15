@@ -3,8 +3,7 @@ package validation
 import (
 	"fmt"
 
-	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
-	"github.com/cadasto/openehr-sdk-go/openehr/internal/rmnames"
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/rmbind"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
@@ -64,35 +63,23 @@ func joinPath(parent, segment string) string {
 // and locatableArchetypeNodeID are thin wrappers.
 //
 // Since ADR 0013 it decomposes onto the generated surface: the name
-// half delegates to rm.RMTypeName (every registered concrete — the
-// previous hand-written closed set was a subset, so recognition
-// widened to the full registry), the archetype_node_id half reads
-// polymorphically through rm.Locatable. Only the parameterised
-// DV_INTERVAL names stay hand-written: they decide the RM type match
-// against an OPT child's RMTypeName, and rm_type_mismatch details
-// carry the same names.
+// half is rmbind.TypeName, the name the binding tiers compare with an
+// OPT child's RMTypeName, so the binding and the RM type match read one
+// name. It delegates to rm.RMTypeName (every registered concrete) and
+// keeps the parameterised DV_INTERVAL names from rmnames: they decide
+// the RM type match against an OPT child's RMTypeName, and
+// rm_type_mismatch details carry the same names. The archetype_node_id
+// half reads polymorphically through rm.Locatable.
 //
 // Returns ("", "", false) for nil, typed-nil, and non-RM Go values.
 // REQ-024 — no reflection.
 func rmTypeInfo(v any) (rmType string, archetypeNodeID string, ok bool) {
-	if v == nil || rmaccess.IsTypedNilPointer(v) {
-		return "", "", false
-	}
-	// Typed DV_INTERVAL instantiations keep their parameterised names:
-	// the type match compares them with the OPT child's RMTypeName, and
-	// rm_type_mismatch details show them. Single canonical closed set in
-	// rmnames — the previous local switch had drifted three
-	// instantiations (DV_DURATION/DV_ORDINAL/DV_SCALE) behind the
-	// DVOrdered closure.
-	if name, ok := rmnames.TypedIntervalName(v); ok {
-		return name, "", true
-	}
-	name, ok := rm.RMTypeName(v)
+	name, ok := rmbind.TypeName(v)
 	if !ok {
 		return "", "", false
 	}
 	if l, isLocatable := v.(rm.Locatable); isLocatable {
-		// Guarded above: typed-nils never reach the getter.
+		// TypeName refuses typed-nils, so none reaches the getter.
 		return name, l.GetArchetypeNodeID(), true
 	}
 	return name, "", true

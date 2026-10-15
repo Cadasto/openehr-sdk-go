@@ -9,7 +9,7 @@
 # In REQ.md only the text between the BEGIN/END GENERATED
 # markers is rewritten; the prose around it is hand-written. In the map only
 # the rows' tests: lists are rewritten. Never edit a generated part by hand:
-# edit the source and run `make spec-gen`.
+# edit the source and run `make spec-generate`.
 #
 # A test file cites REQ-NNN when the token REQ-NNN appears in it with no
 # letter, digit or underscore right before or after it (grep -w), so a hyphen
@@ -82,14 +82,14 @@ render_tests() {
         if (b != "" && !(b in inold))      why = b " cites " id " but is not listed"
         else if (a != "" && !(a in innew)) why = a " is listed but does not cite " id
         else                               why = "the list is not in sorted order at " a
-        printf "spec-gen: traceability.yaml %s tests list is stale: %s; run make spec-gen\n", id, why
+        printf "spec-gen: traceability.yaml %s tests list is stale: %s; run make spec-generate\n", id, why
         return
       }
       # Same paths in the same order: only the layout can differ.
       if (inline)
-        printf "spec-gen: traceability.yaml %s tests list is not in block form; run make spec-gen\n", id
+        printf "spec-gen: traceability.yaml %s tests list is not in block form; run make spec-generate\n", id
       else if (haskey && cnt[id] == 0)
-        printf "spec-gen: traceability.yaml %s has an empty tests: key; run make spec-gen\n", id
+        printf "spec-gen: traceability.yaml %s has an empty tests: key; run make spec-generate\n", id
     }
     function flush(   i, last) {
       if (id == "") return
@@ -131,7 +131,7 @@ apply_tests() {
   [[ "$out" == "$(tr -d '\r' < "$YAML")" ]] && return 0
   if [[ $check -eq 1 ]]; then
     render_tests diag >&2
-    echo "spec-gen: docs/specifications/traceability.yaml tests lists are stale; run make spec-gen" >&2
+    echo "spec-gen: docs/specifications/traceability.yaml tests lists are stale; run make spec-generate" >&2
     stale=1
   else
     printf '%s\n' "$out" > "$YAML"
@@ -193,7 +193,7 @@ apply() {
   out+=$'\n'
   if [[ $check -eq 1 ]]; then
     if [[ "$out" != "$(cat "$file")"$'\n' ]]; then
-      echo "spec-gen: ${file#"${ROOT}/"} ${tag} block is stale — run make spec-gen" >&2
+      echo "spec-gen: ${file#"${ROOT}/"} ${tag} block is stale — run make spec-generate" >&2
       stale=1
     fi
   else

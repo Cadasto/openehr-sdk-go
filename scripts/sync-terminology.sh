@@ -288,7 +288,7 @@ cmd_check() {
   if [[ $rc -ne 0 ]]; then
     die "integrity check failed — never hand-edit the pin; run 'make terminology-sync' to refresh"
   fi
-  echo "terminology-verify: OK"
+  echo "terminology-check: OK"
 
   # 2. Upstream drift (best-effort; never fails the command). Do NOT
   # require_tools here: the integrity check above is fully offline, so a host

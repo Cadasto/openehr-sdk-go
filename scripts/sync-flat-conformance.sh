@@ -184,7 +184,7 @@ cmd_sync() {
 }
 
 cmd_check() {
-  [[ -f "$MANIFEST" ]] || die "no MANIFEST.txt — run 'make flat-conformance-sync' first"
+  [[ -f "$MANIFEST" ]] || die "no MANIFEST.txt — run 'make flat-sync' first"
 
   # 1. Offline integrity: local files must match the manifest hashes.
   echo "Checking vendored FLAT corpus integrity against MANIFEST.txt ..."
@@ -222,7 +222,7 @@ cmd_check() {
   done
 
   if [[ $rc -ne 0 ]]; then
-    die "integrity check failed — run 'make flat-conformance-sync' to refresh"
+    die "integrity check failed — run 'make flat-sync' to refresh"
   fi
   echo "Integrity OK ($(grep -cE '  (compositions|templates)/' <<<"$hash_block") file(s))."
 
@@ -243,7 +243,7 @@ cmd_check() {
   if upstream="$(resolve_commit "$REF" 2>/dev/null)"; then
     if [[ "$pinned" != "$upstream" ]]; then
       echo "Upstream $REPO@$REF advanced: ${pinned:0:12} -> ${upstream:0:12}"
-      echo "Run 'make flat-conformance-sync' to update the vendored corpus."
+      echo "Run 'make flat-sync' to update the vendored corpus."
     else
       echo "Up to date with $REPO@$REF (${pinned:0:12})."
     fi

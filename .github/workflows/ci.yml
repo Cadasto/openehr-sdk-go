@@ -38,13 +38,13 @@ jobs:
         run: make mod-tidy-check
 
       - name: Codegen verify
-        run: make codegen-verify
+        run: make codegen-check
 
       - name: AQL parser verify
-        run: make aqlgen-verify
+        run: make aqlgen-check
 
       - name: Terminology codegen verify
-        run: make termgen-verify
+        run: make termgen-check
 
       - name: Vet
         run: make vet
@@ -55,12 +55,12 @@ jobs:
       # Offline sha256 only (no network, no curl/jq) — guards the pinned
       # upstream FLAT corpus against hand-edits.
       - name: Vendored fixture integrity
-        run: make flat-conformance-verify
+        run: make flat-check
 
       # Same offline sha256 guard for the pinned openEHR Terminology, whose
       # whole value is being byte-identical to the TERM release (REQ-034).
       - name: Vendored terminology integrity
-        run: make terminology-verify
+        run: make terminology-check
 
       - name: Build
         run: make build

@@ -251,7 +251,7 @@ func intervalSwitchArms(t *testing.T, src string) map[string]string {
 // zero-size `omitzero` field for exactly the bound members it leaves out, and
 // a plain wire after the switch. Without this test, removing an arm from the
 // generator leaves that combination writing its empty bound and only
-// `make codegen-verify` notices, as a diff.
+// `make codegen-check` notices, as a diff.
 func TestIntervalMarshalJSONOpenSideArms(t *testing.T) {
 	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
 	if err != nil {

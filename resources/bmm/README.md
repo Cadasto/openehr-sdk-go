@@ -44,7 +44,7 @@ All six pins were verified byte-identical to [`openEHR/BMM-publisher`](https://g
 A BMM version bump is always deliberate and follows [ADR 0001: BMM version-bump runbook](../../docs/adr/0001-bmm-version-bump-runbook.md), the canonical procedure. In outline:
 
 1. Drop the new file alongside the old (e.g. `openehr_rm_1.2.1.bmm.json` next to `openehr_rm_1.2.0.bmm.json`). Do **not** overwrite the old file.
-2. Run `make codegen` then `make codegen-verify`. Optionally inspect the semantic diff with `go run ./cmd/bmmdiff <old> <new>`.
+2. Run `make codegen` then `make codegen-check`. Optionally inspect the semantic diff with `go run ./cmd/bmmdiff <old> <new>`.
 3. Update version pins in [`../../docs/specifications/bmm-conformance.md`](../../docs/specifications/bmm-conformance.md) and the schema ID table above.
 4. Propose the one-line CHANGELOG bullet in the PR body; the CHANGELOG follows the rule in [`AGENTS.md § Code style and conventions`](../../AGENTS.md#code-style-and-conventions) (ADR 0001 step 8).
 5. Remove the old file **in the same commit** once the regen and tests pass.

@@ -22,7 +22,7 @@ parser against the pure-Go runtime.
 
 ```bash
 make aqlgen          # regenerate parse/gen/ from active/
-make aqlgen-verify   # fail if the committed parser drifts from active/
+make aqlgen-check   # fail if the committed parser drifts from active/
 ```
 
 The generator is the ANTLR Java tool, confined to the `antlr` Docker stage; the
@@ -34,7 +34,7 @@ versions together** (see `baseline/PIN`), because they are released in lockstep.
 1. Re-import the new official `.g4` into `baseline/`; update `baseline/PIN`.
 2. For each `SDK-AQL-NNN`: re-apply to `active/`, or drop the row if upstream
    absorbed it.
-3. `make aqlgen && make aqlgen-verify`; run `go test ./openehr/aql/...`.
+3. `make aqlgen && make aqlgen-check`; run `go test ./openehr/aql/...`.
 4. Note the bump in `CHANGELOG.md` (artefact class: "AQL grammar profile").
 
 ## Licence

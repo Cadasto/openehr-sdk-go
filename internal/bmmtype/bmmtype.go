@@ -112,6 +112,43 @@ var formalParameters = map[string][]string{
 	"VERSIONED_OBJECT": {"T"},
 }
 
+// ParameterConstraint reports whether param is one of the formal generic
+// parameters of class, and the type that the actual parameter must conform
+// to. class is a class name without generic parameters, as [Class] returns
+// it. On DV_INTERVAL, T gives "DV_ORDERED" and true. constraint is empty
+// when the schemas set the parameter no constraint, as for the T of
+// VERSION; ok is false when class has no formal parameter named param.
+//
+// An attribute that its class types with a formal parameter, on a value
+// whose type name leaves that parameter open (a bare "DV_INTERVAL"), can
+// hold only a value of the constraint's type or a type that descends from
+// it.
+func ParameterConstraint(class, param string) (constraint string, ok bool) {
+	if !slices.Contains(formalParameters[class], param) {
+		return "", false
+	}
+	return parameterConstraints[class][param], true
+}
+
+// parameterConstraints gives the type each formal parameter in
+// formalParameters must conform to, by class and parameter name; a
+// parameter the schemas set no constraint is left out. A class whose own
+// declaration sets the parameter none takes the constraint of the
+// parameter of the same name on its generic ancestor: the RM schema writes
+// POINT_EVENT's ancestor as "EVENT", so its T is EVENT's T, which must be
+// an ITEM_STRUCTURE. The constraints come from the same schemas as
+// formalParameters, and a test holds this table to them.
+var parameterConstraints = map[string]map[string]string{
+	"DV_INTERVAL":     {"T": "DV_ORDERED"},
+	"EVENT":           {"T": "ITEM_STRUCTURE"},
+	"HISTORY":         {"T": "ITEM_STRUCTURE"},
+	"INTERVAL_EVENT":  {"T": "ITEM_STRUCTURE"},
+	"POINT_EVENT":     {"T": "ITEM_STRUCTURE"},
+	"Point_interval":  {"T": "Ordered"},
+	"Proper_interval": {"T": "Ordered"},
+	"REFERENCE_RANGE": {"T": "DV_ORDERED"},
+}
+
 // wellFormed reports whether s is exactly one type name: a class name,
 // optionally followed by a bracketed, comma-separated list of type names. White
 // space is what [unicode.IsSpace] reports, the same set [strings.TrimSpace]

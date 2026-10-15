@@ -398,7 +398,7 @@ func writeValidationTree(t *testing.T, raw []byte) string {
 	return root
 }
 
-// REQ-171 Acceptance — `make codegen` and `make codegen-verify` fail when an
+// REQ-171 Acceptance — `make codegen` and `make codegen-check` fail when an
 // invariant of the pinned BMMs has no classification: [Run], in both modes,
 // over a tree whose classification lacks one, fails naming it. Over a tree
 // with the full classification it writes the inventory and then verifies it

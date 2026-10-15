@@ -199,7 +199,7 @@ Full normative list: [specifications/idiom.md](specifications/idiom.md).
 
 ## If you don't have host Go
 
-When host Go 1.27.x is missing, the Makefile routes every target through a Docker dev image. Run `make image-dev` once, then use `make` as normal. `make doctor` tells you which toolchain is active. [ci.md](ci.md) and [CONTRIBUTING.md](../CONTRIBUTING.md) cover the contributor targets and the PR gate.
+When host Go 1.27.x is missing, the Makefile routes every target through a Docker dev image. Run `make build-dev` once, then use `make` as normal. `make doctor` tells you which toolchain is active. [ci.md](ci.md) and [CONTRIBUTING.md](../CONTRIBUTING.md) cover the contributor targets and the PR gate.
 
 ---
 

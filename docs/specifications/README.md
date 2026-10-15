@@ -38,7 +38,7 @@ The repo uses several document kinds, each with a distinct role and boundary:
 **Boundaries between kinds:**
 
 - **Topic specs** carry RFC 2119 prose only — no checkbox task lists, no implementation file paths, no PR-style summaries (use a plan for those).
-- **`REQ.md`** is registry-only — one row per REQ-NNN, generated from `traceability.yaml` by `make spec-gen` — canonical prose lives in the topic spec linked from each row.
+- **`REQ.md`** is registry-only — one row per REQ-NNN, generated from `traceability.yaml` by `make spec-generate` — canonical prose lives in the topic spec linked from each row.
 - **`traceability.yaml`** is an index only: ids, links and paths, with no notes or comments (`make spec-check` refuses them). Its `tests:` lists are generated from the tests' REQ citations ([development-process.md § The ladder](../development-process.md#the-ladder-full-lane)). A fact worth keeping goes in its canonical spec; history stays in git, plans and ADRs.
 - **Plans** are working notes outside the traceability chain: no rule here binds them and no gate reads them ([plans/README.md](../plans/README.md)).
 - **ADRs** cover one decision each — long flows or invariants stay in the topic spec; ADRs cite the STRAND-NN they resolve plus any REQ-NNN they amend.
@@ -80,7 +80,7 @@ Cite identifiers when crossing the chain:
 - Every test that exercises a normative requirement SHOULD cite the REQ-ID and (if applicable) PROBE-ID in a comment; that citation is what lists the test under its REQ in `traceability.yaml`. Maintainer comments may cite them too; godoc on exported API does not (it is written for SDK users; see [AGENTS.md](../../AGENTS.md#spec-driven-workflow-agents)).
 - Every ADR in `docs/adr/` MUST cite the STRAND-ID it resolves (from `research-strands.md`) and any REQ-IDs it amends.
 - The map lists no ADRs: an ADR names its REQs in its header, and `make spec-context` finds it from there. Plans are not part of the chain.
-- When landing code or probes, update the packages and probes in [`traceability.yaml`](traceability.yaml) and run `make spec-gen`, which writes the tests lists.
+- When landing code or probes, update the packages and probes in [`traceability.yaml`](traceability.yaml) and run `make spec-generate`, which writes the tests lists.
 
 `make spec-check` catches the drift a machine can see: a cited path, probe or anchor that does not exist, a landed requirement with no packages or tests, and a generated block that no longer matches its source.
 

@@ -86,7 +86,7 @@ Because ADR 0002 D4 flattens the `LOCATABLE` fields into every concrete descenda
 - Every LOCATABLE concrete **MUST** carry four value-receiver read accessors — `GetArchetypeNodeID() string`, `GetName() DVTextLike`, `GetUID() UIDBasedID`, `GetArchetypeDetails() *Archetyped` — whose return types **MUST** equal the flattened field's declared type. The sealed `rm.Locatable` interface lists them; both `T` and `*T` satisfy it.
 - Every LOCATABLE concrete **MUST** carry the four matching pointer-receiver setters, collected behind the sealed `rm.MutableLocatable` interface (satisfied by `*T` only).
 - Accessors return the field verbatim: a getter invoked on a typed-nil `*T` panics, so callers **MUST** guard with `rm.IsTypedNil` (§ Type registry below) before asserting/calling.
-- The surface is machine-owned: accessor emission resolves types through the same rules as struct-field rendering, and `make codegen-verify` gates drift (REQ-042).
+- The surface is machine-owned: accessor emission resolves types through the same rules as struct-field rendering, and `make codegen-check` gates drift (REQ-042).
 
 ## Abstract categories (REQ-032)
 

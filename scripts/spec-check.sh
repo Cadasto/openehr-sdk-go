@@ -303,10 +303,10 @@ stray="$(awk '
   index($0, "<!-- END GENERATED: registry ") == 1 { inside = 0; next }
   !inside && /^\| REQ-[0-9]+ \|.*\| (landed|partial|planned|retired) \|$/ { print NR }
 ' "$REQ_REG")"
-[[ -z "$stray" ]] || die "REQ.md: registry row(s) outside the generated block at line(s) $(echo $stray) — edit traceability.yaml and run make spec-gen"
+[[ -z "$stray" ]] || die "REQ.md: registry row(s) outside the generated block at line(s) $(echo $stray) — edit traceability.yaml and run make spec-generate"
 
 if [[ -f "${ROOT}/scripts/spec-gen.sh" ]]; then
-  bash "${ROOT}/scripts/spec-gen.sh" --check || die "generated blocks are stale — run make spec-gen"
+  bash "${ROOT}/scripts/spec-gen.sh" --check || die "generated blocks are stale — run make spec-generate"
 else
   die "missing scripts/spec-gen.sh"
 fi

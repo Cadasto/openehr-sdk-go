@@ -16,7 +16,7 @@
 // <out>/openehr/terminology/openehr_gen.go, with one variable per
 // terminology group and code set of both files, plus the release version
 // and each file's sha256. `make termgen` regenerates it; `make
-// termgen-verify` fails the build when it drifts from either file. The
+// termgen-check` fails the build when it drifts from either file. The
 // implementation lives in internal/termgen.
 package main
 
