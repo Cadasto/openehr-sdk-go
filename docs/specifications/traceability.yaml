@@ -1162,6 +1162,7 @@ requirements:
     implementation: landed
     packages:
       - openehr/composition
+      - openehr/internal/rmbind
       - openehr/internal/rmnames
       - openehr/templatecompile
       - testkit/probes/composition
@@ -1183,7 +1184,7 @@ requirements:
     canonical: docs/specifications/clinical-modeling.md#req-102--composition-validation
     status: draft
     implementation: landed
-    packages: [openehr/validation, internal/rmaccess, openehr/internal/rmnames, openehr/templatecompile, internal/templatecompile, testkit/probes/validation]
+    packages: [openehr/validation, internal/rmaccess, openehr/internal/rmbind, openehr/internal/rmnames, openehr/templatecompile, internal/templatecompile, testkit/probes/validation]
     probes: [PROBE-025, PROBE-026, PROBE-074]
     tests:
       - internal/rmaccess/interval_test.go
@@ -1460,7 +1461,7 @@ requirements:
     canonical: docs/specifications/clinical-modeling.md#req-110--template-driven-validation-beyond-composition
     status: draft
     implementation: landed
-    packages: [openehr/validation, internal/rmaccess, openehr/internal/rmnames, openehr/templatecompile, internal/templatecompile, testkit/probes/validation]
+    packages: [openehr/validation, internal/rmaccess, openehr/internal/rmbind, openehr/internal/rmnames, openehr/templatecompile, internal/templatecompile, testkit/probes/validation]
     probes: [PROBE-074]
     tests:
       - internal/rmaccess/reads_test.go
