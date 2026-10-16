@@ -4,8 +4,8 @@ package validation_test
 // decoded with canjson.Unmarshal can reach each limit of the walk: a large
 // one the visit limit, a deeply nested one the depth limit. The template
 // check runs in the same walk as the Reference Model rules, so a max_nodes
-// stop ends it too: a template defect past the stop is not reported until
-// the caller raises the limit with WithLimits.
+// stop ends it too: a template defect in a value the walk has not reached
+// is not reported until the caller raises the limit with WithLimits.
 
 import (
 	json "encoding/json/v2"

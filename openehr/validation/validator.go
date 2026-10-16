@@ -38,8 +38,11 @@ type Limits struct {
 	// visit too, though the walk does not enter it. 100,000 by default.
 	//
 	// The stop ends the template check as well as the Reference Model
-	// rules, since both run in the one walk: nothing after the stop is
-	// checked, so a defect there is not reported.
+	// rules, since both run in the one walk: the value where it stops and
+	// every value after it go unchecked, so a defect in them is not
+	// reported. A leaf reached before the stop has already been judged whole
+	// by its template value constraint, so a defect in a part of it the walk
+	// had not yet visited is still reported.
 	Nodes int
 }
 
