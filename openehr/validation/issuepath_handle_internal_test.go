@@ -52,55 +52,63 @@ func TestIssuePath_REQ102_WritesTheStringRule(t *testing.T) {
 		},
 		{
 			name:  "an item by its id",
-			steps: []pathStep{{attr: "content"}, {item: byID("openEHR-EHR-OBSERVATION.bmi.v1")}},
+			steps: []pathStep{{attr: "content"}, {isItem: true, item: byID("openEHR-EHR-OBSERVATION.bmi.v1")}},
 			want:  "/content[openEHR-EHR-OBSERVATION.bmi.v1]",
 		},
 		{
 			name:  "an item by its id and a name with a quote and a backslash",
-			steps: []pathStep{{attr: "items"}, {item: byName("at0004", `O'Brien \ co`)}},
+			steps: []pathStep{{attr: "items"}, {isItem: true, item: byName("at0004", `O'Brien \ co`)}},
 			want:  `/items[at0004, 'O\'Brien \\ co']`,
 		},
-		{name: "an item by its id and a plain name", steps: []pathStep{{attr: "items"}, {item: byName("at0004", "x")}}, want: "/items[at0004, 'x']"},
-		{name: "an item by its position", steps: []pathStep{{attr: "items"}, {item: byPosition(3)}}, want: "/items[3]"},
-		{name: "an item by a three-digit position", steps: []pathStep{{attr: "items"}, {item: byPosition(100)}}, want: "/items[100]"},
-		{name: "an item by a five-digit position", steps: []pathStep{{attr: "items"}, {item: byPosition(20000)}}, want: "/items[20000]"},
-		{name: "an OPT child with no id of its own", steps: []pathStep{{attr: "items"}, {item: predicate{}}}, want: "/items"},
+		{name: "an item by its id and a plain name", steps: []pathStep{{attr: "items"}, {isItem: true, item: byName("at0004", "x")}}, want: "/items[at0004, 'x']"},
+		{name: "an item by its position", steps: []pathStep{{attr: "items"}, {isItem: true, item: byPosition(3)}}, want: "/items[3]"},
+		{name: "an item by a three-digit position", steps: []pathStep{{attr: "items"}, {isItem: true, item: byPosition(100)}}, want: "/items[100]"},
+		{name: "an item by a five-digit position", steps: []pathStep{{attr: "items"}, {isItem: true, item: byPosition(20000)}}, want: "/items[20000]"},
+		// A template may declare an attribute with no name; its step is still
+		// an attribute's, written "/", never read as an item's.
+		{name: "an attribute with an empty name, of the root", steps: []pathStep{{attr: ""}}, want: "/"},
+		{
+			name:  "an attribute with an empty name, below an item",
+			steps: []pathStep{{attr: "content"}, {isItem: true, item: byID("at0001")}, {attr: ""}},
+			want:  "/content[at0001]/",
+		},
+		{name: "an OPT child with no id of its own", steps: []pathStep{{attr: "items"}, {isItem: true, item: predicate{}}}, want: "/items"},
 		{
 			name: "items and attributes nested",
 			steps: []pathStep{
 				{attr: "content"},
-				{item: byID(bp)},
+				{isItem: true, item: byID(bp)},
 				{attr: "data"},
 				{attr: "events"},
-				{item: byID("at0006")},
+				{isItem: true, item: byID("at0006")},
 				{attr: "data"},
 				{attr: "items"},
-				{item: byPosition(2)},
+				{isItem: true, item: byPosition(2)},
 				{attr: "value"},
 			},
 			want: "/content[" + bp + "]/data/events[at0006]/data/items[2]/value",
 		},
 		{
 			name:  "the first entry of a Hash",
-			steps: []pathStep{{attr: "description"}, {attr: "other_details"}, {item: entryPredicate(0)}},
+			steps: []pathStep{{attr: "description"}, {attr: "other_details"}, {isItem: true, item: entryPredicate(0)}},
 			want:  "/description/other_details[1]",
 		},
 		{
 			name:  "the tenth entry of a Hash",
-			steps: []pathStep{{attr: "description"}, {attr: "other_details"}, {item: entryPredicate(9)}},
+			steps: []pathStep{{attr: "description"}, {attr: "other_details"}, {isItem: true, item: entryPredicate(9)}},
 			want:  "/description/other_details[10]",
 		},
-		{name: "an entry of a Hash of the root", steps: []pathStep{{attr: "other_details"}, {item: entryPredicate(0)}}, want: "/other_details[1]"},
+		{name: "an entry of a Hash of the root", steps: []pathStep{{attr: "other_details"}, {isItem: true, item: entryPredicate(0)}}, want: "/other_details[1]"},
 		{name: "a sub-path of the root", segments: []string{"/archetype_details"}, want: "/archetype_details"},
 		{
 			name:     "a sub-path of an item",
-			steps:    []pathStep{{attr: "content"}, {item: byID(bp)}},
+			steps:    []pathStep{{attr: "content"}, {isItem: true, item: byID(bp)}},
 			segments: []string{"/archetype_details"},
 			want:     "/content[" + bp + "]/archetype_details",
 		},
 		{
 			name:     "a sub-path of an attribute of an item",
-			steps:    []pathStep{{attr: "content"}, {item: byID(bp)}, {attr: "language"}},
+			steps:    []pathStep{{attr: "content"}, {isItem: true, item: byID(bp)}, {attr: "language"}},
 			segments: []string{"/code_string"},
 			want:     "/content[" + bp + "]/language/code_string",
 		},
@@ -118,10 +126,10 @@ func TestIssuePath_REQ102_WritesTheStringRule(t *testing.T) {
 			var s pathStack
 			var p issuePath
 			for _, step := range tc.steps {
-				if step.attr != "" {
-					p = s.attribute(p, step.attr)
-				} else {
+				if step.isItem {
 					p = s.item(p, step.item)
+				} else {
+					p = s.attribute(p, step.attr)
 				}
 			}
 			got := p.String()

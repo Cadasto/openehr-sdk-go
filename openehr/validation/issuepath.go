@@ -86,11 +86,16 @@ type pathStack struct {
 
 // pathStep is one step of an issue path below the root.
 type pathStep struct {
-	// attr is the name of an attribute, written "/name"; "" on an item.
+	// attr is the name of an attribute, written "/name"; unused on an item.
+	// It may be empty: a template may declare an attribute with no name,
+	// which is written "/" like any other.
 	attr string
 	// item is the predicate of an item, written after the path of its
 	// attribute; unused on an attribute.
 	item predicate
+	// isItem marks the step of an item, set only by [pathStack.item]; the
+	// step of an attribute is told apart by it, never by an empty attr.
+	isItem bool
 }
 
 // attribute returns the path of the attribute name of the node at p, which
@@ -105,7 +110,7 @@ func (s *pathStack) attribute(p issuePath, name string) issuePath {
 // whose predicate is pred, which spans a step of s more than p, as
 // [pathStack.attribute] pushes one.
 func (s *pathStack) item(p issuePath, pred predicate) issuePath {
-	s.steps = append(s.steps[:p.n], pathStep{item: pred})
+	s.steps = append(s.steps[:p.n], pathStep{item: pred, isItem: true})
 	return issuePath{stack: s, n: p.n + 1}
 }
 
@@ -154,7 +159,7 @@ func (p issuePath) join(segments ...string) string {
 
 // size returns the length of the step as [pathStep.writeTo] writes it.
 func (s *pathStep) size() int {
-	if s.attr != "" {
+	if !s.isItem {
 		return len("/") + len(s.attr)
 	}
 	return s.item.size()
@@ -163,7 +168,7 @@ func (s *pathStep) size() int {
 // writeTo writes the step to b: "/name" for an attribute, the predicate for
 // an item.
 func (s *pathStep) writeTo(b *strings.Builder) {
-	if s.attr != "" {
+	if !s.isItem {
 		b.WriteByte('/')
 		b.WriteString(s.attr)
 		return
