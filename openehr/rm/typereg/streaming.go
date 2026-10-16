@@ -212,23 +212,14 @@ var encodeOptions = json.JoinOptions(
 )
 
 // MarshalOptions returns the encode options every generated MarshalJSONTo
-// passes to json.MarshalEncode, so the deterministic-map and nil-container
-// spellings of [EncodeOptions] hold from any entry point. MarshalEncode joins
-// the options it is passed on top of the encoder's own for that call's
-// duration, so once an enclosing value (or the entry point) has applied them,
-// a nested value's encoder already has all three set to true. MarshalOptions
-// then returns nil, which MarshalEncode skips. Otherwise it returns
-// EncodeOptions, which MarshalEncode joins after the encoder's own options:
-// the same result as joining the two here, without building a new set per
-// value.
-func MarshalOptions(enc *jsontext.Encoder) json.Options {
-	opts := enc.Options()
-	deterministic, _ := json.GetOption(opts, json.Deterministic)
-	nilSliceAsNull, _ := json.GetOption(opts, json.FormatNilSliceAsNull)
-	nilMapAsNull, _ := json.GetOption(opts, json.FormatNilMapAsNull)
-	if deterministic && nilSliceAsNull && nilMapAsNull {
-		return nil
-	}
+// passes to json.MarshalEncode: the [EncodeOptions] value, so the
+// deterministic-map and nil-container spellings hold from any entry point.
+// MarshalEncode joins the options it is passed on top of the encoder's own for
+// that call's duration, which gives the same result as joining the two here,
+// without building a new set per value. The result is never nil, whatever the
+// encoder carries, so a caller that passes it to an encode on another encoder
+// still gets the three options. The encoder is not read, and may be nil.
+func MarshalOptions(_ *jsontext.Encoder) json.Options {
 	return encodeOptions
 }
 
