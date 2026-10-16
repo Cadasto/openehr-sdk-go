@@ -41,7 +41,6 @@ func TestEngine_REQ112_REQ171_MandatoryPrimitiveListCounted(t *testing.T) {
 				Data:      payload,
 			},
 			rmType: "DV_MULTIMEDIA",
-			path:   "/",
 		}, "DV_MULTIMEDIA", &data)
 		var got []string
 		for _, i := range e.found.issues {

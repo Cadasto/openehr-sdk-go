@@ -103,6 +103,18 @@ func TestPredicates_REQ102_OPTChildrenAreNeverNumbered(t *testing.T) {
 	}
 }
 
+// itemPaths applies the path rule to items, which exist in the instance, as
+// [resolvePredicates] does, and returns the path of each below attrPath, the
+// path of their attribute, as the walk writes it.
+func itemPaths(attrPath string, items []predicate) []string {
+	resolvePredicates(items, true)
+	out := make([]string, len(items))
+	for i := range items {
+		out[i] = items[i].pathBelow(attrPath)
+	}
+	return out
+}
+
 // asPredicates returns the predicates the path rule writes into for items,
 // each holding what the rule reads of its item ([resolvePredicates]).
 func asPredicates(items []pathItem) []predicate {

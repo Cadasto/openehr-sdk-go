@@ -45,18 +45,6 @@ func ValidateComposition(comp *rm.Composition, c *templatecompile.Compiled) Resu
 	return Validate(comp, c)
 }
 
-// joinPath glues a parent issue path with a child segment. Mirrors
-// the compile-side pathSegment convention: root path is "/" and
-// child deltas already begin with "/" (e.g. "/category",
-// "/content[at0001]"). Centralised here so future tweaks to path
-// construction (e.g. predicate normalisation) have one home.
-func joinPath(parent, segment string) string {
-	if parent == "/" {
-		return segment
-	}
-	return parent + segment
-}
-
 // rmTypeInfo is the single source of truth for "what RM class is
 // this Go value and (when LOCATABLE) what is its archetype_node_id".
 // The walk and the rules route through this function — describeRMType

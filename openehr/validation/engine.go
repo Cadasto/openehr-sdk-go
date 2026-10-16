@@ -59,7 +59,7 @@ func engineWalk(root any, c *templatecompile.Compiled, lim Limits) (Result, *eng
 			return guard, nil
 		}
 		e := newEngine(lim)
-		e.walk(engineNode{value: root, rmType: rmType, path: "/"})
+		e.walk(engineNode{value: root, rmType: rmType})
 		return e.result(), e
 	}
 	if root == nil || rmaccess.IsTypedNilPointer(root) {
@@ -75,7 +75,7 @@ func engineWalk(root any, c *templatecompile.Compiled, lim Limits) (Result, *eng
 	}
 	e := newEngine(lim)
 	rmType, _, known := rmTypeInfo(root)
-	e.walk(engineNode{value: root, rmType: rmType, path: "/", bound: c.Root()})
+	e.walk(engineNode{value: root, rmType: rmType, bound: c.Root()})
 	if !known {
 		e.found.emit(Issue{
 			Path:     "/",
@@ -120,6 +120,14 @@ type engine struct {
 	// reaches that limit, and ends the walk.
 	visits  int
 	stopped bool
+	// path holds the steps of the issue path of the node the walk is at,
+	// which the handle of each node's path reads ([issuePath]).
+	path pathStack
+	// preds holds the predicates of the items of each list the walk is
+	// inside, outermost first, a run per list: the walk appends a list's run
+	// when it enters the list and drops it when it leaves, so a list of any
+	// length holds its predicates without a slice of its own.
+	preds []predicate
 }
 
 // newEngine returns the state of a walk within lim, each zero or negative
@@ -130,6 +138,8 @@ func newEngine(lim Limits) *engine {
 		maxDepth: lim.Depth,
 		maxNodes: lim.Nodes,
 		ancestry: make([]any, 0, 16),
+		path:     pathStack{steps: make([]pathStep, 0, 16)},
+		preds:    make([]predicate, 0, 16),
 	}
 }
 
@@ -149,8 +159,9 @@ type engineNode struct {
 	// closed RM set knows it, otherwise the type its attribute declares. It
 	// may carry a generic bound (DV_INTERVAL<DV_QUANTITY>).
 	rmType string
-	// path is the node's issue path.
-	path string
+	// path is the node's issue path, a handle valid while the node is
+	// visited ([issuePath]).
+	path issuePath
 	// role is what the node's place tells of it beyond its type.
 	role floorRole
 	// depth is the node's nesting depth, the root's 0.
@@ -275,7 +286,7 @@ func (e *engine) walk(n engineNode) {
 	}
 	if slices.Contains(e.ancestry, n.value) {
 		e.found.emit(Issue{
-			Path:   n.path,
+			Path:   n.path.String(),
 			Code:   "cyclic_value",
 			Detail: fmt.Sprintf("the walk reached this %s again inside itself; it is not entered again", n.rmType),
 		})
@@ -291,14 +302,15 @@ func (e *engine) walk(n engineNode) {
 // whether the walk may go on with it. Past the visit limit it counts
 // nothing: it reports `max_nodes` at path, records path in the stops of
 // [Coverage.Stopped], ends the walk and returns false.
-func (e *engine) spendVisit(path, rmType string) bool {
+func (e *engine) spendVisit(path issuePath, rmType string) bool {
 	if e.visits == e.maxNodes {
+		at := path.String()
 		e.found.emit(Issue{
-			Path:   path,
+			Path:   at,
 			Code:   "max_nodes",
 			Detail: fmt.Sprintf("the walk stopped at %s after visiting %d values, its limit per call", rmType, e.maxNodes),
 		})
-		e.stoppedAt = append(e.stoppedAt, path)
+		e.stoppedAt = append(e.stoppedAt, at)
 		e.stopped = true
 		return false
 	}
@@ -306,19 +318,14 @@ func (e *engine) spendVisit(path, rmType string) bool {
 	return true
 }
 
-// spendLeafVisit counts one visit to a primitive leaf ([primitiveLeaf]), the
-// value of the attribute name, of declared RM type rmType, of the node at
-// the issue path parent, as [engine.spendVisit] counts it, unless the walk
-// has stopped. It builds the leaf's path only to report `max_nodes` there.
-func (e *engine) spendLeafVisit(parent, name, rmType string) {
-	if e.stopped {
-		return
+// spendLeafVisit counts one visit to a primitive leaf ([primitiveLeaf]) of
+// declared RM type rmType at path, as [engine.spendVisit] counts it, unless
+// the walk has stopped: once the visit limit has ended the walk, a leaf is
+// neither counted nor reported, as no other value is.
+func (e *engine) spendLeafVisit(path issuePath, rmType string) {
+	if !e.stopped {
+		e.spendVisit(path, rmType)
 	}
-	if e.visits == e.maxNodes {
-		e.spendVisit(attributePath(parent, name), rmType)
-		return
-	}
-	e.visits++
 }
 
 // primitiveLeaf reports whether value, the value of the single-valued
@@ -390,12 +397,13 @@ func (e *engine) visit(n engineNode) {
 	if n.depth >= e.maxDepth {
 		if !e.depthStopped {
 			e.depthStopped = true
+			at := n.path.String()
 			e.found.emit(Issue{
-				Path:   n.path,
+				Path:   at,
 				Code:   "max_depth",
 				Detail: fmt.Sprintf("the walk reached its depth limit %d at %s; nothing below that depth is walked, and later stops there are not reported again", e.maxDepth, n.rmType),
 			})
-			e.stoppedAt = append(e.stoppedAt, n.path)
+			e.stoppedAt = append(e.stoppedAt, at)
 		}
 		return
 	}
@@ -479,7 +487,7 @@ func (e *engine) checkLeaf(n engineNode, scalar bool, class string) (*tcimpl.Com
 	if !isConstraintRef(pc) {
 		return nil, held
 	}
-	e.external = append(e.external, n.path)
+	e.external = append(e.external, n.path.String())
 	if scalar {
 		return nil, held // a scalar has no attributes to visit
 	}
@@ -571,7 +579,8 @@ func appendLeftIssues(issues []Issue, n engineNode, class string, pc constraints
 // Whether they do depends on the role of the node that holds the part, a
 // DV_SCALE symbol's code_string being one they let be blank, and on whether
 // the walk reaches the part before a limit stops it: the walk sees that
-// once it has visited the attributes ([engine.settle]).
+// once it has visited the attributes ([engine.settle]). The part's path is
+// written only when the part is empty.
 func (e *engine) emptyPart(n engineNode, class string) (string, bool) {
 	steps, ok := constrainedPart[class]
 	if !ok || n.depth >= e.maxDepth || !rmaccess.Covers(n.value) {
@@ -579,10 +588,13 @@ func (e *engine) emptyPart(n engineNode, class string) (string, bool) {
 	}
 	value, path := n.value, n.path
 	for i, name := range steps {
-		path = attributePath(path, name)
+		path = e.path.attribute(path, name)
 		v, present := rmaccess.Single(value, name)
 		if !present || v == nil || rmaccess.IsTypedNilPointer(v) {
-			return path, i == len(steps)-1
+			if i < len(steps)-1 {
+				return "", false
+			}
+			return path.String(), true
 		}
 		value = v
 	}
@@ -773,20 +785,23 @@ func shapeFrom(container, primitiveItems, hash bool) attrShape {
 // RM rules alone. Presence: absent, a mandatory attribute is `required`; a
 // mandatory list that is present and empty is `cardinality`. Then each item:
 // a single value is walked at the attribute's path, each item of a list of
-// RM values at the path the shared path rule writes for it ([itemPaths]),
-// and each entry of a Hash at its position in ascending key order
-// ([hashEntryPath]), never at its key. Only a value of a registered RM class
-// ([rmaccess.Covers]) is walked as an item of a list or a Hash; an item of a
-// list that holds no RM value is reported at its path instead
-// ([engine.walkUnconstrained]), and a counted list is never read item by
-// item. A primitive leaf ([primitiveLeaf]) the template does not constrain
-// is counted as one visit and not walked ([engine.spendLeafVisit]): walking
-// it would do nothing more.
+// RM values at the path the shared path rule writes for it
+// ([resolvePredicates]), and each entry of a Hash at its position in
+// ascending key order ([entryPredicate]), never at its key. Only a value of
+// a registered RM class ([rmaccess.Covers]) is walked as an item of a list
+// or a Hash; an item of a list that holds no RM value is reported at its
+// path instead ([engine.walkUnconstrained]), and a counted list is never
+// read item by item. A primitive leaf ([primitiveLeaf]) the template does
+// not constrain is counted as one visit and not walked
+// ([engine.spendLeafVisit]): walking it would do nothing more. The
+// attribute's path is pushed onto the walk's path stack and written only
+// where something records it ([issuePath]).
 func (e *engine) visitAttribute(n *engineNode, class string, a *engineAttr) {
 	r := readAttribute(n.value, a)
 	if !visitedAt(a, r.present) {
 		return
 	}
+	attrPath := e.path.attribute(n.path, a.name)
 	if a.decl == nil && primitiveLeaf(r.value, a) {
 		// Walking a primitive leaf would only spend its visit (REQ-171
 		// visit limit). Only a present single value is read into r.value,
@@ -794,12 +809,11 @@ func (e *engine) visitAttribute(n *engineNode, class string, a *engineAttr) {
 		// a primitive leaf's type, so the leaf is read as its declared type,
 		// has no identity, and has no attributes to visit, so the depth limit
 		// does not reach it. That type has no RM rules to run or record.
-		// So the visit is counted here, and the leaf's path is built only
+		// So the visit is counted here, and the leaf's path is written only
 		// when the visit limit is reported there.
-		e.spendLeafVisit(n.path, a.name, a.rmType)
+		e.spendLeafVisit(attrPath, a.rmType)
 		return
 	}
-	attrPath := attributePath(n.path, a.name)
 	role := childRole(class, n.role, a.name)
 	if a.decl != nil {
 		if a.shape == shapeSingle {
@@ -829,7 +843,7 @@ func (e *engine) visitAttribute(n *engineNode, class string, a *engineAttr) {
 // an attribute the template leaves open both reach it, while a nil item
 // under an attribute that declares children is the template's to refuse
 // ([engine.visitDeclaredItems]) and never gets here.
-func (e *engine) walkUnconstrained(n *engineNode, a *engineAttr, r *attrReading, attrPath string, role floorRole) {
+func (e *engine) walkUnconstrained(n *engineNode, a *engineAttr, r *attrReading, attrPath issuePath, role floorRole) {
 	switch a.shape {
 	case shapeSingle:
 		e.walk(engineNode{value: r.value, rmType: runtimeRMType(r.value, a.rmType), path: attrPath, role: role, depth: n.depth + 1})
@@ -837,21 +851,24 @@ func (e *engine) walkUnconstrained(n *engineNode, a *engineAttr, r *attrReading,
 		if !slices.ContainsFunc(r.items, walkedOrNil) {
 			return
 		}
-		for i, path := range e.itemPaths(attrPath, r.items) {
+		from := e.unboundPredicates(r.items)
+		for i, item := range r.items {
 			if e.stopped {
-				return // the visit limit ended the walk at or inside an earlier item
+				break // the visit limit ended the walk at or inside an earlier item
 			}
-			if isNilItem(r.items[i]) {
+			path := e.path.item(attrPath, e.preds[from+i])
+			if isNilItem(item) {
 				if e.spendVisit(path, a.rmType) {
 					e.found.checkNilItem(n.rmType, a.name, path)
 				}
 				continue
 			}
-			e.walkItem(n, r.items[i], a.rmType, path, role)
+			e.walkItem(n, item, a.rmType, path, role)
 		}
+		e.preds = e.preds[:from]
 	case shapeHash:
 		for i, entry := range r.items {
-			e.walkItem(n, entry, a.rmType, hashEntryPath(attrPath, i), role)
+			e.walkItem(n, entry, a.rmType, e.path.item(attrPath, entryPredicate(i)), role)
 		}
 	case shapeCounted:
 		// Nothing is below the items of a list of a primitive type.
@@ -862,7 +879,7 @@ func (e *engine) walkUnconstrained(n *engineNode, a *engineAttr, r *attrReading,
 // whose declared RM type is rmType, at path, in role, with the RM rules
 // alone, when it is a value of a registered RM class; any other item has
 // nothing below it to walk.
-func (e *engine) walkItem(n *engineNode, item any, rmType, path string, role floorRole) {
+func (e *engine) walkItem(n *engineNode, item any, rmType string, path issuePath, role floorRole) {
 	if !rmaccess.Covers(item) {
 		return
 	}
@@ -888,7 +905,7 @@ func walkedOrNil(item any) bool {
 // attribute is reported as [engine.checkAbsent] says. Then the admitted value
 // is walked against the child it binds to, or, where the template declares
 // no child, with the RM rules alone.
-func (e *engine) visitDeclaredSingle(n *engineNode, a *engineAttr, r *attrReading, attrPath string, role floorRole) {
+func (e *engine) visitDeclaredSingle(n *engineNode, a *engineAttr, r *attrReading, attrPath issuePath, role floorRole) {
 	if !r.present {
 		e.checkAbsent(n, a, attrPath)
 		return
@@ -924,13 +941,13 @@ func (e *engine) visitDeclaredSingle(n *engineNode, a *engineAttr, r *attrReadin
 // no item as [engine.checkEmpty] says. Counts: the template's child count and
 // each child's occurrences. Then each admitted item is walked against the
 // child it binds to, at the path the shared path rule writes for it, with
-// the name the child pins where a sibling shares its id ([boundItemPaths]);
-// where the template declares no child, each item is walked with the RM
-// rules alone, which report an item that holds no RM value
-// ([engine.walkUnconstrained]). A nil item under an attribute that declares
-// children binds to none, so it is refused above and the RM rules never
-// see it.
-func (e *engine) visitDeclaredItems(n *engineNode, a *engineAttr, r *attrReading, attrPath string, role floorRole) {
+// the name the child pins where a sibling shares its id
+// ([appendBoundPredicates]); where the template declares no child, each item
+// is walked with the RM rules alone, which report an item that holds no RM
+// value ([engine.walkUnconstrained]). A nil item under an attribute that
+// declares children binds to none, so it is refused above and the RM rules
+// never see it.
+func (e *engine) visitDeclaredItems(n *engineNode, a *engineAttr, r *attrReading, attrPath issuePath, role floorRole) {
 	if !r.present {
 		e.checkAbsent(n, a, attrPath)
 		return
@@ -941,22 +958,22 @@ func (e *engine) visitDeclaredItems(n *engineNode, a *engineAttr, r *attrReading
 	}
 	children := tcimpl.ChildNodes(a.decl)
 	var bound []*tcimpl.CompiledNode
-	var paths []string
 	var admitted []bool
+	from := len(e.preds)
 	if len(children) > 0 && a.shape != shapeCounted {
 		var byNodeID []bool
 		bound, byNodeID = bindItems(n.bound.RMTypeName(), a.name, children, r.items)
-		paths = boundItemPaths(attrPath, r.items, bound, a.shape == shapeHash)
+		e.preds = appendBoundPredicates(e.preds, r.items, bound, a.shape == shapeHash)
 		allowed := allowedChildren(a.decl)
 		admitted = make([]bool, len(r.items))
 		for i, item := range r.items {
 			switch {
 			case bound[i] == nil:
-				e.refuse(unboundItemIssue(a.decl, children, item, byNodeID[i], paths[i]))
+				e.refuse(unboundItemIssue(a.decl, children, item, byNodeID[i], e.path.item(attrPath, e.preds[from+i])))
 			case !slices.Contains(allowed, bound[i]):
 				// The child's occurrences, reported with the counts below,
 				// are the one report for the item.
-				e.refused = append(e.refused, paths[i])
+				e.refused = append(e.refused, e.path.item(attrPath, e.preds[from+i]).String())
 			default:
 				admitted[i] = true
 			}
@@ -971,8 +988,7 @@ func (e *engine) visitDeclaredItems(n *engineNode, a *engineAttr, r *attrReading
 		// The template reports the container itself by its child count, or
 		// by the occurrences of a child that has no id of its own, which are
 		// written at the container's path ([optChildPaths]).
-		reported := countOut || slices.ContainsFunc(occurrences, func(iss Issue) bool { return iss.Path == attrPath })
-		e.checkEmpty(n, a, attrPath, reported)
+		e.checkEmpty(n, a, attrPath, countOut || reportsAt(occurrences, attrPath))
 	}
 	if countOut {
 		e.found.emit(countIssue)
@@ -986,9 +1002,20 @@ func (e *engine) visitDeclaredItems(n *engineNode, a *engineAttr, r *attrReading
 			if !admitted[i] {
 				continue
 			}
-			e.walk(engineNode{value: item, rmType: runtimeRMType(item, a.rmType), path: paths[i], role: role, depth: n.depth + 1, bound: bound[i]})
+			e.walk(engineNode{value: item, rmType: runtimeRMType(item, a.rmType), path: e.path.item(attrPath, e.preds[from+i]), role: role, depth: n.depth + 1, bound: bound[i]})
 		}
 	}
+	e.preds = e.preds[:from]
+}
+
+// reportsAt reports whether one of issues is at path. The path is written
+// only when there is an issue to compare it with.
+func reportsAt(issues []Issue, path issuePath) bool {
+	if len(issues) == 0 {
+		return false
+	}
+	at := path.String()
+	return slices.ContainsFunc(issues, func(iss Issue) bool { return iss.Path == at })
 }
 
 // refuse reports iss, the one issue for content the template does not admit,
@@ -1007,7 +1034,7 @@ func (e *engine) refuse(iss Issue) {
 // blank. The RM's requirement is read from the value's class alone: an
 // attribute that class does not list draws no RM finding, whatever
 // mandatory bit the compiled template carries for it.
-func (e *engine) checkAbsent(n *engineNode, a *engineAttr, attrPath string) {
+func (e *engine) checkAbsent(n *engineNode, a *engineAttr, attrPath issuePath) {
 	multiValued := a.shape != shapeSingle
 	if iss, required := absentIssue(a.decl, n.value, attrPath, multiValued); required {
 		e.found.emit(iss)
@@ -1026,7 +1053,7 @@ func (e *engine) checkAbsent(n *engineNode, a *engineAttr, attrPath string) {
 // the same container itself (reported), and only for a list: a Hash that is
 // present and empty breaks no mandatory rule, as the RM rules alone read
 // it, however the template declares it.
-func (e *engine) checkEmpty(n *engineNode, a *engineAttr, attrPath string, reported bool) {
+func (e *engine) checkEmpty(n *engineNode, a *engineAttr, attrPath issuePath, reported bool) {
 	if iss, required := emptyIssue(a.decl, n.value, attrPath); required {
 		e.found.emit(iss)
 		return
@@ -1036,14 +1063,17 @@ func (e *engine) checkEmpty(n *engineNode, a *engineAttr, attrPath string, repor
 	}
 }
 
-// itemPaths returns the issue path of each of the items of the multi-valued
-// attribute at attrPath, by the shared path rule ([itemPaths]), fed each
-// item's archetype_node_id. No template node binds these items, so the rule
-// is fed no pinned name.
-func (e *engine) itemPaths(attrPath string, items []any) []string {
-	preds := make([]predicate, len(items))
-	for i, item := range items {
-		preds[i].id = locatableArchetypeNodeID(item)
+// unboundPredicates appends to the walk's predicates ([engine].preds) the
+// predicate of each of items, the items of a list no template node binds,
+// by the shared path rule ([resolvePredicates]), fed each item's
+// archetype_node_id, and returns where they start. No template node binds
+// these items, so the rule is fed no pinned name. The caller drops them
+// once it has walked the items.
+func (e *engine) unboundPredicates(items []any) (from int) {
+	from = len(e.preds)
+	for _, item := range items {
+		e.preds = append(e.preds, predicate{id: locatableArchetypeNodeID(item)})
 	}
-	return itemPaths(attrPath, preds)
+	resolvePredicates(e.preds[from:], true)
+	return from
 }

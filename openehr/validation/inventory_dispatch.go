@@ -53,7 +53,9 @@ type inventoryEntry struct {
 type floorNode struct {
 	value  any
 	rmType string
-	path   string
+	// path is the node's issue path, a handle valid while the walk visits
+	// the node ([issuePath]); an evaluator writes it only into an issue.
+	path issuePath
 }
 
 // invariantCheck binds an evaluated invariant to the evaluator that
@@ -86,7 +88,7 @@ type invariantCheck struct {
 const mandatoryCheck = "checkMandatory"
 
 // nodeCheck binds an evaluator that reads the node's value and path.
-func nodeCheck(function string, f func(*findings, any, string)) invariantCheck {
+func nodeCheck(function string, f func(*findings, any, issuePath)) invariantCheck {
 	return invariantCheck{function: function, run: func(into *findings, n floorNode, _ string) {
 		f(into, n.value, n.path)
 	}}
@@ -94,7 +96,7 @@ func nodeCheck(function string, f func(*findings, any, string)) invariantCheck {
 
 // typeCheck binds an evaluator that also reads the node's RM type, to name
 // the class it reports on.
-func typeCheck(function string, f func(*findings, any, string, string)) invariantCheck {
+func typeCheck(function string, f func(*findings, any, string, issuePath)) invariantCheck {
 	return invariantCheck{function: function, run: func(into *findings, n floorNode, _ string) {
 		f(into, n.value, n.rmType, n.path)
 	}}
@@ -105,7 +107,7 @@ func typeCheck(function string, f func(*findings, any, string, string)) invarian
 // several classes (Value_valid), or one invariant declared on an ancestor of
 // several (Is_archetype_root), and the rule it reports is always the
 // inventory's key.
-func ruleCheck(function string, f func(*findings, any, string, string, string)) invariantCheck {
+func ruleCheck(function string, f func(*findings, any, string, issuePath, string)) invariantCheck {
 	return invariantCheck{function: function, perRule: true, run: func(into *findings, n floorNode, rule string) {
 		f(into, n.value, n.rmType, n.path, rule)
 	}}

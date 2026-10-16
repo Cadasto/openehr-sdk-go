@@ -157,7 +157,7 @@ func TestEngine_REQ171_PrimitiveValueUnderATypeWithRulesIsVisited(t *testing.T) 
 		t.Fatal("precondition: DV_TEXT leaves no invariant unevaluated, so Coverage cannot tell whether its rules ran")
 	}
 	e := newEngine(Limits{})
-	e.visitAttribute(&engineNode{value: &rm.DVText{Value: "x"}, rmType: "DV_TEXT", path: "/"}, "DV_TEXT",
+	e.visitAttribute(&engineNode{value: &rm.DVText{Value: "x"}, rmType: "DV_TEXT"}, "DV_TEXT",
 		new(walkedAttr(attributeFacts{Name: "value", RMType: "DV_TEXT", Typed: true}, nil)))
 	r := e.result()
 	if e.visits != 1 || len(r.Issues) != 0 {
@@ -177,7 +177,7 @@ func TestEngine_REQ171_PrimitiveLeafAfterTheWalkEnded(t *testing.T) {
 		t.Fatal("precondition: the walk under Nodes 1 did not stop")
 	}
 	visits, issues := e.visits, len(e.found.issues)
-	e.visitAttribute(&engineNode{value: &rm.DVText{Value: "y"}, rmType: "DV_TEXT", path: "/"}, "DV_TEXT",
+	e.visitAttribute(&engineNode{value: &rm.DVText{Value: "y"}, rmType: "DV_TEXT"}, "DV_TEXT",
 		new(walkedAttr(attributeFacts{Name: "value", RMType: "String", Typed: true}, nil)))
 	if e.visits != visits || len(e.found.issues) != issues {
 		t.Errorf("visit of a DV_TEXT value after the walk ended: %d visits and issues %v, want %d visits and %d issues", e.visits, e.found.issues, visits, issues)

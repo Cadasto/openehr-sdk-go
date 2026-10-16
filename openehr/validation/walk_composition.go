@@ -51,13 +51,13 @@ func isConstraintRef(pc constraints.PrimitiveConstraint) bool {
 // `slot_fill`; no child at all is an `rm_type_mismatch` when the attribute
 // allows one child (a plain type constraint) and an `alternative_mismatch`
 // when it allows more, listing their RM types.
-func admitSingle(attr *tcimpl.CompiledAttribute, children []*tcimpl.CompiledNode, val any, attrPath string) (child *tcimpl.CompiledNode, refusal Issue, admitted bool) {
+func admitSingle(attr *tcimpl.CompiledAttribute, children []*tcimpl.CompiledNode, val any, attrPath issuePath) (child *tcimpl.CompiledNode, refusal Issue, admitted bool) {
 	child = matchSingleAlternative(children, val)
 	if child != nil && child.IsSlot() {
 		archetypeID := locatableArchetypeNodeID(val)
 		if archetypeID == "" || !child.AllowsArchetypeID(archetypeID) {
 			return nil, Issue{
-				Path:     attrPath,
+				Path:     attrPath.String(),
 				Code:     "slot_fill",
 				Layer:    LayerTemplate,
 				Rule:     ruleSlot,
@@ -74,7 +74,7 @@ func admitSingle(attr *tcimpl.CompiledAttribute, children []*tcimpl.CompiledNode
 	// "wrong type" from "didn't match any of N allowed types".
 	if len(children) == 1 {
 		return nil, Issue{
-			Path:     attrPath,
+			Path:     attrPath.String(),
 			Code:     "rm_type_mismatch",
 			Layer:    LayerTemplate,
 			Rule:     ruleType,
@@ -83,7 +83,7 @@ func admitSingle(attr *tcimpl.CompiledAttribute, children []*tcimpl.CompiledNode
 		}, false
 	}
 	return nil, Issue{
-		Path:     attrPath,
+		Path:     attrPath.String(),
 		Code:     "alternative_mismatch",
 		Layer:    LayerTemplate,
 		Rule:     ruleType,
@@ -118,7 +118,7 @@ func formatAllowedTypes(children []*tcimpl.CompiledNode) string {
 // layer, rule existence, with required set. A multi-valued attribute is
 // described as one. The RM's requirement is not read here: the walk reads it
 // from the value's class ([engine.checkAbsent]).
-func absentIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath string, multiValued bool) (iss Issue, required bool) {
+func absentIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath issuePath, multiValued bool) (iss Issue, required bool) {
 	if !templateRequires(attr) {
 		return iss, false
 	}
@@ -127,7 +127,7 @@ func absentIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath string, 
 		detail = fmt.Sprintf("required multi-valued attribute %q absent on %s", attr.Name(), describeRMType(parentRM))
 	}
 	return Issue{
-		Path:     attrPath,
+		Path:     attrPath.String(),
 		Code:     "required",
 		Layer:    LayerTemplate,
 		Rule:     ruleExistence,
@@ -142,12 +142,12 @@ func absentIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath string, 
 // `required`, on the template layer, rule existence, with required set. The
 // RM's requirement is not read here: the walk reads it from the value's
 // class ([engine.checkEmpty]).
-func emptyIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath string) (iss Issue, required bool) {
+func emptyIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath issuePath) (iss Issue, required bool) {
 	if !templateRequires(attr) {
 		return iss, false
 	}
 	return Issue{
-		Path:     attrPath,
+		Path:     attrPath.String(),
 		Code:     "required",
 		Layer:    LayerTemplate,
 		Rule:     ruleExistence,
@@ -159,13 +159,13 @@ func emptyIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath string) (
 // childCountIssue returns the `cardinality` issue for the multi-valued
 // attribute attr at attrPath, which holds n items, when the OPT pins a
 // child-count interval n falls outside, with out set.
-func childCountIssue(attr *tcimpl.CompiledAttribute, n int, attrPath string) (iss Issue, out bool) {
+func childCountIssue(attr *tcimpl.CompiledAttribute, n int, attrPath issuePath) (iss Issue, out bool) {
 	cm := attr.ChildMultiplicity()
 	if cm == nil || !outOfMultiplicityInterval(n, cm) {
 		return iss, false
 	}
 	return Issue{
-		Path:     attrPath,
+		Path:     attrPath.String(),
 		Code:     "cardinality",
 		Layer:    LayerTemplate,
 		Rule:     ruleCardinality,
@@ -174,23 +174,31 @@ func childCountIssue(attr *tcimpl.CompiledAttribute, n int, attrPath string) (is
 	}, true
 }
 
-// boundItemPaths returns the issue path of each of the items of the
-// multi-valued attribute at attrPath, bound to the OPT children bound holds.
-// The items of a list are written by the shared path rule ([itemPaths]),
-// which reads each item's id and the name pinned on the child it binds to
-// ([boundPathItems]): the binding comes first, because an item's predicate
-// depends on its siblings' ids and on the names their bound OPT nodes pin.
-// An entry of a Hash attribute (isHash) is written by its position in
-// ascending key order, never by its key (REQ-102 Issue paths).
-func boundItemPaths(attrPath string, items []any, bound []*tcimpl.CompiledNode, isHash bool) []string {
-	if isHash {
-		paths := make([]string, len(items))
-		for idx := range items {
-			paths[idx] = hashEntryPath(attrPath, idx)
+// appendBoundPredicates appends to preds the predicate of each of the items
+// of a multi-valued attribute, bound to the OPT children bound holds, and
+// returns the extended slice. The items of a list are written by the shared
+// path rule ([resolvePredicates]), which reads each item's id and the name
+// pinned on the child it binds to: the binding comes first, because an
+// item's predicate depends on its siblings' ids and on the names their bound
+// OPT nodes pin. An entry of a Hash attribute (isHash) is written by its
+// position in ascending key order, never by its key ([entryPredicate]).
+func appendBoundPredicates(preds []predicate, items []any, bound []*tcimpl.CompiledNode, isHash bool) []predicate {
+	from := len(preds)
+	for idx, item := range items {
+		if isHash {
+			preds = append(preds, entryPredicate(idx))
+			continue
 		}
-		return paths
+		p := predicate{id: locatableArchetypeNodeID(item)}
+		if bound[idx] != nil {
+			p.name = bound[idx].NodeName()
+		}
+		preds = append(preds, p)
 	}
-	return itemPaths(attrPath, boundPathItems(items, bound))
+	if !isHash {
+		resolvePredicates(preds[from:], true)
+	}
+	return preds
 }
 
 // appendOccurrenceIssues appends to issues a `cardinality` issue, rule
@@ -199,7 +207,7 @@ func boundItemPaths(attrPath string, items []any, bound []*tcimpl.CompiledNode, 
 // of items bound to it falls outside; bound holds the child each item binds
 // to. A child whose occurrences the items miss is written with its own
 // predicate ([optChildPaths]).
-func appendOccurrenceIssues(issues []Issue, attr *tcimpl.CompiledAttribute, children, bound []*tcimpl.CompiledNode, attrPath string) []Issue {
+func appendOccurrenceIssues(issues []Issue, attr *tcimpl.CompiledAttribute, children, bound []*tcimpl.CompiledNode, attrPath issuePath) []Issue {
 	var childPath []string
 	for i, c := range children {
 		occ := c.Occurrences()
@@ -216,7 +224,7 @@ func appendOccurrenceIssues(issues []Issue, attr *tcimpl.CompiledAttribute, chil
 			continue
 		}
 		if childPath == nil {
-			childPath = optChildPaths(attrPath, children)
+			childPath = optChildPaths(attrPath.String(), children)
 		}
 		issues = append(issues, Issue{
 			Path:     childPath[i],
@@ -250,20 +258,6 @@ func bindItems(parentRMType, attrName string, children []*tcimpl.CompiledNode, i
 	return bound, byNodeID
 }
 
-// boundPathItems returns what the path rule reads of each item, each as the
-// predicate it is written into ([resolvePredicates]): its archetype_node_id
-// and the name pinned on the child it binds to.
-func boundPathItems(items []any, bound []*tcimpl.CompiledNode) []predicate {
-	out := make([]predicate, len(items))
-	for idx, item := range items {
-		out[idx].id = locatableArchetypeNodeID(item)
-		if bound[idx] != nil {
-			out[idx].name = bound[idx].NodeName()
-		}
-	}
-	return out
-}
-
 // childIdentity describes an OPT child for inclusion in cardinality
 // diagnostics. Prefers the archetype id (for *ArchetypeRoot children)
 // then the at-code then the RM type name.
@@ -279,7 +273,7 @@ func childIdentity(c *tcimpl.CompiledNode) string {
 
 // appendPrimitiveIssues runs the REQ-103 primitive constraint pc against
 // the RM value bound to its node, at path, and appends to issues one Issue
-// per Violation.
+// per Violation; the path is written only when there is one.
 // The constraint's expected input is computed via dataValueInput;
 // for non-DataValue RM types that map to a primitive (e.g.
 // CODE_PHRASE directly under category/defining_code → C_CODE_PHRASE),
@@ -287,11 +281,15 @@ func childIdentity(c *tcimpl.CompiledNode) string {
 //
 // The violation's Detail is value-free, and the value it read moves
 // over to Issue.Value unchanged, still redacted (REQ-168).
-func appendPrimitiveIssues(issues []Issue, rmValue any, path string, pc constraints.PrimitiveConstraint) []Issue {
-	input := primitiveInput(rmValue)
-	for _, v := range pc.Validate(input) {
+func appendPrimitiveIssues(issues []Issue, rmValue any, path issuePath, pc constraints.PrimitiveConstraint) []Issue {
+	violations := pc.Validate(primitiveInput(rmValue))
+	if len(violations) == 0 {
+		return issues
+	}
+	at := path.String()
+	for _, v := range violations {
 		issues = append(issues, Issue{
-			Path:     path,
+			Path:     at,
 			Code:     "primitive_" + string(v.Code),
 			Layer:    LayerTemplate,
 			Rule:     string(v.Code),
@@ -386,13 +384,13 @@ func allowedChildren(attr *tcimpl.CompiledAttribute) []*tcimpl.CompiledNode {
 // leaves the attribute: the walk checks nothing more on it and does not
 // descend into it. The Detail names the attribute, the parent's RM type and
 // how the template prohibits it, never the value.
-func prohibitedIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath string) Issue {
+func prohibitedIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath issuePath) Issue {
 	how := "it allows none of the attribute's children"
 	if e := attr.Existence(); e != nil && !e.UpperUnbounded() && e.Upper() == 0 {
 		how = "existence " + formatInterval(e)
 	}
 	return Issue{
-		Path:     attrPath,
+		Path:     attrPath.String(),
 		Code:     "prohibited",
 		Layer:    LayerTemplate,
 		Rule:     ruleExistence,
@@ -582,11 +580,11 @@ func unboundItemIssue(
 	children []*tcimpl.CompiledNode,
 	item any,
 	byNodeID bool,
-	itemPath string,
+	itemPath issuePath,
 ) Issue {
 	if byNodeID {
 		return Issue{
-			Path:     itemPath,
+			Path:     itemPath.String(),
 			Code:     "slot_fill",
 			Layer:    LayerTemplate,
 			Rule:     ruleSlot,
@@ -608,7 +606,7 @@ func unboundItemIssue(
 		detail = fmt.Sprintf("RM value of type %s under %q matches none of the OPT alternatives %s", describeRMType(item), attr.Name(), formatAllowedTypes(children))
 	}
 	return Issue{
-		Path:     itemPath,
+		Path:     itemPath.String(),
 		Code:     code,
 		Layer:    LayerTemplate,
 		Rule:     ruleType,
@@ -647,7 +645,7 @@ func describeLocatableID(v any) string {
 // set, when the RM's archetype_node_id disagrees with the OPT-pinned id at
 // this node. Archetype-root nodes compare against ArchetypeID(); inner nodes
 // (at-code-pinned) compare against NodeID().
-func identityIssue(opt *tcimpl.CompiledNode, rmValue any, path string) (iss Issue, ok bool) {
+func identityIssue(opt *tcimpl.CompiledNode, rmValue any, path issuePath) (iss Issue, ok bool) {
 	if opt.IsSlot() {
 		// Slot fit is by the parsed REQ-104 archetype-id assertion
 		// grammar (RM-type-prefix fallback when no includes parsed).
@@ -667,21 +665,21 @@ func identityIssue(opt *tcimpl.CompiledNode, rmValue any, path string) (iss Issu
 			return iss, false
 		}
 		return Issue{
-			Path:     joinPath(path, "/archetype_node_id"),
+			Path:     path.join("/archetype_node_id"),
 			Code:     "archetype_id_mismatch",
 			Layer:    LayerTemplate,
 			Rule:     ruleIdentity,
-			Detail:   fmt.Sprintf("archetype_node_id %q does not match template archetype id %q at %s", id, want, path),
+			Detail:   fmt.Sprintf("archetype_node_id %q does not match template archetype id %q at %s", id, want, path.String()),
 			Severity: Error,
 		}, true
 	}
 	if want := opt.NodeID(); want != "" && id != want {
 		return Issue{
-			Path:     joinPath(path, "/archetype_node_id"),
+			Path:     path.join("/archetype_node_id"),
 			Code:     "node_id_mismatch",
 			Layer:    LayerTemplate,
 			Rule:     ruleIdentity,
-			Detail:   fmt.Sprintf("archetype_node_id %q does not match template node_id %q at %s", id, want, path),
+			Detail:   fmt.Sprintf("archetype_node_id %q does not match template node_id %q at %s", id, want, path.String()),
 			Severity: Error,
 		}, true
 	}
@@ -694,7 +692,7 @@ func identityIssue(opt *tcimpl.CompiledNode, rmValue any, path string) (iss Issu
 // ([rmbind.ConformsToNode]), for an abstract and a concrete ancestor alike: a node
 // declared as ITEM_STRUCTURE admits ITEM_TREE, one declared as DV_TEXT
 // admits DV_CODED_TEXT.
-func rmTypeIssue(opt *tcimpl.CompiledNode, rmValue any, path string) (iss Issue, ok bool) {
+func rmTypeIssue(opt *tcimpl.CompiledNode, rmValue any, path issuePath) (iss Issue, ok bool) {
 	want := opt.RMTypeName()
 	if want == "" {
 		return iss, false
@@ -706,12 +704,13 @@ func rmTypeIssue(opt *tcimpl.CompiledNode, rmValue any, path string) (iss Issue,
 	if rmbind.ConformsToNode(opt, got) || intervalRMTypeMatches(got, want, rmValue) {
 		return iss, false
 	}
+	at := path.String()
 	return Issue{
-		Path:     path,
+		Path:     at,
 		Code:     "rm_type_mismatch",
 		Layer:    LayerTemplate,
 		Rule:     ruleType,
-		Detail:   fmt.Sprintf("RM type %s does not satisfy template RM type %s at %s", got, want, path),
+		Detail:   fmt.Sprintf("RM type %s does not satisfy template RM type %s at %s", got, want, at),
 		Severity: Error,
 	}, true
 }

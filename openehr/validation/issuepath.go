@@ -9,9 +9,11 @@ import (
 
 // issuepath.go: the one rule the walk uses to write the predicate of an
 // item of a multi-valued attribute in [Issue.Path], with a template and
-// without one. The template rules (walk_composition.go) and the RM rules
-// (rmfloor.go) report at the paths the walk writes, so one node gets one
-// path whichever of them reports it.
+// without one, and the handle the walk carries for the path of each node
+// and attribute it visits, which writes the path only when something keeps
+// it. The template rules (walk_composition.go) and the RM rules (rmfloor.go)
+// report at the paths the walk writes, so one node gets one path whichever
+// of them reports it.
 
 // pathItem is what the path rule reads of one item of a multi-valued
 // attribute.
@@ -43,7 +45,7 @@ const (
 
 // predicate is the predicate the path rule gives one item of a multi-valued
 // attribute, held as the parts it is written from rather than as a string,
-// so that it is written only into a path that is kept.
+// so that it is written only into a path that is kept ([issuePath]).
 type predicate struct {
 	// pathItem is what the rule read of the item.
 	pathItem
@@ -54,32 +56,119 @@ type predicate struct {
 	pos int
 }
 
-// itemPaths returns the path of each item of the multi-valued attribute at
-// attrPath, whose id and pinned name items holds, in order. It writes the
-// predicate of each into items ([resolvePredicates]). An item is written:
+// issuePath is the issue path of a node or an attribute the walk visits,
+// held as the number of steps of the walk's path stack it spans rather than
+// as a string: the root's path when n is 0, the first n steps below the root
+// otherwise. The walk writes the string only when something keeps the path
+// ([issuePath.String]), so that the paths of the nodes nothing reports at
+// are never written.
 //
-//   - [id] when no other item carries its id;
-//   - [id, 'name'] when another item shares the id and the item's pinned
-//     name tells it apart from every item that shares it;
-//   - [n], its 1-based position, otherwise: it has no id, or its id is
-//     shared and its pinned name does not tell it apart.
-func itemPaths(attrPath string, items []predicate) []string {
-	resolvePredicates(items, true)
-	out := make([]string, len(items))
-	for i := range items {
-		out[i] = items[i].pathBelow(attrPath)
-	}
-	return out
+// A handle is valid only during the visit that pushed its last step. The
+// walk replaces the step at a depth when it moves on to the next attribute
+// or item there ([pathStack.attribute], [pathStack.item]), so a handle kept
+// past its visit would read the steps of another node. Whatever keeps a path
+// keeps the string, written when it is recorded: an issue, a refusal, a stop
+// of the walk, the path of a CONSTRAINT_REF.
+type issuePath struct {
+	// stack is the walk's path stack; nil on a root's path, which spans no
+	// step.
+	stack *pathStack
+	// n is the number of steps of the stack the path spans.
+	n int
 }
 
-// attributePath returns the issue path of the attribute name of the node at
-// the issue path parent: the root's attribute is "/name", any other
-// parent's parent + "/name", built in one step.
-func attributePath(parent, name string) string {
-	if parent == "/" {
-		return "/" + name
+// pathStack holds the steps of the issue path of the node the walk is at,
+// outermost first, below the root. Each step is an attribute, or an item of
+// the multi-valued attribute the step before it names.
+type pathStack struct {
+	steps []pathStep
+}
+
+// pathStep is one step of an issue path below the root.
+type pathStep struct {
+	// attr is the name of an attribute, written "/name"; "" on an item.
+	attr string
+	// item is the predicate of an item, written after the path of its
+	// attribute; unused on an attribute.
+	item predicate
+}
+
+// attribute returns the path of the attribute name of the node at p, which
+// spans a step of s more than p: s keeps p's steps and holds the
+// attribute's step in place of any it held at that depth.
+func (s *pathStack) attribute(p issuePath, name string) issuePath {
+	s.steps = append(s.steps[:p.n], pathStep{attr: name})
+	return issuePath{stack: s, n: p.n + 1}
+}
+
+// item returns the path of the item of the multi-valued attribute at p
+// whose predicate is pred, which spans a step of s more than p, as
+// [pathStack.attribute] pushes one.
+func (s *pathStack) item(p issuePath, pred predicate) issuePath {
+	s.steps = append(s.steps[:p.n], pathStep{item: pred})
+	return issuePath{stack: s, n: p.n + 1}
+}
+
+// String writes the path: "/" for the root, "/name" for an attribute of the
+// root, parent + "/name" for an attribute of any other node, and the path of
+// its attribute followed by its predicate for an item.
+func (p issuePath) String() string {
+	return p.join()
+}
+
+// join writes the path with segments appended in order, in one step; the
+// segments together are a sub-path that begins with "/", such as
+// "/archetype_details", or "/", "language" and "/defining_code". Below the
+// root, the segments follow the path; at the root they stand alone, so the
+// root's sub-path is "/archetype_details", never "//archetype_details".
+func (p issuePath) join(segments ...string) string {
+	if p.n == 0 {
+		switch len(segments) {
+		case 0:
+			return "/"
+		case 1:
+			return segments[0]
+		}
 	}
-	return parent + "/" + name
+	var steps []pathStep
+	if p.n > 0 {
+		steps = p.stack.steps[:p.n]
+	}
+	size := 0
+	for i := range steps {
+		size += steps[i].size()
+	}
+	for _, segment := range segments {
+		size += len(segment)
+	}
+	var b strings.Builder
+	b.Grow(size)
+	for i := range steps {
+		steps[i].writeTo(&b)
+	}
+	for _, segment := range segments {
+		b.WriteString(segment)
+	}
+	return b.String()
+}
+
+// size returns the length of the step as [pathStep.writeTo] writes it.
+func (s *pathStep) size() int {
+	if s.attr != "" {
+		return len("/") + len(s.attr)
+	}
+	return s.item.size()
+}
+
+// writeTo writes the step to b: "/name" for an attribute, the predicate for
+// an item.
+func (s *pathStep) writeTo(b *strings.Builder) {
+	if s.attr != "" {
+		b.WriteByte('/')
+		b.WriteString(s.attr)
+		return
+	}
+	s.item.writeTo(b)
 }
 
 // optChildPaths returns, for each OPT child of the multi-valued attribute at
@@ -112,11 +201,19 @@ func optChildID(c *tcimpl.CompiledNode) string {
 
 // resolvePredicates applies the path rule to the items of one multi-valued
 // attribute, in order, whose id and pinned name items holds, and writes into
-// each the predicate the rule gives it. numbered says whether the items
-// exist in the instance and can be numbered: an item with no id, or with a
-// shared id its pinned name does not tell apart, is then written by its
-// position. When numbered is false (OPT children of a node the instance
-// lacks), the first has no predicate and the second keeps its id alone.
+// each the predicate the rule gives it. An item that exists in the instance
+// is written:
+//
+//   - [id] when no other item carries its id;
+//   - [id, 'name'] when another item shares the id and the item's pinned
+//     name tells it apart from every item that shares it;
+//   - [n], its 1-based position, otherwise: it has no id, or its id is
+//     shared and its pinned name does not tell it apart.
+//
+// numbered says whether the items exist in the instance and can be
+// numbered. When it is false (OPT children of a node the instance lacks),
+// an item with no id has no predicate, and one whose shared id its pinned
+// name does not tell apart keeps its id alone.
 func resolvePredicates(items []predicate, numbered bool) {
 	s := newIDSharing(items)
 	for i := range items {
@@ -139,8 +236,15 @@ func resolvePredicates(items []predicate, numbered bool) {
 	}
 }
 
+// entryPredicate returns the predicate of the entry at index i, in ascending
+// key order, of a Hash attribute: its 1-based position, never its key, which
+// is instance data (REQ-102 Issue paths).
+func entryPredicate(i int) predicate {
+	return predicate{kind: predicatePosition, pos: i + 1}
+}
+
 // pathBelow returns the path of the item p is the predicate of, below the
-// path attrPath of its attribute, written in one step.
+// issue path attrPath of its attribute, already written, in one step.
 func (p *predicate) pathBelow(attrPath string) string {
 	var b strings.Builder
 	b.Grow(len(attrPath) + p.size())
