@@ -9,6 +9,7 @@ package validation_test
 
 import (
 	json "encoding/json/v2"
+	"errors"
 	"fmt"
 	"os"
 	"slices"
@@ -16,6 +17,7 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -163,8 +165,8 @@ func TestValidator_REQ171_DecodedDocumentReachesTheVisitLimit(t *testing.T) {
 	// 18 visits, so the default 100,000 stops it near event 5,550, which
 	// leaves some 2,400 events after it. The stop stays before the last
 	// event while an event costs more than 12.5 visits (100,000 / 8,000);
-	// the check on the stop's path below fails when it does not. The stop's
-	// own path is not pinned: it moves whenever the visits per event change.
+	// the checks below fail when it does not. The stop's own path is not
+	// pinned: it moves whenever the visits per event change.
 	const n = 8_000
 	lastEvent := fmt.Sprintf("%s[%d]", bmiEventsPath, n)
 	lastValue := lastEvent + "/data/items[at0004]/value"
@@ -178,7 +180,11 @@ func TestValidator_REQ171_DecodedDocumentReachesTheVisitLimit(t *testing.T) {
 	r := validation.ValidateComposition(comp, c)
 	got := pathsOf(r.Issues, "max_nodes")
 	if len(got) != 1 {
-		t.Fatalf("%s reports max_nodes %d times, want once; issues %q", call, len(got), issueKeys(r.Issues))
+		hint := ""
+		if len(got) == 0 {
+			hint = fmt.Sprintf(": %d events may no longer reach the default visit limit, so raise n", n)
+		}
+		t.Fatalf("%s reports max_nodes %d times, want once%s; issues %q", call, len(got), hint, issueKeys(r.Issues))
 	}
 	assertStoppedOnce(t, call, r, "max_nodes", got[0])
 	if !strings.HasPrefix(got[0], bmiEventsPath+"[") || strings.HasPrefix(got[0], lastEvent+"/") {
@@ -227,8 +233,11 @@ func TestValidator_REQ171_REQ112_DecodedDocumentReachesTheDepthLimit(t *testing.
 	doc := bmiDocument(t)
 	objectAt(t, doc, "context")["other_context"] = nestedClusterTree(clusters)
 	comp, err := decodeDocument(t, doc)
-	if err != nil {
+	if errors.Is(err, typereg.ErrMaxDepthExceeded) {
 		t.Fatalf("canjson.Unmarshal(BMI composition, %d nested CLUSTERs): %v; the decoder's nesting limit now sits below the walk's depth limit of %d, so no decoded document reaches it and the doc's claim is false", clusters, err, defaultDepth)
+	}
+	if err != nil {
+		t.Fatalf("canjson.Unmarshal(BMI composition, %d nested CLUSTERs): %v", clusters, err)
 	}
 
 	call := fmt.Sprintf("ValidateComposition(BMI composition, %d nested CLUSTERs)", clusters)
