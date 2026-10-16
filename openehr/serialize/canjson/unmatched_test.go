@@ -183,17 +183,29 @@ func decodeCollecting(c unmatchedCase, in []byte, opts ...canjson.DecoderOption)
 }
 
 // assertStrictRefusal checks every facet REQ-170 gives a strict refusal: it
-// wraps canjson.ErrUnknownMember, one step from the sentinel (so its message
-// names one pointer), names the first unmatched member's pointer, carries no
-// value from the input, and matches neither of the codec's other two
-// sentinels (REQ-052) nor the dispatch envelope.
+// wraps canjson.ErrUnknownMember, names the first unmatched member's pointer,
+// carries no value from the input, and matches neither of the codec's other
+// two sentinels (REQ-052) nor the dispatch sentinels. Like every failure the
+// input causes (REQ-052), it is a *canjson.DecodeError at the top of the
+// chain, whose Path is that pointer; the refusal beneath it is one step from
+// the sentinel, so its message names one pointer.
 func assertStrictRefusal(t *testing.T, call string, err error, first string) {
 	t.Helper()
 	if !errors.Is(err, canjson.ErrUnknownMember) {
 		t.Fatalf("%s err = %v; want errors.Is(_, canjson.ErrUnknownMember)", call, err)
 	}
-	if got := errors.Unwrap(err); got != canjson.ErrUnknownMember { //nolint:errorlint // identity by design: the refusal is one step from the sentinel
-		t.Errorf("%s: errors.Unwrap(err) = %v; want canjson.ErrUnknownMember: the refusal comes back alone, not inside the decoder's envelopes", call, got)
+	de, ok := err.(*canjson.DecodeError) //nolint:errorlint // REQ-052: the envelope is the error itself, found without unwrapping
+	if !ok || de == nil {
+		t.Fatalf("%s err = %T %v; want a *canjson.DecodeError at the top of the chain", call, err, err)
+	}
+	if de.Path != first {
+		t.Errorf("%s: DecodeError.Path = %q; want the first unmatched member's pointer %q", call, de.Path, first)
+	}
+	if got := errors.Unwrap(de.Inner); got != canjson.ErrUnknownMember { //nolint:errorlint // identity by design: the refusal is one step from the sentinel
+		t.Errorf("%s: errors.Unwrap(the refusal) = %v; want canjson.ErrUnknownMember: the refusal comes back alone inside the envelope, not inside dispatch envelopes", call, got)
+	}
+	if got := de.Value.Reveal(); got != nil {
+		t.Errorf("%s: DecodeError.Value.Reveal() = %#v; want nothing: an unknown member is not a value the decoder could not take", call, got)
 	}
 	if !strings.Contains(err.Error(), strconv.Quote(first)) {
 		t.Errorf("%s err = %q; want it to name the first unmatched member %s", call, err, strconv.Quote(first))
@@ -204,8 +216,10 @@ func assertStrictRefusal(t *testing.T, call string, err error, first string) {
 	if errors.Is(err, canjson.ErrInvalidShape) || errors.Is(err, canjson.ErrInvalidValue) {
 		t.Errorf("%s err = %v; an unknown member must match neither canjson.ErrInvalidShape nor canjson.ErrInvalidValue", call, err)
 	}
-	if de, ok := errors.AsType[*canjson.DecodeError](err); ok && de != nil {
-		t.Errorf("%s err = %v; an unknown member is not a dispatch failure, want no *canjson.DecodeError", call, err)
+	for _, s := range []error{typereg.ErrMissingType, typereg.ErrUnknownType, typereg.ErrTypeMismatch} {
+		if errors.Is(err, s) {
+			t.Errorf("%s err = %v; an unknown member is not a dispatch failure, want no %v", call, err, s)
+		}
 	}
 }
 

@@ -36,12 +36,14 @@ type Integer int32
 // rounded. The refusal is the parse error beneath it, an encoding/json/v2
 // *json.SemanticError for a bare number and a *strconv.NumError for a
 // quoted one, each reachable with errors.AsType. A quoted literal is named
-// once, by that cause, never again by the prefix. The strconv sentinel the
-// cause carries tells the two refusals apart however the literal writes the
-// number: a non-zero fraction carries strconv.ErrSyntax, whatever the
-// magnitude, and a whole number outside the range carries strconv.ErrRange,
-// so errors.Is(err, strconv.ErrRange) holds for 2147483648, 2147483648.0 and
-// "1e10" alike.
+// once, by that cause, never again by the prefix; the refusal also carries
+// the literal's JSON text, quotes included, which a canjson entry point
+// holds in DecodeError.Value (see typereg.RefuseLiteral). The strconv
+// sentinel the cause carries tells the two refusals apart however the
+// literal writes the number: a non-zero fraction carries strconv.ErrSyntax,
+// whatever the magnitude, and a whole number outside the range carries
+// strconv.ErrRange, so errors.Is(err, strconv.ErrRange) holds for
+// 2147483648, 2147483648.0 and "1e10" alike.
 //
 // A nil receiver is refused with an error rather than dereferenced. That
 // refusal carries typereg.ErrNilReceiver, not typereg.ErrInvalidShape,
@@ -68,8 +70,10 @@ func (i *Integer) UnmarshalJSON(b []byte) error {
 					err = &strconv.NumError{Func: "ParseInt", Num: s, Err: strconv.ErrRange}
 				}
 				// The *strconv.NumError already quotes the literal once; a
-				// second echo here would double it (wire.md § REQ-052).
-				return fmt.Errorf("rm.Integer: parse quoted literal: %w", err)
+				// second echo here would double it (wire.md § REQ-052). The
+				// JSON text as written rides beside it for the entry point's
+				// DecodeError.Value, and never reaches the message.
+				return typereg.RefuseLiteral(b, fmt.Errorf("rm.Integer: parse quoted literal: %w", err))
 			}
 			n = int64(w)
 		}

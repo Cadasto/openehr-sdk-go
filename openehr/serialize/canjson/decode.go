@@ -3,6 +3,7 @@ package canjson
 import (
 	"encoding/json/jsontext"
 	json "encoding/json/v2"
+	"errors"
 	"io"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -37,24 +38,25 @@ import (
 //
 // Four decode failures never carry the sentinel:
 //
-//   - Malformed JSON, which the codec reports as its own syntax or
-//     truncated-input error (an encoding/json/jsontext.SyntacticError).
-//     No sentinel: [Unmarshal]
-//     reports it directly, and [Decoder.Decode] reports an empty stream
-//     as io.EOF. Invalid UTF-8 and a lone surrogate escape are refused on
-//     this same path (jsontext rejects them before rm.Character sees the
-//     bytes), so they too are malformed input carrying no sentinel.
+//   - Malformed JSON, whose cause is the codec's own syntax or
+//     truncated-input error (an encoding/json/jsontext.SyntacticError)
+//     inside the [DecodeError] every failure comes back in. No sentinel;
+//     [Decoder.Decode] reports an empty stream as io.EOF. Invalid UTF-8
+//     and a lone surrogate escape are refused on this same path (jsontext
+//     rejects them before rm.Character sees the bytes), so they too are
+//     malformed input carrying no sentinel.
 //   - A read failure from the underlying reader, on the streaming
 //     [Decoder] entry point: jsontext reports it as its own IO error,
 //     and it passes through unwrapped, carrying no sentinel. The
 //     reader's own error stays reachable with errors.Is.
 //   - A polymorphic dispatch failure (a missing, unknown or mismatched
-//     `_type`, at a slot or on `/_type` for the whole value), which
-//     arrives as a [DecodeError] carrying the path. No sentinel either,
-//     even when it travels out through an enclosing type's
-//     `canjson: <RM_TYPE>:` prefix. Match it with errors.As for
-//     [DecodeError], or errors.Is against [typereg.ErrMissingType] /
-//     [typereg.ErrUnknownType] / [typereg.ErrTypeMismatch].
+//     `_type`, at a slot or on `/_type` for the whole value), raised as a
+//     [DecodeError] carrying the path. No sentinel either, even when it
+//     travels out through an enclosing type's `canjson: <RM_TYPE>:`
+//     prefix. Every failure the input causes is a [DecodeError] at the
+//     top, so match a dispatch failure with errors.Is against
+//     [typereg.ErrMissingType] / [typereg.ErrUnknownType] /
+//     [typereg.ErrTypeMismatch], not by the type.
 //   - A nesting-depth refusal: [typereg.ErrMaxDepthExceeded] inside a
 //     [DecodeError], raised when a value opens past the 512-level bound.
 //     It passes through the enclosing values unchanged, so no
@@ -66,10 +68,29 @@ import (
 // cycle; this is the caller-facing name for it.
 var ErrInvalidShape = typereg.ErrInvalidShape
 
-// DecodeError is the unified error returned by the decoder at
-// polymorphic dispatch sites. Re-exported from the internal poly
-// helper so consumers can `errors.As` against a stable type without
-// importing internal packages.
+// DecodeError is the error [Unmarshal] and [Decoder.Decode] return for
+// every failure the input causes (REQ-052), at the top of the chain, so
+// errors.AsType[*DecodeError] finds it without unwrapping. Its Path is the
+// JSON Pointer of the failing value from the root of the document, where the
+// decoder knows it; its Value holds the JSON text of the value the decoder
+// could not take, as the document wrote it, where the failure concerns one
+// (a number or string its Go type cannot hold, or a quoted literal rm.Real or
+// rm.Integer could not parse); and its text names the failure's class and
+// the pointer but no value from the document. Path, Type and the text are
+// value-free; Value is value-bearing and prints as "[redacted]". The
+// codec's own error is its Inner, so every sentinel and typed cause stays
+// reachable with errors.Is and errors.As, and that cause's own text may name
+// the value. A polymorphic slot that fails adds a DecodeError of its own,
+// naming the slot, beneath the entry point's.
+//
+// Two errors come back as they are, because the input does not cause them:
+// a read failure of the reader under a [Decoder], and io.EOF from a
+// [Decoder] whose stream holds no further value.
+//
+// Since every failure is a DecodeError, classify by sentinel: see
+// [ErrInvalidShape] for where the lines fall. The type is re-exported from
+// the internal poly helper so consumers can match it without importing
+// internal packages; [typereg.DecodeError] documents its fields.
 type DecodeError = poly.DecodeError
 
 // DecoderOption configures a decode, through [Unmarshal] or a [Decoder].
@@ -146,15 +167,16 @@ func classifyDecode(err error) error {
 // threads [typereg.Unmarshalers], the aggregate of every generated
 // interface hook, so a polymorphic slot at the top level resolves too.
 //
-// Returns a [DecodeError] wrapping a typereg sentinel
-// ([typereg.ErrMissingType] / ErrUnknownType / ErrTypeMismatch) at
-// polymorphic dispatch failures. Malformed JSON comes back as a
-// *encoding/json/jsontext.SyntacticError carrying no sentinel; a
-// duplicate member name and a shape error inside a generated RM type
-// both wrap [ErrInvalidShape], the latter behind a `canjson: <RM_TYPE>:`
-// prefix. A shape failure beneath a polymorphic slot carries both the
-// sentinel and a [DecodeError]. See the sentinel's own documentation for
-// where the lines fall.
+// Every failure comes back as a [DecodeError] at the top of the chain,
+// whose text carries no value from the document (REQ-052). Classify it by
+// what it wraps: a polymorphic dispatch failure wraps a typereg sentinel
+// ([typereg.ErrMissingType] / ErrUnknownType / ErrTypeMismatch); malformed
+// JSON wraps a *encoding/json/jsontext.SyntacticError and carries no
+// sentinel; a duplicate member name and a shape error inside a generated
+// RM type both wrap [ErrInvalidShape], the latter behind a
+// `canjson: <RM_TYPE>:` prefix. A shape failure beneath a polymorphic slot
+// carries both the sentinel and the slot's own [DecodeError]. See the
+// sentinel's own documentation for where the lines fall.
 //
 // A member the target does not read is ignored by default. [WithUnmatched]
 // reports each such member and [WithStrict] refuses the first, wrapping
@@ -166,10 +188,10 @@ func classifyDecode(err error) error {
 // leave it partly written.
 func Unmarshal(data []byte, v any, opts ...DecoderOption) error {
 	err := classifyDecode(json.Unmarshal(data, v, typereg.Unmarshalers()))
-	if err != nil || len(opts) == 0 {
-		return err
+	if err == nil && len(opts) > 0 {
+		err = checkUnmatched(data, v, opts)
 	}
-	return checkUnmatched(data, v, opts)
+	return typereg.EntryError(err)
 }
 
 // Decoder reads and decodes canonical-JSON values from a stream.
@@ -190,14 +212,16 @@ func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 }
 
 // Decode reads the next JSON value from the stream and stores it in
-// v. Errors follow the same classification as [Unmarshal], except
-// where reading a stream rather than a whole input changes the answer.
-// An empty or whitespace-only stream is io.EOF, where [Unmarshal]
-// reports the codec's own syntax error; and content after the first
-// value is simply the next value in the stream, not an error, so
-// `{"a":1}x` fails in [Unmarshal] and succeeds here. A truncated
-// value is a *jsontext.SyntacticError wrapping io.ErrUnexpectedEOF in
-// both.
+// v. Errors take the form and classification [Unmarshal]'s do, a
+// [DecodeError] at the top of the chain, except where reading a stream
+// rather than a whole input changes the answer. Two errors the input does
+// not cause come back as they are: io.EOF once the stream holds no further
+// value, an empty or whitespace-only stream included, where [Unmarshal]
+// reports malformed JSON; and a read failure of the underlying reader.
+// Content after the first value is simply the next value in the stream,
+// not an error, so `{"a":1}x` fails in [Unmarshal] and succeeds here. A
+// truncated value wraps a *jsontext.SyntacticError wrapping
+// io.ErrUnexpectedEOF in both.
 //
 // With [WithUnmatched] or [WithStrict], Decode first reads the whole next
 // value into the decoder's read buffer, then decodes those bytes as
@@ -211,16 +235,46 @@ func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 // leave it partly written.
 func (d *Decoder) Decode(v any) error {
 	if !d.cfg.checksMembers() {
-		return classifyDecode(json.UnmarshalDecode(d.dec, v, typereg.Unmarshalers()))
+		return streamError(classifyDecode(json.UnmarshalDecode(d.dec, v, typereg.Unmarshalers())))
 	}
 	raw, err := d.dec.ReadValue()
 	if err != nil {
-		return classifyDecode(err)
+		return streamError(classifyDecode(err))
 	}
 	if err := classifyDecode(json.Unmarshal(raw, v, typereg.Unmarshalers())); err != nil {
+		return typereg.EntryError(err)
+	}
+	return typereg.EntryError(d.cfg.walkUnmatched(raw, v))
+}
+
+// streamError returns err, an error from reading the stream, as
+// [Decoder.Decode] reports it. jsontext and encoding/json/v2 report a failure
+// the input causes as a *jsontext.SyntacticError or a *json.SemanticError,
+// the SDK's own [DecodeError] travelling inside the latter, and such a
+// failure comes back in the envelope [Unmarshal] returns (see
+// [typereg.EntryError]). The two errors the input does not cause carry none
+// of these and come back as they are: io.EOF once the stream holds no
+// further value, so a caller's err == io.EOF holds, and the reader's own
+// failure, which jsontext returns as an I/O error wrapping it.
+func streamError(err error) error {
+	if err == nil || !fromInput(err) {
 		return err
 	}
-	return d.cfg.walkUnmatched(raw, v)
+	return typereg.EntryError(err)
+}
+
+// fromInput reports whether err's chain holds an error the decoder raises for
+// its input: a *jsontext.SyntacticError, a *json.SemanticError or a
+// [DecodeError].
+func fromInput(err error) bool {
+	if _, ok := errors.AsType[*jsontext.SyntacticError](err); ok {
+		return true
+	}
+	if _, ok := errors.AsType[*json.SemanticError](err); ok {
+		return true
+	}
+	_, ok := errors.AsType[*DecodeError](err)
+	return ok
 }
 
 // RelaxedTypeDispatch reports whether the decoder was configured with

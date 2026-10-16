@@ -109,7 +109,10 @@ var errPrecisionLoss = typereg.ClassifyShape(fmt.Errorf("rm.Real: literal carrie
 // *strconv.NumError from the quoted arm, an encoding/json/v2
 // *json.SemanticError (or a *jsontext.SyntacticError for a malformed
 // literal) from the bare arm, each reachable with errors.As and each
-// staying outside typereg.ErrInvalidShape. Only a literal that parsed is
+// staying outside typereg.ErrInvalidShape. A quoted literal that does not
+// parse also carries its JSON text, quotes included, which a canjson entry
+// point holds in DecodeError.Value (see typereg.RefuseLiteral); the message
+// names it once, in the strconv cause. Only a literal that parsed is
 // then measured against the 17-digit limit, and only a literal that
 // passed both is assigned to the receiver. Reversing the order would report
 // "1e400" or "123456789012345678x" as precision loss, which is a
@@ -137,8 +140,10 @@ func (r *Real) UnmarshalJSON(b []byte) error {
 		if err != nil {
 			// The *strconv.NumError already quotes the literal once; a second
 			// echo here would double it (wire.md § REQ-052, causes may name
-			// the literal — the prefix must not repeat it).
-			return fmt.Errorf("rm.Real: parse quoted literal: %w", err)
+			// the literal — the prefix must not repeat it). The JSON text as
+			// written rides beside it for the entry point's DecodeError.Value,
+			// and never reaches the message.
+			return typereg.RefuseLiteral(b, fmt.Errorf("rm.Real: parse quoted literal: %w", err))
 		}
 		if significantDigits(s) > maxSignificantDigits {
 			return errPrecisionLoss
