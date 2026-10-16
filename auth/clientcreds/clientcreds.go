@@ -17,6 +17,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/auth"
 	"github.com/cadasto/openehr-sdk-go/auth/jwtbearer"
+	"github.com/cadasto/openehr-sdk-go/internal/coalesce"
 	"github.com/cadasto/openehr-sdk-go/internal/noredirect"
 	"github.com/cadasto/openehr-sdk-go/internal/urlredact"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
@@ -155,8 +156,11 @@ type exchange struct {
 	done  chan struct{}
 	token auth.Token
 	err   error
-	// abandoned reports that the exchange failed after the context of the
-	// caller running it had ended. That failure belongs to that caller only.
+	// abandoned reports that the exchange has no result for the callers
+	// waiting on it: it failed only because the context of the caller
+	// running it ended, or a panic unwound that caller before the result was
+	// published. That outcome belongs to that caller only. It is written
+	// before done is closed.
 	abandoned bool
 }
 
@@ -302,9 +306,13 @@ var _ auth.Reauther = (*Source)(nil)
 // Token returns the current access token, refreshing transparently
 // when the cached token is within RefreshThreshold of expiry.
 // Concurrent callers share the in-flight exchange. If the caller running
-// that exchange gives up first, a caller whose own context is still live
-// starts a new exchange rather than returning the cancellation of the
-// caller that gave up.
+// that exchange gives up first, and that alone fails the exchange, a caller
+// whose own context is still live starts a new exchange rather than
+// returning the cancellation of the caller that gave up. Any other failure
+// reaches every caller waiting on the exchange. A panic in the exchange,
+// from the HTTP client's RoundTripper or the assertion source for example,
+// goes up through the caller running it, unchanged, and the callers waiting
+// on that exchange start a new one the same way.
 func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 	for {
 		if err := ctx.Err(); err != nil {
@@ -332,10 +340,10 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 		if !ex.abandoned {
 			return ex.token, ex.err
 		}
-		// The caller running ex gave up, and this caller's context is live:
-		// go round again to run a new exchange or wait on a newer one. A new
-		// round follows only an exchange whose caller gave up, so the loop
-		// never spins.
+		// The caller running ex gave up or panicked, and this caller's
+		// context is live: go round again to run a new exchange or wait on a
+		// newer one. A new round follows only an exchange whose caller gave
+		// up or panicked, so the loop never spins.
 	}
 }
 
@@ -367,21 +375,39 @@ func (s *Source) Reauth(ctx context.Context) error {
 
 // lead runs the exchange ex on behalf of every caller waiting on it, caches
 // the token it obtains, and publishes the result to those callers.
+//
+// A panic in the exchange unwinds lead before the result is published. The
+// deferred release still takes ex out of flight and wakes the waiters, with
+// ex marked abandoned so that they start a new exchange, and the panic goes
+// on to the caller as it was raised.
 func (s *Source) lead(ctx context.Context, ex *exchange) (auth.Token, error) {
-	tok, err := s.fetch(ctx)
+	// ex stays abandoned unless the exchange returns and its result is
+	// published below.
+	ex.abandoned = true
+	defer s.release(ex)
 
-	s.mu.Lock()
+	tok, err := s.fetch(ctx)
 	if err == nil {
+		s.mu.Lock()
 		s.cur = tok
+		s.mu.Unlock()
 	}
-	s.inflight = nil
-	s.mu.Unlock()
 	ex.token = tok
 	ex.err = err
-	ex.abandoned = err != nil && ctx.Err() != nil
-	close(ex.done)
-
+	ex.abandoned = coalesce.EndedByContext(ctx, err)
 	return tok, err
+}
+
+// release takes ex out of flight, unless a newer exchange has replaced it
+// there, then wakes the callers waiting on it. lead defers it, so it runs
+// exactly once per exchange, also when a panic unwinds lead.
+func (s *Source) release(ex *exchange) {
+	s.mu.Lock()
+	if s.inflight == ex {
+		s.inflight = nil
+	}
+	s.mu.Unlock()
+	close(ex.done)
 }
 
 func (s *Source) stale() bool {
