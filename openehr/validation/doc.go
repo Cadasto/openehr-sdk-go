@@ -123,7 +123,8 @@
 // # Collect-all
 //
 // Every failing clause emits one [Issue]; the walk does not stop at a
-// finding, so UIs and CI runners get the full list. An attribute the
+// finding, so UIs and CI runners get the full list, unless one of the
+// walk's [Limits] stops it first. An attribute the
 // template and the Reference Model rules both find missing or empty is
 // one issue; a Reference Model rule's own finding at that path, such as a
 // coded attribute's terminology check, is a second.
@@ -150,14 +151,26 @@
 // built with no options.
 //
 // [WithLimits] sets the two [Limits] of the walk: the nesting depth below
-// which it does not descend (256 by default) and the
-// number of values it visits in one call (100,000 by default). No decoded
-// document comes near either; they stop a value built in Go that nests
-// without end or holds itself. A walk that reaches the depth limit reports
-// one max_depth issue, at the first place it stopped, and one that reaches
-// the visit limit reports max_nodes and ends.
+// which it does not descend (256 by default) and the number of values it
+// visits in one call (100,000 by default). They stop a value built in Go
+// that nests without end or holds itself, and a decoded document can reach
+// either: a large one the visit limit, a deeply nested one the depth limit.
+// A walk that reaches the depth limit reports one max_depth issue, at the
+// first place it stopped, and walks nothing below that depth. One that
+// reaches the visit limit reports max_nodes and ends, and since the
+// template check runs in the same walk as the Reference Model rules, it
+// ends too. A node's own checks run when the walk reaches it, before the
+// walk enters its attributes: its identity and type against the template,
+// the Reference Model rules of its class, and at a leaf the template's
+// value constraint. They read the node's attributes, so a node reached
+// before the stop can still report at a path the walk never entered. What
+// the visit limit leaves unchecked is the node where the walk stops, every
+// node after it, and the presence and counts of the attributes not yet
+// visited; a defect only those checks would find is not reported. A caller
+// that must check such a document to the end raises the limit with
+// [WithLimits]:
 //
-//	v := validation.New(validation.WithLimits(validation.Limits{Depth: 64}))
+//	v := validation.New(validation.WithLimits(validation.Limits{Nodes: 1_000_000}))
 //	r := v.Validate(comp, compiled)
 //
 // # Coverage

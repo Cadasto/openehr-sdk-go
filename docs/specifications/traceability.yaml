@@ -1552,6 +1552,7 @@ requirements:
       - openehr/validation/inventory_dispatch_internal_test.go
       - openehr/validation/issuepath_internal_test.go
       - openehr/validation/issuepath_test.go
+      - openehr/validation/limits_decoded_test.go
       - openehr/validation/limits_test.go
       - openehr/validation/multi_nonlocatable_test.go
       - openehr/validation/noncomposition_test.go
@@ -2215,6 +2216,7 @@ requirements:
       - openehr/validation/godoc_class_test.go
       - openehr/validation/imports_test.go
       - openehr/validation/inventory_dispatch_internal_test.go
+      - openehr/validation/limits_decoded_test.go
       - openehr/validation/limits_test.go
       - openehr/validation/locatable_attributes_test.go
       - openehr/validation/noncomposition_test.go

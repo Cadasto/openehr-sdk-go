@@ -4,9 +4,9 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
-// The limits a [Validator] built with no options applies. No decoded
-// document comes near either: the largest corpus document needs about a
-// thousand visits.
+// The limits a [Validator] built with no options applies. The largest
+// corpus document needs about a thousand visits, but a decoded document can
+// reach either limit ([Limits]).
 const (
 	defaultDepth = 256
 	defaultNodes = 100_000
@@ -15,8 +15,9 @@ const (
 // Limits bounds the walk, with a template as without one, so that a value
 // built in Go that nests without end, or holds itself through a list that
 // shares its own backing array, stops the walk rather than running it
-// without end. A field that is zero or negative stands for its default, so
-// no setting turns a limit off.
+// without end. A decoded document can reach either limit too: a large one
+// the visit limit, a deeply nested one the depth limit. A field that is
+// zero or negative stands for its default, so no setting turns a limit off.
 type Limits struct {
 	// Depth is the nesting depth at which the walk stops descending. On a
 	// node that deep the walk still checks the node itself: its identity
@@ -35,6 +36,14 @@ type Limits struct {
 	// stops, reporting a max_nodes issue where it stopped. An item of a list
 	// that holds no value, a nil element or a nil pointer, counts as one
 	// visit too, though the walk does not enter it. 100,000 by default.
+	//
+	// The stop ends the template check as well as the Reference Model
+	// rules, since both run in the one walk. A node reached before the stop
+	// has been checked itself, as for a node at the depth limit above, and
+	// those checks can report at the path of an attribute the walk never
+	// entered. What the stop leaves unchecked is the node where it stops,
+	// every node after it, and the presence and counts of the attributes not
+	// yet visited, so a defect only those checks would find is not reported.
 	Nodes int
 }
 
