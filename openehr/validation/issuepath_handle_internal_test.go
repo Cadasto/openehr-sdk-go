@@ -1,11 +1,11 @@
 package validation
 
-// issuepath_handle_internal_test.go: the issue paths the walk writes only
-// when something records them. The path rule's own cases are in
-// issuepath_internal_test.go; these hold that the handle of a node's path
-// writes the path by that rule, and that the ways the walk applies the rule,
-// counting a long list's ids into maps and a short one's by a scan, give the
-// same predicates.
+// issuepath_handle_internal_test.go: REQ-102 § Issue paths — the issue
+// paths the walk writes only when something records them. The path rule's
+// own cases are in issuepath_internal_test.go; these hold that the handle of
+// a node's path writes the path by that rule, and that the ways the walk
+// applies the rule, counting a long list's ids into maps and a short one's
+// by a scan, give the same predicates.
 
 import (
 	"fmt"
