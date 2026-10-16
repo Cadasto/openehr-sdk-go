@@ -23,11 +23,11 @@ import (
 // whether the list is there and empty without reading its items (REQ-171
 // Structural access).
 func TestEngine_REQ112_REQ171_MandatoryPrimitiveListCounted(t *testing.T) {
-	facts, ok := classAttributes["DV_MULTIMEDIA"].lookup("data")
-	if !ok {
-		t.Fatal("the class table lists no DV_MULTIMEDIA data")
+	walked := classAttributes["DV_MULTIMEDIA"].find("data")
+	if walked == nil {
+		t.Fatal("the class table walks no DV_MULTIMEDIA data")
 	}
-	data := attrFromFacts(engineNode{}, facts, nil)
+	data := walked.inRole(roleNone)
 	if data.shape != shapeCounted || data.mandatory {
 		t.Fatalf("precondition: DV_MULTIMEDIA data reads as shape %d, mandatory %t; want a counted list the pinned RM leaves optional", data.shape, data.mandatory)
 	}

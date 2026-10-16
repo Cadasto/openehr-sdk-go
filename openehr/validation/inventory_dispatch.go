@@ -361,43 +361,56 @@ var floorRules = pinnedSource.build()
 
 // classAttributes holds, for each class the pinned class metadata knows, by
 // its bare name, what the metadata says of each attribute it lists for the
-// class ([classFacts]), which the one walk reads every node by.
-// Built once, when the package is initialised, and never changed, so the
-// walk asks the metadata nothing per node.
-var classAttributes = buildClassAttributes(rminfo.Default)
+// class ([classFacts]) and how the one walk reads each one it visits on a
+// node of the class ([walkedAttr]). Built once, when the package is
+// initialised, and never changed, so the walk asks the metadata nothing per
+// node and builds no attribute per node but the part a node's role decides
+// ([engineAttr.inRole]).
+var classAttributes = buildClassAttributes(rminfo.Default, floorRules.byClass)
 
 // classAttributeTable is what the class metadata says of the attributes of
-// one class: each attribute it lists, in its order, and the position of each
-// by name.
+// one class: each attribute it lists, in its order; each of those the walk
+// visits on a node of the class, those a serialization carries and the
+// metadata gives a type, in the same order, as the walk reads them with no
+// template declaration ([walkedAttr]); and the position of each of these by
+// name. The pinned metadata lists no name twice for a class.
 type classAttributeTable struct {
 	listed []attributeFacts
+	walked []engineAttr
 	byName map[string]int
 }
 
-// lookup returns the facts of the attribute name the table lists, with ok
-// set; ok is unset when it lists none by that name. A nil table lists none.
-func (t *classAttributeTable) lookup(name string) (f attributeFacts, ok bool) {
+// find returns the attribute name the table walks, nil when it walks none by
+// that name: one the class does not list, no serialization carries or the
+// metadata gives no type. A nil table walks none.
+func (t *classAttributeTable) find(name string) *engineAttr {
 	if t == nil {
-		return f, false
+		return nil
 	}
 	i, ok := t.byName[name]
 	if !ok {
-		return f, false
+		return nil
 	}
-	return t.listed[i], true
+	return &t.walked[i]
 }
 
-// buildClassAttributes builds [classAttributes] for every class l knows.
-func buildClassAttributes(l rminfo.Lookup) map[string]*classAttributeTable {
+// buildClassAttributes builds [classAttributes] for every class l knows,
+// whose rules, nil for a class the type registry does not decode, rules
+// holds.
+func buildClassAttributes(l rminfo.Lookup, rules map[string]*classRules) map[string]*classAttributeTable {
 	known := l.KnownRMTypes()
 	out := make(map[string]*classAttributeTable, len(known))
 	for _, class := range known {
 		listed := classFacts(class)
-		byName := make(map[string]int, len(listed))
-		for i, f := range listed {
-			byName[f.Name] = i
+		t := &classAttributeTable{listed: listed, byName: make(map[string]int, len(listed))}
+		for _, f := range listed {
+			if f.NonStorable || !f.Typed {
+				continue
+			}
+			t.byName[f.Name] = len(t.walked)
+			t.walked = append(t.walked, walkedAttr(f, rules[class]))
 		}
-		out[class] = &classAttributeTable{listed: listed, byName: byName}
+		out[class] = t
 	}
 	return out
 }
@@ -610,19 +623,25 @@ func joinClasses(rules map[string]*classRules, tables map[string]*classAttribute
 // may carry a generic bound (DV_INTERVAL<DV_QUANTITY>), and the bare class
 // name; the zero entry, no rules and no table, for a type no class has.
 func classOf(rmType string) (classEntry, string) {
-	class := rmType
-	if strings.IndexByte(rmType, '<') >= 0 {
-		class = bmmtype.Class(rmType)
-	}
+	class := bareClass(rmType)
 	return classEntries[class], class
 }
 
 // rulesFor returns the RM rules for a node of RM type rmType, which may
 // carry a generic bound (DV_INTERVAL<DV_QUANTITY>), and the bare class name;
-// nil rules for a type no registered class has.
+// nil rules for a type no registered class has. It reads [floorRules]
+// itself, so the class tables can ask it while they are built.
 func rulesFor(rmType string) (*classRules, string) {
-	entry, class := classOf(rmType)
-	return entry.rules, class
+	class := bareClass(rmType)
+	return floorRules.byClass[class], class
+}
+
+// bareClass returns the RM type rmType without its generic bound, if any.
+func bareClass(rmType string) string {
+	if strings.IndexByte(rmType, '<') >= 0 {
+		return bmmtype.Class(rmType)
+	}
+	return rmType
 }
 
 // unevaluatedIn returns, sorted and once each, the invariants the classes of

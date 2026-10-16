@@ -36,6 +36,66 @@ func TestREQ171_ClassEntryHoldsTheRulesAndTheTableOfTheClass(t *testing.T) {
 	}
 }
 
+// REQ-171 § One walk — the attributes the table of each class walks, built
+// once per class, are the attributes it lists that a serialization carries
+// and the metadata types, in the class's order, and find returns each by its
+// name and no other. Read on a node in each role, each is the attribute the
+// walk built per node before: its name, declared type and shape as the
+// metadata gives them; mandatory when the metadata marks it mandatory for
+// the class, no rule of the class reports its absence itself and, for a
+// single-valued one, the role does not let it be blank; with no template
+// declaration. Each records whether its declared type has RM rules.
+func TestREQ171_ClassTableWalksEachAttributeAsTheWalkReadsIt(t *testing.T) {
+	t.Parallel()
+	code := classAttributes["CODE_PHRASE"].find("code_string")
+	if code == nil || !code.inRole(roleNone).mandatory || code.inRole(roleScaleSymbolCode).mandatory || !code.noRules {
+		t.Fatalf("precondition: CODE_PHRASE code_string reads as %+v; want a mandatory String, not mandatory in a DV_SCALE symbol's code", code)
+	}
+	if lang := classAttributes["COMPOSITION"].find("language"); lang == nil || lang.noRules {
+		t.Fatalf("precondition: COMPOSITION language reads as %+v; want a CODE_PHRASE, which has RM rules", lang)
+	}
+	roles := []floorRole{roleNone, roleScaleSymbol, roleScaleSymbolCode, roleArchetypedID}
+	for _, class := range slices.Sorted(maps.Keys(classAttributes)) {
+		table, rules := classAttributes[class], floorRules.byClass[class]
+		var walked []attributeFacts
+		for _, f := range table.listed {
+			if f.NonStorable || !f.Typed {
+				if got := table.find(f.Name); got != nil {
+					t.Errorf("%s table finds %s, which it does not walk, as %+v; want none", class, f.Name, got)
+				}
+				continue
+			}
+			walked = append(walked, f)
+		}
+		if len(table.walked) != len(walked) {
+			t.Errorf("%s table walks %d attributes, want %d", class, len(table.walked), len(walked))
+			continue
+		}
+		for i, f := range walked {
+			if got := table.find(f.Name); got != &table.walked[i] {
+				t.Errorf("%s table finds %s as %p, want the attribute at position %d, %p", class, f.Name, got, i, &table.walked[i])
+			}
+			shape := shapeFrom(f.Container, f.PrimitiveItems, f.Hash)
+			declared, _ := rulesFor(f.RMType)
+			for _, role := range roles {
+				want := engineAttr{
+					name:      f.Name,
+					rmType:    f.RMType,
+					shape:     shape,
+					mandatory: f.Mandatory && !rules.leavesOut(f.Name) && (shape != shapeSingle || !mayBeBlank(role, f.Name)),
+					noRules:   declared == nil,
+				}
+				if got := table.walked[i].inRole(role); got != want {
+					t.Errorf("%s %s in role %d reads as %+v, want %+v", class, f.Name, role, got, want)
+				}
+			}
+		}
+	}
+	if got := (*classAttributeTable)(nil).find("value"); got != nil {
+		t.Errorf("a nil table finds value as %+v, want none", got)
+	}
+}
+
 // REQ-171 § One walk — a class that has RM rules and no attribute table
 // keeps its rules, and one that has a table and no rules keeps its table:
 // joining the two tables loses neither side.

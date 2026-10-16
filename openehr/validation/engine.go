@@ -171,8 +171,15 @@ type engineAttr struct {
 	// class, no rule of the class reports its absence itself
 	// ([classRules.leavesOut]) and, for a single-valued one, the node's role
 	// does not let it be blank ([mayBeBlank]): the walk then applies the
-	// mandatory-presence rule to it.
+	// mandatory-presence rule to it. In a class's table
+	// ([classAttributeTable]) it holds the class's part alone; the walk
+	// applies the role's part at each node ([engineAttr.inRole]).
 	mandatory bool
+	// noRules is set, in a class's table, when no RM rules run on a value
+	// read as rmType ([rulesFor]), so that a value of a Go primitive type
+	// the attribute holds is a primitive leaf ([primitiveLeaf]). Unset, the
+	// walk visits such a value as it visits any other.
+	noRules bool
 	// decl is the bound template node's declaration of the attribute, nil
 	// where the template does not constrain it: the attribute is then
 	// visited with the RM rules alone.
@@ -313,15 +320,18 @@ func (e *engine) spendLeafVisit(parent, name, rmType string) {
 	e.visits++
 }
 
-// primitiveLeaf reports whether value, the value of a single-valued
-// attribute of declared RM type declared, is a primitive leaf: a value of a
-// Go primitive type, which no RM class is, read under a declared type that
-// has no RM rules. A named type, such as rm.Real, and a pointer are not one.
-func primitiveLeaf(value any, declared string) bool {
+// primitiveLeaf reports whether value, the value of the single-valued
+// attribute a, is a primitive leaf: a value of a Go primitive type, which no
+// RM class is, read under a declared type that has no RM rules
+// ([engineAttr].noRules). A named type, such as rm.Real, and a pointer are
+// not one.
+func primitiveLeaf(value any, a *engineAttr) bool {
+	if !a.noRules {
+		return false
+	}
 	switch value.(type) {
 	case string, bool, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
-		rules, _ := rulesFor(declared)
-		return rules == nil
+		return true
 	}
 	return false
 }
@@ -609,12 +619,13 @@ func (e *engine) settle(h *heldJudgement) {
 // attributes the template declares on the node it binds to are each read
 // as absent, and only the template's existence reports one.
 //
-// What the class metadata says of each attribute is read from the table
-// built once per class when the package is initialised ([classAttributes]),
-// never from the template, so the RM rules read the pinned Reference Model
-// whatever lookup compiled the template.
+// What the class metadata says of each attribute, and how the walk reads
+// each one it visits, is read from the table built once per class when the
+// package is initialised ([classAttributes]), never from the template, so
+// the RM rules read the pinned Reference Model whatever lookup compiled the
+// template. Only the part the node's role decides is applied at the node
+// ([engineAttr.inRole]).
 func (e *engine) visitAttributes(n engineNode, class string, entry classEntry) {
-	rules := entry.rules
 	var table *classAttributeTable
 	if rmaccess.Covers(n.value) {
 		table = entry.attrs
@@ -627,8 +638,7 @@ func (e *engine) visitAttributes(n engineNode, class string, entry classEntry) {
 			if decl.Implicit() {
 				continue // no template clause: visited below, if the class lists it
 			}
-			f, listed := table.lookup(decl.Name())
-			if a, visited := declaredAttr(n, decl, f, listed, rules); visited {
+			if a, visited := declaredAttr(n, decl, table.find(decl.Name())); visited {
 				e.visitAttribute(n, class, a)
 			}
 		}
@@ -636,14 +646,15 @@ func (e *engine) visitAttributes(n engineNode, class string, entry classEntry) {
 	if table == nil {
 		return
 	}
-	for _, f := range table.listed {
+	for i := range table.walked {
 		if e.stopped {
 			return
 		}
-		if f.NonStorable || !f.Typed || templateDeclares(n.bound, f.Name) {
-			continue // not visited, or visited above in the template's order
+		a := &table.walked[i]
+		if templateDeclares(n.bound, a.name) {
+			continue // visited above in the template's order
 		}
-		e.visitAttribute(n, class, attrFromFacts(n, f, rules))
+		e.visitAttribute(n, class, a.inRole(n.role))
 	}
 }
 
@@ -659,15 +670,16 @@ func templateDeclares(bound *tcimpl.CompiledNode, name string) bool {
 }
 
 // declaredAttr returns the attribute decl the bound template node of n
-// declares, as the walk visits it, with visited set, given f, what the class
-// metadata says of the attribute for the value's class, which lists it when
-// listed is set. An attribute the class lists, a serialization carries and
-// the metadata types is read as the class metadata gives it. Any other is
-// read as the template declares it, single-valued or a list; it is not
-// visited when no serialization of the bound node's class carries it.
-func declaredAttr(n engineNode, decl *tcimpl.CompiledAttribute, f attributeFacts, listed bool, rules *classRules) (a engineAttr, visited bool) {
-	if listed && !f.NonStorable && f.Typed {
-		a = attrFromFacts(n, f, rules)
+// declares, as the walk visits it, with visited set, given walked, the
+// attribute as the value's class table walks it ([classAttributeTable.find]),
+// nil when the table walks none by decl's name. An attribute the class
+// lists, a serialization carries and the metadata types is read as the
+// class metadata gives it, in n's role. Any other is read as the template
+// declares it, single-valued or a list; it is not visited when no
+// serialization of the bound node's class carries it.
+func declaredAttr(n engineNode, decl *tcimpl.CompiledAttribute, walked *engineAttr) (a engineAttr, visited bool) {
+	if walked != nil {
+		a = walked.inRole(n.role)
 		a.decl = decl
 		return a, true
 	}
@@ -681,15 +693,34 @@ func declaredAttr(n engineNode, decl *tcimpl.CompiledAttribute, f attributeFacts
 	return a, true
 }
 
-// attrFromFacts returns the attribute of node n, whose rules are rules,
-// that f describes, as the class metadata gives it, with no template
-// declaration. It is mandatory when the metadata marks it mandatory for the
-// class, no rule of the class reports its absence itself and, for a
-// single-valued one, the node's role does not let it be blank.
-func attrFromFacts(n engineNode, f attributeFacts, rules *classRules) engineAttr {
-	a := engineAttr{name: f.Name, rmType: f.RMType, shape: shapeFrom(f.Container, f.PrimitiveItems, f.Hash)}
-	a.mandatory = f.Mandatory && !rules.leavesOut(f.Name) && (a.shape != shapeSingle || !mayBeBlank(n.role, f.Name))
-	return a
+// walkedAttr returns the attribute f describes, of a class whose rules are
+// rules, nil for a class the type registry does not decode, as the class
+// metadata gives it, with no template declaration, whatever the role of the
+// node it is read on. The class's table holds it, built once per class
+// ([classAttributes]). It is mandatory when the metadata marks it mandatory
+// for the class and no rule of the class reports its absence itself; the
+// role's part is left to [engineAttr.inRole]. It records whether its
+// declared type has RM rules ([engineAttr].noRules).
+func walkedAttr(f attributeFacts, rules *classRules) engineAttr {
+	declared, _ := rulesFor(f.RMType)
+	return engineAttr{
+		name:      f.Name,
+		rmType:    f.RMType,
+		shape:     shapeFrom(f.Container, f.PrimitiveItems, f.Hash),
+		mandatory: f.Mandatory && !rules.leavesOut(f.Name),
+		noRules:   declared == nil,
+	}
+}
+
+// inRole returns the attribute a of a class's table as the walk reads it on
+// a node in role: no longer mandatory where it is single-valued and role
+// lets it be blank ([mayBeBlank]).
+func (a *engineAttr) inRole(role floorRole) engineAttr {
+	out := *a
+	if out.mandatory && out.shape == shapeSingle && mayBeBlank(role, out.name) {
+		out.mandatory = false
+	}
+	return out
 }
 
 // shapeFrom returns how the walk reads an attribute that is a container or
@@ -729,7 +760,7 @@ func (e *engine) visitAttribute(n engineNode, class string, a engineAttr) {
 	if !visitedAt(a, r.present) {
 		return
 	}
-	if a.decl == nil && primitiveLeaf(r.value, a.rmType) {
+	if a.decl == nil && primitiveLeaf(r.value, &a) {
 		// Walking a primitive leaf would only spend its visit (REQ-171
 		// visit limit). Only a present single value is read into r.value,
 		// so the mandatory-presence rule reports nothing. No RM class is a

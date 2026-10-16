@@ -117,8 +117,9 @@ func TestEngine_REQ171_NodeLimitAtAPrimitiveLeaf(t *testing.T) {
 // Read under a declared type that has them, it is visited as that type, whose
 // class is then among the visited, so the invariants that class leaves
 // unevaluated are in Coverage.Unevaluated. No attribute of the pinned RM
-// declares such a type for a primitive value, so the attribute is built: the
-// value of a DV_TEXT, declared a DV_TEXT.
+// declares such a type for a primitive value, so the attribute is built, as
+// a class's table builds it ([walkedAttr]): the value of a DV_TEXT, declared
+// a DV_TEXT.
 func TestEngine_REQ171_PrimitiveValueUnderATypeWithRulesIsVisited(t *testing.T) {
 	rules, _ := rulesFor("DV_TEXT")
 	if rules == nil {
@@ -130,7 +131,7 @@ func TestEngine_REQ171_PrimitiveValueUnderATypeWithRulesIsVisited(t *testing.T) 
 	}
 	e := newEngine(Limits{})
 	e.visitAttribute(engineNode{value: &rm.DVText{Value: "x"}, rmType: "DV_TEXT", path: "/"}, "DV_TEXT",
-		engineAttr{name: "value", rmType: "DV_TEXT", shape: shapeSingle})
+		walkedAttr(attributeFacts{Name: "value", RMType: "DV_TEXT", Typed: true}, nil))
 	r := e.result()
 	if e.visits != 1 || len(r.Issues) != 0 {
 		t.Errorf("visit of DV_TEXT value declared DV_TEXT: %d visits, issues %v; want 1 visit and no issue", e.visits, r.Issues)
@@ -150,7 +151,7 @@ func TestEngine_REQ171_PrimitiveLeafAfterTheWalkEnded(t *testing.T) {
 	}
 	visits, issues := e.visits, len(e.found.issues)
 	e.visitAttribute(engineNode{value: &rm.DVText{Value: "y"}, rmType: "DV_TEXT", path: "/"}, "DV_TEXT",
-		engineAttr{name: "value", rmType: "String", shape: shapeSingle})
+		walkedAttr(attributeFacts{Name: "value", RMType: "String", Typed: true}, nil))
 	if e.visits != visits || len(e.found.issues) != issues {
 		t.Errorf("visit of a DV_TEXT value after the walk ended: %d visits and issues %v, want %d visits and %d issues", e.visits, e.found.issues, visits, issues)
 	}
