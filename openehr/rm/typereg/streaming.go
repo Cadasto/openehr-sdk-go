@@ -187,7 +187,8 @@ func Unmarshalers() json.Options {
 // spells it, instead of v2's default "[]" / "{}".
 //
 // A generated list or map field that is nil is never written: its omit
-// option leaves it out (wire.md § REQ-052). The two FormatNil options decide
+// option leaves it out, because canonical JSON writes a member with no value
+// as no member at all, never as null. The two FormatNil options decide
 // the spelling of a nil slice or map that has no omit option of its own: one
 // held in an any field, one behind a non-nil pointer such as an optional
 // Hash field's *map[string]V, or one passed straight to canjson.Marshal.
