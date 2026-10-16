@@ -20,6 +20,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
@@ -321,16 +322,21 @@ func (e *engine) spendLeafVisit(parent, name, rmType string) {
 }
 
 // primitiveLeaf reports whether value, the value of the single-valued
-// attribute a, is a primitive leaf: a value of a Go primitive type, which no
-// RM class is, read under a declared type that has no RM rules
-// ([engineAttr].noRules). A named type, such as rm.Real, and a pointer are
-// not one.
+// attribute a, is a primitive leaf: a value read under a declared type that
+// has no RM rules ([engineAttr].noRules), of a type no RM class is. The
+// types are the Go primitive types; the primitive types the RM package
+// names, rm.Real, rm.Integer and rm.Character; and the pointers the
+// generated access hands over for an optional primitive attribute, *string,
+// *bool, *rm.Real and *rm.Integer, each of which it reads as present only
+// when it is not nil. A test keeps every one of them outside the RM classes.
 func primitiveLeaf(value any, a *engineAttr) bool {
 	if !a.noRules {
 		return false
 	}
 	switch value.(type) {
-	case string, bool, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+	case string, bool, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64,
+		rm.Real, rm.Integer, rm.Character,
+		*string, *bool, *rm.Real, *rm.Integer:
 		return true
 	}
 	return false
@@ -784,9 +790,9 @@ func (e *engine) visitAttribute(n *engineNode, class string, a *engineAttr) {
 	if a.decl == nil && primitiveLeaf(r.value, a) {
 		// Walking a primitive leaf would only spend its visit (REQ-171
 		// visit limit). Only a present single value is read into r.value,
-		// so the mandatory-presence rule reports nothing. No RM class is a
-		// Go primitive type, so the leaf is read as its declared type, has
-		// no identity, and has no attributes to visit, so the depth limit
+		// so the mandatory-presence rule reports nothing. No RM class is of
+		// a primitive leaf's type, so the leaf is read as its declared type,
+		// has no identity, and has no attributes to visit, so the depth limit
 		// does not reach it. That type has no RM rules to run or record.
 		// So the visit is counted here, and the leaf's path is built only
 		// when the visit limit is reported there.

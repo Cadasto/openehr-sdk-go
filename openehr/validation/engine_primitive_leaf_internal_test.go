@@ -1,17 +1,20 @@
 package validation
 
 // engine_primitive_leaf_internal_test.go: REQ-171 § One walk and § Surface —
-// a primitive leaf, the value of a Go primitive type that an attribute no
-// template clause constrains holds, counts as one visit, as every other
-// value does, and the visit limit reached at such a leaf is reported at the
-// leaf's own path.
+// a primitive leaf, a value of a primitive type, no RM class, that an
+// attribute no template clause constrains holds, counts as one visit, as
+// every other value does, and the visit limit reached at such a leaf is
+// reported at the leaf's own path.
 
 import (
 	"fmt"
+	"reflect"
 	"slices"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
@@ -49,16 +52,26 @@ func TestEngine_REQ171_VisitCountOfTheBenchmarkCompositions(t *testing.T) {
 // next visit is a primitive leaf, the walk reports max_nodes at that leaf's
 // path, naming the type its attribute declares and the limit, as its last
 // and only stop, and lists that path alone in Coverage.Stopped. The leaves
-// are of Go primitive types (String, Boolean, Integer64) and of named RM
-// types (Real, Integer), at an attribute of the root and below, with no
-// template and with one. Each case's limit and path were read off the walk
-// before primitive leaves were counted without being entered.
+// are of Go primitive types (String, Boolean, Integer64), of the primitive
+// types the RM package names (Real, Integer, Character) and pointers to
+// optional ones (String, Boolean, Real, Integer), at an attribute of the
+// root and below, with no template and with one. Each case's limit and path
+// were read off the walk before primitive leaves were counted without being
+// entered, and those of the named types and the pointers before they were
+// counted so too.
 func TestEngine_REQ171_NodeLimitAtAPrimitiveLeaf(t *testing.T) {
-	bmi := benchCases(t)[0]
-	precision := rm.Integer(1)
+	cases := benchCases(t)
+	bmi, demo := cases[0], cases[1]
+	precision, accuracy, percent, system, formatting := rm.Integer(1), rm.Real(0.5), true, "UCUM", "plain"
 	quantity := elementHolding(&rm.DVQuantity{Magnitude: 1.5, Units: "kg", Precision: &precision})
+	optionals := elementHolding(&rm.DVQuantity{Magnitude: 1.5, Units: "kg", Precision: &precision, Accuracy: &accuracy, AccuracyIsPercent: &percent, UnitsSystem: &system})
 	text := elementHolding(&rm.DVText{Value: "x"})
+	code := rm.DVCodedText{Value: "mild", DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "local"}, CodeString: "at1"}}
+	proportionPrecision := rm.Integer(0)
+	proportion := elementHolding(&rm.DVProportion{Numerator: 1, Denominator: 2, Type: 1, Precision: &proportionPrecision})
+	mapped := elementHolding(&rm.DVText{Value: "x", Formatting: &formatting, Mappings: []rm.TermMapping{{Match: "=", Target: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}, CodeString: "1"}}}})
 	const bmiValue = "/content[openEHR-EHR-OBSERVATION.body_mass_index.v1]/data/events[at0002]/data/items[at0004]/value"
+	const demoItems = "/content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0002]/data/items[at0004]"
 	tests := []struct {
 		name   string
 		root   any
@@ -78,6 +91,20 @@ func TestEngine_REQ171_NodeLimitAtAPrimitiveLeaf(t *testing.T) {
 		{name: "String in BMI, BMI template", root: bmi.comp, c: bmi.c, nodes: 4, path: "/category/defining_code/terminology_id/value", rmType: "String"},
 		{name: "Real in BMI, BMI template", root: bmi.comp, c: bmi.c, nodes: 44, path: bmiValue + "/magnitude", rmType: "Real"},
 		{name: "String units in BMI, BMI template", root: bmi.comp, c: bmi.c, nodes: 46, path: bmiValue + "/units", rmType: "String"},
+		{name: "pointer to Real in a DV_QUANTITY", root: optionals, nodes: 5, path: "/value/accuracy", rmType: "Real"},
+		{name: "pointer to Boolean in a DV_QUANTITY", root: optionals, nodes: 6, path: "/value/accuracy_is_percent", rmType: "Boolean"},
+		{name: "pointer to Integer in a DV_QUANTITY", root: optionals, nodes: 8, path: "/value/precision", rmType: "Integer"},
+		{name: "pointer to String in a DV_QUANTITY", root: optionals, nodes: 10, path: "/value/units_system", rmType: "String"},
+		{name: "pointer to String in a DV_TEXT", root: mapped, nodes: 6, path: "/value/formatting", rmType: "String"},
+		{name: "Character in a TERM_MAPPING", root: mapped, nodes: 8, path: "/value/mappings[1]/match", rmType: "Character"},
+		{name: "Integer in a DV_ORDINAL", root: elementHolding(&rm.DVOrdinal{Value: 2, Symbol: code}), nodes: 11, path: "/value/value", rmType: "Integer"},
+		{name: "Real in a DV_SCALE", root: elementHolding(&rm.DVScale{Value: 1.5, Symbol: code}), nodes: 11, path: "/value/value", rmType: "Real"},
+		{name: "Real numerator in a DV_PROPORTION", root: proportion, nodes: 5, path: "/value/numerator", rmType: "Real"},
+		{name: "Real denominator in a DV_PROPORTION", root: proportion, nodes: 6, path: "/value/denominator", rmType: "Real"},
+		{name: "Integer type in a DV_PROPORTION", root: proportion, nodes: 7, path: "/value/type", rmType: "Integer"},
+		{name: "Integer precision in a DV_PROPORTION", root: proportion, nodes: 8, path: "/value/precision", rmType: "Integer"},
+		{name: "pointer to Integer in Demonstration, its template", root: demo.comp, c: demo.c, nodes: 60, path: demoItems + "/items[at0012]/value/precision", rmType: "Integer"},
+		{name: "Real numerator in Demonstration, its template", root: demo.comp, c: demo.c, nodes: 102, path: demoItems + "/items[at0028]/value/numerator", rmType: "Real"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -154,5 +181,60 @@ func TestEngine_REQ171_PrimitiveLeafAfterTheWalkEnded(t *testing.T) {
 		new(walkedAttr(attributeFacts{Name: "value", RMType: "String", Typed: true}, nil)))
 	if e.visits != visits || len(e.found.issues) != issues {
 		t.Errorf("visit of a DV_TEXT value after the walk ended: %d visits and issues %v, want %d visits and %d issues", e.visits, e.found.issues, visits, issues)
+	}
+}
+
+// leafSamples returns one value of each type a primitive leaf may be
+// ([primitiveLeaf]): the Go primitive types, the primitive types the RM
+// package names, and the pointers the generated access hands over for an
+// optional primitive attribute.
+func leafSamples() []any {
+	text, flag, number, integer := "x", true, rm.Real(0.5), rm.Integer(1)
+	return []any{
+		"x", true, int(1), int8(1), int16(1), int32(1), int64(1),
+		uint(1), uint8(1), uint16(1), uint32(1), uint64(1), float32(1), float64(1),
+		rm.Real(0.5), rm.Integer(1), rm.Character("="),
+		&text, &flag, &number, &integer,
+	}
+}
+
+// REQ-171 § One walk — every type a primitive leaf may be is one no RM
+// class is: the closed RM set names none (rmTypeInfo), the generated access
+// reads no attribute of one (rmaccess.Covers) and the walk tracks the
+// identity of none (hasIdentity). Walked, such a value would be read as its
+// declared type, with nothing below it to visit, outside the values the walk
+// is inside, so counting it without entering it changes nothing; a change
+// that makes one of those types an RM class fails here. And no value of a
+// class the type registry decodes, held by pointer or by value, is a
+// primitive leaf.
+func TestEngine_REQ171_PrimitiveLeafTypesAreNoRMClass(t *testing.T) {
+	t.Parallel()
+	leaf := walkedAttr(attributeFacts{Name: "value", RMType: "String", Typed: true}, nil)
+	for _, v := range leafSamples() {
+		if !primitiveLeaf(v, &leaf) {
+			t.Errorf("primitiveLeaf(%T) under String = false, want true", v)
+		}
+		if name, _, ok := rmTypeInfo(v); ok {
+			t.Errorf("rmTypeInfo(%T) = %s, want no RM type", v, name)
+		}
+		if rmaccess.Covers(v) {
+			t.Errorf("rmaccess.Covers(%T) = true, want false", v)
+		}
+		if hasIdentity(v) {
+			t.Errorf("hasIdentity(%T) = true, want false", v)
+		}
+	}
+	names := typereg.Default.Names()
+	if len(names) == 0 {
+		t.Fatal("precondition: the type registry decodes no class")
+	}
+	for _, name := range names {
+		ctor, _ := typereg.Default.Lookup(name)
+		ptr := ctor()
+		for _, v := range []any{ptr, reflect.ValueOf(ptr).Elem().Interface()} {
+			if primitiveLeaf(v, &leaf) {
+				t.Errorf("primitiveLeaf(%T), a value of %s, under String = true, want false", v, name)
+			}
+		}
 	}
 }
