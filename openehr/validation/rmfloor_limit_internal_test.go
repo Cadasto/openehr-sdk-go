@@ -1,10 +1,10 @@
 package validation
 
 // rmfloor_limit_internal_test.go: REQ-112 § Driver, REQ-171 § Surface — the
-// walk's default visit limit sits far above what a decoded document needs,
-// so it stops only a value built in Go that holds itself by value. Under a
-// node limit the walk visits exactly that many values; under a depth limit
-// it visits nothing below it.
+// walk's default visit limit sits far above what the corpus documents need,
+// so none of them stops the walk; a large decoded document still can
+// (limits_decoded_test.go). Under a node limit the walk visits exactly that
+// many values; under a depth limit it visits nothing below it.
 
 import (
 	"os"
@@ -17,8 +17,7 @@ import (
 
 // REQ-112 — every corpus document the fixtures list is walked in under a
 // tenth of the default visit limit, and none reports max_nodes. A fixture
-// that comes within a tenth of the limit fails here, before a real document
-// could reach it.
+// that comes within a tenth of the limit fails here.
 func TestDefaultLimits_REQ112_REQ171_FarAboveTheCorpus(t *testing.T) {
 	rels, err := fixtures.ListCompositionJSON()
 	if err != nil {

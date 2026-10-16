@@ -123,7 +123,8 @@
 // # Collect-all
 //
 // Every failing clause emits one [Issue]; the walk does not stop at a
-// finding, so UIs and CI runners get the full list. An attribute the
+// finding, so UIs and CI runners get the full list, unless one of the
+// walk's [Limits] stops it first. An attribute the
 // template and the Reference Model rules both find missing or empty is
 // one issue; a Reference Model rule's own finding at that path, such as a
 // coded attribute's terminology check, is a second.
@@ -150,12 +151,17 @@
 // built with no options.
 //
 // [WithLimits] sets the two [Limits] of the walk: the nesting depth below
-// which it does not descend (256 by default) and the
-// number of values it visits in one call (100,000 by default). No decoded
-// document comes near either; they stop a value built in Go that nests
-// without end or holds itself. A walk that reaches the depth limit reports
-// one max_depth issue, at the first place it stopped, and one that reaches
-// the visit limit reports max_nodes and ends.
+// which it does not descend (256 by default) and the number of values it
+// visits in one call (100,000 by default). They stop a value built in Go
+// that nests without end or holds itself, and a decoded document can reach
+// either: a large one the visit limit, a deeply nested one the depth limit.
+// A walk that reaches the depth limit reports one max_depth issue, at the
+// first place it stopped, and checks nothing below that depth. One that
+// reaches the visit limit reports max_nodes and ends. The template check
+// runs in the same walk as the Reference Model rules, so a stop ends it
+// too: a defect past the stop is not reported, and the issues before
+// max_nodes are all the walk found. A caller that must check such a
+// document to the end raises the limit with [WithLimits].
 //
 //	v := validation.New(validation.WithLimits(validation.Limits{Depth: 64}))
 //	r := v.Validate(comp, compiled)

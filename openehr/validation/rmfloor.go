@@ -69,8 +69,8 @@ import (
 // path where it recurs and is not entered again. A value held by value can
 // hold itself too, through a list that shares its own backing array, and
 // the walk cannot recognise it; so every call stops after a number of
-// visits, by default far above what a decoded document needs, and reports
-// `max_nodes` once, at the path where it stopped. A graph nested deeper than
+// visits, and reports `max_nodes` once, at the path where it stopped. A
+// large decoded document can reach that limit too. A graph nested deeper than
 // the walk's depth limit is not walked below it; the walk reports
 // `max_depth` once, at the first path where it stopped. [Result.Coverage]
 // lists the path of each of the two, and the [Limits] of a [Validator] set
