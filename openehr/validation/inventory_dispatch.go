@@ -384,14 +384,22 @@ type classAttributeTable struct {
 // that name: one the class does not list, no serialization carries or the
 // metadata gives no type. A nil table walks none.
 func (t *classAttributeTable) find(name string) *engineAttr {
-	if t == nil {
-		return nil
-	}
-	i, ok := t.byName[name]
+	i, ok := t.position(name)
 	if !ok {
 		return nil
 	}
 	return &t.walked[i]
+}
+
+// position returns the position in walked of the attribute name the table
+// walks, with ok set; ok is unset when the table walks none by that name, as
+// [classAttributeTable.find] reads it.
+func (t *classAttributeTable) position(name string) (i int, ok bool) {
+	if t == nil {
+		return 0, false
+	}
+	i, ok = t.byName[name]
+	return i, ok
 }
 
 // buildClassAttributes builds [classAttributes] for every class l knows,

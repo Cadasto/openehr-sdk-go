@@ -608,16 +608,16 @@ func (e *engine) settle(h *heldJudgement) {
 // in the template's order. Then it visits the other attributes the class
 // metadata lists for class, in the class's order, with the RM rules alone:
 // no template clause constrains them. Among them are those the compile
-// injected into the bound node
-// because the RM marks them mandatory for the node's class
-// ([tcimpl.CompiledAttribute.Implicit]); an injected attribute the value's
-// class does not list is not visited, so it draws no finding. It leaves out
-// an attribute no serialization carries ([rminfo.IsNonStorableAttr]), and
-// one the metadata gives no type that the template does not declare. A
-// value of no registered RM class ([rmaccess.Covers]) has no attributes the
-// access reads and no class the metadata lists attributes for: the
-// attributes the template declares on the node it binds to are each read
-// as absent, and only the template's existence reports one.
+// injected into the bound node because the RM marks them mandatory for the
+// node's class ([tcimpl.CompiledAttribute.Implicit]); an injected attribute
+// the value's class does not list is not visited, so it draws no finding.
+// It leaves out an attribute no serialization carries
+// ([rminfo.IsNonStorableAttr]), and one the metadata gives no type that the
+// template does not declare. A value of no registered RM class
+// ([rmaccess.Covers]) has no attributes the access reads and no class the
+// metadata lists attributes for: the attributes the template declares on
+// the node it binds to are each read as absent, and only the template's
+// existence reports one.
 //
 // What the class metadata says of each attribute, and how the walk reads
 // each one it visits, is read from the table built once per class when the
@@ -625,11 +625,22 @@ func (e *engine) settle(h *heldJudgement) {
 // the RM rules read the pinned Reference Model whatever lookup compiled the
 // template. Only the part the node's role decides is applied at the node
 // ([engineAttr.inRole]).
+//
+// An attribute the class lists is visited in the template's order, and not
+// again in the class's, when the bound node declares it as the template
+// wrote it rather than as the compile injected it. The walk marks each such
+// attribute by its position in the class's table while it visits the
+// template's declarations (declared), once however many of them name it;
+// a declaration of a name the class does not list marks none. The compile
+// injects only attributes the template does not declare, so a name the
+// template declares is never also an injected one, and no class's table
+// walks more attributes than the mark holds ([attrMarks]).
 func (e *engine) visitAttributes(n engineNode, class string, entry classEntry) {
 	var table *classAttributeTable
 	if rmaccess.Covers(n.value) {
 		table = entry.attrs
 	}
+	var declared attrMarks
 	if n.bound != nil {
 		for _, decl := range tcimpl.NodeAttributes(n.bound) {
 			if e.stopped {
@@ -638,7 +649,12 @@ func (e *engine) visitAttributes(n engineNode, class string, entry classEntry) {
 			if decl.Implicit() {
 				continue // no template clause: visited below, if the class lists it
 			}
-			if a, visited := declaredAttr(n, decl, table.find(decl.Name())); visited {
+			var walked *engineAttr
+			if i, ok := table.position(decl.Name()); ok {
+				walked = &table.walked[i]
+				declared |= 1 << i
+			}
+			if a, visited := declaredAttr(n, decl, walked); visited {
 				e.visitAttribute(&n, class, &a)
 			}
 		}
@@ -650,10 +666,10 @@ func (e *engine) visitAttributes(n engineNode, class string, entry classEntry) {
 		if e.stopped {
 			return
 		}
-		a := &table.walked[i]
-		if templateDeclares(n.bound, a.name) {
+		if declared&(1<<i) != 0 {
 			continue // visited above in the template's order
 		}
+		a := &table.walked[i]
 		if a.blankIn(n.role) {
 			inRole := a.inRole(n.role)
 			a = &inRole
@@ -662,16 +678,10 @@ func (e *engine) visitAttributes(n engineNode, class string, entry classEntry) {
 	}
 }
 
-// templateDeclares reports whether the template node bound declares the
-// attribute name, as the template wrote it rather than as the compile
-// injected it; a nil bound declares none.
-func templateDeclares(bound *tcimpl.CompiledNode, name string) bool {
-	if bound == nil {
-		return false
-	}
-	a := bound.Attribute(name)
-	return a != nil && !a.Implicit()
-}
+// attrMarks marks attributes of a class's table by their position, bit i
+// for the attribute at position i ([engine.visitAttributes]). No class's
+// table walks more attributes than it has bits; a test keeps it so.
+type attrMarks uint64
 
 // declaredAttr returns the attribute decl the bound template node of n
 // declares, as the walk visits it, with visited set, given walked, the
