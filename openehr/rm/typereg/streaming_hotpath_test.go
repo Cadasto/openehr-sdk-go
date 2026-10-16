@@ -26,11 +26,18 @@ import (
 // check and every row whose decoder carries neither the aggregate nor the
 // memoised join (no set, a nil set, an unrelated caller, a displaced join)
 // comes back nil.
+//
+// Each row stores its own entry in the package-wide memo, so the test puts the
+// entry it found back when it ends: the memo-counting tests in
+// streaming_test.go then see the memo as the rest of the binary left it,
+// whatever order the tests run in.
 func TestDecodeOptionsNilWhenDecoderCarriesSDKOptions(t *testing.T) {
 	agg := aggregateUnmarshalers()
 	if agg == nil {
 		t.Fatal("aggregateUnmarshalers() = nil: this test needs the rm package's interface hooks, which the typereg_test files import")
 	}
+	saved := lastCallerJoin.Load()
+	t.Cleanup(func() { lastCallerJoin.Store(saved) })
 	skip := func(dec *jsontext.Decoder, _ *fakeBox) error { return dec.SkipValue() }
 	caller := json.UnmarshalFromFunc(skip)
 	other := json.UnmarshalFromFunc(skip)
