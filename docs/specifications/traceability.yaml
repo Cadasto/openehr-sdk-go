@@ -1440,6 +1440,7 @@ requirements:
     tests:
       - openehr/bmm/load_test.go
       - openehr/rm/typereg/registry_test.go
+      - openehr/rm/typereg/streaming_hotpath_test.go
       - openehr/serialize/canjson/edgecases_test.go
       - openehr/template/parse_cap_test.go
       - openehr/template/parse_depth_test.go
