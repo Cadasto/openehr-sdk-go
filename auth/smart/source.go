@@ -17,6 +17,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/auth"
 	"github.com/cadasto/openehr-sdk-go/auth/jwtbearer"
+	"github.com/cadasto/openehr-sdk-go/internal/coalesce"
 	"github.com/cadasto/openehr-sdk-go/internal/noredirect"
 	"github.com/cadasto/openehr-sdk-go/internal/urlredact"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
@@ -420,6 +421,13 @@ type tokenExchange struct {
 	// the session while the refresh ran, so its result was discarded and the
 	// callers waiting on it try again. It is written before done is closed.
 	superseded bool
+	// retry reports that the refresh has no result for the callers waiting
+	// on it: it failed only because the context of the call leading it
+	// ended, or a panic unwound that call before the result was published.
+	// A waiter whose own context is live tries again; one whose context has
+	// ended returns its own context's error. It is written before done is
+	// closed.
+	retry bool
 }
 
 // New constructs a Source from clientID and discovery auth endpoints.
@@ -858,21 +866,34 @@ func (s *Source) SetTokens(access auth.Token, refresh string) {
 // answers from the tokens the source holds now: it returns them, refreshing
 // them in turn when they are stale, or, after Revoke, returns
 // [auth.ErrReauthRequired].
+//
+// Concurrent calls share one refresh, which runs under the context of the
+// call that started it. When that context ending is all that failed the
+// refresh, the calls waiting on it do not get that failure: each whose own
+// context is live tries again, sending a new refresh or waiting on a newer
+// one, and one whose context has ended returns its own context's error. Any
+// other failure reaches every waiting call. A panic in the refresh, from the
+// HTTP client's RoundTripper or a client-assertion signer for example, goes
+// up through the call that started it, unchanged, and the calls waiting on
+// that refresh try again the same way.
 func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 	for {
 		tok, retry, err := s.tryToken(ctx)
 		if !retry {
 			return tok, err
 		}
-		// A code exchange, SetTokens or Revoke replaced the session the
-		// refresh belonged to; read what the source holds now. A further
-		// retry needs yet another replacement meanwhile.
+		// The refresh this call led or waited on left it no result: a code
+		// exchange, SetTokens or Revoke replaced the session the refresh
+		// belonged to, or the call leading it gave up or panicked. Read what
+		// the source holds now. A further retry needs another such event
+		// meanwhile, so the loop does not spin.
 	}
 }
 
 // tryToken makes one attempt at Token. retry reports that the refresh it led
-// or waited on was discarded because the session changed, so the caller
-// tries again against the current tokens.
+// or waited on left it no result, because the session changed or because
+// the call leading the refresh gave up or panicked, so the caller tries
+// again against the current tokens.
 func (s *Source) tryToken(ctx context.Context) (tok auth.Token, retry bool, err error) {
 	if err := ctx.Err(); err != nil {
 		return auth.Token{}, false, err
@@ -888,20 +909,31 @@ func (s *Source) tryToken(ctx context.Context) (tok auth.Token, retry bool, err 
 		s.mu.Unlock()
 		select {
 		case <-ex.done:
-			if ex.superseded {
-				return auth.Token{}, true, nil
-			}
-			return ex.token, false, ex.err
 		case <-ctx.Done():
 			return auth.Token{}, false, ctx.Err()
+		}
+		switch {
+		case ex.superseded:
+			return auth.Token{}, true, nil
+		case ex.retry:
+			// The leader's own context ended, or a panic unwound it: that
+			// outcome is not this caller's. Give up with this caller's own
+			// error when its context ended too, otherwise go round again.
+			if err := ctx.Err(); err != nil {
+				return auth.Token{}, false, err
+			}
+			return auth.Token{}, true, nil
+		default:
+			return ex.token, false, ex.err
 		}
 	}
 	refreshTok := s.refresh
 	cur := s.cur
 	if refreshTok == "" && cur.IsZero() {
-		// Post-terminal state: both the access token and the refresh token have
-		// been cleared by a prior terminal failure (F-L). Return immediately
-		// without touching inflight — there is nothing to exchange (REQ-063).
+		// The source holds neither an access token nor a refresh token: it is
+		// new, Revoke signed it out, or a terminal refresh failure cleared both
+		// (F-L). Return immediately without touching inflight — there is
+		// nothing to exchange (REQ-063).
 		s.mu.Unlock()
 		return auth.Token{}, false, &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: errors.New("no token or refresh_token")}
 	}
@@ -924,22 +956,70 @@ func (s *Source) tryToken(ctx context.Context) (tok auth.Token, retry bool, err 
 	s.inflight = ex
 	s.mu.Unlock()
 
-	var refreshedTR TokenResponse
-	tok, refreshedTR, refreshTok, err = s.refreshGrant(ctx, refreshTok, binding)
+	tok, err = s.leadRefresh(ctx, ex, refreshTok, cur, binding)
+	if ex.superseded {
+		return auth.Token{}, true, nil
+	}
+	// The waiters have their token; the change is reported after them, in
+	// the order it was installed whatever the hook does meanwhile.
+	s.deliverChanges()
+	return tok, false, err
+}
 
+// leadRefresh runs the refresh ex stands for on behalf of every caller
+// waiting on it, installs its result and publishes it to those callers.
+// refreshTok is the refresh token to redeem, and cur and binding are the
+// access token and the identity the session held when the refresh began.
+//
+// A panic in the refresh unwinds leadRefresh before the result is published.
+// The deferred release still takes ex out of flight and wakes the waiters,
+// with ex marked for retry so that they try again, and the panic goes on to
+// the caller as it was raised.
+func (s *Source) leadRefresh(ctx context.Context, ex *tokenExchange, refreshTok string, cur auth.Token, binding *idTokenBinding) (auth.Token, error) {
+	// ex stays marked for retry unless the refresh returns and its result
+	// is published below.
+	ex.retry = true
+	defer s.release(ex)
+
+	tok, refreshedTR, next, err := s.refreshGrant(ctx, refreshTok, binding)
+	tok, err = s.installRefresh(ctx, ex, cur, tok, refreshedTR, next, err)
+	// The result is published before release closes done, so every waiter
+	// reads it (auth.md § Concurrency).
+	ex.token = tok
+	ex.err = err
+	ex.retry = coalesce.EndedByContext(ctx, err)
+	return tok, err
+}
+
+// release takes ex out of flight, unless a newer refresh has replaced it
+// there, then wakes the callers waiting on it. leadRefresh defers it, so it
+// runs exactly once per refresh, also when a panic unwinds leadRefresh.
+func (s *Source) release(ex *tokenExchange) {
 	s.mu.Lock()
+	if s.inflight == ex {
+		s.inflight = nil
+	}
+	s.mu.Unlock()
+	close(ex.done)
+}
+
+// installRefresh installs what the refresh ex stands for returned: tok,
+// refreshedTR and refreshTok, or err. cur is the access token the session
+// held when the refresh began. It returns the token and error the callers
+// of the refresh get. When a code exchange, SetTokens or Revoke replaced the
+// session meanwhile, it installs nothing, marks ex superseded and returns no
+// error. It holds s.mu while it runs.
+func (s *Source) installRefresh(ctx context.Context, ex *tokenExchange, cur, tok auth.Token, refreshedTR TokenResponse, refreshTok string, err error) (auth.Token, error) {
+	s.mu.Lock()
+	// Deferred, so that a panic here leaves s.mu free for release.
+	defer s.mu.Unlock()
 	if s.session != ex.session {
 		// A code exchange, SetTokens or Revoke replaced the session while the
 		// refresh ran. Its result, success or failure, belongs to the old
 		// session: nothing of it is kept, and no terminal failure clears the
 		// new tokens. Every caller on this refresh tries again.
-		if s.inflight == ex {
-			s.inflight = nil
-		}
-		s.mu.Unlock()
 		ex.superseded = true
-		close(ex.done)
-		return auth.Token{}, true, nil
+		return auth.Token{}, nil
 	}
 	if err == nil {
 		if refreshedTR.IDToken == "" {
@@ -971,15 +1051,7 @@ func (s *Source) tryToken(ctx context.Context) (tok auth.Token, retry bool, err 
 			err = &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: err}
 		}
 	}
-	s.inflight = nil
-	s.mu.Unlock()
-	ex.token = tok
-	ex.err = err
-	close(ex.done)
-	// The waiters have their token; the change is reported after them, in
-	// the order it was installed whatever the hook does meanwhile.
-	s.deliverChanges()
-	return tok, false, err
+	return tok, err
 }
 
 // RefreshIfNeeded refreshes the access token only when it is within the

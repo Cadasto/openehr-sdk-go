@@ -10,12 +10,18 @@ import (
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
+	"github.com/cadasto/openehr-sdk-go/internal/coalesce"
 	"github.com/cadasto/openehr-sdk-go/internal/urlredact"
 )
 
 const defaultJWKSTTL = 5 * time.Minute
 
 // JWKS holds a cached JSON Web Key Set.
+//
+// Build one with [NewJWKS]. The exported fields are read without the lock,
+// so set them before the first lookup and leave them as they are afterwards.
+// A JWKS built as a literal without an HTTPClient does not panic: every
+// fetch fails with an error matching [auth.ErrInvalidConfig].
 type JWKS struct {
 	HTTPClient *http.Client
 	URI        string
@@ -34,11 +40,17 @@ type JWKS struct {
 }
 
 // jwksRefresh carries the result of a single coalesced refresh so that
-// waiters observe the leader's outcome rather than assuming success. err is
-// written before done is closed, so a receive on done happens-after the write.
+// waiters observe the leader's outcome rather than assuming success. err and
+// retry are written before done is closed, so a receive on done
+// happens-after the writes.
 type jwksRefresh struct {
 	done chan struct{}
 	err  error
+	// retry reports that the refresh has no result for its waiters: it
+	// failed only because the context of the lookup leading it ended, or a
+	// panic unwound that lookup before the fetch returned. A waiter whose
+	// own context is live then refreshes again.
+	retry bool
 }
 
 // NewJWKS constructs a JWKS fetcher for uri. HTTPClient is required.
@@ -135,35 +147,76 @@ func (j *JWKS) staleLocked() bool {
 	return time.Since(j.fetchedAt) >= j.TTL
 }
 
+// refresh fetches the set, or waits for the fetch another lookup leads. The
+// fetch runs under the context of the lookup that leads it. When that
+// context ending is all that failed the fetch, or a panic unwound the
+// leading lookup, a waiter whose own context is live goes round again: it
+// leads a new fetch or waits on a newer one. A waiter whose context has
+// ended returns its own context's error. Every other outcome reaches every
+// waiter.
 func (j *JWKS) refresh(ctx context.Context) error {
-	j.mu.Lock()
-	if r := j.inflight; r != nil {
+	for {
+		j.mu.Lock()
+		r := j.inflight
+		if r == nil {
+			r = &jwksRefresh{done: make(chan struct{})}
+			j.inflight = r
+			j.mu.Unlock()
+			return j.leadRefresh(ctx, r)
+		}
 		j.mu.Unlock()
 		select {
 		case <-r.done:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+		if !r.retry {
 			// Surface the leader's outcome: if its fetch failed, return that
 			// error rather than falling through to a misleading "kid not found
 			// after refresh" on the caller's next lookup.
 			return r.err
-		case <-ctx.Done():
-			return ctx.Err()
+		}
+		if err := ctx.Err(); err != nil {
+			return err
 		}
 	}
-	r := &jwksRefresh{done: make(chan struct{})}
-	j.inflight = r
-	j.mu.Unlock()
+}
+
+// leadRefresh runs the fetch r stands for on behalf of every lookup waiting
+// on it and publishes its outcome to them.
+//
+// A panic in the fetch unwinds leadRefresh before the outcome is published.
+// The deferred release still takes r out of flight and wakes the waiters,
+// with r marked for retry so that they fetch again, and the panic goes on to
+// the caller as it was raised.
+func (j *JWKS) leadRefresh(ctx context.Context, r *jwksRefresh) error {
+	// r stays marked for retry unless the fetch returns.
+	r.retry = true
+	defer j.release(r)
 
 	err := j.fetch(ctx)
-
-	j.mu.Lock()
 	r.err = err
-	j.inflight = nil
-	j.mu.Unlock()
-	close(r.done)
+	r.retry = coalesce.EndedByContext(ctx, err)
 	return err
 }
 
+// release takes r out of flight, unless a newer refresh has replaced it
+// there, then wakes the lookups waiting on it. leadRefresh defers it, so it
+// runs exactly once per refresh, also when a panic unwinds leadRefresh.
+func (j *JWKS) release(r *jwksRefresh) {
+	j.mu.Lock()
+	if j.inflight == r {
+		j.inflight = nil
+	}
+	j.mu.Unlock()
+	close(r.done)
+}
+
 func (j *JWKS) fetch(ctx context.Context) error {
+	if j.HTTPClient == nil {
+		// A JWKS built as a literal rather than by NewJWKS may lack one.
+		return fmt.Errorf("%w: the JWKS has no HTTPClient: build it with NewJWKS", auth.ErrInvalidConfig)
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, j.URI, nil)
 	if err != nil {
 		// url.Parse's error quotes the URI, which may carry a password.
