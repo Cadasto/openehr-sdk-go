@@ -144,7 +144,27 @@ Four decode failures stay **outside** the sentinel by design, and **MUST NOT** a
 
 `canjson.ErrInvalidShape` and `typereg.ErrInvalidShape` are two names for one value, and the three-distinct-sentinel rule above binds it under either name. The AOM 1.4 companions (`openehr/aom/aom14`, REQ-042) classify on the same terms as the canonical-JSON RM surface this § governs.
 
-**Causes may name the literal.** A cause beneath the sentinel **MAY** name the offending literal (`*strconv.NumError` and an underlying codec type-mismatch error both do) because the value-free discipline binds the boundary strings (`WireError.Error()`, `DecodeError.Error()`; [§ REQ-093](transport.md#req-093--openehr-error-envelope-mapping), [§ REQ-151](transport.md#req-151--typed-2xx-decode-failure)), not codec causes. A codec's own prefix **MUST NOT** repeat a value the wrapped cause already carries: `rm.Real` and `rm.Integer` report a quoted literal that fails to parse as `parse quoted literal: <cause>`, so the literal appears exactly once, in the cause.
+**Value-free decode errors.** The text of a decode error travels to places a caller does not choose for clinical data, such as an HTTP error body or a log line, so it carries no value from the document, as the transport's boundary errors carry none ([§ REQ-093](transport.md#req-093--openehr-error-envelope-mapping), [§ REQ-151](transport.md#req-151--typed-2xx-decode-failure)) and the validators' diagnostics carry none ([clinical-modeling.md § REQ-168](clinical-modeling.md#req-168--value-free-validation-diagnostics)):
+
+- Every error `canjson.Unmarshal` and `canjson.Decoder.Decode` return for a failure the input causes **MUST** be a `*canjson.DecodeError` (`typereg.DecodeError`), so `errors.AsType[*canjson.DecodeError]` finds it without unwrapping. Two errors are not caused by the input and are returned as they are: a read error from the underlying reader (the exclusion above) and `io.EOF` from a `Decoder` whose stream holds no further value.
+- The `Error()` of a `DecodeError` **MUST** name the failure's class (malformed JSON, a polymorphic dispatch failure, a wrong shape, a nesting-depth refusal, an unknown member under `WithStrict`) and, where the decoder knows it, the JSON Pointer of the failing value. It **MUST NOT** contain a value from the document: a number, the content of a string, an escape sequence, or a character the tokenizer refused. This binds a `DecodeError` wherever it is raised, canonical XML's included. A cause beneath it whose text cannot be rendered without its value **MUST** be named by its class alone, never quoted.
+- A member name, a `_type` value, and an RM type or attribute name are structure, not values. They **MAY** appear in the pointer or the text, including a member or a type the RM does not define.
+- The `DecodeError` an entry point returns **MUST** hold in `Value`, a `constraints.Redacted` ([§ REQ-168 *The redacting carrier*](clinical-modeling.md#the-redacting-carrier)), the JSON text of the value the decoder could not take, as a string written as the document wrote it, when the failure concerns one: the number or string of a type mismatch or a range refusal, and the quoted literal that `rm.Real` or `rm.Integer` could not parse. `Value` **MUST** be empty for any other failure, malformed JSON included.
+- The original error **MUST** stay reachable through unwrapping, so every sentinel this § names, `jsontext.ErrDuplicateName`, `strconv.ErrSyntax` and `strconv.ErrRange` keep matching with `errors.Is`, and `*json.SemanticError`, `*jsontext.SyntacticError` and `*strconv.NumError` with `errors.As`. The text of such a cause **MAY** name the value: a caller that unwraps to it asks for the value, as one that reads `Value` does.
+- A codec's own prefix **MUST NOT** repeat a value the wrapped cause already carries: `rm.Real` and `rm.Integer` report a quoted literal that fails to parse as `parse quoted literal: <cause>`, so the literal appears exactly once, in the cause.
+
+*Known gaps.* The rule binds the two `canjson` entry points and the `DecodeError` type. A caller driving the generated methods through bare `encoding/json/v2` or v1 `encoding/json` gets that package's own errors, whose text may name the value. `typereg.Registry.Decode` and `typereg.DecodeAs` return their failures unwrapped. Canonical XML's own errors outside a `DecodeError` and the FLAT and STRUCTURED decoders (§ REQ-053) may name the value as well.
+
+**Acceptance (value-free decode errors):**
+
+- Decoded with `canjson.Unmarshal`, and with a `canjson.Decoder`, each of these inputs returns a `*canjson.DecodeError` whose `Error()` names the failing value's JSON Pointer and contains none of the document's values:
+  - a `DV_COUNT` `magnitude` of `3.5` or `98765.4321`;
+  - a `DV_QUANTITY` `precision` of `1.5` or `2147483648`;
+  - a `DV_TEXT` `value` of `"Jane \q Doe"` (an invalid escape) or of the bare token `Jane` (a refused character).
+- In the same cases, `Value.Reveal()` returns the number as written for the four numeric inputs, and nothing for the two malformed ones.
+- A duplicate member name and an unknown `_type` keep the name in `Error()`.
+- Every sentinel and cause the decode reached before this rule is still reached through unwrapping, and a test fails when the entry point drops one.
+- A read error from the reader and `io.EOF` from an exhausted `Decoder` come back unwrapped.
 
 ### Floating-point precision
 
