@@ -34,10 +34,12 @@ func (d DVCount) MarshalJSONTo(enc *jsontext.Encoder) error {
 	}{"DV_COUNT", rawDVCount(d)}, typereg.MarshalOptions(enc))
 }
 
-// jsonWireDVInterval is the canonical-JSON wire struct for DVInterval. DVInterval embeds BASE
-// Interval, so a method-free alias of the class would promote the base's
-// MarshalJSONTo. The wire struct embeds the method-free alias of the base
-// instead, and carries the class's own members beside it.
+// jsonWireDVInterval is the wire struct the decoder of DVInterval reads
+// through. The encoder does not use it: MarshalJSONTo builds a wrapper
+// of its own. DVInterval embeds BASE Interval, so a method-free alias of
+// the class would promote the base's MarshalJSONTo. The wire struct embeds the
+// method-free alias of the base instead, and carries the class's own members
+// beside it.
 type jsonWireDVInterval[T DVOrdered] struct {
 	Type string `json:"_type"`
 	*rawInterval[T]

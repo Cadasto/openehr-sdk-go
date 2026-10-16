@@ -687,9 +687,9 @@ func intervalDecodeOwnFields(plan *Plan, pc *PlannedClass) ([]emittedField, erro
 	return slices.DeleteFunc(own, func(ef emittedField) bool { return isIntervalFlag(ef.Prop.PropertyName()) }), nil
 }
 
-// renderIntervalDerivedWire emits the canonical-JSON wire struct of a class
-// that embeds BASE Interval: `_type`, the method-free alias of the base, and
-// the class's own members. The decoder reads through it, and its pointer to
+// renderIntervalDerivedWire emits the decode-side wire struct of a class that
+// embeds BASE Interval: `_type`, the method-free alias of the base, and the
+// class's own members. The decoder reads through it, and its pointer to
 // the alias lets the base decode in place; the encoder builds wrappers of its
 // own ([renderMarshalIntervalDerived]). The class cannot be marshalled through
 // a method-free alias of itself: the alias would still embed BASE Interval and
@@ -712,10 +712,12 @@ func renderIntervalDerivedWire(plan *Plan, pc, base *PlannedClass, typeParams st
 	wire := flatWireTypeName(pc.GoName)
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "// %s is the canonical-JSON wire struct for %s. %s embeds BASE\n", wire, pc.GoName, pc.GoName)
-	b.WriteString("// Interval, so a method-free alias of the class would promote the base's\n")
-	b.WriteString("// MarshalJSONTo. The wire struct embeds the method-free alias of the base\n")
-	b.WriteString("// instead, and carries the class's own members beside it.\n")
+	fmt.Fprintf(&b, "// %s is the wire struct the decoder of %s reads\n", wire, pc.GoName)
+	b.WriteString("// through. The encoder does not use it: MarshalJSONTo builds a wrapper\n")
+	fmt.Fprintf(&b, "// of its own. %s embeds BASE Interval, so a method-free alias of\n", pc.GoName)
+	b.WriteString("// the class would promote the base's MarshalJSONTo. The wire struct embeds the\n")
+	b.WriteString("// method-free alias of the base instead, and carries the class's own members\n")
+	b.WriteString("// beside it.\n")
 	fmt.Fprintf(&b, "type %s%s struct {\n", wire, typeParams)
 	b.WriteString("\tType string `json:\"_type\"`\n")
 	fmt.Fprintf(&b, "\t*%s%s\n", aliasTypeName(base.GoName), typeArgs)
@@ -763,20 +765,17 @@ func intervalDerivedOwnValues(recv string, own []emittedField) string {
 	return b.String()
 }
 
-// intervalDerivedWireValue renders the composite literal that fills the wire
-// struct of a class from its receiver: the base through the method-free alias,
-// and each own member by value. The decoder leaves `_type` empty (withType
-// false) so that a missing discriminator is still seen as missing. The decoder
-// passes only the own members that are not boundary flags
-// ([intervalDecodeOwnFields]): it reads the flags through its own wrapper. The
-// encoder does not fill the wire struct ([renderMarshalIntervalDerived]).
-func intervalDerivedWireValue(pc, base *PlannedClass, recv, typeArgs string, own []emittedField, withType bool) string {
+// intervalDerivedWireValue renders the composite literal through which the
+// decoder of a class reads into its receiver: the wire struct, with the base
+// reached through the method-free alias, and each own member by value. The
+// literal leaves `_type` empty, so that a missing discriminator is still seen
+// as missing. The decoder passes only the own members that are not boundary
+// flags ([intervalDecodeOwnFields]): it reads the flags through its own
+// wrapper.
+func intervalDerivedWireValue(pc, base *PlannedClass, recv, typeArgs string, own []emittedField) string {
 	alias := aliasTypeName(base.GoName)
 	var b strings.Builder
 	fmt.Fprintf(&b, "&%s%s{", flatWireTypeName(pc.GoName), typeArgs)
-	if withType {
-		fmt.Fprintf(&b, "Type: %q, ", pc.BMMName)
-	}
 	fmt.Fprintf(&b, "%s: (*%s%s)(&%s.%s)", alias, alias, typeArgs, recv, base.GoName)
 	b.WriteString(intervalDerivedOwnValues(recv, own))
 	b.WriteString("}")
@@ -827,7 +826,8 @@ func renderMarshalIntervalDerived(plan *Plan, pc, base *PlannedClass, recv, type
 		r.WriteString("\t\tType string `json:\"_type\"`\n")
 		fmt.Fprintf(&r, "\t\t%s%s\n", alias, typeArgs)
 		for line := range strings.Lines(ownFields) {
-			r.WriteString("\t" + line)
+			r.WriteString("\t")
+			r.WriteString(line)
 		}
 		for _, prop := range omitted {
 			fmt.Fprintf(&r, "\t\t%s struct{} `json:%q`\n", FieldName(prop), prop+",omitzero")

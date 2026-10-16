@@ -57,10 +57,12 @@ func (i Interval[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 	}{rawInterval: rawInterval[T](i)}, typereg.MarshalOptions(enc))
 }
 
-// jsonWirePointInterval is the canonical-JSON wire struct for PointInterval. PointInterval embeds BASE
-// Interval, so a method-free alias of the class would promote the base's
-// MarshalJSONTo. The wire struct embeds the method-free alias of the base
-// instead, and carries the class's own members beside it.
+// jsonWirePointInterval is the wire struct the decoder of PointInterval reads
+// through. The encoder does not use it: MarshalJSONTo builds a wrapper
+// of its own. PointInterval embeds BASE Interval, so a method-free alias of
+// the class would promote the base's MarshalJSONTo. The wire struct embeds the
+// method-free alias of the base instead, and carries the class's own members
+// beside it.
 type jsonWirePointInterval[T any] struct {
 	Type string `json:"_type"`
 	*rawInterval[T]
@@ -131,10 +133,12 @@ func (p PointInterval[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 	}{Type: "Point_interval", rawInterval: rawInterval[T](p.Interval), LowerIncluded: p.LowerIncluded, LowerUnbounded: p.LowerUnbounded, UpperIncluded: p.UpperIncluded, UpperUnbounded: p.UpperUnbounded}, typereg.MarshalOptions(enc))
 }
 
-// jsonWireProperInterval is the canonical-JSON wire struct for ProperInterval. ProperInterval embeds BASE
-// Interval, so a method-free alias of the class would promote the base's
-// MarshalJSONTo. The wire struct embeds the method-free alias of the base
-// instead, and carries the class's own members beside it.
+// jsonWireProperInterval is the wire struct the decoder of ProperInterval reads
+// through. The encoder does not use it: MarshalJSONTo builds a wrapper
+// of its own. ProperInterval embeds BASE Interval, so a method-free alias of
+// the class would promote the base's MarshalJSONTo. The wire struct embeds the
+// method-free alias of the base instead, and carries the class's own members
+// beside it.
 type jsonWireProperInterval[T any] struct {
 	Type string `json:"_type"`
 	*rawInterval[T]
