@@ -40,6 +40,9 @@ const (
 	// nonceLen is the number of random bytes in an OpenID Connect nonce,
 	// the same 256 bits as the state.
 	nonceLen = 32
+	// defaultRefreshThreshold is how long before its expiry the held access
+	// token counts as stale when the configuration sets no threshold.
+	defaultRefreshThreshold = 30 * time.Second
 )
 
 // clientAssertionKey holds the asymmetric credential for private_key_jwt
@@ -59,14 +62,19 @@ type Config struct {
 	// Those requests use a copy made when the source is built, so a
 	// Transport, Timeout or Jar set on the client afterwards does not reach
 	// them. Required.
-	HTTPClient       *http.Client
-	ClientID         string
-	ClientSecret     string
-	RedirectURI      string
-	Scopes           []string
-	Audience         string
-	Auth             discovery.AuthEndpoints
-	Issuer           string
+	HTTPClient   *http.Client
+	ClientID     string
+	ClientSecret string
+	RedirectURI  string
+	Scopes       []string
+	Audience     string
+	Auth         discovery.AuthEndpoints
+	Issuer       string
+	// RefreshThreshold is how long before its expiry the held access token
+	// counts as stale, so that [Source.Token] refreshes it ahead of time. 0
+	// selects the default of 30 seconds. A negative value counts as 0: the
+	// token is refreshed once it has expired, so an expired token is never
+	// returned.
 	RefreshThreshold time.Duration
 	JWKS             *JWKS
 	// IDTokenTrustedAudiences names the audiences an ID token's aud claim
@@ -188,7 +196,11 @@ func WithIDTokenTrustedAudiences(aud ...string) Option {
 	return func(cfg *Config) { cfg.IDTokenTrustedAudiences = trusted }
 }
 
-// WithRefreshThreshold overrides proactive refresh window (default 30s).
+// WithRefreshThreshold sets how long before its expiry the held access token
+// counts as stale, so that [Source.Token] refreshes it ahead of time. The
+// default is 30 seconds, which a d of 0 also selects. A negative d counts as
+// 0: the token is refreshed once it has expired, so an expired token is
+// never returned.
 func WithRefreshThreshold(d time.Duration) Option {
 	return func(cfg *Config) { cfg.RefreshThreshold = d }
 }
@@ -439,10 +451,10 @@ type tokenExchange struct {
 // [auth.ErrInvalidConfig] without an audience, or when the server's
 // advertised PKCE methods leave out S256.
 func New(clientID string, authEP discovery.AuthEndpoints, opts ...Option) (*Source, error) {
+	// FromConfig fills in the defaults, such as the refresh threshold.
 	cfg := Config{
-		ClientID:         clientID,
-		Auth:             authEP,
-		RefreshThreshold: 30 * time.Second,
+		ClientID: clientID,
+		Auth:     authEP,
 	}
 	for _, o := range opts {
 		if o != nil {
@@ -500,9 +512,7 @@ func FromConfig(cfg Config) (*Source, error) {
 		return nil, fmt.Errorf("%w: the server's code_challenge_methods_supported %q does not list %s, the only PKCE method the SDK sends",
 			auth.ErrInvalidConfig, advertised, challengeMethod)
 	}
-	if cfg.RefreshThreshold == 0 {
-		cfg.RefreshThreshold = 30 * time.Second
-	}
+	cfg.RefreshThreshold = cmp.Or(cfg.RefreshThreshold, defaultRefreshThreshold)
 	if err := configureClientAuth(&cfg); err != nil {
 		return nil, err
 	}
@@ -1116,7 +1126,9 @@ func (s *Source) staleLocked() bool {
 	if s.cur.ExpiresAt.IsZero() {
 		return false
 	}
-	return time.Until(s.cur.ExpiresAt) <= s.cfg.RefreshThreshold
+	// A negative threshold counts as 0, so a token past its expiry is never
+	// served (REQ-063).
+	return time.Until(s.cur.ExpiresAt) <= max(s.cfg.RefreshThreshold, 0)
 }
 
 func (s *Source) exchangeCode(ctx context.Context, code, verifier string) (auth.Token, TokenResponse, string, error) {
