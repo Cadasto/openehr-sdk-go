@@ -1041,9 +1041,9 @@ func (e *engine) checkEmpty(n *engineNode, a *engineAttr, attrPath string, repor
 // item's archetype_node_id. No template node binds these items, so the rule
 // is fed no pinned name.
 func (e *engine) itemPaths(attrPath string, items []any) []string {
-	pathItems := make([]pathItem, len(items))
+	preds := make([]predicate, len(items))
 	for i, item := range items {
-		pathItems[i] = pathItem{id: locatableArchetypeNodeID(item)}
+		preds[i].id = locatableArchetypeNodeID(item)
 	}
-	return itemPaths(attrPath, pathItems)
+	return itemPaths(attrPath, preds)
 }

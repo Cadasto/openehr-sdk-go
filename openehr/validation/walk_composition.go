@@ -250,10 +250,11 @@ func bindItems(parentRMType, attrName string, children []*tcimpl.CompiledNode, i
 	return bound, byNodeID
 }
 
-// boundPathItems returns what the path rule reads of each item: its
-// archetype_node_id and the name pinned on the child it binds to.
-func boundPathItems(items []any, bound []*tcimpl.CompiledNode) []pathItem {
-	out := make([]pathItem, len(items))
+// boundPathItems returns what the path rule reads of each item, each as the
+// predicate it is written into ([resolvePredicates]): its archetype_node_id
+// and the name pinned on the child it binds to.
+func boundPathItems(items []any, bound []*tcimpl.CompiledNode) []predicate {
+	out := make([]predicate, len(items))
 	for idx, item := range items {
 		out[idx].id = locatableArchetypeNodeID(item)
 		if bound[idx] != nil {
