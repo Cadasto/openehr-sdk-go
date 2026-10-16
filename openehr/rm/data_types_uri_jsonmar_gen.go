@@ -13,7 +13,7 @@ import (
 // BMM package org.openehr.rm.data_types.uri: canonical-JSON MarshalJSONTo companions
 
 // jsonWireDVEHRURI is the flat canonical-JSON wire struct for DVEHRURI. DVEHRURI embeds
-// a marshaler-bearing concrete ancestor, so the zero-copy alias would
+// a marshaler-bearing concrete ancestor, so an alias of the class would
 // promote that ancestor's methods and emit the wrong `_type`; the flat
 // struct embeds nothing and so cannot promote.
 type jsonWireDVEHRURI struct {
@@ -50,6 +50,6 @@ type rawDVURI DVURI
 func (d DVURI) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawDVURI
-	}{"DV_URI", (*rawDVURI)(&d)}, typereg.MarshalOptions(enc))
+		rawDVURI
+	}{"DV_URI", rawDVURI(d)}, typereg.MarshalOptions(enc))
 }

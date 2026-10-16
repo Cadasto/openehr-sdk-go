@@ -30,8 +30,8 @@ type rawAssertion Assertion
 func (a Assertion) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawAssertion
-	}{"ASSERTION", (*rawAssertion)(&a)}, typereg.MarshalOptions(enc))
+		rawAssertion
+	}{"ASSERTION", rawAssertion(a)}, typereg.MarshalOptions(enc))
 }
 
 // rawAssertionVariable is the method-free canonical-JSON alias for AssertionVariable. The alias
@@ -52,8 +52,8 @@ type rawAssertionVariable AssertionVariable
 func (a AssertionVariable) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawAssertionVariable
-	}{"ASSERTION_VARIABLE", (*rawAssertionVariable)(&a)}, typereg.MarshalOptions(enc))
+		rawAssertionVariable
+	}{"ASSERTION_VARIABLE", rawAssertionVariable(a)}, typereg.MarshalOptions(enc))
 }
 
 // rawExprBinaryOperator is the method-free canonical-JSON alias for ExprBinaryOperator. The alias
@@ -74,8 +74,8 @@ type rawExprBinaryOperator ExprBinaryOperator
 func (e ExprBinaryOperator) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawExprBinaryOperator
-	}{"EXPR_BINARY_OPERATOR", (*rawExprBinaryOperator)(&e)}, typereg.MarshalOptions(enc))
+		rawExprBinaryOperator
+	}{"EXPR_BINARY_OPERATOR", rawExprBinaryOperator(e)}, typereg.MarshalOptions(enc))
 }
 
 // rawExprLeaf is the method-free canonical-JSON alias for ExprLeaf. The alias
@@ -96,8 +96,8 @@ type rawExprLeaf ExprLeaf
 func (e ExprLeaf) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawExprLeaf
-	}{"EXPR_LEAF", (*rawExprLeaf)(&e)}, typereg.MarshalOptions(enc))
+		rawExprLeaf
+	}{"EXPR_LEAF", rawExprLeaf(e)}, typereg.MarshalOptions(enc))
 }
 
 // rawExprUnaryOperator is the method-free canonical-JSON alias for ExprUnaryOperator. The alias
@@ -118,6 +118,6 @@ type rawExprUnaryOperator ExprUnaryOperator
 func (e ExprUnaryOperator) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawExprUnaryOperator
-	}{"EXPR_UNARY_OPERATOR", (*rawExprUnaryOperator)(&e)}, typereg.MarshalOptions(enc))
+		rawExprUnaryOperator
+	}{"EXPR_UNARY_OPERATOR", rawExprUnaryOperator(e)}, typereg.MarshalOptions(enc))
 }

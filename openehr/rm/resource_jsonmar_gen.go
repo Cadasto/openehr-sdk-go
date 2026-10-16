@@ -30,6 +30,6 @@ type rawResourceAnnotations ResourceAnnotations
 func (r ResourceAnnotations) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawResourceAnnotations
-	}{"RESOURCE_ANNOTATIONS", (*rawResourceAnnotations)(&r)}, typereg.MarshalOptions(enc))
+		rawResourceAnnotations
+	}{"RESOURCE_ANNOTATIONS", rawResourceAnnotations(r)}, typereg.MarshalOptions(enc))
 }

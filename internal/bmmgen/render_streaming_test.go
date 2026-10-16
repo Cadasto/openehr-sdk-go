@@ -2,24 +2,34 @@ package bmmgen
 
 import (
 	"context"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
 )
 
+// typeTag is the struct tag of the `_type` member in every wire shape.
+const typeTag = "`json:\"_type\"`"
+
 // marshalLeadsWithType reports whether the rendered marshaller chunk emits
-// `_type` as the leading member. It handles both wire shapes:
+// `_type` as the leading member. It handles every wire shape:
 //
 //   - flat wire struct: `_type` must be the FIRST json tag in the chunk.
-//   - alias: the anonymous wrapper's `_type` field must precede the embedded
-//     `*<alias>` (the embed carries no tag, so a tag-order check alone would
-//     miss a reordering: this compares the field positions).
+//   - alias wrapper and interval-derived wrapper: the embedded alias carries
+//     no tag, so a tag-order check alone would miss a reordering. The chunk
+//     must declare the embed once for each json.MarshalEncode call, and every
+//     such line must follow a `_type` field inside the same struct.
 //
-// aliasEmbed is "*"+aliasTypeName(GoName) for an alias-shape class, or "" for a
-// flat-shape class.
+// aliasEmbed is the embedded field as the struct spells it, without type
+// arguments: aliasTypeName(GoName) for the alias shape, which embeds the alias
+// by value, aliasTypeName(base) for an interval-derived class, whose encoder
+// wrappers embed the base's alias by value, or "" for the flat shape. A chunk
+// that spells the embed any other way, or encodes through a value that does
+// not embed it, reads as not leading, so a change of spelling turns the census
+// red instead of passing it unchecked.
 func marshalLeadsWithType(chunk, aliasEmbed string) bool {
-	tPos := strings.Index(chunk, "`json:\"_type\"`")
+	tPos := strings.Index(chunk, typeTag)
 	if tPos < 0 {
 		return false
 	}
@@ -27,13 +37,39 @@ func marshalLeadsWithType(chunk, aliasEmbed string) bool {
 	if first := strings.Index(chunk, "`json:\""); first >= 0 && first < tPos {
 		return false
 	}
-	// For the alias shape, the embedded alias must come after `_type`.
-	if aliasEmbed != "" {
-		if ePos := strings.Index(chunk, aliasEmbed); ePos >= 0 && ePos < tPos {
+	if aliasEmbed == "" {
+		return true
+	}
+	embeds := embedLineOffsets(chunk, aliasEmbed)
+	if len(embeds) == 0 || len(embeds) != strings.Count(chunk, "json.MarshalEncode(") {
+		return false
+	}
+	for _, ePos := range embeds {
+		open := strings.LastIndex(chunk[:ePos], "struct {")
+		if open < 0 || !strings.Contains(chunk[open:ePos], typeTag) {
 			return false
 		}
 	}
 	return true
+}
+
+// embedLineOffsets returns the offset of every line of chunk that declares
+// embed as an embedded field: the line, without its indentation, is embed
+// alone or embed followed by a type-argument list. The alias declaration
+// `type rawX X` and the conversion `rawX(x)` in a composite literal never
+// match.
+func embedLineOffsets(chunk, embed string) []int {
+	var offsets []int
+	off := 0
+	for line := range strings.Lines(chunk) {
+		field := strings.TrimSpace(line)
+		if rest, ok := strings.CutPrefix(field, embed); ok &&
+			(rest == "" || strings.HasPrefix(rest, "[") && strings.HasSuffix(rest, "]")) {
+			offsets = append(offsets, off)
+		}
+		off += len(line)
+	}
+	return offsets
 }
 
 // TestRenderMarshalLeadsWithType pins the REQ-052 SHOULD that `_type` is the
@@ -43,24 +79,96 @@ func marshalLeadsWithType(chunk, aliasEmbed string) bool {
 // census below renders every concrete class and asserts each marshaller leads
 // with `_type`, regardless of the class's own field order.
 //
-// Can-fail control: [marshalLeadsWithType] is proved discriminating on a
-// deliberately reordered rendering, one whose `_type` follows the alias embed,
-// so the census is not trivially satisfied. Moving the `_type` field after
-// the alias in renderMarshalAlias, or after another field in renderMarshalFlat,
-// turns the census red.
+// Can-fail control: [marshalLeadsWithType] is proved discriminating on
+// deliberately broken renderings, so the census is not trivially satisfied:
+// an alias embed ahead of `_type`, an alias embedded through a pointer
+// instead of by value, an alias held in a named field with no embed line at
+// all, a second wrapper reordered behind a correct first one, an
+// interval-derived wrapper reordered, an encode through the interval wire
+// struct instead of a wrapper, and a flat `_type` tag behind another tag.
+// Moving the `_type` field after the alias in renderMarshalAlias or
+// renderMarshalIntervalDerived, after another field in renderMarshalFlat, or
+// changing how the alias is embedded turns the census red.
 func TestRenderMarshalLeadsWithType(t *testing.T) {
-	// Prove the witness discriminates on BOTH shapes: an anonymous alias wrapper
-	// whose alias embed precedes `_type`, and a flat wire struct whose `_type`
-	// tag follows another tagged field, must each read as NOT leading with
-	// `_type`. Without both, the census could be trivially satisfied for the
-	// shape the witness happens not to exercise.
-	const aliasReordered = "\t}{\n\t\t*rawX\n\t\tType string `json:\"_type\"`\n"
-	if marshalLeadsWithType(aliasReordered, "*rawX") {
-		t.Fatal("marshalLeadsWithType accepted an alias wrapper whose embed precedes `_type`, the alias branch of the witness does not discriminate")
-	}
-	const flatReordered = "type jsonWireX struct {\n\tValue string `json:\"value\"`\n\tClass string `json:\"_type\"`\n}"
-	if marshalLeadsWithType(flatReordered, "") {
-		t.Fatal("marshalLeadsWithType accepted a flat wire struct whose `_type` tag follows another tagged field, the flat branch of the witness does not discriminate")
+	// Prove the witness discriminates on every shape. Each broken rendering
+	// must read as NOT leading with `_type`; without them, the census could be
+	// trivially satisfied for a shape the witness happens not to exercise. The
+	// well-formed generic wrappers must still read as leading, so the type
+	// arguments, the field-keyed literal and the decode-side wire struct, which
+	// embeds the base through a pointer, do not throw the witness off.
+	const intervalWireDecl = "type jsonWireX[T any] struct {\n\tType string `json:\"_type\"`\n\t*rawI[T]\n}\n\n"
+	for _, tc := range []struct {
+		name       string
+		chunk      string
+		aliasEmbed string
+		want       bool
+	}{
+		{
+			name:       "alias embed precedes _type",
+			chunk:      "type rawX X\n\treturn json.MarshalEncode(enc, &struct {\n\t\trawX\n\t\tType string `json:\"_type\"`\n\t}{rawX(x), \"X\"}, typereg.MarshalOptions(enc))\n",
+			aliasEmbed: "rawX",
+			want:       false,
+		},
+		{
+			name:       "alias embedded through a pointer, not by value",
+			chunk:      "type rawX X\n\treturn json.MarshalEncode(enc, &struct {\n\t\tType string `json:\"_type\"`\n\t\t*rawX\n\t}{\"X\", rawX(x)}, typereg.MarshalOptions(enc))\n",
+			aliasEmbed: "rawX",
+			want:       false,
+		},
+		{
+			name:       "alias held in a named field, no embed line",
+			chunk:      "type rawX X\n\treturn json.MarshalEncode(enc, &struct {\n\t\tType string `json:\"_type\"`\n\t\tValue rawX\n\t}{\"X\", rawX(x)}, typereg.MarshalOptions(enc))\n",
+			aliasEmbed: "rawX",
+			want:       false,
+		},
+		{
+			name: "second wrapper embeds the alias before _type",
+			chunk: "type rawX[T any] X[T]\n" +
+				"\t\treturn json.MarshalEncode(enc, &struct {\n\t\t\tType string `json:\"_type\"`\n\t\t\trawX[T]\n\t\t}{Type: \"X\", rawX: rawX[T](x)}, typereg.MarshalOptions(enc))\n" +
+				"\treturn json.MarshalEncode(enc, &struct {\n\t\trawX[T]\n\t\tType string `json:\"_type\"`\n\t}{Type: \"X\", rawX: rawX[T](x)}, typereg.MarshalOptions(enc))\n",
+			aliasEmbed: "rawX",
+			want:       false,
+		},
+		{
+			name:       "flat _type tag follows another tagged field",
+			chunk:      "type jsonWireX struct {\n\tValue string `json:\"value\"`\n\tClass string `json:\"_type\"`\n}",
+			aliasEmbed: "",
+			want:       false,
+		},
+		{
+			name:       "generic alias embed follows _type",
+			chunk:      "type rawX[T any] X[T]\n\treturn json.MarshalEncode(enc, &struct {\n\t\tType string `json:\"_type\"`\n\t\trawX[T]\n\t\tLower struct{} `json:\"lower,omitzero\"`\n\t}{Type: \"X\", rawX: rawX[T](x)}, typereg.MarshalOptions(enc))\n",
+			aliasEmbed: "rawX",
+			want:       true,
+		},
+		{
+			name: "interval-derived wrapper embeds the base before _type",
+			chunk: intervalWireDecl +
+				"\t\treturn json.MarshalEncode(enc, &struct {\n\t\t\tType string `json:\"_type\"`\n\t\t\trawI[T]\n\t\t\tLower struct{} `json:\"lower,omitzero\"`\n\t\t}{Type: \"X\", rawI: rawI[T](x.I)}, typereg.MarshalOptions(enc))\n" +
+				"\treturn json.MarshalEncode(enc, &struct {\n\t\trawI[T]\n\t\tType string `json:\"_type\"`\n\t}{Type: \"X\", rawI: rawI[T](x.I)}, typereg.MarshalOptions(enc))\n",
+			aliasEmbed: "rawI",
+			want:       false,
+		},
+		{
+			name: "interval-derived arm encodes through the wire struct, not a wrapper",
+			chunk: intervalWireDecl +
+				"\t\treturn json.MarshalEncode(enc, &struct {\n\t\t\tType string `json:\"_type\"`\n\t\t\trawI[T]\n\t\t\tLower struct{} `json:\"lower,omitzero\"`\n\t\t}{Type: \"X\", rawI: rawI[T](x.I)}, typereg.MarshalOptions(enc))\n" +
+				"\treturn json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))\n",
+			aliasEmbed: "rawI",
+			want:       false,
+		},
+		{
+			name: "interval-derived wrappers embed the base after _type",
+			chunk: intervalWireDecl +
+				"\t\treturn json.MarshalEncode(enc, &struct {\n\t\t\tType string `json:\"_type\"`\n\t\t\trawI[T]\n\t\t\tLower struct{} `json:\"lower,omitzero\"`\n\t\t}{Type: \"X\", rawI: rawI[T](x.I)}, typereg.MarshalOptions(enc))\n" +
+				"\treturn json.MarshalEncode(enc, &struct {\n\t\tType string `json:\"_type\"`\n\t\trawI[T]\n\t}{Type: \"X\", rawI: rawI[T](x.I)}, typereg.MarshalOptions(enc))\n",
+			aliasEmbed: "rawI",
+			want:       true,
+		},
+	} {
+		if got := marshalLeadsWithType(tc.chunk, tc.aliasEmbed); got != tc.want {
+			t.Fatalf("marshalLeadsWithType(%s) = %v, want %v: the witness does not discriminate, so the census below proves nothing", tc.name, got, tc.want)
+		}
 	}
 
 	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
@@ -74,14 +182,21 @@ func TestRenderMarshalLeadsWithType(t *testing.T) {
 			if err != nil {
 				t.Fatalf("renderMarshalJSON %s: %v", pc.BMMName, err)
 			}
-			aliasEmbed := ""
-			if !embedsMarshalerBearingConcrete(plan, pc) {
-				aliasEmbed = "*" + aliasTypeName(pc.GoName)
-				if shape, base, err := classJSONWireShape(plan, pc); err != nil {
-					t.Fatalf("classJSONWireShape %s: %v", pc.BMMName, err)
-				} else if shape == shapeIntervalDerived {
-					aliasEmbed = "*" + aliasTypeName(base.GoName)
-				}
+			shape, base, err := classJSONWireShape(plan, pc)
+			if err != nil {
+				t.Fatalf("classJSONWireShape %s: %v", pc.BMMName, err)
+			}
+			var aliasEmbed string
+			switch shape {
+			case shapeFlat:
+			case shapeAlias, shapeIntervalAlias:
+				aliasEmbed = aliasTypeName(pc.GoName)
+			case shapeIntervalDerived:
+				aliasEmbed = aliasTypeName(base.GoName)
+			case shapeIntervalBase:
+				t.Fatalf("%s takes the shape of the abstract BASE Interval, which writes no `_type`, yet the plan lists it as concrete", pc.BMMName)
+			default:
+				t.Fatalf("%s takes wire shape %d, which the census has no witness for", pc.BMMName, shape)
 			}
 			if !marshalLeadsWithType(chunk, aliasEmbed) {
 				t.Errorf("%s marshaller does not lead with `_type`: the discriminator must be the first member (REQ-052)", pc.BMMName)
@@ -94,6 +209,58 @@ func TestRenderMarshalLeadsWithType(t *testing.T) {
 	}
 }
 
+// TestRenderIntervalEncodersCopyTheReceiverOnce pins how the interval
+// encoders reach BASE Interval's members: every value they encode is a wrapper
+// that embeds the base's method-free alias by value, and no encoder takes the
+// address of its receiver. Taking it moves the value receiver to the heap, an
+// allocation per encoded value beside the wrapper's own. BASE Interval writes
+// no `_type`, so the census above does not reach its encoder; this test checks
+// it beside the three classes that embed it.
+func TestRenderIntervalEncodersCopyTheReceiverOnce(t *testing.T) {
+	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
+	if err != nil {
+		t.Fatalf("BuildPlanForTarget(RM): %v", err)
+	}
+	for _, class := range []string{"Interval", "Point_interval", "Proper_interval", "DV_INTERVAL"} {
+		t.Run(class, func(t *testing.T) {
+			pc := plan.Classes[class]
+			if pc == nil {
+				t.Fatalf("%s is not in the RM plan", class)
+			}
+			shape, base, err := classJSONWireShape(plan, pc)
+			if err != nil {
+				t.Fatalf("classJSONWireShape(%s): %v", class, err)
+			}
+			switch shape {
+			case shapeIntervalBase:
+				base = pc
+			case shapeIntervalDerived:
+			case shapeAlias, shapeFlat, shapeIntervalAlias:
+				t.Fatalf("classJSONWireShape(%s) = %d, want the BASE Interval shape or the interval-derived shape", class, shape)
+			default:
+				t.Fatalf("classJSONWireShape(%s) = %d, a shape this test has no case for", class, shape)
+			}
+			chunk, err := renderMarshalJSON(plan, pc)
+			if err != nil {
+				t.Fatalf("renderMarshalJSON(%s): %v", class, err)
+			}
+			_, body, ok := strings.Cut(chunk, ") MarshalJSONTo(enc *jsontext.Encoder) error {\n")
+			if !ok {
+				t.Fatalf("no MarshalJSONTo in the %s chunk:\n%s", class, chunk)
+			}
+			recv := jsonmarReceiverName(pc.GoName)
+			if addr := regexp.MustCompile(`&` + regexp.QuoteMeta(recv) + `\b`); addr.MatchString(body) {
+				t.Errorf("%s MarshalJSONTo takes the address of its receiver %q, which moves it to the heap:\n%s", class, recv, body)
+			}
+			calls := strings.Count(body, "json.MarshalEncode(")
+			embeds := len(embedLineOffsets(body, aliasTypeName(base.GoName)))
+			if calls == 0 || embeds != calls {
+				t.Errorf("%s MarshalJSONTo makes %d json.MarshalEncode calls and embeds %s by value %d times, want one by-value embed per call:\n%s", class, calls, aliasTypeName(base.GoName), embeds, body)
+			}
+		})
+	}
+}
+
 // TestRenderFlatDecodeDropPropertyLosesCopy is the generator-side can-fail
 // control for TestRoundTripStructuralEquivalence
 // (openehr/serialize/canjson/roundtrip_test.go): a flat-shape decode copies
@@ -101,7 +268,7 @@ func TestRenderMarshalLeadsWithType(t *testing.T) {
 // drops its copy: the field would then be silently lost on the round trip.
 //
 // DV_CODED_TEXT is flat-shape (it embeds the marshaler-bearing DVText, so it
-// cannot use the zero-copy alias, ruling R19), which is exactly the shape whose
+// cannot use the alias shape, ruling R19), which is exactly the shape whose
 // per-field copy a dropped assignment would break.
 func TestRenderFlatDecodeDropPropertyLosesCopy(t *testing.T) {
 	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})

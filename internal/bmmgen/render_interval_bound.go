@@ -570,12 +570,14 @@ func omitSwitch(ret func(omitted ...string) string) string {
 }
 
 // renderMarshalAliasInterval is [renderMarshalAlias] for an interval-shaped
-// class that declares the BASE Interval members itself. The alias wrapper
-// stays the wire for every member; when a side is open and its bound empty,
-// the wrapper declares a zero-size field of the bound's name at its own level,
-// shallower than the bound embedded through the alias. The shallower field
-// wins, and it is always omitted, so the member drops out and every other
-// member keeps its place.
+// class that declares the BASE Interval members itself. As there, the wrapper
+// embeds the alias by value, so encode copies the value receiver into it once,
+// and the embedded field's key in the literal is the alias name without type
+// arguments. The alias wrapper stays the wire for every member; when a side is
+// open and its bound empty, the wrapper declares a zero-size field of the
+// bound's name at its own level, shallower than the bound embedded through the
+// alias. The shallower field wins, and it is always omitted, so the member
+// drops out and every other member keeps its place.
 func renderMarshalAliasInterval(pc *PlannedClass, recv, typeParams, typeArgs string) string {
 	alias := aliasTypeName(pc.GoName)
 
@@ -599,11 +601,11 @@ func renderMarshalAliasInterval(pc *PlannedClass, recv, typeParams, typeArgs str
 		var r strings.Builder
 		r.WriteString("\treturn json.MarshalEncode(enc, &struct {\n")
 		r.WriteString("\t\tType string `json:\"_type\"`\n")
-		fmt.Fprintf(&r, "\t\t*%s%s\n", alias, typeArgs)
+		fmt.Fprintf(&r, "\t\t%s%s\n", alias, typeArgs)
 		for _, prop := range omitted {
 			fmt.Fprintf(&r, "\t\t%s struct{} `json:%q`\n", FieldName(prop), prop+",omitzero")
 		}
-		fmt.Fprintf(&r, "\t}{Type: %q, %s: (*%s%s)(&%s)}, typereg.MarshalOptions(enc))\n", pc.BMMName, alias, alias, typeArgs, recv)
+		fmt.Fprintf(&r, "\t}{Type: %q, %s: %s%s(%s)}, typereg.MarshalOptions(enc))\n", pc.BMMName, alias, alias, typeArgs, recv)
 		return r.String()
 	}))
 	b.WriteString("}\n")
@@ -613,7 +615,10 @@ func renderMarshalAliasInterval(pc *PlannedClass, recv, typeParams, typeArgs str
 // renderMarshalIntervalBase emits the wire type and MarshalJSONTo of BASE
 // Interval itself. It is abstract, so it writes no `_type`, and AOM 1.4 holds
 // it by value in fields typed by it. The omission mechanism is the one
-// [renderMarshalAliasInterval] uses.
+// [renderMarshalAliasInterval] uses, and so is the wrapper: it embeds the
+// alias by value, so encode copies the value receiver into it once. Embedding
+// the alias through a pointer to the receiver would move the receiver to the
+// heap, a second allocation per encoded value.
 func renderMarshalIntervalBase(pc *PlannedClass, recv, typeParams, typeArgs string) string {
 	alias := aliasTypeName(pc.GoName)
 
@@ -634,11 +639,11 @@ func renderMarshalIntervalBase(pc *PlannedClass, recv, typeParams, typeArgs stri
 	b.WriteString(omitSwitch(func(omitted ...string) string {
 		var r strings.Builder
 		r.WriteString("\treturn json.MarshalEncode(enc, &struct {\n")
-		fmt.Fprintf(&r, "\t\t*%s%s\n", alias, typeArgs)
+		fmt.Fprintf(&r, "\t\t%s%s\n", alias, typeArgs)
 		for _, prop := range omitted {
 			fmt.Fprintf(&r, "\t\t%s struct{} `json:%q`\n", FieldName(prop), prop+",omitzero")
 		}
-		fmt.Fprintf(&r, "\t}{%s: (*%s%s)(&%s)}, typereg.MarshalOptions(enc))\n", alias, alias, typeArgs, recv)
+		fmt.Fprintf(&r, "\t}{%s: %s%s(%s)}, typereg.MarshalOptions(enc))\n", alias, alias, typeArgs, recv)
 		return r.String()
 	}))
 	b.WriteString("}\n")
@@ -646,9 +651,10 @@ func renderMarshalIntervalBase(pc *PlannedClass, recv, typeParams, typeArgs stri
 }
 
 // intervalDerivedOwnFields returns the fields a class that embeds BASE Interval
-// declares itself: the members the wire struct carries beside the embedded
-// base. They come in the order of the class's Go struct body, which sorts by
-// property name, so the wire keeps the encoding the class always had.
+// declares itself: the members the wire struct and the encoder's wrappers
+// carry beside the embedded base. They come in the order of the class's Go
+// struct body, which sorts by property name, so the wire keeps the encoding
+// the class always had.
 // Point_interval re-declares the four flags, so they are its own;
 // Proper_interval and DV_INTERVAL declare none.
 func intervalDerivedOwnFields(plan *Plan, pc *PlannedClass) ([]emittedField, error) {
@@ -681,41 +687,53 @@ func intervalDecodeOwnFields(plan *Plan, pc *PlannedClass) ([]emittedField, erro
 	return slices.DeleteFunc(own, func(ef emittedField) bool { return isIntervalFlag(ef.Prop.PropertyName()) }), nil
 }
 
-// renderIntervalDerivedWire emits the canonical-JSON wire struct of a class
-// that embeds BASE Interval: `_type`, the method-free alias of the base, and
-// the class's own members. The class cannot be marshalled through a method-free
-// alias of itself: the alias would still embed BASE Interval and promote its
-// MarshalJSONTo. With that method promoted, encoding/json/v2 encodes the
-// wrapper through it, silently emitting the base's payload without `_type` and
-// without the open-side omission, and decoding into the wrapper fails at run
-// time with "must not implement marshal or unmarshal methods". The wire struct
-// reaches the base through the base's own method-free alias, which has no
-// methods, and so promotes none.
-func renderIntervalDerivedWire(plan *Plan, pc, base *PlannedClass, typeParams string) (string, []emittedField, error) {
-	own, err := intervalDerivedOwnFields(plan, pc)
-	if err != nil {
-		return "", nil, err
-	}
+// renderIntervalDerivedWire emits the decode-side wire struct of a class that
+// embeds BASE Interval: `_type`, the method-free alias of the base, and the
+// class's own members, passed as ownFields: the text
+// [renderIntervalDerivedOwnFields] renders, which the encoder's wrappers carry
+// too. The decoder reads through it, and its pointer to the alias lets the
+// base decode in place; the encoder builds wrappers of its own
+// ([renderMarshalIntervalDerived]). The class cannot be marshalled through a
+// method-free alias of itself: the alias would still embed BASE Interval and
+// promote its MarshalJSONTo. With that method promoted, encoding/json/v2
+// encodes the wrapper through it, silently emitting the base's payload without
+// `_type` and without the open-side omission, and decoding into the wrapper
+// fails at run time with "must not implement marshal or unmarshal methods".
+// The wire struct reaches the base through the base's own method-free alias,
+// which has no methods, and so promotes none.
+func renderIntervalDerivedWire(pc, base *PlannedClass, typeParams, ownFields string) string {
 	typeArgs := genericTypeArgList(pc.Class.(*bmm.SimpleClass))
 	wire := flatWireTypeName(pc.GoName)
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "// %s is the canonical-JSON wire struct for %s. %s embeds BASE\n", wire, pc.GoName, pc.GoName)
-	b.WriteString("// Interval, so a method-free alias of the class would promote the base's\n")
-	b.WriteString("// MarshalJSONTo. The wire struct embeds the method-free alias of the base\n")
-	b.WriteString("// instead, and carries the class's own members beside it.\n")
+	fmt.Fprintf(&b, "// %s is the wire struct the decoder of %s reads\n", wire, pc.GoName)
+	b.WriteString("// through. The encoder does not use it: MarshalJSONTo builds a wrapper\n")
+	fmt.Fprintf(&b, "// of its own. %s embeds BASE Interval, so a method-free alias of\n", pc.GoName)
+	b.WriteString("// the class would promote the base's MarshalJSONTo. The wire struct embeds the\n")
+	b.WriteString("// method-free alias of the base instead, and carries the class's own members\n")
+	b.WriteString("// beside it.\n")
 	fmt.Fprintf(&b, "type %s%s struct {\n", wire, typeParams)
 	b.WriteString("\tType string `json:\"_type\"`\n")
 	fmt.Fprintf(&b, "\t*%s%s\n", aliasTypeName(base.GoName), typeArgs)
+	b.WriteString(ownFields)
+	b.WriteString("}\n\n")
+	return b.String()
+}
+
+// renderIntervalDerivedOwnFields renders the struct fields of the own members
+// of a class that embeds BASE Interval, one line each at one tab and without
+// doc comments. The wire struct and the encoder's wrappers both carry them;
+// [renderMarshalIntervalDerived] renders them once and hands the text to both.
+func renderIntervalDerivedOwnFields(plan *Plan, pc *PlannedClass, own []emittedField) (string, error) {
+	var b strings.Builder
 	for _, ef := range own {
 		line, err := renderField(plan, ef.Owner, ef.OwnerName, ef.Prop)
 		if err != nil {
-			return "", nil, fmt.Errorf("render wire field %s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
+			return "", fmt.Errorf("render wire field %s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
 		}
 		b.WriteString(withoutCommentLines(line))
 	}
-	b.WriteString("}\n\n")
-	return b.String(), own, nil
+	return b.String(), nil
 }
 
 // withoutCommentLines drops the doc-comment lines of rendered field source.
@@ -730,38 +748,58 @@ func withoutCommentLines(src string) string {
 	return b.String()
 }
 
-// intervalDerivedWireValue renders the composite literal that fills the wire
-// struct of a class from its receiver: the base through the method-free alias,
-// and each own member by value. The encoder sets `_type`; the decoder leaves it
-// empty so that a missing discriminator is still seen as missing. The decoder
-// passes only the own members that are not boundary flags
-// ([intervalDecodeOwnFields]): it reads the flags through its own wrapper.
-func intervalDerivedWireValue(pc, base *PlannedClass, recv, typeArgs string, own []emittedField, withType bool) string {
-	alias := aliasTypeName(base.GoName)
+// intervalDerivedOwnValues renders the composite-literal elements that copy
+// each own member of a class that embeds BASE Interval from its receiver, each
+// one led by a comma.
+func intervalDerivedOwnValues(recv string, own []emittedField) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "&%s%s{", flatWireTypeName(pc.GoName), typeArgs)
-	if withType {
-		fmt.Fprintf(&b, "Type: %q, ", pc.BMMName)
-	}
-	fmt.Fprintf(&b, "%s: (*%s%s)(&%s.%s)", alias, alias, typeArgs, recv, base.GoName)
 	for _, ef := range own {
 		fn := FieldName(ef.Prop.PropertyName())
 		fmt.Fprintf(&b, ", %s: %s.%s", fn, recv, fn)
 	}
+	return b.String()
+}
+
+// intervalDerivedWireValue renders the composite literal through which the
+// decoder of a class reads into its receiver: the wire struct, with the base
+// reached through the method-free alias, and each own member by value. The
+// literal leaves `_type` empty, so that a missing discriminator is still seen
+// as missing. The decoder passes only the own members that are not boundary
+// flags ([intervalDecodeOwnFields]): it reads the flags through its own
+// wrapper.
+func intervalDerivedWireValue(pc, base *PlannedClass, recv, typeArgs string, own []emittedField) string {
+	alias := aliasTypeName(base.GoName)
+	var b strings.Builder
+	fmt.Fprintf(&b, "&%s%s{", flatWireTypeName(pc.GoName), typeArgs)
+	fmt.Fprintf(&b, "%s: (*%s%s)(&%s.%s)", alias, alias, typeArgs, recv, base.GoName)
+	b.WriteString(intervalDerivedOwnValues(recv, own))
 	b.WriteString("}")
 	return b.String()
 }
 
 // renderMarshalIntervalDerived emits the wire struct and MarshalJSONTo of an
-// interval-shaped class that embeds BASE Interval. The open-side mechanism is
-// [renderMarshalAliasInterval]'s: a zero-size `omitzero` field of the bound's
-// name, one level shallower than the bound the wire struct embeds.
+// interval-shaped class that embeds BASE Interval. The encoder does not go
+// through the wire struct, which is the decoder's: each arm of its omit switch
+// encodes an anonymous wrapper that carries `_type`, the base's method-free
+// alias by value and the class's own members, in the wire struct's order. So
+// encode copies the value receiver once, into the one heap value it builds per
+// call. Filling the wire struct instead would take the receiver's address,
+// moving the receiver to the heap, and allocate the wire struct beside the
+// wrapper. The open-side mechanism is [renderMarshalAliasInterval]'s: a
+// zero-size `omitzero` field of the bound's name, one level shallower than the
+// bound the wrapper embeds.
 func renderMarshalIntervalDerived(plan *Plan, pc, base *PlannedClass, recv, typeParams, typeArgs string) (string, error) {
-	wireDecl, own, err := renderIntervalDerivedWire(plan, pc, base, typeParams)
+	own, err := intervalDerivedOwnFields(plan, pc)
 	if err != nil {
 		return "", err
 	}
-	wire := flatWireTypeName(pc.GoName)
+	ownFields, err := renderIntervalDerivedOwnFields(plan, pc, own)
+	if err != nil {
+		return "", err
+	}
+	wireDecl := renderIntervalDerivedWire(pc, base, typeParams, ownFields)
+	alias := aliasTypeName(base.GoName)
+	ownValues := intervalDerivedOwnValues(recv, own)
 
 	var b strings.Builder
 	b.WriteString(wireDecl)
@@ -778,18 +816,19 @@ func renderMarshalIntervalDerived(plan *Plan, pc, base *PlannedClass, recv, type
 	b.WriteString(openBoundDoc())
 	fmt.Fprintf(&b, "func (%s %s%s) MarshalJSONTo(enc *jsontext.Encoder) error {\n", recv, pc.GoName, typeArgs)
 	b.WriteString(omitFlags(recv))
-	fmt.Fprintf(&b, "\tw := %s\n", intervalDerivedWireValue(pc, base, recv, typeArgs, own, true))
 	b.WriteString(omitSwitch(func(omitted ...string) string {
-		if len(omitted) == 0 {
-			return "\treturn json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))\n"
-		}
 		var r strings.Builder
 		r.WriteString("\treturn json.MarshalEncode(enc, &struct {\n")
-		fmt.Fprintf(&r, "\t\t*%s%s\n", wire, typeArgs)
+		r.WriteString("\t\tType string `json:\"_type\"`\n")
+		fmt.Fprintf(&r, "\t\t%s%s\n", alias, typeArgs)
+		for line := range strings.Lines(ownFields) {
+			r.WriteString("\t")
+			r.WriteString(line)
+		}
 		for _, prop := range omitted {
 			fmt.Fprintf(&r, "\t\t%s struct{} `json:%q`\n", FieldName(prop), prop+",omitzero")
 		}
-		fmt.Fprintf(&r, "\t}{%s: w}, typereg.MarshalOptions(enc))\n", wire)
+		fmt.Fprintf(&r, "\t}{Type: %q, %s: %s%s(%s.%s)%s}, typereg.MarshalOptions(enc))\n", pc.BMMName, alias, alias, typeArgs, recv, base.GoName, ownValues)
 		return r.String()
 	}))
 	b.WriteString("}\n")

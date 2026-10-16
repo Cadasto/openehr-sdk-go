@@ -30,8 +30,8 @@ type rawComposition Composition
 func (c Composition) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawComposition
-	}{"COMPOSITION", (*rawComposition)(&c)}, typereg.MarshalOptions(enc))
+		rawComposition
+	}{"COMPOSITION", rawComposition(c)}, typereg.MarshalOptions(enc))
 }
 
 // rawEventContext is the method-free canonical-JSON alias for EventContext. The alias
@@ -52,6 +52,6 @@ type rawEventContext EventContext
 func (e EventContext) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawEventContext
-	}{"EVENT_CONTEXT", (*rawEventContext)(&e)}, typereg.MarshalOptions(enc))
+		rawEventContext
+	}{"EVENT_CONTEXT", rawEventContext(e)}, typereg.MarshalOptions(enc))
 }

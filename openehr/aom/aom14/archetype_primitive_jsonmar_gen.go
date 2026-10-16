@@ -30,8 +30,8 @@ type rawCBoolean CBoolean
 func (c CBoolean) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawCBoolean
-	}{"C_BOOLEAN", (*rawCBoolean)(&c)}, typereg.MarshalOptions(enc))
+		rawCBoolean
+	}{"C_BOOLEAN", rawCBoolean(c)}, typereg.MarshalOptions(enc))
 }
 
 // rawCDate is the method-free canonical-JSON alias for CDate. The alias
@@ -52,8 +52,8 @@ type rawCDate CDate
 func (c CDate) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawCDate
-	}{"C_DATE", (*rawCDate)(&c)}, typereg.MarshalOptions(enc))
+		rawCDate
+	}{"C_DATE", rawCDate(c)}, typereg.MarshalOptions(enc))
 }
 
 // rawCDateTime is the method-free canonical-JSON alias for CDateTime. The alias
@@ -74,8 +74,8 @@ type rawCDateTime CDateTime
 func (c CDateTime) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawCDateTime
-	}{"C_DATE_TIME", (*rawCDateTime)(&c)}, typereg.MarshalOptions(enc))
+		rawCDateTime
+	}{"C_DATE_TIME", rawCDateTime(c)}, typereg.MarshalOptions(enc))
 }
 
 // rawCDuration is the method-free canonical-JSON alias for CDuration. The alias
@@ -96,8 +96,8 @@ type rawCDuration CDuration
 func (c CDuration) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawCDuration
-	}{"C_DURATION", (*rawCDuration)(&c)}, typereg.MarshalOptions(enc))
+		rawCDuration
+	}{"C_DURATION", rawCDuration(c)}, typereg.MarshalOptions(enc))
 }
 
 // rawCInteger is the method-free canonical-JSON alias for CInteger. The alias
@@ -118,8 +118,8 @@ type rawCInteger CInteger
 func (c CInteger) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawCInteger
-	}{"C_INTEGER", (*rawCInteger)(&c)}, typereg.MarshalOptions(enc))
+		rawCInteger
+	}{"C_INTEGER", rawCInteger(c)}, typereg.MarshalOptions(enc))
 }
 
 // rawCReal is the method-free canonical-JSON alias for CReal. The alias
@@ -140,8 +140,8 @@ type rawCReal CReal
 func (c CReal) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawCReal
-	}{"C_REAL", (*rawCReal)(&c)}, typereg.MarshalOptions(enc))
+		rawCReal
+	}{"C_REAL", rawCReal(c)}, typereg.MarshalOptions(enc))
 }
 
 // rawCString is the method-free canonical-JSON alias for CString. The alias
@@ -162,8 +162,8 @@ type rawCString CString
 func (c CString) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawCString
-	}{"C_STRING", (*rawCString)(&c)}, typereg.MarshalOptions(enc))
+		rawCString
+	}{"C_STRING", rawCString(c)}, typereg.MarshalOptions(enc))
 }
 
 // rawCTime is the method-free canonical-JSON alias for CTime. The alias
@@ -184,6 +184,6 @@ type rawCTime CTime
 func (c CTime) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawCTime
-	}{"C_TIME", (*rawCTime)(&c)}, typereg.MarshalOptions(enc))
+		rawCTime
+	}{"C_TIME", rawCTime(c)}, typereg.MarshalOptions(enc))
 }

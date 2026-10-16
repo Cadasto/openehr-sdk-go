@@ -30,6 +30,6 @@ type rawSection Section
 func (s Section) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawSection
-	}{"SECTION", (*rawSection)(&s)}, typereg.MarshalOptions(enc))
+		rawSection
+	}{"SECTION", rawSection(s)}, typereg.MarshalOptions(enc))
 }

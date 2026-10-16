@@ -30,8 +30,8 @@ type rawArchetypeInternalRef ArchetypeInternalRef
 func (a ArchetypeInternalRef) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawArchetypeInternalRef
-	}{"ARCHETYPE_INTERNAL_REF", (*rawArchetypeInternalRef)(&a)}, typereg.MarshalOptions(enc))
+		rawArchetypeInternalRef
+	}{"ARCHETYPE_INTERNAL_REF", rawArchetypeInternalRef(a)}, typereg.MarshalOptions(enc))
 }
 
 // rawArchetypeSlot is the method-free canonical-JSON alias for ArchetypeSlot. The alias
@@ -52,8 +52,8 @@ type rawArchetypeSlot ArchetypeSlot
 func (a ArchetypeSlot) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawArchetypeSlot
-	}{"ARCHETYPE_SLOT", (*rawArchetypeSlot)(&a)}, typereg.MarshalOptions(enc))
+		rawArchetypeSlot
+	}{"ARCHETYPE_SLOT", rawArchetypeSlot(a)}, typereg.MarshalOptions(enc))
 }
 
 // rawCComplexObject is the method-free canonical-JSON alias for CComplexObject. The alias
@@ -74,8 +74,8 @@ type rawCComplexObject CComplexObject
 func (c CComplexObject) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawCComplexObject
-	}{"C_COMPLEX_OBJECT", (*rawCComplexObject)(&c)}, typereg.MarshalOptions(enc))
+		rawCComplexObject
+	}{"C_COMPLEX_OBJECT", rawCComplexObject(c)}, typereg.MarshalOptions(enc))
 }
 
 // rawCMultipleAttribute is the method-free canonical-JSON alias for CMultipleAttribute. The alias
@@ -96,8 +96,8 @@ type rawCMultipleAttribute CMultipleAttribute
 func (c CMultipleAttribute) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawCMultipleAttribute
-	}{"C_MULTIPLE_ATTRIBUTE", (*rawCMultipleAttribute)(&c)}, typereg.MarshalOptions(enc))
+		rawCMultipleAttribute
+	}{"C_MULTIPLE_ATTRIBUTE", rawCMultipleAttribute(c)}, typereg.MarshalOptions(enc))
 }
 
 // rawCPrimitiveObject is the method-free canonical-JSON alias for CPrimitiveObject. The alias
@@ -118,8 +118,8 @@ type rawCPrimitiveObject CPrimitiveObject
 func (c CPrimitiveObject) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawCPrimitiveObject
-	}{"C_PRIMITIVE_OBJECT", (*rawCPrimitiveObject)(&c)}, typereg.MarshalOptions(enc))
+		rawCPrimitiveObject
+	}{"C_PRIMITIVE_OBJECT", rawCPrimitiveObject(c)}, typereg.MarshalOptions(enc))
 }
 
 // rawCSingleAttribute is the method-free canonical-JSON alias for CSingleAttribute. The alias
@@ -140,8 +140,8 @@ type rawCSingleAttribute CSingleAttribute
 func (c CSingleAttribute) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawCSingleAttribute
-	}{"C_SINGLE_ATTRIBUTE", (*rawCSingleAttribute)(&c)}, typereg.MarshalOptions(enc))
+		rawCSingleAttribute
+	}{"C_SINGLE_ATTRIBUTE", rawCSingleAttribute(c)}, typereg.MarshalOptions(enc))
 }
 
 // rawCardinality is the method-free canonical-JSON alias for Cardinality. The alias
@@ -162,8 +162,8 @@ type rawCardinality Cardinality
 func (c Cardinality) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawCardinality
-	}{"CARDINALITY", (*rawCardinality)(&c)}, typereg.MarshalOptions(enc))
+		rawCardinality
+	}{"CARDINALITY", rawCardinality(c)}, typereg.MarshalOptions(enc))
 }
 
 // rawConstraintRef is the method-free canonical-JSON alias for ConstraintRef. The alias
@@ -184,6 +184,6 @@ type rawConstraintRef ConstraintRef
 func (c ConstraintRef) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawConstraintRef
-	}{"CONSTRAINT_REF", (*rawConstraintRef)(&c)}, typereg.MarshalOptions(enc))
+		rawConstraintRef
+	}{"CONSTRAINT_REF", rawConstraintRef(c)}, typereg.MarshalOptions(enc))
 }

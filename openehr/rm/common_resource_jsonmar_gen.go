@@ -30,8 +30,8 @@ type rawResourceDescription ResourceDescription
 func (r ResourceDescription) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawResourceDescription
-	}{"RESOURCE_DESCRIPTION", (*rawResourceDescription)(&r)}, typereg.MarshalOptions(enc))
+		rawResourceDescription
+	}{"RESOURCE_DESCRIPTION", rawResourceDescription(r)}, typereg.MarshalOptions(enc))
 }
 
 // rawResourceDescriptionItem is the method-free canonical-JSON alias for ResourceDescriptionItem. The alias
@@ -52,8 +52,8 @@ type rawResourceDescriptionItem ResourceDescriptionItem
 func (r ResourceDescriptionItem) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawResourceDescriptionItem
-	}{"RESOURCE_DESCRIPTION_ITEM", (*rawResourceDescriptionItem)(&r)}, typereg.MarshalOptions(enc))
+		rawResourceDescriptionItem
+	}{"RESOURCE_DESCRIPTION_ITEM", rawResourceDescriptionItem(r)}, typereg.MarshalOptions(enc))
 }
 
 // rawTranslationDetails is the method-free canonical-JSON alias for TranslationDetails. The alias
@@ -74,6 +74,6 @@ type rawTranslationDetails TranslationDetails
 func (t TranslationDetails) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawTranslationDetails
-	}{"TRANSLATION_DETAILS", (*rawTranslationDetails)(&t)}, typereg.MarshalOptions(enc))
+		rawTranslationDetails
+	}{"TRANSLATION_DETAILS", rawTranslationDetails(t)}, typereg.MarshalOptions(enc))
 }

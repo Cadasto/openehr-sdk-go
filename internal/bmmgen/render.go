@@ -622,8 +622,11 @@ func genericInstantiationFromDescendant(sc *bmm.SimpleClass) string {
 //
 // Every JSON tag on a field that carries a member's value on encode comes
 // from here: the struct declarations, the flat wire structs
-// ([renderMarshalFlat]) and the interval wire structs
-// ([renderIntervalDerivedWire]). Two kinds of generated field are the
+// ([renderMarshalFlat]) and the own members in the wrappers of the interval
+// encoders ([renderMarshalIntervalDerived], through
+// [renderIntervalDerivedOwnFields]). The interval wire structs
+// ([renderIntervalDerivedWire]) take the same tags, but only the decoder
+// reads through them. Two kinds of generated field are the
 // exceptions and write their own tags: the struct{} shadow fields an
 // interval encoder adds to leave out its lower or upper bound, and the
 // intervalFlagJSON and intervalBoundJSON fields of an interval decoder's

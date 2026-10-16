@@ -15,7 +15,7 @@ import (
 
 // TestRegisteredTypeCensus is ruling R19's item (c): the runtime control that
 // contains the two-shape risk. A future BMM bump that adds an embedding edge
-// silently moves a class between the zero-copy alias and the flat wire struct,
+// silently moves a class between the alias shape and the flat wire struct,
 // and the flat-vs-alias mistake is a mislabelled `_type` with no compile error
 // (the promotion trap the hybrid shape exists to dodge). The generator-level
 // render tests check the emitted source; this checks the built tree.

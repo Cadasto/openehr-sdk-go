@@ -30,8 +30,8 @@ type rawContribution Contribution
 func (c Contribution) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawContribution
-	}{"CONTRIBUTION", (*rawContribution)(&c)}, typereg.MarshalOptions(enc))
+		rawContribution
+	}{"CONTRIBUTION", rawContribution(c)}, typereg.MarshalOptions(enc))
 }
 
 // rawImportedVersion is the method-free canonical-JSON alias for ImportedVersion. The alias
@@ -52,8 +52,8 @@ type rawImportedVersion[T any] ImportedVersion[T]
 func (i ImportedVersion[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawImportedVersion[T]
-	}{"IMPORTED_VERSION", (*rawImportedVersion[T])(&i)}, typereg.MarshalOptions(enc))
+		rawImportedVersion[T]
+	}{"IMPORTED_VERSION", rawImportedVersion[T](i)}, typereg.MarshalOptions(enc))
 }
 
 // rawOriginalVersion is the method-free canonical-JSON alias for OriginalVersion. The alias
@@ -74,8 +74,8 @@ type rawOriginalVersion[T any] OriginalVersion[T]
 func (o OriginalVersion[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawOriginalVersion[T]
-	}{"ORIGINAL_VERSION", (*rawOriginalVersion[T])(&o)}, typereg.MarshalOptions(enc))
+		rawOriginalVersion[T]
+	}{"ORIGINAL_VERSION", rawOriginalVersion[T](o)}, typereg.MarshalOptions(enc))
 }
 
 // rawVersionedObject is the method-free canonical-JSON alias for VersionedObject. The alias
@@ -96,6 +96,6 @@ type rawVersionedObject[T any] VersionedObject[T]
 func (v VersionedObject[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawVersionedObject[T]
-	}{"VERSIONED_OBJECT", (*rawVersionedObject[T])(&v)}, typereg.MarshalOptions(enc))
+		rawVersionedObject[T]
+	}{"VERSIONED_OBJECT", rawVersionedObject[T](v)}, typereg.MarshalOptions(enc))
 }

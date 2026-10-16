@@ -75,22 +75,26 @@ The `encoding/json/v2` migration evidence — `_type`-first survival, polymorphi
 
 ### Benchmark evidence
 
-Time/op change against the retired generated marshalers (v1 at `90473f9f`), from `benchstat -count=10` on one machine (13th Gen i7-13700H, WSL2, `go1.27.1`). Each column was measured against its own v1 run in the same session. The benchmarks live in `openehr/serialize/canjson/`, `openehr/rm/typereg/` and `openehr/serialize/simplified/`. The allocation column gives v1, then PR 171, then PR 174, and takes its v1 figure from the PR 171 run.
+Time/op change against the retired generated marshalers (v1 at `90473f9f`), from `benchstat -count=10` on one machine (13th Gen i7-13700H, WSL2, `go1.27.1`). Each of the first two columns was measured against its own v1 run in the same session. The benchmarks live in `openehr/serialize/canjson/`, `openehr/rm/typereg/` and `openehr/serialize/simplified/`. The allocation column gives v1, then PR 171, then PR 174, and takes its v1 figure from the PR 171 run.
 
-| Benchmark | v2 migration ([PR 171](https://github.com/Cadasto/openehr-sdk-go/pull/171), `93d06e1f`) | single-pass concrete decode ([PR 174](https://github.com/Cadasto/openehr-sdk-go/pull/174)) | allocs/op |
-|---|---|---|---|
-| `EncodeComposition_400` | -47.82% | -47.91% | 9 281 / 16 444 / 16.44k |
-| `DecodeComposition_400` | +8.98% | -39.62% | 21 665 / 16 860 / 13.25k |
-| `DecodeCompositionFixture` | -38.30% | -61.05% | 6 279 / 5 220 / 4 809 |
-| `EncodeDVQuantity` | +10.52% | not measured | 6 / 9 / not measured |
-| `DecodeDVQuantity` | +37.88% | -20.19% | 3 / 5 / 4 |
-| `RegistryDecodeElement` | +13.84% | -30.80% | 29 / 39 / 15 |
-| `RegistryDecodeDVQuantity` | +18.80% | -30.04% | 9 / 18 / 5 |
-| `FlatCorpusRoundTrip` | +1.77% | not measured | 68 400 / 69 940 / not measured |
-| `MarshalFlat` | +4.73% | not measured | 1 103 / 1 193 / not measured |
-| `UnmarshalFlat` | +2.69% | not measured | 2 962 / 2 884 / not measured |
+The PR 280 column is measured differently. Its baseline is `main` at `6f75aea3`, which already holds PR 171 and PR 174, not v1, and it comes from `benchstat -count=6` on the same machine with `go1.27.2`. Each cell gives the time/op change, then the allocs/op change in brackets: the FLAT corpus has grown since v1, so its absolute counts no longer compare with the allocation column. A `~` is a time change that did not reach p < 0.05. The FLAT rows ran on a busier host (load about 3) than the others (load about 1), so their time cells are the least reliable; allocation counts do not depend on load.
 
-The budget line used for both runs: a benchmark regresses materially when its v2 time/op is more than 20 percent worse than v1 at p < 0.05. PR 171 crossed it once, on `DecodeDVQuantity`, where buffering, peeking and decoding each concrete value cost the most; PR 174 reads `_type` from the declared wire field after one decode and brings that benchmark under v1. PR 174 was measured on its branch before the rebase that merged it (`0fee2bb2`). A token-scanning peek for `DecodePolymorphic` and `Registry.Decode` is warranted only if their benchmarks cross the line; neither does.
+| Benchmark | v2 migration ([PR 171](https://github.com/Cadasto/openehr-sdk-go/pull/171), `93d06e1f`) | single-pass concrete decode ([PR 174](https://github.com/Cadasto/openehr-sdk-go/pull/174)) | hot-path cuts ([PR 280](https://github.com/Cadasto/openehr-sdk-go/pull/280)), against `main` | allocs/op |
+|---|---|---|---|---|
+| `EncodeComposition_400` | -47.82% | -47.91% | -24.88% (-65.87%) | 9 281 / 16 444 / 16.44k |
+| `DecodeComposition_400` | +8.98% | -39.62% | -44.07% (-42.42%) | 21 665 / 16 860 / 13.25k |
+| `DecodeCompositionFixture` | -38.30% | -61.05% | -31.62% (-45.65%) | 6 279 / 5 220 / 4 809 |
+| `EncodeDVQuantity` | +10.52% | not measured | -21.45% (-44.44%) | 6 / 9 / not measured |
+| `DecodeDVQuantity` | +37.88% | -20.19% | -6.62% (-25.00%) | 3 / 5 / 4 |
+| `RegistryDecodeElement` | +13.84% | -30.80% | -27.83% (-33.33%) | 29 / 39 / 15 |
+| `RegistryDecodeDVQuantity` | +18.80% | -30.04% | -9.62% (-20.00%) | 9 / 18 / 5 |
+| `FlatCorpusRoundTrip` | +1.77% | not measured | -5.59% (-3.31%) | 68 400 / 69 940 / not measured |
+| `MarshalFlat` | +4.73% | not measured | ~ (-4.55%) | 1 103 / 1 193 / not measured |
+| `UnmarshalFlat` | +2.69% | not measured | ~ (-2.17%) | 2 962 / 2 884 / not measured |
+
+The budget line, set against v1 for the PR 171 and PR 174 runs: a benchmark regresses materially when its v2 time/op is more than 20 percent worse than v1 at p < 0.05. PR 171 crossed it once, on `DecodeDVQuantity`, where buffering, peeking and decoding each concrete value cost the most; PR 174 reads `_type` from the declared wire field after one decode and brings that benchmark under v1. PR 174 was measured on its branch before the rebase that merged it (`0fee2bb2`). The PR 280 column does not measure against v1, so it does not test the line again: it only lowers times on `main`, which already sat under it after PR 174.
+
+PR 280 cuts cost with no budget line crossed. It stops rebuilding the json/v2 options for every value, skips the bracket scan of a polymorphic slot too short to break the depth cap, reads a slot's `_type` from its bytes when `_type` is the first member instead of decoding the slot to find it, and makes the encoder copy each value once instead of allocating twice. The `_type` read covers `DecodePolymorphic` only. `Registry.Decode` keeps its peek, because its input has not been tokenised yet, and reading `_type` before the rest would report an unknown `_type` ahead of a syntax error later in the document.
 
 **Resolution form (remaining):** the full-inventory and performance sub-questions resolve through plan tasks and benchmarks, not a new ADR. The codec choice is already resolved by [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md) (which also touched the codegen policy in [ADR 0002](../adr/0002-bmm-codegen-decisions.md), since it changed what the generator emits); a future codec swap, were it revisited, would amend REQ-052 / REQ-053 and possibly REQ-040.
 

@@ -92,6 +92,38 @@ func BenchmarkEncodeDVQuantity(b *testing.B) {
 	}
 }
 
+// BenchmarkEncodeDVInterval isolates the encode cost of a class that embeds
+// BASE Interval: a DV_INTERVAL of DV_QUANTITY with both bounds set, so the
+// encoder takes the arm that leaves no bound out.
+func BenchmarkEncodeDVInterval(b *testing.B) {
+	iv := &rm.DVInterval[*rm.DVQuantity]{
+		Lower:         &rm.DVQuantity{Magnitude: 3.5, Units: "mmol/L"},
+		LowerIncluded: true,
+		Upper:         &rm.DVQuantity{Magnitude: 7.8, Units: "mmol/L"},
+		UpperIncluded: true,
+	}
+	b.ReportAllocs()
+	for b.Loop() {
+		if _, err := canjson.Marshal(iv); err != nil {
+			b.Fatalf("Marshal: %v", err)
+		}
+	}
+}
+
+// BenchmarkEncodeInterval isolates the encode cost of BASE Interval, the
+// encoder an Interval held by value in a field takes, such as an AOM 1.4
+// occurrences interval: an Interval[int] whose upper side is open with an
+// empty bound, so the encoder takes the arm that leaves `upper` out.
+func BenchmarkEncodeInterval(b *testing.B) {
+	iv := &rm.Interval[int]{Lower: 1, LowerIncluded: true, UpperUnbounded: true}
+	b.ReportAllocs()
+	for b.Loop() {
+		if _, err := canjson.Marshal(iv); err != nil {
+			b.Fatalf("Marshal: %v", err)
+		}
+	}
+}
+
 // BenchmarkDecodeDVQuantity is the symmetric leaf-type decode.
 // DV_QUANTITY has a generated UnmarshalJSONFrom but no polymorphic field,
 // so the method decodes into its companion struct and copies the

@@ -13,7 +13,7 @@ import (
 // BMM package org.openehr.base.base_types.identification: canonical-JSON MarshalJSONTo companions
 
 // jsonWireAccessGroupRef is the flat canonical-JSON wire struct for AccessGroupRef. AccessGroupRef embeds
-// a marshaler-bearing concrete ancestor, so the zero-copy alias would
+// a marshaler-bearing concrete ancestor, so an alias of the class would
 // promote that ancestor's methods and emit the wrong `_type`; the flat
 // struct embeds nothing and so cannot promote.
 type jsonWireAccessGroupRef struct {
@@ -62,8 +62,8 @@ type rawArchetypeID ArchetypeID
 func (a ArchetypeID) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawArchetypeID
-	}{"ARCHETYPE_ID", (*rawArchetypeID)(&a)}, typereg.MarshalOptions(enc))
+		rawArchetypeID
+	}{"ARCHETYPE_ID", rawArchetypeID(a)}, typereg.MarshalOptions(enc))
 }
 
 // rawGenericID is the method-free canonical-JSON alias for GenericID. The alias
@@ -84,8 +84,8 @@ type rawGenericID GenericID
 func (g GenericID) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawGenericID
-	}{"GENERIC_ID", (*rawGenericID)(&g)}, typereg.MarshalOptions(enc))
+		rawGenericID
+	}{"GENERIC_ID", rawGenericID(g)}, typereg.MarshalOptions(enc))
 }
 
 // rawHierObjectID is the method-free canonical-JSON alias for HierObjectID. The alias
@@ -106,8 +106,8 @@ type rawHierObjectID HierObjectID
 func (h HierObjectID) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawHierObjectID
-	}{"HIER_OBJECT_ID", (*rawHierObjectID)(&h)}, typereg.MarshalOptions(enc))
+		rawHierObjectID
+	}{"HIER_OBJECT_ID", rawHierObjectID(h)}, typereg.MarshalOptions(enc))
 }
 
 // rawISOOID is the method-free canonical-JSON alias for ISOOID. The alias
@@ -128,8 +128,8 @@ type rawISOOID ISOOID
 func (i ISOOID) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawISOOID
-	}{"ISO_OID", (*rawISOOID)(&i)}, typereg.MarshalOptions(enc))
+		rawISOOID
+	}{"ISO_OID", rawISOOID(i)}, typereg.MarshalOptions(enc))
 }
 
 // rawInternetID is the method-free canonical-JSON alias for InternetID. The alias
@@ -150,12 +150,12 @@ type rawInternetID InternetID
 func (i InternetID) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawInternetID
-	}{"INTERNET_ID", (*rawInternetID)(&i)}, typereg.MarshalOptions(enc))
+		rawInternetID
+	}{"INTERNET_ID", rawInternetID(i)}, typereg.MarshalOptions(enc))
 }
 
 // jsonWireLocatableRef is the flat canonical-JSON wire struct for LocatableRef. LocatableRef embeds
-// a marshaler-bearing concrete ancestor, so the zero-copy alias would
+// a marshaler-bearing concrete ancestor, so an alias of the class would
 // promote that ancestor's methods and emit the wrong `_type`; the flat
 // struct embeds nothing and so cannot promote.
 type jsonWireLocatableRef struct {
@@ -207,8 +207,8 @@ type rawObjectRef ObjectRef
 func (o ObjectRef) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawObjectRef
-	}{"OBJECT_REF", (*rawObjectRef)(&o)}, typereg.MarshalOptions(enc))
+		rawObjectRef
+	}{"OBJECT_REF", rawObjectRef(o)}, typereg.MarshalOptions(enc))
 }
 
 // rawObjectVersionID is the method-free canonical-JSON alias for ObjectVersionID. The alias
@@ -229,12 +229,12 @@ type rawObjectVersionID ObjectVersionID
 func (o ObjectVersionID) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawObjectVersionID
-	}{"OBJECT_VERSION_ID", (*rawObjectVersionID)(&o)}, typereg.MarshalOptions(enc))
+		rawObjectVersionID
+	}{"OBJECT_VERSION_ID", rawObjectVersionID(o)}, typereg.MarshalOptions(enc))
 }
 
 // jsonWirePartyRef is the flat canonical-JSON wire struct for PartyRef. PartyRef embeds
-// a marshaler-bearing concrete ancestor, so the zero-copy alias would
+// a marshaler-bearing concrete ancestor, so an alias of the class would
 // promote that ancestor's methods and emit the wrong `_type`; the flat
 // struct embeds nothing and so cannot promote.
 type jsonWirePartyRef struct {
@@ -283,8 +283,8 @@ type rawTemplateID TemplateID
 func (t TemplateID) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawTemplateID
-	}{"TEMPLATE_ID", (*rawTemplateID)(&t)}, typereg.MarshalOptions(enc))
+		rawTemplateID
+	}{"TEMPLATE_ID", rawTemplateID(t)}, typereg.MarshalOptions(enc))
 }
 
 // rawTerminologyID is the method-free canonical-JSON alias for TerminologyID. The alias
@@ -305,8 +305,8 @@ type rawTerminologyID TerminologyID
 func (t TerminologyID) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawTerminologyID
-	}{"TERMINOLOGY_ID", (*rawTerminologyID)(&t)}, typereg.MarshalOptions(enc))
+		rawTerminologyID
+	}{"TERMINOLOGY_ID", rawTerminologyID(t)}, typereg.MarshalOptions(enc))
 }
 
 // rawUuid is the method-free canonical-JSON alias for Uuid. The alias
@@ -327,8 +327,8 @@ type rawUuid Uuid
 func (u Uuid) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawUuid
-	}{"UUID", (*rawUuid)(&u)}, typereg.MarshalOptions(enc))
+		rawUuid
+	}{"UUID", rawUuid(u)}, typereg.MarshalOptions(enc))
 }
 
 // rawVersionTreeID is the method-free canonical-JSON alias for VersionTreeID. The alias
@@ -349,6 +349,6 @@ type rawVersionTreeID VersionTreeID
 func (v VersionTreeID) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawVersionTreeID
-	}{"VERSION_TREE_ID", (*rawVersionTreeID)(&v)}, typereg.MarshalOptions(enc))
+		rawVersionTreeID
+	}{"VERSION_TREE_ID", rawVersionTreeID(v)}, typereg.MarshalOptions(enc))
 }

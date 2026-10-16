@@ -30,8 +30,8 @@ type rawDVBoolean DVBoolean
 func (d DVBoolean) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawDVBoolean
-	}{"DV_BOOLEAN", (*rawDVBoolean)(&d)}, typereg.MarshalOptions(enc))
+		rawDVBoolean
+	}{"DV_BOOLEAN", rawDVBoolean(d)}, typereg.MarshalOptions(enc))
 }
 
 // rawDVIdentifier is the method-free canonical-JSON alias for DVIdentifier. The alias
@@ -52,8 +52,8 @@ type rawDVIdentifier DVIdentifier
 func (d DVIdentifier) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawDVIdentifier
-	}{"DV_IDENTIFIER", (*rawDVIdentifier)(&d)}, typereg.MarshalOptions(enc))
+		rawDVIdentifier
+	}{"DV_IDENTIFIER", rawDVIdentifier(d)}, typereg.MarshalOptions(enc))
 }
 
 // rawDVState is the method-free canonical-JSON alias for DVState. The alias
@@ -74,6 +74,6 @@ type rawDVState DVState
 func (d DVState) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawDVState
-	}{"DV_STATE", (*rawDVState)(&d)}, typereg.MarshalOptions(enc))
+		rawDVState
+	}{"DV_STATE", rawDVState(d)}, typereg.MarshalOptions(enc))
 }

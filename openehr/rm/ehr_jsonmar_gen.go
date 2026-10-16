@@ -30,8 +30,8 @@ type rawEHR EHR
 func (e EHR) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawEHR
-	}{"EHR", (*rawEHR)(&e)}, typereg.MarshalOptions(enc))
+		rawEHR
+	}{"EHR", rawEHR(e)}, typereg.MarshalOptions(enc))
 }
 
 // rawEHRAccess is the method-free canonical-JSON alias for EHRAccess. The alias
@@ -52,8 +52,8 @@ type rawEHRAccess EHRAccess
 func (e EHRAccess) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawEHRAccess
-	}{"EHR_ACCESS", (*rawEHRAccess)(&e)}, typereg.MarshalOptions(enc))
+		rawEHRAccess
+	}{"EHR_ACCESS", rawEHRAccess(e)}, typereg.MarshalOptions(enc))
 }
 
 // rawEHRStatus is the method-free canonical-JSON alias for EHRStatus. The alias
@@ -74,12 +74,12 @@ type rawEHRStatus EHRStatus
 func (e EHRStatus) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawEHRStatus
-	}{"EHR_STATUS", (*rawEHRStatus)(&e)}, typereg.MarshalOptions(enc))
+		rawEHRStatus
+	}{"EHR_STATUS", rawEHRStatus(e)}, typereg.MarshalOptions(enc))
 }
 
 // jsonWireVersionedComposition is the flat canonical-JSON wire struct for VersionedComposition. VersionedComposition embeds
-// a marshaler-bearing concrete ancestor, so the zero-copy alias would
+// a marshaler-bearing concrete ancestor, so an alias of the class would
 // promote that ancestor's methods and emit the wrong `_type`; the flat
 // struct embeds nothing and so cannot promote.
 type jsonWireVersionedComposition struct {
@@ -105,7 +105,7 @@ func (v VersionedComposition) MarshalJSONTo(enc *jsontext.Encoder) error {
 }
 
 // jsonWireVersionedEHRAccess is the flat canonical-JSON wire struct for VersionedEHRAccess. VersionedEHRAccess embeds
-// a marshaler-bearing concrete ancestor, so the zero-copy alias would
+// a marshaler-bearing concrete ancestor, so an alias of the class would
 // promote that ancestor's methods and emit the wrong `_type`; the flat
 // struct embeds nothing and so cannot promote.
 type jsonWireVersionedEHRAccess struct {
@@ -131,7 +131,7 @@ func (v VersionedEHRAccess) MarshalJSONTo(enc *jsontext.Encoder) error {
 }
 
 // jsonWireVersionedEHRStatus is the flat canonical-JSON wire struct for VersionedEHRStatus. VersionedEHRStatus embeds
-// a marshaler-bearing concrete ancestor, so the zero-copy alias would
+// a marshaler-bearing concrete ancestor, so an alias of the class would
 // promote that ancestor's methods and emit the wrong `_type`; the flat
 // struct embeds nothing and so cannot promote.
 type jsonWireVersionedEHRStatus struct {

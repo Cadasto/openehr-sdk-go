@@ -30,8 +30,8 @@ type rawDVGeneralTimeSpecification DVGeneralTimeSpecification
 func (d DVGeneralTimeSpecification) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawDVGeneralTimeSpecification
-	}{"DV_GENERAL_TIME_SPECIFICATION", (*rawDVGeneralTimeSpecification)(&d)}, typereg.MarshalOptions(enc))
+		rawDVGeneralTimeSpecification
+	}{"DV_GENERAL_TIME_SPECIFICATION", rawDVGeneralTimeSpecification(d)}, typereg.MarshalOptions(enc))
 }
 
 // rawDVPeriodicTimeSpecification is the method-free canonical-JSON alias for DVPeriodicTimeSpecification. The alias
@@ -52,6 +52,6 @@ type rawDVPeriodicTimeSpecification DVPeriodicTimeSpecification
 func (d DVPeriodicTimeSpecification) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawDVPeriodicTimeSpecification
-	}{"DV_PERIODIC_TIME_SPECIFICATION", (*rawDVPeriodicTimeSpecification)(&d)}, typereg.MarshalOptions(enc))
+		rawDVPeriodicTimeSpecification
+	}{"DV_PERIODIC_TIME_SPECIFICATION", rawDVPeriodicTimeSpecification(d)}, typereg.MarshalOptions(enc))
 }

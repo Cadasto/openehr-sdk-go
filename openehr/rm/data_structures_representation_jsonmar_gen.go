@@ -30,8 +30,8 @@ type rawCluster Cluster
 func (c Cluster) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawCluster
-	}{"CLUSTER", (*rawCluster)(&c)}, typereg.MarshalOptions(enc))
+		rawCluster
+	}{"CLUSTER", rawCluster(c)}, typereg.MarshalOptions(enc))
 }
 
 // rawElement is the method-free canonical-JSON alias for Element. The alias
@@ -52,6 +52,6 @@ type rawElement Element
 func (e Element) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawElement
-	}{"ELEMENT", (*rawElement)(&e)}, typereg.MarshalOptions(enc))
+		rawElement
+	}{"ELEMENT", rawElement(e)}, typereg.MarshalOptions(enc))
 }

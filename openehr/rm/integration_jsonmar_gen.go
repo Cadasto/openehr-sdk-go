@@ -30,6 +30,6 @@ type rawGenericEntry GenericEntry
 func (g GenericEntry) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawGenericEntry
-	}{"GENERIC_ENTRY", (*rawGenericEntry)(&g)}, typereg.MarshalOptions(enc))
+		rawGenericEntry
+	}{"GENERIC_ENTRY", rawGenericEntry(g)}, typereg.MarshalOptions(enc))
 }

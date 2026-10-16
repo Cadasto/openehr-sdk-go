@@ -30,8 +30,8 @@ type rawArchetyped Archetyped
 func (a Archetyped) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawArchetyped
-	}{"ARCHETYPED", (*rawArchetyped)(&a)}, typereg.MarshalOptions(enc))
+		rawArchetyped
+	}{"ARCHETYPED", rawArchetyped(a)}, typereg.MarshalOptions(enc))
 }
 
 // rawFeederAudit is the method-free canonical-JSON alias for FeederAudit. The alias
@@ -52,8 +52,8 @@ type rawFeederAudit FeederAudit
 func (f FeederAudit) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawFeederAudit
-	}{"FEEDER_AUDIT", (*rawFeederAudit)(&f)}, typereg.MarshalOptions(enc))
+		rawFeederAudit
+	}{"FEEDER_AUDIT", rawFeederAudit(f)}, typereg.MarshalOptions(enc))
 }
 
 // rawFeederAuditDetails is the method-free canonical-JSON alias for FeederAuditDetails. The alias
@@ -74,8 +74,8 @@ type rawFeederAuditDetails FeederAuditDetails
 func (f FeederAuditDetails) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawFeederAuditDetails
-	}{"FEEDER_AUDIT_DETAILS", (*rawFeederAuditDetails)(&f)}, typereg.MarshalOptions(enc))
+		rawFeederAuditDetails
+	}{"FEEDER_AUDIT_DETAILS", rawFeederAuditDetails(f)}, typereg.MarshalOptions(enc))
 }
 
 // rawLink is the method-free canonical-JSON alias for Link. The alias
@@ -96,6 +96,6 @@ type rawLink Link
 func (l Link) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawLink
-	}{"LINK", (*rawLink)(&l)}, typereg.MarshalOptions(enc))
+		rawLink
+	}{"LINK", rawLink(l)}, typereg.MarshalOptions(enc))
 }

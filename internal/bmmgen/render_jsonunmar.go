@@ -151,7 +151,7 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 			copyBack = append(copyBack, FieldName(ef.Prop.PropertyName()))
 		}
 		wireType := "*" + flatWireTypeName(pc.GoName) + typeArgs
-		wireValue := intervalDerivedWireValue(pc, base, recv, typeArgs, own, false)
+		wireValue := intervalDerivedWireValue(pc, base, recv, typeArgs, own)
 		renderIntervalFlagJSONDecode(&b, recv, pc.BMMName, wireType, wireValue, "", "&wire.Type", copyBack)
 	case shapeFlat:
 		wire := flatWireTypeName(pc.GoName)

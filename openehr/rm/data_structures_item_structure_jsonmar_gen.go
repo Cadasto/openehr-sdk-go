@@ -30,8 +30,8 @@ type rawItemList ItemList
 func (i ItemList) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawItemList
-	}{"ITEM_LIST", (*rawItemList)(&i)}, typereg.MarshalOptions(enc))
+		rawItemList
+	}{"ITEM_LIST", rawItemList(i)}, typereg.MarshalOptions(enc))
 }
 
 // rawItemSingle is the method-free canonical-JSON alias for ItemSingle. The alias
@@ -52,8 +52,8 @@ type rawItemSingle ItemSingle
 func (i ItemSingle) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawItemSingle
-	}{"ITEM_SINGLE", (*rawItemSingle)(&i)}, typereg.MarshalOptions(enc))
+		rawItemSingle
+	}{"ITEM_SINGLE", rawItemSingle(i)}, typereg.MarshalOptions(enc))
 }
 
 // rawItemTable is the method-free canonical-JSON alias for ItemTable. The alias
@@ -74,8 +74,8 @@ type rawItemTable ItemTable
 func (i ItemTable) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawItemTable
-	}{"ITEM_TABLE", (*rawItemTable)(&i)}, typereg.MarshalOptions(enc))
+		rawItemTable
+	}{"ITEM_TABLE", rawItemTable(i)}, typereg.MarshalOptions(enc))
 }
 
 // rawItemTree is the method-free canonical-JSON alias for ItemTree. The alias
@@ -96,6 +96,6 @@ type rawItemTree ItemTree
 func (i ItemTree) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawItemTree
-	}{"ITEM_TREE", (*rawItemTree)(&i)}, typereg.MarshalOptions(enc))
+		rawItemTree
+	}{"ITEM_TREE", rawItemTree(i)}, typereg.MarshalOptions(enc))
 }

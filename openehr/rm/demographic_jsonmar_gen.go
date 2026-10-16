@@ -30,8 +30,8 @@ type rawAddress Address
 func (a Address) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawAddress
-	}{"ADDRESS", (*rawAddress)(&a)}, typereg.MarshalOptions(enc))
+		rawAddress
+	}{"ADDRESS", rawAddress(a)}, typereg.MarshalOptions(enc))
 }
 
 // rawAgent is the method-free canonical-JSON alias for Agent. The alias
@@ -52,8 +52,8 @@ type rawAgent Agent
 func (a Agent) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawAgent
-	}{"AGENT", (*rawAgent)(&a)}, typereg.MarshalOptions(enc))
+		rawAgent
+	}{"AGENT", rawAgent(a)}, typereg.MarshalOptions(enc))
 }
 
 // rawCapability is the method-free canonical-JSON alias for Capability. The alias
@@ -74,8 +74,8 @@ type rawCapability Capability
 func (c Capability) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawCapability
-	}{"CAPABILITY", (*rawCapability)(&c)}, typereg.MarshalOptions(enc))
+		rawCapability
+	}{"CAPABILITY", rawCapability(c)}, typereg.MarshalOptions(enc))
 }
 
 // rawContact is the method-free canonical-JSON alias for Contact. The alias
@@ -96,8 +96,8 @@ type rawContact Contact
 func (c Contact) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawContact
-	}{"CONTACT", (*rawContact)(&c)}, typereg.MarshalOptions(enc))
+		rawContact
+	}{"CONTACT", rawContact(c)}, typereg.MarshalOptions(enc))
 }
 
 // rawGroup is the method-free canonical-JSON alias for Group. The alias
@@ -118,8 +118,8 @@ type rawGroup Group
 func (g Group) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawGroup
-	}{"GROUP", (*rawGroup)(&g)}, typereg.MarshalOptions(enc))
+		rawGroup
+	}{"GROUP", rawGroup(g)}, typereg.MarshalOptions(enc))
 }
 
 // rawOrganisation is the method-free canonical-JSON alias for Organisation. The alias
@@ -140,8 +140,8 @@ type rawOrganisation Organisation
 func (o Organisation) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawOrganisation
-	}{"ORGANISATION", (*rawOrganisation)(&o)}, typereg.MarshalOptions(enc))
+		rawOrganisation
+	}{"ORGANISATION", rawOrganisation(o)}, typereg.MarshalOptions(enc))
 }
 
 // rawPartyIdentity is the method-free canonical-JSON alias for PartyIdentity. The alias
@@ -162,8 +162,8 @@ type rawPartyIdentity PartyIdentity
 func (p PartyIdentity) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawPartyIdentity
-	}{"PARTY_IDENTITY", (*rawPartyIdentity)(&p)}, typereg.MarshalOptions(enc))
+		rawPartyIdentity
+	}{"PARTY_IDENTITY", rawPartyIdentity(p)}, typereg.MarshalOptions(enc))
 }
 
 // rawPartyRelationship is the method-free canonical-JSON alias for PartyRelationship. The alias
@@ -184,8 +184,8 @@ type rawPartyRelationship PartyRelationship
 func (p PartyRelationship) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawPartyRelationship
-	}{"PARTY_RELATIONSHIP", (*rawPartyRelationship)(&p)}, typereg.MarshalOptions(enc))
+		rawPartyRelationship
+	}{"PARTY_RELATIONSHIP", rawPartyRelationship(p)}, typereg.MarshalOptions(enc))
 }
 
 // rawPerson is the method-free canonical-JSON alias for Person. The alias
@@ -206,8 +206,8 @@ type rawPerson Person
 func (p Person) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawPerson
-	}{"PERSON", (*rawPerson)(&p)}, typereg.MarshalOptions(enc))
+		rawPerson
+	}{"PERSON", rawPerson(p)}, typereg.MarshalOptions(enc))
 }
 
 // rawRole is the method-free canonical-JSON alias for Role. The alias
@@ -228,12 +228,12 @@ type rawRole Role
 func (r Role) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, &struct {
 		Type string `json:"_type"`
-		*rawRole
-	}{"ROLE", (*rawRole)(&r)}, typereg.MarshalOptions(enc))
+		rawRole
+	}{"ROLE", rawRole(r)}, typereg.MarshalOptions(enc))
 }
 
 // jsonWireVersionedParty is the flat canonical-JSON wire struct for VersionedParty. VersionedParty embeds
-// a marshaler-bearing concrete ancestor, so the zero-copy alias would
+// a marshaler-bearing concrete ancestor, so an alias of the class would
 // promote that ancestor's methods and emit the wrong `_type`; the flat
 // struct embeds nothing and so cannot promote.
 type jsonWireVersionedParty struct {
