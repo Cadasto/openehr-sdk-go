@@ -689,25 +689,19 @@ func intervalDecodeOwnFields(plan *Plan, pc *PlannedClass) ([]emittedField, erro
 
 // renderIntervalDerivedWire emits the decode-side wire struct of a class that
 // embeds BASE Interval: `_type`, the method-free alias of the base, and the
-// class's own members. The decoder reads through it, and its pointer to
-// the alias lets the base decode in place; the encoder builds wrappers of its
-// own ([renderMarshalIntervalDerived]). The class cannot be marshalled through
-// a method-free alias of itself: the alias would still embed BASE Interval and
+// class's own members, passed as ownFields: the text
+// [renderIntervalDerivedOwnFields] renders, which the encoder's wrappers carry
+// too. The decoder reads through it, and its pointer to the alias lets the
+// base decode in place; the encoder builds wrappers of its own
+// ([renderMarshalIntervalDerived]). The class cannot be marshalled through a
+// method-free alias of itself: the alias would still embed BASE Interval and
 // promote its MarshalJSONTo. With that method promoted, encoding/json/v2
 // encodes the wrapper through it, silently emitting the base's payload without
 // `_type` and without the open-side omission, and decoding into the wrapper
 // fails at run time with "must not implement marshal or unmarshal methods".
 // The wire struct reaches the base through the base's own method-free alias,
 // which has no methods, and so promotes none.
-func renderIntervalDerivedWire(plan *Plan, pc, base *PlannedClass, typeParams string) (string, []emittedField, error) {
-	own, err := intervalDerivedOwnFields(plan, pc)
-	if err != nil {
-		return "", nil, err
-	}
-	ownFields, err := renderIntervalDerivedOwnFields(plan, pc, own)
-	if err != nil {
-		return "", nil, err
-	}
+func renderIntervalDerivedWire(pc, base *PlannedClass, typeParams, ownFields string) string {
 	typeArgs := genericTypeArgList(pc.Class.(*bmm.SimpleClass))
 	wire := flatWireTypeName(pc.GoName)
 
@@ -723,12 +717,13 @@ func renderIntervalDerivedWire(plan *Plan, pc, base *PlannedClass, typeParams st
 	fmt.Fprintf(&b, "\t*%s%s\n", aliasTypeName(base.GoName), typeArgs)
 	b.WriteString(ownFields)
 	b.WriteString("}\n\n")
-	return b.String(), own, nil
+	return b.String()
 }
 
 // renderIntervalDerivedOwnFields renders the struct fields of the own members
 // of a class that embeds BASE Interval, one line each at one tab and without
-// doc comments. The wire struct and the encoder's wrappers both carry them.
+// doc comments. The wire struct and the encoder's wrappers both carry them;
+// [renderMarshalIntervalDerived] renders them once and hands the text to both.
 func renderIntervalDerivedOwnFields(plan *Plan, pc *PlannedClass, own []emittedField) (string, error) {
 	var b strings.Builder
 	for _, ef := range own {
@@ -794,7 +789,7 @@ func intervalDerivedWireValue(pc, base *PlannedClass, recv, typeArgs string, own
 // zero-size `omitzero` field of the bound's name, one level shallower than the
 // bound the wrapper embeds.
 func renderMarshalIntervalDerived(plan *Plan, pc, base *PlannedClass, recv, typeParams, typeArgs string) (string, error) {
-	wireDecl, own, err := renderIntervalDerivedWire(plan, pc, base, typeParams)
+	own, err := intervalDerivedOwnFields(plan, pc)
 	if err != nil {
 		return "", err
 	}
@@ -802,6 +797,7 @@ func renderMarshalIntervalDerived(plan *Plan, pc, base *PlannedClass, recv, type
 	if err != nil {
 		return "", err
 	}
+	wireDecl := renderIntervalDerivedWire(pc, base, typeParams, ownFields)
 	alias := aliasTypeName(base.GoName)
 	ownValues := intervalDerivedOwnValues(recv, own)
 

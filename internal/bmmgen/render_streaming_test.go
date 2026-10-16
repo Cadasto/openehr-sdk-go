@@ -81,13 +81,14 @@ func embedLineOffsets(chunk, embed string) []int {
 //
 // Can-fail control: [marshalLeadsWithType] is proved discriminating on
 // deliberately broken renderings, so the census is not trivially satisfied:
-// an alias embed ahead of `_type`, a chunk with no alias embed at all, a
-// second wrapper reordered behind a correct first one, an interval-derived
-// wrapper reordered, an encode through the interval wire struct instead of a
-// wrapper, and a flat `_type` tag behind another tag. Moving the `_type` field
-// after the alias in renderMarshalAlias or renderMarshalIntervalDerived, after
-// another field in renderMarshalFlat, or changing how the alias is embedded
-// turns the census red.
+// an alias embed ahead of `_type`, an alias embedded through a pointer
+// instead of by value, an alias held in a named field with no embed line at
+// all, a second wrapper reordered behind a correct first one, an
+// interval-derived wrapper reordered, an encode through the interval wire
+// struct instead of a wrapper, and a flat `_type` tag behind another tag.
+// Moving the `_type` field after the alias in renderMarshalAlias or
+// renderMarshalIntervalDerived, after another field in renderMarshalFlat, or
+// changing how the alias is embedded turns the census red.
 func TestRenderMarshalLeadsWithType(t *testing.T) {
 	// Prove the witness discriminates on every shape. Each broken rendering
 	// must read as NOT leading with `_type`; without them, the census could be
@@ -109,8 +110,14 @@ func TestRenderMarshalLeadsWithType(t *testing.T) {
 			want:       false,
 		},
 		{
-			name:       "alias embed missing, only the declaration and the conversion name the alias",
+			name:       "alias embedded through a pointer, not by value",
 			chunk:      "type rawX X\n\treturn json.MarshalEncode(enc, &struct {\n\t\tType string `json:\"_type\"`\n\t\t*rawX\n\t}{\"X\", rawX(x)}, typereg.MarshalOptions(enc))\n",
+			aliasEmbed: "rawX",
+			want:       false,
+		},
+		{
+			name:       "alias held in a named field, no embed line",
+			chunk:      "type rawX X\n\treturn json.MarshalEncode(enc, &struct {\n\t\tType string `json:\"_type\"`\n\t\tValue rawX\n\t}{\"X\", rawX(x)}, typereg.MarshalOptions(enc))\n",
 			aliasEmbed: "rawX",
 			want:       false,
 		},
