@@ -227,7 +227,7 @@ type attrReading struct {
 }
 
 // readAttribute reads the attribute a of value, by its shape.
-func readAttribute(value any, a engineAttr) attrReading {
+func readAttribute(value any, a *engineAttr) attrReading {
 	switch a.shape {
 	case shapeList:
 		items, present := rmaccess.Multiple(value, a.name)
@@ -255,7 +255,7 @@ func readAttribute(value any, a engineAttr) attrReading {
 // alone; one outside it has nothing to check. An absent part of a reference
 // that the template does not declare is outside it too: the reference's own
 // rule reports it, when it checks the node.
-func visitedAt(a engineAttr, present bool) bool {
+func visitedAt(a *engineAttr, present bool) bool {
 	return present || a.mandatory || a.decl != nil
 }
 
@@ -639,7 +639,7 @@ func (e *engine) visitAttributes(n engineNode, class string, entry classEntry) {
 				continue // no template clause: visited below, if the class lists it
 			}
 			if a, visited := declaredAttr(n, decl, table.find(decl.Name())); visited {
-				e.visitAttribute(n, class, a)
+				e.visitAttribute(&n, class, &a)
 			}
 		}
 	}
@@ -654,7 +654,11 @@ func (e *engine) visitAttributes(n engineNode, class string, entry classEntry) {
 		if templateDeclares(n.bound, a.name) {
 			continue // visited above in the template's order
 		}
-		e.visitAttribute(n, class, a.inRole(n.role))
+		if a.blankIn(n.role) {
+			inRole := a.inRole(n.role)
+			a = &inRole
+		}
+		e.visitAttribute(&n, class, a)
 	}
 }
 
@@ -717,10 +721,17 @@ func walkedAttr(f attributeFacts, rules *classRules) engineAttr {
 // lets it be blank ([mayBeBlank]).
 func (a *engineAttr) inRole(role floorRole) engineAttr {
 	out := *a
-	if out.mandatory && out.shape == shapeSingle && mayBeBlank(role, out.name) {
+	if a.blankIn(role) {
 		out.mandatory = false
 	}
 	return out
+}
+
+// blankIn reports whether the attribute a of a class's table, mandatory for
+// the class, is not mandatory on a node in role: it is single-valued and
+// role lets it be blank ([mayBeBlank]).
+func (a *engineAttr) blankIn(role floorRole) bool {
+	return a.mandatory && a.shape == shapeSingle && mayBeBlank(role, a.name)
 }
 
 // shapeFrom returns how the walk reads an attribute that is a container or
@@ -755,12 +766,12 @@ func shapeFrom(container, primitiveItems, hash bool) attrShape {
 // item. A primitive leaf ([primitiveLeaf]) the template does not constrain
 // is counted as one visit and not walked ([engine.spendLeafVisit]): walking
 // it would do nothing more.
-func (e *engine) visitAttribute(n engineNode, class string, a engineAttr) {
+func (e *engine) visitAttribute(n *engineNode, class string, a *engineAttr) {
 	r := readAttribute(n.value, a)
 	if !visitedAt(a, r.present) {
 		return
 	}
-	if a.decl == nil && primitiveLeaf(r.value, &a) {
+	if a.decl == nil && primitiveLeaf(r.value, a) {
 		// Walking a primitive leaf would only spend its visit (REQ-171
 		// visit limit). Only a present single value is read into r.value,
 		// so the mandatory-presence rule reports nothing. No RM class is a
@@ -776,9 +787,9 @@ func (e *engine) visitAttribute(n engineNode, class string, a engineAttr) {
 	role := childRole(class, n.role, a.name)
 	if a.decl != nil {
 		if a.shape == shapeSingle {
-			e.visitDeclaredSingle(n, a, r, attrPath, role)
+			e.visitDeclaredSingle(n, a, &r, attrPath, role)
 		} else {
-			e.visitDeclaredItems(n, a, r, attrPath, role)
+			e.visitDeclaredItems(n, a, &r, attrPath, role)
 		}
 		return
 	}
@@ -786,7 +797,7 @@ func (e *engine) visitAttribute(n engineNode, class string, a engineAttr) {
 		e.found.checkMandatory(n.rmType, a.name, attrPath, a.shape.multiValued(), r.present, r.count)
 	}
 	if r.present {
-		e.walkUnconstrained(n, a, r, attrPath, role)
+		e.walkUnconstrained(n, a, &r, attrPath, role)
 	}
 }
 
@@ -802,7 +813,7 @@ func (e *engine) visitAttribute(n engineNode, class string, a engineAttr) {
 // an attribute the template leaves open both reach it, while a nil item
 // under an attribute that declares children is the template's to refuse
 // ([engine.visitDeclaredItems]) and never gets here.
-func (e *engine) walkUnconstrained(n engineNode, a engineAttr, r attrReading, attrPath string, role floorRole) {
+func (e *engine) walkUnconstrained(n *engineNode, a *engineAttr, r *attrReading, attrPath string, role floorRole) {
 	switch a.shape {
 	case shapeSingle:
 		e.walk(engineNode{value: r.value, rmType: runtimeRMType(r.value, a.rmType), path: attrPath, role: role, depth: n.depth + 1})
@@ -835,7 +846,7 @@ func (e *engine) walkUnconstrained(n engineNode, a engineAttr, r attrReading, at
 // whose declared RM type is rmType, at path, in role, with the RM rules
 // alone, when it is a value of a registered RM class; any other item has
 // nothing below it to walk.
-func (e *engine) walkItem(n engineNode, item any, rmType, path string, role floorRole) {
+func (e *engine) walkItem(n *engineNode, item any, rmType, path string, role floorRole) {
 	if !rmaccess.Covers(item) {
 		return
 	}
@@ -861,7 +872,7 @@ func walkedOrNil(item any) bool {
 // attribute is reported as [engine.checkAbsent] says. Then the admitted value
 // is walked against the child it binds to, or, where the template declares
 // no child, with the RM rules alone.
-func (e *engine) visitDeclaredSingle(n engineNode, a engineAttr, r attrReading, attrPath string, role floorRole) {
+func (e *engine) visitDeclaredSingle(n *engineNode, a *engineAttr, r *attrReading, attrPath string, role floorRole) {
 	if !r.present {
 		e.checkAbsent(n, a, attrPath)
 		return
@@ -903,7 +914,7 @@ func (e *engine) visitDeclaredSingle(n engineNode, a engineAttr, r attrReading, 
 // ([engine.walkUnconstrained]). A nil item under an attribute that declares
 // children binds to none, so it is refused above and the RM rules never
 // see it.
-func (e *engine) visitDeclaredItems(n engineNode, a engineAttr, r attrReading, attrPath string, role floorRole) {
+func (e *engine) visitDeclaredItems(n *engineNode, a *engineAttr, r *attrReading, attrPath string, role floorRole) {
 	if !r.present {
 		e.checkAbsent(n, a, attrPath)
 		return
@@ -980,7 +991,7 @@ func (e *engine) refuse(iss Issue) {
 // blank. The RM's requirement is read from the value's class alone: an
 // attribute that class does not list draws no RM finding, whatever
 // mandatory bit the compiled template carries for it.
-func (e *engine) checkAbsent(n engineNode, a engineAttr, attrPath string) {
+func (e *engine) checkAbsent(n *engineNode, a *engineAttr, attrPath string) {
 	multiValued := a.shape != shapeSingle
 	if iss, required := absentIssue(a.decl, n.value, attrPath, multiValued); required {
 		e.found.emit(iss)
@@ -999,7 +1010,7 @@ func (e *engine) checkAbsent(n engineNode, a engineAttr, attrPath string) {
 // the same container itself (reported), and only for a list: a Hash that is
 // present and empty breaks no mandatory rule, as the RM rules alone read
 // it, however the template declares it.
-func (e *engine) checkEmpty(n engineNode, a engineAttr, attrPath string, reported bool) {
+func (e *engine) checkEmpty(n *engineNode, a *engineAttr, attrPath string, reported bool) {
 	if iss, required := emptyIssue(a.decl, n.value, attrPath); required {
 		e.found.emit(iss)
 		return

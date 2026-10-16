@@ -34,7 +34,7 @@ func TestEngine_REQ112_REQ171_MandatoryPrimitiveListCounted(t *testing.T) {
 	data.mandatory = true
 	visit := func(payload []byte) []string {
 		e := newEngine(Limits{})
-		e.visitAttribute(engineNode{
+		e.visitAttribute(&engineNode{
 			value: &rm.DVMultimedia{
 				MediaType: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "IANA_media-types"}, CodeString: "image/png"},
 				Size:      rm.Integer(len(payload)),
@@ -42,7 +42,7 @@ func TestEngine_REQ112_REQ171_MandatoryPrimitiveListCounted(t *testing.T) {
 			},
 			rmType: "DV_MULTIMEDIA",
 			path:   "/",
-		}, "DV_MULTIMEDIA", data)
+		}, "DV_MULTIMEDIA", &data)
 		var got []string
 		for _, i := range e.found.issues {
 			got = append(got, i.Code+" "+i.Path+" "+i.Layer.String()+" "+i.Rule)
