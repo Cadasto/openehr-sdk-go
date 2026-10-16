@@ -298,6 +298,34 @@ func (e *engine) spendVisit(path, rmType string) bool {
 	return true
 }
 
+// spendLeafVisit counts one visit to a primitive leaf ([primitiveLeaf]), the
+// value of the attribute name, of declared RM type rmType, of the node at
+// the issue path parent, as [engine.spendVisit] counts it, unless the walk
+// has stopped. It builds the leaf's path only to report `max_nodes` there.
+func (e *engine) spendLeafVisit(parent, name, rmType string) {
+	if e.stopped {
+		return
+	}
+	if e.visits == e.maxNodes {
+		e.spendVisit(attributePath(parent, name), rmType)
+		return
+	}
+	e.visits++
+}
+
+// primitiveLeaf reports whether value, the value of a single-valued
+// attribute of declared RM type declared, is a primitive leaf: a value of a
+// Go primitive type, which no RM class is, read under a declared type that
+// has no RM rules. A named type, such as rm.Real, and a pointer are not one.
+func primitiveLeaf(value any, declared string) bool {
+	switch value.(type) {
+	case string, bool, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+		rules, _ := rulesFor(declared)
+		return rules == nil
+	}
+	return false
+}
+
 // visit checks node n. A visit past the visit limit checks nothing: it
 // reports `max_nodes` at n's path and ends the walk ([engine.spendVisit]).
 // Otherwise visit checks
@@ -690,10 +718,24 @@ func shapeFrom(container, primitiveItems, hash bool) attrShape {
 // ([rmaccess.Covers]) is walked as an item of a list or a Hash; an item of a
 // list that holds no RM value is reported at its path instead
 // ([engine.walkUnconstrained]), and a counted list is never read item by
-// item.
+// item. A primitive leaf ([primitiveLeaf]) the template does not constrain
+// is counted as one visit and not walked ([engine.spendLeafVisit]): walking
+// it would do nothing more.
 func (e *engine) visitAttribute(n engineNode, class string, a engineAttr) {
 	r := readAttribute(n.value, a)
 	if !visitedAt(a, r.present) {
+		return
+	}
+	if a.decl == nil && primitiveLeaf(r.value, a.rmType) {
+		// Walking a primitive leaf would only spend its visit (REQ-171
+		// visit limit). Only a present single value is read into r.value,
+		// so the mandatory-presence rule reports nothing. No RM class is a
+		// Go primitive type, so the leaf is read as its declared type, has
+		// no identity, and has no attributes to visit, so the depth limit
+		// does not reach it. That type has no RM rules to run or record.
+		// So the visit is counted here, and the leaf's path is built only
+		// when the visit limit is reported there.
+		e.spendLeafVisit(n.path, a.name, a.rmType)
 		return
 	}
 	attrPath := attributePath(n.path, a.name)
