@@ -98,23 +98,22 @@ func TestDecodeOptionsNilWhenDecoderCarriesSDKOptions(t *testing.T) {
 	}
 }
 
-// TestMarshalOptionsNilWhenEncoderCarriesEncodeOptions pins when MarshalOptions
-// adds nothing. json.MarshalEncode applies the options a call passes to the
-// encoder for that call's duration, so once an enclosing value (or the entry
-// point) has applied EncodeOptions, a nested value's encoder already has all
-// three set; MarshalOptions then returns nil, which MarshalEncode skips.
-// Missing or false, any one of the three makes it return EncodeOptions, and the
-// encoder's options joined with the result have all three set. Drop any one of
-// the three checks and that option's "missing" and "false" rows come back nil.
-func TestMarshalOptionsNilWhenEncoderCarriesEncodeOptions(t *testing.T) {
+// TestMarshalOptionsIsTheSharedEncodeSet pins that MarshalOptions hands every
+// generated MarshalJSONTo the prebuilt EncodeOptions value, whatever the
+// encoder already carries, rather than building a new set per value or
+// returning nil. json.MarshalEncode joins it on top of the encoder's own
+// options, so the encoder's options joined with the result have all three set.
+// A nil result would also be skipped by MarshalEncode, but a caller that
+// passes the result to an encode on another encoder would then lose the three
+// options, so the result is never nil, for a nil encoder included.
+func TestMarshalOptionsIsTheSharedEncodeSet(t *testing.T) {
 	det, nilSlice, nilMap := json.Deterministic, json.FormatNilSliceAsNull, json.FormatNilMapAsNull
 	cases := []struct {
-		name    string
-		opts    []json.Options
-		wantNil bool
+		name string
+		opts []json.Options
 	}{
-		{name: "all three", opts: []json.Options{det(true), nilSlice(true), nilMap(true)}, wantNil: true},
-		{name: "EncodeOptions", opts: []json.Options{EncodeOptions()}, wantNil: true},
+		{name: "all three", opts: []json.Options{det(true), nilSlice(true), nilMap(true)}},
+		{name: "EncodeOptions", opts: []json.Options{EncodeOptions()}},
 		{name: "none"},
 		{name: "Deterministic missing", opts: []json.Options{nilSlice(true), nilMap(true)}},
 		{name: "FormatNilSliceAsNull missing", opts: []json.Options{det(true), nilMap(true)}},
@@ -123,18 +122,15 @@ func TestMarshalOptionsNilWhenEncoderCarriesEncodeOptions(t *testing.T) {
 		{name: "FormatNilSliceAsNull false", opts: []json.Options{det(true), nilSlice(false), nilMap(true)}},
 		{name: "FormatNilMapAsNull false", opts: []json.Options{det(true), nilSlice(true), nilMap(false)}},
 	}
+	if got := MarshalOptions(nil); got != EncodeOptions() {
+		t.Errorf("MarshalOptions(nil encoder) = %v, want the shared EncodeOptions value", got)
+	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			enc := jsontext.NewEncoder(io.Discard, tc.opts...)
 			got := MarshalOptions(enc)
-			if tc.wantNil {
-				if got != nil {
-					t.Fatalf("MarshalOptions(encoder with %s) = %v, want nil: the encoder already carries the three encode options", tc.name, got)
-				}
-				return
-			}
-			if got == nil {
-				t.Fatalf("MarshalOptions(encoder with %s) = nil, want EncodeOptions to join on top of the encoder's options", tc.name)
+			if got != EncodeOptions() {
+				t.Fatalf("MarshalOptions(encoder with %s) = %v, want the shared EncodeOptions value: never nil, never a new set", tc.name, got)
 			}
 			effective := json.JoinOptions(enc.Options(), got)
 			for _, opt := range []struct {
