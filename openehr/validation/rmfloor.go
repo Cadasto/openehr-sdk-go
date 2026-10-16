@@ -305,18 +305,17 @@ func runtimeRMType(val any, declared string) string {
 	return declared
 }
 
-// checkInvariants runs the RM rules of the class of the node value, of RM
-// type rmType, at path, and records the class as visited. The rules are the
-// inventory's ([floorRules]): the evaluators of the evaluated invariants the
-// class and its ancestors declare, the coded ones included, and the
-// attribute checks that apply to the class. A type no registered class has
-// runs nothing (this is a floor, not an exhaustive RM check). It returns the
-// class's rules, nil for such a type, and the bare class name of rmType,
-// which the walk reads the class's attributes by ([classAttributes]).
-func (f *findings) checkInvariants(value any, rmType, path string) (*classRules, string) {
-	rules, class := rulesFor(rmType)
+// checkInvariants runs rules, the RM rules of the class of the node value,
+// of RM type rmType, on the node at path, and records the class as visited.
+// The rules are the inventory's ([floorRules]), which the walk finds with
+// the class's attributes in one lookup ([classOf]): the evaluators of the
+// evaluated invariants the class and its ancestors declare, the coded ones
+// included, and the attribute checks that apply to the class. Nil rules,
+// those of a type no registered class has, run nothing (this is a floor, not
+// an exhaustive RM check).
+func (f *findings) checkInvariants(value any, rmType, path string, rules *classRules) {
 	if rules == nil {
-		return nil, class
+		return
 	}
 	f.visited = f.visited.with(rules.index)
 	n := floorNode{value: value, rmType: rmType, path: path}
@@ -326,7 +325,6 @@ func (f *findings) checkInvariants(value any, rmType, path string) (*classRules,
 	if len(rules.coded) > 0 {
 		f.checkCodedInvariants(value, rmType, path, rules.coded)
 	}
-	return rules, class
 }
 
 // checkArchetypeRoot enforces the archetype-root rule on a node whose class

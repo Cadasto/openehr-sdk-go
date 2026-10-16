@@ -361,7 +361,8 @@ func (e *engine) visit(n engineNode) {
 		scalar = e.checkIdentityAndType(n)
 	}
 	rulesFrom := len(e.found.issues)
-	rules, class := e.found.checkInvariants(n.value, n.rmType, n.path)
+	entry, class := classOf(n.rmType)
+	e.found.checkInvariants(n.value, n.rmType, n.path, entry.rules)
 	rulesTo := len(e.found.issues)
 	var held *heldJudgement
 	if n.bound != nil {
@@ -383,7 +384,7 @@ func (e *engine) visit(n engineNode) {
 		return
 	}
 	refusedFrom := len(e.refused)
-	e.visitAttributes(n, class, rules)
+	e.visitAttributes(n, class, entry)
 	if held != nil {
 		e.settle(held)
 	}
@@ -592,11 +593,12 @@ func (e *engine) settle(h *heldJudgement) {
 }
 
 // visitAttributes visits the attributes of node n, of the bare RM class
-// class whose rules are rules. At a node the template binds it visits first
-// the attributes the template declares, in the template's order. Then it
-// visits the other attributes the class metadata lists for class, in the
-// class's order, with the RM rules alone: no template clause constrains
-// them. Among them are those the compile injected into the bound node
+// class, whose rules and attribute table are entry's ([classOf]). At a node
+// the template binds it visits first the attributes the template declares,
+// in the template's order. Then it visits the other attributes the class
+// metadata lists for class, in the class's order, with the RM rules alone:
+// no template clause constrains them. Among them are those the compile
+// injected into the bound node
 // because the RM marks them mandatory for the node's class
 // ([tcimpl.CompiledAttribute.Implicit]); an injected attribute the value's
 // class does not list is not visited, so it draws no finding. It leaves out
@@ -611,10 +613,11 @@ func (e *engine) settle(h *heldJudgement) {
 // built once per class when the package is initialised ([classAttributes]),
 // never from the template, so the RM rules read the pinned Reference Model
 // whatever lookup compiled the template.
-func (e *engine) visitAttributes(n engineNode, class string, rules *classRules) {
+func (e *engine) visitAttributes(n engineNode, class string, entry classEntry) {
+	rules := entry.rules
 	var table *classAttributeTable
 	if rmaccess.Covers(n.value) {
-		table = classAttributes[class]
+		table = entry.attrs
 	}
 	if n.bound != nil {
 		for _, decl := range tcimpl.NodeAttributes(n.bound) {

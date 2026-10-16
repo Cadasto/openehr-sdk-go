@@ -573,15 +573,56 @@ func conformsTo(h rminfo.Hierarchy, class, ancestor string) bool {
 	return ok && known
 }
 
-// rulesFor returns the RM rules for a node of RM type rmType, which may
-// carry a generic bound (DV_INTERVAL<DV_QUANTITY>), and the bare class name;
-// nil rules for a type no registered class has.
-func rulesFor(rmType string) (*classRules, string) {
+// classEntry is what the walk reads of one class at a node, found by the
+// class's bare name in one lookup ([classOf]): the class's RM rules
+// ([floorRules]), nil for a class the type registry does not decode, and
+// the table of the attributes the class metadata lists for it
+// ([classAttributes]), nil for a class the metadata does not know.
+type classEntry struct {
+	rules *classRules
+	attrs *classAttributeTable
+}
+
+// classEntries holds the entry of every class that has RM rules or an
+// attribute table, by its bare name. The two sets need not be the same: in
+// the pinned RM every class the type registry decodes has a table, while
+// the classes the metadata knows that the registry does not decode, the
+// abstract ones such as LOCATABLE and DV_ORDERED among them, have a table
+// and no rules. Built once, when the package is initialised.
+var classEntries = joinClasses(floorRules.byClass, classAttributes)
+
+// joinClasses returns the entry of every class rules or tables holds, each
+// with what the other holds for it, if anything.
+func joinClasses(rules map[string]*classRules, tables map[string]*classAttributeTable) map[string]classEntry {
+	out := make(map[string]classEntry, max(len(rules), len(tables)))
+	for class, r := range rules {
+		out[class] = classEntry{rules: r, attrs: tables[class]}
+	}
+	for class, t := range tables {
+		if _, done := out[class]; !done {
+			out[class] = classEntry{attrs: t}
+		}
+	}
+	return out
+}
+
+// classOf returns the entry of the class of a node of RM type rmType, which
+// may carry a generic bound (DV_INTERVAL<DV_QUANTITY>), and the bare class
+// name; the zero entry, no rules and no table, for a type no class has.
+func classOf(rmType string) (classEntry, string) {
 	class := rmType
 	if strings.IndexByte(rmType, '<') >= 0 {
 		class = bmmtype.Class(rmType)
 	}
-	return floorRules.byClass[class], class
+	return classEntries[class], class
+}
+
+// rulesFor returns the RM rules for a node of RM type rmType, which may
+// carry a generic bound (DV_INTERVAL<DV_QUANTITY>), and the bare class name;
+// nil rules for a type no registered class has.
+func rulesFor(rmType string) (*classRules, string) {
+	entry, class := classOf(rmType)
+	return entry.rules, class
 }
 
 // unevaluatedIn returns, sorted and once each, the invariants the classes of
