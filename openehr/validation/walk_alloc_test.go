@@ -15,10 +15,13 @@ import (
 // it allocates about half the objects it did when it wrote the path of every
 // attribute and item as it entered it. The BMI corpus composition reports no
 // issue under the RM rules alone; ValidateRM of it allocated 618 objects per
-// call before (BenchmarkValidateComposition/BMI/rm at 90355d7c) and 319
-// after. The bound sits just above that, so a change that writes paths again
-// where nothing records them fails here. The race detector's instrumentation
-// changes what the walk allocates, so a race build skips the count.
+// call before the walk wrote paths only where they are recorded
+// (BenchmarkValidateComposition/BMI/rm on the commit "perf(validation):
+// count named and pointer primitive leaves without entering them", 2d59ff58
+// when this was written) and 319 after. The bound sits just above that, so a
+// change that writes paths again where nothing records them fails here. The
+// race detector's instrumentation changes what the walk allocates, so a race
+// build skips the count.
 func TestValidateRM_REQ171_WritesNoPathWhereNothingIsReported(t *testing.T) {
 	if raceEnabled {
 		t.Skip("the race detector's instrumentation changes what the walk allocates")
