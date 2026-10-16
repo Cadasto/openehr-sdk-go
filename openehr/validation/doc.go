@@ -157,15 +157,20 @@
 // either: a large one the visit limit, a deeply nested one the depth limit.
 // A walk that reaches the depth limit reports one max_depth issue, at the
 // first place it stopped, and walks nothing below that depth. One that
-// reaches the visit limit reports max_nodes and ends. The template check
-// runs in the same walk as the Reference Model rules, so a stop ends it
-// too: what the walk has not reached is not checked, and a defect there is
-// not reported. A leaf it has reached is still judged whole by its
-// template value constraint, the parts the walk had not yet visited
-// included. A caller that must check such a document to the end raises the
-// limit with [WithLimits].
+// reaches the visit limit reports max_nodes and ends, and since the
+// template check runs in the same walk as the Reference Model rules, it
+// ends too. A node's own checks run when the walk reaches it, before the
+// walk enters its attributes: its identity and type against the template,
+// the Reference Model rules of its class, and at a leaf the template's
+// value constraint. They read the node's attributes, so a node reached
+// before the stop can still report at a path the walk never entered. What
+// the visit limit leaves unchecked is the node where the walk stops, every
+// node after it, and the presence and counts of the attributes not yet
+// visited; a defect only those checks would find is not reported. A caller
+// that must check such a document to the end raises the limit with
+// [WithLimits]:
 //
-//	v := validation.New(validation.WithLimits(validation.Limits{Depth: 64}))
+//	v := validation.New(validation.WithLimits(validation.Limits{Nodes: 1_000_000}))
 //	r := v.Validate(comp, compiled)
 //
 // # Coverage
