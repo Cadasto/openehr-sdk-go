@@ -50,9 +50,13 @@ const typeregImportPath = "github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 // with explicit field copies both ways.
 //
 // A class that embeds BASE Interval (DV_INTERVAL, Point_interval,
-// Proper_interval) takes the third shape, the interval wire struct: it embeds
-// the base's own method-free alias and carries the class's own members beside
-// it, so it reaches the base without promoting the base's MarshalJSONTo.
+// Proper_interval) takes the third shape, which reaches the base through the
+// base's own method-free alias, so it never promotes the base's MarshalJSONTo.
+// Decode goes through the interval wire struct: it embeds a pointer to that
+// alias, so the base decodes in place, and carries the class's own members
+// beside it. Encode copies the value receiver once into an anonymous wrapper
+// with the same members, which embeds the alias by value; filling the wire
+// struct would move the receiver to the heap.
 //
 // Every shape but BASE Interval's emits `_type` first. BASE Interval is
 // abstract and writes none. All of them join json.Deterministic(true) plus the
@@ -323,8 +327,9 @@ const (
 	// shapeIntervalAlias is the alias shape for an interval-shaped class that
 	// declares the BASE Interval members itself.
 	shapeIntervalAlias
-	// shapeIntervalDerived is the interval wire struct of a class that embeds
-	// BASE Interval.
+	// shapeIntervalDerived is the shape of a class that embeds BASE Interval:
+	// decode reads through its interval wire struct, and encode copies the
+	// receiver once into a wrapper that embeds the base's alias.
 	shapeIntervalDerived
 	// shapeIntervalBase is BASE Interval itself, which has a marshaller only.
 	shapeIntervalBase

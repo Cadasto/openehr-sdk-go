@@ -37,24 +37,24 @@ func (i Interval[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 	switch {
 	case omitLower && omitUpper:
 		return json.MarshalEncode(enc, &struct {
-			*rawInterval[T]
+			rawInterval[T]
 			Lower struct{} `json:"lower,omitzero"`
 			Upper struct{} `json:"upper,omitzero"`
-		}{rawInterval: (*rawInterval[T])(&i)}, typereg.MarshalOptions(enc))
+		}{rawInterval: rawInterval[T](i)}, typereg.MarshalOptions(enc))
 	case omitLower:
 		return json.MarshalEncode(enc, &struct {
-			*rawInterval[T]
+			rawInterval[T]
 			Lower struct{} `json:"lower,omitzero"`
-		}{rawInterval: (*rawInterval[T])(&i)}, typereg.MarshalOptions(enc))
+		}{rawInterval: rawInterval[T](i)}, typereg.MarshalOptions(enc))
 	case omitUpper:
 		return json.MarshalEncode(enc, &struct {
-			*rawInterval[T]
+			rawInterval[T]
 			Upper struct{} `json:"upper,omitzero"`
-		}{rawInterval: (*rawInterval[T])(&i)}, typereg.MarshalOptions(enc))
+		}{rawInterval: rawInterval[T](i)}, typereg.MarshalOptions(enc))
 	}
 	return json.MarshalEncode(enc, &struct {
-		*rawInterval[T]
-	}{rawInterval: (*rawInterval[T])(&i)}, typereg.MarshalOptions(enc))
+		rawInterval[T]
+	}{rawInterval: rawInterval[T](i)}, typereg.MarshalOptions(enc))
 }
 
 // jsonWirePointInterval is the canonical-JSON wire struct for PointInterval. PointInterval embeds BASE
@@ -88,26 +88,47 @@ type jsonWirePointInterval[T any] struct {
 func (p PointInterval[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 	omitLower := omitIntervalBound(p.LowerUnbounded, p.Lower)
 	omitUpper := omitIntervalBound(p.UpperUnbounded, p.Upper)
-	w := &jsonWirePointInterval[T]{Type: "Point_interval", rawInterval: (*rawInterval[T])(&p.Interval), LowerIncluded: p.LowerIncluded, LowerUnbounded: p.LowerUnbounded, UpperIncluded: p.UpperIncluded, UpperUnbounded: p.UpperUnbounded}
 	switch {
 	case omitLower && omitUpper:
 		return json.MarshalEncode(enc, &struct {
-			*jsonWirePointInterval[T]
-			Lower struct{} `json:"lower,omitzero"`
-			Upper struct{} `json:"upper,omitzero"`
-		}{jsonWirePointInterval: w}, typereg.MarshalOptions(enc))
+			Type string `json:"_type"`
+			rawInterval[T]
+			LowerIncluded  bool     `json:"lower_included"`
+			LowerUnbounded bool     `json:"lower_unbounded"`
+			UpperIncluded  bool     `json:"upper_included"`
+			UpperUnbounded bool     `json:"upper_unbounded"`
+			Lower          struct{} `json:"lower,omitzero"`
+			Upper          struct{} `json:"upper,omitzero"`
+		}{Type: "Point_interval", rawInterval: rawInterval[T](p.Interval), LowerIncluded: p.LowerIncluded, LowerUnbounded: p.LowerUnbounded, UpperIncluded: p.UpperIncluded, UpperUnbounded: p.UpperUnbounded}, typereg.MarshalOptions(enc))
 	case omitLower:
 		return json.MarshalEncode(enc, &struct {
-			*jsonWirePointInterval[T]
-			Lower struct{} `json:"lower,omitzero"`
-		}{jsonWirePointInterval: w}, typereg.MarshalOptions(enc))
+			Type string `json:"_type"`
+			rawInterval[T]
+			LowerIncluded  bool     `json:"lower_included"`
+			LowerUnbounded bool     `json:"lower_unbounded"`
+			UpperIncluded  bool     `json:"upper_included"`
+			UpperUnbounded bool     `json:"upper_unbounded"`
+			Lower          struct{} `json:"lower,omitzero"`
+		}{Type: "Point_interval", rawInterval: rawInterval[T](p.Interval), LowerIncluded: p.LowerIncluded, LowerUnbounded: p.LowerUnbounded, UpperIncluded: p.UpperIncluded, UpperUnbounded: p.UpperUnbounded}, typereg.MarshalOptions(enc))
 	case omitUpper:
 		return json.MarshalEncode(enc, &struct {
-			*jsonWirePointInterval[T]
-			Upper struct{} `json:"upper,omitzero"`
-		}{jsonWirePointInterval: w}, typereg.MarshalOptions(enc))
+			Type string `json:"_type"`
+			rawInterval[T]
+			LowerIncluded  bool     `json:"lower_included"`
+			LowerUnbounded bool     `json:"lower_unbounded"`
+			UpperIncluded  bool     `json:"upper_included"`
+			UpperUnbounded bool     `json:"upper_unbounded"`
+			Upper          struct{} `json:"upper,omitzero"`
+		}{Type: "Point_interval", rawInterval: rawInterval[T](p.Interval), LowerIncluded: p.LowerIncluded, LowerUnbounded: p.LowerUnbounded, UpperIncluded: p.UpperIncluded, UpperUnbounded: p.UpperUnbounded}, typereg.MarshalOptions(enc))
 	}
-	return json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		rawInterval[T]
+		LowerIncluded  bool `json:"lower_included"`
+		LowerUnbounded bool `json:"lower_unbounded"`
+		UpperIncluded  bool `json:"upper_included"`
+		UpperUnbounded bool `json:"upper_unbounded"`
+	}{Type: "Point_interval", rawInterval: rawInterval[T](p.Interval), LowerIncluded: p.LowerIncluded, LowerUnbounded: p.LowerUnbounded, UpperIncluded: p.UpperIncluded, UpperUnbounded: p.UpperUnbounded}, typereg.MarshalOptions(enc))
 }
 
 // jsonWireProperInterval is the canonical-JSON wire struct for ProperInterval. ProperInterval embeds BASE
@@ -137,24 +158,29 @@ type jsonWireProperInterval[T any] struct {
 func (p ProperInterval[T]) MarshalJSONTo(enc *jsontext.Encoder) error {
 	omitLower := omitIntervalBound(p.LowerUnbounded, p.Lower)
 	omitUpper := omitIntervalBound(p.UpperUnbounded, p.Upper)
-	w := &jsonWireProperInterval[T]{Type: "Proper_interval", rawInterval: (*rawInterval[T])(&p.Interval)}
 	switch {
 	case omitLower && omitUpper:
 		return json.MarshalEncode(enc, &struct {
-			*jsonWireProperInterval[T]
+			Type string `json:"_type"`
+			rawInterval[T]
 			Lower struct{} `json:"lower,omitzero"`
 			Upper struct{} `json:"upper,omitzero"`
-		}{jsonWireProperInterval: w}, typereg.MarshalOptions(enc))
+		}{Type: "Proper_interval", rawInterval: rawInterval[T](p.Interval)}, typereg.MarshalOptions(enc))
 	case omitLower:
 		return json.MarshalEncode(enc, &struct {
-			*jsonWireProperInterval[T]
+			Type string `json:"_type"`
+			rawInterval[T]
 			Lower struct{} `json:"lower,omitzero"`
-		}{jsonWireProperInterval: w}, typereg.MarshalOptions(enc))
+		}{Type: "Proper_interval", rawInterval: rawInterval[T](p.Interval)}, typereg.MarshalOptions(enc))
 	case omitUpper:
 		return json.MarshalEncode(enc, &struct {
-			*jsonWireProperInterval[T]
+			Type string `json:"_type"`
+			rawInterval[T]
 			Upper struct{} `json:"upper,omitzero"`
-		}{jsonWireProperInterval: w}, typereg.MarshalOptions(enc))
+		}{Type: "Proper_interval", rawInterval: rawInterval[T](p.Interval)}, typereg.MarshalOptions(enc))
 	}
-	return json.MarshalEncode(enc, w, typereg.MarshalOptions(enc))
+	return json.MarshalEncode(enc, &struct {
+		Type string `json:"_type"`
+		rawInterval[T]
+	}{Type: "Proper_interval", rawInterval: rawInterval[T](p.Interval)}, typereg.MarshalOptions(enc))
 }
