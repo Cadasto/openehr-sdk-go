@@ -22,6 +22,17 @@ import (
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
+// walkedNamed returns the attribute name the table t walks, as the walk
+// reads it at [classAttributeTable.position], nil when t walks none by that
+// name or t is nil.
+func walkedNamed(t *classAttributeTable, name string) *engineAttr {
+	i, ok := t.position(name)
+	if !ok {
+		return nil
+	}
+	return &t.walked[i]
+}
+
 // REQ-171 § One walk — for every class that has RM rules or an attribute
 // table, for a generic instantiation and for a type no class has, the one
 // lookup the walk makes per node finds the rules [floorRules] holds for the
@@ -58,11 +69,11 @@ func TestREQ171_ClassEntryHoldsTheRulesAndTheTableOfTheClass(t *testing.T) {
 // declaration. Each records whether its declared type has RM rules.
 func TestREQ171_ClassTableWalksEachAttributeAsTheWalkReadsIt(t *testing.T) {
 	t.Parallel()
-	code := classAttributes["CODE_PHRASE"].find("code_string")
+	code := walkedNamed(classAttributes["CODE_PHRASE"], "code_string")
 	if code == nil || !code.inRole(roleNone).mandatory || code.inRole(roleScaleSymbolCode).mandatory || !code.noRules {
 		t.Fatalf("precondition: CODE_PHRASE code_string reads as %+v; want a mandatory String, not mandatory in a DV_SCALE symbol's code", code)
 	}
-	if lang := classAttributes["COMPOSITION"].find("language"); lang == nil || lang.noRules {
+	if lang := walkedNamed(classAttributes["COMPOSITION"], "language"); lang == nil || lang.noRules {
 		t.Fatalf("precondition: COMPOSITION language reads as %+v; want a CODE_PHRASE, which has RM rules", lang)
 	}
 	roles := []floorRole{roleNone, roleScaleSymbol, roleScaleSymbolCode, roleArchetypedID}
@@ -71,7 +82,7 @@ func TestREQ171_ClassTableWalksEachAttributeAsTheWalkReadsIt(t *testing.T) {
 		var walked []attributeFacts
 		for _, f := range table.listed {
 			if f.NonStorable || !f.Typed {
-				if got := table.find(f.Name); got != nil {
+				if got := walkedNamed(table, f.Name); got != nil {
 					t.Errorf("%s table finds %s, which it does not walk, as %+v; want none", class, f.Name, got)
 				}
 				continue
@@ -83,7 +94,7 @@ func TestREQ171_ClassTableWalksEachAttributeAsTheWalkReadsIt(t *testing.T) {
 			continue
 		}
 		for i, f := range walked {
-			if got := table.find(f.Name); got != &table.walked[i] {
+			if got := walkedNamed(table, f.Name); got != &table.walked[i] {
 				t.Errorf("%s table finds %s as %p, want the attribute at position %d, %p", class, f.Name, got, i, &table.walked[i])
 			}
 			shape := shapeFrom(f.Container, f.PrimitiveItems, f.Hash)
@@ -102,7 +113,7 @@ func TestREQ171_ClassTableWalksEachAttributeAsTheWalkReadsIt(t *testing.T) {
 			}
 		}
 	}
-	if got := (*classAttributeTable)(nil).find("value"); got != nil {
+	if got := walkedNamed(nil, "value"); got != nil {
 		t.Errorf("a nil table finds value as %+v, want none", got)
 	}
 }

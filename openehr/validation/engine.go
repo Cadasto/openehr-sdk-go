@@ -703,10 +703,10 @@ type attrMarks uint64
 
 // declaredAttr returns the attribute decl the bound template node of n
 // declares, as the walk visits it, with visited set, given walked, the
-// attribute as the value's class table walks it ([classAttributeTable.find]),
-// nil when the table walks none by decl's name. An attribute the class
-// lists, a serialization carries and the metadata types is read as the
-// class metadata gives it, in n's role. Any other is read as the template
+// attribute as the value's class table walks it
+// ([classAttributeTable.position]), nil when the table walks none by decl's
+// name. An attribute the class lists, a serialization carries and the
+// metadata types is read as the class metadata gives it, in n's role. Any other is read as the template
 // declares it, single-valued or a list; it is not visited when no
 // serialization of the bound node's class carries it.
 func declaredAttr(n engineNode, decl *tcimpl.CompiledAttribute, walked *engineAttr) (a engineAttr, visited bool) {

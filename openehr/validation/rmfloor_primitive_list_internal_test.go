@@ -23,7 +23,7 @@ import (
 // whether the list is there and empty without reading its items (REQ-171
 // Structural access).
 func TestEngine_REQ112_REQ171_MandatoryPrimitiveListCounted(t *testing.T) {
-	walked := classAttributes["DV_MULTIMEDIA"].find("data")
+	walked := walkedNamed(classAttributes["DV_MULTIMEDIA"], "data")
 	if walked == nil {
 		t.Fatal("the class table walks no DV_MULTIMEDIA data")
 	}

@@ -382,20 +382,10 @@ type classAttributeTable struct {
 	byName map[string]int
 }
 
-// find returns the attribute name the table walks, nil when it walks none by
-// that name: one the class does not list, no serialization carries or the
-// metadata gives no type. A nil table walks none.
-func (t *classAttributeTable) find(name string) *engineAttr {
-	i, ok := t.position(name)
-	if !ok {
-		return nil
-	}
-	return &t.walked[i]
-}
-
 // position returns the position in walked of the attribute name the table
-// walks, with ok set; ok is unset when the table walks none by that name, as
-// [classAttributeTable.find] reads it.
+// walks, with ok set; ok is unset when the table walks none by that name:
+// one the class does not list, no serialization carries or the metadata
+// gives no type. A nil table walks none.
 func (t *classAttributeTable) position(name string) (i int, ok bool) {
 	if t == nil {
 		return 0, false
