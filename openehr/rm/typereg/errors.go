@@ -134,22 +134,26 @@ type DecodeError struct {
 // The node is written as "decode <path> (_type=\"<type>\")", with the parts
 // that are empty left out. The path is written whole, however long the
 // document makes it, and Go-quoted when it holds a character strconv.Quote
-// escapes, such as a line feed in a member name, so the text stays on one
-// line.
+// escapes, such as a line feed in a member name.
 // The cause follows, written by one rule: text is kept only where it is
 // known to hold no value, the structure of the standard library's errors, a
 // sentinel's fixed text, or a message in the forms the SDK's codecs write; a
 // value-bearing field (a *json.SemanticError's JSONValue, what a
 // *jsontext.SyntacticError's cause quotes, a *strconv.NumError's Num) is
 // left out; and any other cause is named by its Go type alone, never quoted.
+// An error that wraps several causes, such as one errors.Join returns, has
+// them written in turn, separated by "; " where its own text between them
+// is not in those forms. So the text stays on one line.
 //
 // When Inner is itself a DecodeError, the text names both nodes, the outer
 // first, and so on down the chain: a failure inside nested polymorphic slots
 // names every slot from the outside in, then the cause. The whole chain is
 // written in one pass, so its cost grows with its length rather than with
-// the square of it. A cause whose Error method panics, such as a typed-nil
-// pointer without a nil guard, is named by its class rather than taking the
-// caller down.
+// the square of it. That holds where an error of another type wraps a
+// DecodeError at every level too, as fmt.Errorf does: the text of such an
+// error repeats the text below it, so it is left out. A cause whose Error
+// method panics, such as a typed-nil pointer without a nil guard, is named
+// by its class rather than taking the caller down.
 func (e *DecodeError) Error() string {
 	var b strings.Builder
 	writeValueFree(&b, e)

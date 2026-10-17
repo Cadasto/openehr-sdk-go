@@ -16,6 +16,11 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
+// lowerNotGiven is the message of the refusal of an interval side written
+// bounded with no bound, which canonical XML's interval readers wrap with the
+// RM type around canxml's shape sentinel.
+const lowerNotGiven = "lower_unbounded is false but the interval gives no lower bound, which a bound held by value cannot leave out"
+
 // TestDecodeError_REQ052_TextCarriesNoValue pins how DecodeError.Error renders
 // its cause (REQ-052): text from a cause it knows holds no value is kept, the
 // value-bearing parts of the standard library's errors are left out, and any
@@ -136,7 +141,25 @@ func TestDecodeError_REQ052_TextCarriesNoValue(t *testing.T) {
 		{
 			name:   "several causes joined",
 			cause:  errors.Join(typereg.ErrMissingType, errors.New("Jane")),
-			keep:   []string{"typereg: _type discriminator missing\ncause withheld"},
+			keep:   []string{"decode /a: typereg: _type discriminator missing; cause withheld (*errors.errorString)"},
+			absent: []string{"Jane"},
+		},
+		{
+			name:   "several causes in an SDK codec's message",
+			cause:  fmt.Errorf("%w: DV_INTERVAL: %w", typereg.ErrInvalidShape, errors.New(lowerNotGiven)),
+			keep:   []string{"decode /a: canjson: invalid JSON shape: DV_INTERVAL: " + lowerNotGiven},
+			absent: nil,
+		},
+		{
+			name:   "several causes in a message that is not an SDK codec's",
+			cause:  fmt.Errorf("%w: got %s: %w", typereg.ErrInvalidShape, "Jane", typereg.ErrMissingType),
+			keep:   []string{"decode /a: canjson: invalid JSON shape; typereg: _type discriminator missing"},
+			absent: []string{"Jane", "got"},
+		},
+		{
+			name:   "several causes around a word that is not an RM type's name",
+			cause:  fmt.Errorf("%w: %s: %w", typereg.ErrInvalidShape, "Jane", typereg.ErrMissingType),
+			keep:   []string{"decode /a: canjson: invalid JSON shape; typereg: _type discriminator missing"},
 			absent: []string{"Jane"},
 		},
 	}
@@ -144,6 +167,9 @@ func TestDecodeError_REQ052_TextCarriesNoValue(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			e := &typereg.DecodeError{Path: "/a", Inner: tc.cause}
 			got := e.Error()
+			if strings.ContainsAny(got, "\n\r") {
+				t.Errorf("Error() = %q; want the text on one line", got)
+			}
 			for _, k := range tc.keep {
 				if !strings.Contains(got, k) {
 					t.Errorf("Error() = %q; want it to keep %q", got, k)
@@ -239,5 +265,60 @@ func TestDecodeError_REQ052_LongPathIsWrittenWhole(t *testing.T) {
 	short := &typereg.DecodeError{Path: "/content/0/items/1", Inner: typereg.ErrMissingType}
 	if got, want := short.Error(), "decode /content/0/items/1: typereg: _type discriminator missing"; got != want {
 		t.Errorf("Error() = %q; want %q, a short path written as it is", got, want)
+	}
+}
+
+// lazyWrapper wraps an error and writes its text when asked, from the text of
+// the error it wraps, as many error types outside the standard library do.
+type lazyWrapper struct{ err error }
+
+func (w *lazyWrapper) Error() string { return "node child: " + w.err.Error() }
+func (w *lazyWrapper) Unwrap() error { return w.err }
+
+// TestDecodeError_REQ052_TextCostGrowsWithTheChain pins the cost of the text
+// of a chain in which an error of a type the renderer does not know sits
+// above a DecodeError at every level, as when a consumer type registered in
+// typereg.Default wraps the error of the slot it decodes the usual way. The
+// whole chain is written in one pass (REQ-052), so the allocations grow with
+// the depth, and the text names every node and leaves each unknown wrapper's
+// own text out. The wrappers are fmt.Errorf's, which hold their text, a type
+// that writes its text when asked, and errors.Join, which joins its causes'
+// texts when asked.
+//
+// Can-fail control: ask each such wrapper, or the error beneath it, for its
+// text, and every level writes the whole chain below it once more: the
+// allocations double per level and the bound fails a few levels down.
+func TestDecodeError_REQ052_TextCostGrowsWithTheChain(t *testing.T) {
+	const (
+		levels   = 30
+		perLevel = 4  // allocations a level may add
+		fixed    = 16 // allocations any text may take
+	)
+	wrappers := []struct {
+		name string
+		wrap func(error) error
+		join string // the separator a level writes after its node's cause
+	}{
+		{name: "fmt.Errorf", wrap: func(err error) error { return fmt.Errorf("node child: %w", err) }},
+		{name: "a type that writes its text when asked", wrap: func(err error) error { return &lazyWrapper{err: err} }},
+		{name: "errors.Join", wrap: func(err error) error { return errors.Join(err, io.EOF) }, join: "; EOF"},
+	}
+	for _, w := range wrappers {
+		t.Run(w.name, func(t *testing.T) {
+			cause := typereg.ErrUnknownType
+			want := typereg.ErrUnknownType.Error()
+			for depth := 1; depth <= levels; depth++ {
+				cause = w.wrap(&typereg.DecodeError{Path: "/child", Inner: cause})
+				want = "decode /child: " + want + w.join
+				top := &typereg.DecodeError{Path: "/root", Inner: cause}
+				allocs := testing.AllocsPerRun(2, func() { _ = top.Error() })
+				if most := float64(perLevel*depth + fixed); allocs > most {
+					t.Fatalf("Error() of a chain %d levels deep took %.0f allocations; want at most %.0f, a cost that grows with the depth", depth, allocs, most)
+				}
+				if got := top.Error(); got != "decode /root: "+want {
+					t.Fatalf("Error() of a chain %d levels deep = %q; want %q", depth, got, "decode /root: "+want)
+				}
+			}
+		})
 	}
 }

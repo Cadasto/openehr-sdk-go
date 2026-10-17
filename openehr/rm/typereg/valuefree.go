@@ -13,16 +13,18 @@ package typereg
 //     Num, are never written.
 //   - An error it knows by identity: a sentinel whose text is fixed.
 //   - A message the SDK's codecs write, matched against a closed list of
-//     forms, whole or as a wrapper's own text around the error it wraps.
+//     forms, whole or as a wrapper's own text around the errors it wraps.
 //     Every variable part of a form is structure: an RM or Go type name, a
 //     quoted `_type` value or member pointer, or a count.
 //
 // Any other text is left out. A wrapper it cannot place is followed to the
-// error it wraps, and any other error is named by its class, its Go type,
-// alone. So the guarantee does not rest on what an unknown error happens to
-// say: text is kept only where it is known to hold no value. The causes
-// themselves are untouched and stay reachable through Unwrap, where their
-// own text may name the value.
+// error it wraps, as is any wrapper above a DecodeError, whose own text would
+// repeat that DecodeError's; an error that wraps several has each written in
+// turn, on the same line; and any other error is named by its class, its Go
+// type, alone. So the guarantee does not rest on what an unknown error
+// happens to say: text is kept only where it is known to hold no value. The
+// causes themselves are untouched and stay reachable through Unwrap, where
+// their own text may name the value.
 
 import (
 	"encoding/json/jsontext"
@@ -39,22 +41,41 @@ import (
 )
 
 // writeValueFree writes the value-free text of err into b. It follows the
-// chain one link at a time, so its cost grows with the length of the text
-// rather than with the square of the chain's length.
+// chain one link at a time, and it never asks an error above a DecodeError
+// for its text, which would write that DecodeError's text once more for every
+// such error above it. So its cost grows with the length of the text rather
+// than with the square of the chain's length, or with a power of it.
 func writeValueFree(b *strings.Builder, err error) {
-	var suffixes []string // text wrappers write after what they wrap, outermost first
+	w := walk{b: b}
+	w.run(err)
+}
+
+// walk is one pass along a chain of errors.
+type walk struct {
+	b        *strings.Builder
+	suffixes []string // text wrappers write after what they wrap, outermost first
+	// below is a DecodeError known to lie further down the chain, and none
+	// reports that none does; with neither set, the chain below has not been
+	// searched since the last DecodeError was passed.
+	below *DecodeError
+	none  bool
+}
+
+// run writes the text of the chain from err down.
+func (w *walk) run(err error) {
 	for err != nil {
-		err = writeLink(b, err, &suffixes)
+		err = w.link(err)
 	}
-	for _, suffix := range slices.Backward(suffixes) {
-		b.WriteString(suffix)
+	for _, suffix := range slices.Backward(w.suffixes) {
+		w.b.WriteString(suffix)
 	}
 }
 
-// writeLink writes the text err itself contributes and returns the error to
+// link writes the text err itself contributes and returns the error to
 // continue with, or nil where the text ends. A suffix err writes after the
-// error it wraps goes on suffixes.
-func writeLink(b *strings.Builder, err error, suffixes *[]string) error {
+// error it wraps goes on the walk's suffixes.
+func (w *walk) link(err error) error {
+	b := w.b
 	switch e := err.(type) { //nolint:errorlint // each link of the chain is read in turn, by its own type
 	case *DecodeError:
 		if e == nil {
@@ -65,6 +86,7 @@ func writeLink(b *strings.Builder, err error, suffixes *[]string) error {
 		if e.Inner == nil {
 			b.WriteString("unspecified error")
 		}
+		w.below, w.none = nil, false
 		return e.Inner
 	case *shapeError:
 		if e != nil {
@@ -108,6 +130,18 @@ func writeLink(b *strings.Builder, err error, suffixes *[]string) error {
 		b.WriteString(err.Error())
 		return nil
 	}
+	causes, inner := unwrap(err)
+	if (inner != nil || len(causes) > 0) && w.decodeErrorBelow(err) {
+		// The text of an error above a DecodeError holds that DecodeError's
+		// text. Asking for it would write the chain below once more, at every
+		// such error, so the error's own text is left out and what it wraps is
+		// written from its fields.
+		if inner != nil {
+			return inner
+		}
+		w.writeCauses("", causes)
+		return nil
+	}
 	text, ok := errorText(err)
 	if !ok {
 		writeClass(b, err)
@@ -117,29 +151,139 @@ func writeLink(b *strings.Builder, err error, suffixes *[]string) error {
 		b.WriteString(text)
 		return nil
 	}
-	switch w := err.(type) { //nolint:errorlint // the wrapper itself is read, not what it wraps
-	case interface{ Unwrap() error }:
-		inner := w.Unwrap()
-		if inner == nil {
-			break
-		}
+	switch {
+	case inner != nil:
 		prefix, suffix := ownText(text, inner)
 		b.WriteString(prefix)
 		if suffix != "" {
-			*suffixes = append(*suffixes, suffix)
+			w.suffixes = append(w.suffixes, suffix)
 		}
 		return inner
-	case interface{ Unwrap() []error }:
-		for i, inner := range w.Unwrap() {
-			if i > 0 {
-				b.WriteByte('\n') // as errors.Join separates its errors
-			}
-			writeValueFree(b, inner)
-		}
+	case len(causes) > 0:
+		w.writeCauses(text, causes)
 		return nil
 	}
 	writeClass(b, err)
 	return nil
+}
+
+// decodeErrorBelow reports whether a DecodeError lies beneath err, which wraps
+// one error or several. The chain below is searched once between two
+// DecodeErrors: what the search finds stays true for every link down to the
+// DecodeError it found, and a chain with none below a link has none below the
+// links under it either.
+func (w *walk) decodeErrorBelow(err error) bool {
+	if w.below == nil && !w.none {
+		w.below = findDecodeError(err)
+		w.none = w.below == nil
+	}
+	return w.below != nil
+}
+
+// findDecodeError returns the first non-nil DecodeError beneath err, depth
+// first as errors.As searches, or nil when there is none.
+func findDecodeError(err error) *DecodeError {
+	for {
+		causes, inner := unwrap(err)
+		if inner == nil {
+			for _, c := range causes {
+				if de := atOrBelow(c); de != nil {
+					return de
+				}
+			}
+			return nil
+		}
+		if de, ok := inner.(*DecodeError); ok && de != nil { //nolint:errorlint // each link is looked at in turn
+			return de
+		}
+		err = inner
+	}
+}
+
+// atOrBelow returns err when it is a non-nil DecodeError, and otherwise the
+// first one beneath it.
+func atOrBelow(err error) *DecodeError {
+	if de, ok := err.(*DecodeError); ok && de != nil { //nolint:errorlint // each link is looked at in turn
+		return de
+	}
+	return findDecodeError(err)
+}
+
+// unwrap returns the errors err wraps when it wraps several, or the error it
+// wraps. Both are empty when err wraps nothing or its Unwrap method panics,
+// as a method on a nil pointer can.
+func unwrap(err error) (causes []error, inner error) {
+	defer func() {
+		if recover() != nil {
+			causes, inner = nil, nil
+		}
+	}()
+	switch u := err.(type) { //nolint:errorlint // the wrapper itself is read, not what it wraps
+	case interface{ Unwrap() error }:
+		return nil, u.Unwrap()
+	case interface{ Unwrap() []error }:
+		return u.Unwrap(), nil
+	}
+	return nil, nil
+}
+
+// writeCauses writes causes, the errors an error wraps when it wraps several,
+// on one line. text is the wrapper's own message, or "" when it is not read.
+// The parts of text around the causes' own texts are kept where they match a
+// form the SDK's codecs write, before the first cause, between two causes or
+// after the last; any other separator is written as "; ", never as the line
+// break errors.Join puts between its causes. Each cause's chain is written by
+// a walk of its own, which knows what this walk knows of the chains below.
+func (w *walk) writeCauses(text string, causes []error) {
+	if slices.Contains(causes, nil) {
+		causes = slices.DeleteFunc(slices.Clone(causes), func(c error) bool { return c == nil })
+	}
+	parts := splitAround(text, causes)
+	for i, c := range causes {
+		var part string
+		if parts != nil {
+			part = parts[i]
+		}
+		switch {
+		case i == 0:
+			if prefixForms.MatchString(part) {
+				w.b.WriteString(part)
+			}
+		case betweenForms.MatchString(part):
+			w.b.WriteString(part)
+		default:
+			w.b.WriteString("; ")
+		}
+		cause := walk{b: w.b, none: w.none}
+		cause.run(c)
+	}
+	if parts != nil && suffixForms.MatchString(parts[len(causes)]) {
+		w.b.WriteString(parts[len(causes)])
+	}
+}
+
+// splitAround splits text at the causes' own texts, found in order, into the
+// len(causes)+1 parts around them. It returns nil when text is empty or does
+// not hold the causes' texts in order.
+func splitAround(text string, causes []error) []string {
+	if text == "" {
+		return nil
+	}
+	parts := make([]string, 0, len(causes)+1)
+	rest := text
+	for _, c := range causes {
+		causeText, ok := errorText(c)
+		if !ok {
+			return nil
+		}
+		before, after, found := strings.Cut(rest, causeText)
+		if !found {
+			return nil
+		}
+		parts = append(parts, before)
+		rest = after
+	}
+	return append(parts, rest)
 }
 
 // writeClass names err by its class alone: its Go type, which fmt reports
@@ -290,9 +434,10 @@ const (
 )
 
 // prefixForms are the texts the SDK's codecs write before the error they
-// wrap, suffixForms those they write after it, and wholeForms the whole
-// messages of the errors they raise that the renderer does not know by type.
-// A wrapper's own text, or a message, outside these forms is left out.
+// wrap, betweenForms those they write between two errors they wrap together,
+// suffixForms those they write after it, and wholeForms the whole messages of
+// the errors they raise that the renderer does not know by type. A wrapper's
+// own text, or a message, outside these forms is left out.
 var (
 	prefixForms = anchoredForms(
 		`(?:canjson|canxml): `,
@@ -305,6 +450,13 @@ var (
 		`typereg\.Decode `+formQuoted+`: `,
 		`typereg\.DecodeAs: decoded `+formGoType+`: `,
 		`typereg\.(?:DecodeInto|DecodePolymorphic): `,
+	)
+	betweenForms = anchoredForms(
+		`: `,
+		// canonical XML's interval readers, between canxml's shape sentinel
+		// and the refusal of a side written bounded with no bound. The RM
+		// type names are listed: a word between two causes may be a value.
+		`: (?:DV_INTERVAL|Interval|Point_interval|Proper_interval): `,
 	)
 	suffixForms = anchoredForms(
 		``,

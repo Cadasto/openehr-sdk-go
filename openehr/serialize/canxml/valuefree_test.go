@@ -54,3 +54,68 @@ func TestUnmarshal_REQ052_XMITypeRefusalNamesItsClass(t *testing.T) {
 		})
 	}
 }
+
+// slotElement is an ELEMENT whose value slot holds body as the RM type
+// xsiType, so a failure inside the slot comes back in a DecodeError.
+func slotElement(xsiType, body string) string {
+	return `<element xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" archetype_node_id="at0001"><name><value>e</value></name>` +
+		`<value xsi:type="` + xsiType + `">` + body + `</value></element>`
+}
+
+// TestUnmarshal_REQ052_SlotRefusalsKeepTheirTextOnOneLine pins the text of a
+// DecodeError over a canonical-XML refusal the SDK writes around a cause: an
+// interval side written bounded with no bound, which names the RM type
+// between canxml's shape sentinel and the refusal. The text keeps each part,
+// stays on one line (REQ-052) and carries no value from the document, and
+// Value stays empty: canonical XML holds no literal for it.
+//
+// Can-fail control: write an error that wraps several causes as errors.Join
+// does, a line break between the causes and none of its own text, and the
+// interval rows lose "DV_INTERVAL" and break the line.
+func TestUnmarshal_REQ052_SlotRefusalsKeepTheirTextOnOneLine(t *testing.T) {
+	cases := []struct {
+		name   string
+		in     string
+		keep   []string
+		absent []string
+	}{
+		{
+			name: "an interval side written bounded with no bound",
+			in: slotElement("DV_QUANTITY", `<normal_range><upper xsi:type="DV_QUANTITY"><magnitude>7777</magnitude><units>mm</units></upper>`+
+				`<lower_unbounded>false</lower_unbounded></normal_range><magnitude>3</magnitude><units>mm</units>`),
+			keep: []string{
+				`decode /value (_type="DV_QUANTITY"): `,
+				"canxml: invalid XML shape: DV_INTERVAL: lower_unbounded is false but the interval gives no lower bound",
+			},
+			absent: []string{"7777"},
+		},
+	}
+	for _, tc := range cases {
+		for mode, opts := range xmlDecodeModes() {
+			t.Run(tc.name+"/"+mode, func(t *testing.T) {
+				err := canxml.Unmarshal([]byte(tc.in), new(rm.Element), opts...)
+				de, ok := errors.AsType[*canxml.DecodeError](err)
+				if !ok || de == nil {
+					t.Fatalf("Unmarshal(%s) = %T %v; want a *canxml.DecodeError", tc.in, err, err)
+				}
+				msg := de.Error()
+				for _, want := range tc.keep {
+					if !strings.Contains(msg, want) {
+						t.Errorf("DecodeError.Error() = %q; want it to keep %q", msg, want)
+					}
+				}
+				if strings.ContainsAny(msg, "\n\r") {
+					t.Errorf("DecodeError.Error() = %q; want the text on one line", msg)
+				}
+				for _, v := range tc.absent {
+					if strings.Contains(msg, v) {
+						t.Errorf("DecodeError.Error() = %q; the text carries %q from the document", msg, v)
+					}
+				}
+				if got := de.Value.Reveal(); got != nil {
+					t.Errorf("DecodeError.Value.Reveal() = %#v; want nothing: canonical XML holds no literal here", got)
+				}
+			})
+		}
+	}
+}
