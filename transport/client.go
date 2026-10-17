@@ -72,10 +72,10 @@ func New(catalog *discovery.ServiceCatalog, opts ...Option) (*Client, error) {
 		}
 	}
 	if catalog == nil {
-		return nil, fmt.Errorf("%w: ServiceCatalog is required (REQ-070)", ErrInvalidConfig)
+		return nil, fmt.Errorf("%w: ServiceCatalog is required", ErrInvalidConfig)
 	}
 	if cfg.httpClient == nil {
-		return nil, fmt.Errorf("%w: WithHTTPClient is required (REQ-021)", ErrInvalidConfig)
+		return nil, fmt.Errorf("%w: WithHTTPClient is required", ErrInvalidConfig)
 	}
 	if cfg.tokenSrc == nil {
 		cfg.tokenSrc = auth.AnonymousTokenSource()
@@ -300,9 +300,8 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		}
 		return resp, lastErr
 	}
-	if resp != nil && resp.StatusCode >= 400 {
-		span.SetStatus(codes.Error, http.StatusText(resp.StatusCode))
-	}
+	// Here lastErr is nil, which only a 2xx gives: doOnce maps any other
+	// status to a *WireError, and mapWireError never returns nil.
 	if c.cfg.observer != nil {
 		c.emitObservation(ctx, req, safeURL, resp, nil, otelAttempt, time.Since(start))
 	}
@@ -373,7 +372,14 @@ func (c *Client) emitObservation(ctx context.Context, req *Request, safeURL stri
 	}
 	defer func() {
 		if r := recover(); r != nil {
-			c.cfg.logger.Error("transport: observer panicked", "panic", r, "route", obs.Route)
+			// REQ-093: the log names the request by its route template, or
+			// the placeholder, never by obs.Route, which falls back to the
+			// Path and so can carry a caller-supplied identifier.
+			route := unroutedRoute
+			if req != nil {
+				route = req.routeOrPlaceholder()
+			}
+			c.cfg.logger.ErrorContext(ctx, "transport: observer panicked", "panic", r, "route", route)
 		}
 	}()
 	c.cfg.observer.OnRequest(obs)
@@ -539,7 +545,9 @@ func (c *Client) plumbHeaders(ctx context.Context, req *Request, httpReq *http.R
 
 	// Caller-supplied extra headers — applied after so they may
 	// override the standard plumbing on purpose. Use canonical keys so
-	// overrides merge with values set via Header.Set above.
+	// overrides merge with values set via Header.Set above. The token below
+	// is set last, so a token that is not zero replaces a caller's own
+	// Authorization.
 	for k, vv := range req.Headers {
 		canon := http.CanonicalHeaderKey(k)
 		httpReq.Header.Del(canon)
@@ -574,11 +582,14 @@ func (c *Client) tokenSourceFor(ctx context.Context) auth.TokenSource {
 // mapWireError maps a non-2xx response onto a typed *WireError, decoding
 // the openEHR error envelope when possible.
 //
-// By default (rawErrorBodies false) the openEHR envelope Message and the
-// raw response body are omitted from the error — both may contain PHI.
-// The openEHR Code (a coded terminology identifier) is always preserved.
-// Enable WithRawErrorBodies to retain the full payload for diagnostics in
-// environments where WireError values cannot reach logs or traces.
+// By default (rawErrorBodies false) four fields are left empty, because
+// each is free text from the server that may contain PHI: the openEHR
+// envelope's Message and ValidationErrors, the raw response body
+// (RawBody), and the Bearer challenge's ErrorDescription. The openEHR Code
+// and CodedText (coded terminology identifiers) and the challenge's other
+// fields are always preserved. Enable WithRawErrorBodies to retain the
+// full payload for diagnostics in environments where WireError values
+// cannot reach logs or traces.
 func (c *Client) mapWireError(req *Request, safeURL string, resp *Response) error {
 	we := &WireError{
 		StatusCode: resp.StatusCode,
@@ -833,9 +844,12 @@ func joinPaths(a, b string) string {
 	return a + b
 }
 
-// sanitisedURL strips any userinfo from u for emission on logs and
-// OTel attributes (REQ-090). Bearer tokens never appear in u (they're
-// in headers, not the URL) but defensive stripping costs nothing.
+// sanitisedURL returns u as text with its userinfo removed, for the
+// http.url span attribute (REQ-090), Observation.URL (REQ-098) and
+// WireError.URL. Only the userinfo goes: the path and the query are kept as
+// sent, so they can still carry caller-supplied identifiers and any query
+// parameter of the service base URL. Bearer tokens never appear in u (they
+// are in headers, not the URL).
 func sanitisedURL(u *url.URL) string {
 	if u == nil {
 		return ""

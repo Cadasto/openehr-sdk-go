@@ -20,9 +20,11 @@ type Observation struct {
 	// caller did not supply a Route. Empty when Client.Do was given a
 	// nil Request.
 	Route string
-	// URL is the sanitised request URL (query string stripped of
-	// secrets; path preserved). Empty when the call was refused before
-	// the URL was built.
+	// URL is the request URL with any userinfo (user name and password)
+	// removed. Its path and query are kept as sent, so they can carry
+	// caller-supplied identifiers and any query parameter the service
+	// base URL holds. Empty when the call was refused before the URL was
+	// built.
 	URL string
 	// StatusCode is the final HTTP status returned by the server, or 0
 	// if the call terminated before a response (network error,
@@ -94,7 +96,5 @@ func observationTagsFromContext(ctx context.Context) map[string]any {
 	if len(src) == 0 {
 		return nil
 	}
-	out := make(map[string]any, len(src))
-	maps.Copy(out, src)
-	return out
+	return maps.Clone(src)
 }

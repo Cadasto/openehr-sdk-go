@@ -113,8 +113,10 @@ func WithCallerAttributionHeader(name string) Option {
 	return func(cfg *config) { cfg.callerAttributionHeader = name }
 }
 
-// WithLogger sets the slog.Logger the transport uses for non-fatal
-// diagnostics (TLS warnings, retry attempts). Default slog.Default().
+// WithLogger sets the slog.Logger the transport logs to. The transport
+// logs one thing only: a panic it recovered from an Observer, at error
+// level, with the panic value and the request's route template, or
+// "(unrouted)" when the request has none. Default slog.Default().
 func WithLogger(l *slog.Logger) Option {
 	return func(cfg *config) { cfg.logger = l }
 }

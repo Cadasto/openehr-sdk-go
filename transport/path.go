@@ -44,13 +44,16 @@ func segmentFault(s string) string {
 	case ".", "..":
 		return `dot segment ("." or "..")`
 	}
-	for i, r := range s {
-		switch {
-		case r == '/':
+	// idiom.md § String iteration: a check defined over bytes ranges the
+	// bytes. Every byte it looks for is ASCII, so a byte of a multi-byte
+	// character or of invalid UTF-8 never matches.
+	for i := range len(s) {
+		switch b := s[i]; {
+		case b == '/':
 			return fmt.Sprintf(`separator "/" at index %d`, i)
-		case r == '\\':
+		case b == '\\':
 			return fmt.Sprintf("backslash at index %d", i)
-		case r < 0x20 || r == 0x7F:
+		case b < 0x20 || b == 0x7F:
 			return fmt.Sprintf("control byte at index %d", i)
 		}
 	}

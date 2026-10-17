@@ -159,7 +159,9 @@ type WireError struct {
 	// Route is the path template (e.g. "/ehr/{ehr_id}") when known, or the
 	// stable "(unrouted)" placeholder when the request carried no Route.
 	// It is never the expanded Path, which may hold a caller-supplied
-	// identifier. URL is the resolved URL with parameters substituted.
+	// identifier. URL is the resolved URL with parameters substituted and
+	// any userinfo (user name and password) removed; its path and query are
+	// kept as sent. [WireError.Error] never includes it.
 	Method, URL, Route string
 	// OpenEHR is the parsed openEHR error envelope. Nil when
 	// the body could not be parsed as such. OpenEHR.Message may contain

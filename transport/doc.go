@@ -1,7 +1,7 @@
 // Package transport is the HTTP client wrapper around an injected
-// *http.Client. It hosts request/response interceptors, retry and
-// backoff, OpenTelemetry hooks, error mapping, and internal
-// spec-version pinning.
+// *http.Client. It hosts the openEHR header plumbing, retry and
+// backoff, OpenTelemetry hooks, a per-request observer, error mapping,
+// and internal spec-version pinning.
 //
 // The SDK does not allocate its own transport: callers inject the
 // *http.Client whose connection pool, timeouts, and TLS config they
