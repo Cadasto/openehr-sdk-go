@@ -1,0 +1,9 @@
+${query_nr},${path},${expected_file},${nr_of_results}
+1.,"a/name",expected_drill_down_admin_entry_q1.json,1
+2.,"a/name/value",expected_drill_down_admin_entry_q2.json,1
+3.,"a/archetype_node_id",expected_drill_down_admin_entry_q3.json,1
+4.,"a/language",expected_drill_down_admin_entry_q4.json,1
+5.,"a/language/code_string",expected_drill_down_admin_entry_q5.json,1
+6.,"a/language/terminology_id",expected_drill_down_admin_entry_q6.json,1
+7.,"a/language/terminology_id/value",expected_drill_down_admin_entry_q7.json,1
+8.,"a/subject",expected_drill_down_admin_entry_q8.json,1

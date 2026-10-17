@@ -356,6 +356,31 @@ func probe097FireCases() []aqlprobes.SemanticFireCase {
 			SpanNth:   1,
 		},
 		{
+			// The upstream EHRbase suite's directory query, verbatim (REQ-160
+			// § Overlay edges): the FOLDER -> VERSIONED_COMPOSITION reference
+			// hop lands on the version tier, so FOLDER CONTAINS VERSION is
+			// ByReference, never an impossible containment.
+			Name: "containment by reference onto the version tier",
+			Query: "SELECT c/uid/value, cv0/commit_audit/time_committed/value " +
+				"FROM FOLDER f CONTAINS VERSION cv0[LATEST_VERSION] CONTAINS COMPOSITION c " +
+				"WHERE f/name/value = 'root1'",
+			Code:      "aql_containment_by_reference",
+			Severity:  lint.Warning,
+			SpanClass: "VERSION",
+			SpanNth:   1, // the CONTAINS operand; LATEST_VERSION is not an occurrence
+		},
+		{
+			// A class an engine binds by an engine extension stays
+			// non-containable under the default relation (REQ-160 § Containable
+			// operands); the overlay half lives in openehr/aql/lint's tests.
+			Name:      "contains not containable: engine-extension class",
+			Query:     "SELECT ec/start_time/value FROM EHR e CONTAINS COMPOSITION c CONTAINS EVENT_CONTEXT ec",
+			Code:      "aql_contains_not_containable",
+			Severity:  lint.Error,
+			SpanClass: "EVENT_CONTEXT",
+			SpanNth:   1,
+		},
+		{
 			Name:      "VERSION with no version predicate",
 			Query:     "SELECT v FROM VERSION v",
 			Code:      "aql_version_no_predicate",
@@ -1839,7 +1864,7 @@ func TestProbe100DetectsInadmissibleRows(t *testing.T) {
 			name: "unparseable",
 			row: aqlprobes.ConformanceRow{
 				Family: "AND_OR", File: "from_simple_and_or.csv", Line: 2,
-				Suite: "AQL_TESTS/FROM/AND_OR/simple_and_or.robot",
+				Suite: "AQL/FROM/AND_OR/simple_and_or.robot",
 				Query: "SELECT o FROM",
 			},
 		},
@@ -1850,7 +1875,7 @@ func TestProbe100DetectsInadmissibleRows(t *testing.T) {
 			name: "impossible_containment",
 			row: aqlprobes.ConformanceRow{
 				Family: "CONTAINS_A_D", File: "from_contains_plus_contain_chaining.csv", Line: 3,
-				Suite: "AQL_TESTS/FROM/CONTAINS_A_D/contains_plus_contain_chaining.robot",
+				Suite: "AQL/FROM/CONTAINS_A_D/contains_plus_contain_chaining.robot",
 				Query: "SELECT o FROM OBSERVATION o CONTAINS COMPOSITION c",
 			},
 		},
@@ -1922,7 +1947,7 @@ func TestProbe100PermitsWarningSeverityContainmentCodes(t *testing.T) {
 			code: "aql_unknown_rm_class",
 			row: aqlprobes.ConformanceRow{
 				Family: "USABLE_RM_TYPES_A_D", File: "from_item_structure_and_element_in_composition.csv", Line: 6,
-				Suite: "AQL_TESTS/FROM/USABLE_RM_TYPES_A_D/from_item_structure_and_element_in_composition.robot",
+				Suite: "AQL/FROM/USABLE_RM_TYPES_A_D/from_item_structure_and_element_in_composition.robot",
 				Query: "SELECT t FROM COMPOSITION CONTAINS FOO_BAR t",
 			},
 		},
@@ -1937,7 +1962,7 @@ func TestProbe100PermitsWarningSeverityContainmentCodes(t *testing.T) {
 			code: "aql_containment_by_reference",
 			row: aqlprobes.ConformanceRow{
 				Family: "CONTAINS_A_D", File: "from_contains_plus_contain_chaining.csv", Line: 12,
-				Suite: "AQL_TESTS/FROM/CONTAINS_A_D/contains_plus_contain_chaining.robot",
+				Suite: "AQL/FROM/CONTAINS_A_D/contains_plus_contain_chaining.robot",
 				Query: "SELECT o FROM FOLDER CONTAINS COMPOSITION o",
 			},
 		},

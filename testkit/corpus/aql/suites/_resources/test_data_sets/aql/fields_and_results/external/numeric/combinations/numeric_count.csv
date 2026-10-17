@@ -1,0 +1,20 @@
+${query_nr},${path},${where},${expected_file},${nr_of_results}
+1.,"COUNT(eval/data[at0001]/items[at0002]/value/magnitude)","eval/data[at0001]/items[at0002]/value/magnitude > 2.34567890",expected_numeric_count_q1.json,1
+2.,"COUNT(eval/data[at0001]/items[at0002]/value/magnitude)","eval/data[at0001]/items[at0002]/value/magnitude > -1",expected_numeric_count_q2.json,1
+3.,"COUNT(eval/data[at0001]/items[at0002]/value/magnitude)","eval/data[at0001]/items[at0002]/value/magnitude > -1.0",expected_numeric_count_q3.json,1
+4.,"COUNT(eval/data[at0001]/items[at0002]/value/magnitude)","eval/data[at0001]/items[at0002]/value/magnitude IS NOT NULL",expected_numeric_count_q4.json,1
+5.,"COUNT(eval/data[at0001]/items[at0002]/value/magnitude)","eval/data[at0001]/items[at0002]/value/magnitude IS NULL",expected_numeric_count_q5.json,1
+6.,"COUNT(eval/data[at0001]/items[at0002]/value/magnitude)","NOT EXISTS eval/data[at0001]/items[at0002]/value/magnitude",expected_numeric_count_q6.json,1
+7.,"COUNT(eval/data[at0001]/items[at0002]/value/magnitude)","EXISTS eval/data[at0001]/items[at0002]/value/magnitude",expected_numeric_count_q7.json,1
+8.,"COUNT(eval/data[at0001]/items[at0002]/value/magnitude)","eval/data[at0001]/items[at0002]/value/magnitude BETWEEN 4 AND 7",expected_numeric_count_q8.json,1
+9.,"COUNT(eval/data[at0001]/items[at0002]/value/magnitude)","eval/data[at0001]/items[at0002]/value/magnitude MATCHES {1,2,3,4}",expected_numeric_count_q9.json,1
+10.,"COUNT(eval/data[at0001]/items[at0002]/value/magnitude)","1 MATCHES {eval/data[at0001]/items[at0002]/value/magnitude}",expected_numeric_count_q10.json,1
+11.,"COUNT(eval/data[at0001]/items[at0002]/value/magnitude)","eval/data[at0001]/items[at0002]/value/magnitude IN (1,2,3,4)",expected_numeric_count_q11.json,1
+12.,"COUNT(eval/data[at0001]/items[at0002]/value/magnitude)","1 = ANY(eval/data[at0001]/items[at0002]/value/magnitude)",expected_numeric_count_q12.json,1
+13.,"COUNT(eval/data[at0001]/items[at0002]/value/magnitude)","1 < ANY(eval/data[at0001]/items[at0002]/value/magnitude)",expected_numeric_count_q13.json,1
+14.,"COUNT(eval/data[at0001]/items[at0002]/value/magnitude)","1 = SOME(eval/data[at0001]/items[at0002]/value/magnitude)",expected_numeric_count_q14.json,1
+15.,"COUNT(eval/data[at0001]/items[at0002]/value/magnitude)","1 < SOME(eval/data[at0001]/items[at0002]/value/magnitude)",expected_numeric_count_q15.json,1
+16.,"COUNT(eval/data[at0001]/items[at0002]/value/magnitude)","1 = ALL(eval/data[at0001]/items[at0002]/value/magnitude)",expected_numeric_count_q16.json,1
+17.,"COUNT(eval/data[at0001]/items[at0002]/value/magnitude)","1 < ALL(eval/data[at0001]/items[at0002]/value/magnitude)",expected_numeric_count_q17.json,1
+18.,"COUNT(eval/data[at0001]/items[at0002]/value/magnitude)","eval/data[at0001]/items[at0002]/value/magnitude IS NOT NULL",expected_numeric_count_q18.json,1
+19.,"COUNT(eval/data[at0001]/items[at0002]/value/magnitude)","eval/data[at0001]/items[at0002]/value/magnitude IS DISTINCT FROM 2",expected_numeric_count_q19.json,1

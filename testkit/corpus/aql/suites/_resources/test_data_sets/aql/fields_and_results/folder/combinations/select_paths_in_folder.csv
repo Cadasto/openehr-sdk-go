@@ -1,0 +1,5 @@
+${query_nr},${path},${expected_file},${nr_of_results}
+1.,f/items/id/value,expected_select_paths_in_folder_items_id_value.json,3
+2.,f/items,expected_select_paths_in_folder_f_items.json,3
+3.,f/details,expected_select_paths_in_folder_f_details.json,2
+4.,f/details[at0003]/items[at0004]/value/value,expected_select_paths_in_folder_f_details_at4_val.json,2

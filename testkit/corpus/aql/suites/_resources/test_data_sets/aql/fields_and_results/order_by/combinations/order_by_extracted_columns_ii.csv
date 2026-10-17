@@ -1,0 +1,3 @@
+${order},${expected_file},${nr_of_results}
+o/name/value ASC,expected_order_by_extr_col_ii_asc.json,6
+o/name/value DESC,expected_order_by_extr_col_ii_desc.json,6

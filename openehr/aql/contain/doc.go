@@ -10,9 +10,12 @@
 // concrete kinds and reference-typed attributes (OBJECT_REF and its
 // descendants) ending structural reachability. Facts the BMM cannot express
 // (the EHR root's reference-based containment, the VERSION / VERSIONED_*
-// tier, FOLDER→COMPOSITION as a reference hop) are overlay data (see
+// tier, and a folder's references to its compositions, FOLDER→COMPOSITION
+// and FOLDER→VERSIONED_COMPOSITION, as reference hops) are overlay data (see
 // [Default]); consumers extend the relation with their own overlay edges via
-// [TypeRelation.WithOverlay] without forking it.
+// [TypeRelation.WithOverlay] without forking it. A class an engine binds
+// beyond the RM, such as EVENT_CONTEXT, is not containable in the default
+// relation; a deployment relying on it declares its own edge.
 //
 // A verdict reports that a route exists; it is not a claim of RM truth. On the
 // RM-faithful subgraph an [Admissible] verdict is genuine nesting, but where

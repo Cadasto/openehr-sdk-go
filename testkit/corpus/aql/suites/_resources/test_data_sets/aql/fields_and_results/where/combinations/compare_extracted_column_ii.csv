@@ -1,0 +1,3 @@
+${where},${expected_file},${nr_of_results}
+"o/archetype_node_id = 'openEHR-EHR-OBSERVATION.conformance_observation.v0'",compare_extracted_column2_obs_archetype_node.json,4
+"o/name/value = 'Blood pressure'",compare_extracted_column2_obs_name_value.json,1

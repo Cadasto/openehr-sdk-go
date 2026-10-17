@@ -1,0 +1,14 @@
+# EHRbase Robot AQL suite corpus — source provenance pin
+# Written by scripts/ingest-robot-aql.sh, in the same run and from the same
+# clone as ../conformance/AQL_SOURCE.txt, so both pins name one commit.
+# This pin IS authoritative for the vendored files: the Robot AQL suites
+# under AQL/ and the combination CSVs they read under _resources/ are
+# copied unmodified from the commit below, each at its path relative to
+# source_path, so that commit fully determines their bytes.
+source_repo: ehrbase/integration-tests
+source_path: tests/robot
+commit: b4625fc28d6785c05adfd6db26339b4bb2272e06
+commit_date: 2026-08-24T13:05:04+03:00
+recorded_utc: 2026-10-17
+source_tree: https://github.com/ehrbase/integration-tests/tree/b4625fc28d6785c05adfd6db26339b4bb2272e06/tests/robot
+license: Apache-2.0 (see ../../THIRD_PARTY_LICENSES.md)

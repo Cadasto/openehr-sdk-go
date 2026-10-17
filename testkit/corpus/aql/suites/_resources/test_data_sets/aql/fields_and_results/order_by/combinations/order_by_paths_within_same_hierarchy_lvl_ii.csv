@@ -1,0 +1,9 @@
+${path},${order},${expected_file},${nr_of_results}
+ec/health_care_facility/external_ref/id/value,ASC,expected_order_by_paths_within_same_hierarchy_lvl_ii_ext_ref_asc.json,2
+ec/health_care_facility/external_ref/id/value,DESC,expected_order_by_paths_within_same_hierarchy_lvl_ii_ext_ref_desc.json,2
+ec/location,ASC,expected_order_by_paths_within_same_hierarchy_lvl_ii_location_asc.json,2
+ec/location,DESC,expected_order_by_paths_within_same_hierarchy_lvl_ii_location_desc.json,2
+ec/start_time,ASC,expected_order_by_paths_within_same_hierarchy_lvl_ii_start_time_asc.json,2
+ec/start_time,DESC,expected_order_by_paths_within_same_hierarchy_lvl_ii_start_time_desc.json,2
+ec/start_time/value,ASC,expected_order_by_paths_within_same_hierarchy_lvl_ii_start_time_value_asc.json,2
+ec/start_time/value,DESC,expected_order_by_paths_within_same_hierarchy_lvl_ii_start_time_value_desc.json,2

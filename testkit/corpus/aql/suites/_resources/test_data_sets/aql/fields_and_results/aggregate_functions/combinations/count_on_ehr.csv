@@ -1,0 +1,3 @@
+${statement},${nr_of_results},${expected_value}
+"SELECT COUNT(e/ehr_id/value) FROM EHR e CONTAINS COMPOSITION",1,3
+"SELECT COUNT(DISTINCT e/ehr_id/value) FROM EHR e CONTAINS COMPOSITION",1,2

@@ -1,0 +1,9 @@
+${path},${value},${expected_file}
+o/data[at0001]/events[at0002]/data[at0003]/items[at0004]/value/value,"'Lorem ipsum'",expected_compare_by_paths_over_hierarchy_lvl_at4_val_1.json
+o/data[at0001]/events[at0002]/data[at0003]/items[at0004]/value/value,"'Lorem ipsum 2'",expected_compare_by_paths_over_hierarchy_lvl_at4_val_2.json
+o/data[at0001]/events[at0002]/data[at0003]/items[at0008]/value/magnitude,20,expected_compare_by_paths_over_hierarchy_lvl_at8_magnitude_1.json
+o/data[at0001]/events[at0002]/data[at0003]/items[at0008]/value/magnitude,25,expected_compare_by_paths_over_hierarchy_lvl_at8_magnitude_2.json
+o/data[at0001]/events[at0002]/data[at0003]/items[at0011]/value/value,"'2022-02-03T04:05:06'",expected_compare_by_paths_over_hierarchy_lvl_at11_val_1.json
+o/data[at0001]/events[at0002]/data[at0003]/items[at0011]/value/value,"'2024-02-03T04:05:06'",expected_compare_by_paths_over_hierarchy_lvl_at11_val_2.json
+o/data[at0001]/events[at0002]/data[at0003]/items[at0017]/value/value,true,expected_compare_by_paths_over_hierarchy_lvl_at17_val_1.json
+o/data[at0001]/events[at0002]/data[at0003]/items[at0017]/value/value,false,expected_compare_by_paths_over_hierarchy_lvl_at17_val_2.json

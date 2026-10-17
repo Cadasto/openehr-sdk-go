@@ -83,6 +83,39 @@ func TestConsumerEdgeKnownEndpointConformance(t *testing.T) {
 	}
 }
 
+// TestREQ160_EngineExtensionNeedsAConsumerEdge — a class an engine binds by an
+// engine extension stays Never in the default relation, and a consumer edge
+// naming it makes it containable, and the pair it names admissible, for the
+// extended relation only (REQ-160 § Containable operands, § Extensibility).
+// EVENT_CONTEXT is the spec's own example: EHRbase answers
+// COMPOSITION c CONTAINS EVENT_CONTEXT ec, though EVENT_CONTEXT conforms only
+// to PATHABLE.
+func TestREQ160_EngineExtensionNeedsAConsumerEdge(t *testing.T) {
+	base := contain.Default()
+	if got := base.Containable("EVENT_CONTEXT"); got != contain.Never {
+		t.Fatalf("base.Containable(EVENT_CONTEXT) = %v, want Never (an engine extension is not an RM containment)", got)
+	}
+	if got := base.CanContain("COMPOSITION", "EVENT_CONTEXT"); got != contain.Never {
+		t.Fatalf("base.CanContain(COMPOSITION, EVENT_CONTEXT) = %v, want Never", got)
+	}
+
+	ext := base.WithOverlay(contain.Edge{From: "COMPOSITION", To: "EVENT_CONTEXT"})
+	if got := ext.Containable("EVENT_CONTEXT"); got != contain.Admissible {
+		t.Errorf("ext.Containable(EVENT_CONTEXT) = %v, want Admissible (named by a consumer edge)", got)
+	}
+	if got := ext.CanContain("COMPOSITION", "EVENT_CONTEXT"); got != contain.Admissible {
+		t.Errorf("ext.CanContain(COMPOSITION, EVENT_CONTEXT) = %v, want Admissible (verdict per the consumer edge)", got)
+	}
+
+	// The default MUST be unaltered by the extension.
+	if got := base.Containable("EVENT_CONTEXT"); got != contain.Never {
+		t.Errorf("base.Containable(EVENT_CONTEXT) = %v after WithOverlay, want Never (default MUST be unaltered)", got)
+	}
+	if got := base.CanContain("COMPOSITION", "EVENT_CONTEXT"); got != contain.Never {
+		t.Errorf("base.CanContain(COMPOSITION, EVENT_CONTEXT) = %v after WithOverlay, want Never (default MUST be unaltered)", got)
+	}
+}
+
 // TestWithOverlayIgnoresEmptyEndpoint — an edge with an empty endpoint names
 // nothing and is ignored; "" never becomes a containable class.
 func TestWithOverlayIgnoresEmptyEndpoint(t *testing.T) {
