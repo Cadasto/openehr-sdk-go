@@ -513,6 +513,60 @@ Run Query
 			want: []string{"answered: SELECT c FROM COMPOSITION c"},
 		},
 		{
+			// Set Test, Suite and Global Variable set the variable in every
+			// scope from the current one down to their own, as Robot does: the
+			// running body, each keyword call it runs inside, the test, and for
+			// the suite and global setters the suite. A later read in any of
+			// them sees the new value. Set Local Variable sets the current scope
+			// only.
+			name: "scoped_setters_set_every_scope_down_to_their_own",
+			suite: `*** Test Cases ***
+Test Scope
+    ${query}    Set Variable    SELECT c FROM COMPOSITION c
+    Set Test Variable    ${query}    SELECT o FROM OBSERVATION o
+    Set AQL And Execute Ad Hoc Query    ${query}
+Suite Scope
+    ${query}    Set Variable    SELECT c FROM COMPOSITION c
+    Set Suite Variable    ${query}    SELECT e FROM EHR e
+    Set AQL And Execute Ad Hoc Query    ${query}
+Global Scope
+    ${query}    Set Variable    SELECT c FROM COMPOSITION c
+    Set Global Variable    ${query}    SELECT s FROM SECTION s
+    Set AQL And Execute Ad Hoc Query    ${query}
+Set In A Keyword
+    ${query}    Set Variable    SELECT c FROM COMPOSITION c
+    Reset Query
+    Set AQL And Execute Ad Hoc Query    ${query}
+Suite Over Test
+    Set Test Variable    ${query}    SELECT c FROM COMPOSITION c
+    Set Suite Variable    ${query}    SELECT i FROM INSTRUCTION i
+    Send Query
+Local Scope
+    Set Test Variable    ${query}    SELECT f FROM FOLDER f
+    Narrow Query
+    Set AQL And Execute Ad Hoc Query    ${query}
+
+*** Keywords ***
+Reset Query
+    ${query}    Set Variable    SELECT c FROM COMPOSITION c
+    Set Test Variable    ${query}    SELECT p FROM POINT_EVENT p
+    Set AQL And Execute Ad Hoc Query    ${query}
+Send Query
+    Set AQL And Execute Ad Hoc Query    ${query}
+Narrow Query
+    Set Local Variable    ${query}    SELECT a FROM ACTION a
+    Set AQL And Execute Ad Hoc Query    ${query}
+`,
+			want: []string{
+				"answered: SELECT o FROM OBSERVATION o",
+				"answered: SELECT e FROM EHR e",
+				"answered: SELECT s FROM SECTION s",
+				"answered: SELECT p FROM POINT_EVENT p", "answered: SELECT p FROM POINT_EVENT p",
+				"answered: SELECT i FROM INSTRUCTION i",
+				"answered: SELECT a FROM ACTION a", "answered: SELECT f FROM FOLDER f",
+			},
+		},
+		{
 			name: "named_and_default_arguments",
 			suite: `*** Test Cases ***
 T
