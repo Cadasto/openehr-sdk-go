@@ -55,6 +55,10 @@ type clientAssertionKey struct {
 }
 
 // Config carries SMART-on-openEHR OAuth2 settings.
+//
+// [FromConfig] keeps its own copy of Scopes, IDTokenTrustedAudiences and
+// Auth, with the URLs and lists Auth points to, so a change the caller makes
+// to them afterwards does not reach the source.
 type Config struct {
 	// HTTPClient is the injected client used for token and JWKS calls. The
 	// token, refresh and revocation requests never follow a redirect,
@@ -161,9 +165,12 @@ func WithRedirectURI(uri string) Option {
 	return func(cfg *Config) { cfg.RedirectURI = uri }
 }
 
-// WithScopes sets the space-separated scope request (slice joined).
+// WithScopes sets the space-separated scope request (slice joined). The
+// option keeps its own copy of scopes, so a later change to the caller's
+// slice does not reach the source.
 func WithScopes(scopes ...string) Option {
-	return func(cfg *Config) { cfg.Scopes = scopes }
+	own := slices.Clone(scopes)
+	return func(cfg *Config) { cfg.Scopes = own }
 }
 
 // WithAudience sets the `aud` parameter of the authorization request: the
@@ -176,9 +183,47 @@ func WithAudience(aud string) Option {
 	return func(cfg *Config) { cfg.Audience = aud }
 }
 
-// WithAuthEndpoints wires OAuth endpoints from discovery.
+// WithAuthEndpoints wires OAuth endpoints from discovery. The option keeps
+// its own copy of a, with the URLs and lists it points to, so a later change
+// to them does not reach the source.
 func WithAuthEndpoints(a discovery.AuthEndpoints) Option {
-	return func(cfg *Config) { cfg.Auth = a }
+	own := cloneAuthEndpoints(a)
+	return func(cfg *Config) { cfg.Auth = own }
+}
+
+// cloneAuthEndpoints returns a copy of a that shares nothing a caller can
+// change with a: each URL, with its user information, and each list is
+// copied.
+func cloneAuthEndpoints(a discovery.AuthEndpoints) discovery.AuthEndpoints {
+	for _, u := range []**url.URL{
+		&a.AuthorizationEndpoint, &a.TokenEndpoint, &a.JWKSURI, &a.RegistrationEndpoint,
+		&a.IntrospectionEndpoint, &a.RevocationEndpoint, &a.ManagementEndpoint,
+	} {
+		*u = cloneURL(*u)
+	}
+	for _, l := range []*[]string{
+		&a.ScopesSupported, &a.ResponseTypesSupported, &a.CodeChallengeMethodsSupported,
+		&a.GrantTypesSupported, &a.TokenEndpointAuthMethodsSupported,
+		&a.TokenEndpointAuthSigningAlgValuesSupported, &a.IDTokenSigningAlgValuesSupported,
+		&a.Capabilities,
+	} {
+		*l = slices.Clone(*l)
+	}
+	return a
+}
+
+// cloneURL returns a copy of u with its own copy of u's user information,
+// or nil for a nil u.
+func cloneURL(u *url.URL) *url.URL {
+	if u == nil {
+		return nil
+	}
+	c := *u
+	if u.User != nil {
+		user := *u.User
+		c.User = &user
+	}
+	return &c
 }
 
 // WithIssuer records the deployment issuer on produced tokens.
@@ -528,6 +573,11 @@ func FromConfig(cfg Config) (*Source, error) {
 	if cfg.Audience == "" {
 		return nil, fmt.Errorf("%w: Audience is required: SMART requires the aud authorization parameter (set WithAudience, or use NewFromCatalog with a catalog that has a BaseURL)", auth.ErrInvalidConfig)
 	}
+	// The source keeps its own copies, so a later change to the caller's
+	// slices or URLs does not reach it.
+	cfg.Scopes = slices.Clone(cfg.Scopes)
+	cfg.IDTokenTrustedAudiences = slices.Clone(cfg.IDTokenTrustedAudiences)
+	cfg.Auth = cloneAuthEndpoints(cfg.Auth)
 	// The SDK sends only S256 challenges, so a server that lists its PKCE
 	// methods without S256 cannot verify them. An empty list says nothing.
 	if advertised := cfg.Auth.CodeChallengeMethodsSupported; len(advertised) > 0 &&
