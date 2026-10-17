@@ -22,9 +22,11 @@ import (
 // space-separated format, keeps the variable scopes Robot keeps (local, test,
 // suite), resolves variables, the backslash escapes and the built-ins the
 // suites use, calls the keywords a suite defines with their arguments bound,
-// fills a DataDriver template from every row of the data file the suite
-// names, and follows the handful of BuiltIn keywords that build text. A Robot
-// construct it does not run is counted where a test meets it, never skipped.
+// runs every setup and teardown (a directory init file's, a suite file's, a
+// test's and a keyword's), fills a DataDriver template from every row of the
+// data file the suite names, and follows the handful of BuiltIn keywords that
+// build text. A Robot construct it does not run is counted where a test meets
+// it, never skipped.
 //
 // A run-time value is carried through the text as a reference (rtOpen, the
 // variable name, rtClose) until the query is sent. A reference inside a quoted
@@ -98,7 +100,7 @@ var suiteUnrebuiltWhy = map[string]string{
 	reasonQueryNotText:     "the query argument is a list or a dictionary, not text",
 	reasonBodyNotJSON:      "the request body, as the reader holds it, does not decode as a JSON object with a text q member; sent as it is, an engine would refuse it",
 	reasonConditionalSend:  "the query is sent inside a FOR, WHILE, IF or TRY block or a conditional Run Keyword, so whether it runs is unknown",
-	reasonOutsideTest:      "the query is sent from a suite setup or teardown, outside any test",
+	reasonOutsideTest:      "the query is sent from the suite setup or teardown of a suite file or of a directory's init file, outside any test",
 	reasonNoTemplate:       "a data-driven suite whose test case names no template keyword or template row",
 	reasonSeveralTemplates: "a data-driven suite with more than one test case or template row",
 	reasonDataFileMissing:  "the data file a data-driven suite names is not in the corpus, or is named in a form the reader cannot place",
@@ -373,7 +375,10 @@ func robotSectionKind(header string) (string, bool) {
 }
 
 // parseRobotFile parses one file of the space-separated format. Empty and
-// comment-only lines never break a `...` continuation, as in Robot.
+// comment-only lines never break a `...` continuation, as in Robot. Robot
+// reads a line that starts with a pipe in the pipe-separated format; the
+// reader does not parse that format, so such a line is a read error rather
+// than a row read wrong.
 func parseRobotFile(name string, data []byte) (*robotFile, error) {
 	f := &robotFile{}
 	section := ""
@@ -381,6 +386,9 @@ func parseRobotFile(name string, data []byte) (*robotFile, error) {
 	var blocks *[]robotBlock
 	for i, raw := range strings.Split(string(data), "\n") {
 		n := i + 1
+		if strings.HasPrefix(raw, "|") {
+			return nil, fmt.Errorf("PROBE-107: %s:%d: a pipe-separated row; the reader parses only the space-separated format", name, n)
+		}
 		trimmed := strings.TrimLeft(raw, " \t")
 		if strings.HasPrefix(trimmed, "*") && trimmed == raw {
 			first := splitRobotRow(raw)
@@ -447,9 +455,14 @@ type robotSettings struct {
 	suiteTeardown *robotStmt
 	testSetup     []string
 	testTeardown  []string
-	testTemplate  string
-	forceTags     []string // Force Tags and Test Tags
-	defaultTags   []string
+	// hasTestSetup and hasTestTeardown report whether the file has the
+	// setting row at all: a row, even an empty one, overrides the default an
+	// init file above hands down.
+	hasTestSetup    bool
+	hasTestTeardown bool
+	testTemplate    string
+	forceTags       []string // Force Tags and Test Tags
+	defaultTags     []string
 }
 
 func readRobotSettings(f *robotFile) robotSettings {
@@ -470,9 +483,9 @@ func readRobotSettings(f *robotFile) robotSettings {
 		case "suiteteardown":
 			s.suiteTeardown = st
 		case "testsetup", "tasksetup":
-			s.testSetup = args
+			s.testSetup, s.hasTestSetup = args, true
 		case "testteardown", "taskteardown":
-			s.testTeardown = args
+			s.testTeardown, s.hasTestTeardown = args, true
 		case "testtemplate", "tasktemplate":
 			if len(args) > 0 {
 				s.testTemplate = args[0]
@@ -487,10 +500,16 @@ func readRobotSettings(f *robotFile) robotSettings {
 }
 
 // robotInherited is what an __init__.robot hands down to every suite under its
-// directory: its forced tags, and whether its suite setup skips them.
+// directory: its forced tags, whether its suite setup skips them, and its test
+// setup and teardown, the defaults of every test below it that a nearer init
+// file, the suite file or the test itself does not override.
 type robotInherited struct {
-	tags    []string
-	skipped bool
+	tags            []string
+	skipped         bool
+	testSetup       []string
+	testTeardown    []string
+	hasTestSetup    bool
+	hasTestTeardown bool
 }
 
 // ---- values and variables --------------------------------------------------
@@ -719,29 +738,58 @@ func (f *robotFrame) count(reason, detail string) {
 
 // readSuite parses and runs one suite file.
 func (r *suiteReader) readSuite(p string) error {
-	f, err := r.parse(p)
+	inherited, err := r.inheritedFor(path.Dir(p))
 	if err != nil {
 		return err
+	}
+	s, err := r.loadSuite(p)
+	if err != nil {
+		return err
+	}
+	s.inherited, s.skipped = inherited, inherited.skipped
+	if !s.settings.hasTestSetup {
+		s.settings.testSetup = inherited.testSetup
+	}
+	if !s.settings.hasTestTeardown {
+		s.settings.testTeardown = inherited.testTeardown
+	}
+
+	s.runSuiteLevel(s.settings.suiteSetup, true)
+	if s.settings.dataDriver != nil {
+		if err := s.runDataDriven(); err != nil {
+			return err
+		}
+	} else {
+		for i := range s.file.tests {
+			s.runTest(&s.file.tests[i], "", nil)
+		}
+	}
+	s.runSuiteLevel(s.settings.suiteTeardown, false)
+	return nil
+}
+
+// loadSuite parses a suite or init file and readies it to run: its keywords
+// by name, and its Variables section evaluated in suite scope.
+func (r *suiteReader) loadSuite(p string) (*robotSuite, error) {
+	f, err := r.parse(p)
+	if err != nil {
+		return nil, err
 	}
 	s := &robotSuite{
 		r:        r,
 		path:     p,
-		family:   strings.Split(p, "/")[1],
+		family:   suiteFamily(p),
 		file:     f,
 		settings: readRobotSettings(f),
 		keywords: map[string]*robotBlock{},
 		vars:     map[string]robotValue{},
 	}
-	if s.inherited, err = r.inheritedFor(path.Dir(p)); err != nil {
-		return err
-	}
-	s.skipped = s.inherited.skipped
 	for i := range f.keywords {
 		kw := &f.keywords[i]
 		if strings.Contains(kw.name, "${") {
 			e, err := newRobotEmbedded(kw)
 			if err != nil {
-				return fmt.Errorf("PROBE-107: %s:%d: %w", p, kw.line, err)
+				return nil, fmt.Errorf("PROBE-107: %s:%d: %w", p, kw.line, err)
 			}
 			s.embedded = append(s.embedded, e)
 			continue
@@ -751,19 +799,16 @@ func (r *suiteReader) readSuite(p string) error {
 		}
 	}
 	s.initVariables()
+	return s, nil
+}
 
-	s.runSuiteLevel(s.settings.suiteSetup, true)
-	if s.settings.dataDriver != nil {
-		if err := s.runDataDriven(); err != nil {
-			return err
-		}
-	} else {
-		for i := range f.tests {
-			s.runTest(&f.tests[i], "", nil)
-		}
+// suiteFamily is the clause-family directory a corpus file sits in, or ""
+// for the init file directly under AQL/, which sits in none.
+func suiteFamily(p string) string {
+	if parts := strings.Split(p, "/"); len(parts) > 2 {
+		return parts[1]
 	}
-	s.runSuiteLevel(s.settings.suiteTeardown, false)
-	return nil
+	return ""
 }
 
 func (r *suiteReader) parse(p string) (*robotFile, error) {
@@ -775,8 +820,9 @@ func (r *suiteReader) parse(p string) (*robotFile, error) {
 }
 
 // inheritedFor gathers what every __init__.robot from AQL/ down to dir hands
-// down: forced tags accumulate, and a skipping suite setup skips everything
-// below it.
+// down: forced tags accumulate, a skipping suite setup skips everything below
+// it, and the nearest init file that sets a test setup or teardown gives the
+// default.
 func (r *suiteReader) inheritedFor(dir string) (robotInherited, error) {
 	var out robotInherited
 	parts := strings.Split(dir, "/")
@@ -784,27 +830,53 @@ func (r *suiteReader) inheritedFor(dir string) (robotInherited, error) {
 		d := strings.Join(parts[:i+1], "/")
 		in, ok := r.inits[d]
 		if !ok {
-			in = &robotInherited{}
-			p := d + "/" + robotInitFile
-			if _, err := fs.Stat(r.fsys, p); err == nil {
-				f, err := r.parse(p)
-				if err != nil {
-					return out, err
-				}
-				if len(f.tests) > 0 {
-					return out, fmt.Errorf("PROBE-107: %s carries test cases; Robot refuses them in an init file", p)
-				}
-				st := readRobotSettings(f)
-				in.tags = st.forceTags
-				in.skipped = st.suiteSetup != nil && len(st.suiteSetup.cells) > 1 &&
-					robotNormalize(st.suiteSetup.cells[1]) == "skip"
+			var err error
+			if in, err = r.readInit(d); err != nil {
+				return out, err
 			}
 			r.inits[d] = in
 		}
 		out.tags = append(out.tags, in.tags...)
 		out.skipped = out.skipped || in.skipped
+		if in.hasTestSetup {
+			out.testSetup, out.hasTestSetup = in.testSetup, true
+		}
+		if in.hasTestTeardown {
+			out.testTeardown, out.hasTestTeardown = in.testTeardown, true
+		}
 	}
 	return out, nil
+}
+
+// readInit reads the init file of dir, when it has one, and runs its suite
+// setup and teardown with its own keywords and variables: a query either one
+// sends is counted under reasonOutsideTest, once, however many suites sit
+// below. Robot runs the teardown after the last suite below; the reader runs
+// it straight after the setup, since nothing a suite below does reaches it.
+// Its test setup and teardown are not run here: they are inherited, and run
+// in each test below as that test's own.
+func (r *suiteReader) readInit(dir string) (*robotInherited, error) {
+	in := &robotInherited{}
+	p := dir + "/" + robotInitFile
+	if _, err := fs.Stat(r.fsys, p); errors.Is(err, fs.ErrNotExist) {
+		return in, nil
+	} else if err != nil {
+		return nil, fmt.Errorf("PROBE-107: stat %s: %w", p, err)
+	}
+	s, err := r.loadSuite(p)
+	if err != nil {
+		return nil, err
+	}
+	if len(s.file.tests) > 0 {
+		return nil, fmt.Errorf("PROBE-107: %s carries test cases; Robot refuses them in an init file", p)
+	}
+	in.tags = s.settings.forceTags
+	in.testSetup, in.hasTestSetup = s.settings.testSetup, s.settings.hasTestSetup
+	in.testTeardown, in.hasTestTeardown = s.settings.testTeardown, s.settings.hasTestTeardown
+	s.runSuiteLevel(s.settings.suiteSetup, true)
+	in.skipped = s.skipped
+	s.runSuiteLevel(s.settings.suiteTeardown, false)
+	return in, nil
 }
 
 // newRobotEmbedded compiles the name of a keyword with embedded arguments
@@ -949,10 +1021,8 @@ func (s *robotSuite) runTest(b *robotBlock, data string, filled *robotStmt) {
 	ts := s.testSettings(b)
 	t := &robotTest{s: s, vars: map[string]robotValue{}, data: data, notReady: s.notReady(ts), skipped: s.skipped}
 	f := &robotFrame{t: t, locals: map[string]robotValue{}}
-	if len(ts.setup) > 0 && robotNormalize(ts.setup[0]) != "none" {
-		f.site = b.line
-		f.call(b.line, ts.setup[0], ts.setup[1:])
-	}
+	f.site = b.line
+	f.runFixture(b.line, ts.setup)
 	switch {
 	case filled != nil:
 		f.site = filled.line
@@ -965,11 +1035,18 @@ func (s *robotSuite) runTest(b *robotBlock, data string, filled *robotStmt) {
 	default:
 		f.runBody(ts.rows, true)
 	}
-	if len(ts.teardown) > 0 && robotNormalize(ts.teardown[0]) != "none" {
-		f.site = b.line
-		f.call(b.line, ts.teardown[0], ts.teardown[1:])
-	}
+	f.site = b.line
+	f.runFixture(b.line, ts.teardown)
 	t.finish()
+}
+
+// runFixture runs the call a setup or teardown setting names, or nothing
+// when it names no keyword or NONE.
+func (f *robotFrame) runFixture(line int, call []string) {
+	if len(call) == 0 || robotNormalize(call[0]) == "none" {
+		return
+	}
+	f.call(line, call[0], call[1:])
 }
 
 // finish classes every query the test sent (PROBE-107 Classify). Skipped wins
@@ -1517,10 +1594,30 @@ func robotArgSpecs(kw *robotBlock) []robotArgSpec {
 	return specs
 }
 
+// robotKeywordFixtures are the [Setup] and [Teardown] rows of a user keyword,
+// nil when it has none.
+func robotKeywordFixtures(kw *robotBlock) (setup, teardown *robotStmt) {
+	for i := range kw.body {
+		st := &kw.body[i]
+		if len(st.cells) == 0 {
+			continue
+		}
+		switch robotNormalize(st.cells[0]) {
+		case "[setup]":
+			setup = st
+		case "[teardown]":
+			teardown = st
+		}
+	}
+	return setup, teardown
+}
+
 // callUser runs a keyword the suite defines, with its arguments bound as
 // Robot binds them: positional first, then `name=value` for a named argument.
 // Call arguments resolve in the caller's scope, defaults in the keyword's.
-// The keyword's value is a run-time value: RETURN is counted, not run.
+// Its own [Setup] runs before its body and its [Teardown] after it, wherever
+// the rows sit, in the keyword's scope. The keyword's value is a run-time
+// value: RETURN is counted, not run.
 func (f *robotFrame) callUser(kw *robotBlock, args []string, embedded map[string]robotValue) {
 	if f.depth >= robotMaxDepth {
 		f.t.s.unrebuilt(f.site, f.t.data, reasonKeywordDepth, kw.name)
@@ -1566,7 +1663,14 @@ func (f *robotFrame) callUser(kw *robotBlock, args []string, embedded map[string
 			}
 		}
 	}
+	setup, teardown := robotKeywordFixtures(kw)
+	if setup != nil {
+		g.runFixture(setup.line, setup.cells[1:])
+	}
 	g.runBody(kw.body, false)
+	if teardown != nil {
+		g.runFixture(teardown.line, teardown.cells[1:])
+	}
 }
 
 // upstream runs a call to a keyword of the census: it rebuilds the query a
