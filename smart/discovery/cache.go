@@ -62,7 +62,8 @@ type Cache interface {
 }
 
 // MemoryCache is the default in-process Cache implementation. Safe for
-// concurrent use.
+// concurrent use. The zero value is an empty cache ready to use, the same
+// as one NewMemoryCache returns.
 type MemoryCache struct {
 	mu sync.RWMutex
 	m  map[string]*ServiceCatalog
@@ -88,6 +89,11 @@ func (c *MemoryCache) Put(ctx context.Context, baseURL string, cat *ServiceCatal
 		return err
 	}
 	c.mu.Lock()
+	// A MemoryCache literal has no map until its first Put. Reading and
+	// deleting from a nil map are safe, so Get and Invalidate need none.
+	if c.m == nil {
+		c.m = map[string]*ServiceCatalog{}
+	}
 	c.m[baseURL] = cat
 	c.mu.Unlock()
 	return nil
