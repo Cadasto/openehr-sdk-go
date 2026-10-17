@@ -106,10 +106,13 @@ func WithHTTPClient(c *http.Client) Option {
 }
 
 // WithRequiredServices configures which service IDs must be present in
-// every resolved catalog. Default is ["org.openehr.rest"].
+// every resolved catalog. Default is ["org.openehr.rest"]. The option keeps
+// its own copy of ids, so a later change to the caller's slice does not
+// reach it.
 func WithRequiredServices(ids ...string) Option {
+	required := slices.Clone(ids)
 	return func(cfg *resolverConfig) {
-		cfg.requiredServices = append(cfg.requiredServices[:0], ids...)
+		cfg.requiredServices = append(cfg.requiredServices[:0], required...)
 	}
 }
 
@@ -125,11 +128,13 @@ func WithRequiredServices(ids ...string) Option {
 // it makes the check strict: the compared value is the entry's
 // spec_version, or its version when it advertises no spec_version, and an
 // entry that advertises neither is rejected unless "" is in the accepted
-// set.
+// set. The option keeps its own copy of versions, so a later change to the
+// caller's slice does not reach it.
 func WithAcceptedSpecVersions(versions ...string) Option {
+	accepted := slices.Clone(versions)
 	return func(cfg *resolverConfig) {
 		cfg.acceptedVersions = map[string]struct{}{}
-		for _, v := range versions {
+		for _, v := range accepted {
 			cfg.acceptedVersions[v] = struct{}{}
 		}
 		cfg.acceptedVersionsLocked = true

@@ -58,9 +58,11 @@ func WithExpectedNonce(nonce string) ValidateOption {
 // WithIDTokenSigningAlgs constrains the id_token signature algorithms to the
 // authorization server's advertised id_token_signing_alg_values_supported.
 // When unset or empty the SDK default set applies
-// (RS256/RS384/ES256/ES384).
+// (RS256/RS384/ES256/ES384). The option keeps its own copy of algs, so a
+// later change to the caller's slice does not reach it.
 func WithIDTokenSigningAlgs(algs []string) ValidateOption {
-	return func(c *ValidateConfig) { c.AllowedIDTokenAlgs = algs }
+	allowed := slices.Clone(algs)
+	return func(c *ValidateConfig) { c.AllowedIDTokenAlgs = allowed }
 }
 
 // WithTrustedAudiences names the audiences the ID token's aud claim may list
