@@ -20,6 +20,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
@@ -58,7 +59,7 @@ func engineWalk(root any, c *templatecompile.Compiled, lim Limits) (Result, *eng
 			return guard, nil
 		}
 		e := newEngine(lim)
-		e.walk(engineNode{value: root, rmType: rmType, path: "/"})
+		e.walk(engineNode{value: root, rmType: rmType})
 		return e.result(), e
 	}
 	if root == nil || rmaccess.IsTypedNilPointer(root) {
@@ -74,7 +75,7 @@ func engineWalk(root any, c *templatecompile.Compiled, lim Limits) (Result, *eng
 	}
 	e := newEngine(lim)
 	rmType, _, known := rmTypeInfo(root)
-	e.walk(engineNode{value: root, rmType: rmType, path: "/", bound: c.Root()})
+	e.walk(engineNode{value: root, rmType: rmType, bound: c.Root()})
 	if !known {
 		e.found.emit(Issue{
 			Path:     "/",
@@ -119,6 +120,14 @@ type engine struct {
 	// reaches that limit, and ends the walk.
 	visits  int
 	stopped bool
+	// path holds the steps of the issue path of the node the walk is at,
+	// which the handle of each node's path reads ([issuePath]).
+	path pathStack
+	// preds holds the predicates of the items of each list the walk is
+	// inside, outermost first, a run per list: the walk appends a list's run
+	// when it enters the list and drops it when it leaves, so a list of any
+	// length holds its predicates without a slice of its own.
+	preds []predicate
 }
 
 // newEngine returns the state of a walk within lim, each zero or negative
@@ -129,6 +138,8 @@ func newEngine(lim Limits) *engine {
 		maxDepth: lim.Depth,
 		maxNodes: lim.Nodes,
 		ancestry: make([]any, 0, 16),
+		path:     pathStack{steps: make([]pathStep, 0, 16)},
+		preds:    make([]predicate, 0, 16),
 	}
 }
 
@@ -148,8 +159,9 @@ type engineNode struct {
 	// closed RM set knows it, otherwise the type its attribute declares. It
 	// may carry a generic bound (DV_INTERVAL<DV_QUANTITY>).
 	rmType string
-	// path is the node's issue path.
-	path string
+	// path is the node's issue path, a handle valid while the node is
+	// visited ([issuePath]).
+	path issuePath
 	// role is what the node's place tells of it beyond its type.
 	role floorRole
 	// depth is the node's nesting depth, the root's 0.
@@ -171,8 +183,15 @@ type engineAttr struct {
 	// class, no rule of the class reports its absence itself
 	// ([classRules.leavesOut]) and, for a single-valued one, the node's role
 	// does not let it be blank ([mayBeBlank]): the walk then applies the
-	// mandatory-presence rule to it.
+	// mandatory-presence rule to it. In a class's table
+	// ([classAttributeTable]) it holds the class's part alone; the walk
+	// applies the role's part at each node ([engineAttr.inRole]).
 	mandatory bool
+	// noRules is set, in a class's table, when no RM rules run on a value
+	// read as rmType ([rulesFor]), so that a value of a Go primitive type
+	// the attribute holds is a primitive leaf ([primitiveLeaf]). Unset, the
+	// walk visits such a value as it visits any other.
+	noRules bool
 	// decl is the bound template node's declaration of the attribute, nil
 	// where the template does not constrain it: the attribute is then
 	// visited with the RM rules alone.
@@ -220,7 +239,7 @@ type attrReading struct {
 }
 
 // readAttribute reads the attribute a of value, by its shape.
-func readAttribute(value any, a engineAttr) attrReading {
+func readAttribute(value any, a *engineAttr) attrReading {
 	switch a.shape {
 	case shapeList:
 		items, present := rmaccess.Multiple(value, a.name)
@@ -248,7 +267,7 @@ func readAttribute(value any, a engineAttr) attrReading {
 // alone; one outside it has nothing to check. An absent part of a reference
 // that the template does not declare is outside it too: the reference's own
 // rule reports it, when it checks the node.
-func visitedAt(a engineAttr, present bool) bool {
+func visitedAt(a *engineAttr, present bool) bool {
 	return present || a.mandatory || a.decl != nil
 }
 
@@ -267,7 +286,7 @@ func (e *engine) walk(n engineNode) {
 	}
 	if slices.Contains(e.ancestry, n.value) {
 		e.found.emit(Issue{
-			Path:   n.path,
+			Path:   n.path.String(),
 			Code:   "cyclic_value",
 			Detail: fmt.Sprintf("the walk reached this %s again inside itself; it is not entered again", n.rmType),
 		})
@@ -283,19 +302,51 @@ func (e *engine) walk(n engineNode) {
 // whether the walk may go on with it. Past the visit limit it counts
 // nothing: it reports `max_nodes` at path, records path in the stops of
 // [Coverage.Stopped], ends the walk and returns false.
-func (e *engine) spendVisit(path, rmType string) bool {
+func (e *engine) spendVisit(path issuePath, rmType string) bool {
 	if e.visits == e.maxNodes {
+		at := path.String()
 		e.found.emit(Issue{
-			Path:   path,
+			Path:   at,
 			Code:   "max_nodes",
 			Detail: fmt.Sprintf("the walk stopped at %s after visiting %d values, its limit per call", rmType, e.maxNodes),
 		})
-		e.stoppedAt = append(e.stoppedAt, path)
+		e.stoppedAt = append(e.stoppedAt, at)
 		e.stopped = true
 		return false
 	}
 	e.visits++
 	return true
+}
+
+// spendLeafVisit counts one visit to a primitive leaf ([primitiveLeaf]) of
+// declared RM type rmType at path, as [engine.spendVisit] counts it, unless
+// the walk has stopped: once the visit limit has ended the walk, a leaf is
+// neither counted nor reported, as no other value is.
+func (e *engine) spendLeafVisit(path issuePath, rmType string) {
+	if !e.stopped {
+		e.spendVisit(path, rmType)
+	}
+}
+
+// primitiveLeaf reports whether value, the value of the single-valued
+// attribute a, is a primitive leaf: a value read under a declared type that
+// has no RM rules ([engineAttr].noRules), of a type no RM class is. The
+// types are the Go primitive types; the primitive types the RM package
+// names, rm.Real, rm.Integer and rm.Character; and the pointers the
+// generated access hands over for an optional primitive attribute, *string,
+// *bool, *rm.Real and *rm.Integer, each of which it reads as present only
+// when it is not nil. A test keeps every one of them outside the RM classes.
+func primitiveLeaf(value any, a *engineAttr) bool {
+	if !a.noRules {
+		return false
+	}
+	switch value.(type) {
+	case string, bool, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64,
+		rm.Real, rm.Integer, rm.Character,
+		*string, *bool, *rm.Real, *rm.Integer:
+		return true
+	}
+	return false
 }
 
 // visit checks node n. A visit past the visit limit checks nothing: it
@@ -333,7 +384,8 @@ func (e *engine) visit(n engineNode) {
 		scalar = e.checkIdentityAndType(n)
 	}
 	rulesFrom := len(e.found.issues)
-	rules, class := e.found.checkInvariants(n.value, n.rmType, n.path)
+	entry, class := classOf(n.rmType)
+	e.found.checkInvariants(n.value, n.rmType, n.path, entry.rules)
 	rulesTo := len(e.found.issues)
 	var held *heldJudgement
 	if n.bound != nil {
@@ -345,17 +397,18 @@ func (e *engine) visit(n engineNode) {
 	if n.depth >= e.maxDepth {
 		if !e.depthStopped {
 			e.depthStopped = true
+			at := n.path.String()
 			e.found.emit(Issue{
-				Path:   n.path,
+				Path:   at,
 				Code:   "max_depth",
 				Detail: fmt.Sprintf("the walk reached its depth limit %d at %s; nothing below that depth is walked, and later stops there are not reported again", e.maxDepth, n.rmType),
 			})
-			e.stoppedAt = append(e.stoppedAt, n.path)
+			e.stoppedAt = append(e.stoppedAt, at)
 		}
 		return
 	}
 	refusedFrom := len(e.refused)
-	e.visitAttributes(n, class, rules)
+	e.visitAttributes(n, class, entry)
 	if held != nil {
 		e.settle(held)
 	}
@@ -434,7 +487,7 @@ func (e *engine) checkLeaf(n engineNode, scalar bool, class string) (*tcimpl.Com
 	if !isConstraintRef(pc) {
 		return nil, held
 	}
-	e.external = append(e.external, n.path)
+	e.external = append(e.external, n.path.String())
 	if scalar {
 		return nil, held // a scalar has no attributes to visit
 	}
@@ -526,7 +579,8 @@ func appendLeftIssues(issues []Issue, n engineNode, class string, pc constraints
 // Whether they do depends on the role of the node that holds the part, a
 // DV_SCALE symbol's code_string being one they let be blank, and on whether
 // the walk reaches the part before a limit stops it: the walk sees that
-// once it has visited the attributes ([engine.settle]).
+// once it has visited the attributes ([engine.settle]). The part's path is
+// written only when the part is empty.
 func (e *engine) emptyPart(n engineNode, class string) (string, bool) {
 	steps, ok := constrainedPart[class]
 	if !ok || n.depth >= e.maxDepth || !rmaccess.Covers(n.value) {
@@ -534,10 +588,13 @@ func (e *engine) emptyPart(n engineNode, class string) (string, bool) {
 	}
 	value, path := n.value, n.path
 	for i, name := range steps {
-		path = attributePath(path, name)
+		path = e.path.attribute(path, name)
 		v, present := rmaccess.Single(value, name)
 		if !present || v == nil || rmaccess.IsTypedNilPointer(v) {
-			return path, i == len(steps)-1
+			if i < len(steps)-1 {
+				return "", false
+			}
+			return path.String(), true
 		}
 		value = v
 	}
@@ -564,30 +621,44 @@ func (e *engine) settle(h *heldJudgement) {
 }
 
 // visitAttributes visits the attributes of node n, of the bare RM class
-// class whose rules are rules. At a node the template binds it visits first
-// the attributes the template declares, in the template's order. Then it
-// visits the other attributes the class metadata lists for class, in the
-// class's order, with the RM rules alone: no template clause constrains
-// them. Among them are those the compile injected into the bound node
-// because the RM marks them mandatory for the node's class
-// ([tcimpl.CompiledAttribute.Implicit]); an injected attribute the value's
-// class does not list is not visited, so it draws no finding. It leaves out
-// an attribute no serialization carries ([rminfo.IsNonStorableAttr]), and
-// one the metadata gives no type that the template does not declare. A
-// value of no registered RM class ([rmaccess.Covers]) has no attributes the
-// access reads and no class the metadata lists attributes for: the
-// attributes the template declares on the node it binds to are each read
-// as absent, and only the template's existence reports one.
+// class, whose rules and attribute table are entry's ([classOf]). At a node
+// the template binds it visits first the attributes the template declares,
+// in the template's order. Then it visits the other attributes the class
+// metadata lists for class, in the class's order, with the RM rules alone:
+// no template clause constrains them. Among them are those the compile
+// injected into the bound node because the RM marks them mandatory for the
+// node's class ([tcimpl.CompiledAttribute.Implicit]); an injected attribute
+// the value's class does not list is not visited, so it draws no finding.
+// It leaves out an attribute no serialization carries
+// ([rminfo.IsNonStorableAttr]), and one the metadata gives no type that the
+// template does not declare. A value of no registered RM class
+// ([rmaccess.Covers]) has no attributes the access reads and no class the
+// metadata lists attributes for: the attributes the template declares on
+// the node it binds to are each read as absent, and only the template's
+// existence reports one.
 //
-// What the class metadata says of each attribute is read from the table
-// built once per class when the package is initialised ([classAttributes]),
-// never from the template, so the RM rules read the pinned Reference Model
-// whatever lookup compiled the template.
-func (e *engine) visitAttributes(n engineNode, class string, rules *classRules) {
+// What the class metadata says of each attribute, and how the walk reads
+// each one it visits, is read from the table built once per class when the
+// package is initialised ([classAttributes]), never from the template, so
+// the RM rules read the pinned Reference Model whatever lookup compiled the
+// template. Only the part the node's role decides is applied at the node
+// ([engineAttr.inRole]).
+//
+// An attribute the class lists is visited in the template's order, and not
+// again in the class's, when the bound node declares it as the template
+// wrote it rather than as the compile injected it. The walk marks each such
+// attribute by its position in the class's table while it visits the
+// template's declarations (declared), once however many of them name it;
+// a declaration of a name the class does not list marks none. The compile
+// injects only attributes the template does not declare, so a name the
+// template declares is never also an injected one, and no class's table
+// walks more attributes than the mark holds ([attrMarks]).
+func (e *engine) visitAttributes(n engineNode, class string, entry classEntry) {
 	var table *classAttributeTable
 	if rmaccess.Covers(n.value) {
-		table = classAttributes[class]
+		table = entry.attrs
 	}
+	var declared attrMarks
 	if n.bound != nil {
 		for _, decl := range tcimpl.NodeAttributes(n.bound) {
 			if e.stopped {
@@ -596,47 +667,51 @@ func (e *engine) visitAttributes(n engineNode, class string, rules *classRules) 
 			if decl.Implicit() {
 				continue // no template clause: visited below, if the class lists it
 			}
-			f, listed := table.lookup(decl.Name())
-			if a, visited := declaredAttr(n, decl, f, listed, rules); visited {
-				e.visitAttribute(n, class, a)
+			var walked *engineAttr
+			if i, ok := table.position(decl.Name()); ok {
+				walked = &table.walked[i]
+				declared |= 1 << i
+			}
+			if a, visited := declaredAttr(n, decl, walked); visited {
+				e.visitAttribute(&n, class, &a)
 			}
 		}
 	}
 	if table == nil {
 		return
 	}
-	for _, f := range table.listed {
+	for i := range table.walked {
 		if e.stopped {
 			return
 		}
-		if f.NonStorable || !f.Typed || templateDeclares(n.bound, f.Name) {
-			continue // not visited, or visited above in the template's order
+		if declared&(1<<i) != 0 {
+			continue // visited above in the template's order
 		}
-		e.visitAttribute(n, class, attrFromFacts(n, f, rules))
+		a := &table.walked[i]
+		if a.blankIn(n.role) {
+			inRole := a.inRole(n.role)
+			a = &inRole
+		}
+		e.visitAttribute(&n, class, a)
 	}
 }
 
-// templateDeclares reports whether the template node bound declares the
-// attribute name, as the template wrote it rather than as the compile
-// injected it; a nil bound declares none.
-func templateDeclares(bound *tcimpl.CompiledNode, name string) bool {
-	if bound == nil {
-		return false
-	}
-	a := bound.Attribute(name)
-	return a != nil && !a.Implicit()
-}
+// attrMarks marks attributes of a class's table by their position, bit i
+// for the attribute at position i ([engine.visitAttributes]). No class's
+// table walks more attributes than it has bits; a test keeps it so.
+type attrMarks uint64
 
 // declaredAttr returns the attribute decl the bound template node of n
-// declares, as the walk visits it, with visited set, given f, what the class
-// metadata says of the attribute for the value's class, which lists it when
-// listed is set. An attribute the class lists, a serialization carries and
-// the metadata types is read as the class metadata gives it. Any other is
-// read as the template declares it, single-valued or a list; it is not
-// visited when no serialization of the bound node's class carries it.
-func declaredAttr(n engineNode, decl *tcimpl.CompiledAttribute, f attributeFacts, listed bool, rules *classRules) (a engineAttr, visited bool) {
-	if listed && !f.NonStorable && f.Typed {
-		a = attrFromFacts(n, f, rules)
+// declares, as the walk visits it, with visited set, given walked, the
+// attribute as the value's class table walks it
+// ([classAttributeTable.position]), nil when the table walks none by decl's
+// name. An attribute the class lists, a serialization carries and the
+// metadata types is read as the class metadata gives it, in n's role. Any other is read as the template
+// declares it, single-valued or a list; it is not visited when no
+// serialization of the bound node's class carries it.
+func declaredAttr(n engineNode, decl *tcimpl.CompiledAttribute, walked *engineAttr) (a engineAttr, visited bool) {
+	if walked != nil {
+		a = walked.inRole(n.role)
 		a.decl = decl
 		return a, true
 	}
@@ -650,15 +725,41 @@ func declaredAttr(n engineNode, decl *tcimpl.CompiledAttribute, f attributeFacts
 	return a, true
 }
 
-// attrFromFacts returns the attribute of node n, whose rules are rules,
-// that f describes, as the class metadata gives it, with no template
-// declaration. It is mandatory when the metadata marks it mandatory for the
-// class, no rule of the class reports its absence itself and, for a
-// single-valued one, the node's role does not let it be blank.
-func attrFromFacts(n engineNode, f attributeFacts, rules *classRules) engineAttr {
-	a := engineAttr{name: f.Name, rmType: f.RMType, shape: shapeFrom(f.Container, f.PrimitiveItems, f.Hash)}
-	a.mandatory = f.Mandatory && !rules.leavesOut(f.Name) && (a.shape != shapeSingle || !mayBeBlank(n.role, f.Name))
-	return a
+// walkedAttr returns the attribute f describes, of a class whose rules are
+// rules, nil for a class the type registry does not decode, as the class
+// metadata gives it, with no template declaration, whatever the role of the
+// node it is read on. The class's table holds it, built once per class
+// ([classAttributes]). It is mandatory when the metadata marks it mandatory
+// for the class and no rule of the class reports its absence itself; the
+// role's part is left to [engineAttr.inRole]. It records whether its
+// declared type has RM rules ([engineAttr].noRules).
+func walkedAttr(f attributeFacts, rules *classRules) engineAttr {
+	declared, _ := rulesFor(f.RMType)
+	return engineAttr{
+		name:      f.Name,
+		rmType:    f.RMType,
+		shape:     shapeFrom(f.Container, f.PrimitiveItems, f.Hash),
+		mandatory: f.Mandatory && !rules.leavesOut(f.Name),
+		noRules:   declared == nil,
+	}
+}
+
+// inRole returns the attribute a of a class's table as the walk reads it on
+// a node in role: no longer mandatory where it is single-valued and role
+// lets it be blank ([mayBeBlank]).
+func (a *engineAttr) inRole(role floorRole) engineAttr {
+	out := *a
+	if a.blankIn(role) {
+		out.mandatory = false
+	}
+	return out
+}
+
+// blankIn reports whether the attribute a of a class's table, mandatory for
+// the class, is not mandatory on a node in role: it is single-valued and
+// role lets it be blank ([mayBeBlank]).
+func (a *engineAttr) blankIn(role floorRole) bool {
+	return a.mandatory && a.shape == shapeSingle && mayBeBlank(role, a.name)
 }
 
 // shapeFrom returns how the walk reads an attribute that is a container or
@@ -684,25 +785,41 @@ func shapeFrom(container, primitiveItems, hash bool) attrShape {
 // RM rules alone. Presence: absent, a mandatory attribute is `required`; a
 // mandatory list that is present and empty is `cardinality`. Then each item:
 // a single value is walked at the attribute's path, each item of a list of
-// RM values at the path the shared path rule writes for it ([itemPaths]),
-// and each entry of a Hash at its position in ascending key order
-// ([hashEntryPath]), never at its key. Only a value of a registered RM class
-// ([rmaccess.Covers]) is walked as an item of a list or a Hash; an item of a
-// list that holds no RM value is reported at its path instead
-// ([engine.walkUnconstrained]), and a counted list is never read item by
-// item.
-func (e *engine) visitAttribute(n engineNode, class string, a engineAttr) {
+// RM values at the path the shared path rule writes for it
+// ([resolvePredicates]), and each entry of a Hash at its position in
+// ascending key order ([entryPredicate]), never at its key. Only a value of
+// a registered RM class ([rmaccess.Covers]) is walked as an item of a list
+// or a Hash; an item of a list that holds no RM value is reported at its
+// path instead ([engine.walkUnconstrained]), and a counted list is never
+// read item by item. A primitive leaf ([primitiveLeaf]) the template does
+// not constrain is counted as one visit and not walked
+// ([engine.spendLeafVisit]): walking it would do nothing more. The
+// attribute's path is pushed onto the walk's path stack and written only
+// where something records it ([issuePath]).
+func (e *engine) visitAttribute(n *engineNode, class string, a *engineAttr) {
 	r := readAttribute(n.value, a)
 	if !visitedAt(a, r.present) {
 		return
 	}
-	attrPath := attributePath(n.path, a.name)
+	attrPath := e.path.attribute(n.path, a.name)
+	if a.decl == nil && primitiveLeaf(r.value, a) {
+		// Walking a primitive leaf would only spend its visit (REQ-171
+		// visit limit). Only a present single value is read into r.value,
+		// so the mandatory-presence rule reports nothing. No RM class is of
+		// a primitive leaf's type, so the leaf is read as its declared type,
+		// has no identity, and has no attributes to visit, so the depth limit
+		// does not reach it. That type has no RM rules to run or record.
+		// So the visit is counted here, and the leaf's path is written only
+		// when the visit limit is reported there.
+		e.spendLeafVisit(attrPath, a.rmType)
+		return
+	}
 	role := childRole(class, n.role, a.name)
 	if a.decl != nil {
 		if a.shape == shapeSingle {
-			e.visitDeclaredSingle(n, a, r, attrPath, role)
+			e.visitDeclaredSingle(n, a, &r, attrPath, role)
 		} else {
-			e.visitDeclaredItems(n, a, r, attrPath, role)
+			e.visitDeclaredItems(n, a, &r, attrPath, role)
 		}
 		return
 	}
@@ -710,7 +827,7 @@ func (e *engine) visitAttribute(n engineNode, class string, a engineAttr) {
 		e.found.checkMandatory(n.rmType, a.name, attrPath, a.shape.multiValued(), r.present, r.count)
 	}
 	if r.present {
-		e.walkUnconstrained(n, a, r, attrPath, role)
+		e.walkUnconstrained(n, a, &r, attrPath, role)
 	}
 }
 
@@ -726,7 +843,7 @@ func (e *engine) visitAttribute(n engineNode, class string, a engineAttr) {
 // an attribute the template leaves open both reach it, while a nil item
 // under an attribute that declares children is the template's to refuse
 // ([engine.visitDeclaredItems]) and never gets here.
-func (e *engine) walkUnconstrained(n engineNode, a engineAttr, r attrReading, attrPath string, role floorRole) {
+func (e *engine) walkUnconstrained(n *engineNode, a *engineAttr, r *attrReading, attrPath issuePath, role floorRole) {
 	switch a.shape {
 	case shapeSingle:
 		e.walk(engineNode{value: r.value, rmType: runtimeRMType(r.value, a.rmType), path: attrPath, role: role, depth: n.depth + 1})
@@ -734,21 +851,24 @@ func (e *engine) walkUnconstrained(n engineNode, a engineAttr, r attrReading, at
 		if !slices.ContainsFunc(r.items, walkedOrNil) {
 			return
 		}
-		for i, path := range e.itemPaths(attrPath, r.items) {
+		from := e.unboundPredicates(r.items)
+		for i, item := range r.items {
 			if e.stopped {
-				return // the visit limit ended the walk at or inside an earlier item
+				break // the visit limit ended the walk at or inside an earlier item
 			}
-			if isNilItem(r.items[i]) {
+			path := e.path.item(attrPath, e.preds[from+i])
+			if isNilItem(item) {
 				if e.spendVisit(path, a.rmType) {
 					e.found.checkNilItem(n.rmType, a.name, path)
 				}
 				continue
 			}
-			e.walkItem(n, r.items[i], a.rmType, path, role)
+			e.walkItem(n, item, a.rmType, path, role)
 		}
+		e.preds = e.preds[:from]
 	case shapeHash:
 		for i, entry := range r.items {
-			e.walkItem(n, entry, a.rmType, hashEntryPath(attrPath, i), role)
+			e.walkItem(n, entry, a.rmType, e.path.item(attrPath, entryPredicate(i)), role)
 		}
 	case shapeCounted:
 		// Nothing is below the items of a list of a primitive type.
@@ -759,7 +879,7 @@ func (e *engine) walkUnconstrained(n engineNode, a engineAttr, r attrReading, at
 // whose declared RM type is rmType, at path, in role, with the RM rules
 // alone, when it is a value of a registered RM class; any other item has
 // nothing below it to walk.
-func (e *engine) walkItem(n engineNode, item any, rmType, path string, role floorRole) {
+func (e *engine) walkItem(n *engineNode, item any, rmType string, path issuePath, role floorRole) {
 	if !rmaccess.Covers(item) {
 		return
 	}
@@ -785,7 +905,7 @@ func walkedOrNil(item any) bool {
 // attribute is reported as [engine.checkAbsent] says. Then the admitted value
 // is walked against the child it binds to, or, where the template declares
 // no child, with the RM rules alone.
-func (e *engine) visitDeclaredSingle(n engineNode, a engineAttr, r attrReading, attrPath string, role floorRole) {
+func (e *engine) visitDeclaredSingle(n *engineNode, a *engineAttr, r *attrReading, attrPath issuePath, role floorRole) {
 	if !r.present {
 		e.checkAbsent(n, a, attrPath)
 		return
@@ -821,13 +941,13 @@ func (e *engine) visitDeclaredSingle(n engineNode, a engineAttr, r attrReading, 
 // no item as [engine.checkEmpty] says. Counts: the template's child count and
 // each child's occurrences. Then each admitted item is walked against the
 // child it binds to, at the path the shared path rule writes for it, with
-// the name the child pins where a sibling shares its id ([boundItemPaths]);
-// where the template declares no child, each item is walked with the RM
-// rules alone, which report an item that holds no RM value
-// ([engine.walkUnconstrained]). A nil item under an attribute that declares
-// children binds to none, so it is refused above and the RM rules never
-// see it.
-func (e *engine) visitDeclaredItems(n engineNode, a engineAttr, r attrReading, attrPath string, role floorRole) {
+// the name the child pins where a sibling shares its id
+// ([appendBoundPredicates]); where the template declares no child, each item
+// is walked with the RM rules alone, which report an item that holds no RM
+// value ([engine.walkUnconstrained]). A nil item under an attribute that
+// declares children binds to none, so it is refused above and the RM rules
+// never see it.
+func (e *engine) visitDeclaredItems(n *engineNode, a *engineAttr, r *attrReading, attrPath issuePath, role floorRole) {
 	if !r.present {
 		e.checkAbsent(n, a, attrPath)
 		return
@@ -838,22 +958,22 @@ func (e *engine) visitDeclaredItems(n engineNode, a engineAttr, r attrReading, a
 	}
 	children := tcimpl.ChildNodes(a.decl)
 	var bound []*tcimpl.CompiledNode
-	var paths []string
 	var admitted []bool
+	from := len(e.preds)
 	if len(children) > 0 && a.shape != shapeCounted {
 		var byNodeID []bool
 		bound, byNodeID = bindItems(n.bound.RMTypeName(), a.name, children, r.items)
-		paths = boundItemPaths(attrPath, r.items, bound, a.shape == shapeHash)
+		e.preds = appendBoundPredicates(e.preds, r.items, bound, a.shape == shapeHash)
 		allowed := allowedChildren(a.decl)
 		admitted = make([]bool, len(r.items))
 		for i, item := range r.items {
 			switch {
 			case bound[i] == nil:
-				e.refuse(unboundItemIssue(a.decl, children, item, byNodeID[i], paths[i]))
+				e.refuse(unboundItemIssue(a.decl, children, item, byNodeID[i], e.path.item(attrPath, e.preds[from+i])))
 			case !slices.Contains(allowed, bound[i]):
 				// The child's occurrences, reported with the counts below,
 				// are the one report for the item.
-				e.refused = append(e.refused, paths[i])
+				e.refused = append(e.refused, e.path.item(attrPath, e.preds[from+i]).String())
 			default:
 				admitted[i] = true
 			}
@@ -868,8 +988,7 @@ func (e *engine) visitDeclaredItems(n engineNode, a engineAttr, r attrReading, a
 		// The template reports the container itself by its child count, or
 		// by the occurrences of a child that has no id of its own, which are
 		// written at the container's path ([optChildPaths]).
-		reported := countOut || slices.ContainsFunc(occurrences, func(iss Issue) bool { return iss.Path == attrPath })
-		e.checkEmpty(n, a, attrPath, reported)
+		e.checkEmpty(n, a, attrPath, countOut || reportsAt(occurrences, attrPath))
 	}
 	if countOut {
 		e.found.emit(countIssue)
@@ -883,9 +1002,20 @@ func (e *engine) visitDeclaredItems(n engineNode, a engineAttr, r attrReading, a
 			if !admitted[i] {
 				continue
 			}
-			e.walk(engineNode{value: item, rmType: runtimeRMType(item, a.rmType), path: paths[i], role: role, depth: n.depth + 1, bound: bound[i]})
+			e.walk(engineNode{value: item, rmType: runtimeRMType(item, a.rmType), path: e.path.item(attrPath, e.preds[from+i]), role: role, depth: n.depth + 1, bound: bound[i]})
 		}
 	}
+	e.preds = e.preds[:from]
+}
+
+// reportsAt reports whether one of issues is at path. The path is written
+// only when there is an issue to compare it with.
+func reportsAt(issues []Issue, path issuePath) bool {
+	if len(issues) == 0 {
+		return false
+	}
+	at := path.String()
+	return slices.ContainsFunc(issues, func(iss Issue) bool { return iss.Path == at })
 }
 
 // refuse reports iss, the one issue for content the template does not admit,
@@ -904,7 +1034,7 @@ func (e *engine) refuse(iss Issue) {
 // blank. The RM's requirement is read from the value's class alone: an
 // attribute that class does not list draws no RM finding, whatever
 // mandatory bit the compiled template carries for it.
-func (e *engine) checkAbsent(n engineNode, a engineAttr, attrPath string) {
+func (e *engine) checkAbsent(n *engineNode, a *engineAttr, attrPath issuePath) {
 	multiValued := a.shape != shapeSingle
 	if iss, required := absentIssue(a.decl, n.value, attrPath, multiValued); required {
 		e.found.emit(iss)
@@ -923,7 +1053,7 @@ func (e *engine) checkAbsent(n engineNode, a engineAttr, attrPath string) {
 // the same container itself (reported), and only for a list: a Hash that is
 // present and empty breaks no mandatory rule, as the RM rules alone read
 // it, however the template declares it.
-func (e *engine) checkEmpty(n engineNode, a engineAttr, attrPath string, reported bool) {
+func (e *engine) checkEmpty(n *engineNode, a *engineAttr, attrPath issuePath, reported bool) {
 	if iss, required := emptyIssue(a.decl, n.value, attrPath); required {
 		e.found.emit(iss)
 		return
@@ -933,14 +1063,17 @@ func (e *engine) checkEmpty(n engineNode, a engineAttr, attrPath string, reporte
 	}
 }
 
-// itemPaths returns the issue path of each of the items of the multi-valued
-// attribute at attrPath, by the shared path rule ([itemPaths]), fed each
-// item's archetype_node_id. No template node binds these items, so the rule
-// is fed no pinned name.
-func (e *engine) itemPaths(attrPath string, items []any) []string {
-	pathItems := make([]pathItem, len(items))
-	for i, item := range items {
-		pathItems[i] = pathItem{id: locatableArchetypeNodeID(item)}
+// unboundPredicates appends to the walk's predicates ([engine].preds) the
+// predicate of each of items, the items of a list no template node binds,
+// by the shared path rule ([resolvePredicates]), fed each item's
+// archetype_node_id, and returns where they start. No template node binds
+// these items, so the rule is fed no pinned name. The caller drops them
+// once it has walked the items.
+func (e *engine) unboundPredicates(items []any) (from int) {
+	from = len(e.preds)
+	for _, item := range items {
+		e.preds = append(e.preds, predicate{id: locatableArchetypeNodeID(item)})
 	}
-	return itemPaths(attrPath, pathItems)
+	resolvePredicates(e.preds[from:], true)
+	return from
 }

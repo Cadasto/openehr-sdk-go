@@ -575,41 +575,42 @@ func scanDate(s string) (dateParts, error) {
 	if s == "" {
 		return p, errors.New("empty date")
 	}
-	var fields []string
+	var fields [3]string
+	var n int
 	if strings.Contains(s, "-") {
-		fields = strings.Split(s, "-")
+		var ok bool
+		if fields, n, ok = cutFields(s, "-"); !ok {
+			return p, fmt.Errorf("bad date %q", s)
+		}
 	} else { // compact form YYYY[MM[DD]]
 		switch len(s) {
 		case 4:
-			fields = []string{s}
+			fields[0], n = s, 1
 		case 6:
-			fields = []string{s[:4], s[4:6]}
+			fields[0], fields[1], n = s[:4], s[4:6], 2
 		case 8:
-			fields = []string{s[:4], s[4:6], s[6:8]}
+			fields[0], fields[1], fields[2], n = s[:4], s[4:6], s[6:8], 3
 		default:
 			return p, fmt.Errorf("bad date %q", s)
 		}
 	}
-	if len(fields) > 3 {
-		return p, fmt.Errorf("bad date %q", s)
-	}
 	widths := [3]int{4, 2, 2}
 	var nums [3]int
-	for i, f := range fields {
-		n, ok := fixedDigits(f, widths[i])
+	for i, f := range fields[:n] {
+		v, ok := fixedDigits(f, widths[i])
 		if !ok {
 			return p, fmt.Errorf("bad date %q", s)
 		}
-		nums[i] = n
+		nums[i] = v
 	}
 	p.year = nums[0]
-	if len(fields) >= 2 {
+	if n >= 2 {
 		if nums[1] < 1 || nums[1] > 12 {
 			return p, fmt.Errorf("bad month in %q", s)
 		}
 		p.month, p.monthKnown = nums[1], true
 	}
-	if len(fields) == 3 {
+	if n == 3 {
 		if nums[2] < 1 || nums[2] > daysInMonth(p.year, p.month) {
 			return p, fmt.Errorf("bad day in %q", s)
 		}
@@ -651,34 +652,38 @@ func scanTime(s string) (timeParts, error) {
 			return p, fmt.Errorf("bad fractional second in %q", s)
 		}
 	}
-	var fields []string
+	var fields [3]string
+	var n int
 	if strings.Contains(main, ":") {
 		p.colon = true
-		fields = strings.Split(main, ":")
+		var ok bool
+		if fields, n, ok = cutFields(main, ":"); !ok {
+			return p, fmt.Errorf("bad time %q", s)
+		}
 	} else { // compact form hh[mm[ss]]
 		switch len(main) {
 		case 2:
-			fields = []string{main}
+			fields[0], n = main, 1
 		case 4:
-			fields = []string{main[:2], main[2:4]}
+			fields[0], fields[1], n = main[:2], main[2:4], 2
 			p.basic = true
 		case 6:
-			fields = []string{main[:2], main[2:4], main[4:6]}
+			fields[0], fields[1], fields[2], n = main[:2], main[2:4], main[4:6], 3
 			p.basic = true
 		default:
 			return p, fmt.Errorf("bad time %q", s)
 		}
 	}
-	if len(fields) > 3 || (hasFrac && len(fields) != 3) {
+	if hasFrac && n != 3 {
 		return p, fmt.Errorf("bad time %q", s)
 	}
 	var nums [3]int
-	for i, f := range fields {
-		n, ok := fixedDigits(f, 2)
+	for i, f := range fields[:n] {
+		v, ok := fixedDigits(f, 2)
 		if !ok {
 			return p, fmt.Errorf("bad time %q", s)
 		}
-		nums[i] = n
+		nums[i] = v
 	}
 	// BASE: hh is 00 to 23; "24:00:00" is not allowed, since it would mean
 	// the date was really on the next day.
@@ -686,19 +691,21 @@ func scanTime(s string) (timeParts, error) {
 		return p, fmt.Errorf("bad hour in %q", s)
 	}
 	p.hour = nums[0]
-	if len(fields) >= 2 {
+	if n >= 2 {
 		if nums[1] > 59 {
 			return p, fmt.Errorf("bad minute in %q", s)
 		}
 		p.minute, p.minuteKnown = nums[1], true
 	}
-	if len(fields) == 3 {
+	if n == 3 {
 		if nums[2] > 60 {
 			return p, fmt.Errorf("bad second in %q", s)
 		}
 		p.second, p.secondKnown = nums[2], true
 	}
 	if hasFrac {
+		// The joined text does not outlive the call, so the compiler builds
+		// it in a stack buffer when it fits (up to 30 fraction digits).
 		f, err := strconv.ParseFloat("0."+fracDigits, 64)
 		if err != nil {
 			return p, fmt.Errorf("bad fractional second in %q", s)
@@ -706,6 +713,22 @@ func scanTime(s string) (timeParts, error) {
 		p.frac = f
 	}
 	return p, nil
+}
+
+// cutFields splits s around each sep, as strings.Split does, but into a
+// fixed array, so a scan does not allocate a slice per call. It returns the
+// fields and their count, or false when s has more than three fields.
+func cutFields(s, sep string) ([3]string, int, bool) {
+	var fields [3]string
+	n := strings.Count(s, sep) + 1
+	if n > len(fields) {
+		return fields, 0, false
+	}
+	for i := range n - 1 {
+		fields[i], s, _ = strings.Cut(s, sep)
+	}
+	fields[n-1] = s
+	return fields, n, true
 }
 
 // parseZone parses a timezone designator (Z, ±hh, ±hhmm or ±hh:mm) and

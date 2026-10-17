@@ -79,7 +79,7 @@ func TestItemPaths_REQ102_Rule(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := itemPaths("/items", tc.items); !slices.Equal(got, tc.want) {
+			if got := itemPaths("/items", asPredicates(tc.items)); !slices.Equal(got, tc.want) {
 				t.Errorf("itemPaths(%+v) = %q, want %q", tc.items, got, tc.want)
 			}
 		})
@@ -101,6 +101,41 @@ func TestPredicates_REQ102_OPTChildrenAreNeverNumbered(t *testing.T) {
 	if got := predicates(children, false); !slices.Equal(got, want) {
 		t.Errorf("predicates(%+v, false) = %q, want %q", children, got, want)
 	}
+}
+
+// itemPaths applies the path rule to items, which exist in the instance, as
+// [resolvePredicates] does, and returns the path of each below attrPath, the
+// path of their attribute, as the walk writes it.
+func itemPaths(attrPath string, items []predicate) []string {
+	resolvePredicates(items, true)
+	out := make([]string, len(items))
+	for i := range items {
+		out[i] = items[i].pathBelow(attrPath)
+	}
+	return out
+}
+
+// asPredicates returns the predicates the path rule writes into for items,
+// each holding what the rule reads of its item ([resolvePredicates]).
+func asPredicates(items []pathItem) []predicate {
+	out := make([]predicate, len(items))
+	for i, it := range items {
+		out[i].pathItem = it
+	}
+	return out
+}
+
+// predicates applies the path rule to items, numbered or not, as
+// [resolvePredicates] does, and returns each item's predicate as the walk
+// writes it, brackets included.
+func predicates(items []pathItem, numbered bool) []string {
+	preds := asPredicates(items)
+	resolvePredicates(preds, numbered)
+	out := make([]string, len(preds))
+	for i := range preds {
+		out[i] = preds[i].pathBelow("")
+	}
+	return out
 }
 
 // pinnedCluster is a CLUSTER whose two ELEMENTs share at0004 and each carry

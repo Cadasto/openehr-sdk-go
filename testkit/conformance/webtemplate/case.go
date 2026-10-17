@@ -157,8 +157,8 @@ var contextMetaLeaves = map[string]bool{
 //     composer's `_identifier:N` and `/relationship`, are not held out, which
 //     is why the match is suffix-aware. No `ctx/` short form carries them:
 //     they carry the rest of the composer at its real path, which decode
-//     reads and encode writes (ADR 0029), so they are compared like any
-//     content key instead of being absorbed by a base match.
+//     reads and encode writes, so they are compared like any content key
+//     instead of being absorbed by a base match.
 //
 // Keys are held out even when decode happens to accept them, so a metadata
 // key that survives decode does not resurface as a phantom "missing" when

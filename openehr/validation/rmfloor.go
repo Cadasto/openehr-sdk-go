@@ -23,7 +23,6 @@ package validation
 import (
 	"fmt"
 	"math"
-	"strconv"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
@@ -237,11 +236,11 @@ func (f *findings) emit(i Issue) {
 // inventory says this rule decides, such as LOCATABLE.Archetype_node_id_valid,
 // is about one of those, so each is decided on every class subject to it
 // ([invariantChecks]).
-func (f *findings) checkMandatory(rmType, attr, attrPath string, multiValued, present bool, items int) {
+func (f *findings) checkMandatory(rmType, attr string, attrPath issuePath, multiValued, present bool, items int) {
 	switch {
 	case !present && multiValued:
 		f.emit(Issue{
-			Path:   attrPath,
+			Path:   attrPath.String(),
 			Code:   "required",
 			Layer:  LayerRM,
 			Rule:   ruleMandatory,
@@ -249,7 +248,7 @@ func (f *findings) checkMandatory(rmType, attr, attrPath string, multiValued, pr
 		})
 	case !present:
 		f.emit(Issue{
-			Path:   attrPath,
+			Path:   attrPath.String(),
 			Code:   "required",
 			Layer:  LayerRM,
 			Rule:   ruleMandatory,
@@ -257,7 +256,7 @@ func (f *findings) checkMandatory(rmType, attr, attrPath string, multiValued, pr
 		})
 	case multiValued && items == 0:
 		f.emit(Issue{
-			Path:   attrPath,
+			Path:   attrPath.String(),
 			Code:   "cardinality",
 			Layer:  LayerRM,
 			Rule:   ruleCardinality,
@@ -275,21 +274,14 @@ func (f *findings) checkMandatory(rmType, attr, attrPath string, multiValued, pr
 // toward its list, so a list that holds only such items is present and not
 // empty, and toward the visit limit as one visit. A nil item the template
 // refuses is reported by the template's rule alone.
-func (f *findings) checkNilItem(rmType, attr, itemPath string) {
+func (f *findings) checkNilItem(rmType, attr string, itemPath issuePath) {
 	f.emit(Issue{
-		Path:   itemPath,
+		Path:   itemPath.String(),
 		Code:   "required",
 		Layer:  LayerRM,
 		Rule:   ruleMandatory,
 		Detail: fmt.Sprintf("item of %q on %s holds no RM value", attr, rmType),
 	})
-}
-
-// hashEntryPath returns the issue path of the entry at index i, in ascending
-// key order, of the Hash attribute at attrPath: its 1-based position, never
-// its key, which is instance data (REQ-102 Issue paths).
-func hashEntryPath(attrPath string, i int) string {
-	return attrPath + "[" + strconv.Itoa(i+1) + "]"
 }
 
 // runtimeRMType resolves the RM type to descend into: the value's runtime
@@ -305,18 +297,17 @@ func runtimeRMType(val any, declared string) string {
 	return declared
 }
 
-// checkInvariants runs the RM rules of the class of the node value, of RM
-// type rmType, at path, and records the class as visited. The rules are the
-// inventory's ([floorRules]): the evaluators of the evaluated invariants the
-// class and its ancestors declare, the coded ones included, and the
-// attribute checks that apply to the class. A type no registered class has
-// runs nothing (this is a floor, not an exhaustive RM check). It returns the
-// class's rules, nil for such a type, and the bare class name of rmType,
-// which the walk reads the class's attributes by ([classAttributes]).
-func (f *findings) checkInvariants(value any, rmType, path string) (*classRules, string) {
-	rules, class := rulesFor(rmType)
+// checkInvariants runs rules, the RM rules of the class of the node value,
+// of RM type rmType, on the node at path, and records the class as visited.
+// The rules are the inventory's ([floorRules]), which the walk finds with
+// the class's attributes in one lookup ([classOf]): the evaluators of the
+// evaluated invariants the class and its ancestors declare, the coded ones
+// included, and the attribute checks that apply to the class. Nil rules,
+// those of a type no registered class has, run nothing (this is a floor, not
+// an exhaustive RM check).
+func (f *findings) checkInvariants(value any, rmType string, path issuePath, rules *classRules) {
 	if rules == nil {
-		return nil, class
+		return
 	}
 	f.visited = f.visited.with(rules.index)
 	n := floorNode{value: value, rmType: rmType, path: path}
@@ -326,7 +317,6 @@ func (f *findings) checkInvariants(value any, rmType, path string) (*classRules,
 	if len(rules.coded) > 0 {
 		f.checkCodedInvariants(value, rmType, path, rules.coded)
 	}
-	return rules, class
 }
 
 // checkArchetypeRoot enforces the archetype-root rule on a node whose class
@@ -342,14 +332,14 @@ func (f *findings) checkInvariants(value any, rmType, path string) (*classRules,
 // concrete implements. The issue's rule is the Is_archetype_root invariant
 // that dispatched the check: the one the class declares, or the one its
 // ancestor PARTY or ENTRY declares.
-func (f *findings) checkArchetypeRoot(value any, rmType, path, rule string) {
+func (f *findings) checkArchetypeRoot(value any, rmType string, path issuePath, rule string) {
 	l, ok := value.(rm.Locatable)
 	if !ok || rmaccess.IsTypedNilPointer(value) {
 		return
 	}
 	if l.GetArchetypeDetails() == nil {
 		f.emit(Issue{
-			Path:   joinPath(path, "/archetype_details"),
+			Path:   path.join("/archetype_details"),
 			Code:   "is_archetype_root",
 			Layer:  LayerRM,
 			Rule:   rule,
@@ -371,14 +361,14 @@ func (f *findings) checkArchetypeRoot(value any, rmType, path, rule string) {
 //
 // The ARCHETYPE_ID grammar is not checked, and template_id is optional.
 // Diagnostics name the attribute, never its value.
-func (f *findings) checkArchetyped(value any, path string) {
+func (f *findings) checkArchetyped(value any, path issuePath) {
 	a, ok := asArchetyped(value)
 	if !ok {
 		return
 	}
 	if a.ArchetypeID.Value == "" {
 		f.emit(Issue{
-			Path:   joinPath(path, "/archetype_id/value"),
+			Path:   path.join("/archetype_id/value"),
 			Code:   "required",
 			Layer:  LayerRM,
 			Rule:   ruleMandatory,
@@ -387,7 +377,7 @@ func (f *findings) checkArchetyped(value any, path string) {
 	}
 	if a.RMVersion == "" {
 		f.emit(Issue{
-			Path:   joinPath(path, "/rm_version"),
+			Path:   path.join("/rm_version"),
 			Code:   "rm_version_valid",
 			Layer:  LayerRM,
 			Rule:   ruleRMVersionValid,
@@ -436,14 +426,14 @@ func mayBeBlank(role floorRole, attr string) bool {
 // The Detail names the attribute and the allowed range, never the
 // precision the instance carries; that precision is carried in Issue.Value
 // (REQ-168).
-func (f *findings) checkDVQuantity(value any, path string) {
+func (f *findings) checkDVQuantity(value any, path issuePath) {
 	q, ok := asDVQuantity(value)
 	if !ok {
 		return
 	}
 	if q.Precision != nil && int(*q.Precision) < -1 {
 		f.emit(Issue{
-			Path:   path,
+			Path:   path.String(),
 			Code:   "rm_invariant",
 			Layer:  LayerRM,
 			Rule:   rulePrecisionRange,
@@ -481,7 +471,7 @@ func (f *findings) checkDVQuantity(value any, path string) {
 // value the check read is carried in Issue.Value: the precision on the
 // range arm, and the numerator and the denominator, as a [2]float64, on
 // the integrality arm.
-func (f *findings) checkDVProportion(value any, path string) {
+func (f *findings) checkDVProportion(value any, path issuePath) {
 	p, ok := asDVProportion(value)
 	if !ok || p.Precision == nil {
 		return
@@ -489,7 +479,7 @@ func (f *findings) checkDVProportion(value any, path string) {
 	switch prec := int(*p.Precision); {
 	case prec < -1:
 		f.emit(Issue{
-			Path:   path,
+			Path:   path.String(),
 			Code:   "rm_invariant",
 			Layer:  LayerRM,
 			Rule:   rulePrecisionRange,
@@ -506,7 +496,7 @@ func (f *findings) checkDVProportion(value any, path string) {
 		}
 		if len(fractional) > 0 {
 			f.emit(Issue{
-				Path:   path,
+				Path:   path.String(),
 				Code:   "rm_invariant",
 				Layer:  LayerRM,
 				Rule:   ruleProportionPrecision,
@@ -538,13 +528,13 @@ func isIntegralReal(v rm.Real) bool {
 // the offending value (REQ-168); that value string is carried in
 // Issue.Value. The issue's rule is the Value_valid invariant that dispatched
 // the check, the one the node's own class declares.
-func (f *findings) checkTemporalValue(value any, rmType, path, rule string) {
+func (f *findings) checkTemporalValue(value any, rmType string, path issuePath, rule string) {
 	text, valid, ok := temporalValue(value)
 	if !ok || valid || text == "" {
 		return
 	}
 	f.emit(Issue{
-		Path:   path,
+		Path:   path.String(),
 		Code:   "rm_invariant",
 		Layer:  LayerRM,
 		Rule:   rule,
@@ -558,7 +548,7 @@ func (f *findings) checkTemporalValue(value any, rmType, path, rule string) {
 // ELEMENT. is_null() means there is no `value`, so exactly one of `value` and
 // `null_flavour` must be present. A typed-nil `value` counts as absent, as it
 // does everywhere else in the walk. The rule is reported on the ELEMENT.
-func (f *findings) checkElementNullFlavour(value any, path string) {
+func (f *findings) checkElementNullFlavour(value any, path issuePath) {
 	e, ok := asElement(value)
 	if !ok {
 		return
@@ -568,7 +558,7 @@ func (f *findings) checkElementNullFlavour(value any, path string) {
 	switch {
 	case hasValue && hasNullFlavour:
 		f.emit(Issue{
-			Path:   path,
+			Path:   path.String(),
 			Code:   "rm_invariant",
 			Layer:  LayerRM,
 			Rule:   ruleNullFlavourIndicated,
@@ -576,7 +566,7 @@ func (f *findings) checkElementNullFlavour(value any, path string) {
 		})
 	case !hasValue && !hasNullFlavour:
 		f.emit(Issue{
-			Path:   path,
+			Path:   path.String(),
 			Code:   "rm_invariant",
 			Layer:  LayerRM,
 			Rule:   ruleNullFlavourIndicated,
@@ -599,14 +589,14 @@ func (f *findings) checkElementNullFlavour(value any, path string) {
 // two compared magnitudes are carried in Issue.Value, lower first, as a
 // [2]float64 (REQ-168), each in UTC for two values ordered as instants.
 // rmType is the node's RM type, which the flag check names.
-func (f *findings) checkDVInterval(value any, rmType, path string) {
+func (f *findings) checkDVInterval(value any, rmType string, path issuePath) {
 	f.checkIntervalFlags(value, rmType, path)
 	order, ok := dvIntervalOrder(value)
 	if !ok || !order.inverted {
 		return
 	}
 	f.emit(Issue{
-		Path:   path,
+		Path:   path.String(),
 		Code:   "rm_invariant",
 		Layer:  LayerRM,
 		Rule:   ruleIntervalLimits,
@@ -628,7 +618,7 @@ func (f *findings) checkDVInterval(value any, rmType, path string) {
 // Detail names the class of the node, rmType without its generic parameters,
 // the flags and the invariant, never a bound. The check reads only the two
 // flags, which the code already states, so the issue's Value stays empty.
-func (f *findings) checkIntervalFlags(value any, rmType, path string) {
+func (f *findings) checkIntervalFlags(value any, rmType string, path issuePath) {
 	class := bmmtype.Class(rmType)
 	for _, side := range [...]struct{ end, code, invariant, rule string }{
 		{end: "lower", code: "lower_included_valid", invariant: "Lower_included_valid", rule: ruleLowerIncludedValid},
@@ -638,7 +628,7 @@ func (f *findings) checkIntervalFlags(value any, rmType, path string) {
 			continue
 		}
 		f.emit(Issue{
-			Path:   path,
+			Path:   path.String(),
 			Code:   side.code,
 			Layer:  LayerRM,
 			Rule:   side.rule,
@@ -665,7 +655,7 @@ func intervalFlagSet(value any, attr string) bool {
 // class itself declares: a LOCATABLE_REF's own UID_BASED_ID, not the
 // OBJECT_REF id it embeds. It reads type and namespace through the
 // [rm.ObjectRefLike] interface (REQ-052), so any BMM subtype is covered.
-func (f *findings) checkObjectRef(value any, path string) {
+func (f *findings) checkObjectRef(value any, path issuePath) {
 	if value == nil || rmaccess.IsTypedNilPointer(value) {
 		return
 	}
@@ -675,7 +665,7 @@ func (f *findings) checkObjectRef(value any, path string) {
 	}
 	if _, present := rmaccess.Single(value, "id"); !present {
 		f.emit(Issue{
-			Path:   joinPath(path, "/id"),
+			Path:   path.join("/id"),
 			Code:   "rm_invariant",
 			Layer:  LayerRM,
 			Rule:   ruleMandatory,
@@ -684,7 +674,7 @@ func (f *findings) checkObjectRef(value any, path string) {
 	}
 	if ref.GetType() == "" {
 		f.emit(Issue{
-			Path:   joinPath(path, "/type"),
+			Path:   path.join("/type"),
 			Code:   "rm_invariant",
 			Layer:  LayerRM,
 			Rule:   ruleMandatory,
@@ -693,7 +683,7 @@ func (f *findings) checkObjectRef(value any, path string) {
 	}
 	if ref.GetNamespace() == "" {
 		f.emit(Issue{
-			Path:   joinPath(path, "/namespace"),
+			Path:   path.join("/namespace"),
 			Code:   "rm_invariant",
 			Layer:  LayerRM,
 			Rule:   ruleMandatory,
@@ -722,14 +712,14 @@ func (f *findings) checkObjectRef(value any, path string) {
 //
 // Diagnostics name the attribute and the RM rule, never the offending value
 // (REQ-168).
-func (f *findings) checkPartyIdentified(value any, path string) {
+func (f *findings) checkPartyIdentified(value any, path issuePath) {
 	p, ok := asPartyIdentified(value)
 	if !ok {
 		return
 	}
 	if p.Name == nil && p.Identifiers == nil && p.ExternalRef == nil {
 		f.emit(Issue{
-			Path:   path,
+			Path:   path.String(),
 			Code:   "rm_invariant",
 			Layer:  LayerRM,
 			Rule:   rulePartyBasicValidity,
@@ -738,7 +728,7 @@ func (f *findings) checkPartyIdentified(value any, path string) {
 	}
 	if p.Name != nil && *p.Name == "" {
 		f.emit(Issue{
-			Path:   joinPath(path, "/name"),
+			Path:   path.join("/name"),
 			Code:   "rm_invariant",
 			Layer:  LayerRM,
 			Rule:   rulePartyNameValid,
@@ -747,7 +737,7 @@ func (f *findings) checkPartyIdentified(value any, path string) {
 	}
 	if p.Identifiers != nil && len(p.Identifiers) == 0 {
 		f.emit(Issue{
-			Path:   joinPath(path, "/identifiers"),
+			Path:   path.join("/identifiers"),
 			Code:   "rm_invariant",
 			Layer:  LayerRM,
 			Rule:   rulePartyIdentifiersValid,
@@ -773,14 +763,14 @@ func (f *findings) checkPartyIdentified(value any, path string) {
 // Diagnostics name the attribute only, never a value from the instance
 // (REQ-168). The check reads no value, only the list's length, so the
 // issue's Value stays empty.
-func (f *findings) checkTermMappings(value any, path string) {
+func (f *findings) checkTermMappings(value any, path issuePath) {
 	ms, ok := asMappings(value)
 	if !ok {
 		return
 	}
 	if ms != nil && len(ms) == 0 {
 		f.emit(Issue{
-			Path:   joinPath(path, "/mappings"),
+			Path:   path.join("/mappings"),
 			Code:   "mappings_valid",
 			Layer:  LayerRM,
 			Rule:   ruleMappingsValid,
@@ -798,7 +788,7 @@ func (f *findings) checkTermMappings(value any, path string) {
 //
 // The diagnostic names the attribute and the allowed set only — never the
 // offending value (REQ-168); the match is carried in Issue.Value.
-func (f *findings) checkTermMapping(value any, path string) {
+func (f *findings) checkTermMapping(value any, path issuePath) {
 	m, ok := asTermMapping(value)
 	if !ok {
 		return
@@ -807,7 +797,7 @@ func (f *findings) checkTermMapping(value any, path string) {
 	case ">", "=", "<", "?":
 	default:
 		f.emit(Issue{
-			Path:   joinPath(path, "/match"),
+			Path:   path.join("/match"),
 			Code:   "term_mapping_match",
 			Layer:  LayerRM,
 			Rule:   ruleTermMappingMatch,

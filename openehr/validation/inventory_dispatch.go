@@ -53,7 +53,9 @@ type inventoryEntry struct {
 type floorNode struct {
 	value  any
 	rmType string
-	path   string
+	// path is the node's issue path, a handle valid while the walk visits
+	// the node ([issuePath]); an evaluator writes it only into an issue.
+	path issuePath
 }
 
 // invariantCheck binds an evaluated invariant to the evaluator that
@@ -86,7 +88,7 @@ type invariantCheck struct {
 const mandatoryCheck = "checkMandatory"
 
 // nodeCheck binds an evaluator that reads the node's value and path.
-func nodeCheck(function string, f func(*findings, any, string)) invariantCheck {
+func nodeCheck(function string, f func(*findings, any, issuePath)) invariantCheck {
 	return invariantCheck{function: function, run: func(into *findings, n floorNode, _ string) {
 		f(into, n.value, n.path)
 	}}
@@ -94,7 +96,7 @@ func nodeCheck(function string, f func(*findings, any, string)) invariantCheck {
 
 // typeCheck binds an evaluator that also reads the node's RM type, to name
 // the class it reports on.
-func typeCheck(function string, f func(*findings, any, string, string)) invariantCheck {
+func typeCheck(function string, f func(*findings, any, string, issuePath)) invariantCheck {
 	return invariantCheck{function: function, run: func(into *findings, n floorNode, _ string) {
 		f(into, n.value, n.rmType, n.path)
 	}}
@@ -105,7 +107,7 @@ func typeCheck(function string, f func(*findings, any, string, string)) invarian
 // several classes (Value_valid), or one invariant declared on an ancestor of
 // several (Is_archetype_root), and the rule it reports is always the
 // inventory's key.
-func ruleCheck(function string, f func(*findings, any, string, string, string)) invariantCheck {
+func ruleCheck(function string, f func(*findings, any, string, issuePath, string)) invariantCheck {
 	return invariantCheck{function: function, perRule: true, run: func(into *findings, n floorNode, rule string) {
 		f(into, n.value, n.rmType, n.path, rule)
 	}}
@@ -361,43 +363,54 @@ var floorRules = pinnedSource.build()
 
 // classAttributes holds, for each class the pinned class metadata knows, by
 // its bare name, what the metadata says of each attribute it lists for the
-// class ([classFacts]), which the one walk reads every node by.
-// Built once, when the package is initialised, and never changed, so the
-// walk asks the metadata nothing per node.
-var classAttributes = buildClassAttributes(rminfo.Default)
+// class ([classFacts]) and how the one walk reads each one it visits on a
+// node of the class ([walkedAttr]). Built once, when the package is
+// initialised, and never changed, so the walk asks the metadata nothing per
+// node and builds no attribute per node but the part a node's role decides
+// ([engineAttr.inRole]).
+var classAttributes = buildClassAttributes(rminfo.Default, floorRules.byClass)
 
 // classAttributeTable is what the class metadata says of the attributes of
-// one class: each attribute it lists, in its order, and the position of each
-// by name.
+// one class: each attribute it lists, in its order; each of those the walk
+// visits on a node of the class, those a serialization carries and the
+// metadata gives a type, in the same order, as the walk reads them with no
+// template declaration ([walkedAttr]); and the position of each of these by
+// name. The pinned metadata lists no name twice for a class.
 type classAttributeTable struct {
 	listed []attributeFacts
+	walked []engineAttr
 	byName map[string]int
 }
 
-// lookup returns the facts of the attribute name the table lists, with ok
-// set; ok is unset when it lists none by that name. A nil table lists none.
-func (t *classAttributeTable) lookup(name string) (f attributeFacts, ok bool) {
+// position returns the position in walked of the attribute name the table
+// walks, with ok set; ok is unset when the table walks none by that name:
+// one the class does not list, no serialization carries or the metadata
+// gives no type. A nil table walks none.
+func (t *classAttributeTable) position(name string) (i int, ok bool) {
 	if t == nil {
-		return f, false
+		return 0, false
 	}
-	i, ok := t.byName[name]
-	if !ok {
-		return f, false
-	}
-	return t.listed[i], true
+	i, ok = t.byName[name]
+	return i, ok
 }
 
-// buildClassAttributes builds [classAttributes] for every class l knows.
-func buildClassAttributes(l rminfo.Lookup) map[string]*classAttributeTable {
+// buildClassAttributes builds [classAttributes] for every class l knows,
+// whose rules, nil for a class the type registry does not decode, rules
+// holds.
+func buildClassAttributes(l rminfo.Lookup, rules map[string]*classRules) map[string]*classAttributeTable {
 	known := l.KnownRMTypes()
 	out := make(map[string]*classAttributeTable, len(known))
 	for _, class := range known {
 		listed := classFacts(class)
-		byName := make(map[string]int, len(listed))
-		for i, f := range listed {
-			byName[f.Name] = i
+		t := &classAttributeTable{listed: listed, byName: make(map[string]int, len(listed))}
+		for _, f := range listed {
+			if f.NonStorable || !f.Typed {
+				continue
+			}
+			t.byName[f.Name] = len(t.walked)
+			t.walked = append(t.walked, walkedAttr(f, rules[class]))
 		}
-		out[class] = &classAttributeTable{listed: listed, byName: byName}
+		out[class] = t
 	}
 	return out
 }
@@ -573,15 +586,62 @@ func conformsTo(h rminfo.Hierarchy, class, ancestor string) bool {
 	return ok && known
 }
 
+// classEntry is what the walk reads of one class at a node, found by the
+// class's bare name in one lookup ([classOf]): the class's RM rules
+// ([floorRules]), nil for a class the type registry does not decode, and
+// the table of the attributes the class metadata lists for it
+// ([classAttributes]), nil for a class the metadata does not know.
+type classEntry struct {
+	rules *classRules
+	attrs *classAttributeTable
+}
+
+// classEntries holds the entry of every class that has RM rules or an
+// attribute table, by its bare name. The two sets need not be the same: in
+// the pinned RM every class the type registry decodes has a table, while
+// the classes the metadata knows that the registry does not decode, the
+// abstract ones such as LOCATABLE and DV_ORDERED among them, have a table
+// and no rules. Built once, when the package is initialised.
+var classEntries = joinClasses(floorRules.byClass, classAttributes)
+
+// joinClasses returns the entry of every class rules or tables holds, each
+// with what the other holds for it, if anything.
+func joinClasses(rules map[string]*classRules, tables map[string]*classAttributeTable) map[string]classEntry {
+	out := make(map[string]classEntry, max(len(rules), len(tables)))
+	for class, r := range rules {
+		out[class] = classEntry{rules: r, attrs: tables[class]}
+	}
+	for class, t := range tables {
+		if _, done := out[class]; !done {
+			out[class] = classEntry{attrs: t}
+		}
+	}
+	return out
+}
+
+// classOf returns the entry of the class of a node of RM type rmType, which
+// may carry a generic bound (DV_INTERVAL<DV_QUANTITY>), and the bare class
+// name; the zero entry, no rules and no table, for a type no class has.
+func classOf(rmType string) (classEntry, string) {
+	class := bareClass(rmType)
+	return classEntries[class], class
+}
+
 // rulesFor returns the RM rules for a node of RM type rmType, which may
 // carry a generic bound (DV_INTERVAL<DV_QUANTITY>), and the bare class name;
-// nil rules for a type no registered class has.
+// nil rules for a type no registered class has. It reads [floorRules]
+// itself, so the class tables can ask it while they are built.
 func rulesFor(rmType string) (*classRules, string) {
-	class := rmType
-	if strings.IndexByte(rmType, '<') >= 0 {
-		class = bmmtype.Class(rmType)
-	}
+	class := bareClass(rmType)
 	return floorRules.byClass[class], class
+}
+
+// bareClass returns the RM type rmType without its generic bound, if any.
+func bareClass(rmType string) string {
+	if strings.IndexByte(rmType, '<') >= 0 {
+		return bmmtype.Class(rmType)
+	}
+	return rmType
 }
 
 // unevaluatedIn returns, sorted and once each, the invariants the classes of

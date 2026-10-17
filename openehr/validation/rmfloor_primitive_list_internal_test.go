@@ -23,26 +23,25 @@ import (
 // whether the list is there and empty without reading its items (REQ-171
 // Structural access).
 func TestEngine_REQ112_REQ171_MandatoryPrimitiveListCounted(t *testing.T) {
-	facts, ok := classAttributes["DV_MULTIMEDIA"].lookup("data")
-	if !ok {
-		t.Fatal("the class table lists no DV_MULTIMEDIA data")
+	walked := walkedNamed(classAttributes["DV_MULTIMEDIA"], "data")
+	if walked == nil {
+		t.Fatal("the class table walks no DV_MULTIMEDIA data")
 	}
-	data := attrFromFacts(engineNode{}, facts, nil)
+	data := walked.inRole(roleNone)
 	if data.shape != shapeCounted || data.mandatory {
 		t.Fatalf("precondition: DV_MULTIMEDIA data reads as shape %d, mandatory %t; want a counted list the pinned RM leaves optional", data.shape, data.mandatory)
 	}
 	data.mandatory = true
 	visit := func(payload []byte) []string {
 		e := newEngine(Limits{})
-		e.visitAttribute(engineNode{
+		e.visitAttribute(&engineNode{
 			value: &rm.DVMultimedia{
 				MediaType: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "IANA_media-types"}, CodeString: "image/png"},
 				Size:      rm.Integer(len(payload)),
 				Data:      payload,
 			},
 			rmType: "DV_MULTIMEDIA",
-			path:   "/",
-		}, "DV_MULTIMEDIA", data)
+		}, "DV_MULTIMEDIA", &data)
 		var got []string
 		for _, i := range e.found.issues {
 			got = append(got, i.Code+" "+i.Path+" "+i.Layer.String()+" "+i.Rule)
