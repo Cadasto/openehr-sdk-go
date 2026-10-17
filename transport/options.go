@@ -115,7 +115,8 @@ func WithLogger(l *slog.Logger) Option {
 }
 
 // WithObserver installs an Observer. The observer fires
-// exactly once per logical Client.Do call after retries settle. A nil
+// exactly once per logical Client.Do call after retries settle, a call
+// that Client.Do refuses before any attempt included. A nil
 // observer is treated as a no-op (safe to pass through configuration
 // layers that don't know whether the consumer wants observability).
 func WithObserver(o Observer) Option {

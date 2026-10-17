@@ -169,39 +169,24 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 	if c == nil {
 		return nil, fmt.Errorf("transport.Do: %w: nil Client", ErrInvalidConfig)
 	}
-	if req == nil {
-		return nil, fmt.Errorf("transport.Do: %w: nil Request", ErrInvalidConfig)
+	// Skip the wall-clock capture when no observer is registered —
+	// the cost is only sub-µs (time.Now is a vDSO call) but observerless
+	// callers are the hot path the benchmark consumer of REQ-098 cares
+	// about. Gate at the call site so emitObservation has no nil-check.
+	// It is taken first, so a refusal's Duration covers the checks too.
+	var start time.Time
+	if c.cfg.observer != nil {
+		start = time.Now()
 	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	svc, ok := c.catalog.Service(req.effectiveServiceID())
-	if !ok {
-		return nil, fmt.Errorf("%w: %q", ErrServiceUnavailable, req.effectiveServiceID())
-	}
-	// REQ-150: validate before the URL is built, so a traversal or
-	// control-character segment never reaches the wire. Both checks live
-	// here rather than inside joinTarget: the arity half needs req.Route,
-	// and joinTarget's error is re-wrapped with ErrInvalidConfig below —
-	// returning the validators' chain through that branch would wrap the
-	// sentinel twice.
-	if err := ValidateRequestPath(req.Path); err != nil {
-		return nil, err
-	}
-	// A parameter carrying `/` yields individually legal segments, so only
-	// the arity betrays it. Keyed on req.Route directly, never on
-	// effectiveRoute() — that falls back to Path, and comparing a path's
-	// arity against itself never fires. The error names the two counts and
-	// the template, never the path, which holds the caller's identifiers
-	// (REQ-093); a template holds none.
-	if req.Route != "" {
-		if got, want := segmentCount(req.Path), segmentCount(req.Route); got != want {
-			return nil, fmt.Errorf("%w: %w: path has %d segments, route template %q has %d", ErrInvalidConfig, ErrInvalidPathSegment, got, req.Route, want)
-		}
-	}
-	target, err := joinTarget(svc.BaseURL, req.Path, req.Query)
+	svc, target, err := c.prepare(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrInvalidConfig, err)
+		// REQ-098: a call refused before any attempt is still one logical
+		// call, so the observer fires for it too, with no attempt, no status
+		// and no URL, since none was built.
+		if c.cfg.observer != nil {
+			c.emitObservation(ctx, req, nil, nil, err, 0, time.Since(start))
+		}
+		return nil, err
 	}
 
 	tp := c.cfg.tracerProvider
@@ -222,14 +207,6 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 	)
 	defer span.End()
 
-	// Skip the wall-clock capture when no observer is registered —
-	// the cost is only sub-µs (time.Now is a vDSO call) but observerless
-	// callers are the hot path the benchmark consumer of REQ-098 cares
-	// about. Gate at the call site so emitObservation has no nil-check.
-	var start time.Time
-	if c.cfg.observer != nil {
-		start = time.Now()
-	}
 	var (
 		resp        *Response
 		lastErr     error
@@ -318,19 +295,64 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 	return resp, nil
 }
 
+// prepare runs the checks Do makes before any attempt and resolves the URL
+// the request is sent to. Every error it returns is a refusal: nothing has
+// left the process. The URL is nil with any error.
+func (c *Client) prepare(ctx context.Context, req *Request) (discovery.ServiceEntry, *url.URL, error) {
+	if req == nil {
+		return discovery.ServiceEntry{}, nil, fmt.Errorf("transport.Do: %w: nil Request", ErrInvalidConfig)
+	}
+	if err := ctx.Err(); err != nil {
+		return discovery.ServiceEntry{}, nil, err
+	}
+	svc, ok := c.catalog.Service(req.effectiveServiceID())
+	if !ok {
+		return discovery.ServiceEntry{}, nil, fmt.Errorf("%w: %q", ErrServiceUnavailable, req.effectiveServiceID())
+	}
+	// REQ-150: validate before the URL is built, so a traversal or
+	// control-character segment never reaches the wire. Both checks live
+	// here rather than inside joinTarget: the arity half needs req.Route,
+	// and joinTarget's error is re-wrapped with ErrInvalidConfig below —
+	// returning the validators' chain through that branch would wrap the
+	// sentinel twice.
+	if err := ValidateRequestPath(req.Path); err != nil {
+		return discovery.ServiceEntry{}, nil, err
+	}
+	// A parameter carrying `/` yields individually legal segments, so only
+	// the arity betrays it. Keyed on req.Route directly, never on
+	// effectiveRoute() — that falls back to Path, and comparing a path's
+	// arity against itself never fires. The error names the two counts and
+	// the template, never the path, which holds the caller's identifiers
+	// (REQ-093); a template holds none.
+	if req.Route != "" {
+		if got, want := segmentCount(req.Path), segmentCount(req.Route); got != want {
+			return discovery.ServiceEntry{}, nil, fmt.Errorf("%w: %w: path has %d segments, route template %q has %d", ErrInvalidConfig, ErrInvalidPathSegment, got, req.Route, want)
+		}
+	}
+	target, err := joinTarget(svc.BaseURL, req.Path, req.Query)
+	if err != nil {
+		return discovery.ServiceEntry{}, nil, fmt.Errorf("%w: %w", ErrInvalidConfig, err)
+	}
+	return svc, target, nil
+}
+
 // emitObservation delivers an Observation to the configured Observer
 // (REQ-098). Caller MUST ensure c.cfg.observer is non-nil. Panics
 // inside the observer are recovered and logged via the configured
 // slog.Logger so a faulty observer cannot break request handling.
+// A nil req (a call refused for it) leaves Method and Route empty, and a
+// nil target leaves URL empty.
 func (c *Client) emitObservation(ctx context.Context, req *Request, target *url.URL, resp *Response, err error, attempts int, dur time.Duration) {
 	obs := Observation{
-		Method:   req.effectiveMethod(),
-		Route:    req.effectiveRoute(),
 		URL:      sanitisedURL(target),
 		Duration: dur,
 		Attempts: attempts,
 		Err:      err,
 		Tags:     observationTagsFromContext(ctx),
+	}
+	if req != nil {
+		obs.Method = req.effectiveMethod()
+		obs.Route = req.effectiveRoute()
 	}
 	if resp != nil {
 		obs.StatusCode = resp.StatusCode
