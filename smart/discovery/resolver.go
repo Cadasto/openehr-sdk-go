@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cadasto/openehr-sdk-go/internal/coalesce"
 	"github.com/cadasto/openehr-sdk-go/internal/urlredact"
 )
 
@@ -340,8 +341,9 @@ func ownEntry(baseURL string, cat *ServiceCatalog, ok bool) *ServiceCatalog {
 // starter returns an error that reports its context's error, and the failure
 // says nothing about the Platform. The fetch failed that way when its error
 // reports the error of the starter's ended context or the cause that context
-// ended with (see endedByContext). Such a failure leaves the cache as it was,
-// and a waiter whose own context is still live does not receive it. That
+// ended with (the rule internal/coalesce.EndedByContext states, which the
+// auth sources share). Such a failure leaves the cache as it was, and a
+// waiter whose own context is still live does not receive it. That
 // waiter fetches again, joining the next in-flight fetch for baseURL or, when
 // there is none, running one under its own context. It repeats this only
 // while its own context is live, and each round is a real fetch, so it ends
@@ -416,7 +418,7 @@ func (r *Resolver) runCall(ctx context.Context, baseURL string, cached *ServiceC
 	defer r.release(baseURL, call)
 
 	cat, err := r.fetch(ctx, baseURL, cached)
-	ownContextEnded := endedByContext(ctx, err)
+	ownContextEnded := coalesce.EndedByContext(ctx, err)
 
 	// Write the cache while this call is still in flight. A caller arriving
 	// meanwhile joins it, so no later fetch for baseURL can write the cache
@@ -463,21 +465,6 @@ func (r *Resolver) release(baseURL string, call *resolveCall) {
 	delete(r.inflight, baseURL)
 	r.mu.Unlock()
 	close(call.done)
-}
-
-// endedByContext reports whether err means the fetch failed only because ctx
-// ended: ctx is done, and err reports ctx's own error or its cause. The cause
-// counts because net/http returns context.Cause(ctx) when a request's context
-// ends, so a context ended with a cause (context.WithCancelCause,
-// context.WithTimeoutCause, errgroup) yields an error that reports the cause
-// and not context.Canceled or context.DeadlineExceeded. An error that reports
-// some other context error does not count and is a failure of the fetch: the
-// HTTP client's own timeout reports context.DeadlineExceeded whether ctx is
-// live or was only cancelled.
-func endedByContext(ctx context.Context, err error) bool {
-	ctxErr := ctx.Err()
-	return err != nil && ctxErr != nil &&
-		(errors.Is(err, ctxErr) || errors.Is(err, context.Cause(ctx)))
 }
 
 // fetch retrieves, validates and confirms the SMART configuration at
