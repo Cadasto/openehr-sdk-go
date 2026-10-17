@@ -79,10 +79,13 @@ func significantDigits(s string) int {
 	return digits
 }
 
-// errPrecisionLoss is returned, carrying typereg.ErrInvalidShape, when a
-// decimal literal exceeds maxSignificantDigits. Kept in one place (both
+// errPrecisionLoss is the refusal, carrying typereg.ErrInvalidShape, of a
+// decimal literal that exceeds maxSignificantDigits. Kept in one place (both
 // UnmarshalJSON branches share it) so the sentinel and the value-free
-// message text (REQ-093) cannot drift between them.
+// message text (REQ-093) cannot drift between them. Each refusal returns it
+// inside a per-call refused.Literal carrier holding the literal for the entry
+// point's DecodeError.Value; the carrier's message is this one and one
+// errors.Unwrap step reaches it, so errors.Is(err, errPrecisionLoss) holds.
 //
 // The text names the digit budget rather than claiming the value is
 // unrepresentable, because for the budget's documented false positive
@@ -110,14 +113,17 @@ var errPrecisionLoss = typereg.ClassifyShape(fmt.Errorf("rm.Real: literal carrie
 // *strconv.NumError from the quoted arm, an encoding/json/v2
 // *json.SemanticError (or a *jsontext.SyntacticError for a malformed
 // literal) from the bare arm, each reachable with errors.As and each
-// staying outside typereg.ErrInvalidShape. A quoted literal that does not
-// parse also carries its JSON text, quotes included, which a canjson entry
-// point holds in DecodeError.Value; the message
-// names it once, in the strconv cause. Only a literal that parsed is
+// staying outside typereg.ErrInvalidShape. Only a literal that parsed is
 // then measured against the 17-digit limit, and only a literal that
 // passed both is assigned to the receiver. Reversing the order would report
 // "1e400" or "123456789012345678x" as precision loss, which is a
 // misdiagnosis: the value never parsed at all.
+//
+// Two refusals also carry the literal's JSON text as the document wrote it,
+// quotes included for a quoted literal, which a canjson entry point holds in
+// DecodeError.Value: a quoted literal that does not parse, and a literal past
+// the 17-digit limit. The text adds nothing to the message, which names a
+// quoted literal once, in the strconv cause.
 //
 // A nil receiver is refused with an error rather than dereferenced. That
 // refusal carries typereg.ErrNilReceiver, not typereg.ErrInvalidShape,
@@ -139,15 +145,14 @@ func (r *Real) UnmarshalJSON(b []byte) error {
 		}
 		f, err := strconv.ParseFloat(s, 64)
 		if err != nil {
-			// The *strconv.NumError already quotes the literal once; a second
-			// echo here would double it (wire.md § REQ-052, causes may name
-			// the literal — the prefix must not repeat it). The JSON text as
-			// written rides beside it for the entry point's DecodeError.Value,
-			// and never reaches the message.
+			// wire.md § REQ-052: the literal appears once, in the
+			// *strconv.NumError cause, and in the entry point's
+			// DecodeError.Value, which the carrier fills from the JSON text as
+			// written. The prefix does not repeat it.
 			return refused.Literal(b, fmt.Errorf("rm.Real: parse quoted literal: %w", err))
 		}
 		if significantDigits(s) > maxSignificantDigits {
-			return errPrecisionLoss
+			return refused.Literal(b, errPrecisionLoss)
 		}
 		*r = Real(f)
 		return nil
@@ -157,7 +162,7 @@ func (r *Real) UnmarshalJSON(b []byte) error {
 		return fmt.Errorf("rm.Real: %w", err)
 	}
 	if significantDigits(string(b)) > maxSignificantDigits {
-		return errPrecisionLoss
+		return refused.Literal(b, errPrecisionLoss)
 	}
 	*r = Real(f)
 	return nil

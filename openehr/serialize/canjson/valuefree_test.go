@@ -174,6 +174,111 @@ func TestUnmarshal_REQ052_ValueFreeDecodeErrors(t *testing.T) {
 	}
 }
 
+// TestUnmarshal_REQ052_PrimitiveRefusalsKeepTheLiteralInValue is REQ-052's
+// acceptance line for the SDK's own primitive codecs: decoded with
+// canjson.Unmarshal, and with a canjson.Decoder in every decode mode,
+// Value.Reveal() returns the refused literal, as the document wrote it, for an
+// rm.Real number past its digit budget and for a two-character value
+// rm.Character refuses, and nothing for a value of the wrong JSON kind. In
+// every case Error() names the pointer and carries none of the document's
+// values.
+//
+// Can-fail control: return rm.Real's digit-budget refusal or rm.Character's
+// one-character refusal without the literal and the matching rows' Value
+// assertions fail.
+func TestUnmarshal_REQ052_PrimitiveRefusalsKeepTheLiteralInValue(t *testing.T) {
+	const (
+		mappings = `{"_type":"DV_TEXT","value":"a","mappings":[{"_type":"TERM_MAPPING","match":`
+		mapped   = `,"target":{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"SNOMED-CT"},"code_string":"73211009"}}]}`
+	)
+	cases := []struct {
+		name    string
+		in      string
+		targets []target
+		pointer string
+		absent  []string // values from the document the text must not carry
+		value   any      // want Value.Reveal()
+	}{
+		{
+			name:    "Real past its digit budget, a number",
+			in:      `{"_type":"DV_QUANTITY","magnitude":0.1234567890123456789,"units":"kg"}`,
+			targets: concreteAndSlot(func() any { return new(rm.DVQuantity) }),
+			pointer: "/magnitude",
+			absent:  []string{"1234567890123456789"},
+			value:   "0.1234567890123456789",
+		},
+		{
+			name:    "Real past its digit budget, a quoted number",
+			in:      `{"_type":"DV_QUANTITY","magnitude":"18446744073709551616","units":"kg"}`,
+			targets: concreteAndSlot(func() any { return new(rm.DVQuantity) }),
+			pointer: "/magnitude",
+			absent:  []string{"18446744073709551616", "1844674407"},
+			value:   `"18446744073709551616"`,
+		},
+		{
+			name:    "Character of two characters",
+			in:      mappings + `"\u03a9§"` + mapped,
+			targets: concreteAndSlot(func() any { return new(rm.DVText) }),
+			pointer: "/mappings/0/match",
+			absent:  []string{`\u03a9`, "Ω", "§"},
+			value:   `"\u03a9§"`,
+		},
+		{
+			name:    "Character of no character",
+			in:      mappings + `""` + mapped,
+			targets: concreteAndSlot(func() any { return new(rm.DVText) }),
+			pointer: "/mappings/0/match",
+			value:   `""`,
+		},
+		{
+			name:    "a DV_BOOLEAN value of the wrong JSON kind",
+			in:      `{"_type":"DV_BOOLEAN","value":"yes"}`,
+			targets: concreteAndSlot(func() any { return new(rm.DVBoolean) }),
+			pointer: "/value",
+			absent:  []string{"yes"},
+		},
+		{
+			name:    "a Character of the wrong JSON kind",
+			in:      mappings + `true` + mapped,
+			targets: concreteAndSlot(func() any { return new(rm.DVText) }),
+			pointer: "/mappings/0/match",
+		},
+	}
+	for _, tc := range cases {
+		for _, tg := range tc.targets {
+			for _, ep := range entryPoints {
+				for mode, opts := range jsonDecodeModes() {
+					t.Run(tc.name+"/"+tg.name+"/"+ep.name+"/"+mode, func(t *testing.T) {
+						err := ep.decode(tc.in, tg.new(), opts...)
+						de, ok := topDecodeError(err)
+						if !ok {
+							t.Fatalf("%s(%s) = %T %v; want a *canjson.DecodeError at the top of the chain", ep.name, tc.in, err, err)
+						}
+						if de.Path != tc.pointer {
+							t.Errorf("%s(%s): DecodeError.Path = %q; want %q", ep.name, tc.in, de.Path, tc.pointer)
+						}
+						msg := err.Error()
+						if !strings.Contains(msg, tc.pointer) {
+							t.Errorf("%s(%s) = %q; want the text to name the pointer %s", ep.name, tc.in, msg, tc.pointer)
+						}
+						for _, v := range tc.absent {
+							if strings.Contains(msg, v) {
+								t.Errorf("%s(%s) = %q; the text carries %q from the document", ep.name, tc.in, msg, v)
+							}
+						}
+						if got := de.Value.Reveal(); got != tc.value {
+							t.Errorf("%s(%s): Value.Reveal() = %#v; want %#v", ep.name, tc.in, got, tc.value)
+						}
+						if !errors.Is(err, canjson.ErrInvalidShape) {
+							t.Errorf("%s(%s) = %v; want errors.Is(_, canjson.ErrInvalidShape), the classification the refusal carried before", ep.name, tc.in, err)
+						}
+					})
+				}
+			}
+		}
+	}
+}
+
 // TestUnmarshal_REQ052_StructureStaysInDecodeErrorText pins the line REQ-052
 // draws between values and structure: a member name and a `_type` value are
 // structure, so a duplicate member name and an unknown `_type` keep their
@@ -273,6 +378,21 @@ func TestUnmarshal_REQ052_DecodeErrorKeepsEveryCause(t *testing.T) {
 			name: "quoted Integer literal out of range", in: `{"_type":"DV_PROPORTION","numerator":1,"denominator":2,"type":"99999999999"}`, target: func() any { return new(rm.DVProportion) },
 			is: []error{canjson.ErrInvalidShape, strconv.ErrRange}, as: []func(error) bool{isSemantic, isNumError},
 			path: "/type", value: `"99999999999"`,
+		},
+		{
+			name: "Real past its digit budget", in: `{"_type":"DV_QUANTITY","magnitude":0.1234567890123456789,"units":"kg"}`, target: func() any { return new(rm.DVQuantity) },
+			is: []error{canjson.ErrInvalidShape}, as: []func(error) bool{isSemantic},
+			path: "/magnitude", value: "0.1234567890123456789",
+		},
+		{
+			name: "Character of two characters", in: `{"_type":"TERM_MAPPING","match":"ab","target":{"terminology_id":{"value":"x"},"code_string":"c"}}`, target: func() any { return new(rm.TermMapping) },
+			is: []error{canjson.ErrInvalidShape}, as: []func(error) bool{isSemantic},
+			path: "/match", value: `"ab"`,
+		},
+		{
+			name: "value of the wrong JSON kind", in: `{"_type":"DV_BOOLEAN","value":"yes"}`, target: func() any { return new(rm.DVBoolean) },
+			is: []error{canjson.ErrInvalidShape}, as: []func(error) bool{isSemantic},
+			path: "/value",
 		},
 		{
 			name: "malformed JSON", in: `{"_type":"DV_TEXT","value":"Jane \q Doe"}`, target: func() any { return new(rm.DVText) },

@@ -83,6 +83,87 @@ func TestQuotedLiteralRefusal_REQ052_CarriesTheLiteral(t *testing.T) {
 	}
 }
 
+// TestPrimitiveRefusal_REQ052_CarriesTheLiteral pins the other refusals of
+// the SDK's primitive codecs that hand a decode entry point the literal
+// (REQ-052): rm.Real past its 17-digit budget, bare or quoted, and
+// rm.Character for a string that is not exactly one character. Each carries
+// the JSON text as written while its message stays as it was and it still
+// carries typereg.ErrInvalidShape. A value of the wrong JSON kind, and a
+// number rm.Character takes as no usable code point, carry nothing.
+//
+// Can-fail control: return either refusal without the literal and the
+// matching rows' carried-text assertion fails; carry a literal on the
+// last two rows and theirs fails.
+func TestPrimitiveRefusal_REQ052_CarriesTheLiteral(t *testing.T) {
+	decodeReal := func(b []byte) error { var r rm.Real; return r.UnmarshalJSON(b) }
+	decodeChar := func(b []byte) error { var c rm.Character; return c.UnmarshalJSON(b) }
+	cases := []struct {
+		name    string
+		in      string
+		decode  func(b []byte) error
+		message string // the whole message, when the SDK writes it
+		carried string // "" when the refusal carries no literal
+	}{
+		{
+			name:    "Real past its digit budget, bare",
+			in:      `0.1234567890123456789`,
+			decode:  decodeReal,
+			message: "rm.Real: literal carries more than 17 significant decimal digits",
+			carried: `0.1234567890123456789`,
+		},
+		{
+			name:    "Real past its digit budget, quoted",
+			in:      `"18446744073709551616"`,
+			decode:  decodeReal,
+			message: "rm.Real: literal carries more than 17 significant decimal digits",
+			carried: `"18446744073709551616"`,
+		},
+		{
+			name:    "Character of two characters, escaped",
+			in:      `"\u03a9="`,
+			decode:  decodeChar,
+			message: "rm.Character: must be exactly one character, got 2",
+			carried: `"\u03a9="`,
+		},
+		{
+			name:    "Character of no character",
+			in:      `""`,
+			decode:  decodeChar,
+			message: "rm.Character: must be exactly one character, got 0",
+			carried: `""`,
+		},
+		{
+			name:   "Character of the wrong JSON kind",
+			in:     `true`,
+			decode: decodeChar,
+			// No message pin: encoding/json/v2 varies its own wording.
+		},
+		{
+			name:    "Character as a number naming no usable code point",
+			in:      `0`,
+			decode:  decodeChar,
+			message: "rm.Character: number is not a usable code point",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.decode([]byte(tc.in))
+			if err == nil {
+				t.Fatalf("UnmarshalJSON(%s) = nil; want a refusal", tc.in)
+			}
+			if tc.message != "" && err.Error() != tc.message {
+				t.Errorf("UnmarshalJSON(%s) = %q; want %q, the message unchanged", tc.in, err, tc.message)
+			}
+			if !errors.Is(err, typereg.ErrInvalidShape) {
+				t.Errorf("UnmarshalJSON(%s) = %v; want errors.Is(_, typereg.ErrInvalidShape)", tc.in, err)
+			}
+			if got := carried(err); got != tc.carried {
+				t.Errorf("UnmarshalJSON(%s) carries %q for the entry point's Value; want %q", tc.in, got, tc.carried)
+			}
+		})
+	}
+}
+
 // carried returns the literal err carries for a decode entry point's
 // DecodeError.Value, or "" when it carries none.
 func carried(err error) string {

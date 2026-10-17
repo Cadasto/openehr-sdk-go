@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"unicode/utf8"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/refused"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
@@ -89,6 +90,11 @@ func characterFault(s string) error {
 // reachable with errors.AsType. Encode errors are not classified with that
 // sentinel; canjson wraps them in its own encode-only ErrInvalidValue.
 //
+// A string that decodes to other than exactly one character is refused
+// carrying its JSON text as the document wrote it, quotes and escapes
+// included, which a canjson entry point holds in DecodeError.Value. The text
+// adds nothing to the message, which names only the character count.
+//
 // A nil receiver is refused with an error rather than dereferenced. That
 // refusal carries typereg.ErrNilReceiver and not typereg.ErrInvalidShape,
 // because caller misuse is not a wire-shape problem.
@@ -111,7 +117,10 @@ func (c *Character) UnmarshalJSON(b []byte) error {
 			return typereg.ClassifyShape(fmt.Errorf("rm.Character: %w", err))
 		}
 		if err := characterFault(s); err != nil {
-			return typereg.ClassifyShape(fmt.Errorf("rm.Character: %w", err))
+			// The JSON text as written rides beside the refusal for the entry
+			// point's DecodeError.Value (wire.md § REQ-052) and never reaches
+			// the message.
+			return refused.Literal(b, typereg.ClassifyShape(fmt.Errorf("rm.Character: %w", err)))
 		}
 		*c = Character(s)
 		return nil
