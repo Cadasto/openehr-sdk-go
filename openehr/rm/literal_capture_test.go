@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/refused"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
@@ -72,13 +73,22 @@ func TestQuotedLiteralRefusal_REQ052_CarriesTheLiteral(t *testing.T) {
 			if got := errors.Is(err, strconv.ErrRange); got != tc.range_ {
 				t.Errorf("UnmarshalJSON(%s): errors.Is(_, strconv.ErrRange) = %t; want %t", tc.in, got, tc.range_)
 			}
-			de, ok := typereg.EntryError(err).(*typereg.DecodeError) //nolint:errorlint // the envelope is the error itself
-			if !ok || de == nil {
-				t.Fatalf("typereg.EntryError(%v) is not a *typereg.DecodeError", err)
+			if errors.Is(err, typereg.ErrInvalidShape) {
+				t.Errorf("UnmarshalJSON(%s) = %v; a parse failure must not carry typereg.ErrInvalidShape", tc.in, err)
 			}
-			if got := de.Value.Reveal(); got != tc.in {
-				t.Errorf("UnmarshalJSON(%s): the entry point's Value.Reveal() = %#v; want the literal as written, %#v", tc.in, got, tc.in)
+			if got := carried(err); got != tc.in {
+				t.Errorf("UnmarshalJSON(%s) carries %q for the entry point's Value; want the literal as written, %q", tc.in, got, tc.in)
 			}
 		})
 	}
+}
+
+// carried returns the literal err carries for a decode entry point's
+// DecodeError.Value, or "" when it carries none.
+func carried(err error) string {
+	e, ok := errors.AsType[*refused.Error](err)
+	if !ok {
+		return ""
+	}
+	return e.Text()
 }

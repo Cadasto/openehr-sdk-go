@@ -191,7 +191,7 @@ func Unmarshal(data []byte, v any, opts ...DecoderOption) error {
 	if err == nil && len(opts) > 0 {
 		err = checkUnmatched(data, v, opts)
 	}
-	return typereg.EntryError(err)
+	return entryError(err)
 }
 
 // Decoder reads and decodes canonical-JSON values from a stream.
@@ -242,9 +242,9 @@ func (d *Decoder) Decode(v any) error {
 		return streamError(classifyDecode(err))
 	}
 	if err := classifyDecode(json.Unmarshal(raw, v, typereg.Unmarshalers())); err != nil {
-		return typereg.EntryError(err)
+		return entryError(err)
 	}
-	return typereg.EntryError(d.cfg.walkUnmatched(raw, v))
+	return entryError(d.cfg.walkUnmatched(raw, v))
 }
 
 // streamError returns err, an error from reading the stream, as
@@ -252,7 +252,7 @@ func (d *Decoder) Decode(v any) error {
 // the input causes as a *jsontext.SyntacticError or a *json.SemanticError,
 // the SDK's own [DecodeError] travelling inside the latter, and such a
 // failure comes back in the envelope [Unmarshal] returns (see
-// [typereg.EntryError]). The two errors the input does not cause carry none
+// entryError). The two errors the input does not cause carry none
 // of these and come back as they are: io.EOF once the stream holds no
 // further value, so a caller's err == io.EOF holds, and the reader's own
 // failure, which jsontext returns as an I/O error wrapping it.
@@ -260,7 +260,7 @@ func streamError(err error) error {
 	if err == nil || !fromInput(err) {
 		return err
 	}
-	return typereg.EntryError(err)
+	return entryError(err)
 }
 
 // fromInput reports whether err's chain holds an error the decoder raises for

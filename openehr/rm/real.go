@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/refused"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
@@ -111,7 +112,7 @@ var errPrecisionLoss = typereg.ClassifyShape(fmt.Errorf("rm.Real: literal carrie
 // literal) from the bare arm, each reachable with errors.As and each
 // staying outside typereg.ErrInvalidShape. A quoted literal that does not
 // parse also carries its JSON text, quotes included, which a canjson entry
-// point holds in DecodeError.Value (see typereg.RefuseLiteral); the message
+// point holds in DecodeError.Value; the message
 // names it once, in the strconv cause. Only a literal that parsed is
 // then measured against the 17-digit limit, and only a literal that
 // passed both is assigned to the receiver. Reversing the order would report
@@ -143,7 +144,7 @@ func (r *Real) UnmarshalJSON(b []byte) error {
 			// the literal — the prefix must not repeat it). The JSON text as
 			// written rides beside it for the entry point's DecodeError.Value,
 			// and never reaches the message.
-			return typereg.RefuseLiteral(b, fmt.Errorf("rm.Real: parse quoted literal: %w", err))
+			return refused.Literal(b, fmt.Errorf("rm.Real: parse quoted literal: %w", err))
 		}
 		if significantDigits(s) > maxSignificantDigits {
 			return errPrecisionLoss

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/refused"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
@@ -107,7 +108,7 @@ func TestDecodeError_REQ052_TextCarriesNoValue(t *testing.T) {
 		},
 		{
 			name:   "a refused literal",
-			cause:  typereg.RefuseLiteral([]byte(`"3.5"`), fmt.Errorf("rm.Real: parse quoted literal: %w", numErr)),
+			cause:  refused.Literal([]byte(`"3.5"`), fmt.Errorf("rm.Real: parse quoted literal: %w", numErr)),
 			keep:   []string{"decode /a: rm.Real: parse quoted literal: strconv.ParseFloat: invalid syntax"},
 			absent: []string{"3.5"},
 		},
@@ -176,120 +177,5 @@ func TestDecodeError_REQ052_LongPathIsShortenedInText(t *testing.T) {
 	short := &typereg.DecodeError{Path: "/content/0/items/1", Inner: typereg.ErrMissingType}
 	if got, want := short.Error(), "decode /content/0/items/1: typereg: _type discriminator missing"; got != want {
 		t.Errorf("Error() = %q; want %q, a short path written as it is", got, want)
-	}
-}
-
-// TestEntryError_REQ052_EnvelopeAtTheTop pins the envelope a decode entry
-// point returns (REQ-052): a *DecodeError at the top of the chain, whose Path
-// is the failing value's pointer from the root of the document and whose
-// Value holds the literal the decoder could not take, as written; an error
-// that is already a *DecodeError keeps its path and gains the literal; and a
-// nil error stays nil.
-//
-// Can-fail control: leave Path or Value unset and the matching rows fail.
-func TestEntryError_REQ052_EnvelopeAtTheTop(t *testing.T) {
-	numErr := &strconv.NumError{Func: "ParseInt", Num: "1.5", Err: strconv.ErrSyntax}
-	slot := &typereg.DecodeError{Path: "/content/0", Type: "ELEMENT", Inner: &json.SemanticError{
-		JSONPointer: "/value/magnitude", JSONKind: '0', JSONValue: jsontext.Value("3.5"), Err: strconv.ErrSyntax,
-	}}
-	cases := []struct {
-		name      string
-		err       error
-		path      string
-		value     any
-		keepsSelf bool
-	}{
-		{
-			name:  "a SemanticError on a field",
-			err:   &json.SemanticError{JSONPointer: "/a/b", JSONKind: '0', JSONValue: jsontext.Value("98765.4321"), Err: strconv.ErrSyntax},
-			path:  "/a/b",
-			value: "98765.4321",
-		},
-		{
-			name: "a SyntacticError",
-			err:  &jsontext.SyntacticError{JSONPointer: "/value", ByteOffset: 27, Err: errors.New("invalid character 'J' at start of value")},
-			path: "/value",
-		},
-		{
-			name:  "a refused quoted literal beneath a SemanticError",
-			err:   &json.SemanticError{JSONPointer: "/precision", JSONKind: '"', Err: typereg.RefuseLiteral([]byte(`"1.5"`), fmt.Errorf("rm.Integer: parse quoted literal: %w", numErr))},
-			path:  "/precision",
-			value: `"1.5"`,
-		},
-		{
-			name:  "a slot decoded on its own decoder",
-			err:   &json.SemanticError{JSONPointer: "/content", Err: slot},
-			path:  "/content/0/value/magnitude",
-			value: "3.5",
-		},
-		{
-			name:      "an envelope already at the top",
-			err:       slot,
-			path:      "/content/0",
-			value:     "3.5",
-			keepsSelf: true,
-		},
-		{
-			name: "a slot that fell back to its declared type",
-			err: &json.SemanticError{JSONPointer: "/name", Err: &typereg.DecodeError{Path: "/name", Inner: &json.SemanticError{
-				JSONPointer: "/value", JSONKind: '0', Err: errors.New("cannot take a number"),
-			}}},
-			path: "/name/value",
-		},
-		{
-			name: "a _type mismatch on a nested value",
-			err: &json.SemanticError{JSONPointer: "/lower", Err: &typereg.DecodeError{
-				Path: "/_type", Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_QUANTITY", "DV_COUNT", typereg.ErrTypeMismatch),
-			}},
-			path: "/lower/_type",
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			got := typereg.EntryError(tc.err)
-			de, ok := got.(*typereg.DecodeError) //nolint:errorlint // the envelope is the error itself
-			if !ok || de == nil {
-				t.Fatalf("EntryError(%v) = %T; want a *typereg.DecodeError", tc.err, got)
-			}
-			if de.Path != tc.path {
-				t.Errorf("EntryError(%v).Path = %q; want %q", tc.err, de.Path, tc.path)
-			}
-			if v := de.Value.Reveal(); v != tc.value {
-				t.Errorf("EntryError(%v).Value.Reveal() = %#v; want %#v", tc.err, v, tc.value)
-			}
-			if !tc.keepsSelf && !errors.Is(got, tc.err) {
-				t.Errorf("errors.Is(EntryError(err), err) = false; the error must stay reachable")
-			}
-			if tc.keepsSelf && de.Inner != slot.Inner { //nolint:errorlint // identity: the envelope keeps its own Inner
-				t.Errorf("EntryError(envelope).Inner = %v; want the envelope's own Inner, not a second envelope", de.Inner)
-			}
-			if lit, ok := tc.value.(string); ok && strings.Contains(got.Error(), lit) {
-				t.Errorf("EntryError(%v).Error() = %q; it carries the literal %s", tc.err, got, lit)
-			}
-		})
-	}
-	if got := typereg.EntryError(nil); got != nil {
-		t.Errorf("EntryError(nil) = %v; want nil", got)
-	}
-	if slot.Value.Reveal() != nil {
-		t.Errorf("EntryError changed the envelope it was given: Value = %#v; want it left as it was", slot.Value.Reveal())
-	}
-}
-
-// TestRefuseLiteral_REQ052_MessageAndChainUnchanged pins what the literal
-// carrier adds to a codec's refusal: nothing a caller reads. Its message is
-// the refusal's, one errors.Unwrap step reaches the refusal, and a nil
-// refusal stays nil.
-func TestRefuseLiteral_REQ052_MessageAndChainUnchanged(t *testing.T) {
-	cause := fmt.Errorf("rm.Real: parse quoted literal: %w", &strconv.NumError{Func: "ParseFloat", Num: "x", Err: strconv.ErrSyntax})
-	err := typereg.RefuseLiteral([]byte(`"x"`), cause)
-	if err.Error() != cause.Error() {
-		t.Errorf("RefuseLiteral(...).Error() = %q; want the refusal's own %q", err, cause)
-	}
-	if got := errors.Unwrap(err); got != cause { //nolint:errorlint // identity: one step reaches the refusal
-		t.Errorf("errors.Unwrap(RefuseLiteral(...)) = %v; want the refusal", got)
-	}
-	if got := typereg.RefuseLiteral([]byte(`"x"`), nil); got != nil {
-		t.Errorf("RefuseLiteral(lit, nil) = %v; want nil", got)
 	}
 }

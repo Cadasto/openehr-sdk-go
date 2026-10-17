@@ -75,9 +75,9 @@ var (
 
 // DecodeError is the unified envelope of the canjson and canxml decoders.
 // canjson.Unmarshal and canjson.Decoder.Decode return every failure the
-// input causes as a DecodeError at the top of the chain (REQ-052; see
-// [EntryError]), so errors.AsType[*DecodeError] finds one on any such
-// failure, and a polymorphic slot that fails adds one of its own beneath it.
+// input causes as a DecodeError at the top of the chain, so
+// errors.AsType[*DecodeError] finds one on any such failure, and a
+// polymorphic slot that fails adds one of its own beneath it.
 // [DecodeInto] also returns it for a whole-value `_type` mismatch on
 // "/_type", for a depth refusal ([ErrMaxDepthExceeded]) and for a nil
 // argument ([ErrNilArgument]), as does [DecodePolymorphic] for the last two.

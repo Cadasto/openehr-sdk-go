@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/refused"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
@@ -38,9 +39,8 @@ type Integer int32
 // quoted one, each reachable with errors.AsType. A quoted literal is named
 // once, by that cause, never again by the prefix; the refusal also carries
 // the literal's JSON text, quotes included, which a canjson entry point
-// holds in DecodeError.Value (see typereg.RefuseLiteral). The strconv
-// sentinel the cause carries tells the two refusals apart however the
-// literal writes the number: a non-zero fraction carries strconv.ErrSyntax,
+// holds in DecodeError.Value. The strconv sentinel the cause carries tells
+// the two refusals apart however the literal writes the number: a non-zero fraction carries strconv.ErrSyntax,
 // whatever the magnitude, and a whole number outside the range carries
 // strconv.ErrRange, so errors.Is(err, strconv.ErrRange) holds for
 // 2147483648, 2147483648.0 and "1e10" alike.
@@ -73,7 +73,7 @@ func (i *Integer) UnmarshalJSON(b []byte) error {
 				// second echo here would double it (wire.md § REQ-052). The
 				// JSON text as written rides beside it for the entry point's
 				// DecodeError.Value, and never reaches the message.
-				return typereg.RefuseLiteral(b, fmt.Errorf("rm.Integer: parse quoted literal: %w", err))
+				return refused.Literal(b, fmt.Errorf("rm.Integer: parse quoted literal: %w", err))
 			}
 			n = int64(w)
 		}

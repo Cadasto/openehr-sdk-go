@@ -35,6 +35,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/refused"
 )
 
 // writeValueFree writes the value-free text of err into b. It follows the
@@ -74,9 +76,11 @@ func writeLink(b *strings.Builder, err error, suffixes *[]string) error {
 			}
 			return e.cause
 		}
-	case *literalError:
+	case *refused.Error:
 		if e != nil {
-			return e.err
+			// The carrier's message is its refusal's; the literal it holds is
+			// never written.
+			return e.Unwrap()
 		}
 	case *json.SemanticError:
 		if e != nil {
