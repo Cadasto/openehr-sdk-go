@@ -44,15 +44,23 @@ func TestCanContainAcceptanceTable(t *testing.T) {
 		{"FOLDER", "OBSERVATION", contain.ByReference},
 		// ByReference — the FOLDER → VERSIONED_COMPOSITION hop lands on the
 		// version tier (REQ-160 § Overlay edges), and onward through the
-		// family-agnostic VERSION node reaches every payload family.
+		// family-agnostic VERSION node reaches every other payload family.
 		{"FOLDER", "VERSION", contain.ByReference},
 		{"FOLDER", "VERSIONED_COMPOSITION", contain.ByReference},
 		{"FOLDER", "EHR_STATUS", contain.ByReference},
+		// ByReference — a version-tier class reaches the same hop through a
+		// folder version's FOLDER (VERSION → FOLDER, then FOLDER →
+		// VERSIONED_COMPOSITION).
+		{"VERSIONED_FOLDER", "VERSIONED_COMPOSITION", contain.ByReference}, // a real reference chain
+		{"VERSIONED_PARTY", "VERSIONED_COMPOSITION", contain.ByReference},  // cross-family over-admission through the VERSION node, bounded
 		// Never — the hop names VERSIONED_COMPOSITION, not every container: no
 		// default edge leads from FOLDER to another VERSIONED_* class.
 		{"FOLDER", "VERSIONED_EHR_STATUS", contain.Never},
+		// Never — the hub over-admits payloads, but reaches a VERSIONED_*
+		// container only through the FOLDER → VERSIONED_COMPOSITION hop, and
+		// no default edge leads to VERSIONED_PARTY.
+		{"EHR", "VERSIONED_PARTY", contain.Never},
 		// Never.
-		{"EHR", "VERSIONED_PARTY", contain.Never}, // container unreachable
 		{"OBSERVATION", "COMPOSITION", contain.Never},
 		{"OBSERVATION", "SECTION", contain.Never},
 		{"OBSERVATION", "EVALUATION", contain.Never},
@@ -168,17 +176,19 @@ func TestEHRbaseCompatibilityGuard(t *testing.T) {
 func TestEHRbaseDocumentedDifferences(t *testing.T) {
 	r := contain.Default()
 
-	// Pairs this relation verdicts Never that EHRbase observably admits:
-	// EHRbase validates containment at storage-root granularity, so an
-	// RM-impossible pair sharing a storage root is accepted and returns zero
-	// rows (ehrbase-aql.md §4.1.2). The relation answers the RM question.
-	neverHereEHRbaseAdmits := [][2]string{
+	// Pairs this relation verdicts Never that EHRbase accepts and answers
+	// with no rows: EHRbase validates containment at storage-root
+	// granularity, so it does not refuse an RM-impossible pair sharing a
+	// storage root (ehrbase-aql.md §4.1.2). Accepting a pair and answering it
+	// with no rows is consistent with Never (REQ-160 § Overlay edges, the
+	// guard). The relation answers the RM question.
+	neverHereEHRbaseAccepts := [][2]string{
 		{"OBSERVATION", "EVALUATION"}, // sibling entries under the COMPOSITION root
 		{"ELEMENT", "CLUSTER"},        // metadata-only by-value path, same root
 	}
-	for _, p := range neverHereEHRbaseAdmits {
+	for _, p := range neverHereEHRbaseAccepts {
 		if got := r.CanContain(p[0], p[1]); got != contain.Never {
-			t.Errorf("documented difference drifted: CanContain(%q, %q) = %v, want Never (EHRbase admits at root granularity; this relation answers the RM)", p[0], p[1], got)
+			t.Errorf("documented difference drifted: CanContain(%q, %q) = %v, want Never (EHRbase accepts the pair at root granularity and answers with no rows, which is consistent with Never; this relation answers the RM)", p[0], p[1], got)
 		}
 	}
 
