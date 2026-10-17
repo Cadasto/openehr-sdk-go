@@ -106,6 +106,6 @@ func TestEntryError_REQ052_EnvelopeAtTheTop(t *testing.T) {
 		t.Errorf("entryError(nil) = %v; want nil", got)
 	}
 	if slot.Value.Reveal() != nil {
-		t.Errorf("EntryError changed the envelope it was given: Value = %#v; want it left as it was", slot.Value.Reveal())
+		t.Errorf("entryError changed the envelope it was given: Value = %#v; want it left as it was", slot.Value.Reveal())
 	}
 }
