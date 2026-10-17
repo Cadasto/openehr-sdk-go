@@ -1102,6 +1102,97 @@ T
 			want: []string{"answered: SELECT c FROM COMPOSITION c", "answered-empty: SELECT o FROM OBSERVATION o"},
 		},
 		{
+			// A BuiltIn wrapper that swallows the failure of what it runs leaves
+			// an assertion inside it unable to fail the test, so the assertion
+			// classes nothing. A query sent inside one is sent as usual, and a
+			// Skip inside one still skips: Robot lets a skip through.
+			name: "assertion_whose_failure_is_swallowed_does_not_classify",
+			suite: `*** Test Cases ***
+A
+    Set AQL And Execute Ad Hoc Query    SELECT c FROM COMPOSITION c
+    Run Keyword And Return Status    Should Be Empty    ${resp_body['rows']}
+B
+    Set AQL And Execute Ad Hoc Query    SELECT o FROM OBSERVATION o
+    ${result}    Run Keyword And Ignore Error    Should Contain    ${err_msg}    400 != 200
+C
+    Set AQL And Execute Ad Hoc Query    SELECT e FROM EHR e
+    Run Keyword And Warn On Failure    Length Should Be    ${resp_body['rows']}    0
+D
+    Set AQL And Execute Ad Hoc Query    SELECT s FROM SECTION s
+    ${empty}    Run Keyword And Return Status    Check Empty
+E
+    Run Keyword And Ignore Error    Set AQL And Execute Ad Hoc Query    SELECT p FROM POINT_EVENT p
+    Run Keyword And Ignore Error    Run Keyword    Should Be Empty    ${resp_body['rows']}
+F
+    Set AQL And Execute Ad Hoc Query    SELECT f FROM FOLDER f
+    Run Keyword And Ignore Error    Skip    not yet
+
+*** Keywords ***
+Check Empty
+    Should Be Empty    ${resp_body['rows']}
+`,
+			want: []string{
+				"answered: SELECT c FROM COMPOSITION c", "answered: SELECT o FROM OBSERVATION o",
+				"answered: SELECT e FROM EHR e", "answered: SELECT s FROM SECTION s",
+				"answered: SELECT p FROM POINT_EVENT p", "skipped: SELECT f FROM FOLDER f",
+			},
+		},
+		{
+			// A BuiltIn wrapper whose failure still fails the test lets the
+			// assertion inside it class the query.
+			name: "assertion_whose_failure_fails_the_test_classifies",
+			suite: `*** Test Cases ***
+A
+    Set AQL And Execute Ad Hoc Query    SELECT c FROM COMPOSITION c
+    Run Keyword And Continue On Failure    Should Be Empty    ${resp_body['rows']}
+B
+    Set AQL And Execute Ad Hoc Query    SELECT o FROM OBSERVATION o
+    Wait Until Keyword Succeeds    3x    1s    Length Should Be    ${resp_body['rows']}    0
+C
+    Set AQL And Execute Ad Hoc Query    SELECT e FROM EHR e
+    Run Keyword    Should Contain    ${err_msg}    400 != 200
+D
+    Set AQL And Execute Ad Hoc Query    SELECT s FROM SECTION s
+    Run Keywords    Log    sent    AND    Should Be Empty    ${resp_body['rows']}
+E
+    Set AQL And Execute Ad Hoc Query    SELECT p FROM POINT_EVENT p
+    Assert Empty
+
+*** Keywords ***
+Assert Empty
+    Run Keyword And Return    Should Be Empty    ${resp_body['rows']}
+`,
+			want: []string{
+				"answered-empty: SELECT c FROM COMPOSITION c", "answered-empty: SELECT o FROM OBSERVATION o",
+				"refused: SELECT e FROM EHR e", "answered-empty: SELECT s FROM SECTION s",
+				"answered-empty: SELECT p FROM POINT_EVENT p",
+			},
+		},
+		{
+			// A conditional BuiltIn wrapper may not run the assertion it
+			// names, so the assertion classes nothing.
+			name: "assertion_a_conditional_wrapper_may_not_run_does_not_classify",
+			suite: `*** Test Cases ***
+A
+    Set AQL And Execute Ad Hoc Query    SELECT c FROM COMPOSITION c
+    Run Keyword If    ${flag}    Should Be Empty    ${resp_body['rows']}
+B
+    Set AQL And Execute Ad Hoc Query    SELECT o FROM OBSERVATION o
+    Run Keyword Unless    ${flag}    Should Contain    ${err_msg}    400 != 200
+C
+    Set AQL And Execute Ad Hoc Query    SELECT e FROM EHR e
+    Assert Empty If
+
+*** Keywords ***
+Assert Empty If
+    Run Keyword And Return If    ${flag}    Length Should Be    ${resp_body['rows']}    0
+`,
+			want: []string{
+				"answered: SELECT c FROM COMPOSITION c", "answered: SELECT o FROM OBSERVATION o",
+				"answered: SELECT e FROM EHR e",
+			},
+		},
+		{
 			name: "not_ready_by_an_active_tag_only",
 			suite: `*** Test Cases ***
 A
