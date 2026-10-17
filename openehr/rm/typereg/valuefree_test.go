@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/refused"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -155,6 +156,48 @@ func TestDecodeError_REQ052_TextCarriesNoValue(t *testing.T) {
 			}
 			if !errors.Is(e, tc.cause) {
 				t.Errorf("errors.Is(DecodeError, its cause) = false; the cause must stay reachable")
+			}
+		})
+	}
+}
+
+// TestDecodeError_REQ052_PathCannotSplitTheText pins how the text writes a
+// path that holds a character a log line cannot carry as it is: a member name
+// is structure and stays in the text, but Go-quoted, so a control character, a
+// line separator or invalid UTF-8 in it cannot start a new line or forge one.
+// A path with no such character is written as it is.
+//
+// Can-fail control: write Path unquoted and the control characters reach the
+// text raw.
+func TestDecodeError_REQ052_PathCannotSplitTheText(t *testing.T) {
+	cases := []struct {
+		name    string
+		path    string
+		written string // the path as the text writes it
+	}{
+		{name: "a line feed", path: "/x\nERROR forged line", written: `"/x\nERROR forged line"`},
+		{name: "a carriage return", path: "/x\rERROR", written: `"/x\rERROR"`},
+		{name: "a line separator", path: "/x\u2028ERROR", written: `"/x\u2028ERROR"`},
+		{name: "invalid UTF-8", path: "/x\xffERROR", written: `"/x\xffERROR"`},
+		{name: "a quote", path: `/x"ERROR`, written: `"/x\"ERROR"`},
+		{name: "an ordinary path", path: "/content/0/Jane Doe ✓", written: "/content/0/Jane Doe ✓"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, typed := range []bool{false, true} {
+				e := &typereg.DecodeError{Path: tc.path, Inner: typereg.ErrUnknownType}
+				head := "decode " + tc.written + ": "
+				if typed {
+					e.Type = "DV_TEXT"
+					head = "decode " + tc.written + ` (_type="DV_TEXT"): `
+				}
+				got := e.Error()
+				if !strings.HasPrefix(got, head) {
+					t.Errorf("DecodeError{Path: %q, Type: %q}.Error() = %q; want it to open with %q", tc.path, e.Type, got, head)
+				}
+				if strings.ContainsAny(got, "\n\r\u2028") || !utf8.ValidString(got) {
+					t.Errorf("DecodeError{Path: %q, Type: %q}.Error() = %q; want no line break and no invalid UTF-8 in the text", tc.path, e.Type, got)
+				}
 			}
 		})
 	}

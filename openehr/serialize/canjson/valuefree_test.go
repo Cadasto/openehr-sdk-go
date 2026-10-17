@@ -404,6 +404,68 @@ func TestUnmarshal_REQ052_NonStringTypeNamesTheSlot(t *testing.T) {
 	}
 }
 
+// TestUnmarshal_REQ052_MemberNameCannotSplitTheText pins how the text writes
+// a member name that holds a control character: the name is structure and
+// stays in the text, but quoted, so a document cannot start a new log line
+// with it. Path keeps the name as it is.
+//
+// Can-fail control: write the path unquoted and the line feed reaches the text
+// raw.
+func TestUnmarshal_REQ052_MemberNameCannotSplitTheText(t *testing.T) {
+	cases := []struct {
+		name   string
+		in     string
+		target func() any
+		modes  map[string][]canjson.DecoderOption
+		path   string
+	}{
+		{
+			name:   "an unknown member under WithStrict",
+			in:     `{"_type":"DV_TEXT","value":"a","x\nERROR forged line":1}`,
+			target: func() any { return new(rm.DVText) },
+			modes:  map[string][]canjson.DecoderOption{"WithStrict": {canjson.WithStrict()}},
+			path:   "/x\nERROR forged line",
+		},
+		{
+			name:   "a failure beneath the member",
+			in:     `{"_type":"RESOURCE_DESCRIPTION","original_author":{"x\nERROR forged line":7},"lifecycle_state":"x"}`,
+			target: func() any { return new(rm.ResourceDescription) },
+			modes:  jsonDecodeModes(),
+			path:   "/original_author/x\nERROR forged line",
+		},
+		{
+			name:   "a duplicate member",
+			in:     `{"_type":"DV_TEXT","value":"a","x\r\nERROR forged line":1,"x\r\nERROR forged line":2}`,
+			target: func() any { return new(rm.DVText) },
+			modes:  jsonDecodeModes(),
+			path:   "/x\r\nERROR forged line",
+		},
+	}
+	for _, tc := range cases {
+		for _, ep := range entryPoints {
+			for mode, opts := range tc.modes {
+				t.Run(tc.name+"/"+ep.name+"/"+mode, func(t *testing.T) {
+					err := ep.decode(tc.in, tc.target(), opts...)
+					de, ok := topDecodeError(err)
+					if !ok {
+						t.Fatalf("%s(%q) = %T %v; want a *canjson.DecodeError at the top of the chain", ep.name, tc.in, err, err)
+					}
+					if de.Path != tc.path {
+						t.Errorf("%s(%q): DecodeError.Path = %q; want %q, the name as it is", ep.name, tc.in, de.Path, tc.path)
+					}
+					msg := err.Error()
+					if strings.ContainsAny(msg, "\n\r") {
+						t.Errorf("%s(%q) = %q; want no line break in the text", ep.name, tc.in, msg)
+					}
+					if head := "decode " + strconv.Quote(tc.path) + ": "; !strings.HasPrefix(msg, head) {
+						t.Errorf("%s(%q) = %q; want the text to open with %q, the path quoted", ep.name, tc.in, msg, head)
+					}
+				})
+			}
+		}
+	}
+}
+
 // TestUnmarshal_REQ052_DecodeErrorKeepsEveryCause pins the reachability half
 // of REQ-052: under the envelope every entry point now returns, each sentinel
 // and typed cause the decode reached before stays reachable with errors.Is

@@ -133,7 +133,9 @@ type DecodeError struct {
 //
 // The node is written as "decode <path> (_type=\"<type>\")", with the parts
 // that are empty left out; a path longer than 100 bytes is shortened to its
-// first and last segments, as encoding/json/v2 shortens its own pointers.
+// first and last segments, as encoding/json/v2 shortens its own pointers, and
+// a path holding a character strconv.Quote escapes, such as a line feed in a
+// member name, is written Go-quoted, so the text stays on one line.
 // The cause follows, written by one rule: text is kept only where it is
 // known to hold no value, the structure of the standard library's errors, a
 // sentinel's fixed text, or a message in the forms the SDK's codecs write; a
@@ -160,7 +162,7 @@ func (e *DecodeError) writeNode(b *strings.Builder) {
 	b.WriteString("decode")
 	if e.Path != "" {
 		b.WriteByte(' ')
-		b.WriteString(shortPath(e.Path))
+		writePath(b, shortPath(e.Path))
 	}
 	switch {
 	case e.Path != "" && e.Type != "":
@@ -172,6 +174,23 @@ func (e *DecodeError) writeNode(b *strings.Builder) {
 		b.WriteString(strconv.Quote(e.Type))
 	}
 	b.WriteString(": ")
+}
+
+// writePath writes path as it is, or Go-quoted when it holds a character
+// strconv.Quote escapes: a control character, a line separator or another
+// character that does not print, invalid UTF-8, a quote or a backslash. A
+// member name is structure and a document chooses it, so quoting keeps a
+// name from starting a new log line or forging the text around it, while an
+// ordinary path reads as it always has.
+func writePath(b *strings.Builder, path string) {
+	// An escape is always longer than the character it replaces, so the
+	// quoted form is two bytes longer than path exactly when nothing in path
+	// needed one.
+	if quoted := strconv.Quote(path); len(quoted) != len(path)+len(`""`) {
+		b.WriteString(quoted)
+		return
+	}
+	b.WriteString(path)
 }
 
 // Unwrap returns the wrapped error so errors.Is / errors.As reach the
