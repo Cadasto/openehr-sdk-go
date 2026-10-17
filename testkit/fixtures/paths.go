@@ -19,7 +19,7 @@
 //	aql/suites/                   # pinned upstream AQL suites + their CSVs (AQL_SOURCE.txt)
 //	  AQL/**/{suite}.robot
 //	  _resources/test_data_sets/aql/fields_and_results/**/combinations/{name}.csv
-//	crossformat/{set}/           # pinned upstream cross-format sets (MANIFEST.txt)
+//	crossformat/{set}/            # pinned upstream cross-format sets (MANIFEST.txt)
 //	  template.opt | canonical.json | canonical.xml | flat.json | structured.json
 //
 // Vendor provenance is indexed in testkit/corpus/README.md (not in paths).
