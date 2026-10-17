@@ -258,7 +258,7 @@ if ((n_inputs == 0)); then
 fi
 
 # CSV -> the Robot suite family that consumes it, under upstream
-# tests/robot/AQL_TESTS/FROM/<FAMILY>/. The family is the vendored directory name
+# tests/robot/AQL/FROM/<FAMILY>/. The family is the vendored directory name
 # so a reader can find the suite that supplies the query template for each row.
 CORPUS=(
   "AND_OR from_simple_and_or.csv"
