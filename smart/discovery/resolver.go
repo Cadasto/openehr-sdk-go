@@ -1130,14 +1130,14 @@ func acceptedVersionsString(m map[string]struct{}) string {
 // plaintext auth endpoint is refused there, so the auth-endpoint warnings
 // cover the WithAllowInsecure path, while service baseUrl entries are
 // warn-only — the consumer is authoritative on which deployments they
-// want to talk to.
+// want to talk to. This is the REQ-092 warning on a plaintext catalog URL.
 func (r *Resolver) warnInsecure(cat *ServiceCatalog) {
 	check := func(name string, u *url.URL) {
 		if u == nil {
 			return
 		}
 		if u.Scheme == "http" {
-			r.cfg.logger.Warn("discovery: plaintext URL in catalog (REQ-092)", "base_url", urlredact.String(cat.BaseURL), "field", name, "url", u.Redacted())
+			r.cfg.logger.Warn("discovery: plaintext URL in catalog", "base_url", urlredact.String(cat.BaseURL), "field", name, "url", u.Redacted())
 		}
 	}
 	for _, m := range authMembers {
@@ -1160,7 +1160,7 @@ func (r *Resolver) warnPlaintextDocument(baseURL string, req *http.Request, resp
 		u = resp.Request.URL
 	}
 	if u.Scheme == "http" {
-		r.cfg.logger.Warn("discovery: SMART configuration fetched over plaintext http (REQ-092)", "base_url", urlredact.String(baseURL), "url", u.Redacted())
+		r.cfg.logger.Warn("discovery: SMART configuration fetched over plaintext http", "base_url", urlredact.String(baseURL), "url", u.Redacted())
 	}
 }
 

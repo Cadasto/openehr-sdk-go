@@ -12,9 +12,15 @@ import (
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 )
 
-// plaintextDocumentWarning is the message of the warning the resolver logs
-// when it fetched the SMART configuration over http.
-const plaintextDocumentWarning = "SMART configuration fetched over plaintext http"
+// plaintextDocumentWarning is the warning the resolver logs when it fetched
+// the SMART configuration over http, as slog's text handler writes its
+// message. It is the whole message, so counting it also pins that the
+// message carries nothing more, such as an internal requirement id.
+const plaintextDocumentWarning = `msg="discovery: SMART configuration fetched over plaintext http"`
+
+// plaintextDocumentMention is a part of that message, to check that no such
+// warning is logged whatever its full text.
+const plaintextDocumentMention = "fetched over plaintext http"
 
 // loggingResolver builds a Resolver on client that allows insecure URLs and
 // logs to the returned buffer.
@@ -55,6 +61,9 @@ func TestREQ092_WarnsWhenDocumentFetchedOverHTTP(t *testing.T) { // REQ-092
 		if strings.Contains(got, secret) {
 			t.Errorf("log = %q carries the URL password %q", got, secret)
 		}
+		if strings.Contains(got, "REQ-") {
+			t.Errorf("log = %q names an internal requirement id", got)
+		}
 	})
 
 	t.Run("https document", func(t *testing.T) {
@@ -63,8 +72,8 @@ func TestREQ092_WarnsWhenDocumentFetchedOverHTTP(t *testing.T) { // REQ-092
 		if _, err := res.Resolve(t.Context(), p.baseURL()); err != nil {
 			t.Fatalf("Resolve(%q): %v", p.baseURL(), err)
 		}
-		if got := logs.String(); strings.Contains(got, plaintextDocumentWarning) {
-			t.Errorf("log = %q, want no %q warning for an https document", got, plaintextDocumentWarning)
+		if got := logs.String(); strings.Contains(got, plaintextDocumentMention) {
+			t.Errorf("log = %q, want no %q warning for an https document", got, plaintextDocumentMention)
 		}
 	})
 

@@ -134,7 +134,8 @@ func New(tokenURL string, assertion AssertionSource, opts ...Option) (*Source, e
 // FromConfig validates cfg and returns a Source.
 func FromConfig(cfg Config) (*Source, error) {
 	if cfg.HTTPClient == nil {
-		return nil, fmt.Errorf("%w: HTTPClient is required (REQ-021)", auth.ErrInvalidConfig)
+		// REQ-021: the caller supplies the client.
+		return nil, fmt.Errorf("%w: HTTPClient is required", auth.ErrInvalidConfig)
 	}
 	if cfg.TokenURL == "" {
 		return nil, fmt.Errorf("%w: TokenURL is required", auth.ErrInvalidConfig)

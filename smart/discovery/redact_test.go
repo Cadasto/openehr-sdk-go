@@ -461,12 +461,16 @@ func TestREQ071_CacheFailureLogMasksBaseURLPassword(t *testing.T) { // REQ-071
 }
 
 // TestREQ073_PlaintextWarningMasksBaseURLPassword pins the REQ-073 warning
-// on a plaintext service baseUrl: it names the base URL with its password
-// masked.
-func TestREQ073_PlaintextWarningMasksBaseURLPassword(t *testing.T) { // REQ-073
+// on a plaintext service baseUrl: its message is the plaintext URL warning
+// and nothing more, no internal requirement id included, and it names the
+// base URL with its password masked.
+func TestREQ073_PlaintextWarningMasksBaseURLPassword(t *testing.T) { // REQ-073, REQ-092
 	got := logOf(t, fixed(documentWith("http://api.example.com/openehr/v1", nil)), nil, discovery.WithAllowInsecure())
-	if !strings.Contains(got, "plaintext URL in catalog") {
-		t.Fatalf("log = %q, want a plaintext URL warning", got)
+	if !strings.Contains(got, ` msg="discovery: plaintext URL in catalog" `) {
+		t.Fatalf("log = %q, want a warning with the message %q", got, "discovery: plaintext URL in catalog")
+	}
+	if strings.Contains(got, "REQ-") {
+		t.Errorf("log = %q names an internal requirement id", got)
 	}
 	if strings.Contains(got, secret) {
 		t.Errorf("log = %q carries the URL password %q", got, secret)

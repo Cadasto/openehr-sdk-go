@@ -199,7 +199,8 @@ func New(clientID, clientSecret, tokenURL string, opts ...Option) (*Source, erro
 // configuration is loaded declaratively.
 func FromConfig(cfg Config) (*Source, error) {
 	if cfg.HTTPClient == nil {
-		return nil, fmt.Errorf("%w: HTTPClient is required (REQ-021)", auth.ErrInvalidConfig)
+		// REQ-021: the caller supplies the client.
+		return nil, fmt.Errorf("%w: HTTPClient is required", auth.ErrInvalidConfig)
 	}
 	if cfg.ClientID == "" {
 		return nil, fmt.Errorf("%w: ClientID is required", auth.ErrInvalidConfig)

@@ -561,7 +561,8 @@ func New(clientID string, authEP discovery.AuthEndpoints, opts ...Option) (*Sour
 // A JWKSURI it cannot build a key-set fetcher from fails the same way.
 func FromConfig(cfg Config) (*Source, error) {
 	if cfg.HTTPClient == nil {
-		return nil, fmt.Errorf("%w: HTTPClient is required (REQ-021)", auth.ErrInvalidConfig)
+		// REQ-021: the caller supplies the client.
+		return nil, fmt.Errorf("%w: HTTPClient is required", auth.ErrInvalidConfig)
 	}
 	if cfg.ClientID == "" {
 		return nil, fmt.Errorf("%w: ClientID is required", auth.ErrInvalidConfig)
