@@ -252,6 +252,9 @@ func WithTokenChange(fn func(ctx context.Context, change TokenChange)) Option {
 }
 
 // Source implements auth.TokenSource for SMART authorization-code + PKCE.
+//
+// Printing a Source with any fmt verb shows only its client ID and issuer,
+// never its client secret, tokens or token response: see [Source.String].
 type Source struct {
 	cfg Config
 	// credClient sends the token, refresh and revocation requests, which
@@ -281,6 +284,26 @@ type Source struct {
 	changes    []func()
 	delivering bool
 }
+
+// String describes s by two values fixed when s was built: its client ID
+// and its issuer. It never shows the client secret, a token or a token
+// response, and it reads nothing a refresh changes, so it is safe to call
+// while other goroutines use s. A nil s gives "<nil>".
+func (s *Source) String() string {
+	if s == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("smart.Source{ClientID: %q, Issuer: %q}", s.cfg.ClientID, s.cfg.Issuer)
+}
+
+// GoString returns the text of [Source.String], so that printing s in Go
+// syntax shows no credential either.
+func (s *Source) GoString() string { return s.String() }
+
+// Format writes the text of [Source.String] for every fmt verb, whatever its
+// flags and width. Without it, a verb such as %d or %x would print the
+// fields of s, which hold the client secret and the tokens.
+func (s *Source) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, s.String()) }
 
 // queueChangeLocked records change for the token-change hook, with the
 // context of the call that made it. The hook runs without s.mu, so it gets
