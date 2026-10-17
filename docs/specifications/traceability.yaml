@@ -438,6 +438,7 @@ requirements:
       - openehr/client/demographic/versioned_test.go
       - openehr/instance/instance_test.go
       - openehr/instance/polymorphic_roundtrip_test.go
+      - openehr/internal/refused/refused_test.go
       - openehr/rm/character_test.go
       - openehr/rm/character_text_test.go
       - openehr/rm/integer_test.go

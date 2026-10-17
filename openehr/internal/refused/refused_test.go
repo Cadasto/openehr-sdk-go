@@ -9,6 +9,10 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/refused"
 )
 
+// REQ-052 (wire.md § Value-free decode errors): the literal a primitive codec
+// refused reaches DecodeError.Value through this carrier, and the carrier
+// changes neither the refusal's message nor its chain.
+//
 // TestLiteral_REQ052_MessageAndChainUnchanged pins what the literal carrier
 // adds to a codec's refusal: the JSON text it refused, as written, and
 // nothing a caller reads. Its message is the refusal's, one errors.Unwrap step
