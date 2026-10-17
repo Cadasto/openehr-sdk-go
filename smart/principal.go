@@ -27,18 +27,24 @@ type PrincipalIdentity struct {
 	// versa). Nested values are not deep-copied. When the claims come from
 	// the token-endpoint body, Raw holds its members verbatim, the access
 	// and refresh tokens included, so it must not be printed or logged as it
-	// is; log the PrincipalIdentity itself, whose LogValue masks them.
+	// is; log the *PrincipalIdentity itself, whose LogValue masks them.
 	Raw map[string]any
 }
 
-// LogValue lets log/slog log p, or a pointer to it, without the tokens Raw
-// can hold. It logs UID, Type and a copy of Raw as a group, keyed by field
-// name; in the copy the access_token, refresh_token and id_token members
-// keep their keys but have their values replaced by the same fixed marker.
-// p itself is not changed. A nil *PrincipalIdentity has no value to call
-// LogValue on, so slog logs that LogValue panicked in its place; check a
-// pointer for nil before logging it.
-func (p PrincipalIdentity) LogValue() slog.Value {
+// LogValue lets log/slog log p without the tokens Raw can hold. It logs UID,
+// Type and a copy of Raw as a group, keyed by field name; in the copy the
+// access_token, refresh_token and id_token members keep their keys but have
+// their values replaced by the same fixed marker. p itself is not changed. A
+// nil p logs as nil, as slog logs any nil pointer.
+//
+// The masking applies to a *PrincipalIdentity, such as the one
+// [LaunchContext].Principal holds. A PrincipalIdentity value copied out of
+// it (*p) and logged as it is does not go through LogValue, so the tokens in
+// its Raw are logged: log the pointer instead.
+func (p *PrincipalIdentity) LogValue() slog.Value {
+	if p == nil {
+		return slog.AnyValue(nil)
+	}
 	return slog.GroupValue(
 		slog.String("UID", p.UID),
 		slog.String("Type", string(p.Type)),

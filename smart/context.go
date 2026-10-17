@@ -58,19 +58,25 @@ type LaunchContext struct {
 	// nested values are not deep-copied. Mutating it does not affect the
 	// originating TokenResponse. Raw holds the token-endpoint members
 	// verbatim, the access, refresh and ID tokens included, so it must not
-	// be printed or logged as it is; log the LaunchContext itself, whose
+	// be printed or logged as it is; log the *LaunchContext itself, whose
 	// LogValue masks them.
 	Raw map[string]any
 }
 
-// LogValue lets log/slog log lc, or a pointer to it, without its tokens. It
-// logs the fields of lc as a group, keyed by field name, with Raw and
-// Principal's Raw as copies whose access_token, refresh_token and id_token
-// members keep their keys but have their values replaced by the same fixed
-// marker. lc itself is not changed. A nil *LaunchContext has no value to
-// call LogValue on, so slog logs that LogValue panicked in its place; check
-// a pointer for nil before logging it.
-func (lc LaunchContext) LogValue() slog.Value {
+// LogValue lets log/slog log lc without its tokens. It logs the fields of lc
+// as a group, keyed by field name, with Raw and Principal's Raw as copies
+// whose access_token, refresh_token and id_token members keep their keys but
+// have their values replaced by the same fixed marker. lc itself is not
+// changed. A nil lc logs as nil, as slog logs any nil pointer.
+//
+// The masking applies to a *LaunchContext, such as the one
+// [LaunchContextFromTokenResponse] or [LaunchContextFromContext] hands out. A
+// LaunchContext value copied out of it (*lc) and logged as it is does not go
+// through LogValue, so its tokens are logged: log the pointer instead.
+func (lc *LaunchContext) LogValue() slog.Value {
+	if lc == nil {
+		return slog.AnyValue(nil)
+	}
 	principal := slog.Any("Principal", nil)
 	if lc.Principal != nil {
 		principal = slog.Attr{Key: "Principal", Value: lc.Principal.LogValue()}

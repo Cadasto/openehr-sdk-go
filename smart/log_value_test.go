@@ -52,12 +52,19 @@ func logLine(newHandler func(*bytes.Buffer) slog.Handler, v any) string {
 func jsonHandler(b *bytes.Buffer) slog.Handler { return slog.NewJSONHandler(b, nil) }
 func textHandler(b *bytes.Buffer) slog.Handler { return slog.NewTextHandler(b, nil) }
 
-// TestREQ064_LaunchContextLogValueMasksTokens logs a launch context, as a
-// value and as a pointer, through slog's JSON and text handlers: the tokens
-// on Raw and on Principal.Raw are masked, the members stay, and the typed
-// fields are logged.
+// TestREQ064_LaunchContextLogValueMasksTokens logs a launch context through
+// slog's JSON and text handlers, as each pointer a caller can hold: the one
+// LaunchContextFromTokenResponse returns, the one LaunchContextFromContext
+// returns, and a pointer to a copy of the value. The tokens on Raw and on
+// Principal.Raw are masked, the members stay, and the typed fields are
+// logged.
 func TestREQ064_LaunchContextLogValueMasksTokens(t *testing.T) {
 	lc := tokenBodyLaunchContext(t)
+	fromContext, ok := smart.LaunchContextFromContext(smart.WithLaunchContext(t.Context(), lc))
+	if !ok {
+		t.Fatal("LaunchContextFromContext(WithLaunchContext(ctx, lc)) found no launch context")
+	}
+	copied := *lc
 	handlers := []struct {
 		name string
 		new  func(*bytes.Buffer) slog.Handler
@@ -65,7 +72,7 @@ func TestREQ064_LaunchContextLogValueMasksTokens(t *testing.T) {
 	values := []struct {
 		name string
 		v    any
-	}{{"pointer", lc}, {"value", *lc}}
+	}{{"returned pointer", lc}, {"pointer from the context", fromContext}, {"pointer to a copy", &copied}}
 	for _, h := range handlers {
 		for _, v := range values {
 			t.Run(h.name+"/"+v.name, func(t *testing.T) {
@@ -142,7 +149,7 @@ func TestREQ064_LaunchContextLogValueShape(t *testing.T) {
 		t.Errorf("logged IDToken = %#v, want null without an ID token", got.IDToken)
 	}
 
-	bare := smart.LaunchContext{Patient: "p2"}
+	bare := &smart.LaunchContext{Patient: "p2"}
 	var bareRec struct{ V map[string]any }
 	if err := json.Unmarshal([]byte(logLine(jsonHandler, bare)), &bareRec); err != nil {
 		t.Fatalf("JSON log line does not parse: %v", err)
@@ -153,17 +160,62 @@ func TestREQ064_LaunchContextLogValueShape(t *testing.T) {
 	if bareRec.V["Patient"] != "p2" {
 		t.Errorf("logged Patient = %#v, want p2", bareRec.V["Patient"])
 	}
+	if out := logLine(textHandler, bare); !strings.Contains(out, " v.Principal=<nil> ") {
+		t.Errorf("text log of a context without a principal = %q, want v.Principal=<nil>", out)
+	}
+}
+
+// TestREQ025_NilLaunchContextAndPrincipalLogAsNil logs a nil *LaunchContext,
+// as LaunchContextFromContext returns without one, and a nil
+// *PrincipalIdentity, as LaunchContext.Principal often is, through slog's
+// JSON and text handlers: each logs as nil, as slog logs any nil pointer,
+// and LogValue does not panic.
+func TestREQ025_NilLaunchContextAndPrincipalLogAsNil(t *testing.T) { // REQ-025, REQ-064
+	noContext, found := smart.LaunchContextFromContext(t.Context())
+	if found || noContext != nil {
+		t.Fatalf("LaunchContextFromContext(ctx without one) = %v, %v; want nil, false", noContext, found)
+	}
+	values := []struct {
+		name string
+		v    any
+	}{
+		{"*LaunchContext", noContext},
+		{"*PrincipalIdentity", (&smart.LaunchContext{}).Principal},
+	}
+	handlers := []struct {
+		name string
+		new  func(*bytes.Buffer) slog.Handler
+		want string
+	}{
+		{"json", jsonHandler, "\"v\":null}\n"},
+		{"text", textHandler, " v=<nil>\n"},
+	}
+	for _, v := range values {
+		for _, h := range handlers {
+			t.Run(v.name+"/"+h.name, func(t *testing.T) {
+				out := logLine(h.new, v.v)
+				if strings.Contains(out, "panicked") {
+					t.Fatalf("log of a nil %s: LogValue panicked:\n%s", v.name, out)
+				}
+				if !strings.HasSuffix(out, h.want) {
+					t.Errorf("log of a nil %s = %q, want it to end with %q", v.name, out, h.want)
+				}
+			})
+		}
+	}
 }
 
 // TestREQ067_PrincipalIdentityLogValueMasksTokens logs a principal read
-// from a token-endpoint body on its own, as a value and as a pointer: its
-// Raw holds the tokens, and the log masks them.
+// from a token-endpoint body on its own, as the pointer LaunchContext holds
+// and as a pointer to a copy of the value: its Raw holds the tokens, and the
+// log masks them.
 func TestREQ067_PrincipalIdentityLogValueMasksTokens(t *testing.T) {
 	p := tokenBodyLaunchContext(t).Principal
+	copied := *p
 	for _, v := range []struct {
 		name string
 		v    any
-	}{{"pointer", p}, {"value", *p}} {
+	}{{"held pointer", p}, {"pointer to a copy", &copied}} {
 		for _, h := range []func(*bytes.Buffer) slog.Handler{jsonHandler, textHandler} {
 			out := logLine(h, v.v)
 			for _, secret := range []string{accessSecret, refreshSecret} {
