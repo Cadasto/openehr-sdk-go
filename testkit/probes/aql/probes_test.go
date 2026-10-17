@@ -1864,7 +1864,7 @@ func TestProbe100DetectsInadmissibleRows(t *testing.T) {
 			name: "unparseable",
 			row: aqlprobes.ConformanceRow{
 				Family: "AND_OR", File: "from_simple_and_or.csv", Line: 2,
-				Suite: "AQL_TESTS/FROM/AND_OR/simple_and_or.robot",
+				Suite: "AQL/FROM/AND_OR/simple_and_or.robot",
 				Query: "SELECT o FROM",
 			},
 		},
@@ -1875,7 +1875,7 @@ func TestProbe100DetectsInadmissibleRows(t *testing.T) {
 			name: "impossible_containment",
 			row: aqlprobes.ConformanceRow{
 				Family: "CONTAINS_A_D", File: "from_contains_plus_contain_chaining.csv", Line: 3,
-				Suite: "AQL_TESTS/FROM/CONTAINS_A_D/contains_plus_contain_chaining.robot",
+				Suite: "AQL/FROM/CONTAINS_A_D/contains_plus_contain_chaining.robot",
 				Query: "SELECT o FROM OBSERVATION o CONTAINS COMPOSITION c",
 			},
 		},
@@ -1947,7 +1947,7 @@ func TestProbe100PermitsWarningSeverityContainmentCodes(t *testing.T) {
 			code: "aql_unknown_rm_class",
 			row: aqlprobes.ConformanceRow{
 				Family: "USABLE_RM_TYPES_A_D", File: "from_item_structure_and_element_in_composition.csv", Line: 6,
-				Suite: "AQL_TESTS/FROM/USABLE_RM_TYPES_A_D/from_item_structure_and_element_in_composition.robot",
+				Suite: "AQL/FROM/USABLE_RM_TYPES_A_D/from_item_structure_and_element_in_composition.robot",
 				Query: "SELECT t FROM COMPOSITION CONTAINS FOO_BAR t",
 			},
 		},
@@ -1962,7 +1962,7 @@ func TestProbe100PermitsWarningSeverityContainmentCodes(t *testing.T) {
 			code: "aql_containment_by_reference",
 			row: aqlprobes.ConformanceRow{
 				Family: "CONTAINS_A_D", File: "from_contains_plus_contain_chaining.csv", Line: 12,
-				Suite: "AQL_TESTS/FROM/CONTAINS_A_D/contains_plus_contain_chaining.robot",
+				Suite: "AQL/FROM/CONTAINS_A_D/contains_plus_contain_chaining.robot",
 				Query: "SELECT o FROM FOLDER CONTAINS COMPOSITION o",
 			},
 		},

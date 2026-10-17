@@ -131,7 +131,7 @@ var conformanceSuites = []conformanceSuite{
 		Header:   []string{"${statement}", "${expected_file}", "${nr_of_results}"},
 		Vars:     []string{"${statement}"},
 		Template: "${statement}",
-		Suite:    "AQL_TESTS/FROM/AND_OR/simple_and_or.robot",
+		Suite:    "AQL/FROM/AND_OR/simple_and_or.robot",
 	},
 	{
 		Family:   "CONTAINS_A_D",
@@ -139,7 +139,7 @@ var conformanceSuites = []conformanceSuite{
 		Header:   []string{"${from}", "${expected_file}", "${nr_of_results}"},
 		Vars:     []string{"${from}"},
 		Template: "SELECT o FROM ${from}",
-		Suite:    "AQL_TESTS/FROM/CONTAINS_A_D/contains_plus_contain_chaining.robot",
+		Suite:    "AQL/FROM/CONTAINS_A_D/contains_plus_contain_chaining.robot",
 	},
 	{
 		Family:   "CONTAINS_A_D",
@@ -147,7 +147,7 @@ var conformanceSuites = []conformanceSuite{
 		Header:   []string{"${from}", "${expected_file}", "${nr_of_results}"},
 		Vars:     []string{"${from}"},
 		Template: "SELECT o FROM COMPOSITION contains ${from}",
-		Suite:    "AQL_TESTS/FROM/CONTAINS_A_D/contains_with_repeating_types.robot",
+		Suite:    "AQL/FROM/CONTAINS_A_D/contains_with_repeating_types.robot",
 	},
 	{
 		Family:   "EHR_STATUS",
@@ -155,7 +155,7 @@ var conformanceSuites = []conformanceSuite{
 		Header:   []string{"${path}", "${expected_file}", "${nr_of_results}"},
 		Vars:     []string{"${path}"},
 		Template: "SELECT l/name/value FROM EHR e CONTAINS ${path}",
-		Suite:    "AQL_TESTS/FROM/EHR_STATUS/contains.robot",
+		Suite:    "AQL/FROM/EHR_STATUS/contains.robot",
 	},
 	{
 		Family:   "EHR_STATUS",
@@ -163,7 +163,7 @@ var conformanceSuites = []conformanceSuite{
 		Header:   []string{"${path}", "${expected_file}", "${nr_of_results}"},
 		Vars:     []string{"${path}"},
 		Template: "SELECT s/${path} FROM EHR e CONTAINS EHR_STATUS s WHERE e/ehr_id/value = '${ehr_id}'",
-		Suite:    "AQL_TESTS/FROM/EHR_STATUS/from_single_ehr.robot",
+		Suite:    "AQL/FROM/EHR_STATUS/from_single_ehr.robot",
 	},
 	{
 		Family:   "EHR_STATUS",
@@ -171,7 +171,7 @@ var conformanceSuites = []conformanceSuite{
 		Header:   []string{"${path}", "${expected_file}", "${nr_of_results}"},
 		Vars:     []string{"${path}"},
 		Template: "SELECT e/ehr_status/${path} FROM EHR e WHERE e/ehr_id/value = '${ehr_id}'",
-		Suite:    "AQL_TESTS/FROM/EHR_STATUS/via_part.robot",
+		Suite:    "AQL/FROM/EHR_STATUS/via_part.robot",
 	},
 	{
 		Family:   "PREDICATE_A_D",
@@ -179,7 +179,7 @@ var conformanceSuites = []conformanceSuite{
 		Header:   []string{"${type}", "${predicate}", "${expected_file}", "${nr_of_results}"},
 		Vars:     []string{"${type}", "${predicate}"},
 		Template: "SELECT t FROM ${type} t ${predicate}",
-		Suite:    "AQL_TESTS/FROM/PREDICATE_A_D/predicate_on_extracted_column.robot",
+		Suite:    "AQL/FROM/PREDICATE_A_D/predicate_on_extracted_column.robot",
 	},
 	{
 		Family:   "USABLE_RM_TYPES_A_D",
@@ -187,7 +187,7 @@ var conformanceSuites = []conformanceSuite{
 		Header:   []string{"${type}", "${expected_file}", "${nr_of_results}"},
 		Vars:     []string{"${type}"},
 		Template: "SELECT t FROM ${type} t",
-		Suite:    "AQL_TESTS/FROM/USABLE_RM_TYPES_A_D/from_abstract_types.robot",
+		Suite:    "AQL/FROM/USABLE_RM_TYPES_A_D/from_abstract_types.robot",
 	},
 	{
 		Family:   "USABLE_RM_TYPES_A_D",
@@ -195,7 +195,7 @@ var conformanceSuites = []conformanceSuite{
 		Header:   []string{"${type}", "${expected_file}", "${nr_of_results}"},
 		Vars:     []string{"${type}"},
 		Template: "SELECT t FROM ${type} t",
-		Suite:    "AQL_TESTS/FROM/USABLE_RM_TYPES_A_D/from_common_types.robot",
+		Suite:    "AQL/FROM/USABLE_RM_TYPES_A_D/from_common_types.robot",
 	},
 	{
 		Family: "USABLE_RM_TYPES_A_D",
@@ -204,7 +204,7 @@ var conformanceSuites = []conformanceSuite{
 		Header:   []string{"${type}", "${expected_file}"},
 		Vars:     []string{"${type}"},
 		Template: "SELECT t FROM ${type} t",
-		Suite:    "AQL_TESTS/FROM/USABLE_RM_TYPES_A_D/from_composition.robot",
+		Suite:    "AQL/FROM/USABLE_RM_TYPES_A_D/from_composition.robot",
 	},
 	{
 		Family:   "USABLE_RM_TYPES_A_D",
@@ -212,7 +212,7 @@ var conformanceSuites = []conformanceSuite{
 		Header:   []string{"${type}", "${expected_file}", "${nr_of_results}"},
 		Vars:     []string{"${type}"},
 		Template: "SELECT t FROM COMPOSITION CONTAINS ${type} t",
-		Suite:    "AQL_TESTS/FROM/USABLE_RM_TYPES_A_D/from_item_structure_and_element_in_composition.robot",
+		Suite:    "AQL/FROM/USABLE_RM_TYPES_A_D/from_item_structure_and_element_in_composition.robot",
 	},
 	{
 		Family: "USABLE_RM_TYPES_A_D",
@@ -222,7 +222,7 @@ var conformanceSuites = []conformanceSuite{
 		Header:   []string{"${type}", "${expected_file}", "${nr_of_results}"},
 		Vars:     []string{"${type}"},
 		Template: "SELECT t FROM COMPOSITION CONTAINS ${type} t",
-		Suite:    "AQL_TESTS/FROM/USABLE_RM_TYPES_A_D/from_item_structure_in_composition.robot",
+		Suite:    "AQL/FROM/USABLE_RM_TYPES_A_D/from_item_structure_in_composition.robot",
 	},
 }
 
