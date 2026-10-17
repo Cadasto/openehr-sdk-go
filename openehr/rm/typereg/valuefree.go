@@ -311,8 +311,11 @@ var (
 		``,
 		` \([0-9]+ > [0-9]+\)`,
 		`: `+formIdent+` for (?:`+formGoType+`)?`,
+		`: xmi:type on the wire is rejected \(use xsi:type\)`,
 	)
 	wholeForms = anchoredForms(
+		// canxml's own shape sentinel, a value this package cannot name.
+		`canxml: invalid XML shape`,
 		`(?:lower|upper)_unbounded is false but the interval gives no (?:lower|upper) bound, which a bound held by value cannot leave out`,
 		`rm\.(?:Integer|Real|Character): empty input`,
 		`rm\.Real: literal carries more than [0-9]+ significant decimal digits`,
