@@ -29,6 +29,11 @@ corpus/
     AQL_SOURCE.txt                    #   commit pin (authoritative — byte copies)
     EXCLUDED.txt                      #   generated: what upstream is not carried
     {FAMILY}/{name}.csv               #   per consuming Robot suite family
+  aql/suites/                         # pinned upstream AQL suites + their CSVs (PROBE-107)
+    AQL_SOURCE.txt                    #   commit pin (authoritative — byte copies)
+    EXCLUDED.txt                      #   generated: what upstream is not carried
+    AQL/**/{suite}.robot              #   at its path under upstream tests/robot/
+    _resources/test_data_sets/aql/fields_and_results/**/combinations/{name}.csv
 ```
 
 Everything under `flat-conformance/` is a pinned subtree, machine-synced from
@@ -49,7 +54,15 @@ CSVs are byte copies of the upstream files, so its pin
 content. Refresh with [`scripts/ingest-robot-aql.sh`](../../scripts/ingest-robot-aql.sh),
 which also regenerates `EXCLUDED.txt`.
 
-`crossformat/` is a third pinned subtree; do not hand-edit it either. See
+`aql/suites/` is a third pinned subtree; do not hand-edit it either. It mirrors
+upstream `tests/robot/`: the Robot AQL suites sit under `AQL/` and the
+combination CSVs they read under `_resources/`, each a byte copy at its upstream
+path, so its pin ([`AQL_SOURCE.txt`](aql/suites/AQL_SOURCE.txt)) fully
+determines their content. The same ingest refreshes it, in the same run and
+from the same clone as `aql/conformance/`, so the two pins always name one
+commit; it also regenerates this subtree's `EXCLUDED.txt`.
+
+`crossformat/` is a fourth pinned subtree; do not hand-edit it either. See
 [Cross-format sets](#cross-format-sets) below.
 
 Resolve paths via [`testkit/fixtures`](../fixtures/) (`TemplateOpt`, `CompositionJSON`, `CompositionXML`, `RMJSON`, `RMXML`, `SubmissionJSON`, `WebTemplateOpt`, `WebTemplateReference`, `ListCrossFormatSets`).
@@ -176,6 +189,8 @@ The Corona pair is the largest fixture in the repo. That size is the cost of gua
 **Submissions** ([`submissions/`](submissions/README.md)): 47 CONTRIBUTION create payloads from `contributions/` (bulk `create_multiple_compositions` omitted). Decode them with `contribution.Submission`, not `rm.Contribution`.
 
 **AQL conformance corpus** ([`aql/conformance/`](aql/conformance/)): 12 FROM-family combination CSVs from `aql/fields_and_results/from/combinations/`, copied byte-exact and filed under the Robot suite family that consumes each one (`AND_OR`, `CONTAINS_A_D`, `EHR_STATUS`, `PREDICATE_A_D`, `USABLE_RM_TYPES_A_D`). Each row is a FROM/CONTAINS shape, and the family names the suite holding the query template it goes into (PROBE-100). Its own ingest, [`scripts/ingest-robot-aql.sh`](../../scripts/ingest-robot-aql.sh), vendors it on its own cadence, so it carries its own pin: [`AQL_SOURCE.txt`](aql/conformance/AQL_SOURCE.txt). That pin is authoritative for the bytes, where `ROBOT_SOURCE.txt` above is best-effort. [`EXCLUDED.txt`](aql/conformance/EXCLUDED.txt) is generated beside it and names all 1124 upstream files the corpus does not carry, each with a reason tag (`execution-semantics`, `non-from-family`, `unconsumed-by-suite`). Both files are generated; do not hand-edit them.
+
+**AQL suite corpus** ([`aql/suites/`](aql/suites/)): all 132 Robot AQL suites under upstream `tests/robot/AQL/` (`__init__.robot` included) and all 116 combination CSVs under `tests/robot/_resources/test_data_sets/aql/fields_and_results/**/combinations/`, every clause family's, copied byte-exact to their paths relative to upstream `tests/robot/`. A suite's data file `${PROJECT_ROOT}/tests/robot/<rest>` is therefore `aql/suites/<rest>`, and PROBE-107 takes each query template from the suite that sends it. The same ingest writes it in the same run as `aql/conformance/`, from the same clone, so its pin, [`AQL_SOURCE.txt`](aql/suites/AQL_SOURCE.txt), names the same commit. [`EXCLUDED.txt`](aql/suites/EXCLUDED.txt) is generated beside it and names all 1021 upstream files under those two roots that the corpus does not carry, each with a reason tag (`execution-semantics` for the expected-result JSON files, `not-a-suite` for the one non-suite file under `AQL/`). Both files are generated; do not hand-edit them.
 
 ### SDK (`rm/`)
 
