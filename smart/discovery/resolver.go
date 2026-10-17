@@ -141,7 +141,9 @@ func WithDefaultTTL(d time.Duration) Option {
 
 // WithAllowInsecure permits http:// base URLs, issuers and auth endpoint
 // URLs, and redirects to a URL that is not https. By default the resolver
-// refuses both. Use only for local development.
+// refuses both. Use only for local development. The resolver logs a warning
+// for each SMART configuration it then fetches over http, and for each http
+// URL in a catalog it accepts.
 func WithAllowInsecure() Option {
 	return func(cfg *resolverConfig) { cfg.allowInsecure = true }
 }
@@ -535,6 +537,7 @@ func (r *Resolver) fetch(ctx context.Context, baseURL string, cached *ServiceCat
 		if etag == "" {
 			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonFetchFailed, Inner: errors.New("discovery fetch returned 304 to a request without If-None-Match")}
 		}
+		r.warnPlaintextDocument(baseURL, req, resp)
 		// The document is the one cached was built from, but it still goes
 		// through this Resolver's checks, as on a 200: the catalog may have
 		// been cached by a Resolver with other options, or reached the Cache
@@ -554,6 +557,7 @@ func (r *Resolver) fetch(ctx context.Context, baseURL string, cached *ServiceCat
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonFetchFailed, Inner: fmt.Errorf("discovery fetch returned %d", resp.StatusCode)}
 	}
+	r.warnPlaintextDocument(baseURL, req, resp)
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxDocumentBytes))
 	if err != nil {
 		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonFetchFailed, Inner: err}
@@ -1115,6 +1119,22 @@ func (r *Resolver) warnInsecure(cat *ServiceCatalog) {
 	}
 	for id, s := range cat.Services {
 		check("services["+id+"].baseUrl", s.BaseURL)
+	}
+}
+
+// warnPlaintextDocument emits the REQ-092 warning when the SMART
+// configuration for baseURL came over plaintext http, which only a Resolver
+// built with WithAllowInsecure accepts. It judges the URL of the last
+// request the client sent, resp.Request, so an https request redirected to
+// http counts too. A RoundTripper may answer without setting resp.Request;
+// req, the request the resolver sent, then stands in for it.
+func (r *Resolver) warnPlaintextDocument(baseURL string, req *http.Request, resp *http.Response) {
+	u := req.URL
+	if resp.Request != nil && resp.Request.URL != nil {
+		u = resp.Request.URL
+	}
+	if u.Scheme == "http" {
+		r.cfg.logger.Warn("discovery: SMART configuration fetched over plaintext http (REQ-092)", "base_url", urlredact.String(baseURL), "url", u.Redacted())
 	}
 }
 
