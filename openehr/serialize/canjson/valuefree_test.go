@@ -712,6 +712,59 @@ func TestUnmarshal_REQ052_SDKMessagesStayInDecodeErrorText(t *testing.T) {
 	}
 }
 
+// TestUnmarshal_REQ052_Base64RefusalNamesItsOffset pins the text of a
+// DV_MULTIMEDIA byte field whose string is not valid base64: the
+// base64.CorruptInputError beneath it holds only the offset of the first bad
+// byte in the string, which is no value from the document, so the text keeps
+// it beside the pointer and carries none of the string, and Value stays empty
+// (REQ-052).
+//
+// Can-fail control: name a base64 refusal by its class alone, as every error
+// of a type the renderer does not know is named, and the offset assertion
+// fails.
+func TestUnmarshal_REQ052_Base64RefusalNamesItsOffset(t *testing.T) {
+	const multimedia = `{"_type":"DV_MULTIMEDIA","media_type":{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"IANA_media-types"},"code_string":"text/plain"},"size":3,`
+	cases := []struct {
+		name    string
+		in      string
+		pointer string
+		offset  string
+		absent  []string
+	}{
+		{name: "data", in: multimedia + `"data":"Jane@7777"}`, pointer: "/data", offset: "illegal base64 data at input byte 4", absent: []string{"Jane", "7777"}},
+		{name: "integrity_check", in: multimedia + `"integrity_check":"QUJD§q"}`, pointer: "/integrity_check", offset: "illegal base64 data at input byte 4", absent: []string{"QUJD", "§"}},
+	}
+	for _, tc := range cases {
+		for _, tg := range concreteAndSlot(func() any { return new(rm.DVMultimedia) }) {
+			for _, ep := range entryPoints {
+				for mode, opts := range jsonDecodeModes() {
+					t.Run(tc.name+"/"+tg.name+"/"+ep.name+"/"+mode, func(t *testing.T) {
+						err := ep.decode(tc.in, tg.new(), opts...)
+						de, ok := topDecodeError(err)
+						if !ok {
+							t.Fatalf("%s(%s) = %T %v; want a *canjson.DecodeError at the top of the chain", ep.name, tc.in, err, err)
+						}
+						msg := err.Error()
+						for _, want := range []string{tc.pointer, tc.offset} {
+							if !strings.Contains(msg, want) {
+								t.Errorf("%s(%s) = %q; want the text to keep %q", ep.name, tc.in, msg, want)
+							}
+						}
+						for _, v := range tc.absent {
+							if strings.Contains(msg, v) {
+								t.Errorf("%s(%s) = %q; the text carries %q from the document", ep.name, tc.in, msg, v)
+							}
+						}
+						if got := de.Value.Reveal(); got != nil {
+							t.Errorf("%s(%s): Value.Reveal() = %#v; want nothing for a string that is not base64", ep.name, tc.in, got)
+						}
+					})
+				}
+			}
+		}
+	}
+}
+
 // TestDecoder_REQ052_ReaderFailureAndEndOfStreamComeBackUnwrapped pins the two
 // errors REQ-052 leaves as they are, because the input does not cause them: a
 // failing reader's own error, and io.EOF from a Decoder whose stream holds no

@@ -1,6 +1,7 @@
 package typereg_test
 
 import (
+	"encoding/base64"
 	"encoding/json/jsontext"
 	json "encoding/json/v2"
 	"errors"
@@ -160,6 +161,24 @@ func TestDecodeError_REQ052_TextCarriesNoValue(t *testing.T) {
 			name:   "several causes around a word that is not an RM type's name",
 			cause:  fmt.Errorf("%w: %s: %w", typereg.ErrInvalidShape, "Jane", typereg.ErrMissingType),
 			keep:   []string{"decode /a: canjson: invalid JSON shape; typereg: _type discriminator missing"},
+			absent: []string{"Jane"},
+		},
+		{
+			name:   "a base64 refusal",
+			cause:  base64.CorruptInputError(7),
+			keep:   []string{"decode /a: illegal base64 data at input byte 7"},
+			absent: nil,
+		},
+		{
+			name:   "canxml's element prefix",
+			cause:  fmt.Errorf("canxml: <%s>: %w", "data", base64.CorruptInputError(3)),
+			keep:   []string{"decode /a: canxml: <data>: illegal base64 data at input byte 3"},
+			absent: nil,
+		},
+		{
+			name:   "an element prefix that names no element",
+			cause:  fmt.Errorf("canxml: <%s>: %w", "Jane Doe", base64.CorruptInputError(3)),
+			keep:   []string{"decode /a: illegal base64 data at input byte 3"},
 			absent: []string{"Jane"},
 		},
 	}

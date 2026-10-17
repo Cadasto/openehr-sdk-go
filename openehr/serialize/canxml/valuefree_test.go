@@ -63,16 +63,21 @@ func slotElement(xsiType, body string) string {
 }
 
 // TestUnmarshal_REQ052_SlotRefusalsKeepTheirTextOnOneLine pins the text of a
-// DecodeError over a canonical-XML refusal the SDK writes around a cause: an
-// interval side written bounded with no bound, which names the RM type
-// between canxml's shape sentinel and the refusal. The text keeps each part,
-// stays on one line (REQ-052) and carries no value from the document, and
-// Value stays empty: canonical XML holds no literal for it.
+// DecodeError over two canonical-XML refusals the SDK writes around a cause:
+// an interval side written bounded with no bound, which names the RM type
+// between canxml's shape sentinel and the refusal, and an element whose text
+// is not base64, which names the element and the offset of the first bad
+// byte. The text keeps each part, stays on one line (REQ-052) and carries no
+// value from the document, and Value stays empty: canonical XML holds no
+// literal for either.
 //
 // Can-fail control: write an error that wraps several causes as errors.Join
 // does, a line break between the causes and none of its own text, and the
-// interval rows lose "DV_INTERVAL" and break the line.
+// interval rows lose "DV_INTERVAL" and break the line; name a base64 refusal
+// by its class alone, or drop canxml's element prefix, and the base64 rows
+// lose the offset or the element.
 func TestUnmarshal_REQ052_SlotRefusalsKeepTheirTextOnOneLine(t *testing.T) {
+	const media = `<media_type><terminology_id><value>IANA_media-types</value></terminology_id><code_string>text/plain</code_string></media_type><size>5</size>`
 	cases := []struct {
 		name   string
 		in     string
@@ -88,6 +93,15 @@ func TestUnmarshal_REQ052_SlotRefusalsKeepTheirTextOnOneLine(t *testing.T) {
 				"canxml: invalid XML shape: DV_INTERVAL: lower_unbounded is false but the interval gives no lower bound",
 			},
 			absent: []string{"7777"},
+		},
+		{
+			name: "a data element that is not base64",
+			in:   slotElement("DV_MULTIMEDIA", `<data>Jane@7777</data>`+media),
+			keep: []string{
+				`decode /value (_type="DV_MULTIMEDIA"): `,
+				"canxml: <data>: illegal base64 data at input byte 4",
+			},
+			absent: []string{"Jane", "7777"},
 		},
 	}
 	for _, tc := range cases {

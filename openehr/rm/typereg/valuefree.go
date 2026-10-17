@@ -8,14 +8,14 @@ package typereg
 //   - Structure it reads off a field it knows: a DecodeError's Path and Type,
 //     the RM type a shape failure names, a SemanticError's JSON kind, Go type
 //     and pointer, a SyntacticError's pointer and byte offset, a NumError's
-//     function name. The fields that hold the value, a SemanticError's
-//     JSONValue, the text a SyntacticError's cause quotes and a NumError's
-//     Num, are never written.
+//     function name, the offset a base64 refusal names. The fields that
+//     hold the value, a SemanticError's JSONValue, the text a
+//     SyntacticError's cause quotes and a NumError's Num, are never written.
 //   - An error it knows by identity: a sentinel whose text is fixed.
 //   - A message the SDK's codecs write, matched against a closed list of
 //     forms, whole or as a wrapper's own text around the errors it wraps.
-//     Every variable part of a form is structure: an RM or Go type name, a
-//     quoted `_type` value or member pointer, or a count.
+//     Every variable part of a form is structure: an RM or Go type name, an
+//     XML element name, a quoted `_type` value or member pointer, or a count.
 //
 // Any other text is left out. A wrapper it cannot place is followed to the
 // error it wraps, as is any wrapper above a DecodeError, whose own text would
@@ -27,6 +27,7 @@ package typereg
 // their own text may name the value.
 
 import (
+	"encoding/base64"
 	"encoding/json/jsontext"
 	json "encoding/json/v2"
 	"errors"
@@ -125,6 +126,10 @@ func (w *walk) link(err error) error {
 			b.WriteString(": ")
 			return e.Err
 		}
+	case base64.CorruptInputError:
+		// The text names the offset of the first bad byte, not the byte.
+		b.WriteString(e.Error())
+		return nil
 	}
 	if isKnownSentinel(err) {
 		b.WriteString(err.Error())
@@ -444,6 +449,7 @@ var (
 		`canjson: `+formIdent+`: `,
 		`canjson: expected `+formQuoted+`, got `+formQuoted+`: `,
 		`canxml: `+formQuoted+`: `,
+		`canxml: <`+formIdent+`>: `,
 		`canxml: decoded `+formGoType+`: `,
 		`rm\.(?:Integer|Real|Character): (?:parse quoted literal: )?`,
 		`typereg\.Decode: (?:read _type: )?`,
