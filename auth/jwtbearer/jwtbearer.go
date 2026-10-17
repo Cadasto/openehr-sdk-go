@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -278,6 +279,27 @@ func (s *Source) stale() bool {
 // past, which would have every call refresh the token.
 const maxExpiresIn = 100 * 365 * 24 * 60 * 60
 
+// expiresInSeconds reads s, the expires_in member of a token response, as
+// whole seconds. RFC 6749 §5.1 makes it "the lifetime in seconds of the
+// access token", a JSON number, so every form of one counts. An integer is
+// read as it is. Any other number, such as 3600.0, 3.6e3, 3600.5 or an
+// integer beyond the int64 range, counts as its whole seconds rounded down,
+// and as maxExpiresIn when it is larger. ok is false when s is not a number,
+// or is one a float64 cannot hold (it reads as NaN or ±Inf).
+func expiresInSeconds(s string) (secs int64, ok bool) {
+	if secs, err := strconv.ParseInt(s, 10, 64); err == nil {
+		return secs, true
+	}
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
+		return 0, false
+	}
+	// Bounding f first keeps the conversion inside the int64 range, where
+	// it is defined. A negative value stays negative, so it gives no
+	// expiry, as a negative integer does.
+	return int64(math.Floor(min(max(f, -maxExpiresIn), maxExpiresIn))), true
+}
+
 type tokenResponse struct {
 	AccessToken string      `json:"access_token"`
 	TokenType   string      `json:"token_type"`
@@ -349,10 +371,8 @@ func (s *Source) fetch(ctx context.Context) (auth.Token, error) {
 	}
 
 	var expiresAt time.Time
-	if str := tr.ExpiresIn.String(); str != "" {
-		if secs, err := strconv.ParseInt(str, 10, 64); err == nil && secs > 0 {
-			expiresAt = time.Now().Add(time.Duration(min(secs, maxExpiresIn)) * time.Second)
-		}
+	if secs, ok := expiresInSeconds(tr.ExpiresIn.String()); ok && secs > 0 {
+		expiresAt = time.Now().Add(time.Duration(min(secs, maxExpiresIn)) * time.Second)
 	}
 	return auth.Token{
 		Value:     tr.AccessToken,

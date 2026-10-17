@@ -1,10 +1,13 @@
 package clientcreds_test
 
 import (
+	"errors"
 	"net/http"
 	"testing"
 	"testing/synctest"
 	"time"
+
+	"github.com/cadasto/openehr-sdk-go/auth"
 )
 
 // TestREQ063_LargeExpiresInGivesAFutureExpiry pins REQ-063 (auth.md § Token
@@ -50,5 +53,89 @@ func TestREQ063_LargeExpiresInGivesAFutureExpiry(t *testing.T) {
 				}
 			})
 		})
+	}
+}
+
+// expiresInForms are expires_in members in each form a JSON number takes,
+// with the lifetime each gives the access token: none (0) for a negative
+// value or one a float64 cannot hold. A member that is not a number fails
+// the response, as it did before.
+var expiresInForms = []struct {
+	name      string
+	expiresIn string // the member's JSON text
+	want      time.Duration
+	wantErr   bool
+}{
+	{name: "integer", expiresIn: `3600`, want: time.Hour},
+	{name: "zero fraction", expiresIn: `3600.0`, want: time.Hour},
+	{name: "exponent", expiresIn: `3.6e3`, want: time.Hour},
+	{name: "capital exponent", expiresIn: `36E2`, want: time.Hour},
+	{name: "fraction rounded down", expiresIn: `3600.5`, want: time.Hour},
+	{name: "integer in a string", expiresIn: `"3600"`, want: time.Hour},
+	{name: "exponent in a string", expiresIn: `"3.6e3"`, want: time.Hour},
+	{name: "integer beyond int64", expiresIn: `9223372036854775808`, want: hundredYears},
+	{name: "large exponent", expiresIn: `1e300`, want: hundredYears},
+	{name: "negative integer", expiresIn: `-5`},
+	{name: "negative fraction", expiresIn: `-0.5`},
+	{name: "beyond float64", expiresIn: `1e400`},
+	{name: "not a number", expiresIn: `"soon"`, wantErr: true},
+}
+
+// hundredYears is the longest lifetime an expires_in gives a token.
+const hundredYears = 100 * 365 * 24 * time.Hour
+
+// TestREQ063_ExpiresInReadsEveryJSONNumberForm pins REQ-063 (auth.md § Token
+// refresh): RFC 6749 §5.1 makes expires_in "the lifetime in seconds of the
+// access token", a JSON number, so a fraction, an exponent or an integer
+// beyond the int64 range gives the token an expiry, rounded down to whole
+// seconds and at most 100 years, and the source does not run an exchange on
+// every call while the token is valid.
+func TestREQ063_ExpiresInReadsEveryJSONNumberForm(t *testing.T) {
+	for _, tc := range expiresInForms {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				rt := &scriptedTransport{answer: func(r *http.Request, _ int) (*http.Response, error) {
+					return tokenAnswer(r, http.StatusOK, `{"access_token":"tok","token_type":"Bearer","expires_in":`+tc.expiresIn+`}`), nil
+				}}
+				src := newSource(t, "https://idp.test/token", &http.Client{Transport: rt})
+				start := time.Now()
+
+				tok, err := src.Token(t.Context())
+				if tc.wantErr {
+					if !errors.Is(err, auth.ErrTokenExchangeFailed) || tok.Value != "" {
+						t.Errorf("Token() = (%q, %v), want no token and an error matching auth.ErrTokenExchangeFailed", tok.Value, err)
+					}
+					return
+				}
+				if err != nil || tok.Value != "tok" {
+					t.Fatalf("Token() = (%q, %v), want (tok, nil)", tok.Value, err)
+				}
+				checkLifetime(t, tc.expiresIn, tok, start, tc.want)
+				if tok, err := src.Token(t.Context()); err != nil || tok.Value != "tok" {
+					t.Errorf("second Token() = (%q, %v), want (tok, nil)", tok.Value, err)
+				}
+				if got := rt.posts.Load(); got != 1 {
+					t.Errorf("token-endpoint requests = %d, want 1: the token is still valid", got)
+				}
+			})
+		})
+	}
+}
+
+// checkLifetime reports an error unless tok, a token the source got at
+// start from a response whose expires_in is expiresIn, lives for want, or
+// has no expiry when want is 0.
+func checkLifetime(t *testing.T, expiresIn string, tok auth.Token, start time.Time, want time.Duration) {
+	t.Helper()
+	if want == 0 {
+		if !tok.ExpiresAt.IsZero() {
+			t.Errorf("expires_in %s gives the token an expiry %v after it arrived, want none", expiresIn, tok.ExpiresAt.Sub(start))
+		}
+		return
+	}
+	if tok.ExpiresAt.IsZero() {
+		t.Errorf("expires_in %s gives the token no expiry, want a lifetime of %v", expiresIn, want)
+	} else if got := tok.ExpiresAt.Sub(start); got != want {
+		t.Errorf("expires_in %s gives the token a lifetime of %v, want %v", expiresIn, got, want)
 	}
 }
