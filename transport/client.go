@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"math"
 	"net/http"
 	"net/url"
@@ -85,6 +86,11 @@ func New(catalog *discovery.ServiceCatalog, opts ...Option) (*Client, error) {
 	if cfg.callerAttributionHeader == "" {
 		cfg.callerAttributionHeader = DefaultCallerAttributionHeader
 	}
+	// The client-default attribution is copied, so a later change to the
+	// caller's Attributes map neither reaches Do nor races with it, and its
+	// header value is encoded here once rather than on every request.
+	cfg.callerAttribution.Attributes = maps.Clone(cfg.callerAttribution.Attributes)
+	cfg.callerAttributionJSON = cfg.callerAttribution.HeaderJSON()
 	return &Client{cfg: cfg, catalog: catalog}, nil
 }
 
@@ -184,9 +190,17 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		// call, so the observer fires for it too, with no attempt, no status
 		// and no URL, since none was built.
 		if c.cfg.observer != nil {
-			c.emitObservation(ctx, req, nil, nil, err, 0, time.Since(start))
+			c.emitObservation(ctx, req, "", nil, err, 0, time.Since(start))
 		}
 		return nil, err
+	}
+	// The URL is turned into text once per call: the request line on every
+	// attempt uses targetURL, and the span, the observation and any
+	// WireError use safeURL, the same text without userinfo.
+	targetURL := target.String()
+	safeURL := targetURL
+	if target.User != nil {
+		safeURL = sanitisedURL(target)
 	}
 
 	tp := c.cfg.tracerProvider
@@ -201,7 +215,7 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		trace.WithAttributes(
 			attribute.String("http.method", req.effectiveMethod()),
 			attribute.String("http.route", req.effectiveRoute()),
-			attribute.String("http.url", sanitisedURL(target)),
+			attribute.String("http.url", safeURL),
 			attribute.String("openehr.spec_version", svc.SpecVersion),
 		),
 	)
@@ -218,7 +232,7 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		attempt++
 		otelAttempt++
 		span.SetAttributes(attribute.Int("retry.attempt", otelAttempt-1))
-		resp, lastErr = c.doOnce(ctx, req, target)
+		resp, lastErr = c.doOnce(ctx, req, targetURL, safeURL)
 		if !c.shouldRetry(ctx, req, resp, lastErr, attempt) {
 			// 401→reauth safety net (REQ-063, opt-in): if the final error is
 			// a wire 401, a Reauther is configured, this Do call has not yet
@@ -282,7 +296,7 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		span.SetStatus(codes.Error, lastErr.Error())
 		span.RecordError(lastErr)
 		if c.cfg.observer != nil {
-			c.emitObservation(ctx, req, target, resp, lastErr, otelAttempt, time.Since(start))
+			c.emitObservation(ctx, req, safeURL, resp, lastErr, otelAttempt, time.Since(start))
 		}
 		return resp, lastErr
 	}
@@ -290,7 +304,7 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		span.SetStatus(codes.Error, http.StatusText(resp.StatusCode))
 	}
 	if c.cfg.observer != nil {
-		c.emitObservation(ctx, req, target, resp, nil, otelAttempt, time.Since(start))
+		c.emitObservation(ctx, req, safeURL, resp, nil, otelAttempt, time.Since(start))
 	}
 	return resp, nil
 }
@@ -340,11 +354,11 @@ func (c *Client) prepare(ctx context.Context, req *Request) (discovery.ServiceEn
 // (REQ-098). Caller MUST ensure c.cfg.observer is non-nil. Panics
 // inside the observer are recovered and logged via the configured
 // slog.Logger so a faulty observer cannot break request handling.
-// A nil req (a call refused for it) leaves Method and Route empty, and a
-// nil target leaves URL empty.
-func (c *Client) emitObservation(ctx context.Context, req *Request, target *url.URL, resp *Response, err error, attempts int, dur time.Duration) {
+// A nil req (a call refused for it) leaves Method and Route empty; safeURL
+// is the request URL without userinfo, or "" when none was built.
+func (c *Client) emitObservation(ctx context.Context, req *Request, safeURL string, resp *Response, err error, attempts int, dur time.Duration) {
 	obs := Observation{
-		URL:      sanitisedURL(target),
+		URL:      safeURL,
 		Duration: dur,
 		Attempts: attempts,
 		Err:      err,
@@ -372,12 +386,15 @@ func (c *Client) emitObservation(ctx context.Context, req *Request, target *url.
 // Body is empty when the body could not be read. The error is then a
 // *BodyReadError on a 2xx, and on any other status an error that wraps
 // both the *WireError and the read failure.
-func (c *Client) doOnce(ctx context.Context, req *Request, target *url.URL) (*Response, error) {
+//
+// targetURL is the request URL as text, and safeURL the same without
+// userinfo, for the WireError.
+func (c *Client) doOnce(ctx context.Context, req *Request, targetURL, safeURL string) (*Response, error) {
 	var body io.Reader
 	if len(req.Body) > 0 {
 		body = bytes.NewReader(req.Body)
 	}
-	httpReq, err := http.NewRequestWithContext(ctx, req.effectiveMethod(), target.String(), body)
+	httpReq, err := http.NewRequestWithContext(ctx, req.effectiveMethod(), targetURL, body)
 	if err != nil {
 		// A URL that does not parse arrives as url.Parse's own *url.Error,
 		// which quotes the resolved URL: its path may hold a caller-supplied
@@ -424,7 +441,7 @@ func (c *Client) doOnce(ctx context.Context, req *Request, target *url.URL) (*Re
 	if bounded {
 		reader = io.LimitReader(httpResp.Body, limit+1)
 	}
-	respBody, readErr := io.ReadAll(reader)
+	respBody, readErr := readBody(reader, bodySizeHint(httpReq.Method, httpResp.ContentLength, limit, bounded))
 	if readErr == nil && bounded && int64(len(respBody)) > limit {
 		readErr = responseTooLargeError{limit: limit}
 	}
@@ -453,13 +470,13 @@ func (c *Client) doOnce(ctx context.Context, req *Request, target *url.URL) (*Re
 		// still reaches the WireError for the status sentinel, the retry
 		// policy and the 401 safety net. bodyReadFailure keeps the read
 		// failure's own text out of the message, as BodyReadError does.
-		return resp, fmt.Errorf("%w: %w", c.mapWireError(req, target, resp), &bodyReadFailure{cause: readErr})
+		return resp, fmt.Errorf("%w: %w", c.mapWireError(req, safeURL, resp), &bodyReadFailure{cause: readErr})
 	}
 	resp.Body = respBody
 	if is2xx {
 		return resp, nil
 	}
-	return resp, c.mapWireError(req, target, resp)
+	return resp, c.mapWireError(req, safeURL, resp)
 }
 
 func (c *Client) plumbHeaders(ctx context.Context, req *Request, httpReq *http.Request) error {
@@ -471,7 +488,7 @@ func (c *Client) plumbHeaders(ctx context.Context, req *Request, httpReq *http.R
 		httpReq.Header.Set("User-Agent", c.cfg.userAgent)
 	}
 	if c.cfg.sendCadastoHeader && c.cfg.specVersion != "" {
-		httpReq.Header.Set("Cadasto-OpenEhr-Spec-Version", c.cfg.specVersion)
+		httpReq.Header.Set(headerCadastoSpecVersion, c.cfg.specVersion)
 	}
 	if req.IfMatch != "" {
 		httpReq.Header.Set("If-Match", quoteIfMatch(req.IfMatch))
@@ -480,31 +497,32 @@ func (c *Client) plumbHeaders(ctx context.Context, req *Request, httpReq *http.R
 		httpReq.Header.Set("Prefer", v)
 	}
 	if req.AuditDetailsHeader != "" {
-		httpReq.Header.Set("openehr-audit-details", req.AuditDetailsHeader)
+		httpReq.Header.Set(headerOpenEHRAuditDetails, req.AuditDetailsHeader)
 	}
 	if req.RMVersion != "" {
-		httpReq.Header.Set("openehr-version", req.RMVersion)
+		httpReq.Header.Set(headerOpenEHRVersion, req.RMVersion)
 	}
 	if req.TemplateID != "" {
-		httpReq.Header.Set("openehr-template-id", req.TemplateID)
+		httpReq.Header.Set(headerOpenEHRTemplateID, req.TemplateID)
 	}
 	if req.URI != "" {
-		httpReq.Header.Set("openehr-uri", req.URI)
+		httpReq.Header.Set(headerOpenEHRURI, req.URI)
 	}
 	if req.ItemTag != "" {
-		httpReq.Header.Set("openehr-item-tag", req.ItemTag)
+		httpReq.Header.Set(headerOpenEHRItemTag, req.ItemTag)
 	}
 	if req.VersionItemTag != "" {
-		httpReq.Header.Set("openehr-version-item-tag", req.VersionItemTag)
+		httpReq.Header.Set(headerOpenEHRVersionItemTag, req.VersionItemTag)
 	}
 
 	// Caller attribution: per-request override wins over client default.
-	attr := c.cfg.callerAttribution
+	// The client default's header value was encoded once, at New.
+	attr, attrJSON := c.cfg.callerAttribution, c.cfg.callerAttributionJSON
 	if v, ok := CallerAttributionFromContext(ctx); ok {
-		attr = v
+		attr, attrJSON = v, v.HeaderJSON()
 	}
-	if v := attr.HeaderJSON(); v != "" {
-		httpReq.Header.Set(c.cfg.callerAttributionHeader, v)
+	if attrJSON != "" {
+		httpReq.Header.Set(c.cfg.callerAttributionHeader, attrJSON)
 		// Also surface on the active span so OTel-driven audit
 		// reaches a destination beyond the wire (REQ-066).
 		span := trace.SpanFromContext(ctx)
@@ -561,11 +579,11 @@ func (c *Client) tokenSourceFor(ctx context.Context) auth.TokenSource {
 // The openEHR Code (a coded terminology identifier) is always preserved.
 // Enable WithRawErrorBodies to retain the full payload for diagnostics in
 // environments where WireError values cannot reach logs or traces.
-func (c *Client) mapWireError(req *Request, target *url.URL, resp *Response) error {
+func (c *Client) mapWireError(req *Request, safeURL string, resp *Response) error {
 	we := &WireError{
 		StatusCode: resp.StatusCode,
 		Method:     req.effectiveMethod(),
-		URL:        sanitisedURL(target),
+		URL:        safeURL,
 		Route:      req.routeOrPlaceholder(),
 		Sentinel:   statusToSentinel(resp.StatusCode),
 	}
@@ -585,7 +603,7 @@ func (c *Client) mapWireError(req *Request, target *url.URL, resp *Response) err
 	// free text from the server and is kept only under that opt-in, like
 	// the envelope's Message above.
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-		we.Challenge = parseBearerChallenge(resp.Header.Values("WWW-Authenticate"))
+		we.Challenge = parseBearerChallenge(resp.Header.Values(headerWWWAuthenticate))
 		if we.Challenge != nil && !c.cfg.rawErrorBodies {
 			we.Challenge.ErrorDescription = ""
 		}
@@ -898,4 +916,39 @@ func Decode[T any](ctx context.Context, c *Client, req *Request) (*T, *Metadata,
 		}
 	}
 	return out, resp.Metadata, nil
+}
+
+// maxBodyPrealloc caps the buffer readBody sizes from a server-declared
+// Content-Length before any body byte has arrived, so a false Content-Length
+// cannot force a large allocation. A longer body still reads in full, up to
+// the WithMaxResponseBody ceiling: the buffer grows as bytes arrive.
+const maxBodyPrealloc = 4 << 20
+
+// bodySizeHint returns the size readBody preallocates for a response body: the
+// declared Content-Length, at most limit when the read is bounded and at most
+// maxBodyPrealloc, or -1 when the length is unknown. A HEAD response declares
+// the length of a body it does not carry, so it gets -1 too.
+func bodySizeHint(method string, contentLength, limit int64, bounded bool) int64 {
+	if contentLength < 0 || method == http.MethodHead {
+		return -1
+	}
+	hint := min(contentLength, maxBodyPrealloc)
+	if bounded {
+		hint = min(hint, limit)
+	}
+	return hint
+}
+
+// readBody reads r to its end, as io.ReadAll does. With a hint of 0 or more
+// the buffer is sized for that many bytes up front, plus bytes.MinRead so
+// that reading the end of a body of exactly that length needs no new
+// allocation; with a negative hint it is io.ReadAll.
+func readBody(r io.Reader, hint int64) ([]byte, error) {
+	if hint < 0 {
+		return io.ReadAll(r)
+	}
+	var buf bytes.Buffer
+	buf.Grow(int(hint) + bytes.MinRead)
+	_, err := buf.ReadFrom(r)
+	return buf.Bytes(), err
 }

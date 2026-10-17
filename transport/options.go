@@ -22,6 +22,7 @@ type config struct {
 	retry RetryPolicy
 
 	callerAttribution       CallerAttribution
+	callerAttributionJSON   string // callerAttribution's header value, encoded once at New
 	callerAttributionHeader string
 
 	logger *slog.Logger
@@ -98,6 +99,10 @@ func WithRetry(p RetryPolicy) Option {
 // WithCallerAttribution attaches a client-default CallerAttribution
 // emitted on every outgoing request. Per-request overrides
 // via WithCallerAttributionCtx take precedence.
+//
+// New takes a copy of a, its Attributes map included, and encodes the
+// header value once. A change the caller makes to that map after New
+// returns does not reach the Client's requests.
 func WithCallerAttribution(a CallerAttribution) Option {
 	return func(cfg *config) { cfg.callerAttribution = a }
 }

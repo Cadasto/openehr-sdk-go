@@ -78,14 +78,12 @@ func ValidateRequestPath(path string) error {
 	if path == "/" {
 		return nil
 	}
+	// Only an ABSOLUTE path has a leading empty segment to skip. An empty
+	// path is not the service root — it aliases to the service base URL — so
+	// it still yields one empty segment, which is refused.
+	rest, _ := strings.CutPrefix(path, "/")
 	n := 0
-	for i, seg := range strings.Split(path, "/") {
-		// Only an ABSOLUTE path has a leading empty segment to skip. An
-		// empty path is not the service root — it aliases to the service
-		// base URL — so it falls through to the empty-segment refusal.
-		if i == 0 && seg == "" && strings.HasPrefix(path, "/") {
-			continue
-		}
+	for seg := range strings.SplitSeq(rest, "/") {
 		n++
 		if fault := segmentFault(seg); fault != "" {
 			return fmt.Errorf("%w: %w: segment %d: %s", ErrInvalidConfig, ErrInvalidPathSegment, n, fault)
@@ -101,7 +99,8 @@ func segmentCount(p string) int {
 	if p == "/" {
 		return 0
 	}
-	n := len(strings.Split(p, "/"))
+	// Split would return Count+1 pieces; counting them needs no slice.
+	n := strings.Count(p, "/") + 1
 	if strings.HasPrefix(p, "/") {
 		n--
 	}
