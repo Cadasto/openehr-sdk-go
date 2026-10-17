@@ -385,11 +385,11 @@ T
     PUT /definition/query/{qualified_query_name}    SELECT c\tFROM COMPOSITION c
     Send Ad Hoc Request    {"q": "SELECT c\rFROM COMPOSITION c"}
     Send Ad Hoc Request    {\n"q": "SELECT c FROM COMPOSITION c"\t}
-    Set AQL And Execute Ad Hoc Query    SELECT c FROM COMPOSITION c WHERE c/name/value = 'é'
+    Set AQL And Execute Ad Hoc Query    SELECT c FROM COMPOSITION c WHERE c/name/value = '\u00e9'
 `,
 			want: []string{
 				"answered: SELECT c FROM COMPOSITION c",
-				"answered: SELECT c FROM COMPOSITION c WHERE c/name/value = 'é'",
+				"answered: SELECT c FROM COMPOSITION c WHERE c/name/value = '\u00e9'",
 				"unrebuilt " + reasonBodyNotJSON + " (query_expr)",
 				"unrebuilt " + reasonBodyNotJSON + " (query_expr)",
 				"unrebuilt " + reasonBodyNotJSON + " (query_to_store)",
@@ -1176,7 +1176,7 @@ B
 		{"carriage_return", `\r`, "\r"},
 		{"tab", `\t`, "\t"},
 		{"hex_byte", `\x41`, "A"},
-		{"four_digit_code_point", `é`, "é"},
+		{"four_digit_code_point", `\u00e9`, "\u00e9"},
 		{"eight_digit_code_point", `\U0001F600`, "\U0001F600"},
 		{"newline_built_in", `${\n}`, "\n"},
 		{"dollar", `\${x}`, "${x}"},
