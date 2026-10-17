@@ -156,7 +156,10 @@ func WithMaxResponseBody(n int64) Option {
 // When a wire 401 is received and the Reauther has not yet been invoked
 // for the current Do call, transport calls r.Reauth(ctx) once and retries
 // the request one time with the freshly acquired token. On a second 401
-// (or when Reauth returns an error) the error is surfaced to the caller.
+// the error is surfaced to the caller. When Reauth returns an error, Do
+// returns that error wrapped, with the 401's error wrapped beside it, so
+// errors.Is matches both the Reauth error and ErrUnauthorized, and the
+// request is not sent again.
 //
 // The server's Bearer challenge decides whether a 401 is worth a new
 // token. Reauth runs only when the 401 carries no Bearer challenge the

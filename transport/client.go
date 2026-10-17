@@ -244,12 +244,15 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 			// reauthed, and the 401's Bearer challenge allows it (REQ-166),
 			// invoke Reauth once and retry the request once.
 			// The retry re-fetches the token via tokenSourceFor → now fresh.
-			// On a second 401 (or if Reauth itself fails) the error is
-			// surfaced unchanged. This guard fires at most once per Do call.
+			// On a second 401 the error is surfaced unchanged. If Reauth itself
+			// fails, its error is surfaced wrapped, with the 401 wrapped beside
+			// it, so errors.Is still reaches ErrUnauthorized and errors.AsType
+			// the *WireError; neither text carries a request value. This guard
+			// fires at most once per Do call.
 			if !reauthed && c.cfg.reauther != nil && isWire401(lastErr) && challengePermitsReauth(lastErr) {
 				reauthed = true
 				if raErr := c.cfg.reauther.Reauth(ctx); raErr != nil {
-					lastErr = fmt.Errorf("transport: reauth: %w", raErr)
+					lastErr = fmt.Errorf("transport: reauth: %w: %w", raErr, lastErr)
 					break
 				}
 				// Single reauth-retry: cap attempt at MaxAttempts so that
