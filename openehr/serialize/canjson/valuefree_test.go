@@ -334,6 +334,76 @@ func TestUnmarshal_REQ052_StructureStaysInDecodeErrorText(t *testing.T) {
 	}
 }
 
+// TestUnmarshal_REQ052_NonStringTypeNamesTheSlot pins the pointer of a slot
+// whose `_type` is not a string, nested in other slots or not: Path and the
+// head of the text name that slot's own `_type` member, not the enclosing
+// object's, and the failure stays a shape failure with no dispatch sentinel,
+// no value in the text and nothing in Value.
+//
+// Can-fail control: let the slot's peek failure return without an envelope of
+// its own and the pointer lands on the enclosing object's `_type`.
+func TestUnmarshal_REQ052_NonStringTypeNamesTheSlot(t *testing.T) {
+	const elemHead = `{"_type":"ELEMENT","archetype_node_id":"at0001","name":{"_type":"DV_TEXT","value":"e"},"value":`
+	nested := func(slot string) string {
+		return `{"_type":"COMPOSITION","content":[{"_type":"OBSERVATION","data":{"_type":"HISTORY","events":[{"_type":"POINT_EVENT","data":{"_type":"ITEM_TREE","items":[` +
+			elemHead + slot + `}]}}]}}]}`
+	}
+	const nestedPath = "/content/0/data/events/0/data/items/0/value/_type"
+	slots := []struct {
+		name string
+		slot string
+	}{
+		{name: "a number", slot: `{"_type":7777}`},
+		{name: "a boolean", slot: `{"_type":true,"value":"x"}`},
+		{name: "an object", slot: `{"_type":{"x7777":7777}}`},
+	}
+	for _, s := range slots {
+		cases := []struct {
+			name   string
+			in     string
+			target func() any
+			path   string
+		}{
+			{name: "nested slot", in: nested(s.slot), target: func() any { return new(rm.Composition) }, path: nestedPath},
+			{name: "slot of the decoded value", in: elemHead + s.slot + `}`, target: func() any { return new(rm.Element) }, path: "/value/_type"},
+			{name: "slot as the decoded value", in: s.slot, target: func() any { return new(rm.DataValue) }, path: "/_type"},
+		}
+		for _, tc := range cases {
+			for _, ep := range entryPoints {
+				for mode, opts := range jsonDecodeModes() {
+					t.Run(s.name+"/"+tc.name+"/"+ep.name+"/"+mode, func(t *testing.T) {
+						err := ep.decode(tc.in, tc.target(), opts...)
+						de, ok := topDecodeError(err)
+						if !ok {
+							t.Fatalf("%s(%.80s) = %T %v; want a *canjson.DecodeError at the top of the chain", ep.name, tc.in, err, err)
+						}
+						if de.Path != tc.path {
+							t.Errorf("%s(%.80s): DecodeError.Path = %q; want %q, the slot's own _type", ep.name, tc.in, de.Path, tc.path)
+						}
+						if head := "decode " + tc.path + ": "; !strings.HasPrefix(err.Error(), head) {
+							t.Errorf("%s(%.80s) = %q; want the text to open with %q", ep.name, tc.in, err, head)
+						}
+						if !errors.Is(err, canjson.ErrInvalidShape) {
+							t.Errorf("%s(%.80s) = %v; want errors.Is(_, canjson.ErrInvalidShape), the classification it carried before", ep.name, tc.in, err)
+						}
+						for _, sentinel := range []error{typereg.ErrMissingType, typereg.ErrUnknownType, typereg.ErrTypeMismatch} {
+							if errors.Is(err, sentinel) {
+								t.Errorf("%s(%.80s) = %v; want no dispatch sentinel, got errors.Is(_, %v)", ep.name, tc.in, err, sentinel)
+							}
+						}
+						if strings.Contains(err.Error(), "7777") {
+							t.Errorf("%s(%.80s) = %q; the text carries a value from the document", ep.name, tc.in, err)
+						}
+						if got := de.Value.Reveal(); got != nil {
+							t.Errorf("%s(%.80s): Value.Reveal() = %#v; want nothing for a value of the wrong JSON kind", ep.name, tc.in, got)
+						}
+					})
+				}
+			}
+		}
+	}
+}
+
 // TestUnmarshal_REQ052_DecodeErrorKeepsEveryCause pins the reachability half
 // of REQ-052: under the envelope every entry point now returns, each sentinel
 // and typed cause the decode reached before stays reachable with errors.Is
