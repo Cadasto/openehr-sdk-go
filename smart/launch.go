@@ -40,7 +40,11 @@ func WithJWKS(jwks *authsmart.JWKS) ValidateOption {
 	return func(c *ValidateConfig) { c.JWKS = jwks }
 }
 
-// WithIssuer sets the expected iss claim.
+// WithIssuer sets the expected iss claim, which an ID token verified by
+// [LaunchContextFromTokenResponse] must carry. It also sets
+// [LaunchContext.Issuer], in place of the iss of the verified claims the
+// token response may already carry; those are trusted as they are, so iss
+// is not compared with their issuer.
 func WithIssuer(iss string) ValidateOption {
 	return func(c *ValidateConfig) { c.Issuer = iss }
 }

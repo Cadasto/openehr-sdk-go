@@ -27,7 +27,11 @@ type LaunchContext struct {
 	// they are, without verifying the token again or checking exp again, so
 	// a context rebuilt after the token expired still carries them. Only the
 	// Source sets a TokenResponse's IDTokenClaims; never fill them in yourself.
-	IDToken   *IDTokenClaims
+	IDToken *IDTokenClaims
+	// Issuer is the value given with WithIssuer, else the verified ID
+	// token's iss claim, and empty with neither. When the token response
+	// already carries verified claims, a WithIssuer value is not compared
+	// with their iss and takes its place here.
 	Issuer    string
 	Principal *PrincipalIdentity
 	// openEHR-native launch-context claims.

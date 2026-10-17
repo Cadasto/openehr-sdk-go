@@ -1,6 +1,7 @@
 package smart
 
 import (
+	"cmp"
 	"log/slog"
 	"maps"
 )
@@ -52,23 +53,10 @@ type PrincipalClaimNames struct {
 	TypeClaim string // default principal_type
 }
 
-func (n PrincipalClaimNames) uidClaim() string {
-	if n.UIDClaim != "" {
-		return n.UIDClaim
-	}
-	return "principal_uid"
-}
-
-func (n PrincipalClaimNames) typeClaim() string {
-	if n.TypeClaim != "" {
-		return n.TypeClaim
-	}
-	return "principal_type"
-}
-
 func principalFromClaims(claims map[string]any, names PrincipalClaimNames) *PrincipalIdentity {
-	uid, _ := claimString(claims, names.uidClaim())
-	typRaw, _ := claimString(claims, names.typeClaim())
+	// A claim that is absent or not a string reads as "".
+	uid, _ := claims[cmp.Or(names.UIDClaim, "principal_uid")].(string)
+	typRaw, _ := claims[cmp.Or(names.TypeClaim, "principal_type")].(string)
 	if uid == "" && typRaw == "" {
 		return nil
 	}
@@ -77,17 +65,4 @@ func principalFromClaims(claims map[string]any, names PrincipalClaimNames) *Prin
 		pt = PrincipalTypeUnknown
 	}
 	return &PrincipalIdentity{UID: uid, Type: pt, Raw: maps.Clone(claims)}
-}
-
-func claimString(claims map[string]any, key string) (string, bool) {
-	v, ok := claims[key]
-	if !ok {
-		return "", false
-	}
-	switch s := v.(type) {
-	case string:
-		return s, true
-	default:
-		return "", false
-	}
 }
