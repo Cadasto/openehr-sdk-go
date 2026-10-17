@@ -13,6 +13,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // The Robot Framework reader behind PROBE-107.
@@ -96,7 +98,7 @@ var suiteUnrebuiltWhy = map[string]string{
 		"or a library request to a query endpoint or to a URL known only at run time",
 	reasonUnknownKeyword: "a keyword the suite does not define and the reader does not know, so it may send a query",
 	reasonUnsupported: "a Robot construct the reader does not run: an inline IF, VAR, RETURN or [Return], a test template outside a data-driven suite, " +
-		"or an escape or built-in variable it does not resolve",
+		"a built-in variable it does not resolve, or an escape naming a lone UTF-16 surrogate, which Go text cannot hold",
 	reasonQueryNotText:     "the query argument is a list or a dictionary, not text",
 	reasonBodyNotJSON:      "the request body, as the reader holds it, does not decode as a JSON object with a text q member; sent as it is, an engine would refuse it",
 	reasonConditionalSend:  "the query is sent inside a FOR, WHILE, IF or TRY block or a conditional Run Keyword, so whether it runs is unknown",
@@ -589,11 +591,18 @@ func matchingClose(s string, from int, open, closing byte) (int, bool) {
 	return 0, false
 }
 
-// robotUnescape resolves Robot's backslash escapes in literal text: a run of
-// backslashes halves, and an odd one escapes what follows, which stays as
-// itself with the backslash dropped (\$ is $, \# is #). The escapes that make
-// a character of their own (\n, \r, \t and the \x, \u, \U code points) are
-// not resolved: each becomes an unsupported reference, so a query that holds
+// robotHexEscapes is the number of hex digits each code-point escape takes.
+var robotHexEscapes = map[byte]int{'x': 2, 'u': 4, 'U': 8}
+
+// robotUnescape resolves Robot's backslash escapes in literal text, as
+// Robot's own unescaper does: a run of backslashes halves, and an odd run
+// escapes what follows. \n, \r and \t make a newline, a carriage return and a
+// tab, and \xhh, \uhhhh and \Uhhhhhhhh the code point their hex digits name.
+// Any other escaped character stands for itself with the backslash dropped
+// (\$ is $, \# is #, "\ " is a space), and so does the letter of a code-point
+// escape whose hex digits are missing or name a code point beyond Unicode
+// (\xZ1 is xZ1, \U00110000 is U00110000). A lone UTF-16 surrogate, which Go
+// text cannot hold, becomes an unsupported reference, so a query that holds
 // one is counted.
 func robotUnescape(s string) string {
 	if !strings.Contains(s, `\`) {
@@ -616,19 +625,45 @@ func robotUnescape(s string) string {
 		if run%2 == 0 || i >= len(s) {
 			continue
 		}
-		if strings.IndexByte("nrtxuU", s[i]) >= 0 {
-			b.WriteString(unsupportedRef(`\` + s[i:i+1]))
+		switch c := s[i]; c {
+		case 'n':
+			b.WriteByte('\n')
 			i++
+		case 'r':
+			b.WriteByte('\r')
+			i++
+		case 't':
+			b.WriteByte('\t')
+			i++
+		case 'x', 'u', 'U':
+			end := i + 1 + robotHexEscapes[c]
+			if end > len(s) {
+				continue
+			}
+			n, err := strconv.ParseUint(s[i+1:end], 16, 32)
+			switch {
+			case err != nil:
+				continue // not all hex digits: the letter stands for itself
+			case n > unicode.MaxRune:
+				b.WriteString(s[i:end])
+			case !utf8.ValidRune(rune(n)):
+				b.WriteString(unsupportedRef(`\` + s[i:end]))
+			default:
+				b.WriteRune(rune(n))
+			}
+			i = end
 		}
 	}
 	return b.String()
 }
 
 // robotBuiltin is the value of a built-in variable, by normalised name: the
-// ones the suites use, and Robot's integer variables (${0}, ${-1}). Another
-// number variable (${2.5}, ${0x1F}) and the ${/}, ${:} and ${\n} built-ins
-// are not resolved: each is an unsupported reference, so a query that holds
-// one is counted.
+// ones the suites use, Robot's integer variables (${0}, ${-1}), and ${\n},
+// the line separator of the system that runs the suites, a newline on the
+// Linux image upstream runs them in (its Dockerfile at the pin). Another
+// number variable (${2.5}, ${0x1F}) and the ${/} and ${:} built-ins are not
+// resolved: each is an unsupported reference, so a query that holds one is
+// counted.
 func robotBuiltin(key string) (string, bool) {
 	switch key {
 	case "empty":
@@ -641,7 +676,9 @@ func robotBuiltin(key string) (string, bool) {
 		return "False", true
 	case "none":
 		return "None", true
-	case "/", ":", `\n`:
+	case `\n`:
+		return "\n", true
+	case "/", ":":
 		return unsupportedRef("${" + key + "}"), true
 	}
 	if n, err := strconv.ParseInt(key, 10, 64); err == nil {
@@ -1226,6 +1263,19 @@ func (f *robotFrame) resolve(s string) robotValue {
 // replaceString replaces every variable in s with its text and resolves the
 // escapes in the literal text between them.
 func (f *robotFrame) replaceString(s string) string {
+	return f.replaceVariables(s, robotUnescape)
+}
+
+// replaceName replaces every variable inside a variable's name and keeps the
+// name's escapes, as Robot does when it looks a variable up: ${\n} is the
+// built-in named backslash-n, not a variable named by a newline.
+func (f *robotFrame) replaceName(s string) string {
+	return f.replaceVariables(s, func(literal string) string { return literal })
+}
+
+// replaceVariables replaces every variable in s with its text and passes the
+// literal text between them through literal.
+func (f *robotFrame) replaceVariables(s string, literal func(string) string) string {
 	var b strings.Builder
 	pos := 0
 	for {
@@ -1233,7 +1283,7 @@ func (f *robotFrame) replaceString(s string) string {
 		if !ok {
 			break
 		}
-		b.WriteString(robotUnescape(s[pos:ref.start]))
+		b.WriteString(literal(s[pos:ref.start]))
 		v := f.varValue(ref)
 		if v.isText() {
 			b.WriteString(v.text)
@@ -1244,7 +1294,7 @@ func (f *robotFrame) replaceString(s string) string {
 		}
 		pos = ref.end
 	}
-	b.WriteString(robotUnescape(s[pos:]))
+	b.WriteString(literal(s[pos:]))
 	return b.String()
 }
 
@@ -1255,7 +1305,7 @@ func (f *robotFrame) varValue(ref robotVarRef) robotValue {
 	if ref.sigil == '%' || (strings.HasPrefix(ref.name, "{") && strings.HasSuffix(ref.name, "}")) {
 		return textValue(runtimeRef(display)) // environment or inline Python
 	}
-	name := f.replaceString(ref.name)
+	name := f.replaceName(ref.name)
 	v, ok := f.lookup(name)
 	if !ok {
 		v, ok = f.extended(name)
