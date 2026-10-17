@@ -47,7 +47,18 @@ func defaultOverlays() []Edge {
 	}
 
 	// FOLDER references its compositions — a reference hop, not by-value.
+	// This is the shorthand engines resolve straight to the payload; keeping
+	// it beside the version-tier hop below also keeps a route from FOLDER to
+	// COMPOSITION that does not pass through VERSION.
 	edges = append(edges, Edge{From: "FOLDER", To: "COMPOSITION", ByReference: true})
+
+	// The same reference hop, landing on the version tier: the RM Common IM
+	// directory package says a folder's items are references to other
+	// (usually versioned) objects, with VERSIONED_COMPOSITION its worked
+	// example. Onward through the family-agnostic VERSION node, FOLDER
+	// CONTAINS VERSION and every payload family resolve ByReference (REQ-160
+	// § Overlay edges).
+	edges = append(edges, Edge{From: "FOLDER", To: "VERSIONED_COMPOSITION", ByReference: true})
 
 	return edges
 }
