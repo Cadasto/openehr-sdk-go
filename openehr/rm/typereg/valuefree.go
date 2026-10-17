@@ -34,7 +34,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/refused"
 )
@@ -344,57 +343,4 @@ func isIdentifier(s string) bool {
 		}
 	}
 	return true
-}
-
-// maxPathText is the most bytes of a path the text writes whole, the bound
-// encoding/json/v2 puts on a pointer in its own messages.
-const maxPathText = 100
-
-// shortPath returns path as the text writes it: whole when it is at most
-// maxPathText bytes, and otherwise its first and last segments around an
-// ellipsis, the way encoding/json/v2 shortens a pointer (its unexported
-// jsonwire.TruncatePointer). A document can make a path as long as it likes,
-// through its nesting or its member names; the Path field keeps it whole.
-func shortPath(s string) string {
-	const n = maxPathText
-	if len(s) <= n {
-		return s
-	}
-	i, j := n/2, len(s)-n/2
-	// Keep whole segments where there are several.
-	if k := strings.LastIndexByte(s[:i], '/'); k > 0 {
-		i = k
-	}
-	if k := strings.IndexByte(s[j:], '/'); k >= 0 {
-		j += k + len("/")
-	}
-	// Never cut a UTF-8 sequence in two.
-	for i > 0 {
-		if r, size := utf8.DecodeLastRuneInString(s[:i]); r != utf8.RuneError || size != 1 {
-			break
-		}
-		i--
-	}
-	for j < len(s) {
-		if r, size := utf8.DecodeRuneInString(s[j:]); r != utf8.RuneError || size != 1 {
-			break
-		}
-		j++
-	}
-	var middle string
-	switch strings.Count(s[i:j], "/") {
-	case 0:
-		middle = "…"
-	case 1:
-		middle = "…/…"
-	default:
-		middle = "…/…/…"
-	}
-	if strings.HasPrefix(s[i:j], "/") && middle != "…" {
-		middle = strings.TrimPrefix(middle, "…")
-	}
-	if strings.HasSuffix(s[i:j], "/") && middle != "…" {
-		middle = strings.TrimSuffix(middle, "…")
-	}
-	return s[:i] + middle + s[j:]
 }

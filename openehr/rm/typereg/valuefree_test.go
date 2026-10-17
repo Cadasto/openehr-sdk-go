@@ -203,25 +203,38 @@ func TestDecodeError_REQ052_PathCannotSplitTheText(t *testing.T) {
 	}
 }
 
-// TestDecodeError_REQ052_LongPathIsShortenedInText pins the bound on a path's
-// share of the text: a pointer past 100 bytes is shortened there, keeping its
-// first and last segments, the way encoding/json/v2 shortens its own, while
-// Path keeps it whole. A hostile document can make a pointer as long as it
-// likes, through its nesting or its member names.
+// TestDecodeError_REQ052_LongPathIsWrittenWhole pins that the text names the
+// failing value's JSON Pointer whole, however long a document makes it through
+// its nesting or its member names: REQ-052 says the text must name the
+// pointer, and a part of it does not. A long pointer that holds a character
+// strconv.Quote escapes is written whole too, Go-quoted.
 //
-// Can-fail control: write Path whole and the length assertion fails.
-func TestDecodeError_REQ052_LongPathIsShortenedInText(t *testing.T) {
-	path := strings.Repeat("/folders/0", 300)
-	e := &typereg.DecodeError{Path: path, Inner: typereg.ErrMaxDepthExceeded}
-	got := e.Error()
-	if len(got) > 200 {
-		t.Errorf("Error() is %d bytes for a %d-byte path; want the path shortened to about 100", len(got), len(path))
+// Can-fail control: shorten a long path in the text, as an earlier version
+// did around an ellipsis, and the equality assertions fail.
+func TestDecodeError_REQ052_LongPathIsWrittenWhole(t *testing.T) {
+	cases := []struct {
+		name    string
+		path    string
+		written string // the path as the text writes it
+	}{
+		{name: "a deep pointer", path: strings.Repeat("/folders/0", 300), written: strings.Repeat("/folders/0", 300)},
+		{name: "a long member name", path: "/" + strings.Repeat("x", 4096), written: "/" + strings.Repeat("x", 4096)},
+		{
+			name:    "a long pointer with a line feed",
+			path:    strings.Repeat("/folders/0", 30) + "/x\nERROR forged line",
+			written: strconv.Quote(strings.Repeat("/folders/0", 30) + "/x\nERROR forged line"),
+		},
 	}
-	if !strings.HasPrefix(got, "decode /folders/0") || !strings.Contains(got, "…") || !strings.HasSuffix(got, "/folders/0: typereg: nesting depth exceeds limit") {
-		t.Errorf("Error() = %q; want the first and last segments around an ellipsis", got)
-	}
-	if e.Path != path {
-		t.Errorf("Path changed to %q; want it whole", e.Path)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := &typereg.DecodeError{Path: tc.path, Inner: typereg.ErrMaxDepthExceeded}
+			if got, want := e.Error(), "decode "+tc.written+": typereg: nesting depth exceeds limit"; got != want {
+				t.Errorf("DecodeError{Path: %d bytes}.Error() is %d bytes, %.80q…; want %d bytes, %.80q…, the pointer whole", len(tc.path), len(got), got, len(want), want)
+			}
+			if e.Path != tc.path {
+				t.Errorf("Path changed to %q; want it as it was set", e.Path)
+			}
+		})
 	}
 	short := &typereg.DecodeError{Path: "/content/0/items/1", Inner: typereg.ErrMissingType}
 	if got, want := short.Error(), "decode /content/0/items/1: typereg: _type discriminator missing"; got != want {

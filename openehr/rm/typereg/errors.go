@@ -132,10 +132,10 @@ type DecodeError struct {
 // typed nil in caller hands.
 //
 // The node is written as "decode <path> (_type=\"<type>\")", with the parts
-// that are empty left out; a path longer than 100 bytes is shortened to its
-// first and last segments, as encoding/json/v2 shortens its own pointers, and
-// a path holding a character strconv.Quote escapes, such as a line feed in a
-// member name, is written Go-quoted, so the text stays on one line.
+// that are empty left out. The path is written whole, however long the
+// document makes it, and Go-quoted when it holds a character strconv.Quote
+// escapes, such as a line feed in a member name, so the text stays on one
+// line.
 // The cause follows, written by one rule: text is kept only where it is
 // known to hold no value, the structure of the standard library's errors, a
 // sentinel's fixed text, or a message in the forms the SDK's codecs write; a
@@ -162,7 +162,7 @@ func (e *DecodeError) writeNode(b *strings.Builder) {
 	b.WriteString("decode")
 	if e.Path != "" {
 		b.WriteByte(' ')
-		writePath(b, shortPath(e.Path))
+		writePath(b, e.Path)
 	}
 	switch {
 	case e.Path != "" && e.Type != "":
