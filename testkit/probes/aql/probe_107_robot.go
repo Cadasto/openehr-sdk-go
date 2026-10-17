@@ -755,7 +755,11 @@ type robotFrame struct {
 	site   int  // the test-case row this run descends from
 	expect bool // inside Run Keyword And Expect Error
 	cond   bool // inside a control block or a conditional Run Keyword
-	depth  int
+	// swallow is set inside a BuiltIn wrapper that swallows the failure of
+	// what it runs (Run Keyword And Return Status, And Ignore Error, And Warn
+	// On Failure): an assertion there cannot fail the test.
+	swallow bool
+	depth   int
 }
 
 func (s *robotSuite) unrebuilt(line int, data, reason, detail string) {
@@ -1454,8 +1458,17 @@ func (f *robotFrame) builtin(line int, key string, args []string) (v robotValue,
 			inner.call(line, args[1], args[2:])
 		}
 		return robotValue{}, false, true
-	case "runkeyword", "runkeywordandreturnstatus", "runkeywordandignoreerror",
-		"runkeywordandcontinueonfailure", "runkeywordandwarnonfailure", "runkeywordandreturn":
+	case "runkeywordandreturnstatus", "runkeywordandignoreerror", "runkeywordandwarnonfailure":
+		// The wrapper swallows a failure, so an assertion inside it classes
+		// nothing; a query sent inside it is sent as usual, and a Skip inside
+		// it still skips, since Robot lets a skip through these wrappers.
+		if len(args) > 0 {
+			g := *f
+			g.swallow = true
+			g.call(line, args[0], args[1:])
+		}
+		return robotValue{}, false, true
+	case "runkeyword", "runkeywordandcontinueonfailure", "runkeywordandreturn":
 		if len(args) > 0 {
 			f.call(line, args[0], args[1:])
 		}
@@ -1516,10 +1529,11 @@ func robotRowsRef(cell string) bool {
 }
 
 // classify applies an assertion to the query last sent in the test. An
-// assertion that may not run (a control block, a conditional Run Keyword) or
-// that is expected to fail says nothing about that query.
+// assertion that may not run (a control block, a conditional Run Keyword),
+// that is expected to fail, or whose failure a wrapper swallows says nothing
+// about that query.
 func (f *robotFrame) classify(mark func(*robotSent)) {
-	if f.cond || f.expect || f.t.open == nil {
+	if f.cond || f.expect || f.swallow || f.t.open == nil {
 		return
 	}
 	mark(f.t.open)
@@ -1675,7 +1689,7 @@ func (f *robotFrame) callUser(kw *robotBlock, args []string, embedded map[string
 	}
 	g := &robotFrame{
 		t: f.t, locals: map[string]robotValue{}, site: f.site,
-		expect: f.expect, cond: f.cond, depth: f.depth + 1,
+		expect: f.expect, cond: f.cond, swallow: f.swallow, depth: f.depth + 1,
 	}
 	maps.Copy(g.locals, embedded)
 	specs := robotArgSpecs(kw)
