@@ -27,6 +27,10 @@ import (
 // the token endpoint and as listed in a server's grant_types_supported.
 const grantClientCredentials = "client_credentials"
 
+// defaultRefreshThreshold is how long before its expiry the cached access
+// token counts as stale when the configuration sets no threshold.
+const defaultRefreshThreshold = 30 * time.Second
+
 // Client authentication method names, as listed in a server's
 // token_endpoint_auth_methods_supported (RFC 8414).
 const (
@@ -90,8 +94,11 @@ type Config struct {
 	// ClientSecret. A nil *jwtbearer.ClaimsSigner is refused, as it can
 	// never sign.
 	ClientAssertion jwtbearer.AssertionSource
-	// RefreshThreshold is how long before ExpiresAt the source treats
-	// the cached token as stale and triggers a refresh. Default 30s.
+	// RefreshThreshold is how long before its expiry the cached access token
+	// counts as stale, so that [Source.Token] exchanges the grant again ahead
+	// of time. 0 selects the default of 30 seconds. A negative value counts
+	// as 0: the token is replaced once it has expired, so an expired token is
+	// never returned.
 	RefreshThreshold time.Duration
 	// Issuer is the issuer URL recorded on the produced Token. Optional;
 	// when set it is round-tripped to Token.Issuer for audit.
@@ -119,7 +126,11 @@ func WithAudience(aud string) Option { return func(cfg *Config) { cfg.Audience =
 // WithAuthMethod selects how client credentials are presented.
 func WithAuthMethod(m AuthMethod) Option { return func(cfg *Config) { cfg.AuthMethod = m } }
 
-// WithRefreshThreshold overrides the staleness window.
+// WithRefreshThreshold sets how long before its expiry the cached access
+// token counts as stale, so that [Source.Token] exchanges the grant again
+// ahead of time. The default is 30 seconds, which a d of 0 also selects. A
+// negative d counts as 0: the token is replaced once it has expired, so an
+// expired token is never returned.
 func WithRefreshThreshold(d time.Duration) Option {
 	return func(cfg *Config) { cfg.RefreshThreshold = d }
 }
@@ -168,12 +179,12 @@ type exchange struct {
 // options. Returns auth.ErrInvalidConfig (wrapped) on missing required
 // inputs.
 func New(clientID, clientSecret, tokenURL string, opts ...Option) (*Source, error) {
+	// FromConfig fills in the defaults, such as the refresh threshold.
 	cfg := Config{
-		ClientID:         clientID,
-		ClientSecret:     clientSecret,
-		TokenURL:         tokenURL,
-		AuthMethod:       AuthBasic,
-		RefreshThreshold: 30 * time.Second,
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		TokenURL:     tokenURL,
+		AuthMethod:   AuthBasic,
 	}
 	for _, o := range opts {
 		if o != nil {
@@ -215,9 +226,7 @@ func FromConfig(cfg Config) (*Source, error) {
 	if err != nil || u.Scheme == "" || u.Host == "" {
 		return nil, fmt.Errorf("%w: TokenURL %q is not a valid absolute URL", auth.ErrInvalidConfig, urlredact.String(cfg.TokenURL))
 	}
-	if cfg.RefreshThreshold == 0 {
-		cfg.RefreshThreshold = 30 * time.Second
-	}
+	cfg.RefreshThreshold = cmp.Or(cfg.RefreshThreshold, defaultRefreshThreshold)
 	return &Source{cfg: cfg, tokenURL: u, client: noredirect.Client(cfg.HTTPClient)}, nil
 }
 
@@ -420,7 +429,9 @@ func (s *Source) stale() bool {
 		// until the consumer replaces the TokenSource.
 		return false
 	}
-	return time.Until(s.cur.ExpiresAt) <= s.cfg.RefreshThreshold
+	// A negative threshold counts as 0, so a token past its expiry is never
+	// served (REQ-063).
+	return time.Until(s.cur.ExpiresAt) <= max(s.cfg.RefreshThreshold, 0)
 }
 
 // tokenResponse mirrors the RFC 6749 § 5.1 success body. Numeric

@@ -23,6 +23,10 @@ import (
 // GrantType is the assertion grant identifier defined by RFC 7523.
 const GrantType = "urn:ietf:params:oauth:grant-type:jwt-bearer"
 
+// defaultRefreshThreshold is how long before its expiry the cached access
+// token counts as stale when the configuration sets no threshold.
+const defaultRefreshThreshold = 30 * time.Second
+
 // Config carries the constructor inputs. Use New(...Option) for the
 // idiomatic call site; Config is exposed for declarative configuration.
 type Config struct {
@@ -31,11 +35,16 @@ type Config struct {
 	// the client has, and the client is not modified. The request uses a
 	// copy made when the source is built, so a Transport, Timeout or Jar set
 	// on the client afterwards does not reach it. Required.
-	HTTPClient       *http.Client
-	TokenURL         string
-	Assertion        AssertionSource
-	Scope            string
-	Audience         string
+	HTTPClient *http.Client
+	TokenURL   string
+	Assertion  AssertionSource
+	Scope      string
+	Audience   string
+	// RefreshThreshold is how long before its expiry the cached access token
+	// counts as stale, so that [Source.Token] exchanges an assertion again
+	// ahead of time. 0 selects the default of 30 seconds. A negative value
+	// counts as 0: the token is replaced once it has expired, so an expired
+	// token is never returned.
 	RefreshThreshold time.Duration
 	Issuer           string
 	// ClientID, when set, is sent in the form body as client_id;
@@ -66,7 +75,11 @@ func WithAudience(aud string) Option { return func(cfg *Config) { cfg.Audience =
 // WithClientID sets the form-body client_id parameter.
 func WithClientID(id string) Option { return func(cfg *Config) { cfg.ClientID = id } }
 
-// WithRefreshThreshold overrides the staleness window.
+// WithRefreshThreshold sets how long before its expiry the cached access
+// token counts as stale, so that [Source.Token] exchanges an assertion again
+// ahead of time. The default is 30 seconds, which a d of 0 also selects. A
+// negative d counts as 0: the token is replaced once it has expired, so an
+// expired token is never returned.
 func WithRefreshThreshold(d time.Duration) Option {
 	return func(cfg *Config) { cfg.RefreshThreshold = d }
 }
@@ -104,10 +117,10 @@ type exchange struct {
 // token endpoint; assertion is how the provider obtains a signed JWT
 // for each exchange.
 func New(tokenURL string, assertion AssertionSource, opts ...Option) (*Source, error) {
+	// FromConfig fills in the defaults, such as the refresh threshold.
 	cfg := Config{
-		TokenURL:         tokenURL,
-		Assertion:        assertion,
-		RefreshThreshold: 30 * time.Second,
+		TokenURL:  tokenURL,
+		Assertion: assertion,
 	}
 	for _, o := range opts {
 		if o != nil {
@@ -132,9 +145,7 @@ func FromConfig(cfg Config) (*Source, error) {
 	if err != nil || u.Scheme == "" || u.Host == "" {
 		return nil, fmt.Errorf("%w: TokenURL %q is not a valid absolute URL", auth.ErrInvalidConfig, urlredact.String(cfg.TokenURL))
 	}
-	if cfg.RefreshThreshold == 0 {
-		cfg.RefreshThreshold = 30 * time.Second
-	}
+	cfg.RefreshThreshold = cmp.Or(cfg.RefreshThreshold, defaultRefreshThreshold)
 	return &Source{cfg: cfg, tokenURL: u, client: noredirect.Client(cfg.HTTPClient)}, nil
 }
 
@@ -256,7 +267,9 @@ func (s *Source) stale() bool {
 	if s.cur.ExpiresAt.IsZero() {
 		return false
 	}
-	return time.Until(s.cur.ExpiresAt) <= s.cfg.RefreshThreshold
+	// A negative threshold counts as 0, so a token past its expiry is never
+	// served (REQ-063).
+	return time.Until(s.cur.ExpiresAt) <= max(s.cfg.RefreshThreshold, 0)
 }
 
 type tokenResponse struct {
