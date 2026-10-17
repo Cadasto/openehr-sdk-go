@@ -485,7 +485,7 @@ func TestFloor_REQ171_CodedPassChecksOnlyTheRowsItIsGiven(t *testing.T) {
 		{name: "no row", rules: nil},
 	} {
 		var f findings
-		f.checkCodedInvariants(obs, "OBSERVATION", "/", tc.rules)
+		f.checkCodedInvariants(obs, "OBSERVATION", issuePath{}, tc.rules)
 		var got []string
 		for _, i := range f.issues {
 			got = append(got, i.Rule)

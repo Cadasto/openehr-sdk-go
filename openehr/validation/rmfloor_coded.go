@@ -109,14 +109,13 @@ type codedValue struct {
 	code rm.CodePhrase
 }
 
-// path returns where the CODE_PHRASE the rule reads sits, below the node at
+// path writes where the CODE_PHRASE the rule reads sits, below the node at
 // nodePath.
-func (v codedValue) path(nodePath string) string {
-	p := joinPath(nodePath, "/"+v.rule.attr)
+func (v codedValue) path(nodePath issuePath) string {
 	if v.rule.codedText {
-		p += "/defining_code"
+		return nodePath.join("/", v.rule.attr, "/defining_code")
 	}
-	return p
+	return nodePath.join("/", v.rule.attr)
 }
 
 // checkCodedInvariants runs, of the coded invariants, those in rules on the
@@ -125,7 +124,7 @@ func (v codedValue) path(nodePath string) string {
 // evaluate ([classRules]); [codedValues] reads the coded attributes the
 // value carries. It reports each breach as `code_not_in_value_set` at the
 // CODE_PHRASE the invariant reads.
-func (f *findings) checkCodedInvariants(value any, rmType, path string, rules []*codedRule) {
+func (f *findings) checkCodedInvariants(value any, rmType string, path issuePath, rules []*codedRule) {
 	for _, v := range codedValues(value) {
 		if !slices.Contains(rules, v.rule) || v.rule.holds(v.code) {
 			continue

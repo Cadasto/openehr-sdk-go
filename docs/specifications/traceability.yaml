@@ -1231,9 +1231,11 @@ requirements:
       - openehr/validation/constraint_fixtures_test.go
       - openehr/validation/constraint_ref_walk_test.go
       - openehr/validation/data_value_subtypes_test.go
+      - openehr/validation/engine_primitive_leaf_internal_test.go
       - openehr/validation/interval_bounds_test.go
       - openehr/validation/interval_open_side_test.go
       - openehr/validation/issue_err_test.go
+      - openehr/validation/issuepath_handle_internal_test.go
       - openehr/validation/issuepath_internal_test.go
       - openehr/validation/issuepath_test.go
       - openehr/validation/multi_nonlocatable_test.go
@@ -1800,6 +1802,7 @@ requirements:
     tests:
       - openehr/rm/temporal_funcs_test.go
       - openehr/rm/temporal_iso_test.go
+      - openehr/rm/temporal_scan_alloc_test.go
       - openehr/validation/coverage_unevaluated_test.go
       - openehr/validation/rmfloor_interval_order_test.go
       - openehr/validation/rmfloor_invariant_matrix_internal_test.go
@@ -2213,7 +2216,9 @@ requirements:
       - openehr/validation/coverage_test.go
       - openehr/validation/coverage_unevaluated_test.go
       - openehr/validation/engine_bench_test.go
+      - openehr/validation/engine_class_entry_internal_test.go
       - openehr/validation/engine_internal_test.go
+      - openehr/validation/engine_primitive_leaf_internal_test.go
       - openehr/validation/engine_refused_internal_test.go
       - openehr/validation/engine_template_test.go
       - openehr/validation/engine_walk_test.go
@@ -2243,6 +2248,7 @@ requirements:
       - openehr/validation/rmfloor_primitive_list_internal_test.go
       - openehr/validation/rmfloor_test.go
       - openehr/validation/validator_test.go
+      - openehr/validation/walk_alloc_test.go
       - testkit/conformance/webtemplate/archetype_details_test.go
       - testkit/probes/validation/probe_074_test.go
       - testkit/probes/validation/probes_test.go
