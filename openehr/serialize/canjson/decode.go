@@ -69,19 +69,25 @@ import (
 var ErrInvalidShape = typereg.ErrInvalidShape
 
 // DecodeError is the error [Unmarshal] and [Decoder.Decode] return for
-// every failure the input causes (REQ-052), at the top of the chain, so
+// every failure the input causes, at the top of the chain, so
 // errors.AsType[*DecodeError] finds it without unwrapping. Its Path is the
 // JSON Pointer of the failing value from the root of the document, where the
-// decoder knows it; its Value holds the JSON text of the value the decoder
-// could not take, as the document wrote it, where the failure concerns one
-// (a number or string its Go type cannot hold, or a quoted literal rm.Real or
-// rm.Integer could not parse); and its text names the failure's class and
-// the pointer but no value from the document. Path, Type and the text are
-// value-free; Value is value-bearing and prints as "[redacted]". The
-// codec's own error is its Inner, so every sentinel and typed cause stays
-// reachable with errors.Is and errors.As, and that cause's own text may name
-// the value. A polymorphic slot that fails adds a DecodeError of its own,
-// naming the slot, beneath the entry point's.
+// decoder knows it, and its text names the failure's class and the pointer
+// but no value from the document.
+//
+// Its Value holds the JSON text of the value the decoder refused, as the
+// document wrote it, in two cases: a number or string of the right JSON kind
+// that its Go type cannot hold, and a value one of the SDK's primitive codecs
+// refused (a quoted literal rm.Real or rm.Integer could not parse, an rm.Real
+// number past its 17-digit budget, an rm.Character string that is not exactly
+// one character). Value is empty for any other failure, a value of the wrong
+// JSON kind for its target among them.
+//
+// Path, Type and the text are value-free; Value is value-bearing and prints
+// as "[redacted]". The codec's own error is its Inner, so every sentinel and
+// typed cause stays reachable with errors.Is and errors.As, and that cause's
+// own text may name the value. A polymorphic slot that fails adds a
+// DecodeError of its own, naming the slot, beneath the entry point's.
 //
 // Two errors come back as they are, because the input does not cause them:
 // a read failure of the reader under a [Decoder], and io.EOF from a
@@ -168,7 +174,7 @@ func classifyDecode(err error) error {
 // interface hook, so a polymorphic slot at the top level resolves too.
 //
 // Every failure comes back as a [DecodeError] at the top of the chain,
-// whose text carries no value from the document (REQ-052). Classify it by
+// whose text carries no value from the document. Classify it by
 // what it wraps: a polymorphic dispatch failure wraps a typereg sentinel
 // ([typereg.ErrMissingType] / ErrUnknownType / ErrTypeMismatch); malformed
 // JSON wraps a *encoding/json/jsontext.SyntacticError and carries no

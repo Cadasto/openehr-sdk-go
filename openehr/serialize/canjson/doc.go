@@ -141,24 +141,34 @@
 // is raised in both directions, where this one is decode-only.
 //
 // Every failure the input causes comes back from [Unmarshal] and
-// [Decoder.Decode] as a [DecodeError] at the top of the chain (REQ-052),
-// so the type alone no longer tells one failure from another: classify with
-// errors.Is against the sentinels named below, or errors.AsType for a typed
-// cause. The DecodeError's Path is the failing value's JSON Pointer, where
-// the decoder knows it. Its text names the failure's class and the pointer
-// and carries no value from the document, so a log line or an HTTP error
-// body that quotes it carries none either: no number, no string content, no
-// escape sequence or character the tokenizer refused. Member names and `_type` values are
-// structure and do appear, a duplicate member's name and an unknown
-// `_type` included. Its Value holds the JSON text of the value the decoder
-// could not take, as the document wrote it, where the failure concerns one:
-// a number or string its Go type cannot hold, such as 3.5 for an integer or
-// 2147483648 for an rm.Integer, or a quoted literal rm.Real or rm.Integer
-// could not parse, quotes included. Value prints as "[redacted]";
-// Value.Reveal returns the text. The codec's own error stays reachable
-// beneath the DecodeError, and its own text may name the value. Two errors
-// come back as they are, because the input does not cause them: a read
-// failure of the reader under a [Decoder], and io.EOF from a [Decoder]
+// [Decoder.Decode] as a [DecodeError] at the top of the chain, so the type
+// alone no longer tells one failure from another: classify with errors.Is
+// against the sentinels named below, or errors.AsType for a typed cause. The
+// DecodeError's Path is the failing value's JSON Pointer, where the decoder
+// knows it. Its text names the failure's class and the pointer and carries
+// no value from the document, so a log line or an HTTP error body that
+// quotes it carries none either: no number, no string content, no escape
+// sequence or character the tokenizer refused. Member names and `_type`
+// values are structure and do appear, a duplicate member's name and an
+// unknown `_type` included.
+//
+// Its Value holds the JSON text of the value the decoder refused, as the
+// document wrote it, quotes and escapes included, in two cases:
+//
+//   - a number or string of the right JSON kind that its Go type cannot
+//     hold, such as 3.5 for an integer or 2147483648 for an rm.Integer;
+//   - a value one of the SDK's primitive codecs refused: a quoted literal
+//     rm.Real or rm.Integer could not parse, an rm.Real number past its
+//     17-digit budget, and an rm.Character string that is not exactly one
+//     character.
+//
+// Value is empty for any other failure: a value of the wrong JSON kind for
+// its target (a string where a boolean belongs), malformed JSON, a dispatch
+// failure, a nesting-depth refusal and an unknown member. Value prints as
+// "[redacted]"; Value.Reveal returns the text. The codec's own error stays
+// reachable beneath the DecodeError, and its own text may name the value.
+// Two errors come back as they are, because the input does not cause them: a
+// read failure of the reader under a [Decoder], and io.EOF from a [Decoder]
 // whose stream holds no further value.
 //
 // What lies beneath that DecodeError depends on where the failure happens:

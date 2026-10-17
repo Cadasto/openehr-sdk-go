@@ -89,8 +89,8 @@ var (
 // Path is a JSON Pointer (canonical JSON) or an element path (canonical
 // XML) naming the failed node; Type is the observed discriminator (may be
 // empty when the discriminator was missing); Value is the JSON text of the
-// value the decoder could not take, set by an entry point; Inner is the
-// failure itself.
+// value the decoder refused, as the document wrote it, which the canjson
+// entry points set; Inner is the failure itself.
 //
 // Because every failure is a DecodeError now, the type alone no longer
 // tells a dispatch failure from any other: classify with errors.Is against
@@ -99,7 +99,7 @@ var (
 // [ErrMaxDepthExceeded] for depth), or errors.AsType for a typed cause such
 // as *jsontext.SyntacticError for malformed JSON.
 //
-// The fields fall in two classes, as a validation Issue's do (REQ-168):
+// The fields fall in two classes, as the fields of a validation Issue do:
 //
 //   - Value-free: Path, Type and the text Error returns. They carry no value
 //     from the document, only its structure: member names, `_type` values,
@@ -125,7 +125,7 @@ type DecodeError struct {
 }
 
 // Error names the failed node and its cause, with no value from the
-// document (REQ-052). A nil receiver answers with the zero DecodeError's
+// document. A nil receiver answers with the zero DecodeError's
 // text rather than dereferencing. This type is the documented errors.As /
 // errors.AsType out-parameter for both codecs (it is re-exported as
 // canjson.DecodeError and canxml.DecodeError), so a failed match can leave a
@@ -147,7 +147,7 @@ type DecodeError struct {
 // written in one pass, so its cost grows with its length rather than with
 // the square of it. A cause whose Error method panics, such as a typed-nil
 // pointer without a nil guard, is named by its class rather than taking the
-// caller down (REQ-025 nil-receiver axis).
+// caller down.
 func (e *DecodeError) Error() string {
 	var b strings.Builder
 	writeValueFree(&b, e)
