@@ -726,6 +726,14 @@ func joinTarget(base *url.URL, path string, query url.Values) (*url.URL, error) 
 	}
 	out := base.Clone()
 	out.Path = joinPaths(base.Path, path)
+	// The clone keeps the base's RawPath, which no longer matches the joined
+	// Path, so String would encode the whole path again from its decoded
+	// form and turn an escaped "/" (%2F) in the base into a real separator.
+	// The base keeps its own encoding instead; the request path is still
+	// encoded from its decoded form alone (REQ-150, REQ-095).
+	if base.RawPath != "" {
+		out.RawPath = joinPaths(base.EscapedPath(), (&url.URL{Path: path}).EscapedPath())
+	}
 	if len(query) > 0 {
 		out.RawQuery = mergeQuery(base.RawQuery, query)
 	}
