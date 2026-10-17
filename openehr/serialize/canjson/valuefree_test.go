@@ -455,9 +455,12 @@ func TestUnmarshal_REQ052_DecodeErrorKeepsEveryCause(t *testing.T) {
 			path: "/magnitude", value: "0.1234567890123456789",
 		},
 		{
-			name: "Character of two characters", in: `{"_type":"TERM_MAPPING","match":"ab","target":{"terminology_id":{"value":"x"},"code_string":"c"}}`, target: func() any { return new(rm.TermMapping) },
+			// The literal holds a letter no error wording can: json/v2 picks
+			// "cannot" or "unable to" per process, and a plain ASCII run such
+			// as "ab" turns up inside "unable".
+			name: "Character of two characters", in: `{"_type":"TERM_MAPPING","match":"Ωq","target":{"terminology_id":{"value":"x"},"code_string":"c"}}`, target: func() any { return new(rm.TermMapping) },
 			is: []error{canjson.ErrInvalidShape}, as: []func(error) bool{isSemantic},
-			path: "/match", value: `"ab"`,
+			path: "/match", value: `"Ωq"`,
 		},
 		{
 			name: "value of the wrong JSON kind", in: `{"_type":"DV_BOOLEAN","value":"yes"}`, target: func() any { return new(rm.DVBoolean) },
