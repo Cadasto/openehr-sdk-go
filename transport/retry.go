@@ -61,13 +61,27 @@ func (p RetryPolicy) backoff(attempt int) time.Duration {
 		mul = 2.0
 	}
 	d := float64(p.InitialBackoff) * math.Pow(mul, float64(attempt-1))
-	if d <= 0 {
+	// Written so that NaN fails it too: a NaN wait is no wait.
+	if !(d > 0) {
 		return 0
 	}
-	if p.MaxBackoff > 0 && time.Duration(d) > p.MaxBackoff {
-		return p.MaxBackoff
+	// REQ-091: a float at or past 2^63 ns does not fit a Duration, and
+	// converting it is implementation-defined (on amd64 the most negative
+	// Duration), so the cap below would never apply and the retry loop would
+	// skip the wait. Such a wait stops at MaxBackoff, or at the largest
+	// Duration when there is no cap. float64(math.MaxInt64) is exactly 2^63.
+	if d >= float64(math.MaxInt64) {
+		if p.MaxBackoff > 0 {
+			return p.MaxBackoff
+		}
+		return math.MaxInt64
 	}
-	return time.Duration(d)
+	// Every wait that fits is converted first and capped as a Duration, as
+	// before: a float compare would round a cap above 2^53 ns.
+	if w := time.Duration(d); p.MaxBackoff <= 0 || w <= p.MaxBackoff {
+		return w
+	}
+	return p.MaxBackoff
 }
 
 func (p RetryPolicy) retriable(method string, status int) bool {
