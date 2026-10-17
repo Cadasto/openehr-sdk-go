@@ -42,6 +42,15 @@ func TestCanContainAcceptanceTable(t *testing.T) {
 		// ByReference — FOLDER → COMPOSITION reference hop.
 		{"FOLDER", "COMPOSITION", contain.ByReference},
 		{"FOLDER", "OBSERVATION", contain.ByReference},
+		// ByReference — the FOLDER → VERSIONED_COMPOSITION hop lands on the
+		// version tier (REQ-160 § Overlay edges), and onward through the
+		// family-agnostic VERSION node reaches every payload family.
+		{"FOLDER", "VERSION", contain.ByReference},
+		{"FOLDER", "VERSIONED_COMPOSITION", contain.ByReference},
+		{"FOLDER", "EHR_STATUS", contain.ByReference},
+		// Never — the hop names VERSIONED_COMPOSITION, not every container: no
+		// default edge leads from FOLDER to another VERSIONED_* class.
+		{"FOLDER", "VERSIONED_EHR_STATUS", contain.Never},
 		// Never.
 		{"EHR", "VERSIONED_PARTY", contain.Never}, // container unreachable
 		{"OBSERVATION", "COMPOSITION", contain.Never},
@@ -53,9 +62,16 @@ func TestCanContainAcceptanceTable(t *testing.T) {
 		// genuine self-loops above (SECTION, CLUSTER, FOLDER) stay Admissible.
 		{"OBSERVATION", "OBSERVATION", contain.Never}, // entries never contain entries
 		{"ELEMENT", "ELEMENT", contain.Never},
-		{"COMPOSITION", "EHR", contain.Never},           // any CONTAINS EHR
-		{"COMPOSITION", "DV_TEXT", contain.Never},       // Never-containability operand
-		{"COMPOSITION", "EVENT_CONTEXT", contain.Never}, // non-LOCATABLE operand
+		// Engines accept these two and answer with no rows, which is
+		// consistent with Never (REQ-160 § Overlay edges, the guard).
+		{"COMPOSITION", "COMPOSITION", contain.Never},
+		{"EHR_STATUS", "EHR_STATUS", contain.Never},
+		{"COMPOSITION", "EHR", contain.Never},     // any CONTAINS EHR
+		{"COMPOSITION", "DV_TEXT", contain.Never}, // Never-containability operand
+		// EVENT_CONTEXT conforms only to PATHABLE: an engine that answers this
+		// pair does so by an engine extension, which the default relation does
+		// not carry (REQ-160 § Containable operands).
+		{"COMPOSITION", "EVENT_CONTEXT", contain.Never},
 		// UnknownClass.
 		{"FOO_BAR", "COMPOSITION", contain.UnknownClass},
 		{"COMPOSITION", "FOO_BAR", contain.UnknownClass},
@@ -90,7 +106,7 @@ func TestContainable(t *testing.T) {
 		{"VERSIONED_PARTY", contain.Admissible},
 		{"DV_TEXT", contain.Never},
 		{"DV_QUANTITY", contain.Never},
-		{"EVENT_CONTEXT", contain.Never}, // non-LOCATABLE, non-version-tier
+		{"EVENT_CONTEXT", contain.Never}, // non-LOCATABLE, non-version-tier; an engine binding it does so by an extension
 		{"FOO_BAR", contain.UnknownClass},
 	}
 	for _, c := range cases {
@@ -176,6 +192,16 @@ func TestEHRbaseDocumentedDifferences(t *testing.T) {
 	}
 	if got := r.Containable("CLUSTER"); got != contain.Admissible {
 		t.Errorf("documented difference drifted: Containable(CLUSTER) = %v, want Admissible (EHRbase restricts a standalone CLUSTER source; the RM admits the operand)", got)
+	}
+
+	// A class EHRbase binds by an engine extension: it answers
+	// COMPOSITION c CONTAINS EVENT_CONTEXT ec, reaching the context by value
+	// through COMPOSITION.context. EVENT_CONTEXT conforms only to PATHABLE, so
+	// the default relation keeps it Never (REQ-160 § Containable operands); a
+	// deployment relying on the extension declares a consumer edge instead
+	// (TestREQ160_EngineExtensionNeedsAConsumerEdge).
+	if got := r.CanContain("COMPOSITION", "EVENT_CONTEXT"); got != contain.Never {
+		t.Errorf("documented difference drifted: CanContain(COMPOSITION, EVENT_CONTEXT) = %v, want Never (EHRbase binds it by an engine extension; the RM has no containment)", got)
 	}
 }
 

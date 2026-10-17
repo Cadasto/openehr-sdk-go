@@ -79,6 +79,10 @@ func TestUnavoidableAcceptanceTable(t *testing.T) {
 			"same: the container is one route among several, not a gate",
 		},
 		{
+			"FOLDER", "VERSION", "COMPOSITION", false,
+			"the FOLDER -> COMPOSITION shorthand hop goes round the version tier the FOLDER -> VERSIONED_COMPOSITION hop lands on (REQ-160 § Overlay edges)",
+		},
+		{
 			"COMPOSITION", "OBSERVATION", "ELEMENT", false,
 			"any other entry kind, and SECTION-nested content, reach an element without an observation",
 		},

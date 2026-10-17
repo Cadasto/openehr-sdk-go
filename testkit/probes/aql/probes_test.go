@@ -356,6 +356,31 @@ func probe097FireCases() []aqlprobes.SemanticFireCase {
 			SpanNth:   1,
 		},
 		{
+			// The upstream EHRbase suite's directory query, verbatim (REQ-160
+			// § Overlay edges): the FOLDER -> VERSIONED_COMPOSITION reference
+			// hop lands on the version tier, so FOLDER CONTAINS VERSION is
+			// ByReference, never an impossible containment.
+			Name: "containment by reference onto the version tier",
+			Query: "SELECT c/uid/value, cv0/commit_audit/time_committed/value " +
+				"FROM FOLDER f CONTAINS VERSION cv0[LATEST_VERSION] CONTAINS COMPOSITION c " +
+				"WHERE f/name/value = 'root1'",
+			Code:      "aql_containment_by_reference",
+			Severity:  lint.Warning,
+			SpanClass: "VERSION",
+			SpanNth:   1, // the CONTAINS operand; LATEST_VERSION is not an occurrence
+		},
+		{
+			// A class an engine binds by an engine extension stays
+			// non-containable under the default relation (REQ-160 § Containable
+			// operands); the overlay half lives in openehr/aql/lint's tests.
+			Name:      "contains not containable: engine-extension class",
+			Query:     "SELECT ec/start_time/value FROM EHR e CONTAINS COMPOSITION c CONTAINS EVENT_CONTEXT ec",
+			Code:      "aql_contains_not_containable",
+			Severity:  lint.Error,
+			SpanClass: "EVENT_CONTEXT",
+			SpanNth:   1,
+		},
+		{
 			Name:      "VERSION with no version predicate",
 			Query:     "SELECT v FROM VERSION v",
 			Code:      "aql_version_no_predicate",
