@@ -298,6 +298,9 @@ func WithTokenChange(fn func(ctx context.Context, change TokenChange)) Option {
 
 // Source implements auth.TokenSource for SMART authorization-code + PKCE.
 //
+// The zero value is not usable: create a Source with [New], [FromConfig]
+// or [NewFromCatalog].
+//
 // Printing a Source with any fmt verb shows only its client ID and issuer,
 // never its client secret, tokens or token response: see [Source.String].
 type Source struct {
@@ -672,11 +675,9 @@ func NewFromCatalog(catalog *discovery.ServiceCatalog, clientID string, opts ...
 	if catalog == nil {
 		return nil, fmt.Errorf("%w: catalog is nil", auth.ErrInvalidConfig)
 	}
-	// The defaults come first, so an option the caller passes wins.
-	all := []Option{
-		WithAuthEndpoints(catalog.Auth),
-		WithIssuer(catalog.Issuer),
-	}
+	// New takes the endpoints from catalog.Auth. The defaults come first, so
+	// an option the caller passes wins.
+	all := []Option{WithIssuer(catalog.Issuer)}
 	if catalog.BaseURL != "" {
 		all = append(all, WithAudience(catalog.BaseURL))
 	}
@@ -713,7 +714,7 @@ type AuthorizationRequest struct {
 // records what the redirect back to the app will be checked against.
 //
 // If state is empty, a cryptographically random state value is generated
-// (stateLen bytes of entropy, base64url-encoded) and returned in
+// (32 random bytes, base64url-encoded) and returned in
 // [AuthorizationRequest].State. If state is non-empty it is used
 // verbatim, and the caller takes responsibility for its strength and
 // session binding.
@@ -731,11 +732,7 @@ type AuthorizationRequest struct {
 // own request value.
 func (s *Source) BeginAuthorization(state string) (AuthorizationRequest, error) {
 	if state == "" {
-		var err error
-		state, err = randBase64URL(stateLen)
-		if err != nil {
-			return AuthorizationRequest{}, fmt.Errorf("smart: generate state: %w", err)
-		}
+		state = randBase64URL(stateLen)
 	}
 	pkce, err := NewPKCEPair()
 	if err != nil {
@@ -745,10 +742,7 @@ func (s *Source) BeginAuthorization(state string) (AuthorizationRequest, error) 
 	if hasScope(s.cfg.Scopes, auth.ScopeOpenID) {
 		// OpenID Connect Core 1.0 §3.1.2.1: the nonce binds the ID token
 		// to this launch, so a replayed token is refused.
-		req.Nonce, err = randBase64URL(nonceLen)
-		if err != nil {
-			return AuthorizationRequest{}, fmt.Errorf("smart: generate nonce: %w", err)
-		}
+		req.Nonce = randBase64URL(nonceLen)
 	}
 	return req, nil
 }
