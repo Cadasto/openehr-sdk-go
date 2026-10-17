@@ -160,6 +160,12 @@ func rawJSONToAny(raw map[string]json.RawMessage) map[string]any {
 	return out
 }
 
+// maxExpiresIn is the longest lifetime, in seconds, that an expires_in
+// gives an access token: 100 years. A larger value counts as this one, so
+// that turning it into a time.Duration cannot overflow into an expiry in the
+// past, which would have every call refresh the token.
+const maxExpiresIn = 100 * 365 * 24 * 60 * 60
+
 func tokenFromResponse(tr TokenResponse, issuer string) auth.Token {
 	tok := auth.Token{
 		Value:  tr.AccessToken,
@@ -168,7 +174,7 @@ func tokenFromResponse(tr TokenResponse, issuer string) auth.Token {
 		Issuer: issuer,
 	}
 	if tr.ExpiresIn > 0 {
-		tok.ExpiresAt = time.Now().Add(time.Duration(tr.ExpiresIn) * time.Second)
+		tok.ExpiresAt = time.Now().Add(time.Duration(min(tr.ExpiresIn, maxExpiresIn)) * time.Second)
 	}
 	return tok
 }

@@ -272,6 +272,12 @@ func (s *Source) stale() bool {
 	return time.Until(s.cur.ExpiresAt) <= max(s.cfg.RefreshThreshold, 0)
 }
 
+// maxExpiresIn is the longest lifetime, in seconds, that an expires_in
+// gives an access token: 100 years. A larger value counts as this one, so
+// that turning it into a time.Duration cannot overflow into an expiry in the
+// past, which would have every call refresh the token.
+const maxExpiresIn = 100 * 365 * 24 * 60 * 60
+
 type tokenResponse struct {
 	AccessToken string      `json:"access_token"`
 	TokenType   string      `json:"token_type"`
@@ -345,7 +351,7 @@ func (s *Source) fetch(ctx context.Context) (auth.Token, error) {
 	var expiresAt time.Time
 	if str := tr.ExpiresIn.String(); str != "" {
 		if secs, err := strconv.ParseInt(str, 10, 64); err == nil && secs > 0 {
-			expiresAt = time.Now().Add(time.Duration(secs) * time.Second)
+			expiresAt = time.Now().Add(time.Duration(min(secs, maxExpiresIn)) * time.Second)
 		}
 	}
 	return auth.Token{
