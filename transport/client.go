@@ -361,9 +361,10 @@ func (c *Client) doOnce(ctx context.Context, req *Request, target *url.URL) (*Re
 		// which quotes the resolved URL: its path may hold a caller-supplied
 		// identifier and its base URL a password. Name the request by its
 		// route slot instead, as the network-failure arm below does
-		// (REQ-093).
+		// (REQ-093). The marker keeps the retry policy from sending a
+		// request again that fails the same way on every attempt (REQ-091).
 		route := req.routeOrPlaceholder()
-		return nil, fmt.Errorf("transport: build request %s %s: %w", req.effectiveMethod(), route, sanitiseURLError(err, route))
+		return nil, &requestBuildError{err: fmt.Errorf("transport: build request %s %s: %w", req.effectiveMethod(), route, sanitiseURLError(err, route))}
 	}
 	if err := c.plumbHeaders(ctx, req, httpReq); err != nil {
 		return nil, err
@@ -708,6 +709,11 @@ func (c *Client) shouldRetry(ctx context.Context, req *Request, resp *Response, 
 		// server's Location and the request's own credential, so every
 		// attempt would be refused the same way.
 		if errors.Is(err, ErrInsecureRedirect) {
+			return false
+		}
+		// REQ-091: a request that could not be built has the same method and
+		// URL on every attempt, so every attempt would fail the same way.
+		if _, ok := errors.AsType[*requestBuildError](err); ok {
 			return false
 		}
 		// Anything else is a network / transport / transient token error;

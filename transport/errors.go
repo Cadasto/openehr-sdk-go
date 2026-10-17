@@ -400,3 +400,14 @@ type bodyReadFailure struct{ cause error }
 func (e *bodyReadFailure) Error() string { return "read body: " + readFailureText(e.cause) }
 
 func (e *bodyReadFailure) Unwrap() error { return e.cause }
+
+// requestBuildError marks a request that http.NewRequestWithContext refused.
+// The method and the URL are the same on every attempt, so such a request
+// fails the same way each time, and shouldRetry does not send it again
+// (REQ-091). Its text and its chain are those of the error it wraps, so a
+// caller still reaches the *url.Error beneath it.
+type requestBuildError struct{ err error }
+
+func (e *requestBuildError) Error() string { return e.err.Error() }
+
+func (e *requestBuildError) Unwrap() error { return e.err }
