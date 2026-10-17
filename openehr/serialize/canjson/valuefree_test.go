@@ -548,21 +548,47 @@ func TestUnmarshal_REQ052_SDKMessagesStayInDecodeErrorText(t *testing.T) {
 // TestDecoder_REQ052_ReaderFailureAndEndOfStreamComeBackUnwrapped pins the two
 // errors REQ-052 leaves as they are, because the input does not cause them: a
 // failing reader's own error, and io.EOF from a Decoder whose stream holds no
-// further value, which a caller compares with ==.
+// further value, which a caller compares with ==. The reader fails inside a
+// member name, inside a polymorphic slot's value and inside a number, in every
+// decode mode: jsontext reports a failure partway through a value as a
+// *jsontext.SyntacticError around its I/O error, which is still not a failure
+// of the input.
 //
-// Can-fail control: wrap every error Decode returns and both assertions fail.
+// Can-fail control: wrap every error Decode returns, or take every
+// *jsontext.SyntacticError as caused by the input, and the reader rows fail.
 func TestDecoder_REQ052_ReaderFailureAndEndOfStreamComeBackUnwrapped(t *testing.T) {
+	const element = `{"_type":"ELEMENT","archetype_node_id":"at0001","name":{"_type":"DV_TEXT","value":"e"},"value":`
+	readerCases := []struct {
+		name   string
+		in     string // the bytes the reader serves before it fails
+		target func() any
+	}{
+		{name: "inside a member name", in: `{"_type":"DV_TEXT","val`, target: func() any { return new(rm.DVText) }},
+		{name: "inside a slot's value", in: element + `{"_type":"DV_TEXT","value":"Ωq`, target: func() any { return new(rm.Element) }},
+		{name: "inside a number", in: `{"_type":"DV_QUANTITY","units":"kg","magnitude":12.3`, target: func() any { return new(rm.DVQuantity) }},
+	}
+	sentinels := []error{
+		canjson.ErrInvalidShape, canjson.ErrUnknownMember,
+		typereg.ErrMissingType, typereg.ErrUnknownType, typereg.ErrTypeMismatch, typereg.ErrMaxDepthExceeded,
+	}
 	for mode, opts := range jsonDecodeModes() {
-		t.Run("reader failure/"+mode, func(t *testing.T) {
-			dec := canjson.NewDecoder(&failingReader{r: strings.NewReader(`{"_type":"DV_TEXT","val`)}, opts...)
-			err := dec.Decode(new(rm.DVText))
-			if !errors.Is(err, errRead) {
-				t.Fatalf("Decode over a failing reader = %v; want errors.Is(_, the reader's error)", err)
-			}
-			if de, ok := errors.AsType[*canjson.DecodeError](err); ok {
-				t.Errorf("Decode over a failing reader = %v; want the reader's failure unwrapped, got a *canjson.DecodeError (Path %q)", err, de.Path)
-			}
-		})
+		for _, rc := range readerCases {
+			t.Run("reader failure/"+rc.name+"/"+mode, func(t *testing.T) {
+				dec := canjson.NewDecoder(&failingReader{r: strings.NewReader(rc.in)}, opts...)
+				err := dec.Decode(rc.target())
+				if !errors.Is(err, errRead) {
+					t.Fatalf("Decode over a reader failing %s = %v; want errors.Is(_, the reader's error)", rc.name, err)
+				}
+				if de, ok := errors.AsType[*canjson.DecodeError](err); ok {
+					t.Errorf("Decode over a reader failing %s = %v; want the reader's failure unwrapped, got a *canjson.DecodeError (Path %q)", rc.name, err, de.Path)
+				}
+				for _, s := range sentinels {
+					if errors.Is(err, s) {
+						t.Errorf("Decode over a reader failing %s = %v; want no SDK sentinel, got errors.Is(_, %v)", rc.name, err, s)
+					}
+				}
+			})
+		}
 		for _, in := range []string{``, " \n", `{"_type":"DV_TEXT","value":"a"}`} {
 			t.Run("end of stream/"+mode+"/"+strconv.Quote(in), func(t *testing.T) {
 				dec := canjson.NewDecoder(strings.NewReader(in), opts...)
