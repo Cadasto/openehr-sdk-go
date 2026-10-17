@@ -191,9 +191,13 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 	// A parameter carrying `/` yields individually legal segments, so only
 	// the arity betrays it. Keyed on req.Route directly, never on
 	// effectiveRoute() — that falls back to Path, and comparing a path's
-	// arity against itself never fires.
-	if req.Route != "" && segmentCount(req.Path) != segmentCount(req.Route) {
-		return nil, fmt.Errorf("%w: %w: path %q does not match route template %q", ErrInvalidConfig, ErrInvalidPathSegment, req.Path, req.Route)
+	// arity against itself never fires. The error names the two counts and
+	// the template, never the path, which holds the caller's identifiers
+	// (REQ-093); a template holds none.
+	if req.Route != "" {
+		if got, want := segmentCount(req.Path), segmentCount(req.Route); got != want {
+			return nil, fmt.Errorf("%w: %w: path has %d segments, route template %q has %d", ErrInvalidConfig, ErrInvalidPathSegment, got, req.Route, want)
+		}
 	}
 	target, err := joinTarget(svc.BaseURL, req.Path, req.Query)
 	if err != nil {
