@@ -90,10 +90,12 @@ func characterFault(s string) error {
 // reachable with errors.AsType. Encode errors are not classified with that
 // sentinel; canjson wraps them in its own encode-only ErrInvalidValue.
 //
-// A string that decodes to other than exactly one character is refused
-// carrying its JSON text as the document wrote it, quotes and escapes
-// included, which a canjson entry point holds in DecodeError.Value. The text
-// adds nothing to the message, which names only the character count.
+// A string that decodes to other than exactly one character, and a number
+// that names no usable code point, are refused carrying their JSON text as
+// the document wrote it, quotes and escapes included, which a canjson entry
+// point holds in DecodeError.Value. The text adds nothing to the message,
+// which names only the character count or that the number is no usable code
+// point.
 //
 // A nil receiver is refused with an error rather than dereferenced. That
 // refusal carries typereg.ErrNilReceiver and not typereg.ErrInvalidShape,
@@ -138,7 +140,10 @@ func (c *Character) UnmarshalJSON(b []byte) error {
 		return typereg.ClassifyShape(fmt.Errorf("rm.Character: %w", err))
 	}
 	if n == 0 || !utf8.ValidRune(n) {
-		return typereg.ClassifyShape(errors.New("rm.Character: number is not a usable code point"))
+		// The number as written rides beside the refusal for the entry point's
+		// DecodeError.Value, as the string arm's does; the message names
+		// none of it.
+		return refused.Literal(b, typereg.ClassifyShape(errors.New("rm.Character: number is not a usable code point")))
 	}
 	// Past that gate string(n) is one valid UTF-8 rune by construction, so
 	// characterFault has nothing left to add. 65533 is accepted here: a

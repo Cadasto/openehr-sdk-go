@@ -83,10 +83,10 @@ var ErrInvalidShape = typereg.ErrInvalidShape
 // that its Go type cannot hold, and a value one of the SDK's primitive codecs
 // refused (a quoted literal rm.Real or rm.Integer could not parse, an rm.Real
 // number past its 17-digit budget, an rm.Character string that is not exactly
-// one character). Value is empty for any other failure, among them a value of
-// the wrong JSON kind for its target and a string that is not valid base64
-// for a byte field such as DV_MULTIMEDIA data: encoding/json/v2 records the
-// text of neither.
+// one character or number that names no usable code point). Value is empty
+// for any other failure, among them a value of the wrong JSON kind for its
+// target and a string that is not valid base64 for a byte field such as
+// DV_MULTIMEDIA data: encoding/json/v2 records the text of neither.
 //
 // Path, Type and the text are value-free; Value is value-bearing and prints
 // as "[redacted]". The codec's own error is its Inner, so every sentinel and

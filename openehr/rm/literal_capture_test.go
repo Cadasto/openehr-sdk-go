@@ -86,14 +86,14 @@ func TestQuotedLiteralRefusal_REQ052_CarriesTheLiteral(t *testing.T) {
 // TestPrimitiveRefusal_REQ052_CarriesTheLiteral pins the other refusals of
 // the SDK's primitive codecs that hand a decode entry point the literal
 // (REQ-052): rm.Real past its 17-digit budget, bare or quoted, and
-// rm.Character for a string that is not exactly one character. Each carries
-// the JSON text as written while its message stays as it was and it still
-// carries typereg.ErrInvalidShape. A value of the wrong JSON kind, and a
-// number rm.Character takes as no usable code point, carry nothing.
+// rm.Character for a string that is not exactly one character or a number
+// that names no usable code point. Each carries the JSON text as written
+// while its message stays as it was and it still carries
+// typereg.ErrInvalidShape. A value of the wrong JSON kind carries nothing.
 //
-// Can-fail control: return either refusal without the literal and the
-// matching rows' carried-text assertion fails; carry a literal on the
-// last two rows and theirs fails.
+// Can-fail control: return any of these refusals without the literal and the
+// matching rows' carried-text assertion fails; carry a literal on the row of
+// the wrong JSON kind and its assertion fails.
 func TestPrimitiveRefusal_REQ052_CarriesTheLiteral(t *testing.T) {
 	decodeReal := func(b []byte) error { var r rm.Real; return r.UnmarshalJSON(b) }
 	decodeChar := func(b []byte) error { var c rm.Character; return c.UnmarshalJSON(b) }
@@ -139,10 +139,25 @@ func TestPrimitiveRefusal_REQ052_CarriesTheLiteral(t *testing.T) {
 			// No message pin: encoding/json/v2 varies its own wording.
 		},
 		{
-			name:    "Character as a number naming no usable code point",
+			name:    "Character as a number naming no usable code point, zero",
 			in:      `0`,
 			decode:  decodeChar,
 			message: "rm.Character: number is not a usable code point",
+			carried: `0`,
+		},
+		{
+			name:    "Character as a number naming no usable code point, past Unicode",
+			in:      `77777777`,
+			decode:  decodeChar,
+			message: "rm.Character: number is not a usable code point",
+			carried: `77777777`,
+		},
+		{
+			name:    "Character as a number naming no usable code point, a surrogate half",
+			in:      `55296`,
+			decode:  decodeChar,
+			message: "rm.Character: number is not a usable code point",
+			carried: `55296`,
 		},
 	}
 	for _, tc := range cases {

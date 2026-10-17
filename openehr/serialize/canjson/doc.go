@@ -160,7 +160,7 @@
 //   - a value one of the SDK's primitive codecs refused: a quoted literal
 //     rm.Real or rm.Integer could not parse, an rm.Real number past its
 //     17-digit budget, and an rm.Character string that is not exactly one
-//     character.
+//     character or number that names no usable code point.
 //
 // Value is empty for any other failure: a value of the wrong JSON kind for
 // its target (a string where a boolean belongs), a string that is not valid

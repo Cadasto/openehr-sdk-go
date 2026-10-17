@@ -178,14 +178,15 @@ func TestUnmarshal_REQ052_ValueFreeDecodeErrors(t *testing.T) {
 // acceptance line for the SDK's own primitive codecs: decoded with
 // canjson.Unmarshal, and with a canjson.Decoder in every decode mode,
 // Value.Reveal() returns the refused literal, as the document wrote it, for an
-// rm.Real number past its digit budget and for a two-character value
-// rm.Character refuses, and nothing for a value of the wrong JSON kind or for
+// rm.Real number past its digit budget and for a value rm.Character refuses,
+// two characters or a number naming no usable code point, and nothing for a
+// value of the wrong JSON kind or for
 // a DV_MULTIMEDIA byte field whose string is not valid base64. In every case
 // Error() names the pointer and carries none of the document's values.
 //
-// Can-fail control: return rm.Real's digit-budget refusal or rm.Character's
-// one-character refusal without the literal and the matching rows' Value
-// assertions fail.
+// Can-fail control: return rm.Real's digit-budget refusal, rm.Character's
+// one-character refusal or its code-point refusal without the literal and the
+// matching rows' Value assertions fail.
 func TestUnmarshal_REQ052_PrimitiveRefusalsKeepTheLiteralInValue(t *testing.T) {
 	const (
 		mappings   = `{"_type":"DV_TEXT","value":"a","mappings":[{"_type":"TERM_MAPPING","match":`
@@ -230,6 +231,22 @@ func TestUnmarshal_REQ052_PrimitiveRefusalsKeepTheLiteralInValue(t *testing.T) {
 			targets: concreteAndSlot(func() any { return new(rm.DVText) }),
 			pointer: "/mappings/0/match",
 			value:   `""`,
+		},
+		{
+			name:    "Character as a number naming no usable code point",
+			in:      mappings + `77777777` + mapped,
+			targets: concreteAndSlot(func() any { return new(rm.DVText) }),
+			pointer: "/mappings/0/match",
+			absent:  []string{"7777"},
+			value:   "77777777",
+		},
+		{
+			name:    "Character as a number that is no code point at all",
+			in:      mappings + `77.77` + mapped,
+			targets: concreteAndSlot(func() any { return new(rm.DVText) }),
+			pointer: "/mappings/0/match",
+			absent:  []string{"77.77"},
+			value:   "77.77",
 		},
 		{
 			name:    "a DV_BOOLEAN value of the wrong JSON kind",
