@@ -35,9 +35,12 @@ type Observation struct {
 	// Duration is the total wall-clock time including all retries and
 	// backoff sleeps, that is, the latency of the logical call.
 	Duration time.Duration
-	// Attempts is the number of HTTP attempts actually issued; 1 when
-	// retries were disabled or the first attempt succeeded. It is 0 when
-	// Client.Do refused the call before any attempt: a nil Request, a
+	// Attempts is the number of times Client.Do tried the request: each
+	// retry and the replay after a re-authentication count, and so does an
+	// attempt that failed before anything reached the server (a request
+	// that cannot be built, a token that could not be obtained). It is 1
+	// when retries were disabled or the first attempt succeeded, and 0 only
+	// when Client.Do refused the call before any attempt: a nil Request, a
 	// context already ended, a service missing from the catalog, or a
 	// path that fails validation.
 	Attempts int
