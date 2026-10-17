@@ -147,10 +147,22 @@ func TestUnmarshalMaxDepthExceeded(t *testing.T) {
 		t.Errorf("Unmarshal over-deep folder: err = %v; want no canjson.ErrInvalidShape on a depth refusal", err)
 	}
 	// The refusal passes through the enclosing values unchanged, so its text
-	// stays one path long. Re-wrapped at every level, the message grows with
-	// the square of the depth (tens of kilobytes here) on hostile input.
-	if err != nil && len(err.Error()) > 1024 {
-		t.Errorf("Unmarshal over-deep folder: error text is %d bytes, want at most 1024 (the depth refusal must not be re-wrapped per level)", len(err.Error()))
+	// names the failing value's pointer once, whole (REQ-052), and stays
+	// within a fixed allowance of it. Re-wrapped at every level, the message
+	// grows with the square of the depth on hostile input: about 49 kilobytes
+	// here, around a pointer of about 2.5.
+	if err != nil {
+		de, ok := errors.AsType[*canjson.DecodeError](err)
+		if !ok || de == nil {
+			t.Fatalf("Unmarshal over-deep folder: err = %T %v; want a *canjson.DecodeError", err, err)
+		}
+		msg := err.Error()
+		if n, most := len(msg), len(de.Path)+1024; n > most {
+			t.Errorf("Unmarshal over-deep folder: error text is %d bytes, want at most %d, the %d-byte pointer and 1024 more (the depth refusal must not be re-wrapped per level)", n, most, len(de.Path))
+		}
+		if n := strings.Count(msg, de.Path); n != 1 {
+			t.Errorf("Unmarshal over-deep folder: error text holds the %d-byte pointer %d times; want it once, whole", len(de.Path), n)
+		}
 	}
 }
 
@@ -208,12 +220,14 @@ func folderWithClusterTree(folders, clusters int) []byte {
 // entry points, bare encoding/json/v2 and bare v1 encoding/json callers driving
 // the generated methods, and the registry chokepoint (REQ-108 names all five).
 //
-// errCap bounds the refusal's text on each route. The canjson and v2 routes
-// report one path, so their text stays within 1024 bytes. Bare v1 builds its
-// own dotted Go-field path to the failing value (`Folders.Folders.…`, one
-// segment per enclosing level), so its text runs to a few kilobytes at this
-// depth; 8192 is a generous fixed bound that still catches the quadratic
-// per-level re-wrapping the cap exists to prevent (tens of kilobytes here).
+// errCap bounds the refusal's text on each route, beyond the pointer of the
+// DecodeError it carries, which the text names whole (REQ-052). The canjson
+// and v2 routes report one path, so their text stays within 1024 bytes of it.
+// Bare v1 builds its own dotted Go-field path to the failing value
+// (`Folders.Folders.…`, one segment per enclosing level), so its text runs to
+// a few kilobytes at this depth; 8192 is a generous fixed bound that still
+// catches the quadratic per-level re-wrapping the cap exists to prevent (tens
+// of kilobytes here).
 //
 // countsBrackets marks the registry route: typereg.Default.Decode measures
 // every bracket of its buffered input, where the concrete routes count RM
@@ -281,8 +295,12 @@ func TestUnmarshalMaxDepthAcrossPolymorphicSlots(t *testing.T) {
 			if errors.Is(err, canjson.ErrInvalidShape) {
 				t.Errorf("%s(200 folders + 200 clusters) err = %v; a depth refusal must not carry canjson.ErrInvalidShape", route.name, err)
 			}
-			if n := len(err.Error()); n > route.errCap {
-				t.Errorf("%s(200 folders + 200 clusters): error text is %d bytes, want at most %d (the depth refusal must not be re-wrapped per level)", route.name, n, route.errCap)
+			most := route.errCap
+			if de, ok := errors.AsType[*canjson.DecodeError](err); ok && de != nil {
+				most += len(de.Path)
+			}
+			if n := len(err.Error()); n > most {
+				t.Errorf("%s(200 folders + 200 clusters): error text is %d bytes, want at most %d, the DecodeError's pointer and %d more (the depth refusal must not be re-wrapped per level)", route.name, n, most, route.errCap)
 			}
 		})
 		t.Run(route.name+"/control", func(t *testing.T) {

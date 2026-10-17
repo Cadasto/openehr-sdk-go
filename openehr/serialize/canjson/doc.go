@@ -140,7 +140,40 @@
 // they share a name and a subtree but are different values, and canxml's
 // is raised in both directions, where this one is decode-only.
 //
-// What a decode failure looks like depends on where it happens:
+// Every failure the input causes comes back from [Unmarshal] and
+// [Decoder.Decode] as a [DecodeError] at the top of the chain, so the type
+// alone no longer tells one failure from another: classify with errors.Is
+// against the sentinels named below, or errors.AsType for a typed cause. The
+// DecodeError's Path is the failing value's JSON Pointer, where the decoder
+// knows it. Its text names the failure's class and the pointer and carries
+// no value from the document, so a log line or an HTTP error body that
+// quotes it carries none either: no number, no string content, no escape
+// sequence or character the tokenizer refused. Member names and `_type`
+// values are structure and do appear, a duplicate member's name and an
+// unknown `_type` included.
+//
+// Its Value holds the JSON text of the value the decoder refused, as the
+// document wrote it, quotes and escapes included, in two cases:
+//
+//   - a number or string of the right JSON kind that its Go type cannot
+//     hold, such as 3.5 for an integer or 2147483648 for an rm.Integer;
+//   - a value one of the SDK's primitive codecs refused: a quoted literal
+//     rm.Real or rm.Integer could not parse, an rm.Real number past its
+//     17-digit budget, and an rm.Character string that is not exactly one
+//     character or number that names no usable code point.
+//
+// Value is empty for any other failure: a value of the wrong JSON kind for
+// its target (a string where a boolean belongs), a string that is not valid
+// base64 for a byte field such as DV_MULTIMEDIA data or integrity_check
+// (encoding/json/v2 records the text of neither), malformed JSON, a dispatch
+// failure, a nesting-depth refusal and an unknown member. Value prints as
+// "[redacted]"; Value.Reveal returns the text. The codec's own error stays
+// reachable beneath the DecodeError, and its own text may name the value.
+// Two errors come back as they are, because the input does not cause them: a
+// read failure of the reader under a [Decoder], and io.EOF from a [Decoder]
+// whose stream holds no further value.
+//
+// What lies beneath that DecodeError depends on where the failure happens:
 //
 //   - Malformed JSON is refused by the tokenizer as the value it
 //     malforms is decoded, except where a value is buffered first: a
@@ -148,10 +181,10 @@
 //     value a [Decoder] given [WithUnmatched] or [WithStrict] reads, so
 //     malformed bytes anywhere inside such a value are reported ahead of a
 //     shape failure inside it.
-//     No sentinel: the codec reports its own syntax or truncated-input
+//     No sentinel: the cause is the codec's own syntax or truncated-input
 //     error (a *jsontext.SyntacticError), except that [Decoder.Decode]
-//     reports an empty stream as io.EOF and a truncated value wraps
-//     io.ErrUnexpectedEOF. Invalid UTF-8 and a lone surrogate escape are
+//     reports an empty stream as io.EOF, unwrapped, and a truncated value
+//     wraps io.ErrUnexpectedEOF. Invalid UTF-8 and a lone surrogate escape are
 //     refused on this same path, before rm.Character sees the bytes, so
 //     they too are malformed input carrying no sentinel. rm.Character's
 //     own string arm relies on that same tokenizer refusal and does not
@@ -161,9 +194,11 @@
 //     cause reachable, so errors.Is finds both the sentinel and
 //     jsontext.ErrDuplicateName (RFC 8259 § 4).
 //   - A polymorphic dispatch failure (a missing, unknown or
-//     mismatched `_type`) arrives as [DecodeError] carrying the path,
+//     mismatched `_type`) is raised as a [DecodeError] carrying the path,
 //     either at a slot or on `/_type` where the whole value's `_type`
-//     names a different class than the target. No sentinel: an
+//     names a different class than the target; it wraps
+//     [typereg.ErrMissingType], [typereg.ErrUnknownType] or
+//     [typereg.ErrTypeMismatch]. No sentinel: an
 //     enclosing type's `canjson: <RM_TYPE>:` funnel does not add one
 //     to a [DecodeError] travelling out through it, so a nested
 //     dispatch failure never turns into a shape error.
@@ -217,9 +252,9 @@
 //     appears in the input, as a JSON Pointer (RFC 6901) from the root of
 //     the value, such as "/content/0/x-note". The decode returns the same
 //     value as the default.
-//   - [WithStrict] refuses the decode at the first one, with an error that
-//     wraps [ErrUnknownMember] and names its pointer. An absent member is
-//     never refused.
+//   - [WithStrict] refuses the decode at the first one, with a
+//     [DecodeError] whose Path is its pointer and which wraps
+//     [ErrUnknownMember]. An absent member is never refused.
 //
 // The options check the members once the decode has succeeded, in a second
 // pass over the same input that reads the RM's own attribute lists. So a

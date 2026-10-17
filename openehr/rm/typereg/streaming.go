@@ -416,11 +416,19 @@ func DecodePolymorphic[T any](dec *jsontext.Decoder, out *T, fallback func() any
 	// `canjson: <Interface>:` rather than a bare colon. [leadingType] reads a
 	// leading `_type` without the peek's decode when nothing can make the two
 	// disagree; any other slot takes the peek.
+	//
+	// The peek runs on a decoder of its own, so the position in its failure
+	// counts from the slot. The [DecodeError] around it marks where the slot
+	// begins, as it does for every other failure at a slot, so the enclosing
+	// decode fills in the slot's position and an entry point reads the
+	// failure's pointer from the document's root (REQ-052). It adds no
+	// classification: the shape failure inside keeps [ErrInvalidShape], and
+	// no dispatch sentinel joins it.
 	opts := dec.Options()
 	name, ok := leadingType(raw, opts)
 	if !ok {
 		if name, err = peekType(raw, opts); err != nil {
-			return WrapShapeError(reflect.TypeFor[T]().Name(), err)
+			return &DecodeError{Inner: WrapShapeError(reflect.TypeFor[T]().Name(), err)}
 		}
 	}
 	var v any

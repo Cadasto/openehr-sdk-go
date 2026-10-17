@@ -12,9 +12,11 @@ import (
 	"encoding/gob"
 	jsonv1 "encoding/json"
 	jsonv2 "encoding/json/v2"
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -223,13 +225,14 @@ func TestREQ168_InstanceIssuesKeepTheValueInValue(t *testing.T) {
 // TestREQ168_DecodeErrorInValue covers the invalid_shape row: input that
 // fails either decode of ValidateRMEHRStatusBytes reports one invalid_shape
 // at "/" whose Value is the decode error. When the EHR_STATUS decode fails
-// on a nested DV_QUANTITY that quotes its magnitude, the error's text quotes
-// the literal, which stays out of every value-free field.
+// on a nested DV_QUANTITY that quotes its magnitude, the error in Value
+// reaches the literal through unwrapping, in the *strconv.NumError beneath
+// it, and the literal stays out of every value-free field.
 func TestREQ168_DecodeErrorInValue(t *testing.T) {
 	cases := []struct {
 		name string
 		data []byte
-		// marker, when set, is a literal the decode error quotes.
+		// marker, when set, is a literal the decode error holds.
 		marker string
 	}{
 		{name: "malformed JSON", data: []byte(`{"_type": "EHR_STATUS",`)},
@@ -250,8 +253,18 @@ func TestREQ168_DecodeErrorInValue(t *testing.T) {
 			if !ok {
 				t.Fatalf("ValidateRMEHRStatusBytes(%s): invalid_shape Value.Reveal() = %T, want an error", tc.data, issue.Value.Reveal())
 			}
-			if !strings.Contains(err.Error(), tc.marker) {
-				t.Errorf("invalid_shape Value.Reveal().Error() = %q, want it to contain the decode literal %q", err.Error(), tc.marker)
+			if tc.marker == "" {
+				return
+			}
+			// The decode error's own text need not name the literal: canjson's
+			// envelope names such a cause by its class. The literal is reached
+			// by unwrapping, which is asking for the value.
+			ne, ok := errors.AsType[*strconv.NumError](err)
+			if !ok || ne == nil {
+				t.Fatalf("invalid_shape Value.Reveal() = %v; want a *strconv.NumError reachable through unwrapping", err)
+			}
+			if ne.Num != tc.marker {
+				t.Errorf("invalid_shape Value.Reveal(): the *strconv.NumError beneath it holds %q, want the decode literal %q", ne.Num, tc.marker)
 			}
 		})
 	}

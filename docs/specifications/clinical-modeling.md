@@ -1099,7 +1099,7 @@ On an `Issue` from the instance validators, `Value` **MUST** hold:
 | `rm_invariant` on a `DV_INTERVAL` whose lower bound is above its upper bound | the two compared magnitudes, lower first, as a `[2]float64` |
 | `rm_invariant` on a temporal `value` (`Value_valid`) | the `value` string |
 | `term_mapping_match` | the `match` |
-| `invalid_shape` from a failed decode | the decode error, whose text may name a literal ([wire.md § REQ-052](wire.md#req-052)) |
+| `invalid_shape` from a failed decode | the decode error, which carries the literal through unwrapping ([wire.md § REQ-052](wire.md#req-052)) |
 
 Every other `Issue` (an absence, a count, a type or identity mismatch, a guard) **MUST** carry an empty `Value`. On an `Issue` from `ValidateAQL` or `ValidateAQLWithTypeRelation`, `Value` **MUST** be empty.
 
@@ -1116,7 +1116,7 @@ Every other `Issue` (an absence, a count, a type or identity mismatch, a guard) 
 
 ### Acceptance
 
-- For each row of § What `Value` holds, a test **MUST** plant a marker value that no constraint text contains, and **MUST** fail when the marker appears in a value-free field or when `Value.Reveal()` does not return what the row names: the marker itself, the pair that holds it, or an error whose text carries it. Restoring a `Detail` that quotes the value **MUST** fail a named test.
+- For each row of § What `Value` holds, a test **MUST** plant a marker value that no constraint text contains, and **MUST** fail when the marker appears in a value-free field or when `Value.Reveal()` does not return what the row names: the marker itself, the pair that holds it, or an error that carries it through unwrapping. Restoring a `Detail` that quotes the value **MUST** fail a named test.
 - The empty-`Value` cases (`CodeWrongType`, an unparseable pattern, an absence, an issue from `ValidateAQL`) **MUST** each be pinned by a named test.
 - A test **MUST** fail when `==` on two `Violation` or `Issue` values panics, when two diagnostics that hold equal values compare unequal, or when `Equal` disagrees with `==`.
 - A test **MUST** fail when `Reveal` returns a NaN, alone or inside an array, as anything but a NaN in the same place, and when `Redacted` gains a method that no test checks for the held value.

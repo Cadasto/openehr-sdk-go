@@ -11,17 +11,19 @@ import (
 // ErrUnknownMember is the sentinel for a member the decode does not read: its
 // name is neither `_type` nor an attribute of the RM type its object decodes
 // as. Such a member is ignored by default. Only a decode given [WithStrict]
-// refuses one: the refusal wraps this sentinel and names the member's JSON
-// Pointer from the root of the value (see [WithUnmatched]). The pointer
-// carries the member's name but none of its value.
+// refuses one: the refusal is a [DecodeError] whose Path is the member's
+// JSON Pointer from the root of the value (see [WithUnmatched]), and it wraps
+// this sentinel. The pointer carries the member's name but none of its
+// value.
 //
 // It is distinct from [ErrInvalidShape] and [ErrInvalidValue]: errors.Is
 // against one of the three never matches an error raised for another.
 var ErrUnknownMember = errors.New("canjson: unknown member")
 
-// unknownMemberError is the [WithStrict] refusal of an unmatched member. It
-// names the member by its JSON Pointer and carries nothing else from the
-// input, so the member's value never reaches the message.
+// unknownMemberError is the [WithStrict] refusal of an unmatched member,
+// the Inner of the [DecodeError] the decode returns. It names the member by
+// its JSON Pointer and carries nothing else from the input, so the member's
+// value never reaches the message.
 type unknownMemberError struct {
 	pointer string
 }
@@ -82,9 +84,10 @@ func WithUnmatched(fn func(pointer string)) DecoderOption {
 
 // WithStrict refuses the decode at its first unmatched member (see
 // [WithUnmatched] for what is unmatched and for the form of its pointer). The
-// error wraps [ErrUnknownMember] and names the member's pointer from the root
-// of the value; it carries none of the member's value. The value v points to
-// is unspecified after the refusal.
+// error is a [DecodeError], as every failure the input causes is, whose Path
+// is the member's pointer from the root of the value; it wraps
+// [ErrUnknownMember], names the pointer in its text and carries none of the
+// member's value. The value v points to is unspecified after the refusal.
 //
 // Strict covers unmatched members only. An absent member is never refused,
 // mandatory or not, and neither is a boundary flag an interval leaves out.
@@ -136,7 +139,7 @@ func (c *decoderConfig) walkUnmatched(data []byte, v any) error {
 			c.unmatched(pointer)
 		}
 		if c.strict {
-			return &unknownMemberError{pointer: pointer}
+			return &DecodeError{Path: pointer, Inner: &unknownMemberError{pointer: pointer}}
 		}
 		return nil
 	})

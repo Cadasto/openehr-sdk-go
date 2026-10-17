@@ -16,10 +16,13 @@ func TestDecodeErrorUnwrapsTyperegSentinel(t *testing.T) {
 	}
 }
 
+// The message names the path, the _type and the cause. The cause is an SDK
+// sentinel, whose text is value-free; an arbitrary cause would be named by
+// its class alone (REQ-052 § Value-free decode errors).
 func TestDecodeErrorMessageIncludesPathAndType(t *testing.T) {
-	de := &DecodeError{Path: "/content/0", Type: "OBSERVATION", Inner: errors.New("inner")}
+	de := &DecodeError{Path: "/content/0", Type: "OBSERVATION", Inner: typereg.ErrUnknownType}
 	msg := de.Error()
-	for _, want := range []string{"/content/0", "OBSERVATION", "inner"} {
+	for _, want := range []string{"/content/0", "OBSERVATION", typereg.ErrUnknownType.Error()} {
 		if !strings.Contains(msg, want) {
 			t.Errorf("DecodeError.Error() = %q; missing substring %q", msg, want)
 		}
