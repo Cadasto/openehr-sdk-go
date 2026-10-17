@@ -115,16 +115,21 @@ func LaunchContextFromTokenResponse(ctx context.Context, tr authsmart.TokenRespo
 		}
 	}
 	lc := &LaunchContext{
-		Patient:           tr.Patient,
-		Encounter:         tr.Encounter,
-		Issuer:            cfg.Issuer,
-		EHRID:             tr.EHRID,
-		EpisodeID:         tr.EpisodeID,
-		Intent:            tr.Intent,
-		SMARTStyleURL:     tr.SMARTStyleURL,
-		NeedPatientBanner: tr.NeedPatientBanner,
-		Tenant:            tr.Tenant,
-		Raw:               maps.Clone(tr.Raw),
+		Patient:       tr.Patient,
+		Encounter:     tr.Encounter,
+		Issuer:        cfg.Issuer,
+		EHRID:         tr.EHRID,
+		EpisodeID:     tr.EpisodeID,
+		Intent:        tr.Intent,
+		SMARTStyleURL: tr.SMARTStyleURL,
+		Tenant:        tr.Tenant,
+		Raw:           maps.Clone(tr.Raw),
+	}
+	// The launch context keeps its own copy of the banner preference, as it
+	// does of the other fields, so an edit through tr's pointer does not
+	// reach it.
+	if tr.NeedPatientBanner != nil {
+		lc.NeedPatientBanner = new(*tr.NeedPatientBanner)
 	}
 	if tr.Scope != "" {
 		lc.Scopes = strings.Fields(tr.Scope)

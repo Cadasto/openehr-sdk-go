@@ -50,7 +50,7 @@ type LaunchContext struct {
 	// NeedPatientBanner is the optional "need_patient_banner" launch-context parameter
 	// (SMART v2). nil means the server did not express a preference, and the caller should
 	// apply the SMART default of showing the patient banner. Non-nil points to the
-	// server's explicit value.
+	// launch context's own copy of the server's explicit value.
 	NeedPatientBanner *bool
 	// Tenant is the optional "tenant" launch-context parameter (SMART v2).
 	Tenant string
