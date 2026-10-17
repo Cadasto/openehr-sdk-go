@@ -760,6 +760,9 @@ type robotFrame struct {
 	// On Failure): an assertion there cannot fail the test.
 	swallow bool
 	depth   int
+	// caller is the frame that called this keyword, nil for a test body or
+	// a suite setup or teardown: a scoped setter reaches its locals too.
+	caller *robotFrame
 }
 
 func (s *robotSuite) unrebuilt(line int, data, reason, detail string) {
@@ -1227,16 +1230,24 @@ func (f *robotFrame) exec(st robotStmt) {
 	}
 }
 
-// setScoped sets a variable in the scope a Set … Variable keyword names.
+// setScoped sets a variable in the scope a Set … Variable keyword names, and,
+// as Robot does, in every scope between the current one and that one: the
+// local scope of the running body and of every keyword call it runs inside,
+// then the test scope, then for the suite scope the suite's. A body that
+// already holds a local of that name reads the new value. The local scope is
+// the current one only.
 func (f *robotFrame) setScoped(scope, name string, v robotValue) {
 	key := robotNormalize(name)
-	switch scope {
-	case "test":
-		f.t.vars[key] = v
-	case "suite":
-		f.t.s.vars[key] = v
-	default:
+	if scope == "local" {
 		f.locals[key] = v
+		return
+	}
+	for g := f; g != nil; g = g.caller {
+		g.locals[key] = v
+	}
+	f.t.vars[key] = v
+	if scope == "suite" {
+		f.t.s.vars[key] = v
 	}
 }
 
@@ -1593,9 +1604,11 @@ func (f *robotFrame) runKeywordIf(line int, args []string) {
 	}
 }
 
-// setVariable runs Set Test, Suite and Local Variable: the name may be
-// written ${x}, \${x} or $x; one value keeps its kind, several make a list,
-// and none promotes the variable's current value.
+// setVariable runs Set Test, Suite, Global and Local Variable: the name may
+// be written ${x}, \${x} or $x; one value keeps its kind, several make a list,
+// and none promotes the variable's current value. Set Global Variable reaches
+// as far as the suite scope: the reader reads one suite at a time, so a value
+// it sets does not reach a suite read later.
 func (f *robotFrame) setVariable(scope string, args []string) {
 	if len(args) == 0 {
 		return
@@ -1689,7 +1702,7 @@ func (f *robotFrame) callUser(kw *robotBlock, args []string, embedded map[string
 	}
 	g := &robotFrame{
 		t: f.t, locals: map[string]robotValue{}, site: f.site,
-		expect: f.expect, cond: f.cond, swallow: f.swallow, depth: f.depth + 1,
+		expect: f.expect, cond: f.cond, swallow: f.swallow, depth: f.depth + 1, caller: f,
 	}
 	maps.Copy(g.locals, embedded)
 	specs := robotArgSpecs(kw)
