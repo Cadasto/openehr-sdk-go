@@ -334,12 +334,13 @@ func TestProbe107ReaderRebuildsTheSuites_REQ109(t *testing.T) {
 	const dataDriven = "*** Settings ***\nLibrary    DataDriver\n" +
 		"...    file=${PROJECT_ROOT}/tests/robot/_resources/w/combinations/t.csv\n...    dialect=excel\n\n"
 	const csvPath = "_resources/w/combinations/t.csv"
-	cases := []struct {
+	type rebuildCase struct {
 		name  string
 		suite string
 		files map[string]string
 		want  []string
-	}{
+	}
+	cases := []rebuildCase{
 		// --- Rebuild: a test case's own query.
 		{
 			name: "set_variable_then_send",
@@ -370,6 +371,30 @@ T
     Send Ad Hoc Request Through GET    ${query}
 `,
 			want: []string{`answered: SELECT c FROM COMPOSITION c WHERE c/uid/value = $id AND c/name/value = 'a\b#c'`},
+		},
+		{
+			// A resolved control character inside the JSON string of a request
+			// body leaves the body undecodable, as the engine would find it;
+			// between JSON tokens it is whitespace, and a printable character
+			// is held as it is.
+			name: "resolved_escape_in_a_json_body",
+			suite: `*** Test Cases ***
+T
+    Set AQL And Execute Ad Hoc Query    SELECT c\nFROM COMPOSITION c
+    Set AQL And Execute Ad Hoc Query    SELECT c${\n}FROM COMPOSITION c
+    PUT /definition/query/{qualified_query_name}    SELECT c\tFROM COMPOSITION c
+    Send Ad Hoc Request    {"q": "SELECT c\rFROM COMPOSITION c"}
+    Send Ad Hoc Request    {\n"q": "SELECT c FROM COMPOSITION c"\t}
+    Set AQL And Execute Ad Hoc Query    SELECT c FROM COMPOSITION c WHERE c/name/value = 'é'
+`,
+			want: []string{
+				"answered: SELECT c FROM COMPOSITION c",
+				"answered: SELECT c FROM COMPOSITION c WHERE c/name/value = 'é'",
+				"unrebuilt " + reasonBodyNotJSON + " (query_expr)",
+				"unrebuilt " + reasonBodyNotJSON + " (query_expr)",
+				"unrebuilt " + reasonBodyNotJSON + " (query_to_store)",
+				"unrebuilt " + reasonBodyNotJSON + " (aql_body)",
+			},
 		},
 		{
 			// Upstream wraps the argument as {"q":"…"} and the engine decodes
@@ -688,8 +713,8 @@ Return
 Template
     [Template]    Set AQL And Execute Ad Hoc Query
     SELECT c FROM COMPOSITION c
-Newline Escape
-    Send Ad Hoc Request Through GET    SELECT c\nFROM COMPOSITION c
+Lone Surrogate
+    Send Ad Hoc Request Through GET    SELECT c FROM COMPOSITION c WHERE c/name/value = '\uD800'
 Path Separator
     Send Ad Hoc Request Through GET    SELECT c FROM COMPOSITION c WHERE c/name/value = 'a${/}b'
 Float Number
@@ -707,7 +732,7 @@ Build Query The Old Way
 				"unrebuilt " + reasonUnsupported + " (RETURN)",
 				"unrebuilt " + reasonUnsupported + " ([Return])",
 				"unrebuilt " + reasonUnsupported + " ([Template])",
-				"unrebuilt " + reasonUnsupported + ` (\n)`,
+				"unrebuilt " + reasonUnsupported + ` (\uD800)`,
 				"unrebuilt " + reasonUnsupported + " (${/})",
 				"unrebuilt " + reasonUnsupported + " (${2.5})",
 			},
@@ -1141,6 +1166,37 @@ B
 				"answered: SELECT p FROM POINT_EVENT p",
 			},
 		},
+	}
+	// One case per escape Robot defines: each sequence makes the character it
+	// names, and any other escaped character stands for itself. The text
+	// sender sends the query as it is, so the rebuild shows the character; a
+	// variable sigil that stands for itself starts no variable.
+	for _, e := range []struct{ name, escape, char string }{
+		{"newline", `\n`, "\n"},
+		{"carriage_return", `\r`, "\r"},
+		{"tab", `\t`, "\t"},
+		{"hex_byte", `\x41`, "A"},
+		{"four_digit_code_point", `é`, "é"},
+		{"eight_digit_code_point", `\U0001F600`, "\U0001F600"},
+		{"newline_built_in", `${\n}`, "\n"},
+		{"dollar", `\${x}`, "${x}"},
+		{"at_sign", `\@{x}`, "@{x}"},
+		{"ampersand", `\&{x}`, "&{x}"},
+		{"percent", `\%{x}`, "%{x}"},
+		{"hash", `\#`, "#"},
+		{"equals", `\=`, "="},
+		{"pipe", `\|`, "|"},
+		{"backslash", `\\`, `\`},
+		{"space", `\ `, " "},
+		{"hex_byte_without_its_digits", `\xZ1`, "xZ1"},
+		{"code_point_beyond_unicode", `\U00110000`, "U00110000"},
+	} {
+		cases = append(cases, rebuildCase{
+			name: "escape_" + e.name,
+			suite: "*** Test Cases ***\nT\n    Send Ad Hoc Request Through GET    " +
+				"SELECT c FROM COMPOSITION c WHERE c/name/value = 'a" + e.escape + "b'\n",
+			want: []string{"answered: SELECT c FROM COMPOSITION c WHERE c/name/value = 'a" + e.char + "b'"},
+		})
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
