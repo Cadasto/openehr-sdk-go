@@ -1,0 +1,10 @@
+${query_nr},${path},${where},${order_by},${expected_file},${nr_of_results}
+1.,cv/uid/value,"WHERE cv/uid/value = '${compo_uid_2_v3}'",ORDER BY cv/uid/value,expected_version_composition_uid_value.json,1
+2.,cv/commit_audit/system_id,"WHERE cv/commit_audit/system_id > '${tenant_id_from_system_id}'",${EMPTY},expected_version_composition_system_id.json,4
+3.,cv/commit_audit/change_type,${EMPTY},${EMPTY},expected_version_composition_change_type.json,4
+4.,cv/commit_audit/change_type/value,"WHERE cv/commit_audit/change_type/value = 'creation'",ORDER BY cv/commit_audit/change_type/value,expected_version_composition_change_type_value.json,1
+5.,cv/commit_audit/change_type/defining_code/code_string,"WHERE cv/commit_audit/change_type/defining_code/code_string = '251'",ORDER BY cv/commit_audit/change_type/defining_code/code_string DESC,expected_version_composition_code_string.json,3
+6.,cv/commit_audit/change_type/defining_code/preferred_term,"WHERE cv/commit_audit/change_type/defining_code/preferred_term = 'creation'",ORDER BY cv/commit_audit/change_type/defining_code/preferred_term,expected_version_composition_preferred_term.json,1
+7.,cv/commit_audit/change_type/defining_code/terminology_id/value,"WHERE cv/commit_audit/change_type/defining_code/terminology_id/value > 'open'",${EMPTY},expected_version_composition_terminology_id_value.json,4
+8.,"cv/uid/value, cv/commit_audit/description","WHERE cv/uid/value = '${compo_uid_1}'",${EMPTY},expected_version_composition_value_description.json,1
+9.,"cv/commit_audit/description/value","WHERE cv/commit_audit/description/value = '<optional audit description>'",ORDER BY cv/commit_audit/description/value ASC,expected_version_composition_audit_description.json,1

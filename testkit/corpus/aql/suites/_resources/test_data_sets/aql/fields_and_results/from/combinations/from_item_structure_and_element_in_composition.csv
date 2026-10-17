@@ -1,0 +1,6 @@
+${type},${expected_file},${nr_of_results}
+ITEM_TREE,expected_from_item_structure_item_tree.json,14
+CLUSTER,expected_from_item_structure_cluster.json,3
+ITEM_STRUCTURE,expected_from_item_structure_item_structure.json,14
+DATA_STRUCTURE,expected_from_item_structure_data_struct.json,15
+ELEMENT,expected_from_item_structure_element.json,68

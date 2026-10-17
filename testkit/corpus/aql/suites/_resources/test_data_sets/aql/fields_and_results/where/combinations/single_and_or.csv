@@ -1,0 +1,7 @@
+${where},${expected_file},${nr_of_results}
+"(e/ehr_id/value = '${ehr_id1}' and c/uid/value = '${c_uid1}')",expected_ehr1_and_compo1.json,1
+"(e/ehr_id/value = '${ehr_id1}' or c/uid/value = '${c_uid1}')",expected_ehr1_or_compo1.json,2
+"(c/uid/value = '${c_uid1}' or c/uid/value = '${c_uid2}')",expected_compo1_or_compo2.json,2
+"(c/uid/value = '${c_uid1}' and c/uid/value = '${c_uid2}')",expected_compo1_and_compo2.json,0
+"(e/ehr_id/value != '${ehr_id1}' and c/uid/value = '${c_uid1}')",expected_not_ehr1_and_compo1.json,0
+"(e/ehr_id/value != '${ehr_id2}' and c/uid/value = '${c_uid1}')",expected_not_ehr2_and_compo1.json,1

@@ -1,0 +1,4 @@
+${statement},${expected_file},${nr_of_results}
+"SELECT o/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.conformance_cluster.v0]/items[at0003]/value/value FROM OBSERVATION o[openEHR-EHR-OBSERVATION.conformance_observation.v0]",expected_null_value_in_select_q1.json,2
+"SELECT o/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.conformance_cluster.v0]/items[at0003]/value/value, o/data[at0001]/events[at0002]/data[at0003]/items[openEHR-EHR-CLUSTER.conformance_cluster.v0]/items[at0005]/value/value FROM OBSERVATION o[openEHR-EHR-OBSERVATION.conformance_observation.v0]",expected_null_value_in_select_q2.json,3
+"SELECT c/items[at0003]/value/value FROM OBSERVATION o[openEHR-EHR-OBSERVATION.conformance_observation.v0] CONTAINS CLUSTER c[openEHR-EHR-CLUSTER.conformance_cluster.v0]",expected_null_value_in_select_q3.json,3

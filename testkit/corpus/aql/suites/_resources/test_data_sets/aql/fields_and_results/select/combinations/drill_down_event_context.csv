@@ -1,0 +1,13 @@
+${path},${expected_file},${nr_of_results}
+c,expected_drill_down_event_context_c.json,1
+c/start_time,expected_drill_down_event_context_c_start_time.json,1
+c/start_time/value,expected_drill_down_event_context_c_start_time_value.json,1
+c/end_time,expected_drill_down_event_context_c_end_time.json,1
+c/end_time/value,expected_drill_down_event_context_c_end_time_value.json,1
+c/location,expected_drill_down_event_context_c_location.json,1
+c/setting,expected_drill_down_event_context_c_setting.json,1
+c/setting/value,expected_drill_down_event_context_c_setting_value.json,1
+c/setting/defining_code/code_string,expected_drill_down_event_context_c_setting_code_string.json,1
+c/setting/defining_code,expected_drill_down_event_context_c_setting_defining_code.json,1
+c/setting/defining_code/terminology_id,expected_drill_down_event_context_c_terminology_id.json,1
+c/setting/defining_code/terminology_id/value,expected_drill_down_event_context_c_terminology_id_value.json,1

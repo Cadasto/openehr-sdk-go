@@ -1,0 +1,2 @@
+${query_nr},${path},${where},${expected_file},${nr_of_results}
+1.,"activities[at0001]/description[at0002]/items[at0003]/value/value","c/uid/value = '${c_uid}' AND i/activities[at0001]/description[at0002]/items[at0003]/value/value > 'P100Y'",expected_test_arbitrary_minimal_instruction_3_q1.json,1

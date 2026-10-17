@@ -1,0 +1,7 @@
+${path},${order},${expected_file},${nr_of_results}
+e/ehr_id/value,ASC,expected_order_by_extr_col_iii_ehr_id1_ehr_id2.json,2
+e/ehr_id/value,DESC,expected_order_by_extr_col_iii_ehr_id2_ehr_id1.json,2
+c/archetype_details/template_id/value,ASC,expected_order_by_extr_col_iii_templ1_templ2.json,2
+c/archetype_details/template_id/value,DESC,expected_order_by_extr_col_iii_templ2_templ1.json,2
+c/uid/value,ASC,expected_order_by_extr_col_iii_c_uid1_c_uid2.json,2
+c/uid/value,DESC,expected_order_by_extr_col_iii_c_uid2_c_uid1.json,2

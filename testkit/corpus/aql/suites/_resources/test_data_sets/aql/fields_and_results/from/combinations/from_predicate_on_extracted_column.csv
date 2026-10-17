@@ -1,0 +1,6 @@
+${type},${predicate},${expected_file},${nr_of_results}
+OBSERVATION,[openEHR-EHR-OBSERVATION.conformance_observation.v0],expected_from_predicate_conformance_observation.json,4
+OBSERVATION,[openEHR-EHR-OBSERVATION.blood_pressure.v2],expected_from_predicate_blood_pressure.json,1
+SECTION,[openEHR-EHR-SECTION.conformance_section.v0],expected_from_predicate_conformance_section.json,1
+SECTION,[openEHR-EHR-SECTION.adhoc.v1],expected_from_predicate_adhoc.json,2
+SECTION,"[openEHR-EHR-SECTION.adhoc.v1,'Section 1']",expected_from_predicate_adhoc_section_1.json,1

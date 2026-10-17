@@ -1,0 +1,5 @@
+${where},${expected_file},${nr_of_results}
+"(e/ehr_id/value = '${ehr_id1}' and (c/uid/value = '${c_uid1}' or c/uid/value = '${c_uid3}'))",expected_chaining_ehr1_and__compo1_or_compo3_ent.json,1
+"((e/ehr_id/value = '${ehr_id1}' and c/uid/value = '${c_uid1}') or c/uid/value = '${c_uid3}')",expected_chaining_ehr1_and_compo1_or_compo3_ent.json,2
+"((e/ehr_id/value = '${ehr_id1}' or e/ehr_id/value = '${ehr_id2}') and (c/uid/value = '${c_uid1}' or c/uid/value = '${c_uid3}'))",expected_chaining_ehr1_or_ehr2__and__compo1_or_compo3_ent.json,2
+"((e/ehr_id/value = '${ehr_id1}' and c/uid/value = '${c_uid1}') or (e/ehr_id/value = '${ehr_id2}' and c/uid/value = '${c_uid4}'))",expected_chaining_ehr1_and_compo1__or__ehr2_and_compo4_ent.json,2

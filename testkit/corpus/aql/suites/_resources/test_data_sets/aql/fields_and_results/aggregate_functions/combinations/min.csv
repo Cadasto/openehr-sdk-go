@@ -1,0 +1,11 @@
+${path},${expected_file},${nr_of_results}
+"o/data[at0001]/events[at0002]/data[at0003]/items[at0004]/value/value",expected_min_at4_val_val.json,1
+"o/data[at0001]/events[at0002]/data[at0003]/items[at0005]/value/value",expected_min_at5_val_val.json,1
+"o/data[at0001]/events[at0002]/data[at0003]/items[at0008]/value/units",expected_min_at8_val_units.json,1
+"o/data[at0001]/events[at0002]/data[at0003]/items[at0008]/value/magnitude",expected_min_at8_val_mag.json,1
+"o/data[at0001]/events[at0002]/data[at0003]/items[at0008]/null_flavour/value",expected_min_at8_null_flavour_val.json,1
+"o/data[at0001]/events[at0002]/data[at0003]/items[at0010]/value/magnitude",expected_min_at10_val_mag.json,1
+"o/data[at0001]/events[at0002]/data[at0003]/items[at0011]/value/value",expected_min_at11_val_val.json,1
+"o/data[at0001]/events[at0002]/data[at0003]/items[at0012]/value/value",expected_min_at12_val_val.json,1
+"o/data[at0001]/events[at0002]/data[at0003]/items[at0013]/value/value",expected_min_at13_val_val.json,1
+"o/data[at0001]/events[at0002]/data[at0003]/items[at0018]/value/value",expected_min_at18_val_val.json,1

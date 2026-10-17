@@ -1,0 +1,4 @@
+${query_nr},${path},${expected_file},${nr_of_results}
+1,o/data[at0001]/events[at0002]/data[at0003]/items[at0004]/value,expected_order_by_unknown_type_at4.json,19
+2,o/data[at0001]/events[at0002]/data[at0003]/items[at0004]/value/value,expected_order_by_unknown_type_at4_1.json,19
+3,o/data[at0001]/events[at0002]/data[at0003]/items[at0004]/value/magnitude,expected_order_by_unknown_type_at4_2.json,19

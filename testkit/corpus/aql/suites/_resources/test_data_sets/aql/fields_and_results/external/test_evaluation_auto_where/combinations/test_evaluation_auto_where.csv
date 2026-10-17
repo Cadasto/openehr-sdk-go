@@ -1,0 +1,30 @@
+${query_nr},${path},${where},${expected_file},${nr_of_results}
+1.,"name/value","c/uid/value = '${c_uid}' AND eval/name/value = 'Test all types'",expected_test_evaluation_auto_where_q1.json,1
+2.,"language/code_string","c/uid/value = '${c_uid}' AND eval/language/code_string = 'en'",expected_test_evaluation_auto_where_q2.json,1
+3.,"language/terminology_id/value","c/uid/value = '${c_uid}' AND eval/language/terminology_id/value = 'ISO_639-1'",expected_test_evaluation_auto_where_q3.json,1
+4.,"data[at0001]/name/value","c/uid/value = '${c_uid}' AND eval/data[at0001]/name/value = 'Arbol'",expected_test_evaluation_auto_where_q4.json,1
+5.,"data[at0001]/items[at0003]/name/value","c/uid/value = '${c_uid}' AND eval/data[at0001]/items[at0003]/name/value = 'interval count'",expected_test_evaluation_auto_where_q5.json,1
+6.,"data[at0001]/items[at0003]/value/lower/magnitude","c/uid/value = '${c_uid}' AND eval/data[at0001]/items[at0003]/value/lower/magnitude = 123",expected_test_evaluation_auto_where_q6.json,1
+7.,"data[at0001]/items[at0003]/value/upper/magnitude","c/uid/value = '${c_uid}' AND eval/data[at0001]/items[at0003]/value/upper/magnitude = 234",expected_test_evaluation_auto_where_q7.json,1
+8.,"data[at0001]/items[at0003]/value/lower_unbounded","c/uid/value = '${c_uid}' AND eval/data[at0001]/items[at0003]/value/lower_unbounded = false",expected_test_evaluation_auto_where_q8.json,1
+9.,"data[at0001]/items[at0003]/value/upper_unbounded","c/uid/value = '${c_uid}' AND eval/data[at0001]/items[at0003]/value/upper_unbounded = false",expected_test_evaluation_auto_where_q9.json,1
+10.,"data[at0001]/items[at0004]/name/value","c/uid/value = '${c_uid}' AND eval/data[at0001]/items[at0004]/name/value = 'interval quantity'",expected_test_evaluation_auto_where_q10.json,1
+11.,"data[at0001]/items[at0004]/value/lower/magnitude","c/uid/value = '${c_uid}' AND eval/data[at0001]/items[at0004]/value/lower/magnitude = 123.123",expected_test_evaluation_auto_where_q11.json,1
+12.,"data[at0001]/items[at0004]/value/lower/units","c/uid/value = '${c_uid}' AND eval/data[at0001]/items[at0004]/value/lower/units = 'mm[H20]'",expected_test_evaluation_auto_where_q12.json,1
+13.,"data[at0001]/items[at0004]/value/upper/magnitude","c/uid/value = '${c_uid}' AND eval/data[at0001]/items[at0004]/value/upper/magnitude = 234.234",expected_test_evaluation_auto_where_q13.json,1
+14.,"data[at0001]/items[at0004]/value/upper/units","c/uid/value = '${c_uid}' AND eval/data[at0001]/items[at0004]/value/upper/units = 'mm[H20]'",expected_test_evaluation_auto_where_q14.json,1
+15.,"data[at0001]/items[at0004]/value/lower_unbounded","c/uid/value = '${c_uid}' AND eval/data[at0001]/items[at0004]/value/lower_unbounded = false",expected_test_evaluation_auto_where_q15.json,1
+16.,"data[at0001]/items[at0004]/value/upper_unbounded","c/uid/value = '${c_uid}' AND eval/data[at0001]/items[at0004]/value/upper_unbounded = false",expected_test_evaluation_auto_where_q16.json,1
+17.,"data[at0001]/items[at0005]/name/value","c/uid/value = '${c_uid}' AND eval/data[at0001]/items[at0005]/name/value = 'interval datetime'",expected_test_evaluation_auto_where_q17.json,1
+18.,"data[at0001]/items[at0005]/value/lower/value","c/uid/value = '${c_uid}' AND eval/data[at0001]/items[at0005]/value/lower/value = '2019-01-28T21:22:49.426Z'",expected_test_evaluation_auto_where_q18.json,1
+19.,"data[at0001]/items[at0005]/value/upper/value","c/uid/value = '${c_uid}' AND eval/data[at0001]/items[at0005]/value/upper/value = '2019-01-28T21:22:49.426Z'",expected_test_evaluation_auto_where_q19.json,1
+20.,"data[at0001]/items[at0005]/value/lower_unbounded","c/uid/value = '${c_uid}' AND eval/data[at0001]/items[at0005]/value/lower_unbounded = false",expected_test_evaluation_auto_where_q20.json,1
+21.,"data[at0001]/items[at0005]/value/upper_unbounded","c/uid/value = '${c_uid}' AND eval/data[at0001]/items[at0005]/value/upper_unbounded = false",expected_test_evaluation_auto_where_q21.json,1
+22.,"data[at0001]/items[at0009]/name/value","c/uid/value = '${c_uid}' AND eval/data[at0001]/items[at0009]/name/value = 'choice'",expected_test_evaluation_auto_where_q22.json,1
+23.,"data[at0001]/items[at0009]/value/magnitude","c/uid/value = '${c_uid}' AND eval/data[at0001]/items[at0009]/value/magnitude = 148.01210165023804",expected_test_evaluation_auto_where_q23.json,1
+24.,"data[at0001]/items[at0009]/value/units","c/uid/value = '${c_uid}' AND eval/data[at0001]/items[at0009]/value/units = 'mm[H20]'",expected_test_evaluation_auto_where_q24.json,1
+25.,"data[at0001]/items[at0006]/name/value","c/uid/value = '${c_uid}' AND eval/data[at0001]/items[at0006]/name/value = 'cluster 1'",expected_test_evaluation_auto_where_q25.json,1
+26.,"data[at0001]/items[at0006]/items[at0007]/name/value","c/uid/value = '${c_uid}' AND eval/data[at0001]/items[at0006]/items[at0007]/name/value = 'cluster 2'",expected_test_evaluation_auto_where_q26.json,1
+27.,"data[at0001]/items[at0006]/items[at0007]/items[at0008]/name/value","c/uid/value = '${c_uid}' AND eval/data[at0001]/items[at0006]/items[at0007]/items[at0008]/name/value = 'cluster 3'",expected_test_evaluation_auto_where_q27.json,1
+28.,"data[at0001]/items[at0006]/items[at0007]/items[at0008]/items[at0010]/name/value","c/uid/value = '${c_uid}' AND eval/data[at0001]/items[at0006]/items[at0007]/items[at0008]/items[at0010]/name/value = 'text 2'",expected_test_evaluation_auto_where_q28.json,1
+29.,"data[at0001]/items[at0006]/items[at0007]/items[at0008]/items[at0010]/value/value","c/uid/value = '${c_uid}' AND eval/data[at0001]/items[at0006]/items[at0007]/items[at0008]/items[at0010]/value/value = 'FViqRjKtFGXm ,iPOYGPuYNjqqVYifvxzvbOlMnuidJvvdYByUiDUgQIBkyOcJtgZcRKdFmyo .TrsPDcaXtFeqLlnZgqdTxb.,LGavIsdXKcBhTWd,PElsLCymSIGcfRrObkevpucVkThYTAZZxcikhpGVaQ.UbyrkwewgarEn gLmIWGLqFZBFYLcBje.GwiYMBoHEEVymGCkyXUyosuq,CNvWsuUnHdVEjEuxGSEwBDEVgwWrXWOYWUCIhos'",expected_test_evaluation_auto_where_q29.json,1

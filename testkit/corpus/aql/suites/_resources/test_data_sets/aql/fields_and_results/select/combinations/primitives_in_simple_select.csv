@@ -1,0 +1,9 @@
+${primitive},${expected_file},${nr_of_results}
+'A',expected_primitives_simple_select_a.json,1
+1,expected_primitives_simple_select_1.json,1
+1.1,expected_primitives_simple_select_1_dot_1.json,1
+'3e102',expected_primitives_simple_select_3e.json,1
+'7.51e10-9',expected_primitives_simple_select_7_51e.json,1
+'${TRUE}',expected_primitives_simple_select_true.json,1
+'2021-12-21T14:19:31.649613+01:00',expected_primitives_simple_select_timestamp.json,1
+NULL,expected_primitives_simple_select_null.json,1

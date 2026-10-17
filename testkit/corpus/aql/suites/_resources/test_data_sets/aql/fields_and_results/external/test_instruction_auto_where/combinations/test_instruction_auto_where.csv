@@ -1,0 +1,11 @@
+${query_nr},${path},${where},${expected_file},${nr_of_results}
+1.,"name/value","c/uid/value = '${c_uid}' AND i/name/value = 'Test all types'",expected_test_instruction_auto_where_q1.json,1
+2.,"language/code_string","c/uid/value = '${c_uid}' AND i/language/code_string = 'en'",expected_test_instruction_auto_where_q2.json,1
+3.,"language/terminology_id/value","c/uid/value = '${c_uid}' AND i/language/terminology_id/value = 'ISO_639-1'",expected_test_instruction_auto_where_q3.json,1
+4.,"activities[at0001]/name/value","c/uid/value = '${c_uid}' AND i/activities[at0001]/name/value = 'Current Activity'",expected_test_instruction_auto_where_q4.json,1
+5.,"activities[at0001]/timing/value","c/uid/value = '${c_uid}' AND i/activities[at0001]/timing/value = 'P1D'",expected_test_instruction_auto_where_q5.json,1
+6.,"activities[at0001]/timing/formalism","c/uid/value = '${c_uid}' AND i/activities[at0001]/timing/formalism = 'ISO8601'",expected_test_instruction_auto_where_q6.json,1
+7.,"activities[at0001]/description[at0002]/items[at0003]/name/value","c/uid/value = '${c_uid}' AND i/activities[at0001]/description[at0002]/items[at0003]/name/value = 'partial date'",expected_test_instruction_auto_where_q7.json,1
+8.,"activities[at0001]/description[at0002]/items[at0003]/value/value","c/uid/value = '${c_uid}' AND i/activities[at0001]/description[at0002]/items[at0003]/value/value = '2019-01-14'",expected_test_instruction_auto_where_q8.json,1
+9.,"activities[at0001]/description[at0002]/items[at0004]/name/value","c/uid/value = '${c_uid}' AND i/activities[at0001]/description[at0002]/items[at0004]/name/value = 'partial datetime'",expected_test_instruction_auto_where_q9.json,1
+10.,"activities[at0001]/description[at0002]/items[at0004]/value/value","c/uid/value = '${c_uid}' AND i/activities[at0001]/description[at0002]/items[at0004]/value/value = '2019-01-28T21:22:49.426Z'",expected_test_instruction_auto_where_q10.json,1

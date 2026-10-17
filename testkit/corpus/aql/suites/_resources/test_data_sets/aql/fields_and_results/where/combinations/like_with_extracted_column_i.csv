@@ -1,0 +1,4 @@
+${like},${expected_file},${nr_of_results}
+'type_repetition_conformance_ehrbase.org',expected_like_compo2.json,1
+'type?repetition?conformance?ehrbase*',expected_like_compo2.json,1
+'*ehrbase*',expected_like_compo1_compo2.json,2
