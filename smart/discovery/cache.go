@@ -13,7 +13,10 @@ import (
 // resolved (ServiceCatalog.BaseURL), never by the OpenID Connect issuer. An
 // entry whose BaseURL is not the base URL it is found under counts as no
 // entry: the Resolver fetches the document with a plain request, as for a
-// miss, and the fetch then replaces or drops it as below.
+// miss, and the fetch then replaces or drops it as below. The key is the
+// base URL exactly as the caller gave it, which can carry a password in its
+// userinfo, so an implementation must not echo the key, as given or
+// escaped, in its errors or logs.
 //
 // Resolvers built with different options may share one Cache, and a Cache
 // may hold entries that no Resolver in this process fetched, such as one
@@ -43,8 +46,17 @@ import (
 // that only the caller's own context ending caused, and a panic in the
 // fetch.
 //
-// The Resolver logs an error from Put or Invalidate at warning level and
-// carries on: it does not reach the caller of Resolve or Refresh. A failed
+// The Resolver calls Put and Invalidate with a context that keeps the values
+// of the caller's context but not its cancellation or deadline, so that the
+// write lands when the caller gives up after the fetch, and that ends 10
+// seconds after the call instead. Callers that resolve the same base URL
+// meanwhile wait for the write, so an implementation that can block, such
+// as a network cache, should return when its context ends.
+//
+// The Resolver logs an error from Put or Invalidate at warning level, with
+// the base URL's password masked wherever the error's text quotes it, as
+// given or escaped, and carries on: it does not reach the caller of Resolve
+// or Refresh. A failed
 // Put or Invalidate leaves the cache as it was, so the next Resolve fetches
 // again unless the entry the cache still holds is fresh. A panic in Put or
 // Invalidate reaches the caller that started the fetch as it was raised, and
@@ -57,7 +69,15 @@ type Cache interface {
 }
 
 // MemoryCache is the default in-process Cache implementation. Safe for
-// concurrent use.
+// concurrent use. The zero value is an empty cache ready to use, the same
+// as one NewMemoryCache returns.
+//
+// A MemoryCache never evicts: an entry stays until a later fetch for its
+// base URL replaces or drops it, so the cache keeps one entry for every base
+// URL ever resolved through it. Check a SMART launch's iss parameter against
+// the Platforms the application trusts before passing it to Resolve:
+// otherwise each launch can name a new URL, which the Resolver then fetches
+// and the cache keeps.
 type MemoryCache struct {
 	mu sync.RWMutex
 	m  map[string]*ServiceCatalog
@@ -83,6 +103,11 @@ func (c *MemoryCache) Put(ctx context.Context, baseURL string, cat *ServiceCatal
 		return err
 	}
 	c.mu.Lock()
+	// A MemoryCache literal has no map until its first Put. Reading and
+	// deleting from a nil map are safe, so Get and Invalidate need none.
+	if c.m == nil {
+		c.m = map[string]*ServiceCatalog{}
+	}
 	c.m[baseURL] = cat
 	c.mu.Unlock()
 	return nil

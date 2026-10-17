@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"cmp"
 	"net/http"
 	"net/url"
 	"strings"
@@ -61,7 +62,12 @@ type Request struct {
 	// space is sent as `%20`, never as `+`.
 	Query url.Values
 	// Headers carries extra caller-supplied headers, merged after
-	// the transport's standard plumbing so callers can override.
+	// the transport's standard plumbing so callers can override it,
+	// with one exception: when the token source returns a token that is
+	// not the zero Token (see auth.Token.IsZero), the Authorization
+	// header made from it replaces one set here. A caller that sends its
+	// own Authorization sets NoAuth, or uses a token source that returns
+	// the zero Token, such as auth.AnonymousTokenSource, the default.
 	Headers http.Header
 	// Body is the pre-marshalled request body. The codec choice is the
 	// caller's responsibility; the transport sets Content-Type from
@@ -114,10 +120,7 @@ type Request struct {
 // routeOrPlaceholder instead (REQ-093): see that doc comment for why the two
 // must not share a fallback.
 func (r *Request) effectiveRoute() string {
-	if r.Route != "" {
-		return r.Route
-	}
-	return r.Path
+	return cmp.Or(r.Route, r.Path)
 }
 
 // unroutedRoute is the stable, value-free placeholder substituted for the
@@ -135,31 +138,19 @@ const unroutedRoute = "(unrouted)"
 // value-free. Every human-readable error surface in this package uses this
 // method instead of effectiveRoute.
 func (r *Request) routeOrPlaceholder() string {
-	if r.Route != "" {
-		return r.Route
-	}
-	return unroutedRoute
+	return cmp.Or(r.Route, unroutedRoute)
 }
 
 func (r *Request) effectiveServiceID() string {
-	if r.ServiceID != "" {
-		return r.ServiceID
-	}
-	return "org.openehr.rest"
+	return cmp.Or(r.ServiceID, "org.openehr.rest")
 }
 
 func (r *Request) effectiveContentType() string {
-	if r.ContentType != "" {
-		return r.ContentType
-	}
-	return "application/json"
+	return cmp.Or(r.ContentType, "application/json")
 }
 
 func (r *Request) effectiveAccept() string {
-	if r.Accept != "" {
-		return r.Accept
-	}
-	return "application/json"
+	return cmp.Or(r.Accept, "application/json")
 }
 
 func (r *Request) effectiveMethod() string {

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -14,8 +16,13 @@ import (
 // TokenResponse is the SMART token-endpoint payload. The
 // application-level smart/ package maps this into LaunchContext.
 type TokenResponse struct {
-	AccessToken  string
-	TokenType    string
+	AccessToken string
+	TokenType   string
+	// ExpiresIn is the response's expires_in, the access token's lifetime
+	// in whole seconds, or 0 when the response has none. An integer is kept
+	// as sent. Any other number, such as 3600.5 or 3.6e3, is rounded down,
+	// and counts as 100 years when larger; one too large for a float64
+	// counts as none.
 	ExpiresIn    int64
 	RefreshToken string
 	Scope        string
@@ -29,8 +36,9 @@ type TokenResponse struct {
 	// [ParseTokenResponse], which verifies nothing.
 	//
 	// smart.LaunchContextFromTokenResponse trusts these claims as they are:
-	// it does not verify them again or check their expiry. Treat them as
-	// read-only; the value is shared with [Source.LastTokenResponse].
+	// it does not verify them again or check their expiry, so pass them on
+	// unchanged. Each TokenResponse a Source hands out has its own copy of
+	// them, so changing one changes neither the source nor another copy.
 	IDTokenClaims *IDTokenClaims
 	// FHIR-compat launch-context claims.
 	Patient   string
@@ -87,11 +95,8 @@ func ParseTokenResponse(body []byte) (TokenResponse, error) {
 		Tenant:            tr.Tenant,
 		Raw:               rawJSONToAny(raw),
 	}
-	if tr.ExpiresIn != "" {
-		sec, err := strconv.ParseInt(string(tr.ExpiresIn), 10, 64)
-		if err == nil {
-			out.ExpiresIn = sec
-		}
+	if secs, ok := expiresInSeconds(string(tr.ExpiresIn)); ok {
+		out.ExpiresIn = secs
 	}
 	return out, nil
 }
@@ -144,6 +149,62 @@ func keepSessionMembers(prev, next TokenResponse) TokenResponse {
 	return next
 }
 
+// cloneTokenResponse returns a copy of tr that shares no map, slice or
+// pointer with tr: Raw is copied all the way down, and IDTokenClaims, with
+// its Audience and Extra, and NeedPatientBanner point to copies of their
+// own. The source keeps and hands out only such copies, so a caller who
+// changes a token response it was given changes neither the source nor
+// another caller's copy, and does not race with a refresh reading the
+// source's own.
+func cloneTokenResponse(tr TokenResponse) TokenResponse {
+	tr.Raw = cloneJSONObject(tr.Raw)
+	if tr.NeedPatientBanner != nil {
+		tr.NeedPatientBanner = new(*tr.NeedPatientBanner)
+	}
+	if tr.IDTokenClaims != nil {
+		claims := *tr.IDTokenClaims
+		claims.Audience = slices.Clone(claims.Audience)
+		claims.Extra = cloneJSONObject(claims.Extra)
+		tr.IDTokenClaims = &claims
+	}
+	return tr
+}
+
+// cloneJSONObject returns a copy of m, an object decoded from JSON, with a
+// copy of each object and array nested in it, so it shares no map or slice
+// with m. A nil m gives nil.
+func cloneJSONObject(m map[string]any) map[string]any {
+	if m == nil {
+		return nil
+	}
+	out := make(map[string]any, len(m))
+	for k, v := range m {
+		out[k] = cloneJSONValue(v)
+	}
+	return out
+}
+
+// cloneJSONValue returns a copy of v, a value decoded from JSON, that
+// shares no map or slice with v. A string, number, bool or null holds
+// nothing to share and is returned as it is.
+func cloneJSONValue(v any) any {
+	switch v := v.(type) {
+	case map[string]any:
+		return cloneJSONObject(v)
+	case []any:
+		if v == nil {
+			return v
+		}
+		out := make([]any, len(v))
+		for i, e := range v {
+			out[i] = cloneJSONValue(e)
+		}
+		return out
+	default:
+		return v
+	}
+}
+
 func rawJSONToAny(raw map[string]json.RawMessage) map[string]any {
 	if len(raw) == 0 {
 		return nil
@@ -160,6 +221,33 @@ func rawJSONToAny(raw map[string]json.RawMessage) map[string]any {
 	return out
 }
 
+// maxExpiresIn is the longest lifetime, in seconds, that an expires_in
+// gives an access token: 100 years. A larger value counts as this one, so
+// that turning it into a time.Duration cannot overflow into an expiry in the
+// past, which would have every call refresh the token.
+const maxExpiresIn = 100 * 365 * 24 * 60 * 60
+
+// expiresInSeconds reads s, the expires_in member of a token response, as
+// whole seconds. RFC 6749 §5.1 makes it "the lifetime in seconds of the
+// access token", a JSON number, so every form of one counts. An integer is
+// read as it is. Any other number, such as 3600.0, 3.6e3, 3600.5 or an
+// integer beyond the int64 range, counts as its whole seconds rounded down,
+// and as maxExpiresIn when it is larger. ok is false when s is not a number,
+// or is one a float64 cannot hold (it reads as NaN or ±Inf).
+func expiresInSeconds(s string) (secs int64, ok bool) {
+	if secs, err := strconv.ParseInt(s, 10, 64); err == nil {
+		return secs, true
+	}
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
+		return 0, false
+	}
+	// Bounding f first keeps the conversion inside the int64 range, where
+	// it is defined. A negative value stays negative, so it gives no
+	// expiry, as a negative integer does.
+	return int64(math.Floor(min(max(f, -maxExpiresIn), maxExpiresIn))), true
+}
+
 func tokenFromResponse(tr TokenResponse, issuer string) auth.Token {
 	tok := auth.Token{
 		Value:  tr.AccessToken,
@@ -168,7 +256,7 @@ func tokenFromResponse(tr TokenResponse, issuer string) auth.Token {
 		Issuer: issuer,
 	}
 	if tr.ExpiresIn > 0 {
-		tok.ExpiresAt = time.Now().Add(time.Duration(tr.ExpiresIn) * time.Second)
+		tok.ExpiresAt = time.Now().Add(time.Duration(min(tr.ExpiresIn, maxExpiresIn)) * time.Second)
 	}
 	return tok
 }

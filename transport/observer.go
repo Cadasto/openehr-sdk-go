@@ -13,24 +13,36 @@ import (
 // metrics, or test assertions.
 type Observation struct {
 	// Method is the HTTP method (canonical upper-case, e.g. "POST").
+	// Empty when Client.Do was given a nil Request.
 	Method string
 	// Route is the path template used for OTel span naming (e.g.
 	// "/ehr/{ehr_id}/composition"). Falls back to Path when the
-	// caller did not supply a Route.
+	// caller did not supply a Route. Empty when Client.Do was given a
+	// nil Request.
 	Route string
-	// URL is the sanitised request URL (query string stripped of
-	// secrets; path preserved).
+	// URL is the request URL with any userinfo (user name and password)
+	// removed. Its path and query are kept as sent, so they can carry
+	// caller-supplied identifiers and any query parameter the service
+	// base URL holds. Empty when the call was refused before the URL was
+	// built.
 	URL string
 	// StatusCode is the final HTTP status returned by the server, or 0
 	// if the call terminated before a response (network error,
-	// ctx-cancellation, token failure). It is set when the status and
-	// headers arrived but the body could not be read.
+	// ctx-cancellation, token failure, or a refusal before any attempt).
+	// It is set when the status and headers arrived but the body could
+	// not be read.
 	StatusCode int
 	// Duration is the total wall-clock time including all retries and
 	// backoff sleeps, that is, the latency of the logical call.
 	Duration time.Duration
-	// Attempts is the number of HTTP attempts actually issued; 1 when
-	// retries were disabled or the first attempt succeeded.
+	// Attempts is the number of times Client.Do tried the request: each
+	// retry and the replay after a re-authentication count, and so does an
+	// attempt that failed before anything reached the server (a request
+	// that cannot be built, a token that could not be obtained). It is 1
+	// when retries were disabled or the first attempt succeeded, and 0 only
+	// when Client.Do refused the call before any attempt: a nil Request, a
+	// context already ended, a service missing from the catalog, or a
+	// path that fails validation.
 	Attempts int
 	// Err is nil on a 2xx outcome whose body was read, and is, or wraps, a
 	// *BodyReadError on a 2xx whose body could not be read. For non-2xx
@@ -87,7 +99,5 @@ func observationTagsFromContext(ctx context.Context) map[string]any {
 	if len(src) == 0 {
 		return nil
 	}
-	out := make(map[string]any, len(src))
-	maps.Copy(out, src)
-	return out
+	return maps.Clone(src)
 }

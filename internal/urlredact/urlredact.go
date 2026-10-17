@@ -5,12 +5,15 @@
 // [String] masks a URL string, and [Error] masks an error url.Parse returned
 // for one: both the URL its *url.Error quotes and what its cause quotes from
 // the password. The masked text still names the scheme, the user name and
-// the host.
+// the host. [Text] masks the password of a URL in any other text, such as
+// the message of an error from code that was handed the URL.
 package urlredact
 
 import (
+	"cmp"
 	"errors"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -81,6 +84,56 @@ func Error(err error, raw string) error {
 		ue.Err = &maskedCause{text: masked, err: ue.Err}
 	}
 	return err
+}
+
+// Text returns text with the password of raw masked wherever text holds it:
+// as raw writes it, and as url.QueryEscape and url.PathEscape write that, the
+// forms a file name or a key made from raw takes. It is for text that may
+// quote something handed raw, such as the message of an error from a cache
+// whose key is raw. Text cannot tell where in text a value came from, so it
+// masks every place text holds one of these forms, including one that is
+// not from raw. When raw has no password, or an empty one, text comes back
+// unchanged.
+//
+// The password is the one String masks: when url.Parse accepts raw, the
+// part of its userinfo after the first ":", and otherwise everything from
+// the first ":" after "//" to the last "@".
+func Text(text, raw string) string {
+	pw, ok := writtenPassword(raw)
+	if !ok || pw == "" {
+		return text
+	}
+	forms := []string{pw, url.QueryEscape(pw), url.PathEscape(pw)}
+	// A Replacer tries its pairs in order at each place in text, so the
+	// longest form goes first and is masked whole when it holds a shorter
+	// one. One pass also leaves the mask itself alone.
+	slices.SortStableFunc(forms, func(a, b string) int { return cmp.Compare(len(b), len(a)) })
+	pairs := make([]string, 0, 2*len(forms))
+	for _, f := range forms {
+		pairs = append(pairs, f, mask)
+	}
+	return strings.NewReplacer(pairs...).Replace(text)
+}
+
+// writtenPassword returns the password of raw as raw writes it, and whether
+// raw has one. When url.Parse accepts raw, its authority ends at the first
+// "/", "?" or "#" after "//", so the password is looked for in raw cut
+// there, and an "@" in the path does not end it.
+func writtenPassword(raw string) (string, bool) {
+	if u, err := url.Parse(raw); err == nil {
+		if _, ok := u.User.Password(); !ok {
+			return "", false
+		}
+		_, rest, _ := strings.Cut(raw, "//")
+		if i := strings.IndexAny(rest, "/?#"); i >= 0 {
+			raw = raw[:len(raw)-len(rest)+i]
+		}
+	}
+	start, end, ok := passwordSpan(raw)
+	if !ok {
+		return "", false
+	}
+	return raw[start:end], true
 }
 
 // maskedCause is url.Parse's cause with the text Error masked.

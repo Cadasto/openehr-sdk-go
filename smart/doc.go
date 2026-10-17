@@ -1,5 +1,6 @@
 // Package smart is the application-level SMART launch surface: a typed
-// [LaunchContext], ID-token claim parsing, and platform principal claims.
+// [LaunchContext], ID-token verification that forwards to auth/smart
+// ([ValidateIDToken], [IDTokenClaims]), and platform principal claims.
 //
 // Distinct from auth/smart, which handles the OAuth2/PKCE flow and
 // returns [authsmart.TokenResponse]. After
@@ -11,7 +12,8 @@
 // the claims the Source verified, and LaunchContextFromTokenResponse trusts
 // them without verifying the ID token again.
 //
-// Service discovery lives in smart/discovery: every typed client
-// resolves its base URL from a ServiceCatalog returned by the
-// discovery resolver.
+// Service discovery lives in smart/discovery: every typed client takes
+// its base URL from a ServiceCatalog, which the discovery resolver fetches
+// from the Platform, or which discovery.NewStaticCatalog builds by hand
+// for a backend that publishes no discovery document.
 package smart

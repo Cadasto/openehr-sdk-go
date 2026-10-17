@@ -179,3 +179,34 @@ func TestWithTrustedAudiencesKeepsItsOwnCopy(t *testing.T) {
 		t.Fatalf("LaunchContextFromTokenResponse(aud [client-id api], trusted [other] then edited to [api]) error = %v, want ErrJWKSValidationFailed", err)
 	}
 }
+
+// TestREQ062_WithIDTokenSigningAlgsKeepsItsOwnCopy checks that changing the
+// caller's slice after building smart.WithIDTokenSigningAlgs does not change
+// the allowlist LaunchContextFromTokenResponse passes to the verification.
+func TestREQ062_WithIDTokenSigningAlgsKeepsItsOwnCopy(t *testing.T) { // REQ-062, REQ-064
+	now := time.Unix(1_700_000_000, 0)
+	priv, body := testRSAKey(t)
+	jwks := idTokenJWKS(t, body)
+	tok := signJWT(t, priv, "test-kid", map[string]any{
+		"iss": "https://issuer.example",
+		"sub": "user-1",
+		"aud": "client-id",
+		"exp": now.Add(time.Hour).Unix(),
+	})
+
+	algs := []string{"ES256"}
+	opt := smart.WithIDTokenSigningAlgs(algs)
+	algs[0] = "RS256"
+	_, err := smart.LaunchContextFromTokenResponse(t.Context(), authsmart.TokenResponse{AccessToken: "at", IDToken: tok},
+		smart.WithJWKS(jwks),
+		smart.WithIssuer("https://issuer.example"),
+		smart.WithClientID("client-id"),
+		smart.WithValidationTime(now),
+		opt,
+	)
+	// The allowlist is the one given when the option was built: ES256 only,
+	// so the RS256 token is refused.
+	if !errors.Is(err, auth.ErrJWKSValidationFailed) {
+		t.Fatalf("LaunchContextFromTokenResponse(RS256 token, algs [ES256] then edited to [RS256]) error = %v, want ErrJWKSValidationFailed", err)
+	}
+}

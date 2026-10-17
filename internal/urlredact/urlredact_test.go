@@ -364,3 +364,107 @@ func parseError(t *testing.T, raw string) *url.Error {
 	}
 	return ue
 }
+
+// TestText pins Text: it masks the password of raw wherever text holds it,
+// as raw writes it and in its url.QueryEscape and url.PathEscape forms, and
+// leaves text unchanged when raw has no password. The password p;a+b is
+// written differently in each of the three forms.
+func TestText(t *testing.T) {
+	t.Parallel()
+	const raw = "https://svc:p;a+b@x.example/t"
+	tests := []struct {
+		name string
+		text string
+		raw  string
+		want string
+	}{
+		{
+			name: "as written",
+			text: "cache: open https://svc:p;a+b@x.example/t: denied",
+			raw:  raw,
+			want: "cache: open https://svc:xxxxx@x.example/t: denied",
+		},
+		{
+			name: "query-escaped",
+			text: "open /c/" + url.QueryEscape(raw) + ": no such file or directory",
+			raw:  raw,
+			want: "open /c/https%3A%2F%2Fsvc%3Axxxxx%40x.example%2Ft: no such file or directory",
+		},
+		{
+			name: "path-escaped",
+			text: "open /c/" + url.PathEscape(raw) + ": no such file or directory",
+			raw:  raw,
+			want: "open /c/https:%2F%2Fsvc:xxxxx@x.example%2Ft: no such file or directory",
+		},
+		{
+			name: "escaped password, query-escaped",
+			text: "key " + url.QueryEscape("https://svc:p%40ss@x.example/") + " refused",
+			raw:  "https://svc:p%40ss@x.example/",
+			want: "key https%3A%2F%2Fsvc%3Axxxxx%40x.example%2F refused",
+		},
+		{
+			// url.Parse reads the userinfo up to the authority's last "@";
+			// an "@" in the path is not part of the password.
+			name: "@ in the path",
+			text: "put https://svc:pw1@x.example/a@b failed",
+			raw:  "https://svc:pw1@x.example/a@b",
+			want: "put https://svc:xxxxx@x.example/a@b failed",
+		},
+		{
+			// url.Parse refuses raw, so the password runs from the first
+			// ":" after "//" to the last "@", as String masks it.
+			name: "refused URL",
+			text: "open " + url.QueryEscape("https://svc:top/secret@x.example/t") + ": denied; key https://svc:top/secret@x.example/t",
+			raw:  "https://svc:top/secret@x.example/t",
+			want: "open https%3A%2F%2Fsvc%3Axxxxx%40x.example%2Ft: denied; key https://svc:xxxxx@x.example/t",
+		},
+		{
+			// The password pw% as written is the start of its escaped
+			// form pw%25, which must be masked whole.
+			name: "written form starts the escaped form",
+			text: "open /c/" + url.QueryEscape("https://svc:pw%@x.example/") + ": denied",
+			raw:  "https://svc:pw%@x.example/",
+			want: "open /c/https%3A%2F%2Fsvc%3Axxxxx%40x.example%2F: denied",
+		},
+		{
+			// text cannot tell where it took a value from, so every place
+			// it holds the password is masked.
+			name: "password is a substring of other text",
+			text: "admin: open /admin/" + url.QueryEscape("https://svc:admin@x.example/") + ": denied",
+			raw:  "https://svc:admin@x.example/",
+			want: "xxxxx: open /xxxxx/https%3A%2F%2Fsvc%3Axxxxx%40x.example%2F: denied",
+		},
+		{
+			name: "no password",
+			text: "open https://svc@x.example/t: svc denied",
+			raw:  "https://svc@x.example/t",
+			want: "open https://svc@x.example/t: svc denied",
+		},
+		{
+			name: "empty password",
+			text: "open https://svc:@x.example/t: denied",
+			raw:  "https://svc:@x.example/t",
+			want: "open https://svc:@x.example/t: denied",
+		},
+		{
+			name: "no userinfo",
+			text: "open https://x.example/t: denied",
+			raw:  "https://x.example/t",
+			want: "open https://x.example/t: denied",
+		},
+		{
+			name: "not a URL",
+			text: "cache down",
+			raw:  "not a url",
+			want: "cache down",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := urlredact.Text(tc.text, tc.raw); got != tc.want {
+				t.Errorf("Text(%q, %q) =\n %q\nwant\n %q", tc.text, tc.raw, got, tc.want)
+			}
+		})
+	}
+}
