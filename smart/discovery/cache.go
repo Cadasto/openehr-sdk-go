@@ -71,6 +71,13 @@ type Cache interface {
 // MemoryCache is the default in-process Cache implementation. Safe for
 // concurrent use. The zero value is an empty cache ready to use, the same
 // as one NewMemoryCache returns.
+//
+// A MemoryCache never evicts: an entry stays until a later fetch for its
+// base URL replaces or drops it, so the cache keeps one entry for every base
+// URL ever resolved through it. Check a SMART launch's iss parameter against
+// the Platforms the application trusts before passing it to Resolve:
+// otherwise each launch can name a new URL, which the Resolver then fetches
+// and the cache keeps.
 type MemoryCache struct {
 	mu sync.RWMutex
 	m  map[string]*ServiceCatalog

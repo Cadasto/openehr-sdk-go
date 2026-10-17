@@ -71,7 +71,7 @@ const (
 )
 
 // DiscoveryError is the typed error every discovery failure surfaces
-// as. Distinguish from transport.WireError via errors.As.
+// as. Distinguish from transport.WireError via errors.AsType.
 type DiscoveryError struct {
 	// Issuer is the Platform base URL the resolution was for: the URL
 	// passed to Resolver.Resolve or Resolver.Refresh, or the base URL of a

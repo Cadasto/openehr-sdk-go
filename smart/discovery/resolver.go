@@ -31,8 +31,8 @@ const SpecVersionPin = "1.1.0"
 // WithWellKnownPath when constructing the Resolver.
 const WellKnownPath = "/.well-known/smart-configuration"
 
-// DefaultTTL is applied when the discovery document does not advertise
-// an explicit Cache-Control max-age.
+// DefaultTTL is applied when the response to a discovery fetch carries no
+// positive Cache-Control max-age.
 const DefaultTTL = 15 * time.Minute
 
 // openIDConfigurationPath is the OpenID Connect discovery path, appended
@@ -60,6 +60,9 @@ const cacheWriteTimeout = 10 * time.Second
 // A single Resolver instance is safe for concurrent use across many
 // goroutines; concurrent Resolve()/Refresh() calls for the same base URL
 // coalesce around one in-flight fetch.
+//
+// The zero Resolver is not usable: it has no HTTP client and no cache.
+// Construct one with NewResolver.
 type Resolver struct {
 	cfg   resolverConfig
 	cache Cache
@@ -141,8 +144,11 @@ func WithAcceptedSpecVersions(versions ...string) Option {
 	}
 }
 
-// WithDefaultTTL overrides the cache TTL applied when the discovery
-// document does not advertise one.
+// WithDefaultTTL overrides DefaultTTL, the cache TTL applied when the
+// response to a discovery fetch carries no positive Cache-Control max-age.
+// A d of 0 or less means such a catalog never expires: its ExpiresAt is
+// the zero time, so Resolve keeps returning it from the cache until Refresh
+// fetches it again.
 func WithDefaultTTL(d time.Duration) Option {
 	return func(cfg *resolverConfig) { cfg.defaultTTL = d }
 }
@@ -196,7 +202,9 @@ func NewResolver(cache Cache, opts ...Option) (*Resolver, error) {
 		}
 	}
 	if cfg.httpClient == nil {
-		return nil, fmt.Errorf("discovery: %w", &DiscoveryError{Reason: ReasonFetchFailed, Inner: errors.New("HTTPClient is required (REQ-021)")})
+		// REQ-021: the caller supplies the client. The DiscoveryError's own
+		// text starts with "discovery: ", so it is returned as it is.
+		return nil, &DiscoveryError{Reason: ReasonFetchFailed, Inner: errors.New("HTTPClient is required")}
 	}
 	if cfg.logger == nil {
 		cfg.logger = slog.Default()
@@ -769,9 +777,13 @@ func joinURL(rawBase, path string) (*url.URL, error) {
 	return doc, nil
 }
 
-// computeExpiry inspects Cache-Control max-age and falls through to the
-// configured default. Per RFC 7234 the max-age directive overrides
-// Expires.
+// computeExpiry returns when a catalog resolved at now expires. It reads only
+// the max-age directive of Cache-Control (RFC 9111 §5.2.2.1): a positive
+// max-age gives now plus that many seconds. Otherwise, when there is no
+// max-age, or it is 0 or does not parse, fallback applies: now plus
+// fallback, or the zero time, which never expires, when fallback is 0 or
+// negative. Expires, Age and the other Cache-Control directives, no-store
+// and no-cache included, are not read.
 func computeExpiry(h http.Header, fallback time.Duration, now time.Time) time.Time {
 	cc := h.Get("Cache-Control")
 	if cc != "" {
