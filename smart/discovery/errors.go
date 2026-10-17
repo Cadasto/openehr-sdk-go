@@ -15,10 +15,11 @@ const (
 	// could not be retrieved (network error, non-2xx HTTP status, or a
 	// 304 Not Modified the resolver did not ask for). It also covers an
 	// issuer's OpenID configuration document that could not be retrieved
-	// or read, or that names no issuer.
+	// or read, is longer than 1 MiB (1048576 bytes), or names no issuer.
 	ReasonFetchFailed DiscoveryErrorReason = "fetch_failed"
 	// ReasonParseError indicates the response body could not be parsed
-	// as a SMART configuration document.
+	// as a SMART configuration document, or is longer than the 1 MiB
+	// (1048576 bytes) the resolver reads of one.
 	ReasonParseError DiscoveryErrorReason = "parse_error"
 	// ReasonMissingService indicates a required service identifier is
 	// absent from the catalog. MissingServices enumerates which.

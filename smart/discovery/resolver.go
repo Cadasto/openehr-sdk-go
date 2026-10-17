@@ -39,8 +39,11 @@ const DefaultTTL = 15 * time.Minute
 // to the issuer's own path (OpenID Connect Discovery 1.0 §4).
 const openIDConfigurationPath = "/.well-known/openid-configuration"
 
-// maxDocumentBytes caps how much of a discovery document the resolver
-// reads.
+// maxDocumentBytes caps the size of a SMART configuration or an OpenID
+// configuration the resolver accepts. It reads one byte more, so that a
+// longer document fails with an error that names its size instead of being
+// cut short into JSON that does not parse. The failure keeps the reason an
+// unparsable document of the same kind gets.
 const maxDocumentBytes = 1 << 20
 
 // cacheWriteTimeout bounds the Cache write that records a fetch's result.
@@ -558,9 +561,12 @@ func (r *Resolver) fetch(ctx context.Context, baseURL string, cached *ServiceCat
 		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonFetchFailed, Inner: fmt.Errorf("discovery fetch returned %d", resp.StatusCode)}
 	}
 	r.warnPlaintextDocument(baseURL, req, resp)
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxDocumentBytes))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxDocumentBytes+1))
 	if err != nil {
 		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonFetchFailed, Inner: err}
+	}
+	if len(body) > maxDocumentBytes {
+		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonParseError, Inner: fmt.Errorf("SMART configuration exceeds %d bytes", maxDocumentBytes)}
 	}
 	var wire smartConfigWire
 	if err := json.Unmarshal(body, &wire); err != nil {
@@ -702,9 +708,12 @@ func (r *Resolver) checkOpenIDConfiguration(ctx context.Context, cat *ServiceCat
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fail(ReasonFetchFailed, fmt.Errorf("openid-configuration fetch returned %d", resp.StatusCode))
 	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxDocumentBytes))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxDocumentBytes+1))
 	if err != nil {
 		return fail(ReasonFetchFailed, err)
+	}
+	if len(body) > maxDocumentBytes {
+		return fail(ReasonFetchFailed, fmt.Errorf("openid-configuration exceeds %d bytes", maxDocumentBytes))
 	}
 	var doc struct {
 		Issuer  string `json:"issuer"`
