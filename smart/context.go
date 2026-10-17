@@ -1,6 +1,10 @@
 package smart
 
-import "context"
+import (
+	"context"
+	"log/slog"
+	"maps"
+)
 
 type launchContextKey struct{}
 
@@ -48,8 +52,64 @@ type LaunchContext struct {
 	Tenant string
 	// Raw is a defensive shallow copy of the token-response raw map;
 	// nested values are not deep-copied. Mutating it does not affect the
-	// originating TokenResponse.
+	// originating TokenResponse. Raw holds the token-endpoint members
+	// verbatim, the access, refresh and ID tokens included, so it must not
+	// be printed or logged as it is; log the LaunchContext itself, whose
+	// LogValue masks them.
 	Raw map[string]any
+}
+
+// LogValue lets log/slog log lc, or a pointer to it, without its tokens. It
+// logs the fields of lc as a group, keyed by field name, with Raw and
+// Principal's Raw as copies whose access_token, refresh_token and id_token
+// members keep their keys but have their values replaced by the same fixed
+// marker. lc itself is not changed. A nil *LaunchContext has no value to
+// call LogValue on, so slog logs that LogValue panicked in its place; check
+// a pointer for nil before logging it.
+func (lc LaunchContext) LogValue() slog.Value {
+	principal := slog.Any("Principal", nil)
+	if lc.Principal != nil {
+		principal = slog.Attr{Key: "Principal", Value: lc.Principal.LogValue()}
+	}
+	banner := slog.Any("NeedPatientBanner", nil)
+	if lc.NeedPatientBanner != nil {
+		banner = slog.Bool("NeedPatientBanner", *lc.NeedPatientBanner)
+	}
+	return slog.GroupValue(
+		slog.String("Patient", lc.Patient),
+		slog.String("Encounter", lc.Encounter),
+		slog.String("User", lc.User),
+		slog.Any("Scopes", lc.Scopes),
+		slog.Any("IDToken", lc.IDToken),
+		slog.String("Issuer", lc.Issuer),
+		principal,
+		slog.String("EHRID", lc.EHRID),
+		slog.String("EpisodeID", lc.EpisodeID),
+		slog.String("Intent", lc.Intent),
+		slog.String("SMARTStyleURL", lc.SMARTStyleURL),
+		banner,
+		slog.String("Tenant", lc.Tenant),
+		slog.Any("Raw", maskedTokens(lc.Raw)),
+	)
+}
+
+// tokenMembers are the token-endpoint members that carry a credential
+// (RFC 6749 §5.1; OpenID Connect Core 1.0 §3.1.3.3).
+var tokenMembers = [...]string{"access_token", "refresh_token", "id_token"}
+
+// tokenMask stands in for the value of a token member in a log line.
+const tokenMask = "[REDACTED]"
+
+// maskedTokens returns a shallow copy of raw whose token members, when
+// present, hold tokenMask. A nil raw gives nil.
+func maskedTokens(raw map[string]any) map[string]any {
+	masked := maps.Clone(raw)
+	for _, k := range tokenMembers {
+		if _, ok := masked[k]; ok {
+			masked[k] = tokenMask
+		}
+	}
+	return masked
 }
 
 // WithLaunchContext attaches lc to ctx for downstream handlers.
