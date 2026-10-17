@@ -89,7 +89,7 @@ var conformanceRootFiles = []string{"AQL_SOURCE.txt", "EXCLUDED.txt"}
 // suite that consumes it.
 type conformanceSuite struct {
 	// Family is the corpus family directory, which is the upstream
-	// AQL_TESTS/FROM/<FAMILY>/ directory the consuming suite lives in.
+	// tests/robot/AQL/FROM/<FAMILY>/ directory the consuming suite lives in.
 	Family string
 	// File is the CSV basename inside that family directory.
 	File string
