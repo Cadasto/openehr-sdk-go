@@ -64,7 +64,7 @@ func TestQuotedLiteralRefusal_REQ052_CarriesTheLiteral(t *testing.T) {
 			if err.Error() != tc.message {
 				t.Errorf("UnmarshalJSON(%s) = %q; want %q", tc.in, err, tc.message)
 			}
-			if got := strings.Count(err.Error(), strings.Trim(strings.ReplaceAll(tc.in, `.`, "."), `"`)); got != 1 {
+			if got := strings.Count(err.Error(), strings.Trim(tc.in, `"`)); got != 1 {
 				t.Errorf("UnmarshalJSON(%s) = %q names the literal %d times; want once, in the cause", tc.in, err, got)
 			}
 			if _, ok := errors.AsType[*strconv.NumError](err); !ok {

@@ -10,11 +10,12 @@ import (
 )
 
 // TestQuotedLiteralParseErrorNamesTheLiteralOnce pins wire.md § REQ-052
-// "Causes may name the literal": the *strconv.NumError beneath a quoted-arm
-// parse failure already quotes the offending literal, so the codec's own
-// prefix must not repeat it. Restoring the former `parse %q: %w` wrap fails
-// this test with a count of two; dropping the %w wrap fails the errors.AsType
-// arm.
+// "Value-free decode errors", the rule that a codec's own prefix must not
+// repeat a value the wrapped cause already carries: the *strconv.NumError
+// beneath a quoted-arm parse failure already quotes the offending literal, so
+// the codec's own prefix must not repeat it. Restoring the former
+// `parse %q: %w` wrap fails this test with a count of two; dropping the %w
+// wrap fails the errors.AsType arm.
 func TestQuotedLiteralParseErrorNamesTheLiteralOnce(t *testing.T) { // REQ-052
 	t.Parallel()
 	cases := []struct {

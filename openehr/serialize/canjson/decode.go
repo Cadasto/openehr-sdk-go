@@ -211,7 +211,7 @@ func Unmarshal(data []byte, v any, opts ...DecoderOption) error {
 // [encoding/json/v2.UnmarshalDecode].
 type Decoder struct {
 	dec *jsontext.Decoder
-	src *readRecorder // nil when r cannot fail on its own
+	src *readRecorder // nil when r is nil or a *bytes.Buffer, the readers NewDecoder does not wrap
 	cfg decoderConfig
 }
 
