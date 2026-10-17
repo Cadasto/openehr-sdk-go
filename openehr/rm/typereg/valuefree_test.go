@@ -95,6 +95,12 @@ func TestDecodeError_REQ052_TextCarriesNoValue(t *testing.T) {
 			absent: []string{"3.5", "rm.Real"},
 		},
 		{
+			name:   "a suffix that is not an SDK codec's, after a sentinel",
+			cause:  fmt.Errorf("%w: got %s", typereg.ErrUnknownType, "Jane"),
+			keep:   []string{"decode /a: typereg: _type not in registry"},
+			absent: []string{"Jane"},
+		},
+		{
 			name:   "an SDK codec's message",
 			cause:  errors.New("rm.Real: literal carries more than 17 significant decimal digits"),
 			keep:   []string{"decode /a: rm.Real: literal carries more than 17 significant decimal digits"},
