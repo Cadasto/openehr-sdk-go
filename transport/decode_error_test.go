@@ -261,8 +261,15 @@ func TestDecodeErrorStringIsValueFree(t *testing.T) { // REQ-151
 	if inner == nil {
 		t.Fatal("DecodeError.Unwrap() = nil; this test needs the decoder error it is guarding against echoing")
 	}
-	if !strings.Contains(inner.Error(), phiMarker) {
-		t.Fatalf("the decoder error %q does not embed %q; the premise of this guard — a codec message that carries payload values — is gone", inner, phiMarker)
+	// The codec message that carries the payload is the leaf of the chain:
+	// canjson names a cause like it by its class alone in its own text, so
+	// the payload is reached by unwrapping, not read off inner.
+	leaf := inner
+	for next := errors.Unwrap(leaf); next != nil; next = errors.Unwrap(leaf) {
+		leaf = next
+	}
+	if !strings.Contains(leaf.Error(), phiMarker) {
+		t.Fatalf("the codec error at the end of the chain, %q, does not embed %q; the premise of this guard — a codec message that carries payload values — is gone", leaf, phiMarker)
 	}
 
 	got := de.Error()
@@ -282,11 +289,14 @@ func TestDecodeErrorStringIsValueFree(t *testing.T) { // REQ-151
 	if strings.Contains(got, inner.Error()) {
 		t.Errorf("Error() = %q interpolates the wrapped decoder's text; REQ-151 forbids it", got)
 	}
+	if strings.Contains(got, leaf.Error()) {
+		t.Errorf("Error() = %q interpolates the codec's own text; REQ-151 forbids it", got)
+	}
 
-	// And every distinctive word of either, so a partial echo is caught too.
+	// And every distinctive word of any of them, so a partial echo is caught too.
 	var e *transport.DecodeError // typed nil: the value-free template, with no method or route in it
 	allowed := words(e.Error() + " " + method + " " + route)
-	for _, src := range []string{body, inner.Error()} {
+	for _, src := range []string{body, inner.Error(), leaf.Error()} {
 		for w := range words(src) {
 			if _, ok := allowed[w]; ok {
 				continue
