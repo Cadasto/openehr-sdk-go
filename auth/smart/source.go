@@ -112,11 +112,10 @@ type TokenChange struct {
 	// exchange and, after a refresh, the one the source held before.
 	RefreshToken string
 	// Response is the token response as [Source.LastTokenResponse] returns
-	// it, so a refresh response's left-out launch context is filled in. Its
-	// Raw map is a copy of the source's top level, so adding, replacing or
-	// deleting a key of it does not reach the source. Values nested inside Raw (a fhirContext
-	// object, for example), IDTokenClaims and NeedPatientBanner are shared
-	// with the source: treat them as read-only.
+	// it, so a refresh response's left-out launch context is filled in. It
+	// is the hook's own copy, as deep as LastTokenResponse's: changing it,
+	// down to a value nested inside Raw, the IDTokenClaims or
+	// NeedPatientBanner, does not reach the source.
 	Response TokenResponse
 }
 
@@ -355,15 +354,15 @@ func (s *Source) Format(f fmt.State, _ rune) { _, _ = io.WriteString(f, s.String
 
 // queueChangeLocked records change for the token-change hook, with the
 // context of the call that made it. The hook runs without s.mu, so it gets
-// its own copy of the response's Raw map. The caller holds s.mu, has
-// installed the change under it, and calls deliverChanges once it has
-// released s.mu.
+// its own copy of the response, which shares nothing with the source's. The
+// caller holds s.mu, has installed the change under it, and calls
+// deliverChanges once it has released s.mu.
 func (s *Source) queueChangeLocked(ctx context.Context, change TokenChange) {
 	hook := s.cfg.tokenChange
 	if hook == nil {
 		return
 	}
-	change.Response.Raw = maps.Clone(change.Response.Raw)
+	change.Response = cloneTokenResponse(change.Response)
 	s.changes = append(s.changes, func() { hook(ctx, change) })
 }
 
@@ -840,7 +839,8 @@ func (s *Source) AuthorizeURL(req AuthorizationRequest, launch string) (string, 
 // running from the earlier session has its result discarded.
 //
 // The returned [TokenResponse] also carries the SMART launch parameters
-// for smart/.
+// for smart/. It is the caller's own: the source keeps a copy of it that
+// shares no map, slice or pointer with it.
 func (s *Source) ExchangeAuthorizationCode(ctx context.Context, code string, callbackState string, req AuthorizationRequest) (auth.Token, TokenResponse, error) {
 	if req.State == "" || req.PKCE.Verifier == "" {
 		return auth.Token{}, TokenResponse{}, fmt.Errorf("%w: AuthorizationRequest from BeginAuthorization is required", auth.ErrInvalidConfig)
@@ -864,7 +864,9 @@ func (s *Source) ExchangeAuthorizationCode(ctx context.Context, code string, cal
 	s.mu.Lock()
 	s.session++
 	s.setTokensLocked(tok, refresh)
-	s.lastTR = tr
+	// The source keeps its own copy, so the caller may change the tr it is
+	// returned.
+	s.lastTR = cloneTokenResponse(tr)
 	// A new authorization starts a new session: without an ID token there
 	// is nothing to bind a refresh to.
 	s.idBinding = bindingOf(tr.IDTokenClaims)
@@ -907,10 +909,15 @@ func (s *Source) verifyIDToken(ctx context.Context, raw, nonce string) (*IDToken
 //
 // After [Source.Revoke] it is the zero value until a code exchange or a
 // refresh succeeds.
+//
+// The result is the caller's own copy: it shares no map, slice or pointer
+// with the source, down to the values nested inside Raw, the IDTokenClaims
+// and NeedPatientBanner, so changing it changes neither the source nor what
+// the source returns afterwards.
 func (s *Source) LastTokenResponse() TokenResponse {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.lastTR
+	return cloneTokenResponse(s.lastTR)
 }
 
 // SetTokens seeds access and optional refresh tokens (testing / token import).

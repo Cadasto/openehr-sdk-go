@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"slices"
 	"sync"
 	"testing"
@@ -177,8 +178,8 @@ func TestExchangeVerifiesIDToken(t *testing.T) { // REQ-064
 	if c.Subject != "user-1" || c.Issuer != oidcIssuer || c.Nonce != req.Nonce || !slices.Equal(c.Audience, []string{"client-id"}) {
 		t.Errorf("IDTokenClaims = %+v, want sub user-1, iss %s, aud [client-id], nonce %q", c, oidcIssuer, req.Nonce)
 	}
-	if last := src.LastTokenResponse(); last.IDTokenClaims != c {
-		t.Errorf("LastTokenResponse().IDTokenClaims = %p, want the returned claims %p", last.IDTokenClaims, c)
+	if last := src.LastTokenResponse(); !reflect.DeepEqual(last.IDTokenClaims, c) {
+		t.Errorf("LastTokenResponse().IDTokenClaims = %+v, want the returned claims %+v", last.IDTokenClaims, c)
 	}
 	if access, refresh := src.HeldTokens(); access.Value != "at-1" || refresh != "rt-1" {
 		t.Errorf("held tokens = %q, %q; want at-1, rt-1", access.Value, refresh)
