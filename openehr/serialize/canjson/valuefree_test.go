@@ -179,17 +179,18 @@ func TestUnmarshal_REQ052_ValueFreeDecodeErrors(t *testing.T) {
 // canjson.Unmarshal, and with a canjson.Decoder in every decode mode,
 // Value.Reveal() returns the refused literal, as the document wrote it, for an
 // rm.Real number past its digit budget and for a two-character value
-// rm.Character refuses, and nothing for a value of the wrong JSON kind. In
-// every case Error() names the pointer and carries none of the document's
-// values.
+// rm.Character refuses, and nothing for a value of the wrong JSON kind or for
+// a DV_MULTIMEDIA byte field whose string is not valid base64. In every case
+// Error() names the pointer and carries none of the document's values.
 //
 // Can-fail control: return rm.Real's digit-budget refusal or rm.Character's
 // one-character refusal without the literal and the matching rows' Value
 // assertions fail.
 func TestUnmarshal_REQ052_PrimitiveRefusalsKeepTheLiteralInValue(t *testing.T) {
 	const (
-		mappings = `{"_type":"DV_TEXT","value":"a","mappings":[{"_type":"TERM_MAPPING","match":`
-		mapped   = `,"target":{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"SNOMED-CT"},"code_string":"73211009"}}]}`
+		mappings   = `{"_type":"DV_TEXT","value":"a","mappings":[{"_type":"TERM_MAPPING","match":`
+		mapped     = `,"target":{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"SNOMED-CT"},"code_string":"73211009"}}]}`
+		multimedia = `{"_type":"DV_MULTIMEDIA","media_type":{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"IANA_media-types"},"code_string":"text/plain"},"size":3,`
 	)
 	cases := []struct {
 		name    string
@@ -242,6 +243,20 @@ func TestUnmarshal_REQ052_PrimitiveRefusalsKeepTheLiteralInValue(t *testing.T) {
 			in:      mappings + `true` + mapped,
 			targets: concreteAndSlot(func() any { return new(rm.DVText) }),
 			pointer: "/mappings/0/match",
+		},
+		{
+			name:    "a DV_MULTIMEDIA data string that is not valid base64",
+			in:      multimedia + `"data":"not base64!"}`,
+			targets: concreteAndSlot(func() any { return new(rm.DVMultimedia) }),
+			pointer: "/data",
+			absent:  []string{"not base64!"},
+		},
+		{
+			name:    "a DV_MULTIMEDIA integrity_check string that is not valid base64",
+			in:      multimedia + `"integrity_check":"Ωq§"}`,
+			targets: concreteAndSlot(func() any { return new(rm.DVMultimedia) }),
+			pointer: "/integrity_check",
+			absent:  []string{"Ωq§", "Ω", "§"},
 		},
 	}
 	for _, tc := range cases {

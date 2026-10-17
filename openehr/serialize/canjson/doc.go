@@ -163,7 +163,9 @@
 //     character.
 //
 // Value is empty for any other failure: a value of the wrong JSON kind for
-// its target (a string where a boolean belongs), malformed JSON, a dispatch
+// its target (a string where a boolean belongs), a string that is not valid
+// base64 for a byte field such as DV_MULTIMEDIA data or integrity_check
+// (encoding/json/v2 records the text of neither), malformed JSON, a dispatch
 // failure, a nesting-depth refusal and an unknown member. Value prints as
 // "[redacted]"; Value.Reveal returns the text. The codec's own error stays
 // reachable beneath the DecodeError, and its own text may name the value.
