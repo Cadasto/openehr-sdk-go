@@ -46,6 +46,13 @@ import (
 // that only the caller's own context ending caused, and a panic in the
 // fetch.
 //
+// The Resolver calls Put and Invalidate with a context that keeps the values
+// of the caller's context but not its cancellation or deadline, so that the
+// write lands when the caller gives up after the fetch, and that ends 10
+// seconds after the call instead. Callers that resolve the same base URL
+// meanwhile wait for the write, so an implementation that can block, such
+// as a network cache, should return when its context ends.
+//
 // The Resolver logs an error from Put or Invalidate at warning level, with
 // the base URL's password masked wherever the error's text quotes it, as
 // given or escaped, and carries on: it does not reach the caller of Resolve

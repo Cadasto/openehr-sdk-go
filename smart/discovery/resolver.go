@@ -43,6 +43,14 @@ const openIDConfigurationPath = "/.well-known/openid-configuration"
 // reads.
 const maxDocumentBytes = 1 << 20
 
+// cacheWriteTimeout bounds the Cache write that records a fetch's result.
+// The write runs without the caller's cancellation and deadline, so that it
+// lands when the caller gives up after the fetch, and the call stays in
+// flight until it returns; without a bound of its own, a Cache that honours
+// its context but cannot finish would hold the starter and every caller
+// joined to it for as long as it hangs.
+const cacheWriteTimeout = 10 * time.Second
+
 // Resolver fetches, validates, caches, and refreshes SMART
 // configuration documents for one or more Platform base URLs.
 //
@@ -361,7 +369,8 @@ func ownEntry(baseURL string, cat *ServiceCatalog, ok bool) *ServiceCatalog {
 // written before the call leaves the in-flight set, so callers that arrive
 // while it is written join the call and get its result, and a later fetch
 // for baseURL never has its cache entry overwritten or dropped by an earlier
-// one.
+// one. The write runs under writeCache's context, which the starter's
+// cancellation and deadline do not end and cacheWriteTimeout does.
 //
 // A panic in the fetch, or in the Cache call that records its result, is not
 // recovered: it goes on to the starter as it was raised. The call still leaves
@@ -430,15 +439,16 @@ func (r *Resolver) runCall(ctx context.Context, baseURL string, cached *ServiceC
 		// Drop what was cached, so the next resolution fetches again and
 		// reports the failure instead of serving a catalog the Platform no
 		// longer vouches for. The caller's context may have ended after the
-		// failure, so it must not stop the invalidation.
-		if ierr := r.cache.Invalidate(context.WithoutCancel(ctx), baseURL); ierr != nil {
+		// failure, so it must not stop the invalidation; writeCache bounds it
+		// instead.
+		if ierr := writeCache(ctx, func(wctx context.Context) error { return r.cache.Invalidate(wctx, baseURL) }); ierr != nil {
 			r.cfg.logger.Warn("discovery: cache invalidate failed", "base_url", urlredact.String(baseURL), "err", cacheErrorText(ierr, baseURL))
 		}
 	case cat != nil:
 		// The caller may have cancelled after the fetch succeeded. The
 		// write still has to land, or the entry from before this fetch
 		// stays. Cancellation must not refuse it, as with Invalidate above.
-		if perr := r.cache.Put(context.WithoutCancel(ctx), baseURL, cat); perr != nil {
+		if perr := writeCache(ctx, func(wctx context.Context) error { return r.cache.Put(wctx, baseURL, cat) }); perr != nil {
 			r.cfg.logger.Warn("discovery: cache put failed", "base_url", urlredact.String(baseURL), "err", cacheErrorText(perr, baseURL))
 		}
 	}
@@ -455,6 +465,18 @@ func (r *Resolver) runCall(ctx context.Context, baseURL string, cached *ServiceC
 	call.ownContextEnded = ownContextEnded
 	call.abandoned = false
 	return cat, err
+}
+
+// writeCache calls write, the Put or Invalidate that records a fetch's
+// result, with a context that keeps ctx's values but not its cancellation or
+// deadline, and that ends cacheWriteTimeout after the call. A Cache that
+// honours its context then returns by that time, with an error the caller
+// logs as any other; one that ignores its context holds the call until it
+// returns.
+func writeCache(ctx context.Context, write func(context.Context) error) error {
+	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cacheWriteTimeout)
+	defer cancel()
+	return write(wctx)
 }
 
 // cacheErrorText is the text of err, an error from a Cache write for baseURL,
