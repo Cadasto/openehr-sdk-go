@@ -82,24 +82,26 @@ func (j *JWKS) Key(ctx context.Context, kid string) (json.RawMessage, error) {
 	if kid == "" {
 		return j.onlySigningKey(ctx)
 	}
-	var refreshed bool
-	for {
-		j.mu.Lock()
-		stale := j.staleLocked()
-		k, ok := j.keys[kid]
-		j.mu.Unlock()
-		if ok && !stale {
-			return k, nil
-		}
-		if refreshed {
-			break
-		}
-		if err := j.refresh(ctx); err != nil {
-			return nil, err
-		}
-		refreshed = true
+	j.mu.Lock()
+	stale := j.staleLocked()
+	k, ok := j.keys[kid]
+	j.mu.Unlock()
+	if ok && !stale {
+		return k, nil
 	}
-	return nil, fmt.Errorf("%w: kid %q not found after refresh", auth.ErrJWKSValidationFailed, kid)
+	if err := j.refresh(ctx); err != nil {
+		return nil, err
+	}
+	// This lookup fetched the set or waited on a fetch: look kid up in what
+	// was fetched without asking again whether it is stale, so a TTL shorter
+	// than one fetch does not hide a key the set publishes.
+	j.mu.Lock()
+	k, ok = j.keys[kid]
+	j.mu.Unlock()
+	if !ok {
+		return nil, fmt.Errorf("%w: kid %q not found after refresh", auth.ErrJWKSValidationFailed, kid)
+	}
+	return k, nil
 }
 
 // onlySigningKey returns the set's only signing key, for a token without a
