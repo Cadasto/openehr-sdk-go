@@ -19,7 +19,8 @@ import (
 // the same position to every clause family: the vendored corpus under
 // testkit/corpus/aql/suites/ carries the upstream Robot AQL suites themselves,
 // so the reader takes each query from the suite that sends it and transcribes
-// nothing (probe_107_robot.go is that reader).
+// no query template, only which upstream keywords send a query and how
+// (probe_107_robot.go is that reader).
 //
 // Each rebuilt query is classed by what its test asserts (REQ-109/REQ-160
 // § PROBE-107 Classify). Only two classes are asserted: an answered query
@@ -155,8 +156,9 @@ type suiteDecline struct {
 	// Reason is one of declineGrammarExtension and declineContainsExtension.
 	Reason string
 	// Covers reports whether the Error-severity issue i, raised on query q, is
-	// the one this decline records. A query that does not parse is offered as
-	// an aql_syntax issue.
+	// the one this decline records. It is offered only issues of Code, so it
+	// names the construct alone. A query that does not parse is offered as an
+	// aql_syntax issue.
 	Covers func(q string, i lint.Issue) bool
 }
 
@@ -175,7 +177,7 @@ var suiteDeclines = []suiteDecline{
 		Construct: "CONTAINS operand EVENT_CONTEXT",
 		Reason:    declineContainsExtension,
 		Covers: func(_ string, i lint.Issue) bool {
-			return i.Code == codeContainsNotContainable && issueClass(i) == "EVENT_CONTEXT"
+			return issueClass(i) == "EVENT_CONTEXT"
 		},
 	},
 }

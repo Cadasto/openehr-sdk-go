@@ -20,11 +20,11 @@ import (
 // The upstream suites build each query at run time, so the reader runs just
 // enough of Robot Framework to rebuild it (PROBE-107 Rebuild): it parses the
 // space-separated format, keeps the variable scopes Robot keeps (local, test,
-// suite), resolves variables, Robot's backslash escapes and the built-ins,
-// calls the keywords a suite defines with their arguments bound, fills a
-// DataDriver template from every row of the data file the suite names, and
-// follows the handful of BuiltIn keywords that build text. Every keyword it
-// does not define is a no-op whose assigned variables become run-time values.
+// suite), resolves variables, the backslash escapes and the built-ins the
+// suites use, calls the keywords a suite defines with their arguments bound,
+// fills a DataDriver template from every row of the data file the suite
+// names, and follows the handful of BuiltIn keywords that build text. A Robot
+// construct it does not run is counted where a test meets it, never skipped.
 //
 // A run-time value is carried through the text as a reference (rtOpen, the
 // variable name, rtClose) until the query is sent. A reference inside a quoted
@@ -32,9 +32,13 @@ import (
 // asserts admissibility, not results; a reference outside one leaves the query
 // unrebuildable under a named reason, never dropped.
 //
-// The query-sending keywords live upstream in _resources/keywords/, which the
-// corpus does not vendor. suiteSenders names them and the argument each takes
-// the query in, from that resource at the pin AQL_SOURCE.txt records.
+// The keywords a suite calls without defining them live upstream, in
+// _resources/keywords/ and in libraries, which the corpus does not vendor.
+// upstreamKeywords is the census of those resources at the pin AQL_SOURCE.txt
+// records: every keyword there that sends an AQL query, and what the reader
+// does with it, plus the keywords the suites call that send none.
+// inertLibraryKeywords and requestsVerbs cover the library keywords. Any other
+// keyword may send a query, so a call to it is counted, never run as a no-op.
 
 // robotInitFile is the directory-level settings file of a Robot suite tree.
 const robotInitFile = "__init__.robot"
@@ -45,20 +49,30 @@ const robotInitFile = "__init__.robot"
 // a fixed one keeps the rebuild deterministic.
 const suiteFixedLiteral = "11111111-1111-1111-1111-111111111111"
 
-// The run-time reference markers: two private-use runes no suite text holds.
+// The run-time reference markers: private-use runes no suite text holds. A
+// construct the reader does not resolve travels the same way, opened by
+// rtUnsupported, so a query holding one is counted rather than rebuilt wrong.
 const (
-	rtOpen  = '\uE000'
-	rtClose = '\uE001'
+	rtOpen        = '\uE000'
+	rtClose       = '\uE001'
+	rtUnsupported = '\uE002'
 )
 
 func runtimeRef(name string) string { return string(rtOpen) + name + string(rtClose) }
+
+func unsupportedRef(construct string) string {
+	return string(rtUnsupported) + construct + string(rtClose)
+}
 
 // The reasons a query is counted rather than rebuilt (PROBE-107 Rebuild). The
 // tag is what the tally keys on; suiteUnrebuiltWhy states each rule.
 const (
 	reasonUnquotedVariable = "unquoted-variable"
 	reasonUnknownQueryText = "unknown-query-text"
-	reasonUnknownSender    = "unknown-sender"
+	reasonQueryNotVendored = "query-text-not-vendored"
+	reasonSendNotRebuilt   = "send-not-rebuilt"
+	reasonUnknownKeyword   = "unknown-keyword"
+	reasonUnsupported      = "unsupported-construct"
 	reasonQueryNotText     = "query-not-text"
 	reasonBodyNotJSON      = "request-body-not-json"
 	reasonConditionalSend  = "conditional-send"
@@ -75,9 +89,14 @@ const (
 var suiteUnrebuiltWhy = map[string]string{
 	reasonUnquotedVariable: "a run-time variable sits outside a quoted literal, so no fixed literal can stand in for it",
 	reasonUnknownQueryText: "the query text comes from a variable or keyword the reader cannot rebuild",
-	reasonUnknownSender:    "a keyword that looks like it sends a query is not one the reader knows",
+	reasonQueryNotVendored: "the sending keyword takes its query text from its own upstream resource or from a data file the corpus does not vendor",
+	reasonSendNotRebuilt: "a request that may send a query in a form the reader does not rebuild: an upstream keyword that sends a test variable, " +
+		"or a library request to a query endpoint or to a URL known only at run time",
+	reasonUnknownKeyword: "a keyword the suite does not define and the reader does not know, so it may send a query",
+	reasonUnsupported: "a Robot construct the reader does not run: an inline IF, VAR, RETURN or [Return], a test template outside a data-driven suite, " +
+		"or an escape or built-in variable it does not resolve",
 	reasonQueryNotText:     "the query argument is a list or a dictionary, not text",
-	reasonBodyNotJSON:      "the request body is not a JSON object with a text q member",
+	reasonBodyNotJSON:      "the request body, as the reader holds it, does not decode as a JSON object with a text q member; sent as it is, an engine would refuse it",
 	reasonConditionalSend:  "the query is sent inside a FOR, WHILE, IF or TRY block or a conditional Run Keyword, so whether it runs is unknown",
 	reasonOutsideTest:      "the query is sent from a suite setup or teardown, outside any test",
 	reasonNoTemplate:       "a data-driven suite whose test case names no template keyword or template row",
@@ -91,62 +110,196 @@ var suiteUnrebuiltWhy = map[string]string{
 // counted under reasonKeywordDepth rather than followed forever.
 const robotMaxDepth = 16
 
-// suiteSender is a keyword that sends its query to the engine.
-type suiteSender struct {
-	// args are the keyword's argument names, in order; a call argument
-	// `name=value` naming one of them is a named argument.
+// upstreamKeyword is one keyword of the upstream keyword resources, as the
+// census of those resources at the pin found it.
+type upstreamKeyword struct {
+	// at is where the keyword is defined: its file under _resources/keywords/
+	// and its line, at the pin.
+	at string
+	// send is what the keyword sends.
+	send sendForm
+	// args are the keyword's [Arguments] names, in order, for a sender the
+	// reader rebuilds; the query is the first of them unless send says else.
 	args []string
-	// query is the index in args of the argument that carries the query.
-	query int
-	// shape says how that argument carries it.
-	shape senderShape
-	// kwargs is set for a keyword that also takes free `name=value`
-	// arguments, so any such cell is named rather than positional.
-	kwargs bool
 }
 
-type senderShape int
+// sendForm is what an upstream keyword sends, and so what the reader does
+// when a suite calls it.
+type sendForm int
 
 const (
-	// senderText: the argument is the query text.
-	senderText senderShape = iota
-	// senderJSONBody: the argument is a JSON request body; its q member is
-	// the query.
-	senderJSONBody
-	// senderPayload: the keyword sends the test variable ${payload}.
-	senderPayload
-	// senderSessionGet: a RequestsLibrary GET; when its url is /query/aql,
-	// the q entry of its params dictionary is the query.
-	senderSessionGet
+	// sendsNoQuery: the keyword sends no AQL query. Its value is a run-time
+	// value.
+	sendsNoQuery sendForm = iota
+	// runsStoredQuery: the keyword runs a query stored earlier and sends no
+	// query text; the query is counted where it was stored.
+	runsStoredQuery
+	// sendsText: the first argument is the query text, sent as it is.
+	sendsText
+	// sendsJSONBody: the first argument is a JSON request body; the engine
+	// decodes it and runs its q member.
+	sendsJSONBody
+	// sendsAdHocBody: the keyword wraps the first argument as the body
+	// {"q":"\u2026"}, with a query_parameters member when the second argument is
+	// not empty; the engine decodes that body and runs its q member.
+	sendsAdHocBody
+	// sendsStoredBody: the keyword stores the first argument, wrapped as the
+	// body {"q":"\u2026"} when the second argument (format) is json, its default,
+	// or as plain text when it is text.
+	sendsStoredBody
+	// sendsPayload: the keyword sends the test or suite variable ${payload}
+	// as the query text.
+	sendsPayload
+	// sendsUpstreamText: the keyword takes its query text from its own
+	// resource or from a data file the corpus does not vendor; the send is
+	// counted under reasonQueryNotVendored.
+	sendsUpstreamText
+	// sendsUnrebuilt: the keyword sends a query from a test variable in a
+	// form the reader does not rebuild; the send is counted under
+	// reasonSendNotRebuilt.
+	sendsUnrebuilt
 )
 
-// suiteSenders are the query-sending keywords the vendored suites call, keyed
-// by normalised name. Each argument list is the keyword's [Arguments] row in
-// the upstream resource it lives in.
-var suiteSenders = map[string]suiteSender{
-	robotNormalize("Set AQL And Execute Ad Hoc Query"): {args: []string{"query_expr", "parameter"}, shape: senderText},
-	robotNormalize("Send Ad Hoc Request"):              {args: []string{"aql_body", "req_headers"}, shape: senderJSONBody},
-	robotNormalize("Send Ad Hoc Request Through GET"):  {args: []string{"q_param", "req_headers"}, shape: senderText},
+// upstreamKeywords is the census, keyed by normalised name: every keyword in
+// the upstream keyword resources at the pin that sends an AQL query, directly
+// or through another keyword, and every keyword there the vendored suites
+// call that sends none. A keyword that only reads, lists or deletes stored
+// queries (GET or DELETE /definition/query\u2026, (admin) delete stored query,
+// DELETE /query/\u2026 ADMIN) sends no AQL and no suite calls it, so it is left
+// out, and a call to it would be counted.
+var upstreamKeywords = map[string]upstreamKeyword{
+	// The senders the reader rebuilds: the suite passes the query text.
+	robotNormalize("Set AQL And Execute Ad Hoc Query"): {
+		at: "aql_keywords.robot:54", send: sendsAdHocBody, args: []string{"query_expr", "parameter"},
+	},
+	robotNormalize("Send Ad Hoc Request"): {
+		at: "aql_keywords.robot:90", send: sendsJSONBody, args: []string{"aql_body", "req_headers"},
+	},
+	robotNormalize("Send Ad Hoc Request Through GET"): {
+		at: "aql_keywords.robot:71", send: sendsText, args: []string{"q_param", "req_headers"},
+	},
 	robotNormalize("PUT /definition/query/{qualified_query_name}"): {
-		args: []string{"query_to_store", "format", "multitenancy_token", "query_type"}, shape: senderText,
+		at: "aql_query_keywords.robot:270", send: sendsStoredBody,
+		args: []string{"query_to_store", "format", "multitenancy_token", "query_type"},
 	},
 	robotNormalize("PUT /definition/query/{qualified_query_name}/{version}"): {
-		args: []string{"query_to_store", "format", "multitenancy_token"}, shape: senderText,
+		at: "aql_query_keywords.robot:325", send: sendsStoredBody,
+		args: []string{"query_to_store", "format", "multitenancy_token"},
 	},
-	robotNormalize("GET /query/aql?q={query}"): {args: []string{"multitenancy_token"}, shape: senderPayload},
-	robotNormalize("GET On Session"): {
-		args: []string{"alias", "url", "params", "expected_status", "msg"}, query: 2, shape: senderSessionGet, kwargs: true,
+	robotNormalize("PUT AQL Query With Qualified Name And Version Multitenancy"): {
+		at: "aql_query_keywords.robot:442", send: sendsStoredBody,
+		args: []string{"query_to_store", "format", "multitenancy_token"},
 	},
+	robotNormalize("GET /query/aql?q={query}"): {at: "aql_query_keywords.robot:425", send: sendsPayload},
+
+	// The senders whose query text is not in the vendored suites.
+	robotNormalize("Execute Ad Hoc Query"):           {at: "aql_keywords.robot:38", send: sendsUpstreamText},
+	robotNormalize("Get EHR Status Time Committed"):  {at: "aql_keywords.robot:290", send: sendsUpstreamText},
+	robotNormalize("Get Composition Time Committed"): {at: "aql_keywords.robot:300", send: sendsUpstreamText},
+	robotNormalize("Get Observation Time Committed"): {at: "aql_keywords.robot:310", send: sendsUpstreamText},
+	robotNormalize("execute ad-hoc query and check result (empty DB)"): {
+		at: "aql_query_keywords.robot:97", send: sendsUpstreamText,
+	},
+	robotNormalize("execute invalid ad-hoc query and check result (empty DB)"): {
+		at: "aql_query_keywords.robot:106", send: sendsUpstreamText,
+	},
+	robotNormalize("execute ad-hoc query and check result (loaded DB)"): {
+		at: "aql_query_keywords.robot:114", send: sendsUpstreamText,
+	},
+	robotNormalize("execute ad-hoc query (no result comparison)"): {
+		at: "aql_query_keywords.robot:123", send: sendsUpstreamText,
+	},
+	robotNormalize("execute ad-hoc query"):         {at: "aql_query_keywords.robot:130", send: sendsUpstreamText},
+	robotNormalize("execute invalid ad-hoc query"): {at: "aql_query_keywords.robot:138", send: sendsUpstreamText},
+	robotNormalize("Execute Query And Compare Actual Result With Expected"): {
+		at: "aql_query_keywords.robot:2212", send: sendsUpstreamText,
+	},
+
+	// The senders of a test variable, in a form the reader does not rebuild.
+	robotNormalize("POST /query/aql"):           {at: "aql_query_keywords.robot:211", send: sendsUnrebuilt},
+	robotNormalize("POST /query/aql (REST)"):    {at: "aql_query_keywords.robot:231", send: sendsUnrebuilt},
+	robotNormalize("POST /query (REST) - ECIS"): {at: "aql_query_keywords.robot:256", send: sendsUnrebuilt},
+
+	// The stored-query runners.
+	robotNormalize("GET /query/{qualified_query_name}"):           {at: "aql_query_keywords.robot:533", send: runsStoredQuery},
+	robotNormalize("POST /query/{qualified_query_name}"):          {at: "aql_query_keywords.robot:573", send: runsStoredQuery},
+	robotNormalize("GET /query/{qualified_query_name}/{version}"): {at: "aql_query_keywords.robot:614", send: runsStoredQuery},
+	robotNormalize("POST /query/{qualified_query_name}/{version} With Query Params"): {
+		at: "aql_query_keywords.robot:643", send: runsStoredQuery,
+	},
+	robotNormalize("GET /query/{qualified_query_name}/{version} With Query Params"): {
+		at: "aql_query_keywords.robot:666", send: runsStoredQuery,
+	},
+	robotNormalize("POST /query/{qualified_query_name}/{version}"): {at: "aql_query_keywords.robot:689", send: runsStoredQuery},
+
+	// The keywords the vendored suites call that send no query.
+	robotNormalize("Upload OPT For AQL"):                                            {at: "aql_keywords.robot:150"},
+	robotNormalize("Create EHR For AQL"):                                            {at: "aql_keywords.robot:173"},
+	robotNormalize("Create EHR For AQL With Custom EHR Status"):                     {at: "aql_keywords.robot:197"},
+	robotNormalize("Commit Composition For AQL"):                                    {at: "aql_keywords.robot:214"},
+	robotNormalize("Admin Delete EHR For AQL"):                                      {at: "aql_keywords.robot:264"},
+	robotNormalize("Update EHR Status For EHR"):                                     {at: "aql_keywords.robot:277"},
+	robotNormalize("Commit Contribution For AQL"):                                   {at: "aql_keywords.robot:320"},
+	robotNormalize("Update Composition For AQL"):                                    {at: "aql_keywords.robot:333"},
+	robotNormalize("Delete Composition For AQL"):                                    {at: "aql_keywords.robot:352"},
+	robotNormalize("Create Directory For AQL"):                                      {at: "aql_keywords.robot:361"},
+	robotNormalize("Get File And Replace Dynamic Vars In File And Store As String"): {at: "aql_keywords.robot:394"},
+	robotNormalize("GET /ehr/ehr_id/contribution/contribution_uid"):                 {at: "contribution_keywords.robot:372"},
+	robotNormalize("generate random ehr_id"):                                        {at: "ehr_keywords.robot:972"},
+	robotNormalize("compare json-strings"):                                          {at: "generic_keywords.robot:59"},
+	robotNormalize("compare json-string with json-file"):                            {at: "generic_keywords.robot:99"},
+	robotNormalize("Set Library Search Order For Tests"):                            {at: "generic_keywords.robot:743"},
 }
 
-// suiteStoredQueryRunners run a query stored earlier by one of the PUT
-// senders. They send no query text of their own: the query is counted where
-// it was stored.
-var suiteStoredQueryRunners = []string{
-	robotNormalize("GET /query/{qualified_query_name}"),
-	robotNormalize("POST /query/{qualified_query_name}"),
-	robotNormalize("GET /query/{qualified_query_name}/{version}"),
-	robotNormalize("POST /query/{qualified_query_name}/{version}"),
+// inertLibraryKeywords are the library keywords the vendored suites call that
+// send no query and that the reader does not follow, with their library.
+// Their values are run-time values. The BuiltIn keywords the reader follows
+// are in robotFrame.builtin.
+var inertLibraryKeywords = map[string]string{
+	robotNormalize("Log"):                               "BuiltIn",
+	robotNormalize("Evaluate"):                          "BuiltIn",
+	robotNormalize("Fail"):                              "BuiltIn",
+	robotNormalize("Get Length"):                        "BuiltIn",
+	robotNormalize("Should Be Equal"):                   "BuiltIn",
+	robotNormalize("Should Be Equal As Strings"):        "BuiltIn",
+	robotNormalize("Should Match Regexp"):               "BuiltIn",
+	robotNormalize("Append To List"):                    "Collections",
+	robotNormalize("Dictionary Should Contain Key"):     "Collections",
+	robotNormalize("Dictionary Should Not Contain Key"): "Collections",
+	robotNormalize("Get Dictionary Keys"):               "Collections",
+	robotNormalize("List Should Contain Value"):         "Collections",
+	robotNormalize("Lists Should Be Equal"):             "Collections",
+	robotNormalize("Split String"):                      "String",
+	robotNormalize("Create Binary File"):                "OperatingSystem",
+	robotNormalize("Create File"):                       "OperatingSystem",
+	robotNormalize("Get Binary File"):                   "OperatingSystem",
+	robotNormalize("Get File"):                          "OperatingSystem",
+	robotNormalize("Remove File"):                       "OperatingSystem",
+	robotNormalize("Get Value From Json"):               "JSONLibrary",
+	robotNormalize("Update Value To Json"):              "JSONLibrary",
+}
+
+// requestsVerbs are the RequestsLibrary request keywords, each with its
+// leading argument names: the session alias for the On Session forms, then
+// url, then params for GET On Session. A request whose url is literal text
+// with no /query in it sends no query; GET On Session to /query/aql sends the
+// q entry of its params dictionary; any other request is counted under
+// reasonSendNotRebuilt.
+var requestsVerbs = map[string][]string{
+	robotNormalize("GET On Session"):     {"alias", "url", "params"},
+	robotNormalize("POST On Session"):    {"alias", "url"},
+	robotNormalize("PUT On Session"):     {"alias", "url"},
+	robotNormalize("PATCH On Session"):   {"alias", "url"},
+	robotNormalize("DELETE On Session"):  {"alias", "url"},
+	robotNormalize("HEAD On Session"):    {"alias", "url"},
+	robotNormalize("OPTIONS On Session"): {"alias", "url"},
+	robotNormalize("GET"):                {"url"},
+	robotNormalize("POST"):               {"url"},
+	robotNormalize("PUT"):                {"url"},
+	robotNormalize("PATCH"):              {"url"},
+	robotNormalize("DELETE"):             {"url"},
+	robotNormalize("HEAD"):               {"url"},
+	robotNormalize("OPTIONS"):            {"url"},
 }
 
 // robotNormalize is Robot's name normalisation for keywords, variables,
@@ -418,9 +571,11 @@ func matchingClose(s string, from int, open, closing byte) (int, bool) {
 }
 
 // robotUnescape resolves Robot's backslash escapes in literal text: a run of
-// backslashes halves, and an odd one escapes what follows — \n, \r, \t and the
-// \x, \u, \U code points become their characters, and any other character
-// stays as itself with the backslash dropped (\$ is $, \# is #).
+// backslashes halves, and an odd one escapes what follows, which stays as
+// itself with the backslash dropped (\$ is $, \# is #). The escapes that make
+// a character of their own (\n, \r, \t and the \x, \u, \U code points) are
+// not resolved: each becomes an unsupported reference, so a query that holds
+// one is counted.
 func robotUnescape(s string) string {
 	if !strings.Contains(s, `\`) {
 		return s
@@ -442,30 +597,19 @@ func robotUnescape(s string) string {
 		if run%2 == 0 || i >= len(s) {
 			continue
 		}
-		switch s[i] {
-		case 'n':
-			b.WriteByte('\n')
+		if strings.IndexByte("nrtxuU", s[i]) >= 0 {
+			b.WriteString(unsupportedRef(`\` + s[i:i+1]))
 			i++
-		case 'r':
-			b.WriteByte('\r')
-			i++
-		case 't':
-			b.WriteByte('\t')
-			i++
-		case 'x', 'u', 'U':
-			width := map[byte]int{'x': 2, 'u': 4, 'U': 8}[s[i]]
-			if i+1+width <= len(s) {
-				if cp, err := strconv.ParseUint(s[i+1:i+1+width], 16, 32); err == nil {
-					b.WriteRune(rune(cp))
-					i += 1 + width
-				}
-			}
 		}
 	}
 	return b.String()
 }
 
-// robotBuiltin is the value of a built-in variable, by normalised name.
+// robotBuiltin is the value of a built-in variable, by normalised name: the
+// ones the suites use, and Robot's integer variables (${0}, ${-1}). Another
+// number variable (${2.5}, ${0x1F}) and the ${/}, ${:} and ${\n} built-ins
+// are not resolved: each is an unsupported reference, so a query that holds
+// one is counted.
 func robotBuiltin(key string) (string, bool) {
 	switch key {
 	case "empty":
@@ -478,24 +622,14 @@ func robotBuiltin(key string) (string, bool) {
 		return "False", true
 	case "none":
 		return "None", true
-	case `\n`:
-		return "\n", true
-	case "/":
-		return "/", true
-	case ":":
-		return ":", true
+	case "/", ":", `\n`:
+		return unsupportedRef("${" + key + "}"), true
 	}
-	// ${0}, ${-1}, ${2.5}, ${0x1F}: Robot's number variables.
 	if n, err := strconv.ParseInt(key, 10, 64); err == nil {
 		return strconv.FormatInt(n, 10), true
 	}
-	if _, err := strconv.ParseFloat(key, 64); err == nil {
-		return key, true
-	}
-	if len(key) > 2 && key[0] == '0' && strings.ContainsRune("xob", rune(key[1])) {
-		if n, err := strconv.ParseInt(key, 0, 64); err == nil {
-			return strconv.FormatInt(n, 10), true
-		}
+	if d := strings.TrimPrefix(key, "-"); d != "" && d[0] >= '0' && d[0] <= '9' {
+		return unsupportedRef("${" + key + "}"), true
 	}
 	return "", false
 }
@@ -556,7 +690,6 @@ type robotSent struct {
 	query   string
 	refused bool
 	empty   bool
-	skipped bool
 }
 
 // robotFrame is one keyword or test body being run.
@@ -567,7 +700,6 @@ type robotFrame struct {
 	expect bool // inside Run Keyword And Expect Error
 	cond   bool // inside a control block or a conditional Run Keyword
 	depth  int
-	ret    *robotValue
 }
 
 func (s *robotSuite) unrebuilt(line int, data, reason, detail string) {
@@ -575,6 +707,14 @@ func (s *robotSuite) unrebuilt(line int, data, reason, detail string) {
 		Family: s.family, Suite: s.path, Line: line, Data: data,
 		Reason: reason, Why: suiteUnrebuiltWhy[reason], Detail: detail,
 	})
+}
+
+// count counts a send, or a construct that may send, under reason at the
+// test-case row the frame runs, and closes the open query: an assertion after
+// it may be about what it sent.
+func (f *robotFrame) count(reason, detail string) {
+	f.t.s.unrebuilt(f.site, f.t.data, reason, detail)
+	f.t.open = nil
 }
 
 // readSuite parses and runs one suite file.
@@ -818,10 +958,10 @@ func (s *robotSuite) runTest(b *robotBlock, data string, filled *robotStmt) {
 		f.site = filled.line
 		f.call(filled.line, ts.template, filled.cells)
 	case ts.template != "":
-		for _, row := range ts.rows {
-			f.site = row.line
-			f.call(row.line, ts.template, row.cells)
-		}
+		// A test template outside a data-driven suite: the reader runs none
+		// of its rows.
+		f.site = b.line
+		f.count(reasonUnsupported, "[Template]")
 	default:
 		f.runBody(ts.rows, true)
 	}
@@ -833,12 +973,14 @@ func (s *robotSuite) runTest(b *robotBlock, data string, filled *robotStmt) {
 }
 
 // finish classes every query the test sent (PROBE-107 Classify). Skipped wins
-// over not-ready, not-ready over refused, refused over answered-empty.
+// over not-ready, not-ready over refused, refused over answered-empty. A test
+// that meets an active Skip is reported skipped, so every query it sent is
+// skipped, the ones sent before the Skip included.
 func (t *robotTest) finish() {
 	for _, q := range t.sent {
 		class := SuiteAnswered
 		switch {
-		case q.skipped:
+		case t.skipped:
 			class = SuiteSkipped
 		case t.notReady:
 			class = SuiteNotReady
@@ -855,7 +997,7 @@ func (t *robotTest) finish() {
 
 // runBody runs a test or keyword body. Rows inside a FOR, WHILE, IF or TRY
 // block run once, flagged conditional: the reader cannot know whether or how
-// often they run.
+// often they run. An inline IF, VAR, RETURN and [Return] are counted, not run.
 func (f *robotFrame) runBody(body []robotStmt, testLevel bool) {
 	depth := 0
 	for _, st := range body {
@@ -876,7 +1018,7 @@ func (f *robotFrame) runBody(body []robotStmt, testLevel bool) {
 			continue
 		case "IF":
 			if len(st.cells) > 2 { // an inline IF: its branches are on this row
-				f.inlineIf(st)
+				f.count(reasonUnsupported, "inline IF")
 			} else {
 				depth++
 			}
@@ -888,18 +1030,13 @@ func (f *robotFrame) runBody(body []robotStmt, testLevel bool) {
 			continue
 		case "ELSE", "ELSE IF", "EXCEPT", "FINALLY", "BREAK", "CONTINUE":
 			continue
-		case "RETURN":
-			v := f.returnValue(st.cells[1:])
-			f.ret = &v
-			if depth == 0 {
-				return
-			}
+		case "VAR", "RETURN":
+			f.count(reasonUnsupported, head)
 			continue
 		}
 		if strings.HasPrefix(head, "[") && strings.HasSuffix(head, "]") {
 			if robotNormalize(head) == "[return]" {
-				v := f.returnValue(st.cells[1:])
-				f.ret = &v
+				f.count(reasonUnsupported, head)
 			}
 			continue
 		}
@@ -921,33 +1058,9 @@ func (f *robotFrame) loopVariables(header []string) {
 	}
 }
 
-// inlineIf runs the branches of `IF  cond  Keyword  args  ELSE  Keyword …`
-// conditionally.
-func (f *robotFrame) inlineIf(st robotStmt) {
-	saved := f.cond
-	f.cond = true
-	defer func() { f.cond = saved }()
-	cells := st.cells[2:]
-	for len(cells) > 0 {
-		end := slices.IndexFunc(cells, func(c string) bool { return c == "ELSE" || c == "ELSE IF" })
-		branch := cells
-		if end >= 0 {
-			branch = cells[:end]
-		}
-		if len(branch) > 0 {
-			f.exec(robotStmt{line: st.line, cells: branch})
-		}
-		if end < 0 {
-			return
-		}
-		if cells[end] == "ELSE IF" {
-			end++ // the condition
-		}
-		cells = cells[min(end+1, len(cells)):]
-	}
-}
-
-func (f *robotFrame) returnValue(cells []string) robotValue {
+// setVariableValue is the value Set Variable gives: one value keeps its kind,
+// several make a list, none is empty text.
+func (f *robotFrame) setVariableValue(cells []string) robotValue {
 	switch len(cells) {
 	case 0:
 		return textValue("")
@@ -974,10 +1087,6 @@ func robotTargetName(cell string) (string, bool) {
 // exec runs one row: its assignment targets, then its keyword call.
 func (f *robotFrame) exec(st robotStmt) {
 	cells := st.cells
-	if cells[0] == "VAR" {
-		f.varStatement(cells[1:])
-		return
-	}
 	var targets []string
 	for len(cells) > 0 {
 		name, ok := robotTargetName(cells[0])
@@ -1000,49 +1109,13 @@ func (f *robotFrame) exec(st robotStmt) {
 	}
 }
 
-// varStatement runs Robot's VAR syntax: `VAR  ${x}  value…  scope=…`.
-func (f *robotFrame) varStatement(cells []string) {
-	if len(cells) == 0 {
-		return
-	}
-	name, ok := robotTargetName(cells[0])
-	if !ok {
-		return
-	}
-	scope, sep := "local", " "
-	var values []string
-	for _, c := range cells[1:] {
-		switch {
-		case strings.HasPrefix(c, "scope="):
-			scope = robotNormalize(strings.TrimPrefix(c, "scope="))
-		case strings.HasPrefix(c, "separator="):
-			sep = f.replaceString(strings.TrimPrefix(c, "separator="))
-		default:
-			values = append(values, c)
-		}
-	}
-	var v robotValue
-	switch cells[0][0] {
-	case '@':
-		v = robotValue{list: true}
-	case '&':
-		v = f.dictionary(values)
-	default:
-		parts := make([]string, len(values))
-		for i, c := range values {
-			parts[i] = f.replaceString(c)
-		}
-		v = textValue(strings.Join(parts, sep))
-	}
-	f.setScoped(scope, name, v)
-}
-
+// setScoped sets a variable in the scope a Set … Variable keyword names.
 func (f *robotFrame) setScoped(scope, name string, v robotValue) {
 	key := robotNormalize(name)
 	switch scope {
-	case "test", "task":
+	case "test":
 		f.t.vars[key] = v
-	case "suite", "global":
+	case "suite":
 		f.t.s.vars[key] = v
 	default:
 		f.locals[key] = v
@@ -1174,12 +1247,15 @@ func robotNamedArg(cell string) (name, value string, ok bool) {
 
 // call runs one keyword call and returns its value; known is false when the
 // reader cannot know the value, and the assigned variables then hold
-// run-time values.
+// run-time values. A keyword is, in this order, one the suite defines, a
+// BuiltIn the reader follows, an upstream keyword of the census, a
+// RequestsLibrary request or an inert library keyword; any other is counted.
 func (f *robotFrame) call(line int, name string, args []string) (v robotValue, known bool) {
 	key := robotNormalize(name)
 	s := f.t.s
 	if kw := s.keywords[key]; kw != nil {
-		return f.callUser(line, kw, args, nil)
+		f.callUser(kw, args, nil)
+		return robotValue{}, false
 	}
 	for _, e := range s.embedded {
 		if m := e.re.FindStringSubmatch(name); m != nil {
@@ -1187,32 +1263,25 @@ func (f *robotFrame) call(line int, name string, args []string) (v robotValue, k
 			for i, n := range e.names {
 				embedded[robotNormalize(n)] = f.resolve(m[i+1])
 			}
-			return f.callUser(line, e.kw, args, embedded)
+			f.callUser(e.kw, args, embedded)
+			return robotValue{}, false
 		}
 	}
 	if v, known, handled := f.builtin(line, key, args); handled {
 		return v, known
 	}
-	if sender, ok := suiteSenders[key]; ok {
-		f.send(line, sender, args)
+	if k, ok := upstreamKeywords[key]; ok {
+		f.upstream(name, k, args)
 		return robotValue{}, false
 	}
-	if !slices.Contains(suiteStoredQueryRunners, key) && looksLikeQuerySend(key, args) {
-		f.t.s.unrebuilt(f.site, f.t.data, reasonUnknownSender, name)
-		f.t.open = nil
+	if names, ok := requestsVerbs[key]; ok {
+		f.request(name, names, args)
+		return robotValue{}, false
+	}
+	if _, ok := inertLibraryKeywords[key]; !ok {
+		f.count(reasonUnknownKeyword, name)
 	}
 	return robotValue{}, false
-}
-
-// looksLikeQuerySend is the census net for a sending keyword the reader does
-// not know: a name about queries or requests, or a RequestsLibrary session
-// call addressed to a query endpoint.
-func looksLikeQuerySend(key string, args []string) bool {
-	if strings.Contains(key, "query") || strings.Contains(key, "request") {
-		return true
-	}
-	return strings.HasSuffix(key, "onsession") &&
-		slices.ContainsFunc(args, func(a string) bool { return strings.Contains(a, "/query") })
 }
 
 // builtin runs the BuiltIn keywords that build text, scope variables, wrap
@@ -1220,7 +1289,7 @@ func looksLikeQuerySend(key string, args []string) bool {
 func (f *robotFrame) builtin(line int, key string, args []string) (v robotValue, known, handled bool) {
 	switch key {
 	case "setvariable":
-		return f.returnValue(args), true, true
+		return f.setVariableValue(args), true, true
 	case "catenate":
 		sep := " "
 		if len(args) > 0 && strings.HasPrefix(args[0], "SEPARATOR=") {
@@ -1451,10 +1520,11 @@ func robotArgSpecs(kw *robotBlock) []robotArgSpec {
 // callUser runs a keyword the suite defines, with its arguments bound as
 // Robot binds them: positional first, then `name=value` for a named argument.
 // Call arguments resolve in the caller's scope, defaults in the keyword's.
-func (f *robotFrame) callUser(line int, kw *robotBlock, args []string, embedded map[string]robotValue) (robotValue, bool) {
+// The keyword's value is a run-time value: RETURN is counted, not run.
+func (f *robotFrame) callUser(kw *robotBlock, args []string, embedded map[string]robotValue) {
 	if f.depth >= robotMaxDepth {
 		f.t.s.unrebuilt(f.site, f.t.data, reasonKeywordDepth, kw.name)
-		return robotValue{}, false
+		return
 	}
 	g := &robotFrame{
 		t: f.t, locals: map[string]robotValue{}, site: f.site,
@@ -1497,81 +1567,149 @@ func (f *robotFrame) callUser(line int, kw *robotBlock, args []string, embedded 
 		}
 	}
 	g.runBody(kw.body, false)
-	if g.ret != nil {
-		return *g.ret, true
-	}
-	return robotValue{}, false
 }
 
-// send rebuilds the query a sending keyword sends and records it, or counts
-// why it cannot.
-func (f *robotFrame) send(line int, sender suiteSender, args []string) {
-	t := f.t
-	raw, found := senderArg(sender, args)
-	if sender.shape == senderSessionGet {
-		url, ok := senderArgAt(sender, args, 1)
-		if !ok || f.replaceString(url) != "/query/aql" {
-			return // a GET to another endpoint sends no query
+// upstream runs a call to a keyword of the census: it rebuilds the query a
+// sender the reader knows sends, counts a send it cannot rebuild, and does
+// nothing for a keyword that sends no query text.
+func (f *robotFrame) upstream(name string, k upstreamKeyword, args []string) {
+	switch k.send {
+	case sendsNoQuery, runsStoredQuery:
+	case sendsUpstreamText:
+		f.count(reasonQueryNotVendored, name)
+	case sendsUnrebuilt:
+		f.count(reasonSendNotRebuilt, name)
+	case sendsText, sendsPayload:
+		if text, ok := f.queryText(k, args); ok {
+			f.emit(text)
+		}
+	case sendsJSONBody:
+		if text, ok := f.queryText(k, args); ok {
+			f.emitBody(k.args[0], text)
+		}
+	case sendsAdHocBody:
+		text, ok := f.queryText(k, args)
+		if !ok {
+			return
+		}
+		body := `{"q":"` + text + `"`
+		if raw, found := argAt(k.args, false, args, 1); found {
+			if p := f.replaceString(raw); p != "" {
+				body += `,"query_parameters":` + p
+			}
+		}
+		f.emitBody(k.args[0], body+"}")
+	case sendsStoredBody:
+		text, ok := f.queryText(k, args)
+		if !ok {
+			return
+		}
+		format := "json"
+		if raw, found := argAt(k.args, false, args, 1); found {
+			format = f.replaceString(raw)
+		}
+		switch format {
+		case "json":
+			f.emitBody(k.args[0], `{"q":"`+text+`"}`)
+		case "text":
+			f.emit(text)
+		default:
+			// Upstream builds a body only for json and text; any other format
+			// leaves it unset, and the keyword fails before it sends.
+			f.count(reasonUnknownQueryText, "format")
 		}
 	}
-	t.open = nil
-	var q robotValue
-	switch sender.shape {
-	case senderPayload:
-		var ok bool
-		if q, ok = f.lookup("payload"); !ok {
-			q = textValue(runtimeRef("payload"))
-		}
-	case senderSessionGet:
-		params := robotValue{}
-		if found {
-			params = f.resolve(raw)
-		}
-		qv, ok := params.dict["q"]
-		if !ok {
-			t.s.unrebuilt(f.site, t.data, reasonUnknownQueryText, "params")
-			return
-		}
-		q = qv
-	case senderText, senderJSONBody:
+}
+
+// queryText is the text a sender is called with, or false once it has counted
+// why there is none. It closes the open query: an assertion after the call is
+// about what the call sends.
+func (f *robotFrame) queryText(k upstreamKeyword, args []string) (string, bool) {
+	f.t.open = nil
+	arg, q := "payload", robotValue{}
+	if k.send == sendsPayload {
+		q = f.testOrSuite(arg)
+	} else {
+		arg = k.args[0]
+		raw, found := argAt(k.args, false, args, 0)
 		if !found {
-			t.s.unrebuilt(f.site, t.data, reasonUnknownQueryText, sender.args[sender.query])
-			return
+			f.count(reasonUnknownQueryText, arg)
+			return "", false
 		}
 		q = f.resolve(raw)
 	}
 	if !q.isText() {
-		t.s.unrebuilt(f.site, t.data, reasonQueryNotText, sender.args[sender.query])
-		return
+		f.count(reasonQueryNotText, arg)
+		return "", false
 	}
-	text := q.text
-	if sender.shape == senderJSONBody {
-		var body map[string]any
-		if err := json.Unmarshal([]byte(text), &body); err != nil {
-			t.s.unrebuilt(f.site, t.data, reasonBodyNotJSON, sender.args[sender.query])
-			return
-		}
-		s, ok := body["q"].(string)
-		if !ok {
-			t.s.unrebuilt(f.site, t.data, reasonBodyNotJSON, sender.args[sender.query])
-			return
-		}
-		text = s
-	}
-	f.emit(text)
+	return q.text, true
 }
 
-// senderArg is the raw call argument that carries the query: the named one,
-// or the positional one at its index.
-func senderArg(sender suiteSender, args []string) (string, bool) {
-	return senderArgAt(sender, args, sender.query)
+// testOrSuite is the value of a test or suite variable. A keyword resource
+// reads such a variable from those two scopes only: a variable local to its
+// caller is not visible to it, so it is a run-time value.
+func (f *robotFrame) testOrSuite(name string) robotValue {
+	key := robotNormalize(name)
+	for _, scope := range []map[string]robotValue{f.t.vars, f.t.s.vars} {
+		if v, ok := scope[key]; ok {
+			return v
+		}
+	}
+	return textValue(runtimeRef(name))
 }
 
-func senderArgAt(sender suiteSender, args []string, index int) (string, bool) {
+// emitBody sends the q member of a JSON request body, as an engine decodes
+// it, or counts a body that is not a JSON object with a text q member under
+// arg, the argument that carried the query.
+func (f *robotFrame) emitBody(arg, body string) {
+	var v map[string]any
+	if err := json.Unmarshal([]byte(body), &v); err == nil {
+		if q, ok := v["q"].(string); ok {
+			f.emit(q)
+			return
+		}
+	}
+	f.count(reasonBodyNotJSON, arg)
+}
+
+// request runs a RequestsLibrary request (PROBE-107 Rebuild): a GET On
+// Session to /query/aql sends the q entry of its params dictionary, a request
+// whose url is literal text with no /query in it sends no query, and any
+// other request is counted, since it may send one.
+func (f *robotFrame) request(name string, names, args []string) {
+	raw, _ := argAt(names, true, args, slices.Index(names, "url"))
+	url := f.replaceString(raw)
+	switch {
+	case robotNormalize(name) == robotNormalize("GET On Session") && url == "/query/aql":
+		f.t.open = nil
+		raw, found := argAt(names, true, args, slices.Index(names, "params"))
+		q, ok := robotValue{}, false
+		if found {
+			q, ok = f.resolve(raw).dict["q"]
+		}
+		switch {
+		case !ok:
+			f.count(reasonUnknownQueryText, "params")
+		case !q.isText():
+			f.count(reasonQueryNotText, "params")
+		default:
+			f.emit(q.text)
+		}
+	case !strings.ContainsAny(url, string([]rune{rtOpen, rtUnsupported})) && !strings.Contains(url, "/query"):
+	default:
+		f.count(reasonSendNotRebuilt, name)
+	}
+}
+
+// argAt is the raw call argument bound to the parameter at index in names: the
+// one passed as `name=value`, or the positional one at that index. With
+// kwargs, any `identifier=value` cell is a named argument, as for a keyword
+// that takes free named arguments.
+func argAt(names []string, kwargs bool, args []string, index int) (string, bool) {
 	pos := 0
 	for _, a := range args {
-		if n, v, ok := robotNamedArg(a); ok && (slices.Contains(sender.args, n) || sender.kwargs && robotIdentifier.MatchString(n)) {
-			if n == sender.args[index] {
+		if n, v, ok := robotNamedArg(a); ok && (slices.Contains(names, n) || kwargs && robotIdentifier.MatchString(n)) {
+			if n == names[index] {
 				return v, true
 			}
 			continue
@@ -1598,6 +1736,11 @@ func (f *robotFrame) emit(text string) {
 		t.s.unrebuilt(f.site, t.data, reasonConditionalSend, "")
 		return
 	}
+	if _, rest, found := strings.Cut(text, string(rtUnsupported)); found {
+		construct, _, _ := strings.Cut(rest, string(rtClose))
+		t.s.unrebuilt(f.site, t.data, reasonUnsupported, construct)
+		return
+	}
 	if name, whole := wholeRuntimeRef(text); whole {
 		t.s.unrebuilt(f.site, t.data, reasonUnknownQueryText, name)
 		return
@@ -1607,7 +1750,7 @@ func (f *robotFrame) emit(text string) {
 		t.s.unrebuilt(f.site, t.data, reasonUnquotedVariable, strings.Join(outside, ", "))
 		return
 	}
-	q := &robotSent{line: f.site, query: query, refused: f.expect, skipped: t.skipped}
+	q := &robotSent{line: f.site, query: query, refused: f.expect}
 	t.sent = append(t.sent, q)
 	t.open = q
 }
