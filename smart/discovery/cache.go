@@ -13,7 +13,10 @@ import (
 // resolved (ServiceCatalog.BaseURL), never by the OpenID Connect issuer. An
 // entry whose BaseURL is not the base URL it is found under counts as no
 // entry: the Resolver fetches the document with a plain request, as for a
-// miss, and the fetch then replaces or drops it as below.
+// miss, and the fetch then replaces or drops it as below. The key is the
+// base URL exactly as the caller gave it, which can carry a password in its
+// userinfo, so an implementation must not echo the key, as given or
+// escaped, in its errors or logs.
 //
 // Resolvers built with different options may share one Cache, and a Cache
 // may hold entries that no Resolver in this process fetched, such as one
@@ -43,8 +46,10 @@ import (
 // that only the caller's own context ending caused, and a panic in the
 // fetch.
 //
-// The Resolver logs an error from Put or Invalidate at warning level and
-// carries on: it does not reach the caller of Resolve or Refresh. A failed
+// The Resolver logs an error from Put or Invalidate at warning level, with
+// the base URL's password masked wherever the error's text quotes it, as
+// given or escaped, and carries on: it does not reach the caller of Resolve
+// or Refresh. A failed
 // Put or Invalidate leaves the cache as it was, so the next Resolve fetches
 // again unless the entry the cache still holds is fresh. A panic in Put or
 // Invalidate reaches the caller that started the fetch as it was raised, and

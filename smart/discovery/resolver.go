@@ -432,14 +432,14 @@ func (r *Resolver) runCall(ctx context.Context, baseURL string, cached *ServiceC
 		// longer vouches for. The caller's context may have ended after the
 		// failure, so it must not stop the invalidation.
 		if ierr := r.cache.Invalidate(context.WithoutCancel(ctx), baseURL); ierr != nil {
-			r.cfg.logger.Warn("discovery: cache invalidate failed", "base_url", urlredact.String(baseURL), "err", ierr)
+			r.cfg.logger.Warn("discovery: cache invalidate failed", "base_url", urlredact.String(baseURL), "err", cacheErrorText(ierr, baseURL))
 		}
 	case cat != nil:
 		// The caller may have cancelled after the fetch succeeded. The
 		// write still has to land, or the entry from before this fetch
 		// stays. Cancellation must not refuse it, as with Invalidate above.
 		if perr := r.cache.Put(context.WithoutCancel(ctx), baseURL, cat); perr != nil {
-			r.cfg.logger.Warn("discovery: cache put failed", "base_url", urlredact.String(baseURL), "err", perr)
+			r.cfg.logger.Warn("discovery: cache put failed", "base_url", urlredact.String(baseURL), "err", cacheErrorText(perr, baseURL))
 		}
 	}
 
@@ -455,6 +455,15 @@ func (r *Resolver) runCall(ctx context.Context, baseURL string, cached *ServiceC
 	call.ownContextEnded = ownContextEnded
 	call.abandoned = false
 	return cat, err
+}
+
+// cacheErrorText is the text of err, an error from a Cache write for baseURL,
+// with the password of baseURL masked. The Cache is handed baseURL as its
+// key, so its error can quote the key, as given or escaped, as a file-backed
+// Cache's *os.PathError does when the file is named after it. fmt.Sprint
+// gives the text of a typed nil error too, instead of panicking.
+func cacheErrorText(err error, baseURL string) string {
+	return urlredact.Text(fmt.Sprint(err), baseURL)
 }
 
 // release takes call out of the in-flight set, then wakes its waiters. runCall

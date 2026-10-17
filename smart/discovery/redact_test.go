@@ -5,9 +5,11 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -471,5 +473,71 @@ func TestREQ073_PlaintextWarningMasksBaseURLPassword(t *testing.T) { // REQ-073
 	}
 	if !strings.Contains(got, "base_url=https://svc:xxxxx@127.0.0.1") {
 		t.Errorf("log = %q, want the base URL with its password masked", got)
+	}
+}
+
+// echoingCache fails every write with an error that quotes its key in the
+// form quote gives it, as a file-backed Cache does when it names a file
+// made from the key.
+type echoingCache struct {
+	*discovery.MemoryCache
+	quote func(key string) string
+}
+
+func (c echoingCache) Put(_ context.Context, key string, _ *discovery.ServiceCatalog) error {
+	return &fs.PathError{Op: "open", Path: "/var/cache/smart/" + c.quote(key), Err: fs.ErrPermission}
+}
+
+func (c echoingCache) Invalidate(_ context.Context, key string) error {
+	return &fs.PathError{Op: "remove", Path: "/var/cache/smart/" + c.quote(key), Err: fs.ErrPermission}
+}
+
+// TestREQ071_CacheErrorLogMasksBaseURLPassword pins the text of a Cache
+// error the resolver logs: the Cache is handed the base URL as its key, and
+// an error that quotes the key, as given or escaped for a file name, is
+// logged with the base URL's password masked. The password p;a+b is written
+// differently as given, query-escaped and path-escaped.
+func TestREQ071_CacheErrorLogMasksBaseURLPassword(t *testing.T) { // REQ-071
+	const password = "p;a+b"
+	forms := []string{password, url.QueryEscape(password), url.PathEscape(password)}
+	quotes := []struct {
+		name  string
+		quote func(string) string
+	}{
+		{"as given", func(k string) string { return k }},
+		{"query-escaped", url.QueryEscape},
+		{"path-escaped", url.PathEscape},
+	}
+	writes := []struct {
+		name    string
+		smart   documentFunc
+		wantMsg string
+	}{
+		{"Put after a resolution", serve(fixed(documentWith("https://api.example.com/openehr/v1", nil))), "cache put failed"},
+		{"Invalidate after a failed fetch", notFound, "cache invalidate failed"},
+	}
+	for _, q := range quotes {
+		for _, w := range writes {
+			t.Run(q.name+"/"+w.name, func(t *testing.T) {
+				p := startPlatform(t, false, w.smart, notFound)
+				var buf bytes.Buffer
+				res, err := discovery.NewResolver(echoingCache{discovery.NewMemoryCache(), q.quote},
+					discovery.WithHTTPClient(p.srv.Client()),
+					discovery.WithLogger(slog.New(slog.NewTextHandler(&buf, nil))))
+				if err != nil {
+					t.Fatal(err)
+				}
+				_, _ = res.Resolve(t.Context(), strings.Replace(p.baseURL(), "://", "://svc:"+password+"@", 1))
+				got := buf.String()
+				if !strings.Contains(got, w.wantMsg) || !strings.Contains(got, "permission denied") {
+					t.Fatalf("log = %q, want a %q warning with the Cache's error", got, w.wantMsg)
+				}
+				for _, f := range forms {
+					if strings.Contains(got, f) {
+						t.Errorf("log = %q carries the password as %q", got, f)
+					}
+				}
+			})
+		}
 	}
 }
