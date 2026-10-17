@@ -151,9 +151,9 @@ Four decode failures stay **outside** the sentinel by design, and **MUST NOT** a
 - A member name, a `_type` value, and an RM type or attribute name are structure, not values. They **MAY** appear in the pointer or the text, including a member or a type the RM does not define.
 - The `DecodeError` an entry point returns **MUST** hold in `Value`, a `constraints.Redacted` ([§ REQ-168 *The redacting carrier*](clinical-modeling.md#the-redacting-carrier)), the JSON text of the value the decoder refused, as a string written as the document wrote it, when the code that refused it holds that text. Two cases:
   - a number or string of the right JSON kind that the target Go type cannot hold, such as a fraction or an out-of-range number for an integer;
-  - a value an SDK primitive codec refused: `rm.Real` and `rm.Integer` for a quoted literal they cannot parse, `rm.Real` for a number past its digit budget (§ Floating-point precision), and `rm.Character` for a value that is not exactly one character.
+  - a value an SDK primitive codec refused: `rm.Real` and `rm.Integer` for a quoted literal they cannot parse, `rm.Real` for a number past its digit budget (§ Floating-point precision), and `rm.Character` for a value that is not exactly one character or not a usable code point.
 
-  `Value` **MUST** be empty for any other failure: a value of the wrong JSON kind for its target, malformed JSON, a dispatch failure, a nesting-depth refusal, and an unknown member.
+  `Value` **MUST** be empty for any other failure: a value of the wrong JSON kind for its target, a string that is not valid base64 for a byte field such as `DV_MULTIMEDIA` `data` (json/v2 records no literal for either), malformed JSON, a dispatch failure, a nesting-depth refusal, and an unknown member.
 - The original error **MUST** stay reachable through unwrapping, so every sentinel this § names, `jsontext.ErrDuplicateName`, `strconv.ErrSyntax` and `strconv.ErrRange` keep matching with `errors.Is`, and `*json.SemanticError`, `*jsontext.SyntacticError` and `*strconv.NumError` with `errors.As`. The text of such a cause **MAY** name the value: a caller that unwraps to it asks for the value, as one that reads `Value` does.
 - A codec's own prefix **MUST NOT** repeat a value the wrapped cause already carries: `rm.Real` and `rm.Integer` report a quoted literal that fails to parse as `parse quoted literal: <cause>`, so the literal appears exactly once, in the cause.
 
@@ -166,7 +166,8 @@ Four decode failures stay **outside** the sentinel by design, and **MUST NOT** a
   - a `DV_QUANTITY` `precision` of `1.5` or `2147483648`;
   - a `DV_TEXT` `value` of `"Jane \q Doe"` (an invalid escape) or of the bare token `Jane` (a refused character).
 - In the same cases, `Value.Reveal()` returns the number as written for the four numeric inputs, and nothing for the two malformed ones.
-- `Value.Reveal()` returns the refused literal for an `rm.Real` number past the digit budget and for a two-character value `rm.Character` refuses. It returns nothing for a value of the wrong JSON kind, such as a `DV_BOOLEAN` `value` of `"yes"`.
+- `Value.Reveal()` returns the refused literal for an `rm.Real` number past the digit budget and for a two-character value `rm.Character` refuses. It returns nothing for a value of the wrong JSON kind, such as a `DV_BOOLEAN` `value` of `"yes"`, or for a `DV_MULTIMEDIA` `data` string that is not valid base64.
+- A reader that fails partway through a value, inside a polymorphic slot or under `WithStrict` included, comes back as its own error, not wrapped in a `DecodeError`.
 - A duplicate member name and an unknown `_type` keep the name in `Error()`.
 - Every sentinel and cause the decode reached before this rule is still reached through unwrapping, and a test fails when the entry point drops one.
 - A read error from the reader and `io.EOF` from an exhausted `Decoder` come back unwrapped.
