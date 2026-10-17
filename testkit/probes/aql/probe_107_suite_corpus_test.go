@@ -735,6 +735,117 @@ T
 			want: []string{"unrebuilt " + reasonOutsideTest + " ()"},
 		},
 		{
+			// Every position a suite file runs a keyword from: its own suite
+			// setup and teardown are counted, its test setup, teardown and
+			// template are the defaults a test's own settings override.
+			name: "every_suite_file_and_test_fixture_runs",
+			suite: `*** Settings ***
+Suite Setup    Log    nothing sent
+Suite Teardown    Set AQL And Execute Ad Hoc Query    SELECT f FROM FOLDER f
+Test Setup    Set AQL And Execute Ad Hoc Query    SELECT c FROM COMPOSITION c
+Test Teardown    Set AQL And Execute Ad Hoc Query    SELECT o FROM OBSERVATION o
+
+*** Test Cases ***
+Defaults
+    Log    body
+Own Fixtures
+    [Setup]    Set AQL And Execute Ad Hoc Query    SELECT e FROM EHR e
+    [Teardown]    Set AQL And Execute Ad Hoc Query    SELECT s FROM SECTION s
+    Log    body
+No Fixtures
+    [Setup]    NONE
+    [Teardown]
+    Set AQL And Execute Ad Hoc Query    SELECT p FROM POINT_EVENT p
+`,
+			files: map[string]string{
+				"AQL/MIXED/t.robot": "*** Settings ***\nTest Template    Set AQL And Execute Ad Hoc Query\n\n" +
+					"*** Test Cases ***\nT\n    SELECT c FROM COMPOSITION c\n",
+			},
+			want: []string{
+				"answered: SELECT c FROM COMPOSITION c", "answered: SELECT o FROM OBSERVATION o",
+				"answered: SELECT e FROM EHR e", "answered: SELECT s FROM SECTION s",
+				"answered: SELECT p FROM POINT_EVENT p",
+				"unrebuilt " + reasonUnsupported + " ([Template])",
+				"unrebuilt " + reasonOutsideTest + " ()",
+			},
+		},
+		{
+			// A directory's init file runs its suite setup and teardown once,
+			// around every suite below it, with its own keywords.
+			name: "init_file_suite_setup_and_teardown_are_counted",
+			suite: `*** Test Cases ***
+T
+    Log    nothing sent
+`,
+			files: map[string]string{
+				"AQL/WHERE/__init__.robot": `*** Settings ***
+Suite Setup    Set AQL And Execute Ad Hoc Query    SELECT c FROM COMPOSITION c
+Suite Teardown    Send Query
+
+*** Keywords ***
+Send Query
+    Set AQL And Execute Ad Hoc Query    SELECT o FROM OBSERVATION o
+`,
+				"AQL/WHERE/u.robot": "*** Test Cases ***\nU\n    Log    nothing sent\n",
+			},
+			want: []string{"unrebuilt " + reasonOutsideTest + " ()", "unrebuilt " + reasonOutsideTest + " ()"},
+		},
+		{
+			// An init file's test setup and teardown are the defaults of every
+			// test below it: a nearer init file, the suite file's own setting
+			// and the test's own setting each override them.
+			name: "init_file_test_setup_and_teardown_are_inherited",
+			suite: `*** Test Cases ***
+Inherited
+    Log    body
+Own Setup
+    [Setup]    Set AQL And Execute Ad Hoc Query    SELECT e FROM EHR e
+    Log    body
+`,
+			files: map[string]string{
+				"AQL/WHERE/__init__.robot": "*** Settings ***\n" +
+					"Test Setup    Set AQL And Execute Ad Hoc Query    SELECT c FROM COMPOSITION c\n" +
+					"Test Teardown    Set AQL And Execute Ad Hoc Query    SELECT o FROM OBSERVATION o\n",
+				"AQL/WHERE/u.robot": "*** Settings ***\n" +
+					"Test Setup    Set AQL And Execute Ad Hoc Query    SELECT s FROM SECTION s\n\n" +
+					"*** Test Cases ***\nSuite Setting\n    Log    body\n",
+				"AQL/WHERE/NESTED/__init__.robot": "*** Settings ***\n" +
+					"Test Setup    Set AQL And Execute Ad Hoc Query    SELECT p FROM POINT_EVENT p\n",
+				"AQL/WHERE/NESTED/v.robot": "*** Test Cases ***\nNearer Init\n    Log    body\n",
+			},
+			want: []string{
+				"answered: SELECT p FROM POINT_EVENT p", "answered: SELECT o FROM OBSERVATION o",
+				"answered: SELECT c FROM COMPOSITION c", "answered: SELECT o FROM OBSERVATION o",
+				"answered: SELECT e FROM EHR e", "answered: SELECT o FROM OBSERVATION o",
+				"answered: SELECT s FROM SECTION s", "answered: SELECT o FROM OBSERVATION o",
+			},
+		},
+		{
+			// A keyword's own [Setup] and [Teardown] run before and after its
+			// body, wherever the rows sit, with its arguments bound.
+			name: "keyword_setup_and_teardown_run_around_its_body",
+			suite: `*** Test Cases ***
+T
+    Run Query    SELECT o FROM OBSERVATION o
+    Run Query Without Fixtures
+
+*** Keywords ***
+Run Query
+    [Arguments]    ${closing}
+    [Teardown]    Set AQL And Execute Ad Hoc Query    ${closing}
+    [Setup]    Set AQL And Execute Ad Hoc Query    SELECT c FROM COMPOSITION c
+    Set AQL And Execute Ad Hoc Query    SELECT e FROM EHR e
+Run Query Without Fixtures
+    [Setup]    NONE
+    [Teardown]
+    Set AQL And Execute Ad Hoc Query    SELECT s FROM SECTION s
+`,
+			want: []string{
+				"answered: SELECT c FROM COMPOSITION c", "answered: SELECT e FROM EHR e",
+				"answered: SELECT o FROM OBSERVATION o", "answered: SELECT s FROM SECTION s",
+			},
+		},
+		{
 			name: "keyword_recursion_is_counted",
 			suite: `*** Test Cases ***
 T
@@ -1052,15 +1163,20 @@ B
 
 // TestProbe107ReaderLocatesEachQuery_REQ109 pins the corpus coordinate a
 // failure names: the test-case row that sends the query, and for a
-// data-driven test the data row too.
+// data-driven test the data row too. A send an init file counts is placed at
+// the init file's setting row, under the family the init file sits in, or
+// under none at AQL/.
 func TestProbe107ReaderLocatesEachQuery_REQ109(t *testing.T) {
 	t.Parallel()
+	const initSend = "*** Settings ***\n%s    Set AQL And Execute Ad Hoc Query    SELECT e FROM EHR e\n"
 	c, err := readSuiteCorpus(suiteFixture(map[string]string{
 		"AQL/WHERE/t.robot": "*** Test Cases ***\nT\n    Log    first\n    Run Query\n\n" +
 			"*** Keywords ***\nRun Query\n    Set AQL And Execute Ad Hoc Query    SELECT c FROM COMPOSITION c\n",
 		"AQL/FROM/d.robot": "*** Settings ***\nLibrary    DataDriver    file=../../_resources/d.csv\n\n" +
 			"*** Test Cases ***\nD\n    [Template]    Set AQL And Execute Ad Hoc Query\n    ${q}\n",
-		"_resources/d.csv": "${q}\nSELECT o FROM OBSERVATION o\n",
+		"_resources/d.csv":         "${q}\nSELECT o FROM OBSERVATION o\n",
+		"AQL/__init__.robot":       fmt.Sprintf(initSend, "Suite Setup"),
+		"AQL/WHERE/__init__.robot": fmt.Sprintf(initSend, "Suite Teardown"),
 	}))
 	if err != nil {
 		t.Fatalf("readSuiteCorpus: %v", err)
@@ -1072,6 +1188,17 @@ func TestProbe107ReaderLocatesEachQuery_REQ109(t *testing.T) {
 	want := []string{"FROM AQL/FROM/d.robot:7 (data _resources/d.csv:2)", "WHERE AQL/WHERE/t.robot:4"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("coordinates = %v, want %v", got, want)
+	}
+	got = nil
+	for _, u := range c.Unrebuilt {
+		got = append(got, u.Family+" "+u.Where()+" "+u.Reason)
+	}
+	want = []string{
+		" AQL/__init__.robot:2 " + reasonOutsideTest,
+		"WHERE AQL/WHERE/__init__.robot:2 " + reasonOutsideTest,
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("unrebuilt coordinates = %v, want %v", got, want)
 	}
 }
 
@@ -1102,6 +1229,22 @@ func TestProbe107ReaderRefusesAnUnlearnedCorpus_REQ160(t *testing.T) {
 			"unknown_section",
 			func(m fstest.MapFS) { m["AQL/WHERE/t.robot"] = &fstest.MapFile{Data: []byte("*** Cases ***\n")} },
 			`section header "*** Cases ***"`,
+		},
+		{
+			"pipe_separated_suite",
+			func(m fstest.MapFS) {
+				m["AQL/WHERE/t.robot"] = &fstest.MapFile{Data: []byte("*** Test Cases ***\n" +
+					"| T | Set AQL And Execute Ad Hoc Query | SELECT c FROM COMPOSITION c |\n")}
+			},
+			"AQL/WHERE/t.robot:2: a pipe-separated row",
+		},
+		{
+			"pipe_separated_init_file",
+			func(m fstest.MapFS) {
+				m["AQL/WHERE/__init__.robot"] = &fstest.MapFile{Data: []byte("| *** Settings *** |\n" +
+					"| Suite Setup | Set AQL And Execute Ad Hoc Query | SELECT c FROM COMPOSITION c |\n")}
+			},
+			"AQL/WHERE/__init__.robot:1: a pipe-separated row",
 		},
 		{
 			"malformed_data_file",
