@@ -67,6 +67,7 @@ func Compile(opt *template.OperationalTemplate, opts ...Options) (*Compiled, err
 		compiled: c,
 		lookup:   o.Lookup,
 		opts:     o,
+		required: map[string][]string{},
 		pathAttr: map[string]*template.Attribute{},
 		seenPath: map[string]bool{},
 	}
@@ -88,6 +89,12 @@ type walker struct {
 	compiled *Compiled
 	lookup   rminfo.Lookup
 	opts     Options
+
+	// required holds, for each bare RM class this call has met, the
+	// attributes lookup says the class requires, so the lookup, which
+	// builds a fresh list on every call, is asked once per class rather
+	// than once per node and per declared attribute.
+	required map[string][]string
 
 	// currentAttr is the wire-side *template.Attribute under whose
 	// Children() the immediately-recursed compileNode is descending.
@@ -242,10 +249,17 @@ func (w *walker) descend(n template.Node, cn *CompiledNode) error {
 // Order: OPT-declared first (document order), then implicit
 // (sorted by RM declaration order from rminfo).
 func (w *walker) attachAttributes(cn *CompiledNode, declared []*template.Attribute) error {
+	// rminfo knows each class by its bare BMM name; the OPT may declare a
+	// generic instantiation (DV_INTERVAL<DV_QUANTITY>) that it does not.
+	class := bmmtype.Class(cn.rmTypeName)
+	var required []string
+	if cn.rmTypeName != "" {
+		required = w.requiredAttributes(class)
+	}
 	declaredByName := make(map[string]bool, len(declared))
 	for _, a := range declared {
 		declaredByName[a.Name()] = true
-		ca, err := w.buildAttribute(cn, a)
+		ca, err := w.buildAttribute(cn, class, required, a)
 		if err != nil {
 			return err
 		}
@@ -257,20 +271,17 @@ func (w *walker) attachAttributes(cn *CompiledNode, declared []*template.Attribu
 	if cn.rmTypeName == "" {
 		return nil
 	}
-	// rminfo knows each class by its bare BMM name; the OPT may declare a
-	// generic instantiation (DV_INTERVAL<DV_QUANTITY>) that it does not.
-	class := bmmtype.Class(cn.rmTypeName)
-	// Walk RM declaration order so implicit attributes appear in
-	// BMM-stable order regardless of OPT walk path. Only the attributes
-	// the RM mandates are injected: the composition builder needs
-	// implicit entries for required-but-OPT-silent fields alone, and
-	// optional ones would inflate every node with RM metadata that
-	// walker code does not need.
-	for _, attrName := range allAttributesInOrder(w.lookup, class) {
+	// The lookup lists the required attributes in RM declaration order,
+	// so implicit attributes appear in BMM-stable order regardless of OPT
+	// walk path. Only the attributes the RM mandates are injected: the
+	// composition builder needs implicit entries for required-but-OPT-silent
+	// fields alone, and optional ones would inflate every node with RM
+	// metadata that walker code does not need.
+	for _, attrName := range required {
 		if declaredByName[attrName] {
 			continue
 		}
-		rm, ok := w.attributeType(cn.rmTypeName, attrName)
+		rm, ok := w.attributeType(cn.rmTypeName, class, attrName)
 		if !ok || rm == "" {
 			continue
 		}
@@ -290,23 +301,32 @@ func (w *walker) attachAttributes(cn *CompiledNode, declared []*template.Attribu
 	return nil
 }
 
+// requiredAttributes returns the attributes the lookup says the bare RM
+// class class requires, in RM declaration order, asking the lookup once
+// per class and call. The caller must not change the slice.
+func (w *walker) requiredAttributes(class string) []string {
+	required, ok := w.required[class]
+	if !ok {
+		required = w.lookup.RequiredAttributes(class)
+		w.required[class] = required
+	}
+	return required
+}
+
 // buildAttribute compiles one OPT-declared attribute, recursing
 // into its children. The attribute's BMM RM type is looked up so
 // downstream consumers can resolve type-aware constraints without a
-// separate rminfo query.
-func (w *walker) buildAttribute(parent *CompiledNode, a *template.Attribute) (*CompiledAttribute, error) {
-	rm, _ := w.attributeType(parent.rmTypeName, a.Name())
-	required := false
-	if parent.rmTypeName != "" {
-		required = slices.Contains(w.lookup.RequiredAttributes(bmmtype.Class(parent.rmTypeName)), a.Name())
-	}
+// separate rminfo query. class is the bare class of parent's RM type,
+// and required the attributes that class requires.
+func (w *walker) buildAttribute(parent *CompiledNode, class string, required []string, a *template.Attribute) (*CompiledAttribute, error) {
+	rm, _ := w.attributeType(parent.rmTypeName, class, a.Name())
 	ca := &CompiledAttribute{
 		name:              a.Name(),
 		cardinality:       a.Cardinality(),
 		existence:         a.Existence(),
 		childMultiplicity: a.ChildMultiplicity(),
 		rmTypeName:        rm,
-		required:          required,
+		required:          slices.Contains(required, a.Name()),
 	}
 	prevAttr := w.currentAttr
 	w.currentAttr = a
@@ -323,13 +343,14 @@ func (w *walker) buildAttribute(parent *CompiledNode, a *template.Attribute) (*C
 }
 
 // attributeType resolves the RM type of attribute attr on a node whose
-// OPT-declared type is owner. rminfo is keyed by bare class name, so a generic
-// instantiation is looked up by its class; and rminfo types an attribute the
-// class declares with a formal parameter by that parameter's name
-// (DV_INTERVAL.lower is "T"), so the actual parameter the declared name
-// supplies takes its place (DV_QUANTITY for DV_INTERVAL<DV_QUANTITY>).
-func (w *walker) attributeType(owner, attr string) (string, bool) {
-	rm, ok := w.lookup.AttributeRMType(bmmtype.Class(owner), attr)
+// OPT-declared type is owner and whose bare class is class. rminfo is keyed by
+// bare class name, so a generic instantiation is looked up by its class; and
+// rminfo types an attribute the class declares with a formal parameter by
+// that parameter's name (DV_INTERVAL.lower is "T"), so the actual parameter
+// the declared name supplies takes its place (DV_QUANTITY for
+// DV_INTERVAL<DV_QUANTITY>).
+func (w *walker) attributeType(owner, class, attr string) (string, bool) {
+	rm, ok := w.lookup.AttributeRMType(class, attr)
 	if !ok {
 		return "", false
 	}
@@ -422,22 +443,6 @@ func slotPathPredicate(s *template.Slot) string {
 		return ""
 	}
 	return strings.ReplaceAll(inc[0], `\`, "")
-}
-
-// allAttributesInOrder returns the BMM-declared attributes of an RM
-// type in deterministic order. The rminfo Lookup does not expose
-// AttrOrder directly; we reconstruct it by intersecting the order
-// returned by RequiredAttributes + alphabetical for the
-// non-required tail. (This is good enough for stable injection
-// order; the actual BMM order is preserved by Required first since
-// implicit injection only emits required attributes.)
-//
-// The implementation is intentionally simple: rminfo.Default's
-// RequiredAttributes already returns in BMM declaration order, so
-// for the required subset (the only thing we actually inject) it
-// suffices.
-func allAttributesInOrder(l rminfo.Lookup, rmType string) []string {
-	return l.RequiredAttributes(rmType)
 }
 
 func (w *walker) registerPath(cn *CompiledNode) error {
