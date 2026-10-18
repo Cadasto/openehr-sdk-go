@@ -52,8 +52,8 @@ func TestEngine_REQ171_VisitCountOfTheBenchmarkCompositions(t *testing.T) {
 // next visit is a primitive leaf, the walk reports max_nodes at that leaf's
 // path, naming the type its attribute declares and the limit, as its last
 // and only stop, and lists that path alone in Coverage.Stopped. The leaves
-// are of Go primitive types (String, Boolean, Integer64), of the primitive
-// types the RM package names (Real, Integer, Character) and pointers to
+// are of Go primitive types (String, Boolean), of the primitive types the RM
+// package names (Real, Integer, Integer64, Character) and pointers to
 // optional ones (String, Boolean, Real, Integer), at an attribute of the
 // root and below, with no template and with one. Each case's limit and path
 // were read off the walk before primitive leaves were counted without being

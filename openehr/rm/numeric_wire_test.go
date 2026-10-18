@@ -48,9 +48,9 @@ func TestRealEncodesAsNumber(t *testing.T) {
 }
 
 // TestIntegerQuotedNumberDecodes — same asymmetric tolerance for
-// `Integer`. `DV_COUNT.magnitude` is `int64` (Integer64) so we use
-// `DV_PROPORTION.type` which is BMM `Integer` (int32) for this
-// assertion.
+// `Integer`. `DV_COUNT.magnitude` is `rm.Integer64` (BMM Integer64), which
+// takes the same rule at 64 bits, so we use `DV_PROPORTION.type` which is
+// BMM `Integer` (`rm.Integer`) for this assertion.
 func TestIntegerQuotedNumberDecodes(t *testing.T) {
 	in := []byte(`{"_type":"DV_PROPORTION","numerator":1,"denominator":2,"type":"1"}`)
 	var p rm.DVProportion
