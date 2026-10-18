@@ -1,8 +1,8 @@
 package template
 
 import (
-	"encoding/xml"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
@@ -13,17 +13,17 @@ var (
 	slotValueRE      = regexp.MustCompile(`(?is)<value>(.*?)</value>`)
 )
 
-// parseSlotAssertions parses raw OPT slot assertion XML / text blobs
-// into compiled [constraints.SlotAssertion] values. Unparseable
-// entries are skipped (best-effort); callers retain [Slot.Includes]
-// for the original wire form.
-func parseSlotAssertions(raw []string) []constraints.SlotAssertion {
-	if len(raw) == 0 {
+// parseSlotAssertions parses the OPT slot assertion blobs into
+// compiled [constraints.SlotAssertion] values. Unparseable entries are
+// skipped (best-effort); callers retain [Slot.Includes] for the
+// original wire form.
+func parseSlotAssertions(xs []xmlAssertion) []constraints.SlotAssertion {
+	if len(xs) == 0 {
 		return nil
 	}
-	out := make([]constraints.SlotAssertion, 0, len(raw))
-	for _, blob := range raw {
-		for _, pattern := range extractSlotPatterns(blob) {
+	out := make([]constraints.SlotAssertion, 0, len(xs))
+	for _, x := range xs {
+		for _, pattern := range extractSlotPatterns(x) {
 			a, err := constraints.NewSlotAssertion(pattern)
 			if err != nil {
 				continue
@@ -37,36 +37,50 @@ func parseSlotAssertions(raw []string) []constraints.SlotAssertion {
 	return out
 }
 
-func extractSlotPatterns(raw string) []string {
-	raw = strings.TrimSpace(raw)
+// extractSlotPatterns returns the archetype-id patterns of one
+// assertion blob, in this order: the `archetype_id matches {…}` text,
+// the <string_expression> text, then each supported <expression> the
+// OPT decode read. The <value> text is the fallback when none of those
+// gives a pattern. A blob often states one pattern in several of these
+// forms, as <string_expression> text and as an <expression> tree, so a
+// pattern the blob has already given is not listed again.
+func extractSlotPatterns(x xmlAssertion) []string {
+	raw := strings.TrimSpace(x.InnerXML)
 	if raw == "" {
 		return nil
 	}
 	var patterns []string
+	add := func(p string) {
+		p = normalizeSlotPattern(p)
+		if !slices.Contains(patterns, p) {
+			patterns = append(patterns, p)
+		}
+	}
 	if p := extractTextSlotPattern(raw); p != "" {
-		patterns = append(patterns, normalizeSlotPattern(p))
+		add(p)
 	}
 	// Ocean Template Designer <string_expression> shape.
 	if m := slotStringExprRE.FindStringSubmatch(raw); len(m) == 2 {
 		if p := extractTextSlotPattern(m[1]); p != "" {
-			patterns = append(patterns, normalizeSlotPattern(p))
+			add(p)
 		}
 	}
-	for _, p := range extractXMLSlotPatterns(raw) {
-		patterns = append(patterns, normalizeSlotPattern(p))
+	for _, expr := range x.Expressions {
+		if !expr.isSupportedSlotMatch() {
+			continue
+		}
+		if p := strings.TrimSpace(expr.Right.Item.Pattern); p != "" {
+			add(p)
+		}
 	}
 	if len(patterns) == 0 {
 		if v := extractXMLChardataValue(raw); v != "" {
 			if p := extractTextSlotPattern(v); p != "" {
-				patterns = append(patterns, normalizeSlotPattern(p))
+				add(p)
 			}
 		}
 	}
 	return patterns
-}
-
-type slotExpressionWrapper struct {
-	Expressions []slotExpression `xml:"expression"`
 }
 
 type slotExpression struct {
@@ -84,24 +98,6 @@ type slotOperand struct {
 type slotOperandItem struct {
 	Text    string `xml:",chardata"`
 	Pattern string `xml:"pattern"`
-}
-
-func extractXMLSlotPatterns(raw string) []string {
-	wrapped := `<root xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">` + raw + `</root>`
-	var w slotExpressionWrapper
-	if err := xml.Unmarshal([]byte(wrapped), &w); err != nil {
-		return nil
-	}
-	var patterns []string
-	for _, expr := range w.Expressions {
-		if !expr.isSupportedSlotMatch() {
-			continue
-		}
-		if p := strings.TrimSpace(expr.Right.Item.Pattern); p != "" {
-			patterns = append(patterns, p)
-		}
-	}
-	return patterns
 }
 
 func (e slotExpression) isSupportedSlotMatch() bool {
@@ -170,11 +166,13 @@ func extractXMLChardataValue(raw string) string {
 // slotRules builds [constraints.SlotRules] for a wire-side slot.
 // RawIncludeCount carries the pre-parse blob count so consumers can
 // detect the fail-open case where every include failed to compile.
+// The rule slices share the slot's own, so the result is for read-only
+// checks inside this package; [Slot.SlotRules] hands out a clone.
 func (s *Slot) slotRules() constraints.SlotRules {
 	return constraints.SlotRules{
 		RMTypeName:      s.rmTypeName,
 		Includes:        s.parsedIncludes,
 		Excludes:        s.parsedExcludes,
 		RawIncludeCount: len(s.includes),
-	}.Clone()
+	}
 }

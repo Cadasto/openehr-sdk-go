@@ -1,9 +1,9 @@
 // Package walk provides a Visitor abstraction over the compiled
-// OPT tree produced by [internal/templatecompile.Compile]. Consumers
-// such as the composition builder, validator, example generator and
-// serialisation walkers share it, so none of them reimplements
-// depth-first traversal, pre/post-order hook semantics or subtree
-// pruning.
+// OPT tree produced by [internal/templatecompile.Compile]: depth-first
+// traversal with pre- and post-order hooks and subtree pruning. Outside
+// tests its one user is the templatedump printer beneath it; the
+// composition builder, validator, example generator and codecs each walk
+// the compiled tree with their own loops.
 //
 // The package is internal, like [internal/templatecompile].
 //

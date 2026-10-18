@@ -19,6 +19,10 @@ import (
 type SlotAssertion struct {
 	pattern string
 	re      *regexp.Regexp
+	// example is the synthetic archetype id [SlotRules.ExampleArchetypeID]
+	// returns for this assertion, worked out once here rather than on
+	// every call; "" when the pattern is too complex to synthesise from.
+	example string
 }
 
 // NewSlotAssertion compiles pattern as a Go regexp / RE2 expression
@@ -39,7 +43,7 @@ func NewSlotAssertion(pattern string) (SlotAssertion, error) {
 	if err != nil {
 		return SlotAssertion{}, fmt.Errorf("slot assertion: %w", err)
 	}
-	return SlotAssertion{pattern: pattern, re: re}, nil
+	return SlotAssertion{pattern: pattern, re: re, example: exampleFromPattern(pattern, re)}, nil
 }
 
 // anchorPattern wraps a raw archetype-id pattern so it matches the
@@ -158,10 +162,7 @@ func (r SlotRules) AllowsRMTypePrefix(archetypeID string) bool {
 // example. Used by the instance synthesiser.
 func (r SlotRules) ExampleArchetypeID() string {
 	if len(r.Includes) > 0 {
-		if id := exampleFromPattern(r.Includes[0].pattern); id != "" {
-			return id
-		}
-		return ""
+		return r.Includes[0].example
 	}
 	if r.RMTypeName != "" {
 		return "openEHR-EHR-" + r.RMTypeName + ".example.v1"
@@ -178,15 +179,20 @@ var archetypeIDShapeRE = regexp.MustCompile(`^openEHR-[A-Za-z]+-[A-Za-z0-9_]+\.[
 // exampleFromPattern derives a literal archetype id that satisfies
 // simple OPT patterns (no unbounded repetition). Returns "" when the
 // pattern is too complex to synthesise a conforming id from.
-func exampleFromPattern(pattern string) string {
+//
+// whole, when not nil, is the regexp compiled from
+// anchorPattern(pattern); it is used instead of compiling that same
+// source again.
+func exampleFromPattern(pattern string, whole *regexp.Regexp) string {
 	pattern = strings.TrimSpace(pattern)
 	if pattern == "" {
 		return ""
 	}
 	// Flat alternation (A|B|…) is the common closed-includes shape:
-	// synthesise from the first alternative.
+	// synthesise from the first alternative, which whole does not
+	// stand for.
 	if before, _, ok := strings.Cut(pattern, "|"); ok {
-		return exampleFromPattern(before)
+		return exampleFromPattern(before, nil)
 	}
 	// Drop the optional ADL suffix group, then unescape literal dots.
 	simplified := strings.ReplaceAll(pattern, `(-[a-zA-Z0-9_]+)*`, "")
@@ -197,7 +203,14 @@ func exampleFromPattern(pattern string) string {
 	if !archetypeIDShapeRE.MatchString(simplified) {
 		return ""
 	}
-	if re, err := regexp.Compile(anchorPattern(pattern)); err == nil && re.MatchString(simplified) {
+	if whole == nil {
+		re, err := regexp.Compile(anchorPattern(pattern))
+		if err != nil {
+			return ""
+		}
+		whole = re
+	}
+	if whole.MatchString(simplified) {
 		return simplified
 	}
 	return ""

@@ -307,8 +307,10 @@ func TestCString_Validate(t *testing.T) {
 	}
 }
 
-// REQ-103 — temporal validators accept ISO 8601 shapes (full,
-// year-month, year for dates; RFC 3339 for date-times).
+// REQ-103 — temporal validators accept exactly the ISO 8601 forms the
+// RM's temporal parse accepts (rm.DVDate.ValidISO8601 and its DV_TIME,
+// DV_DATE_TIME and DV_DURATION siblings), partial dates included, and
+// refuse text that is not ISO 8601.
 func TestTemporal_Validate(t *testing.T) {
 	if v := (constraints.CDate{}).Validate("2026-05-24"); len(v) != 0 {
 		t.Errorf("CDate(2026-05-24) = %v, want nil", v)

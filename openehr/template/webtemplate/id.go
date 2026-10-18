@@ -3,7 +3,9 @@ package webtemplate
 import (
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
+	impl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
@@ -16,10 +18,17 @@ import (
 //   - trim leading/trailing '_' (a trailing '.' is kept, e.g. "Anzeichens.");
 //   - if the result begins with a digit, prefix 'a' (identifiers may not
 //     start with a digit — "24 hour average" → "a24_hour_average").
+//
+// Each rune is lowercased on its own with [unicode.ToLower], which is what
+// [strings.ToLower] does to a string: it has no rule that looks at a rune's
+// neighbours, such as a final sigma, and it reads a byte that is not valid
+// UTF-8 as U+FFFD, as ranging over the string does.
 func sanitizeID(s string) string {
 	var b strings.Builder
+	b.Grow(len(s))
 	prevUnderscore := false
-	for _, r := range strings.ToLower(s) {
+	for _, r := range s {
+		r = unicode.ToLower(r)
 		switch {
 		case unicode.IsLetter(r) || unicode.IsDigit(r) || r == '.' || r == '-':
 			b.WriteRune(r)
@@ -37,20 +46,20 @@ func sanitizeID(s string) string {
 		}
 	}
 	out := strings.Trim(b.String(), "_")
-	if out != "" {
-		if r := []rune(out)[0]; unicode.IsDigit(r) {
-			out = "a" + out
-		}
+	// An empty out decodes as U+FFFD, which is not a digit.
+	if r, _ := utf8.DecodeRuneInString(out); unicode.IsDigit(r) {
+		out = "a" + out
 	}
 	return out
 }
 
-// termText returns the node's display text in the given language, or "".
-func termText(n *templatecompile.CompiledNode, lang string) string {
-	if t, ok := n.Term(n.NodeID(), lang); ok {
-		return t.Items["text"]
-	}
-	return ""
+// termText returns the node's display text: the text of the term for its
+// node id that the nearest enclosing archetype root defines, or "" when no
+// root defines one. A compiled template carries one set of terms, in its
+// default language, so the text is in that language.
+func termText(n *templatecompile.CompiledNode) string {
+	text, _ := impl.TermItem(n, n.NodeID(), "text")
+	return text
 }
 
 // idOf resolves a node's web id: the template-level node name the OPT pins
@@ -63,8 +72,11 @@ func termText(n *templatecompile.CompiledNode, lang string) string {
 // it is the only thing that distinguishes siblings filling one slot with
 // the same archetype: they share a concept term, so deriving from the term
 // gave every one of them the same id and hit [ErrIDCollision].
-func idOf(n *templatecompile.CompiledNode, attrName string, cfg *config) string {
-	return firstNonEmptyID(n.NodeName(), termText(n, cfg.defaultLanguage), attrName, n.RMTypeName())
+//
+// text is the node's term text, as [termText] returns it; the caller passes
+// it in because it also names the node.
+func idOf(n *templatecompile.CompiledNode, attrName, text string) string {
+	return firstNonEmptyID(n.NodeName(), text, attrName, n.RMTypeName())
 }
 
 // firstNonEmptyID returns the first candidate whose sanitised form is

@@ -7,9 +7,9 @@ import (
 
 // CodedTermRef is the openEHR CODE_PHRASE shape used inside primitive
 // constraint payloads (e.g. DV_QUANTITY.property, DV_ORDINAL.symbol).
-// It is a flat record so this package stays stdlib-only; the rm
-// package's DvCodedText pulls in too much surface for a leaf
-// constraint type.
+// It is a flat record so this package need not import the rm package,
+// whose rm.DVCodedText pulls in too much surface for a leaf constraint
+// type.
 type CodedTermRef struct {
 	Terminology string
 	CodeString  string

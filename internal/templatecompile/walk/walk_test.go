@@ -246,12 +246,12 @@ func TestWalk_NilInputs(t *testing.T) {
 }
 
 // Phase 5 — the walker must reach every CompiledNode in the
-// compiled tree, including implicit-attribute children. The "truth
-// count" is the byPath index size (every node was registered there
-// during Compile, with duplicate-collision detection — see
-// registerPath in compile.go). Comparing the walker's PreHandle
-// tally to NumNodes catches subtree-pruning bugs that comparing the
-// walker against itself cannot.
+// compiled tree, including implicit-attribute children. NumNodes
+// counts distinct AQL paths, and every node of vital_signs has a path
+// of its own, so here it also counts the nodes; on a template whose
+// nodes share paths it would count fewer. Comparing the walker's
+// PreHandle tally to it catches subtree-pruning bugs that comparing
+// the walker against itself cannot.
 func TestWalk_VisitsEveryNode(t *testing.T) {
 	c := mustCompile(t, "vital_signs")
 	var visited int

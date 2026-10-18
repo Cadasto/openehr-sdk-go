@@ -37,18 +37,18 @@ func IsAOMPrimitiveShortName(s string) bool {
 // archetype id on this node (i.e. it was a *ArchetypeRoot on the
 // wire side).
 type CompiledNode struct {
-	aqlPath      string
-	rmTypeName   string
-	nodeID       string
-	nodeName     string
-	archetypeID  string // empty unless this node was an *ArchetypeRoot on the wire
-	occurrences  *template.Multiplicity
-	attributes   []*CompiledAttribute
-	parent       *CompiledNode
-	isSlot       bool
-	slotIncludes []string
-	slotExcludes []string
-	slotRules    constraints.SlotRules
+	aqlPath     string
+	rmTypeName  string
+	nodeID      string
+	nodeName    string
+	archetypeID string // empty unless this node was an *ArchetypeRoot on the wire
+	occurrences *template.Multiplicity
+	attributes  []*CompiledAttribute
+	parent      *CompiledNode
+
+	// slot holds what only a slot carries; nil exactly when the node is
+	// not a slot.
+	slot *slotInfo
 
 	// primitive carries the typed REQ-103 constraint value when the
 	// wire xsi:type was a primitive. Nil for non-primitive nodes
@@ -68,6 +68,16 @@ type CompiledNode struct {
 	// it.
 	conforming         classBits
 	conformingResolved bool
+}
+
+// slotInfo is what a slot node carries beyond the fields every node has:
+// its raw include and exclude assertion strings and its parsed rules. It
+// sits behind a pointer so that the many nodes that are not slots do not
+// carry room for it.
+type slotInfo struct {
+	includes []string
+	excludes []string
+	rules    constraints.SlotRules
 }
 
 // AQLPath returns the canonical openEHR path string of this node.
@@ -125,30 +135,45 @@ func (n *CompiledNode) Parent() *CompiledNode { return n.parent }
 
 // IsSlot reports whether the wire-side node was an *ARCHETYPE_SLOT
 // (i.e. an opaque slot-fill point with no descendable structure).
-func (n *CompiledNode) IsSlot() bool { return n.isSlot }
+func (n *CompiledNode) IsSlot() bool { return n.slot != nil }
 
 // SlotIncludes returns a defensive copy of the slot's raw
 // archetype-id include assertion strings. Empty for non-slot nodes.
-func (n *CompiledNode) SlotIncludes() []string { return slices.Clone(n.slotIncludes) }
+func (n *CompiledNode) SlotIncludes() []string {
+	if n.slot == nil {
+		return nil
+	}
+	return slices.Clone(n.slot.includes)
+}
 
 // SlotExcludes returns a defensive copy of the slot's raw
 // archetype-id exclude assertion strings. Empty for non-slot nodes.
-func (n *CompiledNode) SlotExcludes() []string { return slices.Clone(n.slotExcludes) }
+func (n *CompiledNode) SlotExcludes() []string {
+	if n.slot == nil {
+		return nil
+	}
+	return slices.Clone(n.slot.excludes)
+}
 
 // SlotRules returns the parsed archetype-slot assertion rules for this
 // slot. Zero value for non-slot nodes. The returned rule slices are
 // defensive copies.
-func (n *CompiledNode) SlotRules() constraints.SlotRules { return n.slotRules.Clone() }
+func (n *CompiledNode) SlotRules() constraints.SlotRules {
+	if n.slot == nil {
+		return constraints.SlotRules{}
+	}
+	return n.slot.rules.Clone()
+}
 
 // AllowsArchetypeID reports whether archetypeID satisfies this
 // slot's include / exclude rules, including the
 // RM-type-prefix fallback when no includes were parsed. False for
 // non-slot nodes.
 func (n *CompiledNode) AllowsArchetypeID(archetypeID string) bool {
-	if !n.isSlot {
+	if n.slot == nil {
 		return false
 	}
-	return n.slotRules.AllowsArchetypeID(archetypeID)
+	return n.slot.rules.AllowsArchetypeID(archetypeID)
 }
 
 // ExampleSlotFillArchetypeID returns a synthetic archetype id for
@@ -156,10 +181,10 @@ func (n *CompiledNode) AllowsArchetypeID(archetypeID string) bool {
 // Returns "" for non-slot nodes, or when parsed includes are too
 // complex to synthesize safely.
 func (n *CompiledNode) ExampleSlotFillArchetypeID() string {
-	if !n.isSlot {
+	if n.slot == nil {
 		return ""
 	}
-	return n.slotRules.ExampleArchetypeID()
+	return n.slot.rules.ExampleArchetypeID()
 }
 
 // PrimitiveConstraint returns the typed primitive constraint value for
@@ -256,7 +281,9 @@ func (a *CompiledAttribute) RMTypeName() string { return a.rmTypeName }
 // Implicit reports whether this attribute was injected by the
 // compile step because the BMM declares it mandatory and the OPT
 // omitted it. Implicit attributes carry no children; downstream
-// composition builders fill them with RM defaults.
+// composition builders fill them with RM defaults. One implicit
+// attribute value is shared by every node of the same RM type that
+// lacks it, so its pointer does not identify a node.
 func (a *CompiledAttribute) Implicit() bool { return a.implicit }
 
 // Required reports whether the BMM declares this attribute as

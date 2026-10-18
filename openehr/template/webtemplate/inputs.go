@@ -1,6 +1,7 @@
 package webtemplate
 
 import (
+	impl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
@@ -235,9 +236,7 @@ func partyProxyInputs() []Input {
 // localized text from the archetype terms attached to the value node.
 func listItem(v *templatecompile.CompiledNode, code string) InputListItem {
 	item := InputListItem{Value: code}
-	if t, ok := v.Term(code, ""); ok {
-		item.Label = t.Items["text"]
-	}
+	item.Label, _ = impl.TermItem(v, code, "text")
 	return item
 }
 
@@ -247,7 +246,7 @@ func childNode(v *templatecompile.CompiledNode, attr string) *templatecompile.Co
 	if a == nil {
 		return nil
 	}
-	if cs := a.Children(); len(cs) > 0 {
+	if cs := impl.ChildNodes(a); len(cs) > 0 {
 		return cs[0]
 	}
 	return nil

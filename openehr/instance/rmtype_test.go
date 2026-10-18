@@ -2,6 +2,7 @@ package instance
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 	"testing"
 
@@ -71,6 +72,31 @@ func TestNewRMForOPTType_genericSpellings(t *testing.T) {
 		v, err := newRMForOPTType(declared)
 		if !errors.Is(err, rmwrite.ErrUnknownRMType) {
 			t.Errorf("newRMForOPTType(%q) = (%T, %v), want ErrUnknownRMType", declared, v, err)
+		}
+	}
+}
+
+// TestNewRMIfKnown_agreesWithNewRMForOPTType checks that newRMIfKnown, which
+// the callers that drop the failure use, builds what newRMForOPTType builds
+// and reports false exactly where newRMForOPTType returns an error: on every
+// registered type, the abstract names concreteFor substitutes, the generic
+// spellings, and the BMM primitives an attribute filled from the BMM alone
+// can be typed by.
+func TestNewRMIfKnown_agreesWithNewRMForOPTType(t *testing.T) {
+	names := append(typereg.Default.Names(),
+		"EVENT", "ITEM_STRUCTURE", "DATA_VALUE", "PARTY_PROXY", "DURATION", " DV_TEXT ",
+		"DV_INTERVAL<DV_QUANTITY>", " DV_INTERVAL< DV_COUNT > ", "DV_INTERVAL<NOT_A_TYPE>",
+		"DV_INTERVAL<DV_QUANTITY, DV_COUNT>", "DV_INTERVAL<>", "HISTORY<ITEM_STRUCTURE>",
+		"Boolean", "Integer", "Integer64", "Real", "String", "NOT_A_TYPE", "")
+	for _, name := range names {
+		want, err := newRMForOPTType(name)
+		got, ok := newRMIfKnown(name)
+		if ok != (err == nil) {
+			t.Errorf("newRMIfKnown(%q) ok = %v, but newRMForOPTType returned error %v", name, ok, err)
+			continue
+		}
+		if fmt.Sprintf("%T", got) != fmt.Sprintf("%T", want) {
+			t.Errorf("newRMIfKnown(%q) = %T, want %T as newRMForOPTType builds", name, got, want)
 		}
 	}
 }

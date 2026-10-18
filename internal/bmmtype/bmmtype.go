@@ -27,6 +27,15 @@ import (
 // follows the closing bracket. Split runs in linear time in the length of
 // the name, however deeply the parameters nest.
 func Split(name string) (class string, params []string, ok bool) {
+	if plain(name) {
+		return name, nil, true
+	}
+	return split(name)
+}
+
+// split is [Split] without its shortcut for a plain name, for a caller that
+// already knows the name is not plain.
+func split(name string) (class string, params []string, ok bool) {
 	name = strings.TrimSpace(name)
 	if !wellFormed(name) {
 		return "", nil, false
@@ -61,11 +70,17 @@ func Split(name string) (class string, params []string, ok bool) {
 // that is not well formed (see [Split]) is returned unchanged, so a lookup
 // keyed by class name misses it rather than matching a guess.
 func Class(name string) string {
-	class, _, ok := Split(name)
-	if !ok {
+	if plain(name) {
 		return name
 	}
-	return class
+	trimmed := strings.TrimSpace(name)
+	if !wellFormed(trimmed) {
+		return name
+	}
+	// The class is what comes before the first bracket, as Split reads it,
+	// without building the parameter list that Split would.
+	class, _, _ := strings.Cut(trimmed, "<")
+	return strings.TrimSpace(class)
 }
 
 // Substitute returns the type an attribute has on a value of the type named
@@ -76,7 +91,16 @@ func Class(name string) string {
 // declared is returned unchanged, including when owner names the class
 // without parameters, since no actual type is then known.
 func Substitute(owner, declared string) string {
-	class, params, ok := Split(owner)
+	// An owner without a bracket supplies no actual parameter, and a declared
+	// type that no class takes as a formal parameter is never replaced, so
+	// either way the owner need not be read.
+	if !strings.Contains(owner, "<") {
+		return declared
+	}
+	if !slices.Contains(formalNames, declared) {
+		return declared
+	}
+	class, params, ok := split(owner)
 	if !ok || len(params) == 0 {
 		return declared
 	}
@@ -111,6 +135,19 @@ var formalParameters = map[string][]string{
 	"VERSION":          {"T"},
 	"VERSIONED_OBJECT": {"T"},
 }
+
+// formalNames holds every parameter name in formalParameters, once each, so
+// Substitute can tell at once that a declared type is not a formal parameter
+// of any class. The classes share so few names that searching this list is
+// quicker than looking the name up in a map.
+var formalNames = func() []string {
+	var names []string
+	for _, formals := range formalParameters {
+		names = append(names, formals...)
+	}
+	slices.Sort(names)
+	return slices.Compact(names)
+}()
 
 // ParameterConstraint reports whether param is one of the formal generic
 // parameters of class, and the type that the actual parameter must conform
@@ -147,6 +184,26 @@ var parameterConstraints = map[string]map[string]string{
 	"Point_interval":  {"T": "Ordered"},
 	"Proper_interval": {"T": "Ordered"},
 	"REFERENCE_RANGE": {"T": "DV_ORDERED"},
+}
+
+// plain reports whether name is made only of ASCII letters, digits and
+// underscores, and is not empty. Such a name is a well-formed class name
+// with no parameters and no white space around it, so Split and Class can
+// return it as it is without scanning it as a type name.
+func plain(name string) bool {
+	// A generic name ends with its closing bracket, so it is turned away
+	// here without a scan.
+	if name == "" || name[len(name)-1] == '>' {
+		return false
+	}
+	for i := range len(name) {
+		switch c := name[i]; {
+		case 'A' <= c && c <= 'Z', 'a' <= c && c <= 'z', '0' <= c && c <= '9', c == '_':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // wellFormed reports whether s is exactly one type name: a class name,

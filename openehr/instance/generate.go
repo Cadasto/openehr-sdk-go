@@ -7,6 +7,7 @@ import (
 	"regexp/syntax"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 	"uuid"
 
@@ -122,6 +123,9 @@ type generator struct {
 	// is RandomFill; the zero value (used under ExampleFill) is never
 	// consulted. REQ-107.
 	valueSampler sampler
+	// nowText is opts.Now as dateTimeDefault writes it, formatted on first
+	// use; "" until then.
+	nowText string
 }
 
 // nextUID returns the next LOCATABLE.uid pointer. Honours
@@ -165,16 +169,10 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	// the primitive's RM-mandatory child attributes are implicitly
 	// captured by the value (e.g. DV_QUANTITY embeds magnitude and
 	// units). Validation v2 does not descend into primitive subtrees
-	// either.
+	// either. Minimal values the leaf too, so the tree is valid: a
+	// bounded constraint requires a value, and a zero RM value would
+	// surface as primitive_wrong_type or out_of_range at validation.
 	if pc := optNode.PrimitiveConstraint(); pc != nil {
-		if g.opts.Policy == Example {
-			return g.applyPrimitiveExample(optNode, rmValue, "", pc)
-		}
-		// Under Minimal we still populate the leaf so the resulting
-		// tree is valid (bounded constraints require a value); leaving
-		// a zero RM value would surface as primitive_wrong_type or
-		// out_of_range at validation. Cheap and aligned with the
-		// "structurally complete" Minimal contract.
 		return g.applyPrimitiveExample(optNode, rmValue, "", pc)
 	}
 
@@ -186,7 +184,7 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 		}
 	}
 
-	for _, attr := range optNode.Attributes() {
+	for _, attr := range tcimpl.NodeAttributes(optNode) {
 		if !g.visits(optNode, attr) {
 			continue
 		}
@@ -217,7 +215,7 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 // as materialiseImplicitSingle leaves them.
 func (g *generator) fillUncarriedRequired(optNode *tcimpl.CompiledNode, rmValue any) {
 	class := bmmtype.Class(rmTypeOf(rmValue))
-	for _, attrName := range rminfo.Default.RequiredAttributes(class) {
+	for _, attrName := range requiredAttributes(class) {
 		if optNode.Attribute(attrName) != nil || compositionDefaultOwns(class, attrName) {
 			continue
 		}
@@ -319,13 +317,7 @@ func rmNeedsProhibited(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttrib
 // never prohibited: the RM rule wins over the prohibition, so it is
 // visited and filled as an attribute the OPT leaves silent is.
 func attrProhibited(attr *tcimpl.CompiledAttribute) bool {
-	if attr.Required() {
-		return false
-	}
-	if e := attr.Existence(); e != nil && !e.UpperUnbounded() && e.Upper() == 0 {
-		return true
-	}
-	return len(attr.Children()) > 0 && len(allowedChildren(attr)) == 0
+	return !attr.Required() && tcimpl.Prohibited(attr)
 }
 
 // shouldVisit decides whether an attribute is in scope under the
@@ -350,28 +342,7 @@ func (g *generator) shouldVisit(attr *tcimpl.CompiledAttribute) bool {
 	if cm := attr.ChildMultiplicity(); cm != nil && !cm.LowerUnbounded() && cm.Lower() > 0 {
 		return true
 	}
-	return len(allowedChildren(attr)) > 0
-}
-
-// childProhibited reports whether the OPT prohibits child: its
-// occurrences upper bound is bounded and 0.
-func childProhibited(child *tcimpl.CompiledNode) bool {
-	occ := child.Occurrences()
-	return occ != nil && !occ.UpperUnbounded() && occ.Upper() == 0
-}
-
-// allowedChildren returns the OPT children of attr the OPT does not
-// prohibit, in OPT order. An attribute whose children are all prohibited
-// is itself prohibited (attrProhibited), unless the BMM marks it
-// mandatory: then it is built as one the OPT leaves silent.
-func allowedChildren(attr *tcimpl.CompiledAttribute) []*tcimpl.CompiledNode {
-	var allowed []*tcimpl.CompiledNode
-	for _, child := range attr.Children() {
-		if !childProhibited(child) {
-			allowed = append(allowed, child)
-		}
-	}
-	return allowed
+	return len(tcimpl.AllowedChildNodes(attr)) > 0
 }
 
 // bindingAlternative returns the allowed alternative of a single-valued
@@ -439,7 +410,7 @@ func (g *generator) materialiseSingle(
 	// wins. With none allowed the attribute is prohibited and not visited
 	// (attrProhibited), unless the BMM marks it mandatory: then it gets
 	// here and is built as one the OPT leaves silent.
-	children := allowedChildren(attr)
+	children := tcimpl.AllowedChildNodes(attr)
 	if len(children) == 0 {
 		// Implicit / OPT-silent attribute. When the attribute carries
 		// a BMM-resolved RM type, materialise a default child of that
@@ -468,23 +439,8 @@ func (g *generator) materialiseSingle(
 		}
 		return nil
 	}
-	child := bindingAlternative(children, builtRMType(children[0]))
-	rmChild, err := g.makeChild(child)
+	rmChild, err := g.buildChild(bindingAlternative(children, builtRMType(children[0])))
 	if err != nil {
-		return err
-	}
-	// Stamp default primitive values BEFORE descending. When the
-	// child is a DV scalar wrapper (DV_DURATION, DV_DATE, …),
-	// populatePrimitiveDefault gives the wrapper a non-empty
-	// canonical-JSON shape (`"value":"P0D"`, etc.) as a safe fallback
-	// when the OPT does not pin a leaf primitive constraint. When a
-	// constraint IS present, applyPrimitiveExample inside walkNode
-	// overwrites the default. No-op for non-primitive wrappers.
-	g.populatePrimitiveDefault(rmChild)
-	if child.IsSlot() && !g.stampSlotFill(rmChild, child) {
-		return fmt.Errorf("%w: %s", ErrSlotFillUnsupported, child.AQLPath())
-	}
-	if err := g.walkNode(child, rmChild); err != nil {
 		return err
 	}
 	if replacesTerminology(parentRM, attr.Name(), rmChild) {
@@ -529,6 +485,18 @@ func (g *generator) materialiseImplicitSingle(
 	attr *tcimpl.CompiledAttribute,
 	parentRM any,
 ) error {
+	// A locatable's node id and name are the identity rule's:
+	// setLocatableIdentity has stamped both, the name from the node's
+	// term, and fillBMMAttr skips them too, so a node that carries them
+	// implicitly is built as one that does not.
+	switch attr.Name() {
+	case "archetype_node_id":
+		return nil
+	case "name":
+		if _, ok := parentRM.(rm.MutableLocatable); ok {
+			return nil
+		}
+	}
 	if compositionDefaultOwns(optNode.RMTypeName(), attr.Name()) {
 		return nil
 	}
@@ -545,12 +513,12 @@ func (g *generator) materialiseImplicitSingle(
 		g.writeBMMString(parentRM, attr.Name())
 		return nil
 	}
-	rmChild, err := newRMForOPTType(rmType)
-	if err != nil {
-		// Unknown RM type — silently skip; the OPT is mis-modelled or
-		// the attribute is outside the current registry, both of
-		// which the validator will flag.
-		return nil //nolint:nilerr // intentional: defer to validator
+	rmChild, ok := newRMIfKnown(rmType)
+	if !ok {
+		// No RM class to build: a BMM primitive such as Boolean or
+		// Integer, which the parent holds as a Go value, or a type
+		// outside the registry, which the validator flags.
+		return nil
 	}
 	// A default built from the BMM alone has no archetype to name, so it
 	// must not be an archetype root: an optional attribute gets nothing,
@@ -600,10 +568,29 @@ func (g *generator) populateBMMRequiredAttrs(parent any, parentRMType string, de
 	if depth >= maxDepth || parent == nil || parentRMType == "" {
 		return
 	}
-	for _, attrName := range rminfo.Default.RequiredAttributes(parentRMType) {
+	for _, attrName := range requiredAttributes(parentRMType) {
 		g.fillBMMAttr(parent, parentRMType, attrName, depth)
 	}
 }
+
+// requiredAttributes returns the attributes the pinned RM marks mandatory on
+// the bare class class, in declaration order, as
+// rminfo.Default.RequiredAttributes does, and nil for a class it does not
+// know. It reads them from a table built once rather than building a slice
+// per call. The caller must not change the slice.
+func requiredAttributes(class string) []string { return requiredAttrTable()[class] }
+
+// requiredAttrTable holds what rminfo.Default.RequiredAttributes answers for
+// each class rminfo.Default knows. The pinned RM does not change, so it is
+// built on first use and only read after, by any number of goroutines.
+var requiredAttrTable = sync.OnceValue(func() map[string][]string {
+	known := rminfo.Default.KnownRMTypes()
+	table := make(map[string][]string, len(known))
+	for _, class := range known {
+		table[class] = rminfo.Default.RequiredAttributes(class)
+	}
+	return table
+})
 
 // fillBMMAttr builds a default for attrName of parent from its BMM type
 // alone, fills that default's own BMM-mandatory attributes, and attaches
@@ -630,8 +617,8 @@ func (g *generator) fillBMMAttr(parent any, parentRMType, attrName string, depth
 		return
 	}
 	concrete := concreteFor(rmType)
-	rmChild, err := rmwrite.NewRM(concrete)
-	if err != nil {
+	rmChild, ok := newRMIfKnown(concrete)
+	if !ok {
 		return
 	}
 	g.populatePrimitiveDefault(rmChild)
@@ -676,10 +663,16 @@ func attrType(parentType, declared string) string {
 		return actual
 	}
 	class := bmmtype.Class(parentType)
-	if arg, ok := builtTypeArgument[class]; ok {
-		return bmmtype.Substitute(class+"<"+arg+">", declared)
+	arg, ok := builtTypeArgument[class]
+	if !ok {
+		return declared
 	}
-	return declared
+	// Only a formal parameter of class is replaced, so any other type
+	// returns before the instantiated name is built.
+	if _, formal := bmmtype.ParameterConstraint(class, declared); !formal {
+		return declared
+	}
+	return bmmtype.Substitute(class+"<"+arg+">", declared)
 }
 
 // settleBuilt gives a value built from the BMM alone, which the walk
@@ -774,10 +767,14 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 }
 
 // dateTimeDefault is the ISO 8601 form Options.Now contributes to
-// DV_DATE_TIME values. It matches the clock applyCompositionDefaults
-// uses for EventContext.start_time.
+// DV_DATE_TIME values, and to EventContext.start_time in
+// applyCompositionDefaults. The clock does not change during a call, so
+// it is formatted once.
 func (g *generator) dateTimeDefault() string {
-	return g.opts.Now.Format(time.RFC3339)
+	if g.nowText == "" {
+		g.nowText = g.opts.Now.Format(time.RFC3339)
+	}
+	return g.nowText
 }
 
 // temporalSentinel is the valid ISO 8601 value the generator writes on
@@ -808,8 +805,8 @@ func (g *generator) temporalSentinel(v any) string {
 // preferred_term, a quantity's magnitude_status, a party's name), and
 // through the writer otherwise.
 func (g *generator) writeBMMString(parent any, attr string) {
-	get, set, covered := stringField(parent, attr)
-	if covered && get() != "" {
+	ref, covered := stringField(parent, attr)
+	if covered && ref.get() != "" {
 		return
 	}
 	val, ok := g.bmmStringDefault(parent, attr)
@@ -817,13 +814,14 @@ func (g *generator) writeBMMString(parent any, attr string) {
 		return
 	}
 	if covered {
-		set(val)
+		ref.set(val)
 		return
 	}
-	// Best-effort, on purpose: the write is refused for a String
-	// attribute rmwrite does not address (a locatable's
-	// archetype_node_id), which another default fills or the validator
-	// reports. Returning the error would fail Generate on every OPT.
+	// Best-effort, on purpose: rmwrite refuses a String attribute it does
+	// not address, which another default fills or the validator reports,
+	// and returning the error would fail Generate on such an OPT. A
+	// locatable's archetype_node_id never gets here: the identity rule
+	// stamps it, and both callers skip it.
 	_ = rmwrite.EnsureSingle(parent, attr, val)
 }
 
@@ -858,22 +856,23 @@ func (g *generator) bmmStringDefault(parent any, attr string) (string, bool) {
 	return "example", true
 }
 
-// stringField returns a reader and a writer for the BMM String attribute
-// attr of parent. It covers every String attribute of the data values the
-// generator builds, plus ACTIVITY.action_archetype_id, TERMINOLOGY_ID.value,
-// a PARTY_REF's namespace and type, and a PARTY_IDENTIFIED's or
-// PARTY_RELATED's name, so the walk writes a C_STRING the OPT pins on any
-// of them. A pin on a PARTY_REF holds where the reference
+// stringField returns a reference to the BMM String attribute attr of
+// parent, through which it is read and written. It covers every String
+// attribute of the data values the generator builds, plus
+// ACTIVITY.action_archetype_id, TERMINOLOGY_ID.value, a PARTY_REF's
+// namespace and type, and a PARTY_IDENTIFIED's or PARTY_RELATED's name, so
+// the walk writes a C_STRING the OPT pins on any of them. A pin on a
+// PARTY_REF holds where the reference
 // can be attached and no later default replaces it: a ROLE's performer
 // keeps it, because fillPerformer fills only the empty parts. A template
 // that names a PARTY_RELATIONSHIP's source or target makes Generate fail
 // today, because rmwrite cannot attach either; once it can, a pin there
 // would still be lost, because fillPartyRelationship replaces a reference
 // with any empty part whole, and the walk cannot build the id. An optional
-// attribute reads as "" while unset, and its writer sets it. ok is false
-// when parent has no such field; when ok is true, get and set are both
-// non-nil.
-func stringField(parent any, attr string) (get func() string, set func(string), ok bool) {
+// attribute reads as "" while unset, and writing it sets it. ok is false
+// when parent has no such field; when ok is true, the reference addresses
+// that field.
+func stringField(parent any, attr string) (ref stringRef, ok bool) {
 	switch p := parent.(type) {
 	case *rm.DVText:
 		return textField(&p.Value, &p.Formatting, attr)
@@ -949,41 +948,63 @@ func stringField(parent any, attr string) (get func() string, set func(string), 
 			return optionalString(&p.Name)
 		}
 	}
-	return nil, nil, false
+	return stringRef{}, false
 }
 
-func textField(value *string, formatting **string, attr string) (func() string, func(string), bool) {
+func textField(value *string, formatting **string, attr string) (stringRef, bool) {
 	switch attr {
 	case "value":
 		return requiredString(value)
 	case "formatting":
 		return optionalString(formatting)
 	}
-	return nil, nil, false
+	return stringRef{}, false
 }
 
-func valueField(value *string, attr string) (func() string, func(string), bool) {
+func valueField(value *string, attr string) (stringRef, bool) {
 	if attr != "value" {
-		return nil, nil, false
+		return stringRef{}, false
 	}
 	return requiredString(value)
 }
 
-func requiredString(f *string) (func() string, func(string), bool) {
-	return func() string { return *f }, func(s string) { *f = s }, true
+// stringRef addresses one String attribute of an RM value: a mandatory one
+// held as a string, or an optional one held as a *string. Exactly one of the
+// two pointers is set.
+type stringRef struct {
+	required *string
+	optional **string
 }
 
-// optionalString reads and writes an optional String attribute. It reads
-// as "" while unset; the writer sets the attribute, so a C_STRING
-// constraint on it is honoured like any other String leaf.
-func optionalString(f **string) (func() string, func(string), bool) {
-	get := func() string {
-		if *f == nil {
-			return ""
-		}
-		return **f
+// get returns the attribute's value, or "" while an optional one is unset.
+func (r stringRef) get() string {
+	if r.required != nil {
+		return *r.required
 	}
-	return get, func(s string) { *f = &s }, true
+	if *r.optional == nil {
+		return ""
+	}
+	return **r.optional
+}
+
+// set stores s in the attribute, setting an optional one.
+func (r stringRef) set(s string) {
+	if r.required != nil {
+		*r.required = s
+		return
+	}
+	*r.optional = &s
+}
+
+func requiredString(f *string) (stringRef, bool) {
+	return stringRef{required: f}, true
+}
+
+// optionalString addresses an optional String attribute. It reads as ""
+// while unset; writing it sets the attribute, so a C_STRING constraint on
+// it is honoured like any other String leaf.
+func optionalString(f **string) (stringRef, bool) {
+	return stringRef{optional: f}, true
 }
 
 // fillEntryCode sets ENTRY.language from Options.Language and
@@ -1105,7 +1126,7 @@ func includedPerOPT(optNode *tcimpl.CompiledNode, attrName string) bool {
 	if attr == nil {
 		return true
 	}
-	for _, child := range allowedChildren(attr) {
+	for _, child := range tcimpl.AllowedChildNodes(attr) {
 		if c, ok := child.PrimitiveConstraint().(constraints.CBoolean); ok {
 			included, _ := c.ExampleValue().(bool)
 			return included
@@ -1129,7 +1150,7 @@ func (g *generator) materialiseMultiple(
 	// prohibited the attribute is prohibited and not visited
 	// (attrProhibited), unless the BMM marks it mandatory: then it gets
 	// here and is built as one the OPT leaves silent.
-	children := allowedChildren(attr)
+	children := tcimpl.AllowedChildNodes(attr)
 	if len(children) == 0 {
 		// Implicit / OPT-silent multi-valued attribute. A required one
 		// (BMM-mandatory, or existence or cardinality lower of 1 or more)
@@ -1144,7 +1165,7 @@ func (g *generator) materialiseMultiple(
 		upperBound = cm.Upper()
 	}
 	total := 0
-	for _, child := range children {
+	for i, child := range children {
 		// Slots are caller-filled; the synthesiser does not invent
 		// archetype roots to fill them and instead leaves the count
 		// to satisfy the slot's occurrences.lower (often 0 — most
@@ -1152,8 +1173,7 @@ func (g *generator) materialiseMultiple(
 		if child.IsSlot() {
 			continue
 		}
-		if g.opts.Policy == Minimal && optionalSiblingIDCollides(child, children) &&
-			!firstCollidingOptionalSibling(child, children) {
+		if g.opts.Policy == Minimal && identityTaken(children, i) {
 			continue
 		}
 		childCount := 1
@@ -1162,25 +1182,18 @@ func (g *generator) materialiseMultiple(
 				childCount = occ.Lower()
 			}
 			// occ.Lower()==0 → still produce one fill so the
-			// resulting tree carries every OPT-pinned archetype-root
-			// child at least once. Drops to a per-child loop body of
-			// `1` which is the minimal-yet-complete contract.
+			// resulting tree carries each archetype-root child the
+			// policy keeps at least once (under Minimal, an optional
+			// child whose identity a sibling carries is skipped above).
+			// Drops to a per-child loop body of `1` which is the
+			// minimal-yet-complete contract.
 		}
 		for range childCount {
 			if upperBound >= 0 && total >= upperBound {
 				return nil
 			}
-			rmChild, err := g.makeChild(child)
+			rmChild, err := g.buildChild(child)
 			if err != nil {
-				return err
-			}
-			// Mirror materialiseSingle: stamp default primitive values
-			// before walkNode descends so DV scalar wrappers in a
-			// multi-attribute slot also carry a non-empty canonical-
-			// JSON shape under the wire-parser primitive-constraint
-			// gap. No-op for non-primitive RM children.
-			g.populatePrimitiveDefault(rmChild)
-			if err := g.walkNode(child, rmChild); err != nil {
 				return err
 			}
 			if err := rmwrite.AppendMultiple(parentRM, attr.Name(), rmChild); err != nil {
@@ -1189,9 +1202,11 @@ func (g *generator) materialiseMultiple(
 			total++
 		}
 	}
-	// Top-up to satisfy the attribute's overall lower bound when
-	// nothing was appended (e.g. all OPT children had occurrence
-	// lower 0 under Example with no top-level cardinality block).
+	// Top-up to satisfy the attribute's overall lower bound when the
+	// members appended so far fall short of it (e.g. all OPT children
+	// had occurrence lower 0 under Example with no top-level
+	// cardinality block, or Minimal skipped a child the lower bound
+	// still needs).
 	// When every OPT child is a slot we synthesise a slot-shaped
 	// fill: an RM value of the slot's RMTypeName stamped (by
 	// stampSlotFill) with an archetype id drawn from the parsed
@@ -1199,23 +1214,13 @@ func (g *generator) materialiseMultiple(
 	// only when no includes were parsed.
 	if needed := remainingLowerNeeded(attr, total); needed > 0 {
 		seed := firstNonSlot(children)
-		if seed == nil && len(children) > 0 {
+		if seed == nil {
+			// Every child is a slot; children is not empty here.
 			seed = children[0]
 		}
-		if seed == nil {
-			return nil
-		}
 		for needed > 0 && (upperBound < 0 || total < upperBound) {
-			rmChild, err := g.makeChild(seed)
+			rmChild, err := g.buildChild(seed)
 			if err != nil {
-				return err
-			}
-			if seed.IsSlot() {
-				if !g.stampSlotFill(rmChild, seed) {
-					return fmt.Errorf("%w: %s", ErrSlotFillUnsupported, seed.AQLPath())
-				}
-			}
-			if err := g.walkNode(seed, rmChild); err != nil {
 				return err
 			}
 			if err := rmwrite.AppendMultiple(parentRM, attr.Name(), rmChild); err != nil {
@@ -1235,18 +1240,42 @@ func (g *generator) materialiseMultiple(
 	return nil
 }
 
+// buildChild builds the RM value for the OPT child child and walks it. The
+// value is built with its identity (makeChild), then given the primitive
+// default of its type before the walk descends: a DV scalar wrapper
+// (DV_DURATION, DV_DATE, …) gets a non-empty value (`"value":"P0D"`, …) as a
+// fallback where the OPT pins no primitive constraint, which a constraint
+// the walk reaches overwrites; any other value is left alone. A slot then
+// gets the archetype id of its fill (stampSlotFill), and is refused with
+// ErrSlotFillUnsupported when none can be derived. Every attribute builds
+// its OPT children here, so a child built to make up a lower bound is the
+// same as one built for its own occurrences.
+func (g *generator) buildChild(child *tcimpl.CompiledNode) (any, error) {
+	rmChild, err := g.makeChild(child)
+	if err != nil {
+		return nil, err
+	}
+	g.populatePrimitiveDefault(rmChild)
+	if child.IsSlot() && !g.stampSlotFill(rmChild, child) {
+		return nil, fmt.Errorf("%w: %s", ErrSlotFillUnsupported, child.AQLPath())
+	}
+	if err := g.walkNode(child, rmChild); err != nil {
+		return nil, err
+	}
+	return rmChild, nil
+}
+
 // stampSlotFill overrides the archetype_node_id and archetype_details
 // on a freshly-constructed RM value when a valid slot-fill archetype
 // id can be synthesized. It falls back to the RM-type-prefix example
 // only for slots without parsed includes; parsed includes must be
 // satisfied explicitly. Returns false when no safe id can be derived.
 func (g *generator) stampSlotFill(rmValue any, slot *tcimpl.CompiledNode) bool {
-	rules := slot.SlotRules()
-	archetypeID := rules.ExampleArchetypeID()
-	if archetypeID == "" && !rules.HasParsedIncludes() {
+	archetypeID := slot.ExampleSlotFillArchetypeID()
+	if archetypeID == "" && !slot.SlotRules().HasParsedIncludes() {
 		archetypeID = "openEHR-EHR-" + slot.RMTypeName() + ".example.v1"
 	}
-	if archetypeID == "" || !rules.AllowsArchetypeID(archetypeID) {
+	if archetypeID == "" || !slot.AllowsArchetypeID(archetypeID) {
 		return false
 	}
 	ad := &rm.Archetyped{
@@ -1294,9 +1323,10 @@ func (g *generator) materialiseImplicitMultiple(
 		needed = min(needed, cm.Upper())
 	}
 	for range needed {
-		rmChild, err := newRMForOPTType(rmType)
-		if err != nil {
-			return nil //nolint:nilerr // intentional: defer to validator
+		rmChild, ok := newRMIfKnown(rmType)
+		if !ok {
+			// Outside the registry: left to the validator.
+			return nil
 		}
 		// A required attribute whose child would be an archetype root is
 		// refused instead, for the same reason: the generator does not
@@ -1453,14 +1483,16 @@ func (g *generator) setLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, 
 	}
 
 	// Resolve a human-readable runtime name from the OPT term
-	// definitions when available; the RM type acts as the fallback.
+	// definitions when available; the RM type acts as the fallback. The
+	// term is the node's own: an archetype root's is its node id's
+	// (at0000), since no term table is keyed by an archetype id.
+	termCode := id
+	if opt.ArchetypeID() != "" {
+		termCode = opt.NodeID()
+	}
 	name := opt.RMTypeName()
-	if id != "" {
-		if t, ok := opt.Term(id, ""); ok {
-			if text, found := t.Items["text"]; found && text != "" {
-				name = text
-			}
-		}
+	if text, found := tcimpl.TermItem(opt, termCode, "text"); found && text != "" {
+		name = text
 	}
 
 	// Archetype-root pins also get a populated archetype_details
@@ -1517,12 +1549,14 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 		v.Magnitude = rm.Real(q.Magnitude)
 		v.Units = q.Units
 		return nil
-	case *rm.DVText:
+	case *rm.DVText, *rm.DVDate, *rm.DVTime, *rm.DVDateTime, *rm.DVDuration:
+		// Each holds its whole value in its String attribute value.
 		s, ok := ex.(string)
 		if !ok {
-			return fmt.Errorf("DV_TEXT example value is %T, want string", ex)
+			return fmt.Errorf("%s example value is %T, want string", rmTypeOf(rmValue), ex)
 		}
-		v.Value = s
+		ref, _ := stringField(rmValue, "value")
+		ref.set(s)
 		return nil
 	case *rm.DVCodedText:
 		// A C_STRING on .value arrives as a string. A code constraint
@@ -1567,34 +1601,6 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 		return applyOrdinal(v, pc, ex)
 	case *rm.DVProportion:
 		return applyProportionPrimitive(v, attr, ex)
-	case *rm.DVDate:
-		s, ok := ex.(string)
-		if !ok {
-			return fmt.Errorf("DV_DATE example value is %T, want string", ex)
-		}
-		v.Value = s
-		return nil
-	case *rm.DVTime:
-		s, ok := ex.(string)
-		if !ok {
-			return fmt.Errorf("DV_TIME example value is %T, want string", ex)
-		}
-		v.Value = s
-		return nil
-	case *rm.DVDateTime:
-		s, ok := ex.(string)
-		if !ok {
-			return fmt.Errorf("DV_DATE_TIME example value is %T, want string", ex)
-		}
-		v.Value = s
-		return nil
-	case *rm.DVDuration:
-		s, ok := ex.(string)
-		if !ok {
-			return fmt.Errorf("DV_DURATION example value is %T, want string", ex)
-		}
-		v.Value = s
-		return nil
 	}
 	// Unknown RM target for this constraint — silently no-op so the
 	// generator stays sound on RM types REQ-103 does not yet have a
@@ -1750,7 +1756,7 @@ func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 	}
 	contextNode := bindingChild(root, "context")
 	if c.Context.StartTime.Value == "" && !prohibited(contextNode, "start_time") {
-		c.Context.StartTime = rm.DVDateTime{Value: g.opts.Now.Format(time.RFC3339)}
+		c.Context.StartTime = rm.DVDateTime{Value: g.dateTimeDefault()}
 	}
 	// EventContext.Setting is BMM-mandatory and carries the RM invariant
 	// Setting_valid — its defining code MUST be a member of the openEHR
@@ -1808,53 +1814,60 @@ func newHierObjectID() *rm.HierObjectID {
 	return &rm.HierObjectID{Value: uuid.NewV4().String()}
 }
 
-// optionalSiblingIDCollides reports whether this optional child shares
-// its node_id with another optional sibling under the same attribute.
-func optionalSiblingIDCollides(child *tcimpl.CompiledNode, siblings []*tcimpl.CompiledNode) bool {
-	if child.IsSlot() {
+// identityTaken reports whether children[i] is optional and a sibling
+// carries its identity: a required sibling before or after it, or an
+// optional sibling before it. Under Minimal such a child gets no member of
+// its own, so the validator's binding of members to children stays
+// unambiguous, though the top-up to the attribute's lower bound can still
+// build one, from the first child that is not a slot; a required child is
+// always built. A slot does not count as a sibling. A sibling carries an
+// identity as the validator binds a member by it (carriesIdentity), so an
+// archetype root also carries its node id: an optional child that is not a
+// root gets no member after a root with its node id, while optional
+// archetype roots of different archetypes are each built, since a root's
+// identity is its archetype id (childIdentity). A child with no identity is
+// never skipped. A name the OPT pins on a child is not part of it.
+func identityTaken(children []*tcimpl.CompiledNode, i int) bool {
+	child := children[i]
+	if childRequired(child) {
 		return false
 	}
-	occ := child.Occurrences()
-	if occ != nil && !occ.LowerUnbounded() && occ.Lower() > 0 {
-		return false
-	}
-	id := child.NodeID()
+	id := childIdentity(child)
 	if id == "" {
 		return false
 	}
-	count := 0
-	for _, sib := range siblings {
-		if sib.IsSlot() {
+	for j, sib := range children {
+		if j == i || sib.IsSlot() || !carriesIdentity(sib, id) {
 			continue
 		}
-		sibOcc := sib.Occurrences()
-		if sibOcc != nil && !sibOcc.LowerUnbounded() && sibOcc.Lower() > 0 {
-			continue
-		}
-		if sib.NodeID() == id {
-			count++
-		}
-	}
-	return count > 1
-}
-
-// firstCollidingOptionalSibling is true when child is the first
-// optional sibling among those sharing its node_id.
-func firstCollidingOptionalSibling(child *tcimpl.CompiledNode, siblings []*tcimpl.CompiledNode) bool {
-	id := child.NodeID()
-	for _, sib := range siblings {
-		if sib.IsSlot() {
-			continue
-		}
-		sibOcc := sib.Occurrences()
-		if sibOcc != nil && !sibOcc.LowerUnbounded() && sibOcc.Lower() > 0 {
-			continue
-		}
-		if sib.NodeID() == id {
-			return sib == child
+		if j < i || childRequired(sib) {
+			return true
 		}
 	}
 	return false
+}
+
+// childRequired reports whether the OPT requires child: its occurrences
+// give a lower bound of 1 or more.
+func childRequired(child *tcimpl.CompiledNode) bool {
+	occ := child.Occurrences()
+	return occ != nil && !occ.LowerUnbounded() && occ.Lower() > 0
+}
+
+// childIdentity returns child's identity: the archetype id for an archetype
+// root and the node id for any other child, or "" when it has neither.
+func childIdentity(child *tcimpl.CompiledNode) string {
+	if id := child.ArchetypeID(); id != "" {
+		return id
+	}
+	return child.NodeID()
+}
+
+// carriesIdentity reports whether sib carries the identity id, which is not
+// empty: id is sib's archetype id or its node id, the ids the validator
+// binds a member to a child by. An archetype root carries both.
+func carriesIdentity(sib *tcimpl.CompiledNode, id string) bool {
+	return sib.ArchetypeID() == id || sib.NodeID() == id
 }
 
 // finishNode fills RM-mandatory fields the OPT walk left empty.
@@ -2047,7 +2060,7 @@ func stringAdmitted(attr *tcimpl.CompiledAttribute, s string) bool {
 	if attr == nil {
 		return true
 	}
-	children := allowedChildren(attr)
+	children := tcimpl.AllowedChildNodes(attr)
 	if len(children) == 0 {
 		return true
 	}
@@ -2165,8 +2178,8 @@ func (g *generator) fillElementValue(e *rm.Element) bool {
 	if !ok {
 		return false
 	}
-	value, err := newRMForOPTType(rmType)
-	if err != nil {
+	value, known := newRMIfKnown(rmType)
+	if !known {
 		return false
 	}
 	g.populatePrimitiveDefault(value)
@@ -2335,7 +2348,7 @@ func applyStringLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, cs con
 	if attr == "" {
 		attr = mainStringAttr(rmValue)
 	}
-	_, set, ok := stringField(rmValue, attr)
+	ref, ok := stringField(rmValue, attr)
 	if !ok {
 		return nil
 	}
@@ -2346,7 +2359,7 @@ func applyStringLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, cs con
 	if err != nil {
 		return fmt.Errorf("%w: %s.%s at %s: %w", ErrConstraintUnsatisfiable, rmTypeOf(rmValue), attr, leafPath(leaf), err)
 	}
-	set(s)
+	ref.set(s)
 	return nil
 }
 

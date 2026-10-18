@@ -312,7 +312,8 @@ func (a *ArchetypeRoot) TemplateID() string { return a.templateID }
 // Terms returns the per-at-code term definitions captured from the
 // OPT's <term_definitions code="..."> blocks on this archetype root.
 // Returns nil when none were declared. The returned map is a
-// defensive copy.
+// defensive copy, and each term's Items map is a copy too, so a caller
+// may change either without changing the template.
 func (a *ArchetypeRoot) Terms() map[string]ArchetypeTerm {
 	if len(a.terms) == 0 {
 		return nil
@@ -489,7 +490,7 @@ func (s *Slot) AllowsRMType(archetypeID string) bool {
 
 // SlotRules returns the parsed assertion rules for this slot.
 // The returned rule slices are defensive copies.
-func (s *Slot) SlotRules() constraints.SlotRules { return s.slotRules() }
+func (s *Slot) SlotRules() constraints.SlotRules { return s.slotRules().Clone() }
 
 // AllowsArchetypeID reports whether archetypeID satisfies parsed
 // include / exclude rules, falling back to [Slot.AllowsRMType] when

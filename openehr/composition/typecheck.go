@@ -48,9 +48,15 @@ func bindRMType(node *tcimpl.CompiledNode, v any) (*tcimpl.CompiledNode, error) 
 	if !ok {
 		return nil, fmt.Errorf("%w: value type %T is not a recognised RM concrete", ErrTypeMismatch, v)
 	}
-	alternatives := alternativesAt(node)
+	// Every alternative sits under node's parent attribute, so one search
+	// finds the attribute for both the alternatives and the attribute check.
+	var attr *tcimpl.CompiledAttribute
+	if parent := node.Parent(); parent != nil {
+		attr = findAttributeContaining(parent, node)
+	}
+	alternatives := alternativesAt(node, attr)
 	if bound := rmbind.Bind(alternatives, v, anyNode); bound != nil {
-		if err := attributeHolds(bound, v, got); err != nil {
+		if err := attributeHolds(bound, attr, v, got); err != nil {
 			return nil, err
 		}
 		return bound, nil
@@ -76,8 +82,8 @@ func bindRMType(node *tcimpl.CompiledNode, v any) (*tcimpl.CompiledNode, error) 
 // the template allows at the path, a slot included.
 func anyNode(*tcimpl.CompiledNode) bool { return true }
 
-// attributeHolds returns nil when the RM attribute that node sits under
-// can hold v, of RM type got; otherwise it returns ErrTypeMismatch,
+// attributeHolds returns nil when the RM attribute that node sits under,
+// attr, can hold v, of RM type got; otherwise it returns ErrTypeMismatch,
 // wrapped with the attribute and the type it holds. The pinned RM
 // metadata ([rminfo.Default]) gives the attribute and its type.
 //
@@ -99,19 +105,18 @@ func anyNode(*tcimpl.CompiledNode) bool { return true }
 // such as DV_PROPORTION.is_integral, as if it were an attribute.
 //
 // There is nothing to test against, and so no refusal, at the root, which
-// sits under no attribute; under a parent the template leaves untyped or
-// whose class the metadata does not know; and where the attribute's type
-// is no class the hierarchy knows and no plain value type
-// ([plainValueTypes]): Any, or a formal parameter left open that the
-// schemas set no constraint, such as the T of VERSION.
-func attributeHolds(node *tcimpl.CompiledNode, v any, got string) error {
+// sits under no attribute, or where attr is nil; under a parent the
+// template leaves untyped or whose class the metadata does not know; and
+// where the attribute's type is no class the hierarchy knows and no plain
+// value type ([plainValueTypes]): Any, or a formal parameter left open
+// that the schemas set no constraint, such as the T of VERSION.
+func attributeHolds(node *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute, v any, got string) error {
 	parent := node.Parent()
-	if parent == nil {
+	if parent == nil || attr == nil {
 		return nil
 	}
 	owner := parent.RMTypeName()
-	attr, _ := findAttributeContaining(parent, node)
-	if owner == "" || attr == nil {
+	if owner == "" {
 		return nil
 	}
 	class := bmmtype.Class(owner)
@@ -124,13 +129,18 @@ func attributeHolds(node *tcimpl.CompiledNode, v any, got string) error {
 			ErrTypeMismatch, v, got, attr.Name(), owner)
 	}
 	held := bmmtype.Substitute(owner, declared)
-	what := held
-	if constraint, open := bmmtype.ParameterConstraint(class, held); open && constraint != "" {
-		what = fmt.Sprintf("its generic parameter %s, a %s", held, constraint)
-		held = constraint
+	constraint, open := bmmtype.ParameterConstraint(class, held)
+	open = open && constraint != ""
+	target := held
+	if open {
+		target = constraint
 	}
-	if holds, known := canHold(held, got); holds || !known {
+	if holds, known := canHold(target, got); holds || !known {
 		return nil
+	}
+	what := held
+	if open {
+		what = fmt.Sprintf("its generic parameter %s, a %s", held, constraint)
 	}
 	return fmt.Errorf("%w: value type %T (RM %q): the path writes attribute %q of %s, which holds %s",
 		ErrTypeMismatch, v, got, attr.Name(), owner, what)
@@ -151,16 +161,14 @@ func classKnown(class string) bool {
 // hierarchy, each looked up by its class, without generic parameters. An
 // attribute of a plain value type ([plainValueTypes]) holds no RM value.
 // known is false when held is no plain value type and the hierarchy does
-// not know held's class or got's.
+// not know held's class or got's. It answers as the hierarchy of
+// [rminfo.Default] does, from tables built once rather than a walk of the
+// hierarchy on each call ([tcimpl.ClassConformsTo]).
 func canHold(held, got string) (holds, known bool) {
 	if plainValueTypes[held] {
 		return false, true
 	}
-	h, ok := rminfo.Default.(rminfo.Hierarchy)
-	if !ok {
-		return false, false
-	}
-	return h.ConformsTo(bmmtype.Class(got), bmmtype.Class(held))
+	return tcimpl.ClassConformsTo(bmmtype.Class(got), bmmtype.Class(held))
 }
 
 // plainValueTypes lists the BASE primitive types whose values are plain:
@@ -183,18 +191,14 @@ var plainValueTypes = map[string]bool{
 }
 
 // alternativesAt returns, in OPT order, the nodes the template allows at
-// node's path: node and every other child of node's parent attribute at
-// that same path, the alternatives an OPT lists under one attribute,
-// leaving out a child whose occurrences are 0..0
+// node's path: node and every other child of node's parent attribute,
+// attr, at that same path, the alternatives an OPT lists under one
+// attribute, leaving out a child whose occurrences are 0..0
 // ([tcimpl.AllowedChildNodes]). Compile indexes only the first of them
 // under the path, so Compiled.NodeAt returns that one alone. The root,
-// which has no parent attribute, is its own only alternative.
-func alternativesAt(node *tcimpl.CompiledNode) []*tcimpl.CompiledNode {
-	parent := node.Parent()
-	if parent == nil {
-		return []*tcimpl.CompiledNode{node}
-	}
-	attr, _ := findAttributeContaining(parent, node)
+// which has no parent attribute, is its own only alternative, and so is a
+// node whose attr is nil.
+func alternativesAt(node *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) []*tcimpl.CompiledNode {
 	if attr == nil {
 		return []*tcimpl.CompiledNode{node}
 	}

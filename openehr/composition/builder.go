@@ -17,7 +17,9 @@ import (
 )
 
 // Builder accumulates path assignments over a skeleton. Returned by
-// [NewBuilder]; finalised via [Builder.Build].
+// [NewBuilder]; finalised via [Builder.Build]. A Builder that NewBuilder
+// did not make, such as the zero value, has no template to resolve paths
+// against: its Set and Build return an error.
 type Builder struct {
 	compiled *templatecompile.Compiled
 	skeleton *rm.Composition
@@ -31,6 +33,10 @@ type Builder struct {
 	// one round-trip.
 	errs []error
 }
+
+// errNotMade is the error Set and Build return on a Builder that
+// [NewBuilder] did not make.
+var errNotMade = errors.New("composition: Builder not made by NewBuilder")
 
 // pendingAssignment is one queued (path, value) pair plus the compiled
 // node the value binds: of the nodes the template allows at the path,
@@ -130,10 +136,14 @@ func (b *Builder) TemplateID() string {
 // recover every faulty path in one round-trip.
 //
 // Returns the same error it stored, primarily for callers that want
-// to react to the first failure inline.
+// to react to the first failure inline. On a nil Builder, or one that
+// NewBuilder did not make, Set returns an error and stores nothing.
 func (b *Builder) Set(path string, v any) error {
 	if b == nil {
 		return errors.New("composition: nil Builder")
+	}
+	if b.compiled == nil {
+		return errNotMade
 	}
 	if v == nil {
 		err := fmt.Errorf("%w: %s: nil value", ErrTypeMismatch, path)
@@ -214,9 +224,15 @@ func (b *Builder) SetCodedText(path, terminology, code, display string) error {
 // chain Set → Build → Set → Build without errors stacking from a
 // prior pass; per-call errors return value still surfaces the
 // per-Set failures that drove the current Build to fail.
+//
+// On a nil Builder, or one that NewBuilder did not make, Build returns
+// no composition and an error.
 func (b *Builder) Build() (*rm.Composition, error) {
 	if b == nil {
 		return nil, errors.New("composition: nil Builder")
+	}
+	if b.compiled == nil {
+		return nil, errNotMade
 	}
 	// Drain accumulated state in one pass — pending consumed via the
 	// range loop snapshot below; errs reset to capture only this
@@ -297,25 +313,36 @@ func (b *Builder) applyAssignment(p pendingAssignment) error {
 
 // pathSegment captures one step in the parent → child walk: the
 // attribute on the parent RM value, its cardinality, and any
-// predicate (archetype id / at-code) the OPT pinned for the child
-// selection on multi-valued attributes.
+// predicate (archetype id / at-code, and the name the template fixes
+// on the child) the OPT pinned for the child selection on
+// multi-valued attributes.
 type pathSegment struct {
 	attrName    string
 	cardinality template.Cardinality
 	// matchID is the predicate to match against (archetype_node_id /
 	// archetype id). Empty for single-attr segments.
 	matchID string
+	// matchName is the name the template fixes on the child, which the
+	// child's LOCATABLE.name value must equal: siblings that share
+	// matchID differ by it alone. Empty when the template fixes none,
+	// and whenever matchID is empty.
+	matchName string
 }
 
 // buildSegments produces the ordered (attr, predicate) list from
-// compiled root to the supplied node. Walks up via Parent() and
-// reverses.
+// compiled root to the supplied node. Walks up via Parent(), filling the
+// list from its end.
 func buildSegments(node *tcimpl.CompiledNode) ([]pathSegment, error) {
-	var segs []pathSegment
+	depth := 0
+	for cur := node; cur != nil && cur.Parent() != nil; cur = cur.Parent() {
+		depth++
+	}
+	segs := make([]pathSegment, depth)
+	i := depth
 	for cur := node; cur != nil && cur.Parent() != nil; cur = cur.Parent() {
 		parent := cur.Parent()
 		// Locate the attribute on parent that holds `cur`.
-		attr, child := findAttributeContaining(parent, cur)
+		attr := findAttributeContaining(parent, cur)
 		if attr == nil {
 			return nil, fmt.Errorf("%w: child %s not found under parent %s",
 				ErrInvalidPath, cur.AQLPath(), parent.AQLPath())
@@ -327,40 +354,43 @@ func buildSegments(node *tcimpl.CompiledNode) ([]pathSegment, error) {
 		if attr.Cardinality() == template.Multiple {
 			// Prefer archetype id over at-code as the predicate
 			// (matches the path-segment policy in
-			// internal/templatecompile/compile.go:pathSegment).
-			if aid := child.ArchetypeID(); aid != "" {
+			// internal/templatecompile/compile.go:childPath).
+			if aid := cur.ArchetypeID(); aid != "" {
 				seg.matchID = aid
-			} else if nid := child.NodeID(); nid != "" {
+			} else if nid := cur.NodeID(); nid != "" {
 				seg.matchID = nid
 			}
+			// The compiled path carries the fixed name beside the id, as a
+			// name predicate, and never on its own.
+			if seg.matchID != "" {
+				seg.matchName = cur.NodeName()
+			}
 		}
-		segs = append(segs, seg)
+		i--
+		segs[i] = seg
 	}
-	// Reverse — collected child→root, need root→child.
-	slices.Reverse(segs)
 	return segs, nil
 }
 
-// findAttributeContaining returns (parentAttr, child) where
-// parentAttr is the CompiledAttribute on parent whose Children slice
-// contains target.
-func findAttributeContaining(parent, target *tcimpl.CompiledNode) (*tcimpl.CompiledAttribute, *tcimpl.CompiledNode) {
-	for _, attr := range parent.Attributes() {
-		for _, c := range attr.Children() {
-			if c == target {
-				return attr, c
-			}
+// findAttributeContaining returns the CompiledAttribute on parent whose
+// children include target, or nil when none does. It reads the compiled
+// slices in place, without the copies the exported accessors make.
+func findAttributeContaining(parent, target *tcimpl.CompiledNode) *tcimpl.CompiledAttribute {
+	for _, attr := range tcimpl.NodeAttributes(parent) {
+		if slices.Contains(tcimpl.ChildNodes(attr), target) {
+			return attr
 		}
 	}
-	return nil, nil
+	return nil
 }
 
 // navigateTo follows segs from rmRoot, returning the RM value at the
 // terminal segment. Each step:
 //   - Single attr: rmaccess.Single(parent, attr) → descend.
 //   - Multi attr: rmaccess.Multiple(parent, attr) → first child
-//     whose archetype_node_id matches the segment's matchID, else
-//     the first child when matchID is empty (covers OPT-silent or
+//     whose archetype_node_id matches the segment's matchID and, when
+//     the segment carries a matchName, whose name value equals it;
+//     else the first child when matchID is empty (covers OPT-silent or
 //     non-archetype-keyed multi-attrs).
 func navigateTo(rmRoot any, segs []pathSegment) (any, error) {
 	cur := rmRoot
@@ -397,7 +427,9 @@ func descendOne(cur any, s pathSegment) (any, error) {
 			return items[0], nil
 		}
 		for _, it := range items {
-			if id := archetypeNodeID(it); id == s.matchID {
+			// Siblings that share the id differ by the name the template
+			// fixes on each, so the name must match too when it fixes one.
+			if archetypeNodeID(it) == s.matchID && (s.matchName == "" || locatableName(it) == s.matchName) {
 				return it, nil
 			}
 		}
@@ -412,54 +444,33 @@ func descendOne(cur any, s pathSegment) (any, error) {
 		// routing still matches by archetype-id equality and does not
 		// yet consult that grammar.
 		return nil, fmt.Errorf("%w: no sibling under %q matches predicate %q (siblings: %s)",
-			ErrInvalidPath, s.attrName, s.matchID, siblingIDs(items))
+			ErrInvalidPath, s.attrName, tcimpl.NamePredicate(s.matchID, s.matchName), siblingIDs(items))
 	}
 	return nil, fmt.Errorf("%w: unsupported cardinality %v on attribute %q", ErrInvalidPath, s.cardinality, s.attrName)
 }
 
 // archetypeNodeID returns the LOCATABLE.archetype_node_id of the
-// supplied RM value, or "" when the value does not carry one.
-// Closed type switch — REQ-024, no reflection.
+// supplied RM value, or "" when the value is no LOCATABLE or is a nil
+// pointer to one.
 func archetypeNodeID(v any) string {
-	switch x := v.(type) {
-	case *rm.Composition:
-		return x.ArchetypeNodeID
-	case *rm.Observation:
-		return x.ArchetypeNodeID
-	case *rm.Evaluation:
-		return x.ArchetypeNodeID
-	case *rm.Instruction:
-		return x.ArchetypeNodeID
-	case *rm.Action:
-		return x.ArchetypeNodeID
-	case *rm.AdminEntry:
-		return x.ArchetypeNodeID
-	case *rm.GenericEntry:
-		return x.ArchetypeNodeID
-	case *rm.Section:
-		return x.ArchetypeNodeID
-	case *rm.Activity:
-		return x.ArchetypeNodeID
-	case *rm.History[rm.ItemStructure]:
-		return x.ArchetypeNodeID
-	case *rm.PointEvent[rm.ItemStructure]:
-		return x.ArchetypeNodeID
-	case *rm.IntervalEvent[rm.ItemStructure]:
-		return x.ArchetypeNodeID
-	case *rm.ItemTree:
-		return x.ArchetypeNodeID
-	case *rm.ItemList:
-		return x.ArchetypeNodeID
-	case *rm.ItemSingle:
-		return x.ArchetypeNodeID
-	case *rm.ItemTable:
-		return x.ArchetypeNodeID
-	case *rm.Cluster:
-		return x.ArchetypeNodeID
-	case *rm.Element:
-		return x.ArchetypeNodeID
+	if l, ok := v.(rm.Locatable); ok && !rm.IsTypedNil(v) {
+		return l.GetArchetypeNodeID()
 	}
 	return ""
+}
+
+// locatableName returns the value of the LOCATABLE.name of v, or "" when v
+// is no LOCATABLE, is a nil pointer to one, or carries no name.
+func locatableName(v any) string {
+	l, ok := v.(rm.Locatable)
+	if !ok || rm.IsTypedNil(v) {
+		return ""
+	}
+	name := l.GetName()
+	if name == nil || rm.IsTypedNil(name) {
+		return ""
+	}
+	return name.GetValue()
 }
 
 // siblingIDs joins the archetype_node_id (or "<empty>") of each item

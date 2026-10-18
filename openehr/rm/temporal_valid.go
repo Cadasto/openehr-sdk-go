@@ -14,14 +14,15 @@ package rm
 // duration follows P[nnY][nnM][nnW][nnD][T[nnH][nnM][nnS]] with each
 // designator at most once and in that order.
 
+import "github.com/cadasto/openehr-sdk-go/internal/iso8601"
+
 // ValidISO8601 reports whether the date's value is a valid ISO 8601 date,
 // partial forms included.
 func (d *DVDate) ValidISO8601() bool {
 	if d == nil {
 		return false
 	}
-	_, err := parseDate(d.Value)
-	return err == nil
+	return iso8601.ValidDate(d.Value)
 }
 
 // ValidISO8601 reports whether the time's value is a valid ISO 8601 time of
@@ -30,8 +31,7 @@ func (d *DVTime) ValidISO8601() bool {
 	if d == nil {
 		return false
 	}
-	_, err := parseTime(d.Value)
-	return err == nil
+	return iso8601.ValidTime(d.Value)
 }
 
 // ValidISO8601 reports whether the date-time's value is a valid ISO 8601
@@ -40,8 +40,7 @@ func (d *DVDateTime) ValidISO8601() bool {
 	if d == nil {
 		return false
 	}
-	_, _, err := d.split()
-	return err == nil
+	return iso8601.ValidDateTime(d.Value)
 }
 
 // ValidISO8601 reports whether the duration's value is a valid ISO 8601
@@ -50,6 +49,5 @@ func (d *DVDuration) ValidISO8601() bool {
 	if d == nil {
 		return false
 	}
-	_, err := parseDuration(d.Value)
-	return err == nil
+	return iso8601.ValidDuration(d.Value)
 }

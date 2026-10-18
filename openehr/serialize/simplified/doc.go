@@ -16,7 +16,8 @@
 // return bytes (or the reverse). They import only openehr/rm (+ rmpath /
 // rminfo / typereg), openehr/terminology, openehr/template/webtemplate,
 // openehr/templatecompile (the WithTemplate name/default source),
-// openehr/serialize/canjson, a module-internal type-name helper, and the
+// openehr/serialize/canjson, two module-internal helpers (the type-name
+// reader and the compiled template's non-copying readers), and the
 // standard library. They never import the transport, auth, or client layers.
 //
 // Context output-form and exotic-datatype fallbacks are documented in

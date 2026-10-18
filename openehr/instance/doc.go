@@ -44,9 +44,10 @@
 //
 // # Trust model
 //
-// The OPT walk is authoritative. RM children are created via
-// [internal/templateinstance/rmwrite.NewRM] (typereg.Default.Lookup),
-// attached via rmwrite EnsureSingle / AppendMultiple, and decorated
+// The OPT walk is authoritative. RM children are created from the
+// openehr/rm/typereg registry (typereg.Default.Lookup), directly or
+// through [internal/templateinstance/rmwrite.NewRM], attached via
+// rmwrite EnsureSingle / AppendMultiple, and decorated
 // with LOCATABLE bookkeeping (archetype_node_id, name, uid,
 // archetype_details) here in the instance package. rmwrite stays
 // focused on the attribute setter contract, the inverse of the
@@ -57,10 +58,10 @@
 // The exported Generate signature takes the public compiled template
 // openehr/templatecompile.Compiled; this package also imports
 // openehr/rm, openehr/rm/typereg, openehr/rm/rminfo, openehr/template,
-// openehr/template/constraints, internal/templatecompile (engine node
-// types), internal/templatecompile/walk, and
-// internal/templateinstance/rmwrite, the same set as
-// openehr/validation. It does not import openehr/serialize,
+// openehr/template/constraints, openehr/terminology,
+// internal/templatecompile (engine node types),
+// internal/templateinstance/rmwrite, internal/bmmtype and
+// internal/rmroots. It does not import openehr/serialize,
 // openehr/client, transport, auth, openehr/composition (which uses
 // this package, not the reverse), or openehr/validation.
 package instance

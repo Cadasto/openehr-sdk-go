@@ -18,7 +18,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
-func compileFixture(t *testing.T, name string) *templatecompile.Compiled {
+func compileFixture(t testing.TB, name string) *templatecompile.Compiled {
 	t.Helper()
 	opt, err := template.ParseFile(fixtures.TemplateOptForName(name))
 	if err != nil {

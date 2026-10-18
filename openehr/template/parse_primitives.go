@@ -1,7 +1,7 @@
 package template
 
 import (
-	"encoding/xml"
+	"bytes"
 	"fmt"
 	"strconv"
 	"strings"
@@ -50,17 +50,15 @@ type xmlBoolFlag struct {
 	value bool
 }
 
-// UnmarshalXML reads the element's text into the flag.
-func (f *xmlBoolFlag) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
-	var text string
-	if err := d.DecodeElement(&text, &start); err != nil {
-		return err
-	}
-	text = strings.TrimSpace(text)
-	if text == "" {
+// UnmarshalText reads the element's text into the flag. encoding/xml
+// passes it the element's own character data, without that of any
+// child element.
+func (f *xmlBoolFlag) UnmarshalText(b []byte) error {
+	text := bytes.TrimSpace(b)
+	if len(text) == 0 {
 		return nil
 	}
-	v, err := strconv.ParseBool(text)
+	v, err := strconv.ParseBool(string(text))
 	if err != nil {
 		return err
 	}

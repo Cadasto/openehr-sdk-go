@@ -210,7 +210,7 @@ func bindingChild(node *tcimpl.CompiledNode, attrName string) *tcimpl.CompiledNo
 	if attr == nil {
 		return nil
 	}
-	children := allowedChildren(attr)
+	children := tcimpl.AllowedChildNodes(attr)
 	if len(children) == 0 {
 		return nil
 	}
