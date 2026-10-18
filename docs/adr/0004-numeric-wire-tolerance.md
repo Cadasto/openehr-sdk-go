@@ -11,6 +11,7 @@ date: 2026-05-16
 - **Status:** Accepted, 2026-05-16.
 - **Tracks:** REQ-046 (BMM primitive mapping), REQ-052 (canonical-JSON wire profile), STRAND-04 (RM polymorphism + codec performance).
 - **Amended 2026-10-15** (maintainer decision): `Integer` decode also accepts a whole number written with a zero fraction or an exponent (`1.0`, `1e0`), bare or quoted, as that integer, and refuses one with a non-zero fraction; the reference's own FLAT writes a DV_PROPORTION `type` as `1.0`. The rule's normative home is [wire.md § Floating-point precision](../specifications/wire.md#floating-point-precision); `Integer64` stays out of scope as below.
+- **Amended 2026-10-19** (maintainer decision): `Integer64` takes the `Integer` decode rule above, as the defined type `rm.Integer64` (underlying `int64`), which supersedes its exclusion in the 2026-10-15 amendment. `DV_COUNT.magnitude`, the RM's one `Integer64` attribute, refused `2.0`, `2e0` and `"2"`, which a `DV_QUANTITY.precision` accepts; one RM integer rule now covers both widths. `Double` stays out of scope.
 
 ## Context
 
@@ -51,7 +52,7 @@ Both types are emitted by the BMM generator wherever the BMM primitive `Real` / 
 
 ### Out of scope for this ADR
 
-- **`Integer64` / `Double`**: keep their direct alias (`int64` / `float64`) for now. No vendored fixture currently exercises quoted variants for these, and a precedent in PHP / CDR has not yet been observed. Promote them to defined types if and when a fixture demonstrates the need.
+- **`Double`**: keeps its direct alias (`float64`) for now. No vendored fixture currently exercises quoted variants for it, and a precedent in PHP / CDR has not yet been observed. Promote it to a defined type if and when a fixture demonstrates the need. (`Integer64` was listed here until the 2026-10-19 amendment.)
 - **Other numeric primitives** (`Octet`, `Character`): not affected — they're not floating-point and openEHR producers do not quote them.
 - **Validating numeric precision** beyond IEEE 754 (REQ-052): out of scope; an overflow on decode still surfaces via `strconv.ParseFloat` / `strconv.ParseInt` and is wrapped in a typed error.
 
@@ -67,6 +68,6 @@ Both types are emitted by the BMM generator wherever the BMM primitive `Real` / 
 
 - [`docs/specifications/bmm-conformance.md`](../../docs/specifications/bmm-conformance.md) — REQ-046 (primitive mapping).
 - [`docs/specifications/wire.md`](../../docs/specifications/wire.md) — REQ-052 (canonical-JSON wire profile, Floating-point precision).
-- [`openehr/rm/real.go`](../../openehr/rm/real.go), [`openehr/rm/integer.go`](../../openehr/rm/integer.go) — the alias types implementing this ADR.
+- [`openehr/rm/real.go`](../../openehr/rm/real.go), [`openehr/rm/integer.go`](../../openehr/rm/integer.go), [`openehr/rm/integer64.go`](../../openehr/rm/integer64.go) — the defined types implementing this ADR.
 - [`internal/bmmgen/primitives.go`](../../internal/bmmgen/primitives.go) — the generator's mapping table.
 - [`testkit/corpus/compositions/BMI.json`](../../testkit/corpus/compositions/BMI.json) — concrete fixture with quoted-number magnitudes.
