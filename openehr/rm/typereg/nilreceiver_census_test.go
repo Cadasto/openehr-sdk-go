@@ -102,6 +102,7 @@ func TestNilReceiverUnmarshalJSONCensus(t *testing.T) { // REQ-025
 	primitives := map[string]json.Unmarshaler{
 		"rm.Real":      (*rm.Real)(nil),
 		"rm.Integer":   (*rm.Integer)(nil),
+		"rm.Integer64": (*rm.Integer64)(nil),
 		"rm.Character": (*rm.Character)(nil),
 	}
 	for name, u := range primitives {

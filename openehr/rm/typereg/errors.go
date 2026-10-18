@@ -47,8 +47,8 @@ var (
 	// to construct (a failed errors.AsType leaves a typed nil behind; a
 	// zero-value struct holds one in a field), and it is returned as an error
 	// instead of panicking on a dereference. Every generated UnmarshalJSONFrom
-	// and the hand-written primitive codecs (rm.Real, rm.Integer, rm.Character)
-	// wrap it.
+	// and the hand-written primitive codecs (rm.Real, rm.Integer,
+	// rm.Integer64, rm.Character) wrap it.
 	ErrNilReceiver = errors.New("typereg: nil receiver")
 	// ErrNilArgument classifies a nil argument that an exported decode helper
 	// would otherwise dereference: a nil *jsontext.Decoder, a nil out, or a
