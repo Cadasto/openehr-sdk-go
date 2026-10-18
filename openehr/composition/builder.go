@@ -314,14 +314,19 @@ type pathSegment struct {
 }
 
 // buildSegments produces the ordered (attr, predicate) list from
-// compiled root to the supplied node. Walks up via Parent() and
-// reverses.
+// compiled root to the supplied node. Walks up via Parent(), filling the
+// list from its end.
 func buildSegments(node *tcimpl.CompiledNode) ([]pathSegment, error) {
-	var segs []pathSegment
+	depth := 0
+	for cur := node; cur != nil && cur.Parent() != nil; cur = cur.Parent() {
+		depth++
+	}
+	segs := make([]pathSegment, depth)
+	i := depth
 	for cur := node; cur != nil && cur.Parent() != nil; cur = cur.Parent() {
 		parent := cur.Parent()
 		// Locate the attribute on parent that holds `cur`.
-		attr, child := findAttributeContaining(parent, cur)
+		attr := findAttributeContaining(parent, cur)
 		if attr == nil {
 			return nil, fmt.Errorf("%w: child %s not found under parent %s",
 				ErrInvalidPath, cur.AQLPath(), parent.AQLPath())
@@ -333,37 +338,34 @@ func buildSegments(node *tcimpl.CompiledNode) ([]pathSegment, error) {
 		if attr.Cardinality() == template.Multiple {
 			// Prefer archetype id over at-code as the predicate
 			// (matches the path-segment policy in
-			// internal/templatecompile/compile.go:pathSegment).
-			if aid := child.ArchetypeID(); aid != "" {
+			// internal/templatecompile/compile.go:childPath).
+			if aid := cur.ArchetypeID(); aid != "" {
 				seg.matchID = aid
-			} else if nid := child.NodeID(); nid != "" {
+			} else if nid := cur.NodeID(); nid != "" {
 				seg.matchID = nid
 			}
 			// The compiled path carries the fixed name beside the id, as a
 			// name predicate, and never on its own.
 			if seg.matchID != "" {
-				seg.matchName = child.NodeName()
+				seg.matchName = cur.NodeName()
 			}
 		}
-		segs = append(segs, seg)
+		i--
+		segs[i] = seg
 	}
-	// Reverse — collected child→root, need root→child.
-	slices.Reverse(segs)
 	return segs, nil
 }
 
-// findAttributeContaining returns (parentAttr, child) where
-// parentAttr is the CompiledAttribute on parent whose Children slice
-// contains target.
-func findAttributeContaining(parent, target *tcimpl.CompiledNode) (*tcimpl.CompiledAttribute, *tcimpl.CompiledNode) {
-	for _, attr := range parent.Attributes() {
-		for _, c := range attr.Children() {
-			if c == target {
-				return attr, c
-			}
+// findAttributeContaining returns the CompiledAttribute on parent whose
+// children include target, or nil when none does. It reads the compiled
+// slices in place, without the copies the exported accessors make.
+func findAttributeContaining(parent, target *tcimpl.CompiledNode) *tcimpl.CompiledAttribute {
+	for _, attr := range tcimpl.NodeAttributes(parent) {
+		if slices.Contains(tcimpl.ChildNodes(attr), target) {
+			return attr
 		}
 	}
-	return nil, nil
+	return nil
 }
 
 // navigateTo follows segs from rmRoot, returning the RM value at the

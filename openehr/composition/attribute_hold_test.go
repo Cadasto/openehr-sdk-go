@@ -165,8 +165,12 @@ func TestREQ101_AttributeHoldsUnderAnUnknownClass(t *testing.T) {
 	if got := node.Parent().RMTypeName(); got != unknownOwnerClass {
 		t.Fatalf("node at %s sits under RM type %q, want %q (fixture drift)", unknownOwnerSummaryPath, got, unknownOwnerClass)
 	}
+	attr := findAttributeContaining(node.Parent(), node)
+	if attr == nil {
+		t.Fatalf("node at %s sits under no attribute of its parent (fixture drift)", unknownOwnerSummaryPath)
+	}
 	v := &rm.DVText{Value: "x"}
-	if err := attributeHolds(node, v, "DV_TEXT"); err != nil {
+	if err := attributeHolds(node, attr, v, "DV_TEXT"); err != nil {
 		t.Errorf("attributeHolds(%s, %T, %q) = %v, want nil", unknownOwnerSummaryPath, v, "DV_TEXT", err)
 	}
 }
