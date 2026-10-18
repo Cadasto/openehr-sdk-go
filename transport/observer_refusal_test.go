@@ -69,6 +69,14 @@ func TestREQ098_ObserverFiresOnceForEveryRefusal(t *testing.T) {
 			wantMeth: http.MethodGet, wantRoute: "/ehr/{ehr_id}",
 		},
 	}
+	// The subtests run in parallel, so they start only after this function
+	// returns. A check after the loop would always see 0 requests. A cleanup
+	// runs once every subtest has finished.
+	t.Cleanup(func() {
+		if n := hits.Load(); n != 0 {
+			t.Errorf("issued %d requests, want 0", n)
+		}
+	})
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -126,9 +134,6 @@ func TestREQ098_ObserverFiresOnceForEveryRefusal(t *testing.T) {
 				t.Error("the observer changed the caller's context tags")
 			}
 		})
-	}
-	if n := hits.Load(); n != 0 {
-		t.Errorf("issued %d requests, want 0", n)
 	}
 }
 
