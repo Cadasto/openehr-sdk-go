@@ -2,6 +2,7 @@ package template
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
@@ -40,20 +41,28 @@ func parseSlotAssertions(xs []xmlAssertion) []constraints.SlotAssertion {
 // assertion blob, in this order: the `archetype_id matches {…}` text,
 // the <string_expression> text, then each supported <expression> the
 // OPT decode read. The <value> text is the fallback when none of those
-// gives a pattern.
+// gives a pattern. A blob often states one pattern in several of these
+// forms, as <string_expression> text and as an <expression> tree, so a
+// pattern the blob has already given is not listed again.
 func extractSlotPatterns(x xmlAssertion) []string {
 	raw := strings.TrimSpace(x.InnerXML)
 	if raw == "" {
 		return nil
 	}
 	var patterns []string
+	add := func(p string) {
+		p = normalizeSlotPattern(p)
+		if !slices.Contains(patterns, p) {
+			patterns = append(patterns, p)
+		}
+	}
 	if p := extractTextSlotPattern(raw); p != "" {
-		patterns = append(patterns, normalizeSlotPattern(p))
+		add(p)
 	}
 	// Ocean Template Designer <string_expression> shape.
 	if m := slotStringExprRE.FindStringSubmatch(raw); len(m) == 2 {
 		if p := extractTextSlotPattern(m[1]); p != "" {
-			patterns = append(patterns, normalizeSlotPattern(p))
+			add(p)
 		}
 	}
 	for _, expr := range x.Expressions {
@@ -61,13 +70,13 @@ func extractSlotPatterns(x xmlAssertion) []string {
 			continue
 		}
 		if p := strings.TrimSpace(expr.Right.Item.Pattern); p != "" {
-			patterns = append(patterns, normalizeSlotPattern(p))
+			add(p)
 		}
 	}
 	if len(patterns) == 0 {
 		if v := extractXMLChardataValue(raw); v != "" {
 			if p := extractTextSlotPattern(v); p != "" {
-				patterns = append(patterns, normalizeSlotPattern(p))
+				add(p)
 			}
 		}
 	}
