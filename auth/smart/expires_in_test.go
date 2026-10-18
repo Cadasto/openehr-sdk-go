@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
+	"github.com/cadasto/openehr-sdk-go/auth/smart"
 )
 
 // TestREQ063_LargeExpiresInGivesAFutureExpiry pins REQ-063 (auth.md § Token
@@ -75,10 +76,12 @@ var expiresInForms = []struct {
 	{name: "fraction rounded down", expiresIn: `3600.5`, want: time.Hour},
 	{name: "integer in a string", expiresIn: `"3600"`, want: time.Hour},
 	{name: "exponent in a string", expiresIn: `"3.6e3"`, want: time.Hour},
+	{name: "largest int64", expiresIn: `9223372036854775807`, want: hundredYears},
 	{name: "integer beyond int64", expiresIn: `9223372036854775808`, want: hundredYears},
 	{name: "large exponent", expiresIn: `1e300`, want: hundredYears},
 	{name: "negative integer", expiresIn: `-5`},
 	{name: "negative fraction", expiresIn: `-0.5`},
+	{name: "smallest int64", expiresIn: `-9223372036854775808`},
 	{name: "beyond float64", expiresIn: `1e400`},
 	{name: "not a number", expiresIn: `"soon"`, wantErr: true},
 }
@@ -141,5 +144,41 @@ func checkLifetime(t *testing.T, expiresIn string, tok auth.Token, start time.Ti
 		t.Errorf("expires_in %s gives the token no expiry, want a lifetime of %v", expiresIn, want)
 	} else if got := tok.ExpiresAt.Sub(start); got != want {
 		t.Errorf("expires_in %s gives the token a lifetime of %v, want %v", expiresIn, got, want)
+	}
+}
+
+// TestREQ063_TokenResponseExpiresInConvertsToADuration pins REQ-063 (auth.md
+// § Token refresh) at the public field: TokenResponse.ExpiresIn holds every
+// form of expires_in rounded down to whole seconds and kept between minus
+// and plus 100 years, an integer included, so a caller can turn it into a
+// time.Duration without overflow.
+func TestREQ063_TokenResponseExpiresInConvertsToADuration(t *testing.T) {
+	const maxSeconds = int64(hundredYears / time.Second)
+	tests := []struct {
+		expiresIn string // the member's JSON text
+		want      int64
+	}{
+		{expiresIn: `3600`, want: 3600},
+		{expiresIn: `"3600"`, want: 3600},
+		{expiresIn: `3600.5`, want: 3600},
+		{expiresIn: `3153600000`, want: maxSeconds},
+		{expiresIn: `3153600001`, want: maxSeconds},
+		{expiresIn: `9223372036854775807`, want: maxSeconds},
+		{expiresIn: `9223372036854775808`, want: maxSeconds},
+		{expiresIn: `1e300`, want: maxSeconds},
+		{expiresIn: `-5`, want: -5},
+		{expiresIn: `-9223372036854775808`, want: -maxSeconds},
+		{expiresIn: `-1e300`, want: -maxSeconds},
+		{expiresIn: `1e400`, want: 0},
+	}
+	for _, tc := range tests {
+		tr, err := smart.ParseTokenResponse([]byte(`{"access_token":"at","expires_in":` + tc.expiresIn + `}`))
+		if err != nil {
+			t.Errorf("ParseTokenResponse(expires_in %s) error = %v, want nil", tc.expiresIn, err)
+			continue
+		}
+		if tr.ExpiresIn != tc.want {
+			t.Errorf("ParseTokenResponse(expires_in %s).ExpiresIn = %d, want %d", tc.expiresIn, tr.ExpiresIn, tc.want)
+		}
 	}
 }

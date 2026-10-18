@@ -73,10 +73,12 @@ var expiresInForms = []struct {
 	{name: "fraction rounded down", expiresIn: `3600.5`, want: time.Hour},
 	{name: "integer in a string", expiresIn: `"3600"`, want: time.Hour},
 	{name: "exponent in a string", expiresIn: `"3.6e3"`, want: time.Hour},
+	{name: "largest int64", expiresIn: `9223372036854775807`, want: hundredYears},
 	{name: "integer beyond int64", expiresIn: `9223372036854775808`, want: hundredYears},
 	{name: "large exponent", expiresIn: `1e300`, want: hundredYears},
 	{name: "negative integer", expiresIn: `-5`},
 	{name: "negative fraction", expiresIn: `-0.5`},
+	{name: "smallest int64", expiresIn: `-9223372036854775808`},
 	{name: "beyond float64", expiresIn: `1e400`},
 	{name: "not a number", expiresIn: `"soon"`, wantErr: true},
 }

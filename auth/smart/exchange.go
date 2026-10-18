@@ -4,13 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
-	"math"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
+	"github.com/cadasto/openehr-sdk-go/internal/expiresin"
 )
 
 // TokenResponse is the SMART token-endpoint payload. The
@@ -19,10 +18,11 @@ type TokenResponse struct {
 	AccessToken string
 	TokenType   string
 	// ExpiresIn is the response's expires_in, the access token's lifetime
-	// in whole seconds, or 0 when the response has none. An integer is kept
-	// as sent. Any other number, such as 3600.5 or 3.6e3, is rounded down,
-	// and counts as 100 years when larger; one too large for a float64
-	// counts as none.
+	// in whole seconds, or 0 when the response has none. A number such as
+	// 3600.5 or 3.6e3 is rounded down. Every value, an integer included, is
+	// kept between minus and plus 100 years, so turning it into a
+	// time.Duration of that many seconds cannot overflow. A number too large
+	// for a float64 counts as none.
 	ExpiresIn    int64
 	RefreshToken string
 	Scope        string
@@ -95,7 +95,7 @@ func ParseTokenResponse(body []byte) (TokenResponse, error) {
 		Tenant:            tr.Tenant,
 		Raw:               rawJSONToAny(raw),
 	}
-	if secs, ok := expiresInSeconds(string(tr.ExpiresIn)); ok {
+	if secs, ok := expiresin.Seconds(string(tr.ExpiresIn)); ok {
 		out.ExpiresIn = secs
 	}
 	return out, nil
@@ -221,33 +221,6 @@ func rawJSONToAny(raw map[string]json.RawMessage) map[string]any {
 	return out
 }
 
-// maxExpiresIn is the longest lifetime, in seconds, that an expires_in
-// gives an access token: 100 years. A larger value counts as this one, so
-// that turning it into a time.Duration cannot overflow into an expiry in the
-// past, which would have every call refresh the token.
-const maxExpiresIn = 100 * 365 * 24 * 60 * 60
-
-// expiresInSeconds reads s, the expires_in member of a token response, as
-// whole seconds. RFC 6749 §5.1 makes it "the lifetime in seconds of the
-// access token", a JSON number, so every form of one counts. An integer is
-// read as it is. Any other number, such as 3600.0, 3.6e3, 3600.5 or an
-// integer beyond the int64 range, counts as its whole seconds rounded down,
-// and as maxExpiresIn when it is larger. ok is false when s is not a number,
-// or is one a float64 cannot hold (it reads as NaN or ±Inf).
-func expiresInSeconds(s string) (secs int64, ok bool) {
-	if secs, err := strconv.ParseInt(s, 10, 64); err == nil {
-		return secs, true
-	}
-	f, err := strconv.ParseFloat(s, 64)
-	if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
-		return 0, false
-	}
-	// Bounding f first keeps the conversion inside the int64 range, where
-	// it is defined. A negative value stays negative, so it gives no
-	// expiry, as a negative integer does.
-	return int64(math.Floor(min(max(f, -maxExpiresIn), maxExpiresIn))), true
-}
-
 func tokenFromResponse(tr TokenResponse, issuer string) auth.Token {
 	tok := auth.Token{
 		Value:  tr.AccessToken,
@@ -256,7 +229,7 @@ func tokenFromResponse(tr TokenResponse, issuer string) auth.Token {
 		Issuer: issuer,
 	}
 	if tr.ExpiresIn > 0 {
-		tok.ExpiresAt = time.Now().Add(time.Duration(min(tr.ExpiresIn, maxExpiresIn)) * time.Second)
+		tok.ExpiresAt = time.Now().Add(time.Duration(tr.ExpiresIn) * time.Second)
 	}
 	return tok
 }
