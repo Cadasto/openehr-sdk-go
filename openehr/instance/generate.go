@@ -1173,7 +1173,7 @@ func (g *generator) materialiseMultiple(
 		if child.IsSlot() {
 			continue
 		}
-		if g.opts.Policy == Minimal && identityTakenEarlier(child, children[:i]) {
+		if g.opts.Policy == Minimal && identityTaken(children, i) {
 			continue
 		}
 		childCount := 1
@@ -1182,9 +1182,11 @@ func (g *generator) materialiseMultiple(
 				childCount = occ.Lower()
 			}
 			// occ.Lower()==0 → still produce one fill so the
-			// resulting tree carries every OPT-pinned archetype-root
-			// child at least once. Drops to a per-child loop body of
-			// `1` which is the minimal-yet-complete contract.
+			// resulting tree carries each archetype-root child the
+			// policy keeps at least once (under Minimal, an optional
+			// child whose identity a sibling holds is skipped above).
+			// Drops to a per-child loop body of `1` which is the
+			// minimal-yet-complete contract.
 		}
 		for range childCount {
 			if upperBound >= 0 && total >= upperBound {
@@ -1810,43 +1812,49 @@ func newHierObjectID() *rm.HierObjectID {
 	return &rm.HierObjectID{Value: uuid.NewV4().String()}
 }
 
-// identityTakenEarlier reports whether child is optional and an optional
-// sibling before it, in earlier, has its identity. Under Minimal only the
-// first of the optional siblings that share an identity is built, so the
-// validator binds each member to one child; a required sibling is always
-// built and does not count, nor does a slot. The identity is the one the
-// validator binds a member by (see optionalIdentity), so optional archetype
-// roots of different archetypes are each built, though every archetype root
-// carries the node id at0000.
-func identityTakenEarlier(child *tcimpl.CompiledNode, earlier []*tcimpl.CompiledNode) bool {
-	id, optional := optionalIdentity(child)
-	if !optional {
+// identityTaken reports whether children[i] is optional and a sibling
+// holds its identity: a required sibling before or after it, or an
+// optional sibling before it. Under Minimal such a child is not built, so
+// the validator's binding of members to children stays unambiguous; a
+// required child is always built. A slot does not count as a sibling. The
+// identity is the one the validator binds a member by (see childIdentity),
+// so optional archetype roots of different archetypes are each built,
+// though every archetype root carries the node id at0000. A name the OPT
+// pins on a child is not part of it.
+func identityTaken(children []*tcimpl.CompiledNode, i int) bool {
+	child := children[i]
+	if childRequired(child) {
 		return false
 	}
-	for _, sib := range earlier {
-		if sib.IsSlot() {
+	id := childIdentity(child)
+	if id == "" {
+		return false
+	}
+	for j, sib := range children {
+		if j == i || sib.IsSlot() || childIdentity(sib) != id {
 			continue
 		}
-		if sibID, ok := optionalIdentity(sib); ok && sibID == id {
+		if j < i || childRequired(sib) {
 			return true
 		}
 	}
 	return false
 }
 
-// optionalIdentity returns child's identity, and true, when child has one
-// and the OPT leaves it optional: its occurrences give no lower bound of 1
-// or more. The identity is the archetype id for an archetype root and the
-// node id for any other child.
-func optionalIdentity(child *tcimpl.CompiledNode) (string, bool) {
-	if occ := child.Occurrences(); occ != nil && !occ.LowerUnbounded() && occ.Lower() > 0 {
-		return "", false
-	}
+// childRequired reports whether the OPT requires child: its occurrences
+// give a lower bound of 1 or more.
+func childRequired(child *tcimpl.CompiledNode) bool {
+	occ := child.Occurrences()
+	return occ != nil && !occ.LowerUnbounded() && occ.Lower() > 0
+}
+
+// childIdentity returns child's identity: the archetype id for an archetype
+// root and the node id for any other child, or "" when it has neither.
+func childIdentity(child *tcimpl.CompiledNode) string {
 	if id := child.ArchetypeID(); id != "" {
-		return id, true
+		return id
 	}
-	id := child.NodeID()
-	return id, id != ""
+	return child.NodeID()
 }
 
 // finishNode fills RM-mandatory fields the OPT walk left empty.

@@ -469,12 +469,15 @@ func TestREQ107_MinimalKeepsTheFirstOptionalSiblingOfEachIdentity(t *testing.T) 
 // TestREQ107_MinimalOptionalSiblingYieldsToARequiredOne is the REQ-107
 // check that, under Minimal, an optional child whose identity a required
 // sibling shares gets no member, whether that sibling comes before or after
-// it, while optional roots of different archetypes each get theirs. The
-// cases are archetype roots of one archetype under CLUSTER.items in both
-// orders, ELEMENTs of one node_id, and roots of two archetypes; the
-// siblings that share an identity differ in content, so the members show
-// which of them was built. Example builds every sibling. It holds under
-// both value fills and both compile modes.
+// it, while optional roots of different archetypes each get theirs and a
+// slot with an ELEMENT's node_id does not count as its sibling. The cases
+// are archetype roots of one archetype under CLUSTER.items in both orders,
+// ELEMENTs of one node_id, roots of two archetypes, and a slot before an
+// optional ELEMENT of its node_id, which a required ELEMENT of another
+// node_id precedes so that no top-up builds it; the siblings that share an
+// identity differ in content, so the members show which of them was built.
+// Example builds every sibling but the slot. It holds under both value
+// fills and both compile modes.
 //
 // Where siblings share an identity and pin no name, the template validator
 // binds every member with that identity to the first of them, so a root
@@ -529,6 +532,14 @@ func TestREQ107_MinimalOptionalSiblingYieldsToARequiredOne(t *testing.T) {
 			children:     []string{root(clusterA, 0, "DV_TEXT"), root(clusterB, 0, "DV_COUNT")},
 			minimal:      []string{clusterA + "[DV_TEXT]", clusterB + "[DV_COUNT]"},
 			example:      []string{clusterA + "[DV_TEXT]", clusterB + "[DV_COUNT]"},
+			minimalValid: true,
+			exampleValid: true,
+		},
+		{
+			name:         "slot then optional element of its node_id",
+			children:     []string{element("at0002", 1, "DV_COUNT"), optSlot("ELEMENT", "at0001"), element("at0001", 0, "DV_TEXT")},
+			minimal:      []string{"DV_COUNT", "DV_TEXT"},
+			example:      []string{"DV_COUNT", "DV_TEXT"},
 			minimalValid: true,
 			exampleValid: true,
 		},
