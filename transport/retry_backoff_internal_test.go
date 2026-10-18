@@ -21,7 +21,7 @@ import (
 // of zero or less, sends the next attempts back to back. The wait instead
 // stops at MaxBackoff, or at the largest Duration when MaxBackoff is unset,
 // and every value that fits keeps exactly the value it had.
-func TestREQ091_BackoffSaturatesInsteadOfOverflowing(t *testing.T) {
+func TestREQ091_BackoffSaturatesInsteadOfOverflowing(t *testing.T) { // REQ-091
 	t.Parallel()
 	capped := RetryPolicy{InitialBackoff: 100 * time.Millisecond, MaxBackoff: 30 * time.Second, Multiplier: 2}
 	uncapped := RetryPolicy{InitialBackoff: 100 * time.Millisecond, Multiplier: 2}
@@ -97,7 +97,7 @@ func (a always503) RoundTrip(r *http.Request) (*http.Response, error) {
 // 4.001s. From the fourth wait on the float product is past 2^63 ns; a wait
 // lost to the overflow would end the call early, sending its attempts back to
 // back at a server that is already answering 503.
-func TestREQ091_BackoffWaitSurvivesOverflowThroughDo(t *testing.T) {
+func TestREQ091_BackoffWaitSurvivesOverflowThroughDo(t *testing.T) { // REQ-091
 	synctest.Test(t, func(t *testing.T) {
 		cat, err := discovery.NewStaticCatalog(discovery.StaticConfig{
 			Issuer: "https://idp.example",

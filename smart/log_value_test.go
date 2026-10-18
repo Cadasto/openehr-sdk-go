@@ -209,7 +209,7 @@ func TestREQ025_NilLaunchContextAndPrincipalLogAsNil(t *testing.T) { // REQ-025,
 // from a token-endpoint body on its own, as the pointer LaunchContext holds
 // and as a pointer to a copy of the value: its Raw holds the tokens, and the
 // log masks them.
-func TestREQ067_PrincipalIdentityLogValueMasksTokens(t *testing.T) {
+func TestREQ067_PrincipalIdentityLogValueMasksTokens(t *testing.T) { // REQ-067
 	p := tokenBodyLaunchContext(t).Principal
 	copied := *p
 	for _, v := range []struct {
