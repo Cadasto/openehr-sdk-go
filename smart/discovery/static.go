@@ -34,7 +34,10 @@ type StaticConfig struct {
 // trip. Used for static EHRbase deployments, local development, and
 // tests. It checks that every Services entry has a BaseURL that is
 // non-nil and absolute. It copies the Services map and sets each copied
-// entry's ID to its key, leaving the caller's StaticConfig unchanged.
+// entry's ID to its key, leaving the caller's StaticConfig unchanged. It
+// also copies Auth: every endpoint URL, with its user information, and
+// every list, so a later change to the caller's endpoints does not reach
+// the catalog, and a change to the catalog's does not reach the caller's.
 //
 // The catalog's BaseURL is StaticConfig.BaseURL, or StaticConfig.Issuer
 // when BaseURL is empty.
@@ -65,7 +68,7 @@ func NewStaticCatalog(cfg StaticConfig) (*ServiceCatalog, error) {
 		BaseURL:    baseURL,
 		Issuer:     cfg.Issuer,
 		Services:   services,
-		Auth:       cfg.Auth,
+		Auth:       cloneAuthEndpoints(cfg.Auth),
 		ResolvedAt: time.Now(),
 		ExpiresAt:  cfg.ExpiresAt,
 		ETag:       cfg.ETag,
@@ -84,6 +87,39 @@ func cloneServices(in map[string]ServiceEntry) map[string]ServiceEntry {
 		out[k] = v
 	}
 	return out
+}
+
+// cloneAuthEndpoints returns a copy of a that shares nothing a caller can
+// change with a: each endpoint URL, with its user information, and each
+// list is copied. The endpoint URLs are the ones authMembers lists.
+func cloneAuthEndpoints(a AuthEndpoints) AuthEndpoints {
+	for _, m := range authMembers {
+		u := m.endpoint(&a)
+		*u = cloneURL(*u)
+	}
+	for _, l := range []*[]string{
+		&a.ScopesSupported, &a.ResponseTypesSupported, &a.CodeChallengeMethodsSupported,
+		&a.GrantTypesSupported, &a.TokenEndpointAuthMethodsSupported,
+		&a.TokenEndpointAuthSigningAlgValuesSupported, &a.IDTokenSigningAlgValuesSupported,
+		&a.Capabilities,
+	} {
+		*l = slices.Clone(*l)
+	}
+	return a
+}
+
+// cloneURL returns a copy of u with its own copy of u's user information,
+// or nil for a nil u.
+func cloneURL(u *url.URL) *url.URL {
+	if u == nil {
+		return nil
+	}
+	c := *u
+	if u.User != nil {
+		user := *u.User
+		c.User = &user
+	}
+	return &c
 }
 
 // MustParseURL panics on invalid URLs; intended for static catalog

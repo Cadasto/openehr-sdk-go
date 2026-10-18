@@ -112,6 +112,8 @@ requirements:
     status: draft
     implementation: landed
     packages: [transport, openehr/client]
+    tests:
+      - transport/diagnostics_internal_test.go
 
   - id: REQ-021
     title: Injected `*http.Client`
@@ -120,8 +122,13 @@ requirements:
     implementation: landed
     packages: [transport]
     tests:
+      - auth/clientcreds/http_client_required_test.go
+      - auth/jwtbearer/http_client_required_test.go
+      - auth/smart/http_client_required_test.go
+      - smart/discovery/new_resolver_test.go
       - smart/discovery/refuse_downgrade_internal_test.go
       - transport/client_test.go
+      - transport/diagnostics_internal_test.go
       - transport/redirect_internal_test.go
       - transport/redirect_test.go
 
@@ -158,7 +165,10 @@ requirements:
     implementation: landed
     packages: [transport, auth, smart/discovery, openehr/client/ehr, openehr/client/ehr/contribution, openehr/client/system, openehr/aql, openehr/aql/parse, openehr/aql/lint, openehr/aql/contain, openehr/client/query, openehr/rm/typereg, openehr/rm, openehr/aom/aom14, internal/bmmgen]
     tests:
+      - auth/clientcreds/shared_exchange_test.go
+      - auth/jwtbearer/shared_exchange_test.go
       - auth/nilautherror_test.go
+      - auth/smart/shared_refresh_test.go
       - cadasto/admin/probes_test.go
       - internal/option_guard_test.go
       - openehr/aql/contain/nilrelation_test.go
@@ -192,7 +202,11 @@ requirements:
       - openehr/serialize/simplified/mediatype_test.go
       - openehr/terminology/terminology_test.go
       - sandbox/nilhandler_test.go
+      - smart/discovery/memory_cache_test.go
+      - smart/discovery/new_resolver_test.go
       - smart/discovery/nildiscoveryerror_test.go
+      - smart/discovery/plaintext_document_test.go
+      - smart/log_value_test.go
       - testkit/probe/run_test.go
       - testkit/probes/aql/probe_097_semantic_lint.go
       - testkit/probes/aql/probes_test.go
@@ -200,6 +214,7 @@ requirements:
       - transport/challenge_test.go
       - transport/client_test.go
       - transport/decode_error_test.go
+      - transport/diagnostics_internal_test.go
       - transport/nilwiredereference_internal_test.go
       - transport/nilwireerror_test.go
 
@@ -211,10 +226,20 @@ requirements:
     packages: [smart/discovery, transport]
     tests:
       - auth/clientcreds/reauth_test.go
+      - auth/clientcreds/shared_exchange_test.go
       - auth/jwtbearer/reauth_test.go
+      - auth/jwtbearer/shared_exchange_test.go
+      - auth/jwtbearer/template_copy_test.go
+      - auth/smart/own_copy_test.go
+      - auth/smart/print_test.go
+      - auth/smart/response_copy_test.go
+      - auth/smart/shared_refresh_test.go
+      - internal/coalesce/coalesce_test.go
       - sandbox/roundtrip_test.go
+      - smart/discovery/cache_write_bound_test.go
       - smart/discovery/coalesce_cancel_test.go
       - smart/discovery/coalesce_panic_test.go
+      - smart/discovery/static_own_copy_test.go
       - smart/discovery/static_test.go
 
   - id: REQ-030
@@ -418,6 +443,8 @@ requirements:
     status: draft
     implementation: landed
     packages: [transport]
+    tests:
+      - transport/hot_path_internal_test.go
 
   - id: REQ-052
     title: Canonical JSON
@@ -655,6 +682,7 @@ requirements:
       - testkit/probes/rest/audit_grammar_test.go
       - testkit/probes/rest/probe_062_audit_details_header.go
       - testkit/probes/rest/probes_test.go
+      - transport/hot_path_internal_test.go
       - transport/response_test.go
 
   - id: REQ-060
@@ -674,6 +702,7 @@ requirements:
       - auth/tokensource_test.go
       - internal/noredirect/noredirect_test.go
       - transport/client_test.go
+      - transport/diagnostics_internal_test.go
 
   - id: REQ-061
     title: SMART-on-openEHR PKCE
@@ -689,6 +718,7 @@ requirements:
       - auth/smart/complete_test.go
       - auth/smart/exchange_idtoken_test.go
       - auth/smart/launch_test.go
+      - auth/smart/own_copy_test.go
       - auth/smart/redact_test.go
       - auth/smart/smart_test.go
       - auth/tokensource_test.go
@@ -709,7 +739,9 @@ requirements:
       - auth/smart/idtoken_subject_test.go
       - auth/smart/idtoken_test.go
       - auth/smart/jwks_kidless_test.go
+      - auth/smart/jwks_ttl_test.go
       - auth/smart/redact_test.go
+      - auth/smart/shared_refresh_test.go
       - auth/smart/smart_test.go
       - smart/discovery/resolver_test.go
       - smart/idtoken_test.go
@@ -725,20 +757,31 @@ requirements:
     packages: [auth, auth/clientcreds, auth/jwtbearer, auth/smart, transport, testkit/probes/auth]
     probes: [PROBE-007]
     tests:
+      - auth/clientcreds/expires_in_test.go
       - auth/clientcreds/reauth_test.go
+      - auth/clientcreds/refresh_threshold_test.go
+      - auth/clientcreds/shared_exchange_test.go
       - auth/errors_test.go
+      - auth/jwtbearer/expires_in_test.go
       - auth/jwtbearer/reauth_test.go
+      - auth/jwtbearer/refresh_threshold_test.go
+      - auth/jwtbearer/shared_exchange_test.go
+      - auth/smart/expires_in_test.go
       - auth/smart/reauth_test.go
       - auth/smart/redact_test.go
       - auth/smart/redirect_test.go
       - auth/smart/refresh_carry_test.go
       - auth/smart/refresh_failure_test.go
       - auth/smart/refresh_idtoken_test.go
+      - auth/smart/refresh_threshold_test.go
+      - auth/smart/response_copy_test.go
       - auth/smart/restored_scope_test.go
       - auth/smart/revoke_test.go
+      - auth/smart/shared_refresh_test.go
       - auth/smart/smart_test.go
       - auth/smart/token_change_test.go
       - auth/tokensource_test.go
+      - internal/expiresin/expiresin_test.go
       - testkit/probes/auth/probe_007_proactive_refresh.go
       - testkit/probes/auth/probe_007_transport_refresh.go
       - testkit/probes/auth/probes_test.go
@@ -746,6 +789,7 @@ requirements:
       - transport/client_test.go
       - transport/reauth_backend_test.go
       - transport/reauth_challenge_test.go
+      - transport/reauth_error_test.go
 
   - id: REQ-064
     title: Launch context
@@ -768,6 +812,7 @@ requirements:
       - smart/launch_claims_test.go
       - smart/launch_seam_test.go
       - smart/launch_test.go
+      - smart/log_value_test.go
 
   - id: REQ-065
     title: Per-client tenant binding
@@ -788,6 +833,7 @@ requirements:
     tests:
       - testkit/probes/auth/probe_009_caller_attribution.go
       - testkit/probes/auth/probes_test.go
+      - transport/caller_attribution_snapshot_test.go
       - transport/client_test.go
 
   - id: REQ-067
@@ -799,6 +845,7 @@ requirements:
     probes: [PROBE-008]
     tests:
       - smart/launch_test.go
+      - smart/log_value_test.go
       - testkit/probes/auth/probe_008_principal_claims.go
       - testkit/probes/auth/probes_test.go
 
@@ -816,6 +863,7 @@ requirements:
       - auth/jwtbearer/client_assertion_test.go
       - auth/jwtbearer/jwtbearer_test.go
       - auth/jwtbearer/redact_test.go
+      - auth/jwtbearer/template_copy_test.go
       - auth/smart/client_assertion_test.go
       - auth/smart/client_id_test.go
       - auth/smart/confidential_pkce_test.go
@@ -850,6 +898,7 @@ requirements:
       - smart/discovery/redact_test.go
       - smart/discovery/resolver_test.go
       - smart/discovery/service_entry_test.go
+      - smart/discovery/static_own_copy_test.go
       - smart/discovery/static_test.go
       - testkit/probes/auth/probe_002_openehr_rest_service.go
       - testkit/probes/auth/probes_test.go
@@ -864,6 +913,7 @@ requirements:
     probes: [PROBE-041]
     tests:
       - smart/discovery/cache_hit_test.go
+      - smart/discovery/cache_write_bound_test.go
       - smart/discovery/coalesce_cancel_test.go
       - smart/discovery/coalesce_panic_test.go
       - smart/discovery/issuer_test.go
@@ -881,6 +931,8 @@ requirements:
     tests:
       - smart/discovery/auth_members_test.go
       - smart/discovery/cache_hit_test.go
+      - smart/discovery/document_size_test.go
+      - smart/discovery/option_copy_test.go
       - smart/discovery/redact_test.go
       - smart/discovery/resolver_test.go
       - smart/discovery/service_entry_test.go
@@ -899,6 +951,7 @@ requirements:
     tests:
       - smart/discovery/cache_hit_test.go
       - smart/discovery/diagnostics_test.go
+      - smart/discovery/document_size_test.go
       - smart/discovery/insecure_baseurl_test.go
       - smart/discovery/issuer_test.go
       - smart/discovery/redact_test.go
@@ -1002,9 +1055,11 @@ requirements:
     packages: [transport]
     tests:
       - transport/body_read_error_test.go
+      - transport/build_error_retry_test.go
       - transport/client_test.go
       - transport/reauth_challenge_test.go
       - transport/redirect_test.go
+      - transport/retry_backoff_internal_test.go
 
   - id: REQ-092
     title: TLS posture
@@ -1013,6 +1068,8 @@ requirements:
     implementation: landed
     packages: [transport, smart/discovery]
     tests:
+      - smart/discovery/plaintext_document_test.go
+      - smart/discovery/redact_test.go
       - transport/redirect_internal_test.go
       - transport/redirect_test.go
 
@@ -1038,9 +1095,13 @@ requirements:
       - transport/body_read_error_test.go
       - transport/client_test.go
       - transport/decode_error_test.go
+      - transport/diagnostics_internal_test.go
       - transport/error_envelope_test.go
       - transport/errors_test.go
+      - transport/hot_path_internal_test.go
+      - transport/path_error_text_test.go
       - transport/reauth_challenge_test.go
+      - transport/reauth_error_test.go
       - transport/redact_test.go
       - transport/redirect_test.go
 
@@ -1098,6 +1159,7 @@ requirements:
       - testkit/probes/rest/probes_test.go
       - testkit/probes/transport/probe_091_path_segment_validation.go
       - testkit/probes/versioned/probe_072_contribution_submission_shape.go
+      - transport/base_url_encoding_test.go
       - transport/path_encoding_test.go
       - transport/query_encoding_test.go
 
@@ -1125,7 +1187,9 @@ requirements:
     packages: [transport]
     tests:
       - transport/body_read_error_test.go
+      - transport/diagnostics_internal_test.go
       - transport/errors_test.go
+      - transport/observer_refusal_test.go
       - transport/observer_test.go
 
   - id: REQ-099
@@ -1905,6 +1969,10 @@ requirements:
       - openehr/client/route_guard_test.go
       - testkit/probes/transport/probe_091_path_segment_validation.go
       - testkit/probes/transport/probes_test.go
+      - transport/base_url_encoding_test.go
+      - transport/diagnostics_internal_test.go
+      - transport/hot_path_internal_test.go
+      - transport/path_error_text_test.go
       - transport/path_test.go
 
   - id: REQ-151

@@ -6,6 +6,22 @@ import (
 	"strings"
 )
 
+// Header names, spelt as http.CanonicalHeaderKey spells them so that
+// Header.Get, Set and Values find them without canonicalising them again on
+// every request. net/http sends and reads every header name in this form,
+// so the names on the wire are the same either way.
+const (
+	headerOpenEHRVersion        = "Openehr-Version"
+	headerOpenEHRAuditDetails   = "Openehr-Audit-Details"
+	headerOpenEHRTemplateID     = "Openehr-Template-Id"
+	headerOpenEHRURI            = "Openehr-Uri"
+	headerOpenEHRItemTag        = "Openehr-Item-Tag"
+	headerOpenEHRVersionItemTag = "Openehr-Version-Item-Tag"
+	headerCadastoSpecVersion    = "Cadasto-Openehr-Spec-Version"
+	headerETag                  = "Etag"
+	headerWWWAuthenticate       = "Www-Authenticate"
+)
+
 // Prefer is the typed enum for HTTP Prefer return-mode negotiation.
 // The zero value (PreferDefault) suppresses the header.
 type Prefer string

@@ -90,6 +90,8 @@ type ClaimsTemplate struct {
 // Signing is delegated to go-jose/v4, which handles JOSE encoding
 // (including ECDSA r‖s padding) internally.
 type ClaimsSigner struct {
+	// Template is the claim set the signer signs. [NewClaimsSigner] sets it
+	// to its own copy of the template it is given.
 	Template ClaimsTemplate
 	// Signer is the private-key signer. Required.
 	Signer crypto.Signer
@@ -127,8 +129,18 @@ type ClaimsSigner struct {
 //   - RS256, RS384: *rsa.PrivateKey
 //   - ES256: *ecdsa.PrivateKey on P-256
 //   - ES384: *ecdsa.PrivateKey on P-384
+//
+// The signer keeps its own copy of the template it is built from, with its
+// own copy of template.Extra, so a claim the caller adds to, replaces in or
+// removes from that map afterwards does not reach the assertions it signs.
+// The claim values are not copied: a value that is itself a map or a slice
+// must not change while the signer is in use. Setting the signer's Template
+// field replaces the copy.
 func NewClaimsSigner(template ClaimsTemplate, signer crypto.Signer, opts ...SignerOption) (*ClaimsSigner, error) {
 	s := &ClaimsSigner{Template: template, Signer: signer, Algorithm: "RS384"}
+	// Assertion reads Extra on every call, from any goroutine, so the signer
+	// does not share the map with the caller.
+	s.Template.Extra = maps.Clone(template.Extra)
 	for _, o := range opts {
 		if o != nil {
 			o(s)

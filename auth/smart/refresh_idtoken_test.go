@@ -4,6 +4,7 @@ import (
 	"crypto/rsa"
 	"errors"
 	"net/url"
+	"reflect"
 	"testing"
 	"time"
 
@@ -340,7 +341,7 @@ func TestRefreshWithoutIDTokenKeepsTheVerifiedClaims(t *testing.T) { // REQ-064
 	if last.AccessToken != "at-2" {
 		t.Errorf("LastTokenResponse().AccessToken = %q, want the refresh's at-2", last.AccessToken)
 	}
-	if last.IDTokenClaims != tr.IDTokenClaims {
+	if tr.IDTokenClaims == nil || !reflect.DeepEqual(last.IDTokenClaims, tr.IDTokenClaims) {
 		t.Errorf("LastTokenResponse().IDTokenClaims = %+v, want the exchange's verified claims %+v", last.IDTokenClaims, tr.IDTokenClaims)
 	}
 
@@ -350,7 +351,7 @@ func TestRefreshWithoutIDTokenKeepsTheVerifiedClaims(t *testing.T) { // REQ-064
 	if _, err := src.Token(t.Context()); err != nil {
 		t.Fatalf("second Token() error = %v, want a refreshed token", err)
 	}
-	if got := src.LastTokenResponse().IDTokenClaims; got != tr.IDTokenClaims {
+	if got := src.LastTokenResponse().IDTokenClaims; !reflect.DeepEqual(got, tr.IDTokenClaims) {
 		t.Errorf("after a second refresh, LastTokenResponse().IDTokenClaims = %+v, want the exchange's claims", got)
 	}
 

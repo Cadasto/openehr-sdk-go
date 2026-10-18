@@ -73,13 +73,13 @@ func parseMetadata(h http.Header) *Metadata {
 		ETag:               etag,
 		ETags:              etags,
 		Location:           h.Get("Location"),
-		RMVersion:          h.Get("openehr-version"),
-		AuditDetails:       h.Get("openehr-audit-details"),
-		URI:                h.Get("openehr-uri"),
-		ItemTag:            joinHeaderField(h, "openehr-item-tag"),
-		VersionItemTag:     joinHeaderField(h, "openehr-version-item-tag"),
-		TemplateID:         h.Get("openehr-template-id"),
-		CadastoSpecVersion: h.Get("Cadasto-OpenEhr-Spec-Version"),
+		RMVersion:          h.Get(headerOpenEHRVersion),
+		AuditDetails:       h.Get(headerOpenEHRAuditDetails),
+		URI:                h.Get(headerOpenEHRURI),
+		ItemTag:            joinHeaderField(h, headerOpenEHRItemTag),
+		VersionItemTag:     joinHeaderField(h, headerOpenEHRVersionItemTag),
+		TemplateID:         h.Get(headerOpenEHRTemplateID),
+		CadastoSpecVersion: h.Get(headerCadastoSpecVersion),
 	}
 	if lm := h.Get("Last-Modified"); lm != "" {
 		if t, err := http.ParseTime(lm); err == nil {
@@ -93,7 +93,7 @@ func parseMetadata(h http.Header) *Metadata {
 // prefix stripped, in wire order. The slice is a copy. Nil when the
 // response carried no ETag.
 func etagValues(h http.Header) []string {
-	raw := h.Values("ETag")
+	raw := h.Values(headerETag)
 	if len(raw) == 0 {
 		return nil
 	}

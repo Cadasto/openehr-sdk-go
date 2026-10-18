@@ -32,17 +32,12 @@ func NewPKCEPair() (PKCEPair, error) {
 	}, nil
 }
 
-func base64URLEncode(b []byte) string {
-	return base64.RawURLEncoding.EncodeToString(b)
-}
-
 // randBase64URL returns n cryptographically random bytes encoded as an
 // unpadded base64url string. It generates the OAuth `state` (CSRF) value
-// and the OpenID Connect nonce.
-func randBase64URL(n int) (string, error) {
+// and the OpenID Connect nonce. crypto/rand.Read never fails and always
+// fills b.
+func randBase64URL(n int) string {
 	b := make([]byte, n)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return base64URLEncode(b), nil
+	_, _ = rand.Read(b)
+	return base64.RawURLEncoding.EncodeToString(b)
 }

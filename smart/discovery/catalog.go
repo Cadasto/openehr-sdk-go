@@ -64,7 +64,8 @@ func (c *ServiceCatalog) Service(serviceID string) (ServiceEntry, bool) {
 
 // OpenEHRRest is shorthand for c.Service("org.openehr.rest"). Returns
 // the entry and ok=true when the catalog advertises the openEHR REST
-// service; the typed leaf clients call this on every request.
+// service. The typed clients look up each request's service with Service;
+// OpenEHRRest is for a caller that wants the openEHR REST entry itself.
 func (c *ServiceCatalog) OpenEHRRest() (ServiceEntry, bool) {
 	return c.Service(ServiceIDOpenEHRRest)
 }
@@ -172,8 +173,9 @@ type AuthEndpoints struct {
 }
 
 // Service identifier constants. The SDK consumes only the openEHR
-// service; the FHIR identifier is included so non-Go SDKs sharing
-// these constants can avoid string-literal drift.
+// service; the FHIR identifier is included so a caller that reads the
+// FHIR entry of a SMART-on-openEHR document can name it with a constant
+// rather than a string literal.
 const (
 	ServiceIDOpenEHRRest = "org.openehr.rest"
 	ServiceIDFHIRRest    = "org.fhir.rest"

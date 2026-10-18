@@ -40,7 +40,11 @@ func WithJWKS(jwks *authsmart.JWKS) ValidateOption {
 	return func(c *ValidateConfig) { c.JWKS = jwks }
 }
 
-// WithIssuer sets the expected iss claim.
+// WithIssuer sets the expected iss claim, which an ID token verified by
+// [LaunchContextFromTokenResponse] must carry. It also sets
+// [LaunchContext.Issuer], in place of the iss of the verified claims the
+// token response may already carry; those are trusted as they are, so iss
+// is not compared with their issuer.
 func WithIssuer(iss string) ValidateOption {
 	return func(c *ValidateConfig) { c.Issuer = iss }
 }
@@ -58,9 +62,11 @@ func WithExpectedNonce(nonce string) ValidateOption {
 // WithIDTokenSigningAlgs constrains the id_token signature algorithms to the
 // authorization server's advertised id_token_signing_alg_values_supported.
 // When unset or empty the SDK default set applies
-// (RS256/RS384/ES256/ES384).
+// (RS256/RS384/ES256/ES384). The option keeps its own copy of algs, so a
+// later change to the caller's slice does not reach it.
 func WithIDTokenSigningAlgs(algs []string) ValidateOption {
-	return func(c *ValidateConfig) { c.AllowedIDTokenAlgs = algs }
+	allowed := slices.Clone(algs)
+	return func(c *ValidateConfig) { c.AllowedIDTokenAlgs = allowed }
 }
 
 // WithTrustedAudiences names the audiences the ID token's aud claim may list
@@ -109,16 +115,21 @@ func LaunchContextFromTokenResponse(ctx context.Context, tr authsmart.TokenRespo
 		}
 	}
 	lc := &LaunchContext{
-		Patient:           tr.Patient,
-		Encounter:         tr.Encounter,
-		Issuer:            cfg.Issuer,
-		EHRID:             tr.EHRID,
-		EpisodeID:         tr.EpisodeID,
-		Intent:            tr.Intent,
-		SMARTStyleURL:     tr.SMARTStyleURL,
-		NeedPatientBanner: tr.NeedPatientBanner,
-		Tenant:            tr.Tenant,
-		Raw:               maps.Clone(tr.Raw),
+		Patient:       tr.Patient,
+		Encounter:     tr.Encounter,
+		Issuer:        cfg.Issuer,
+		EHRID:         tr.EHRID,
+		EpisodeID:     tr.EpisodeID,
+		Intent:        tr.Intent,
+		SMARTStyleURL: tr.SMARTStyleURL,
+		Tenant:        tr.Tenant,
+		Raw:           maps.Clone(tr.Raw),
+	}
+	// The launch context keeps its own copy of the banner preference, as it
+	// does of the other fields, so an edit through tr's pointer does not
+	// reach it.
+	if tr.NeedPatientBanner != nil {
+		lc.NeedPatientBanner = new(*tr.NeedPatientBanner)
 	}
 	if tr.Scope != "" {
 		lc.Scopes = strings.Fields(tr.Scope)

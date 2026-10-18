@@ -9,3 +9,8 @@ func (s *Source) HeldTokens() (auth.Token, string) {
 	defer s.mu.Unlock()
 	return s.cur, s.refresh
 }
+
+// Settings returns the configuration the source keeps, so a test can check
+// that a change the caller makes afterwards to what it passed does not reach
+// the source.
+func (s *Source) Settings() Config { return s.cfg }

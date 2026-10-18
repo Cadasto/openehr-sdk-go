@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cadasto/openehr-sdk-go/internal/coalesce"
 	"github.com/cadasto/openehr-sdk-go/internal/urlredact"
 )
 
@@ -30,17 +31,28 @@ const SpecVersionPin = "1.1.0"
 // WithWellKnownPath when constructing the Resolver.
 const WellKnownPath = "/.well-known/smart-configuration"
 
-// DefaultTTL is applied when the discovery document does not advertise
-// an explicit Cache-Control max-age.
+// DefaultTTL is applied when the response to a discovery fetch carries no
+// positive Cache-Control max-age.
 const DefaultTTL = 15 * time.Minute
 
 // openIDConfigurationPath is the OpenID Connect discovery path, appended
 // to the issuer's own path (OpenID Connect Discovery 1.0 §4).
 const openIDConfigurationPath = "/.well-known/openid-configuration"
 
-// maxDocumentBytes caps how much of a discovery document the resolver
-// reads.
+// maxDocumentBytes caps the size of a SMART configuration or an OpenID
+// configuration the resolver accepts. It reads one byte more, so that a
+// longer document fails with an error that names its size instead of being
+// cut short into JSON that does not parse. The failure keeps the reason an
+// unparsable document of the same kind gets.
 const maxDocumentBytes = 1 << 20
+
+// cacheWriteTimeout bounds the Cache write that records a fetch's result.
+// The write runs without the caller's cancellation and deadline, so that it
+// lands when the caller gives up after the fetch, and the call stays in
+// flight until it returns; without a bound of its own, a Cache that honours
+// its context but cannot finish would hold the starter and every caller
+// joined to it for as long as it hangs.
+const cacheWriteTimeout = 10 * time.Second
 
 // Resolver fetches, validates, caches, and refreshes SMART
 // configuration documents for one or more Platform base URLs.
@@ -48,6 +60,9 @@ const maxDocumentBytes = 1 << 20
 // A single Resolver instance is safe for concurrent use across many
 // goroutines; concurrent Resolve()/Refresh() calls for the same base URL
 // coalesce around one in-flight fetch.
+//
+// The zero Resolver is not usable: it has no HTTP client and no cache.
+// Construct one with NewResolver.
 type Resolver struct {
 	cfg   resolverConfig
 	cache Cache
@@ -94,10 +109,13 @@ func WithHTTPClient(c *http.Client) Option {
 }
 
 // WithRequiredServices configures which service IDs must be present in
-// every resolved catalog. Default is ["org.openehr.rest"].
+// every resolved catalog. Default is ["org.openehr.rest"]. The option keeps
+// its own copy of ids, so a later change to the caller's slice does not
+// reach it.
 func WithRequiredServices(ids ...string) Option {
+	required := slices.Clone(ids)
 	return func(cfg *resolverConfig) {
-		cfg.requiredServices = append(cfg.requiredServices[:0], ids...)
+		cfg.requiredServices = append(cfg.requiredServices[:0], required...)
 	}
 }
 
@@ -113,26 +131,33 @@ func WithRequiredServices(ids ...string) Option {
 // it makes the check strict: the compared value is the entry's
 // spec_version, or its version when it advertises no spec_version, and an
 // entry that advertises neither is rejected unless "" is in the accepted
-// set.
+// set. The option keeps its own copy of versions, so a later change to the
+// caller's slice does not reach it.
 func WithAcceptedSpecVersions(versions ...string) Option {
+	accepted := slices.Clone(versions)
 	return func(cfg *resolverConfig) {
 		cfg.acceptedVersions = map[string]struct{}{}
-		for _, v := range versions {
+		for _, v := range accepted {
 			cfg.acceptedVersions[v] = struct{}{}
 		}
 		cfg.acceptedVersionsLocked = true
 	}
 }
 
-// WithDefaultTTL overrides the cache TTL applied when the discovery
-// document does not advertise one.
+// WithDefaultTTL overrides DefaultTTL, the cache TTL applied when the
+// response to a discovery fetch carries no positive Cache-Control max-age.
+// A d of 0 or less means such a catalog never expires: its ExpiresAt is
+// the zero time, so Resolve keeps returning it from the cache until Refresh
+// fetches it again.
 func WithDefaultTTL(d time.Duration) Option {
 	return func(cfg *resolverConfig) { cfg.defaultTTL = d }
 }
 
 // WithAllowInsecure permits http:// base URLs, issuers and auth endpoint
 // URLs, and redirects to a URL that is not https. By default the resolver
-// refuses both. Use only for local development.
+// refuses both. Use only for local development. The resolver logs a warning
+// for each SMART configuration it then fetches over http, and for each http
+// URL in a catalog it accepts.
 func WithAllowInsecure() Option {
 	return func(cfg *resolverConfig) { cfg.allowInsecure = true }
 }
@@ -177,7 +202,9 @@ func NewResolver(cache Cache, opts ...Option) (*Resolver, error) {
 		}
 	}
 	if cfg.httpClient == nil {
-		return nil, fmt.Errorf("discovery: %w", &DiscoveryError{Reason: ReasonFetchFailed, Inner: errors.New("HTTPClient is required (REQ-021)")})
+		// REQ-021: the caller supplies the client. The DiscoveryError's own
+		// text starts with "discovery: ", so it is returned as it is.
+		return nil, &DiscoveryError{Reason: ReasonFetchFailed, Inner: errors.New("HTTPClient is required")}
 	}
 	if cfg.logger == nil {
 		cfg.logger = slog.Default()
@@ -340,8 +367,9 @@ func ownEntry(baseURL string, cat *ServiceCatalog, ok bool) *ServiceCatalog {
 // starter returns an error that reports its context's error, and the failure
 // says nothing about the Platform. The fetch failed that way when its error
 // reports the error of the starter's ended context or the cause that context
-// ended with (see endedByContext). Such a failure leaves the cache as it was,
-// and a waiter whose own context is still live does not receive it. That
+// ended with (the rule internal/coalesce.EndedByContext states, which the
+// auth sources share). Such a failure leaves the cache as it was, and a
+// waiter whose own context is still live does not receive it. That
 // waiter fetches again, joining the next in-flight fetch for baseURL or, when
 // there is none, running one under its own context. It repeats this only
 // while its own context is live, and each round is a real fetch, so it ends
@@ -359,7 +387,8 @@ func ownEntry(baseURL string, cat *ServiceCatalog, ok bool) *ServiceCatalog {
 // written before the call leaves the in-flight set, so callers that arrive
 // while it is written join the call and get its result, and a later fetch
 // for baseURL never has its cache entry overwritten or dropped by an earlier
-// one.
+// one. The write runs under writeCache's context, which the starter's
+// cancellation and deadline do not end and cacheWriteTimeout does.
 //
 // A panic in the fetch, or in the Cache call that records its result, is not
 // recovered: it goes on to the starter as it was raised. The call still leaves
@@ -416,7 +445,7 @@ func (r *Resolver) runCall(ctx context.Context, baseURL string, cached *ServiceC
 	defer r.release(baseURL, call)
 
 	cat, err := r.fetch(ctx, baseURL, cached)
-	ownContextEnded := endedByContext(ctx, err)
+	ownContextEnded := coalesce.EndedByContext(ctx, err)
 
 	// Write the cache while this call is still in flight. A caller arriving
 	// meanwhile joins it, so no later fetch for baseURL can write the cache
@@ -428,16 +457,17 @@ func (r *Resolver) runCall(ctx context.Context, baseURL string, cached *ServiceC
 		// Drop what was cached, so the next resolution fetches again and
 		// reports the failure instead of serving a catalog the Platform no
 		// longer vouches for. The caller's context may have ended after the
-		// failure, so it must not stop the invalidation.
-		if ierr := r.cache.Invalidate(context.WithoutCancel(ctx), baseURL); ierr != nil {
-			r.cfg.logger.Warn("discovery: cache invalidate failed", "base_url", urlredact.String(baseURL), "err", ierr)
+		// failure, so it must not stop the invalidation; writeCache bounds it
+		// instead.
+		if ierr := writeCache(ctx, func(wctx context.Context) error { return r.cache.Invalidate(wctx, baseURL) }); ierr != nil {
+			r.cfg.logger.Warn("discovery: cache invalidate failed", "base_url", urlredact.String(baseURL), "err", cacheErrorText(ierr, baseURL))
 		}
 	case cat != nil:
 		// The caller may have cancelled after the fetch succeeded. The
 		// write still has to land, or the entry from before this fetch
 		// stays. Cancellation must not refuse it, as with Invalidate above.
-		if perr := r.cache.Put(context.WithoutCancel(ctx), baseURL, cat); perr != nil {
-			r.cfg.logger.Warn("discovery: cache put failed", "base_url", urlredact.String(baseURL), "err", perr)
+		if perr := writeCache(ctx, func(wctx context.Context) error { return r.cache.Put(wctx, baseURL, cat) }); perr != nil {
+			r.cfg.logger.Warn("discovery: cache put failed", "base_url", urlredact.String(baseURL), "err", cacheErrorText(perr, baseURL))
 		}
 	}
 
@@ -455,6 +485,27 @@ func (r *Resolver) runCall(ctx context.Context, baseURL string, cached *ServiceC
 	return cat, err
 }
 
+// writeCache calls write, the Put or Invalidate that records a fetch's
+// result, with a context that keeps ctx's values but not its cancellation or
+// deadline, and that ends cacheWriteTimeout after the call. A Cache that
+// honours its context then returns by that time, with an error the caller
+// logs as any other; one that ignores its context holds the call until it
+// returns.
+func writeCache(ctx context.Context, write func(context.Context) error) error {
+	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cacheWriteTimeout)
+	defer cancel()
+	return write(wctx)
+}
+
+// cacheErrorText is the text of err, an error from a Cache write for baseURL,
+// with the password of baseURL masked. The Cache is handed baseURL as its
+// key, so its error can quote the key, as given or escaped, as a file-backed
+// Cache's *os.PathError does when the file is named after it. fmt.Sprint
+// gives the text of a typed nil error too, instead of panicking.
+func cacheErrorText(err error, baseURL string) string {
+	return urlredact.Text(fmt.Sprint(err), baseURL)
+}
+
 // release takes call out of the in-flight set, then wakes its waiters. runCall
 // defers it, so it runs exactly once per call, also when a panic unwinds
 // runCall.
@@ -463,21 +514,6 @@ func (r *Resolver) release(baseURL string, call *resolveCall) {
 	delete(r.inflight, baseURL)
 	r.mu.Unlock()
 	close(call.done)
-}
-
-// endedByContext reports whether err means the fetch failed only because ctx
-// ended: ctx is done, and err reports ctx's own error or its cause. The cause
-// counts because net/http returns context.Cause(ctx) when a request's context
-// ends, so a context ended with a cause (context.WithCancelCause,
-// context.WithTimeoutCause, errgroup) yields an error that reports the cause
-// and not context.Canceled or context.DeadlineExceeded. An error that reports
-// some other context error does not count and is a failure of the fetch: the
-// HTTP client's own timeout reports context.DeadlineExceeded whether ctx is
-// live or was only cancelled.
-func endedByContext(ctx context.Context, err error) bool {
-	ctxErr := ctx.Err()
-	return err != nil && ctxErr != nil &&
-		(errors.Is(err, ctxErr) || errors.Is(err, context.Cause(ctx)))
 }
 
 // fetch retrieves, validates and confirms the SMART configuration at
@@ -517,6 +553,7 @@ func (r *Resolver) fetch(ctx context.Context, baseURL string, cached *ServiceCat
 		if etag == "" {
 			return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonFetchFailed, Inner: errors.New("discovery fetch returned 304 to a request without If-None-Match")}
 		}
+		r.warnPlaintextDocument(baseURL, req, resp)
 		// The document is the one cached was built from, but it still goes
 		// through this Resolver's checks, as on a 200: the catalog may have
 		// been cached by a Resolver with other options, or reached the Cache
@@ -536,9 +573,13 @@ func (r *Resolver) fetch(ctx context.Context, baseURL string, cached *ServiceCat
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonFetchFailed, Inner: fmt.Errorf("discovery fetch returned %d", resp.StatusCode)}
 	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxDocumentBytes))
+	r.warnPlaintextDocument(baseURL, req, resp)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxDocumentBytes+1))
 	if err != nil {
 		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonFetchFailed, Inner: err}
+	}
+	if len(body) > maxDocumentBytes {
+		return nil, &DiscoveryError{Issuer: baseURL, Reason: ReasonParseError, Inner: fmt.Errorf("SMART configuration exceeds %d bytes", maxDocumentBytes)}
 	}
 	var wire smartConfigWire
 	if err := json.Unmarshal(body, &wire); err != nil {
@@ -680,9 +721,12 @@ func (r *Resolver) checkOpenIDConfiguration(ctx context.Context, cat *ServiceCat
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fail(ReasonFetchFailed, fmt.Errorf("openid-configuration fetch returned %d", resp.StatusCode))
 	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxDocumentBytes))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxDocumentBytes+1))
 	if err != nil {
 		return fail(ReasonFetchFailed, err)
+	}
+	if len(body) > maxDocumentBytes {
+		return fail(ReasonFetchFailed, fmt.Errorf("openid-configuration exceeds %d bytes", maxDocumentBytes))
 	}
 	var doc struct {
 		Issuer  string `json:"issuer"`
@@ -733,9 +777,13 @@ func joinURL(rawBase, path string) (*url.URL, error) {
 	return doc, nil
 }
 
-// computeExpiry inspects Cache-Control max-age and falls through to the
-// configured default. Per RFC 7234 the max-age directive overrides
-// Expires.
+// computeExpiry returns when a catalog resolved at now expires. It reads only
+// the max-age directive of Cache-Control (RFC 9111 §5.2.2.1): a positive
+// max-age gives now plus that many seconds. Otherwise, when there is no
+// max-age, or it is 0 or does not parse, fallback applies: now plus
+// fallback, or the zero time, which never expires, when fallback is 0 or
+// negative. Expires, Age and the other Cache-Control directives, no-store
+// and no-cache included, are not read.
 func computeExpiry(h http.Header, fallback time.Duration, now time.Time) time.Time {
 	cc := h.Get("Cache-Control")
 	if cc != "" {
@@ -1082,14 +1130,14 @@ func acceptedVersionsString(m map[string]struct{}) string {
 // plaintext auth endpoint is refused there, so the auth-endpoint warnings
 // cover the WithAllowInsecure path, while service baseUrl entries are
 // warn-only — the consumer is authoritative on which deployments they
-// want to talk to.
+// want to talk to. This is the REQ-092 warning on a plaintext catalog URL.
 func (r *Resolver) warnInsecure(cat *ServiceCatalog) {
 	check := func(name string, u *url.URL) {
 		if u == nil {
 			return
 		}
 		if u.Scheme == "http" {
-			r.cfg.logger.Warn("discovery: plaintext URL in catalog (REQ-092)", "base_url", urlredact.String(cat.BaseURL), "field", name, "url", u.Redacted())
+			r.cfg.logger.Warn("discovery: plaintext URL in catalog", "base_url", urlredact.String(cat.BaseURL), "field", name, "url", u.Redacted())
 		}
 	}
 	for _, m := range authMembers {
@@ -1097,6 +1145,22 @@ func (r *Resolver) warnInsecure(cat *ServiceCatalog) {
 	}
 	for id, s := range cat.Services {
 		check("services["+id+"].baseUrl", s.BaseURL)
+	}
+}
+
+// warnPlaintextDocument emits the REQ-092 warning when the SMART
+// configuration for baseURL came over plaintext http, which only a Resolver
+// built with WithAllowInsecure accepts. It judges the URL of the last
+// request the client sent, resp.Request, so an https request redirected to
+// http counts too. A RoundTripper may answer without setting resp.Request;
+// req, the request the resolver sent, then stands in for it.
+func (r *Resolver) warnPlaintextDocument(baseURL string, req *http.Request, resp *http.Response) {
+	u := req.URL
+	if resp.Request != nil && resp.Request.URL != nil {
+		u = resp.Request.URL
+	}
+	if u.Scheme == "http" {
+		r.cfg.logger.Warn("discovery: SMART configuration fetched over plaintext http", "base_url", urlredact.String(baseURL), "url", u.Redacted())
 	}
 }
 
