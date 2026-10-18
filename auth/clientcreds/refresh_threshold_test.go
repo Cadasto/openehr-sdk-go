@@ -81,3 +81,71 @@ func TestREQ063_NegativeRefreshThresholdCountsAsZero(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ063_DefaultRefreshThresholdIsThirtySeconds pins REQ-063 (auth.md §
+// Token refresh, G-2): without WithRefreshThreshold, and with a
+// Config.RefreshThreshold of 0, the refresh window is the 30-second default.
+// A token valid for a minute is returned without an exchange 20 seconds on,
+// with 40 seconds left, and is exchanged exactly once 40 seconds on, with 20
+// seconds left.
+func TestREQ063_DefaultRefreshThresholdIsThirtySeconds(t *testing.T) {
+	builds := []struct {
+		name  string
+		build func(t *testing.T, rt http.RoundTripper) *clientcreds.Source
+	}{
+		{name: "New without WithRefreshThreshold", build: func(t *testing.T, rt http.RoundTripper) *clientcreds.Source {
+			src, err := clientcreds.New("c", "s", "https://idp.test/token",
+				clientcreds.WithHTTPClient(&http.Client{Transport: rt}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			return src
+		}},
+		{name: "Config.RefreshThreshold 0", build: func(t *testing.T, rt http.RoundTripper) *clientcreds.Source {
+			src, err := clientcreds.FromConfig(clientcreds.Config{
+				HTTPClient:       &http.Client{Transport: rt},
+				TokenURL:         "https://idp.test/token",
+				ClientID:         "c",
+				ClientSecret:     "s",
+				RefreshThreshold: 0,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			return src
+		}},
+	}
+	steps := []struct {
+		at    time.Duration // time since the first exchange
+		want  string
+		posts int32
+	}{
+		{at: 20 * time.Second, want: "tok-1", posts: 1}, // 40 s left: outside the window
+		{at: 40 * time.Second, want: "tok-2", posts: 2}, // 20 s left: inside the window
+	}
+	for _, b := range builds {
+		t.Run(b.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				rt := &scriptedTransport{answer: func(r *http.Request, n int) (*http.Response, error) {
+					return tokenAnswer(r, http.StatusOK, minuteTokenBody(n)), nil
+				}}
+				src := b.build(t, rt)
+				start := time.Now()
+				if tok, err := src.Token(t.Context()); err != nil || tok.Value != "tok-1" {
+					t.Fatalf("first Token() = (%q, %v), want (tok-1, nil)", tok.Value, err)
+				}
+				for _, st := range steps {
+					time.Sleep(time.Until(start.Add(st.at)))
+
+					tok, err := src.Token(t.Context())
+					if err != nil || tok.Value != st.want {
+						t.Errorf("Token() %v after a token valid for a minute = (%q, %v), want (%s, nil)", st.at, tok.Value, err, st.want)
+					}
+					if got := rt.posts.Load(); got != st.posts {
+						t.Errorf("token-endpoint requests %v after the first exchange = %d, want %d", st.at, got, st.posts)
+					}
+				}
+			})
+		})
+	}
+}
