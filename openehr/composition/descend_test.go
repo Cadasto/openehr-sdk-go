@@ -155,3 +155,75 @@ func TestLocatableName(t *testing.T) {
 		})
 	}
 }
+
+// TestArchetypeNodeID checks that archetypeNodeID reads the
+// archetype_node_id of every LOCATABLE a composition path can descend
+// through, and answers "" without panicking for a value that is no
+// LOCATABLE and for a nil pointer to one.
+func TestArchetypeNodeID(t *testing.T) {
+	const id = "at0001"
+	cases := []struct {
+		name string
+		v    any
+		want string
+	}{
+		{name: "COMPOSITION", v: &rm.Composition{ArchetypeNodeID: id}, want: id},
+		{name: "OBSERVATION", v: &rm.Observation{ArchetypeNodeID: id}, want: id},
+		{name: "EVALUATION", v: &rm.Evaluation{ArchetypeNodeID: id}, want: id},
+		{name: "INSTRUCTION", v: &rm.Instruction{ArchetypeNodeID: id}, want: id},
+		{name: "ACTION", v: &rm.Action{ArchetypeNodeID: id}, want: id},
+		{name: "ADMIN_ENTRY", v: &rm.AdminEntry{ArchetypeNodeID: id}, want: id},
+		{name: "GENERIC_ENTRY", v: &rm.GenericEntry{ArchetypeNodeID: id}, want: id},
+		{name: "SECTION", v: &rm.Section{ArchetypeNodeID: id}, want: id},
+		{name: "ACTIVITY", v: &rm.Activity{ArchetypeNodeID: id}, want: id},
+		{name: "HISTORY", v: &rm.History[rm.ItemStructure]{ArchetypeNodeID: id}, want: id},
+		{name: "POINT_EVENT", v: &rm.PointEvent[rm.ItemStructure]{ArchetypeNodeID: id}, want: id},
+		{name: "INTERVAL_EVENT", v: &rm.IntervalEvent[rm.ItemStructure]{ArchetypeNodeID: id}, want: id},
+		{name: "ITEM_TREE", v: &rm.ItemTree{ArchetypeNodeID: id}, want: id},
+		{name: "ITEM_LIST", v: &rm.ItemList{ArchetypeNodeID: id}, want: id},
+		{name: "ITEM_SINGLE", v: &rm.ItemSingle{ArchetypeNodeID: id}, want: id},
+		{name: "ITEM_TABLE", v: &rm.ItemTable{ArchetypeNodeID: id}, want: id},
+		{name: "CLUSTER", v: &rm.Cluster{ArchetypeNodeID: id}, want: id},
+		{name: "ELEMENT", v: &rm.Element{ArchetypeNodeID: id}, want: id},
+		{name: "not a LOCATABLE", v: &rm.DVText{Value: id}},
+		{name: "nil", v: nil},
+		{name: "nil pointer to a LOCATABLE", v: (*rm.Observation)(nil)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := archetypeNodeID(tc.v); got != tc.want {
+				t.Errorf("archetypeNodeID(%#v) = %q, want %q", tc.v, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestDescendOne_SkipsANilSibling checks that a nil pointer among the
+// siblings neither panics nor matches: descendOne returns the sibling the
+// predicate names, and a predicate no sibling matches fails with
+// ErrInvalidPath, listing the nil sibling as having no id.
+func TestDescendOne_SkipsANilSibling(t *testing.T) {
+	target := &rm.Observation{ArchetypeNodeID: "openEHR-EHR-OBSERVATION.blood_pressure.v1"}
+	parent := &rm.Composition{
+		Content: []rm.ContentItem{(*rm.Observation)(nil), target},
+	}
+	seg := pathSegment{
+		attrName:    "content",
+		cardinality: template.Multiple,
+		matchID:     "openEHR-EHR-OBSERVATION.blood_pressure.v1",
+	}
+	got, err := descendOne(parent, seg)
+	if err != nil {
+		t.Fatalf("descendOne(%+v): %v", seg, err)
+	}
+	if got != target {
+		t.Errorf("descendOne(%+v) returned %#v, want the blood pressure observation", seg, got)
+	}
+
+	seg.matchID = "openEHR-EHR-OBSERVATION.heart_rate.v1"
+	if _, err := descendOne(parent, seg); !errors.Is(err, ErrInvalidPath) {
+		t.Errorf("descendOne(%+v) = %v, want ErrInvalidPath", seg, err)
+	} else if !strings.Contains(err.Error(), "<empty>, openEHR-EHR-OBSERVATION.blood_pressure.v1") {
+		t.Errorf("descendOne(%+v) error %q does not list the siblings as <empty>, then the blood pressure id", seg, err)
+	}
+}

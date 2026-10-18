@@ -434,46 +434,11 @@ func descendOne(cur any, s pathSegment) (any, error) {
 }
 
 // archetypeNodeID returns the LOCATABLE.archetype_node_id of the
-// supplied RM value, or "" when the value does not carry one.
-// Closed type switch — REQ-024, no reflection.
+// supplied RM value, or "" when the value is no LOCATABLE or is a nil
+// pointer to one.
 func archetypeNodeID(v any) string {
-	switch x := v.(type) {
-	case *rm.Composition:
-		return x.ArchetypeNodeID
-	case *rm.Observation:
-		return x.ArchetypeNodeID
-	case *rm.Evaluation:
-		return x.ArchetypeNodeID
-	case *rm.Instruction:
-		return x.ArchetypeNodeID
-	case *rm.Action:
-		return x.ArchetypeNodeID
-	case *rm.AdminEntry:
-		return x.ArchetypeNodeID
-	case *rm.GenericEntry:
-		return x.ArchetypeNodeID
-	case *rm.Section:
-		return x.ArchetypeNodeID
-	case *rm.Activity:
-		return x.ArchetypeNodeID
-	case *rm.History[rm.ItemStructure]:
-		return x.ArchetypeNodeID
-	case *rm.PointEvent[rm.ItemStructure]:
-		return x.ArchetypeNodeID
-	case *rm.IntervalEvent[rm.ItemStructure]:
-		return x.ArchetypeNodeID
-	case *rm.ItemTree:
-		return x.ArchetypeNodeID
-	case *rm.ItemList:
-		return x.ArchetypeNodeID
-	case *rm.ItemSingle:
-		return x.ArchetypeNodeID
-	case *rm.ItemTable:
-		return x.ArchetypeNodeID
-	case *rm.Cluster:
-		return x.ArchetypeNodeID
-	case *rm.Element:
-		return x.ArchetypeNodeID
+	if l, ok := v.(rm.Locatable); ok && !rm.IsTypedNil(v) {
+		return l.GetArchetypeNodeID()
 	}
 	return ""
 }
