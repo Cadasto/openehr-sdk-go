@@ -1179,7 +1179,7 @@ func (g *generator) materialiseMultiple(
 		upperBound = cm.Upper()
 	}
 	total := 0
-	for _, child := range children {
+	for i, child := range children {
 		// Slots are caller-filled; the synthesiser does not invent
 		// archetype roots to fill them and instead leaves the count
 		// to satisfy the slot's occurrences.lower (often 0 — most
@@ -1187,8 +1187,7 @@ func (g *generator) materialiseMultiple(
 		if child.IsSlot() {
 			continue
 		}
-		if g.opts.Policy == Minimal && optionalSiblingIDCollides(child, children) &&
-			!firstCollidingOptionalSibling(child, children) {
+		if g.opts.Policy == Minimal && idTakenEarlier(child, children[:i]) {
 			continue
 		}
 		childCount := 1
@@ -1839,53 +1838,36 @@ func newHierObjectID() *rm.HierObjectID {
 	return &rm.HierObjectID{Value: uuid.NewV4().String()}
 }
 
-// optionalSiblingIDCollides reports whether this optional child shares
-// its node_id with another optional sibling under the same attribute.
-func optionalSiblingIDCollides(child *tcimpl.CompiledNode, siblings []*tcimpl.CompiledNode) bool {
-	if child.IsSlot() {
+// idTakenEarlier reports whether child is optional and an optional sibling
+// before it, in earlier, has its node id. Under Minimal only the first of
+// the optional siblings that share a node id is built, so the validator
+// binds each member to one child; a required sibling is always built and
+// does not count, nor does a slot.
+func idTakenEarlier(child *tcimpl.CompiledNode, earlier []*tcimpl.CompiledNode) bool {
+	id, optional := optionalNodeID(child)
+	if !optional {
 		return false
 	}
-	occ := child.Occurrences()
-	if occ != nil && !occ.LowerUnbounded() && occ.Lower() > 0 {
-		return false
-	}
-	id := child.NodeID()
-	if id == "" {
-		return false
-	}
-	count := 0
-	for _, sib := range siblings {
+	for _, sib := range earlier {
 		if sib.IsSlot() {
 			continue
 		}
-		sibOcc := sib.Occurrences()
-		if sibOcc != nil && !sibOcc.LowerUnbounded() && sibOcc.Lower() > 0 {
-			continue
-		}
-		if sib.NodeID() == id {
-			count++
-		}
-	}
-	return count > 1
-}
-
-// firstCollidingOptionalSibling is true when child is the first
-// optional sibling among those sharing its node_id.
-func firstCollidingOptionalSibling(child *tcimpl.CompiledNode, siblings []*tcimpl.CompiledNode) bool {
-	id := child.NodeID()
-	for _, sib := range siblings {
-		if sib.IsSlot() {
-			continue
-		}
-		sibOcc := sib.Occurrences()
-		if sibOcc != nil && !sibOcc.LowerUnbounded() && sibOcc.Lower() > 0 {
-			continue
-		}
-		if sib.NodeID() == id {
-			return sib == child
+		if sibID, ok := optionalNodeID(sib); ok && sibID == id {
+			return true
 		}
 	}
 	return false
+}
+
+// optionalNodeID returns child's node id, and true, when child has one and
+// the OPT leaves it optional: its occurrences give no lower bound of 1 or
+// more.
+func optionalNodeID(child *tcimpl.CompiledNode) (string, bool) {
+	if occ := child.Occurrences(); occ != nil && !occ.LowerUnbounded() && occ.Lower() > 0 {
+		return "", false
+	}
+	id := child.NodeID()
+	return id, id != ""
 }
 
 // finishNode fills RM-mandatory fields the OPT walk left empty.
