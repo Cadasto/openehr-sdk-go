@@ -227,7 +227,7 @@ The zero-value `NumericRange{}` (no fields set) is treated as "any value accepte
 
 ### Out of scope (this REQ)
 
-- **AOM partial date / time pattern enforcement** — `CDate`, `CTime`, `CDateTime`, `CDuration` capture the raw `Pattern` string but `Validate` performs only an ISO 8601 sanity check. Strict AOM-pattern enforcement is a follow-up. Validators that need it interpret the stored pattern directly.
+- **AOM partial date / time pattern enforcement** — `CDate`, `CTime`, `CDateTime`, `CDuration` capture the raw `Pattern` string, and `Validate` checks only that the value is an ISO 8601 form the RM's temporal parse accepts ([REQ-123](rm-functions.md#req-123--temporal-data-value-helpers)). Strict AOM-pattern enforcement is a follow-up. Validators that need it interpret the stored pattern directly.
 - **`C_STRING.list_open`** — AOM 1.4 declares this mandatory flag on `C_STRING` to distinguish open enumerations (the list is *exemplars*, not the closed set) from closed ones. v1 `CString` does not capture it; `Validate` treats every non-empty `List` as closed. Surfacing the flag (and weakening `Validate` to "advisory" when `list_open=true`) is a follow-up REQ.
 - **`ARCHETYPE_SLOT` assertion grammar** — landed under REQ-104 (see below).
 - **External terminology lookup** — REQ-105 surfaces bindings carried in the OPT; neither REQ-103 nor REQ-105 calls into a remote terminology service during `Validate`.
