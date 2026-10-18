@@ -8,6 +8,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-10-18
+
+Thirty-sixth `v0.x` minor: canonical JSON, validation and the template-driven paths run much faster with the same results, canonical JSON decode errors carry no document values, `Minimal` builds every optional archetype, the template's temporal validators accept what the RM accepts, and a shared token refresh survives a caller that gives up. **Breaking:** every canonical JSON decode failure is a `*DecodeError`, `Minimal` output and generated names change, the temporal validators accept and refuse different strings, and `Builder.Set` refuses a sibling name the template does not pin.
+
+### Added
+
+- **PROBE-107 holds the AQL lint and the containment relation to the queries the upstream AQL integration suites send (REQ-109, REQ-160).** `fixtures.AQLSuitesRoot` and `aqlprobes.ReadSuiteCorpus` expose the vendored suites and the queries rebuilt from them.
+- **`*smart.Source`, `smart.LaunchContext` and `smart.PrincipalIdentity` print and log without their secret or tokens, and `discovery.AuthEndpoints.Clone` returns an unshared copy (REQ-063, REQ-064, REQ-070).** `Source` gains `String`, `GoString` and `Format`; the other two implement `slog.LogValuer`.
+
+### Changed
+
+- **Breaking: every canonical JSON decode failure is a `*canjson.DecodeError` whose text carries no value from the document (REQ-052).** The refused literal sits in the redacted `Value` field; classify a polymorphic dispatch failure by the `typereg` sentinels.
+- **Breaking: the `Minimal` policy builds a member for each optional archetype under an attribute, and generated locatables are named by their node's term (REQ-107).** A vital_signs skeleton now holds all four observations, and both compile modes give the same instance.
+- **Breaking: the template's date, time, date-time and duration validators accept exactly the ISO 8601 forms the RM accepts (REQ-103, REQ-123).** Offsets such as `+0100` and `-P1D` now pass; `10:30:00.+01` and `P1DT` are refused.
+- **Breaking: `composition.Builder.Set` writes to the sibling a name predicate picks, and refuses a name no sibling pins (REQ-101, REQ-116).** It used to write into the first same-id sibling; a zero-value `Builder` returns an error instead of panicking.
+- **`DvQuantity.Validate` admits a value any same-units range admits, and a slot lists each include pattern once (REQ-103, REQ-104).**
+- **Canonical JSON, validation and the template-driven paths are faster with identical results (REQ-052, REQ-171, REQ-107).** Decoding is 44% and encoding 25% faster, validation 51% faster with 76% less memory, and `Generate` and `NewBuilder` about 77% faster.
+- **The AQL containment relation reaches a composition version through a FOLDER (REQ-160).** `FOLDER CONTAINS VERSION` draws `aql_containment_by_reference` instead of `aql_impossible_containment`; `EVENT_CONTEXT` as an operand stays an engine extension.
+- **A token refresh or key-set fetch that callers share no longer fails or hangs the others when the caller running it gives up or panics (REQ-062, REQ-063).** This holds in `auth/smart`, `auth/clientcreds`, `auth/jwtbearer` and `smart/discovery`.
+- **A failed reauth keeps the 401 in the error chain, a request that cannot be built is not retried, and the observer sees a call refused before any attempt (REQ-063, REQ-091, REQ-098).** Error texts no longer cite requirement ids.
+- **The zero `discovery.MemoryCache` and a `JWKS` literal no longer panic, and a negative refresh threshold counts as 0 (REQ-025, REQ-063).**
+
 ## [0.35.0] - 2026-10-16
 
 Thirty-fifth `v0.x` minor: validation runs as one walk and reports each defect once, a response with an unreadable body keeps its status, canonical JSON omits an absent mandatory member, `composition.Builder.Set` binds a value as the validator does, and FLAT carries a referenced composer, a renamed composition and nulls. **Breaking:** validation reports nil list items, mismatched ordinal symbols and shared values at each path with fewer findings, `query.Repository` gains `RunStoredVersion`, `Set` refuses a value its attribute cannot hold, and FLAT encode and null handling change.
