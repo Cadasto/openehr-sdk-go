@@ -21,10 +21,11 @@ type Compiled struct {
 	language   string
 	root       *CompiledNode
 
-	// Indexes built once during compile. byPath maps every node's
-	// canonical AQL path string to the node; byNodeID groups nodes
-	// by archetype node id (at-code); byRMType groups nodes by RM
-	// type name. All three are non-nil after a successful compile.
+	// Indexes built once during compile. byPath maps each canonical
+	// AQL path string to the first node walked with that path; byNodeID
+	// groups nodes by archetype node id (at-code); byRMType groups
+	// nodes by RM type name; byArchetypeID groups archetype roots by
+	// archetype id. All four are non-nil after a successful compile.
 	byPath        map[string]*CompiledNode
 	byNodeID      map[string][]*CompiledNode
 	byRMType      map[string][]*CompiledNode
@@ -105,12 +106,12 @@ func (c *Compiled) AllByArchetypeID(hrid string) []*CompiledNode {
 	return slices.Clone(c.byArchetypeID[hrid])
 }
 
-// NumNodes returns the total number of unique [CompiledNode] entries
-// reachable in the compiled tree (the size of the byPath index built
-// during [Compile]). Useful as an independent "truth count" against
-// which traversal code in [internal/templatecompile/walk] can assert
-// it visited every node; comparing a walker's tally to this value
-// detects subtree-pruning bugs that a second walker call cannot.
+// NumNodes returns the number of distinct AQL paths in the compiled
+// tree: the paths [Compiled.NodeAt] resolves. Nodes that share a path,
+// such as alternatives under one single-valued attribute or siblings
+// with the same node id, count once, so a template with such nodes has
+// more nodes reachable from [Compiled.Root] than NumNodes reports. When
+// every node has a path of its own, the two counts are equal.
 func (c *Compiled) NumNodes() int { return len(c.byPath) }
 
 // Term looks up the at-code's term definition under the root

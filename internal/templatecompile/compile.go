@@ -33,8 +33,14 @@ type Options struct {
 // tree shares no mutable state with opt (struct values are copied,
 // slices are freshly allocated).
 //
-// Returns ErrInvalidInput when opt is nil or has no root. Returns
-// any error surfaced by AQL path computation (currently none).
+// Returns an error wrapping ErrInvalidInput when opt is nil, when it has
+// no root, and when two nodes under different attributes have the same
+// AQL path, which is a defect in the OPT. Nodes under one attribute that
+// share a path (alternatives, or siblings with the same node id) and the
+// descendants of such nodes are admitted, and [Compiled.NodeAt] resolves
+// the path to the first one walked. Returns an error that does not wrap
+// ErrInvalidInput when the tree holds a node of a kind Compile does not
+// handle, which a parsed OPT does not contain.
 func Compile(opt *template.OperationalTemplate, opts ...Options) (*Compiled, error) {
 	if opt == nil {
 		return nil, fmt.Errorf("%w: nil template", ErrInvalidInput)
@@ -78,8 +84,9 @@ func Compile(opt *template.OperationalTemplate, opts ...Options) (*Compiled, err
 	return c, nil
 }
 
-// ErrInvalidInput is returned by [Compile] for nil templates or
-// templates whose root could not be resolved.
+// ErrInvalidInput is returned, wrapped, by [Compile] for a nil
+// template, a template with no root, and a template in which two nodes
+// under different attributes have the same AQL path.
 var ErrInvalidInput = errors.New("templatecompile: invalid input")
 
 // walker carries the per-call state shared across recursive node
