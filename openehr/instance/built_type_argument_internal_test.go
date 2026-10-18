@@ -116,3 +116,29 @@ func TestREQ107_BuiltTypeArgumentCoversRequiredParameters(t *testing.T) {
 		t.Errorf("builtTypeArgument lists %v, want exactly the buildable classes with a required parameter-typed attribute %v", got, want)
 	}
 }
+
+// TestAttrType resolves a formal parameter of the generic class of the
+// parent, from the type the parent names or else from builtTypeArgument, and
+// leaves any other declared type as it is.
+func TestAttrType(t *testing.T) {
+	cases := []struct {
+		parent, declared, want string
+	}{
+		{parent: "POINT_EVENT", declared: "T", want: "ITEM_STRUCTURE"},
+		{parent: "INTERVAL_EVENT", declared: "T", want: "ITEM_STRUCTURE"},
+		{parent: "EVENT", declared: "T", want: "ITEM_STRUCTURE"},
+		{parent: "POINT_EVENT<ITEM_TREE>", declared: "T", want: "ITEM_TREE"},
+		{parent: "DV_INTERVAL<DV_QUANTITY>", declared: "T", want: "DV_QUANTITY"},
+		{parent: "POINT_EVENT", declared: "DV_DATE_TIME", want: "DV_DATE_TIME"},
+		{parent: "POINT_EVENT", declared: "ITEM_STRUCTURE", want: "ITEM_STRUCTURE"},
+		{parent: "POINT_EVENT", declared: "U", want: "U"},
+		{parent: "HISTORY", declared: "T", want: "T"},
+		{parent: "DV_INTERVAL", declared: "T", want: "T"},
+		{parent: "ELEMENT", declared: "DATA_VALUE", want: "DATA_VALUE"},
+	}
+	for _, tc := range cases {
+		if got := attrType(tc.parent, tc.declared); got != tc.want {
+			t.Errorf("attrType(%q, %q) = %q, want %q", tc.parent, tc.declared, got, tc.want)
+		}
+	}
+}

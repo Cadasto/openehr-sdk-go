@@ -674,10 +674,16 @@ func attrType(parentType, declared string) string {
 		return actual
 	}
 	class := bmmtype.Class(parentType)
-	if arg, ok := builtTypeArgument[class]; ok {
-		return bmmtype.Substitute(class+"<"+arg+">", declared)
+	arg, ok := builtTypeArgument[class]
+	if !ok {
+		return declared
 	}
-	return declared
+	// Only a formal parameter of class is replaced, so any other type
+	// returns before the instantiated name is built.
+	if _, formal := bmmtype.ParameterConstraint(class, declared); !formal {
+		return declared
+	}
+	return bmmtype.Substitute(class+"<"+arg+">", declared)
 }
 
 // settleBuilt gives a value built from the BMM alone, which the walk
