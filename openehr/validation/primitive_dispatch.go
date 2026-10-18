@@ -27,7 +27,7 @@ const noPrecision rm.Integer = -1
 //   - DV_CODED_TEXT → [constraints.CodedTermRef] (defining_code)
 //   - DV_TEXT      → string (value)
 //   - DV_BOOLEAN   → bool
-//   - DV_COUNT     → int (magnitude)
+//   - DV_COUNT     → int64 (magnitude)
 //   - DV_ORDINAL   → [constraints.OrdinalSymbol] (value, symbol's
 //     defining_code)
 //   - DV_DATE      → string (value, ISO 8601)

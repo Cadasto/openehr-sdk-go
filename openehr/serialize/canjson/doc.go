@@ -156,11 +156,12 @@
 // document wrote it, quotes and escapes included, in two cases:
 //
 //   - a number or string of the right JSON kind that its Go type cannot
-//     hold, such as 3.5 for an integer or 2147483648 for an rm.Integer;
+//     hold, such as 3.5 for an rm.Integer64 or 2147483648 for an
+//     rm.Integer;
 //   - a value one of the SDK's primitive codecs refused: a quoted literal
-//     rm.Real or rm.Integer could not parse, an rm.Real number past its
-//     17-digit budget, and an rm.Character string that is not exactly one
-//     character or number that names no usable code point.
+//     rm.Real, rm.Integer or rm.Integer64 could not parse, an rm.Real
+//     number past its 17-digit budget, and an rm.Character string that is
+//     not exactly one character or number that names no usable code point.
 //
 // Value is empty for any other failure: a value of the wrong JSON kind for
 // its target (a string where a boolean belongs), a string that is not valid
@@ -214,8 +215,8 @@
 //     beneath it, so a consumer reads the path off one and the kind off
 //     the other.
 //   - A hand-written primitive decoded at the top level (rm.Real,
-//     rm.Integer or rm.Character handed to [Unmarshal] directly rather
-//     than reached through a generated type) carries its own
+//     rm.Integer, rm.Integer64 or rm.Character handed to [Unmarshal]
+//     directly rather than reached through a generated type) carries its own
 //     `rm.<Type>:` prefix, not the `canjson: <RM_TYPE>:` funnel. Which
 //     refusals carry [ErrInvalidShape] differs by primitive. On
 //     rm.Character a refusal it raises itself, applying the
@@ -226,12 +227,12 @@
 //     rm.Character on this path: the tokenizer refuses it first, so it is
 //     malformed input carrying no sentinel, the same treatment as
 //     malformed JSON above. On rm.Real only the precision refusal carries
-//     the sentinel; on rm.Integer none does. An empty input carries no
-//     sentinel on any of the three, and neither does a strconv or
-//     encoding/json/v2 parse or range failure beneath rm.Real or
-//     rm.Integer; those causes stay reachable with errors.AsType. A nil
-//     receiver on any of them, as on every generated type, is a
-//     typereg.ErrNilReceiver error.
+//     the sentinel; on rm.Integer and rm.Integer64 none does. An empty
+//     input carries no sentinel on any of the four, and neither does a
+//     strconv or encoding/json/v2 parse or range failure beneath rm.Real,
+//     rm.Integer or rm.Integer64; those causes stay reachable with
+//     errors.AsType. A nil receiver on any of them, as on every generated
+//     type, is a typereg.ErrNilReceiver error.
 //
 // # Unmatched members
 //
