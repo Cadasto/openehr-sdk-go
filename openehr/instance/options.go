@@ -32,7 +32,7 @@ const (
 	Example
 )
 
-// String returns "minimal" / "example" / "unknown(N)" for diagnostics.
+// String returns "minimal" / "example" / "unknown" for diagnostics.
 func (p Policy) String() string {
 	switch p {
 	case Minimal:
@@ -75,8 +75,8 @@ func (f ValueFill) String() string {
 }
 
 // Options configures one [Generate] invocation. Zero value is valid
-// for non-COMPOSITION roots: Minimal policy, English language,
-// time.Now().UTC() clock.
+// for non-COMPOSITION roots: Minimal policy, the compiled template's own
+// language (English when it names none), time.Now().UTC() clock.
 type Options struct {
 	// Policy is Minimal or Example. Zero value = Minimal.
 	Policy Policy
