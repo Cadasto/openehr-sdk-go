@@ -3,6 +3,7 @@ package webtemplate
 import (
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	impl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
@@ -17,10 +18,17 @@ import (
 //   - trim leading/trailing '_' (a trailing '.' is kept, e.g. "Anzeichens.");
 //   - if the result begins with a digit, prefix 'a' (identifiers may not
 //     start with a digit — "24 hour average" → "a24_hour_average").
+//
+// Each rune is lowercased on its own with [unicode.ToLower], which is what
+// [strings.ToLower] does to a string: it has no rule that looks at a rune's
+// neighbours, such as a final sigma, and it reads a byte that is not valid
+// UTF-8 as U+FFFD, as ranging over the string does.
 func sanitizeID(s string) string {
 	var b strings.Builder
+	b.Grow(len(s))
 	prevUnderscore := false
-	for _, r := range strings.ToLower(s) {
+	for _, r := range s {
+		r = unicode.ToLower(r)
 		switch {
 		case unicode.IsLetter(r) || unicode.IsDigit(r) || r == '.' || r == '-':
 			b.WriteRune(r)
@@ -38,10 +46,9 @@ func sanitizeID(s string) string {
 		}
 	}
 	out := strings.Trim(b.String(), "_")
-	if out != "" {
-		if r := []rune(out)[0]; unicode.IsDigit(r) {
-			out = "a" + out
-		}
+	// An empty out decodes as U+FFFD, which is not a digit.
+	if r, _ := utf8.DecodeRuneInString(out); unicode.IsDigit(r) {
+		out = "a" + out
 	}
 	return out
 }
