@@ -591,6 +591,13 @@ func wholeNumber(lit string, bits int) (string, bool) {
 	if !jsonNumber.MatchString(lit) {
 		return "", false
 	}
+	// A mantissa of zeros is 0 whatever the exponent, and math/big refuses
+	// an exponent outside the int64 range, so 0e18446744073709551616 is
+	// settled here.
+	mant, _, _ := strings.Cut(strings.ToLower(lit), "e")
+	if strings.Trim(mant, "-0.") == "" {
+		return "0", true
+	}
 	r, ok := new(big.Rat).SetString(lit)
 	if !ok || !r.IsInt() {
 		return "", false
