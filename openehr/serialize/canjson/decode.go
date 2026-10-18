@@ -257,6 +257,16 @@ func (rr *readRecorder) Read(p []byte) (int, error) {
 	return n, err
 }
 
+// forget drops the failure recorded so far. jsontext asks the reader again
+// after a failure, so a failure is the reader's only in the call it happened
+// in: kept longer, one that shares a sentinel with jsontext's own, such as
+// io.ErrUnexpectedEOF, would take a later value cut short for the reader's.
+func (rr *readRecorder) forget() {
+	if rr != nil {
+		rr.err = nil
+	}
+}
+
 // failed reports whether err holds a failure of the reader.
 func (rr *readRecorder) failed(err error) bool {
 	return rr != nil && rr.err != nil && errors.Is(err, rr.err)
@@ -286,6 +296,7 @@ func (rr *readRecorder) failed(err error) bool {
 // The value v points to is unspecified after an error: a failed decode may
 // leave it partly written.
 func (d *Decoder) Decode(v any) error {
+	d.src.forget()
 	if !d.cfg.checksMembers() {
 		return d.streamError(classifyDecode(json.UnmarshalDecode(d.dec, v, typereg.Unmarshalers())))
 	}

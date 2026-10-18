@@ -826,6 +826,58 @@ func TestDecoder_REQ052_ReaderFailureAndEndOfStreamComeBackUnwrapped(t *testing.
 	}
 }
 
+// TestDecoder_REQ052_EarlierReaderFailureLeavesLaterValuesToTheInput pins
+// that a reader's failure is told apart from the input's per call: once a
+// reader has failed with io.ErrUnexpectedEOF, a later Decode of a value cut
+// short, which jsontext reports with that same sentinel, is a failure the
+// input causes and comes back as a *canjson.DecodeError (REQ-052).
+//
+// Can-fail control: keep the reader's failure from one Decode to the next and
+// the second Decode comes back without a DecodeError.
+func TestDecoder_REQ052_EarlierReaderFailureLeavesLaterValuesToTheInput(t *testing.T) {
+	for mode, opts := range jsonDecodeModes() {
+		t.Run(mode, func(t *testing.T) {
+			r := &scriptedReader{steps: []readStep{
+				{err: io.ErrUnexpectedEOF},
+				{data: `{"_type":"DV_TEXT","value":"a"`},
+			}}
+			dec := canjson.NewDecoder(r, opts...)
+			err := dec.Decode(new(rm.DVText))
+			if _, ok := errors.AsType[*canjson.DecodeError](err); ok || !errors.Is(err, io.ErrUnexpectedEOF) {
+				t.Fatalf("first Decode over a failing reader = %T %v; want the reader's io.ErrUnexpectedEOF, no *canjson.DecodeError", err, err)
+			}
+			err = dec.Decode(new(rm.DVText))
+			if _, ok := errors.AsType[*canjson.DecodeError](err); !ok {
+				t.Errorf("second Decode of a value cut short = %T %v; want a *canjson.DecodeError, the input's failure", err, err)
+			}
+		})
+	}
+}
+
+// scriptedReader serves its steps in turn: each step's bytes, then its error
+// on the Read that ends them. After the last step it reports io.EOF.
+type scriptedReader struct{ steps []readStep }
+
+type readStep struct {
+	data string
+	err  error
+}
+
+func (r *scriptedReader) Read(p []byte) (int, error) {
+	if len(r.steps) == 0 {
+		return 0, io.EOF
+	}
+	s := &r.steps[0]
+	n := copy(p, s.data)
+	s.data = s.data[n:]
+	if s.data != "" {
+		return n, nil
+	}
+	err := s.err
+	r.steps = r.steps[1:]
+	return n, err
+}
+
 // corpusLiteral is the number planted in place of each numeric leaf: out of
 // float64's range, so every numeric RM field refuses it, and distinctive
 // enough that its digits cannot appear in an error's text by chance.
