@@ -29,7 +29,7 @@ func fullAuthEndpoints(t *testing.T) discovery.AuthEndpoints {
 		case reflect.TypeFor[bool]():
 			f.SetBool(true)
 		default:
-			t.Fatalf("discovery.AuthEndpoints.%s has type %s, which this test cannot set: copy it in cloneAuthEndpoints and set it here", name, f.Type())
+			t.Fatalf("discovery.AuthEndpoints.%s has type %s, which this test cannot set: copy it in discovery.AuthEndpoints.Clone and set it here", name, f.Type())
 		}
 	}
 	return ep

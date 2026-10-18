@@ -68,7 +68,7 @@ func NewStaticCatalog(cfg StaticConfig) (*ServiceCatalog, error) {
 		BaseURL:    baseURL,
 		Issuer:     cfg.Issuer,
 		Services:   services,
-		Auth:       cloneAuthEndpoints(cfg.Auth),
+		Auth:       cfg.Auth.Clone(),
 		ResolvedAt: time.Now(),
 		ExpiresAt:  cfg.ExpiresAt,
 		ETag:       cfg.ETag,
@@ -87,39 +87,6 @@ func cloneServices(in map[string]ServiceEntry) map[string]ServiceEntry {
 		out[k] = v
 	}
 	return out
-}
-
-// cloneAuthEndpoints returns a copy of a that shares nothing a caller can
-// change with a: each endpoint URL, with its user information, and each
-// list is copied. The endpoint URLs are the ones authMembers lists.
-func cloneAuthEndpoints(a AuthEndpoints) AuthEndpoints {
-	for _, m := range authMembers {
-		u := m.endpoint(&a)
-		*u = cloneURL(*u)
-	}
-	for _, l := range []*[]string{
-		&a.ScopesSupported, &a.ResponseTypesSupported, &a.CodeChallengeMethodsSupported,
-		&a.GrantTypesSupported, &a.TokenEndpointAuthMethodsSupported,
-		&a.TokenEndpointAuthSigningAlgValuesSupported, &a.IDTokenSigningAlgValuesSupported,
-		&a.Capabilities,
-	} {
-		*l = slices.Clone(*l)
-	}
-	return a
-}
-
-// cloneURL returns a copy of u with its own copy of u's user information,
-// or nil for a nil u.
-func cloneURL(u *url.URL) *url.URL {
-	if u == nil {
-		return nil
-	}
-	c := *u
-	if u.User != nil {
-		user := *u.User
-		c.User = &user
-	}
-	return &c
 }
 
 // MustParseURL panics on invalid URLs; intended for static catalog

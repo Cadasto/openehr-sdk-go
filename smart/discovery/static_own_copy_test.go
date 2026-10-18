@@ -12,7 +12,8 @@ import (
 // own https URL on idp.test, with user information, each list to S256 and
 // one more value, and each flag to true. A field of a kind it cannot set
 // fails the test, so a field added to discovery.AuthEndpoints later is not
-// left out of the copy NewStaticCatalog keeps.
+// left out of the copy AuthEndpoints.Clone makes, which NewStaticCatalog
+// keeps.
 func fullAuthEndpoints(t *testing.T) discovery.AuthEndpoints {
 	t.Helper()
 	var ep discovery.AuthEndpoints
@@ -26,7 +27,7 @@ func fullAuthEndpoints(t *testing.T) discovery.AuthEndpoints {
 		case reflect.TypeFor[bool]():
 			f.SetBool(true)
 		default:
-			t.Fatalf("discovery.AuthEndpoints.%s has type %s, which this test cannot set: copy it in NewStaticCatalog and set it here", name, f.Type())
+			t.Fatalf("discovery.AuthEndpoints.%s has type %s, which this test cannot set: copy it in AuthEndpoints.Clone and set it here", name, f.Type())
 		}
 	}
 	return ep
