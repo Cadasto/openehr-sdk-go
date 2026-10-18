@@ -2,10 +2,12 @@ package constraints_test
 
 // pure_imports_test.go: REQ-103. clinical-modeling.md § Validate contract
 // (under § REQ-103) rules that validators MUST be pure functions with no
-// I/O. Nothing at a call site shows that a validator stays in memory, so
-// this reads the package's non-test Go files, and those of each package of
-// this module it may import, and holds every import to a list of packages
-// that do no I/O. "os", "io", "net", "reflect" and the rest
+// I/O, and § Building-block independence that the package MUST import only
+// the standard library and internal/iso8601, which MUST itself import only
+// the standard library. Nothing at a call site shows that a validator stays
+// in memory, so this reads the package's non-test Go files, and those of each
+// package of this module it may import, and holds every import to a list of
+// packages that do no I/O. "os", "io", "net", "reflect" and the rest
 // of the standard library are not on it. Two listed packages also have
 // members that do I/O or read the clock; a use of one of those fails too, and
 // so does a dot import of either package, whose uses would be unqualified and
@@ -73,7 +75,7 @@ func TestREQ103ValidatorsImportNoIO(t *testing.T) {
 			t.Errorf("scanned no non-test Go file in %s, so the guard has gone blind there", dir)
 		}
 		for _, p := range problems {
-			t.Errorf("%s: %s: validators MUST be pure functions with no I/O (clinical-modeling.md § Validate contract, REQ-103)", dir, p)
+			t.Errorf("%s: %s: validators MUST be pure functions with no I/O, and the package MUST import only the standard library and internal/iso8601 (clinical-modeling.md § Validate contract and § Building-block independence, REQ-103)", dir, p)
 		}
 		t.Logf("scanned %d non-test Go files in %s", scanned, dir)
 	}

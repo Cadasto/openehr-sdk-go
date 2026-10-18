@@ -888,7 +888,7 @@ Templates that **reuse one archetype under a multi-valued slot** (name-distingui
 
 ### Building-block independence (REQ-013)
 
-`openehr/template/webtemplate/` is a building block under [REQ-013](module-layout.md#req-013--building-block-independence). It imports `openehr/templatecompile` (the compiled input, REQ-111), `openehr/template/constraints` (primitive constraints, REQ-103), `internal/templatecompile` (the shared REQ-116 name-predicate quoting — one rule for both path builders), and the standard library only.
+`openehr/template/webtemplate/` is a building block under [REQ-013](module-layout.md#req-013--building-block-independence). It imports `openehr/templatecompile` (the compiled input, REQ-111), `openehr/template/constraints` (primitive constraints, REQ-103), `internal/templatecompile` (the shared REQ-116 name-predicate quoting — one rule for both path builders — and the compiled node's readers that do not copy, `NodeAttributes`, `ChildNodes` and `TermItem`), and the standard library only.
 
 - **Lives in:** [`openehr/template/webtemplate/`](../../openehr/template/webtemplate/).
 - **Verification:** unit tests for id-generation, per-datatype `inputs` mapping, and tree shape; round-trip goldens per fixture OPT (determinism); and PROBE-075 structural parity against three vendored EHRbase references — `constrain_test` plus the two REQ-116 archetype-reuse oracles. Catalogued in [`conformance.md`](conformance.md).
