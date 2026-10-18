@@ -191,8 +191,8 @@ func wholeInt(lit string, bitSize int) (int64, error) {
 		v = v*10 + d
 	}
 	if neg {
-		// Negating in uint64 and converting reads 2^63 as math.MinInt64,
-		// which -int64(v) could not.
+		// The negated magnitude converts exactly in two's complement, so a
+		// magnitude of 2^63 reads as math.MinInt64.
 		return int64(-v), nil
 	}
 	return int64(v), nil
