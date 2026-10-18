@@ -281,7 +281,9 @@ func (a *CompiledAttribute) RMTypeName() string { return a.rmTypeName }
 // Implicit reports whether this attribute was injected by the
 // compile step because the BMM declares it mandatory and the OPT
 // omitted it. Implicit attributes carry no children; downstream
-// composition builders fill them with RM defaults.
+// composition builders fill them with RM defaults. One implicit
+// attribute value is shared by every node of the same RM type that
+// lacks it, so its pointer does not identify a node.
 func (a *CompiledAttribute) Implicit() bool { return a.implicit }
 
 // Required reports whether the BMM declares this attribute as
