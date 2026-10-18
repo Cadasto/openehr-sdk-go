@@ -485,10 +485,17 @@ func (g *generator) materialiseImplicitSingle(
 	attr *tcimpl.CompiledAttribute,
 	parentRM any,
 ) error {
-	// A locatable's node id is the identity rule's: setLocatableIdentity
-	// has stamped it, and rmwrite has no writer for it.
-	if attr.Name() == "archetype_node_id" {
+	// A locatable's node id and name are the identity rule's:
+	// setLocatableIdentity has stamped both, the name from the node's
+	// term, and fillBMMAttr skips them too, so a node that carries them
+	// implicitly is built as one that does not.
+	switch attr.Name() {
+	case "archetype_node_id":
 		return nil
+	case "name":
+		if _, ok := parentRM.(rm.MutableLocatable); ok {
+			return nil
+		}
 	}
 	if compositionDefaultOwns(optNode.RMTypeName(), attr.Name()) {
 		return nil
@@ -1472,9 +1479,15 @@ func (g *generator) setLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, 
 	}
 
 	// Resolve a human-readable runtime name from the OPT term
-	// definitions when available; the RM type acts as the fallback.
+	// definitions when available; the RM type acts as the fallback. The
+	// term is the node's own: an archetype root's is its node id's
+	// (at0000), since no term table is keyed by an archetype id.
+	termCode := id
+	if opt.ArchetypeID() != "" {
+		termCode = opt.NodeID()
+	}
 	name := opt.RMTypeName()
-	if text, found := tcimpl.TermItem(opt, id, "text"); found && text != "" {
+	if text, found := tcimpl.TermItem(opt, termCode, "text"); found && text != "" {
 		name = text
 	}
 
