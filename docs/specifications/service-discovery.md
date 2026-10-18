@@ -80,7 +80,7 @@ type AuthEndpoints struct {
 }
 ```
 
-`AuthEndpoints.Clone()` **MUST** return a copy that shares nothing with its receiver: each URL is a new value, its user information included, and each list a new slice, so an edit to one cannot reach the other. `NewStaticCatalog` copies `StaticConfig.Auth` this way.
+`AuthEndpoints.Clone()` **MUST** return a copy that shares nothing with its receiver: each URL is a new value, its user information included, and each list a new slice, so an edit to one cannot reach the other. `NewStaticCatalog` **MUST** copy `StaticConfig.Auth` this way.
 
 Every typed client (`openehr/client/ehr`, `openehr/client/query`, `cadasto/extra`, etc.) **MUST** resolve its base URL from the catalog by service ID, not from a top-level "base URL" config field.
 

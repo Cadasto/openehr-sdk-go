@@ -201,7 +201,7 @@ transport.WithObservationTag(ctx, k, v) context.Context
 
 Rules:
 
-- The observer **MUST** fire exactly once per logical `Client.Do` call — after retries settle — with retry-aware `Attempts` and total wall-clock `Duration`. A call `Client.Do` refuses before any attempt (a nil `Request`, a context already ended, a service missing from the catalog, a path that fails validation) is observed too, with `Attempts` 0 and an empty `URL`.
+- The observer **MUST** fire exactly once per logical `Client.Do` call — after retries settle — with retry-aware `Attempts` and total wall-clock `Duration`. A call `Client.Do` refuses before any attempt (a nil `Request`, a context already ended, a service missing from the catalog, a path that fails validation) **MUST** be observed too, with `Attempts` 0 and an empty `URL`.
 - `WithObserver(nil)` **MUST** be a safe no-op.
 - A panicking observer **MUST NOT** break the request lifecycle. The transport **MUST** recover the panic and log via the configured `slog.Logger`.
 - `Observation.Tags` **MUST** be a defensive copy of any context-attached tags — observers **MUST NOT** be able to mutate the caller's context.
