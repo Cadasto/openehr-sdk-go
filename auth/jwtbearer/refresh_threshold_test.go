@@ -118,8 +118,10 @@ func TestREQ063_DefaultRefreshThresholdIsThirtySeconds(t *testing.T) {
 		want  string
 		posts int32
 	}{
-		{at: 20 * time.Second, want: "tok-1", posts: 1}, // 40 s left: outside the window
-		{at: 40 * time.Second, want: "tok-2", posts: 2}, // 20 s left: inside the window
+		// 31 s left, then 30 s left: only a 30 s window keeps the first and
+		// renews at the second, so any other default fails one of them.
+		{at: 29 * time.Second, want: "tok-1", posts: 1}, // 31 s left: outside the window
+		{at: 30 * time.Second, want: "tok-2", posts: 2}, // 30 s left: on its edge, renewed
 	}
 	for _, b := range builds {
 		t.Run(b.name, func(t *testing.T) {
