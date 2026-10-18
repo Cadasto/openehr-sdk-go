@@ -355,8 +355,13 @@ type xmlCardinality struct {
 	Interval  *xmlInterval `xml:"interval"`
 }
 
+// xmlAssertion is one <includes> or <excludes> blob of an
+// ARCHETYPE_SLOT. InnerXML keeps the raw text the slot reports;
+// Expressions holds the <expression> children the same decode reads,
+// so the slot patterns need no second XML pass over InnerXML.
 type xmlAssertion struct {
-	InnerXML string `xml:",innerxml"`
+	InnerXML    string           `xml:",innerxml"`
+	Expressions []slotExpression `xml:"expression"`
 }
 
 // xmlAnnotation captures one <annotations path="..."><items
@@ -437,8 +442,8 @@ func buildNode(o *xmlCObject, strict bool, depth int) (Node, error) {
 			nodeID:         o.NodeID,
 			includes:       includes,
 			excludes:       excludes,
-			parsedIncludes: parseSlotAssertions(includes),
-			parsedExcludes: parseSlotAssertions(excludes),
+			parsedIncludes: parseSlotAssertions(o.Includes),
+			parsedExcludes: parseSlotAssertions(o.Excludes),
 		}, nil
 	default:
 		// REQ-103 primitive constraint types, CONSTRAINT_REF among
