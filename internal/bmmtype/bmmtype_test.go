@@ -128,3 +128,33 @@ func TestSubstitute(t *testing.T) {
 		})
 	}
 }
+
+// sink keeps the results of the calls TestNoAllocation counts, so the
+// compiler cannot drop the calls.
+var sink string
+
+// Callers run these per node or per attribute, so the common calls must not
+// allocate: Class reads the class of a generic name without building its
+// parameter list, and Substitute returns a declared type that no class takes
+// as a formal parameter without reading the owner's parameters.
+func TestNoAllocation(t *testing.T) {
+	cases := []struct {
+		name string
+		call func()
+	}{
+		{name: "Split of a plain name", call: func() { sink, _, _ = bmmtype.Split("DV_QUANTITY") }},
+		{name: "Class of a plain name", call: func() { sink = bmmtype.Class("DV_QUANTITY") }},
+		{name: "Class of a generic name", call: func() { sink = bmmtype.Class("DV_INTERVAL<DV_QUANTITY>") }},
+		{name: "Class of a nested name", call: func() { sink = bmmtype.Class(" A < B<C, D> > ") }},
+		{name: "Substitute on a plain owner", call: func() { sink = bmmtype.Substitute("ELEMENT", "T") }},
+		{
+			name: "Substitute of a type that is no formal parameter",
+			call: func() { sink = bmmtype.Substitute("DV_INTERVAL<DV_QUANTITY>", "Boolean") },
+		},
+	}
+	for _, tc := range cases {
+		if n := testing.AllocsPerRun(100, tc.call); n != 0 {
+			t.Errorf("%s: %v allocations per call, want 0", tc.name, n)
+		}
+	}
+}
