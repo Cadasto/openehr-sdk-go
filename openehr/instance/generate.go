@@ -1477,12 +1477,8 @@ func (g *generator) setLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, 
 	// Resolve a human-readable runtime name from the OPT term
 	// definitions when available; the RM type acts as the fallback.
 	name := opt.RMTypeName()
-	if id != "" {
-		if t, ok := opt.Term(id, ""); ok {
-			if text, found := t.Items["text"]; found && text != "" {
-				name = text
-			}
-		}
+	if text, found := tcimpl.TermItem(opt, id, "text"); found && text != "" {
+		name = text
 	}
 
 	// Archetype-root pins also get a populated archetype_details
