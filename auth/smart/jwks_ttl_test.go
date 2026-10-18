@@ -15,16 +15,18 @@ import (
 //
 // The test runs on the real clock: under a synctest fake clock no time
 // passes between the fetch and the lookup, so the set would not go stale in
-// between.
+// between. Each kid gets a new, empty JWKS, so every lookup has to fetch. A
+// shared JWKS would fetch again for the second kid only if the clock had
+// moved since the first fetch, which a coarse clock may not do.
 func TestREQ062_ShortJWKSTTLFindsAKidInTheSetJustFetched(t *testing.T) {
 	const keySet = `{"keys":[{"kty":"oct","kid":"k0","use":"sig"},{"kty":"oct","kid":"k1","use":"sig"}]}`
 	srv := &scriptedServer{keySet: func(r *http.Request, _ int) (*http.Response, error) {
 		return scriptedAnswer(r, http.StatusOK, keySet), nil
 	}}
-	jwks := scriptedJWKS(t, srv)
-	jwks.TTL = time.Nanosecond
 
 	for _, want := range []string{"k1", "k0"} {
+		jwks := scriptedJWKS(t, srv)
+		jwks.TTL = time.Nanosecond
 		_, before := srv.counts()
 		key, err := jwks.Key(t.Context(), want)
 		if err != nil || !strings.Contains(string(key), `"kid":"`+want+`"`) {
