@@ -149,24 +149,30 @@ func (c *Compiled) TermBindingsForNode(nodeID string) []template.TermBinding {
 	if nodeID == "" {
 		return nil
 	}
+	// The result is built here, so it is the caller's own without a copy.
 	var out []template.TermBinding
+	predicate := "[" + nodeID + "]"
 	for _, b := range c.termBindings {
-		if termBindingMatchesNode(b, nodeID) {
+		if termBindingMatchesNode(b, nodeID, predicate) {
 			out = append(out, b)
 		}
 	}
-	return slices.Clone(out)
+	return out
 }
 
-func termBindingMatchesNode(b template.TermBinding, nodeID string) bool {
+// termBindingMatchesNode reports whether the binding b locates nodeID:
+// its NodeOrPath is nodeID, contains predicate (nodeID in brackets), or
+// ends with /nodeID.
+func termBindingMatchesNode(b template.TermBinding, nodeID, predicate string) bool {
 	if b.NodeOrPath == nodeID {
 		return true
 	}
 	// Path-shaped locators: .../events[at0006]/...
-	if strings.Contains(b.NodeOrPath, "["+nodeID+"]") {
+	if strings.Contains(b.NodeOrPath, predicate) {
 		return true
 	}
-	return strings.HasSuffix(b.NodeOrPath, "/"+nodeID)
+	rest, ok := strings.CutSuffix(b.NodeOrPath, nodeID)
+	return ok && strings.HasSuffix(rest, "/")
 }
 
 // ErrPathNotFound is returned by [Compiled.NodeAt] when the path
