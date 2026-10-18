@@ -193,6 +193,7 @@ requirements:
       - openehr/client/query/nilaqlerror_test.go
       - openehr/client/query/nilwiredereference_internal_test.go
       - openehr/rm/character_test.go
+      - openehr/rm/integer64_test.go
       - openehr/rm/integer_test.go
       - openehr/rm/real_test.go
       - openehr/rm/typereg/nildecodeerror_test.go
@@ -470,6 +471,7 @@ requirements:
       - openehr/internal/refused/refused_test.go
       - openehr/rm/character_test.go
       - openehr/rm/character_text_test.go
+      - openehr/rm/integer64_test.go
       - openehr/rm/integer_test.go
       - openehr/rm/interval_bound_test.go
       - openehr/rm/like_interfaces_test.go
