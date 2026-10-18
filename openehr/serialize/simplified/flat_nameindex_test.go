@@ -12,6 +12,8 @@ package simplified
 // so the whole suite stayed green through the regression — hence this test.
 
 import (
+	"maps"
+	"slices"
 	"strings"
 	"testing"
 
@@ -107,4 +109,92 @@ func TestBuildNameIndex_AnswersBareSpelling(t *testing.T) {
 	if predicated == 0 {
 		t.Fatal("fixture pins no names any more — pick another name-pinning template")
 	}
+}
+
+// buildNameIndexReference is buildNameIndex as it stood before it read the
+// compiled template without copying: it reads each term through Term, which
+// copies the term's items, and the tree through Attributes and Children,
+// which copy their slices. Decode repopulates LOCATABLE.name from the
+// index, so buildNameIndex must give the same index as this copy.
+func buildNameIndexReference(c *templatecompile.Compiled) map[string]string {
+	names := make(map[string]string)
+	lang := c.Language()
+	var walk func(n *templatecompile.CompiledNode)
+	walk = func(n *templatecompile.CompiledNode) {
+		if id := n.NodeID(); id != "" {
+			var rubric string
+			if t, ok := n.Term(id, lang); ok {
+				rubric = t.Items["text"]
+			}
+			name := n.NodeName()
+			if name == "" {
+				name = rubric
+			}
+			if name != "" {
+				path := n.AQLPath()
+				names[path] = name
+				if bare := bareAQLPath(path); bare != path {
+					if prev, taken := names[bare]; taken && prev != name {
+						names[bare] = rubric
+					} else {
+						names[bare] = name
+					}
+				}
+			}
+		}
+		for _, a := range n.Attributes() {
+			for _, ch := range a.Children() {
+				walk(ch)
+			}
+		}
+	}
+	if root := c.Root(); root != nil {
+		walk(root)
+	}
+	return names
+}
+
+// minNameIndexTemplates is a floor on how many corpus templates
+// TestBuildNameIndexMatchesReference compares, so the comparison cannot
+// shrink unnoticed when templates stop parsing or compiling. 61 of the 62
+// corpus templates compile today.
+const minNameIndexTemplates = 61
+
+// buildNameIndex must give the index the earlier version gave on every
+// template of the corpus that compiles, entry for entry.
+func TestBuildNameIndexMatchesReference(t *testing.T) {
+	refs, err := fixtures.ListAllOPTs()
+	if err != nil {
+		t.Fatalf("ListAllOPTs: %v", err)
+	}
+	var compared int
+	for _, ref := range refs {
+		parsed, err := template.ParseFile(ref.Path)
+		if err != nil {
+			continue
+		}
+		c, err := templatecompile.Compile(parsed)
+		if err != nil {
+			continue
+		}
+		compared++
+		got, want := buildNameIndex(c), buildNameIndexReference(c)
+		if maps.Equal(got, want) {
+			continue
+		}
+		for _, k := range slices.Sorted(maps.Keys(want)) {
+			if g, ok := got[k]; !ok || g != want[k] {
+				t.Errorf("%s: buildNameIndex()[%q] = %q (present %t), earlier version gave %q", ref.Name, k, g, ok, want[k])
+			}
+		}
+		for _, k := range slices.Sorted(maps.Keys(got)) {
+			if _, ok := want[k]; !ok {
+				t.Errorf("%s: buildNameIndex() has %q = %q, earlier version has no such key", ref.Name, k, got[k])
+			}
+		}
+	}
+	if compared < minNameIndexTemplates {
+		t.Fatalf("compared the name index of %d of the %d corpus templates, want at least %d", compared, len(refs), minNameIndexTemplates)
+	}
+	t.Logf("compared the name index of %d of the %d corpus templates", compared, len(refs))
 }

@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
+	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
@@ -2162,16 +2163,17 @@ func bareAQLPath(p string) string {
 // per-sibling pinned name at a bare key needs the FLAT segment identity
 // carried into this lookup — recorded in deviations.md § Conformance as part
 // of the reused-sibling residual the PROBE-086 adapter work owns.
+//
+// The walk reads the compiled template in place, through the module-internal
+// readers that do not copy a node's attributes, an attribute's children or a
+// term's items. A compiled template carries one set of terms, in its default
+// language, so the rubric is in that language.
 func buildNameIndex(c *templatecompile.Compiled) map[string]string {
 	names := make(map[string]string)
-	lang := c.Language()
 	var walk func(n *templatecompile.CompiledNode)
 	walk = func(n *templatecompile.CompiledNode) {
 		if id := n.NodeID(); id != "" {
-			var rubric string
-			if t, ok := n.Term(id, lang); ok {
-				rubric = t.Items["text"]
-			}
+			rubric, _ := tcimpl.TermItem(n, id, "text")
 			name := n.NodeName()
 			if name == "" {
 				name = rubric
@@ -2190,8 +2192,8 @@ func buildNameIndex(c *templatecompile.Compiled) map[string]string {
 				}
 			}
 		}
-		for _, a := range n.Attributes() {
-			for _, ch := range a.Children() {
+		for _, a := range tcimpl.NodeAttributes(n) {
+			for _, ch := range tcimpl.ChildNodes(a) {
 				walk(ch)
 			}
 		}
