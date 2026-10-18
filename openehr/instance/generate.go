@@ -169,16 +169,10 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	// the primitive's RM-mandatory child attributes are implicitly
 	// captured by the value (e.g. DV_QUANTITY embeds magnitude and
 	// units). Validation v2 does not descend into primitive subtrees
-	// either.
+	// either. Minimal values the leaf too, so the tree is valid: a
+	// bounded constraint requires a value, and a zero RM value would
+	// surface as primitive_wrong_type or out_of_range at validation.
 	if pc := optNode.PrimitiveConstraint(); pc != nil {
-		if g.opts.Policy == Example {
-			return g.applyPrimitiveExample(optNode, rmValue, "", pc)
-		}
-		// Under Minimal we still populate the leaf so the resulting
-		// tree is valid (bounded constraints require a value); leaving
-		// a zero RM value would surface as primitive_wrong_type or
-		// out_of_range at validation. Cheap and aligned with the
-		// "structurally complete" Minimal contract.
 		return g.applyPrimitiveExample(optNode, rmValue, "", pc)
 	}
 
@@ -1547,12 +1541,14 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 		v.Magnitude = rm.Real(q.Magnitude)
 		v.Units = q.Units
 		return nil
-	case *rm.DVText:
+	case *rm.DVText, *rm.DVDate, *rm.DVTime, *rm.DVDateTime, *rm.DVDuration:
+		// Each holds its whole value in its String attribute value.
 		s, ok := ex.(string)
 		if !ok {
-			return fmt.Errorf("DV_TEXT example value is %T, want string", ex)
+			return fmt.Errorf("%s example value is %T, want string", rmTypeOf(rmValue), ex)
 		}
-		v.Value = s
+		ref, _ := stringField(rmValue, "value")
+		ref.set(s)
 		return nil
 	case *rm.DVCodedText:
 		// A C_STRING on .value arrives as a string. A code constraint
@@ -1597,34 +1593,6 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 		return applyOrdinal(v, pc, ex)
 	case *rm.DVProportion:
 		return applyProportionPrimitive(v, attr, ex)
-	case *rm.DVDate:
-		s, ok := ex.(string)
-		if !ok {
-			return fmt.Errorf("DV_DATE example value is %T, want string", ex)
-		}
-		v.Value = s
-		return nil
-	case *rm.DVTime:
-		s, ok := ex.(string)
-		if !ok {
-			return fmt.Errorf("DV_TIME example value is %T, want string", ex)
-		}
-		v.Value = s
-		return nil
-	case *rm.DVDateTime:
-		s, ok := ex.(string)
-		if !ok {
-			return fmt.Errorf("DV_DATE_TIME example value is %T, want string", ex)
-		}
-		v.Value = s
-		return nil
-	case *rm.DVDuration:
-		s, ok := ex.(string)
-		if !ok {
-			return fmt.Errorf("DV_DURATION example value is %T, want string", ex)
-		}
-		v.Value = s
-		return nil
 	}
 	// Unknown RM target for this constraint — silently no-op so the
 	// generator stays sound on RM types REQ-103 does not yet have a
