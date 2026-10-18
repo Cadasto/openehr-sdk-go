@@ -98,11 +98,13 @@ func firstDifference(a, b []byte) string {
 	return fmt.Sprintf("one output is a prefix of the other (%d and %d lines)", len(la), len(lb))
 }
 
-// TestREQ107_ArchetypeRootIsNamedByItsNodeTerm is the REQ-107 Identity
-// check that an archetype root the OPT gives no name constraint is named by
-// the text of its own node's term (at0000), as any other node is, not by
-// its RM type: the vital_signs composition and each observation in its
-// content, in both compile modes and under both policies.
+// TestREQ107_ArchetypeRootIsNamedByItsNodeTerm pins the name the
+// implementation gives an archetype root the OPT gives no name constraint:
+// the text of its own node's term (at0000), as for any other node, not its
+// RM type. No REQ-107 sentence binds that name (Placeholders leaves it to
+// the implementation); the test keeps both compile modes and both policies
+// to the same choice, on the vital_signs composition and each observation
+// in its content.
 func TestREQ107_ArchetypeRootIsNamedByItsNodeTerm(t *testing.T) {
 	for _, implicit := range []bool{true, false} {
 		c := compileFixtureMode(t, "vital_signs", implicit)

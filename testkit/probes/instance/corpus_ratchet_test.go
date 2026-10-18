@@ -74,14 +74,17 @@ var corpusCompileFailures = []string{
 // Each reason is category plus a stable locator (type, attribute, code
 // and path, or JSON path).
 //
-// Minimal rows: under Minimal an optional child yields only to an earlier
-// optional sibling with its identity, and an archetype root's identity is
-// its archetype id (REQ-107 What a visit writes). So Minimal builds one
-// member of each optional archetype under an attribute, as Example does,
-// and reaches the same TestPerson.v2 identifier clusters and the same
-// clinical_content_validation EVALUATION; their rows hold under both
-// policies. No template's body is hollow: a hollow_body failure on any
-// template fails the ratchet.
+// Minimal rows: under Minimal an optional child yields to a required
+// sibling with its identity and to an earlier optional one, and an
+// archetype root's identity is its archetype id (REQ-107 What a visit
+// writes). So Minimal builds one member of each optional archetype under
+// an attribute, as Example does, and reaches the same TestPerson.v2
+// identifier clusters and the same clinical_content_validation EVALUATION;
+// their rows hold under both policies. The Corona_Anamnese slot_fill rows
+// stay Example-only: Minimal skips the repeated named SECTION.adhoc.v1
+// roots after the first, so it never reaches 'Allgemeine Angaben'. No
+// template's body is hollow: a hollow_body failure on any template fails
+// the ratchet.
 //
 // floor_coded rows: TestPerson.v2 codes both its DV_MULTIMEDIA media_type
 // nodes in terminology openEHR, one with the code list 425 to 429 and one
