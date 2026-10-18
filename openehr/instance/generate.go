@@ -1184,7 +1184,7 @@ func (g *generator) materialiseMultiple(
 			// occ.Lower()==0 → still produce one fill so the
 			// resulting tree carries each archetype-root child the
 			// policy keeps at least once (under Minimal, an optional
-			// child whose identity a sibling holds is skipped above).
+			// child whose identity a sibling carries is skipped above).
 			// Drops to a per-child loop body of `1` which is the
 			// minimal-yet-complete contract.
 		}
@@ -1815,16 +1815,18 @@ func newHierObjectID() *rm.HierObjectID {
 }
 
 // identityTaken reports whether children[i] is optional and a sibling
-// holds its identity: a required sibling before or after it, or an
+// carries its identity: a required sibling before or after it, or an
 // optional sibling before it. Under Minimal such a child gets no member of
 // its own, so the validator's binding of members to children stays
 // unambiguous, though the top-up to the attribute's lower bound can still
 // build one, from the first child that is not a slot; a required child is
-// always built. A slot does not count as a sibling. The identity is the one
-// the validator binds a member by (see childIdentity), so optional
-// archetype roots of different archetypes are each built, though every
-// archetype root carries the node id at0000, and a child with no identity
-// is never skipped. A name the OPT pins on a child is not part of it.
+// always built. A slot does not count as a sibling. A sibling carries an
+// identity as the validator binds a member by it (carriesIdentity), so an
+// archetype root also carries its node id: an optional child that is not a
+// root gets no member after a root with its node id, while optional
+// archetype roots of different archetypes are each built, since a root's
+// identity is its archetype id (childIdentity). A child with no identity is
+// never skipped. A name the OPT pins on a child is not part of it.
 func identityTaken(children []*tcimpl.CompiledNode, i int) bool {
 	child := children[i]
 	if childRequired(child) {
@@ -1835,7 +1837,7 @@ func identityTaken(children []*tcimpl.CompiledNode, i int) bool {
 		return false
 	}
 	for j, sib := range children {
-		if j == i || sib.IsSlot() || childIdentity(sib) != id {
+		if j == i || sib.IsSlot() || !carriesIdentity(sib, id) {
 			continue
 		}
 		if j < i || childRequired(sib) {
@@ -1859,6 +1861,13 @@ func childIdentity(child *tcimpl.CompiledNode) string {
 		return id
 	}
 	return child.NodeID()
+}
+
+// carriesIdentity reports whether sib carries the identity id, which is not
+// empty: id is sib's archetype id or its node id, the ids the validator
+// binds a member to a child by. An archetype root carries both.
+func carriesIdentity(sib *tcimpl.CompiledNode, id string) bool {
+	return sib.ArchetypeID() == id || sib.NodeID() == id
 }
 
 // finishNode fills RM-mandatory fields the OPT walk left empty.
