@@ -7,6 +7,7 @@ import (
 	"regexp/syntax"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 	"uuid"
 
@@ -217,7 +218,7 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 // as materialiseImplicitSingle leaves them.
 func (g *generator) fillUncarriedRequired(optNode *tcimpl.CompiledNode, rmValue any) {
 	class := bmmtype.Class(rmTypeOf(rmValue))
-	for _, attrName := range rminfo.Default.RequiredAttributes(class) {
+	for _, attrName := range requiredAttributes(class) {
 		if optNode.Attribute(attrName) != nil || compositionDefaultOwns(class, attrName) {
 			continue
 		}
@@ -578,10 +579,29 @@ func (g *generator) populateBMMRequiredAttrs(parent any, parentRMType string, de
 	if depth >= maxDepth || parent == nil || parentRMType == "" {
 		return
 	}
-	for _, attrName := range rminfo.Default.RequiredAttributes(parentRMType) {
+	for _, attrName := range requiredAttributes(parentRMType) {
 		g.fillBMMAttr(parent, parentRMType, attrName, depth)
 	}
 }
+
+// requiredAttributes returns the attributes the pinned RM marks mandatory on
+// the bare class class, in declaration order, as
+// rminfo.Default.RequiredAttributes does, and nil for a class it does not
+// know. It reads them from a table built once rather than building a slice
+// per call. The caller must not change the slice.
+func requiredAttributes(class string) []string { return requiredAttrTable()[class] }
+
+// requiredAttrTable holds what rminfo.Default.RequiredAttributes answers for
+// each class rminfo.Default knows. The pinned RM does not change, so it is
+// built on first use and only read after, by any number of goroutines.
+var requiredAttrTable = sync.OnceValue(func() map[string][]string {
+	known := rminfo.Default.KnownRMTypes()
+	table := make(map[string][]string, len(known))
+	for _, class := range known {
+		table[class] = rminfo.Default.RequiredAttributes(class)
+	}
+	return table
+})
 
 // fillBMMAttr builds a default for attrName of parent from its BMM type
 // alone, fills that default's own BMM-mandatory attributes, and attaches
