@@ -123,6 +123,9 @@ type generator struct {
 	// is RandomFill; the zero value (used under ExampleFill) is never
 	// consulted. REQ-107.
 	valueSampler sampler
+	// nowText is opts.Now as dateTimeDefault writes it, formatted on first
+	// use; "" until then.
+	nowText string
 }
 
 // nextUID returns the next LOCATABLE.uid pointer. Honours
@@ -778,10 +781,14 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 }
 
 // dateTimeDefault is the ISO 8601 form Options.Now contributes to
-// DV_DATE_TIME values. It matches the clock applyCompositionDefaults
-// uses for EventContext.start_time.
+// DV_DATE_TIME values, and to EventContext.start_time in
+// applyCompositionDefaults. The clock does not change during a call, so
+// it is formatted once.
 func (g *generator) dateTimeDefault() string {
-	return g.opts.Now.Format(time.RFC3339)
+	if g.nowText == "" {
+		g.nowText = g.opts.Now.Format(time.RFC3339)
+	}
+	return g.nowText
 }
 
 // temporalSentinel is the valid ISO 8601 value the generator writes on
@@ -1774,7 +1781,7 @@ func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 	}
 	contextNode := bindingChild(root, "context")
 	if c.Context.StartTime.Value == "" && !prohibited(contextNode, "start_time") {
-		c.Context.StartTime = rm.DVDateTime{Value: g.opts.Now.Format(time.RFC3339)}
+		c.Context.StartTime = rm.DVDateTime{Value: g.dateTimeDefault()}
 	}
 	// EventContext.Setting is BMM-mandatory and carries the RM invariant
 	// Setting_valid — its defining code MUST be a member of the openEHR
