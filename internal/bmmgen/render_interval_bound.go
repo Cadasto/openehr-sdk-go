@@ -1109,10 +1109,10 @@ func scalarAlias(goType string) string {
 }
 
 // scalarBoundGoTypes lists, sorted, every Go built-in scalar type and the
-// named scalar types the BMM primitives map to (Integer, Real, Character).
-// A bound of one of these types is empty when it equals its zero value. A
-// primitive mapped to anything but an identifier (a slice, a pointer) is
-// refused: it could not be compared with its zero value.
+// named scalar types the BMM primitives map to (Integer, Integer64, Real,
+// Character). A bound of one of these types is empty when it equals its zero
+// value. A primitive mapped to anything but an identifier (a slice, a
+// pointer) is refused: it could not be compared with its zero value.
 func scalarBoundGoTypes() ([]string, error) {
 	set := map[string]bool{}
 	for _, goType := range builtinScalarGoTypes {
@@ -1255,7 +1255,7 @@ func zeroFieldCondition(plan *Plan, pc *PlannedClass, prop bmm.Property) (string
 				return "!" + field, nil, nil
 			case "string", "Character":
 				return field + ` == ""`, nil, nil
-			case "Integer", "Real", "byte", "float64", "int64":
+			case "Integer", "Integer64", "Real", "byte", "float64":
 				return field + " == 0", nil, nil
 			}
 			return "", nil, fmt.Errorf("primitive %s (Go %s) has no zero comparison", p.TypeName, primitiveGoType[p.TypeName])

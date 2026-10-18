@@ -1,6 +1,7 @@
 package validation_test
 
 import (
+	"math"
 	"slices"
 	"strings"
 	"testing"
@@ -483,6 +484,34 @@ const (
       </children>`
 )
 
+// REQ-110, REQ-102 — a C_INTEGER on DV_COUNT.magnitude reads the magnitude, an
+// rm.Integer64, as the integer it holds. A count the range admits binds the
+// INTEGER child and passes; one it refuses is reported as
+// primitive_out_of_range at the magnitude, never as primitive_wrong_type or
+// rm_type_mismatch. The int64 extremes are read without loss.
+func TestValidate_REQ110_CountMagnitudeUnderCInteger(t *testing.T) {
+	t.Parallel()
+	c := mustCompileInline(t, elementValueOPT(countChild))
+	outOfRange := []string{"primitive_out_of_range /value/magnitude"}
+	for _, tc := range []struct {
+		magnitude rm.Integer64
+		want      []string
+	}{
+		{magnitude: 0, want: []string{}},
+		{magnitude: 3, want: []string{}},
+		{magnitude: 5, want: []string{}},
+		{magnitude: 6, want: outOfRange},
+		{magnitude: -1, want: outOfRange},
+		{magnitude: math.MaxInt64, want: outOfRange},
+		{magnitude: math.MinInt64, want: outOfRange},
+	} {
+		got := issueKeys(validation.Validate(valueElement(&rm.DVCount{Magnitude: tc.magnitude}), c).Issues)
+		if !slices.Equal(got, tc.want) {
+			t.Errorf("Validate(DV_COUNT magnitude %d under a C_INTEGER of 0 to 5) issues = %q, want %q", tc.magnitude, got, tc.want)
+		}
+	}
+}
+
 // REQ-102 — binding prefers the most specific child, in three tiers, and
 // the order of the alternatives does not change which child binds. Each
 // case's value conforms to both alternatives, and only the tighter one
@@ -674,7 +703,7 @@ func orderedIntervalBound(side string) string {
 func TestValidate_REQ110_IntervalBoundsConformToAbstractParameter(t *testing.T) {
 	t.Parallel()
 	c := mustCompileInline(t, elementValueOPT(orderedIntervalChild))
-	count := func(m int64) *rm.DVCount { return &rm.DVCount{Magnitude: m} }
+	count := func(m int64) *rm.DVCount { return &rm.DVCount{Magnitude: rm.Integer64(m)} }
 	tests := []struct {
 		name  string
 		value rm.DataValue

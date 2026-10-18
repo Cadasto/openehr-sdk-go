@@ -332,17 +332,18 @@ func (e *engine) spendLeafVisit(path issuePath, rmType string) {
 // attribute a, is a primitive leaf: a value read under a declared type that
 // has no RM rules ([engineAttr].noRules), of a type no RM class is. The
 // types are the Go primitive types; the primitive types the RM package
-// names, rm.Real, rm.Integer and rm.Character; and the pointers the
-// generated access hands over for an optional primitive attribute, *string,
-// *bool, *rm.Real and *rm.Integer, each of which it reads as present only
-// when it is not nil. A test keeps every one of them outside the RM classes.
+// names, rm.Real, rm.Integer, rm.Integer64 and rm.Character; and the
+// pointers the generated access hands over for an optional primitive
+// attribute, *string, *bool, *rm.Real and *rm.Integer, each of which it
+// reads as present only when it is not nil. A test keeps every one of them
+// outside the RM classes.
 func primitiveLeaf(value any, a *engineAttr) bool {
 	if !a.noRules {
 		return false
 	}
 	switch value.(type) {
 	case string, bool, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64,
-		rm.Real, rm.Integer, rm.Character,
+		rm.Real, rm.Integer, rm.Integer64, rm.Character,
 		*string, *bool, *rm.Real, *rm.Integer:
 		return true
 	}

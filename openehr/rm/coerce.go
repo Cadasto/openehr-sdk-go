@@ -2,10 +2,10 @@ package rm
 
 import "math"
 
-// AsInt64 widens any Go integer shape, and the RM [Integer] scalar,
-// to int64. uint/uint64 values above [math.MaxInt64] return ok=false
-// rather than silently wrapping to a negative. Float inputs are
-// rejected (they belong to [AsReal]).
+// AsInt64 widens any Go integer shape, and the RM [Integer] and
+// [Integer64] scalars, to int64. uint/uint64 values above
+// [math.MaxInt64] return ok=false rather than silently wrapping to a
+// negative. Float inputs are rejected (they belong to [AsReal]).
 //
 // This is the single integer coercion shared by the RM write/validate
 // paths (instance synthesis, rmwrite attach, validation matching) so
@@ -40,12 +40,15 @@ func AsInt64(v any) (int64, bool) {
 		return int64(n), true
 	case Integer:
 		return int64(n), true
+	case Integer64:
+		return int64(n), true
 	}
 	return 0, false
 }
 
-// AsReal widens any Go numeric shape, and the RM [Integer]/[Real]
-// scalars, to [Real]. Integer inputs widen losslessly. It is the
+// AsReal widens any Go numeric shape, and the RM [Integer], [Integer64]
+// and [Real] scalars, to [Real]. An integer input converts to the
+// nearest float64, which is exact up to 2^53 in magnitude. It is the
 // real counterpart to [AsInt64], shared across the same layers.
 func AsReal(v any) (Real, bool) {
 	switch n := v.(type) {

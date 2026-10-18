@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
@@ -47,29 +48,31 @@ func fitBody(tc fitCase) map[string]any {
 // ErrUnsupportedDatatype and naming the FLAT key as written: a string that is
 // no decimal where the attribute is a number, a number or a Boolean where it
 // is a String, a non-Boolean where it is a Boolean, and a number with a
-// non-zero fraction, or outside the int32 range, where it is an Integer
-// (DV_PROPORTION |type, |precision, DV_ORDINAL |ordinal). DV_COUNT's bare
-// magnitude is an Integer64, which canonical JSON reads as a plain integer.
-// The same bodies are refused in STRUCTURED.
+// non-zero fraction, bare or quoted, or one outside the field's range, where
+// it is an Integer (DV_PROPORTION |type, |precision, DV_ORDINAL |ordinal; the
+// int32 range) or an Integer64 (DV_COUNT's bare magnitude; the int64 range),
+// as REQ-052 § Floating-point precision has canonical JSON refuse it. The
+// same bodies are refused in STRUCTURED.
 func TestREQ053ValueMustFitItsAttribute(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	for name, tc := range map[string]fitCase{
-		"proportion |type with a fraction":       {rmattrProportion + "|type", 1.5},
-		"proportion |numerator not a decimal":    {rmattrProportion + "|numerator", "x"},
-		"quantity |precision with a fraction":    {rmattrElement + "|precision", 1.5},
-		"quantity |precision outside int32":      {rmattrElement + "|precision", 3000000000},
-		"quantity |magnitude not a decimal":      {rmattrElement + "|magnitude", "abc"},
-		"quantity |unit a number":                {rmattrElement + "|unit", 5},
-		"quantity |units_system a Boolean":       {rmattrElement + "|units_system", true},
-		"quantity |accuracy_is_percent a string": {rmattrElement + "|accuracy_is_percent", "yes"},
-		"ordinal |ordinal with a fraction":       {rmattrOrdinal + "|ordinal", 2.5},
-		"coded text |code a number":              {rmattrCodedText + "|code", 5},
-		"coded text |terminology a Boolean":      {rmattrCodedText + "|terminology", false},
-		"boolean bare value a string":            {rmattrBoolean, "yes"},
-		"count bare value with a fraction":       {rmattrCount, 1.5},
-		"count bare value quoted":                {rmattrCount, "7"},
-		"text bare value a number":               {rmattrText, 5},
-		"date time bare value a number":          {rmattrDateTime, 20220112},
+		"proportion |type with a fraction":        {rmattrProportion + "|type", 1.5},
+		"proportion |numerator not a decimal":     {rmattrProportion + "|numerator", "x"},
+		"quantity |precision with a fraction":     {rmattrElement + "|precision", 1.5},
+		"quantity |precision outside int32":       {rmattrElement + "|precision", 3000000000},
+		"quantity |magnitude not a decimal":       {rmattrElement + "|magnitude", "abc"},
+		"quantity |unit a number":                 {rmattrElement + "|unit", 5},
+		"quantity |units_system a Boolean":        {rmattrElement + "|units_system", true},
+		"quantity |accuracy_is_percent a string":  {rmattrElement + "|accuracy_is_percent", "yes"},
+		"ordinal |ordinal with a fraction":        {rmattrOrdinal + "|ordinal", 2.5},
+		"coded text |code a number":               {rmattrCodedText + "|code", 5},
+		"coded text |terminology a Boolean":       {rmattrCodedText + "|terminology", false},
+		"boolean bare value a string":             {rmattrBoolean, "yes"},
+		"count bare value with a fraction":        {rmattrCount, 1.5},
+		"count bare value quoted with a fraction": {rmattrCount, "1.5"},
+		"count bare value outside Integer64":      {rmattrCount, json.Number("9223372036854775808")},
+		"text bare value a number":                {rmattrText, 5},
+		"date time bare value a number":           {rmattrDateTime, 20220112},
 	} {
 		t.Run(name, func(t *testing.T) {
 			body := fitBody(tc)
@@ -163,6 +166,41 @@ func TestREQ053FitAdmitsWhatCanonicalJSONAdmits(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			decodeRMAttr(t, wt, fitBody(tc))
+		})
+	}
+}
+
+// TestREQ053CountBareValueTakesTheWholeNumberRule — REQ-053, REQ-052
+// § Floating-point precision: DV_COUNT's bare value fills DV_COUNT.magnitude,
+// an Integer64, which canonical JSON reads under the whole-number rule an
+// Integer has. So the bare value "7", 7.0 and "7.0" each decode as magnitude
+// 7, in FLAT and in STRUCTURED. TestREQ053ValueMustFitItsAttribute pins the
+// refusals beside them: 1.5, "1.5" and a value outside the int64 range.
+func TestREQ053CountBareValueTakesTheWholeNumberRule(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	for name, v := range map[string]any{
+		"quoted":                      "7",
+		"written 7.0":                 json.Number("7.0"),
+		"quoted with a zero fraction": "7.0",
+		"written 70e-1":               json.Number("70e-1"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			body := rmattrBody(map[string]any{rmattrCount: v})
+			flat := elementValue[rm.DVCount](t, decodeRMAttr(t, wt, body))
+			if flat.Magnitude != 7 {
+				t.Errorf("FLAT: bare value %#v decoded as magnitude %d, want 7", v, flat.Magnitude)
+			}
+			b, err := FlatToStructured(mustJSON(t, body))
+			if err != nil {
+				t.Fatalf("FlatToStructured: %v", err)
+			}
+			comp, err := UnmarshalStructured(b, wt)
+			if err != nil {
+				t.Fatalf("STRUCTURED: bare value %#v: UnmarshalStructured = %v, want nil", v, err)
+			}
+			if structured := elementValue[rm.DVCount](t, comp); structured.Magnitude != 7 {
+				t.Errorf("STRUCTURED: bare value %#v decoded as magnitude %d, want 7", v, structured.Magnitude)
+			}
 		})
 	}
 }

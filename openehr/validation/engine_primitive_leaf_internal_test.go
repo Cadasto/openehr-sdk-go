@@ -193,7 +193,7 @@ func leafSamples() []any {
 	return []any{
 		"x", true, int(1), int8(1), int16(1), int32(1), int64(1),
 		uint(1), uint8(1), uint16(1), uint32(1), uint64(1), float32(1), float64(1),
-		rm.Real(0.5), rm.Integer(1), rm.Character("="),
+		rm.Real(0.5), rm.Integer(1), rm.Integer64(1), rm.Character("="),
 		&text, &flag, &number, &integer,
 	}
 }

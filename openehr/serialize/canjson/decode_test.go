@@ -6,6 +6,8 @@ import (
 	jsonv2 "encoding/json/v2"
 	"errors"
 	"io"
+	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -1097,4 +1099,142 @@ func TestBareV1CallerOptionsGovernPolymorphicSlots(t *testing.T) {
 			t.Fatalf("jsonv2.Unmarshal(%s, RejectUnknownMembers(true)) = %v; want nil: every member is declared", in, err)
 		}
 	})
+}
+
+// TestREQ052_WholeNumberDecodeAcceptance is the acceptance block of wire.md
+// § Floating-point precision (REQ-052), run through canjson.Unmarshal on both
+// attributes it names: DV_COUNT.magnitude, the RM's one Integer64, and
+// DV_QUANTITY.precision, an Integer. A whole number reads as that integer
+// however the literal writes it, bare or quoted, and re-encodes as the bare
+// number. The int64 bounds of a magnitude read, and a whole number past them
+// is refused with strconv.ErrRange. A non-zero fraction is refused with
+// strconv.ErrSyntax, never read as the integer either side of it.
+func TestREQ052_WholeNumberDecodeAcceptance(t *testing.T) {
+	t.Parallel()
+	// read decodes doc, returns the attribute's value and its re-encoded
+	// member, or the decode error.
+	type read func(doc []byte) (n int64, member string, err error)
+	member := func(t *testing.T, out []byte, name string) string {
+		t.Helper()
+		var m map[string]jsonv1.RawMessage
+		if err := jsonv1.Unmarshal(out, &m); err != nil {
+			t.Fatalf("re-encoded %s is not a JSON object: %v", out, err)
+		}
+		return string(m[name])
+	}
+	attrs := []struct {
+		name string
+		doc  func(lit string) string
+		read func(t *testing.T) read
+	}{
+		{
+			name: "DV_COUNT.magnitude",
+			doc:  func(lit string) string { return `{"_type":"DV_COUNT","magnitude":` + lit + `}` },
+			read: func(t *testing.T) read {
+				return func(doc []byte) (int64, string, error) {
+					var c rm.DVCount
+					if err := canjson.Unmarshal(doc, &c); err != nil {
+						return 0, "", err
+					}
+					out, err := canjson.Marshal(&c)
+					if err != nil {
+						t.Fatalf("canjson.Marshal(DV_COUNT %d) = %v", c.Magnitude, err)
+					}
+					return int64(c.Magnitude), member(t, out, "magnitude"), nil
+				}
+			},
+		},
+		{
+			name: "DV_QUANTITY.precision",
+			doc: func(lit string) string {
+				return `{"_type":"DV_QUANTITY","magnitude":80.5,"units":"kg","precision":` + lit + `}`
+			},
+			read: func(t *testing.T) read {
+				return func(doc []byte) (int64, string, error) {
+					var q rm.DVQuantity
+					if err := canjson.Unmarshal(doc, &q); err != nil {
+						return 0, "", err
+					}
+					if q.Precision == nil {
+						t.Fatalf("canjson.Unmarshal(%s) left precision absent", doc)
+					}
+					out, err := canjson.Marshal(&q)
+					if err != nil {
+						t.Fatalf("canjson.Marshal(DV_QUANTITY precision %d) = %v", *q.Precision, err)
+					}
+					return int64(*q.Precision), member(t, out, "precision"), nil
+				}
+			},
+		},
+	}
+	type accepted struct {
+		lit, encoded string
+		want         int64
+	}
+	type refused struct {
+		lit             string
+		cause, notCause error
+	}
+	twos := []accepted{
+		{lit: `2`, want: 2, encoded: `2`},
+		{lit: `2.0`, want: 2, encoded: `2`},
+		{lit: `2e0`, want: 2, encoded: `2`},
+		{lit: `20e-1`, want: 2, encoded: `2`},
+		{lit: `"2"`, want: 2, encoded: `2`},
+		{lit: `"2.0"`, want: 2, encoded: `2`},
+	}
+	fractions := []refused{
+		{lit: `2.5`, cause: strconv.ErrSyntax, notCause: strconv.ErrRange},
+		{lit: `"2.5"`, cause: strconv.ErrSyntax, notCause: strconv.ErrRange},
+		{lit: `25e-1`, cause: strconv.ErrSyntax, notCause: strconv.ErrRange},
+	}
+	edges := map[string]struct {
+		accepted []accepted
+		refused  []refused
+	}{
+		"DV_COUNT.magnitude": {
+			accepted: []accepted{
+				{lit: `9223372036854775807`, want: math.MaxInt64, encoded: `9223372036854775807`},
+				{lit: `9223372036854775807.0`, want: math.MaxInt64, encoded: `9223372036854775807`},
+				{lit: `"9223372036854775807"`, want: math.MaxInt64, encoded: `9223372036854775807`},
+			},
+			refused: []refused{
+				{lit: `9223372036854775808`, cause: strconv.ErrRange, notCause: strconv.ErrSyntax},
+				{lit: `-9223372036854775809`, cause: strconv.ErrRange, notCause: strconv.ErrSyntax},
+				{lit: `1e19`, cause: strconv.ErrRange, notCause: strconv.ErrSyntax},
+				{lit: `"1e19"`, cause: strconv.ErrRange, notCause: strconv.ErrSyntax},
+			},
+		},
+	}
+	for _, a := range attrs {
+		for _, tc := range append(slices.Clone(twos), edges[a.name].accepted...) {
+			t.Run(a.name+"/"+tc.lit, func(t *testing.T) {
+				t.Parallel()
+				doc := a.doc(tc.lit)
+				n, encoded, err := a.read(t)([]byte(doc))
+				if err != nil {
+					t.Fatalf("canjson.Unmarshal(%s) = %v, want nil", doc, err)
+				}
+				if n != tc.want {
+					t.Errorf("canjson.Unmarshal(%s) read %d, want %d", doc, n, tc.want)
+				}
+				if encoded != tc.encoded {
+					t.Errorf("canjson.Unmarshal(%s) re-encodes the member as %s, want the bare %s", doc, encoded, tc.encoded)
+				}
+			})
+		}
+		for _, tc := range append(slices.Clone(fractions), edges[a.name].refused...) {
+			t.Run(a.name+"/"+tc.lit, func(t *testing.T) {
+				t.Parallel()
+				doc := a.doc(tc.lit)
+				n, _, err := a.read(t)([]byte(doc))
+				if err == nil {
+					t.Fatalf("canjson.Unmarshal(%s) = nil error, read %d; want a refusal", doc, n)
+				}
+				if !errors.Is(err, tc.cause) || errors.Is(err, tc.notCause) {
+					t.Errorf("canjson.Unmarshal(%s) = %v; want it to carry %v and not %v", doc, err, tc.cause, tc.notCause)
+				}
+			})
+		}
+	}
 }

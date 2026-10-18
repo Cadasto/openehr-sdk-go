@@ -76,12 +76,12 @@ func dataValueInput(dv rm.DataValue) (any, bool) {
 	case rm.DVBoolean:
 		return v.Value, true
 	case *rm.DVCount:
-		// DV_COUNT.magnitude is Integer64 (int64) per the RM spec —
-		// pass-through preserves precision on 32-bit platforms.
-		// [constraints.CInteger.Validate] accepts int64 directly.
-		return v.Magnitude, true
+		// DV_COUNT.magnitude is an rm.Integer64. The constraints package
+		// cannot name the RM type, so it gets the bare int64, which
+		// [constraints.CInteger.Validate] reads without loss.
+		return int64(v.Magnitude), true
 	case rm.DVCount:
-		return v.Magnitude, true
+		return int64(v.Magnitude), true
 	case *rm.DVOrdinal:
 		return ordinalInput(v), true
 	case rm.DVOrdinal:

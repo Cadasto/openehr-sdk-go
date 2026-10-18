@@ -14,7 +14,7 @@ var primitiveGoType = map[string]string{
 	// Basic scalars
 	"Boolean":   "bool",
 	"Integer":   "Integer",
-	"Integer64": "int64",
+	"Integer64": "Integer64",
 	"Real":      "Real",
 	"Double":    "float64",
 	"Character": "Character", // was "rune": canonical JSON is a single-char string — REQ-046

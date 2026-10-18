@@ -1595,7 +1595,7 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 		if !ok {
 			return fmt.Errorf("DV_COUNT example value is %T, want integer", ex)
 		}
-		v.Magnitude = n
+		v.Magnitude = rm.Integer64(n)
 		return nil
 	case *rm.DVOrdinal:
 		return applyOrdinal(v, pc, ex)

@@ -9,10 +9,10 @@ package simplified
 //
 // The check is canonical JSON's own: the attribute's type comes from the RM
 // (rminfo), and the value is decoded with the decoder canjson uses for that
-// type ([rm.Real], [rm.Integer], or encoding/json/v2 for the rest). So it
-// admits everything canonical JSON admits, quoted decimals and whole numbers
-// written with a fraction included (ADR 0004, REQ-052 § Floating-point
-// precision), and adds no strictness beyond naming the key.
+// type ([rm.Real], [rm.Integer], [rm.Integer64], or encoding/json/v2 for the
+// rest). So it admits everything canonical JSON admits, quoted decimals and
+// whole numbers written with a fraction included (ADR 0004, REQ-052
+// § Floating-point precision), and adds no strictness beyond naming the key.
 
 import (
 	"encoding/json"
@@ -143,7 +143,7 @@ func decodeTarget(bmmType string) any {
 	case "Integer":
 		return new(rm.Integer)
 	case "Integer64":
-		return new(int64)
+		return new(rm.Integer64)
 	case "Real":
 		return new(rm.Real)
 	case "Octet":
@@ -189,7 +189,7 @@ func (f valueFit) takes() string {
 	case "Integer":
 		return "a whole number in the Integer range, bare or quoted"
 	case "Integer64":
-		return "an integer literal in the Integer64 range, unquoted"
+		return "a whole number in the Integer64 range, bare or quoted"
 	case "Real":
 		return "a number, bare or quoted"
 	case "Octet":

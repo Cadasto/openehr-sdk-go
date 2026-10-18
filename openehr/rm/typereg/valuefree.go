@@ -463,7 +463,7 @@ var (
 		`canxml: `+formQuoted+`: `,
 		`canxml: <`+formIdent+`>: `,
 		`canxml: decoded `+formGoType+`: `,
-		`rm\.(?:Integer|Real|Character): (?:parse quoted literal: )?`,
+		`rm\.(?:Integer|Integer64|Real|Character): (?:parse quoted literal: )?`,
 		`typereg\.Decode: (?:read _type: )?`,
 		`typereg\.Decode `+formQuoted+`: `,
 		`typereg\.DecodeAs: decoded `+formGoType+`: `,
@@ -486,7 +486,7 @@ var (
 		// canxml's own shape sentinel, a value this package cannot name.
 		`canxml: invalid XML shape`,
 		`(?:lower|upper)_unbounded is false but the interval gives no (?:lower|upper) bound, which a bound held by value cannot leave out`,
-		`rm\.(?:Integer|Real|Character): empty input`,
+		`rm\.(?:Integer|Integer64|Real|Character): empty input`,
 		`rm\.Real: literal carries more than [0-9]+ significant decimal digits`,
 		`value is not valid UTF-8`,
 		`must be exactly one character, got [0-9]+`,

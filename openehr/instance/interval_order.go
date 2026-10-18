@@ -51,8 +51,8 @@ func orderIntervalBounds(optNode *tcimpl.CompiledNode, rmValue any) {
 	switch iv := rmValue.(type) {
 	case *rm.DVInterval[rm.DVCount]:
 		orderConcrete(&iv.Interval, optNode, countScale,
-			func(b rm.DVCount) int64 { return b.Magnitude },
-			func(b *rm.DVCount, m int64) { b.Magnitude = m })
+			func(b rm.DVCount) int64 { return int64(b.Magnitude) },
+			func(b *rm.DVCount, m int64) { b.Magnitude = rm.Integer64(m) })
 	case *rm.DVInterval[rm.DVQuantity]:
 		orderConcrete(&iv.Interval, optNode, quantityScale, quantityKeyOf, setQuantityKey)
 	case *rm.DVInterval[rm.DVDate]:
@@ -95,7 +95,7 @@ func orderConcrete[T any, K any](iv *rm.Interval[T], optNode *tcimpl.CompiledNod
 // changed in place and a value bound is replaced, so each keeps its form.
 // A mixed or missing pair is left alone.
 func orderOrderedBounds(optNode *tcimpl.CompiledNode, iv *rm.Interval[rm.DVOrdered]) {
-	if orderOrderedAs(iv, optNode, countScale, asCount, func(c rm.DVCount) int64 { return c.Magnitude }, setOrderedCount) {
+	if orderOrderedAs(iv, optNode, countScale, asCount, func(c rm.DVCount) int64 { return int64(c.Magnitude) }, setOrderedCount) {
 		return
 	}
 	if orderOrderedAs(iv, optNode, quantityScale, asQuantity, quantityKeyOf, setOrderedQuantity) {
@@ -397,9 +397,9 @@ func asQuantity(v rm.DVOrdered) (rm.DVQuantity, bool) {
 func setOrderedCount(slot *rm.DVOrdered, m int64) {
 	switch x := (*slot).(type) {
 	case *rm.DVCount:
-		x.Magnitude = m
+		x.Magnitude = rm.Integer64(m)
 	case rm.DVCount:
-		x.Magnitude = m
+		x.Magnitude = rm.Integer64(m)
 		*slot = x
 	}
 }

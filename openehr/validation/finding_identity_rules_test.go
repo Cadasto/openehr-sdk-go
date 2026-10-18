@@ -334,8 +334,8 @@ func TestValidateRM_REQ171_RMLayerRules(t *testing.T) {
 	openEHR271 := &rm.DVCodedText{Value: "no information", DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}, CodeString: "271"}}
 	interval := func(lower, upper int64) *rm.DVInterval[rm.DVCount] {
 		return &rm.DVInterval[rm.DVCount]{
-			Lower: rm.DVCount{Magnitude: lower}, LowerIncluded: true,
-			Upper: rm.DVCount{Magnitude: upper}, UpperIncluded: true,
+			Lower: rm.DVCount{Magnitude: rm.Integer64(lower)}, LowerIncluded: true,
+			Upper: rm.DVCount{Magnitude: rm.Integer64(upper)}, UpperIncluded: true,
 		}
 	}
 	tests := []struct {

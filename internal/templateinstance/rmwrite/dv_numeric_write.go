@@ -13,7 +13,7 @@ func writeDVCountSingle(c *rm.DVCount, attr string, child any) error {
 		if !ok {
 			return mismatch(attr, child, "Integer")
 		}
-		c.Magnitude = n
+		c.Magnitude = rm.Integer64(n)
 		return nil
 	case "normal_status":
 		v, ok := child.(*rm.CodePhrase)
