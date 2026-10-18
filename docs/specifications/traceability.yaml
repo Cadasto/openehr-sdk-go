@@ -105,6 +105,8 @@ requirements:
     status: draft
     implementation: landed
     packages: [transport, openehr/client]
+    tests:
+      - openehr/internal/refused/imports_test.go
 
   - id: REQ-020
     title: Context-first I/O
