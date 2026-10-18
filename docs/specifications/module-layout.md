@@ -29,7 +29,7 @@ Generic openEHR primitives. No application-specific healthcare models live here.
 | `auth/clientcreds/` | OAuth2 Client Credentials grant provider. |
 | `auth/jwtbearer/` | OAuth2 JWT Bearer (RFC 7523) grant provider. |
 | `auth/basic/` | HTTP Basic (RFC 7617) credentials for openEHR REST (REQ-069). |
-| `transport/` | HTTP client wrapper around an injected `*http.Client`. Hosts interceptors, retry/backoff, OTel hooks, error mapping, optional spec-version pinning. Named `transport/` (not `http/`) to avoid collision with `net/http` at consumer call sites. |
+| `transport/` | HTTP client wrapper around an injected `*http.Client`. Hosts retry/backoff, OTel hooks, the request observer, error mapping, optional spec-version pinning. Named `transport/` (not `http/`) to avoid collision with `net/http` at consumer call sites. |
 | `openehr/` | Namespace marker; exports nothing. |
 | `openehr/rm/` | RM types (clinical + demographic) as concrete structs with embedded base types; abstract RM categories as Go interfaces. **Generated** from the pinned `openehr_rm_*.bmm.json` schema (REQ-042). |
 | `openehr/rm/typereg/` | Central type registry mapping `_type` discriminator → concrete Go type. **Generated** as part of the RM emission. |

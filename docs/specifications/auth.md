@@ -69,7 +69,7 @@ Rules:
 - `Token.Value` is opaque to `transport/`: transports **MUST** forward it as `Authorization: <Type> <Value>` without inspecting either half — there is no scheme allowlist, so a scheme this SDK has no provider for (`DPoP`, …) reaches the wire verbatim. When `Type` is empty, `transport/` **MUST** treat it as `Bearer`. A **zero** `Token` (no value and no type — `auth.Token.IsZero`) is the anonymous case and **MUST** suppress the `Authorization` header entirely rather than emit an empty scheme or an empty credential; `auth.AnonymousTokenSource` is the sanctioned way to ask for it, and it is `transport/`'s default token source.
 - A `TokenSource` **MAY** be stateful (caching, refresh) but **MUST** be safe for concurrent use (REQ-026).
 
-The coalesced refresh in `auth/smart` is race-free: the goroutine that refreshes stores the token before it closes the channel the other callers wait on, so under the Go memory model every waiter reads the stored result. Discovery resolution (`smart/discovery`) coalesces the same way.
+The coalesced refresh in `auth/smart`, `auth/clientcreds` and `auth/jwtbearer` is race-free: the goroutine that refreshes stores the token before it closes the channel the other callers wait on, so under the Go memory model every waiter reads the stored result. A waiter whose own context is still live tries again when the refresh failed only because the refreshing caller's context ended, or when it panicked ([idiom.md § Concurrency](idiom.md#concurrency-req-026)). Discovery resolution (`smart/discovery`) coalesces the same way.
 
 #### Credential-bearing requests
 
@@ -289,7 +289,7 @@ The SDK validates ID tokens against the deployment's published JWKS. JWKS rotati
 
 The SDK provides `auth.ScopeOfflineAccess` and `auth.ScopeOnlineAccess` constants for composing these scope strings via `auth.JoinScopes`. These constants are lexical only — whether the server honours the request depends on the deployment's policy.
 
-The `auth/smart` `TokenSource` **MUST** proactively refresh access tokens when `ExpiresAt` is within a configurable threshold (default: 30 seconds) of `time.Now()`.
+The `auth/smart`, `auth/clientcreds` and `auth/jwtbearer` token sources **MUST** proactively renew access tokens when `ExpiresAt` is within a configurable threshold (default: 30 seconds) of `time.Now()`: `auth/smart` with its refresh token, the other two with a new exchange, as their grants issue no refresh token.
 
 Wire-driven refresh — recovering from a `401 Unauthorized` that indicates an expired/invalid token — is **opt-in** rather than automatic inside the `TokenSource`: the transport layer exposes `transport.WithReauthOn401`, which on a 401 invokes the configured `auth.Reauther` (implemented by `*smart.Source.Reauth`) once and replays the request. Keeping it opt-in avoids surprising retries of non-idempotent writes (see _transport reauth hook_ below).
 
@@ -324,7 +324,7 @@ When a `refresh_token` grant fails, `Source.Token` classifies the returned `*aut
 Both state mutations happen under `s.mu` (the same mutex used by all of `Token`).
 
 **Configurable early-expiry buffer (G-2).**
-`WithRefreshThreshold(d time.Duration)` sets the proactive-refresh window (default: 30 seconds). A token is considered stale — and `Token()` will attempt a refresh — when `time.Until(ExpiresAt) <= RefreshThreshold`. This is the sole configurable early-expiry buffer; no duplicate option exists.
+`WithRefreshThreshold(d time.Duration)` on the `auth/smart`, `auth/clientcreds` and `auth/jwtbearer` sources sets the proactive-refresh window; a threshold of 0 **MUST** select the default of 30 seconds. A token is considered stale — and `Token()` will attempt a refresh — when `time.Until(ExpiresAt) <= max(RefreshThreshold, 0)`: a negative threshold **MUST** count as 0, so a token past its `ExpiresAt` is never served ([§ REQ-063](#req-063--token-refresh): the expired token is not used silently). This is the sole configurable early-expiry buffer; no duplicate option exists.
 
 **`RefreshIfNeeded(ctx context.Context) error`.**
 A non-request-bound refresh trigger: checks `staleLocked()` and whether a refresh token is present; if both are true it calls through to `Token()` to execute the refresh; otherwise it is a no-op returning `nil`. Error contract is identical to `Token()`.

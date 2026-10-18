@@ -186,43 +186,8 @@ func WithAudience(aud string) Option {
 // its own copy of a, with the URLs and lists it points to, so a later change
 // to them does not reach the source.
 func WithAuthEndpoints(a discovery.AuthEndpoints) Option {
-	own := cloneAuthEndpoints(a)
+	own := a.Clone()
 	return func(cfg *Config) { cfg.Auth = own }
-}
-
-// cloneAuthEndpoints returns a copy of a that shares nothing a caller can
-// change with a: each URL, with its user information, and each list is
-// copied.
-func cloneAuthEndpoints(a discovery.AuthEndpoints) discovery.AuthEndpoints {
-	for _, u := range []**url.URL{
-		&a.AuthorizationEndpoint, &a.TokenEndpoint, &a.JWKSURI, &a.RegistrationEndpoint,
-		&a.IntrospectionEndpoint, &a.RevocationEndpoint, &a.ManagementEndpoint,
-	} {
-		*u = cloneURL(*u)
-	}
-	for _, l := range []*[]string{
-		&a.ScopesSupported, &a.ResponseTypesSupported, &a.CodeChallengeMethodsSupported,
-		&a.GrantTypesSupported, &a.TokenEndpointAuthMethodsSupported,
-		&a.TokenEndpointAuthSigningAlgValuesSupported, &a.IDTokenSigningAlgValuesSupported,
-		&a.Capabilities,
-	} {
-		*l = slices.Clone(*l)
-	}
-	return a
-}
-
-// cloneURL returns a copy of u with its own copy of u's user information,
-// or nil for a nil u.
-func cloneURL(u *url.URL) *url.URL {
-	if u == nil {
-		return nil
-	}
-	c := *u
-	if u.User != nil {
-		user := *u.User
-		c.User = &user
-	}
-	return &c
 }
 
 // WithIssuer records the deployment issuer on produced tokens.
@@ -580,7 +545,7 @@ func FromConfig(cfg Config) (*Source, error) {
 	// slices or URLs does not reach it.
 	cfg.Scopes = slices.Clone(cfg.Scopes)
 	cfg.IDTokenTrustedAudiences = slices.Clone(cfg.IDTokenTrustedAudiences)
-	cfg.Auth = cloneAuthEndpoints(cfg.Auth)
+	cfg.Auth = cfg.Auth.Clone()
 	// The SDK sends only S256 challenges, so a server that lists its PKCE
 	// methods without S256 cannot verify them. An empty list says nothing.
 	if advertised := cfg.Auth.CodeChallengeMethodsSupported; len(advertised) > 0 &&

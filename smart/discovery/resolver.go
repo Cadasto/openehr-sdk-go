@@ -963,7 +963,9 @@ type authMember struct {
 // authMembers lists the auth endpoint members in the order the resolver
 // checks them. The parser reads a new document's endpoints in this order,
 // and checkURLs a cached catalog's, so both refuse a document or catalog
-// with two refused endpoints for the same one.
+// with two refused endpoints for the same one. AuthEndpoints.Clone copies
+// each URL named here and no other, so the list must name every *url.URL
+// field of AuthEndpoints.
 var authMembers = [...]authMember{
 	{
 		name:     "authorization_endpoint",

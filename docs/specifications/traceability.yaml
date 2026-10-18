@@ -122,7 +122,7 @@ requirements:
     canonical: docs/specifications/idiom.md#http-client-injection-req-021
     status: draft
     implementation: landed
-    packages: [transport]
+    packages: [transport, auth/clientcreds, auth/jwtbearer, auth/smart, smart/discovery]
     tests:
       - auth/clientcreds/http_client_required_test.go
       - auth/jwtbearer/http_client_required_test.go
@@ -225,7 +225,7 @@ requirements:
     canonical: docs/specifications/idiom.md#concurrency-req-026
     status: draft
     implementation: landed
-    packages: [smart/discovery, transport]
+    packages: [smart/discovery, transport, auth/clientcreds, auth/jwtbearer, auth/smart, internal/coalesce]
     tests:
       - auth/clientcreds/reauth_test.go
       - auth/clientcreds/shared_exchange_test.go
@@ -765,7 +765,7 @@ requirements:
     canonical: docs/specifications/auth.md#req-063--token-refresh
     status: draft
     implementation: landed
-    packages: [auth, auth/clientcreds, auth/jwtbearer, auth/smart, transport, testkit/probes/auth]
+    packages: [auth, auth/clientcreds, auth/jwtbearer, auth/smart, transport, testkit/probes/auth, internal/expiresin]
     probes: [PROBE-007]
     tests:
       - auth/clientcreds/expires_in_test.go
@@ -901,6 +901,7 @@ requirements:
     packages: [smart/discovery]
     probes: [PROBE-002, PROBE-040]
     tests:
+      - smart/discovery/auth_endpoints_test.go
       - smart/discovery/diagnostics_test.go
       - smart/discovery/iss_parameter_test.go
       - smart/discovery/issuer_path_test.go
