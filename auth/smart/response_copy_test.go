@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"reflect"
 	"slices"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/cadasto/openehr-sdk-go/auth/smart"
 )
@@ -223,4 +225,89 @@ func TestREQ026_ChangingATokenResponseDoesNotRaceARefresh(t *testing.T) {
 	if last := src.LastTokenResponse(); last.Patient != "P1" || last.Raw["patient"] != "P1" {
 		t.Errorf("LastTokenResponse() Patient = %q, Raw[patient] = %v; want P1 for both: no holder's change reaches the source", last.Patient, last.Raw["patient"])
 	}
+}
+
+// copiedReferenceFields are the fields of TokenResponse and IDTokenClaims
+// that can share memory with a copy of the struct that holds them: a map,
+// slice, pointer, interface, channel or function. The source's copy of a
+// token response copies each one deeply, and changeResponse and
+// checkSessionResponse check each one by name.
+var copiedReferenceFields = []string{
+	"TokenResponse.IDTokenClaims",
+	"TokenResponse.NeedPatientBanner",
+	"TokenResponse.Raw",
+	"IDTokenClaims.Audience",
+	"IDTokenClaims.Extra",
+}
+
+// TestREQ026_TokenResponseCopyCoversEveryReferenceField pins REQ-026
+// (idiom.md § Concurrency) for fields added later: it walks TokenResponse
+// and, through its IDTokenClaims pointer, IDTokenClaims, and fails on each
+// field that can share memory with a copy and that copiedReferenceFields
+// does not list. A map, slice or pointer added to either struct then fails
+// this test by name, instead of being shared between the source and the
+// copies it hands out. A listed field the walk no longer finds fails it
+// too, so the list stays true.
+func TestREQ026_TokenResponseCopyCoversEveryReferenceField(t *testing.T) { // REQ-026
+	t.Parallel()
+	listed := make(map[string]bool, len(copiedReferenceFields))
+	for _, name := range copiedReferenceFields {
+		listed[name] = false
+	}
+	walked := make(map[reflect.Type]bool)
+	var walk func(owner string, typ reflect.Type)
+	walk = func(owner string, typ reflect.Type) {
+		if walked[typ] {
+			return
+		}
+		walked[typ] = true
+		for field := range typ.Fields() {
+			name := owner + "." + field.Name
+			switch ft := field.Type; {
+			case ft == reflect.TypeFor[time.Time]():
+				// A time.Time is a value. The *Location it holds is never
+				// changed once made, so a copy of it shares nothing that
+				// changes.
+			case ft.Kind() == reflect.Struct:
+				walk(name, ft)
+			case sharesMemory(ft):
+				if _, ok := listed[name]; !ok {
+					t.Errorf("%s is a %s, which a copy of a token response would share with the source: copy it deeply in cloneTokenResponse, change and check it in changeResponse and checkSessionResponse, and list it in copiedReferenceFields", name, ft)
+					continue
+				}
+				listed[name] = true
+				if ft.Kind() == reflect.Pointer && ft.Elem().Kind() == reflect.Struct {
+					walk(ft.Elem().Name(), ft.Elem())
+				}
+			}
+		}
+	}
+	walk("TokenResponse", reflect.TypeFor[smart.TokenResponse]())
+	for _, name := range copiedReferenceFields {
+		if !listed[name] {
+			t.Errorf("copiedReferenceFields lists %s, which the walk did not find: drop it from the list", name)
+		}
+	}
+}
+
+// sharesMemory reports whether a value of type typ can share memory with a
+// copy of it: a map, slice, pointer, interface, channel or function, or an
+// array or struct that holds one.
+func sharesMemory(typ reflect.Type) bool {
+	switch typ.Kind() {
+	case reflect.Map, reflect.Slice, reflect.Pointer, reflect.UnsafePointer, reflect.Interface, reflect.Chan, reflect.Func:
+		return true
+	case reflect.Array:
+		return sharesMemory(typ.Elem())
+	case reflect.Struct:
+		if typ == reflect.TypeFor[time.Time]() {
+			return false
+		}
+		for field := range typ.Fields() {
+			if sharesMemory(field.Type) {
+				return true
+			}
+		}
+	}
+	return false
 }
