@@ -128,7 +128,7 @@ func checkIDCollisions(n *Node) error {
 // language, encoding, territory, time, …) when the template did not already
 // supply them.
 func childrenOf(n *templatecompile.CompiledNode, parentPath string, cfg *config) []*Node {
-	out := emitAll(n, parentPath, cfg)
+	out := emitAll(nil, n, parentPath, cfg)
 	seen := map[string]bool{}
 	for _, nd := range out {
 		seen[nd.AQLPath] = true
@@ -187,8 +187,9 @@ func cloneRange(r *Range) *Range {
 	return &nr
 }
 
-// emitAll emits the WebTemplate nodes contributed by all of n's attribute
-// children, with parentPath the accumulated aqlPath prefix.
+// emitAll appends to dst the WebTemplate nodes contributed by all of n's
+// attribute children, with parentPath the accumulated aqlPath prefix, and
+// returns the extended slice.
 //
 // The LOCATABLE `name` attribute is skipped (REQ-116): when an OPT pins a
 // node's name it constrains that attribute, and walking it as data emitted
@@ -197,17 +198,16 @@ func cloneRange(r *Range) *Range {
 // never as a child. Measured against the goldens, dropping it is exactly
 // right: it removes 4 surplus nodes on GECCO and 21 on Corona, and neither
 // golden has a `…/name` node anywhere.
-func emitAll(n *templatecompile.CompiledNode, parentPath string, cfg *config) []*Node {
-	var out []*Node
+func emitAll(dst []*Node, n *templatecompile.CompiledNode, parentPath string, cfg *config) []*Node {
 	for _, attr := range impl.NodeAttributes(n) {
 		if attr.Name() == "name" {
 			continue
 		}
 		for _, child := range impl.ChildNodes(attr) {
-			out = append(out, emit(child, attr, parentPath, cfg)...)
+			dst = emit(dst, child, attr, parentPath, cfg)
 		}
 	}
-	return out
+	return dst
 }
 
 var (
@@ -262,43 +262,44 @@ var (
 	}
 )
 
-// emit returns the WebTemplate node(s) contributed by compiled child c,
-// reached from its parent through attribute attr whose parent sits at
-// parentPath. A dropped structural wrapper contributes its lifted kept
-// descendants (its predicate stays in the accumulated path); an ELEMENT
-// contributes a single collapsed value leaf; a value type contributes a
-// leaf; any other kept container contributes a node with recursed children.
-func emit(c *templatecompile.CompiledNode, attr *templatecompile.CompiledAttribute, parentPath string, cfg *config) []*Node {
-	childPath := parentPath + "/" + attr.Name() + predicate(c)
+// emit appends to dst the WebTemplate node(s) contributed by compiled
+// child c, reached from its parent through attribute attr whose parent sits
+// at parentPath, and returns the extended slice. A dropped structural
+// wrapper contributes its lifted kept descendants (its predicate stays in
+// the accumulated path); an ELEMENT contributes a single collapsed value
+// leaf; a value type contributes a leaf; any other kept container
+// contributes a node with recursed children.
+func emit(dst []*Node, c *templatecompile.CompiledNode, attr *templatecompile.CompiledAttribute, parentPath string, cfg *config) []*Node {
+	path := childPath(parentPath, attr.Name(), c)
 
 	switch {
 	case isDroppedContainer(c.RMTypeName()):
-		return emitAll(c, childPath, cfg)
+		return emitAll(dst, c, path, cfg)
 
 	case isCollapsedEvent(c):
 		// Lifted like a dropped wrapper, but through childrenOf: the
 		// reference still emits the EVENT's in-context `time` leaf under
 		// the (retained) events[…] path segment.
-		return childrenOf(c, childPath, cfg)
+		return append(dst, childrenOf(c, path, cfg)...)
 
 	case c.RMTypeName() == "ELEMENT":
-		if leaf := collapseElement(c, childPath, attr, cfg); leaf != nil {
-			return []*Node{leaf}
+		if leaf := collapseElement(c, path, attr, cfg); leaf != nil {
+			return append(dst, leaf)
 		}
-		return nil // ELEMENT with no value constraint — EHRbase omits it
+		return dst // ELEMENT with no value constraint — EHRbase omits it
 
 	case isValueLeaf(c.RMTypeName()):
-		leaf := newNode(c, childPath, attr, cfg)
+		leaf := newNode(c, path, attr, cfg)
 		leaf.Inputs = inputsFor(c)
-		return []*Node{leaf}
+		return append(dst, leaf)
 
 	default: // kept container
-		node := newNode(c, childPath, attr, cfg)
-		node.Children = childrenOf(c, childPath, cfg)
+		node := newNode(c, path, attr, cfg)
+		node.Children = childrenOf(c, path, cfg)
 		if len(node.Children) == 0 {
-			return nil // EHRbase prunes empty containers (e.g. unfilled slots)
+			return dst // EHRbase prunes empty containers (e.g. unfilled slots)
 		}
-		return []*Node{node}
+		return append(dst, node)
 	}
 }
 
@@ -389,22 +390,24 @@ func setNames(node *Node, c *templatecompile.CompiledNode, text string, cfg *con
 	}
 }
 
-// predicate returns the aqlPath node predicate for c: its archetype id if
-// it is a slot/archetype root, else its at-code, else empty (RM-attribute
+// childPath returns the aqlPath of c, reached through the attribute
+// attrName from a parent at parentPath: the attribute's segment followed by
+// c's node predicate. The predicate is c's archetype id if it is a
+// slot/archetype root, else its at-code, else there is none (RM-attribute
 // values carry no predicate). A node that pins a template-level name
 // carries it inside the same brackets (REQ-116) — the reference's
-// `[archetype_id,'Name']` form.
+// `[archetype_id,'Name']` form. The path is built in one concatenation.
 //
 // This builder composes its own paths rather than reading
 // CompiledNode.AQLPath (it drops structural wrappers, so its paths
 // legitimately differ), which is why the predicate rule has to be applied
 // here too; the quoting itself is shared with the compiled-path builder
 // via impl.NamePredicate so the two cannot drift.
-func predicate(c *templatecompile.CompiledNode) string {
+func childPath(parentPath, attrName string, c *templatecompile.CompiledNode) string {
 	if id := nodeIDOf(c); id != "" {
-		return "[" + impl.NamePredicate(id, c.NodeName()) + "]"
+		return parentPath + "/" + attrName + "[" + impl.NamePredicate(id, c.NodeName()) + "]"
 	}
-	return ""
+	return parentPath + "/" + attrName
 }
 
 // nodeIDOf returns the WebTemplate nodeId: archetype id when present, else
