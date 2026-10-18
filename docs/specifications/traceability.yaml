@@ -1341,7 +1341,9 @@ requirements:
       - openehr/template/constraints/constraint_ref_test.go
       - openehr/template/constraints/constraints_test.go
       - openehr/template/constraints/example_test.go
+      - openehr/template/constraints/numeric_example_test.go
       - openehr/template/constraints/pure_imports_test.go
+      - openehr/template/constraints/quantity_units_test.go
       - openehr/template/constraints/string_cache_test.go
       - openehr/template/constraints/temporal_parity_test.go
       - openehr/template/constraints/temporal_validate_test.go
@@ -1368,9 +1370,11 @@ requirements:
     tests:
       - internal/templatecompile/compile_test.go
       - internal/templatecompile/walk/walk_test.go
+      - openehr/template/constraints/slot_example_test.go
       - openehr/template/constraints/slot_test.go
       - openehr/template/path_test.go
       - openehr/template/slot_assertion_test.go
+      - openehr/template/slot_duplicate_test.go
       - openehr/validation/composition_test.go
 
   - id: REQ-105
