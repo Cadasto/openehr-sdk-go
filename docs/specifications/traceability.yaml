@@ -1343,6 +1343,8 @@ requirements:
       - openehr/template/constraints/example_test.go
       - openehr/template/constraints/pure_imports_test.go
       - openehr/template/constraints/string_cache_test.go
+      - openehr/template/constraints/temporal_parity_test.go
+      - openehr/template/constraints/temporal_validate_test.go
       - openehr/template/interval_flags_test.go
       - openehr/template/parse_primitives_test.go
       - openehr/validation/constraint_fixtures_test.go
@@ -1872,9 +1874,11 @@ requirements:
     packages:
       - openehr/rm
     tests:
+      - internal/iso8601/scan_test.go
       - openehr/rm/temporal_funcs_test.go
       - openehr/rm/temporal_iso_test.go
-      - openehr/rm/temporal_scan_alloc_test.go
+      - openehr/template/constraints/temporal_parity_test.go
+      - openehr/template/constraints/temporal_validate_test.go
       - openehr/validation/coverage_unevaluated_test.go
       - openehr/validation/rmfloor_interval_order_test.go
       - openehr/validation/rmfloor_invariant_matrix_internal_test.go
