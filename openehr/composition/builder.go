@@ -297,14 +297,20 @@ func (b *Builder) applyAssignment(p pendingAssignment) error {
 
 // pathSegment captures one step in the parent → child walk: the
 // attribute on the parent RM value, its cardinality, and any
-// predicate (archetype id / at-code) the OPT pinned for the child
-// selection on multi-valued attributes.
+// predicate (archetype id / at-code, and the name the template fixes
+// on the child) the OPT pinned for the child selection on
+// multi-valued attributes.
 type pathSegment struct {
 	attrName    string
 	cardinality template.Cardinality
 	// matchID is the predicate to match against (archetype_node_id /
 	// archetype id). Empty for single-attr segments.
 	matchID string
+	// matchName is the name the template fixes on the child, which the
+	// child's LOCATABLE.name value must equal: siblings that share
+	// matchID differ by it alone. Empty when the template fixes none,
+	// and whenever matchID is empty.
+	matchName string
 }
 
 // buildSegments produces the ordered (attr, predicate) list from
@@ -333,6 +339,11 @@ func buildSegments(node *tcimpl.CompiledNode) ([]pathSegment, error) {
 			} else if nid := child.NodeID(); nid != "" {
 				seg.matchID = nid
 			}
+			// The compiled path carries the fixed name beside the id, as a
+			// name predicate, and never on its own.
+			if seg.matchID != "" {
+				seg.matchName = child.NodeName()
+			}
 		}
 		segs = append(segs, seg)
 	}
@@ -359,8 +370,9 @@ func findAttributeContaining(parent, target *tcimpl.CompiledNode) (*tcimpl.Compi
 // terminal segment. Each step:
 //   - Single attr: rmaccess.Single(parent, attr) → descend.
 //   - Multi attr: rmaccess.Multiple(parent, attr) → first child
-//     whose archetype_node_id matches the segment's matchID, else
-//     the first child when matchID is empty (covers OPT-silent or
+//     whose archetype_node_id matches the segment's matchID and, when
+//     the segment carries a matchName, whose name value equals it;
+//     else the first child when matchID is empty (covers OPT-silent or
 //     non-archetype-keyed multi-attrs).
 func navigateTo(rmRoot any, segs []pathSegment) (any, error) {
 	cur := rmRoot
@@ -397,7 +409,9 @@ func descendOne(cur any, s pathSegment) (any, error) {
 			return items[0], nil
 		}
 		for _, it := range items {
-			if id := archetypeNodeID(it); id == s.matchID {
+			// Siblings that share the id differ by the name the template
+			// fixes on each, so the name must match too when it fixes one.
+			if archetypeNodeID(it) == s.matchID && (s.matchName == "" || locatableName(it) == s.matchName) {
 				return it, nil
 			}
 		}
@@ -412,7 +426,7 @@ func descendOne(cur any, s pathSegment) (any, error) {
 		// routing still matches by archetype-id equality and does not
 		// yet consult that grammar.
 		return nil, fmt.Errorf("%w: no sibling under %q matches predicate %q (siblings: %s)",
-			ErrInvalidPath, s.attrName, s.matchID, siblingIDs(items))
+			ErrInvalidPath, s.attrName, tcimpl.NamePredicate(s.matchID, s.matchName), siblingIDs(items))
 	}
 	return nil, fmt.Errorf("%w: unsupported cardinality %v on attribute %q", ErrInvalidPath, s.cardinality, s.attrName)
 }
@@ -460,6 +474,20 @@ func archetypeNodeID(v any) string {
 		return x.ArchetypeNodeID
 	}
 	return ""
+}
+
+// locatableName returns the value of the LOCATABLE.name of v, or "" when v
+// is no LOCATABLE, is a nil pointer to one, or carries no name.
+func locatableName(v any) string {
+	l, ok := v.(rm.Locatable)
+	if !ok || rm.IsTypedNil(v) {
+		return ""
+	}
+	name := l.GetName()
+	if name == nil || rm.IsTypedNil(name) {
+		return ""
+	}
+	return name.GetValue()
 }
 
 // siblingIDs joins the archetype_node_id (or "<empty>") of each item

@@ -98,3 +98,60 @@ func TestDescendOne_NoPredicateReturnsFirst(t *testing.T) {
 		t.Errorf("descendOne returned wrong sibling without predicate (got %p, want %p)", got, first)
 	}
 }
+
+// TestDescendOne_NamePredicatePicksTheNamedSibling checks that a segment
+// carrying a name returns, of the siblings that share its id, the one
+// whose name value is that name, skipping one without a name; and that a
+// name no sibling carries fails with ErrInvalidPath naming the predicate
+// with its name, rather than routing to a sibling of another name.
+func TestDescendOne_NamePredicatePicksTheNamedSibling(t *testing.T) {
+	target := &rm.Element{ArchetypeNodeID: "at0002", Name: &rm.DVCodedText{Value: "B"}}
+	parent := &rm.ItemTree{
+		Items: []rm.Item{
+			&rm.Element{ArchetypeNodeID: "at0002", Name: rm.DVText{Value: "A"}},
+			&rm.Element{ArchetypeNodeID: "at0002"},
+			target,
+		},
+	}
+	seg := pathSegment{attrName: "items", cardinality: template.Multiple, matchID: "at0002", matchName: "B"}
+	got, err := descendOne(parent, seg)
+	if err != nil {
+		t.Fatalf("descendOne(%+v): %v", seg, err)
+	}
+	if got != target {
+		t.Errorf("descendOne(%+v) returned %+v, want the sibling named B", seg, got)
+	}
+
+	seg.matchName = "C"
+	if _, err := descendOne(parent, seg); !errors.Is(err, ErrInvalidPath) {
+		t.Errorf("descendOne(%+v) = %v, want ErrInvalidPath", seg, err)
+	} else if !strings.Contains(err.Error(), `"at0002,'C'"`) {
+		t.Errorf("descendOne(%+v) error %q does not name the predicate at0002,'C'", seg, err)
+	}
+}
+
+// TestLocatableName checks that locatableName reads the name value of a
+// LOCATABLE, plain or coded, and answers "" without panicking for a value
+// that is no LOCATABLE, a nil pointer to one, and one whose name is
+// absent or a nil pointer.
+func TestLocatableName(t *testing.T) {
+	cases := []struct {
+		name string
+		v    any
+		want string
+	}{
+		{name: "DV_TEXT name", v: &rm.Element{Name: rm.DVText{Value: "A"}}, want: "A"},
+		{name: "DV_CODED_TEXT name", v: &rm.Cluster{Name: &rm.DVCodedText{Value: "B"}}, want: "B"},
+		{name: "not a LOCATABLE", v: &rm.DVText{Value: "A"}},
+		{name: "nil pointer to a LOCATABLE", v: (*rm.Element)(nil)},
+		{name: "absent name", v: &rm.Element{}},
+		{name: "nil pointer name", v: &rm.Element{Name: (*rm.DVText)(nil)}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := locatableName(tc.v); got != tc.want {
+				t.Errorf("locatableName(%#v) = %q, want %q", tc.v, got, tc.want)
+			}
+		})
+	}
+}
