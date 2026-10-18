@@ -12,7 +12,7 @@ import (
 // C_SINGLE_ATTRIBUTE alternatives under the same attribute.
 func TestRegisterPath_DuplicateFromDifferentAttribute(t *testing.T) {
 	c := &Compiled{byPath: make(map[string]*CompiledNode)}
-	w := walker{compiled: c, pathAttr: make(map[string]*template.Attribute)}
+	w := walker{compiled: c, paths: make(map[string]pathMark)}
 
 	attrA := &template.Attribute{}
 	attrB := &template.Attribute{}
@@ -42,8 +42,7 @@ func TestRegisterPath_AdmitsDescendantsOfSharedPath(t *testing.T) {
 	c := &Compiled{byPath: make(map[string]*CompiledNode)}
 	w := walker{
 		compiled: c,
-		pathAttr: make(map[string]*template.Attribute),
-		seenPath: make(map[string]bool),
+		paths:    make(map[string]pathMark),
 	}
 
 	// First alternative's descendant registers normally.

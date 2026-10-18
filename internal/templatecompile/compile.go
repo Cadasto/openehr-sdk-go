@@ -3,7 +3,6 @@ package templatecompile
 import (
 	"errors"
 	"fmt"
-	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -68,10 +67,10 @@ func Compile(opt *template.OperationalTemplate, opts ...Options) (*Compiled, err
 		lookup:   o.Lookup,
 		opts:     o,
 		required: map[string][]string{},
-		pathAttr: map[string]*template.Attribute{},
-		seenPath: map[string]bool{},
+		implicit: map[implicitKey]*CompiledAttribute{},
+		paths:    map[string]pathMark{},
 	}
-	root, err := w.compileNode(opt.Root(), nil, "")
+	root, err := w.compileNode(opt.Root(), nil, "/")
 	if err != nil {
 		return nil, err
 	}
@@ -96,6 +95,13 @@ type walker struct {
 	// than once per node and per declared attribute.
 	required map[string][]string
 
+	// implicit holds the implicit attribute made for each owner type and
+	// attribute name this call has met, nil when the lookup gives the
+	// attribute no RM type. An implicit attribute depends on nothing else:
+	// it has no children, no existence and no node-specific fact, so the
+	// nodes of one owner type share it.
+	implicit map[implicitKey]*CompiledAttribute
+
 	// currentAttr is the wire-side *template.Attribute under whose
 	// Children() the immediately-recursed compileNode is descending.
 	// Set by buildAttribute around the per-child loop and consumed by
@@ -104,18 +110,14 @@ type walker struct {
 	// attribute path collisions (an OPT bug).
 	currentAttr *template.Attribute
 
-	// pathAttr records which wire-side attribute first registered a
-	// given AQL path. registerPath consults it on duplicates: same
-	// attribute → alternative, keep first; different attribute →
-	// reject with ErrInvalidInput.
-	pathAttr map[string]*template.Attribute
-
-	// seenPath marks every AQL path reached at node *entry* (pre-order).
+	// paths holds every AQL path reached at node *entry* (pre-order).
 	// byPath cannot serve here: registration is post-order (a node
 	// registers after its own subtree), so at the time a second node
 	// with the same path descends, the first node's own entry is not yet
-	// in byPath while its descendants already are.
-	seenPath map[string]bool
+	// in byPath while its descendants already are. Each entry also
+	// records which wire-side attribute first registered the path (see
+	// [pathMark]).
+	paths map[string]pathMark
 
 	// dupDepth > 0 while descending the subtree of a node whose AQL path
 	// repeats one already seen. Two nodes may legally share a path — AOM
@@ -139,42 +141,34 @@ type walker struct {
 	dupDepth int
 }
 
-// compileNode walks one OPT node, computes its AQL path, recurses
-// into its children, and registers the result in the indexes.
-// parentPath is the AQL path of the enclosing node ("" for the root);
-// segment is the path delta from parent to this node ("" for the
-// root). The two-arg shape avoids re-concatenating per-call.
-func (w *walker) compileNode(n template.Node, parent *CompiledNode, segment string) (*CompiledNode, error) {
-	cn := &CompiledNode{parent: parent}
+// implicitKey names an implicit attribute: the RM type of its owner, as
+// the OPT writes it, and the attribute's name.
+type implicitKey struct{ owner, attr string }
 
-	parentPath := ""
-	if parent != nil {
-		parentPath = parent.aqlPath
-	}
-	switch parentPath {
-	case "":
-		// Root path is "/". Descend deltas append directly.
-		if segment == "" {
-			cn.aqlPath = "/"
-		} else {
-			cn.aqlPath = segment
-		}
-	default:
-		if parentPath == "/" {
-			cn.aqlPath = segment
-		} else {
-			cn.aqlPath = parentPath + segment
-		}
-	}
+// pathMark is what the walk knows of an AQL path it has reached: attr is
+// the wire-side attribute that first registered the path, nil until a node
+// registers it (and for the root, which no attribute holds). registerPath
+// consults it on duplicates: same attribute → alternative, keep first;
+// different attribute → reject with ErrInvalidInput.
+type pathMark struct {
+	attr *template.Attribute
+}
+
+// compileNode walks one OPT node, recurses into its children, and
+// registers the result in the indexes. path is the node's AQL path ("/"
+// for the root), which the caller computes ([childPath]).
+func (w *walker) compileNode(n template.Node, parent *CompiledNode, path string) (*CompiledNode, error) {
+	cn := &CompiledNode{parent: parent, aqlPath: path}
 
 	// A repeated path means this node shares an AQL path with one already
 	// walked (alternatives, or a same-node_id sibling). Mark the descent
 	// so registerPath admits the descendants that necessarily collide;
 	// the counter is dropped again before this node registers itself.
-	inDup := w.seenPath[cn.aqlPath]
-	w.seenPath[cn.aqlPath] = true
+	_, inDup := w.paths[cn.aqlPath]
 	if inDup {
 		w.dupDepth++
+	} else {
+		w.paths[cn.aqlPath] = pathMark{}
 	}
 	err := w.descend(n, cn)
 	if inDup {
@@ -221,7 +215,8 @@ func (w *walker) descend(n template.Node, cn *CompiledNode) error {
 		// Per-archetype-root terms live on the node; bindings flatten
 		// to the Compiled aggregate (binding records carry their own
 		// terminology + at-code/path, so collisions are non-issues).
-		cn.terms = copyTerms(v.Terms())
+		// Terms already copies each term and its items.
+		cn.terms = v.Terms()
 		w.compiled.termBindings = append(w.compiled.termBindings, v.TermBindings()...)
 		return w.attachAttributes(cn, v.Attributes())
 	case *template.ComplexObject:
@@ -256,49 +251,81 @@ func (w *walker) attachAttributes(cn *CompiledNode, declared []*template.Attribu
 	if cn.rmTypeName != "" {
 		required = w.requiredAttributes(class)
 	}
-	declaredByName := make(map[string]bool, len(declared))
-	for _, a := range declared {
-		declaredByName[a.Name()] = true
-		ca, err := w.buildAttribute(cn, class, required, a)
-		if err != nil {
-			return err
-		}
-		cn.attributes = append(cn.attributes, ca)
-	}
-	if w.opts.SkipImplicitAttributes {
-		return nil
-	}
-	if cn.rmTypeName == "" {
-		return nil
-	}
 	// The lookup lists the required attributes in RM declaration order,
 	// so implicit attributes appear in BMM-stable order regardless of OPT
 	// walk path. Only the attributes the RM mandates are injected: the
 	// composition builder needs implicit entries for required-but-OPT-silent
 	// fields alone, and optional ones would inflate every node with RM
 	// metadata that walker code does not need.
-	for _, attrName := range required {
-		if declaredByName[attrName] {
+	var implicit []string
+	if !w.opts.SkipImplicitAttributes && cn.rmTypeName != "" {
+		implicit = required
+	}
+	// Room for every attribute up front, so appending never grows the
+	// slice; a node with none keeps a nil slice.
+	if n := len(declared) + countUndeclared(implicit, declared); n > 0 {
+		cn.attributes = make([]*CompiledAttribute, 0, n)
+	}
+	for _, a := range declared {
+		ca, err := w.buildAttribute(cn, class, required, a)
+		if err != nil {
+			return err
+		}
+		cn.attributes = append(cn.attributes, ca)
+	}
+	for _, attrName := range implicit {
+		if declares(declared, attrName) {
 			continue
 		}
-		rm, ok := w.attributeType(cn.rmTypeName, class, attrName)
-		if !ok || rm == "" {
-			continue
+		if ca := w.implicitAttribute(cn.rmTypeName, class, attrName); ca != nil {
+			cn.attributes = append(cn.attributes, ca)
 		}
-		container, _ := w.lookup.IsContainer(class, attrName)
+	}
+	return nil
+}
+
+// declares reports whether declared holds an attribute named name.
+func declares(declared []*template.Attribute, name string) bool {
+	return slices.ContainsFunc(declared, func(a *template.Attribute) bool { return a.Name() == name })
+}
+
+// countUndeclared returns how many of names declared does not hold.
+func countUndeclared(names []string, declared []*template.Attribute) int {
+	n := 0
+	for _, name := range names {
+		if !declares(declared, name) {
+			n++
+		}
+	}
+	return n
+}
+
+// implicitAttribute returns the implicit attribute attr of a node whose
+// OPT-declared type is owner and whose bare class is class, or nil when the
+// lookup gives the attribute no RM type. It is made once per owner type and
+// attribute name in a call, and shared by the nodes of that type.
+func (w *walker) implicitAttribute(owner, class, attr string) *CompiledAttribute {
+	key := implicitKey{owner: owner, attr: attr}
+	if ca, ok := w.implicit[key]; ok {
+		return ca
+	}
+	var ca *CompiledAttribute
+	if rm, ok := w.attributeType(owner, class, attr); ok && rm != "" {
+		container, _ := w.lookup.IsContainer(class, attr)
 		card := template.Single
 		if container {
 			card = template.Multiple
 		}
-		cn.attributes = append(cn.attributes, &CompiledAttribute{
-			name:        attrName,
+		ca = &CompiledAttribute{
+			name:        attr,
 			cardinality: card,
 			rmTypeName:  rm,
 			implicit:    true,
 			required:    true,
-		})
+		}
 	}
-	return nil
+	w.implicit[key] = ca
+	return ca
 }
 
 // requiredAttributes returns the attributes the lookup says the bare RM
@@ -331,9 +358,17 @@ func (w *walker) buildAttribute(parent *CompiledNode, class string, required []s
 	prevAttr := w.currentAttr
 	w.currentAttr = a
 	defer func() { w.currentAttr = prevAttr }()
-	for i, child := range a.Children() {
-		segment := pathSegment(a.Name(), a.Cardinality(), child, i)
-		cn, err := w.compileNode(child, parent, segment)
+	children := a.Children()
+	if len(children) > 0 {
+		ca.children = make([]*CompiledNode, 0, len(children))
+	}
+	// The root's path is "/", and a child of the root starts its own.
+	base := parent.aqlPath
+	if base == "/" {
+		base = ""
+	}
+	for i, child := range children {
+		cn, err := w.compileNode(child, parent, childPath(base, a.Name(), a.Cardinality(), child, i))
 		if err != nil {
 			return nil, err
 		}
@@ -357,38 +392,38 @@ func (w *walker) attributeType(owner, class, attr string) (string, bool) {
 	return bmmtype.Substitute(owner, rm), true
 }
 
-// pathSegment computes the path delta for descending from parent
-// (attribute name + cardinality) into a child node. For single
-// attributes the delta is "/name"; for multiple attributes the
-// child contributes a predicate (archetype id, at-code, slot
-// include pattern, or a 1-based sibling suffix when the OPT omits
-// all of the above), with the template-level node name appended to
-// an id-derived predicate per REQ-116 — see [namePredicated].
-func pathSegment(attrName string, card template.Cardinality, child template.Node, siblingIndex int) string {
-	seg := "/" + attrName
+// childPath computes the AQL path of a child node reached from the
+// parent path base ("" for the root) through the attribute attrName of
+// cardinality card. For single attributes the child adds "/name"; for
+// multiple attributes it also contributes a predicate (archetype id,
+// at-code, slot include pattern, or a 1-based sibling suffix when the OPT
+// omits all of the above), with the template-level node name appended to
+// an id-derived predicate (see [namePredicated]). Each path is built in one
+// concatenation.
+func childPath(base, attrName string, card template.Cardinality, child template.Node, siblingIndex int) string {
 	if card != template.Multiple {
 		// No named node in the vendored corpus sits under a single
 		// attribute, and no reference golden predicates one, so the
 		// bare form stands: a name never *creates* a predicate.
-		return seg
+		return base + "/" + attrName
 	}
 	if ar, ok := child.(*template.ArchetypeRoot); ok && ar.ArchetypeID() != "" {
-		return seg + "[" + namePredicated(ar.ArchetypeID(), child) + "]"
+		return base + "/" + attrName + "[" + namePredicated(ar.ArchetypeID(), child) + "]"
 	}
 	if id := child.NodeID(); id != "" {
-		return seg + "[" + namePredicated(id, child) + "]"
+		return base + "/" + attrName + "[" + namePredicated(id, child) + "]"
 	}
 	if sl, ok := child.(*template.Slot); ok {
 		if p := slotPathPredicate(sl); p != "" {
 			// Slots are not ObjectNodes and cannot pin a name.
-			return seg + "[" + p + "]"
+			return base + "/" + attrName + "[" + p + "]"
 		}
 	}
 	// The synthetic positional key is our own fallback, never a shape
 	// the reference emits, and it already disambiguates siblings. No
 	// corpus node reaches it *with* a name; if one ever does, Phase 4
 	// parity is where the reference's actual shape would surface.
-	return seg + "[@" + strconv.Itoa(siblingIndex+1) + "]"
+	return base + "/" + attrName + "[@" + strconv.Itoa(siblingIndex+1) + "]"
 }
 
 // NamePredicate appends a template-level node name to an id-derived path
@@ -396,7 +431,7 @@ func pathSegment(attrName string, card template.Cardinality, child template.Node
 // it returns id unchanged when name is empty.
 //
 // It is exported inside the module because name-predicated paths are
-// composed by two builders, this package's [pathSegment] and the
+// composed by two builders, this package's [childPath] and the
 // WebTemplate builder's own `predicate`, and both must quote the same way.
 //
 // Measured across the vendored reference goldens: the name is always
@@ -456,7 +491,7 @@ func (w *walker) registerPath(cn *CompiledNode) error {
 		// keeps the first; the structural validator walks the
 		// remaining alternatives via the parent attribute's
 		// Children() directly.
-		if w.currentAttr != nil && w.pathAttr[cn.aqlPath] == w.currentAttr {
+		if w.currentAttr != nil && w.paths[cn.aqlPath].attr == w.currentAttr {
 			return nil
 		}
 		// Inside the subtree of a node that legally repeated a path
@@ -474,20 +509,6 @@ func (w *walker) registerPath(cn *CompiledNode) error {
 		)
 	}
 	w.compiled.byPath[cn.aqlPath] = cn
-	w.pathAttr[cn.aqlPath] = w.currentAttr
+	w.paths[cn.aqlPath] = pathMark{attr: w.currentAttr}
 	return nil
-}
-
-// copyTerms deep-copies per-archetype-root term maps so compile
-// output does not alias mutable state from the wire tree.
-func copyTerms(src map[string]template.ArchetypeTerm) map[string]template.ArchetypeTerm {
-	if src == nil {
-		return nil
-	}
-	out := make(map[string]template.ArchetypeTerm, len(src))
-	for code, term := range src {
-		items := maps.Clone(term.Items)
-		out[code] = template.ArchetypeTerm{Code: term.Code, Items: items}
-	}
-	return out
 }

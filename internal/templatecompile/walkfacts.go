@@ -30,6 +30,13 @@ import (
 func resolveWalkFacts(cn *CompiledNode) {
 	cn.attributes = slices.Clip(cn.attributes)
 	for _, a := range cn.attributes {
+		if a.implicit {
+			// An implicit attribute has no child and no existence, so it
+			// allows nothing and is not prohibited: its zero facts are
+			// already right. The nodes of one owner type share it, so it is
+			// left as it was made.
+			continue
+		}
 		a.children = slices.Clip(a.children)
 		a.allowed, a.prohibited = allowedChildren(a.existence, a.children)
 	}
