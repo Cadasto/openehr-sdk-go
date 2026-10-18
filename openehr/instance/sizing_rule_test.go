@@ -391,3 +391,47 @@ func TestREQ107_MinimalSkipsCollidingOptionalSiblings(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ107_MinimalKeepsTheFirstOptionalSiblingOfEachNodeID is the REQ-107
+// check that, under Minimal, only an optional sibling yields to an earlier
+// optional one with its node_id: a required sibling with that node_id is
+// built and does not count, and each node_id keeps its own first optional
+// sibling. Example builds every sibling. It holds under both value fills
+// and both compile modes.
+func TestREQ107_MinimalKeepsTheFirstOptionalSiblingOfEachNodeID(t *testing.T) {
+	element := func(nodeID string, lower int, valueType string) string {
+		return optOccurring("C_COMPLEX_OBJECT", "ELEMENT", nodeID, lower, 1, optSingle("value", optNode(valueType, "")))
+	}
+	opt := optTemplate("CLUSTER", optCardinal("items", 1, -1,
+		element("at0001", 1, "DV_BOOLEAN"),
+		element("at0001", 0, "DV_TEXT"),
+		element("at0002", 0, "DV_DATE"),
+		element("at0001", 0, "DV_COUNT"),
+		element("at0002", 0, "DV_DURATION")))
+	want := map[instance.Policy][]string{
+		instance.Minimal: {"DV_BOOLEAN", "DV_TEXT", "DV_DATE"},
+		instance.Example: {"DV_BOOLEAN", "DV_TEXT", "DV_DATE", "DV_COUNT", "DV_DURATION"},
+	}
+	for _, implicit := range []bool{true, false} {
+		c := compileOPTText(t, opt, implicit)
+		for _, opts := range defaultsOptions() {
+			t.Run(fmt.Sprintf("implicit=%t/%v/%v", implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+				out, err := instance.Generate(t.Context(), c, opts)
+				if err != nil {
+					t.Fatalf("Generate: %v", err)
+				}
+				var got []string
+				for _, item := range out.(*rm.Cluster).Items {
+					el, ok := item.(*rm.Element)
+					if !ok || el.Value == nil {
+						t.Fatalf("CLUSTER.items member is %#v, want an ELEMENT with a value", item)
+					}
+					got = append(got, rmTypeName(el.Value))
+				}
+				if !slices.Equal(got, want[opts.Policy]) {
+					t.Errorf("CLUSTER.items values = %v, want %v", got, want[opts.Policy])
+				}
+			})
+		}
+	}
+}
