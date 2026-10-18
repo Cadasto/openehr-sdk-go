@@ -17,7 +17,9 @@ import (
 )
 
 // Builder accumulates path assignments over a skeleton. Returned by
-// [NewBuilder]; finalised via [Builder.Build].
+// [NewBuilder]; finalised via [Builder.Build]. A Builder that NewBuilder
+// did not make, such as the zero value, has no template to resolve paths
+// against: its Set and Build return an error.
 type Builder struct {
 	compiled *templatecompile.Compiled
 	skeleton *rm.Composition
@@ -31,6 +33,10 @@ type Builder struct {
 	// one round-trip.
 	errs []error
 }
+
+// errNotMade is the error Set and Build return on a Builder that
+// [NewBuilder] did not make.
+var errNotMade = errors.New("composition: Builder not made by NewBuilder")
 
 // pendingAssignment is one queued (path, value) pair plus the compiled
 // node the value binds: of the nodes the template allows at the path,
@@ -130,10 +136,14 @@ func (b *Builder) TemplateID() string {
 // recover every faulty path in one round-trip.
 //
 // Returns the same error it stored, primarily for callers that want
-// to react to the first failure inline.
+// to react to the first failure inline. On a nil Builder, or one that
+// NewBuilder did not make, Set returns an error and stores nothing.
 func (b *Builder) Set(path string, v any) error {
 	if b == nil {
 		return errors.New("composition: nil Builder")
+	}
+	if b.compiled == nil {
+		return errNotMade
 	}
 	if v == nil {
 		err := fmt.Errorf("%w: %s: nil value", ErrTypeMismatch, path)
@@ -214,9 +224,15 @@ func (b *Builder) SetCodedText(path, terminology, code, display string) error {
 // chain Set → Build → Set → Build without errors stacking from a
 // prior pass; per-call errors return value still surfaces the
 // per-Set failures that drove the current Build to fail.
+//
+// On a nil Builder, or one that NewBuilder did not make, Build returns
+// no composition and an error.
 func (b *Builder) Build() (*rm.Composition, error) {
 	if b == nil {
 		return nil, errors.New("composition: nil Builder")
+	}
+	if b.compiled == nil {
+		return nil, errNotMade
 	}
 	// Drain accumulated state in one pass — pending consumed via the
 	// range loop snapshot below; errs reset to capture only this
