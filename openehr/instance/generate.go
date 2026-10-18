@@ -1220,12 +1220,11 @@ func (g *generator) materialiseMultiple(
 // only for slots without parsed includes; parsed includes must be
 // satisfied explicitly. Returns false when no safe id can be derived.
 func (g *generator) stampSlotFill(rmValue any, slot *tcimpl.CompiledNode) bool {
-	rules := slot.SlotRules()
-	archetypeID := rules.ExampleArchetypeID()
-	if archetypeID == "" && !rules.HasParsedIncludes() {
+	archetypeID := slot.ExampleSlotFillArchetypeID()
+	if archetypeID == "" && !slot.SlotRules().HasParsedIncludes() {
 		archetypeID = "openEHR-EHR-" + slot.RMTypeName() + ".example.v1"
 	}
-	if archetypeID == "" || !rules.AllowsArchetypeID(archetypeID) {
+	if archetypeID == "" || !slot.AllowsArchetypeID(archetypeID) {
 		return false
 	}
 	ad := &rm.Archetyped{
