@@ -806,8 +806,8 @@ func (g *generator) temporalSentinel(v any) string {
 // preferred_term, a quantity's magnitude_status, a party's name), and
 // through the writer otherwise.
 func (g *generator) writeBMMString(parent any, attr string) {
-	get, set, covered := stringField(parent, attr)
-	if covered && get() != "" {
+	ref, covered := stringField(parent, attr)
+	if covered && ref.get() != "" {
 		return
 	}
 	val, ok := g.bmmStringDefault(parent, attr)
@@ -815,7 +815,7 @@ func (g *generator) writeBMMString(parent any, attr string) {
 		return
 	}
 	if covered {
-		set(val)
+		ref.set(val)
 		return
 	}
 	// Best-effort, on purpose: rmwrite refuses a String attribute it does
@@ -857,22 +857,23 @@ func (g *generator) bmmStringDefault(parent any, attr string) (string, bool) {
 	return "example", true
 }
 
-// stringField returns a reader and a writer for the BMM String attribute
-// attr of parent. It covers every String attribute of the data values the
-// generator builds, plus ACTIVITY.action_archetype_id, TERMINOLOGY_ID.value,
-// a PARTY_REF's namespace and type, and a PARTY_IDENTIFIED's or
-// PARTY_RELATED's name, so the walk writes a C_STRING the OPT pins on any
-// of them. A pin on a PARTY_REF holds where the reference
+// stringField returns a reference to the BMM String attribute attr of
+// parent, through which it is read and written. It covers every String
+// attribute of the data values the generator builds, plus
+// ACTIVITY.action_archetype_id, TERMINOLOGY_ID.value, a PARTY_REF's
+// namespace and type, and a PARTY_IDENTIFIED's or PARTY_RELATED's name, so
+// the walk writes a C_STRING the OPT pins on any of them. A pin on a
+// PARTY_REF holds where the reference
 // can be attached and no later default replaces it: a ROLE's performer
 // keeps it, because fillPerformer fills only the empty parts. A template
 // that names a PARTY_RELATIONSHIP's source or target makes Generate fail
 // today, because rmwrite cannot attach either; once it can, a pin there
 // would still be lost, because fillPartyRelationship replaces a reference
 // with any empty part whole, and the walk cannot build the id. An optional
-// attribute reads as "" while unset, and its writer sets it. ok is false
-// when parent has no such field; when ok is true, get and set are both
-// non-nil.
-func stringField(parent any, attr string) (get func() string, set func(string), ok bool) {
+// attribute reads as "" while unset, and writing it sets it. ok is false
+// when parent has no such field; when ok is true, the reference addresses
+// that field.
+func stringField(parent any, attr string) (ref stringRef, ok bool) {
 	switch p := parent.(type) {
 	case *rm.DVText:
 		return textField(&p.Value, &p.Formatting, attr)
@@ -948,41 +949,63 @@ func stringField(parent any, attr string) (get func() string, set func(string), 
 			return optionalString(&p.Name)
 		}
 	}
-	return nil, nil, false
+	return stringRef{}, false
 }
 
-func textField(value *string, formatting **string, attr string) (func() string, func(string), bool) {
+func textField(value *string, formatting **string, attr string) (stringRef, bool) {
 	switch attr {
 	case "value":
 		return requiredString(value)
 	case "formatting":
 		return optionalString(formatting)
 	}
-	return nil, nil, false
+	return stringRef{}, false
 }
 
-func valueField(value *string, attr string) (func() string, func(string), bool) {
+func valueField(value *string, attr string) (stringRef, bool) {
 	if attr != "value" {
-		return nil, nil, false
+		return stringRef{}, false
 	}
 	return requiredString(value)
 }
 
-func requiredString(f *string) (func() string, func(string), bool) {
-	return func() string { return *f }, func(s string) { *f = s }, true
+// stringRef addresses one String attribute of an RM value: a mandatory one
+// held as a string, or an optional one held as a *string. Exactly one of the
+// two pointers is set.
+type stringRef struct {
+	required *string
+	optional **string
 }
 
-// optionalString reads and writes an optional String attribute. It reads
-// as "" while unset; the writer sets the attribute, so a C_STRING
-// constraint on it is honoured like any other String leaf.
-func optionalString(f **string) (func() string, func(string), bool) {
-	get := func() string {
-		if *f == nil {
-			return ""
-		}
-		return **f
+// get returns the attribute's value, or "" while an optional one is unset.
+func (r stringRef) get() string {
+	if r.required != nil {
+		return *r.required
 	}
-	return get, func(s string) { *f = &s }, true
+	if *r.optional == nil {
+		return ""
+	}
+	return **r.optional
+}
+
+// set stores s in the attribute, setting an optional one.
+func (r stringRef) set(s string) {
+	if r.required != nil {
+		*r.required = s
+		return
+	}
+	*r.optional = &s
+}
+
+func requiredString(f *string) (stringRef, bool) {
+	return stringRef{required: f}, true
+}
+
+// optionalString addresses an optional String attribute. It reads as ""
+// while unset; writing it sets the attribute, so a C_STRING constraint on
+// it is honoured like any other String leaf.
+func optionalString(f **string) (stringRef, bool) {
+	return stringRef{optional: f}, true
 }
 
 // fillEntryCode sets ENTRY.language from Options.Language and
@@ -2334,7 +2357,7 @@ func applyStringLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, cs con
 	if attr == "" {
 		attr = mainStringAttr(rmValue)
 	}
-	_, set, ok := stringField(rmValue, attr)
+	ref, ok := stringField(rmValue, attr)
 	if !ok {
 		return nil
 	}
@@ -2345,7 +2368,7 @@ func applyStringLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, cs con
 	if err != nil {
 		return fmt.Errorf("%w: %s.%s at %s: %w", ErrConstraintUnsatisfiable, rmTypeOf(rmValue), attr, leafPath(leaf), err)
 	}
-	set(s)
+	ref.set(s)
 	return nil
 }
 
