@@ -489,7 +489,7 @@ func (s *Slot) AllowsRMType(archetypeID string) bool {
 
 // SlotRules returns the parsed assertion rules for this slot.
 // The returned rule slices are defensive copies.
-func (s *Slot) SlotRules() constraints.SlotRules { return s.slotRules() }
+func (s *Slot) SlotRules() constraints.SlotRules { return s.slotRules().Clone() }
 
 // AllowsArchetypeID reports whether archetypeID satisfies parsed
 // include / exclude rules, falling back to [Slot.AllowsRMType] when

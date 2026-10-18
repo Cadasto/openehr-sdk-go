@@ -157,11 +157,13 @@ func extractXMLChardataValue(raw string) string {
 // slotRules builds [constraints.SlotRules] for a wire-side slot.
 // RawIncludeCount carries the pre-parse blob count so consumers can
 // detect the fail-open case where every include failed to compile.
+// The rule slices share the slot's own, so the result is for read-only
+// checks inside this package; [Slot.SlotRules] hands out a clone.
 func (s *Slot) slotRules() constraints.SlotRules {
 	return constraints.SlotRules{
 		RMTypeName:      s.rmTypeName,
 		Includes:        s.parsedIncludes,
 		Excludes:        s.parsedExcludes,
 		RawIncludeCount: len(s.includes),
-	}.Clone()
+	}
 }
