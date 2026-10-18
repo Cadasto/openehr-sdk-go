@@ -1814,13 +1814,15 @@ func newHierObjectID() *rm.HierObjectID {
 
 // identityTaken reports whether children[i] is optional and a sibling
 // holds its identity: a required sibling before or after it, or an
-// optional sibling before it. Under Minimal such a child is not built, so
-// the validator's binding of members to children stays unambiguous; a
-// required child is always built. A slot does not count as a sibling. The
-// identity is the one the validator binds a member by (see childIdentity),
-// so optional archetype roots of different archetypes are each built,
-// though every archetype root carries the node id at0000. A name the OPT
-// pins on a child is not part of it.
+// optional sibling before it. Under Minimal such a child gets no member of
+// its own, so the validator's binding of members to children stays
+// unambiguous, though the top-up to the attribute's lower bound can still
+// build one, from the first child that is not a slot; a required child is
+// always built. A slot does not count as a sibling. The identity is the one
+// the validator binds a member by (see childIdentity), so optional
+// archetype roots of different archetypes are each built, though every
+// archetype root carries the node id at0000, and a child with no identity
+// is never skipped. A name the OPT pins on a child is not part of it.
 func identityTaken(children []*tcimpl.CompiledNode, i int) bool {
 	child := children[i]
 	if childRequired(child) {

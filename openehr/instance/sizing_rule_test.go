@@ -8,6 +8,8 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
 // optInterval is an AOM interval body with the given bounds; an upper of
@@ -358,8 +360,10 @@ func TestREQ107_FirstAllowedAlternativeWins(t *testing.T) {
 // optional sibling shares gets no member, so the validator's binding of
 // members to children stays unambiguous, while Example gives each its
 // member. The two siblings are ELEMENTs, whose identity is their node_id,
-// told apart by their value's RM type. It holds under both value fills and
-// both compile modes.
+// told apart by their value's RM type. The Minimal root passes the template
+// validator; the Example root shows the known gap at the ELEMENTs' path
+// (checkTemplateValidator). It holds under both value fills and both
+// compile modes.
 func TestREQ107_MinimalSkipsCollidingOptionalSiblings(t *testing.T) {
 	opt := optTemplate("CLUSTER", optCardinal("items", 1, -1,
 		optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0001", 0, 1, optSingle("value", optNode("DV_TEXT", ""))),
@@ -367,6 +371,9 @@ func TestREQ107_MinimalSkipsCollidingOptionalSiblings(t *testing.T) {
 	want := map[instance.Policy][]string{
 		instance.Minimal: {"DV_TEXT"},
 		instance.Example: {"DV_TEXT", "DV_COUNT"},
+	}
+	gap := map[instance.Policy][]string{
+		instance.Example: {"/items[at0001]"},
 	}
 	for _, implicit := range []bool{true, false} {
 		c := compileOPTText(t, opt, implicit)
@@ -388,6 +395,7 @@ func TestREQ107_MinimalSkipsCollidingOptionalSiblings(t *testing.T) {
 					t.Errorf("CLUSTER.items values = %v, want %v", got, want[opts.Policy])
 				}
 				noFloorErrors(t, out)
+				checkTemplateValidator(t, out, c, gap[opts.Policy]...)
 			})
 		}
 	}
@@ -403,9 +411,10 @@ func TestREQ107_MinimalSkipsCollidingOptionalSiblings(t *testing.T) {
 // archetype roots of different archetypes both carry the node id at0000,
 // and each gets its member; a second optional root of an archetype already
 // built gets none. The Minimal root passes the template validator. Example
-// builds every sibling, so the validator binds the at0001 and at0002
-// members to the first child of each (REQ-107 Exceptions and known gaps).
-// It holds under both value fills and both compile modes.
+// builds every sibling, so the validator binds the at0001, at0002 and
+// sibling_a members to the first child of each, and the root shows the
+// known gap at each of their paths (checkTemplateValidator). It holds under
+// both value fills and both compile modes.
 func TestREQ107_MinimalKeepsTheFirstOptionalSiblingOfEachIdentity(t *testing.T) {
 	element := func(nodeID string, lower int, valueType string) string {
 		return optOccurring("C_COMPLEX_OBJECT", "ELEMENT", nodeID, lower, 1, optSingle("value", optNode(valueType, "")))
@@ -429,6 +438,9 @@ func TestREQ107_MinimalKeepsTheFirstOptionalSiblingOfEachIdentity(t *testing.T) 
 	want := map[instance.Policy][]string{
 		instance.Minimal: {"DV_BOOLEAN", clusterA, "DV_DATE", clusterB},
 		instance.Example: {"DV_BOOLEAN", "DV_TEXT", clusterA, "DV_DATE", clusterB, "DV_COUNT", clusterA, "DV_DURATION"},
+	}
+	gap := map[instance.Policy][]string{
+		instance.Example: {"/items[at0001]", "/items[at0002]", "/items[" + clusterA + "]"},
 	}
 	for _, implicit := range []bool{true, false} {
 		c := compileOPTText(t, opt, implicit)
@@ -456,11 +468,7 @@ func TestREQ107_MinimalKeepsTheFirstOptionalSiblingOfEachIdentity(t *testing.T) 
 					t.Errorf("CLUSTER.items members = %v, want %v", got, want[opts.Policy])
 				}
 				noFloorErrors(t, out)
-				if opts.Policy == instance.Minimal {
-					for _, iss := range templateErrors(out, c) {
-						t.Errorf("Validate: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
-					}
-				}
+				checkTemplateValidator(t, out, c, gap[opts.Policy]...)
 			})
 		}
 	}
@@ -468,25 +476,30 @@ func TestREQ107_MinimalKeepsTheFirstOptionalSiblingOfEachIdentity(t *testing.T) 
 
 // TestREQ107_MinimalOptionalSiblingYieldsToARequiredOne is the REQ-107
 // check that, under Minimal, an optional child whose identity a required
-// sibling shares gets no member, whether that sibling comes before or after
-// it, while optional roots of different archetypes each get theirs and a
-// slot with an ELEMENT's node_id does not count as its sibling. The cases
-// are archetype roots of one archetype under CLUSTER.items in both orders,
-// ELEMENTs of one node_id, roots of two archetypes, and a slot before an
-// optional ELEMENT of its node_id, which a required ELEMENT of another
-// node_id precedes so that no top-up builds it; the siblings that share an
-// identity differ in content, so the members show which of them was built.
-// Example builds every sibling but the slot. It holds under both value
-// fills and both compile modes.
+// sibling shares gets no member of its own, whether that sibling comes
+// before or after it, while optional roots of different archetypes each get
+// theirs and a slot with an ELEMENT's node_id does not count as its
+// sibling. The cases are archetype roots of one archetype under
+// CLUSTER.items in both orders, ELEMENTs of one node_id, roots of two
+// archetypes, and a slot before an optional ELEMENT of its node_id, which a
+// required ELEMENT of another node_id precedes so that no top-up builds it;
+// the siblings that share an identity differ in content, so the members
+// show which of them was built. Example builds every sibling but the slot.
+// It holds under both value fills and both compile modes.
+//
+// The skip leaves the top-up free. Where CLUSTER.items needs two members
+// and an optional root or ELEMENT yields to a required one after it, the
+// required child's member comes first, and the top-up then builds one of
+// the optional child, the first allowed child that is not a slot.
 //
 // Where siblings share an identity and pin no name, the template validator
 // binds every member with that identity to the first of them, so a root
 // passes it only where every member it holds belongs to that first child.
-// Under Example both siblings are built (REQ-107 Exceptions and known
-// gaps). Under Minimal the root passes, except where the optional sibling
-// comes first: the validator binds the required sibling's member to the
-// optional one and finds no member for the required one, whatever is
-// built.
+// Elsewhere the root shows the known gap (checkTemplateValidator): under
+// Example, which builds both siblings, and under Minimal where the optional
+// sibling comes first, since the validator then binds the required
+// sibling's member to the optional one and finds no member for the
+// required one, whatever is built.
 func TestREQ107_MinimalOptionalSiblingYieldsToARequiredOne(t *testing.T) {
 	const clusterA, clusterB = "openEHR-EHR-CLUSTER.sibling_a.v1", "openEHR-EHR-CLUSTER.sibling_b.v1"
 	element := func(nodeID string, lower int, valueType string) string {
@@ -498,54 +511,81 @@ func TestREQ107_MinimalOptionalSiblingYieldsToARequiredOne(t *testing.T) {
 			optCardinal("items", 1, -1, element("at0001", 1, valueType)) +
 			`<archetype_id><value>` + archetypeID + `</value></archetype_id></children>`
 	}
+	rootGap, elementGap := []string{"/items[" + clusterA + "]"}, []string{"/items[at0001]"}
 	cases := []struct {
-		name     string
+		name string
+		// lower is the cardinality lower bound of CLUSTER.items.
+		lower    int
 		children []string
 		minimal  []string
 		example  []string
-		// minimalValid and exampleValid are whether the root passes the
-		// template validator under each policy.
-		minimalValid, exampleValid bool
+		// minimalGap and exampleGap are the paths at which the root shows
+		// the known gap under each policy; none where it passes the
+		// template validator.
+		minimalGap, exampleGap []string
 	}{
 		{
-			name:         "required root then optional root",
-			children:     []string{root(clusterA, 1, "DV_TEXT"), root(clusterA, 0, "DV_COUNT")},
-			minimal:      []string{clusterA + "[DV_TEXT]"},
-			example:      []string{clusterA + "[DV_TEXT]", clusterA + "[DV_COUNT]"},
-			minimalValid: true,
+			name:       "required root then optional root",
+			lower:      1,
+			children:   []string{root(clusterA, 1, "DV_TEXT"), root(clusterA, 0, "DV_COUNT")},
+			minimal:    []string{clusterA + "[DV_TEXT]"},
+			example:    []string{clusterA + "[DV_TEXT]", clusterA + "[DV_COUNT]"},
+			exampleGap: rootGap,
 		},
 		{
-			name:     "optional root then required root",
-			children: []string{root(clusterA, 0, "DV_COUNT"), root(clusterA, 1, "DV_TEXT")},
-			minimal:  []string{clusterA + "[DV_TEXT]"},
-			example:  []string{clusterA + "[DV_COUNT]", clusterA + "[DV_TEXT]"},
+			name:       "optional root then required root",
+			lower:      1,
+			children:   []string{root(clusterA, 0, "DV_COUNT"), root(clusterA, 1, "DV_TEXT")},
+			minimal:    []string{clusterA + "[DV_TEXT]"},
+			example:    []string{clusterA + "[DV_COUNT]", clusterA + "[DV_TEXT]"},
+			minimalGap: rootGap,
+			exampleGap: rootGap,
 		},
 		{
-			name:         "required element then optional element",
-			children:     []string{element("at0001", 1, "DV_TEXT"), element("at0001", 0, "DV_COUNT")},
-			minimal:      []string{"DV_TEXT"},
-			example:      []string{"DV_TEXT", "DV_COUNT"},
-			minimalValid: true,
+			name:       "required element then optional element",
+			lower:      1,
+			children:   []string{element("at0001", 1, "DV_TEXT"), element("at0001", 0, "DV_COUNT")},
+			minimal:    []string{"DV_TEXT"},
+			example:    []string{"DV_TEXT", "DV_COUNT"},
+			exampleGap: elementGap,
 		},
 		{
-			name:         "optional roots of different archetypes",
-			children:     []string{root(clusterA, 0, "DV_TEXT"), root(clusterB, 0, "DV_COUNT")},
-			minimal:      []string{clusterA + "[DV_TEXT]", clusterB + "[DV_COUNT]"},
-			example:      []string{clusterA + "[DV_TEXT]", clusterB + "[DV_COUNT]"},
-			minimalValid: true,
-			exampleValid: true,
+			name:     "optional roots of different archetypes",
+			lower:    1,
+			children: []string{root(clusterA, 0, "DV_TEXT"), root(clusterB, 0, "DV_COUNT")},
+			minimal:  []string{clusterA + "[DV_TEXT]", clusterB + "[DV_COUNT]"},
+			example:  []string{clusterA + "[DV_TEXT]", clusterB + "[DV_COUNT]"},
 		},
 		{
-			name:         "slot then optional element of its node_id",
-			children:     []string{element("at0002", 1, "DV_COUNT"), optSlot("ELEMENT", "at0001"), element("at0001", 0, "DV_TEXT")},
-			minimal:      []string{"DV_COUNT", "DV_TEXT"},
-			example:      []string{"DV_COUNT", "DV_TEXT"},
-			minimalValid: true,
-			exampleValid: true,
+			name:     "slot then optional element of its node_id",
+			lower:    1,
+			children: []string{element("at0002", 1, "DV_COUNT"), optSlot("ELEMENT", "at0001"), element("at0001", 0, "DV_TEXT")},
+			minimal:  []string{"DV_COUNT", "DV_TEXT"},
+			example:  []string{"DV_COUNT", "DV_TEXT"},
+		},
+		{
+			// The top-up builds a member of the optional root that yields
+			// to the required one.
+			name:       "optional root then required root, cardinality lower 2",
+			lower:      2,
+			children:   []string{root(clusterA, 0, "DV_COUNT"), root(clusterA, 1, "DV_TEXT")},
+			minimal:    []string{clusterA + "[DV_TEXT]", clusterA + "[DV_COUNT]"},
+			example:    []string{clusterA + "[DV_COUNT]", clusterA + "[DV_TEXT]"},
+			minimalGap: rootGap,
+			exampleGap: rootGap,
+		},
+		{
+			name:       "optional element then required element, cardinality lower 2",
+			lower:      2,
+			children:   []string{element("at0001", 0, "DV_COUNT"), element("at0001", 1, "DV_TEXT")},
+			minimal:    []string{"DV_TEXT", "DV_COUNT"},
+			example:    []string{"DV_COUNT", "DV_TEXT"},
+			minimalGap: elementGap,
+			exampleGap: elementGap,
 		},
 	}
 	for _, tc := range cases {
-		opt := optTemplate("CLUSTER", optCardinal("items", 1, -1, tc.children...))
+		opt := optTemplate("CLUSTER", optCardinal("items", tc.lower, -1, tc.children...))
 		for _, implicit := range []bool{true, false} {
 			c := compileOPTText(t, opt, implicit)
 			for _, opts := range defaultsOptions() {
@@ -554,23 +594,103 @@ func TestREQ107_MinimalOptionalSiblingYieldsToARequiredOne(t *testing.T) {
 					if err != nil {
 						t.Fatalf("Generate: %v", err)
 					}
-					want, valid := tc.example, tc.exampleValid
+					want, gap := tc.example, tc.exampleGap
 					if opts.Policy == instance.Minimal {
-						want, valid = tc.minimal, tc.minimalValid
+						want, gap = tc.minimal, tc.minimalGap
 					}
 					if got := memberLabels(t, out); !slices.Equal(got, want) {
 						t.Errorf("CLUSTER.items members = %v, want %v", got, want)
 					}
 					noFloorErrors(t, out)
-					if valid {
-						for _, iss := range templateErrors(out, c) {
-							t.Errorf("Validate: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
-						}
-					}
+					checkTemplateValidator(t, out, c, gap...)
 				})
 			}
 		}
 	}
+}
+
+// TestREQ107_MinimalNeverSkipsAChildWithNoIdentity is the REQ-107 check
+// that a child with neither an archetype id nor a node_id has no identity,
+// so no sibling holds it and Minimal never skips it: two optional ELEMENTs
+// with no node_id under CLUSTER.items each get a member, under both
+// policies. Their values differ in RM type, so the members show that both
+// were built. It holds under both value fills and both compile modes. The
+// template validator is not consulted: it binds a LOCATABLE member by an
+// archetype id or a node_id its OPT child carries (REQ-102), so it binds
+// neither member here, whatever the generator builds.
+func TestREQ107_MinimalNeverSkipsAChildWithNoIdentity(t *testing.T) {
+	element := func(valueType string) string {
+		return optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "", 0, 1, optSingle("value", optNode(valueType, "")))
+	}
+	opt := optTemplate("CLUSTER", optCardinal("items", 1, -1, element("DV_TEXT"), element("DV_COUNT")))
+	want := []string{"DV_TEXT", "DV_COUNT"}
+	for _, implicit := range []bool{true, false} {
+		c := compileOPTText(t, opt, implicit)
+		for _, opts := range defaultsOptions() {
+			t.Run(fmt.Sprintf("implicit=%t/%v/%v", implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+				out, err := instance.Generate(t.Context(), c, opts)
+				if err != nil {
+					t.Fatalf("Generate: %v", err)
+				}
+				if got := memberLabels(t, out); !slices.Equal(got, want) {
+					t.Errorf("CLUSTER.items members = %v, want %v: a child with no identity is never skipped", got, want)
+				}
+				noFloorErrors(t, out)
+			})
+		}
+	}
+}
+
+// sharedIdentityGap names the REQ-107 known gap for siblings that share an
+// identity and pin no name (§ Exceptions and known gaps).
+const sharedIdentityGap = "REQ-107 known gap, siblings that share an identity and pin no name"
+
+// checkTemplateValidator checks the template validator's verdict on out.
+// With no gaps, out must pass it: every error is reported. Otherwise out
+// holds siblings that share an identity and pin no name, whose members the
+// validator binds to the first such child (sharedIdentityGap), and each
+// path in gaps must carry the cardinality issue that shows it; the other
+// errors that misbinding causes are expected. The day the validator binds
+// such members to their own children the check fails, and the case should
+// then expect out to pass.
+func checkTemplateValidator(t *testing.T, out any, c *templatecompile.Compiled, gaps ...string) {
+	t.Helper()
+	errs := templateErrors(out, c)
+	if len(gaps) == 0 {
+		for _, iss := range errs {
+			t.Errorf("Validate: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+		}
+		return
+	}
+	for _, path := range gaps {
+		if !hasCardinalityAt(errs, path) {
+			t.Errorf("%s: Validate reports %s, want a cardinality issue at %s; if the validator now binds these members to their own children, expect the root to pass",
+				sharedIdentityGap, issueSummary(errs), path)
+		}
+	}
+}
+
+// hasCardinalityAt reports whether errs holds the template validator's
+// report of a child's occurrences broken at path: code cardinality, on the
+// template layer, rule occurrences (REQ-102).
+func hasCardinalityAt(errs []validation.Issue, path string) bool {
+	return slices.ContainsFunc(errs, func(iss validation.Issue) bool {
+		return iss.Path == path && iss.Code == "cardinality" &&
+			iss.Layer == validation.LayerTemplate && iss.Rule == "occurrences"
+	})
+}
+
+// issueSummary lists each issue in errs by code and path, or says there is
+// none.
+func issueSummary(errs []validation.Issue) string {
+	if len(errs) == 0 {
+		return "no error"
+	}
+	parts := make([]string, 0, len(errs))
+	for _, iss := range errs {
+		parts = append(parts, iss.Code+" @ "+iss.Path)
+	}
+	return "[" + strings.Join(parts, ", ") + "]"
 }
 
 // memberLabels names each member of a generated CLUSTER's items: an
