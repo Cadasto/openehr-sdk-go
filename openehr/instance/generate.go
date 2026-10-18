@@ -439,23 +439,8 @@ func (g *generator) materialiseSingle(
 		}
 		return nil
 	}
-	child := bindingAlternative(children, builtRMType(children[0]))
-	rmChild, err := g.makeChild(child)
+	rmChild, err := g.buildChild(bindingAlternative(children, builtRMType(children[0])))
 	if err != nil {
-		return err
-	}
-	// Stamp default primitive values BEFORE descending. When the
-	// child is a DV scalar wrapper (DV_DURATION, DV_DATE, …),
-	// populatePrimitiveDefault gives the wrapper a non-empty
-	// canonical-JSON shape (`"value":"P0D"`, etc.) as a safe fallback
-	// when the OPT does not pin a leaf primitive constraint. When a
-	// constraint IS present, applyPrimitiveExample inside walkNode
-	// overwrites the default. No-op for non-primitive wrappers.
-	g.populatePrimitiveDefault(rmChild)
-	if child.IsSlot() && !g.stampSlotFill(rmChild, child) {
-		return fmt.Errorf("%w: %s", ErrSlotFillUnsupported, child.AQLPath())
-	}
-	if err := g.walkNode(child, rmChild); err != nil {
 		return err
 	}
 	if replacesTerminology(parentRM, attr.Name(), rmChild) {
@@ -1198,17 +1183,8 @@ func (g *generator) materialiseMultiple(
 			if upperBound >= 0 && total >= upperBound {
 				return nil
 			}
-			rmChild, err := g.makeChild(child)
+			rmChild, err := g.buildChild(child)
 			if err != nil {
-				return err
-			}
-			// Mirror materialiseSingle: stamp default primitive values
-			// before walkNode descends so DV scalar wrappers in a
-			// multi-attribute slot also carry a non-empty canonical-
-			// JSON shape under the wire-parser primitive-constraint
-			// gap. No-op for non-primitive RM children.
-			g.populatePrimitiveDefault(rmChild)
-			if err := g.walkNode(child, rmChild); err != nil {
 				return err
 			}
 			if err := rmwrite.AppendMultiple(parentRM, attr.Name(), rmChild); err != nil {
@@ -1227,23 +1203,13 @@ func (g *generator) materialiseMultiple(
 	// only when no includes were parsed.
 	if needed := remainingLowerNeeded(attr, total); needed > 0 {
 		seed := firstNonSlot(children)
-		if seed == nil && len(children) > 0 {
+		if seed == nil {
+			// Every child is a slot; children is not empty here.
 			seed = children[0]
 		}
-		if seed == nil {
-			return nil
-		}
 		for needed > 0 && (upperBound < 0 || total < upperBound) {
-			rmChild, err := g.makeChild(seed)
+			rmChild, err := g.buildChild(seed)
 			if err != nil {
-				return err
-			}
-			if seed.IsSlot() {
-				if !g.stampSlotFill(rmChild, seed) {
-					return fmt.Errorf("%w: %s", ErrSlotFillUnsupported, seed.AQLPath())
-				}
-			}
-			if err := g.walkNode(seed, rmChild); err != nil {
 				return err
 			}
 			if err := rmwrite.AppendMultiple(parentRM, attr.Name(), rmChild); err != nil {
@@ -1261,6 +1227,31 @@ func (g *generator) materialiseMultiple(
 		}
 	}
 	return nil
+}
+
+// buildChild builds the RM value for the OPT child child and walks it. The
+// value is built with its identity (makeChild), then given the primitive
+// default of its type before the walk descends: a DV scalar wrapper
+// (DV_DURATION, DV_DATE, …) gets a non-empty value (`"value":"P0D"`, …) as a
+// fallback where the OPT pins no primitive constraint, which a constraint
+// the walk reaches overwrites; any other value is left alone. A slot then
+// gets the archetype id of its fill (stampSlotFill), and is refused with
+// ErrSlotFillUnsupported when none can be derived. Every attribute builds
+// its OPT children here, so a child built to make up a lower bound is the
+// same as one built for its own occurrences.
+func (g *generator) buildChild(child *tcimpl.CompiledNode) (any, error) {
+	rmChild, err := g.makeChild(child)
+	if err != nil {
+		return nil, err
+	}
+	g.populatePrimitiveDefault(rmChild)
+	if child.IsSlot() && !g.stampSlotFill(rmChild, child) {
+		return nil, fmt.Errorf("%w: %s", ErrSlotFillUnsupported, child.AQLPath())
+	}
+	if err := g.walkNode(child, rmChild); err != nil {
+		return nil, err
+	}
+	return rmChild, nil
 }
 
 // stampSlotFill overrides the archetype_node_id and archetype_details
