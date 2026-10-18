@@ -334,6 +334,42 @@ func TestLaunchContextSMARTCompatExtras(t *testing.T) {
 	}
 }
 
+// TestREQ064_LaunchContextKeepsItsOwnNeedPatientBanner pins that a launch
+// context holds its own copy of need_patient_banner, as it does of the
+// token response's other fields: an edit through the token response's
+// pointer afterwards does not reach the launch context, an edit through the
+// launch context's pointer does not reach the token response, and a
+// response without a preference gives a nil NeedPatientBanner.
+func TestREQ064_LaunchContextKeepsItsOwnNeedPatientBanner(t *testing.T) { // REQ-064
+	banner := false
+	tr := authsmart.TokenResponse{AccessToken: "tok", NeedPatientBanner: &banner}
+	lc, err := smart.LaunchContextFromTokenResponse(t.Context(), tr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lc.NeedPatientBanner == nil || *lc.NeedPatientBanner {
+		t.Fatalf("NeedPatientBanner = %v, want non-nil false", lc.NeedPatientBanner)
+	}
+
+	*tr.NeedPatientBanner = true
+	if *lc.NeedPatientBanner {
+		t.Errorf("after the token response's need_patient_banner was set to true, the launch context's NeedPatientBanner = true, want false")
+	}
+	*tr.NeedPatientBanner = false
+	*lc.NeedPatientBanner = true
+	if *tr.NeedPatientBanner {
+		t.Errorf("after the launch context's NeedPatientBanner was set to true, the token response's need_patient_banner = true, want false")
+	}
+
+	unset, err := smart.LaunchContextFromTokenResponse(t.Context(), authsmart.TokenResponse{AccessToken: "tok"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if unset.NeedPatientBanner != nil {
+		t.Errorf("NeedPatientBanner without need_patient_banner = %v, want nil", *unset.NeedPatientBanner)
+	}
+}
+
 func testRSAKey(t *testing.T) (*rsa.PrivateKey, []byte) {
 	t.Helper()
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)

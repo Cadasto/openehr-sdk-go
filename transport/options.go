@@ -22,6 +22,7 @@ type config struct {
 	retry RetryPolicy
 
 	callerAttribution       CallerAttribution
+	callerAttributionJSON   string // callerAttribution's header value, encoded once at New
 	callerAttributionHeader string
 
 	logger *slog.Logger
@@ -98,6 +99,10 @@ func WithRetry(p RetryPolicy) Option {
 // WithCallerAttribution attaches a client-default CallerAttribution
 // emitted on every outgoing request. Per-request overrides
 // via WithCallerAttributionCtx take precedence.
+//
+// New takes a copy of a, its Attributes map included, and encodes the
+// header value once. A change the caller makes to that map after New
+// returns does not reach the Client's requests.
 func WithCallerAttribution(a CallerAttribution) Option {
 	return func(cfg *config) { cfg.callerAttribution = a }
 }
@@ -108,14 +113,17 @@ func WithCallerAttributionHeader(name string) Option {
 	return func(cfg *config) { cfg.callerAttributionHeader = name }
 }
 
-// WithLogger sets the slog.Logger the transport uses for non-fatal
-// diagnostics (TLS warnings, retry attempts). Default slog.Default().
+// WithLogger sets the slog.Logger the transport logs to. The transport
+// logs one thing only: a panic it recovered from an Observer, at error
+// level, with the panic value and the request's route template, or
+// "(unrouted)" when the request has none. Default slog.Default().
 func WithLogger(l *slog.Logger) Option {
 	return func(cfg *config) { cfg.logger = l }
 }
 
 // WithObserver installs an Observer. The observer fires
-// exactly once per logical Client.Do call after retries settle. A nil
+// exactly once per logical Client.Do call after retries settle, a call
+// that Client.Do refuses before any attempt included. A nil
 // observer is treated as a no-op (safe to pass through configuration
 // layers that don't know whether the consumer wants observability).
 func WithObserver(o Observer) Option {
@@ -156,7 +164,10 @@ func WithMaxResponseBody(n int64) Option {
 // When a wire 401 is received and the Reauther has not yet been invoked
 // for the current Do call, transport calls r.Reauth(ctx) once and retries
 // the request one time with the freshly acquired token. On a second 401
-// (or when Reauth returns an error) the error is surfaced to the caller.
+// the error is surfaced to the caller. When Reauth returns an error, Do
+// returns that error wrapped, with the 401's error wrapped beside it, so
+// errors.Is matches both the Reauth error and ErrUnauthorized, and the
+// request is not sent again.
 //
 // The server's Bearer challenge decides whether a 401 is worth a new
 // token. Reauth runs only when the 401 carries no Bearer challenge the

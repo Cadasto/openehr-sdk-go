@@ -1,0 +1,8 @@
+${like},${expected_file},${nr_of_results}
+'Name%',expected_like_column_ii_empty_ent.json,0
+'Name%\_',expected_like_column_ii_name_percent_underscore_ent.json,1
+'*%\_',expected_like_column_ii_name_percent_underscore_ent.json,1
+'Name\*',expected_like_column_ii_name_percent_underscore_and_star_question_ent.json,2
+'Name\\\\\\\\*',expected_like_column_ii_empty_ent.json,0
+'Name\\\\\\\\*\\\\\\\\?',expected_like_column_ii_name_star_question_ent.json,1
+'*\\\\\\\\*\\\\\\\\?',expected_like_column_ii_name_star_question_ent.json,1

@@ -1,0 +1,5 @@
+${path},${expected_file},${nr_of_results}
+is_modifiable,expected_ehr_status_from_single_ehr_is_modifiable.json,1
+subject,expected_ehr_status_from_single_ehr_subject.json,1
+subject/external_ref/id/value,expected_ehr_status_from_single_ehr_ext_ref_value.json,1
+other_details/items[at0001]/value/id,expected_ehr_status_from_single_ehr_at1_id.json,1

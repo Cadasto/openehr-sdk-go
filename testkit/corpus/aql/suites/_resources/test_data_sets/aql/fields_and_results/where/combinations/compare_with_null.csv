@@ -1,0 +1,5 @@
+${path},${spath},${condition},${expected_file},${nr_of_results}
+o/data[at0001]/events[at0002]/data[at0003]/items[at0008]/value,/magnitude,EXISTS,expected_compare_with_null_exists_mag.json,2
+o/data[at0001]/events[at0002]/data[at0003]/items[at0008]/value/magnitude,${EMPTY},EXISTS,expected_compare_with_null_exists_mag1.json,2
+o/data[at0001]/events[at0002]/data[at0003]/items[at0008]/value,/magnitude,NOT EXISTS,expected_compare_with_null_not_exists_mag.json,1
+o/data[at0001]/events[at0002]/data[at0003]/items[at0008]/value/magnitude,${EMPTY},NOT EXISTS,expected_compare_with_null_not_exists_mag1.json,1

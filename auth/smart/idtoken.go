@@ -107,7 +107,7 @@ func ValidateIDToken(ctx context.Context, raw string, jwks *JWKS, issuer, client
 
 	// Read the header to locate the signing key by kid. The signature
 	// itself is verified by go-oidc below — this only selects the key.
-	headerB64, _, _, err := splitJWT(raw)
+	headerB64, err := jwtHeader(raw)
 	if err != nil {
 		return nil, err
 	}
@@ -259,12 +259,14 @@ func publicKeyFromJWK(jwkRaw json.RawMessage) (crypto.PublicKey, error) {
 	return k.Key, nil
 }
 
-func splitJWT(raw string) (header, payload, sig string, err error) {
-	parts := strings.Split(raw, ".")
-	if len(parts) != 3 {
-		return "", "", "", fmt.Errorf("%w: expected 3 JWT segments", auth.ErrJWKSValidationFailed)
+// jwtHeader checks that raw has the three segments of a compact JWS and
+// returns the first of them, the header.
+func jwtHeader(raw string) (string, error) {
+	if strings.Count(raw, ".") != 2 {
+		return "", fmt.Errorf("%w: expected 3 JWT segments", auth.ErrJWKSValidationFailed)
 	}
-	return parts[0], parts[1], parts[2], nil
+	header, _, _ := strings.Cut(raw, ".")
+	return header, nil
 }
 
 func decodeJWTPart(b64 string, dest any) error {
@@ -278,10 +280,11 @@ func decodeJWTPart(b64 string, dest any) error {
 	return nil
 }
 
+// claimsFromMap checks the claims of an ID token whose signature
+// ValidateIDToken has verified, as of now, and returns them as
+// IDTokenClaims. now is never zero: ValidateIDToken, the only caller,
+// defaults it to the current time.
 func claimsFromMap(claims map[string]any, issuer, clientID, nonce string, now time.Time, trustedAudiences []string) (*IDTokenClaims, error) {
-	if now.IsZero() {
-		now = time.Now()
-	}
 	iss, _ := claimString(claims, "iss")
 	if iss != issuer {
 		return nil, fmt.Errorf("%w: iss mismatch", auth.ErrJWKSValidationFailed)
@@ -414,15 +417,11 @@ func optionalClaimNumericTime(claims map[string]any, key string) (time.Time, boo
 	if !ok {
 		return time.Time{}, false, nil
 	}
+	// The claims come from encoding/json without UseNumber, so a number is
+	// always a float64.
 	switch n := v.(type) {
 	case float64:
 		return time.Unix(int64(n), 0), true, nil
-	case json.Number:
-		i, err := n.Int64()
-		if err != nil {
-			return time.Time{}, false, fmt.Errorf("%w: invalid %s", auth.ErrJWKSValidationFailed, key)
-		}
-		return time.Unix(i, 0), true, nil
 	default:
 		return time.Time{}, false, fmt.Errorf("%w: invalid %s type", auth.ErrJWKSValidationFailed, key)
 	}

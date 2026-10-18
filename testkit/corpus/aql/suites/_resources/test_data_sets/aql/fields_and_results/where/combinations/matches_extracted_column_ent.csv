@@ -1,0 +1,3 @@
+${where},${expected_file},${nr_of_results}
+"e/ehr_id/value MATCHES {'${ehr_id1}', '${ehr_id2}'}",expected_ehr1_compo1_ehr2_compo2_ent.json,2
+"e/ehr_id/value MATCHES {'${ehr_id1}', '${ehr_id3}'}",expected_ehr1_compo1_ehr3_compo3_ent.json,2

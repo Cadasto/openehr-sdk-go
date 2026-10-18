@@ -1,0 +1,5 @@
+${order1},${order2},${expected_file},${nr_of_results}
+ASC,ASC,expected_multiple_order_by_asc_asc.json,6
+DESC,DESC,expected_multiple_order_by_desc_desc.json,6
+ASC,DESC,expected_multiple_order_by_asc_desc.json,6
+DESC,ASC,expected_multiple_order_by_desc_asc.json,6

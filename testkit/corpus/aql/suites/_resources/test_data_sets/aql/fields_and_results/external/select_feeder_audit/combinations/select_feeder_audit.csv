@@ -1,0 +1,21 @@
+${query_nr},${path},${additional_contains},${expected_file},${nr_of_results}
+1.,"c/feeder_audit/originating_system_audit/system_id",,expected_select_feeder_audit_q1.json,1
+2.,"c/feeder_audit/feeder_system_audit/system_id",,expected_select_feeder_audit_q2.json,1
+3.,"c/feeder_audit/feeder_system_audit/other_details[openEHR-EHR-ITEM_TREE.generic.v1]/name/value",,expected_select_feeder_audit_q3.json,1
+4.,"c/feeder_audit/feeder_system_audit/other_details[openEHR-EHR-ITEM_TREE.generic.v1]/items[at0001]",,expected_select_feeder_audit_q4.json,1
+5.,"c/feeder_audit/feeder_system_audit/other_details[openEHR-EHR-ITEM_TREE.generic.v1]/items[at0001]/name",,expected_select_feeder_audit_q5.json,1
+6.,"c/feeder_audit/feeder_system_audit/other_details[openEHR-EHR-ITEM_TREE.generic.v1]/items[at0001]/name/value",,expected_select_feeder_audit_q6.json,1
+7.,"c/feeder_audit/feeder_system_audit/other_details[openEHR-EHR-ITEM_TREE.generic.v1]/items[at0001]/value",,expected_select_feeder_audit_q7.json,1
+8.,"c/feeder_audit/feeder_system_audit/other_details[openEHR-EHR-ITEM_TREE.generic.v1]/items[at0001]/value/type",,expected_select_feeder_audit_q8.json,1
+9.,"c/feeder_audit/feeder_system_audit/other_details[openEHR-EHR-ITEM_TREE.generic.v1]/items[at0001]/value/issuer",,expected_select_feeder_audit_q9.json,1
+10.,"c/feeder_audit/feeder_system_audit/other_details[openEHR-EHR-ITEM_TREE.generic.v1]/items[at0001]/value/assigner",,expected_select_feeder_audit_q10.json,1
+11.,"o/feeder_audit/originating_system_audit/system_id",CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.test_all_types.v1],expected_select_feeder_audit_q11.json,1
+12.,"o/feeder_audit/feeder_system_audit/system_id",CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.test_all_types.v1],expected_select_feeder_audit_q12.json,1
+13.,"o/feeder_audit/feeder_system_audit/other_details[openEHR-EHR-ITEM_TREE.generic.v1]/name/value",CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.test_all_types.v1],expected_select_feeder_audit_q13.json,1
+14.,"o/feeder_audit/feeder_system_audit/other_details[openEHR-EHR-ITEM_TREE.generic.v1]/items[at0001]",CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.test_all_types.v1],expected_select_feeder_audit_q14.json,1
+15.,"o/feeder_audit/feeder_system_audit/other_details[openEHR-EHR-ITEM_TREE.generic.v1]/items[at0001]/name",CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.test_all_types.v1],expected_select_feeder_audit_q15.json,1
+16.,"o/feeder_audit/feeder_system_audit/other_details[openEHR-EHR-ITEM_TREE.generic.v1]/items[at0001]/name/value",CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.test_all_types.v1],expected_select_feeder_audit_q16.json,1
+17.,"o/feeder_audit/feeder_system_audit/other_details[openEHR-EHR-ITEM_TREE.generic.v1]/items[at0001]/value",CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.test_all_types.v1],expected_select_feeder_audit_q17.json,1
+18.,"o/feeder_audit/feeder_system_audit/other_details[openEHR-EHR-ITEM_TREE.generic.v1]/items[at0001]/value/type",CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.test_all_types.v1],expected_select_feeder_audit_q18.json,1
+19.,"o/feeder_audit/feeder_system_audit/other_details[openEHR-EHR-ITEM_TREE.generic.v1]/items[at0001]/value/issuer",CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.test_all_types.v1],expected_select_feeder_audit_q19.json,1
+20.,"o/feeder_audit/feeder_system_audit/other_details[openEHR-EHR-ITEM_TREE.generic.v1]/items[at0001]/value/assigner",CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.test_all_types.v1],expected_select_feeder_audit_q20.json,1

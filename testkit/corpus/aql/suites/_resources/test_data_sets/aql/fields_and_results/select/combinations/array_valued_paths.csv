@@ -1,0 +1,8 @@
+${path},${expected_file},${nr_of_results}
+"c/context/participations/performer/name, c/context/participations/performer/external_ref/id/value",expected_arr_valued_paths_ext_ref_id_value.json,2
+"c/context/participations/performer/name, c/context/participations/performer/identifiers/id",expected_arr_valued_paths_perf_identifiers_id.json,4
+"c/feeder_audit/original_content/value, c/feeder_audit/feeder_system_item_ids/id, c/feeder_audit/feeder_system_item_ids/type, c/feeder_audit/feeder_system_item_ids/issuer",expected_arr_valued_paths_issuer.json,2
+o/subject/identifiers/id,expected_arr_valued_paths_identifiers_id.json,2
+"o/other_participations/performer/name, o/other_participations/performer/external_ref/id/value",expected_arr_valued_paths_perf_ext_ref_id.json,2
+"o/data[at0001]/events[at0002]/data[at0003]/items[at0004]/value/mappings/match, o/data[at0001]/events[at0002]/data[at0003]/items[at0004]/value/mappings/target/code_string",expected_arr_valued_paths_target_code_str.json,2
+"o/data[at0001]/events[at0002]/data[at0003]/items[at0010]/value/other_reference_ranges/range/lower/magnitude, o/data[at0001]/events[at0002]/data[at0003]/items[at0010]/value/other_reference_ranges/range/upper/magnitude, o/data[at0001]/events[at0002]/data[at0003]/items[at0010]/value/other_reference_ranges/meaning/value",expected_arr_valued_paths_ranges_range.json,2

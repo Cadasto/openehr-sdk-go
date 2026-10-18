@@ -1,0 +1,7 @@
+${path},${order},${expected_file},${nr_of_results}
+i/sample_count,ASC,expected_order_by_paths_within_same_hierarchy_lvl_iii_sample_count_asc.json,2
+i/sample_count,DESC,expected_order_by_paths_within_same_hierarchy_lvl_iii_sample_count_desc.json,2
+i/width,ASC,expected_order_by_paths_within_same_hierarchy_lvl_iii_width_asc.json,2
+i/width,DESC,expected_order_by_paths_within_same_hierarchy_lvl_iii_width_desc.json,2
+i/width/value,ASC,expected_order_by_paths_within_same_hierarchy_lvl_iii_width_value_asc.json,2
+i/width/value,DESC,expected_order_by_paths_within_same_hierarchy_lvl_iii_width_value_desc.json,2

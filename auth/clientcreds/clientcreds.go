@@ -10,13 +10,14 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
 	"github.com/cadasto/openehr-sdk-go/auth/jwtbearer"
+	"github.com/cadasto/openehr-sdk-go/internal/coalesce"
+	"github.com/cadasto/openehr-sdk-go/internal/expiresin"
 	"github.com/cadasto/openehr-sdk-go/internal/noredirect"
 	"github.com/cadasto/openehr-sdk-go/internal/urlredact"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
@@ -25,6 +26,10 @@ import (
 // grantClientCredentials is the grant_type value of this grant, as sent to
 // the token endpoint and as listed in a server's grant_types_supported.
 const grantClientCredentials = "client_credentials"
+
+// defaultRefreshThreshold is how long before its expiry the cached access
+// token counts as stale when the configuration sets no threshold.
+const defaultRefreshThreshold = 30 * time.Second
 
 // Client authentication method names, as listed in a server's
 // token_endpoint_auth_methods_supported (RFC 8414).
@@ -89,8 +94,11 @@ type Config struct {
 	// ClientSecret. A nil *jwtbearer.ClaimsSigner is refused, as it can
 	// never sign.
 	ClientAssertion jwtbearer.AssertionSource
-	// RefreshThreshold is how long before ExpiresAt the source treats
-	// the cached token as stale and triggers a refresh. Default 30s.
+	// RefreshThreshold is how long before its expiry the cached access token
+	// counts as stale, so that [Source.Token] exchanges the grant again ahead
+	// of time. 0 selects the default of 30 seconds. A negative value counts
+	// as 0: the token is replaced once it has expired, so an expired token is
+	// never returned.
 	RefreshThreshold time.Duration
 	// Issuer is the issuer URL recorded on the produced Token. Optional;
 	// when set it is round-tripped to Token.Issuer for audit.
@@ -118,7 +126,11 @@ func WithAudience(aud string) Option { return func(cfg *Config) { cfg.Audience =
 // WithAuthMethod selects how client credentials are presented.
 func WithAuthMethod(m AuthMethod) Option { return func(cfg *Config) { cfg.AuthMethod = m } }
 
-// WithRefreshThreshold overrides the staleness window.
+// WithRefreshThreshold sets how long before its expiry the cached access
+// token counts as stale, so that [Source.Token] exchanges the grant again
+// ahead of time. The default is 30 seconds, which a d of 0 also selects. A
+// negative d counts as 0: the token is replaced once it has expired, so an
+// expired token is never returned.
 func WithRefreshThreshold(d time.Duration) Option {
 	return func(cfg *Config) { cfg.RefreshThreshold = d }
 }
@@ -155,8 +167,11 @@ type exchange struct {
 	done  chan struct{}
 	token auth.Token
 	err   error
-	// abandoned reports that the exchange failed after the context of the
-	// caller running it had ended. That failure belongs to that caller only.
+	// abandoned reports that the exchange has no result for the callers
+	// waiting on it: it failed only because the context of the caller
+	// running it ended, or a panic unwound that caller before the result was
+	// published. That outcome belongs to that caller only. It is written
+	// before done is closed.
 	abandoned bool
 }
 
@@ -164,12 +179,12 @@ type exchange struct {
 // options. Returns auth.ErrInvalidConfig (wrapped) on missing required
 // inputs.
 func New(clientID, clientSecret, tokenURL string, opts ...Option) (*Source, error) {
+	// FromConfig fills in the defaults, such as the refresh threshold.
 	cfg := Config{
-		ClientID:         clientID,
-		ClientSecret:     clientSecret,
-		TokenURL:         tokenURL,
-		AuthMethod:       AuthBasic,
-		RefreshThreshold: 30 * time.Second,
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		TokenURL:     tokenURL,
+		AuthMethod:   AuthBasic,
 	}
 	for _, o := range opts {
 		if o != nil {
@@ -183,7 +198,8 @@ func New(clientID, clientSecret, tokenURL string, opts ...Option) (*Source, erro
 // configuration is loaded declaratively.
 func FromConfig(cfg Config) (*Source, error) {
 	if cfg.HTTPClient == nil {
-		return nil, fmt.Errorf("%w: HTTPClient is required (REQ-021)", auth.ErrInvalidConfig)
+		// REQ-021: the caller supplies the client.
+		return nil, fmt.Errorf("%w: HTTPClient is required", auth.ErrInvalidConfig)
 	}
 	if cfg.ClientID == "" {
 		return nil, fmt.Errorf("%w: ClientID is required", auth.ErrInvalidConfig)
@@ -211,9 +227,7 @@ func FromConfig(cfg Config) (*Source, error) {
 	if err != nil || u.Scheme == "" || u.Host == "" {
 		return nil, fmt.Errorf("%w: TokenURL %q is not a valid absolute URL", auth.ErrInvalidConfig, urlredact.String(cfg.TokenURL))
 	}
-	if cfg.RefreshThreshold == 0 {
-		cfg.RefreshThreshold = 30 * time.Second
-	}
+	cfg.RefreshThreshold = cmp.Or(cfg.RefreshThreshold, defaultRefreshThreshold)
 	return &Source{cfg: cfg, tokenURL: u, client: noredirect.Client(cfg.HTTPClient)}, nil
 }
 
@@ -302,9 +316,13 @@ var _ auth.Reauther = (*Source)(nil)
 // Token returns the current access token, refreshing transparently
 // when the cached token is within RefreshThreshold of expiry.
 // Concurrent callers share the in-flight exchange. If the caller running
-// that exchange gives up first, a caller whose own context is still live
-// starts a new exchange rather than returning the cancellation of the
-// caller that gave up.
+// that exchange gives up first, and that alone fails the exchange, a caller
+// whose own context is still live starts a new exchange rather than
+// returning the cancellation of the caller that gave up. Any other failure
+// reaches every caller waiting on the exchange. A panic in the exchange,
+// from the HTTP client's RoundTripper or the assertion source for example,
+// goes up through the caller running it, unchanged, and the callers waiting
+// on that exchange start a new one the same way.
 func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 	for {
 		if err := ctx.Err(); err != nil {
@@ -332,10 +350,10 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 		if !ex.abandoned {
 			return ex.token, ex.err
 		}
-		// The caller running ex gave up, and this caller's context is live:
-		// go round again to run a new exchange or wait on a newer one. A new
-		// round follows only an exchange whose caller gave up, so the loop
-		// never spins.
+		// The caller running ex gave up or panicked, and this caller's
+		// context is live: go round again to run a new exchange or wait on a
+		// newer one. A new round follows only an exchange whose caller gave
+		// up or panicked, so the loop never spins.
 	}
 }
 
@@ -367,21 +385,39 @@ func (s *Source) Reauth(ctx context.Context) error {
 
 // lead runs the exchange ex on behalf of every caller waiting on it, caches
 // the token it obtains, and publishes the result to those callers.
+//
+// A panic in the exchange unwinds lead before the result is published. The
+// deferred release still takes ex out of flight and wakes the waiters, with
+// ex marked abandoned so that they start a new exchange, and the panic goes
+// on to the caller as it was raised.
 func (s *Source) lead(ctx context.Context, ex *exchange) (auth.Token, error) {
-	tok, err := s.fetch(ctx)
+	// ex stays abandoned unless the exchange returns and its result is
+	// published below.
+	ex.abandoned = true
+	defer s.release(ex)
 
-	s.mu.Lock()
+	tok, err := s.fetch(ctx)
 	if err == nil {
+		s.mu.Lock()
 		s.cur = tok
+		s.mu.Unlock()
 	}
-	s.inflight = nil
-	s.mu.Unlock()
 	ex.token = tok
 	ex.err = err
-	ex.abandoned = err != nil && ctx.Err() != nil
-	close(ex.done)
-
+	ex.abandoned = coalesce.EndedByContext(ctx, err)
 	return tok, err
+}
+
+// release takes ex out of flight, unless a newer exchange has replaced it
+// there, then wakes the callers waiting on it. lead defers it, so it runs
+// exactly once per exchange, also when a panic unwinds lead.
+func (s *Source) release(ex *exchange) {
+	s.mu.Lock()
+	if s.inflight == ex {
+		s.inflight = nil
+	}
+	s.mu.Unlock()
+	close(ex.done)
 }
 
 func (s *Source) stale() bool {
@@ -394,7 +430,9 @@ func (s *Source) stale() bool {
 		// until the consumer replaces the TokenSource.
 		return false
 	}
-	return time.Until(s.cur.ExpiresAt) <= s.cfg.RefreshThreshold
+	// A negative threshold counts as 0, so a token past its expiry is never
+	// served (REQ-063).
+	return time.Until(s.cur.ExpiresAt) <= max(s.cfg.RefreshThreshold, 0)
 }
 
 // tokenResponse mirrors the RFC 6749 § 5.1 success body. Numeric
@@ -497,10 +535,8 @@ func (s *Source) fetch(ctx context.Context) (auth.Token, error) {
 	}
 
 	var expiresAt time.Time
-	if s := tr.ExpiresIn.String(); s != "" {
-		if secs, err := strconv.ParseInt(s, 10, 64); err == nil && secs > 0 {
-			expiresAt = time.Now().Add(time.Duration(secs) * time.Second)
-		}
+	if secs, ok := expiresin.Seconds(tr.ExpiresIn.String()); ok && secs > 0 {
+		expiresAt = time.Now().Add(time.Duration(secs) * time.Second)
 	}
 	return auth.Token{
 		Value:     tr.AccessToken,

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"math"
 	"net/http"
 	"net/url"
@@ -71,10 +72,10 @@ func New(catalog *discovery.ServiceCatalog, opts ...Option) (*Client, error) {
 		}
 	}
 	if catalog == nil {
-		return nil, fmt.Errorf("%w: ServiceCatalog is required (REQ-070)", ErrInvalidConfig)
+		return nil, fmt.Errorf("%w: ServiceCatalog is required", ErrInvalidConfig)
 	}
 	if cfg.httpClient == nil {
-		return nil, fmt.Errorf("%w: WithHTTPClient is required (REQ-021)", ErrInvalidConfig)
+		return nil, fmt.Errorf("%w: WithHTTPClient is required", ErrInvalidConfig)
 	}
 	if cfg.tokenSrc == nil {
 		cfg.tokenSrc = auth.AnonymousTokenSource()
@@ -85,6 +86,11 @@ func New(catalog *discovery.ServiceCatalog, opts ...Option) (*Client, error) {
 	if cfg.callerAttributionHeader == "" {
 		cfg.callerAttributionHeader = DefaultCallerAttributionHeader
 	}
+	// The client-default attribution is copied, so a later change to the
+	// caller's Attributes map neither reaches Do nor races with it, and its
+	// header value is encoded here once rather than on every request.
+	cfg.callerAttribution.Attributes = maps.Clone(cfg.callerAttribution.Attributes)
+	cfg.callerAttributionJSON = cfg.callerAttribution.HeaderJSON()
 	return &Client{cfg: cfg, catalog: catalog}, nil
 }
 
@@ -169,35 +175,32 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 	if c == nil {
 		return nil, fmt.Errorf("transport.Do: %w: nil Client", ErrInvalidConfig)
 	}
-	if req == nil {
-		return nil, fmt.Errorf("transport.Do: %w: nil Request", ErrInvalidConfig)
+	// Skip the wall-clock capture when no observer is registered —
+	// the cost is only sub-µs (time.Now is a vDSO call) but observerless
+	// callers are the hot path the benchmark consumer of REQ-098 cares
+	// about. Gate at the call site so emitObservation has no nil-check.
+	// It is taken first, so a refusal's Duration covers the checks too.
+	var start time.Time
+	if c.cfg.observer != nil {
+		start = time.Now()
 	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	svc, ok := c.catalog.Service(req.effectiveServiceID())
-	if !ok {
-		return nil, fmt.Errorf("%w: %q", ErrServiceUnavailable, req.effectiveServiceID())
-	}
-	// REQ-150: validate before the URL is built, so a traversal or
-	// control-character segment never reaches the wire. Both checks live
-	// here rather than inside joinTarget: the arity half needs req.Route,
-	// and joinTarget's error is re-wrapped with ErrInvalidConfig below —
-	// returning the validators' chain through that branch would wrap the
-	// sentinel twice.
-	if err := ValidateRequestPath(req.Path); err != nil {
-		return nil, err
-	}
-	// A parameter carrying `/` yields individually legal segments, so only
-	// the arity betrays it. Keyed on req.Route directly, never on
-	// effectiveRoute() — that falls back to Path, and comparing a path's
-	// arity against itself never fires.
-	if req.Route != "" && segmentCount(req.Path) != segmentCount(req.Route) {
-		return nil, fmt.Errorf("%w: %w: path %q does not match route template %q", ErrInvalidConfig, ErrInvalidPathSegment, req.Path, req.Route)
-	}
-	target, err := joinTarget(svc.BaseURL, req.Path, req.Query)
+	svc, target, err := c.prepare(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrInvalidConfig, err)
+		// REQ-098: a call refused before any attempt is still one logical
+		// call, so the observer fires for it too, with no attempt, no status
+		// and no URL, since none was built.
+		if c.cfg.observer != nil {
+			c.emitObservation(ctx, req, "", nil, err, 0, time.Since(start))
+		}
+		return nil, err
+	}
+	// The URL is turned into text once per call: the request line on every
+	// attempt uses targetURL, and the span, the observation and any
+	// WireError use safeURL, the same text without userinfo.
+	targetURL := target.String()
+	safeURL := targetURL
+	if target.User != nil {
+		safeURL = sanitisedURL(target)
 	}
 
 	tp := c.cfg.tracerProvider
@@ -212,20 +215,12 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		trace.WithAttributes(
 			attribute.String("http.method", req.effectiveMethod()),
 			attribute.String("http.route", req.effectiveRoute()),
-			attribute.String("http.url", sanitisedURL(target)),
+			attribute.String("http.url", safeURL),
 			attribute.String("openehr.spec_version", svc.SpecVersion),
 		),
 	)
 	defer span.End()
 
-	// Skip the wall-clock capture when no observer is registered —
-	// the cost is only sub-µs (time.Now is a vDSO call) but observerless
-	// callers are the hot path the benchmark consumer of REQ-098 cares
-	// about. Gate at the call site so emitObservation has no nil-check.
-	var start time.Time
-	if c.cfg.observer != nil {
-		start = time.Now()
-	}
 	var (
 		resp        *Response
 		lastErr     error
@@ -237,19 +232,22 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		attempt++
 		otelAttempt++
 		span.SetAttributes(attribute.Int("retry.attempt", otelAttempt-1))
-		resp, lastErr = c.doOnce(ctx, req, target)
+		resp, lastErr = c.doOnce(ctx, req, targetURL, safeURL)
 		if !c.shouldRetry(ctx, req, resp, lastErr, attempt) {
 			// 401→reauth safety net (REQ-063, opt-in): if the final error is
 			// a wire 401, a Reauther is configured, this Do call has not yet
 			// reauthed, and the 401's Bearer challenge allows it (REQ-166),
 			// invoke Reauth once and retry the request once.
 			// The retry re-fetches the token via tokenSourceFor → now fresh.
-			// On a second 401 (or if Reauth itself fails) the error is
-			// surfaced unchanged. This guard fires at most once per Do call.
+			// On a second 401 the error is surfaced unchanged. If Reauth itself
+			// fails, its error is surfaced wrapped, with the 401 wrapped beside
+			// it, so errors.Is still reaches ErrUnauthorized and errors.AsType
+			// the *WireError; neither text carries a request value. This guard
+			// fires at most once per Do call.
 			if !reauthed && c.cfg.reauther != nil && isWire401(lastErr) && challengePermitsReauth(lastErr) {
 				reauthed = true
 				if raErr := c.cfg.reauther.Reauth(ctx); raErr != nil {
-					lastErr = fmt.Errorf("transport: reauth: %w", raErr)
+					lastErr = fmt.Errorf("transport: reauth: %w: %w", raErr, lastErr)
 					break
 				}
 				// Single reauth-retry: cap attempt at MaxAttempts so that
@@ -298,39 +296,90 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		span.SetStatus(codes.Error, lastErr.Error())
 		span.RecordError(lastErr)
 		if c.cfg.observer != nil {
-			c.emitObservation(ctx, req, target, resp, lastErr, otelAttempt, time.Since(start))
+			c.emitObservation(ctx, req, safeURL, resp, lastErr, otelAttempt, time.Since(start))
 		}
 		return resp, lastErr
 	}
-	if resp != nil && resp.StatusCode >= 400 {
-		span.SetStatus(codes.Error, http.StatusText(resp.StatusCode))
-	}
+	// Here lastErr is nil, which only a 2xx gives: doOnce maps any other
+	// status to a *WireError, and mapWireError never returns nil.
 	if c.cfg.observer != nil {
-		c.emitObservation(ctx, req, target, resp, nil, otelAttempt, time.Since(start))
+		c.emitObservation(ctx, req, safeURL, resp, nil, otelAttempt, time.Since(start))
 	}
 	return resp, nil
+}
+
+// prepare runs the checks Do makes before any attempt and resolves the URL
+// the request is sent to. Every error it returns is a refusal: nothing has
+// left the process. The URL is nil with any error.
+func (c *Client) prepare(ctx context.Context, req *Request) (discovery.ServiceEntry, *url.URL, error) {
+	if req == nil {
+		return discovery.ServiceEntry{}, nil, fmt.Errorf("transport.Do: %w: nil Request", ErrInvalidConfig)
+	}
+	if err := ctx.Err(); err != nil {
+		return discovery.ServiceEntry{}, nil, err
+	}
+	svc, ok := c.catalog.Service(req.effectiveServiceID())
+	if !ok {
+		return discovery.ServiceEntry{}, nil, fmt.Errorf("%w: %q", ErrServiceUnavailable, req.effectiveServiceID())
+	}
+	// REQ-150: validate before the URL is built, so a traversal or
+	// control-character segment never reaches the wire. Both checks live
+	// here rather than inside joinTarget: the arity half needs req.Route,
+	// and joinTarget's error is re-wrapped with ErrInvalidConfig below —
+	// returning the validators' chain through that branch would wrap the
+	// sentinel twice.
+	if err := ValidateRequestPath(req.Path); err != nil {
+		return discovery.ServiceEntry{}, nil, err
+	}
+	// A parameter carrying `/` yields individually legal segments, so only
+	// the arity betrays it. Keyed on req.Route directly, never on
+	// effectiveRoute() — that falls back to Path, and comparing a path's
+	// arity against itself never fires. The error names the two counts and
+	// the template, never the path, which holds the caller's identifiers
+	// (REQ-093); a template holds none.
+	if req.Route != "" {
+		if got, want := segmentCount(req.Path), segmentCount(req.Route); got != want {
+			return discovery.ServiceEntry{}, nil, fmt.Errorf("%w: %w: path has %d segments, route template %q has %d", ErrInvalidConfig, ErrInvalidPathSegment, got, req.Route, want)
+		}
+	}
+	target, err := joinTarget(svc.BaseURL, req.Path, req.Query)
+	if err != nil {
+		return discovery.ServiceEntry{}, nil, fmt.Errorf("%w: %w", ErrInvalidConfig, err)
+	}
+	return svc, target, nil
 }
 
 // emitObservation delivers an Observation to the configured Observer
 // (REQ-098). Caller MUST ensure c.cfg.observer is non-nil. Panics
 // inside the observer are recovered and logged via the configured
 // slog.Logger so a faulty observer cannot break request handling.
-func (c *Client) emitObservation(ctx context.Context, req *Request, target *url.URL, resp *Response, err error, attempts int, dur time.Duration) {
+// A nil req (a call refused for it) leaves Method and Route empty; safeURL
+// is the request URL without userinfo, or "" when none was built.
+func (c *Client) emitObservation(ctx context.Context, req *Request, safeURL string, resp *Response, err error, attempts int, dur time.Duration) {
 	obs := Observation{
-		Method:   req.effectiveMethod(),
-		Route:    req.effectiveRoute(),
-		URL:      sanitisedURL(target),
+		URL:      safeURL,
 		Duration: dur,
 		Attempts: attempts,
 		Err:      err,
 		Tags:     observationTagsFromContext(ctx),
+	}
+	if req != nil {
+		obs.Method = req.effectiveMethod()
+		obs.Route = req.effectiveRoute()
 	}
 	if resp != nil {
 		obs.StatusCode = resp.StatusCode
 	}
 	defer func() {
 		if r := recover(); r != nil {
-			c.cfg.logger.Error("transport: observer panicked", "panic", r, "route", obs.Route)
+			// REQ-093: the log names the request by its route template, or
+			// the placeholder, never by obs.Route, which falls back to the
+			// Path and so can carry a caller-supplied identifier.
+			route := unroutedRoute
+			if req != nil {
+				route = req.routeOrPlaceholder()
+			}
+			c.cfg.logger.ErrorContext(ctx, "transport: observer panicked", "panic", r, "route", route)
 		}
 	}()
 	c.cfg.observer.OnRequest(obs)
@@ -343,20 +392,24 @@ func (c *Client) emitObservation(ctx context.Context, req *Request, target *url.
 // Body is empty when the body could not be read. The error is then a
 // *BodyReadError on a 2xx, and on any other status an error that wraps
 // both the *WireError and the read failure.
-func (c *Client) doOnce(ctx context.Context, req *Request, target *url.URL) (*Response, error) {
+//
+// targetURL is the request URL as text, and safeURL the same without
+// userinfo, for the WireError.
+func (c *Client) doOnce(ctx context.Context, req *Request, targetURL, safeURL string) (*Response, error) {
 	var body io.Reader
 	if len(req.Body) > 0 {
 		body = bytes.NewReader(req.Body)
 	}
-	httpReq, err := http.NewRequestWithContext(ctx, req.effectiveMethod(), target.String(), body)
+	httpReq, err := http.NewRequestWithContext(ctx, req.effectiveMethod(), targetURL, body)
 	if err != nil {
 		// A URL that does not parse arrives as url.Parse's own *url.Error,
 		// which quotes the resolved URL: its path may hold a caller-supplied
 		// identifier and its base URL a password. Name the request by its
 		// route slot instead, as the network-failure arm below does
-		// (REQ-093).
+		// (REQ-093). The marker keeps the retry policy from sending a
+		// request again that fails the same way on every attempt (REQ-091).
 		route := req.routeOrPlaceholder()
-		return nil, fmt.Errorf("transport: build request %s %s: %w", req.effectiveMethod(), route, sanitiseURLError(err, route))
+		return nil, &requestBuildError{err: fmt.Errorf("transport: build request %s %s: %w", req.effectiveMethod(), route, sanitiseURLError(err, route))}
 	}
 	if err := c.plumbHeaders(ctx, req, httpReq); err != nil {
 		return nil, err
@@ -394,7 +447,7 @@ func (c *Client) doOnce(ctx context.Context, req *Request, target *url.URL) (*Re
 	if bounded {
 		reader = io.LimitReader(httpResp.Body, limit+1)
 	}
-	respBody, readErr := io.ReadAll(reader)
+	respBody, readErr := readBody(reader, bodySizeHint(httpReq.Method, httpResp.ContentLength, limit, bounded))
 	if readErr == nil && bounded && int64(len(respBody)) > limit {
 		readErr = responseTooLargeError{limit: limit}
 	}
@@ -423,13 +476,13 @@ func (c *Client) doOnce(ctx context.Context, req *Request, target *url.URL) (*Re
 		// still reaches the WireError for the status sentinel, the retry
 		// policy and the 401 safety net. bodyReadFailure keeps the read
 		// failure's own text out of the message, as BodyReadError does.
-		return resp, fmt.Errorf("%w: %w", c.mapWireError(req, target, resp), &bodyReadFailure{cause: readErr})
+		return resp, fmt.Errorf("%w: %w", c.mapWireError(req, safeURL, resp), &bodyReadFailure{cause: readErr})
 	}
 	resp.Body = respBody
 	if is2xx {
 		return resp, nil
 	}
-	return resp, c.mapWireError(req, target, resp)
+	return resp, c.mapWireError(req, safeURL, resp)
 }
 
 func (c *Client) plumbHeaders(ctx context.Context, req *Request, httpReq *http.Request) error {
@@ -441,7 +494,7 @@ func (c *Client) plumbHeaders(ctx context.Context, req *Request, httpReq *http.R
 		httpReq.Header.Set("User-Agent", c.cfg.userAgent)
 	}
 	if c.cfg.sendCadastoHeader && c.cfg.specVersion != "" {
-		httpReq.Header.Set("Cadasto-OpenEhr-Spec-Version", c.cfg.specVersion)
+		httpReq.Header.Set(headerCadastoSpecVersion, c.cfg.specVersion)
 	}
 	if req.IfMatch != "" {
 		httpReq.Header.Set("If-Match", quoteIfMatch(req.IfMatch))
@@ -450,31 +503,32 @@ func (c *Client) plumbHeaders(ctx context.Context, req *Request, httpReq *http.R
 		httpReq.Header.Set("Prefer", v)
 	}
 	if req.AuditDetailsHeader != "" {
-		httpReq.Header.Set("openehr-audit-details", req.AuditDetailsHeader)
+		httpReq.Header.Set(headerOpenEHRAuditDetails, req.AuditDetailsHeader)
 	}
 	if req.RMVersion != "" {
-		httpReq.Header.Set("openehr-version", req.RMVersion)
+		httpReq.Header.Set(headerOpenEHRVersion, req.RMVersion)
 	}
 	if req.TemplateID != "" {
-		httpReq.Header.Set("openehr-template-id", req.TemplateID)
+		httpReq.Header.Set(headerOpenEHRTemplateID, req.TemplateID)
 	}
 	if req.URI != "" {
-		httpReq.Header.Set("openehr-uri", req.URI)
+		httpReq.Header.Set(headerOpenEHRURI, req.URI)
 	}
 	if req.ItemTag != "" {
-		httpReq.Header.Set("openehr-item-tag", req.ItemTag)
+		httpReq.Header.Set(headerOpenEHRItemTag, req.ItemTag)
 	}
 	if req.VersionItemTag != "" {
-		httpReq.Header.Set("openehr-version-item-tag", req.VersionItemTag)
+		httpReq.Header.Set(headerOpenEHRVersionItemTag, req.VersionItemTag)
 	}
 
 	// Caller attribution: per-request override wins over client default.
-	attr := c.cfg.callerAttribution
+	// The client default's header value was encoded once, at New.
+	attr, attrJSON := c.cfg.callerAttribution, c.cfg.callerAttributionJSON
 	if v, ok := CallerAttributionFromContext(ctx); ok {
-		attr = v
+		attr, attrJSON = v, v.HeaderJSON()
 	}
-	if v := attr.HeaderJSON(); v != "" {
-		httpReq.Header.Set(c.cfg.callerAttributionHeader, v)
+	if attrJSON != "" {
+		httpReq.Header.Set(c.cfg.callerAttributionHeader, attrJSON)
 		// Also surface on the active span so OTel-driven audit
 		// reaches a destination beyond the wire (REQ-066).
 		span := trace.SpanFromContext(ctx)
@@ -491,7 +545,9 @@ func (c *Client) plumbHeaders(ctx context.Context, req *Request, httpReq *http.R
 
 	// Caller-supplied extra headers — applied after so they may
 	// override the standard plumbing on purpose. Use canonical keys so
-	// overrides merge with values set via Header.Set above.
+	// overrides merge with values set via Header.Set above. The token below
+	// is set last, so a token that is not zero replaces a caller's own
+	// Authorization.
 	for k, vv := range req.Headers {
 		canon := http.CanonicalHeaderKey(k)
 		httpReq.Header.Del(canon)
@@ -526,16 +582,19 @@ func (c *Client) tokenSourceFor(ctx context.Context) auth.TokenSource {
 // mapWireError maps a non-2xx response onto a typed *WireError, decoding
 // the openEHR error envelope when possible.
 //
-// By default (rawErrorBodies false) the openEHR envelope Message and the
-// raw response body are omitted from the error — both may contain PHI.
-// The openEHR Code (a coded terminology identifier) is always preserved.
-// Enable WithRawErrorBodies to retain the full payload for diagnostics in
-// environments where WireError values cannot reach logs or traces.
-func (c *Client) mapWireError(req *Request, target *url.URL, resp *Response) error {
+// By default (rawErrorBodies false) four fields are left empty, because
+// each is free text from the server that may contain PHI: the openEHR
+// envelope's Message and ValidationErrors, the raw response body
+// (RawBody), and the Bearer challenge's ErrorDescription. The openEHR Code
+// and CodedText (coded terminology identifiers) and the challenge's other
+// fields are always preserved. Enable WithRawErrorBodies to retain the
+// full payload for diagnostics in environments where WireError values
+// cannot reach logs or traces.
+func (c *Client) mapWireError(req *Request, safeURL string, resp *Response) error {
 	we := &WireError{
 		StatusCode: resp.StatusCode,
 		Method:     req.effectiveMethod(),
-		URL:        sanitisedURL(target),
+		URL:        safeURL,
 		Route:      req.routeOrPlaceholder(),
 		Sentinel:   statusToSentinel(resp.StatusCode),
 	}
@@ -555,7 +614,7 @@ func (c *Client) mapWireError(req *Request, target *url.URL, resp *Response) err
 	// free text from the server and is kept only under that opt-in, like
 	// the envelope's Message above.
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-		we.Challenge = parseBearerChallenge(resp.Header.Values("WWW-Authenticate"))
+		we.Challenge = parseBearerChallenge(resp.Header.Values(headerWWWAuthenticate))
 		if we.Challenge != nil && !c.cfg.rawErrorBodies {
 			we.Challenge.ErrorDescription = ""
 		}
@@ -703,6 +762,11 @@ func (c *Client) shouldRetry(ctx context.Context, req *Request, resp *Response, 
 		if errors.Is(err, ErrInsecureRedirect) {
 			return false
 		}
+		// REQ-091: a request that could not be built has the same method and
+		// URL on every attempt, so every attempt would fail the same way.
+		if _, ok := errors.AsType[*requestBuildError](err); ok {
+			return false
+		}
 		// Anything else is a network / transport / transient token error;
 		// retry per the method's idempotency.
 		return true
@@ -719,6 +783,14 @@ func joinTarget(base *url.URL, path string, query url.Values) (*url.URL, error) 
 	}
 	out := base.Clone()
 	out.Path = joinPaths(base.Path, path)
+	// The clone keeps the base's RawPath, which no longer matches the joined
+	// Path, so String would encode the whole path again from its decoded
+	// form and turn an escaped "/" (%2F) in the base into a real separator.
+	// The base keeps its own encoding instead; the request path is still
+	// encoded from its decoded form alone (REQ-150, REQ-095).
+	if base.RawPath != "" {
+		out.RawPath = joinPaths(base.EscapedPath(), (&url.URL{Path: path}).EscapedPath())
+	}
 	if len(query) > 0 {
 		out.RawQuery = mergeQuery(base.RawQuery, query)
 	}
@@ -772,9 +844,12 @@ func joinPaths(a, b string) string {
 	return a + b
 }
 
-// sanitisedURL strips any userinfo from u for emission on logs and
-// OTel attributes (REQ-090). Bearer tokens never appear in u (they're
-// in headers, not the URL) but defensive stripping costs nothing.
+// sanitisedURL returns u as text with its userinfo removed, for the
+// http.url span attribute (REQ-090), Observation.URL (REQ-098) and
+// WireError.URL. Only the userinfo goes: the path and the query are kept as
+// sent, so they can still carry caller-supplied identifiers and any query
+// parameter of the service base URL. Bearer tokens never appear in u (they
+// are in headers, not the URL).
 func sanitisedURL(u *url.URL) string {
 	if u == nil {
 		return ""
@@ -855,4 +930,39 @@ func Decode[T any](ctx context.Context, c *Client, req *Request) (*T, *Metadata,
 		}
 	}
 	return out, resp.Metadata, nil
+}
+
+// maxBodyPrealloc caps the buffer readBody sizes from a server-declared
+// Content-Length before any body byte has arrived, so a false Content-Length
+// cannot force a large allocation. A longer body still reads in full, up to
+// the WithMaxResponseBody ceiling: the buffer grows as bytes arrive.
+const maxBodyPrealloc = 4 << 20
+
+// bodySizeHint returns the size readBody preallocates for a response body: the
+// declared Content-Length, at most limit when the read is bounded and at most
+// maxBodyPrealloc, or -1 when the length is unknown. A HEAD response declares
+// the length of a body it does not carry, so it gets -1 too.
+func bodySizeHint(method string, contentLength, limit int64, bounded bool) int64 {
+	if contentLength < 0 || method == http.MethodHead {
+		return -1
+	}
+	hint := min(contentLength, maxBodyPrealloc)
+	if bounded {
+		hint = min(hint, limit)
+	}
+	return hint
+}
+
+// readBody reads r to its end, as io.ReadAll does. With a hint of 0 or more
+// the buffer is sized for that many bytes up front, plus bytes.MinRead so
+// that reading the end of a body of exactly that length needs no new
+// allocation; with a negative hint it is io.ReadAll.
+func readBody(r io.Reader, hint int64) ([]byte, error) {
+	if hint < 0 {
+		return io.ReadAll(r)
+	}
+	var buf bytes.Buffer
+	buf.Grow(int(hint) + bytes.MinRead)
+	_, err := buf.ReadFrom(r)
+	return buf.Bytes(), err
 }

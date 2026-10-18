@@ -1,0 +1,8 @@
+${path},${condition},${expected_file},${nr_of_results}
+ec/start_time,"= '2021-12-21T15:19:31.649613+01:00'",expected_compare_by_dv_date_eq1.json,1
+ec/start_time,"= '2021-12-21T15:19:31.649613+02:00'",expected_compare_by_dv_date_eq2.json,1
+ec/start_time,">= '2021-12-21T15:19:31.649613+01:00'",expected_compare_by_dv_date_greater_eq.json,2
+ec/start_time,"> '2021-12-21T15:19:31.649613+01:00'",expected_compare_by_dv_date_greater.json,1
+ec/start_time,"<= '2021-12-21T15:19:31.649613+01:00'",expected_compare_by_dv_date_lower_eq.json,3
+ec/start_time,"< '2021-12-21T15:19:31.649613+01:00'",expected_compare_by_dv_date_lower.json,2
+ec/start_time,"!= '2021-12-21T15:19:31.649613+01:00'",expected_compare_by_dv_date_different.json,3

@@ -1,0 +1,4 @@
+${path},${where},${expected_file},${nr_of_results}
+"o/data[at0001]/events[at0002]/data[at0003]/items[at0004]/value/value","'Lorem ipsum3'",expected_aggregate_function_and_where_max_at4_val_ent.json,1
+"o/data[at0001]/events[at0002]/data[at0003]/items[at0005]/value/value","'term1'",expected_aggregate_function_and_where_max_at5_val_ent.json,1
+"o/data[at0001]/events[at0002]/data[at0003]/items[at0010]/value/magnitude",400,expected_aggregate_function_and_where_max_at10_val_mag_ent.json,1

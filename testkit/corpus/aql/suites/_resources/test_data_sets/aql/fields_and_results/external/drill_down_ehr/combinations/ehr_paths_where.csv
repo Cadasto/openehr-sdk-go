@@ -1,0 +1,21 @@
+${path},${where},${expected_file},${nr_of_results}
+"subject","name/value = 'EHR Status'",expected_ehr_status_with_where__subject.json,1
+"subject","archetype_node_id = 'openEHR-EHR-EHR_STATUS.generic.v1'",expected_ehr_status_with_where__subject.json,1
+"subject","subject/external_ref/id/value = '${subject_external_ref_value}'",expected_ehr_status_with_where__subject.json,1
+"subject","subject/external_ref/namespace = '${subject_external_ref_namespace}'",expected_ehr_status_with_where__subject.json,1
+"subject","subject/external_ref/id/scheme = 'id_scheme'",expected_ehr_status_with_where__subject.json,1
+"subject","subject/external_ref/type = 'PERSON'",expected_ehr_status_with_where__subject.json,1
+"subject","other_details/name/value = 'family group'",expected_ehr_status_with_where__subject.json,1
+"subject","other_details/items[at0001]/name/value = 'family group id'",expected_ehr_status_with_where__subject.json,1
+"subject","other_details/items[at0001]/value/id = '55175056'",expected_ehr_status_with_where__subject.json,1
+"subject","other_details/items[at0001]/value/type = 'FAMILY_GROUP_ID'",expected_ehr_status_with_where__subject.json,1
+"subject","other_details/items[at0001]/value/issuer = 'MoH'",expected_ehr_status_with_where__subject.json,1
+"subject","other_details/items[at0001]/value/assigner = 'MoH'",expected_ehr_status_with_where__subject.json,1
+"subject","is_queryable = true",expected_ehr_status_with_where__subject.json,1
+"subject","is_modifiable = true",expected_ehr_status_with_where__subject.json,1
+"uid/value","name/value = 'EHR Status'",expected_ehr_status_with_where__uid.json,1
+"uid/value","archetype_node_id = 'openEHR-EHR-EHR_STATUS.generic.v1'",expected_ehr_status_with_where__uid.json,1
+"uid/value","subject/external_ref/id/value = '${subject_external_ref_value}'",expected_ehr_status_with_where__uid.json,1
+"uid/value","other_details/items[at0001]/value/id = '55175056'",expected_ehr_status_with_where__uid.json,1
+"uid/value","other_details/items[at0001]/value/issuer = 'MoH'",expected_ehr_status_with_where__uid.json,1
+"uid/value","is_modifiable = true",expected_ehr_status_with_where__uid.json,1
