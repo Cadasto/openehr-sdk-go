@@ -138,9 +138,10 @@ func (CReal) isPrimitive() {}
 // When List is non-empty and Range is bounded, it picks the first list
 // entry inside the range (Validate requires both list membership and
 // range containment). When no list entry lies inside the range, it
-// falls through to a range-only example: the range's lower bound when
-// bounded (adjusted to mid-range when the lower side is exclusive),
-// else float64(0).
+// falls through to a range-only example: the lower bound when there is
+// one (moved inside when exclusive: to the midpoint when the upper side
+// is bounded, else to lower + 1), else the upper bound (minus 1 when
+// exclusive), else float64(0).
 func (c CReal) ExampleValue() any {
 	if len(c.List) > 0 {
 		if !c.Range.IsBounded() {
@@ -153,27 +154,7 @@ func (c CReal) ExampleValue() any {
 		}
 		// List exists but every entry is out of range — fall through.
 	}
-	if c.Range.IsBounded() && !c.Range.LowerUnbounded {
-		f := c.Range.Lower
-		if !c.Range.LowerInclusive {
-			// Move just inside the exclusive lower; midpoint with
-			// upper when bounded keeps us safely inside both sides.
-			if !c.Range.UpperUnbounded {
-				f = (c.Range.Lower + c.Range.Upper) / 2
-			} else {
-				f = c.Range.Lower + 1
-			}
-		}
-		return f
-	}
-	if c.Range.IsBounded() && !c.Range.UpperUnbounded {
-		f := c.Range.Upper
-		if !c.Range.UpperInclusive {
-			f = c.Range.Upper - 1
-		}
-		return f
-	}
-	return float64(0)
+	return exampleMagnitude(c.Range)
 }
 
 // Validate accepts float32 / float64 and any integer type (widened

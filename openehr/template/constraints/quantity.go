@@ -51,8 +51,9 @@ func (c DvQuantity) ExampleValue() any {
 	return QuantityValue{Magnitude: mag, Units: u.Units, Precision: -1}
 }
 
-// exampleMagnitude picks an in-range float for a quantity unit. Same
-// "lower bound nudged inside exclusive ends" rule as [CReal].
+// exampleMagnitude picks an in-range float from r, for a quantity
+// unit's magnitude and for [CReal.ExampleValue]: the lower bound nudged
+// inside an exclusive end, else the upper bound likewise, else 0.
 func exampleMagnitude(r NumericRange) float64 {
 	if !r.IsBounded() {
 		return 0
