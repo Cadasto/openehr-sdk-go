@@ -115,6 +115,8 @@ Application code (cmd/examples, downstream consumers)
     └─ (building-block use, no transport) ──→ openehr/template/
 
 openehr/{serialize, instance, client/*} ──→ openehr/terminology/   (stdlib-only; sits below openehr/rm, which may import it later — REQ-034)
+openehr/{rm, rm/typereg, serialize/canjson} ──→ openehr/internal/refused/   (stdlib-only; carries a refused literal to DecodeError.Value)
+openehr/{rm/typereg, serialize/canjson} ──→ openehr/template/constraints/   (stdlib-only; the Redacted type DecodeError.Value holds)
 
 cadasto/care      ──→ openehr/client/*
 cadasto/{extra, mpi, admin} ──→ transport/
@@ -129,6 +131,7 @@ testkit/  -. helpers for .-→ all of the above
 - `transport/` depends on `auth/`, never the reverse.
 - `openehr/client/*` depends on `transport/`, `openehr/rm/`, `openehr/serialize/`, never on `cadasto/…`.
 - `openehr/rm/`'s generated marshal files import `openehr/serialize/canxml/` and `openehr/internal/xmlunmatched/`. That edge does not cycle: `canxml` imports only `openehr/rm/typereg/`, `openehr/serialize/internal/poly` and `openehr/internal/xmlunmatched/` from this module, and `xmlunmatched` imports only the standard library ([ADR 0002](../adr/0002-bmm-codegen-decisions.md) D9).
+- `openehr/rm/typereg/` imports `openehr/template/constraints/`, for the `Redacted` type that `DecodeError.Value` holds ([§ REQ-052 *Value-free decode errors*](wire.md#req-052)), and `openehr/internal/refused/`, which carries a literal an RM primitive codec refused to the codecs' entry points. `openehr/rm/` (its `Real`, `Integer` and `Character` codecs) imports `openehr/internal/refused/` to hand the literal over, and `openehr/serialize/canjson/` imports both packages to read it into `Value`. Both packages import only the standard library, so none of these edges cycles back into the RM or the codecs. `TestRefusedImportsOnlyTheStandardLibrary` holds this for `refused`, and `TestREQ103ValidatorsImportNoIO`, which admits a short list of standard-library packages, for `constraints`.
 - `openehr/serialize/canjson/` reaches the RM's attribute tables through `internal/rmjsonwalk/`, which imports `openehr/rm/rminfo/` and `internal/rmjsonwalk/polyreg/`, never `openehr/rm/`; `openehr/rm/`'s generated init registers its interface table into `polyreg`, which imports only the standard library. `TestCanJSONDoesNotImportTheRM` holds this.
 - `cadasto/<X>` may depend on `openehr/client/*`, `transport/`, `openehr/rm/`, etc. — but never on another `cadasto/<Y>`. `cadasto/datamap` is the exception on the wire side: REQ-058 keeps it off `transport/` and `auth/`.
 - `openehr/bmm/` depends on no `transport/`, `auth/` or HTTP package; the rule is [REQ-045](bmm-conformance.md#req-045--bmm-loader-is-a-building-block)'s.

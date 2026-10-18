@@ -13,7 +13,9 @@ import (
 // envelopes, each the Inner of the one before: every envelope's own text in
 // turn, in each of the four forms Path and Type give it, then the cause of the
 // innermost. It is the text formatting each Inner in turn gives, so a chain
-// reads the same however it is rendered.
+// reads the same however it is rendered. The causes are sentinels, whose text
+// the value-free rule keeps (REQ-052); a cause of a type the renderer does not
+// know is named by its class alone, as the last case shows.
 func TestREQ056_DecodeErrorChainMessage(t *testing.T) {
 	var typedNil *typereg.DecodeError
 	for _, tc := range []struct {
@@ -25,10 +27,10 @@ func TestREQ056_DecodeErrorChainMessage(t *testing.T) {
 			name: "four forms, then the cause",
 			err: &typereg.DecodeError{Path: "/a", Type: "A", Inner: &typereg.DecodeError{
 				Path: "/b", Inner: &typereg.DecodeError{
-					Type: "C", Inner: &typereg.DecodeError{Inner: errors.New("boom")},
+					Type: "C", Inner: &typereg.DecodeError{Inner: typereg.ErrUnknownType},
 				},
 			}},
-			want: `decode /a (_type="A"): decode /b: decode _type="C": decode: boom`,
+			want: `decode /a (_type="A"): decode /b: decode _type="C": decode: typereg: _type not in registry`,
 		},
 		{
 			name: "innermost without a cause",
@@ -43,9 +45,14 @@ func TestREQ056_DecodeErrorChainMessage(t *testing.T) {
 		{
 			name: "a wrapped envelope is the cause, rendered whole",
 			err: &typereg.DecodeError{Path: "/a", Inner: errors.Join(
-				&typereg.DecodeError{Path: "/b", Inner: errors.New("boom")},
+				&typereg.DecodeError{Path: "/b", Inner: typereg.ErrMissingType},
 			)},
-			want: `decode /a: decode /b: boom`,
+			want: `decode /a: decode /b: typereg: _type discriminator missing`,
+		},
+		{
+			name: "a cause of a type it does not know is named by its class",
+			err:  &typereg.DecodeError{Path: "/a", Inner: &typereg.DecodeError{Path: "/b", Inner: errors.New("boom")}},
+			want: `decode /a: decode /b: cause withheld (*errors.errorString)`,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -73,7 +80,7 @@ func TestREQ056_DecodeErrorChainMessage(t *testing.T) {
 // magnitude.
 func TestREQ056_DecodeErrorChainRendersInLinearMemory(t *testing.T) {
 	const length = 4000
-	err := &typereg.DecodeError{Path: "/items", Type: "ELEMENT", Inner: errors.New("boom")}
+	err := &typereg.DecodeError{Path: "/items", Type: "ELEMENT", Inner: typereg.ErrUnknownType}
 	for range length - 1 {
 		err = &typereg.DecodeError{Path: "/items", Type: "CLUSTER", Inner: err}
 	}
@@ -95,7 +102,7 @@ func TestREQ056_DecodeErrorChainRendersInLinearMemory(t *testing.T) {
 	if got := strings.Count(msg, "decode /items"); got != length {
 		t.Fatalf("Error() names %d envelopes; want %d", got, length)
 	}
-	if !strings.HasSuffix(msg, `decode /items (_type="ELEMENT"): boom`) {
+	if !strings.HasSuffix(msg, `decode /items (_type="ELEMENT"): typereg: _type not in registry`) {
 		t.Fatalf("Error() ends %q; want the innermost envelope and its cause", msg[max(0, len(msg)-80):])
 	}
 	if limit := 8 * uint64(len(msg)); best > limit {

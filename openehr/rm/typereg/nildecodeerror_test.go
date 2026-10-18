@@ -109,11 +109,16 @@ func TestDecodeErrorToleratesAnUnguardedNilInner(t *testing.T) {
 		t.Errorf("Error() = %q, want it to still name Path and Type despite the unreadable Inner", got)
 	}
 
-	// A withCause Inner still renders its own message, so the guard did not
-	// swallow the signal.
-	withCause := &typereg.DecodeError{Path: "/composition/content", Type: "OBSERVATION", Inner: errors.New("boom")}
-	if got, want := withCause.Error(), "decode /composition/content (_type=\"OBSERVATION\"): boom"; got != want {
+	// A cause whose text the value-free rule keeps (REQ-052), a sentinel,
+	// still renders its own message, so the guard did not swallow the signal.
+	withCause := &typereg.DecodeError{Path: "/composition/content", Type: "OBSERVATION", Inner: typereg.ErrUnknownType}
+	if got, want := withCause.Error(), "decode /composition/content (_type=\"OBSERVATION\"): typereg: _type not in registry"; got != want {
 		t.Errorf("Error() with a withCause Inner = %q, want %q", got, want)
+	}
+	// The unreadable Inner is named by its class, as any cause the renderer
+	// cannot read is, rather than by fmt's "<nil>".
+	if want := "cause withheld (*typereg_test.unguardedNilError)"; !strings.Contains(got, want) {
+		t.Errorf("Error() with a boxed typed-nil Inner = %q, want it to contain %q", got, want)
 	}
 }
 

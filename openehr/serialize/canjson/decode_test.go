@@ -344,6 +344,10 @@ func TestUnmarshalNestedDecodeErrorIsNotShapeTagged(t *testing.T) {
 // DecodeError names the slot on its Path, and errors.Is reaches
 // canjson.ErrInvalidShape. Only the polymorphic *dispatch* failure
 // (missing / unknown / mismatched `_type`) stays outside the sentinel.
+//
+// Since every entry-point failure is a DecodeError (REQ-052), the outermost
+// one is the entry point's, whose Path is the failing value's pointer, which
+// passes through the slot; the slot's own envelope is beneath it.
 func TestUnmarshalSlotNestedShapeFailureCarriesBothClassifications(t *testing.T) {
 	// ELEMENT.value is declared DATA_VALUE, a genuine polymorphic slot the
 	// streaming codec resolves through the registered DataValue hook. The wire
@@ -366,8 +370,12 @@ func TestUnmarshalSlotNestedShapeFailureCarriesBothClassifications(t *testing.T)
 	if !ok {
 		t.Fatalf("err = %v (%T); want errors.As to reach *canjson.DecodeError", err, err)
 	}
-	if de.Path != "/value" {
-		t.Errorf("DecodeError.Path = %q, want %q: the slot it failed at, so a consumer keeps the path alongside the kind", de.Path, "/value")
+	if de.Path != "/value/units" {
+		t.Errorf("entry point's DecodeError.Path = %q, want %q: the failing value, through the slot", de.Path, "/value/units")
+	}
+	slot, ok := errors.AsType[*canjson.DecodeError](de.Inner)
+	if !ok || slot.Path != "/value" || slot.Type != "DV_QUANTITY" {
+		t.Errorf("err = %v; want the slot's own DecodeError beneath, with Path %q and Type DV_QUANTITY: the slot it failed at, so a consumer keeps the path alongside the kind", err, "/value")
 	}
 	if !errors.Is(err, canjson.ErrInvalidShape) {
 		t.Errorf("err = %v; a shape failure raised beneath a polymorphic slot stays a shape failure — a DecodeError must not strip the classification", err)
@@ -403,7 +411,9 @@ func TestUnmarshalSlotNestedShapeFailureCarriesBothClassifications(t *testing.T)
 // it as *DecodeError{Path: "/name"}. Both classifications hold, exactly
 // as for the `_type`-present slot. ErrMissingType is *not* in the chain:
 // the fallback consumed that condition and the dispatch error was
-// discarded — what remains is the shape failure the retry produced.
+// discarded — what remains is the shape failure the retry produced. The
+// entry point's DecodeError (REQ-052) sits above the slot's, naming the
+// failing value through the slot.
 func TestUnmarshalNarrowSlotMissingTypeFallbackKeepsBothClassifications(t *testing.T) {
 	// `name` carries no `_type`, so dispatch falls back to DV_TEXT; its
 	// `value` must be a string, and 5 is not one.
@@ -417,8 +427,11 @@ func TestUnmarshalNarrowSlotMissingTypeFallbackKeepsBothClassifications(t *testi
 	if !ok {
 		t.Fatalf("err = %v (%T); want errors.As to reach *canjson.DecodeError", err, err)
 	}
-	if de.Path != "/name" {
-		t.Errorf("DecodeError.Path = %q, want %q — the narrow slot the fallback failed at", de.Path, "/name")
+	if de.Path != "/name/value" {
+		t.Errorf("entry point's DecodeError.Path = %q, want %q — the failing value, through the narrow slot", de.Path, "/name/value")
+	}
+	if slot, ok := errors.AsType[*canjson.DecodeError](de.Inner); !ok || slot.Path != "/name" {
+		t.Errorf("err = %v; want the slot's own DecodeError beneath, with Path %q — the narrow slot the fallback failed at", err, "/name")
 	}
 	if !errors.Is(err, canjson.ErrInvalidShape) {
 		t.Errorf("err = %v; the fallback decodes through DV_TEXT's own funnel, so its shape failure must keep the sentinel", err)

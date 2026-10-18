@@ -105,6 +105,8 @@ requirements:
     status: draft
     implementation: landed
     packages: [transport, openehr/client]
+    tests:
+      - openehr/internal/refused/imports_test.go
 
   - id: REQ-020
     title: Context-first I/O
@@ -451,7 +453,7 @@ requirements:
     canonical: docs/specifications/wire.md#req-052
     status: draft
     implementation: landed
-    packages: [openehr/serialize/canjson, openehr/rm, openehr/rm/typereg, openehr/aom/aom14, testkit/corpus, testkit/fixtures, testkit/wireequiv, testkit/expectedform]
+    packages: [openehr/serialize/canjson, openehr/rm, openehr/rm/typereg, openehr/internal/refused, openehr/aom/aom14, testkit/corpus, testkit/fixtures, testkit/wireequiv, testkit/expectedform]
     probes: [PROBE-030, PROBE-031, PROBE-038]
     tests:
       - internal/bmmgen/render_interval_bound_test.go
@@ -465,21 +467,27 @@ requirements:
       - openehr/client/demographic/versioned_test.go
       - openehr/instance/instance_test.go
       - openehr/instance/polymorphic_roundtrip_test.go
+      - openehr/internal/refused/refused_test.go
       - openehr/rm/character_test.go
       - openehr/rm/character_text_test.go
       - openehr/rm/integer_test.go
       - openehr/rm/interval_bound_test.go
       - openehr/rm/like_interfaces_test.go
+      - openehr/rm/literal_capture_test.go
       - openehr/rm/numeric_wire_test.go
       - openehr/rm/quoted_literal_test.go
       - openehr/rm/real_test.go
+      - openehr/rm/typereg/decodeerror_chain_test.go
+      - openehr/rm/typereg/nildecodeerror_test.go
       - openehr/rm/typereg/registry_test.go
+      - openehr/rm/typereg/valuefree_test.go
       - openehr/serialize/canjson/absent_mandatory_test.go
       - openehr/serialize/canjson/bare_v2_decode_test.go
       - openehr/serialize/canjson/corpus_parity_test.go
       - openehr/serialize/canjson/decode_test.go
       - openehr/serialize/canjson/edgecases_test.go
       - openehr/serialize/canjson/encode_test.go
+      - openehr/serialize/canjson/entryerror_internal_test.go
       - openehr/serialize/canjson/interval_failed_decode_test.go
       - openehr/serialize/canjson/interval_flag_defaults_test.go
       - openehr/serialize/canjson/interval_open_side_test.go
@@ -496,8 +504,11 @@ requirements:
       - openehr/serialize/canjson/type_census_test.go
       - openehr/serialize/canjson/typednil_slot_test.go
       - openehr/serialize/canjson/unmatched_test.go
+      - openehr/serialize/canjson/valuefree_test.go
       - openehr/serialize/canxml/interval_open_side_test.go
       - openehr/serialize/canxml/unmatched_test.go
+      - openehr/serialize/canxml/valuefree_test.go
+      - openehr/serialize/internal/poly/poly_test.go
       - openehr/serialize/simplified/datatypes_test.go
       - openehr/serialize/simplified/fit_test.go
       - openehr/templatecompile/external_test.go

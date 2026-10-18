@@ -8,9 +8,10 @@ package typereg
 import (
 	"encoding/json/jsontext"
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
 
 // Sentinel errors returned by [Registry.Decode], [DecodeAs] and the decode
@@ -72,20 +73,42 @@ var (
 	ErrInvalidShape = errors.New("canjson: invalid JSON shape")
 )
 
-// DecodeError is the unified envelope returned by the canjson and
-// canxml decoders at polymorphic-dispatch sites. [DecodeInto] also
-// returns it for a whole-value `_type` mismatch on "/_type", for a depth
-// refusal ([ErrMaxDepthExceeded]) and for a nil argument
-// ([ErrNilArgument]), as does [DecodePolymorphic] for the last two.
+// DecodeError is the unified envelope of the canjson and canxml decoders.
+// canjson.Unmarshal and canjson.Decoder.Decode return every failure the
+// input causes as a DecodeError at the top of the chain, so
+// errors.AsType[*DecodeError] finds one on any such failure, and a
+// polymorphic slot that fails adds one of its own beneath it.
+// [DecodeInto] also returns it for a whole-value `_type` mismatch on
+// "/_type", for a depth refusal ([ErrMaxDepthExceeded]) and for a nil
+// argument ([ErrNilArgument]), as does [DecodePolymorphic] for the last two.
 // It lives here in typereg (rather than in a codec-specific package) so
 // the generator-emitted UnmarshalJSONFrom methods on the generated RM
 // types can construct it without forming an `openehr/rm →
 // serialize/...` import cycle.
 //
-// Path is a JSON-pointer-ish or XPath-ish string describing the
-// failed node; Type is the observed discriminator (may be empty when
-// the discriminator was missing); Inner unwraps to one of the
-// typereg sentinels (or a codec-defined shape error).
+// Path is a JSON Pointer (canonical JSON) or an element path (canonical
+// XML) naming the failed node; Type is the observed discriminator (may be
+// empty when the discriminator was missing, and empty on the canjson entry
+// points' envelope unless the failed node is the slot that read it); Value is the JSON text of the
+// value the decoder refused, as the document wrote it, which the canjson
+// entry points set; Inner is the failure itself.
+//
+// Because every failure is a DecodeError now, the type alone no longer
+// tells a dispatch failure from any other: classify with errors.Is against
+// the sentinels instead ([ErrMissingType], [ErrUnknownType],
+// [ErrTypeMismatch] for dispatch, [ErrInvalidShape] for shape,
+// [ErrMaxDepthExceeded] for depth), or errors.AsType for a typed cause such
+// as *jsontext.SyntacticError for malformed JSON.
+//
+// The fields fall in two classes, as the fields of a validation Issue do:
+//
+//   - Value-free: Path, Type and the text Error returns. They carry no value
+//     from the document, only its structure: member names, `_type` values,
+//     RM type and attribute names.
+//   - Value-bearing: Value, a [constraints.Redacted] that prints as
+//     "[redacted]" and encodes as null; Value.Reveal returns the text. Inner
+//     is the original error, whose own text may name the value: a caller
+//     that unwraps to it asks for the value, as one that reads Value does.
 //
 // The envelope is classification-neutral in both directions: it never
 // adds [ErrInvalidShape] to what it wraps, and, because Unwrap exposes
@@ -98,51 +121,43 @@ var (
 type DecodeError struct {
 	Path  string
 	Type  string
+	Value constraints.Redacted
 	Inner error
 }
 
-// Error names the failed node and the wrapped cause. A nil receiver
-// answers with the zero DecodeError's text rather than dereferencing.
-// This type is the documented errors.As / errors.AsType out-parameter
-// for both codecs (it is re-exported as canjson.DecodeError and
-// canxml.DecodeError), so a failed match can leave a typed nil in
-// caller hands.
+// Error names the failed node and its cause, with no value from the
+// document. A nil receiver answers with the zero DecodeError's
+// text rather than dereferencing. This type is the documented errors.As /
+// errors.AsType out-parameter for both codecs (it is re-exported as
+// canjson.DecodeError and canxml.DecodeError), so a failed match can leave a
+// typed nil in caller hands.
 //
-// When Inner is itself a DecodeError, the text names both nodes, the
-// outer first, and so on down a chain of them: a failure inside nested
-// polymorphic slots names every slot from the outside in, then the cause.
-// The whole chain is written in one pass, so its cost grows with its
-// length rather than with the square of it.
+// The node is written as "decode <path> (_type=\"<type>\")", with the parts
+// that are empty left out. The path is written whole, however long the
+// document makes it, and Go-quoted when it holds a character strconv.Quote
+// escapes, such as a line feed in a member name.
+// The cause follows, written by one rule: text is kept only where it is
+// known to hold no value, the structure of the standard library's errors, a
+// sentinel's fixed text, or a message in the forms the SDK's codecs write; a
+// value-bearing field (a *json.SemanticError's JSONValue, what a
+// *jsontext.SyntacticError's cause quotes, a *strconv.NumError's Num) is
+// left out; and any other cause is named by its Go type alone, never quoted.
+// An error that wraps several causes, such as one errors.Join returns, has
+// them written in turn, separated by "; " where its own text between them
+// is not in those forms. So the text stays on one line.
+//
+// When Inner is itself a DecodeError, the text names both nodes, the outer
+// first, and so on down the chain: a failure inside nested polymorphic slots
+// names every slot from the outside in, then the cause. The whole chain is
+// written in one pass, so its cost grows with its length rather than with
+// the square of it. That holds where an error of another type wraps a
+// DecodeError at every level too, as fmt.Errorf does: the text of such an
+// error repeats the text below it, so it is left out. A cause whose Error
+// method panics, such as a typed-nil pointer without a nil guard, is named
+// by its class rather than taking the caller down.
 func (e *DecodeError) Error() string {
-	if e == nil {
-		return (&DecodeError{}).Error()
-	}
 	var b strings.Builder
-	for {
-		e.writeNode(&b)
-		// Only an envelope held directly continues the chain. Any other
-		// error, one that wraps an envelope included, is the cause and is
-		// written whole below.
-		next, ok := e.Inner.(*DecodeError) //nolint:errorlint // a direct link only, see above
-		if !ok || next == nil {
-			break
-		}
-		e = next
-	}
-	// Every producer sets Inner; only a caller-built zero value leaves it
-	// nil. Inner is any error a codec or caller can supply — including a
-	// boxed typed-nil pointer whose own Error() dereferences unguarded, the
-	// shape a failed errors.As / errors.AsType leaves behind — so a direct
-	// err.Error() call is not safe here the way it is for this package's own
-	// guarded types. %v is: fmt recovers a panicking Error() method itself
-	// and renders a nil-pointer receiver as "<nil>" (REQ-025 nil-receiver
-	// axis). A typed-nil *DecodeError ends the chain above and lands here
-	// too, where its own nil guard answers.
-	if e.Inner == nil {
-		b.WriteString("unspecified error")
-	} else {
-		fmt.Fprintf(&b, "%v", e.Inner)
-	}
+	writeValueFree(&b, e)
 	return b.String()
 }
 
@@ -152,7 +167,7 @@ func (e *DecodeError) writeNode(b *strings.Builder) {
 	b.WriteString("decode")
 	if e.Path != "" {
 		b.WriteByte(' ')
-		b.WriteString(e.Path)
+		writePath(b, e.Path)
 	}
 	switch {
 	case e.Path != "" && e.Type != "":
@@ -164,6 +179,23 @@ func (e *DecodeError) writeNode(b *strings.Builder) {
 		b.WriteString(strconv.Quote(e.Type))
 	}
 	b.WriteString(": ")
+}
+
+// writePath writes path as it is, or Go-quoted when it holds a character
+// strconv.Quote escapes: a control character, a line separator or another
+// character that does not print, invalid UTF-8, a quote or a backslash. A
+// member name is structure and a document chooses it, so quoting keeps a
+// name from starting a new log line or forging the text around it, while an
+// ordinary path reads as it always has.
+func writePath(b *strings.Builder, path string) {
+	// An escape is always longer than the character it replaces, so the
+	// quoted form is two bytes longer than path exactly when nothing in path
+	// needed one.
+	if quoted := strconv.Quote(path); len(quoted) != len(path)+len(`""`) {
+		b.WriteString(quoted)
+		return
+	}
+	b.WriteString(path)
 }
 
 // Unwrap returns the wrapped error so errors.Is / errors.As reach the
@@ -197,6 +229,11 @@ func (e *DecodeError) Unwrap() error {
 // sentinel, because ErrInvalidShape means "JSON-level shape", not "any
 // decode failure".
 //
+// The wrapper holds err rather than formatting its message, so wrapping
+// costs nothing in proportion to err's text: a failure inside nested
+// polymorphic slots passes through one funnel per slot on its way out, and
+// a formatted message at each would cost the square of the depth.
+//
 // A nil err returns nil, so a caller cannot manufacture an error out
 // of a success.
 func WrapShapeError(rmType string, err error) error {
@@ -204,7 +241,7 @@ func WrapShapeError(rmType string, err error) error {
 		return nil
 	}
 	if de, ok := errors.AsType[*DecodeError](err); ok && de != nil {
-		return fmt.Errorf("canjson: %s: %w", rmType, err)
+		return &shapeError{rmType: rmType, cause: err, unclassified: true}
 	}
 	return &shapeError{rmType: rmType, cause: err}
 }
@@ -261,13 +298,16 @@ func ClassifyDuplicate(err error) error {
 	return err
 }
 
-// shapeError is the [ErrInvalidShape]-carrying error [WrapShapeError]
-// returns. It is unexported: consumers classify with errors.Is against
-// the sentinel and reach the cause with errors.As, so the concrete type
-// is not part of the public surface.
+// shapeError is the error [WrapShapeError] and [ClassifyShape] return.
+// It carries [ErrInvalidShape] unless unclassified is set, which
+// WrapShapeError sets for a cause that already carries a [DecodeError]. It
+// is unexported: consumers classify with errors.Is against the sentinel and
+// reach the cause with errors.As, so the concrete type is not part of the
+// public surface.
 type shapeError struct {
-	rmType string
-	cause  error
+	rmType       string
+	cause        error
+	unclassified bool
 }
 
 // Error reproduces the `canjson: <RM_TYPE>: <cause>` text the generated
@@ -294,7 +334,8 @@ func (e *shapeError) Unwrap() error {
 
 // Is reports the sentinel this type carries. It matches [ErrInvalidShape]
 // only — the classification [WrapShapeError] attaches — and leaves every
-// other target to the ordinary unwrap walk down e.cause.
+// other target to the ordinary unwrap walk down e.cause. An unclassified
+// wrapper matches nothing itself.
 func (e *shapeError) Is(target error) bool {
-	return target == ErrInvalidShape
+	return e != nil && !e.unclassified && target == ErrInvalidShape
 }
