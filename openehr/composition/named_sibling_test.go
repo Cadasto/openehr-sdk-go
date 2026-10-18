@@ -110,8 +110,8 @@ func siblingValues(t *testing.T, comp *rm.Composition) map[string]string {
 	return values
 }
 
-// TestREQ101_REQ116_SetWritesTheNamedSibling checks that Set writes into
-// the sibling its path names when two siblings share an at-code and differ
+// TestREQ101_REQ116_SetWritesTheNamedSibling checks, for REQ-101 and
+// REQ-116, that Set writes into the sibling its path names when two siblings share an at-code and differ
 // only by the name the template fixes on each. A name predicate is how
 // openEHR addresses one of several siblings that share an archetype node
 // id, and Set routes the assignment through the parent attribute, so the

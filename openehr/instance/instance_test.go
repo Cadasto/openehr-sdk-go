@@ -299,9 +299,8 @@ func elementQuantity(e *rm.Element) *rm.DVQuantity {
 // generator tried to attach a fresh *DVDuration to the parent DV's
 // .value (a String slot) and failed; this regression keeps the
 // generator end-to-end on the vendored OPT fixture under Example
-// policy (the INSTRUCTION subtree carrying DV_DURATION is beyond the
-// first content entry capped under Minimal — see
-// TestREQ107_GenerateSocialMinimal_respectsContentUpper).
+// policy, which visits every attribute the INSTRUCTION subtree carrying
+// the DV_DURATION needs.
 func TestGenerateClinicalNoteExample(t *testing.T) {
 	c := compileFixture(t, "clinical_note")
 	name := "Test Composer"

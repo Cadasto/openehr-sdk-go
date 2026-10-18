@@ -1266,6 +1266,8 @@ requirements:
       - openehr/composition/attribute_hold_test.go
       - openehr/composition/builder_defaults_test.go
       - openehr/composition/builder_test.go
+      - openehr/composition/minimal_content_test.go
+      - openehr/composition/named_sibling_test.go
       - openehr/composition/set_binding_test.go
       - openehr/composition/typecheck_test.go
       - openehr/composition/typecheck_tiers_test.go
@@ -1432,6 +1434,7 @@ requirements:
       - internal/templateinstance/rmwrite/write_test.go
       - internal/templateinstance/rmwrite/write_text_like_test.go
       - openehr/composition/builder_defaults_test.go
+      - openehr/composition/minimal_content_test.go
       - openehr/instance/accessors_test.go
       - openehr/instance/allowed_alternative_test.go
       - openehr/instance/archetype_root_guard_internal_test.go
@@ -1728,6 +1731,7 @@ requirements:
       - internal/templatecompile/pathsnapshot_test.go
       - internal/templatecompile/registerpath_test.go
       - internal/templatecompile/webtemplate_oracle_compile_test.go
+      - openehr/composition/named_sibling_test.go
       - openehr/serialize/simplified/flat_encode_test.go
       - openehr/serialize/simplified/flat_nameindex_test.go
       - openehr/serialize/simplified/flat_pinned_test.go
