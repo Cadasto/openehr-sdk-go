@@ -757,18 +757,15 @@ requirements:
     packages: [auth, auth/clientcreds, auth/jwtbearer, auth/smart, transport, testkit/probes/auth]
     probes: [PROBE-007]
     tests:
-      - auth/clientcreds/expires_in_internal_test.go
       - auth/clientcreds/expires_in_test.go
       - auth/clientcreds/reauth_test.go
       - auth/clientcreds/refresh_threshold_test.go
       - auth/clientcreds/shared_exchange_test.go
       - auth/errors_test.go
-      - auth/jwtbearer/expires_in_internal_test.go
       - auth/jwtbearer/expires_in_test.go
       - auth/jwtbearer/reauth_test.go
       - auth/jwtbearer/refresh_threshold_test.go
       - auth/jwtbearer/shared_exchange_test.go
-      - auth/smart/expires_in_internal_test.go
       - auth/smart/expires_in_test.go
       - auth/smart/reauth_test.go
       - auth/smart/redact_test.go
@@ -784,6 +781,7 @@ requirements:
       - auth/smart/smart_test.go
       - auth/smart/token_change_test.go
       - auth/tokensource_test.go
+      - internal/expiresin/expiresin_test.go
       - testkit/probes/auth/probe_007_proactive_refresh.go
       - testkit/probes/auth/probe_007_transport_refresh.go
       - testkit/probes/auth/probes_test.go
@@ -847,6 +845,7 @@ requirements:
     probes: [PROBE-008]
     tests:
       - smart/launch_test.go
+      - smart/log_value_test.go
       - testkit/probes/auth/probe_008_principal_claims.go
       - testkit/probes/auth/probes_test.go
 
@@ -1060,6 +1059,7 @@ requirements:
       - transport/client_test.go
       - transport/reauth_challenge_test.go
       - transport/redirect_test.go
+      - transport/retry_backoff_internal_test.go
 
   - id: REQ-092
     title: TLS posture
