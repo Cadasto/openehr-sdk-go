@@ -890,6 +890,7 @@ requirements:
     packages: [smart/discovery]
     probes: [PROBE-002, PROBE-040]
     tests:
+      - smart/discovery/auth_endpoints_test.go
       - smart/discovery/diagnostics_test.go
       - smart/discovery/iss_parameter_test.go
       - smart/discovery/issuer_path_test.go
