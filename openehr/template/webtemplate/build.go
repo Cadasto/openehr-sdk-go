@@ -37,14 +37,15 @@ func Build(c *templatecompile.Compiled, opts ...Option) (*WebTemplate, error) {
 	}
 
 	root := c.Root()
+	text := termText(root)
 	tree := &Node{
 		RMType:  root.RMTypeName(),
 		NodeID:  nodeIDOf(root),
 		AQLPath: "",
-		ID:      idOf(root, "", cfg),
+		ID:      idOf(root, "", text),
 	}
 	setOccurrences(tree, root)
-	setNames(tree, root, cfg)
+	setNames(tree, root, text, cfg)
 	tree.Children = childrenOf(root, "", cfg)
 	dedupeSiblingIDs(tree)
 	if err := checkIDCollisions(tree); err != nil {
@@ -198,11 +199,11 @@ func cloneRange(r *Range) *Range {
 // golden has a `…/name` node anywhere.
 func emitAll(n *templatecompile.CompiledNode, parentPath string, cfg *config) []*Node {
 	var out []*Node
-	for _, attr := range n.Attributes() {
+	for _, attr := range impl.NodeAttributes(n) {
 		if attr.Name() == "name" {
 			continue
 		}
-		for _, child := range attr.Children() {
+		for _, child := range impl.ChildNodes(attr) {
 			out = append(out, emit(child, attr, parentPath, cfg)...)
 		}
 	}
@@ -306,10 +307,10 @@ func emit(c *templatecompile.CompiledNode, attr *templatecompile.CompiledAttribu
 // and aqlPath is the ELEMENT path extended by /value.
 func collapseElement(el *templatecompile.CompiledNode, elPath string, attr *templatecompile.CompiledAttribute, cfg *config) *Node {
 	va := el.Attribute("value")
-	if va == nil || len(va.Children()) == 0 {
+	if va == nil || len(impl.ChildNodes(va)) == 0 {
 		return nil // no constrained value — EHRbase omits the ELEMENT
 	}
-	alts := va.Children()
+	alts := impl.ChildNodes(va)
 	v := alts[0] // primary value alternative
 	leaf := newNode(el, elPath, attr, cfg)
 	leaf.RMType = v.RMTypeName()
@@ -337,14 +338,15 @@ func hasTextAlternative(alts []*templatecompile.CompiledNode) bool {
 
 // newNode builds the common fields of a WebTemplate node from a compiled node.
 func newNode(c *templatecompile.CompiledNode, aqlPath string, attr *templatecompile.CompiledAttribute, cfg *config) *Node {
+	text := termText(c)
 	node := &Node{
 		RMType:  c.RMTypeName(),
 		NodeID:  nodeIDOf(c),
 		AQLPath: aqlPath,
-		ID:      idOf(c, attr.Name(), cfg),
+		ID:      idOf(c, attr.Name(), text),
 	}
 	setOccurrences(node, c)
-	setNames(node, c, cfg)
+	setNames(node, c, text, cfg)
 	return node
 }
 
@@ -362,25 +364,27 @@ func setOccurrences(node *Node, c *templatecompile.CompiledNode) {
 	}
 }
 
-func setNames(node *Node, c *templatecompile.CompiledNode, cfg *config) {
-	node.Name = termText(c, cfg.defaultLanguage)
-	node.LocalizedName = node.Name
+// setNames sets the display name of node and its text and description in
+// each language of cfg, from the term for c's node id; text is that term's
+// text, as termText returns it. A compiled template carries one set of
+// terms, in its default language, so every language reads the same text and
+// description, which are looked up once.
+func setNames(node *Node, c *templatecompile.CompiledNode, text string, cfg *config) {
+	node.Name = text
+	node.LocalizedName = text
+	desc, _ := impl.TermItem(c, c.NodeID(), "description")
 	for _, lang := range cfg.languages {
-		t, ok := c.Term(c.NodeID(), lang)
-		if !ok {
-			continue
-		}
-		if txt := t.Items["text"]; txt != "" {
+		if text != "" {
 			if node.LocalizedNames == nil {
 				node.LocalizedNames = map[string]string{}
 			}
-			node.LocalizedNames[lang] = txt
+			node.LocalizedNames[lang] = text
 		}
-		if d := t.Items["description"]; d != "" {
+		if desc != "" {
 			if node.LocalizedDescriptions == nil {
 				node.LocalizedDescriptions = map[string]string{}
 			}
-			node.LocalizedDescriptions[lang] = d
+			node.LocalizedDescriptions[lang] = desc
 		}
 	}
 }

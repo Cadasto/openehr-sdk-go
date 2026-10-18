@@ -4,6 +4,7 @@ import (
 	"strings"
 	"unicode"
 
+	impl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
@@ -45,12 +46,13 @@ func sanitizeID(s string) string {
 	return out
 }
 
-// termText returns the node's display text in the given language, or "".
-func termText(n *templatecompile.CompiledNode, lang string) string {
-	if t, ok := n.Term(n.NodeID(), lang); ok {
-		return t.Items["text"]
-	}
-	return ""
+// termText returns the node's display text: the text of the term for its
+// node id that the nearest enclosing archetype root defines, or "" when no
+// root defines one. A compiled template carries one set of terms, in its
+// default language, so the text is in that language.
+func termText(n *templatecompile.CompiledNode) string {
+	text, _ := impl.TermItem(n, n.NodeID(), "text")
+	return text
 }
 
 // idOf resolves a node's web id: the template-level node name the OPT pins
@@ -63,8 +65,11 @@ func termText(n *templatecompile.CompiledNode, lang string) string {
 // it is the only thing that distinguishes siblings filling one slot with
 // the same archetype: they share a concept term, so deriving from the term
 // gave every one of them the same id and hit [ErrIDCollision].
-func idOf(n *templatecompile.CompiledNode, attrName string, cfg *config) string {
-	return firstNonEmptyID(n.NodeName(), termText(n, cfg.defaultLanguage), attrName, n.RMTypeName())
+//
+// text is the node's term text, as [termText] returns it; the caller passes
+// it in because it also names the node.
+func idOf(n *templatecompile.CompiledNode, attrName, text string) string {
+	return firstNonEmptyID(n.NodeName(), text, attrName, n.RMTypeName())
 }
 
 // firstNonEmptyID returns the first candidate whose sanitised form is

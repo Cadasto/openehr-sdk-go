@@ -12,8 +12,8 @@ import (
 // compiled OPT and returns WebTemplate JSON. Today it imports
 // openehr/templatecompile, openehr/template/constraints, internal/templatecompile
 // (for the name-predicate quoting it shares with the template compiler, so
-// the two path builders cannot drift) and the standard library. Two rules
-// hold:
+// the two path builders cannot drift, and for readers of the compiled
+// template that do not copy) and the standard library. Two rules hold:
 //
 //   - Neither the package nor any package of this module it pulls in imports
 //     transport, auth or openehr/client.

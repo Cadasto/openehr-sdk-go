@@ -10,8 +10,9 @@
 // The package takes a *templatecompile.Compiled in and returns bytes out.
 // It imports only openehr/templatecompile, openehr/template/constraints,
 // internal/templatecompile (the shared name-predicate quoting, so the two
-// path builders cannot drift), and the standard library. It never imports
-// the transport, auth, client, or serialize layers.
+// path builders cannot drift, and readers of the compiled template that do
+// not copy), and the standard library. It never imports the transport,
+// auth, client, or serialize layers.
 //
 // Sibling disambiguation: a node's id comes from the template-level name
 // the OPT pins on it, falling back to the archetype concept term, and
