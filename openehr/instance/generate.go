@@ -186,7 +186,7 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 		}
 	}
 
-	for _, attr := range optNode.Attributes() {
+	for _, attr := range tcimpl.NodeAttributes(optNode) {
 		if !g.visits(optNode, attr) {
 			continue
 		}
@@ -319,13 +319,7 @@ func rmNeedsProhibited(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttrib
 // never prohibited: the RM rule wins over the prohibition, so it is
 // visited and filled as an attribute the OPT leaves silent is.
 func attrProhibited(attr *tcimpl.CompiledAttribute) bool {
-	if attr.Required() {
-		return false
-	}
-	if e := attr.Existence(); e != nil && !e.UpperUnbounded() && e.Upper() == 0 {
-		return true
-	}
-	return len(attr.Children()) > 0 && len(allowedChildren(attr)) == 0
+	return !attr.Required() && tcimpl.Prohibited(attr)
 }
 
 // shouldVisit decides whether an attribute is in scope under the
@@ -350,28 +344,7 @@ func (g *generator) shouldVisit(attr *tcimpl.CompiledAttribute) bool {
 	if cm := attr.ChildMultiplicity(); cm != nil && !cm.LowerUnbounded() && cm.Lower() > 0 {
 		return true
 	}
-	return len(allowedChildren(attr)) > 0
-}
-
-// childProhibited reports whether the OPT prohibits child: its
-// occurrences upper bound is bounded and 0.
-func childProhibited(child *tcimpl.CompiledNode) bool {
-	occ := child.Occurrences()
-	return occ != nil && !occ.UpperUnbounded() && occ.Upper() == 0
-}
-
-// allowedChildren returns the OPT children of attr the OPT does not
-// prohibit, in OPT order. An attribute whose children are all prohibited
-// is itself prohibited (attrProhibited), unless the BMM marks it
-// mandatory: then it is built as one the OPT leaves silent.
-func allowedChildren(attr *tcimpl.CompiledAttribute) []*tcimpl.CompiledNode {
-	var allowed []*tcimpl.CompiledNode
-	for _, child := range attr.Children() {
-		if !childProhibited(child) {
-			allowed = append(allowed, child)
-		}
-	}
-	return allowed
+	return len(tcimpl.AllowedChildNodes(attr)) > 0
 }
 
 // bindingAlternative returns the allowed alternative of a single-valued
@@ -439,7 +412,7 @@ func (g *generator) materialiseSingle(
 	// wins. With none allowed the attribute is prohibited and not visited
 	// (attrProhibited), unless the BMM marks it mandatory: then it gets
 	// here and is built as one the OPT leaves silent.
-	children := allowedChildren(attr)
+	children := tcimpl.AllowedChildNodes(attr)
 	if len(children) == 0 {
 		// Implicit / OPT-silent attribute. When the attribute carries
 		// a BMM-resolved RM type, materialise a default child of that
@@ -1105,7 +1078,7 @@ func includedPerOPT(optNode *tcimpl.CompiledNode, attrName string) bool {
 	if attr == nil {
 		return true
 	}
-	for _, child := range allowedChildren(attr) {
+	for _, child := range tcimpl.AllowedChildNodes(attr) {
 		if c, ok := child.PrimitiveConstraint().(constraints.CBoolean); ok {
 			included, _ := c.ExampleValue().(bool)
 			return included
@@ -1129,7 +1102,7 @@ func (g *generator) materialiseMultiple(
 	// prohibited the attribute is prohibited and not visited
 	// (attrProhibited), unless the BMM marks it mandatory: then it gets
 	// here and is built as one the OPT leaves silent.
-	children := allowedChildren(attr)
+	children := tcimpl.AllowedChildNodes(attr)
 	if len(children) == 0 {
 		// Implicit / OPT-silent multi-valued attribute. A required one
 		// (BMM-mandatory, or existence or cardinality lower of 1 or more)
@@ -2047,7 +2020,7 @@ func stringAdmitted(attr *tcimpl.CompiledAttribute, s string) bool {
 	if attr == nil {
 		return true
 	}
-	children := allowedChildren(attr)
+	children := tcimpl.AllowedChildNodes(attr)
 	if len(children) == 0 {
 		return true
 	}
