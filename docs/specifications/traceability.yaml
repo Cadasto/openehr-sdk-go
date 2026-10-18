@@ -518,6 +518,7 @@ requirements:
       - openehr/validation/noncomposition_test.go
       - openehr/validation/rmfloor_bytes_test.go
       - openehr/validation/rmfloor_test.go
+      - testkit/expectedform/expectedform_test.go
       - testkit/expectedform/walker_internal_test.go
       - testkit/fixtures/discover_test.go
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
