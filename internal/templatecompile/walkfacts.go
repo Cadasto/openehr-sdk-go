@@ -8,7 +8,10 @@ package templatecompile
 // alone, so it is not stored on each node: the walk reads it from a table of
 // its own, built once per class. Everything here is set by [Compile] and
 // never changed after it returns, so a compiled template is read by any
-// number of goroutines with no lock.
+// number of goroutines with no lock. The file also holds readers that answer
+// what an exported accessor answers without copying: the compiled attributes
+// and children, one item of a term, and class conformance from the tables
+// built here.
 //
 // The functions below are package-level, not methods, so that the public
 // alias of [CompiledNode] and [CompiledAttribute] in openehr/templatecompile
@@ -109,6 +112,38 @@ func ConformsTo(n *CompiledNode, class string) (conforms, known bool) {
 		return false, false
 	}
 	return bits.has(i), true
+}
+
+// ClassConformsTo reports whether the bare RM class sub is class or descends
+// from it, as the pinned class hierarchy of [rminfo.Default] answers it, and
+// whether the hierarchy knows both names, as [rminfo.Hierarchy.ConformsTo]
+// does with the same arguments in the same order. It reads tables built once
+// for the package rather than walking the hierarchy on each call. A
+// parameterised type such as "DV_INTERVAL<DV_QUANTITY>" is no class, so it is
+// not known.
+func ClassConformsTo(sub, class string) (conforms, known bool) {
+	i, subKnown := classIndex[sub]
+	bits, classKnown := conformingClasses[class]
+	if !subKnown || !classKnown {
+		return false, false
+	}
+	return bits.has(i), true
+}
+
+// TermItem returns the item key ("text", "description", ...) of the term
+// for code that the nearest enclosing archetype root of n defines, finding
+// that term as [CompiledNode.Term] does, without copying the term's items.
+// The second result is false when no enclosing root defines code, and when
+// the term found has no item key: like Term, the search stops at the nearest
+// root that defines code, so a root further up is not asked for the item.
+func TermItem(n *CompiledNode, code, key string) (string, bool) {
+	for cur := n; cur != nil; cur = cur.parent {
+		if t, ok := cur.terms[code]; ok {
+			v, ok := t.Items[key]
+			return v, ok
+		}
+	}
+	return "", false
 }
 
 // classBits is a set of the classes [rminfo.Default] knows, by their index

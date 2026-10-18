@@ -132,6 +132,43 @@ func TestREQ171_WalkFactsEqualTheRuntimeAnswers(t *testing.T) {
 	}
 }
 
+// ClassConformsTo answers as the class hierarchy of rminfo.Default does, for
+// every ordered pair of the classes it knows and of names it does not, on
+// either side: whether the first is the second or descends from it, and
+// whether both are known.
+func TestClassConformsToMatchesTheHierarchy(t *testing.T) {
+	t.Parallel()
+	h, ok := rminfo.Default.(rminfo.Hierarchy)
+	if !ok {
+		t.Fatal("rminfo.Default answers no class hierarchy")
+	}
+	probes := conformanceProbes()
+	var pairs, conforming, unknown int
+	for _, sub := range probes {
+		for _, class := range probes {
+			got, gotKnown := templatecompile.ClassConformsTo(sub, class)
+			want, wantKnown := h.ConformsTo(sub, class)
+			if got != want || gotKnown != wantKnown {
+				t.Errorf("ClassConformsTo(%q, %q) = (%t, %t), want (%t, %t)", sub, class, got, gotKnown, want, wantKnown)
+			}
+			pairs++
+			if want {
+				conforming++
+			}
+			if !wantKnown {
+				unknown++
+			}
+		}
+	}
+	// Every known class conforms to itself, so a hierarchy with any
+	// descent has more conforming pairs than classes; and the unknown names
+	// make some pairs unknown.
+	known := len(rminfo.Default.KnownRMTypes())
+	if pairs != len(probes)*len(probes) || conforming <= known || unknown == 0 {
+		t.Fatalf("compared %d pairs (%d conforming, %d unknown) over %d known classes: the comparison lost its cases", pairs, conforming, unknown, known)
+	}
+}
+
 // interval is an AOM interval body from lower to upper.
 func interval(lower, upper string) string {
 	return `<lower_included>true</lower_included><upper_included>true</upper_included>` +
