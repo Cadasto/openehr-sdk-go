@@ -394,15 +394,18 @@ func TestREQ107_MinimalSkipsCollidingOptionalSiblings(t *testing.T) {
 }
 
 // TestREQ107_MinimalKeepsTheFirstOptionalSiblingOfEachIdentity is the
-// REQ-107 check that, under Minimal, only an optional sibling yields to an
-// earlier optional one with its identity, the one the validator binds a
-// member by: the node_id for an ELEMENT, the archetype id for an archetype
-// root. A required sibling with that identity is built and does not count,
-// and each identity keeps its own first optional sibling. Two archetype
-// roots of different archetypes both carry the node id at0000, and each
-// gets its member; a second optional root of an archetype already built
-// gets none. Example builds every sibling. It holds under both value fills
-// and both compile modes.
+// REQ-107 check that, under Minimal, an optional sibling yields to a
+// required one with its identity and to an earlier optional one with it;
+// the identity is the one the validator binds a member by: the node_id for
+// an ELEMENT, the archetype id for an archetype root. So the optional
+// at0001 ELEMENTs get no member beside the required one, while at0002,
+// which no required sibling carries, keeps its first optional sibling. Two
+// archetype roots of different archetypes both carry the node id at0000,
+// and each gets its member; a second optional root of an archetype already
+// built gets none. The Minimal root passes the template validator. Example
+// builds every sibling, so the validator binds the at0001 and at0002
+// members to the first child of each (REQ-107 Exceptions and known gaps).
+// It holds under both value fills and both compile modes.
 func TestREQ107_MinimalKeepsTheFirstOptionalSiblingOfEachIdentity(t *testing.T) {
 	element := func(nodeID string, lower int, valueType string) string {
 		return optOccurring("C_COMPLEX_OBJECT", "ELEMENT", nodeID, lower, 1, optSingle("value", optNode(valueType, "")))
@@ -424,7 +427,7 @@ func TestREQ107_MinimalKeepsTheFirstOptionalSiblingOfEachIdentity(t *testing.T) 
 		root(clusterA),
 		element("at0002", 0, "DV_DURATION")))
 	want := map[instance.Policy][]string{
-		instance.Minimal: {"DV_BOOLEAN", "DV_TEXT", clusterA, "DV_DATE", clusterB},
+		instance.Minimal: {"DV_BOOLEAN", clusterA, "DV_DATE", clusterB},
 		instance.Example: {"DV_BOOLEAN", "DV_TEXT", clusterA, "DV_DATE", clusterB, "DV_COUNT", clusterA, "DV_DURATION"},
 	}
 	for _, implicit := range []bool{true, false} {
@@ -453,7 +456,134 @@ func TestREQ107_MinimalKeepsTheFirstOptionalSiblingOfEachIdentity(t *testing.T) 
 					t.Errorf("CLUSTER.items members = %v, want %v", got, want[opts.Policy])
 				}
 				noFloorErrors(t, out)
+				if opts.Policy == instance.Minimal {
+					for _, iss := range templateErrors(out, c) {
+						t.Errorf("Validate: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+					}
+				}
 			})
 		}
 	}
+}
+
+// TestREQ107_MinimalOptionalSiblingYieldsToARequiredOne is the REQ-107
+// check that, under Minimal, an optional child whose identity a required
+// sibling shares gets no member, whether that sibling comes before or after
+// it, while optional roots of different archetypes each get theirs. The
+// cases are archetype roots of one archetype under CLUSTER.items in both
+// orders, ELEMENTs of one node_id, and roots of two archetypes; the
+// siblings that share an identity differ in content, so the members show
+// which of them was built. Example builds every sibling. It holds under
+// both value fills and both compile modes.
+//
+// Where siblings share an identity and pin no name, the template validator
+// binds every member with that identity to the first of them, so a root
+// passes it only where every member it holds belongs to that first child.
+// Under Example both siblings are built (REQ-107 Exceptions and known
+// gaps). Under Minimal the root passes, except where the optional sibling
+// comes first: the validator binds the required sibling's member to the
+// optional one and finds no member for the required one, whatever is
+// built.
+func TestREQ107_MinimalOptionalSiblingYieldsToARequiredOne(t *testing.T) {
+	const clusterA, clusterB = "openEHR-EHR-CLUSTER.sibling_a.v1", "openEHR-EHR-CLUSTER.sibling_b.v1"
+	element := func(nodeID string, lower int, valueType string) string {
+		return optOccurring("C_COMPLEX_OBJECT", "ELEMENT", nodeID, lower, 1, optSingle("value", optNode(valueType, "")))
+	}
+	root := func(archetypeID string, lower int, valueType string) string {
+		return `<children xsi:type="C_ARCHETYPE_ROOT"><rm_type_name>CLUSTER</rm_type_name>` +
+			`<occurrences>` + optInterval(lower, 1) + `</occurrences><node_id>at0000</node_id>` +
+			optCardinal("items", 1, -1, element("at0001", 1, valueType)) +
+			`<archetype_id><value>` + archetypeID + `</value></archetype_id></children>`
+	}
+	cases := []struct {
+		name     string
+		children []string
+		minimal  []string
+		example  []string
+		// minimalValid and exampleValid are whether the root passes the
+		// template validator under each policy.
+		minimalValid, exampleValid bool
+	}{
+		{
+			name:         "required root then optional root",
+			children:     []string{root(clusterA, 1, "DV_TEXT"), root(clusterA, 0, "DV_COUNT")},
+			minimal:      []string{clusterA + "[DV_TEXT]"},
+			example:      []string{clusterA + "[DV_TEXT]", clusterA + "[DV_COUNT]"},
+			minimalValid: true,
+		},
+		{
+			name:     "optional root then required root",
+			children: []string{root(clusterA, 0, "DV_COUNT"), root(clusterA, 1, "DV_TEXT")},
+			minimal:  []string{clusterA + "[DV_TEXT]"},
+			example:  []string{clusterA + "[DV_COUNT]", clusterA + "[DV_TEXT]"},
+		},
+		{
+			name:         "required element then optional element",
+			children:     []string{element("at0001", 1, "DV_TEXT"), element("at0001", 0, "DV_COUNT")},
+			minimal:      []string{"DV_TEXT"},
+			example:      []string{"DV_TEXT", "DV_COUNT"},
+			minimalValid: true,
+		},
+		{
+			name:         "optional roots of different archetypes",
+			children:     []string{root(clusterA, 0, "DV_TEXT"), root(clusterB, 0, "DV_COUNT")},
+			minimal:      []string{clusterA + "[DV_TEXT]", clusterB + "[DV_COUNT]"},
+			example:      []string{clusterA + "[DV_TEXT]", clusterB + "[DV_COUNT]"},
+			minimalValid: true,
+			exampleValid: true,
+		},
+	}
+	for _, tc := range cases {
+		opt := optTemplate("CLUSTER", optCardinal("items", 1, -1, tc.children...))
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, opt, implicit)
+			for _, opts := range defaultsOptions() {
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err != nil {
+						t.Fatalf("Generate: %v", err)
+					}
+					want, valid := tc.example, tc.exampleValid
+					if opts.Policy == instance.Minimal {
+						want, valid = tc.minimal, tc.minimalValid
+					}
+					if got := memberLabels(t, out); !slices.Equal(got, want) {
+						t.Errorf("CLUSTER.items members = %v, want %v", got, want)
+					}
+					noFloorErrors(t, out)
+					if valid {
+						for _, iss := range templateErrors(out, c) {
+							t.Errorf("Validate: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+// memberLabels names each member of a generated CLUSTER's items: an
+// ELEMENT by its value's RM type, a CLUSTER by its archetype_node_id
+// followed by the labels of its own members in brackets.
+func memberLabels(t *testing.T, out any) []string {
+	t.Helper()
+	cluster, ok := out.(*rm.Cluster)
+	if !ok {
+		t.Fatalf("generated value is %T, want a CLUSTER", out)
+	}
+	var got []string
+	for _, item := range cluster.Items {
+		switch v := item.(type) {
+		case *rm.Element:
+			if v.Value == nil {
+				t.Fatalf("CLUSTER.items member is %#v, want an ELEMENT with a value", item)
+			}
+			got = append(got, rmTypeName(v.Value))
+		case *rm.Cluster:
+			got = append(got, v.ArchetypeNodeID+"["+strings.Join(memberLabels(t, v), ",")+"]")
+		default:
+			t.Fatalf("CLUSTER.items member is %#v, want an ELEMENT or a CLUSTER", item)
+		}
+	}
+	return got
 }
