@@ -502,6 +502,11 @@ func (g *generator) materialiseImplicitSingle(
 	attr *tcimpl.CompiledAttribute,
 	parentRM any,
 ) error {
+	// A locatable's node id is the identity rule's: setLocatableIdentity
+	// has stamped it, and rmwrite has no writer for it.
+	if attr.Name() == "archetype_node_id" {
+		return nil
+	}
 	if compositionDefaultOwns(optNode.RMTypeName(), attr.Name()) {
 		return nil
 	}
@@ -518,12 +523,12 @@ func (g *generator) materialiseImplicitSingle(
 		g.writeBMMString(parentRM, attr.Name())
 		return nil
 	}
-	rmChild, err := newRMForOPTType(rmType)
-	if err != nil {
-		// Unknown RM type — silently skip; the OPT is mis-modelled or
-		// the attribute is outside the current registry, both of
-		// which the validator will flag.
-		return nil //nolint:nilerr // intentional: defer to validator
+	rmChild, ok := newRMIfKnown(rmType)
+	if !ok {
+		// No RM class to build: a BMM primitive such as Boolean or
+		// Integer, which the parent holds as a Go value, or a type
+		// outside the registry, which the validator flags.
+		return nil
 	}
 	// A default built from the BMM alone has no archetype to name, so it
 	// must not be an archetype root: an optional attribute gets nothing,
@@ -603,8 +608,8 @@ func (g *generator) fillBMMAttr(parent any, parentRMType, attrName string, depth
 		return
 	}
 	concrete := concreteFor(rmType)
-	rmChild, err := rmwrite.NewRM(concrete)
-	if err != nil {
+	rmChild, ok := newRMIfKnown(concrete)
+	if !ok {
 		return
 	}
 	g.populatePrimitiveDefault(rmChild)
@@ -793,10 +798,11 @@ func (g *generator) writeBMMString(parent any, attr string) {
 		set(val)
 		return
 	}
-	// Best-effort, on purpose: the write is refused for a String
-	// attribute rmwrite does not address (a locatable's
-	// archetype_node_id), which another default fills or the validator
-	// reports. Returning the error would fail Generate on every OPT.
+	// Best-effort, on purpose: rmwrite refuses a String attribute it does
+	// not address, which another default fills or the validator reports,
+	// and returning the error would fail Generate on such an OPT. A
+	// locatable's archetype_node_id never gets here: the identity rule
+	// stamps it, and both callers skip it.
 	_ = rmwrite.EnsureSingle(parent, attr, val)
 }
 
@@ -1267,9 +1273,10 @@ func (g *generator) materialiseImplicitMultiple(
 		needed = min(needed, cm.Upper())
 	}
 	for range needed {
-		rmChild, err := newRMForOPTType(rmType)
-		if err != nil {
-			return nil //nolint:nilerr // intentional: defer to validator
+		rmChild, ok := newRMIfKnown(rmType)
+		if !ok {
+			// Outside the registry: left to the validator.
+			return nil
 		}
 		// A required attribute whose child would be an archetype root is
 		// refused instead, for the same reason: the generator does not
@@ -2138,8 +2145,8 @@ func (g *generator) fillElementValue(e *rm.Element) bool {
 	if !ok {
 		return false
 	}
-	value, err := newRMForOPTType(rmType)
-	if err != nil {
+	value, known := newRMIfKnown(rmType)
+	if !known {
 		return false
 	}
 	g.populatePrimitiveDefault(value)
