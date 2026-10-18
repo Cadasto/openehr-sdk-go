@@ -1173,7 +1173,7 @@ func (g *generator) materialiseMultiple(
 		if child.IsSlot() {
 			continue
 		}
-		if g.opts.Policy == Minimal && idTakenEarlier(child, children[:i]) {
+		if g.opts.Policy == Minimal && identityTakenEarlier(child, children[:i]) {
 			continue
 		}
 		childCount := 1
@@ -1810,13 +1810,16 @@ func newHierObjectID() *rm.HierObjectID {
 	return &rm.HierObjectID{Value: uuid.NewV4().String()}
 }
 
-// idTakenEarlier reports whether child is optional and an optional sibling
-// before it, in earlier, has its node id. Under Minimal only the first of
-// the optional siblings that share a node id is built, so the validator
-// binds each member to one child; a required sibling is always built and
-// does not count, nor does a slot.
-func idTakenEarlier(child *tcimpl.CompiledNode, earlier []*tcimpl.CompiledNode) bool {
-	id, optional := optionalNodeID(child)
+// identityTakenEarlier reports whether child is optional and an optional
+// sibling before it, in earlier, has its identity. Under Minimal only the
+// first of the optional siblings that share an identity is built, so the
+// validator binds each member to one child; a required sibling is always
+// built and does not count, nor does a slot. The identity is the one the
+// validator binds a member by (see optionalIdentity), so optional archetype
+// roots of different archetypes are each built, though every archetype root
+// carries the node id at0000.
+func identityTakenEarlier(child *tcimpl.CompiledNode, earlier []*tcimpl.CompiledNode) bool {
+	id, optional := optionalIdentity(child)
 	if !optional {
 		return false
 	}
@@ -1824,19 +1827,23 @@ func idTakenEarlier(child *tcimpl.CompiledNode, earlier []*tcimpl.CompiledNode) 
 		if sib.IsSlot() {
 			continue
 		}
-		if sibID, ok := optionalNodeID(sib); ok && sibID == id {
+		if sibID, ok := optionalIdentity(sib); ok && sibID == id {
 			return true
 		}
 	}
 	return false
 }
 
-// optionalNodeID returns child's node id, and true, when child has one and
-// the OPT leaves it optional: its occurrences give no lower bound of 1 or
-// more.
-func optionalNodeID(child *tcimpl.CompiledNode) (string, bool) {
+// optionalIdentity returns child's identity, and true, when child has one
+// and the OPT leaves it optional: its occurrences give no lower bound of 1
+// or more. The identity is the archetype id for an archetype root and the
+// node id for any other child.
+func optionalIdentity(child *tcimpl.CompiledNode) (string, bool) {
 	if occ := child.Occurrences(); occ != nil && !occ.LowerUnbounded() && occ.Lower() > 0 {
 		return "", false
+	}
+	if id := child.ArchetypeID(); id != "" {
+		return id, true
 	}
 	id := child.NodeID()
 	return id, id != ""

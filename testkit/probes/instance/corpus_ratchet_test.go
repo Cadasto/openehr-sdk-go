@@ -74,10 +74,14 @@ var corpusCompileFailures = []string{
 // Each reason is category plus a stable locator (type, attribute, code
 // and path, or JSON path).
 //
-// hollow_body rows: under Minimal, clinical_content_validation builds one
-// content entry, a SECTION that declares no items. That section holds no
-// ELEMENT, so the body is hollow. The three rows pin that fact so that any
-// other template going hollow fails the ratchet.
+// Minimal rows: under Minimal an optional child yields only to an earlier
+// optional sibling with its identity, and an archetype root's identity is
+// its archetype id (REQ-107 What a visit writes). So Minimal builds one
+// member of each optional archetype under an attribute, as Example does,
+// and reaches the same TestPerson.v2 identifier clusters and the same
+// clinical_content_validation EVALUATION; their rows hold under both
+// policies. No template's body is hollow: a hollow_body failure on any
+// template fails the ratchet.
 //
 // floor_coded rows: TestPerson.v2 codes both its DV_MULTIMEDIA media_type
 // nodes in terminology openEHR, one with the code list 425 to 429 and one
@@ -93,9 +97,13 @@ var corpusRatchet = []ratchetFailure{
 	{template: "templates/TestPerson.v2", entry: "generate", policy: "example", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
 	{template: "templates/TestPerson.v2", entry: "generate", policy: "example", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"},
 	{template: "templates/TestPerson.v2", entry: "generate", policy: "example", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
-	{template: "templates/clinical_content_validation", entry: "builder", policy: "minimal", fill: "example", reason: "hollow_body:/"},
-	{template: "templates/clinical_content_validation", entry: "generate", policy: "minimal", fill: "example", reason: "hollow_body:/"},
-	{template: "templates/clinical_content_validation", entry: "generate", policy: "minimal", fill: "random", reason: "hollow_body:/"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "minimal", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "minimal", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "minimal", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "minimal", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
+	{template: "templates/clinical_content_validation", entry: "builder", policy: "minimal", fill: "example", reason: "validator_other:required:/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rotated"},
+	{template: "templates/clinical_content_validation", entry: "generate", policy: "minimal", fill: "example", reason: "validator_other:required:/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rotated"},
+	{template: "templates/clinical_content_validation", entry: "generate", policy: "minimal", fill: "random", reason: "validator_other:required:/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rotated"},
 	{template: "templates/clinical_content_validation", entry: "generate", policy: "example", fill: "example", reason: "validator_other:required:/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rotated"},
 	{template: "templates/clinical_content_validation", entry: "generate", policy: "example", fill: "random", reason: "validator_other:required:/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rotated"},
 	{template: "templates/family_history.v.1.2.3", entry: "builder", policy: "minimal", fill: "example", reason: "refusal_other:slot_fill:/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0024]/items[at0027]"},
