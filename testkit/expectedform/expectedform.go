@@ -64,6 +64,8 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"math/big"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -532,8 +534,11 @@ func isEmptyBytes(v any) bool {
 // normaliseNumber replaces a number held by a numeric primitive attribute,
 // written bare or quoted, with the literal the encoder writes for its value: a
 // Real or Double as encoding/json formats a float64, an Integer or Integer64 in
-// decimal. A value that is not a number of that kind is returned unchanged, so
-// the difference shows when the output is compared.
+// decimal. An Integer or Integer64 is a decimal integer as strconv.ParseInt
+// reads it, or a JSON number whose value is whole, however it writes it, so
+// 2.0, "2.0" and 20e-1 all become 2. A value that is not a number of that
+// kind, a whole number outside the attribute's range among them, is returned
+// unchanged, so the difference shows when the output is compared.
 func normaliseNumber(attrType string, v any) any {
 	var lit string
 	switch x := v.(type) {
@@ -560,13 +565,42 @@ func normaliseNumber(attrType string, v any) any {
 		if attrType == "Integer" {
 			bits = 32
 		}
-		n, err := strconv.ParseInt(lit, 10, bits)
-		if err != nil {
-			return v
+		if n, err := strconv.ParseInt(lit, 10, bits); err == nil {
+			return json.Number(strconv.FormatInt(n, 10))
 		}
-		return json.Number(strconv.FormatInt(n, 10))
+		if n, ok := wholeNumber(lit, bits); ok {
+			return json.Number(n)
+		}
+		return v
 	}
 	return v
+}
+
+// jsonNumber matches a JSON number literal, the number grammar of RFC 8259
+// § 6.
+var jsonNumber = regexp.MustCompile(`^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$`)
+
+// wholeNumber returns the decimal integer lit writes when lit is a JSON number
+// literal whose value is a whole number in the signed range of bits bits, 32
+// or 64: "2" for 2.0 and for 20e-1. It reports false for anything else. The
+// grammar check comes first because math/big also reads forms JSON has no
+// number for, such as "4/2", "0x10" and "+2.0". It reads the value with
+// math/big rather than with the codec's own reader, so the expected form
+// does not share the code it is compared against.
+func wholeNumber(lit string, bits int) (string, bool) {
+	if !jsonNumber.MatchString(lit) {
+		return "", false
+	}
+	r, ok := new(big.Rat).SetString(lit)
+	if !ok || !r.IsInt() {
+		return "", false
+	}
+	n := r.Num()
+	limit := new(big.Int).Lsh(big.NewInt(1), uint(bits-1)) // 2^(bits-1)
+	if n.Cmp(limit) >= 0 || n.Cmp(new(big.Int).Neg(limit)) < 0 {
+		return "", false
+	}
+	return n.String(), true
 }
 
 // payloadNumbers returns v, plain JSON inside a generic payload, with every
