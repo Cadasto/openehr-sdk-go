@@ -354,11 +354,12 @@ func TestREQ107_FirstAllowedAlternativeWins(t *testing.T) {
 }
 
 // TestREQ107_MinimalSkipsCollidingOptionalSiblings is the REQ-107 check
-// that, under Minimal, an optional child whose node_id an earlier optional
-// sibling shares gets no member, so validator node-id binding stays
-// unambiguous, while Example gives each its member. The two siblings are
-// ELEMENTs, not archetype roots, told apart by their value's RM type. It
-// holds under both value fills and both compile modes.
+// that, under Minimal, an optional child whose identity an earlier
+// optional sibling shares gets no member, so the validator's binding of
+// members to children stays unambiguous, while Example gives each its
+// member. The two siblings are ELEMENTs, whose identity is their node_id,
+// told apart by their value's RM type. It holds under both value fills and
+// both compile modes.
 func TestREQ107_MinimalSkipsCollidingOptionalSiblings(t *testing.T) {
 	opt := optTemplate("CLUSTER", optCardinal("items", 1, -1,
 		optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0001", 0, 1, optSingle("value", optNode("DV_TEXT", ""))),
@@ -392,25 +393,39 @@ func TestREQ107_MinimalSkipsCollidingOptionalSiblings(t *testing.T) {
 	}
 }
 
-// TestREQ107_MinimalKeepsTheFirstOptionalSiblingOfEachNodeID is the REQ-107
-// check that, under Minimal, only an optional sibling yields to an earlier
-// optional one with its node_id: a required sibling with that node_id is
-// built and does not count, and each node_id keeps its own first optional
-// sibling. Example builds every sibling. It holds under both value fills
+// TestREQ107_MinimalKeepsTheFirstOptionalSiblingOfEachIdentity is the
+// REQ-107 check that, under Minimal, only an optional sibling yields to an
+// earlier optional one with its identity, the one the validator binds a
+// member by: the node_id for an ELEMENT, the archetype id for an archetype
+// root. A required sibling with that identity is built and does not count,
+// and each identity keeps its own first optional sibling. Two archetype
+// roots of different archetypes both carry the node id at0000, and each
+// gets its member; a second optional root of an archetype already built
+// gets none. Example builds every sibling. It holds under both value fills
 // and both compile modes.
-func TestREQ107_MinimalKeepsTheFirstOptionalSiblingOfEachNodeID(t *testing.T) {
+func TestREQ107_MinimalKeepsTheFirstOptionalSiblingOfEachIdentity(t *testing.T) {
 	element := func(nodeID string, lower int, valueType string) string {
 		return optOccurring("C_COMPLEX_OBJECT", "ELEMENT", nodeID, lower, 1, optSingle("value", optNode(valueType, "")))
+	}
+	const clusterA, clusterB = "openEHR-EHR-CLUSTER.sibling_a.v1", "openEHR-EHR-CLUSTER.sibling_b.v1"
+	root := func(archetypeID string) string {
+		return `<children xsi:type="C_ARCHETYPE_ROOT"><rm_type_name>CLUSTER</rm_type_name>` +
+			`<occurrences>` + optInterval(0, 1) + `</occurrences><node_id>at0000</node_id>` +
+			optCardinal("items", 1, -1, element("at0001", 1, "DV_TEXT")) +
+			`<archetype_id><value>` + archetypeID + `</value></archetype_id></children>`
 	}
 	opt := optTemplate("CLUSTER", optCardinal("items", 1, -1,
 		element("at0001", 1, "DV_BOOLEAN"),
 		element("at0001", 0, "DV_TEXT"),
+		root(clusterA),
 		element("at0002", 0, "DV_DATE"),
+		root(clusterB),
 		element("at0001", 0, "DV_COUNT"),
+		root(clusterA),
 		element("at0002", 0, "DV_DURATION")))
 	want := map[instance.Policy][]string{
-		instance.Minimal: {"DV_BOOLEAN", "DV_TEXT", "DV_DATE"},
-		instance.Example: {"DV_BOOLEAN", "DV_TEXT", "DV_DATE", "DV_COUNT", "DV_DURATION"},
+		instance.Minimal: {"DV_BOOLEAN", "DV_TEXT", clusterA, "DV_DATE", clusterB},
+		instance.Example: {"DV_BOOLEAN", "DV_TEXT", clusterA, "DV_DATE", clusterB, "DV_COUNT", clusterA, "DV_DURATION"},
 	}
 	for _, implicit := range []bool{true, false} {
 		c := compileOPTText(t, opt, implicit)
@@ -422,15 +437,22 @@ func TestREQ107_MinimalKeepsTheFirstOptionalSiblingOfEachNodeID(t *testing.T) {
 				}
 				var got []string
 				for _, item := range out.(*rm.Cluster).Items {
-					el, ok := item.(*rm.Element)
-					if !ok || el.Value == nil {
-						t.Fatalf("CLUSTER.items member is %#v, want an ELEMENT with a value", item)
+					switch v := item.(type) {
+					case *rm.Element:
+						if v.Value == nil {
+							t.Fatalf("CLUSTER.items member is %#v, want an ELEMENT with a value", item)
+						}
+						got = append(got, rmTypeName(v.Value))
+					case *rm.Cluster:
+						got = append(got, v.ArchetypeNodeID)
+					default:
+						t.Fatalf("CLUSTER.items member is %#v, want an ELEMENT or a CLUSTER", item)
 					}
-					got = append(got, rmTypeName(el.Value))
 				}
 				if !slices.Equal(got, want[opts.Policy]) {
-					t.Errorf("CLUSTER.items values = %v, want %v", got, want[opts.Policy])
+					t.Errorf("CLUSTER.items members = %v, want %v", got, want[opts.Policy])
 				}
+				noFloorErrors(t, out)
 			})
 		}
 	}
