@@ -50,7 +50,7 @@ Rules:
 - Retries **MUST** respect `ctx` cancellation.
 - The retry budget **MUST** be observable via the OTel span (`retry.attempt`, `retry.backoff_ms`).
 
-The SDK checks the method before it looks at the error or the status, so a token or network failure on a non-idempotent request is not retried either. A request carrying a credential header that `Client.Do` refuses with `transport.ErrInsecureRedirect` is never retried either: [§ REQ-092](#req-092--tls-posture) *No downgrade with a credential* holds that rule. A request whose 2xx body could not be read is sent again only for a safe method: [§ REQ-172](#req-172--typed-2xx-body-read-failure) *Retry* holds that rule. A request that cannot be built (`http.NewRequestWithContext` refuses it) is not retried either: every attempt would fail the same way.
+The SDK checks the method before it looks at the error or the status, so a token or network failure on a non-idempotent request is not retried either. A request carrying a credential header that `Client.Do` refuses with `transport.ErrInsecureRedirect` is never retried either: [§ REQ-092](#req-092--tls-posture) *No downgrade with a credential* holds that rule. A request whose 2xx body could not be read is sent again only for a safe method: [§ REQ-172](#req-172--typed-2xx-body-read-failure) *Retry* holds that rule. A request that cannot be built (`http.NewRequestWithContext` refuses it) **MUST NOT** be retried either: every attempt would fail the same way.
 
 - **Lives in:** [`transport/`](../../transport)
 

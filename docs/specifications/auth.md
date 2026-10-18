@@ -324,7 +324,7 @@ When a `refresh_token` grant fails, `Source.Token` classifies the returned `*aut
 Both state mutations happen under `s.mu` (the same mutex used by all of `Token`).
 
 **Configurable early-expiry buffer (G-2).**
-`WithRefreshThreshold(d time.Duration)` on the `auth/smart`, `auth/clientcreds` and `auth/jwtbearer` sources sets the proactive-refresh window (default: 30 seconds; 0 selects the default). A token is considered stale — and `Token()` will attempt a refresh — when `time.Until(ExpiresAt) <= max(RefreshThreshold, 0)`: a negative threshold counts as 0, so a token past its `ExpiresAt` is never served ([§ REQ-063](#req-063--token-refresh): the expired token is not used silently). This is the sole configurable early-expiry buffer; no duplicate option exists.
+`WithRefreshThreshold(d time.Duration)` on the `auth/smart`, `auth/clientcreds` and `auth/jwtbearer` sources sets the proactive-refresh window (default: 30 seconds; 0 selects the default). A token is considered stale — and `Token()` will attempt a refresh — when `time.Until(ExpiresAt) <= max(RefreshThreshold, 0)`: a negative threshold **MUST** count as 0, so a token past its `ExpiresAt` is never served ([§ REQ-063](#req-063--token-refresh): the expired token is not used silently). This is the sole configurable early-expiry buffer; no duplicate option exists.
 
 **`RefreshIfNeeded(ctx context.Context) error`.**
 A non-request-bound refresh trigger: checks `staleLocked()` and whether a refresh token is present; if both are true it calls through to `Token()` to execute the refresh; otherwise it is a no-op returning `nil`. Error contract is identical to `Token()`.
