@@ -45,7 +45,9 @@
 // (see its documentation for the exact rules); [Redacted.Reveal]
 // returns the value itself.
 //
-// The package is stdlib-only, so primitive constraint shapes are usable
-// from any consumer (composition builder, validator, codegen) without
-// pulling in transport, auth, or rm types.
+// The package imports only the standard library and a module-internal
+// ISO 8601 parser that itself imports only the standard library, so
+// primitive constraint shapes are usable from any consumer (composition
+// builder, validator, codegen) without pulling in transport, auth, or rm
+// types.
 package constraints
