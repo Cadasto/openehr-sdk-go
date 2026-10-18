@@ -289,7 +289,7 @@ The SDK validates ID tokens against the deployment's published JWKS. JWKS rotati
 
 The SDK provides `auth.ScopeOfflineAccess` and `auth.ScopeOnlineAccess` constants for composing these scope strings via `auth.JoinScopes`. These constants are lexical only — whether the server honours the request depends on the deployment's policy.
 
-The `auth/smart` `TokenSource` **MUST** proactively refresh access tokens when `ExpiresAt` is within a configurable threshold (default: 30 seconds) of `time.Now()`.
+The `auth/smart`, `auth/clientcreds` and `auth/jwtbearer` token sources **MUST** proactively renew access tokens when `ExpiresAt` is within a configurable threshold (default: 30 seconds) of `time.Now()`: `auth/smart` with its refresh token, the other two with a new exchange, as their grants issue no refresh token.
 
 Wire-driven refresh — recovering from a `401 Unauthorized` that indicates an expired/invalid token — is **opt-in** rather than automatic inside the `TokenSource`: the transport layer exposes `transport.WithReauthOn401`, which on a 401 invokes the configured `auth.Reauther` (implemented by `*smart.Source.Reauth`) once and replays the request. Keeping it opt-in avoids surprising retries of non-idempotent writes (see _transport reauth hook_ below).
 
