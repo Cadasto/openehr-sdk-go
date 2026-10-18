@@ -1,0 +1,5 @@
+${query_nr},${predicate1},${predicate2},${expected_file},${nr_of_results}
+1.,"openEHR-EHR-FOLDER.generic.v1,'root1'",openEHR-EHR-FOLDER.episode_of_care.v1,expected_folder_contains_folder_find_by_1.json,4
+2.,"openEHR-EHR-FOLDER.generic.v1,'subfolder1'",openEHR-EHR-FOLDER.episode_of_care.v1,expected_folder_contains_folder_find_by_2.json,2
+3.,"openEHR-EHR-FOLDER.generic.v1,'subfolder2'",openEHR-EHR-FOLDER.episode_of_care.v1,expected_folder_contains_folder_find_by_3.json,2
+4.,"openEHR-EHR-FOLDER.generic.v1,'root1'","openEHR-EHR-FOLDER.episode_of_care.v1,'subsubfolder1'",expected_folder_contains_folder_find_by_4.json,2

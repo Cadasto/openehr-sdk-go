@@ -1,0 +1,12 @@
+${query_nr},${where},${expected_file},${nr_of_results}
+1.,"c/feeder_audit/originating_system_audit/system_id = 'FHIR-bridge'",expected_test_arbitrary_where_q1.json,1
+2.,"c/feeder_audit/feeder_system_audit/version_id = 'final'",expected_test_arbitrary_where_q2.json,1
+3.,"c/feeder_audit/feeder_system_audit/other_details[openEHR-EHR-ITEM_TREE.generic.v1]/items[at0001]/name/value = 'family group id'",expected_test_arbitrary_where_q3.json,1
+4.,"c/feeder_audit/feeder_system_audit/other_details[openEHR-EHR-ITEM_TREE.generic.v1]/items[at0001]/value/issuer = 'MoH'",expected_test_arbitrary_where_q4.json,1
+5.,"c/feeder_audit/feeder_system_audit/other_details[openEHR-EHR-ITEM_TREE.generic.v1]/items[at0001]/value/assigner = 'MoH'",expected_test_arbitrary_where_q5.json,1
+6.,"c/feeder_audit/feeder_system_audit/other_details[openEHR-EHR-ITEM_TREE.generic.v1]/items[at0001]/value/id = '99999999'",expected_test_arbitrary_where_q6.json,1
+7.,"c/feeder_audit/feeder_system_audit/other_details[openEHR-EHR-ITEM_TREE.generic.v1]/items[at0001]/value/type = 'FAMILY_GROUP_ID'",expected_test_arbitrary_where_q7.json,1
+8.,"c/feeder_audit/feeder_system_item_ids/id = '2.16.840.1.113883.3.1937.777.24.5.1.36'",expected_test_arbitrary_where_q8.json,2
+9.,"c/feeder_audit/feeder_system_item_ids/type = 'OID_MDAT_nutzen'",expected_test_arbitrary_where_q9.json,1
+10.,"c/feeder_audit/feeder_system_item_ids/issuer = 'DIMDI'",expected_test_arbitrary_where_q10.json,2
+11.,"c/feeder_audit/feeder_system_item_ids/assigner = 'NUM-CODEX'",expected_test_arbitrary_where_q11.json,2

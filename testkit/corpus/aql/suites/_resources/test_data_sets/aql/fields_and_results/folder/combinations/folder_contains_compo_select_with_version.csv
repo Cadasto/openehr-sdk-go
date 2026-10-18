@@ -1,0 +1,6 @@
+${query_nr},${name},${expected_file},${nr_of_results}
+1.,root1,expected_folder_contains_compo_select_with_version_root1.json,4
+2.,subfolder1,expected_folder_contains_compo_select_with_version_subfolder1.json,4
+3.,subsubfolder1,expected_folder_contains_compo_select_with_version_subsubfolder1.json,2
+4.,subsubfolder2,expected_folder_contains_compo_select_with_version_subsubfolder2.json,1
+5.,subsubsubfolder2,expected_folder_contains_compo_select_with_version_subsubsubfolder2.json,1

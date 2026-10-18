@@ -1,0 +1,5 @@
+${path},${expected_file},${nr_of_results}
+EHR_STATUS CONTAINS ELEMENT l,expected_ehr_status_contains_ehr_status.json,1
+ELEMENT l [at0001],expected_ehr_status_contains_el_at1.json,1
+ELEMENT l [at0013],expected_ehr_status_contains_el_at13.json,1
+ELEMENT l,expected_ehr_status_contains_el_l.json,8

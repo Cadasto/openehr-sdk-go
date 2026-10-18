@@ -1,0 +1,11 @@
+${query_nr},${where},${expected_file},${nr_of_results}
+1.,"o/data[at0001]/events[at0002]/data[at0003]/items[at0011]/value/value = '2019-01-28T21:22:49.427+07:00'",expected_arbitrary_query_date_time_q1.json,1
+2.,"(o/data[at0001]/events[at0002]/data[at0003]/items[at0011]/value/value > '2021' AND o/data[at0001]/events[at0002]/data[at0003]/items[at0011]/value/value < '2022')",expected_arbitrary_query_date_time_q2.json,0
+3.,"(o/data[at0001]/events[at0002]/data[at0003]/items[at0011]/value/value > '2019' AND o/data[at0001]/events[at0002]/data[at0003]/items[at0011]/value/value < '2020')",expected_arbitrary_query_date_time_q3.json,1
+4.,"(o/data[at0001]/events[at0002]/data[at0003]/items[at0011]/value/value > '2019-01' AND o/data[at0001]/events[at0002]/data[at0003]/items[at0011]/value/value < '2019-12')",expected_arbitrary_query_date_time_q4.json,1
+5.,"(o/data[at0001]/events[at0002]/data[at0003]/items[at0011]/value/value > '2019-01-01' AND o/data[at0001]/events[at0002]/data[at0003]/items[at0011]/value/value < '2019-01-31')",expected_arbitrary_query_date_time_q5.json,1
+6.,"(o/data[at0001]/events[at0002]/data[at0003]/items[at0011]/value/value > '2019-01-28T01' AND o/data[at0001]/events[at0002]/data[at0003]/items[at0011]/value/value < '2019-01-28T24')",expected_arbitrary_query_date_time_q6.json,1
+7.,"(o/data[at0001]/events[at0002]/data[at0003]/items[at0011]/value/value > '2019-01-28T21:00' AND o/data[at0001]/events[at0002]/data[at0003]/items[at0011]/value/value < '2019-01-28T21:59')",expected_arbitrary_query_date_time_q7.json,1
+8.,"(o/data[at0001]/events[at0002]/data[at0003]/items[at0011]/value/value > '2019-01-28T21:22:00' AND o/data[at0001]/events[at0002]/data[at0003]/items[at0011]/value/value < '2019-01-28T21:22:59')",expected_arbitrary_query_date_time_q8.json,1
+9.,"o/data[at0001]/events[at0002]/data[at0003]/items[at0011]/value/value = '2019-01-28T21:22:49'",expected_arbitrary_query_date_time_q9.json,0
+10.,"(o/data[at0001]/events[at0002]/data[at0003]/items[at0011]/value/value >= '2019-01-28T21:22:00' AND o/data[at0001]/events[at0002]/data[at0003]/items[at0011]/value/value <= '2019-01-28T21:22:59')",expected_arbitrary_query_date_time_q10.json,1

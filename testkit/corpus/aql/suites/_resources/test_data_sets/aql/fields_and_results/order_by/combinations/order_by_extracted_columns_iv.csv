@@ -1,0 +1,3 @@
+${path},${order},${expected_file},${nr_of_results}
+o/archetype_node_id,ASC,expected_order_by_extr_col_iv_obs_asc.json,6
+o/archetype_node_id,DESC,expected_order_by_extr_col_iv_obs_desc.json,6

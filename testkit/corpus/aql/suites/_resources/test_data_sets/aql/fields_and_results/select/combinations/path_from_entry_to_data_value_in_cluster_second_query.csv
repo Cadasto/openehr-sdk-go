@@ -1,0 +1,5 @@
+${path},${expected_file},${nr_of_results}
+items[at0003]/value/value,expected_select_data_value_in_cluster_at3_second_q.json,3
+items[at0005]/value/value,expected_select_data_value_in_cluster_at5_second_q.json,3
+feeder_audit/originating_system_item_ids,expected_select_data_value_in_cluster_system_ids_second_q.json,4
+feeder_audit/originating_system_item_ids/id,expected_select_data_value_in_cluster_system_ids_id_second_q.json,4

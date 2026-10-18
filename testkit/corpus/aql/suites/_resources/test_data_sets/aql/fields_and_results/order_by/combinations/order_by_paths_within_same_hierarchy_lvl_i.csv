@@ -1,0 +1,3 @@
+${path},${order},${expected_file},${nr_of_results}
+c/composer/name,ASC,expected_order_by_paths_within_same_hierarchy_lvl_i_asc.json,2
+c/composer/name,DESC,expected_order_by_paths_within_same_hierarchy_lvl_i_desc.json,2

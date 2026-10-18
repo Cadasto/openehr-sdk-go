@@ -1,0 +1,11 @@
+${path},${value},${expected_file},${nr_of_results}
+o/data[at0001]/events[at0002]/data[at0003]/items[at0004]/value/value,"\""Lorem ipsum\""",expected_parameter_in_where_at4_1.json,1
+o/data[at0001]/events[at0002]/data[at0003]/items[at0004]/value/value,"\""Lorem ipsum 2\""",expected_parameter_in_where_at4_2.json,1
+o/data[at0001]/events[at0002]/data[at0003]/items[at0008]/value/magnitude,20,expected_parameter_in_where_at8_1.json,1
+o/data[at0001]/events[at0002]/data[at0003]/items[at0008]/value/magnitude,25,expected_parameter_in_where_at8_2.json,1
+o/data[at0001]/events[at0002]/data[at0003]/items[at0011]/value/value,"\""2022-02-03T04:05:06\""",expected_parameter_in_where_at11_val_val_1.json,1
+o/data[at0001]/events[at0002]/data[at0003]/items[at0011]/value/value,"\""2024-02-03T04:05:06\""",expected_parameter_in_where_at11_val_val_2.json,1
+o/data[at0001]/events[at0002]/data[at0003]/items[at0011]/value,"\""2022-02-03T04:05:06\""",expected_parameter_in_where_at11_val_1.json,1
+o/data[at0001]/events[at0002]/data[at0003]/items[at0011]/value,"\""2024-02-03T04:05:06\""",expected_parameter_in_where_at11_val_2.json,1
+o/data[at0001]/events[at0002]/data[at0003]/items[at0017]/value/value,true,expected_parameter_in_where_at17_1.json,1
+o/data[at0001]/events[at0002]/data[at0003]/items[at0017]/value/value,false,expected_parameter_in_where_at17_2.json,1

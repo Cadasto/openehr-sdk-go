@@ -1524,7 +1524,7 @@ requirements:
       - openehr/templatecompile
       - internal/templatecompile
       - testkit/probes/aql
-    probes: [PROBE-028, PROBE-096]
+    probes: [PROBE-028, PROBE-096, PROBE-107]
     tests:
       - openehr/aql/internal/semcheck/semcheck_test.go
       - openehr/aql/lint/extract_test.go
@@ -1542,6 +1542,8 @@ requirements:
       - openehr/validation/aql_test.go
       - testkit/probes/aql/probe_028_aql_lint.go
       - testkit/probes/aql/probe_099_path_shape_lint.go
+      - testkit/probes/aql/probe_107_suite_corpus.go
+      - testkit/probes/aql/probe_107_suite_corpus_test.go
       - testkit/probes/aql/probes_test.go
 
   - id: REQ-110
@@ -2028,8 +2030,10 @@ requirements:
       - openehr/validation/aql_test.go
       - testkit/probes/aql/probe_097_semantic_lint.go
       - testkit/probes/aql/probe_100_conformance_corpus.go
+      - testkit/probes/aql/probe_107_suite_corpus.go
+      - testkit/probes/aql/probe_107_suite_corpus_test.go
       - testkit/probes/aql/probes_test.go
-    probes: [PROBE-097, PROBE-100]
+    probes: [PROBE-097, PROBE-100, PROBE-107]
 
   - id: REQ-161
     title: AQL semantic and portability lint
@@ -2059,6 +2063,8 @@ requirements:
       - testkit/probes/aql/probe_088_builder_containment_paging.go
       - testkit/probes/aql/probe_097_semantic_lint.go
       - testkit/probes/aql/probe_100_conformance_corpus.go
+      - testkit/probes/aql/probe_107_suite_corpus.go
+      - testkit/probes/aql/probe_107_suite_corpus_test.go
       - testkit/probes/aql/probes_test.go
 
   - id: REQ-162

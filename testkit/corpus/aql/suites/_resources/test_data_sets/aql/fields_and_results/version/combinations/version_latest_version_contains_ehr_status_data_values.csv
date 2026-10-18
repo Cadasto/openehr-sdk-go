@@ -1,0 +1,8 @@
+${query_nr},${path},${where},${order_by},${expected_file},${nr_of_results}
+1.,cv/uid/value,"WHERE cv/uid/value = '${ehr_status_id3_version2}'",ORDER BY cv/uid/value DESC,expected_version_ehr_status_uid_value.json,1
+2.,cv/commit_audit/system_id,"WHERE cv/commit_audit/system_id = '${system_id_with_tenant}'",${EMPTY},expected_version_ehr_status_system_id.json,2
+3.,cv/commit_audit/change_type,${EMPTY},${EMPTY},expected_version_ehr_status_change_type.json,2
+4.,cv/commit_audit/change_type/value,"WHERE cv/commit_audit/change_type/value = 'modification'",ORDER BY cv/commit_audit/change_type/value,expected_version_ehr_status_change_type_value.json,1
+5.,cv/commit_audit/change_type/defining_code/code_string,"WHERE cv/commit_audit/change_type/defining_code/code_string = '249'",ORDER BY cv/commit_audit/change_type/defining_code/code_string ASC,expected_version_ehr_status_code_string.json,1
+6.,cv/commit_audit/change_type/defining_code/preferred_term,"WHERE cv/commit_audit/change_type/defining_code/preferred_term = 'creation'",ORDER BY cv/commit_audit/change_type/defining_code/preferred_term DESC,expected_version_ehr_status_preferred_term.json,1
+7.,cv/commit_audit/change_type/defining_code/terminology_id/value,${EMPTY},${EMPTY},expected_version_ehr_status_terminology_id_value.json,2

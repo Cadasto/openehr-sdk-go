@@ -1,0 +1,9 @@
+${path},${where},${expected_file}
+ec/health_care_facility/external_ref/id/value,"ec/health_care_facility/external_ref/id/value = '9091'",expected_compare_by_paths_same_lvl_id_value_1.json
+ec/health_care_facility/external_ref/id/value,"ec/health_care_facility/external_ref/id/value = '9092'",expected_compare_by_paths_same_lvl_id_value_2.json
+ec/location,"ec/location = 'Hospital'",expected_compare_by_paths_same_lvl_ec_loc_1.json
+ec/location,"ec/location = 'microbiology lab 2'",expected_compare_by_paths_same_lvl_ec_loc_2.json
+ec/start_time/value,"ec/start_time = '2021-12-21T14:19:31.649613+01:00'",expected_compare_by_paths_same_lvl_ec_start_time_1.json
+ec/start_time/value,"ec/start_time = '2022-12-21T14:19:31.649613+01:00'",expected_compare_by_paths_same_lvl_ec_start_time_2.json
+ec/start_time/value,"ec/start_time/value = '2021-12-21T14:19:31.649613+01:00'",expected_compare_by_paths_same_lvl_ec_start_time_val_1.json
+ec/start_time/value,"ec/start_time/value = '2022-12-21T14:19:31.649613+01:00'",expected_compare_by_paths_same_lvl_ec_start_time_val_2.json

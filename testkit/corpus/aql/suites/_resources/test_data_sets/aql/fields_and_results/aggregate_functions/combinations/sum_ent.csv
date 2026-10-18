@@ -1,0 +1,3 @@
+${path},${expected_file},${nr_of_results}
+"o/data[at0001]/events[at0002]/data[at0003]/items[at0008]/value/magnitude",expected_sum_at8_val_mag_ent.json,1
+"o/data[at0001]/events[at0002]/data[at0003]/items[at0010]/value/magnitude",expected_sum_at10_val_mag_ent.json,1

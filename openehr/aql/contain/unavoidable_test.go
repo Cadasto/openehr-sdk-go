@@ -46,7 +46,7 @@ func TestUnavoidableAcceptanceTable(t *testing.T) {
 		},
 		{
 			"FOLDER", "COMPOSITION", "OBSERVATION", true,
-			"proof holds across a ByReference hop: FOLDER reaches OBSERVATION only through the FOLDER -> COMPOSITION reference",
+			"proof holds across ByReference hops: every FOLDER -> OBSERVATION route passes a COMPOSITION, whether by the FOLDER -> COMPOSITION shorthand or by FOLDER -> VERSIONED_COMPOSITION -> VERSION -> COMPOSITION",
 		},
 
 		// --- Not proved: a route goes round the via -----------------------
@@ -77,6 +77,10 @@ func TestUnavoidableAcceptanceTable(t *testing.T) {
 		{
 			"EHR", "VERSIONED_COMPOSITION", "COMPOSITION", false,
 			"same: the container is one route among several, not a gate",
+		},
+		{
+			"FOLDER", "VERSION", "COMPOSITION", false,
+			"depends on two things: the FOLDER -> COMPOSITION shorthand hop going round the version tier the FOLDER -> VERSIONED_COMPOSITION hop lands on (REQ-160 § Overlay edges), and the exclusion walk counting that reference hop — if this turns true together with TestUnavoidableCountsAByReferenceBypass, reachableAvoiding has been narrowed to the non-reference closure",
 		},
 		{
 			"COMPOSITION", "OBSERVATION", "ELEMENT", false,
@@ -162,18 +166,22 @@ func TestUnavoidableOverlayEdgeRetiresAProof(t *testing.T) {
 	}
 }
 
-// TestUnavoidableCountsAByReferenceBypass is the witness for the one decision
-// the method's own doc states and the default relation's edge table cannot
-// exercise: routes are read at their WIDEST, ByReference edges included, on
-// the EXCLUSION half as well as on the route-existence half.
+// TestUnavoidableCountsAByReferenceBypass is a witness for the one decision
+// the method's own doc states: routes are read at their WIDEST, ByReference
+// edges included, on the EXCLUSION half as well as on the route-existence half.
 //
 // A bypass crossing a reference hop is still a bypass on an engine that
 // resolves the hop (REQ-160 § Overlay edges), so a relation whose dialect files
 // observations under the EHR status BY REFERENCE must not be told its
 // COMPOSITION step is redundant. The route-existence half finds a route either
-// way here, so only the exclusion half's mode is under test: narrowing
-// reachableAvoiding to the non-reference closure makes this row — and only this
-// row — answer true again.
+// way here, so only the exclusion half's mode is under test.
+//
+// The default relation now carries a second witness: the
+// FOLDER/VERSION/COMPOSITION row of TestUnavoidableAcceptanceTable, whose only
+// way round the version tier is the FOLDER -> COMPOSITION reference hop.
+// Narrowing reachableAvoiding to the non-reference closure makes exactly these
+// two answer true. This one keeps the rule pinned on a consumer edge of its
+// own, so it stays a witness whatever happens to the default's overlay data.
 func TestUnavoidableCountsAByReferenceBypass(t *testing.T) {
 	ref := contain.Default().WithOverlay(contain.Edge{From: "EHR_STATUS", To: "OBSERVATION", ByReference: true})
 	if !contain.Default().Unavoidable("EHR", "COMPOSITION", "OBSERVATION") {
@@ -183,7 +191,7 @@ func TestUnavoidableCountsAByReferenceBypass(t *testing.T) {
 		t.Fatalf("premise gone: EHR CONTAINS OBSERVATION = %v, want Admissible — the route-existence half must still find a route", got)
 	}
 	if ref.Unavoidable("EHR", "COMPOSITION", "OBSERVATION") {
-		t.Error("the relation still proves the step redundant, though its own ByReference edge routes round the COMPOSITION")
+		t.Error("the relation still proves the step redundant, though its own ByReference edge routes round the COMPOSITION — the exclusion walk (reachableAvoiding) must count ByReference edges")
 	}
 }
 

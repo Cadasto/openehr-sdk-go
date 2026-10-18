@@ -667,6 +667,76 @@ func TestOverlayRelationRetiresFindings(t *testing.T) {
 	}
 }
 
+// errorCodes lists the codes of every Error-severity issue in r, in issue
+// order: what makes Result.OK() false.
+func errorCodes(r lint.Result) []string {
+	var out []string
+	for _, i := range r.Issues {
+		if i.Severity == lint.Error {
+			out = append(out, i.Code)
+		}
+	}
+	return out
+}
+
+// TestREQ161_FolderVersionTierQueryIsByReference is the upstream EHRbase suite's
+// directory query, verbatim: FOLDER CONTAINS VERSION is ByReference through the
+// FOLDER → VERSIONED_COMPOSITION reference hop (REQ-160 § Overlay edges), so it
+// draws aql_containment_by_reference (REQ-161 § Checks) and no Error. A
+// relation without that hop finds no route and reports aql_impossible_containment
+// on a query a conformant engine answers with rows.
+func TestREQ161_FolderVersionTierQueryIsByReference(t *testing.T) {
+	t.Parallel()
+	const q = "SELECT c/uid/value, cv0/commit_audit/time_committed/value " +
+		"FROM FOLDER f CONTAINS VERSION cv0[LATEST_VERSION] CONTAINS COMPOSITION c " +
+		"WHERE f/name/value = 'root1'"
+	r := lint.LintString(q, nil)
+	if got := errorCodes(r); len(got) != 0 {
+		t.Errorf("Error-severity codes = %v, want none (full result %v)", got, codes(r))
+	}
+	if got := req161(r); !slices.Equal(got, []string{codeByReference}) {
+		t.Fatalf("containment codes = %v, want exactly [%s] (full result %v)", got, codeByReference, codes(r))
+	}
+	iss := r.Issues[slices.IndexFunc(r.Issues, func(i lint.Issue) bool { return i.Code == codeByReference })]
+	if iss.Severity != lint.Warning {
+		t.Errorf("%s severity = %v, want %v", codeByReference, iss.Severity, lint.Warning)
+	}
+	if want := classSpan(t, q, "VERSION", 1); iss.Span != want {
+		t.Errorf("%s span = %+v, want %+v (on the VERSION class expression)", codeByReference, iss.Span, want)
+	}
+}
+
+// TestREQ161_EngineExtensionOperandNeedsAnOverlay — EVENT_CONTEXT is a class an
+// engine binds by an engine extension (REQ-160 § Containable operands): under
+// the default relation the CONTAINS operand draws aql_contains_not_containable
+// (REQ-161 § Checks), and under a relation carrying the consumer edge
+// COMPOSITION → EVENT_CONTEXT (REQ-160 § Extensibility) it draws no Error.
+func TestREQ161_EngineExtensionOperandNeedsAnOverlay(t *testing.T) {
+	t.Parallel()
+	const q = "SELECT ec/start_time/value FROM EHR e CONTAINS COMPOSITION c CONTAINS EVENT_CONTEXT ec"
+
+	def := lint.LintString(q, nil)
+	if got := req161(def); !slices.Equal(got, []string{codeNotContain}) {
+		t.Fatalf("default relation: containment codes = %v, want exactly [%s] (full result %v)", got, codeNotContain, codes(def))
+	}
+	iss := def.Issues[slices.IndexFunc(def.Issues, func(i lint.Issue) bool { return i.Code == codeNotContain })]
+	if iss.Severity != lint.Error {
+		t.Errorf("%s severity = %v, want %v", codeNotContain, iss.Severity, lint.Error)
+	}
+	if want := classSpan(t, q, "EVENT_CONTEXT", 1); iss.Span != want {
+		t.Errorf("%s span = %+v, want %+v (on the EVENT_CONTEXT operand)", codeNotContain, iss.Span, want)
+	}
+
+	opts := &lint.Options{Relation: contain.Default().WithOverlay(contain.Edge{From: "COMPOSITION", To: "EVENT_CONTEXT"})}
+	ext := lint.LintString(q, opts)
+	if got := errorCodes(ext); len(got) != 0 {
+		t.Errorf("overlay relation: Error-severity codes = %v, want none (full result %v)", got, codes(ext))
+	}
+	if got := req161(ext); len(got) != 0 {
+		t.Errorf("overlay relation: containment codes = %v, want none", got)
+	}
+}
+
 // TestOptionsFieldsAreIndependent pins that the new field did not disturb the
 // existing ones (REQ-161 § Additivity): setting Relation must not switch on or
 // off anything Compiled or Query gate.

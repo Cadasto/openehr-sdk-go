@@ -1,0 +1,9 @@
+${path},${expected_file}
+"o/data[at0001]/events[at0002]/data[at0003]/items[at0008]/value",expected_avg_on_dv_ordered_at8_quantity.json
+"o/data[at0001]/events[at0002]/data[at0003]/items[at0009]/value",expected_avg_on_dv_ordered_at9_proportion.json
+"o/data[at0001]/events[at0002]/data[at0003]/items[at0010]/value",expected_avg_on_dv_ordered_at10_count.json
+"o/data[at0001]/events[at0002]/data[at0003]/items[at0011]/value",expected_avg_on_dv_ordered_at11_datetime.json
+"o/data[at0001]/events[at0002]/data[at0003]/items[at0012]/value",expected_avg_on_dv_ordered_at12_time.json
+"o/data[at0001]/events[at0002]/data[at0003]/items[at0013]/value",expected_avg_on_dv_ordered_at13_date.json
+"o/data[at0001]/events[at0002]/data[at0003]/items[at0014]/value",expected_avg_on_dv_ordered_at14_ordinal.json
+"o/data[at0001]/events[at0002]/data[at0003]/items[at0018]/value",expected_avg_on_dv_ordered_at18_duration.json

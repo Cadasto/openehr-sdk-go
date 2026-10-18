@@ -1,0 +1,7 @@
+${query_nr},${where},${expected_file},${nr_of_results}
+1.,"d/description[at0001]/items[openEHR-EHR-CLUSTER.test_all_types.v1]/items[at0001]/items[at0002]/items[at0003]/value/value = 'hello'",expected_arbitrary_query_boolean_where_q1_ent.json,0
+2.,"NOT d/description[at0001]/items[openEHR-EHR-CLUSTER.test_all_types.v1]/items[at0001]/items[at0002]/items[at0003]/value/value = false",expected_arbitrary_query_boolean_where_q2_ent.json,1
+3.,"d/description[at0001]/items[openEHR-EHR-CLUSTER.test_all_types.v1]/items[at0001]/items[at0002]/items[at0003]/value/value != false",expected_arbitrary_query_boolean_where_q3_ent.json,1
+4.,"d/description[at0001]/items[openEHR-EHR-CLUSTER.test_all_types.v1]/items[at0001]/items[at0002]/items[at0003]/value/value = true",expected_arbitrary_query_boolean_where_q4_ent.json,1
+5.,"(d/description[at0001]/items[openEHR-EHR-CLUSTER.test_all_types.v1]/items[at0001]/items[at0002]/items[at0003]/value/value = true AND d/description[at0001]/items[openEHR-EHR-CLUSTER.test_all_types.v1]/items[at0001]/items[at0002]/items[at0003]/value/value != false)",expected_arbitrary_query_boolean_where_q5_ent.json,1
+6.,"(d/description[at0001]/items[openEHR-EHR-CLUSTER.test_all_types.v1]/items[at0001]/items[at0002]/items[at0003]/value/value = true OR d/description[at0001]/items[openEHR-EHR-CLUSTER.test_all_types.v1]/items[at0001]/items[at0002]/items[at0003]/value/value = false)",expected_arbitrary_query_boolean_where_q6_ent.json,1

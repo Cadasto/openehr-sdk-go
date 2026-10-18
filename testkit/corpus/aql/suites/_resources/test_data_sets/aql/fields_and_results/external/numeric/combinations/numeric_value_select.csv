@@ -1,0 +1,13 @@
+${query_nr},${path},${where},${expected_file},${nr_of_results}
+1.,"eval/data[at0001]/items/value/magnitude","eval/data[at0001]/items/value/magnitude = 78.5",expected_numeric_value_select_q1.json,1
+2.,"eval/data[at0001]/items/value/magnitude","eval/data[at0001]/items[at0003]/value/magnitude = 10",expected_numeric_value_select_q2.json,1
+3.,"eval/data[at0001]/items/value/magnitude","eval/data[at0001]/items/value/magnitude > 10",expected_numeric_value_select_q3.json,2
+4.,"eval/data[at0001]/items/value/magnitude","eval/data[at0001]/items/value/magnitude >= 10",expected_numeric_value_select_q4.json,3
+5.,"eval/data[at0001]/items[at0002]/value/magnitude","eval/data[at0001]/items/value/magnitude >= 2 ORDER BY eval/data[at0001]/items[at0002]/value/magnitude ASC LIMIT 1",expected_numeric_value_select_q5.json,1
+6.,"eval/data[at0001]/items[at0002]/value/magnitude","eval/data[at0001]/items/value/magnitude >= 2 ORDER BY eval/data[at0001]/items[at0002]/value/magnitude ASC LIMIT 2",expected_numeric_value_select_q6.json,2
+7.,"eval/data[at0001]/items/value/magnitude","eval/data[at0001]/items/value/magnitude >= 2 ORDER BY eval/data[at0001]/items/value/magnitude ASCENDING LIMIT 3",expected_numeric_value_select_q7.json,3
+8.,"eval/data[at0001]/items[at0002]/value/magnitude","eval/data[at0001]/items[at0002]/value/magnitude >= 2 ORDER BY eval/data[at0001]/items[at0002]/value/magnitude ASCENDING LIMIT 1",expected_numeric_value_select_q8.json,1
+9.,"eval/data[at0001]/items[at0002]/value/magnitude","eval/data[at0001]/items[at0002]/value/magnitude >= 2 ORDER BY eval/data[at0001]/items[at0002]/value/magnitude ASC LIMIT 1 OFFSET 3",expected_numeric_value_select_q9.json,0
+10.,"eval/data[at0001]/items/value/magnitude","eval/data[at0001]/items/value/magnitude > 2 ORDER BY eval/data[at0001]/items/value/magnitude DESC LIMIT 2",expected_numeric_value_select_q10.json,2
+11.,"eval/data[at0001]/items/value/magnitude","eval/data[at0001]/items/value/magnitude >= 10 ORDER BY eval/data[at0001]/items[at0002]/value/magnitude DESCENDING LIMIT 1",expected_numeric_value_select_q11.json,1
+12.,"eval/data[at0001]/items/value/magnitude","eval/data[at0001]/items/value/magnitude < 10.5 ORDER BY eval/data[at0001]/items/value/magnitude DESC LIMIT 1 OFFSET 3",expected_numeric_value_select_q12.json,0

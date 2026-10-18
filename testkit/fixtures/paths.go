@@ -16,6 +16,9 @@
 //	  compositions/{name}.json
 //	aql/conformance/              # pinned upstream AQL FROM corpus (AQL_SOURCE.txt)
 //	  {family}/{name}.csv
+//	aql/suites/                   # pinned upstream AQL suites + their CSVs (AQL_SOURCE.txt)
+//	  AQL/**/{suite}.robot
+//	  _resources/test_data_sets/aql/fields_and_results/**/combinations/{name}.csv
 //	crossformat/{set}/            # pinned upstream cross-format sets (MANIFEST.txt)
 //	  template.opt | canonical.json | canonical.xml | flat.json | structured.json
 //
@@ -126,6 +129,18 @@ func FlatConformanceFlat(name string) string {
 // queries.
 func AQLConformanceRoot() string {
 	return filepath.Join(CorpusRoot(), "aql", "conformance")
+}
+
+// AQLSuitesRoot is testkit/corpus/aql/suites, the pinned upstream EHRbase
+// Robot AQL suite corpus (see AQL_SOURCE.txt and EXCLUDED.txt there, and
+// scripts/ingest-robot-aql.sh, which writes it in the same run as
+// [AQLConformanceRoot]). Vendored Apache-2.0; provenance in
+// THIRD_PARTY_LICENSES.md. It mirrors upstream tests/robot/: the suites sit
+// under AQL/ and the combination CSVs they read under
+// _resources/test_data_sets/aql/fields_and_results/, so a suite's data-file
+// path ${PROJECT_ROOT}/tests/robot/<rest> resolves to <rest> under this root.
+func AQLSuitesRoot() string {
+	return filepath.Join(CorpusRoot(), "aql", "suites")
 }
 
 // ListFlatConformance returns the FLAT conformance fixture names (no
