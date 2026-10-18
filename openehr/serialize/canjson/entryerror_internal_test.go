@@ -15,12 +15,15 @@ import (
 
 // TestEntryError_REQ052_EnvelopeAtTheTop pins the envelope a decode entry
 // point returns (REQ-052): a *DecodeError at the top of the chain, whose Path
-// is the failing value's pointer from the root of the document and whose
+// is the failing value's pointer from the root of the document, whose Type is
+// the `_type` a slot read when that slot is the failing value, and whose
 // Value holds the literal the decoder could not take, as written; an error
-// that is already a *DecodeError keeps its path and gains the literal; and a
-// nil error stays nil.
+// that is already a *DecodeError keeps its path and type and gains the
+// literal; and a nil error stays nil.
 //
-// Can-fail control: leave Path or Value unset and the matching rows fail.
+// Can-fail control: leave Path, Type or Value unset and the matching rows
+// fail; keep a slot's Type for a failure inside its value and the "slot
+// decoded on its own decoder" row fails.
 func TestEntryError_REQ052_EnvelopeAtTheTop(t *testing.T) {
 	numErr := &strconv.NumError{Func: "ParseInt", Num: "1.5", Err: strconv.ErrSyntax}
 	slot := &DecodeError{Path: "/content/0", Type: "ELEMENT", Inner: &json.SemanticError{
@@ -30,6 +33,7 @@ func TestEntryError_REQ052_EnvelopeAtTheTop(t *testing.T) {
 		name      string
 		err       error
 		path      string
+		typ       string
 		value     any
 		keepsSelf bool
 	}{
@@ -57,9 +61,18 @@ func TestEntryError_REQ052_EnvelopeAtTheTop(t *testing.T) {
 			value: "3.5",
 		},
 		{
+			name: "a slot whose _type the registry does not know",
+			err: &json.SemanticError{JSONPointer: "/items", Err: &DecodeError{Path: "/items/0", Type: "ELEMENT", Inner: &json.SemanticError{
+				Err: &DecodeError{Path: "/value", Type: "NOPE_TYPE", Inner: fmt.Errorf("typereg.Decode %q: %w", "NOPE_TYPE", typereg.ErrUnknownType)},
+			}}},
+			path: "/items/0/value",
+			typ:  "NOPE_TYPE",
+		},
+		{
 			name:      "an envelope already at the top",
 			err:       slot,
 			path:      "/content/0",
+			typ:       "ELEMENT",
 			value:     "3.5",
 			keepsSelf: true,
 		},
@@ -87,6 +100,9 @@ func TestEntryError_REQ052_EnvelopeAtTheTop(t *testing.T) {
 			}
 			if de.Path != tc.path {
 				t.Errorf("entryError(%v).Path = %q; want %q", tc.err, de.Path, tc.path)
+			}
+			if de.Type != tc.typ {
+				t.Errorf("entryError(%v).Type = %q; want %q", tc.err, de.Type, tc.typ)
 			}
 			if v := de.Value.Reveal(); v != tc.value {
 				t.Errorf("entryError(%v).Value.Reveal() = %#v; want %#v", tc.err, v, tc.value)

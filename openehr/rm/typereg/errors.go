@@ -88,7 +88,8 @@ var (
 //
 // Path is a JSON Pointer (canonical JSON) or an element path (canonical
 // XML) naming the failed node; Type is the observed discriminator (may be
-// empty when the discriminator was missing); Value is the JSON text of the
+// empty when the discriminator was missing, and empty on the canjson entry
+// points' envelope unless the failed node is the slot that read it); Value is the JSON text of the
 // value the decoder refused, as the document wrote it, which the canjson
 // entry points set; Inner is the failure itself.
 //

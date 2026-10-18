@@ -76,7 +76,10 @@ var ErrInvalidShape = typereg.ErrInvalidShape
 // errors.AsType[*DecodeError] finds it without unwrapping. Its Path is the
 // JSON Pointer of the failing value from the root of the document, where the
 // decoder knows it, and its text names the failure's class and the pointer
-// but no value from the document.
+// but no value from the document. Its Type is the `_type` a polymorphic slot
+// read when that slot is the failing value, as for a `_type` the registry
+// does not know; a failure inside a slot's value leaves Type empty, and the
+// slot's own DecodeError beneath names it.
 //
 // Its Value holds the JSON text of the value the decoder refused, as the
 // document wrote it, in two cases: a number or string of the right JSON kind
