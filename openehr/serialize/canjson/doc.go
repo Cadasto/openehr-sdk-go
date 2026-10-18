@@ -169,9 +169,11 @@
 // failure, a nesting-depth refusal and an unknown member. Value prints as
 // "[redacted]"; Value.Reveal returns the text. The codec's own error stays
 // reachable beneath the DecodeError, and its own text may name the value.
-// Two errors come back as they are, because the input does not cause them: a
-// read failure of the reader under a [Decoder], and io.EOF from a [Decoder]
-// whose stream holds no further value.
+// Two errors come back without a DecodeError, because the input does not
+// cause them: io.EOF from a [Decoder] whose stream holds no further value,
+// itself, so err == io.EOF holds; and a read failure of the reader under a
+// [Decoder], as jsontext reports it, with the reader's own error reachable
+// through errors.Is.
 //
 // What lies beneath that DecodeError depends on where the failure happens:
 //
@@ -218,8 +220,8 @@
 //     refusals carry [ErrInvalidShape] differs by primitive. On
 //     rm.Character a refusal it raises itself, applying the
 //     one-character rule to a value the tokenizer accepted (an empty or
-//     multi-character string, or a control character, and the
-//     encoding/json/v2 type mismatch of its string arm), carries the
+//     multi-character string, and the encoding/json/v2 type mismatch of
+//     its string arm), carries the
 //     sentinel. A lone surrogate or invalid UTF-8 does not reach
 //     rm.Character on this path: the tokenizer refuses it first, so it is
 //     malformed input carrying no sentinel, the same treatment as

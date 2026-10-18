@@ -766,13 +766,13 @@ func TestUnmarshal_REQ052_Base64RefusalNamesItsOffset(t *testing.T) {
 }
 
 // TestDecoder_REQ052_ReaderFailureAndEndOfStreamComeBackUnwrapped pins the two
-// errors REQ-052 leaves as they are, because the input does not cause them: a
-// failing reader's own error, and io.EOF from a Decoder whose stream holds no
-// further value, which a caller compares with ==. The reader fails inside a
-// member name, inside a polymorphic slot's value and inside a number, in every
-// decode mode: jsontext reports a failure partway through a value as a
-// *jsontext.SyntacticError around its I/O error, which is still not a failure
-// of the input.
+// errors REQ-052 keeps out of a DecodeError, because the input does not cause
+// them: a failing reader's error, reached with errors.Is, and io.EOF from a
+// Decoder whose stream holds no further value, which a caller compares with
+// ==. The reader fails inside a member name, inside a polymorphic slot's value
+// and inside a number, in every decode mode: jsontext reports some of these
+// as a *jsontext.SyntacticError around its I/O error, which is still not a
+// failure of the input.
 //
 // Can-fail control: wrap every error Decode returns, or take every
 // *jsontext.SyntacticError as caused by the input, and the reader rows fail.

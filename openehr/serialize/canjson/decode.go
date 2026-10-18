@@ -47,10 +47,10 @@ import (
 //     rejects them before rm.Character sees the bytes), so they too are
 //     malformed input carrying no sentinel.
 //   - A read failure from the underlying reader, on the streaming
-//     [Decoder] entry point: jsontext reports it as its own IO error,
-//     inside a *encoding/json/jsontext.SyntacticError when the reader fails
-//     partway through a value, and it passes through as jsontext reports it,
-//     with no [DecodeError] and no sentinel. The reader's own error stays
+//     [Decoder] entry point: jsontext reports it as its own IO error, on
+//     its own or inside a *encoding/json/jsontext.SyntacticError, by where
+//     the read stopped, and it passes through as jsontext reports it, with
+//     no [DecodeError] and no sentinel. The reader's own error stays
 //     reachable with errors.Is.
 //   - A polymorphic dispatch failure (a missing, unknown or mismatched
 //     `_type`, at a slot or on `/_type` for the whole value), raised as a
@@ -97,9 +97,11 @@ var ErrInvalidShape = typereg.ErrInvalidShape
 // own text may name the value. A polymorphic slot that fails adds a
 // DecodeError of its own, naming the slot, beneath the entry point's.
 //
-// Two errors come back as they are, because the input does not cause them:
-// a read failure of the reader under a [Decoder], and io.EOF from a
-// [Decoder] whose stream holds no further value.
+// Two errors come back without a DecodeError, because the input does not
+// cause them: io.EOF from a [Decoder] whose stream holds no further value,
+// itself, so err == io.EOF holds; and a read failure of the reader under a
+// [Decoder], as jsontext reports it, with the reader's own error reachable
+// through errors.Is.
 //
 // Since every failure is a DecodeError, classify by sentinel: see
 // [ErrInvalidShape] for where the lines fall. The type is re-exported from
@@ -238,10 +240,10 @@ func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 }
 
 // readRecorder is the reader a [Decoder] reads through: the caller's own,
-// which it records the last failure of. jsontext reports a reader that fails
-// partway through a value as a *jsontext.SyntacticError, the same type it
-// reports malformed input with, so the record is how the decoder tells the
-// two apart.
+// which it records the last failure of. jsontext may report a reader's
+// failure inside a *jsontext.SyntacticError, the same type it reports
+// malformed input with, so the record is how the decoder tells the two
+// apart.
 type readRecorder struct {
 	r   io.Reader
 	err error // the last error r returned, io.EOF aside
@@ -264,9 +266,10 @@ func (rr *readRecorder) failed(err error) bool {
 // v. Errors take the form and classification [Unmarshal]'s do, a
 // [DecodeError] at the top of the chain, except where reading a stream
 // rather than a whole input changes the answer. Two errors the input does
-// not cause come back as they are: io.EOF once the stream holds no further
-// value, an empty or whitespace-only stream included, where [Unmarshal]
-// reports malformed JSON; and a read failure of the underlying reader.
+// not cause come back without a [DecodeError]: io.EOF itself once the
+// stream holds no further value, an empty or whitespace-only stream
+// included, where [Unmarshal] reports malformed JSON; and a read failure of
+// the underlying reader, as jsontext reports it.
 // Content after the first value is simply the next value in the stream,
 // not an error, so `{"a":1}x` fails in [Unmarshal] and succeeds here. A
 // truncated value wraps a *jsontext.SyntacticError wrapping
@@ -304,9 +307,9 @@ func (d *Decoder) Decode(v any) error {
 // entryError). The two errors the input does not cause come back as they
 // are: io.EOF once the stream holds no further value, so a caller's
 // err == io.EOF holds, and the reader's own failure. jsontext returns the
-// latter as an I/O error wrapping it, inside a *jsontext.SyntacticError when
-// the reader fails partway through a value, so it is told by the reader's
-// own error in the chain, not by the type.
+// latter as an I/O error wrapping it, on its own or inside a
+// *jsontext.SyntacticError, by where the read stopped, so it is told by the
+// reader's own error in the chain, not by the type.
 func (d *Decoder) streamError(err error) error {
 	if err == nil || d.src.failed(err) || !fromInput(err) {
 		return err
