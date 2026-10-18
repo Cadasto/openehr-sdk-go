@@ -80,6 +80,8 @@ type AuthEndpoints struct {
 }
 ```
 
+`AuthEndpoints.Clone()` **MUST** return a copy that shares nothing with its receiver: each URL is a new value, its user information included, and each list a new slice, so an edit to one cannot reach the other. `NewStaticCatalog` copies `StaticConfig.Auth` this way.
+
 Every typed client (`openehr/client/ehr`, `openehr/client/query`, `cadasto/extra`, etc.) **MUST** resolve its base URL from the catalog by service ID, not from a top-level "base URL" config field.
 
 The catalog **MUST** carry the Platform base URL and the OIDC issuer as two values ([ADR 0023](../adr/0023-smart-platform-base-url-and-oidc-issuer.md)). `BaseURL` is the URL the document was resolved from: in SMART App Launch the embedded-launch `iss` parameter names this API base, not the OIDC issuer. `Issuer` is the document's `issuer` member, the value ID tokens are checked against; when the document declares no `issuer`, `Issuer` **MUST** equal `BaseURL`.

@@ -50,7 +50,7 @@ Rules:
 - Retries **MUST** respect `ctx` cancellation.
 - The retry budget **MUST** be observable via the OTel span (`retry.attempt`, `retry.backoff_ms`).
 
-The SDK checks the method before it looks at the error or the status, so a token or network failure on a non-idempotent request is not retried either. A request carrying a credential header that `Client.Do` refuses with `transport.ErrInsecureRedirect` is never retried either: [§ REQ-092](#req-092--tls-posture) *No downgrade with a credential* holds that rule. A request whose 2xx body could not be read is sent again only for a safe method: [§ REQ-172](#req-172--typed-2xx-body-read-failure) *Retry* holds that rule.
+The SDK checks the method before it looks at the error or the status, so a token or network failure on a non-idempotent request is not retried either. A request carrying a credential header that `Client.Do` refuses with `transport.ErrInsecureRedirect` is never retried either: [§ REQ-092](#req-092--tls-posture) *No downgrade with a credential* holds that rule. A request whose 2xx body could not be read is sent again only for a safe method: [§ REQ-172](#req-172--typed-2xx-body-read-failure) *Retry* holds that rule. A request that cannot be built (`http.NewRequestWithContext` refuses it) is not retried either: every attempt would fail the same way.
 
 - **Lives in:** [`transport/`](../../transport)
 
@@ -201,7 +201,7 @@ transport.WithObservationTag(ctx, k, v) context.Context
 
 Rules:
 
-- The observer **MUST** fire exactly once per logical `Client.Do` call — after retries settle — with retry-aware `Attempts` and total wall-clock `Duration`.
+- The observer **MUST** fire exactly once per logical `Client.Do` call — after retries settle — with retry-aware `Attempts` and total wall-clock `Duration`. A call `Client.Do` refuses before any attempt (a nil `Request`, a context already ended, a service missing from the catalog, a path that fails validation) is observed too, with `Attempts` 0 and an empty `URL`.
 - `WithObserver(nil)` **MUST** be a safe no-op.
 - A panicking observer **MUST NOT** break the request lifecycle. The transport **MUST** recover the panic and log via the configured `slog.Logger`.
 - `Observation.Tags` **MUST** be a defensive copy of any context-attached tags — observers **MUST NOT** be able to mutate the caller's context.
