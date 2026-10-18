@@ -196,8 +196,9 @@ var suiteContainmentErrors = []string{
 }
 
 // ReadSuiteCorpus reads the vendored suite corpus rooted at root (the
-// directory holding AQL/, _resources/, AQL_SOURCE.txt and EXCLUDED.txt) and
-// rebuilds every query its suites send.
+// directory holding AQL/, _resources/, AQL_SOURCE.txt and EXCLUDED.txt). It
+// rebuilds each query its suites send, and counts in Unrebuilt each one it
+// cannot rebuild.
 //
 // Callers in this repository pass fixtures.AQLSuitesRoot(); the parameter is
 // there so a downstream SDK can point the same reader at its own vendored

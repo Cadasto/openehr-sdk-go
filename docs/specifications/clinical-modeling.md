@@ -1873,7 +1873,7 @@ An overlay edge — default and consumer alike — is a record of two class-name
 | `COMPOSITION CONTAINS DV_TEXT` (pair question: a Never-containability operand) | Never |
 | `FOO_BAR` as either operand — pair and containability questions alike | UnknownClass |
 
-Differences from any engine's observed admissibility are asserted as neutral, cited, executable documentation — including the EHRbase-compatibility guard above — not treated as anyone's defect. That guard's evidence base is mechanical rather than merely cited: [PROBE-100](conformance.md#probe-100--upstream-aql-admissibility-corpus-ratchet) is its gate over the upstream FROM/CONTAINS combination corpus, and [PROBE-107](conformance.md#probe-107--upstream-aql-suite-admissibility-corpus) its gate over every query the upstream AQL suites send, in every clause family; both corpora are vendored under [conformance.md § Vendored fixtures](conformance.md#vendored-fixtures-testkitcorpus).
+Differences from any engine's observed admissibility are asserted as neutral, cited, executable documentation — including the EHRbase-compatibility guard above — not treated as anyone's defect. That guard's evidence base is mechanical rather than merely cited: [PROBE-100](conformance.md#probe-100--upstream-aql-admissibility-corpus-ratchet) is its gate over the upstream FROM/CONTAINS combination corpus, and [PROBE-107](conformance.md#probe-107--upstream-aql-suite-admissibility-corpus) its gate over the queries the upstream AQL suites send and an engine answers, in every clause family; both corpora are vendored under [conformance.md § Vendored fixtures](conformance.md#vendored-fixtures-testkitcorpus).
 
 ### Out of scope
 
