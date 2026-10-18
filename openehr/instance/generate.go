@@ -1202,9 +1202,11 @@ func (g *generator) materialiseMultiple(
 			total++
 		}
 	}
-	// Top-up to satisfy the attribute's overall lower bound when
-	// nothing was appended (e.g. all OPT children had occurrence
-	// lower 0 under Example with no top-level cardinality block).
+	// Top-up to satisfy the attribute's overall lower bound when the
+	// members appended so far fall short of it (e.g. all OPT children
+	// had occurrence lower 0 under Example with no top-level
+	// cardinality block, or Minimal skipped a child the lower bound
+	// still needs).
 	// When every OPT child is a slot we synthesise a slot-shaped
 	// fill: an RM value of the slot's RMTypeName stamped (by
 	// stampSlotFill) with an archetype id drawn from the parsed
