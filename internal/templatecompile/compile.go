@@ -228,10 +228,11 @@ func (w *walker) descend(n template.Node, cn *CompiledNode) error {
 	case *template.Slot:
 		cn.rmTypeName = v.RMTypeName()
 		cn.nodeID = v.NodeID()
-		cn.isSlot = true
-		cn.slotIncludes = v.Includes()
-		cn.slotExcludes = v.Excludes()
-		cn.slotRules = v.SlotRules()
+		cn.slot = &slotInfo{
+			includes: v.Includes(),
+			excludes: v.Excludes(),
+			rules:    v.SlotRules(),
+		}
 		return nil
 	default:
 		return fmt.Errorf("templatecompile: unhandled wire node type %T", n)
