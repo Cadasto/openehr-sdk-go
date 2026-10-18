@@ -2,16 +2,18 @@ package constraints
 
 import (
 	"fmt"
-	"regexp"
-	"time"
+
+	"github.com/cadasto/openehr-sdk-go/internal/iso8601"
 )
 
 // CDate constrains an RM ISO_DATE value (C_DATE). Pattern is the
 // AOM 1.4 partial-date pattern (e.g. "yyyy-mm-dd", "yyyy-??-??");
 // it is preserved verbatim for callers that need stricter
-// enforcement than [Validate] performs. Validate accepts any
-// well-formed ISO 8601 date: full ("2026-05-24"), year-month
-// ("2026-05"), or year ("2026").
+// enforcement than [CDate.Validate] performs. Validate accepts
+// exactly the strings rm.DVDate.ValidISO8601 accepts: a full date, a
+// year and month, or a year alone, in the extended layout
+// ("2026-05-24", "2026-05", "2026") or the basic one ("20260524",
+// "202605"), with the month and day checked against the calendar.
 type CDate struct {
 	Pattern string
 }
@@ -23,25 +25,27 @@ func (CDate) isPrimitive() {}
 // The AOM partial-date pattern is not enforced.
 func (CDate) ExampleValue() any { return "2020-01-01" }
 
-// Validate accepts a Go string. The value must parse as an ISO 8601
-// date in one of the three partial shapes (yyyy-mm-dd, yyyy-mm,
-// yyyy). The AOM partial-date pattern is not enforced; callers that
-// need it pre-validate before calling.
+// Validate accepts a Go string that rm.DVDate.ValidISO8601 accepts as
+// a date value, partial dates included, and reports any other string
+// as not a valid ISO 8601 date. The AOM partial-date pattern is not
+// enforced; callers that need it pre-validate before calling.
 func (c CDate) Validate(value any) []Violation {
 	s, ok := value.(string)
 	if !ok {
 		return []Violation{{Code: CodeWrongType, Detail: fmt.Sprintf("expected string date, got %T", value)}}
 	}
-	for _, layout := range []string{"2006-01-02", "2006-01", "2006"} {
-		if _, err := time.Parse(layout, s); err == nil {
-			return nil
-		}
+	if iso8601.ValidDate(s) {
+		return nil
 	}
 	return []Violation{{Code: CodeInvalidValue, Detail: "value is not a valid ISO 8601 date", Value: Redact(value)}}
 }
 
 // CTime constrains an RM ISO_TIME value (C_TIME). Validate accepts
-// "hh:mm:ss" and "hh:mm".
+// exactly the strings rm.DVTime.ValidISO8601 accepts: the extended
+// layouts hh:mm:ss and hh:mm, the basic layouts hhmmss and hhmm, or
+// hh alone, with a comma or dot fraction on the seconds and a zone of
+// Z, ±hh, ±hhmm or ±hh:mm. The hour runs from 00 to 23, and the
+// second may be 60 for a leap second.
 type CTime struct {
 	Pattern string
 }
@@ -52,23 +56,27 @@ func (CTime) isPrimitive() {}
 // satisfying the ISO 8601 hh:mm:ss shape Validate accepts.
 func (CTime) ExampleValue() any { return "12:00:00" }
 
-// Validate accepts a Go string parsing as ISO 8601 time, optionally
-// with trailing fractional seconds. The AOM pattern is not enforced.
+// Validate accepts a Go string that rm.DVTime.ValidISO8601 accepts as
+// a time value, partial times included, and reports any other string
+// as not a valid ISO 8601 time. The AOM pattern is not enforced.
 func (c CTime) Validate(value any) []Violation {
 	s, ok := value.(string)
 	if !ok {
 		return []Violation{{Code: CodeWrongType, Detail: fmt.Sprintf("expected string time, got %T", value)}}
 	}
-	for _, layout := range []string{"15:04:05", "15:04", "15:04:05.000", "15:04:05Z07:00"} {
-		if _, err := time.Parse(layout, s); err == nil {
-			return nil
-		}
+	if iso8601.ValidTime(s) {
+		return nil
 	}
 	return []Violation{{Code: CodeInvalidValue, Detail: "value is not a valid ISO 8601 time", Value: Redact(value)}}
 }
 
 // CDateTime constrains an RM ISO_DATE_TIME value (C_DATE_TIME).
-// Validate accepts RFC 3339 / ISO 8601 timestamps.
+// Validate accepts exactly the strings rm.DVDateTime.ValidISO8601
+// accepts: a date as [CDate] accepts it, optionally followed by "T"
+// and a time as [CTime] accepts it. A time needs a full date before
+// it, and the date and the time use the same layout, both extended
+// ("2026-05-24T10:30:00Z") or both basic ("20260524T103000Z"); the
+// zone may be written in either layout.
 type CDateTime struct {
 	Pattern string
 }
@@ -79,28 +87,32 @@ func (CDateTime) isPrimitive() {}
 // sentinel satisfying the RFC 3339 shape Validate accepts.
 func (CDateTime) ExampleValue() any { return "2020-01-01T12:00:00Z" }
 
-// Validate accepts a Go string that parses under RFC 3339 (the ISO
-// 8601 profile openEHR uses) or its date-only / partial-time
-// shortcuts. The AOM pattern is not enforced.
+// Validate accepts a Go string that rm.DVDateTime.ValidISO8601 accepts
+// as a date-time value, a date alone and other partial forms included,
+// and reports any other string as not a valid ISO 8601 date-time. The
+// AOM pattern is not enforced.
 func (c CDateTime) Validate(value any) []Violation {
 	s, ok := value.(string)
 	if !ok {
 		return []Violation{{Code: CodeWrongType, Detail: fmt.Sprintf("expected string date-time, got %T", value)}}
 	}
-	for _, layout := range []string{time.RFC3339, time.RFC3339Nano, "2006-01-02T15:04:05", "2006-01-02T15:04"} {
-		if _, err := time.Parse(layout, s); err == nil {
-			return nil
-		}
+	if iso8601.ValidDateTime(s) {
+		return nil
 	}
 	return []Violation{{Code: CodeInvalidValue, Detail: "value is not a valid ISO 8601 date-time", Value: Redact(value)}}
 }
 
 // CDuration constrains an RM ISO_DURATION value (C_DURATION).
-// Validate accepts the ISO 8601 PnYnMnDTnHnMnS shape. It does not
-// enforce numeric-range bounds on durations (e.g. "between PT1H and
-// PT24H"): converting partial years / months to seconds needs calendar
-// reasoning that a stdlib-only validator does not do. The AOM pattern
-// is not enforced either.
+// Validate accepts exactly the strings rm.DVDuration.ValidISO8601
+// accepts: P[nY][nM][nW][nD][T[nH][nM][nS]], with each designator at
+// most once and in that order, at least one component in all and at
+// least one after a T, and a comma or dot fraction on the seconds
+// only. Two openEHR additions to ISO 8601 are accepted too: a leading
+// minus sign ("-P1D") and W mixed with the other designators
+// ("P1Y2W"). It does not enforce numeric-range bounds on durations
+// (e.g. "between PT1H and PT24H"): converting partial years / months
+// to seconds needs calendar reasoning that this validator does not
+// do. The AOM pattern is not enforced either.
 type CDuration struct {
 	Pattern string
 }
@@ -111,18 +123,16 @@ func (CDuration) isPrimitive() {}
 // the ISO 8601 duration shape Validate accepts.
 func (CDuration) ExampleValue() any { return "P0D" }
 
-var durationRe = regexp.MustCompile(`^P(?:\d+Y)?(?:\d+M)?(?:\d+W)?(?:\d+D)?(?:T(?:\d+H)?(?:\d+M)?(?:\d+(?:\.\d+)?S)?)?$`)
-
-// Validate accepts a Go string of the ISO 8601 duration shape.
-// Returns CodeInvalidValue for shapes outside PnYnMnWnDTnHnMnS or
-// for empty / period-only stubs (P, PT).
+// Validate accepts a Go string that rm.DVDuration.ValidISO8601 accepts
+// as a duration value, and reports any other string, such as "", "P",
+// "PT" or "P1DT", as not a valid ISO 8601 duration.
 func (c CDuration) Validate(value any) []Violation {
 	s, ok := value.(string)
 	if !ok {
 		return []Violation{{Code: CodeWrongType, Detail: fmt.Sprintf("expected string duration, got %T", value)}}
 	}
-	if s == "" || s == "P" || s == "PT" || !durationRe.MatchString(s) {
-		return []Violation{{Code: CodeInvalidValue, Detail: "value is not a valid ISO 8601 duration", Value: Redact(value)}}
+	if iso8601.ValidDuration(s) {
+		return nil
 	}
-	return nil
+	return []Violation{{Code: CodeInvalidValue, Detail: "value is not a valid ISO 8601 duration", Value: Redact(value)}}
 }
