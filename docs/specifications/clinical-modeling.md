@@ -1101,7 +1101,7 @@ On an `Issue` from the instance validators, `Value` **MUST** hold:
 | `rm_invariant` on a `DV_INTERVAL` whose lower bound is above its upper bound | the two compared magnitudes, lower first, as a `[2]float64` |
 | `rm_invariant` on a temporal `value` (`Value_valid`) | the `value` string |
 | `term_mapping_match` | the `match` |
-| `invalid_shape` from a failed decode | the decode error, which carries the literal through unwrapping ([wire.md § REQ-052](wire.md#req-052)) |
+| `invalid_shape` from a failed decode | the decode error, which carries the literal through unwrapping where one of its causes records it, as a `*json.SemanticError` or a `*strconv.NumError` does ([wire.md § REQ-052](wire.md#req-052)) |
 
 Every other `Issue` (an absence, a count, a type or identity mismatch, a guard) **MUST** carry an empty `Value`. On an `Issue` from `ValidateAQL` or `ValidateAQLWithTypeRelation`, `Value` **MUST** be empty.
 

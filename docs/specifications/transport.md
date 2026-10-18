@@ -279,8 +279,8 @@ representation, the SDK **MUST** return a `*transport.DecodeError`. That error *
 **`Error()` stays value-free.** `DecodeError.Error()` **MUST** carry the HTTP method, the route
 template and the classification only, in the REQ-093 discipline. It **MUST NOT** interpolate the
 body, and **MUST NOT** interpolate the wrapped decoder's text: a cause beneath it may still embed the
-offending value (`*strconv.NumError` always, and a `*json.SemanticError` from a decode outside the
-`canjson` entry points), even though `canjson.DecodeError.Error()` carries none
+offending value (`*strconv.NumError` always, and a `*json.SemanticError`, beneath a
+`canjson.DecodeError` too), even though `canjson.DecodeError.Error()` itself carries none
 ([wire.md § REQ-052](wire.md#req-052)), which is why the transport error's own message **MUST**
 stay value-free and the cause is reachable only by unwrapping. Callers that need the diagnostics unwrap or read `Body`.
 
