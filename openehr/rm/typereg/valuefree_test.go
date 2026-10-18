@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json/jsontext"
 	json "encoding/json/v2"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
@@ -82,6 +83,18 @@ func TestDecodeError_REQ052_TextCarriesNoValue(t *testing.T) {
 			cause:  &jsontext.SyntacticError{ByteOffset: 30, Err: io.ErrUnexpectedEOF},
 			keep:   []string{"jsontext: unexpected EOF after offset 30"},
 			absent: nil,
+		},
+		{
+			name:   "an XML syntax error",
+			cause:  fmt.Errorf("canxml: %w", &xml.SyntaxError{Msg: "invalid character entity &Jane;", Line: 7}),
+			keep:   []string{"decode /a: canxml: XML syntax error on line 7"},
+			absent: []string{"Jane", "entity", "cause withheld"},
+		},
+		{
+			name:   "a quoted form holding a raw line break",
+			cause:  fmt.Errorf("canxml: \"Jane\nDoe\": %w", typereg.ErrUnknownType),
+			keep:   []string{"decode /a: typereg: _type not in registry"},
+			absent: []string{"Jane", "\n"},
 		},
 		{
 			name:   "a NumError",

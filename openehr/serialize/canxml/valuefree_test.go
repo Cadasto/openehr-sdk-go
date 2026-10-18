@@ -103,6 +103,15 @@ func TestUnmarshal_REQ052_SlotRefusalsKeepTheirTextOnOneLine(t *testing.T) {
 			},
 			absent: []string{"Jane", "7777"},
 		},
+		{
+			name: "a malformed element inside a slot",
+			in:   slotElement("DV_TEXT", `<value>Jane &Doe7777; x</value>`),
+			keep: []string{
+				`decode /value (_type="DV_TEXT"): `,
+				"canxml: XML syntax error on line 1",
+			},
+			absent: []string{"Jane", "Doe", "7777", "cause withheld"},
+		},
 	}
 	for _, tc := range cases {
 		for mode, opts := range xmlDecodeModes() {

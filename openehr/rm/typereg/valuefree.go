@@ -30,6 +30,7 @@ import (
 	"encoding/base64"
 	"encoding/json/jsontext"
 	json "encoding/json/v2"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
@@ -111,6 +112,14 @@ func (w *walk) link(err error) error {
 	case *jsontext.SyntacticError:
 		if e != nil {
 			writeSyntactic(b, e, false)
+			return nil
+		}
+	case *xml.SyntaxError:
+		if e != nil {
+			// The line is structure, like a SyntacticError's offset; Msg can
+			// quote the document's text.
+			b.WriteString("XML syntax error on line ")
+			b.WriteString(strconv.Itoa(e.Line))
 			return nil
 		}
 	case *strconv.NumError:
@@ -431,9 +440,12 @@ func ownText(text string, inner error) (prefix, suffix string) {
 }
 
 // The variable parts a form admits. Each is structure: a Go-quoted `_type`
-// value, RM type name or member pointer; an identifier; a Go type name.
+// value, RM type name or member pointer; an identifier; a Go type name. A
+// quoted part admits only what strconv.Quote writes, printable characters and
+// backslash escapes, so a text that holds a raw line break between quotes is
+// not in a form.
 const (
-	formQuoted = `"(?:[^"\\]|\\.)*"`
+	formQuoted = `"(?:[^"\\\pC\pZ]| |\\[!-~])*"`
 	formIdent  = `[A-Za-z_][A-Za-z0-9_]*`
 	formGoType = `[*\[\]A-Za-z0-9_./]+`
 )
