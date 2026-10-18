@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/testkit/expectedform"
 	"github.com/cadasto/openehr-sdk-go/testkit/wireequiv"
 )
@@ -601,6 +602,92 @@ func TestREQ052_BuildWritesNumbersAsTheEncoderDoes(t *testing.T) {
 		{name: "Integer64", root: "DV_COUNT", in: `{"_type":"DV_COUNT","magnitude":"0012"}`, want: `{"_type":"DV_COUNT","magnitude":12}`},
 		{name: "a String member is not a number", root: "DV_TEXT", in: `{"_type":"DV_TEXT","value":"1.50"}`, want: `{"_type":"DV_TEXT","value":"1.50"}`},
 	})
+}
+
+// TestREQ052_BuildWritesAWholeNumberAsItsInteger pins that an Integer or
+// Integer64 written as a JSON number whose value is whole, bare or quoted,
+// becomes the integer the encoder writes, however the literal writes it (ADR
+// 0004): 2.0, "2.0" and 20e-1 are all 2. A value with a fraction, a whole
+// number outside the attribute's range, and a quoted string that is not a
+// JSON number stay as written. The last group holds strings math/big reads
+// as whole numbers although JSON has no such number, so the expected form
+// does not take them for one.
+func TestREQ052_BuildWritesAWholeNumberAsItsInteger(t *testing.T) {
+	count := func(magnitude string) string {
+		return `{"_type":"DV_COUNT","magnitude":` + magnitude + `}`
+	}
+	quantity := func(precision string) string {
+		return `{"_type":"DV_QUANTITY","magnitude":1,"units":"kg","precision":` + precision + `}`
+	}
+	runBuild(t, []buildCase{
+		{name: "Integer64 zero fraction", root: "DV_COUNT", in: count(`2.0`), want: count(`2`)},
+		{name: "Integer64 quoted zero fraction", root: "DV_COUNT", in: count(`"2.0"`), want: count(`2`)},
+		{name: "Integer64 exponent", root: "DV_COUNT", in: count(`20e-1`), want: count(`2`)},
+		{name: "Integer64 quoted exponent", root: "DV_COUNT", in: count(`"2E0"`), want: count(`2`)},
+		{name: "Integer64 largest", root: "DV_COUNT", in: count(`9223372036854775807.0`), want: count(`9223372036854775807`)},
+		{name: "Integer64 smallest", root: "DV_COUNT", in: count(`-9223372036854775808.0`), want: count(`-9223372036854775808`)},
+		{name: "Integer64 past the range kept", root: "DV_COUNT", in: count(`9223372036854775808.0`), want: count(`9223372036854775808.0`)},
+		{name: "Integer64 fraction kept", root: "DV_COUNT", in: count(`2.5`), want: count(`2.5`)},
+		{name: "Integer64 quoted fraction kept", root: "DV_COUNT", in: count(`"2.5"`), want: count(`"2.5"`)},
+		{name: "Integer zero fraction", root: "DV_QUANTITY", in: quantity(`2.0`), want: quantity(`2`)},
+		{name: "Integer quoted zero fraction", root: "DV_QUANTITY", in: quantity(`"2.0"`), want: quantity(`2`)},
+		{name: "Integer exponent", root: "DV_QUANTITY", in: quantity(`20e-1`), want: quantity(`2`)},
+		{name: "Integer negative zero", root: "DV_QUANTITY", in: quantity(`-0.0`), want: quantity(`0`)},
+		{name: "Integer smallest", root: "DV_QUANTITY", in: quantity(`-2147483648.0`), want: quantity(`-2147483648`)},
+		{name: "Integer past the range kept", root: "DV_QUANTITY", in: quantity(`2147483648.0`), want: quantity(`2147483648.0`)},
+		{name: "Integer quoted past the range kept", root: "DV_QUANTITY", in: quantity(`"2147483648.0"`), want: quantity(`"2147483648.0"`)},
+		{name: "Integer fraction kept", root: "DV_QUANTITY", in: quantity(`2.5`), want: quantity(`2.5`)},
+		{name: "Integer quoted fraction kept", root: "DV_QUANTITY", in: quantity(`"2.5"`), want: quantity(`"2.5"`)},
+		{name: "quoted leading plus kept", root: "DV_QUANTITY", in: quantity(`"+2.0"`), want: quantity(`"+2.0"`)},
+		{name: "quoted leading zero kept", root: "DV_QUANTITY", in: quantity(`"02.0"`), want: quantity(`"02.0"`)},
+		{name: "quoted fraction form kept", root: "DV_QUANTITY", in: quantity(`"4/2"`), want: quantity(`"4/2"`)},
+		{name: "quoted hex kept", root: "DV_QUANTITY", in: quantity(`"0x10"`), want: quantity(`"0x10"`)},
+		{name: "quoted empty fraction kept", root: "DV_QUANTITY", in: quantity(`"2."`), want: quantity(`"2."`)},
+		{name: "quoted empty integer part kept", root: "DV_COUNT", in: count(`".5e1"`), want: count(`".5e1"`)},
+		{name: "quoted digit separator kept", root: "DV_COUNT", in: count(`"1_0"`), want: count(`"1_0"`)},
+	})
+}
+
+// TestREQ052_WholeNumberRoundTripMatchesTheExpectedForm holds the expected
+// form and the codec together: an input that writes a whole Integer or
+// Integer64 with a fraction or an exponent decodes with canjson, re-encodes,
+// and the output is wire-equivalent to the input's expected form, the
+// comparison PROBE-030's input leg makes.
+func TestREQ052_WholeNumberRoundTripMatchesTheExpectedForm(t *testing.T) {
+	count := func() any { return new(rm.DVCount) }
+	quantity := func() any { return new(rm.DVQuantity) }
+	cases := []struct {
+		name   string
+		in     string
+		target func() any
+	}{
+		{name: "Integer64 zero fraction", in: `{"_type":"DV_COUNT","magnitude":2.0}`, target: count},
+		{name: "Integer64 quoted zero fraction", in: `{"_type":"DV_COUNT","magnitude":"2.0"}`, target: count},
+		{name: "Integer64 exponent", in: `{"_type":"DV_COUNT","magnitude":20e-1}`, target: count},
+		{name: "Integer64 largest", in: `{"_type":"DV_COUNT","magnitude":9223372036854775807.0}`, target: count},
+		{name: "Integer zero fraction", in: `{"_type":"DV_QUANTITY","magnitude":1,"units":"kg","precision":2.0}`, target: quantity},
+		{name: "Integer quoted zero fraction", in: `{"_type":"DV_QUANTITY","magnitude":1,"units":"kg","precision":"2.0"}`, target: quantity},
+		{name: "Integer exponent", in: `{"_type":"DV_QUANTITY","magnitude":1,"units":"kg","precision":20e-1}`, target: quantity},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			v := tc.target()
+			if err := canjson.Unmarshal([]byte(tc.in), v); err != nil {
+				t.Fatalf("canjson.Unmarshal(%s) error: %v", tc.in, err)
+			}
+			out, err := canjson.Marshal(v)
+			if err != nil {
+				t.Fatalf("canjson.Marshal error: %v", err)
+			}
+			want, err := expectedform.BuildFor([]byte(tc.in), v)
+			if err != nil {
+				t.Fatalf("BuildFor(%s) error: %v", tc.in, err)
+			}
+			if ok, diff := wireequiv.Equivalent(want, out); !ok {
+				t.Errorf("re-encode of %s = %s, want it wire-equivalent to the expected form %s: %s", tc.in, out, want, diff)
+			}
+		})
+	}
 }
 
 // TestREQ052_BuildRefusesInputItCannotRead pins the errors: Build never guesses
