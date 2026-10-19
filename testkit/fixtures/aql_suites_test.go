@@ -445,6 +445,50 @@ func TestIngestRobotAQLRefusesBeforeWriting_PROBE107_REQ160(t *testing.T) {
 	}
 }
 
+// The ingest has no default clone. Without ROBOT_ROOT, or with it empty, it
+// refuses before it writes anything, and says what ROBOT_ROOT must name.
+func TestIngestRobotAQLRequiresRobotRoot(t *testing.T) {
+	t.Parallel()
+	h := newAQLIngest(t)
+	cases := []struct {
+		name string
+		// env is added to the ingest's environment, which holds no
+		// ROBOT_ROOT of its own.
+		env []string
+	}{
+		{name: "ROBOT_ROOT unset"},
+		{name: "ROBOT_ROOT empty", env: []string{"ROBOT_ROOT="}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			up, head := h.newUpstream(t)
+			sdk := h.newSDK(t, head)
+			if out, err := h.ingest(t, sdk, up, ""); err != nil {
+				t.Fatalf("ingest with ROBOT_ROOT set: %v\n%s", err, out)
+			}
+			before := tree(t, sdk)
+
+			out, err := h.run(t, sdk, tc.env...)
+			if err == nil {
+				t.Fatalf("ingest succeeded; want a refusal naming ROBOT_ROOT\n%s", out)
+			}
+			for _, want := range robotRootRefusal {
+				if !strings.Contains(out, want) {
+					t.Errorf("ingest refused with %q; want the refusal to name %q", out, want)
+				}
+			}
+			if changed := changedFiles(before, tree(t, sdk)); len(changed) > 0 {
+				t.Errorf("the refusal changed %q in the scratch tree; want nothing changed", changed)
+			}
+		})
+	}
+}
+
+// robotRootRefusal is what both Robot ingests print when ROBOT_ROOT is unset
+// or empty: the variable, and the upstream directory it must name.
+var robotRootRefusal = []string{"ROBOT_ROOT is unset or empty", "tests/robot/_resources/test_data_sets"}
+
 // Paths in the scratch trees, slash-separated.
 const (
 	fieldsAndResults = "_resources/test_data_sets/aql/fields_and_results"
@@ -557,8 +601,15 @@ func (h *aqlIngest) ingest(t *testing.T, sdk, up, robotRoot string, env ...strin
 	if robotRoot == "" {
 		robotRoot = "tests/robot/_resources/test_data_sets"
 	}
+	return h.run(t, sdk, slices.Concat([]string{"ROBOT_ROOT=" + filepath.Join(up, filepath.FromSlash(robotRoot))}, env)...)
+}
+
+// run runs the script in sdk with only env added to its environment, so
+// ROBOT_ROOT is unset unless env sets it, and returns its combined output.
+func (h *aqlIngest) run(t *testing.T, sdk string, env ...string) (string, error) {
+	t.Helper()
 	cmd := exec.CommandContext(t.Context(), h.bash, filepath.Join(sdk, "scripts", "ingest-robot-aql.sh"))
-	cmd.Env = slices.Concat(h.env, []string{"ROBOT_ROOT=" + filepath.Join(up, filepath.FromSlash(robotRoot))}, env)
+	cmd.Env = slices.Concat(h.env, env)
 	out, err := cmd.CombinedOutput()
 	return string(out), err
 }
