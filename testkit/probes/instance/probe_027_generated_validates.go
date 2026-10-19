@@ -33,7 +33,7 @@ func Probe027GeneratedValidates(ctx context.Context, c *templatecompile.Compiled
 	}
 
 	var failures []string
-	for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+	for _, policy := range []instance.Policy{instance.Large, instance.Medium, instance.Required} {
 		opts.Policy = policy
 		out, err := instance.Generate(ctx, c, opts)
 		if err != nil {

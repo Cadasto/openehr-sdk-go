@@ -169,7 +169,7 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	// the primitive's RM-mandatory child attributes are implicitly
 	// captured by the value (e.g. DV_QUANTITY embeds magnitude and
 	// units). Validation v2 does not descend into primitive subtrees
-	// either. Minimal values the leaf too, so the tree is valid: a
+	// either. Every policy values the leaf, so the tree is valid: a
 	// bounded constraint requires a value, and a zero RM value would
 	// surface as primitive_wrong_type or out_of_range at validation.
 	if pc := optNode.PrimitiveConstraint(); pc != nil {
@@ -200,6 +200,9 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 		}
 	}
 	g.fillUncarriedRequired(optNode, rmValue)
+	if err := g.writeRMNeeded(optNode, rmValue); err != nil {
+		return err
+	}
 	orderIntervalBounds(optNode, rmValue)
 	settleIntervalEndpoints(optNode, rmValue)
 	g.finishNode(optNode, rmValue)
@@ -223,6 +226,57 @@ func (g *generator) fillUncarriedRequired(optNode *tcimpl.CompiledNode, rmValue 
 	}
 }
 
+// writeRMNeeded writes, as a visit writes it, an attribute of rmValue that
+// an RM rule needs and the walk left unwritten, where optNode names an
+// allowed OPT child for it: the policy did not visit it, as Required
+// leaves an optional attribute alone, or the OPT prohibits it (REQ-107
+// Precedence 2). The attribute is built from its first allowed child
+// (materialiseSingle), as the walk would build it, so it keeps the OPT's
+// constraints rather than taking a default of its BMM type. The
+// attributes are an ELEMENT's null_flavour when it has no value, or its
+// value where the OPT prohibits the null_flavour and allows the value,
+// and a PARTY_IDENTIFIED's or PARTY_RELATED's name when it has no name,
+// identifiers or external_ref. finishNode then gives each the RM default
+// it gives a visited one, and builds one with no allowed OPT child from
+// its BMM type. A DV_MULTIMEDIA's uri is not among them: the generator
+// has no writer for a uri the OPT constrains, so settleMultimedia writes
+// its default, over a prohibition too.
+func (g *generator) writeRMNeeded(optNode *tcimpl.CompiledNode, rmValue any) error {
+	switch v := rmValue.(type) {
+	case *rm.Element:
+		if (v.Value != nil && !rm.IsTypedNil(v.Value)) || v.NullFlavour != nil {
+			return nil
+		}
+		if prohibited(optNode, "null_flavour") && !nullFlavourNeeded(optNode) {
+			return g.visitNeeded(optNode, "value", v)
+		}
+		return g.visitNeeded(optNode, "null_flavour", v)
+	case *rm.PartyIdentified:
+		if partyNamed(v.Name, len(v.Identifiers), v.ExternalRef) {
+			return nil
+		}
+		return g.visitNeeded(optNode, "name", v)
+	case *rm.PartyRelated:
+		if partyNamed(v.Name, len(v.Identifiers), v.ExternalRef) {
+			return nil
+		}
+		return g.visitNeeded(optNode, "name", v)
+	}
+	return nil
+}
+
+// visitNeeded builds attrName of optNode, an attribute an RM rule needs,
+// on rmValue from its first allowed OPT child, as a visit builds it. An
+// attribute optNode does not name, or names with no allowed child, is
+// left alone.
+func (g *generator) visitNeeded(optNode *tcimpl.CompiledNode, attrName string, rmValue any) error {
+	attr := optNode.Attribute(attrName)
+	if attr == nil || len(tcimpl.AllowedChildNodes(attr)) == 0 {
+		return nil
+	}
+	return g.materialiseSingle(optNode, attr, rmValue)
+}
+
 // compositionDefaultOwns reports whether attrName of class is one
 // applyCompositionDefaults fills, from Options or its RM default, so no
 // generic default is built for it first.
@@ -238,7 +292,7 @@ func compositionDefaultOwns(class, attrName string) bool {
 }
 
 // visits decides whether the walk descends into attr of optNode. Under
-// either policy it never visits an attribute the OPT prohibits (an
+// every policy it never visits an attribute the OPT prohibits (an
 // existence of 0..0, or OPT children it all prohibits) that no RM rule
 // needs (attrProhibited), whatever children the OPT names under it, nor
 // one the RM computes rather than stores (offset on POINT_EVENT and
@@ -259,7 +313,7 @@ func (g *generator) visits(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAt
 	if rminfo.IsNonStorableAttr(bmmtype.Class(optNode.RMTypeName()), attr.Name()) {
 		return false
 	}
-	return g.shouldVisit(attr)
+	return g.shouldVisit(optNode, attr)
 }
 
 // locatableUID reports whether attr is the uid of a locatable, the one
@@ -321,17 +375,24 @@ func attrProhibited(attr *tcimpl.CompiledAttribute) bool {
 }
 
 // shouldVisit decides whether an attribute is in scope under the
-// current policy. Under Example: every attribute. Under Minimal:
-// every attribute that is required (BMM-mandatory OR existence ≥ 1),
-// whose cardinality lower bound is 1 or more, OR that has OPT-pinned
-// children the OPT does not prohibit. The "has OPT children" arm captures
-// the case where the
-// OPT explicitly constrains a structurally optional attribute (e.g.
-// COMPOSITION.content with archetype-root pins) — the act of pinning
-// is itself a signal that the resulting tree should carry those
-// children even under the smallest viable build.
-func (g *generator) shouldVisit(attr *tcimpl.CompiledAttribute) bool {
-	if g.opts.Policy == Example {
+// current policy. Under Large: every attribute. Under Required: every
+// attribute that is required, because the BMM marks it mandatory or its
+// existence or cardinality lower bound is bounded and at least 1, and no
+// other. Under Medium: every attribute that is required in that sense,
+// OR that has OPT-pinned children the OPT does not prohibit. The "has
+// OPT children" arm captures the case where the OPT explicitly
+// constrains a structurally optional attribute (e.g. COMPOSITION.content
+// with archetype-root pins): under Medium the act of pinning is itself
+// a signal that the resulting tree should carry those children. Required
+// does not take that arm, so it builds only what the template makes
+// mandatory, except on a COMPOSITION's context, which it visits as
+// Medium does: applyCompositionDefaults writes a context under every
+// policy, so the walk builds it under the OPT's constraints (a pinned
+// setting, a required other_context) rather than leaving it bare. Inside
+// the context Required's own rule applies. A Policy value outside the
+// three is read as Medium here.
+func (g *generator) shouldVisit(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
+	if g.opts.Policy == Large {
 		return true
 	}
 	if isRequired(attr) {
@@ -342,7 +403,16 @@ func (g *generator) shouldVisit(attr *tcimpl.CompiledAttribute) bool {
 	if cm := attr.ChildMultiplicity(); cm != nil && !cm.LowerUnbounded() && cm.Lower() > 0 {
 		return true
 	}
+	if g.opts.Policy == Required && !compositionContext(optNode, attr) {
+		return false
+	}
 	return len(tcimpl.AllowedChildNodes(attr)) > 0
+}
+
+// compositionContext reports whether attr is the context of a
+// COMPOSITION, the one attribute Required visits as Medium does.
+func compositionContext(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
+	return attr.Name() == "context" && bmmtype.Class(optNode.RMTypeName()) == "COMPOSITION"
 }
 
 // bindingAlternative returns the allowed alternative of a single-valued
@@ -693,14 +763,22 @@ func settleBuilt(v any) {
 // fillPartyName gives a PARTY_IDENTIFIED, or a PARTY_RELATED, with no
 // name, identifiers or external_ref the name "example", so RM
 // Basic_validity holds. The RM rule wins over the OPT, whether the OPT
-// prohibits name or Minimal would not visit it; a name the walk wrote,
-// one a C_STRING admits, stays.
+// prohibits name or the policy would not visit it. A name the walk wrote,
+// one a C_STRING admits, stays, as does one writeRMNeeded built from the
+// name's first allowed OPT child; so "example" goes only where the OPT
+// names no allowed child for name.
 func fillPartyName(name **string, identifiers int, externalRef *rm.PartyRef) {
-	if *name != nil || identifiers > 0 || externalRef != nil {
+	if partyNamed(*name, identifiers, externalRef) {
 		return
 	}
 	example := "example"
 	*name = &example
+}
+
+// partyNamed reports whether a party already meets RM Basic_validity: it
+// has a name, an identifier or an external_ref.
+func partyNamed(name *string, identifiers int, externalRef *rm.PartyRef) bool {
+	return name != nil || identifiers > 0 || externalRef != nil
 }
 
 // populatePrimitiveDefault stamps a minimal-valid sentinel on a
@@ -1137,9 +1215,14 @@ func includedPerOPT(optNode *tcimpl.CompiledNode, attrName string) bool {
 
 // materialiseMultiple synthesises and appends children under a
 // C_MULTIPLE_ATTRIBUTE. Per-child counts honour each OPT child's
-// occurrences.lower (default 1) and the overall attribute's
-// cardinality.upper (default unbounded). The synthesised count
-// never exceeds the OPT-declared upper bound.
+// occurrences.lower: max(occurrences.lower, 1) under Large and Medium,
+// and occurrences.lower under Required, so an optional child (bounded
+// occurrences with a lower bound of 0) gets none of its own there; a child
+// with no occurrences, or an unbounded lower, counts as required
+// (childRequired) and gets one under every policy. Under Large and Medium a
+// child ownMemberSkipped names gets none of its own either. The overall attribute's
+// cardinality.upper (default unbounded) caps the total, and its lower
+// bound is met by the top-up below under every policy.
 func (g *generator) materialiseMultiple(
 	optNode *tcimpl.CompiledNode,
 	attr *tcimpl.CompiledAttribute,
@@ -1173,20 +1256,20 @@ func (g *generator) materialiseMultiple(
 		if child.IsSlot() {
 			continue
 		}
-		if g.opts.Policy == Minimal && identityTaken(children, i) {
+		if g.ownMemberSkipped(children, i) {
 			continue
 		}
 		childCount := 1
 		if occ := child.Occurrences(); occ != nil && !occ.LowerUnbounded() {
-			if occ.Lower() > 0 {
+			if occ.Lower() > 0 || g.opts.Policy == Required {
 				childCount = occ.Lower()
 			}
-			// occ.Lower()==0 → still produce one fill so the
-			// resulting tree carries each archetype-root child the
-			// policy keeps at least once (under Minimal, an optional
-			// child whose identity a sibling carries is skipped above).
-			// Drops to a per-child loop body of `1` which is the
-			// minimal-yet-complete contract.
+			// occ.Lower()==0 → under Large and Medium, still produce one
+			// fill so the resulting tree carries each child the policy
+			// keeps at least once (ownMemberSkipped above drops the
+			// others). Under Required an optional child gets none: only
+			// the top-up below can build one, to meet the attribute's
+			// lower bound.
 		}
 		for range childCount {
 			if upperBound >= 0 && total >= upperBound {
@@ -1203,10 +1286,9 @@ func (g *generator) materialiseMultiple(
 		}
 	}
 	// Top-up to satisfy the attribute's overall lower bound when the
-	// members appended so far fall short of it (e.g. all OPT children
-	// had occurrence lower 0 under Example with no top-level
-	// cardinality block, or Minimal skipped a child the lower bound
-	// still needs).
+	// members appended so far fall short of it, under every policy (e.g.
+	// Large or Medium skipped a child the lower bound still needs, or
+	// Required built no member of an optional child).
 	// When every OPT child is a slot we synthesise a slot-shaped
 	// fill: an RM value of the slot's RMTypeName stamped (by
 	// stampSlotFill) with an archetype id drawn from the parsed
@@ -1814,19 +1896,62 @@ func newHierObjectID() *rm.HierObjectID {
 	return &rm.HierObjectID{Value: uuid.NewV4().String()}
 }
 
+// ownMemberSkipped reports whether children[i], an allowed child that is
+// not a slot, gets no member of its own under the policy in force. Under
+// Large and Medium, a child whose identity a sibling carries gets none
+// (identityTaken). Under Medium, an optional archetype root after the first
+// optional archetype root of the attribute gets none either
+// (laterOptionalArchetype), so the attribute holds at most one optional
+// archetype. Required skips no child here: it sizes each child by its
+// occurrences lower bound, which gives an optional child no member. A
+// Policy value outside the three skips no child. The top-up to the
+// attribute's lower bound can still build a member of a skipped child.
+func (g *generator) ownMemberSkipped(children []*tcimpl.CompiledNode, i int) bool {
+	switch g.opts.Policy {
+	case Large:
+		return identityTaken(children, i)
+	case Medium:
+		return identityTaken(children, i) || laterOptionalArchetype(children, i)
+	case Required:
+		return false
+	}
+	return false
+}
+
+// laterOptionalArchetype reports whether children[i] is an optional
+// archetype root that comes after another optional archetype root among
+// its siblings, in OPT order, whatever the archetype of either. The first
+// optional archetype root counts even where identityTaken skips it, and a
+// slot is not an archetype root.
+func laterOptionalArchetype(children []*tcimpl.CompiledNode, i int) bool {
+	return optionalArchetypeRoot(children[i]) && slices.ContainsFunc(children[:i], optionalArchetypeRoot)
+}
+
+// optionalArchetypeRoot reports whether child is an archetype root the OPT
+// leaves optional: it names an archetype id, is not a slot, and its
+// occurrences have a bounded lower bound of 0 (childRequired). A root with
+// no occurrences, or with an unbounded lower bound, counts as required.
+func optionalArchetypeRoot(child *tcimpl.CompiledNode) bool {
+	return !child.IsSlot() && child.ArchetypeID() != "" && !childRequired(child)
+}
+
 // identityTaken reports whether children[i] is optional and a sibling
 // carries its identity: a required sibling before or after it, or an
-// optional sibling before it. Under Minimal such a child gets no member of
-// its own, so the validator's binding of members to children stays
-// unambiguous, though the top-up to the attribute's lower bound can still
-// build one, from the first child that is not a slot; a required child is
-// always built. A slot does not count as a sibling. A sibling carries an
-// identity as the validator binds a member by it (carriesIdentity), so an
-// archetype root also carries its node id: an optional child that is not a
-// root gets no member after a root with its node id, while optional
-// archetype roots of different archetypes are each built, since a root's
-// identity is its archetype id (childIdentity). A child with no identity is
-// never skipped. A name the OPT pins on a child is not part of it.
+// optional sibling before it. Under Large and Medium such a child gets no
+// member of its own, so the validator's binding of members to children
+// stays unambiguous, though the top-up to the attribute's lower bound can
+// still build one, from the first child that is not a slot; a required
+// child is always built. A slot does not count as a sibling. A sibling
+// carries an identity as the validator binds a member by it
+// (carriesIdentity), so an archetype root also carries its node id: an
+// optional child that is not a root gets no member after a root with its
+// node id, while optional archetype roots of different archetypes are not
+// skipped here, since a root's identity is its archetype id
+// (childIdentity); Medium skips the later ones by another rule
+// (laterOptionalArchetype). A child with no identity is never skipped. A
+// name the OPT pins on a child is not part of it. Optional and required
+// are as childRequired reads them: a child with no occurrences, or with an
+// unbounded lower bound, counts as required.
 func identityTaken(children []*tcimpl.CompiledNode, i int) bool {
 	child := children[i]
 	if childRequired(child) {
@@ -1847,11 +1972,14 @@ func identityTaken(children []*tcimpl.CompiledNode, i int) bool {
 	return false
 }
 
-// childRequired reports whether the OPT requires child: its occurrences
-// give a lower bound of 1 or more.
+// childRequired reports whether child counts as required: every child does
+// unless the OPT gives it bounded occurrences whose lower bound is 0, which
+// makes it optional. A child with no occurrences, or with an unbounded lower
+// bound, is required, as materialiseMultiple sizes it as one member under
+// every policy.
 func childRequired(child *tcimpl.CompiledNode) bool {
 	occ := child.Occurrences()
-	return occ != nil && !occ.LowerUnbounded() && occ.Lower() > 0
+	return occ == nil || occ.LowerUnbounded() || occ.Lower() > 0
 }
 
 // childIdentity returns child's identity: the archetype id for an archetype
@@ -1954,7 +2082,8 @@ func openehrCoded(group *terminology.Group, code string) rm.DVCodedText {
 // rejects that, such as a C_CODE_PHRASE that names the terminology
 // openEHR (codeAdmitted); a code the OPT gave is kept. A value with
 // neither uri nor data gets the uri http://example.com, so RM Not_empty
-// holds, unless the OPT prohibits uri. opt is the OPT node of m.
+// holds, where the OPT prohibits uri too: the RM rule wins over the
+// prohibition (REQ-107 Precedence 2). opt is the OPT node of m.
 func settleMultimedia(opt *tcimpl.CompiledNode, m *rm.DVMultimedia) {
 	textPlain := rm.CodePhrase{
 		CodeString:    "text/plain",
@@ -1963,7 +2092,7 @@ func settleMultimedia(opt *tcimpl.CompiledNode, m *rm.DVMultimedia) {
 	if noCode(m.MediaType.CodeString) && codeAdmitted(opt, "media_type", textPlain) {
 		m.MediaType = textPlain
 	}
-	if (m.URI == nil || rm.IsTypedNil(m.URI)) && len(m.Data) == 0 && !prohibited(opt, "uri") {
+	if (m.URI == nil || rm.IsTypedNil(m.URI)) && len(m.Data) == 0 {
 		m.URI = &rm.DVURI{Value: "http://example.com"}
 	}
 }
@@ -2101,10 +2230,13 @@ func (g *generator) placeholderElement() *rm.Element {
 // the OPT's constraint on null_flavour rejects that code (codeAdmitted);
 // where a code-phrase constraint rejects it, the walk's null flavour
 // stays. Where the OPT prohibits null_flavour, the RM rule wins: the
-// ELEMENT takes a value built as for an ELEMENT.value the OPT leaves
-// silent, or, where the OPT prohibits value as well, the null flavour the
-// walk wrote as if the OPT allowed it (visits), with "no information"
-// where that leaves no code its own child admits. A null flavour with a
+// ELEMENT takes a value, which writeRMNeeded has built from the value's
+// first allowed OPT child where the walk did not visit it, and which is
+// built here as for an ELEMENT.value the OPT leaves silent where the OPT
+// names no allowed child; or, where the OPT prohibits value as well, the
+// null flavour the walk wrote as if the OPT allowed it (visits,
+// writeRMNeeded), with "no information" where that leaves no code its own
+// child admits. A null flavour with a
 // code keeps it, and takes the pinned rubric of that code when the code
 // is in the openEHR null flavours group. opt is the OPT node of e, or nil
 // for an ELEMENT built from the BMM alone.
@@ -2172,7 +2304,9 @@ func requiresAttr(opt *tcimpl.CompiledNode, attrName string) bool {
 
 // fillElementValue gives e the value the generator builds for an
 // ELEMENT.value the OPT leaves silent: a default of the attribute's BMM
-// type. It reports whether it wrote one.
+// type. A value the OPT names an allowed child for is built from that
+// child instead (writeRMNeeded), so it never gets here. It reports whether
+// it wrote one.
 func (g *generator) fillElementValue(e *rm.Element) bool {
 	rmType, ok := rminfo.Default.AttributeRMType("ELEMENT", "value")
 	if !ok {

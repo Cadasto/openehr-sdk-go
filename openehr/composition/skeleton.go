@@ -10,11 +10,15 @@ import (
 )
 
 // NewSkeleton produces a structurally-conformant *rm.Composition for
-// c with no clinical data. It delegates to instance.Generate with
-// Policy: Minimal: every required RM attribute is filled (BMM-mandatory
-// implicits and OPT-declared ones) and primitive leaves carry
-// ExampleValue defaults, so the resulting tree is valid against
-// `validation.ValidateComposition`.
+// c with no clinical data. It delegates to instance.Generate with the
+// policy WithPolicy selects, instance.Large when none is given: every
+// required RM attribute is filled (BMM-mandatory implicits and
+// OPT-declared ones), a member of every optional archetype the template
+// names is built, and primitive leaves carry ExampleValue defaults, so
+// the resulting tree is valid against `validation.ValidateComposition`.
+// NewSkeleton accepts instance.Large, instance.Medium and
+// instance.Required. It refuses any other Policy value, before generating
+// anything, with an error wrapping ErrUnsupportedPolicy.
 //
 // WithComposer and WithTerritory are required for COMPOSITION roots
 // (instance.Generate enforces); WithLanguage / WithCategory / WithNow
@@ -30,8 +34,14 @@ func NewSkeleton(ctx context.Context, c *templatecompile.Compiled, opts ...Optio
 		return nil, fmt.Errorf("composition.NewSkeleton: OPT root %q is not COMPOSITION", rt)
 	}
 	cfg := buildConfig(opts...)
+	switch cfg.policy {
+	case instance.Large, instance.Medium, instance.Required:
+		// The policies the instance package defines.
+	default:
+		return nil, errUndefinedPolicy("composition.NewSkeleton", cfg.policy)
+	}
 	v, err := instance.Generate(ctx, c, instance.Options{
-		Policy:      instance.Minimal,
+		Policy:      cfg.policy,
 		Language:    cfg.language,
 		Territory:   cfg.territory,
 		Composer:    cfg.composer,
@@ -50,6 +60,14 @@ func NewSkeleton(ctx context.Context, c *templatecompile.Compiled, opts ...Optio
 		comp.Category = *cfg.category
 	}
 	return comp, nil
+}
+
+// errUndefinedPolicy returns the error the entry point op gives for p, a
+// Policy value that is none of those the instance package defines. It
+// wraps ErrUnsupportedPolicy and prints p's number, since Policy's String
+// names every such value "unknown".
+func errUndefinedPolicy(op string, p instance.Policy) error {
+	return fmt.Errorf("%s: %w: %d", op, ErrUnsupportedPolicy, p)
 }
 
 // buildConfig folds opts into a config struct.

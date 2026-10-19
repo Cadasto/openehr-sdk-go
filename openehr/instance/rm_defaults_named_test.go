@@ -34,7 +34,7 @@ const (
 // code: as a CODE_PHRASE or DV_CODED_TEXT node with no constraint, or as a
 // C_CODE_PHRASE with an empty code list, whose placeholder code the RM
 // default wins over. Each OPT is compiled with and without the implicit
-// attributes, and generated under both policies and both value fills.
+// attributes, and generated under every policy and both value fills.
 func TestREQ107_RMDefaultsWhenOPTNamesNoCode(t *testing.T) {
 	// An ACTION names every attribute the RM floor needs, so the
 	// generated value passes it with or without the implicit attributes.
@@ -97,7 +97,7 @@ func TestREQ107_RMDefaultsWhenOPTNamesNoCode(t *testing.T) {
 	for _, tc := range cases {
 		for _, implicit := range []bool{true, false} {
 			c := compileOPTText(t, tc.opt, implicit)
-			for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+			for _, policy := range everyPolicy {
 				for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
 					t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, policy, fill), func(t *testing.T) {
 						out, err := instance.Generate(t.Context(), c, instance.Options{
@@ -204,7 +204,7 @@ func TestREQ107_RMDefaultsKeepOPTCode(t *testing.T) {
 	}
 	for _, tc := range cases {
 		c := compileOPTText(t, tc.opt, true)
-		for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+		for _, policy := range everyPolicy {
 			t.Run(tc.name+"/"+policy.String(), func(t *testing.T) {
 				out, err := instance.Generate(t.Context(), c, instance.Options{
 					Policy:    policy,

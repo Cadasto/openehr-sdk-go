@@ -34,7 +34,7 @@ func optProhibitedMultiple(name string, children ...string) string {
 
 // TestREQ107_ProhibitedAttributeIsNotVisited is the REQ-107 check that
 // Generate does not visit an attribute the OPT prohibits with an existence
-// of 0..0, under either policy, either value fill and either compile mode:
+// of 0..0, under every policy, either value fill and either compile mode:
 // a single-valued or a multi-valued one, with or without children the OPT
 // names under it, gets nothing.
 func TestREQ107_ProhibitedAttributeIsNotVisited(t *testing.T) {
@@ -99,7 +99,7 @@ func TestREQ107_ProhibitedAttributeIsNotVisited(t *testing.T) {
 // TestREQ107_AttributeWithOnlyProhibitedChildrenIsProhibited is the REQ-107
 // check that the OPT prohibits an attribute all of whose OPT children it
 // prohibits (occurrences upper bound 0): an optional one is not visited,
-// under Example either, so nothing is written there and an RM default
+// under Large either, so nothing is written there and an RM default
 // that yields to a prohibition writes nothing either; a mandatory one,
 // which the RM needs, is built from its BMM type as if the OPT left it
 // silent. It holds under both value fills and both compile modes.

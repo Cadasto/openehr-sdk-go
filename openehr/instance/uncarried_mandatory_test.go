@@ -24,7 +24,7 @@ var entryConcretes = []string{"OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTIO
 // is built over ITEM_STRUCTURE, the type argument the generator builds an
 // event with. An ACTION's ism_transition built from the BMM takes the
 // current state openehr 524|initial|, in both compile modes. The output
-// passes the RM floor under both policies and both value fills.
+// passes the RM floor under every policy and both value fills.
 func TestREQ107_UncarriedMandatoryAttributesAreFilled(t *testing.T) {
 	type tree struct {
 		name  string

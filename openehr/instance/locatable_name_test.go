@@ -55,14 +55,14 @@ func fixedOptions(policy instance.Policy) instance.Options {
 // check that a mandatory attribute a compiled node does not carry, as under
 // WithoutImplicitAttributes, is visited as if the node carried it with no
 // OPT child: a corpus template compiled with and without the implicit
-// attributes generates the same canonical JSON, under both policies. A
+// attributes generates the same canonical JSON, under every policy. A
 // locatable's name, which the identity rule stamps from its node's term,
 // is the same in both.
 func TestREQ107_CompileModesGenerateTheSameInstance(t *testing.T) {
 	for _, name := range []string{"vital_signs"} {
 		implicit := compileFixtureMode(t, name, true)
 		uncarried := compileFixtureMode(t, name, false)
-		for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+		for _, policy := range everyPolicy {
 			t.Run(fmt.Sprintf("%s/%v", name, policy), func(t *testing.T) {
 				var out [2][]byte
 				for i, c := range []*templatecompile.Compiled{implicit, uncarried} {
@@ -102,13 +102,14 @@ func firstDifference(a, b []byte) string {
 // implementation gives an archetype root the OPT gives no name constraint:
 // the text of its own node's term (at0000), as for any other node, not its
 // RM type. No REQ-107 sentence binds that name (Placeholders leaves it to
-// the implementation); the test keeps both compile modes and both policies
+// the implementation); the test keeps both compile modes and every policy
 // to the same choice, on the vital_signs composition and each observation
-// in its content.
+// in its content. vital_signs makes its content optional, so under
+// Required the composition holds none and only its own name is checked.
 func TestREQ107_ArchetypeRootIsNamedByItsNodeTerm(t *testing.T) {
 	for _, implicit := range []bool{true, false} {
 		c := compileFixtureMode(t, "vital_signs", implicit)
-		for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+		for _, policy := range everyPolicy {
 			t.Run(fmt.Sprintf("implicit=%t/%v", implicit, policy), func(t *testing.T) {
 				out, err := instance.Generate(t.Context(), c, fixedOptions(policy))
 				if err != nil {
@@ -119,6 +120,12 @@ func TestREQ107_ArchetypeRootIsNamedByItsNodeTerm(t *testing.T) {
 					t.Fatalf("AsComposition: %v", err)
 				}
 				checkRootName(t, c, comp)
+				if policy == instance.Required {
+					if len(comp.Content) != 0 {
+						t.Errorf("COMPOSITION.content has %d members under Required, want none: vital_signs makes it optional", len(comp.Content))
+					}
+					return
+				}
 				if len(comp.Content) == 0 {
 					t.Fatal("COMPOSITION.content is empty; vital_signs pins observations")
 				}

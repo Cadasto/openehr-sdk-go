@@ -43,7 +43,7 @@ func TestREQ107_LocatableNodeIDPlaceholder(t *testing.T) {
 	}
 	for _, tc := range cases {
 		c := compileOPTText(t, tc.opt, tc.implicit)
-		for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+		for _, policy := range everyPolicy {
 			t.Run(fmt.Sprintf("%s/%v", tc.name, policy), func(t *testing.T) {
 				out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, Now: defaultsNow})
 				if err != nil {

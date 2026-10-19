@@ -50,7 +50,9 @@ func TestREQ100_REQ107_TArchetypeRootEntriesPassRMFloor(t *testing.T) {
 		t.Fatalf("Compile(social.opt with T_ARCHETYPE_ROOT): %v", err)
 	}
 
-	for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+	// social.opt makes its content optional, so Required builds no entry
+	// to check: the entries are read under the policies that build them.
+	for _, policy := range []instance.Policy{instance.Large, instance.Medium} {
 		t.Run(policy.String(), func(t *testing.T) {
 			out, err := instance.Generate(t.Context(), compiled, instance.Options{
 				Policy:    policy,

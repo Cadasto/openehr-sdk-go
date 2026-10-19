@@ -13,7 +13,7 @@ import (
 // DV_DATE_TIME the generator builds as a default, with no primitive
 // constraint and no value from the OPT, takes the clock: ACTION.time
 // built from its BMM type, as an implicit attribute or as one the
-// compiled node does not carry, and, under Example,
+// compiled node does not carry, and, under Large,
 // which visits them, an INSTRUCTION's expiry_time and an EVENT_CONTEXT's
 // end_time the OPT names without children. An unconstrained DV_DATE_TIME
 // the OPT names as a node is TestREQ107_UnconstrainedDateTimeTakesTheClock.
@@ -30,14 +30,14 @@ func TestREQ107_DefaultDateTimesTakeTheClock(t *testing.T) {
 			name:     "ACTION time from the BMM default",
 			opt:      optTemplate("ACTION"),
 			modes:    []bool{true, false},
-			policies: []instance.Policy{instance.Minimal, instance.Example},
+			policies: everyPolicy,
 			value:    func(_ *testing.T, out any) string { return out.(*rm.Action).Time.Value },
 		},
 		{
-			name:     "INSTRUCTION expiry_time under Example",
+			name:     "INSTRUCTION expiry_time under Large",
 			opt:      optTemplate("INSTRUCTION", optOptionalSingle("expiry_time")),
 			modes:    []bool{true, false},
-			policies: []instance.Policy{instance.Example},
+			policies: []instance.Policy{instance.Large},
 			value: func(t *testing.T, out any) string {
 				et := out.(*rm.Instruction).ExpiryTime
 				if et == nil {
@@ -47,10 +47,10 @@ func TestREQ107_DefaultDateTimesTakeTheClock(t *testing.T) {
 			},
 		},
 		{
-			name:     "EVENT_CONTEXT end_time under Example",
+			name:     "EVENT_CONTEXT end_time under Large",
 			opt:      optTemplate("COMPOSITION", optSingle("context", optNode("EVENT_CONTEXT", "", optOptionalSingle("end_time")))),
 			modes:    []bool{true, false},
-			policies: []instance.Policy{instance.Example},
+			policies: []instance.Policy{instance.Large},
 			value: func(t *testing.T, out any) string {
 				et := generatedComposition(t, out).Context.EndTime
 				if et == nil {

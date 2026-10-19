@@ -8,37 +8,69 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
 
-// Policy controls which attributes the generator visits. Under either
+// Policy controls which attributes the generator visits. Under every
 // policy it skips an attribute the OPT prohibits (an existence of 0..0),
 // unless an RM rule needs it, such as an attribute the BMM marks
 // mandatory, and never visits one the RM computes rather than stores
 // (offset on POINT_EVENT and INTERVAL_EVENT, is_integral on DV_QUANTITY
 // and DV_PROPORTION) or a locatable's uid, which the identity rule
-// decides. [ValueFill], not the policy, decides how a primitive leaf is
-// valued.
+// decides. Under every policy an RM rule can need more than the policy
+// visits, such as an ELEMENT's value or null_flavour, and a visited
+// multi-valued attribute is topped up to its lower bound. [ValueFill],
+// not the policy, decides how a primitive leaf is valued.
 type Policy int
 
 const (
-	// Minimal visits the required attributes, and those with an allowed
-	// OPT child: an attribute the BMM marks mandatory, one whose
-	// existence or cardinality lower bound is at least 1, and one with
-	// an OPT child whose occurrences upper bound is not 0. An RM rule
-	// can need more, such as an ELEMENT's value or null_flavour.
-	// Smallest valid tree.
-	Minimal Policy = iota
-	// Example visits every attribute the visit rule allows: every
+	// Large builds a member of every optional archetype the template
+	// names. It visits every attribute the visit rule allows: every
 	// attribute the compiled node carries, the optional ones the OPT
-	// names included. Suited to fixtures.
-	Example
+	// names included. A visited multi-valued attribute gets at least one
+	// member of each allowed OPT child that is not a slot, except an
+	// optional child whose identity a required sibling, or an earlier
+	// optional one, carries; optional archetype roots of different
+	// archetypes each get theirs. It stops short of the ITS-REST template
+	// example's detail_level=complete (every data point the template
+	// allows), which no policy builds. Large is the zero value.
+	Large Policy = iota
+	// Medium builds at most one optional archetype under an attribute,
+	// what the ITS-REST template example calls detail_level=medium. It
+	// visits the required attributes, and those with an allowed OPT
+	// child: an attribute the BMM marks mandatory, one whose existence or
+	// cardinality lower bound is bounded and at least 1, and one with an
+	// OPT child whose occurrences upper bound is not 0. A visited
+	// multi-valued attribute gets its members as under Large, except that
+	// an optional archetype root after the first optional archetype root
+	// of the attribute, in OPT order, gets none of its own, whatever its
+	// archetype.
+	Medium
+	// Required builds only the data points the template makes mandatory
+	// and a composition's context, what the ITS-REST template example
+	// calls detail_level=required. It visits only the required
+	// attributes: an attribute the BMM marks mandatory, or one whose
+	// existence or cardinality lower bound is bounded and at least 1; it
+	// does not visit an attribute merely because it has an allowed OPT
+	// child, except a COMPOSITION's context, which it visits as Medium
+	// does, so the context every policy writes is built under the OPT's
+	// constraints. A visited multi-valued attribute gets
+	// occurrences.lower members of each allowed OPT child that is not a
+	// slot, so an optional child gets none of its own. The top-up to the
+	// attribute's lower bound and the RM rules, such as an ELEMENT's
+	// value or null_flavour, still apply. An RM rule can add a node, such
+	// as the null_flavour of an ELEMENT whose value the template leaves
+	// optional, so its tree is not always smaller than Medium's.
+	Required
 )
 
-// String returns "minimal" / "example" / "unknown" for diagnostics.
+// String returns "large" / "medium" / "required" / "unknown" for
+// diagnostics.
 func (p Policy) String() string {
 	switch p {
-	case Minimal:
-		return "minimal"
-	case Example:
-		return "example"
+	case Large:
+		return "large"
+	case Medium:
+		return "medium"
+	case Required:
+		return "required"
 	}
 	return "unknown"
 }
@@ -75,10 +107,10 @@ func (f ValueFill) String() string {
 }
 
 // Options configures one [Generate] invocation. Zero value is valid
-// for non-COMPOSITION roots: Minimal policy, the compiled template's own
-// language (English when it names none), time.Now().UTC() clock.
+// for non-COMPOSITION roots: the Large policy, the compiled template's
+// own language (English when it names none), time.Now().UTC() clock.
 type Options struct {
-	// Policy is Minimal or Example. Zero value = Minimal.
+	// Policy is Large, Medium or Required. The zero value is Large.
 	Policy Policy
 
 	// Language is the ISO 639-1 code of the COMPOSITION's and every

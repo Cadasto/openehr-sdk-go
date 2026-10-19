@@ -375,7 +375,7 @@ func TestValidate_REQ102_AOMShortNameAdmitsItsWrapper(t *testing.T) {
 		t.Run(tc.short, func(t *testing.T) {
 			t.Parallel()
 			c := mustCompileInline(t, elementValueOPT(tc.child))
-			out, err := instance.Generate(t.Context(), c, instance.Options{Policy: instance.Example})
+			out, err := instance.Generate(t.Context(), c, instance.Options{Policy: instance.Large})
 			if err != nil {
 				t.Fatalf("Generate(ELEMENT value %s): %v", tc.short, err)
 			}
@@ -757,7 +757,7 @@ func TestValidate_REQ110_IntervalBoundsConformToAbstractParameter(t *testing.T) 
 func TestGenerate_REQ107_REQ110_AbstractIntervalParameterValidates(t *testing.T) {
 	t.Parallel()
 	c := mustCompileInline(t, elementValueOPT(orderedIntervalChild))
-	for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+	for _, policy := range []instance.Policy{instance.Large, instance.Medium} {
 		t.Run(policy.String(), func(t *testing.T) {
 			t.Parallel()
 			out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy})

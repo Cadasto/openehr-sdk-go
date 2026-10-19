@@ -74,7 +74,7 @@ func TestREQ107_ImplicitSingleArchetypeRootRefusedWhenRequired(t *testing.T) {
 			}
 			uids := 0
 			g := &generator{compiled: c, opts: Options{
-				Policy: Example,
+				Policy: Large,
 				UIDSource: func() *rm.HierObjectID {
 					uids++
 					return &rm.HierObjectID{Value: "00000000-0000-4000-8000-000000000001"}

@@ -29,7 +29,7 @@ func optMultipleLowerZero(name string, children ...string) string {
 // TestREQ107_ElementSlotCarriesExactlyOneOfValueAndNullFlavour (REQ-107) pins the two
 // places the generator fills an ELEMENT archetype slot. A slot body is not in
 // the OPT, so the filled ELEMENT has no value and must carry a null flavour
-// (Inv_null_flavour_indicated), under both policies and both fills.
+// (Inv_null_flavour_indicated), under every policy and both fills.
 //
 //   - required: CLUSTER.items is mandatory (lower 1) and holds only the slot,
 //     so the top-up fill of the attribute walks the slot.
@@ -49,7 +49,7 @@ func TestREQ107_ElementSlotCarriesExactlyOneOfValueAndNullFlavour(t *testing.T) 
 	policies := []struct {
 		name string
 		p    instance.Policy
-	}{{"Minimal", instance.Minimal}, {"Example", instance.Example}}
+	}{{"Large", instance.Large}, {"Medium", instance.Medium}, {"Required", instance.Required}}
 	fills := []struct {
 		name string
 		f    instance.ValueFill

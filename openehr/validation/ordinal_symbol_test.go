@@ -198,7 +198,7 @@ var dvOrdinalType = regexp.MustCompile(`"_type"\s*:\s*"DV_ORDINAL"`)
 // REQ-102 / REQ-103: an OPT whose ordinal symbols name no terminology lists
 // each pair with an empty terminology, which admits the terminology the
 // instance carries. Under such a template the vendored composition and the
-// generator's Example output, which both write local there, draw no
+// generator's Large output, which both write local there, draw no
 // primitive_* issue, and a symbol that does not match its value is still
 // primitive_not_in_list.
 func TestValidateComposition_REQ102_REQ103_OrdinalSymbolUnnamedTerminology(t *testing.T) {
@@ -213,18 +213,18 @@ func TestValidateComposition_REQ102_REQ103_OrdinalSymbolUnnamedTerminology(t *te
 		}
 	})
 
-	t.Run("generated Example instance", func(t *testing.T) {
+	t.Run("generated Large instance", func(t *testing.T) {
 		t.Parallel()
 		root, err := generateExample(t, c)
 		if err != nil {
-			t.Fatalf("Generate(Demonstration.v1, Example): %v", err)
+			t.Fatalf("Generate(Demonstration.v1, Large): %v", err)
 		}
 		raw, err := canjson.Marshal(root)
 		if err != nil {
 			t.Fatalf("canjson.Marshal(%T): %v", root, err)
 		}
 		if !dvOrdinalType.Match(raw) {
-			t.Fatalf("Generate(Demonstration.v1, Example) built no DV_ORDINAL, so the check below is vacuous")
+			t.Fatalf("Generate(Demonstration.v1, Large) built no DV_ORDINAL, so the check below is vacuous")
 		}
 		if got := primitiveIssueKeys(validateRoot(root, c).Issues); len(got) != 0 {
 			t.Errorf("ValidateComposition(generated Demonstration.v1) primitive issues = %q, want none", got)

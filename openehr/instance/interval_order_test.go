@@ -54,7 +54,7 @@ func TestGenerateIntervalBoundsInOrder(t *testing.T) {
 			c := compileFixture(t, name)
 			compared := 0
 			for seed := range uint64(orderSeeds) {
-				opts := intervalOptions(instance.Example)
+				opts := intervalOptions(instance.Large)
 				opts.ValueFill = instance.RandomFill
 				opts.ValueSource = rand.NewPCG(seed, 1)
 				walkIntervals(generateCanonical(t, c, opts), "", func(path string, iv map[string]any) {
@@ -152,7 +152,7 @@ func TestGenerateIntervalOrderKeepsEachSideInItsConstraint(t *testing.T) {
 		}
 		t.Run(tc.name+"/RandomFill", func(t *testing.T) {
 			for seed := range uint64(orderSeeds) {
-				opts := intervalOptions(instance.Example)
+				opts := intervalOptions(instance.Large)
 				opts.ValueFill = instance.RandomFill
 				opts.ValueSource = rand.NewPCG(seed, 1)
 				lower, upper := onlyInterval(t, opts)
@@ -224,7 +224,7 @@ func TestREQ107_RandomFillIntervalOrder(t *testing.T) {
 			c := compileSyntheticOPT(t, tc.opt)
 			compared := 0
 			for seed := range uint64(orderSeeds) {
-				opts := intervalOptions(instance.Example)
+				opts := intervalOptions(instance.Large)
 				opts.ValueFill = instance.RandomFill
 				opts.ValueSource = rand.NewPCG(seed, 1)
 				walkIntervals(generateCanonical(t, c, opts), "", func(path string, iv map[string]any) {

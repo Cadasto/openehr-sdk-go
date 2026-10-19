@@ -44,7 +44,7 @@ func TestREQ107_SingleAttributeBuildsUnderBindingAlternative(t *testing.T) {
 	}
 	for _, tc := range cases {
 		c := compileOPTText(t, optTemplate("ELEMENT", optSingle("value", tc.alternatives...)), true)
-		for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+		for _, policy := range everyPolicy {
 			for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
 				t.Run(tc.name+"/"+policy.String()+"/"+fill.String(), func(t *testing.T) {
 					out, err := instance.Generate(t.Context(), c, instance.Options{

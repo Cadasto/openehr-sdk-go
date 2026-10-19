@@ -105,7 +105,7 @@ func TestREQ107_RootPlaceholders(t *testing.T) {
 	for _, tc := range cases {
 		for _, implicit := range []bool{true, false} {
 			c := compileOPTText(t, optTemplate(tc.root, tc.attrs...), implicit)
-			for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+			for _, policy := range everyPolicy {
 				t.Run(fmt.Sprintf("%s/implicit=%t/%v", tc.name, implicit, policy), func(t *testing.T) {
 					out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, Now: now})
 					if err != nil {
@@ -262,7 +262,7 @@ func TestREQ107_NestedMediaTypeTerminology(t *testing.T) {
 	c := compileOPTText(t, optTemplate("ELEMENT", optSingle("value",
 		optNode("DV_MULTIMEDIA", "", optSingle("media_type", optNode("CODE_PHRASE", ""))))), true)
 	want := rm.CodePhrase{CodeString: "text/plain", TerminologyID: rm.TerminologyID{Value: "IANA_media-types"}}
-	for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+	for _, policy := range everyPolicy {
 		t.Run(policy.String(), func(t *testing.T) {
 			out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, Now: defaultsNow})
 			if err != nil {

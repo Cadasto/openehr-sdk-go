@@ -221,7 +221,7 @@ func TestREQ107_IncludedFlagFromAllowedAlternative(t *testing.T) {
 // allowed one) gives no code, whatever code a later alternative names: a
 // later alternative is not the OPT's value for the attribute. Where the
 // walked alternative names a code, the walk writes it and no default
-// replaces it. It holds under both policies, both value fills and both
+// replaces it. It holds under every policy, both value fills and both
 // compile modes.
 func TestREQ107_CurrentStateDefaultReadsTheWalkedAlternative(t *testing.T) {
 	cases := []struct {

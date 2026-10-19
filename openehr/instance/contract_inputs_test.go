@@ -17,7 +17,7 @@ const optLanguageElement = `<language><terminology_id><value>ISO_639-1</value></
 // TestREQ107_EmptyLanguageReadsTheTemplateThenEn is the REQ-107 check that
 // an empty Options.Language is read as Compiled.Language(), and as en when
 // the template has no language either: the ENTRY's language and a
-// COMPOSITION's language take it. It holds under both policies and both
+// COMPOSITION's language take it. It holds under every policy and both
 // compile modes.
 func TestREQ107_EmptyLanguageReadsTheTemplateThenEn(t *testing.T) {
 	cases := []struct {
@@ -34,7 +34,7 @@ func TestREQ107_EmptyLanguageReadsTheTemplateThenEn(t *testing.T) {
 				if tc.want == "en" && c.Language() != "" {
 					t.Fatalf("Compiled.Language() = %q, want empty", c.Language())
 				}
-				for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+				for _, policy := range everyPolicy {
 					t.Run(fmt.Sprintf("%s/%s/implicit=%t/%v", tc.name, class, implicit, policy), func(t *testing.T) {
 						out, err := instance.Generate(t.Context(), c, instance.Options{
 							Policy: policy, Now: defaultsNow, Territory: "NL", Composer: testComposer(),
@@ -61,7 +61,7 @@ func TestREQ107_EmptyLanguageReadsTheTemplateThenEn(t *testing.T) {
 // does not read an OPT's assumed_value, which compile captures into the
 // constraint's Default: under ExampleFill a leaf whose assumed_value
 // differs from its constraint's example value takes the example value.
-// It holds for a C_BOOLEAN and a C_INTEGER, under both policies and both
+// It holds for a C_BOOLEAN and a C_INTEGER, under every policy and both
 // compile modes.
 func TestREQ107_AssumedValueIsNotRead(t *testing.T) {
 	cases := []struct {
@@ -95,7 +95,7 @@ func TestREQ107_AssumedValueIsNotRead(t *testing.T) {
 	for _, tc := range cases {
 		for _, implicit := range []bool{true, false} {
 			c := compileOPTText(t, optTemplate("ELEMENT", optSingle("value", tc.value)), implicit)
-			for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+			for _, policy := range everyPolicy {
 				t.Run(fmt.Sprintf("%s/implicit=%t/%v", tc.name, implicit, policy), func(t *testing.T) {
 					out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, Now: defaultsNow})
 					if err != nil {
@@ -111,14 +111,14 @@ func TestREQ107_AssumedValueIsNotRead(t *testing.T) {
 // TestREQ107_OtherGenericTypeIsRefused is the REQ-107 check of the known
 // gap for generic types: an OPT node whose rm_type_name is a generic type
 // other than a DV_INTERVAL instantiation, here POINT_EVENT<ITEM_TREE>,
-// cannot be built, and Generate returns an error and no root, under both
-// policies and both compile modes.
+// cannot be built, and Generate returns an error and no root, under every
+// policy and both compile modes.
 func TestREQ107_OtherGenericTypeIsRefused(t *testing.T) {
 	opt := optTemplate("OBSERVATION", optSingle("data", optNode("HISTORY", "at0001",
 		optMultiple("events", optNode("POINT_EVENT&lt;ITEM_TREE&gt;", "at0002")))))
 	for _, implicit := range []bool{true, false} {
 		c := compileOPTText(t, opt, implicit)
-		for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+		for _, policy := range everyPolicy {
 			t.Run(fmt.Sprintf("implicit=%t/%v", implicit, policy), func(t *testing.T) {
 				out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, Now: defaultsNow})
 				if !errors.Is(err, rmwrite.ErrUnknownRMType) {

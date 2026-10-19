@@ -12,7 +12,7 @@ import (
 // that every ENTRY concrete whose OPT names language and encoding without
 // a code, as a bare CODE_PHRASE or as a C_CODE_PHRASE with an empty code
 // list, takes Options.Language in ISO_639-1 and UTF-8 in
-// IANA_character-sets, under both policies, both value fills and both
+// IANA_character-sets, under every policy, both value fills and both
 // compile modes, and passes the RM floor.
 func TestREQ107_EntryCodesWhenOPTNamesNoCodeOnEveryEntry(t *testing.T) {
 	shapes := []struct {

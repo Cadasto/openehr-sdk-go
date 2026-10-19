@@ -53,11 +53,11 @@ func identityOptions(policy instance.Policy, uids *recordingUIDs) instance.Optio
 // TestREQ107_UIDClassRootsTakeUIDFromSource is the REQ-107 check that a
 // COMPOSITION, an ENTRY, a GENERIC_ENTRY, a PARTY and a PARTY_RELATIONSHIP
 // generated as the template root carry a uid that Options.UIDSource issued,
-// under both policies (RM PARTY Uid_mandatory for the PARTY classes).
+// under every policy (RM PARTY Uid_mandatory for the PARTY classes).
 func TestREQ107_UIDClassRootsTakeUIDFromSource(t *testing.T) {
 	for _, class := range uidClasses {
 		c := compileOPTText(t, optTemplate(class), true)
-		for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+		for _, policy := range everyPolicy {
 			t.Run(class+"/"+policy.String(), func(t *testing.T) {
 				uids := &recordingUIDs{}
 				out, err := instance.Generate(t.Context(), c, identityOptions(policy, uids))
@@ -79,11 +79,14 @@ func TestREQ107_UIDClassRootsTakeUIDFromSource(t *testing.T) {
 
 // identityTree is a compiled template whose generated tree the identity
 // checks read. nested reports whether that tree holds archetype_details
-// below its root.
+// below its root; requiredBare, that it holds none under Required, since
+// the template makes every nested archetype optional and Required builds
+// none (REQ-107 Visit rule, What a visit writes).
 type identityTree struct {
-	name   string
-	c      *templatecompile.Compiled
-	nested bool
+	name         string
+	c            *templatecompile.Compiled
+	nested       bool
+	requiredBare bool
 }
 
 // identityTrees are generated trees that hold many locatable classes:
@@ -102,7 +105,8 @@ func identityTrees(t *testing.T) []identityTree {
 	for _, name := range []string{
 		"templates/vital_signs", "templates/nested.en.v1", "templates/TestPerson.v2", "templates/cluster-slot.ehrbase.org.v0",
 	} {
-		trees = append(trees, identityTree{name: name, c: compileCorpusOPT(t, name), nested: true})
+		bare := name == "templates/vital_signs" || name == "templates/nested.en.v1"
+		trees = append(trees, identityTree{name: name, c: compileCorpusOPT(t, name), nested: true, requiredBare: bare})
 	}
 	return trees
 }
@@ -180,10 +184,10 @@ func generatedLocatables(t *testing.T, out any) []generatedLocatable {
 // TestREQ107_OnlyUIDClassesCarryAUID is the REQ-107 check that the
 // generator gives a uid to every COMPOSITION, ENTRY, GENERIC_ENTRY, PARTY
 // and PARTY_RELATIONSHIP in a generated tree and to no other locatable,
-// under both policies.
+// under every policy.
 func TestREQ107_OnlyUIDClassesCarryAUID(t *testing.T) {
 	for _, tree := range identityTrees(t) {
-		for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+		for _, policy := range everyPolicy {
 			t.Run(tree.name+"/"+policy.String(), func(t *testing.T) {
 				out, err := instance.Generate(t.Context(), tree.c, identityOptions(policy, &recordingUIDs{}))
 				if err != nil {
@@ -206,10 +210,11 @@ func TestREQ107_OnlyUIDClassesCarryAUID(t *testing.T) {
 // TestREQ107_TemplateIDOnTheRootOnly is the REQ-107 check that the
 // template id is written in the template root's archetype_details and in
 // no other archetype_details, such as a nested OBSERVATION's, a nested
-// archetyped CLUSTER's or a slot fill's, under both policies.
+// archetyped CLUSTER's or a slot fill's, under every policy. Under Required
+// a template whose nested archetypes are all optional holds none to check.
 func TestREQ107_TemplateIDOnTheRootOnly(t *testing.T) {
 	for _, tree := range identityTrees(t) {
-		for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+		for _, policy := range everyPolicy {
 			t.Run(tree.name+"/"+policy.String(), func(t *testing.T) {
 				out, err := instance.Generate(t.Context(), tree.c, identityOptions(policy, &recordingUIDs{}))
 				if err != nil {
@@ -235,8 +240,13 @@ func TestREQ107_TemplateIDOnTheRootOnly(t *testing.T) {
 				if tree.c.Root().ArchetypeID() == "" {
 					t.Fatalf("template root names no archetype, want one so it has archetype_details")
 				}
-				if tree.nested && nested == 0 {
+				bare := policy == instance.Required && tree.requiredBare
+				wantNested := tree.nested && !bare
+				if wantNested && nested == 0 {
 					t.Errorf("generated tree has no nested archetype_details, want at least one")
+				}
+				if !wantNested && tree.nested && nested > 0 {
+					t.Errorf("generated tree has %d nested archetype_details, want none: the template makes each nested archetype optional", nested)
 				}
 			})
 		}
@@ -252,7 +262,7 @@ var partyClasses = []string{"PERSON", "ORGANISATION", "GROUP", "AGENT", "ROLE"}
 // a PARTY_RELATIONSHIP whose OPT prohibits its uid, and gives a PARTY one
 // all the same, because the RM needs it. Each class is the template root;
 // a PARTY_RELATIONSHIP is also nested in a PERSON's relationships. It
-// holds under both policies, both value fills and both compile modes, and
+// holds under every policy, both value fills and both compile modes, and
 // the output passes the RM floor.
 func TestREQ107_ProhibitedUIDYieldsExceptOnAParty(t *testing.T) {
 	type tree struct {
@@ -317,7 +327,7 @@ func optRequiredSingle(name string, children ...string) string {
 // or an ENTRY whose OPT names its uid, with no child or with a
 // HIER_OBJECT_ID child, keeps the uid the generator stamps from
 // Options.UIDSource, and a CLUSTER whose OPT names an optional uid gets
-// none. It holds under both policies, both value fills and both compile
+// none. It holds under every policy, both value fills and both compile
 // modes.
 func TestREQ107_UIDIsNotVisited(t *testing.T) {
 	hier := optNode("HIER_OBJECT_ID", "", optStringAttr("value", "<list>from-the-opt</list>"))
@@ -358,9 +368,9 @@ func TestREQ107_UIDIsNotVisited(t *testing.T) {
 // locatable outside the classes the identity rule names gets a uid only
 // where its OPT requires one (an existence lower bound of at least 1),
 // drawn from Options.UIDSource, or from the random fallback when that is
-// nil, and none where its OPT names the uid optional, under Example too.
+// nil, and none where its OPT names the uid optional, under Large too.
 // It holds for a CLUSTER and an ELEMENT, at the root and nested, under
-// both policies, both value fills and both compile modes, and the output
+// every policy, both value fills and both compile modes, and the output
 // passes the RM floor.
 func TestREQ107_RequiredUIDOnOtherLocatables(t *testing.T) {
 	type place struct {

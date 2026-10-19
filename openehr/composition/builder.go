@@ -55,15 +55,32 @@ type pendingAssignment struct {
 }
 
 // NewBuilder constructs a Builder seeded with NewSkeleton output.
-// Composition options (WithComposer, WithTerritory, …) are forwarded
-// to the underlying instance.Generate call. The Builder retains the
-// compiled template for path lookups.
+// Composition options (WithComposer, WithTerritory, WithPolicy, …) are
+// forwarded to the underlying instance.Generate call. The Builder retains
+// the compiled template for path lookups.
+//
+// Set routes a value only into a node the skeleton already holds, and does
+// not build a missing one, so the skeleton must carry a member of every
+// optional archetype the template names, which only instance.Large, the
+// default, builds. NewBuilder accepts only instance.Large. It refuses
+// instance.Medium and instance.Required, naming the policy, and any Policy
+// value the instance package does not define, before generating anything,
+// with an error wrapping ErrUnsupportedPolicy and no Builder.
 func NewBuilder(ctx context.Context, c *templatecompile.Compiled, opts ...Option) (*Builder, error) {
 	if c == nil {
 		// Wrap instance.ErrNilCompiled (the sentinel NewSkeleton /
 		// instance.Generate return for a nil template) so external callers
 		// can errors.Is against it uniformly across the three entry points.
 		return nil, fmt.Errorf("composition.NewBuilder: %w", instance.ErrNilCompiled)
+	}
+	switch p := buildConfig(opts...).policy; p {
+	case instance.Large:
+		// Its skeleton holds a member of every optional archetype, the
+		// nodes Set routes a value into.
+	case instance.Medium, instance.Required:
+		return nil, fmt.Errorf("composition.NewBuilder: %w: %s", ErrUnsupportedPolicy, p)
+	default:
+		return nil, errUndefinedPolicy("composition.NewBuilder", p)
 	}
 	skel, err := NewSkeleton(ctx, c, opts...)
 	if err != nil {

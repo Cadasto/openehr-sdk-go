@@ -62,22 +62,22 @@ var visitCases = []struct {
 	},
 }
 
-// TestREQ107_ExampleVisitsOptionalAttributeMinimalDoesNot is the REQ-107
-// check of the visit rule for an attribute outside Minimal's cases: not
+// TestREQ107_LargeVisitsOptionalAttributeMediumDoesNot is the REQ-107
+// check of the visit rule for an attribute outside Medium's cases: not
 // BMM-mandatory, no OPT children, existence lower 0, and single-valued, so
-// it has no cardinality. Example MUST visit it, which writes a value, and
-// Minimal MUST NOT materialise it.
-func TestREQ107_ExampleVisitsOptionalAttributeMinimalDoesNot(t *testing.T) {
+// it has no cardinality. Large MUST visit it, which writes a value, and
+// Medium and Required MUST NOT materialise it.
+func TestREQ107_LargeVisitsOptionalAttributeMediumDoesNot(t *testing.T) {
 	for _, tc := range visitCases {
 		t.Run(tc.name, func(t *testing.T) {
 			c := compileOPTText(t, optTemplate(tc.root, optOptionalSingle(tc.attr)), true)
 			requireAttribute(t, c, tc.attr, 0)
-			for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+			for _, policy := range everyPolicy {
 				out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, Now: defaultsNow})
 				if err != nil {
 					t.Fatalf("Generate(%v): %v", policy, err)
 				}
-				want := policy == instance.Example
+				want := policy == instance.Large
 				if got := tc.present(out); got != want {
 					t.Errorf("Generate(%v): %s.%s present = %t, want %t", policy, tc.root, tc.attr, got, want)
 				}
@@ -86,16 +86,17 @@ func TestREQ107_ExampleVisitsOptionalAttributeMinimalDoesNot(t *testing.T) {
 	}
 }
 
-// TestREQ107_MinimalMaterialisesExistenceLowerOne is the REQ-107 check that
-// Minimal materialises an attribute whose existence lower bound is 1 when
+// TestREQ107_MediumMaterialisesExistenceLowerOne is the REQ-107 check that
+// Medium materialises an attribute whose existence lower bound is 1 when
 // nothing else would make it: the attribute is not BMM-mandatory, has no
-// OPT children, and is single-valued, so it has no cardinality.
-func TestREQ107_MinimalMaterialisesExistenceLowerOne(t *testing.T) {
+// OPT children, and is single-valued, so it has no cardinality. Every
+// policy does, Required included.
+func TestREQ107_MediumMaterialisesExistenceLowerOne(t *testing.T) {
 	for _, tc := range visitCases {
 		t.Run(tc.name, func(t *testing.T) {
 			c := compileOPTText(t, optTemplate(tc.root, optSingle(tc.attr)), true)
 			requireAttribute(t, c, tc.attr, 1)
-			for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+			for _, policy := range everyPolicy {
 				out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, Now: defaultsNow})
 				if err != nil {
 					t.Fatalf("Generate(%v): %v", policy, err)
@@ -134,7 +135,7 @@ func requireAttribute(t *testing.T, c *templatecompile.Compiled, name string, ex
 
 // TestREQ107_OptionalSilentEventsGetNoMember is the REQ-107 check that a
 // multi-valued attribute that is not archetype-rooted, optional, and named
-// by the OPT without children gets no member, also under Example, which
+// by the OPT without children gets no member, also under Large, which
 // visits it: an optional attribute the OPT leaves silent MUST get no child.
 // HISTORY.events is optional in the RM, and its member would be an event,
 // not an archetype root. It holds in both compile modes.
@@ -160,9 +161,9 @@ func TestREQ107_OptionalSilentEventsGetNoMember(t *testing.T) {
 // existence or cardinality lower bound the OPT marks unbounded does not
 // make an attribute required, whatever number the OPT puts beside it: the
 // visit rule counts a lower bound only when it is bounded and at least 1.
-// Minimal does not visit an optional OBSERVATION protocol whose existence
-// lower bound is unbounded with a lower of 1, and Example, which visits
-// it, writes it from its BMM type; neither policy gives a silent optional
+// Medium and Required do not visit an optional OBSERVATION protocol whose
+// existence lower bound is unbounded with a lower of 1, and Large, which
+// visits it, writes it from its BMM type; no policy gives a silent optional
 // ITEM_TREE items list whose cardinality lower bound is unbounded with a
 // lower of 2 any member. It holds under both value fills and both compile
 // modes.
@@ -188,7 +189,7 @@ func TestREQ107_UnboundedLowerBoundIsNotRequired(t *testing.T) {
 			check: func(t *testing.T, policy instance.Policy, out any) {
 				p := out.(*rm.Observation).Protocol
 				present := p != nil && !rm.IsTypedNil(p)
-				if want := policy == instance.Example; present != want {
+				if want := policy == instance.Large; present != want {
 					t.Errorf("OBSERVATION.protocol present = %t, want %t", present, want)
 				}
 			},

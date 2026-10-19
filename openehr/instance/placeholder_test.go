@@ -25,7 +25,7 @@ func TestREQ107_NoPlaceholderDateTimeLanguageOrLocalExample(t *testing.T) {
 	for _, name := range []string{"vital_signs", "Test_dv_ordinal_with_constraints.v0"} {
 		t.Run(name, func(t *testing.T) {
 			out := generateCompiled(t, compileFixture(t, name), instance.Options{
-				Policy:    instance.Example,
+				Policy:    instance.Large,
 				Language:  "en",
 				Territory: "NL",
 				Composer:  testComposer(),
@@ -52,7 +52,7 @@ func TestREQ107_OrdinalSymbolFromConstraintPair(t *testing.T) {
 
 	t.Run("ExampleFill", func(t *testing.T) {
 		out := generateCompiled(t, c, instance.Options{
-			Policy:    instance.Example,
+			Policy:    instance.Large,
 			Language:  "en",
 			Territory: "NL",
 			Composer:  testComposer(),
@@ -78,7 +78,7 @@ func TestREQ107_OrdinalSymbolFromConstraintPair(t *testing.T) {
 		seen := map[rm.Integer]string{}
 		for seed := uint64(1); seed <= 24; seed++ {
 			out := generateCompiled(t, c, instance.Options{
-				Policy:      instance.Example,
+				Policy:      instance.Large,
 				Language:    "en",
 				Territory:   "NL",
 				Composer:    testComposer(),

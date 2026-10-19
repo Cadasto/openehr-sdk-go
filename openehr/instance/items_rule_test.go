@@ -94,9 +94,9 @@ func itemsOPT(place string, opt func(string) string, rmType string, attrs []stri
 // TestREQ107_OptionalItemsGetNoMember is the REQ-107 check that an
 // ITEM_TREE or ITEM_LIST whose items attribute the OPT leaves optional, or
 // does not name, gets no member: the RM makes both items lists optional
-// and no RM rule needs a member, so Minimal MUST NOT materialise one and an
+// and no RM rule needs a member, so Medium MUST NOT materialise one and an
 // optional attribute the OPT leaves silent MUST get no child. It holds
-// under both policies and both compile modes, at the root and nested, and
+// under every policy and both compile modes, at the root and nested, and
 // the output passes the RM floor and the template validator.
 func TestREQ107_OptionalItemsGetNoMember(t *testing.T) {
 	for _, rmType := range []string{"ITEM_TREE", "ITEM_LIST"} {
@@ -104,7 +104,7 @@ func TestREQ107_OptionalItemsGetNoMember(t *testing.T) {
 			for _, place := range itemsPlacements {
 				for _, implicit := range []bool{true, false} {
 					c := compileOPTText(t, itemsOPT(place.name, place.opt, rmType, variant.attrs), implicit)
-					for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+					for _, policy := range everyPolicy {
 						t.Run(fmt.Sprintf("%s/%s/%s/implicit=%t/%v", rmType, variant.name, place.name, implicit, policy), func(t *testing.T) {
 							out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, Now: defaultsNow})
 							if err != nil {
@@ -125,14 +125,14 @@ func TestREQ107_OptionalItemsGetNoMember(t *testing.T) {
 // TestREQ107_RequiredItemsGetOneMember is the REQ-107 check that an
 // ITEM_TREE or ITEM_LIST whose items attribute the OPT requires, with no
 // child to describe a member, gets exactly one member, and that the output
-// passes the RM floor and the template validator. It holds under both
-// policies and both compile modes, at the root and nested.
+// passes the RM floor and the template validator. It holds under every
+// policy and both compile modes, at the root and nested.
 func TestREQ107_RequiredItemsGetOneMember(t *testing.T) {
 	for _, rmType := range []string{"ITEM_TREE", "ITEM_LIST"} {
 		for _, place := range itemsPlacements {
 			for _, implicit := range []bool{true, false} {
 				c := compileOPTText(t, itemsOPT(place.name, place.opt, rmType, []string{optRequiredMultiple("items")}), implicit)
-				for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+				for _, policy := range everyPolicy {
 					t.Run(fmt.Sprintf("%s/%s/implicit=%t/%v", rmType, place.name, implicit, policy), func(t *testing.T) {
 						out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, Now: defaultsNow})
 						if err != nil {

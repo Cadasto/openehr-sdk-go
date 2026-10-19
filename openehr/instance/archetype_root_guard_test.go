@@ -91,12 +91,12 @@ func guardChild(xsiType, rmType, nodeID, occurrences, archetypeID string, attrs 
 		`<node_id>` + nodeID + `</node_id>` + strings.Join(attrs, "") + id + `</children>`
 }
 
-// guardOptions are the four generator settings the rule holds for: both
-// policies, each with both value fills. RandomFill draws from a fixed
-// source, so a failure can be replayed.
+// guardOptions are the six generator settings the rule holds for: every
+// policy, each with both value fills. RandomFill draws from a fixed source,
+// so a failure can be replayed.
 func guardOptions() []instance.Options {
 	var out []instance.Options
-	for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+	for _, policy := range everyPolicy {
 		for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
 			o := instance.Options{
 				Policy:    policy,
@@ -159,18 +159,25 @@ type guardCase struct {
 	// check, when set, runs on a control row's output after the RM-floor
 	// check.
 	check func(t *testing.T, call string, out any)
+	// unreached marks a row whose unnamed object sits under an optional
+	// attribute: Required does not visit it, so the walk never reaches the
+	// object, and the row is a control row under Required (REQ-107 Errors
+	// covers the objects the walk reaches).
+	unreached bool
 }
 
 // TestREQ107_UnnamedArchetypeRootIsRefused is the REQ-107 check that an
 // object of an archetype-root class (an ENTRY, a COMPOSITION, a PARTY,
 // EHR_STATUS or EHR_ACCESS) for which the OPT names no archetype id makes
 // Generate return an error wrapping ErrArchetypeIDMissing, and no root, at
-// either policy and either value fill. That covers an OPT node without an
-// archetype id, a required attribute the OPT leaves without children, and
-// the template root. It runs every archetype-root class as the template
-// root and every ENTRY class as a content child. The error names the RM
-// type and the OPT path, and it wraps neither ErrSlotFillUnsupported nor
-// ErrConstraintUnsatisfiable.
+// every policy and either value fill, where the walk reaches the object;
+// under Required it does not reach one below an optional attribute, which
+// that row then generates as a control row does. That covers an OPT node
+// without an archetype id, a required attribute the OPT leaves without
+// children, and the template root. It runs every archetype-root class as
+// the template root and every ENTRY class as a content child. The error
+// names the RM type and the OPT path, and it wraps neither
+// ErrSlotFillUnsupported nor ErrConstraintUnsatisfiable.
 //
 // The control rows still generate, and their output passes the RM floor:
 // an entry the OPT names, and an optional content attribute the OPT leaves
@@ -219,7 +226,8 @@ func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 			name: "optional content whose only child is an unnamed entry",
 			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence01,
 				guardChild("C_COMPLEX_OBJECT", "OBSERVATION", "at0000", guardOccurrences01, ""))),
-			detail: "OBSERVATION at /content[at0000]",
+			detail:    "OBSERVATION at /content[at0000]",
+			unreached: true,
 		},
 		{
 			name: "control: an entry the template names",
@@ -269,7 +277,11 @@ func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 			for _, opts := range guardOptions() {
 				call := fmt.Sprintf("Generate(%v, %v)", opts.Policy, opts.ValueFill)
 				out, err := instance.Generate(t.Context(), c, opts)
-				if tc.detail == "" {
+				detail := tc.detail
+				if tc.unreached && opts.Policy == instance.Required {
+					detail = ""
+				}
+				if detail == "" {
 					if err != nil {
 						t.Fatalf("%s: %v, want a root", call, err)
 					}
@@ -281,7 +293,7 @@ func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 					}
 					continue
 				}
-				checkArchetypeIDMissing(t, call, err, tc.detail)
+				checkArchetypeIDMissing(t, call, err, detail)
 				if out != nil {
 					t.Errorf("%s returned %T with the error, want no root", call, out)
 				}
@@ -295,7 +307,7 @@ func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 // root, for which the OPT names no archetype id, gets no archetype_details:
 // an ARCHETYPED needs an archetype id, the generator invents none, and these
 // classes may leave the attribute out. The output passes the RM floor and
-// the template validator at either policy and either value fill.
+// the template validator at every policy and either value fill.
 func TestREQ107_UnnamedNonRootTemplateRootHasNoArchetypeDetails(t *testing.T) {
 	for _, class := range []string{"CLUSTER", "SECTION", "GENERIC_ENTRY", "ELEMENT", "ITEM_TREE"} {
 		t.Run(class, func(t *testing.T) {
@@ -330,7 +342,7 @@ func TestREQ107_UnnamedNonRootTemplateRootHasNoArchetypeDetails(t *testing.T) {
 // TestREQ107_NamedTemplateRootPassesTheFloor is the REQ-107 check that a
 // template root of every archetype-root class, for which the template names
 // an archetype id, generates output that passes the RM floor and the
-// template validator at either policy and either value fill. The template
+// template validator at every policy and either value fill. The template
 // says nothing below the root, so every RM-mandatory attribute of the class
 // comes from the generator's own defaults: a party's identities, and a
 // ROLE's performer.
@@ -359,7 +371,7 @@ func TestREQ107_NamedTemplateRootPassesTheFloor(t *testing.T) {
 // TestREQ107_RequiredSlotFillPassesTheFloor is the REQ-107 check that a
 // required slot with no includes, which the slot-fill rule stamps with the
 // RM-type-prefix archetype id, generates a fill that passes the RM floor at
-// either policy and either value fill. The fill's body is not in the
+// every policy and either value fill. The fill's body is not in the
 // template, so the RM-mandatory attributes of its class come from the
 // generator's defaults: an ENTRY's language, encoding and subject, and
 // each class's own, such as an OBSERVATION's data or an ACTION's time,

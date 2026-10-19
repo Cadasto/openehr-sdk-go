@@ -15,7 +15,7 @@ import (
 // "other care", an ISM_TRANSITION's current state "initial", an
 // INTERVAL_EVENT's math function "mean", and an ELEMENT's null flavour
 // "no information". The OPT leaves each attribute silent. It holds under
-// both policies, both value fills and both compile modes.
+// every policy, both value fills and both compile modes.
 func TestREQ107_CodedDefaultsCarryTheOpenEHRRubric(t *testing.T) {
 	cases := []struct {
 		name, code, text string

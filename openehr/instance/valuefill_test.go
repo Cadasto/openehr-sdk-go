@@ -36,7 +36,7 @@ func TestGenerateRandomFillReproducibleAndValid(t *testing.T) {
 	gen := func(vf instance.ValueFill, src mrand.Source) []byte {
 		t.Helper()
 		out, err := instance.Generate(context.Background(), c, instance.Options{
-			Policy:      instance.Example,
+			Policy:      instance.Large,
 			Territory:   "NL",
 			Composer:    &rm.PartyIdentified{Name: &name},
 			Now:         now,
@@ -93,7 +93,7 @@ func TestGeneratedSettingSatisfiesSettingValid(t *testing.T) {
 	for _, fixture := range []string{"body_weight", "vital_signs", "minimal_observation.en.v1"} {
 		t.Run(fixture, func(t *testing.T) {
 			out, err := instance.Generate(context.Background(), compileFixture(t, fixture), instance.Options{
-				Policy:    instance.Example,
+				Policy:    instance.Large,
 				Territory: "NL",
 				Composer:  &rm.PartyIdentified{Name: &name},
 			})
@@ -130,7 +130,7 @@ func TestGeneratedSubjectSatisfiesBasicValidity(t *testing.T) {
 	for _, fixture := range []string{"body_weight", "vital_signs", "minimal_observation.en.v1"} {
 		t.Run(fixture, func(t *testing.T) {
 			out, err := instance.Generate(context.Background(), compileFixture(t, fixture), instance.Options{
-				Policy:    instance.Example,
+				Policy:    instance.Large,
 				Territory: "NL",
 				Composer:  &rm.PartyIdentified{Name: &name},
 			})
@@ -163,11 +163,11 @@ func TestGeneratedSubjectSatisfiesBasicValidity(t *testing.T) {
 // TestREQ107_OtherValueFillDegradesToExampleFill is the REQ-107 check that a
 // ValueFill other than RandomFill degrades to ExampleFill rather than
 // error: ValueFill(7), with a ValueSource set, gives output byte-identical
-// to ExampleFill's, under both policies.
+// to ExampleFill's, under every policy.
 func TestREQ107_OtherValueFillDegradesToExampleFill(t *testing.T) {
 	c := compileFixture(t, "vital_signs")
 	name := "Test Composer"
-	for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+	for _, policy := range everyPolicy {
 		gen := func(vf instance.ValueFill, src mrand.Source) []byte {
 			t.Helper()
 			out, err := instance.Generate(t.Context(), c, instance.Options{

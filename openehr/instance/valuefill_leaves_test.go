@@ -39,7 +39,7 @@ func leafConstraint[T constraints.PrimitiveConstraint](t *testing.T, c *template
 // values a constrained leaf with a draw from its constraint, for a C_DATE,
 // a C_TIME, a C_STRING list and a C_CODE_PHRASE list: over eight seeds the
 // values vary and each passes the constraint, and ExampleFill gives the
-// constraint's example value. It holds under both policies and both
+// constraint's example value. It holds under every policy and both
 // compile modes.
 func TestREQ107_RandomFillDrawsEachLeafKind(t *testing.T) {
 	element := func(value string) string { return optTemplate("ELEMENT", optSingle("value", value)) }
@@ -95,7 +95,7 @@ func TestREQ107_RandomFillDrawsEachLeafKind(t *testing.T) {
 	for _, tc := range cases {
 		for _, implicit := range []bool{true, false} {
 			c := compileOPTText(t, tc.opt, implicit)
-			for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+			for _, policy := range everyPolicy {
 				t.Run(fmt.Sprintf("%s/implicit=%t/%v", tc.name, implicit, policy), func(t *testing.T) {
 					out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, Now: defaultsNow})
 					if err != nil {

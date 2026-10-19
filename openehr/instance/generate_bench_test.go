@@ -20,7 +20,7 @@ import (
 )
 
 // BenchmarkGenerate measures Generate on Demonstration.v1 and vital_signs,
-// under Minimal and Example, with the example fill.
+// under Large and Medium, with the example fill.
 func BenchmarkGenerate(b *testing.B) {
 	now := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
 	for _, id := range []string{"Demonstration.v1", "vital_signs"} {
@@ -32,7 +32,7 @@ func BenchmarkGenerate(b *testing.B) {
 		if err != nil {
 			b.Fatalf("compile %s: %v", id, err)
 		}
-		for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+		for _, policy := range []instance.Policy{instance.Large, instance.Medium} {
 			b.Run(id+"/"+policy.String(), func(b *testing.B) {
 				uid := 0
 				opts := instance.Options{

@@ -211,7 +211,7 @@ func TestValidateComposition_REQ102_UnmatchedNameBindsToFirstNamedChild(t *testi
 func TestGenerate_REQ107_REQ116_ReusedArchetypeOutputValidates(t *testing.T) {
 	for _, names := range [][]string{{"Erste", "Zweite"}, {"Erste", "Zweite", ""}, {"", "Erste"}} {
 		c := mustCompileSyntheticOPT(t, reusedArchetypeOPTOf(names...))
-		for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+		for _, policy := range []instance.Policy{instance.Large, instance.Medium} {
 			t.Run(fmt.Sprintf("%q/%s", names, policy), func(t *testing.T) {
 				out, err := instance.Generate(t.Context(), c, instance.Options{
 					Policy:    policy,

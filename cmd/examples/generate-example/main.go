@@ -12,7 +12,7 @@
 //	    --opt testkit/corpus/templates/vital_signs.opt \
 //	    --territory NL \
 //	    --composer-name "Test Composer" \
-//	    --policy example
+//	    --policy large
 //
 // The output is one line of JSON; pipe it to a file or into validate-from-json.
 // Each run gets fresh uids and a wall-clock context start time.
@@ -41,7 +41,7 @@ func main() {
 
 func run() error {
 	optFlag := flag.String("opt", "", "path to an ADL 1.4 operational template (default: the vendored vital_signs.opt)")
-	policyFlag := flag.String("policy", "example", "how much to fill in: 'minimal' or 'example'")
+	policyFlag := flag.String("policy", "large", "how much to build: 'required' (the mandatory data and a composition's context), 'medium' (at most one optional archetype under an attribute) or 'large' (a member of every optional archetype)")
 	territoryFlag := flag.String("territory", "NL", "ISO 3166-1 territory code; a COMPOSITION root requires one")
 	composerFlag := flag.String("composer-name", "Example Composer", "name recorded as the composition's composer")
 	flag.Parse()
@@ -100,18 +100,23 @@ func run() error {
 	return nil
 }
 
-// parsePolicy maps the flag text onto the two generation policies. Minimal
-// creates only the nodes the template requires, the smallest valid tree;
-// Example also populates every primitive leaf with its example value. An
-// unknown value is an error, so a typo on the command line does not silently
-// pick a default.
+// parsePolicy maps the flag text onto the three generation policies, which
+// follow the levels of the ITS-REST template example. Required builds only
+// the data points the template makes mandatory and a composition's
+// context. Medium also builds at most one optional archetype under an
+// attribute. Large builds a member of every optional archetype the
+// template names. Under each of them every primitive leaf holds its
+// example value. An unknown value is an error, so a typo on the command
+// line does not silently pick a default.
 func parsePolicy(name string) (instance.Policy, error) {
 	switch name {
-	case "minimal":
-		return instance.Minimal, nil
-	case "example":
-		return instance.Example, nil
+	case "required":
+		return instance.Required, nil
+	case "medium":
+		return instance.Medium, nil
+	case "large":
+		return instance.Large, nil
 	default:
-		return 0, fmt.Errorf("unknown --policy %q (want 'minimal' or 'example')", name)
+		return 0, fmt.Errorf("unknown --policy %q (want 'required', 'medium' or 'large')", name)
 	}
 }
