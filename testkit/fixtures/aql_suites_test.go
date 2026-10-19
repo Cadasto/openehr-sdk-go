@@ -46,6 +46,23 @@ func TestAQLSuitesRootHoldsPinnedCorpus_PROBE107_REQ160(t *testing.T) {
 	}
 }
 
+// testkit/corpus/aql/ holds one vendored AQL corpus, suites/. Beside it sits
+// lint/, the hand-written PROBE-028 lint inputs, which no ingest vendors. Any
+// other entry, such as a second vendored corpus, fails here by name.
+func TestAQLCorpusTreeHoldsOneVendoredCorpus_REQ160(t *testing.T) {
+	t.Parallel()
+	entries, err := os.ReadDir(filepath.Dir(fixtures.AQLSuitesRoot()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if e.Name() != "suites" && e.Name() != "lint" {
+			t.Errorf("%s/%s exists; want only suites/, the one vendored AQL corpus, "+
+				"and lint/, the hand-written lint inputs", aqlCorpusDir, e.Name())
+		}
+	}
+}
+
 func TestIngestRobotAQLWritesSuiteCorpus_PROBE107_REQ160(t *testing.T) {
 	t.Parallel()
 	h := newAQLIngest(t)
