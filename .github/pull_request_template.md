@@ -1,8 +1,10 @@
 ## Summary
 
-<!-- What changed and why, in prose. Name the decisions taken and the alternatives not taken.
-     No commit list, no task ticks, no finding ids: findings live in the findings file and the
-     review threads (docs/ai-workflow.md § Review). -->
+<!-- What changed and why, in at most three sentences. Name the decisions taken and the
+     alternatives not taken. Keep the whole body to about 300 words besides the checklist.
+     It describes the branch, never its review: no commit list, no task ticks, no finding ids,
+     counts or passes; findings live in the findings file and the review threads
+     (docs/ai-workflow.md § Review). -->
 
 ## Checklist
 
@@ -26,4 +28,5 @@
 
 ## Notes for review
 
-<!-- Where to look hardest; what is out of scope; a known gap left on purpose. Omit when empty. -->
+<!-- At most three bullets: where to look hardest; what is out of scope; a known gap left on
+     purpose. Omit when empty. -->

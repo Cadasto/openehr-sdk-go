@@ -61,7 +61,7 @@ sdd:
 
   check:
     script: scripts/sdd-check.py   # where the vendored gate lives
-    version: "0.14.0"              # must equal the vendored tool's own version
+    version: "0.15.0"              # must equal the vendored tool's own version
     links:
       exclude: []                  # globs; printed in every report when non-empty
     changelog:
@@ -97,9 +97,8 @@ sdd:
     max_parallel_workers: 3
     worktree_per_worker: false      # true: each parallel worker on its own branch and worktree, merged; false: one shared branch
     worker_skills: [go-coding:go-coding]  # skills named in the worker's brief (suggested from go.mod)
-    reviewers: [go-coding:go-reviewer]    # this repo's own language reviewers, by agent name (suggested from go.mod)
+    reviewers:                      # this repo's own language reviewers, by path pattern (suggested from go.mod)
+      "**/*.go": go-coding:go-reviewer
+      "**/go.mod": go-coding:go-reviewer
+    skip: ["testkit/corpus/**", "testkit/recordings/**", "resources/**"]  # vendored corpora and upstream resources no reviewer reads
     task_review: lane               # on | off | lane  (lane = on for full, off for maintenance)
-    review_panel:                   # who reviews the PR, per lane; names are prompt targets, not integrations
-      full: [claude, cursor]
-      maintenance: [claude]
-      external: []                  # names that never load the plugin; --panel prints them the request block
