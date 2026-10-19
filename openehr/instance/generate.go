@@ -2045,6 +2045,9 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 	case *rm.PartyRelated:
 		fillPartyName(&v.Name, len(v.Identifiers), v.ExternalRef)
 		fillRelationship(opt, &v.Relationship)
+		// A code the OPT pinned takes its rubric, as a pinned category and
+		// null_flavour do.
+		useGroupRubric(&v.Relationship, terminology.SubjectRelationship)
 	case *rm.Element:
 		g.settleElement(opt, v)
 	case *rm.DVEHRURI:
