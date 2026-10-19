@@ -21,10 +21,11 @@ import (
 // PROBE-107. It must carry its own provenance pin and generated exclusion list
 // beside the mirrored AQL/ tree, and its own ingest, scripts/ingest-robot-aql.sh,
 // writes it from one pinned clone. The first two tests check the vendored
-// tree; the others run the ingest against a small synthetic upstream clone,
-// with the script's pinned commit rewritten to a commit of that clone, so its
-// layout, re-run and refusal behaviour, and its independence from the clone's
-// working tree, are checked without the real upstream.
+// tree, and the third checks the second's check on crafted trees; the others
+// run the ingest against a small synthetic upstream clone, with the script's
+// pinned commit rewritten to a commit of that clone, so its layout, re-run and
+// refusal behaviour, and its independence from the clone's working tree, are
+// checked without the real upstream.
 
 func TestAQLSuitesRootHoldsPinnedCorpus_PROBE107_REQ160(t *testing.T) {
 	t.Parallel()
