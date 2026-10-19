@@ -103,6 +103,13 @@ func TestIngestRobotAQLWritesSuiteCorpus_PROBE107_REQ160(t *testing.T) {
 				t.Fatalf("ingest at the pin: %v\n%s", err, out)
 			}
 			got := tree(t, filepath.Join(sdk, suitesDir))
+			// The suite corpus is the one AQL corpus: the run writes
+			// nothing else under testkit/corpus/aql.
+			for _, rel := range slices.Sorted(maps.Keys(tree(t, filepath.Join(sdk, aqlCorpusDir)))) {
+				if !strings.HasPrefix(rel, "suites/") {
+					t.Errorf("the ingest wrote %s/%s; want it to write only under %s", aqlCorpusDir, rel, suitesDir)
+				}
+			}
 
 			carried := []string{
 				"AQL/__init__.robot",
