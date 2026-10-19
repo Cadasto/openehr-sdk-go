@@ -76,6 +76,27 @@ type SuiteQuery struct {
 	Class SuiteClass
 	// Query is the rebuilt query text.
 	Query string
+	// Declines are the reviewed declines that cover an Error-severity lint
+	// issue this query draws, each once, in the reader's table order. Only an
+	// answered query carries any; it is nil when no decline covers the query.
+	// A consumer gating queries through the same lint can read an Error that
+	// matches a decline's code and construct as a reviewed refusal of a query
+	// an engine answers, not as a defect in the query or in the SDK.
+	Declines []SuiteDecline
+}
+
+// SuiteDecline is a reviewed decline: an Error-severity lint issue the SDK
+// raises on a query a conformant engine answers, recorded with the reason the
+// refusal is not a defect. It widens nothing: the SDK still refuses the query.
+type SuiteDecline struct {
+	// Code is the Error-severity lint issue code the decline covers.
+	Code string
+	// Construct names, in prose, the construct the code fires on.
+	Construct string
+	// Reason says why the refusal is not a defect: the query uses an engine
+	// grammar extension outside foundation AQL, or binds a CONTAINS operand
+	// through an engine extension.
+	Reason string
 }
 
 // Where is the query's corpus coordinate: `suite:LINE`, followed by the data

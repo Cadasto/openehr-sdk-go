@@ -59,6 +59,14 @@ var probe107Pin = suiteTally{
 	declines:  map[string]int{"CONTAINS operand EVENT_CONTEXT": 25},
 }
 
+// eventContextDecline is the shipped decline as the exported reader hands it
+// to a query, spelled out here so a reader that garbles a field is caught.
+var eventContextDecline = SuiteDecline{
+	Code:      "aql_contains_not_containable",
+	Construct: "CONTAINS operand EVENT_CONTEXT",
+	Reason:    "a CONTAINS operand an engine binds by an engine extension",
+}
+
 func tallySuiteCorpus(c SuiteCorpus, declines []suiteDecline) suiteTally {
 	t := suiteTally{
 		classes:   map[SuiteClass]int{},
@@ -132,7 +140,9 @@ func probe107Corpus(t *testing.T) SuiteCorpus {
 // TestProbe107SuiteCorpus_REQ109_REQ160 runs PROBE-107 over the vendored
 // suite corpus, logs what it covered, and asserts the pinned tally (PROBE-107
 // Ratchet): a per-family tripwire fires only at zero, so a query moving
-// between classes, or a family shrinking, would otherwise stay green.
+// between classes, or a family shrinking, would otherwise stay green. It also
+// asserts that the reader hands the decline's pinned queries, and no other,
+// the decline that covers them (PROBE-107 Declines exposed).
 func TestProbe107SuiteCorpus_REQ109_REQ160(t *testing.T) {
 	t.Parallel()
 	c := probe107Corpus(t)
@@ -148,6 +158,24 @@ func TestProbe107SuiteCorpus_REQ109_REQ160(t *testing.T) {
 	for _, d := range probe107Pin.diff(got) {
 		t.Errorf("%s; the PROBE-107 pin records the corpus at AQL_SOURCE.txt — "+
 			"re-baseline the pin and the Status together after a refresh", d)
+	}
+
+	// The decline's queries are found here by their text, not by the lint
+	// the reader runs: every answered query that binds EVENT_CONTEXT as a
+	// CONTAINS operand carries the decline, and no other query carries any.
+	carrying := 0
+	for _, q := range c.Queries {
+		var want []SuiteDecline
+		if q.Class == SuiteAnswered && strings.Contains(q.Query, "CONTAINS EVENT_CONTEXT") {
+			want = []SuiteDecline{eventContextDecline}
+			carrying++
+		}
+		if !slices.Equal(q.Declines, want) {
+			t.Errorf("%s: Declines = %+v, want %+v (class %s, query %q)", q.Where(), q.Declines, want, q.Class, q.Query)
+		}
+	}
+	if w := probe107Pin.declines[eventContextDecline.Construct]; carrying != w {
+		t.Errorf("%d answered queries bind EVENT_CONTEXT as a CONTAINS operand, want the decline's pinned %d", carrying, w)
 	}
 
 	r, err := Probe107SuiteCorpus(c)
@@ -1484,6 +1512,10 @@ const (
 	queryUnknownAlias = "SELECT x/uid/value FROM COMPOSITION c"
 	queryImpossible   = "SELECT o FROM OBSERVATION o CONTAINS COMPOSITION c"
 	queryEventContext = "SELECT ec/start_time/value FROM EHR e CONTAINS COMPOSITION c CONTAINS EVENT_CONTEXT ec"
+	// queryEventContextTwice draws the declined Error on two operands: the
+	// decline covers both, and is carried once.
+	queryEventContextTwice = "SELECT a/start_time/value AS t FROM EHR e CONTAINS COMPOSITION c " +
+		"CONTAINS (EVENT_CONTEXT a AND EVENT_CONTEXT b)"
 	queryUnknownClass = "SELECT t FROM COMPOSITION CONTAINS FOO_BAR t"
 	// queryOtherOperand binds a not-containable operand other than
 	// EVENT_CONTEXT: the decline must not cover it.
@@ -1511,6 +1543,10 @@ func TestProbe107QueryPremises_REQ161(t *testing.T) {
 		{query: queryUnknownAlias, errs: []string{"aql_unknown_alias"}},
 		{query: queryImpossible, errs: []string{codeImpossibleContainment}},
 		{query: queryEventContext, errs: []string{codeContainsNotContainable}, classes: []string{"EVENT_CONTEXT"}},
+		{
+			query: queryEventContextTwice, errs: []string{codeContainsNotContainable, codeContainsNotContainable},
+			classes: []string{"EVENT_CONTEXT", "EVENT_CONTEXT"},
+		},
 		{query: queryUnknownClass, warn: codeUnknownRMClass},
 		{query: queryOtherOperand, errs: []string{codeContainsNotContainable}, classes: []string{"ISM_TRANSITION"}},
 		{
@@ -1674,6 +1710,49 @@ func TestProbe107HoldsEachClassToItsRule_REQ109_REQ160(t *testing.T) {
 				t.Fatalf("detail = %q, want it to contain %q", r.Detail, tc.detail)
 			}
 		})
+	}
+}
+
+// TestProbe107ReaderHandsAnsweredQueriesTheirDeclines_REQ160 is the control
+// for PROBE-107 Declines exposed: of the queries that draw the same declined
+// Error, only the answered ones carry the decline, once each; an answered
+// query that draws no Error, or one no decline covers, carries none.
+func TestProbe107ReaderHandsAnsweredQueriesTheirDeclines_REQ160(t *testing.T) {
+	t.Parallel()
+	const send = "    Set AQL And Execute Ad Hoc Query    "
+	c, err := readSuiteCorpus(suiteFixture(map[string]string{
+		"AQL/WHERE/t.robot": "*** Test Cases ***\n" +
+			"Answered\n" + send + queryEventContext + "\n" +
+			"Answered Twice\n" + send + queryEventContextTwice + "\n" +
+			"Answered Empty\n" + send + queryEventContext + "\n    Should Be Empty    ${resp_body['rows']}\n" +
+			"Refused\n" + send + queryEventContext + "\n    Should Contain    ${err_msg}    422 != 200\n" +
+			"Clean\n" + send + queryClean + "\n" +
+			"Other Operand\n" + send + queryOtherOperand + "\n",
+	}))
+	if err != nil {
+		t.Fatalf("readSuiteCorpus: %v", err)
+	}
+	declined := []SuiteDecline{eventContextDecline}
+	want := []struct {
+		class    SuiteClass
+		declines []SuiteDecline
+	}{
+		{SuiteAnswered, declined},
+		{SuiteAnswered, declined},
+		{SuiteAnsweredEmpty, nil},
+		{SuiteRefused, nil},
+		{SuiteAnswered, nil},
+		{SuiteAnswered, nil},
+	}
+	if len(c.Queries) != len(want) {
+		t.Fatalf("premise: the fixture rebuilt %d queries, want %d: %v", len(c.Queries), len(want), renderSuiteCorpus(c))
+	}
+	for i, q := range c.Queries {
+		w := want[i]
+		if q.Class != w.class || !slices.Equal(q.Declines, w.declines) || (q.Declines == nil) != (w.declines == nil) {
+			t.Errorf("%s: class %s, Declines %#v; want class %s, Declines %#v (query %q)",
+				q.Where(), q.Class, q.Declines, w.class, w.declines, q.Query)
+		}
 	}
 }
 
