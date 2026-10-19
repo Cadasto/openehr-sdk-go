@@ -18,11 +18,11 @@
 # changes nothing. So the commit recorded in AQL_SOURCE.txt determines the
 # vendored content, not merely the tree the ingest happened to read.
 #
-# ROBOT_ROOT points at the upstream tests/robot/_resources/test_data_sets
-# directory of the clone (same convention as the fixtures ingest). It locates
-# the clone, and its path inside the clone names the two roots read from the
-# commit: tests/robot/AQL, two levels above it, and its
-# aql/fields_and_results subtree.
+# ROBOT_ROOT is required and has no default. It points at the upstream
+# tests/robot/_resources/test_data_sets directory of an ehrbase/integration-tests
+# clone (same convention as the fixtures ingest). It locates the clone, and its
+# path inside the clone names the two roots read from the commit:
+# tests/robot/AQL, two levels above it, and its aql/fields_and_results subtree.
 #
 # EXPECTED_COMMIT below is the pin. The script refuses unless it names, in full,
 # a commit present in the clone; HEAD may point anywhere. Refreshing the corpus
@@ -52,7 +52,12 @@ set -euo pipefail
 
 EXPECTED_COMMIT=b4625fc28d6785c05adfd6db26339b4bb2272e06
 
-ROBOT="${ROBOT_ROOT:-/src/ehrbase/integration-tests/tests/robot/_resources/test_data_sets}"
+if [[ -z "${ROBOT_ROOT:-}" ]]; then
+  echo "ROBOT_ROOT is unset or empty" >&2
+  echo "set ROBOT_ROOT to the upstream tests/robot/_resources/test_data_sets directory of an ehrbase/integration-tests clone" >&2
+  exit 1
+fi
+ROBOT=$ROBOT_ROOT
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 SUITES_DEST="$REPO/testkit/corpus/aql/suites"
 
