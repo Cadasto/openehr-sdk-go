@@ -559,19 +559,29 @@ func TestIngestRobotAQLRequiresRobotRoot(t *testing.T) {
 		// env is added to the ingest's environment, which holds no
 		// ROBOT_ROOT of its own.
 		env []string
+		// ingested runs an ingest with ROBOT_ROOT set first, so the
+		// refusal meets a vendored corpus it must leave alone. Without it
+		// the scratch tree holds only the script, so a directory the script
+		// makes before its guard shows up as new, even one an ingest also
+		// makes.
+		ingested bool
 	}{
-		{name: "ROBOT_ROOT unset"},
-		{name: "ROBOT_ROOT empty", env: []string{"ROBOT_ROOT="}},
+		{name: "ROBOT_ROOT unset, script only"},
+		{name: "ROBOT_ROOT empty, script only", env: []string{"ROBOT_ROOT="}},
+		{name: "ROBOT_ROOT unset, after an ingest", ingested: true},
+		{name: "ROBOT_ROOT empty, after an ingest", env: []string{"ROBOT_ROOT="}, ingested: true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			up, head := h.newUpstream(t)
 			sdk := h.newSDK(t, head)
-			if out, err := h.ingest(t, sdk, up, ""); err != nil {
-				t.Fatalf("ingest with ROBOT_ROOT set: %v\n%s", err, out)
+			if tc.ingested {
+				if out, err := h.ingest(t, sdk, up, ""); err != nil {
+					t.Fatalf("ingest with ROBOT_ROOT set: %v\n%s", err, out)
+				}
 			}
-			before := tree(t, sdk)
+			before, beforeEntries := tree(t, sdk), entries(t, sdk)
 
 			out, err := h.run(t, sdk, tc.env...)
 			if err == nil {
@@ -582,6 +592,9 @@ func TestIngestRobotAQLRequiresRobotRoot(t *testing.T) {
 					t.Errorf("ingest refused with %q; want the refusal to name %q", out, want)
 				}
 			}
+			if after := entries(t, sdk); !slices.Equal(after, beforeEntries) {
+				t.Errorf("the refusal left the scratch tree holding %q; want %q", after, beforeEntries)
+			}
 			if changed := changedFiles(before, tree(t, sdk)); len(changed) > 0 {
 				t.Errorf("the refusal changed %q in the scratch tree; want nothing changed", changed)
 			}
@@ -590,8 +603,13 @@ func TestIngestRobotAQLRequiresRobotRoot(t *testing.T) {
 }
 
 // robotRootRefusal is what both Robot ingests print when ROBOT_ROOT is unset
-// or empty: the variable, and the upstream directory it must name.
-var robotRootRefusal = []string{"ROBOT_ROOT is unset or empty", "tests/robot/_resources/test_data_sets"}
+// or empty: the variable, the upstream directory it must name, and the clone
+// that directory belongs to.
+var robotRootRefusal = []string{
+	"ROBOT_ROOT is unset or empty",
+	"tests/robot/_resources/test_data_sets",
+	"ehrbase/integration-tests",
+}
 
 // Paths in the scratch trees, slash-separated.
 const (
