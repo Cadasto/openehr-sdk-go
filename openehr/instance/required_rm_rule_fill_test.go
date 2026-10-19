@@ -25,14 +25,10 @@ func TestREQ107_RMRuleFillFollowsTheOPTChild(t *testing.T) {
 	// prohibits marks a case whose OPT prohibits the attribute the RM rule
 	// writes: the template validator reports that prohibition (REQ-107
 	// Exceptions and known gaps), so only the RM floor is checked.
-	// nameOnly marks a PARTY_RELATED case: the generator gives its
-	// relationship no default, so the RM floor reports Relationship_valid
-	// whatever the name, and only the name is checked.
 	cases := []struct {
 		name      string
 		opt       string
 		prohibits bool
-		nameOnly  bool
 		check     func(t *testing.T, out any)
 	}{
 		{
@@ -87,15 +83,14 @@ func TestREQ107_RMRuleFillFollowsTheOPTChild(t *testing.T) {
 			name: "PARTY_RELATED name 0..1 over a C_STRING list",
 			opt: optTemplate("OBSERVATION", optSingle("subject", optNode("PARTY_RELATED", "",
 				optOptionalSingleOver("name", optPrimitive("STRING", "C_STRING", "<list>Dr X</list>"))))),
-			nameOnly: true,
-			check:    subjectNamed("Dr X"),
+			check: subjectNamed("Dr X"),
 		},
 		{
 			name: "PARTY_RELATED name 0..0 over a C_STRING list",
 			opt: optTemplate("OBSERVATION", optSingle("subject", optNode("PARTY_RELATED", "",
 				optProhibitedSingle("name", optPrimitive("STRING", "C_STRING", "<list>Dr X</list>"))))),
-			nameOnly: true,
-			check:    subjectNamed("Dr X"),
+			prohibits: true,
+			check:     subjectNamed("Dr X"),
 		},
 	}
 	for _, tc := range cases {
@@ -108,9 +103,6 @@ func TestREQ107_RMRuleFillFollowsTheOPTChild(t *testing.T) {
 						t.Fatalf("Generate: %v", err)
 					}
 					tc.check(t, out)
-					if tc.nameOnly {
-						return
-					}
 					if tc.prohibits {
 						checkFloor(t, out)
 						return

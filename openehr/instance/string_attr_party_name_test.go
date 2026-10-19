@@ -119,8 +119,9 @@ func partyName(v any) (string, bool) {
 // optional attribute), and an ENTRY subject the OPT pins to a bare
 // PARTY_IDENTIFIED or PARTY_RELATED node. The RM rule wins over a
 // prohibited name. A name the OPT constrains with a C_STRING keeps the
-// value that constraint admits. It holds under every policy that visits
-// the party, both value fills and both compile modes.
+// value that constraint admits. The bare PARTY_RELATED subject also
+// passes the RM floor, its relationship included. It holds under every
+// policy that visits the party, both value fills and both compile modes.
 func TestREQ107_PartyIdentifiedGetsAName(t *testing.T) {
 	type place struct {
 		name     string
@@ -128,6 +129,7 @@ func TestREQ107_PartyIdentifiedGetsAName(t *testing.T) {
 		policies []instance.Policy
 		party    func(out any) any
 		want     string
+		floor    bool
 	}
 	facility := func(attr string) string {
 		return optTemplate("COMPOSITION", optSingle("context", optNode("EVENT_CONTEXT", "", attr)))
@@ -150,7 +152,7 @@ func TestREQ107_PartyIdentifiedGetsAName(t *testing.T) {
 		},
 		{
 			name: "subject bare PARTY_RELATED", opt: optTemplate("OBSERVATION", optSingle("subject", optNode("PARTY_RELATED", ""))),
-			policies: every, party: fromSubject, want: "example",
+			policies: every, party: fromSubject, want: "example", floor: true,
 		},
 		{
 			name: "subject PARTY_IDENTIFIED, name prohibited", opt: optTemplate("OBSERVATION", optSingle("subject",
@@ -182,6 +184,9 @@ func TestREQ107_PartyIdentifiedGetsAName(t *testing.T) {
 					}
 					if got != tc.want {
 						t.Errorf("name = %q, want %q", got, tc.want)
+					}
+					if tc.floor {
+						checkFloor(t, out)
 					}
 				})
 			}
