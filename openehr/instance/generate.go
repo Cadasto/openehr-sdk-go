@@ -759,8 +759,9 @@ func attrType(parentType, declared string) string {
 
 // settleBuilt gives a value built from the BMM alone, which the walk
 // never reaches, the RM default finishNode gives a walked one where no
-// other pass does: an ISM_TRANSITION's current state, a party's name, and
-// a PARTY_RELATED's relationship.
+// other pass does: an ISM_TRANSITION's current state and a party's name.
+// No attribute of the pinned RM has the type PARTY_RELATED, so the BMM
+// alone never builds one, and its relationship is finishNode's alone.
 func settleBuilt(v any) {
 	switch b := v.(type) {
 	case *rm.IsmTransition:
@@ -769,7 +770,6 @@ func settleBuilt(v any) {
 		fillPartyName(&b.Name, len(b.Identifiers), b.ExternalRef)
 	case *rm.PartyRelated:
 		fillPartyName(&b.Name, len(b.Identifiers), b.ExternalRef)
-		fillRelationship(nil, &b.Relationship)
 	}
 }
 
@@ -2492,8 +2492,7 @@ func fillCurrentState(opt *tcimpl.CompiledNode, iv *rm.IsmTransition) {
 // (noCode) the code 253 (unknown) of the openEHR subject relationship
 // group, with its rubric, so RM Relationship_valid holds, where the OPT's
 // constraint on relationship admits it (codedTextAdmitted). A code the
-// OPT gave is kept. opt is the OPT node of the party, or nil for one
-// built from the BMM alone.
+// OPT gave is kept. opt is the OPT node of the party.
 func fillRelationship(opt *tcimpl.CompiledNode, rel *rm.DVCodedText) {
 	if !noCode(rel.DefiningCode.CodeString) {
 		return

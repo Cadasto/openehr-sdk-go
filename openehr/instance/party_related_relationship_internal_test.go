@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
 
@@ -41,7 +40,7 @@ func TestREQ107_RelationshipDefaultYieldsToTheOPT(t *testing.T) {
 	unknown := coded("openehr", "253", "unknown")
 	cases := []struct {
 		name string
-		opt  string // the relationship's OPT child; "" for a party built from the BMM alone
+		opt  string // the relationship's OPT child
 		have rm.DVCodedText
 		want rm.DVCodedText
 	}{
@@ -64,17 +63,15 @@ func TestREQ107_RelationshipDefaultYieldsToTheOPT(t *testing.T) {
 			want: unknown,
 		},
 		{
-			name: "empty relationship of a party built from the BMM",
+			name: "empty relationship replaced where the OPT names openehr with no code",
+			opt:  relationshipCodedText("openehr"),
 			have: rm.DVCodedText{},
 			want: unknown,
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			var opt *tcimpl.CompiledNode
-			if tc.opt != "" {
-				opt, _ = visitAttribute(t, visitRootOPT("PARTY_RELATED", visitSingle("relationship", tc.opt)), "relationship")
-			}
+			opt, _ := visitAttribute(t, visitRootOPT("PARTY_RELATED", visitSingle("relationship", tc.opt)), "relationship")
 			got := tc.have
 			fillRelationship(opt, &got)
 			if got.DefiningCode != tc.want.DefiningCode || got.Value != tc.want.Value {
