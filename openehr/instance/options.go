@@ -169,6 +169,11 @@ var ErrTerritoryRequired = errors.New("instance.Generate: Territory is required 
 // invocation omitted the Composer option.
 var ErrComposerRequired = errors.New("instance.Generate: Composer is required for COMPOSITION roots")
 
+// ErrUnsupportedPolicy signals that the Policy option is none of Large,
+// Medium and Required. Generate returns it, naming the value, before it
+// builds anything.
+var ErrUnsupportedPolicy = errors.New("instance.Generate: unsupported policy")
+
 // ErrTypeMismatch is returned by AsComposition / AsObservation /
 // etc. when the produced root is not the requested concrete type.
 var ErrTypeMismatch = errors.New("instance: root type does not match requested accessor")
