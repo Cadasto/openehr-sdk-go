@@ -81,9 +81,14 @@ type SuiteQuery struct {
 	// Declines are the reviewed declines that cover an Error-severity lint
 	// issue this query draws, each once, in the reader's table order. Only an
 	// answered query carries any; it is nil when no decline covers the query.
-	// A consumer gating queries through the same lint can read an Error that
-	// matches a decline's code and construct as a reviewed refusal of a query
-	// an engine answers, not as a defect in the query or in the SDK.
+	// A decline covers the Error of its code on its construct only, and
+	// Construct is prose, so a program can match a decline by its code alone;
+	// another Error of the same code on the query is not covered by it. On a
+	// corpus [Probe107SuiteCorpus] passes, though, every Error-severity issue
+	// an answered query draws is covered: the query draws an Error exactly
+	// when Declines is not empty. A consumer gating queries through the same
+	// lint can then read those Errors as reviewed refusals of a query an
+	// engine answers, not as defects in the query or in the SDK.
 	Declines []SuiteDecline
 }
 
