@@ -43,7 +43,7 @@ limitations under the License.
 ## ehrbase (integration-tests Robot)
 
 **Source:** https://github.com/ehrbase/integration-tests (split out of the former `ehrbase/ehrbase` monorepo)  
-**Path within source:** `tests/robot/_resources/test_data_sets/` (sibling clone under `/src/ehrbase/integration-tests`); the AQL suite corpus also reads `tests/robot/AQL/`  
+**Path within source:** `tests/robot/_resources/test_data_sets/` (read from a local clone of the upstream, located by `ROBOT_ROOT`); the AQL suite corpus also reads `tests/robot/AQL/`  
 **Pinned commit:** recorded in [`ROBOT_SOURCE.txt`](ROBOT_SOURCE.txt) — the upstream commit the curated fixtures were ingested from (provenance pin, not a per-file `sha256` lock). The AQL suite corpus from the same repository, `aql/suites/`, is vendored separately, by its own ingest, and carries its own pin, [`aql/suites/AQL_SOURCE.txt`](aql/suites/AQL_SOURCE.txt).
 
 ```

@@ -16,7 +16,8 @@ import (
 // robotRoot is the ehrbase integration-tests Robot fixture tree (sibling clone).
 func robotRoot(t *testing.T) string {
 	t.Helper()
-	// Sibling clone: /src/ehrbase (four levels up from internal/templatecompile).
+	// A sibling ehrbase/integration-tests clone, four levels up from
+	// internal/templatecompile.
 	root := filepath.Join("..", "..", "..", "..", "ehrbase", "integration-tests", "tests", "robot", "_resources", "test_data_sets")
 	abs, err := filepath.Abs(root)
 	if err != nil {
