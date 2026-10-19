@@ -137,7 +137,7 @@ func dateTimeConstraint(t *testing.T, c *templatecompile.Compiled) constraints.C
 // DV_DATE_TIME whose OPT node carries a primitive constraint is valued as the
 // ValueFill in force says, not from the clock: under ExampleFill it is the
 // constraint's example value, and under RandomFill a draw the constraint
-// accepts that is not the clock. It holds under both policies, with and
+// accepts that is not the clock. It holds under every policy, with and
 // without the implicit attributes, nested and as the root.
 func TestREQ107_ConstrainedDateTimeFollowsValueFill(t *testing.T) {
 	clock := defaultsNow.Format(time.RFC3339)
@@ -145,7 +145,7 @@ func TestREQ107_ConstrainedDateTimeFollowsValueFill(t *testing.T) {
 		for _, implicit := range []bool{true, false} {
 			c := compileOPTText(t, place.opt(true), implicit)
 			pc := dateTimeConstraint(t, c)
-			for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+			for _, policy := range everyPolicy {
 				for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
 					t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", place.name, implicit, policy, fill), func(t *testing.T) {
 						out, err := instance.Generate(t.Context(), c, instance.Options{
@@ -183,14 +183,14 @@ func TestREQ107_ConstrainedDateTimeFollowsValueFill(t *testing.T) {
 
 // TestREQ107_UnconstrainedDateTimeTakesTheClock is the REQ-107 check that a
 // DV_DATE_TIME whose OPT node carries no primitive constraint takes its
-// value from the clock, under both policies and both value fills, with and
+// value from the clock, under every policy and both value fills, with and
 // without the implicit attributes, nested and as the root.
 func TestREQ107_UnconstrainedDateTimeTakesTheClock(t *testing.T) {
 	clock := defaultsNow.Format(time.RFC3339)
 	for _, place := range dateTimePlacements {
 		for _, implicit := range []bool{true, false} {
 			c := compileOPTText(t, place.opt(false), implicit)
-			for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+			for _, policy := range everyPolicy {
 				for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
 					t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", place.name, implicit, policy, fill), func(t *testing.T) {
 						out, err := instance.Generate(t.Context(), c, instance.Options{

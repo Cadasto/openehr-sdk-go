@@ -23,6 +23,8 @@ type config struct {
 	composer    rm.PartyProxy
 	category    *rm.DVCodedText
 	now         time.Time
+	policy      instance.Policy
+	policySet   bool // WithPolicy was given; its policy can be the zero value
 	valueFill   instance.ValueFill
 	valueSource mrand.Source
 }
@@ -66,6 +68,28 @@ func WithCategory(c rm.DVCodedText) Option {
 // determinism.
 func WithNow(t time.Time) Option {
 	return func(c *config) { c.now = t }
+}
+
+// WithPolicy selects the instance.Policy NewSkeleton passes to
+// instance.Generate, which decides which nodes the skeleton holds.
+// NewSkeleton's default is the instance package's, instance.Medium, which
+// builds at most one optional archetype under an attribute.
+// instance.Large builds a member of every optional archetype the template
+// names, the nodes Set needs to route a value into, and instance.Required
+// builds only what the template makes mandatory and a composition's
+// context; instance.Complete and instance.Minimal are other names for
+// Large and Required. NewSkeleton accepts the three. NewBuilder builds on
+// Large when no WithPolicy is given and accepts only Large, since Set does
+// not build a node the skeleton lacks: it refuses an explicit
+// WithPolicy(instance.Medium), though Medium is the zero value. Each
+// returns ErrUnsupportedPolicy for a Policy value it does not accept, and
+// for one the instance package does not define an error that also wraps
+// instance.ErrUnsupportedPolicy.
+func WithPolicy(p instance.Policy) Option {
+	return func(c *config) {
+		c.policy = p
+		c.policySet = true
+	}
 }
 
 // WithValueFill selects how primitive leaves are valued. The default
@@ -118,3 +142,17 @@ var ErrTypeMismatch = errors.New("composition: value type does not match path RM
 // parent). Distinct from ErrUnknownPath: the path IS in the template
 // but the live skeleton lacks the addressable parent.
 var ErrInvalidPath = errors.New("composition: path not addressable on skeleton")
+
+// ErrUnsupportedPolicy signals that an entry point refuses the policy
+// WithPolicy selects, before it generates anything. NewBuilder returns it
+// for instance.Medium and instance.Required (and so instance.Minimal),
+// naming the policy, since Set routes a value only into a node the
+// skeleton already holds and only an instance.Large skeleton holds a
+// member of every optional archetype. NewBuilder also returns it for any
+// Policy value the instance package does not define. NewSkeleton accepts
+// instance.Medium, instance.Required and instance.Large, and returns it
+// for any other Policy value. The refusal of a Policy value the instance
+// package does not define also wraps instance.ErrUnsupportedPolicy, as
+// instance.Generate's does; NewBuilder's refusal of instance.Medium or
+// instance.Required does not. Comparable via errors.Is.
+var ErrUnsupportedPolicy = errors.New("composition: unsupported skeleton policy")

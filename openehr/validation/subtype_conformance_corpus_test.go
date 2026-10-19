@@ -17,26 +17,26 @@ import (
 )
 
 // REQ-102 (Validation dimensions: RM type match) — a DV_CODED_TEXT
-// satisfies an OPT child declared as DV_TEXT. These tests take the Example
+// satisfies an OPT child declared as DV_TEXT. These tests take the Large
 // instance the generator builds for a vendored template, code one or more of
 // its DV_TEXT values on the canonical JSON, as a client holding wire data
 // would, and validate the result.
 
 // minCorpusSwept is the number of vendored templates the corpus sweep
-// measured: their Example instance validates clean and holds a DV_TEXT
+// measured: their Large instance validates clean and holds a DV_TEXT
 // ELEMENT value. A sweep that covers fewer has lost templates, and passes
 // for that reason rather than for the rule it checks. Template validation
-// includes the RM floor, so TestPerson.v2 is not counted: its Example
+// includes the RM floor, so TestPerson.v2 is not counted: its Large
 // instance breaks the floor's media type rule, a known generator gap the
 // REQ-107 corpus ratchet records.
 const minCorpusSwept = 47
 
-// generateExample builds the Example instance of c, with the composer and
+// generateExample builds the Large instance of c, with the composer and
 // territory a COMPOSITION root needs; any other root ignores them.
 func generateExample(t *testing.T, c *templatecompile.Compiled) (any, error) {
 	t.Helper()
 	return instance.Generate(t.Context(), c, instance.Options{
-		Policy:    instance.Example,
+		Policy:    instance.Large,
 		Language:  "en",
 		Territory: "NL",
 		Composer:  &rm.PartyIdentified{Name: new("Test Composer")},
@@ -145,7 +145,7 @@ func decodeInto[T any](raw []byte, dst *T) (any, error) {
 	return dst, nil
 }
 
-// REQ-102 — issue #248: the Example instance of BMI.opt validates clean,
+// REQ-102 — issue #248: the Large instance of BMI.opt validates clean,
 // and stays clean once the DV_TEXT value of its protocol ELEMENT at0010 is
 // coded, because a DV_CODED_TEXT satisfies the DV_TEXT the OPT declares
 // there. It used to be reported as rm_type_mismatch at
@@ -158,11 +158,11 @@ func TestValidateComposition_REQ102_CodedTextElementValueUnderTextChild(t *testi
 		t.Fatalf("Generate(BMI): %v", err)
 	}
 	if r := validateRoot(root, c); !r.OK {
-		t.Fatalf("precondition: the Example instance of BMI has issues %q, want none", issueKeys(r.Issues))
+		t.Fatalf("precondition: the Large instance of BMI has issues %q, want none", issueKeys(r.Issues))
 	}
 	coded, n := editElementTexts(t, root, "value", withNodeID("at0010"), codeText)
 	if n == 0 {
-		t.Fatal("the Example instance of BMI holds no DV_TEXT value on ELEMENT at0010; update the node id")
+		t.Fatal("the Large instance of BMI holds no DV_TEXT value on ELEMENT at0010; update the node id")
 	}
 	r := validateRoot(coded, c)
 	if got := issueKeys(r.Issues); len(got) != 0 {
@@ -207,11 +207,11 @@ func TestValidateComposition_REQ102_CodedTextNameUnderTextChild(t *testing.T) {
 				t.Fatalf("Generate(%s): %v", tc.template, err)
 			}
 			if r := validateRoot(root, c); !r.OK {
-				t.Fatalf("precondition: the Example instance of %s has issues %q, want none", tc.template, issueKeys(r.Issues))
+				t.Fatalf("precondition: the Large instance of %s has issues %q, want none", tc.template, issueKeys(r.Issues))
 			}
 			coded, n := editElementTexts(t, root, "name", withNodeID(tc.nodeID), tc.edit)
 			if n == 0 {
-				t.Fatalf("the Example instance of %s holds no DV_TEXT name on ELEMENT %s; update the node id", tc.template, tc.nodeID)
+				t.Fatalf("the Large instance of %s holds no DV_TEXT name on ELEMENT %s; update the node id", tc.template, tc.nodeID)
 			}
 			r := validateRoot(coded, c)
 			got := issueKeys(r.Issues)
@@ -227,7 +227,7 @@ func TestValidateComposition_REQ102_CodedTextNameUnderTextChild(t *testing.T) {
 }
 
 // REQ-102 — the sweep issue #248 measured, over the templates vendored in
-// testkit/corpus/templates: for every one whose Example instance validates
+// testkit/corpus/templates: for every one whose Large instance validates
 // clean, coding every DV_TEXT ELEMENT value brings no rm_type_mismatch or
 // alternative_mismatch. A DV_CODED_TEXT conforms to every child a DV_TEXT
 // conforms to; a coded child's own constraints may still report the code.
@@ -260,11 +260,11 @@ func TestValidate_REQ102_CorpusCodedTextValues(t *testing.T) {
 				t.Skipf("Generate: %v", err)
 			}
 			if r := validateRoot(root, c); !r.OK {
-				t.Skipf("the Example instance has issues %q", issueKeys(r.Issues))
+				t.Skipf("the Large instance has issues %q", issueKeys(r.Issues))
 			}
 			coded, n := editElementTexts(t, root, "value", anyElement, codeText)
 			if n == 0 {
-				t.Skip("the Example instance holds no DV_TEXT ELEMENT value")
+				t.Skip("the Large instance holds no DV_TEXT ELEMENT value")
 			}
 			swept++
 			for _, iss := range validateRoot(coded, c).Issues {

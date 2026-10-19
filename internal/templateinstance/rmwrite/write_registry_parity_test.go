@@ -376,6 +376,7 @@ var pinnedUnwritten = map[string][]string{
 	"OBSERVATION":    {"guideline_id", "other_participations", "workflow_id"},
 	"ORGANISATION":   {"languages", "roles"},
 	"PARTY_IDENTITY": {},
+	"PARTY_RELATED":  {"external_ref", "identifiers", "name"},
 	"PERSON":         {"languages", "roles"},
 	"POINT_EVENT":    {},
 	"ROLE":           {},

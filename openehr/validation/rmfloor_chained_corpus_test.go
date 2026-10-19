@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/composition"
+	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -21,14 +22,16 @@ import (
 const bmiObservationPath = "/content[openEHR-EHR-OBSERVATION.body_mass_index.v1]"
 
 // bmiSkeleton returns the composition composition.NewSkeleton generates for
-// testkit/corpus/templates/BMI.opt, with its OBSERVATION, its event and the
-// event's BMI ELEMENT (at0004) for a test to break in place.
+// testkit/corpus/templates/BMI.opt under instance.Large, the skeleton issue
+// 238 measured, with its OBSERVATION, its event and the event's BMI ELEMENT
+// (at0004) for a test to break in place.
 func bmiSkeleton(t *testing.T) (*rm.Composition, *rm.Observation, *rm.PointEvent[rm.ItemStructure], *rm.Element) {
 	t.Helper()
 	comp, err := composition.NewSkeleton(t.Context(), mustCompile(t, "BMI"),
 		composition.WithTerritory("NL"),
 		composition.WithComposer(&rm.PartyIdentified{Name: new("Dr Jones")}),
 		composition.WithNow(time.Date(2026, 10, 11, 9, 0, 0, 0, time.UTC)),
+		composition.WithPolicy(instance.Large),
 	)
 	if err != nil {
 		t.Fatalf("NewSkeleton(BMI): %v", err)

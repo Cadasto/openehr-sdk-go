@@ -57,7 +57,7 @@ func TestREQ107_DateTimeIntervalOrderedAsInstants(t *testing.T) {
 	c := compileSyntheticOPT(t, instance.RetargetInterval(t, count, "DV_DATE_TIME", openDateTimeBound, stamp))
 	east := time.FixedZone("UTC+2", 2*60*60)
 	for seed := range uint64(5) {
-		opts := intervalOptions(instance.Example)
+		opts := intervalOptions(instance.Large)
 		opts.ValueFill = instance.RandomFill
 		opts.Now = time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC)
 		opts.ValueSource = rand.NewPCG(seed, 1)
@@ -81,7 +81,7 @@ func TestREQ107_DateTimeIntervalOrderedAsInstants(t *testing.T) {
 // UTC, whatever zone Now carries.
 func TestREQ107_GeneratedDateTimesInUTC(t *testing.T) {
 	c := compileFixture(t, "vital_signs")
-	opts := intervalOptions(instance.Example)
+	opts := intervalOptions(instance.Large)
 	opts.Now = time.Date(2026, 10, 1, 23, 0, 0, 0, time.FixedZone("UTC+2", 2*60*60))
 	want := opts.Now.UTC().Format(time.RFC3339)
 	out, err := instance.Generate(t.Context(), c, opts)

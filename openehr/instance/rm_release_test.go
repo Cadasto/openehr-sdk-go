@@ -54,7 +54,7 @@ func archetypedRMVersions(t *testing.T, v any) map[string]any {
 func TestREQ107_GeneratedArchetypedCarriesRMRelease(t *testing.T) {
 	c := compileFixture(t, "vital_signs")
 	out, err := instance.Generate(context.Background(), c, instance.Options{
-		Policy:    instance.Example,
+		Policy:    instance.Large,
 		Territory: "NL",
 		Composer:  testComposer(),
 	})
@@ -82,7 +82,7 @@ var slotNoIncludesOPT = regexp.MustCompile(`(?s)\s*<includes>.*?</includes>`).
 func TestREQ107_SlotFillArchetypedCarriesRMRelease(t *testing.T) {
 	c := compileSyntheticOPT(t, slotNoIncludesOPT)
 	out, err := instance.Generate(context.Background(), c, instance.Options{
-		Policy:    instance.Minimal,
+		Policy:    instance.Medium,
 		Territory: "NL",
 		Composer:  testComposer(),
 	})

@@ -192,7 +192,7 @@ func TestExternalInstanceAndAQL(t *testing.T) {
 
 	// instance.Generate synthesises an RM root from the public *Compiled.
 	v, err := instance.Generate(ctx, c, instance.Options{
-		Policy:    instance.Minimal,
+		Policy:    instance.Large,
 		Territory: "NL",
 		Composer:  externalComposer(),
 	})

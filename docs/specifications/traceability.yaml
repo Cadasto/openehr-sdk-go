@@ -1023,6 +1023,7 @@ requirements:
       - testkit/probe/live_test.go
       - testkit/probe/livecomposition_test.go
       - testkit/probe/liveexample_test.go
+      - testkit/probe/livegenerated_test.go
       - testkit/probe/livesnapshot_test.go
       - testkit/probe/livestatus_test.go
       - testkit/probe/livestoredquery_test.go
@@ -1269,9 +1270,10 @@ requirements:
       - openehr/composition/attribute_hold_test.go
       - openehr/composition/builder_defaults_test.go
       - openehr/composition/builder_test.go
-      - openehr/composition/minimal_content_test.go
       - openehr/composition/named_sibling_test.go
+      - openehr/composition/optional_content_test.go
       - openehr/composition/set_binding_test.go
+      - openehr/composition/skeleton_policy_test.go
       - openehr/composition/typecheck_test.go
       - openehr/composition/typecheck_tiers_test.go
       - testkit/probes/composition/probe_023_builder_round_trip.go
@@ -1429,6 +1431,7 @@ requirements:
       - testkit/probes/instance
     probes: [PROBE-027]
     tests:
+      - cmd/examples/generate-example/main_test.go
       - internal/rmaccess/reads_test.go
       - internal/templateinstance/rmwrite/write_datavalue_test.go
       - internal/templateinstance/rmwrite/write_item_single_test.go
@@ -1437,9 +1440,11 @@ requirements:
       - internal/templateinstance/rmwrite/write_test.go
       - internal/templateinstance/rmwrite/write_text_like_test.go
       - openehr/composition/builder_defaults_test.go
-      - openehr/composition/minimal_content_test.go
+      - openehr/composition/optional_content_test.go
+      - openehr/composition/skeleton_policy_test.go
       - openehr/instance/accessors_test.go
       - openehr/instance/allowed_alternative_test.go
+      - openehr/instance/archetype_identity_test.go
       - openehr/instance/archetype_root_guard_internal_test.go
       - openehr/instance/archetype_root_guard_test.go
       - openehr/instance/binding_alternative_internal_test.go
@@ -1468,7 +1473,6 @@ requirements:
       - openehr/instance/interval_zone_test.go
       - openehr/instance/items_rule_test.go
       - openehr/instance/locatable_name_test.go
-      - openehr/instance/minimal_archetype_identity_test.go
       - openehr/instance/multimedia_uri_internal_test.go
       - openehr/instance/node_id_internal_test.go
       - openehr/instance/node_id_test.go
@@ -1476,14 +1480,21 @@ requirements:
       - openehr/instance/nonstorable_visit_test.go
       - openehr/instance/null_flavour_default_test.go
       - openehr/instance/party_attribute_test.go
+      - openehr/instance/party_related_relationship_internal_test.go
+      - openehr/instance/party_related_relationship_test.go
       - openehr/instance/party_relationship_uid_test.go
       - openehr/instance/phase4_test.go
       - openehr/instance/placeholder_exact_test.go
       - openehr/instance/placeholder_test.go
+      - openehr/instance/policy_names_test.go
+      - openehr/instance/policy_refusal_test.go
       - openehr/instance/polymorphic_roundtrip_test.go
       - openehr/instance/post_walk_binding_test.go
       - openehr/instance/prohibited_attribute_test.go
       - openehr/instance/realworld_opt_synthesis_test.go
+      - openehr/instance/required_context_test.go
+      - openehr/instance/required_policy_test.go
+      - openehr/instance/required_rm_rule_fill_test.go
       - openehr/instance/rm_defaults_named_test.go
       - openehr/instance/rm_defaults_test.go
       - openehr/instance/rm_defaults_yield_test.go
@@ -1510,6 +1521,7 @@ requirements:
       - openehr/validation/subtype_conformance_corpus_test.go
       - openehr/validation/subtype_conformance_test.go
       - openehr/validation/walk_primitive_test.go
+      - testkit/probe/livegenerated_test.go
       - testkit/probes/composition/probe_023_builder_round_trip.go
       - testkit/probes/instance/corpus_ratchet_test.go
       - testkit/probes/instance/probe_027_generated_validates.go

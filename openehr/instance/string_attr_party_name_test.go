@@ -15,9 +15,9 @@ import (
 // attribute the generator visits gets a value, also one the
 // template-instance writer has no field for: a DV_TEXT's or a
 // DV_CODED_TEXT's formatting, a CODE_PHRASE's preferred_term and a
-// DV_QUANTITY's magnitude_status. A required one is written under both
-// policies and the template validator then finds it; an optional one the
-// OPT names is written under Example only. A magnitude_status takes "=",
+// DV_QUANTITY's magnitude_status. A required one is written under every
+// policy and the template validator then finds it; an optional one the
+// OPT names is written under Large only. A magnitude_status takes "=",
 // a value its RM invariant (Magnitude_status_valid) accepts. It holds
 // under both value fills and both compile modes.
 func TestREQ107_StringAttributeIsWritten(t *testing.T) {
@@ -72,14 +72,14 @@ func TestREQ107_StringAttributeIsWritten(t *testing.T) {
 							t.Fatalf("Generate: %v", err)
 						}
 						got := tc.read(out.(*rm.Element).Value)
-						wantWritten := required || opts.Policy == instance.Example
+						wantWritten := required || opts.Policy == instance.Large
 						switch {
 						case wantWritten && got == "":
 							t.Errorf("%s is empty, want a value", tc.name)
 						case wantWritten && tc.want != "" && got != tc.want:
 							t.Errorf("%s = %q, want %q", tc.name, got, tc.want)
 						case !wantWritten && got != "":
-							t.Errorf("%s = %q, want none: Minimal does not visit an optional attribute", tc.name, got)
+							t.Errorf("%s = %q, want none: Medium and Required do not visit an optional attribute", tc.name, got)
 						}
 						for _, iss := range templateErrors(out, c) {
 							if strings.HasPrefix(iss.Path, tc.path) {
@@ -114,12 +114,14 @@ func partyName(v any) (string, bool) {
 // PARTY_IDENTIFIED or a PARTY_RELATED the generator writes with no name,
 // identifiers or external_ref takes the name "example", so RM
 // Basic_validity holds: an EVENT_CONTEXT's health_care_facility the OPT
-// names without a child (under Example, which visits it) or as a bare
-// PARTY_IDENTIFIED node, and an ENTRY subject the OPT pins to a bare
+// names without a child (under Large, which visits it) or as a bare
+// PARTY_IDENTIFIED node (under Large and Medium, which visit that
+// optional attribute), and an ENTRY subject the OPT pins to a bare
 // PARTY_IDENTIFIED or PARTY_RELATED node. The RM rule wins over a
 // prohibited name. A name the OPT constrains with a C_STRING keeps the
-// value that constraint admits. It holds under both policies, both value
-// fills and both compile modes.
+// value that constraint admits. The bare PARTY_RELATED subject also
+// passes the RM floor, its relationship included. It holds under every
+// policy that visits the party, both value fills and both compile modes.
 func TestREQ107_PartyIdentifiedGetsAName(t *testing.T) {
 	type place struct {
 		name     string
@@ -127,39 +129,40 @@ func TestREQ107_PartyIdentifiedGetsAName(t *testing.T) {
 		policies []instance.Policy
 		party    func(out any) any
 		want     string
+		floor    bool
 	}
 	facility := func(attr string) string {
 		return optTemplate("COMPOSITION", optSingle("context", optNode("EVENT_CONTEXT", "", attr)))
 	}
 	fromFacility := func(out any) any { return out.(*rm.Composition).Context.HealthCareFacility }
 	fromSubject := func(out any) any { return out.(*rm.Observation).Subject }
-	both := []instance.Policy{instance.Minimal, instance.Example}
+	every := everyPolicy
 	cases := []place{
 		{
 			name: "health_care_facility named without a child", opt: facility(optOptionalSingle("health_care_facility")),
-			policies: []instance.Policy{instance.Example}, party: fromFacility, want: "example",
+			policies: []instance.Policy{instance.Large}, party: fromFacility, want: "example",
 		},
 		{
 			name: "health_care_facility bare PARTY_IDENTIFIED", opt: facility(optOptionalSingleOver("health_care_facility", optNode("PARTY_IDENTIFIED", ""))),
-			policies: both, party: fromFacility, want: "example",
+			policies: largeAndMedium, party: fromFacility, want: "example",
 		},
 		{
 			name: "subject bare PARTY_IDENTIFIED", opt: optTemplate("OBSERVATION", optSingle("subject", optNode("PARTY_IDENTIFIED", ""))),
-			policies: both, party: fromSubject, want: "example",
+			policies: every, party: fromSubject, want: "example",
 		},
 		{
 			name: "subject bare PARTY_RELATED", opt: optTemplate("OBSERVATION", optSingle("subject", optNode("PARTY_RELATED", ""))),
-			policies: both, party: fromSubject, want: "example",
+			policies: every, party: fromSubject, want: "example", floor: true,
 		},
 		{
 			name: "subject PARTY_IDENTIFIED, name prohibited", opt: optTemplate("OBSERVATION", optSingle("subject",
 				optNode("PARTY_IDENTIFIED", "", optProhibitedSingle("name")))),
-			policies: both, party: fromSubject, want: "example",
+			policies: every, party: fromSubject, want: "example",
 		},
 		{
 			name: "subject PARTY_IDENTIFIED, name C_STRING", opt: optTemplate("OBSERVATION", optSingle("subject",
 				optNode("PARTY_IDENTIFIED", "", optStringAttr("name", "<list>Dr Who</list>")))),
-			policies: both, party: fromSubject, want: "Dr Who",
+			policies: every, party: fromSubject, want: "Dr Who",
 		},
 	}
 	for _, tc := range cases {
@@ -181,6 +184,9 @@ func TestREQ107_PartyIdentifiedGetsAName(t *testing.T) {
 					}
 					if got != tc.want {
 						t.Errorf("name = %q, want %q", got, tc.want)
+					}
+					if tc.floor {
+						checkFloor(t, out)
 					}
 				})
 			}

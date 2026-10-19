@@ -9,7 +9,7 @@
 //
 //	name := "Test"
 //	out, err := instance.Generate(ctx, compiled, instance.Options{
-//	    Policy:    instance.Minimal,
+//	    Policy:    instance.Large,
 //	    Territory: "NL",
 //	    Composer:  &rm.PartyIdentified{Name: &name},
 //	})
@@ -20,22 +20,55 @@
 //
 // # Policies
 //
-// Under either policy the generator skips an attribute the template
+// Under every policy the generator skips an attribute the template
 // prohibits (an existence of 0..0), unless an RM rule needs it, such as
 // an attribute the BMM marks mandatory, which it then writes as if the
 // template allowed it; and it never visits one the RM computes rather
 // than stores (offset on an event, is_integral on DV_QUANTITY and
 // DV_PROPORTION), nor a locatable's uid, which the identity rule
-// decides.
+// decides. Under every policy an RM rule can need more than the policy
+// visits, such as an ELEMENT's value or null flavour, which the generator
+// then builds as a visit does, from the attribute's first allowed
+// template child where it has one; and a visited multi-valued attribute
+// is topped up to its lower bound.
 //
-//   - Minimal: the required attributes, and those with an allowed
-//     template child (one whose occurrences upper bound is not 0). An
-//     RM rule can need more, such as an ELEMENT's value or null
-//     flavour. Smallest valid tree.
-//   - Example: every attribute the visit rule allows. Useful for
-//     fixtures and demos.
+// The three policies follow the levels of the ITS-REST template
+// example's detail_level:
 //
-// Under both, every primitive leaf the walk reaches is valued as
+//   - Medium: the required attributes (the BMM marks them mandatory, or
+//     their existence or cardinality lower bound is at least 1), and those
+//     with an allowed template child (one whose occurrences upper bound is
+//     not 0). A visited multi-valued attribute gets its members as under
+//     Large, except that an optional archetype after the first optional
+//     archetype of the attribute gets none, whatever its archetype. So
+//     Medium builds at most one optional archetype under an attribute, the
+//     medium level. It is the zero value, and so the default.
+//   - Required: the required attributes only, not one merely because it
+//     has an allowed template child, except a composition's context,
+//     which it visits as Medium does, so the context every policy writes
+//     is built under the template's constraints. A visited multi-valued
+//     attribute gets each allowed child that is not a slot as many times
+//     as its occurrences lower bound says, so an optional child gets none.
+//     It builds the data points the template makes mandatory and a
+//     composition's context, the required level. An RM rule can still add
+//     a node, such as the null flavour of an element whose value the
+//     template leaves optional, so its tree is not always smaller than
+//     Medium's.
+//   - Large: every attribute the visit rule allows, the optional ones the
+//     template names included. A visited multi-valued attribute gets at
+//     least one member of each allowed child that is not a slot, except
+//     an optional child whose identity a required or earlier sibling
+//     carries. So Large builds a member of every optional archetype the
+//     template names. It stops short of the complete level, every data
+//     point the template allows, which no level of its own builds yet.
+//
+// [Minimal] is another name for Required, and [Complete] for Large until
+// the complete level lands. [ParsePolicy] reads a policy from the names
+// required, minimal, medium, large and complete, in any case. Generate
+// refuses any other Policy value with [ErrUnsupportedPolicy], before it
+// builds anything.
+//
+// Under every policy, every primitive leaf the walk reaches is valued as
 // [Options.ValueFill] says: the constraint's example value under
 // [ExampleFill], an in-constraint draw under [RandomFill]. Where the
 // template gives an RM attribute no value, the generator writes an

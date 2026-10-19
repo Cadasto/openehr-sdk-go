@@ -269,7 +269,7 @@ go run ./cmd/examples/generate-example \
   --opt testkit/corpus/templates/vital_signs.opt \
   --territory NL \
   --composer-name "Test Composer" \
-  --policy example
+  --policy large
 ```
 
 **Flags:**
@@ -277,7 +277,7 @@ go run ./cmd/examples/generate-example \
 | Flag | Default | Values |
 |---|---|---|
 | `--opt` | `vital_signs.opt` fixture | Path to an ADL 1.4 OPT |
-| `--policy` | `example` | `minimal` creates only the nodes the template requires; `example` also fills every primitive leaf with its example value |
+| `--policy` | `medium` | `required` builds only the data points the template makes mandatory and a composition's context; `medium` also builds every attribute the template constrains, with at most one optional archetype under each, the first; `large` builds every attribute and a member of every optional archetype the template names. `minimal` is another name for `required`, and `complete` for `large` for now. Case does not matter. `required` and `medium` are the ITS-REST template example's `detail_level` levels of those names; `large` stops short of its `complete` level. Under each of them every primitive leaf holds its example value |
 | `--territory` | `NL` | ISO 3166-1 code; a COMPOSITION root requires one |
 | `--composer-name` | `Example Composer` | Name recorded as the composition's composer |
 
@@ -286,7 +286,7 @@ go run ./cmd/examples/generate-example \
 The output is one line of JSON. Each run gets fresh uids and a wall-clock context start time, so two runs are never byte-identical; that is why this entry shows no sample block. Pipe the output to a file or into `validate-from-json` to see that generated data passes validation, the template constraints and the RM floor:
 
 ```bash
-go run ./cmd/examples/generate-example --policy minimal > /tmp/generated.json
+go run ./cmd/examples/generate-example --policy medium > /tmp/generated.json
 go run ./cmd/examples/validate-from-json /tmp/generated.json testkit/corpus/templates/vital_signs.opt
 ```
 

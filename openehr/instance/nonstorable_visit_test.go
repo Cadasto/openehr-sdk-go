@@ -49,7 +49,7 @@ var nonStorableOPTs = []struct {
 
 // TestREQ107_NonStorableAttributesAreNotVisited is the REQ-107 check that
 // Generate does not visit offset on POINT_EVENT or INTERVAL_EVENT, or
-// is_integral on DV_QUANTITY or DV_PROPORTION, under either policy and
+// is_integral on DV_QUANTITY or DV_PROPORTION, under every policy and
 // either value fill. A visit of offset fails, because the RM writer has no
 // offset field, and a visit of is_integral on DV_QUANTITY fails, because a
 // boolean is not a quantity; the DV_PROPORTION visit is silent, which the
@@ -58,7 +58,7 @@ var nonStorableOPTs = []struct {
 func TestREQ107_NonStorableAttributesAreNotVisited(t *testing.T) {
 	for _, tc := range nonStorableOPTs {
 		c := compileOPTText(t, tc.opt, true)
-		for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+		for _, policy := range everyPolicy {
 			for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
 				t.Run(tc.name+"/"+policy.String()+"/"+fill.String(), func(t *testing.T) {
 					out, err := instance.Generate(t.Context(), c, instance.Options{

@@ -109,9 +109,9 @@ func validateClean(t *testing.T, root any, c *templatecompile.Compiled) {
 // stringLeafFills are the value fills each STRING leaf test runs under:
 // ExampleFill, and RandomFill on a few fixed seeds.
 func stringLeafFills() []instance.Options {
-	fills := []instance.Options{intervalOptions(instance.Example)}
+	fills := []instance.Options{intervalOptions(instance.Large)}
 	for seed := range uint64(5) {
-		o := intervalOptions(instance.Example)
+		o := intervalOptions(instance.Large)
 		o.ValueFill = instance.RandomFill
 		o.ValueSource = mrand.NewPCG(seed, 3)
 		fills = append(fills, o)

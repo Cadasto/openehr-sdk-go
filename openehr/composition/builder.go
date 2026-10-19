@@ -55,9 +55,20 @@ type pendingAssignment struct {
 }
 
 // NewBuilder constructs a Builder seeded with NewSkeleton output.
-// Composition options (WithComposer, WithTerritory, …) are forwarded
-// to the underlying instance.Generate call. The Builder retains the
-// compiled template for path lookups.
+// Composition options (WithComposer, WithTerritory, WithPolicy, …) are
+// forwarded to the underlying instance.Generate call. The Builder retains
+// the compiled template for path lookups.
+//
+// Set routes a value only into a node the skeleton already holds, and does
+// not build a missing one, so the skeleton must carry a member of every
+// optional archetype the template names, which only instance.Large builds.
+// NewBuilder builds on instance.Large when no WithPolicy is given, and
+// accepts only instance.Large. It refuses instance.Medium and
+// instance.Required, naming the policy, and any Policy value the instance
+// package does not define, before generating anything, with an error
+// wrapping ErrUnsupportedPolicy and no Builder. Only the refusal of an
+// undefined value also wraps instance.ErrUnsupportedPolicy, since the
+// instance package defines Medium and Required.
 func NewBuilder(ctx context.Context, c *templatecompile.Compiled, opts ...Option) (*Builder, error) {
 	if c == nil {
 		// Wrap instance.ErrNilCompiled (the sentinel NewSkeleton /
@@ -65,7 +76,23 @@ func NewBuilder(ctx context.Context, c *templatecompile.Compiled, opts ...Option
 		// can errors.Is against it uniformly across the three entry points.
 		return nil, fmt.Errorf("composition.NewBuilder: %w", instance.ErrNilCompiled)
 	}
-	skel, err := NewSkeleton(ctx, c, opts...)
+	cfg := buildConfig(opts...)
+	if !cfg.policySet {
+		// Whether WithPolicy was given, not the policy's value, decides:
+		// an explicit WithPolicy of the zero value is refused like any
+		// other policy but Large.
+		cfg.policy = instance.Large
+	}
+	switch cfg.policy {
+	case instance.Large:
+		// Its skeleton holds a member of every optional archetype, the
+		// nodes Set routes a value into.
+	case instance.Medium, instance.Required:
+		return nil, fmt.Errorf("composition.NewBuilder: %w: %s", ErrUnsupportedPolicy, cfg.policy)
+	default:
+		return nil, errUndefinedPolicy("composition.NewBuilder", cfg.policy)
+	}
+	skel, err := newSkeleton(ctx, c, cfg)
 	if err != nil {
 		return nil, err
 	}

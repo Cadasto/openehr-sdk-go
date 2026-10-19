@@ -25,7 +25,7 @@ import (
 const minimalObsOPT = "../../../testkit/corpus/templates/minimal_observation.en.v1.opt"
 
 // genComposition compiles an OPT, builds its Web Template, and synthesises an
-// Example composition against it (REQ-107).
+// composition under the Large policy against it (REQ-107).
 func genComposition(t *testing.T, optPath string) (*rm.Composition, *webtemplate.WebTemplate) {
 	t.Helper()
 	opt, err := template.ParseFile(optPath)
@@ -42,7 +42,7 @@ func genComposition(t *testing.T, optPath string) (*rm.Composition, *webtemplate
 	}
 	composer := "Test Composer"
 	out, err := instance.Generate(context.Background(), c, instance.Options{
-		Policy:    instance.Example,
+		Policy:    instance.Large,
 		Territory: "NL",
 		Composer:  &rm.PartyIdentified{Name: &composer},
 		Now:       time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),

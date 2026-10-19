@@ -76,10 +76,10 @@ func TestGenerateCompositionRequiresOptions(t *testing.T) {
 	}
 }
 
-func TestGenerateVitalSignsMinimal(t *testing.T) {
+func TestGenerateVitalSignsMedium(t *testing.T) {
 	c := compileFixture(t, "vital_signs")
 	out, err := instance.Generate(context.Background(), c, instance.Options{
-		Policy:    instance.Minimal,
+		Policy:    instance.Medium,
 		Territory: "NL",
 		Composer:  testComposer(),
 	})
@@ -103,7 +103,7 @@ func TestGenerateVitalSignsMinimal(t *testing.T) {
 		t.Error("Context.StartTime.Value is empty")
 	}
 	if len(comp.Content) == 0 {
-		t.Errorf("Content empty under Minimal policy (vital_signs OPT pins multiple OBSERVATIONs)")
+		t.Errorf("Content empty under Medium policy (vital_signs OPT pins multiple OBSERVATIONs)")
 	}
 	if comp.Composer == nil {
 		t.Error("Composer is nil")
@@ -124,15 +124,15 @@ func TestGenerateVitalSignsMinimal(t *testing.T) {
 	}
 }
 
-func TestGenerateVitalSignsExamplePopulatesPrimitives(t *testing.T) {
+func TestGenerateVitalSignsLargePopulatesPrimitives(t *testing.T) {
 	c := compileFixture(t, "vital_signs")
 	out, err := instance.Generate(context.Background(), c, instance.Options{
-		Policy:    instance.Example,
+		Policy:    instance.Large,
 		Territory: "NL",
 		Composer:  testComposer(),
 	})
 	if err != nil {
-		t.Fatalf("Generate Example: %v", err)
+		t.Fatalf("Generate Large: %v", err)
 	}
 	comp, err := instance.AsComposition(out)
 	if err != nil {
@@ -145,10 +145,10 @@ func TestGenerateVitalSignsExamplePopulatesPrimitives(t *testing.T) {
 	// magnitude or non-empty units".
 	found := findQuantityLeaf(comp)
 	if found == nil {
-		t.Fatal("no DV_QUANTITY leaf found under Example-policy composition")
+		t.Fatal("no DV_QUANTITY leaf found under Large-policy composition")
 	}
 	if found.Units == "" {
-		t.Errorf("DV_QUANTITY leaf units empty under Example policy")
+		t.Errorf("DV_QUANTITY leaf units empty under Large policy")
 	}
 }
 
@@ -176,7 +176,7 @@ func TestGenerateSettingMembershipAgainstThePin(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			c := compileSyntheticOPT(t, fmt.Sprintf(settingCodedOPT, tc.terminology, tc.pinned))
 			out, err := instance.Generate(context.Background(), c, instance.Options{
-				Policy:    instance.Example,
+				Policy:    instance.Large,
 				Territory: "NL",
 				Composer:  testComposer(),
 			})
@@ -204,7 +204,7 @@ func TestGenerateSettingMembershipAgainstThePin(t *testing.T) {
 func TestGenerateRequiredSlotOnlyUnsynthesisableIncludeErrors(t *testing.T) {
 	c := compileSyntheticOPT(t, requiredSlotOnlyUnsynthesisableOPT)
 	_, err := instance.Generate(context.Background(), c, instance.Options{
-		Policy:    instance.Minimal,
+		Policy:    instance.Medium,
 		Territory: "NL",
 		Composer:  testComposer(),
 	})
@@ -292,20 +292,20 @@ func elementQuantity(e *rm.Element) *rm.DVQuantity {
 	return nil
 }
 
-// TestGenerateClinicalNoteExample pins the PR #18 re-review finding:
+// TestGenerateClinicalNoteLarge pins the PR #18 re-review finding:
 // clinical_note.opt uses the AOM 1.4 primitive-short-name shape
 // (DV_DURATION → value → C_PRIMITIVE_OBJECT → DURATION → C_DURATION).
 // Before the materialiseSingle / IsAOMPrimitiveShortName fix, the
 // generator tried to attach a fresh *DVDuration to the parent DV's
 // .value (a String slot) and failed; this regression keeps the
-// generator end-to-end on the vendored OPT fixture under Example
+// generator end-to-end on the vendored OPT fixture under the Large
 // policy, which visits every attribute the INSTRUCTION subtree carrying
 // the DV_DURATION needs.
-func TestGenerateClinicalNoteExample(t *testing.T) {
+func TestGenerateClinicalNoteLarge(t *testing.T) {
 	c := compileFixture(t, "clinical_note")
 	name := "Test Composer"
 	out, err := instance.Generate(context.Background(), c, instance.Options{
-		Policy:    instance.Example,
+		Policy:    instance.Large,
 		Territory: "NL",
 		Composer:  &rm.PartyIdentified{Name: &name},
 	})
@@ -329,7 +329,7 @@ func TestGenerateClinicalNoteValidates(t *testing.T) {
 	c := compileFixture(t, "clinical_note")
 	name := "Test Composer"
 	out, err := instance.Generate(context.Background(), c, instance.Options{
-		Policy:    instance.Example,
+		Policy:    instance.Large,
 		Territory: "NL",
 		Composer:  &rm.PartyIdentified{Name: &name},
 	})
@@ -417,7 +417,7 @@ func TestGenerateUIDCarriesType(t *testing.T) {
 	c := compileFixture(t, "vital_signs")
 	name := "Test Composer"
 	out, err := instance.Generate(context.Background(), c, instance.Options{
-		Policy:    instance.Minimal,
+		Policy:    instance.Medium,
 		Territory: "NL",
 		Composer:  &rm.PartyIdentified{Name: &name},
 	})
@@ -473,11 +473,19 @@ func uidSlice(b []byte) string {
 }
 
 func TestPolicyString(t *testing.T) {
-	if instance.Minimal.String() != "minimal" {
-		t.Error("Minimal.String() != minimal")
+	cases := []struct {
+		policy instance.Policy
+		want   string
+	}{
+		{policy: instance.Medium, want: "medium"},
+		{policy: instance.Required, want: "required"},
+		{policy: instance.Large, want: "large"},
+		{policy: instance.Policy(0), want: "medium"},
 	}
-	if instance.Example.String() != "example" {
-		t.Error("Example.String() != example")
+	for _, tc := range cases {
+		if got := tc.policy.String(); got != tc.want {
+			t.Errorf("Policy(%d).String() = %q, want %q", int(tc.policy), got, tc.want)
+		}
 	}
 	if !strings.Contains(instance.Policy(99).String(), "unknown") {
 		t.Error("Policy(99).String() should contain 'unknown'")

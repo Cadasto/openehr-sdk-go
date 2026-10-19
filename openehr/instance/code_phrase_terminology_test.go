@@ -12,7 +12,8 @@ import (
 
 // optOptionalSingleOver is a C_SINGLE_ATTRIBUTE called name with existence
 // 0..1 over children: optional, but the OPT pins children under it, so
-// both policies visit it. The template validator reads no value for some
+// Large and Medium visit it; Required does not visit an optional
+// attribute. The template validator reads no value for some
 // such attributes (DV_PARSABLE charset and language, DV_MULTIMEDIA
 // compression_algorithm), and would report a required one absent.
 func optOptionalSingleOver(name string, children ...string) string {
@@ -26,8 +27,10 @@ func optOptionalSingleOver(name string, children ...string) string {
 // phrase the OPT names with no constraint gets the code at0000 in
 // terminology local, wherever it sits: the empty TERMINOLOGY_ID the
 // generator builds from the BMM for the code phrase's own terminology_id
-// must not replace that local. It holds under both policies, both value
-// fills and both compile modes. Neither the template validator nor the RM
+// must not replace that local. It holds under every policy, both value
+// fills and both compile modes, where the policy visits the code phrase:
+// the optional ones under Large and Medium only, since Required does
+// not visit an optional attribute. Neither the template validator nor the RM
 // floor reports anything on the code phrase, except where an RM rule ties
 // the attribute to a code set: there local::at0000 is no member, and the
 // floor, alone or inside template validation, reports exactly one
@@ -45,41 +48,49 @@ func TestREQ107_BareCodePhraseKeepsLocal(t *testing.T) {
 		// codeSet is set when an RM rule ties the attribute to a code set
 		// (REQ-112 Coded invariants), which the placeholder breaks.
 		codeSet bool
+		// policies are the policies the case runs under; every policy when
+		// empty.
+		policies []instance.Policy
 	}{
 		{
-			name:    "DV_COUNT normal_status",
-			value:   optNode("DV_COUNT", "", optOptionalSingleOver("normal_status", bare)),
-			path:    "/value/normal_status",
-			code:    func(v rm.DataValue) *rm.CodePhrase { return v.(*rm.DVCount).NormalStatus },
-			codeSet: true,
+			name:     "DV_COUNT normal_status",
+			value:    optNode("DV_COUNT", "", optOptionalSingleOver("normal_status", bare)),
+			path:     "/value/normal_status",
+			code:     func(v rm.DataValue) *rm.CodePhrase { return v.(*rm.DVCount).NormalStatus },
+			codeSet:  true,
+			policies: largeAndMedium,
 		},
 		{
-			name:    "DV_QUANTITY normal_status",
-			value:   optNode("DV_QUANTITY", "", optOptionalSingleOver("normal_status", bare)),
-			path:    "/value/normal_status",
-			code:    func(v rm.DataValue) *rm.CodePhrase { return v.(*rm.DVQuantity).NormalStatus },
-			codeSet: true,
+			name:     "DV_QUANTITY normal_status",
+			value:    optNode("DV_QUANTITY", "", optOptionalSingleOver("normal_status", bare)),
+			path:     "/value/normal_status",
+			code:     func(v rm.DataValue) *rm.CodePhrase { return v.(*rm.DVQuantity).NormalStatus },
+			codeSet:  true,
+			policies: largeAndMedium,
 		},
 		{
-			name:    "DV_PARSABLE charset",
-			value:   optNode("DV_PARSABLE", "", optOptionalSingleOver("charset", bare)),
-			path:    "/value/charset",
-			code:    func(v rm.DataValue) *rm.CodePhrase { return v.(*rm.DVParsable).Charset },
-			codeSet: true,
+			name:     "DV_PARSABLE charset",
+			value:    optNode("DV_PARSABLE", "", optOptionalSingleOver("charset", bare)),
+			path:     "/value/charset",
+			code:     func(v rm.DataValue) *rm.CodePhrase { return v.(*rm.DVParsable).Charset },
+			codeSet:  true,
+			policies: largeAndMedium,
 		},
 		{
-			name:    "DV_PARSABLE language",
-			value:   optNode("DV_PARSABLE", "", optOptionalSingleOver("language", bare)),
-			path:    "/value/language",
-			code:    func(v rm.DataValue) *rm.CodePhrase { return v.(*rm.DVParsable).Language },
-			codeSet: true,
+			name:     "DV_PARSABLE language",
+			value:    optNode("DV_PARSABLE", "", optOptionalSingleOver("language", bare)),
+			path:     "/value/language",
+			code:     func(v rm.DataValue) *rm.CodePhrase { return v.(*rm.DVParsable).Language },
+			codeSet:  true,
+			policies: largeAndMedium,
 		},
 		{
-			name:    "DV_MULTIMEDIA compression_algorithm",
-			value:   optNode("DV_MULTIMEDIA", "", optOptionalSingleOver("compression_algorithm", bare)),
-			path:    "/value/compression_algorithm",
-			code:    func(v rm.DataValue) *rm.CodePhrase { return v.(*rm.DVMultimedia).CompressionAlgorithm },
-			codeSet: true,
+			name:     "DV_MULTIMEDIA compression_algorithm",
+			value:    optNode("DV_MULTIMEDIA", "", optOptionalSingleOver("compression_algorithm", bare)),
+			path:     "/value/compression_algorithm",
+			code:     func(v rm.DataValue) *rm.CodePhrase { return v.(*rm.DVMultimedia).CompressionAlgorithm },
+			codeSet:  true,
+			policies: largeAndMedium,
 		},
 		{
 			name:  "DV_CODED_TEXT defining_code",
@@ -91,7 +102,7 @@ func TestREQ107_BareCodePhraseKeepsLocal(t *testing.T) {
 	for _, tc := range cases {
 		for _, implicit := range []bool{true, false} {
 			c := compileOPTText(t, optTemplate("ELEMENT", optSingle("value", tc.value)), implicit)
-			for _, opts := range defaultsOptions() {
+			for _, opts := range optionsFor(tc.policies) {
 				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
 					out, err := instance.Generate(t.Context(), c, opts)
 					if err != nil {
@@ -146,15 +157,18 @@ func TestREQ107_BareCodePhraseKeepsLocal(t *testing.T) {
 // that a code phrase whose terminology_id the OPT names as a TERMINOLOGY_ID
 // with no constraint on its value keeps the terminology local: the walk
 // cannot write that value, and the empty TERMINOLOGY_ID it builds must not
-// replace local. It holds for a code phrase at the root and under DV_COUNT
-// normal_status, under both policies, both value fills and both compile
-// modes.
+// replace local. It holds for a code phrase at the root, under every
+// policy, and under an optional DV_COUNT normal_status, under Large and
+// Medium, which visit it; both value fills and both compile modes.
 func TestREQ107_UnconstrainedTerminologyIDKeepsLocal(t *testing.T) {
 	termID := optSingle("terminology_id", optNode("TERMINOLOGY_ID", ""))
 	cases := []struct {
 		name string
 		opt  string
 		code func(out any) rm.CodePhrase
+		// policies are the policies the case runs under; every policy when
+		// empty.
+		policies []instance.Policy
 	}{
 		{
 			name: "root CODE_PHRASE",
@@ -172,12 +186,13 @@ func TestREQ107_UnconstrainedTerminologyIDKeepsLocal(t *testing.T) {
 				}
 				return *ns
 			},
+			policies: largeAndMedium,
 		},
 	}
 	for _, tc := range cases {
 		for _, implicit := range []bool{true, false} {
 			c := compileOPTText(t, tc.opt, implicit)
-			for _, opts := range defaultsOptions() {
+			for _, opts := range optionsFor(tc.policies) {
 				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
 					out, err := instance.Generate(t.Context(), c, opts)
 					if err != nil {

@@ -38,7 +38,7 @@ func TestCorpusRoundTripValidates(t *testing.T) {
 			c := compileRealWorldFixture(t, name)
 			composer := "Test Composer"
 			out, err := instance.Generate(context.Background(), c, instance.Options{
-				Policy:    instance.Example,
+				Policy:    instance.Large,
 				Territory: "NL",
 				Composer:  &rm.PartyIdentified{Name: &composer},
 				Now:       now,

@@ -28,7 +28,7 @@ func TestREQ107_IntervalOrderReadsBindingAlternative(t *testing.T) {
 			optCount(false, "<list>50</list>")),
 		optSingle("upper", optCount(false, "<list>10</list>")))
 	c := compileOPTText(t, optTemplate("ELEMENT", optSingle("value", interval)), true)
-	for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+	for _, policy := range everyPolicy {
 		for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
 			t.Run(policy.String()+"/"+fill.String(), func(t *testing.T) {
 				out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, ValueFill: fill})

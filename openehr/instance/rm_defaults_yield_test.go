@@ -126,7 +126,7 @@ func isProhibitedAt(iss validation.Issue, path string) bool {
 // on a row marked RM wins, the one prohibited at the attribute the OPT
 // prohibits and the RM needs (REQ-102). Where the OPT's constraint admits the
 // default, the default is written; the rows marked admit check that for
-// the cases other tests do not cover. Each row runs under both policies,
+// the cases other tests do not cover. Each row runs under every policy,
 // both value fills and both compile modes.
 func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 	setting := func(out any) rm.DVCodedText {
@@ -538,11 +538,19 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 			},
 		},
 		{
-			name: "DV_MULTIMEDIA uri, prohibited",
-			opt:  yieldMultimedia(optProhibitedSingle("uri")),
+			// RM wins: a value with no data needs its uri (Not_empty), so
+			// the default is written over the OPT's prohibition, which the
+			// template validator reports (REQ-107 Precedence 2).
+			name:       "DV_MULTIMEDIA uri, prohibited, no data",
+			opt:        yieldMultimedia(optProhibitedSingle("uri")),
+			prohibited: "/value/uri",
 			check: func(t *testing.T, out any) {
-				if uri := rootElementValue[*rm.DVMultimedia](t, out).URI; uri != nil {
-					t.Errorf("DV_MULTIMEDIA.uri = %#v, want none", uri)
+				uri := rootElementValue[*rm.DVMultimedia](t, out).URI
+				if uri == nil || rm.IsTypedNil(uri) {
+					t.Fatal("DV_MULTIMEDIA.uri absent, want the RM default http://example.com (Not_empty)")
+				}
+				if uri.GetValue() != "http://example.com" {
+					t.Errorf("DV_MULTIMEDIA.uri = %q, want the RM default http://example.com", uri.GetValue())
 				}
 			},
 		},

@@ -12,7 +12,7 @@
 //	    --opt testkit/corpus/templates/vital_signs.opt \
 //	    --territory NL \
 //	    --composer-name "Test Composer" \
-//	    --policy example
+//	    --policy large
 //
 // The output is one line of JSON; pipe it to a file or into validate-from-json.
 // Each run gets fresh uids and a wall-clock context start time.
@@ -41,7 +41,7 @@ func main() {
 
 func run() error {
 	optFlag := flag.String("opt", "", "path to an ADL 1.4 operational template (default: the vendored vital_signs.opt)")
-	policyFlag := flag.String("policy", "example", "how much to fill in: 'minimal' or 'example'")
+	policyFlag := flag.String("policy", defaultPolicy, "how much to build; case does not matter: 'required' or its alias 'minimal' (the mandatory data and a composition's context), 'medium' (also every attribute the template constrains, at most one optional archetype under each), 'large' or its alias 'complete' (a member of every optional archetype)")
 	territoryFlag := flag.String("territory", "NL", "ISO 3166-1 territory code; a COMPOSITION root requires one")
 	composerFlag := flag.String("composer-name", "Example Composer", "name recorded as the composition's composer")
 	flag.Parse()
@@ -100,18 +100,25 @@ func run() error {
 	return nil
 }
 
-// parsePolicy maps the flag text onto the two generation policies. Minimal
-// creates only the nodes the template requires, the smallest valid tree;
-// Example also populates every primitive leaf with its example value. An
-// unknown value is an error, so a typo on the command line does not silently
-// pick a default.
+// defaultPolicy is the --policy default, the instance package's default
+// level.
+const defaultPolicy = "medium"
+
+// parsePolicy reads the --policy text with instance.ParsePolicy, which
+// takes the names required, minimal, medium, large and complete in any
+// case. Required, and minimal with it, builds only the data points the
+// template makes mandatory and a composition's context, the ITS-REST
+// template example's detail_level=required. Medium also builds every
+// attribute the template constrains, with at most one optional archetype
+// under each, its detail_level=medium. Large, and complete with it for
+// now, builds a member of every optional archetype the template names,
+// short of its detail_level=complete. Under each of them every primitive
+// leaf holds its example value. Any other text is an error that names the
+// flag, so a typo on the command line does not silently pick a default.
 func parsePolicy(name string) (instance.Policy, error) {
-	switch name {
-	case "minimal":
-		return instance.Minimal, nil
-	case "example":
-		return instance.Example, nil
-	default:
-		return 0, fmt.Errorf("unknown --policy %q (want 'minimal' or 'example')", name)
+	p, err := instance.ParsePolicy(name)
+	if err != nil {
+		return 0, fmt.Errorf("--policy (want required, minimal, medium, large or complete): %w", err)
 	}
+	return p, nil
 }

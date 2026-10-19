@@ -67,6 +67,41 @@ var corpusCompileFailures = []string{
 	"definition/body_weight",
 }
 
+// requiredBodies names the compiling vendored templates whose body holds
+// at least one ELEMENT under Required, under every value fill and seed:
+// the hollow-body floor under that policy. Required builds only what the
+// template makes mandatory and gives an optional child no member of its
+// own (REQ-107 Visit rule, What a visit writes), so a template that
+// requires no ELEMENT gets a body with none by design: the other 55
+// compiling COMPOSITION templates, whose ELEMENTs all sit below an
+// optional attribute or child (an optional content, or a required entry
+// whose items are optional), and Address.v2, which is ADDRESS-rooted, has
+// no content attribute, and leaves its details optional. A listed
+// template that becomes hollow under Required fails the ratchet, and so
+// does an unlisted one that stops being hollow, as a listed row that now
+// passes does.
+var requiredBodies = []string{
+	"templates/TestPerson.v2",
+	"templates/body_weight",
+	"templates/clinical_notes.v0",
+	"templates/test_template_rename_node_2",
+	"webtemplate/GECCO_Diagnose",
+}
+
+// mediumHollowBodies names the compiling vendored templates of which a root
+// Generate returns under Medium, under some value fill or seed, holds no
+// ELEMENT: the hollow-body floor under that policy. Medium gives a
+// multi-valued attribute at most one optional archetype, its first optional
+// archetype root in OPT order (REQ-107 What a visit writes), so a template
+// whose first optional archetype holds no ELEMENT gets a body with none by
+// design: clinical_content_validation, whose content builds only its first
+// optional root, a SECTION.validation_section_test.v0 with no items. A
+// listed template that stops being hollow under Medium fails the ratchet,
+// and so does an unlisted one that becomes hollow, as an unlisted row does.
+var mediumHollowBodies = []string{
+	"templates/clinical_content_validation",
+}
+
 // corpusRatchet is the failure set measured on this tree. Policy and fill
 // are the diagnostic strings from instance.Policy and instance.ValueFill.
 // RandomFill runs once per seed in ratchetSeeds, a fresh math/rand/v2 PCG
@@ -74,17 +109,40 @@ var corpusCompileFailures = []string{
 // Each reason is category plus a stable locator (type, attribute, code
 // and path, or JSON path).
 //
-// Minimal rows: under Minimal an optional child yields to a required
-// sibling with its identity and to an earlier optional one, and an
-// archetype root's identity is its archetype id (REQ-107 What a visit
-// writes). So Minimal builds one member of each optional archetype under
-// an attribute, as Example does, and reaches the same TestPerson.v2
-// identifier clusters and the same clinical_content_validation EVALUATION;
-// their rows hold under both policies. The Corona_Anamnese slot_fill rows
-// stay Example-only: Minimal skips the repeated named SECTION.adhoc.v1
-// roots after the first, so it never reaches 'Allgemeine Angaben'. No
-// template's body is hollow: a hollow_body failure on any template fails
-// the ratchet.
+// Large rows: under Large an optional child yields to a required sibling
+// with its identity and to an earlier optional one, and an archetype root's
+// identity is its archetype id (REQ-107 What a visit writes). So Large
+// builds one member of each optional archetype under an attribute, and
+// reaches the TestPerson.v2 identifier clusters, the
+// clinical_content_validation EVALUATION and the family_history EVALUATION.
+// It skips the repeated named SECTION.adhoc.v1 roots of Corona_Anamnese
+// after the first, so it never reaches 'Allgemeine Angaben' and its
+// unfillable slot. Under Large no template's body is hollow: a hollow_body
+// failure there fails the ratchet. The builder builds on Large when no
+// WithPolicy is given, so its rows are Large rows.
+//
+// Medium rows: Medium gives an attribute at most one optional archetype,
+// its first optional archetype root. family_history's content builds its
+// first, the family_history EVALUATION, so Medium reaches the same
+// unfillable slot as Large. The TestPerson.v2 identifier clusters and the
+// clinical_content_validation EVALUATION come after the first optional
+// root of their attribute, so Medium builds neither and has no row there.
+// Under Medium the hollow-body floor is the mediumHollowBodies list instead
+// of a row.
+//
+// Required rows: none. Required visits only the attributes the template
+// makes mandatory and gives an optional child no member of its own
+// (REQ-107 Visit rule, What a visit writes), so it reaches none of the
+// optional archetypes the rows here fail in. Under Required the
+// hollow-body floor is the requiredBodies list instead of a row.
+//
+// slot_fill rows: family_history.v.1.2.3 puts a slot no example can fill
+// below its content EVALUATION, so Generate returns ErrSlotFillUnsupported
+// (REQ-107 Slot fills).
+//
+// rotated rows: clinical_content_validation constrains ITEM_TABLE.rotated,
+// an attribute the pinned RM does not have (REQ-107 § Exceptions and known
+// gaps), so the template validator finds it absent.
 //
 // floor_coded rows: TestPerson.v2 codes both its DV_MULTIMEDIA media_type
 // nodes in terminology openEHR, one with the code list 425 to 429 and one
@@ -96,26 +154,18 @@ var corpusCompileFailures = []string{
 // the text/plain default, so Media_type_valid (REQ-112 Coded invariants)
 // breaks.
 var corpusRatchet = []ratchetFailure{
-	{template: "templates/TestPerson.v2", entry: "generate", policy: "example", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"},
-	{template: "templates/TestPerson.v2", entry: "generate", policy: "example", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
-	{template: "templates/TestPerson.v2", entry: "generate", policy: "example", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"},
-	{template: "templates/TestPerson.v2", entry: "generate", policy: "example", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
-	{template: "templates/TestPerson.v2", entry: "generate", policy: "minimal", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"},
-	{template: "templates/TestPerson.v2", entry: "generate", policy: "minimal", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
-	{template: "templates/TestPerson.v2", entry: "generate", policy: "minimal", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"},
-	{template: "templates/TestPerson.v2", entry: "generate", policy: "minimal", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
-	{template: "templates/clinical_content_validation", entry: "builder", policy: "minimal", fill: "example", reason: "validator_other:required:/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rotated"},
-	{template: "templates/clinical_content_validation", entry: "generate", policy: "minimal", fill: "example", reason: "validator_other:required:/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rotated"},
-	{template: "templates/clinical_content_validation", entry: "generate", policy: "minimal", fill: "random", reason: "validator_other:required:/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rotated"},
-	{template: "templates/clinical_content_validation", entry: "generate", policy: "example", fill: "example", reason: "validator_other:required:/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rotated"},
-	{template: "templates/clinical_content_validation", entry: "generate", policy: "example", fill: "random", reason: "validator_other:required:/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rotated"},
-	{template: "templates/family_history.v.1.2.3", entry: "builder", policy: "minimal", fill: "example", reason: "refusal_other:slot_fill:/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0024]/items[at0027]"},
-	{template: "templates/family_history.v.1.2.3", entry: "generate", policy: "example", fill: "example", reason: "refusal_other:slot_fill:/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0024]/items[at0027]"},
-	{template: "templates/family_history.v.1.2.3", entry: "generate", policy: "example", fill: "random", reason: "refusal_other:slot_fill:/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0024]/items[at0027]"},
-	{template: "templates/family_history.v.1.2.3", entry: "generate", policy: "minimal", fill: "example", reason: "refusal_other:slot_fill:/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0024]/items[at0027]"},
-	{template: "templates/family_history.v.1.2.3", entry: "generate", policy: "minimal", fill: "random", reason: "refusal_other:slot_fill:/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0024]/items[at0027]"},
-	{template: "webtemplate/Corona_Anamnese", entry: "generate", policy: "example", fill: "example", reason: "refusal_other:slot_fill:/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-INSTRUCTION.service_request.v1]/protocol/items[at0141]"},
-	{template: "webtemplate/Corona_Anamnese", entry: "generate", policy: "example", fill: "random", reason: "refusal_other:slot_fill:/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-INSTRUCTION.service_request.v1]/protocol/items[at0141]"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"},
+	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
+	{template: "templates/clinical_content_validation", entry: "builder", policy: "large", fill: "example", reason: "validator_other:required:/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rotated"},
+	{template: "templates/clinical_content_validation", entry: "generate", policy: "large", fill: "example", reason: "validator_other:required:/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rotated"},
+	{template: "templates/clinical_content_validation", entry: "generate", policy: "large", fill: "random", reason: "validator_other:required:/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rotated"},
+	{template: "templates/family_history.v.1.2.3", entry: "builder", policy: "large", fill: "example", reason: "refusal_other:slot_fill:/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0024]/items[at0027]"},
+	{template: "templates/family_history.v.1.2.3", entry: "generate", policy: "large", fill: "example", reason: "refusal_other:slot_fill:/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0024]/items[at0027]"},
+	{template: "templates/family_history.v.1.2.3", entry: "generate", policy: "large", fill: "random", reason: "refusal_other:slot_fill:/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0024]/items[at0027]"},
+	{template: "templates/family_history.v.1.2.3", entry: "generate", policy: "medium", fill: "example", reason: "refusal_other:slot_fill:/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0024]/items[at0027]"},
+	{template: "templates/family_history.v.1.2.3", entry: "generate", policy: "medium", fill: "random", reason: "refusal_other:slot_fill:/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0024]/items[at0027]"},
 }
 
 func TestREQ107_CorpusRatchet(t *testing.T) {
@@ -132,6 +182,13 @@ func TestREQ107_CorpusRatchet(t *testing.T) {
 
 	var compileFails []string
 	observed := make(map[ratchetFailure]struct{})
+	// requiredRuns records, per template, whether every root Generate
+	// returned under Required holds an ELEMENT: true while each does, false
+	// once one is hollow. A template with no such root is absent.
+	requiredRuns := make(map[string]bool)
+	// mediumHollow records the templates of which a root Generate returned
+	// under Medium holds no ELEMENT.
+	mediumHollow := make(map[string]struct{})
 	for _, ref := range refs {
 		opt, err := template.ParseFile(ref.Path)
 		if err != nil {
@@ -149,7 +206,7 @@ func TestREQ107_CorpusRatchet(t *testing.T) {
 		}
 		compositionRoot := rootType == "COMPOSITION"
 
-		for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+		for _, policy := range []instance.Policy{instance.Large, instance.Medium, instance.Required} {
 			for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
 				seeds := ratchetSeeds
 				if fill == instance.ExampleFill {
@@ -174,6 +231,21 @@ func TestREQ107_CorpusRatchet(t *testing.T) {
 						continue
 					}
 					reasons := outputReasons(t, out, compiled, compositionRoot, fill)
+					_, hollow := reasons[reasonHollowBody+":/"]
+					switch policy {
+					case instance.Large:
+						// A hollow body under Large stays a row, so it
+						// fails the ratchet.
+					case instance.Required:
+						delete(reasons, reasonHollowBody+":/")
+						body, seen := requiredRuns[ref.Name]
+						requiredRuns[ref.Name] = !hollow && (body || !seen)
+					case instance.Medium:
+						delete(reasons, reasonHollowBody+":/")
+						if hollow {
+							mediumHollow[ref.Name] = struct{}{}
+						}
+					}
 					recordReasons(observed, ref.Name, entryGenerate, policy, fill, reasons)
 				}
 			}
@@ -191,22 +263,31 @@ func TestREQ107_CorpusRatchet(t *testing.T) {
 		)
 		if err != nil {
 			reason := generateReason(t, err)
-			recordReason(observed, ref.Name, entryBuilder, instance.Minimal, instance.ExampleFill, reason)
+			recordReason(observed, ref.Name, entryBuilder, instance.Large, instance.ExampleFill, reason)
 			continue
 		}
 		comp, err := b.Build()
 		if err != nil {
 			reason := generateReason(t, err)
-			recordReason(observed, ref.Name, entryBuilder, instance.Minimal, instance.ExampleFill, reason)
+			recordReason(observed, ref.Name, entryBuilder, instance.Large, instance.ExampleFill, reason)
 			continue
 		}
 		reasons := outputReasons(t, comp, compiled, true, instance.ExampleFill)
-		recordReasons(observed, ref.Name, entryBuilder, instance.Minimal, instance.ExampleFill, reasons)
+		recordReasons(observed, ref.Name, entryBuilder, instance.Large, instance.ExampleFill, reasons)
 	}
 
 	compileUnlisted, compileStale := diffStrings(setOf(compileFails), setOf(corpusCompileFailures))
 	unlisted, stale := diffRatchet(observed, ratchetSet(t, corpusRatchet))
-	if len(compileUnlisted) == 0 && len(compileStale) == 0 && len(unlisted) == 0 && len(stale) == 0 {
+	bodies := make(map[string]struct{})
+	for name, body := range requiredRuns {
+		if body {
+			bodies[name] = struct{}{}
+		}
+	}
+	bodyUnlisted, nowHollow := diffStrings(bodies, setOf(requiredBodies))
+	hollowUnlisted, nowHolds := diffStrings(mediumHollow, setOf(mediumHollowBodies))
+	if len(compileUnlisted) == 0 && len(compileStale) == 0 && len(unlisted) == 0 && len(stale) == 0 &&
+		len(bodyUnlisted) == 0 && len(nowHollow) == 0 && len(hollowUnlisted) == 0 && len(nowHolds) == 0 {
 		return
 	}
 
@@ -217,6 +298,22 @@ func TestREQ107_CorpusRatchet(t *testing.T) {
 		buf.WriteString(strings.Join(compileUnlisted, ", "))
 		buf.WriteString("\n  now compiles: ")
 		buf.WriteString(strings.Join(compileStale, ", "))
+		buf.WriteByte('\n')
+	}
+	if len(bodyUnlisted) > 0 || len(nowHollow) > 0 {
+		buf.WriteString("Required hollow-body list (requiredBodies) mismatch\n")
+		buf.WriteString("  listed, now hollow under Required: ")
+		buf.WriteString(strings.Join(nowHollow, ", "))
+		buf.WriteString("\n  unlisted, now holds an ELEMENT under Required: ")
+		buf.WriteString(strings.Join(bodyUnlisted, ", "))
+		buf.WriteByte('\n')
+	}
+	if len(hollowUnlisted) > 0 || len(nowHolds) > 0 {
+		buf.WriteString("Medium hollow-body list (mediumHollowBodies) mismatch\n")
+		buf.WriteString("  unlisted, now hollow under Medium: ")
+		buf.WriteString(strings.Join(hollowUnlisted, ", "))
+		buf.WriteString("\n  listed, now holds an ELEMENT under Medium: ")
+		buf.WriteString(strings.Join(nowHolds, ", "))
 		buf.WriteByte('\n')
 	}
 	writeRows(&buf, "unlisted failures", unlisted)
@@ -245,6 +342,11 @@ func recordReasons(dst map[ratchetFailure]struct{}, template, entry string, poli
 	}
 }
 
+// outputReasons returns the census reasons for one generated root: the
+// errors ValidateRM and the template validator report, and the body scan's
+// placeholder and hollow-body findings. Under Required and Medium the caller
+// takes the hollow-body finding out and checks it against requiredBodies or
+// mediumHollowBodies instead.
 func outputReasons(t *testing.T, root any, compiled *templatecompile.Compiled, compositionRoot bool, fill instance.ValueFill) map[string]struct{} {
 	t.Helper()
 	reasons := make(map[string]struct{})

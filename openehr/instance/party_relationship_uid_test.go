@@ -24,7 +24,7 @@ const (
 // is missing or is 00000000-0000-0000-0000-000000000001 or ...0002.
 func TestREQ107_PartyRelationshipIDsFromUIDSource(t *testing.T) {
 	c := compileOPTText(t, optTemplate("PARTY_RELATIONSHIP"), true)
-	for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+	for _, policy := range everyPolicy {
 		t.Run(policy.String(), func(t *testing.T) {
 			var issued []string
 			n := 0
@@ -93,7 +93,7 @@ func TestREQ107_PartyRelationshipNilUIDSourceStillMintsIDs(t *testing.T) {
 func generatedRelationship(t *testing.T, c *templatecompile.Compiled) *rm.PartyRelationship {
 	t.Helper()
 	out, err := instance.Generate(t.Context(), c, instance.Options{
-		Policy: instance.Minimal,
+		Policy: instance.Medium,
 		Now:    defaultsNow,
 	})
 	if err != nil {

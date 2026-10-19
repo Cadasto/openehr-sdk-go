@@ -29,7 +29,10 @@ var intervalTemplates = []string{
 	"Test_dv_interval_dv_quantity_open_constraint.v0",
 }
 
-var intervalPolicies = []instance.Policy{instance.Minimal, instance.Example}
+// intervalPolicies are the policies the interval checks run under. The
+// vendored interval OPTs put their DV_INTERVAL ELEMENT under optional
+// content, which Required does not visit, so it builds no interval there.
+var intervalPolicies = largeAndMedium
 
 // intervalOptions returns the generator options the interval tests share.
 func intervalOptions(policy instance.Policy) instance.Options {

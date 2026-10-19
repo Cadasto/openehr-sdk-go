@@ -40,7 +40,8 @@
 //   - DV_INTERVAL over each concrete ordered data value and over
 //     DV_ORDERED itself;
 //   - the parties PERSON, AGENT, GROUP, ORGANISATION and ROLE, and
-//     CAPABILITY, ADDRESS and PARTY_IDENTITY.
+//     CAPABILITY, ADDRESS and PARTY_IDENTITY;
+//   - PARTY_RELATED, of which it writes only relationship.
 //
 // AppendMultiple adds a member to multi-valued attributes on
 // COMPOSITION, SECTION, INSTRUCTION, HISTORY, ITEM_TREE, ITEM_LIST,

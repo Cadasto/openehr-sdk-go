@@ -14,7 +14,7 @@ import (
 // optional attribute with no child, as a DV_CODED_TEXT with no constraint,
 // or as a C_CODE_PHRASE under openehr with an empty code list, takes the
 // RM default openehr 271|no information|, not the walk's at0000
-// placeholder. It holds under both policies, both value fills and both
+// placeholder. It holds under every policy, both value fills and both
 // compile modes, and the output passes the RM floor and the template
 // validator.
 func TestREQ107_NamedNullFlavourWithoutCodeGetsNoInformation(t *testing.T) {
@@ -54,7 +54,7 @@ func TestREQ107_NamedNullFlavourWithoutCodeGetsNoInformation(t *testing.T) {
 // ELEMENT whose OPT prohibits null_flavour, and whose walk wrote no value,
 // takes a value built as for an ELEMENT.value the OPT leaves silent: the
 // RM rule that an ELEMENT carry exactly one of value and null_flavour wins
-// over Minimal. A null_reason the walk wrote then goes, because an ELEMENT
+// over the policy. A null_reason the walk wrote then goes, because an ELEMENT
 // with a value carries none. Where the OPT prohibits value as well, the RM
 // rule wins over that prohibition too, with the null flavour (the
 // both-prohibited row of TestREQ107_RMDefaultsYieldToTheOPT).
@@ -102,30 +102,35 @@ func TestREQ107_ProhibitedNullFlavourTakesAValue(t *testing.T) {
 // ELEMENT whose OPT prohibits both value and null_flavour, which the RM
 // rule Inv_null_flavour_indicated then needs, has its null_flavour written
 // as if the OPT allowed it: the walk takes the prohibited attribute's own
-// child, so a pinned code stays, and the RM default 271 applies only where
-// that leaves no code and the child admits 271. It holds under both
-// policies, both value fills and both compile modes.
+// child, so a pinned code stays with its rubric as its text, since the
+// child leaves the text free, and the RM default 271 applies only where
+// that leaves no code and the child admits 271. It holds under every
+// policy, both value fills and both compile modes.
 func TestREQ107_BothProhibitedNullFlavourIsWalked(t *testing.T) {
 	cases := []struct {
 		name string
 		nf   string
 		want rm.CodePhrase
+		text string // the null flavour's text
 	}{
 		{
 			name: "no child", nf: optProhibitedSingle("null_flavour"),
 			want: rm.CodePhrase{CodeString: "271", TerminologyID: rm.TerminologyID{Value: terminology.ID}},
+			text: "no information",
 		},
 		{
 			name: "a C_CODE_PHRASE pinning 253", nf: optProhibitedSingle("null_flavour", optCodedText(terminology.ID, "253")),
 			want: rm.CodePhrase{CodeString: "253", TerminologyID: rm.TerminologyID{Value: terminology.ID}},
+			text: "unknown",
 		},
 		{
 			name: "an empty-list C_CODE_PHRASE under openehr", nf: optProhibitedSingle("null_flavour", optCodedText(terminology.ID)),
 			want: rm.CodePhrase{CodeString: "271", TerminologyID: rm.TerminologyID{Value: terminology.ID}},
+			text: "no information",
 		},
 		{
 			name: "an empty-list C_CODE_PHRASE under local", nf: optProhibitedSingle("null_flavour", optCodedText("local")),
-			want: localAt0000,
+			want: localAt0000, text: walkText,
 		},
 	}
 	for _, tc := range cases {
@@ -145,6 +150,9 @@ func TestREQ107_BothProhibitedNullFlavourIsWalked(t *testing.T) {
 						t.Fatalf("ELEMENT.null_flavour absent, want %+v", tc.want)
 					}
 					checkCode(t, "ELEMENT.null_flavour", el.NullFlavour.DefiningCode, tc.want)
+					if el.NullFlavour.Value != tc.text {
+						t.Errorf("ELEMENT.null_flavour.value = %q, want %q", el.NullFlavour.Value, tc.text)
+					}
 				})
 			}
 		}
@@ -157,11 +165,18 @@ func TestREQ107_BothProhibitedNullFlavourIsWalked(t *testing.T) {
 // or the null_reason but not the value, so the ELEMENT has no value and
 // keeps or takes its null_flavour (271 when the walk wrote none), and the
 // value wins otherwise, the null attributes then dropped. Both directions,
-// and an OPT that requires both, under both policies, both value fills and
-// both compile modes. Where the OPT does not contradict itself, the
-// template validator finds no error.
+// and an OPT that requires both, under every policy, both value fills and
+// both compile modes. Where the OPT requires neither, Required does not
+// visit the optional value, so the ELEMENT has none and the RM rule has
+// its null_flavour written from its OPT child (REQ-107 Precedence 2).
+// Where the OPT does not contradict itself, the template validator finds
+// no error.
 func TestREQ107_ValueGivesWayToARequiredNullAttribute(t *testing.T) {
 	optionalText := optOptionalSingleOver("value", optNode("DV_TEXT", ""))
+	type nullWant struct {
+		value bool
+		nf    string
+	}
 	cases := []struct {
 		name      string
 		attrs     []string
@@ -169,6 +184,9 @@ func TestREQ107_ValueGivesWayToARequiredNullAttribute(t *testing.T) {
 		wantNF    string // the null flavour code, "" for none
 		wantNR    bool   // a null_reason
 		contra    bool   // the OPT contradicts itself
+		// required is what Required builds where it differs from the
+		// other policies; nil where it does not.
+		required *nullWant
 	}{
 		{
 			name: "null_flavour required, pinned 253", attrs: []string{optionalText, optSingle("null_flavour", optCodedText(terminology.ID, "253"))},
@@ -184,7 +202,7 @@ func TestREQ107_ValueGivesWayToARequiredNullAttribute(t *testing.T) {
 		},
 		{
 			name: "neither required", attrs: []string{optionalText, optOptionalSingleOver("null_flavour", optCodedText(terminology.ID, "253"))},
-			wantValue: true,
+			wantValue: true, required: &nullWant{nf: "253"},
 		},
 		{
 			name: "value and null_flavour required", attrs: []string{optSingle("value", optNode("DV_TEXT", "")), optSingle("null_flavour", optCodedText(terminology.ID, "253"))},
@@ -201,15 +219,19 @@ func TestREQ107_ValueGivesWayToARequiredNullAttribute(t *testing.T) {
 						t.Fatalf("Generate: %v", err)
 					}
 					el := out.(*rm.Element)
-					if has := el.Value != nil && !rm.IsTypedNil(el.Value); has != tc.wantValue {
-						t.Errorf("ELEMENT.value present = %t, want %t", has, tc.wantValue)
+					wantValue, wantNF := tc.wantValue, tc.wantNF
+					if opts.Policy == instance.Required && tc.required != nil {
+						wantValue, wantNF = tc.required.value, tc.required.nf
+					}
+					if has := el.Value != nil && !rm.IsTypedNil(el.Value); has != wantValue {
+						t.Errorf("ELEMENT.value present = %t, want %t", has, wantValue)
 					}
 					gotNF := ""
 					if el.NullFlavour != nil {
 						gotNF = el.NullFlavour.DefiningCode.CodeString
 					}
-					if gotNF != tc.wantNF {
-						t.Errorf("ELEMENT.null_flavour code = %q, want %q", gotNF, tc.wantNF)
+					if gotNF != wantNF {
+						t.Errorf("ELEMENT.null_flavour code = %q, want %q", gotNF, wantNF)
 					}
 					if has := el.NullReason != nil; has != tc.wantNR {
 						t.Errorf("ELEMENT.null_reason present = %t, want %t", has, tc.wantNR)

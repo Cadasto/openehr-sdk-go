@@ -252,7 +252,7 @@ func TestREQ107_RMDefaultsFillOPTSilentFields(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			c := compileOPTText(t, tc.opt, tc.implicit)
-			for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+			for _, policy := range everyPolicy {
 				out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, Now: defaultsNow})
 				if err != nil {
 					t.Fatalf("Generate(%v): %v", policy, err)
@@ -272,7 +272,7 @@ func TestREQ107_RMDefaultsFillOPTSilentFields(t *testing.T) {
 // the defaults the generator writes on values it builds from the BMM
 // alone, and on values the OPT names but leaves unconstrained. Each case
 // asserts the field the default writes and checks the generated value
-// against the RM floor, under both policies and both value fills.
+// against the RM floor, under every policy and both value fills.
 func TestREQ107_RMDefaultsFillBMMSynthesisedValues(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -411,7 +411,7 @@ func TestREQ107_RMDefaultsFillBMMSynthesisedValues(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			c := compileOPTText(t, tc.opt, true)
-			for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+			for _, policy := range everyPolicy {
 				for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
 					t.Run(policy.String()+"/"+fill.String(), func(t *testing.T) {
 						out, err := instance.Generate(t.Context(), c, instance.Options{
@@ -458,7 +458,7 @@ func TestREQ034_REQ107_PinnedCategoryCarriesItsRubric(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			c := compileOPTText(t, optTemplate("COMPOSITION", optSingle("category", optCodedText(tc.terminologyID, tc.code))), true)
-			for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+			for _, policy := range everyPolicy {
 				for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
 					t.Run(policy.String()+"/"+fill.String(), func(t *testing.T) {
 						out, err := instance.Generate(t.Context(), c, instance.Options{
@@ -509,7 +509,7 @@ var pinnedObservationOPT = optTemplate("COMPOSITION", optMultiple("content",
 // check that a structure the generator builds from the BMM alone, for a
 // mandatory single the OPT leaves silent (OBSERVATION.data, EVALUATION.data,
 // ACTION.description, ADMIN_ENTRY.data), carries the archetype_node_id and
-// name the RM floor requires, under both policies and both value fills.
+// name the RM floor requires, under every policy and both value fills.
 func TestREQ107_ImplicitEntryStructureCarriesLocatableIdentity(t *testing.T) {
 	cases := []struct {
 		name string
@@ -565,7 +565,7 @@ func TestREQ107_ImplicitEntryStructureCarriesLocatableIdentity(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			c := compileOPTText(t, tc.opt, true)
-			for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+			for _, policy := range everyPolicy {
 				for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
 					t.Run(policy.String()+"/"+fill.String(), func(t *testing.T) {
 						out, err := instance.Generate(t.Context(), c, instance.Options{

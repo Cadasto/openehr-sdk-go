@@ -73,7 +73,7 @@ The full editing rules (idiomatic surface, the `cadasto/` boundary contract, and
 - **Completion is accounted for.** A worker that dies is re-dispatched, or the gap is named. A task is not done because a dispatch ended.
 - **Findings state is read from the findings file (§ Review), never remembered.**
 - **The maintainer merges.** Agents open PRs, a draft only when asked.
-- The worker model, parallelism, worktrees, the per-task review gate and the review panel are declared under `agents:` in [`.sdd.yaml`](.sdd.yaml). The model is passed per dispatch.
+- The worker model, parallelism, worktrees, the per-task review gate, the reviewers and the paths they skip are declared under `agents:` in [`.sdd.yaml`](.sdd.yaml). The model is passed per dispatch.
 
 ## Examples
 
@@ -89,7 +89,7 @@ Findings for a branch live in one file in the clone's git directory, `<git-commo
 
 There are three severities, graded by harm. **Critical** and **important** findings carry evidence: the command run, the failing test, or the two sentences that disagree, quoted. A claim of wrong code behaviour is settled by running it, or by a named input, then graded by its harm; a missing specification sentence never lowers it. Those about the change are resolved before merge, either fixed or declined with the reason on the finding's line, and they are the only ones that get inline threads on the PR. One about code or a document the change did not touch keeps its severity, is marked `outside`, blocks nothing and is carried after merge unless fixed here. **Suggestions** never block and stay on the PR in its suggestion comments; the close-out (`/sdd-close`) asks once whether to carry them to `docs/backlog.md` in the PR, and after the merge `/sdd-triage --backlog` carries any it did not. A suggestion is written down only when it outlives the change; taste (naming, wording, style) never does. In anything posted to the PR, never write a number with a leading hash sign, which GitHub turns into a link to an unrelated issue.
 
-A panel host that loads the sdd plugin runs `/sdd-review --pr <N>`, which `/sdd-review --panel` prints as one line. A reviewer named in `agents.review_panel.external` never loads the plugin, so `--panel` prints this request for it instead, filled in:
+A reviewer that loads the sdd plugin runs `/sdd-review --pr <N>`, in whichever host the orchestrator chooses; a second pass lands in the same findings file. One that does not load the plugin gets this request, filled in (`sdd-pr scope` prints the range), so what it is given does not drift from what the repo defines:
 
 ```text
 ── review request · <branch> · range <a>..<b> · profile formal ──

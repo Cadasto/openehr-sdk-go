@@ -31,16 +31,17 @@ func compileRealWorldFixture(t *testing.T, name string) *templatecompile.Compile
 	return c
 }
 
-// TestREQ107_GenerateSocialMinimal_keepsEachContentArchetype pins REQ-107:
-// social.opt names content with an existence of 0..1, which bounds the
-// attribute, not its members, and a cardinality of 0..*, over six optional
-// archetype roots of six different archetypes. They all carry the node id
-// at0000, but under Minimal an optional child yields only to an earlier
-// optional sibling with its identity, and an archetype root's identity is
-// its archetype id. So Minimal emits one content entry of each archetype,
-// in OPT order. Minimal and Example must each contain at least one
-// ELEMENT; a hollow tree passes the content check and both validators.
-func TestREQ107_GenerateSocialMinimal_keepsEachContentArchetype(t *testing.T) {
+// TestREQ107_GenerateSocialContentArchetypes pins REQ-107: social.opt
+// names content with an existence of 0..1, which bounds the attribute, not
+// its members, and a cardinality of 0..*, over six optional archetype roots
+// of six different archetypes. They all carry the node id at0000, but an
+// optional child yields only to an earlier optional sibling with its
+// identity, and an archetype root's identity is its archetype id. So Large
+// emits one content entry of each archetype, in OPT order. Medium builds at
+// most one optional archetype under an attribute, so it emits the first
+// alone. Large and Medium must each contain at least one ELEMENT; a hollow
+// tree passes the content check and both validators.
+func TestREQ107_GenerateSocialContentArchetypes(t *testing.T) {
 	opt, err := template.ParseFile(fixtures.TemplateOptForName("social"))
 	if err != nil {
 		t.Fatalf("ParseFile social.opt: %v", err)
@@ -51,13 +52,26 @@ func TestREQ107_GenerateSocialMinimal_keepsEachContentArchetype(t *testing.T) {
 	}
 	name := "Test Composer"
 	for _, tc := range []struct {
-		name   string
 		policy instance.Policy
+		want   []string
 	}{
-		{name: "minimal", policy: instance.Minimal},
-		{name: "example", policy: instance.Example},
+		{
+			policy: instance.Large,
+			want: []string{
+				"openEHR-EHR-OBSERVATION.livingsituation.v1",
+				"openEHR-EHR-OBSERVATION.languageproficiency.v1",
+				"openEHR-EHR-OBSERVATION.participationinsociety.v1",
+				"openEHR-EHR-OBSERVATION.helpfromothers.v1",
+				"openEHR-EHR-EVALUATION.familysituation.v1",
+				"openEHR-EHR-EVALUATION.education_summary.v1",
+			},
+		},
+		{
+			policy: instance.Medium,
+			want:   []string{"openEHR-EHR-OBSERVATION.livingsituation.v1"},
+		},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.policy.String(), func(t *testing.T) {
 			out, err := instance.Generate(t.Context(), c, instance.Options{
 				Policy:    tc.policy,
 				Territory: "NL",
@@ -70,18 +84,8 @@ func TestREQ107_GenerateSocialMinimal_keepsEachContentArchetype(t *testing.T) {
 			if err != nil {
 				t.Fatalf("AsComposition: %v", err)
 			}
-			if tc.policy == instance.Minimal {
-				want := []string{
-					"openEHR-EHR-OBSERVATION.livingsituation.v1",
-					"openEHR-EHR-OBSERVATION.languageproficiency.v1",
-					"openEHR-EHR-OBSERVATION.participationinsociety.v1",
-					"openEHR-EHR-OBSERVATION.helpfromothers.v1",
-					"openEHR-EHR-EVALUATION.familysituation.v1",
-					"openEHR-EHR-EVALUATION.education_summary.v1",
-				}
-				if got := contentIDs(comp.Content); !slices.Equal(got, want) {
-					t.Fatalf("content = %v, want one entry of each optional archetype, %v", got, want)
-				}
+			if got := contentIDs(comp.Content); !slices.Equal(got, tc.want) {
+				t.Fatalf("content under %v = %v, want %v", tc.policy, got, tc.want)
 			}
 			if n := compositionElementCount(t, comp); n < 1 {
 				t.Fatalf("ELEMENT count = %d, want at least 1", n)

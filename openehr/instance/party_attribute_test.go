@@ -44,7 +44,7 @@ func checkBothValidators(t *testing.T, call string, out any, c *templatecompile.
 
 // TestREQ107_RolePerformerPassesBothValidators is the REQ-107 check that a
 // ROLE whose template names performer as a PARTY_REF generates output both
-// validators accept, at either policy and either value fill. With no pins,
+// validators accept, at every policy and either value fill. With no pins,
 // the performer takes the generator's default reference, local::PERSON. A
 // C_STRING the template pins on the reference's namespace or type is
 // honoured, and only the parts the template leaves open take the default.
@@ -97,7 +97,7 @@ func guardDateInterval() string {
 
 // TestREQ107_TimeValidityPassesBothValidators is the REQ-107 check that a
 // time_validity the template requires, on a ROLE root or on a capability
-// of one, comes out set and passes both validators at either policy and
+// of one, comes out set and passes both validators at every policy and
 // either value fill.
 func TestREQ107_TimeValidityPassesBothValidators(t *testing.T) {
 	cases := []struct {
@@ -153,7 +153,7 @@ func TestREQ107_TimeValidityPassesBothValidators(t *testing.T) {
 // TestREQ107_KnownGapUnwritableAttributes pins the REQ-107 known gap on
 // attributes the generator cannot write: a template that puts an object
 // under one makes Generate return an error wrapping
-// rmwrite.ErrUnknownAttribute, and no root, at either policy and either
+// rmwrite.ErrUnknownAttribute, and no root, at every policy and either
 // value fill. The rows pin each attribute the gap names: a PERSON's
 // languages holding a DV_TEXT, a PERSON's roles holding a PARTY_REF, and a
 // ROLE performer's id holding a HIER_OBJECT_ID, which rmwrite cannot
@@ -206,7 +206,7 @@ var partyRefTypes = []string{"PERSON", "ORGANISATION", "GROUP", "AGENT", "ROLE",
 
 // TestREQ107_PinnedPerformerTypeIsAPartyClass is the REQ-107 check that a
 // C_STRING the template pins on a ROLE performer's type yields a type BASE
-// PARTY_REF Type_validity admits, at either policy and either value fill.
+// PARTY_REF Type_validity admits, at every policy and either value fill.
 // Neither validator evaluates that invariant, so the test reads the value.
 // An open C_STRING or a pattern that also admits other strings gives the
 // default PERSON; a list pin keeps its member, and ExampleFill its first

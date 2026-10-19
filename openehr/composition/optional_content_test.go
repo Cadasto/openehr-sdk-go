@@ -15,14 +15,14 @@ import (
 const heartRatePath = "/content[openEHR-EHR-OBSERVATION.heart_rate.v1]/data/events[at0003]/data/items[at0004]/value"
 
 // TestREQ101_REQ107_SetReachesEachOptionalContentArchetype checks, for
-// REQ-101 and REQ-107's Minimal rule, that the skeleton a Builder starts
+// REQ-101 and REQ-107's Large rule, that the skeleton a Builder starts
 // from holds the heart-rate member of vital_signs, an optional content
 // archetype after the first: the template leaves its four content
 // OBSERVATIONs optional, and every archetype root carries the node id
 // at0000. So a value set at a path into the heart-rate observation lands
 // there, Build returns no error, and the validator finds nothing the bare
 // skeleton did not have. That every optional content archetype gets its
-// member is TestREQ107_MinimalKeepsEachOptionalContentArchetype's check.
+// member is TestREQ107_LargeKeepsEachOptionalContentArchetype's check.
 func TestREQ101_REQ107_SetReachesEachOptionalContentArchetype(t *testing.T) {
 	t.Parallel()
 	c := compileFixture(t, "vital_signs")

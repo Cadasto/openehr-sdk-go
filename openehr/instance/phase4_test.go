@@ -69,7 +69,7 @@ func TestREQ107_FloorGapsFilled(t *testing.T) {
 				t.Fatalf("Compile: %v", err)
 			}
 			out, err := instance.Generate(t.Context(), c, instance.Options{
-				Policy:    instance.Example,
+				Policy:    instance.Large,
 				Language:  "en",
 				Territory: "NL",
 				Composer:  testComposer(),

@@ -13,14 +13,14 @@ import (
 )
 
 // REQ-107 — every generated ELEMENT carries exactly one of value and
-// null_flavour (RM Inv_null_flavour_indicated), under both policies and
+// null_flavour (RM Inv_null_flavour_indicated), under every policy and
 // both fills.
 func TestREQ107_GeneratedElementsCarryExactlyOneOfValueAndNullFlavour(t *testing.T) {
 	templates := []string{"vital_signs", "Demonstration.v1", "BMI", "body_weight"}
 	policies := []struct {
 		name string
 		p    instance.Policy
-	}{{"Minimal", instance.Minimal}, {"Example", instance.Example}}
+	}{{"Large", instance.Large}, {"Medium", instance.Medium}, {"Required", instance.Required}}
 	fills := []struct {
 		name string
 		f    instance.ValueFill
@@ -86,7 +86,7 @@ func TestREQ107_GeneratedElementHasNullReasonOnlyWhenNull(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			c := compileOPTText(t, tc.opt, true)
-			for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+			for _, policy := range everyPolicy {
 				for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
 					t.Run(policy.String()+"/"+fill.String(), func(t *testing.T) {
 						out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, ValueFill: fill, Now: defaultsNow})
@@ -119,7 +119,7 @@ func TestREQ107_GeneratedElementHasNullReasonOnlyWhenNull(t *testing.T) {
 func TestREQ107_GeneratedNullFlavourIsFromTheOpenEHRGroup(t *testing.T) {
 	c := compileFixture(t, "Demonstration.v1")
 	out, err := instance.Generate(t.Context(), c, instance.Options{
-		Policy:    instance.Example,
+		Policy:    instance.Large,
 		Language:  "en",
 		Territory: "NL",
 		Composer:  testComposer(),
@@ -192,7 +192,7 @@ func TestREQ107_ElementWithNeitherGetsNoInformation(t *testing.T) {
 	}
 	for _, tc := range cases {
 		c := compileOPTText(t, tc.opt, tc.implicit)
-		for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+		for _, policy := range everyPolicy {
 			t.Run(tc.name+"/"+policy.String(), func(t *testing.T) {
 				out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, Now: defaultsNow})
 				if err != nil {
@@ -234,7 +234,7 @@ func TestREQ034_REQ107_OPTFilledNullFlavourCarriesItsRubric(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			c := compileOPTText(t, optTemplate("ELEMENT", optSingle("null_flavour", optCodedText(tc.terminologyID, tc.code))), true)
-			for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+			for _, policy := range everyPolicy {
 				for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
 					t.Run(policy.String()+"/"+fill.String(), func(t *testing.T) {
 						out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, ValueFill: fill, Now: defaultsNow})

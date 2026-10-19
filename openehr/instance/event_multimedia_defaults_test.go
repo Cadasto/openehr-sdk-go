@@ -81,11 +81,32 @@ var eventPlacements = []struct {
 	},
 }
 
+// everyPolicy is every Policy value, for the REQ-107 rules that bind under
+// every policy.
+var everyPolicy = []instance.Policy{instance.Large, instance.Medium, instance.Required}
+
+// largeAndMedium are the policies that visit an optional attribute the OPT
+// names an allowed child under. A case that asserts what such an attribute
+// holds runs under these two: Required does not visit it (REQ-107 Visit
+// rule), so it has nothing there to check. They are also the two that
+// give an optional child a member of its own and skip one whose identity
+// a sibling carries.
+var largeAndMedium = []instance.Policy{instance.Large, instance.Medium}
+
 // defaultsOptions are the generator settings the default rules hold for:
-// both policies, each with both value fills.
+// every policy, each with both value fills.
 func defaultsOptions() []instance.Options {
+	return optionsFor(everyPolicy)
+}
+
+// optionsFor are the settings of defaultsOptions under policies only, or
+// under every policy when policies is empty.
+func optionsFor(policies []instance.Policy) []instance.Options {
+	if len(policies) == 0 {
+		policies = everyPolicy
+	}
 	var out []instance.Options
-	for _, policy := range []instance.Policy{instance.Minimal, instance.Example} {
+	for _, policy := range policies {
 		for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
 			out = append(out, instance.Options{
 				Policy:      policy,
@@ -113,7 +134,7 @@ func noFloorErrors(t *testing.T, out any) {
 // silent or naming it without a code, takes the math function openehr
 // 146|mean|, with the rubric of the openEHR event math function group, so
 // that RM Math_function_validity holds. It holds at the root and nested,
-// under both policies and both value fills, with and without the implicit
+// under every policy and both value fills, with and without the implicit
 // attributes.
 func TestREQ107_IntervalEventTakesMeanMathFunction(t *testing.T) {
 	mean, _ := terminology.EventMathFunction.Rubric("146")
@@ -234,7 +255,7 @@ func checkExampleURI(t *testing.T, mm *rm.DVMultimedia) {
 // silent or naming it without a code, takes the media type text/plain in
 // IANA_media-types, so that RM Media_type_valid holds, and, having neither
 // uri nor data, the uri http://example.com, so that Not_empty holds. It
-// holds at the root and nested, under both policies and both value fills,
+// holds at the root and nested, under every policy and both value fills,
 // with and without the implicit attributes.
 func TestREQ107_MultimediaTakesTextPlainAndExampleURI(t *testing.T) {
 	want := rm.CodePhrase{CodeString: "text/plain", TerminologyID: rm.TerminologyID{Value: "IANA_media-types"}}

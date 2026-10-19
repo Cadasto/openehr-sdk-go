@@ -37,9 +37,10 @@ func slotProtocolOPT(children ...string) string {
 // with the RM-type-prefix fallback where it has no includes; and that one
 // whose includes give no archetype id the generator can derive makes
 // Generate return an error wrapping ErrSlotFillUnsupported. Both hold at
-// either policy, either value fill and through the builder; an OBSERVATION's
-// protocol is the attribute, which either policy visits since it has an
-// allowed OPT child.
+// Large and Medium, either value fill and through the builder; an
+// OBSERVATION's optional protocol is the attribute, which those two visit
+// since it has an allowed OPT child. Required does not visit an optional
+// attribute, so it never reaches the slot.
 func TestREQ107_SingleValuedSlotFillIsStamped(t *testing.T) {
 	const medication = "openEHR-EHR-ITEM_TREE.medication.v1"
 	cases := []struct {
@@ -74,6 +75,9 @@ func TestREQ107_SingleValuedSlotFillIsStamped(t *testing.T) {
 	for _, tc := range cases {
 		c := compileOPTText(t, tc.opt, true)
 		for _, opts := range guardOptions() {
+			if opts.Policy == instance.Required {
+				continue // the protocol is optional, so Required never reaches the slot
+			}
 			t.Run(fmt.Sprintf("%s/%v/%v", tc.name, opts.Policy, opts.ValueFill), func(t *testing.T) {
 				out, err := instance.Generate(t.Context(), c, opts)
 				checkSlotProtocol(t, c, out, err, tc.want)
