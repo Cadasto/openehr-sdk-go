@@ -63,6 +63,9 @@
 //     template leaves optional, so its tree is not always smaller than
 //     Medium's.
 //
+// Generate refuses any other Policy value with [ErrUnsupportedPolicy],
+// before it builds anything.
+//
 // Under every policy, every primitive leaf the walk reaches is valued as
 // [Options.ValueFill] says: the constraint's example value under
 // [ExampleFill], an in-constraint draw under [RandomFill]. Where the

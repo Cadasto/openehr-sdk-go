@@ -33,6 +33,10 @@ import (
 // any; use [AsComposition], [AsObservation], etc. for the concrete
 // access path.
 //
+// A Policy other than Large, Medium and Required makes Generate return
+// an error wrapping [ErrUnsupportedPolicy] and no root, before it builds
+// anything.
+//
 // When the template asks for an object of a class that is always an
 // archetype root but names no archetype for it, Generate returns an
 // error wrapping [ErrArchetypeIDMissing] and no root. A slot is not
@@ -45,6 +49,14 @@ func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (a
 	}
 	if c == nil || c.Root() == nil {
 		return nil, ErrNilCompiled
+	}
+	switch opts.Policy {
+	case Large, Medium, Required:
+		// The policies the package defines.
+	default:
+		// Policy's String names every other value "unknown", so the
+		// error prints its number.
+		return nil, fmt.Errorf("%w: %d", ErrUnsupportedPolicy, int(opts.Policy))
 	}
 
 	rootType := c.Root().RMTypeName()
@@ -389,8 +401,8 @@ func attrProhibited(attr *tcimpl.CompiledAttribute) bool {
 // Medium does: applyCompositionDefaults writes a context under every
 // policy, so the walk builds it under the OPT's constraints (a pinned
 // setting, a required other_context) rather than leaving it bare. Inside
-// the context Required's own rule applies. A Policy value outside the
-// three is read as Medium here.
+// the context Required's own rule applies. No other Policy value gets
+// here: Generate refuses one before the walk starts.
 func (g *generator) shouldVisit(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
 	if g.opts.Policy == Large {
 		return true
@@ -1903,9 +1915,9 @@ func newHierObjectID() *rm.HierObjectID {
 // optional archetype root of the attribute gets none either
 // (laterOptionalArchetype), so the attribute holds at most one optional
 // archetype. Required skips no child here: it sizes each child by its
-// occurrences lower bound, which gives an optional child no member. A
-// Policy value outside the three skips no child. The top-up to the
-// attribute's lower bound can still build a member of a skipped child.
+// occurrences lower bound, which gives an optional child no member. The
+// top-up to the attribute's lower bound can still build a member of a
+// skipped child.
 func (g *generator) ownMemberSkipped(children []*tcimpl.CompiledNode, i int) bool {
 	switch g.opts.Policy {
 	case Large:
@@ -1915,6 +1927,7 @@ func (g *generator) ownMemberSkipped(children []*tcimpl.CompiledNode, i int) boo
 	case Required:
 		return false
 	}
+	// Unreachable: Generate refuses any other Policy value first.
 	return false
 }
 

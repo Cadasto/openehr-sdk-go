@@ -17,7 +17,9 @@ import (
 // decides. Under every policy an RM rule can need more than the policy
 // visits, such as an ELEMENT's value or null_flavour, and a visited
 // multi-valued attribute is topped up to its lower bound. [ValueFill],
-// not the policy, decides how a primitive leaf is valued.
+// not the policy, decides how a primitive leaf is valued. Large, Medium
+// and Required are the only policies: [Generate] refuses any other value
+// with [ErrUnsupportedPolicy].
 type Policy int
 
 const (
@@ -111,6 +113,7 @@ func (f ValueFill) String() string {
 // own language (English when it names none), time.Now().UTC() clock.
 type Options struct {
 	// Policy is Large, Medium or Required. The zero value is Large.
+	// Generate refuses any other value with ErrUnsupportedPolicy.
 	Policy Policy
 
 	// Language is the ISO 639-1 code of the COMPOSITION's and every
