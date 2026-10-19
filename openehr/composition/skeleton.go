@@ -11,16 +11,17 @@ import (
 
 // NewSkeleton produces a structurally-conformant *rm.Composition for
 // c with no clinical data. It delegates to instance.Generate with the
-// policy WithPolicy selects, instance.Large when none is given: every
-// required RM attribute is filled (BMM-mandatory implicits and
-// OPT-declared ones), the optional content the policy builds is added
-// (under instance.Large, a member of every optional archetype the
-// template names; under instance.Medium, at most one optional archetype
-// under an attribute; under instance.Required, none), and primitive
-// leaves carry ExampleValue defaults, so the resulting tree is valid
-// against `validation.ValidateComposition`.
-// NewSkeleton accepts instance.Large, instance.Medium and
-// instance.Required. It refuses any other Policy value, before generating
+// policy WithPolicy selects, instance.Medium, the instance package's
+// default, when none is given: every required RM attribute is filled
+// (BMM-mandatory implicits and OPT-declared ones), the optional content
+// the policy builds is added (under instance.Medium, at most one optional
+// archetype under an attribute; under instance.Large, a member of every
+// optional archetype the template names; under instance.Required, none),
+// and primitive leaves carry ExampleValue defaults, so the resulting tree
+// is valid against `validation.ValidateComposition`.
+// NewSkeleton accepts instance.Medium, instance.Required and
+// instance.Large, and so their other names instance.Minimal and
+// instance.Complete. It refuses any other Policy value, before generating
 // anything, with an error wrapping ErrUnsupportedPolicy.
 //
 // WithComposer and WithTerritory are required for COMPOSITION roots
@@ -43,7 +44,7 @@ func newSkeleton(ctx context.Context, c *templatecompile.Compiled, cfg *config) 
 		return nil, fmt.Errorf("composition.NewSkeleton: OPT root %q is not COMPOSITION", rt)
 	}
 	switch cfg.policy {
-	case instance.Large, instance.Medium, instance.Required:
+	case instance.Medium, instance.Required, instance.Large:
 		// The policies the instance package defines.
 	default:
 		return nil, errUndefinedPolicy("composition.NewSkeleton", cfg.policy)

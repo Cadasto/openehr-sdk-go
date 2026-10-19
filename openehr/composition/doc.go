@@ -14,13 +14,15 @@
 // the composition-specific options (`WithLanguage`, `WithTerritory`,
 // `WithComposer`, `WithCategory`, `WithNow`, `WithPolicy`,
 // `WithValueFill`, `WithValueSource`) and the path-assigning API.
-// `WithPolicy(instance.Medium)` gives a skeleton with at most one
-// optional archetype under an attribute, and
-// `WithPolicy(instance.Required)` one with only what the template makes
-// mandatory and a composition's context. NewSkeleton accepts both and
-// NewBuilder refuses both with [ErrUnsupportedPolicy], because Set needs a
-// member of every optional archetype, which only the default
-// instance.Large builds. There is no second OPT walker here: the generated attribute
+// With no WithPolicy, NewSkeleton builds instance.Medium, the instance
+// package's default: a skeleton with at most one optional archetype under
+// an attribute. `WithPolicy(instance.Required)` gives one with only what
+// the template makes mandatory and a composition's context, and
+// `WithPolicy(instance.Large)` one with a member of every optional
+// archetype. NewBuilder builds on instance.Large when no WithPolicy is
+// given, and refuses Medium and Required with [ErrUnsupportedPolicy],
+// because Set needs a member of every optional archetype, which only Large
+// builds. There is no second OPT walker here: the generated attribute
 // access of `internal/rmaccess` (read side) and `rmwrite` (write side)
 // provide the closed-dispatch attribute access the path navigator needs.
 //

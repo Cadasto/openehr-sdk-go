@@ -225,23 +225,28 @@ func TestREQ101_REQ107_NewSkeletonAcceptsRequired(t *testing.T) {
 // policy for NewBuilder: Set routes a value only into a node the skeleton
 // already holds, so it needs a member of every optional archetype, which
 // only REQ-107's Large builds. NewBuilder refuses Medium, whose skeleton
-// holds one optional archetype under an attribute, and Required, whose
-// skeleton holds none, with an error wrapping ErrUnsupportedPolicy that
-// names the policy, and no Builder. The Large skeleton holds the
-// heart-rate OBSERVATION of vital_signs, the third of its four optional
-// content archetypes, so a value set there builds without error.
+// holds one optional archetype under an attribute, also given explicitly
+// as the zero value it is, and Required, whose skeleton holds none, and so
+// Minimal, with an error wrapping ErrUnsupportedPolicy that names the
+// policy, and no Builder. It accepts Large, and so Complete. The Large
+// skeleton holds the heart-rate OBSERVATION of vital_signs, the third of
+// its four optional content archetypes, so a value set there builds
+// without error.
 func TestREQ101_REQ107_NewBuilderAcceptsOnlyLarge(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
+		name    string
 		policy  instance.Policy
 		refused bool
 	}{
-		{policy: instance.Required, refused: true},
-		{policy: instance.Medium, refused: true},
-		{policy: instance.Large},
+		{name: "Required", policy: instance.Required, refused: true},
+		{name: "Minimal", policy: instance.Minimal, refused: true},
+		{name: "Medium", policy: instance.Medium, refused: true},
+		{name: "Large", policy: instance.Large},
+		{name: "Complete", policy: instance.Complete},
 	}
 	for _, tc := range cases {
-		t.Run(tc.policy.String(), func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			c := compileFixture(t, "vital_signs")
 			b, err := composition.NewBuilder(t.Context(), c, policyOptions(composition.WithPolicy(tc.policy))...)
