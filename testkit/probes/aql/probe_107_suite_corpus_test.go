@@ -1756,6 +1756,22 @@ func TestProbe107ReaderHandsAnsweredQueriesTheirDeclines_REQ160(t *testing.T) {
 	}
 }
 
+// TestProbe107DeclinesComeInTableOrder_REQ160 is the control for the order a
+// query's declines come in: the decline table's, not the order lint raises
+// the Errors in (queryEventContextOtherCode raises the declined code first).
+func TestProbe107DeclinesComeInTableOrder_REQ160(t *testing.T) {
+	t.Parallel()
+	mismatch := suiteDecline{
+		Code: codeArchetypeClassMismatch, Construct: "an archetype on EVENT_CONTEXT", Reason: declineContainsExtension,
+		Covers: func(string, lint.Issue) bool { return true },
+	}
+	q := SuiteQuery{Class: SuiteAnswered, Query: queryEventContextOtherCode}
+	got := coveringDeclines(q, []suiteDecline{mismatch, suiteDeclines[0]})
+	if want := []SuiteDecline{mismatch.exported(), eventContextDecline}; !slices.Equal(got, want) {
+		t.Fatalf("coveringDeclines(%q) = %+v, want %+v", q.Query, got, want)
+	}
+}
+
 // TestProbe107RequiresANonEmptyCorpus_REQ160 is the control for the
 // whole-corpus tripwire: no query at all is an error, never a vacuous pass.
 func TestProbe107RequiresANonEmptyCorpus_REQ160(t *testing.T) {

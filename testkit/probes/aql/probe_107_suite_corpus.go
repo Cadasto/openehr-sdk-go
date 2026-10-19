@@ -14,13 +14,12 @@ import (
 
 // PROBE-107 — the REQ-109 + REQ-160 upstream AQL suite admissibility corpus.
 //
-// PROBE-100 holds the REQ-160 relation against the FROM-family combination
-// rows, rebuilt with templates transcribed into its reader. This probe widens
-// the same position to every clause family: the vendored corpus under
-// testkit/corpus/aql/suites/ carries the upstream Robot AQL suites themselves,
-// so the reader takes each query from the suite that sends it and transcribes
-// no query template, only which upstream keywords send a query and how
-// (probe_107_robot.go is that reader).
+// This probe holds the REQ-109 grammar profile and the REQ-160 relation to
+// every clause family the upstream suites send a query in: the vendored
+// corpus under testkit/corpus/aql/suites/ carries the upstream Robot AQL
+// suites themselves, so the reader takes each query from the suite that
+// sends it and transcribes no query template, only which upstream keywords
+// send a query and how (probe_107_robot.go is that reader).
 //
 // Each rebuilt query is classed by what its test asserts (REQ-109/REQ-160
 // § PROBE-107 Classify). Only two classes are asserted: an answered query
@@ -30,11 +29,14 @@ import (
 // answering with no rows is consistent with (REQ-160 § Overlay edges).
 // Refused, not-ready and skipped queries are counted and never asserted: the
 // SDK stays the looser of the two, and the corpus is not a rejection
-// catalogue.
+// catalogue. The reader hands each answered query the declines that cover it
+// (§ PROBE-107 Declines exposed), so a consumer gating queries through the
+// same lint tells a reviewed decline from a defect without a copy of the
+// table.
 //
-// Severity is read from lint.Issue.Severity alone, as in PROBE-100, so a
-// re-grading in the REQ-161 catalogue flows through instead of drifting
-// against a copy kept here.
+// Severity is read from lint.Issue.Severity alone, so a re-grading in the
+// REQ-161 catalogue flows through instead of drifting against a copy kept
+// here.
 
 // SuiteClass is what a suite test asserts about the query it sends.
 type SuiteClass string
@@ -183,6 +185,12 @@ type suiteDecline struct {
 	Covers func(q string, i lint.Issue) bool
 }
 
+// exported is d as the reader hands it to a query it covers: the code,
+// construct and reason, without the matcher.
+func (d suiteDecline) exported() SuiteDecline {
+	return SuiteDecline{Code: d.Code, Construct: d.Construct, Reason: d.Reason}
+}
+
 // suiteDeclines is the decline table. Each entry needs a ruling: a decline
 // widens nothing, but it does stop the probe from reporting a refusal, so an
 // entry is added only for a construct the specification itself places outside
@@ -219,7 +227,8 @@ var suiteContainmentErrors = []string{
 // ReadSuiteCorpus reads the vendored suite corpus rooted at root (the
 // directory holding AQL/, _resources/, AQL_SOURCE.txt and EXCLUDED.txt). It
 // rebuilds each query its suites send, and counts in Unrebuilt each one it
-// cannot rebuild.
+// cannot rebuild. Each answered query carries in [SuiteQuery.Declines] the
+// reviewed declines that cover it.
 //
 // Callers in this repository pass fixtures.AQLSuitesRoot(); the parameter is
 // there so a downstream SDK can point the same reader at its own vendored
@@ -235,7 +244,7 @@ func ReadSuiteCorpus(root string) (SuiteCorpus, error) {
 }
 
 // Probe107SuiteCorpus runs the PROBE-107 ratchet over c and aggregates every
-// failure into one [Result], as [Probe100ConformanceCorpus] does.
+// failure into one [Result].
 //
 // An answered query passes when it parses under the SDK grammar profile and
 // draws no Error-severity lint issue, or when every Error it draws is one a
@@ -302,10 +311,9 @@ func probe107(c SuiteCorpus, declines []suiteDecline, families []string) (Result
 				"remove it, or re-baseline the corpus that should still need it", d.Code, d.Construct))
 		}
 	}
-	// The per-family tripwire, as in PROBE-100: a family that answers nothing
-	// is a family this ratchet no longer holds the SDK to. Families come from
-	// the list, not from what was read, so a family that vanished still has
-	// to answer for it.
+	// The per-family tripwire: a family that answers nothing is a family this
+	// ratchet no longer holds the SDK to. Families come from the list, not
+	// from what was read, so a family that vanished still has to answer for it.
 	for _, fam := range families {
 		if answered[fam] == 0 {
 			failures = append(failures, fmt.Sprintf("family %s: no answered query; "+
@@ -420,6 +428,23 @@ func suiteDeclineCoverage(c SuiteCorpus, declines []suiteDecline) []int {
 	return n
 }
 
+// coveringDeclines is the declines that cover an Error-severity issue on q,
+// in table order, each once: the coverage [checkSuiteAnswered] computes. It
+// is nil for a query that is not answered, and for one no decline covers.
+func coveringDeclines(q SuiteQuery, declines []suiteDecline) []SuiteDecline {
+	if q.Class != SuiteAnswered {
+		return nil
+	}
+	_, by := checkSuiteAnswered(q, declines)
+	var out []SuiteDecline
+	for i, d := range declines {
+		if slices.Contains(by, i) {
+			out = append(out, d.exported())
+		}
+	}
+	return out
+}
+
 // readSuiteCorpus is [ReadSuiteCorpus] over any file system, so the controls
 // can hand it a corpus built in memory.
 func readSuiteCorpus(fsys fs.FS) (SuiteCorpus, error) {
@@ -432,6 +457,9 @@ func readSuiteCorpus(fsys fs.FS) (SuiteCorpus, error) {
 		if err := r.readSuite(p); err != nil {
 			return SuiteCorpus{}, err
 		}
+	}
+	for i := range r.out.Queries {
+		r.out.Queries[i].Declines = coveringDeclines(r.out.Queries[i], suiteDeclines)
 	}
 	return r.out, nil
 }
