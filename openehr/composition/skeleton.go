@@ -34,8 +34,9 @@ func NewSkeleton(ctx context.Context, c *templatecompile.Compiled, opts ...Optio
 	return newSkeleton(ctx, c, buildConfig(opts...))
 }
 
-// newSkeleton is NewSkeleton on the options cfg holds. With no WithPolicy
-// given, cfg holds the zero Policy, the instance package's default.
+// newSkeleton is NewSkeleton on the options cfg holds. NewSkeleton passes
+// the zero Policy, the instance package's default, when no WithPolicy is
+// given; NewBuilder passes Large in that case.
 func newSkeleton(ctx context.Context, c *templatecompile.Compiled, cfg *config) (*rm.Composition, error) {
 	if c == nil || c.Root() == nil {
 		return nil, instance.ErrNilCompiled
