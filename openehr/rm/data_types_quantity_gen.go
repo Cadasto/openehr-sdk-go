@@ -94,8 +94,8 @@ type DVCount struct {
 	// A value of `_unknown_accuracy_value_` means that accuracy was not recorded.
 	Accuracy *Real `json:"accuracy,omitzero"`
 	// AccuracyIsPercent If `True`, indicates that when this object was created, `_accuracy_` was recorded as a percent value; if `False`, as an absolute quantity value.
-	AccuracyIsPercent *bool `json:"accuracy_is_percent,omitzero"`
-	Magnitude         int64 `json:"magnitude"`
+	AccuracyIsPercent *bool     `json:"accuracy_is_percent,omitzero"`
+	Magnitude         Integer64 `json:"magnitude"`
 	// MagnitudeStatus Optional status of magnitude with values:
 	//
 	// * `"="`   :   magnitude is a point value

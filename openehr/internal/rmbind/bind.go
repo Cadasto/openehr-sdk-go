@@ -106,9 +106,10 @@ func Bind(nodes []*tcimpl.CompiledNode, v any, eligible func(*tcimpl.CompiledNod
 // so a typed node whose T every present bound is names it. One with no bound
 // present has no parameter, so only a bare DV_INTERVAL node names its type,
 // and a typed node admits it in the third tier ([conformsToChild]). An AOM
-// 1.4 primitive short name over a Go primitive val (an int64 under INTEGER, a
-// string under DURATION) also names val's type. An untyped node names no
-// type.
+// 1.4 primitive short name over a primitive val (an integer under INTEGER, a
+// string under DURATION) also names val's type. val is read as the RM holds
+// it, so DV_COUNT.magnitude arrives as an rm.Integer64, not as the int64 the
+// validator later hands a C_INTEGER. An untyped node names no type.
 func namesRMType(c *tcimpl.CompiledNode, gotType string, val any) bool {
 	want := c.RMTypeName()
 	if want == "" {
@@ -306,8 +307,9 @@ func collapsedIntervalBounds(val any) (bounds []rm.DVOrdered, ok bool) {
 // PrimitiveValueMatchesShortName reports whether val, a Go value an RM
 // attribute holds, satisfies a node that names the AOM 1.4 primitive short
 // name shortName (INTEGER, REAL, DURATION, STRING, …) under an attribute of
-// a primitive type: a bool under BOOLEAN, an integer under INTEGER, a real
-// under REAL, a string under DATE, TIME, DATE_TIME and DURATION, and a
+// a primitive type: a bool under BOOLEAN, an integer under INTEGER (a Go
+// integer, an rm.Integer or an rm.Integer64, as [rm.AsInt64] reads them), a
+// real under REAL, a string under DATE, TIME, DATE_TIME and DURATION, and a
 // string or a non-nil *string under STRING.
 func PrimitiveValueMatchesShortName(shortName string, val any) bool {
 	switch shortName {
@@ -344,9 +346,9 @@ func PrimitiveValueMatchesShortName(shortName string, val any) bool {
 // value binds the node it was built for and passes the validator's RM type
 // match.
 //
-// A Go primitive under a short name (an int64 under INTEGER, a string
-// under DURATION) is admitted apart from this table, by
-// [PrimitiveValueMatchesShortName].
+// A primitive under a short name (an integer under INTEGER, such as the
+// rm.Integer64 of DV_COUNT.magnitude, or a string under DURATION) is
+// admitted apart from this table, by [PrimitiveValueMatchesShortName].
 var primitiveWrappers = map[string]string{
 	"DURATION":  "DV_DURATION",
 	"DATE":      "DV_DATE",

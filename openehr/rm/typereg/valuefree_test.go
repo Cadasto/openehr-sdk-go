@@ -15,6 +15,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/refused"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
@@ -214,6 +215,40 @@ func TestDecodeError_REQ052_TextCarriesNoValue(t *testing.T) {
 			}
 			if !errors.Is(e, tc.cause) {
 				t.Errorf("errors.Is(DecodeError, its cause) = false; the cause must stay reachable")
+			}
+		})
+	}
+}
+
+// TestDecodeError_REQ052_EmptyInputKeepsItsText pins that a DecodeError over
+// the empty-input refusal of each RM primitive codec, Integer, Integer64, Real
+// and Character, keeps that refusal's text (REQ-052): it holds no value, so
+// it is named as it is rather than withheld. Each cause is the one the codec
+// returns, so a codec whose message drifts from the form the renderer keeps
+// fails here.
+//
+// Can-fail control: drop the "rm.<primitive>: empty input" form from the
+// whole-message forms and every case reads "cause withheld".
+func TestDecodeError_REQ052_EmptyInputKeepsItsText(t *testing.T) {
+	cases := []struct {
+		name  string
+		codec json.Unmarshaler
+	}{
+		{name: "Integer", codec: new(rm.Integer)},
+		{name: "Integer64", codec: new(rm.Integer64)},
+		{name: "Real", codec: new(rm.Real)},
+		{name: "Character", codec: new(rm.Character)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cause := tc.codec.UnmarshalJSON(nil)
+			want := "rm." + tc.name + ": empty input"
+			if cause == nil || cause.Error() != want {
+				t.Fatalf("(*rm.%s).UnmarshalJSON(nil) = %v; want the refusal %q", tc.name, cause, want)
+			}
+			e := &typereg.DecodeError{Path: "/a", Inner: cause}
+			if got := e.Error(); !strings.Contains(got, "decode /a: "+want) {
+				t.Errorf("Error() = %q; want it to keep %q", got, want)
 			}
 		})
 	}

@@ -587,7 +587,7 @@ func emitCoreLeaf(out map[string]any, flatPath string, v any, rmType string, lis
 		return nil
 	}
 	if dv, ok := as[rm.DVCount](v); ok {
-		out[flatPath] = dv.Magnitude
+		out[flatPath] = int64(dv.Magnitude)
 		emitOrdered(out, flatPath, ordered{
 			magnitudeStatus: dv.MagnitudeStatus, normalStatus: dv.NormalStatus,
 			accuracy: dv.Accuracy, accuracyIsPercent: dv.AccuracyIsPercent,

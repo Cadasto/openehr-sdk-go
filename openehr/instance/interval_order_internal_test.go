@@ -115,10 +115,10 @@ func TestOrderIntervalBoundsCount(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			node := intervalNode(t, EditCountBounds(t, opt, tc.lower, tc.upper))
 			iv := &rm.DVInterval[rm.DVCount]{}
-			iv.Lower.Magnitude, iv.Upper.Magnitude = tc.bounds[0], tc.bounds[1]
+			iv.Lower.Magnitude, iv.Upper.Magnitude = rm.Integer64(tc.bounds[0]), rm.Integer64(tc.bounds[1])
 			iv.LowerUnbounded = tc.lowerOpen
 			orderIntervalBounds(node, iv)
-			if got := [2]int64{iv.Lower.Magnitude, iv.Upper.Magnitude}; got != tc.want {
+			if got := [2]int64{int64(iv.Lower.Magnitude), int64(iv.Upper.Magnitude)}; got != tc.want {
 				t.Errorf("orderIntervalBounds(%v) = %v, want %v", tc.bounds, got, tc.want)
 			}
 		})

@@ -342,6 +342,10 @@ func primitiveInput(rmValue any) any {
 		return *v
 	case rm.Integer:
 		return int64(v)
+	case rm.Integer64:
+		// DV_COUNT.magnitude: a C_INTEGER constraint reads a bare int64,
+		// and the constraints package cannot name the RM type.
+		return int64(v)
 	case rm.Real:
 		// Normalise the named float64 to a bare float64 so a C_REAL
 		// constraint validates it instead of rejecting it as

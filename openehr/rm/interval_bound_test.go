@@ -37,6 +37,8 @@ func TestIsEmptyIntervalBound(t *testing.T) {
 		{"pointer-typed: pointer to an all-zero value", IsEmptyIntervalBound(&DVQuantity{}), false},
 		{"Integer: zero", IsEmptyIntervalBound(Integer(0)), true},
 		{"Integer: one", IsEmptyIntervalBound(Integer(1)), false},
+		{"Integer64: zero", IsEmptyIntervalBound(Integer64(0)), true},
+		{"Integer64: one", IsEmptyIntervalBound(Integer64(1)), false},
 		{"Real: zero", IsEmptyIntervalBound(Real(0)), true},
 		{"Character: empty", IsEmptyIntervalBound(Character("")), true},
 		{"Character: one", IsEmptyIntervalBound(Character("=")), false},

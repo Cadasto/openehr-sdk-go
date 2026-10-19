@@ -544,6 +544,16 @@ func TestUnmarshal_REQ052_DecodeErrorKeepsEveryCause(t *testing.T) {
 			path: "/type", value: `"99999999999"`,
 		},
 		{
+			name: "quoted Integer64 literal with a fraction", in: `{"_type":"DV_COUNT","magnitude":"3.5"}`, target: func() any { return new(rm.DVCount) },
+			is: []error{canjson.ErrInvalidShape, strconv.ErrSyntax}, isNot: []error{strconv.ErrRange}, as: []func(error) bool{isSemantic, isNumError},
+			path: "/magnitude", value: `"3.5"`,
+		},
+		{
+			name: "quoted Integer64 literal out of range", in: `{"_type":"DV_COUNT","magnitude":"99999999999999999999"}`, target: func() any { return new(rm.DVCount) },
+			is: []error{canjson.ErrInvalidShape, strconv.ErrRange}, isNot: []error{strconv.ErrSyntax}, as: []func(error) bool{isSemantic, isNumError},
+			path: "/magnitude", value: `"99999999999999999999"`,
+		},
+		{
 			name: "Real past its digit budget", in: `{"_type":"DV_QUANTITY","magnitude":0.1234567890123456789,"units":"kg"}`, target: func() any { return new(rm.DVQuantity) },
 			is: []error{canjson.ErrInvalidShape}, as: []func(error) bool{isSemantic},
 			path: "/magnitude", value: "0.1234567890123456789",
@@ -671,6 +681,18 @@ func TestUnmarshal_REQ052_SDKMessagesStayInDecodeErrorText(t *testing.T) {
 			in:     `{"_type":"DV_PROPORTION","numerator":1,"denominator":2,"type":"1.5"}`,
 			target: func() any { return new(rm.DVProportion) },
 			want:   []string{"canjson: DV_PROPORTION: ", "rm.Integer: parse quoted literal: strconv.ParseInt: invalid syntax"},
+		},
+		{
+			name:   "quoted Integer64 literal",
+			in:     `{"_type":"DV_COUNT","magnitude":"3.5"}`,
+			target: func() any { return new(rm.DVCount) },
+			want:   []string{"canjson: DV_COUNT: ", "rm.Integer64: parse quoted literal: strconv.ParseInt: invalid syntax"},
+		},
+		{
+			name:   "quoted Integer64 literal out of range",
+			in:     `{"_type":"DV_COUNT","magnitude":"1e19"}`,
+			target: func() any { return new(rm.DVCount) },
+			want:   []string{"canjson: DV_COUNT: ", "rm.Integer64: parse quoted literal: strconv.ParseInt: value out of range"},
 		},
 		{
 			name:   "Character of two characters",

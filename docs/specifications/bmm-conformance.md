@@ -335,7 +335,7 @@ The 29 primitives in `openehr_base_1.3.0.bmm.json` map to Go types per the table
 |---|---|---|
 | `Boolean` | `bool` | |
 | `Integer` | `rm.Integer` (underlying `int32`) | Pinned to 32-bit per the BMM spec. Emitted as the defined type `rm.Integer` so the codec can attach the wire-tolerance rule from [`../docs/adr/0004-numeric-wire-tolerance.md`](../adr/0004-numeric-wire-tolerance.md). |
-| `Integer64` | `int64` | |
+| `Integer64` | `rm.Integer64` (underlying `int64`) | Emitted as the defined type `rm.Integer64` so the codec can attach the same wire-tolerance rule as `Integer` ([`../docs/adr/0004-numeric-wire-tolerance.md`](../adr/0004-numeric-wire-tolerance.md)). `DV_COUNT.magnitude` is the RM's one `Integer64` attribute. |
 | `Real` | `rm.Real` (underlying `float64`) | The BMM `Real` is single-precision conceptually but openEHR JSON uses unbounded-precision numbers; `float64` is the safe choice. Emitted as the defined type `rm.Real` so the codec can attach the wire-tolerance rule from [`../docs/adr/0004-numeric-wire-tolerance.md`](../adr/0004-numeric-wire-tolerance.md). |
 | `Double` | `float64` | Same as `Real`, no codec tolerance attached. |
 | `Character` | `rm.Character` | canonical JSON single-character **string**, not a number; hand-written named type (`openehr/rm/character.go`), like `Integer`/`Real` |

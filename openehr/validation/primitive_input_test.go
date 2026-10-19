@@ -34,3 +34,16 @@ func TestPrimitiveInput_IntegerMagnitude(t *testing.T) {
 		t.Fatalf("CInteger.Validate(%v) = %+v, want no violations", got, vs)
 	}
 }
+
+// TestPrimitiveInput_Integer64Magnitude is the DV_COUNT.magnitude pin
+// (REQ-110): rm.Integer64 normalises to int64 so CInteger.Validate accepts
+// it, the constraints package being unable to name the RM type.
+func TestPrimitiveInput_Integer64Magnitude(t *testing.T) {
+	got := primitiveInput(rm.Integer64(7))
+	if _, ok := got.(int64); !ok {
+		t.Fatalf("primitiveInput(rm.Integer64) = %T, want int64", got)
+	}
+	if vs := (constraints.CInteger{}).Validate(got); len(vs) != 0 {
+		t.Fatalf("CInteger.Validate(%v) = %+v, want no violations", got, vs)
+	}
+}

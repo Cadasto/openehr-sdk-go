@@ -169,7 +169,7 @@ func TestAccess_REQ102_REQ110_ReadsTheTemplateWalkAttributes(t *testing.T) {
 		{name: "empty TERM_MAPPING target", parent: rm.TermMapping{}, attr: "target"},
 
 		// The data-value scalars a template constrains (REQ-110).
-		{name: "DV_COUNT magnitude", parent: rm.DVCount{Magnitude: 5}, attr: "magnitude", present: true, want: int64(5)},
+		{name: "DV_COUNT magnitude", parent: rm.DVCount{Magnitude: 5}, attr: "magnitude", present: true, want: rm.Integer64(5)},
 		{name: "DV_QUANTITY magnitude", parent: rm.DVQuantity{Magnitude: 1.5}, attr: "magnitude", present: true, want: rm.Real(1.5)},
 		{name: "DV_QUANTITY units", parent: rm.DVQuantity{Units: "kg"}, attr: "units", present: true, want: "kg"},
 		{name: "DV_PROPORTION numerator", parent: rm.DVProportion{Numerator: 1, Denominator: 2}, attr: "numerator", present: true, want: rm.Real(1)},

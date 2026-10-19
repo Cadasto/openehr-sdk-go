@@ -135,6 +135,7 @@ const (
 var rmPrimitiveKinds = map[string]accessKind{
 	"Character": accessString,
 	"Integer":   accessNumber,
+	"Integer64": accessNumber,
 	"Real":      accessNumber,
 }
 
