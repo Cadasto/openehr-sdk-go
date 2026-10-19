@@ -1832,7 +1832,7 @@ func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 	} else {
 		// The OPT pinned the code, and the walk left the synthesiser's text
 		// beside it.
-		useGroupRubric(&c.Category, terminology.CompositionCategory)
+		useGroupRubric(root, "category", &c.Category, terminology.CompositionCategory)
 	}
 	language := rm.CodePhrase{CodeString: g.opts.Language, TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}}
 	if noCode(c.Language.CodeString) && codeAdmitted(root, "language", language) {
@@ -2047,7 +2047,7 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 		fillRelationship(opt, &v.Relationship)
 		// A code the OPT pinned takes its rubric, as a pinned category and
 		// null_flavour do.
-		useGroupRubric(&v.Relationship, terminology.SubjectRelationship)
+		useGroupRubric(opt, "relationship", &v.Relationship, terminology.SubjectRelationship)
 	case *rm.Element:
 		g.settleElement(opt, v)
 	case *rm.DVEHRURI:
@@ -2256,8 +2256,9 @@ func (g *generator) placeholderElement() *rm.Element {
 // writeRMNeeded), with "no information" where that leaves no code its own
 // child admits. A null flavour with a
 // code keeps it, and takes the pinned rubric of that code when the code
-// is in the openEHR null flavours group. opt is the OPT node of e, or nil
-// for an ELEMENT built from the BMM alone.
+// is in the openEHR null flavours group and the OPT's constraint on its
+// text admits the rubric (useGroupRubric). opt is the OPT node of e, or
+// nil for an ELEMENT built from the BMM alone.
 func (g *generator) settleElement(opt *tcimpl.CompiledNode, e *rm.Element) {
 	if e.Value != nil && !rm.IsTypedNil(e.Value) {
 		if !valueGivesWay(opt) {
@@ -2268,7 +2269,7 @@ func (g *generator) settleElement(opt *tcimpl.CompiledNode, e *rm.Element) {
 		e.Value = nil
 	}
 	if e.NullFlavour != nil && !noCode(e.NullFlavour.DefiningCode.CodeString) {
-		useGroupRubric(e.NullFlavour, terminology.NullFlavours)
+		useGroupRubric(opt, "null_flavour", e.NullFlavour, terminology.NullFlavours)
 		return
 	}
 	nf := noInformation()
@@ -2339,17 +2340,28 @@ func (g *generator) fillElementValue(e *rm.Element) bool {
 	return rmwrite.EnsureSingle(e, "value", value) == nil
 }
 
-// useGroupRubric sets the text of a coded text to the pinned rubric of its
-// code, when that code is an `openehr` code in group. The walk fills a code
-// the OPT pins but leaves the synthesiser's placeholder text beside it. A
-// code in another terminology, or outside group, keeps its text, so the
-// generator invents no rubric for it.
-func useGroupRubric(v *rm.DVCodedText, group *terminology.Group) {
+// useGroupRubric sets the text of v, the coded text attrName of opt, to
+// the pinned rubric of its code, when that code is an `openehr` code in
+// group and the OPT child the walk built v under ([bindingChild]) admits
+// the rubric as its text (codedTextAdmits). The walk fills a code the OPT
+// pins but leaves the synthesiser's placeholder text beside it. A code in
+// another terminology, or outside group, keeps its text, so the generator
+// invents no rubric for it, and so does a code whose child limits the text
+// to values that leave the rubric out. The child is read where the OPT
+// prohibits attrName too, since the walk then builds v under it as if the
+// OPT allowed it. opt is nil for a value built from the BMM alone.
+func useGroupRubric(opt *tcimpl.CompiledNode, attrName string, v *rm.DVCodedText, group *terminology.Group) {
 	if v.DefiningCode.TerminologyID.Value != terminology.ID {
 		return
 	}
-	if rubric, ok := group.Rubric(v.DefiningCode.CodeString); ok {
-		v.Value = rubric
+	rubric, ok := group.Rubric(v.DefiningCode.CodeString)
+	if !ok {
+		return
+	}
+	withRubric := *v
+	withRubric.Value = rubric
+	if codedTextAdmits(bindingChild(opt, attrName), withRubric) {
+		*v = withRubric
 	}
 }
 
