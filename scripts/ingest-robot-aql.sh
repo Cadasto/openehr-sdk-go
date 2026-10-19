@@ -1,22 +1,12 @@
 #!/usr/bin/env bash
-# Vendor both EHRbase Robot AQL corpora from one pinned commit of the upstream
-# integration-tests repository:
-#
-#   testkit/corpus/aql/conformance/  the FROM-combination corpus: the FROM-family
-#                                    combination CSVs, filed under the Robot
-#                                    suite family that consumes each one.
-#   testkit/corpus/aql/suites/       the AQL suite corpus: every Robot suite
-#                                    under tests/robot/AQL/ and every combination
-#                                    CSV under
-#                                    tests/robot/_resources/test_data_sets/aql/fields_and_results/**/combinations/,
-#                                    each at its path relative to upstream
-#                                    tests/robot/, so a suite's
-#                                    ${PROJECT_ROOT}/tests/robot/<rest> reads
-#                                    suites/<rest>.
-#
-# Each corpus carries its own AQL_SOURCE.txt and generated EXCLUDED.txt. One run
-# writes both from the same commit of one clone, so the two pins cannot name
-# different commits.
+# Vendor the EHRbase Robot AQL suite corpus, the tree's one AQL corpus, from one
+# pinned commit of the upstream integration-tests repository into
+# testkit/corpus/aql/suites/: every Robot suite under tests/robot/AQL/ and every
+# combination CSV under
+# tests/robot/_resources/test_data_sets/aql/fields_and_results/**/combinations/,
+# each at its path relative to upstream tests/robot/, so a suite's
+# ${PROJECT_ROOT}/tests/robot/<rest> reads suites/<rest>. The corpus carries its
+# own AQL_SOURCE.txt and generated EXCLUDED.txt.
 #
 # Sibling of scripts/ingest-robot-fixtures.sh, but a different job: that one
 # hand-curates and renames composition fixtures, this one copies the upstream
@@ -25,7 +15,7 @@
 # EXPECTED_COMMIT, and every byte it vendors from `git cat-file blob` of that
 # tree's blobs, which applies no attribute, filter or line-ending conversion.
 # What is checked out, modified, untracked, ignored or unreadable in the clone
-# changes nothing. So the commit recorded in each AQL_SOURCE.txt determines the
+# changes nothing. So the commit recorded in AQL_SOURCE.txt determines the
 # vendored content, not merely the tree the ingest happened to read.
 #
 # ROBOT_ROOT points at the upstream tests/robot/_resources/test_data_sets
@@ -35,11 +25,11 @@
 # aql/fields_and_results subtree.
 #
 # EXPECTED_COMMIT below is the pin. The script refuses unless it names, in full,
-# a commit present in the clone; HEAD may point anywhere. Refreshing the corpora
+# a commit present in the clone; HEAD may point anywhere. Refreshing the corpus
 # to a newer upstream commit means editing EXPECTED_COMMIT here, in the same
 # commit as the refreshed files.
 #
-# Both pins record source_repo, the GitHub owner/repo of the clone's origin
+# The pin records source_repo, the GitHub owner/repo of the clone's origin
 # remote. Only a github.com origin names one: https://github.com/OWNER/REPO,
 # git@github.com:OWNER/REPO or ssh://git@github.com/OWNER/REPO, each with or
 # without .git. Any other origin (a local path, another host, none) makes the
@@ -53,9 +43,9 @@
 # any file no rule below knows.
 #
 # Idempotence: re-running at the same pin must leave `git status` clean. The
-# vendored files are byte copies and each EXCLUDED.txt is derived from the pinned
+# vendored files are byte copies and EXCLUDED.txt is derived from the pinned
 # tree, so all are stable by construction; recorded_utc would otherwise churn, so
-# it is read back from each existing AQL_SOURCE.txt whenever that file's
+# it is read back from the existing AQL_SOURCE.txt whenever that file's
 # `commit:` still matches EXPECTED_COMMIT. Only a re-pin (or a missing pin file)
 # moves the recorded date.
 set -euo pipefail
@@ -64,7 +54,6 @@ EXPECTED_COMMIT=b4625fc28d6785c05adfd6db26339b4bb2272e06
 
 ROBOT="${ROBOT_ROOT:-/src/ehrbase/integration-tests/tests/robot/_resources/test_data_sets}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-DEST="$REPO/testkit/corpus/aql/conformance"
 SUITES_DEST="$REPO/testkit/corpus/aql/suites"
 
 if [[ ! -d "$ROBOT" ]]; then
@@ -100,17 +89,16 @@ esac
 tests_robot_rel=${robot_rel%/_resources/test_data_sets}
 suites_rel=$tests_robot_rel/AQL
 aql_rel=$robot_rel/aql/fields_and_results
-src_rel=$aql_rel/from/combinations
 # far_rel is aql_rel relative to tests/robot, the spelling the suite corpus
 # uses for every path.
 far_rel=${aql_rel#"$tests_robot_rel/"}
 
 # --- validate -----------------------------------------------------------------
 #
-# Every refusal, for either corpus, runs before the first byte under $DEST or
-# $SUITES_DEST moves. Clearing the destinations first and only then discovering
-# an unclassifiable upstream file would empty the vendored corpora and abort,
-# leaving them in a state the pin does not describe. So this pass only reads.
+# Every refusal runs before the first byte under $SUITES_DEST moves. Clearing
+# the destination first and only then discovering an unclassifiable upstream
+# file would empty the vendored corpus and abort, leaving it in a state the pin
+# does not describe. So this pass only reads.
 
 # The pin, by its full object name: an abbreviation or a ref name would be
 # recorded as the commit, and neither fixes the bytes.
@@ -122,7 +110,7 @@ if [[ "$(git -C "$src_root" rev-parse --verify --quiet "$EXPECTED_COMMIT^{commit
 fi
 src_date=$(git -C "$src_root" show -s --format=%cI "$EXPECTED_COMMIT")
 
-# source_repo: the GitHub owner/repo both pins record and build their
+# source_repo: the GitHub owner/repo the pin records and builds its
 # source_tree URL from. A GitHub owner is letters, digits and hyphens; a
 # repository name adds dots and underscores, but is never . or ..
 owner_repo_re='^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9._-]+$'
@@ -149,7 +137,7 @@ else
     echo "the origin remote of $src_root is not a github.com repository URL" >&2
     echo "accepted: https://github.com/OWNER/REPO, git@github.com:OWNER/REPO or" >&2
     echo "ssh://git@github.com/OWNER/REPO, each with or without .git; for any other" >&2
-    echo "origin, set ROBOT_SOURCE_REPO=OWNER/REPO to name the upstream the pins record" >&2
+    echo "origin, set ROBOT_SOURCE_REPO=OWNER/REPO to name the upstream the pin records" >&2
     exit 1
   fi
 fi
@@ -161,13 +149,12 @@ tmp=$(mktemp -d)
 trap 'rm -rf -- "$tmp"' EXIT
 git -C "$src_root" ls-tree -r -z --full-tree "$EXPECTED_COMMIT" -- "$suites_rel" "$aql_rel" > "$tmp/listing"
 
-# Suite corpus: classify every entry, by its path relative to tests/robot, the
-# spelling a suite's DataDriver `file=${PROJECT_ROOT}/tests/robot/<rest>` uses,
-# so a carried file lands at suites/<rest>. Each file is carried, excluded with
-# a reason tag, or refused: a file no rule knows is the re-pin author's
-# decision, not something to file under a guessed tag.
+# Classify every entry, by its path relative to tests/robot, the spelling a
+# suite's DataDriver `file=${PROJECT_ROOT}/tests/robot/<rest>` uses, so a
+# carried file lands at suites/<rest>. Each file is carried, excluded with a
+# reason tag, or refused: a file no rule knows is the re-pin author's decision,
+# not something to file under a guessed tag.
 declare -A BLOB=()
-FAR_FILES=()
 SUITES_CARRIED=()
 SUITES_EXCLUDED=()
 n_suites=0
@@ -197,7 +184,7 @@ while IFS= read -r -d '' entry; do
   100644 | 100755) ;;
   *)
     echo "upstream entry is not a regular file: $rel" >&2
-    echo "the AQL corpora carry and list byte copies of regular files only" >&2
+    echo "the AQL corpus carries and lists byte copies of regular files only" >&2
     exit 1
     ;;
   esac
@@ -229,12 +216,10 @@ while IFS= read -r -d '' entry; do
       exit 1
     fi
     SUITES_CARRIED+=("$rel")
-    FAR_FILES+=("$rel")
     n_inputs=$((n_inputs + 1))
     ;;
   "$far_rel"/*.json)
     SUITES_EXCLUDED+=("$rel execution-semantics")
-    FAR_FILES+=("$rel")
     ;;
   *)
     echo "unclassified upstream file under the AQL suite roots: $rel" >&2
@@ -245,7 +230,7 @@ while IFS= read -r -d '' entry; do
   esac
 done < "$tmp/listing"
 
-# An empty root is a pin these corpora cannot describe, not an empty corpus.
+# An empty root is a pin this corpus cannot describe, not an empty corpus.
 if ((n_suites == 0)); then
   echo "no Robot AQL suite (*.robot) under $suites_rel at the pin" >&2
   echo "refusing to vendor a suite corpus with no suites" >&2
@@ -256,79 +241,6 @@ if ((n_inputs == 0)); then
   echo "refusing to vendor suites without the data they read" >&2
   exit 1
 fi
-
-# CSV -> the Robot suite family that consumes it, under upstream
-# tests/robot/AQL/FROM/<FAMILY>/. The family is the vendored directory name
-# so a reader can find the suite that supplies the query template for each row.
-CORPUS=(
-  "AND_OR from_simple_and_or.csv"
-  "CONTAINS_A_D from_contains_plus_contain_chaining.csv"
-  "CONTAINS_A_D from_contains_with_repeating_types.csv"
-  "EHR_STATUS contains.csv"
-  "EHR_STATUS from_single_ehr.csv"
-  "EHR_STATUS via_part.csv"
-  "PREDICATE_A_D from_predicate_on_extracted_column.csv"
-  "USABLE_RM_TYPES_A_D from_abstract_types.csv"
-  "USABLE_RM_TYPES_A_D from_common_types.csv"
-  "USABLE_RM_TYPES_A_D from_composition.csv"
-  "USABLE_RM_TYPES_A_D from_item_structure_and_element_in_composition.csv"
-  "USABLE_RM_TYPES_A_D from_item_structure_composition.csv"
-)
-
-FAMILIES=(AND_OR CONTAINS_A_D EHR_STATUS PREDICATE_A_D USABLE_RM_TYPES_A_D)
-
-# FROM-family CSVs that are input data yet deliberately NOT vendored, tagged
-# with the reason their rows cannot be reconstructed. Keyed by the path
-# relative to the corpus root — the same spelling EXCLUDED.txt records — and
-# never by basename: a nested CSV that merely shares an excluded basename is a
-# different file, and must reach the refusal below rather than inherit an
-# exclusion written for its namesake. At this pin:
-# from/combinations/from_simple_and_or_ent.csv has zero references anywhere
-# under the upstream tests/ tree, so no suite supplies a query template for its
-# rows.
-declare -A KNOWN_UNCONSUMED=(
-  ["from/combinations/from_simple_and_or_ent.csv"]=unconsumed-by-suite
-)
-
-declare -A VENDORED=()
-for entry in "${CORPUS[@]}"; do
-  csv=${entry#* }
-  if [[ -z "${BLOB[$far_rel/from/combinations/$csv]:-}" ]]; then
-    echo "missing upstream CSV at the pin: $src_rel/$csv" >&2
-    exit 1
-  fi
-  VENDORED["from/combinations/$csv"]=1
-done
-
-# FROM corpus: classify every file under the fields_and_results root it does
-# not carry, by its path relative to that root. Every FROM-family CSV, at any
-# depth under from/, is input data (the suite pass above has already refused a
-# CSV outside a combinations/ directory), so it must be vendored or a named
-# exclusion; anything else is new input the corpus does not know, and the
-# ingest refuses rather than file it under a wrong tag. A CSV of another clause
-# family is non-from-family, and everything else here is an expected-result
-# JSON, the only other kind the suite pass lets through.
-CONFORMANCE_EXCLUDED=()
-for rel in "${FAR_FILES[@]}"; do
-  frel=${rel#"$far_rel/"}
-  if [[ -n "${VENDORED[$frel]:-}" ]]; then
-    continue
-  fi
-  case "$frel" in
-  from/*.csv)
-    tag=${KNOWN_UNCONSUMED[$frel]:-}
-    if [[ -z "$tag" ]]; then
-      echo "new upstream input CSV at the pin: $frel" >&2
-      echo "it is neither vendored (CORPUS) nor a named exclusion (KNOWN_UNCONSUMED) —" >&2
-      echo "vendor it and teach the reader its template, or record why it cannot be reconstructed" >&2
-      exit 1
-    fi
-    ;;
-  *.csv) tag=non-from-family ;;
-  *) tag=execution-semantics ;;
-  esac
-  CONFORMANCE_EXCLUDED+=("$frel $tag")
-done
 
 # blob_to OBJECT FILE writes the blob OBJECT of the clone to FILE, byte for
 # byte: `git cat-file blob` prints the stored content with no conversion.
@@ -349,80 +261,6 @@ recorded_utc_for() {
 
 # --- copy ---------------------------------------------------------------------
 
-# Clear the family directories first: a re-pin that drops a CSV upstream must not
-# leave the old copy behind pretending to still be vendored.
-for fam in "${FAMILIES[@]}"; do
-  mkdir -p "$DEST/$fam"
-  rm -f "${DEST:?}/$fam"/*.csv
-done
-
-for entry in "${CORPUS[@]}"; do
-  fam=${entry%% *}
-  csv=${entry#* }
-  blob_to "${BLOB[$far_rel/from/combinations/$csv]}" "$DEST/$fam/$csv"
-done
-
-# --- provenance pin -----------------------------------------------------------
-
-pin_file="$DEST/AQL_SOURCE.txt"
-recorded=$(recorded_utc_for "$pin_file")
-
-{
-  echo "# EHRbase Robot AQL FROM-combination corpus — source provenance pin"
-  echo "# Written by scripts/ingest-robot-aql.sh. This pin IS authoritative for"
-  echo "# the vendored CSVs: they are copied unmodified from the commit below, so"
-  echo "# that commit fully determines their bytes. (Contrast ROBOT_SOURCE.txt one"
-  echo "# level up, whose fixtures are hand-curated and renamed, making its pin a"
-  echo "# record of the tree the ingest read rather than of the files it produced.)"
-  echo "source_repo: ${src_remote}"
-  echo "source_path: ${src_rel}"
-  echo "commit: ${EXPECTED_COMMIT}"
-  echo "commit_date: ${src_date}"
-  echo "recorded_utc: ${recorded}"
-  echo "source_tree: https://github.com/${src_remote}/tree/${EXPECTED_COMMIT}/${src_rel}"
-  echo "license: Apache-2.0 (see ../../THIRD_PARTY_LICENSES.md)"
-} > "$pin_file"
-
-# --- exclusion list -----------------------------------------------------------
-
-excl_file="$DEST/EXCLUDED.txt"
-{
-  echo "# Generated by scripts/ingest-robot-aql.sh — DO NOT HAND-EDIT."
-  echo "# Regenerate by re-running the ingest; hand edits are overwritten."
-  echo "#"
-  echo "# Every file under the upstream AQL tree that this corpus does NOT carry,"
-  echo "# one per line, as:"
-  echo "#   <path relative to ${aql_rel}> <reason-tag>"
-  echo "# Sorted with LC_ALL=C so the list has a stable diff across machines."
-  echo "#"
-  echo "# Reason tags:"
-  echo "#   execution-semantics  an expected-result artefact — what a query"
-  echo "#                        returned against a loaded EHR. This corpus"
-  echo "#                        asserts admissibility (the query parses and"
-  echo "#                        survives the semantic lint), never result"
-  echo "#                        equality, so no result artefact is vendored."
-  echo "#   non-from-family      a combination CSV for another clause family"
-  echo "#                        (where/, select/, order_by/, …). This corpus is"
-  echo "#                        the FROM family only."
-  echo "#   unconsumed-by-suite  a from/combinations CSV that no Robot suite"
-  echo "#                        references under the upstream tests/ tree at this"
-  echo "#                        pin, so no query template exists to reconstruct"
-  echo "#                        its rows into queries."
-  echo "#"
-  echo "# The pin these paths are relative to: AQL_SOURCE.txt, beside this file."
-} > "$excl_file"
-
-# printf with no arguments would still print one empty line.
-if ((${#CONFORMANCE_EXCLUDED[@]})); then
-  printf '%s\n' "${CONFORMANCE_EXCLUDED[@]}" | LC_ALL=C sort >> "$excl_file"
-fi
-
-echo "vendored ${#CORPUS[@]} CSVs across ${#FAMILIES[@]} families into $DEST"
-echo "pinned ${src_remote}@${EXPECTED_COMMIT:0:12} -> $pin_file"
-echo "excluded ${#CONFORMANCE_EXCLUDED[@]} upstream files -> $excl_file"
-
-# --- suite corpus: copy -------------------------------------------------------
-
 # Clear both mirrored subtrees first: a re-pin that drops an upstream file must
 # not leave the old copy behind pretending to still be vendored.
 rm -rf "${SUITES_DEST:?}/AQL" "${SUITES_DEST:?}/_resources"
@@ -432,7 +270,7 @@ for rel in "${SUITES_CARRIED[@]}"; do
   blob_to "${BLOB[$rel]}" "$SUITES_DEST/$rel"
 done
 
-# --- suite corpus: provenance pin ---------------------------------------------
+# --- provenance pin -----------------------------------------------------------
 
 suites_src_rel=$tests_robot_rel
 suites_pin="$SUITES_DEST/AQL_SOURCE.txt"
@@ -440,8 +278,7 @@ suites_recorded=$(recorded_utc_for "$suites_pin")
 
 {
   echo "# EHRbase Robot AQL suite corpus — source provenance pin"
-  echo "# Written by scripts/ingest-robot-aql.sh, in the same run and from the same"
-  echo "# clone as ../conformance/AQL_SOURCE.txt, so both pins name one commit."
+  echo "# Written by scripts/ingest-robot-aql.sh, which vendors this corpus alone."
   echo "# This pin IS authoritative for the vendored files: the Robot AQL suites"
   echo "# under AQL/ and the combination CSVs they read under _resources/ are"
   echo "# copied unmodified from the commit below, each at its path relative to"
@@ -455,7 +292,7 @@ suites_recorded=$(recorded_utc_for "$suites_pin")
   echo "license: Apache-2.0 (see ../../THIRD_PARTY_LICENSES.md)"
 } > "$suites_pin"
 
-# --- suite corpus: exclusion list ---------------------------------------------
+# --- exclusion list -----------------------------------------------------------
 
 suites_excl="$SUITES_DEST/EXCLUDED.txt"
 {
