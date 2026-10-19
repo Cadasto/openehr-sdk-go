@@ -1887,7 +1887,7 @@ An overlay edge — default and consumer alike — is a record of two class-name
 | `COMPOSITION CONTAINS DV_TEXT` (pair question: a Never-containability operand) | Never |
 | `FOO_BAR` as either operand — pair and containability questions alike | UnknownClass |
 
-Differences from any engine's observed admissibility are asserted as neutral, cited, executable documentation — including the EHRbase-compatibility guard above — not treated as anyone's defect. That guard's evidence base is mechanical rather than merely cited: [PROBE-100](conformance.md#probe-100--upstream-aql-admissibility-corpus-ratchet) is its gate over the upstream FROM/CONTAINS combination corpus, and [PROBE-107](conformance.md#probe-107--upstream-aql-suite-admissibility-corpus) its gate over the queries the upstream AQL suites send and an engine answers, in every clause family; both corpora are vendored under [conformance.md § Vendored fixtures](conformance.md#vendored-fixtures-testkitcorpus).
+Differences from any engine's observed admissibility are asserted as neutral, cited, executable documentation — including the EHRbase-compatibility guard above — not treated as anyone's defect. That guard's evidence base is mechanical rather than merely cited: [PROBE-107](conformance.md#probe-107--upstream-aql-suite-admissibility-corpus) is its gate over the queries the upstream AQL suites send and an engine answers, in every clause family, the FROM/CONTAINS combinations included; the corpus is vendored under [conformance.md § Vendored fixtures](conformance.md#vendored-fixtures-testkitcorpus).
 
 ### Out of scope
 
@@ -1898,7 +1898,7 @@ Row-semantics adjudication (REQ-161 carries the single advisory; the relation an
 On top of [REQ-013](module-layout.md#req-013--building-block-independence)'s rules, `openehr/aql/contain/` **MUST** limit its own imports to `openehr/rm/rminfo`, `openehr/rm` (REQ-120's canonical `ParseArchetypeID` — § Archetype/class conformance), and the standard library — it sits below both `openehr/aql` and `openehr/aql/lint`. Enforced by `TestContainForbiddenImports`.
 
 - **Lives in:** [`openehr/aql/contain/`](../../openehr/aql/contain/)
-- **Probes:** [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus) (armed by the Phase 2 lint corpus and the Phase 3 builder-verification parity arm); [PROBE-100](conformance.md#probe-100--upstream-aql-admissibility-corpus-ratchet) (the compatibility guard's evidence gate — the vendored upstream FROM/CONTAINS corpus, § Acceptance); [PROBE-107](conformance.md#probe-107--upstream-aql-suite-admissibility-corpus) (the same guard over every clause family the vendored upstream suites query)
+- **Probes:** [PROBE-097](conformance.md#probe-097--aql-semantic-and-portability-lint-corpus) (armed by the Phase 2 lint corpus and the Phase 3 builder-verification parity arm); [PROBE-107](conformance.md#probe-107--upstream-aql-suite-admissibility-corpus) (the compatibility guard's evidence gate over every clause family the vendored upstream suites query, the FROM/CONTAINS combinations included, § Acceptance)
 
 ## REQ-161 — AQL semantic and portability lint
 

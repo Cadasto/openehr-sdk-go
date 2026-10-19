@@ -2075,7 +2075,7 @@ requirements:
       - testkit/probes/aql/probe_107_suite_corpus.go
       - testkit/probes/aql/probe_107_suite_corpus_test.go
       - testkit/probes/aql/probes_test.go
-    probes: [PROBE-097, PROBE-100, PROBE-107]
+    probes: [PROBE-097, PROBE-107]
 
   - id: REQ-161
     title: AQL semantic and portability lint
