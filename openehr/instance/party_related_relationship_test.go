@@ -73,10 +73,11 @@ func TestREQ107_PartyRelatedGetsARelationship(t *testing.T) {
 // a DV_CODED_TEXT child: the generator writes the coded text the walk
 // builds under that child, and the RM default openehr 253 "unknown" is
 // never written over it. With one code listed the relationship is openehr
-// 10. With two listed, 10 and 253, it is the code the walk chose from the
-// list. Either way its text is the walk's, not the default's rubric. The
-// output passes the RM floor and the template validator, under every
-// policy, both value fills and both compile modes.
+// 10, and its text is that code's rubric in the subject relationship
+// group, "mother", not the walk's placeholder. With two listed, 10 and
+// 253, it is the code the walk chose from the list, with that code's
+// rubric. The output passes the RM floor and the template validator, under
+// every policy, both value fills and both compile modes.
 func TestREQ107_RelationshipKeepsTheOPTCode(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -84,6 +85,9 @@ func TestREQ107_RelationshipKeepsTheOPTCode(t *testing.T) {
 	}{
 		{name: "one code", codes: []string{"10"}},
 		{name: "two codes", codes: []string{"10", "253"}},
+	}
+	if rubric, _ := terminology.SubjectRelationship.Rubric("10"); rubric != "mother" {
+		t.Fatalf("subject relationship rubric of 10 = %q, want %q", rubric, "mother")
 	}
 	for _, tc := range cases {
 		opt := partyRelatedSubject(optSingle("relationship", optCodedText(terminology.ID, tc.codes...)))
@@ -100,8 +104,12 @@ func TestREQ107_RelationshipKeepsTheOPTCode(t *testing.T) {
 					if code.TerminologyID.Value != terminology.ID || !slices.Contains(tc.codes, code.CodeString) {
 						t.Errorf("PARTY_RELATED.relationship.defining_code = %+v, want a code of %s in %v", code, terminology.ID, tc.codes)
 					}
-					if rel.Value != walkText {
-						t.Errorf("PARTY_RELATED.relationship.value = %q, want the walk's %q", rel.Value, walkText)
+					rubric, ok := terminology.SubjectRelationship.Rubric(code.CodeString)
+					if !ok {
+						t.Fatalf("code %q has no rubric in the subject relationship group", code.CodeString)
+					}
+					if rel.Value != rubric {
+						t.Errorf("PARTY_RELATED.relationship.value = %q, want the group rubric %q of code %s", rel.Value, rubric, code.CodeString)
 					}
 					checkValid(t, out, c)
 				})
