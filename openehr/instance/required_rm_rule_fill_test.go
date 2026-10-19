@@ -18,17 +18,21 @@ import (
 // OPT's constraints, not a default of its BMM type: an ELEMENT whose
 // null_flavour the OPT prohibits takes the DV_QUANTITY its optional value
 // allows, an ELEMENT with no value takes the null flavour its optional
-// null_flavour lists, and a PARTY_IDENTIFIED takes the name its optional
-// C_STRING lists. Each case holds in both compile modes, and the output
-// passes the RM floor and the template validator.
+// null_flavour lists, and a PARTY_IDENTIFIED or PARTY_RELATED takes the
+// name its optional C_STRING lists. Each case holds in both compile modes,
+// and the output passes the RM floor and the template validator.
 func TestREQ107_RMRuleFillFollowsTheOPTChild(t *testing.T) {
 	// prohibits marks a case whose OPT prohibits the attribute the RM rule
 	// writes: the template validator reports that prohibition (REQ-107
 	// Exceptions and known gaps), so only the RM floor is checked.
+	// nameOnly marks a PARTY_RELATED case: the generator gives its
+	// relationship no default, so the RM floor reports Relationship_valid
+	// whatever the name, and only the name is checked.
 	cases := []struct {
 		name      string
 		opt       string
 		prohibits bool
+		nameOnly  bool
 		check     func(t *testing.T, out any)
 	}{
 		{
@@ -79,6 +83,20 @@ func TestREQ107_RMRuleFillFollowsTheOPTChild(t *testing.T) {
 			prohibits: true,
 			check:     subjectNamed("Dr X"),
 		},
+		{
+			name: "PARTY_RELATED name 0..1 over a C_STRING list",
+			opt: optTemplate("OBSERVATION", optSingle("subject", optNode("PARTY_RELATED", "",
+				optOptionalSingleOver("name", optPrimitive("STRING", "C_STRING", "<list>Dr X</list>"))))),
+			nameOnly: true,
+			check:    subjectNamed("Dr X"),
+		},
+		{
+			name: "PARTY_RELATED name 0..0 over a C_STRING list",
+			opt: optTemplate("OBSERVATION", optSingle("subject", optNode("PARTY_RELATED", "",
+				optProhibitedSingle("name", optPrimitive("STRING", "C_STRING", "<list>Dr X</list>"))))),
+			nameOnly: true,
+			check:    subjectNamed("Dr X"),
+		},
 	}
 	for _, tc := range cases {
 		for _, implicit := range []bool{true, false} {
@@ -90,6 +108,9 @@ func TestREQ107_RMRuleFillFollowsTheOPTChild(t *testing.T) {
 						t.Fatalf("Generate: %v", err)
 					}
 					tc.check(t, out)
+					if tc.nameOnly {
+						return
+					}
 					if tc.prohibits {
 						checkFloor(t, out)
 						return
@@ -112,7 +133,7 @@ func generatedElement(t *testing.T, out any) *rm.Element {
 }
 
 // subjectNamed checks that out is an OBSERVATION whose subject is a
-// PARTY_IDENTIFIED named want.
+// PARTY_IDENTIFIED or PARTY_RELATED named want.
 func subjectNamed(want string) func(t *testing.T, out any) {
 	return func(t *testing.T, out any) {
 		t.Helper()
@@ -120,15 +141,20 @@ func subjectNamed(want string) func(t *testing.T, out any) {
 		if !ok {
 			t.Fatalf("generated root is %T, want *rm.Observation", out)
 		}
-		party, ok := obs.Subject.(*rm.PartyIdentified)
-		if !ok {
-			t.Fatalf("OBSERVATION.subject is %T, want *rm.PartyIdentified", obs.Subject)
+		var name *string
+		switch party := obs.Subject.(type) {
+		case *rm.PartyIdentified:
+			name = party.Name
+		case *rm.PartyRelated:
+			name = party.Name
+		default:
+			t.Fatalf("OBSERVATION.subject is %T, want *rm.PartyIdentified or *rm.PartyRelated", obs.Subject)
 		}
-		if party.Name == nil {
-			t.Fatalf("PARTY_IDENTIFIED.name absent, want the %q the OPT lists", want)
+		if name == nil {
+			t.Fatalf("%T.name absent, want the %q the OPT lists", obs.Subject, want)
 		}
-		if *party.Name != want {
-			t.Errorf("PARTY_IDENTIFIED.name = %q, want the %q the OPT lists", *party.Name, want)
+		if *name != want {
+			t.Errorf("%T.name = %q, want the %q the OPT lists", obs.Subject, *name, want)
 		}
 	}
 }
