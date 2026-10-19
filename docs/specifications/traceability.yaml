@@ -1023,6 +1023,7 @@ requirements:
       - testkit/probe/live_test.go
       - testkit/probe/livecomposition_test.go
       - testkit/probe/liveexample_test.go
+      - testkit/probe/livegenerated_test.go
       - testkit/probe/livesnapshot_test.go
       - testkit/probe/livestatus_test.go
       - testkit/probe/livestoredquery_test.go
@@ -1516,6 +1517,7 @@ requirements:
       - openehr/validation/subtype_conformance_corpus_test.go
       - openehr/validation/subtype_conformance_test.go
       - openehr/validation/walk_primitive_test.go
+      - testkit/probe/livegenerated_test.go
       - testkit/probes/composition/probe_023_builder_round_trip.go
       - testkit/probes/instance/corpus_ratchet_test.go
       - testkit/probes/instance/probe_027_generated_validates.go
