@@ -269,6 +269,49 @@ func TestREQ101_REQ107_NewBuilderAcceptsOnlyLarge(t *testing.T) {
 	}
 }
 
+// TestREQ101_NewBuilderDefaultsToLarge checks REQ-101's skeleton policy
+// for NewBuilder when no WithPolicy is given: it builds on REQ-107's Large,
+// whatever the instance package's zero Policy is. On vital_signs its
+// skeleton holds a member of each of the four optional content
+// OBSERVATIONs, and as many JSON values as instance.Generate under Large.
+// That an explicit WithPolicy of another level is refused, the zero value
+// included, is TestREQ101_REQ107_NewBuilderAcceptsOnlyLarge's check.
+func TestREQ101_NewBuilderDefaultsToLarge(t *testing.T) {
+	t.Parallel()
+	c := compileFixture(t, "vital_signs")
+	b, err := composition.NewBuilder(t.Context(), c, policyOptions()...)
+	if err != nil {
+		t.Fatalf("NewBuilder(vital_signs) with no WithPolicy = %v, want nil", err)
+	}
+	skeleton, err := b.Build()
+	if err != nil {
+		t.Fatalf("Build of the bare skeleton: %v", err)
+	}
+	tree := decodedJSON(t, skeleton)
+
+	want := []string{
+		"openEHR-EHR-OBSERVATION.blood_pressure.v1",
+		"openEHR-EHR-OBSERVATION.body_temperature.v1",
+		"openEHR-EHR-OBSERVATION.heart_rate.v1",
+		"openEHR-EHR-OBSERVATION.respiration.v1",
+	}
+	if got := contentArchetypeIDs(tree); !slices.Equal(got, want) {
+		t.Errorf("NewBuilder(vital_signs) with no WithPolicy: skeleton content archetype ids = %v, want %v", got, want)
+	}
+	large, err := instance.Generate(t.Context(), c, instance.Options{
+		Policy:    instance.Large,
+		Territory: "NL",
+		Composer:  testComposer(),
+		Now:       policyNow,
+	})
+	if err != nil {
+		t.Fatalf("Generate(vital_signs, Large): %v", err)
+	}
+	if got, want := jsonValueCount(tree), jsonValueCount(decodedJSON(t, large)); got != want {
+		t.Errorf("NewBuilder(vital_signs) with no WithPolicy: skeleton holds %d JSON values, want Generate(Large)'s %d", got, want)
+	}
+}
+
 // undefinedPolicies are Policy values REQ-107 does not define: one past
 // its last level and one below its first. Policy's String names both
 // "unknown", so a refusal prints their number.

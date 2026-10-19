@@ -30,13 +30,18 @@ import (
 // fixed ExampleValue to seeded, sampled in-constraint values, for a
 // varied but valid corpus.
 func NewSkeleton(ctx context.Context, c *templatecompile.Compiled, opts ...Option) (*rm.Composition, error) {
+	return newSkeleton(ctx, c, buildConfig(opts...))
+}
+
+// newSkeleton is NewSkeleton on the options cfg holds. With no WithPolicy
+// given, cfg holds the zero Policy, the instance package's default.
+func newSkeleton(ctx context.Context, c *templatecompile.Compiled, cfg *config) (*rm.Composition, error) {
 	if c == nil || c.Root() == nil {
 		return nil, instance.ErrNilCompiled
 	}
 	if rt := c.Root().RMTypeName(); rt != "COMPOSITION" {
 		return nil, fmt.Errorf("composition.NewSkeleton: OPT root %q is not COMPOSITION", rt)
 	}
-	cfg := buildConfig(opts...)
 	switch cfg.policy {
 	case instance.Large, instance.Medium, instance.Required:
 		// The policies the instance package defines.

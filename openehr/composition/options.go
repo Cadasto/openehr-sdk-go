@@ -24,6 +24,7 @@ type config struct {
 	category    *rm.DVCodedText
 	now         time.Time
 	policy      instance.Policy
+	policySet   bool // WithPolicy was given; its policy can be the zero value
 	valueFill   instance.ValueFill
 	valueSource mrand.Source
 }
@@ -80,7 +81,10 @@ func WithNow(t time.Time) Option {
 // skeleton lacks. Each returns ErrUnsupportedPolicy for a Policy value it
 // does not accept.
 func WithPolicy(p instance.Policy) Option {
-	return func(c *config) { c.policy = p }
+	return func(c *config) {
+		c.policy = p
+		c.policySet = true
+	}
 }
 
 // WithValueFill selects how primitive leaves are valued. The default
