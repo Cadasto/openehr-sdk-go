@@ -90,9 +90,8 @@ func TestProbe027MissingTerritoryFails(t *testing.T) {
 }
 
 // TestProbe027_RealWorldCorpus extends PROBE-027 to the real-world OPTs
-// filed against REQ-107. The assertion below is the Large policy, the
-// default; TestREQ107_CorpusRatchet runs the other settings over the same
-// OPTs.
+// filed against REQ-107. The assertion below is the Large policy;
+// TestREQ107_CorpusRatchet runs the other settings over the same OPTs.
 func TestProbe027_RealWorldCorpus(t *testing.T) {
 	opts := instance.Options{
 		Policy:    instance.Large,

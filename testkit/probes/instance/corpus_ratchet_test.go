@@ -118,8 +118,8 @@ var mediumHollowBodies = []string{
 // It skips the repeated named SECTION.adhoc.v1 roots of Corona_Anamnese
 // after the first, so it never reaches 'Allgemeine Angaben' and its
 // unfillable slot. Under Large no template's body is hollow: a hollow_body
-// failure there fails the ratchet. The builder runs the default policy,
-// Large, so its rows are Large rows.
+// failure there fails the ratchet. The builder builds on Large when no
+// WithPolicy is given, so its rows are Large rows.
 //
 // Medium rows: Medium gives an attribute at most one optional archetype,
 // its first optional archetype root. family_history's content builds its
