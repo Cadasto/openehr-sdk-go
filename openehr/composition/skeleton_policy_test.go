@@ -228,7 +228,9 @@ func TestREQ101_REQ107_NewSkeletonAcceptsRequired(t *testing.T) {
 // holds one optional archetype under an attribute, also given explicitly
 // as the zero value it is, and Required, whose skeleton holds none, and so
 // Minimal, with an error wrapping ErrUnsupportedPolicy that names the
-// policy, and no Builder. It accepts Large, and so Complete. The Large
+// policy, and no Builder. That error does not wrap
+// instance.ErrUnsupportedPolicy, since REQ-107 defines both levels. It
+// accepts Large, and so Complete. The Large
 // skeleton holds the heart-rate OBSERVATION of vital_signs, the third of
 // its four optional content archetypes, so a value set there builds
 // without error.
@@ -253,6 +255,9 @@ func TestREQ101_REQ107_NewBuilderAcceptsOnlyLarge(t *testing.T) {
 			if tc.refused {
 				if !errors.Is(err, composition.ErrUnsupportedPolicy) {
 					t.Errorf("NewBuilder(vital_signs, WithPolicy(%v)) error = %v, want one wrapping ErrUnsupportedPolicy", tc.policy, err)
+				}
+				if errors.Is(err, instance.ErrUnsupportedPolicy) {
+					t.Errorf("NewBuilder(vital_signs, WithPolicy(%v)) error = %v wraps instance.ErrUnsupportedPolicy, want it not to: the instance package defines %v", tc.policy, err, tc.policy)
 				}
 				if err != nil && !strings.Contains(err.Error(), tc.policy.String()) {
 					t.Errorf("NewBuilder(vital_signs, WithPolicy(%v)) error = %q, want it to name the policy %q", tc.policy, err, tc.policy)
@@ -319,17 +324,17 @@ func TestREQ101_NewBuilderDefaultsToLarge(t *testing.T) {
 }
 
 // undefinedPolicies are Policy values REQ-107 does not define: one past
-// its last level and one below its first. Policy's String names both
-// "unknown", so a refusal prints their number.
-var undefinedPolicies = []instance.Policy{instance.Policy(3), instance.Policy(-1)}
+// its last level, one below its first and one far past it. Policy's
+// String names each "unknown", so a refusal prints their number.
+var undefinedPolicies = []instance.Policy{instance.Policy(3), instance.Policy(-1), instance.Policy(99)}
 
 // TestREQ101_NewBuilderRefusesAnUndefinedPolicy checks REQ-101's skeleton
 // policy for a Policy value that is none of REQ-107's three: NewBuilder
-// refuses it with an error wrapping ErrUnsupportedPolicy that prints the
-// value's number, and returns no Builder. NewSkeleton refuses such a
-// value too, so the error's composition.NewBuilder prefix is what shows
-// that NewBuilder refused it itself, rather than passing it on to
-// NewSkeleton.
+// refuses it with an error wrapping ErrUnsupportedPolicy and
+// instance.ErrUnsupportedPolicy that prints the value's number, and
+// returns no Builder. NewSkeleton refuses such a value too, so the
+// error's composition.NewBuilder prefix is what shows that NewBuilder
+// refused it itself, rather than passing it on to NewSkeleton.
 func TestREQ101_NewBuilderRefusesAnUndefinedPolicy(t *testing.T) {
 	t.Parallel()
 	for _, p := range undefinedPolicies {
@@ -344,6 +349,9 @@ func TestREQ101_NewBuilderRefusesAnUndefinedPolicy(t *testing.T) {
 			if !errors.Is(err, composition.ErrUnsupportedPolicy) {
 				t.Fatalf("NewBuilder(vital_signs, WithPolicy(%s)) error = %v, want one wrapping ErrUnsupportedPolicy", n, err)
 			}
+			if !errors.Is(err, instance.ErrUnsupportedPolicy) {
+				t.Errorf("NewBuilder(vital_signs, WithPolicy(%s)) error = %v, want one wrapping instance.ErrUnsupportedPolicy too", n, err)
+			}
 			if msg := err.Error(); !strings.HasPrefix(msg, "composition.NewBuilder: ") || !strings.HasSuffix(msg, ": "+n) {
 				t.Errorf("NewBuilder(vital_signs, WithPolicy(%s)) error = %q, want NewBuilder's own refusal ending in the number %s", n, msg, n)
 			}
@@ -354,7 +362,8 @@ func TestREQ101_NewBuilderRefusesAnUndefinedPolicy(t *testing.T) {
 // TestREQ101_NewSkeletonRefusesAnUndefinedPolicy checks REQ-101's
 // skeleton policy for NewSkeleton: a Policy value that is none of
 // REQ-107's three is refused with an error wrapping ErrUnsupportedPolicy
-// that prints the value's number, and no composition.
+// and instance.ErrUnsupportedPolicy that prints the value's number, and
+// no composition.
 func TestREQ101_NewSkeletonRefusesAnUndefinedPolicy(t *testing.T) {
 	t.Parallel()
 	for _, p := range undefinedPolicies {
@@ -368,6 +377,9 @@ func TestREQ101_NewSkeletonRefusesAnUndefinedPolicy(t *testing.T) {
 			}
 			if !errors.Is(err, composition.ErrUnsupportedPolicy) {
 				t.Fatalf("NewSkeleton(vital_signs, WithPolicy(%s)) error = %v, want one wrapping ErrUnsupportedPolicy", n, err)
+			}
+			if !errors.Is(err, instance.ErrUnsupportedPolicy) {
+				t.Errorf("NewSkeleton(vital_signs, WithPolicy(%s)) error = %v, want one wrapping instance.ErrUnsupportedPolicy too", n, err)
 			}
 			if msg := err.Error(); !strings.HasSuffix(msg, ": "+n) {
 				t.Errorf("NewSkeleton(vital_signs, WithPolicy(%s)) error = %q, want it to end in the number %s", n, msg, n)
