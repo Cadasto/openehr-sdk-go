@@ -28,8 +28,11 @@ func relationshipCodedText(terminologyID string, codes ...string) string {
 // admits it. A code the OPT gave is kept, also where the OPT admits 253
 // too, and the placeholder stays where the OPT names another terminology.
 // It calls fillRelationship directly, so each relationship state it starts
-// from is set by hand; TestREQ107_RelationshipKeepsTheOPTCode covers the
-// same rule through Generate.
+// from is set by hand. Through Generate,
+// TestREQ107_PartyRelatedGetsARelationship checks the 253 default where the
+// OPT gives no code, and TestREQ107_RelationshipKeepsTheOPTCode checks that
+// a code the OPT pins is kept: the walk's 10 under ExampleFill, also where
+// the OPT admits 253 too.
 func TestREQ107_RelationshipDefaultYieldsToTheOPT(t *testing.T) {
 	coded := func(terminologyID, code, text string) rm.DVCodedText {
 		return rm.DVCodedText{

@@ -102,7 +102,8 @@ func TestREQ107_ProhibitedNullFlavourTakesAValue(t *testing.T) {
 // ELEMENT whose OPT prohibits both value and null_flavour, which the RM
 // rule Inv_null_flavour_indicated then needs, has its null_flavour written
 // as if the OPT allowed it: the walk takes the prohibited attribute's own
-// child, so a pinned code stays, and the RM default 271 applies only where
+// child, so a pinned code stays with its rubric as its text, since the
+// child leaves the text free, and the RM default 271 applies only where
 // that leaves no code and the child admits 271. It holds under every
 // policy, both value fills and both compile modes.
 func TestREQ107_BothProhibitedNullFlavourIsWalked(t *testing.T) {
@@ -110,22 +111,26 @@ func TestREQ107_BothProhibitedNullFlavourIsWalked(t *testing.T) {
 		name string
 		nf   string
 		want rm.CodePhrase
+		text string // the null flavour's text
 	}{
 		{
 			name: "no child", nf: optProhibitedSingle("null_flavour"),
 			want: rm.CodePhrase{CodeString: "271", TerminologyID: rm.TerminologyID{Value: terminology.ID}},
+			text: "no information",
 		},
 		{
 			name: "a C_CODE_PHRASE pinning 253", nf: optProhibitedSingle("null_flavour", optCodedText(terminology.ID, "253")),
 			want: rm.CodePhrase{CodeString: "253", TerminologyID: rm.TerminologyID{Value: terminology.ID}},
+			text: "unknown",
 		},
 		{
 			name: "an empty-list C_CODE_PHRASE under openehr", nf: optProhibitedSingle("null_flavour", optCodedText(terminology.ID)),
 			want: rm.CodePhrase{CodeString: "271", TerminologyID: rm.TerminologyID{Value: terminology.ID}},
+			text: "no information",
 		},
 		{
 			name: "an empty-list C_CODE_PHRASE under local", nf: optProhibitedSingle("null_flavour", optCodedText("local")),
-			want: localAt0000,
+			want: localAt0000, text: walkText,
 		},
 	}
 	for _, tc := range cases {
@@ -145,6 +150,9 @@ func TestREQ107_BothProhibitedNullFlavourIsWalked(t *testing.T) {
 						t.Fatalf("ELEMENT.null_flavour absent, want %+v", tc.want)
 					}
 					checkCode(t, "ELEMENT.null_flavour", el.NullFlavour.DefiningCode, tc.want)
+					if el.NullFlavour.Value != tc.text {
+						t.Errorf("ELEMENT.null_flavour.value = %q, want %q", el.NullFlavour.Value, tc.text)
+					}
 				})
 			}
 		}

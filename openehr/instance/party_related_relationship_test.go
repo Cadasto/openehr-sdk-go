@@ -70,21 +70,24 @@ func TestREQ107_PartyRelatedGetsARelationship(t *testing.T) {
 
 // TestREQ107_RelationshipKeepsTheOPTCode is the REQ-107 check of
 // Precedence 1 on a PARTY_RELATED's relationship the OPT constrains with
-// a DV_CODED_TEXT child: the generator writes the coded text the walk
-// builds under that child, and the RM default openehr 253 "unknown" is
-// never written over it. With one code listed the relationship is openehr
-// 10, and its text is that code's rubric in the subject relationship
-// group, "mother", not the walk's placeholder. With two listed, 10 and
-// 253, it is the code the walk chose from the list, with that code's
-// rubric. The output passes the RM floor and the template validator, under
-// every policy, both value fills and both compile modes.
+// a DV_CODED_TEXT child: the generator writes the code the walk builds
+// under that child, with that code's rubric in the subject relationship
+// group as its text, not the walk's placeholder, and the RM default
+// openehr 253 "unknown" is not written over it. With one code listed the
+// relationship is openehr 10 "mother". With two listed, 10 and 253, it is
+// a listed code with its rubric, and under ExampleFill, whose choice is
+// fixed, the walk's 10 "mother", so a 253 written over it fails. The
+// output passes the RM floor and the template validator, under every
+// policy, both value fills and both compile modes.
 func TestREQ107_RelationshipKeepsTheOPTCode(t *testing.T) {
 	cases := []struct {
 		name  string
 		codes []string
+		// example is the code the walk writes under ExampleFill.
+		example string
 	}{
-		{name: "one code", codes: []string{"10"}},
-		{name: "two codes", codes: []string{"10", "253"}},
+		{name: "one code", codes: []string{"10"}, example: "10"},
+		{name: "two codes", codes: []string{"10", "253"}, example: "10"},
 	}
 	if rubric, _ := terminology.SubjectRelationship.Rubric("10"); rubric != "mother" {
 		t.Fatalf("subject relationship rubric of 10 = %q, want %q", rubric, "mother")
@@ -103,6 +106,9 @@ func TestREQ107_RelationshipKeepsTheOPTCode(t *testing.T) {
 					code := rel.DefiningCode
 					if code.TerminologyID.Value != terminology.ID || !slices.Contains(tc.codes, code.CodeString) {
 						t.Errorf("PARTY_RELATED.relationship.defining_code = %+v, want a code of %s in %v", code, terminology.ID, tc.codes)
+					}
+					if opts.ValueFill == instance.ExampleFill && code.CodeString != tc.example {
+						t.Errorf("PARTY_RELATED.relationship code under ExampleFill = %q, want the walk's %q", code.CodeString, tc.example)
 					}
 					rubric, ok := terminology.SubjectRelationship.Rubric(code.CodeString)
 					if !ok {
