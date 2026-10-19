@@ -1486,6 +1486,7 @@ requirements:
       - openehr/instance/phase4_test.go
       - openehr/instance/placeholder_exact_test.go
       - openehr/instance/placeholder_test.go
+      - openehr/instance/policy_names_test.go
       - openehr/instance/policy_refusal_test.go
       - openehr/instance/polymorphic_roundtrip_test.go
       - openehr/instance/post_walk_binding_test.go
