@@ -14,7 +14,7 @@ import (
 )
 
 // undefinedPolicies are Policy values REQ-107 does not define: one past
-// Required, a negative one and one far out of range.
+// Large, a negative one and one far out of range.
 var undefinedPolicies = []instance.Policy{instance.Policy(3), instance.Policy(-1), instance.Policy(99)}
 
 // countingSource is a math/rand/v2 Source that counts its draws.

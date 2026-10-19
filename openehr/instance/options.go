@@ -2,7 +2,9 @@ package instance
 
 import (
 	"errors"
+	"fmt"
 	mrand "math/rand/v2"
+	"strings"
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -17,23 +19,14 @@ import (
 // decides. Under every policy an RM rule can need more than the policy
 // visits, such as an ELEMENT's value or null_flavour, and a visited
 // multi-valued attribute is topped up to its lower bound. [ValueFill],
-// not the policy, decides how a primitive leaf is valued. Large, Medium
-// and Required are the only policies: [Generate] refuses any other value
-// with [ErrUnsupportedPolicy].
+// not the policy, decides how a primitive leaf is valued. Medium,
+// Required and Large are the only levels, and Medium, the zero value, is
+// the default; Minimal and Complete are other names for Required and
+// Large. [Generate] refuses any other value with [ErrUnsupportedPolicy].
+// [ParsePolicy] reads a policy from its name.
 type Policy int
 
 const (
-	// Large builds a member of every optional archetype the template
-	// names. It visits every attribute the visit rule allows: every
-	// attribute the compiled node carries, the optional ones the OPT
-	// names included. A visited multi-valued attribute gets at least one
-	// member of each allowed OPT child that is not a slot, except an
-	// optional child whose identity a required sibling, or an earlier
-	// optional one, carries; optional archetype roots of different
-	// archetypes each get theirs. It stops short of the ITS-REST template
-	// example's detail_level=complete (every data point the template
-	// allows), which no policy builds. Large is the zero value.
-	Large Policy = iota
 	// Medium builds at most one optional archetype under an attribute,
 	// what the ITS-REST template example calls detail_level=medium. It
 	// visits the required attributes, and those with an allowed OPT
@@ -43,8 +36,9 @@ const (
 	// multi-valued attribute gets its members as under Large, except that
 	// an optional archetype root after the first optional archetype root
 	// of the attribute, in OPT order, gets none of its own, whatever its
-	// archetype.
-	Medium
+	// archetype. Medium is the zero value, so Options with no Policy
+	// builds it.
+	Medium Policy = iota
 	// Required builds only the data points the template makes mandatory
 	// and a composition's context, what the ITS-REST template example
 	// calls detail_level=required. It visits only the required
@@ -61,20 +55,64 @@ const (
 	// as the null_flavour of an ELEMENT whose value the template leaves
 	// optional, so its tree is not always smaller than Medium's.
 	Required
+	// Large builds a member of every optional archetype the template
+	// names. It visits every attribute the visit rule allows: every
+	// attribute the compiled node carries, the optional ones the OPT
+	// names included. A visited multi-valued attribute gets at least one
+	// member of each allowed OPT child that is not a slot, except an
+	// optional child whose identity a required sibling, or an earlier
+	// optional one, carries; optional archetype roots of different
+	// archetypes each get theirs. It stops short of the ITS-REST template
+	// example's detail_level=complete (every data point the template
+	// allows), which no level of its own builds yet.
+	Large
+
+	// Minimal is another name for Required.
+	Minimal = Required
+	// Complete is another name for Large, until a level of its own
+	// builds the ITS-REST template example's detail_level=complete.
+	Complete = Large
 )
 
-// String returns "large" / "medium" / "required" / "unknown" for
-// diagnostics.
+// String returns "medium" / "required" / "large" / "unknown" for
+// diagnostics. Minimal and Complete print the name of the level they
+// stand for.
 func (p Policy) String() string {
 	switch p {
-	case Large:
-		return "large"
 	case Medium:
 		return "medium"
 	case Required:
 		return "required"
+	case Large:
+		return "large"
 	}
 	return "unknown"
+}
+
+// ParsePolicy returns the Policy that name names: "required", "minimal",
+// "medium", "large" or "complete", in any mix of upper and lower case.
+// "minimal" gives Required and "complete" gives Large. Any other text,
+// the empty string and a name with a space around it included, returns
+// an error wrapping [ErrUnsupportedPolicy] that quotes the text.
+func ParsePolicy(name string) (Policy, error) {
+	for _, n := range policyNames {
+		if strings.EqualFold(name, n.name) {
+			return n.policy, nil
+		}
+	}
+	return 0, fmt.Errorf("%w %q", ErrUnsupportedPolicy, name)
+}
+
+// policyNames are the names ParsePolicy reads, with the policy each names.
+var policyNames = [...]struct {
+	name   string
+	policy Policy
+}{
+	{name: "required", policy: Required},
+	{name: "minimal", policy: Minimal},
+	{name: "medium", policy: Medium},
+	{name: "large", policy: Large},
+	{name: "complete", policy: Complete},
 }
 
 // ValueFill controls how primitive leaves are valued, orthogonally to
@@ -109,11 +147,12 @@ func (f ValueFill) String() string {
 }
 
 // Options configures one [Generate] invocation. Zero value is valid
-// for non-COMPOSITION roots: the Large policy, the compiled template's
+// for non-COMPOSITION roots: the Medium policy, the compiled template's
 // own language (English when it names none), time.Now().UTC() clock.
 type Options struct {
-	// Policy is Large, Medium or Required. The zero value is Large.
-	// Generate refuses any other value with ErrUnsupportedPolicy.
+	// Policy is Medium, Required or Large, or Minimal or Complete, their
+	// other names. The zero value is Medium. Generate refuses any other
+	// value with ErrUnsupportedPolicy.
 	Policy Policy
 
 	// Language is the ISO 639-1 code of the COMPOSITION's and every
@@ -172,10 +211,11 @@ var ErrTerritoryRequired = errors.New("instance.Generate: Territory is required 
 // invocation omitted the Composer option.
 var ErrComposerRequired = errors.New("instance.Generate: Composer is required for COMPOSITION roots")
 
-// ErrUnsupportedPolicy signals that the Policy option is none of Large,
-// Medium and Required. Generate returns it, naming the value, before it
-// builds anything.
-var ErrUnsupportedPolicy = errors.New("instance.Generate: unsupported policy")
+// ErrUnsupportedPolicy signals a policy the package does not define.
+// Generate returns it, naming the value, for a Policy option that is none
+// of Medium, Required and Large, before it builds anything, and
+// ParsePolicy returns it, quoting the text, for a name it does not read.
+var ErrUnsupportedPolicy = errors.New("instance: unsupported policy")
 
 // ErrTypeMismatch is returned by AsComposition / AsObservation /
 // etc. when the produced root is not the requested concrete type.

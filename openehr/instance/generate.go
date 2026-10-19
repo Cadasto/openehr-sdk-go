@@ -33,7 +33,7 @@ import (
 // any; use [AsComposition], [AsObservation], etc. for the concrete
 // access path.
 //
-// A Policy other than Large, Medium and Required makes Generate return
+// A Policy other than Medium, Required and Large makes Generate return
 // an error wrapping [ErrUnsupportedPolicy] and no root, before it builds
 // anything.
 //
@@ -51,7 +51,7 @@ func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (a
 		return nil, ErrNilCompiled
 	}
 	switch opts.Policy {
-	case Large, Medium, Required:
+	case Medium, Required, Large:
 		// The policies the package defines.
 	default:
 		// Policy's String names every other value "unknown", so the

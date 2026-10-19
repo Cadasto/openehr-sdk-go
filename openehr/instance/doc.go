@@ -35,14 +35,6 @@
 // The three policies follow the levels of the ITS-REST template
 // example's detail_level:
 //
-//   - Large: every attribute the visit rule allows, the optional ones the
-//     template names included. A visited multi-valued attribute gets at
-//     least one member of each allowed child that is not a slot, except
-//     an optional child whose identity a required or earlier sibling
-//     carries. So Large builds a member of every optional archetype the
-//     template names. It stops short of the complete level, every data
-//     point the template allows, which no policy builds. It is the
-//     default.
 //   - Medium: the required attributes (the BMM marks them mandatory, or
 //     their existence or cardinality lower bound is at least 1), and those
 //     with an allowed template child (one whose occurrences upper bound is
@@ -50,7 +42,7 @@
 //     Large, except that an optional archetype after the first optional
 //     archetype of the attribute gets none, whatever its archetype. So
 //     Medium builds at most one optional archetype under an attribute, the
-//     medium level.
+//     medium level. It is the zero value, and so the default.
 //   - Required: the required attributes only, not one merely because it
 //     has an allowed template child, except a composition's context,
 //     which it visits as Medium does, so the context every policy writes
@@ -62,9 +54,19 @@
 //     a node, such as the null flavour of an element whose value the
 //     template leaves optional, so its tree is not always smaller than
 //     Medium's.
+//   - Large: every attribute the visit rule allows, the optional ones the
+//     template names included. A visited multi-valued attribute gets at
+//     least one member of each allowed child that is not a slot, except
+//     an optional child whose identity a required or earlier sibling
+//     carries. So Large builds a member of every optional archetype the
+//     template names. It stops short of the complete level, every data
+//     point the template allows, which no level of its own builds yet.
 //
-// Generate refuses any other Policy value with [ErrUnsupportedPolicy],
-// before it builds anything.
+// [Minimal] is another name for Required, and [Complete] for Large until
+// the complete level lands. [ParsePolicy] reads a policy from the names
+// required, minimal, medium, large and complete, in any case. Generate
+// refuses any other Policy value with [ErrUnsupportedPolicy], before it
+// builds anything.
 //
 // Under every policy, every primitive leaf the walk reaches is valued as
 // [Options.ValueFill] says: the constraint's example value under
