@@ -22,7 +22,8 @@ import (
 // NewSkeleton accepts instance.Medium, instance.Required and
 // instance.Large, and so their other names instance.Minimal and
 // instance.Complete. It refuses any other Policy value, before generating
-// anything, with an error wrapping ErrUnsupportedPolicy.
+// anything, with an error wrapping both ErrUnsupportedPolicy and
+// instance.ErrUnsupportedPolicy.
 //
 // WithComposer and WithTerritory are required for COMPOSITION roots
 // (instance.Generate enforces); WithLanguage / WithCategory / WithNow
@@ -74,10 +75,11 @@ func newSkeleton(ctx context.Context, c *templatecompile.Compiled, cfg *config) 
 
 // errUndefinedPolicy returns the error the entry point op gives for p, a
 // Policy value that is none of those the instance package defines. It
-// wraps ErrUnsupportedPolicy and prints p's number, since Policy's String
-// names every such value "unknown".
+// wraps ErrUnsupportedPolicy, and instance.ErrUnsupportedPolicy as
+// instance.Generate does for such a value, and prints p's number, since
+// Policy's String names every such value "unknown".
 func errUndefinedPolicy(op string, p instance.Policy) error {
-	return fmt.Errorf("%s: %w: %d", op, ErrUnsupportedPolicy, p)
+	return fmt.Errorf("%s: %w: %w: %d", op, ErrUnsupportedPolicy, instance.ErrUnsupportedPolicy, p)
 }
 
 // buildConfig folds opts into a config struct.

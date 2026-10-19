@@ -82,7 +82,9 @@ func WithNow(t time.Time) Option {
 // Large when no WithPolicy is given and accepts only Large, since Set does
 // not build a node the skeleton lacks: it refuses an explicit
 // WithPolicy(instance.Medium), though Medium is the zero value. Each
-// returns ErrUnsupportedPolicy for a Policy value it does not accept.
+// returns ErrUnsupportedPolicy for a Policy value it does not accept, and
+// for one the instance package does not define an error that also wraps
+// instance.ErrUnsupportedPolicy.
 func WithPolicy(p instance.Policy) Option {
 	return func(c *config) {
 		c.policy = p
@@ -149,5 +151,8 @@ var ErrInvalidPath = errors.New("composition: path not addressable on skeleton")
 // member of every optional archetype. NewBuilder also returns it for any
 // Policy value the instance package does not define. NewSkeleton accepts
 // instance.Medium, instance.Required and instance.Large, and returns it
-// for any other Policy value. Comparable via errors.Is.
+// for any other Policy value. The refusal of a Policy value the instance
+// package does not define also wraps instance.ErrUnsupportedPolicy, as
+// instance.Generate's does; NewBuilder's refusal of instance.Medium or
+// instance.Required does not. Comparable via errors.Is.
 var ErrUnsupportedPolicy = errors.New("composition: unsupported skeleton policy")

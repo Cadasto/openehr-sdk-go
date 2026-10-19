@@ -66,7 +66,9 @@ type pendingAssignment struct {
 // accepts only instance.Large. It refuses instance.Medium and
 // instance.Required, naming the policy, and any Policy value the instance
 // package does not define, before generating anything, with an error
-// wrapping ErrUnsupportedPolicy and no Builder.
+// wrapping ErrUnsupportedPolicy and no Builder. Only the refusal of an
+// undefined value also wraps instance.ErrUnsupportedPolicy, since the
+// instance package defines Medium and Required.
 func NewBuilder(ctx context.Context, c *templatecompile.Compiled, opts ...Option) (*Builder, error) {
 	if c == nil {
 		// Wrap instance.ErrNilCompiled (the sentinel NewSkeleton /

@@ -22,9 +22,12 @@
 // archetype. NewBuilder builds on instance.Large when no WithPolicy is
 // given, and refuses Medium and Required with [ErrUnsupportedPolicy],
 // because Set needs a member of every optional archetype, which only Large
-// builds. There is no second OPT walker here: the generated attribute
-// access of `internal/rmaccess` (read side) and `rmwrite` (write side)
-// provide the closed-dispatch attribute access the path navigator needs.
+// builds. Both entry points refuse a Policy value the instance package does
+// not define with an error wrapping [ErrUnsupportedPolicy] and
+// [instance.ErrUnsupportedPolicy]. There is no second OPT walker here: the
+// generated attribute access of `internal/rmaccess` (read side) and
+// `rmwrite` (write side) provide the closed-dispatch attribute access the
+// path navigator needs.
 //
 // Per-template typed builders (vital-signs-shaped struct setters) are
 // not provided.
