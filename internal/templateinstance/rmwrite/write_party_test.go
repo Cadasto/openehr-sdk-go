@@ -111,3 +111,40 @@ func TestREQ107_PartyParentsAddressTheirAttributes(t *testing.T) {
 		})
 	}
 }
+
+// TestREQ107_PartyRelatedWritesItsRelationship is the REQ-107 check that
+// rmwrite writes a PARTY_RELATED's relationship, so the generator keeps
+// the coded text an OPT constrains there. The DV_CODED_TEXT is taken as a
+// pointer, the shape the walk builds, or as a value. Another child is
+// ErrTypeMismatch, and every other attribute, single or multi-valued, is
+// ErrUnknownAttribute.
+func TestREQ107_PartyRelatedWritesItsRelationship(t *testing.T) {
+	t.Parallel()
+	mother := rm.DVCodedText{
+		Value:        "mother",
+		DefiningCode: rm.CodePhrase{CodeString: "10", TerminologyID: rm.TerminologyID{Value: "openehr"}},
+	}
+	for _, child := range []any{&mother, mother} {
+		p := &rm.PartyRelated{}
+		if err := EnsureSingle(p, "relationship", child); err != nil {
+			t.Errorf("EnsureSingle(PARTY_RELATED, relationship, %T) = %v, want nil", child, err)
+			continue
+		}
+		if got := p.Relationship; got.DefiningCode != mother.DefiningCode || got.Value != mother.Value {
+			t.Errorf("EnsureSingle(PARTY_RELATED, relationship, %T): relationship = %q %+v, want %q %+v",
+				child, got.Value, got.DefiningCode, mother.Value, mother.DefiningCode)
+		}
+	}
+	for _, child := range []any{&rm.DVText{Value: "mother"}, (*rm.DVCodedText)(nil), "mother"} {
+		if err := EnsureSingle(&rm.PartyRelated{}, "relationship", child); !errors.Is(err, ErrTypeMismatch) {
+			t.Errorf("EnsureSingle(PARTY_RELATED, relationship, %T) = %v, want ErrTypeMismatch", child, err)
+		}
+	}
+	for _, attr := range []string{"name", "external_ref", "identifiers", "not_an_attribute"} {
+		for _, write := range []func(any, string, any) error{EnsureSingle, AppendMultiple} {
+			if err := write(&rm.PartyRelated{}, attr, &mother); !errors.Is(err, ErrUnknownAttribute) {
+				t.Errorf("write(PARTY_RELATED, %q) = %v, want ErrUnknownAttribute", attr, err)
+			}
+		}
+	}
+}

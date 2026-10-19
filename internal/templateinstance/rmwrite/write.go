@@ -134,6 +134,8 @@ func EnsureSingle(parent any, attrName string, child any) error {
 		return writeAddressSingle(p, attrName, child)
 	case *rm.PartyIdentity:
 		return writePartyIdentitySingle(p, attrName, child)
+	case *rm.PartyRelated:
+		return writePartyRelatedSingle(p, attrName, child)
 	}
 	return fmt.Errorf("%w: parent %T, attr %q", ErrUnknownAttribute, parent, attrName)
 }
@@ -1171,6 +1173,16 @@ func writePartyIdentitySingle(p *rm.PartyIdentity, attr string, child any) error
 		return assignItemStructure(child, func(v rm.ItemStructure) { p.Details = v }, attr)
 	}
 	return fmt.Errorf("%w: *rm.PartyIdentity has no single attr %q", ErrUnknownAttribute, attr)
+}
+
+// writePartyRelatedSingle writes the relationship of a PARTY_RELATED, so a
+// coded text an OPT constrains there is kept. It writes no other
+// PARTY_RELATED attribute.
+func writePartyRelatedSingle(p *rm.PartyRelated, attr string, child any) error {
+	if attr == "relationship" {
+		return assignVia(child, func(v rm.DVCodedText) { p.Relationship = v }, attr, "DV_CODED_TEXT")
+	}
+	return fmt.Errorf("%w: *rm.PartyRelated has no single attr %q", ErrUnknownAttribute, attr)
 }
 
 func writeContactMultiple(c *rm.Contact, attr string, child any) error {

@@ -38,9 +38,7 @@ func subjectRelationship(t *testing.T, out any) rm.DVCodedText {
 // the subject relationship group, so RM Relationship_valid holds. The
 // output passes the RM floor and the template validator. It holds under
 // every policy, both value fills and both compile modes. A relationship
-// the OPT constrains with a child is not built here: the template-instance
-// writer cannot write it, so TestREQ107_RelationshipDefaultYieldsToTheOPT
-// checks that case on the default alone.
+// the OPT constrains with a child is TestREQ107_RelationshipKeepsTheOPTCode's.
 func TestREQ107_PartyRelatedGetsARelationship(t *testing.T) {
 	cases := []struct {
 		name string
