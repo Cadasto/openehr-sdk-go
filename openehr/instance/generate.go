@@ -759,8 +759,8 @@ func attrType(parentType, declared string) string {
 
 // settleBuilt gives a value built from the BMM alone, which the walk
 // never reaches, the RM default finishNode gives a walked one where no
-// other pass does: an ISM_TRANSITION's current state, and a party's
-// name.
+// other pass does: an ISM_TRANSITION's current state, a party's name, and
+// a PARTY_RELATED's relationship.
 func settleBuilt(v any) {
 	switch b := v.(type) {
 	case *rm.IsmTransition:
@@ -769,6 +769,7 @@ func settleBuilt(v any) {
 		fillPartyName(&b.Name, len(b.Identifiers), b.ExternalRef)
 	case *rm.PartyRelated:
 		fillPartyName(&b.Name, len(b.Identifiers), b.ExternalRef)
+		fillRelationship(nil, &b.Relationship)
 	}
 }
 
@@ -2043,6 +2044,7 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 		fillPartyName(&v.Name, len(v.Identifiers), v.ExternalRef)
 	case *rm.PartyRelated:
 		fillPartyName(&v.Name, len(v.Identifiers), v.ExternalRef)
+		fillRelationship(opt, &v.Relationship)
 	case *rm.Element:
 		g.settleElement(opt, v)
 	case *rm.DVEHRURI:
@@ -2481,6 +2483,23 @@ func fillCurrentState(opt *tcimpl.CompiledNode, iv *rm.IsmTransition) {
 		return
 	}
 	iv.CurrentState = initial
+}
+
+// fillRelationship gives a PARTY_RELATED's relationship with no code
+// (noCode) the code 253 (unknown) of the openEHR subject relationship
+// group, with its rubric, so RM Relationship_valid holds, where the OPT's
+// constraint on relationship admits it (codedTextAdmitted). A code the
+// OPT gave is kept. opt is the OPT node of the party, or nil for one
+// built from the BMM alone.
+func fillRelationship(opt *tcimpl.CompiledNode, rel *rm.DVCodedText) {
+	if !noCode(rel.DefiningCode.CodeString) {
+		return
+	}
+	unknown := openehrCoded(terminology.SubjectRelationship, "253")
+	if !codedTextAdmitted(opt, "relationship", unknown) {
+		return
+	}
+	*rel = unknown
 }
 
 // applyStringLeaf writes a C_STRING leaf onto the String attribute attr
