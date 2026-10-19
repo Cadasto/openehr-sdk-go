@@ -8,6 +8,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-10-19
+
+Thirty-seventh `v0.x` minor: the instance generator builds at three levels named after the ITS-REST template example's `detail_level`, and a `DV_COUNT` magnitude decodes a whole number however it is written. **Breaking:** `instance.Example` is removed, `instance.Minimal` names the new `Required` level, `Generate` and `NewSkeleton` build `Medium` by default, `NewBuilder` refuses every level but `Large`, and `DVCount.Magnitude` is an `rm.Integer64`.
+
+### Added
+
+- **The instance generator builds at `instance.Required`, `Medium` and `Large`, after the ITS-REST template example's `detail_level`, with `Minimal` and `Complete` as aliases (REQ-107, REQ-101).** `instance.ParsePolicy` reads the five names in any case, `composition.WithPolicy` picks the level, and `generate-example --policy` takes them.
+
+### Changed
+
+- **Breaking: with no policy, `Generate` and `NewSkeleton` build `Medium`, v0.35's `Minimal`, and `instance.Minimal` now names `Required`, which builds only what the template makes mandatory (REQ-107, REQ-101).** A vital_signs skeleton holds 189 values where v0.36 gave 519; pass `instance.Large` for v0.36's tree.
+- **Breaking: `composition.NewBuilder` builds on `Large` and refuses `Medium` and `Required`, and every entry point refuses an undefined level with an error matching `instance.ErrUnsupportedPolicy` (REQ-101, REQ-107).**
+- **Breaking: `DVCount.Magnitude` is an `rm.Integer64`, which reads `2.0`, `2e0` or `"2"` as 2 in canonical JSON, FLAT and STRUCTURED, as `Integer` does (REQ-052, REQ-053).** A non-zero fraction is refused with `strconv.ErrSyntax`, and a number outside `int64` with `strconv.ErrRange`.
+- **A generated `PARTY_RELATED` carries a `relationship`, `openehr 253|unknown|` unless the template sets one, and a pinned openEHR code takes its rubric only where the template's text constraint admits it (REQ-107).**
+
+### Removed
+
+- **`instance.Example` (REQ-107).** `instance.Large` builds the same tree.
+
 ## [0.36.0] - 2026-10-18
 
 Thirty-sixth `v0.x` minor: canonical JSON, validation and the template-driven paths run much faster with the same results, canonical JSON decode errors carry no document values, `Minimal` builds every optional archetype, the template's temporal validators accept what the RM accepts, and a shared token refresh survives a caller that gives up. **Breaking:** every canonical JSON decode failure is a `*DecodeError`, `Minimal` output and generated names change, the temporal validators accept and refuse different strings, and `Builder.Set` refuses a sibling name the template does not pin.
