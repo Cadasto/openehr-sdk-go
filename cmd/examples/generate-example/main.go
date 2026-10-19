@@ -41,7 +41,7 @@ func main() {
 
 func run() error {
 	optFlag := flag.String("opt", "", "path to an ADL 1.4 operational template (default: the vendored vital_signs.opt)")
-	policyFlag := flag.String("policy", "large", "how much to build: 'required' (the mandatory data and a composition's context), 'medium' (at most one optional archetype under an attribute) or 'large' (a member of every optional archetype)")
+	policyFlag := flag.String("policy", "large", "how much to build: 'required' (the mandatory data and a composition's context), 'medium' (also every attribute the template constrains, at most one optional archetype under each) or 'large' (a member of every optional archetype)")
 	territoryFlag := flag.String("territory", "NL", "ISO 3166-1 territory code; a COMPOSITION root requires one")
 	composerFlag := flag.String("composer-name", "Example Composer", "name recorded as the composition's composer")
 	flag.Parse()
@@ -100,14 +100,16 @@ func run() error {
 	return nil
 }
 
-// parsePolicy maps the flag text onto the three generation policies, which
-// follow the levels of the ITS-REST template example. Required builds only
-// the data points the template makes mandatory and a composition's
-// context. Medium also builds at most one optional archetype under an
-// attribute. Large builds a member of every optional archetype the
-// template names. Under each of them every primitive leaf holds its
-// example value. An unknown value is an error, so a typo on the command
-// line does not silently pick a default.
+// parsePolicy maps the flag text onto the three generation policies.
+// Required builds only the data points the template makes mandatory and a
+// composition's context, the ITS-REST template example's
+// detail_level=required. Medium also builds every attribute the template
+// constrains, with at most one optional archetype under each, its
+// detail_level=medium. Large builds a member of every optional archetype
+// the template names, short of its detail_level=complete. Under each of
+// them every primitive leaf holds its example value. An unknown value is
+// an error, so a typo on the command line does not silently pick a
+// default.
 func parsePolicy(name string) (instance.Policy, error) {
 	switch name {
 	case "required":

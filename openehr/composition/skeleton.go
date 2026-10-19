@@ -13,9 +13,12 @@ import (
 // c with no clinical data. It delegates to instance.Generate with the
 // policy WithPolicy selects, instance.Large when none is given: every
 // required RM attribute is filled (BMM-mandatory implicits and
-// OPT-declared ones), a member of every optional archetype the template
-// names is built, and primitive leaves carry ExampleValue defaults, so
-// the resulting tree is valid against `validation.ValidateComposition`.
+// OPT-declared ones), the optional content the policy builds is added
+// (under instance.Large, a member of every optional archetype the
+// template names; under instance.Medium, at most one optional archetype
+// under an attribute; under instance.Required, none), and primitive
+// leaves carry ExampleValue defaults, so the resulting tree is valid
+// against `validation.ValidateComposition`.
 // NewSkeleton accepts instance.Large, instance.Medium and
 // instance.Required. It refuses any other Policy value, before generating
 // anything, with an error wrapping ErrUnsupportedPolicy.
