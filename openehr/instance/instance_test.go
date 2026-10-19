@@ -473,11 +473,19 @@ func uidSlice(b []byte) string {
 }
 
 func TestPolicyString(t *testing.T) {
-	if instance.Large.String() != "large" {
-		t.Error("Large.String() != large")
+	cases := []struct {
+		policy instance.Policy
+		want   string
+	}{
+		{policy: instance.Medium, want: "medium"},
+		{policy: instance.Required, want: "required"},
+		{policy: instance.Large, want: "large"},
+		{policy: instance.Policy(0), want: "medium"},
 	}
-	if instance.Medium.String() != "medium" {
-		t.Error("Medium.String() != medium")
+	for _, tc := range cases {
+		if got := tc.policy.String(); got != tc.want {
+			t.Errorf("Policy(%d).String() = %q, want %q", int(tc.policy), got, tc.want)
+		}
 	}
 	if !strings.Contains(instance.Policy(99).String(), "unknown") {
 		t.Error("Policy(99).String() should contain 'unknown'")

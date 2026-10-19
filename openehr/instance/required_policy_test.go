@@ -177,6 +177,34 @@ func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 	}
 }
 
+// TestREQ107_ZeroPolicyBuildsMedium is the REQ-107 check of Levels and
+// names on vital_signs: Options with no Policy builds the medium level, the
+// tree Medium builds in TestREQ107_PoliciesBuildTheirLevels, with 189 JSON
+// values and, besides the composition's own archetype, only the first
+// optional content OBSERVATION and the device CLUSTER it holds.
+func TestREQ107_ZeroPolicyBuildsMedium(t *testing.T) {
+	c := compileFixture(t, "vital_signs")
+	comp := generateComposition(t, c, instance.Options{
+		Territory: "NL",
+		Composer:  testComposer(),
+		Now:       defaultsNow,
+	})
+	tree := decodedJSON(t, comp)
+	if got, want := jsonValueCount(tree), 189; got != want {
+		t.Errorf("Generate(vital_signs) with no Policy holds %d JSON values, want Medium's %d", got, want)
+	}
+	got := make(map[string]int)
+	archetypeIDCounts(tree, got)
+	want := map[string]int{
+		"openEHR-EHR-COMPOSITION.encounter.v1":      1,
+		"openEHR-EHR-OBSERVATION.blood_pressure.v1": 1,
+		"openEHR-EHR-CLUSTER.device.v1":             1,
+	}
+	if !maps.Equal(got, want) {
+		t.Errorf("Generate(vital_signs) with no Policy archetype ids = %v, want Medium's %v", got, want)
+	}
+}
+
 // TestREQ107_RequiredHoldsNoOptionalContentArchetype is the REQ-107 check
 // that Required builds no member of an optional archetype the template
 // names: vital_signs and social give COMPOSITION.content an existence of
@@ -354,18 +382,18 @@ func TestREQ107_RequiredElementWithOptionalValueGetsNullFlavour(t *testing.T) {
 	}
 }
 
-// TestREQ107_PolicyValuesAndNames is the REQ-107 check of the Policy
-// constants: Large is the zero value, Medium follows it, Required comes
-// after both, and each names itself for diagnostics.
+// TestREQ107_PolicyValuesAndNames is the REQ-107 check of Levels and
+// names: Medium is the zero value, Required follows it, Large comes after
+// both, and each names itself for diagnostics.
 func TestREQ107_PolicyValuesAndNames(t *testing.T) {
 	cases := []struct {
 		policy instance.Policy
 		value  int
 		name   string
 	}{
-		{policy: instance.Large, value: 0, name: "large"},
-		{policy: instance.Medium, value: 1, name: "medium"},
-		{policy: instance.Required, value: 2, name: "required"},
+		{policy: instance.Medium, value: 0, name: "medium"},
+		{policy: instance.Required, value: 1, name: "required"},
+		{policy: instance.Large, value: 2, name: "large"},
 		{policy: instance.Policy(99), value: 99, name: "unknown"},
 	}
 	for _, tc := range cases {

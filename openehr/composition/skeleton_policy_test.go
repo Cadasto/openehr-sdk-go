@@ -104,14 +104,15 @@ func contentArchetypeIDs(tree any) []string {
 	return ids
 }
 
-// TestREQ101_REQ107_NewSkeletonDefaultsToLarge checks REQ-101's
+// TestREQ101_REQ107_NewSkeletonDefaultsToMedium checks REQ-101's
 // skeleton policy when no WithPolicy is given: NewSkeleton builds the
-// tree REQ-107's Large builds. On vital_signs that tree holds a member of
-// each of the template's four optional content OBSERVATIONs, where Medium
-// builds the first alone and Required none, and as many JSON values as
-// instance.Generate under Large. Of two optional siblings that share an
-// at-code, the default builds the first alone, as Large and Medium do.
-func TestREQ101_REQ107_NewSkeletonDefaultsToLarge(t *testing.T) {
+// tree REQ-107's Medium, the instance package's zero Policy, builds. On
+// vital_signs that tree holds the first of the template's four optional
+// content OBSERVATIONs alone, where Large builds a member of each and
+// Required none, and as many JSON values as instance.Generate under
+// Medium. Of two optional siblings that share an at-code, the default
+// builds the first alone, as Large and Medium do.
+func TestREQ101_REQ107_NewSkeletonDefaultsToMedium(t *testing.T) {
 	t.Parallel()
 	t.Run("vital_signs", func(t *testing.T) {
 		t.Parallel()
@@ -122,36 +123,36 @@ func TestREQ101_REQ107_NewSkeletonDefaultsToLarge(t *testing.T) {
 		}
 		tree := decodedJSON(t, comp)
 
-		want := []string{
-			"openEHR-EHR-OBSERVATION.blood_pressure.v1",
-			"openEHR-EHR-OBSERVATION.body_temperature.v1",
-			"openEHR-EHR-OBSERVATION.heart_rate.v1",
-			"openEHR-EHR-OBSERVATION.respiration.v1",
-		}
+		want := []string{"openEHR-EHR-OBSERVATION.blood_pressure.v1"}
 		if got := contentArchetypeIDs(tree); !slices.Equal(got, want) {
 			t.Errorf("NewSkeleton(vital_signs) with no WithPolicy: content archetype ids = %v, want %v", got, want)
 		}
 
-		large, err := instance.Generate(t.Context(), c, instance.Options{
-			Policy:    instance.Large,
+		medium, err := instance.Generate(t.Context(), c, instance.Options{
+			Policy:    instance.Medium,
 			Territory: "NL",
 			Composer:  testComposer(),
 			Now:       policyNow,
 		})
 		if err != nil {
-			t.Fatalf("Generate(vital_signs, Large): %v", err)
+			t.Fatalf("Generate(vital_signs, Medium): %v", err)
 		}
-		if got, want := jsonValueCount(tree), jsonValueCount(decodedJSON(t, large)); got != want {
-			t.Errorf("NewSkeleton(vital_signs) with no WithPolicy holds %d JSON values, want Generate(Large)'s %d", got, want)
+		if got, want := jsonValueCount(tree), jsonValueCount(decodedJSON(t, medium)); got != want {
+			t.Errorf("NewSkeleton(vital_signs) with no WithPolicy holds %d JSON values, want Generate(Medium)'s %d", got, want)
 		}
 
-		medium, err := composition.NewSkeleton(t.Context(), c, policyOptions(composition.WithPolicy(instance.Medium))...)
+		large, err := composition.NewSkeleton(t.Context(), c, policyOptions(composition.WithPolicy(instance.Large))...)
 		if err != nil {
-			t.Fatalf("NewSkeleton(vital_signs, WithPolicy(Medium)): %v", err)
+			t.Fatalf("NewSkeleton(vital_signs, WithPolicy(Large)): %v", err)
 		}
-		wantMedium := []string{"openEHR-EHR-OBSERVATION.blood_pressure.v1"}
-		if got := contentArchetypeIDs(decodedJSON(t, medium)); !slices.Equal(got, wantMedium) {
-			t.Errorf("NewSkeleton(vital_signs, WithPolicy(Medium)) content archetype ids = %v, want %v, so the default is not Medium", got, wantMedium)
+		wantLarge := []string{
+			"openEHR-EHR-OBSERVATION.blood_pressure.v1",
+			"openEHR-EHR-OBSERVATION.body_temperature.v1",
+			"openEHR-EHR-OBSERVATION.heart_rate.v1",
+			"openEHR-EHR-OBSERVATION.respiration.v1",
+		}
+		if got := contentArchetypeIDs(decodedJSON(t, large)); !slices.Equal(got, wantLarge) {
+			t.Errorf("NewSkeleton(vital_signs, WithPolicy(Large)) content archetype ids = %v, want %v, so the default is not Large", got, wantLarge)
 		}
 	})
 	t.Run("optional named siblings", func(t *testing.T) {
@@ -205,11 +206,11 @@ func TestREQ101_REQ107_NewSkeletonAcceptsRequired(t *testing.T) {
 		t.Errorf("NewSkeleton(vital_signs, WithPolicy(Required)) archetype ids = %v, want %v", got, want)
 	}
 
-	required, large := jsonValueCount(tree), jsonValueCount(decodedJSON(t, def))
-	t.Logf("vital_signs JSON values: required=%d default=%d", required, large)
-	if required >= large {
+	required, medium := jsonValueCount(tree), jsonValueCount(decodedJSON(t, def))
+	t.Logf("vital_signs JSON values: required=%d default=%d", required, medium)
+	if required >= medium {
 		t.Errorf("NewSkeleton(vital_signs, WithPolicy(Required)) holds %d JSON values, want fewer than the default skeleton's %d",
-			required, large)
+			required, medium)
 	}
 
 	if res := validation.ValidateComposition(comp, c); !res.OK {
