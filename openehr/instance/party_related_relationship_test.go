@@ -2,6 +2,7 @@ package instance_test
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
@@ -61,6 +62,48 @@ func TestREQ107_PartyRelatedGetsARelationship(t *testing.T) {
 					checkOpenEHRCode(t, "PARTY_RELATED.relationship", rel, terminology.SubjectRelationship, "253")
 					if rel.Value != "unknown" {
 						t.Errorf("PARTY_RELATED.relationship.value = %q, want %q", rel.Value, "unknown")
+					}
+					checkValid(t, out, c)
+				})
+			}
+		}
+	}
+}
+
+// TestREQ107_RelationshipKeepsTheOPTCode is the REQ-107 check of
+// Precedence 1 on a PARTY_RELATED's relationship the OPT constrains with
+// a DV_CODED_TEXT child: the generator writes the coded text the walk
+// builds under that child, and the RM default openehr 253 "unknown" is
+// never written over it. With one code listed the relationship is openehr
+// 10. With two listed, 10 and 253, it is the code the walk chose from the
+// list. Either way its text is the walk's, not the default's rubric. The
+// output passes the RM floor and the template validator, under every
+// policy, both value fills and both compile modes.
+func TestREQ107_RelationshipKeepsTheOPTCode(t *testing.T) {
+	cases := []struct {
+		name  string
+		codes []string
+	}{
+		{name: "one code", codes: []string{"10"}},
+		{name: "two codes", codes: []string{"10", "253"}},
+	}
+	for _, tc := range cases {
+		opt := partyRelatedSubject(optSingle("relationship", optCodedText(terminology.ID, tc.codes...)))
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, opt, implicit)
+			for _, opts := range defaultsOptions() {
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err != nil {
+						t.Fatalf("Generate: %v", err)
+					}
+					rel := subjectRelationship(t, out)
+					code := rel.DefiningCode
+					if code.TerminologyID.Value != terminology.ID || !slices.Contains(tc.codes, code.CodeString) {
+						t.Errorf("PARTY_RELATED.relationship.defining_code = %+v, want a code of %s in %v", code, terminology.ID, tc.codes)
+					}
+					if rel.Value != walkText {
+						t.Errorf("PARTY_RELATED.relationship.value = %q, want the walk's %q", rel.Value, walkText)
 					}
 					checkValid(t, out, c)
 				})
