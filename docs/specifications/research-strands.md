@@ -331,7 +331,7 @@ Three candidates are named and none is built:
 
 **Why it is open:** each candidate is additive on REQ-171's options and cheap to add, and each changes what a `Result` means to the caller who reads it. None has a consumer asking for it yet except the warn-or-reject policy, which a server that validates on commit needs in some form. Adding an option nobody uses is the second kind of waste ADR 0025 named.
 
-**Evidence needed:** a consumer for each candidate, with the result shape it needs; for the partial mode, whether the generator's `Minimal` output and the composition builder's intermediate states are the instances it would serve.
+**Evidence needed:** a consumer for each candidate, with the result shape it needs; for the partial mode, whether the generator's `Large` skeleton and the composition builder's intermediate states are the instances it would serve.
 
 **Resolution form:** each candidate resolves on its own, by an amendment to REQ-171's *Surface* and *Coverage* with the option's contract; an ADR only where an option changes what an existing result means.
 
