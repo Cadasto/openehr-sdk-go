@@ -2071,7 +2071,6 @@ requirements:
       - openehr/aql/verify_test.go
       - openehr/validation/aql_test.go
       - testkit/probes/aql/probe_097_semantic_lint.go
-      - testkit/probes/aql/probe_100_conformance_corpus.go
       - testkit/probes/aql/probe_107_suite_corpus.go
       - testkit/probes/aql/probe_107_suite_corpus_test.go
       - testkit/probes/aql/probes_test.go
@@ -2104,7 +2103,6 @@ requirements:
       - openehr/validation/aql_test.go
       - testkit/probes/aql/probe_088_builder_containment_paging.go
       - testkit/probes/aql/probe_097_semantic_lint.go
-      - testkit/probes/aql/probe_100_conformance_corpus.go
       - testkit/probes/aql/probe_107_suite_corpus.go
       - testkit/probes/aql/probe_107_suite_corpus_test.go
       - testkit/probes/aql/probes_test.go
@@ -2128,7 +2126,6 @@ requirements:
       - openehr/aql/verify_parity_test.go
       - openehr/aql/verify_test.go
       - testkit/probes/aql/probe_097_semantic_lint.go
-      - testkit/probes/aql/probe_100_conformance_corpus.go
       - testkit/probes/aql/probes_test.go
 
   - id: REQ-163
