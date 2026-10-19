@@ -6,11 +6,13 @@ import (
 	"maps"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
@@ -45,20 +47,121 @@ func TestAQLSuitesRootHoldsPinnedCorpus_PROBE107_REQ160(t *testing.T) {
 }
 
 // testkit/corpus/aql/ holds one vendored AQL corpus, suites/. Beside it sits
-// lint/, the hand-written PROBE-028 lint inputs, which no ingest vendors. Any
-// other entry, such as a second vendored corpus, fails here by name.
+// lint/, the hand-written PROBE-028 lint inputs, which no ingest vendors: only
+// *.aql files, directly in it. Any other entry, such as a second vendored
+// corpus beside suites/ or under lint/, fails here by name.
 func TestAQLCorpusTreeHoldsOneVendoredCorpus_REQ160(t *testing.T) {
 	t.Parallel()
-	entries, err := os.ReadDir(filepath.Dir(fixtures.AQLSuitesRoot()))
+	strays, err := aqlCorpusStrays(os.DirFS(filepath.Dir(fixtures.AQLSuitesRoot())))
 	if err != nil {
 		t.Fatal(err)
 	}
+	for _, rel := range strays {
+		t.Errorf("%s/%s exists; want only suites/, the one vendored AQL corpus, "+
+			"and lint/, which holds only the hand-written *.aql lint inputs, directly in it", aqlCorpusDir, rel)
+	}
+}
+
+// The check above names a second corpus wherever it sits: crafted trees with
+// one beside suites/ or under lint/ fail by name, and a tree shaped like the
+// vendored one passes.
+func TestAQLCorpusStraysNamesEveryOtherEntry_REQ160(t *testing.T) {
+	t.Parallel()
+	vendored := func(extra fstest.MapFS) fstest.MapFS {
+		fsys := fstest.MapFS{
+			"suites/AQL_SOURCE.txt":      {},
+			"suites/EXCLUDED.txt":        {},
+			"suites/AQL/__init__.robot":  {},
+			"lint/bad_syntax.aql":        {},
+			"lint/missing_archetype.aql": {},
+			"lint/valid.aql":             {},
+		}
+		maps.Copy(fsys, extra)
+		return fsys
+	}
+	cases := []struct {
+		name string
+		fsys fstest.MapFS
+		// want is every entry the check must name, in lexical order.
+		want []string
+	}{
+		{name: "the vendored layout", fsys: vendored(nil)},
+		{
+			name: "second corpus beside suites",
+			fsys: vendored(fstest.MapFS{"conformance/AND_OR/x.csv": {}}),
+			want: []string{"conformance"},
+		},
+		{
+			name: "second corpus under lint",
+			fsys: vendored(fstest.MapFS{"lint/conformance/AND_OR/x.csv": {}}),
+			want: []string{"lint/conformance", "lint/conformance/AND_OR", "lint/conformance/AND_OR/x.csv"},
+		},
+		{
+			name: "AQL file in a subdirectory of lint",
+			fsys: vendored(fstest.MapFS{"lint/more/extra.aql": {}}),
+			want: []string{"lint/more", "lint/more/extra.aql"},
+		},
+		{
+			name: "file of another kind in lint",
+			fsys: vendored(fstest.MapFS{"lint/from_simple_and_or.csv": {}, "lint/valid.AQL": {}}),
+			want: []string{"lint/from_simple_and_or.csv", "lint/valid.AQL"},
+		},
+		{
+			name: "symbolic link in lint",
+			fsys: vendored(fstest.MapFS{"lint/link.aql": {Data: []byte("valid.aql"), Mode: fs.ModeSymlink}}),
+			want: []string{"lint/link.aql"},
+		},
+		{
+			name: "lint that is a file",
+			fsys: fstest.MapFS{"suites/AQL_SOURCE.txt": {}, "lint": {}},
+			want: []string{"lint"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := aqlCorpusStrays(tc.fsys)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("aqlCorpusStrays() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// aqlCorpusStrays returns, in lexical order and relative to the root of fsys,
+// every entry of an AQL corpus tree other than suites/, lint/ and the regular
+// *.aql files directly in lint/. A subdirectory of lint/ is returned with
+// everything below it.
+func aqlCorpusStrays(fsys fs.FS) ([]string, error) {
+	entries, err := fs.ReadDir(fsys, ".")
+	if err != nil {
+		return nil, err
+	}
+	var strays []string
 	for _, e := range entries {
-		if e.Name() != "suites" && e.Name() != "lint" {
-			t.Errorf("%s/%s exists; want only suites/, the one vendored AQL corpus, "+
-				"and lint/, the hand-written lint inputs", aqlCorpusDir, e.Name())
+		switch {
+		case e.Name() == "suites":
+		case e.Name() == "lint" && e.IsDir():
+			err = fs.WalkDir(fsys, "lint", func(p string, d fs.DirEntry, err error) error {
+				if err != nil || p == "lint" {
+					return err
+				}
+				if path.Dir(p) != "lint" || !d.Type().IsRegular() || path.Ext(p) != ".aql" {
+					strays = append(strays, p)
+				}
+				return nil
+			})
+			if err != nil {
+				return nil, err
+			}
+		default:
+			strays = append(strays, e.Name())
 		}
 	}
+	return strays, nil
 }
 
 func TestIngestRobotAQLWritesSuiteCorpus_PROBE107_REQ160(t *testing.T) {
