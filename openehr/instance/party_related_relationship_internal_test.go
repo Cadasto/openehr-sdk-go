@@ -28,9 +28,9 @@ func relationshipCodedText(terminologyID string, codes ...string) string {
 // at0000 placeholder), and only where the OPT's constraint on relationship
 // admits it. A code the OPT gave is kept, also where the OPT admits 253
 // too, and the placeholder stays where the OPT names another terminology.
-// It calls fillRelationship directly, because the template-instance
-// writer cannot write a relationship the OPT constrains with a child, so
-// Generate never builds one.
+// It calls fillRelationship directly, so each relationship state it starts
+// from is set by hand; TestREQ107_RelationshipKeepsTheOPTCode covers the
+// same rule through Generate.
 func TestREQ107_RelationshipDefaultYieldsToTheOPT(t *testing.T) {
 	coded := func(terminologyID, code, text string) rm.DVCodedText {
 		return rm.DVCodedText{
