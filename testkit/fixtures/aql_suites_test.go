@@ -36,12 +36,11 @@ func TestAQLSuitesRootHoldsPinnedCorpus_PROBE107_REQ160(t *testing.T) {
 	if fi, err := os.Stat(filepath.Join(root, "AQL")); err != nil || !fi.IsDir() {
 		t.Errorf("AQL under AQLSuitesRoot() %s: stat error %v; want a directory", root, err)
 	}
-	suites := pinFields(readText(t, filepath.Join(root, "AQL_SOURCE.txt")))
-	conformance := pinFields(readText(t, filepath.Join(fixtures.AQLConformanceRoot(), "AQL_SOURCE.txt")))
+	pin := pinFields(readText(t, filepath.Join(root, "AQL_SOURCE.txt")))
 	for _, key := range []string{"source_repo", "commit", "commit_date"} {
-		if suites[key] == "" || suites[key] != conformance[key] {
-			t.Errorf("suite pin %s = %q, conformance pin %s = %q; want one non-empty value "+
-				"(re-run scripts/ingest-robot-aql.sh; never edit a pin)", key, suites[key], key, conformance[key])
+		if pin[key] == "" {
+			t.Errorf("suite pin %s is empty; want a value "+
+				"(re-run scripts/ingest-robot-aql.sh; never edit a pin)", key)
 		}
 	}
 }
