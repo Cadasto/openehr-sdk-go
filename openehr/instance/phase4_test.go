@@ -111,10 +111,6 @@ func TestREQ107_FloorGapsFilled(t *testing.T) {
 				if iss.Severity != validation.Error {
 					continue
 				}
-				// ITEM_TABLE.rotated is not an attribute of the pinned RM.
-				if iss.Path == "/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rotated" {
-					continue
-				}
 				if f := iss.Code + " " + iss.Path; slices.Contains(allowed, f) {
 					templExcepted = append(templExcepted, f)
 					continue

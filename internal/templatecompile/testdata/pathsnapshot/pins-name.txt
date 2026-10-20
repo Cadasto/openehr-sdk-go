@@ -168,7 +168,7 @@
 /content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0031,'null']/name/value
 /content[openEHR-EHR-OBSERVATION.test123.v0]/protocol
 
-## templates/clinical_content_validation  nodes=31
+## templates/clinical_content_validation  nodes=30
 /
 /category
 /category/defining_code
@@ -192,7 +192,6 @@
 /content[openEHR-EHR-EVALUATION.validation_evaliation_test.v2,'Validation evaluation test with tree']/name/value
 /content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3,'Validation evaluation test with table']
 /content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3,'Validation evaluation test with table']/data
-/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3,'Validation evaluation test with table']/data/rotated
 /content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3,'Validation evaluation test with table']/data/rows[at0004]
 /content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3,'Validation evaluation test with table']/name
 /content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3,'Validation evaluation test with table']/name/value

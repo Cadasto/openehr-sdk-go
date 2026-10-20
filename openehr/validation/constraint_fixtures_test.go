@@ -156,13 +156,11 @@ func TestValidateComposition_ConstraintFixture_ParsableViolation(t *testing.T) {
 }
 
 // REQ-102 and REQ-103: clinical_content_validation's report is exactly these
-// eight issues, each a real defect of the instance against its OPT:
+// seven issues, each a real defect of the instance against its OPT:
 //
 //   - four EVALUATION names outside the OPT's one-entry closed lists (the
 //     C_STRING sets no list_open, and the v1 entry is itself misspelled
 //     "evaliation");
-//   - ITEM_TABLE.rotated, which the OPT requires (existence 1..1) but which
-//     the pinned RM does not define, so no instance can carry it;
 //   - three content items whose archetype ids are not among the OPT's
 //     content children (the OPT names valiadation_instruction_test,
 //     validation_action_test and validation_observation_test).
@@ -172,7 +170,6 @@ func TestValidateComposition_ConstraintFixture_ClinicalContentViolations(t *test
 		"primitive_not_in_list /content[openEHR-EHR-EVALUATION.validation_evaliation_test.v0]/name/value",
 		"primitive_not_in_list /content[openEHR-EHR-EVALUATION.validation_evaliation_test.v2]/name/value",
 		"primitive_not_in_list /content[openEHR-EHR-EVALUATION.validation_evaliation_test.v1]/name/value",
-		"required /content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rotated",
 		"primitive_not_in_list /content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/name/value",
 		"slot_fill /content[openEHR-EHR-INSTRUCTION.instruction_test.v0]",
 		"slot_fill /content[openEHR-EHR-ACTION.action_test.v0]",

@@ -470,14 +470,12 @@ func TestREQ101_SetAcceptsWhatAnOpenParameterAllows(t *testing.T) {
 // TestREQ101_SetRefusesAPathThatWritesNoAttribute checks, for REQ-101 Type
 // enforcement, that Set returns ErrTypeMismatch, and Build carries it, at a
 // template path that writes no RM attribute. Modelling tools constrain BMM
-// functions as if they were attributes, and corpus templates carry three:
-// DV_PROPORTION.is_integral and the offset of a POINT_EVENT in
-// Demonstration.v1, and ITEM_TABLE.rotated in clinical_content_validation.
-// The error names the attribute and the class.
+// functions as if they were attributes, and Demonstration.v1 carries two:
+// DV_PROPORTION.is_integral and the offset of a POINT_EVENT. The error
+// names the attribute and the class.
 func TestREQ101_SetRefusesAPathThatWritesNoAttribute(t *testing.T) {
 	t.Parallel()
 	demonstration := compileFixture(t, "Demonstration.v1")
-	contentValidation := compileFixture(t, "clinical_content_validation")
 
 	cases := []struct {
 		name string
@@ -497,11 +495,6 @@ func TestREQ101_SetRefusesAPathThatWritesNoAttribute(t *testing.T) {
 			name: "DV_DURATION at POINT_EVENT.offset", c: demonstration,
 			path:   "/content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0035]/offset",
 			nodeAt: "DV_DURATION", owner: "POINT_EVENT", attr: "offset", v: &rm.DVDuration{Value: "PT1M"},
-		},
-		{
-			name: "DV_BOOLEAN at ITEM_TABLE.rotated", c: contentValidation,
-			path:   "/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3,'Validation evaluation test with table']/data/rotated",
-			nodeAt: "BOOLEAN", owner: "ITEM_TABLE", attr: "rotated", v: &rm.DVBoolean{Value: true},
 		},
 	}
 	for _, tc := range cases {

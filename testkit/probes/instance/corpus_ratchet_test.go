@@ -139,10 +139,6 @@ var mediumHollowBodies = []string{
 // no policy builds that CLUSTER (REQ-107 § Slot fills) and every entry
 // returns a root; TestREQ107_FamilyHistoryLeavesItsUnfillableSlotOut pins it.
 //
-// rotated rows: clinical_content_validation constrains ITEM_TABLE.rotated,
-// an attribute the pinned RM does not have (REQ-107 § Exceptions and known
-// gaps), so the template validator finds it absent.
-//
 // floor_coded rows: TestPerson.v2 codes both its DV_MULTIMEDIA media_type
 // nodes in terminology openEHR, one with the code list 425 to 429 and one
 // with no code. REQ-107 § Exceptions and known gaps, "An OPT constraint that
@@ -157,9 +153,6 @@ var corpusRatchet = []ratchetFailure{
 	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
 	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"},
 	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
-	{template: "templates/clinical_content_validation", entry: "builder", policy: "large", fill: "example", reason: "validator_other:required:/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rotated"},
-	{template: "templates/clinical_content_validation", entry: "generate", policy: "large", fill: "example", reason: "validator_other:required:/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rotated"},
-	{template: "templates/clinical_content_validation", entry: "generate", policy: "large", fill: "random", reason: "validator_other:required:/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rotated"},
 }
 
 func TestREQ107_CorpusRatchet(t *testing.T) {

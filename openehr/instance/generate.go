@@ -489,7 +489,8 @@ func builtRMType(alternative *tcimpl.CompiledNode) string {
 // attrTypedByRMClass reports whether the pinned BMM types attr of
 // optNode by an RM class (ELEMENT.value, a DATA_VALUE), rather than by
 // a primitive such as String or Boolean (DV_DURATION.value,
-// ITEM_TABLE.rotated) or not at all.
+// DV_BOOLEAN.value) or not at all (an attribute the pinned RM does not
+// have).
 func attrTypedByRMClass(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
 	h, ok := rminfo.Default.(rminfo.Hierarchy)
 	if !ok {
