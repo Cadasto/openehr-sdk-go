@@ -237,27 +237,15 @@ var multimediaPlacements = []struct {
 	},
 }
 
-// checkExampleURI fails t unless mm has no data and the uri
-// http://example.com, the RM default that makes Not_empty hold.
-func checkExampleURI(t *testing.T, mm *rm.DVMultimedia) {
-	t.Helper()
-	if len(mm.Data) != 0 {
-		t.Errorf("DV_MULTIMEDIA.data = %v, want none", mm.Data)
-	}
-	uri, ok := mm.URI.(*rm.DVURI)
-	if !ok || uri == nil || uri.Value != "http://example.com" {
-		t.Errorf("DV_MULTIMEDIA.uri = %#v, want a DV_URI http://example.com", mm.URI)
-	}
-}
-
-// TestREQ107_MultimediaTakesTextPlainAndExampleURI is the REQ-107 check
+// TestREQ107_MultimediaTakesTextPlainAndSizedData is the REQ-107 check
 // that a DV_MULTIMEDIA whose OPT gives media_type no value, by leaving it
 // silent or naming it without a code, takes the media type text/plain in
-// IANA_media-types, so that RM Media_type_valid holds, and, having neither
-// uri nor data, the uri http://example.com, so that Not_empty holds. It
-// holds at the root and nested, under every policy and both value fills,
-// with and without the implicit attributes.
-func TestREQ107_MultimediaTakesTextPlainAndExampleURI(t *testing.T) {
+// IANA_media-types, so that RM Media_type_valid holds, and carries the
+// example payload as its data with its byte count as its size, so that
+// Not_empty holds with no uri. It holds at the root and nested, under
+// every policy and both value fills, with and without the implicit
+// attributes.
+func TestREQ107_MultimediaTakesTextPlainAndSizedData(t *testing.T) {
 	want := rm.CodePhrase{CodeString: "text/plain", TerminologyID: rm.TerminologyID{Value: "IANA_media-types"}}
 	for _, variant := range mediaTypeVariants {
 		for _, place := range multimediaPlacements {
@@ -273,7 +261,7 @@ func TestREQ107_MultimediaTakesTextPlainAndExampleURI(t *testing.T) {
 						if mm.MediaType != want {
 							t.Errorf("DV_MULTIMEDIA.media_type = %+v, want %+v", mm.MediaType, want)
 						}
-						checkExampleURI(t, mm)
+						checkSizedData(t, mm)
 						noFloorErrors(t, out)
 					})
 				}
@@ -283,8 +271,8 @@ func TestREQ107_MultimediaTakesTextPlainAndExampleURI(t *testing.T) {
 }
 
 // TestREQ107_MultimediaKeepsPinnedMediaType is the REQ-107 check that a
-// media type code the OPT gives a DV_MULTIMEDIA is kept, while the uri
-// default still applies. One pin lists text/plain beside image/png, so the
+// media type code the OPT gives a DV_MULTIMEDIA is kept, while the data
+// and size defaults still apply. One pin lists text/plain beside image/png, so the
 // OPT admits the default and only the rule that keeps a given code stops
 // it: under ExampleFill the walk gives the first code, image/png, and
 // under RandomFill one of the two.
@@ -310,7 +298,7 @@ func TestREQ107_MultimediaKeepsPinnedMediaType(t *testing.T) {
 						case !slices.Contains(codes, got):
 							t.Errorf("DV_MULTIMEDIA.media_type code = %q, want one of the pinned %q", got, codes)
 						}
-						checkExampleURI(t, mm)
+						checkSizedData(t, mm)
 						noFloorErrors(t, out)
 					})
 				}
@@ -324,7 +312,7 @@ func TestREQ107_MultimediaKeepsPinnedMediaType(t *testing.T) {
 // OPT's C_CODE_PHRASE names: the generated value must satisfy the OPT's
 // primitive constraints, and text/plain in IANA_media-types does not
 // satisfy a C_CODE_PHRASE that names the terminology openEHR. The media
-// type keeps that terminology and the uri default still applies. The
+// type keeps that terminology and the data and size defaults still apply. The
 // template validator finds no error apart from the RM floor's one
 // code_not_in_value_set on the media type: no openEHR code is an IANA media
 // type, which REQ-107 § Exceptions and known gaps excepts.
@@ -343,7 +331,7 @@ func TestREQ107_MultimediaMediaTypeKeepsTheOPTTerminology(t *testing.T) {
 					if got := mm.MediaType.TerminologyID.Value; got != "openEHR" {
 						t.Errorf("DV_MULTIMEDIA.media_type = %+v, want the OPT's terminology openEHR", mm.MediaType)
 					}
-					checkExampleURI(t, mm)
+					checkSizedData(t, mm)
 					var coded int
 					for _, iss := range validation.Validate(out, c).Issues {
 						if iss.Severity != validation.Error {
