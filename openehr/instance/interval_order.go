@@ -718,6 +718,11 @@ func proportionAdopt(node *tcimpl.CompiledNode, like, other proportionKey, low b
 			k.numerator = round(k.numerator)
 		}
 	}
+	// A numerator that overflowed float64 is no bound: canonical JSON has no
+	// infinity, so the pair stays as generated.
+	if math.IsInf(k.numerator, 0) || math.IsNaN(k.numerator) {
+		return proportionKey{}, false
+	}
 	return k, true
 }
 
