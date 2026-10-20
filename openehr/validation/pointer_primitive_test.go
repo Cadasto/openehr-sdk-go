@@ -69,7 +69,9 @@ func intervalEventOPT() string {
 // REQ-102 — each row validates an ELEMENT whose value holds a pointer-held
 // primitive under a template primitive constraint, and pins the template's
 // findings: none for a value the constraint admits, its out_of_range or
-// not_in_list at the attribute for one it refuses.
+// not_in_list at the attribute for one it refuses. A pointer that is not set
+// is an absent attribute: the constraint judges no value and the rows report
+// nothing.
 func TestValidate_REQ102_PointerHeldPrimitiveBindsAsItsValue(t *testing.T) {
 	t.Parallel()
 	const (
@@ -125,6 +127,21 @@ func TestValidate_REQ102_PointerHeldPrimitiveBindsAsItsValue(t *testing.T) {
 			name:  "DV_DURATION accuracy under C_REAL, inside",
 			child: primitiveAttrChild("DV_DURATION", "accuracy", "REAL", "C_REAL", realZeroToOne),
 			value: &rm.DVDuration{Value: "PT1H", Accuracy: new(rm.Real(0.5))},
+		},
+		{
+			name:  "DV_QUANTITY precision not set under C_INTEGER, absent",
+			child: primitiveAttrChild("DV_QUANTITY", "precision", "INTEGER", "C_INTEGER", integerZeroToFive),
+			value: &rm.DVQuantity{Magnitude: 1, Units: "kg"},
+		},
+		{
+			name:  "DV_COUNT accuracy not set under C_REAL, absent",
+			child: primitiveAttrChild("DV_COUNT", "accuracy", "REAL", "C_REAL", realZeroToOne),
+			value: &rm.DVCount{Magnitude: 3},
+		},
+		{
+			name:  "DV_COUNT accuracy_is_percent not set under C_BOOLEAN, absent",
+			child: primitiveAttrChild("DV_COUNT", "accuracy_is_percent", "BOOLEAN", "C_BOOLEAN", trueOnly),
+			value: &rm.DVCount{Magnitude: 3},
 		},
 		{
 			name:  "DV_PROPORTION precision under C_INTEGER, inside",

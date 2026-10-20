@@ -74,3 +74,28 @@ func TestPrimitiveInput_REQ102_PointerHeldPrimitive(t *testing.T) {
 		}
 	}
 }
+
+// REQ-102: a pointer-held primitive that is not set is an absent attribute.
+// The walk never hands one to the typed primitive validator, because the
+// generated access reports it as absent. Handed one, primitiveInput reads it
+// as [rmbind.PrimitiveValue] does: an optional Boolean, Integer or Real is no
+// value, which the validator refuses as wrong_type, and never the zero value
+// it could be mistaken for. An optional String keeps the older rule, the
+// empty string.
+func TestPrimitiveInput_REQ102_NilPointerHeldPrimitive(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		in   any
+		want any
+	}{
+		{in: (*bool)(nil)},
+		{in: (*rm.Integer)(nil)},
+		{in: (*rm.Real)(nil)},
+		{in: (*string)(nil), want: ""},
+	}
+	for _, tc := range tests {
+		if got := primitiveInput(tc.in); got != tc.want {
+			t.Errorf("primitiveInput(%T nil) = %#v (%T), want %#v (%T)", tc.in, got, got, tc.want, tc.want)
+		}
+	}
+}
