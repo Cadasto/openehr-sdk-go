@@ -3,10 +3,12 @@ package instanceprobes_test
 import (
 	jsonv2 "encoding/json/v2"
 	"fmt"
+	mrand "math/rand/v2"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
@@ -226,6 +228,62 @@ func TestREQ107_UndescribedContentCensus(t *testing.T) {
 	}
 }
 
+// TestREQ107_FamilyHistoryLeavesItsUnfillableSlotOut is the corpus check of
+// REQ-107 § Slot fills on family_history.v.1.2.3: its slot at0027, whose
+// includes no example can fill, sits in the optional CLUSTER at0024, whose
+// required items admit only slots. That CLUSTER needs undescribed content,
+// so no policy builds it, and Generate, under every policy and both value
+// fills, and the builder return a root with no member of it that passes the
+// RM floor and the template validator. Its body holds an ELEMENT except
+// under Required, which builds only what the template requires
+// (requiredBodies does not list it).
+func TestREQ107_FamilyHistoryLeavesItsUnfillableSlotOut(t *testing.T) {
+	const holder = "/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0024]"
+	c := compileFixture(t, "family_history.v.1.2.3")
+	if n, err := c.NodeAt(holder); err != nil || n.IsSlot() {
+		t.Fatalf("NodeAt(%s) = %v, %v; want the optional CLUSTER at0024", holder, n, err)
+	}
+	roots := make(map[string]any)
+	for _, policy := range []instance.Policy{instance.Large, instance.Medium, instance.Required} {
+		for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
+			out, err := instance.Generate(t.Context(), c, instance.Options{
+				Policy: policy, ValueFill: fill, ValueSource: mrand.NewPCG(1, 2),
+				Language: "en", Territory: "NL", Composer: fixedComposer(), Now: ratchetNow,
+			})
+			if err != nil {
+				t.Fatalf("Generate(%s, %s): %v", policy, fill, err)
+			}
+			roots[fmt.Sprintf("Generate(%s, %s)", policy, fill)] = out
+		}
+	}
+	b, err := composition.NewBuilder(t.Context(), c, composition.WithLanguage("en"), composition.WithTerritory("NL"),
+		composition.WithComposer(fixedComposer()), composition.WithNow(ratchetNow))
+	if err != nil {
+		t.Fatalf("NewBuilder: %v", err)
+	}
+	comp, err := b.Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	roots["builder"] = comp
+	for call, out := range roots {
+		reasons := outputReasons(t, out, c, true, instance.ExampleFill)
+		if strings.HasPrefix(call, "Generate(required") {
+			delete(reasons, reasonHollowBody+":/")
+		}
+		if len(reasons) > 0 {
+			t.Errorf("%s: %d findings, want none: %v", call, len(reasons), reasons)
+		}
+		raw, err := canjson.Marshal(out)
+		if err != nil {
+			t.Fatalf("%s: canjson.Marshal: %v", call, err)
+		}
+		if strings.Contains(string(raw), `"archetype_node_id":"at0024"`) {
+			t.Errorf("%s: holds a member of the CLUSTER at0024, want none", call)
+		}
+	}
+}
+
 // censusFinding is an undescribed member with where it sits: holderOptional
 // when the node that holds it is optional, so the walk built that node
 // though nothing required it, and underOptional when that node or one
@@ -350,10 +408,13 @@ func allowedChildren(attr *templatecompile.CompiledAttribute) []*templatecompile
 }
 
 // nodeOptional reports whether the walk builds node though nothing
-// requires it: a child of a multi-valued attribute whose occurrences lower
-// bound is 0, or the child of a single-valued attribute that is not
-// required, by the BMM or by an existence lower bound of at least 1. The
-// template root is required.
+// requires it: a child of an attribute that is not required, by the BMM or
+// by an existence or cardinality lower bound of at least 1, or a child of a
+// multi-valued attribute whose occurrences lower bound is 0. The template
+// root is required. This reads a required child of an optional multi-valued
+// attribute as optional, although § Slot fills builds it where a described
+// sibling has the attribute visited; no vendored template has one that
+// holds undescribed content, so the census would name it if one came.
 func nodeOptional(node *templatecompile.CompiledNode) bool {
 	parent := node.Parent()
 	if parent == nil {

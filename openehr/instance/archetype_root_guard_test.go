@@ -223,9 +223,13 @@ func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 			detail: "OBSERVATION for SECTION.items at /content[at0001] (required, but the template names no child)",
 		},
 		{
+			// The entry's data takes a HISTORY the template describes, so
+			// the entry needs no undescribed content (REQ-107 § Slot fills)
+			// and Large and Medium build it.
 			name: "optional content whose only child is an unnamed entry",
 			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence01,
-				guardChild("C_COMPLEX_OBJECT", "OBSERVATION", "at0000", guardOccurrences01, ""))),
+				guardChild("C_COMPLEX_OBJECT", "OBSERVATION", "at0000", guardOccurrences01, "",
+					guardSingle("data", guardExistence11, guardChild("C_COMPLEX_OBJECT", "HISTORY", "at0001", "", ""))))),
 			detail:    "OBSERVATION at /content[at0000]",
 			unreached: true,
 		},

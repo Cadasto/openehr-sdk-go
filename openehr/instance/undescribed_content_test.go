@@ -186,12 +186,14 @@ func TestREQ107_OptionalNodeHoldingOnlyUndescribedContentGetsNoMember(t *testing
 			required: "at0002(" + stub + "(at0000))",
 		},
 		{
+			// The content is optional, so no top-up stands in for the root
+			// Medium keeps.
 			name: "first optional archetype root under Medium is the first that needs none",
-			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
+			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence01,
 				undescribedObservation(slotted, guardOccurrences01, describedHistory, slottedProtocol),
 				undescribedObservation(described, guardOccurrences01, describedHistory),
 				undescribedObservation(third, guardOccurrences01, describedHistory))),
-			large: described + "," + third, medium: described, required: described,
+			large: described + "," + third, medium: described, required: "",
 		},
 	}
 	for _, tc := range cases {

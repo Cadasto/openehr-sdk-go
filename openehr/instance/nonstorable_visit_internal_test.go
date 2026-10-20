@@ -129,7 +129,6 @@ func visitProhibitedSingle(name, child string) string {
 // visit predicate never visits an attribute the OPT prohibits (existence
 // 0..0), under every policy, with or without a child under it.
 func TestREQ107_VisitsSkipsProhibitedAttributes(t *testing.T) {
-	visitTree := `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>ITEM_TREE</rm_type_name><node_id>at0001</node_id></children>`
 	for _, child := range []string{"", visitTree} {
 		node, attr := visitAttribute(t, visitRootOPT("OBSERVATION", visitProhibitedSingle("protocol", child)), "protocol")
 		for _, policy := range []Policy{Large, Medium, Required} {
@@ -171,14 +170,20 @@ func TestREQ107_VisitsSkipsAnAttributeWithOnlyProhibitedChildren(t *testing.T) {
 	}
 }
 
+// visitTree is an ITEM_TREE the OPT describes: its items are optional in
+// the RM, so it needs no content the OPT does not describe.
+const visitTree = `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>ITEM_TREE</rm_type_name><node_id>at0001</node_id></children>`
+
 // TestREQ107_VisitsReadsAnOpenExistenceAsAllowed is the REQ-107 check that
 // an existence whose upper bound is unbounded does not prohibit the
-// attribute, although its upper value reads 0: Large visits it.
+// attribute, although its upper value reads 0: Large visits it. The
+// protocol has an ITEM_TREE child the OPT describes, so the rule on
+// undescribed members does not decide it.
 func TestREQ107_VisitsReadsAnOpenExistenceAsAllowed(t *testing.T) {
 	open := `<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>protocol</rm_attribute_name>` +
 		`<existence><lower_included>true</lower_included>` +
 		`<lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded>` +
-		`<lower>0</lower></existence></attributes>`
+		`<lower>0</lower></existence>` + visitTree + `</attributes>`
 	node, attr := visitAttribute(t, visitRootOPT("OBSERVATION", open), "protocol")
 	if e := attr.Existence(); e == nil || !e.UpperUnbounded() || e.Upper() != 0 {
 		t.Fatalf("protocol existence = %+v, want an unbounded upper that reads 0", e)
@@ -190,15 +195,40 @@ func TestREQ107_VisitsReadsAnOpenExistenceAsAllowed(t *testing.T) {
 }
 
 // TestREQ107_VisitsFollowsThePolicy is the REQ-107 check that the visit
-// predicate applies the policy to a storable attribute: an optional
-// attribute the OPT names with no children is visited under Large and
-// not under Medium or Required.
+// predicate applies the policy to a storable attribute that is not
+// required. One the OPT names with no children is visited under Large and
+// not under Medium or Required, unless its member, built from its BMM
+// type, would be a LOCATABLE no OPT node describes: then Large does not
+// visit it either. One with a child the OPT describes is visited under
+// Large and Medium and not under Required.
 func TestREQ107_VisitsFollowsThePolicy(t *testing.T) {
-	node, attr := visitAttribute(t, visitRootOPT("OBSERVATION", visitOptionalSingle("protocol")), "protocol")
-	for policy, want := range map[Policy]bool{Large: true, Medium: false, Required: false} {
-		g := &generator{opts: Options{Policy: policy}}
-		if got := g.visits(node, attr); got != want {
-			t.Errorf("visits(OBSERVATION, protocol) under %v = %t, want %t", policy, got, want)
+	cases := []struct {
+		name, rmType, attr, opt string
+		want                    map[Policy]bool
+	}{
+		{
+			name: "a data value with no child", rmType: "INSTRUCTION", attr: "expiry_time",
+			opt:  visitOptionalSingle("expiry_time"),
+			want: map[Policy]bool{Large: true, Medium: false, Required: false},
+		},
+		{
+			name: "a structure with no child", rmType: "OBSERVATION", attr: "protocol",
+			opt:  visitOptionalSingle("protocol"),
+			want: map[Policy]bool{Large: false, Medium: false, Required: false},
+		},
+		{
+			name: "a structure with a described child", rmType: "OBSERVATION", attr: "protocol",
+			opt:  strings.Replace(visitOptionalSingle("protocol"), "</attributes>", visitTree+"</attributes>", 1),
+			want: map[Policy]bool{Large: true, Medium: true, Required: false},
+		},
+	}
+	for _, tc := range cases {
+		node, attr := visitAttribute(t, visitRootOPT(tc.rmType, tc.opt), tc.attr)
+		for policy, want := range tc.want {
+			g := &generator{opts: Options{Policy: policy}}
+			if got := g.visits(node, attr); got != want {
+				t.Errorf("%s: visits(%s, %s) under %v = %t, want %t", tc.name, tc.rmType, tc.attr, policy, got, want)
+			}
 		}
 	}
 }

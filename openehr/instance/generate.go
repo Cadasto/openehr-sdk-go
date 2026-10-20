@@ -139,6 +139,12 @@ type generator struct {
 	// nowText is opts.Now as dateTimeDefault writes it, formatted on first
 	// use; "" until then.
 	nowText string
+	// undescribed holds, per template node, whether it needs content the
+	// template does not describe (needsUndescribed), and locatableTypes,
+	// per RM type, whether the value built for it is a LOCATABLE
+	// (buildsLocatable). Both are filled on first use.
+	undescribed    map[*tcimpl.CompiledNode]bool
+	locatableTypes map[string]bool
 }
 
 // nextUID returns the next LOCATABLE.uid pointer. Honours
@@ -311,22 +317,27 @@ func compositionDefaultOwns(class, attrName string) bool {
 // one the RM computes rather than stores (offset on POINT_EVENT and
 // INTERVAL_EVENT, is_integral on DV_QUANTITY and DV_PROPORTION): the
 // generator has nothing to write there. Nor does it visit a locatable's
-// uid, which setLocatableIdentity stamps. A prohibited ELEMENT null_flavour the RM rule needs, because the
-// OPT prohibits value too, is visited as if the OPT allowed it. Any other
-// attribute is visited when the policy says so (shouldVisit).
+// uid, which setLocatableIdentity stamps (walkSkips). A prohibited ELEMENT
+// null_flavour the RM rule needs, because the OPT prohibits value too, is
+// visited as if the OPT allowed it. Any other attribute is visited when the
+// policy says so (shouldVisit).
 func (g *generator) visits(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
+	return !walkSkips(optNode, attr) && g.shouldVisit(optNode, attr)
+}
+
+// walkSkips reports whether the walk leaves attr of optNode alone under
+// every policy: a locatable's uid, an attribute the OPT prohibits that no RM
+// rule needs, and one the RM computes rather than stores.
+func walkSkips(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
 	if locatableUID(optNode, attr) {
-		return false
+		return true
 	}
 	if attrProhibited(attr) && !rmNeedsProhibited(optNode, attr) {
-		return false
+		return true
 	}
 	// rminfo knows each class by its bare BMM name; the OPT may declare
 	// a generic instantiation (DV_INTERVAL<DV_QUANTITY>).
-	if rminfo.IsNonStorableAttr(bmmtype.Class(optNode.RMTypeName()), attr.Name()) {
-		return false
-	}
-	return g.shouldVisit(optNode, attr)
+	return rminfo.IsNonStorableAttr(bmmtype.Class(optNode.RMTypeName()), attr.Name())
 }
 
 // locatableUID reports whether attr is the uid of a locatable, the one
@@ -388,11 +399,12 @@ func attrProhibited(attr *tcimpl.CompiledAttribute) bool {
 }
 
 // shouldVisit decides whether an attribute is in scope under the
-// current policy. Under Large: every attribute. Under Required: every
-// attribute that is required, because the BMM marks it mandatory or its
-// existence or cardinality lower bound is bounded and at least 1, and no
-// other. Under Medium: every attribute that is required in that sense,
-// OR that has OPT-pinned children the OPT does not prohibit. The "has
+// current policy. Under Large: every attribute, but for the rule on
+// undescribed content below. Under Required: every attribute that is
+// required, because the BMM marks it mandatory or its existence or
+// cardinality lower bound is bounded and at least 1, and no other. Under
+// Medium: every attribute that is required in that sense, OR that has
+// OPT-pinned children the OPT does not prohibit. The "has
 // OPT children" arm captures the case where the OPT explicitly
 // constrains a structurally optional attribute (e.g. COMPOSITION.content
 // with archetype-root pins): under Medium the act of pinning is itself
@@ -402,24 +414,37 @@ func attrProhibited(attr *tcimpl.CompiledAttribute) bool {
 // Medium does: applyCompositionDefaults writes a context under every
 // policy, so the walk builds it under the OPT's constraints (a pinned
 // setting, a required other_context) rather than leaving it bare. Inside
-// the context Required's own rule applies. No other Policy value gets
+// the context Required's own rule applies. Under Large and Medium, and on
+// that context, an attribute that is not required is not visited either
+// when every member the walk would build for it is undescribed or needs
+// undescribed content (membersUndescribed): a slot fill, a LOCATABLE built
+// from a BMM type where the OPT names no node, or a node with a required
+// attribute that can only hold such members. No other Policy value gets
 // here: Generate refuses one before the walk starts.
 func (g *generator) shouldVisit(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
-	if g.opts.Policy == Large {
-		return true
-	}
-	if isRequired(attr) {
-		return true
-	}
-	// Cardinality lower and existence are separate. A 1..* list is
-	// still required when existence does not say so.
-	if cm := attr.ChildMultiplicity(); cm != nil && !cm.LowerUnbounded() && cm.Lower() > 0 {
+	if visitRequired(attr) {
 		return true
 	}
 	if g.opts.Policy == Required && !compositionContext(optNode, attr) {
 		return false
 	}
-	return len(tcimpl.AllowedChildNodes(attr)) > 0
+	if g.membersUndescribed(optNode, attr) {
+		return false
+	}
+	return g.opts.Policy == Large || len(tcimpl.AllowedChildNodes(attr)) > 0
+}
+
+// visitRequired reports whether attr is required as the visit rule reads
+// it, so every policy visits it: the BMM marks it mandatory, or its
+// existence or cardinality lower bound is bounded and at least 1.
+// Cardinality lower and existence are separate, so a 1..* list is required
+// when existence does not say so.
+func visitRequired(attr *tcimpl.CompiledAttribute) bool {
+	if isRequired(attr) {
+		return true
+	}
+	cm := attr.ChildMultiplicity()
+	return cm != nil && !cm.LowerUnbounded() && cm.Lower() > 0
 }
 
 // compositionContext reports whether attr is the context of a
@@ -1309,7 +1334,12 @@ func (g *generator) materialiseMultiple(
 	// REQ-104 include grammar, or from the RM-type-prefix fallback
 	// only when no includes were parsed.
 	if needed := remainingLowerNeeded(attr, total); needed > 0 {
-		seed := firstNonSlot(children)
+		// The first child that needs no content the OPT does not describe,
+		// else the first that is not a slot, else the first slot.
+		seed := g.firstDescribed(children)
+		if seed == nil {
+			seed = firstNonSlot(children)
+		}
 		if seed == nil {
 			// Every child is a slot; children is not empty here.
 			seed = children[0]
@@ -2061,20 +2091,21 @@ func newHierObjectID() *rm.HierObjectID {
 
 // ownMemberSkipped reports whether children[i], an allowed child that is
 // not a slot, gets no member of its own under the policy in force. Under
-// Large and Medium, a child whose identity a sibling carries gets none
-// (identityTaken). Under Medium, an optional archetype root after the first
-// optional archetype root of the attribute gets none either
-// (laterOptionalArchetype), so the attribute holds at most one optional
-// archetype. Required skips no child here: it sizes each child by its
-// occurrences lower bound, which gives an optional child no member. The
-// top-up to the attribute's lower bound can still build a member of a
-// skipped child.
+// Large and Medium, an optional child that needs content the OPT does not
+// describe gets none (optionalUndescribed), nor does a child whose identity
+// a sibling carries (identityTaken). Under Medium, an optional archetype
+// root after the first optional archetype root of the attribute that needs
+// no such content gets none either (laterOptionalArchetype), so the
+// attribute holds at most one optional archetype. Required skips no child
+// here: it sizes each child by its occurrences lower bound, which gives an
+// optional child no member. The top-up to the attribute's lower bound can
+// still build a member of a skipped child.
 func (g *generator) ownMemberSkipped(children []*tcimpl.CompiledNode, i int) bool {
 	switch g.opts.Policy {
 	case Large:
-		return identityTaken(children, i)
+		return g.optionalUndescribed(children[i]) || identityTaken(children, i)
 	case Medium:
-		return identityTaken(children, i) || laterOptionalArchetype(children, i)
+		return g.optionalUndescribed(children[i]) || identityTaken(children, i) || g.laterOptionalArchetype(children, i)
 	case Required:
 		return false
 	}
@@ -2084,11 +2115,13 @@ func (g *generator) ownMemberSkipped(children []*tcimpl.CompiledNode, i int) boo
 
 // laterOptionalArchetype reports whether children[i] is an optional
 // archetype root that comes after another optional archetype root among
-// its siblings, in OPT order, whatever the archetype of either. The first
-// optional archetype root counts even where identityTaken skips it, and a
-// slot is not an archetype root.
-func laterOptionalArchetype(children []*tcimpl.CompiledNode, i int) bool {
-	return optionalArchetypeRoot(children[i]) && slices.ContainsFunc(children[:i], optionalArchetypeRoot)
+// its siblings, in OPT order, whatever the archetype of either, that needs
+// no content the OPT does not describe. Such an earlier root counts even
+// where identityTaken skips it, and a slot is not an archetype root.
+func (g *generator) laterOptionalArchetype(children []*tcimpl.CompiledNode, i int) bool {
+	return optionalArchetypeRoot(children[i]) && slices.ContainsFunc(children[:i], func(c *tcimpl.CompiledNode) bool {
+		return optionalArchetypeRoot(c) && !g.needsUndescribed(c)
+	})
 }
 
 // optionalArchetypeRoot reports whether child is an archetype root the OPT
@@ -2104,9 +2137,9 @@ func optionalArchetypeRoot(child *tcimpl.CompiledNode) bool {
 // optional sibling before it. Under Large and Medium such a child gets no
 // member of its own, so the validator's binding of members to children
 // stays unambiguous, though the top-up to the attribute's lower bound can
-// still build one, from the first child that is not a slot; a required
-// child is always built. A slot does not count as a sibling. A sibling
-// carries an identity as the validator binds a member by it
+// still build one, from the child it takes (materialiseMultiple); a
+// required child is always built. A slot does not count as a sibling. A
+// sibling carries an identity as the validator binds a member by it
 // (carriesIdentity), so an archetype root also carries its node id: an
 // optional child that is not a root gets no member after a root with its
 // node id, while optional archetype roots of different archetypes are not

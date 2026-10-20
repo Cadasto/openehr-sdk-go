@@ -23,12 +23,17 @@ func optSlotIncluding(rmType, nodeID, pattern string) string {
 		`</pattern></item><reference_type>constraint</reference_type></right_operand></expression></includes></children>`
 }
 
-// slotProtocolOPT is a COMPOSITION whose one OBSERVATION has an optional
-// protocol with the given OPT children.
-func slotProtocolOPT(children ...string) string {
+// slotProtocolOPT is a COMPOSITION whose one OBSERVATION has a protocol,
+// which the OPT requires (existence 1..1) or leaves optional, with the given
+// OPT children.
+func slotProtocolOPT(required bool, children ...string) string {
+	protocol := optOptionalSingleOver("protocol", children...)
+	if required {
+		protocol = optSingle("protocol", children...)
+	}
 	return guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
 		guardChild("C_ARCHETYPE_ROOT", "OBSERVATION", "at0000", guardOccurrences11, guardObservationID,
-			optOptionalSingleOver("protocol", children...))))
+			protocol)))
 }
 
 // TestREQ107_SingleValuedSlotFillIsStamped is the REQ-107 check that a slot
@@ -37,62 +42,90 @@ func slotProtocolOPT(children ...string) string {
 // with the RM-type-prefix fallback where it has no includes; and that one
 // whose includes give no archetype id the generator can derive makes
 // Generate return an error wrapping ErrSlotFillUnsupported. Both hold at
-// Large and Medium, either value fill and through the builder; an
-// OBSERVATION's optional protocol is the attribute, which those two visit
-// since it has an allowed OPT child. Required does not visit an optional
-// attribute, so it never reaches the slot.
+// every policy, either value fill and through the builder; an
+// OBSERVATION's protocol, which the OPT requires, is the attribute, so
+// every policy visits it. Where the OPT leaves that protocol optional, no
+// policy visits it, since its member would be a slot fill (REQ-107 Visit
+// rule, § Slot fills): Generate and the builder then return a root with no
+// protocol, the slot no example can fill included.
 func TestREQ107_SingleValuedSlotFillIsStamped(t *testing.T) {
 	const medication = "openEHR-EHR-ITEM_TREE.medication.v1"
 	cases := []struct {
-		name string
-		opt  string
-		want string // the archetype id; "" wants ErrSlotFillUnsupported
+		name     string
+		children []string
+		want     string // the archetype id; "" wants ErrSlotFillUnsupported
 	}{
 		{
-			name: "includes a medication tree",
-			opt:  slotProtocolOPT(optSlotIncluding("ITEM_TREE", "at0001", `openEHR-EHR-ITEM_TREE\.medication\.v1`)),
-			want: medication,
+			name:     "includes a medication tree",
+			children: []string{optSlotIncluding("ITEM_TREE", "at0001", `openEHR-EHR-ITEM_TREE\.medication\.v1`)},
+			want:     medication,
 		},
 		{
-			name: "no includes",
-			opt:  slotProtocolOPT(optSlot("ITEM_TREE", "at0001")),
-			want: "openEHR-EHR-ITEM_TREE.example.v1",
+			name:     "no includes",
+			children: []string{optSlot("ITEM_TREE", "at0001")},
+			want:     "openEHR-EHR-ITEM_TREE.example.v1",
 		},
 		{
 			// The prohibited alternative is of another RM type: the
 			// template validator binds a single-valued attribute's value to
 			// the first alternative of its RM type, prohibited or not.
 			name: "after a prohibited alternative",
-			opt: slotProtocolOPT(optOccurring("C_COMPLEX_OBJECT", "ITEM_LIST", "at0002", 0, 0),
-				optSlotIncluding("ITEM_TREE", "at0001", `openEHR-EHR-ITEM_TREE\.medication\.v1`)),
+			children: []string{
+				optOccurring("C_COMPLEX_OBJECT", "ITEM_LIST", "at0002", 0, 0),
+				optSlotIncluding("ITEM_TREE", "at0001", `openEHR-EHR-ITEM_TREE\.medication\.v1`),
+			},
 			want: medication,
 		},
 		{
-			name: "includes no archetype id the generator can derive",
-			opt:  slotProtocolOPT(optSlotIncluding("ITEM_TREE", "at0001", `openEHR-EHR-ITEM_TREE\..*`)),
+			name:     "includes no archetype id the generator can derive",
+			children: []string{optSlotIncluding("ITEM_TREE", "at0001", `openEHR-EHR-ITEM_TREE\..*`)},
 		},
 	}
 	for _, tc := range cases {
-		c := compileOPTText(t, tc.opt, true)
-		for _, opts := range guardOptions() {
-			if opts.Policy == instance.Required {
-				continue // the protocol is optional, so Required never reaches the slot
+		for _, required := range []bool{true, false} {
+			c := compileOPTText(t, slotProtocolOPT(required, tc.children...), true)
+			want := tc.want
+			check := checkSlotProtocol
+			if !required {
+				check = checkNoProtocol
 			}
-			t.Run(fmt.Sprintf("%s/%v/%v", tc.name, opts.Policy, opts.ValueFill), func(t *testing.T) {
-				out, err := instance.Generate(t.Context(), c, opts)
-				checkSlotProtocol(t, c, out, err, tc.want)
+			for _, opts := range guardOptions() {
+				t.Run(fmt.Sprintf("%s/required=%t/%v/%v", tc.name, required, opts.Policy, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
+					check(t, c, out, err, want)
+				})
+			}
+			t.Run(fmt.Sprintf("%s/required=%t/builder", tc.name, required), func(t *testing.T) {
+				b, err := composition.NewBuilder(t.Context(), c, composition.WithTerritory("NL"),
+					composition.WithComposer(testComposer()), composition.WithNow(defaultsNow))
+				if err != nil {
+					check(t, c, nil, err, want)
+					return
+				}
+				comp, err := b.Build()
+				check(t, c, comp, err, want)
 			})
 		}
-		t.Run(tc.name+"/builder", func(t *testing.T) {
-			b, err := composition.NewBuilder(t.Context(), c, composition.WithTerritory("NL"),
-				composition.WithComposer(testComposer()), composition.WithNow(defaultsNow))
-			if err != nil {
-				checkSlotProtocol(t, c, nil, err, tc.want)
-				return
-			}
-			comp, err := b.Build()
-			checkSlotProtocol(t, c, comp, err, tc.want)
-		})
+	}
+}
+
+// checkNoProtocol fails t unless err is nil and the one OBSERVATION in out
+// has no protocol, and out passes the RM floor and the template validator.
+func checkNoProtocol(t *testing.T, c *templatecompile.Compiled, out any, err error, _ string) {
+	t.Helper()
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	obs, ok := firstContent(t, "Generate", out).(*rm.Observation)
+	if !ok {
+		t.Fatalf("content[0] is %T, want *rm.Observation", firstContent(t, "Generate", out))
+	}
+	if p := obs.Protocol; p != nil && !rm.IsTypedNil(p) {
+		t.Errorf("OBSERVATION.protocol = %T, want none", p)
+	}
+	noFloorErrors(t, out)
+	for _, iss := range templateErrors(out, c) {
+		t.Errorf("template validator: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
 	}
 }
 

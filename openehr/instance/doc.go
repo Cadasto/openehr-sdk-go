@@ -59,8 +59,23 @@
 //     least one member of each allowed child that is not a slot, except
 //     an optional child whose identity a required or earlier sibling
 //     carries. So Large builds a member of every optional archetype the
-//     template names. It stops short of the complete level, every data
-//     point the template allows, which no level of its own builds yet.
+//     template names, except one that holds only content the template does
+//     not describe (below). It stops short of the complete level, every
+//     data point the template allows, which no level of its own builds yet.
+//
+// Under Large and Medium the generator builds an optional node only where
+// it holds more than content the template does not describe: a slot fill,
+// or a LOCATABLE built from the BMM type of an attribute the template gives
+// no allowed child, such as the placeholder element of a required list the
+// template leaves empty. An optional child gets no member of its own when
+// it is a slot, or when an attribute of its own that is required can only
+// be given such members; an attribute that is not required is not visited
+// when every member it would get is such content or such a child. A top-up
+// takes the first child that needs none, and the first optional archetype
+// Medium keeps is the first that needs none. The check reads a node's own
+// attributes only: below a node the template or the RM requires, the walk
+// builds what it always builds, placeholders and slot fills included, so
+// the described content around them is kept.
 //
 // [Minimal] is another name for Required, and [Complete] for Large until
 // the complete level lands. [ParsePolicy] reads a policy from the names
