@@ -406,6 +406,8 @@ func TestREQ107_ProportionIntervalBoundsKeepTheirKind(t *testing.T) {
 	count := instance.ReadVendoredOPT(t, instance.CountIntervalOPT)
 	r, closed := instance.RealRange, instance.Closed
 	tenth := r(closed(0), closed(10))
+	ratio := instance.IntList(0)
+	upToTwo := instance.IntRange(closed(0), closed(2))
 	cases := []struct {
 		name         string
 		lower, upper string
@@ -417,18 +419,28 @@ func TestREQ107_ProportionIntervalBoundsKeepTheirKind(t *testing.T) {
 		},
 		{
 			name:  "ratios of precision 0 below and no precision above",
-			lower: instance.ProportionKindBound(tenth, instance.IntList(0), instance.IntList(0)),
-			upper: instance.ProportionKindBound(tenth, instance.IntList(0), ""),
+			lower: instance.ProportionKindBound(tenth, ratio, instance.RequiredPrecision(instance.IntList(0))),
+			upper: instance.ProportionKindBound(tenth, ratio, ""),
 		},
 		{
 			name:  "ratios of no precision below and precision 0 above",
-			lower: instance.ProportionKindBound(tenth, instance.IntList(0), ""),
-			upper: instance.ProportionKindBound(tenth, instance.IntList(0), instance.IntList(0)),
+			lower: instance.ProportionKindBound(tenth, ratio, ""),
+			upper: instance.ProportionKindBound(tenth, ratio, instance.RequiredPrecision(instance.IntList(0))),
 		},
 		{
 			name:  "ratios that both draw a precision in 0..2",
-			lower: instance.ProportionKindBound(tenth, instance.IntList(0), instance.IntRange(closed(0), closed(2))),
-			upper: instance.ProportionKindBound(tenth, instance.IntList(0), instance.IntRange(closed(0), closed(2))),
+			lower: instance.ProportionKindBound(tenth, ratio, instance.RequiredPrecision(upToTwo)),
+			upper: instance.ProportionKindBound(tenth, ratio, instance.RequiredPrecision(upToTwo)),
+		},
+		{
+			name:  "ratios of precision 2 below and precision 0 above",
+			lower: instance.ProportionKindBound(tenth, ratio, instance.RequiredPrecision(instance.IntList(2))),
+			upper: instance.ProportionKindBound(tenth, ratio, instance.RequiredPrecision(instance.IntList(0))),
+		},
+		{
+			name:  "ratios of an optional precision below and a prohibited one above",
+			lower: instance.ProportionKindBound(tenth, ratio, instance.OptionalPrecision(upToTwo)),
+			upper: instance.ProportionKindBound(tenth, ratio, instance.ProhibitedPrecision()),
 		},
 	}
 	for _, tc := range cases {

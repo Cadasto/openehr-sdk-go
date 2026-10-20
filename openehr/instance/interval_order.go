@@ -42,9 +42,13 @@ import (
 //     inside it, and for a proportion that needs whole numbers the nearest
 //     whole number inside it.
 //
-// An ordinal bound the second pair replaces takes the symbol its side
-// lists for the new value, with the text of a local code's term in lang
-// (useLocalTermText), as the walk writes it.
+// A proportion bound's precision moves with its numerator and
+// denominator, and a pair fits a side only where that side's constraint
+// on precision admits the precision it brings, so every bound written
+// keeps the whole numbers its precision needs. An ordinal bound the
+// second pair replaces takes the symbol its side lists for the new value,
+// with the text of a local code's term in lang (useLocalTermText), as the
+// walk writes it.
 //
 // These constraints are one-dimensional, so an in-order pair exists only if
 // the second pair is in order. When it is not, the two sides' constraints
@@ -488,33 +492,47 @@ func isoShape(s string) string {
 	}, s)
 }
 
-// proportionKey is the part of a DV_PROPORTION bound that is compared.
-// DV_PROPORTION.magnitude and less_than are not implemented on the
-// generated type. The RM states the magnitude as the ratio
+// proportionKey is the part of a DV_PROPORTION bound that is compared and
+// constrained. DV_PROPORTION.magnitude and less_than are not implemented
+// on the generated type. The RM states the magnitude as the ratio
 // numerator/denominator, and is_strictly_comparable_to as "the same
 // type", so two bounds compare only when their types match and neither
-// denominator is zero. whole records whether the bound the key was read
-// from needs whole numbers (wholeOperands); it is not written back.
+// denominator is zero. precision is the bound's precision, nil when it has
+// none: it moves with the numerator and the denominator, which were
+// settled under it, so a swap cannot put a number that is not whole on a
+// bound of precision 0. whole records whether the key needs whole numbers
+// (wholeOperands); it is not written back.
 type proportionKey struct {
 	numerator   float64
 	denominator float64
 	kind        int64
+	precision   *rm.Integer
 	whole       bool
 }
 
 func proportionKeyOf(p rm.DVProportion) proportionKey {
-	return proportionKey{
+	k := proportionKey{
 		numerator:   float64(p.Numerator),
 		denominator: float64(p.Denominator),
 		kind:        int64(p.Type),
 		whole:       wholeOperands(int64(p.Type), p.Precision),
 	}
+	if p.Precision != nil {
+		k.precision = new(*p.Precision)
+	}
+	return k
 }
 
+// setProportionKey writes k onto p, with a precision of its own, so two
+// bounds never share one.
 func setProportionKey(p *rm.DVProportion, k proportionKey) {
 	p.Numerator = rm.Real(k.numerator)
 	p.Denominator = rm.Real(k.denominator)
 	p.Type = rm.Integer(k.kind)
+	p.Precision = nil
+	if k.precision != nil {
+		p.Precision = new(*k.precision)
+	}
 }
 
 // proportionScale orders DV_PROPORTION bounds by numerator/denominator
@@ -553,10 +571,29 @@ func proportionRatio(k proportionKey) (float64, bool) {
 	return k.numerator / k.denominator, true
 }
 
+// proportionFits reports whether k suits a side's bound node: its
+// numerator, denominator, type and precision each fit the node's own
+// constraint on that attribute.
 func proportionFits(node *tcimpl.CompiledNode, k proportionKey) bool {
 	return componentFits(bindingChild(node, "numerator"), k.numerator) &&
 		componentFits(bindingChild(node, "denominator"), k.denominator) &&
-		componentFits(bindingChild(node, "type"), k.kind)
+		componentFits(bindingChild(node, "type"), k.kind) &&
+		precisionFits(node, k.precision)
+}
+
+// precisionFits reports whether a side's bound node admits precision, nil
+// for none: no precision where the node does not require one, and a
+// precision where the node does not prohibit it and its constraint on
+// precision accepts it. A nil node constrains nothing.
+func precisionFits(node *tcimpl.CompiledNode, precision *rm.Integer) bool {
+	if node == nil {
+		return true
+	}
+	if precision == nil {
+		attr := node.Attribute("precision")
+		return attr == nil || !isRequired(attr)
+	}
+	return !prohibited(node, "precision") && componentFits(bindingChild(node, "precision"), int64(*precision))
 }
 
 func componentFits(node *tcimpl.CompiledNode, v any) bool {
@@ -565,8 +602,8 @@ func componentFits(node *tcimpl.CompiledNode, v any) bool {
 }
 
 // proportionEnd returns the lowest (low) or highest ratio a side accepts
-// while keeping like's type and denominator, with a whole numerator where
-// like needs whole numbers. It returns false when the numerator constraint
+// while keeping like's type, denominator and precision, with a whole
+// numerator where like needs whole numbers. It returns false when the numerator constraint
 // has no end in the direction that moves the ratio that way, or no whole
 // number at that end where one is needed, or when like itself does not
 // fit.
@@ -595,7 +632,7 @@ func proportionEnd(node *tcimpl.CompiledNode, like proportionKey, low bool) (pro
 			return proportionKey{}, false
 		}
 	}
-	return proportionKey{numerator: n, denominator: like.denominator, kind: like.kind, whole: like.whole}, true
+	return proportionKey{numerator: n, denominator: like.denominator, kind: like.kind, precision: like.precision, whole: like.whole}, true
 }
 
 // realEnd returns the lowest (low) or highest value a C_REAL accepts:

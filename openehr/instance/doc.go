@@ -74,9 +74,11 @@
 // template gives an RM attribute no value, the generator writes an
 // RM-valid default, unless the template's own constraint on that
 // attribute rejects it. A DV_PROPORTION is then settled to the rules of
-// its kind, inside the template's constraints on its parts: a percent
-// over 100, a fraction over whole numbers, a ratio over a denominator that
-// is not 0. Where the drawn type cannot meet its rule there, another type
+// its kind, inside the template's constraints on its parts: a unitary
+// proportion over 1, a percent over 100, a fraction or an integer
+// fraction over whole numbers, any proportion of precision 0 over whole
+// numbers, and every kind over a denominator that is not 0. Where the
+// drawn type cannot meet its rule there, another type
 // the template allows is taken, and where none can, the value stays as
 // the walk wrote it. A coded text whose code is in terminology local takes
 // the text the template's archetype gives that code, in [Options.Language],

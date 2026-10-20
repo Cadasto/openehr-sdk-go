@@ -1807,9 +1807,10 @@ const (
 // the first of a fixed list of candidates (proportionOperand), so nothing
 // is drawn and the value is as reproducible as the walk's. The precision is
 // never changed. The walk writes each attribute from its own OPT
-// constraint, or leaves the placeholder 1 where the OPT says nothing, so
-// the kind is settled here, once all of them are written. opt is the OPT
-// node of p.
+// constraint, or, where the OPT says nothing, leaves its placeholder: 1
+// for the numerator and the denominator, 0 (a ratio) for the type, and no
+// precision. So the kind is settled here, once all of them are written.
+// opt is the OPT node of p.
 func settleProportion(opt *tcimpl.CompiledNode, p *rm.DVProportion) {
 	walked := int64(p.Type)
 	if settleProportionAs(opt, p, walked) {
