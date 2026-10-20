@@ -265,7 +265,7 @@ func retypeSlotReEncoder(slot string, replacement map[string]any) func(any) ([]b
 // not just that its entries behave. The RM-floor leg (REQ-112) is a MUST for
 // every fixture; only a fixture whose vendored content carries findings
 // invariant to the round trip may be held out, and today that is exactly the
-// sixteen named below, each justified at its probe030SkipFloor entry. Eleven
+// eighteen named below, each justified at its probe030SkipFloor entry. Eleven
 // of them omit archetype_details on an archetype root (REQ-112). Because
 // probe030RoundTrip skips the floor for any key in this map, an entry added
 // here silently drops the floor MUST for that fixture while TestProbe030 and
@@ -279,6 +279,8 @@ func TestProbe030SkipFloorSetIsLocked(t *testing.T) {
 		"compositions/TestPerson.v2.json",
 		"compositions/Test_dv_interval_dv_count_open_constraint.v0.json",
 		"compositions/Test_dv_interval_dv_quantity_open_constraint.v0.json",
+		"compositions/Test_dv_proportion_open_constraint.v0.json",
+		"compositions/Test_dv_proportion_open_constraint_precision_1.v0.json",
 		"compositions/clinical_notes.v0.json",
 		"rm/compo_with_nested_party_related.json",
 		"rm/ehr_status_other_details_simple.json",

@@ -131,11 +131,12 @@ func ClassConformsTo(sub, class string) (conforms, known bool) {
 }
 
 // TermItem returns the value of the item key (such as "text" or
-// "description") in the term for code that the nearest enclosing archetype
-// root of n defines, finding that term as [CompiledNode.Term] does, without
-// copying the term's items.
+// "description") in the term for code, walking outward from n to the first
+// enclosing archetype root that defines code, as [CompiledNode.Term] does,
+// without copying the term's items. That root need not be the nearest
+// enclosing one.
 // The second result is false when no enclosing root defines code, and when
-// the term found has no item key: like Term, the search stops at the nearest
+// the term found has no item key: like Term, the search stops at the first
 // root that defines code, so a root further up is not asked for the item.
 func TermItem(n *CompiledNode, code, key string) (string, bool) {
 	for cur := n; cur != nil; cur = cur.parent {

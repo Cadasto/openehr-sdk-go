@@ -167,3 +167,101 @@ func checkRootName(t *testing.T, c *templatecompile.Compiled, loc rm.Locatable) 
 		t.Errorf("%s is named %q, want %q, the text of its %s term", archetypeID, got, want, nodes[0].NodeID())
 	}
 }
+
+// Names of the nodes nestedNameOPT builds.
+const (
+	outerNodeName = "Outer node"
+	innerNodeName = "Inner node"
+)
+
+// nestedNameOPT is a CLUSTER template whose archetype defines at0005 as
+// outerNodeName and holds an ELEMENT at0005 of its own, and an inner CLUSTER
+// archetype that defines at0001 as innerNodeName and, where innerAt0005 is
+// not "", at0005 as innerAt0005. The inner archetype holds an ELEMENT at0005
+// and an ELEMENT at0001.
+func nestedNameOPT(innerAt0005 string) string {
+	outerTerms := `<term_definitions code="at0005"><items id="text">` + outerNodeName + `</items></term_definitions>`
+	innerTerms := `<term_definitions code="at0001"><items id="text">` + innerNodeName + `</items></term_definitions>`
+	if innerAt0005 != "" {
+		innerTerms += `<term_definitions code="at0005"><items id="text">` + innerAt0005 + `</items></term_definitions>`
+	}
+	inner := optArchetypeRoot("CLUSTER", "openEHR-EHR-CLUSTER.inner.v1", innerTerms,
+		optMultiple("items", optNode("ELEMENT", "at0005"), optNode("ELEMENT", "at0001")))
+	return optTemplate("CLUSTER", outerTerms, optMultiple("items", inner, optNode("ELEMENT", "at0005")))
+}
+
+// TestREQ107_NodeIsNamedByItsOwnArchetypeTerm is the REQ-107 check that the
+// generator names a node by the term its own archetype, the nearest
+// enclosing archetype root, defines for its node id: a node id the inner
+// archetype does not define keeps the name the generator writes where no
+// term exists, its RM type, even where the outer archetype defines the same
+// id, since that term names another concept. Where the inner archetype
+// defines the id, and for a node of the outer archetype, the node takes its
+// own archetype's term. It holds under every policy and both value fills.
+func TestREQ107_NodeIsNamedByItsOwnArchetypeTerm(t *testing.T) {
+	cases := []struct {
+		name        string
+		innerAt0005 string
+		want        map[string]string // "<archetype>/<node id>" → name
+	}{
+		{
+			name: "inner archetype without at0005",
+			want: map[string]string{
+				"inner/at0005": "ELEMENT",
+				"inner/at0001": innerNodeName,
+				"outer/at0005": outerNodeName,
+			},
+		},
+		{
+			name:        "inner archetype with at0005",
+			innerAt0005: "Inner at0005",
+			want: map[string]string{
+				"inner/at0005": "Inner at0005",
+				"inner/at0001": innerNodeName,
+				"outer/at0005": outerNodeName,
+			},
+		},
+	}
+	for _, tc := range cases {
+		c := compileOPTText(t, nestedNameOPT(tc.innerAt0005), true)
+		for _, opts := range defaultsOptions() {
+			t.Run(fmt.Sprintf("%s/%v/%v", tc.name, opts.Policy, opts.ValueFill), func(t *testing.T) {
+				out, err := instance.Generate(t.Context(), c, opts)
+				if err != nil {
+					t.Fatalf("Generate: %v", err)
+				}
+				got := nestedNames(t, out)
+				for key, want := range tc.want {
+					if got[key] != want {
+						t.Errorf("%s is named %q, want %q", key, got[key], want)
+					}
+				}
+				noFloorErrors(t, out)
+			})
+		}
+	}
+}
+
+// nestedNames returns the name of each ELEMENT in a root nestedNameOPT
+// generates, keyed by its archetype ("outer" or "inner") and its node id.
+func nestedNames(t *testing.T, out any) map[string]string {
+	t.Helper()
+	names := make(map[string]string)
+	var collect func(archetype string, items []rm.Item)
+	collect = func(archetype string, items []rm.Item) {
+		for _, item := range items {
+			switch v := item.(type) {
+			case *rm.Element:
+				names[archetype+"/"+v.ArchetypeNodeID] = v.Name.GetValue()
+			case *rm.Cluster:
+				collect("inner", v.Items)
+			}
+		}
+	}
+	root, ok := out.(*rm.Cluster)
+	if !ok {
+		t.Fatalf("root is %T, want *rm.Cluster", out)
+	}
+	collect("outer", root.Items)
+	return names
+}

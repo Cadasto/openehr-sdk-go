@@ -157,6 +157,56 @@ func valueCases() []valueCase {
 			want:    [2]float64{12345.678, 24680},
 		},
 		{
+			name: "rm_invariant DV_PROPORTION type that is no proportion kind",
+			run: func(*testing.T) validation.Result {
+				return validation.ValidateRM(&rm.DVProportion{Numerator: 13579, Denominator: 24680, Type: 98765})
+			},
+			code:    "rm_invariant",
+			path:    "/",
+			markers: []string{"98765", "13579", "24680"},
+			want:    rm.Integer(98765),
+		},
+		{
+			name: "rm_invariant DV_PROPORTION denominator a unitary proportion rejects",
+			run: func(*testing.T) validation.Result {
+				return validation.ValidateRM(&rm.DVProportion{Numerator: 13579, Denominator: 2468.25, Type: rm.Integer(rm.ProportionKindPkUnitary)})
+			},
+			code:    "rm_invariant",
+			path:    "/",
+			markers: []string{"2468.25", "13579"},
+			want:    rm.Real(2468.25),
+		},
+		{
+			name: "rm_invariant DV_PROPORTION denominator a percent rejects",
+			run: func(*testing.T) validation.Result {
+				return validation.ValidateRM(&rm.DVProportion{Numerator: 13579, Denominator: 8642, Type: rm.Integer(rm.ProportionKindPkPercent)})
+			},
+			code:    "rm_invariant",
+			path:    "/",
+			markers: []string{"8642", "13579"},
+			want:    rm.Real(8642),
+		},
+		{
+			name: "rm_invariant DV_PROPORTION denominator of 0",
+			run: func(*testing.T) validation.Result {
+				return validation.ValidateRM(&rm.DVProportion{Numerator: 13579, Denominator: 0})
+			},
+			code:    "rm_invariant",
+			path:    "/",
+			markers: []string{"13579"},
+			want:    rm.Real(0),
+		},
+		{
+			name: "rm_invariant DV_PROPORTION fraction with a fractional operand",
+			run: func(*testing.T) validation.Result {
+				return validation.ValidateRM(&rm.DVProportion{Numerator: 13579.25, Denominator: 8642, Type: rm.Integer(rm.ProportionKindPkFraction)})
+			},
+			code:    "rm_invariant",
+			path:    "/",
+			markers: []string{"13579.25", "8642"},
+			want:    [2]float64{13579.25, 8642},
+		},
+		{
 			name: "rm_invariant DV_INTERVAL lower above upper",
 			run: func(*testing.T) validation.Result {
 				return validation.ValidateRM(&rm.DVInterval[rm.DVCount]{

@@ -538,11 +538,26 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 			},
 		},
 		{
+			// OPT wins: a value with data needs no uri (Not_empty), so the
+			// generator writes its example data and no uri.
+			name: "DV_MULTIMEDIA uri, prohibited, data allowed",
+			opt:  yieldMultimedia(optProhibitedSingle("uri")),
+			check: func(t *testing.T, out any) {
+				mm := rootElementValue[*rm.DVMultimedia](t, out)
+				if mm.URI != nil {
+					t.Errorf("DV_MULTIMEDIA.uri = %#v, want none: the OPT prohibits it and the value has data", mm.URI)
+				}
+				if len(mm.Data) == 0 {
+					t.Error("DV_MULTIMEDIA.data absent, want the example payload")
+				}
+			},
+		},
+		{
 			// RM wins: a value with no data needs its uri (Not_empty), so
 			// the default is written over the OPT's prohibition, which the
 			// template validator reports (REQ-107 Precedence 2).
-			name:       "DV_MULTIMEDIA uri, prohibited, no data",
-			opt:        yieldMultimedia(optProhibitedSingle("uri")),
+			name:       "DV_MULTIMEDIA uri, prohibited, data prohibited",
+			opt:        yieldMultimedia(optProhibitedSingle("uri"), optProhibitedSingle("data")),
 			prohibited: "/value/uri",
 			check: func(t *testing.T, out any) {
 				uri := rootElementValue[*rm.DVMultimedia](t, out).URI

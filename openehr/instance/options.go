@@ -35,9 +35,10 @@ const (
 	// OPT child whose occurrences upper bound is not 0. A visited
 	// multi-valued attribute gets its members as under Large, except that
 	// an optional archetype root after the first optional archetype root
-	// of the attribute, in OPT order, gets none of its own, whatever its
-	// archetype. Medium is the zero value, so Options with no Policy
-	// builds it.
+	// of the attribute, in OPT order, that holds more than content the
+	// template does not describe (see the package documentation) gets
+	// none of its own, whatever its archetype. Medium is the zero value,
+	// so Options with no Policy builds it.
 	Medium Policy = iota
 	// Required builds only the data points the template makes mandatory
 	// and a composition's context, what the ITS-REST template example
@@ -56,11 +57,13 @@ const (
 	// optional, so its tree is not always smaller than Medium's.
 	Required
 	// Large builds a member of every optional archetype the template
-	// names. It visits every attribute the visit rule allows: every
-	// attribute the compiled node carries, the optional ones the OPT
-	// names included. A visited multi-valued attribute gets at least one
-	// member of each allowed OPT child that is not a slot, except an
-	// optional child whose identity a required sibling, or an earlier
+	// names that holds more than content the template does not describe
+	// (see the package documentation). It visits every attribute the
+	// visit rule allows: every attribute the compiled node carries, the
+	// optional ones the OPT names included. A visited multi-valued
+	// attribute gets at least one member of each allowed OPT child that
+	// is not a slot, except an optional child that holds only such
+	// content, or whose identity a required sibling, or an earlier
 	// optional one, carries; optional archetype roots of different
 	// archetypes each get theirs. It stops short of the ITS-REST template
 	// example's detail_level=complete (every data point the template
@@ -179,11 +182,13 @@ type Options struct {
 	Now time.Time
 
 	// UIDSource supplies the uids the generator writes: the uid of every
-	// COMPOSITION, ENTRY, GENERIC_ENTRY, PARTY and PARTY_RELATIONSHIP, of
-	// any other locatable whose OPT requires its uid, and the id of a
-	// PARTY_RELATIONSHIP's source or target that carries none. Nil falls
-	// back to a random RFC 9562 v4 UUID (stdlib uuid.NewV4). Tests pin a
-	// counter or named-seed source for deterministic uids.
+	// ENTRY, GENERIC_ENTRY, PARTY and PARTY_RELATIONSHIP, of any other
+	// locatable whose OPT requires its uid, and the id of a
+	// PARTY_RELATIONSHIP's source or target that carries none. A
+	// COMPOSITION gets a uid only where its OPT requires one, so the
+	// server that stores it gives it its version id. Nil falls back to a
+	// random RFC 9562 v4 UUID (stdlib uuid.NewV4). Tests pin a counter or
+	// named-seed source for deterministic uids.
 	UIDSource func() *rm.HierObjectID
 
 	// ValueFill selects how primitive leaves are valued. Zero value =

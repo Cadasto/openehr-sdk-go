@@ -277,7 +277,7 @@ go run ./cmd/examples/generate-example \
 | Flag | Default | Values |
 |---|---|---|
 | `--opt` | `vital_signs.opt` fixture | Path to an ADL 1.4 OPT |
-| `--policy` | `medium` | `required` builds only the data points the template makes mandatory and a composition's context; `medium` also builds every attribute the template constrains, with at most one optional archetype under each, the first; `large` builds every attribute and a member of every optional archetype the template names. `minimal` is another name for `required`, and `complete` for `large` for now. Case does not matter. `required` and `medium` are the ITS-REST template example's `detail_level` levels of those names; `large` stops short of its `complete` level. Under each of them every primitive leaf holds its example value |
+| `--policy` | `medium` | `required` builds only the data points the template makes mandatory and a composition's context; `medium` also builds every attribute the template constrains, with at most one optional archetype under each, the first whose content the template describes; `large` builds every attribute and a member of every optional archetype the template names. `minimal` is another name for `required`, and `complete` for `large` for now. Case does not matter. `required` and `medium` are the ITS-REST template example's `detail_level` levels of those names; `large` stops short of its `complete` level. No policy builds an optional node whose only content the template leaves undescribed, such as a cluster that holds nothing but an open slot. Under each of them every primitive leaf holds its example value |
 | `--territory` | `NL` | ISO 3166-1 code; a COMPOSITION root requires one |
 | `--composer-name` | `Example Composer` | Name recorded as the composition's composer |
 
@@ -491,7 +491,7 @@ go run ./cmd/examples/compile-build-validate path/to/template.opt
 
 ```text
 template             : vital_signs (vital_signs.opt)
-composition          : 10039 bytes canonical JSON, round-tripped
+composition          : 9959 bytes canonical JSON, round-tripped
 validation           : OK, no issues
 ```
 

@@ -52,10 +52,11 @@ func countedOptions(policy instance.Policy, fill instance.ValueFill, uids *int, 
 // Required and Large. It refuses before it builds anything, so it draws
 // no uid from UIDSource and no value from ValueSource. It holds on a
 // COMPOSITION root and on roots of other classes, under both value fills.
-// The COMPOSITION and the OBSERVATION each draw a uid when they are built,
-// which a control run under Large shows, so their counters would catch a
-// refusal made after building; a CLUSTER or ELEMENT root draws neither, so
-// those rows check the error and the missing root only.
+// The OBSERVATION, and the vital_signs COMPOSITION through its entries,
+// draw a uid when they are built, which a control run under Large shows,
+// so their counters would catch a refusal made after building; a CLUSTER
+// or ELEMENT root draws neither, so those rows check the error and the
+// missing root only.
 func TestREQ107_GenerateRefusesAnUndefinedPolicy(t *testing.T) {
 	roots := []struct {
 		name     string

@@ -64,7 +64,8 @@ func localSymbolJSON(code string) string {
 // (REQ-171 Finding identity), not the invariant's. more holds further pairs
 // of breaking and conforming members, each checked like the row's own, for
 // an invariant whose evaluator reads values of one class in more than one
-// way: Limits_consistent orders the bounds of a DV_INTERVAL by their type.
+// way: Limits_consistent orders the bounds of a DV_INTERVAL by their type,
+// and Fraction_validity holds on a fraction and on an integer fraction.
 type matrixRow struct {
 	breaking, conforming string
 	rule, path           string
@@ -124,7 +125,12 @@ var invariantMatrix = map[string]matrixRow{
 	"DV_DATE_TIME.Value_valid":           {breaking: `"value":"example"`, conforming: `"value":"2024-01-01T10:30:00Z"`},
 	"DV_DURATION.Value_valid":            {breaking: `"value":"example"`, conforming: `"value":"P1D"`},
 	"DV_INTERVAL.Limits_consistent":      {breaking: `"lower":{"_type":"DV_COUNT","magnitude":5},"upper":{"_type":"DV_COUNT","magnitude":1}`, conforming: `"lower":{"_type":"DV_COUNT","magnitude":5},"upper":{"_type":"DV_COUNT","magnitude":5}`, more: intervalOrderPairs},
+	"DV_PROPORTION.Fraction_validity":    {breaking: `"numerator":1.5,"denominator":2,"type":3`, conforming: `"numerator":1,"denominator":2,"type":3`, more: []matrixPair{{breaking: `"numerator":3,"denominator":2.5,"type":4`, conforming: `"numerator":3,"denominator":2,"type":4`}}},
+	"DV_PROPORTION.Percent_validity":     {breaking: `"numerator":1,"denominator":1,"type":2`, conforming: `"numerator":1,"denominator":100,"type":2`},
 	"DV_PROPORTION.Precision_validity":   {breaking: `"numerator":1.5,"denominator":2,"type":0,"precision":0`, conforming: `"numerator":1,"denominator":2,"type":0,"precision":0`},
+	"DV_PROPORTION.Type_validity":        {breaking: `"numerator":1,"denominator":2,"type":5`, conforming: `"numerator":1,"denominator":2,"type":0`},
+	"DV_PROPORTION.Unitary_validity":     {breaking: `"numerator":1,"denominator":2,"type":1`, conforming: `"numerator":1,"denominator":1,"type":1`},
+	"DV_PROPORTION.Valid_denominator":    {breaking: `"numerator":1,"denominator":0,"type":0`, conforming: `"numerator":1,"denominator":2,"type":0`},
 	"DV_TEXT.Mappings_valid":             {breaking: `"value":"x","mappings":[]`, conforming: `"value":"x","mappings":[{"_type":"TERM_MAPPING","match":"="}]`},
 	"DV_TIME.Value_valid":                {breaking: `"value":"example"`, conforming: `"value":"10:30:00"`},
 	"EHR_ACCESS.Is_archetype_root":       {breaking: ``, conforming: archetypeDetailsMember},

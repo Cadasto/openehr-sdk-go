@@ -92,12 +92,13 @@ var requiredBodies = []string{
 // Generate returns under Medium, under some value fill or seed, holds no
 // ELEMENT: the hollow-body floor under that policy. Medium gives a
 // multi-valued attribute at most one optional archetype, its first optional
-// archetype root in OPT order (REQ-107 What a visit writes), so a template
-// whose first optional archetype holds no ELEMENT gets a body with none by
-// design: clinical_content_validation, whose content builds only its first
-// optional root, a SECTION.validation_section_test.v0 with no items. A
-// listed template that stops being hollow under Medium fails the ratchet,
-// and so does an unlisted one that becomes hollow, as an unlisted row does.
+// archetype root in OPT order that needs no undescribed content (REQ-107
+// What a visit writes), so a template whose kept optional archetype holds
+// no ELEMENT gets a body with none by design: clinical_content_validation,
+// whose content builds only that root, a SECTION.validation_section_test.v0
+// with no items. A listed template that stops being hollow under Medium
+// fails the ratchet, and so does an unlisted one that becomes hollow, as an
+// unlisted row does.
 var mediumHollowBodies = []string{
 	"templates/clinical_content_validation",
 }
@@ -113,22 +114,20 @@ var mediumHollowBodies = []string{
 // with its identity and to an earlier optional one, and an archetype root's
 // identity is its archetype id (REQ-107 What a visit writes). So Large
 // builds one member of each optional archetype under an attribute, and
-// reaches the TestPerson.v2 identifier clusters, the
-// clinical_content_validation EVALUATION and the family_history EVALUATION.
-// It skips the repeated named SECTION.adhoc.v1 roots of Corona_Anamnese
-// after the first, so it never reaches 'Allgemeine Angaben' and its
-// unfillable slot. Under Large no template's body is hollow: a hollow_body
-// failure there fails the ratchet. The builder builds on Large when no
-// WithPolicy is given, so its rows are Large rows.
+// reaches the TestPerson.v2 identifier clusters and the
+// clinical_content_validation EVALUATION. It skips the repeated named
+// SECTION.adhoc.v1 roots of Corona_Anamnese after the first, so it never
+// reaches 'Allgemeine Angaben' and its unfillable slot. Under Large no
+// template's body is hollow: a hollow_body failure there fails the ratchet.
+// The builder builds on Large when no WithPolicy is given, so its rows are
+// Large rows.
 //
 // Medium rows: Medium gives an attribute at most one optional archetype,
-// its first optional archetype root. family_history's content builds its
-// first, the family_history EVALUATION, so Medium reaches the same
-// unfillable slot as Large. The TestPerson.v2 identifier clusters and the
-// clinical_content_validation EVALUATION come after the first optional
-// root of their attribute, so Medium builds neither and has no row there.
-// Under Medium the hollow-body floor is the mediumHollowBodies list instead
-// of a row.
+// its first optional archetype root. The TestPerson.v2 identifier clusters
+// and the clinical_content_validation EVALUATION come after the first
+// optional root of their attribute, so Medium builds neither and has no row
+// there. Under Medium the hollow-body floor is the mediumHollowBodies list
+// instead of a row.
 //
 // Required rows: none. Required visits only the attributes the template
 // makes mandatory and gives an optional child no member of its own
@@ -136,13 +135,10 @@ var mediumHollowBodies = []string{
 // optional archetypes the rows here fail in. Under Required the
 // hollow-body floor is the requiredBodies list instead of a row.
 //
-// slot_fill rows: family_history.v.1.2.3 puts a slot no example can fill
-// below its content EVALUATION, so Generate returns ErrSlotFillUnsupported
-// (REQ-107 Slot fills).
-//
-// rotated rows: clinical_content_validation constrains ITEM_TABLE.rotated,
-// an attribute the pinned RM does not have (REQ-107 § Exceptions and known
-// gaps), so the template validator finds it absent.
+// No slot_fill rows: family_history.v.1.2.3's slot no example can fill sits
+// in the optional CLUSTER at0024, whose required items admit only slots, so
+// no policy builds that CLUSTER (REQ-107 § Slot fills) and every entry
+// returns a root; TestREQ107_FamilyHistoryLeavesItsUnfillableSlotOut pins it.
 //
 // floor_coded rows: TestPerson.v2 codes both its DV_MULTIMEDIA media_type
 // nodes in terminology openEHR, one with the code list 425 to 429 and one
@@ -158,14 +154,6 @@ var corpusRatchet = []ratchetFailure{
 	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "example", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
 	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2]/items[at0001]/value/media_type"},
 	{template: "templates/TestPerson.v2", entry: "generate", policy: "large", fill: "random", reason: "floor_coded:code_not_in_value_set:/details/items[openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2]/items[at0006]/value/media_type"},
-	{template: "templates/clinical_content_validation", entry: "builder", policy: "large", fill: "example", reason: "validator_other:required:/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rotated"},
-	{template: "templates/clinical_content_validation", entry: "generate", policy: "large", fill: "example", reason: "validator_other:required:/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rotated"},
-	{template: "templates/clinical_content_validation", entry: "generate", policy: "large", fill: "random", reason: "validator_other:required:/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rotated"},
-	{template: "templates/family_history.v.1.2.3", entry: "builder", policy: "large", fill: "example", reason: "refusal_other:slot_fill:/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0024]/items[at0027]"},
-	{template: "templates/family_history.v.1.2.3", entry: "generate", policy: "large", fill: "example", reason: "refusal_other:slot_fill:/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0024]/items[at0027]"},
-	{template: "templates/family_history.v.1.2.3", entry: "generate", policy: "large", fill: "random", reason: "refusal_other:slot_fill:/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0024]/items[at0027]"},
-	{template: "templates/family_history.v.1.2.3", entry: "generate", policy: "medium", fill: "example", reason: "refusal_other:slot_fill:/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0024]/items[at0027]"},
-	{template: "templates/family_history.v.1.2.3", entry: "generate", policy: "medium", fill: "random", reason: "refusal_other:slot_fill:/content[openEHR-EHR-EVALUATION.family_history.v2]/data/items[at0003]/items[at0024]/items[at0027]"},
 }
 
 func TestREQ107_CorpusRatchet(t *testing.T) {

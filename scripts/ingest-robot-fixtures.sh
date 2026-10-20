@@ -48,6 +48,17 @@ cp_comp_xml valid_templates/minimal/minimal_action_2.instance.composition.xml 'm
 
 # 4 — validation (compile-passing) + Test_dv_* OPT+JSON
 cp_opt valid_templates/validation/clinical_content_validation.opt 'clinical_content_validation.opt'
+# Upstream constrains ITEM_TABLE.rotated, an attribute RM 1.2.0's ITEM_TABLE
+# does not define; drop that constraint (testkit/corpus/README.md).
+python3 - "$CAS/templates/clinical_content_validation.opt" <<'PY'
+import re, sys
+p = sys.argv[1]
+s = open(p, encoding='utf-8', newline='').read()
+s, n = re.subn(r'[ \t]*<attributes xsi:type="C_SINGLE_ATTRIBUTE">\s*<rm_attribute_name>rotated</rm_attribute_name>.*?</attributes>\r?\n', '', s, flags=re.S)
+if n != 1:
+    sys.exit(f'expected one ITEM_TABLE.rotated block in {p}, found {n}')
+open(p, 'w', encoding='utf-8', newline='').write(s)
+PY
 cp_comp_json compositions/CANONICAL_JSON/clinical_content_validation__full.json 'clinical_content_validation.json'
 
 for opt in "$ROBOT"/valid_templates/all_types/Test_dv_*.opt; do
