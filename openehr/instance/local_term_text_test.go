@@ -170,8 +170,8 @@ const optOrdinal = `<children xsi:type="C_DV_ORDINAL"><rm_type_name>DV_ORDINAL</
 // REQ-105 resolves it (a language the OPT has no translation for gets the
 // document language's term). Where the OPT limits the text with a C_STRING
 // that rejects the term text, the text the walk wrote stays (Precedence
-// 1), and a code the archetype defines no term for, or the placeholder
-// at0000, keeps the walk's text.
+// 1), and a code the archetype defines no term for, the placeholder at0000
+// and a code of another terminology keep the walk's text.
 // It holds under every policy and both value fills.
 func TestREQ107_LocalCodedTextTakesTheTermText(t *testing.T) {
 	cases := []struct {
@@ -222,6 +222,14 @@ func TestREQ107_LocalCodedTextTakesTheTermText(t *testing.T) {
 			name: "ELEMENT value with the placeholder code",
 			opt: optTemplate("ELEMENT", optTerms, `<term_definitions code="at0000"><items id="text">Concept</items></term_definitions>`,
 				optSingle("value", optCodedText("local"))),
+			coded: elementCodedText,
+			want:  []string{walkText},
+		},
+		{
+			// A code of another terminology that reads like an at-code
+			// still names no term of the archetype.
+			name:  "ELEMENT value coded in another terminology",
+			opt:   optTemplate("ELEMENT", optTerms, optSingle("value", optCodedText("ICD10", "at0001"))),
 			coded: elementCodedText,
 			want:  []string{walkText},
 		},

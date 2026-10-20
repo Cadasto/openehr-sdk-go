@@ -42,13 +42,17 @@ import (
 //     inside it, and for a proportion that needs whole numbers the nearest
 //     whole number inside it.
 //
+// An ordinal bound the second pair replaces takes the symbol its side
+// lists for the new value, with the text of a local code's term in lang
+// (useLocalTermText), as the walk writes it.
+//
 // These constraints are one-dimensional, so an in-order pair exists only if
 // the second pair is in order. When it is not, the two sides' constraints
 // admit no ordered interval at all. The generator has no error for a
 // constraint it cannot satisfy (sampleValue, for one, falls back to the
 // example value without a signal), so the bounds are then left as they
 // are, and the interval breaks Limits_consistent.
-func orderIntervalBounds(optNode *tcimpl.CompiledNode, rmValue any) {
+func orderIntervalBounds(optNode *tcimpl.CompiledNode, rmValue any, lang string) {
 	switch iv := rmValue.(type) {
 	case *rm.DVInterval[rm.DVCount]:
 		orderConcrete(&iv.Interval, optNode, countScale,
@@ -71,10 +75,10 @@ func orderIntervalBounds(optNode *tcimpl.CompiledNode, rmValue any) {
 	case *rm.DVInterval[rm.DVProportion]:
 		orderConcrete(&iv.Interval, optNode, proportionScale, proportionKeyOf, setProportionKey)
 	case *rm.DVInterval[rm.DVOrdinal]:
-		orderConcrete(&iv.Interval, optNode, ordinalScale, ordinalKeyOf, setOrdinalKey)
+		orderConcrete(&iv.Interval, optNode, ordinalScaleIn(lang), ordinalKeyOf, setOrdinalKey)
 	case *rm.DVInterval[rm.DVOrdered]:
 		if bothBounded(&iv.Interval) {
-			orderOrderedBounds(optNode, &iv.Interval)
+			orderOrderedBounds(optNode, &iv.Interval, lang)
 		}
 	}
 }
@@ -94,8 +98,9 @@ func orderConcrete[T any, K any](iv *rm.Interval[T], optNode *tcimpl.CompiledNod
 // orderOrderedBounds orders a DV_INTERVAL<DV_ORDERED> whose two bounds are
 // the same comparable type, in value or pointer form. A pointer bound is
 // changed in place and a value bound is replaced, so each keeps its form.
-// A mixed or missing pair is left alone.
-func orderOrderedBounds(optNode *tcimpl.CompiledNode, iv *rm.Interval[rm.DVOrdered]) {
+// A mixed or missing pair is left alone. lang is the language of an
+// ordinal symbol's text.
+func orderOrderedBounds(optNode *tcimpl.CompiledNode, iv *rm.Interval[rm.DVOrdered], lang string) {
 	if orderOrderedAs(iv, optNode, countScale, asCount, func(c rm.DVCount) int64 { return int64(c.Magnitude) }, setOrderedCount) {
 		return
 	}
@@ -114,7 +119,7 @@ func orderOrderedBounds(optNode *tcimpl.CompiledNode, iv *rm.Interval[rm.DVOrder
 	if orderOrderedAs(iv, optNode, proportionScale, asProportion, proportionKeyOf, setOrderedProportion) {
 		return
 	}
-	orderOrderedAs(iv, optNode, ordinalScale, asOrdinal, ordinalKeyOf, setOrderedOrdinal)
+	orderOrderedAs(iv, optNode, ordinalScaleIn(lang), asOrdinal, ordinalKeyOf, setOrderedOrdinal)
 }
 
 // orderOrderedAs orders iv when both bounds are T. It reports whether
@@ -652,17 +657,20 @@ func setOrdinalKey(o *rm.DVOrdinal, k ordinalKey) {
 	o.Symbol = k.symbol
 }
 
-// ordinalScale orders DV_ORDINAL bounds by Value. The OPT constrains a
-// DV_ORDINAL bound on the bound node itself.
-var ordinalScale = scale[ordinalKey]{
-	compare: func(a, b ordinalKey) (int, bool) { return compareOrdered(a.value, b.value), true },
-	fits:    ordinalFits,
-	lowest: func(node *tcimpl.CompiledNode, _ ordinalKey) (ordinalKey, bool) {
-		return ordinalEnd(node, true)
-	},
-	highest: func(node *tcimpl.CompiledNode, _ ordinalKey) (ordinalKey, bool) {
-		return ordinalEnd(node, false)
-	},
+// ordinalScaleIn orders DV_ORDINAL bounds by Value. The OPT constrains a
+// DV_ORDINAL bound on the bound node itself. lang is the language of the
+// text of a symbol the extreme replacement writes (ordinalEnd).
+func ordinalScaleIn(lang string) scale[ordinalKey] {
+	return scale[ordinalKey]{
+		compare: func(a, b ordinalKey) (int, bool) { return compareOrdered(a.value, b.value), true },
+		fits:    ordinalFits,
+		lowest: func(node *tcimpl.CompiledNode, _ ordinalKey) (ordinalKey, bool) {
+			return ordinalEnd(node, true, lang)
+		},
+		highest: func(node *tcimpl.CompiledNode, _ ordinalKey) (ordinalKey, bool) {
+			return ordinalEnd(node, false, lang)
+		},
+	}
 }
 
 // ordinalFits reports whether k suits a side's bound node. When the node
@@ -683,7 +691,11 @@ func ordinalFits(node *tcimpl.CompiledNode, k ordinalKey) bool {
 	return len(pc.Validate(int(k.value))) == 0
 }
 
-func ordinalEnd(node *tcimpl.CompiledNode, low bool) (ordinalKey, bool) {
+// ordinalEnd returns the lowest (low) or highest pair node's C_DV_ORDINAL
+// lists, with the symbol the walk writes for it: the text of a local
+// code's term in lang (useLocalTermText). It returns false when node lists
+// no pair its constraint admits.
+func ordinalEnd(node *tcimpl.CompiledNode, low bool, lang string) (ordinalKey, bool) {
 	c, ok := primitiveOf(node).(constraints.CDvOrdinal)
 	if !ok || len(c.Values) == 0 {
 		return ordinalKey{}, false
@@ -701,7 +713,9 @@ func ordinalEnd(node *tcimpl.CompiledNode, low bool) (ordinalKey, bool) {
 	if !found {
 		return ordinalKey{}, false
 	}
-	return ordinalKey{value: int64(best.Value), symbol: ordinalSymbolText(best.Symbol)}, true
+	symbol := ordinalSymbolText(best.Symbol)
+	useLocalTermText(node, &symbol, lang)
+	return ordinalKey{value: int64(best.Value), symbol: symbol}, true
 }
 
 func asDate(v rm.DVOrdered) (rm.DVDate, bool) {

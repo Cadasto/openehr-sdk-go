@@ -216,7 +216,7 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	if err := g.writeRMNeeded(optNode, rmValue); err != nil {
 		return err
 	}
-	orderIntervalBounds(optNode, rmValue)
+	orderIntervalBounds(optNode, rmValue, g.opts.Language)
 	settleIntervalEndpoints(optNode, rmValue)
 	g.finishNode(optNode, rmValue)
 	return nil
@@ -1667,6 +1667,7 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 				CodeString:    ex.CodeString,
 				TerminologyID: rm.TerminologyID{Value: ex.Terminology},
 			}
+			useLocalTermText(leaf, v, g.opts.Language)
 			return nil
 		default:
 			return fmt.Errorf("DV_CODED_TEXT example value is %T, want CodedTermRef or string", ex)
@@ -1694,7 +1695,12 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 		v.Magnitude = rm.Integer64(n)
 		return nil
 	case *rm.DVOrdinal:
-		return applyOrdinal(v, pc, ex)
+		if err := applyOrdinal(v, pc, ex); err != nil {
+			return err
+		}
+		// The C_DV_ORDINAL lists the symbol's code, not its text.
+		useLocalTermText(leaf, &v.Symbol, g.opts.Language)
+		return nil
 	case *rm.DVProportion:
 		return applyProportionPrimitive(v, attr, ex)
 	}
@@ -2161,6 +2167,11 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 		// A bound of an interval is settled here too, before the interval's
 		// own walk puts its two bounds in order.
 		settleProportion(opt, v)
+	case *rm.DVCodedText:
+		// Any coded text the OPT builds as a node of its own: an ELEMENT's
+		// value, a locatable's name, an ISM_TRANSITION's careflow step or
+		// transition, a PARTICIPATION's function or mode, and so on.
+		useLocalTermText(opt, v, g.opts.Language)
 	case *rm.Cluster:
 		// CLUSTER.items is RM-mandatory. ITEM_TREE.items and ITEM_LIST.items
 		// are optional, so they get no member here: the walk gives them one
@@ -2489,10 +2500,39 @@ func useGroupRubric(opt *tcimpl.CompiledNode, attrName string, v *rm.DVCodedText
 	if !ok {
 		return
 	}
-	withRubric := *v
-	withRubric.Value = rubric
-	if codedTextAdmits(bindingChild(opt, attrName), withRubric) {
-		*v = withRubric
+	takeText(bindingChild(opt, attrName), v, rubric)
+}
+
+// useLocalTermText sets the text of v, a coded text the walk built under
+// node, to the text of the term node's archetype defines for its code,
+// when that code is in terminology local and is not the placeholder at0000
+// (noCode), and node admits that text (takeText). The term is the one
+// CompiledNode.Term resolves in lang: an OPT carries one document
+// language, whose term a language it has no translation for gets too. A
+// code its archetype defines no term for keeps its text, as does a code in
+// any other terminology. For an ordinal's symbol node is the C_DV_ORDINAL,
+// which constrains the symbol's code and not its text. A nil node leaves v
+// alone.
+func useLocalTermText(node *tcimpl.CompiledNode, v *rm.DVCodedText, lang string) {
+	code := v.DefiningCode
+	if node == nil || code.TerminologyID.Value != "local" || noCode(code.CodeString) {
+		return
+	}
+	term, ok := node.Term(code.CodeString, lang)
+	if text := term.Items["text"]; ok && text != "" {
+		takeText(node, v, text)
+	}
+}
+
+// takeText sets the text of v, a coded text the walk built under node, to
+// text where node admits the coded text with it (codedTextAdmits): a
+// C_STRING the OPT puts on its value that rejects text leaves the text the
+// walk wrote.
+func takeText(node *tcimpl.CompiledNode, v *rm.DVCodedText, text string) {
+	withText := *v
+	withText.Value = text
+	if codedTextAdmits(node, withText) {
+		*v = withText
 	}
 }
 

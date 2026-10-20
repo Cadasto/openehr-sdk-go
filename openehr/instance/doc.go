@@ -78,7 +78,9 @@
 // over 100, a fraction over whole numbers, a ratio over a denominator that
 // is not 0. Where the drawn type cannot meet its rule there, another type
 // the template allows is taken, and where none can, the value stays as
-// the walk wrote it.
+// the walk wrote it. A coded text whose code is in terminology local takes
+// the text the template's archetype gives that code, in [Options.Language],
+// unless the template's constraint on the text rejects it.
 //
 // # Trust model
 //
