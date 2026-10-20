@@ -101,13 +101,15 @@ const (
 // the field's own: ITEM_SINGLE item and REFERENCE_RANGE range come back as a
 // pointer into the parent (the builder writes through the first);
 // ISM_TRANSITION careflow_step and transition come back as the DV_CODED_TEXT
-// they point to, and DV_PROPORTION precision as its Integer, which the
-// primitive binding reads; ORIGINAL_VERSION data comes back as the value its
-// pointer holds, the payload of a version built in Go. That field is a
-// pointer to the type parameter, which the one instantiation the registry
-// recognises binds to any, and no walk can enter a *any. Presence is read
-// from the field either way, so a pointer that is not nil and holds a nil
-// interface comes back as nil and present.
+// they point to, and DV_PROPORTION precision as its Integer, the one optional
+// primitive handed back dereferenced: the others come back as the pointer,
+// which the primitive binding reads as the value it points to, so the binding
+// does not need the dereference; ORIGINAL_VERSION data comes back as the
+// value its pointer holds, the payload of a version built in Go. That field
+// is a pointer to the type parameter, which the one instantiation the
+// registry recognises binds to any, and no walk can enter a *any. Presence is
+// read from the field either way, so a pointer that is not nil and holds a
+// nil interface comes back as nil and present.
 var accessShapes = map[string]map[string]accessShape{
 	"ITEM_SINGLE":      {"item": shapeAddress},
 	"REFERENCE_RANGE":  {"range": shapeAddress},
