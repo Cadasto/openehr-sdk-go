@@ -38,8 +38,9 @@ import (
 //     highest value the upper side's constraint accepts. A side whose
 //     constraint has no end in that direction takes the other side's
 //     current bound instead, which a range open that way accepts; a
-//     proportion takes that bound's ratio on its own denominator
-//     (proportionAdopt). At an exclusive real end the accepted extreme is
+//     proportion side that has no usable end there, whether its range is
+//     open or its type, denominator or precision rules the end out, takes
+//     that bound's ratio on its own denominator (proportionAdopt). At an exclusive real end the accepted extreme is
 //     the nearest float64 inside it, and for a proportion that needs whole
 //     numbers the nearest whole number it accepts.
 //
