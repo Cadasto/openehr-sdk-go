@@ -1701,7 +1701,7 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 				CodeString:    ex.CodeString,
 				TerminologyID: rm.TerminologyID{Value: ex.Terminology},
 			}
-			useLocalTermText(leaf, v, g.opts.Language)
+			useCodedText(leaf, v, g.opts.Language)
 			return nil
 		default:
 			return fmt.Errorf("DV_CODED_TEXT example value is %T, want CodedTermRef or string", ex)
@@ -1733,7 +1733,7 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 			return err
 		}
 		// The C_DV_ORDINAL lists the symbol's code, not its text.
-		useLocalTermText(leaf, &v.Symbol, g.opts.Language)
+		useTermText(leaf, &v.Symbol, g.opts.Language)
 		return nil
 	case *rm.DVProportion:
 		return applyProportionPrimitive(v, attr, ex)
@@ -2009,10 +2009,6 @@ func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 		if event := openehrCoded(terminology.CompositionCategory, "433"); codedTextAdmitted(root, "category", event) {
 			c.Category = event
 		}
-	} else {
-		// The OPT pinned the code, and the walk left the synthesiser's text
-		// beside it.
-		useGroupRubric(root, "category", &c.Category, terminology.CompositionCategory)
 	}
 	language := rm.CodePhrase{CodeString: g.opts.Language, TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}}
 	if noCode(c.Language.CodeString) && codeAdmitted(root, "language", language) {
@@ -2219,9 +2215,11 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 		settleProportion(opt, v)
 	case *rm.DVCodedText:
 		// Any coded text the OPT builds as a node of its own: an ELEMENT's
-		// value, a locatable's name, an ISM_TRANSITION's careflow step or
-		// transition, a PARTICIPATION's function or mode, and so on.
-		useLocalTermText(opt, v, g.opts.Language)
+		// value or null flavour, a locatable's name, an INTERVAL_EVENT's
+		// math function, an ISM_TRANSITION's current state or careflow
+		// step, a COMPOSITION's category, a PARTY_RELATED's relationship,
+		// and so on.
+		useCodedText(opt, v, g.opts.Language)
 	case *rm.Cluster:
 		// CLUSTER.items is RM-mandatory. ITEM_TREE.items and ITEM_LIST.items
 		// are optional, so they get no member here: the walk gives them one
@@ -2237,9 +2235,6 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 	case *rm.PartyRelated:
 		fillPartyName(&v.Name, len(v.Identifiers), v.ExternalRef)
 		fillRelationship(opt, &v.Relationship)
-		// A code the OPT pinned takes its rubric, as a pinned category and
-		// null_flavour do.
-		useGroupRubric(opt, "relationship", &v.Relationship, terminology.SubjectRelationship)
 	case *rm.Element:
 		g.settleElement(opt, v)
 	case *rm.DVEHRURI:
@@ -2463,11 +2458,11 @@ func (g *generator) placeholderElement() *rm.Element {
 // names no allowed child; or, where the OPT prohibits value as well, the
 // null flavour the walk wrote as if the OPT allowed it (visits,
 // writeRMNeeded), with "no information" where that leaves no code its own
-// child admits. A null flavour with a
-// code keeps it, and takes the pinned rubric of that code when the code
-// is in the openEHR null flavours group and the OPT's constraint on its
-// text admits the rubric (useGroupRubric). opt is the OPT node of e, or
-// nil for an ELEMENT built from the BMM alone.
+// child admits. A null flavour with a code keeps it, with the text the
+// walk gave it: the rubric of that code in the openEHR null flavours
+// group, where the OPT's constraint on its text admits the rubric
+// (useCodedText). opt is the OPT node of e, or nil for an ELEMENT built
+// from the BMM alone.
 func (g *generator) settleElement(opt *tcimpl.CompiledNode, e *rm.Element) {
 	if e.Value != nil && !rm.IsTypedNil(e.Value) {
 		if !valueGivesWay(opt) {
@@ -2478,7 +2473,6 @@ func (g *generator) settleElement(opt *tcimpl.CompiledNode, e *rm.Element) {
 		e.Value = nil
 	}
 	if e.NullFlavour != nil && !noCode(e.NullFlavour.DefiningCode.CodeString) {
-		useGroupRubric(opt, "null_flavour", e.NullFlavour, terminology.NullFlavours)
 		return
 	}
 	nf := noInformation()
@@ -2547,51 +2541,6 @@ func (g *generator) fillElementValue(e *rm.Element) bool {
 	g.populatePrimitiveDefault(value)
 	g.populateBMMRequiredAttrs(value, concreteFor(rmType), 0)
 	return rmwrite.EnsureSingle(e, "value", value) == nil
-}
-
-// useGroupRubric sets the text of v, the coded text attrName of opt, to
-// the pinned rubric of its code, when that code is an `openehr` code in
-// group and the OPT child the walk built v under ([bindingChild]) admits
-// the rubric as its text (codedTextAdmits). The walk fills a code the OPT
-// pins but leaves the synthesiser's placeholder text beside it. A code in
-// another terminology, or outside group, keeps its text, so the generator
-// invents no rubric for it, and so does a code whose child limits the text
-// to values that leave the rubric out. The child is read where the OPT
-// prohibits attrName too, since the walk then builds v under it as if the
-// OPT allowed it. opt is nil for a value built from the BMM alone.
-func useGroupRubric(opt *tcimpl.CompiledNode, attrName string, v *rm.DVCodedText, group *terminology.Group) {
-	if v.DefiningCode.TerminologyID.Value != terminology.ID {
-		return
-	}
-	rubric, ok := group.Rubric(v.DefiningCode.CodeString)
-	if !ok {
-		return
-	}
-	takeText(bindingChild(opt, attrName), v, rubric)
-}
-
-// useLocalTermText sets the text of v, a coded text the walk built under
-// node, to the text of the term node's own archetype, its nearest
-// enclosing archetype root, defines for its code, when that code is in
-// terminology local and is not the placeholder at0000 (noCode), and node
-// admits that text (takeText). The term is the one tcimpl.RootTermItem
-// reads. lang is the language asked for: an OPT carries one document
-// language, whose term a language it has no translation for gets too, so
-// the term is the same in every lang. A code its own archetype
-// defines no term for keeps its text, even where an enclosing archetype
-// defines the same code, since that term names another concept; so does a
-// code in any other terminology. For an ordinal's symbol node is the
-// C_DV_ORDINAL, which constrains the symbol's code and not its text. A nil
-// node leaves v alone.
-func useLocalTermText(node *tcimpl.CompiledNode, v *rm.DVCodedText, lang string) {
-	code := v.DefiningCode
-	if node == nil || code.TerminologyID.Value != "local" || noCode(code.CodeString) {
-		return
-	}
-	_ = lang // one document language per OPT; see above.
-	if text, ok := tcimpl.RootTermItem(node, code.CodeString, "text"); ok && text != "" {
-		takeText(node, v, text)
-	}
 }
 
 // takeText sets the text of v, a coded text the walk built under node, to

@@ -95,11 +95,18 @@
 // numbers, and every kind over a denominator that is not 0. Where the
 // drawn type cannot meet its rule there, another type the template allows
 // is taken, and where none can, the value stays as the walk wrote it. A
-// coded text whose code is in terminology local takes the text its own
-// archetype, the nearest enclosing archetype root, gives that code, in
-// [Options.Language], unless the template's constraint on the text rejects
-// it; a code its own archetype does not define keeps the walk's text, even
-// where an enclosing archetype defines it. A DV_MULTIMEDIA carries inline
+// coded text whose code is in the openEHR terminology, on an attribute the
+// RM ties to a group of that terminology (a COMPOSITION's category, an
+// INTERVAL_EVENT's math function, a PARTY_RELATED's relationship, …),
+// takes as its text that code's rubric in the group. A coded text whose
+// code is in any other terminology takes the text its own archetype, the
+// nearest enclosing archetype root, gives that code, in
+// [Options.Language]: under its code string for a local code, and under
+// <terminology id>::<code string>, such as SNOMED-CT::248152002, for a code
+// of an external terminology. Either way the walk's text stays where the
+// template's constraint on the text rejects the new one, and where the
+// group has no rubric for the code or its own archetype does not define
+// it, even where an enclosing archetype does. A DV_MULTIMEDIA carries inline
 // data, the seven bytes of the text "example" under both value fills,
 // with that byte count as its size, unless the template prohibits data or
 // its constraint on size rejects that count.
