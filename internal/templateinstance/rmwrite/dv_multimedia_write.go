@@ -21,28 +21,20 @@ func writeDVMultimediaSingle(m *rm.DVMultimedia, attr string, child any) error {
 		m.MediaType = v
 		return nil
 	case "size":
-		n, ok := rm.AsInt64(child)
-		if !ok {
-			return mismatch(attr, child, "Integer")
+		v, err := asInteger(attr, child)
+		if err != nil {
+			return err
 		}
-		m.Size = rm.Integer(n)
+		m.Size = v
 		return nil
-	case "charset", "language", "compression_algorithm", "integrity_check_algorithm":
-		v, ok := child.(*rm.CodePhrase)
-		if !ok {
-			return mismatch(attr, child, "CODE_PHRASE")
-		}
-		switch attr {
-		case "charset":
-			m.Charset = v
-		case "language":
-			m.Language = v
-		case "compression_algorithm":
-			m.CompressionAlgorithm = v
-		case "integrity_check_algorithm":
-			m.IntegrityCheckAlgorithm = v
-		}
-		return nil
+	case "charset":
+		return assignVia(child, func(v rm.CodePhrase) { m.Charset = &v }, attr, "CODE_PHRASE")
+	case "language":
+		return assignVia(child, func(v rm.CodePhrase) { m.Language = &v }, attr, "CODE_PHRASE")
+	case "compression_algorithm":
+		return assignVia(child, func(v rm.CodePhrase) { m.CompressionAlgorithm = &v }, attr, "CODE_PHRASE")
+	case "integrity_check_algorithm":
+		return assignVia(child, func(v rm.CodePhrase) { m.IntegrityCheckAlgorithm = &v }, attr, "CODE_PHRASE")
 	case "alternate_text":
 		v, ok := child.(string)
 		if !ok {

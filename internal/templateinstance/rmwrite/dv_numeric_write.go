@@ -98,16 +98,33 @@ func writeOptionalReal(dst **rm.Real, attr string, child any) error {
 }
 
 // writeOptionalInteger stores a whole number on an optional Integer
-// attribute, which the RM type holds as a pointer. A number outside the
-// 32-bit range an Integer holds is refused.
+// attribute, which the RM type holds as a pointer.
 func writeOptionalInteger(dst **rm.Integer, attr string, child any) error {
-	n, ok := rm.AsInt64(child)
-	if !ok || n < math.MinInt32 || n > math.MaxInt32 {
-		return mismatch(attr, child, "Integer")
+	v, err := asInteger(attr, child)
+	if err != nil {
+		return err
 	}
-	v := rm.Integer(n)
 	*dst = &v
 	return nil
+}
+
+// asInteger converts child, a whole number of any Go integer shape or an
+// RM Integer held by pointer, to the 32-bit RM Integer attr holds. A child
+// that is no whole number is a type mismatch; a whole number outside the
+// 32-bit range is one too, and its message says that the range is what
+// fails. The message carries the attribute, never the value.
+func asInteger(attr string, child any) (rm.Integer, error) {
+	if p, ok := child.(*rm.Integer); ok && p != nil {
+		child = *p
+	}
+	n, ok := rm.AsInt64(child)
+	if !ok {
+		return 0, mismatch(attr, child, "Integer")
+	}
+	if n < math.MinInt32 || n > math.MaxInt32 {
+		return 0, fmt.Errorf("%w: attr %q takes an Integer and the whole number is outside the 32-bit Integer range", ErrTypeMismatch, attr)
+	}
+	return rm.Integer(n), nil
 }
 
 // writeOptionalBoolean stores a bool on an optional Boolean attribute,

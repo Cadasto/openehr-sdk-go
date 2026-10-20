@@ -726,12 +726,7 @@ func writeIntervalEventSingle(e *rm.IntervalEvent[rm.ItemStructure], attr string
 		e.MathFunction = v
 		return nil
 	case "sample_count":
-		v, ok := child.(*rm.Integer)
-		if !ok {
-			return mismatch(attr, child, "Integer")
-		}
-		e.SampleCount = v
-		return nil
+		return writeOptionalInteger(&e.SampleCount, attr, child)
 	case "data":
 		v, ok := child.(rm.ItemStructure)
 		if !ok {

@@ -56,7 +56,10 @@
 // DV_MULTIMEDIA `uri`) a DV_EHR_URI, EVENT_CONTEXT `health_care_facility`
 // a PARTY_RELATED as well as a PARTY_IDENTIFIED, and an attribute of an
 // abstract class, such as ELEMENT `value` (DATA_VALUE), any concrete class
-// of it. Any other
+// of it. An Integer attribute (DV_QUANTITY `precision`, DV_MULTIMEDIA `size`,
+// INTERVAL_EVENT `sample_count`) takes a whole number of any Go integer
+// shape, and a whole number outside the 32-bit range an RM Integer holds
+// returns an ErrTypeMismatch that says so. Any other
 // parent or attribute returns ErrUnknownAttribute, and a child of the
 // wrong Go type returns ErrTypeMismatch. Table-driven tests in this package
 // write through most of these parents, and check the DV_INTERVAL cases
