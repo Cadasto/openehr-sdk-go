@@ -137,13 +137,14 @@ func coveredCheck(function string, _ any) invariantCheck {
 // an evaluated invariant is missing here or one listed here is not evaluated.
 // One evaluator may evaluate several invariants of a class and run once on
 // the node: checkDVProportion reads a DV_PROPORTION once for its precision
-// and proportion-kind rules. The last three groups bind the invariants another evaluated check decides:
-// the mandatory-presence rule, for a mandatory string or list the invariant
-// says is not empty; the REQ-123 parse a temporal Value_valid applies, for
-// the parts of the ISO 8601 value it refuses; and the DV_PROPORTION
-// precision check, for Is_integral_validity, whose is_integral the RM reads
-// as a precision of 0, under which that check reports an operand that is not
-// whole as DV_PROPORTION.Precision_validity.
+// and proportion-kind rules. The last three groups bind the invariants
+// another evaluated check decides: the mandatory-presence rule, for a
+// mandatory string or list the invariant says is not empty; the REQ-123
+// parse a temporal Value_valid applies, for the parts of the ISO 8601 value
+// it refuses; and the DV_PROPORTION precision check, for
+// Is_integral_validity, whose is_integral the RM reads as a precision of 0,
+// under which that check reports an operand that is not whole as
+// DV_PROPORTION.Precision_validity.
 var invariantChecks = map[string]invariantCheck{
 	"ARCHETYPED.Rm_version_valid":        nodeCheck("checkArchetyped", (*findings).checkArchetyped),
 	"COMPOSITION.Is_archetype_root":      ruleCheck("checkArchetypeRoot", (*findings).checkArchetypeRoot),

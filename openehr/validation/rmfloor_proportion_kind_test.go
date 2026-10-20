@@ -118,6 +118,54 @@ func TestValidateRM_REQ112_DVProportionKindRules(t *testing.T) {
 	}
 }
 
+// TestValidateRM_REQ112_DVProportionIssueOrder pins the order in which one
+// DV_PROPORTION draws its issues: the type rule, the precision rules, the
+// kind rule (fraction, unitary or percent), then the denominator rule. The
+// table above sorts the rules it compares, so it leaves the order free; a
+// value that breaks several rules fixes it here.
+func TestValidateRM_REQ112_DVProportionIssueOrder(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name    string
+		members string
+		want    []string
+	}{
+		{
+			name:    "fraction of precision 0 over a fractional numerator and denominator 0",
+			members: `"numerator":1.5,"denominator":0,"type":3,"precision":0`,
+			want:    []string{proportionPrecision, proportionFraction, proportionZero},
+		},
+		{
+			name:    "no kind of precision 0 over a fractional numerator and denominator 0",
+			members: `"numerator":1.5,"denominator":0,"type":7,"precision":0`,
+			want:    []string{proportionType, proportionPrecision, proportionZero},
+		},
+		{
+			name:    "unitary over denominator 0",
+			members: `"numerator":1,"denominator":0,"type":1`,
+			want:    []string{proportionUnitary, proportionZero},
+		},
+		{
+			name:    "percent over denominator 0",
+			members: `"numerator":1,"denominator":0,"type":2`,
+			want:    []string{proportionPercent, proportionZero},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			r := validation.ValidateRM(decodeProportion(t, tc.members))
+			got := make([]string, 0, len(r.Issues))
+			for _, i := range r.Issues {
+				got = append(got, i.Rule)
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("ValidateRM({%s}) rules in emitted order = %q, want %q", tc.members, got, tc.want)
+			}
+		})
+	}
+}
+
 // TestValidateComposition_REQ112_PercentOverDenominatorOne is the issue-291
 // reproduction: a composition holding the percent
 // {"numerator":1,"denominator":1,"type":2}, which openEHR servers refuse
