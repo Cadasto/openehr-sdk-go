@@ -930,8 +930,9 @@ func (g *generator) temporalSentinel(v any) string {
 // a clock or a code before this pass. The value is bmmStringDefault's.
 // It is written through stringField's setter where that covers the
 // attribute, which reaches the String attributes the template-instance
-// writer has no case for (a PARTY_IDENTIFIED's or PARTY_RELATED's name),
-// and through the writer otherwise.
+// writer has no case for (a PARTY_IDENTIFIED's or PARTY_RELATED's name, a
+// TERMINOLOGY_ID's value, and a PARTY_REF's namespace and type), and
+// through the writer otherwise.
 func (g *generator) writeBMMString(parent any, attr string) {
 	ref, covered := stringField(parent, attr)
 	if covered && ref.get() != "" {
@@ -985,12 +986,13 @@ func (g *generator) bmmStringDefault(parent any, attr string) (string, bool) {
 
 // stringField returns a reference to the BMM String attribute attr of
 // parent, through which it is read and written. It covers every String
-// attribute of the data values the generator builds, a quantified value's
-// magnitude_status and a quantity's units_system and units_display_name
-// among them, plus
-// ACTIVITY.action_archetype_id, TERMINOLOGY_ID.value, a PARTY_REF's
-// namespace and type, and a PARTY_IDENTIFIED's or PARTY_RELATED's name, so
-// the walk writes a C_STRING the OPT pins on any of them. A pin on a
+// attribute of the data values the generator builds, the magnitude_status
+// of each quantified value (a quantity, a count, a proportion and a
+// temporal value) and a quantity's units_system and units_display_name
+// among them, plus ACTIVITY.action_archetype_id, TERMINOLOGY_ID.value,
+// EVENT_CONTEXT.location, a PARTY_REF's namespace and type, and a
+// PARTY_IDENTIFIED's or PARTY_RELATED's name, so the walk writes a
+// C_STRING the OPT pins on any of them. A pin on a
 // PARTY_REF holds where the reference
 // can be attached and no later default replaces it: a ROLE's performer
 // keeps it, because fillPerformer fills only the empty parts. A template
@@ -1062,6 +1064,14 @@ func stringField(parent any, attr string) (ref stringRef, ok bool) {
 			return optionalString(&p.UnitsSystem)
 		case "units_display_name":
 			return optionalString(&p.UnitsDisplayName)
+		}
+	case *rm.DVProportion:
+		if attr == "magnitude_status" {
+			return optionalString(&p.MagnitudeStatus)
+		}
+	case *rm.EventContext:
+		if attr == "location" {
+			return optionalString(&p.Location)
 		}
 	case *rm.Activity:
 		if attr == "action_archetype_id" {
@@ -1726,8 +1736,20 @@ func (g *generator) setLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, 
 // the attribute of rmValue it constrains, or "" when pc constrains
 // rmValue itself. A leaf on an attribute of a data value other than the
 // one the switch values (routedPrimitive) is written through rmwrite
-// (writePrimitive).
+// (writePrimitive). A C_INTEGER on an attribute of the RM type Integer,
+// which is 32 bits wide, is narrowed to the part of its range inside that
+// type first (narrowToInteger), and the leaf fails with an error wrapping
+// ErrConstraintUnsatisfiable where nothing of the range is inside it.
 func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any, attr string, pc constraints.PrimitiveConstraint) error {
+	if ci, ok := pc.(constraints.CInteger); ok && holdsInteger(rmValue, attr) {
+		// An RM Integer is 32 bits wide: where the OPT leaves a wider
+		// range open, the value is taken from the part inside it.
+		narrowed, err := narrowToInteger(ci)
+		if err != nil {
+			return fmt.Errorf("%w: %s.%s at %s: %w", ErrConstraintUnsatisfiable, rmTypeOf(rmValue), attr, leafPath(leaf), err)
+		}
+		pc = narrowed
+	}
 	ex := pc.ExampleValue()
 	if g.opts.ValueFill == RandomFill {
 		// In-constraint sampled value (valid by construction); same Go
@@ -1831,10 +1853,11 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 // of a DV_QUANTITY, a DV_COUNT, a temporal value, a DV_BOOLEAN, a DV_TEXT,
 // a DV_CODED_TEXT, a DV_MULTIMEDIA or a DV_STATE other than the one the
 // switch there values, such as a DV_QUANTITY's precision, a DV_COUNT's or
-// a DV_DURATION's accuracy, or a DV_STATE's is_terminal. A leaf on rmValue
-// itself (attr "") and a leaf on any other value go to the switch, which
-// leaves one it has no case for alone, as an interval's *_unbounded flag,
-// which the walk decides by the bounds it writes.
+// a DV_DURATION's accuracy, or a DV_STATE's is_terminal, and an
+// INTERVAL_EVENT's sample_count. A leaf on rmValue itself (attr "") and a
+// leaf on any other value go to the switch, which leaves one it has no
+// case for alone, as an interval's *_unbounded flag, which the walk decides
+// by the bounds it writes.
 func routedPrimitive(rmValue any, attr string) bool {
 	if attr == "" {
 		return false
@@ -1850,6 +1873,10 @@ func routedPrimitive(rmValue any, attr string) bool {
 		return attr != "magnitude"
 	case *rm.DVMultimedia:
 		return attr != "size"
+	case *rm.IntervalEvent[rm.ItemStructure]:
+		// The one primitive attribute of an event; its others hold
+		// values the walk builds from their own OPT nodes.
+		return attr == "sample_count"
 	}
 	return false
 }

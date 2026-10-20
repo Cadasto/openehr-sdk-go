@@ -257,9 +257,18 @@ func TestREQ107_IntegerLeafIsNarrowedToTheIntegerRange(t *testing.T) {
 		past       = 5_000_000_000
 		above      = 3_000_000_000
 	)
+	// precision is a DV_QUANTITY whose precision the OPT constrains to
+	// lower..upper, or to lower and above when upper is -1; optInterval
+	// takes any negative upper bound for none.
 	precision := func(lower, upper int) string {
+		interval := optInterval(lower, upper)
+		if upper < -1 {
+			interval = fmt.Sprintf("<lower_included>true</lower_included><lower_unbounded>false</lower_unbounded>"+
+				"<lower>%d</lower><upper_included>true</upper_included><upper_unbounded>false</upper_unbounded>"+
+				"<upper>%d</upper>", lower, upper)
+		}
 		return optNode("DV_QUANTITY", "", optSingle("precision",
-			optPrimitive("INTEGER", "C_INTEGER", "<range>"+optInterval(lower, upper)+"</range>")))
+			optPrimitive("INTEGER", "C_INTEGER", "<range>"+interval+"</range>")))
 	}
 	generate := func(t *testing.T, c *templatecompile.Compiled, policy instance.Policy, fill instance.ValueFill, seed uint64) (any, error) {
 		t.Helper()
