@@ -253,7 +253,7 @@ func (g *generator) fillUncarriedRequired(optNode *tcimpl.CompiledNode, rmValue 
 // it gives a visited one, and builds one with no allowed OPT child from
 // its BMM type. A DV_MULTIMEDIA's uri is not among them: the generator
 // has no writer for a uri the OPT constrains, so settleMultimedia writes
-// its default, over a prohibition too.
+// its default, over a prohibition too, where the OPT prohibits data.
 func (g *generator) writeRMNeeded(optNode *tcimpl.CompiledNode, rmValue any) error {
 	switch v := rmValue.(type) {
 	case *rm.Element:
@@ -1703,6 +1703,18 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 		return nil
 	case *rm.DVProportion:
 		return applyProportionPrimitive(v, attr, ex)
+	case *rm.DVMultimedia:
+		// A C_INTEGER on size; settleMultimedia replaces it with the
+		// byte count of the data where this constraint admits that.
+		if attr != "size" {
+			return nil
+		}
+		n, ok := rm.AsInt64(ex)
+		if !ok {
+			return fmt.Errorf("DV_MULTIMEDIA size example value is %T, want integer", ex)
+		}
+		v.Size = rm.Integer(n)
+		return nil
 	}
 	// Unknown RM target for this constraint — silently no-op so the
 	// generator stays sound on RM types REQ-103 does not yet have a
@@ -2236,15 +2248,26 @@ func openehrCoded(group *terminology.Group, code string) rm.DVCodedText {
 	}
 }
 
+// multimediaExample is the inline data the generator gives a
+// DV_MULTIMEDIA: the seven bytes of the text "example", which suits the
+// text/plain media type it defaults to. It is fixed, so the data is the
+// same under both value fills.
+const multimediaExample = "example"
+
 // settleMultimedia gives a DV_MULTIMEDIA the RM defaults the OPT left it
 // without, where the OPT's own constraint admits them. A media type with
 // no code (noCode) becomes text/plain in IANA_media-types, so RM
 // Media_type_valid holds, unless the OPT's constraint on media_type
 // rejects that, such as a C_CODE_PHRASE that names the terminology
-// openEHR (codeAdmitted); a code the OPT gave is kept. A value with
-// neither uri nor data gets the uri http://example.com, so RM Not_empty
-// holds, where the OPT prohibits uri too: the RM rule wins over the
-// prohibition (REQ-107 Precedence 2). opt is the OPT node of m.
+// openEHR (codeAdmitted); a code the OPT gave is kept. A value with no
+// data gets multimediaExample as its data, unless the OPT prohibits data,
+// and a value with data takes the number of its bytes as its size, the
+// size of the data before any encoding, as the RM defines it, unless the
+// OPT's constraint on size rejects that number, where the size the walk
+// wrote stays. A value with neither uri nor data, because the OPT
+// prohibits data, gets the uri http://example.com, so RM Not_empty holds,
+// where the OPT prohibits uri too: the RM rule wins over the prohibition.
+// opt is the OPT node of m.
 func settleMultimedia(opt *tcimpl.CompiledNode, m *rm.DVMultimedia) {
 	textPlain := rm.CodePhrase{
 		CodeString:    "text/plain",
@@ -2252,6 +2275,12 @@ func settleMultimedia(opt *tcimpl.CompiledNode, m *rm.DVMultimedia) {
 	}
 	if noCode(m.MediaType.CodeString) && codeAdmitted(opt, "media_type", textPlain) {
 		m.MediaType = textPlain
+	}
+	if len(m.Data) == 0 && !prohibited(opt, "data") {
+		m.Data = []byte(multimediaExample)
+	}
+	if size := int64(len(m.Data)); size > 0 && componentFits(bindingChild(opt, "size"), size) {
+		m.Size = rm.Integer(size)
 	}
 	if (m.URI == nil || rm.IsTypedNil(m.URI)) && len(m.Data) == 0 {
 		m.URI = &rm.DVURI{Value: "http://example.com"}

@@ -84,7 +84,10 @@
 // archetype, the nearest enclosing archetype root, gives that code, in
 // [Options.Language], unless the template's constraint on the text rejects
 // it; a code its own archetype does not define keeps the walk's text, even
-// where an enclosing archetype defines it.
+// where an enclosing archetype defines it. A DV_MULTIMEDIA carries inline
+// data, the seven bytes of the text "example" under both value fills,
+// with that byte count as its size, unless the template prohibits data or
+// its constraint on size rejects that count.
 //
 // # Trust model
 //
