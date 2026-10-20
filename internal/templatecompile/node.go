@@ -195,11 +195,14 @@ func (n *CompiledNode) PrimitiveConstraint() constraints.PrimitiveConstraint {
 	return n.primitive
 }
 
-// Term returns the term definition for an at-code, scoped to the
-// nearest enclosing archetype root. Walks the parent chain so a
-// descendant of `/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]`
-// sees that root's terminology rather than a sibling root's. Returns
-// (zero, false) when no enclosing root defines the code.
+// Term returns the term definition for an at-code from the nearest
+// enclosing archetype root of n that defines it, n itself included. It
+// walks the parent chain, so a descendant of
+// `/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]` sees that root's
+// terminology rather than a sibling root's; where that root does not
+// define the code, the walk goes on to the roots further up, and the
+// first one that defines it answers. [RootTermItem] asks the nearest root
+// alone. Returns (zero, false) when no enclosing root defines the code.
 //
 // The lang parameter is accepted for forward compatibility but is
 // currently ignored: an ADL 1.4 OPT carries a single document
@@ -220,29 +223,31 @@ func (n *CompiledNode) Term(code, lang string) (template.ArchetypeTerm, bool) {
 	return template.ArchetypeTerm{}, false
 }
 
-// RootTerm returns the term definition for an at-code that the nearest
-// enclosing archetype root of n defines, n itself included: the first
-// node up the parent chain that has an archetype id. Unlike [Term], it
-// asks that root alone, so a code the root does not define finds nothing,
-// even where a root further up defines the same code: a local code means
-// what its own archetype says. lang is read as Term reads it. Returns
-// (zero, false) when n has no enclosing archetype root or that root does
-// not define code.
-//
-// The returned [template.ArchetypeTerm.Items] map is a defensive copy.
-func (n *CompiledNode) RootTerm(code, lang string) (template.ArchetypeTerm, bool) {
-	_ = lang // one document language per OPT; see Term.
+// RootTermItem returns the value of the item key (such as "text") in the
+// term for code that the nearest enclosing archetype root of n defines, n
+// itself included: the first node up the parent chain that has an
+// archetype id. Unlike [CompiledNode.Term] and [TermItem], it asks that
+// root alone, so a code the root does not define finds nothing, even where
+// a root further up defines the same code: a local code means what its own
+// archetype says. It reads the term without copying its items. The second
+// result is false when n has no enclosing archetype root, when that root
+// does not define code, and when its term has no item key. An OPT carries
+// one document language, so there is no language to choose. It is a
+// function rather than a method so that the public alias of [CompiledNode]
+// gains no method.
+func RootTermItem(n *CompiledNode, code, key string) (string, bool) {
 	for cur := n; cur != nil; cur = cur.parent {
 		if cur.archetypeID == "" {
 			continue
 		}
 		t, ok := cur.terms[code]
 		if !ok {
-			return template.ArchetypeTerm{}, false
+			return "", false
 		}
-		return template.ArchetypeTerm{Code: t.Code, Items: maps.Clone(t.Items)}, true
+		v, ok := t.Items[key]
+		return v, ok
 	}
-	return template.ArchetypeTerm{}, false
+	return "", false
 }
 
 // CompiledAttribute is one attribute on a CompiledNode. Carries the

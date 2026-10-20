@@ -1581,13 +1581,17 @@ func (g *generator) setLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, 
 	// Resolve a human-readable runtime name from the OPT term
 	// definitions when available; the RM type acts as the fallback. The
 	// term is the node's own: an archetype root's is its node id's
-	// (at0000), since no term table is keyed by an archetype id.
+	// (at0000), since no term table is keyed by an archetype id. It comes
+	// from the node's own archetype, its nearest enclosing archetype root,
+	// alone: a node id that archetype does not define keeps the fallback,
+	// even where an enclosing archetype defines the same id, since that
+	// term names another concept.
 	termCode := id
 	if opt.ArchetypeID() != "" {
 		termCode = opt.NodeID()
 	}
 	name := opt.RMTypeName()
-	if text, found := tcimpl.TermItem(opt, termCode, "text"); found && text != "" {
+	if text, found := tcimpl.RootTermItem(opt, termCode, "text"); found && text != "" {
 		name = text
 	}
 
@@ -2537,9 +2541,10 @@ func useGroupRubric(opt *tcimpl.CompiledNode, attrName string, v *rm.DVCodedText
 // node, to the text of the term node's own archetype, its nearest
 // enclosing archetype root, defines for its code, when that code is in
 // terminology local and is not the placeholder at0000 (noCode), and node
-// admits that text (takeText). The term is the one CompiledNode.RootTerm
-// resolves in lang: an OPT carries one document language, whose term a
-// language it has no translation for gets too. A code its own archetype
+// admits that text (takeText). The term is the one tcimpl.RootTermItem
+// reads. lang is the language asked for: an OPT carries one document
+// language, whose term a language it has no translation for gets too, so
+// the term is the same in every lang. A code its own archetype
 // defines no term for keeps its text, even where an enclosing archetype
 // defines the same code, since that term names another concept; so does a
 // code in any other terminology. For an ordinal's symbol node is the
@@ -2550,8 +2555,8 @@ func useLocalTermText(node *tcimpl.CompiledNode, v *rm.DVCodedText, lang string)
 	if node == nil || code.TerminologyID.Value != "local" || noCode(code.CodeString) {
 		return
 	}
-	term, ok := node.RootTerm(code.CodeString, lang)
-	if text := term.Items["text"]; ok && text != "" {
+	_ = lang // one document language per OPT; see above.
+	if text, ok := tcimpl.RootTermItem(node, code.CodeString, "text"); ok && text != "" {
 		takeText(node, v, text)
 	}
 }
