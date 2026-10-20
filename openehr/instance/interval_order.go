@@ -661,7 +661,8 @@ func proportionEnd(node *tcimpl.CompiledNode, like proportionKey, low bool) (pro
 // on precision, 1 and -1, in that order, and takes the first node admits
 // that needs no more whole numbers than the type does, so the numerator
 // need not be rounded. Only where node admits no such precision does it
-// take the first node admits, which is then 0.
+// take the first node admits, which is then 0. It never takes a precision
+// below -1, which the RM floor rejects (-1 is no limit).
 func proportionPrecision(node *tcimpl.CompiledNode, like proportionKey) (*rm.Integer, bool) {
 	candidates := []*rm.Integer{like.precision, nil}
 	if c, ok := primitiveOf(bindingChild(node, "precision")).(constraints.CInteger); ok {
@@ -673,6 +674,9 @@ func proportionPrecision(node *tcimpl.CompiledNode, like proportionKey) (*rm.Int
 	typeWhole := wholeOperands(like.kind, nil)
 	for _, rounded := range []bool{false, true} {
 		for _, p := range candidates {
+			if p != nil && *p < -1 {
+				continue
+			}
 			if (rounded || wholeOperands(like.kind, p) == typeWhole) && precisionFits(node, p) {
 				return p, true
 			}
