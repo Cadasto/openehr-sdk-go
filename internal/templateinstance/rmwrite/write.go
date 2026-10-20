@@ -79,13 +79,13 @@ func EnsureSingle(parent any, attrName string, child any) error {
 	case *rm.DVIdentifier:
 		return writeDVIdentifierSingle(p, attrName, child)
 	case *rm.DVDate:
-		return writeDVTemporalValueSingle("DV_DATE", attrName, child, func(s string) { p.Value = s })
+		return writeDVTemporalSingle(temporalFields{"DV_DATE", &p.Value, &p.MagnitudeStatus, &p.Accuracy}, attrName, child)
 	case *rm.DVTime:
-		return writeDVTemporalValueSingle("DV_TIME", attrName, child, func(s string) { p.Value = s })
+		return writeDVTemporalSingle(temporalFields{"DV_TIME", &p.Value, &p.MagnitudeStatus, &p.Accuracy}, attrName, child)
 	case *rm.DVDateTime:
-		return writeDVTemporalValueSingle("DV_DATE_TIME", attrName, child, func(s string) { p.Value = s })
+		return writeDVTemporalSingle(temporalFields{"DV_DATE_TIME", &p.Value, &p.MagnitudeStatus, &p.Accuracy}, attrName, child)
 	case *rm.DVDuration:
-		return writeDVTemporalValueSingle("DV_DURATION", attrName, child, func(s string) { p.Value = s })
+		return writeDVDurationSingle(p, attrName, child)
 	case *rm.DVBoolean:
 		return writeDVBooleanSingle(p, attrName, child)
 	case *rm.DVCount:
@@ -94,6 +94,12 @@ func EnsureSingle(parent any, attrName string, child any) error {
 		return writeDVQuantitySingle(p, attrName, child)
 	case *rm.DVMultimedia:
 		return writeDVMultimediaSingle(p, attrName, child)
+	case *rm.DVState:
+		return writeDVStateSingle(p, attrName, child)
+	case *rm.DVGeneralTimeSpecification:
+		return writeTimeSpecificationSingle("DV_GENERAL_TIME_SPECIFICATION", &p.Value, attrName, child)
+	case *rm.DVPeriodicTimeSpecification:
+		return writeTimeSpecificationSingle("DV_PERIODIC_TIME_SPECIFICATION", &p.Value, attrName, child)
 	case *rm.CodePhrase:
 		return writeCodePhraseSingle(p, attrName, child)
 	case *rm.DVInterval[rm.DVQuantity]:
@@ -173,6 +179,8 @@ func AppendMultiple(parent any, attrName string, child any) error {
 		return writeRoleMultiple(p, attrName, child)
 	case *rm.Contact:
 		return writeContactMultiple(p, attrName, child)
+	case *rm.DVParagraph:
+		return writeDVParagraphMultiple(p, attrName, child)
 	}
 	return fmt.Errorf("%w: parent %T, attr %q", ErrUnknownAttribute, parent, attrName)
 }
@@ -878,22 +886,48 @@ func writeElementSingle(e *rm.Element, attr string, child any) error {
 
 // --- DataValue navigations ----------------------------------------------
 
-// writeDVTemporalValueSingle handles `value` on DV_DATE / DV_TIME /
-// DV_DATE_TIME / DV_DURATION — all carry an ISO 8601 string. The
-// setter closure binds the concrete RM field; rmType names the wire
-// shape for the mismatch detail. AOM 1.4 primitive short names
-// (DURATION, DATE, ...) materialise as these wrappers via
-// instance.concreteFor.
-func writeDVTemporalValueSingle(rmType, attr string, child any, set func(string)) error {
-	if attr != "value" {
-		return fmt.Errorf("%w: %s has no single attr %q", ErrUnknownAttribute, rmType, attr)
+// temporalFields points at the attributes DV_DATE, DV_TIME and
+// DV_DATE_TIME share, so one writer serves all three. rmType names the
+// class for the error detail.
+type temporalFields struct {
+	rmType          string
+	value           *string
+	magnitudeStatus **string
+	accuracy        **rm.DVDuration
+}
+
+// writeDVTemporalSingle handles DV_DATE, DV_TIME and DV_DATE_TIME: the ISO
+// 8601 value, the magnitude_status, and the DV_DURATION accuracy that
+// DV_TEMPORAL declares. AOM 1.4 primitive short names (DATE, TIME,
+// DATE_TIME) materialise as these wrappers via instance.concreteFor.
+func writeDVTemporalSingle(f temporalFields, attr string, child any) error {
+	switch attr {
+	case "value":
+		return writeStringValue(f.value, attr, child)
+	case "magnitude_status":
+		return writeOptionalString(f.magnitudeStatus, attr, child)
+	case "accuracy":
+		return assignVia(child, func(v rm.DVDuration) { *f.accuracy = &v }, attr, "DV_DURATION")
 	}
-	v, ok := child.(string)
-	if !ok {
-		return mismatch(attr, child, "String")
+	return fmt.Errorf("%w: %s has no single attr %q", ErrUnknownAttribute, f.rmType, attr)
+}
+
+// writeDVDurationSingle handles DV_DURATION: the ISO 8601 value, the
+// magnitude_status, and the Real accuracy with its accuracy_is_percent
+// that DV_AMOUNT declares. The AOM 1.4 primitive short name DURATION
+// materialises as this wrapper via instance.concreteFor.
+func writeDVDurationSingle(d *rm.DVDuration, attr string, child any) error {
+	switch attr {
+	case "value":
+		return writeStringValue(&d.Value, attr, child)
+	case "magnitude_status":
+		return writeOptionalString(&d.MagnitudeStatus, attr, child)
+	case "accuracy":
+		return writeOptionalReal(&d.Accuracy, attr, child)
+	case "accuracy_is_percent":
+		return writeOptionalBoolean(&d.AccuracyIsPercent, attr, child)
 	}
-	set(v)
-	return nil
+	return fmt.Errorf("%w: *rm.DVDuration has no single attr %q", ErrUnknownAttribute, attr)
 }
 
 // writeDVBooleanSingle handles `value` on DV_BOOLEAN. Parallels the
@@ -911,27 +945,32 @@ func writeDVBooleanSingle(b *rm.DVBoolean, attr string, child any) error {
 }
 
 func writeDVTextSingle(t *rm.DVText, attr string, child any) error {
+	return writeTextAttr(t, "*rm.DVText", attr, child)
+}
+
+// writeTextAttr writes the single attributes DV_TEXT declares, which
+// DV_CODED_TEXT inherits: value, formatting, language, encoding and
+// hyperlink. A hyperlink is a DV_URI or its descendant DV_EHR_URI, stored
+// as given. mappings is a list, which this writer does not fill. class
+// names the Go type for the error detail.
+func writeTextAttr(t *rm.DVText, class, attr string, child any) error {
 	switch attr {
 	case "value":
-		v, ok := child.(string)
-		if !ok {
-			return mismatch(attr, child, "String")
-		}
-		t.Value = v
-		return nil
+		return writeStringValue(&t.Value, attr, child)
+	case "formatting":
+		return writeOptionalString(&t.Formatting, attr, child)
+	case "language":
+		return assignVia(child, func(v rm.CodePhrase) { t.Language = &v }, attr, "CODE_PHRASE")
+	case "encoding":
+		return assignVia(child, func(v rm.CodePhrase) { t.Encoding = &v }, attr, "CODE_PHRASE")
+	case "hyperlink":
+		return assignURI(child, func(v rm.DVURILike) { t.Hyperlink = v }, attr)
 	}
-	return fmt.Errorf("%w: *rm.DVText has no single attr %q", ErrUnknownAttribute, attr)
+	return fmt.Errorf("%w: %s has no single attr %q", ErrUnknownAttribute, class, attr)
 }
 
 func writeDVCodedTextSingle(t *rm.DVCodedText, attr string, child any) error {
 	switch attr {
-	case "value":
-		v, ok := child.(string)
-		if !ok {
-			return mismatch(attr, child, "String")
-		}
-		t.Value = v
-		return nil
 	case "defining_code":
 		v, ok := coerceCodePhrase(child)
 		if !ok {
@@ -943,7 +982,7 @@ func writeDVCodedTextSingle(t *rm.DVCodedText, attr string, child any) error {
 		t.DefiningCode = v
 		return nil
 	}
-	return fmt.Errorf("%w: *rm.DVCodedText has no single attr %q", ErrUnknownAttribute, attr)
+	return writeTextAttr(&t.DVText, "*rm.DVCodedText", attr, child)
 }
 
 func writeCodePhraseSingle(c *rm.CodePhrase, attr string, child any) error {
@@ -1203,6 +1242,16 @@ func assignDVTextLike(child any, set func(rm.DVTextLike), attr string) error {
 		return nil
 	}
 	return mismatch(attr, child, "DV_TEXT")
+}
+
+// assignURI stores a DV_URI or its descendant DV_EHR_URI, as given.
+func assignURI(child any, set func(rm.DVURILike), attr string) error {
+	v, ok := child.(rm.DVURILike)
+	if !ok || rm.IsTypedNil(v) {
+		return mismatch(attr, child, "DV_URI")
+	}
+	set(v)
+	return nil
 }
 
 func assignItemStructure(child any, set func(rm.ItemStructure), attr string) error {

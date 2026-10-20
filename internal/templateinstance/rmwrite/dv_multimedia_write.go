@@ -50,6 +50,11 @@ func writeDVMultimediaSingle(m *rm.DVMultimedia, attr string, child any) error {
 		}
 		m.AlternateText = &v
 		return nil
+	case "uri":
+		// A DV_URI or its descendant DV_EHR_URI, stored as given.
+		return assignURI(child, func(v rm.DVURILike) { m.URI = v }, attr)
+	case "thumbnail":
+		return assignVia(child, func(v rm.DVMultimedia) { m.Thumbnail = &v }, attr, "DV_MULTIMEDIA")
 	}
 	return fmt.Errorf("%w: *rm.DVMultimedia has no single attr %q", ErrUnknownAttribute, attr)
 }

@@ -6,9 +6,10 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
 
-// writeStringValue stores a String child on a String attribute: the value of
-// DV_URI, DV_EHR_URI and DV_PARSABLE, DV_PARSABLE's formalism and
-// DV_IDENTIFIER's id.
+// writeStringValue stores a String child on a String attribute the RM type
+// holds as a string: the value of a text, a temporal value, DV_URI,
+// DV_EHR_URI and DV_PARSABLE, DV_PARSABLE's formalism and DV_IDENTIFIER's
+// id.
 func writeStringValue(dst *string, attr string, child any) error {
 	v, ok := child.(string)
 	if !ok {

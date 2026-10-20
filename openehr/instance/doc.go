@@ -27,10 +27,11 @@
 // than stores (offset on an event, is_integral on DV_QUANTITY and
 // DV_PROPORTION), nor a locatable's uid, which the identity rule
 // decides. Under every policy an RM rule can need more than the policy
-// visits, such as an ELEMENT's value or null flavour, which the generator
-// then builds as a visit does, from the attribute's first allowed
-// template child where it has one; and a visited multi-valued attribute
-// is topped up to its lower bound.
+// visits, such as an ELEMENT's value or null flavour, or a DV_MULTIMEDIA's
+// uri where the template prohibits its data, which the generator then
+// builds as a visit does, from the attribute's first allowed template
+// child where it has one; and a visited multi-valued attribute is topped
+// up to its lower bound.
 //
 // The three policies follow the levels of the ITS-REST template
 // example's detail_level:
@@ -123,7 +124,12 @@
 // it, even where an enclosing archetype does. A DV_MULTIMEDIA carries inline
 // data, the seven bytes of the text "example" under both value fills,
 // with that byte count as its size, unless the template prohibits data or
-// its constraint on size rejects that count.
+// its constraint on size rejects that count; where the template prohibits
+// data and names no child for the uri, the uri is http://example.com. A
+// language, encoding or charset the template names with no code, on an
+// entry, a text or an encapsulated value, takes Options.Language in
+// ISO_639-1 or UTF-8 in IANA_character-sets, and a periodic time
+// specification's value takes the formalism HL7:PIVL.
 //
 // # Trust model
 //

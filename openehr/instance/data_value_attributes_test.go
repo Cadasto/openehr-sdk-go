@@ -164,14 +164,14 @@ func textCodes(language, encoding rm.CodePhrase) func(t *testing.T, out any) {
 // root passes both validators.
 func TestREQ107_TextAttributesAreWritten(t *testing.T) {
 	pinnedLanguage := rm.CodePhrase{CodeString: "de", TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}}
-	pinnedEncoding := rm.CodePhrase{CodeString: "ISO-8859-1", TerminologyID: rm.TerminologyID{Value: "IANA_character-sets"}}
+	pinnedEncoding := rm.CodePhrase{CodeString: "US-ASCII", TerminologyID: rm.TerminologyID{Value: "IANA_character-sets"}}
 	codes := func(language, encoding string) string {
 		return optNode("DV_TEXT", "", optSingle("language", language), optSingle("encoding", encoding))
 	}
 	runDataValueCases(t, []dvCase{
 		{
 			name:  "DV_TEXT language and encoding pinned",
-			value: codes(optCodePhrase("ISO_639-1", "de"), optCodePhrase("IANA_character-sets", "ISO-8859-1")),
+			value: codes(optCodePhrase("ISO_639-1", "de"), optCodePhrase("IANA_character-sets", "US-ASCII")),
 			check: textCodes(pinnedLanguage, pinnedEncoding),
 		},
 		{
@@ -214,7 +214,13 @@ func TestREQ107_TextAttributesAreWritten(t *testing.T) {
 			value: optNode("DV_TEXT", "", optSingle("formatting", guardString("plain"))),
 			check: func(t *testing.T, out any) {
 				t.Helper()
-				checkHeldString(t, "DV_TEXT.formatting", dvValue[*rm.DVText](t, out).Formatting, "plain")
+				v := dvValue[*rm.DVText](t, out)
+				checkHeldString(t, "DV_TEXT.formatting", v.Formatting, "plain")
+				// The OPT names neither language nor encoding, so the walk
+				// writes neither, and no RM default is written there.
+				if v.Language != nil || v.Encoding != nil {
+					t.Errorf("DV_TEXT language %+v, encoding %+v, want both unset", v.Language, v.Encoding)
+				}
 			},
 		},
 	})
@@ -274,6 +280,9 @@ func TestREQ107_EncapsulatedAttributesAreWritten(t *testing.T) {
 				v := dvValue[*rm.DVMultimedia](t, out)
 				checkURI(t, "DV_MULTIMEDIA.uri", v.URI, scan)
 				checkExampleMultimedia(t, "DV_MULTIMEDIA.thumbnail", v.Thumbnail)
+				if v.Language != nil || v.Charset != nil {
+					t.Errorf("DV_MULTIMEDIA language %+v, charset %+v, want both unset: the OPT names neither", v.Language, v.Charset)
+				}
 			},
 		},
 		{
@@ -404,6 +413,30 @@ func TestREQ107_QuantifiedAttributesAreWritten(t *testing.T) {
 			},
 		},
 		{
+			name:  "DV_COUNT magnitude_status named with no child",
+			value: optNode("DV_COUNT", "", optSingle("magnitude_status")),
+			check: func(t *testing.T, out any) {
+				t.Helper()
+				checkHeldString(t, "DV_COUNT.magnitude_status", dvValue[*rm.DVCount](t, out).MagnitudeStatus, "=")
+			},
+		},
+		{
+			name:  "DV_DURATION magnitude_status named with no child",
+			value: optNode("DV_DURATION", "", optSingle("magnitude_status")),
+			check: func(t *testing.T, out any) {
+				t.Helper()
+				checkHeldString(t, "DV_DURATION.magnitude_status", dvValue[*rm.DVDuration](t, out).MagnitudeStatus, "=")
+			},
+		},
+		{
+			name:  "DV_DATE magnitude_status named with no child",
+			value: optNode("DV_DATE", "", optSingle("magnitude_status")),
+			check: func(t *testing.T, out any) {
+				t.Helper()
+				checkHeldString(t, "DV_DATE.magnitude_status", dvValue[*rm.DVDate](t, out).MagnitudeStatus, "=")
+			},
+		},
+		{
 			name: "DV_DATE",
 			value: optNode("DV_DATE", "",
 				optSingle("magnitude_status", guardString("~")),
@@ -514,5 +547,118 @@ func TestREQ107_StateParagraphAndTimeSpecificationsAreWritten(t *testing.T) {
 				optSingle("formalism", guardString("HL7:EIVL"))))),
 			check: periodicFormalism("HL7:EIVL"),
 		},
+		{
+			name: "DV_PERIODIC_TIME_SPECIFICATION with its formalism pinned to one the RM rejects",
+			value: optNode("DV_PERIODIC_TIME_SPECIFICATION", "", optSingle("value", optNode("DV_PARSABLE", "",
+				optSingle("formalism", guardString("HL7:GTS"))))),
+			check: periodicFormalism("HL7:GTS"),
+		},
 	})
+}
+
+// TestREQ107_PeriodicFormalismTheOPTGivesIsKept is the REQ-107 Leaf values
+// check that a DV_PERIODIC_TIME_SPECIFICATION's formalism the walk takes
+// from the OPT's C_STRING, here HL7:EIVL, the first of HL7:EIVL and
+// HL7:PIVL, is kept under ExampleFill: Value_valid admits HL7:EIVL, so the
+// HL7:PIVL default does not replace it, though the C_STRING admits that too.
+func TestREQ107_PeriodicFormalismTheOPTGivesIsKept(t *testing.T) {
+	value := optNode("DV_PERIODIC_TIME_SPECIFICATION", "", optSingle("value", optNode("DV_PARSABLE", "",
+		optSingle("formalism", optPrimitive("STRING", "C_STRING", "<list>HL7:EIVL</list><list>HL7:PIVL</list>")))))
+	for _, implicit := range []bool{true, false} {
+		c := compileOPTText(t, optTemplate("ELEMENT", optSingle("value", value)), implicit)
+		for _, policy := range everyPolicy {
+			t.Run(fmt.Sprintf("implicit=%t/%v", implicit, policy), func(t *testing.T) {
+				out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, Now: defaultsNow})
+				if err != nil {
+					t.Fatalf("Generate: %v, want a root", err)
+				}
+				if got := dvValue[*rm.DVPeriodicTimeSpecification](t, out).Value.Formalism; got != "HL7:EIVL" {
+					t.Errorf("DV_PERIODIC_TIME_SPECIFICATION.value.formalism = %q, want the example HL7:EIVL", got)
+				}
+				checkValid(t, out, c)
+			})
+		}
+	}
+}
+
+// TestREQ107_TextCodeDefaultYieldsToTheOPT is the REQ-107 Precedence 1
+// check that the RM default of a DV_TEXT's language and encoding yields to
+// an OPT whose constraint rejects it: a C_CODE_PHRASE in terminology local
+// with an empty code list keeps the placeholder local::at0000 the walk
+// wrote, under every policy and both value fills. The placeholder breaks
+// Language_valid and Encoding_valid, as § Exceptions and known gaps says
+// of an OPT constraint that admits no value an RM rule accepts, so no
+// validator is run.
+func TestREQ107_TextCodeDefaultYieldsToTheOPT(t *testing.T) {
+	local := rm.CodePhrase{CodeString: "at0000", TerminologyID: rm.TerminologyID{Value: "local"}}
+	value := optNode("DV_TEXT", "", optSingle("language", optCodePhrase("local")), optSingle("encoding", optCodePhrase("local")))
+	for _, implicit := range []bool{true, false} {
+		c := compileOPTText(t, optTemplate("ELEMENT", optSingle("value", value)), implicit)
+		for _, opts := range optionsFor(everyPolicy) {
+			opts.Language = dvLanguage
+			t.Run(fmt.Sprintf("implicit=%t/%v/%v", implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+				out, err := instance.Generate(t.Context(), c, opts)
+				if err != nil {
+					t.Fatalf("Generate: %v, want a root", err)
+				}
+				textCodes(local, local)(t, out)
+			})
+		}
+	}
+}
+
+// TestREQ107_MultimediaURIOnlyWhereTheRMNeedsIt is the REQ-107 Visit rule
+// and Precedence 2 check that a DV_MULTIMEDIA's optional uri is not built
+// under Required, which does not visit it, where the OPT allows data: the
+// data the generator writes meets Not_empty, so no RM rule needs the uri.
+// Large and Medium visit it and build it from its OPT child.
+func TestREQ107_MultimediaURIOnlyWhereTheRMNeedsIt(t *testing.T) {
+	const scan = "http://example.org/scan"
+	value := optNode("DV_MULTIMEDIA", "", optOptionalSingleOver("uri", dvURI(scan)))
+	for _, implicit := range []bool{true, false} {
+		c := compileOPTText(t, optTemplate("ELEMENT", optSingle("value", value)), implicit)
+		for _, opts := range optionsFor(everyPolicy) {
+			t.Run(fmt.Sprintf("implicit=%t/%v/%v", implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+				out, err := instance.Generate(t.Context(), c, opts)
+				if err != nil {
+					t.Fatalf("Generate: %v, want a root", err)
+				}
+				m := dvValue[*rm.DVMultimedia](t, out)
+				checkExampleMultimedia(t, "DV_MULTIMEDIA", m)
+				if opts.Policy == instance.Required {
+					if m.URI != nil {
+						t.Errorf("DV_MULTIMEDIA.uri = %#v under Required, want none: the policy does not visit it and data meets Not_empty", m.URI)
+					}
+				} else {
+					checkURI(t, "DV_MULTIMEDIA.uri", m.URI, scan)
+				}
+				checkValid(t, out, c)
+			})
+		}
+	}
+}
+
+// TestREQ107_PrimitiveOnAnAttributeTheRMDoesNotHave is the REQ-107 check,
+// for § Exceptions and known gaps, that a primitive leaf the OPT puts on an
+// attribute the pinned RM does not have is left unwritten: Generate still
+// returns a root, under every policy and both value fills, and writes the
+// attributes the RM has. The template validator then reports the
+// constraint, so it is not run.
+func TestREQ107_PrimitiveOnAnAttributeTheRMDoesNotHave(t *testing.T) {
+	value := optNode("DV_QUANTITY", "", optSingle("no_such_attribute", dvInteger("1")), optSingle("precision", dvInteger("2")))
+	for _, implicit := range []bool{true, false} {
+		c := compileOPTText(t, optTemplate("ELEMENT", optSingle("value", value)), implicit)
+		for _, opts := range optionsFor(everyPolicy) {
+			t.Run(fmt.Sprintf("implicit=%t/%v/%v", implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+				out, err := instance.Generate(t.Context(), c, opts)
+				if err != nil {
+					t.Fatalf("Generate: %v, want a root", err)
+				}
+				if q := dvValue[*rm.DVQuantity](t, out); q.Precision == nil || *q.Precision != 2 {
+					t.Errorf("DV_QUANTITY.precision = %v, want 2", q.Precision)
+				}
+				noFloorErrors(t, out)
+			})
+		}
+	}
 }

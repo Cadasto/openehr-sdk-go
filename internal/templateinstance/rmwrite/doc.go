@@ -35,8 +35,9 @@
 //     ITEM_TABLE, and CLUSTER and ELEMENT;
 //   - the data values DV_TEXT, DV_CODED_TEXT, DV_URI, DV_EHR_URI,
 //     DV_PARSABLE, DV_IDENTIFIER, DV_DATE, DV_TIME, DV_DATE_TIME,
-//     DV_DURATION, DV_BOOLEAN, DV_COUNT, DV_QUANTITY and DV_MULTIMEDIA,
-//     and CODE_PHRASE;
+//     DV_DURATION, DV_BOOLEAN, DV_COUNT, DV_QUANTITY, DV_MULTIMEDIA,
+//     DV_STATE, DV_GENERAL_TIME_SPECIFICATION and
+//     DV_PERIODIC_TIME_SPECIFICATION, and CODE_PHRASE;
 //   - DV_INTERVAL over each concrete ordered data value and over
 //     DV_ORDERED itself;
 //   - the parties PERSON, AGENT, GROUP, ORGANISATION and ROLE, and
@@ -45,15 +46,17 @@
 //
 // AppendMultiple adds a member to multi-valued attributes on
 // COMPOSITION, SECTION, INSTRUCTION, HISTORY, ITEM_TREE, ITEM_LIST,
-// ITEM_TABLE, CLUSTER, the five parties and CONTACT.
+// ITEM_TABLE, CLUSTER, the five parties, CONTACT and DV_PARAGRAPH.
 //
 // Each parent's writer lists the attributes it fills. An attribute takes
 // a child of its RM type or of a class that descends from it, wherever
 // the parent's Go field can hold one: a DV_TEXT attribute (every `name`,
-// ELEMENT `null_reason`, INSTRUCTION `narrative`) also takes a
-// DV_CODED_TEXT, EVENT_CONTEXT `health_care_facility` a PARTY_RELATED as
-// well as a PARTY_IDENTIFIED, and an attribute of an abstract class, such
-// as ELEMENT `value` (DATA_VALUE), any concrete class of it. Any other
+// ELEMENT `null_reason`, INSTRUCTION `narrative`, DV_PARAGRAPH `items`)
+// also takes a DV_CODED_TEXT, a DV_URI attribute (DV_TEXT `hyperlink`,
+// DV_MULTIMEDIA `uri`) a DV_EHR_URI, EVENT_CONTEXT `health_care_facility`
+// a PARTY_RELATED as well as a PARTY_IDENTIFIED, and an attribute of an
+// abstract class, such as ELEMENT `value` (DATA_VALUE), any concrete class
+// of it. Any other
 // parent or attribute returns ErrUnknownAttribute, and a child of the
 // wrong Go type returns ErrTypeMismatch. Table-driven tests in this package
 // write through most of these parents, and check the DV_INTERVAL cases

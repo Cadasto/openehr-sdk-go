@@ -254,14 +254,19 @@ func (g *generator) fillUncarriedRequired(optNode *tcimpl.CompiledNode, rmValue 
 // constraints rather than taking a default of its BMM type. The
 // attributes are an ELEMENT's null_flavour when it has no value, or its
 // value where the OPT prohibits the null_flavour and allows the value,
-// and a PARTY_IDENTIFIED's or PARTY_RELATED's name when it has no name,
-// identifiers or external_ref. finishNode then gives each the RM default
-// it gives a visited one, and builds one with no allowed OPT child from
-// its BMM type. A DV_MULTIMEDIA's uri is not among them: the generator
-// has no writer for a uri the OPT constrains, so settleMultimedia writes
-// its default, over a prohibition too, where the OPT prohibits data.
+// a PARTY_IDENTIFIED's or PARTY_RELATED's name when it has no name,
+// identifiers or external_ref, and a DV_MULTIMEDIA's uri when it has no
+// uri and the OPT prohibits its data, which it then never gets (RM
+// Not_empty). finishNode then gives each the RM default it gives a visited
+// one, and builds one with no allowed OPT child from its BMM type; a uri
+// with none takes the default settleMultimedia writes.
 func (g *generator) writeRMNeeded(optNode *tcimpl.CompiledNode, rmValue any) error {
 	switch v := rmValue.(type) {
+	case *rm.DVMultimedia:
+		if (v.URI != nil && !rm.IsTypedNil(v.URI)) || len(v.Data) > 0 || !prohibited(optNode, "data") {
+			return nil
+		}
+		return g.visitNeeded(optNode, "uri", v)
 	case *rm.Element:
 		if (v.Value != nil && !rm.IsTypedNil(v.Value)) || v.NullFlavour != nil {
 			return nil
@@ -611,7 +616,7 @@ func (g *generator) materialiseImplicitSingle(
 	if compositionDefaultOwns(optNode.RMTypeName(), attr.Name()) {
 		return nil
 	}
-	if g.fillEntryCode(optNode, parentRM, optNode.RMTypeName(), attr.Name()) {
+	if g.fillCodeDefault(optNode, parentRM, attr.Name()) {
 		return nil
 	}
 	rmType := attrType(optNode.RMTypeName(), attr.RMTypeName())
@@ -719,7 +724,7 @@ func (g *generator) fillBMMAttr(parent any, parentRMType, attrName string, depth
 		return
 	}
 	rmType = attrType(parentRMType, rmType)
-	if g.fillEntryCode(nil, parent, parentRMType, attrName) {
+	if g.fillCodeDefault(nil, parent, attrName) {
 		return
 	}
 	isContainer, _ := rminfo.Default.IsContainer(parentRMType, attrName)
@@ -788,13 +793,17 @@ func attrType(parentType, declared string) string {
 
 // settleBuilt gives a value built from the BMM alone, which the walk
 // never reaches, the RM default finishNode gives a walked one where no
-// other pass does: an ISM_TRANSITION's current state and a party's name.
-// No attribute of the pinned RM has the type PARTY_RELATED, so the BMM
-// alone never builds one, and its relationship is finishNode's alone.
+// other pass does: an ISM_TRANSITION's current state, a party's name, and
+// a DV_MULTIMEDIA's media type, data and size, such as a thumbnail the OPT
+// names with no child. No attribute of the pinned RM has the type
+// PARTY_RELATED, so the BMM alone never builds one, and its relationship
+// is finishNode's alone.
 func settleBuilt(v any) {
 	switch b := v.(type) {
 	case *rm.IsmTransition:
 		fillCurrentState(nil, b)
+	case *rm.DVMultimedia:
+		settleMultimedia(nil, b)
 	case *rm.PartyIdentified:
 		fillPartyName(&b.Name, len(b.Identifiers), b.ExternalRef)
 	case *rm.PartyRelated:
@@ -921,9 +930,8 @@ func (g *generator) temporalSentinel(v any) string {
 // a clock or a code before this pass. The value is bmmStringDefault's.
 // It is written through stringField's setter where that covers the
 // attribute, which reaches the String attributes the template-instance
-// writer has no field for (a text's formatting, a code phrase's
-// preferred_term, a quantity's magnitude_status, a party's name), and
-// through the writer otherwise.
+// writer has no case for (a PARTY_IDENTIFIED's or PARTY_RELATED's name),
+// and through the writer otherwise.
 func (g *generator) writeBMMString(parent any, attr string) {
 	ref, covered := stringField(parent, attr)
 	if covered && ref.get() != "" {
@@ -947,21 +955,20 @@ func (g *generator) writeBMMString(parent any, attr string) {
 
 // bmmStringDefault is the value writeBMMString gives an empty String
 // attribute attr of parent: a temporal value's sentinel, so it stays a
-// valid ISO 8601 value; "=" for a quantity's magnitude_status, the value
-// its RM invariant Magnitude_status_valid admits; a PARTY_REF's own
-// defaults (partyRef); and the open-string example otherwise. ok is false
-// for a TERMINOLOGY_ID's value, which stays empty: the code phrase it
-// belongs to keeps the terminology it already carries
-// (replacesTerminology).
+// valid ISO 8601 value; "=" for the magnitude_status of a quantified value
+// (a quantity, a count or a temporal value), the value its RM invariant
+// Magnitude_status_valid admits; a PARTY_REF's own defaults (partyRef);
+// and the open-string example otherwise. ok is false for a TERMINOLOGY_ID's
+// value, which stays empty: the code phrase it belongs to keeps the
+// terminology it already carries (replacesTerminology).
 func (g *generator) bmmStringDefault(parent any, attr string) (string, bool) {
 	if s := g.temporalSentinel(parent); attr == "value" && s != "" {
 		return s, true
 	}
+	if attr == "magnitude_status" {
+		return "=", true
+	}
 	switch parent.(type) {
-	case *rm.DVQuantity:
-		if attr == "magnitude_status" {
-			return "=", true
-		}
 	case *rm.TerminologyID:
 		return "", false
 	case *rm.PartyRef:
@@ -978,7 +985,9 @@ func (g *generator) bmmStringDefault(parent any, attr string) (string, bool) {
 
 // stringField returns a reference to the BMM String attribute attr of
 // parent, through which it is read and written. It covers every String
-// attribute of the data values the generator builds, plus
+// attribute of the data values the generator builds, a quantified value's
+// magnitude_status and a quantity's units_system and units_display_name
+// among them, plus
 // ACTIVITY.action_archetype_id, TERMINOLOGY_ID.value, a PARTY_REF's
 // namespace and type, and a PARTY_IDENTIFIED's or PARTY_RELATED's name, so
 // the walk writes a C_STRING the OPT pins on any of them. A pin on a
@@ -1006,13 +1015,17 @@ func stringField(parent any, attr string) (ref stringRef, ok bool) {
 			return optionalString(&p.PreferredTerm)
 		}
 	case *rm.DVDate:
-		return valueField(&p.Value, attr)
+		return quantifiedField(&p.Value, &p.MagnitudeStatus, attr)
 	case *rm.DVTime:
-		return valueField(&p.Value, attr)
+		return quantifiedField(&p.Value, &p.MagnitudeStatus, attr)
 	case *rm.DVDateTime:
-		return valueField(&p.Value, attr)
+		return quantifiedField(&p.Value, &p.MagnitudeStatus, attr)
 	case *rm.DVDuration:
-		return valueField(&p.Value, attr)
+		return quantifiedField(&p.Value, &p.MagnitudeStatus, attr)
+	case *rm.DVCount:
+		if attr == "magnitude_status" {
+			return optionalString(&p.MagnitudeStatus)
+		}
 	case *rm.DVURI:
 		return valueField(&p.Value, attr)
 	case *rm.DVEHRURI:
@@ -1045,6 +1058,10 @@ func stringField(parent any, attr string) (ref stringRef, ok bool) {
 			return requiredString(&p.Units)
 		case "magnitude_status":
 			return optionalString(&p.MagnitudeStatus)
+		case "units_system":
+			return optionalString(&p.UnitsSystem)
+		case "units_display_name":
+			return optionalString(&p.UnitsDisplayName)
 		}
 	case *rm.Activity:
 		if attr == "action_archetype_id" {
@@ -1088,6 +1105,15 @@ func valueField(value *string, attr string) (stringRef, bool) {
 	return requiredString(value)
 }
 
+// quantifiedField addresses the String attributes of a temporal value: its
+// ISO 8601 value and its magnitude_status.
+func quantifiedField(value *string, status **string, attr string) (stringRef, bool) {
+	if attr == "magnitude_status" {
+		return optionalString(status)
+	}
+	return valueField(value, attr)
+}
+
 // stringRef addresses one String attribute of an RM value: a mandatory one
 // held as a string, or an optional one held as a *string. Exactly one of the
 // two pointers is set.
@@ -1127,61 +1153,83 @@ func optionalString(f **string) (stringRef, bool) {
 	return stringRef{optional: f}, true
 }
 
-// fillEntryCode sets ENTRY.language from Options.Language and
-// ENTRY.encoding to UTF-8 when that field has no code (noCode) and the
-// OPT's constraint on it admits the default (codeAdmitted); opt is the
-// OPT node of parent, or nil for an entry built from the BMM alone. It
-// reports whether attr is one of those two fields, so the caller does
-// not also build a generic code phrase.
-func (g *generator) fillEntryCode(opt *tcimpl.CompiledNode, parent any, parentType, attr string) bool {
-	phrase, ok := g.entryCodePhrase(parentType, attr)
+// fillCodeDefault writes the RM default code on attr of parent where the
+// walk writes that attribute with no OPT child, or from the BMM alone: an
+// ENTRY's language and encoding, a DV_TEXT's or DV_CODED_TEXT's language
+// and encoding, and a DV_ENCAPSULATED's language and charset
+// (codeDefaultFor). The default is written where the attribute holds no
+// code (noCode) and the OPT's constraint on it admits the default
+// (codeAdmitted); opt is the OPT node of parent, or nil for a value built
+// from the BMM alone. It reports whether attr is one of those attributes,
+// so the caller does not also build a generic code phrase.
+func (g *generator) fillCodeDefault(opt *tcimpl.CompiledNode, parent any, attr string) bool {
+	d, ok := g.codeDefaultFor(parent, attr)
 	if !ok {
 		return false
 	}
-	if !entryCodeEmpty(parent, attr) || !codeAdmitted(opt, attr, phrase) {
+	if (d.set && !noCode(d.held)) || !codeAdmitted(opt, attr, d.code) {
 		return true
 	}
-	// Best-effort: every ENTRY parent type is addressed by rmwrite, and an
-	// entry the walk builds is checked by the validator afterwards.
-	_ = rmwrite.EnsureSingle(parent, attr, phrase)
+	// Best-effort: rmwrite addresses each of these attributes on every
+	// class codeDefaultFor names, and a value the walk builds is checked by
+	// the validator afterwards.
+	_ = rmwrite.EnsureSingle(parent, attr, &d.code)
 	return true
 }
 
-func (g *generator) entryCodePhrase(parentType, attr string) (rm.CodePhrase, bool) {
-	switch parentType {
-	case "OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION", "ADMIN_ENTRY", "CARE_ENTRY", "ENTRY":
-	default:
-		return rm.CodePhrase{}, false
-	}
-	switch attr {
-	case "language":
-		return rm.CodePhrase{
-			CodeString:    g.opts.Language,
-			TerminologyID: rm.TerminologyID{Value: "ISO_639-1"},
-		}, true
-	case "encoding":
-		return rm.CodePhrase{
-			CodeString:    "UTF-8",
-			TerminologyID: rm.TerminologyID{Value: "IANA_character-sets"},
-		}, true
-	default:
-		return rm.CodePhrase{}, false
+// settleCodes gives each attribute of v an RM default covers
+// (codeDefaultFor) that the walk wrote without a code (noCode) its default,
+// where the OPT's constraint on it admits the default (codeAdmitted): the
+// placeholder the walk writes where the OPT names a code phrase with no
+// code to choose. An optional attribute the walk left unset stays unset.
+// opt is the OPT node of v.
+func (g *generator) settleCodes(opt *tcimpl.CompiledNode, v any) {
+	for _, attr := range [...]string{"language", "encoding", "charset"} {
+		if d, ok := g.codeDefaultFor(v, attr); ok && d.set && noCode(d.held) && codeAdmitted(opt, attr, d.code) {
+			_ = rmwrite.EnsureSingle(v, attr, &d.code)
+		}
 	}
 }
 
-func entryCodeEmpty(parent any, attr string) bool {
-	lang, enc, ok := entryCodes(parent)
+// codeDefault is the RM default of a code phrase attribute and what the
+// attribute holds now.
+type codeDefault struct {
+	code rm.CodePhrase // the default
+	held string        // the code the attribute holds, "" while unset
+	set  bool          // the attribute holds a code phrase; an ENTRY's always do
+}
+
+// codeDefaultFor returns the RM default of attr of parent: Options.Language
+// in ISO_639-1 for a language, and UTF-8 in IANA_character-sets for an
+// ENTRY's, a DV_TEXT's or a DV_CODED_TEXT's encoding and a
+// DV_ENCAPSULATED's charset, so Language_valid, Encoding_valid and
+// Charset_valid hold. ok is false for any other attribute or parent.
+func (g *generator) codeDefaultFor(parent any, attr string) (codeDefault, bool) {
+	language, charset, charsetAttr, ok := heldCodes(parent)
 	if !ok {
-		return true
+		return codeDefault{}, false
 	}
 	switch attr {
 	case "language":
-		return noCode(lang.CodeString)
-	case "encoding":
-		return noCode(enc.CodeString)
-	default:
-		return true
+		return codeDefault{
+			code: rm.CodePhrase{CodeString: g.opts.Language, TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}},
+			held: codeString(language), set: language != nil,
+		}, true
+	case charsetAttr:
+		return codeDefault{
+			code: rm.CodePhrase{CodeString: "UTF-8", TerminologyID: rm.TerminologyID{Value: "IANA_character-sets"}},
+			held: codeString(charset), set: charset != nil,
+		}, true
 	}
+	return codeDefault{}, false
+}
+
+// codeString is the code of cp, or "" for no code phrase.
+func codeString(cp *rm.CodePhrase) string {
+	if cp == nil {
+		return ""
+	}
+	return cp.CodeString
 }
 
 // noCode reports whether code is no real code: empty, or the placeholder
@@ -1195,21 +1243,34 @@ func noCode(code string) bool {
 	return code == "" || code == "at0000"
 }
 
-func entryCodes(parent any) (language, encoding rm.CodePhrase, ok bool) {
+// heldCodes returns the language parent holds and the code phrase it holds
+// in charsetAttr, the attribute that names its character set: encoding on
+// an ENTRY, a DV_TEXT and a DV_CODED_TEXT, charset on a DV_MULTIMEDIA and
+// a DV_PARSABLE. A nil code phrase is an optional attribute left unset; an
+// ENTRY holds both as values, so they are never nil. ok is false for any
+// other parent.
+func heldCodes(parent any) (language, charset *rm.CodePhrase, charsetAttr string, ok bool) {
 	switch p := parent.(type) {
 	case *rm.Observation:
-		return p.Language, p.Encoding, true
+		return &p.Language, &p.Encoding, "encoding", true
 	case *rm.Evaluation:
-		return p.Language, p.Encoding, true
+		return &p.Language, &p.Encoding, "encoding", true
 	case *rm.Instruction:
-		return p.Language, p.Encoding, true
+		return &p.Language, &p.Encoding, "encoding", true
 	case *rm.Action:
-		return p.Language, p.Encoding, true
+		return &p.Language, &p.Encoding, "encoding", true
 	case *rm.AdminEntry:
-		return p.Language, p.Encoding, true
-	default:
-		return rm.CodePhrase{}, rm.CodePhrase{}, false
+		return &p.Language, &p.Encoding, "encoding", true
+	case *rm.DVText:
+		return p.Language, p.Encoding, "encoding", true
+	case *rm.DVCodedText:
+		return p.Language, p.Encoding, "encoding", true
+	case *rm.DVMultimedia:
+		return p.Language, p.Charset, "charset", true
+	case *rm.DVParsable:
+		return p.Language, p.Charset, "charset", true
 	}
+	return nil, nil, "", false
 }
 
 // settleIntervalEndpoints decides, once the walk has written the bounds
@@ -1663,7 +1724,9 @@ func (g *generator) setLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, 
 // constraint type because the value shape differs per primitive
 // (REQ-103 closed set). leaf is the OPT node that carries pc; attr is
 // the attribute of rmValue it constrains, or "" when pc constrains
-// rmValue itself.
+// rmValue itself. A leaf on an attribute of a data value other than the
+// one the switch values (routedPrimitive) is written through rmwrite
+// (writePrimitive).
 func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any, attr string, pc constraints.PrimitiveConstraint) error {
 	ex := pc.ExampleValue()
 	if g.opts.ValueFill == RandomFill {
@@ -1673,6 +1736,9 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 	}
 	if cs, ok := pc.(constraints.CString); ok {
 		return applyStringLeaf(leaf, rmValue, attr, cs, ex)
+	}
+	if routedPrimitive(rmValue, attr) {
+		return writePrimitive(leaf, rmValue, attr, ex)
 	}
 	switch v := rmValue.(type) {
 	case *rm.DVQuantity:
@@ -1758,6 +1824,51 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 	// generator stays sound on RM types REQ-103 does not yet have a
 	// typed primitive for.
 	return nil
+}
+
+// routedPrimitive reports whether a primitive leaf on attr of rmValue is
+// one applyPrimitiveExample writes through rmwrite: a leaf on an attribute
+// of a DV_QUANTITY, a DV_COUNT, a temporal value, a DV_BOOLEAN, a DV_TEXT,
+// a DV_CODED_TEXT, a DV_MULTIMEDIA or a DV_STATE other than the one the
+// switch there values, such as a DV_QUANTITY's precision, a DV_COUNT's or
+// a DV_DURATION's accuracy, or a DV_STATE's is_terminal. A leaf on rmValue
+// itself (attr "") and a leaf on any other value go to the switch, which
+// leaves one it has no case for alone, as an interval's *_unbounded flag,
+// which the walk decides by the bounds it writes.
+func routedPrimitive(rmValue any, attr string) bool {
+	if attr == "" {
+		return false
+	}
+	switch rmValue.(type) {
+	case *rm.DVQuantity, *rm.DVState:
+		// The switch values a DV_QUANTITY only from a C_DV_QUANTITY on the
+		// value itself; a DV_STATE has no case there.
+		return true
+	case *rm.DVText, *rm.DVCodedText, *rm.DVDate, *rm.DVTime, *rm.DVDateTime, *rm.DVDuration, *rm.DVBoolean:
+		return attr != "value"
+	case *rm.DVCount:
+		return attr != "magnitude"
+	case *rm.DVMultimedia:
+		return attr != "size"
+	}
+	return false
+}
+
+// writePrimitive writes ex, the value of a primitive leaf on attr of
+// rmValue, through rmwrite. rmwrite writes every primitive attribute of the
+// values routedPrimitive names but a DV_MULTIMEDIA's data and
+// integrity_check, arrays of octets no AOM 1.4 primitive constraint
+// describes, so an attribute it does not address
+// (rmwrite.ErrUnknownAttribute) is one the pinned RM does not have; it is
+// left unwritten, and the template validator reports the constraint. A
+// value of the wrong type for the attribute, such as a C_REAL on a
+// Boolean, is returned as an error.
+func writePrimitive(leaf *tcimpl.CompiledNode, rmValue any, attr string, ex any) error {
+	err := rmwrite.EnsureSingle(rmValue, attr, ex)
+	if err == nil || errors.Is(err, rmwrite.ErrUnknownAttribute) {
+		return nil
+	}
+	return fmt.Errorf("%s.%s at %s: %w", rmTypeOf(rmValue), attr, leafPath(leaf), err)
 }
 
 // applyOrdinal sets the integer and, when the constraint lists pairs,
@@ -2211,13 +2322,11 @@ func carriesIdentity(sib *tcimpl.CompiledNode, id string) bool {
 // finishNode fills RM-mandatory fields the OPT walk left empty.
 // REQ-107: generated output has to pass the template-less floor.
 func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
-	// An OPT can name an ENTRY's language or encoding without a code; the
-	// walk then leaves the placeholder there for the RM default to replace,
-	// where the OPT's constraint on that attribute admits the default.
-	if _, _, ok := entryCodes(rmValue); ok {
-		g.fillEntryCode(opt, rmValue, opt.RMTypeName(), "language")
-		g.fillEntryCode(opt, rmValue, opt.RMTypeName(), "encoding")
-	}
+	// An OPT can name an ENTRY's, a text's or an encapsulated value's
+	// language, encoding or charset without a code; the walk then leaves
+	// the placeholder there for the RM default to replace, where the OPT's
+	// constraint on that attribute admits the default.
+	g.settleCodes(opt, rmValue)
 	switch v := rmValue.(type) {
 	case *rm.IsmTransition:
 		fillCurrentState(opt, v)
@@ -2226,6 +2335,8 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 		fillMathFunction(opt, &v.MathFunction)
 	case *rm.DVMultimedia:
 		settleMultimedia(opt, v)
+	case *rm.DVPeriodicTimeSpecification:
+		fillPeriodicFormalism(opt, v)
 	case *rm.DVProportion:
 		// A bound of an interval is settled here too, before the interval's
 		// own walk puts its two bounds in order.
@@ -2284,6 +2395,25 @@ func fillMathFunction(opt *tcimpl.CompiledNode, mf *rm.DVCodedText) {
 	*mf = mean
 }
 
+// fillPeriodicFormalism gives the value of a DV_PERIODIC_TIME_SPECIFICATION
+// the formalism HL7:PIVL, so RM Value_valid holds, unless it already has
+// HL7:PIVL or HL7:EIVL, the two the invariant admits, or the OPT's C_STRING
+// on the value's formalism rejects HL7:PIVL; the formalism the walk wrote
+// then stays (Precedence 1). opt is the OPT node of p.
+func fillPeriodicFormalism(opt *tcimpl.CompiledNode, p *rm.DVPeriodicTimeSpecification) {
+	const pivl = "HL7:PIVL"
+	if f := p.Value.Formalism; f == pivl || f == "HL7:EIVL" {
+		return
+	}
+	var formalism *tcimpl.CompiledAttribute
+	if value := bindingChild(opt, "value"); value != nil {
+		formalism = value.Attribute("formalism")
+	}
+	if stringAdmitted(formalism, pivl) {
+		p.Value.Formalism = pivl
+	}
+}
+
 // openehrCoded is the coded text of code in the openEHR terminology, with
 // the pinned rubric of that code in group as its text.
 func openehrCoded(group *terminology.Group, code string) rm.DVCodedText {
@@ -2314,9 +2444,11 @@ const multimediaExample = "example"
 // size of the data before any encoding, as the RM defines it, unless the
 // OPT's constraint on size rejects that number, where the size the walk
 // wrote stays. A value with neither uri nor data, because the OPT
-// prohibits data, gets the uri http://example.com, so RM Not_empty holds,
+// prohibits data and names no allowed child for uri to build it from
+// (writeRMNeeded), gets the uri http://example.com, so RM Not_empty holds,
 // where the OPT prohibits uri too: the RM rule wins over the prohibition.
-// opt is the OPT node of m.
+// opt is the OPT node of m, or nil for one built from the BMM alone, such
+// as a thumbnail the OPT names with no child.
 func settleMultimedia(opt *tcimpl.CompiledNode, m *rm.DVMultimedia) {
 	textPlain := rm.CodePhrase{
 		CodeString:    "text/plain",
