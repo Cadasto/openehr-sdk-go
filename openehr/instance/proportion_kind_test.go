@@ -528,6 +528,13 @@ func TestREQ107_ProportionIntervalBoundsKeepTheirKind(t *testing.T) {
 			upper: instance.ProportionKindBoundOver(instance.RealList(-86), instance.RealList(3), ratio, ""),
 		},
 		{
+			// The upper bound takes 86/3 on its own denominator 7, where
+			// 86*7/3 divided by 7 lands a float64 step below 86/3.
+			name:  "ratios over a denominator of 3 below and of 7 above a numerator open upward",
+			lower: instance.ProportionKindBoundOver(instance.RealList(86), instance.RealList(3), ratio, ""),
+			upper: instance.ProportionKindBoundOver(r(closed(0), noEnd), instance.RealList(7), ratio, ""),
+		},
+		{
 			// The upper bound's denominator 2.5 is not a whole number, so the
 			// lower bound of precision 0 cannot take it.
 			name:  "ratios of precision 0 below a numerator open downward and precision 2 over a denominator of 2.5 above",
@@ -571,4 +578,75 @@ func TestREQ107_ProportionIntervalBoundsKeepTheirKind(t *testing.T) {
 			})
 		}
 	}
+}
+
+// eachProportionIntervalRun compiles the vendored DV_COUNT interval OPT
+// with lower and upper as its two bound nodes, as a DV_INTERVAL<DV_PROPORTION>
+// and as a DV_INTERVAL<DV_ORDERED>, and calls check, once for each, with the
+// canonical JSON of each root Generate returns under fill: one for
+// ExampleFill, orderSeeds for RandomFill, one per seed.
+func eachProportionIntervalRun(t *testing.T, lower, upper string, fill instance.ValueFill, check func(t *testing.T, docs []any)) {
+	t.Helper()
+	count := instance.ReadVendoredOPT(t, instance.CountIntervalOPT)
+	for _, param := range []string{"DV_PROPORTION", "DV_ORDERED"} {
+		t.Run(param, func(t *testing.T) {
+			c := compileSyntheticOPT(t, instance.RetargetInterval(t, count, param, lower, upper))
+			seeds := uint64(orderSeeds)
+			if fill == instance.ExampleFill {
+				seeds = 1
+			}
+			var docs []any
+			for seed := range seeds {
+				opts := intervalOptions(instance.Large)
+				opts.ValueFill = fill
+				opts.ValueSource = mrand.NewPCG(seed, 1)
+				_, doc := generateWithJSON(t, c, opts)
+				docs = append(docs, doc)
+			}
+			check(t, docs)
+		})
+	}
+}
+
+// TestREQ107_ProportionIntervalAdoptionKeepsThePrecisionItChooses is the
+// REQ-107 check (Output, Intervals) that a bound which takes the other
+// bound's ratio, because its numerator range has no low end, takes the
+// precision its side admits and that needs no whole numbers, not the one
+// the walk drew: the lower side admits an optional precision 0 or 2 and
+// the upper side the numerators -90 to -80, so where the pair is put in
+// order (the upper bound then sits at -80) the lower bound takes the upper
+// one's numerator, a real number, with no precision 0 and no rounding to a
+// whole number, even where the walk drew precision 0.
+func TestREQ107_ProportionIntervalAdoptionKeepsThePrecisionItChooses(t *testing.T) {
+	r, closed, noEnd := instance.RealRange, instance.Closed, instance.NoEnd
+	ratio := instance.IntList(0)
+	lower := instance.ProportionKindBound(r(noEnd, closed(10)), ratio, instance.OptionalPrecision(instance.IntList(0, 2)))
+	upper := instance.ProportionKindBound(r(closed(-90), closed(-80)), ratio, instance.RequiredPrecision(instance.IntList(2)))
+	eachProportionIntervalRun(t, lower, upper, instance.RandomFill, func(t *testing.T, docs []any) {
+		ordered := 0
+		for seed, doc := range docs {
+			walkIntervals(doc, "", func(path string, iv map[string]any) {
+				lo, hi, ok := boundedPair(iv)
+				if !ok {
+					return
+				}
+				// A pair the walk drew in order is left alone, and its lower bound
+				// may keep any precision its side admits.
+				if top, _ := hi["numerator"].(float64); top != -80 {
+					return
+				}
+				ordered++
+				numerator, _ := lo["numerator"].(float64)
+				if precision, has := lo["precision"].(float64); has && precision == 0 {
+					t.Errorf("seed %d, %s: lower bound %v/%v has precision 0, but its side admits one that needs no whole number", seed, path, lo["numerator"], lo["denominator"])
+				}
+				if numerator == math.Trunc(numerator) {
+					t.Errorf("seed %d, %s: lower bound numerator %v is a whole number, want the upper bound's real one", seed, path, numerator)
+				}
+			})
+		}
+		if ordered == 0 {
+			t.Fatal("no pair was put in order, so nothing was checked")
+		}
+	})
 }
