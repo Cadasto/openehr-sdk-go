@@ -220,6 +220,31 @@ func (n *CompiledNode) Term(code, lang string) (template.ArchetypeTerm, bool) {
 	return template.ArchetypeTerm{}, false
 }
 
+// RootTerm returns the term definition for an at-code that the nearest
+// enclosing archetype root of n defines, n itself included: the first
+// node up the parent chain that has an archetype id. Unlike [Term], it
+// asks that root alone, so a code the root does not define finds nothing,
+// even where a root further up defines the same code: a local code means
+// what its own archetype says. lang is read as Term reads it. Returns
+// (zero, false) when n has no enclosing archetype root or that root does
+// not define code.
+//
+// The returned [template.ArchetypeTerm.Items] map is a defensive copy.
+func (n *CompiledNode) RootTerm(code, lang string) (template.ArchetypeTerm, bool) {
+	_ = lang // one document language per OPT; see Term.
+	for cur := n; cur != nil; cur = cur.parent {
+		if cur.archetypeID == "" {
+			continue
+		}
+		t, ok := cur.terms[code]
+		if !ok {
+			return template.ArchetypeTerm{}, false
+		}
+		return template.ArchetypeTerm{Code: t.Code, Items: maps.Clone(t.Items)}, true
+	}
+	return template.ArchetypeTerm{}, false
+}
+
 // CompiledAttribute is one attribute on a CompiledNode. Carries the
 // OPT-declared cardinality + existence when the OPT had an
 // <attributes> entry for it, and the RM-derived type when implicit.
