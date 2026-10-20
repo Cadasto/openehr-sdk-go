@@ -39,7 +39,8 @@ import (
 //     constraint has no end in that direction uses the other side's
 //     current bound instead, which a range open that way accepts. At an
 //     exclusive real end the accepted extreme is the nearest float64
-//     inside it.
+//     inside it, and for a proportion that needs whole numbers the nearest
+//     whole number inside it.
 //
 // These constraints are one-dimensional, so an in-order pair exists only if
 // the second pair is in order. When it is not, the two sides' constraints
@@ -487,15 +488,22 @@ func isoShape(s string) string {
 // generated type. The RM states the magnitude as the ratio
 // numerator/denominator, and is_strictly_comparable_to as "the same
 // type", so two bounds compare only when their types match and neither
-// denominator is zero.
+// denominator is zero. whole records whether the bound the key was read
+// from needs whole numbers (wholeOperands); it is not written back.
 type proportionKey struct {
 	numerator   float64
 	denominator float64
 	kind        int64
+	whole       bool
 }
 
 func proportionKeyOf(p rm.DVProportion) proportionKey {
-	return proportionKey{numerator: float64(p.Numerator), denominator: float64(p.Denominator), kind: int64(p.Type)}
+	return proportionKey{
+		numerator:   float64(p.Numerator),
+		denominator: float64(p.Denominator),
+		kind:        int64(p.Type),
+		whole:       wholeOperands(int64(p.Type), p.Precision),
+	}
 }
 
 func setProportionKey(p *rm.DVProportion, k proportionKey) {
@@ -509,6 +517,9 @@ func setProportionKey(p *rm.DVProportion, k proportionKey) {
 // and denominator and moves the numerator to the end its C_REAL accepts,
 // which is the low or high ratio while that denominator stays positive.
 // A negative denominator reverses which numerator end is the low ratio.
+// A bound that needs whole numbers, as a fraction does, takes the whole
+// number nearest that end inside the range, so the replacement keeps the
+// rules of its kind (settleProportion).
 var proportionScale = scale[proportionKey]{
 	compare: func(a, b proportionKey) (int, bool) {
 		if a.kind != b.kind {
@@ -549,9 +560,11 @@ func componentFits(node *tcimpl.CompiledNode, v any) bool {
 }
 
 // proportionEnd returns the lowest (low) or highest ratio a side accepts
-// while keeping like's type and denominator. It returns false when the
-// numerator constraint has no end in the direction that moves the ratio
-// that way, or when like itself does not fit.
+// while keeping like's type and denominator, with a whole numerator where
+// like needs whole numbers. It returns false when the numerator constraint
+// has no end in the direction that moves the ratio that way, or no whole
+// number at that end where one is needed, or when like itself does not
+// fit.
 func proportionEnd(node *tcimpl.CompiledNode, like proportionKey, low bool) (proportionKey, bool) {
 	if like.denominator == 0 || !componentFits(bindingChild(node, "type"), like.kind) || !componentFits(bindingChild(node, "denominator"), like.denominator) {
 		return proportionKey{}, false
@@ -560,11 +573,24 @@ func proportionEnd(node *tcimpl.CompiledNode, like proportionKey, low bool) (pro
 	if like.denominator < 0 {
 		numLow = !low
 	}
-	n, ok := realEnd(bindingChild(node, "numerator"), numLow)
+	numerator := bindingChild(node, "numerator")
+	n, ok := realEnd(numerator, numLow)
 	if !ok {
 		return proportionKey{}, false
 	}
-	return proportionKey{numerator: n, denominator: like.denominator, kind: like.kind}, true
+	if like.whole {
+		// The nearest whole number inside the range: up from its low end,
+		// down from its high end.
+		if numLow {
+			n = math.Ceil(n)
+		} else {
+			n = math.Floor(n)
+		}
+		if !componentFits(numerator, n) {
+			return proportionKey{}, false
+		}
+	}
+	return proportionKey{numerator: n, denominator: like.denominator, kind: like.kind, whole: like.whole}, true
 }
 
 // realEnd returns the lowest (low) or highest value a C_REAL accepts:

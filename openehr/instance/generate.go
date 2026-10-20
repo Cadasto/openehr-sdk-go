@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"regexp/syntax"
 	"slices"
 	"strings"
@@ -1776,6 +1777,132 @@ func applyProportionPrimitive(v *rm.DVProportion, attr string, ex any) error {
 	}
 }
 
+// The PROPORTION_KIND codes a DV_PROPORTION's type takes.
+const (
+	pkRatio           = 0
+	pkUnitary         = 1
+	pkPercent         = 2
+	pkFraction        = 3
+	pkIntegerFraction = 4
+)
+
+// settleProportion gives a DV_PROPORTION the walk wrote a type, a numerator
+// and a denominator that meet the RM rules of its kind: a type that is a
+// proportion kind (Type_validity), a denominator of 1 for a unitary
+// proportion and of 100 for a percent (Unitary_validity, Percent_validity),
+// whole numbers for a fraction or an integer fraction and wherever the
+// precision is 0 (Fraction_validity, Precision_validity), and a denominator
+// that is not 0 (Valid_denominator). The OPT wins: every value it writes is
+// one the OPT's own constraint on that attribute of opt accepts. The type
+// the walk wrote is kept where its rules can be met. Else the first other
+// kind, in code order, that the OPT admits and whose rules can be met is
+// taken. Where none can, the value stays as the walk wrote it. A numerator
+// or a denominator that already meets the rules is kept, and a new one is
+// the first of a fixed list of candidates (proportionOperand), so nothing
+// is drawn and the value is as reproducible as the walk's. The precision is
+// never changed. The walk writes each attribute from its own OPT
+// constraint, or leaves the placeholder 1 where the OPT says nothing, so
+// the kind is settled here, once all of them are written. opt is the OPT
+// node of p.
+func settleProportion(opt *tcimpl.CompiledNode, p *rm.DVProportion) {
+	walked := int64(p.Type)
+	if settleProportionAs(opt, p, walked) {
+		return
+	}
+	for kind := range int64(pkIntegerFraction + 1) {
+		if kind != walked && settleProportionAs(opt, p, kind) {
+			return
+		}
+	}
+}
+
+// settleProportionAs settles p as a proportion of kind where the OPT admits
+// that type and the rules of kind can be met inside the OPT's constraints
+// on numerator and denominator, and reports whether it did. It leaves p
+// alone when it did not.
+func settleProportionAs(opt *tcimpl.CompiledNode, p *rm.DVProportion, kind int64) bool {
+	if kind < pkRatio || kind > pkIntegerFraction || !componentFits(bindingChild(opt, "type"), kind) {
+		return false
+	}
+	whole := wholeOperands(kind, p.Precision)
+	denominator, ok := proportionDenominator(bindingChild(opt, "denominator"), float64(p.Denominator), kind, whole)
+	if !ok {
+		return false
+	}
+	numerator, ok := proportionOperand(bindingChild(opt, "numerator"), float64(p.Numerator), whole, false)
+	if !ok {
+		return false
+	}
+	p.Type = rm.Integer(kind)
+	p.Numerator = rm.Real(numerator)
+	p.Denominator = rm.Real(denominator)
+	return true
+}
+
+// wholeOperands reports whether a proportion of kind with precision needs
+// a whole-number numerator and denominator: a fraction and an integer
+// fraction do (Fraction_validity), and so does any proportion of precision
+// 0 (Precision_validity). A whole number is one whose floor is itself, as
+// the RM floor reads Is_integral_validity.
+func wholeOperands(kind int64, precision *rm.Integer) bool {
+	return kind == pkFraction || kind == pkIntegerFraction || (precision != nil && *precision == 0)
+}
+
+// proportionDenominator returns the denominator a proportion of kind takes
+// under node, the OPT node of its denominator: 1 for a unitary proportion
+// and 100 for a percent, where node admits it, and for any other kind a
+// value proportionOperand gives that is not 0. It reports false when there
+// is none.
+func proportionDenominator(node *tcimpl.CompiledNode, current float64, kind int64, whole bool) (float64, bool) {
+	switch kind {
+	case pkUnitary:
+		return 1, componentFits(node, 1.0)
+	case pkPercent:
+		return 100, componentFits(node, 100.0)
+	}
+	return proportionOperand(node, current, whole, true)
+}
+
+// proportionOperand returns a numerator or a denominator that node, its
+// OPT node, accepts, that is a whole number where whole says so, and that
+// is not 0 where nonZero says so. It is the first of these that does:
+// current; current rounded, then its floor and its ceiling; the members of
+// the C_REAL's list; the whole numbers nearest the ends of its range,
+// inside it; 1; and the ends of the range themselves. It reports false
+// when none does.
+func proportionOperand(node *tcimpl.CompiledNode, current float64, whole, nonZero bool) (float64, bool) {
+	fits := func(v float64) bool {
+		return !math.IsNaN(v) && !math.IsInf(v, 0) &&
+			(!whole || math.Trunc(v) == v) && (!nonZero || v != 0) &&
+			componentFits(node, v)
+	}
+	candidates := []float64{current, math.Round(current), math.Floor(current), math.Ceil(current)}
+	if c, ok := primitiveOf(node).(constraints.CReal); ok {
+		candidates = append(candidates, c.List...)
+	}
+	lo, hasLo := realEnd(node, true)
+	hi, hasHi := realEnd(node, false)
+	if hasLo {
+		candidates = append(candidates, math.Ceil(lo))
+	}
+	if hasHi {
+		candidates = append(candidates, math.Floor(hi))
+	}
+	candidates = append(candidates, 1)
+	if hasHi {
+		candidates = append(candidates, hi)
+	}
+	if hasLo {
+		candidates = append(candidates, lo)
+	}
+	for _, v := range candidates {
+		if fits(v) {
+			return v, true
+		}
+	}
+	return 0, false
+}
+
 func float64Value(v any) (float64, bool) {
 	switch n := v.(type) {
 	case float64:
@@ -2030,6 +2157,10 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 		fillMathFunction(opt, &v.MathFunction)
 	case *rm.DVMultimedia:
 		settleMultimedia(opt, v)
+	case *rm.DVProportion:
+		// A bound of an interval is settled here too, before the interval's
+		// own walk puts its two bounds in order.
+		settleProportion(opt, v)
 	case *rm.Cluster:
 		// CLUSTER.items is RM-mandatory. ITEM_TREE.items and ITEM_LIST.items
 		// are optional, so they get no member here: the walk gives them one
