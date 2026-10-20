@@ -45,6 +45,22 @@ func TestAQLSuitesRootHoldsPinnedCorpus_PROBE107_REQ160(t *testing.T) {
 				"(re-run scripts/ingest-robot-aql.sh; never edit a pin)", key)
 		}
 	}
+	// The pin records the commit the ingest read, which is the script's
+	// EXPECTED_COMMIT: a pin edited by hand, or a re-pin that moved one of the
+	// two without the other, names another.
+	script := readText(t, filepath.Join(fixtures.CorpusRoot(), "..", "..", "scripts", "ingest-robot-aql.sh"))
+	lines := expectedCommitRE.FindAllString(script, -1)
+	if len(lines) != 1 {
+		t.Fatalf("scripts/ingest-robot-aql.sh has %d EXPECTED_COMMIT lines, want 1", len(lines))
+	}
+	want := strings.TrimPrefix(lines[0], "EXPECTED_COMMIT=")
+	if pin["commit"] != want {
+		t.Errorf("suite pin commit = %q, want the ingest's EXPECTED_COMMIT %q "+
+			"(re-run scripts/ingest-robot-aql.sh; never edit a pin)", pin["commit"], want)
+	}
+	if !strings.Contains(pin["source_tree"], "/tree/"+want+"/") {
+		t.Errorf("suite pin source_tree = %q, want it to name the commit %s", pin["source_tree"], want)
+	}
 }
 
 // testkit/corpus/aql/ holds one vendored AQL corpus, suites/. Beside it sits
