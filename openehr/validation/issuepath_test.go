@@ -192,7 +192,10 @@ func reusedArchetypeOPTWith(children ...string) string {
 
 // reusedObservationChild renders one OBSERVATION archetype root of
 // openEHR-EHR-OBSERVATION.reused.v1, occurring at least lower times and at
-// most once, that pins name, or no name when name is empty.
+// most once, that pins name, or no name when name is empty. It describes its
+// RM-required data (HISTORY at0001), so the generator builds an optional one:
+// an OBSERVATION whose data the OPT leaves undescribed gets no member under
+// Large and Medium (REQ-107 § Slot fills).
 func reusedObservationChild(name string, lower int) string {
 	pin := ""
 	if name != "" {
@@ -222,6 +225,10 @@ func reusedObservationChild(name string, lower int) string {
           <lower>` + strconv.Itoa(lower) + `</lower><upper>1</upper>
         </occurrences>
         <node_id>at0000</node_id>` + pin + `
+        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+          <rm_attribute_name>data</rm_attribute_name>
+          <children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>HISTORY</rm_type_name><node_id>at0001</node_id></children>
+        </attributes>
         <archetype_id><value>openEHR-EHR-OBSERVATION.reused.v1</value></archetype_id>
       </children>`
 }
