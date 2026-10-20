@@ -1,9 +1,12 @@
 package instance_test
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/rmwrite"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
@@ -659,6 +662,61 @@ func TestREQ107_PrimitiveOnAnAttributeTheRMDoesNotHave(t *testing.T) {
 				}
 				noFloorErrors(t, out)
 			})
+		}
+	}
+}
+
+// TestREQ107_WrongTypeLeafOnARoutedAttributeFailsGenerate is the REQ-107
+// check that a primitive leaf whose value cannot be the type of the
+// attribute the OPT puts it on makes Generate fail, where the attribute is
+// one the generator writes through the template-instance writer: a C_REAL
+// on a DV_STATE's is_terminal, and a C_REAL and a C_BOOLEAN on a
+// DV_QUANTITY's precision. Only an attribute the pinned RM does not have is
+// left unwritten (TestREQ107_PrimitiveOnAnAttributeTheRMDoesNotHave). The
+// error wraps the writer's type mismatch and names the RM type, the
+// attribute and the OPT path. It holds under every policy, both value fills
+// and both compile modes.
+func TestREQ107_WrongTypeLeafOnARoutedAttributeFailsGenerate(t *testing.T) {
+	realLeaf := dvReal("1.5")
+	cases := []struct {
+		name  string
+		value string
+		// where is what the error names: the RM type and the attribute.
+		where string
+	}{
+		{
+			name:  "DV_STATE is_terminal, C_REAL",
+			value: optNode("DV_STATE", "", optSingle("is_terminal", realLeaf)),
+			where: "DV_STATE.is_terminal",
+		},
+		{
+			name:  "DV_QUANTITY precision, C_REAL",
+			value: optNode("DV_QUANTITY", "", optSingle("precision", realLeaf)),
+			where: "DV_QUANTITY.precision",
+		},
+		{
+			name:  "DV_QUANTITY precision, C_BOOLEAN",
+			value: optNode("DV_QUANTITY", "", optSingle("precision", dvOnlyTrue)),
+			where: "DV_QUANTITY.precision",
+		},
+	}
+	for _, tc := range cases {
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, optTemplate("ELEMENT", optSingle("value", tc.value)), implicit)
+			for _, opts := range defaultsOptions() {
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err == nil {
+						t.Fatalf("Generate = %T, nil error, want an error: the leaf is not a value of the attribute", out)
+					}
+					if !errors.Is(err, rmwrite.ErrTypeMismatch) {
+						t.Errorf("Generate error = %v, want one wrapping rmwrite.ErrTypeMismatch", err)
+					}
+					if !strings.Contains(err.Error(), tc.where) {
+						t.Errorf("Generate error = %q, want it to name %s", err, tc.where)
+					}
+				})
+			}
 		}
 	}
 }

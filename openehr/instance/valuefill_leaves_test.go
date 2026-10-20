@@ -128,3 +128,113 @@ func TestREQ107_RandomFillDrawsEachLeafKind(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ107_RandomFillDrawsRoutedPrimitiveLeaves is the REQ-107 Leaf values
+// check that RandomFill values a primitive leaf on a secondary attribute of a
+// data value, which the generator writes through the template-instance
+// writer, with a draw from its constraint, as it does a leaf on the main
+// value: a DV_QUANTITY's precision over a range of integers, a DV_QUANTITY's,
+// a DV_COUNT's and a DV_DURATION's accuracy over a range of reals, and a
+// DV_QUANTITY's accuracy_is_percent and a DV_STATE's is_terminal where the
+// constraint admits both Booleans. Over eight seeds the values vary and each
+// passes the constraint, and ExampleFill gives the constraint's example
+// value. It holds under every policy and both compile modes.
+func TestREQ107_RandomFillDrawsRoutedPrimitiveLeaves(t *testing.T) {
+	const bothBooleans = "<true_valid>true</true_valid><false_valid>true</false_valid>"
+	integers := optPrimitive("INTEGER", "C_INTEGER", "<range>"+optInterval(0, 50)+"</range>")
+	reals := optPrimitive("REAL", "C_REAL", "<range>"+optInterval(0, 50)+"</range>")
+	booleans := optPrimitive("BOOLEAN", "C_BOOLEAN", bothBooleans)
+	cases := []struct {
+		name  string
+		value string
+		// leaf reads the generated leaf value; constraint is the
+		// compiled constraint it is checked against.
+		leaf       func(v rm.DataValue) any
+		constraint func(t *testing.T, c *templatecompile.Compiled) constraints.PrimitiveConstraint
+	}{
+		{
+			name:  "DV_QUANTITY precision",
+			value: optNode("DV_QUANTITY", "", optSingle("precision", integers)),
+			leaf:  func(v rm.DataValue) any { return int64(*v.(*rm.DVQuantity).Precision) },
+			constraint: func(t *testing.T, c *templatecompile.Compiled) constraints.PrimitiveConstraint {
+				return leafConstraint[constraints.CInteger](t, c)
+			},
+		},
+		{
+			name:  "DV_QUANTITY accuracy",
+			value: optNode("DV_QUANTITY", "", optSingle("accuracy", reals)),
+			leaf:  func(v rm.DataValue) any { return float64(*v.(*rm.DVQuantity).Accuracy) },
+			constraint: func(t *testing.T, c *templatecompile.Compiled) constraints.PrimitiveConstraint {
+				return leafConstraint[constraints.CReal](t, c)
+			},
+		},
+		{
+			name:  "DV_COUNT accuracy",
+			value: optNode("DV_COUNT", "", optSingle("accuracy", reals)),
+			leaf:  func(v rm.DataValue) any { return float64(*v.(*rm.DVCount).Accuracy) },
+			constraint: func(t *testing.T, c *templatecompile.Compiled) constraints.PrimitiveConstraint {
+				return leafConstraint[constraints.CReal](t, c)
+			},
+		},
+		{
+			name:  "DV_DURATION accuracy",
+			value: optNode("DV_DURATION", "", optSingle("accuracy", reals)),
+			leaf:  func(v rm.DataValue) any { return float64(*v.(*rm.DVDuration).Accuracy) },
+			constraint: func(t *testing.T, c *templatecompile.Compiled) constraints.PrimitiveConstraint {
+				return leafConstraint[constraints.CReal](t, c)
+			},
+		},
+		{
+			name:  "DV_QUANTITY accuracy_is_percent",
+			value: optNode("DV_QUANTITY", "", optSingle("accuracy_is_percent", booleans)),
+			leaf:  func(v rm.DataValue) any { return *v.(*rm.DVQuantity).AccuracyIsPercent },
+			constraint: func(t *testing.T, c *templatecompile.Compiled) constraints.PrimitiveConstraint {
+				return leafConstraint[constraints.CBoolean](t, c)
+			},
+		},
+		{
+			name:  "DV_STATE is_terminal",
+			value: optNode("DV_STATE", "", optSingle("is_terminal", booleans)),
+			leaf:  func(v rm.DataValue) any { return v.(*rm.DVState).IsTerminal },
+			constraint: func(t *testing.T, c *templatecompile.Compiled) constraints.PrimitiveConstraint {
+				return leafConstraint[constraints.CBoolean](t, c)
+			},
+		},
+	}
+	for _, tc := range cases {
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, optTemplate("ELEMENT", optSingle("value", tc.value)), implicit)
+			pc := tc.constraint(t, c)
+			for _, policy := range everyPolicy {
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v", tc.name, implicit, policy), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, instance.Options{Policy: policy, Now: defaultsNow})
+					if err != nil {
+						t.Fatalf("Generate(ExampleFill): %v", err)
+					}
+					example := pc.ExampleValue()
+					if got := tc.leaf(out.(*rm.Element).Value); got != example {
+						t.Errorf("ExampleFill leaf = %v, want the constraint's example value %v", got, example)
+					}
+					seen := map[any]bool{}
+					for seed := range uint64(8) {
+						out, err := instance.Generate(t.Context(), c, instance.Options{
+							Policy: policy, Now: defaultsNow,
+							ValueFill: instance.RandomFill, ValueSource: mrand.NewPCG(seed, seed),
+						})
+						if err != nil {
+							t.Fatalf("Generate(RandomFill, seed %d): %v", seed, err)
+						}
+						v := tc.leaf(out.(*rm.Element).Value)
+						if violations := pc.Validate(v); len(violations) != 0 {
+							t.Errorf("RandomFill seed %d leaf = %v, which the constraint rejects: %v", seed, v, violations)
+						}
+						seen[v] = true
+					}
+					if len(seen) < 2 {
+						t.Errorf("RandomFill leaf took %d distinct values over 8 seeds, want them to vary: it is the constraint's draw, not its example value %v", len(seen), example)
+					}
+				})
+			}
+		}
+	}
+}
