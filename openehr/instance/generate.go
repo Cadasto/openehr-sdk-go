@@ -931,8 +931,8 @@ func (g *generator) temporalSentinel(v any) string {
 // It is written through stringField's setter where that covers the
 // attribute, which reaches the String attributes the template-instance
 // writer has no case for (a PARTY_IDENTIFIED's or PARTY_RELATED's name, a
-// TERMINOLOGY_ID's value, and a PARTY_REF's namespace and type), and
-// through the writer otherwise.
+// DV_PROPORTION's magnitude_status, a TERMINOLOGY_ID's value, and a
+// PARTY_REF's namespace and type), and through the writer otherwise.
 func (g *generator) writeBMMString(parent any, attr string) {
 	ref, covered := stringField(parent, attr)
 	if covered && ref.get() != "" {

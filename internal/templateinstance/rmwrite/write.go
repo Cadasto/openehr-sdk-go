@@ -1042,11 +1042,9 @@ func coerceValueOrPtr[T any](child any) (T, bool) {
 // assignVia coerces child to T via coerceValueOrPtr and hands the
 // result to set — a caller-supplied closure that either assigns a
 // scalar field or appends to a slice, so one helper covers both
-// shapes uniformly. Mirrors the writeDVTemporalValueSingle closure
-// idiom, generalised beyond the string primitive. On coercion
-// failure it returns the same mismatch(attr, child, rmName) every
-// inline coercion switch in this file used to build directly, so
-// error output is unchanged.
+// shapes uniformly. On coercion failure it returns
+// mismatch(attr, child, rmName), the error every other case of this
+// file reports for a child of the wrong type.
 func assignVia[T any](child any, set func(T), attr, rmName string) error {
 	v, ok := coerceValueOrPtr[T](child)
 	if !ok {

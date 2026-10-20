@@ -66,8 +66,9 @@
 // against the type registry, so an ordered data value the registry
 // gains fails them until it has a case.
 //
-// Two more tests ask both writers about every class the type registry
-// knows and every attribute name any class in openehr/rm/rminfo
+// Three more tests ask the writers about the type registry and the
+// classes in openehr/rm/rminfo. The first two ask both writers about
+// every class the type registry knows and every attribute name any class
 // declares, with a child no case accepts. The first checks that each
 // writer case names an attribute its class declares, in the right
 // shape: EnsureSingle for a single-valued attribute, AppendMultiple for
@@ -80,7 +81,12 @@
 // renamed, fails it until the attribute gets a case or joins the
 // pinned list on purpose. The instance generator drops the error when
 // it fills an RM-required default, so without this pin a missing case
-// would drop the default silently.
+// would drop the default silently. The third pins the classes the
+// second cannot see: the registered classes a value below a LOCATABLE can
+// be, found by following the declared type of each attribute from every
+// concrete LOCATABLE, that neither writer has a case for. A class that
+// becomes reachable, or loses its last case, fails it until the class gets
+// a case or joins the pinned list on purpose.
 //
 // # Dependencies
 //

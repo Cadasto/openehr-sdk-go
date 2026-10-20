@@ -13,9 +13,10 @@ import (
 // optOptionalSingleOver is a C_SINGLE_ATTRIBUTE called name with existence
 // 0..1 over children: optional, but the OPT pins children under it, so
 // Large and Medium visit it; Required does not visit an optional
-// attribute. The template validator reads no value for some
-// such attributes (DV_PARSABLE charset and language, DV_MULTIMEDIA
-// compression_algorithm), and would report a required one absent.
+// attribute. The template validator reads such an attribute like any
+// other, DV_PARSABLE's charset and language and DV_MULTIMEDIA's
+// compression_algorithm among them, and reports a code in it that the RM
+// ties to a code set as code_not_in_value_set.
 func optOptionalSingleOver(name string, children ...string) string {
 	return `<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>` + name + `</rm_attribute_name>` +
 		`<existence><lower_included>true</lower_included><upper_included>true</upper_included>` +
