@@ -381,6 +381,31 @@ func TestValidateRM_REQ171_RMLayerRules(t *testing.T) {
 			root: &rm.DVProportion{Numerator: 1.5, Denominator: 2, Precision: &zero},
 			want: []string{"rm_invariant / rm DV_PROPORTION.Precision_validity"},
 		},
+		{
+			name: "DV_PROPORTION type that is no proportion kind",
+			root: &rm.DVProportion{Numerator: 1, Denominator: 2, Type: 5},
+			want: []string{"rm_invariant / rm DV_PROPORTION.Type_validity"},
+		},
+		{
+			name: "DV_PROPORTION unitary over denominator 2",
+			root: &rm.DVProportion{Numerator: 1, Denominator: 2, Type: rm.Integer(rm.ProportionKindPkUnitary)},
+			want: []string{"rm_invariant / rm DV_PROPORTION.Unitary_validity"},
+		},
+		{
+			name: "DV_PROPORTION percent over denominator 1",
+			root: &rm.DVProportion{Numerator: 1, Denominator: 1, Type: rm.Integer(rm.ProportionKindPkPercent)},
+			want: []string{"rm_invariant / rm DV_PROPORTION.Percent_validity"},
+		},
+		{
+			name: "DV_PROPORTION fraction with a fractional numerator",
+			root: &rm.DVProportion{Numerator: 1.5, Denominator: 2, Type: rm.Integer(rm.ProportionKindPkFraction)},
+			want: []string{"rm_invariant / rm DV_PROPORTION.Fraction_validity"},
+		},
+		{
+			name: "DV_PROPORTION over denominator 0",
+			root: &rm.DVProportion{Numerator: 1, Denominator: 0},
+			want: []string{"rm_invariant / rm DV_PROPORTION.Valid_denominator"},
+		},
 		{name: "DV_DATE not ISO 8601", root: &rm.DVDate{Value: "example"}, want: []string{"rm_invariant / rm DV_DATE.Value_valid"}},
 		{name: "DV_TIME not ISO 8601", root: &rm.DVTime{Value: "example"}, want: []string{"rm_invariant / rm DV_TIME.Value_valid"}},
 		{name: "DV_DATE_TIME not ISO 8601", root: &rm.DVDateTime{Value: "example"}, want: []string{"rm_invariant / rm DV_DATE_TIME.Value_valid"}},
