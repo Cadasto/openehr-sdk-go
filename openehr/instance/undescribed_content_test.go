@@ -186,6 +186,43 @@ func TestREQ107_OptionalNodeHoldingOnlyUndescribedContentGetsNoMember(t *testing
 			required: "at0002(" + stub + "(at0000))",
 		},
 		{
+			// Both children carry at0002, and only the second needs no
+			// undescribed content. The validator binds a member with node id
+			// at0002 to the first, so the top-up takes the first child that is
+			// not a slot rather than the second, and the RM requirement keeps
+			// its fill.
+			name: "top-up past a described child whose identity an earlier sibling carries",
+			opt: optTemplate("CLUSTER", optMultiple("items",
+				slotOnlyCluster("at0002", guardOccurrences01),
+				guardChild("C_COMPLEX_OBJECT", "CLUSTER", "at0002", guardOccurrences01, "",
+					optMultiple("items", optNode("ELEMENT", "at0003"))))),
+			large: "at0002(" + stub + "(at0000))", medium: "at0002(" + stub + "(at0000))",
+			required: "at0002(" + stub + "(at0000))",
+		},
+		{
+			// The walk builds an ITEM_TREE, which the validator binds to the
+			// slot, the first alternative naming ITEM_TREE: the entry needs
+			// undescribed content although the described tree is allowed.
+			name: "optional entry whose required protocol binds a slot before a described tree",
+			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
+				undescribedObservation(slotted, guardOccurrences01, describedHistory,
+					optSingle("protocol", optSlot("ITEM_TREE", "at0002"), optNode("ITEM_TREE", "at0003"))),
+				undescribedObservation(guardObservationID, guardOccurrences11, describedHistory))),
+			large: "openEHR-EHR-OBSERVATION.example.v1", medium: "openEHR-EHR-OBSERVATION.example.v1",
+			required: "openEHR-EHR-OBSERVATION.example.v1",
+		},
+		{
+			// The first alternative names ITEM_STRUCTURE, so the walk builds
+			// an ITEM_TREE, which the validator binds to the slot after it.
+			name: "optional entry whose required protocol binds a slot after a described structure",
+			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
+				undescribedObservation(slotted, guardOccurrences01, describedHistory,
+					optSingle("protocol", optNode("ITEM_STRUCTURE", "at0003"), optSlot("ITEM_TREE", "at0002"))),
+				undescribedObservation(guardObservationID, guardOccurrences11, describedHistory))),
+			large: "openEHR-EHR-OBSERVATION.example.v1", medium: "openEHR-EHR-OBSERVATION.example.v1",
+			required: "openEHR-EHR-OBSERVATION.example.v1",
+		},
+		{
 			// The content is optional, so no top-up stands in for the root
 			// Medium keeps.
 			name: "first optional archetype root under Medium is the first that needs none",
@@ -210,6 +247,67 @@ func TestREQ107_OptionalNodeHoldingOnlyUndescribedContentGetsNoMember(t *testing
 					}
 					if got := undescribedShape(out); got != want {
 						t.Errorf("Generate built %q, want %q", got, want)
+					}
+					noFloorErrors(t, out)
+					for _, iss := range templateErrors(out, c) {
+						t.Errorf("template validator: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+					}
+				})
+			}
+		}
+	}
+}
+
+// TestREQ107_CompositionContextIsVisitedWhateverItsMembersNeed is the
+// REQ-107 check that the rule on undescribed content leaves a COMPOSITION's
+// context alone (Visit rule, § Slot fills): RM defaults write a context
+// under every policy, so the walk visits the one the OPT leaves optional,
+// although its EVENT_CONTEXT requires an other_context the OPT gives only a
+// slot or no child, and that other_context is built. A context whose
+// other_context the OPT describes is the control. Every root passes the RM
+// floor and the template validator, under every policy, both value fills
+// and both compile modes.
+func TestREQ107_CompositionContextIsVisitedWhateverItsMembersNeed(t *testing.T) {
+	cases := []struct {
+		name         string
+		otherContext string
+		// want is the archetype node id of the other_context built.
+		want string
+	}{
+		{
+			name:         "other_context admits only a slot",
+			otherContext: optRequiredSingle("other_context", optSlot("ITEM_TREE", "at0001")),
+			want:         "openEHR-EHR-ITEM_TREE.example.v1",
+		},
+		{
+			name:         "other_context has no child",
+			otherContext: optRequiredSingle("other_context"),
+			want:         "at0000",
+		},
+		{
+			name:         "other_context described",
+			otherContext: optRequiredSingle("other_context", optNode("ITEM_TREE", "at0001")),
+			want:         "at0001",
+		},
+	}
+	for _, tc := range cases {
+		opt := optTemplate("COMPOSITION", optOptionalSingleOver("context", optNode("EVENT_CONTEXT", "", tc.otherContext)))
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, opt, implicit)
+			for _, opts := range guardOptions() {
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err != nil {
+						t.Fatalf("Generate: %v", err)
+					}
+					comp := generatedComposition(t, out)
+					if comp.Context == nil {
+						t.Fatal("COMPOSITION.context absent, want the EVENT_CONTEXT RM defaults write")
+					}
+					if oc := comp.Context.OtherContext; oc == nil || rm.IsTypedNil(oc) {
+						t.Errorf("EVENT_CONTEXT.other_context absent, want one with archetype node id %q", tc.want)
+					} else if got := nodeID(oc); got != tc.want {
+						t.Errorf("EVENT_CONTEXT.other_context archetype node id = %q, want %q", got, tc.want)
 					}
 					noFloorErrors(t, out)
 					for _, iss := range templateErrors(out, c) {
