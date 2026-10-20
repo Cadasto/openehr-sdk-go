@@ -8,6 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **Each answered PROBE-107 query carries the declines that cover it (REQ-160, REQ-109).** `aqlprobes.SuiteDecline` and `SuiteQuery.Declines` give a consumer gating queries through the same lint each Error code, construct and reason.
+
+### Changed
+
+- **The RM floor evaluates the DV_PROPORTION kind rules (REQ-112, REQ-171).** A proportion whose type, denominator or operands break its kind's invariants draws `rm_invariant`, and five invariants leave `Coverage.Unevaluated`.
+- **Generated compositions pass the Cadasto, FerroEHR and EHRbase CDRs (REQ-107).** A COMPOSITION carries no uid unless its template requires one, DV_MULTIMEDIA data its byte size, and no optional node only undescribed content.
+
+### Removed
+
+- **The PROBE-100 reader and its FROM-family corpus: `aqlprobes.Probe100ConformanceCorpus`, `ReadConformanceCorpus` and `fixtures.AQLConformanceRoot` (REQ-160).** PROBE-107's suite corpus is the one vendored AQL corpus.
+
 ## [0.37.0] - 2026-10-19
 
 Thirty-seventh `v0.x` minor: the instance generator builds at three levels named after the ITS-REST template example's `detail_level`, and a `DV_COUNT` magnitude decodes a whole number however it is written. **Breaking:** `instance.Example` is removed, `instance.Minimal` names the new `Required` level, `Generate` and `NewSkeleton` build `Medium` by default, `NewBuilder` refuses every level but `Large`, and `DVCount.Magnitude` is an `rm.Integer64`.
