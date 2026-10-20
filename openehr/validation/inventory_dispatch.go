@@ -135,7 +135,9 @@ func coveredCheck(function string, _ any) invariantCheck {
 // fails to build. The names recorded beside the functions are checked against
 // the functions and against invariants.json by a test, which also fails when
 // an evaluated invariant is missing here or one listed here is not evaluated.
-// The last three groups bind the invariants another evaluated check decides:
+// One evaluator may evaluate several invariants of a class and run once on
+// the node: checkDVProportion reads a DV_PROPORTION once for its precision
+// and proportion-kind rules. The last three groups bind the invariants another evaluated check decides:
 // the mandatory-presence rule, for a mandatory string or list the invariant
 // says is not empty; the REQ-123 parse a temporal Value_valid applies, for
 // the parts of the ISO 8601 value it refuses; and the DV_PROPORTION
@@ -149,7 +151,12 @@ var invariantChecks = map[string]invariantCheck{
 	"DV_DATE_TIME.Value_valid":           ruleCheck("checkTemporalValue", (*findings).checkTemporalValue),
 	"DV_DURATION.Value_valid":            ruleCheck("checkTemporalValue", (*findings).checkTemporalValue),
 	"DV_INTERVAL.Limits_consistent":      typeCheck("checkDVInterval", (*findings).checkDVInterval),
+	"DV_PROPORTION.Fraction_validity":    nodeCheck("checkDVProportion", (*findings).checkDVProportion),
+	"DV_PROPORTION.Percent_validity":     nodeCheck("checkDVProportion", (*findings).checkDVProportion),
 	"DV_PROPORTION.Precision_validity":   nodeCheck("checkDVProportion", (*findings).checkDVProportion),
+	"DV_PROPORTION.Type_validity":        nodeCheck("checkDVProportion", (*findings).checkDVProportion),
+	"DV_PROPORTION.Unitary_validity":     nodeCheck("checkDVProportion", (*findings).checkDVProportion),
+	"DV_PROPORTION.Valid_denominator":    nodeCheck("checkDVProportion", (*findings).checkDVProportion),
 	"DV_TEXT.Mappings_valid":             nodeCheck("checkTermMappings", (*findings).checkTermMappings),
 	"DV_TIME.Value_valid":                ruleCheck("checkTemporalValue", (*findings).checkTemporalValue),
 	"EHR_ACCESS.Is_archetype_root":       ruleCheck("checkArchetypeRoot", (*findings).checkArchetypeRoot),

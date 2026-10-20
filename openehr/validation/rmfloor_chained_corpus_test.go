@@ -167,7 +167,8 @@ func decodedCorpus(t *testing.T, templateID string) validation.Result {
 // REQ-102, REQ-112 — the three corpus compositions issue 238 found
 // template-valid and RM-invalid are not OK: each DV_INTERVAL has its lower
 // bound above its upper one, and Demonstration.v1 also has an ELEMENT with
-// both value and null_flavour. The want lists are the whole result.
+// both value and null_flavour and DV_PROPORTIONs that break the rule of
+// their kind. The want lists are the whole result.
 func TestValidateComposition_REQ102_REQ112_CorpusFloorBreaches(t *testing.T) {
 	// Both events of the interval tests carry at0002, so the event is
 	// written by its position.
@@ -197,26 +198,36 @@ func TestValidateComposition_REQ102_REQ112_CorpusFloorBreaches(t *testing.T) {
 // Demonstration.v1 corpus composition, sorted as issueKeys sorts it: in each
 // event, the ELEMENT at0016 carries both value and null_flavour, and the
 // DV_INTERVALs at0022 (DV_COUNT), at0023 (DV_QUANTITY) and at0024
-// (DV_DATE_TIME) have their lower bound above their upper one. All are the
-// RM rules'; the template reports nothing.
+// (DV_DATE_TIME) have their lower bound above their upper one; in three
+// clusters the DV_PROPORTION at0028 breaks the rule of its kind (REQ-112
+// DV_PROPORTION). All are the RM rules'; the template reports nothing.
 var demonstrationFloorIssues = func() []string {
 	const obs = "/content[openEHR-EHR-OBSERVATION.demo.v1]/data/events"
 	var out []string
 	for _, cluster := range []struct {
 		path      string
 		intervals []string
+		// proportion is set where the DV_PROPORTION at0028 breaks the rule
+		// of its kind.
+		proportion bool
 	}{
 		// at0024: inverted DV_INTERVAL<DV_DATE_TIME> in the vendored fixture (DV_INTERVAL.Limits_consistent).
 		{path: "[at0002]/data/items[at0004]", intervals: []string{"at0022", "at0023", "at0024"}},
 		// at0024: inverted DV_INTERVAL<DV_DATE_TIME> in the vendored fixture (DV_INTERVAL.Limits_consistent).
-		{path: "[at0033]/data/items[at0004]", intervals: []string{"at0022", "at0023", "at0024"}},
+		// at0028: a fraction over operands that are not whole (DV_PROPORTION.Fraction_validity).
+		{path: "[at0033]/data/items[at0004]", intervals: []string{"at0022", "at0023", "at0024"}, proportion: true},
 		{path: "[at0034]/data/items[at0004]", intervals: []string{"at0022"}},
-		{path: "[at0035]/data/items[2]", intervals: []string{"at0023"}},
-		{path: "[at0035]/data/items[3]", intervals: []string{"at0023"}},
+		// at0028: a fraction over operands that are not whole (DV_PROPORTION.Fraction_validity).
+		{path: "[at0035]/data/items[2]", intervals: []string{"at0023"}, proportion: true},
+		// at0028: a percent whose denominator is not 100 (DV_PROPORTION.Percent_validity).
+		{path: "[at0035]/data/items[3]", intervals: []string{"at0023"}, proportion: true},
 	} {
 		out = append(out, "rm_invariant "+obs+cluster.path+"/items[at0016]")
 		for _, iv := range cluster.intervals {
 			out = append(out, "rm_invariant "+obs+cluster.path+"/items["+iv+"]/value")
+		}
+		if cluster.proportion {
+			out = append(out, "rm_invariant "+obs+cluster.path+"/items[at0028]/value")
 		}
 	}
 	return out

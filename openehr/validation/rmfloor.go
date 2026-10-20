@@ -443,9 +443,11 @@ func (f *findings) checkDVQuantity(value any, path issuePath) {
 	}
 }
 
-// checkDVProportion enforces the two precision arms the RM puts on
-// DV_PROPORTION:
+// checkDVProportion enforces the RM rules on a DV_PROPORTION, in the order
+// the BMM declares its invariants:
 //
+//   - Type_validity: `valid_proportion_kind (type)`, so type is a
+//     PROPORTION_KIND, 0 (pk_ratio) to 4 (pk_integer_fraction).
 //   - Range. precision, when set, must be ≥ -1. The BMM property doc
 //     string gives it the same reading as DV_QUANTITY.precision — a
 //     number of decimal places, where 0 means integral and -1 means "no
@@ -459,21 +461,94 @@ func (f *findings) checkDVQuantity(value any, path issuePath) {
 //     A precision of 0 therefore requires whole-number operands, and a
 //     fractional numerator or denominator breaches the RM even though the
 //     precision value itself is in range.
+//   - Fraction_validity: `(type = pk_fraction or type =
+//     pk_integer_fraction) implies is_integral`, with is_integral read as
+//     for Precision_validity, so a fraction or an integer fraction requires
+//     whole-number operands, whatever its precision.
+//   - Unitary_validity and Percent_validity: a unitary proportion has
+//     denominator 1, and a percent denominator 100.
+//   - Valid_denominator: `denominator /= 0.0`, on every kind.
 //
-// The remaining DV_PROPORTION invariants are NOT in the floor: the
-// type-kind rules (`Type_validity`, `Unitary_validity`, `Percent_validity`,
-// `Fraction_validity`), which turn on the `type` proportion-kind code, a
-// different axis from precision, and `Valid_denominator`
-// (`denominator /= 0.0`), which reads the denominator alone.
+// Each rule the value breaks is one issue of its own, with the rule as
+// Rule, so one value can draw several: a fraction of precision 0 over a
+// fractional operand breaks Precision_validity and Fraction_validity, and a
+// percent over denominator 0 Percent_validity and Valid_denominator. No rule
+// is reported twice: Is_integral_validity is decided by the integrality arm,
+// and an integrality rule names every operand that is not whole in its one
+// issue. A type that is no proportion kind draws Type_validity alone of the
+// rules keyed on the kind.
 //
-// Diagnostics name the attribute and the offending operand, never a value
-// from the instance: neither the precision nor an operand (REQ-168). The
-// value the check read is carried in Issue.Value: the precision on the
-// range arm, and the numerator and the denominator, as a [2]float64, on
-// the integrality arm.
+// Diagnostics name the attribute, the rule and the offending operand, never
+// a value from the instance (REQ-168). The value the check read is carried
+// in Issue.Value: the precision on the range arm; the type on
+// Type_validity; the denominator on Unitary_validity, Percent_validity and
+// Valid_denominator; and the numerator and the denominator, as a
+// [2]float64, on Precision_validity and Fraction_validity.
 func (f *findings) checkDVProportion(value any, path issuePath) {
 	p, ok := asDVProportion(value)
-	if !ok || p.Precision == nil {
+	if !ok {
+		return
+	}
+	kind := rm.ProportionKind(p.Type)
+	if !isProportionKind(kind) {
+		f.emit(Issue{
+			Path:   path.String(),
+			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   ruleProportionType,
+			Detail: "DV_PROPORTION.type must be a PROPORTION_KIND, 0 to 4 (RM Type_validity)",
+			Value:  constraints.Redact(p.Type),
+		})
+	}
+	f.checkProportionPrecision(p, path)
+	if kind == rm.ProportionKindPkFraction || kind == rm.ProportionKindPkIntegerFraction {
+		if fractional := nonIntegralOperands(p); fractional != "" {
+			f.emit(Issue{
+				Path:   path.String(),
+				Code:   "rm_invariant",
+				Layer:  LayerRM,
+				Rule:   ruleProportionFraction,
+				Detail: "DV_PROPORTION.type is a fraction kind, which requires a whole-number numerator and denominator (RM Fraction_validity); not integral: " + fractional,
+				Value:  constraints.Redact([2]float64{float64(p.Numerator), float64(p.Denominator)}),
+			})
+		}
+	}
+	if kind == rm.ProportionKindPkUnitary && p.Denominator != 1 {
+		f.emit(Issue{
+			Path:   path.String(),
+			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   ruleProportionUnitary,
+			Detail: "DV_PROPORTION.denominator must be 1 on a unitary proportion (RM Unitary_validity)",
+			Value:  constraints.Redact(p.Denominator),
+		})
+	}
+	if kind == rm.ProportionKindPkPercent && p.Denominator != 100 {
+		f.emit(Issue{
+			Path:   path.String(),
+			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   ruleProportionPercent,
+			Detail: "DV_PROPORTION.denominator must be 100 on a percent (RM Percent_validity)",
+			Value:  constraints.Redact(p.Denominator),
+		})
+	}
+	if p.Denominator == 0 {
+		f.emit(Issue{
+			Path:   path.String(),
+			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   ruleProportionDenominator,
+			Detail: "DV_PROPORTION.denominator must not be 0 (RM Valid_denominator)",
+			Value:  constraints.Redact(p.Denominator),
+		})
+	}
+}
+
+// checkProportionPrecision enforces the two precision arms of
+// [findings.checkDVProportion] on p, when its precision is set.
+func (f *findings) checkProportionPrecision(p rm.DVProportion, path issuePath) {
+	if p.Precision == nil {
 		return
 	}
 	switch prec := int(*p.Precision); {
@@ -487,24 +562,42 @@ func (f *findings) checkDVProportion(value any, path issuePath) {
 			Value:  constraints.Redact(*p.Precision),
 		})
 	case prec == 0:
-		var fractional []string
-		if !isIntegralReal(p.Numerator) {
-			fractional = append(fractional, "numerator")
-		}
-		if !isIntegralReal(p.Denominator) {
-			fractional = append(fractional, "denominator")
-		}
-		if len(fractional) > 0 {
+		if fractional := nonIntegralOperands(p); fractional != "" {
 			f.emit(Issue{
 				Path:   path.String(),
 				Code:   "rm_invariant",
 				Layer:  LayerRM,
 				Rule:   ruleProportionPrecision,
-				Detail: "DV_PROPORTION.precision is 0, which requires a whole-number numerator and denominator (RM Precision_validity); not integral: " + strings.Join(fractional, ", "),
+				Detail: "DV_PROPORTION.precision is 0, which requires a whole-number numerator and denominator (RM Precision_validity); not integral: " + fractional,
 				Value:  constraints.Redact([2]float64{float64(p.Numerator), float64(p.Denominator)}),
 			})
 		}
 	}
+}
+
+// isProportionKind reports whether k is one of the five PROPORTION_KIND
+// values, the RM's valid_proportion_kind.
+func isProportionKind(k rm.ProportionKind) bool {
+	switch k {
+	case rm.ProportionKindPkRatio, rm.ProportionKindPkUnitary, rm.ProportionKindPkPercent,
+		rm.ProportionKindPkFraction, rm.ProportionKindPkIntegerFraction:
+		return true
+	}
+	return false
+}
+
+// nonIntegralOperands names the operands of p that are not whole numbers
+// ([isIntegralReal]), "numerator", "denominator" or both joined by a comma,
+// or returns "" when both are whole.
+func nonIntegralOperands(p rm.DVProportion) string {
+	var fractional []string
+	if !isIntegralReal(p.Numerator) {
+		fractional = append(fractional, "numerator")
+	}
+	if !isIntegralReal(p.Denominator) {
+		fractional = append(fractional, "denominator")
+	}
+	return strings.Join(fractional, ", ")
 }
 
 // isIntegralReal reports whether v is a whole number — the

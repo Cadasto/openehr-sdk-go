@@ -69,6 +69,10 @@
 //     symbol, which the RM lets carry no code, is exempt);
 //   - DV_QUANTITY and DV_PROPORTION precision, and whole-number operands
 //     on a DV_PROPORTION of precision 0;
+//   - the DV_PROPORTION proportion-kind rules: a type from 0 to 4, a
+//     denominator of 1 on a unitary proportion and of 100 on a percent,
+//     whole-number operands on a fraction or an integer fraction, and no
+//     denominator of 0;
 //   - DV_INTERVAL numeric bounds in order, and no side both unbounded and
 //     included;
 //   - an ISO 8601 value on DV_DATE, DV_TIME, DV_DATE_TIME and DV_DURATION
