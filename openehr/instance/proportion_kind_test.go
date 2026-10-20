@@ -415,13 +415,21 @@ func TestREQ107_ProportionKeepsTheOPTWhereNoKindFits(t *testing.T) {
 // whether the two sides constrain precision differently or draw it each
 // on its own from one range, and the RM floor and the template validator
 // pass. Each case's two numerator ranges overlap, so RandomFill draws the
-// bounds either way round.
+// bounds either way round, and each case admits an in-order pair, which
+// the generator writes even where it needs a bound to take a precision
+// other than the one it drew, or a value past the open end of its
+// numerator range, on its own denominator.
 func TestREQ107_ProportionIntervalBoundsKeepTheirKind(t *testing.T) {
 	count := instance.ReadVendoredOPT(t, instance.CountIntervalOPT)
-	r, closed := instance.RealRange, instance.Closed
+	r, closed, noEnd := instance.RealRange, instance.Closed, instance.NoEnd
 	tenth := r(closed(0), closed(10))
 	ratio := instance.IntList(0)
 	upToTwo := instance.IntRange(closed(0), closed(2))
+	zero, two := instance.RequiredPrecision(instance.IntList(0)), instance.RequiredPrecision(instance.IntList(2))
+	// Only numerators from 0.5 to 0.7 put these two sides in order, so a
+	// lower bound that drew precision 0, whose numerator is then a whole
+	// number of at least 1, is in order only with another precision.
+	belowOne, upToPointSeven := r(closed(0.5), closed(10)), r(closed(0), closed(0.7))
 	cases := []struct {
 		name         string
 		lower, upper string
@@ -455,6 +463,82 @@ func TestREQ107_ProportionIntervalBoundsKeepTheirKind(t *testing.T) {
 			name:  "ratios of an optional precision below and a prohibited one above",
 			lower: instance.ProportionKindBound(tenth, ratio, instance.OptionalPrecision(upToTwo)),
 			upper: instance.ProportionKindBound(tenth, ratio, instance.ProhibitedPrecision()),
+		},
+		{
+			name:  "ratios of precision 0 below and precision 2 above a numerator open upward",
+			lower: instance.ProportionKindBound(tenth, ratio, zero),
+			upper: instance.ProportionKindBound(r(closed(0), noEnd), ratio, two),
+		},
+		{
+			name:  "ratios of precision 0 below and a prohibited precision above a numerator open upward",
+			lower: instance.ProportionKindBound(tenth, ratio, zero),
+			upper: instance.ProportionKindBound(r(closed(0), noEnd), ratio, instance.ProhibitedPrecision()),
+		},
+		{
+			name:  "ratios of precision 2 below a numerator open downward and precision 0 above",
+			lower: instance.ProportionKindBound(r(noEnd, closed(10)), ratio, two),
+			upper: instance.ProportionKindBound(r(closed(-90), closed(-80)), ratio, zero),
+		},
+		{
+			// The lower bound takes the upper one's ratio rounded down to a
+			// whole number.
+			name:  "ratios of precision 0 below a numerator open downward and precision 2 above",
+			lower: instance.ProportionKindBound(r(noEnd, closed(10)), ratio, zero),
+			upper: instance.ProportionKindBound(r(closed(-90), closed(-80)), ratio, two),
+		},
+		{
+			// The upper bound takes the lower one's ratio rounded up to a
+			// whole number.
+			name:  "ratios of precision 2 below and precision 0 above a numerator open upward",
+			lower: instance.ProportionKindBound(r(closed(90), closed(100)), ratio, two),
+			upper: instance.ProportionKindBound(r(closed(0), noEnd), ratio, zero),
+		},
+		{
+			name:  "ratios in order only below 1, of an optional precision 0 or 2 below and an optional precision 2 above",
+			lower: instance.ProportionKindBound(belowOne, ratio, instance.OptionalPrecision(instance.IntList(0, 2))),
+			upper: instance.ProportionKindBound(upToPointSeven, ratio, instance.OptionalPrecision(instance.IntList(2))),
+		},
+		{
+			name:  "ratios in order only below 1, of a precision 0 or 2 below and precision 2 above",
+			lower: instance.ProportionKindBound(belowOne, ratio, instance.RequiredPrecision(instance.IntList(0, 2))),
+			upper: instance.ProportionKindBound(upToPointSeven, ratio, two),
+		},
+		{
+			name:  "ratios in order only below 1, of a precision in 0..2 below and precision 2 above",
+			lower: instance.ProportionKindBound(belowOne, ratio, instance.RequiredPrecision(upToTwo)),
+			upper: instance.ProportionKindBound(upToPointSeven, ratio, two),
+		},
+		{
+			name:  "ratios in order only below 1, of a precision in -1..0 below and precision 2 above",
+			lower: instance.ProportionKindBound(belowOne, ratio, instance.RequiredPrecision(instance.IntRange(closed(-1), closed(0)))),
+			upper: instance.ProportionKindBound(upToPointSeven, ratio, two),
+		},
+		{
+			// The lowest whole numerator the lower side lists is 3, not 0.5
+			// rounded up.
+			name:  "ratios of precision 0 over a numerator list of 0.5, 3 and 8 below and precision 2 above",
+			lower: instance.ProportionKindBound(instance.RealList(0.5, 3, 8), ratio, zero),
+			upper: instance.ProportionKindBound(r(closed(0), closed(5)), ratio, two),
+		},
+		{
+			// The lower bound takes -86/3 on its own denominator 7, where
+			// -86*7/3 divided by 7 lands a float64 step above -86/3.
+			name:  "ratios over a denominator of 7 below a numerator open downward and of 3 above",
+			lower: instance.ProportionKindBoundOver(r(noEnd, closed(-80)), instance.RealList(7), ratio, ""),
+			upper: instance.ProportionKindBoundOver(instance.RealList(-86), instance.RealList(3), ratio, ""),
+		},
+		{
+			// The upper bound's denominator 2.5 is not a whole number, so the
+			// lower bound of precision 0 cannot take it.
+			name:  "ratios of precision 0 below a numerator open downward and precision 2 over a denominator of 2.5 above",
+			lower: instance.ProportionKindBound(r(noEnd, closed(10)), ratio, zero),
+			upper: instance.ProportionKindBoundOver(r(closed(-90), closed(-80)), instance.RealList(2.5), ratio, two),
+		},
+		{
+			// A negative denominator makes a higher numerator the lower ratio.
+			name:  "ratios over a denominator of -1, of precision 0 below a numerator open upward and precision 2 above",
+			lower: instance.ProportionKindBoundOver(r(closed(0), noEnd), instance.RealList(-1), ratio, zero),
+			upper: instance.ProportionKindBoundOver(r(closed(90), closed(100)), instance.RealList(-1), ratio, two),
 		},
 	}
 	for _, tc := range cases {
