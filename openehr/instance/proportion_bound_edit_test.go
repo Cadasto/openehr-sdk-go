@@ -8,9 +8,21 @@ import "fmt"
 // RequiredPrecision, OptionalPrecision or ProhibitedPrecision, or "" to
 // leave the precision open. The denominator is left open.
 func ProportionKindBound(realBody, typeBody, precisionAttr string) string {
+	return ProportionKindBoundOver(realBody, "", typeBody, precisionAttr)
+}
+
+// ProportionKindBoundOver is ProportionKindBound with a denominator that
+// carries the C_REAL body denominatorBody, or is left open where that is
+// "".
+func ProportionKindBoundOver(realBody, denominatorBody, typeBody, precisionAttr string) string {
+	denominator := ""
+	if denominatorBody != "" {
+		denominator = boundPrimitive("denominator", "REAL", "C_REAL", denominatorBody)
+	}
 	return `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>DV_PROPORTION</rm_type_name>` +
 		boundOccurrences + `<node_id></node_id>` +
 		boundPrimitive("numerator", "REAL", "C_REAL", realBody) +
+		denominator +
 		boundPrimitive("type", "INTEGER", "C_INTEGER", typeBody) +
 		precisionAttr +
 		`</children>`

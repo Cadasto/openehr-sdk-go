@@ -415,13 +415,21 @@ func TestREQ107_ProportionKeepsTheOPTWhereNoKindFits(t *testing.T) {
 // whether the two sides constrain precision differently or draw it each
 // on its own from one range, and the RM floor and the template validator
 // pass. Each case's two numerator ranges overlap, so RandomFill draws the
-// bounds either way round.
+// bounds either way round, and each case admits an in-order pair, which
+// the generator writes even where it needs a bound to take a precision
+// other than the one it drew, or, where its numerator range has no end that
+// way, the other bound's ratio on its own denominator.
 func TestREQ107_ProportionIntervalBoundsKeepTheirKind(t *testing.T) {
 	count := instance.ReadVendoredOPT(t, instance.CountIntervalOPT)
-	r, closed := instance.RealRange, instance.Closed
+	r, closed, noEnd := instance.RealRange, instance.Closed, instance.NoEnd
 	tenth := r(closed(0), closed(10))
 	ratio := instance.IntList(0)
 	upToTwo := instance.IntRange(closed(0), closed(2))
+	zero, two := instance.RequiredPrecision(instance.IntList(0)), instance.RequiredPrecision(instance.IntList(2))
+	// Only numerators from 0.5 to 0.7 put these two sides in order, so a
+	// lower bound that drew precision 0, whose numerator is then a whole
+	// number of at least 1, is in order only with another precision.
+	belowOne, upToPointSeven := r(closed(0.5), closed(10)), r(closed(0), closed(0.7))
 	cases := []struct {
 		name         string
 		lower, upper string
@@ -456,6 +464,89 @@ func TestREQ107_ProportionIntervalBoundsKeepTheirKind(t *testing.T) {
 			lower: instance.ProportionKindBound(tenth, ratio, instance.OptionalPrecision(upToTwo)),
 			upper: instance.ProportionKindBound(tenth, ratio, instance.ProhibitedPrecision()),
 		},
+		{
+			name:  "ratios of precision 0 below and precision 2 above a numerator open upward",
+			lower: instance.ProportionKindBound(tenth, ratio, zero),
+			upper: instance.ProportionKindBound(r(closed(0), noEnd), ratio, two),
+		},
+		{
+			name:  "ratios of precision 0 below and a prohibited precision above a numerator open upward",
+			lower: instance.ProportionKindBound(tenth, ratio, zero),
+			upper: instance.ProportionKindBound(r(closed(0), noEnd), ratio, instance.ProhibitedPrecision()),
+		},
+		{
+			name:  "ratios of precision 2 below a numerator open downward and precision 0 above",
+			lower: instance.ProportionKindBound(r(noEnd, closed(10)), ratio, two),
+			upper: instance.ProportionKindBound(r(closed(-90), closed(-80)), ratio, zero),
+		},
+		{
+			// The lower bound takes the upper one's ratio rounded down to a
+			// whole number.
+			name:  "ratios of precision 0 below a numerator open downward and precision 2 above",
+			lower: instance.ProportionKindBound(r(noEnd, closed(10)), ratio, zero),
+			upper: instance.ProportionKindBound(r(closed(-90), closed(-80)), ratio, two),
+		},
+		{
+			// The upper bound takes the lower one's ratio rounded up to a
+			// whole number.
+			name:  "ratios of precision 2 below and precision 0 above a numerator open upward",
+			lower: instance.ProportionKindBound(r(closed(90), closed(100)), ratio, two),
+			upper: instance.ProportionKindBound(r(closed(0), noEnd), ratio, zero),
+		},
+		{
+			name:  "ratios in order only below 1, of an optional precision 0 or 2 below and an optional precision 2 above",
+			lower: instance.ProportionKindBound(belowOne, ratio, instance.OptionalPrecision(instance.IntList(0, 2))),
+			upper: instance.ProportionKindBound(upToPointSeven, ratio, instance.OptionalPrecision(instance.IntList(2))),
+		},
+		{
+			name:  "ratios in order only below 1, of a precision 0 or 2 below and precision 2 above",
+			lower: instance.ProportionKindBound(belowOne, ratio, instance.RequiredPrecision(instance.IntList(0, 2))),
+			upper: instance.ProportionKindBound(upToPointSeven, ratio, two),
+		},
+		{
+			name:  "ratios in order only below 1, of a precision in 0..2 below and precision 2 above",
+			lower: instance.ProportionKindBound(belowOne, ratio, instance.RequiredPrecision(upToTwo)),
+			upper: instance.ProportionKindBound(upToPointSeven, ratio, two),
+		},
+		{
+			name:  "ratios in order only below 1, of a precision in -1..0 below and precision 2 above",
+			lower: instance.ProportionKindBound(belowOne, ratio, instance.RequiredPrecision(instance.IntRange(closed(-1), closed(0)))),
+			upper: instance.ProportionKindBound(upToPointSeven, ratio, two),
+		},
+		{
+			// The lowest whole numerator the lower side lists is 3, not 0.5
+			// rounded up.
+			name:  "ratios of precision 0 over a numerator list of 0.5, 3 and 8 below and precision 2 above",
+			lower: instance.ProportionKindBound(instance.RealList(0.5, 3, 8), ratio, zero),
+			upper: instance.ProportionKindBound(r(closed(0), closed(5)), ratio, two),
+		},
+		{
+			// The lower bound takes -86/3 on its own denominator 7, where
+			// -86*7/3 divided by 7 lands a float64 step above -86/3.
+			name:  "ratios over a denominator of 7 below a numerator open downward and of 3 above",
+			lower: instance.ProportionKindBoundOver(r(noEnd, closed(-80)), instance.RealList(7), ratio, ""),
+			upper: instance.ProportionKindBoundOver(instance.RealList(-86), instance.RealList(3), ratio, ""),
+		},
+		{
+			// The upper bound takes 86/3 on its own denominator 7, where
+			// 86*7/3 divided by 7 lands a float64 step below 86/3.
+			name:  "ratios over a denominator of 3 below and of 7 above a numerator open upward",
+			lower: instance.ProportionKindBoundOver(instance.RealList(86), instance.RealList(3), ratio, ""),
+			upper: instance.ProportionKindBoundOver(r(closed(0), noEnd), instance.RealList(7), ratio, ""),
+		},
+		{
+			// The upper bound's denominator 2.5 is not a whole number, so the
+			// lower bound of precision 0 cannot take it.
+			name:  "ratios of precision 0 below a numerator open downward and precision 2 over a denominator of 2.5 above",
+			lower: instance.ProportionKindBound(r(noEnd, closed(10)), ratio, zero),
+			upper: instance.ProportionKindBoundOver(r(closed(-90), closed(-80)), instance.RealList(2.5), ratio, two),
+		},
+		{
+			// A negative denominator makes a higher numerator the lower ratio.
+			name:  "ratios over a denominator of -1, of precision 0 below a numerator open upward and precision 2 above",
+			lower: instance.ProportionKindBoundOver(r(closed(0), noEnd), instance.RealList(-1), ratio, zero),
+			upper: instance.ProportionKindBoundOver(r(closed(90), closed(100)), instance.RealList(-1), ratio, two),
+		},
 	}
 	for _, tc := range cases {
 		for _, param := range []string{"DV_PROPORTION", "DV_ORDERED"} {
@@ -487,4 +578,147 @@ func TestREQ107_ProportionIntervalBoundsKeepTheirKind(t *testing.T) {
 			})
 		}
 	}
+}
+
+// eachProportionIntervalRun compiles the vendored DV_COUNT interval OPT
+// with lower and upper as its two bound nodes, as a DV_INTERVAL<DV_PROPORTION>
+// and as a DV_INTERVAL<DV_ORDERED>, and calls check, once for each, with the
+// canonical JSON of each root Generate returns under fill: one for
+// ExampleFill, orderSeeds for RandomFill, one per seed.
+func eachProportionIntervalRun(t *testing.T, lower, upper string, fill instance.ValueFill, check func(t *testing.T, docs []any)) {
+	t.Helper()
+	count := instance.ReadVendoredOPT(t, instance.CountIntervalOPT)
+	for _, param := range []string{"DV_PROPORTION", "DV_ORDERED"} {
+		t.Run(param, func(t *testing.T) {
+			c := compileSyntheticOPT(t, instance.RetargetInterval(t, count, param, lower, upper))
+			seeds := uint64(orderSeeds)
+			if fill == instance.ExampleFill {
+				seeds = 1
+			}
+			var docs []any
+			for seed := range seeds {
+				opts := intervalOptions(instance.Large)
+				opts.ValueFill = fill
+				opts.ValueSource = mrand.NewPCG(seed, 1)
+				_, doc := generateWithJSON(t, c, opts)
+				docs = append(docs, doc)
+			}
+			check(t, docs)
+		})
+	}
+}
+
+// TestREQ107_ProportionIntervalAdoptionKeepsThePrecisionItChooses is the
+// REQ-107 check (Output, Intervals) that a bound which takes the other
+// bound's ratio, because its numerator range has no low end, takes the
+// precision its side admits and that needs no whole numbers, not the one
+// the walk drew: the lower side admits an optional precision 0 or 2 and
+// the upper side the numerators -90 to -80, so where the pair is put in
+// order (the upper bound then sits at -80) the lower bound takes the upper
+// one's numerator, a real number, with no precision 0 and no rounding to a
+// whole number, even where the walk drew precision 0.
+func TestREQ107_ProportionIntervalAdoptionKeepsThePrecisionItChooses(t *testing.T) {
+	r, closed, noEnd := instance.RealRange, instance.Closed, instance.NoEnd
+	ratio := instance.IntList(0)
+	lower := instance.ProportionKindBound(r(noEnd, closed(10)), ratio, instance.OptionalPrecision(instance.IntList(0, 2)))
+	upper := instance.ProportionKindBound(r(closed(-90), closed(-80)), ratio, instance.RequiredPrecision(instance.IntList(2)))
+	eachProportionIntervalRun(t, lower, upper, instance.RandomFill, func(t *testing.T, docs []any) {
+		ordered := 0
+		for seed, doc := range docs {
+			walkIntervals(doc, "", func(path string, iv map[string]any) {
+				lo, hi, ok := boundedPair(iv)
+				if !ok {
+					return
+				}
+				// A pair the walk drew in order is left alone, and its lower bound
+				// may keep any precision its side admits.
+				if top, _ := hi["numerator"].(float64); top != -80 {
+					return
+				}
+				ordered++
+				numerator, _ := lo["numerator"].(float64)
+				if precision, has := lo["precision"].(float64); has && precision == 0 {
+					t.Errorf("seed %d, %s: lower bound %v/%v has precision 0, but its side admits one that needs no whole number", seed, path, lo["numerator"], lo["denominator"])
+				}
+				if numerator == math.Trunc(numerator) {
+					t.Errorf("seed %d, %s: lower bound numerator %v is a whole number, want the upper bound's real one", seed, path, numerator)
+				}
+			})
+		}
+		if ordered == 0 {
+			t.Fatal("no pair was put in order, so nothing was checked")
+		}
+	})
+}
+
+// TestREQ107_ProportionIntervalLeavesAPairWhoseAdoptionOverflows is the
+// REQ-107 check (Output, Intervals) that a pair no finite replacement puts
+// in order is left as generated: the lower bound has no low end, so it
+// would take the upper bound's ratio over its own denominator 1e10, a
+// numerator of -1e310 that float64 cannot hold. The pair stays as the walk
+// wrote it, which canjson.Marshal accepts, with the upper bound's -1e300
+// over 1 and a finite lower numerator over 1e10.
+func TestREQ107_ProportionIntervalLeavesAPairWhoseAdoptionOverflows(t *testing.T) {
+	r, closed, noEnd := instance.RealRange, instance.Closed, instance.NoEnd
+	ratio := instance.IntList(0)
+	lower := instance.ProportionKindBoundOver(r(noEnd, closed(0)), instance.RealList(1e10), ratio, "")
+	upper := instance.ProportionKindBoundOver(instance.RealList(-1e300), instance.RealList(1), ratio, "")
+	eachProportionIntervalRun(t, lower, upper, instance.RandomFill, func(t *testing.T, docs []any) {
+		compared := 0
+		for seed, doc := range docs {
+			walkIntervals(doc, "", func(path string, iv map[string]any) {
+				lo, hi, ok := boundedPair(iv)
+				if !ok {
+					return
+				}
+				compared++
+				if n, _ := lo["numerator"].(float64); math.IsInf(n, 0) || math.IsNaN(n) || lo["denominator"] != 1e10 {
+					t.Errorf("seed %d, %s: lower bound %v/%v, want a finite numerator over 1e10 as generated", seed, path, lo["numerator"], lo["denominator"])
+				}
+				if hi["numerator"] != -1e300 || hi["denominator"] != 1.0 {
+					t.Errorf("seed %d, %s: upper bound %v/%v, want -1e300/1 as generated", seed, path, hi["numerator"], hi["denominator"])
+				}
+			})
+		}
+		if compared == 0 {
+			t.Fatal("no bounded DV_INTERVAL generated, so nothing was checked")
+		}
+	})
+}
+
+// TestREQ107_ProportionIntervalOrderingWritesNoPrecisionBelowTheFloor is
+// the REQ-107 check (Output, Intervals) that putting a pair in order never
+// gives a bound a precision the RM floor rejects (DV_PROPORTION precision
+// at least -1, REQ-112) where the walk did not draw it. The lower side
+// lists the precisions 0 and -2 and the numerators 0.5 to 10, the upper
+// side the numerators 0 to 0.7, so the lower bound is in order only up to
+// 0.7, which precision 0 cannot hold: the one precision that would put the
+// pair in order is -2, and the pair stays as generated. ExampleFill draws
+// the first precision the lower side lists, 0, so a -2 in the output is the
+// ordering's.
+func TestREQ107_ProportionIntervalOrderingWritesNoPrecisionBelowTheFloor(t *testing.T) {
+	r, closed := instance.RealRange, instance.Closed
+	ratio := instance.IntList(0)
+	lower := instance.ProportionKindBound(r(closed(0.5), closed(10)), ratio, instance.RequiredPrecision(instance.IntList(0, -2)))
+	upper := instance.ProportionKindBound(r(closed(0), closed(0.7)), ratio, instance.RequiredPrecision(instance.IntList(2)))
+	eachProportionIntervalRun(t, lower, upper, instance.ExampleFill, func(t *testing.T, docs []any) {
+		compared := 0
+		for seed, doc := range docs {
+			walkIntervals(doc, "", func(path string, iv map[string]any) {
+				lo, hi, ok := boundedPair(iv)
+				if !ok {
+					return
+				}
+				compared++
+				for _, bound := range []map[string]any{lo, hi} {
+					if precision, has := bound["precision"].(float64); has && precision < -1 {
+						t.Errorf("seed %d, %s: bound %v/%v has precision %v, below the RM floor's -1", seed, path, bound["numerator"], bound["denominator"], precision)
+					}
+				}
+			})
+		}
+		if compared == 0 {
+			t.Fatal("no bounded DV_INTERVAL generated, so nothing was checked")
+		}
+	})
 }

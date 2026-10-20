@@ -36,26 +36,38 @@ import (
 //   - the two bounds swapped, which keeps the values RandomFill drew;
 //   - the lowest value the lower side's constraint accepts, with the
 //     highest value the upper side's constraint accepts. A side whose
-//     constraint has no end in that direction uses the other side's
-//     current bound instead, which a range open that way accepts. At an
-//     exclusive real end the accepted extreme is the nearest float64
-//     inside it, and for a proportion that needs whole numbers the nearest
-//     whole number inside it.
+//     constraint has no end in that direction takes the other side's
+//     current bound instead, which a range open that way accepts; a
+//     proportion side that has no usable end there, whether its range is
+//     open or its type, denominator or precision rules the end out, takes
+//     that bound's ratio on its own denominator (proportionAdopt). At an exclusive real end the accepted extreme is
+//     the nearest float64 inside it, and for a proportion that needs whole
+//     numbers the nearest whole number it accepts.
 //
-// A proportion bound's precision moves with its numerator and
-// denominator, and a pair fits a side only where that side's constraint
-// on precision admits the precision it brings, so every bound written
-// keeps the whole numbers its precision needs. An ordinal bound the
-// second pair replaces takes the symbol its side lists for the new value,
-// with the text of a local code's term in lang (useLocalTermText), as the
-// walk writes it.
+// In a swap a proportion bound's precision moves with its numerator and
+// denominator, which were settled under it. In the second pair each
+// proportion bound keeps its type and denominator and takes a precision
+// its own side admits, one that needs no more whole numbers than its type
+// does wherever the side admits one (proportionPrecision), so its
+// numerator is rounded only where its type, or every precision its side
+// admits, needs whole numbers. A pair fits a side only where that side's
+// constraint on precision admits the precision of its bound, so every
+// bound written keeps the whole numbers its precision needs. An ordinal
+// bound the second pair replaces takes the symbol its side lists for the
+// new value, with the text of a local code's term in lang
+// (useLocalTermText), as the walk writes it.
 //
-// These constraints are one-dimensional, so an in-order pair exists only if
-// the second pair is in order. When it is not, the two sides' constraints
-// admit no ordered interval at all. The generator has no error for a
-// constraint it cannot satisfy (sampleValue, for one, falls back to the
-// example value without a signal), so the bounds are then left as they
-// are, and the interval breaks Limits_consistent.
+// So for a count, a quantity, an ordinal or a proportion the second pair
+// holds each side's extreme, over its precision too for a proportion, and
+// on a side with no end that way a value at the other side's current
+// bound, which the other side's extreme does not pass. An in-order pair
+// therefore exists only if the second pair is in order: for a proportion,
+// among the pairs that keep each bound's type and denominator. When it is
+// not, the two sides' constraints admit no such ordered interval. The
+// generator has no error for a constraint it cannot satisfy (sampleValue,
+// for one, falls back to the example value without a signal), so the
+// bounds are then left as they are, and the interval breaks
+// Limits_consistent.
 func orderIntervalBounds(optNode *tcimpl.CompiledNode, rmValue any, lang string) {
 	switch iv := rmValue.(type) {
 	case *rm.DVInterval[rm.DVCount]:
@@ -170,6 +182,21 @@ type scale[K any] struct {
 	// bound node accepts, in the units of like where units apply, and false
 	// when its constraint has no end in that direction.
 	lowest, highest func(node *tcimpl.CompiledNode, like K) (K, bool)
+	// adopt returns the value a side takes where lowest (low) or highest
+	// gave none: one at other, the other side's current bound, where like
+	// is the side's own bound. It chooses only what a value may choose for
+	// itself, as proportionAdopt does a precision its side admits; whether
+	// the side's bound node accepts the rest is for fits. It returns false
+	// when there is none. A nil adopt takes other as it is.
+	adopt func(node *tcimpl.CompiledNode, like, other K, low bool) (K, bool)
+}
+
+// adopted is s.adopt, or other where s has no adopt.
+func (s scale[K]) adopted(node *tcimpl.CompiledNode, like, other K, low bool) (K, bool) {
+	if s.adopt == nil {
+		return other, true
+	}
+	return s.adopt(node, like, other, low)
 }
 
 // orderPair returns an in-order replacement for the inverted pair
@@ -186,15 +213,15 @@ func orderPair[K any](lower, upper K, lowerNode, upperNode *tcimpl.CompiledNode,
 	if fitsInOrder(upper, lower) {
 		return upper, lower, true
 	}
-	lo, ok := s.lowest(lowerNode, lower)
-	if !ok {
-		lo = upper
+	lo, loOK := s.lowest(lowerNode, lower)
+	if !loOK {
+		lo, loOK = s.adopted(lowerNode, lower, upper, true)
 	}
-	hi, ok := s.highest(upperNode, upper)
-	if !ok {
-		hi = lower
+	hi, hiOK := s.highest(upperNode, upper)
+	if !hiOK {
+		hi, hiOK = s.adopted(upperNode, upper, lower, false)
 	}
-	if fitsInOrder(lo, hi) {
+	if loOK && hiOK && fitsInOrder(lo, hi) {
 		return lo, hi, true
 	}
 	return lower, upper, false
@@ -500,14 +527,12 @@ func isoShape(s string) string {
 // denominator is zero. precision is the bound's precision, nil when it has
 // none: it moves with the numerator and the denominator, which were
 // settled under it, so a swap cannot put a number that is not whole on a
-// bound of precision 0. whole records whether the key needs whole numbers
-// (wholeOperands); it is not written back.
+// bound of precision 0.
 type proportionKey struct {
 	numerator   float64
 	denominator float64
 	kind        int64
 	precision   *rm.Integer
-	whole       bool
 }
 
 func proportionKeyOf(p rm.DVProportion) proportionKey {
@@ -515,7 +540,6 @@ func proportionKeyOf(p rm.DVProportion) proportionKey {
 		numerator:   float64(p.Numerator),
 		denominator: float64(p.Denominator),
 		kind:        int64(p.Type),
-		whole:       wholeOperands(int64(p.Type), p.Precision),
 	}
 	if p.Precision != nil {
 		k.precision = new(*p.Precision)
@@ -537,31 +561,38 @@ func setProportionKey(p *rm.DVProportion, k proportionKey) {
 
 // proportionScale orders DV_PROPORTION bounds by numerator/denominator
 // when their types match. The extreme replacement keeps the bound's type
-// and denominator and moves the numerator to the end its C_REAL accepts,
-// which is the low or high ratio while that denominator stays positive.
-// A negative denominator reverses which numerator end is the low ratio.
-// A bound that needs whole numbers, as a fraction does, takes the whole
-// number nearest that end inside the range, so the replacement keeps the
-// rules of its kind (settleProportion).
+// and denominator, takes a precision its side admits (proportionPrecision)
+// and moves the numerator to the end its C_REAL accepts, which is the low
+// or high ratio while that denominator stays positive. A negative
+// denominator reverses which numerator end is the low ratio. A bound that
+// needs whole numbers, as a fraction or a bound of precision 0 does, takes
+// the whole number nearest that end its C_REAL accepts, so the
+// replacement keeps the rules of its kind (settleProportion). Where
+// proportionEnd gives a side no bound, for whatever reason, the side takes
+// the other bound's ratio on its own type and denominator instead
+// (proportionAdopt), kept only where its constraints accept the result.
 var proportionScale = scale[proportionKey]{
-	compare: func(a, b proportionKey) (int, bool) {
-		if a.kind != b.kind {
-			return 0, false
-		}
-		ra, aOK := proportionRatio(a)
-		rb, bOK := proportionRatio(b)
-		if !aOK || !bOK {
-			return 0, false
-		}
-		return compareOrdered(ra, rb), true
-	},
-	fits: proportionFits,
+	compare: compareProportions,
+	fits:    proportionFits,
 	lowest: func(node *tcimpl.CompiledNode, like proportionKey) (proportionKey, bool) {
 		return proportionEnd(node, like, true)
 	},
 	highest: func(node *tcimpl.CompiledNode, like proportionKey) (proportionKey, bool) {
 		return proportionEnd(node, like, false)
 	},
+	adopt: proportionAdopt,
+}
+
+func compareProportions(a, b proportionKey) (int, bool) {
+	if a.kind != b.kind {
+		return 0, false
+	}
+	ra, aOK := proportionRatio(a)
+	rb, bOK := proportionRatio(b)
+	if !aOK || !bOK {
+		return 0, false
+	}
+	return compareOrdered(ra, rb), true
 }
 
 func proportionRatio(k proportionKey) (float64, bool) {
@@ -602,37 +633,109 @@ func componentFits(node *tcimpl.CompiledNode, v any) bool {
 }
 
 // proportionEnd returns the lowest (low) or highest ratio a side accepts
-// while keeping like's type, denominator and precision, with a whole
-// numerator where like needs whole numbers. It returns false when the numerator constraint
-// has no end in the direction that moves the ratio that way, or no whole
-// number at that end where one is needed, or when like itself does not
-// fit.
+// while keeping like's type and denominator, with the precision
+// proportionPrecision gives and a whole numerator where that precision or
+// the type needs whole numbers. It returns false when the numerator
+// constraint has no end in the direction that moves the ratio that way,
+// or no whole number toward that end where one is needed, or when the
+// side does not admit like's type or denominator, or admits no precision.
 func proportionEnd(node *tcimpl.CompiledNode, like proportionKey, low bool) (proportionKey, bool) {
 	if like.denominator == 0 || !componentFits(bindingChild(node, "type"), like.kind) || !componentFits(bindingChild(node, "denominator"), like.denominator) {
+		return proportionKey{}, false
+	}
+	precision, ok := proportionPrecision(node, like)
+	if !ok {
 		return proportionKey{}, false
 	}
 	numLow := low
 	if like.denominator < 0 {
 		numLow = !low
 	}
-	numerator := bindingChild(node, "numerator")
-	n, ok := realEnd(numerator, numLow)
+	n, ok := realEndOf(bindingChild(node, "numerator"), numLow, wholeOperands(like.kind, precision))
 	if !ok {
 		return proportionKey{}, false
 	}
-	if like.whole {
-		// The nearest whole number inside the range: up from its low end,
-		// down from its high end.
-		if numLow {
-			n = math.Ceil(n)
-		} else {
-			n = math.Floor(n)
-		}
-		if !componentFits(numerator, n) {
-			return proportionKey{}, false
+	return proportionKey{numerator: n, denominator: like.denominator, kind: like.kind, precision: precision}, true
+}
+
+// proportionPrecision returns the precision a bound of like's type takes
+// where the second pair of orderIntervalBounds rewrites it on node's
+// side, like being the bound that side drew, and false when node admits
+// none. It tries like's own precision, none, the members of the C_INTEGER
+// on precision, 1 and -1, in that order, and takes the first node admits
+// that needs no more whole numbers than the type does, so the numerator
+// need not be rounded. Only where node admits no such precision does it
+// take the first node admits, which is then 0. It never takes a precision
+// below -1, which the RM floor rejects (-1 is no limit).
+func proportionPrecision(node *tcimpl.CompiledNode, like proportionKey) (*rm.Integer, bool) {
+	candidates := []*rm.Integer{like.precision, nil}
+	if c, ok := primitiveOf(bindingChild(node, "precision")).(constraints.CInteger); ok {
+		for _, p := range c.List {
+			candidates = append(candidates, new(rm.Integer(p)))
 		}
 	}
-	return proportionKey{numerator: n, denominator: like.denominator, kind: like.kind, precision: like.precision, whole: like.whole}, true
+	candidates = append(candidates, new(rm.Integer(1)), new(rm.Integer(-1)))
+	typeWhole := wholeOperands(like.kind, nil)
+	for _, rounded := range []bool{false, true} {
+		for _, p := range candidates {
+			if p != nil && *p < -1 {
+				continue
+			}
+			if (rounded || wholeOperands(like.kind, p) == typeWhole) && precisionFits(node, p) {
+				return p, true
+			}
+		}
+	}
+	return nil, false
+}
+
+// proportionAdopt returns the bound a side takes at other, the other
+// side's current bound, where proportionEnd gave it none, low naming the
+// lower side: like's type and denominator, the precision
+// proportionPrecision gives, and the numerator that puts its ratio at
+// other's. Where that precision or the type needs whole numbers, the
+// numerator is the whole number next to that one on the side's own side of
+// other, down for the lower side over a positive denominator. float64 can
+// leave the ratio just past other's where the two denominators differ, so
+// the numerator then steps back toward the side's own side, at most four
+// times, until it is not: each time by one float64 step, which is then
+// rounded to a whole number where whole numbers are needed. It returns
+// false when node admits no precision or the numerator is not a finite
+// number. It does not check that the rest suits node, which the caller
+// does.
+func proportionAdopt(node *tcimpl.CompiledNode, like, other proportionKey, low bool) (proportionKey, bool) {
+	precision, ok := proportionPrecision(node, like)
+	if !ok {
+		return proportionKey{}, false
+	}
+	k := proportionKey{numerator: other.numerator, denominator: like.denominator, kind: like.kind, precision: precision}
+	if like.denominator != other.denominator {
+		k.numerator = other.numerator * like.denominator / other.denominator
+	}
+	// A lower numerator lowers the ratio over a positive denominator.
+	round, away := math.Ceil, math.Inf(1)
+	if low == (like.denominator > 0) {
+		round, away = math.Floor, math.Inf(-1)
+	}
+	whole := wholeOperands(like.kind, precision)
+	if whole {
+		k.numerator = round(k.numerator)
+	}
+	for range 4 {
+		if c, ok := compareProportions(k, other); !ok || (low && c <= 0) || (!low && c >= 0) {
+			break
+		}
+		k.numerator = math.Nextafter(k.numerator, away)
+		if whole {
+			k.numerator = round(k.numerator)
+		}
+	}
+	// A numerator that overflowed float64 is no bound: canonical JSON has no
+	// infinity, so the pair stays as generated.
+	if math.IsInf(k.numerator, 0) || math.IsNaN(k.numerator) {
+		return proportionKey{}, false
+	}
+	return k, true
 }
 
 // realEnd returns the lowest (low) or highest value a C_REAL accepts:
@@ -641,6 +744,14 @@ func proportionEnd(node *tcimpl.CompiledNode, like proportionKey, low bool) (pro
 // returns false when there is no such constraint, or when the constraint
 // has no end in that direction.
 func realEnd(node *tcimpl.CompiledNode, low bool) (float64, bool) {
+	return realEndOf(node, low, false)
+}
+
+// realEndOf is realEnd, among whole numbers only where whole says so: the
+// extreme whole list entry, or the whole number nearest the range's end
+// inside it, up from its low end and down from its high end. It returns
+// false where there is no such number.
+func realEndOf(node *tcimpl.CompiledNode, low, whole bool) (float64, bool) {
 	c, ok := primitiveOf(node).(constraints.CReal)
 	if !ok {
 		return 0, false
@@ -649,7 +760,7 @@ func realEnd(node *tcimpl.CompiledNode, low bool) (float64, bool) {
 		var end float64
 		found := false
 		for _, n := range c.List {
-			if len(c.Validate(n)) != 0 {
+			if len(c.Validate(n)) != 0 || (whole && math.Trunc(n) != n) {
 				continue
 			}
 			if !found || (low && n < end) || (!low && n > end) {
@@ -659,23 +770,32 @@ func realEnd(node *tcimpl.CompiledNode, low bool) (float64, bool) {
 		return end, found
 	}
 	r := c.Range
+	var m float64
 	switch {
 	case !r.IsBounded():
 		return 0, false
 	case low && !r.LowerUnbounded:
-		m := r.Lower
+		m = r.Lower
 		if !r.LowerInclusive {
 			m = math.Nextafter(m, math.Inf(1))
 		}
-		return m, true
 	case !low && !r.UpperUnbounded:
-		m := r.Upper
+		m = r.Upper
 		if !r.UpperInclusive {
 			m = math.Nextafter(m, math.Inf(-1))
 		}
+	default:
+		return 0, false
+	}
+	if !whole {
 		return m, true
 	}
-	return 0, false
+	if low {
+		m = math.Ceil(m)
+	} else {
+		m = math.Floor(m)
+	}
+	return m, len(c.Validate(m)) == 0
 }
 
 // ordinalKey is the part of a DV_ORDINAL bound that is compared and
