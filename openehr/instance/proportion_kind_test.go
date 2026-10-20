@@ -685,3 +685,40 @@ func TestREQ107_ProportionIntervalLeavesAPairWhoseAdoptionOverflows(t *testing.T
 		}
 	})
 }
+
+// TestREQ107_ProportionIntervalOrderingWritesNoPrecisionBelowTheFloor is
+// the REQ-107 check (Output, Intervals) that putting a pair in order never
+// gives a bound a precision the RM floor rejects (DV_PROPORTION precision
+// at least -1, REQ-112) where the walk did not draw it. The lower side
+// lists the precisions 0 and -2 and the numerators 0.5 to 10, the upper
+// side the numerators 0 to 0.7, so the lower bound is in order only up to
+// 0.7, which precision 0 cannot hold: the one precision that would put the
+// pair in order is -2, and the pair stays as generated. ExampleFill draws
+// the first precision the lower side lists, 0, so a -2 in the output is the
+// ordering's.
+func TestREQ107_ProportionIntervalOrderingWritesNoPrecisionBelowTheFloor(t *testing.T) {
+	r, closed := instance.RealRange, instance.Closed
+	ratio := instance.IntList(0)
+	lower := instance.ProportionKindBound(r(closed(0.5), closed(10)), ratio, instance.RequiredPrecision(instance.IntList(0, -2)))
+	upper := instance.ProportionKindBound(r(closed(0), closed(0.7)), ratio, instance.RequiredPrecision(instance.IntList(2)))
+	eachProportionIntervalRun(t, lower, upper, instance.ExampleFill, func(t *testing.T, docs []any) {
+		compared := 0
+		for seed, doc := range docs {
+			walkIntervals(doc, "", func(path string, iv map[string]any) {
+				lo, hi, ok := boundedPair(iv)
+				if !ok {
+					return
+				}
+				compared++
+				for _, bound := range []map[string]any{lo, hi} {
+					if precision, has := bound["precision"].(float64); has && precision < -1 {
+						t.Errorf("seed %d, %s: bound %v/%v has precision %v, below the RM floor's -1", seed, path, bound["numerator"], bound["denominator"], precision)
+					}
+				}
+			})
+		}
+		if compared == 0 {
+			t.Fatal("no bounded DV_INTERVAL generated, so nothing was checked")
+		}
+	})
+}
