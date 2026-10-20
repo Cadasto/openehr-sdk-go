@@ -1317,7 +1317,10 @@ requirements:
       - openehr/validation/issuepath_test.go
       - openehr/validation/multi_nonlocatable_test.go
       - openehr/validation/ordinal_symbol_test.go
+      - openehr/validation/pointer_primitive_census_internal_test.go
+      - openehr/validation/pointer_primitive_test.go
       - openehr/validation/primitive_empty_part_test.go
+      - openehr/validation/primitive_input_test.go
       - openehr/validation/prohibited_test.go
       - openehr/validation/rmfloor_chained_corpus_test.go
       - openehr/validation/rmfloor_chained_internal_test.go
@@ -1443,6 +1446,7 @@ requirements:
       - openehr/composition/builder_defaults_test.go
       - openehr/composition/optional_content_test.go
       - openehr/composition/skeleton_policy_test.go
+      - openehr/composition/text_language_test.go
       - openehr/instance/accessors_test.go
       - openehr/instance/allowed_alternative_test.go
       - openehr/instance/archetype_identity_test.go
@@ -1461,6 +1465,7 @@ requirements:
       - openehr/instance/composer_option_test.go
       - openehr/instance/constrained_datetime_test.go
       - openehr/instance/contract_inputs_test.go
+      - openehr/instance/data_value_attributes_test.go
       - openehr/instance/element_rule_test.go
       - openehr/instance/element_slot_test.go
       - openehr/instance/entry_codes_test.go
