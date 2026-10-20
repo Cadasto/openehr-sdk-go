@@ -1511,6 +1511,7 @@ requirements:
       - openehr/instance/string_leaf_internal_test.go
       - openehr/instance/string_leaf_test.go
       - openehr/instance/uncarried_mandatory_test.go
+      - openehr/instance/undescribed_content_test.go
       - openehr/instance/valuefill_leaves_test.go
       - openehr/instance/valuefill_test.go
       - openehr/instance/visit_rules_test.go
@@ -1521,6 +1522,7 @@ requirements:
       - openehr/validation/binding_by_name_test.go
       - openehr/validation/constraint_fixtures_test.go
       - openehr/validation/inventory_dispatch_internal_test.go
+      - openehr/validation/issuepath_test.go
       - openehr/validation/optional_string_test.go
       - openehr/validation/subtype_conformance_corpus_test.go
       - openehr/validation/subtype_conformance_test.go
@@ -1532,6 +1534,7 @@ requirements:
       - testkit/probes/instance/probes_test.go
       - testkit/probes/instance/ratchet_categories_test.go
       - testkit/probes/instance/t_archetype_root_test.go
+      - testkit/probes/instance/undescribed_census_test.go
       - testkit/probes/template/constraint_fixtures_test.go
 
   - id: REQ-108
