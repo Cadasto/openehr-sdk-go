@@ -2505,21 +2505,23 @@ func useGroupRubric(opt *tcimpl.CompiledNode, attrName string, v *rm.DVCodedText
 }
 
 // useLocalTermText sets the text of v, a coded text the walk built under
-// node, to the text of the term node's archetype defines for its code,
-// when that code is in terminology local and is not the placeholder at0000
-// (noCode), and node admits that text (takeText). The term is the one
-// CompiledNode.Term resolves in lang: an OPT carries one document
-// language, whose term a language it has no translation for gets too. A
-// code its archetype defines no term for keeps its text, as does a code in
-// any other terminology. For an ordinal's symbol node is the C_DV_ORDINAL,
-// which constrains the symbol's code and not its text. A nil node leaves v
-// alone.
+// node, to the text of the term node's own archetype, its nearest
+// enclosing archetype root, defines for its code, when that code is in
+// terminology local and is not the placeholder at0000 (noCode), and node
+// admits that text (takeText). The term is the one CompiledNode.RootTerm
+// resolves in lang: an OPT carries one document language, whose term a
+// language it has no translation for gets too. A code its own archetype
+// defines no term for keeps its text, even where an enclosing archetype
+// defines the same code, since that term names another concept; so does a
+// code in any other terminology. For an ordinal's symbol node is the
+// C_DV_ORDINAL, which constrains the symbol's code and not its text. A nil
+// node leaves v alone.
 func useLocalTermText(node *tcimpl.CompiledNode, v *rm.DVCodedText, lang string) {
 	code := v.DefiningCode
 	if node == nil || code.TerminologyID.Value != "local" || noCode(code.CodeString) {
 		return
 	}
-	term, ok := node.Term(code.CodeString, lang)
+	term, ok := node.RootTerm(code.CodeString, lang)
 	if text := term.Items["text"]; ok && text != "" {
 		takeText(node, v, text)
 	}
