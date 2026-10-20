@@ -54,7 +54,7 @@ func TestPrimitiveInput_Integer64Magnitude(t *testing.T) {
 // pointer as wrong_type.
 func TestPrimitiveInput_REQ102_PointerHeldPrimitive(t *testing.T) {
 	t.Parallel()
-	flag, integer, integer64, number := true, rm.Integer(2), rm.Integer64(2), rm.Real(0.5)
+	flag, integer, number := true, rm.Integer(2), rm.Real(0.5)
 	tests := []struct {
 		in   any
 		want any
@@ -62,7 +62,6 @@ func TestPrimitiveInput_REQ102_PointerHeldPrimitive(t *testing.T) {
 	}{
 		{in: &flag, want: true, pc: constraints.CBoolean{TrueValid: true}},
 		{in: &integer, want: int64(2), pc: constraints.CInteger{}},
-		{in: &integer64, want: int64(2), pc: constraints.CInteger{}},
 		{in: &number, want: float64(0.5), pc: constraints.CReal{}},
 	}
 	for _, tc := range tests {

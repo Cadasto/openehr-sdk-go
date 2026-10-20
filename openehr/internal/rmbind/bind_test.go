@@ -45,14 +45,13 @@ func TestREQ107_STRINGPrimitiveMatchesOptionalPointer(t *testing.T) {
 // matches nothing.
 func TestREQ102_PrimitivePointerMatchesAsItsValue(t *testing.T) {
 	t.Parallel()
-	flag, integer, integer64, number := true, rm.Integer(2), rm.Integer64(2), rm.Real(0.5)
+	flag, integer, number := true, rm.Integer(2), rm.Real(0.5)
 	tests := []struct {
 		short, other string
 		set, none    any
 	}{
 		{short: "BOOLEAN", other: "INTEGER", set: &flag, none: (*bool)(nil)},
 		{short: "INTEGER", other: "BOOLEAN", set: &integer, none: (*rm.Integer)(nil)},
-		{short: "INTEGER", other: "BOOLEAN", set: &integer64, none: (*rm.Integer64)(nil)},
 		{short: "REAL", other: "INTEGER", set: &number, none: (*rm.Real)(nil)},
 	}
 	for _, tc := range tests {

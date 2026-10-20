@@ -310,10 +310,9 @@ func collapsedIntervalBounds(val any) (bounds []rm.DVOrdered, ok bool) {
 // a primitive type: a bool under BOOLEAN, an integer under INTEGER (a Go
 // integer, an rm.Integer or an rm.Integer64, as [rm.AsInt64] reads them), a
 // real under REAL, a string under DATE, TIME, DATE_TIME and DURATION, and a
-// string or a non-nil *string under STRING. An optional Boolean, Integer,
-// Integer64 or Real the RM holds by pointer matches as the value it points
-// to ([PrimitiveValue]); a nil one is an absent attribute and matches
-// nothing.
+// string or a non-nil *string under STRING. An optional Boolean, Integer or
+// Real the RM holds by pointer matches as the value it points to
+// ([PrimitiveValue]); a nil one is an absent attribute and matches nothing.
 func PrimitiveValueMatchesShortName(shortName string, val any) bool {
 	val = PrimitiveValue(val)
 	switch shortName {
@@ -342,19 +341,19 @@ func PrimitiveValueMatchesShortName(shortName string, val any) bool {
 }
 
 // PrimitiveValue returns the value of val, an optional primitive attribute
-// the RM holds by pointer: what a *bool, *rm.Integer, *rm.Integer64 or
-// *rm.Real that is not nil points to (DV_QUANTITY.precision,
-// DV_AMOUNT.accuracy and accuracy_is_percent, INTERVAL_EVENT.sample_count).
-// A nil one is an absent attribute and comes back as nil. Any other val,
-// a *string included, comes back as it is: an optional String matches
-// STRING alone, which [PrimitiveValueMatchesShortName] decides itself.
+// the RM holds by pointer: what a *bool, *rm.Integer or *rm.Real that is not
+// nil points to (DV_QUANTITY.precision, DV_AMOUNT.accuracy and
+// accuracy_is_percent, INTERVAL_EVENT.sample_count). These are the pointer
+// types the RM's primitive fields have, a *string apart; a test keeps the
+// two in step. A nil one is an absent attribute and comes back as nil. Any
+// other val, a *string included, comes back as it is: an optional String
+// matches STRING alone, which [PrimitiveValueMatchesShortName] decides
+// itself.
 func PrimitiveValue(val any) any {
 	switch p := val.(type) {
 	case *bool:
 		return pointee(p)
 	case *rm.Integer:
-		return pointee(p)
-	case *rm.Integer64:
 		return pointee(p)
 	case *rm.Real:
 		return pointee(p)
