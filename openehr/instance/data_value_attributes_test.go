@@ -416,6 +416,22 @@ func TestREQ107_QuantifiedAttributesAreWritten(t *testing.T) {
 			},
 		},
 		{
+			name:  "DV_PROPORTION magnitude_status",
+			value: optNode("DV_PROPORTION", "", optSingle("magnitude_status", guardString("~"))),
+			check: func(t *testing.T, out any) {
+				t.Helper()
+				checkHeldString(t, "DV_PROPORTION.magnitude_status", dvValue[*rm.DVProportion](t, out).MagnitudeStatus, "~")
+			},
+		},
+		{
+			name:  "DV_PROPORTION magnitude_status named with no child",
+			value: optNode("DV_PROPORTION", "", optSingle("magnitude_status")),
+			check: func(t *testing.T, out any) {
+				t.Helper()
+				checkHeldString(t, "DV_PROPORTION.magnitude_status", dvValue[*rm.DVProportion](t, out).MagnitudeStatus, "=")
+			},
+		},
+		{
 			name:  "DV_COUNT magnitude_status named with no child",
 			value: optNode("DV_COUNT", "", optSingle("magnitude_status")),
 			check: func(t *testing.T, out any) {

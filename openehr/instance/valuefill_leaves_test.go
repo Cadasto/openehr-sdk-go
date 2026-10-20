@@ -1,8 +1,10 @@
 package instance_test
 
 import (
+	"errors"
 	"fmt"
 	mrand "math/rand/v2"
+	"strings"
 	"testing"
 
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
@@ -234,6 +236,100 @@ func TestREQ107_RandomFillDrawsRoutedPrimitiveLeaves(t *testing.T) {
 						t.Errorf("RandomFill leaf took %d distinct values over 8 seeds, want them to vary: it is the constraint's draw, not its example value %v", len(seen), example)
 					}
 				})
+			}
+		}
+	}
+}
+
+// TestREQ107_IntegerLeafIsNarrowedToTheIntegerRange is the REQ-107
+// Precedence 3 check that an RM type limit narrows a value the OPT leaves
+// open: an RM Integer is 32 bits wide, so a C_INTEGER on an Integer attribute
+// (a DV_QUANTITY's precision) whose range reaches past 32 bits is valued from
+// the part of the range inside the Integer range, under ExampleFill and under
+// RandomFill alike, and Generate does not fail where the OPT admits such a
+// value. Where the range and the Integer range share no value, below or above
+// it, Generate returns an error wrapping ErrConstraintUnsatisfiable that says
+// the constraint is outside the 32-bit Integer range. It holds under every
+// policy and both compile modes.
+func TestREQ107_IntegerLeafIsNarrowedToTheIntegerRange(t *testing.T) {
+	const (
+		maxInteger = 1<<31 - 1
+		past       = 5_000_000_000
+		above      = 3_000_000_000
+	)
+	precision := func(lower, upper int) string {
+		return optNode("DV_QUANTITY", "", optSingle("precision",
+			optPrimitive("INTEGER", "C_INTEGER", "<range>"+optInterval(lower, upper)+"</range>")))
+	}
+	generate := func(t *testing.T, c *templatecompile.Compiled, policy instance.Policy, fill instance.ValueFill, seed uint64) (any, error) {
+		t.Helper()
+		return instance.Generate(t.Context(), c, instance.Options{
+			Policy: policy, Now: defaultsNow, ValueFill: fill, ValueSource: mrand.NewPCG(seed, seed),
+		})
+	}
+	admitted := []struct {
+		name         string
+		value        string
+		lower, upper int64 // the values the OPT and the Integer range share
+	}{
+		{"range past the upper end", precision(0, past), 0, maxInteger},
+		{"range with no upper bound near the upper end", precision(maxInteger-20, -1), maxInteger - 20, maxInteger},
+	}
+	for _, tc := range admitted {
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, optTemplate("ELEMENT", optSingle("value", tc.value)), implicit)
+			for _, policy := range everyPolicy {
+				for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
+					t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, policy, fill), func(t *testing.T) {
+						seen := map[rm.Integer]bool{}
+						for seed := range uint64(8) {
+							out, err := generate(t, c, policy, fill, seed)
+							if err != nil {
+								t.Fatalf("Generate(seed %d): %v, want a root: the OPT admits values inside the Integer range", seed, err)
+							}
+							q := out.(*rm.Element).Value.(*rm.DVQuantity)
+							if q.Precision == nil || int64(*q.Precision) < tc.lower || int64(*q.Precision) > tc.upper {
+								t.Fatalf("DV_QUANTITY.precision = %v (seed %d), want a value within %d..%d", q.Precision, seed, tc.lower, tc.upper)
+							}
+							seen[*q.Precision] = true
+							checkValid(t, out, c)
+						}
+						if fill == instance.RandomFill && len(seen) < 2 {
+							t.Errorf("precision took %d distinct values over 8 seeds, want them to vary", len(seen))
+						}
+					})
+				}
+			}
+		}
+	}
+
+	refused := []struct {
+		name  string
+		value string
+	}{
+		{"range above the Integer range", precision(above, past)},
+		{"range below the Integer range", precision(-past, -above)},
+	}
+	for _, tc := range refused {
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, optTemplate("ELEMENT", optSingle("value", tc.value)), implicit)
+			for _, policy := range everyPolicy {
+				for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {
+					t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, policy, fill), func(t *testing.T) {
+						out, err := generate(t, c, policy, fill, 1)
+						if err == nil {
+							t.Fatalf("Generate = %T, nil error, want an error: no value of the range is an Integer", out)
+						}
+						if !errors.Is(err, instance.ErrConstraintUnsatisfiable) {
+							t.Errorf("Generate error = %v, want one wrapping ErrConstraintUnsatisfiable", err)
+						}
+						for _, want := range []string{"DV_QUANTITY.precision", "32-bit Integer range"} {
+							if !strings.Contains(err.Error(), want) {
+								t.Errorf("Generate error = %q, want it to say %q", err, want)
+							}
+						}
+					})
+				}
 			}
 		}
 	}

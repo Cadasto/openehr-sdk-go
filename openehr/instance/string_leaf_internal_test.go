@@ -97,6 +97,7 @@ func TestREQ107_StringLeafWritesTheNamedAttribute(t *testing.T) {
 		{"DV_IDENTIFIER.type", &rm.DVIdentifier{}, "type", func(v any) string { return deref(v.(*rm.DVIdentifier).Type) }},
 		{"DV_MULTIMEDIA.alternate_text", &rm.DVMultimedia{}, "alternate_text", func(v any) string { return deref(v.(*rm.DVMultimedia).AlternateText) }},
 		{"DV_QUANTITY.magnitude_status", &rm.DVQuantity{}, "magnitude_status", func(v any) string { return deref(v.(*rm.DVQuantity).MagnitudeStatus) }},
+		{"DV_PROPORTION.magnitude_status", &rm.DVProportion{}, "magnitude_status", func(v any) string { return deref(v.(*rm.DVProportion).MagnitudeStatus) }},
 		{"CODE_PHRASE.preferred_term", &rm.CodePhrase{}, "preferred_term", func(v any) string { return deref(v.(*rm.CodePhrase).PreferredTerm) }},
 	}
 	for _, tc := range cases {
