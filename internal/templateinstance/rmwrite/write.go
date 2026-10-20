@@ -604,12 +604,7 @@ func writeEventContextSingle(c *rm.EventContext, attr string, child any) error {
 		c.EndTime = v
 		return nil
 	case "location":
-		v, ok := child.(*string)
-		if !ok {
-			return mismatch(attr, child, "String")
-		}
-		c.Location = v
-		return nil
+		return assignVia(child, func(v string) { c.Location = &v }, attr, "String")
 	case "health_care_facility":
 		// PARTY_IDENTIFIED or its descendant PARTY_RELATED, stored as given.
 		v, ok := child.(rm.PartyIdentifiedLike)

@@ -181,3 +181,27 @@ func TestREQ101_EnsureSingleWritesConformingSubtype(t *testing.T) {
 		})
 	}
 }
+
+// TestREQ107_EnsureSingleWritesAnEventContextLocation checks that
+// EVENT_CONTEXT location takes a string as a value or as a pointer, like
+// every other optional String attribute, and refuses a nil pointer and a
+// child of another type with ErrTypeMismatch.
+func TestREQ107_EnsureSingleWritesAnEventContextLocation(t *testing.T) {
+	t.Parallel()
+	const ward = "ward A3"
+	for name, child := range map[string]any{"value": ward, "pointer": new(ward)} {
+		c := &rm.EventContext{}
+		if err := EnsureSingle(c, "location", child); err != nil {
+			t.Errorf("EnsureSingle(EVENT_CONTEXT, location, %s) = %v, want nil", name, err)
+			continue
+		}
+		if c.Location == nil || *c.Location != ward {
+			t.Errorf("EVENT_CONTEXT.location after writing a %s = %v, want %q", name, c.Location, ward)
+		}
+	}
+	for _, child := range []any{(*string)(nil), 42, []byte(ward)} {
+		if err := EnsureSingle(&rm.EventContext{}, "location", child); !errors.Is(err, ErrTypeMismatch) {
+			t.Errorf("EnsureSingle(EVENT_CONTEXT, location, %#v) = %v, want ErrTypeMismatch", child, err)
+		}
+	}
+}
