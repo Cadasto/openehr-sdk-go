@@ -182,9 +182,11 @@ type scale[K any] struct {
 	// when its constraint has no end in that direction.
 	lowest, highest func(node *tcimpl.CompiledNode, like K) (K, bool)
 	// adopt returns the value a side takes where lowest (low) or highest
-	// gave none: one at other, the other side's current bound, made to
-	// suit the side's bound node, where like is the side's own bound. It
-	// returns false when there is none. A nil adopt takes other as it is.
+	// gave none: one at other, the other side's current bound, where like
+	// is the side's own bound. It chooses only what a value may choose for
+	// itself, as proportionAdopt does a precision its side admits; whether
+	// the side's bound node accepts the rest is for fits. It returns false
+	// when there is none. A nil adopt takes other as it is.
 	adopt func(node *tcimpl.CompiledNode, like, other K, low bool) (K, bool)
 }
 
@@ -564,9 +566,10 @@ func setProportionKey(p *rm.DVProportion, k proportionKey) {
 // denominator reverses which numerator end is the low ratio. A bound that
 // needs whole numbers, as a fraction or a bound of precision 0 does, takes
 // the whole number nearest that end its C_REAL accepts, so the
-// replacement keeps the rules of its kind (settleProportion). A side
-// whose numerator has no end that way takes the other bound's ratio
-// (proportionAdopt).
+// replacement keeps the rules of its kind (settleProportion). Where
+// proportionEnd gives a side no bound, for whatever reason, the side takes
+// the other bound's ratio on its own type and denominator instead
+// (proportionAdopt), kept only where its constraints accept the result.
 var proportionScale = scale[proportionKey]{
 	compare: compareProportions,
 	fits:    proportionFits,
@@ -685,16 +688,20 @@ func proportionPrecision(node *tcimpl.CompiledNode, like proportionKey) (*rm.Int
 	return nil, false
 }
 
-// proportionAdopt returns the bound a side whose numerator has no end in
-// the direction low names takes at other, the other side's current bound:
-// like's type and denominator, the precision proportionPrecision gives,
-// and the numerator that puts its ratio at other's. Where that precision
-// or the type needs whole numbers, the numerator is the whole number next
-// to that one on the side's own side of other, down for the lower side
-// over a positive denominator. float64 can leave the ratio just past
-// other's where the two denominators differ, so the numerator then steps
-// back toward the side's own side, a few float64 steps at most, until it
-// is not. It returns false when node admits no precision.
+// proportionAdopt returns the bound a side takes at other, the other
+// side's current bound, where proportionEnd gave it none, low naming the
+// lower side: like's type and denominator, the precision
+// proportionPrecision gives, and the numerator that puts its ratio at
+// other's. Where that precision or the type needs whole numbers, the
+// numerator is the whole number next to that one on the side's own side of
+// other, down for the lower side over a positive denominator. float64 can
+// leave the ratio just past other's where the two denominators differ, so
+// the numerator then steps back toward the side's own side, at most four
+// times, until it is not: each time by one float64 step, which is then
+// rounded to a whole number where whole numbers are needed. It returns
+// false when node admits no precision or the numerator is not a finite
+// number. It does not check that the rest suits node, which the caller
+// does.
 func proportionAdopt(node *tcimpl.CompiledNode, like, other proportionKey, low bool) (proportionKey, bool) {
 	precision, ok := proportionPrecision(node, like)
 	if !ok {

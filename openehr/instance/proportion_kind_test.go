@@ -417,8 +417,8 @@ func TestREQ107_ProportionKeepsTheOPTWhereNoKindFits(t *testing.T) {
 // pass. Each case's two numerator ranges overlap, so RandomFill draws the
 // bounds either way round, and each case admits an in-order pair, which
 // the generator writes even where it needs a bound to take a precision
-// other than the one it drew, or a value past the open end of its
-// numerator range, on its own denominator.
+// other than the one it drew, or, where its numerator range has no end that
+// way, the other bound's ratio on its own denominator.
 func TestREQ107_ProportionIntervalBoundsKeepTheirKind(t *testing.T) {
 	count := instance.ReadVendoredOPT(t, instance.CountIntervalOPT)
 	r, closed, noEnd := instance.RealRange, instance.Closed, instance.NoEnd
