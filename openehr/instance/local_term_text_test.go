@@ -15,41 +15,95 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
 
-// templateTerms returns, for each code an OPT defines a term for in any
-// of its archetypes, the texts of those terms.
-func templateTerms(t *testing.T, raw []byte) map[string][]string {
+// archetypeTerms maps an archetype id to the texts of the terms the OPT
+// defines for each code in that archetype: in every archetype root of
+// that id, which an OPT can hold more than once.
+type archetypeTerms map[string]map[string][]string
+
+// templateTerms returns the term texts each archetype root of an OPT
+// defines, by archetype id: the definition and every C_ARCHETYPE_ROOT.
+// A term belongs to the root whose element holds its term_definitions.
+func templateTerms(t *testing.T, raw []byte) archetypeTerms {
 	t.Helper()
-	terms := make(map[string][]string)
+	type root struct {
+		id    string
+		terms map[string][]string
+	}
+	// stack holds one entry per open element: the root it opens, or nil.
+	var stack []*root
+	out := make(archetypeTerms)
 	dec := xml.NewDecoder(bytes.NewReader(raw))
 	for {
 		tok, err := dec.Token()
 		if errors.Is(err, io.EOF) {
-			return terms
+			return out
 		}
 		if err != nil {
 			t.Fatalf("read term definitions: %v", err)
 		}
-		start, ok := tok.(xml.StartElement)
-		if !ok || start.Name.Local != "term_definitions" {
-			continue
-		}
-		var def struct {
-			Code  string `xml:"code,attr"`
-			Items []struct {
-				ID   string `xml:"id,attr"`
-				Text string `xml:",chardata"`
-			} `xml:"items"`
-		}
-		if err := dec.DecodeElement(&def, &start); err != nil {
-			t.Fatalf("decode term definition: %v", err)
-		}
-		for _, item := range def.Items {
-			if item.ID == "text" {
-				code := strings.TrimSpace(def.Code)
-				terms[code] = append(terms[code], strings.TrimSpace(item.Text))
+		switch tok := tok.(type) {
+		case xml.StartElement:
+			var parent *root
+			if len(stack) > 0 {
+				parent = stack[len(stack)-1]
+			}
+			switch {
+			case parent != nil && tok.Name.Local == "archetype_id":
+				var id struct {
+					Value string `xml:"value"`
+				}
+				if err := dec.DecodeElement(&id, &tok); err != nil {
+					t.Fatalf("decode archetype id: %v", err)
+				}
+				parent.id = strings.TrimSpace(id.Value)
+			case parent != nil && tok.Name.Local == "term_definitions":
+				var def struct {
+					Code  string `xml:"code,attr"`
+					Items []struct {
+						ID   string `xml:"id,attr"`
+						Text string `xml:",chardata"`
+					} `xml:"items"`
+				}
+				if err := dec.DecodeElement(&def, &tok); err != nil {
+					t.Fatalf("decode term definition: %v", err)
+				}
+				for _, item := range def.Items {
+					if item.ID == "text" {
+						code := strings.TrimSpace(def.Code)
+						parent.terms[code] = append(parent.terms[code], strings.TrimSpace(item.Text))
+					}
+				}
+			case tok.Name.Local == "definition" || xsiType(tok) == "C_ARCHETYPE_ROOT":
+				stack = append(stack, &root{terms: make(map[string][]string)})
+			default:
+				stack = append(stack, nil)
+			}
+		case xml.EndElement:
+			closed := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			if closed == nil {
+				continue
+			}
+			byCode := out[closed.id]
+			if byCode == nil {
+				byCode = make(map[string][]string)
+				out[closed.id] = byCode
+			}
+			for code, texts := range closed.terms {
+				byCode[code] = append(byCode[code], texts...)
 			}
 		}
 	}
+}
+
+// xsiType is the xsi:type attribute of an element, or "".
+func xsiType(e xml.StartElement) string {
+	for _, a := range e.Attr {
+		if a.Name.Local == "type" {
+			return a.Value
+		}
+	}
+	return ""
 }
 
 // localCode reports whether a coded text's defining code is a local code
@@ -63,38 +117,48 @@ func localCode(c rm.DVCodedText) bool {
 // defaults check, over every vendored template, that each DV_CODED_TEXT
 // the generator writes in terminology local, wherever it sits (an
 // ELEMENT's value, an ordinal's symbol, a locatable's name, an
-// ISM_TRANSITION's careflow step, …), takes the text of the term the OPT
-// defines for its code rather than the open-string example or the code
-// itself, under every policy, both value fills and several fixed seeds. A
-// code the OPT defines no term for is not checked. No vendored OPT limits
-// such a text with a C_STRING that rejects its term.
+// ISM_TRANSITION's careflow step, …), takes the text of the term its own
+// archetype, the nearest enclosing archetype root, defines for its code
+// rather than the open-string example or the code itself, and that a code
+// its own archetype defines no term for takes no other archetype's term
+// text for that code, under every policy, both value fills and several
+// fixed seeds. No vendored OPT limits such a text with a C_STRING that
+// rejects its term.
 func TestREQ107_CorpusLocalCodedTextsTakeTheTermText(t *testing.T) {
-	checked := 0
-	terms := make(map[string]map[string][]string)
+	checked, foreign := 0, 0
+	terms := make(map[string]archetypeTerms)
 	eachCorpusRun(t, func(run corpusRun) {
-		byCode, ok := terms[run.name]
+		byArchetype, ok := terms[run.name]
 		if !ok {
-			byCode = templateTerms(t, run.raw)
-			terms[run.name] = byCode
+			byArchetype = templateTerms(t, run.raw)
+			terms[run.name] = byArchetype
 		}
-		visitRM(run.out, func(path string, c rm.DVCodedText) {
-			if !localCode(c) {
+		visitRMIn(run.out, func(path, archetype string, c rm.DVCodedText) {
+			if !localCode(c) || archetype == "" {
 				return
 			}
-			texts, ok := byCode[c.DefiningCode.CodeString]
-			if !ok {
+			code := c.DefiningCode.CodeString
+			if texts, ok := byArchetype[archetype][code]; ok {
+				checked++
+				if !slices.Contains(texts, c.Value) {
+					t.Errorf("%s: DV_CODED_TEXT local::%s at %s has text %q, want the term text %s defines, one of %q",
+						run, code, path, c.Value, archetype, texts)
+				}
 				return
 			}
-			checked++
-			if !slices.Contains(texts, c.Value) {
-				t.Errorf("%s: DV_CODED_TEXT local::%s at %s has text %q, want the OPT's term text, one of %q",
-					run, c.DefiningCode.CodeString, path, c.Value, texts)
+			for other, byCode := range byArchetype {
+				if texts := byCode[code]; other != archetype && slices.Contains(texts, c.Value) {
+					foreign++
+					t.Errorf("%s: DV_CODED_TEXT local::%s at %s in %s, which defines no such term, has the text %q that %s defines",
+						run, code, path, archetype, c.Value, other)
+				}
 			}
 		})
 	})
 	if checked == 0 {
-		t.Fatal("no local DV_CODED_TEXT with an OPT term generated, so nothing was checked")
+		t.Fatal("no local DV_CODED_TEXT with a term of its own archetype generated, so nothing was checked")
 	}
+	t.Logf("%d local coded texts checked against their own archetype's term, %d took another archetype's", checked, foreign)
 }
 
 // TestREQ107_BMIMethodTakesTheTermText is the REQ-107 RM defaults check on
@@ -165,14 +229,15 @@ const optOrdinal = `<children xsi:type="C_DV_ORDINAL"><rm_type_name>DV_ORDINAL</
 // check on each place the generator writes a DV_CODED_TEXT whose code the
 // OPT gives in terminology local (an ELEMENT's value, a DV_ORDINAL's
 // symbol, a locatable's name, an ISM_TRANSITION's careflow step): the
-// coded text takes the text of the
-// term the OPT's archetype defines for the code, in Options.Language as
+// coded text takes the text of the term its own archetype, the nearest
+// enclosing archetype root, defines for the code, in Options.Language as
 // REQ-105 resolves it (a language the OPT has no translation for gets the
 // document language's term). Where the OPT limits the text with a C_STRING
 // that rejects the term text, the text the walk wrote stays (Precedence
-// 1), and a code the archetype defines no term for, the placeholder at0000
-// and a code of another terminology keep the walk's text.
-// It holds under every policy and both value fills.
+// 1), and a code its own archetype defines no term for, even where an
+// enclosing archetype does, the placeholder at0000 and a code of another
+// terminology keep the walk's text. It holds under every policy and both
+// value fills.
 func TestREQ107_LocalCodedTextTakesTheTermText(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -240,6 +305,20 @@ func TestREQ107_LocalCodedTextTakesTheTermText(t *testing.T) {
 			want:  []string{walkText},
 		},
 		{
+			// The coded text's own archetype, the inner CLUSTER, defines
+			// no at0005; the enclosing one does, for another concept.
+			name:  "ELEMENT value whose code only an enclosing archetype defines",
+			opt:   nestedTermOPT(""),
+			coded: codedTextWithCode("at0005"),
+			want:  []string{walkText},
+		},
+		{
+			name:  "ELEMENT value whose code its own and an enclosing archetype define",
+			opt:   nestedTermOPT(innerTerm),
+			coded: codedTextWithCode("at0005"),
+			want:  []string{innerTerm},
+		},
+		{
 			name:  "DV_ORDINAL symbol",
 			opt:   optTemplate("ELEMENT", optTerms, optSingle("value", optOrdinal)),
 			coded: func(t *testing.T, out any) rm.DVCodedText { return rootValueAs[*rm.DVOrdinal](t, out).Symbol },
@@ -298,6 +377,45 @@ func TestREQ107_LocalCodedTextTakesTheTermText(t *testing.T) {
 				})
 			}
 		}
+	}
+}
+
+// Term texts of the nested archetypes nestedTermOPT builds.
+const (
+	outerTerm = "Outer term"
+	innerTerm = "Inner term"
+)
+
+// nestedTermOPT is a CLUSTER template whose archetype defines at0005 as
+// outerTerm, holding an inner CLUSTER archetype that defines at0001 and,
+// where innerAt0005 is not "", at0005 as innerAt0005. The inner archetype
+// holds an ELEMENT at0001 whose value is coded local::at0005.
+func nestedTermOPT(innerAt0005 string) string {
+	outerTerms := `<term_definitions code="at0005"><items id="text">` + outerTerm + `</items></term_definitions>`
+	innerTerms := `<term_definitions code="at0001"><items id="text">Inner element</items></term_definitions>`
+	if innerAt0005 != "" {
+		innerTerms += `<term_definitions code="at0005"><items id="text">` + innerAt0005 + `</items></term_definitions>`
+	}
+	element := optNode("ELEMENT", "at0001", optSingle("value", optCodedText("local", "at0005")))
+	inner := optArchetypeRoot("CLUSTER", "openEHR-EHR-CLUSTER.inner.v1", innerTerms, optMultiple("items", element))
+	return optTemplate("CLUSTER", outerTerms, optMultiple("items", inner))
+}
+
+// codedTextWithCode returns the one DV_CODED_TEXT coded local::code in a
+// generated root.
+func codedTextWithCode(code string) func(t *testing.T, out any) rm.DVCodedText {
+	return func(t *testing.T, out any) rm.DVCodedText {
+		t.Helper()
+		var found []rm.DVCodedText
+		visitRM(out, func(_ string, c rm.DVCodedText) {
+			if c.DefiningCode.TerminologyID.Value == "local" && c.DefiningCode.CodeString == code {
+				found = append(found, c)
+			}
+		})
+		if len(found) != 1 {
+			t.Fatalf("%d DV_CODED_TEXT coded local::%s generated, want 1", len(found), code)
+		}
+		return found[0]
 	}
 }
 

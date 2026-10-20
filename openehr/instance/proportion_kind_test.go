@@ -119,44 +119,55 @@ func eachCorpusRun(t *testing.T, check func(run corpusRun)) {
 // canonical JSON attribute names to it. A pointer reached twice is walked
 // once.
 func visitRM[T any](root any, visit func(path string, v T)) {
+	visitRMIn(root, func(path, _ string, v T) { visit(path, v) })
+}
+
+// visitRMIn is visitRM that also passes the archetype id of the nearest
+// enclosing archetype root of each value: the nearest object at or above
+// it that carries archetype_details, or "" when there is none.
+func visitRMIn[T any](root any, visit func(path, archetype string, v T)) {
 	target := reflect.TypeFor[T]()
+	details := reflect.TypeFor[*rm.Archetyped]()
 	seen := make(map[uintptr]bool)
-	var walk func(rv reflect.Value, path string)
-	walk = func(rv reflect.Value, path string) {
+	var walk func(rv reflect.Value, path, archetype string)
+	walk = func(rv reflect.Value, path, archetype string) {
 		switch rv.Kind() {
 		case reflect.Pointer:
 			if rv.IsNil() || seen[rv.Pointer()] {
 				return
 			}
 			seen[rv.Pointer()] = true
-			walk(rv.Elem(), path)
+			walk(rv.Elem(), path, archetype)
 		case reflect.Interface:
 			if !rv.IsNil() {
-				walk(rv.Elem(), path)
+				walk(rv.Elem(), path, archetype)
 			}
 		case reflect.Struct:
+			if f := rv.FieldByName("ArchetypeDetails"); f.IsValid() && f.Type() == details && !f.IsNil() {
+				archetype = f.Interface().(*rm.Archetyped).ArchetypeID.Value
+			}
 			if rv.Type() == target {
-				visit(path, rv.Interface().(T))
+				visit(path, archetype, rv.Interface().(T))
 			}
 			for i := range rv.NumField() {
 				field := rv.Type().Field(i)
 				if !field.IsExported() {
 					continue
 				}
-				walk(rv.Field(i), path+"/"+jsonName(field))
+				walk(rv.Field(i), path+"/"+jsonName(field), archetype)
 			}
 		case reflect.Slice, reflect.Array:
 			for i := range rv.Len() {
-				walk(rv.Index(i), fmt.Sprintf("%s[%d]", path, i))
+				walk(rv.Index(i), fmt.Sprintf("%s[%d]", path, i), archetype)
 			}
 		case reflect.Map:
 			iter := rv.MapRange()
 			for iter.Next() {
-				walk(iter.Value(), fmt.Sprintf("%s[%v]", path, iter.Key()))
+				walk(iter.Value(), fmt.Sprintf("%s[%v]", path, iter.Key()), archetype)
 			}
 		}
 	}
-	walk(reflect.ValueOf(root), "")
+	walk(reflect.ValueOf(root), "", "")
 }
 
 // jsonName is the canonical JSON name of an RM struct field, or the Go
