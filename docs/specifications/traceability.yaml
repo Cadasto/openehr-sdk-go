@@ -1475,6 +1475,7 @@ requirements:
       - openehr/instance/items_rule_test.go
       - openehr/instance/local_term_text_test.go
       - openehr/instance/locatable_name_test.go
+      - openehr/instance/multimedia_data_test.go
       - openehr/instance/multimedia_uri_internal_test.go
       - openehr/instance/node_id_internal_test.go
       - openehr/instance/node_id_test.go
@@ -1645,6 +1646,7 @@ requirements:
       - internal/rmroots/rmroots_test.go
       - openehr/instance/code_phrase_terminology_test.go
       - openehr/instance/phase4_test.go
+      - openehr/instance/proportion_kind_test.go
       - openehr/rm/interval_bound_test.go
       - openehr/rm/rminfo/nonstorable_test.go
       - openehr/rm/temporal_iso_test.go
@@ -1690,6 +1692,7 @@ requirements:
       - openehr/validation/rmfloor_party_ref_test.go
       - openehr/validation/rmfloor_presence_readings_test.go
       - openehr/validation/rmfloor_primitive_list_internal_test.go
+      - openehr/validation/rmfloor_proportion_kind_test.go
       - openehr/validation/rmfloor_proportion_test.go
       - openehr/validation/rmfloor_reference_part_internal_test.go
       - openehr/validation/rmfloor_temporal_element_test.go
