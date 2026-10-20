@@ -8,13 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-10-21
+
+Thirty-eighth `v0.x` minor: the RM floor evaluates the DV_PROPORTION kind rules, generated compositions pass the Cadasto, FerroEHR and EHRbase CDRs, and PROBE-107's suite corpus replaces PROBE-100's. **Breaking:** the floor refuses a DV_PROPORTION that breaks its kind's rules, and `aqlprobes.Probe100ConformanceCorpus`, `ReadConformanceCorpus` and `fixtures.AQLConformanceRoot` are removed.
+
 ### Added
 
 - **Each answered PROBE-107 query carries the declines that cover it (REQ-160, REQ-109).** `aqlprobes.SuiteDecline` and `SuiteQuery.Declines` give a consumer gating queries through the same lint each Error code, construct and reason.
 
 ### Changed
 
-- **The RM floor evaluates the DV_PROPORTION kind rules (REQ-112, REQ-171).** A proportion whose type, denominator or operands break its kind's invariants draws `rm_invariant`, and five invariants leave `Coverage.Unevaluated`.
+- **Breaking: the RM floor evaluates the DV_PROPORTION kind rules (REQ-112, REQ-171).** A proportion whose type, denominator or operands break its kind's invariants draws `rm_invariant`, and five invariants leave `Coverage.Unevaluated`.
 - **Generated compositions pass the Cadasto, FerroEHR and EHRbase CDRs (REQ-107).** A COMPOSITION carries no uid unless its template requires one, DV_MULTIMEDIA data its byte size, and no optional node only undescribed content.
 
 ### Removed
