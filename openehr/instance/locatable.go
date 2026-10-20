@@ -56,18 +56,20 @@ func partyNeedsUID(v any) bool {
 }
 
 // stampsUID lists the classes whose generated instances carry a fresh
-// uid (REQ-107 emission policy): COMPOSITION, the ENTRY concretes and
-// GENERIC_ENTRY, the independently addressable clinical objects, and the
-// PARTY concretes, whose uid the RM requires (PARTY Uid_mandatory). A
-// PARTY_RELATIONSHIP takes its uid in fillPartyRelationship instead.
-// Structure nodes (SECTION, ITEM_*, CLUSTER, ELEMENT, HISTORY, events)
-// and the other demographic locatables (PARTY_IDENTITY, CONTACT,
-// ADDRESS, CAPABILITY) deliberately get no generator-minted uid. This is
-// policy dispatch, not identity plumbing — it stays a hand-written
-// closed set (REQ-024, no reflection).
+// uid: the ENTRY concretes and GENERIC_ENTRY, the independently
+// addressable clinical objects, and the PARTY concretes, whose uid the RM
+// requires (PARTY Uid_mandatory). A PARTY_RELATIONSHIP takes its uid in
+// fillPartyRelationship instead. A COMPOSITION gets none, so the server
+// that stores it gives it its version id: a CDR can refuse a uid it did
+// not assign. Structure nodes (SECTION, ITEM_*, CLUSTER, ELEMENT,
+// HISTORY, events) and the other demographic locatables (PARTY_IDENTITY,
+// CONTACT, ADDRESS, CAPABILITY) deliberately get no generator-minted uid
+// either. Any of these gets one where its OPT requires it
+// (setLocatableIdentity). This is policy dispatch, not identity plumbing:
+// it stays a hand-written closed set, with no reflection.
 func stampsUID(v any) bool {
 	switch v.(type) {
-	case *rm.Composition, *rm.Observation, *rm.Evaluation,
+	case *rm.Observation, *rm.Evaluation,
 		*rm.Instruction, *rm.Action, *rm.AdminEntry, *rm.GenericEntry,
 		*rm.Person, *rm.Organisation, *rm.Group, *rm.Agent, *rm.Role:
 		return true
