@@ -650,3 +650,38 @@ func TestREQ107_ProportionIntervalAdoptionKeepsThePrecisionItChooses(t *testing.
 		}
 	})
 }
+
+// TestREQ107_ProportionIntervalLeavesAPairWhoseAdoptionOverflows is the
+// REQ-107 check (Output, Intervals) that a pair no finite replacement puts
+// in order is left as generated: the lower bound has no low end, so it
+// would take the upper bound's ratio over its own denominator 1e10, a
+// numerator of -1e310 that float64 cannot hold. The pair stays as the walk
+// wrote it, which canjson.Marshal accepts, with the upper bound's -1e300
+// over 1 and a finite lower numerator over 1e10.
+func TestREQ107_ProportionIntervalLeavesAPairWhoseAdoptionOverflows(t *testing.T) {
+	r, closed, noEnd := instance.RealRange, instance.Closed, instance.NoEnd
+	ratio := instance.IntList(0)
+	lower := instance.ProportionKindBoundOver(r(noEnd, closed(0)), instance.RealList(1e10), ratio, "")
+	upper := instance.ProportionKindBoundOver(instance.RealList(-1e300), instance.RealList(1), ratio, "")
+	eachProportionIntervalRun(t, lower, upper, instance.RandomFill, func(t *testing.T, docs []any) {
+		compared := 0
+		for seed, doc := range docs {
+			walkIntervals(doc, "", func(path string, iv map[string]any) {
+				lo, hi, ok := boundedPair(iv)
+				if !ok {
+					return
+				}
+				compared++
+				if n, _ := lo["numerator"].(float64); math.IsInf(n, 0) || math.IsNaN(n) || lo["denominator"] != 1e10 {
+					t.Errorf("seed %d, %s: lower bound %v/%v, want a finite numerator over 1e10 as generated", seed, path, lo["numerator"], lo["denominator"])
+				}
+				if hi["numerator"] != -1e300 || hi["denominator"] != 1.0 {
+					t.Errorf("seed %d, %s: upper bound %v/%v, want -1e300/1 as generated", seed, path, hi["numerator"], hi["denominator"])
+				}
+			})
+		}
+		if compared == 0 {
+			t.Fatal("no bounded DV_INTERVAL generated, so nothing was checked")
+		}
+	})
+}
