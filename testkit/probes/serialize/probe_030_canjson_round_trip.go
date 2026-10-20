@@ -265,7 +265,10 @@ var probe030SkipFloor = map[string][]string{
 	// value and a null_flavour, which breaks Inv_null_flavour_indicated
 	// (exactly one of the two is present). The last event holds two at0004
 	// clusters, so they are written by their positions, items[2] and
-	// items[3].
+	// items[3]. Three DV_PROPORTION values at items[at0028] break their
+	// proportion kind: two fractions over a fractional operand
+	// (Fraction_validity) and a percent whose denominator is not 100
+	// (Percent_validity).
 	"compositions/Demonstration.v1.json": {
 		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0002]/data/items[at0004]/items[at0023]/value",
 		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0002]/data/items[at0004]/items[at0022]/value",
@@ -274,14 +277,17 @@ var probe030SkipFloor = map[string][]string{
 		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0002]/data/items[at0004]/items[at0016]",
 		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0033]/data/items[at0004]/items[at0023]/value",
 		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0033]/data/items[at0004]/items[at0022]/value",
+		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0033]/data/items[at0004]/items[at0028]/value",
 		// Inverted DV_INTERVAL<DV_DATE_TIME> in the vendored fixture (DV_INTERVAL.Limits_consistent).
 		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0033]/data/items[at0004]/items[at0024]/value",
 		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0033]/data/items[at0004]/items[at0016]",
 		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0034]/data/items[at0004]/items[at0022]/value",
 		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0034]/data/items[at0004]/items[at0016]",
 		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0035]/data/items[2]/items[at0023]/value",
+		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0035]/data/items[2]/items[at0028]/value",
 		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0035]/data/items[2]/items[at0016]",
 		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0035]/data/items[3]/items[at0023]/value",
+		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0035]/data/items[3]/items[at0028]/value",
 		"rm_invariant /content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0035]/data/items[3]/items[at0016]",
 	},
 	// TestPerson.v2: two DV_MULTIMEDIA.media_type values break
@@ -310,6 +316,17 @@ var probe030SkipFloor = map[string][]string{
 	// archetype node id, so the event is written by its position.
 	"compositions/Test_dv_interval_dv_count_open_constraint.v0.json": {
 		"rm_invariant /content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[1]/data/items[at0046]/value",
+	},
+	// Test_dv_proportion_open_constraint.v0: the DV_PROPORTION in the first
+	// event has the type 898, no proportion kind (Type_validity).
+	"compositions/Test_dv_proportion_open_constraint.v0.json": {
+		"rm_invariant /content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[1]/data/items[at0044]/value",
+	},
+	// Test_dv_proportion_open_constraint_precision_1.v0: the DV_PROPORTION
+	// in the first event is an integer fraction over the denominator 500.5
+	// (Fraction_validity).
+	"compositions/Test_dv_proportion_open_constraint_precision_1.v0.json": {
+		"rm_invariant /content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[1]/data/items[at0044]/value",
 	},
 	// Test_dv_interval_dv_quantity_open_constraint.v0: a
 	// DV_INTERVAL<DV_QUANTITY> with lower 200 mm over upper 100 mm, in the

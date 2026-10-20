@@ -68,7 +68,7 @@ func TestEngine_REQ171_NodeLimitAtAPrimitiveLeaf(t *testing.T) {
 	text := elementHolding(&rm.DVText{Value: "x"})
 	code := rm.DVCodedText{Value: "mild", DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "local"}, CodeString: "at1"}}
 	proportionPrecision := rm.Integer(0)
-	proportion := elementHolding(&rm.DVProportion{Numerator: 1, Denominator: 2, Type: 1, Precision: &proportionPrecision})
+	proportion := elementHolding(&rm.DVProportion{Numerator: 1, Denominator: 2, Type: 0, Precision: &proportionPrecision})
 	mapped := elementHolding(&rm.DVText{Value: "x", Formatting: &formatting, Mappings: []rm.TermMapping{{Match: "=", Target: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}, CodeString: "1"}}}})
 	const bmiValue = "/content[openEHR-EHR-OBSERVATION.body_mass_index.v1]/data/events[at0002]/data/items[at0004]/value"
 	const demoItems = "/content[openEHR-EHR-OBSERVATION.demo.v1]/data/events[at0002]/data/items[at0004]"

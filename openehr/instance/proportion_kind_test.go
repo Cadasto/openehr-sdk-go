@@ -14,6 +14,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -389,16 +390,18 @@ func TestREQ107_ProportionSettlesToItsKind(t *testing.T) {
 // Precedence 1 check that the OPT wins where its constraints admit no
 // value the rule of any kind it allows accepts: a percent whose
 // denominator the OPT limits to 1..50 keeps the type and the denominator
-// the walk wrote, which the template validator accepts, and breaks
-// Percent_validity (§ Exceptions and known gaps).
+// the walk wrote, which the template layer accepts, and breaks
+// Percent_validity (§ Exceptions and known gaps), which the RM floor
+// reports (REQ-112) as the one error of the run.
 func TestREQ107_ProportionKeepsTheOPTWhereNoKindFits(t *testing.T) {
 	c := compileOPTText(t, optProportion("", instance.RealRange(instance.Closed(1), instance.Closed(50)), instance.IntList(2), ""), true)
 	eachProportionRun(t, c, func(t *testing.T, what string, out any, p rm.DVProportion) {
 		if p.Type != 2 || p.Denominator < 1 || p.Denominator > 50 {
 			t.Errorf("%s: DV_PROPORTION %s, want the walk's type 2 over a denominator in 1..50", what, proportionText(p))
 		}
-		if issues := templateErrors(out, c); len(issues) > 0 {
-			t.Errorf("%s: template validator: %v", what, issues)
+		issues := templateErrors(out, c)
+		if len(issues) != 1 || issues[0].Layer != validation.LayerRM || issues[0].Rule != "DV_PROPORTION.Percent_validity" {
+			t.Errorf("%s: validator errors %v, want the one RM-layer DV_PROPORTION.Percent_validity", what, issues)
 		}
 	})
 }
