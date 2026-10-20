@@ -40,9 +40,11 @@
 //     with an allowed template child (one whose occurrences upper bound is
 //     not 0). A visited multi-valued attribute gets its members as under
 //     Large, except that an optional archetype after the first optional
-//     archetype of the attribute gets none, whatever its archetype. So
-//     Medium builds at most one optional archetype under an attribute, the
-//     medium level. It is the zero value, and so the default.
+//     archetype of the attribute that holds more than content the
+//     template does not describe (below) gets none, whatever its
+//     archetype. So Medium builds at most one optional archetype under an
+//     attribute, the medium level. It is the zero value, and so the
+//     default.
 //   - Required: the required attributes only, not one merely because it
 //     has an allowed template child, except a composition's context,
 //     which it visits as Medium does, so the context every policy writes

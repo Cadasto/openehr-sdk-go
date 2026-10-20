@@ -92,12 +92,13 @@ var requiredBodies = []string{
 // Generate returns under Medium, under some value fill or seed, holds no
 // ELEMENT: the hollow-body floor under that policy. Medium gives a
 // multi-valued attribute at most one optional archetype, its first optional
-// archetype root in OPT order (REQ-107 What a visit writes), so a template
-// whose first optional archetype holds no ELEMENT gets a body with none by
-// design: clinical_content_validation, whose content builds only its first
-// optional root, a SECTION.validation_section_test.v0 with no items. A
-// listed template that stops being hollow under Medium fails the ratchet,
-// and so does an unlisted one that becomes hollow, as an unlisted row does.
+// archetype root in OPT order that needs no undescribed content (REQ-107
+// What a visit writes), so a template whose kept optional archetype holds
+// no ELEMENT gets a body with none by design: clinical_content_validation,
+// whose content builds only that root, a SECTION.validation_section_test.v0
+// with no items. A listed template that stops being hollow under Medium
+// fails the ratchet, and so does an unlisted one that becomes hollow, as an
+// unlisted row does.
 var mediumHollowBodies = []string{
 	"templates/clinical_content_validation",
 }
