@@ -19,13 +19,15 @@ import (
 // composition against its template can find no template node for either.
 // So under Large and Medium the walk builds an optional node only where
 // it holds more than such content: an optional child that needs it gets
-// no member of its own, an attribute that is not required and whose
+// no member of its own, and an attribute that is not required and whose
 // members would all be undescribed or need undescribed content is not
-// visited, and a top-up takes a child that needs none where the attribute
-// has one. The check reads a node's own attributes only. Below a node the
-// template or the RM requires, the walk builds what it always builds,
-// undescribed members included, so the described content around them is
-// kept.
+// visited, except a composition's context, which RM defaults write under
+// every policy. Under every policy a top-up takes the first child that
+// needs none and whose identity no earlier sibling carries, where the
+// attribute has one. The check reads a node's own attributes only. Below a
+// node the template or the RM requires, the walk builds what it always
+// builds, undescribed members included, so the described content around
+// them is kept.
 
 // needsUndescribed reports whether node, a template child, needs content
 // the template does not describe: node is a slot, or an attribute of node
@@ -84,12 +86,18 @@ func (g *generator) ownContentUndescribed(node *tcimpl.CompiledNode) bool {
 
 // onlyUndescribed reports whether attr of node can only be given
 // undescribed members: it has no allowed template child and the member the
-// walk builds from its BMM type is a LOCATABLE, or every allowed template
-// child of it is a slot.
+// walk builds from its BMM type is a LOCATABLE, it is single-valued and the
+// child that builds its member (bindingAlternative) is a slot, or it is
+// multi-valued and every allowed template child of it is a slot. A
+// single-valued attribute whose first child is a primitive the walk writes
+// onto node itself binds that primitive, which is not a slot.
 func (g *generator) onlyUndescribed(node *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
 	children := tcimpl.AllowedChildNodes(attr)
 	if len(children) == 0 {
 		return g.bmmMemberLocatable(node, attr)
+	}
+	if attr.Cardinality() == template.Single {
+		return bindingAlternative(children, builtRMType(children[0])).IsSlot()
 	}
 	for _, c := range children {
 		if !c.IsSlot() {
@@ -167,11 +175,14 @@ func (g *generator) optionalUndescribed(child *tcimpl.CompiledNode) bool {
 }
 
 // firstDescribed returns the first of children that needs no content the
-// template does not describe, or nil when every one does. A slot always
-// does.
+// template does not describe and whose identity no earlier sibling other
+// than a slot carries (identityCarriedBefore), or nil when there is none.
+// A slot always needs such content. A member of a child whose identity an
+// earlier sibling carries would be bound to that sibling, which describes
+// other content.
 func (g *generator) firstDescribed(children []*tcimpl.CompiledNode) *tcimpl.CompiledNode {
-	for _, c := range children {
-		if !g.needsUndescribed(c) {
+	for i, c := range children {
+		if !g.needsUndescribed(c) && !identityCarriedBefore(children, i) {
 			return c
 		}
 	}

@@ -69,13 +69,25 @@
 // no allowed child, such as the placeholder element of a required list the
 // template leaves empty. An optional child gets no member of its own when
 // it is a slot, or when an attribute of its own that is required can only
-// be given such members; an attribute that is not required is not visited
-// when every member it would get is such content or such a child. A top-up
-// takes the first child that needs none, and the first optional archetype
-// Medium keeps is the first that needs none. The check reads a node's own
-// attributes only: below a node the template or the RM requires, the walk
-// builds what it always builds, placeholders and slot fills included, so
-// the described content around them is kept.
+// be given such members: the attribute has no allowed child and its member
+// would be a LOCATABLE, every allowed child of it is a slot, or it is
+// single-valued and the child that builds its member is a slot. An
+// attribute that is not required is not visited when every member it
+// would get is such content or such a child. A composition's context is
+// the exception: every policy writes one, so the walk visits it whatever
+// its members need. The first optional archetype Medium keeps is the first
+// that needs none. The check reads a node's own attributes only: below a
+// node the template or the RM requires, the walk builds what it always
+// builds, placeholders and slot fills included, so the described content
+// around them is kept.
+//
+// Under every policy, an attribute left with fewer members than it needs
+// is topped up with members of its first allowed child that needs no
+// such content and whose identity no earlier sibling carries, else of its
+// first allowed child that is not a slot, else with fills of its first
+// slot. A child's identity is its archetype id when it is an archetype
+// root, and its node id otherwise, and a sibling that is a slot carries
+// none.
 //
 // [Minimal] is another name for Required, and [Complete] for Large until
 // the complete level lands. [ParsePolicy] reads a policy from the names

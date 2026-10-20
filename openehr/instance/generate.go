@@ -414,22 +414,23 @@ func attrProhibited(attr *tcimpl.CompiledAttribute) bool {
 // Medium does: applyCompositionDefaults writes a context under every
 // policy, so the walk builds it under the OPT's constraints (a pinned
 // setting, a required other_context) rather than leaving it bare. Inside
-// the context Required's own rule applies. Under Large and Medium, and on
-// that context, an attribute that is not required is not visited either
-// when every member the walk would build for it is undescribed or needs
-// undescribed content (membersUndescribed): a slot fill, a LOCATABLE built
-// from a BMM type where the OPT names no node, or a node with a required
-// attribute that can only hold such members. No other Policy value gets
-// here: Generate refuses one before the walk starts.
+// the context Required's own rule applies. Under Large and Medium, an
+// attribute that is not required, other than that context, is not visited
+// either when every member the walk would build for it is undescribed or
+// needs undescribed content (membersUndescribed): a slot fill, a LOCATABLE
+// built from a BMM type where the OPT names no node, or a node with a
+// required attribute that can only hold such members. The context is
+// visited whatever its members need, since RM defaults would write it
+// without them. No other Policy value gets here: Generate refuses one
+// before the walk starts.
 func (g *generator) shouldVisit(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
 	if visitRequired(attr) {
 		return true
 	}
-	if g.opts.Policy == Required && !compositionContext(optNode, attr) {
-		return false
-	}
-	if g.membersUndescribed(optNode, attr) {
-		return false
+	if !compositionContext(optNode, attr) {
+		if g.opts.Policy == Required || g.membersUndescribed(optNode, attr) {
+			return false
+		}
 	}
 	return g.opts.Policy == Large || len(tcimpl.AllowedChildNodes(attr)) > 0
 }
@@ -448,7 +449,8 @@ func visitRequired(attr *tcimpl.CompiledAttribute) bool {
 }
 
 // compositionContext reports whether attr is the context of a
-// COMPOSITION, the one attribute Required visits as Medium does.
+// COMPOSITION, the one attribute Required visits as Medium does and the
+// one the rule on undescribed content never keeps the walk out of.
 func compositionContext(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
 	return attr.Name() == "context" && bmmtype.Class(optNode.RMTypeName()) == "COMPOSITION"
 }
@@ -1334,8 +1336,9 @@ func (g *generator) materialiseMultiple(
 	// REQ-104 include grammar, or from the RM-type-prefix fallback
 	// only when no includes were parsed.
 	if needed := remainingLowerNeeded(attr, total); needed > 0 {
-		// The first child that needs no content the OPT does not describe,
-		// else the first that is not a slot, else the first slot.
+		// The first child that needs no content the OPT does not describe
+		// and whose identity no earlier sibling carries, else the first
+		// that is not a slot, else the first slot.
 		seed := g.firstDescribed(children)
 		if seed == nil {
 			seed = firstNonSlot(children)
@@ -2150,19 +2153,32 @@ func identityTaken(children []*tcimpl.CompiledNode, i int) bool {
 	if childRequired(child) {
 		return false
 	}
+	if identityCarriedBefore(children, i) {
+		return true
+	}
 	id := childIdentity(child)
 	if id == "" {
 		return false
 	}
-	for j, sib := range children {
-		if j == i || sib.IsSlot() || !carriesIdentity(sib, id) {
-			continue
-		}
-		if j < i || childRequired(sib) {
+	for _, sib := range children[i+1:] {
+		if !sib.IsSlot() && childRequired(sib) && carriesIdentity(sib, id) {
 			return true
 		}
 	}
 	return false
+}
+
+// identityCarriedBefore reports whether a sibling before children[i], other
+// than a slot, carries its identity (childIdentity, carriesIdentity). A
+// child with no identity is never carried.
+func identityCarriedBefore(children []*tcimpl.CompiledNode, i int) bool {
+	id := childIdentity(children[i])
+	if id == "" {
+		return false
+	}
+	return slices.ContainsFunc(children[:i], func(sib *tcimpl.CompiledNode) bool {
+		return !sib.IsSlot() && carriesIdentity(sib, id)
+	})
 }
 
 // childRequired reports whether child counts as required: every child does
