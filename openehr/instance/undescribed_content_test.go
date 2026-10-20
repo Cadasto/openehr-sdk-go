@@ -148,6 +148,25 @@ func TestREQ107_OptionalNodeHoldingOnlyUndescribedContentGetsNoMember(t *testing
 			large: "protocol=false", medium: "protocol=false", required: "protocol=false",
 		},
 		{
+			// The first alternative names ITEM_STRUCTURE and needs nothing
+			// undescribed, but the walk builds an ITEM_TREE, which the
+			// validator binds to the slot after it: that slot is the member.
+			name: "optional single attribute whose bound alternative is a slot",
+			opt: optTemplate("OBSERVATION", describedHistory, optOptionalSingleOver("protocol",
+				optNode("ITEM_STRUCTURE", "at0003"), optSlot("ITEM_TREE", "at0002"))),
+			large: "protocol=false", medium: "protocol=false", required: "protocol=false",
+		},
+		{
+			// The tree's items have a lower bound of 1, but the template
+			// prohibits their one child, so the walk skips them and the tree
+			// needs no undescribed content: the optional protocol is kept.
+			name: "optional single attribute whose child requires items the template prohibits",
+			opt: optTemplate("OBSERVATION", describedHistory, optOptionalSingleOver("protocol",
+				optNode("ITEM_TREE", "at0002", optMultiple("items",
+					optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0003", 0, 0))))),
+			large: "protocol=true", medium: "protocol=true", required: "protocol=false",
+		},
+		{
 			// One level: the required CLUSTER needs undescribed content, and
 			// keeps it, since nothing optional holds it; the optional
 			// attribute is visited for its described element.

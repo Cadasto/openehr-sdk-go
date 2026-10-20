@@ -88,9 +88,9 @@ func (g *generator) ownContentUndescribed(node *tcimpl.CompiledNode) bool {
 // undescribed members: it has no allowed template child and the member the
 // walk builds from its BMM type is a LOCATABLE, it is single-valued and the
 // child that builds its member (bindingAlternative) is a slot, or it is
-// multi-valued and every allowed template child of it is a slot. A
-// single-valued attribute whose first child is a primitive the walk writes
-// onto node itself binds that primitive, which is not a slot.
+// multi-valued and every allowed template child of it is a slot. Where
+// the child that builds a single-valued member is a primitive the walk
+// writes onto node itself, it is not a slot.
 func (g *generator) onlyUndescribed(node *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
 	children := tcimpl.AllowedChildNodes(attr)
 	if len(children) == 0 {
@@ -111,21 +111,18 @@ func (g *generator) onlyUndescribed(node *tcimpl.CompiledNode, attr *tcimpl.Comp
 // attr of node is undescribed or needs undescribed content. With no allowed
 // template child, the member is built from the attribute's BMM type, which
 // is undescribed when it is a LOCATABLE. A single-valued attribute takes
-// one child (bindingAlternative), so its member is that child's. A
-// multi-valued attribute builds members of each allowed child, so every
-// one of them has to be a slot or need undescribed content.
+// one child (bindingAlternative), so its member is that child's; where
+// that child is a primitive the walk writes onto node itself, it is a
+// primitive leaf, which needs none. A multi-valued attribute builds
+// members of each allowed child, so every one of them has to be a slot or
+// need undescribed content.
 func (g *generator) membersUndescribed(node *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
 	children := tcimpl.AllowedChildNodes(attr)
 	if len(children) == 0 {
 		return g.bmmMemberLocatable(node, attr)
 	}
 	if attr.Cardinality() == template.Single {
-		first := children[0]
-		if tcimpl.IsAOMPrimitiveShortName(first.RMTypeName()) && !attrTypedByRMClass(node, attr) {
-			// A primitive the walk writes onto node itself.
-			return false
-		}
-		return g.needsUndescribed(bindingAlternative(children, builtRMType(first)))
+		return g.needsUndescribed(bindingAlternative(children, builtRMType(children[0])))
 	}
 	for _, c := range children {
 		if !g.needsUndescribed(c) {
