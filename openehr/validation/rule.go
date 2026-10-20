@@ -45,7 +45,12 @@ const (
 // CLASS.Invariant: the class that declares the invariant and the
 // invariant's name, both as the BMM spells them.
 const (
+	ruleProportionType        = "DV_PROPORTION.Type_validity"
 	ruleProportionPrecision   = "DV_PROPORTION.Precision_validity"
+	ruleProportionFraction    = "DV_PROPORTION.Fraction_validity"
+	ruleProportionUnitary     = "DV_PROPORTION.Unitary_validity"
+	ruleProportionPercent     = "DV_PROPORTION.Percent_validity"
+	ruleProportionDenominator = "DV_PROPORTION.Valid_denominator"
 	ruleNullFlavourIndicated  = "ELEMENT.Inv_null_flavour_indicated"
 	ruleIntervalLimits        = "DV_INTERVAL.Limits_consistent"
 	ruleLowerIncludedValid    = "Interval.Lower_included_valid"

@@ -70,8 +70,9 @@ func TestCoverage_REQ171_UnevaluatedListsARootsInvariants(t *testing.T) {
 // the BASE rule, a date-time without its day or month, a leap second, are
 // still listed. DV_PROPORTION.Is_integral_validity, which the DV_PROPORTION
 // precision check decides as DV_PROPORTION.Precision_validity, is not listed
-// on any DV_PROPORTION root, whatever its precision; the proportion-kind rules
-// and Valid_denominator are.
+// on any DV_PROPORTION root, whatever its precision; nor are the
+// proportion-kind rules and Valid_denominator, which the same check
+// evaluates (REQ-112).
 func TestCoverage_REQ171_UnevaluatedLeavesOutWhatAnotherCheckDecides(t *testing.T) {
 	t.Parallel()
 	ordered := []string{
@@ -86,11 +87,6 @@ func TestCoverage_REQ171_UnevaluatedLeavesOutWhatAnotherCheckDecides(t *testing.
 		"DV_ORDERED.Is_simple_validity",
 		"DV_ORDERED.Normal_range_and_status_consistency",
 		"DV_ORDERED.Other_reference_ranges_validity",
-		"DV_PROPORTION.Fraction_validity",
-		"DV_PROPORTION.Percent_validity",
-		"DV_PROPORTION.Type_validity",
-		"DV_PROPORTION.Unitary_validity",
-		"DV_PROPORTION.Valid_denominator",
 		"DV_QUANTIFIED.Magnitude_status_valid",
 	}
 	for _, tc := range []struct {

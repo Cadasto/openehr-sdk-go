@@ -225,6 +225,14 @@ type Issue struct {
 	//   - on an rm_invariant issue for a precision of 0 with a
 	//     fractional operand, the numerator and the denominator, a
 	//     [2]float64;
+	//   - on an rm_invariant issue for a proportion whose type is not a
+	//     proportion kind, the type, an rm.Integer;
+	//   - on an rm_invariant issue for a unitary proportion or a percent
+	//     over the wrong denominator, or for a proportion over a
+	//     denominator of 0, the denominator, an rm.Real;
+	//   - on an rm_invariant issue for a fraction or an integer fraction
+	//     with a fractional operand, the numerator and the denominator, a
+	//     [2]float64;
 	//   - on an rm_invariant issue for interval bounds out of order, the
 	//     two compared magnitudes, lower first, a [2]float64;
 	//   - on an rm_invariant issue for a date, time or duration that is
