@@ -403,9 +403,9 @@ func findInItemTree(t *rm.ItemTree) *rm.DVDuration {
 }
 
 // TestGenerateUIDCarriesType pins the PR #20 re-review deferral:
-// canjson's polymorphic dispatch on Composition.uid (an interface
-// `UIDBasedID` whose concrete should be HierObjectID) requires a
-// pointer receiver path. Before the
+// canjson's polymorphic dispatch on a generated uid, here an ENTRY's in
+// vital_signs (an interface `UIDBasedID` whose concrete should be
+// HierObjectID), requires a pointer receiver path. Before the
 // C_PRIMITIVE_OBJECT wire-parser fix (PR 21), `newHierObjectID()`
 // returned a value, and canjson emitted
 // `uid` WITHOUT a `_type` discriminator — breaking the unmarshal
@@ -439,7 +439,7 @@ func TestGenerateUIDCarriesType(t *testing.T) {
 	// with the discriminator, which is what lets a streaming decoder
 	// dispatch. Member order is otherwise not a contract.
 	if !bytes.Contains(b, []byte(`"uid":{"_type":"HIER_OBJECT_ID"`)) {
-		t.Errorf("canjson(Composition).uid missing _type discriminator; got: %s", uidSlice(b))
+		t.Errorf("canjson(Composition) entry uid missing _type discriminator; got: %s", uidSlice(b))
 	}
 }
 

@@ -19,7 +19,7 @@ func TestApplyLocatableIdentityTypedNil(t *testing.T) {
 		return nil
 	}
 	for _, v := range []any{
-		(*rm.Composition)(nil), // stampsUID member
+		(*rm.Observation)(nil), // stampsUID member
 		(*rm.Section)(nil),     // non-uid LOCATABLE
 		nil,                    // bare nil interface
 		rm.Section{},           // value form: not MutableLocatable

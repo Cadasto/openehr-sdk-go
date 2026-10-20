@@ -77,6 +77,44 @@ func TestNewSkeleton_vitalSigns(t *testing.T) {
 	}
 }
 
+// TestREQ107_SkeletonCarriesNoCompositionUID checks that a skeleton, and
+// a composition the builder builds, carry no COMPOSITION uid where the
+// OPT does not require one, under every policy NewSkeleton takes: the
+// server that stores the composition gives it its version id. BMI and
+// vital_signs require none.
+func TestREQ107_SkeletonCarriesNoCompositionUID(t *testing.T) {
+	for _, name := range []string{"BMI", "vital_signs"} {
+		c := compileFixture(t, name)
+		for _, policy := range []instance.Policy{instance.Required, instance.Medium, instance.Large} {
+			comp, err := composition.NewSkeleton(t.Context(), c,
+				composition.WithTerritory("NL"),
+				composition.WithComposer(testComposer()),
+				composition.WithPolicy(policy),
+			)
+			if err != nil {
+				t.Fatalf("NewSkeleton(%s, %v): %v", name, policy, err)
+			}
+			if comp.UID != nil {
+				t.Errorf("NewSkeleton(%s, %v) uid = %v, want none", name, policy, comp.UID)
+			}
+		}
+		b, err := composition.NewBuilder(t.Context(), c,
+			composition.WithTerritory("NL"),
+			composition.WithComposer(testComposer()),
+		)
+		if err != nil {
+			t.Fatalf("NewBuilder(%s): %v", name, err)
+		}
+		comp, err := b.Build()
+		if err != nil {
+			t.Fatalf("Build(%s): %v", name, err)
+		}
+		if comp.UID != nil {
+			t.Errorf("NewBuilder(%s).Build() uid = %v, want none", name, comp.UID)
+		}
+	}
+}
+
 // TestNewSkeleton_requiresComposer asserts that omitting WithComposer
 // surfaces instance.ErrComposerRequired (wrapped).
 func TestNewSkeleton_requiresComposer(t *testing.T) {
@@ -176,11 +214,7 @@ func TestBuilder_SetQuantity_systolic(t *testing.T) {
 
 	// Confirm canjson Marshal preserves the values in the output
 	// bytes (the leaf path / value reaches the wire). Full Marshal
-	// → Unmarshal round-trip is exercised in PROBE-023; some root-
-	// level identity fields (UID) currently marshal without the
-	// canjson `_type` discriminator (see instance.newHierObjectID),
-	// so the round-trip Unmarshal there clears UID and Composer
-	// before re-decoding.
+	// → Unmarshal round-trip is exercised in PROBE-023.
 	payload, err := canjson.Marshal(comp)
 	if err != nil {
 		t.Fatalf("canjson.Marshal: %v", err)

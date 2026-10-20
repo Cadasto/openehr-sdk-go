@@ -15,10 +15,10 @@ import (
 )
 
 // uidClasses are the classes whose generated instances REQ-107 gives a
-// uid: COMPOSITION, the ENTRY concretes, GENERIC_ENTRY, the PARTY
-// concretes and PARTY_RELATIONSHIP. Every other locatable gets none.
+// uid: the ENTRY concretes, GENERIC_ENTRY, the PARTY concretes and
+// PARTY_RELATIONSHIP. Every other locatable, a COMPOSITION included, gets
+// one only where its OPT requires it.
 var uidClasses = []string{
-	"COMPOSITION",
 	"OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION", "ADMIN_ENTRY",
 	"GENERIC_ENTRY",
 	"PERSON", "ORGANISATION", "GROUP", "AGENT", "ROLE",
@@ -50,10 +50,10 @@ func identityOptions(policy instance.Policy, uids *recordingUIDs) instance.Optio
 	}
 }
 
-// TestREQ107_UIDClassRootsTakeUIDFromSource is the REQ-107 check that a
-// COMPOSITION, an ENTRY, a GENERIC_ENTRY, a PARTY and a PARTY_RELATIONSHIP
-// generated as the template root carry a uid that Options.UIDSource issued,
-// under every policy (RM PARTY Uid_mandatory for the PARTY classes).
+// TestREQ107_UIDClassRootsTakeUIDFromSource is the REQ-107 check that an
+// ENTRY, a GENERIC_ENTRY, a PARTY and a PARTY_RELATIONSHIP generated as
+// the template root carry a uid that Options.UIDSource issued, under every
+// policy (RM PARTY Uid_mandatory for the PARTY classes).
 func TestREQ107_UIDClassRootsTakeUIDFromSource(t *testing.T) {
 	for _, class := range uidClasses {
 		c := compileOPTText(t, optTemplate(class), true)
@@ -182,9 +182,9 @@ func generatedLocatables(t *testing.T, out any) []generatedLocatable {
 }
 
 // TestREQ107_OnlyUIDClassesCarryAUID is the REQ-107 check that the
-// generator gives a uid to every COMPOSITION, ENTRY, GENERIC_ENTRY, PARTY
-// and PARTY_RELATIONSHIP in a generated tree and to no other locatable,
-// under every policy.
+// generator gives a uid to every ENTRY, GENERIC_ENTRY, PARTY and
+// PARTY_RELATIONSHIP in a generated tree and to no other locatable whose
+// OPT does not require one, a COMPOSITION included, under every policy.
 func TestREQ107_OnlyUIDClassesCarryAUID(t *testing.T) {
 	for _, tree := range identityTrees(t) {
 		for _, policy := range everyPolicy {
@@ -273,7 +273,7 @@ func TestREQ107_ProhibitedUIDYieldsExceptOnAParty(t *testing.T) {
 	}
 	root := func(_ *testing.T, out any) rm.Locatable { return out.(rm.Locatable) }
 	var cases []tree
-	for _, class := range uidClasses {
+	for _, class := range append([]string{"COMPOSITION"}, uidClasses...) {
 		cases = append(cases, tree{
 			name:    class + " root",
 			opt:     optTemplate(class, optProhibitedSingle("uid")),
@@ -323,12 +323,12 @@ func optRequiredSingle(name string, children ...string) string {
 }
 
 // TestREQ107_UIDIsNotVisited is the REQ-107 check that the walk never
-// visits a locatable's uid, which the identity rule decides: a COMPOSITION
-// or an ENTRY whose OPT names its uid, with no child or with a
-// HIER_OBJECT_ID child, keeps the uid the generator stamps from
-// Options.UIDSource, and a CLUSTER whose OPT names an optional uid gets
-// none. It holds under every policy, both value fills and both compile
-// modes.
+// visits a locatable's uid, which the identity rule decides: an ENTRY
+// whose OPT names its uid, with no child or with a HIER_OBJECT_ID child,
+// and a COMPOSITION or a CLUSTER whose OPT requires it, keep the uid the
+// generator stamps from Options.UIDSource, and a COMPOSITION or a CLUSTER
+// whose OPT names an optional uid gets none. It holds under every policy,
+// both value fills and both compile modes.
 func TestREQ107_UIDIsNotVisited(t *testing.T) {
 	hier := optNode("HIER_OBJECT_ID", "", optStringAttr("value", "<list>from-the-opt</list>"))
 	uidAttrs := map[string]string{
@@ -338,7 +338,7 @@ func TestREQ107_UIDIsNotVisited(t *testing.T) {
 	}
 	for shape, attr := range uidAttrs {
 		for _, class := range []string{"COMPOSITION", "OBSERVATION", "CLUSTER"} {
-			wantStamp := class != "CLUSTER" || shape == "required, a HIER_OBJECT_ID"
+			wantStamp := class == "OBSERVATION" || shape == "required, a HIER_OBJECT_ID"
 			for _, implicit := range []bool{true, false} {
 				c := compileOPTText(t, optTemplate(class, attr), implicit)
 				for _, opts := range defaultsOptions() {
@@ -369,9 +369,9 @@ func TestREQ107_UIDIsNotVisited(t *testing.T) {
 // where its OPT requires one (an existence lower bound of at least 1),
 // drawn from Options.UIDSource, or from the random fallback when that is
 // nil, and none where its OPT names the uid optional, under Large too.
-// It holds for a CLUSTER and an ELEMENT, at the root and nested, under
-// every policy, both value fills and both compile modes, and the output
-// passes the RM floor.
+// It holds for a COMPOSITION root, and a CLUSTER and an ELEMENT at the
+// root and nested, under every policy, both value fills and both compile
+// modes, and the output passes the RM floor.
 func TestREQ107_RequiredUIDOnOtherLocatables(t *testing.T) {
 	type place struct {
 		name   string
@@ -379,6 +379,11 @@ func TestREQ107_RequiredUIDOnOtherLocatables(t *testing.T) {
 		target func(t *testing.T, out any) rm.Locatable
 	}
 	places := []place{
+		{
+			name:   "COMPOSITION root",
+			opt:    func(uid string) string { return optTemplate("COMPOSITION", uid) },
+			target: func(_ *testing.T, out any) rm.Locatable { return out.(rm.Locatable) },
+		},
 		{
 			name: "CLUSTER root",
 			opt: func(uid string) string {
@@ -421,6 +426,7 @@ func TestREQ107_RequiredUIDOnOtherLocatables(t *testing.T) {
 						} else {
 							opts.UIDSource = nil
 						}
+						opts.Territory, opts.Composer = "NL", testComposer()
 						t.Run(fmt.Sprintf("%s/required=%t/%s/implicit=%t/%v/%v", p.name, required, source, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
 							out, err := instance.Generate(t.Context(), c, opts)
 							if err != nil {
@@ -441,5 +447,31 @@ func TestREQ107_RequiredUIDOnOtherLocatables(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// TestREQ107_CorpusCompositionsCarryNoUID is the REQ-107 Identity check,
+// over every vendored COMPOSITION template, that the generator writes no
+// COMPOSITION uid where the OPT does not require one, which no vendored
+// OPT does: the server that stores the composition gives it its version
+// id. It holds under every policy, both value fills and several fixed
+// seeds.
+func TestREQ107_CorpusCompositionsCarryNoUID(t *testing.T) {
+	checked := 0
+	eachCorpusRun(t, func(run corpusRun) {
+		comp, ok := run.out.(*rm.Composition)
+		if !ok {
+			return
+		}
+		if attr := run.compiled.Root().Attribute("uid"); attr != nil {
+			t.Fatalf("%s: the OPT constrains the COMPOSITION uid; this check assumes no vendored OPT does", run)
+		}
+		checked++
+		if comp.UID != nil {
+			t.Errorf("%s: COMPOSITION uid = %v, want none: the OPT does not require it", run, comp.UID)
+		}
+	})
+	if checked == 0 {
+		t.Fatal("no vendored COMPOSITION generated, so nothing was checked")
 	}
 }
