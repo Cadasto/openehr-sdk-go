@@ -47,3 +47,31 @@ func TestPrimitiveInput_Integer64Magnitude(t *testing.T) {
 		t.Fatalf("CInteger.Validate(%v) = %+v, want no violations", got, vs)
 	}
 }
+
+// REQ-102: an optional primitive attribute the RM holds by pointer reaches
+// the typed primitive validator as the value it points to, normalised as
+// that value is, so the constraint judges the value instead of rejecting the
+// pointer as wrong_type.
+func TestPrimitiveInput_REQ102_PointerHeldPrimitive(t *testing.T) {
+	t.Parallel()
+	flag, integer, integer64, number := true, rm.Integer(2), rm.Integer64(2), rm.Real(0.5)
+	tests := []struct {
+		in   any
+		want any
+		pc   constraints.PrimitiveConstraint
+	}{
+		{in: &flag, want: true, pc: constraints.CBoolean{TrueValid: true}},
+		{in: &integer, want: int64(2), pc: constraints.CInteger{}},
+		{in: &integer64, want: int64(2), pc: constraints.CInteger{}},
+		{in: &number, want: float64(0.5), pc: constraints.CReal{}},
+	}
+	for _, tc := range tests {
+		got := primitiveInput(tc.in)
+		if got != tc.want {
+			t.Errorf("primitiveInput(%T) = %#v (%T), want %#v (%T)", tc.in, got, got, tc.want, tc.want)
+		}
+		if vs := tc.pc.Validate(got); len(vs) != 0 {
+			t.Errorf("%T.Validate(primitiveInput(%T)) = %+v, want no violations", tc.pc, tc.in, vs)
+		}
+	}
+}
