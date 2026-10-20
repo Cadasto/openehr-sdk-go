@@ -201,8 +201,8 @@ func (n *CompiledNode) PrimitiveConstraint() constraints.PrimitiveConstraint {
 // `/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]` sees that root's
 // terminology rather than a sibling root's; where that root does not
 // define the code, the walk goes on to the roots further up, and the
-// first one that defines it answers. [RootTermItem] asks the nearest root
-// alone. Returns (zero, false) when no enclosing root defines the code.
+// first one that defines it answers. Returns (zero, false) when no
+// enclosing root defines the code.
 //
 // The lang parameter is accepted for forward compatibility but is
 // currently ignored: an ADL 1.4 OPT carries a single document
