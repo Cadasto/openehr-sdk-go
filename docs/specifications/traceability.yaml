@@ -1456,6 +1456,8 @@ requirements:
       - openehr/instance/code_phrase_terminology_internal_test.go
       - openehr/instance/code_phrase_terminology_test.go
       - openehr/instance/coded_rubric_test.go
+      - openehr/instance/coded_term_text_test.go
+      - openehr/instance/coded_text_internal_test.go
       - openehr/instance/composer_option_test.go
       - openehr/instance/constrained_datetime_test.go
       - openehr/instance/contract_inputs_test.go
@@ -1648,6 +1650,8 @@ requirements:
       - internal/rmaccess/reads_test.go
       - internal/rmroots/rmroots_test.go
       - openehr/instance/code_phrase_terminology_test.go
+      - openehr/instance/coded_term_text_test.go
+      - openehr/instance/coded_text_internal_test.go
       - openehr/instance/phase4_test.go
       - openehr/instance/proportion_kind_test.go
       - openehr/rm/interval_bound_test.go
