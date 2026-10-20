@@ -393,40 +393,72 @@ func TestREQ107_ProportionKeepsTheOPTWhereNoKindFits(t *testing.T) {
 }
 
 // TestREQ107_ProportionIntervalBoundsKeepTheirKind is the REQ-107 check
-// that the bounds of a DV_INTERVAL<DV_PROPORTION>, and of a
-// DV_INTERVAL<DV_ORDERED> holding proportions, are settled to their kind
-// before they are put in order, and stay so once they are: two fraction
-// bounds whose numerator ranges overlap only in part are drawn either way
-// round, and the in-order pair the generator writes keeps whole numbers.
+// (Output, Intervals) that the bounds of a DV_INTERVAL<DV_PROPORTION>, and
+// of a DV_INTERVAL<DV_ORDERED> holding proportions, are settled to their
+// kind before they are put in order, and stay so once they are, inside
+// their own side's OPT constraints: the in-order pair the generator writes
+// keeps whole numbers wherever a bound is a fraction or has precision 0,
+// whether the two sides constrain precision differently or draw it each
+// on its own from one range, and the RM floor and the template validator
+// pass. Each case's two numerator ranges overlap, so RandomFill draws the
+// bounds either way round.
 func TestREQ107_ProportionIntervalBoundsKeepTheirKind(t *testing.T) {
 	count := instance.ReadVendoredOPT(t, instance.CountIntervalOPT)
-	lower := instance.ProportionKindBound(instance.RealRange(instance.Closed(5.5), instance.Closed(10.5)), instance.IntList(3))
-	upper := instance.ProportionKindBound(instance.RealRange(instance.Closed(0), instance.Closed(7.5)), instance.IntList(3))
-	for _, param := range []string{"DV_PROPORTION", "DV_ORDERED"} {
-		t.Run(param, func(t *testing.T) {
-			c := compileSyntheticOPT(t, instance.RetargetInterval(t, count, param, lower, upper))
-			compared := 0
-			for seed := range uint64(orderSeeds) {
-				opts := intervalOptions(instance.Large)
-				opts.ValueFill = instance.RandomFill
-				opts.ValueSource = mrand.NewPCG(seed, 1)
-				root, doc := generateWithJSON(t, c, opts)
-				visitRM(root, func(path string, p rm.DVProportion) {
-					if breaks := proportionKindBreaks(p); len(breaks) > 0 {
-						t.Errorf("seed %d: DV_PROPORTION %s at %s breaks %v", seed, proportionText(p), path, breaks)
-					}
-				})
-				walkIntervals(doc, "", func(path string, iv map[string]any) {
-					if _, _, ok := boundedPair(iv); !ok {
-						return
-					}
-					compared++
-					proportionInOrder(t, seed, path, iv)
-				})
-			}
-			if compared == 0 {
-				t.Fatal("no bounded DV_INTERVAL generated, so nothing was checked")
-			}
-		})
+	r, closed := instance.RealRange, instance.Closed
+	tenth := r(closed(0), closed(10))
+	cases := []struct {
+		name         string
+		lower, upper string
+	}{
+		{
+			name:  "fractions over numerator ranges that overlap in part",
+			lower: instance.ProportionKindBound(r(closed(5.5), closed(10.5)), instance.IntList(3), ""),
+			upper: instance.ProportionKindBound(r(closed(0), closed(7.5)), instance.IntList(3), ""),
+		},
+		{
+			name:  "ratios of precision 0 below and no precision above",
+			lower: instance.ProportionKindBound(tenth, instance.IntList(0), instance.IntList(0)),
+			upper: instance.ProportionKindBound(tenth, instance.IntList(0), ""),
+		},
+		{
+			name:  "ratios of no precision below and precision 0 above",
+			lower: instance.ProportionKindBound(tenth, instance.IntList(0), ""),
+			upper: instance.ProportionKindBound(tenth, instance.IntList(0), instance.IntList(0)),
+		},
+		{
+			name:  "ratios that both draw a precision in 0..2",
+			lower: instance.ProportionKindBound(tenth, instance.IntList(0), instance.IntRange(closed(0), closed(2))),
+			upper: instance.ProportionKindBound(tenth, instance.IntList(0), instance.IntRange(closed(0), closed(2))),
+		},
+	}
+	for _, tc := range cases {
+		for _, param := range []string{"DV_PROPORTION", "DV_ORDERED"} {
+			t.Run(tc.name+"/"+param, func(t *testing.T) {
+				c := compileSyntheticOPT(t, instance.RetargetInterval(t, count, param, tc.lower, tc.upper))
+				compared := 0
+				for seed := range uint64(orderSeeds) {
+					opts := intervalOptions(instance.Large)
+					opts.ValueFill = instance.RandomFill
+					opts.ValueSource = mrand.NewPCG(seed, 1)
+					root, doc := generateWithJSON(t, c, opts)
+					visitRM(root, func(path string, p rm.DVProportion) {
+						if breaks := proportionKindBreaks(p); len(breaks) > 0 {
+							t.Errorf("seed %d: DV_PROPORTION %s at %s breaks %v", seed, proportionText(p), path, breaks)
+						}
+					})
+					walkIntervals(doc, "", func(path string, iv map[string]any) {
+						if _, _, ok := boundedPair(iv); !ok {
+							return
+						}
+						compared++
+						proportionInOrder(t, seed, path, iv)
+					})
+					checkValid(t, root, c)
+				}
+				if compared == 0 {
+					t.Fatal("no bounded DV_INTERVAL generated, so nothing was checked")
+				}
+			})
+		}
 	}
 }

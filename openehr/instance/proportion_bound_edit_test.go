@@ -1,13 +1,20 @@
 package instance
 
 // ProportionKindBound is one DV_PROPORTION bound whose numerator carries
-// the C_REAL body realBody and whose type carries the C_INTEGER body
-// typeBody; the denominator is left open.
-func ProportionKindBound(realBody, typeBody string) string {
+// the C_REAL body realBody, whose type carries the C_INTEGER body typeBody
+// and whose precision carries the C_INTEGER body precisionBody; the
+// denominator is left open, and so is the precision when precisionBody is
+// "".
+func ProportionKindBound(realBody, typeBody, precisionBody string) string {
+	precision := ""
+	if precisionBody != "" {
+		precision = boundPrimitive("precision", "INTEGER", "C_INTEGER", precisionBody)
+	}
 	return `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>DV_PROPORTION</rm_type_name>` +
 		boundOccurrences + `<node_id></node_id>` +
 		boundPrimitive("numerator", "REAL", "C_REAL", realBody) +
 		boundPrimitive("type", "INTEGER", "C_INTEGER", typeBody) +
+		precision +
 		`</children>`
 }
 
