@@ -64,6 +64,11 @@ type dvCase struct {
 	// (REQ-107 § Exceptions and known gaps), so the template validator
 	// reports it and only the RM floor is checked.
 	floorOnly bool
+	// unchecked is set where the OPT pins a value no RM rule accepts, which
+	// the generator keeps (REQ-107 § Exceptions and known gaps), so no
+	// validator is run: a validator that stays silent does so only because
+	// it does not evaluate that rule.
+	unchecked bool
 }
 
 // runDataValueCases generates each case under its policies, both value
@@ -82,6 +87,9 @@ func runDataValueCases(t *testing.T, cases []dvCase) {
 						t.Fatalf("Generate: %v, want a root", err)
 					}
 					tc.check(t, out)
+					if tc.unchecked {
+						return
+					}
 					if tc.floorOnly {
 						noFloorErrors(t, out)
 						return
@@ -464,8 +472,8 @@ func TestREQ107_QuantifiedAttributesAreWritten(t *testing.T) {
 				t.Helper()
 				d := dvValue[*rm.DVDate](t, out)
 				checkHeldString(t, "DV_DATE.magnitude_status", d.MagnitudeStatus, "~")
-				if d.Accuracy == nil || d.Accuracy.Value == "" {
-					t.Errorf("DV_DATE.accuracy = %+v, want a DV_DURATION with a value", d.Accuracy)
+				if d.Accuracy == nil || d.Accuracy.Value != "P0D" {
+					t.Errorf("DV_DATE.accuracy = %+v, want a DV_DURATION of the sentinel P0D", d.Accuracy)
 				}
 			},
 		},
@@ -523,8 +531,11 @@ func TestREQ107_StateParagraphAndTimeSpecificationsAreWritten(t *testing.T) {
 			value: optNode("DV_STATE", ""),
 			check: func(t *testing.T, out any) {
 				t.Helper()
-				if s := dvValue[*rm.DVState](t, out); s.Value.DefiningCode.CodeString == "" {
-					t.Errorf("DV_STATE.value = %+v, want a coded text", s.Value)
+				// REQ-107 Placeholders: the code at0000 in local, where neither
+				// the OPT nor an RM default gives a value.
+				local := rm.CodePhrase{CodeString: "at0000", TerminologyID: rm.TerminologyID{Value: "local"}}
+				if s := dvValue[*rm.DVState](t, out); s.Value.DefiningCode != local {
+					t.Errorf("DV_STATE.value.defining_code = %+v, want %+v", s.Value.DefiningCode, local)
 				}
 			},
 		},
@@ -567,10 +578,15 @@ func TestREQ107_StateParagraphAndTimeSpecificationsAreWritten(t *testing.T) {
 			check: periodicFormalism("HL7:EIVL"),
 		},
 		{
+			// Value_valid admits HL7:PIVL and HL7:EIVL alone, so the root
+			// breaks it. The RM floor does not evaluate that invariant (it is
+			// out of scope in its inventory), so it would pass on that gap
+			// alone, and no validator is run.
 			name: "DV_PERIODIC_TIME_SPECIFICATION with its formalism pinned to one the RM rejects",
 			value: optNode("DV_PERIODIC_TIME_SPECIFICATION", "", optSingle("value", optNode("DV_PARSABLE", "",
 				optSingle("formalism", guardString("HL7:GTS"))))),
-			check: periodicFormalism("HL7:GTS"),
+			check:     periodicFormalism("HL7:GTS"),
+			unchecked: true,
 		},
 	})
 }
