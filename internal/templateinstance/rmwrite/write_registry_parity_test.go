@@ -12,12 +12,14 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// The two tests below tie the hand-written writers to the RM metadata. The
+// The tests below tie the hand-written writers to the RM metadata. The
 // instance generator fills BMM-required defaults through EnsureSingle and
 // AppendMultiple and drops their error, so a writer case that goes missing
-// drops a required default without an error. Neither test keeps a hand list of
+// drops a required default without an error. No test keeps a hand list of
 // writer cases: they ask the writers about every pair of a registered class
-// and an attribute name, and compare the answers with openehr/rm/rminfo.
+// and an attribute name, and compare the answers with openehr/rm/rminfo. The
+// reachability test also walks rminfo from every concrete LOCATABLE, so it
+// sees the classes a value can be that no writer has a case for at all.
 
 // probeChild is a child value no writer accepts: it is no RM type and
 // implements no RM interface. Handing it to a writer exercises the writer's
@@ -226,9 +228,10 @@ var skippedLocatableAttrs = []string{"archetype_details", "feeder_audit", "links
 // abstract type standing for its concrete descendants. It does not follow
 // the LOCATABLE attributes skippedLocatableAttrs names; an attribute of the
 // same name a class declares itself is followed. It does not walk through a
-// class registered leaves out, since nothing can build a value of it. A
+// class missing from registered, since nothing can build a value of it. A
 // primitive or a generic parameter (String, T) is not a class of model and
-// ends the walk.
+// ends the walk, so a class used only as a type argument, such as the T of a
+// DV_INTERVAL<T>, would not be reached.
 func reachableClasses(model rmModel, registered map[string]bool) []string {
 	seen := map[string]bool{}
 	var queue []string
@@ -261,7 +264,8 @@ func reachableClasses(model rmModel, registered map[string]bool) []string {
 // for with the pinned ones, and lists each class that differs, sorted: a
 // reachable class with no writer case that is not pinned, a pinned class a
 // writer now has a case for, and a pinned class the closure no longer
-// reaches.
+// reaches, because no concrete LOCATABLE reaches it or the type registry
+// does not register it.
 func unreachedDrift(reachable []string, arms armTable, pinned map[string]string) []string {
 	classes := slices.Clone(reachable)
 	for class := range pinned {
@@ -280,7 +284,7 @@ func unreachedDrift(reachable []string, arms armTable, pinned map[string]string)
 		case isReachable && !written && !isPinned:
 			out = append(out, class+": reachable and no writer has a case for it, but it is not pinned")
 		case isPinned && !isReachable:
-			out = append(out, class+": pinned, but no concrete LOCATABLE reaches it any more")
+			out = append(out, class+": pinned, but no concrete LOCATABLE reaches it, or the type registry does not register it")
 		case isPinned && written:
 			out = append(out, class+": pinned, but a writer now has a case for it")
 		}
@@ -597,13 +601,14 @@ func TestREQ107_WriterParentAttributeParity(t *testing.T) {
 
 // pinnedUnreached lists the registered classes a value below a LOCATABLE can
 // be that neither writer has a case for (reachableClasses says how the set is
-// found). It is the measured residual, not a judgement: each class here is a
-// value the instance generator cannot build when an OPT puts one under an
-// attribute. The value is the reason a class stays, and is empty for a gap a
-// writer is meant to close. Classes reached only through LOCATABLE's links,
-// feeder_audit, archetype_details or uid (LINK, FEEDER_AUDIT, ARCHETYPED and
-// what only they hold) are not listed, because the closure does not follow
-// those attributes.
+// found). It is the measured residual, not a judgement: rmwrite has no case to
+// write any attribute of an instance of a class here, so where an OPT
+// constrains one of its attributes the instance generator cannot write what
+// the OPT constrains. The value is the reason a class stays, and is empty for
+// a gap a writer is meant to close. Classes reached only through LOCATABLE's
+// links, feeder_audit, archetype_details or uid (LINK, FEEDER_AUDIT,
+// ARCHETYPED and what only they hold) are not listed, because the closure
+// does not follow those attributes.
 var pinnedUnreached = map[string]string{
 	"ACCESS_GROUP_REF":               "",
 	"ARCHETYPE_ID":                   "",
@@ -694,14 +699,14 @@ func TestREQ107_WriterReachableClassParity(t *testing.T) {
 					root.AttrOrder = slices.DeleteFunc(root.AttrOrder, func(a string) bool { return a == "value" })
 					data["FIX_ROOT"] = root
 				},
-				want: []string{"FIX_VALUE_B: pinned, but no concrete LOCATABLE reaches it any more"},
+				want: []string{"FIX_VALUE_B: pinned, but no concrete LOCATABLE reaches it, or the type registry does not register it"},
 			},
 			{
 				name:     "class dropped from the registry",
 				registry: func(reg map[string]bool) { delete(reg, "FIX_REF") },
 				want: []string{
-					"FIX_LINKED: pinned, but no concrete LOCATABLE reaches it any more",
-					"FIX_REF: pinned, but no concrete LOCATABLE reaches it any more",
+					"FIX_LINKED: pinned, but no concrete LOCATABLE reaches it, or the type registry does not register it",
+					"FIX_REF: pinned, but no concrete LOCATABLE reaches it, or the type registry does not register it",
 				},
 			},
 			{
@@ -743,9 +748,11 @@ func TestREQ107_WriterReachableClassParity(t *testing.T) {
 		if drift := unreachedDrift(reachable, registryArms(t, model), pinnedUnreached); len(drift) > 0 {
 			t.Errorf("the reachable RM classes rmwrite has no writer case for drifted from pinnedUnreached:\n  %s\n"+
 				"A pinned class that now has a writer case leaves pinnedUnreached, and its unwritten "+
-				"attributes go into pinnedUnwritten. A class that became reachable either gets writer "+
-				"cases in write.go, or is added to pinnedUnreached on purpose. A class whose last writer "+
-				"case was removed makes the instance generator fail on it: restore the case.",
+				"attributes go into pinnedUnwritten. A pinned class no concrete LOCATABLE reaches any "+
+				"more, or that the type registry no longer registers, leaves pinnedUnreached too. A class "+
+				"that became reachable either gets writer cases in write.go, or is added to "+
+				"pinnedUnreached on purpose. A class whose last writer case was removed makes the "+
+				"instance generator fail on it: restore the case.",
 				strings.Join(drift, "\n  "))
 		}
 	})
