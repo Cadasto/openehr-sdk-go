@@ -104,7 +104,7 @@ func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 		{
 			name: "vital_signs",
 			want: map[instance.Policy]policyLevel{
-				instance.Large: {values: 519, archetypes: map[string]int{
+				instance.Large: {values: 516, archetypes: map[string]int{
 					encounter: 1,
 					"openEHR-EHR-OBSERVATION.blood_pressure.v1":       1,
 					"openEHR-EHR-OBSERVATION.body_temperature.v1":     1,
@@ -113,18 +113,18 @@ func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 					"openEHR-EHR-CLUSTER.device.v1":                   2,
 					"openEHR-EHR-CLUSTER.environmental_conditions.v1": 1,
 				}},
-				instance.Medium: {values: 189, archetypes: map[string]int{
+				instance.Medium: {values: 186, archetypes: map[string]int{
 					encounter: 1,
 					"openEHR-EHR-OBSERVATION.blood_pressure.v1": 1,
 					"openEHR-EHR-CLUSTER.device.v1":             1,
 				}},
-				instance.Required: {values: 56, archetypes: map[string]int{encounter: 1}},
+				instance.Required: {values: 53, archetypes: map[string]int{encounter: 1}},
 			},
 		},
 		{
 			name: "social",
 			want: map[instance.Policy]policyLevel{
-				instance.Large: {values: 676, archetypes: map[string]int{
+				instance.Large: {values: 673, archetypes: map[string]int{
 					encounter: 1,
 					"openEHR-EHR-OBSERVATION.livingsituation.v1":        1,
 					"openEHR-EHR-OBSERVATION.languageproficiency.v1":    1,
@@ -134,11 +134,11 @@ func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 					"openEHR-EHR-EVALUATION.education_summary.v1":       1,
 					"openEHR-EHR-CLUSTER.contact_persons_context.v1":    1,
 				}},
-				instance.Medium: {values: 142, archetypes: map[string]int{
+				instance.Medium: {values: 139, archetypes: map[string]int{
 					encounter: 1,
 					"openEHR-EHR-OBSERVATION.livingsituation.v1": 1,
 				}},
-				instance.Required: {values: 56, archetypes: map[string]int{encounter: 1}},
+				instance.Required: {values: 53, archetypes: map[string]int{encounter: 1}},
 			},
 		},
 	}
@@ -179,7 +179,7 @@ func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 
 // TestREQ107_ZeroPolicyBuildsMedium is the REQ-107 check of Levels and
 // names on vital_signs: Options with no Policy builds the medium level, the
-// tree Medium builds in TestREQ107_PoliciesBuildTheirLevels, with 189 JSON
+// tree Medium builds in TestREQ107_PoliciesBuildTheirLevels, with 186 JSON
 // values and, besides the composition's own archetype, only the first
 // optional content OBSERVATION and the device CLUSTER it holds.
 func TestREQ107_ZeroPolicyBuildsMedium(t *testing.T) {
@@ -190,7 +190,7 @@ func TestREQ107_ZeroPolicyBuildsMedium(t *testing.T) {
 		Now:       defaultsNow,
 	})
 	tree := decodedJSON(t, comp)
-	if got, want := jsonValueCount(tree), 189; got != want {
+	if got, want := jsonValueCount(tree), 186; got != want {
 		t.Errorf("Generate(vital_signs) with no Policy holds %d JSON values, want Medium's %d", got, want)
 	}
 	got := make(map[string]int)

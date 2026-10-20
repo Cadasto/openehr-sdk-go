@@ -119,8 +119,8 @@ func TestGenerateVitalSignsMedium(t *testing.T) {
 	} else if comp.ArchetypeDetails.TemplateID == nil || comp.ArchetypeDetails.TemplateID.Value == "" {
 		t.Error("ArchetypeDetails.TemplateID is empty on template root")
 	}
-	if comp.UID == nil {
-		t.Error("UID is nil on template root")
+	if comp.UID != nil {
+		t.Errorf("UID = %v on template root, want none: vital_signs does not require it", comp.UID)
 	}
 }
 
