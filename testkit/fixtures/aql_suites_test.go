@@ -6,24 +6,26 @@ import (
 	"maps"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
-// The AQL suite corpus is the input to PROBE-107. It must carry its own
-// provenance pin and generated exclusion list beside the mirrored AQL/ tree,
-// and one ingest, scripts/ingest-robot-aql.sh, writes it and the AQL
-// conformance corpus from one pinned clone, so the two pins name one commit.
-// The first test checks the vendored tree; the others run the ingest against a
-// small synthetic upstream clone, with the script's pinned commit rewritten to
-// a commit of that clone, so its layout, re-run and refusal behaviour, and its
-// independence from the clone's working tree, are checked without the real
-// upstream.
+// The AQL suite corpus is the tree's one AQL corpus and the input to
+// PROBE-107. It must carry its own provenance pin and generated exclusion list
+// beside the mirrored AQL/ tree, and its own ingest, scripts/ingest-robot-aql.sh,
+// writes it from one pinned clone. The first two tests check the vendored
+// tree, and the third checks the second's check on crafted trees; the others
+// run the ingest against a small synthetic upstream clone, with the script's
+// pinned commit rewritten to a commit of that clone, so its layout, re-run and
+// refusal behaviour, and its independence from the clone's working tree, are
+// checked without the real upstream.
 
 func TestAQLSuitesRootHoldsPinnedCorpus_PROBE107_REQ160(t *testing.T) {
 	t.Parallel()
@@ -36,14 +38,147 @@ func TestAQLSuitesRootHoldsPinnedCorpus_PROBE107_REQ160(t *testing.T) {
 	if fi, err := os.Stat(filepath.Join(root, "AQL")); err != nil || !fi.IsDir() {
 		t.Errorf("AQL under AQLSuitesRoot() %s: stat error %v; want a directory", root, err)
 	}
-	suites := pinFields(readText(t, filepath.Join(root, "AQL_SOURCE.txt")))
-	conformance := pinFields(readText(t, filepath.Join(fixtures.AQLConformanceRoot(), "AQL_SOURCE.txt")))
+	pin := pinFields(readText(t, filepath.Join(root, "AQL_SOURCE.txt")))
 	for _, key := range []string{"source_repo", "commit", "commit_date"} {
-		if suites[key] == "" || suites[key] != conformance[key] {
-			t.Errorf("suite pin %s = %q, conformance pin %s = %q; want one non-empty value "+
-				"(re-run scripts/ingest-robot-aql.sh; never edit a pin)", key, suites[key], key, conformance[key])
+		if pin[key] == "" {
+			t.Errorf("suite pin %s is empty; want a value "+
+				"(re-run scripts/ingest-robot-aql.sh; never edit a pin)", key)
 		}
 	}
+	// The pin records the commit the ingest read, which is the script's
+	// EXPECTED_COMMIT: a pin edited by hand, or a re-pin that moved one of the
+	// two without the other, names another.
+	script := readText(t, filepath.Join(fixtures.CorpusRoot(), "..", "..", "scripts", "ingest-robot-aql.sh"))
+	lines := expectedCommitRE.FindAllString(script, -1)
+	if len(lines) != 1 {
+		t.Fatalf("scripts/ingest-robot-aql.sh has %d EXPECTED_COMMIT lines, want 1", len(lines))
+	}
+	want := strings.TrimPrefix(lines[0], "EXPECTED_COMMIT=")
+	if pin["commit"] != want {
+		t.Errorf("suite pin commit = %q, want the ingest's EXPECTED_COMMIT %q "+
+			"(re-run scripts/ingest-robot-aql.sh; never edit a pin)", pin["commit"], want)
+	}
+	if !strings.Contains(pin["source_tree"], "/tree/"+want+"/") {
+		t.Errorf("suite pin source_tree = %q, want it to name the commit %s", pin["source_tree"], want)
+	}
+}
+
+// testkit/corpus/aql/ holds one vendored AQL corpus, suites/. Beside it sits
+// lint/, the hand-written PROBE-028 lint inputs, which no ingest vendors: only
+// *.aql files, directly in it. Any other entry, such as a second vendored
+// corpus beside suites/ or under lint/, fails here by name.
+func TestAQLCorpusTreeHoldsOneVendoredCorpus_REQ160(t *testing.T) {
+	t.Parallel()
+	strays, err := aqlCorpusStrays(os.DirFS(filepath.Dir(fixtures.AQLSuitesRoot())))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, rel := range strays {
+		t.Errorf("%s/%s exists; want only suites/, the one vendored AQL corpus, "+
+			"and lint/, which holds only the hand-written *.aql lint inputs, directly in it", aqlCorpusDir, rel)
+	}
+}
+
+// The check above names a second corpus wherever it sits: crafted trees with
+// one beside suites/ or under lint/ fail by name, and a tree shaped like the
+// vendored one passes.
+func TestAQLCorpusStraysNamesEveryOtherEntry_REQ160(t *testing.T) {
+	t.Parallel()
+	vendored := func(extra fstest.MapFS) fstest.MapFS {
+		fsys := fstest.MapFS{
+			"suites/AQL_SOURCE.txt":      {},
+			"suites/EXCLUDED.txt":        {},
+			"suites/AQL/__init__.robot":  {},
+			"lint/bad_syntax.aql":        {},
+			"lint/missing_archetype.aql": {},
+			"lint/valid.aql":             {},
+		}
+		maps.Copy(fsys, extra)
+		return fsys
+	}
+	cases := []struct {
+		name string
+		fsys fstest.MapFS
+		// want is every entry the check must name, in lexical order.
+		want []string
+	}{
+		{name: "the vendored layout", fsys: vendored(nil)},
+		{
+			name: "second corpus beside suites",
+			fsys: vendored(fstest.MapFS{"conformance/AND_OR/x.csv": {}}),
+			want: []string{"conformance"},
+		},
+		{
+			name: "second corpus under lint",
+			fsys: vendored(fstest.MapFS{"lint/conformance/AND_OR/x.csv": {}}),
+			want: []string{"lint/conformance", "lint/conformance/AND_OR", "lint/conformance/AND_OR/x.csv"},
+		},
+		{
+			name: "AQL file in a subdirectory of lint",
+			fsys: vendored(fstest.MapFS{"lint/more/extra.aql": {}}),
+			want: []string{"lint/more", "lint/more/extra.aql"},
+		},
+		{
+			name: "file of another kind in lint",
+			fsys: vendored(fstest.MapFS{"lint/from_simple_and_or.csv": {}, "lint/valid.AQL": {}}),
+			want: []string{"lint/from_simple_and_or.csv", "lint/valid.AQL"},
+		},
+		{
+			name: "symbolic link in lint",
+			fsys: vendored(fstest.MapFS{"lint/link.aql": {Data: []byte("valid.aql"), Mode: fs.ModeSymlink}}),
+			want: []string{"lint/link.aql"},
+		},
+		{
+			name: "lint that is a file",
+			fsys: fstest.MapFS{"suites/AQL_SOURCE.txt": {}, "lint": {}},
+			want: []string{"lint"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := aqlCorpusStrays(tc.fsys)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("aqlCorpusStrays() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// aqlCorpusStrays returns, in lexical order and relative to the root of fsys,
+// every entry of an AQL corpus tree other than suites/, lint/ and the regular
+// *.aql files directly in lint/. A subdirectory of lint/ is returned with
+// everything below it.
+func aqlCorpusStrays(fsys fs.FS) ([]string, error) {
+	entries, err := fs.ReadDir(fsys, ".")
+	if err != nil {
+		return nil, err
+	}
+	var strays []string
+	for _, e := range entries {
+		switch {
+		case e.Name() == "suites":
+		case e.Name() == "lint" && e.IsDir():
+			err = fs.WalkDir(fsys, "lint", func(p string, d fs.DirEntry, err error) error {
+				if err != nil || p == "lint" {
+					return err
+				}
+				if path.Dir(p) != "lint" || !d.Type().IsRegular() || path.Ext(p) != ".aql" {
+					strays = append(strays, p)
+				}
+				return nil
+			})
+			if err != nil {
+				return nil, err
+			}
+		default:
+			strays = append(strays, e.Name())
+		}
+	}
+	return strays, nil
 }
 
 func TestIngestRobotAQLWritesSuiteCorpus_PROBE107_REQ160(t *testing.T) {
@@ -87,14 +222,19 @@ func TestIngestRobotAQLWritesSuiteCorpus_PROBE107_REQ160(t *testing.T) {
 				t.Fatalf("ingest at the pin: %v\n%s", err, out)
 			}
 			got := tree(t, filepath.Join(sdk, suitesDir))
+			// The suite corpus is the one AQL corpus: the run writes
+			// nothing else under testkit/corpus/aql.
+			for _, rel := range slices.Sorted(maps.Keys(tree(t, filepath.Join(sdk, aqlCorpusDir)))) {
+				if !strings.HasPrefix(rel, "suites/") {
+					t.Errorf("the ingest wrote %s/%s; want it to write only under %s", aqlCorpusDir, rel, suitesDir)
+				}
+			}
 
 			carried := []string{
 				"AQL/__init__.robot",
 				"AQL/FROM/AND_OR/from_and_or.robot",
 				fieldsAndResults + "/where/combinations/compare.csv",
-			}
-			for _, name := range h.inputs {
-				carried = append(carried, fieldsAndResults+"/from/combinations/"+name)
+				fromCSV,
 			}
 			for _, rel := range carried {
 				if want := h.blob(t, up, head, "tests/robot/"+rel); got[rel] != want {
@@ -115,14 +255,6 @@ func TestIngestRobotAQLWritesSuiteCorpus_PROBE107_REQ160(t *testing.T) {
 			if gotExcluded := records(got["EXCLUDED.txt"]); !slices.Equal(gotExcluded, wantExcluded) {
 				t.Errorf("EXCLUDED.txt records = %q, want %q", gotExcluded, wantExcluded)
 			}
-			wantConformanceExcluded := []string{
-				"where/combinations/compare.csv non-from-family",
-				"where/expected_compare.json execution-semantics",
-			}
-			conformanceExcluded := records(readText(t, filepath.Join(sdk, conformanceDir, "EXCLUDED.txt")))
-			if !slices.Equal(conformanceExcluded, wantConformanceExcluded) {
-				t.Errorf("conformance EXCLUDED.txt records = %q, want %q", conformanceExcluded, wantConformanceExcluded)
-			}
 
 			pin := pinFields(got["AQL_SOURCE.txt"])
 			wantPin := map[string]string{
@@ -135,12 +267,6 @@ func TestIngestRobotAQLWritesSuiteCorpus_PROBE107_REQ160(t *testing.T) {
 			for _, key := range slices.Sorted(maps.Keys(wantPin)) {
 				if pin[key] != wantPin[key] {
 					t.Errorf("AQL_SOURCE.txt %s = %q, want %q", key, pin[key], wantPin[key])
-				}
-			}
-			conformance := pinFields(readText(t, filepath.Join(sdk, conformanceDir, "AQL_SOURCE.txt")))
-			for _, key := range []string{"source_repo", "commit", "commit_date"} {
-				if conformance[key] != pin[key] {
-					t.Errorf("conformance pin %s = %q, suite pin %s = %q; want one value from one run", key, conformance[key], key, pin[key])
 				}
 			}
 		})
@@ -196,7 +322,7 @@ func TestIngestRobotAQLSuiteCorpusReRunAndRePin_PROBE107_REQ160(t *testing.T) {
 	}
 }
 
-// The pinned commit, not the clone's working tree, determines both corpora:
+// The pinned commit, not the clone's working tree, determines the corpus:
 // a run from a clone whose HEAD has moved past the pin, and whose working tree
 // then differs from HEAD in each way listed below, writes exactly what a run
 // from the pristine clone wrote.
@@ -215,7 +341,7 @@ func TestIngestRobotAQLReadsOnlyThePinnedCommit_PROBE107_REQ160(t *testing.T) {
 	// HEAD moves past the pin: a later commit adds a suite, rewrites a FROM
 	// input and drops the note under AQL/.
 	writeText(t, filepath.Join(robot, "AQL/FROM/later.robot"), "*** Test Cases ***\n")
-	writeText(t, filepath.Join(far, "from/combinations", h.inputs[0]), "later\n")
+	writeText(t, filepath.Join(robot, filepath.FromSlash(fromCSV)), "later\n")
 	h.git(t, up, "rm", "-q", "tests/robot/AQL/ORDER_BY/tests_to_add.txt")
 	if head := h.commitAll(t, up); head == pin {
 		t.Fatalf("HEAD = the pin %s after a new commit; want it past the pin", pin)
@@ -346,14 +472,6 @@ func TestIngestRobotAQLRefusesBeforeWriting_PROBE107_REQ160(t *testing.T) {
 			want: "AQL/FROM/keywords.resource",
 		},
 		{
-			name: "FROM CSV in another combinations directory",
-			change: func(t *testing.T, up string) {
-				writeText(t, filepath.Join(up, "tests/robot", fieldsAndResults, "from/legacy/combinations/old.csv"), "a\n")
-				h.commitAll(t, up)
-			},
-			want: "from/legacy/combinations/old.csv",
-		},
-		{
 			name: "CSV outside a combinations directory",
 			change: func(t *testing.T, up string) {
 				writeText(t, filepath.Join(up, "tests/robot", fieldsAndResults, "where/stray.csv"), "a\n")
@@ -408,9 +526,7 @@ func TestIngestRobotAQLRefusesBeforeWriting_PROBE107_REQ160(t *testing.T) {
 		{
 			name: "ROBOT_ROOT elsewhere under tests/robot",
 			change: func(t *testing.T, up string) {
-				for _, name := range h.inputs {
-					writeText(t, filepath.Join(up, "tests/robot/data/sets/aql/fields_and_results/from/combinations", name), "from\n")
-				}
+				writeText(t, filepath.Join(up, "tests/robot/data/sets/aql/fields_and_results/where/combinations/compare.csv"), "a,b\n")
 				h.commitAll(t, up)
 			},
 			robotRoot: "tests/robot/data/sets",
@@ -449,18 +565,78 @@ func TestIngestRobotAQLRefusesBeforeWriting_PROBE107_REQ160(t *testing.T) {
 	}
 }
 
+// The ingest has no default clone. Without ROBOT_ROOT, or with it empty, it
+// refuses before it writes anything, and says what ROBOT_ROOT must name.
+func TestIngestRobotAQLRequiresRobotRoot(t *testing.T) {
+	t.Parallel()
+	h := newAQLIngest(t)
+	cases := []struct {
+		name string
+		// env is added to the ingest's environment, which holds no
+		// ROBOT_ROOT of its own.
+		env []string
+		// ingested runs an ingest with ROBOT_ROOT set first, so the
+		// refusal meets a vendored corpus it must leave alone. Without it
+		// the scratch tree holds only the script, so a directory the script
+		// makes before its guard shows up as new, even one an ingest also
+		// makes.
+		ingested bool
+	}{
+		{name: "ROBOT_ROOT unset, script only"},
+		{name: "ROBOT_ROOT empty, script only", env: []string{"ROBOT_ROOT="}},
+		{name: "ROBOT_ROOT unset, after an ingest", ingested: true},
+		{name: "ROBOT_ROOT empty, after an ingest", env: []string{"ROBOT_ROOT="}, ingested: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			up, head := h.newUpstream(t)
+			sdk := h.newSDK(t, head)
+			if tc.ingested {
+				if out, err := h.ingest(t, sdk, up, ""); err != nil {
+					t.Fatalf("ingest with ROBOT_ROOT set: %v\n%s", err, out)
+				}
+			}
+			before, beforeEntries := tree(t, sdk), entries(t, sdk)
+
+			out, err := h.run(t, sdk, tc.env...)
+			if err == nil {
+				t.Fatalf("ingest succeeded; want a refusal naming ROBOT_ROOT\n%s", out)
+			}
+			for _, want := range robotRootRefusal {
+				if !strings.Contains(out, want) {
+					t.Errorf("ingest refused with %q; want the refusal to name %q", out, want)
+				}
+			}
+			if after := entries(t, sdk); !slices.Equal(after, beforeEntries) {
+				t.Errorf("the refusal left the scratch tree holding %q; want %q", after, beforeEntries)
+			}
+			if changed := changedFiles(before, tree(t, sdk)); len(changed) > 0 {
+				t.Errorf("the refusal changed %q in the scratch tree; want nothing changed", changed)
+			}
+		})
+	}
+}
+
+// robotRootRefusal is what both Robot ingests print when ROBOT_ROOT is unset
+// or empty: the variable, the upstream directory it must name, and the clone
+// that directory belongs to.
+var robotRootRefusal = []string{
+	"ROBOT_ROOT is unset or empty",
+	"tests/robot/_resources/test_data_sets",
+	"ehrbase/integration-tests",
+}
+
 // Paths in the scratch trees, slash-separated.
 const (
 	fieldsAndResults = "_resources/test_data_sets/aql/fields_and_results"
 	aqlCorpusDir     = "testkit/corpus/aql"
 	suitesDir        = aqlCorpusDir + "/suites"
-	conformanceDir   = aqlCorpusDir + "/conformance"
+	// fromCSV is the FROM-family combination CSV of the synthetic upstream.
+	fromCSV = fieldsAndResults + "/from/combinations/from_simple_and_or.csv"
 )
 
 var (
-	// corpusEntryRE matches one entry of the ingest script's CORPUS list,
-	// `"FAMILY name.csv"`, and captures the CSV name.
-	corpusEntryRE = regexp.MustCompile(`(?m)^\s+"[A-Z_]+ ([^"\s/]+\.csv)"$`)
 	// expectedCommitRE matches the ingest script's pinned commit.
 	expectedCommitRE = regexp.MustCompile(`(?m)^EXPECTED_COMMIT=[0-9a-f]+$`)
 	// recordedRE matches a pin's recording date line.
@@ -471,9 +647,6 @@ var (
 type aqlIngest struct {
 	bash, gitBin string
 	script       []byte
-	// inputs are the FROM-family CSV names the script's CORPUS list
-	// requires every upstream clone to hold.
-	inputs []string
 	// env isolates git and the ingest from the host: no inherited GIT_* or
 	// ROBOT_* variable, no global or system configuration, no global
 	// ignore file.
@@ -494,15 +667,6 @@ func newAQLIngest(t *testing.T) *aqlIngest {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var inputs []string
-	for _, m := range corpusEntryRE.FindAllSubmatch(script, -1) {
-		if name := string(m[1]); !slices.Contains(inputs, name) {
-			inputs = append(inputs, name)
-		}
-	}
-	if len(inputs) == 0 {
-		t.Fatal("no CORPUS entry found in scripts/ingest-robot-aql.sh")
-	}
 	home := t.TempDir()
 	var env []string
 	for _, kv := range os.Environ() {
@@ -518,7 +682,7 @@ func newAQLIngest(t *testing.T) *aqlIngest {
 		"GIT_COMMITTER_NAME=fixture", "GIT_COMMITTER_EMAIL=fixture@example.org",
 		"GIT_AUTHOR_DATE=2026-01-02T03:04:05Z", "GIT_COMMITTER_DATE=2026-01-02T03:04:05Z",
 	)
-	return &aqlIngest{bash: bash, gitBin: gitBin, script: script, inputs: inputs, env: slices.Clip(env)}
+	return &aqlIngest{bash: bash, gitBin: gitBin, script: script, env: slices.Clip(env)}
 }
 
 // newUpstream creates a git repository shaped like the upstream clone, with
@@ -536,11 +700,9 @@ func (h *aqlIngest) newUpstream(t *testing.T) (root, head string) {
 		"tests/robot/AQL/SELECT/README.md":                                    "notes\n",
 		"tests/robot/" + fieldsAndResults + "/where/combinations/compare.csv": "a,b\n",
 		"tests/robot/" + fieldsAndResults + "/where/expected_compare.json":    "{}\n",
+		"tests/robot/" + fromCSV:                                              "from,simple\n",
 		"tests/robot/OTHER/outside.robot":                                     "*** Test Cases ***\n",
 		"tests/robot/_resources/test_data_sets/aql/data_load/load.json":       "{}\n",
-	}
-	for _, name := range h.inputs {
-		files["tests/robot/"+fieldsAndResults+"/from/combinations/"+name] = "from," + name + "\n"
 	}
 	for rel, body := range files {
 		writeText(t, filepath.Join(root, filepath.FromSlash(rel)), body)
@@ -577,8 +739,15 @@ func (h *aqlIngest) ingest(t *testing.T, sdk, up, robotRoot string, env ...strin
 	if robotRoot == "" {
 		robotRoot = "tests/robot/_resources/test_data_sets"
 	}
+	return h.run(t, sdk, slices.Concat([]string{"ROBOT_ROOT=" + filepath.Join(up, filepath.FromSlash(robotRoot))}, env)...)
+}
+
+// run runs the script in sdk with only env added to its environment, so
+// ROBOT_ROOT is unset unless env sets it, and returns its combined output.
+func (h *aqlIngest) run(t *testing.T, sdk string, env ...string) (string, error) {
+	t.Helper()
 	cmd := exec.CommandContext(t.Context(), h.bash, filepath.Join(sdk, "scripts", "ingest-robot-aql.sh"))
-	cmd.Env = slices.Concat(h.env, []string{"ROBOT_ROOT=" + filepath.Join(up, filepath.FromSlash(robotRoot))}, env)
+	cmd.Env = slices.Concat(h.env, env)
 	out, err := cmd.CombinedOutput()
 	return string(out), err
 }

@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
-# One-off ingest from ehrbase Robot integration test data (sibling clone).
+# One-off ingest from ehrbase Robot integration test data. ROBOT_ROOT is
+# required and has no default: it points at the upstream
+# tests/robot/_resources/test_data_sets directory of an ehrbase/integration-tests
+# clone.
 set -euo pipefail
 
-ROBOT="${ROBOT_ROOT:-/src/ehrbase/integration-tests/tests/robot/_resources/test_data_sets}"
+if [[ -z "${ROBOT_ROOT:-}" ]]; then
+  echo "ROBOT_ROOT is unset or empty" >&2
+  echo "set ROBOT_ROOT to the upstream tests/robot/_resources/test_data_sets directory of an ehrbase/integration-tests clone" >&2
+  exit 1
+fi
+ROBOT=$ROBOT_ROOT
 CAS="$(cd "$(dirname "$0")/.." && pwd)/testkit/corpus"
 
 if [[ ! -d "$ROBOT" ]]; then
