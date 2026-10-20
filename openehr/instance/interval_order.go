@@ -54,8 +54,9 @@ import (
 // constraint on precision admits the precision of its bound, so every
 // bound written keeps the whole numbers its precision needs. An ordinal
 // bound the second pair replaces takes the symbol its side lists for the
-// new value, with the text of a local code's term in lang
-// (useLocalTermText), as the walk writes it.
+// new value, with the text the nearest archetype root's term gives a code
+// in any terminology other than openehr (useTermText), as the walk writes
+// it.
 //
 // So for a count, a quantity, an ordinal or a proportion the second pair
 // holds each side's extreme, over its precision too for a proportion, and
@@ -849,9 +850,10 @@ func ordinalFits(node *tcimpl.CompiledNode, k ordinalKey) bool {
 }
 
 // ordinalEnd returns the lowest (low) or highest pair node's C_DV_ORDINAL
-// lists, with the symbol the walk writes for it: the text of a local
-// code's term in lang (useLocalTermText). It returns false when node lists
-// no pair its constraint admits.
+// lists, with the symbol the walk writes for it: for a code in any
+// terminology other than openehr, the text of the term the nearest
+// archetype root defines for it (useTermText). It returns false when node
+// lists no pair its constraint admits.
 func ordinalEnd(node *tcimpl.CompiledNode, low bool, lang string) (ordinalKey, bool) {
 	c, ok := primitiveOf(node).(constraints.CDvOrdinal)
 	if !ok || len(c.Values) == 0 {
@@ -871,7 +873,7 @@ func ordinalEnd(node *tcimpl.CompiledNode, low bool, lang string) (ordinalKey, b
 		return ordinalKey{}, false
 	}
 	symbol := ordinalSymbolText(best.Symbol)
-	useLocalTermText(node, &symbol, lang)
+	useTermText(node, &symbol, lang)
 	return ordinalKey{value: int64(best.Value), symbol: symbol}, true
 }
 

@@ -116,10 +116,3 @@ func termKey(code rm.CodePhrase) (string, bool) {
 		return tid + "::" + code.CodeString, true
 	}
 }
-
-// useLocalTermText is useTermText under the name the interval bounds call
-// it by, so the symbol of an ordinal bound they replace gets the text the
-// walk gives a symbol.
-func useLocalTermText(node *tcimpl.CompiledNode, v *rm.DVCodedText, lang string) {
-	useTermText(node, v, lang)
-}
