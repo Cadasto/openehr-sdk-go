@@ -327,10 +327,12 @@ func compositionDefaultOwns(class, attrName string) bool {
 // one the RM computes rather than stores (offset on POINT_EVENT and
 // INTERVAL_EVENT, is_integral on DV_QUANTITY and DV_PROPORTION): the
 // generator has nothing to write there. Nor does it visit a locatable's
-// uid, which setLocatableIdentity stamps (walkSkips). A prohibited ELEMENT
-// null_flavour the RM rule needs, because the OPT prohibits value too, is
-// visited as if the OPT allowed it. Any other attribute is visited when the
-// policy says so (shouldVisit).
+// uid, which setLocatableIdentity stamps, nor the normal_range or
+// other_reference_ranges of a bound of a REFERENCE_RANGE's range, which
+// the RM keeps absent (walkSkips). A prohibited ELEMENT null_flavour the RM
+// rule needs, because the OPT prohibits value too, is visited as if the OPT
+// allowed it. Any other attribute is visited when the policy says so
+// (shouldVisit).
 func (g *generator) visits(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
 	return !walkSkips(optNode, attr) && g.shouldVisit(optNode, attr)
 }
