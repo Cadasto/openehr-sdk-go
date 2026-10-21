@@ -72,7 +72,7 @@ func TestREQ107_FillReferenceGivesAnIDItsClassForm(t *testing.T) {
 
 func objectRef(id rm.ObjectID) any { return &rm.ObjectRef{ID: id} }
 
-func partyRef(id rm.ObjectID) any { return &rm.PartyRef{ObjectRef: rm.ObjectRef{ID: id}} }
+func partyRef(id rm.ObjectID) any { return &rm.PartyRef{ID: id} }
 
 func locatableRef(id rm.ObjectID) any { return &rm.LocatableRef{ID: id.(rm.UIDBasedID)} }
 

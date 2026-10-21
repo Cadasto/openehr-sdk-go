@@ -203,33 +203,31 @@ func TestREQ107_ReferenceRangeBoundKeepsItsNormalStatus(t *testing.T) {
 		return countValue(n, ordNormalStatus, optSingle("normal_range", ordInterval("DV_COUNT", countValue("1"), countValue("9"))))
 	}
 	runSimpleBoundCases(t, []simpleBoundCase{{
-		dvCase: dvCase{
-			name:  "DV_COUNT bounds with a normal_status and a normal_range",
-			value: countValue("4", ordReferenceRange(ordInterval("DV_COUNT", bound("2"), bound("8")))),
-			check: func(t *testing.T, out any) {
-				t.Helper()
-				el, ok := out.(*rm.Element)
+		name:  "DV_COUNT bounds with a normal_status and a normal_range",
+		value: countValue("4", ordReferenceRange(ordInterval("DV_COUNT", bound("2"), bound("8")))),
+		check: func(t *testing.T, out any) {
+			t.Helper()
+			el, ok := out.(*rm.Element)
+			if !ok {
+				t.Fatalf("generated root is %T, want *rm.Element", out)
+			}
+			checkRangesSimple(t, el.Value)
+			lower, upper := referenceRangeBounds(t, el.Value)
+			for _, side := range []struct {
+				name  string
+				bound rm.DVOrdered
+			}{{"lower", lower}, {"upper", upper}} {
+				c, ok := side.bound.(*rm.DVCount)
 				if !ok {
-					t.Fatalf("generated root is %T, want *rm.Element", out)
+					t.Fatalf("range %s is %T, want a *rm.DVCount", side.name, side.bound)
 				}
-				checkRangesSimple(t, el.Value)
-				lower, upper := referenceRangeBounds(t, el.Value)
-				for _, side := range []struct {
-					name  string
-					bound rm.DVOrdered
-				}{{"lower", lower}, {"upper", upper}} {
-					c, ok := side.bound.(*rm.DVCount)
-					if !ok {
-						t.Fatalf("range %s is %T, want a *rm.DVCount", side.name, side.bound)
-					}
-					if c.NormalStatus == nil || codeString(*c.NormalStatus) != "openehr_normal_statuses::N" {
-						t.Errorf("range %s normal_status = %v, want openehr_normal_statuses::N", side.name, c.NormalStatus)
-					}
-					if c.NormalRange != nil {
-						t.Errorf("range %s normal_range = %s, want none", side.name, intervalString(c.NormalRange))
-					}
+				if c.NormalStatus == nil || codeString(*c.NormalStatus) != "openehr_normal_statuses::N" {
+					t.Errorf("range %s normal_status = %v, want openehr_normal_statuses::N", side.name, c.NormalStatus)
 				}
-			},
+				if c.NormalRange != nil {
+					t.Errorf("range %s normal_range = %s, want none", side.name, intervalString(c.NormalRange))
+				}
+			}
 		},
 		expected: []expectedIssue{normalRangeAbsent("lower"), normalRangeAbsent("upper")},
 	}})
