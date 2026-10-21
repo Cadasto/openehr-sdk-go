@@ -22,9 +22,10 @@ import (
 // every LOCATABLE concrete the template compiler can yield (FOLDER,
 // EHR_STATUS, the demographic PARTY family, …) now gets its identity
 // stamped rather than silently skipped. The uid comes from uidSource; a
-// nil uidSource stamps none. The caller decides: the classes stampsUID
-// names get one unless their OPT prohibits it, and any other locatable
-// only where its OPT requires one (setLocatableIdentity, uidFor).
+// nil uidSource stamps none, and neither does one that returns nil. The
+// caller decides: the classes stampsUID names get one unless their OPT
+// prohibits it, and any other locatable only where its OPT requires one
+// (setLocatableIdentity, uidFor).
 func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *rm.Archetyped, uidSource func() *rm.HierObjectID) {
 	m, ok := rmValue.(rm.MutableLocatable)
 	if !ok || rm.IsTypedNil(rmValue) {
@@ -37,9 +38,12 @@ func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *
 	}
 	if uidSource != nil {
 		// Set-only-if-unset: an explicitly provided UID (e.g. a fixture
-		// replay) wins over the generator's uidSource.
+		// replay) wins over the generator's uidSource. A source that gives
+		// nil leaves the uid unset, with no nil pointer stored in its place.
 		if l := rmValue.(rm.Locatable); l.GetUID() == nil {
-			m.SetUID(uidSource())
+			if uid := uidSource(); uid != nil {
+				m.SetUID(uid)
+			}
 		}
 	}
 }

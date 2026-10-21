@@ -190,8 +190,8 @@ type Options struct {
 	// server that stores it gives it its version id. Nil falls back to a
 	// random RFC 9562 v4 UUID (stdlib uuid.NewV4). Tests pin a counter or
 	// named-seed source for deterministic uids. A source that returns nil
-	// where the generator draws the id of a reference leaves that id unset:
-	// the reference has no id, or keeps an id with an empty value.
+	// leaves unset what the generator drew it for: the locatable has no
+	// uid, and the reference no id, or an id with an empty value.
 	UIDSource func() *rm.HierObjectID
 
 	// ValueFill selects how primitive leaves are valued. Zero value =

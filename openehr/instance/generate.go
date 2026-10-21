@@ -2803,16 +2803,18 @@ func (g *generator) stampIfLocatable(rmValue any, rmType string) {
 
 // fillPartyRelationship gives a PARTY_RELATIONSHIP what the RM requires
 // and the walk leaves empty: its node id, its uid unless the OPT
-// prohibits it, and the parts of its source and target references that
-// are empty (fillReference), so a part the OPT pins on either is kept.
-// opt is the relationship's OPT node, or nil for one built from the BMM
-// alone.
+// prohibits it or Options.UIDSource returns nil, and the parts of its
+// source and target references that are empty (fillReference), so a part
+// the OPT pins on either is kept. opt is the relationship's OPT node, or
+// nil for one built from the BMM alone.
 func (g *generator) fillPartyRelationship(opt *tcimpl.CompiledNode, rel *rm.PartyRelationship) {
 	if rel.GetArchetypeNodeID() == "" {
 		applyLocatableIdentity(rel, "at0000", "relationship", nil, nil)
 	}
 	if rel.GetUID() == nil && !prohibited(opt, "uid") {
-		rel.SetUID(g.nextUID())
+		if uid := g.nextUID(); uid != nil {
+			rel.SetUID(uid)
+		}
 	}
 	g.fillReference(&rel.Source, "source")
 	g.fillReference(&rel.Target, "target")
