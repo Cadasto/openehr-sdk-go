@@ -117,6 +117,9 @@ func orderConcrete[T any, K any](iv *rm.Interval[T], optNode *tcimpl.CompiledNod
 	if !bothBounded(iv) {
 		return
 	}
+	if !inverted(key(iv.Lower), key(iv.Upper), s) {
+		return
+	}
 	lowerNode, upperNode := boundNodes(optNode)
 	lower := orderSide[K]{node: lowerNode, narrow: normalAt(iv.Lower, lowerNode, key, apply, true)}
 	upper := orderSide[K]{node: upperNode, narrow: normalAt(iv.Upper, upperNode, key, apply, false)}
@@ -175,6 +178,9 @@ func orderOrderedAs[T any, K any](
 	if !ok {
 		return false
 	}
+	if !inverted(key(lowerValue), key(upperValue), s) {
+		return true
+	}
 	lowerNode, upperNode := boundNodes(optNode)
 	lower := orderSide[K]{node: lowerNode, narrow: normalAt(lowerValue, lowerNode, key, apply, true)}
 	upper := orderSide[K]{node: upperNode, narrow: normalAt(upperValue, upperNode, key, apply, false)}
@@ -219,6 +225,13 @@ func (s scale[K]) adopted(node *tcimpl.CompiledNode, like, other K, low bool) (K
 	return s.adopt(node, like, other, low)
 }
 
+// inverted reports whether lower lies above upper, as s compares them, and
+// false for a pair that does not compare.
+func inverted[K any](lower, upper K, s scale[K]) bool {
+	c, ok := s.compare(lower, upper)
+	return ok && c > 0
+}
+
 // orderSide is one side of an interval that orderPair orders.
 type orderSide[K any] struct {
 	// node is the OPT node the side's bound is built from, nil for a bound
@@ -244,7 +257,7 @@ func (s orderSide[K]) narrowed(k K) (K, bool) {
 // normal_range rule (orderSide.narrow), and a pair in which a side has no
 // such value is not one that fits.
 func orderPair[K any](lower, upper K, lowerSide, upperSide orderSide[K], s scale[K]) (K, K, bool) {
-	if c, ok := s.compare(lower, upper); !ok || c <= 0 {
+	if !inverted(lower, upper, s) {
 		return lower, upper, false
 	}
 	// fitsInOrder returns the pair as each side keeps it, and whether that
