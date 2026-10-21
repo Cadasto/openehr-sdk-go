@@ -1806,9 +1806,18 @@ func (g *generator) setLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, 
 // on an attribute of the RM type Integer, which is 32 bits wide, is
 // narrowed first, and the value is taken from what is left of it
 // (narrowedLeaf); the leaf fails with an error wrapping
-// ErrConstraintUnsatisfiable where nothing is left.
+// ErrConstraintUnsatisfiable where nothing is left. A C_INTEGER on a
+// DV_ORDINAL itself, which AOM 1.4 builds no node for but an OPT can name,
+// gives the ordinal its value (applyOrdinal), so it is narrowed as one on
+// the value is.
 func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any, attr string, pc constraints.PrimitiveConstraint) error {
-	pc, ex, err := narrowedLeaf(leaf, rmValue, attr, pc)
+	narrowedAttr := attr
+	if _, isOrdinal := rmValue.(*rm.DVOrdinal); isOrdinal && attr == "" {
+		if _, isInteger := pc.(constraints.CInteger); isInteger {
+			narrowedAttr = "value"
+		}
+	}
+	pc, ex, err := narrowedLeaf(leaf, rmValue, narrowedAttr, pc)
 	if err != nil {
 		return err
 	}
