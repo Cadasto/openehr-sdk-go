@@ -337,9 +337,11 @@ func (g *generator) visits(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAt
 
 // walkSkips reports whether the walk leaves attr of optNode alone under
 // every policy: a locatable's uid, an attribute the OPT prohibits that no RM
-// rule needs, and one the RM computes rather than stores.
+// rule needs, one the RM computes rather than stores, and the
+// normal_range and other_reference_ranges of a bound of a REFERENCE_RANGE's
+// range, which the OPT may name and the RM keeps absent.
 func walkSkips(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
-	if locatableUID(optNode, attr) {
+	if locatableUID(optNode, attr) || referenceRangeBoundRanges(optNode, attr) {
 		return true
 	}
 	if attrProhibited(attr) && !rmNeedsProhibited(optNode, attr) {
@@ -348,6 +350,28 @@ func walkSkips(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) boo
 	// rminfo knows each class by its bare BMM name; the OPT may declare
 	// a generic instantiation (DV_INTERVAL<DV_QUANTITY>).
 	return rminfo.IsNonStorableAttr(bmmtype.Class(optNode.RMTypeName()), attr.Name())
+}
+
+// referenceRangeBoundRanges reports whether attr is the normal_range or the
+// other_reference_ranges of optNode, and optNode is a bound of a
+// REFERENCE_RANGE's range: the node held by the lower or the upper of a
+// DV_INTERVAL that is the range of a REFERENCE_RANGE. A bound that carries
+// either is not simple, which breaks REFERENCE_RANGE Range_is_simple, so
+// the RM wins over the OPT, whether the OPT names the attribute optional or
+// required (Precedence 2). Its normal_status alone is not a reference range
+// and is left to the walk.
+func referenceRangeBoundRanges(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
+	if name := attr.Name(); name != "normal_range" && name != "other_reference_ranges" {
+		return false
+	}
+	if side := holdingAttribute(optNode); side != "lower" && side != "upper" {
+		return false
+	}
+	interval := optNode.Parent()
+	if bmmtype.Class(interval.RMTypeName()) != "DV_INTERVAL" || holdingAttribute(interval) != "range" {
+		return false
+	}
+	return bmmtype.Class(interval.Parent().RMTypeName()) == "REFERENCE_RANGE"
 }
 
 // locatableUID reports whether attr is the uid of a locatable, the one
