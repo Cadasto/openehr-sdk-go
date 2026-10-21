@@ -2818,8 +2818,10 @@ const referenceNamespace = "local"
 // drawn like a uid, from Options.UIDSource or its random fallback
 // (Identity). An empty namespace becomes referenceNamespace, and an empty
 // type referenceType's for ref held in attr. A LOCATABLE_REF holds the
-// UID_BASED_ID id it declares itself. Any other value is left alone, and
-// so is an id value a UIDSource that returns nil gives none.
+// UID_BASED_ID id it declares itself. A UIDSource that returns nil gives
+// no id and no value, so a reference with no id keeps none, with no nil
+// pointer stored in its place, and an id with no value keeps its empty one.
+// Any other value is left alone.
 func (g *generator) fillReference(ref any, attr string) {
 	var base *rm.ObjectRef
 	var id any
@@ -2841,7 +2843,9 @@ func (g *generator) fillReference(ref any, attr string) {
 		id, setID = base.ID, func(h *rm.HierObjectID) { base.ID = h }
 	}
 	if id == nil || rm.IsTypedNil(id) {
-		setID(g.nextUID())
+		if uid := g.nextUID(); uid != nil {
+			setID(uid)
+		}
 	} else if value, ok := stringField(id, "value"); ok && value.get() == "" {
 		if uid := g.nextUID(); uid != nil {
 			value.set(uid.Value)
