@@ -60,6 +60,26 @@ func TestREQ107_NormalRangeSettleEdges(t *testing.T) {
 			want:  "10:59:59Z",
 		},
 		{
+			// A step below 00:00:00 would wrap to 23:59:59, which is above the
+			// range and no second before it, so no such step is offered.
+			name: "DV_TIME zoneless, L, no step below midnight, the first step above the range",
+			v: &rm.DVTime{
+				Value: "03:00:00", NormalStatus: normalStatusCode("L"),
+				NormalRange: closedRange[rm.DVOrdered](&rm.DVTime{Value: "00:00:00"}, &rm.DVTime{Value: "06:00:00"}),
+			},
+			value: func(v any) string { return v.(*rm.DVTime).Value },
+			want:  "06:00:01",
+		},
+		{
+			name: "DV_TIME zoned, L, no step below midnight in its own zone, the first step above the range",
+			v: &rm.DVTime{
+				Value: "03:00:00+01:00", NormalStatus: normalStatusCode("L"),
+				NormalRange: closedRange[rm.DVOrdered](&rm.DVTime{Value: "00:00:00+01:00"}, &rm.DVTime{Value: "06:00:00+01:00"}),
+			},
+			value: func(v any) string { return v.(*rm.DVTime).Value },
+			want:  "06:00:01+01:00",
+		},
+		{
 			name: "DV_DATE_TIME zoneless, N, the lower bound",
 			v: &rm.DVDateTime{
 				Value: "2021-03-05T00:00:00", NormalStatus: normalStatusCode("N"),
