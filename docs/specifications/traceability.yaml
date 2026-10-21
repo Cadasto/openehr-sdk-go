@@ -1442,11 +1442,13 @@ requirements:
       - internal/templateinstance/rmwrite/write_item_single_test.go
       - internal/templateinstance/rmwrite/write_parent_test.go
       - internal/templateinstance/rmwrite/write_party_test.go
+      - internal/templateinstance/rmwrite/write_ref_test.go
       - internal/templateinstance/rmwrite/write_test.go
       - internal/templateinstance/rmwrite/write_text_like_test.go
       - openehr/composition/builder_defaults_test.go
       - openehr/composition/optional_content_test.go
       - openehr/composition/participation_test.go
+      - openehr/composition/reference_test.go
       - openehr/composition/skeleton_policy_test.go
       - openehr/composition/text_language_test.go
       - openehr/instance/accessors_test.go
@@ -1468,6 +1470,7 @@ requirements:
       - openehr/instance/constrained_datetime_test.go
       - openehr/instance/contract_inputs_test.go
       - openehr/instance/data_value_attributes_test.go
+      - openehr/instance/ehr_container_test.go
       - openehr/instance/element_rule_test.go
       - openehr/instance/element_slot_test.go
       - openehr/instance/entry_codes_test.go
@@ -1493,6 +1496,7 @@ requirements:
       - openehr/instance/null_flavour_default_test.go
       - openehr/instance/participation_mapping_test.go
       - openehr/instance/party_attribute_test.go
+      - openehr/instance/party_proxy_attribute_test.go
       - openehr/instance/party_related_relationship_internal_test.go
       - openehr/instance/party_related_relationship_test.go
       - openehr/instance/party_relationship_uid_test.go
@@ -1506,6 +1510,7 @@ requirements:
       - openehr/instance/prohibited_attribute_test.go
       - openehr/instance/proportion_kind_test.go
       - openehr/instance/realworld_opt_synthesis_test.go
+      - openehr/instance/reference_attribute_test.go
       - openehr/instance/required_context_test.go
       - openehr/instance/required_policy_test.go
       - openehr/instance/required_rm_rule_fill_test.go
@@ -1610,6 +1615,8 @@ requirements:
     probes: [PROBE-074]
     tests:
       - internal/rmaccess/reads_test.go
+      - internal/templateinstance/rmwrite/write_ref_test.go
+      - openehr/instance/ehr_container_test.go
       - openehr/validation/constraint_fixtures_test.go
       - openehr/validation/locatable_attributes_test.go
       - openehr/validation/noncomposition_test.go
