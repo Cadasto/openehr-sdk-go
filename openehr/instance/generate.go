@@ -2869,13 +2869,14 @@ func (g *generator) fillPartyRelationship(opt *tcimpl.CompiledNode, rel *rm.Part
 const referenceNamespace = "local"
 
 // fillReference gives ref, a reference the generator writes, each part
-// the RM requires that is empty, so a part the OPT pins is kept. An id it
-// has none of is a HIER_OBJECT_ID (RM defaults); an id with no value, of
-// any identifier class, takes one. Either value is drawn like a uid, from
-// Options.UIDSource or its random fallback (Identity). The namespace is
-// referenceNamespace, and the type is referenceType's for ref held in
-// attr. A LOCATABLE_REF holds the UID_BASED_ID id it declares itself. Any
-// other value is left alone.
+// the RM requires that is empty, so a part the OPT pins is kept. A
+// reference with no id takes a HIER_OBJECT_ID (RM defaults), and an id
+// with no value, of any identifier class, takes a value; either value is
+// drawn like a uid, from Options.UIDSource or its random fallback
+// (Identity). An empty namespace becomes referenceNamespace, and an empty
+// type referenceType's for ref held in attr. A LOCATABLE_REF holds the
+// UID_BASED_ID id it declares itself. Any other value is left alone, and
+// so is an id value a UIDSource that returns nil gives none.
 func (g *generator) fillReference(ref any, attr string) {
 	var base *rm.ObjectRef
 	var id any
@@ -2899,7 +2900,9 @@ func (g *generator) fillReference(ref any, attr string) {
 	if id == nil || rm.IsTypedNil(id) {
 		setID(g.nextUID())
 	} else if value, ok := stringField(id, "value"); ok && value.get() == "" {
-		value.set(g.nextUID().Value)
+		if uid := g.nextUID(); uid != nil {
+			value.set(uid.Value)
+		}
 	}
 	if base.Namespace == "" {
 		base.Namespace = referenceNamespace
@@ -3122,7 +3125,8 @@ func fillCodedDefault(opt *tcimpl.CompiledNode, attr string, ct *rm.DVCodedText,
 // of rmValue, or onto its main string attribute when attr is "". The
 // value is a list member or a pattern match that the constraint accepts;
 // on a PARTY_REF's type it is also a class name PARTY_REF Type_validity
-// admits (see partyRefType), and on a TERM_MAPPING's match a character
+// admits (see partyRefType), on an ACCESS_GROUP_REF's type the one type
+// its Type_validity admits, and on a TERM_MAPPING's match a character
 // TERM_MAPPING Match_valid admits (see termMappingMatch). When there is
 // none, it writes nothing and returns an error wrapping
 // ErrConstraintUnsatisfiable. An attribute the generator has no field for

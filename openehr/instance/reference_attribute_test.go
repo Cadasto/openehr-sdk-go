@@ -288,3 +288,27 @@ func TestREQ107_PerformerWithoutIDTakesOneFromUIDSource(t *testing.T) {
 		}
 	})
 }
+
+// TestREQ107_UIDSourceReturningNilDoesNotPanic is the REQ-107 check that a
+// UIDSource that returns nil, where the generator draws the value of an id
+// a reference holds, makes Generate return rather than panic, at every
+// policy and either value fill. The id then keeps no value.
+func TestREQ107_UIDSourceReturningNilDoesNotPanic(t *testing.T) {
+	c := compileOPTText(t, guardRootOPT("OBSERVATION", guardObservationID,
+		requiredRef("workflow_id", "OBJECT_REF", requiredRef("id", "HIER_OBJECT_ID"))), true)
+	for _, opts := range guardOptions() {
+		opts.UIDSource = func() *rm.HierObjectID { return nil }
+		call := fmt.Sprintf("Generate(%v, %v)", opts.Policy, opts.ValueFill)
+		out, err := instance.Generate(t.Context(), c, opts)
+		if err != nil {
+			t.Fatalf("%s: %v, want a root", call, err)
+		}
+		obs, ok := out.(*rm.Observation)
+		if !ok {
+			t.Fatalf("%s returned %T, want *rm.Observation", call, out)
+		}
+		if got, want := refString(obs.WorkflowID), "OBJECT_REF local::ANY id HIER_OBJECT_ID "; got != want {
+			t.Errorf("%s: workflow_id = %q, want %q", call, got, want)
+		}
+	}
+}
