@@ -35,11 +35,13 @@
 //     ITEM_TABLE, and CLUSTER and ELEMENT;
 //   - the data values DV_TEXT, DV_CODED_TEXT, DV_URI, DV_EHR_URI,
 //     DV_PARSABLE, DV_IDENTIFIER, DV_DATE, DV_TIME, DV_DATE_TIME,
-//     DV_DURATION, DV_BOOLEAN, DV_COUNT, DV_QUANTITY, DV_MULTIMEDIA,
-//     DV_STATE, DV_GENERAL_TIME_SPECIFICATION and
-//     DV_PERIODIC_TIME_SPECIFICATION, and CODE_PHRASE;
+//     DV_DURATION, DV_BOOLEAN, DV_COUNT, DV_QUANTITY, DV_PROPORTION,
+//     DV_ORDINAL, DV_SCALE, DV_MULTIMEDIA, DV_STATE,
+//     DV_GENERAL_TIME_SPECIFICATION and DV_PERIODIC_TIME_SPECIFICATION,
+//     and CODE_PHRASE;
 //   - DV_INTERVAL over each concrete ordered data value and over
-//     DV_ORDERED itself;
+//     DV_ORDERED itself, and REFERENCE_RANGE over DV_ORDERED, the one the
+//     type registry builds;
 //   - the parties PERSON, AGENT, GROUP, ORGANISATION and ROLE, and
 //     CAPABILITY, ADDRESS, CONTACT, PARTY_IDENTITY and PARTY_RELATIONSHIP;
 //   - the party proxies PARTY_IDENTIFIED, PARTY_RELATED and PARTY_SELF;
@@ -54,7 +56,8 @@
 // COMPOSITION, EVENT_CONTEXT, SECTION, the five entries, ISM_TRANSITION,
 // HISTORY, ITEM_TREE, ITEM_LIST, ITEM_TABLE, CLUSTER, the five parties
 // (an ACTOR's languages and roles included), CONTACT, PARTY_IDENTIFIED,
-// PARTY_RELATED, FOLDER, DV_TEXT, DV_CODED_TEXT and DV_PARAGRAPH.
+// PARTY_RELATED, FOLDER, DV_TEXT, DV_CODED_TEXT, DV_PARAGRAPH, and the
+// nine ordered data values (their other_reference_ranges).
 //
 // Each parent's writer lists the attributes it fills. An attribute takes a
 // child of its RM type or of a class that descends from it, wherever the
@@ -70,8 +73,15 @@
 // ENTRY's `workflow_id`, a CARE_ENTRY's `guideline_id`, a member of a
 // FOLDER's `items`) takes any class of reference as given, and
 // LOCATABLE_REF `id` is written into the UID_BASED_ID field LOCATABLE_REF
-// declares, not the one it embeds from OBJECT_REF. An Integer attribute
-// (DV_QUANTITY `precision`, DV_MULTIMEDIA `size`, INTERVAL_EVENT
+// declares, not the one it embeds from OBJECT_REF. A DV_INTERVAL
+// attribute an ordered value holds (a DV_ORDERED's `normal_range`, a
+// REFERENCE_RANGE's `range`) takes a DV_INTERVAL of any instantiation and
+// converts it into the one the Go field holds, an open side holding no
+// bound; a bound of another class than the field holds returns an
+// ErrTypeMismatch. An `other_reference_ranges` member is a REFERENCE_RANGE
+// of any instantiation, copied into the one the field holds. An Integer
+// attribute (DV_QUANTITY and DV_PROPORTION `precision`, DV_PROPORTION
+// `type`, DV_ORDINAL `value`, DV_MULTIMEDIA `size`, INTERVAL_EVENT
 // `sample_count`) takes a whole number of any Go integer shape, and a
 // whole number outside the 32-bit range an RM Integer holds returns an
 // ErrTypeMismatch that says so. A Character attribute (TERM_MAPPING

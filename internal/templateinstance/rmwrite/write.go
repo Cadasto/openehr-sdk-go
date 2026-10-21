@@ -79,11 +79,11 @@ func EnsureSingle(parent any, attrName string, child any) error {
 	case *rm.DVIdentifier:
 		return writeDVIdentifierSingle(p, attrName, child)
 	case *rm.DVDate:
-		return writeDVTemporalSingle(temporalFields{"DV_DATE", &p.Value, &p.MagnitudeStatus, &p.Accuracy}, attrName, child)
+		return writeDVTemporalSingle(temporalFields{"*rm.DVDate", &p.Value, &p.MagnitudeStatus, &p.Accuracy, &p.NormalStatus, &p.NormalRange}, attrName, child)
 	case *rm.DVTime:
-		return writeDVTemporalSingle(temporalFields{"DV_TIME", &p.Value, &p.MagnitudeStatus, &p.Accuracy}, attrName, child)
+		return writeDVTemporalSingle(temporalFields{"*rm.DVTime", &p.Value, &p.MagnitudeStatus, &p.Accuracy, &p.NormalStatus, &p.NormalRange}, attrName, child)
 	case *rm.DVDateTime:
-		return writeDVTemporalSingle(temporalFields{"DV_DATE_TIME", &p.Value, &p.MagnitudeStatus, &p.Accuracy}, attrName, child)
+		return writeDVTemporalSingle(temporalFields{"*rm.DVDateTime", &p.Value, &p.MagnitudeStatus, &p.Accuracy, &p.NormalStatus, &p.NormalRange}, attrName, child)
 	case *rm.DVDuration:
 		return writeDVDurationSingle(p, attrName, child)
 	case *rm.DVBoolean:
@@ -92,6 +92,14 @@ func EnsureSingle(parent any, attrName string, child any) error {
 		return writeDVCountSingle(p, attrName, child)
 	case *rm.DVQuantity:
 		return writeDVQuantitySingle(p, attrName, child)
+	case *rm.DVProportion:
+		return writeDVProportionSingle(p, attrName, child)
+	case *rm.DVOrdinal:
+		return writeDVOrdinalSingle(p, attrName, child)
+	case *rm.DVScale:
+		return writeDVScaleSingle(p, attrName, child)
+	case *rm.ReferenceRange[rm.DVOrdered]:
+		return writeReferenceRangeSingle(p, attrName, child)
 	case *rm.DVMultimedia:
 		return writeDVMultimediaSingle(p, attrName, child)
 	case *rm.DVState:
@@ -241,6 +249,24 @@ func AppendMultiple(parent any, attrName string, child any) error {
 		return writeDVParagraphMultiple(p, attrName, child)
 	case *rm.Folder:
 		return writeFolderMultiple(p, attrName, child)
+	case *rm.DVCount:
+		return writeReferenceRanges("*rm.DVCount", &p.OtherReferenceRanges, attrName, child)
+	case *rm.DVQuantity:
+		return writeReferenceRanges("*rm.DVQuantity", &p.OtherReferenceRanges, attrName, child)
+	case *rm.DVProportion:
+		return writeReferenceRanges("*rm.DVProportion", &p.OtherReferenceRanges, attrName, child)
+	case *rm.DVOrdinal:
+		return writeReferenceRanges("*rm.DVOrdinal", &p.OtherReferenceRanges, attrName, child)
+	case *rm.DVScale:
+		return writeReferenceRanges("*rm.DVScale", &p.OtherReferenceRanges, attrName, child)
+	case *rm.DVDate:
+		return writeReferenceRanges("*rm.DVDate", &p.OtherReferenceRanges, attrName, child)
+	case *rm.DVTime:
+		return writeReferenceRanges("*rm.DVTime", &p.OtherReferenceRanges, attrName, child)
+	case *rm.DVDateTime:
+		return writeReferenceRanges("*rm.DVDateTime", &p.OtherReferenceRanges, attrName, child)
+	case *rm.DVDuration:
+		return writeReferenceRanges("*rm.DVDuration", &p.OtherReferenceRanges, attrName, child)
 	}
 	return fmt.Errorf("%w: parent %T, attr %q", ErrUnknownAttribute, parent, attrName)
 }
@@ -970,19 +996,22 @@ func writeElementSingle(e *rm.Element, attr string, child any) error {
 // --- DataValue navigations ----------------------------------------------
 
 // temporalFields points at the attributes DV_DATE, DV_TIME and
-// DV_DATE_TIME share, so one writer serves all three. rmType names the
-// class for the error detail.
+// DV_DATE_TIME share, so one writer serves all three. class names the Go
+// type for the error detail.
 type temporalFields struct {
-	rmType          string
+	class           string
 	value           *string
 	magnitudeStatus **string
 	accuracy        **rm.DVDuration
+	normalStatus    **rm.CodePhrase
+	normalRange     **rm.DVInterval[rm.DVOrdered]
 }
 
 // writeDVTemporalSingle handles DV_DATE, DV_TIME and DV_DATE_TIME: the ISO
-// 8601 value, the magnitude_status, and the DV_DURATION accuracy that
-// DV_TEMPORAL declares. AOM 1.4 primitive short names (DATE, TIME,
-// DATE_TIME) materialise as these wrappers via instance.concreteFor.
+// 8601 value, the magnitude_status, the DV_DURATION accuracy that
+// DV_TEMPORAL declares, and the normal_status and normal_range of a
+// DV_ORDERED (writeOrderedSingle). AOM 1.4 primitive short names (DATE,
+// TIME, DATE_TIME) materialise as these wrappers via instance.concreteFor.
 func writeDVTemporalSingle(f temporalFields, attr string, child any) error {
 	switch attr {
 	case "value":
@@ -992,13 +1021,14 @@ func writeDVTemporalSingle(f temporalFields, attr string, child any) error {
 	case "accuracy":
 		return assignVia(child, func(v rm.DVDuration) { *f.accuracy = &v }, attr, "DV_DURATION")
 	}
-	return fmt.Errorf("%w: %s has no single attr %q", ErrUnknownAttribute, f.rmType, attr)
+	return writeOrderedSingle(f.class, f.normalStatus, f.normalRange, attr, child)
 }
 
 // writeDVDurationSingle handles DV_DURATION: the ISO 8601 value, the
-// magnitude_status, and the Real accuracy with its accuracy_is_percent
-// that DV_AMOUNT declares. The AOM 1.4 primitive short name DURATION
-// materialises as this wrapper via instance.concreteFor.
+// magnitude_status, the Real accuracy with its accuracy_is_percent that
+// DV_AMOUNT declares, and the normal_status and normal_range of a
+// DV_ORDERED (writeOrderedSingle). The AOM 1.4 primitive short name
+// DURATION materialises as this wrapper via instance.concreteFor.
 func writeDVDurationSingle(d *rm.DVDuration, attr string, child any) error {
 	switch attr {
 	case "value":
@@ -1010,7 +1040,7 @@ func writeDVDurationSingle(d *rm.DVDuration, attr string, child any) error {
 	case "accuracy_is_percent":
 		return writeOptionalBoolean(&d.AccuracyIsPercent, attr, child)
 	}
-	return fmt.Errorf("%w: *rm.DVDuration has no single attr %q", ErrUnknownAttribute, attr)
+	return writeOrderedSingle("*rm.DVDuration", &d.NormalStatus, &d.NormalRange, attr, child)
 }
 
 // writeDVBooleanSingle handles `value` on DV_BOOLEAN. Parallels the

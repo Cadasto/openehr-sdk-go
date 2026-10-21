@@ -943,9 +943,7 @@ func (g *generator) temporalSentinel(v any) string {
 // field that already holds a value is left alone: populatePrimitiveDefault
 // may have set a clock or a code before this pass. The value is
 // bmmStringDefault's. It is written through stringField's setter where
-// that covers the attribute, which reaches a String attribute the
-// template-instance writer has no case for, such as a DV_PROPORTION's
-// magnitude_status, and through the writer otherwise.
+// that covers the attribute, and through the writer otherwise.
 func (g *generator) writeBMMString(parent any, attr string) {
 	ref, covered := stringField(parent, attr)
 	if covered && ref.get() != "" {
@@ -1890,8 +1888,6 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 		// The C_DV_ORDINAL lists the symbol's code, not its text.
 		useTermText(leaf, &v.Symbol, g.opts.Language)
 		return nil
-	case *rm.DVProportion:
-		return applyProportionPrimitive(v, attr, ex)
 	case *rm.DVMultimedia:
 		// A C_INTEGER on size; settleMultimedia replaces it with the
 		// byte count of the data where this constraint admits that.
@@ -1914,12 +1910,13 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 // routedPrimitive reports whether a primitive leaf on attr of rmValue is
 // one applyPrimitiveExample writes through rmwrite: a leaf on an attribute
 // of a DV_QUANTITY, a DV_COUNT, a temporal value, a DV_BOOLEAN, a DV_TEXT,
-// a DV_CODED_TEXT, a DV_MULTIMEDIA or a DV_STATE other than the one the
-// switch there values, such as a DV_QUANTITY's precision, a DV_COUNT's or
-// a DV_DURATION's accuracy, or a DV_STATE's is_terminal, an
-// INTERVAL_EVENT's sample_count, and an EHR_STATUS's is_queryable and
-// is_modifiable. A leaf on rmValue itself (attr "") and a
-// leaf on any other value go to the switch, which leaves one it has no
+// a DV_CODED_TEXT, a DV_MULTIMEDIA, a DV_STATE, a DV_ORDINAL, a DV_SCALE
+// or a DV_PROPORTION other than the one the switch there values, such as
+// a DV_QUANTITY's precision, a DV_COUNT's or a DV_DURATION's accuracy, a
+// DV_STATE's is_terminal, a DV_SCALE's value, or a DV_PROPORTION's
+// numerator, an INTERVAL_EVENT's sample_count, and an EHR_STATUS's
+// is_queryable and is_modifiable. A leaf on rmValue itself (attr "") and
+// a leaf on any other value go to the switch, which leaves one it has no
 // case for alone, as an interval's *_unbounded flag, which the walk decides
 // by the bounds it writes.
 func routedPrimitive(rmValue any, attr string) bool {
@@ -1927,10 +1924,11 @@ func routedPrimitive(rmValue any, attr string) bool {
 		return false
 	}
 	switch rmValue.(type) {
-	case *rm.DVQuantity, *rm.DVState, *rm.EHRStatus:
+	case *rm.DVQuantity, *rm.DVState, *rm.EHRStatus, *rm.DVOrdinal, *rm.DVScale, *rm.DVProportion:
 		// The switch values a DV_QUANTITY only from a C_DV_QUANTITY on the
-		// value itself; a DV_STATE and an EHR_STATUS, whose primitive
-		// attributes are its two flags, have no case there.
+		// value itself, and a DV_ORDINAL only from a C_DV_ORDINAL on it. A
+		// DV_STATE and an EHR_STATUS, whose primitive attributes are their
+		// flags, a DV_SCALE and a DV_PROPORTION have no case there.
 		return true
 	case *rm.DVText, *rm.DVCodedText, *rm.DVDate, *rm.DVTime, *rm.DVDateTime, *rm.DVDuration, *rm.DVBoolean:
 		return attr != "value"
@@ -1993,47 +1991,6 @@ func applyOrdinal(v *rm.DVOrdinal, pc constraints.PrimitiveConstraint, ex any) e
 	v.Value = rm.Integer(pair.Value)
 	v.Symbol = ordinalSymbolText(pair.Symbol)
 	return nil
-}
-
-// applyProportionPrimitive writes one sampled primitive onto the
-// proportion field the OPT named. A C_REAL or C_INTEGER on numerator,
-// denominator or type is otherwise discarded: the proportion node itself
-// has no primitive constraint, so the value stayed at the sentinel.
-func applyProportionPrimitive(v *rm.DVProportion, attr string, ex any) error {
-	switch attr {
-	case "numerator", "denominator", "accuracy":
-		f, ok := float64Value(ex)
-		if !ok {
-			return fmt.Errorf("DV_PROPORTION %s example value is %T, want real", attr, ex)
-		}
-		switch attr {
-		case "numerator":
-			v.Numerator = rm.Real(f)
-		case "denominator":
-			v.Denominator = rm.Real(f)
-		default:
-			a := rm.Real(f)
-			v.Accuracy = &a
-		}
-		return nil
-	case "type":
-		n, ok := rm.AsInt64(ex)
-		if !ok {
-			return fmt.Errorf("DV_PROPORTION type example value is %T, want integer", ex)
-		}
-		v.Type = rm.Integer(n)
-		return nil
-	case "precision":
-		n, ok := rm.AsInt64(ex)
-		if !ok {
-			return fmt.Errorf("DV_PROPORTION precision example value is %T, want integer", ex)
-		}
-		p := rm.Integer(n)
-		v.Precision = &p
-		return nil
-	default:
-		return nil
-	}
 }
 
 // The PROPORTION_KIND codes a DV_PROPORTION's type takes.
@@ -2161,18 +2118,6 @@ func proportionOperand(node *tcimpl.CompiledNode, current float64, whole, nonZer
 		}
 	}
 	return 0, false
-}
-
-func float64Value(v any) (float64, bool) {
-	switch n := v.(type) {
-	case float64:
-		return n, true
-	case float32:
-		return float64(n), true
-	default:
-		i, ok := rm.AsInt64(v)
-		return float64(i), ok
-	}
 }
 
 func ordinalPair(c constraints.CDvOrdinal, n int64) (constraints.OrdinalSymbol, bool) {

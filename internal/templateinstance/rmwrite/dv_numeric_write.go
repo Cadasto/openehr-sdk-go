@@ -16,20 +16,6 @@ func writeDVCountSingle(c *rm.DVCount, attr string, child any) error {
 		}
 		c.Magnitude = rm.Integer64(n)
 		return nil
-	case "normal_status":
-		v, ok := child.(*rm.CodePhrase)
-		if !ok {
-			return mismatch(attr, child, "CODE_PHRASE")
-		}
-		c.NormalStatus = v
-		return nil
-	case "normal_range":
-		v, ok := child.(*rm.DVInterval[rm.DVCount])
-		if !ok {
-			return mismatch(attr, child, "DV_INTERVAL")
-		}
-		c.NormalRange = v
-		return nil
 	case "accuracy":
 		return writeOptionalReal(&c.Accuracy, attr, child)
 	case "accuracy_is_percent":
@@ -37,7 +23,7 @@ func writeDVCountSingle(c *rm.DVCount, attr string, child any) error {
 	case "magnitude_status":
 		return writeOptionalString(&c.MagnitudeStatus, attr, child)
 	}
-	return fmt.Errorf("%w: *rm.DVCount has no single attr %q", ErrUnknownAttribute, attr)
+	return writeOrderedSingle("*rm.DVCount", &c.NormalStatus, &c.NormalRange, attr, child)
 }
 
 func writeDVQuantitySingle(q *rm.DVQuantity, attr string, child any) error {
@@ -56,20 +42,6 @@ func writeDVQuantitySingle(q *rm.DVQuantity, attr string, child any) error {
 		}
 		q.Units = v
 		return nil
-	case "normal_status":
-		v, ok := child.(*rm.CodePhrase)
-		if !ok {
-			return mismatch(attr, child, "CODE_PHRASE")
-		}
-		q.NormalStatus = v
-		return nil
-	case "normal_range":
-		v, ok := child.(*rm.DVInterval[rm.DVQuantity])
-		if !ok {
-			return mismatch(attr, child, "DV_INTERVAL")
-		}
-		q.NormalRange = v
-		return nil
 	case "accuracy":
 		return writeOptionalReal(&q.Accuracy, attr, child)
 	case "accuracy_is_percent":
@@ -83,7 +55,7 @@ func writeDVQuantitySingle(q *rm.DVQuantity, attr string, child any) error {
 	case "units_display_name":
 		return writeOptionalString(&q.UnitsDisplayName, attr, child)
 	}
-	return fmt.Errorf("%w: *rm.DVQuantity has no single attr %q", ErrUnknownAttribute, attr)
+	return writeOrderedSingle("*rm.DVQuantity", &q.NormalStatus, &q.NormalRange, attr, child)
 }
 
 // writeOptionalReal stores a number on an optional Real attribute, which
