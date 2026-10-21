@@ -1479,6 +1479,8 @@ requirements:
       - openehr/instance/identity_stamp_test.go
       - openehr/instance/imports_test.go
       - openehr/instance/instance_test.go
+      - openehr/instance/interval_expanded_bounds_test.go
+      - openehr/instance/interval_expanded_internal_test.go
       - openehr/instance/interval_flags_test.go
       - openehr/instance/interval_order_internal_test.go
       - openehr/instance/interval_order_test.go
