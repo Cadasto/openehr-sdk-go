@@ -1447,6 +1447,7 @@ requirements:
       - internal/templateinstance/rmwrite/write_text_like_test.go
       - openehr/composition/builder_defaults_test.go
       - openehr/composition/optional_content_test.go
+      - openehr/composition/ordered_value_test.go
       - openehr/composition/participation_test.go
       - openehr/composition/reference_test.go
       - openehr/composition/skeleton_policy_test.go
@@ -1494,6 +1495,7 @@ requirements:
       - openehr/instance/nonstorable_visit_internal_test.go
       - openehr/instance/nonstorable_visit_test.go
       - openehr/instance/null_flavour_default_test.go
+      - openehr/instance/ordered_value_test.go
       - openehr/instance/participation_mapping_test.go
       - openehr/instance/party_attribute_test.go
       - openehr/instance/party_proxy_attribute_test.go
@@ -1509,6 +1511,7 @@ requirements:
       - openehr/instance/post_walk_binding_test.go
       - openehr/instance/prohibited_attribute_test.go
       - openehr/instance/proportion_kind_test.go
+      - openehr/instance/quantified_rules_test.go
       - openehr/instance/realworld_opt_synthesis_test.go
       - openehr/instance/reference_attribute_test.go
       - openehr/instance/required_context_test.go
@@ -1669,6 +1672,7 @@ requirements:
       - openehr/instance/coded_text_internal_test.go
       - openehr/instance/phase4_test.go
       - openehr/instance/proportion_kind_test.go
+      - openehr/instance/quantified_rules_test.go
       - openehr/rm/interval_bound_test.go
       - openehr/rm/rminfo/nonstorable_test.go
       - openehr/rm/temporal_iso_test.go
