@@ -121,6 +121,9 @@ func writeReferenceRanges[T rm.DVOrdered](class string, list *[]rm.ReferenceRang
 		return fmt.Errorf("%w: %s has no multiple attr %q", ErrUnknownAttribute, class, attr)
 	}
 	for _, read := range referenceRangeReaders {
+		if read == nil {
+			continue
+		}
 		if meaning, rng, ok := read(child); ok {
 			*list = append(*list, rm.ReferenceRange[T]{Meaning: meaning, Range: rng})
 			return nil
@@ -229,6 +232,9 @@ func intervalAs[T rm.DVOrdered](child any, attr, rmName string) (rm.DVInterval[T
 	var parts intervalParts
 	var ok bool
 	for _, read := range intervalReaders {
+		if read == nil {
+			continue
+		}
 		if parts, ok = read(child); ok {
 			break
 		}
