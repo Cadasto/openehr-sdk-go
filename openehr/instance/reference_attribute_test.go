@@ -7,6 +7,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
 // The OPTs below are small templates for the REQ-107 rules on object
@@ -21,6 +22,16 @@ import (
 // them. It checks each root against both validators and hands it to check.
 func generateEvery(t *testing.T, opt string, check func(t *testing.T, call string, out any)) {
 	t.Helper()
+	generateEveryCompiled(t, opt, func(t *testing.T, call string, out any, _ *templatecompile.Compiled) {
+		t.Helper()
+		check(t, call, out)
+	})
+}
+
+// generateEveryCompiled is generateEvery, and also hands check the compiled
+// template the root was generated from.
+func generateEveryCompiled(t *testing.T, opt string, check func(t *testing.T, call string, out any, c *templatecompile.Compiled)) {
+	t.Helper()
 	for _, implicit := range []bool{true, false} {
 		c := compileOPTText(t, opt, implicit)
 		for _, opts := range guardOptions() {
@@ -30,7 +41,7 @@ func generateEvery(t *testing.T, opt string, check func(t *testing.T, call strin
 			if err != nil {
 				t.Fatalf("%s: %v, want a root", call, err)
 			}
-			check(t, call, out)
+			check(t, call, out, c)
 			checkBothValidators(t, call, out, c)
 		}
 	}

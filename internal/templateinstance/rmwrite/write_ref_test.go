@@ -236,3 +236,54 @@ func TestREQ107_EntryParentsAddressTheirReferences(t *testing.T) {
 		},
 	})
 }
+
+// TestREQ107_EHRContainerParentsAddressTheirAttributes is the REQ-107
+// check that rmwrite writes the attributes an OPT can name on an
+// EHR_STATUS and a FOLDER, the EHR-wide roots REQ-110 validates, so the
+// generator can build either as a template root: an EHR_STATUS's name,
+// PARTY_SELF subject, other_details and the two Boolean flags, and a
+// FOLDER's name, details, sub-folders and items, which take any class of
+// OBJECT_REF as given.
+func TestREQ107_EHRContainerParentsAddressTheirAttributes(t *testing.T) {
+	t.Parallel()
+	tree := &rm.ItemTree{ArchetypeNodeID: "at0001"}
+	self := &rm.PartySelf{ExternalRef: &rm.PartyRef{ID: &rm.HierObjectID{Value: "p-1"}, Namespace: "DEMOGRAPHIC", Type: "PERSON"}}
+	item := &rm.ObjectRef{ID: &rm.HierObjectID{Value: "c-1"}, Namespace: "local", Type: "VERSIONED_COMPOSITION"}
+	group := &rm.AccessGroupRef{ID: &rm.HierObjectID{Value: "g-1"}, Namespace: "local", Type: "ACCESS_GROUP"}
+	runWriterCases(t, []writerCase{
+		{
+			class: "EHR_STATUS", parent: func() any { return &rm.EHRStatus{} },
+			writes: []fieldWrite{
+				{attr: "name", child: &rm.DVText{Value: "EHR status"}, field: "Name", want: rm.DVText{Value: "EHR status"}},
+				{attr: "subject", child: self, field: "Subject", want: *self},
+				{attr: "other_details", child: tree, field: "OtherDetails", want: tree},
+				{attr: "is_queryable", child: true, field: "IsQueryable", want: true},
+				{attr: "is_modifiable", child: true, field: "IsModifiable", want: true},
+			},
+			mismatched: []fieldWrite{
+				{attr: "subject", child: &rm.PartyIdentified{}},
+				{attr: "other_details", child: &rm.Cluster{}},
+				{attr: "is_queryable", child: "true"},
+				{attr: "is_modifiable", child: 1},
+			},
+			unknown: []string{"settings"},
+		},
+		{
+			class: "FOLDER", parent: func() any { return &rm.Folder{} },
+			writes: []fieldWrite{
+				{attr: "name", child: &rm.DVText{Value: "episodes"}, field: "Name", want: rm.DVText{Value: "episodes"}},
+				{attr: "details", child: tree, field: "Details", want: tree},
+				{attr: "folders", multi: true, child: &rm.Folder{ArchetypeNodeID: "at0002"}, field: "Folders", want: []rm.Folder{{ArchetypeNodeID: "at0002"}}},
+				{attr: "items", multi: true, child: item, field: "Items", want: []rm.ObjectRefLike{item}},
+				{attr: "items", multi: true, child: group, field: "Items", want: []rm.ObjectRefLike{group}},
+			},
+			mismatched: []fieldWrite{
+				{attr: "details", child: &rm.Cluster{}},
+				{attr: "folders", multi: true, child: &rm.Section{}},
+				{attr: "items", multi: true, child: &rm.HierObjectID{Value: "c-1"}},
+				{attr: "items", multi: true, child: (*rm.ObjectRef)(nil)},
+			},
+			unknown: []string{"settings", "subject"},
+		},
+	})
+}
