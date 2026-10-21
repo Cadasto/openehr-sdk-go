@@ -2850,15 +2850,15 @@ const referenceNamespace = "local"
 
 // fillReference gives ref, a reference the generator writes, each part
 // the RM requires that is empty, so a part the OPT pins is kept. A
-// reference with no id takes a HIER_OBJECT_ID (RM defaults), and an id
-// with no value, of any identifier class, takes a value; either value is
+// reference with no id takes a HIER_OBJECT_ID (RM defaults), whose value is
 // drawn like a uid, from Options.UIDSource or its random fallback
-// (Identity). An empty namespace becomes referenceNamespace, and an empty
-// type referenceType's for ref held in attr. A LOCATABLE_REF holds the
-// UID_BASED_ID id it declares itself. A UIDSource that returns nil gives
-// no id and no value, so a reference with no id keeps none, with no nil
-// pointer stored in its place, and an id with no value keeps its empty one.
-// Any other value is left alone.
+// (Identity). An id with no value, of any identifier class, takes a value
+// in its class's form (emptyIDValue). An empty namespace becomes
+// referenceNamespace, and an empty type referenceType's for ref held in
+// attr. A LOCATABLE_REF holds the UID_BASED_ID id it declares itself. A
+// UIDSource that returns nil gives no id and no uid, so a reference with no
+// id keeps none, with no nil pointer stored in its place, and an id whose
+// value takes the uid keeps its empty one. Any other value is left alone.
 func (g *generator) fillReference(ref any, attr string) {
 	var base *rm.ObjectRef
 	var id any
@@ -2884,8 +2884,8 @@ func (g *generator) fillReference(ref any, attr string) {
 			setID(uid)
 		}
 	} else if value, ok := stringField(id, "value"); ok && value.get() == "" {
-		if uid := g.nextUID(); uid != nil {
-			value.set(uid.Value)
+		if v, ok := g.emptyIDValue(id); ok {
+			value.set(v)
 		}
 	}
 	if base.Namespace == "" {
@@ -2894,6 +2894,39 @@ func (g *generator) fillReference(ref any, attr string) {
 	if base.Type == "" {
 		base.Type = referenceType(ref, attr)
 	}
+}
+
+// exampleVersionSuffix follows the uid's value in the value of an
+// OBJECT_VERSION_ID the generator writes: the creating system example and
+// the first trunk version, so the value reads object_id::creating_system_id::
+// version_tree_id.
+const exampleVersionSuffix = "::example::1"
+
+// exampleArchetypeID is the value of an ARCHETYPE_ID the generator writes
+// where the OPT gives none: an id in the form
+// rm_originator-rm_name-rm_entity.concept.vN.
+const exampleArchetypeID = "openEHR-EHR-CLUSTER.example.v1"
+
+// emptyIDValue returns the value the generator gives id, an identifier an
+// object reference holds with no value, in its class's form (Identity): the
+// value of a uid drawn from Options.UIDSource or its random fallback for a
+// HIER_OBJECT_ID, a GENERIC_ID, a TEMPLATE_ID and a TERMINOLOGY_ID; that
+// value followed by exampleVersionSuffix for an OBJECT_VERSION_ID; and
+// exampleArchetypeID, with no uid drawn, for an ARCHETYPE_ID. ok is false
+// where the form takes a uid and UIDSource returns nil, so the id keeps its
+// empty value.
+func (g *generator) emptyIDValue(id any) (value string, ok bool) {
+	if _, isArchetypeID := id.(*rm.ArchetypeID); isArchetypeID {
+		return exampleArchetypeID, true
+	}
+	uid := g.nextUID()
+	if uid == nil {
+		return "", false
+	}
+	if _, isVersionID := id.(*rm.ObjectVersionID); isVersionID {
+		return uid.Value + exampleVersionSuffix, true
+	}
+	return uid.Value, true
 }
 
 // referenceType is the type the generator gives ref, a reference held in

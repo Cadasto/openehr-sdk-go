@@ -185,13 +185,17 @@ type Options struct {
 	// ENTRY, GENERIC_ENTRY, PARTY and PARTY_RELATIONSHIP, of any other
 	// locatable whose OPT requires its uid, and the id value of every
 	// object reference it writes that carries none, a ROLE's performer and
-	// a PARTY_RELATIONSHIP's source and target among them. A
-	// COMPOSITION gets a uid only where its OPT requires one, so the
-	// server that stores it gives it its version id. Nil falls back to a
-	// random RFC 9562 v4 UUID (stdlib uuid.NewV4). Tests pin a counter or
-	// named-seed source for deterministic uids. A source that returns nil
-	// leaves unset what the generator drew it for: the locatable has no
-	// uid, and the reference no id, or an id with an empty value.
+	// a PARTY_RELATIONSHIP's source and target among them. The id takes
+	// the uid's value in the form of its class: the value itself for a
+	// HIER_OBJECT_ID, a GENERIC_ID, a TEMPLATE_ID and a TERMINOLOGY_ID, and
+	// the value followed by "::example::1" for an OBJECT_VERSION_ID. An
+	// ARCHETYPE_ID takes a fixed id and draws no uid. A COMPOSITION gets a
+	// uid only where its OPT requires one, so the server that stores it
+	// gives it its version id. Nil falls back to a random RFC 9562 v4 UUID
+	// (stdlib uuid.NewV4). Tests pin a counter or named-seed source for
+	// deterministic uids. A source that returns nil leaves unset what the
+	// generator drew it for: the locatable has no uid, and the reference no
+	// id, or an id with an empty value.
 	UIDSource func() *rm.HierObjectID
 
 	// ValueFill selects how primitive leaves are valued. Zero value =
