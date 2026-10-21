@@ -100,7 +100,15 @@
 //
 // Under every policy, every primitive leaf the walk reaches is valued as
 // [Options.ValueFill] says: the constraint's example value under
-// [ExampleFill], an in-constraint draw under [RandomFill]. Where the
+// [ExampleFill], an in-constraint draw under [RandomFill]. Where an RM
+// rule narrows what the constraint leaves open, the value is taken from
+// what is left: a PARTY_REF's type is a party class name, a TERM_MAPPING's
+// match one of >, =, < and ?, a magnitude_status one of =, <, >, <=, >=
+// and ~, a percentage accuracy more than 0 and at most 100, a precision -1
+// or more, and an RM Integer, such as a DV_ORDINAL's value, inside its 32
+// bits, the example of a range bounded on one side alone staying on that
+// side. Where nothing is left, Generate returns an error wrapping
+// [ErrConstraintUnsatisfiable]. Where the
 // template gives an RM attribute no value, the generator writes an
 // RM-valid default, unless the template's own constraint on that
 // attribute rejects it. A DV_PROPORTION is then settled to the rules of

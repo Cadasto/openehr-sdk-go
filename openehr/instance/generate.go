@@ -224,6 +224,9 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	}
 	orderIntervalBounds(optNode, rmValue, g.opts.Language)
 	settleIntervalEndpoints(optNode, rmValue)
+	if err := settleAccuracy(optNode, rmValue); err != nil {
+		return err
+	}
 	g.finishNode(optNode, rmValue)
 	return nil
 }
@@ -982,7 +985,7 @@ func (g *generator) bmmStringDefault(parent any, attr string) (string, bool) {
 		return s, true
 	}
 	if attr == "magnitude_status" {
-		return "=", true
+		return defaultMagnitudeStatus, true
 	}
 	switch parent.(type) {
 	case *rm.TerminologyID:
@@ -1797,21 +1800,16 @@ func (g *generator) setLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, 
 // the attribute of rmValue it constrains, or "" when pc constrains
 // rmValue itself. A leaf on an attribute of a data value other than the
 // one the switch values (routedPrimitive) is written through rmwrite
-// (writePrimitive). A C_INTEGER on an attribute of the RM type Integer,
-// which is 32 bits wide, is narrowed to the part of its range inside that
-// type first (narrowToInteger), and the leaf fails with an error wrapping
-// ErrConstraintUnsatisfiable where nothing of the range is inside it.
+// (writePrimitive). A constraint an RM rule narrows, such as a C_INTEGER
+// on an attribute of the RM type Integer, which is 32 bits wide, is
+// narrowed first, and the value is taken from what is left of it
+// (narrowedLeaf); the leaf fails with an error wrapping
+// ErrConstraintUnsatisfiable where nothing is left.
 func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any, attr string, pc constraints.PrimitiveConstraint) error {
-	if ci, ok := pc.(constraints.CInteger); ok && holdsInteger(rmValue, attr) {
-		// An RM Integer is 32 bits wide: where the OPT leaves a wider
-		// range open, the value is taken from the part inside it.
-		narrowed, err := narrowToInteger(ci)
-		if err != nil {
-			return fmt.Errorf("%w: %s.%s at %s: %w", ErrConstraintUnsatisfiable, rmTypeOf(rmValue), attr, leafPath(leaf), err)
-		}
-		pc = narrowed
+	pc, ex, err := narrowedLeaf(leaf, rmValue, attr, pc)
+	if err != nil {
+		return err
 	}
-	ex := pc.ExampleValue()
 	if g.opts.ValueFill == RandomFill {
 		// In-constraint sampled value (valid by construction); same Go
 		// shape as ExampleValue so the switch below is unchanged. REQ-107.
@@ -3071,11 +3069,15 @@ func fillCodedDefault(opt *tcimpl.CompiledNode, attr string, ct *rm.DVCodedText,
 // value is a list member or a pattern match that the constraint accepts;
 // on a PARTY_REF's type it is also a class name PARTY_REF Type_validity
 // admits (see partyRefType), on an ACCESS_GROUP_REF's type the one type
-// its Type_validity admits, and on a TERM_MAPPING's match a character
-// TERM_MAPPING Match_valid admits (see termMappingMatch). When there is
-// none, it writes nothing and returns an error wrapping
-// ErrConstraintUnsatisfiable. An attribute the generator has no field for
-// is left alone, like any other unknown primitive target.
+// its Type_validity admits, on a TERM_MAPPING's match a character
+// TERM_MAPPING Match_valid admits (see termMappingMatch), and on the
+// magnitude_status of a quantified value one of the strings DV_QUANTIFIED
+// Magnitude_status_valid admits (magnitudeStatuses), the first of them
+// the C_STRING accepts, the default = first, where the C_STRING path
+// picked none of them. When there is none, it writes nothing and returns
+// an error wrapping ErrConstraintUnsatisfiable. An attribute the
+// generator has no field for is left alone, like any other unknown
+// primitive target.
 func applyStringLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, cs constraints.CString, ex any) error {
 	if attr == "" {
 		attr = mainStringAttr(rmValue)
@@ -3103,6 +3105,10 @@ func applyStringLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, cs con
 	case *rm.TermMapping:
 		if attr == "match" {
 			s, err = termMappingMatch(cs, s)
+		}
+	default:
+		if attr == "magnitude_status" && quantified(rmValue) {
+			s, err = narrowString(cs, s, magnitudeStatuses, errNoMagnitudeStatus)
 		}
 	}
 	if err != nil {
