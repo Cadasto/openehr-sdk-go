@@ -540,9 +540,11 @@ var pinnedUnwritten = map[string][]string{
 	"DV_TEXT":                        {},
 	"DV_TIME":                        {"normal_range", "normal_status", "other_reference_ranges"},
 	"DV_URI":                         {},
+	"EHR_STATUS":                     {},
 	"ELEMENT":                        {},
 	"EVALUATION":                     {},
 	"EVENT_CONTEXT":                  {},
+	"FOLDER":                         {},
 	"GENERIC_ENTRY":                  {},
 	"GENERIC_ID":                     {},
 	"GROUP":                          {},
@@ -637,8 +639,6 @@ var pinnedUnreached = map[string]string{
 	"DV_PROPORTION":   "",
 	"DV_SCALE":        "",
 	"EHR_ACCESS":      "settings, its one attribute beside LOCATABLE's, is ACCESS_CONTROL_SETTINGS, which no concrete class extends in the pinned RM",
-	"EHR_STATUS":      "",
-	"FOLDER":          "",
 	"REFERENCE_RANGE": "",
 }
 

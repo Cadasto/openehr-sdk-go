@@ -176,6 +176,10 @@ func EnsureSingle(parent any, attrName string, child any) error {
 		return writeGenericIDSingle(p, attrName, child)
 	case *rm.InstructionDetails:
 		return writeInstructionDetailsSingle(p, attrName, child)
+	case *rm.EHRStatus:
+		return writeEHRStatusSingle(p, attrName, child)
+	case *rm.Folder:
+		return writeFolderSingle(p, attrName, child)
 	}
 	return fmt.Errorf("%w: parent %T, attr %q", ErrUnknownAttribute, parent, attrName)
 }
@@ -235,6 +239,8 @@ func AppendMultiple(parent any, attrName string, child any) error {
 		return writeTextMultiple(&p.DVText, "*rm.DVCodedText", attrName, child)
 	case *rm.DVParagraph:
 		return writeDVParagraphMultiple(p, attrName, child)
+	case *rm.Folder:
+		return writeFolderMultiple(p, attrName, child)
 	}
 	return fmt.Errorf("%w: parent %T, attr %q", ErrUnknownAttribute, parent, attrName)
 }

@@ -1916,8 +1916,9 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 // of a DV_QUANTITY, a DV_COUNT, a temporal value, a DV_BOOLEAN, a DV_TEXT,
 // a DV_CODED_TEXT, a DV_MULTIMEDIA or a DV_STATE other than the one the
 // switch there values, such as a DV_QUANTITY's precision, a DV_COUNT's or
-// a DV_DURATION's accuracy, or a DV_STATE's is_terminal, and an
-// INTERVAL_EVENT's sample_count. A leaf on rmValue itself (attr "") and a
+// a DV_DURATION's accuracy, or a DV_STATE's is_terminal, an
+// INTERVAL_EVENT's sample_count, and an EHR_STATUS's is_queryable and
+// is_modifiable. A leaf on rmValue itself (attr "") and a
 // leaf on any other value go to the switch, which leaves one it has no
 // case for alone, as an interval's *_unbounded flag, which the walk decides
 // by the bounds it writes.
@@ -1926,9 +1927,10 @@ func routedPrimitive(rmValue any, attr string) bool {
 		return false
 	}
 	switch rmValue.(type) {
-	case *rm.DVQuantity, *rm.DVState:
+	case *rm.DVQuantity, *rm.DVState, *rm.EHRStatus:
 		// The switch values a DV_QUANTITY only from a C_DV_QUANTITY on the
-		// value itself; a DV_STATE has no case there.
+		// value itself; a DV_STATE and an EHR_STATUS, whose primitive
+		// attributes are its two flags, have no case there.
 		return true
 	case *rm.DVText, *rm.DVCodedText, *rm.DVDate, *rm.DVTime, *rm.DVDateTime, *rm.DVDuration, *rm.DVBoolean:
 		return attr != "value"
