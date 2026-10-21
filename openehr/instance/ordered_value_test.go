@@ -436,6 +436,14 @@ func TestREQ107_OrdinalAndScaleTakeTheirSymbolAndValue(t *testing.T) {
 			value: optNode("DV_ORDINAL", "", optSingle("value", dvInteger("2")), optSingle("symbol", optNode("DV_CODED_TEXT", ""))),
 			check: ordinal(2, "local::at0000"),
 		},
+		{
+			// The known-gap row TestREQ107_KnownGapUnwritableAttributes
+			// pinned before: the symbol alone, as a node of its own. The
+			// value the OPT leaves silent keeps the zero the RM type holds.
+			name:  "DV_ORDINAL symbol alone as a node of its own",
+			value: optNode("DV_ORDINAL", "", optSingle("symbol", optNode("DV_CODED_TEXT", ""))),
+			check: ordinal(0, "local::at0000"),
+		},
 		{name: "DV_SCALE", value: scaleValue("1.5", "at0003"), check: scale(1.5, "local::at0003")},
 		{
 			name:  "DV_SCALE symbol named with no constraint",
