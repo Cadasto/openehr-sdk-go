@@ -57,6 +57,13 @@ func realFrom(lo, hi float64) string {
 	return optPrimitive("REAL", "C_REAL", instance.RealRange(instance.Closed(lo), instance.Closed(hi)))
 }
 
+// ratioBound is a DV_PROPORTION of the ratio type, numerator over denominator,
+// each a C_REAL that pins it.
+func ratioBound(numerator, denominator string) string {
+	return optNode("DV_PROPORTION", "", optSingle("numerator", dvReal(numerator)),
+		optSingle("denominator", dvReal(denominator)), optSingle("type", dvInteger("0")))
+}
+
 // normalString renders an ordered value as the checks below compare it:
 // its own value, as boundString renders a bound, then its DV_ORDERED
 // attributes, as orderedString renders them.
@@ -330,6 +337,81 @@ func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T)
 				"normal_range [*DV_ORDINAL 5 local::at0001 .. *DV_ORDINAL 20 local::at0002]" + noRefs,
 		},
 		{
+			// 10 is the first value outside the range that the value's own
+			// constraint accepts: -1, below the lower bound, is rejected by it.
+			name: "DV_QUANTITY magnitude 0..100 mm, range [0 mm..9 mm], H",
+			value: optNode("DV_QUANTITY", "", optSingle("magnitude", realFrom(0, 100)), optSingle("units", guardString("mm")),
+				normalRangeOver("DV_QUANTITY", quantityValue("0"), quantityValue("9")), normalStatus("H")),
+			want:       "DV_QUANTITY 10 mm; normal_status openehr_normal_statuses::H; normal_range [DV_QUANTITY 0 mm .. DV_QUANTITY 9 mm]" + noRefs,
+			wantRandom: "DV_QUANTITY 67.6455659667825 mm; normal_status openehr_normal_statuses::H; normal_range [DV_QUANTITY 0 mm .. DV_QUANTITY 9 mm]" + noRefs,
+		},
+		{
+			name: "DV_PROPORTION unitary numerator 0..100, range [0/1..9/1], H",
+			value: optNode("DV_PROPORTION", "", optSingle("numerator", realFrom(0, 100)),
+				optSingle("denominator", dvReal("1")), optSingle("type", dvInteger("1")),
+				normalRangeOver("DV_PROPORTION", proportionValue("0"), proportionValue("9")), normalStatus("H")),
+			want:       "DV_PROPORTION 10/1 type 1; normal_status openehr_normal_statuses::H; normal_range [DV_PROPORTION 0/1 type 1 .. DV_PROPORTION 9/1 type 1]" + noRefs,
+			wantRandom: "DV_PROPORTION 67.6455659667825/1 type 1; normal_status openehr_normal_statuses::H; normal_range [DV_PROPORTION 0/1 type 1 .. DV_PROPORTION 9/1 type 1]" + noRefs,
+		},
+		{
+			// The OPT lists 5 and 20. The bounds of the range, the values a
+			// step from them and the middle of the range give 1, 0, 2, 9, 8,
+			// 10 and 5, and the OPT accepts none of them outside the range:
+			// only its own 20 is.
+			name: "DV_COUNT magnitude listing 5 and 20, range [1..9], H",
+			value: optNode("DV_COUNT", "", optSingle("magnitude", intList(5, 20)),
+				normalRangeOver("DV_COUNT", countValue("1"), countValue("9")), normalStatus("H")),
+			want: "DV_COUNT 20; normal_status openehr_normal_statuses::H; normal_range [DV_COUNT 1 .. DV_COUNT 9]" + noRefs,
+		},
+		{
+			// The step below the lower bound is tried before the step above
+			// it: -1 before 1, and for a quantity and a proportion as well,
+			// where the unconstrained example is 0 and 1.
+			name: "DV_COUNT with no magnitude constraint, range [0..0], H",
+			value: optNode("DV_COUNT", "", normalRangeOver("DV_COUNT", countValue("0"), countValue("0")),
+				normalStatus("H")),
+			want: "DV_COUNT -1; normal_status openehr_normal_statuses::H; normal_range [DV_COUNT 0 .. DV_COUNT 0]" + noRefs,
+		},
+		{
+			name: "DV_QUANTITY with no magnitude constraint, range [0 mm..0 mm], H",
+			value: optNode("DV_QUANTITY", "", optSingle("units", guardString("mm")),
+				normalRangeOver("DV_QUANTITY", quantityValue("0"), quantityValue("0")), normalStatus("H")),
+			want: "DV_QUANTITY -1 mm; normal_status openehr_normal_statuses::H; normal_range [DV_QUANTITY 0 mm .. DV_QUANTITY 0 mm]" + noRefs,
+		},
+		{
+			name: "DV_PROPORTION unitary with no numerator constraint, range [1/1..1/1], H",
+			value: optNode("DV_PROPORTION", "", optSingle("denominator", dvReal("1")), optSingle("type", dvInteger("1")),
+				normalRangeOver("DV_PROPORTION", proportionValue("1"), proportionValue("1")), normalStatus("H")),
+			want: "DV_PROPORTION 0/1 type 1; normal_status openehr_normal_statuses::H; normal_range [DV_PROPORTION 1/1 type 1 .. DV_PROPORTION 1/1 type 1]" + noRefs,
+		},
+		{
+			// The OPT lists 0, 7, 5 and 20. The middle of the range, 5, is
+			// tried before the values the OPT names itself, of which 7 is the
+			// first inside the range.
+			name: "DV_COUNT magnitude listing 0, 7, 5 and 20, range [1..9], N",
+			value: optNode("DV_COUNT", "", optSingle("magnitude", intList(0, 7, 5, 20)),
+				normalRangeOver("DV_COUNT", countValue("1"), countValue("9")), normalStatus("N")),
+			want: "DV_COUNT 5; normal_status openehr_normal_statuses::N; normal_range [DV_COUNT 1 .. DV_COUNT 9]" + noRefs,
+		},
+		{
+			// Neither bound nor a step from one is inside the open range,
+			// and the OPT has no constraint to name a value: the middle is.
+			name: "DV_QUANTITY range (1 mm..2 mm), N",
+			value: optNode("DV_QUANTITY", "", optSingle("units", guardString("mm")),
+				normalRangeOver("DV_QUANTITY", quantityValue("1"), quantityValue("2"), excludesLower, excludesUpper),
+				normalStatus("N")),
+			want: "DV_QUANTITY 1.5 mm; normal_status openehr_normal_statuses::N; normal_range (DV_QUANTITY 1 mm .. DV_QUANTITY 2 mm)" + noRefs,
+		},
+		{
+			// A ratio over 10 against a range whose bounds are over 1: the
+			// bound 3/1 is 30/10 on the value's own denominator.
+			name: "DV_PROPORTION ratio over 10, numerator 0..100, range [3/1..3/1], N",
+			value: optNode("DV_PROPORTION", "", optSingle("numerator", realFrom(0, 100)),
+				optSingle("denominator", dvReal("10")), optSingle("type", dvInteger("0")),
+				normalRangeOver("DV_PROPORTION", ratioBound("3", "1"), ratioBound("3", "1")), normalStatus("N")),
+			want: "DV_PROPORTION 30/10 type 0; normal_status openehr_normal_statuses::N; normal_range [DV_PROPORTION 3/1 type 0 .. DV_PROPORTION 3/1 type 0]" + noRefs,
+		},
+		{
 			name: "DV_QUANTITY in mm, range in cm, N, left as generated",
 			value: optNode("DV_QUANTITY", "", optSingle("magnitude", realFrom(0, 100)), optSingle("units", guardString("mm")),
 				normalRangeOver("DV_QUANTITY",
@@ -421,6 +503,19 @@ func TestREQ107_NormalRangeWithNoConsistentValueIsUnsatisfiable(t *testing.T) {
 			value: optNode("DV_COUNT", "", optSingle("magnitude", integerFrom(20, 30)),
 				normalRangeOver("DV_COUNT", countValue("1"), countValue("9")), normalStatus("N")),
 			want: "DV_COUNT.magnitude at /value/magnitude",
+		},
+		{
+			name: "DV_QUANTITY magnitude 20..30 mm, range [1 mm..9 mm], N",
+			value: optNode("DV_QUANTITY", "", optSingle("magnitude", realFrom(20, 30)), optSingle("units", guardString("mm")),
+				normalRangeOver("DV_QUANTITY", quantityValue("1"), quantityValue("9")), normalStatus("N")),
+			want: "DV_QUANTITY.magnitude at /value/magnitude",
+		},
+		{
+			name: "DV_PROPORTION unitary numerator 20..30, range [1/1..9/1], N",
+			value: optNode("DV_PROPORTION", "", optSingle("numerator", realFrom(20, 30)),
+				optSingle("denominator", dvReal("1")), optSingle("type", dvInteger("1")),
+				normalRangeOver("DV_PROPORTION", proportionValue("1"), proportionValue("9")), normalStatus("N")),
+			want: "DV_PROPORTION.numerator at /value/numerator",
 		},
 		{
 			name: "DV_ORDINAL value [2], range [1..3], L",
