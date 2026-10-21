@@ -66,3 +66,21 @@ func TestREQ102_PrimitivePointerMatchesAsItsValue(t *testing.T) {
 		}
 	}
 }
+
+// REQ-102: the BMM Character an RM attribute holds (TERM_MAPPING.match, an
+// rm.Character) is a one-character string, and AOM 1.4 has no C_CHARACTER,
+// so an OPT constrains it with a C_STRING on a STRING node. A Character
+// matches STRING and no other short name.
+func TestREQ102_STRINGPrimitiveMatchesCharacter(t *testing.T) {
+	t.Parallel()
+	for _, c := range []rm.Character{">", "=", "<", "?"} {
+		if !rmbind.PrimitiveValueMatchesShortName("STRING", c) {
+			t.Errorf("PrimitiveValueMatchesShortName(%q, rm.Character(%q)) = false, want true", "STRING", string(c))
+		}
+		for _, other := range []string{"DATE", "TIME", "DATE_TIME", "DURATION", "INTEGER", "REAL", "BOOLEAN"} {
+			if rmbind.PrimitiveValueMatchesShortName(other, c) {
+				t.Errorf("PrimitiveValueMatchesShortName(%q, rm.Character(%q)) = true, want false", other, string(c))
+			}
+		}
+	}
+}

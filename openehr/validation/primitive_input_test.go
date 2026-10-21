@@ -99,3 +99,29 @@ func TestPrimitiveInput_REQ102_NilPointerHeldPrimitive(t *testing.T) {
 		}
 	}
 }
+
+// REQ-102: a Character the RM holds (TERM_MAPPING.match) reaches the typed
+// primitive validator as the one-character string it is, so a C_STRING,
+// the one constraint AOM 1.4 has for it, judges the character instead of
+// rejecting the named type as wrong_type.
+func TestPrimitiveInput_REQ102_Character(t *testing.T) {
+	t.Parallel()
+	got := primitiveInput(rm.Character("="))
+	if got != "=" {
+		t.Fatalf("primitiveInput(rm.Character(%q)) = %#v (%T), want the string %q", "=", got, got, "=")
+	}
+	tests := []struct {
+		name string
+		pc   constraints.CString
+		want int
+	}{
+		{name: "open", pc: constraints.CString{}},
+		{name: "listing it", pc: constraints.CString{List: []string{"="}}},
+		{name: "not listing it", pc: constraints.CString{List: []string{"<"}}, want: 1},
+	}
+	for _, tc := range tests {
+		if vs := tc.pc.Validate(got); len(vs) != tc.want {
+			t.Errorf("%s: CString.Validate(primitiveInput(rm.Character(%q))) = %+v, want %d violations", tc.name, "=", vs, tc.want)
+		}
+	}
+}
