@@ -23,7 +23,8 @@ func closedRange[T rm.DVOrdered](lower, upper T) *rm.DVInterval[T] {
 // TestREQ107_NormalRangeSettleEdges pins how settleNormalRange treats the
 // values the generator cannot reach through a synthetic OPT, with no OPT
 // constraint on the value (a nil node): the temporal layouts it steps a
-// bound in and those it does not, a range open on both sides, a pair that
+// bound in and those it does not, a range open on both sides, which has no
+// bound to compare the value with and so is left as generated, a pair that
 // does not compare, a status that is not one of the normal statuses, the
 // whole numerator a fraction needs, and the 32-bit range of an ordinal's
 // value (§ Precedence 3, § Errors). Each row pins the value after the
@@ -96,14 +97,13 @@ func TestREQ107_NormalRangeSettleEdges(t *testing.T) {
 			want:  "7",
 		},
 		{
-			name: "DV_COUNT H, range open on both sides, which has every value",
+			name: "DV_COUNT H, range open on both sides, no bound to compare with, left as generated",
 			v: &rm.DVCount{
 				Magnitude: 5, NormalStatus: normalStatusCode("H"),
 				NormalRange: &rm.DVInterval[rm.DVCount]{LowerUnbounded: true, UpperUnbounded: true},
 			},
-			value:         func(v any) string { return fmt.Sprint(v.(*rm.DVCount).Magnitude) },
-			want:          "5",
-			unsatisfiable: true,
+			value: func(v any) string { return fmt.Sprint(v.(*rm.DVCount).Magnitude) },
+			want:  "5",
 		},
 		{
 			name: "DV_COUNT N, range open on both sides, kept",

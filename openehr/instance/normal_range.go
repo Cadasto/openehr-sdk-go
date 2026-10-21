@@ -43,10 +43,10 @@ var errNoNormalValue = errors.New("the OPT admits no value the generator can der
 // orders them by: a DV_COUNT by magnitude; a DV_QUANTITY by magnitude where
 // the bounds of its range share its units; a DV_PROPORTION by ratio where
 // they share its type; a DV_ORDINAL by value; and a DV_DATE, DV_TIME or
-// DV_DATE_TIME where its bounds compare with it (temporalCompare). A range
-// open on both sides has every value. Any other value, such as a DV_SCALE
-// or a DV_DURATION, and one that a bound of its range does not compare
-// with, is left as generated. It runs once the value and its range are
+// DV_DATE_TIME where its bounds compare with it (temporalCompare). Any
+// other value, such as a DV_SCALE or a DV_DURATION, one that a bound of its
+// range does not compare with, and one whose range is open on both sides,
+// which has no bound to pair it with, is left as generated. It runs once the value and its range are
 // final: the walk has written the range, with its bounds in order
 // (orderIntervalBounds) and its flags settled (settleIntervalEndpoints), and
 // finishNode has settled a DV_PROPORTION's kind (settleProportion). The OPT
@@ -96,11 +96,14 @@ type normalBounds[K any] struct {
 }
 
 // normalBoundsOf reads the bounds of iv as K with read, and returns false
-// when a bound that is there does not read as K.
+// when a bound that is there does not read as K, or when iv has no bound.
 func normalBoundsOf[T, K any](iv *rm.Interval[T], read func(T) (K, bool)) (normalBounds[K], bool) {
 	b := normalBounds[K]{
 		lowerUnbounded: iv.LowerUnbounded, upperUnbounded: iv.UpperUnbounded,
 		lowerIncluded: iv.LowerIncluded, upperIncluded: iv.UpperIncluded,
+	}
+	if b.lowerUnbounded && b.upperUnbounded {
+		return b, false
 	}
 	var ok bool
 	if !b.lowerUnbounded {

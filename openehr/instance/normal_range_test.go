@@ -216,7 +216,8 @@ type normalCase struct {
 // keeps the rest of the value: a quantity's units, a proportion's type and
 // denominator, an ordinal's symbol. Any other pair, here a quantity
 // against bounds in other units, a DV_SCALE and a DV_DURATION, is left as
-// generated. It holds under every policy, both value fills, and with and
+// generated, and so is a value whose range, open on both sides, has no
+// bound to pair it with. It holds under every policy, both value fills, and with and
 // without the implicit attributes, and the root passes both validators.
 func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T) {
 	const noRefs = "; other_reference_ranges []"
@@ -312,6 +313,12 @@ func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T)
 				normalStatus("N")),
 			want:        "DV_QUANTITY 0 mm; normal_status openehr_normal_statuses::N; normal_range [DV_QUANTITY 1 cm .. DV_QUANTITY 9 cm]" + noRefs,
 			wantRandom:  "DV_QUANTITY 67.6455659667825 mm; normal_status openehr_normal_statuses::N; normal_range [DV_QUANTITY 1 cm .. DV_QUANTITY 9 cm]" + noRefs,
+			asGenerated: true,
+		},
+		{
+			name:        "DV_COUNT range named with no child, H, left as generated",
+			value:       optNode("DV_COUNT", "", optSingle("normal_range"), normalStatus("H")),
+			want:        "DV_COUNT 0; normal_status openehr_normal_statuses::H; normal_range (open .. open)" + noRefs,
 			asGenerated: true,
 		},
 		{
