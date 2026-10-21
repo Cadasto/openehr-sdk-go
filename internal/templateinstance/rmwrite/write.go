@@ -146,6 +146,14 @@ func EnsureSingle(parent any, attrName string, child any) error {
 		return writePartyIdentitySingle(p, attrName, child)
 	case *rm.PartyRelated:
 		return writePartyRelatedSingle(p, attrName, child)
+	case *rm.PartyIdentified:
+		return writePartyIdentifiedSingle(p, "*rm.PartyIdentified", attrName, child)
+	case *rm.PartySelf:
+		return writePartySelfSingle(p, attrName, child)
+	case *rm.PartyRelationship:
+		return writePartyRelationshipSingle(p, attrName, child)
+	case *rm.Contact:
+		return writeContactSingle(p, attrName, child)
 	case *rm.ObjectRef:
 		return writeObjectRefSingle(p, "*rm.ObjectRef", attrName, child)
 	case *rm.PartyRef:
@@ -217,6 +225,10 @@ func AppendMultiple(parent any, attrName string, child any) error {
 		return writeRoleMultiple(p, attrName, child)
 	case *rm.Contact:
 		return writeContactMultiple(p, attrName, child)
+	case *rm.PartyIdentified:
+		return writePartyIdentifiedMultiple(p, "*rm.PartyIdentified", attrName, child)
+	case *rm.PartyRelated:
+		return writePartyIdentifiedMultiple(&p.PartyIdentified, "*rm.PartyRelated", attrName, child)
 	case *rm.DVText:
 		return writeTextMultiple(p, "*rm.DVText", attrName, child)
 	case *rm.DVCodedText:
@@ -1184,11 +1196,9 @@ func writeIsmTransitionMultiple(i *rm.IsmTransition, attr string, child any) err
 	return fmt.Errorf("%w: *rm.IsmTransition has no multiple attr %q", ErrUnknownAttribute, attr)
 }
 
-// partyFields points at the attributes PARTY gives every party class, so
-// one pair of writers serves all five. The ACTOR attributes languages and
-// roles have no writer yet; the template validator binds their members by
-// RM type, so adding one is a follow-up. A template that names either
-// makes the write fail instead.
+// partyFields points at the attributes PARTY gives every party class, and
+// the two ACTOR adds, so one pair of writers serves all five. languages
+// and roles are nil on a ROLE, which is no ACTOR.
 type partyFields struct {
 	class         string // the Go type, for the error detail
 	name          *rm.DVTextLike
@@ -1196,26 +1206,28 @@ type partyFields struct {
 	identities    *[]rm.PartyIdentity
 	contacts      *[]rm.Contact
 	relationships *[]rm.PartyRelationship
+	languages     *[]rm.DVTextLike
+	roles         *[]rm.PartyRef
 }
 
 func personFields(p *rm.Person) partyFields {
-	return partyFields{"*rm.Person", &p.Name, &p.Details, &p.Identities, &p.Contacts, &p.Relationships}
+	return partyFields{"*rm.Person", &p.Name, &p.Details, &p.Identities, &p.Contacts, &p.Relationships, &p.Languages, &p.Roles}
 }
 
 func agentFields(a *rm.Agent) partyFields {
-	return partyFields{"*rm.Agent", &a.Name, &a.Details, &a.Identities, &a.Contacts, &a.Relationships}
+	return partyFields{"*rm.Agent", &a.Name, &a.Details, &a.Identities, &a.Contacts, &a.Relationships, &a.Languages, &a.Roles}
 }
 
 func groupFields(g *rm.Group) partyFields {
-	return partyFields{"*rm.Group", &g.Name, &g.Details, &g.Identities, &g.Contacts, &g.Relationships}
+	return partyFields{"*rm.Group", &g.Name, &g.Details, &g.Identities, &g.Contacts, &g.Relationships, &g.Languages, &g.Roles}
 }
 
 func organisationFields(o *rm.Organisation) partyFields {
-	return partyFields{"*rm.Organisation", &o.Name, &o.Details, &o.Identities, &o.Contacts, &o.Relationships}
+	return partyFields{"*rm.Organisation", &o.Name, &o.Details, &o.Identities, &o.Contacts, &o.Relationships, &o.Languages, &o.Roles}
 }
 
 func roleFields(r *rm.Role) partyFields {
-	return partyFields{"*rm.Role", &r.Name, &r.Details, &r.Identities, &r.Contacts, &r.Relationships}
+	return partyFields{"*rm.Role", &r.Name, &r.Details, &r.Identities, &r.Contacts, &r.Relationships, nil, nil}
 }
 
 func writePartySingle(f partyFields, attr string, child any) error {
@@ -1236,6 +1248,15 @@ func writePartyMultiple(f partyFields, attr string, child any) error {
 		return assignVia(child, func(v rm.Contact) { *f.contacts = append(*f.contacts, v) }, attr, "CONTACT")
 	case "relationships":
 		return assignVia(child, func(v rm.PartyRelationship) { *f.relationships = append(*f.relationships, v) }, attr, "PARTY_RELATIONSHIP")
+	case "languages":
+		// A DV_TEXT or its descendant DV_CODED_TEXT.
+		if f.languages != nil {
+			return assignDVTextLike(child, func(v rm.DVTextLike) { *f.languages = append(*f.languages, v) }, attr)
+		}
+	case "roles":
+		if f.roles != nil {
+			return assignVia(child, func(v rm.PartyRef) { *f.roles = append(*f.roles, v) }, attr, "PARTY_REF")
+		}
 	}
 	return fmt.Errorf("%w: %s has no multiple attr %q", ErrUnknownAttribute, f.class, attr)
 }
@@ -1295,13 +1316,76 @@ func writePartyIdentitySingle(p *rm.PartyIdentity, attr string, child any) error
 }
 
 // writePartyRelatedSingle writes the relationship of a PARTY_RELATED, so a
-// coded text an OPT constrains there is kept. It writes no other
-// PARTY_RELATED attribute.
+// coded text an OPT constrains there is kept, and the single attributes it
+// inherits from PARTY_IDENTIFIED.
 func writePartyRelatedSingle(p *rm.PartyRelated, attr string, child any) error {
 	if attr == "relationship" {
 		return assignVia(child, func(v rm.DVCodedText) { p.Relationship = v }, attr, "DV_CODED_TEXT")
 	}
-	return fmt.Errorf("%w: *rm.PartyRelated has no single attr %q", ErrUnknownAttribute, attr)
+	return writePartyIdentifiedSingle(&p.PartyIdentified, "*rm.PartyRelated", attr, child)
+}
+
+// writePartyIdentifiedSingle writes the single attributes PARTY_IDENTIFIED
+// declares, which PARTY_RELATED inherits: the String name and the
+// PARTY_REF external_ref. class names the Go type for the error detail.
+func writePartyIdentifiedSingle(p *rm.PartyIdentified, class, attr string, child any) error {
+	switch attr {
+	case "name":
+		return writeOptionalString(&p.Name, attr, child)
+	case "external_ref":
+		return assignVia(child, func(v rm.PartyRef) { p.ExternalRef = &v }, attr, "PARTY_REF")
+	}
+	return fmt.Errorf("%w: %s has no single attr %q", ErrUnknownAttribute, class, attr)
+}
+
+// writePartyIdentifiedMultiple appends a DV_IDENTIFIER, given as a value or
+// as a pointer, to the identifiers PARTY_IDENTIFIED declares, which
+// PARTY_RELATED inherits. class names the Go type for the error detail.
+func writePartyIdentifiedMultiple(p *rm.PartyIdentified, class, attr string, child any) error {
+	if attr == "identifiers" {
+		return assignVia(child, func(v rm.DVIdentifier) { p.Identifiers = append(p.Identifiers, v) }, attr, "DV_IDENTIFIER")
+	}
+	return fmt.Errorf("%w: %s has no multiple attr %q", ErrUnknownAttribute, class, attr)
+}
+
+// writePartySelfSingle writes a PARTY_SELF's external_ref, its one
+// attribute.
+func writePartySelfSingle(p *rm.PartySelf, attr string, child any) error {
+	if attr == "external_ref" {
+		return assignVia(child, func(v rm.PartyRef) { p.ExternalRef = &v }, attr, "PARTY_REF")
+	}
+	return fmt.Errorf("%w: *rm.PartySelf has no single attr %q", ErrUnknownAttribute, attr)
+}
+
+// writePartyRelationshipSingle writes a PARTY_RELATIONSHIP's name, details,
+// source and target references and time_validity.
+func writePartyRelationshipSingle(r *rm.PartyRelationship, attr string, child any) error {
+	switch attr {
+	case "name":
+		return assignDVTextLike(child, func(v rm.DVTextLike) { r.Name = v }, attr)
+	case "details":
+		return assignItemStructure(child, func(v rm.ItemStructure) { r.Details = v }, attr)
+	case "source":
+		// Value field. The synthesiser passes *PartyRef.
+		return assignVia(child, func(v rm.PartyRef) { r.Source = v }, attr, "PARTY_REF")
+	case "target":
+		return assignVia(child, func(v rm.PartyRef) { r.Target = v }, attr, "PARTY_REF")
+	case "time_validity":
+		return assignVia(child, func(v rm.DVInterval[rm.DVDate]) { r.TimeValidity = &v }, attr, "DV_INTERVAL<DV_DATE>")
+	}
+	return fmt.Errorf("%w: *rm.PartyRelationship has no single attr %q", ErrUnknownAttribute, attr)
+}
+
+// writeContactSingle writes a CONTACT's name, which names its purpose, and
+// its time_validity.
+func writeContactSingle(c *rm.Contact, attr string, child any) error {
+	switch attr {
+	case "name":
+		return assignDVTextLike(child, func(v rm.DVTextLike) { c.Name = v }, attr)
+	case "time_validity":
+		return assignVia(child, func(v rm.DVInterval[rm.DVDate]) { c.TimeValidity = &v }, attr, "DV_INTERVAL<DV_DATE>")
+	}
+	return fmt.Errorf("%w: *rm.Contact has no single attr %q", ErrUnknownAttribute, attr)
 }
 
 func writeContactMultiple(c *rm.Contact, attr string, child any) error {

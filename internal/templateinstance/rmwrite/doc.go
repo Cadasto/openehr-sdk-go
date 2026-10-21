@@ -41,8 +41,8 @@
 //   - DV_INTERVAL over each concrete ordered data value and over
 //     DV_ORDERED itself;
 //   - the parties PERSON, AGENT, GROUP, ORGANISATION and ROLE, and
-//     CAPABILITY, ADDRESS and PARTY_IDENTITY;
-//   - PARTY_RELATED, of which it writes only relationship;
+//     CAPABILITY, ADDRESS, CONTACT, PARTY_IDENTITY and PARTY_RELATIONSHIP;
+//   - the party proxies PARTY_IDENTIFIED, PARTY_RELATED and PARTY_SELF;
 //   - PARTICIPATION and TERM_MAPPING;
 //   - the references OBJECT_REF, PARTY_REF, LOCATABLE_REF and
 //     ACCESS_GROUP_REF, the identifiers HIER_OBJECT_ID,
@@ -51,34 +51,35 @@
 //
 // AppendMultiple adds a member to multi-valued attributes on
 // COMPOSITION, EVENT_CONTEXT, SECTION, the five entries, ISM_TRANSITION,
-// HISTORY, ITEM_TREE, ITEM_LIST, ITEM_TABLE, CLUSTER, the five parties,
-// CONTACT, DV_TEXT, DV_CODED_TEXT and DV_PARAGRAPH.
+// HISTORY, ITEM_TREE, ITEM_LIST, ITEM_TABLE, CLUSTER, the five parties
+// (an ACTOR's languages and roles included), CONTACT, PARTY_IDENTIFIED,
+// PARTY_RELATED, DV_TEXT, DV_CODED_TEXT and DV_PARAGRAPH.
 //
-// Each parent's writer lists the attributes it fills. An attribute takes
-// a child of its RM type or of a class that descends from it, wherever
-// the parent's Go field can hold one: a DV_TEXT attribute (every `name`,
-// ELEMENT `null_reason`, INSTRUCTION `narrative`, DV_PARAGRAPH `items`,
-// PARTICIPATION `function`, ISM_TRANSITION `reason`) also takes a
-// DV_CODED_TEXT, a DV_URI attribute (DV_TEXT `hyperlink`, DV_MULTIMEDIA
-// `uri`) a DV_EHR_URI, EVENT_CONTEXT `health_care_facility` a
-// PARTY_RELATED as well as a PARTY_IDENTIFIED, and an attribute of an
-// abstract class, such as ELEMENT `value` (DATA_VALUE), PARTICIPATION
-// `performer` (PARTY_PROXY) or OBJECT_REF `id` (OBJECT_ID), any concrete
-// class of it. An OBJECT_REF attribute (an ENTRY's `workflow_id`, a
-// CARE_ENTRY's `guideline_id`) takes any class of reference as given, and
-// LOCATABLE_REF `id` is written into the UID_BASED_ID field LOCATABLE_REF
-// declares, not the one it embeds from OBJECT_REF. An Integer attribute
-// (DV_QUANTITY `precision`, DV_MULTIMEDIA `size`, INTERVAL_EVENT
-// `sample_count`) takes a whole number of any Go integer shape, and a whole
-// number outside the 32-bit range an RM Integer holds returns an
-// ErrTypeMismatch that says so. A Character attribute (TERM_MAPPING
-// `match`) takes a string or an rm.Character of one character, and one of
-// any other length returns an ErrTypeMismatch that says so. Any other
-// parent or attribute returns ErrUnknownAttribute, and a child of the
-// wrong Go type returns ErrTypeMismatch. Table-driven tests in this package
-// write through most of these parents, and check the DV_INTERVAL cases
-// against the type registry, so an ordered data value the registry
-// gains fails them until it has a case.
+// Each parent's writer lists the attributes it fills. An attribute takes a
+// child of its RM type or of a class that descends from it, wherever the
+// parent's Go field can hold one: a DV_TEXT attribute (every LOCATABLE
+// `name`, ELEMENT `null_reason`, INSTRUCTION `narrative`, DV_PARAGRAPH
+// `items`, PARTICIPATION `function`, ISM_TRANSITION `reason`, ACTOR
+// `languages`) also takes a DV_CODED_TEXT, a DV_URI attribute (DV_TEXT
+// `hyperlink`, DV_MULTIMEDIA `uri`) a DV_EHR_URI, EVENT_CONTEXT
+// `health_care_facility` a PARTY_RELATED as well as a PARTY_IDENTIFIED,
+// and an attribute of an abstract class, such as ELEMENT `value`
+// (DATA_VALUE), PARTICIPATION `performer` (PARTY_PROXY) or OBJECT_REF `id`
+// (OBJECT_ID), any concrete class of it. An OBJECT_REF attribute (an
+// ENTRY's `workflow_id`, a CARE_ENTRY's `guideline_id`) takes any class of
+// reference as given, and LOCATABLE_REF `id` is written into the
+// UID_BASED_ID field LOCATABLE_REF declares, not the one it embeds from
+// OBJECT_REF. An Integer attribute (DV_QUANTITY `precision`, DV_MULTIMEDIA
+// `size`, INTERVAL_EVENT `sample_count`) takes a whole number of any Go
+// integer shape, and a whole number outside the 32-bit range an RM Integer
+// holds returns an ErrTypeMismatch that says so. A Character attribute
+// (TERM_MAPPING `match`) takes a string or an rm.Character of one
+// character, and one of any other length returns an ErrTypeMismatch that
+// says so. Any other parent or attribute returns ErrUnknownAttribute, and
+// a child of the wrong Go type returns ErrTypeMismatch. Table-driven tests
+// in this package write through most of these parents, and check the
+// DV_INTERVAL cases against the type registry, so an ordered data value
+// the registry gains fails them until it has a case.
 //
 // Three more tests ask the writers about the type registry and the
 // classes in openehr/rm/rminfo. The first two ask both writers about

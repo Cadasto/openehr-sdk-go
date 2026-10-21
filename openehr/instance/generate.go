@@ -741,9 +741,6 @@ func (g *generator) fillBMMAttr(parent any, parentRMType, attrName string, depth
 	}
 	g.populatePrimitiveDefault(rmChild)
 	g.stampIfLocatable(rmChild, concrete)
-	if rel, ok := rmChild.(*rm.PartyRelationship); ok {
-		g.fillPartyRelationship(nil, rel)
-	}
 	// Recurse so nested BMM-required attrs (e.g. CODE_PHRASE inside
 	// DV_CODED_TEXT) get filled.
 	g.populateBMMRequiredAttrs(rmChild, concrete, depth+1)
@@ -805,11 +802,12 @@ func attrType(parentType, declared string) string {
 // never reaches, the RM default finishNode gives a walked one where no
 // other pass does: an ISM_TRANSITION's current state, a party's name, a
 // DV_MULTIMEDIA's media type, data and size, such as a thumbnail the OPT
-// names with no child, and the id, namespace and type of a reference
-// (fillReference). attr is the attribute v is built for, which decides the
-// type of a reference. No attribute of the pinned RM has the type
-// PARTY_RELATED, so the BMM alone never builds one, and its relationship
-// is finishNode's alone.
+// names with no child, the id, namespace and type of a reference
+// (fillReference), and a PARTY_RELATIONSHIP's node id, uid and references
+// (fillPartyRelationship). attr is the attribute v is built for, which
+// decides the type of a reference. No attribute of the pinned RM has the
+// type PARTY_RELATED, so the BMM alone never builds one, and its
+// relationship is finishNode's alone.
 func (g *generator) settleBuilt(v any, attr string) {
 	switch b := v.(type) {
 	case *rm.IsmTransition:
@@ -822,6 +820,8 @@ func (g *generator) settleBuilt(v any, attr string) {
 		fillPartyName(&b.Name, len(b.Identifiers), b.ExternalRef)
 	case *rm.ObjectRef, *rm.PartyRef, *rm.AccessGroupRef, *rm.LocatableRef:
 		g.fillReference(v, attr)
+	case *rm.PartyRelationship:
+		g.fillPartyRelationship(nil, b)
 	}
 }
 
@@ -943,10 +943,9 @@ func (g *generator) temporalSentinel(v any) string {
 // field that already holds a value is left alone: populatePrimitiveDefault
 // may have set a clock or a code before this pass. The value is
 // bmmStringDefault's. It is written through stringField's setter where
-// that covers the attribute, which reaches the String attributes the
-// template-instance writer has no case for (a PARTY_IDENTIFIED's or
-// PARTY_RELATED's name, a DV_PROPORTION's magnitude_status), and through
-// the writer otherwise.
+// that covers the attribute, which reaches a String attribute the
+// template-instance writer has no case for, such as a DV_PROPORTION's
+// magnitude_status, and through the writer otherwise.
 func (g *generator) writeBMMString(parent any, attr string) {
 	ref, covered := stringField(parent, attr)
 	if covered && ref.get() != "" {
@@ -1602,9 +1601,6 @@ func (g *generator) materialiseImplicitMultiple(
 		}
 		g.populatePrimitiveDefault(rmChild)
 		g.stampIfLocatable(rmChild, concreteFor(rmType))
-		if rel, ok := rmChild.(*rm.PartyRelationship); ok {
-			g.fillPartyRelationship(nil, rel)
-		}
 		g.populateBMMRequiredAttrs(rmChild, concreteFor(rmType), 0)
 		g.settleBuilt(rmChild, attr.Name())
 		_ = rmwrite.AppendMultiple(parentRM, attr.Name(), rmChild)
@@ -1658,9 +1654,6 @@ func (g *generator) makeChild(child *tcimpl.CompiledNode) (any, error) {
 		return nil, fmt.Errorf("%w: %s at %s", ErrArchetypeIDMissing, declared, child.AQLPath())
 	}
 	g.setLocatableIdentity(child, rmChild, false /* isTemplateRoot */)
-	if rel, ok := rmChild.(*rm.PartyRelationship); ok {
-		g.fillPartyRelationship(child, rel)
-	}
 	return rmChild, nil
 }
 

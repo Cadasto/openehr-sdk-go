@@ -188,3 +188,37 @@ func TestREQ107_ContactTakesItsNameAndTimeValidity(t *testing.T) {
 		}
 	})
 }
+
+// TestREQ107_PartyRelationshipFromTheBMMTakesItsParts is the REQ-107 check
+// that a PARTY_RELATIONSHIP the generator builds from the BMM alone, for a
+// PERSON whose template requires relationships and names no child, takes
+// what the RM requires, at every policy, either value fill and either
+// compile mode, and passes both validators: the node id at0000, a target
+// and a source, in the order the BMM declares them, with the namespace
+// local, the type PERSON and ids drawn from UIDSource, and then its own
+// uid (Identity).
+func TestREQ107_PartyRelationshipFromTheBMMTakesItsParts(t *testing.T) {
+	opt := guardRootOPT("PERSON", "openEHR-DEMOGRAPHIC-PERSON.example.v1", optMultiple("relationships"))
+	generateEvery(t, opt, func(t *testing.T, call string, out any) {
+		person, ok := out.(*rm.Person)
+		if !ok {
+			t.Fatalf("%s returned %T, want *rm.Person", call, out)
+		}
+		if len(person.Relationships) != 1 {
+			t.Fatalf("%s: the PERSON has %d relationships, want 1", call, len(person.Relationships))
+		}
+		rel := &person.Relationships[0]
+		if rel.ArchetypeNodeID != "at0000" {
+			t.Errorf("%s: relationship node id = %q, want at0000", call, rel.ArchetypeNodeID)
+		}
+		if got, want := refString(&rel.Target), "PARTY_REF local::PERSON id HIER_OBJECT_ID uid-0002"; got != want {
+			t.Errorf("%s: target = %s, want %s", call, got, want)
+		}
+		if got, want := refString(&rel.Source), "PARTY_REF local::PERSON id HIER_OBJECT_ID uid-0003"; got != want {
+			t.Errorf("%s: source = %s, want %s", call, got, want)
+		}
+		if uid := hierIDText(rel.GetUID()); uid != "uid-0004" {
+			t.Errorf("%s: relationship uid = %q, want uid-0004", call, uid)
+		}
+	})
+}
