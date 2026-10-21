@@ -276,7 +276,9 @@ func (r normalRule[K]) keep(status *rm.CodePhrase, end normalEnd) bool {
 // are there; and the values the OPT's own constraint on the value names
 // (own). Each bound is taken on the value's own terms first (rebase), and
 // each candidate gives the whole numbers next to it where the value needs
-// whole numbers (round). A side the range leaves open gives none.
+// whole numbers (round). A side the range leaves open gives none. A step
+// from a time of day that would cross midnight gives none: no value below a
+// bound at 00:00:00, and none above one at 23:59:59 (temporalNear).
 func (r normalRule[K]) candidates() []K {
 	rebase := func(b K) K {
 		if r.steps.rebase == nil {
@@ -532,10 +534,12 @@ func settleOrdinalNormal(opt *tcimpl.CompiledNode, o *rm.DVOrdinal, end normalEn
 
 // temporalStep is a layout of a temporal value and the step
 // settleTemporalNormal moves a bound in that layout by: a day, or else a
-// second.
+// second. A time of day (clock) has no day to step into, so a step that would
+// cross midnight is not taken.
 type temporalStep struct {
 	layout string
 	day    bool
+	clock  bool
 }
 
 // The layouts settleTemporalNormal steps a bound in: a full date in the
@@ -546,13 +550,15 @@ type temporalStep struct {
 // gives only itself.
 var (
 	dateSteps     = []temporalStep{{layout: "2006-01-02", day: true}}
-	timeSteps     = []temporalStep{{layout: "15:04:05Z07:00"}, {layout: "15:04:05"}}
+	timeSteps     = []temporalStep{{layout: "15:04:05Z07:00", clock: true}, {layout: "15:04:05", clock: true}}
 	dateTimeSteps = []temporalStep{{layout: time.RFC3339}, {layout: "2006-01-02T15:04:05"}}
 )
 
 // temporalNear returns the value one step after s (up) or before it in
 // the first of steps whose layout s has, written in that layout, and false
-// where s has none of them.
+// where s has none of them, or where the step of a time of day would cross
+// midnight: no second before 00:00:00 and none after 23:59:59 is offered, as
+// both would be on the other side of the day.
 func temporalNear(steps []temporalStep, s string, up bool) (string, bool) {
 	sign := -1
 	if up {
@@ -563,14 +569,26 @@ func temporalNear(steps []temporalStep, s string, up bool) (string, bool) {
 		if err != nil {
 			continue
 		}
+		var next time.Time
 		if st.day {
-			t = t.AddDate(0, 0, sign)
+			next = t.AddDate(0, 0, sign)
 		} else {
-			t = t.Add(time.Duration(sign) * time.Second)
+			next = t.Add(time.Duration(sign) * time.Second)
 		}
-		return t.Format(st.layout), true
+		if st.clock && !sameDay(t, next) {
+			return "", false
+		}
+		return next.Format(st.layout), true
 	}
 	return "", false
+}
+
+// sameDay reports whether a and b fall on one calendar day in their own
+// zones.
+func sameDay(a, b time.Time) bool {
+	ay, am, ad := a.Date()
+	by, bm, bd := b.Date()
+	return ay == by && am == bm && ad == bd
 }
 
 // settleTemporalNormal keeps the value of a DV_DATE, DV_TIME or
