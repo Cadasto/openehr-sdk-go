@@ -146,6 +146,28 @@ func EnsureSingle(parent any, attrName string, child any) error {
 		return writePartyIdentitySingle(p, attrName, child)
 	case *rm.PartyRelated:
 		return writePartyRelatedSingle(p, attrName, child)
+	case *rm.ObjectRef:
+		return writeObjectRefSingle(p, "*rm.ObjectRef", attrName, child)
+	case *rm.PartyRef:
+		return writeObjectRefSingle(&p.ObjectRef, "*rm.PartyRef", attrName, child)
+	case *rm.AccessGroupRef:
+		return writeObjectRefSingle(&p.ObjectRef, "*rm.AccessGroupRef", attrName, child)
+	case *rm.LocatableRef:
+		return writeLocatableRefSingle(p, attrName, child)
+	case *rm.HierObjectID:
+		return writeObjectIDValue("*rm.HierObjectID", &p.Value, attrName, child)
+	case *rm.ObjectVersionID:
+		return writeObjectIDValue("*rm.ObjectVersionID", &p.Value, attrName, child)
+	case *rm.ArchetypeID:
+		return writeObjectIDValue("*rm.ArchetypeID", &p.Value, attrName, child)
+	case *rm.TemplateID:
+		return writeObjectIDValue("*rm.TemplateID", &p.Value, attrName, child)
+	case *rm.TerminologyID:
+		return writeObjectIDValue("*rm.TerminologyID", &p.Value, attrName, child)
+	case *rm.GenericID:
+		return writeGenericIDSingle(p, attrName, child)
+	case *rm.InstructionDetails:
+		return writeInstructionDetailsSingle(p, attrName, child)
 	}
 	return fmt.Errorf("%w: parent %T, attr %q", ErrUnknownAttribute, parent, attrName)
 }
@@ -314,6 +336,10 @@ func writeObservationSingle(o *rm.Observation, attr string, child any) error {
 		}
 		o.Protocol = v
 		return nil
+	case "workflow_id":
+		return assignObjectRef(child, func(v rm.ObjectRefLike) { o.WorkflowID = v }, attr)
+	case "guideline_id":
+		return assignObjectRef(child, func(v rm.ObjectRefLike) { o.GuidelineID = v }, attr)
 	}
 	return fmt.Errorf("%w: *rm.Observation has no single attr %q", ErrUnknownAttribute, attr)
 }
@@ -366,6 +392,10 @@ func writeEvaluationSingle(e *rm.Evaluation, attr string, child any) error {
 		}
 		e.Protocol = v
 		return nil
+	case "workflow_id":
+		return assignObjectRef(child, func(v rm.ObjectRefLike) { e.WorkflowID = v }, attr)
+	case "guideline_id":
+		return assignObjectRef(child, func(v rm.ObjectRefLike) { e.GuidelineID = v }, attr)
 	}
 	return fmt.Errorf("%w: *rm.Evaluation has no single attr %q", ErrUnknownAttribute, attr)
 }
@@ -427,6 +457,10 @@ func writeInstructionSingle(i *rm.Instruction, attr string, child any) error {
 		}
 		i.Provider = v
 		return nil
+	case "workflow_id":
+		return assignObjectRef(child, func(v rm.ObjectRefLike) { i.WorkflowID = v }, attr)
+	case "guideline_id":
+		return assignObjectRef(child, func(v rm.ObjectRefLike) { i.GuidelineID = v }, attr)
 	}
 	return fmt.Errorf("%w: *rm.Instruction has no single attr %q", ErrUnknownAttribute, attr)
 }
@@ -502,6 +536,12 @@ func writeActionSingle(a *rm.Action, attr string, child any) error {
 		return assignVia(child, func(v rm.IsmTransition) { a.IsmTransition = v }, attr, "ISM_TRANSITION")
 	case "time":
 		return assignVia(child, func(v rm.DVDateTime) { a.Time = v }, attr, "DV_DATE_TIME")
+	case "workflow_id":
+		return assignObjectRef(child, func(v rm.ObjectRefLike) { a.WorkflowID = v }, attr)
+	case "guideline_id":
+		return assignObjectRef(child, func(v rm.ObjectRefLike) { a.GuidelineID = v }, attr)
+	case "instruction_details":
+		return assignVia(child, func(v rm.InstructionDetails) { a.InstructionDetails = &v }, attr, "INSTRUCTION_DETAILS")
 	}
 	return fmt.Errorf("%w: *rm.Action has no single attr %q", ErrUnknownAttribute, attr)
 }
@@ -547,6 +587,9 @@ func writeAdminEntrySingle(a *rm.AdminEntry, attr string, child any) error {
 		}
 		a.Provider = v
 		return nil
+	case "workflow_id":
+		// ADMIN_ENTRY is no CARE_ENTRY, so it has no guideline_id.
+		return assignObjectRef(child, func(v rm.ObjectRefLike) { a.WorkflowID = v }, attr)
 	}
 	return fmt.Errorf("%w: *rm.AdminEntry has no single attr %q", ErrUnknownAttribute, attr)
 }

@@ -1,6 +1,7 @@
 package instance_test
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -158,16 +159,22 @@ func TestREQ107_InstructionDetailsTakeTheirParts(t *testing.T) {
 // the template pins on the value of the identifier an OBJECT_REF holds is
 // kept, whichever OBJECT_ID class the template names, at every policy,
 // either value fill and either compile mode, and the output passes both
-// validators. The id is never replaced by a drawn one.
+// validators. The id is never replaced by a drawn one. Where the template
+// names the abstract OBJECT_ID or UID_BASED_ID, the id is a HIER_OBJECT_ID
+// (RM defaults).
 func TestREQ107_PinnedObjectIDValueIsKept(t *testing.T) {
 	cases := []struct {
-		class, value string
+		// class is the id class the template names, built the class the
+		// generator builds for it.
+		class, built, value string
 	}{
-		{class: "HIER_OBJECT_ID", value: "6e4b1c2a-0000-4000-8000-00000000abcd"},
-		{class: "OBJECT_VERSION_ID", value: "6e4b1c2a-0000-4000-8000-00000000abcd::example.org::1"},
-		{class: "ARCHETYPE_ID", value: "openEHR-EHR-OBSERVATION.example.v1"},
-		{class: "TEMPLATE_ID", value: "example.template.v1"},
-		{class: "TERMINOLOGY_ID", value: "SNOMED-CT"},
+		{class: "HIER_OBJECT_ID", built: "HIER_OBJECT_ID", value: "6e4b1c2a-0000-4000-8000-00000000abcd"},
+		{class: "OBJECT_VERSION_ID", built: "OBJECT_VERSION_ID", value: "6e4b1c2a-0000-4000-8000-00000000abcd::example.org::1"},
+		{class: "ARCHETYPE_ID", built: "ARCHETYPE_ID", value: "openEHR-EHR-OBSERVATION.example.v1"},
+		{class: "TEMPLATE_ID", built: "TEMPLATE_ID", value: "example.template.v1"},
+		{class: "TERMINOLOGY_ID", built: "TERMINOLOGY_ID", value: "SNOMED-CT"},
+		{class: "OBJECT_ID", built: "HIER_OBJECT_ID", value: "6e4b1c2a-0000-4000-8000-00000000abcd"},
+		{class: "UID_BASED_ID", built: "HIER_OBJECT_ID", value: "6e4b1c2a-0000-4000-8000-00000000abcd"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.class, func(t *testing.T) {
@@ -178,7 +185,57 @@ func TestREQ107_PinnedObjectIDValueIsKept(t *testing.T) {
 				if !ok {
 					t.Fatalf("%s returned %T, want *rm.Observation", call, out)
 				}
-				if got, want := refString(obs.WorkflowID), "OBJECT_REF local::ANY id "+tc.class+" "+tc.value; got != want {
+				if got, want := refString(obs.WorkflowID), "OBJECT_REF local::ANY id "+tc.built+" "+tc.value; got != want {
+					t.Errorf("%s: workflow_id = %s, want %s", call, got, want)
+				}
+			})
+		})
+	}
+}
+
+// TestREQ107_AccessGroupTypeIsAccessGroup is the REQ-107 check that an
+// ACCESS_GROUP_REF the generator writes, here as an ENTRY's workflow_id,
+// carries the type ACCESS_GROUP, the one ACCESS_GROUP_REF Type_validity
+// admits, at every policy, either value fill and either compile mode, and
+// passes both validators: where the template leaves the type open, and
+// where a C_STRING on it admits that type among others (Precedence 3). A
+// C_STRING that rejects ACCESS_GROUP makes Generate return an error
+// wrapping ErrConstraintUnsatisfiable, and no root.
+func TestREQ107_AccessGroupTypeIsAccessGroup(t *testing.T) {
+	cases := []struct {
+		name          string
+		attrs         []string
+		unsatisfiable bool
+	}{
+		{name: "type left open"},
+		{name: "pattern .*", attrs: []string{guardSingle("type", guardExistence11, optPrimitive("STRING", "C_STRING", "<pattern>.*</pattern>"))}},
+		{name: "list with another class first", attrs: []string{guardSingle("type", guardExistence11,
+			optPrimitive("STRING", "C_STRING", "<list>GROUP</list><list>ACCESS_GROUP</list>"))}},
+		{name: "list that rejects ACCESS_GROUP", attrs: []string{pinnedString("type", "GROUP")}, unsatisfiable: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			opt := guardRootOPT("OBSERVATION", guardObservationID, requiredRef("workflow_id", "ACCESS_GROUP_REF", tc.attrs...))
+			if tc.unsatisfiable {
+				c := compileOPTText(t, opt, true)
+				for _, opts := range guardOptions() {
+					call := fmt.Sprintf("Generate(%v, %v)", opts.Policy, opts.ValueFill)
+					out, err := instance.Generate(t.Context(), c, opts)
+					if !errors.Is(err, instance.ErrConstraintUnsatisfiable) {
+						t.Errorf("%s error = %v, want one wrapping ErrConstraintUnsatisfiable", call, err)
+					}
+					if out != nil {
+						t.Errorf("%s returned %T, want no root", call, out)
+					}
+				}
+				return
+			}
+			generateEvery(t, opt, func(t *testing.T, call string, out any) {
+				obs, ok := out.(*rm.Observation)
+				if !ok {
+					t.Fatalf("%s returned %T, want *rm.Observation", call, out)
+				}
+				if got, want := refString(obs.WorkflowID), "ACCESS_GROUP_REF local::ACCESS_GROUP id HIER_OBJECT_ID uid-0002"; got != want {
 					t.Errorf("%s: workflow_id = %s, want %s", call, got, want)
 				}
 			})

@@ -43,7 +43,11 @@
 //   - the parties PERSON, AGENT, GROUP, ORGANISATION and ROLE, and
 //     CAPABILITY, ADDRESS and PARTY_IDENTITY;
 //   - PARTY_RELATED, of which it writes only relationship;
-//   - PARTICIPATION and TERM_MAPPING.
+//   - PARTICIPATION and TERM_MAPPING;
+//   - the references OBJECT_REF, PARTY_REF, LOCATABLE_REF and
+//     ACCESS_GROUP_REF, the identifiers HIER_OBJECT_ID,
+//     OBJECT_VERSION_ID, ARCHETYPE_ID, TEMPLATE_ID, TERMINOLOGY_ID and
+//     GENERIC_ID, and the INSTRUCTION_DETAILS an ACTION holds.
 //
 // AppendMultiple adds a member to multi-valued attributes on
 // COMPOSITION, EVENT_CONTEXT, SECTION, the five entries, ISM_TRANSITION,
@@ -58,8 +62,12 @@
 // DV_CODED_TEXT, a DV_URI attribute (DV_TEXT `hyperlink`, DV_MULTIMEDIA
 // `uri`) a DV_EHR_URI, EVENT_CONTEXT `health_care_facility` a
 // PARTY_RELATED as well as a PARTY_IDENTIFIED, and an attribute of an
-// abstract class, such as ELEMENT `value` (DATA_VALUE) or PARTICIPATION
-// `performer` (PARTY_PROXY), any concrete class of it. An Integer attribute
+// abstract class, such as ELEMENT `value` (DATA_VALUE), PARTICIPATION
+// `performer` (PARTY_PROXY) or OBJECT_REF `id` (OBJECT_ID), any concrete
+// class of it. An OBJECT_REF attribute (an ENTRY's `workflow_id`, a
+// CARE_ENTRY's `guideline_id`) takes any class of reference as given, and
+// LOCATABLE_REF `id` is written into the UID_BASED_ID field LOCATABLE_REF
+// declares, not the one it embeds from OBJECT_REF. An Integer attribute
 // (DV_QUANTITY `precision`, DV_MULTIMEDIA `size`, INTERVAL_EVENT
 // `sample_count`) takes a whole number of any Go integer shape, and a whole
 // number outside the 32-bit range an RM Integer holds returns an

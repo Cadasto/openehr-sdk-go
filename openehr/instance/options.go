@@ -183,8 +183,9 @@ type Options struct {
 
 	// UIDSource supplies the uids the generator writes: the uid of every
 	// ENTRY, GENERIC_ENTRY, PARTY and PARTY_RELATIONSHIP, of any other
-	// locatable whose OPT requires its uid, and the id of a
-	// PARTY_RELATIONSHIP's source or target that carries none. A
+	// locatable whose OPT requires its uid, and the id value of every
+	// object reference it writes that carries none, a ROLE's performer and
+	// a PARTY_RELATIONSHIP's source and target among them. A
 	// COMPOSITION gets a uid only where its OPT requires one, so the
 	// server that stores it gives it its version id. Nil falls back to a
 	// random RFC 9562 v4 UUID (stdlib uuid.NewV4). Tests pin a counter or

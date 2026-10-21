@@ -660,7 +660,7 @@ func (g *generator) materialiseImplicitSingle(
 	// requires.
 	g.stampIfLocatable(rmChild, concreteFor(rmType))
 	g.populateBMMRequiredAttrs(rmChild, concreteFor(rmType), 0)
-	settleBuilt(rmChild)
+	g.settleBuilt(rmChild, attr.Name())
 	if replacesTerminology(parentRM, attr.Name(), rmChild) {
 		return nil
 	}
@@ -747,7 +747,7 @@ func (g *generator) fillBMMAttr(parent any, parentRMType, attrName string, depth
 	// Recurse so nested BMM-required attrs (e.g. CODE_PHRASE inside
 	// DV_CODED_TEXT) get filled.
 	g.populateBMMRequiredAttrs(rmChild, concrete, depth+1)
-	settleBuilt(rmChild)
+	g.settleBuilt(rmChild, attrName)
 	// Best-effort attach: a default the slot rejects (a polymorphic
 	// attribute the BMM cannot narrow) is left to the validator, as in
 	// materialiseImplicitSingle.
@@ -803,12 +803,14 @@ func attrType(parentType, declared string) string {
 
 // settleBuilt gives a value built from the BMM alone, which the walk
 // never reaches, the RM default finishNode gives a walked one where no
-// other pass does: an ISM_TRANSITION's current state, a party's name, and
-// a DV_MULTIMEDIA's media type, data and size, such as a thumbnail the OPT
-// names with no child. No attribute of the pinned RM has the type
+// other pass does: an ISM_TRANSITION's current state, a party's name, a
+// DV_MULTIMEDIA's media type, data and size, such as a thumbnail the OPT
+// names with no child, and the id, namespace and type of a reference
+// (fillReference). attr is the attribute v is built for, which decides the
+// type of a reference. No attribute of the pinned RM has the type
 // PARTY_RELATED, so the BMM alone never builds one, and its relationship
 // is finishNode's alone.
-func settleBuilt(v any) {
+func (g *generator) settleBuilt(v any, attr string) {
 	switch b := v.(type) {
 	case *rm.IsmTransition:
 		fillCurrentState(nil, b)
@@ -818,6 +820,8 @@ func settleBuilt(v any) {
 		fillPartyName(&b.Name, len(b.Identifiers), b.ExternalRef)
 	case *rm.PartyRelated:
 		fillPartyName(&b.Name, len(b.Identifiers), b.ExternalRef)
+	case *rm.ObjectRef, *rm.PartyRef, *rm.AccessGroupRef, *rm.LocatableRef:
+		g.fillReference(v, attr)
 	}
 }
 
@@ -941,9 +945,8 @@ func (g *generator) temporalSentinel(v any) string {
 // bmmStringDefault's. It is written through stringField's setter where
 // that covers the attribute, which reaches the String attributes the
 // template-instance writer has no case for (a PARTY_IDENTIFIED's or
-// PARTY_RELATED's name, a DV_PROPORTION's magnitude_status, a
-// TERMINOLOGY_ID's value, and a PARTY_REF's namespace and type), and
-// through the writer otherwise.
+// PARTY_RELATED's name, a DV_PROPORTION's magnitude_status), and through
+// the writer otherwise.
 func (g *generator) writeBMMString(parent any, attr string) {
 	ref, covered := stringField(parent, attr)
 	if covered && ref.get() != "" {
@@ -969,12 +972,14 @@ func (g *generator) writeBMMString(parent any, attr string) {
 // attribute attr of parent: a temporal value's sentinel, so it stays a
 // valid ISO 8601 value; "=" for the magnitude_status of a quantified value
 // (a quantity, a count or a temporal value), the value its RM invariant
-// Magnitude_status_valid admits; a PARTY_REF's own defaults (partyRef);
-// defaultMatch for a TERM_MAPPING's match, the RM default, which
-// Match_valid admits; and the open-string example otherwise. ok is false
-// for a TERMINOLOGY_ID's value, which stays empty: the code phrase it
-// belongs to keeps the terminology it already carries
-// (replacesTerminology).
+// Magnitude_status_valid admits; defaultMatch for a TERM_MAPPING's match,
+// the RM default, which Match_valid admits; and the open-string example
+// otherwise. ok is false for a TERMINOLOGY_ID's value, which stays empty:
+// the code phrase it belongs to keeps the terminology it already carries
+// (replacesTerminology). It is false as well for the value of any other
+// identifier and for a reference's namespace and type, which stay empty
+// until the reference that holds them is settled (fillReference): its id
+// value is drawn like a uid, and its type depends on where it sits.
 func (g *generator) bmmStringDefault(parent any, attr string) (string, bool) {
 	if s := g.temporalSentinel(parent); attr == "value" && s != "" {
 		return s, true
@@ -985,17 +990,17 @@ func (g *generator) bmmStringDefault(parent any, attr string) (string, bool) {
 	switch parent.(type) {
 	case *rm.TerminologyID:
 		return "", false
+	case *rm.HierObjectID, *rm.ObjectVersionID, *rm.ArchetypeID, *rm.TemplateID, *rm.GenericID:
+		if attr == "value" {
+			return "", false
+		}
+	case *rm.ObjectRef, *rm.PartyRef, *rm.AccessGroupRef, *rm.LocatableRef:
+		if attr == "namespace" || attr == "type" {
+			return "", false
+		}
 	case *rm.TermMapping:
 		if attr == "match" {
 			return defaultMatch, true
-		}
-	case *rm.PartyRef:
-		def := partyRef(nil)
-		switch attr {
-		case "namespace":
-			return def.Namespace, true
-		case "type":
-			return def.Type, true
 		}
 	}
 	return "example", true
@@ -1006,21 +1011,16 @@ func (g *generator) bmmStringDefault(parent any, attr string) (string, bool) {
 // attribute of the data values the generator builds, the magnitude_status
 // of each quantified value (a quantity, a count, a proportion and a
 // temporal value) and a quantity's units_system and units_display_name
-// among them, plus ACTIVITY.action_archetype_id, TERMINOLOGY_ID.value,
-// EVENT_CONTEXT.location, a PARTY_REF's namespace and type, a
-// PARTY_IDENTIFIED's or PARTY_RELATED's name, and a TERM_MAPPING's match,
-// a BMM Character held as text, so the walk writes a C_STRING the OPT pins
-// on any of them. A pin on a
-// PARTY_REF holds where the reference
-// can be attached and no later default replaces it: a ROLE's performer
-// keeps it, because fillPerformer fills only the empty parts. A template
-// that names a PARTY_RELATIONSHIP's source or target makes Generate fail
-// today, because rmwrite cannot attach either; once it can, a pin there
-// would still be lost, because fillPartyRelationship replaces a reference
-// with any empty part whole, and the walk cannot build the id. An optional
-// attribute reads as "" while unset, and writing it sets it. ok is false
-// when parent has no such field; when ok is true, the reference addresses
-// that field.
+// among them, plus ACTIVITY.action_archetype_id, EVENT_CONTEXT.location,
+// INSTRUCTION_DETAILS.activity_id, the value of every identifier class
+// and a GENERIC_ID's scheme, the namespace and type of every reference
+// class and a LOCATABLE_REF's path, a PARTY_IDENTIFIED's or
+// PARTY_RELATED's name, and a TERM_MAPPING's match, a BMM Character held
+// as text, so the walk writes a C_STRING the OPT pins on any of them. A
+// pin on a reference holds, because the defaults fill only the parts that
+// are empty (fillReference). An optional attribute reads as "" while
+// unset, and writing it sets it. ok is false when parent has no such
+// field; when ok is true, the reference addresses that field.
 func stringField(parent any, attr string) (ref stringRef, ok bool) {
 	switch p := parent.(type) {
 	case *rm.DVText:
@@ -1097,12 +1097,33 @@ func stringField(parent any, attr string) (ref stringRef, ok bool) {
 		}
 	case *rm.TerminologyID:
 		return valueField(&p.Value, attr)
+	case *rm.HierObjectID:
+		return valueField(&p.Value, attr)
+	case *rm.ObjectVersionID:
+		return valueField(&p.Value, attr)
+	case *rm.ArchetypeID:
+		return valueField(&p.Value, attr)
+	case *rm.TemplateID:
+		return valueField(&p.Value, attr)
+	case *rm.GenericID:
+		if attr == "scheme" {
+			return requiredString(&p.Scheme)
+		}
+		return valueField(&p.Value, attr)
+	case *rm.ObjectRef:
+		return referenceField(p, attr)
 	case *rm.PartyRef:
-		switch attr {
-		case "namespace":
-			return requiredString(&p.Namespace)
-		case "type":
-			return requiredString(&p.Type)
+		return referenceField(&p.ObjectRef, attr)
+	case *rm.AccessGroupRef:
+		return referenceField(&p.ObjectRef, attr)
+	case *rm.LocatableRef:
+		if attr == "path" {
+			return optionalString(&p.Path)
+		}
+		return referenceField(&p.ObjectRef, attr)
+	case *rm.InstructionDetails:
+		if attr == "activity_id" {
+			return requiredString(&p.ActivityID)
 		}
 	case *rm.PartyIdentified:
 		if attr == "name" {
@@ -1126,6 +1147,18 @@ func textField(value *string, formatting **string, attr string) (stringRef, bool
 		return requiredString(value)
 	case "formatting":
 		return optionalString(formatting)
+	}
+	return stringRef{}, false
+}
+
+// referenceField addresses the String attributes every reference class
+// inherits from OBJECT_REF: its namespace and its type.
+func referenceField(ref *rm.ObjectRef, attr string) (stringRef, bool) {
+	switch attr {
+	case "namespace":
+		return requiredString(&ref.Namespace)
+	case "type":
+		return requiredString(&ref.Type)
 	}
 	return stringRef{}, false
 }
@@ -1573,6 +1606,7 @@ func (g *generator) materialiseImplicitMultiple(
 			g.fillPartyRelationship(nil, rel)
 		}
 		g.populateBMMRequiredAttrs(rmChild, concreteFor(rmType), 0)
+		g.settleBuilt(rmChild, attr.Name())
 		_ = rmwrite.AppendMultiple(parentRM, attr.Name(), rmChild)
 	}
 	return nil
@@ -1672,6 +1706,11 @@ func concreteFor(rmType string) string {
 	// self-referencing ENTRY `subject`.
 	case "PARTY_PROXY":
 		return "PARTY_SELF"
+	// The id of a reference: a HIER_OBJECT_ID, whose value Identity draws
+	// like a uid (fillReference). It is both an OBJECT_ID and a
+	// UID_BASED_ID, so it suits an OBJECT_REF's id and a LOCATABLE_REF's.
+	case "OBJECT_ID", "UID_BASED_ID":
+		return "HIER_OBJECT_ID"
 	// AOM 1.4 primitive short names → canonical DV wrapper.
 	case "DURATION":
 		return "DV_DURATION"
@@ -2246,8 +2285,8 @@ func isRequired(attr *tcimpl.CompiledAttribute) bool {
 // newHierObjectID generates a HierObjectID with a random RFC 9562
 // version-4 UUID. When Options.UIDSource is nil it gives the uid of each
 // locatable stampsUID names (an Entry, a Party) and of any locatable whose
-// OPT requires its uid, and a PARTY_RELATIONSHIP's uid and empty source or
-// target id. Returns a pointer so
+// OPT requires its uid, a PARTY_RELATIONSHIP's uid, and the id value of
+// each reference that has none (fillReference). Returns a pointer so
 // canjson's polymorphic dispatch on the UIDBasedID interface emits
 // the `_type:"HIER_OBJECT_ID"` discriminator the decoder needs to
 // round-trip the field. uuid.NewV4 has no error path — it draws from
@@ -2424,7 +2463,11 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 	case *rm.PartyRelationship:
 		g.fillPartyRelationship(opt, v)
 	case *rm.Role:
-		fillPerformer(&v.Performer)
+		// Its walked performer settled itself; this fills one the walk did
+		// not write.
+		g.fillReference(&v.Performer, "performer")
+	case *rm.ObjectRef, *rm.PartyRef, *rm.AccessGroupRef, *rm.LocatableRef:
+		g.fillReference(v, holdingAttribute(opt))
 	case *rm.PartyIdentified:
 		fillPartyName(&v.Name, len(v.Identifiers), v.ExternalRef)
 	case *rm.PartyRelated:
@@ -2811,9 +2854,10 @@ func (g *generator) stampIfLocatable(rmValue any, rmType string) {
 
 // fillPartyRelationship gives a PARTY_RELATIONSHIP what the RM requires
 // and the walk leaves empty: its node id, its uid unless the OPT
-// prohibits it, and a source and a target reference, each with an id
-// from Options.UIDSource. opt is the relationship's OPT node, or nil for
-// one built from the BMM alone.
+// prohibits it, and the parts of its source and target references that
+// are empty (fillReference), so a part the OPT pins on either is kept.
+// opt is the relationship's OPT node, or nil for one built from the BMM
+// alone.
 func (g *generator) fillPartyRelationship(opt *tcimpl.CompiledNode, rel *rm.PartyRelationship) {
 	if rel.GetArchetypeNodeID() == "" {
 		applyLocatableIdentity(rel, "at0000", "relationship", nil, nil)
@@ -2821,49 +2865,98 @@ func (g *generator) fillPartyRelationship(opt *tcimpl.CompiledNode, rel *rm.Part
 	if rel.GetUID() == nil && !prohibited(opt, "uid") {
 		rel.SetUID(g.nextUID())
 	}
-	if rel.Source.Namespace == "" || rel.Source.Type == "" || rel.Source.ID == nil {
-		rel.Source = partyRef(g.nextUID())
+	g.fillReference(&rel.Source, "source")
+	g.fillReference(&rel.Target, "target")
+}
+
+// referenceNamespace is the namespace the generator gives a reference
+// whose OPT leaves it open.
+const referenceNamespace = "local"
+
+// fillReference gives ref, a reference the generator writes, each part
+// the RM requires that is empty, so a part the OPT pins is kept. An id it
+// has none of is a HIER_OBJECT_ID (RM defaults); an id with no value, of
+// any identifier class, takes one. Either value is drawn like a uid, from
+// Options.UIDSource or its random fallback (Identity). The namespace is
+// referenceNamespace, and the type is referenceType's for ref held in
+// attr. A LOCATABLE_REF holds the UID_BASED_ID id it declares itself. Any
+// other value is left alone.
+func (g *generator) fillReference(ref any, attr string) {
+	var base *rm.ObjectRef
+	var id any
+	var setID func(*rm.HierObjectID)
+	switch r := ref.(type) {
+	case *rm.ObjectRef:
+		base = r
+	case *rm.PartyRef:
+		base = &r.ObjectRef
+	case *rm.AccessGroupRef:
+		base = &r.ObjectRef
+	case *rm.LocatableRef:
+		base = &r.ObjectRef
+		id, setID = r.ID, func(h *rm.HierObjectID) { r.ID = h }
+	default:
+		return
 	}
-	if rel.Target.Namespace == "" || rel.Target.Type == "" || rel.Target.ID == nil {
-		rel.Target = partyRef(g.nextUID())
+	if setID == nil {
+		id, setID = base.ID, func(h *rm.HierObjectID) { base.ID = h }
+	}
+	if id == nil || rm.IsTypedNil(id) {
+		setID(g.nextUID())
+	} else if value, ok := stringField(id, "value"); ok && value.get() == "" {
+		value.set(g.nextUID().Value)
+	}
+	if base.Namespace == "" {
+		base.Namespace = referenceNamespace
+	}
+	if base.Type == "" {
+		base.Type = referenceType(ref, attr)
 	}
 }
 
-// fillPerformer gives a ROLE the performer the RM requires, a reference
-// to the actor that plays the role, with partyRef's namespace and type:
-// the generator cannot build the abstract OBJECT_ID a PARTY_REF needs.
-// Only the parts the template left empty are filled. The id is a fixed
-// one, where a PARTY_RELATIONSHIP's source and target ids are drawn from
-// Options.UIDSource.
-func fillPerformer(ref *rm.PartyRef) {
-	def := partyRef(&rm.HierObjectID{Value: "00000000-0000-0000-0000-000000000001"})
-	if ref.ID == nil || rm.IsTypedNil(ref.ID) {
-		ref.ID = def.ID
+// referenceType is the type the generator gives ref, a reference held in
+// attr, where the OPT leaves the type open: ROLE for a member of an
+// ACTOR's roles, the one attribute named roles, and PERSON for any other
+// PARTY_REF, so BASE PARTY_REF Type_validity holds; ACCESS_GROUP for an
+// ACCESS_GROUP_REF, the one its Type_validity admits; INSTRUCTION for a
+// LOCATABLE_REF, which an ACTION's instruction_details holds; and ANY for
+// an OBJECT_REF, the type the RM gives for any type.
+func referenceType(ref any, attr string) string {
+	switch ref.(type) {
+	case *rm.PartyRef:
+		if attr == "roles" {
+			return "ROLE"
+		}
+		return defaultPartyRefType
+	case *rm.AccessGroupRef:
+		return accessGroupType
+	case *rm.LocatableRef:
+		return "INSTRUCTION"
 	}
-	if ref.Namespace == "" {
-		ref.Namespace = def.Namespace
-	}
-	if ref.Type == "" {
-		ref.Type = def.Type
-	}
+	return "ANY"
 }
 
-func partyRef(id *rm.HierObjectID) rm.PartyRef {
-	return rm.PartyRef{
-		ID:        id,
-		Namespace: "local",
-		Type:      defaultPartyRefType,
+// holdingAttribute returns the name of the attribute of opt's parent node
+// that names opt, or "" for the template root and for a nil opt.
+func holdingAttribute(opt *tcimpl.CompiledNode) string {
+	if opt == nil || opt.Parent() == nil {
+		return ""
 	}
+	for _, attr := range tcimpl.NodeAttributes(opt.Parent()) {
+		if slices.Contains(tcimpl.ChildNodes(attr), opt) {
+			return attr.Name()
+		}
+	}
+	return ""
 }
 
-// defaultPartyRefType is the type of the references the generator builds
-// itself: a PARTY_RELATIONSHIP's source and target, a ROLE's performer.
+// defaultPartyRefType is the type the generator gives a PARTY_REF where the
+// OPT leaves it open, but for a member of an ACTOR's roles.
 const defaultPartyRefType = "PERSON"
 
 // partyRefTypes are the class names BASE PARTY_REF Type_validity admits as
-// a reference's type, in the invariant's order, which starts with the
-// default type, so a pin that accepts the default gets it.
-var partyRefTypes = []string{defaultPartyRefType, "ORGANISATION", "GROUP", "AGENT", "ROLE", "PARTY", "ACTOR"}
+// a reference's type, in the invariant's order.
+var partyRefTypes = []string{"PERSON", "ORGANISATION", "GROUP", "AGENT", "ROLE", "PARTY", "ACTOR"}
 
 // errNoPartyRefType reports a C_STRING on a PARTY_REF's type that accepts
 // none of the class names PARTY_REF Type_validity admits.
@@ -2873,13 +2966,21 @@ var errNoPartyRefType = errors.New("the C_STRING accepts no class name PARTY_REF
 // OPT constrains it with cs, so BASE PARTY_REF Type_validity holds, which
 // neither validator evaluates. It is chosen, the string the C_STRING path
 // picked, when that is an admitted class name, so a list pin keeps its
-// example value and RandomFill its draw; else the first admitted class
-// name cs accepts, which is the default type when cs accepts it. chosen is
-// "" when the C_STRING path found no string. It returns errNoPartyRefType
-// when cs accepts no admitted class name.
-func partyRefType(cs constraints.CString, chosen string) (string, error) {
-	return narrowString(cs, chosen, partyRefTypes, errNoPartyRefType)
+// example value and RandomFill its draw; else def, the type the reference
+// takes where the OPT leaves it open (referenceType), when cs accepts it;
+// else the first admitted class name cs accepts. chosen is "" when the
+// C_STRING path found no string. It returns errNoPartyRefType when cs
+// accepts no admitted class name.
+func partyRefType(cs constraints.CString, chosen, def string) (string, error) {
+	return narrowString(cs, chosen, append([]string{def}, partyRefTypes...), errNoPartyRefType)
 }
+
+// accessGroupType is the one type ACCESS_GROUP_REF Type_validity admits.
+const accessGroupType = "ACCESS_GROUP"
+
+// errNoAccessGroupType reports a C_STRING on an ACCESS_GROUP_REF's type
+// that rejects the one type ACCESS_GROUP_REF Type_validity admits.
+var errNoAccessGroupType = errors.New("the C_STRING rejects " + accessGroupType + ", the one type ACCESS_GROUP_REF Type_validity admits")
 
 // defaultMatch is the match the generator writes on a TERM_MAPPING whose
 // OPT gives it none: the RM default, the kind of mapping is unknown.
@@ -3043,7 +3144,17 @@ func applyStringLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, cs con
 	switch rmValue.(type) {
 	case *rm.PartyRef:
 		if attr == "type" {
-			s, err = partyRefType(cs, s)
+			// leaf sits on the reference's type, so its parent is the
+			// reference's own node.
+			var held string
+			if leaf != nil {
+				held = holdingAttribute(leaf.Parent())
+			}
+			s, err = partyRefType(cs, s, referenceType(rmValue, held))
+		}
+	case *rm.AccessGroupRef:
+		if attr == "type" {
+			s, err = narrowString(cs, s, []string{accessGroupType}, errNoAccessGroupType)
 		}
 	case *rm.TermMapping:
 		if attr == "match" {

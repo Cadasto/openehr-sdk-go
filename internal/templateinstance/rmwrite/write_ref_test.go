@@ -173,7 +173,7 @@ func TestREQ107_ReferenceParentsAddressTheirAttributes(t *testing.T) {
 // one.
 func entryRefWrites() []fieldWrite {
 	workflow := &rm.ObjectRef{ID: &rm.HierObjectID{Value: "wf-1"}, Namespace: "local", Type: "ANY"}
-	guideline := &rm.PartyRef{ObjectRef: rm.ObjectRef{ID: &rm.HierObjectID{Value: "g-1"}, Namespace: "local", Type: "PERSON"}}
+	guideline := &rm.PartyRef{ID: &rm.HierObjectID{Value: "g-1"}, Namespace: "local", Type: "PERSON"}
 	return []fieldWrite{
 		{attr: "workflow_id", child: workflow, field: "WorkflowID", want: workflow},
 		{attr: "guideline_id", child: guideline, field: "GuidelineID", want: guideline},
@@ -198,7 +198,8 @@ func entryRefMismatches() []fieldWrite {
 func TestREQ107_EntryParentsAddressTheirReferences(t *testing.T) {
 	t.Parallel()
 	instructionID := &rm.LocatableRef{
-		ObjectRef: rm.ObjectRef{Namespace: "local", Type: "INSTRUCTION"},
+		Namespace: "local",
+		Type:      "INSTRUCTION",
 		ID:        &rm.HierObjectID{Value: "6e4b1c2a-0000-4000-8000-00000000abcd"},
 	}
 	details := &rm.InstructionDetails{InstructionID: *instructionID, ActivityID: "activities[at0001]"}
