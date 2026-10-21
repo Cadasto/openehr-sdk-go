@@ -312,3 +312,64 @@ func TestREQ107_UIDSourceReturningNilDoesNotPanic(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ107_RequiredReferenceTheTemplateNamesNoChildForIsBuilt is the
+// REQ-107 check that a reference the generator builds from the RM alone,
+// for a multi-valued attribute the template requires but names no child
+// for, comes out whole and passes both validators, at every policy, either
+// value fill and either compile mode. A FOLDER's items hold an OBJECT_REF,
+// so the member takes the namespace local, the type ANY and an id drawn
+// from UIDSource; a PERSON's roles hold a PARTY_REF, so the member takes
+// the type ROLE, the one a role's reference has, and an id drawn after the
+// PERSON's own uid.
+func TestREQ107_RequiredReferenceTheTemplateNamesNoChildForIsBuilt(t *testing.T) {
+	cases := []struct {
+		name string
+		opt  string
+		// member returns the reference the root holds in the attribute.
+		member func(t *testing.T, call string, out any) string
+		want   string
+	}{
+		{
+			name: "FOLDER items",
+			opt:  guardRootOPT("FOLDER", "openEHR-EHR-FOLDER.generic.v1", guardMultiple("items", guardExistence11)),
+			member: func(t *testing.T, call string, out any) string {
+				t.Helper()
+				folder, ok := out.(*rm.Folder)
+				if !ok {
+					t.Fatalf("%s returned %T, want *rm.Folder", call, out)
+				}
+				if len(folder.Items) != 1 {
+					t.Fatalf("%s: items has %d members, want 1", call, len(folder.Items))
+				}
+				return refString(folder.Items[0])
+			},
+			want: "OBJECT_REF local::ANY id HIER_OBJECT_ID uid-0001",
+		},
+		{
+			name: "PERSON roles",
+			opt:  guardRootOPT("PERSON", "openEHR-DEMOGRAPHIC-PERSON.example.v1", guardMultiple("roles", guardExistence11)),
+			member: func(t *testing.T, call string, out any) string {
+				t.Helper()
+				person, ok := out.(*rm.Person)
+				if !ok {
+					t.Fatalf("%s returned %T, want *rm.Person", call, out)
+				}
+				if len(person.Roles) != 1 {
+					t.Fatalf("%s: roles has %d members, want 1", call, len(person.Roles))
+				}
+				return refString(&person.Roles[0])
+			},
+			want: "PARTY_REF local::ROLE id HIER_OBJECT_ID uid-0002",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			generateEvery(t, tc.opt, func(t *testing.T, call string, out any) {
+				if got := tc.member(t, call, out); got != tc.want {
+					t.Errorf("%s: member = %s, want %s", call, got, tc.want)
+				}
+			})
+		})
+	}
+}
