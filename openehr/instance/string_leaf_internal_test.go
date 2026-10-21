@@ -96,8 +96,6 @@ func TestREQ107_StringLeafWritesTheNamedAttribute(t *testing.T) {
 		{"DV_IDENTIFIER.assigner", &rm.DVIdentifier{}, "assigner", func(v any) string { return deref(v.(*rm.DVIdentifier).Assigner) }},
 		{"DV_IDENTIFIER.type", &rm.DVIdentifier{}, "type", func(v any) string { return deref(v.(*rm.DVIdentifier).Type) }},
 		{"DV_MULTIMEDIA.alternate_text", &rm.DVMultimedia{}, "alternate_text", func(v any) string { return deref(v.(*rm.DVMultimedia).AlternateText) }},
-		{"DV_QUANTITY.magnitude_status", &rm.DVQuantity{}, "magnitude_status", func(v any) string { return deref(v.(*rm.DVQuantity).MagnitudeStatus) }},
-		{"DV_PROPORTION.magnitude_status", &rm.DVProportion{}, "magnitude_status", func(v any) string { return deref(v.(*rm.DVProportion).MagnitudeStatus) }},
 		{"CODE_PHRASE.preferred_term", &rm.CodePhrase{}, "preferred_term", func(v any) string { return deref(v.(*rm.CodePhrase).PreferredTerm) }},
 	}
 	for _, tc := range cases {
@@ -107,6 +105,32 @@ func TestREQ107_StringLeafWritesTheNamedAttribute(t *testing.T) {
 		}
 		if got := tc.read(tc.value); got != "XYZ" {
 			t.Errorf("%s = %q after applyStringLeaf, want XYZ", tc.name, got)
+		}
+	}
+
+	// A magnitude_status takes a string DV_QUANTIFIED Magnitude_status_valid
+	// admits, so its row writes one of those.
+	status := constraints.NewCString("", []string{"~"}, "")
+	statusCases := []struct {
+		name  string
+		value any
+		read  func(any) string
+	}{
+		{"DV_QUANTITY.magnitude_status", &rm.DVQuantity{}, func(v any) string { return deref(v.(*rm.DVQuantity).MagnitudeStatus) }},
+		{"DV_COUNT.magnitude_status", &rm.DVCount{}, func(v any) string { return deref(v.(*rm.DVCount).MagnitudeStatus) }},
+		{"DV_PROPORTION.magnitude_status", &rm.DVProportion{}, func(v any) string { return deref(v.(*rm.DVProportion).MagnitudeStatus) }},
+		{"DV_DATE.magnitude_status", &rm.DVDate{}, func(v any) string { return deref(v.(*rm.DVDate).MagnitudeStatus) }},
+		{"DV_TIME.magnitude_status", &rm.DVTime{}, func(v any) string { return deref(v.(*rm.DVTime).MagnitudeStatus) }},
+		{"DV_DATE_TIME.magnitude_status", &rm.DVDateTime{}, func(v any) string { return deref(v.(*rm.DVDateTime).MagnitudeStatus) }},
+		{"DV_DURATION.magnitude_status", &rm.DVDuration{}, func(v any) string { return deref(v.(*rm.DVDuration).MagnitudeStatus) }},
+	}
+	for _, tc := range statusCases {
+		if err := applyStringLeaf(nil, tc.value, "magnitude_status", status, "~"); err != nil {
+			t.Errorf("%s: applyStringLeaf: %v", tc.name, err)
+			continue
+		}
+		if got := tc.read(tc.value); got != "~" {
+			t.Errorf("%s = %q after applyStringLeaf, want ~", tc.name, got)
 		}
 	}
 
