@@ -1494,8 +1494,10 @@ requirements:
       - openehr/instance/node_id_test.go
       - openehr/instance/nonstorable_visit_internal_test.go
       - openehr/instance/nonstorable_visit_test.go
+      - openehr/instance/normal_range_test.go
       - openehr/instance/null_flavour_default_test.go
       - openehr/instance/ordered_value_test.go
+      - openehr/instance/ordinal_integer_test.go
       - openehr/instance/participation_mapping_test.go
       - openehr/instance/party_attribute_test.go
       - openehr/instance/party_proxy_attribute_test.go
@@ -1529,6 +1531,7 @@ requirements:
       - openehr/instance/string_attr_party_name_test.go
       - openehr/instance/string_leaf_internal_test.go
       - openehr/instance/string_leaf_test.go
+      - openehr/instance/uid_source_nil_internal_test.go
       - openehr/instance/uncarried_mandatory_test.go
       - openehr/instance/undescribed_content_test.go
       - openehr/instance/valuefill_leaves_test.go
