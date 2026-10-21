@@ -151,9 +151,12 @@ func codeString(cp rm.CodePhrase) string {
 	return cp.TerminologyID.Value + "::" + cp.CodeString
 }
 
-// intervalString renders iv as [lower .. upper], or "none" for no
-// interval. An open side renders as "open" where it holds no bound: nil
-// over DV_ORDERED, the zero value over a concrete class.
+// intervalString renders iv as lower .. upper between two brackets, or
+// "none" for no interval. Each bracket shows the side's included flag, the
+// one BASE Interval.has reads: [ or ] where the interval includes that
+// bound, ( or ) where it does not. An open side renders as "open" where it
+// holds no bound: nil over DV_ORDERED, the zero value over a concrete
+// class.
 func intervalString[T rm.DVOrdered](iv *rm.DVInterval[T]) string {
 	if iv == nil {
 		return "none"
@@ -167,7 +170,14 @@ func intervalString[T rm.DVOrdered](iv *rm.DVInterval[T]) string {
 		}
 		return "open, holding " + boundString(b)
 	}
-	return "[" + side(iv.Lower, iv.LowerUnbounded) + " .. " + side(iv.Upper, iv.UpperUnbounded) + "]"
+	opening, closing := "(", ")"
+	if iv.LowerIncluded {
+		opening = "["
+	}
+	if iv.UpperIncluded {
+		closing = "]"
+	}
+	return opening + side(iv.Lower, iv.LowerUnbounded) + " .. " + side(iv.Upper, iv.UpperUnbounded) + closing
 }
 
 // orderedString renders the DV_ORDERED attributes of v: its normal_status,
@@ -369,10 +379,10 @@ func TestREQ107_OrderedValueAttributesAreWritten(t *testing.T) {
 	runDataValueCases(t, []dvCase{
 		orderedCase("DV_COUNT",
 			countValue("4", ordered("DV_COUNT", countValue("1"), countValue("9"), countValue("2"), "")...),
-			status+"normal_range [DV_COUNT 1 .. DV_COUNT 9]; other_reference_ranges [critical: [*DV_COUNT 2 .. open]]"),
+			status+"normal_range [DV_COUNT 1 .. DV_COUNT 9]; other_reference_ranges [critical: [*DV_COUNT 2 .. open)]"),
 		orderedCase("DV_QUANTITY",
 			quantityValue("4", ordered("DV_QUANTITY", quantityValue("1"), quantityValue("9"), "", quantityValue("20"))...),
-			status+"normal_range [DV_QUANTITY 1 mm .. DV_QUANTITY 9 mm]; other_reference_ranges [critical: [open .. *DV_QUANTITY 20 mm]]"),
+			status+"normal_range [DV_QUANTITY 1 mm .. DV_QUANTITY 9 mm]; other_reference_ranges [critical: (open .. *DV_QUANTITY 20 mm]]"),
 		orderedCase("DV_PROPORTION",
 			proportionValue("4", ordered("DV_PROPORTION", proportionValue("1"), proportionValue("9"), proportionValue("2"), proportionValue("5"))...),
 			status+"normal_range [DV_PROPORTION 1/1 type 1 .. DV_PROPORTION 9/1 type 1]; "+
@@ -380,24 +390,24 @@ func TestREQ107_OrderedValueAttributesAreWritten(t *testing.T) {
 		orderedCase("DV_ORDINAL",
 			ordinalValue("2", "at0002", ordered("DV_ORDINAL", ordinalBound("1", "at0001"), ordinalBound("3", "at0003"), ordinalBound("3", "at0003"), "")...),
 			status+"normal_range [*DV_ORDINAL 1 local::at0001 .. *DV_ORDINAL 3 local::at0003]; "+
-				"other_reference_ranges [critical: [*DV_ORDINAL 3 local::at0003 .. open]]"),
+				"other_reference_ranges [critical: [*DV_ORDINAL 3 local::at0003 .. open)]"),
 		orderedCase("DV_SCALE",
 			scaleValue("1.5", "at0002", ordered("DV_SCALE", scaleValue("0.5", "at0001"), scaleValue("2.5", "at0003"), "", scaleValue("4", "at0004"))...),
 			status+"normal_range [*DV_SCALE 0.5 local::at0001 .. *DV_SCALE 2.5 local::at0003]; "+
-				"other_reference_ranges [critical: [open .. *DV_SCALE 4 local::at0004]]"),
+				"other_reference_ranges [critical: (open .. *DV_SCALE 4 local::at0004]]"),
 		orderedCase("DV_DATE",
 			optNode("DV_DATE", "", ordered("DV_DATE", optNode("DV_DATE", ""), optNode("DV_DATE", ""), optNode("DV_DATE", ""), "")...),
-			status+"normal_range [*DV_DATE 2020-01-01 .. *DV_DATE 2020-01-01]; other_reference_ranges [critical: [*DV_DATE 2020-01-01 .. open]]"),
+			status+"normal_range [*DV_DATE 2020-01-01 .. *DV_DATE 2020-01-01]; other_reference_ranges [critical: [*DV_DATE 2020-01-01 .. open)]"),
 		orderedCase("DV_TIME",
 			optNode("DV_TIME", "", ordered("DV_TIME", optNode("DV_TIME", ""), "", optNode("DV_TIME", ""), optNode("DV_TIME", ""))...),
-			status+"normal_range [*DV_TIME 12:00:00 .. open]; other_reference_ranges [critical: [*DV_TIME 12:00:00 .. *DV_TIME 12:00:00]]"),
+			status+"normal_range [*DV_TIME 12:00:00 .. open); other_reference_ranges [critical: [*DV_TIME 12:00:00 .. *DV_TIME 12:00:00]]"),
 		orderedCase("DV_DATE_TIME",
 			optNode("DV_DATE_TIME", "", ordered("DV_DATE_TIME", optNode("DV_DATE_TIME", ""), optNode("DV_DATE_TIME", ""), optNode("DV_DATE_TIME", ""), "")...),
 			status+"normal_range [*DV_DATE_TIME 2021-03-04T05:06:07Z .. *DV_DATE_TIME 2021-03-04T05:06:07Z]; "+
-				"other_reference_ranges [critical: [*DV_DATE_TIME 2021-03-04T05:06:07Z .. open]]"),
+				"other_reference_ranges [critical: [*DV_DATE_TIME 2021-03-04T05:06:07Z .. open)]"),
 		orderedCase("DV_DURATION",
 			optNode("DV_DURATION", "", ordered("DV_DURATION", "", optNode("DV_DURATION", ""), optNode("DV_DURATION", ""), optNode("DV_DURATION", ""))...),
-			status+"normal_range [open .. *DV_DURATION P0D]; other_reference_ranges [critical: [*DV_DURATION P0D .. *DV_DURATION P0D]]"),
+			status+"normal_range (open .. *DV_DURATION P0D]; other_reference_ranges [critical: [*DV_DURATION P0D .. *DV_DURATION P0D]]"),
 	})
 }
 
@@ -437,8 +447,9 @@ func TestREQ107_OrdinalAndScaleTakeTheirSymbolAndValue(t *testing.T) {
 			check: ordinal(2, "local::at0000"),
 		},
 		{
-			// The known-gap row TestREQ107_KnownGapUnwritableAttributes
-			// pinned before: the symbol alone, as a node of its own. The
+			// The row TestREQ107_AttributeThePinnedRMDoesNotHaveIsRefused
+			// pinned before as a known gap: the symbol alone, as a node of
+			// its own. The
 			// value the OPT leaves silent keeps the zero the RM type holds.
 			name:  "DV_ORDINAL symbol alone as a node of its own",
 			value: optNode("DV_ORDINAL", "", optSingle("symbol", optNode("DV_CODED_TEXT", ""))),
@@ -492,7 +503,7 @@ func TestREQ107_ProportionAmountAttributesAreWritten(t *testing.T) {
 // passes both validators.
 func TestREQ107_OrderedRangesTheOPTNamesWithNoChild(t *testing.T) {
 	bare := []string{optSingle("normal_range"), optMultiple("other_reference_ranges")}
-	const want = "normal_status none; normal_range [open .. open]; other_reference_ranges [example: [open .. open]]"
+	const want = "normal_status none; normal_range (open .. open); other_reference_ranges [example: (open .. open)]"
 	runDataValueCases(t, []dvCase{
 		orderedCase("DV_COUNT", countValue("4", bare...), want),
 		orderedCase("DV_ORDINAL", ordinalValue("2", "at0002", bare...), want),
