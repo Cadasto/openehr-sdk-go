@@ -1304,6 +1304,7 @@ requirements:
       - openehr/internal/rmbind/bind_test.go
       - openehr/validation/aql_test.go
       - openehr/validation/binding_by_name_test.go
+      - openehr/validation/character_binding_test.go
       - openehr/validation/composition_test.go
       - openehr/validation/constraint_fixtures_test.go
       - openehr/validation/constraint_ref_walk_test.go
@@ -1445,6 +1446,7 @@ requirements:
       - internal/templateinstance/rmwrite/write_text_like_test.go
       - openehr/composition/builder_defaults_test.go
       - openehr/composition/optional_content_test.go
+      - openehr/composition/participation_test.go
       - openehr/composition/skeleton_policy_test.go
       - openehr/composition/text_language_test.go
       - openehr/instance/accessors_test.go
@@ -1489,6 +1491,7 @@ requirements:
       - openehr/instance/nonstorable_visit_internal_test.go
       - openehr/instance/nonstorable_visit_test.go
       - openehr/instance/null_flavour_default_test.go
+      - openehr/instance/participation_mapping_test.go
       - openehr/instance/party_attribute_test.go
       - openehr/instance/party_related_relationship_internal_test.go
       - openehr/instance/party_related_relationship_test.go
