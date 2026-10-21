@@ -891,12 +891,7 @@ func writeElementSingle(e *rm.Element, attr string, child any) error {
 		return nil
 	case "null_reason":
 		// DV_TEXT or its descendant DV_CODED_TEXT, stored as given.
-		v, ok := child.(rm.DVTextLike)
-		if !ok {
-			return mismatch(attr, child, "DV_TEXT")
-		}
-		e.NullReason = v
-		return nil
+		return assignTextAsGiven(child, func(v rm.DVTextLike) { e.NullReason = v }, attr)
 	case "name":
 		if v, ok := coerceDVText(child); ok {
 			e.Name = v
@@ -1130,12 +1125,7 @@ func writeIsmTransitionSingle(i *rm.IsmTransition, attr string, child any) error
 		// Value field, not a pointer. The synthesiser passes *DVCodedText.
 		return assignVia(child, func(v rm.DVCodedText) { i.CurrentState = v }, attr, "DV_CODED_TEXT")
 	case "careflow_step":
-		v, ok := child.(*rm.DVCodedText)
-		if !ok {
-			return mismatch(attr, child, "DV_CODED_TEXT")
-		}
-		i.CareflowStep = v
-		return nil
+		return assignVia(child, func(v rm.DVCodedText) { i.CareflowStep = &v }, attr, "DV_CODED_TEXT")
 	case "transition":
 		return assignVia(child, func(v rm.DVCodedText) { i.Transition = &v }, attr, "DV_CODED_TEXT")
 	}
