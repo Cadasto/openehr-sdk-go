@@ -157,10 +157,11 @@ func TestREQ107_TimeValidityPassesBothValidators(t *testing.T) {
 // which bind such a member by its RM type. The language is the text the
 // template pins. A role whose template leaves it open takes the namespace
 // local, the type ROLE and an id drawn from UIDSource, after the PERSON's
-// own uid; a C_STRING on its type that admits ROLE among other class names
-// gives ROLE too, and one that admits only another class name keeps that
-// one. These replace the known-gap rows in which rmwrite could not write
-// either attribute.
+// own uid; a pattern on its type that admits ROLE among other names gives
+// ROLE too, and a list that names only another class keeps that one (a list
+// that names ROLE and another class keeps the member the value fill picks:
+// TestREQ107_RoleTypeListKeepsItsMemberOverTheDefault). These replace the
+// known-gap rows in which rmwrite could not write either attribute.
 func TestREQ107_ActorLanguagesAndRolesTakeTheirMembers(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -206,19 +207,83 @@ func TestREQ107_ActorLanguagesAndRolesTakeTheirMembers(t *testing.T) {
 	}
 }
 
-// TestREQ107_KnownGapUnwritableAttributes pins the REQ-107 rule that an
-// attribute the generator cannot write fails Generate where a template
-// puts an object under it: Generate returns an error wrapping
-// rmwrite.ErrUnknownAttribute, and no root, at every policy and either
-// value fill. Its row is an attribute the pinned RM does not have, on a
-// DV_ORDINAL (§ Exceptions and known gaps, "An attribute the pinned RM
-// does not have"), which no writer can write. The rows it pinned before
-// are written now: a PERSON's languages and roles and a ROLE performer's
-// id (TestREQ107_ActorLanguagesAndRolesTakeTheirMembers,
+// TestREQ107_RoleTypeListKeepsItsMemberOverTheDefault is the REQ-107 check
+// that a list the template pins on the type of a PERSON's role keeps the
+// member the value fill picks, where Type_validity admits it, rather than
+// the type ROLE a role takes where the template leaves it open
+// (Precedence 3), at every policy and either compile mode. ExampleFill
+// takes the list's first member and RandomFill any member. Both validators
+// accept the PERSON.
+func TestREQ107_RoleTypeListKeepsItsMemberOverTheDefault(t *testing.T) {
+	cases := []struct {
+		name string
+		list string // the C_STRING body
+		// wantExample is the type ExampleFill must give, and wantRandom the
+		// types RandomFill may give.
+		wantExample string
+		wantRandom  []string
+	}{
+		{
+			name:        "ROLE after another class name",
+			list:        "<list>ORGANISATION</list><list>ROLE</list>",
+			wantExample: "ORGANISATION",
+			wantRandom:  []string{"ORGANISATION", "ROLE"},
+		},
+		{
+			name:        "ROLE only",
+			list:        "<list>ROLE</list>",
+			wantExample: "ROLE",
+			wantRandom:  []string{"ROLE"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			opt := guardRootOPT("PERSON", "openEHR-DEMOGRAPHIC-PERSON.example.v1",
+				guardMultiple("roles", guardExistence11,
+					guardChild("C_COMPLEX_OBJECT", "PARTY_REF", "", guardOccurrences11, "",
+						guardSingle("type", guardExistence11, optPrimitive("STRING", "C_STRING", tc.list)))))
+			for _, implicit := range []bool{true, false} {
+				c := compileOPTText(t, opt, implicit)
+				for _, opts := range guardOptions() {
+					call := fmt.Sprintf("Generate(%v, %v, implicit attributes %v)", opts.Policy, opts.ValueFill, implicit)
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err != nil {
+						t.Fatalf("%s: %v, want a root", call, err)
+					}
+					person, ok := out.(*rm.Person)
+					if !ok {
+						t.Fatalf("%s returned %T, want *rm.Person", call, out)
+					}
+					if len(person.Roles) != 1 {
+						t.Fatalf("%s: roles has %d members, want 1", call, len(person.Roles))
+					}
+					got := person.Roles[0].Type
+					if opts.ValueFill == instance.ExampleFill && got != tc.wantExample {
+						t.Errorf("%s: role type = %q, want %q", call, got, tc.wantExample)
+					}
+					if opts.ValueFill == instance.RandomFill && !slices.Contains(tc.wantRandom, got) {
+						t.Errorf("%s: role type = %q, want one of %v", call, got, tc.wantRandom)
+					}
+					checkBothValidators(t, call, out, c)
+				}
+			}
+		})
+	}
+}
+
+// TestREQ107_AttributeThePinnedRMDoesNotHaveIsRefused is the REQ-107 check
+// that an attribute the pinned RM does not have cannot be written, so
+// Generate returns an error wrapping rmwrite.ErrUnknownAttribute, and no
+// root, where a template puts an object under one, at every policy and
+// either value fill (§ Exceptions and known gaps, "An attribute the pinned
+// RM does not have"). Its row is a made-up attribute on a DV_ORDINAL, which
+// no writer can write. The rows it pinned as known gaps are written now: a
+// PERSON's languages and roles and a ROLE performer's id
+// (TestREQ107_ActorLanguagesAndRolesTakeTheirMembers,
 // TestREQ107_PerformerIDTakesAValueFromUIDSource), and a DV_ORDINAL's
 // symbol the template names as a node of its own
 // (TestREQ107_OrdinalAndScaleTakeTheirSymbolAndValue).
-func TestREQ107_KnownGapUnwritableAttributes(t *testing.T) {
+func TestREQ107_AttributeThePinnedRMDoesNotHaveIsRefused(t *testing.T) {
 	cases := []struct {
 		name string
 		opt  string
