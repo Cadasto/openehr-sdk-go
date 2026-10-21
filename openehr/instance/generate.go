@@ -228,7 +228,9 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 		return err
 	}
 	g.finishNode(optNode, rmValue)
-	return nil
+	// After finishNode, which settles a DV_PROPORTION's kind, so the value
+	// and its normal_range are final.
+	return settleNormalRange(optNode, rmValue)
 }
 
 // fillUncarriedRequired fills each attribute the BMM marks mandatory on

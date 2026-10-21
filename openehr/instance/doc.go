@@ -105,17 +105,22 @@
 // what is left: a PARTY_REF's type is a party class name, a TERM_MAPPING's
 // match one of >, =, < and ?, a magnitude_status one of =, <, >, <=, >=
 // and ~, a percentage accuracy more than 0 and at most 100, a precision -1
-// or more, and an RM Integer, such as a DV_ORDINAL's value, inside its 32
-// bits, the example of a range bounded on one side alone staying on that
-// side. Where nothing is left, Generate returns an error wrapping
-// [ErrConstraintUnsatisfiable]. Where the
-// template gives an RM attribute no value, the generator writes an
-// RM-valid default, unless the template's own constraint on that
-// attribute rejects it. A DV_PROPORTION is then settled to the rules of
-// its kind, inside the template's constraints on its parts: a unitary
-// proportion over 1, a percent over 100, a fraction or an integer
-// fraction over whole numbers, any proportion of precision 0 over whole
-// numbers, and every kind over a denominator that is not 0. Where the
+// or more, an ordered value with both a normal range and a normal status
+// inside that range where the status is N and outside it where the status
+// is any other, wherever the value compares with the range's bounds (a
+// count, a quantity in the bounds' units, a proportion of the bounds' type,
+// by ratio, an ordinal, by value, and a date, a time or a date-time of the
+// bounds' layout), and an RM Integer, such as a DV_ORDINAL's value, inside
+// its 32 bits, the example of a range bounded on one side alone staying on
+// that side. Where nothing is left, Generate returns an error wrapping
+// [ErrConstraintUnsatisfiable]. Where the template gives an RM attribute
+// no value, the generator writes an RM-valid default, unless the
+// template's own constraint on that attribute rejects it. A DV_PROPORTION
+// is then settled to the rules of its kind, inside the template's
+// constraints on its parts: a unitary proportion over 1, a percent over
+// 100, a fraction or an integer fraction over whole numbers, any
+// proportion of precision 0 over whole numbers, and every kind over a
+// denominator that is not 0. Where the
 // drawn type cannot meet its rule there, another type the template allows
 // is taken, and where none can, the value stays as the walk wrote it. A
 // coded text whose code is in the openEHR terminology, on an attribute the

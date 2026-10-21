@@ -290,11 +290,17 @@ var countScale = scale[int64]{
 }
 
 // integerEnd returns the lowest (low) or highest value the C_INTEGER on a
-// DV_COUNT bound node's magnitude accepts: the extreme list entry the range
-// also admits, or the range's own end. It returns false when there is no
-// such constraint, or when the constraint has no end in that direction.
+// DV_COUNT bound node's magnitude accepts (integerEndOf).
 func integerEnd(node *tcimpl.CompiledNode, low bool) (int64, bool) {
-	c, ok := primitiveOf(bindingChild(node, "magnitude")).(constraints.CInteger)
+	return integerEndOf(bindingChild(node, "magnitude"), low)
+}
+
+// integerEndOf returns the lowest (low) or highest value the C_INTEGER of
+// node accepts: the extreme list entry the range also admits, or the
+// range's own end. It returns false when there is no such constraint, or
+// when the constraint has no end in that direction.
+func integerEndOf(node *tcimpl.CompiledNode, low bool) (int64, bool) {
+	c, ok := primitiveOf(node).(constraints.CInteger)
 	if !ok {
 		return 0, false
 	}
