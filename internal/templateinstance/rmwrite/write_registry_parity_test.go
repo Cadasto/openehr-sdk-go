@@ -520,10 +520,10 @@ var pinnedUnwritten = map[string][]string{
 	"CONTACT":                       {},
 	"DV_BOOLEAN":                    {},
 	"DV_CODED_TEXT":                 {},
-	"DV_COUNT":                      {"other_reference_ranges"},
-	"DV_DATE":                       {"normal_range", "normal_status", "other_reference_ranges"},
-	"DV_DATE_TIME":                  {"normal_range", "normal_status", "other_reference_ranges"},
-	"DV_DURATION":                   {"normal_range", "normal_status", "other_reference_ranges"},
+	"DV_COUNT":                      {},
+	"DV_DATE":                       {},
+	"DV_DATE_TIME":                  {},
+	"DV_DURATION":                   {},
 	"DV_EHR_URI":                    {},
 	"DV_GENERAL_TIME_SPECIFICATION": {},
 	"DV_IDENTIFIER":                 {},
@@ -532,13 +532,16 @@ var pinnedUnwritten = map[string][]string{
 	// constraint describes, so no OPT puts a value there to write; the
 	// instance generator writes the example data itself.
 	"DV_MULTIMEDIA":                  {"data", "integrity_check"},
+	"DV_ORDINAL":                     {},
 	"DV_PARAGRAPH":                   {},
 	"DV_PARSABLE":                    {},
 	"DV_PERIODIC_TIME_SPECIFICATION": {},
-	"DV_QUANTITY":                    {"other_reference_ranges"},
+	"DV_PROPORTION":                  {},
+	"DV_QUANTITY":                    {},
+	"DV_SCALE":                       {},
 	"DV_STATE":                       {},
 	"DV_TEXT":                        {},
-	"DV_TIME":                        {"normal_range", "normal_status", "other_reference_ranges"},
+	"DV_TIME":                        {},
 	"DV_URI":                         {},
 	"EHR_STATUS":                     {},
 	"ELEMENT":                        {},
@@ -572,6 +575,7 @@ var pinnedUnwritten = map[string][]string{
 	"PARTY_SELF":                     {},
 	"PERSON":                         {},
 	"POINT_EVENT":                    {},
+	"REFERENCE_RANGE":                {},
 	"ROLE":                           {},
 	"SECTION":                        {},
 	"TEMPLATE_ID":                    {},
@@ -635,11 +639,7 @@ func TestREQ107_WriterParentAttributeParity(t *testing.T) {
 // ARCHETYPED and what only they hold) are not listed, because the closure
 // does not follow those attributes.
 var pinnedUnreached = map[string]string{
-	"DV_ORDINAL":      "",
-	"DV_PROPORTION":   "",
-	"DV_SCALE":        "",
-	"EHR_ACCESS":      "settings, its one attribute beside LOCATABLE's, is ACCESS_CONTROL_SETTINGS, which no concrete class extends in the pinned RM",
-	"REFERENCE_RANGE": "",
+	"EHR_ACCESS": "settings, its one attribute beside LOCATABLE's, is ACCESS_CONTROL_SETTINGS, which no concrete class extends in the pinned RM",
 }
 
 // TestREQ107_WriterReachableClassParity checks that the classes a value below

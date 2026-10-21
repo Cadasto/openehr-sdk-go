@@ -206,25 +206,27 @@ func TestREQ107_ActorLanguagesAndRolesTakeTheirMembers(t *testing.T) {
 	}
 }
 
-// TestREQ107_KnownGapUnwritableAttributes pins the REQ-107 known gap on
-// attributes the generator cannot write: a template that puts an object
-// under one makes Generate return an error wrapping
+// TestREQ107_KnownGapUnwritableAttributes pins the REQ-107 rule that an
+// attribute the generator cannot write fails Generate where a template
+// puts an object under it: Generate returns an error wrapping
 // rmwrite.ErrUnknownAttribute, and no root, at every policy and either
-// value fill. Its row is a DV_ORDINAL's symbol the template names as a
-// node of its own, which the gap names and rmwrite has no writer for. The
-// rows it pinned before, a PERSON's languages and roles and a ROLE
-// performer's id, are written now
-// (TestREQ107_ActorLanguagesAndRolesTakeTheirMembers,
-// TestREQ107_PerformerIDTakesAValueFromUIDSource).
+// value fill. Its row is an attribute the pinned RM does not have, on a
+// DV_ORDINAL (§ Exceptions and known gaps, "An attribute the pinned RM
+// does not have"), which no writer can write. The rows it pinned before
+// are written now: a PERSON's languages and roles and a ROLE performer's
+// id (TestREQ107_ActorLanguagesAndRolesTakeTheirMembers,
+// TestREQ107_PerformerIDTakesAValueFromUIDSource), and a DV_ORDINAL's
+// symbol the template names as a node of its own
+// (TestREQ107_OrdinalAndScaleTakeTheirSymbolAndValue).
 func TestREQ107_KnownGapUnwritableAttributes(t *testing.T) {
 	cases := []struct {
 		name string
 		opt  string
 	}{
 		{
-			name: "DV_ORDINAL symbol as a node of its own",
+			name: "DV_ORDINAL attribute the pinned RM does not have",
 			opt: optTemplate("ELEMENT", optSingle("value", optNode("DV_ORDINAL", "",
-				optSingle("symbol", optNode("DV_CODED_TEXT", ""))))),
+				optSingle("no_such_attribute", optNode("DV_CODED_TEXT", ""))))),
 		},
 	}
 	for _, tc := range cases {
