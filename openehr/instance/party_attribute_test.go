@@ -150,32 +150,81 @@ func TestREQ107_TimeValidityPassesBothValidators(t *testing.T) {
 	}
 }
 
+// TestREQ107_ActorLanguagesAndRolesTakeTheirMembers is the REQ-107 check
+// that a PERSON whose template names languages holding a DV_TEXT and roles
+// holding a PARTY_REF comes out with one member of each, at every policy,
+// either value fill and either compile mode, and passes both validators,
+// which bind such a member by its RM type. The language is the text the
+// template pins. A role whose template leaves it open takes the namespace
+// local, the type ROLE and an id drawn from UIDSource, after the PERSON's
+// own uid; a C_STRING on its type that admits ROLE among other class names
+// gives ROLE too, and one that admits only another class name keeps that
+// one. These replace the known-gap rows in which rmwrite could not write
+// either attribute.
+func TestREQ107_ActorLanguagesAndRolesTakeTheirMembers(t *testing.T) {
+	cases := []struct {
+		name     string
+		roleType []string // the attributes the template names on the role's PARTY_REF
+		want     string
+	}{
+		{name: "role left open", want: "PARTY_REF local::ROLE id HIER_OBJECT_ID uid-0002"},
+		{
+			name:     "role type pattern .*",
+			roleType: []string{guardSingle("type", guardExistence11, optPrimitive("STRING", "C_STRING", "<pattern>.*</pattern>"))},
+			want:     "PARTY_REF local::ROLE id HIER_OBJECT_ID uid-0002",
+		},
+		{
+			name:     "role type pinned PERSON",
+			roleType: []string{guardSingle("type", guardExistence11, guardString("PERSON"))},
+			want:     "PARTY_REF local::PERSON id HIER_OBJECT_ID uid-0002",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			opt := guardRootOPT("PERSON", "openEHR-DEMOGRAPHIC-PERSON.example.v1",
+				guardMultiple("languages", guardExistence11,
+					guardChild("C_COMPLEX_OBJECT", "DV_TEXT", "", guardOccurrences11, "",
+						guardSingle("value", guardExistence11, guardString("Dutch")))),
+				guardMultiple("roles", guardExistence11,
+					guardChild("C_COMPLEX_OBJECT", "PARTY_REF", "", guardOccurrences11, "", tc.roleType...)))
+			generateEvery(t, opt, func(t *testing.T, call string, out any) {
+				person, ok := out.(*rm.Person)
+				if !ok {
+					t.Fatalf("%s returned %T, want *rm.Person", call, out)
+				}
+				if len(person.Languages) != 1 || person.Languages[0] == nil || person.Languages[0].GetValue() != "Dutch" {
+					t.Errorf("%s: languages = %#v, want one text Dutch", call, person.Languages)
+				}
+				if len(person.Roles) != 1 {
+					t.Fatalf("%s: roles has %d members, want 1", call, len(person.Roles))
+				}
+				if got := refString(&person.Roles[0]); got != tc.want {
+					t.Errorf("%s: roles[0] = %s, want %s", call, got, tc.want)
+				}
+			})
+		})
+	}
+}
+
 // TestREQ107_KnownGapUnwritableAttributes pins the REQ-107 known gap on
 // attributes the generator cannot write: a template that puts an object
 // under one makes Generate return an error wrapping
 // rmwrite.ErrUnknownAttribute, and no root, at every policy and either
-// value fill. The rows pin each attribute the gap names: a PERSON's
-// languages holding a DV_TEXT, and a PERSON's roles holding a PARTY_REF.
-// Languages and roles have no writer yet, although the template validator
-// now binds their members by RM type; those rows change when rmwrite gains
-// the writers. A ROLE performer's id holding a HIER_OBJECT_ID is written
-// now (TestREQ107_PerformerIDTakesAValueFromUIDSource).
+// value fill. Its row is a DV_ORDINAL's symbol the template names as a
+// node of its own, which the gap names and rmwrite has no writer for. The
+// rows it pinned before, a PERSON's languages and roles and a ROLE
+// performer's id, are written now
+// (TestREQ107_ActorLanguagesAndRolesTakeTheirMembers,
+// TestREQ107_PerformerIDTakesAValueFromUIDSource).
 func TestREQ107_KnownGapUnwritableAttributes(t *testing.T) {
 	cases := []struct {
 		name string
 		opt  string
 	}{
 		{
-			name: "PERSON languages holding a DV_TEXT",
-			opt: guardRootOPT("PERSON", "openEHR-DEMOGRAPHIC-PERSON.example.v1",
-				guardMultiple("languages", guardExistence11,
-					guardChild("C_COMPLEX_OBJECT", "DV_TEXT", "", guardOccurrences11, ""))),
-		},
-		{
-			name: "PERSON roles holding a PARTY_REF",
-			opt: guardRootOPT("PERSON", "openEHR-DEMOGRAPHIC-PERSON.example.v1",
-				guardMultiple("roles", guardExistence11,
-					guardChild("C_COMPLEX_OBJECT", "PARTY_REF", "", guardOccurrences11, ""))),
+			name: "DV_ORDINAL symbol as a node of its own",
+			opt: optTemplate("ELEMENT", optSingle("value", optNode("DV_ORDINAL", "",
+				optSingle("symbol", optNode("DV_CODED_TEXT", ""))))),
 		},
 	}
 	for _, tc := range cases {
