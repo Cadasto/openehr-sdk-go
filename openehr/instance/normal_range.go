@@ -53,30 +53,12 @@ var errNoNormalValue = errors.New("the OPT admits no value the generator can der
 // constrains a DV_ORDINAL here through a C_INTEGER on its value: a
 // C_DV_ORDINAL makes the ordinal a primitive leaf, which carries no
 // normal_range. opt is the OPT node of v.
+//
+// A value that is a bound of an interval is settled by its own walk, before
+// the interval's walk puts its bounds in order, which keeps each bound's
+// settle (normalAt).
 func settleNormalRange(opt *tcimpl.CompiledNode, v any) error {
-	var attr string
-	var kept bool
-	switch o := v.(type) {
-	case *rm.DVCount:
-		attr, kept = "magnitude", settleCountNormal(opt, o)
-	case *rm.DVQuantity:
-		attr, kept = "magnitude", settleQuantityNormal(opt, o)
-	case *rm.DVProportion:
-		attr, kept = "numerator", settleProportionNormal(opt, o)
-	case *rm.DVOrdinal:
-		attr, kept = "value", settleOrdinalNormal(opt, o)
-	case *rm.DVDate:
-		attr, kept = "value", settleTemporalNormal(opt, o.NormalStatus, o.NormalRange, &o.Value, dateScale, dateSteps,
-			func(b rm.DVOrdered) (string, bool) { d, ok := asDate(b); return d.Value, ok })
-	case *rm.DVTime:
-		attr, kept = "value", settleTemporalNormal(opt, o.NormalStatus, o.NormalRange, &o.Value, timeScale, timeSteps,
-			func(b rm.DVOrdered) (string, bool) { d, ok := asTime(b); return d.Value, ok })
-	case *rm.DVDateTime:
-		attr, kept = "value", settleTemporalNormal(opt, o.NormalStatus, o.NormalRange, &o.Value, dateTimeScale, dateTimeSteps,
-			func(b rm.DVOrdered) (string, bool) { d, ok := asDateTime(b); return d.Value, ok })
-	default:
-		return nil
-	}
+	attr, kept := keepNormalRange(opt, v, firstCandidate)
 	if kept {
 		return nil
 	}
@@ -85,6 +67,61 @@ func settleNormalRange(opt *tcimpl.CompiledNode, v any) error {
 		path = leafPath(node)
 	}
 	return fmt.Errorf("%w: %s.%s at %s: %w", ErrConstraintUnsatisfiable, rmTypeOf(v), attr, path, errNoNormalValue)
+}
+
+// keepNormalRange is settleNormalRange without the error, and with the end
+// of the candidates it takes: it narrows v as settleNormalRange describes,
+// and reports the attribute it narrows and whether v keeps the rule or is
+// left as generated. It reports false when no candidate keeps the rule, and
+// v is then as it was.
+func keepNormalRange(opt *tcimpl.CompiledNode, v any, end normalEnd) (attr string, kept bool) {
+	switch o := v.(type) {
+	case *rm.DVCount:
+		return "magnitude", settleCountNormal(opt, o, end)
+	case *rm.DVQuantity:
+		return "magnitude", settleQuantityNormal(opt, o, end)
+	case *rm.DVProportion:
+		return "numerator", settleProportionNormal(opt, o, end)
+	case *rm.DVOrdinal:
+		return "value", settleOrdinalNormal(opt, o, end)
+	case *rm.DVDate:
+		return "value", settleTemporalNormal(opt, o.NormalStatus, o.NormalRange, &o.Value, dateScale, dateSteps, end,
+			func(b rm.DVOrdered) (string, bool) { d, ok := asDate(b); return d.Value, ok })
+	case *rm.DVTime:
+		return "value", settleTemporalNormal(opt, o.NormalStatus, o.NormalRange, &o.Value, timeScale, timeSteps, end,
+			func(b rm.DVOrdered) (string, bool) { d, ok := asTime(b); return d.Value, ok })
+	case *rm.DVDateTime:
+		return "value", settleTemporalNormal(opt, o.NormalStatus, o.NormalRange, &o.Value, dateTimeScale, dateTimeSteps, end,
+			func(b rm.DVOrdered) (string, bool) { d, ok := asDateTime(b); return d.Value, ok })
+	}
+	return "", true
+}
+
+// normalAt returns how a bound of an interval, of Go type T, keeps its own
+// normal_range rule at a value k of K, as settleNormalRange judges it: the
+// bound as it stands with k written on it (apply), and read back (key) once
+// keepNormalRange has narrowed it. A value that keeps the rule stays, and
+// any other is narrowed to the lowest value that does, for the lower side of
+// the interval (low), or the highest, for the upper side, among the
+// candidates of the rule (normalRule.candidates). The function returns false
+// where no candidate keeps the rule, and the bound is not changed either
+// way. node is the OPT node the bound is built from. A bound with no
+// normal_range or no normal_status, or one that does not compare with its
+// range, keeps k.
+func normalAt[T, K any](bound T, node *tcimpl.CompiledNode, key func(T) K, apply func(*T, K), low bool) func(k K) (K, bool) {
+	end := highestCandidate
+	if low {
+		end = lowestCandidate
+	}
+	return func(k K) (K, bool) {
+		c := bound
+		apply(&c, k)
+		if _, kept := keepNormalRange(node, &c, end); !kept {
+			var none K
+			return none, false
+		}
+		return key(c), true
+	}
 }
 
 // normalBounds are the bounds of a normal_range read as K, with the flags
@@ -176,22 +213,61 @@ type normalRule[K any] struct {
 	set func(k K)
 }
 
+// normalEnd is which of the candidates that keep a normal_range rule keep
+// takes.
+type normalEnd int
+
+const (
+	// firstCandidate takes the first, in the order candidates gives.
+	firstCandidate normalEnd = iota
+	// lowestCandidate takes the lowest and highestCandidate the highest, as
+	// the rule's compare orders them, the first of equals.
+	lowestCandidate
+	highestCandidate
+)
+
+// admits reports whether k is inside the range, where inside is set, or
+// outside it, and the OPT's own constraint accepts k.
+func (r normalRule[K]) admits(k K, inside bool) bool {
+	has, ok := r.bounds.has(r.compare, k)
+	return ok && has == inside && r.fits(k)
+}
+
+// beats reports whether a lies beyond b towards end, which is not
+// firstCandidate.
+func (r normalRule[K]) beats(a, b K, end normalEnd) bool {
+	c, ok := r.compare(a, b)
+	return ok && ((end == lowestCandidate && c < 0) || (end == highestCandidate && c > 0))
+}
+
 // keep narrows the value so that it is inside the range where status is N
 // and outside it otherwise, as settleNormalRange describes, and reports
-// whether the value keeps the rule or is left as generated. It reports
-// false when no candidate keeps the rule.
-func (r normalRule[K]) keep(status *rm.CodePhrase) bool {
+// whether the value keeps the rule or is left as generated. It takes the
+// candidate that end names among those that keep the rule. It reports false
+// when no candidate keeps the rule.
+func (r normalRule[K]) keep(status *rm.CodePhrase, end normalEnd) bool {
 	inside := status.CodeString == normalCode
 	if has, ok := r.bounds.has(r.compare, r.value); !ok || has == inside {
 		return true
 	}
+	var best K
+	found := false
 	for _, k := range r.candidates() {
-		if has, ok := r.bounds.has(r.compare, k); ok && has == inside && r.fits(k) {
+		if !r.admits(k, inside) {
+			continue
+		}
+		if end == firstCandidate {
 			r.set(k)
 			return true
 		}
+		if !found || r.beats(k, best, end) {
+			best, found = k, true
+		}
 	}
-	return false
+	if found {
+		r.set(best)
+	}
+	return found
 }
 
 // candidates returns the values keep tries, in this fixed order: the lower
@@ -291,7 +367,7 @@ func finite(f float64) bool { return !math.IsInf(f, 0) && !math.IsNaN(f) }
 // settleCountNormal keeps a DV_COUNT's magnitude on the side of its
 // normal_range its normal_status needs, inside the C_INTEGER on its
 // magnitude, and reports false where it cannot (settleNormalRange).
-func settleCountNormal(opt *tcimpl.CompiledNode, c *rm.DVCount) bool {
+func settleCountNormal(opt *tcimpl.CompiledNode, c *rm.DVCount, end normalEnd) bool {
 	if c.NormalStatus == nil || c.NormalRange == nil {
 		return true
 	}
@@ -307,14 +383,14 @@ func settleCountNormal(opt *tcimpl.CompiledNode, c *rm.DVCount) bool {
 		own:     integerOwn(bindingChild(opt, "magnitude")),
 		fits:    func(m int64) bool { return countScale.fits(opt, m) },
 		set:     func(m int64) { c.Magnitude = rm.Integer64(m) },
-	}.keep(c.NormalStatus)
+	}.keep(c.NormalStatus, end)
 }
 
 // settleQuantityNormal keeps a DV_QUANTITY's magnitude on the side of its
 // normal_range its normal_status needs, in its own units and inside the
 // C_REAL on its magnitude, and reports false where it cannot
 // (settleNormalRange).
-func settleQuantityNormal(opt *tcimpl.CompiledNode, q *rm.DVQuantity) bool {
+func settleQuantityNormal(opt *tcimpl.CompiledNode, q *rm.DVQuantity, end normalEnd) bool {
 	if q.NormalStatus == nil || q.NormalRange == nil {
 		return true
 	}
@@ -349,7 +425,7 @@ func settleQuantityNormal(opt *tcimpl.CompiledNode, q *rm.DVQuantity) bool {
 		own:  own,
 		fits: func(k quantityKey) bool { return componentFits(magnitude, k.magnitude) },
 		set:  func(k quantityKey) { q.Magnitude = rm.Real(k.magnitude) },
-	}.keep(q.NormalStatus)
+	}.keep(q.NormalStatus, end)
 }
 
 // settleProportionNormal keeps a DV_PROPORTION's ratio on the side of its
@@ -358,7 +434,7 @@ func settleQuantityNormal(opt *tcimpl.CompiledNode, q *rm.DVQuantity) bool {
 // (settleNormalRange). Its type, denominator and precision stay, which the
 // walk and settleProportion settled under the OPT, and so do the whole
 // numbers its kind or its precision needs (wholeOperands).
-func settleProportionNormal(opt *tcimpl.CompiledNode, p *rm.DVProportion) bool {
+func settleProportionNormal(opt *tcimpl.CompiledNode, p *rm.DVProportion, end normalEnd) bool {
 	if p.NormalStatus == nil || p.NormalRange == nil {
 		return true
 	}
@@ -413,14 +489,14 @@ func settleProportionNormal(opt *tcimpl.CompiledNode, p *rm.DVProportion) bool {
 		// float64, and canonical JSON has no infinity.
 		fits: func(k proportionKey) bool { return finite(k.numerator) && proportionFits(opt, k) },
 		set:  func(k proportionKey) { p.Numerator = rm.Real(k.numerator) },
-	}.keep(p.NormalStatus)
+	}.keep(p.NormalStatus, end)
 }
 
 // settleOrdinalNormal keeps a DV_ORDINAL's value on the side of its
 // normal_range its normal_status needs, inside the 32-bit range of an RM
 // Integer and the C_INTEGER on its value, and reports false where it
 // cannot (settleNormalRange). Its symbol stays.
-func settleOrdinalNormal(opt *tcimpl.CompiledNode, o *rm.DVOrdinal) bool {
+func settleOrdinalNormal(opt *tcimpl.CompiledNode, o *rm.DVOrdinal, end normalEnd) bool {
 	if o.NormalStatus == nil || o.NormalRange == nil {
 		return true
 	}
@@ -451,7 +527,7 @@ func settleOrdinalNormal(opt *tcimpl.CompiledNode, o *rm.DVOrdinal) bool {
 		own:  own,
 		fits: func(k ordinalKey) bool { return fitsInteger(k.value) && componentFits(valueNode, k.value) },
 		set:  func(k ordinalKey) { o.Value = rm.Integer(k.value) },
-	}.keep(o.NormalStatus)
+	}.keep(o.NormalStatus, end)
 }
 
 // temporalStep is a layout of a temporal value and the step
@@ -505,7 +581,7 @@ func temporalNear(steps []temporalStep, s string, up bool) (string, bool) {
 // from them (steps); the OPT's constraint on the value is s.fits. read
 // reads a bound's value.
 func settleTemporalNormal(opt *tcimpl.CompiledNode, status *rm.CodePhrase, rng *rm.DVInterval[rm.DVOrdered], value *string,
-	s scale[string], steps []temporalStep, read func(rm.DVOrdered) (string, bool),
+	s scale[string], steps []temporalStep, end normalEnd, read func(rm.DVOrdered) (string, bool),
 ) bool {
 	if status == nil || rng == nil {
 		return true
@@ -523,5 +599,5 @@ func settleTemporalNormal(opt *tcimpl.CompiledNode, status *rm.CodePhrase, rng *
 		},
 		fits: func(k string) bool { return s.fits(opt, k) },
 		set:  func(k string) { *value = k },
-	}.keep(status)
+	}.keep(status, end)
 }

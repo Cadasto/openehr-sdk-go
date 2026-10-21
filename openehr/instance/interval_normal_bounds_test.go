@@ -44,8 +44,19 @@ func normalOrdinal(value, code, lo, hi, status string) string {
 		normalRangeOver("DV_ORDINAL", ordinalBound(lo, code), ordinalBound(hi, code)), normalStatus(status))
 }
 
-// dataValueOf is b as the data value it is.
-func dataValueOf[T any](b *T) rm.DataValue { return any(b).(rm.DataValue) }
+// dataValueOf is a bound as the data value the checks read: a pointer to a
+// copy of a bound held by value, and a bound held by pointer as it is.
+func dataValueOf[T rm.DVOrdered](b T) rm.DataValue {
+	switch v := any(b).(type) {
+	case rm.DVCount:
+		return &v
+	case rm.DVQuantity:
+		return &v
+	case rm.DVOrdinal:
+		return &v
+	}
+	return any(b).(rm.DataValue)
+}
 
 // normalBoundString renders a bound as normalString does, without the
 // other_reference_ranges, which no OPT here constrains and which stay empty.
@@ -56,8 +67,7 @@ func normalBoundString(v rm.DataValue) string {
 // normalBoundsString renders iv as intervalString does, then each bound as
 // normalBoundString does, so a bound's normal_status and normal_range show.
 func normalBoundsString[T rm.DVOrdered](iv *rm.DVInterval[T]) string {
-	lower, upper := iv.Lower, iv.Upper
-	return intervalString(iv) + " | lower " + normalBoundString(dataValueOf(&lower)) + " | upper " + normalBoundString(dataValueOf(&upper))
+	return intervalString(iv) + " | lower " + normalBoundString(dataValueOf(iv.Lower)) + " | upper " + normalBoundString(dataValueOf(iv.Upper))
 }
 
 // normalBoundsPair is one DV_INTERVAL whose lower and upper bounds are the
@@ -115,12 +125,11 @@ func runNormalBounds[T rm.DVOrdered](t *testing.T, boundRM string, cases []norma
 				} else {
 					checkValid(t, out, c)
 				}
-				lower, upper := iv.Lower, iv.Upper
 				if tc.lowerRule {
-					checkNormalConsistency(t, dataValueOf(&lower))
+					checkNormalConsistency(t, dataValueOf(iv.Lower))
 				}
 				if tc.upperRule {
-					checkNormalConsistency(t, dataValueOf(&upper))
+					checkNormalConsistency(t, dataValueOf(iv.Upper))
 				}
 				return iv
 			}
@@ -242,6 +251,42 @@ func TestREQ107_IntervalOrderKeepsEachBoundsNormalRange(t *testing.T) {
 			ordered: true,
 		},
 	}, func(c rm.DVCount) float64 { return float64(c.Magnitude) })
+	// A DV_INTERVAL<DV_ORDERED> holds each bound by pointer, as a count here.
+	runNormalBounds(t, "DV_ORDERED", []normalBoundsPair{
+		{
+			name:  "DV_ORDERED lower bound 0..10 in the range [5..9], N, upper 0..10",
+			lower: normalCount(integerFrom(0, 10), "5", "9", "N"), upper: plainCount(integerFrom(0, 10)),
+			lowerRule: true,
+			want: "[*DV_COUNT 5 .. *DV_COUNT 5] | " +
+				"lower DV_COUNT 5; normal_status openehr_normal_statuses::N; normal_range [DV_COUNT 5 .. DV_COUNT 9] | " +
+				"upper DV_COUNT 5; normal_status none; normal_range none",
+			wantRandom: "[*DV_COUNT 5 .. *DV_COUNT 8] | " +
+				"lower DV_COUNT 5; normal_status openehr_normal_statuses::N; normal_range [DV_COUNT 5 .. DV_COUNT 9] | " +
+				"upper DV_COUNT 8; normal_status none; normal_range none",
+			ordered: true,
+		},
+		{
+			name:  "DV_ORDERED lower bound 3..10, upper 0..10 in the range [0..4], N",
+			lower: plainCount(integerFrom(3, 10)), upper: normalCount(integerFrom(0, 10), "0", "4", "N"),
+			upperRule: true,
+			want: "[*DV_COUNT 3 .. *DV_COUNT 4] | " +
+				"lower DV_COUNT 3; normal_status none; normal_range none | " +
+				"upper DV_COUNT 4; normal_status openehr_normal_statuses::N; normal_range [DV_COUNT 0 .. DV_COUNT 4]",
+			ordered: true,
+		},
+		{
+			name:  "DV_ORDERED lower bound 0..10 in the range [5..9], N, upper 0..3, no ordered pair",
+			lower: normalCount(integerFrom(0, 10), "5", "9", "N"), upper: plainCount(integerFrom(0, 3)),
+			lowerRule: true,
+			want: "[*DV_COUNT 5 .. *DV_COUNT 0] | " +
+				"lower DV_COUNT 5; normal_status openehr_normal_statuses::N; normal_range [DV_COUNT 5 .. DV_COUNT 9] | " +
+				"upper DV_COUNT 0; normal_status none; normal_range none",
+			wantRandom: "[*DV_COUNT 8 .. *DV_COUNT 0] | " +
+				"lower DV_COUNT 8; normal_status openehr_normal_statuses::N; normal_range [DV_COUNT 5 .. DV_COUNT 9] | " +
+				"upper DV_COUNT 0; normal_status none; normal_range none",
+			unordered: true,
+		},
+	}, func(b rm.DVOrdered) float64 { pos, _, _ := normalPosition(b); return pos })
 	runNormalBounds(t, "DV_QUANTITY", []normalBoundsPair{
 		{
 			name:  "quantity lower bound 0..10 mm in the range [5..9] mm, N, upper 0..10 mm",
@@ -316,10 +361,10 @@ type nestedBounds struct {
 // normal_range, or of the range of an other_reference_ranges member, keeps
 // the normal_range and the normal_status a bound carries, as the order of an
 // interval of its own does
-// (TestREQ107_IntervalOrderKeepsEachBoundsNormalRange): the ranges are held
-// over DV_COUNT for a DV_COUNT's normal_range, and over DV_ORDERED for a
-// DV_ORDINAL's normal_range and for the range of a REFERENCE_RANGE, which
-// holds its bounds by pointer. A REFERENCE_RANGE's bounds are simple in the
+// (TestREQ107_IntervalOrderKeepsEachBoundsNormalRange): the OPT names each
+// range as a DV_INTERVAL over the bounds' class, which its walk puts in
+// order before the value takes it, and a REFERENCE_RANGE holds its range
+// over DV_ORDERED. A REFERENCE_RANGE's bounds are simple in the
 // RM (Range_is_simple), so the OPT of that case is one an author would not
 // write; the generator writes a bound as the OPT constrains it, and the case
 // pins that the order keeps what it wrote. It holds under every policy, both
@@ -338,8 +383,7 @@ func TestREQ107_RangesWhoseBoundsCarryTheirOwnNormalRange(t *testing.T) {
 				if !ok || c.NormalRange == nil {
 					t.Fatalf("ELEMENT.value is %T, want a *rm.DVCount with a normal_range", v)
 				}
-				lower, upper := c.NormalRange.Lower, c.NormalRange.Upper
-				return intervalString(c.NormalRange), dataValueOf(&lower), dataValueOf(&upper)
+				return intervalString(c.NormalRange), dataValueOf(c.NormalRange.Lower), dataValueOf(c.NormalRange.Upper)
 			},
 			want: "[DV_COUNT 5 .. DV_COUNT 5] | " +
 				"lower DV_COUNT 5; normal_status openehr_normal_statuses::N; normal_range [DV_COUNT 5 .. DV_COUNT 9] | " +
@@ -349,7 +393,7 @@ func TestREQ107_RangesWhoseBoundsCarryTheirOwnNormalRange(t *testing.T) {
 				"upper DV_COUNT 6; normal_status none; normal_range none",
 		},
 		{
-			name: "DV_ORDINAL normal_range over DV_ORDINAL, held over DV_ORDERED",
+			name: "DV_ORDINAL normal_range over DV_ORDINAL",
 			value: optNode("DV_ORDINAL", "", optSingle("value", integerFrom(0, 100)), optSingle("symbol", optCodedText("local", "at0001")),
 				normalRangeOver("DV_ORDINAL", normalOrdinal(integerFrom(0, 10), "at0001", "5", "9", "N"), expandedOrdinal(integerFrom(0, 10), "at0001"))),
 			bounds: func(t *testing.T, v rm.DataValue) (string, rm.DataValue, rm.DataValue) {
@@ -369,7 +413,7 @@ func TestREQ107_RangesWhoseBoundsCarryTheirOwnNormalRange(t *testing.T) {
 				"upper DV_ORDINAL 8 local::at0001; normal_status none; normal_range none",
 		},
 		{
-			name:  "DV_COUNT other_reference_ranges, a range held over DV_ORDERED",
+			name:  "DV_COUNT other_reference_ranges, a range over DV_COUNT",
 			value: countValue("4", ordReferenceRange(ordInterval("DV_COUNT", countLower, countUpper))),
 			bounds: func(t *testing.T, v rm.DataValue) (string, rm.DataValue, rm.DataValue) {
 				t.Helper()
