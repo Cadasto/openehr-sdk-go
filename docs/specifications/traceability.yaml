@@ -1482,6 +1482,7 @@ requirements:
       - openehr/instance/interval_expanded_bounds_test.go
       - openehr/instance/interval_expanded_internal_test.go
       - openehr/instance/interval_flags_test.go
+      - openehr/instance/interval_normal_bounds_test.go
       - openehr/instance/interval_order_internal_test.go
       - openehr/instance/interval_order_test.go
       - openehr/instance/interval_ordinal_pairs_internal_test.go
