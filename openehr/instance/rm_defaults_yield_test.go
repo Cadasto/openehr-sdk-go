@@ -117,9 +117,11 @@ func isProhibitedAt(iss validation.Issue, path string) bool {
 // default yields to the OPT. Where the OPT's own constraint on the
 // attribute rejects the default, through a C_CODE_PHRASE that names
 // another terminology with an empty code list, a C_STRING on a code
-// phrase's code_string or terminology id, or an existence of 0..0, the
+// phrase's code_string or terminology id, a C_STRING on a coded text's
+// value that rejects the default's rubric, or an existence of 0..0, the
 // generator keeps what the walk wrote, which that constraint admits: the
-// at0000 placeholder under the OPT's terminology, or nothing. The template
+// at0000 placeholder under the OPT's terminology, with the text that
+// C_STRING admits on a coded text, or nothing. The template
 // validator then finds no error, apart from the RM floor's one
 // code_not_in_value_set where the placeholder sits on an attribute the RM
 // ties to a code set or group (REQ-107 § Exceptions and known gaps), and,
