@@ -58,6 +58,14 @@ import (
 // in any terminology other than openehr (useTermText), as the walk writes
 // it.
 //
+// The OPT may constrain a quantity or an ordinal bound as one C_DV_QUANTITY
+// or C_DV_ORDINAL on the bound node, or, where it builds the bound as a
+// C_COMPLEX_OBJECT, on the nodes of its attributes: the magnitude and the
+// units of a quantity, the value and the symbol of an ordinal. Both are
+// read (quantityFits, ordinalFits). An ordinal bound built the second way
+// holds its symbol apart from its value, so the second pair keeps each
+// side's own symbol and changes only its value.
+//
 // So for a count, a quantity, an ordinal or a proportion the second pair
 // holds each side's extreme, over its precision too for a proportion, and
 // on a side with no end that way a value at the other side's current
@@ -354,7 +362,11 @@ func setQuantityKey(q *rm.DVQuantity, k quantityKey) {
 }
 
 // quantityScale orders DV_QUANTITY bounds by magnitude when their units
-// match. The OPT constrains a DV_QUANTITY bound on the bound node itself.
+// match. The OPT constrains a DV_QUANTITY bound as one C_DV_QUANTITY on the
+// bound node itself, or on the nodes of its magnitude and units attributes
+// where it builds the bound as a C_COMPLEX_OBJECT. Neither writes the
+// bound's precision, so each bound keeps the precision its own side
+// admitted.
 var quantityScale = scale[quantityKey]{
 	compare: func(a, b quantityKey) (int, bool) {
 		if a.units != b.units {
@@ -362,11 +374,7 @@ var quantityScale = scale[quantityKey]{
 		}
 		return compareOrdered(a.magnitude, b.magnitude), true
 	},
-	fits: func(node *tcimpl.CompiledNode, k quantityKey) bool {
-		pc := primitiveOf(node)
-		v := constraints.QuantityValue{Magnitude: k.magnitude, Units: k.units, Precision: -1}
-		return pc == nil || len(pc.Validate(v)) == 0
-	},
+	fits: quantityFits,
 	lowest: func(node *tcimpl.CompiledNode, like quantityKey) (quantityKey, bool) {
 		return magnitudeEnd(node, like.units, true)
 	},
@@ -375,16 +383,38 @@ var quantityScale = scale[quantityKey]{
 	},
 }
 
+// quantityFits reports whether k suits a side's bound node: the C_DV_QUANTITY
+// on the node accepts it, or, where the node is a C_COMPLEX_OBJECT, the
+// constraint on each of its magnitude and units attributes does. A nil node
+// constrains nothing.
+func quantityFits(node *tcimpl.CompiledNode, k quantityKey) bool {
+	if pc := primitiveOf(node); pc != nil {
+		v := constraints.QuantityValue{Magnitude: k.magnitude, Units: k.units, Precision: -1}
+		return len(pc.Validate(v)) == 0
+	}
+	return componentFits(bindingChild(node, "magnitude"), k.magnitude) &&
+		componentFits(bindingChild(node, "units"), k.units)
+}
+
 // magnitudeEnd returns the lowest (low) or highest magnitude a DV_QUANTITY
 // bound node accepts in units: the end of the magnitude range of the first
 // entry for those units, which is the entry DvQuantity.Validate checks. At
 // an exclusive end it is the nearest float64 inside the range. It returns
 // false when there is no such entry, or when its range has no end in that
-// direction.
+// direction. Where the node is a C_COMPLEX_OBJECT, the end is that of the
+// C_REAL on its magnitude (realEnd), and there is none unless the C_STRING
+// on its units accepts units.
 func magnitudeEnd(node *tcimpl.CompiledNode, units string, low bool) (quantityKey, bool) {
 	c, ok := primitiveOf(node).(constraints.DvQuantity)
 	if !ok {
-		return quantityKey{}, false
+		if !componentFits(bindingChild(node, "units"), units) {
+			return quantityKey{}, false
+		}
+		m, ok := realEnd(bindingChild(node, "magnitude"), low)
+		if !ok {
+			return quantityKey{}, false
+		}
+		return quantityKey{magnitude: m, units: units}, true
 	}
 	for _, u := range c.Units {
 		if u.Units != units {
@@ -822,29 +852,37 @@ func setOrdinalKey(o *rm.DVOrdinal, k ordinalKey) {
 }
 
 // ordinalScaleIn orders DV_ORDINAL bounds by Value. The OPT constrains a
-// DV_ORDINAL bound on the bound node itself. lang is the language of the
-// text of a symbol the extreme replacement writes (ordinalEnd).
+// DV_ORDINAL bound as one C_DV_ORDINAL on the bound node itself, or on the
+// nodes of its value and symbol attributes where it builds the bound as a
+// C_COMPLEX_OBJECT. lang is the language of the text of a symbol the
+// extreme replacement writes (ordinalEnd).
 func ordinalScaleIn(lang string) scale[ordinalKey] {
 	return scale[ordinalKey]{
 		compare: func(a, b ordinalKey) (int, bool) { return compareOrdered(a.value, b.value), true },
 		fits:    ordinalFits,
-		lowest: func(node *tcimpl.CompiledNode, _ ordinalKey) (ordinalKey, bool) {
-			return ordinalEnd(node, true, lang)
+		lowest: func(node *tcimpl.CompiledNode, like ordinalKey) (ordinalKey, bool) {
+			return ordinalEnd(node, like, true, lang)
 		},
-		highest: func(node *tcimpl.CompiledNode, _ ordinalKey) (ordinalKey, bool) {
-			return ordinalEnd(node, false, lang)
+		highest: func(node *tcimpl.CompiledNode, like ordinalKey) (ordinalKey, bool) {
+			return ordinalEnd(node, like, false, lang)
 		},
+		adopt: ordinalAdopt,
 	}
 }
 
 // ordinalFits reports whether k suits a side's bound node. When the node
 // lists (value, symbol) pairs, k's symbol must be the one listed for k's
 // value, so a swap cannot hand one side the other side's symbol. A side
-// with no list constrains the value only.
+// with no list constrains the value only. Where the node is a
+// C_COMPLEX_OBJECT, the value must fit the C_INTEGER on its value and the
+// RM Integer, and the symbol the constraint on its symbol, a code and a
+// text the side admits (codedTextAdmits).
 func ordinalFits(node *tcimpl.CompiledNode, k ordinalKey) bool {
 	pc := primitiveOf(node)
 	if pc == nil {
-		return true
+		return fitsInteger(k.value) &&
+			componentFits(bindingChild(node, "value"), k.value) &&
+			codedTextAdmits(bindingChild(node, "symbol"), k.symbol)
 	}
 	if c, ok := pc.(constraints.CDvOrdinal); ok && len(c.Values) > 0 {
 		pair, found := ordinalPair(c, k.value)
@@ -859,10 +897,21 @@ func ordinalFits(node *tcimpl.CompiledNode, k ordinalKey) bool {
 // lists, with the symbol the walk writes for it: for a code in any
 // terminology other than openehr, the text of the term the nearest
 // archetype root defines for it (useTermText). It returns false when node
-// lists no pair its constraint admits.
-func ordinalEnd(node *tcimpl.CompiledNode, low bool, lang string) (ordinalKey, bool) {
+// lists no pair its constraint admits. Where node is a C_COMPLEX_OBJECT,
+// the symbol and the value are constrained apart, so the end is the lowest
+// or highest value of the C_INTEGER on its value (integerEndOf) with like's
+// symbol, the side's own, which its constraint on the symbol admitted; there
+// is none where that C_INTEGER has no end.
+func ordinalEnd(node *tcimpl.CompiledNode, like ordinalKey, low bool, lang string) (ordinalKey, bool) {
 	c, ok := primitiveOf(node).(constraints.CDvOrdinal)
-	if !ok || len(c.Values) == 0 {
+	if !ok {
+		n, ok := integerEndOf(bindingChild(node, "value"), low)
+		if !ok {
+			return ordinalKey{}, false
+		}
+		return ordinalKey{value: n, symbol: like.symbol}, true
+	}
+	if len(c.Values) == 0 {
 		return ordinalKey{}, false
 	}
 	var best constraints.OrdinalSymbol
@@ -881,6 +930,18 @@ func ordinalEnd(node *tcimpl.CompiledNode, low bool, lang string) (ordinalKey, b
 	symbol := ordinalSymbolText(best.Symbol)
 	useTermText(node, &symbol, lang)
 	return ordinalKey{value: int64(best.Value), symbol: symbol}, true
+}
+
+// ordinalAdopt returns the bound a side takes at other, the other side's
+// current bound, where ordinalEnd gave it none. A side built as a
+// C_COMPLEX_OBJECT constrains its symbol apart from its value, so it takes
+// other's value with its own symbol, which its constraint admitted. Any
+// other side takes other as it is.
+func ordinalAdopt(node *tcimpl.CompiledNode, like, other ordinalKey, _ bool) (ordinalKey, bool) {
+	if node == nil || primitiveOf(node) != nil {
+		return other, true
+	}
+	return ordinalKey{value: other.value, symbol: like.symbol}, true
 }
 
 func asDate(v rm.DVOrdered) (rm.DVDate, bool) {
