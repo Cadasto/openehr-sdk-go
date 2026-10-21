@@ -155,11 +155,11 @@ func TestREQ107_TimeValidityPassesBothValidators(t *testing.T) {
 // under one makes Generate return an error wrapping
 // rmwrite.ErrUnknownAttribute, and no root, at every policy and either
 // value fill. The rows pin each attribute the gap names: a PERSON's
-// languages holding a DV_TEXT, a PERSON's roles holding a PARTY_REF, and a
-// ROLE performer's id holding a HIER_OBJECT_ID, which rmwrite cannot
-// attach to a PARTY_REF. Languages and roles have no writer yet, although
-// the template validator now binds their members by RM type; those rows
-// change when rmwrite gains the writers.
+// languages holding a DV_TEXT, and a PERSON's roles holding a PARTY_REF.
+// Languages and roles have no writer yet, although the template validator
+// now binds their members by RM type; those rows change when rmwrite gains
+// the writers. A ROLE performer's id holding a HIER_OBJECT_ID is written
+// now (TestREQ107_PerformerIDTakesAValueFromUIDSource).
 func TestREQ107_KnownGapUnwritableAttributes(t *testing.T) {
 	cases := []struct {
 		name string
@@ -176,11 +176,6 @@ func TestREQ107_KnownGapUnwritableAttributes(t *testing.T) {
 			opt: guardRootOPT("PERSON", "openEHR-DEMOGRAPHIC-PERSON.example.v1",
 				guardMultiple("roles", guardExistence11,
 					guardChild("C_COMPLEX_OBJECT", "PARTY_REF", "", guardOccurrences11, ""))),
-		},
-		{
-			name: "ROLE performer id holding a HIER_OBJECT_ID",
-			opt: rolePerformerOPT(guardSingle("id", guardExistence11,
-				guardChild("C_COMPLEX_OBJECT", "HIER_OBJECT_ID", "", guardOccurrences11, ""))),
 		},
 	}
 	for _, tc := range cases {
@@ -279,10 +274,10 @@ func TestREQ107_PinnedPerformerTypeIsAPartyClass(t *testing.T) {
 // TestREQ102_ConstrainedPerformerIDIsRead is the REQ-102 check that the
 // template validator reads a ROLE performer's id when the template
 // constrains it: a HIER_OBJECT_ID whose value the template pins with a
-// C_STRING pattern. The generator cannot write a PARTY_REF's id from the
-// template, so the ROLE comes from the template without the id constraint,
-// and its performer id is set by hand. An id the pattern accepts passes
-// both validators; one it rejects is reported at its value.
+// C_STRING pattern. The ROLE comes from the template without the id
+// constraint, so its performer id can be set by hand to one the pattern
+// accepts and to one it rejects. An id the pattern accepts passes both
+// validators; one it rejects is reported at its value.
 func TestREQ102_ConstrainedPerformerIDIsRead(t *testing.T) {
 	withID := compileOPTText(t, rolePerformerOPT(
 		guardSingle("id", guardExistence11,
