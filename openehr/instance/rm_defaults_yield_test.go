@@ -471,6 +471,56 @@ func TestREQ107_RMDefaultsYieldToTheOPT(t *testing.T) {
 			},
 		},
 		{
+			// The OPT's text rejects the rubric of the default, not specified.
+			name:       "PARTICIPATION mode, value C_STRING in person",
+			floorCoded: "/context/participations[1]/mode/defining_code",
+			opt: contextParticipationsOPT(optSingle("function", optNode("DV_TEXT", "")),
+				optSingle("mode", codedTextWithValue("in person"))),
+			check: func(t *testing.T, out any) {
+				mode := onlyParticipation(t, out).Mode
+				if mode == nil {
+					t.Fatal("PARTICIPATION.mode absent, want the walk's value")
+				}
+				checkCodedText(t, "PARTICIPATION.mode", *mode, "in person", openehrAt0000)
+			},
+		},
+		{
+			// The OPT's text rejects the rubric of the default, unknown.
+			name:       "PARTICIPATION function, value C_STRING requester",
+			floorCoded: "/context/participations[1]/function/defining_code",
+			opt:        contextParticipationsOPT(optSingle("function", codedTextWithValue("requester"))),
+			check: func(t *testing.T, out any) {
+				checkCodedText(t, "PARTICIPATION.function", codedFunction(t, onlyParticipation(t, out)), "requester", openehrAt0000)
+			},
+		},
+		{
+			// The OPT's text rejects the rubric of the default, public health.
+			name:       "TERM_MAPPING purpose, value C_STRING research",
+			floorCoded: "/value/mappings[1]/purpose/defining_code",
+			opt:        mappedValueOPT(optSingle("purpose", codedTextWithValue("research")), mappingTarget),
+			check: func(t *testing.T, out any) {
+				ms := valueMappings(t, out)
+				if len(ms) != 1 || ms[0].Purpose == nil {
+					t.Fatalf("TERM_MAPPING.purpose absent in %+v, want the walk's value", ms)
+				}
+				checkCodedText(t, "TERM_MAPPING.purpose", *ms[0].Purpose, "research", openehrAt0000)
+			},
+		},
+		{
+			// The current state is the initial one, so the default is the
+			// transition initiate, which the OPT's text rejects.
+			name:       "ISM_TRANSITION transition, value C_STRING start",
+			floorCoded: "/ism_transition/transition/defining_code",
+			opt:        optISMTransition(optSingle("transition", codedTextWithValue("start"))),
+			check: func(t *testing.T, out any) {
+				iv := actionTransition(t, out)
+				if iv.Transition == nil {
+					t.Fatal("ISM_TRANSITION.transition absent, want the walk's value")
+				}
+				checkCodedText(t, "ISM_TRANSITION.transition", *iv.Transition, "start", openehrAt0000)
+			},
+		},
+		{
 			name:       "INTERVAL_EVENT math_function, value C_STRING maximum",
 			floorCoded: "/math_function/defining_code",
 			opt: optTemplate("INTERVAL_EVENT", append([]string{optSingle("math_function", codedTextWithValue("maximum"))},

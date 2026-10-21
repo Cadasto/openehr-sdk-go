@@ -163,6 +163,7 @@ func TestREQ107_ParticipationAndTermMappingWritersRefuse(t *testing.T) {
 		{&rm.Participation{}, "time", &rm.DVInterval[rm.DVDate]{}},
 		{&rm.TermMapping{}, "match", "=="},
 		{&rm.TermMapping{}, "match", ""},
+		{&rm.TermMapping{}, "match", "\xff"}, // one byte, so one rune, but no valid UTF-8
 		{&rm.TermMapping{}, "match", rm.Character("<>")},
 		{&rm.TermMapping{}, "match", '='},
 		{&rm.TermMapping{}, "purpose", &rm.DVText{}},

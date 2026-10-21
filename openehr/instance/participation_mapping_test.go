@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -366,10 +367,12 @@ var matchCharacters = []rm.Character{">", "=", "<", "?"}
 
 // TestREQ107_TermMappingsAreWritten is the REQ-107 check that a TERM_MAPPING
 // the OPT puts in a DV_CODED_TEXT's or DV_TEXT's mappings is written. Its
-// match is one Match_valid admits: ? where the OPT leaves it silent or open,
-// the character a C_STRING pins, and the first admitted one a pattern
-// accepts (Precedence 3); a C_STRING that admits none makes Generate return
-// an error wrapping ErrConstraintUnsatisfiable, and no root. A purpose the
+// match is one Match_valid admits (Precedence 3): ? where the OPT leaves it
+// silent or open, the character a C_STRING lists, the first listed one
+// under ExampleFill, and, for a pattern, its own shortest example where
+// Match_valid admits it, else the first admitted character it accepts, tried
+// in the order ?, >, =, <. A match no admitted character satisfies is the
+// error TestREQ107_TermMappingMatchNoCharacterIsUnsatisfiable pins. A purpose the
 // OPT names with no code takes openehr 669|public health|, one it pins keeps
 // its code with that code's rubric, and one it codes in local keeps the
 // walk's code and breaks Purpose_valid (Precedence 1). The target is the
@@ -481,21 +484,63 @@ func TestREQ107_TermMappingsAreWritten(t *testing.T) {
 	}
 }
 
+// checkMatchUnsatisfiable fails t unless err is the REQ-107 error for a
+// C_STRING on a TERM_MAPPING's match that admits no character Match_valid
+// admits: it wraps ErrConstraintUnsatisfiable, wraps neither
+// ErrSlotFillUnsupported nor ErrArchetypeIDMissing, names the RM type, the
+// attribute and the OPT path, and echoes none of rejected, the values the
+// constraint pins.
+func checkMatchUnsatisfiable(t *testing.T, err error, path string, rejected []string) {
+	t.Helper()
+	if !errors.Is(err, instance.ErrConstraintUnsatisfiable) {
+		t.Errorf("Generate error = %v, want one wrapping ErrConstraintUnsatisfiable", err)
+		return
+	}
+	if errors.Is(err, instance.ErrSlotFillUnsupported) {
+		t.Errorf("Generate error = %v, want it not to wrap ErrSlotFillUnsupported", err)
+	}
+	if errors.Is(err, instance.ErrArchetypeIDMissing) {
+		t.Errorf("Generate error = %v, want it not to wrap ErrArchetypeIDMissing", err)
+	}
+	// The message of the unmatched-character error itself names the RM type,
+	// so the type and the attribute are pinned together.
+	for _, part := range []string{"TERM_MAPPING.match", path} {
+		if !strings.Contains(err.Error(), part) {
+			t.Errorf("Generate error = %q, want it to name %q", err, part)
+		}
+	}
+	for _, value := range rejected {
+		if strings.Contains(err.Error(), value) {
+			t.Errorf("Generate error = %q, want it not to echo the rejected value %q", err, value)
+		}
+	}
+}
+
 // TestREQ107_TermMappingMatchNoCharacterIsUnsatisfiable is the REQ-107
 // check that a C_STRING on a TERM_MAPPING's match that admits none of the
 // characters Match_valid admits makes Generate return an error wrapping
 // ErrConstraintUnsatisfiable, and no root, under every policy, both value
-// fills and both compile modes.
+// fills and both compile modes. The error names the RM type, the attribute
+// and the OPT path, wraps neither ErrSlotFillUnsupported nor
+// ErrArchetypeIDMissing, and does not echo the values the constraint pins.
 func TestREQ107_TermMappingMatchNoCharacterIsUnsatisfiable(t *testing.T) {
-	for _, pin := range []string{"<list>x</list>", "<pattern>[a-z]</pattern>", "<list>broader</list><list>narrower</list>"} {
+	cases := []struct {
+		pin string
+		// rejected are the values of pin the error must not echo.
+		rejected []string
+	}{
+		{pin: "<list>x</list>"},
+		{pin: "<pattern>[a-z]</pattern>"},
+		{pin: "<list>broader</list><list>narrower</list>", rejected: []string{"broader", "narrower"}},
+	}
+	for _, tc := range cases {
 		for _, implicit := range []bool{true, false} {
-			c := compileOPTText(t, mappedValueOPT(optStringAttr("match", pin), mappingTarget), implicit)
+			c := compileOPTText(t, mappedValueOPT(optStringAttr("match", tc.pin), mappingTarget), implicit)
+			path := stringLeafPath(t, c)
 			for _, opts := range defaultsOptions() {
-				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", pin, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.pin, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
 					out, err := instance.Generate(t.Context(), c, opts)
-					if !errors.Is(err, instance.ErrConstraintUnsatisfiable) {
-						t.Errorf("Generate error = %v, want one wrapping ErrConstraintUnsatisfiable", err)
-					}
+					checkMatchUnsatisfiable(t, err, path, tc.rejected)
 					if out != nil {
 						t.Errorf("Generate returned %T, want no root", out)
 					}
