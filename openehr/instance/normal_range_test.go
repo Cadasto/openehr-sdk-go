@@ -305,6 +305,31 @@ func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T)
 				"normal_range [*DV_DATE_TIME 2021-03-04T05:06:07Z .. *DV_DATE_TIME 2021-03-04T05:06:07Z]" + noRefs,
 		},
 		{
+			// The bounds are the OPT's own C_REAL on each magnitude, which
+			// the swapped pair 0..5 would break: the lower side admits 5..10.
+			// Of the candidates 5, 4, 6, 20, 19 and 21, only 4 is outside the
+			// range and below the value's own 6..30, so 21 is the first.
+			name: "DV_QUANTITY magnitude 6..30 mm, range of bounds built per attribute 5..10 and 0..20, H",
+			value: optNode("DV_QUANTITY", "", optSingle("magnitude", realFrom(6, 30)), optSingle("units", guardString("mm")),
+				normalRangeOver("DV_QUANTITY", expandedQuantity(realFrom(5, 10)), expandedQuantity(realFrom(0, 20))), normalStatus("H")),
+			want: "DV_QUANTITY 21 mm; normal_status openehr_normal_statuses::H; normal_range [DV_QUANTITY 5 mm .. DV_QUANTITY 20 mm]" + noRefs,
+			wantRandom: "DV_QUANTITY 22.2349358320278 mm; normal_status openehr_normal_statuses::H; " +
+				"normal_range [DV_QUANTITY 7.542736988380132 mm .. DV_QUANTITY 15.956046987772261 mm]" + noRefs,
+		},
+		{
+			// As above for a DV_ORDINAL: the swapped pair would hand the lower
+			// side 0 and the upper side's symbol.
+			name: "DV_ORDINAL value 6..30, range of bounds built per attribute 5..10 and 0..20, H",
+			value: optNode("DV_ORDINAL", "", optSingle("value", integerFrom(6, 30)),
+				optSingle("symbol", optCodedText("local", "at0003")),
+				normalRangeOver("DV_ORDINAL", expandedOrdinal(integerFrom(5, 10), "at0001"), expandedOrdinal(integerFrom(0, 20), "at0002")),
+				normalStatus("H")),
+			want: "DV_ORDINAL 21 local::at0003; normal_status openehr_normal_statuses::H; " +
+				"normal_range [*DV_ORDINAL 5 local::at0001 .. *DV_ORDINAL 20 local::at0002]" + noRefs,
+			wantRandom: "DV_ORDINAL 25 local::at0003; normal_status openehr_normal_statuses::H; " +
+				"normal_range [*DV_ORDINAL 5 local::at0001 .. *DV_ORDINAL 20 local::at0002]" + noRefs,
+		},
+		{
 			name: "DV_QUANTITY in mm, range in cm, N, left as generated",
 			value: optNode("DV_QUANTITY", "", optSingle("magnitude", realFrom(0, 100)), optSingle("units", guardString("mm")),
 				normalRangeOver("DV_QUANTITY",
