@@ -2969,21 +2969,21 @@ var transitionInto = map[string]string{
 	"533": "549", // expired: time out
 }
 
-// initiate is the transition the generator writes beside the initial
-// state, which no transition leads into, and beside a current state outside
-// the instruction states group.
-const initiate = "535"
+// defaultTransition is the transition (initiate) the generator writes
+// beside the initial state, which no transition leads into, and beside a
+// current state outside the instruction states group.
+const defaultTransition = "535"
 
 // fillTransition gives an ISM_TRANSITION's transition, where the walk wrote
 // one with no code (noCode), the transition of the openEHR instruction state
 // machine that leads into the current state, with its rubric, so RM
 // Transition_valid holds: transitionInto's for a current state it names,
-// initiate for any other. It writes the transition only where the OPT's
-// constraint on it admits that code (codedTextAdmitted); the code the walk
-// wrote stays otherwise (Precedence 1). A transition the walk did not write
-// stays unwritten. opt is the OPT node of iv.
+// defaultTransition for any other. It writes the transition only where the
+// OPT's constraint on it admits that code (codedTextAdmitted); the code the
+// walk wrote stays otherwise (Precedence 1). A transition the walk did not
+// write stays unwritten. opt is the OPT node of iv.
 func fillTransition(opt *tcimpl.CompiledNode, iv *rm.IsmTransition) {
-	code := initiate
+	code := defaultTransition
 	if state := iv.CurrentState.DefiningCode; state.TerminologyID.Value == terminology.ID {
 		if into, ok := transitionInto[state.CodeString]; ok {
 			code = into
@@ -2999,12 +2999,8 @@ func fillTransition(opt *tcimpl.CompiledNode, iv *rm.IsmTransition) {
 // it is: the invariant binds a coded one only. opt is the OPT node of p.
 func fillFunction(opt *tcimpl.CompiledNode, p *rm.Participation) {
 	const unknown = "253"
-	switch f := p.Function.(type) {
-	case *rm.DVCodedText:
+	if f, ok := p.Function.(*rm.DVCodedText); ok {
 		fillCodedDefault(opt, "function", f, terminology.ParticipationFunction, unknown)
-	case rm.DVCodedText:
-		fillCodedDefault(opt, "function", &f, terminology.ParticipationFunction, unknown)
-		p.Function = f
 	}
 }
 
