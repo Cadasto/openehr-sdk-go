@@ -310,7 +310,9 @@ func collapsedIntervalBounds(val any) (bounds []rm.DVOrdered, ok bool) {
 // a primitive type: a bool under BOOLEAN, an integer under INTEGER (a Go
 // integer, an rm.Integer or an rm.Integer64, as [rm.AsInt64] reads them), a
 // real under REAL, a string under DATE, TIME, DATE_TIME and DURATION, and a
-// string or a non-nil *string under STRING. An optional Boolean, Integer or
+// string, an rm.Character or a non-nil *string under STRING (AOM 1.4 has no
+// C_CHARACTER, so a template constrains a Character, TERM_MAPPING.match, with
+// a C_STRING). An optional Boolean, Integer or
 // Real the RM holds by pointer matches as the value it points to
 // ([PrimitiveValue]); a nil one is an absent attribute and matches nothing.
 func PrimitiveValueMatchesShortName(shortName string, val any) bool {
@@ -330,11 +332,13 @@ func PrimitiveValueMatchesShortName(shortName string, val any) bool {
 		// An optional String attribute (DV_TEXT.formatting,
 		// DV_IDENTIFIER.issuer, …) is a *string in the RM; the reader
 		// returns it only when set, so a nil pointer is absent.
-		if p, isPtr := val.(*string); isPtr {
-			return p != nil
+		switch v := val.(type) {
+		case *string:
+			return v != nil
+		case string, rm.Character:
+			return true
 		}
-		_, ok := val.(string)
-		return ok
+		return false
 	default:
 		return false
 	}

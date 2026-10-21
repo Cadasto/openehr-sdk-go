@@ -302,7 +302,7 @@ func appendPrimitiveIssues(issues []Issue, rmValue any, path issuePath, pc const
 }
 
 // primitiveInput converts an RM value into the Go value the typed
-// primitive validator expects. Handles five layers:
+// primitive validator expects. Handles six layers:
 //
 //   - rm.DataValue concretes (DvQuantity, DvCodedText, DvText, …)
 //     via dataValueInput — REQ-103 primitive types that bind to
@@ -317,6 +317,9 @@ func appendPrimitiveIssues(issues []Issue, rmValue any, path issuePath, pc const
 //     formatting): the text it points to, or the empty string when it
 //     is not set. [rmbind.PrimitiveValue] leaves a *string as it is;
 //     the *string case below reads it.
+//   - a Character (an rm.Character, TERM_MAPPING.match): the one-character
+//     string it is, which a C_STRING judges, the only constraint AOM 1.4
+//     has for it.
 //   - everything else: pass through unchanged. The typed primitive
 //     validator returns CodeWrongType when the input shape does not
 //     fit; that is a contract failure on the caller side, not a
@@ -349,6 +352,8 @@ func primitiveInput(rmValue any) any {
 			return ""
 		}
 		return *v
+	case rm.Character:
+		return string(v)
 	case rm.Integer:
 		return int64(v)
 	case rm.Integer64:

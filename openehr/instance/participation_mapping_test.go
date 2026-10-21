@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
 	"testing"
 	"time"
 
@@ -129,8 +128,7 @@ func checkCodedAs(t *testing.T, what string, got rm.DVCodedText, code rm.CodePhr
 }
 
 // expectedIssue is an error a case expects a validator to report: a breach
-// of an RM rule the OPT's own constraint makes (REQ-107 Exceptions), or a
-// known gap of the template validator.
+// of an RM rule the OPT's own constraint makes (REQ-107 Exceptions).
 type expectedIssue struct {
 	name  string
 	match func(validation.Issue) bool
@@ -143,23 +141,9 @@ func ruleBroken(rule string) expectedIssue {
 	return expectedIssue{name: "a breach of " + rule, match: func(iss validation.Issue) bool { return iss.Rule == rule }}
 }
 
-// characterBindingGap is a known gap of the template validator, outside
-// the generator: where the OPT puts a C_STRING on a TERM_MAPPING's match,
-// it binds no rm.Character to the node the C_STRING sits on, an AOM 1.4
-// STRING, so it reports rm_type_mismatch at the match whatever the match
-// holds. The case expects it, so it fails once the validator binds a
-// Character there, and the expectation is then dropped.
-var characterBindingGap = expectedIssue{
-	name: "the template validator's rm_type_mismatch on a C_STRING under TERM_MAPPING.match",
-	match: func(iss validation.Issue) bool {
-		return iss.Code == "rm_type_mismatch" && iss.Layer == validation.LayerTemplate && strings.HasSuffix(iss.Path, "/match")
-	},
-}
-
 // checkValidBut reports every error the RM floor or the template validator
 // finds in out that none of expected matches, and fails too when neither
-// reports one of expected, so the case is seen to break that rule, or to
-// meet that gap.
+// reports one of expected, so the case is seen to break that rule.
 func checkValidBut(t *testing.T, out any, c *templatecompile.Compiled, expected ...expectedIssue) {
 	t.Helper()
 	seen := make([]bool, len(expected))
@@ -392,9 +376,7 @@ var matchCharacters = []rm.Character{">", "=", "<", "?"}
 // code the OPT pins. A mappings list the OPT requires and gives no child
 // gets one TERM_MAPPING built from the BMM, whose match is ?. Each holds
 // under every policy, both value fills and both compile modes, and passes
-// both validators but for the rule a case breaks and, where the OPT puts a
-// C_STRING on the match, the template validator's known gap there
-// (characterBindingGap).
+// both validators but for the rule a case breaks.
 func TestREQ107_TermMappingsAreWritten(t *testing.T) {
 	icd10 := rm.CodePhrase{CodeString: "J45", TerminologyID: rm.TerminologyID{Value: "ICD10"}}
 	cases := []struct {
@@ -420,17 +402,16 @@ func TestREQ107_TermMappingsAreWritten(t *testing.T) {
 				}
 			},
 		},
-		{name: "match an open C_STRING", opt: mappedValueOPT(optStringAttr("match", ""), mappingTarget), match: "?", expect: []expectedIssue{characterBindingGap}},
-		{name: "match a pattern .*", opt: mappedValueOPT(optStringAttr("match", "<pattern>.*</pattern>"), mappingTarget), match: "?", expect: []expectedIssue{characterBindingGap}},
-		{name: "match a C_STRING listing =", opt: mappedValueOPT(optStringAttr("match", "<list>=</list>"), mappingTarget), match: "=", expect: []expectedIssue{characterBindingGap}},
+		{name: "match an open C_STRING", opt: mappedValueOPT(optStringAttr("match", ""), mappingTarget), match: "?"},
+		{name: "match a pattern .*", opt: mappedValueOPT(optStringAttr("match", "<pattern>.*</pattern>"), mappingTarget), match: "?"},
+		{name: "match a C_STRING listing =", opt: mappedValueOPT(optStringAttr("match", "<list>=</list>"), mappingTarget), match: "="},
 		{
 			name:         "match a C_STRING listing = and <",
 			opt:          mappedValueOPT(optStringAttr("match", "<list>=</list><list>&lt;</list>"), mappingTarget),
 			matchExample: "=",
-			expect:       []expectedIssue{characterBindingGap},
 		},
-		{name: "match a pattern that admits > and <", opt: mappedValueOPT(optStringAttr("match", "<pattern>[&lt;&gt;]</pattern>"), mappingTarget), match: "<", expect: []expectedIssue{characterBindingGap}},
-		{name: "match a C_STRING listing a character and a word", opt: mappedValueOPT(optStringAttr("match", "<list>broader</list><list>&gt;</list>"), mappingTarget), match: ">", expect: []expectedIssue{characterBindingGap}},
+		{name: "match a pattern that admits > and <", opt: mappedValueOPT(optStringAttr("match", "<pattern>[&lt;&gt;]</pattern>"), mappingTarget), match: "<"},
+		{name: "match a C_STRING listing a character and a word", opt: mappedValueOPT(optStringAttr("match", "<list>broader</list><list>&gt;</list>"), mappingTarget), match: ">"},
 		{
 			name:  "purpose pinned in openehr",
 			opt:   mappedValueOPT(optSingle("purpose", optCodedText(terminology.ID, "670")), mappingTarget),
@@ -468,8 +449,7 @@ func TestREQ107_TermMappingsAreWritten(t *testing.T) {
 			name: "DV_TEXT mappings with a C_STRING listing >",
 			opt: optTemplate("ELEMENT", optSingle("value", optNode("DV_TEXT", "",
 				optMultiple("mappings", optTermMapping(optStringAttr("match", "<list>&gt;</list>"), mappingTarget))))),
-			match:  ">",
-			expect: []expectedIssue{characterBindingGap},
+			match: ">",
 		},
 		{
 			name:  "DV_TEXT mappings the OPT requires with no child",
