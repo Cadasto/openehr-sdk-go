@@ -42,24 +42,30 @@
 //     DV_ORDERED itself;
 //   - the parties PERSON, AGENT, GROUP, ORGANISATION and ROLE, and
 //     CAPABILITY, ADDRESS and PARTY_IDENTITY;
-//   - PARTY_RELATED, of which it writes only relationship.
+//   - PARTY_RELATED, of which it writes only relationship;
+//   - PARTICIPATION and TERM_MAPPING.
 //
 // AppendMultiple adds a member to multi-valued attributes on
-// COMPOSITION, SECTION, INSTRUCTION, HISTORY, ITEM_TREE, ITEM_LIST,
-// ITEM_TABLE, CLUSTER, the five parties, CONTACT and DV_PARAGRAPH.
+// COMPOSITION, EVENT_CONTEXT, SECTION, the five entries, ISM_TRANSITION,
+// HISTORY, ITEM_TREE, ITEM_LIST, ITEM_TABLE, CLUSTER, the five parties,
+// CONTACT, DV_TEXT, DV_CODED_TEXT and DV_PARAGRAPH.
 //
 // Each parent's writer lists the attributes it fills. An attribute takes
 // a child of its RM type or of a class that descends from it, wherever
 // the parent's Go field can hold one: a DV_TEXT attribute (every `name`,
-// ELEMENT `null_reason`, INSTRUCTION `narrative`, DV_PARAGRAPH `items`)
-// also takes a DV_CODED_TEXT, a DV_URI attribute (DV_TEXT `hyperlink`,
-// DV_MULTIMEDIA `uri`) a DV_EHR_URI, EVENT_CONTEXT `health_care_facility`
-// a PARTY_RELATED as well as a PARTY_IDENTIFIED, and an attribute of an
-// abstract class, such as ELEMENT `value` (DATA_VALUE), any concrete class
-// of it. An Integer attribute (DV_QUANTITY `precision`, DV_MULTIMEDIA `size`,
-// INTERVAL_EVENT `sample_count`) takes a whole number of any Go integer
-// shape, and a whole number outside the 32-bit range an RM Integer holds
-// returns an ErrTypeMismatch that says so. Any other
+// ELEMENT `null_reason`, INSTRUCTION `narrative`, DV_PARAGRAPH `items`,
+// PARTICIPATION `function`, ISM_TRANSITION `reason`) also takes a
+// DV_CODED_TEXT, a DV_URI attribute (DV_TEXT `hyperlink`, DV_MULTIMEDIA
+// `uri`) a DV_EHR_URI, EVENT_CONTEXT `health_care_facility` a
+// PARTY_RELATED as well as a PARTY_IDENTIFIED, and an attribute of an
+// abstract class, such as ELEMENT `value` (DATA_VALUE) or PARTICIPATION
+// `performer` (PARTY_PROXY), any concrete class of it. An Integer attribute
+// (DV_QUANTITY `precision`, DV_MULTIMEDIA `size`, INTERVAL_EVENT
+// `sample_count`) takes a whole number of any Go integer shape, and a whole
+// number outside the 32-bit range an RM Integer holds returns an
+// ErrTypeMismatch that says so. A Character attribute (TERM_MAPPING
+// `match`) takes a string or an rm.Character of one character, and one of
+// any other length returns an ErrTypeMismatch that says so. Any other
 // parent or attribute returns ErrUnknownAttribute, and a child of the
 // wrong Go type returns ErrTypeMismatch. Table-driven tests in this package
 // write through most of these parents, and check the DV_INTERVAL cases

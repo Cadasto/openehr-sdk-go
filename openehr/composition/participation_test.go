@@ -71,7 +71,9 @@ func TestREQ101_REQ107_ContextParticipationBuildsAndSets(t *testing.T) {
 		t.Errorf("skeleton PARTICIPATION.performer is %T, want *rm.PartySelf", seeded.Performer)
 	}
 
-	const functionPath, modePath = "/context/participations/function", "/context/participations/mode"
+	// The PARTICIPATION has no node id, so its path carries the positional
+	// key the compiled template gives it.
+	const functionPath, modePath = "/context/participations[@1]/function", "/context/participations[@1]/mode"
 	function := &rm.DVText{Value: "requester"}
 	mode := &rm.DVCodedText{
 		Value:        "face-to-face communication",

@@ -124,6 +124,10 @@ func EnsureSingle(parent any, attrName string, child any) error {
 		return writeDVIntervalOrderedSingle(p, attrName, child)
 	case *rm.IsmTransition:
 		return writeIsmTransitionSingle(p, attrName, child)
+	case *rm.Participation:
+		return writeParticipationSingle(p, attrName, child)
+	case *rm.TermMapping:
+		return writeTermMappingSingle(p, attrName, child)
 	case *rm.Person:
 		return writePartySingle(personFields(p), attrName, child)
 	case *rm.Agent:
@@ -153,10 +157,22 @@ func AppendMultiple(parent any, attrName string, child any) error {
 	switch p := parent.(type) {
 	case *rm.Composition:
 		return writeCompositionMultiple(p, attrName, child)
+	case *rm.EventContext:
+		return writeEventContextMultiple(p, attrName, child)
 	case *rm.Section:
 		return writeSectionMultiple(p, attrName, child)
+	case *rm.Observation:
+		return writeOtherParticipations("*rm.Observation", &p.OtherParticipations, attrName, child)
+	case *rm.Evaluation:
+		return writeOtherParticipations("*rm.Evaluation", &p.OtherParticipations, attrName, child)
 	case *rm.Instruction:
 		return writeInstructionMultiple(p, attrName, child)
+	case *rm.Action:
+		return writeOtherParticipations("*rm.Action", &p.OtherParticipations, attrName, child)
+	case *rm.AdminEntry:
+		return writeOtherParticipations("*rm.AdminEntry", &p.OtherParticipations, attrName, child)
+	case *rm.IsmTransition:
+		return writeIsmTransitionMultiple(p, attrName, child)
 	case *rm.History[rm.ItemStructure]:
 		return writeHistoryMultiple(p, attrName, child)
 	case *rm.ItemTree:
@@ -179,6 +195,10 @@ func AppendMultiple(parent any, attrName string, child any) error {
 		return writeRoleMultiple(p, attrName, child)
 	case *rm.Contact:
 		return writeContactMultiple(p, attrName, child)
+	case *rm.DVText:
+		return writeTextMultiple(p, "*rm.DVText", attrName, child)
+	case *rm.DVCodedText:
+		return writeTextMultiple(&p.DVText, "*rm.DVCodedText", attrName, child)
 	case *rm.DVParagraph:
 		return writeDVParagraphMultiple(p, attrName, child)
 	}
@@ -412,11 +432,21 @@ func writeInstructionSingle(i *rm.Instruction, attr string, child any) error {
 }
 
 func writeInstructionMultiple(i *rm.Instruction, attr string, child any) error {
-	switch attr {
-	case "activities":
+	if attr == "activities" {
 		return assignVia(child, func(v rm.Activity) { i.Activities = append(i.Activities, v) }, attr, "ACTIVITY")
 	}
-	return fmt.Errorf("%w: *rm.Instruction has no multiple attr %q", ErrUnknownAttribute, attr)
+	return writeOtherParticipations("*rm.Instruction", &i.OtherParticipations, attr, child)
+}
+
+// writeOtherParticipations appends to the other_participations every ENTRY
+// class declares, the one multi-valued attribute OBSERVATION, EVALUATION,
+// ACTION and ADMIN_ENTRY hold. class names the Go type for the error
+// detail.
+func writeOtherParticipations(class string, list *[]rm.Participation, attr string, child any) error {
+	if attr == "other_participations" {
+		return appendParticipation(list, attr, child)
+	}
+	return fmt.Errorf("%w: %s has no multiple attr %q", ErrUnknownAttribute, class, attr)
 }
 
 // --- ACTION --------------------------------------------------------------
@@ -631,6 +661,13 @@ func writeEventContextSingle(c *rm.EventContext, attr string, child any) error {
 		return assignVia(child, func(v rm.DVDateTime) { c.StartTime = v }, attr, "DV_DATE_TIME")
 	}
 	return fmt.Errorf("%w: *rm.EventContext has no single attr %q", ErrUnknownAttribute, attr)
+}
+
+func writeEventContextMultiple(c *rm.EventContext, attr string, child any) error {
+	if attr == "participations" {
+		return appendParticipation(&c.Participations, attr, child)
+	}
+	return fmt.Errorf("%w: *rm.EventContext has no multiple attr %q", ErrUnknownAttribute, attr)
 }
 
 // --- HISTORY -------------------------------------------------------------
@@ -941,8 +978,8 @@ func writeDVTextSingle(t *rm.DVText, attr string, child any) error {
 // writeTextAttr writes the single attributes DV_TEXT declares, which
 // DV_CODED_TEXT inherits: value, formatting, language, encoding and
 // hyperlink. A hyperlink is a DV_URI or its descendant DV_EHR_URI, stored
-// as given. mappings is a list, which this writer does not fill. class
-// names the Go type for the error detail.
+// as given. mappings is a list, which writeTextMultiple fills. class names
+// the Go type for the error detail.
 func writeTextAttr(t *rm.DVText, class, attr string, child any) error {
 	switch attr {
 	case "value":
@@ -957,6 +994,16 @@ func writeTextAttr(t *rm.DVText, class, attr string, child any) error {
 		return assignURI(child, func(v rm.DVURILike) { t.Hyperlink = v }, attr)
 	}
 	return fmt.Errorf("%w: %s has no single attr %q", ErrUnknownAttribute, class, attr)
+}
+
+// writeTextMultiple appends a TERM_MAPPING, given as a value or as a
+// pointer, to the mappings DV_TEXT declares, which DV_CODED_TEXT inherits.
+// class names the Go type for the error detail.
+func writeTextMultiple(t *rm.DVText, class, attr string, child any) error {
+	if attr == "mappings" {
+		return assignVia(child, func(v rm.TermMapping) { t.Mappings = append(t.Mappings, v) }, attr, "TERM_MAPPING")
+	}
+	return fmt.Errorf("%w: %s has no multiple attr %q", ErrUnknownAttribute, class, attr)
 }
 
 func writeDVCodedTextSingle(t *rm.DVCodedText, attr string, child any) error {
@@ -1075,6 +1122,7 @@ func mismatch(attr string, got any, wantRM string) error {
 }
 
 // --- ISM_TRANSITION / PARTY / ADDRESS ------------------------------------
+// The PARTICIPATION and TERM_MAPPING writers are in participation_write.go.
 
 func writeIsmTransitionSingle(i *rm.IsmTransition, attr string, child any) error {
 	switch attr {
@@ -1088,8 +1136,19 @@ func writeIsmTransitionSingle(i *rm.IsmTransition, attr string, child any) error
 		}
 		i.CareflowStep = v
 		return nil
+	case "transition":
+		return assignVia(child, func(v rm.DVCodedText) { i.Transition = &v }, attr, "DV_CODED_TEXT")
 	}
 	return fmt.Errorf("%w: *rm.IsmTransition has no single attr %q", ErrUnknownAttribute, attr)
+}
+
+// writeIsmTransitionMultiple appends a reason, a DV_TEXT or its descendant
+// DV_CODED_TEXT stored as given.
+func writeIsmTransitionMultiple(i *rm.IsmTransition, attr string, child any) error {
+	if attr == "reason" {
+		return assignTextAsGiven(child, func(v rm.DVTextLike) { i.Reason = append(i.Reason, v) }, attr)
+	}
+	return fmt.Errorf("%w: *rm.IsmTransition has no multiple attr %q", ErrUnknownAttribute, attr)
 }
 
 // partyFields points at the attributes PARTY gives every party class, so

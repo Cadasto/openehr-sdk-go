@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -127,29 +128,61 @@ func checkCodedAs(t *testing.T, what string, got rm.DVCodedText, code rm.CodePhr
 	}
 }
 
-// checkValidBut reports every error the template validator finds in out, and
-// every error the RM floor finds that is not a breach of the RM rule broken,
-// such as PARTICIPATION.Mode_valid, which the OPT's own constraint breaks
-// (REQ-107 Exceptions). It fails too when the floor does not report broken,
-// so the case is seen to break that rule. An empty broken allows none.
-func checkValidBut(t *testing.T, out any, c *templatecompile.Compiled, broken string) {
+// expectedIssue is an error a case expects a validator to report: a breach
+// of an RM rule the OPT's own constraint makes (REQ-107 Exceptions), or a
+// known gap of the template validator.
+type expectedIssue struct {
+	name  string
+	match func(validation.Issue) bool
+}
+
+// ruleBroken expects a breach of the RM rule rule, such as
+// PARTICIPATION.Mode_valid. The floor reports it, and so does the template
+// validator, which runs the floor too.
+func ruleBroken(rule string) expectedIssue {
+	return expectedIssue{name: "a breach of " + rule, match: func(iss validation.Issue) bool { return iss.Rule == rule }}
+}
+
+// characterBindingGap is a known gap of the template validator, outside
+// the generator: where the OPT puts a C_STRING on a TERM_MAPPING's match,
+// it binds no rm.Character to the node the C_STRING sits on, an AOM 1.4
+// STRING, so it reports rm_type_mismatch at the match whatever the match
+// holds. The case expects it, so it fails once the validator binds a
+// Character there, and the expectation is then dropped.
+var characterBindingGap = expectedIssue{
+	name: "the template validator's rm_type_mismatch on a C_STRING under TERM_MAPPING.match",
+	match: func(iss validation.Issue) bool {
+		return iss.Code == "rm_type_mismatch" && iss.Layer == validation.LayerTemplate && strings.HasSuffix(iss.Path, "/match")
+	},
+}
+
+// checkValidBut reports every error the RM floor or the template validator
+// finds in out that none of expected matches, and fails too when neither
+// reports one of expected, so the case is seen to break that rule, or to
+// meet that gap.
+func checkValidBut(t *testing.T, out any, c *templatecompile.Compiled, expected ...expectedIssue) {
 	t.Helper()
-	seen := false
-	for _, iss := range validation.ValidateRM(out).Issues {
-		if iss.Severity != validation.Error {
-			continue
+	seen := make([]bool, len(expected))
+	check := func(validator string, issues []validation.Issue) {
+		t.Helper()
+		for _, iss := range issues {
+			if iss.Severity != validation.Error {
+				continue
+			}
+			i := slices.IndexFunc(expected, func(e expectedIssue) bool { return e.match(iss) })
+			if i < 0 {
+				t.Errorf("%s: %s @ %s: %s", validator, iss.Code, iss.Path, iss.Detail)
+				continue
+			}
+			seen[i] = true
 		}
-		if broken != "" && iss.Rule == broken {
-			seen = true
-			continue
+	}
+	check("ValidateRM", validation.ValidateRM(out).Issues)
+	check("Validate", templateErrors(out, c))
+	for i, e := range expected {
+		if !seen[i] {
+			t.Errorf("neither validator reports %s, which the case expects", e.name)
 		}
-		t.Errorf("ValidateRM: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
-	}
-	if broken != "" && !seen {
-		t.Errorf("ValidateRM reports no breach of %s, want the one the OPT's own constraint makes", broken)
-	}
-	for _, iss := range templateErrors(out, c) {
-		t.Errorf("Validate: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
 	}
 }
 
@@ -200,7 +233,7 @@ func TestREQ107_ParticipationsAreWritten(t *testing.T) {
 		opt    string
 		list   func(t *testing.T, out any) []rm.Participation
 		check  func(t *testing.T, p rm.Participation)
-		broken string
+		expect []expectedIssue
 	}{
 		{
 			name: "context: function DV_TEXT, mode, performer omitted, time",
@@ -243,7 +276,7 @@ func TestREQ107_ParticipationsAreWritten(t *testing.T) {
 			name:   "context: function coded in local",
 			opt:    contextParticipationsOPT(optSingle("function", optCodedText("local"))),
 			list:   contextParticipations,
-			broken: "PARTICIPATION.Function_valid",
+			expect: []expectedIssue{ruleBroken("PARTICIPATION.Function_valid")},
 			check: func(t *testing.T, p rm.Participation) {
 				checkCodedAs(t, "PARTICIPATION.function", codedFunction(t, p), localAt0000, walkText)
 			},
@@ -252,7 +285,7 @@ func TestREQ107_ParticipationsAreWritten(t *testing.T) {
 			name:   "context: mode coded in local",
 			opt:    contextParticipationsOPT(optSingle("function", optNode("DV_TEXT", "")), optSingle("mode", optCodedText("local"))),
 			list:   contextParticipations,
-			broken: "PARTICIPATION.Mode_valid",
+			expect: []expectedIssue{ruleBroken("PARTICIPATION.Mode_valid")},
 			check: func(t *testing.T, p rm.Participation) {
 				if p.Mode == nil {
 					t.Fatal("PARTICIPATION.mode absent, want the local code the walk wrote")
@@ -309,7 +342,7 @@ func TestREQ107_ParticipationsAreWritten(t *testing.T) {
 				t.Fatalf("%d participations generated, want 1", len(ps))
 			}
 			tc.check(t, ps[0])
-			checkValidBut(t, out, c, tc.broken)
+			checkValidBut(t, out, c, tc.expect...)
 		})
 	}
 }
@@ -359,7 +392,9 @@ var matchCharacters = []rm.Character{">", "=", "<", "?"}
 // code the OPT pins. A mappings list the OPT requires and gives no child
 // gets one TERM_MAPPING built from the BMM, whose match is ?. Each holds
 // under every policy, both value fills and both compile modes, and passes
-// both validators but for the rule a case breaks.
+// both validators but for the rule a case breaks and, where the OPT puts a
+// C_STRING on the match, the template validator's known gap there
+// (characterBindingGap).
 func TestREQ107_TermMappingsAreWritten(t *testing.T) {
 	icd10 := rm.CodePhrase{CodeString: "J45", TerminologyID: rm.TerminologyID{Value: "ICD10"}}
 	cases := []struct {
@@ -369,7 +404,7 @@ func TestREQ107_TermMappingsAreWritten(t *testing.T) {
 		// one ExampleFill must give where the settings may differ.
 		match, matchExample rm.Character
 		check               func(t *testing.T, m rm.TermMapping)
-		broken              string
+		expect              []expectedIssue
 	}{
 		{
 			name:  "match silent, purpose with no code",
@@ -385,16 +420,17 @@ func TestREQ107_TermMappingsAreWritten(t *testing.T) {
 				}
 			},
 		},
-		{name: "match an open C_STRING", opt: mappedValueOPT(optStringAttr("match", ""), mappingTarget), match: "?"},
-		{name: "match a pattern .*", opt: mappedValueOPT(optStringAttr("match", "<pattern>.*</pattern>"), mappingTarget), match: "?"},
-		{name: "match a C_STRING listing =", opt: mappedValueOPT(optStringAttr("match", "<list>=</list>"), mappingTarget), match: "="},
+		{name: "match an open C_STRING", opt: mappedValueOPT(optStringAttr("match", ""), mappingTarget), match: "?", expect: []expectedIssue{characterBindingGap}},
+		{name: "match a pattern .*", opt: mappedValueOPT(optStringAttr("match", "<pattern>.*</pattern>"), mappingTarget), match: "?", expect: []expectedIssue{characterBindingGap}},
+		{name: "match a C_STRING listing =", opt: mappedValueOPT(optStringAttr("match", "<list>=</list>"), mappingTarget), match: "=", expect: []expectedIssue{characterBindingGap}},
 		{
 			name:         "match a C_STRING listing = and <",
 			opt:          mappedValueOPT(optStringAttr("match", "<list>=</list><list>&lt;</list>"), mappingTarget),
 			matchExample: "=",
+			expect:       []expectedIssue{characterBindingGap},
 		},
-		{name: "match a pattern that admits > and <", opt: mappedValueOPT(optStringAttr("match", "<pattern>[&lt;&gt;]</pattern>"), mappingTarget), match: "<"},
-		{name: "match a C_STRING listing a character and a word", opt: mappedValueOPT(optStringAttr("match", "<list>broader</list><list>&gt;</list>"), mappingTarget), match: ">"},
+		{name: "match a pattern that admits > and <", opt: mappedValueOPT(optStringAttr("match", "<pattern>[&lt;&gt;]</pattern>"), mappingTarget), match: "<", expect: []expectedIssue{characterBindingGap}},
+		{name: "match a C_STRING listing a character and a word", opt: mappedValueOPT(optStringAttr("match", "<list>broader</list><list>&gt;</list>"), mappingTarget), match: ">", expect: []expectedIssue{characterBindingGap}},
 		{
 			name:  "purpose pinned in openehr",
 			opt:   mappedValueOPT(optSingle("purpose", optCodedText(terminology.ID, "670")), mappingTarget),
@@ -410,7 +446,7 @@ func TestREQ107_TermMappingsAreWritten(t *testing.T) {
 			name:   "purpose coded in local",
 			opt:    mappedValueOPT(optSingle("purpose", optCodedText("local")), mappingTarget),
 			match:  "?",
-			broken: "TERM_MAPPING.Purpose_valid",
+			expect: []expectedIssue{ruleBroken("TERM_MAPPING.Purpose_valid")},
 			check: func(t *testing.T, m rm.TermMapping) {
 				if m.Purpose == nil {
 					t.Fatal("TERM_MAPPING.purpose absent, want the local code the walk wrote")
@@ -432,7 +468,8 @@ func TestREQ107_TermMappingsAreWritten(t *testing.T) {
 			name: "DV_TEXT mappings with a C_STRING listing >",
 			opt: optTemplate("ELEMENT", optSingle("value", optNode("DV_TEXT", "",
 				optMultiple("mappings", optTermMapping(optStringAttr("match", "<list>&gt;</list>"), mappingTarget))))),
-			match: ">",
+			match:  ">",
+			expect: []expectedIssue{characterBindingGap},
 		},
 		{
 			name:  "DV_TEXT mappings the OPT requires with no child",
@@ -459,7 +496,7 @@ func TestREQ107_TermMappingsAreWritten(t *testing.T) {
 			if tc.check != nil {
 				tc.check(t, m)
 			}
-			checkValidBut(t, out, c, tc.broken)
+			checkValidBut(t, out, c, tc.expect...)
 		})
 	}
 }
@@ -542,7 +579,7 @@ func TestREQ107_ISMTransitionIsWritten(t *testing.T) {
 		name   string
 		opt    string
 		check  func(t *testing.T, iv rm.IsmTransition)
-		broken string
+		expect []expectedIssue
 	}
 	cases := []ismCase{
 		{
@@ -564,7 +601,7 @@ func TestREQ107_ISMTransitionIsWritten(t *testing.T) {
 		{
 			name:   "transition coded in local",
 			opt:    optISMTransition(optSingle("transition", optCodedText("local"))),
-			broken: "ISM_TRANSITION.Transition_valid",
+			expect: []expectedIssue{ruleBroken("ISM_TRANSITION.Transition_valid")},
 			check: func(t *testing.T, iv rm.IsmTransition) {
 				if iv.Transition == nil {
 					t.Fatal("ISM_TRANSITION.transition absent, want the local code the walk wrote")
@@ -576,13 +613,22 @@ func TestREQ107_ISMTransitionIsWritten(t *testing.T) {
 			name: "current state outside the instruction states group",
 			opt: optISMTransition(optSingle("current_state", optCodedText(terminology.ID, "433")),
 				optSingle("transition", bareCodedText)),
-			broken: "ISM_TRANSITION.Current_state_valid",
+			expect: []expectedIssue{ruleBroken("ISM_TRANSITION.Current_state_valid")},
 			check: func(t *testing.T, iv rm.IsmTransition) {
 				if iv.CurrentState.DefiningCode != openehrCode("433") {
 					t.Errorf("ISM_TRANSITION.current_state = %+v, want the openehr 433 the OPT pins", iv.CurrentState.DefiningCode)
 				}
 				checkTransition(t, iv, "535")
 			},
+		},
+		{
+			// A local code that shares its code string with completed is not
+			// the openEHR state, so it is outside the group too.
+			name: "current state a local code with the code string of completed",
+			opt: optISMTransition(optSingle("current_state", optCodedText("local", "532")),
+				optSingle("transition", bareCodedText)),
+			expect: []expectedIssue{ruleBroken("ISM_TRANSITION.Current_state_valid")},
+			check:  func(t *testing.T, iv rm.IsmTransition) { checkTransition(t, iv, "535") },
 		},
 		{
 			name: "reason",
@@ -612,7 +658,72 @@ func TestREQ107_ISMTransitionIsWritten(t *testing.T) {
 	for _, tc := range cases {
 		runEveryWay(t, tc.name, tc.opt, func(t *testing.T, _ instance.Options, out any, c *templatecompile.Compiled) {
 			tc.check(t, actionTransition(t, out))
-			checkValidBut(t, out, c, tc.broken)
+			checkValidBut(t, out, c, tc.expect...)
+		})
+	}
+}
+
+// TestREQ107_CodeTheOPTGivesIsKeptOverTheDefault is the REQ-107 check that
+// an RM default goes only where the OPT gives no code: where the OPT lists
+// several codes the default is among, the code the walk wrote from that
+// list stays, the first listed under ExampleFill and a listed one under
+// RandomFill, with its rubric, on a PARTICIPATION's mode, a TERM_MAPPING's
+// purpose and an ISM_TRANSITION's transition. Each holds under every
+// policy and both compile modes, and passes both validators.
+func TestREQ107_CodeTheOPTGivesIsKeptOverTheDefault(t *testing.T) {
+	cases := []struct {
+		name  string
+		opt   string
+		group *terminology.Group
+		codes []string // the codes the OPT lists, the first one ExampleFill writes
+		coded func(t *testing.T, out any) *rm.DVCodedText
+	}{
+		{
+			name: "PARTICIPATION mode", group: terminology.ParticipationMode, codes: []string{"216", "193"},
+			opt: contextParticipationsOPT(optSingle("function", optNode("DV_TEXT", "")),
+				optSingle("mode", optCodedText(terminology.ID, "216", "193"))),
+			coded: func(t *testing.T, out any) *rm.DVCodedText { return onlyParticipation(t, out).Mode },
+		},
+		{
+			name: "TERM_MAPPING purpose", group: terminology.TermMappingPurpose, codes: []string{"670", "669"},
+			opt: mappedValueOPT(optSingle("purpose", optCodedText(terminology.ID, "670", "669")), mappingTarget),
+			coded: func(t *testing.T, out any) *rm.DVCodedText {
+				t.Helper()
+				ms := valueMappings(t, out)
+				if len(ms) != 1 {
+					t.Fatalf("%d mappings generated, want 1", len(ms))
+				}
+				return ms[0].Purpose
+			},
+		},
+		{
+			// The current state completed derives finish, which the OPT lists
+			// after start.
+			name: "ISM_TRANSITION transition", group: terminology.InstructionTransitions, codes: []string{"540", "548"},
+			opt: optISMTransition(optSingle("current_state", optCodedText(terminology.ID, "532")),
+				optSingle("transition", optCodedText(terminology.ID, "540", "548"))),
+			coded: func(t *testing.T, out any) *rm.DVCodedText {
+				t.Helper()
+				return actionTransition(t, out).Transition
+			},
+		},
+	}
+	for _, tc := range cases {
+		runEveryWay(t, tc.name, tc.opt, func(t *testing.T, opts instance.Options, out any, c *templatecompile.Compiled) {
+			got := tc.coded(t, out)
+			if got == nil {
+				t.Fatalf("%s absent, want one of the codes the OPT lists", tc.name)
+			}
+			code := got.DefiningCode.CodeString
+			if !slices.Contains(tc.codes, code) || got.DefiningCode.TerminologyID.Value != terminology.ID {
+				t.Fatalf("%s = %+v, want one of openehr %v", tc.name, got.DefiningCode, tc.codes)
+			}
+			if opts.ValueFill == instance.ExampleFill && code != tc.codes[0] {
+				t.Errorf("%s = openehr %s, want %s, the first code the OPT lists, kept over the default", tc.name, code, tc.codes[0])
+			}
+			rubric, _ := tc.group.Rubric(code)
+			checkCodedAs(t, tc.name, *got, openehrCode(code), rubric)
+			checkValidBut(t, out, c)
 		})
 	}
 }
