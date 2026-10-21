@@ -341,9 +341,8 @@ func TestREQ107_IntervalOrderKeepsEachBoundsNormalRange(t *testing.T) {
 	}, func(o rm.DVOrdinal) float64 { return float64(o.Value) })
 }
 
-// nestedBounds is one ordered value whose range, a normal_range or the range
-// of an other_reference_ranges member, has a bound that carries a
-// normal_range and a normal_status of its own.
+// nestedBounds is one ordered value whose normal_range has a bound that
+// carries a normal_range and a normal_status of its own.
 type nestedBounds struct {
 	name  string
 	value string // the ELEMENT's value node
@@ -358,18 +357,15 @@ type nestedBounds struct {
 
 // TestREQ107_RangesWhoseBoundsCarryTheirOwnNormalRange is the REQ-107
 // Intervals and Precedence 3 check that the order of the bounds of a
-// normal_range, or of the range of an other_reference_ranges member, keeps
-// the normal_range and the normal_status a bound carries, as the order of an
-// interval of its own does
-// (TestREQ107_IntervalOrderKeepsEachBoundsNormalRange): the OPT names each
+// normal_range keeps the normal_range and the normal_status a bound
+// carries, as the order of an interval of its own does
+// (TestREQ107_IntervalOrderKeepsEachBoundsNormalRange): the OPT names the
 // range as a DV_INTERVAL over the bounds' class, which its walk puts in
-// order before the value takes it, and a REFERENCE_RANGE holds its range
-// over DV_ORDERED. A REFERENCE_RANGE's bounds are simple in the
-// RM (Range_is_simple), so the OPT of that case is one an author would not
-// write; the generator writes a bound as the OPT constrains it, and the case
-// pins that the order keeps what it wrote. It holds under every policy, both
-// value fills, and with and without the implicit attributes, and the root
-// passes both validators.
+// order before the value takes it. A REFERENCE_RANGE's range has no such
+// case: its bounds are simple in the RM (Range_is_simple), so they carry
+// no normal_range. It holds under every policy, both value fills, and with
+// and without the implicit attributes, and the root passes both
+// validators.
 func TestREQ107_RangesWhoseBoundsCarryTheirOwnNormalRange(t *testing.T) {
 	countLower, countUpper := normalCount(integerFrom(0, 10), "5", "9", "N"), plainCount(integerFrom(0, 10))
 	cases := []nestedBounds{
@@ -411,26 +407,6 @@ func TestREQ107_RangesWhoseBoundsCarryTheirOwnNormalRange(t *testing.T) {
 			wantRandom: "[*DV_ORDINAL 5 local::at0001 .. *DV_ORDINAL 8 local::at0001] | " +
 				"lower DV_ORDINAL 5 local::at0001; normal_status openehr_normal_statuses::N; normal_range [*DV_ORDINAL 5 local::at0001 .. *DV_ORDINAL 9 local::at0001] | " +
 				"upper DV_ORDINAL 8 local::at0001; normal_status none; normal_range none",
-		},
-		{
-			name:  "DV_COUNT other_reference_ranges, a range over DV_COUNT",
-			value: countValue("4", ordReferenceRange(ordInterval("DV_COUNT", countLower, countUpper))),
-			bounds: func(t *testing.T, v rm.DataValue) (string, rm.DataValue, rm.DataValue) {
-				t.Helper()
-				c, ok := v.(*rm.DVCount)
-				if !ok || len(c.OtherReferenceRanges) != 1 {
-					t.Fatalf("ELEMENT.value is %T, want a *rm.DVCount with one other_reference_ranges member", v)
-				}
-				rng := c.OtherReferenceRanges[0].Range
-				lower, upper := rng.Lower.(*rm.DVCount), rng.Upper.(*rm.DVCount)
-				return intervalString(&rng), lower, upper
-			},
-			want: "[*DV_COUNT 5 .. *DV_COUNT 5] | " +
-				"lower DV_COUNT 5; normal_status openehr_normal_statuses::N; normal_range [DV_COUNT 5 .. DV_COUNT 9] | " +
-				"upper DV_COUNT 5; normal_status none; normal_range none",
-			wantRandom: "[*DV_COUNT 5 .. *DV_COUNT 8] | " +
-				"lower DV_COUNT 5; normal_status openehr_normal_statuses::N; normal_range [DV_COUNT 5 .. DV_COUNT 9] | " +
-				"upper DV_COUNT 8; normal_status none; normal_range none",
 		},
 	}
 	for _, tc := range cases {
