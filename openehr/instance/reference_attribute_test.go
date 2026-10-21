@@ -373,3 +373,260 @@ func TestREQ107_RequiredReferenceTheTemplateNamesNoChildForIsBuilt(t *testing.T)
 		})
 	}
 }
+
+// idForm is one identifier class a reference's id takes, and the value the
+// generator gives it where the template names the class with no value.
+type idForm struct {
+	class string
+	// uidBased is set for the classes a UID_BASED_ID holds: a
+	// LOCATABLE_REF's id is no other class.
+	uidBased bool
+	// attrs are pins the template gives the id beside its value, which it
+	// leaves open: a GENERIC_ID's scheme.
+	attrs []string
+	// shown renders the id as idString renders it, given the uid drawn.
+	shown func(uid string) string
+	// parse is the class's parser in rm, nil for a class that has none.
+	parse func(value string) error
+}
+
+// idForms are the identifier classes an OBJECT_REF's id takes that the
+// generator gives a value: the value of a drawn uid for a HIER_OBJECT_ID, a
+// GENERIC_ID, a TEMPLATE_ID and a TERMINOLOGY_ID; that value followed by
+// ::example::1 for an OBJECT_VERSION_ID; and a fixed archetype id for an
+// ARCHETYPE_ID, for which no uid is drawn.
+var idForms = []idForm{
+	{
+		class:    "HIER_OBJECT_ID",
+		uidBased: true,
+		shown:    func(uid string) string { return "HIER_OBJECT_ID " + uid },
+	},
+	{
+		class: "GENERIC_ID",
+		attrs: []string{pinnedString("scheme", "local")},
+		shown: func(uid string) string { return "GENERIC_ID local " + uid },
+	},
+	{
+		class: "TEMPLATE_ID",
+		shown: func(uid string) string { return "TEMPLATE_ID " + uid },
+	},
+	{
+		class: "TERMINOLOGY_ID",
+		shown: func(uid string) string { return "TERMINOLOGY_ID " + uid },
+		parse: func(value string) error { _, err := rm.ParseTerminologyID(value); return err },
+	},
+	{
+		class:    "OBJECT_VERSION_ID",
+		uidBased: true,
+		shown:    func(uid string) string { return "OBJECT_VERSION_ID " + uid + "::example::1" },
+		parse:    func(value string) error { _, err := rm.ParseObjectVersionID(value); return err },
+	},
+	{
+		class: "ARCHETYPE_ID",
+		shown: func(string) string { return "ARCHETYPE_ID openEHR-EHR-CLUSTER.example.v1" },
+		parse: func(value string) error { _, err := rm.ParseArchetypeID(value); return err },
+	},
+}
+
+// idHolder is a reference the generator writes whose id the template
+// names, with the OPT that holds it and the reference as the root holds it.
+type idHolder struct {
+	name string
+	// uidBasedOnly is set where the reference's id is a UID_BASED_ID, which
+	// no other identifier class fits.
+	uidBasedOnly bool
+	// opt returns the OPT whose reference holds id, the OPT of its id node.
+	opt func(id string) string
+	// ref returns the reference, and what refString renders of it before
+	// the id.
+	ref func(t *testing.T, call string, out any) (ref any, shown string)
+}
+
+// idHolders are the three kinds of reference the cases below put an id on:
+// an OBJECT_REF, a PARTY_REF and a LOCATABLE_REF, whose id is a UID_BASED_ID.
+var idHolders = []idHolder{
+	{
+		name: "OBSERVATION workflow_id",
+		opt: func(id string) string {
+			return guardRootOPT("OBSERVATION", guardObservationID, requiredRef("workflow_id", "OBJECT_REF", id))
+		},
+		ref: func(t *testing.T, call string, out any) (any, string) {
+			t.Helper()
+			obs, ok := out.(*rm.Observation)
+			if !ok {
+				t.Fatalf("%s returned %T, want *rm.Observation", call, out)
+			}
+			return obs.WorkflowID, "OBJECT_REF local::ANY id "
+		},
+	},
+	{
+		name: "ROLE performer",
+		opt:  func(id string) string { return rolePerformerOPT(id) },
+		ref: func(t *testing.T, call string, out any) (any, string) {
+			t.Helper()
+			role, ok := out.(*rm.Role)
+			if !ok {
+				t.Fatalf("%s returned %T, want *rm.Role", call, out)
+			}
+			return &role.Performer, "PARTY_REF local::PERSON id "
+		},
+	},
+	{
+		name:         "ACTION instruction_id",
+		uidBasedOnly: true,
+		opt: func(id string) string {
+			return guardRootOPT("ACTION", "openEHR-EHR-ACTION.example.v1",
+				requiredRef("instruction_details", "INSTRUCTION_DETAILS",
+					requiredRef("instruction_id", "LOCATABLE_REF", id),
+					pinnedString("activity_id", "activities[at0001]"),
+					guardSingle("wf_details", guardExistence11, guardChild("C_COMPLEX_OBJECT", "ITEM_TREE", "at0010", guardOccurrences11, ""))))
+		},
+		ref: func(t *testing.T, call string, out any) (any, string) {
+			t.Helper()
+			action, ok := out.(*rm.Action)
+			if !ok {
+				t.Fatalf("%s returned %T, want *rm.Action", call, out)
+			}
+			if action.InstructionDetails == nil {
+				t.Fatalf("%s: instruction_details is unset, want the one the template names", call)
+			}
+			return &action.InstructionDetails.InstructionID, "LOCATABLE_REF local::INSTRUCTION id "
+		},
+	},
+}
+
+// eachIDCase runs fn as a subtest for each reference an id of each class
+// fits: every class on an OBJECT_REF and a PARTY_REF, the UID_BASED_ID
+// classes alone on a LOCATABLE_REF.
+func eachIDCase(t *testing.T, fn func(t *testing.T, holder idHolder, form idForm)) {
+	t.Helper()
+	for _, holder := range idHolders {
+		for _, form := range idForms {
+			if holder.uidBasedOnly && !form.uidBased {
+				continue
+			}
+			t.Run(holder.name+"/"+form.class, func(t *testing.T) { fn(t, holder, form) })
+		}
+	}
+}
+
+// TestREQ107_EmptyReferenceIDTakesItsClassForm is the REQ-107 Identity
+// check that an id the template names with no value on a reference the
+// generator writes takes a value in its class's form, whichever reference
+// holds it, at every policy, either value fill and either compile mode, and
+// the output passes both validators. A HIER_OBJECT_ID, a GENERIC_ID, a
+// TEMPLATE_ID and a TERMINOLOGY_ID take the value of the uid drawn from
+// UIDSource, after the root's own uid; an OBJECT_VERSION_ID takes that value
+// followed by ::example::1; and an ARCHETYPE_ID takes
+// openEHR-EHR-CLUSTER.example.v1, with no uid drawn. A class the rm package
+// parses accepts what the generator wrote.
+func TestREQ107_EmptyReferenceIDTakesItsClassForm(t *testing.T) {
+	eachIDCase(t, func(t *testing.T, holder idHolder, form idForm) {
+		opt := holder.opt(requiredRef("id", form.class, form.attrs...))
+		generateEvery(t, opt, func(t *testing.T, call string, out any) {
+			ref, prefix := holder.ref(t, call, out)
+			if got, want := refString(ref), prefix+form.shown("uid-0002"); got != want {
+				t.Errorf("%s: reference = %s, want %s", call, got, want)
+			}
+			checkIDParses(t, call, ref, form)
+		})
+	})
+}
+
+// TestREQ107_EmptyReferenceIDParsesWithTheRandomUIDFallback is the REQ-107
+// Identity check that an id the template names with no value takes a value
+// in its class's form where Options.UIDSource is nil, so the uid is the
+// random fallback's: the rm package's parser accepts what the generator
+// wrote for each class that has one, and every other class gets a value. It
+// holds at every policy, either value fill and either compile mode, and the
+// output passes both validators.
+func TestREQ107_EmptyReferenceIDParsesWithTheRandomUIDFallback(t *testing.T) {
+	eachIDCase(t, func(t *testing.T, holder idHolder, form idForm) {
+		opt := holder.opt(requiredRef("id", form.class, form.attrs...))
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, opt, implicit)
+			for _, opts := range guardOptions() {
+				call := fmt.Sprintf("Generate(%v, %v, implicit attributes %v)", opts.Policy, opts.ValueFill, implicit)
+				out, err := instance.Generate(t.Context(), c, opts)
+				if err != nil {
+					t.Fatalf("%s: %v, want a root", call, err)
+				}
+				ref, _ := holder.ref(t, call, out)
+				checkIDParses(t, call, ref, form)
+				checkBothValidators(t, call, out, c)
+			}
+		}
+	})
+}
+
+// checkIDParses fails t unless the id ref holds has a value and, where
+// form's class has a parser in rm, the parser accepts it.
+func checkIDParses(t *testing.T, call string, ref any, form idForm) {
+	t.Helper()
+	r, ok := ref.(rm.ObjectRefLike)
+	if !ok || rm.IsTypedNil(r) {
+		t.Fatalf("%s: %T is no reference", call, ref)
+	}
+	value := idValue(r.GetID())
+	if value == "" {
+		t.Errorf("%s: %s id has no value, want one", call, form.class)
+		return
+	}
+	if form.parse == nil {
+		return
+	}
+	if err := form.parse(value); err != nil {
+		t.Errorf("%s: %s id value %q: %v, want one its class's parser accepts", call, form.class, value, err)
+	}
+}
+
+// idValue returns the value of an identifier, or "" for none.
+func idValue(id rm.ObjectID) string {
+	switch v := id.(type) {
+	case *rm.HierObjectID:
+		return v.Value
+	case *rm.GenericID:
+		return v.Value
+	case *rm.ObjectVersionID:
+		return v.Value
+	case *rm.ArchetypeID:
+		return v.Value
+	case *rm.TemplateID:
+		return v.Value
+	case *rm.TerminologyID:
+		return v.Value
+	}
+	return ""
+}
+
+// TestREQ107_UIDSourceReturningNilLeavesAUIDBasedValueEmpty is the REQ-107
+// Identity and Exceptions check that a UIDSource that returns nil, where the
+// generator draws the value of an id a reference holds, leaves the value of
+// each class that takes the uid's value empty, an OBJECT_VERSION_ID's
+// included, which no ::example::1 stands alone for, while an ARCHETYPE_ID,
+// for which no uid is drawn, takes its class's form all the same. It holds
+// at every policy and either value fill.
+func TestREQ107_UIDSourceReturningNilLeavesAUIDBasedValueEmpty(t *testing.T) {
+	holder := idHolders[0]
+	for _, form := range idForms {
+		t.Run(form.class, func(t *testing.T) {
+			c := compileOPTText(t, holder.opt(requiredRef("id", form.class, form.attrs...)), true)
+			for _, opts := range guardOptions() {
+				opts.UIDSource = func() *rm.HierObjectID { return nil }
+				call := fmt.Sprintf("Generate(%v, %v)", opts.Policy, opts.ValueFill)
+				out, err := instance.Generate(t.Context(), c, opts)
+				if err != nil {
+					t.Fatalf("%s: %v, want a root", call, err)
+				}
+				ref, _ := holder.ref(t, call, out)
+				want := ""
+				if form.class == "ARCHETYPE_ID" {
+					want = "openEHR-EHR-CLUSTER.example.v1"
+				}
+				if got := idValue(ref.(rm.ObjectRefLike).GetID()); got != want {
+					t.Errorf("%s: %s id value = %q, want %q", call, form.class, got, want)
+				}
+			}
+		})
+	}
+}
