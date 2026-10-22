@@ -216,6 +216,40 @@ func TestREQ107_SeededGenerateReturnsEqualRoots(t *testing.T) {
 	}
 }
 
+// TestREQ107_SeededGenerateRefusesAlike is the REQ-107 Reproducible uids
+// check for calls Generate refuses, which no vendored template reaches:
+// two seeded calls with the same options both return no root and an
+// error wrapping the same sentinel, whether the options cause the
+// refusal (a missing composer or territory, an undefined policy) or the
+// walk does (a C_STRING no string satisfies).
+func TestREQ107_SeededGenerateRefusesAlike(t *testing.T) {
+	vitalSigns := compileFixture(t, "vital_signs")
+	unsatisfiable := compileSyntheticOPT(t, editOPT(t, textPatternOPT, textValueListXYZ, "<list>XYZ</list><pattern>[0-9]+</pattern>"))
+	cases := []struct {
+		name string
+		c    *templatecompile.Compiled
+		edit func(*instance.Options)
+		want error
+	}{
+		{name: "no composer", c: vitalSigns, edit: func(o *instance.Options) { o.Composer = nil }, want: instance.ErrComposerRequired},
+		{name: "no territory", c: vitalSigns, edit: func(o *instance.Options) { o.Territory = "" }, want: instance.ErrTerritoryRequired},
+		{name: "undefined policy", c: vitalSigns, edit: func(o *instance.Options) { o.Policy = instance.Policy(99) }, want: instance.ErrUnsupportedPolicy},
+		{name: "unsatisfiable string", c: unsatisfiable, edit: func(*instance.Options) {}, want: instance.ErrConstraintUnsatisfiable},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := vitalSignsRandomLarge(nil, nil)
+			tc.edit(&opts)
+			for call := range 2 {
+				out, err := instance.Generate(t.Context(), tc.c, seededOptions(opts, 42))
+				if out != nil || !errors.Is(err, tc.want) {
+					t.Errorf("seeded call %d = %T, %v; want no root and an error wrapping %v", call+1, out, err, tc.want)
+				}
+			}
+		})
+	}
+}
+
 // vitalSignsRandomLarge returns the options the ValueSource checks
 // generate vital_signs under: Large and RandomFill, with uids and values
 // drawn as given.
