@@ -3,12 +3,18 @@ package admin_test
 import (
 	"context"
 	"errors"
+	"io"
+	"math"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/textproto"
 	"net/url"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/cadasto/openehr-sdk-go/cadasto/admin"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
@@ -19,6 +25,13 @@ import (
 // at srv.URL with the conventional /openehr/v1 API prefix — the prefix
 // the probe MUST strip when targeting deployment-root /health/*.
 func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
+	t.Helper()
+	return newClientWithHTTP(t, srv, srv.Client())
+}
+
+// newClientWithHTTP is newClient with hc as the HTTP client, so a test
+// can wrap the server's own transport.
+func newClientWithHTTP(t *testing.T, srv *httptest.Server, hc *http.Client) *transport.Client {
 	t.Helper()
 	cat, err := discovery.NewStaticCatalog(discovery.StaticConfig{
 		Issuer: "https://test.example.com",
@@ -32,7 +45,7 @@ func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
 	if err != nil {
 		t.Fatalf("build catalog: %v", err)
 	}
-	c, err := transport.New(cat, transport.WithHTTPClient(srv.Client()))
+	c, err := transport.New(cat, transport.WithHTTPClient(hc))
 	if err != nil {
 		t.Fatalf("build client: %v", err)
 	}
@@ -384,5 +397,631 @@ func TestNilClientProbesDoNotPanic(t *testing.T) {
 				t.Errorf("err = %v; want ErrInvalidConfig", err)
 			}
 		})
+	}
+}
+
+// readyDoc is a readiness document that names the service and its
+// version.
+const readyDoc = `{"status":"UP","version":"1.2.3"}`
+
+// readySecret stands for a value the server sends. It must never reach
+// an error's text.
+const readySecret = "PATIENT-SECRET-4711"
+
+// secretDoc is a readiness document that carries readySecret.
+const secretDoc = `{"status":"UP","note":"` + readySecret + `"}`
+
+// bodyHandler answers every request with status and body.
+func bodyHandler(status int, body string) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		_, _ = io.WriteString(w, body)
+	}
+}
+
+// rawHandler takes over the connection, writes raw as the whole
+// response and closes the connection. It lets a test send what
+// net/http's server would not write: a body shorter than its
+// Content-Length, or a malformed chunked trailer.
+func rawHandler(t *testing.T, raw string) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		hj, ok := w.(http.Hijacker)
+		if !ok {
+			t.Error("the test server's ResponseWriter is not an http.Hijacker; the premise of this test is gone")
+			return
+		}
+		conn, buf, err := hj.Hijack()
+		if err != nil {
+			t.Errorf("Hijack: %v", err)
+			return
+		}
+		defer func() { _ = conn.Close() }()
+		_, _ = buf.WriteString(raw)
+		_ = buf.Flush()
+	}
+}
+
+// assertNoServerValues fails the test when msg carries readySecret or
+// any of the other bytes the server sent.
+func assertNoServerValues(t *testing.T, msg string, sent ...string) {
+	t.Helper()
+	for _, v := range append([]string{readySecret}, sent...) {
+		if strings.Contains(msg, v) {
+			t.Errorf("error text %q carries %q, which the server sent", msg, v)
+		}
+	}
+}
+
+// TestReadyBodyReturnsBody pins the readiness body: a 2xx from the
+// default readiness path returns exactly the bytes the server sent.
+func TestReadyBodyReturnsBody(t *testing.T) { // REQ-083
+	paths := make(chan string, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths <- r.URL.Path
+		bodyHandler(http.StatusOK, readyDoc)(w, r)
+	}))
+	defer srv.Close()
+
+	got, err := admin.ReadyBody(t.Context(), newClient(t, srv))
+	if err != nil {
+		t.Fatalf("ReadyBody: %v", err)
+	}
+	if string(got) != readyDoc {
+		t.Errorf("ReadyBody = %q, want %q", got, readyDoc)
+	}
+	if p := <-paths; p != admin.DefaultReadyPath {
+		t.Errorf("probe path = %q, want %q", p, admin.DefaultReadyPath)
+	}
+}
+
+// TestReadyBodySendsReadyRequest pins the request ReadyBody sends: a GET
+// to the WithReadyPath override at the origin of the openEHR REST entry,
+// with Accept: application/json and no Authorization header.
+func TestReadyBodySendsReadyRequest(t *testing.T) { // REQ-083
+	type seen struct {
+		method, host, path, accept string
+		auth                       bool
+	}
+	reqs := make(chan seen, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, auth := r.Header["Authorization"]
+		reqs <- seen{method: r.Method, host: r.Host, path: r.URL.Path, accept: r.Header.Get("Accept"), auth: auth}
+		bodyHandler(http.StatusOK, readyDoc)(w, r)
+	}))
+	defer srv.Close()
+	srvURL, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatalf("parse server URL: %v", err)
+	}
+
+	got, err := admin.ReadyBody(t.Context(), newClient(t, srv), admin.WithReadyPath("/ehrbase/rest/status"))
+	if err != nil {
+		t.Fatalf("ReadyBody: %v", err)
+	}
+	if string(got) != readyDoc {
+		t.Errorf("ReadyBody = %q, want %q", got, readyDoc)
+	}
+	want := seen{method: http.MethodGet, host: srvURL.Host, path: "/ehrbase/rest/status", accept: "application/json"}
+	if r := <-reqs; r != want {
+		t.Errorf("request = %+v, want %+v (the override path at the origin, no /openehr/v1, no Authorization)", r, want)
+	}
+}
+
+// TestReadyBodyLimit pins the bounded read: a body of exactly the limit
+// is returned whole, one byte more returns no bytes and an error that
+// matches transport.ErrResponseTooLarge and names the limit. 0 selects
+// DefaultMaxReadyBody, a negative limit reads without one, and
+// math.MaxInt64 reads every body whole.
+func TestReadyBodyLimit(t *testing.T) { // REQ-083
+	n := int64(len(secretDoc))
+	atDefault := strings.Repeat("x", int(admin.DefaultMaxReadyBody))
+	cases := []struct {
+		name  string
+		body  string
+		opts  []admin.ReadyOption
+		limit int64 // the limit the error names; 0 when the body is returned whole
+	}{
+		{name: "exactly n", body: secretDoc, opts: []admin.ReadyOption{admin.WithMaxReadyBody(n)}},
+		{name: "one byte over n", body: secretDoc + " ", opts: []admin.ReadyOption{admin.WithMaxReadyBody(n)}, limit: n},
+		{name: "exactly the default", body: atDefault},
+		{name: "one byte over the default", body: atDefault + "x", limit: admin.DefaultMaxReadyBody},
+		{name: "zero selects the default", body: atDefault + "x", opts: []admin.ReadyOption{admin.WithMaxReadyBody(0)}, limit: admin.DefaultMaxReadyBody},
+		{name: "negative reads without a limit", body: atDefault + "x", opts: []admin.ReadyOption{admin.WithMaxReadyBody(-1)}},
+		{name: "MaxInt64 reads the body whole", body: secretDoc, opts: []admin.ReadyOption{admin.WithMaxReadyBody(math.MaxInt64)}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(bodyHandler(http.StatusOK, tc.body))
+			defer srv.Close()
+
+			got, err := admin.ReadyBody(t.Context(), newClient(t, srv), tc.opts...)
+			if tc.limit == 0 {
+				if err != nil {
+					t.Fatalf("ReadyBody: %v", err)
+				}
+				if string(got) != tc.body {
+					t.Errorf("ReadyBody returned %d bytes, want the %d-byte body whole", len(got), len(tc.body))
+				}
+				return
+			}
+			if got != nil {
+				t.Errorf("ReadyBody returned %d bytes beside the error, want none: a partial body is not the document", len(got))
+			}
+			if !errors.Is(err, transport.ErrResponseTooLarge) {
+				t.Fatalf("err = %v, want errors.Is(err, transport.ErrResponseTooLarge)", err)
+			}
+			if limit := strconv.FormatInt(tc.limit, 10); !strings.Contains(err.Error(), limit) {
+				t.Errorf("err = %q, want it to name the limit %s", err, limit)
+			}
+			assertNoServerValues(t, err.Error())
+		})
+	}
+}
+
+// countingTransport counts the response body bytes its caller reads.
+type countingTransport struct {
+	base http.RoundTripper
+	read int64
+}
+
+func (ct *countingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	resp, err := ct.base.RoundTrip(r)
+	if err != nil {
+		return nil, err
+	}
+	resp.Body = &countingBody{ReadCloser: resp.Body, read: &ct.read}
+	return resp, nil
+}
+
+type countingBody struct {
+	io.ReadCloser
+	read *int64
+}
+
+func (b *countingBody) Read(p []byte) (int, error) {
+	n, err := b.ReadCloser.Read(p)
+	*b.read += int64(n)
+	return n, err
+}
+
+// TestReadyBodyStopsReadingPastLimit pins the cap on the bytes read, not
+// only the check on their count: ReadyBody stops one byte past the limit
+// instead of reading a long body to its end.
+func TestReadyBodyStopsReadingPastLimit(t *testing.T) { // REQ-083
+	const limit = 1024
+	srv := httptest.NewServer(bodyHandler(http.StatusOK, strings.Repeat("x", 64*limit)))
+	defer srv.Close()
+	ct := &countingTransport{base: srv.Client().Transport}
+
+	got, err := admin.ReadyBody(t.Context(), newClientWithHTTP(t, srv, &http.Client{Transport: ct}), admin.WithMaxReadyBody(limit))
+	if !errors.Is(err, transport.ErrResponseTooLarge) {
+		t.Fatalf("err = %v, want errors.Is(err, transport.ErrResponseTooLarge)", err)
+	}
+	if got != nil {
+		t.Errorf("ReadyBody returned %d bytes beside the error, want none", len(got))
+	}
+	if ct.read > limit+1 {
+		t.Errorf("ReadyBody read %d body bytes under a limit of %d, want at most %d", ct.read, limit, limit+1)
+	}
+}
+
+// drainCap is the most bytes a probe reads from a body it does not return,
+// as the package doc states: 256 KiB.
+const drainCap = 256 << 10
+
+// endlessHandler answers with status and a body that never ends. It writes
+// until a write fails or the request's context ends, which both happen once
+// the client closes the connection.
+func endlessHandler(status int) http.HandlerFunc {
+	chunk := []byte(strings.Repeat("x", 32<<10))
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(status)
+		for r.Context().Err() == nil {
+			if _, err := w.Write(chunk); err != nil {
+				return
+			}
+		}
+	}
+}
+
+// probeCall runs one probe and returns the bytes it returns: none for Live
+// and Ready.
+type probeCall func(ctx context.Context, c *transport.Client) ([]byte, error)
+
+func callLive(ctx context.Context, c *transport.Client) ([]byte, error) {
+	return nil, admin.Live(ctx, c)
+}
+
+func callReady(ctx context.Context, c *transport.Client) ([]byte, error) {
+	return nil, admin.Ready(ctx, c)
+}
+
+func callReadyBody(ctx context.Context, c *transport.Client) ([]byte, error) {
+	return admin.ReadyBody(ctx, c)
+}
+
+// TestProbesBoundEndlessBodyDrain pins the bounded drain: a 2xx body that
+// never ends makes Live and Ready return nil, and a 503 body that never
+// ends makes ReadyBody return no bytes and an error matching
+// transport.ErrServerError, each after reading at most drainCap bytes of
+// it. The counter wraps the body the probe reads, above net/http's own
+// buffered reader, so it counts only the bytes handed to the probe and the
+// bound needs no allowance. The deadline ends a drain without a cap, so
+// such a drain fails on the byte count instead of hanging the suite.
+func TestProbesBoundEndlessBodyDrain(t *testing.T) { // REQ-083
+	cases := []struct {
+		name     string
+		status   int
+		call     probeCall
+		sentinel error // nil when the probe must return nil
+	}{
+		{name: "Live 200", status: http.StatusOK, call: callLive},
+		{name: "Ready 200", status: http.StatusOK, call: callReady},
+		{name: "ReadyBody 503", status: http.StatusServiceUnavailable, call: callReadyBody, sentinel: transport.ErrServerError},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(endlessHandler(tc.status))
+			defer srv.Close()
+			ct := &countingTransport{base: srv.Client().Transport}
+			c := newClientWithHTTP(t, srv, &http.Client{Transport: ct})
+			ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+			defer cancel()
+
+			got, err := tc.call(ctx, c)
+			if got != nil {
+				t.Errorf("%s returned %d bytes, want none", tc.name, len(got))
+			}
+			switch {
+			case tc.sentinel == nil && err != nil:
+				t.Errorf("%s = %v, want nil", tc.name, err)
+			case tc.sentinel != nil && !errors.Is(err, tc.sentinel):
+				t.Errorf("%s err = %v, want errors.Is(err, %v)", tc.name, err, tc.sentinel)
+			}
+			if ct.read > drainCap {
+				t.Errorf("%s read %d bytes of a body that never ends, want at most %d", tc.name, ct.read, drainCap)
+			}
+		})
+	}
+}
+
+// trickleHandler answers with status and a body that never ends, sent one
+// byte at a time with a pause after each. It stops once a write fails or
+// the request's context ends, which both happen once the client drops the
+// connection.
+func trickleHandler(status int) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(status)
+		rc := http.NewResponseController(w)
+		for {
+			if _, err := io.WriteString(w, "x"); err != nil {
+				return
+			}
+			if err := rc.Flush(); err != nil {
+				return
+			}
+			select {
+			case <-r.Context().Done():
+				return
+			case <-time.After(10 * time.Millisecond):
+			}
+		}
+	}
+}
+
+// stallHandler answers with status and one byte of body, then sends nothing
+// more until the request's context ends, which happens once the client
+// drops the connection.
+func stallHandler(status int) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(status)
+		_, _ = io.WriteString(w, "x")
+		_ = http.NewResponseController(w).Flush()
+		<-r.Context().Done()
+	}
+}
+
+// TestProbesBoundSlowBodyDrain pins the time bound on the drain: a 2xx body
+// that trickles without end, or sends a byte and stalls, makes Live and
+// Ready return nil, and such a 503 body makes ReadyBody return no bytes and
+// an error matching transport.ErrServerError, each before its context
+// ends. The deadline is far above the time bound, so a drain bounded only
+// in bytes holds the probe until the deadline and fails on the context
+// check.
+func TestProbesBoundSlowBodyDrain(t *testing.T) { // REQ-083
+	bodies := []struct {
+		name    string
+		handler func(status int) http.HandlerFunc
+	}{
+		{name: "trickle", handler: trickleHandler},
+		{name: "stall", handler: stallHandler},
+	}
+	probes := []struct {
+		name     string
+		status   int
+		call     probeCall
+		sentinel error // nil when the probe must return nil
+	}{
+		{name: "Live 200", status: http.StatusOK, call: callLive},
+		{name: "Ready 200", status: http.StatusOK, call: callReady},
+		{name: "ReadyBody 503", status: http.StatusServiceUnavailable, call: callReadyBody, sentinel: transport.ErrServerError},
+	}
+	for _, body := range bodies {
+		for _, tc := range probes {
+			t.Run(body.name+"/"+tc.name, func(t *testing.T) {
+				srv := httptest.NewServer(body.handler(tc.status))
+				defer srv.Close()
+				ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+				defer cancel()
+
+				got, err := tc.call(ctx, newClient(t, srv))
+				if ctxErr := ctx.Err(); ctxErr != nil {
+					t.Errorf("%s on a %s body returned after its context ended (%v), want it to return before", tc.name, body.name, ctxErr)
+				}
+				if got != nil {
+					t.Errorf("%s on a %s body returned %d bytes, want none", tc.name, body.name, len(got))
+				}
+				switch {
+				case tc.sentinel == nil && err != nil:
+					t.Errorf("%s on a %s body = %v, want nil", tc.name, body.name, err)
+				case tc.sentinel != nil && !errors.Is(err, tc.sentinel):
+					t.Errorf("%s on a %s body: err = %v, want errors.Is(err, %v)", tc.name, body.name, err, tc.sentinel)
+				}
+			})
+		}
+	}
+}
+
+// TestReadyBodySlowBodyReturnedWhole pins that the drain's time bound stays
+// off the body ReadyBody returns: a 2xx body that arrives one byte at a
+// time, over several times the drain's 50 ms, still comes back whole.
+func TestReadyBodySlowBodyReturnedWhole(t *testing.T) { // REQ-083
+	const body = `{"status":"UP"}`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rc := http.NewResponseController(w)
+		for i := range len(body) {
+			if _, err := io.WriteString(w, body[i:i+1]); err != nil {
+				return
+			}
+			if err := rc.Flush(); err != nil {
+				return
+			}
+			select {
+			case <-r.Context().Done():
+				return
+			case <-time.After(20 * time.Millisecond):
+			}
+		}
+	}))
+	defer srv.Close()
+
+	got, err := admin.ReadyBody(t.Context(), newClient(t, srv))
+	if err != nil {
+		t.Fatalf("ReadyBody on a slow body: %v, want nil", err)
+	}
+	if string(got) != body {
+		t.Errorf("ReadyBody on a slow body = %q, want %q whole", got, body)
+	}
+}
+
+// TestProbesDrainSmallBodyAndReuseConnection pins the drain and what it is
+// for: a probe reads a small body to its end before it closes it, and the
+// next probe reuses the connection. The byte count is what fails when the
+// drain is skipped. net/http's client itself drains a body closed before
+// its end, for a short time and below the counter, so a skipped drain can
+// still leave the connection reused.
+func TestProbesDrainSmallBodyAndReuseConnection(t *testing.T) { // REQ-083
+	cases := []struct {
+		name   string
+		status int
+		call   probeCall
+	}{
+		{name: "Live 200", status: http.StatusOK, call: callLive},
+		{name: "Ready 200", status: http.StatusOK, call: callReady},
+		{name: "ReadyBody 200", status: http.StatusOK, call: callReadyBody},
+		{name: "Live 503", status: http.StatusServiceUnavailable, call: callLive},
+		{name: "Ready 503", status: http.StatusServiceUnavailable, call: callReady},
+		{name: "ReadyBody 503", status: http.StatusServiceUnavailable, call: callReadyBody},
+	}
+	const calls = 3
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var conns atomic.Int64
+			srv := httptest.NewUnstartedServer(bodyHandler(tc.status, secretDoc))
+			srv.Config.ConnState = func(_ net.Conn, s http.ConnState) {
+				if s == http.StateNew {
+					conns.Add(1)
+				}
+			}
+			srv.Start()
+			defer srv.Close()
+			ct := &countingTransport{base: srv.Client().Transport}
+			c := newClientWithHTTP(t, srv, &http.Client{Transport: ct})
+
+			for range calls {
+				_, err := tc.call(t.Context(), c)
+				if wantErr := tc.status != http.StatusOK; (err != nil) != wantErr {
+					t.Fatalf("%s: err = %v, want an error = %t", tc.name, err, wantErr)
+				}
+			}
+			if want := int64(calls * len(secretDoc)); ct.read != want {
+				t.Errorf("%d calls of %s on a %d-byte body read %d bytes, want %d: each body read to its end", calls, tc.name, len(secretDoc), ct.read, want)
+			}
+			if n := conns.Load(); n != 1 {
+				t.Errorf("%d calls of %s on a %d-byte body opened %d connections, want 1", calls, tc.name, len(secretDoc), n)
+			}
+		})
+	}
+}
+
+// TestReadyIgnoresMaxReadyBody pins that WithMaxReadyBody does not change
+// Ready, which reads no body it returns.
+func TestReadyIgnoresMaxReadyBody(t *testing.T) { // REQ-083
+	srv := httptest.NewServer(bodyHandler(http.StatusOK, secretDoc))
+	defer srv.Close()
+	if err := admin.Ready(t.Context(), newClient(t, srv), admin.WithMaxReadyBody(1)); err != nil {
+		t.Errorf("Ready with WithMaxReadyBody(1) = %v, want nil", err)
+	}
+}
+
+// TestReadyBodyCutMidBody pins the read failure of a 2xx body cut
+// mid-read: no bytes, an error that matches io.ErrUnexpectedEOF, and none
+// of the bytes read before the cut in the error text.
+func TestReadyBodyCutMidBody(t *testing.T) { // REQ-083
+	partial := `{"status":"UP","note":"` + readySecret
+	srv := httptest.NewServer(rawHandler(t, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n"+partial))
+	defer srv.Close()
+
+	got, err := admin.ReadyBody(t.Context(), newClient(t, srv))
+	if got != nil {
+		t.Errorf("ReadyBody returned %q beside the error, want no bytes: a partial body is not the document", got)
+	}
+	if !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Fatalf("err = %v, want errors.Is(err, io.ErrUnexpectedEOF)", err)
+	}
+	assertNoServerValues(t, err.Error(), partial, `"status":"UP"`)
+}
+
+// TestReadyBodyTrailerTextStaysOut pins the value-free text on the read
+// failure's own text: net/http quotes a malformed chunked trailer line in
+// its read error, so a server can put any value there. That value
+// appears nowhere in the error text, and the read failure is still
+// reached by unwrapping.
+func TestReadyBodyTrailerTextStaysOut(t *testing.T) { // REQ-083
+	srv := httptest.NewServer(rawHandler(t, "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n0\r\n"+readySecret+"\r\n\r\n"))
+	defer srv.Close()
+
+	got, err := admin.ReadyBody(t.Context(), newClient(t, srv))
+	cause, ok := errors.AsType[textproto.ProtocolError](err)
+	if !ok || !strings.Contains(cause.Error(), readySecret) {
+		t.Fatalf("errors.AsType[textproto.ProtocolError](%v) = (%v, %v), want net/http's read error quoting %q; the premise of this test is gone", err, cause, ok, readySecret)
+	}
+	if got != nil {
+		t.Errorf("ReadyBody returned %q beside the error, want no bytes", got)
+	}
+	assertNoServerValues(t, err.Error(), "hello")
+}
+
+// cancelAfterHeaders cancels a context once the response headers have
+// arrived, so the cancellation lands while the body is being read.
+type cancelAfterHeaders struct {
+	base   http.RoundTripper
+	cancel context.CancelFunc
+}
+
+func (ct cancelAfterHeaders) RoundTrip(r *http.Request) (*http.Response, error) {
+	resp, err := ct.base.RoundTrip(r)
+	ct.cancel()
+	return resp, err
+}
+
+// TestReadyBodyCanceledMidBody pins that a read failure other than a cut
+// connection is reached by unwrapping too: a context canceled while the
+// body is read gives no bytes and an error matching context.Canceled.
+func TestReadyBodyCanceledMidBody(t *testing.T) { // REQ-083
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", "100")
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, `{"status":"UP","note":"`+readySecret)
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		<-r.Context().Done()
+	}))
+	defer srv.Close()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	hc := &http.Client{Transport: cancelAfterHeaders{base: srv.Client().Transport, cancel: cancel}}
+
+	got, err := admin.ReadyBody(ctx, newClientWithHTTP(t, srv, hc))
+	if got != nil {
+		t.Errorf("ReadyBody returned %q beside the error, want no bytes", got)
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want errors.Is(err, context.Canceled)", err)
+	}
+	assertNoServerValues(t, err.Error())
+}
+
+// TestReadyBodyNon2xxMatchesReady pins the status mapping: a status that
+// is not 2xx returns no bytes, even when the server sends a body, and the
+// same error Ready returns for that status.
+func TestReadyBodyNon2xxMatchesReady(t *testing.T) { // REQ-083
+	cases := []struct {
+		status   int
+		sentinel error // nil for a status outside the mapped set
+	}{
+		{http.StatusServiceUnavailable, transport.ErrServerError},
+		{http.StatusInternalServerError, transport.ErrServerError},
+		{http.StatusNotFound, transport.ErrNotFound},
+		{http.StatusUnauthorized, transport.ErrUnauthorized},
+		{http.StatusForbidden, transport.ErrForbidden},
+		{http.StatusBadRequest, nil},
+		{http.StatusTooManyRequests, nil},
+	}
+	for _, tc := range cases {
+		t.Run(strconv.Itoa(tc.status), func(t *testing.T) {
+			srv := httptest.NewServer(bodyHandler(tc.status, secretDoc))
+			defer srv.Close()
+			c := newClient(t, srv)
+
+			got, err := admin.ReadyBody(t.Context(), c)
+			if got != nil {
+				t.Errorf("status=%d: ReadyBody returned %q, want no bytes", tc.status, got)
+			}
+			if err == nil {
+				t.Fatalf("status=%d: ReadyBody returned no error", tc.status)
+			}
+			if tc.sentinel != nil && !errors.Is(err, tc.sentinel) {
+				t.Errorf("status=%d: err = %v, want errors.Is(err, %v)", tc.status, err, tc.sentinel)
+			}
+			readyErr := admin.Ready(t.Context(), c)
+			if readyErr == nil || err.Error() != readyErr.Error() {
+				t.Errorf("status=%d: ReadyBody err = %v, Ready err = %v, want the same error", tc.status, err, readyErr)
+			}
+			assertNoServerValues(t, err.Error())
+		})
+	}
+}
+
+// TestReadyBodyPathOptionValidation pins Ready's path guard on ReadyBody:
+// an empty or relative override returns ErrInvalidPath and no bytes
+// before any request is sent.
+func TestReadyBodyPathOptionValidation(t *testing.T) { // REQ-083
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("path validation should fail before hitting the server, but got request to %s", r.URL.Path)
+	}))
+	defer srv.Close()
+	c := newClient(t, srv)
+
+	for _, path := range []string{"", "health/ready", "./health/ready"} {
+		t.Run(strconv.Quote(path), func(t *testing.T) {
+			got, err := admin.ReadyBody(t.Context(), c, admin.WithReadyPath(path))
+			if got != nil {
+				t.Errorf("path=%q: ReadyBody returned %q, want no bytes", path, got)
+			}
+			if !errors.Is(err, admin.ErrInvalidPath) {
+				t.Errorf("path=%q: err = %v, want errors.Is(err, ErrInvalidPath)", path, err)
+			}
+		})
+	}
+}
+
+// TestReadyBodyNilClient pins the nil-Client guard on ReadyBody, which
+// bypasses transport.Client.Do like Ready does: no panic, no bytes and an
+// error matching transport.ErrInvalidConfig.
+func TestReadyBodyNilClient(t *testing.T) { // REQ-083 REQ-025
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("ReadyBody with a nil client panicked: %v", r)
+		}
+	}()
+	got, err := admin.ReadyBody(t.Context(), nil)
+	if got != nil {
+		t.Errorf("ReadyBody returned %q, want no bytes", got)
+	}
+	if !errors.Is(err, transport.ErrInvalidConfig) {
+		t.Errorf("err = %v, want errors.Is(err, transport.ErrInvalidConfig)", err)
 	}
 }
