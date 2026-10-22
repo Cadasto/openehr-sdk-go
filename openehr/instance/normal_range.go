@@ -59,8 +59,9 @@ var errNoNormalValue = errors.New("the OPT admits no value the generator can der
 // DV_DATE_TIME where its bounds compare with it (temporalCompare). Any
 // other value, such as a DV_SCALE or a DV_DURATION, one that a bound of its
 // range does not compare with, and one whose range is open on both sides,
-// which has no bound to pair it with, is left as generated. It runs once the value and its range are
-// final: the walk has written the range, with its bounds in order
+// which has no bound to pair it with, is left as generated. It runs once
+// the value and its range are final: the walk has written the range, with
+// its bounds in order
 // (orderIntervalBounds) and its flags settled (settleIntervalEndpoints), and
 // finishNode has settled a DV_PROPORTION's kind (settleProportion). The OPT
 // constrains a DV_ORDINAL here through a C_INTEGER on its value: a
@@ -256,16 +257,31 @@ func (r normalRule[K]) beats(a, b K, end normalEnd) bool {
 // keep narrows the value so that it is inside the range where status is N
 // and outside it otherwise, as settleNormalRange describes, and reports
 // whether the value keeps the rule or is left as generated. It takes the
-// candidate that end names among those that keep the rule. It reports false
-// when no candidate keeps the rule.
+// candidate that end names among those that keep the rule, trying the
+// candidates on the side the status points to before the others
+// (onSide), so a high value lands above the range wherever the OPT admits
+// one there. It reports false when no candidate keeps the rule.
 func (r normalRule[K]) keep(status *rm.CodePhrase, end normalEnd) bool {
 	inside := status.CodeString == normalCode
 	if has, ok := r.bounds.has(r.compare, r.value); !ok || has == inside {
 		return true
 	}
+	side := sideOf(status)
+	cands := r.candidates(side)
+	if side != anySide {
+		var first, rest []K
+		for _, k := range cands {
+			if r.onSide(k, side) {
+				first = append(first, k)
+			} else {
+				rest = append(rest, k)
+			}
+		}
+		cands = append(first, rest...)
+	}
 	var best K
 	found := false
-	for _, k := range r.candidates(sideOf(status)) {
+	for _, k := range cands {
 		if !r.admits(k, inside) {
 			continue
 		}
@@ -296,6 +312,22 @@ const (
 	// belowRange is the side of the lower bound, for a low status.
 	belowRange
 )
+
+// onSide reports whether k is at or past the bound of side: at or above the
+// upper bound for aboveRange, at or below the lower bound for belowRange. A
+// side the range leaves open has no such value. keep asks it only of a
+// candidate outside the range, so at the bound means past an excluded one.
+func (r normalRule[K]) onSide(k K, side normalSide) bool {
+	switch side {
+	case aboveRange:
+		c, ok := r.compare(k, r.bounds.upper)
+		return !r.bounds.upperUnbounded && ok && c >= 0
+	case belowRange:
+		c, ok := r.compare(k, r.bounds.lower)
+		return !r.bounds.lowerUnbounded && ok && c <= 0
+	}
+	return false
+}
 
 // sideOf returns the side of its range that status points a value to: above
 // it for a code string that starts with H, below it for one that starts
