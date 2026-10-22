@@ -59,8 +59,13 @@ func writeDVQuantitySingle(q *rm.DVQuantity, attr string, child any) error {
 }
 
 // writeOptionalReal stores a number on an optional Real attribute, which
-// the RM type holds as a pointer.
+// the RM type holds as a pointer. The child is a number of any Go numeric
+// shape or an RM Real held by pointer, of which the attribute keeps a copy.
+// A nil pointer is a type mismatch, as it is for writeOptionalInteger.
 func writeOptionalReal(dst **rm.Real, attr string, child any) error {
+	if p, ok := child.(*rm.Real); ok && p != nil {
+		child = *p
+	}
 	v, ok := rm.AsReal(child)
 	if !ok {
 		return mismatch(attr, child, "Real")
@@ -100,9 +105,11 @@ func asInteger(attr string, child any) (rm.Integer, error) {
 }
 
 // writeOptionalBoolean stores a bool on an optional Boolean attribute,
-// which the RM type holds as a pointer.
+// which the RM type holds as a pointer. The child is a bool as a value or
+// as a pointer, of which the attribute keeps a copy. A nil pointer is a
+// type mismatch, as it is for writeOptionalInteger.
 func writeOptionalBoolean(dst **bool, attr string, child any) error {
-	v, ok := child.(bool)
+	v, ok := coerceValueOrPtr[bool](child)
 	if !ok {
 		return mismatch(attr, child, "Boolean")
 	}

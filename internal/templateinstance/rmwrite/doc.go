@@ -84,7 +84,14 @@
 // `type`, DV_ORDINAL `value`, DV_MULTIMEDIA `size`, INTERVAL_EVENT
 // `sample_count`) takes a whole number of any Go integer shape, and a
 // whole number outside the 32-bit range an RM Integer holds returns an
-// ErrTypeMismatch that says so. A Character attribute (TERM_MAPPING
+// ErrTypeMismatch that says so, and so does an rm.Integer held by pointer.
+// An optional Real attribute (an accuracy) takes a number of any Go numeric
+// shape or an rm.Real held by pointer, an optional Boolean attribute
+// (accuracy_is_percent) a bool as a value or as a pointer, and an optional
+// String attribute (a magnitude_status, a units_system, an EVENT_CONTEXT
+// location, a PARTY_IDENTIFIED name) a string as a value or as a pointer;
+// each keeps a copy of what it is given, and a nil pointer returns an
+// ErrTypeMismatch, as it does for an Integer attribute. A Character attribute (TERM_MAPPING
 // `match`) takes a string or an rm.Character of one character, and one of
 // any other length returns an ErrTypeMismatch that says so. Any other
 // parent or attribute returns ErrUnknownAttribute, and a child of the

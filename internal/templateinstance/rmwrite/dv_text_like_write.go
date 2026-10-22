@@ -20,9 +20,11 @@ func writeStringValue(dst *string, attr string, child any) error {
 }
 
 // writeOptionalString stores a String child on an optional String
-// attribute, which the RM type holds as a pointer.
+// attribute, which the RM type holds as a pointer. The child is a string as
+// a value or as a pointer, of which the attribute keeps a copy. A nil
+// pointer is a type mismatch, as it is for writeOptionalInteger.
 func writeOptionalString(dst **string, attr string, child any) error {
-	v, ok := child.(string)
+	v, ok := coerceValueOrPtr[string](child)
 	if !ok {
 		return mismatch(attr, child, "String")
 	}

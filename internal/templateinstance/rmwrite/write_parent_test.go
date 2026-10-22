@@ -183,9 +183,11 @@ func TestREQ101_EnsureSingleWritesConformingSubtype(t *testing.T) {
 }
 
 // TestREQ107_EnsureSingleWritesAnEventContextLocation checks that
-// EVENT_CONTEXT location takes a string as a value or as a pointer, like
-// every other optional String attribute, and refuses a nil pointer and a
-// child of another type with ErrTypeMismatch.
+// EVENT_CONTEXT location takes a string as a value or as a pointer, and
+// refuses a nil pointer and a child of another type with ErrTypeMismatch.
+// Every other optional String attribute takes the same two shapes, which
+// TestREQ101_EnsureSingleWritesAnOptionalStringAsAValueOrAPointer checks
+// for all of them, this one included.
 func TestREQ107_EnsureSingleWritesAnEventContextLocation(t *testing.T) {
 	t.Parallel()
 	const ward = "ward A3"
