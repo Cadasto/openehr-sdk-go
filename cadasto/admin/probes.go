@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 	"github.com/cadasto/openehr-sdk-go/transport"
@@ -119,7 +120,7 @@ func Live(ctx context.Context, c *transport.Client, opts ...LiveOption) error {
 // contract as [Live]; see that doc for the status mapping, the
 // transport.Do bypass and the [ErrInvalidPath] guard on the
 // WithReadyPath override. Ready reads at most 256 KiB of the response
-// body and discards it; [ReadyBody] returns it.
+// body, for at most 50 ms, and discards it; [ReadyBody] returns it.
 func Ready(ctx context.Context, c *transport.Client, opts ...ReadyOption) error {
 	return probe(ctx, c, newReadyConfig(opts).path)
 }
@@ -141,10 +142,13 @@ func Ready(ctx context.Context, c *transport.Client, opts ...ReadyOption) error 
 // quote bytes the server sent.
 func ReadyBody(ctx context.Context, c *transport.Client, opts ...ReadyOption) ([]byte, error) {
 	cfg := newReadyConfig(opts)
-	resp, err := send(ctx, c, cfg.path)
+	resp, cancel, err := send(ctx, c, cfg.path)
 	if err != nil {
 		return nil, err
 	}
+	// The request's context is canceled only after the read and the close,
+	// so the read runs under the caller's context alone.
+	defer cancel()
 	// Closed without draining: a body read to its end leaves nothing to
 	// drain, and the rest of a body over the limit is not worth reading.
 	defer func() { _ = resp.Body.Close() }()
@@ -164,82 +168,98 @@ func newReadyConfig(opts []ReadyOption) readyConfig {
 // probe sends the GET of a Live or Ready call and maps its status. It
 // drains and discards the body of a 2xx.
 func probe(ctx context.Context, c *transport.Client, path string) error {
-	resp, err := send(ctx, c, path)
+	resp, cancel, err := send(ctx, c, path)
 	if err != nil {
 		return err
 	}
-	drainAndClose(resp)
+	drainAndClose(resp, cancel)
 	return nil
 }
 
 // send issues the probe GET for path at the origin of the openEHR REST
-// service entry. A 2xx returns the open response, whose body the caller
-// reads and closes. Any other status returns the error statusToSentinel
-// gives it, with the body already drained (up to maxDrain bytes) and
-// closed.
-func send(ctx context.Context, c *transport.Client, path string) (*http.Response, error) {
+// service entry. The request runs on a context derived from ctx, so the
+// probe can end the request itself when a body will not finish. A 2xx
+// returns the open response and the cancel of that context: the caller
+// reads and closes the body, then calls cancel. Any other status returns
+// the error statusToSentinel gives it, with the body already drained (up
+// to maxDrain bytes, for up to maxDrainTime) and closed.
+func send(ctx context.Context, c *transport.Client, path string) (*http.Response, context.CancelFunc, error) {
 	if path == "" || !strings.HasPrefix(path, "/") {
-		return nil, fmt.Errorf("%w: %q (must be a non-empty absolute path starting with '/')", ErrInvalidPath, path)
+		return nil, nil, fmt.Errorf("%w: %q (must be a non-empty absolute path starting with '/')", ErrInvalidPath, path)
 	}
 	// REQ-025: this leaf deliberately bypasses transport.Do (see the Live
 	// doc), so Do's central nil-Client guard never runs here — the probe
 	// carries its own.
 	if c == nil {
-		return nil, fmt.Errorf("admin: probe: %w: nil Client", transport.ErrInvalidConfig)
+		return nil, nil, fmt.Errorf("admin: probe: %w: nil Client", transport.ErrInvalidConfig)
 	}
 	entry, ok := c.Catalog().OpenEHRRest()
 	if !ok {
-		return nil, fmt.Errorf("admin: probe: %w: %s", transport.ErrServiceUnavailable, discovery.ServiceIDOpenEHRRest)
+		return nil, nil, fmt.Errorf("admin: probe: %w: %s", transport.ErrServiceUnavailable, discovery.ServiceIDOpenEHRRest)
 	}
 	if entry.BaseURL == nil {
-		return nil, fmt.Errorf("admin: probe: %w: %s has nil BaseURL", transport.ErrInvalidConfig, discovery.ServiceIDOpenEHRRest)
+		return nil, nil, fmt.Errorf("admin: probe: %w: %s has nil BaseURL", transport.ErrInvalidConfig, discovery.ServiceIDOpenEHRRest)
+	}
+	hc := c.HTTPClient()
+	if hc == nil {
+		return nil, nil, fmt.Errorf("admin: probe: %w: HTTPClient", transport.ErrInvalidConfig)
 	}
 	target := &url.URL{
 		Scheme: entry.BaseURL.Scheme,
 		Host:   entry.BaseURL.Host,
 		Path:   path,
 	}
+	ctx, cancel := context.WithCancel(ctx)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target.String(), nil)
 	if err != nil {
-		return nil, fmt.Errorf("admin: probe %s: build request: %w", target, err)
+		cancel()
+		return nil, nil, fmt.Errorf("admin: probe %s: build request: %w", target, err)
 	}
 	req.Header.Set("Accept", "application/json")
 
-	hc := c.HTTPClient()
-	if hc == nil {
-		return nil, fmt.Errorf("admin: probe: %w: HTTPClient", transport.ErrInvalidConfig)
-	}
 	resp, err := hc.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("admin: probe GET %s: %w", target, err)
+		cancel()
+		return nil, nil, fmt.Errorf("admin: probe GET %s: %w", target, err)
 	}
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		return resp, nil
+		return resp, cancel, nil
 	}
-	drainAndClose(resp)
+	drainAndClose(resp, cancel)
 	sentinel := statusToSentinel(resp.StatusCode)
 	if sentinel == nil {
-		return nil, fmt.Errorf("admin: probe %s: unexpected status %d", path, resp.StatusCode)
+		return nil, nil, fmt.Errorf("admin: probe %s: unexpected status %d", path, resp.StatusCode)
 	}
-	return nil, fmt.Errorf("admin: probe %s status=%d: %w", path, resp.StatusCode, sentinel)
+	return nil, nil, fmt.Errorf("admin: probe %s status=%d: %w", path, resp.StatusCode, sentinel)
 }
 
 // maxDrain is the most bytes drainAndClose reads from a body: 256 KiB, the
 // bound net/http's server applies when it reads what a handler left of a
 // request body to keep the connection alive (maxPostHandlerReadBytes in
-// net/http/server.go).
+// net/http/server.go). maxDrainTime bounds the same read in time.
 const maxDrain = 256 << 10
 
-// drainAndClose reads up to maxDrain bytes of what is left of the response
-// body and closes it. A body read to its end lets the underlying
-// connection be reused: probes run in tight loops (k8s liveness polling,
-// CDR benchmarks) where every dropped keep-alive becomes a re-handshake
-// cost. The cap keeps a body that never ends from holding the probe
-// until its context ends; a longer body is closed before its end, which
-// can cost the connection.
-func drainAndClose(resp *http.Response) {
+// maxDrainTime is the longest drainAndClose reads a body: 50 ms, the time
+// net/http's client gives its own drain of a body closed before its end
+// (maxPostCloseReadTime in net/http/transport.go).
+const maxDrainTime = 50 * time.Millisecond
+
+// drainAndClose reads what is left of the response body, up to maxDrain
+// bytes and for up to maxDrainTime, then closes the body and calls cancel,
+// the cancel of the request's context. A body read to its end lets the
+// underlying connection be reused: probes run in tight loops (k8s
+// liveness polling, CDR benchmarks) where every dropped keep-alive
+// becomes a re-handshake cost. The two bounds keep a body that never
+// ends, sent fast or slowly, from holding the probe until its context
+// ends. When the time runs out, cancel ends the request, which stops the
+// read and can cost the connection; so can a body longer than maxDrain,
+// which is closed before its end.
+func drainAndClose(resp *http.Response, cancel context.CancelFunc) {
+	timer := time.AfterFunc(maxDrainTime, cancel)
 	_, _ = io.CopyN(io.Discard, resp.Body, maxDrain)
+	timer.Stop()
 	_ = resp.Body.Close()
+	cancel()
 }
 
 // readReadyBody reads a 2xx readiness body under limit, where 0 selects

@@ -26,8 +26,10 @@
 // read failure is reached by unwrapping the error; both return nil bytes.
 //
 // A probe reads at most 256 KiB of a body it does not return (the 2xx
-// body Live and Ready discard, and any non-2xx body) before it closes it,
-// so a body that never ends cannot hold a probe until its context ends.
+// body Live and Ready discard, and any non-2xx body), for at most 50 ms,
+// before it closes it. So a body that never ends, sent fast or slowly,
+// cannot hold a probe until its context ends. When the 50 ms run out, the
+// probe ends its request, which can cost the connection.
 //
 // Probes reuse [transport]'s sentinel errors for the mapped codes but
 // bypass [transport.Client.Do]: they do no openEHR error envelope
