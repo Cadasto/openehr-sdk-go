@@ -88,7 +88,7 @@ func TestREQ107_ExistenceOnlyItemsGetNoUndescribedMember(t *testing.T) {
 		},
 		{
 			name: "control: ITEM_TREE items at cardinality 1..* with only a slot",
-			opt:  optTemplate("ITEM_TREE", optMultiple("items", optSlot("CLUSTER", "at0001"))),
+			opt:  optTemplate("ITEM_TREE", guardCountedMultiple("items", guardExistence11, optSlot("CLUSTER", "at0001"))),
 			want: stub + "(at0000)",
 		},
 		{

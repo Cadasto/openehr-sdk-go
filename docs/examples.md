@@ -491,7 +491,7 @@ go run ./cmd/examples/compile-build-validate path/to/template.opt
 
 ```text
 template             : vital_signs (vital_signs.opt)
-composition          : 9959 bytes canonical JSON, round-tripped
+composition          : 7066 bytes canonical JSON, round-tripped
 validation           : OK, no issues
 ```
 

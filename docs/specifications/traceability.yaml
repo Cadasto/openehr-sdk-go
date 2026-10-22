@@ -1467,6 +1467,8 @@ requirements:
       - openehr/instance/element_slot_test.go
       - openehr/instance/entry_codes_test.go
       - openehr/instance/event_multimedia_defaults_test.go
+      - openehr/instance/existence_only_internal_test.go
+      - openehr/instance/existence_only_items_test.go
       - openehr/instance/identity_stamp_test.go
       - openehr/instance/imports_test.go
       - openehr/instance/instance_test.go

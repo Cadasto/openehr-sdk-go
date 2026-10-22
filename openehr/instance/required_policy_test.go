@@ -93,7 +93,10 @@ type policyLevel struct {
 // optional archetype under an attribute, so each composition's content
 // holds only its first OBSERVATION, with what that OBSERVATION holds;
 // Required builds no optional archetype, only the composition's own and
-// its context. Each tree passes the template validator and the RM floor
+// its context. No policy builds a slot fill in vital_signs: the slots sit
+// in the items of an OBSERVATION's protocol or an event's state, which only
+// their existence requires, so those items get no member (What a visit
+// writes). Each tree passes the template validator and the RM floor
 // (PROBE-027).
 func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 	const encounter = "openEHR-EHR-COMPOSITION.encounter.v1"
@@ -104,19 +107,16 @@ func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 		{
 			name: "vital_signs",
 			want: map[instance.Policy]policyLevel{
-				instance.Large: {values: 516, archetypes: map[string]int{
+				instance.Large: {values: 365, archetypes: map[string]int{
 					encounter: 1,
-					"openEHR-EHR-OBSERVATION.blood_pressure.v1":       1,
-					"openEHR-EHR-OBSERVATION.body_temperature.v1":     1,
-					"openEHR-EHR-OBSERVATION.heart_rate.v1":           1,
-					"openEHR-EHR-OBSERVATION.respiration.v1":          1,
-					"openEHR-EHR-CLUSTER.device.v1":                   2,
-					"openEHR-EHR-CLUSTER.environmental_conditions.v1": 1,
+					"openEHR-EHR-OBSERVATION.blood_pressure.v1":   1,
+					"openEHR-EHR-OBSERVATION.body_temperature.v1": 1,
+					"openEHR-EHR-OBSERVATION.heart_rate.v1":       1,
+					"openEHR-EHR-OBSERVATION.respiration.v1":      1,
 				}},
-				instance.Medium: {values: 186, archetypes: map[string]int{
+				instance.Medium: {values: 141, archetypes: map[string]int{
 					encounter: 1,
 					"openEHR-EHR-OBSERVATION.blood_pressure.v1": 1,
-					"openEHR-EHR-CLUSTER.device.v1":             1,
 				}},
 				instance.Required: {values: 53, archetypes: map[string]int{encounter: 1}},
 			},
@@ -179,9 +179,9 @@ func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 
 // TestREQ107_ZeroPolicyBuildsMedium is the REQ-107 check of Levels and
 // names on vital_signs: Options with no Policy builds the medium level, the
-// tree Medium builds in TestREQ107_PoliciesBuildTheirLevels, with 186 JSON
+// tree Medium builds in TestREQ107_PoliciesBuildTheirLevels, with 141 JSON
 // values and, besides the composition's own archetype, only the first
-// optional content OBSERVATION and the device CLUSTER it holds.
+// optional content OBSERVATION.
 func TestREQ107_ZeroPolicyBuildsMedium(t *testing.T) {
 	c := compileFixture(t, "vital_signs")
 	comp := generateComposition(t, c, instance.Options{
@@ -190,7 +190,7 @@ func TestREQ107_ZeroPolicyBuildsMedium(t *testing.T) {
 		Now:       defaultsNow,
 	})
 	tree := decodedJSON(t, comp)
-	if got, want := jsonValueCount(tree), 186; got != want {
+	if got, want := jsonValueCount(tree), 141; got != want {
 		t.Errorf("Generate(vital_signs) with no Policy holds %d JSON values, want Medium's %d", got, want)
 	}
 	got := make(map[string]int)
@@ -198,7 +198,6 @@ func TestREQ107_ZeroPolicyBuildsMedium(t *testing.T) {
 	want := map[string]int{
 		"openEHR-EHR-COMPOSITION.encounter.v1":      1,
 		"openEHR-EHR-OBSERVATION.blood_pressure.v1": 1,
-		"openEHR-EHR-CLUSTER.device.v1":             1,
 	}
 	if !maps.Equal(got, want) {
 		t.Errorf("Generate(vital_signs) with no Policy archetype ids = %v, want Medium's %v", got, want)

@@ -1263,8 +1263,11 @@ func includedPerOPT(optNode *tcimpl.CompiledNode, attrName string) bool {
 // with no occurrences, or an unbounded lower, counts as required
 // (childRequired) and gets one under every policy. Under Large and Medium a
 // child ownMemberSkipped names gets none of its own either. The overall attribute's
-// cardinality.upper (default unbounded) caps the total, and its lower
-// bound is met by the top-up below under every policy.
+// cardinality.upper (default unbounded) caps the total, and the count the
+// attribute needs (remainingLowerNeeded) is met by the top-up below under
+// every policy, from the child topUpSeed names. Where only the attribute's
+// existence asks for a member, the top-up builds one only of a child that
+// needs no undescribed content, and none where there is no such child.
 func (g *generator) materialiseMultiple(
 	optNode *tcimpl.CompiledNode,
 	attr *tcimpl.CompiledAttribute,
@@ -1277,12 +1280,14 @@ func (g *generator) materialiseMultiple(
 	// here and is built as one the OPT leaves silent.
 	children := tcimpl.AllowedChildNodes(attr)
 	if len(children) == 0 {
-		// Implicit / OPT-silent multi-valued attribute. A required one
-		// (BMM-mandatory, or existence or cardinality lower of 1 or more)
-		// gets one default child of the BMM-resolved element type so the
-		// validator's required-attribute / cardinality.lower check
-		// passes; downstream consumers (REQ-101 Builder) overwrite. An
-		// optional one gets no child.
+		// Implicit / OPT-silent multi-valued attribute. One the BMM marks
+		// mandatory, or whose cardinality lower bound is 1 or more, gets
+		// the members it needs (remainingLowerNeeded) as default children
+		// of the BMM-resolved element type, so the RM floor's
+		// mandatory-attribute check and the validator's cardinality.lower
+		// check pass; downstream consumers (REQ-101 Builder) overwrite.
+		// One only its existence requires, and an optional one, get no
+		// child: a list with no member meets its existence.
 		return g.materialiseImplicitMultiple(optNode, attr, parentRM)
 	}
 	upperBound := -1 // -1 == unbounded
@@ -1327,26 +1332,22 @@ func (g *generator) materialiseMultiple(
 			total++
 		}
 	}
-	// Top-up to satisfy the attribute's overall lower bound when the
-	// members appended so far fall short of it, under every policy (e.g.
-	// Large or Medium skipped a child the lower bound still needs, or
-	// Required built no member of an optional child).
-	// When every OPT child is a slot we synthesise a slot-shaped
-	// fill: an RM value of the slot's RMTypeName stamped (by
-	// stampSlotFill) with an archetype id drawn from the parsed
-	// REQ-104 include grammar, or from the RM-type-prefix fallback
-	// only when no includes were parsed.
+	// Top-up to the count the attribute needs when the members appended
+	// so far fall short of it, under every policy (e.g. Large or Medium
+	// skipped a child the lower bound still needs, or Required built no
+	// member of an optional child). Where the BMM, the cardinality or a
+	// child's occurrences asks for the member (not existenceOnly) and
+	// every OPT child is a slot, the seed is the first slot, and
+	// buildChild synthesises a slot-shaped fill: an RM value of the slot's
+	// RMTypeName stamped (by stampSlotFill) with an archetype id drawn
+	// from the parsed REQ-104 include grammar, or from the RM-type-prefix
+	// fallback only when no includes were parsed. Where only the
+	// existence asks for it, there is no seed unless a child needs no
+	// undescribed content (topUpSeed), and the attribute keeps no member.
 	if needed := remainingLowerNeeded(attr, total); needed > 0 {
-		// The first child that needs no content the OPT does not describe
-		// and whose identity no earlier sibling carries, else the first
-		// that is not a slot, else the first slot.
-		seed := g.firstDescribed(children)
+		seed := g.topUpSeed(attr, children)
 		if seed == nil {
-			seed = firstNonSlot(children)
-		}
-		if seed == nil {
-			// Every child is a slot; children is not empty here.
-			seed = children[0]
+			return nil
 		}
 		for needed > 0 && (upperBound < 0 || total < upperBound) {
 			rmChild, err := g.buildChild(seed)
@@ -1416,6 +1417,27 @@ func (g *generator) stampSlotFill(rmValue any, slot *tcimpl.CompiledNode) bool {
 	return true
 }
 
+// topUpSeed returns the allowed child of attr whose members top attr up to
+// the count it needs: the first child that needs no content the OPT does
+// not describe and whose identity no earlier sibling carries
+// (firstDescribed), else the first that is not a slot, else the first slot.
+// Where only attr's existence asks for a member (existenceOnly), it returns
+// the first of these or nil, so the attribute gets no undescribed member: a
+// list with no member meets its existence.
+func (g *generator) topUpSeed(attr *tcimpl.CompiledAttribute, children []*tcimpl.CompiledNode) *tcimpl.CompiledNode {
+	if seed := g.firstDescribed(children); seed != nil {
+		return seed
+	}
+	if existenceOnly(attr) {
+		return nil
+	}
+	if seed := firstNonSlot(children); seed != nil {
+		return seed
+	}
+	// Every child is a slot; children is not empty here.
+	return children[0]
+}
+
 // firstNonSlot returns the first OPT child that is not a slot, or
 // nil when every child is a slot.
 func firstNonSlot(children []*tcimpl.CompiledNode) *tcimpl.CompiledNode {
@@ -1427,13 +1449,16 @@ func firstNonSlot(children []*tcimpl.CompiledNode) *tcimpl.CompiledNode {
 	return nil
 }
 
-// materialiseImplicitMultiple creates one default child for a
-// BMM-mandatory multi-valued attribute the OPT did not pin. Uses
-// the attribute's BMM element type via [concreteFor]; silently no-op
-// when the type is outside the typereg registry — the validator
-// will flag it. An attribute that is optional (neither BMM-mandatory,
-// nor existence or cardinality lower ≥ 1) gets no child. A required
-// one whose child would be an archetype root is refused with
+// materialiseImplicitMultiple creates the default children of a
+// multi-valued attribute the OPT gives no allowed child: as many as it
+// needs (remainingLowerNeeded) where the BMM marks it mandatory or its
+// cardinality lower bound is 1 or more. Uses the attribute's BMM element
+// type via [concreteFor]; silently no-op when the type is outside the
+// typereg registry — the validator will flag it. An attribute that is
+// optional (neither BMM-mandatory, nor existence or cardinality lower ≥ 1)
+// gets no child, and neither does one only its existence requires
+// (existenceOnly), since a list with no member meets its existence. One
+// that needs a child that would be an archetype root is refused with
 // [ErrArchetypeIDMissing].
 func (g *generator) materialiseImplicitMultiple(
 	optNode *tcimpl.CompiledNode,
@@ -1441,7 +1466,7 @@ func (g *generator) materialiseImplicitMultiple(
 	parentRM any,
 ) error {
 	rmType := attr.RMTypeName()
-	if rmType == "" {
+	if rmType == "" || existenceOnly(attr) {
 		return nil
 	}
 	// An optional attribute the OPT leaves empty stays empty. A child
@@ -1458,8 +1483,8 @@ func (g *generator) materialiseImplicitMultiple(
 			// Outside the registry: left to the validator.
 			return nil
 		}
-		// A required attribute whose child would be an archetype root is
-		// refused instead, for the same reason: the generator does not
+		// An attribute that needs a child that would be an archetype root
+		// is refused instead, for the same reason: the generator does not
 		// invent an archetype id.
 		if built := rmTypeOf(rmChild); rmroots.IsArchetypeRoot(built) {
 			return fmt.Errorf("%w: %s for %s.%s at %s (required, but the template names no child)",
@@ -1476,12 +1501,15 @@ func (g *generator) materialiseImplicitMultiple(
 	return nil
 }
 
-// remainingLowerNeeded returns the count still required to satisfy
-// the attribute's lower bound. Combines cardinality.lower (when
-// present) with the existence ≥ 1 requirement — REQ-102 v2 flags
-// an empty multi-valued attribute as "required" whenever existence
-// pins lower ≥ 1, regardless of cardinality.lower (cardinality and
-// existence are orthogonal in AOM 1.4).
+// remainingLowerNeeded returns the count of members attr still needs,
+// given current: its cardinality lower bound (when present), or one member
+// when that bound is 0 and the BMM marks the attribute mandatory or its
+// existence lower bound is at least 1. Cardinality and existence are
+// separate in AOM 1.4: existence asks for the container and cardinality
+// for its members. So where only the existence asks for the member
+// (existenceOnly), the top-up takes it only from a child that needs no
+// undescribed content (topUpSeed), and materialiseImplicitMultiple builds
+// none: a list with no member meets that existence.
 func remainingLowerNeeded(attr *tcimpl.CompiledAttribute, current int) int {
 	low := 0
 	if cm := attr.ChildMultiplicity(); cm != nil && !cm.LowerUnbounded() {
@@ -1494,6 +1522,32 @@ func remainingLowerNeeded(attr *tcimpl.CompiledAttribute, current int) int {
 		return 0
 	}
 	return low - current
+}
+
+// existenceOnly reports whether only attr's existence asks for a member:
+// its existence lower bound is bounded and at least 1, the BMM does not
+// mark it mandatory, and neither its cardinality lower bound nor the
+// occurrences lower bound of an allowed child is bounded and at least 1. A
+// child with no occurrences does not count, nor does a slot, whose
+// occurrences the parser does not read. A multi-valued attribute with no
+// member meets such an existence, since existence asks for the container
+// and the counts for its members.
+func existenceOnly(attr *tcimpl.CompiledAttribute) bool {
+	if attr.Required() || lowerAtLeastOne(attr.ChildMultiplicity()) {
+		return false
+	}
+	if slices.ContainsFunc(tcimpl.AllowedChildNodes(attr), func(c *tcimpl.CompiledNode) bool {
+		return lowerAtLeastOne(c.Occurrences())
+	}) {
+		return false
+	}
+	return isRequired(attr)
+}
+
+// lowerAtLeastOne reports whether the interval m has a bounded lower bound
+// of 1 or more. A nil interval, one the OPT does not state, has none.
+func lowerAtLeastOne(m *template.Multiplicity) bool {
+	return m != nil && !m.LowerUnbounded() && m.Lower() >= 1
 }
 
 // makeChild constructs a fresh RM instance for the OPT child's
@@ -2058,8 +2112,10 @@ func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 	return nil
 }
 
-// isRequired mirrors validation/walk_composition.go's isRequired —
-// BMM-mandatory OR existence lower ≥ 1.
+// isRequired reports whether the BMM marks attr mandatory or its existence
+// lower bound is bounded and at least 1. On a multi-valued attribute that
+// existence asks for the container alone: existenceOnly tells where it is
+// the only thing that asks for a member.
 func isRequired(attr *tcimpl.CompiledAttribute) bool {
 	if attr.Required() {
 		return true
