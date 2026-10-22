@@ -45,11 +45,13 @@ var (
 // Precedence 3), and the value ExampleFill takes from it. A C_INTEGER on
 // an attribute of the RM type Integer, which is 32 bits wide, is narrowed
 // to that range, and on the precision of a DV_QUANTITY or a DV_PROPORTION
-// to the part of it from -1 up (narrowInteger). A C_DV_ORDINAL keeps the
-// pairs whose value is an Integer (narrowOrdinal). Any other pc comes back
-// as it is, with its own example value. Where nothing of pc is left, the
-// leaf fails with an error wrapping ErrConstraintUnsatisfiable that names
-// the RM type, the attribute and the OPT path, and no value.
+// to the part of it from -1 up, a side it leaves open being closed within
+// the sampler's window of the side it bounds (narrowInteger). A
+// C_DV_ORDINAL keeps the pairs whose value is an Integer (narrowOrdinal).
+// Any other pc comes back as it is, with its own example value. Where
+// nothing of pc is left, the leaf fails with an error wrapping
+// ErrConstraintUnsatisfiable that names the RM type, the attribute and the
+// OPT path, and no value.
 func narrowedLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, pc constraints.PrimitiveConstraint) (constraints.PrimitiveConstraint, any, error) {
 	unsatisfiable := func(attr string, err error) error {
 		return fmt.Errorf("%w: %s.%s at %s: %w", ErrConstraintUnsatisfiable, rmTypeOf(rmValue), attr, leafPath(leaf), err)
@@ -107,7 +109,11 @@ func holdsInteger(rmValue any, attr string) bool {
 // that an example value or a draw is one the attribute can take. It
 // returns c itself when nothing it would give leaves limits, and
 // limits.none when no value of c is inside them. The narrowed range holds
-// the values of c inside limits, both its ends included.
+// the values of c inside limits, both its ends included. A range that c
+// leaves open on one side, and that has no list to draw from, is closed on
+// that side no further than the sampler's window (sampleWindow) from the
+// side c bounds, so a draw from the narrowed range stays where the sampler
+// would draw from c, not across the whole of limits.
 func narrowInteger(c constraints.CInteger, limits intLimits) (constraints.CInteger, error) {
 	if !leavesLimits(c, limits) {
 		return c, nil
@@ -115,6 +121,14 @@ func narrowInteger(c constraints.CInteger, limits intLimits) (constraints.CInteg
 	lo, hi, ok := boundsWithin(c.Range, limits)
 	if !ok {
 		return c, limits.none
+	}
+	if len(c.List) == 0 {
+		switch {
+		case c.Range.UpperUnbounded && !c.Range.LowerUnbounded:
+			hi = min(hi, lo+sampleWindow)
+		case c.Range.LowerUnbounded && !c.Range.UpperUnbounded:
+			lo = max(lo, hi-sampleWindow)
+		}
 	}
 	narrowed := c
 	narrowed.Range = constraints.NumericRange{
