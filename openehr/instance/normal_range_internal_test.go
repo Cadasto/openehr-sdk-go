@@ -144,6 +144,95 @@ func TestREQ107_NormalRangeSettleEdges(t *testing.T) {
 			want:  "0",
 		},
 		{
+			name: "DV_COUNT H, inside the range, the step above the upper bound",
+			v: &rm.DVCount{
+				Magnitude: 5, NormalStatus: normalStatusCode("H"),
+				NormalRange: closedRange(rm.DVCount{Magnitude: 1}, rm.DVCount{Magnitude: 9}),
+			},
+			value: func(v any) string { return fmt.Sprint(v.(*rm.DVCount).Magnitude) },
+			want:  "10",
+		},
+		{
+			name: "DV_COUNT HHH, inside the range, the step above the upper bound",
+			v: &rm.DVCount{
+				Magnitude: 5, NormalStatus: normalStatusCode("HHH"),
+				NormalRange: closedRange(rm.DVCount{Magnitude: 1}, rm.DVCount{Magnitude: 9}),
+			},
+			value: func(v any) string { return fmt.Sprint(v.(*rm.DVCount).Magnitude) },
+			want:  "10",
+		},
+		{
+			name: "DV_COUNT L, inside the range, the step below the lower bound",
+			v: &rm.DVCount{
+				Magnitude: 5, NormalStatus: normalStatusCode("L"),
+				NormalRange: closedRange(rm.DVCount{Magnitude: 1}, rm.DVCount{Magnitude: 9}),
+			},
+			value: func(v any) string { return fmt.Sprint(v.(*rm.DVCount).Magnitude) },
+			want:  "0",
+		},
+		{
+			name: "DV_COUNT LLL, inside the range, the step below the lower bound",
+			v: &rm.DVCount{
+				Magnitude: 5, NormalStatus: normalStatusCode("LLL"),
+				NormalRange: closedRange(rm.DVCount{Magnitude: 1}, rm.DVCount{Magnitude: 9}),
+			},
+			value: func(v any) string { return fmt.Sprint(v.(*rm.DVCount).Magnitude) },
+			want:  "0",
+		},
+		{
+			// A value outside the range already keeps the rule, on whichever
+			// side it lies: the status steers a choice among candidates, it
+			// does not move the value.
+			name: "DV_COUNT H, already below the range, stays",
+			v: &rm.DVCount{
+				Magnitude: 0, NormalStatus: normalStatusCode("H"),
+				NormalRange: closedRange(rm.DVCount{Magnitude: 1}, rm.DVCount{Magnitude: 9}),
+			},
+			value: func(v any) string { return fmt.Sprint(v.(*rm.DVCount).Magnitude) },
+			want:  "0",
+		},
+		{
+			name: "DV_COUNT L, already above the range, stays",
+			v: &rm.DVCount{
+				Magnitude: 20, NormalStatus: normalStatusCode("L"),
+				NormalRange: closedRange(rm.DVCount{Magnitude: 1}, rm.DVCount{Magnitude: 9}),
+			},
+			value: func(v any) string { return fmt.Sprint(v.(*rm.DVCount).Magnitude) },
+			want:  "20",
+		},
+		{
+			// A range open above has no upper bound to step from, so a high
+			// status takes the only side left, below the lower bound.
+			name: "DV_COUNT H, range open above, the step below the lower bound",
+			v: &rm.DVCount{
+				Magnitude: 7, NormalStatus: normalStatusCode("H"),
+				NormalRange: &rm.DVInterval[rm.DVCount]{UpperUnbounded: true, LowerIncluded: true, Lower: rm.DVCount{Magnitude: 5}},
+			},
+			value: func(v any) string { return fmt.Sprint(v.(*rm.DVCount).Magnitude) },
+			want:  "4",
+		},
+		{
+			name: "DV_COUNT L, range open below, the step above the upper bound",
+			v: &rm.DVCount{
+				Magnitude: 3, NormalStatus: normalStatusCode("L"),
+				NormalRange: &rm.DVInterval[rm.DVCount]{LowerUnbounded: true, UpperIncluded: true, Upper: rm.DVCount{Magnitude: 5}},
+			},
+			value: func(v any) string { return fmt.Sprint(v.(*rm.DVCount).Magnitude) },
+			want:  "6",
+		},
+		{
+			// No second follows 23:59:59 on the same day, so a high status has
+			// no step above the upper bound and falls back to the step below
+			// the lower.
+			name: "DV_TIME H, no step above 23:59:59, the step below the lower bound",
+			v: &rm.DVTime{
+				Value: "13:00:00", NormalStatus: normalStatusCode("H"),
+				NormalRange: closedRange[rm.DVOrdered](&rm.DVTime{Value: "12:00:00"}, &rm.DVTime{Value: "23:59:59"}),
+			},
+			value: func(v any) string { return v.(*rm.DVTime).Value },
+			want:  "11:59:59",
+		},
+		{
 			name: "DV_PROPORTION fraction over 3, N, the whole numerator next to the lower bound",
 			v: &rm.DVProportion{
 				Numerator: 0, Denominator: 3, Type: pkFraction, NormalStatus: normalStatusCode("N"),

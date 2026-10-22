@@ -207,6 +207,10 @@ type normalCase struct {
 	// no pair the generator can compare (REQ-107 § Contract Intervals), so
 	// it is left as generated and the rule is not checked.
 	asGenerated bool
+	// placeholderStatus is set where the normal_status is none of the
+	// openEHR normal statuses, which the validators refuse
+	// (DV_ORDERED.Normal_status_validity), so only the rule is checked.
+	placeholderStatus bool
 }
 
 // TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange is the
@@ -296,7 +300,13 @@ func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T)
 		{
 			name:  "DV_DATE range [2020-01-01..2020-01-01], H",
 			value: optNode("DV_DATE", "", normalRangeOver("DV_DATE", optNode("DV_DATE", ""), optNode("DV_DATE", "")), normalStatus("H")),
-			want: "DV_DATE 2019-12-31; normal_status openehr_normal_statuses::H; " +
+			want: "DV_DATE 2020-01-02; normal_status openehr_normal_statuses::H; " +
+				"normal_range [*DV_DATE 2020-01-01 .. *DV_DATE 2020-01-01]" + noRefs,
+		},
+		{
+			name:  "DV_DATE range [2020-01-01..2020-01-01], L",
+			value: optNode("DV_DATE", "", normalRangeOver("DV_DATE", optNode("DV_DATE", ""), optNode("DV_DATE", "")), normalStatus("L")),
+			want: "DV_DATE 2019-12-31; normal_status openehr_normal_statuses::L; " +
 				"normal_range [*DV_DATE 2020-01-01 .. *DV_DATE 2020-01-01]" + noRefs,
 		},
 		{
@@ -364,25 +374,35 @@ func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T)
 			want: "DV_COUNT 20; normal_status openehr_normal_statuses::H; normal_range [DV_COUNT 1 .. DV_COUNT 9]" + noRefs,
 		},
 		{
-			// The step below the lower bound is tried before the step above
-			// it: -1 before 1, and for a quantity and a proportion as well,
-			// where the unconstrained example is 0 and 1.
+			// A high status takes the step above the upper bound before any
+			// other candidate: 1, not the -1 below the lower bound, and for a
+			// quantity and a proportion as well, where the unconstrained
+			// example is 0 and 1. The rows of
+			// TestREQ107_NormalStatusSteersTheValueToItsSide pin the order for
+			// the other statuses.
 			name: "DV_COUNT with no magnitude constraint, range [0..0], H",
 			value: optNode("DV_COUNT", "", normalRangeOver("DV_COUNT", countValue("0"), countValue("0")),
 				normalStatus("H")),
-			want: "DV_COUNT -1; normal_status openehr_normal_statuses::H; normal_range [DV_COUNT 0 .. DV_COUNT 0]" + noRefs,
+			want: "DV_COUNT 1; normal_status openehr_normal_statuses::H; normal_range [DV_COUNT 0 .. DV_COUNT 0]" + noRefs,
 		},
 		{
 			name: "DV_QUANTITY with no magnitude constraint, range [0 mm..0 mm], H",
 			value: optNode("DV_QUANTITY", "", optSingle("units", guardString("mm")),
 				normalRangeOver("DV_QUANTITY", quantityValue("0"), quantityValue("0")), normalStatus("H")),
-			want: "DV_QUANTITY -1 mm; normal_status openehr_normal_statuses::H; normal_range [DV_QUANTITY 0 mm .. DV_QUANTITY 0 mm]" + noRefs,
+			want: "DV_QUANTITY 1 mm; normal_status openehr_normal_statuses::H; normal_range [DV_QUANTITY 0 mm .. DV_QUANTITY 0 mm]" + noRefs,
 		},
 		{
 			name: "DV_PROPORTION unitary with no numerator constraint, range [1/1..1/1], H",
 			value: optNode("DV_PROPORTION", "", optSingle("denominator", dvReal("1")), optSingle("type", dvInteger("1")),
 				normalRangeOver("DV_PROPORTION", proportionValue("1"), proportionValue("1")), normalStatus("H")),
-			want: "DV_PROPORTION 0/1 type 1; normal_status openehr_normal_statuses::H; normal_range [DV_PROPORTION 1/1 type 1 .. DV_PROPORTION 1/1 type 1]" + noRefs,
+			want: "DV_PROPORTION 2/1 type 1; normal_status openehr_normal_statuses::H; normal_range [DV_PROPORTION 1/1 type 1 .. DV_PROPORTION 1/1 type 1]" + noRefs,
+		},
+		{
+			// A low status takes the step below the lower bound: -1 mm.
+			name: "DV_QUANTITY with no magnitude constraint, range [0 mm..0 mm], L",
+			value: optNode("DV_QUANTITY", "", optSingle("units", guardString("mm")),
+				normalRangeOver("DV_QUANTITY", quantityValue("0"), quantityValue("0")), normalStatus("L")),
+			want: "DV_QUANTITY -1 mm; normal_status openehr_normal_statuses::L; normal_range [DV_QUANTITY 0 mm .. DV_QUANTITY 0 mm]" + noRefs,
 		},
 		{
 			// The OPT lists 0, 7, 5 and 20. The middle of the range, 5, is
@@ -445,6 +465,16 @@ func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T)
 			asGenerated: true,
 		},
 	}
+	runNormalCases(t, cases)
+}
+
+// runNormalCases generates each case under every policy, both value fills
+// and with and without the implicit attributes, and checks the value as
+// normalString renders it, DV_ORDERED Normal_range_and_status_consistency
+// unless the case is asGenerated, and that the root passes both
+// validators.
+func runNormalCases(t *testing.T, cases []normalCase) {
+	t.Helper()
 	for _, tc := range cases {
 		for _, implicit := range []bool{true, false} {
 			c := compileOPTText(t, optTemplate("ELEMENT", optSingle("value", tc.value)), implicit)
@@ -468,11 +498,116 @@ func TestREQ107_NormalStatusKeepsTheValueOnItsSideOfTheNormalRange(t *testing.T)
 					if !tc.asGenerated {
 						checkNormalConsistency(t, el.Value)
 					}
-					checkValid(t, out, c)
+					if !tc.placeholderStatus {
+						checkValid(t, out, c)
+					}
 				})
 			}
 		}
 	}
+}
+
+// placeholderStatusNode is a normal_status the OPT pins to a placeholder
+// code of a local terminology, which is none of the openEHR normal statuses.
+var placeholderStatusNode = optSingle("normal_status", optCodePhrase("local", "at0000"))
+
+// TestREQ107_NormalStatusSteersTheValueToItsSide is the REQ-107 Precedence 3
+// check of the side a value takes when its normal_status needs it outside
+// its normal_range: a status whose code string starts with H (H, HH, HHH of
+// the openEHR normal statuses code set) takes the step above the upper
+// bound, one that starts with L (L, LL, LLL) the step below the lower bound,
+// and any other status, here a placeholder code of a local terminology,
+// keeps the order settleNormalRange documents, which tries the step below
+// the lower bound before the step above the upper. The range holds the
+// unconstrained example value, so each fill starts from a value inside it.
+// It holds for a DV_COUNT, a DV_QUANTITY and a DV_PROPORTION, under every
+// policy, both value fills, and with and without the implicit attributes.
+func TestREQ107_NormalStatusSteersTheValueToItsSide(t *testing.T) {
+	const noRefs = "; other_reference_ranges []"
+	type kind struct {
+		name string
+		// build is the ELEMENT's value node for a normal_status node.
+		build func(status string) string
+		// render is the settled value, then the status code, then the range.
+		render func(value, status string) string
+		// below and above are the value one step below the lower bound and
+		// one step above the upper.
+		below, above string
+	}
+	kinds := []kind{
+		{
+			name: "DV_COUNT with no magnitude constraint, range [0..0]",
+			build: func(status string) string {
+				return optNode("DV_COUNT", "", normalRangeOver("DV_COUNT", countValue("0"), countValue("0")), status)
+			},
+			render: func(value, status string) string {
+				return "DV_COUNT " + value + "; normal_status " + status + "; normal_range [DV_COUNT 0 .. DV_COUNT 0]" + noRefs
+			},
+			below: "-1", above: "1",
+		},
+		{
+			name: "DV_QUANTITY with no magnitude constraint, range [0 mm..0 mm]",
+			build: func(status string) string {
+				return optNode("DV_QUANTITY", "", optSingle("units", guardString("mm")),
+					normalRangeOver("DV_QUANTITY", quantityValue("0"), quantityValue("0")), status)
+			},
+			render: func(value, status string) string {
+				return "DV_QUANTITY " + value + " mm; normal_status " + status +
+					"; normal_range [DV_QUANTITY 0 mm .. DV_QUANTITY 0 mm]" + noRefs
+			},
+			below: "-1", above: "1",
+		},
+		{
+			name: "DV_PROPORTION unitary with no numerator constraint, range [1/1..1/1]",
+			build: func(status string) string {
+				return optNode("DV_PROPORTION", "", optSingle("denominator", dvReal("1")), optSingle("type", dvInteger("1")),
+					normalRangeOver("DV_PROPORTION", proportionValue("1"), proportionValue("1")), status)
+			},
+			render: func(value, status string) string {
+				return "DV_PROPORTION " + value + "/1 type 1; normal_status " + status +
+					"; normal_range [DV_PROPORTION 1/1 type 1 .. DV_PROPORTION 1/1 type 1]" + noRefs
+			},
+			below: "0", above: "2",
+		},
+	}
+	statuses := []struct {
+		code string
+		// node is the OPT's normal_status, and rendered how normalString
+		// renders it.
+		node, rendered string
+		// above is set where the status takes the step above the upper
+		// bound, below where it takes the step below the lower, and neither
+		// where it keeps the documented order, whose first outside candidate
+		// is the step below.
+		above, below bool
+		// placeholder is set where the status is none of the openEHR normal
+		// statuses.
+		placeholder bool
+	}{
+		{code: "H", node: normalStatus("H"), rendered: "openehr_normal_statuses::H", above: true},
+		{code: "HH", node: normalStatus("HH"), rendered: "openehr_normal_statuses::HH", above: true},
+		{code: "HHH", node: normalStatus("HHH"), rendered: "openehr_normal_statuses::HHH", above: true},
+		{code: "L", node: normalStatus("L"), rendered: "openehr_normal_statuses::L", below: true},
+		{code: "LL", node: normalStatus("LL"), rendered: "openehr_normal_statuses::LL", below: true},
+		{code: "LLL", node: normalStatus("LLL"), rendered: "openehr_normal_statuses::LLL", below: true},
+		{code: "placeholder at0000", node: placeholderStatusNode, rendered: "local::at0000", placeholder: true},
+	}
+	var cases []normalCase
+	for _, k := range kinds {
+		for _, st := range statuses {
+			value := k.below
+			if st.above {
+				value = k.above
+			}
+			cases = append(cases, normalCase{
+				name:              k.name + ", " + st.code,
+				value:             k.build(st.node),
+				want:              k.render(value, st.rendered),
+				placeholderStatus: st.placeholder,
+			})
+		}
+	}
+	runNormalCases(t, cases)
 }
 
 // TestREQ107_NormalRangeWithNoConsistentValueIsUnsatisfiable is the REQ-107
