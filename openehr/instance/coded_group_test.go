@@ -537,8 +537,9 @@ func checkOnlyBroken(t *testing.T, validator string, issues []validation.Issue, 
 // REQ-107 Precedence 4 check on a DV_PERIODIC_TIME_SPECIFICATION's formalism,
 // which RM Value_valid keeps to HL7:PIVL or HL7:EIVL: where the OPT's
 // C_STRING lists foo and HL7:EIVL, the walk's foo gives way to HL7:EIVL,
-// without a draw, since the OPT rejects the default HL7:PIVL; where it lists
-// foo alone, foo stays (REQ-107 § Exceptions and known gaps). The RM floor
+// without a draw, since the OPT rejects the default HL7:PIVL, and so it does
+// where a pattern admits foo or HL7:EIVL; where it lists foo alone, foo
+// stays (REQ-107 § Exceptions and known gaps). The RM floor
 // does not evaluate Value_valid, so the second root is not validated: a
 // silent validator would prove nothing there. Each holds under every
 // policy, ExampleFill and randomSeeds RandomFill sources, and both compile
@@ -550,6 +551,7 @@ func TestREQ107_PeriodicFormalismTakesHL7EIVLWhereTheOPTRejectsHL7PIVL(t *testin
 	}{
 		{name: "foo or HL7:EIVL", list: "<list>foo</list><list>HL7:EIVL</list>", want: "HL7:EIVL", validate: true},
 		{name: "foo alone", list: "<list>foo</list>", want: "foo"},
+		{name: "a pattern admitting foo or HL7:EIVL", list: "<pattern>foo|HL7:EIVL</pattern>", want: "HL7:EIVL", validate: true},
 	}
 	for _, tc := range cases {
 		value := optNode("DV_PERIODIC_TIME_SPECIFICATION", "", optSingle("value", optNode("DV_PARSABLE", "",
