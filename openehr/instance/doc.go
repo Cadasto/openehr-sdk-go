@@ -115,7 +115,13 @@
 // that side. Where nothing is left, Generate returns an error wrapping
 // [ErrConstraintUnsatisfiable]. Where the template gives an RM attribute
 // no value, the generator writes an RM-valid default, unless the
-// template's own constraint on that attribute rejects it. A DV_PROPORTION
+// template's own constraint on that attribute rejects it. A coded
+// attribute the RM keeps within a group or a code set of the openEHR
+// terminology, such as a participation's mode, a text's language or a
+// multimedia value's media type, keeps a code the walk wrote that the set
+// has; otherwise it takes, without a draw, its default where the template
+// admits it, else the first code the template lists that the set has, and
+// the walk's code stays where the template lists none. A DV_PROPORTION
 // is then settled to the rules of its kind, inside the template's
 // constraints on its parts: a unitary proportion over 1, a percent over
 // 100, a fraction or an integer fraction over whole numbers, any
@@ -142,7 +148,9 @@
 // language, encoding or charset the template names with no code, on an
 // entry, a text or an encapsulated value, takes Options.Language in
 // ISO_639-1 or UTF-8 in IANA_character-sets, and a periodic time
-// specification's value takes the formalism HL7:PIVL.
+// specification's value keeps the formalism HL7:PIVL or HL7:EIVL the walk
+// wrote, else takes HL7:PIVL, or HL7:EIVL where the template rejects
+// HL7:PIVL.
 //
 // # Trust model
 //

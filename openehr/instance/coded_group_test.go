@@ -4,6 +4,7 @@ import (
 	"fmt"
 	mrand "math/rand/v2"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
@@ -118,11 +119,11 @@ func elementValueOPT(rmType string, attrs ...string) string {
 // goes with any listed code.
 func optCodePhraseStrings(terminologies, codes []string) string {
 	list := func(items []string) string {
-		var s string
+		var s strings.Builder
 		for _, item := range items {
-			s += "<list>" + item + "</list>"
+			s.WriteString("<list>" + item + "</list>")
 		}
-		return s
+		return s.String()
 	}
 	return optNode("CODE_PHRASE", "",
 		optSingle("terminology_id", optNode("TERMINOLOGY_ID", "", optStringAttr("value", list(terminologies)))),
@@ -427,6 +428,43 @@ func TestREQ107_CodedAttributeKeepsToItsGroupOrCodeSet(t *testing.T) {
 						checkInSet(t, tc, c, inSetOptions(policy, instance.RandomFill, seed))
 					})
 				}
+			}
+		}
+	}
+}
+
+// TestREQ107_TransitionLeadsIntoTheSettledCurrentState is the REQ-107 RM
+// defaults check that an ISM_TRANSITION's transition the OPT names with no
+// code is the one that leads into the current state as Precedence 4
+// settles it: where the OPT lists a code outside the instruction states
+// group before 245|active|, the current state is active and the transition
+// 540|start|, not the 535|initiate| beside a state outside the group. It
+// holds under every policy, ExampleFill and randomSeeds RandomFill sources,
+// and both compile modes, and the root passes both validators.
+func TestREQ107_TransitionLeadsIntoTheSettledCurrentState(t *testing.T) {
+	opt := optISMTransition(optSingle("current_state", optCodedText(terminology.ID, "271", "245")),
+		optSingle("transition", bareCodedText))
+	for _, implicit := range []bool{true, false} {
+		c := compileOPTText(t, opt, implicit)
+		for _, policy := range everyPolicy {
+			check := func(t *testing.T, opts instance.Options) {
+				t.Helper()
+				out, err := instance.Generate(t.Context(), c, opts)
+				if err != nil {
+					t.Fatalf("Generate: %v, want a root", err)
+				}
+				iv := actionTransition(t, out)
+				checkOpenEHRCode(t, "ISM_TRANSITION.current_state", iv.CurrentState, terminology.InstructionStates, "245")
+				checkTransition(t, iv, "540")
+				checkValidBut(t, out, c)
+			}
+			t.Run(fmt.Sprintf("implicit=%t/%v/%v", implicit, policy, instance.ExampleFill), func(t *testing.T) {
+				check(t, inSetOptions(policy, instance.ExampleFill, 0))
+			})
+			for seed := range uint64(randomSeeds) {
+				t.Run(fmt.Sprintf("implicit=%t/%v/%v/seed=%d", implicit, policy, instance.RandomFill, seed), func(t *testing.T) {
+					check(t, inSetOptions(policy, instance.RandomFill, seed))
+				})
 			}
 		}
 	}
