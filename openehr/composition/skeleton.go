@@ -30,7 +30,10 @@ import (
 // are optional defaults documented per Option. WithValueFill
 // (instance.RandomFill) with WithValueSource switches leaves from the
 // fixed ExampleValue to seeded, sampled in-constraint values, for a
-// varied but valid corpus.
+// varied but valid corpus. WithUIDSource sets the source of the
+// skeleton's uids: with instance.UIDsFrom on a fixed source, WithNow and,
+// under instance.RandomFill, WithValueSource, two calls on fresh sources
+// in the same state give equal skeletons.
 func NewSkeleton(ctx context.Context, c *templatecompile.Compiled, opts ...Option) (*rm.Composition, error) {
 	return newSkeleton(ctx, c, buildConfig(opts...))
 }
@@ -57,6 +60,7 @@ func newSkeleton(ctx context.Context, c *templatecompile.Compiled, cfg *config) 
 		Territory:   cfg.territory,
 		Composer:    cfg.composer,
 		Now:         cfg.now,
+		UIDSource:   cfg.uidSource,
 		ValueFill:   cfg.valueFill,
 		ValueSource: cfg.valueSource,
 	})
