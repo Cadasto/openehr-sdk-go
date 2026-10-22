@@ -5,13 +5,16 @@ import (
 	"errors"
 	"io"
 	"math"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/textproto"
 	"net/url"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/cadasto/openehr-sdk-go/cadasto/admin"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
@@ -600,6 +603,136 @@ func TestReadyBodyStopsReadingPastLimit(t *testing.T) { // REQ-083
 	}
 	if ct.read > limit+1 {
 		t.Errorf("ReadyBody read %d body bytes under a limit of %d, want at most %d", ct.read, limit, limit+1)
+	}
+}
+
+// drainCap is the most bytes a probe reads from a body it does not return,
+// as the package doc states: 256 KiB.
+const drainCap = 256 << 10
+
+// endlessHandler answers with status and a body that never ends. It writes
+// until a write fails or the request's context ends, which both happen once
+// the client closes the connection.
+func endlessHandler(status int) http.HandlerFunc {
+	chunk := []byte(strings.Repeat("x", 32<<10))
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(status)
+		for r.Context().Err() == nil {
+			if _, err := w.Write(chunk); err != nil {
+				return
+			}
+		}
+	}
+}
+
+// probeCall runs one probe and returns the bytes it returns: none for Live
+// and Ready.
+type probeCall func(ctx context.Context, c *transport.Client) ([]byte, error)
+
+func callLive(ctx context.Context, c *transport.Client) ([]byte, error) {
+	return nil, admin.Live(ctx, c)
+}
+
+func callReady(ctx context.Context, c *transport.Client) ([]byte, error) {
+	return nil, admin.Ready(ctx, c)
+}
+
+func callReadyBody(ctx context.Context, c *transport.Client) ([]byte, error) {
+	return admin.ReadyBody(ctx, c)
+}
+
+// TestProbesBoundEndlessBodyDrain pins the bounded drain: a 2xx body that
+// never ends makes Live and Ready return nil, and a 503 body that never
+// ends makes ReadyBody return no bytes and an error matching
+// transport.ErrServerError, each after reading at most drainCap bytes of
+// it. The counter wraps the body the probe reads, above net/http's own
+// buffered reader, so it counts only the bytes handed to the probe and the
+// bound needs no allowance. The deadline ends a drain without a cap, so
+// such a drain fails on the byte count instead of hanging the suite.
+func TestProbesBoundEndlessBodyDrain(t *testing.T) { // REQ-083
+	cases := []struct {
+		name     string
+		status   int
+		call     probeCall
+		sentinel error // nil when the probe must return nil
+	}{
+		{name: "Live 200", status: http.StatusOK, call: callLive},
+		{name: "Ready 200", status: http.StatusOK, call: callReady},
+		{name: "ReadyBody 503", status: http.StatusServiceUnavailable, call: callReadyBody, sentinel: transport.ErrServerError},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(endlessHandler(tc.status))
+			defer srv.Close()
+			ct := &countingTransport{base: srv.Client().Transport}
+			c := newClientWithHTTP(t, srv, &http.Client{Transport: ct})
+			ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
+			defer cancel()
+
+			got, err := tc.call(ctx, c)
+			if got != nil {
+				t.Errorf("%s returned %d bytes, want none", tc.name, len(got))
+			}
+			switch {
+			case tc.sentinel == nil && err != nil:
+				t.Errorf("%s = %v, want nil", tc.name, err)
+			case tc.sentinel != nil && !errors.Is(err, tc.sentinel):
+				t.Errorf("%s err = %v, want errors.Is(err, %v)", tc.name, err, tc.sentinel)
+			}
+			if ct.read > drainCap {
+				t.Errorf("%s read %d bytes of a body that never ends, want at most %d", tc.name, ct.read, drainCap)
+			}
+		})
+	}
+}
+
+// TestProbesDrainSmallBodyAndReuseConnection pins the drain and what it is
+// for: a probe reads a small body to its end before it closes it, and the
+// next probe reuses the connection. The byte count is what fails when the
+// drain is skipped. net/http's client itself drains a body closed before
+// its end, for a short time and below the counter, so a skipped drain can
+// still leave the connection reused.
+func TestProbesDrainSmallBodyAndReuseConnection(t *testing.T) { // REQ-083
+	cases := []struct {
+		name   string
+		status int
+		call   probeCall
+	}{
+		{name: "Live 200", status: http.StatusOK, call: callLive},
+		{name: "Ready 200", status: http.StatusOK, call: callReady},
+		{name: "ReadyBody 200", status: http.StatusOK, call: callReadyBody},
+		{name: "Live 503", status: http.StatusServiceUnavailable, call: callLive},
+		{name: "Ready 503", status: http.StatusServiceUnavailable, call: callReady},
+		{name: "ReadyBody 503", status: http.StatusServiceUnavailable, call: callReadyBody},
+	}
+	const calls = 3
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var conns atomic.Int64
+			srv := httptest.NewUnstartedServer(bodyHandler(tc.status, secretDoc))
+			srv.Config.ConnState = func(_ net.Conn, s http.ConnState) {
+				if s == http.StateNew {
+					conns.Add(1)
+				}
+			}
+			srv.Start()
+			defer srv.Close()
+			ct := &countingTransport{base: srv.Client().Transport}
+			c := newClientWithHTTP(t, srv, &http.Client{Transport: ct})
+
+			for range calls {
+				_, err := tc.call(t.Context(), c)
+				if wantErr := tc.status != http.StatusOK; (err != nil) != wantErr {
+					t.Fatalf("%s: err = %v, want an error = %t", tc.name, err, wantErr)
+				}
+			}
+			if want := int64(calls * len(secretDoc)); ct.read != want {
+				t.Errorf("%d calls of %s on a %d-byte body read %d bytes, want %d: each body read to its end", calls, tc.name, len(secretDoc), ct.read, want)
+			}
+			if n := conns.Load(); n != 1 {
+				t.Errorf("%d calls of %s on a %d-byte body opened %d connections, want 1", calls, tc.name, len(secretDoc), n)
+			}
+		})
 	}
 }
 

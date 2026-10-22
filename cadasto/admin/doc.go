@@ -20,10 +20,14 @@
 // formatted error with no sentinel. ReadyBody returns nil bytes beside
 // that error.
 //
-// ReadyBody reads at most DefaultMaxReadyBody bytes (1 MiB), or the
-// limit WithMaxReadyBody sets. A longer 2xx body fails with an error
-// that matches [transport.ErrResponseTooLarge], and any other read
-// failure is reached by unwrapping the error; both return nil bytes.
+// ReadyBody reads at most DefaultMaxReadyBody bytes (1 MiB) of a 2xx
+// body, or the limit WithMaxReadyBody sets. A longer 2xx body fails with
+// an error that matches [transport.ErrResponseTooLarge], and any other
+// read failure is reached by unwrapping the error; both return nil bytes.
+//
+// A probe reads at most 256 KiB of a body it does not return (the 2xx
+// body Live and Ready discard, and any non-2xx body) before it closes it,
+// so a body that never ends cannot hold a probe until its context ends.
 //
 // Probes reuse [transport]'s sentinel errors for the mapped codes but
 // bypass [transport.Client.Do]: they do no openEHR error envelope

@@ -118,8 +118,8 @@ func Live(ctx context.Context, c *transport.Client, opts ...LiveOption) error {
 // Ready probes the deployment readiness endpoint. It has the same error
 // contract as [Live]; see that doc for the status mapping, the
 // transport.Do bypass and the [ErrInvalidPath] guard on the
-// WithReadyPath override. Ready drains and discards the response body;
-// [ReadyBody] returns it.
+// WithReadyPath override. Ready reads at most 256 KiB of the response
+// body and discards it; [ReadyBody] returns it.
 func Ready(ctx context.Context, c *transport.Client, opts ...ReadyOption) error {
 	return probe(ctx, c, newReadyConfig(opts).path)
 }
@@ -135,10 +135,10 @@ func Ready(ctx context.Context, c *transport.Client, opts ...ReadyOption) error 
 // with an error that matches [transport.ErrResponseTooLarge] and names
 // the limit. Any other read failure, such as [io.ErrUnexpectedEOF] for a
 // connection cut mid-body, is reached by unwrapping the error. Both
-// return nil bytes, because a partial body is not the document. The
-// error text names the probe path and the status, but never a body
-// byte, a header value or the read failure's own text, which can quote
-// bytes the server sent.
+// return nil bytes, because a partial body is not the document. The text
+// of these read errors names the probe path and the status, but never a
+// body byte, a header value or the read failure's own text, which can
+// quote bytes the server sent.
 func ReadyBody(ctx context.Context, c *transport.Client, opts ...ReadyOption) ([]byte, error) {
 	cfg := newReadyConfig(opts)
 	resp, err := send(ctx, c, cfg.path)
@@ -175,7 +175,8 @@ func probe(ctx context.Context, c *transport.Client, path string) error {
 // send issues the probe GET for path at the origin of the openEHR REST
 // service entry. A 2xx returns the open response, whose body the caller
 // reads and closes. Any other status returns the error statusToSentinel
-// gives it, with the body already drained and closed.
+// gives it, with the body already drained (up to maxDrain bytes) and
+// closed.
 func send(ctx context.Context, c *transport.Client, path string) (*http.Response, error) {
 	if path == "" || !strings.HasPrefix(path, "/") {
 		return nil, fmt.Errorf("%w: %q (must be a non-empty absolute path starting with '/')", ErrInvalidPath, path)
@@ -223,12 +224,21 @@ func send(ctx context.Context, c *transport.Client, path string) (*http.Response
 	return nil, fmt.Errorf("admin: probe %s status=%d: %w", path, resp.StatusCode, sentinel)
 }
 
-// drainAndClose reads what is left of the response body and closes it,
-// so the underlying connection can be reused: probes run in tight loops
-// (k8s liveness polling, CDR benchmarks) where every dropped keep-alive
-// becomes a re-handshake cost.
+// maxDrain is the most bytes drainAndClose reads from a body: 256 KiB, the
+// bound net/http's server applies when it reads what a handler left of a
+// request body to keep the connection alive (maxPostHandlerReadBytes in
+// net/http/server.go).
+const maxDrain = 256 << 10
+
+// drainAndClose reads up to maxDrain bytes of what is left of the response
+// body and closes it. A body read to its end lets the underlying
+// connection be reused: probes run in tight loops (k8s liveness polling,
+// CDR benchmarks) where every dropped keep-alive becomes a re-handshake
+// cost. The cap keeps a body that never ends from holding the probe
+// until its context ends; a longer body is closed before its end, which
+// can cost the connection.
 func drainAndClose(resp *http.Response) {
-	_, _ = io.Copy(io.Discard, resp.Body)
+	_, _ = io.CopyN(io.Discard, resp.Body, maxDrain)
 	_ = resp.Body.Close()
 }
 
