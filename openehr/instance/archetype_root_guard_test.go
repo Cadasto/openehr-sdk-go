@@ -199,10 +199,12 @@ type guardCase struct {
 // silent, written as multiple or as single, which gets no child at all. So
 // does a content or SECTION items list that only its existence requires
 // (What a visit writes): with no child, or only a slot, it gets no member,
-// so the walk reaches no object to refuse. A required slot is no such
-// node: where the cardinality asks for a member, the slot-fill rule stamps
-// it with the RM-type-prefix archetype id instead, and the fill passes the
-// floor too.
+// so the walk reaches no object to refuse, and so does such a content list
+// the template writes as a single attribute, which is read as the list the
+// RM declares (TestREQ107_SingleAttributeRMListGetsNoMember). A required
+// slot is no such node: where the cardinality asks for a member, the
+// slot-fill rule stamps it with the RM-type-prefix archetype id instead,
+// and the fill passes the floor too.
 func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 	checkGuardClasses(t)
 	cases := []guardCase{
@@ -230,9 +232,12 @@ func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 			detail: "OBSERVATION for COMPOSITION.content at / (required, but the template names no child)",
 		},
 		{
-			name:   "required content written as a single attribute without children",
-			opt:    guardOPT(guardCompositionID, guardSingle("content", guardExistence11)),
-			detail: "OBSERVATION for COMPOSITION.content at / (required, but the template names no child)",
+			// The RM declares content a list, so it is read as one: only
+			// its existence asks for a member, nothing is built and there
+			// is no object to refuse (REQ-107 What a visit writes).
+			name:  "control: content only its existence requires, written as a single attribute without children",
+			opt:   guardOPT(guardCompositionID, guardSingle("content", guardExistence11)),
+			check: checkNoContent,
 		},
 		{
 			name: "SECTION items whose cardinality requires a member, which the template leaves without children",
@@ -358,6 +363,65 @@ func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestREQ107_SingleAttributeRMListGetsNoMember is the REQ-107 check of What
+// a visit writes on an attribute the RM declares a list that the template
+// writes as a C_SINGLE_ATTRIBUTE with no child, at an existence of 1..1:
+// COMPOSITION.content, and a SECTION's items. The BMM marks neither
+// mandatory, so it is read as the list the RM declares, as the template
+// validator reads it: only its existence asks for a member, so it gets none,
+// and Generate does not refuse it with ErrArchetypeIDMissing. The root
+// passes the RM floor and the template validator, under every policy, both
+// value fills and both compile modes.
+func TestREQ107_SingleAttributeRMListGetsNoMember(t *testing.T) {
+	cases := []struct {
+		name  string
+		opt   string
+		check func(t *testing.T, call string, out any)
+	}{
+		{
+			name:  "COMPOSITION.content",
+			opt:   guardOPT(guardCompositionID, guardSingle("content", guardExistence11)),
+			check: checkNoContent,
+		},
+		{
+			name: "SECTION.items",
+			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
+				guardChild("C_COMPLEX_OBJECT", "SECTION", "at0001", guardOccurrences11, "",
+					guardSingle("items", guardExistence11)))),
+			check: func(t *testing.T, call string, out any) {
+				t.Helper()
+				section, ok := firstContent(t, call, out).(*rm.Section)
+				if !ok {
+					t.Fatalf("%s: content[0] is not a SECTION", call)
+				}
+				if n := len(section.Items); n != 0 {
+					t.Errorf("%s: SECTION.items has %d members, want none", call, n)
+				}
+			},
+		},
+	}
+	for _, tc := range cases {
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, tc.opt, implicit)
+			for _, opts := range guardOptions() {
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err != nil {
+						t.Fatalf("Generate: %v, want a root", err)
+					}
+					tc.check(t, "Generate", out)
+					if r := validation.ValidateRM(out); !r.OK {
+						t.Errorf("ValidateRM issues %+v, want none", r.Issues)
+					}
+					for _, iss := range templateErrors(out, c) {
+						t.Errorf("template validator: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+					}
+				})
+			}
+		}
 	}
 }
 
