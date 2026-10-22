@@ -24,8 +24,8 @@ func drawUIDs(next func() *rm.HierObjectID, n int) []string {
 // check that every uid UIDsFrom issues is an RFC 9562 version-4 UUID in
 // its lowercase hex-and-dash form: version 4 in the high nibble of byte 6
 // and the variant 0b10 in the top two bits of byte 8. Were either left as
-// drawn, all 64 uids would still carry it only by a chance below 2^-128,
-// so the check fails when either is not set.
+// drawn, all 64 uids would still carry it only by a chance of at most
+// 2^-128, so the check fails when either is not set.
 func TestREQ107_UIDsFromDrawsVersion4UUIDs(t *testing.T) {
 	next := instance.UIDsFrom(mrand.NewPCG(7, 7))
 	for _, s := range drawUIDs(next, 64) {
@@ -49,9 +49,10 @@ func TestREQ107_UIDsFromDrawsVersion4UUIDs(t *testing.T) {
 // Reproducible uids check that the 122 bits of a uid other than its
 // version and variant are taken from the source. A second source in the
 // same state gives the expected bits: two Uint64 draws per uid, the first
-// for bytes 0 to 7 and the second for bytes 8 to 15, big-endian. That
-// layout is the implementation's choice, which the test pins so that a
-// seeded sequence of uids stays the same from one release to the next.
+// for bytes 0 to 7 and the second for bytes 8 to 15, big-endian. The test
+// pins that layout, the two draws per uid that UIDsFrom documents,
+// because comparing with the source's own draws is what shows the bits
+// come from the source.
 func TestREQ107_UIDsFromTakesTheOtherBitsFromSource(t *testing.T) {
 	next := instance.UIDsFrom(mrand.NewPCG(7, 7))
 	reference := mrand.NewPCG(7, 7)

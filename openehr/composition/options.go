@@ -108,8 +108,8 @@ func WithValueFill(f instance.ValueFill) Option {
 // under ExampleFill.
 //
 // A math/rand/v2.Source is not safe for concurrent use: do not share one
-// Source across concurrent NewSkeleton / Build calls. Give each its own,
-// or leave it nil to use the concurrency-safe global.
+// Source across concurrent NewSkeleton / NewBuilder calls. Give each its
+// own, or leave it nil to use the concurrency-safe global.
 func WithValueSource(src mrand.Source) Option {
 	return func(c *config) { c.valueSource = src }
 }

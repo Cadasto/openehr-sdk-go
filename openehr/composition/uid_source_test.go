@@ -164,7 +164,7 @@ func TestREQ101_REQ107_SeededSkeletonIsReproducible(t *testing.T) {
 			}
 			comp, first := build()
 			_, second := build()
-			if len(treeUIDs(decodedJSON(t, comp))) == 0 {
+			if !slices.ContainsFunc(treeUIDs(decodedJSON(t, comp)), func(u treeUID) bool { return u.value != "" }) {
 				t.Fatal("the skeleton carries no uid, so the uids were not checked")
 			}
 			if !bytes.Equal(first, second) {
