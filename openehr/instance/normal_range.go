@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
@@ -18,6 +19,14 @@ import (
 // normal range, the one DV_ORDERED Normal_range_and_status_consistency
 // reads.
 const normalCode = "N"
+
+// highPrefix and lowPrefix start the code string of a normal status above
+// the normal range (H, HH, HHH of the openEHR normal statuses code set) and
+// of one below it (L, LL, LLL).
+const (
+	highPrefix = "H"
+	lowPrefix  = "L"
+)
 
 // errNoNormalValue reports an ordered value whose OPT admits no value the
 // generator can derive on the side of its normal_range that its
@@ -31,8 +40,12 @@ var errNoNormalValue = errors.New("the OPT admits no value the generator can der
 // reads the range's bounds and its lower_included and upper_included. A
 // value that already does stays, a RandomFill draw included. Else the
 // value is narrowed to the first candidate (normalRule.candidates) that
-// does and that the OPT's own constraint on the value accepts, and the rest
-// of the value is kept: a DV_QUANTITY's units, a DV_PROPORTION's type,
+// does and that the OPT's own constraint on the value accepts. A status
+// whose code string starts with H (the high statuses) tries the step above
+// the range's upper bound first, and one that starts with L (the low
+// statuses) the step below its lower bound, so a high value lies above the
+// range and a low value below it where the OPT lets it. The rest of the
+// value is kept: a DV_QUANTITY's units, a DV_PROPORTION's type,
 // denominator and precision, with a whole numerator where its kind or its
 // precision needs one, and a DV_ORDINAL's symbol, which the OPT constrains
 // on a node of its own. Where no candidate does, it returns an error
@@ -252,7 +265,7 @@ func (r normalRule[K]) keep(status *rm.CodePhrase, end normalEnd) bool {
 	}
 	var best K
 	found := false
-	for _, k := range r.candidates() {
+	for _, k := range r.candidates(sideOf(status)) {
 		if !r.admits(k, inside) {
 			continue
 		}
@@ -270,16 +283,48 @@ func (r normalRule[K]) keep(status *rm.CodePhrase, end normalEnd) bool {
 	return found
 }
 
-// candidates returns the values keep tries, in this fixed order: the lower
-// bound, the value one step below it and the value one step above it; the
-// same three for the upper bound; the middle of the two bounds, where both
-// are there; and the values the OPT's own constraint on the value names
-// (own). Each bound is taken on the value's own terms first (rebase), and
-// each candidate gives the whole numbers next to it where the value needs
-// whole numbers (round). A side the range leaves open gives none. A step
-// from a time of day that would cross midnight gives none: no value below a
-// bound at 00:00:00, and none above one at 23:59:59 (temporalNear).
-func (r normalRule[K]) candidates() []K {
+// normalSide is the side of its normal_range that a normal_status points a
+// value to, where the status needs the value outside it.
+type normalSide int
+
+const (
+	// anySide is no side: the status is N, or none of the high and low
+	// statuses, such as a placeholder code.
+	anySide normalSide = iota
+	// aboveRange is the side of the upper bound, for a high status.
+	aboveRange
+	// belowRange is the side of the lower bound, for a low status.
+	belowRange
+)
+
+// sideOf returns the side of its range that status points a value to: above
+// it for a code string that starts with H, below it for one that starts
+// with L, and none for any other, N and a placeholder code included.
+func sideOf(status *rm.CodePhrase) normalSide {
+	switch {
+	case strings.HasPrefix(status.CodeString, highPrefix):
+		return aboveRange
+	case strings.HasPrefix(status.CodeString, lowPrefix):
+		return belowRange
+	}
+	return anySide
+}
+
+// candidates returns the values keep tries, in this order. For the side
+// above the range it starts with the value one step above the upper bound,
+// and for the side below it with the value one step below the lower bound,
+// where that bound is there and the step gives a value; the same value then
+// comes again in the order below, and keep takes the first that qualifies.
+// The fixed order is: the lower bound, the value one step below it and the
+// value one step above it; the same three for the upper bound; the middle
+// of the two bounds, where both are there; and the values the OPT's own
+// constraint on the value names (own). Each bound is taken on the value's
+// own terms first (rebase), and each candidate gives the whole numbers next
+// to it where the value needs whole numbers (round). A side the range
+// leaves open gives none. A step from a time of day that would cross
+// midnight gives none: no value below a bound at 00:00:00, and none above
+// one at 23:59:59 (temporalNear).
+func (r normalRule[K]) candidates(side normalSide) []K {
 	rebase := func(b K) K {
 		if r.steps.rebase == nil {
 			return b
@@ -295,12 +340,22 @@ func (r normalRule[K]) candidates() []K {
 	var lower, upper K
 	if !r.bounds.lowerUnbounded {
 		lower = rebase(r.bounds.lower)
+	}
+	if !r.bounds.upperUnbounded {
+		upper = rebase(r.bounds.upper)
+	}
+	switch {
+	case side == aboveRange && !r.bounds.upperUnbounded:
+		add(r.steps.near(upper, true))
+	case side == belowRange && !r.bounds.lowerUnbounded:
+		add(r.steps.near(lower, false))
+	}
+	if !r.bounds.lowerUnbounded {
 		raw = append(raw, lower)
 		add(r.steps.near(lower, false))
 		add(r.steps.near(lower, true))
 	}
 	if !r.bounds.upperUnbounded {
-		upper = rebase(r.bounds.upper)
 		raw = append(raw, upper)
 		add(r.steps.near(upper, false))
 		add(r.steps.near(upper, true))
