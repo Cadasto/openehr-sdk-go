@@ -152,8 +152,10 @@ type Issue struct {
 	// Layer says which rules the issue comes from: [LayerTemplate] for a
 	// clause of the operational template, [LayerRM] for a rule of the
 	// openEHR Reference Model. An absent attribute is on the template layer
-	// when the template's own existence constraint requires it, and on the
-	// RM layer when only the Reference Model makes it mandatory. [LayerNone]
+	// when the template requires it: its existence does, and for a list or a
+	// Hash its counts ask for a member too, by its cardinality or by the
+	// occurrences of a child. It is on the RM layer when only the Reference
+	// Model makes it mandatory. [LayerNone]
 	// marks an issue that judges the call or the walk rather than the
 	// instance: a guard (nil_composition, nil_template, nil_root and the
 	// other nil_ codes, rm_type_unknown, and invalid_shape on input that

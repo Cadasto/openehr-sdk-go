@@ -1028,8 +1028,10 @@ func (e *engine) refuse(iss Issue) {
 
 // checkAbsent reports the attribute a of node n, which the template declares
 // and the instance lacks, at attrPath, once. Where the template requires it
-// ([templateRequires]: its existence, and for a multi-valued attribute its
-// cardinality too), it is the template's `required`. Otherwise it is the RM's
+// ([templateRequires]: its existence, and for a list or a Hash a cardinality
+// or a child's occurrences that asks for a member too), it is the template's
+// `required`. A Hash is read as multi-valued here, as a list is, although
+// [attrShape.multiValued] leaves it out. Otherwise it is the RM's
 // `required` where the RM marks it mandatory for the value's class, as the
 // RM rules alone read it (a.mandatory), which leave out the part of a
 // reference, whose own rule reports it, and a value the node's role lets be
@@ -1049,13 +1051,14 @@ func (e *engine) checkAbsent(n *engineNode, a *engineAttr, attrPath issuePath) {
 
 // checkEmpty reports the multi-valued attribute a of node n, at attrPath,
 // which is present and holds no item, once. Where the template requires it
-// ([templateRequires]: its existence and its cardinality), it is the
-// template's `required`. Where only the RM requires it, read from the value's
-// class alone as [engine.checkAbsent] reads it, it is the RM's
-// `cardinality`, rule cardinality, unless the template reports the same
-// container itself (reported), and only for a list: a Hash that is present
-// and empty breaks no mandatory rule, as the RM rules alone read it, however
-// the template declares it.
+// ([templateRequires]: its existence, and a cardinality or a child's
+// occurrences that asks for a member), it is the template's `required`.
+// Where only the RM requires it, read from the value's class alone as
+// [engine.checkAbsent] reads it, it is the RM's `cardinality`, rule
+// cardinality, unless the template reports the same container itself
+// (reported), and only for a list: a Hash that is present and empty breaks
+// no mandatory rule, as the RM rules alone read it, however the template
+// declares it.
 func (e *engine) checkEmpty(n *engineNode, a *engineAttr, attrPath issuePath, reported bool) {
 	if iss, required := emptyIssue(a.decl, n.value, attrPath); required {
 		e.found.emit(iss)
