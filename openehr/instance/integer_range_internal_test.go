@@ -57,6 +57,36 @@ func TestREQ107_NarrowToIntegerKeepsTheValuesAnIntegerHolds(t *testing.T) {
 			in:   constraints.CInteger{Range: constraints.NumericRange{Lower: top - 5, Upper: past}},
 			lo:   top - 4, hi: top,
 		},
+		{
+			// A side c leaves open is closed no further than the sampler's
+			// window of 100 from the side c bounds, not at the limit.
+			name: "no upper bound, past the lower end",
+			in:   constraints.CInteger{Range: constraints.NumericRange{Lower: -past, LowerInclusive: true, UpperUnbounded: true}},
+			lo:   bottom, hi: bottom + 100,
+		},
+		{
+			name: "no lower bound, past the upper end",
+			in:   constraints.CInteger{Range: constraints.NumericRange{Upper: past, UpperInclusive: true, LowerUnbounded: true}},
+			lo:   top - 100, hi: top,
+		},
+		{
+			// A list is what a draw takes from, so its members inside the
+			// limits all stay, however far from the bound they lie.
+			name: "no upper bound, a list reaching past",
+			in: constraints.CInteger{
+				List:  []int64{7, 50_000_000, 1 << 40},
+				Range: constraints.NumericRange{Lower: 0, LowerInclusive: true, UpperUnbounded: true},
+			},
+			lo: 0, hi: top, list: []int64{7, 50_000_000},
+		},
+		{
+			name: "no lower bound, a list reaching past",
+			in: constraints.CInteger{
+				List:  []int64{-50_000_000, 7, 1 << 40},
+				Range: constraints.NumericRange{Upper: 100, UpperInclusive: true, LowerUnbounded: true},
+			},
+			lo: bottom, hi: 100, list: []int64{-50_000_000, 7},
+		},
 		{name: "a list reaching past, whole unbounded", in: constraints.CInteger{List: []int64{7, 1 << 40, -1 << 40, 9}}, lo: bottom, hi: top, list: []int64{7, 9}},
 		{name: "a list reaching past, in a range", in: constraints.CInteger{List: []int64{7, 1 << 40}, Range: between(0, past)}, lo: 0, hi: top, list: []int64{7}},
 		{name: "above the Integer range", in: constraints.CInteger{Range: between(3_000_000_000, past)}, refused: true},
@@ -143,6 +173,13 @@ func TestREQ107_NarrowIntegerKeepsAPrecisionFromMinusOne(t *testing.T) {
 		{name: "from 0 to 3", in: constraints.CInteger{Range: between(0, 3)}, same: true},
 		{name: "from -1 to 3", in: constraints.CInteger{Range: between(-1, 3)}, same: true},
 		{name: "from -10 to 10", in: constraints.CInteger{Range: between(-10, 10)}, lo: -1, hi: 10},
+		{name: "at least -5", in: constraints.CInteger{Range: constraints.NumericRange{Lower: -5, LowerInclusive: true, UpperUnbounded: true}}, lo: -1, hi: 99},
+		{name: "above -5", in: constraints.CInteger{Range: constraints.NumericRange{Lower: -5, UpperUnbounded: true}}, lo: -1, hi: 99},
+		{
+			name: "up to past the Integer range",
+			in:   constraints.CInteger{Range: constraints.NumericRange{Upper: 5_000_000_000, UpperInclusive: true, LowerUnbounded: true}},
+			lo:   math.MaxInt32 - 100, hi: math.MaxInt32,
+		},
 		{name: "up to 5", in: constraints.CInteger{Range: constraints.NumericRange{Upper: 5, UpperInclusive: true, LowerUnbounded: true}}, lo: -1, hi: 5},
 		{name: "a list reaching below", in: constraints.CInteger{List: []int64{-5, 2}}, lo: -1, hi: math.MaxInt32, list: []int64{2}},
 		{

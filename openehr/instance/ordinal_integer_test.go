@@ -32,10 +32,12 @@ func TestREQ107_IntegerOnTheOrdinalItselfStaysInsideItsValue(t *testing.T) {
 		unsatisfiable    bool
 	}{
 		{
+			// The draw lies within 100 of the greatest Integer, the window
+			// the sampler draws from a range bounded above alone.
 			name:       "at most 5000000000",
 			body:       instance.IntRange(instance.NoEnd, instance.Closed(5000000000)),
 			want:       2147483647,
-			wantRandom: -688982768,
+			wantRandom: 2147483624,
 		},
 		{
 			name:          "listing 5000000000 alone",
