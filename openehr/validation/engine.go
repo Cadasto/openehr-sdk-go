@@ -635,8 +635,8 @@ func (e *engine) settle(h *heldJudgement) {
 // template does not declare. A value of no registered RM class
 // ([rmaccess.Covers]) has no attributes the access reads and no class the
 // metadata lists attributes for: the attributes the template declares on
-// the node it binds to are each read as absent, and only the template's
-// existence reports one.
+// the node it binds to are each read as absent, and only the template
+// reports one, where it requires it ([templateRequires]).
 //
 // What the class metadata says of each attribute, and how the walk reads
 // each one it visits, is read from the table built once per class when the
@@ -1027,8 +1027,9 @@ func (e *engine) refuse(iss Issue) {
 }
 
 // checkAbsent reports the attribute a of node n, which the template declares
-// and the instance lacks, at attrPath, once. Where the template's existence
-// requires it, it is the template's `required`. Otherwise it is the RM's
+// and the instance lacks, at attrPath, once. Where the template requires it
+// ([templateRequires]: its existence, and for a multi-valued attribute its
+// cardinality too), it is the template's `required`. Otherwise it is the RM's
 // `required` where the RM marks it mandatory for the value's class, as the
 // RM rules alone read it (a.mandatory), which leave out the part of a
 // reference, whose own rule reports it, and a value the node's role lets be
@@ -1047,13 +1048,14 @@ func (e *engine) checkAbsent(n *engineNode, a *engineAttr, attrPath issuePath) {
 }
 
 // checkEmpty reports the multi-valued attribute a of node n, at attrPath,
-// which is present and holds no item, once. Where the template's existence
-// requires it, it is the template's `required`. Where only the RM requires
-// it, read from the value's class alone as [engine.checkAbsent] reads it, it
-// is the RM's `cardinality`, rule cardinality, unless the template reports
-// the same container itself (reported), and only for a list: a Hash that is
-// present and empty breaks no mandatory rule, as the RM rules alone read
-// it, however the template declares it.
+// which is present and holds no item, once. Where the template requires it
+// ([templateRequires]: its existence and its cardinality), it is the
+// template's `required`. Where only the RM requires it, read from the value's
+// class alone as [engine.checkAbsent] reads it, it is the RM's
+// `cardinality`, rule cardinality, unless the template reports the same
+// container itself (reported), and only for a list: a Hash that is present
+// and empty breaks no mandatory rule, as the RM rules alone read it, however
+// the template declares it.
 func (e *engine) checkEmpty(n *engineNode, a *engineAttr, attrPath issuePath, reported bool) {
 	if iss, required := emptyIssue(a.decl, n.value, attrPath); required {
 		e.found.emit(iss)

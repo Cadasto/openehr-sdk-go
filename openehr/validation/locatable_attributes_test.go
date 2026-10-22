@@ -21,7 +21,10 @@ const locatableArchetype = "openEHR-EHR-ELEMENT.locatable.v1"
 
 // locatableAttributesOPT returns an ELEMENT template whose uid and
 // feeder_audit, two single-valued attributes, and whose links, a
-// multi-valued one, all have the existence lower..upper and no child.
+// multi-valued one, all have the existence lower..upper and no child. The
+// links also hold from lower items up: where their existence requires them,
+// their child count asks for a member too, since an existence alone asks
+// for none.
 func locatableAttributesOPT(lower, upper string) string {
 	existence := `<existence>` + fiInterval(lower, upper) + `</existence>`
 	return `<?xml version="1.0" encoding="utf-8"?>
@@ -33,7 +36,7 @@ func locatableAttributesOPT(lower, upper string) string {
 <attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>feeder_audit</rm_attribute_name>` + existence + `</attributes>
 <attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>links</rm_attribute_name>` + existence + `
 <cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval>` +
-		`<lower_included>true</lower_included><lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>0</lower>` +
+		`<lower_included>true</lower_included><lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>` + lower + `</lower>` +
 		`</interval></cardinality></attributes>
 <archetype_id><value>` + locatableArchetype + `</value></archetype_id></definition>
 </template>`

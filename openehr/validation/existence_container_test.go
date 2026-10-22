@@ -72,7 +72,7 @@ func noInformationElement() *rm.Element {
 		ArchetypeNodeID: "at0001",
 		Name:            rm.DVText{Value: "element"},
 		NullFlavour: &rm.DVCodedText{
-			DVText:       rm.DVText{Value: "no information"},
+			Value:        "no information",
 			DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}, CodeString: "271"},
 		},
 	}

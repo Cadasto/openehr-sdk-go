@@ -113,13 +113,14 @@ func formatAllowedTypes(children []*tcimpl.CompiledNode) string {
 }
 
 // absentIssue returns the issue the template reports for the attribute attr
-// of parentRM, at attrPath, when the instance lacks it and the template's
-// existence requires it ([templateRequires]): `required`, on the template
-// layer, rule existence, with required set. A multi-valued attribute is
-// described as one. The RM's requirement is not read here: the walk reads it
-// from the value's class ([engine.checkAbsent]).
+// of parentRM, at attrPath, when the instance lacks it and the template
+// requires it ([templateRequires]): `required`, on the template layer, rule
+// existence, with required set. A multi-valued attribute is required only
+// where its cardinality asks for a member too, and is described as one. The
+// RM's requirement is not read here: the walk reads it from the value's
+// class ([engine.checkAbsent]).
 func absentIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath issuePath, multiValued bool) (iss Issue, required bool) {
-	if !templateRequires(attr) {
+	if !templateRequires(attr, multiValued) {
 		return iss, false
 	}
 	detail := fmt.Sprintf("required attribute %q absent on %s", attr.Name(), describeRMType(parentRM))
@@ -138,12 +139,13 @@ func absentIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath issuePat
 
 // emptyIssue returns the issue the template reports for the multi-valued
 // attribute attr of parentRM, at attrPath, when it is present and holds no
-// item and the template's existence requires it ([templateRequires]):
-// `required`, on the template layer, rule existence, with required set. The
-// RM's requirement is not read here: the walk reads it from the value's
-// class ([engine.checkEmpty]).
+// item and the template requires it ([templateRequires]), which it does only
+// where its cardinality asks for at least one member: `required`, on the
+// template layer, rule existence, with required set. The RM's requirement is
+// not read here: the walk reads it from the value's class
+// ([engine.checkEmpty]).
 func emptyIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath issuePath) (iss Issue, required bool) {
-	if !templateRequires(attr) {
+	if !templateRequires(attr, true) {
 		return iss, false
 	}
 	return Issue{
@@ -355,15 +357,30 @@ func primitiveInput(rmValue any) any {
 	return rmValue
 }
 
-// templateRequires reports whether the template's own existence requires
-// the compiled attribute: an OPT existence interval with a lower bound of 1
-// or more. The mandatory bit the compile carries from the lookup it was
-// given ([tcimpl.CompiledAttribute.Required]) is not the template's
-// requirement and is not read: the RM rules read the pinned Reference
-// Model, from the value's class.
-func templateRequires(attr *tcimpl.CompiledAttribute) bool {
-	e := attr.Existence()
-	return e != nil && !e.LowerUnbounded() && e.Lower() >= 1
+// templateRequires reports whether the template itself requires the
+// compiled attribute, which is multi-valued or not. A single-valued
+// attribute is required by an OPT existence interval with a bounded lower
+// bound of 1 or more. On a multi-valued attribute that existence asks for
+// the container alone and the cardinality
+// ([tcimpl.CompiledAttribute.ChildMultiplicity]) for its members, and an
+// instance cannot show a list with no member apart from a missing one, so it
+// is required only where its cardinality has a bounded lower bound of 1 or
+// more as well; an OPT that states no cardinality asks for no member. The
+// mandatory bit the compile carries from the lookup it was given
+// ([tcimpl.CompiledAttribute.Required]) is not the template's requirement
+// and is not read: the RM rules read the pinned Reference Model, from the
+// value's class.
+func templateRequires(attr *tcimpl.CompiledAttribute, multiValued bool) bool {
+	if !lowerAtLeastOne(attr.Existence()) {
+		return false
+	}
+	return !multiValued || lowerAtLeastOne(attr.ChildMultiplicity())
+}
+
+// lowerAtLeastOne reports whether the interval m has a bounded lower bound
+// of 1 or more. A nil interval, one the OPT does not state, has none.
+func lowerAtLeastOne(m *template.Multiplicity) bool {
+	return m != nil && !m.LowerUnbounded() && m.Lower() >= 1
 }
 
 // isProhibited reports whether the OPT prohibits the compiled attribute:

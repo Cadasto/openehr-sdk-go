@@ -265,8 +265,9 @@ const paragraphChild = `
 
 // REQ-171 § Finding identity, § One walk (Presence) — an empty or absent
 // multi-valued attribute is reported once, by the rule that requires it. One
-// the template's own existence requires and the instance holds empty is
-// template existence, and the template's counts report it too. One only the
+// the template requires itself, by its existence and by a child count from
+// 1, and the instance holds empty is template existence, and the template's
+// counts report it too; an existence alone asks for no member. One only the
 // RM makes mandatory and the instance holds empty is the RM's `cardinality`,
 // rule cardinality. One only the RM makes mandatory and the instance leaves
 // nil is absent (§ REQ-171 Structural access), so it is the RM's `required`,

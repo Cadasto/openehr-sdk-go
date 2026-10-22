@@ -1309,6 +1309,8 @@ requirements:
       - openehr/validation/constraint_ref_walk_test.go
       - openehr/validation/data_value_subtypes_test.go
       - openehr/validation/engine_primitive_leaf_internal_test.go
+      - openehr/validation/engine_template_test.go
+      - openehr/validation/existence_container_test.go
       - openehr/validation/interval_bounds_test.go
       - openehr/validation/interval_open_side_test.go
       - openehr/validation/issue_err_test.go
@@ -2342,6 +2344,7 @@ requirements:
       - openehr/validation/engine_refused_internal_test.go
       - openehr/validation/engine_template_test.go
       - openehr/validation/engine_walk_test.go
+      - openehr/validation/existence_container_test.go
       - openehr/validation/finding_identity_rules_test.go
       - openehr/validation/finding_identity_test.go
       - openehr/validation/godoc_class_test.go
