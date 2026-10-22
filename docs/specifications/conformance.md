@@ -541,9 +541,9 @@ client scenarios to SDK coverage:
 
 #### PROBE-026 — Missing required nodes / cardinality
 
-- **Title:** Sharpens PROBE-025 with negative structural cases — missing required nodes, empty multi-valued attributes with `existence ≥ 1`, occurrences upper-bound violations, RM-type mismatches under C_SINGLE_ATTRIBUTE alternatives — and asserts the issue-code multiset (`required`, `cardinality`, `rm_type_mismatch`, `alternative_mismatch`) is stable across conformant implementations.
+- **Title:** Sharpens PROBE-025 with negative structural cases — missing required nodes, empty multi-valued attributes with `existence ≥ 1` and `cardinality ≥ 1`, occurrences upper-bound violations, RM-type mismatches under C_SINGLE_ATTRIBUTE alternatives — and asserts the issue-code multiset (`required`, `cardinality`, `rm_type_mismatch`, `alternative_mismatch`) is stable across conformant implementations.
 - **Preconditions:** Same OPT + composition tuple shape as PROBE-025; cases focus on the v2 template-driven structural completion surface that the RM-guided intermediate could not detect.
-- **Wire assertion:** In-repo property — same pipeline as PROBE-025. A composition with the systolic ELEMENT removed surfaces `required` at the ITEM_LIST `/items` path; an empty `events` list surfaces `required` + `cardinality`, and an absent one `required` alone; an unmatched alternative surfaces `alternative_mismatch`.
+- **Wire assertion:** In-repo property — same pipeline as PROBE-025. A composition with the systolic ELEMENT removed surfaces no issue, since the template leaves that ELEMENT optional and the ITEM_LIST's `items` carry cardinality `0..*`, so their existence asks for no member ([§ REQ-102](clinical-modeling.md#req-102--composition-validation) *An existence lower bound alone asks for no member*); an empty `events` list surfaces `required` + `cardinality`, and an absent one `required` alone; an unmatched alternative surfaces `alternative_mismatch`.
 - **Modes:** In-repo (issue-code multiset against a fixture OPT; no backend).
 - **Status:** Implemented (inline) — see [`testkit/probes/validation/probe_025_composition_validate.go`](../../testkit/probes/validation/probe_025_composition_validate.go).
 - **Satisfies:** REQ-102
