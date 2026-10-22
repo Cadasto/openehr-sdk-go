@@ -579,7 +579,7 @@ The known gaps below describe the generator as it is; they are informative.
 
 **Known gap: other generic types.** An OPT node whose `rm_type_name` is a generic type other than a `DV_INTERVAL` instantiation, such as `POINT_EVENT<ITEM_TREE>`, cannot be built, and `Generate` returns an error.
 
-**Known gap: slot occurrences.** The parser does not read an `ARCHETYPE_SLOT`'s occurrences, so the generator cannot tell a slot the OPT prohibits (an occurrences upper bound of 0) or requires (a lower bound of at least 1) from an optional one: a top-up whose only allowed children are slots can fill a prohibited one, and a required slot beside a non-slot child is not filled. No vendored OPT prohibits a slot.
+**Known gap: slot occurrences.** The parser does not read an `ARCHETYPE_SLOT`'s occurrences, so the generator cannot tell a slot the OPT prohibits (an occurrences upper bound of 0) or requires (a lower bound of at least 1) from an optional one: a top-up whose only allowed children are slots can fill a prohibited one, and a required slot is not filled where it sits beside a non-slot child, or under a list that only its existence otherwise requires (§ Contract *What a visit writes*). The template validator cannot count a slot's occurrences either ([§ REQ-102](#req-102--composition-validation)), so it reports neither case. No vendored OPT prohibits or requires a slot: every one of the 213 slots in `testkit/corpus` has an occurrences lower bound of 0.
 
 ### Primitive-leaf value fill
 
