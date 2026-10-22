@@ -148,8 +148,8 @@ type generator struct {
 }
 
 // nextUID returns the next LOCATABLE.uid pointer. Honours
-// [Options.UIDSource] when set (tests pin a counter for golden
-// fixtures); falls back to a random v4 UUID otherwise.
+// [Options.UIDSource] when set (a counter in tests, or [UIDsFrom] on a
+// seeded source); falls back to a random v4 UUID otherwise.
 func (g *generator) nextUID() *rm.HierObjectID {
 	if g.opts.UIDSource != nil {
 		return g.opts.UIDSource()

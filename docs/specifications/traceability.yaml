@@ -1276,6 +1276,7 @@ requirements:
       - openehr/composition/skeleton_policy_test.go
       - openehr/composition/typecheck_test.go
       - openehr/composition/typecheck_tiers_test.go
+      - openehr/composition/uid_source_test.go
       - testkit/probes/composition/probe_023_builder_round_trip.go
       - testkit/probes/composition/probes_test.go
       - testkit/probes/instance/corpus_ratchet_test.go
@@ -1452,6 +1453,7 @@ requirements:
       - openehr/composition/reference_test.go
       - openehr/composition/skeleton_policy_test.go
       - openehr/composition/text_language_test.go
+      - openehr/composition/uid_source_test.go
       - openehr/instance/accessors_test.go
       - openehr/instance/allowed_alternative_test.go
       - openehr/instance/archetype_identity_test.go
@@ -1525,6 +1527,7 @@ requirements:
       - openehr/instance/reference_id_form_internal_test.go
       - openehr/instance/reference_range_bounds_test.go
       - openehr/instance/reference_uid_internal_test.go
+      - openehr/instance/reproducible_test.go
       - openehr/instance/required_context_test.go
       - openehr/instance/required_policy_test.go
       - openehr/instance/required_rm_rule_fill_test.go
@@ -1540,6 +1543,7 @@ requirements:
       - openehr/instance/string_leaf_internal_test.go
       - openehr/instance/string_leaf_test.go
       - openehr/instance/uid_source_nil_internal_test.go
+      - openehr/instance/uids_test.go
       - openehr/instance/uncarried_mandatory_test.go
       - openehr/instance/undescribed_content_test.go
       - openehr/instance/valuefill_leaves_test.go

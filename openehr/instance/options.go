@@ -192,10 +192,11 @@ type Options struct {
 	// ARCHETYPE_ID takes a fixed id and draws no uid. A COMPOSITION gets a
 	// uid only where its OPT requires one, so the server that stores it
 	// gives it its version id. Nil falls back to a random RFC 9562 v4 UUID
-	// (stdlib uuid.NewV4). Tests pin a counter or named-seed source for
-	// deterministic uids. A source that returns nil leaves unset what the
-	// generator drew it for: the locatable has no uid, and the reference no
-	// id, or an id with an empty value.
+	// (stdlib uuid.NewV4). [UIDsFrom] gives version-4 uids drawn from a
+	// math/rand/v2.Source, so a seeded run is reproducible; tests also pin
+	// a counter for deterministic uids. A source that returns nil leaves
+	// unset what the generator drew it for: the locatable has no uid, and
+	// the reference no id, or an id with an empty value.
 	UIDSource func() *rm.HierObjectID
 
 	// ValueFill selects how primitive leaves are valued. Zero value =
@@ -207,7 +208,8 @@ type Options struct {
 	// RandomFill; ignored otherwise. A fixed source (e.g.
 	// rand.NewPCG(seed, seed)) makes the leaf values byte-reproducible;
 	// nil draws from the package-global, auto-seeded generator so
-	// successive calls differ. Mirrors the UIDSource seam.
+	// successive calls differ. The generator never draws a uid from it:
+	// the uids come from UIDSource, or from its random fallback.
 	//
 	// A math/rand/v2.Source is not safe for concurrent use: do not share
 	// one Source across concurrent Generate calls. Give each goroutine its
