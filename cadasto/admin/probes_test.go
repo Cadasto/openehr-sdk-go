@@ -3,8 +3,11 @@ package admin_test
 import (
 	"context"
 	"errors"
+	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
+	"net/textproto"
 	"net/url"
 	"strconv"
 	"strings"
@@ -20,6 +23,13 @@ import (
 // the probe MUST strip when targeting deployment-root /health/*.
 func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
 	t.Helper()
+	return newClientWithHTTP(t, srv, srv.Client())
+}
+
+// newClientWithHTTP is newClient with hc as the HTTP client, so a test
+// can wrap the server's own transport.
+func newClientWithHTTP(t *testing.T, srv *httptest.Server, hc *http.Client) *transport.Client {
+	t.Helper()
 	cat, err := discovery.NewStaticCatalog(discovery.StaticConfig{
 		Issuer: "https://test.example.com",
 		Services: map[string]discovery.ServiceEntry{
@@ -32,7 +42,7 @@ func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
 	if err != nil {
 		t.Fatalf("build catalog: %v", err)
 	}
-	c, err := transport.New(cat, transport.WithHTTPClient(srv.Client()))
+	c, err := transport.New(cat, transport.WithHTTPClient(hc))
 	if err != nil {
 		t.Fatalf("build client: %v", err)
 	}
@@ -384,5 +394,382 @@ func TestNilClientProbesDoNotPanic(t *testing.T) {
 				t.Errorf("err = %v; want ErrInvalidConfig", err)
 			}
 		})
+	}
+}
+
+// readyDoc is a readiness document that names the service and its
+// version.
+const readyDoc = `{"status":"UP","version":"1.2.3"}`
+
+// readySecret stands for a value the server sends. It must never reach
+// an error's text.
+const readySecret = "PATIENT-SECRET-4711"
+
+// secretDoc is a readiness document that carries readySecret.
+const secretDoc = `{"status":"UP","note":"` + readySecret + `"}`
+
+// bodyHandler answers every request with status and body.
+func bodyHandler(status int, body string) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		_, _ = io.WriteString(w, body)
+	}
+}
+
+// rawHandler takes over the connection, writes raw as the whole
+// response and closes the connection. It lets a test send what
+// net/http's server would not write: a body shorter than its
+// Content-Length, or a malformed chunked trailer.
+func rawHandler(t *testing.T, raw string) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		hj, ok := w.(http.Hijacker)
+		if !ok {
+			t.Error("the test server's ResponseWriter is not an http.Hijacker; the premise of this test is gone")
+			return
+		}
+		conn, buf, err := hj.Hijack()
+		if err != nil {
+			t.Errorf("Hijack: %v", err)
+			return
+		}
+		defer func() { _ = conn.Close() }()
+		_, _ = buf.WriteString(raw)
+		_ = buf.Flush()
+	}
+}
+
+// assertNoServerValues fails the test when msg carries readySecret or
+// any of the other bytes the server sent.
+func assertNoServerValues(t *testing.T, msg string, sent ...string) {
+	t.Helper()
+	for _, v := range append([]string{readySecret}, sent...) {
+		if strings.Contains(msg, v) {
+			t.Errorf("error text %q carries %q, which the server sent", msg, v)
+		}
+	}
+}
+
+// TestReadyBodyReturnsBody pins the readiness body: a 2xx from the
+// default readiness path returns exactly the bytes the server sent.
+func TestReadyBodyReturnsBody(t *testing.T) { // REQ-083
+	paths := make(chan string, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths <- r.URL.Path
+		bodyHandler(http.StatusOK, readyDoc)(w, r)
+	}))
+	defer srv.Close()
+
+	got, err := admin.ReadyBody(t.Context(), newClient(t, srv))
+	if err != nil {
+		t.Fatalf("ReadyBody: %v", err)
+	}
+	if string(got) != readyDoc {
+		t.Errorf("ReadyBody = %q, want %q", got, readyDoc)
+	}
+	if p := <-paths; p != admin.DefaultReadyPath {
+		t.Errorf("probe path = %q, want %q", p, admin.DefaultReadyPath)
+	}
+}
+
+// TestReadyBodySendsReadyRequest pins the request ReadyBody sends: a GET
+// to the WithReadyPath override at the origin of the openEHR REST entry,
+// with Accept: application/json and no Authorization header.
+func TestReadyBodySendsReadyRequest(t *testing.T) { // REQ-083
+	type seen struct {
+		method, host, path, accept string
+		auth                       bool
+	}
+	reqs := make(chan seen, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, auth := r.Header["Authorization"]
+		reqs <- seen{method: r.Method, host: r.Host, path: r.URL.Path, accept: r.Header.Get("Accept"), auth: auth}
+		bodyHandler(http.StatusOK, readyDoc)(w, r)
+	}))
+	defer srv.Close()
+	srvURL, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatalf("parse server URL: %v", err)
+	}
+
+	got, err := admin.ReadyBody(t.Context(), newClient(t, srv), admin.WithReadyPath("/ehrbase/rest/status"))
+	if err != nil {
+		t.Fatalf("ReadyBody: %v", err)
+	}
+	if string(got) != readyDoc {
+		t.Errorf("ReadyBody = %q, want %q", got, readyDoc)
+	}
+	want := seen{method: http.MethodGet, host: srvURL.Host, path: "/ehrbase/rest/status", accept: "application/json"}
+	if r := <-reqs; r != want {
+		t.Errorf("request = %+v, want %+v (the override path at the origin, no /openehr/v1, no Authorization)", r, want)
+	}
+}
+
+// TestReadyBodyLimit pins the bounded read: a body of exactly the limit
+// is returned whole, one byte more returns no bytes and an error that
+// matches transport.ErrResponseTooLarge and names the limit. 0 selects
+// DefaultMaxReadyBody, a negative limit reads without one, and
+// math.MaxInt64 reads every body whole.
+func TestReadyBodyLimit(t *testing.T) { // REQ-083
+	n := int64(len(secretDoc))
+	atDefault := strings.Repeat("x", int(admin.DefaultMaxReadyBody))
+	cases := []struct {
+		name  string
+		body  string
+		opts  []admin.ReadyOption
+		limit int64 // the limit the error names; 0 when the body is returned whole
+	}{
+		{name: "exactly n", body: secretDoc, opts: []admin.ReadyOption{admin.WithMaxReadyBody(n)}},
+		{name: "one byte over n", body: secretDoc + " ", opts: []admin.ReadyOption{admin.WithMaxReadyBody(n)}, limit: n},
+		{name: "exactly the default", body: atDefault},
+		{name: "one byte over the default", body: atDefault + "x", limit: admin.DefaultMaxReadyBody},
+		{name: "zero selects the default", body: atDefault + "x", opts: []admin.ReadyOption{admin.WithMaxReadyBody(0)}, limit: admin.DefaultMaxReadyBody},
+		{name: "negative reads without a limit", body: atDefault + "x", opts: []admin.ReadyOption{admin.WithMaxReadyBody(-1)}},
+		{name: "MaxInt64 reads the body whole", body: secretDoc, opts: []admin.ReadyOption{admin.WithMaxReadyBody(math.MaxInt64)}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(bodyHandler(http.StatusOK, tc.body))
+			defer srv.Close()
+
+			got, err := admin.ReadyBody(t.Context(), newClient(t, srv), tc.opts...)
+			if tc.limit == 0 {
+				if err != nil {
+					t.Fatalf("ReadyBody: %v", err)
+				}
+				if string(got) != tc.body {
+					t.Errorf("ReadyBody returned %d bytes, want the %d-byte body whole", len(got), len(tc.body))
+				}
+				return
+			}
+			if got != nil {
+				t.Errorf("ReadyBody returned %d bytes beside the error, want none: a partial body is not the document", len(got))
+			}
+			if !errors.Is(err, transport.ErrResponseTooLarge) {
+				t.Fatalf("err = %v, want errors.Is(err, transport.ErrResponseTooLarge)", err)
+			}
+			if limit := strconv.FormatInt(tc.limit, 10); !strings.Contains(err.Error(), limit) {
+				t.Errorf("err = %q, want it to name the limit %s", err, limit)
+			}
+			assertNoServerValues(t, err.Error())
+		})
+	}
+}
+
+// countingTransport counts the response body bytes its caller reads.
+type countingTransport struct {
+	base http.RoundTripper
+	read int64
+}
+
+func (ct *countingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	resp, err := ct.base.RoundTrip(r)
+	if err != nil {
+		return nil, err
+	}
+	resp.Body = &countingBody{ReadCloser: resp.Body, read: &ct.read}
+	return resp, nil
+}
+
+type countingBody struct {
+	io.ReadCloser
+	read *int64
+}
+
+func (b *countingBody) Read(p []byte) (int, error) {
+	n, err := b.ReadCloser.Read(p)
+	*b.read += int64(n)
+	return n, err
+}
+
+// TestReadyBodyStopsReadingPastLimit pins the cap on the bytes read, not
+// only the check on their count: ReadyBody stops one byte past the limit
+// instead of reading a long body to its end.
+func TestReadyBodyStopsReadingPastLimit(t *testing.T) { // REQ-083
+	const limit = 1024
+	srv := httptest.NewServer(bodyHandler(http.StatusOK, strings.Repeat("x", 64*limit)))
+	defer srv.Close()
+	ct := &countingTransport{base: srv.Client().Transport}
+
+	got, err := admin.ReadyBody(t.Context(), newClientWithHTTP(t, srv, &http.Client{Transport: ct}), admin.WithMaxReadyBody(limit))
+	if !errors.Is(err, transport.ErrResponseTooLarge) {
+		t.Fatalf("err = %v, want errors.Is(err, transport.ErrResponseTooLarge)", err)
+	}
+	if got != nil {
+		t.Errorf("ReadyBody returned %d bytes beside the error, want none", len(got))
+	}
+	if ct.read > limit+1 {
+		t.Errorf("ReadyBody read %d body bytes under a limit of %d, want at most %d", ct.read, limit, limit+1)
+	}
+}
+
+// TestReadyIgnoresMaxReadyBody pins that WithMaxReadyBody does not change
+// Ready, which reads no body it returns.
+func TestReadyIgnoresMaxReadyBody(t *testing.T) { // REQ-083
+	srv := httptest.NewServer(bodyHandler(http.StatusOK, secretDoc))
+	defer srv.Close()
+	if err := admin.Ready(t.Context(), newClient(t, srv), admin.WithMaxReadyBody(1)); err != nil {
+		t.Errorf("Ready with WithMaxReadyBody(1) = %v, want nil", err)
+	}
+}
+
+// TestReadyBodyCutMidBody pins the read failure of a 2xx body cut
+// mid-read: no bytes, an error that matches io.ErrUnexpectedEOF, and none
+// of the bytes read before the cut in the error text.
+func TestReadyBodyCutMidBody(t *testing.T) { // REQ-083
+	partial := `{"status":"UP","note":"` + readySecret
+	srv := httptest.NewServer(rawHandler(t, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n"+partial))
+	defer srv.Close()
+
+	got, err := admin.ReadyBody(t.Context(), newClient(t, srv))
+	if got != nil {
+		t.Errorf("ReadyBody returned %q beside the error, want no bytes: a partial body is not the document", got)
+	}
+	if !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Fatalf("err = %v, want errors.Is(err, io.ErrUnexpectedEOF)", err)
+	}
+	assertNoServerValues(t, err.Error(), partial, `"status":"UP"`)
+}
+
+// TestReadyBodyTrailerTextStaysOut pins the value-free text on the read
+// failure's own text: net/http quotes a malformed chunked trailer line in
+// its read error, so a server can put any value there. That value
+// appears nowhere in the error text, and the read failure is still
+// reached by unwrapping.
+func TestReadyBodyTrailerTextStaysOut(t *testing.T) { // REQ-083
+	srv := httptest.NewServer(rawHandler(t, "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n0\r\n"+readySecret+"\r\n\r\n"))
+	defer srv.Close()
+
+	got, err := admin.ReadyBody(t.Context(), newClient(t, srv))
+	cause, ok := errors.AsType[textproto.ProtocolError](err)
+	if !ok || !strings.Contains(cause.Error(), readySecret) {
+		t.Fatalf("errors.AsType[textproto.ProtocolError](%v) = (%v, %v), want net/http's read error quoting %q; the premise of this test is gone", err, cause, ok, readySecret)
+	}
+	if got != nil {
+		t.Errorf("ReadyBody returned %q beside the error, want no bytes", got)
+	}
+	assertNoServerValues(t, err.Error(), "hello")
+}
+
+// cancelAfterHeaders cancels a context once the response headers have
+// arrived, so the cancellation lands while the body is being read.
+type cancelAfterHeaders struct {
+	base   http.RoundTripper
+	cancel context.CancelFunc
+}
+
+func (ct cancelAfterHeaders) RoundTrip(r *http.Request) (*http.Response, error) {
+	resp, err := ct.base.RoundTrip(r)
+	ct.cancel()
+	return resp, err
+}
+
+// TestReadyBodyCanceledMidBody pins that a read failure other than a cut
+// connection is reached by unwrapping too: a context canceled while the
+// body is read gives no bytes and an error matching context.Canceled.
+func TestReadyBodyCanceledMidBody(t *testing.T) { // REQ-083
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", "100")
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, `{"status":"UP","note":"`+readySecret)
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		<-r.Context().Done()
+	}))
+	defer srv.Close()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	hc := &http.Client{Transport: cancelAfterHeaders{base: srv.Client().Transport, cancel: cancel}}
+
+	got, err := admin.ReadyBody(ctx, newClientWithHTTP(t, srv, hc))
+	if got != nil {
+		t.Errorf("ReadyBody returned %q beside the error, want no bytes", got)
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want errors.Is(err, context.Canceled)", err)
+	}
+	assertNoServerValues(t, err.Error())
+}
+
+// TestReadyBodyNon2xxMatchesReady pins the status mapping: a status that
+// is not 2xx returns no bytes, even when the server sends a body, and the
+// same error Ready returns for that status.
+func TestReadyBodyNon2xxMatchesReady(t *testing.T) { // REQ-083
+	cases := []struct {
+		status   int
+		sentinel error // nil for a status outside the mapped set
+	}{
+		{http.StatusServiceUnavailable, transport.ErrServerError},
+		{http.StatusInternalServerError, transport.ErrServerError},
+		{http.StatusNotFound, transport.ErrNotFound},
+		{http.StatusUnauthorized, transport.ErrUnauthorized},
+		{http.StatusForbidden, transport.ErrForbidden},
+		{http.StatusBadRequest, nil},
+		{http.StatusTooManyRequests, nil},
+	}
+	for _, tc := range cases {
+		t.Run(strconv.Itoa(tc.status), func(t *testing.T) {
+			srv := httptest.NewServer(bodyHandler(tc.status, secretDoc))
+			defer srv.Close()
+			c := newClient(t, srv)
+
+			got, err := admin.ReadyBody(t.Context(), c)
+			if got != nil {
+				t.Errorf("status=%d: ReadyBody returned %q, want no bytes", tc.status, got)
+			}
+			if err == nil {
+				t.Fatalf("status=%d: ReadyBody returned no error", tc.status)
+			}
+			if tc.sentinel != nil && !errors.Is(err, tc.sentinel) {
+				t.Errorf("status=%d: err = %v, want errors.Is(err, %v)", tc.status, err, tc.sentinel)
+			}
+			readyErr := admin.Ready(t.Context(), c)
+			if readyErr == nil || err.Error() != readyErr.Error() {
+				t.Errorf("status=%d: ReadyBody err = %v, Ready err = %v, want the same error", tc.status, err, readyErr)
+			}
+			assertNoServerValues(t, err.Error())
+		})
+	}
+}
+
+// TestReadyBodyPathOptionValidation pins Ready's path guard on ReadyBody:
+// an empty or relative override returns ErrInvalidPath and no bytes
+// before any request is sent.
+func TestReadyBodyPathOptionValidation(t *testing.T) { // REQ-083
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("path validation should fail before hitting the server, but got request to %s", r.URL.Path)
+	}))
+	defer srv.Close()
+	c := newClient(t, srv)
+
+	for _, path := range []string{"", "health/ready", "./health/ready"} {
+		t.Run(strconv.Quote(path), func(t *testing.T) {
+			got, err := admin.ReadyBody(t.Context(), c, admin.WithReadyPath(path))
+			if got != nil {
+				t.Errorf("path=%q: ReadyBody returned %q, want no bytes", path, got)
+			}
+			if !errors.Is(err, admin.ErrInvalidPath) {
+				t.Errorf("path=%q: err = %v, want errors.Is(err, ErrInvalidPath)", path, err)
+			}
+		})
+	}
+}
+
+// TestReadyBodyNilClient pins the nil-Client guard on ReadyBody, which
+// bypasses transport.Client.Do like Ready does: no panic, no bytes and an
+// error matching transport.ErrInvalidConfig.
+func TestReadyBodyNilClient(t *testing.T) { // REQ-083 REQ-025
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("ReadyBody with a nil client panicked: %v", r)
+		}
+	}()
+	got, err := admin.ReadyBody(t.Context(), nil)
+	if got != nil {
+		t.Errorf("ReadyBody returned %q, want no bytes", got)
+	}
+	if !errors.Is(err, transport.ErrInvalidConfig) {
+		t.Errorf("err = %v, want errors.Is(err, transport.ErrInvalidConfig)", err)
 	}
 }
