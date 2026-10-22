@@ -82,9 +82,9 @@
 // of any instantiation, copied into the one the field holds. An Integer
 // attribute (DV_QUANTITY and DV_PROPORTION `precision`, DV_PROPORTION
 // `type`, DV_ORDINAL `value`, DV_MULTIMEDIA `size`, INTERVAL_EVENT
-// `sample_count`) takes a whole number of any Go integer shape, and a
-// whole number outside the 32-bit range an RM Integer holds returns an
-// ErrTypeMismatch that says so, and so does an rm.Integer held by pointer.
+// `sample_count`) takes a whole number of any Go integer shape held by
+// value, or an rm.Integer held by pointer, and a whole number outside the
+// 32-bit range an RM Integer holds returns an ErrTypeMismatch that says so.
 // An optional Real attribute (an accuracy) takes a number of any Go numeric
 // shape or an rm.Real held by pointer, an optional Boolean attribute
 // (accuracy_is_percent) a bool as a value or as a pointer, and an optional
