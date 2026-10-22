@@ -92,6 +92,14 @@ func TestREQ107_ExistenceOnlyItemsGetNoUndescribedMember(t *testing.T) {
 			want: stub + "(at0000)",
 		},
 		{
+			// No child needs no undescribed content, so the top-up falls
+			// back to the first allowed child that is not a slot.
+			name: "control: ITEM_TREE items at cardinality 1..* with a slot before a child that needs undescribed content",
+			opt: optTemplate("ITEM_TREE", guardCountedMultiple("items", guardExistence11,
+				optSlot("CLUSTER", "at0001"), slotOnlyCluster("at0003", guardOccurrences01))),
+			want: "at0003(" + stub + "(at0000))",
+		},
+		{
 			name: "control: CLUSTER items, which the BMM requires, with only a slot",
 			opt:  optTemplate("CLUSTER", guardMultiple("items", guardExistence11, optSlot("CLUSTER", "at0001"))),
 			want: stub + "(at0000)",
