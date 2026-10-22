@@ -48,14 +48,17 @@ type undescribedPin struct {
 // requires, so REQ-107 § Slot fills keeps it: the rule reads an optional
 // node's own attributes only, and below a required child the walk builds
 // what § Contract says, undescribed members included where the BMM or the
-// attribute's cardinality asks for a member. A list only its existence
-// requires gets no undescribed member (What a visit writes), so vital_signs'
-// protocols and event states, whose items the template leaves without a
-// child or with slots only at an existence of 1..1 and a cardinality of
-// 0..*, hold none. Medium builds only the first optional archetype root of
-// a content attribute, so it does not reach clinical_content_validation's
-// EVALUATION. A new such member, or a listed one that is gone, fails the
-// census.
+// attribute's cardinality asks for a member. A child's occurrences add no
+// such member, though the generator's existenceOnly reads them: a required
+// child that is not a slot gets a member of its own, so no top-up runs, and
+// the parser does not read a slot's occurrences (REQ-107 Known gap: slot
+// occurrences). A list only its existence requires gets no undescribed
+// member (What a visit writes), so vital_signs' protocols and event states,
+// whose items the template leaves without a child or with slots only at an
+// existence of 1..1 and a cardinality of 0..*, hold none. Medium builds
+// only the first optional archetype root of a content attribute, so it does
+// not reach clinical_content_validation's EVALUATION. A new such member, or
+// a listed one that is gone, fails the census.
 var undescribedBelowRequired = []undescribedPin{
 	{
 		member: undescribedMember{
@@ -553,7 +556,11 @@ func attrRequired(attr *templatecompile.CompiledAttribute) bool {
 // the top-up takes only a child that needs no undescribed content, so it
 // has no last resort. A member built so is not one of node's own, which
 // § Slot fills keeps out, so the census lists what it holds rather than
-// calling it a violation.
+// calling it a violation. Unlike the generator's existenceOnly, this does
+// not read a child's occurrences, on purpose: a required child that is not
+// a slot gets a member of its own, so no top-up runs, and the parser does
+// not read a slot's occurrences (REQ-107 Known gap: slot occurrences).
+// Reading them would only exempt a node that no top-up builds.
 func topUpLastResort(node *templatecompile.CompiledNode) bool {
 	attr := parentAttribute(node)
 	if attr == nil || attr.Cardinality() != template.Multiple ||

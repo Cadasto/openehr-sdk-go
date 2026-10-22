@@ -441,11 +441,7 @@ func (g *generator) shouldVisit(optNode *tcimpl.CompiledNode, attr *tcimpl.Compi
 // Cardinality lower and existence are separate, so a 1..* list is required
 // when existence does not say so.
 func visitRequired(attr *tcimpl.CompiledAttribute) bool {
-	if isRequired(attr) {
-		return true
-	}
-	cm := attr.ChildMultiplicity()
-	return cm != nil && !cm.LowerUnbounded() && cm.Lower() > 0
+	return isRequired(attr) || lowerAtLeastOne(attr.ChildMultiplicity())
 }
 
 // compositionContext reports whether attr is the context of a
@@ -2117,17 +2113,7 @@ func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 // existence asks for the container alone: existenceOnly tells where it is
 // the only thing that asks for a member.
 func isRequired(attr *tcimpl.CompiledAttribute) bool {
-	if attr.Required() {
-		return true
-	}
-	e := attr.Existence()
-	if e == nil {
-		return false
-	}
-	if e.LowerUnbounded() {
-		return false
-	}
-	return e.Lower() >= 1
+	return attr.Required() || lowerAtLeastOne(attr.Existence())
 }
 
 // newHierObjectID generates a HierObjectID with a random RFC 9562
@@ -2296,8 +2282,9 @@ func (g *generator) finishNode(opt *tcimpl.CompiledNode, rmValue any) {
 	case *rm.Cluster:
 		// CLUSTER.items is RM-mandatory. ITEM_TREE.items and ITEM_LIST.items
 		// are optional, so they get no member here: the walk gives them one
-		// when the OPT requires it, and none when the OPT leaves them
-		// optional.
+		// where the BMM, the attribute's cardinality or a child's
+		// occurrences asks for one, and none where only their existence
+		// does.
 		g.ensureItems(&v.Items)
 	case *rm.PartyRelationship:
 		g.fillPartyRelationship(opt, v)
