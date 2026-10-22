@@ -773,6 +773,38 @@ func TestProbesBoundSlowBodyDrain(t *testing.T) { // REQ-083
 	}
 }
 
+// TestReadyBodySlowBodyReturnedWhole pins that the drain's time bound stays
+// off the body ReadyBody returns: a 2xx body that arrives one byte at a
+// time, over several times the drain's 50 ms, still comes back whole.
+func TestReadyBodySlowBodyReturnedWhole(t *testing.T) { // REQ-083
+	const body = `{"status":"UP"}`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rc := http.NewResponseController(w)
+		for i := range len(body) {
+			if _, err := io.WriteString(w, body[i:i+1]); err != nil {
+				return
+			}
+			if err := rc.Flush(); err != nil {
+				return
+			}
+			select {
+			case <-r.Context().Done():
+				return
+			case <-time.After(20 * time.Millisecond):
+			}
+		}
+	}))
+	defer srv.Close()
+
+	got, err := admin.ReadyBody(t.Context(), newClient(t, srv))
+	if err != nil {
+		t.Fatalf("ReadyBody on a slow body: %v, want nil", err)
+	}
+	if string(got) != body {
+		t.Errorf("ReadyBody on a slow body = %q, want %q whole", got, body)
+	}
+}
+
 // TestProbesDrainSmallBodyAndReuseConnection pins the drain and what it is
 // for: a probe reads a small body to its end before it closes it, and the
 // next probe reuses the connection. The byte count is what fails when the
