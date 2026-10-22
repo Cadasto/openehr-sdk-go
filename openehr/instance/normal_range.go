@@ -325,6 +325,7 @@ func (r normalRule[K]) onSide(k K, side normalSide) bool {
 	case belowRange:
 		c, ok := r.compare(k, r.bounds.lower)
 		return !r.bounds.lowerUnbounded && ok && c <= 0
+	case anySide:
 	}
 	return false
 }
