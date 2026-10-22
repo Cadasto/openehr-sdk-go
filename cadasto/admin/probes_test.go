@@ -686,6 +686,93 @@ func TestProbesBoundEndlessBodyDrain(t *testing.T) { // REQ-083
 	}
 }
 
+// trickleHandler answers with status and a body that never ends, sent one
+// byte at a time with a pause after each. It stops once a write fails or
+// the request's context ends, which both happen once the client drops the
+// connection.
+func trickleHandler(status int) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(status)
+		rc := http.NewResponseController(w)
+		for {
+			if _, err := io.WriteString(w, "x"); err != nil {
+				return
+			}
+			if err := rc.Flush(); err != nil {
+				return
+			}
+			select {
+			case <-r.Context().Done():
+				return
+			case <-time.After(10 * time.Millisecond):
+			}
+		}
+	}
+}
+
+// stallHandler answers with status and one byte of body, then sends nothing
+// more until the request's context ends, which happens once the client
+// drops the connection.
+func stallHandler(status int) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(status)
+		_, _ = io.WriteString(w, "x")
+		_ = http.NewResponseController(w).Flush()
+		<-r.Context().Done()
+	}
+}
+
+// TestProbesBoundSlowBodyDrain pins the time bound on the drain: a 2xx body
+// that trickles without end, or sends a byte and stalls, makes Live and
+// Ready return nil, and such a 503 body makes ReadyBody return no bytes and
+// an error matching transport.ErrServerError, each before its context
+// ends. The deadline is far above the time bound, so a drain bounded only
+// in bytes holds the probe until the deadline and fails on the context
+// check.
+func TestProbesBoundSlowBodyDrain(t *testing.T) { // REQ-083
+	bodies := []struct {
+		name    string
+		handler func(status int) http.HandlerFunc
+	}{
+		{name: "trickle", handler: trickleHandler},
+		{name: "stall", handler: stallHandler},
+	}
+	probes := []struct {
+		name     string
+		status   int
+		call     probeCall
+		sentinel error // nil when the probe must return nil
+	}{
+		{name: "Live 200", status: http.StatusOK, call: callLive},
+		{name: "Ready 200", status: http.StatusOK, call: callReady},
+		{name: "ReadyBody 503", status: http.StatusServiceUnavailable, call: callReadyBody, sentinel: transport.ErrServerError},
+	}
+	for _, body := range bodies {
+		for _, tc := range probes {
+			t.Run(body.name+"/"+tc.name, func(t *testing.T) {
+				srv := httptest.NewServer(body.handler(tc.status))
+				defer srv.Close()
+				ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+				defer cancel()
+
+				got, err := tc.call(ctx, newClient(t, srv))
+				if ctxErr := ctx.Err(); ctxErr != nil {
+					t.Errorf("%s on a %s body returned after its context ended (%v), want it to return before", tc.name, body.name, ctxErr)
+				}
+				if got != nil {
+					t.Errorf("%s on a %s body returned %d bytes, want none", tc.name, body.name, len(got))
+				}
+				switch {
+				case tc.sentinel == nil && err != nil:
+					t.Errorf("%s on a %s body = %v, want nil", tc.name, body.name, err)
+				case tc.sentinel != nil && !errors.Is(err, tc.sentinel):
+					t.Errorf("%s on a %s body: err = %v, want errors.Is(err, %v)", tc.name, body.name, err, tc.sentinel)
+				}
+			})
+		}
+	}
+}
+
 // TestProbesDrainSmallBodyAndReuseConnection pins the drain and what it is
 // for: a probe reads a small body to its end before it closes it, and the
 // next probe reuses the connection. The byte count is what fails when the
