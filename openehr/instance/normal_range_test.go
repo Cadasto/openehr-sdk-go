@@ -517,11 +517,14 @@ var placeholderStatusNode = optSingle("normal_status", optCodePhrase("local", "a
 // the openEHR normal statuses code set) takes the step above the upper
 // bound, one that starts with L (L, LL, LLL) the step below the lower bound,
 // and any other status, here a placeholder code of a local terminology,
-// keeps the order settleNormalRange documents, which tries the step below
-// the lower bound before the step above the upper. The range holds the
-// unconstrained example value, so each fill starts from a value inside it.
-// It holds for a DV_COUNT, a DV_QUANTITY and a DV_PROPORTION, under every
-// policy, both value fills, and with and without the implicit attributes.
+// keeps the order settleNormalRange documents. That order tries the step
+// below the lower bound before the step above the upper, but the lower bound
+// itself before both, so where the range excludes its lower bound, which
+// lies outside it, a placeholder takes that bound and a low status the step
+// below it. Each range holds the unconstrained example value, so each fill
+// starts from a value inside it. It holds for a DV_COUNT, a DV_QUANTITY and
+// a DV_PROPORTION, under every policy, both value fills, and with and
+// without the implicit attributes.
 func TestREQ107_NormalStatusSteersTheValueToItsSide(t *testing.T) {
 	const noRefs = "; other_reference_ranges []"
 	type kind struct {
@@ -531,8 +534,9 @@ func TestREQ107_NormalStatusSteersTheValueToItsSide(t *testing.T) {
 		// render is the settled value, then the status code, then the range.
 		render func(value, status string) string
 		// below and above are the value one step below the lower bound and
-		// one step above the upper.
-		below, above string
+		// one step above the upper, and other is the value a status that is
+		// neither high nor low takes.
+		below, above, other string
 	}
 	kinds := []kind{
 		{
@@ -543,7 +547,7 @@ func TestREQ107_NormalStatusSteersTheValueToItsSide(t *testing.T) {
 			render: func(value, status string) string {
 				return "DV_COUNT " + value + "; normal_status " + status + "; normal_range [DV_COUNT 0 .. DV_COUNT 0]" + noRefs
 			},
-			below: "-1", above: "1",
+			below: "-1", above: "1", other: "-1",
 		},
 		{
 			name: "DV_QUANTITY with no magnitude constraint, range [0 mm..0 mm]",
@@ -555,7 +559,7 @@ func TestREQ107_NormalStatusSteersTheValueToItsSide(t *testing.T) {
 				return "DV_QUANTITY " + value + " mm; normal_status " + status +
 					"; normal_range [DV_QUANTITY 0 mm .. DV_QUANTITY 0 mm]" + noRefs
 			},
-			below: "-1", above: "1",
+			below: "-1", above: "1", other: "-1",
 		},
 		{
 			name: "DV_PROPORTION unitary with no numerator constraint, range [1/1..1/1]",
@@ -567,7 +571,41 @@ func TestREQ107_NormalStatusSteersTheValueToItsSide(t *testing.T) {
 				return "DV_PROPORTION " + value + "/1 type 1; normal_status " + status +
 					"; normal_range [DV_PROPORTION 1/1 type 1 .. DV_PROPORTION 1/1 type 1]" + noRefs
 			},
-			below: "0", above: "2",
+			below: "0", above: "2", other: "0",
+		},
+		{
+			name: "DV_COUNT with no magnitude constraint, range (-5..5]",
+			build: func(status string) string {
+				return optNode("DV_COUNT", "", normalRangeOver("DV_COUNT", countValue("-5"), countValue("5"), excludesLower), status)
+			},
+			render: func(value, status string) string {
+				return "DV_COUNT " + value + "; normal_status " + status + "; normal_range (DV_COUNT -5 .. DV_COUNT 5]" + noRefs
+			},
+			below: "-6", above: "6", other: "-5",
+		},
+		{
+			name: "DV_QUANTITY with no magnitude constraint, range (-5 mm..5 mm]",
+			build: func(status string) string {
+				return optNode("DV_QUANTITY", "", optSingle("units", guardString("mm")),
+					normalRangeOver("DV_QUANTITY", quantityValue("-5"), quantityValue("5"), excludesLower), status)
+			},
+			render: func(value, status string) string {
+				return "DV_QUANTITY " + value + " mm; normal_status " + status +
+					"; normal_range (DV_QUANTITY -5 mm .. DV_QUANTITY 5 mm]" + noRefs
+			},
+			below: "-6", above: "6", other: "-5",
+		},
+		{
+			name: "DV_PROPORTION unitary with no numerator constraint, range (-5/1..5/1]",
+			build: func(status string) string {
+				return optNode("DV_PROPORTION", "", optSingle("denominator", dvReal("1")), optSingle("type", dvInteger("1")),
+					normalRangeOver("DV_PROPORTION", proportionValue("-5"), proportionValue("5"), excludesLower), status)
+			},
+			render: func(value, status string) string {
+				return "DV_PROPORTION " + value + "/1 type 1; normal_status " + status +
+					"; normal_range (DV_PROPORTION -5/1 type 1 .. DV_PROPORTION 5/1 type 1]" + noRefs
+			},
+			below: "-6", above: "6", other: "-5",
 		},
 	}
 	statuses := []struct {
@@ -577,8 +615,7 @@ func TestREQ107_NormalStatusSteersTheValueToItsSide(t *testing.T) {
 		node, rendered string
 		// above is set where the status takes the step above the upper
 		// bound, below where it takes the step below the lower, and neither
-		// where it keeps the documented order, whose first outside candidate
-		// is the step below.
+		// where it keeps the documented order.
 		above, below bool
 		// placeholder is set where the status is none of the openEHR normal
 		// statuses.
@@ -595,9 +632,12 @@ func TestREQ107_NormalStatusSteersTheValueToItsSide(t *testing.T) {
 	var cases []normalCase
 	for _, k := range kinds {
 		for _, st := range statuses {
-			value := k.below
-			if st.above {
+			value := k.other
+			switch {
+			case st.above:
 				value = k.above
+			case st.below:
+				value = k.below
 			}
 			cases = append(cases, normalCase{
 				name:              k.name + ", " + st.code,

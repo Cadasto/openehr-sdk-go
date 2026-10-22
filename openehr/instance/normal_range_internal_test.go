@@ -221,6 +221,18 @@ func TestREQ107_NormalRangeSettleEdges(t *testing.T) {
 			want:  "6",
 		},
 		{
+			// The upper bound is below zero, so a step from the zero value of
+			// an absent lower bound would be outside the range: -1. Only the
+			// step above the upper bound is.
+			name: "DV_COUNT L, range open below and under zero, the step above the upper bound",
+			v: &rm.DVCount{
+				Magnitude: -7, NormalStatus: normalStatusCode("L"),
+				NormalRange: &rm.DVInterval[rm.DVCount]{LowerUnbounded: true, UpperIncluded: true, Upper: rm.DVCount{Magnitude: -5}},
+			},
+			value: func(v any) string { return fmt.Sprint(v.(*rm.DVCount).Magnitude) },
+			want:  "-4",
+		},
+		{
 			// No second follows 23:59:59 on the same day, so a high status has
 			// no step above the upper bound and falls back to the step below
 			// the lower.
