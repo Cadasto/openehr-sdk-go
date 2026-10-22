@@ -644,6 +644,53 @@ func TestREQ171_EngineReadsAnEmptyHashAsTheRMRulesDo(t *testing.T) {
 	}
 }
 
+// REQ-171 § One walk (Presence), REQ-102 § An existence lower bound alone
+// asks for no member — a Hash the RM marks mandatory that the instance lacks
+// is reported once, by the rule that requires it. A template that declares
+// RESOURCE_DESCRIPTION original_author multi-valued asks for no member where
+// its existence alone requires it, so the absent Hash is the RM's `required`,
+// rule mandatory, as it is where the existence is open. Where the template's
+// existence and its child count both require it, it is the template's
+// `required`, rule existence, alone: an absent Hash has no entries to count.
+func TestREQ171_EngineReportsAnAbsentHashByTheRuleThatRequiresIt(t *testing.T) {
+	t.Parallel()
+	const path = "/original_author"
+	tests := []struct {
+		name string
+		c    *templatecompile.Compiled
+		want []string
+	}{
+		{
+			name: "existence open",
+			c:    mustCompileInline(t, resourceDescriptionOPT("0", "1", "0")),
+			want: []string{"required rm mandatory"},
+		},
+		{
+			name: "existence required alone",
+			c:    mustCompileInline(t, resourceDescriptionOPT("1", "1", "0")),
+			want: []string{"required rm mandatory"},
+		},
+		{
+			name: "existence and child count required",
+			c:    mustCompileInline(t, resourceDescriptionOPT("1", "1", "1")),
+			want: []string{"required template existence"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			root := describedResource([]string{"en"}, "")
+			root.OriginalAuthor = nil
+			if got, want := keysAt(validation.ValidateRM(root).Issues, path), []string{"required rm mandatory"}; !slices.Equal(got, want) {
+				t.Fatalf("precondition: ValidateRM(RESOURCE_DESCRIPTION with no original_author) at %s = %q, want %q", path, got, want)
+			}
+			if got := keysAt(validateWith(t, root, tc.c).Issues, path); !slices.Equal(got, tc.want) {
+				t.Errorf("Validate(RESOURCE_DESCRIPTION with no original_author, %s) at %s = %q, want %q", tc.name, path, got, tc.want)
+			}
+		})
+	}
+}
+
 // REQ-171 § Surface — the compiled template is built once and shared:
 // Validate over every corpus composition, against its compiled template,
 // run from several goroutines at once over one compiled template and one

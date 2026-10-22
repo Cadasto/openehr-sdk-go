@@ -3,11 +3,13 @@ package validation_test
 // existence_container_test.go: REQ-102 § Validation dimensions, Structural —
 // required attributes, and § An existence lower bound alone asks for no
 // member. On a multi-valued attribute the template's existence asks for the
-// container and its cardinality for the members, and canonical JSON leaves a
-// list with no member out, so the template reports `required` for a list that
-// is absent, or present and empty, only where its cardinality lower bound is
-// bounded and at least 1. A single-valued attribute keeps its reading, and
-// the RM layer still reports a container the Reference Model requires.
+// container and its counts for the members, and canonical JSON leaves a list
+// with no member out, so the template reports `required` for a list that is
+// absent, or present and empty, only where it asks for a member there: its
+// cardinality lower bound, or the occurrences lower bound of a child it
+// allows, is bounded and at least 1. A single-valued attribute keeps its
+// reading, and the RM layer still reports a container the Reference Model
+// requires.
 
 import (
 	"os"
@@ -34,11 +36,16 @@ func containerArchetype(rmType string) string {
 	return "openEHR-EHR-" + rmType + ".existence_container.v1"
 }
 
-// containerElement is an ELEMENT child at0001, occurring lower..1 times,
-// whose value the template requires (existence 1..1) as a DV_TEXT.
+// containerElement is an ELEMENT child at0001, occurring lower..1 times, or
+// stating no occurrences where lower is empty, whose value the template
+// requires (existence 1..1) as a DV_TEXT.
 func containerElement(lower string) string {
+	occurrences := ""
+	if lower != "" {
+		occurrences = `<occurrences>` + fiInterval(lower, "1") + `</occurrences>`
+	}
 	return `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>ELEMENT</rm_type_name>` +
-		`<occurrences>` + fiInterval(lower, "1") + `</occurrences><node_id>at0001</node_id>` +
+		occurrences + `<node_id>at0001</node_id>` +
 		`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>value</rm_attribute_name>` +
 		`<existence>` + fiInterval("1", "1") + `</existence>` +
 		`<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>DV_TEXT</rm_type_name><node_id></node_id></children>` +
@@ -80,21 +87,28 @@ func noInformationElement() *rm.Element {
 
 // REQ-102 — a list whose existence lower bound is 1 is asked for as a
 // container only: absent, or present and empty, it draws no `required` from
-// the template unless its cardinality lower bound is bounded and at least 1,
-// whether the template admits a child under it or not, and whether it states
-// a cardinality or not. Where the cardinality lower bound is 1, an absent
-// list draws `required` alone (no `cardinality`, no `occurrences` of the
-// child it requires, REQ-171 § Structural access) and a present, empty one
-// both `required` and `cardinality`, with that child's occurrences beside
-// them. A single-valued attribute at existence 1..1
-// that is absent still draws `required`, and the RM layer still reports a
-// container the Reference Model requires (CLUSTER.items).
+// the template unless the template asks for a member there, by a cardinality
+// lower bound, or the occurrences lower bound of a child it allows, that is
+// bounded and at least 1. So it draws none whether the template admits a
+// child under it or not, whether it states a cardinality or not, and where
+// its one child is optional or states no occurrences. Where the cardinality
+// lower bound is 1, an absent list draws `required` alone (no `cardinality`,
+// no `occurrences` of the child it requires, REQ-171 § Structural access)
+// and a present, empty one both `required` and `cardinality`, with that
+// child's occurrences beside them. Where only a child's occurrences lower
+// bound is 1, an absent list draws `required` alone too, and a present,
+// empty one `required` with that child's occurrences. A single-valued
+// attribute at existence 1..1 that is absent still draws `required`, and
+// the RM layer still reports a container the Reference Model requires
+// (CLUSTER.items).
 func TestValidate_REQ102_ListExistenceAsksForTheContainerOnly(t *testing.T) {
 	t.Parallel()
 	zeroOrMore := mustCompileInline(t, containerOPT("ITEM_TREE", fromLowerUnbounded("0"), containerElement("0")))
 	noChild := mustCompileInline(t, containerOPT("ITEM_TREE", fromLowerUnbounded("0")))
 	noCardinality := mustCompileInline(t, containerOPT("ITEM_TREE", "", containerElement("0")))
+	noOccurrences := mustCompileInline(t, containerOPT("ITEM_TREE", fromLowerUnbounded("0"), containerElement("")))
 	oneOrMore := mustCompileInline(t, containerOPT("ITEM_TREE", fromLowerUnbounded("1"), containerElement("1")))
+	requiredChild := mustCompileInline(t, containerOPT("ITEM_TREE", fromLowerUnbounded("0"), containerElement("1")))
 	cluster := mustCompileInline(t, containerOPT("CLUSTER", fromLowerUnbounded("0"), containerElement("0")))
 	tree := func(items []rm.Item) *rm.ItemTree {
 		return &rm.ItemTree{ArchetypeNodeID: containerArchetype("ITEM_TREE"), Name: rm.DVText{Value: "tree"}, Items: items}
@@ -113,6 +127,23 @@ func TestValidate_REQ102_ListExistenceAsksForTheContainerOnly(t *testing.T) {
 		{name: "present empty list, no child", root: tree([]rm.Item{}), under: noChild},
 		{name: "absent list, no cardinality stated", root: tree(nil), under: noCardinality},
 		{name: "present empty list, no cardinality stated", root: tree([]rm.Item{}), under: noCardinality},
+		{name: "absent list, child with no occurrences", root: tree(nil), under: noOccurrences},
+		{name: "present empty list, child with no occurrences", root: tree([]rm.Item{}), under: noOccurrences},
+		{
+			name:  "absent list, cardinality 0..*, child at occurrences 1..1",
+			root:  tree(nil),
+			under: requiredChild,
+			want:  []string{"required /items template existence"},
+		},
+		{
+			name:  "present empty list, cardinality 0..*, child at occurrences 1..1",
+			root:  tree([]rm.Item{}),
+			under: requiredChild,
+			want: []string{
+				"cardinality /items[at0001] template occurrences",
+				"required /items template existence",
+			},
+		},
 		{
 			name:  "absent list, cardinality 1..*",
 			root:  tree(nil),
