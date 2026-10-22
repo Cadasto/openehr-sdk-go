@@ -216,8 +216,8 @@ func TestREQ107_ProhibitedAlternativeIsSkipped(t *testing.T) {
 // multi-valued attribute the OPT names without children, whose cardinality
 // lower bound is above 1, is topped up to that bound with members built
 // from its BMM type, and to no more than its cardinality upper bound,
-// which wins where the existence requires a member the cardinality does
-// not allow.
+// which wins where the BMM requires a member the cardinality does not
+// allow.
 func TestREQ107_SilentRequiredMultipleIsToppedUp(t *testing.T) {
 	cases := []struct {
 		name string
@@ -226,9 +226,14 @@ func TestREQ107_SilentRequiredMultipleIsToppedUp(t *testing.T) {
 	}{
 		{name: "CLUSTER items, lower 2", opt: optTemplate("CLUSTER", optCardinal("items", 2, -1)), want: 2},
 		{name: "ITEM_TREE items, lower 3", opt: optTemplate("ITEM_TREE", optCardinal("items", 3, -1)), want: 3},
-		// Existence 1..1 requires a member, and cardinality 0..0 allows
-		// none; the upper bound wins.
+		// Existence 1..1 alone asks for no member, and cardinality 0..0
+		// allows none, so the list stays empty.
 		{name: "ITEM_TREE items, existence 1, upper 0", opt: optTemplate("ITEM_TREE", optRequiredCardinal("items", 0, 0)), want: 0},
+		// The BMM requires a CLUSTER's items, and cardinality 0..0 allows
+		// none: the walk builds none, and the RM rule then puts in the
+		// placeholder ELEMENT (REQ-107 Precedence 2), which breaks the
+		// OPT's upper bound.
+		{name: "CLUSTER items, upper 0", opt: optTemplate("CLUSTER", optCardinal("items", 0, 0)), want: 1},
 	}
 	for _, tc := range cases {
 		for _, implicit := range []bool{true, false} {
@@ -245,6 +250,34 @@ func TestREQ107_SilentRequiredMultipleIsToppedUp(t *testing.T) {
 					noFloorErrors(t, out)
 				})
 			}
+		}
+	}
+}
+
+// TestREQ107_CardinalityUpperCapsAMandatoryListWithNoChild is the REQ-107
+// check of What a visit writes that a multi-valued attribute gets no more
+// members than its cardinality upper bound, where the BMM requires a member
+// and the OPT names no child: a PERSON's identities at cardinality 0..0 get
+// none. The OPT refuses what the RM requires (REQ-107 Exceptions and known
+// gaps), so the floor is not checked.
+func TestREQ107_CardinalityUpperCapsAMandatoryListWithNoChild(t *testing.T) {
+	opt := optTemplate("PERSON", optCardinal("identities", 0, 0))
+	for _, implicit := range []bool{true, false} {
+		c := compileOPTText(t, opt, implicit)
+		for _, opts := range defaultsOptions() {
+			t.Run(fmt.Sprintf("implicit=%t/%v/%v", implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+				out, err := instance.Generate(t.Context(), c, opts)
+				if err != nil {
+					t.Fatalf("Generate: %v", err)
+				}
+				p, ok := out.(*rm.Person)
+				if !ok {
+					t.Fatalf("generated root is %T, want a PERSON", out)
+				}
+				if got := len(p.Identities); got != 0 {
+					t.Errorf("identities has %d members, want 0", got)
+				}
+			})
 		}
 	}
 }
