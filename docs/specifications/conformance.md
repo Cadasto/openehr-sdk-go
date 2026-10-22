@@ -147,7 +147,7 @@ The openEHR surface conforms to the openEHR spec (REQ-080). The Cadasto-platform
 - A 2xx body of exactly `n` bytes under `WithMaxReadyBody(n)` is returned whole; one byte more returns no bytes and an error matching `transport.ErrResponseTooLarge` whose text names `n`. Without the option, a body over `DefaultMaxReadyBody` fails the same way.
 - A 2xx body cut mid-read returns no bytes and an error matching `io.ErrUnexpectedEOF`. None of the bytes read before the cut, and no value the server sends as a malformed chunked trailer, appears in the error text.
 - A `503` returns no bytes and an error matching `transport.ErrServerError`; an empty or relative `WithReadyPath` returns `ErrInvalidPath` without sending a request; a nil `*transport.Client` returns an error matching `transport.ErrInvalidConfig`.
-- A 2xx body that never ends makes `Live` and `Ready` return `nil`, and a `503` body that never ends makes `ReadyBody` return no bytes and an error matching `transport.ErrServerError`, each after reading a bounded number of body bytes; a body that sends a byte and then stalls makes each of them return before its context ends.
+- A 2xx body that never ends makes `Live` and `Ready` return `nil`, and a `503` body that never ends makes `ReadyBody` return no bytes and an error matching `transport.ErrServerError`, each after reading a bounded number of body bytes. When that body (a 2xx for `Live` and `Ready`, a `503` for `ReadyBody`) sends a byte and then stalls, each call returns the same result before its context ends.
 
 **Status:** landed (`cadasto/admin`). Distinct from the ITS-REST Admin client (`openehr/client/admin`). Platform-API conformance fixtures remain Phase 4 per above.
 
