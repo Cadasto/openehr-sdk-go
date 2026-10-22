@@ -132,7 +132,7 @@ The openEHR surface conforms to the openEHR spec (REQ-080). The Cadasto-platform
 - **Public / no auth.** Health endpoints are public: the SDK **MUST NOT** send an `Authorization` header on a probe.
 - **Status mapping** (`errors.Is`-compatible): `2xx → nil`; `401 → transport.ErrUnauthorized`; `403 → transport.ErrForbidden`; `404 → transport.ErrNotFound`; `5xx → transport.ErrServerError`. Other non-2xx codes (400, 405, 408, 429, …) surface as a plain formatted error with no sentinel.
 - Probes borrow `transport`'s sentinel taxonomy (REQ-093) but **bypass** `transport.Client.Do` — no openEHR error-envelope decoding, no OTel spans, no retries. Use `openehr/client/admin` when those concerns matter.
-- **Bounded drain.** A probe drains a body it does not return so the connection can be reused, and **MUST** read at most a fixed number of bytes of it before closing it: a body that never ends **MUST NOT** hold a probe until its context ends.
+- **Bounded drain.** A probe drains the 2xx body `Live` and `Ready` discard, and any body that is not 2xx, so the connection can be reused. It **MUST** read at most a fixed number of bytes of that body, for at most a fixed time, before closing it: a body that never ends, streamed fast or trickled, **MUST NOT** hold a probe until its context ends. A `ReadyBody` 2xx body is read under *The readiness body* below instead.
 
 **The readiness body.** A readiness endpoint often answers with a small document that names the service and its version, and `Ready` discards it. `ReadyBody` sends the request `Ready` sends, takes the same options, and has `Ready`'s path guard and status mapping; on a 2xx it **MUST** return the response body instead of `nil`.
 
@@ -147,7 +147,7 @@ The openEHR surface conforms to the openEHR spec (REQ-080). The Cadasto-platform
 - A 2xx body of exactly `n` bytes under `WithMaxReadyBody(n)` is returned whole; one byte more returns no bytes and an error matching `transport.ErrResponseTooLarge` whose text names `n`. Without the option, a body over `DefaultMaxReadyBody` fails the same way.
 - A 2xx body cut mid-read returns no bytes and an error matching `io.ErrUnexpectedEOF`. None of the bytes read before the cut, and no value the server sends as a malformed chunked trailer, appears in the error text.
 - A `503` returns no bytes and an error matching `transport.ErrServerError`; an empty or relative `WithReadyPath` returns `ErrInvalidPath` without sending a request; a nil `*transport.Client` returns an error matching `transport.ErrInvalidConfig`.
-- A 2xx body that never ends makes `Live` and `Ready` return `nil`, and a `503` body that never ends makes `ReadyBody` return no bytes and an error matching `transport.ErrServerError`, each after reading a bounded number of body bytes.
+- A 2xx body that never ends makes `Live` and `Ready` return `nil`, and a `503` body that never ends makes `ReadyBody` return no bytes and an error matching `transport.ErrServerError`, each after reading a bounded number of body bytes; a body that sends a byte and then stalls makes each of them return before its context ends.
 
 **Status:** landed (`cadasto/admin`). Distinct from the ITS-REST Admin client (`openehr/client/admin`). Platform-API conformance fixtures remain Phase 4 per above.
 
