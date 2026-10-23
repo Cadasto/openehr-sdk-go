@@ -42,10 +42,13 @@ func contentOPT(lower int) string {
 //
 // No attribute the pinned RM declares single-valued has a default that is
 // an archetype root (TestREQ107_SingleAttributeDefaultsAreNoArchetypeRoot).
-// A template reaches this path when it writes a multi-valued attribute such
-// as COMPOSITION.content as a C_SINGLE_ATTRIBUTE, which the external
-// TestREQ107_UnnamedArchetypeRootIsRefused covers through Generate. This
-// test hands the path COMPOSITION.content directly, whose default is an
+// A template that writes a list such as COMPOSITION.content as a
+// C_SINGLE_ATTRIBUTE reaches this path only where the BMM marks that list
+// mandatory: materialiseSingle reads any other as the list the RM declares
+// and builds it no member. The external
+// TestREQ107_SingleAttributeRMListTheLookupRequires covers the refusal
+// through Generate, with a lookup that marks COMPOSITION.content mandatory.
+// This test hands the path COMPOSITION.content directly, whose default is an
 // OBSERVATION, so the optional case can count what the path builds.
 func TestREQ107_ImplicitSingleArchetypeRootRefusedWhenRequired(t *testing.T) {
 	cases := []struct {
