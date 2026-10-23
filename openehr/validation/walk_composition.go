@@ -302,13 +302,24 @@ func appendPrimitiveIssues(issues []Issue, rmValue any, path issuePath, pc const
 }
 
 // primitiveInput converts an RM value into the Go value the typed
-// primitive validator expects. Handles three layers:
+// primitive validator expects. Handles six layers:
 //
 //   - rm.DataValue concretes (DvQuantity, DvCodedText, DvText, …)
 //     via dataValueInput — REQ-103 primitive types that bind to
 //     ELEMENT.value.
 //   - rm.CodePhrase directly (e.g. category/defining_code) — bind
 //     to constraints.CodedTermRef.
+//   - an optional primitive the RM holds by pointer (an *rm.Integer
+//     precision, an *rm.Real accuracy, a *bool accuracy_is_percent):
+//     the value it points to, read as that value is
+//     ([rmbind.PrimitiveValue]).
+//   - an optional String the RM holds by pointer (a *string
+//     formatting): the text it points to, or the empty string when it
+//     is not set. [rmbind.PrimitiveValue] leaves a *string as it is;
+//     the *string case below reads it.
+//   - a Character (an rm.Character, TERM_MAPPING.match): the one-character
+//     string it is, which a C_STRING judges, the only constraint AOM 1.4
+//     has for it.
 //   - everything else: pass through unchanged. The typed primitive
 //     validator returns CodeWrongType when the input shape does not
 //     fit; that is a contract failure on the caller side, not a
@@ -320,7 +331,8 @@ func primitiveInput(rmValue any) any {
 		}
 		return dv
 	}
-	switch v := rmValue.(type) {
+	value := rmbind.PrimitiveValue(rmValue)
+	switch v := value.(type) {
 	case rm.CodePhrase:
 		return constraints.CodedTermRef{
 			Terminology: v.TerminologyID.Value,
@@ -340,6 +352,8 @@ func primitiveInput(rmValue any) any {
 			return ""
 		}
 		return *v
+	case rm.Character:
+		return string(v)
 	case rm.Integer:
 		return int64(v)
 	case rm.Integer64:
@@ -352,7 +366,7 @@ func primitiveInput(rmValue any) any {
 		// wrong_type (REQ-110: REAL on DV_QUANTITY.magnitude).
 		return float64(v)
 	}
-	return rmValue
+	return value
 }
 
 // templateRequires reports whether the template's own existence requires

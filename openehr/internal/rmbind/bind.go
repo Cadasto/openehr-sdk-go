@@ -10,7 +10,7 @@
 // leaf, and it checks on its own that the RM attribute at the path can hold
 // the value. The validator's RM type match also reads
 // [ConformsToNode], [TypedIntervalBound] and [IntervalConformsTo], and its
-// primitive leaves read [PrimitiveValueMatchesShortName].
+// primitive leaves read [PrimitiveValueMatchesShortName] and [PrimitiveValue].
 //
 // The rule has three tiers, tried in order, and within a tier the first
 // node in template order wins:
@@ -310,8 +310,13 @@ func collapsedIntervalBounds(val any) (bounds []rm.DVOrdered, ok bool) {
 // a primitive type: a bool under BOOLEAN, an integer under INTEGER (a Go
 // integer, an rm.Integer or an rm.Integer64, as [rm.AsInt64] reads them), a
 // real under REAL, a string under DATE, TIME, DATE_TIME and DURATION, and a
-// string or a non-nil *string under STRING.
+// string, an rm.Character or a non-nil *string under STRING (AOM 1.4 has no
+// C_CHARACTER, so a template constrains a Character, TERM_MAPPING.match, with
+// a C_STRING). An optional Boolean, Integer or
+// Real the RM holds by pointer matches as the value it points to
+// ([PrimitiveValue]); a nil one is an absent attribute and matches nothing.
 func PrimitiveValueMatchesShortName(shortName string, val any) bool {
+	val = PrimitiveValue(val)
 	switch shortName {
 	case "BOOLEAN":
 		_, ok := val.(bool)
@@ -327,14 +332,45 @@ func PrimitiveValueMatchesShortName(shortName string, val any) bool {
 		// An optional String attribute (DV_TEXT.formatting,
 		// DV_IDENTIFIER.issuer, …) is a *string in the RM; the reader
 		// returns it only when set, so a nil pointer is absent.
-		if p, isPtr := val.(*string); isPtr {
-			return p != nil
+		switch v := val.(type) {
+		case *string:
+			return v != nil
+		case string, rm.Character:
+			return true
 		}
-		_, ok := val.(string)
-		return ok
+		return false
 	default:
 		return false
 	}
+}
+
+// PrimitiveValue returns the value of val, an optional primitive attribute
+// the RM holds by pointer: what a *bool, *rm.Integer or *rm.Real that is not
+// nil points to (DV_QUANTITY.precision, DV_AMOUNT.accuracy and
+// accuracy_is_percent, INTERVAL_EVENT.sample_count). These are the pointer
+// types the RM's primitive fields have, a *string apart; a test keeps the
+// two in step. A nil one is an absent attribute and comes back as nil. Any
+// other val, a *string included, comes back as it is: an optional String
+// matches STRING alone, which [PrimitiveValueMatchesShortName] decides
+// itself.
+func PrimitiveValue(val any) any {
+	switch p := val.(type) {
+	case *bool:
+		return pointee(p)
+	case *rm.Integer:
+		return pointee(p)
+	case *rm.Real:
+		return pointee(p)
+	}
+	return val
+}
+
+// pointee returns what p points to, or nil for a nil p.
+func pointee[T any](p *T) any {
+	if p == nil {
+		return nil
+	}
+	return *p
 }
 
 // primitiveWrappers maps each AOM 1.4 primitive short name a template may

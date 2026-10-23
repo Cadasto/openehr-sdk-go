@@ -27,10 +27,11 @@
 // than stores (offset on an event, is_integral on DV_QUANTITY and
 // DV_PROPORTION), nor a locatable's uid, which the identity rule
 // decides. Under every policy an RM rule can need more than the policy
-// visits, such as an ELEMENT's value or null flavour, which the generator
-// then builds as a visit does, from the attribute's first allowed
-// template child where it has one; and a visited multi-valued attribute
-// is topped up to its lower bound.
+// visits, such as an ELEMENT's value or null flavour, or a DV_MULTIMEDIA's
+// uri where the template prohibits its data, which the generator then
+// builds as a visit does, from the attribute's first allowed template
+// child where it has one; and a visited multi-valued attribute is topped
+// up to its lower bound.
 //
 // The three policies follow the levels of the ITS-REST template
 // example's detail_level:
@@ -99,14 +100,33 @@
 //
 // Under every policy, every primitive leaf the walk reaches is valued as
 // [Options.ValueFill] says: the constraint's example value under
-// [ExampleFill], an in-constraint draw under [RandomFill]. Where the
-// template gives an RM attribute no value, the generator writes an
-// RM-valid default, unless the template's own constraint on that
-// attribute rejects it. A DV_PROPORTION is then settled to the rules of
-// its kind, inside the template's constraints on its parts: a unitary
-// proportion over 1, a percent over 100, a fraction or an integer
-// fraction over whole numbers, any proportion of precision 0 over whole
-// numbers, and every kind over a denominator that is not 0. Where the
+// [ExampleFill], an in-constraint draw under [RandomFill]. Where an RM
+// rule narrows what the constraint leaves open, the value is taken from
+// what is left: a PARTY_REF's type is a party class name, a TERM_MAPPING's
+// match one of >, =, < and ?, a magnitude_status one of =, <, >, <=, >=
+// and ~, a percentage accuracy more than 0 and at most 100, a precision -1
+// or more, an ordered value with both a normal range and a normal status
+// inside that range where the status is N and outside it where the status
+// is any other, wherever the value compares with the range's bounds (a
+// count, a quantity in the bounds' units, a proportion of the bounds' type,
+// by ratio, an ordinal, by value, and a date, a time or a date-time of the
+// bounds' layout), and an RM Integer, such as a DV_ORDINAL's value, inside
+// its 32 bits, the example of a range bounded on one side alone staying on
+// that side. Where nothing is left, Generate returns an error wrapping
+// [ErrConstraintUnsatisfiable]. Where the template gives an RM attribute
+// no value, the generator writes an RM-valid default, unless the
+// template's own constraint on that attribute rejects it. A coded
+// attribute the RM keeps within a group or a code set of the openEHR
+// terminology, such as a participation's mode, a text's language or a
+// multimedia value's media type, keeps a code the walk wrote that the set
+// has; otherwise it takes, without a draw, its default where the template
+// admits it, else the first code the template lists that the set has, and
+// the walk's code stays where the template lists none. A DV_PROPORTION
+// is then settled to the rules of its kind, inside the template's
+// constraints on its parts: a unitary proportion over 1, a percent over
+// 100, a fraction or an integer fraction over whole numbers, any
+// proportion of precision 0 over whole numbers, and every kind over a
+// denominator that is not 0. Where the
 // drawn type cannot meet its rule there, another type the template allows
 // is taken, and where none can, the value stays as the walk wrote it. A
 // coded text whose code is in the openEHR terminology, on an attribute the
@@ -123,7 +143,14 @@
 // it, even where an enclosing archetype does. A DV_MULTIMEDIA carries inline
 // data, the seven bytes of the text "example" under both value fills,
 // with that byte count as its size, unless the template prohibits data or
-// its constraint on size rejects that count.
+// its constraint on size rejects that count; where the template prohibits
+// data and names no child for the uri, the uri is http://example.com. A
+// language, encoding or charset the template names with no code, on an
+// entry, a text or an encapsulated value, takes Options.Language in
+// ISO_639-1 or UTF-8 in IANA_character-sets, and a periodic time
+// specification's value keeps the formalism HL7:PIVL or HL7:EIVL the walk
+// wrote, else takes HL7:PIVL, or HL7:EIVL where the template rejects
+// HL7:PIVL.
 //
 // # Trust model
 //

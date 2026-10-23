@@ -300,11 +300,10 @@ func mathFunction(t *testing.T, out any) rm.DVCodedText {
 // ties to a group of the openEHR terminology takes as its text that code's
 // rubric in that group: an INTERVAL_EVENT's math_function, as a
 // DV_CODED_TEXT with a code constraint and as one a C_CODE_PHRASE
-// constrains as a whole; an EVENT_CONTEXT's setting; and an
-// ISM_TRANSITION's current_state. The walk cannot build a PARTICIPATION's
-// function or mode, an ISM_TRANSITION's transition or a TERM_MAPPING's
-// purpose from an OPT node, so those are not generated here. Code 532 is
-// "complete" in the version lifecycle
+// constrains as a whole; an EVENT_CONTEXT's setting; an ISM_TRANSITION's
+// current_state and transition; a PARTICIPATION's function and mode, in an
+// EVENT_CONTEXT's participations; and a TERM_MAPPING's purpose, in a
+// DV_CODED_TEXT's mappings. Code 532 is "complete" in the version lifecycle
 // state group and "completed" in the instruction states group, so an
 // ISM_TRANSITION's current_state takes "completed". A code the attribute's
 // group has no rubric for, such as 433, the event of the composition
@@ -355,6 +354,49 @@ func TestREQ107_PinnedOpenEHRCodeTakesItsGroupRubric(t *testing.T) {
 			name: "ISM_TRANSITION current_state", code: "532", text: "completed", valid: true,
 			opt:   optISMTransition(optSingle("current_state", optCodedText(terminology.ID, "532"))),
 			coded: func(t *testing.T, out any) rm.DVCodedText { return out.(*rm.Action).IsmTransition.CurrentState },
+		},
+		{
+			name: "ISM_TRANSITION transition", code: "540", text: "start", valid: true,
+			opt: optISMTransition(optSingle("current_state", optCodedText(terminology.ID, "245")),
+				optSingle("transition", optCodedText(terminology.ID, "540"))),
+			coded: func(t *testing.T, out any) rm.DVCodedText {
+				t.Helper()
+				iv := actionTransition(t, out)
+				if iv.Transition == nil {
+					t.Fatal("ISM_TRANSITION.transition absent, want the code the OPT pins")
+				}
+				return *iv.Transition
+			},
+		},
+		{
+			name: "PARTICIPATION function", code: "253", text: "unknown", valid: true,
+			opt:   contextParticipationsOPT(optSingle("function", optCodedText(terminology.ID, "253"))),
+			coded: func(t *testing.T, out any) rm.DVCodedText { return codedFunction(t, onlyParticipation(t, out)) },
+		},
+		{
+			name: "PARTICIPATION mode", code: "216", text: "face-to-face communication", valid: true,
+			opt: contextParticipationsOPT(optSingle("function", optNode("DV_TEXT", "")),
+				optSingle("mode", optCodedText(terminology.ID, "216"))),
+			coded: func(t *testing.T, out any) rm.DVCodedText {
+				t.Helper()
+				p := onlyParticipation(t, out)
+				if p.Mode == nil {
+					t.Fatal("PARTICIPATION.mode absent, want the code the OPT pins")
+				}
+				return *p.Mode
+			},
+		},
+		{
+			name: "TERM_MAPPING purpose", code: "671", text: "research study", valid: true,
+			opt: mappedValueOPT(optSingle("purpose", optCodedText(terminology.ID, "671")), mappingTarget),
+			coded: func(t *testing.T, out any) rm.DVCodedText {
+				t.Helper()
+				ms := valueMappings(t, out)
+				if len(ms) != 1 || ms[0].Purpose == nil {
+					t.Fatalf("ELEMENT value mappings = %+v, want one with the purpose the OPT pins", ms)
+				}
+				return *ms[0].Purpose
+			},
 		},
 	}
 	for _, tc := range cases {

@@ -47,3 +47,81 @@ func TestPrimitiveInput_Integer64Magnitude(t *testing.T) {
 		t.Fatalf("CInteger.Validate(%v) = %+v, want no violations", got, vs)
 	}
 }
+
+// REQ-102: an optional primitive attribute the RM holds by pointer reaches
+// the typed primitive validator as the value it points to, normalised as
+// that value is, so the constraint judges the value instead of rejecting the
+// pointer as wrong_type.
+func TestPrimitiveInput_REQ102_PointerHeldPrimitive(t *testing.T) {
+	t.Parallel()
+	flag, integer, number := true, rm.Integer(2), rm.Real(0.5)
+	tests := []struct {
+		in   any
+		want any
+		pc   constraints.PrimitiveConstraint
+	}{
+		{in: &flag, want: true, pc: constraints.CBoolean{TrueValid: true}},
+		{in: &integer, want: int64(2), pc: constraints.CInteger{}},
+		{in: &number, want: float64(0.5), pc: constraints.CReal{}},
+	}
+	for _, tc := range tests {
+		got := primitiveInput(tc.in)
+		if got != tc.want {
+			t.Errorf("primitiveInput(%T) = %#v (%T), want %#v (%T)", tc.in, got, got, tc.want, tc.want)
+		}
+		if vs := tc.pc.Validate(got); len(vs) != 0 {
+			t.Errorf("%T.Validate(primitiveInput(%T)) = %+v, want no violations", tc.pc, tc.in, vs)
+		}
+	}
+}
+
+// REQ-102: a pointer-held primitive that is not set is an absent attribute.
+// The walk never hands one to the typed primitive validator, because the
+// generated access reports it as absent. Handed one, primitiveInput reads it
+// as [rmbind.PrimitiveValue] does: an optional Boolean, Integer or Real is no
+// value, which the validator refuses as wrong_type, and never the zero value
+// it could be mistaken for. An optional String keeps the older rule, the
+// empty string.
+func TestPrimitiveInput_REQ102_NilPointerHeldPrimitive(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		in   any
+		want any
+	}{
+		{in: (*bool)(nil)},
+		{in: (*rm.Integer)(nil)},
+		{in: (*rm.Real)(nil)},
+		{in: (*string)(nil), want: ""},
+	}
+	for _, tc := range tests {
+		if got := primitiveInput(tc.in); got != tc.want {
+			t.Errorf("primitiveInput(%T nil) = %#v (%T), want %#v (%T)", tc.in, got, got, tc.want, tc.want)
+		}
+	}
+}
+
+// REQ-102: a Character the RM holds (TERM_MAPPING.match) reaches the typed
+// primitive validator as the one-character string it is, so a C_STRING,
+// the one constraint AOM 1.4 has for it, judges the character instead of
+// rejecting the named type as wrong_type.
+func TestPrimitiveInput_REQ102_Character(t *testing.T) {
+	t.Parallel()
+	got := primitiveInput(rm.Character("="))
+	if got != "=" {
+		t.Fatalf("primitiveInput(rm.Character(%q)) = %#v (%T), want the string %q", "=", got, got, "=")
+	}
+	tests := []struct {
+		name string
+		pc   constraints.CString
+		want int
+	}{
+		{name: "open", pc: constraints.CString{}},
+		{name: "listing it", pc: constraints.CString{List: []string{"="}}},
+		{name: "not listing it", pc: constraints.CString{List: []string{"<"}}, want: 1},
+	}
+	for _, tc := range tests {
+		if vs := tc.pc.Validate(got); len(vs) != tc.want {
+			t.Errorf("%s: CString.Validate(primitiveInput(rm.Character(%q))) = %+v, want %d violations", tc.name, "=", vs, tc.want)
+		}
+	}
+}

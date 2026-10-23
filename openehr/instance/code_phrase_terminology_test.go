@@ -13,9 +13,10 @@ import (
 // optOptionalSingleOver is a C_SINGLE_ATTRIBUTE called name with existence
 // 0..1 over children: optional, but the OPT pins children under it, so
 // Large and Medium visit it; Required does not visit an optional
-// attribute. The template validator reads no value for some
-// such attributes (DV_PARSABLE charset and language, DV_MULTIMEDIA
-// compression_algorithm), and would report a required one absent.
+// attribute. The template validator reads such an attribute like any
+// other, DV_PARSABLE's charset and language and DV_MULTIMEDIA's
+// compression_algorithm among them, and reports a code in it that the RM
+// ties to a code set as code_not_in_value_set.
 func optOptionalSingleOver(name string, children ...string) string {
 	return `<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>` + name + `</rm_attribute_name>` +
 		`<existence><lower_included>true</lower_included><upper_included>true</upper_included>` +
@@ -37,7 +38,9 @@ func optOptionalSingleOver(name string, children ...string) string {
 // code_not_in_value_set on the code phrase
 // (REQ-107 § Exceptions and known gaps, "A placeholder code on an attribute
 // an RM rule ties to a code set or terminology group for which § Contract
-// gives no default").
+// gives no default"). A DV_PARSABLE's charset and language are no such
+// case: they take their RM defaults instead, which
+// TestREQ107_EncapsulatedAttributesAreWritten checks on the same shape.
 func TestREQ107_BareCodePhraseKeepsLocal(t *testing.T) {
 	bare := optNode("CODE_PHRASE", "")
 	cases := []struct {
@@ -65,22 +68,6 @@ func TestREQ107_BareCodePhraseKeepsLocal(t *testing.T) {
 			value:    optNode("DV_QUANTITY", "", optOptionalSingleOver("normal_status", bare)),
 			path:     "/value/normal_status",
 			code:     func(v rm.DataValue) *rm.CodePhrase { return v.(*rm.DVQuantity).NormalStatus },
-			codeSet:  true,
-			policies: largeAndMedium,
-		},
-		{
-			name:     "DV_PARSABLE charset",
-			value:    optNode("DV_PARSABLE", "", optOptionalSingleOver("charset", bare)),
-			path:     "/value/charset",
-			code:     func(v rm.DataValue) *rm.CodePhrase { return v.(*rm.DVParsable).Charset },
-			codeSet:  true,
-			policies: largeAndMedium,
-		},
-		{
-			name:     "DV_PARSABLE language",
-			value:    optNode("DV_PARSABLE", "", optOptionalSingleOver("language", bare)),
-			path:     "/value/language",
-			code:     func(v rm.DataValue) *rm.CodePhrase { return v.(*rm.DVParsable).Language },
 			codeSet:  true,
 			policies: largeAndMedium,
 		},

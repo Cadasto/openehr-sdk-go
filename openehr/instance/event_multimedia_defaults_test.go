@@ -188,6 +188,44 @@ func TestREQ107_IntervalEventKeepsPinnedMathFunction(t *testing.T) {
 	}
 }
 
+// TestREQ107_IntervalEventWritesItsSampleCount is the REQ-107 Leaf values
+// check that a C_INTEGER the OPT puts on an INTERVAL_EVENT's sample_count is
+// written, from its list under both value fills and from its range under
+// RandomFill within the range. It holds at the root and nested, under every
+// policy, with and without the implicit attributes, and the root passes the
+// RM floor.
+func TestREQ107_IntervalEventWritesItsSampleCount(t *testing.T) {
+	ranged := optPrimitive("INTEGER", "C_INTEGER", "<range>"+optInterval(10, 20)+"</range>")
+	for _, place := range eventPlacements {
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, place.opt([]string{optSingle("sample_count", dvInteger("5"))}), implicit)
+			cRange := compileOPTText(t, place.opt([]string{optSingle("sample_count", ranged)}), implicit)
+			for _, opts := range defaultsOptions() {
+				t.Run(fmt.Sprintf("list/%s/implicit=%t/%v/%v", place.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err != nil {
+						t.Fatalf("Generate: %v", err)
+					}
+					if got := place.event(t, out).SampleCount; got == nil || *got != 5 {
+						t.Errorf("INTERVAL_EVENT.sample_count = %v, want the 5 its list admits alone", got)
+					}
+					noFloorErrors(t, out)
+				})
+				t.Run(fmt.Sprintf("range/%s/implicit=%t/%v/%v", place.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), cRange, opts)
+					if err != nil {
+						t.Fatalf("Generate: %v", err)
+					}
+					if got := place.event(t, out).SampleCount; got == nil || *got < 10 || *got > 20 {
+						t.Errorf("INTERVAL_EVENT.sample_count = %v, want a value within 10..20", got)
+					}
+					noFloorErrors(t, out)
+				})
+			}
+		}
+	}
+}
+
 // mediaTypeVariants are the ways an OPT can give a DV_MULTIMEDIA's
 // media_type no value: leave it silent, or name it without a code, as an
 // attribute with no child, as a CODE_PHRASE with no constraint, or as a

@@ -58,13 +58,33 @@ import (
 // in any terminology other than openehr (useTermText), as the walk writes
 // it.
 //
+// The OPT may constrain a quantity or an ordinal bound as one C_DV_QUANTITY
+// or C_DV_ORDINAL on the bound node, or, where it builds the bound as a
+// C_COMPLEX_OBJECT, on the nodes of its attributes: the magnitude and the
+// units of a quantity, the value and the symbol of an ordinal. Both are
+// read (quantityFits, ordinalFits). An ordinal bound built the second way
+// holds its symbol apart from its value, so the second pair keeps each
+// side's own symbol and changes only its value.
+//
+// A bound that carries a normal_range and a normal_status was settled by
+// its own walk (settleNormalRange), and each pair keeps it so. A value a
+// pair gives such a side stays where its bound keeps the rule at that value,
+// and else is narrowed as settleNormalRange narrows a bound: to the lowest
+// value that keeps the rule for the lower side, or the highest for the upper
+// side, among the candidates of the rule that the side's constraint accepts
+// (normalAt). A pair in which a side has no such value is not one that fits.
+// A bound that does not compare with its normal_range keeps any value, as
+// settleNormalRange leaves it as generated.
+//
 // So for a count, a quantity, an ordinal or a proportion the second pair
 // holds each side's extreme, over its precision too for a proportion, and
 // on a side with no end that way a value at the other side's current
-// bound, which the other side's extreme does not pass. An in-order pair
-// therefore exists only if the second pair is in order: for a proportion,
-// among the pairs that keep each bound's type and denominator. When it is
-// not, the two sides' constraints admit no such ordered interval. The
+// bound, which the other side's extreme does not pass; on a side whose bound
+// keeps a normal_range rule it is the extreme among the values that keep
+// the rule. An in-order pair therefore exists only if the second pair is in
+// order: for a proportion, among the pairs that keep each bound's type and
+// denominator. When it is not, the two sides' constraints admit no such
+// ordered interval. The
 // generator has no error for a constraint it cannot satisfy (sampleValue,
 // for one, falls back to the example value without a signal), so the
 // bounds are then left as they are, and the interval breaks
@@ -72,23 +92,15 @@ import (
 func orderIntervalBounds(optNode *tcimpl.CompiledNode, rmValue any, lang string) {
 	switch iv := rmValue.(type) {
 	case *rm.DVInterval[rm.DVCount]:
-		orderConcrete(&iv.Interval, optNode, countScale,
-			func(b rm.DVCount) int64 { return int64(b.Magnitude) },
-			func(b *rm.DVCount, m int64) { b.Magnitude = rm.Integer64(m) })
+		orderConcrete(&iv.Interval, optNode, countScale, countKeyOf, setCountKey)
 	case *rm.DVInterval[rm.DVQuantity]:
 		orderConcrete(&iv.Interval, optNode, quantityScale, quantityKeyOf, setQuantityKey)
 	case *rm.DVInterval[rm.DVDate]:
-		orderConcrete(&iv.Interval, optNode, dateScale,
-			func(b rm.DVDate) string { return b.Value },
-			func(b *rm.DVDate, v string) { b.Value = v })
+		orderConcrete(&iv.Interval, optNode, dateScale, dateKeyOf, setDateKey)
 	case *rm.DVInterval[rm.DVTime]:
-		orderConcrete(&iv.Interval, optNode, timeScale,
-			func(b rm.DVTime) string { return b.Value },
-			func(b *rm.DVTime, v string) { b.Value = v })
+		orderConcrete(&iv.Interval, optNode, timeScale, timeKeyOf, setTimeKey)
 	case *rm.DVInterval[rm.DVDateTime]:
-		orderConcrete(&iv.Interval, optNode, dateTimeScale,
-			func(b rm.DVDateTime) string { return b.Value },
-			func(b *rm.DVDateTime, v string) { b.Value = v })
+		orderConcrete(&iv.Interval, optNode, dateTimeScale, dateTimeKeyOf, setDateTimeKey)
 	case *rm.DVInterval[rm.DVProportion]:
 		orderConcrete(&iv.Interval, optNode, proportionScale, proportionKeyOf, setProportionKey)
 	case *rm.DVInterval[rm.DVOrdinal]:
@@ -105,7 +117,12 @@ func orderConcrete[T any, K any](iv *rm.Interval[T], optNode *tcimpl.CompiledNod
 	if !bothBounded(iv) {
 		return
 	}
-	lower, upper := boundNodes(optNode)
+	if !inverted(key(iv.Lower), key(iv.Upper), s) {
+		return
+	}
+	lowerNode, upperNode := boundNodes(optNode)
+	lower := orderSide[K]{node: lowerNode, narrow: normalAt(iv.Lower, lowerNode, key, apply, true)}
+	upper := orderSide[K]{node: upperNode, narrow: normalAt(iv.Upper, upperNode, key, apply, false)}
 	if lo, hi, ok := orderPair(key(iv.Lower), key(iv.Upper), lower, upper, s); ok {
 		apply(&iv.Lower, lo)
 		apply(&iv.Upper, hi)
@@ -118,36 +135,39 @@ func orderConcrete[T any, K any](iv *rm.Interval[T], optNode *tcimpl.CompiledNod
 // A mixed or missing pair is left alone. lang is the language of an
 // ordinal symbol's text.
 func orderOrderedBounds(optNode *tcimpl.CompiledNode, iv *rm.Interval[rm.DVOrdered], lang string) {
-	if orderOrderedAs(iv, optNode, countScale, asCount, func(c rm.DVCount) int64 { return int64(c.Magnitude) }, setOrderedCount) {
+	if orderOrderedAs(iv, optNode, countScale, asCount, countKeyOf, setCountKey, setOrderedCount) {
 		return
 	}
-	if orderOrderedAs(iv, optNode, quantityScale, asQuantity, quantityKeyOf, setOrderedQuantity) {
+	if orderOrderedAs(iv, optNode, quantityScale, asQuantity, quantityKeyOf, setQuantityKey, setOrderedQuantity) {
 		return
 	}
-	if orderOrderedAs(iv, optNode, dateScale, asDate, func(d rm.DVDate) string { return d.Value }, setOrderedDate) {
+	if orderOrderedAs(iv, optNode, dateScale, asDate, dateKeyOf, setDateKey, setOrderedDate) {
 		return
 	}
-	if orderOrderedAs(iv, optNode, timeScale, asTime, func(d rm.DVTime) string { return d.Value }, setOrderedTime) {
+	if orderOrderedAs(iv, optNode, timeScale, asTime, timeKeyOf, setTimeKey, setOrderedTime) {
 		return
 	}
-	if orderOrderedAs(iv, optNode, dateTimeScale, asDateTime, func(d rm.DVDateTime) string { return d.Value }, setOrderedDateTime) {
+	if orderOrderedAs(iv, optNode, dateTimeScale, asDateTime, dateTimeKeyOf, setDateTimeKey, setOrderedDateTime) {
 		return
 	}
-	if orderOrderedAs(iv, optNode, proportionScale, asProportion, proportionKeyOf, setOrderedProportion) {
+	if orderOrderedAs(iv, optNode, proportionScale, asProportion, proportionKeyOf, setProportionKey, setOrderedProportion) {
 		return
 	}
-	orderOrderedAs(iv, optNode, ordinalScaleIn(lang), asOrdinal, ordinalKeyOf, setOrderedOrdinal)
+	orderOrderedAs(iv, optNode, ordinalScaleIn(lang), asOrdinal, ordinalKeyOf, setOrdinalKey, setOrderedOrdinal)
 }
 
 // orderOrderedAs orders iv when both bounds are T. It reports whether
 // they were, including when the pair was already in order or could not
-// be repaired.
+// be repaired. A bound is read as a copy of its T (read, key), which the
+// bound's own normal_range rule is tried on (apply); write puts a key on the
+// bound itself.
 func orderOrderedAs[T any, K any](
 	iv *rm.Interval[rm.DVOrdered],
 	optNode *tcimpl.CompiledNode,
 	s scale[K],
 	read func(rm.DVOrdered) (T, bool),
 	key func(T) K,
+	apply func(*T, K),
 	write func(*rm.DVOrdered, K),
 ) bool {
 	lowerValue, ok := read(iv.Lower)
@@ -158,7 +178,12 @@ func orderOrderedAs[T any, K any](
 	if !ok {
 		return false
 	}
-	lower, upper := boundNodes(optNode)
+	if !inverted(key(lowerValue), key(upperValue), s) {
+		return true
+	}
+	lowerNode, upperNode := boundNodes(optNode)
+	lower := orderSide[K]{node: lowerNode, narrow: normalAt(lowerValue, lowerNode, key, apply, true)}
+	upper := orderSide[K]{node: upperNode, narrow: normalAt(upperValue, upperNode, key, apply, false)}
 	if lo, hi, ok := orderPair(key(lowerValue), key(upperValue), lower, upper, s); ok {
 		write(&iv.Lower, lo)
 		write(&iv.Upper, hi)
@@ -200,30 +225,67 @@ func (s scale[K]) adopted(node *tcimpl.CompiledNode, like, other K, low bool) (K
 	return s.adopt(node, like, other, low)
 }
 
+// inverted reports whether lower lies above upper, as s compares them, and
+// false for a pair that does not compare.
+func inverted[K any](lower, upper K, s scale[K]) bool {
+	c, ok := s.compare(lower, upper)
+	return ok && c > 0
+}
+
+// orderSide is one side of an interval that orderPair orders.
+type orderSide[K any] struct {
+	// node is the OPT node the side's bound is built from, nil for a bound
+	// the OPT does not constrain.
+	node *tcimpl.CompiledNode
+	// narrow returns k as the bound has it once it keeps its own normal_range
+	// rule (normalAt), and false where no value does. A nil narrow keeps k.
+	narrow func(k K) (K, bool)
+}
+
+// narrowed is s.narrow, or k where s has no narrow.
+func (s orderSide[K]) narrowed(k K) (K, bool) {
+	if s.narrow == nil {
+		return k, true
+	}
+	return s.narrow(k)
+}
+
 // orderPair returns an in-order replacement for the inverted pair
 // (lower, upper), as orderIntervalBounds describes, and false when the pair
 // is in order already, does not compare, or has no in-order replacement.
-func orderPair[K any](lower, upper K, lowerNode, upperNode *tcimpl.CompiledNode, s scale[K]) (K, K, bool) {
-	if c, ok := s.compare(lower, upper); !ok || c <= 0 {
+// Each value a pair gives a side is first narrowed to keep that side's own
+// normal_range rule (orderSide.narrow), and a pair in which a side has no
+// such value is not one that fits.
+func orderPair[K any](lower, upper K, lowerSide, upperSide orderSide[K], s scale[K]) (K, K, bool) {
+	if !inverted(lower, upper, s) {
 		return lower, upper, false
 	}
-	fitsInOrder := func(lo, hi K) bool {
+	// fitsInOrder returns the pair as each side keeps it, and whether that
+	// pair is in order and fits each side's OPT constraint.
+	fitsInOrder := func(lo, hi K) (K, K, bool) {
+		lo, loOK := lowerSide.narrowed(lo)
+		hi, hiOK := upperSide.narrowed(hi)
+		if !loOK || !hiOK {
+			return lo, hi, false
+		}
 		c, ok := s.compare(lo, hi)
-		return ok && c <= 0 && s.fits(lowerNode, lo) && s.fits(upperNode, hi)
+		return lo, hi, ok && c <= 0 && s.fits(lowerSide.node, lo) && s.fits(upperSide.node, hi)
 	}
-	if fitsInOrder(upper, lower) {
-		return upper, lower, true
-	}
-	lo, loOK := s.lowest(lowerNode, lower)
-	if !loOK {
-		lo, loOK = s.adopted(lowerNode, lower, upper, true)
-	}
-	hi, hiOK := s.highest(upperNode, upper)
-	if !hiOK {
-		hi, hiOK = s.adopted(upperNode, upper, lower, false)
-	}
-	if loOK && hiOK && fitsInOrder(lo, hi) {
+	if lo, hi, ok := fitsInOrder(upper, lower); ok {
 		return lo, hi, true
+	}
+	lo, loOK := s.lowest(lowerSide.node, lower)
+	if !loOK {
+		lo, loOK = s.adopted(lowerSide.node, lower, upper, true)
+	}
+	hi, hiOK := s.highest(upperSide.node, upper)
+	if !hiOK {
+		hi, hiOK = s.adopted(upperSide.node, upper, lower, false)
+	}
+	if loOK && hiOK {
+		if lo, hi, ok := fitsInOrder(lo, hi); ok {
+			return lo, hi, true
+		}
 	}
 	return lower, upper, false
 }
@@ -290,11 +352,17 @@ var countScale = scale[int64]{
 }
 
 // integerEnd returns the lowest (low) or highest value the C_INTEGER on a
-// DV_COUNT bound node's magnitude accepts: the extreme list entry the range
-// also admits, or the range's own end. It returns false when there is no
-// such constraint, or when the constraint has no end in that direction.
+// DV_COUNT bound node's magnitude accepts (integerEndOf).
 func integerEnd(node *tcimpl.CompiledNode, low bool) (int64, bool) {
-	c, ok := primitiveOf(bindingChild(node, "magnitude")).(constraints.CInteger)
+	return integerEndOf(bindingChild(node, "magnitude"), low)
+}
+
+// integerEndOf returns the lowest (low) or highest value the C_INTEGER of
+// node accepts: the extreme list entry the range also admits, or the
+// range's own end. It returns false when there is no such constraint, or
+// when the constraint has no end in that direction.
+func integerEndOf(node *tcimpl.CompiledNode, low bool) (int64, bool) {
+	c, ok := primitiveOf(node).(constraints.CInteger)
 	if !ok {
 		return 0, false
 	}
@@ -348,7 +416,11 @@ func setQuantityKey(q *rm.DVQuantity, k quantityKey) {
 }
 
 // quantityScale orders DV_QUANTITY bounds by magnitude when their units
-// match. The OPT constrains a DV_QUANTITY bound on the bound node itself.
+// match. The OPT constrains a DV_QUANTITY bound as one C_DV_QUANTITY on the
+// bound node itself, or on the nodes of its magnitude and units attributes
+// where it builds the bound as a C_COMPLEX_OBJECT. Neither writes the
+// bound's precision, so each bound keeps the precision its own side
+// admitted.
 var quantityScale = scale[quantityKey]{
 	compare: func(a, b quantityKey) (int, bool) {
 		if a.units != b.units {
@@ -356,11 +428,7 @@ var quantityScale = scale[quantityKey]{
 		}
 		return compareOrdered(a.magnitude, b.magnitude), true
 	},
-	fits: func(node *tcimpl.CompiledNode, k quantityKey) bool {
-		pc := primitiveOf(node)
-		v := constraints.QuantityValue{Magnitude: k.magnitude, Units: k.units, Precision: -1}
-		return pc == nil || len(pc.Validate(v)) == 0
-	},
+	fits: quantityFits,
 	lowest: func(node *tcimpl.CompiledNode, like quantityKey) (quantityKey, bool) {
 		return magnitudeEnd(node, like.units, true)
 	},
@@ -369,16 +437,38 @@ var quantityScale = scale[quantityKey]{
 	},
 }
 
+// quantityFits reports whether k suits a side's bound node: the C_DV_QUANTITY
+// on the node accepts it, or, where the node is a C_COMPLEX_OBJECT, the
+// constraint on each of its magnitude and units attributes does. A nil node
+// constrains nothing.
+func quantityFits(node *tcimpl.CompiledNode, k quantityKey) bool {
+	if pc := primitiveOf(node); pc != nil {
+		v := constraints.QuantityValue{Magnitude: k.magnitude, Units: k.units, Precision: -1}
+		return len(pc.Validate(v)) == 0
+	}
+	return componentFits(bindingChild(node, "magnitude"), k.magnitude) &&
+		componentFits(bindingChild(node, "units"), k.units)
+}
+
 // magnitudeEnd returns the lowest (low) or highest magnitude a DV_QUANTITY
 // bound node accepts in units: the end of the magnitude range of the first
 // entry for those units, which is the entry DvQuantity.Validate checks. At
 // an exclusive end it is the nearest float64 inside the range. It returns
 // false when there is no such entry, or when its range has no end in that
-// direction.
+// direction. Where the node is a C_COMPLEX_OBJECT, the end is that of the
+// C_REAL on its magnitude (realEnd), and there is none unless the C_STRING
+// on its units accepts units.
 func magnitudeEnd(node *tcimpl.CompiledNode, units string, low bool) (quantityKey, bool) {
 	c, ok := primitiveOf(node).(constraints.DvQuantity)
 	if !ok {
-		return quantityKey{}, false
+		if !componentFits(bindingChild(node, "units"), units) {
+			return quantityKey{}, false
+		}
+		m, ok := realEnd(bindingChild(node, "magnitude"), low)
+		if !ok {
+			return quantityKey{}, false
+		}
+		return quantityKey{magnitude: m, units: units}, true
 	}
 	for _, u := range c.Units {
 		if u.Units != units {
@@ -405,6 +495,10 @@ func magnitudeEnd(node *tcimpl.CompiledNode, units string, low bool) (quantityKe
 	}
 	return quantityKey{}, false
 }
+
+func countKeyOf(c rm.DVCount) int64 { return int64(c.Magnitude) }
+
+func setCountKey(c *rm.DVCount, m int64) { c.Magnitude = rm.Integer64(m) }
 
 // asCount and asQuantity read a DV_INTERVAL<DV_ORDERED> bound held in value
 // or pointer form; a nil or typed-nil bound is neither.
@@ -460,6 +554,18 @@ var (
 	timeScale     = temporalScale(temporalCompare("15:04:05Z07:00", timeZoned))
 	dateTimeScale = temporalScale(temporalCompare(time.RFC3339, dateTimeZoned))
 )
+
+func dateKeyOf(d rm.DVDate) string { return d.Value }
+
+func setDateKey(d *rm.DVDate, v string) { d.Value = v }
+
+func timeKeyOf(d rm.DVTime) string { return d.Value }
+
+func setTimeKey(d *rm.DVTime, v string) { d.Value = v }
+
+func dateTimeKeyOf(d rm.DVDateTime) string { return d.Value }
+
+func setDateTimeKey(d *rm.DVDateTime, v string) { d.Value = v }
 
 func temporalScale(compare func(a, b string) (int, bool)) scale[string] {
 	return scale[string]{
@@ -816,29 +922,37 @@ func setOrdinalKey(o *rm.DVOrdinal, k ordinalKey) {
 }
 
 // ordinalScaleIn orders DV_ORDINAL bounds by Value. The OPT constrains a
-// DV_ORDINAL bound on the bound node itself. lang is the language of the
-// text of a symbol the extreme replacement writes (ordinalEnd).
+// DV_ORDINAL bound as one C_DV_ORDINAL on the bound node itself, or on the
+// nodes of its value and symbol attributes where it builds the bound as a
+// C_COMPLEX_OBJECT. lang is the language of the text of a symbol the
+// extreme replacement writes (ordinalEnd).
 func ordinalScaleIn(lang string) scale[ordinalKey] {
 	return scale[ordinalKey]{
 		compare: func(a, b ordinalKey) (int, bool) { return compareOrdered(a.value, b.value), true },
 		fits:    ordinalFits,
-		lowest: func(node *tcimpl.CompiledNode, _ ordinalKey) (ordinalKey, bool) {
-			return ordinalEnd(node, true, lang)
+		lowest: func(node *tcimpl.CompiledNode, like ordinalKey) (ordinalKey, bool) {
+			return ordinalEnd(node, like, true, lang)
 		},
-		highest: func(node *tcimpl.CompiledNode, _ ordinalKey) (ordinalKey, bool) {
-			return ordinalEnd(node, false, lang)
+		highest: func(node *tcimpl.CompiledNode, like ordinalKey) (ordinalKey, bool) {
+			return ordinalEnd(node, like, false, lang)
 		},
+		adopt: ordinalAdopt,
 	}
 }
 
 // ordinalFits reports whether k suits a side's bound node. When the node
 // lists (value, symbol) pairs, k's symbol must be the one listed for k's
 // value, so a swap cannot hand one side the other side's symbol. A side
-// with no list constrains the value only.
+// with no list constrains the value only. Where the node is a
+// C_COMPLEX_OBJECT, the value must fit the C_INTEGER on its value and the
+// RM Integer, and the symbol the constraint on its symbol, a code and a
+// text the side admits (codedTextAdmits).
 func ordinalFits(node *tcimpl.CompiledNode, k ordinalKey) bool {
 	pc := primitiveOf(node)
 	if pc == nil {
-		return true
+		return fitsInteger(k.value) &&
+			componentFits(bindingChild(node, "value"), k.value) &&
+			codedTextAdmits(bindingChild(node, "symbol"), k.symbol)
 	}
 	if c, ok := pc.(constraints.CDvOrdinal); ok && len(c.Values) > 0 {
 		pair, found := ordinalPair(c, k.value)
@@ -853,10 +967,21 @@ func ordinalFits(node *tcimpl.CompiledNode, k ordinalKey) bool {
 // lists, with the symbol the walk writes for it: for a code in any
 // terminology other than openehr, the text of the term the nearest
 // archetype root defines for it (useTermText). It returns false when node
-// lists no pair its constraint admits.
-func ordinalEnd(node *tcimpl.CompiledNode, low bool, lang string) (ordinalKey, bool) {
+// lists no pair its constraint admits. Where node is a C_COMPLEX_OBJECT,
+// the symbol and the value are constrained apart, so the end is the lowest
+// or highest value of the C_INTEGER on its value (integerEndOf) with like's
+// symbol, the side's own, which its constraint on the symbol admitted; there
+// is none where that C_INTEGER has no end.
+func ordinalEnd(node *tcimpl.CompiledNode, like ordinalKey, low bool, lang string) (ordinalKey, bool) {
 	c, ok := primitiveOf(node).(constraints.CDvOrdinal)
-	if !ok || len(c.Values) == 0 {
+	if !ok {
+		n, ok := integerEndOf(bindingChild(node, "value"), low)
+		if !ok {
+			return ordinalKey{}, false
+		}
+		return ordinalKey{value: n, symbol: like.symbol}, true
+	}
+	if len(c.Values) == 0 {
 		return ordinalKey{}, false
 	}
 	var best constraints.OrdinalSymbol
@@ -875,6 +1000,18 @@ func ordinalEnd(node *tcimpl.CompiledNode, low bool, lang string) (ordinalKey, b
 	symbol := ordinalSymbolText(best.Symbol)
 	useTermText(node, &symbol, lang)
 	return ordinalKey{value: int64(best.Value), symbol: symbol}, true
+}
+
+// ordinalAdopt returns the bound a side takes at other, the other side's
+// current bound, where ordinalEnd gave it none. A side built as a
+// C_COMPLEX_OBJECT constrains its symbol apart from its value, so it takes
+// other's value with its own symbol, which its constraint admitted. Any
+// other side takes other as it is.
+func ordinalAdopt(node *tcimpl.CompiledNode, like, other ordinalKey, _ bool) (ordinalKey, bool) {
+	if node == nil || primitiveOf(node) != nil {
+		return other, true
+	}
+	return ordinalKey{value: other.value, symbol: like.symbol}, true
 }
 
 func asDate(v rm.DVOrdered) (rm.DVDate, bool) {

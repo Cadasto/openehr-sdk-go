@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/internal/rmbind"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
 
 // REQ-102: STRING belongs to the same closed primitive short-name set
@@ -35,5 +36,51 @@ func TestREQ107_STRINGPrimitiveMatchesOptionalPointer(t *testing.T) {
 	}
 	if rmbind.PrimitiveValueMatchesShortName("DATE", &s) {
 		t.Error(`PrimitiveValueMatchesShortName("DATE", &"example") = true, want false`)
+	}
+}
+
+// REQ-102: an optional primitive attribute the RM holds by pointer matches
+// the short name of the value it points to, as that value does, and no short
+// name the value does not match; a nil pointer is an absent attribute and
+// matches nothing.
+func TestREQ102_PrimitivePointerMatchesAsItsValue(t *testing.T) {
+	t.Parallel()
+	flag, integer, number := true, rm.Integer(2), rm.Real(0.5)
+	tests := []struct {
+		short, other string
+		set, none    any
+	}{
+		{short: "BOOLEAN", other: "INTEGER", set: &flag, none: (*bool)(nil)},
+		{short: "INTEGER", other: "BOOLEAN", set: &integer, none: (*rm.Integer)(nil)},
+		{short: "REAL", other: "INTEGER", set: &number, none: (*rm.Real)(nil)},
+	}
+	for _, tc := range tests {
+		if !rmbind.PrimitiveValueMatchesShortName(tc.short, tc.set) {
+			t.Errorf("PrimitiveValueMatchesShortName(%q, %T set) = false, want true", tc.short, tc.set)
+		}
+		if rmbind.PrimitiveValueMatchesShortName(tc.short, tc.none) {
+			t.Errorf("PrimitiveValueMatchesShortName(%q, %T nil) = true, want false", tc.short, tc.none)
+		}
+		if rmbind.PrimitiveValueMatchesShortName(tc.other, tc.set) {
+			t.Errorf("PrimitiveValueMatchesShortName(%q, %T set) = true, want false", tc.other, tc.set)
+		}
+	}
+}
+
+// REQ-102: the BMM Character an RM attribute holds (TERM_MAPPING.match, an
+// rm.Character) is a one-character string, and AOM 1.4 has no C_CHARACTER,
+// so an OPT constrains it with a C_STRING on a STRING node. A Character
+// matches STRING and no other short name.
+func TestREQ102_STRINGPrimitiveMatchesCharacter(t *testing.T) {
+	t.Parallel()
+	for _, c := range []rm.Character{">", "=", "<", "?"} {
+		if !rmbind.PrimitiveValueMatchesShortName("STRING", c) {
+			t.Errorf("PrimitiveValueMatchesShortName(%q, rm.Character(%q)) = false, want true", "STRING", string(c))
+		}
+		for _, other := range []string{"DATE", "TIME", "DATE_TIME", "DURATION", "INTEGER", "REAL", "BOOLEAN"} {
+			if rmbind.PrimitiveValueMatchesShortName(other, c) {
+				t.Errorf("PrimitiveValueMatchesShortName(%q, rm.Character(%q)) = true, want false", other, string(c))
+			}
+		}
 	}
 }

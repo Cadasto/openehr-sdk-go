@@ -165,6 +165,44 @@ func ProportionBound(realBody string) string {
 		`</item></children></attributes></children>`
 }
 
+// boundAttribute is one single attribute of a bound built as a
+// C_COMPLEX_OBJECT, constrained by one C_PRIMITIVE_OBJECT of the AOM
+// primitive rmType whose item is an itemType carrying body.
+func boundAttribute(name, rmType, itemType, body string) string {
+	return `<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>` + name + `</rm_attribute_name>` +
+		boundExistence + `<match_negated>false</match_negated><children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>` +
+		rmType + `</rm_type_name>` + boundOccurrences + `<node_id></node_id><item xsi:type="` + itemType + `">` + body +
+		`</item></children></attributes>`
+}
+
+// ExpandedQuantityBound is one DV_QUANTITY bound built as a
+// C_COMPLEX_OBJECT: realBody is the C_REAL constraint on magnitude, and
+// units the one unit the C_STRING on units admits.
+func ExpandedQuantityBound(realBody, units string) string {
+	return `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>DV_QUANTITY</rm_type_name>` +
+		boundOccurrences + `<node_id></node_id>` + boundAttribute("magnitude", "REAL", "C_REAL", realBody) +
+		boundAttribute("units", "STRING", "C_STRING", "<list>"+units+"</list>") + `</children>`
+}
+
+// ExpandedOrdinalBound is one DV_ORDINAL bound built as a
+// C_COMPLEX_OBJECT: integerBody is the C_INTEGER constraint on value, and
+// the C_CODE_PHRASE on the defining_code of symbol admits the local codes
+// alone.
+func ExpandedOrdinalBound(integerBody string, codes ...string) string {
+	var list strings.Builder
+	for _, code := range codes {
+		list.WriteString(`<code_list>` + code + `</code_list>`)
+	}
+	return `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>DV_ORDINAL</rm_type_name>` +
+		boundOccurrences + `<node_id></node_id>` + boundAttribute("value", "INTEGER", "C_INTEGER", integerBody) +
+		`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>symbol</rm_attribute_name>` + boundExistence +
+		`<match_negated>false</match_negated><children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>DV_CODED_TEXT</rm_type_name>` +
+		boundOccurrences + `<node_id></node_id><attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>defining_code</rm_attribute_name>` +
+		boundExistence + `<match_negated>false</match_negated><children xsi:type="C_CODE_PHRASE"><rm_type_name>CODE_PHRASE</rm_type_name>` +
+		boundOccurrences + `<node_id></node_id><terminology_id><value>local</value></terminology_id>` + list.String() +
+		`</children></attributes></children></attributes></children>`
+}
+
 // replaceBoundChildren replaces the child element of the interval's lower
 // attribute, then of its upper attribute.
 func replaceBoundChildren(t *testing.T, opt, lowerXML, upperXML string) string {

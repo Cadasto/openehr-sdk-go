@@ -12,9 +12,9 @@ import (
 // count, unless the OPT prohibits data, and the uri default
 // http://example.com only where it then has neither uri nor data: a uri
 // or inline data it already has is kept, and no uri is added beside data.
-// It calls settleMultimedia directly, because the template-instance
-// writer cannot write a DV_MULTIMEDIA's uri or data, so a value Generate
-// builds never has either before it is settled.
+// It calls settleMultimedia directly, because a value Generate builds
+// never has data before it is settled: no AOM 1.4 constraint describes
+// data, an array of octets, so no OPT puts one there.
 func TestREQ107_MultimediaURIOnlyWhenEmpty(t *testing.T) {
 	node, _ := visitAttribute(t, visitRootOPT("DV_MULTIMEDIA", visitOptionalSingle("alternate_text")), "alternate_text")
 	noData, _ := visitAttribute(t, visitRootOPT("DV_MULTIMEDIA", visitProhibitedSingle("data", "")), "data")

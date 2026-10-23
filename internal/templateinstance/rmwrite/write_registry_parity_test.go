@@ -12,12 +12,14 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
-// The two tests below tie the hand-written writers to the RM metadata. The
+// The tests below tie the hand-written writers to the RM metadata. The
 // instance generator fills BMM-required defaults through EnsureSingle and
 // AppendMultiple and drops their error, so a writer case that goes missing
-// drops a required default without an error. Neither test keeps a hand list of
+// drops a required default without an error. No test keeps a hand list of
 // writer cases: they ask the writers about every pair of a registered class
-// and an attribute name, and compare the answers with openehr/rm/rminfo.
+// and an attribute name, and compare the answers with openehr/rm/rminfo. The
+// reachability test also walks rminfo from every concrete LOCATABLE, so it
+// sees the classes a value can be that no writer has a case for at all.
 
 // probeChild is a child value no writer accepts: it is no RM type and
 // implements no RM interface. Handing it to a writer exercises the writer's
@@ -214,6 +216,91 @@ func registryArms(t *testing.T, model rmModel) armTable {
 	return arms
 }
 
+// skippedLocatableAttrs are the LOCATABLE attributes reachableClasses does
+// not follow. The instance generator stamps uid and archetype_details itself,
+// and nothing fills links or feeder_audit, so no writer is asked to build
+// what they hold.
+var skippedLocatableAttrs = []string{"archetype_details", "feeder_audit", "links", "uid"}
+
+// reachableClasses returns, sorted, every registered class a value below a
+// LOCATABLE can be. It is the closure over model that starts at every
+// concrete LOCATABLE and follows the declared type of each attribute, an
+// abstract type standing for its concrete descendants. It does not follow
+// the LOCATABLE attributes skippedLocatableAttrs names; an attribute of the
+// same name a class declares itself is followed. It does not walk through a
+// class missing from registered, since nothing can build a value of it. A
+// primitive or a generic parameter (String, T) is not a class of model and
+// ends the walk, so a class used only as a type argument, such as the T of a
+// DV_INTERVAL<T>, would not be reached.
+func reachableClasses(model rmModel, registered map[string]bool) []string {
+	seen := map[string]bool{}
+	var queue []string
+	reach := func(rmType string) {
+		concrete, _ := model.ConcreteDescendants(rmType)
+		for _, class := range concrete {
+			if registered[class] && !seen[class] {
+				seen[class] = true
+				queue = append(queue, class)
+			}
+		}
+	}
+	reach("LOCATABLE")
+	for len(queue) > 0 {
+		class := queue[0]
+		queue = queue[1:]
+		for _, attr := range model.AttributeNames(class) {
+			if site, _ := model.DeclaredOn(class, attr); site == "LOCATABLE" && slices.Contains(skippedLocatableAttrs, attr) {
+				continue
+			}
+			if rmType, ok := model.AttributeRMType(class, attr); ok {
+				reach(rmType)
+			}
+		}
+	}
+	return slices.Sorted(maps.Keys(seen))
+}
+
+// unreachedDrift compares the reachable classes neither writer has a case
+// for with the pinned ones, and lists each class that differs, sorted: a
+// reachable class with no writer case that is not pinned, a pinned class a
+// writer now has a case for, and a pinned class the closure no longer
+// reaches, because no concrete LOCATABLE reaches it or the type registry
+// does not register it.
+func unreachedDrift(reachable []string, arms armTable, pinned map[string]string) []string {
+	classes := slices.Clone(reachable)
+	for class := range pinned {
+		if !slices.Contains(reachable, class) {
+			classes = append(classes, class)
+		}
+	}
+	slices.Sort(classes)
+
+	var out []string
+	for _, class := range classes {
+		_, isPinned := pinned[class]
+		_, written := arms[class]
+		isReachable := slices.Contains(reachable, class)
+		switch {
+		case isReachable && !written && !isPinned:
+			out = append(out, class+": reachable and no writer has a case for it, but it is not pinned")
+		case isPinned && !isReachable:
+			out = append(out, class+": pinned, but no concrete LOCATABLE reaches it, or the type registry does not register it")
+		case isPinned && written:
+			out = append(out, class+": pinned, but a writer now has a case for it")
+		}
+	}
+	return out
+}
+
+// registrySet returns the names of the classes the type registry knows.
+func registrySet() map[string]bool {
+	out := map[string]bool{}
+	for name := range registryParents() {
+		out[name] = true
+	}
+	return out
+}
+
 // --- the can-fail fixture -------------------------------------------------
 
 // The fixture is a two-class model whose writers break each rule once, so
@@ -284,6 +371,90 @@ func fixtureMultiple(parent any, attr string, child any) error {
 	return fmt.Errorf("%w: parent %T, attr %q", ErrUnknownAttribute, parent, attr)
 }
 
+// The reachability fixture is a small LOCATABLE tree, built fresh on each
+// call so a control can change it. FIX_ROOT is the one concrete LOCATABLE.
+// Its value names the abstract FIX_VALUE, which stands for FIX_VALUE_A and
+// FIX_VALUE_B. Its ref leads to FIX_REF, which is no LOCATABLE and declares
+// a links of its own that leads to FIX_LINKED. LOCATABLE's uid and links
+// lead to FIX_HIDDEN, which nothing else holds. FIX_ROOT's other leads to
+// FIX_UNREGISTERED, which the fixture registry leaves out, and FIX_BELOW is
+// reachable only through that class. FIX_ROOT's label is a String.
+func reachFixtureData() map[string]rminfo.ClassMeta {
+	inherited := map[string]rminfo.AttrMeta{
+		"name":  {TypeName: "DV_TEXT", Required: true, DeclaredIn: "LOCATABLE"},
+		"uid":   {TypeName: "FIX_HIDDEN", DeclaredIn: "LOCATABLE"},
+		"links": {TypeName: "FIX_HIDDEN", Container: true, DeclaredIn: "LOCATABLE"},
+	}
+	root := maps.Clone(inherited)
+	maps.Copy(root, map[string]rminfo.AttrMeta{
+		"value": {TypeName: "FIX_VALUE", DeclaredIn: "FIX_ROOT"},
+		"ref":   {TypeName: "FIX_REF", DeclaredIn: "FIX_ROOT"},
+		"other": {TypeName: "FIX_UNREGISTERED", DeclaredIn: "FIX_ROOT"},
+		"label": {TypeName: "String", DeclaredIn: "FIX_ROOT"},
+	})
+	magnitude := func(class string) rminfo.ClassMeta {
+		return rminfo.ClassMeta{
+			Attributes: map[string]rminfo.AttrMeta{"magnitude": {TypeName: "Real", Required: true, DeclaredIn: class}},
+			AttrOrder:  []string{"magnitude"},
+			Parents:    []string{"FIX_VALUE"},
+		}
+	}
+	return map[string]rminfo.ClassMeta{
+		"LOCATABLE": {Attributes: inherited, AttrOrder: []string{"name", "uid", "links"}, Abstract: true},
+		"FIX_ROOT": {
+			Attributes: root,
+			AttrOrder:  []string{"name", "uid", "links", "value", "ref", "other", "label"},
+			Parents:    []string{"LOCATABLE"},
+		},
+		"DV_TEXT": {
+			Attributes: map[string]rminfo.AttrMeta{"value": {TypeName: "String", Required: true, DeclaredIn: "DV_TEXT"}},
+			AttrOrder:  []string{"value"},
+		},
+		"FIX_VALUE":   {Abstract: true},
+		"FIX_VALUE_A": magnitude("FIX_VALUE_A"),
+		"FIX_VALUE_B": magnitude("FIX_VALUE_B"),
+		"FIX_REF": {
+			Attributes: map[string]rminfo.AttrMeta{"links": {TypeName: "FIX_LINKED", Container: true, DeclaredIn: "FIX_REF"}},
+			AttrOrder:  []string{"links"},
+		},
+		"FIX_LINKED": {},
+		"FIX_HIDDEN": {},
+		"FIX_UNREGISTERED": {
+			Attributes: map[string]rminfo.AttrMeta{"below": {TypeName: "FIX_BELOW", DeclaredIn: "FIX_UNREGISTERED"}},
+			AttrOrder:  []string{"below"},
+		},
+		"FIX_BELOW": {},
+	}
+}
+
+// reachFixtureRegistry holds every concrete fixture class but
+// FIX_UNREGISTERED.
+func reachFixtureRegistry() map[string]bool {
+	return map[string]bool{
+		"DV_TEXT": true, "FIX_BELOW": true, "FIX_HIDDEN": true, "FIX_LINKED": true,
+		"FIX_REF": true, "FIX_ROOT": true, "FIX_VALUE_A": true, "FIX_VALUE_B": true,
+	}
+}
+
+// reachFixtureArms is a synthetic arm table with cases for DV_TEXT, FIX_ROOT
+// and FIX_VALUE_A; no writer is probed.
+func reachFixtureArms() armTable {
+	return armTable{
+		"DV_TEXT":     {"value": {single: true}},
+		"FIX_ROOT":    {"name": {single: true}, "value": {single: true}},
+		"FIX_VALUE_A": {"magnitude": {single: true}},
+	}
+}
+
+// reachFixturePin is the fixture's unreached residual.
+func reachFixturePin() map[string]string {
+	return map[string]string{
+		"FIX_LINKED":  "",
+		"FIX_REF":     "",
+		"FIX_VALUE_B": "",
+	}
+}
+
 // --- the tests ------------------------------------------------------------
 
 // TestREQ107_WriterArmsDeclaredByRM checks that every case of EnsureSingle
@@ -335,52 +506,81 @@ func TestREQ107_WriterArmsDeclaredByRM(t *testing.T) {
 // OPT that constrains one of their attributes already fails the write with
 // ErrUnknownAttribute.
 var pinnedUnwritten = map[string][]string{
-	"ACTION":         {"guideline_id", "instruction_details", "other_participations", "workflow_id"},
-	"ACTIVITY":       {},
-	"ADDRESS":        {},
-	"ADMIN_ENTRY":    {"other_participations", "workflow_id"},
-	"AGENT":          {"languages", "roles"},
-	"CAPABILITY":     {},
-	"CLUSTER":        {},
-	"CODE_PHRASE":    {},
-	"COMPOSITION":    {},
-	"CONTACT":        {"name", "time_validity"},
-	"DV_BOOLEAN":     {},
-	"DV_CODED_TEXT":  {"encoding", "formatting", "hyperlink", "language", "mappings"},
-	"DV_COUNT":       {"accuracy", "accuracy_is_percent", "magnitude_status", "other_reference_ranges"},
-	"DV_DATE":        {"accuracy", "magnitude_status", "normal_range", "normal_status", "other_reference_ranges"},
-	"DV_DATE_TIME":   {"accuracy", "magnitude_status", "normal_range", "normal_status", "other_reference_ranges"},
-	"DV_DURATION":    {"accuracy", "accuracy_is_percent", "magnitude_status", "normal_range", "normal_status", "other_reference_ranges"},
-	"DV_EHR_URI":     {},
-	"DV_IDENTIFIER":  {},
-	"DV_INTERVAL":    {},
-	"DV_MULTIMEDIA":  {"data", "integrity_check", "thumbnail", "uri"},
-	"DV_PARSABLE":    {},
-	"DV_QUANTITY":    {"accuracy", "accuracy_is_percent", "magnitude_status", "other_reference_ranges", "precision", "units_display_name", "units_system"},
-	"DV_TEXT":        {"encoding", "formatting", "hyperlink", "language", "mappings"},
-	"DV_TIME":        {"accuracy", "magnitude_status", "normal_range", "normal_status", "other_reference_ranges"},
-	"DV_URI":         {},
-	"ELEMENT":        {},
-	"EVALUATION":     {"guideline_id", "other_participations", "workflow_id"},
-	"EVENT_CONTEXT":  {"participations"},
-	"GENERIC_ENTRY":  {},
-	"GROUP":          {"languages", "roles"},
-	"HISTORY":        {},
-	"INSTRUCTION":    {"guideline_id", "other_participations", "workflow_id"},
-	"INTERVAL_EVENT": {},
-	"ISM_TRANSITION": {"reason", "transition"},
-	"ITEM_LIST":      {},
-	"ITEM_SINGLE":    {},
-	"ITEM_TABLE":     {},
-	"ITEM_TREE":      {},
-	"OBSERVATION":    {"guideline_id", "other_participations", "workflow_id"},
-	"ORGANISATION":   {"languages", "roles"},
-	"PARTY_IDENTITY": {},
-	"PARTY_RELATED":  {"external_ref", "identifiers", "name"},
-	"PERSON":         {"languages", "roles"},
-	"POINT_EVENT":    {},
-	"ROLE":           {},
-	"SECTION":        {},
+	"ACCESS_GROUP_REF":              {},
+	"ACTION":                        {},
+	"ACTIVITY":                      {},
+	"ADDRESS":                       {},
+	"ADMIN_ENTRY":                   {},
+	"AGENT":                         {},
+	"ARCHETYPE_ID":                  {},
+	"CAPABILITY":                    {},
+	"CLUSTER":                       {},
+	"CODE_PHRASE":                   {},
+	"COMPOSITION":                   {},
+	"CONTACT":                       {},
+	"DV_BOOLEAN":                    {},
+	"DV_CODED_TEXT":                 {},
+	"DV_COUNT":                      {},
+	"DV_DATE":                       {},
+	"DV_DATE_TIME":                  {},
+	"DV_DURATION":                   {},
+	"DV_EHR_URI":                    {},
+	"DV_GENERAL_TIME_SPECIFICATION": {},
+	"DV_IDENTIFIER":                 {},
+	"DV_INTERVAL":                   {},
+	// data and integrity_check are arrays of octets, which no AOM 1.4
+	// constraint describes, so no OPT puts a value there to write; the
+	// instance generator writes the example data itself.
+	"DV_MULTIMEDIA":                  {"data", "integrity_check"},
+	"DV_ORDINAL":                     {},
+	"DV_PARAGRAPH":                   {},
+	"DV_PARSABLE":                    {},
+	"DV_PERIODIC_TIME_SPECIFICATION": {},
+	"DV_PROPORTION":                  {},
+	"DV_QUANTITY":                    {},
+	"DV_SCALE":                       {},
+	"DV_STATE":                       {},
+	"DV_TEXT":                        {},
+	"DV_TIME":                        {},
+	"DV_URI":                         {},
+	"EHR_STATUS":                     {},
+	"ELEMENT":                        {},
+	"EVALUATION":                     {},
+	"EVENT_CONTEXT":                  {},
+	"FOLDER":                         {},
+	"GENERIC_ENTRY":                  {},
+	"GENERIC_ID":                     {},
+	"GROUP":                          {},
+	"HIER_OBJECT_ID":                 {},
+	"HISTORY":                        {},
+	"INSTRUCTION":                    {},
+	"INSTRUCTION_DETAILS":            {},
+	"INTERVAL_EVENT":                 {},
+	"ISM_TRANSITION":                 {},
+	"ITEM_LIST":                      {},
+	"ITEM_SINGLE":                    {},
+	"ITEM_TABLE":                     {},
+	"ITEM_TREE":                      {},
+	"LOCATABLE_REF":                  {},
+	"OBJECT_REF":                     {},
+	"OBJECT_VERSION_ID":              {},
+	"OBSERVATION":                    {},
+	"ORGANISATION":                   {},
+	"PARTICIPATION":                  {},
+	"PARTY_IDENTITY":                 {},
+	"PARTY_IDENTIFIED":               {},
+	"PARTY_REF":                      {},
+	"PARTY_RELATED":                  {},
+	"PARTY_RELATIONSHIP":             {},
+	"PARTY_SELF":                     {},
+	"PERSON":                         {},
+	"POINT_EVENT":                    {},
+	"REFERENCE_RANGE":                {},
+	"ROLE":                           {},
+	"SECTION":                        {},
+	"TEMPLATE_ID":                    {},
+	"TERMINOLOGY_ID":                 {},
+	"TERM_MAPPING":                   {},
 }
 
 // TestREQ107_WriterParentAttributeParity checks that the declared attributes
@@ -423,6 +623,139 @@ func TestREQ107_WriterParentAttributeParity(t *testing.T) {
 				"A new BMM attribute on a class rmwrite writes into either gets a writer case in "+
 				"write.go, or is added to pinnedUnwritten on purpose. A writer case that was removed "+
 				"or renamed makes the instance generator drop that attribute without an error: restore it.",
+				strings.Join(drift, "\n  "))
+		}
+	})
+}
+
+// pinnedUnreached lists the registered classes a value below a LOCATABLE can
+// be that neither writer has a case for (reachableClasses says how the set is
+// found). It is the measured residual, not a judgement: rmwrite has no case to
+// write any attribute of an instance of a class here, so where an OPT
+// constrains one of its attributes the instance generator cannot write what
+// the OPT constrains. The value is the reason a class stays, and is empty for
+// a gap a writer is meant to close. Classes reached only through LOCATABLE's
+// links, feeder_audit, archetype_details or uid (LINK, FEEDER_AUDIT,
+// ARCHETYPED and what only they hold) are not listed, because the closure
+// does not follow those attributes.
+var pinnedUnreached = map[string]string{
+	"EHR_ACCESS": "settings, its one attribute beside LOCATABLE's, is ACCESS_CONTROL_SETTINGS, which no concrete class extends in the pinned RM",
+}
+
+// TestREQ107_WriterReachableClassParity checks that the classes a value below
+// a LOCATABLE can be, which neither writer has a case for, are exactly
+// pinnedUnreached. TestREQ107_WriterParentAttributeParity sees only classes
+// with at least one writer case; this test sees the rest. A BMM bump that
+// makes a class reachable, a writer case added for a pinned class, or a
+// class's last writer case removed changes the set and fails here.
+func TestREQ107_WriterReachableClassParity(t *testing.T) {
+	t.Parallel()
+
+	t.Run("fixture control", func(t *testing.T) {
+		t.Parallel()
+		reachable := reachableClasses(modelOf(t, rminfo.New(reachFixtureData())), reachFixtureRegistry())
+		wantReachable := []string{"DV_TEXT", "FIX_LINKED", "FIX_REF", "FIX_ROOT", "FIX_VALUE_A", "FIX_VALUE_B"}
+		if !slices.Equal(reachable, wantReachable) {
+			t.Fatalf("reachableClasses(fixture) = %v, want %v", reachable, wantReachable)
+		}
+		if drift := unreachedDrift(reachable, reachFixtureArms(), reachFixturePin()); len(drift) > 0 {
+			t.Errorf("unreachedDrift(fixture) drifted from %v:\n  %s", reachFixturePin(), strings.Join(drift, "\n  "))
+		}
+
+		// Each case changes the fixture model, registry or arm table once,
+		// and the unchanged pin then drifts by exactly the classes it touches.
+		addRootAttr := func(data map[string]rminfo.ClassMeta, attr, rmType string) {
+			root := data["FIX_ROOT"]
+			root.Attributes[attr] = rminfo.AttrMeta{TypeName: rmType, DeclaredIn: "FIX_ROOT"}
+			root.AttrOrder = append(root.AttrOrder, attr)
+			data["FIX_ROOT"] = root
+		}
+		changes := []struct {
+			name     string
+			model    func(map[string]rminfo.ClassMeta)
+			registry func(map[string]bool)
+			arms     func(armTable)
+			want     []string
+		}{
+			{
+				name: "class added under a new attribute",
+				model: func(data map[string]rminfo.ClassMeta) {
+					data["FIX_NEW"] = rminfo.ClassMeta{}
+					addRootAttr(data, "extra", "FIX_NEW")
+				},
+				registry: func(reg map[string]bool) { reg["FIX_NEW"] = true },
+				want:     []string{"FIX_NEW: reachable and no writer has a case for it, but it is not pinned"},
+			},
+			{
+				name: "concrete descendant added to an abstract attribute type",
+				model: func(data map[string]rminfo.ClassMeta) {
+					data["FIX_VALUE_C"] = rminfo.ClassMeta{Parents: []string{"FIX_VALUE"}}
+				},
+				registry: func(reg map[string]bool) { reg["FIX_VALUE_C"] = true },
+				want:     []string{"FIX_VALUE_C: reachable and no writer has a case for it, but it is not pinned"},
+			},
+			{
+				name: "attribute removed",
+				model: func(data map[string]rminfo.ClassMeta) {
+					root := data["FIX_ROOT"]
+					delete(root.Attributes, "value")
+					root.AttrOrder = slices.DeleteFunc(root.AttrOrder, func(a string) bool { return a == "value" })
+					data["FIX_ROOT"] = root
+				},
+				want: []string{"FIX_VALUE_B: pinned, but no concrete LOCATABLE reaches it, or the type registry does not register it"},
+			},
+			{
+				name:     "class dropped from the registry",
+				registry: func(reg map[string]bool) { delete(reg, "FIX_REF") },
+				want: []string{
+					"FIX_LINKED: pinned, but no concrete LOCATABLE reaches it, or the type registry does not register it",
+					"FIX_REF: pinned, but no concrete LOCATABLE reaches it, or the type registry does not register it",
+				},
+			},
+			{
+				name: "writer case added",
+				arms: func(arms armTable) { arms["FIX_VALUE_B"] = map[string]armShape{"magnitude": {single: true}} },
+				want: []string{"FIX_VALUE_B: pinned, but a writer now has a case for it"},
+			},
+			{
+				name: "writer case removed",
+				arms: func(arms armTable) { delete(arms, "FIX_VALUE_A") },
+				want: []string{"FIX_VALUE_A: reachable and no writer has a case for it, but it is not pinned"},
+			},
+		}
+		for _, tc := range changes {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				data, registry, arms := reachFixtureData(), reachFixtureRegistry(), reachFixtureArms()
+				if tc.model != nil {
+					tc.model(data)
+				}
+				if tc.registry != nil {
+					tc.registry(registry)
+				}
+				if tc.arms != nil {
+					tc.arms(arms)
+				}
+				reachable := reachableClasses(modelOf(t, rminfo.New(data)), registry)
+				if got := unreachedDrift(reachable, arms, reachFixturePin()); !slices.Equal(got, tc.want) {
+					t.Errorf("unreachedDrift(changed fixture) =\n  %s\nwant\n  %s", strings.Join(got, "\n  "), strings.Join(tc.want, "\n  "))
+				}
+			})
+		}
+	})
+
+	t.Run("registry", func(t *testing.T) {
+		t.Parallel()
+		model := modelOf(t, rminfo.Default)
+		reachable := reachableClasses(model, registrySet())
+		if drift := unreachedDrift(reachable, registryArms(t, model), pinnedUnreached); len(drift) > 0 {
+			t.Errorf("the reachable RM classes rmwrite has no writer case for drifted from pinnedUnreached:\n  %s\n"+
+				"A pinned class that now has a writer case leaves pinnedUnreached, and its unwritten "+
+				"attributes go into pinnedUnwritten. A pinned class no concrete LOCATABLE reaches any "+
+				"more, or that the type registry no longer registers, leaves pinnedUnreached too. A class "+
+				"that became reachable either gets writer cases in write.go, or is added to "+
+				"pinnedUnreached on purpose. A class whose last writer case was removed makes the "+
+				"instance generator fail on it: restore the case.",
 				strings.Join(drift, "\n  "))
 		}
 	})
