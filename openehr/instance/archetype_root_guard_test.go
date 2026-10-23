@@ -13,6 +13,8 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
+	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
@@ -372,9 +374,13 @@ func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 // COMPOSITION.content, and a SECTION's items. The BMM marks neither
 // mandatory, so it is read as the list the RM declares, as the template
 // validator reads it: only its existence asks for a member, so it gets none,
-// and Generate does not refuse it with ErrArchetypeIDMissing. The root
-// passes the RM floor and the template validator, under every policy, both
-// value fills and both compile modes.
+// and Generate does not refuse it with ErrArchetypeIDMissing. A CLUSTER's
+// items, which the BMM marks mandatory, is a control: written so, it still
+// ends with one member, the placeholder ELEMENT the RM defaults put in an
+// empty CLUSTER's items after the walk. The root passes the RM floor and
+// the template validator, under every policy, both value fills and both
+// compile modes. TestREQ107_SingleAttributeRMListTheLookupRequires checks
+// that a list the BMM marks mandatory is not skipped.
 func TestREQ107_SingleAttributeRMListGetsNoMember(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -402,6 +408,20 @@ func TestREQ107_SingleAttributeRMListGetsNoMember(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "control: CLUSTER.items, which the BMM marks mandatory",
+			opt:  guardRootOPT("CLUSTER", "openEHR-EHR-CLUSTER.example.v1", guardSingle("items", guardExistence11)),
+			check: func(t *testing.T, call string, out any) {
+				t.Helper()
+				cluster, ok := out.(*rm.Cluster)
+				if !ok {
+					t.Fatalf("%s returned %T, want a CLUSTER", call, out)
+				}
+				if n := len(cluster.Items); n != 1 {
+					t.Errorf("%s: CLUSTER.items has %d members, want 1", call, n)
+				}
+			},
+		},
 	}
 	for _, tc := range cases {
 		for _, implicit := range []bool{true, false} {
@@ -420,6 +440,56 @@ func TestREQ107_SingleAttributeRMListGetsNoMember(t *testing.T) {
 						t.Errorf("template validator: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
 					}
 				})
+			}
+		}
+	}
+}
+
+// contentRequiredLookup is the pinned RM info with COMPOSITION.content
+// marked mandatory, as a lookup handed to templatecompile.WithRMInfo may
+// mark it.
+type contentRequiredLookup struct{ rminfo.Lookup }
+
+func (l contentRequiredLookup) RequiredAttributes(rmType string) []string {
+	required := l.Lookup.RequiredAttributes(rmType)
+	if rmType == "COMPOSITION" {
+		return append(slices.Clone(required), "content")
+	}
+	return required
+}
+
+// TestREQ107_SingleAttributeRMListTheLookupRequires is the REQ-107 control
+// of TestREQ107_SingleAttributeRMListGetsNoMember: only a list the BMM does
+// not mark mandatory is read as one that only its existence asks a member
+// of. Compiled with RM info that marks COMPOSITION.content mandatory, the
+// same template's content, written as a C_SINGLE_ATTRIBUTE with no child,
+// still takes the default its BMM type gives. That default is an
+// OBSERVATION, an archetype root, so Generate refuses it with
+// ErrArchetypeIDMissing, under every policy, both value fills and both
+// compile modes.
+func TestREQ107_SingleAttributeRMListTheLookupRequires(t *testing.T) {
+	opt, err := template.ParseOPT(strings.NewReader(guardOPT(guardCompositionID, guardSingle("content", guardExistence11))))
+	if err != nil {
+		t.Fatalf("ParseOPT: %v", err)
+	}
+	for _, implicit := range []bool{true, false} {
+		compileOpts := []templatecompile.Option{templatecompile.WithRMInfo(contentRequiredLookup{rminfo.Default})}
+		if !implicit {
+			compileOpts = append(compileOpts, templatecompile.WithoutImplicitAttributes())
+		}
+		c, err := templatecompile.Compile(opt, compileOpts...)
+		if err != nil {
+			t.Fatalf("Compile(implicit=%t): %v", implicit, err)
+		}
+		if content := c.Root().Attribute("content"); content == nil || !content.Required() {
+			t.Fatalf("precondition: Compile(implicit=%t) does not mark content required; the lookup does not shape the template", implicit)
+		}
+		for _, opts := range guardOptions() {
+			call := fmt.Sprintf("Generate(implicit=%t, %v, %v)", implicit, opts.Policy, opts.ValueFill)
+			out, err := instance.Generate(t.Context(), c, opts)
+			checkArchetypeIDMissing(t, call, err, "OBSERVATION for COMPOSITION.content at / (required, but the template names no child)")
+			if out != nil {
+				t.Errorf("%s returned %T with the error, want no root", call, out)
 			}
 		}
 	}

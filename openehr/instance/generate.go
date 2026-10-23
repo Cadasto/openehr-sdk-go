@@ -519,6 +519,15 @@ func (g *generator) materialiseSingle(
 	// here and is built as one the OPT leaves silent.
 	children := tcimpl.AllowedChildNodes(attr)
 	if len(children) == 0 {
+		// An attribute the RM declares a list, which the template writes
+		// as a single attribute (COMPOSITION.content as a
+		// C_SINGLE_ATTRIBUTE), is read as that list, as the template
+		// validator reads it. Where the BMM does not mark it mandatory,
+		// only its existence asks for a member, so it gets none: a list
+		// with no member meets its existence.
+		if !attr.Required() && rmDeclaresList(parentRM, attr.Name()) {
+			return nil
+		}
 		// Implicit / OPT-silent attribute. When the attribute carries
 		// a BMM-resolved RM type, materialise a default child of that
 		// type so REQ-102 v2's required-attribute check passes; root-
@@ -557,6 +566,14 @@ func (g *generator) materialiseSingle(
 		return fmt.Errorf("attach %s.%s: %w", optNode.RMTypeName(), attr.Name(), err)
 	}
 	return nil
+}
+
+// rmDeclaresList reports whether the pinned RM declares attrName a list on
+// the class of parentRM, the value the walk built, whatever the template
+// writes it as.
+func rmDeclaresList(parentRM any, attrName string) bool {
+	container, _ := rminfo.Default.IsContainer(bmmtype.Class(rmTypeOf(parentRM)), attrName)
+	return container
 }
 
 // replacesTerminology reports whether attaching child as attr of parent
@@ -631,8 +648,11 @@ func (g *generator) materialiseImplicitSingle(
 	// must not be an archetype root: an optional attribute gets nothing,
 	// and a required one is refused, as in materialiseImplicitMultiple.
 	// No attribute the pinned RM declares single-valued has such a
-	// default; a template reaches this by writing a multi-valued one,
-	// such as COMPOSITION.content, as a single attribute.
+	// default. A template that writes a list as a single attribute, such
+	// as COMPOSITION.content, reaches this only where the BMM marks the
+	// list mandatory: materialiseSingle reads any other as the list the
+	// RM declares and builds it no member. No list the pinned RM marks
+	// mandatory holds archetype roots, so the refusal is a backstop.
 	if built := rmTypeOf(rmChild); rmroots.IsArchetypeRoot(built) {
 		if !isRequired(attr) {
 			return nil
