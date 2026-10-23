@@ -150,37 +150,148 @@ func TestREQ107_TimeValidityPassesBothValidators(t *testing.T) {
 	}
 }
 
-// TestREQ107_KnownGapUnwritableAttributes pins the REQ-107 known gap on
-// attributes the generator cannot write: a template that puts an object
-// under one makes Generate return an error wrapping
-// rmwrite.ErrUnknownAttribute, and no root, at every policy and either
-// value fill. The rows pin each attribute the gap names: a PERSON's
-// languages holding a DV_TEXT, a PERSON's roles holding a PARTY_REF, and a
-// ROLE performer's id holding a HIER_OBJECT_ID, which rmwrite cannot
-// attach to a PARTY_REF. Languages and roles have no writer yet, although
-// the template validator now binds their members by RM type; those rows
-// change when rmwrite gains the writers.
-func TestREQ107_KnownGapUnwritableAttributes(t *testing.T) {
+// TestREQ107_ActorLanguagesAndRolesTakeTheirMembers is the REQ-107 check
+// that a PERSON whose template names languages holding a DV_TEXT and roles
+// holding a PARTY_REF comes out with one member of each, at every policy,
+// either value fill and either compile mode, and passes both validators,
+// which bind such a member by its RM type. The language is the text the
+// template pins. A role whose template leaves it open takes the namespace
+// local, the type ROLE and an id drawn from UIDSource, after the PERSON's
+// own uid; a pattern on its type that admits ROLE among other names gives
+// ROLE too, and a list that names only another class keeps that one (a list
+// that names ROLE and another class keeps the member the value fill picks:
+// TestREQ107_RoleTypeListKeepsItsMemberOverTheDefault). These replace the
+// known-gap rows in which rmwrite could not write either attribute.
+func TestREQ107_ActorLanguagesAndRolesTakeTheirMembers(t *testing.T) {
+	cases := []struct {
+		name     string
+		roleType []string // the attributes the template names on the role's PARTY_REF
+		want     string
+	}{
+		{name: "role left open", want: "PARTY_REF local::ROLE id HIER_OBJECT_ID uid-0002"},
+		{
+			name:     "role type pattern .*",
+			roleType: []string{guardSingle("type", guardExistence11, optPrimitive("STRING", "C_STRING", "<pattern>.*</pattern>"))},
+			want:     "PARTY_REF local::ROLE id HIER_OBJECT_ID uid-0002",
+		},
+		{
+			name:     "role type pinned PERSON",
+			roleType: []string{guardSingle("type", guardExistence11, guardString("PERSON"))},
+			want:     "PARTY_REF local::PERSON id HIER_OBJECT_ID uid-0002",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			opt := guardRootOPT("PERSON", "openEHR-DEMOGRAPHIC-PERSON.example.v1",
+				guardMultiple("languages", guardExistence11,
+					guardChild("C_COMPLEX_OBJECT", "DV_TEXT", "", guardOccurrences11, "",
+						guardSingle("value", guardExistence11, guardString("Dutch")))),
+				guardMultiple("roles", guardExistence11,
+					guardChild("C_COMPLEX_OBJECT", "PARTY_REF", "", guardOccurrences11, "", tc.roleType...)))
+			generateEvery(t, opt, func(t *testing.T, call string, out any) {
+				person, ok := out.(*rm.Person)
+				if !ok {
+					t.Fatalf("%s returned %T, want *rm.Person", call, out)
+				}
+				if len(person.Languages) != 1 || person.Languages[0] == nil || person.Languages[0].GetValue() != "Dutch" {
+					t.Errorf("%s: languages = %#v, want one text Dutch", call, person.Languages)
+				}
+				if len(person.Roles) != 1 {
+					t.Fatalf("%s: roles has %d members, want 1", call, len(person.Roles))
+				}
+				if got := refString(&person.Roles[0]); got != tc.want {
+					t.Errorf("%s: roles[0] = %s, want %s", call, got, tc.want)
+				}
+			})
+		})
+	}
+}
+
+// TestREQ107_RoleTypeListKeepsItsMemberOverTheDefault is the REQ-107 check
+// that a list the template pins on the type of a PERSON's role keeps the
+// member the value fill picks, where Type_validity admits it, rather than
+// the type ROLE a role takes where the template leaves it open
+// (Precedence 3), at every policy and either compile mode. ExampleFill
+// takes the list's first member and RandomFill any member. Both validators
+// accept the PERSON.
+func TestREQ107_RoleTypeListKeepsItsMemberOverTheDefault(t *testing.T) {
+	cases := []struct {
+		name string
+		list string // the C_STRING body
+		// wantExample is the type ExampleFill must give, and wantRandom the
+		// types RandomFill may give.
+		wantExample string
+		wantRandom  []string
+	}{
+		{
+			name:        "ROLE after another class name",
+			list:        "<list>ORGANISATION</list><list>ROLE</list>",
+			wantExample: "ORGANISATION",
+			wantRandom:  []string{"ORGANISATION", "ROLE"},
+		},
+		{
+			name:        "ROLE only",
+			list:        "<list>ROLE</list>",
+			wantExample: "ROLE",
+			wantRandom:  []string{"ROLE"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			opt := guardRootOPT("PERSON", "openEHR-DEMOGRAPHIC-PERSON.example.v1",
+				guardMultiple("roles", guardExistence11,
+					guardChild("C_COMPLEX_OBJECT", "PARTY_REF", "", guardOccurrences11, "",
+						guardSingle("type", guardExistence11, optPrimitive("STRING", "C_STRING", tc.list)))))
+			for _, implicit := range []bool{true, false} {
+				c := compileOPTText(t, opt, implicit)
+				for _, opts := range guardOptions() {
+					call := fmt.Sprintf("Generate(%v, %v, implicit attributes %v)", opts.Policy, opts.ValueFill, implicit)
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err != nil {
+						t.Fatalf("%s: %v, want a root", call, err)
+					}
+					person, ok := out.(*rm.Person)
+					if !ok {
+						t.Fatalf("%s returned %T, want *rm.Person", call, out)
+					}
+					if len(person.Roles) != 1 {
+						t.Fatalf("%s: roles has %d members, want 1", call, len(person.Roles))
+					}
+					got := person.Roles[0].Type
+					if opts.ValueFill == instance.ExampleFill && got != tc.wantExample {
+						t.Errorf("%s: role type = %q, want %q", call, got, tc.wantExample)
+					}
+					if opts.ValueFill == instance.RandomFill && !slices.Contains(tc.wantRandom, got) {
+						t.Errorf("%s: role type = %q, want one of %v", call, got, tc.wantRandom)
+					}
+					checkBothValidators(t, call, out, c)
+				}
+			}
+		})
+	}
+}
+
+// TestREQ107_AttributeThePinnedRMDoesNotHaveIsRefused is the REQ-107 check
+// that an attribute the pinned RM does not have cannot be written, so
+// Generate returns an error wrapping rmwrite.ErrUnknownAttribute, and no
+// root, where a template puts an object under one, at every policy and
+// either value fill (§ Exceptions and known gaps, "An attribute the pinned
+// RM does not have"). Its row is a made-up attribute on a DV_ORDINAL, which
+// no writer can write. The rows it pinned as known gaps are written now: a
+// PERSON's languages and roles and a ROLE performer's id
+// (TestREQ107_ActorLanguagesAndRolesTakeTheirMembers,
+// TestREQ107_PerformerIDTakesAValueFromUIDSource), and a DV_ORDINAL's
+// symbol the template names as a node of its own
+// (TestREQ107_OrdinalAndScaleTakeTheirSymbolAndValue).
+func TestREQ107_AttributeThePinnedRMDoesNotHaveIsRefused(t *testing.T) {
 	cases := []struct {
 		name string
 		opt  string
 	}{
 		{
-			name: "PERSON languages holding a DV_TEXT",
-			opt: guardRootOPT("PERSON", "openEHR-DEMOGRAPHIC-PERSON.example.v1",
-				guardMultiple("languages", guardExistence11,
-					guardChild("C_COMPLEX_OBJECT", "DV_TEXT", "", guardOccurrences11, ""))),
-		},
-		{
-			name: "PERSON roles holding a PARTY_REF",
-			opt: guardRootOPT("PERSON", "openEHR-DEMOGRAPHIC-PERSON.example.v1",
-				guardMultiple("roles", guardExistence11,
-					guardChild("C_COMPLEX_OBJECT", "PARTY_REF", "", guardOccurrences11, ""))),
-		},
-		{
-			name: "ROLE performer id holding a HIER_OBJECT_ID",
-			opt: rolePerformerOPT(guardSingle("id", guardExistence11,
-				guardChild("C_COMPLEX_OBJECT", "HIER_OBJECT_ID", "", guardOccurrences11, ""))),
+			name: "DV_ORDINAL attribute the pinned RM does not have",
+			opt: optTemplate("ELEMENT", optSingle("value", optNode("DV_ORDINAL", "",
+				optSingle("no_such_attribute", optNode("DV_CODED_TEXT", ""))))),
 		},
 	}
 	for _, tc := range cases {
@@ -279,10 +390,10 @@ func TestREQ107_PinnedPerformerTypeIsAPartyClass(t *testing.T) {
 // TestREQ102_ConstrainedPerformerIDIsRead is the REQ-102 check that the
 // template validator reads a ROLE performer's id when the template
 // constrains it: a HIER_OBJECT_ID whose value the template pins with a
-// C_STRING pattern. The generator cannot write a PARTY_REF's id from the
-// template, so the ROLE comes from the template without the id constraint,
-// and its performer id is set by hand. An id the pattern accepts passes
-// both validators; one it rejects is reported at its value.
+// C_STRING pattern. The ROLE comes from the template without the id
+// constraint, so its performer id can be set by hand to one the pattern
+// accepts and to one it rejects. An id the pattern accepts passes both
+// validators; one it rejects is reported at its value.
 func TestREQ102_ConstrainedPerformerIDIsRead(t *testing.T) {
 	withID := compileOPTText(t, rolePerformerOPT(
 		guardSingle("id", guardExistence11,

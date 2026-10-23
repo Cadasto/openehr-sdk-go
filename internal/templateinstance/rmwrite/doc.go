@@ -35,33 +35,74 @@
 //     ITEM_TABLE, and CLUSTER and ELEMENT;
 //   - the data values DV_TEXT, DV_CODED_TEXT, DV_URI, DV_EHR_URI,
 //     DV_PARSABLE, DV_IDENTIFIER, DV_DATE, DV_TIME, DV_DATE_TIME,
-//     DV_DURATION, DV_BOOLEAN, DV_COUNT, DV_QUANTITY and DV_MULTIMEDIA,
+//     DV_DURATION, DV_BOOLEAN, DV_COUNT, DV_QUANTITY, DV_PROPORTION,
+//     DV_ORDINAL, DV_SCALE, DV_MULTIMEDIA, DV_STATE,
+//     DV_GENERAL_TIME_SPECIFICATION and DV_PERIODIC_TIME_SPECIFICATION,
 //     and CODE_PHRASE;
 //   - DV_INTERVAL over each concrete ordered data value and over
-//     DV_ORDERED itself;
+//     DV_ORDERED itself, and REFERENCE_RANGE over DV_ORDERED, the one the
+//     type registry builds;
 //   - the parties PERSON, AGENT, GROUP, ORGANISATION and ROLE, and
-//     CAPABILITY, ADDRESS and PARTY_IDENTITY;
-//   - PARTY_RELATED, of which it writes only relationship.
+//     CAPABILITY, ADDRESS, CONTACT, PARTY_IDENTITY and PARTY_RELATIONSHIP;
+//   - the party proxies PARTY_IDENTIFIED, PARTY_RELATED and PARTY_SELF;
+//   - the EHR-wide roots EHR_STATUS and FOLDER;
+//   - PARTICIPATION and TERM_MAPPING;
+//   - the references OBJECT_REF, PARTY_REF, LOCATABLE_REF and
+//     ACCESS_GROUP_REF, the identifiers HIER_OBJECT_ID,
+//     OBJECT_VERSION_ID, ARCHETYPE_ID, TEMPLATE_ID, TERMINOLOGY_ID and
+//     GENERIC_ID, and the INSTRUCTION_DETAILS an ACTION holds.
 //
 // AppendMultiple adds a member to multi-valued attributes on
-// COMPOSITION, SECTION, INSTRUCTION, HISTORY, ITEM_TREE, ITEM_LIST,
-// ITEM_TABLE, CLUSTER, the five parties and CONTACT.
+// COMPOSITION, EVENT_CONTEXT, SECTION, the five entries, ISM_TRANSITION,
+// HISTORY, ITEM_TREE, ITEM_LIST, ITEM_TABLE, CLUSTER, the five parties
+// (an ACTOR's languages and roles included), CONTACT, PARTY_IDENTIFIED,
+// PARTY_RELATED, FOLDER, DV_TEXT, DV_CODED_TEXT, DV_PARAGRAPH, and the
+// nine ordered data values (their other_reference_ranges).
 //
-// Each parent's writer lists the attributes it fills. An attribute takes
-// a child of its RM type or of a class that descends from it, wherever
-// the parent's Go field can hold one: a DV_TEXT attribute (every `name`,
-// ELEMENT `null_reason`, INSTRUCTION `narrative`) also takes a
-// DV_CODED_TEXT, EVENT_CONTEXT `health_care_facility` a PARTY_RELATED as
-// well as a PARTY_IDENTIFIED, and an attribute of an abstract class, such
-// as ELEMENT `value` (DATA_VALUE), any concrete class of it. Any other
+// Each parent's writer lists the attributes it fills. An attribute takes a
+// child of its RM type or of a class that descends from it, wherever the
+// parent's Go field can hold one: a DV_TEXT attribute (every LOCATABLE
+// `name`, ELEMENT `null_reason`, INSTRUCTION `narrative`, DV_PARAGRAPH
+// `items`, PARTICIPATION `function`, ISM_TRANSITION `reason`, ACTOR
+// `languages`) also takes a DV_CODED_TEXT, a DV_URI attribute (DV_TEXT
+// `hyperlink`, DV_MULTIMEDIA `uri`) a DV_EHR_URI, EVENT_CONTEXT
+// `health_care_facility` a PARTY_RELATED as well as a PARTY_IDENTIFIED,
+// and an attribute of an abstract class, such as ELEMENT `value`
+// (DATA_VALUE), PARTICIPATION `performer` (PARTY_PROXY) or OBJECT_REF `id`
+// (OBJECT_ID), any concrete class of it. An OBJECT_REF attribute (an
+// ENTRY's `workflow_id`, a CARE_ENTRY's `guideline_id`, a member of a
+// FOLDER's `items`) takes any class of reference as given, and
+// LOCATABLE_REF `id` is written into the UID_BASED_ID field LOCATABLE_REF
+// declares, not the one it embeds from OBJECT_REF. A DV_INTERVAL
+// attribute an ordered value holds (a DV_ORDERED's `normal_range`, a
+// REFERENCE_RANGE's `range`) takes a DV_INTERVAL of any instantiation and
+// converts it into the one the Go field holds, an open side holding no
+// bound; a bound of another class than the field holds returns an
+// ErrTypeMismatch. An `other_reference_ranges` member is a REFERENCE_RANGE
+// of any instantiation, copied into the one the field holds. An Integer
+// attribute (DV_QUANTITY and DV_PROPORTION `precision`, DV_PROPORTION
+// `type`, DV_ORDINAL `value`, DV_MULTIMEDIA `size`, INTERVAL_EVENT
+// `sample_count`) takes a whole number of any Go integer shape held by
+// value, or an rm.Integer held by pointer, and a whole number outside the
+// 32-bit range an RM Integer holds returns an ErrTypeMismatch that says so.
+// An optional Real attribute (an accuracy) takes a number of any Go numeric
+// shape or an rm.Real held by pointer, an optional Boolean attribute
+// (accuracy_is_percent) a bool as a value or as a pointer, and an optional
+// String attribute (a magnitude_status, a units_system, an EVENT_CONTEXT
+// location, a PARTY_IDENTIFIED name) a string as a value or as a pointer;
+// each keeps a copy of what it is given, and a nil pointer returns an
+// ErrTypeMismatch, as it does for an Integer attribute. A Character attribute (TERM_MAPPING
+// `match`) takes a string or an rm.Character of one character, and one of
+// any other length returns an ErrTypeMismatch that says so. Any other
 // parent or attribute returns ErrUnknownAttribute, and a child of the
-// wrong Go type returns ErrTypeMismatch. Table-driven tests in this package
-// write through most of these parents, and check the DV_INTERVAL cases
-// against the type registry, so an ordered data value the registry
+// wrong Go type returns ErrTypeMismatch. Table-driven tests in this
+// package write through most of these parents, and check the DV_INTERVAL
+// cases against the type registry, so an ordered data value the registry
 // gains fails them until it has a case.
 //
-// Two more tests ask both writers about every class the type registry
-// knows and every attribute name any class in openehr/rm/rminfo
+// Three more tests ask the writers about the type registry and the
+// classes in openehr/rm/rminfo. The first two ask both writers about
+// every class the type registry knows and every attribute name any class
 // declares, with a child no case accepts. The first checks that each
 // writer case names an attribute its class declares, in the right
 // shape: EnsureSingle for a single-valued attribute, AppendMultiple for
@@ -74,7 +115,12 @@
 // renamed, fails it until the attribute gets a case or joins the
 // pinned list on purpose. The instance generator drops the error when
 // it fills an RM-required default, so without this pin a missing case
-// would drop the default silently.
+// would drop the default silently. The third pins the classes the
+// second cannot see: the registered classes a value below a LOCATABLE can
+// be, found by following the declared type of each attribute from every
+// concrete LOCATABLE, that neither writer has a case for. A class that
+// becomes reachable, or loses its last case, fails it until the class gets
+// a case or joins the pinned list on purpose.
 //
 // # Dependencies
 //

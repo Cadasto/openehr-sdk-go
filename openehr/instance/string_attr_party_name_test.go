@@ -98,6 +98,42 @@ func TestREQ107_StringAttributeIsWritten(t *testing.T) {
 	}
 }
 
+// TestREQ107_EventContextLocationIsWritten is the REQ-107 Leaf values check
+// that a C_STRING the OPT pins on an EVENT_CONTEXT's location is written: the
+// template-instance writer takes the location as a string, and the walk
+// writes a C_STRING leaf on it as it does on any String attribute. It holds
+// under every policy, both value fills and both compile modes, and the
+// template validator finds nothing at the location.
+func TestREQ107_EventContextLocationIsWritten(t *testing.T) {
+	const location = "ward A3"
+	opt := optTemplate("COMPOSITION", optSingle("context", optNode("EVENT_CONTEXT", "",
+		optSingle("location", guardString(location)))))
+	for _, implicit := range []bool{true, false} {
+		c := compileOPTText(t, opt, implicit)
+		for _, opts := range defaultsOptions() {
+			opts.Language, opts.Territory, opts.Composer = "en", "NL", testComposer()
+			t.Run(fmt.Sprintf("implicit=%t/%v/%v", implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+				out, err := instance.Generate(t.Context(), c, opts)
+				if err != nil {
+					t.Fatalf("Generate: %v", err)
+				}
+				comp := generatedComposition(t, out)
+				if comp.Context == nil {
+					t.Fatal("COMPOSITION.context is absent, want an EVENT_CONTEXT")
+				}
+				if got := derefString(comp.Context.Location); got != location {
+					t.Errorf("EVENT_CONTEXT.location = %q, want %q", got, location)
+				}
+				for _, iss := range templateErrors(out, c) {
+					if strings.HasPrefix(iss.Path, "/context/location") {
+						t.Errorf("template validator: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+					}
+				}
+			})
+		}
+	}
+}
+
 // partyName returns the name of a PARTY_IDENTIFIED or a PARTY_RELATED, ""
 // when it has none, and whether v is one of the two.
 func partyName(v any) (string, bool) {

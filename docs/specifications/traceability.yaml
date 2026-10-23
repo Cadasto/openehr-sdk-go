@@ -1276,6 +1276,7 @@ requirements:
       - openehr/composition/skeleton_policy_test.go
       - openehr/composition/typecheck_test.go
       - openehr/composition/typecheck_tiers_test.go
+      - openehr/composition/uid_source_test.go
       - testkit/probes/composition/probe_023_builder_round_trip.go
       - testkit/probes/composition/probes_test.go
       - testkit/probes/instance/corpus_ratchet_test.go
@@ -1305,6 +1306,7 @@ requirements:
       - openehr/internal/rmbind/bind_test.go
       - openehr/validation/aql_test.go
       - openehr/validation/binding_by_name_test.go
+      - openehr/validation/character_binding_test.go
       - openehr/validation/composition_test.go
       - openehr/validation/constraint_fixtures_test.go
       - openehr/validation/constraint_ref_walk_test.go
@@ -1320,7 +1322,10 @@ requirements:
       - openehr/validation/issuepath_test.go
       - openehr/validation/multi_nonlocatable_test.go
       - openehr/validation/ordinal_symbol_test.go
+      - openehr/validation/pointer_primitive_census_internal_test.go
+      - openehr/validation/pointer_primitive_test.go
       - openehr/validation/primitive_empty_part_test.go
+      - openehr/validation/primitive_input_test.go
       - openehr/validation/prohibited_test.go
       - openehr/validation/rmfloor_chained_corpus_test.go
       - openehr/validation/rmfloor_chained_internal_test.go
@@ -1442,11 +1447,17 @@ requirements:
       - internal/templateinstance/rmwrite/write_item_single_test.go
       - internal/templateinstance/rmwrite/write_parent_test.go
       - internal/templateinstance/rmwrite/write_party_test.go
+      - internal/templateinstance/rmwrite/write_ref_test.go
       - internal/templateinstance/rmwrite/write_test.go
       - internal/templateinstance/rmwrite/write_text_like_test.go
       - openehr/composition/builder_defaults_test.go
       - openehr/composition/optional_content_test.go
+      - openehr/composition/ordered_value_test.go
+      - openehr/composition/participation_test.go
+      - openehr/composition/reference_test.go
       - openehr/composition/skeleton_policy_test.go
+      - openehr/composition/text_language_test.go
+      - openehr/composition/uid_source_test.go
       - openehr/instance/accessors_test.go
       - openehr/instance/allowed_alternative_test.go
       - openehr/instance/archetype_identity_test.go
@@ -1459,12 +1470,16 @@ requirements:
       - openehr/instance/clock_test.go
       - openehr/instance/code_phrase_terminology_internal_test.go
       - openehr/instance/code_phrase_terminology_test.go
+      - openehr/instance/coded_group_test.go
       - openehr/instance/coded_rubric_test.go
+      - openehr/instance/coded_settle_internal_test.go
       - openehr/instance/coded_term_text_test.go
       - openehr/instance/coded_text_internal_test.go
       - openehr/instance/composer_option_test.go
       - openehr/instance/constrained_datetime_test.go
       - openehr/instance/contract_inputs_test.go
+      - openehr/instance/data_value_attributes_test.go
+      - openehr/instance/ehr_container_test.go
       - openehr/instance/element_rule_test.go
       - openehr/instance/element_slot_test.go
       - openehr/instance/entry_codes_test.go
@@ -1474,7 +1489,11 @@ requirements:
       - openehr/instance/identity_stamp_test.go
       - openehr/instance/imports_test.go
       - openehr/instance/instance_test.go
+      - openehr/instance/integer_draw_window_test.go
+      - openehr/instance/interval_expanded_bounds_test.go
+      - openehr/instance/interval_expanded_internal_test.go
       - openehr/instance/interval_flags_test.go
+      - openehr/instance/interval_normal_bounds_test.go
       - openehr/instance/interval_order_internal_test.go
       - openehr/instance/interval_order_test.go
       - openehr/instance/interval_ordinal_pairs_internal_test.go
@@ -1489,8 +1508,13 @@ requirements:
       - openehr/instance/node_id_test.go
       - openehr/instance/nonstorable_visit_internal_test.go
       - openehr/instance/nonstorable_visit_test.go
+      - openehr/instance/normal_range_test.go
       - openehr/instance/null_flavour_default_test.go
+      - openehr/instance/ordered_value_test.go
+      - openehr/instance/ordinal_integer_test.go
+      - openehr/instance/participation_mapping_test.go
       - openehr/instance/party_attribute_test.go
+      - openehr/instance/party_proxy_attribute_test.go
       - openehr/instance/party_related_relationship_internal_test.go
       - openehr/instance/party_related_relationship_test.go
       - openehr/instance/party_relationship_uid_test.go
@@ -1503,7 +1527,13 @@ requirements:
       - openehr/instance/post_walk_binding_test.go
       - openehr/instance/prohibited_attribute_test.go
       - openehr/instance/proportion_kind_test.go
+      - openehr/instance/quantified_rules_test.go
       - openehr/instance/realworld_opt_synthesis_test.go
+      - openehr/instance/reference_attribute_test.go
+      - openehr/instance/reference_id_form_internal_test.go
+      - openehr/instance/reference_range_bounds_test.go
+      - openehr/instance/reference_uid_internal_test.go
+      - openehr/instance/reproducible_test.go
       - openehr/instance/required_context_test.go
       - openehr/instance/required_policy_test.go
       - openehr/instance/required_rm_rule_fill_test.go
@@ -1518,6 +1548,8 @@ requirements:
       - openehr/instance/string_attr_party_name_test.go
       - openehr/instance/string_leaf_internal_test.go
       - openehr/instance/string_leaf_test.go
+      - openehr/instance/uid_source_nil_internal_test.go
+      - openehr/instance/uids_test.go
       - openehr/instance/uncarried_mandatory_test.go
       - openehr/instance/undescribed_content_test.go
       - openehr/instance/valuefill_leaves_test.go
@@ -1608,6 +1640,8 @@ requirements:
     probes: [PROBE-074]
     tests:
       - internal/rmaccess/reads_test.go
+      - internal/templateinstance/rmwrite/write_ref_test.go
+      - openehr/instance/ehr_container_test.go
       - openehr/validation/constraint_fixtures_test.go
       - openehr/validation/locatable_attributes_test.go
       - openehr/validation/noncomposition_test.go
@@ -1656,10 +1690,13 @@ requirements:
       - internal/rmaccess/reads_test.go
       - internal/rmroots/rmroots_test.go
       - openehr/instance/code_phrase_terminology_test.go
+      - openehr/instance/coded_group_test.go
+      - openehr/instance/coded_settle_internal_test.go
       - openehr/instance/coded_term_text_test.go
       - openehr/instance/coded_text_internal_test.go
       - openehr/instance/phase4_test.go
       - openehr/instance/proportion_kind_test.go
+      - openehr/instance/quantified_rules_test.go
       - openehr/rm/interval_bound_test.go
       - openehr/rm/rminfo/nonstorable_test.go
       - openehr/rm/temporal_iso_test.go

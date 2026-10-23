@@ -22,12 +22,13 @@ func relationshipCodedText(terminologyID string, codes ...string) string {
 }
 
 // TestREQ107_RelationshipDefaultYieldsToTheOPT is the REQ-107 check of
-// Precedence 1 on a PARTY_RELATED's relationship: the RM default openehr
-// 253 "unknown" replaces only a relationship with no code (empty, or the
-// at0000 placeholder), and only where the OPT's constraint on relationship
-// admits it. A code the OPT gave is kept, also where the OPT admits 253
+// Precedence 1 and 4 on a PARTY_RELATED's relationship: the RM default
+// openehr 253 "unknown" replaces only a relationship outside the subject
+// relationship group (empty, the at0000 placeholder, or a code of another
+// group), and only where the OPT's constraint on relationship admits it. A
+// code of the group the OPT gave is kept, also where the OPT admits 253
 // too, and the placeholder stays where the OPT names another terminology.
-// It calls fillRelationship directly, so each relationship state it starts
+// It calls settleCoded directly, so each relationship state it starts
 // from is set by hand. Through Generate,
 // TestREQ107_PartyRelatedGetsARelationship checks the 253 default where the
 // OPT gives no code, and TestREQ107_RelationshipKeepsTheOPTCode checks that
@@ -71,14 +72,20 @@ func TestREQ107_RelationshipDefaultYieldsToTheOPT(t *testing.T) {
 			have: rm.DVCodedText{},
 			want: unknown,
 		},
+		{
+			name: "code of another group replaced where the OPT admits 253 too",
+			opt:  relationshipCodedText("openehr", "271", "253"),
+			have: coded("openehr", "271", "example"),
+			want: unknown,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			opt, _ := visitAttribute(t, visitRootOPT("PARTY_RELATED", visitSingle("relationship", tc.opt)), "relationship")
-			got := tc.have
-			fillRelationship(opt, &got)
-			if got.DefiningCode != tc.want.DefiningCode || got.Value != tc.want.Value {
-				t.Errorf("fillRelationship(%+v) = %q %+v, want %q %+v",
+			party := &rm.PartyRelated{Relationship: tc.have}
+			(&generator{}).settleCoded(opt, party)
+			if got := party.Relationship; got.DefiningCode != tc.want.DefiningCode || got.Value != tc.want.Value {
+				t.Errorf("settleCoded(%+v) = %q %+v, want %q %+v",
 					tc.have.DefiningCode, got.Value, got.DefiningCode, tc.want.Value, tc.want.DefiningCode)
 			}
 		})

@@ -13,7 +13,8 @@
 // OPT-driven recursive walk and primitive defaults. This package owns
 // the composition-specific options (`WithLanguage`, `WithTerritory`,
 // `WithComposer`, `WithCategory`, `WithNow`, `WithPolicy`,
-// `WithValueFill`, `WithValueSource`) and the path-assigning API.
+// `WithValueFill`, `WithValueSource`, `WithUIDSource`) and the
+// path-assigning API.
 // With no WithPolicy, NewSkeleton builds instance.Medium, the instance
 // package's default: a skeleton with at most one optional archetype under
 // an attribute. `WithPolicy(instance.Required)` gives one with only what

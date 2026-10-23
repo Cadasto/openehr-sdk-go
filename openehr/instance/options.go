@@ -183,12 +183,20 @@ type Options struct {
 
 	// UIDSource supplies the uids the generator writes: the uid of every
 	// ENTRY, GENERIC_ENTRY, PARTY and PARTY_RELATIONSHIP, of any other
-	// locatable whose OPT requires its uid, and the id of a
-	// PARTY_RELATIONSHIP's source or target that carries none. A
-	// COMPOSITION gets a uid only where its OPT requires one, so the
-	// server that stores it gives it its version id. Nil falls back to a
-	// random RFC 9562 v4 UUID (stdlib uuid.NewV4). Tests pin a counter or
-	// named-seed source for deterministic uids.
+	// locatable whose OPT requires its uid, and the id value of every
+	// object reference it writes that carries none, a ROLE's performer and
+	// a PARTY_RELATIONSHIP's source and target among them. The id takes
+	// the uid's value in the form of its class: the value itself for a
+	// HIER_OBJECT_ID, a GENERIC_ID, a TEMPLATE_ID and a TERMINOLOGY_ID, and
+	// the value followed by "::example::1" for an OBJECT_VERSION_ID. An
+	// ARCHETYPE_ID takes a fixed id and draws no uid. A COMPOSITION gets a
+	// uid only where its OPT requires one, so the server that stores it
+	// gives it its version id. Nil falls back to a random RFC 9562 v4 UUID
+	// (stdlib uuid.NewV4). [UIDsFrom] gives version-4 uids drawn from a
+	// math/rand/v2.Source, so a seeded run is reproducible; tests also pin
+	// a counter for deterministic uids. A source that returns nil leaves
+	// unset what the generator drew it for: the locatable has no uid, and
+	// the reference no id, or an id with an empty value.
 	UIDSource func() *rm.HierObjectID
 
 	// ValueFill selects how primitive leaves are valued. Zero value =
@@ -200,7 +208,8 @@ type Options struct {
 	// RandomFill; ignored otherwise. A fixed source (e.g.
 	// rand.NewPCG(seed, seed)) makes the leaf values byte-reproducible;
 	// nil draws from the package-global, auto-seeded generator so
-	// successive calls differ. Mirrors the UIDSource seam.
+	// successive calls differ. The generator never draws a uid from it:
+	// the uids come from UIDSource, or from its random fallback.
 	//
 	// A math/rand/v2.Source is not safe for concurrent use: do not share
 	// one Source across concurrent Generate calls. Give each goroutine its

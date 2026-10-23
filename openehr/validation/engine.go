@@ -335,8 +335,10 @@ func (e *engine) spendLeafVisit(path issuePath, rmType string) {
 // names, rm.Real, rm.Integer, rm.Integer64 and rm.Character; and the
 // pointers the generated access hands over for an optional primitive
 // attribute, *string, *bool, *rm.Real and *rm.Integer, each of which it
-// reads as present only when it is not nil. A test keeps every one of them
-// outside the RM classes.
+// reads as present only when it is not nil. They are the pointer types the
+// RM's primitive fields have, no more and no fewer, which a census of the
+// registered classes' fields keeps. A test keeps every one of them outside
+// the RM classes.
 func primitiveLeaf(value any, a *engineAttr) bool {
 	if !a.noRules {
 		return false

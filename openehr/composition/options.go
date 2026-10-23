@@ -27,6 +27,7 @@ type config struct {
 	policySet   bool // WithPolicy was given; its policy can be the zero value
 	valueFill   instance.ValueFill
 	valueSource mrand.Source
+	uidSource   func() *rm.HierObjectID
 }
 
 // WithLanguage overrides the OPT-declared language for
@@ -107,10 +108,25 @@ func WithValueFill(f instance.ValueFill) Option {
 // under ExampleFill.
 //
 // A math/rand/v2.Source is not safe for concurrent use: do not share one
-// Source across concurrent NewSkeleton / Build calls. Give each its own,
-// or leave it nil to use the concurrency-safe global.
+// Source across concurrent NewSkeleton / NewBuilder calls. Give each its
+// own, or leave it nil to use the concurrency-safe global.
 func WithValueSource(src mrand.Source) Option {
 	return func(c *config) { c.valueSource = src }
+}
+
+// WithUIDSource sets instance.Options.UIDSource, the source of every uid
+// the skeleton carries, such as each ENTRY's. Nil, or no WithUIDSource,
+// leaves the generator's random version-4 UUIDs. With
+// WithUIDSource(instance.UIDsFrom(rand.NewPCG(seed, seed))), WithNow and,
+// under instance.RandomFill, WithValueSource, a skeleton is reproducible:
+// two calls, each on fresh sources in the same state, give equal
+// skeletons.
+//
+// A source from instance.UIDsFrom draws from a math/rand/v2.Source, so it
+// is not safe for concurrent use: do not share one across concurrent
+// NewSkeleton / NewBuilder calls. Give each its own.
+func WithUIDSource(src func() *rm.HierObjectID) Option {
+	return func(c *config) { c.uidSource = src }
 }
 
 // ErrUnknownPath signals that the supplied path is not addressable in

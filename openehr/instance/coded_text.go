@@ -15,21 +15,20 @@ type classAttribute struct {
 }
 
 // attributeGroups pairs each coded-text attribute an invariant of its RM
-// class ties to a group of the openEHR terminology with that group. These
-// are the pairs the template-less RM validator checks; a test holds the
-// two to the same list.
-var attributeGroups = map[classAttribute]*terminology.Group{
-	{"COMPOSITION", "category"}:         terminology.CompositionCategory,
-	{"EVENT_CONTEXT", "setting"}:        terminology.Setting,
-	{"ELEMENT", "null_flavour"}:         terminology.NullFlavours,
-	{"INTERVAL_EVENT", "math_function"}: terminology.EventMathFunction,
-	{"ISM_TRANSITION", "current_state"}: terminology.InstructionStates,
-	{"ISM_TRANSITION", "transition"}:    terminology.InstructionTransitions,
-	{"PARTICIPATION", "function"}:       terminology.ParticipationFunction,
-	{"PARTICIPATION", "mode"}:           terminology.ParticipationMode,
-	{"PARTY_RELATED", "relationship"}:   terminology.SubjectRelationship,
-	{"TERM_MAPPING", "purpose"}:         terminology.TermMappingPurpose,
-}
+// class ties to a group of the openEHR terminology with that group. It is
+// the rows of codedRules that name a group, so the table the generator
+// keeps a coded attribute to and the one it reads a rubric by are one; the
+// rows are the pairs the template-less RM validator checks, which a test
+// holds codedRules to.
+var attributeGroups = func() map[classAttribute]*terminology.Group {
+	groups := make(map[classAttribute]*terminology.Group)
+	for _, r := range codedRules {
+		if r.group != nil {
+			groups[classAttribute{class: r.class, attr: r.attr}] = r.group
+		}
+	}
+	return groups
+}()
 
 // useCodedText sets the text of v, a coded text the walk built under node,
 // to the text its code has, where node admits the coded text with that

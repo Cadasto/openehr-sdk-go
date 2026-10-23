@@ -186,14 +186,19 @@ func sampleMagnitude(r constraints.NumericRange, s sampler) float64 {
 	return exampleMagnitudeFallback(r)
 }
 
+// sampleWindow is how far from its bounded side the sampler draws from a
+// one-sided numeric range: a range bounded below alone draws up to this far
+// above its lower bound, and one bounded above alone down to this far below
+// its upper.
+const sampleWindow = 100
+
 // intSampleBounds returns an inclusive integer [lo, hi] window to draw
-// from. A one-sided range gets a finite window anchored on the bounded
-// side. Returns ok=false for an unbounded range.
+// from. A one-sided range gets a finite window of sampleWindow anchored on
+// the bounded side. Returns ok=false for an unbounded range.
 func intSampleBounds(r constraints.NumericRange) (lo, hi int64, ok bool) {
 	if !r.IsBounded() {
 		return 0, 0, false
 	}
-	const window = 100
 	switch {
 	case !r.LowerUnbounded && !r.UpperUnbounded:
 		lo = int64(r.Lower)
@@ -209,13 +214,13 @@ func intSampleBounds(r constraints.NumericRange) (lo, hi int64, ok bool) {
 		if !r.LowerInclusive {
 			lo++
 		}
-		hi = lo + window
+		hi = lo + sampleWindow
 	default: // only upper bounded
 		hi = int64(r.Upper)
 		if !r.UpperInclusive {
 			hi--
 		}
-		lo = hi - window
+		lo = hi - sampleWindow
 	}
 	if hi < lo {
 		return 0, 0, false
@@ -224,20 +229,19 @@ func intSampleBounds(r constraints.NumericRange) (lo, hi int64, ok bool) {
 }
 
 // floatSampleBounds returns a [lo, hi) window for a real range, with a
-// finite window on the bounded side of a one-sided range. Returns
+// window of sampleWindow on the bounded side of a one-sided range. Returns
 // ok=false for an unbounded range.
 func floatSampleBounds(r constraints.NumericRange) (lo, hi float64, ok bool) {
 	if !r.IsBounded() {
 		return 0, 0, false
 	}
-	const window = 100
 	switch {
 	case !r.LowerUnbounded && !r.UpperUnbounded:
 		lo, hi = r.Lower, r.Upper
 	case !r.LowerUnbounded:
-		lo, hi = r.Lower, r.Lower+window
+		lo, hi = r.Lower, r.Lower+sampleWindow
 	default:
-		lo, hi = r.Upper-window, r.Upper
+		lo, hi = r.Upper-sampleWindow, r.Upper
 	}
 	if hi <= lo {
 		return 0, 0, false
