@@ -315,9 +315,10 @@ func TestREQ107_UIDSourceReturningNilDoesNotPanic(t *testing.T) {
 
 // TestREQ107_RequiredReferenceTheTemplateNamesNoChildForIsBuilt is the
 // REQ-107 check that a reference the generator builds from the RM alone,
-// for a multi-valued attribute the template requires but names no child
-// for, comes out whole and passes both validators, at every policy, either
-// value fill and either compile mode. A FOLDER's items hold an OBJECT_REF,
+// for a multi-valued attribute whose cardinality asks for a member and that
+// the template names no child for, comes out whole and passes both
+// validators, at every policy, either value fill and either compile mode.
+// An existence of 1..1 alone would ask for no member (What a visit writes). A FOLDER's items hold an OBJECT_REF,
 // so the member takes the namespace local, the type ANY and an id drawn
 // from UIDSource; a PERSON's roles hold a PARTY_REF, so the member takes
 // the type ROLE, the one a role's reference has, and an id drawn after the
@@ -332,7 +333,7 @@ func TestREQ107_RequiredReferenceTheTemplateNamesNoChildForIsBuilt(t *testing.T)
 	}{
 		{
 			name: "FOLDER items",
-			opt:  guardRootOPT("FOLDER", "openEHR-EHR-FOLDER.generic.v1", guardMultiple("items", guardExistence11)),
+			opt:  guardRootOPT("FOLDER", "openEHR-EHR-FOLDER.generic.v1", guardCountedMultiple("items", guardExistence11)),
 			member: func(t *testing.T, call string, out any) string {
 				t.Helper()
 				folder, ok := out.(*rm.Folder)
@@ -348,7 +349,7 @@ func TestREQ107_RequiredReferenceTheTemplateNamesNoChildForIsBuilt(t *testing.T)
 		},
 		{
 			name: "PERSON roles",
-			opt:  guardRootOPT("PERSON", "openEHR-DEMOGRAPHIC-PERSON.example.v1", guardMultiple("roles", guardExistence11)),
+			opt:  guardRootOPT("PERSON", "openEHR-DEMOGRAPHIC-PERSON.example.v1", guardCountedMultiple("roles", guardExistence11)),
 			member: func(t *testing.T, call string, out any) string {
 				t.Helper()
 				person, ok := out.(*rm.Person)
