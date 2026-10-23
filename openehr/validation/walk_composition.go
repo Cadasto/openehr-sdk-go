@@ -10,7 +10,6 @@ package validation
 
 import (
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -117,7 +116,7 @@ func formatAllowedTypes(children []*tcimpl.CompiledNode) string {
 // of parentRM, at attrPath, when the instance lacks it and the template
 // requires it ([templateRequires]): `required`, on the template layer, rule
 // existence, with required set. A multi-valued attribute is required only
-// where the template asks for a member too ([asksForMember]), and is
+// where the template asks for a member too ([tcimpl.AsksForMember]), and is
 // described as one. The RM's requirement is not read here: the walk reads it
 // from the value's class ([engine.checkAbsent]).
 func absentIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath issuePath, multiValued bool) (iss Issue, required bool) {
@@ -142,7 +141,7 @@ func absentIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath issuePat
 // attribute attr of parentRM, at attrPath, when it is present and holds no
 // item and the template requires it ([templateRequires]), which it does only
 // where its cardinality, or the occurrences of a child it allows, asks for at
-// least one member ([asksForMember]): `required`, on the template layer,
+// least one member ([tcimpl.AsksForMember]): `required`, on the template layer,
 // rule existence, with required set. The RM's requirement is not read here:
 // the walk reads it from the value's class ([engine.checkEmpty]).
 func emptyIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath issuePath) (iss Issue, required bool) {
@@ -365,37 +364,15 @@ func primitiveInput(rmValue any) any {
 // existence asks for the container alone and the counts for its members, and
 // an instance cannot show a list with no member apart from a missing one, so
 // it is required only where the template asks for a member as well
-// ([asksForMember]). The mandatory bit the compile carries from the lookup
-// it was given ([tcimpl.CompiledAttribute.Required]) is not the template's
-// requirement and is not read: the RM rules read the pinned Reference
-// Model, from the value's class.
+// ([tcimpl.AsksForMember]). The mandatory bit the compile carries from the
+// lookup it was given ([tcimpl.CompiledAttribute.Required]) is not the
+// template's requirement and is not read: the RM rules read the pinned
+// Reference Model, from the value's class.
 func templateRequires(attr *tcimpl.CompiledAttribute, multiValued bool) bool {
-	if !lowerAtLeastOne(attr.Existence()) {
+	if !tcimpl.LowerAtLeastOne(attr.Existence()) {
 		return false
 	}
-	return !multiValued || asksForMember(attr)
-}
-
-// asksForMember reports whether the template asks the multi-valued
-// attribute attr for at least one member: its cardinality
-// ([tcimpl.CompiledAttribute.ChildMultiplicity]), or the occurrences of a
-// child it allows ([allowedChildren]), has a bounded lower bound of 1 or
-// more. An OPT that states no cardinality, and a child that states no
-// occurrences, ask for no member. The generator reads a list the same way
-// when it decides that only the list's existence asks for a member.
-func asksForMember(attr *tcimpl.CompiledAttribute) bool {
-	if lowerAtLeastOne(attr.ChildMultiplicity()) {
-		return true
-	}
-	return slices.ContainsFunc(allowedChildren(attr), func(c *tcimpl.CompiledNode) bool {
-		return lowerAtLeastOne(c.Occurrences())
-	})
-}
-
-// lowerAtLeastOne reports whether the interval m has a bounded lower bound
-// of 1 or more. A nil interval, one the OPT does not state, has none.
-func lowerAtLeastOne(m *template.Multiplicity) bool {
-	return m != nil && !m.LowerUnbounded() && m.Lower() >= 1
+	return !multiValued || tcimpl.AsksForMember(attr)
 }
 
 // isProhibited reports whether the OPT prohibits the compiled attribute:

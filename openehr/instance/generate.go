@@ -365,8 +365,7 @@ func requiresUID(opt *tcimpl.CompiledNode) bool {
 	if attr == nil {
 		return false
 	}
-	e := attr.Existence()
-	return e != nil && !e.LowerUnbounded() && e.Lower() >= 1
+	return tcimpl.LowerAtLeastOne(attr.Existence())
 }
 
 // uidFor returns the uid source for a value built without an OPT node
@@ -441,7 +440,7 @@ func (g *generator) shouldVisit(optNode *tcimpl.CompiledNode, attr *tcimpl.Compi
 // Cardinality lower and existence are separate, so a 1..* list is required
 // when existence does not say so.
 func visitRequired(attr *tcimpl.CompiledAttribute) bool {
-	return isRequired(attr) || lowerAtLeastOne(attr.ChildMultiplicity())
+	return isRequired(attr) || tcimpl.LowerAtLeastOne(attr.ChildMultiplicity())
 }
 
 // compositionContext reports whether attr is the context of a
@@ -1542,28 +1541,16 @@ func remainingLowerNeeded(attr *tcimpl.CompiledAttribute, current int) int {
 
 // existenceOnly reports whether only attr's existence asks for a member:
 // its existence lower bound is bounded and at least 1, the BMM does not
-// mark it mandatory, and neither its cardinality lower bound nor the
+// mark it mandatory, and the template asks it for no member
+// ([tcimpl.AsksForMember]): neither its cardinality lower bound nor the
 // occurrences lower bound of an allowed child is bounded and at least 1. A
 // child with no occurrences does not count, nor does a slot, whose
 // occurrences the parser does not read. A multi-valued attribute with no
 // member meets such an existence, since existence asks for the container
-// and the counts for its members.
+// and the counts for its members. The template validator reads a list's
+// existence the same way.
 func existenceOnly(attr *tcimpl.CompiledAttribute) bool {
-	if attr.Required() || lowerAtLeastOne(attr.ChildMultiplicity()) {
-		return false
-	}
-	if slices.ContainsFunc(tcimpl.AllowedChildNodes(attr), func(c *tcimpl.CompiledNode) bool {
-		return lowerAtLeastOne(c.Occurrences())
-	}) {
-		return false
-	}
-	return isRequired(attr)
-}
-
-// lowerAtLeastOne reports whether the interval m has a bounded lower bound
-// of 1 or more. A nil interval, one the OPT does not state, has none.
-func lowerAtLeastOne(m *template.Multiplicity) bool {
-	return m != nil && !m.LowerUnbounded() && m.Lower() >= 1
+	return !attr.Required() && !tcimpl.AsksForMember(attr) && tcimpl.LowerAtLeastOne(attr.Existence())
 }
 
 // makeChild constructs a fresh RM instance for the OPT child's
@@ -2133,7 +2120,7 @@ func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 // existence asks for the container alone: existenceOnly tells where it is
 // the only thing that asks for a member.
 func isRequired(attr *tcimpl.CompiledAttribute) bool {
-	return attr.Required() || lowerAtLeastOne(attr.Existence())
+	return attr.Required() || tcimpl.LowerAtLeastOne(attr.Existence())
 }
 
 // newHierObjectID generates a HierObjectID with a random RFC 9562

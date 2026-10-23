@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
@@ -542,7 +543,7 @@ func parentAttribute(node *templatecompile.CompiledNode) *templatecompile.Compil
 // marks it mandatory, or its existence or cardinality lower bound is at
 // least 1.
 func attrRequired(attr *templatecompile.CompiledAttribute) bool {
-	return attr.Required() || lowerAtLeastOne(attr.Existence()) || lowerAtLeastOne(attr.ChildMultiplicity())
+	return attr.Required() || tcimpl.LowerAtLeastOne(attr.Existence()) || tcimpl.LowerAtLeastOne(attr.ChildMultiplicity())
 }
 
 // topUpLastResort reports whether node, an optional child, is the child a
@@ -564,7 +565,7 @@ func attrRequired(attr *templatecompile.CompiledAttribute) bool {
 func topUpLastResort(node *templatecompile.CompiledNode) bool {
 	attr := parentAttribute(node)
 	if attr == nil || attr.Cardinality() != template.Multiple ||
-		(!attr.Required() && !lowerAtLeastOne(attr.ChildMultiplicity())) {
+		(!attr.Required() && !tcimpl.LowerAtLeastOne(attr.ChildMultiplicity())) {
 		return false
 	}
 	children := allowedChildren(attr)
@@ -652,10 +653,6 @@ func identityCarriedBefore(children []*templatecompile.CompiledNode, i int) bool
 	return slices.ContainsFunc(children[:i], func(sib *templatecompile.CompiledNode) bool {
 		return !sib.IsSlot() && (sib.ArchetypeID() == id || sib.NodeID() == id)
 	})
-}
-
-func lowerAtLeastOne(m *template.Multiplicity) bool {
-	return m != nil && !m.LowerUnbounded() && m.Lower() >= 1
 }
 
 // holderPath is node's template path, or "?" for a value built from the

@@ -1291,6 +1291,7 @@ requirements:
       - internal/rmaccess/interval_test.go
       - internal/rmaccess/reads_test.go
       - internal/templatecompile/compile_test.go
+      - internal/templatecompile/members_test.go
       - internal/templatecompile/node_primitive_test.go
       - internal/templatecompile/walkfacts_test.go
       - openehr/composition/set_binding_test.go
@@ -1436,6 +1437,7 @@ requirements:
     tests:
       - cmd/examples/generate-example/main_test.go
       - internal/rmaccess/reads_test.go
+      - internal/templatecompile/members_test.go
       - internal/templateinstance/rmwrite/write_datavalue_test.go
       - internal/templateinstance/rmwrite/write_item_single_test.go
       - internal/templateinstance/rmwrite/write_parent_test.go
