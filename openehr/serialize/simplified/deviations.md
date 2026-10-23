@@ -399,8 +399,9 @@ partially or silently accepted.
 - **Interval boundary flags are asymmetric** (REQ-140) — each of the four DV_INTERVAL
   Booleans is written only where it differs from its bounded-side default, and decode reads
   an absent one back by side.
-  BASE `Interval` declares all four mandatory (`1..1`), and the reference omits each one's
-  bounded-side default. `\|lower_unbounded` / `\|upper_unbounded` are omitted when `false`, and
+  BASE `Interval` declares all four mandatory (`1..1`); the Simplified Formats specification
+  gives each a default (`false` for `\|*_unbounded`, `true` for `\|*_included`), and the
+  reference omits each one's default. `\|lower_unbounded` / `\|upper_unbounded` are omitted when `false`, and
   only `true` is emitted. Absent, they follow the side's bound (wire.md § REQ-169, amended
   2026-10-13): `false` beside a bound, `true` where the side's bound keys are absent or all
   null, so an interval that spells only an upper bound is open below. A side marked
@@ -425,11 +426,13 @@ partially or silently accepted.
   absent `\|*_included` on an open side re-encodes as an explicit `false`. Each denotes the
   same RM value as the other spelling, so these are canonical-spelling normalisations like
   the `:0` one above, not a loss.
-  The bounded-side defaults are corpus-derived: `dv_count` omits both flags on a
-  bounded interval, and `dv_quantity` spells both `false`. Every open end in the
-  corpus (`dv_ordinal`, `dv_quantity`, `interval_dv_quantity`) spells
-  `\|*_included: false`, so BASE `Lower_included_valid` / `Upper_included_valid`
-  fix the open-side default, not the corpus (wire.md § REQ-140).
+  The bounded-side defaults are the specification's, and the corpus agrees: `dv_count`
+  omits both flags on a bounded interval, and `dv_quantity` spells both `false`. On an open
+  side the reading goes further than the specification's literal defaults (wire.md § REQ-169
+  *Where this goes further than FLAT*): every open end in the corpus (`dv_ordinal`,
+  `dv_quantity`, `interval_dv_quantity`) spells `\|*_included: false`, as the
+  specification's examples do, and BASE `Lower_included_valid` / `Upper_included_valid` fix
+  that default (wire.md § REQ-140).
 
 ## Conformance
 
