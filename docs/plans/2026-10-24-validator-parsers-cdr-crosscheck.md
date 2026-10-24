@@ -61,18 +61,16 @@ Maintainer ruling (2026-10-24): property units and temporal patterns are in scop
 - **A node with no type in the XSI namespace (V4).**
   - In strict mode, refuse an `<attributes>` or `<children>` inside `<definition>` that carries no type in the XSI namespace (`openehr/template/parse.go:245,321,414,574`). ITS-XML makes C_ATTRIBUTE and C_OBJECT abstract (`Archetype.xsd:32,43`).
   - Add the REQ-100 sentence.
-- **Decision to confirm:** what lenient mode does with an unresolvable type.
-  - Keep today's default.
-  - Or read a `type` attribute whose prefix is `xsi` by its letters, as FerroEHR does. This recovers the constraints of the two Case OPTs.
+- Maintainer ruling (2026-10-25): lenient mode keeps today's default for a type the parser cannot resolve; only strict mode refuses the node. The two Case OPTs' constraints stay unrecovered in lenient mode, and so does the Case category outside the OPT's list.
 - **An attribute the RM class does not have (V3, G10).**
   - Compile marks an attribute that names neither a property nor a function of its class in the pinned BMM. The functions `is_integral` and `offset` stay legal.
   - The validator skips it as it skips a non-storable attribute (`declaredAttr`, `openehr/validation/engine.go:715-728`) and lists it in `Coverage`. The generator plan's Phase 3 reads the same mark.
   - Amend REQ-100, REQ-102 and the REQ-171 sentence on attributes no serialization carries.
-- **Decision to confirm:** whether strict mode refuses such an attribute, and whether the parser reads `null_flavor` as `null_flavour`, FerroEHR's reading, or skips it like any attribute the class lacks. Both CDRs accept these OPTs. Recommended: skip; AOM 2 VCARM makes the OPT invalid, and a table of misspellings has no end.
+- Maintainer ruling (2026-10-25): strict mode accepts such an OPT, as both CDRs do, and the parser reads `null_flavor` as `null_flavour`, FerroEHR's reading, so the constraint is kept; that one spelling is the whole table, and § REQ-100 names it. Every other attribute the class lacks is marked and skipped as above.
 
 **Definition of done:**
-- The 39 `ISM_TRANSITION.name` findings and the 9 Case findings are gone.
-- The Case category outside the OPT's list is reported, in lenient mode, if the decision recovers it.
+- The 39 `ISM_TRANSITION.name` findings are gone, and RIPPLE's `null_flavor` constraint is applied as `null_flavour`.
+- The two Case OPTs are refused in strict mode and parse as today in lenient mode; their 9 findings stay, recorded in the evidence as the OPTs' own defect.
 - `make ci` is green.
 
 ### Phase 3: binding (REQ-102)
@@ -105,7 +103,7 @@ Maintainer ruling (2026-10-24): the validator follows the generator's `Required`
 **Tasks:**
 - **A mandatory child under an optional list (V6).**
   - Scope the REQ-102 absent-list sentence to a list the template requires by its existence: such a list, absent, keeps drawing `required` alone when its cardinality or a child's occurrences asks for a member (*An existence lower bound alone asks for no member*).
-  - Add a paragraph: on an object the instance carries, each allowed child of a multi-valued attribute that is not a slot is counted against its occurrences, whether the list is present, empty or absent. On a list the template leaves optional by its existence, the list's own cardinality is not counted when the list is absent (ADL 1.4 `:275-280`, "optional, but if present"), and, since canonical JSON carries an empty optional list as an absent one (REQ-102, *An existence lower bound alone asks for no member*), not when it is present and empty either. Decision to confirm: this reads the two alike, as REQ-102 already does for existence.
+  - Add a paragraph: on an object the instance carries, each allowed child of a multi-valued attribute that is not a slot is counted against its occurrences, whether the list is present, empty or absent. On a list the template leaves optional by its existence, the list's own cardinality is not counted when the list is absent (ADL 1.4 `:275-280`, "optional, but if present"), and, since canonical JSON carries an empty optional list as an absent one (REQ-102, *An existence lower bound alone asks for no member*), not when it is present and empty either. Maintainer ruling (2026-10-25): the two read alike, as REQ-102 already does for existence.
   - Bring the *child cardinality* row in line.
   - Code: on an absent list at `engine.go:953`, run `appendOccurrenceIssues` with an empty binding. With the cardinality rule above, an absent and an empty optional list draw the same findings.
 - **The RM's non-empty lists (V7, V10).**

@@ -8,7 +8,7 @@ kind: plan
 **Status:** Draft, from the cross-check of 2026-10-24 on `main` at `9e29377a` ([evidence](cdr-crosscheck-evidence/README.md)). The maintainer's rulings of the same day are recorded in the phases they decide.
 **Covers:** REQ-107 ([§ REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator)); REQ-101 through the skeleton `composition.NewBuilder` seeds from `Large` ([§ REQ-101](../specifications/clinical-modeling.md#req-101--generic-opt-driven-composition-builder))
 **Probes:** PROBE-027
-**Depends on:** [the validator and parsers plan](2026-10-24-validator-parsers-cdr-crosscheck.md) Phase 1 for the duration, pattern and property-unit rows of Phase 4, and its Phase 2 for the attribute mark Phase 3 reads; its Phase 3 decides the unnamed-sibling question of Phase 5. Phase 1 here lands before that plan's Phase 4.
+**Depends on:** [the validator and parsers plan](2026-10-24-validator-parsers-cdr-crosscheck.md) Phase 1 for the duration, pattern and property-unit rows of Phase 4, and its Phase 2 for the attribute mark Phase 3 reads; its Phase 3 lands before the unnamed-sibling part of Phase 5. Phase 1 here lands before that plan's Phase 4.
 **Defers:** a real `complete` level (ITS-REST `detail_level=complete`: a second occurrence of each repeating node, alternatives spread across occurrences, RM-optional attributes such as `provider`, `workflow_id`, `guideline_id`, `end_time`, `health_care_facility`); `Medium`'s one-optional-archetype rule; a C_CODE_REFERENCE placeholder in the terminology its `referenceSetUri` names; the ELEMENT's name as DV_TEXT placeholder text.
 
 This header is for the reader. No tool reads it, and nothing fails when it is missing or out of date. The work itself meets the [Definition of Ready](../development-process.md#definition-of-ready) before it starts and the [Definition of Done](../development-process.md#definition-of-done) in the implementing PR.
@@ -62,16 +62,16 @@ Maintainer ruling (2026-10-24): `Required` follows both readings below.
 ### Phase 3: OPT shapes `Generate` fails on
 
 **Tasks:**
-- **Attributes the RM class does not have (G10).** Examples: `ISM_TRANSITION.name` and `ELEMENT.null_flavor`.
+- **Attributes the RM class does not have (G10).** Example: `ISM_TRANSITION.name`; `ELEMENT.null_flavor` reads as `null_flavour` once the validator plan's Phase 2 maps it.
   - Skip them in `walkSkips` (`generate.go:345`) as the non-storable set is skipped, reading the mark the validator plan's Phase 2 adds at compile.
   - Amend § REQ-107 *Visit rule* and the *Exceptions and known gaps* sentence on such attributes. That sentence now claims the root fails the validator and that no vendored OPT has one; neither holds.
 - **An optional attribute the generator has no writer for (G11).** Examples: LOCATABLE `feeder_audit` and `links`.
   - Leave it unvisited unless the BMM or its existence requires it, and fail only then.
   - Amend the writer-gap sentence of *Exceptions and known gaps*.
 
-**Decision to confirm:** an OPT that names no archetype for an ENTRY (section_admin_test) makes `Generate` return `ErrArchetypeIDMissing` under `Medium` and `Large`. One option is to treat that member as undescribed content and leave the optional attribute unvisited, which returns a valid root. Confirm today's error, or take the option.
+- **An ENTRY the OPT names no archetype for.** Maintainer ruling (2026-10-25): an OPT node of an archetype-root class with no archetype id (section_admin_test's inline ADMIN_ENTRY under its SECTION) is undescribed content, as a slot nothing can fill is. Under `Medium` and `Large`, an optional attribute whose members would all need it stays unvisited, so `Generate` returns a valid root (section_admin_test's `content` stays empty), and `ErrArchetypeIDMissing` stays for an attribute or a child the OPT requires. Amend the undescribed-content clause of § REQ-107 *Visit rule* and the *Errors* paragraph on `ErrArchetypeIDMissing`; the defect in the OPT is [the OPT author validator plan](2026-07-16-opt-author-validator.md)'s to report.
 
-**Definition of done:** GECCO core, RIPPLE - Conformance Test template and genericFHIRTemplate generate under every policy, and both CDRs accept the documents. `make ci` is green.
+**Definition of done:** GECCO core, RIPPLE - Conformance Test template, genericFHIRTemplate and section_admin_test generate under every policy, and both CDRs accept the documents. `make ci` is green.
 
 ### Phase 4: values the CDRs refuse
 
@@ -108,7 +108,7 @@ Maintainer ruling (2026-10-24): `Large` writes named clones, writes no empty ite
   - Amend § REQ-107 *What a visit writes*.
   - `composition.NewBuilder` seeds from `Large`, so the builder's skeleton grows. Check `openehr/composition/named_sibling_test.go` and the REQ-101 *Set* paths that rely on it, and record the change as consumer-visible.
   - Named clones need no validator change: it binds them by their pinned name today (§ REQ-102 *Structural, binding items*; `TestValidateComposition_REQ102_REQ116_SharedIDBindsByPinnedName`).
-- **Unnamed siblings of one identity.** Once [the validator plan](2026-10-24-validator-parsers-cdr-crosscheck.md) Phase 3 binds an item to the first sibling with room, the REQ-107 skip of an optional child whose identity a sibling carries (*What a visit writes*) loses its reason, unambiguous binding. Decision to confirm, then: whether `Large` writes a member of each unnamed sibling, and whether the *An earlier sibling that carries a later one's identity* bullet of *Exceptions and known gaps* goes.
+- **Unnamed siblings of one identity.** Once [the validator plan](2026-10-24-validator-parsers-cdr-crosscheck.md) Phase 3 binds an item to the first sibling with room, the REQ-107 skip of an optional child whose identity a sibling carries (*What a visit writes*) loses its reason, unambiguous binding. Maintainer ruling (2026-10-25): once that binding lands, `Large` writes a member of each unnamed sibling of one identity, and the *An earlier sibling that carries a later one's identity* bullet of *Exceptions and known gaps* goes. Amend § REQ-107 *What a visit writes* so that the skip holds under `Medium` alone, where one optional archetype per attribute is the rule.
 - **No empty item structure.**
   - Leave unvisited an optional attribute whose only allowed child would hold no member, such as an ITEM_TREE under `protocol`, `state` or `other_context`.
   - A structure the RM or the OPT requires, such as `EVENT.data`, is still written.
@@ -120,7 +120,7 @@ Maintainer ruling (2026-10-24): `Large` writes named clones, writes no empty ite
 
 **Definition of done:**
 - `Large` covers at least 95% of the archetype roots the 162 cross-checked templates name, against 64% today.
-- No document carries an empty optional item structure or an ENTRY uid.
+- No document carries an empty optional item structure, or a uid on an ENTRY, a PARTY or a PARTY_RELATIONSHIP the OPT did not ask for; under `Large`, every unnamed sibling of one identity has a member.
 - Both CDRs accept the documents.
 - `make ci` is green.
 
@@ -128,9 +128,7 @@ Maintainer ruling (2026-10-24): `Large` writes named clones, writes no empty ite
 
 **Tasks:**
 - **Reproduction OPTs.** Add a vendored OPT for each shape a phase fixes. Take it from a licensed source with its notice, or write a minimal synthetic OPT; the forum templates in the evidence carry no licence.
-- **Decision to confirm:** whether to land the cross-check harness.
-  - The option: an opt-in Go tool behind a make target. It needs local CDRs and skips without them, and records the numbers each phase's definition of done quotes.
-  - The alternative: keep the harness local and record the numbers in each PR body.
+- **The harness lands.** Maintainer ruling (2026-10-25): an opt-in Go tool behind a make target that takes the template directory and the CDR URLs from the environment and skips when they are unset. It records the numbers each phase's definition of done quotes. The template set and the CDRs' compose files stay outside the repository.
 - **Rerun and update.** After the last phase, rerun the cross-check and update the evidence README with the new numbers.
 
 **Definition of done:** both CDRs accept every document of the 202 templates under every policy, except the documents the findings attribute to a template defect or to one CDR's own reading.
