@@ -47,7 +47,7 @@ Maintainer ruling (2026-10-24): property units and temporal patterns are in scop
   - Vendor the openEHR property-unit table (`PropertyUnitData.xml`, specifications-TERM) beside `resources/terminology`, after checking its licence.
   - Where the OPT gives a property and no unit list, `Validate` checks that the unit belongs to the property, and `ExampleValue` picks one of its units.
   - A unit list the OPT gives keeps precedence, including units outside the property.
-  - Amend REQ-103 where it says the property is exposed but not enforced. The conformance test schedule case `CONT-DV_QUANTITY-validate_property` is the acceptance.
+  - Add a REQ-103 row for it; today only the `DvQuantity` doc comment says the property is exposed but not enforced (`openehr/template/constraints/quantity.go:30-32`). The conformance test schedule case `CONT-DV_QUANTITY-validate_property` is the acceptance.
 
 **Definition of done:**
 - The 190 `list_open` findings are gone.
@@ -58,7 +58,7 @@ Maintainer ruling (2026-10-24): property units and temporal patterns are in scop
 ### Phase 2: OPT parse fidelity (REQ-100)
 
 **Tasks:**
-- **An `xsi:type` the parser cannot resolve (V4).**
+- **A node with no type in the XSI namespace (V4).**
   - In strict mode, refuse an `<attributes>` or `<children>` inside `<definition>` that carries no type in the XSI namespace (`openehr/template/parse.go:245,321,414,574`). ITS-XML makes C_ATTRIBUTE and C_OBJECT abstract (`Archetype.xsd:32,43`).
   - Add the REQ-100 sentence.
 - **Decision to confirm:** what lenient mode does with an unresolvable type.

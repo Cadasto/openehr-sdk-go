@@ -84,8 +84,8 @@ Maintainer ruling (2026-10-24): property units, temporal patterns and the coded-
 - **Date and time patterns (G9).** Example and random dates, times and date-times leave out the fields the pattern forbids (`XX`), for example `yyyy-??-XX`.
 - **Property units (G8).** A C_DV_QUANTITY constrained by `property` with no unit list gets a unit of that property, from the table the validator plan vendors, under both fills.
 - **Term text under the bare code (G6).**
-  - `termKey` (`openehr/instance/coded_text.go:107`) falls back to the bare code when the OPT defines no `<terminology>::<code>` term.
-  - Amend the term-text sentence of § REQ-107 *Placeholders*.
+  - `termKey` (`openehr/instance/coded_text.go:107-113`) falls back to the bare code for a code of another terminology when the OPT defines no `<terminology>::<code>` term; a `local` code is read bare already.
+  - Amend the term-text paragraph of § REQ-107, after *RM defaults*.
 - **A coded name whose text the OPT pins (G7).**
   - Write the listed code whose term text the C_STRING admits, not the first listed code.
   - Amend the same sentence.
