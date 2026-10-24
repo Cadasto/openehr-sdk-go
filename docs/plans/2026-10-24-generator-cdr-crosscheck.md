@@ -8,7 +8,7 @@ kind: plan
 **Status:** Draft, from the cross-check of 2026-10-24 on `main` at `9e29377a` ([evidence](cdr-crosscheck-evidence/README.md)). The maintainer's rulings of the same day are recorded in the phases they decide.
 **Covers:** REQ-107 ([§ REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator)); REQ-101 through the skeleton `composition.NewBuilder` seeds from `Large` ([§ REQ-101](../specifications/clinical-modeling.md#req-101--generic-opt-driven-composition-builder))
 **Probes:** PROBE-027
-**Depends on:** [the validator and parsers plan](2026-10-24-validator-parsers-cdr-crosscheck.md) Phase 1 for the duration, pattern and property-unit rows of Phase 4, and its Phase 2 for the attribute mark Phase 3 reads. Phase 1 here lands before that plan's Phase 4.
+**Depends on:** [the validator and parsers plan](2026-10-24-validator-parsers-cdr-crosscheck.md) Phase 1 for the duration, pattern and property-unit rows of Phase 4, and its Phase 2 for the attribute mark Phase 3 reads; its Phase 3 decides the unnamed-sibling question of Phase 5. Phase 1 here lands before that plan's Phase 4.
 **Defers:** a real `complete` level (ITS-REST `detail_level=complete`: a second occurrence of each repeating node, alternatives spread across occurrences, RM-optional attributes such as `provider`, `workflow_id`, `guideline_id`, `end_time`, `health_care_facility`); `Medium`'s one-optional-archetype rule; a C_CODE_REFERENCE placeholder in the terminology its `referenceSetUri` names; the ELEMENT's name as DV_TEXT placeholder text.
 
 This header is for the reader. No tool reads it, and nothing fails when it is missing or out of date. The work itself meets the [Definition of Ready](../development-process.md#definition-of-ready) before it starts and the [Definition of Done](../development-process.md#definition-of-done) in the implementing PR.
@@ -24,38 +24,38 @@ Make every document `Generate` writes, under each policy and both value fills, o
 Maintainer ruling (2026-10-24): `Required` follows both readings below.
 
 **Tasks:**
-- Amend the definition of a *required* attribute in § REQ-107 *Visit rule*. An attribute becomes required when the BMM marks it mandatory or its existence lower bound is 1 or more. Where the OPT declares it multi-valued, it is also required when an allowed child that is not a slot has an occurrences lower bound of 1 or more (G1).
+- Amend the definition of a *required* attribute in § REQ-107 *Visit rule*. An attribute becomes required when the BMM marks it mandatory or its existence lower bound is 1 or more. Where the OPT declares it multi-valued, it is also required when an allowed child that is not a slot has an occurrences lower bound of 1 or more (G1). ADL 1.4 says such a child is mandatory within its container and leaves the optional container to its existence; that the child then needs the container is the reading both CDRs apply and the maintainer ruled for, and the sentence records it as a chosen reading.
   - Sources: ADL 1.4 `master05-cadl.adoc:284,316`, "mandatory in the GROUP"; AOM 2 VACMCO, "mandatory child object".
   - A cardinality lower bound counts members only once the attribute is visited (G2; AOM 1.4 `master04-constraint_model_package.adoc:33`).
   - A single-valued attribute's child never makes the attribute required: ADL 1.4 `:284` says its existence decides.
   - The COMPOSITION `context` exception stays.
-- Change `visitRequired` and `isRequired` (`openehr/instance/generate.go:478`, `:2265`) to match, using `tcimpl.AsksForMember` for the list rule.
-- Add reproduction tests that fail first:
-  - an optional list holding a 1..1 child, such as `ITEM_TREE.items` over an ELEMENT;
-  - an optional `content` with cardinality 1..* and an optional child;
-  - an optional `content` with a 1..1 archetype root;
-  - `testkit/corpus/templates/family_history.v.1.2.3.opt`, which is vendored.
+- Change `visitRequired` and `isRequired` (`openehr/instance/generate.go:478`, `:2265`) to match. `tcimpl.AsksForMember` (`internal/templatecompile/members.go:28`) does not fit: it counts a cardinality lower bound, which G2 keeps out, and scans slots too. Add a reader beside it that answers only whether an allowed child that is not a slot has an occurrences lower bound of 1 or more, and leave `AsksForMember` to the validator's REQ-102 use (*An existence lower bound alone asks for no member*).
+- Add reproduction tests that fail first, each saying what `Required` writes:
+  - an optional list holding a 1..1 child, such as `ITEM_TREE.items` over an ELEMENT: visited, one member;
+  - an optional `content` with cardinality 1..* and an optional child: not visited, no member (G2);
+  - an optional `content` with a 1..1 archetype root: visited, one member;
+  - `testkit/corpus/templates/family_history.v.1.2.3.opt`, which is vendored: `data/items[at0003]` gets its CLUSTER.
 - Check the knock-on:
   - `Medium` and `Large` documents do not change: a census of the 202 templates found no unmet mandatory child under them.
   - The `Required` documents of 52 templates lose a topped-up `content`.
   - Bring `docs/examples.md` and the PROBE-027 text in line where they show a `Required` document.
-- Delete the backlog lead on the `Required` visit of an optional attribute (`generate.go:466`). Its Demonstration at0016 clause is EHRbase's single-attribute reading (findings, *CDR observations*), not this cause.
+- Delete the backlog lead on the `Required` visit of an optional attribute (the `generate.go:425` line of `docs/backlog.md`). Its Demonstration at0016 clause is EHRbase's single-attribute reading (findings, *CDR observations*), not this cause.
 
 **Definition of done:** the `Required` documents of the ten G1 templates are accepted by both CDRs on a rerun of the cross-check, and pass both SDK validators. `TestREQ107_CorpusRatchet` and `make ci` are green.
 
 ### Phase 2: RM invariants and OPTs that contradict themselves
 
 **Tasks:**
-- **HISTORY `Events_valid` (G4).**
-  - In `writeRMNeeded` (`generate.go:268`): when a HISTORY has neither `events` nor `summary`, write `events` with a member of its first allowed EVENT child.
+- **HISTORY `Events_valid` (G4).** The invariant reads `(events /= Void and then not events.is_empty) or summary /= Void`, so either side satisfies it.
+  - In `writeRMNeeded` (`generate.go:268`): when a HISTORY has neither `events` nor `summary`, write `events` with a member of its first allowed EVENT child where the OPT allows one; else write `summary` from its allowed child where the OPT allows one; where the OPT allows neither, leave the HISTORY as it is, which *Exceptions* admits already as an OPT that contradicts itself.
   - Add the rule to the "Present" list of § REQ-107 *Precedence* item 2.
 - **Interval bounds that cannot be compared (G5).**
   - Give a side the OPT leaves without units the unit of the other side, under both value fills, before ordering (`openehr/instance/interval_order.go`).
   - Amend § REQ-107 *Intervals* so that both bounds are strictly comparable wherever both sides admit such a pair (RM `DV_INTERVAL.Limits_consistent`).
-  - This settles the backlog lead on `sharedQuantityUnit` (`interval_order.go:1131`).
+  - This settles the backlog lead on `sharedQuantityUnit` (the `interval_order.go:1066` line of `docs/backlog.md`).
 - **Unsatisfiable cardinality (G12).**
   - Return `ErrConstraintUnsatisfiable` when the occurrence lower bounds of an attribute's allowed children add up past its bounded cardinality upper bound (ADL 1.4 VCOC, AOM 2 VACMCO).
-  - Amend § REQ-107 *Errors*, and remove the case from *Exceptions and known gaps*.
+  - Amend § REQ-107 *Errors*, and narrow the *An OPT that contradicts itself* bullet of *Exceptions and known gaps*, which admits this root today, to the contradictions that remain.
 
 **Definition of done:** 10_alternative_types.en.v1, PROMIS-29 and test_intervals.en.v1 yield documents both CDRs accept under every fill. cardinality_of_section returns the error. `make ci` is green.
 
@@ -107,12 +107,14 @@ Maintainer ruling (2026-10-24): `Large` writes named clones, writes no empty ite
   - Under `Large`, write a member of every optional named use of one archetype that needs no undescribed content, not only the first.
   - Amend § REQ-107 *What a visit writes*.
   - `composition.NewBuilder` seeds from `Large`, so the builder's skeleton grows. Check `openehr/composition/named_sibling_test.go` and the REQ-101 *Set* paths that rely on it, and record the change as consumer-visible.
+  - Named clones need no validator change: it binds them by their pinned name today (§ REQ-102 *Structural, binding items*; `TestValidateComposition_REQ102_REQ116_SharedIDBindsByPinnedName`).
+- **Unnamed siblings of one identity.** Once [the validator plan](2026-10-24-validator-parsers-cdr-crosscheck.md) Phase 3 binds an item to the first sibling with room, the REQ-107 skip of an optional child whose identity a sibling carries (*What a visit writes*) loses its reason, unambiguous binding. Decision to confirm, then: whether `Large` writes a member of each unnamed sibling, and whether the *An earlier sibling that carries a later one's identity* bullet of *Exceptions and known gaps* goes.
 - **No empty item structure.**
   - Leave unvisited an optional attribute whose only allowed child would hold no member, such as an ITEM_TREE under `protocol`, `state` or `other_context`.
   - A structure the RM or the OPT requires, such as `EVENT.data`, is still written.
   - Amend § REQ-107 *Visit rule* and the sentence of *What a visit writes* that writes such a tree with no items.
 - **No ENTRY uid.**
-  - Write a locatable's `uid` only where the OPT constrains it or the RM requires it (`PARTY` `Uid_mandatory`), as the RM Common IM describes (`master03-archetyped_package.adoc:39-41`).
+  - Write no `uid` on an ENTRY or a `GENERIC_ENTRY` unless the OPT constrains it, as the RM Common IM describes (`master03-archetyped_package.adoc:39-41`). A `PARTY` keeps its uid (`Uid_mandatory`), and so does a `PARTY_RELATIONSHIP`, as § REQ-107 *Identity* has it today; no RM invariant asks for the latter, so confirm that it stays (decision to confirm).
   - Amend § REQ-107 *Identity*.
   - Check what depends on entry uids: the `UIDsFrom` determinism tests and the builder's uid-source tests.
 

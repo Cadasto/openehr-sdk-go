@@ -31,7 +31,7 @@ Maintainer ruling (2026-10-24): property units and temporal patterns are in scop
 - **C_STRING `list_open` (V1, 190 false findings).**
   - Parse the flag (`openehr/template/parse_primitives.go:249-260`) and carry it on `CString`, through a field or a new constructor, so the exported `NewCString` signature stays.
   - `Validate` then skips list membership on an open list and still checks a pattern.
-  - Derive the Web Template's `listOpen` from the flag, not from an empty list (`openehr/template/webtemplate/inputs.go:60`).
+  - Give the Web Template's TEXT input the C_STRING list and a `listOpen` read from the flag (`openehr/template/webtemplate/inputs.go:18-19` emits TEXT with no list today). The coded-text `listOpen` at `inputs.go:60` comes from an empty code list and is another flag.
   - Turn the REQ-103 out-of-scope bullet into a row.
 - **C_DURATION range (G3, V9).**
   - Parse `range` (`parse_primitives.go:262`).
@@ -68,7 +68,7 @@ Maintainer ruling (2026-10-24): property units and temporal patterns are in scop
   - Compile marks an attribute that names neither a property nor a function of its class in the pinned BMM. The functions `is_integral` and `offset` stay legal.
   - The validator skips it as it skips a non-storable attribute (`declaredAttr`, `openehr/validation/engine.go:715-728`) and lists it in `Coverage`. The generator plan's Phase 3 reads the same mark.
   - Amend REQ-100, REQ-102 and the REQ-171 sentence on attributes no serialization carries.
-- **Decision to confirm:** whether strict mode refuses such an attribute. Both CDRs accept these OPTs, and FerroEHR reads `null_flavor` as `null_flavour`.
+- **Decision to confirm:** whether strict mode refuses such an attribute, and whether the parser reads `null_flavor` as `null_flavour`, FerroEHR's reading, or skips it like any attribute the class lacks. Both CDRs accept these OPTs. Recommended: skip; AOM 2 VCARM makes the OPT invalid, and a table of misspellings has no end.
 
 **Definition of done:**
 - The 39 `ISM_TRANSITION.name` findings and the 9 Case findings are gone.
@@ -79,17 +79,19 @@ Maintainer ruling (2026-10-24): property units and temporal patterns are in scop
 
 **Tasks:**
 - **Alternatives of one RM type (V2, 37 false findings).**
-  - Amend § REQ-102 *Structural, alternatives* and the sentence on items that are not a LOCATABLE. Within a tier, a value binds the first child under whose constraints it validates. When no child validates it, it binds the first child of the tier, whose findings are reported.
+  - Amend § REQ-102 *Structural, alternatives* and the sentence on items that are not a LOCATABLE. The three type tiers stay. Within a tier, the validator binds a value to the first child under whose constraints it validates; when no child validates it, to the first child of the tier, whose findings are reported.
   - Sources: ADL 1.4 `master05-cadl.adoc:237`, "only one of which needs to be matched by the data"; AOM 1.4 C_SINGLE_ATTRIBUTE `alternatives`. Archie (`RMObjectValidator`) and EHRbase (`IsmTransitionValidator`) both check whole alternatives.
-- Implement the trial walk with the engine's issue slice and `withdrawInside` (`engine.go:423`):
-  - walk the value under each candidate into a buffered sink, in OPT order;
-  - count its visits against the limit;
+  - The trial is the validator's alone. The generator builds under the first child of the tier and `composition.Builder.Set` accepts by type, so both keep the tier rule through the shared binder `rmbind.Bind` (`openehr/internal/rmbind/bind.go:82`, called at `openehr/composition/typecheck.go:58` and `openehr/validation/walk_composition.go:102`); the validator adds its trial on top of that choice. A value the generator builds under the first child validates under it, so § REQ-107 *What a visit writes* keeps its claim. Amend that sentence, which restates the tier rule ("the first child, unless a later one names that type exactly"), and § REQ-101 *Type enforcement*, which binds `Set` to the alternatives rule, so that both name the tier rule and not the trial.
+- Implement the trial walk with the engine's issue slice and `withdrawInside` (`engine.go:427`):
+  - walk the value under each candidate into a buffered sink, in OPT order, and stop at the first that reports nothing;
+  - count every trial visit against `Limits.Nodes`, so a value under k same-tier alternatives costs at most k walks of its subtree, and a run that exhausts the limit still ends with `max_nodes`;
   - restore what a failed trial changed.
-- Tests: an ISM_TRANSITION that matches a later alternative (the minimal_action shape), and two DV_QUANTITY alternatives.
+  - Add a sentence to § REQ-171 *One walk* that a trial under an alternative is part of the walk and counts toward its limits; the walk order and the union rule do not change. Benchmark `ValidateComposition` on Demonstration.v1 before and after, within the budget of STRAND-04.
+- Tests: an ISM_TRANSITION that matches a later alternative (the minimal_action shape), two DV_QUANTITY alternatives, and a value that validates under none and is reported under the first.
 - **Siblings that share an identity (V5).**
-  - Bind an item to the first equally ranked child whose occurrences upper bound is not reached yet, counting per child, in place of the stateless choice in `matchChildByPinnedName` (`openehr/validation/walk_composition.go:542-563`).
+  - Among equally ranked children, bind an item to the first whose occurrences upper bound is not reached yet and under whose constraints it validates; failing that, to the first with room; failing that, to the first, counting per child, in place of the stateless choice in `matchChildByPinnedName` (`openehr/validation/walk_composition.go:542-563`). This is the alternatives rule with occurrences added, so one method decides both questions.
   - Amend § REQ-102 *Structural, binding items*.
-  - This also settles the backlog lead on siblings that share an identity and pin no name (`walk_composition.go:515`), which fails a later required sibling.
+  - This also settles the backlog lead on siblings that share an identity and pin no name (`walk_composition.go:515`), which fails a later required sibling, and removes the reason for the REQ-107 skip of an optional child whose identity a sibling carries (§ REQ-107 *What a visit writes*, "so the validator's binding of members to children stays unambiguous") and for the *An earlier sibling that carries a later one's identity* bullet of its *Exceptions and known gaps*. [The generator plan](2026-10-24-generator-cdr-crosscheck.md) Phase 5 decides what `Large` then writes.
 
 **Definition of done:**
 - The 37 alternative findings and the SSIAD PRIeSM finding are gone.
@@ -102,10 +104,10 @@ Maintainer ruling (2026-10-24): the validator follows the generator's `Required`
 
 **Tasks:**
 - **A mandatory child under an optional list (V6).**
-  - Scope the REQ-102 absent-list sentence to a list the template requires by its existence.
-  - Add a paragraph: on an object the instance carries, each allowed child of a multi-valued attribute that is not a slot is counted against its occurrences, whether the list is present, empty or absent. The absent list's own cardinality is not counted (ADL 1.4 `:275-280`, "optional, but if present").
+  - Scope the REQ-102 absent-list sentence to a list the template requires by its existence: such a list, absent, keeps drawing `required` alone when its cardinality or a child's occurrences asks for a member (*An existence lower bound alone asks for no member*).
+  - Add a paragraph: on an object the instance carries, each allowed child of a multi-valued attribute that is not a slot is counted against its occurrences, whether the list is present, empty or absent. On a list the template leaves optional by its existence, the list's own cardinality is not counted when the list is absent (ADL 1.4 `:275-280`, "optional, but if present"), and, since canonical JSON carries an empty optional list as an absent one (REQ-102, *An existence lower bound alone asks for no member*), not when it is present and empty either. Decision to confirm: this reads the two alike, as REQ-102 already does for existence.
   - Bring the *child cardinality* row in line.
-  - Code: on an absent list at `engine.go:953`, run `appendOccurrenceIssues` with an empty binding. This also ends the difference between an absent and an empty list.
+  - Code: on an absent list at `engine.go:953`, run `appendOccurrenceIssues` with an empty binding. With the cardinality rule above, an absent and an empty optional list draw the same findings.
 - **The RM's non-empty lists (V7, V10).**
   - Evaluate in the floor:
     - `EVENT_CONTEXT.Participations_validity`;
@@ -118,7 +120,7 @@ Maintainer ruling (2026-10-24): the validator follows the generator's `Required`
   - Carve these attributes out of *An existence lower bound alone asks for no member*.
 
 **Definition of done:**
-- The `Required` documents the generator wrote before its Phase 1 are refused for the same nodes both CDRs name.
+- A document shaped as the G1 cases, an absent optional list whose child has occurrences lower 1 or more, is refused at that child in reproduction tests that build the document by hand, since the generator writes none after its Phase 1; the ten G1 templates' `Required` documents, regenerated at `9e29377a` by the harness, get the verdicts both CDRs gave.
 - Referral without participations is refused.
 - `TestREQ107_CorpusRatchet` and `make ci` are green.
 
