@@ -80,18 +80,40 @@ func NewCString(pattern string, list []string, assumed string) CString {
 
 func (CString) isPrimitive() {}
 
-// ExampleValue returns a minimal-valid string example.
-// The first entry of List wins when non-empty so closed enumerations
-// produce a member, and an open list produces one of its exemplars;
-// otherwise it returns the literal "example". Validate
-// without a pattern accepts any string. Pattern-only constraints are
-// not covered by the bounded-constraint guarantee, so callers that need
-// a value satisfying the pattern supply their own example.
-func (c CString) ExampleValue() any {
-	if len(c.List) > 0 {
-		return c.List[0]
+// wholePattern returns Pattern compiled for a whole-string match, reusing
+// the regexp NewCString compiled when there is one.
+func (c CString) wholePattern() (*regexp.Regexp, error) {
+	if c.re != nil {
+		return c.re, nil
 	}
-	return "example"
+	return compileWhole(c.Pattern)
+}
+
+// ExampleValue returns a minimal-valid string example. With a List, open
+// or closed, it returns the first entry, or, when Pattern is set, the
+// first entry Pattern matches as a whole string, as Validate matches it,
+// so a closed enumeration produces a member Validate accepts. When Pattern
+// matches no entry, or is malformed, it returns the first entry, which
+// Validate then rejects: a closed List admits no value at all, and an open
+// one admits only strings outside it. Without a List it returns the
+// literal "example". Validate without a pattern accepts any string.
+// Pattern-only constraints are not covered by the bounded-constraint
+// guarantee, so callers that need a value satisfying the pattern supply
+// their own example.
+func (c CString) ExampleValue() any {
+	if len(c.List) == 0 {
+		return "example"
+	}
+	if c.Pattern != "" {
+		if re, err := c.wholePattern(); err == nil {
+			for _, s := range c.List {
+				if re.MatchString(s) {
+					return s
+				}
+			}
+		}
+	}
+	return c.List[0]
 }
 
 // Validate accepts a Go string. Any other type returns CodeWrongType.
@@ -115,11 +137,7 @@ func (c CString) Validate(value any) []Violation {
 		})
 	}
 	if c.Pattern != "" {
-		re := c.re
-		var err error
-		if re == nil {
-			re, err = compileWhole(c.Pattern)
-		}
+		re, err := c.wholePattern()
 		if err != nil {
 			out = append(out, Violation{Code: CodeInvalidValue, Detail: fmt.Sprintf("constraint pattern %q is not a valid regex: %v", c.Pattern, err)})
 		} else if !re.MatchString(s) {

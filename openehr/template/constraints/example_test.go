@@ -59,6 +59,9 @@ func TestPrimitiveConstraint_ExampleValueValidates(t *testing.T) {
 		// CString — closed list, open list (REQ-103 list_open), unbounded.
 		{"CString/list", constraints.CString{List: []string{"yes", "no"}}},
 		{"CString/open-list", constraints.CString{List: []string{"yes", "no"}, ListOpen: true}},
+		// REQ-103 invariant: when Pattern rejects the first list entry,
+		// ExampleValue picks an entry that satisfies both.
+		{"CString/list-with-pattern-rejecting-leading", constraints.CString{List: []string{"a1", "bb"}, Pattern: "[a-z]+"}},
 		{"CString/unbounded", constraints.CString{}},
 
 		// Temporal — every sentinel must parse against its validator.
@@ -97,6 +100,33 @@ func TestPrimitiveConstraint_ExampleValueValidates(t *testing.T) {
 			v := tt.c.ExampleValue()
 			if violations := tt.c.Validate(v); len(violations) != 0 {
 				t.Fatalf("Validate(ExampleValue()=%#v) = %v, want no violations", v, violations)
+			}
+		})
+	}
+}
+
+// REQ-103 — with a List, open or closed, CString.ExampleValue returns the
+// first entry Pattern matches as a whole string, or the first entry when no
+// Pattern is set or none matches.
+func TestREQ103_CStringExampleValue(t *testing.T) {
+	cases := []struct {
+		name string
+		c    constraints.CString
+		want string
+	}{
+		{name: "open list, no pattern", c: constraints.CString{List: []string{"yes", "no"}, ListOpen: true}, want: "yes"},
+		// "a1" contains a match of [a-z]+ but is not one, so the whole-string
+		// reading Validate applies skips it.
+		{name: "closed list, pattern rejects the first entry", c: constraints.CString{List: []string{"a1", "bb"}, Pattern: "[a-z]+"}, want: "bb"},
+		{name: "closed list, pattern compiled by NewCString", c: constraints.NewCString("[a-z]+", []string{"a1", "bb"}, ""), want: "bb"},
+		{name: "open list, pattern rejects the first entry", c: constraints.CString{List: []string{"a1", "bb"}, Pattern: "[a-z]+", ListOpen: true}, want: "bb"},
+		{name: "closed list, pattern matches no entry", c: constraints.CString{List: []string{"a1", "b2"}, Pattern: "[a-z]+"}, want: "a1"},
+		{name: "closed list, malformed pattern", c: constraints.CString{List: []string{"x", "y"}, Pattern: "("}, want: "x"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.c.ExampleValue(); got != tc.want {
+				t.Errorf("CString{List: %q, Pattern: %q, ListOpen: %t}.ExampleValue() = %#v, want %q", tc.c.List, tc.c.Pattern, tc.c.ListOpen, got, tc.want)
 			}
 		})
 	}
