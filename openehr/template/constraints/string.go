@@ -8,8 +8,14 @@ import (
 
 // CString constrains an RM String value (C_STRING). Pattern is an
 // optional regular expression in Go's [regexp] syntax; List is an
-// optional closed enumeration. When both are set, the value must satisfy
-// both.
+// optional enumeration, closed unless ListOpen is set. When both are
+// set, the value must satisfy both.
+//
+// ListOpen carries the AOM 1.4 C_STRING list_open flag: true when List
+// constrains the value but is not exhaustive. Validate then accepts a
+// value outside List and still checks Pattern. False, the zero value, is
+// a closed List; the OPT parser reads an omitted list_open element as
+// false.
 //
 // A Pattern must match the whole string, as if written ^(?:Pattern)$.
 // The AOM does not say whether it is a whole-string or a search match;
@@ -22,9 +28,10 @@ import (
 //
 // Default carries the OPT <assumed_value>; empty when omitted.
 type CString struct {
-	Pattern string
-	List    []string
-	Default string
+	Pattern  string
+	List     []string
+	ListOpen bool
+	Default  string
 
 	re *regexp.Regexp // compiled whole-string form of Pattern; nil until set by NewCString or compiled lazily in Validate
 }
@@ -59,7 +66,8 @@ func compileWhole(pattern string) (*regexp.Regexp, error) {
 // surfaces as CodeInvalidValue on Validate, which keeps a value
 // violation distinguishable from an unparseable OPT regex. pattern,
 // list, and assumed (the C_STRING <assumed_value> default) map to the
-// struct fields.
+// struct fields. The result has a closed list; set ListOpen on it to open
+// the list.
 func NewCString(pattern string, list []string, assumed string) CString {
 	c := CString{Pattern: pattern, List: list, Default: assumed}
 	if pattern != "" {
@@ -74,7 +82,8 @@ func (CString) isPrimitive() {}
 
 // ExampleValue returns a minimal-valid string example.
 // The first entry of List wins when non-empty so closed enumerations
-// produce a member; otherwise it returns the literal "example". Validate
+// produce a member, and an open list produces one of its exemplars;
+// otherwise it returns the literal "example". Validate
 // without a pattern accepts any string. Pattern-only constraints are
 // not covered by the bounded-constraint guarantee, so callers that need
 // a value satisfying the pattern supply their own example.
@@ -86,6 +95,8 @@ func (c CString) ExampleValue() any {
 }
 
 // Validate accepts a Go string. Any other type returns CodeWrongType.
+// A value outside a closed List is a CodeNotInList; an open List
+// (ListOpen) reports none.
 // A Pattern must match the whole string, so a value that only contains a
 // match is a CodePatternMismatch. A malformed Pattern surfaces as CodeInvalidValue so callers can
 // distinguish "value violated the constraint" from "the OPT itself
@@ -96,7 +107,7 @@ func (c CString) Validate(value any) []Violation {
 		return []Violation{{Code: CodeWrongType, Detail: fmt.Sprintf("expected string, got %T", value)}}
 	}
 	var out []Violation
-	if len(c.List) > 0 && !slices.Contains(c.List, s) {
+	if len(c.List) > 0 && !c.ListOpen && !slices.Contains(c.List, s) {
 		out = append(out, Violation{
 			Code:   CodeNotInList,
 			Detail: fmt.Sprintf("value not in allowed list %v", c.List),

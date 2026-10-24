@@ -56,8 +56,9 @@ func TestPrimitiveConstraint_ExampleValueValidates(t *testing.T) {
 		}},
 		{"CReal/unbounded", constraints.CReal{}},
 
-		// CString — closed list, unbounded.
+		// CString — closed list, open list (REQ-103 list_open), unbounded.
 		{"CString/list", constraints.CString{List: []string{"yes", "no"}}},
+		{"CString/open-list", constraints.CString{List: []string{"yes", "no"}, ListOpen: true}},
 		{"CString/unbounded", constraints.CString{}},
 
 		// Temporal — every sentinel must parse against its validator.

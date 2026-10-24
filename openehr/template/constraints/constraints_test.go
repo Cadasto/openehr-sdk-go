@@ -2,6 +2,7 @@ package constraints_test
 
 import (
 	"math"
+	"slices"
 	"strings"
 	"testing"
 
@@ -304,6 +305,41 @@ func TestCString_Validate(t *testing.T) {
 	v = c.Validate("anything")
 	if len(v) != 1 || v[0].Code != constraints.CodeInvalidValue {
 		t.Errorf("Validate(bad pattern) = %v, want CodeInvalidValue", v)
+	}
+}
+
+// REQ-103 — an open CString list (AOM 1.4 C_STRING.list_open) is not
+// exhaustive, so Validate reports no value outside it, and it still checks
+// the pattern. A closed list still reports a value outside it.
+func TestCString_Validate_REQ103_ListOpen(t *testing.T) {
+	t.Parallel()
+	openWithPattern := constraints.NewCString(`[A-Z][a-z]+`, []string{"Husten"}, "")
+	openWithPattern.ListOpen = true
+	tests := []struct {
+		name  string
+		c     constraints.CString
+		value string
+		want  []constraints.ViolationCode
+	}{
+		{name: "open list, value outside", c: constraints.CString{List: []string{"Husten"}, ListOpen: true}, value: "Schnupfen"},
+		{name: "open list, value inside", c: constraints.CString{List: []string{"Husten"}, ListOpen: true}, value: "Husten"},
+		{name: "closed list, value outside", c: constraints.CString{List: []string{"Husten"}}, value: "Schnupfen", want: []constraints.ViolationCode{constraints.CodeNotInList}},
+		{name: "open list, value outside matches pattern", c: openWithPattern, value: "Schnupfen"},
+		{name: "open list, value outside fails pattern", c: openWithPattern, value: "schnupfen", want: []constraints.ViolationCode{constraints.CodePatternMismatch}},
+		{name: "open list, pattern compiled on first use", c: constraints.CString{Pattern: `[A-Z][a-z]+`, List: []string{"Husten"}, ListOpen: true}, value: "schnupfen", want: []constraints.ViolationCode{constraints.CodePatternMismatch}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var got []constraints.ViolationCode
+			for _, v := range tc.c.Validate(tc.value) {
+				got = append(got, v.Code)
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("CString{Pattern: %q, List: %v, ListOpen: %v}.Validate(%q) codes = %v, want %v",
+					tc.c.Pattern, tc.c.List, tc.c.ListOpen, tc.value, got, tc.want)
+			}
+		})
 	}
 }
 
