@@ -504,11 +504,11 @@ func buildComplexObject(o *xmlCObject, strict bool, depth int) (*ComplexObject, 
 // deriveNodeName extracts the template-level node name (REQ-116): the
 // fixed C_STRING the OPT pins on the node's name attribute — name →
 // a DV_TEXT/DV_CODED_TEXT child → value → C_STRING whose list holds
-// exactly one non-blank entry, taken trimmed. Anything looser (no
-// name attribute, an open pattern, a multi-entry list, a lone blank
-// entry — a whitespace-only name is useless as a disambiguator) is
-// not a *fixed* name and yields "" — the archetype concept term is
-// never substituted. When the name attribute carries alternatives,
+// exactly one non-blank entry, taken trimmed, and is closed. Anything
+// looser (no name attribute, an open pattern, a multi-entry list, an
+// open list, a lone blank entry — a whitespace-only name is useless
+// as a disambiguator) is not a *fixed* name and yields "" — the
+// archetype concept term is never substituted. When the name attribute carries alternatives,
 // the first child that pins a fixed value wins (a non-pinning or
 // blank-pinning alternative falls through to the next), matching the
 // first-alternative convention used across the parse and compile
@@ -535,7 +535,9 @@ func deriveNodeName(attrs []*xmlCAttribute) string {
 
 // fixedValueString returns the single fixed string pinned on the
 // value attribute of a wire name-constraint node, or "" when the
-// constraint does not pin exactly one raw non-blank <list> entry.
+// constraint does not pin exactly one raw non-blank <list> entry in a
+// closed list. A list whose list_open is true admits other strings, so
+// it pins nothing; an omitted or empty list_open leaves it closed.
 // Handles both wire spellings: a C_PRIMITIVE_OBJECT wrapper carrying
 // <item xsi:type="C_STRING">, and a direct C_STRING child.
 func fixedValueString(o *xmlCObject) string {
@@ -551,7 +553,7 @@ func fixedValueString(o *xmlCObject) string {
 			if leaf.Type == "C_PRIMITIVE_OBJECT" && leaf.Item != nil {
 				leaf = leaf.Item
 			}
-			if leaf.Type != "C_STRING" || len(leaf.PrimitiveList) != 1 {
+			if leaf.Type != "C_STRING" || len(leaf.PrimitiveList) != 1 || leaf.ListOpen.orFalse() {
 				continue
 			}
 			if s := strings.TrimSpace(leaf.PrimitiveList[0].Text); s != "" {

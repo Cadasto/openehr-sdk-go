@@ -158,6 +158,25 @@ func TestNodeName_Synthetic(t *testing.T) {
 			want: "Second",
 		},
 		{
+			// An open list is not exhaustive: it admits names outside
+			// its one entry, so it fixes nothing.
+			name:     "open single-entry list is not a fixed name",
+			fragment: nameAttr("DV_TEXT", "<list>Husten</list><list_open>true</list_open>"),
+			want:     "",
+		},
+		{
+			name:     "single-entry list with list_open false is fixed",
+			fragment: nameAttr("DV_TEXT", "<list>Husten</list><list_open>false</list_open>"),
+			want:     "Husten",
+		},
+		{
+			// An empty list_open element reads as omitted, so the list
+			// stays closed.
+			name:     "single-entry list with an empty list_open is fixed",
+			fragment: nameAttr("DV_TEXT", "<list>Husten</list><list_open> </list_open>"),
+			want:     "Husten",
+		},
+		{
 			// Exactly one raw entry, but blank: a whitespace-only name is
 			// useless as a disambiguator, so it pins nothing.
 			name:     "whitespace-only single entry pins nothing",
