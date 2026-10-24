@@ -267,6 +267,7 @@ type xmlCObject struct {
 	Range            *xmlNumericInterval    `xml:"range"`
 	PrimitivePattern string                 `xml:"pattern"`
 	PrimitiveList    []xmlPrimitiveListItem `xml:"list"`
+	ListOpen         xmlBoolFlag            `xml:"list_open"`
 	AssumedValue     string                 `xml:"assumed_value"`
 	Property         *xmlCodePhraseRef      `xml:"property"`
 	TerminologyID    *xmlValueWrapper       `xml:"terminology_id"`

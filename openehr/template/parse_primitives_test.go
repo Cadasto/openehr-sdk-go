@@ -3,6 +3,7 @@ package template_test
 import (
 	"errors"
 	"io"
+	"slices"
 	"strings"
 	"testing"
 
@@ -393,6 +394,84 @@ func TestParse_CString(t *testing.T) {
 	}
 	if len(c.List) != 2 || c.List[0] != "YES" {
 		t.Errorf("List = %v, want [YES NO]", c.List)
+	}
+}
+
+// REQ-103 — the parser reads AOM 1.4 C_STRING.list_open onto
+// CString.ListOpen in both parse modes, on a bare C_STRING and on the
+// C_STRING item of a C_PRIMITIVE_OBJECT. The ITS-XML AM 1.4 schema makes
+// the element optional with no default, so an absent, empty or
+// whitespace-only element reads as false: the list stays closed.
+func TestParse_REQ103_CStringListOpen(t *testing.T) {
+	t.Parallel()
+	parsers := []struct {
+		name  string
+		parse func(io.Reader) (*template.OperationalTemplate, error)
+	}{
+		{name: "ParseOPT", parse: template.ParseOPT},
+		{name: "ParseOPTStrict", parse: template.ParseOPTStrict},
+	}
+	wrappers := []struct {
+		name string
+		wrap func(cString string) string
+	}{
+		{name: "C_STRING", wrap: func(s string) string {
+			return `<children xsi:type="C_STRING"><rm_type_name>STRING</rm_type_name><node_id/>` + s + `</children>`
+		}},
+		{name: "C_PRIMITIVE_OBJECT", wrap: func(s string) string {
+			return `<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>STRING</rm_type_name><node_id/><item xsi:type="C_STRING">` + s + `</item></children>`
+		}},
+	}
+	cases := []struct {
+		name     string
+		listOpen string
+		want     bool
+	}{
+		{name: "absent", listOpen: ``, want: false},
+		{name: "true", listOpen: `<list_open>true</list_open>`, want: true},
+		{name: "false", listOpen: `<list_open>false</list_open>`, want: false},
+		{name: "padded_one", listOpen: `<list_open> 1 </list_open>`, want: true},
+		{name: "self_closing", listOpen: `<list_open/>`, want: false},
+		{name: "whitespace", listOpen: "<list_open> \n\t</list_open>", want: false},
+	}
+	for _, p := range parsers {
+		for _, w := range wrappers {
+			for _, tc := range cases {
+				t.Run(p.name+"/"+w.name+"/"+tc.name, func(t *testing.T) {
+					t.Parallel()
+					child := w.wrap(`<list>Husten</list>` + tc.listOpen)
+					tmpl, err := p.parse(strings.NewReader(strings.Replace(primitiveOPTTemplate, "%s", child, 1)))
+					if err != nil {
+						t.Fatalf("%s(%s) error = %v, want nil", p.name, child, err)
+					}
+					prim := firstChildPrimitive(t, tmpl)
+					c, ok := prim.(constraints.CString)
+					if !ok {
+						t.Fatalf("%s(%s) constraint = %T, want CString", p.name, child, prim)
+					}
+					if c.ListOpen != tc.want {
+						t.Errorf("%s(%s) ListOpen = %v, want %v", p.name, child, c.ListOpen, tc.want)
+					}
+					if !slices.Equal(c.List, []string{"Husten"}) {
+						t.Errorf("%s(%s) List = %v, want [Husten]", p.name, child, c.List)
+					}
+				})
+			}
+		}
+	}
+}
+
+// REQ-103 — a list_open element whose text is not a boolean fails the
+// parse in both modes, as a C_BOOLEAN flag does.
+func TestParse_REQ103_CStringListOpenNonBooleanRefused(t *testing.T) {
+	t.Parallel()
+	child := `<children xsi:type="C_STRING"><rm_type_name>STRING</rm_type_name><node_id/><list>Husten</list><list_open>yes</list_open></children>`
+	body := strings.Replace(primitiveOPTTemplate, "%s", child, 1)
+	if _, err := template.ParseOPT(strings.NewReader(body)); !errors.Is(err, template.ErrInvalidOPT) {
+		t.Errorf("ParseOPT(<list_open>yes</list_open>) error = %v, want errors.Is(err, ErrInvalidOPT)", err)
+	}
+	if _, err := template.ParseOPTStrict(strings.NewReader(body)); !errors.Is(err, template.ErrInvalidOPT) {
+		t.Errorf("ParseOPTStrict(<list_open>yes</list_open>) error = %v, want errors.Is(err, ErrInvalidOPT)", err)
 	}
 }
 

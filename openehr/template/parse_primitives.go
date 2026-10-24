@@ -37,6 +37,7 @@ type xmlNumericInterval struct {
 }
 
 // xmlBoolFlag is the true_valid or false_valid element of a C_BOOLEAN,
+// the list_open element of a C_STRING,
 // or one of the four boundary flags (lower_included, upper_included,
 // lower_unbounded, upper_unbounded) of an interval: an occurrences,
 // existence or cardinality interval, or a numeric range.
@@ -70,6 +71,12 @@ func (f *xmlBoolFlag) UnmarshalText(b []byte) error {
 // or empty.
 func (f xmlBoolFlag) orTrue() bool {
 	return !f.set || f.value
+}
+
+// orFalse returns the flag's value, or false when the element was omitted
+// or empty.
+func (f xmlBoolFlag) orFalse() bool {
+	return f.set && f.value
 }
 
 // ptr returns a pointer to the flag's value, or nil when the element was
@@ -256,7 +263,11 @@ func buildString(o *xmlCObject) constraints.CString {
 			list = append(list, s)
 		}
 	}
-	return constraints.NewCString(pattern, list, assumed)
+	c := constraints.NewCString(pattern, list, assumed)
+	// The ITS-XML AM 1.4 schema makes list_open optional with no default,
+	// so an omitted or empty element leaves the list closed.
+	c.ListOpen = o.ListOpen.orFalse()
+	return c
 }
 
 func buildDuration(o *xmlCObject) constraints.CDuration {
