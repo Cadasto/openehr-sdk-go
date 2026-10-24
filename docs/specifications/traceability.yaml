@@ -1322,6 +1322,7 @@ requirements:
       - openehr/validation/issuepath_internal_test.go
       - openehr/validation/issuepath_test.go
       - openehr/validation/multi_nonlocatable_test.go
+      - openehr/validation/open_name_list_test.go
       - openehr/validation/ordinal_symbol_test.go
       - openehr/validation/pointer_primitive_census_internal_test.go
       - openehr/validation/pointer_primitive_test.go
@@ -1817,6 +1818,7 @@ requirements:
       - openehr/template/webtemplate/paths_rmpath_test.go
       - openehr/template/webtemplate/req116_gap_test.go
       - openehr/validation/binding_by_name_test.go
+      - openehr/validation/open_name_list_test.go
       - openehr/validation/rmfloor_chained_internal_test.go
       - openehr/validation/rmfloor_chained_test.go
 
