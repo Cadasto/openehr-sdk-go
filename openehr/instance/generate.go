@@ -1449,10 +1449,7 @@ func (g *generator) materialiseMultiple(
 		// child: a list with no member meets its existence.
 		return g.materialiseImplicitMultiple(optNode, attr, parentRM)
 	}
-	upperBound := -1 // -1 == unbounded
-	if cm := attr.ChildMultiplicity(); cm != nil && !cm.UpperUnbounded() {
-		upperBound = cm.Upper()
-	}
+	upperBound := memberCap(attr)
 	total := 0
 	for i, child := range children {
 		// Slots are caller-filled; the synthesiser does not invent
@@ -1633,8 +1630,8 @@ func (g *generator) materialiseImplicitMultiple(
 	// archetype-rooted one (COMPOSITION.content) would break the RM
 	// floor's archetype_details rule; the RM rule needs no such child.
 	needed := remainingLowerNeeded(attr, 0)
-	if cm := attr.ChildMultiplicity(); cm != nil && !cm.UpperUnbounded() {
-		needed = min(needed, cm.Upper())
+	if upper := memberCap(attr); upper >= 0 {
+		needed = min(needed, upper)
 	}
 	for range needed {
 		rmChild, ok := newRMIfKnown(rmType)
@@ -1656,6 +1653,22 @@ func (g *generator) materialiseImplicitMultiple(
 		_ = rmwrite.AppendMultiple(parentRM, attr.Name(), rmChild)
 	}
 	return nil
+}
+
+// memberCap returns the most members attr may get, or -1 for no bound: its
+// cardinality upper bound, but at least 1 where the BMM marks attr
+// mandatory, since that RM rule wins over the OPT (REQ-107 Precedence 2).
+// So a PARTY's identities at cardinality 0..0 still get the member the
+// BMM requires, and the root breaks the OPT's bound instead of the RM's.
+func memberCap(attr *tcimpl.CompiledAttribute) int {
+	cm := attr.ChildMultiplicity()
+	if cm == nil || cm.UpperUnbounded() {
+		return -1
+	}
+	if attr.Required() {
+		return max(cm.Upper(), 1)
+	}
+	return cm.Upper()
 }
 
 // remainingLowerNeeded returns the count of members attr still needs,
