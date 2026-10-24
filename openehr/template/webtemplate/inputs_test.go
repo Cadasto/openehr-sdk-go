@@ -202,9 +202,10 @@ var inputDeviationCounts = map[string]int{
 
 // REQ-106, REQ-103 — a DV_TEXT whose value C_STRING carries a list emits
 // that list on its TEXT input, each entry's label the list string, and
-// listOpen read from the C_STRING list_open flag. The vendored fixture
-// sets no list_open, so its list is closed; the open case adds the
-// element to the same C_STRING.
+// listOpen read from the C_STRING list_open flag, with a list or without
+// one. The vendored fixture sets no list_open, so its list is closed; the
+// open cases add the element to the same C_STRING, the last one in place
+// of its list.
 func TestTextInput_REQ106_REQ103_CStringList(t *testing.T) {
 	t.Parallel()
 	const fixture = "../../../testkit/corpus/templates/Test_dv_text_list_constraint.v0.opt"
@@ -212,11 +213,18 @@ func TestTextInput_REQ106_REQ103_CStringList(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const lastEntry = "<list>OPQ</list>"
-	if bytes.Count(raw, []byte(lastEntry)) != 1 {
-		t.Fatalf("fixture %s does not hold %s exactly once", fixture, lastEntry)
+	const (
+		lastEntry  = "<list>OPQ</list>"
+		allEntries = "<list>XYZ</list>\n    " + lastEntry
+		openFlag   = "<list_open>true</list_open>"
+	)
+	for _, s := range []string{lastEntry, allEntries} {
+		if bytes.Count(raw, []byte(s)) != 1 {
+			t.Fatalf("fixture %s does not hold %q exactly once", fixture, s)
+		}
 	}
-	open := bytes.Replace(raw, []byte(lastEntry), []byte(lastEntry+"<list_open>true</list_open>"), 1)
+	open := bytes.Replace(raw, []byte(lastEntry), []byte(lastEntry+openFlag), 1)
+	openNoList := bytes.Replace(raw, []byte(allEntries), []byte(openFlag), 1)
 	list := []webtemplate.InputListItem{{Value: "XYZ", Label: "XYZ"}, {Value: "OPQ", Label: "OPQ"}}
 	tests := []struct {
 		name string
@@ -225,6 +233,7 @@ func TestTextInput_REQ106_REQ103_CStringList(t *testing.T) {
 	}{
 		{name: "closed", opt: raw, want: []webtemplate.Input{{Type: "TEXT", List: list}}},
 		{name: "open", opt: open, want: []webtemplate.Input{{Type: "TEXT", List: list, ListOpen: true}}},
+		{name: "open, no list", opt: openNoList, want: []webtemplate.Input{{Type: "TEXT", ListOpen: true}}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
