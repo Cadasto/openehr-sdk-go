@@ -159,7 +159,7 @@ The closed set of REQ-103 primitive constraints maps **one-to-one** to ADL 1.4 O
 | `C_BOOLEAN` | `CBoolean` | `TrueValid`, `FalseValid`, optional `Default` |
 | `C_INTEGER` | `CInteger` | `Range`, optional closed `List`, optional `Default` |
 | `C_REAL` | `CReal` | `Range`, optional closed `List`, optional `Default` |
-| `C_STRING` | `CString` | `Pattern` (regex), optional closed `List`, optional `Default` |
+| `C_STRING` | `CString` | `Pattern` (regex), optional `List`, `ListOpen` (closed `List` when false, open when true), optional `Default` |
 | `C_DATE` | `CDate` | `Pattern` (AOM partial-date pattern, raw) |
 | `C_TIME` | `CTime` | `Pattern` (raw) |
 | `C_DATE_TIME` | `CDateTime` | `Pattern` (raw) |
@@ -192,6 +192,7 @@ The set is closed by `isPrimitive()`; new primitive shapes appear in the `constr
 - Integer / real validators accept any Go integer kind (`int`, `int8`..`int64`, `uint`, `uint8`..`uint64`). `uint` and `uint64` values exceeding `math.MaxInt64` return `CodeWrongType` rather than silently wrapping. `CReal.Validate` additionally accepts `float32` / `float64`.
 - String, date, time, date-time, duration validators accept Go `string`.
 - `CString.Validate` **MUST** match `Pattern` against the whole string, as if written `^(?:Pattern)$`, so a value that only contains a match is a `CodePatternMismatch`: the AOM leaves the match mode open, and the SDK reads the pattern as whole-string because the specification's own examples (`/.+/`, `/km\/h|mi\/h/`) read most naturally that way and Archie, a widely used AOM implementation, matches with Java `String.matches`, which is whole-string.
+- `CString.ListOpen` carries the AOM 1.4 `C_STRING.list_open` attribute, "True if the list is being used to specify the constraint but is not considered exhaustive" (AOM 1.4, class `C_STRING`). When it is true, `CString.Validate` **MUST NOT** report a value outside `List`, since the list is not exhaustive, and **MUST** still check `Pattern` when one is set. When it is false, `List` is closed, and a value outside a non-empty `List` is a `CodeNotInList`. AOM 1.4 makes the attribute mandatory, but the ITS-XML AM 1.4 schema (`Archetype.xsd`, complex type `C_STRING`) makes the `list_open` element optional and gives it no default, so the parser **MUST** read an absent or empty element as false: a list stays closed unless the OPT opens it. Text that is not a boolean fails the parse, as it does for the `C_BOOLEAN` flags. An open list bounds nothing: `ExampleValue` still returns its first entry, and with no `Pattern` set `Validate` accepts that example, as it accepts any string.
 - `CBoolean.Validate` accepts Go `bool`.
 - `CodePhrase.Validate` accepts either a bare `string` (treated as the code under the constrained terminology) or a `constraints.CodedTermRef`.
 - `ConstraintRef.Validate` accepts a bare `string` or a `constraints.CodedTermRef` and reports no violation for either, since the value set it names is external terminology; any other Go type is `CodeWrongType`.
@@ -228,7 +229,6 @@ The zero-value `NumericRange{}` (no fields set) is treated as "any value accepte
 ### Out of scope (this REQ)
 
 - **AOM partial date / time pattern enforcement** — `CDate`, `CTime`, `CDateTime`, `CDuration` capture the raw `Pattern` string, and `Validate` checks only that the value is an ISO 8601 form the RM's temporal parse accepts ([REQ-123](rm-functions.md#req-123--temporal-data-value-helpers)). Strict AOM-pattern enforcement is a follow-up. Validators that need it interpret the stored pattern directly.
-- **`C_STRING.list_open`** — AOM 1.4 declares this mandatory flag on `C_STRING` to distinguish open enumerations (the list is *exemplars*, not the closed set) from closed ones. v1 `CString` does not capture it; `Validate` treats every non-empty `List` as closed. Surfacing the flag (and weakening `Validate` to "advisory" when `list_open=true`) is a follow-up REQ.
 - **`ARCHETYPE_SLOT` assertion grammar** — landed under REQ-104 (see below).
 - **External terminology lookup** — REQ-105 surfaces bindings carried in the OPT; neither REQ-103 nor REQ-105 calls into a remote terminology service during `Validate`.
 - **AOM 2 `tuple_constraint`** — not used by ADL 1.4.
@@ -900,7 +900,7 @@ A pinned name is the disambiguator wherever one exists, so no suffixing is neede
 
 ### `inputs` (core clinical subset)
 
-Each `ELEMENT` value constraint (via REQ-103 primitive constraints) **MUST** map to `inputs[]` for the core clinical datatypes: `DV_TEXT` (one `TEXT` input), `DV_CODED_TEXT` (a `code` CODED_TEXT input with `list` / `listOpen` / `terminology`), `DV_QUANTITY` (`magnitude` DECIMAL + `unit` CODED_TEXT with validation), `DV_COUNT` (INTEGER/COUNT), `DV_ORDINAL` (an ordinal `list`), `DV_DATE_TIME` / `DV_DATE` / `DV_TIME` (temporal with pattern validation), `DV_BOOLEAN` (BOOLEAN), `DV_DURATION` (pattern-ordered INTEGER component fields), and `DV_PROPORTION` (`numerator` + `denominator`, with the percent-kind–derived denominator bound). Datatypes outside this subset (e.g. `DV_MULTIMEDIA`, `DV_PARSABLE`, `DV_IDENTIFIER`, `DV_INTERVAL`) **MUST** emit the node **without** `inputs` and **MUST NOT** error — the omission is a documented gap, recorded so consumers can distinguish "no inputs" from "unsupported".
+Each `ELEMENT` value constraint (via REQ-103 primitive constraints) **MUST** map to `inputs[]` for the core clinical datatypes: `DV_TEXT` (one `TEXT` input; when the value's `C_STRING` carries a `List`, the input carries it as `list`, each entry with the list string as both `value` and `label`, and carries `CString.ListOpen` ([§ REQ-103](#req-103--primitive-constraint-introspection)) as `listOpen`, as the `Corona_Anamnese` golden spells it; a false `listOpen` is left out, an absent optional field under § *Conformance and deviations*), `DV_CODED_TEXT` (a `code` CODED_TEXT input with `list` / `listOpen` / `terminology`), `DV_QUANTITY` (`magnitude` DECIMAL + `unit` CODED_TEXT with validation), `DV_COUNT` (INTEGER/COUNT), `DV_ORDINAL` (an ordinal `list`), `DV_DATE_TIME` / `DV_DATE` / `DV_TIME` (temporal with pattern validation), `DV_BOOLEAN` (BOOLEAN), `DV_DURATION` (pattern-ordered INTEGER component fields), and `DV_PROPORTION` (`numerator` + `denominator`, with the percent-kind–derived denominator bound). Datatypes outside this subset (e.g. `DV_MULTIMEDIA`, `DV_PARSABLE`, `DV_IDENTIFIER`, `DV_INTERVAL`) **MUST** emit the node **without** `inputs` and **MUST NOT** error — the omission is a documented gap, recorded so consumers can distinguish "no inputs" from "unsupported".
 
 ### Conformance and deviations
 
