@@ -1310,6 +1310,7 @@ requirements:
       - openehr/validation/composition_test.go
       - openehr/validation/constraint_fixtures_test.go
       - openehr/validation/constraint_ref_walk_test.go
+      - openehr/validation/cstring_list_open_test.go
       - openehr/validation/data_value_subtypes_test.go
       - openehr/validation/engine_primitive_leaf_internal_test.go
       - openehr/validation/engine_template_test.go
@@ -1364,8 +1365,10 @@ requirements:
       - openehr/template/constraints/temporal_validate_test.go
       - openehr/template/interval_flags_test.go
       - openehr/template/parse_primitives_test.go
+      - openehr/template/webtemplate/inputs_test.go
       - openehr/validation/constraint_fixtures_test.go
       - openehr/validation/constraint_ref_walk_test.go
+      - openehr/validation/cstring_list_open_test.go
       - openehr/validation/optional_string_test.go
       - openehr/validation/ordinal_symbol_test.go
       - testkit/probes/template/constraint_fixtures_test.go

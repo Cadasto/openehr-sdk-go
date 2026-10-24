@@ -181,7 +181,7 @@ func assertInputParity(t *testing.T, stem string) {
 			t.Logf("  %s", m)
 		}
 	}
-	// The oracles carry known input deltas (see deviations.md
+	// The REQ-116 oracles carry known input deltas (see deviations.md
 	// § Input-level). A constrained DV_TEXT's C_STRING list now reaches its
 	// TEXT input (REQ-106, REQ-103 list_open), so what is left is one node
 	// in each oracle whose input shape differs from the reference's.
