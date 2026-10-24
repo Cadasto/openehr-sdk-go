@@ -100,7 +100,7 @@ Maintainer ruling (2026-10-24): property units, temporal patterns and the coded-
 
 ### Phase 5: what `Large` writes
 
-Maintainer ruling (2026-10-24): `Large` writes named clones, writes no empty item structure, and writes no ENTRY uid.
+Maintainer ruling (2026-10-24): `Large` writes named clones, writes no empty item structure, and writes no ENTRY uid; on 2026-10-25, no PARTY or PARTY_RELATIONSHIP uid either.
 
 **Tasks:**
 - **Named clones.**
@@ -114,7 +114,7 @@ Maintainer ruling (2026-10-24): `Large` writes named clones, writes no empty ite
   - A structure the RM or the OPT requires, such as `EVENT.data`, is still written.
   - Amend § REQ-107 *Visit rule* and the sentence of *What a visit writes* that writes such a tree with no items.
 - **No ENTRY uid.**
-  - Write no `uid` on an ENTRY or a `GENERIC_ENTRY` unless the OPT constrains it, as the RM Common IM describes (`master03-archetyped_package.adoc:39-41`). A `PARTY` keeps its uid (`Uid_mandatory`), and so does a `PARTY_RELATIONSHIP`, as § REQ-107 *Identity* has it today; no RM invariant asks for the latter, so confirm that it stays (decision to confirm).
+  - Write no `uid` on an ENTRY, a `GENERIC_ENTRY`, a `PARTY` or a `PARTY_RELATIONSHIP` unless the OPT constrains it, as § REQ-107 *Identity* already does for a `COMPOSITION`: the server that stores a top-level object gives it its version id (RM Common IM, `master03-archetyped_package.adoc:39-41`). Maintainer ruling (2026-10-25): a PARTY and a PARTY_RELATIONSHIP are treated as a COMPOSITION and an ENTRY are. A `PARTY` without a uid breaks RM `PARTY.Uid_mandatory`, which the floor does not evaluate (`openehr/validation/invariants.json`, "Not yet evaluated"); take the PARTY uid out of the "Present" list of § REQ-107 *Precedence* item 2 and add the rule to *Exceptions and known gaps*, as one the stored object meets once the server assigns the id.
   - Amend § REQ-107 *Identity*.
   - Check what depends on entry uids: the `UIDsFrom` determinism tests and the builder's uid-source tests.
 
