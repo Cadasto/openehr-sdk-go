@@ -4,12 +4,17 @@ package webtemplate_test
 // vendored EHRbase reference.
 
 import (
+	"bytes"
 	"fmt"
+	"os"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
 // inputSig is the comparable signature of a node's inputs: per input the
@@ -176,11 +181,12 @@ func assertInputParity(t *testing.T, stem string) {
 			t.Logf("  %s", m)
 		}
 	}
-	// The oracles carry a known, pre-REQ-116 input gap (see deviations.md
-	// § Input-level): the reference enumerates a constrained DV_TEXT's
-	// allowed values where this builder emits the bare input. Structural
-	// parity is exact for both, so the count is pinned rather than waived —
-	// it must shrink deliberately, never grow silently.
+	// The oracles carry known input deltas (see deviations.md
+	// § Input-level). A constrained DV_TEXT's C_STRING list now reaches its
+	// TEXT input (REQ-106, REQ-103 list_open), so what is left is one node
+	// in each oracle whose input shape differs from the reference's.
+	// Structural parity is exact for both, so the count is pinned rather
+	// than waived — it must shrink deliberately, never grow silently.
 	if want := inputDeviationCounts[stem]; len(mismatch) != want {
 		t.Errorf("input (suffix,type) parity: %d mismatches, want %d documented (see deviations.md)", len(mismatch), want)
 	}
@@ -190,6 +196,63 @@ func assertInputParity(t *testing.T, stem string) {
 // deltas per parity fixture.
 var inputDeviationCounts = map[string]int{
 	referenceStem:     0,
-	"Corona_Anamnese": 20,
+	"Corona_Anamnese": 1,
 	"GECCO_Diagnose":  1,
+}
+
+// REQ-106, REQ-103 — a DV_TEXT whose value C_STRING carries a list emits
+// that list on its TEXT input, each entry's label the list string, and
+// listOpen read from the C_STRING list_open flag. The vendored fixture
+// sets no list_open, so its list is closed; the open case adds the
+// element to the same C_STRING.
+func TestTextInput_REQ106_REQ103_CStringList(t *testing.T) {
+	t.Parallel()
+	const fixture = "../../../testkit/corpus/templates/Test_dv_text_list_constraint.v0.opt"
+	raw, err := os.ReadFile(fixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const lastEntry = "<list>OPQ</list>"
+	if bytes.Count(raw, []byte(lastEntry)) != 1 {
+		t.Fatalf("fixture %s does not hold %s exactly once", fixture, lastEntry)
+	}
+	open := bytes.Replace(raw, []byte(lastEntry), []byte(lastEntry+"<list_open>true</list_open>"), 1)
+	list := []webtemplate.InputListItem{{Value: "XYZ", Label: "XYZ"}, {Value: "OPQ", Label: "OPQ"}}
+	tests := []struct {
+		name string
+		opt  []byte
+		want []webtemplate.Input
+	}{
+		{name: "closed", opt: raw, want: []webtemplate.Input{{Type: "TEXT", List: list}}},
+		{name: "open", opt: open, want: []webtemplate.Input{{Type: "TEXT", List: list, ListOpen: true}}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			opt, err := template.ParseOPT(bytes.NewReader(tc.opt))
+			if err != nil {
+				t.Fatalf("ParseOPT: %v", err)
+			}
+			c, err := templatecompile.Compile(opt)
+			if err != nil {
+				t.Fatalf("Compile: %v", err)
+			}
+			wt, err := webtemplate.Build(c)
+			if err != nil {
+				t.Fatalf("Build: %v", err)
+			}
+			var got *webtemplate.Node
+			walkOurTree(wt.Tree, func(n *webtemplate.Node) {
+				if n.NodeID == "at0031" && n.RMType == "DV_TEXT" {
+					got = n
+				}
+			})
+			if got == nil {
+				t.Fatal("no DV_TEXT leaf at0031 in the built tree")
+			}
+			if !reflect.DeepEqual(got.Inputs, tc.want) {
+				t.Errorf("DV_TEXT at0031 inputs = %+v, want %+v", got.Inputs, tc.want)
+			}
+		})
+	}
 }
