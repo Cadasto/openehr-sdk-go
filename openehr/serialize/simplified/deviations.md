@@ -427,9 +427,11 @@ partially or silently accepted.
   same RM value as the other spelling, so these are canonical-spelling normalisations like
   the `:0` one above, not a loss.
   The bounded-side defaults are the specification's, and the corpus agrees: `dv_count`
-  omits both flags on a bounded interval, and `dv_quantity` spells both `false`. On an open
-  side the reading goes further than the specification's literal defaults (wire.md § REQ-169
-  *Where this goes further than FLAT*): every open end in the corpus (`dv_ordinal`,
+  omits both flags on a bounded interval, and `dv_quantity` spells both `false`. On a side
+  with no bound, or an open one, the reading goes further than the specification's literal
+  defaults (wire.md § REQ-169 *Where this goes further than FLAT*): an absent
+  `\|*_unbounded` with no bound reads `true`, not `false`, and an absent `\|*_included` on
+  an open side reads `false`, not `true`. Every open end in the corpus (`dv_ordinal`,
   `dv_quantity`, `interval_dv_quantity`) spells `\|*_included: false`, as the
   specification's examples do, and BASE `Lower_included_valid` / `Upper_included_valid` fix
   that default (wire.md § REQ-140).
