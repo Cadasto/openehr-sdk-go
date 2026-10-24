@@ -104,7 +104,7 @@ All errors wrap context with `fmt.Errorf("...: %w", err)`; callers compare with 
 
 ### Building-block independence (REQ-013)
 
-On top of [REQ-013](module-layout.md#req-013--building-block-independence)'s rules, the `openehr/template` package, and every package of this module it imports, **MUST NOT** import `openehr/rm/` or `openehr/aom/aom14/`; `TestTemplateForbiddenImports` checks both. (`openehr/template/webtemplate` is a separate building block, REQ-106.) In v1 the package imports only the standard library and its sub-package `openehr/template/constraints/` (REQ-103 typed primitive constraints) — RM class names appear only as string values surfaced from OPT XML, not as Go type references.
+On top of [REQ-013](module-layout.md#req-013--building-block-independence)'s rules, the `openehr/template` package, and every package of this module it imports, **MUST NOT** import `openehr/rm/` or `openehr/aom/aom14/`; `TestTemplateForbiddenImports` checks both. (`openehr/template/webtemplate` is a separate building block, REQ-106.) In v1 the package imports only the standard library, its sub-package `openehr/template/constraints/` (REQ-103 typed primitive constraints) and `openehr/terminology/` (the property-unit table of [rm-modeling.md § REQ-034](rm-modeling.md#openehr-terminology-vocabulary-req-034), from which it fills a `C_DV_QUANTITY`'s `PropertyUnits`) — RM class names appear only as string values surfaced from OPT XML, not as Go type references.
 
 ### Out of scope (v1)
 
@@ -165,7 +165,7 @@ The closed set of REQ-103 primitive constraints maps **one-to-one** to ADL 1.4 O
 | `C_DATE_TIME` | `CDateTime` | `Pattern` (raw) |
 | `C_DURATION` | `CDuration` | `Pattern` (raw) |
 | `C_CODE_PHRASE` | `CodePhrase` | `Terminology`, optional `CodeList`, `External()` predicate |
-| `C_DV_QUANTITY` | `DvQuantity` | enumerated `Units` (each with magnitude / precision `NumericRange`), optional `Property` (CodedTermRef) |
+| `C_DV_QUANTITY` | `DvQuantity` | enumerated `Units` (each with magnitude / precision `NumericRange`), optional `Property` (CodedTermRef), `PropertyUnits` (the UCUM units the property admits, primary units first) |
 | `C_DV_ORDINAL` | `CDvOrdinal` | `Values` (closed list of `(int, CodedTermRef)` pairs) |
 | `CONSTRAINT_REF` | `ConstraintRef` | `Reference` (the `ac` code that names the value set; the node's `RMTypeName()` is the RM type it constrains, typically `CODE_PHRASE`). The value set is external terminology, so `Validate` reports no violation for a value of that RM type ([§ REQ-102](#req-102--composition-validation) *Terminology binding value-set*) |
 
@@ -196,7 +196,7 @@ The set is closed by `isPrimitive()`; new primitive shapes appear in the `constr
 - `CBoolean.Validate` accepts Go `bool`.
 - `CodePhrase.Validate` accepts either a bare `string` (treated as the code under the constrained terminology) or a `constraints.CodedTermRef`.
 - `ConstraintRef.Validate` accepts a bare `string` or a `constraints.CodedTermRef` and reports no violation for either, since the value set it names is external terminology; any other Go type is `CodeWrongType`.
-- `DvQuantity.Validate` accepts a `constraints.QuantityValue` `{Magnitude, Units, Precision}` triple.
+- `DvQuantity.Validate` accepts a `constraints.QuantityValue` `{Magnitude, Units, Precision}` triple. A non-empty `Units` list **MUST** take precedence over the property: a value whose units no entry lists is a `CodeUnitUnknown`, and `PropertyUnits` is not consulted, so a listed unit the property does not admit is accepted. With an empty `Units` list, a value whose units are not in a non-empty `PropertyUnits` **MUST** be a `CodeUnitUnknown`, as the specifications-CNF conformance schedule's case `CONT-DV_QUANTITY-validate_property` rejects `mg` under the property `openehr::122` (length); with both empty, any units are accepted. The parser **MUST** fill `PropertyUnits` when `Property` is an `openehr` code that the property-unit table of [rm-modeling.md § REQ-034](rm-modeling.md#openehr-terminology-vocabulary-req-034) (TERM `PropertyUnitData.xml`) lists, with that property's UCUM units, its primary units first and each part in source order, and **MUST** leave it empty for any other terminology or code. With an empty `Units` list, `ExampleValue` returns magnitude 0 in the first entry of `PropertyUnits`, or `{0, "1"}` when that is empty too.
 - `CDvOrdinal.Validate` accepts either an `int` (ordinal value) or a `constraints.OrdinalSymbol` `(value, symbol)` pair. An `OrdinalSymbol` **MUST** match a listed pair when the values and the code strings are equal and the terminologies are equal or either is empty, the rule `CodePhrase.Validate` applies to a terminology, so a listed symbol whose OPT names no terminology admits the one the instance carries. An empty `Values` list constrains the type only: `Validate` **MUST** accept any `int` or `OrdinalSymbol` against it, because an OPT that names `DV_ORDINAL` and lists no pairs leaves the value open, and **MUST** refuse any other Go type with `CodeWrongType`.
 
 A value whose Go type is not in the accepted set returns a single `CodeWrongType` violation; this is a contract failure on the caller side, not a constraint failure.
@@ -211,7 +211,7 @@ Every `Violation` carries a typed `ViolationCode`. The closed set is:
 | `CodePatternMismatch` | string fails a regex / pattern (matched against the whole string) |
 | `CodeNotInList` | value is not a member of a closed list (strings, codes, ordinals, etc.) |
 | `CodeWrongType` | input Go type cannot be coerced to the constraint's expected type |
-| `CodeUnitUnknown` | DV_QUANTITY units string is not in the enumerated allowed list |
+| `CodeUnitUnknown` | DV_QUANTITY units string is not in the enumerated allowed list, or, with no list, not among the units of the constraint's property |
 | `CodeInvalidValue` | constraint or input is malformed (e.g. unparseable regex in the OPT, malformed date string) |
 
 `Violation.Detail` carries a human-readable message; consumers building structured diagnostics SHOULD pattern-match on `Code`. The class of each `Violation` field, and where the value goes, are in [§ REQ-168](#req-168--value-free-validation-diagnostics) and not restated here.
@@ -239,7 +239,7 @@ The zero-value `NumericRange{}` (no fields set) is treated as "any value accepte
 
 ### Example value emission (REQ-107 hook)
 
-Every `PrimitiveConstraint` additionally exposes `ExampleValue() any` — a minimal-valid Go example value in the shape `Validate` accepts. For bounded constraints (closed lists, bounded ranges, enumerated units), `Validate(c.ExampleValue())` MUST return an empty `Violation` slice; unbounded primitives return a documented sentinel (e.g. `"example"`, `int64(0)`, `"2020-01-01"`). The factory is the leaf primitive of the REQ-107 template-driven instance generator and stays on the sealed interface so the closed type-switch remains the only entry point for new primitive shapes, with no reflection ([idiom.md § Generics policy (REQ-024)](idiom.md#generics-policy-req-024)). See § REQ-107 for the generator contract; the per-type example strategy landed in [PR 18](https://github.com/Cadasto/openehr-sdk-go/pull/18).
+Every `PrimitiveConstraint` additionally exposes `ExampleValue() any` — a minimal-valid Go example value in the shape `Validate` accepts. For bounded constraints (closed lists, bounded ranges, enumerated units, a property's units), `Validate(c.ExampleValue())` MUST return an empty `Violation` slice; unbounded primitives return a documented sentinel (e.g. `"example"`, `int64(0)`, `"2020-01-01"`). The factory is the leaf primitive of the REQ-107 template-driven instance generator and stays on the sealed interface so the closed type-switch remains the only entry point for new primitive shapes, with no reflection ([idiom.md § Generics policy (REQ-024)](idiom.md#generics-policy-req-024)). See § REQ-107 for the generator contract; the per-type example strategy landed in [PR 18](https://github.com/Cadasto/openehr-sdk-go/pull/18).
 
 - **Lives in:** [`openehr/template/constraints/`](../../openehr/template/constraints/)
 - **Probes:** PROBE-024 (primitive constraint validation against fixture inputs)

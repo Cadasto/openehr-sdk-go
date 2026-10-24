@@ -114,7 +114,7 @@ Application code (cmd/examples, downstream consumers)
     ├─ (building-block use, no transport) ──→ openehr/validation/   ──→ openehr/rm/  openehr/template/
     └─ (building-block use, no transport) ──→ openehr/template/
 
-openehr/{serialize, instance, client/*} ──→ openehr/terminology/   (stdlib-only; sits below openehr/rm, which may import it later — REQ-034)
+openehr/{serialize, instance, client/*, template} ──→ openehr/terminology/   (stdlib-only; sits below openehr/rm, which may import it later — REQ-034)
 openehr/{rm, rm/typereg, serialize/canjson} ──→ openehr/internal/refused/   (stdlib-only; carries a refused literal to DecodeError.Value)
 openehr/{rm/typereg, serialize/canjson} ──→ openehr/template/constraints/   (stdlib + internal/iso8601 only; the Redacted type DecodeError.Value holds)
 
