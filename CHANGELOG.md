@@ -8,6 +8,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-10-24
+
+Thirty-ninth `v0.x` minor: the instance generator writes every attribute an OPT can constrain and can reproduce seeded uids, a list's existence asks only for its container, and `admin.ReadyBody` returns the readiness body. **Breaking:** `Generate` now refuses an OPT whose constraint, once an RM rule narrows it, admits no value.
+
+### Added
+
+- **`admin.ReadyBody` returns the 2xx readiness body, read up to `DefaultMaxReadyBody` (1 MiB) or `WithMaxReadyBody` (REQ-083).** A longer body fails with `transport.ErrResponseTooLarge`, and the read-failure text carries no server bytes.
+- **Seeded skeletons are reproducible with `instance.UIDsFrom` and `composition.WithUIDSource` (REQ-107, REQ-101).** A `math/rand/v2` source yields version-4 uids, so seeded `NewSkeleton` and `NewBuilder` calls return equal roots.
+
+### Changed
+
+- **Breaking: the instance generator writes every attribute an OPT can constrain (REQ-107).** Participations, term mappings, transitions, references and ranges take RM defaults, and an OPT leaving an RM rule no value draws `ErrConstraintUnsatisfiable`.
+- **A list's existence asks only for its container (REQ-102, REQ-107).** `ValidateComposition` stops reporting `required` on an empty or absent list whose counts allow none, and `Generate` adds no placeholder ELEMENT there.
+- **Health probes bound the drain of a discarded body (REQ-083).** `Live` and `Ready` stop after 256 KiB or 50 ms, so an endless or stalled body costs the connection instead of holding the probe.
+
 ## [0.38.0] - 2026-10-21
 
 Thirty-eighth `v0.x` minor: the RM floor evaluates the DV_PROPORTION kind rules, generated compositions pass the Cadasto, FerroEHR and EHRbase CDRs, and PROBE-107's suite corpus replaces PROBE-100's. **Breaking:** the floor refuses a DV_PROPORTION that breaks its kind's rules, and `aqlprobes.Probe100ConformanceCorpus`, `ReadConformanceCorpus` and `fixtures.AQLConformanceRoot` are removed.
