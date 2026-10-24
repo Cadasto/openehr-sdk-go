@@ -13,6 +13,8 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
+	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
@@ -40,6 +42,11 @@ const (
 	guardOpenCardinality = `<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval>` +
 		`<lower_included>true</lower_included><lower_unbounded>false</lower_unbounded>` +
 		`<upper_unbounded>true</upper_unbounded><lower>0</lower></interval></cardinality>`
+	// guardCountedCardinality has a lower bound of 1, so the attribute's
+	// cardinality asks for a member, whatever its existence says.
+	guardCountedCardinality = `<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval>` +
+		`<lower_included>true</lower_included><lower_unbounded>false</lower_unbounded>` +
+		`<upper_unbounded>true</upper_unbounded><lower>1</lower></interval></cardinality>`
 
 	guardCompositionID = "openEHR-EHR-COMPOSITION.encounter.v1"
 	guardObservationID = "openEHR-EHR-OBSERVATION.example.v1"
@@ -71,6 +78,15 @@ func guardOPT(rootArchetypeID, content string) string {
 func guardMultiple(name, existence string, children ...string) string {
 	return `<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>` + name + `</rm_attribute_name>` +
 		existence + guardOpenCardinality + strings.Join(children, "") + `</attributes>`
+}
+
+// guardCountedMultiple is a C_MULTIPLE_ATTRIBUTE called name with the given
+// existence and children, and a cardinality lower bound of 1: the
+// cardinality asks for a member, so the top-up builds one where no child
+// gets one of its own (REQ-107 What a visit writes).
+func guardCountedMultiple(name, existence string, children ...string) string {
+	return `<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>` + name + `</rm_attribute_name>` +
+		existence + guardCountedCardinality + strings.Join(children, "") + `</attributes>`
 }
 
 // guardSingle is a C_SINGLE_ATTRIBUTE called name with the given existence
@@ -173,17 +189,24 @@ type guardCase struct {
 // every policy and either value fill, where the walk reaches the object;
 // under Required it does not reach one below an optional attribute, which
 // that row then generates as a control row does. That covers an OPT node
-// without an archetype id, a required attribute the OPT leaves without
-// children, and the template root. It runs every archetype-root class as
-// the template root and every ENTRY class as a content child. The error
-// names the RM type and the OPT path, and it wraps neither
-// ErrSlotFillUnsupported nor ErrConstraintUnsatisfiable.
+// without an archetype id, an attribute whose cardinality asks for a
+// member that the OPT leaves without children, and the template root. It
+// runs every archetype-root class as the template root and every ENTRY
+// class as a content child. The error names the RM type and the OPT path,
+// and it wraps neither ErrSlotFillUnsupported nor
+// ErrConstraintUnsatisfiable.
 //
 // The control rows still generate, and their output passes the RM floor:
 // an entry the OPT names, and an optional content attribute the OPT leaves
-// silent, written as multiple or as single, which gets no child at all. A
-// required slot is no such node: the slot-fill rule stamps it with the
-// RM-type-prefix archetype id instead, and the fill passes the floor too.
+// silent, written as multiple or as single, which gets no child at all. So
+// does a content or SECTION items list that only its existence requires
+// (What a visit writes): with no child, or only a slot, it gets no member,
+// so the walk reaches no object to refuse, and so does such a content list
+// the template writes as a single attribute, which is read as the list the
+// RM declares (TestREQ107_SingleAttributeRMListGetsNoMember). A required
+// slot is no such node: where the cardinality asks for a member, the
+// slot-fill rule stamps it with the RM-type-prefix archetype id instead,
+// and the fill passes the floor too.
 func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 	checkGuardClasses(t)
 	cases := []guardCase{
@@ -206,20 +229,23 @@ func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 			detail: "CONTENT_ITEM (built as OBSERVATION) at /content[at0001]",
 		},
 		{
-			name:   "required content the template leaves without children",
-			opt:    guardOPT(guardCompositionID, guardMultiple("content", guardExistence11)),
+			name:   "content whose cardinality requires a member, which the template leaves without children",
+			opt:    guardOPT(guardCompositionID, guardCountedMultiple("content", guardExistence11)),
 			detail: "OBSERVATION for COMPOSITION.content at / (required, but the template names no child)",
 		},
 		{
-			name:   "required content written as a single attribute without children",
-			opt:    guardOPT(guardCompositionID, guardSingle("content", guardExistence11)),
-			detail: "OBSERVATION for COMPOSITION.content at / (required, but the template names no child)",
+			// The RM declares content a list, so it is read as one: only
+			// its existence asks for a member, nothing is built and there
+			// is no object to refuse (REQ-107 What a visit writes).
+			name:  "control: content only its existence requires, written as a single attribute without children",
+			opt:   guardOPT(guardCompositionID, guardSingle("content", guardExistence11)),
+			check: checkNoContent,
 		},
 		{
-			name: "required SECTION items the template leaves without children",
+			name: "SECTION items whose cardinality requires a member, which the template leaves without children",
 			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
 				guardChild("C_COMPLEX_OBJECT", "SECTION", "at0001", guardOccurrences11, "",
-					guardMultiple("items", guardExistence11)))),
+					guardCountedMultiple("items", guardExistence11)))),
 			detail: "OBSERVATION for SECTION.items at /content[at0001] (required, but the template names no child)",
 		},
 		{
@@ -248,12 +274,48 @@ func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 		},
 		{
 			name: "control: a required slot of an entry class with no includes",
-			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
+			opt: guardOPT(guardCompositionID, guardCountedMultiple("content", guardExistence11,
 				guardChild("ARCHETYPE_SLOT", "OBSERVATION", "at0000", guardOccurrences11, ""))),
 			check: func(t *testing.T, call string, out any) {
 				t.Helper()
 				checkSlotFallbackStamp(t, call, firstContent(t, call, out), "OBSERVATION")
 			},
+		},
+		{
+			// Only the existence asks for a member, so nothing is built
+			// and there is no object to refuse (REQ-107 What a visit
+			// writes).
+			name:  "control: content only its existence requires, which the template leaves without children",
+			opt:   guardOPT(guardCompositionID, guardMultiple("content", guardExistence11)),
+			check: checkNoContent,
+		},
+		{
+			name: "control: SECTION items only their existence requires, which the template leaves without children",
+			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
+				guardChild("C_COMPLEX_OBJECT", "SECTION", "at0001", guardOccurrences11, "",
+					guardMultiple("items", guardExistence11)))),
+			check: func(t *testing.T, call string, out any) {
+				t.Helper()
+				section, ok := firstContent(t, call, out).(*rm.Section)
+				if !ok {
+					t.Fatalf("%s: content[0] is not a SECTION", call)
+				}
+				if len(section.Items) != 0 {
+					t.Errorf("%s: SECTION.items has %d members, want none", call, len(section.Items))
+				}
+			},
+		},
+		{
+			// The slot gets no fill: only the content's existence asks for
+			// a member, and the slot needs undescribed content. Its
+			// occurrences of 1..1 do not ask for one, since the parser
+			// does not read a slot's occurrences (REQ-107 Known gap: slot
+			// occurrences); TestREQ107_ExistenceOnly pins the rule for a
+			// child whose occurrences it reads.
+			name: "control: content only its existence requires, whose one child is a slot",
+			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
+				guardChild("ARCHETYPE_SLOT", "OBSERVATION", "at0000", guardOccurrences11, ""))),
+			check: checkNoContent,
 		},
 	}
 	for _, class := range guardRootClasses {
@@ -303,6 +365,133 @@ func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestREQ107_SingleAttributeRMListGetsNoMember is the REQ-107 check of What
+// a visit writes on an attribute the RM declares a list that the template
+// writes as a C_SINGLE_ATTRIBUTE with no child, at an existence of 1..1:
+// COMPOSITION.content, and a SECTION's items. The BMM marks neither
+// mandatory, so it is read as the list the RM declares, as the template
+// validator reads it: only its existence asks for a member, so it gets none,
+// and Generate does not refuse it with ErrArchetypeIDMissing. A CLUSTER's
+// items, which the BMM marks mandatory, is a control: written so, it still
+// ends with one member, the placeholder ELEMENT the RM defaults put in an
+// empty CLUSTER's items after the walk. The root passes the RM floor and
+// the template validator, under every policy, both value fills and both
+// compile modes. TestREQ107_SingleAttributeRMListTheLookupRequires checks
+// that a list the BMM marks mandatory is not skipped.
+func TestREQ107_SingleAttributeRMListGetsNoMember(t *testing.T) {
+	cases := []struct {
+		name  string
+		opt   string
+		check func(t *testing.T, call string, out any)
+	}{
+		{
+			name:  "COMPOSITION.content",
+			opt:   guardOPT(guardCompositionID, guardSingle("content", guardExistence11)),
+			check: checkNoContent,
+		},
+		{
+			name: "SECTION.items",
+			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
+				guardChild("C_COMPLEX_OBJECT", "SECTION", "at0001", guardOccurrences11, "",
+					guardSingle("items", guardExistence11)))),
+			check: func(t *testing.T, call string, out any) {
+				t.Helper()
+				section, ok := firstContent(t, call, out).(*rm.Section)
+				if !ok {
+					t.Fatalf("%s: content[0] is not a SECTION", call)
+				}
+				if n := len(section.Items); n != 0 {
+					t.Errorf("%s: SECTION.items has %d members, want none", call, n)
+				}
+			},
+		},
+		{
+			name: "control: CLUSTER.items, which the BMM marks mandatory",
+			opt:  guardRootOPT("CLUSTER", "openEHR-EHR-CLUSTER.example.v1", guardSingle("items", guardExistence11)),
+			check: func(t *testing.T, call string, out any) {
+				t.Helper()
+				cluster, ok := out.(*rm.Cluster)
+				if !ok {
+					t.Fatalf("%s returned %T, want a CLUSTER", call, out)
+				}
+				if n := len(cluster.Items); n != 1 {
+					t.Errorf("%s: CLUSTER.items has %d members, want 1", call, n)
+				}
+			},
+		},
+	}
+	for _, tc := range cases {
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, tc.opt, implicit)
+			for _, opts := range guardOptions() {
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err != nil {
+						t.Fatalf("Generate: %v, want a root", err)
+					}
+					tc.check(t, "Generate", out)
+					if r := validation.ValidateRM(out); !r.OK {
+						t.Errorf("ValidateRM issues %+v, want none", r.Issues)
+					}
+					for _, iss := range templateErrors(out, c) {
+						t.Errorf("template validator: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+					}
+				})
+			}
+		}
+	}
+}
+
+// contentRequiredLookup is the pinned RM info with COMPOSITION.content
+// marked mandatory, as a lookup handed to templatecompile.WithRMInfo may
+// mark it.
+type contentRequiredLookup struct{ rminfo.Lookup }
+
+func (l contentRequiredLookup) RequiredAttributes(rmType string) []string {
+	required := l.Lookup.RequiredAttributes(rmType)
+	if rmType == "COMPOSITION" {
+		return append(slices.Clone(required), "content")
+	}
+	return required
+}
+
+// TestREQ107_SingleAttributeRMListTheLookupRequires is the REQ-107 control
+// of TestREQ107_SingleAttributeRMListGetsNoMember: only a list the BMM does
+// not mark mandatory is read as one that only its existence asks a member
+// of. Compiled with RM info that marks COMPOSITION.content mandatory, the
+// same template's content, written as a C_SINGLE_ATTRIBUTE with no child,
+// still takes the default its BMM type gives. That default is an
+// OBSERVATION, an archetype root, so Generate refuses it with
+// ErrArchetypeIDMissing, under every policy, both value fills and both
+// compile modes.
+func TestREQ107_SingleAttributeRMListTheLookupRequires(t *testing.T) {
+	opt, err := template.ParseOPT(strings.NewReader(guardOPT(guardCompositionID, guardSingle("content", guardExistence11))))
+	if err != nil {
+		t.Fatalf("ParseOPT: %v", err)
+	}
+	for _, implicit := range []bool{true, false} {
+		compileOpts := []templatecompile.Option{templatecompile.WithRMInfo(contentRequiredLookup{rminfo.Default})}
+		if !implicit {
+			compileOpts = append(compileOpts, templatecompile.WithoutImplicitAttributes())
+		}
+		c, err := templatecompile.Compile(opt, compileOpts...)
+		if err != nil {
+			t.Fatalf("Compile(implicit=%t): %v", implicit, err)
+		}
+		if content := c.Root().Attribute("content"); content == nil || !content.Required() {
+			t.Fatalf("precondition: Compile(implicit=%t) does not mark content required; the lookup does not shape the template", implicit)
+		}
+		for _, opts := range guardOptions() {
+			call := fmt.Sprintf("Generate(implicit=%t, %v, %v)", implicit, opts.Policy, opts.ValueFill)
+			out, err := instance.Generate(t.Context(), c, opts)
+			checkArchetypeIDMissing(t, call, err, "OBSERVATION for COMPOSITION.content at / (required, but the template names no child)")
+			if out != nil {
+				t.Errorf("%s returned %T with the error, want no root", call, out)
+			}
+		}
 	}
 }
 
@@ -375,7 +564,10 @@ func TestREQ107_NamedTemplateRootPassesTheFloor(t *testing.T) {
 // TestREQ107_RequiredSlotFillPassesTheFloor is the REQ-107 check that a
 // required slot with no includes, which the slot-fill rule stamps with the
 // RM-type-prefix archetype id, generates a fill that passes the RM floor at
-// every policy and either value fill. The fill's body is not in the
+// every policy and either value fill. A content slot is required where the
+// content's cardinality asks for a member (an existence alone asks for
+// none, What a visit writes); a CLUSTER's items, which the BMM marks
+// mandatory, ask for one at any cardinality. The fill's body is not in the
 // template, so the RM-mandatory attributes of its class come from the
 // generator's defaults: an ENTRY's language, encoding and subject, and
 // each class's own, such as an OBSERVATION's data or an ACTION's time,
@@ -400,7 +592,7 @@ func TestREQ107_RequiredSlotFillPassesTheFloor(t *testing.T) {
 	} {
 		cases = append(cases, slotCase{
 			name: "content slot of " + class,
-			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
+			opt: guardOPT(guardCompositionID, guardCountedMultiple("content", guardExistence11,
 				guardChild("ARCHETYPE_SLOT", class, "at0000", guardOccurrences11, ""))),
 			rmType: class,
 			fill:   firstContent,
@@ -495,6 +687,18 @@ func firstContent(t *testing.T, call string, out any) any {
 		t.Fatalf("%s: content is empty, want the stamped slot fill", call)
 	}
 	return comp.Content[0]
+}
+
+// checkNoContent fails t unless out is a COMPOSITION with no content.
+func checkNoContent(t *testing.T, call string, out any) {
+	t.Helper()
+	comp, err := instance.AsComposition(out)
+	if err != nil {
+		t.Fatalf("%s: AsComposition: %v", call, err)
+	}
+	if n := len(comp.Content); n != 0 {
+		t.Errorf("%s: content has %d members, want none", call, n)
+	}
 }
 
 // checkSlotFallbackStamp fails t unless fill is a LOCATABLE that carries the

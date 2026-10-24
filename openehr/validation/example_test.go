@@ -37,7 +37,8 @@ func ExampleValidateRM() {
 }
 
 // reportOPT is a minimal operational template: a COMPOSITION whose content
-// is required and holds a blood pressure OBSERVATION.
+// is required, by its existence and by a cardinality of at least one item,
+// and holds a blood pressure OBSERVATION.
 const reportOPT = `<?xml version="1.0" encoding="UTF-8"?>
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <template_id><value>example_report</value></template_id>
@@ -58,6 +59,14 @@ const reportOPT = `<?xml version="1.0" encoding="UTF-8"?>
         <node_id>at0000</node_id>
         <archetype_id><value>openEHR-EHR-OBSERVATION.blood_pressure.v1</value></archetype_id>
       </children>
+      <cardinality>
+        <is_ordered>true</is_ordered><is_unique>false</is_unique>
+        <interval>
+          <lower_included>true</lower_included><upper_included>false</upper_included>
+          <lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded>
+          <lower>1</lower>
+        </interval>
+      </cardinality>
     </attributes>
   </definition>
 </template>`

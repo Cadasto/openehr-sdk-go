@@ -1292,6 +1292,7 @@ requirements:
       - internal/rmaccess/interval_test.go
       - internal/rmaccess/reads_test.go
       - internal/templatecompile/compile_test.go
+      - internal/templatecompile/members_test.go
       - internal/templatecompile/node_primitive_test.go
       - internal/templatecompile/walkfacts_test.go
       - openehr/composition/set_binding_test.go
@@ -1311,6 +1312,8 @@ requirements:
       - openehr/validation/constraint_ref_walk_test.go
       - openehr/validation/data_value_subtypes_test.go
       - openehr/validation/engine_primitive_leaf_internal_test.go
+      - openehr/validation/engine_template_test.go
+      - openehr/validation/existence_container_test.go
       - openehr/validation/interval_bounds_test.go
       - openehr/validation/interval_open_side_test.go
       - openehr/validation/issue_err_test.go
@@ -1439,6 +1442,7 @@ requirements:
     tests:
       - cmd/examples/generate-example/main_test.go
       - internal/rmaccess/reads_test.go
+      - internal/templatecompile/members_test.go
       - internal/templateinstance/rmwrite/write_datavalue_test.go
       - internal/templateinstance/rmwrite/write_item_single_test.go
       - internal/templateinstance/rmwrite/write_parent_test.go
@@ -1480,6 +1484,8 @@ requirements:
       - openehr/instance/element_slot_test.go
       - openehr/instance/entry_codes_test.go
       - openehr/instance/event_multimedia_defaults_test.go
+      - openehr/instance/existence_only_internal_test.go
+      - openehr/instance/existence_only_items_test.go
       - openehr/instance/identity_stamp_test.go
       - openehr/instance/imports_test.go
       - openehr/instance/instance_test.go
@@ -2379,6 +2385,7 @@ requirements:
       - openehr/validation/engine_refused_internal_test.go
       - openehr/validation/engine_template_test.go
       - openehr/validation/engine_walk_test.go
+      - openehr/validation/existence_container_test.go
       - openehr/validation/finding_identity_rules_test.go
       - openehr/validation/finding_identity_test.go
       - openehr/validation/godoc_class_test.go

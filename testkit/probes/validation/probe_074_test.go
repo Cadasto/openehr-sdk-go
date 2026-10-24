@@ -43,9 +43,10 @@ func TestProbe074NonCompositionValidate(t *testing.T) {
 			Name: "person_empty_identities",
 			OPT:  []byte(probes.PersonIdentitiesOPT),
 			Root: probes.PersonEmptyIdentities(),
-			// existence lower >= 1 → required; cardinality interval
-			// lower >= 1 with zero children → cardinality (both clauses
-			// independent, mirroring PROBE-026 empty-events).
+			// existence lower >= 1 with cardinality lower >= 1 → required
+			// (an existence alone asks for no member); cardinality
+			// interval lower >= 1 with zero children → cardinality (both
+			// clauses independent, mirroring PROBE-026 empty-events).
 			WantCodes: []string{"required", "cardinality"},
 		},
 		{

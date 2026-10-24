@@ -82,7 +82,7 @@ type missingNodeCase struct {
 
 // missingNodeCases returns an OBSERVATION without its data under
 // vital_signs.opt, and a PERSON without its identities under a template
-// whose existence requires them.
+// whose existence and child count require them.
 func missingNodeCases(t *testing.T) []missingNodeCase {
 	t.Helper()
 	noData := validVitalSignsComposition()
@@ -469,7 +469,8 @@ func personIdentityChildOPT(nodeID string) string {
 // emptyContainerCases returns an ORGANISATION whose identities are empty
 // under a template that declares nothing on them, the vital_signs device
 // CLUSTER, which fills a slot, with empty items, and a PERSON whose
-// identities are empty under a template that requires them by its existence,
+// identities are empty under a template whose existence alone requires
+// them, under one that requires them by its existence and its child count,
 // under one that requires them by its child count, and under two that leave
 // them optional but require one child: one whose child has no node id, so
 // the template's occurrences report the container's own path, and one whose
@@ -506,11 +507,18 @@ func emptyContainerCases(t *testing.T) []emptyContainerCase {
 			want: []string{"cardinality rm cardinality"},
 		},
 		{
-			name: "under the template's existence",
+			name: "under the template's existence alone",
 			root: probes.PersonEmptyIdentities(),
 			c:    mustCompileInline(t, personIdentitiesOPT(required, "0")),
 			path: "/identities",
-			want: []string{"required template existence"},
+			want: []string{"cardinality rm cardinality"},
+		},
+		{
+			name: "under the template's existence and child count",
+			root: probes.PersonEmptyIdentities(),
+			c:    mustCompileInline(t, personIdentitiesOPT(required, "1")),
+			path: "/identities",
+			want: []string{"cardinality template cardinality", "required template existence"},
 		},
 		{
 			name: "under the template's child count",
@@ -540,15 +548,19 @@ func emptyContainerCases(t *testing.T) []emptyContainerCase {
 
 // REQ-171 § One walk (Presence, Counts), § Acceptance; REQ-112 § Driver —
 // an RM-mandatory container that is present and empty, which the RM rules
-// alone report as `cardinality`, draws one finding. Where no template clause
-// covers it, it is the RM's `cardinality`: under a template node that
-// carries only the BMM's mandatory bit, and below a slot the template does
-// not constrain. Where the template's existence requires it, it is the
-// template's `required`; where the template's child count reports it, the
-// template's `cardinality` alone; and so where a child's occurrences report
-// it, at the container's own path. Occurrences written at the child's own
-// path report the child, not the container: the RM's `cardinality` stays
-// beside them, and the empty list's child that occurs once is still counted.
+// alone report as `cardinality`, is reported by the template where a
+// template clause covers it and by the RM rules otherwise, never by both.
+// Where no template clause covers it, it is the RM's `cardinality`: under a
+// template node that carries only the BMM's mandatory bit, below a slot the
+// template does not constrain, and under a template whose existence alone
+// requires it, since an existence alone asks for no member (REQ-102). Where
+// the template's existence and its child count both require it, it is the
+// template's `required` and `cardinality`, one per clause; where the
+// template's child count alone reports it, the template's `cardinality`
+// alone; and so where a child's occurrences report it, at the container's
+// own path. Occurrences written at the child's own path report the child,
+// not the container: the RM's `cardinality` stays beside them, and the
+// empty list's child that occurs once is still counted.
 func TestREQ171_EngineReportsAnEmptyMandatoryContainerOnce(t *testing.T) {
 	t.Parallel()
 	tests := emptyContainerCases(t)
@@ -559,7 +571,7 @@ func TestREQ171_EngineReportsAnEmptyMandatoryContainerOnce(t *testing.T) {
 			}
 			r := validateWith(t, tc.root, tc.c)
 			if got := keysAt(r.Issues, tc.path); !slices.Equal(got, tc.want) {
-				t.Errorf("Validate(%s) at %s = %q, want %q: one finding for one empty container", tc.name, tc.path, got, tc.want)
+				t.Errorf("Validate(%s) at %s = %q, want %q: the template's findings or the RM's, never both, for one empty container", tc.name, tc.path, got, tc.want)
 			}
 			if tc.childPath == "" {
 				return
@@ -573,8 +585,8 @@ func TestREQ171_EngineReportsAnEmptyMandatoryContainerOnce(t *testing.T) {
 
 // resourceDescriptionOPT returns a RESOURCE_DESCRIPTION template that
 // declares original_author, a Hash the RM marks mandatory, as multi-valued,
-// with the existence lower..upper.
-func resourceDescriptionOPT(lower, upper string) string {
+// with the existence lower..upper and a child count from countLower up.
+func resourceDescriptionOPT(lower, upper, countLower string) string {
 	return `<?xml version="1.0"?>
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <template_id><value>resource-description</value></template_id>
@@ -587,7 +599,7 @@ func resourceDescriptionOPT(lower, upper string) string {
       <rm_attribute_name>original_author</rm_attribute_name>
       <existence>` + fiInterval(lower, upper) + `</existence>
       <cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique>
-        <interval><lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>0</lower></interval></cardinality>
+        <interval><lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>` + countLower + `</lower></interval></cardinality>
     </attributes>
   </definition>
 </template>`
@@ -598,8 +610,10 @@ func resourceDescriptionOPT(lower, upper string) string {
 // rules alone read it, however the template declares it: a template that
 // declares RESOURCE_DESCRIPTION original_author multi-valued and leaves its
 // existence open draws nothing, though the template carries the BMM's
-// mandatory bit for it. Where the template's existence requires it, the
-// template's `required` stays.
+// mandatory bit for it, and nor does one whose existence alone requires it,
+// since an existence alone asks for no member (REQ-102). Where the
+// template's existence and its child count both require it, the template's
+// `required` and `cardinality` stay.
 func TestREQ171_EngineReadsAnEmptyHashAsTheRMRulesDo(t *testing.T) {
 	t.Parallel()
 	const path = "/original_author"
@@ -608,8 +622,13 @@ func TestREQ171_EngineReadsAnEmptyHashAsTheRMRulesDo(t *testing.T) {
 		c    *templatecompile.Compiled
 		want []string
 	}{
-		{name: "existence open", c: mustCompileInline(t, resourceDescriptionOPT("0", "1"))},
-		{name: "existence required", c: mustCompileInline(t, resourceDescriptionOPT("1", "1")), want: []string{"required template existence"}},
+		{name: "existence open", c: mustCompileInline(t, resourceDescriptionOPT("0", "1", "0"))},
+		{name: "existence required alone", c: mustCompileInline(t, resourceDescriptionOPT("1", "1", "0"))},
+		{
+			name: "existence and child count required",
+			c:    mustCompileInline(t, resourceDescriptionOPT("1", "1", "1")),
+			want: []string{"cardinality template cardinality", "required template existence"},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -620,6 +639,53 @@ func TestREQ171_EngineReadsAnEmptyHashAsTheRMRulesDo(t *testing.T) {
 			}
 			if got := keysAt(validateWith(t, root, tc.c).Issues, path); !slices.Equal(got, tc.want) {
 				t.Errorf("Validate(RESOURCE_DESCRIPTION with an empty original_author, %s) at %s = %q, want %q", tc.name, path, got, tc.want)
+			}
+		})
+	}
+}
+
+// REQ-171 § One walk (Presence), REQ-102 § An existence lower bound alone
+// asks for no member — a Hash the RM marks mandatory that the instance lacks
+// is reported once, by the rule that requires it. A template that declares
+// RESOURCE_DESCRIPTION original_author multi-valued asks for no member where
+// its existence alone requires it, so the absent Hash is the RM's `required`,
+// rule mandatory, as it is where the existence is open. Where the template's
+// existence and its child count both require it, it is the template's
+// `required`, rule existence, alone: an absent Hash has no entries to count.
+func TestREQ171_EngineReportsAnAbsentHashByTheRuleThatRequiresIt(t *testing.T) {
+	t.Parallel()
+	const path = "/original_author"
+	tests := []struct {
+		name string
+		c    *templatecompile.Compiled
+		want []string
+	}{
+		{
+			name: "existence open",
+			c:    mustCompileInline(t, resourceDescriptionOPT("0", "1", "0")),
+			want: []string{"required rm mandatory"},
+		},
+		{
+			name: "existence required alone",
+			c:    mustCompileInline(t, resourceDescriptionOPT("1", "1", "0")),
+			want: []string{"required rm mandatory"},
+		},
+		{
+			name: "existence and child count required",
+			c:    mustCompileInline(t, resourceDescriptionOPT("1", "1", "1")),
+			want: []string{"required template existence"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			root := describedResource([]string{"en"}, "")
+			root.OriginalAuthor = nil
+			if got, want := keysAt(validation.ValidateRM(root).Issues, path), []string{"required rm mandatory"}; !slices.Equal(got, want) {
+				t.Fatalf("precondition: ValidateRM(RESOURCE_DESCRIPTION with no original_author) at %s = %q, want %q", path, got, want)
+			}
+			if got := keysAt(validateWith(t, root, tc.c).Issues, path); !slices.Equal(got, tc.want) {
+				t.Errorf("Validate(RESOURCE_DESCRIPTION with no original_author, %s) at %s = %q, want %q", tc.name, path, got, tc.want)
 			}
 		})
 	}

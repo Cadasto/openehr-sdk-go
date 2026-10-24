@@ -14,20 +14,27 @@ import (
 // describe. A member is undescribed when no template node describes it: a
 // slot fill, whose body the template leaves to the caller, or a LOCATABLE
 // the walk builds from the BMM type of an attribute the template gives no
-// allowed child, such as the placeholder ELEMENT of an ITEM_LIST whose
-// items the template requires and leaves empty. A server that checks a
-// composition against its template can find no template node for either.
-// So under Large and Medium the walk builds an optional node only where
-// it holds more than such content: an optional child that needs it gets
-// no member of its own, and an attribute that is not required and whose
-// members would all be undescribed or need undescribed content is not
-// visited, except a composition's context, which RM defaults write under
-// every policy. Under every policy a top-up takes the first child that
-// needs none and whose identity no earlier sibling carries, where the
-// attribute has one. The check reads a node's own attributes only. Below a
+// allowed child, such as the placeholder ELEMENT of a CLUSTER's items,
+// which the RM requires, or of an ITEM_LIST's items, whose cardinality
+// lower bound the template sets to 1, where the template leaves either
+// empty. A server that checks a composition against its template can find
+// no template node for either. So under Large and Medium the walk builds
+// an optional node only where it holds more than such content: an optional
+// child that needs it gets no member of its own, and an attribute that is
+// not required and whose members would all be undescribed or need
+// undescribed content is not visited, except a composition's context,
+// which RM defaults write under every policy. Under every policy a top-up
+// takes the first child that needs none and whose identity no earlier
+// sibling carries, where the attribute has one. Where only the
+// attribute's existence asks for the member, the top-up takes no other
+// child, so the attribute gets no undescribed member and is left with none
+// where it has no such child (topUpSeed): a list with no member meets its
+// existence. The check reads a node's own attributes only, and still
+// counts an attribute only its existence requires as required. Below a
 // node the template or the RM requires, the walk builds what it always
-// builds, undescribed members included, so the described content around
-// them is kept.
+// builds, undescribed members included where the BMM, the attribute's
+// cardinality or a child's occurrences asks for a member, so the described
+// content around them is kept.
 
 // needsUndescribed reports whether node, a template child, needs content
 // the template does not describe: node is a slot, or an attribute of node

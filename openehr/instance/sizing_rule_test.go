@@ -216,8 +216,7 @@ func TestREQ107_ProhibitedAlternativeIsSkipped(t *testing.T) {
 // multi-valued attribute the OPT names without children, whose cardinality
 // lower bound is above 1, is topped up to that bound with members built
 // from its BMM type, and to no more than its cardinality upper bound,
-// which wins where the existence requires a member the cardinality does
-// not allow.
+// except the member the BMM requires (REQ-107 Precedence 2).
 func TestREQ107_SilentRequiredMultipleIsToppedUp(t *testing.T) {
 	cases := []struct {
 		name string
@@ -226,9 +225,13 @@ func TestREQ107_SilentRequiredMultipleIsToppedUp(t *testing.T) {
 	}{
 		{name: "CLUSTER items, lower 2", opt: optTemplate("CLUSTER", optCardinal("items", 2, -1)), want: 2},
 		{name: "ITEM_TREE items, lower 3", opt: optTemplate("ITEM_TREE", optCardinal("items", 3, -1)), want: 3},
-		// Existence 1..1 requires a member, and cardinality 0..0 allows
-		// none; the upper bound wins.
+		// Existence 1..1 alone asks for no member, and cardinality 0..0
+		// allows none, so the list stays empty.
 		{name: "ITEM_TREE items, existence 1, upper 0", opt: optTemplate("ITEM_TREE", optRequiredCardinal("items", 0, 0)), want: 0},
+		// The BMM requires a CLUSTER's items, and cardinality 0..0 allows
+		// none: the RM rule wins (REQ-107 Precedence 2), so the items get
+		// one member, which breaks the OPT's upper bound.
+		{name: "CLUSTER items, upper 0", opt: optTemplate("CLUSTER", optCardinal("items", 0, 0)), want: 1},
 	}
 	for _, tc := range cases {
 		for _, implicit := range []bool{true, false} {
@@ -241,6 +244,56 @@ func TestREQ107_SilentRequiredMultipleIsToppedUp(t *testing.T) {
 					}
 					if got := len(itemIDs(t, out)); got != tc.want {
 						t.Errorf("items has %d members, want %d", got, tc.want)
+					}
+					noFloorErrors(t, out)
+				})
+			}
+		}
+	}
+}
+
+// TestREQ107_BMMMemberWinsOverCardinalityUpper is the REQ-107 Precedence 2
+// check that a list the BMM requires a member in gets that member although
+// the OPT's cardinality upper bound is 0, which breaks the OPT's bound
+// (Exceptions and known gaps): a PERSON's identities at cardinality 0..0
+// get one member, built from the BMM where the OPT names no child and from
+// the first allowed child where it names one, and the root passes the RM
+// floor. CLUSTER items at 0..0 are the other such list
+// (TestREQ107_SilentRequiredMultipleIsToppedUp).
+func TestREQ107_BMMMemberWinsOverCardinalityUpper(t *testing.T) {
+	cases := []struct {
+		name string
+		opt  string
+		// want is the archetype_node_id of the one identity; "" takes
+		// any, for one built from the BMM.
+		want string
+	}{
+		{name: "no child", opt: optTemplate("PERSON", optCardinal("identities", 0, 0))},
+		{
+			name: "optional child",
+			opt: optTemplate("PERSON", optCardinal("identities", 0, 0,
+				optOccurring("C_COMPLEX_OBJECT", "PARTY_IDENTITY", "at0001", 0, 1))),
+			want: "at0001",
+		},
+	}
+	for _, tc := range cases {
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, tc.opt, implicit)
+			for _, opts := range defaultsOptions() {
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err != nil {
+						t.Fatalf("Generate: %v", err)
+					}
+					p, ok := out.(*rm.Person)
+					if !ok {
+						t.Fatalf("generated root is %T, want a PERSON", out)
+					}
+					if got := len(p.Identities); got != 1 {
+						t.Fatalf("identities has %d members, want 1", got)
+					}
+					if got := p.Identities[0].ArchetypeNodeID; tc.want != "" && got != tc.want {
+						t.Errorf("identity archetype_node_id is %q, want %q", got, tc.want)
 					}
 					noFloorErrors(t, out)
 				})

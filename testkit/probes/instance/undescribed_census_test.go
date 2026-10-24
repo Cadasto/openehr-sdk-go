@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
@@ -47,11 +48,18 @@ type undescribedPin struct {
 // compiling vendored templates. Each sits in a node the template or the RM
 // requires, so REQ-107 § Slot fills keeps it: the rule reads an optional
 // node's own attributes only, and below a required child the walk builds
-// what § Contract says, undescribed members included. Medium builds only
-// the first optional archetype root of a content attribute, so it reaches
-// vital_signs' blood_pressure and not clinical_content_validation's
-// EVALUATION. A new such member, or a listed one that is gone, fails the
-// census.
+// what § Contract says, undescribed members included where the BMM or the
+// attribute's cardinality asks for a member. A child's occurrences add no
+// such member, though the generator's existenceOnly reads them: a required
+// child that is not a slot gets a member of its own, so no top-up runs, and
+// the parser does not read a slot's occurrences (REQ-107 Known gap: slot
+// occurrences). A list only its existence requires gets no undescribed
+// member (What a visit writes), so vital_signs' protocols and event states,
+// whose items the template leaves without a child or with slots only at an
+// existence of 1..1 and a cardinality of 0..*, hold none. Medium builds
+// only the first optional archetype root of a content attribute, so it does
+// not reach clinical_content_validation's EVALUATION. A new such member, or
+// a listed one that is gone, fails the census.
 var undescribedBelowRequired = []undescribedPin{
 	{
 		member: undescribedMember{
@@ -61,92 +69,6 @@ var undescribedBelowRequired = []undescribedPin{
 		},
 		reason: "the RM requires the EVALUATION's data, which takes the ITEM_SINGLE at0001, and its item, which the template leaves without a child",
 	},
-	{
-		member: undescribedMember{
-			template: "templates/vital_signs", policy: "large",
-			attr: "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]/state/items",
-			kind: "bmm", ident: "ELEMENT",
-		},
-		reason: vitalSignsState("ITEM_LIST at0007"),
-	},
-	{
-		member: undescribedMember{
-			template: "templates/vital_signs", policy: "medium",
-			attr: "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]/state/items",
-			kind: "bmm", ident: "ELEMENT",
-		},
-		reason: vitalSignsState("ITEM_LIST at0007"),
-	},
-	{
-		member: undescribedMember{
-			template: "templates/vital_signs", policy: "large",
-			attr: "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/protocol/items",
-			kind: "slot", ident: "openEHR-EHR-CLUSTER.device.v1",
-		},
-		reason: vitalSignsProtocolSlot("ITEM_TREE at0011"),
-	},
-	{
-		member: undescribedMember{
-			template: "templates/vital_signs", policy: "medium",
-			attr: "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/protocol/items",
-			kind: "slot", ident: "openEHR-EHR-CLUSTER.device.v1",
-		},
-		reason: vitalSignsProtocolSlot("ITEM_TREE at0011"),
-	},
-	{
-		member: undescribedMember{
-			template: "templates/vital_signs", policy: "large",
-			attr: "/content[openEHR-EHR-OBSERVATION.body_temperature.v1]/data/events[at0003]/state/items",
-			kind: "slot", ident: "openEHR-EHR-CLUSTER.environmental_conditions.v1",
-		},
-		reason: "the template requires the event's state and the items of its ITEM_TREE at0029 (existence 1..1), which admit only slots",
-	},
-	{
-		member: undescribedMember{
-			template: "templates/vital_signs", policy: "large",
-			attr: "/content[openEHR-EHR-OBSERVATION.body_temperature.v1]/protocol/items",
-			kind: "slot", ident: "openEHR-EHR-CLUSTER.device.v1",
-		},
-		reason: vitalSignsProtocolSlot("ITEM_TREE at0020"),
-	},
-	{
-		member: undescribedMember{
-			template: "templates/vital_signs", policy: "large",
-			attr: "/content[openEHR-EHR-OBSERVATION.heart_rate.v1]/data/events[at0003]/state/items",
-			kind: "bmm", ident: "ELEMENT",
-		},
-		reason: vitalSignsState("ITEM_LIST at0012"),
-	},
-	{
-		member: undescribedMember{
-			template: "templates/vital_signs", policy: "large",
-			attr: "/content[openEHR-EHR-OBSERVATION.heart_rate.v1]/protocol/items",
-			kind: "bmm", ident: "ELEMENT",
-		},
-		reason: "the template requires the protocol (existence 1..1) and the items of its ITEM_LIST at0010 (existence 1..1), and names no child of them",
-	},
-	{
-		member: undescribedMember{
-			template: "templates/vital_signs", policy: "large",
-			attr: "/content[openEHR-EHR-OBSERVATION.respiration.v1]/data/events[at0002]/state/items",
-			kind: "bmm", ident: "ELEMENT",
-		},
-		reason: vitalSignsState("ITEM_LIST at0022"),
-	},
-}
-
-// vitalSignsState is the reason for a placeholder in a vital_signs event's
-// state, which the template requires with list.
-func vitalSignsState(list string) string {
-	return "the template requires the event's state (existence 1..1) and the items of its " + list +
-		" (existence 1..1), and names no child of them"
-}
-
-// vitalSignsProtocolSlot is the reason for a slot fill in a vital_signs
-// protocol, which the template requires with tree.
-func vitalSignsProtocolSlot(tree string) string {
-	return "the template requires the protocol (existence 1..1) and the items of its " + tree +
-		" (existence 1..1), which admit only a slot"
 }
 
 // TestREQ107_UndescribedContentCensus is the corpus check of REQ-107 §
@@ -299,6 +221,80 @@ func TestREQ107_CensusExemptsATopUpsLastResort(t *testing.T) {
 		{name: "a described sibling that carries the child's node id", against: censusOPT(slotOnly, censusOptional("CLUSTER", "at0002", censusItems(element)))},
 	}
 	generated := compileCensusOPT(t, censusOPT(slotOnly))
+	for _, policy := range []instance.Policy{instance.Large, instance.Medium} {
+		out, err := instance.Generate(t.Context(), generated, instance.Options{Policy: policy, Language: "en", Now: ratchetNow})
+		if err != nil {
+			t.Fatalf("Generate(%s): %v", policy, err)
+		}
+		for _, tc := range cases {
+			t.Run(fmt.Sprintf("%s/%s", tc.name, policy), func(t *testing.T) {
+				findings, err := undescribedMembers(out, compileCensusOPT(t, tc.against))
+				if err != nil {
+					t.Fatalf("undescribedMembers: %v", err)
+				}
+				if len(findings) != 1 {
+					t.Fatalf("undescribedMembers found %d members, want the one slot fill: %+v", len(findings), findings)
+				}
+				f := findings[0]
+				if f.member.kind != "slot" || !f.underOptional {
+					t.Errorf("finding %+v, want a slot fill below an optional node", f)
+				}
+				if f.holderOptional != tc.violation {
+					t.Errorf("finding %s: holderOptional = %t, want %t", f.member.line(), f.holderOptional, tc.violation)
+				}
+			})
+		}
+	}
+}
+
+// censusTreeOPT is a template whose root is an ITEM_TREE archetype root
+// with the items attribute items. The RM does not require an ITEM_TREE's
+// items, so only the template's bounds ask for a member.
+func censusTreeOPT(items string) string {
+	return `<?xml version="1.0" encoding="utf-8"?>
+<template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.openehr.org/v1">
+<language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
+<template_id><value>census_tree</value></template_id><concept>census_tree</concept>
+<definition><rm_type_name>ITEM_TREE</rm_type_name><node_id>at0000</node_id>` + items +
+		`<archetype_id><value>openEHR-EHR-ITEM_TREE.census.v1</value></archetype_id></definition>
+</template>`
+}
+
+// censusExistenceItems is a C_MULTIPLE_ATTRIBUTE items over children with
+// an existence of 1..1 and a cardinality lower bound of 0: only the
+// existence asks for a member.
+func censusExistenceItems(children ...string) string {
+	return `<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>items</rm_attribute_name>` +
+		`<existence><lower_included>true</lower_included><upper_included>true</upper_included>` +
+		`<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded>` +
+		`<lower>1</lower><upper>1</upper></existence>` + strings.Join(children, "") +
+		`<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval>` +
+		`<lower_included>true</lower_included><lower_unbounded>false</lower_unbounded>` +
+		`<upper_unbounded>true</upper_unbounded><lower>0</lower></interval></cardinality></attributes>`
+}
+
+// TestREQ107_CensusGrantsNoLastResortToAnExistenceOnlyList checks the
+// census's reading of a top-up (REQ-107 § Contract What a visit writes)
+// where only a list's existence asks for a member. The root is generated
+// from an ITEM_TREE whose items have a cardinality lower bound of 1 and one
+// child, the optional CLUSTER at0002, whose own items admit only a slot:
+// the top-up takes that CLUSTER as its last resort, so the census lists its
+// slot fill below an optional node and reports no violation. Read beside
+// the same tree whose items only their existence requires, where the
+// top-up takes no child that needs undescribed content, the same root
+// holds a violation.
+func TestREQ107_CensusGrantsNoLastResortToAnExistenceOnlyList(t *testing.T) {
+	slotOnly := censusOptional("CLUSTER", "at0002",
+		censusItems(`<children xsi:type="ARCHETYPE_SLOT"><rm_type_name>CLUSTER</rm_type_name><node_id>at0003</node_id></children>`))
+	cases := []struct {
+		name      string
+		against   string
+		violation bool
+	}{
+		{name: "the template the root was generated from", against: censusTreeOPT(censusItems(slotOnly))},
+		{name: "items only their existence requires", against: censusTreeOPT(censusExistenceItems(slotOnly)), violation: true},
+	}
+	generated := compileCensusOPT(t, censusTreeOPT(censusItems(slotOnly)))
 	for _, policy := range []instance.Policy{instance.Large, instance.Medium} {
 		out, err := instance.Generate(t.Context(), generated, instance.Options{Policy: policy, Language: "en", Now: ratchetNow})
 		if err != nil {
@@ -547,21 +543,29 @@ func parentAttribute(node *templatecompile.CompiledNode) *templatecompile.Compil
 // marks it mandatory, or its existence or cardinality lower bound is at
 // least 1.
 func attrRequired(attr *templatecompile.CompiledAttribute) bool {
-	return attr.Required() || lowerAtLeastOne(attr.Existence()) || lowerAtLeastOne(attr.ChildMultiplicity())
+	return attr.Required() || tcimpl.LowerAtLeastOne(attr.Existence()) || tcimpl.LowerAtLeastOne(attr.ChildMultiplicity())
 }
 
 // topUpLastResort reports whether node, an optional child, is the child a
 // top-up takes when no other will do (REQ-107 § Contract What a visit
-// writes): its attribute is multi-valued and required, so a top-up builds
-// a member where no child got one of its own, node is the first allowed
-// child that is not a slot, and no allowed child that is not a slot needs
-// no undescribed content (needsNoUndescribed) and has an identity no
-// earlier sibling carries. A member built so is not one of node's own,
-// which § Slot fills keeps out, so the census lists what it holds rather
-// than calling it a violation.
+// writes): its attribute is multi-valued and the BMM marks it mandatory or
+// its cardinality lower bound is at least 1, so a top-up builds a member
+// where no child got one of its own, node is the first allowed child that
+// is not a slot, and no allowed child that is not a slot needs no
+// undescribed content (needsNoUndescribed) and has an identity no earlier
+// sibling carries. Where only the attribute's existence asks for a member,
+// the top-up takes only a child that needs no undescribed content, so it
+// has no last resort. A member built so is not one of node's own, which
+// § Slot fills keeps out, so the census lists what it holds rather than
+// calling it a violation. Unlike the generator's existenceOnly, this does
+// not read a child's occurrences, on purpose: a required child that is not
+// a slot gets a member of its own, so no top-up runs, and the parser does
+// not read a slot's occurrences (REQ-107 Known gap: slot occurrences).
+// Reading them would only exempt a node that no top-up builds.
 func topUpLastResort(node *templatecompile.CompiledNode) bool {
 	attr := parentAttribute(node)
-	if attr == nil || attr.Cardinality() != template.Multiple || !attrRequired(attr) {
+	if attr == nil || attr.Cardinality() != template.Multiple ||
+		(!attr.Required() && !tcimpl.LowerAtLeastOne(attr.ChildMultiplicity())) {
 		return false
 	}
 	children := allowedChildren(attr)
@@ -649,10 +653,6 @@ func identityCarriedBefore(children []*templatecompile.CompiledNode, i int) bool
 	return slices.ContainsFunc(children[:i], func(sib *templatecompile.CompiledNode) bool {
 		return !sib.IsSlot() && (sib.ArchetypeID() == id || sib.NodeID() == id)
 	})
-}
-
-func lowerAtLeastOne(m *template.Multiplicity) bool {
-	return m != nil && !m.LowerUnbounded() && m.Lower() >= 1
 }
 
 // holderPath is node's template path, or "?" for a value built from the

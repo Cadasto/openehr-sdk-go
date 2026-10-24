@@ -15,9 +15,11 @@ var (
 	// also surfaces as ErrCardinality.
 	ErrCardinality = errors.New("validation: cardinality")
 
-	// ErrRequired fires when a required attribute (RM-mandatory via
-	// rminfo, or OPT-declared via explicit existence) is absent or
-	// zero-valued.
+	// ErrRequired fires when a required attribute is absent or
+	// zero-valued: one the Reference Model marks mandatory, or one the
+	// template requires. The template requires an attribute by its
+	// existence, and a list or a Hash only where its cardinality, or the
+	// occurrences of one of its children, also asks for a member.
 	ErrRequired = errors.New("validation: required attribute missing")
 
 	// ErrProhibited fires when an attribute the OPT prohibits (its

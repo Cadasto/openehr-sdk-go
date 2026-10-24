@@ -200,8 +200,11 @@ func TestValidateDemographic_RootTypeMismatch(t *testing.T) {
 	}
 }
 
-// REQ-110 — an OPT pinning PERSON.identities existence >= 1 flags a
-// person with no identities as `required`.
+// REQ-110 — an OPT pinning PERSON.identities existence >= 1 and
+// cardinality >= 1, so asking for a member, flags a person with no
+// identities as `required` on the template layer, rule existence. The RM
+// also marks identities mandatory, but one absence draws one finding, the
+// template's (REQ-171 § One walk, Presence).
 func TestValidateDemographic_RequiredIdentities(t *testing.T) {
 	const body = `<?xml version="1.0"?>
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -222,8 +225,8 @@ func TestValidateDemographic_RequiredIdentities(t *testing.T) {
 	c := mustCompileInline(t, body)
 	person := &rm.Person{ArchetypeNodeID: "at0000", Name: rm.DVText{Value: "P"}}
 	r := validation.ValidateDemographic(person, c)
-	if !containsIssue(r.Issues, "/identities", "required") {
-		t.Errorf("expected required at /identities, got %+v", r.Issues)
+	if got, want := keysAt(r.Issues, "/identities"), []string{"required template existence"}; !slices.Equal(got, want) {
+		t.Errorf("ValidateDemographic(PERSON with no identities) at /identities = %q, want %q; all issues: %+v", got, want, r.Issues)
 	}
 }
 

@@ -54,9 +54,12 @@ func TestProbe025CompositionValidate_PrimitiveOutOfRange(t *testing.T) {
 	}
 }
 
-// PROBE-026 — missing-required-node case. Removing the systolic
-// element from the ITEM_LIST surfaces a `required` issue at the
-// /data/items path. Negative-case stability test.
+// PROBE-026 — REQ-102 § An existence lower bound alone asks for no member.
+// Removing the systolic element, so that the ITEM_LIST holds no items list
+// at all, surfaces no issue: vital_signs.opt gives those items existence
+// 1..1 and cardinality 0..*, and the systolic element is optional, so the
+// template asks for the container alone and an instance cannot show an
+// empty one apart from a missing one. Stability test.
 func TestProbe026MissingNodes_MissingSystolic(t *testing.T) {
 	body := loadFixture(t, "vital_signs")
 	cases := []probes.ValidateCase{
@@ -64,7 +67,7 @@ func TestProbe026MissingNodes_MissingSystolic(t *testing.T) {
 			Name:        "missing_systolic_items",
 			OPT:         body,
 			Composition: probes.SystolicItemsAbsent(),
-			WantCodes:   []string{"required"},
+			WantCodes:   nil,
 		},
 	}
 	r, err := probes.Probe026MissingNodes(cases)
@@ -149,7 +152,8 @@ func TestProbe026MissingNodes_PrimitiveNotInList(t *testing.T) {
 }
 
 // PROBE-026 — empty events. An OBSERVATION whose Data.Events slice
-// is present and empty fires BOTH `required` (existence lower ≥ 1) AND
+// is present and empty fires BOTH `required` (existence lower ≥ 1, which
+// asks for a member only beside a child-count lower ≥ 1) AND
 // `cardinality` (the OPT pins child-count lower ≥ 1) at
 // /data/events. Both constraints are independent — multiset
 // reflects both for openEHR conformance. A nil Data.Events is absent
