@@ -542,14 +542,23 @@ func carriesID(c *tcimpl.CompiledNode, id string) bool {
 // carries it.
 func rankByPinnedName(dst []*tcimpl.CompiledNode, from int, name string) []*tcimpl.CompiledNode {
 	pins := func(c *tcimpl.CompiledNode) bool { return name != "" && c.NodeName() == name }
-	pinsNone := func(c *tcimpl.CompiledNode) bool { return c.NodeName() == "" }
-	for _, inRank := range [...]func(*tcimpl.CompiledNode) bool{pins, pinsNone} {
-		if slices.ContainsFunc(dst[from:], inRank) {
-			kept := slices.DeleteFunc(dst[from:], func(c *tcimpl.CompiledNode) bool { return !inRank(c) })
-			return dst[:from+len(kept)]
-		}
+	if slices.ContainsFunc(dst[from:], pins) {
+		return keepRank(dst, from, pins)
+	}
+	if slices.ContainsFunc(dst[from:], pinsNoName) {
+		return keepRank(dst, from, pinsNoName)
 	}
 	return dst
+}
+
+// pinsNoName reports whether the OPT child c pins no template-level name.
+func pinsNoName(c *tcimpl.CompiledNode) bool { return c.NodeName() == "" }
+
+// keepRank keeps, of dst[from:], the children inRank holds, in order, and
+// returns dst cut to them.
+func keepRank(dst []*tcimpl.CompiledNode, from int, inRank func(*tcimpl.CompiledNode) bool) []*tcimpl.CompiledNode {
+	kept := slices.DeleteFunc(dst[from:], func(c *tcimpl.CompiledNode) bool { return !inRank(c) })
+	return dst[:from+len(kept)]
 }
 
 // locatableName returns the value of a LOCATABLE item's name, a DV_TEXT

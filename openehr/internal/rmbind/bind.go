@@ -105,8 +105,7 @@ func Bind(nodes []*tcimpl.CompiledNode, v any, eligible func(*tcimpl.CompiledNod
 // of the three tiers of [Bind] that admits the value v, in the order of
 // nodes, and returns the extended slice; it appends none when no node admits
 // v. Its first node is the one Bind returns. The builder takes that node; the
-// validator binds v within the tier by walking it under each node in turn
-// (REQ-102).
+// validator binds v within the tier by walking it under each node in turn.
 func Tier(dst, nodes []*tcimpl.CompiledNode, v any, eligible func(*tcimpl.CompiledNode) bool) []*tcimpl.CompiledNode {
 	gotType := describe(v)
 	from := len(dst)

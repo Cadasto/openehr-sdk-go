@@ -739,3 +739,28 @@ func TestValidateComposition_REQ102_SlotAlternativesBindByTheirAssertions(t *tes
 		}
 	}
 }
+
+// REQ-102 Structural — binding items — the item's name ranks the children
+// that carry its id before any trial: those that pin its name, failing any,
+// those that pin no name, failing any, all of them. An item named Erste
+// binds to the required child that pins Erste, though the optional child
+// before it pins no name and admits it too. An item whose name no child
+// pins binds among the children that pin none, so, carrying a defect that
+// fails it everywhere, it binds to the child that pins no name and draws
+// that defect alone, not the name of the child that pins Erste before it.
+func TestValidateComposition_REQ102_ItemNameRanksTheChildren(t *testing.T) {
+	const at = "/content[" + reusedID + "]"
+	t.Run("a child that pins the name", func(t *testing.T) {
+		c := mustCompileSyntheticOPT(t, reusedArchetypeOPTWith(reusedObservationChild("", 0), reusedObservationChild("Erste", 1)))
+		if got := issueKeys(validation.ValidateComposition(reusedComposition("Erste"), c).Issues); len(got) != 0 {
+			t.Errorf("ValidateComposition(Erste) issues = %q, want none: it binds to the child that pins Erste", got)
+		}
+	})
+	t.Run("a child that pins no name", func(t *testing.T) {
+		c := mustCompileSyntheticOPT(t, reusedArchetypeOPTWith(reusedObservationChild("Erste", 0), reusedObservationChild("", 0)))
+		r := validation.ValidateComposition(withoutLanguage(t, reusedComposition("Andere"), 0), c)
+		if got, want := issueKeys(r.Issues), emptyLanguage(at); !slices.Equal(got, want) {
+			t.Errorf("ValidateComposition(Andere, no language) issues = %q, want %q: it binds to the child that pins no name", got, want)
+		}
+	})
+}
