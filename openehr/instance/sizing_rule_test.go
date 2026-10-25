@@ -212,29 +212,45 @@ func TestREQ107_ProhibitedAlternativeIsSkipped(t *testing.T) {
 	}
 }
 
+// membersUnderEveryPolicy is n members under each of the three policies.
+func membersUnderEveryPolicy(n int) map[instance.Policy]int {
+	return map[instance.Policy]int{instance.Large: n, instance.Medium: n, instance.Required: n}
+}
+
 // TestREQ107_SilentRequiredMultipleIsToppedUp is the REQ-107 check that a
-// required multi-valued attribute the OPT names without children, whose
-// cardinality lower bound is above 1, is topped up to that bound with members built
+// multi-valued attribute the OPT names without children, whose cardinality
+// lower bound is above 1, is topped up to that bound with members built
 // from its BMM type, and to no more than its cardinality upper bound,
-// except the member the BMM requires (REQ-107 Precedence 2).
+// except the member the BMM requires (REQ-107 Precedence 2), under each
+// policy that visits it. Required leaves out such a list where only that
+// cardinality asks for a member (REQ-107 Visit rule).
 func TestREQ107_SilentRequiredMultipleIsToppedUp(t *testing.T) {
 	cases := []struct {
 		name string
 		opt  string
-		want int
+		// want is the number of members, per policy.
+		want map[instance.Policy]int
 	}{
-		{name: "CLUSTER items, lower 2", opt: optTemplate("CLUSTER", optCardinal("items", 2, -1)), want: 2},
-		// The RM leaves an ITEM_TREE's items optional, so the existence
-		// requires them: a cardinality lower bound alone does not make
-		// Required visit a list (REQ-107 Visit rule).
-		{name: "ITEM_TREE items, existence 1, lower 3", opt: optTemplate("ITEM_TREE", optRequiredCardinal("items", 3, -1)), want: 3},
+		{name: "CLUSTER items, lower 2", opt: optTemplate("CLUSTER", optCardinal("items", 2, -1)), want: membersUnderEveryPolicy(2)},
+		// The RM leaves an ITEM_TREE's items optional and the OPT names no
+		// child, so only the cardinality asks for a member: a cardinality
+		// lower bound counts the members of a list that exists and does not
+		// make Required visit the list (REQ-107 Visit rule).
+		{
+			name: "ITEM_TREE items, lower 3",
+			opt:  optTemplate("ITEM_TREE", optCardinal("items", 3, -1)),
+			want: map[instance.Policy]int{instance.Large: 3, instance.Medium: 3, instance.Required: 0},
+		},
+		// The existence requires the same list, so every policy visits it
+		// and its cardinality tops it up.
+		{name: "ITEM_TREE items, existence 1, lower 3", opt: optTemplate("ITEM_TREE", optRequiredCardinal("items", 3, -1)), want: membersUnderEveryPolicy(3)},
 		// Existence 1..1 alone asks for no member, and cardinality 0..0
 		// allows none, so the list stays empty.
-		{name: "ITEM_TREE items, existence 1, upper 0", opt: optTemplate("ITEM_TREE", optRequiredCardinal("items", 0, 0)), want: 0},
+		{name: "ITEM_TREE items, existence 1, upper 0", opt: optTemplate("ITEM_TREE", optRequiredCardinal("items", 0, 0)), want: membersUnderEveryPolicy(0)},
 		// The BMM requires a CLUSTER's items, and cardinality 0..0 allows
 		// none: the RM rule wins (REQ-107 Precedence 2), so the items get
 		// one member, which breaks the OPT's upper bound.
-		{name: "CLUSTER items, upper 0", opt: optTemplate("CLUSTER", optCardinal("items", 0, 0)), want: 1},
+		{name: "CLUSTER items, upper 0", opt: optTemplate("CLUSTER", optCardinal("items", 0, 0)), want: membersUnderEveryPolicy(1)},
 	}
 	for _, tc := range cases {
 		for _, implicit := range []bool{true, false} {
@@ -245,8 +261,8 @@ func TestREQ107_SilentRequiredMultipleIsToppedUp(t *testing.T) {
 					if err != nil {
 						t.Fatalf("Generate: %v", err)
 					}
-					if got := len(itemIDs(t, out)); got != tc.want {
-						t.Errorf("items has %d members, want %d", got, tc.want)
+					if got, want := len(itemIDs(t, out)), tc.want[opts.Policy]; got != want {
+						t.Errorf("items has %d members, want %d", got, want)
 					}
 					noFloorErrors(t, out)
 				})
