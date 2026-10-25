@@ -1157,7 +1157,7 @@ func optionalList(attr *tcimpl.CompiledAttribute) bool {
 // ([tcimpl.MandatoryListChildren]), the one the example generator's
 // Required policy builds members of: no item binds to it, so it appears 0
 // times. The issue is the one [appendOccurrenceIssues] writes for a child
-// the items miss, at the path the child has among all the attribute's
+// the items miss ([occurrencesIssue]), at the path the child has among all the attribute's
 // children ([optChildPaths]). A list the template prohibits, one of
 // primitive values, and the children of an attribute the template writes
 // as single-valued draw none.
@@ -1168,15 +1168,7 @@ func appendMissingChildIssues(issues []Issue, attr *tcimpl.CompiledAttribute, at
 		if childPath == nil {
 			childPath = optChildPaths(attrPath.String(), children)
 		}
-		occ := c.Occurrences()
-		issues = append(issues, Issue{
-			Path:     childPath[slices.Index(children, c)],
-			Code:     "cardinality",
-			Layer:    LayerTemplate,
-			Rule:     ruleOccurrences,
-			Detail:   fmt.Sprintf("OPT child %s appears 0 times under %q; occurrences %s", childIdentity(c), attr.Name(), formatInterval(occ)),
-			Severity: Error,
-		})
+		issues = append(issues, occurrencesIssue(childPath[slices.Index(children, c)], c, 0, attr))
 	}
 	return issues
 }

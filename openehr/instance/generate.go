@@ -2330,8 +2330,10 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 		return err
 	}
 	if g.opts.ValueFill == RandomFill {
-		// In-constraint sampled value (valid by construction); same Go
-		// shape as ExampleValue so the switch below is unchanged. REQ-107.
+		// A value sampled inside the constraint, in the Go shape of
+		// ExampleValue so the switch below is unchanged (REQ-107). A
+		// CString draw can be a list entry its pattern refuses, which
+		// applyStringLeaf replaces (stringForConstraint).
 		ex = sampleValue(pc, g.valueSampler)
 	}
 	if cs, ok := pc.(constraints.CString); ok {

@@ -230,16 +230,23 @@ func appendOccurrenceIssues(issues []Issue, attr *tcimpl.CompiledAttribute, chil
 		if childPath == nil {
 			childPath = optChildPaths(attrPath.String(), children)
 		}
-		issues = append(issues, Issue{
-			Path:     childPath[i],
-			Code:     "cardinality",
-			Layer:    LayerTemplate,
-			Rule:     ruleOccurrences,
-			Detail:   fmt.Sprintf("OPT child %s appears %d times under %q; occurrences %s", childIdentity(c), got, attr.Name(), formatInterval(occ)),
-			Severity: Error,
-		})
+		issues = append(issues, occurrencesIssue(childPath[i], c, got, attr))
 	}
 	return issues
+}
+
+// occurrencesIssue is the `cardinality` issue, rule occurrences, at path
+// for the OPT child c of the attribute attr, to which got items bind
+// outside its occurrences interval.
+func occurrencesIssue(path string, c *tcimpl.CompiledNode, got int, attr *tcimpl.CompiledAttribute) Issue {
+	return Issue{
+		Path:     path,
+		Code:     "cardinality",
+		Layer:    LayerTemplate,
+		Rule:     ruleOccurrences,
+		Detail:   fmt.Sprintf("OPT child %s appears %d times under %q; occurrences %s", childIdentity(c), got, attr.Name(), formatInterval(c.Occurrences())),
+		Severity: Error,
+	}
 }
 
 // itemRank appends to dst the children of a multi-valued attribute an item

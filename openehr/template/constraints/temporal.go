@@ -1,6 +1,7 @@
 package constraints
 
 import (
+	"cmp"
 	"fmt"
 	"strconv"
 	"strings"
@@ -51,8 +52,8 @@ func (CDate) isPrimitive() {}
 // the month or the day as a literal number beside a range: written to the
 // pattern, a bound takes the literal, which can move it out of the range.
 // "yyyy-06-dd" with the range up to 2004-05-20 gives "2020-01-01", though
-// "2003-06-01" is valid. No OPT reaches that case: the ITS-XML pattern
-// grammar admits no literal.
+// "2003-06-01" is valid. Only an OPT that breaks the ITS-XML pattern
+// grammar, which admits no literal, reaches that case.
 func (c CDate) ExampleValue() any {
 	return clockExample(clockDate, c.Pattern, c.Range, c.TimezoneValidity, "2020-01-01")
 }
@@ -282,9 +283,9 @@ func (c CDuration) Validate(value any) []Violation {
 		}
 	}
 	secs := d.ToSeconds()
-	order := func(bound string) (cmp int, ordered, ok bool) {
+	order := func(bound string) (sign int, ordered, ok bool) {
 		b, ok := durationSeconds(bound)
-		return compareFloat(secs, b), true, ok
+		return cmp.Compare(secs, b), true, ok
 	}
 	return appendRangeViolation(out, c.Range, order, "duration", value)
 }
@@ -371,11 +372,11 @@ func (r TemporalRange) String() string {
 	return sb.String()
 }
 
-// boundOrder compares a value with a bound written as ISO 8601 text: cmp
+// boundOrder compares a value with a bound written as ISO 8601 text: sign
 // is the sign of the value less the bound, ordered is false for a pair the
 // order leaves unordered, and ok is false for a bound that is not ISO 8601
 // text of the constrained type.
-type boundOrder func(bound string) (cmp int, ordered, ok bool)
+type boundOrder func(bound string) (sign int, ordered, ok bool)
 
 // contains reports whether a value lies in the range, order comparing it
 // with each bound. A bound the value is not ordered against does not
@@ -405,17 +406,6 @@ func (r TemporalRange) contains(order boundOrder) (in, ok bool) {
 		}
 	}
 	return in, true
-}
-
-// compareFloat returns the sign of a less b.
-func compareFloat(a, b float64) int {
-	switch {
-	case a < b:
-		return -1
-	case a > b:
-		return 1
-	}
-	return 0
 }
 
 // appendRangeViolation appends to out the violation of the range clause
@@ -754,21 +744,21 @@ func (v clockValue) zone() string {
 // their magnitudes.
 func clockOrder(k clockKind, v clockValue) boundOrder {
 	mag, zone := v.magnitude(k), v.zone()
-	return func(bound string) (cmp int, ordered, ok bool) {
+	return func(bound string) (sign int, ordered, ok bool) {
 		b, ok := parseClock(k, bound)
 		if !ok {
 			return 0, false, false
 		}
 		bmag, bzone := b.magnitude(k), b.zone()
 		if zone == bzone {
-			return compareFloat(mag, bmag), true, true
+			return cmp.Compare(mag, bmag), true, true
 		}
 		utc, zoned := iso8601.UTCMagnitude(mag, zone)
 		butc, bzoned := iso8601.UTCMagnitude(bmag, bzone)
 		if !zoned || !bzoned {
 			return 0, false, true
 		}
-		return compareFloat(utc, butc), true, true
+		return cmp.Compare(utc, butc), true, true
 	}
 }
 

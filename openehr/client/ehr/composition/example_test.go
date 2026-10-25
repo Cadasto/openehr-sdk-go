@@ -1,6 +1,7 @@
 package composition_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -8,9 +9,11 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 	"github.com/cadasto/openehr-sdk-go/sandbox"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 	"github.com/cadasto/openehr-sdk-go/transport"
@@ -162,4 +165,72 @@ func ExampleUpdate() {
 	// Output:
 	// updated, new version: 8849182c-82ad-4088-a07f-48ead4180515::sandbox.local::2
 	// stale update refused, latest version: 8849182c-82ad-4088-a07f-48ead4180515::sandbox.local::2
+}
+
+// Read a composition in canonical XML. WithGetFormat sends the XML media
+// type as Accept and decodes the XML body; WithRawBody keeps the bytes the
+// server sent beside the decoded composition, for a caller that stores or
+// forwards them as they are.
+func ExampleWithGetFormat() {
+	const (
+		ehrID      = "7d44b88c-4199-4bad-97dc-d78268e01398"
+		voID       = "8849182c-82ad-4088-a07f-48ead4180515"
+		versionUID = voID + "::sandbox.local::1"
+	)
+
+	stored := new(rm.Composition)
+	if err := canjson.Unmarshal([]byte(compositionJSON), stored); err != nil {
+		log.Fatal(err)
+	}
+	storedXML, err := canxml.Marshal(stored)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// A fake CDR that serves the composition as canonical XML when the
+	// request asks for it, and refuses any other media type with 406.
+	backend := sandbox.New()
+	backend.HandleFunc(http.MethodGet, "/ehr/"+ehrID+"/composition/"+voID, func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Accept") != "application/xml" {
+			w.WriteHeader(http.StatusNotAcceptable)
+			return
+		}
+		w.Header().Set("Content-Type", "application/xml")
+		w.Header().Set("ETag", `"`+versionUID+`"`)
+		_, _ = w.Write(storedXML)
+	})
+
+	catalog, err := discovery.NewStaticCatalog(discovery.StaticConfig{
+		Issuer: "https://sandbox.local",
+		Services: map[string]discovery.ServiceEntry{
+			discovery.ServiceIDOpenEHRRest: {
+				BaseURL:     discovery.MustParseURL("https://sandbox.local/openehr/v1"),
+				SpecVersion: discovery.SpecVersionPin,
+			},
+		},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	client, err := transport.New(catalog, transport.WithHTTPClient(backend.HTTPClient()))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var raw composition.Raw
+	comp, meta, err := composition.Get(context.Background(), client, ehrID, ehr.LatestOf(voID),
+		composition.WithGetFormat(composition.FormatXML, nil),
+		composition.WithRawBody(&raw))
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("name:", comp.Name.GetValue())
+	fmt.Println("VersionUID:", meta.VersionUID)
+	fmt.Println("raw Content-Type:", raw.ContentType)
+	fmt.Println("raw body is the XML sent:", bytes.Equal(raw.Body, storedXML))
+	// Output:
+	// name: Encounter
+	// VersionUID: 8849182c-82ad-4088-a07f-48ead4180515::sandbox.local::1
+	// raw Content-Type: application/xml
+	// raw body is the XML sent: true
 }
