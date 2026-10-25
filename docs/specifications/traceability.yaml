@@ -2445,6 +2445,7 @@ requirements:
     packages: [openehr/client/ehr/composition, testkit/probes/rest]
     probes: [PROBE-108]
     tests:
+      - openehr/client/ehr/composition/doc_guard_test.go
       - openehr/client/ehr/composition/format_get_test.go
       - openehr/client/ehr/composition/format_write_test.go
       - testkit/probes/rest/probe_108_composition_formats.go
