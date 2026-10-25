@@ -12,7 +12,7 @@ What the `openehr-sdk-go` v1 surface includes and excludes. Out-of-scope items a
 
 | Area | Coverage |
 |---|---|
-| openEHR REST `1.1.0` — primary surface | EHR, Composition, Contribution, Directory, EHR_STATUS, ItemTags, Template/Definition, Demographic, AQL, System endpoints |
+| openEHR REST `1.1.0` — primary surface | EHR, Composition, Contribution, Directory, EHR_STATUS, ItemTags, Template/Definition, Demographic, AQL, System endpoints, and the versioned-object reads of COMPOSITION, EHR_STATUS and PARTY ([wire.md § REQ-174](wire.md#req-174--versioned-object-reads)) |
 | openEHR Reference Model | Concrete types for clinical and demographic RM (excluding the `ehr_extract` package — deferred), type registry, embedded base structs, interfaces for abstract categories ([rm-modeling.md](rm-modeling.md)) — **generated** from the pinned BMM schema in [`../resources/bmm/`](../../resources/bmm) per [bmm-conformance.md](bmm-conformance.md) |
 | Archetype Object Model 1.4 | `openehr/aom/aom14/` — generated from `openehr_am_1.4.0.bmm.json`; sibling of `openehr/rm/`. Consumed by `openehr/template/` for parsing ADL 1.4 archetypes embedded in OPTs. |
 | BMM loader | Public `openehr/bmm/` (hand-written for v1) — P_BMM JSON parser, includes resolution, queryable in-memory model. Building block (REQ-045). |
@@ -38,7 +38,6 @@ What the `openehr-sdk-go` v1 surface includes and excludes. Out-of-scope items a
 | AOM 2 / ADL 2 / OPT-2 | Deferred — `openehr_am_2.4.0.bmm.json` kept in `resources/bmm/` but not generated. AOM 1.4 covers v1's archetype/template parsing needs. |
 | openEHR LANG types as generated code | Deferred — `openehr_lang_1.1.0.bmm.json` kept as reference. The BMM meta-classes used by `openehr/bmm/` are hand-written against the P_BMM persistence shape for v1; auto-generating them is a future option. |
 | openEHR TERM service interface | Deferred — `openehr_term_3.1.0.bmm.json` kept in `resources/bmm/`. No v1 consumer requires a typed terminology-service interface; consumers integrate with a deployment-specific terminology backend directly. |
-| ITS-REST `VERSIONED_COMPOSITION` and `VERSIONED_EHR_STATUS` resources (`/versioned_composition/…`, `/versioned_ehr_status/…`: the versioned-object metadata, revision history and `ORIGINAL_VERSION` envelope reads; version-at-time reads of the resources themselves are in scope and shipped) | Deferred — no leaf client yet. `VERSIONED_PARTY` is implemented in `openehr/client/demographic`. |
 | Full Master Patient Index design beyond a preview search surface | Cadasto MPI research track. The `cadasto/mpi` preview is a placeholder shape only. |
 | OIDC provider and Authorization Server **design** | Cadasto authorization-server research track. The SDK *consumes* the AS via `auth/smart`; it does not implement or define one. |
 | Production federator policy (authority, merge strategy, partial-failure semantics) | A separate proposal pending MPI research outcomes. The SDK provides per-node primitives; policy is bespoke per deployment. |

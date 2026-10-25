@@ -6,7 +6,7 @@ kind: specification
 
 **Status:** Draft
 
-The normative contract between the SDK and any conformant openEHR backend (Cadasto CDR, EHRbase, others). Covers REQ-050 through REQ-059 (wire surface and openEHR headers), REQ-095 (OpenAPI authoritative source), REQ-130 (contribution builder), REQ-140 (underscore-prefixed RM attributes), REQ-142 (contribution read), REQ-143 (template list filters), and REQ-144 (Definition metadata decoding). Transport hygiene (REQ-090–094, REQ-150) lives in [transport.md](transport.md).
+The normative contract between the SDK and any conformant openEHR backend (Cadasto CDR, EHRbase, others). Covers REQ-050 through REQ-059 (wire surface and openEHR headers), REQ-095 (OpenAPI authoritative source), REQ-130 (contribution builder), REQ-140 (underscore-prefixed RM attributes), REQ-142 (contribution read), REQ-143 (template list filters), and REQ-144 (Definition metadata decoding), and REQ-174 (versioned-object reads). Transport hygiene (REQ-090–094, REQ-150) lives in [transport.md](transport.md).
 
 The premise: correctness is wire-level (REQ-080). The bytes on the wire and the AQL strings conform to the openEHR spec; the Go source shape is independent.
 
@@ -593,6 +593,33 @@ The set is closed: decode **MUST NOT** accept a **non-empty** value outside it (
 
 **Out of scope.** RM `DV_DATE_TIME` wire formats (REQ-052 / REQ-123) are untouched, and this § grants no SDK-wide zone-less tolerance for `time.Time`: the timestamp rules above reach exactly these two Definition-area catalog fields.
 
+### REQ-174 — Versioned-object reads
+
+The composition and EHR_STATUS leaves **MUST** expose the reads the vendored EHR API defines on their versioned objects, so a caller reads a record's history without building the requests by hand. Each family has four operations (`versioned_composition_*` and `versioned_ehr_status_*` in `ehr-validation.openapi.yaml`):
+
+| Read | Composition | EHR_STATUS |
+|---|---|---|
+| The versioned object | `GET /ehr/{ehr_id}/versioned_composition/{versioned_object_uid}` | `GET /ehr/{ehr_id}/versioned_ehr_status` |
+| Its revision history | `…/versioned_composition/{versioned_object_uid}/revision_history` | `…/versioned_ehr_status/revision_history` |
+| The latest version, or the version at a time | `…/versioned_composition/{versioned_object_uid}/version`, with an optional `version_at_time` | `…/versioned_ehr_status/version`, with an optional `version_at_time` |
+| One version by its id | `…/versioned_composition/{versioned_object_uid}/version/{version_uid}` | `…/versioned_ehr_status/version/{version_uid}` |
+
+An EHR has one EHR_STATUS, so its versioned object is addressed by the `ehr_id` alone. The demographic leaf offers the same reads for `VERSIONED_PARTY`.
+
+**Responses.** The versioned-object read **MUST** return the `VERSIONED_COMPOSITION` or `VERSIONED_EHR_STATUS`, and the revision-history read the `REVISION_HISTORY`, each decoded as its RM type. A version read **MUST** decode the `ORIGINAL_VERSION` envelope and return at least its `uid`, `preceding_version_uid`, `lifecycle_state`, `commit_audit` and `contribution`, and its `data` decoded as a `COMPOSITION` or an `EHR_STATUS`; a version that carries no `data` returns no payload and no error. The pin's version schemas (`UVersionOfComposition`, `UVersionOfEhrStatus`) also admit an `IMPORTED_VERSION`. v1 reads only `ORIGINAL_VERSION`: a body whose `_type` names anything else **MUST** fail as the typed decode failure of [REQ-151](transport.md#req-151--typed-2xx-decode-failure), never decode to an empty version. An empty or `null` 2xx body on any of these reads **MUST** fail with `ErrInvalidShape`, since the pin answers each of them `200` with a body, or `404`.
+
+**Version metadata.** Each read returns a `*VersionMetadata` filled from the response headers by [§ REQ-054](#req-054)'s version-identifier rule. The pin defines an `ETag` only on the version-at-time responses (`ETag_VERSION_of_COMPOSITION`, `ETag_VERSION`), so the SDK **MUST NOT** require populated metadata on the other reads.
+
+**Latest and at a time.** The latest-version read and the version-at-time read are separate calls on one path. The latest-version read **MUST NOT** send `version_at_time`. The version-at-time read **MUST** refuse a zero `time.Time` with `ErrInvalidConfig` before any request is issued: the zero time is Go's "not set", not an instant a caller means, and the latest-version read is the call for "now".
+
+**Preconditions and errors.** An empty `ehr_id`, `versioned_object_uid` or `version_uid` **MUST** fail with `ErrInvalidConfig` before any request is issued; an empty interpolated segment is what [REQ-150](transport.md#req-150--path-parameter-segment-validation)'s validator refuses. A `404` **MUST** map to `ErrNotFound`. Path parameters are raw, decoded strings ([§ REQ-095](#req-095) *Path-parameter encoding*).
+
+**Representation.** v1 of these reads **MUST** request canonical JSON (`Accept: application/json`, the pin's `Accept_canonical`). Canonical XML and the simplified formats are out of scope here.
+
+Each leaf's repository interface includes the same reads, under the interface-growth rule in [§ REST leaf operations](#rest-leaf-operations).
+
+**The `version_at_time` value.** Every `version_at_time` the SDK sends, on any leaf, **MUST** be the instant in UTC, written in the RFC 3339 profile of ISO 8601 extended format with its fraction of a second: the fractional digits the `time.Time` carries, trailing zeros dropped, and no fraction for a whole second (Go's `time.RFC3339Nano` layout). That covers the composition read by a `Ref` that carries a time, the EHR_STATUS and directory reads at a time, the version-at-time reads of this §, and the `VERSIONED_PARTY` version-at-time read. The SDK **MUST NOT** truncate or round the fraction: two versions committed within one second are told apart only by it. The pins declare the parameter as "A given time in the extended ISO 8601 format", with the example `2015-01-20T19:30:22.765+01:00` (`ehr-validation.openapi.yaml`, `demographic-validation.openapi.yaml`).
+
 ## Write-side authoring
 
 ### REQ-130 — Contribution builder
@@ -663,5 +690,6 @@ Out of v1 scope:
 | Contribution read | REQ-142 | `openehr/client/ehr/contribution/` |
 | Template list filters | REQ-143 | `openehr/client/definition/` |
 | Definition metadata decoding | REQ-144 | `openehr/client/definition/` |
+| Versioned-object reads | REQ-174 | `openehr/client/ehr/composition/`, `openehr/client/ehr/ehrstatus/` (the `version_at_time` value: every leaf that sends one) |
 | Shared RM / OPT fixtures | REQ-052, REQ-056 | `testkit/corpus/{templates,compositions,rm}/` — resolve via `testkit/fixtures/`; index in [`testkit/corpus/README.md`](../../testkit/corpus/README.md). Bodies, not REQ-082 Cassette-mode recordings ([conformance.md § Vendored fixtures](conformance.md#vendored-fixtures-testkitcorpus)) |
 | Transport (OTel, retry, TLS, errors, Prefer) | REQ-090–094 | [transport.md](transport.md) → `transport/`, `smart/discovery/` |

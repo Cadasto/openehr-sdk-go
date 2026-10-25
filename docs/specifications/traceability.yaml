@@ -2514,3 +2514,11 @@ requirements:
       - transport/errors_test.go
       - transport/nilwiredereference_internal_test.go
       - transport/span_status_test.go
+
+  - id: REQ-174
+    title: Versioned-object reads
+    canonical: docs/specifications/wire.md#req-174--versioned-object-reads
+    status: draft
+    implementation: planned
+    packages: [openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/ehrstatus, openehr/client/ehr/directory, openehr/client/demographic]
+    probes: [PROBE-109]
