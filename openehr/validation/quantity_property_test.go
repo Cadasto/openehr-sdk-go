@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
@@ -14,19 +15,19 @@ import (
 // propertyQuantityChild is a C_DV_QUANTITY whose property is openehr::code,
 // with units as its unit list: none when units is empty.
 func propertyQuantityChild(code string, units ...string) string {
-	child := `
+	var list strings.Builder
+	for _, u := range units {
+		list.WriteString(`
+        <list><units>` + u + `</units></list>`)
+	}
+	return `
       <children xsi:type="C_DV_QUANTITY">
         <rm_type_name>DV_QUANTITY</rm_type_name>
         <node_id></node_id>
         <property>
           <terminology_id><value>openehr</value></terminology_id>
           <code_string>` + code + `</code_string>
-        </property>`
-	for _, u := range units {
-		child += `
-        <list><units>` + u + `</units></list>`
-	}
-	return child + `
+        </property>` + list.String() + `
       </children>`
 }
 
