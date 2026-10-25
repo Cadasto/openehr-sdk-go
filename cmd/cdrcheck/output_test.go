@@ -42,6 +42,14 @@ func TestRedactor_FindsTheCredentialInEveryForm_REQ082(t *testing.T) {
 		{name: "a character outside the BMP as a surrogate pair", user: "op", pass: "key🔑", text: `"op:key\ud83d\udd11"`, want: `"` + redacted + `"`},
 		{name: "the password alone is kept", user: "operator", pass: "ehrbase", text: "ehrbase answered 422", want: "ehrbase answered 422"},
 		{name: "an escaped backslash is not an escape", user: "operator", pass: "s3cr3t", text: `operator:s3cr3\\u0074`, want: `operator:s3cr3\\u0074`},
+		// A password can hold a backslash and a letter that a JSON escape
+		// would read as one character: spelt out, it is matched byte for
+		// byte, and JSON-escaped, as the escape reads.
+		{name: `\t in the password, spelt out`, user: "op", pass: `p\tw`, text: `url http://op:p\tw@host/`, want: "url http://" + redacted + "@host/"},
+		{name: `\t in the password, JSON-escaped`, user: "op", pass: `p\tw`, text: `{"message":"op:p\\tw"}`, want: `{"message":"` + redacted + `"}`},
+		{name: `\n in the password, spelt out`, user: "op", pass: `p\nw`, text: `url http://op:p\nw@host/`, want: "url http://" + redacted + "@host/"},
+		{name: `\n in the password, JSON-escaped`, user: "op", pass: `p\nw`, text: `{"message":"op:p\\nw"}`, want: `{"message":"` + redacted + `"}`},
+		{name: "the credential right after a backslash", user: "tom", pass: "s3cr3t", text: `C:\tom:s3cr3t`, want: `C:\` + redacted},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

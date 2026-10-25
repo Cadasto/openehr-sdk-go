@@ -31,14 +31,23 @@ const redacted = "[redacted]"
 //
 // It removes the forms a credential takes on the wire: user:pass and its
 // base64 encoding, which is what a Basic Authorization header carries. Each
-// is found spelt out or JSON-escaped, in whole or in part, as a CDR's JSON
-// encoder or the run's own may write it: \/, \", \\, the other short escapes
-// and \uXXXX (a surrogate pair included) each read as the character they
-// stand for, so YWI\/OmNkPn4\u003d matches as YWI/OmNkPn4= does. The password
-// alone is not removed: it may equal an ordinary word of the output, such as
-// the CDR's own name.
+// is found spelt out, byte for byte, or JSON-escaped, in whole or in part, as
+// a CDR's JSON encoder or the run's own may write it: \/, \", \\, the other
+// short escapes and \uXXXX (a surrogate pair included) each read as the
+// character they stand for, so YWI\/OmNkPn4\u003d matches as YWI/OmNkPn4=
+// does. Both are tried at every byte, so a password that holds \t or \n is
+// found spelt out although the escape reading takes it for a tab or a new
+// line, and so is a credential right after a backslash. The password alone
+// is not removed: it may equal an ordinary word of the output, such as the
+// CDR's own name.
 type redactor struct {
-	secrets [][]rune // longest first, so one inside another is never left half-replaced
+	secrets []secret // longest first, so one inside another is never left half-replaced
+}
+
+// secret is one credential form, as its bytes and as its characters.
+type secret struct {
+	raw   []byte
+	runes []rune
 }
 
 func newRedactor(cdrs []cdrTarget) redactor {
@@ -48,9 +57,11 @@ func newRedactor(cdrs []cdrTarget) redactor {
 			continue
 		}
 		pair := c.user + ":" + c.pass
-		r.secrets = append(r.secrets, []rune(pair), []rune(base64.StdEncoding.EncodeToString([]byte(pair))))
+		for _, form := range []string{pair, base64.StdEncoding.EncodeToString([]byte(pair))} {
+			r.secrets = append(r.secrets, secret{raw: []byte(form), runes: []rune(form)})
+		}
 	}
-	slices.SortFunc(r.secrets, func(a, b []rune) int { return cmp.Compare(len(b), len(a)) })
+	slices.SortFunc(r.secrets, func(a, b secret) int { return cmp.Compare(len(b.runes), len(a.runes)) })
 	return r
 }
 
@@ -61,14 +72,13 @@ func (r redactor) bytes(b []byte) []byte {
 	var out []byte
 	last := 0
 	for p := 0; p < len(b); {
-		first, w := unit(b, p)
-		if n := r.match(b, p, first, w); n > 0 {
+		if n := r.match(b, p); n > 0 {
 			out = append(append(out, b[last:p]...), redacted...)
 			p += n
 			last = p
 			continue
 		}
-		p += w
+		p++
 	}
 	if out == nil {
 		return b
@@ -78,22 +88,27 @@ func (r redactor) bytes(b []byte) []byte {
 
 func (r redactor) string(s string) string { return string(r.bytes([]byte(s))) }
 
-// match returns the length in bytes of the secret that starts at b[p], or 0.
-// first and w are the character at p and its length.
-func (r redactor) match(b []byte, p int, first rune, w int) int {
+// match returns the length in bytes of the secret that starts at b[p], or 0:
+// spelt out there byte for byte, or read there character by character, a
+// JSON escape as the character it stands for (unit).
+func (r redactor) match(b []byte, p int) int {
+	first, w := unit(b, p)
 	for _, s := range r.secrets {
-		if s[0] != first {
+		if bytes.HasPrefix(b[p:], s.raw) {
+			return len(s.raw)
+		}
+		if s.runes[0] != first {
 			continue
 		}
 		q, i := p+w, 1
-		for i < len(s) && q < len(b) {
+		for i < len(s.runes) && q < len(b) {
 			c, n := unit(b, q)
-			if c != s[i] {
+			if c != s.runes[i] {
 				break
 			}
 			q, i = q+n, i+1
 		}
-		if i == len(s) {
+		if i == len(s.runes) {
 			return q - p
 		}
 	}
