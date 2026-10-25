@@ -755,11 +755,15 @@ func TestParse_REQ103_CDvQuantityListKeepsPrecedence(t *testing.T) {
 
 // REQ-103 — only an openehr property code the table lists has units: a
 // property in another terminology, or an openehr code the table does not
-// list, leaves PropertyUnits empty, and Validate accepts any units.
+// list, leaves PropertyUnits empty, and Validate accepts any units. The
+// terminology name matches exactly, as an openEHR-issued lookup does
+// (REQ-034), so OPENEHR and openEHR are other terminologies.
 func TestParse_REQ103_CDvQuantityPropertyOutsideTheTable(t *testing.T) {
 	for _, tc := range []struct{ terminology, code string }{
 		{"local", "125"},
 		{"SNOMED-CT", "122"},
+		{"OPENEHR", "122"},
+		{"openEHR", "122"},
 		{"openehr", "433"},
 		{"openehr", ""},
 	} {
