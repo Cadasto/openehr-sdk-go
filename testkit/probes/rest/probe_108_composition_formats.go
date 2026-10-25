@@ -64,8 +64,6 @@ type probe108Arm struct {
 	// parameters; formatParam is the `format` value both must then send.
 	formatQuery bool
 	formatParam string
-	// readBack reads the written version back in the same format.
-	readBack bool
 	// contentType and accept are the write's headers; accept is the read's
 	// Accept as well.
 	contentType string
@@ -82,10 +80,10 @@ func (a probe108Arm) webTemplate(wt *webtemplate.WebTemplate) *webtemplate.WebTe
 }
 
 var probe108Arms = []probe108Arm{
-	{name: "XML", format: composition.FormatXML, readBack: true, contentType: probe108MediaXML, accept: probe108MediaXML},
-	{name: "FLAT", format: composition.FormatFlat, simplified: true, readBack: true, contentType: probe108MediaFlat, accept: probe108MediaFlat},
-	{name: "STRUCTURED", format: composition.FormatStructured, simplified: true, readBack: true, contentType: probe108MediaStructured, accept: probe108MediaStructured},
-	{name: "FLAT (format query)", format: composition.FormatFlat, simplified: true, formatQuery: true, formatParam: "FLAT", readBack: true, contentType: probe108MediaJSON, accept: probe108MediaJSON},
+	{name: "XML", format: composition.FormatXML, contentType: probe108MediaXML, accept: probe108MediaXML},
+	{name: "FLAT", format: composition.FormatFlat, simplified: true, contentType: probe108MediaFlat, accept: probe108MediaFlat},
+	{name: "STRUCTURED", format: composition.FormatStructured, simplified: true, contentType: probe108MediaStructured, accept: probe108MediaStructured},
+	{name: "FLAT (format query)", format: composition.FormatFlat, simplified: true, formatQuery: true, formatParam: "FLAT", contentType: probe108MediaJSON, accept: probe108MediaJSON},
 }
 
 // Probe108CompositionFormats implements PROBE-108: a composition written and
@@ -145,9 +143,6 @@ func Probe108CompositionFormats(ctx context.Context, c *transport.Client, captur
 			r.Status = "fail"
 			r.Detail = fault
 			return r, nil
-		}
-		if !arm.readBack {
-			continue
 		}
 		readPath, err := servicePath(c, "/ehr/"+string(ehrID)+"/composition/"+string(uid))
 		if err != nil {
