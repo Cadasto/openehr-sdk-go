@@ -38,7 +38,9 @@ type ByVersionedObjectID struct {
 	// AtTime optionally requests the version that was current at the
 	// given instant, sent in UTC with its fraction of a second. Zero
 	// time omits the version_at_time query param and returns the
-	// absolute latest.
+	// absolute latest. A time whose UTC year falls outside 0000-9999
+	// is refused by [ByVersionedObjectID.Validate] and by the reads
+	// that take the Ref.
 	AtTime time.Time
 }
 
@@ -95,7 +97,8 @@ func (r ByVersionUID) Validate() error { return nil }
 func LatestOf(voID VersionedObjectID) Ref { return ByVersionedObjectID{VOID: voID} }
 
 // LatestAtTime returns a Ref addressing the version of voID that was
-// current at t. The time is sent in UTC with its fraction of a second.
+// current at t. The time is sent in UTC with its fraction of a second; a
+// t whose UTC year falls outside 0000-9999 is refused before any request.
 func LatestAtTime(voID VersionedObjectID, t time.Time) Ref {
 	return ByVersionedObjectID{VOID: voID, AtTime: t}
 }
