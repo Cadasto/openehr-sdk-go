@@ -246,7 +246,7 @@ Wherever the SDK reads an interval of an RM instance, an archetype or a template
 
 A flag that is present **MUST** be read as written, and an absent flag **MUST NOT** be a decode error. In canonical XML and in OPT XML an empty or whitespace-only flag element carries no boolean and **MUST** be read as an absent flag.
 
-**A closed side with no bound.** A side whose `*_unbounded` is present and `false` but whose bound is absent or `null` names a closed end with no value. Where the SDK holds that bound by value, as it does for a concrete `T` (`DV_COUNT.normal_range`, an AOM 1.4 occurrences interval, an OPT numeric range), the Go value cannot hold the absence, and a reader that filled in the zero bound would change the interval's meaning. Every reader **MUST** refuse such a side, in every mode, wrapping its sentinel for malformed input: `canjson.ErrInvalidShape`, `canxml.ErrInvalidShape`, `simplified.ErrUnsupportedDatatype` and `template.ErrInvalidOPT`. Where the SDK holds the bound by pointer or as an interface, the side decodes as written, with no bound.
+**A closed side with no bound.** A side whose `*_unbounded` is present and `false` but whose bound is absent or `null` names a closed end with no value. Where the SDK holds that bound by value, as it does for a concrete `T` (`DV_COUNT.normal_range`, an AOM 1.4 occurrences interval, an OPT numeric or temporal range), the Go value cannot hold the absence, and a reader that filled in the zero bound would change the interval's meaning. Every reader **MUST** refuse such a side, in every mode, wrapping its sentinel for malformed input: `canjson.ErrInvalidShape`, `canxml.ErrInvalidShape`, `simplified.ErrUnsupportedDatatype` and `template.ErrInvalidOPT`. Where the SDK holds the bound by pointer or as an interface, the side decodes as written, with no bound.
 
 The rule binds every such interval reader the SDK has:
 
@@ -254,7 +254,7 @@ The rule binds every such interval reader the SDK has:
 |---|---|
 | canonical JSON ([§ REQ-052](#req-052)) and canonical XML ([§ REQ-056](#req-056)) | `DV_INTERVAL<T>`, BASE `Interval<T>` wherever an RM class holds one, and the AOM 1.4 companions' constraint intervals (`occurrences`, `existence`, `cardinality.interval`, and the ranges of the primitive constraints) |
 | FLAT and STRUCTURED ([§ REQ-140](#req-140--underscore-prefixed-rm-attributes)) | the four interval keys `\|lower_unbounded`, `\|upper_unbounded`, `\|lower_included` and `\|upper_included` |
-| the OPT parser ([clinical-modeling.md § REQ-100](clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths)) | the `occurrences`, `existence` and `cardinality` intervals, and the numeric ranges of `C_INTEGER`, `C_REAL` and `C_DV_QUANTITY` |
+| the OPT parser ([clinical-modeling.md § REQ-100](clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths)) | the `occurrences`, `existence` and `cardinality` intervals, the numeric ranges of `C_INTEGER`, `C_REAL` and `C_DV_QUANTITY`, and the temporal ranges of `C_DATE`, `C_TIME`, `C_DATE_TIME` and `C_DURATION` |
 
 The P_BMM schema loader (`openehr/bmm`) is not one of them: it reads schema data and keeps a container's `cardinality` as written.
 
