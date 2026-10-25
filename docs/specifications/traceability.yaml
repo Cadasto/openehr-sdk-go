@@ -2434,3 +2434,9 @@ requirements:
       - transport/errors_test.go
       - transport/nilwiredereference_internal_test.go
       - transport/span_status_test.go
+
+  - id: REQ-173
+    title: Composition representation formats
+    canonical: docs/specifications/wire.md#req-173--composition-representation-formats
+    status: draft
+    implementation: planned

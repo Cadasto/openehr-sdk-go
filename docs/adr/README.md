@@ -41,6 +41,7 @@ Open decisions (those that would be ADRs once resolved) live in this repo as **r
 | ADR-0027 | Template admission precedes the RM rules at every node | Accepted | 2026-10-13 | Amends: ADR-0025 (clause 1), REQ-102, REQ-112 |
 | ADR-0028 | Generated attribute access replaces the hand-written RM readers | Accepted | 2026-10-13 | Amends: REQ-101, REQ-102, REQ-110, REQ-112, REQ-013 |
 | ADR-0029 | FLAT: the composer rides its real path when the `ctx/` short forms cannot carry it | Accepted | 2026-10-15 | Amends: ADR-0015, REQ-053, REQ-140, REQ-170 |
+| ADR-0030 | Composition calls send the format query parameters only when the caller opts in, departing from the pinned composition operations | Accepted | 2026-10-25 | Amends: REQ-173, REQ-095 |
 
 <!-- /sdd:generated -->
 
