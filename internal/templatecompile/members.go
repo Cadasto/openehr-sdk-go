@@ -26,7 +26,9 @@ func LowerAtLeastOne(m *template.Multiplicity) bool {
 // asks for the list alone and is not read here. The template validator
 // reads a list this way when it decides whether the template requires it,
 // and the example generator when it decides whether only the list's
-// existence asks for a member, so the two cannot drift apart.
+// existence asks for a member. The validator also lets the existence of a
+// list the RM makes non-empty when present ask for a member, which the
+// generator does not read here.
 func AsksForMember(a *CompiledAttribute) bool {
 	if LowerAtLeastOne(a.ChildMultiplicity()) {
 		return true
