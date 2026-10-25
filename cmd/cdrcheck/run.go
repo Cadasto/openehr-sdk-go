@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path"
@@ -17,12 +18,17 @@ import (
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 )
 
 // renameSuffix is appended to a template id whose CDR copy holds other
 // content. The OPT is uploaded again under the new id, to every CDR, and
 // generated from under it, so both CDRs and the SDK read the same content.
 const renameSuffix = ".xc1"
+
+// runFile is the run's provenance, and the file whose creation claims the
+// output directory for the run (prepareOut).
+const runFile = "run.json"
 
 // forEach calls fn for 0..n-1 on at most workers goroutines at once, and
 // returns when every call has. It stops starting calls once ctx ends, and
@@ -46,14 +52,45 @@ func forEach(ctx context.Context, workers, n int, fn func(ctx context.Context, i
 	return context.Cause(ctx)
 }
 
-// execute runs the cross-check cfg describes and writes its output.
+// runner is one run: its output, the CDRs it talks to, the EHR ids it hands
+// out, and a stream per stage file.
+type runner struct {
+	s       *sink
+	clients []*cdrClient
+	ids     *runIDs
+	workers int
+
+	// templates is every OPT file read, a renamed template included. It is
+	// written to templates.jsonl once the renames are decided, or when the
+	// run stops before that.
+	templates        []templateRecord
+	templatesWritten bool
+
+	uploads   *stream[uploadRecord]
+	gens      *stream[genRecord]
+	ehrs      *stream[ehrRecord]
+	posts     *stream[postRecord]
+	examples  *stream[exampleRecord]
+	validates *stream[validateRecord]
+	cross     *stream[postRecord]
+}
+
+// execute runs the cross-check cfg describes and writes its output. Each
+// record is written as it completes. However the run ends, finished,
+// interrupted or on an error, it then writes the summary of the records it
+// made, marked partial when it stopped early, and returns why it stopped.
 func execute(ctx context.Context, cfg config, stdout io.Writer) error {
-	if err := prepareOut(cfg.out); err != nil {
+	dir, err := prepareOut(cfg)
+	if err != nil {
 		return err
 	}
-	s := &sink{dir: cfg.out, red: newRedactor(cfg.cdrs), log: stdout}
+	ctx, stop := context.WithCancelCause(ctx)
+	defer stop(nil)
+	s := &sink{dir: dir, red: newRedactor(cfg.cdrs), log: stdout}
+	r := &runner{s: s, ids: newRunIDs(), workers: cfg.workers}
 	info := runInfo{
 		Started:   time.Now().UTC().Format(time.RFC3339),
+		RunID:     r.ids.id(),
 		SDKCommit: cfg.sdkCommit,
 		Templates: cfg.templates,
 		CDRStages: "ran",
@@ -72,20 +109,60 @@ func execute(ctx context.Context, cfg config, stdout io.Writer) error {
 		info.CDRStages = "skipped: " + cfg.cdrSkip
 		s.logf("cdrcheck: CDR stages skipped: %s", cfg.cdrSkip)
 	}
-	s.logf("cdrcheck: output in %s", cfg.out)
+	s.logf("cdrcheck: output in %s, run %s", dir, info.RunID)
 
-	var data runData
-	var clients []*cdrClient
 	for _, t := range cfg.cdrs {
-		c, err := newCDRClient(t, cfg.workers)
+		c, err := newCDRClient(t, cfg.workers, s.red)
 		if err != nil {
 			return err
 		}
-		clients = append(clients, c)
-		data.cdrs = append(data.cdrs, t.name)
+		r.clients = append(r.clients, c)
 		info.CDRs = append(info.CDRs, cdrRef{Name: t.name, Base: t.base})
 	}
+	// The run identifier is on disk before the first request, so every EHR
+	// the run creates is attributable even if nothing else gets written.
+	if err := s.writeJSON(runFile, info); err != nil {
+		return err
+	}
+	runErr := r.openStreams(stop)
+	if runErr == nil {
+		runErr = r.run(ctx, cfg)
+	}
+	return errors.Join(runErr, r.finish(info, runErr))
+}
 
+// openStreams creates the stage files: gen.jsonl always, the others when
+// the run talks to a CDR.
+func (r *runner) openStreams(stop context.CancelCauseFunc) error {
+	var err error
+	if r.gens, err = openStream[genRecord](r.s, "gen.jsonl", stop, nil); err != nil {
+		return err
+	}
+	if len(r.clients) == 0 {
+		return nil
+	}
+	if r.uploads, err = openStream(r.s, "upload.jsonl", stop, uploadRecord.written); err != nil {
+		return err
+	}
+	if r.ehrs, err = openStream(r.s, "ehrs.jsonl", stop, ehrRecord.written); err != nil {
+		return err
+	}
+	if r.posts, err = openStream(r.s, "post.jsonl", stop, postRecord.written); err != nil {
+		return err
+	}
+	if r.examples, err = openStream(r.s, "examples.jsonl", stop, exampleRecord.written); err != nil {
+		return err
+	}
+	if r.validates, err = openStream[validateRecord](r.s, "validate.jsonl", stop, nil); err != nil {
+		return err
+	}
+	r.cross, err = openStream(r.s, "cross.jsonl", stop, postRecord.written)
+	return err
+}
+
+// run runs the stages in order and returns the first error, or why the run
+// was stopped.
+func (r *runner) run(ctx context.Context, cfg config) error {
 	all, err := collectTemplates(cfg.templates)
 	if err != nil {
 		return err
@@ -99,151 +176,268 @@ func execute(ctx context.Context, cfg config, stdout io.Writer) error {
 			tpls = append(tpls, all[i])
 		}
 	}
-	s.logf("collect: %d OPT files, %d templates checked", len(all), len(tpls))
+	r.templates = all
+	r.s.logf("collect: %d OPT files, %d templates checked", len(all), len(tpls))
 
 	present := map[string]map[string]bool{}
-	if len(clients) > 0 {
+	if len(r.clients) > 0 {
 		var renamed []templateRecord
-		data.uploads, tpls, renamed, err = uploadStage(ctx, s, clients, tpls, cfg.workers)
+		tpls, renamed, err = r.uploadStage(ctx, tpls)
+		r.applyRenames(renamed)
 		if err != nil {
 			return err
 		}
-		for _, nt := range renamed {
-			for i := range all {
-				if all[i].Kept && all[i].TemplateID == nt.RenamedFrom {
-					all[i].Kept, all[i].RenamedTo = false, nt.TemplateID
-				}
-			}
-		}
-		all = append(all, renamed...)
-		for _, u := range data.uploads {
-			if present[u.CDR] == nil {
-				present[u.CDR] = map[string]bool{}
-			}
-			present[u.CDR][u.TemplateID] = u.Present
-		}
-		for _, c := range clients {
+		present = presence(r.uploads.records())
+		for _, c := range r.clients {
 			n := 0
 			for _, ok := range present[c.name] {
 				if ok {
 					n++
 				}
 			}
-			s.logf("upload %s: %d of %d templates present", c.name, n, len(tpls))
+			r.s.logf("upload %s: %d of %d templates present", c.name, n, len(tpls))
 		}
 	}
-	data.templates = all
+	if err := r.writeTemplates(); err != nil {
+		return err
+	}
 
 	cc := &compiler{}
-	data.gens, data.posts, err = generateStage(ctx, s, cc, clients, present, tpls, cfg.workers)
-	if err != nil {
+	if err := r.generateStage(ctx, cc, present, tpls); err != nil {
 		return err
 	}
-	s.logf("generate: %d runs", len(data.gens))
-
-	if len(clients) > 0 {
-		files := map[string]string{}
-		for _, t := range tpls {
-			files[t.TemplateID] = t.File
-		}
-		data.examples, err = exampleStage(ctx, s, clients, present, tpls, cfg.workers)
-		if err != nil {
-			return err
-		}
-		data.validates, err = validateStage(ctx, s, cc, files, data.examples, cfg.workers)
-		if err != nil {
-			return err
-		}
-		data.cross, err = crossStage(ctx, s, clients, present, data.examples, cfg.workers)
-		if err != nil {
-			return err
-		}
+	r.s.logf("generate: %d runs", len(r.gens.records()))
+	if len(r.clients) == 0 {
+		return nil
 	}
+	files := map[string]string{}
+	for _, t := range tpls {
+		files[t.TemplateID] = t.File
+	}
+	if err := r.exampleStage(ctx, present, tpls); err != nil {
+		return err
+	}
+	if err := r.validateStage(ctx, cc, files); err != nil {
+		return err
+	}
+	return r.crossStage(ctx, present)
+}
 
-	sum := summarize(data)
+// finish writes what a run writes last, however it ended: templates.jsonl if
+// the run stopped before it, the summary of the records made, and run.json
+// with the end time and, for a run that stopped early, why.
+func (r *runner) finish(info runInfo, runErr error) error {
+	errs := []error{r.writeTemplates()}
+	for _, c := range []interface{ close() error }{r.uploads, r.gens, r.ehrs, r.posts, r.examples, r.validates, r.cross} {
+		errs = append(errs, c.close())
+	}
+	sum := summarize(r.data())
+	sum.Only = info.Only
 	info.Finished = time.Now().UTC().Format(time.RFC3339)
-	if err := writeAll(s, info, data, sum); err != nil {
-		return err
+	if runErr != nil {
+		info.Stopped = runErr.Error()
+		sum.Partial = runErr.Error()
 	}
-	logSummary(s, sum)
-	return nil
+	errs = append(errs, r.s.writeJSON(runFile, info), r.s.writeJSON("summary.json", sum))
+	_, err := r.s.writeFile("summary.md", []byte(markdown(info, sum)))
+	errs = append(errs, err)
+	if runErr != nil {
+		r.s.logf("cdrcheck: stopped before it finished (%s); the summary counts the records made until then", runErr)
+	}
+	logSummary(r.s, sum)
+	return errors.Join(errs...)
 }
 
-// prepareOut creates the output directory. It refuses one that already
-// holds files, so that two runs never mix.
-func prepareOut(dir string) error {
-	entries, err := os.ReadDir(dir)
-	switch {
-	case errors.Is(err, os.ErrNotExist):
-	case err != nil:
-		return fmt.Errorf("output directory: %w", err)
-	case len(entries) > 0:
-		return fmt.Errorf("output directory %s is not empty; name a new one with -out or %s", dir, envOut)
+// writeTemplates writes templates.jsonl, once.
+func (r *runner) writeTemplates() error {
+	if r.templatesWritten {
+		return nil
 	}
-	return os.MkdirAll(dir, 0o755)
+	r.templatesWritten = true
+	return writeJSONL(r.s, "templates.jsonl", r.templates)
 }
 
-// uploadStage uploads every template to every CDR. A template some CDR
-// holds other content under is renamed (renameSuffix) and uploaded again,
-// to every CDR, in place of the original; renamed lists the new records.
-func uploadStage(ctx context.Context, s *sink, clients []*cdrClient, tpls []templateRecord, workers int) (recs []uploadRecord, out, renamed []templateRecord, err error) {
-	recs, err = uploadAll(ctx, clients, tpls, workers)
-	if err != nil {
-		return nil, nil, nil, err
+// data is what the run recorded, each stage's records in a fixed order: the
+// streams hold them in the order they completed.
+func (r *runner) data() runData {
+	d := runData{templates: r.templates}
+	for _, c := range r.clients {
+		d.cdrs = append(d.cdrs, c.name)
 	}
-	stale := map[string]bool{}
-	for _, r := range recs {
-		if r.StoredSame != nil && !*r.StoredSame {
-			stale[r.TemplateID] = true
-		}
+	byDoc := func(a, b postRecord) int {
+		return cmp.Or(strings.Compare(a.CDR, b.CDR), strings.Compare(a.TemplateID, b.TemplateID), strings.Compare(a.Label, b.Label))
 	}
-	if len(stale) == 0 {
-		return recs, tpls, nil, nil
-	}
-	out = slices.Clone(tpls)
-	for i, t := range out {
-		if !stale[t.TemplateID] {
-			continue
-		}
-		raw, err := os.ReadFile(t.File)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("read OPT: %w", err)
-		}
-		newID := t.TemplateID + renameSuffix
-		b, err := renamedOPT(raw, newID)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("rename %s: %w", t.TemplateID, err)
-		}
-		rel, err := s.writeFile(path.Join("opts", fileName(newID)+".opt"), b)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		nt := templateRecord{
-			TemplateID: newID, File: filepath.Join(s.dir, rel), Root: t.Root,
-			Signature: signatureOf(b), Kept: true, RenamedFrom: t.TemplateID,
-		}
-		renamed = append(renamed, nt)
-		out[i] = nt
-	}
-	recs = slices.DeleteFunc(recs, func(r uploadRecord) bool { return stale[r.TemplateID] })
-	again, err := uploadAll(ctx, clients, renamed, workers)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	recs = append(recs, again...)
-	slices.SortFunc(recs, func(a, b uploadRecord) int {
+	d.uploads = sorted(r.uploads.records(), func(a, b uploadRecord) int {
 		return cmp.Or(strings.Compare(a.CDR, b.CDR), strings.Compare(a.TemplateID, b.TemplateID))
 	})
-	s.logf("upload: renamed %d templates a CDR holds other content under", len(renamed))
-	return recs, out, renamed, nil
+	d.gens = sorted(r.gens.records(), func(a, b genRecord) int {
+		return cmp.Or(strings.Compare(a.TemplateID, b.TemplateID), strings.Compare(a.Policy, b.Policy), strings.Compare(a.Fill, b.Fill))
+	})
+	d.ehrs = sorted(r.ehrs.records(), func(a, b ehrRecord) int {
+		return cmp.Or(strings.Compare(a.CDR, b.CDR), strings.Compare(a.EHRID, b.EHRID))
+	})
+	d.posts = sorted(r.posts.records(), byDoc)
+	d.examples = sorted(r.examples.records(), func(a, b exampleRecord) int {
+		return cmp.Or(strings.Compare(a.CDR, b.CDR), strings.Compare(a.TemplateID, b.TemplateID), strings.Compare(a.Level, b.Level))
+	})
+	d.validates = sorted(r.validates.records(), func(a, b validateRecord) int {
+		return cmp.Or(strings.Compare(a.CDR, b.CDR), strings.Compare(a.TemplateID, b.TemplateID), strings.Compare(a.Level, b.Level))
+	})
+	d.cross = sorted(r.cross.records(), byDoc)
+	return d
 }
 
-func uploadAll(ctx context.Context, clients []*cdrClient, tpls []templateRecord, workers int) ([]uploadRecord, error) {
-	recs := make([]uploadRecord, len(clients)*len(tpls))
-	err := forEach(ctx, workers, len(recs), func(ctx context.Context, i int) {
-		recs[i] = uploadOne(ctx, clients[i/len(tpls)], tpls[i%len(tpls)])
+func sorted[T any](s []T, by func(a, b T) int) []T {
+	slices.SortStableFunc(s, by)
+	return s
+}
+
+// prepareOut claims the run's output directory and returns its path. A
+// directory named by -out or OPENEHR_XC_OUT is created with os.Mkdir, or
+// taken as it is when it exists already and is empty; with none named, a
+// new one is made under cfg.outRoot with os.MkdirTemp, a name no other run
+// gets. Either way the run then claims the directory by creating run.json
+// with O_EXCL, so that of two runs given one directory only one gets it, and
+// it refuses a directory that holds anything else.
+func prepareOut(cfg config) (string, error) {
+	dir := cfg.out
+	if dir == "" {
+		if err := os.MkdirAll(cfg.outRoot, 0o755); err != nil {
+			return "", fmt.Errorf("output directory: %w", err)
+		}
+		d, err := os.MkdirTemp(cfg.outRoot, time.Now().UTC().Format("20060102T150405Z")+"-")
+		if err != nil {
+			return "", fmt.Errorf("output directory: %w", err)
+		}
+		dir = d
+	} else {
+		if err := os.MkdirAll(filepath.Dir(dir), 0o755); err != nil {
+			return "", fmt.Errorf("output directory: %w", err)
+		}
+		if err := os.Mkdir(dir, 0o755); err != nil && !errors.Is(err, fs.ErrExist) {
+			return "", fmt.Errorf("output directory: %w", err)
+		}
+	}
+	claim := filepath.Join(dir, runFile)
+	f, err := os.OpenFile(claim, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if errors.Is(err, fs.ErrExist) {
+		return "", fmt.Errorf("output directory %s is in use by another run; name a new one with -out or %s", dir, envOut)
+	}
+	if err != nil {
+		return "", fmt.Errorf("output directory: %w", err)
+	}
+	if err := f.Close(); err != nil {
+		return "", fmt.Errorf("output directory: %w", err)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return "", errors.Join(fmt.Errorf("output directory: %w", err), os.Remove(claim))
+	}
+	if len(entries) > 1 {
+		return "", errors.Join(fmt.Errorf("output directory %s is not empty; name a new one with -out or %s", dir, envOut), os.Remove(claim))
+	}
+	return dir, nil
+}
+
+// presence maps each CDR to the templates it holds after the upload stage.
+func presence(ups []uploadRecord) map[string]map[string]bool {
+	present := map[string]map[string]bool{}
+	for _, u := range ups {
+		if present[u.CDR] == nil {
+			present[u.CDR] = map[string]bool{}
+		}
+		present[u.CDR][u.TemplateID] = u.Present
+	}
+	return present
+}
+
+// uploadStage uploads every template to every CDR, a template at a time. out
+// is tpls with each renamed template (uploadTemplate) in place of its
+// original; renamed lists the new records. Both cover the templates the
+// stage finished, when it stops early.
+func (r *runner) uploadStage(ctx context.Context, tpls []templateRecord) (out, renamed []templateRecord, err error) {
+	news := make([]*templateRecord, len(tpls))
+	errs := make([]error, len(tpls))
+	ferr := forEach(ctx, r.workers, len(tpls), func(ctx context.Context, i int) {
+		news[i], errs[i] = r.uploadTemplate(ctx, tpls[i])
 	})
-	return recs, err
+	out = slices.Clone(tpls)
+	for i, nt := range news {
+		if nt != nil {
+			out[i] = *nt
+			renamed = append(renamed, *nt)
+		}
+	}
+	if len(renamed) > 0 {
+		r.s.logf("upload: renamed %d templates a CDR holds other content under", len(renamed))
+	}
+	return out, renamed, errors.Join(append(errs, ferr)...)
+}
+
+// uploadTemplate uploads t to every CDR and records each answer. Where some
+// CDR holds other content under t's id, t is renamed (renameSuffix) and
+// uploaded again, to every CDR; the records of t are kept, marked as
+// superseded by the new id, and the new record is returned.
+func (r *runner) uploadTemplate(ctx context.Context, t templateRecord) (*templateRecord, error) {
+	recs := make([]uploadRecord, 0, len(r.clients))
+	stale := false
+	for _, c := range r.clients {
+		rec := uploadOne(ctx, c, t)
+		stale = stale || (rec.StoredSame != nil && !*rec.StoredSame)
+		recs = append(recs, rec)
+	}
+	if !stale {
+		r.uploads.add(recs...)
+		return nil, nil
+	}
+	nt, err := r.renamedTemplate(t)
+	if err != nil {
+		r.uploads.add(recs...)
+		return nil, err
+	}
+	for i := range recs {
+		recs[i].SupersededBy = nt.TemplateID
+	}
+	r.uploads.add(recs...)
+	for _, c := range r.clients {
+		r.uploads.add(uploadOne(ctx, c, nt))
+	}
+	return &nt, nil
+}
+
+// renamedTemplate writes t's OPT under its id plus renameSuffix to the
+// output directory and returns its record.
+func (r *runner) renamedTemplate(t templateRecord) (templateRecord, error) {
+	raw, err := os.ReadFile(t.File)
+	if err != nil {
+		return templateRecord{}, fmt.Errorf("read OPT: %w", err)
+	}
+	newID := t.TemplateID + renameSuffix
+	b, err := renamedOPT(raw, newID)
+	if err != nil {
+		return templateRecord{}, fmt.Errorf("rename %s: %w", t.TemplateID, err)
+	}
+	rel, err := r.s.writeFile(path.Join("opts", fileName(newID)+".opt"), b)
+	if err != nil {
+		return templateRecord{}, err
+	}
+	return templateRecord{
+		TemplateID: newID, File: filepath.Join(r.s.dir, rel), Root: t.Root,
+		Signature: signatureOf(b), Kept: true, RenamedFrom: t.TemplateID,
+	}, nil
+}
+
+// applyRenames marks each renamed template's original as replaced and adds
+// the renamed record.
+func (r *runner) applyRenames(renamed []templateRecord) {
+	for _, nt := range renamed {
+		for i := range r.templates {
+			if r.templates[i].Kept && r.templates[i].TemplateID == nt.RenamedFrom {
+				r.templates[i].Kept, r.templates[i].RenamedTo = false, nt.TemplateID
+			}
+		}
+	}
+	r.templates = append(r.templates, renamed...)
 }
 
 // uploadOne uploads one OPT. When the CDR refuses it as already present,
@@ -281,54 +475,54 @@ func uploadOne(ctx context.Context, c *cdrClient, t templateRecord) uploadRecord
 
 // generateStage generates every template's documents and posts each
 // COMPOSITION to every CDR that holds its template, each to a fresh EHR.
-func generateStage(ctx context.Context, s *sink, cc *compiler, clients []*cdrClient, present map[string]map[string]bool, tpls []templateRecord, workers int) ([]genRecord, []postRecord, error) {
-	type result struct {
-		gens  []genRecord
-		posts []postRecord
-	}
-	results := make([]result, len(tpls))
-	err := forEach(ctx, workers, len(tpls), func(ctx context.Context, i int) {
+func (r *runner) generateStage(ctx context.Context, cc *compiler, present map[string]map[string]bool, tpls []templateRecord) error {
+	return forEach(ctx, r.workers, len(tpls), func(ctx context.Context, i int) {
 		t := tpls[i]
-		for _, d := range generateAll(ctx, s, cc, t) {
-			results[i].gens = append(results[i].gens, d.rec)
+		generateAll(ctx, r.s, cc, t, func(d generated) {
+			r.gens.add(d.rec)
 			if d.comp == nil || d.rec.File == "" {
-				continue
+				return
 			}
-			for _, c := range clients {
+			for _, c := range r.clients {
 				if !present[c.name][t.TemplateID] {
 					continue
 				}
-				id, o, created := c.postComposition(ctx, d.comp)
-				p := postRecord{CDR: c.name, TemplateID: t.TemplateID, Label: d.rec.label(), File: d.rec.File, EHRID: string(id), outcome: o}
-				if !created {
-					p.Stage = "ehr"
-				}
-				results[i].posts = append(results[i].posts, p)
+				p := postRecord{CDR: c.name, TemplateID: t.TemplateID, Label: d.rec.label(), File: d.rec.File}
+				r.post(ctx, c, p, r.posts, func(ctx context.Context, id openehrclient.EHRID) outcome {
+					return c.saveComposition(ctx, id, d.comp)
+				})
 			}
-		}
+		})
 	})
-	var gens []genRecord
-	var posts []postRecord
-	for _, r := range results {
-		gens = append(gens, r.gens...)
-		posts = append(posts, r.posts...)
+}
+
+// post creates the next EHR of the run on c and, once it exists, sends the
+// document there with send. The EHR create is recorded in ehrs.jsonl as it
+// returns, then the post in out. A create the CDR refuses is the document's
+// outcome, with stage "ehr".
+func (r *runner) post(ctx context.Context, c *cdrClient, p postRecord, out *stream[postRecord], send func(context.Context, openehrclient.EHRID) outcome) {
+	id := r.ids.next()
+	eo := c.newEHR(ctx, id)
+	r.ehrs.add(ehrRecord{CDR: c.name, EHRID: string(id), TemplateID: p.TemplateID, Label: p.Label, Source: p.Source, outcome: eo})
+	p.EHRID = string(id)
+	if eo.OK {
+		p.outcome = send(ctx, id)
+	} else {
+		p.Stage, p.outcome = "ehr", eo
 	}
-	slices.SortStableFunc(posts, func(a, b postRecord) int {
-		return cmp.Or(strings.Compare(a.CDR, b.CDR), strings.Compare(a.TemplateID, b.TemplateID), strings.Compare(a.Label, b.Label))
-	})
-	return gens, posts, err
+	out.add(p)
 }
 
 // exampleStage fetches each CDR's own example of each template it holds,
 // at each level it builds.
-func exampleStage(ctx context.Context, s *sink, clients []*cdrClient, present map[string]map[string]bool, tpls []templateRecord, workers int) ([]exampleRecord, error) {
+func (r *runner) exampleStage(ctx context.Context, present map[string]map[string]bool, tpls []templateRecord) error {
 	type job struct {
 		c     *cdrClient
 		tid   string
 		level definition.ExampleDetailLevel
 	}
 	var jobs []job
-	for _, c := range clients {
+	for _, c := range r.clients {
 		for _, t := range tpls {
 			if !present[c.name][t.TemplateID] {
 				continue
@@ -338,8 +532,7 @@ func exampleStage(ctx context.Context, s *sink, clients []*cdrClient, present ma
 			}
 		}
 	}
-	recs := make([]exampleRecord, len(jobs))
-	err := forEach(ctx, workers, len(jobs), func(ctx context.Context, i int) {
+	err := forEach(ctx, r.workers, len(jobs), func(ctx context.Context, i int) {
 		j := jobs[i]
 		level := cmp.Or(string(j.level), "default")
 		rec := exampleRecord{CDR: j.c.name, TemplateID: j.tid, Level: level}
@@ -351,119 +544,84 @@ func exampleStage(ctx context.Context, s *sink, clients []*cdrClient, present ma
 			}
 			if err := json.Unmarshal(body, &probe); err != nil {
 				rec.OK, rec.Error = false, "the example is not a JSON object: "+err.Error()
-				rec.Body = clip(string(body))
+				rec.Body = r.s.red.string(string(body))
 			} else {
 				rec.RootType = probe.Type
-				rel, err := s.writeFile(path.Join("examples", j.c.name, fileName(j.tid), level+".json"), body)
+				rel, err := r.s.writeFile(path.Join("examples", j.c.name, fileName(j.tid), level+".json"), body)
 				if err != nil {
 					rec.Error = err.Error()
 				}
 				rec.File = rel
 			}
 		}
-		recs[i] = rec
+		r.examples.add(rec)
 	})
-	for _, c := range clients {
+	recs := r.examples.records()
+	for _, c := range r.clients {
 		n, of := 0, 0
-		for _, r := range recs {
-			if r.CDR == c.name {
+		for _, e := range recs {
+			if e.CDR == c.name {
 				of++
-				if r.File != "" {
+				if e.File != "" {
 					n++
 				}
 			}
 		}
-		s.logf("examples %s: %d of %d fetched", c.name, n, of)
+		r.s.logf("examples %s: %d of %d fetched", c.name, n, of)
 	}
-	return recs, err
+	return err
 }
 
 // validateStage validates every fetched CDR example with the SDK.
-func validateStage(ctx context.Context, s *sink, cc *compiler, files map[string]string, examples []exampleRecord, workers int) ([]validateRecord, error) {
+func (r *runner) validateStage(ctx context.Context, cc *compiler, files map[string]string) error {
 	var fetched []exampleRecord
-	for _, e := range examples {
+	for _, e := range r.examples.records() {
 		if e.File != "" {
 			fetched = append(fetched, e)
 		}
 	}
-	recs := make([]validateRecord, len(fetched))
-	err := forEach(ctx, workers, len(fetched), func(ctx context.Context, i int) {
+	return forEach(ctx, r.workers, len(fetched), func(ctx context.Context, i int) {
 		e := fetched[i]
-		doc, err := os.ReadFile(filepath.Join(s.dir, e.File))
+		doc, err := os.ReadFile(filepath.Join(r.s.dir, e.File))
 		if err != nil {
-			recs[i] = validateRecord{CDR: e.CDR, TemplateID: e.TemplateID, Level: e.Level, File: e.File, Stage: "read", Error: err.Error()}
+			r.validates.add(validateRecord{CDR: e.CDR, TemplateID: e.TemplateID, Level: e.Level, File: e.File, Stage: "read", Error: err.Error()})
 			return
 		}
-		recs[i] = validateExample(cc, files[e.TemplateID], e, doc)
+		r.validates.add(validateExample(cc, files[e.TemplateID], e, doc))
 	})
-	return recs, err
 }
 
 // crossStage posts every CDR example that is a COMPOSITION, its top-level
 // uid removed, to every CDR that holds its template, each to a fresh EHR.
-func crossStage(ctx context.Context, s *sink, clients []*cdrClient, present map[string]map[string]bool, examples []exampleRecord, workers int) ([]postRecord, error) {
+func (r *runner) crossStage(ctx context.Context, present map[string]map[string]bool) error {
 	var docs []exampleRecord
-	for _, e := range examples {
+	for _, e := range r.examples.records() {
 		if e.File != "" && e.RootType == "COMPOSITION" {
 			docs = append(docs, e)
 		}
 	}
-	results := make([][]postRecord, len(docs))
-	err := forEach(ctx, workers, len(docs), func(ctx context.Context, i int) {
+	return forEach(ctx, r.workers, len(docs), func(ctx context.Context, i int) {
 		e := docs[i]
-		label := e.CDR + ":" + e.Level
-		raw, err := os.ReadFile(filepath.Join(s.dir, e.File))
+		raw, err := os.ReadFile(filepath.Join(r.s.dir, e.File))
 		var doc []byte
 		if err == nil {
 			doc, err = withoutUID(raw)
 		}
-		for _, c := range clients {
+		for _, c := range r.clients {
 			if !present[c.name][e.TemplateID] {
 				continue
 			}
-			p := postRecord{CDR: c.name, TemplateID: e.TemplateID, Label: label, Source: e.CDR, File: e.File}
+			p := postRecord{CDR: c.name, TemplateID: e.TemplateID, Label: e.CDR + ":" + e.Level, Source: e.CDR, File: e.File}
 			if err != nil {
 				p.Stage, p.Error = "read", err.Error()
-				results[i] = append(results[i], p)
+				r.cross.add(p)
 				continue
 			}
-			id, o, created := c.postRaw(ctx, doc)
-			p.EHRID, p.outcome = string(id), o
-			if !created {
-				p.Stage = "ehr"
-			}
-			results[i] = append(results[i], p)
+			r.post(ctx, c, p, r.cross, func(ctx context.Context, id openehrclient.EHRID) outcome {
+				return c.postRaw(ctx, id, doc)
+			})
 		}
 	})
-	var out []postRecord
-	for _, r := range results {
-		out = append(out, r...)
-	}
-	slices.SortStableFunc(out, func(a, b postRecord) int {
-		return cmp.Or(strings.Compare(a.CDR, b.CDR), strings.Compare(a.TemplateID, b.TemplateID), strings.Compare(a.Label, b.Label))
-	})
-	return out, err
-}
-
-// writeAll writes each stage's JSON Lines, the summary and the run's
-// provenance.
-func writeAll(s *sink, info runInfo, d runData, sum summary) error {
-	errs := []error{
-		writeJSONL(s, "templates.jsonl", d.templates),
-		writeJSONL(s, "gen.jsonl", d.gens),
-	}
-	if len(d.cdrs) > 0 {
-		errs = append(errs,
-			writeJSONL(s, "upload.jsonl", d.uploads),
-			writeJSONL(s, "post.jsonl", d.posts),
-			writeJSONL(s, "examples.jsonl", d.examples),
-			writeJSONL(s, "validate.jsonl", d.validates),
-			writeJSONL(s, "cross.jsonl", d.cross),
-		)
-	}
-	errs = append(errs, s.writeJSON("run.json", info), s.writeJSON("summary.json", sum))
-	_, err := s.writeFile("summary.md", []byte(markdown(info, sum)))
-	return errors.Join(append(errs, err)...)
 }
 
 // logSummary prints the headline numbers.
@@ -471,8 +629,8 @@ func logSummary(s *sink, sum summary) {
 	g := sum.Generation
 	s.logf("generation: %d runs, %d errors, %d not self-valid, %d not RM-valid", g.Runs, g.Errors, g.NotSelfValid, g.NotRMValid)
 	for _, c := range sum.PerCDR {
-		s.logf("%s: templates %s, SDK documents accepted %s, examples fetched %s, SDK-valid examples %s, own examples accepted %s, other CDRs' examples accepted %s",
-			c.Name, c.TemplatesPresent, c.DocumentsAccepted, c.ExamplesFetched, c.ExamplesSDKValid, c.OwnExamplesAccepted, c.OtherExamplesAccepted)
+		s.logf("%s: templates %s, EHRs created %s, SDK documents accepted %s, examples fetched %s, SDK-valid examples %s, own examples accepted %s, other CDRs' examples accepted %s",
+			c.Name, c.TemplatesPresent, c.EHRsCreated, c.DocumentsAccepted, c.ExamplesFetched, c.ExamplesSDKValid, c.OwnExamplesAccepted, c.OtherExamplesAccepted)
 	}
 	if len(sum.PerCDR) > 0 {
 		var alone []string

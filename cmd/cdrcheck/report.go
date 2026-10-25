@@ -18,6 +18,7 @@ type runData struct {
 	templates []templateRecord
 	uploads   []uploadRecord
 	gens      []genRecord
+	ehrs      []ehrRecord
 	posts     []postRecord
 	examples  []exampleRecord
 	validates []validateRecord
@@ -42,6 +43,37 @@ type uploadRecord struct {
 	// Present is true when the CDR holds this template after the upload, so
 	// documents of it are posted there.
 	Present bool `json:"present"`
+	// SupersededBy names the id the template was uploaded again under,
+	// because a CDR holds other content under this one (uploadTemplate). The
+	// record is kept, as what this CDR answered, and left out of the counts.
+	SupersededBy string `json:"superseded_by,omitempty"`
+}
+
+// written is the record as upload.jsonl holds it.
+func (u uploadRecord) written() uploadRecord {
+	u.outcome = u.outcome.written()
+	return u
+}
+
+// ehrRecord is one EHR the run asked a CDR to create, one line of
+// ehrs.jsonl, written as the create returns. EHRID is the id the run named
+// (runIDs), so a create cut short by the end of the run is recorded with it
+// too.
+type ehrRecord struct {
+	CDR   string `json:"cdr"`
+	EHRID string `json:"ehr_id"`
+	// TemplateID, Label and Source name the document the EHR is for, as its
+	// postRecord does.
+	TemplateID string `json:"template_id"`
+	Label      string `json:"label"`
+	Source     string `json:"source,omitempty"`
+	outcome
+}
+
+// written is the record as ehrs.jsonl holds it.
+func (e ehrRecord) written() ehrRecord {
+	e.outcome = e.outcome.written()
+	return e
 }
 
 // postRecord is one document posted to one CDR, a line of post.jsonl (an
@@ -62,8 +94,15 @@ type postRecord struct {
 	outcome
 }
 
-// posted reports whether the document reached the CDR.
-func (p postRecord) posted() bool { return p.Stage == "" }
+// posted reports whether the document reached the CDR and the CDR's
+// verdict on it is known.
+func (p postRecord) posted() bool { return p.Stage == "" && !p.Stopped }
+
+// written is the record as post.jsonl or cross.jsonl holds it.
+func (p postRecord) written() postRecord {
+	p.outcome = p.outcome.written()
+	return p
+}
 
 // exampleRecord is one CDR example asked for, one line of examples.jsonl.
 type exampleRecord struct {
@@ -73,6 +112,12 @@ type exampleRecord struct {
 	File       string `json:"file,omitempty"`
 	RootType   string `json:"root_type,omitempty"`
 	outcome
+}
+
+// written is the record as examples.jsonl holds it.
+func (e exampleRecord) written() exampleRecord {
+	e.outcome = e.outcome.written()
+	return e
 }
 
 // ratio is n of a total.
@@ -97,10 +142,14 @@ type refusalGroup struct {
 
 // cdrSummary is one CDR's numbers.
 type cdrSummary struct {
-	Name                  string         `json:"name"`
-	TemplatesPresent      ratio          `json:"templates_present"`
-	UploadRefusals        []refusalGroup `json:"upload_refusals,omitempty"`
-	StoredDiffers         []string       `json:"stored_differs,omitempty"`
+	Name             string         `json:"name"`
+	TemplatesPresent ratio          `json:"templates_present"`
+	UploadRefusals   []refusalGroup `json:"upload_refusals,omitempty"`
+	StoredDiffers    []string       `json:"stored_differs,omitempty"`
+	// EHRsCreated counts the EHR creates the CDR accepted, of those whose
+	// answer came; EHRRefusals groups the others.
+	EHRsCreated           ratio          `json:"ehrs_created"`
+	EHRRefusals           []refusalGroup `json:"ehr_refusals,omitempty"`
 	DocumentsAccepted     ratio          `json:"documents_accepted"`
 	DocumentRefusals      []refusalGroup `json:"document_refusals,omitempty"`
 	EHRFailures           int            `json:"ehr_failures"`
@@ -119,10 +168,15 @@ type refusedDocs struct {
 	Details    map[string][]string `json:"details"`
 }
 
-// summary is the run's numbers, the ones the evidence README's tables and
-// the plans' definitions of done quote.
+// summary is the run's numbers.
 type summary struct {
 	CDRs []string `json:"cdrs"`
+	// Only is the -only expression of a run that checked only the
+	// templates it matches.
+	Only string `json:"only,omitempty"`
+	// Partial says why a run stopped before it finished; its numbers then
+	// count the records made until it stopped.
+	Partial string `json:"partial,omitempty"`
 	// Templates counts the OPT files read, the templates checked (a renamed
 	// one under its new id), and the files left out: a second file with an
 	// id already read, a file with no id, or one -only does not match.
@@ -354,20 +408,35 @@ func summarize(r runData) summary {
 			if u.CDR != cdr {
 				continue
 			}
+			if u.StoredSame != nil && !*u.StoredSame {
+				cs.StoredDiffers = append(cs.StoredDiffers, u.TemplateID)
+			}
+			if u.SupersededBy != "" || u.Stopped {
+				continue
+			}
 			cs.TemplatesPresent.Of++
 			if u.Present {
 				cs.TemplatesPresent.N++
 			} else {
 				up = append(up, verdict{tid: u.TemplateID, o: u.outcome})
 			}
-			if u.StoredSame != nil && !*u.StoredSame {
-				cs.StoredDiffers = append(cs.StoredDiffers, u.TemplateID)
-			}
 		}
 		cs.UploadRefusals = groupRefusals(up)
+		var ehrs []verdict
+		for _, e := range r.ehrs {
+			if e.CDR != cdr || e.Stopped {
+				continue
+			}
+			cs.EHRsCreated.Of++
+			if e.OK {
+				cs.EHRsCreated.N++
+			}
+			ehrs = append(ehrs, verdict{tid: e.TemplateID, label: e.Label, o: e.outcome})
+		}
+		cs.EHRRefusals = groupRefusals(ehrs)
 		var docs []verdict
 		for _, p := range r.posts {
-			if p.CDR != cdr {
+			if p.CDR != cdr || p.Stopped {
 				continue
 			}
 			if p.Stage == "ehr" {
@@ -384,7 +453,7 @@ func summarize(r runData) summary {
 		}
 		cs.DocumentRefusals = groupRefusals(docs)
 		for _, e := range r.examples {
-			if e.CDR != cdr {
+			if e.CDR != cdr || e.Stopped {
 				continue
 			}
 			cs.ExamplesFetched.Of++
@@ -408,7 +477,7 @@ func summarize(r runData) summary {
 		}
 		var ex []verdict
 		for _, c := range r.cross {
-			if c.CDR != cdr {
+			if c.CDR != cdr || c.Stopped {
 				continue
 			}
 			if c.Stage == "ehr" {

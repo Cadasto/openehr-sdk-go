@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"cmp"
 	"errors"
 	"flag"
 	"fmt"
@@ -11,7 +12,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
 	"github.com/cadasto/openehr-sdk-go/testkit/probe"
@@ -76,7 +76,10 @@ type cdrTarget struct {
 // config is one run's settings.
 type config struct {
 	templates string
+	// out is the output directory -out or OPENEHR_XC_OUT names. When
+	// neither does, the run makes a new one under outRoot (prepareOut).
 	out       string
+	outRoot   string
 	workers   int
 	only      *regexp.Regexp
 	sdkCommit string
@@ -155,20 +158,18 @@ func loadConfig(args []string, getenv func(string) string, usage io.Writer) (cfg
 		cfg.cdrs = nil
 	}
 
-	cfg.out = *out
-	if cfg.out == "" {
-		cfg.out = getenv(envOut)
-	}
-	if cfg.out == "" {
-		cfg.out = filepath.Join(os.TempDir(), "openehr-cdrcheck", time.Now().UTC().Format("20060102T150405Z"))
-	}
-	abs, err := filepath.Abs(cfg.out)
+	given := cmp.Or(*out, getenv(envOut))
+	abs, err := filepath.Abs(cmp.Or(given, filepath.Join(os.TempDir(), "openehr-cdrcheck")))
 	if err != nil {
 		return config{}, false, fmt.Errorf("output directory: %w", err)
 	}
-	cfg.out = abs
-	if root, inside := insideModule(cfg.out); inside {
-		return config{}, false, fmt.Errorf("output directory %s is inside the repository at %s; the run's data stays outside it", cfg.out, root)
+	if given != "" {
+		cfg.out = abs
+	} else {
+		cfg.outRoot = abs
+	}
+	if root, inside := insideModule(abs); inside {
+		return config{}, false, fmt.Errorf("output directory %s is inside the repository at %s; the run's data stays outside it", abs, root)
 	}
 	return cfg, false, nil
 }
@@ -200,10 +201,39 @@ func readTarget(spec cdrSpec, getenv func(string) string) (cdrTarget, bool, erro
 	return t, true, nil
 }
 
-// insideModule reports whether dir is in a checkout of this module: dir or
-// one of its parents holds a go.mod declaring modulePath. root is that
-// directory.
+// insideModule reports whether dir is in a checkout of this module, as
+// written or with its symbolic links resolved (resolveLinks): dir or one of
+// its parents holds a go.mod declaring modulePath. root is that directory.
 func insideModule(dir string) (root string, inside bool) {
+	for _, d := range []string{filepath.Clean(dir), resolveLinks(dir)} {
+		if root, inside := moduleAt(d); inside {
+			return root, true
+		}
+	}
+	return "", false
+}
+
+// resolveLinks returns dir with the symbolic links of its nearest existing
+// ancestor resolved (filepath.EvalSymlinks). The part below that ancestor
+// does not exist yet, so it holds no link.
+func resolveLinks(dir string) string {
+	d, rest := filepath.Clean(dir), ""
+	for {
+		if r, err := filepath.EvalSymlinks(d); err == nil {
+			return filepath.Join(r, rest)
+		}
+		parent := filepath.Dir(d)
+		if parent == d {
+			return filepath.Clean(dir)
+		}
+		rest = filepath.Join(filepath.Base(d), rest)
+		d = parent
+	}
+}
+
+// moduleAt reports whether dir or one of its parents, as written, holds a
+// go.mod declaring modulePath.
+func moduleAt(dir string) (root string, inside bool) {
 	for d := filepath.Clean(dir); ; {
 		if declaresModule(filepath.Join(d, "go.mod")) {
 			return d, true

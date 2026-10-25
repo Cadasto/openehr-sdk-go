@@ -21,8 +21,8 @@ import (
 // fakeCDR stands in for a CDR's openEHR REST API in tests. It answers the
 // calls the run makes, and is as strict as the CDRs on the points the run
 // handles: it refuses an OPT that starts with a byte-order mark, an EHR
-// create that carries a body or a Content-Type, and, when persistent is
-// set, a second composition in one EHR.
+// create that carries a body or a Content-Type, an EHR id it holds already,
+// and, when persistent is set, a second composition in one EHR.
 type fakeCDR struct {
 	srv *httptest.Server
 	// user and pass, when set, are the Basic credential every request must
@@ -31,9 +31,17 @@ type fakeCDR struct {
 	// persistent refuses a second composition in one EHR, as FerroEHR does
 	// for a persistent template.
 	persistent bool
-	// refuseCompositions answers every composition with a 422 whose text
-	// quotes the request's Authorization header.
-	refuseCompositions bool
+	// refusal, when set, answers every composition with a 422 and the body
+	// it builds from the request's Authorization header.
+	refusal func(auth string) string
+	// refuseEHRCreate answers every EHR create with a 405.
+	refuseEHRCreate bool
+	// afterEHRCreate, when set, is called with the number of EHRs created so
+	// far once each create is stored, before its answer is sent.
+	afterEHRCreate func(n int)
+	// ehrAnswer, when set, is the body of a 201 to an EHR create of id, in
+	// place of the EHR's representation.
+	ehrAnswer func(id string) string
 	// serveStored rewrites a stored OPT on the way out; nil serves it as
 	// uploaded.
 	serveStored func([]byte) []byte
@@ -46,6 +54,8 @@ type fakeCDR struct {
 	uploads     [][]byte
 	ehrs        map[string]int
 	ehrCreates  int
+	ehrIDs      []string
+	ehrCalls    []string
 	posted      []postedDoc
 	exampleAsks []string
 }
@@ -78,8 +88,12 @@ func (f *fakeCDR) count() int {
 
 // fakeState is a copy of what a fakeCDR saw.
 type fakeState struct {
-	uploads     [][]byte
-	ehrCreates  int
+	uploads    [][]byte
+	ehrCreates int
+	// ehrIDs are the EHRs created, in order; ehrCalls the method and path
+	// of every EHR create asked for, refused ones included.
+	ehrIDs      []string
+	ehrCalls    []string
 	posted      []postedDoc
 	exampleAsks []string
 }
@@ -90,6 +104,8 @@ func (f *fakeCDR) state() fakeState {
 	return fakeState{
 		uploads:     slices.Clone(f.uploads),
 		ehrCreates:  f.ehrCreates,
+		ehrIDs:      slices.Clone(f.ehrIDs),
+		ehrCalls:    slices.Clone(f.ehrCalls),
 		posted:      slices.Clone(f.posted),
 		exampleAsks: slices.Clone(f.exampleAsks),
 	}
@@ -160,17 +176,9 @@ func (f *fakeCDR) serve(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/xml")
 		_, _ = w.Write(stored)
 	case r.Method == http.MethodPost && p == "/ehr":
-		if len(body) > 0 || r.Header.Get("Content-Type") != "" {
-			writeJSONError(w, http.StatusUnsupportedMediaType, `{"message":"Content-Type is not supported"}`)
-			return
-		}
-		f.ehrCreates++
-		id := fmt.Sprintf("00000000-0000-4000-8000-%012d", f.ehrCreates)
-		f.ehrs[id] = 0
-		w.Header().Set("Location", f.url()+"/ehr/"+id)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		_, _ = fmt.Fprintf(w, `{"_type":"EHR","ehr_id":{"_type":"HIER_OBJECT_ID","value":%q},"system_id":{"_type":"HIER_OBJECT_ID","value":"fake"},"time_created":{"_type":"DV_DATE_TIME","value":"2026-01-02T03:04:05Z"}}`, id)
+		f.createEHR(w, r, body, fmt.Sprintf("00000000-0000-4000-8000-%012d", f.ehrCreates+1))
+	case r.Method == http.MethodPut && strings.HasPrefix(p, "/ehr/") && strings.Count(p, "/") == 2:
+		f.createEHR(w, r, body, strings.TrimPrefix(p, "/ehr/"))
 	case r.Method == http.MethodPost && strings.HasPrefix(p, "/ehr/") && strings.HasSuffix(p, "/composition"):
 		id := strings.TrimSuffix(strings.TrimPrefix(p, "/ehr/"), "/composition")
 		n, ok := f.ehrs[id]
@@ -184,8 +192,8 @@ func (f *fakeCDR) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		f.ehrs[id] = n + 1
 		f.posted = append(f.posted, postedDoc{ehr: id, body: body})
-		if f.refuseCompositions {
-			writeJSONError(w, http.StatusUnprocessableEntity, fmt.Sprintf(`{"message":"rejected request with header Authorization: %s"}`, r.Header.Get("Authorization")))
+		if f.refusal != nil {
+			writeJSONError(w, http.StatusUnprocessableEntity, f.refusal(r.Header.Get("Authorization")))
 			return
 		}
 		w.Header().Set("Location", f.url()+"/ehr/"+id+"/composition/11111111-1111-4111-8111-111111111111::fake::1")
@@ -193,6 +201,39 @@ func (f *fakeCDR) serve(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeJSONError(w, http.StatusNotFound, `{"message":"no such route"}`)
 	}
+}
+
+// createEHR answers an EHR create for id: POST /ehr with the id the fake
+// picks, PUT /ehr/{ehr_id} with the client's. It holds f.mu.
+func (f *fakeCDR) createEHR(w http.ResponseWriter, r *http.Request, body []byte, id string) {
+	f.ehrCalls = append(f.ehrCalls, r.Method+" "+r.URL.Path)
+	if len(body) > 0 || r.Header.Get("Content-Type") != "" {
+		writeJSONError(w, http.StatusUnsupportedMediaType, `{"message":"Content-Type is not supported"}`)
+		return
+	}
+	if f.refuseEHRCreate {
+		writeJSONError(w, http.StatusMethodNotAllowed, `{"message":"EHR create is not supported here"}`)
+		return
+	}
+	if _, dup := f.ehrs[id]; dup {
+		writeJSONError(w, http.StatusConflict, `{"message":"EHR with this ID already exists"}`)
+		return
+	}
+	f.ehrCreates++
+	f.ehrs[id] = 0
+	f.ehrIDs = append(f.ehrIDs, id)
+	if f.afterEHRCreate != nil {
+		f.afterEHRCreate(f.ehrCreates)
+	}
+	w.Header().Set("Location", f.url()+"/ehr/"+id)
+	if f.ehrAnswer != nil {
+		w.WriteHeader(http.StatusCreated)
+		_, _ = io.WriteString(w, f.ehrAnswer(id))
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_, _ = fmt.Fprintf(w, `{"_type":"EHR","ehr_id":{"_type":"HIER_OBJECT_ID","value":%q},"system_id":{"_type":"HIER_OBJECT_ID","value":"fake"},"time_created":{"_type":"DV_DATE_TIME","value":"2026-01-02T03:04:05Z"}}`, id)
 }
 
 // testTemplate is the vendored OPT the pipeline tests run over.

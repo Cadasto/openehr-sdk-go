@@ -15,8 +15,12 @@ const maxGroups = 25
 // runInfo is the run's provenance, written to run.json and heading
 // summary.md.
 type runInfo struct {
-	Started   string   `json:"started"`
-	Finished  string   `json:"finished"`
+	Started  string `json:"started"`
+	Finished string `json:"finished,omitempty"`
+	// RunID is the per-run identifier every EHR id begins with (runIDs).
+	RunID string `json:"run_id"`
+	// Stopped says why a run stopped before it finished.
+	Stopped   string   `json:"stopped,omitempty"`
 	SDKCommit string   `json:"sdk_commit,omitempty"`
 	Templates string   `json:"templates"`
 	Only      string   `json:"only,omitempty"`
@@ -39,7 +43,10 @@ func markdown(info runInfo, s summary) string {
 	var b strings.Builder
 	w := func(format string, args ...any) { fmt.Fprintf(&b, format, args...) }
 	w("# CDR cross-check\n\n")
-	w("- **Run:** %s to %s, SDK `%s`.\n", info.Started, info.Finished, cmp.Or(info.SDKCommit, "unknown"))
+	if s.Partial != "" {
+		w("- **Partial:** the run stopped before it finished (%s); the numbers count the records made until then.\n", cell(s.Partial))
+	}
+	w("- **Run:** `%s`, %s to %s, SDK `%s`. Every EHR id it creates begins with `%s`.\n", info.RunID, info.Started, info.Finished, cmp.Or(info.SDKCommit, "unknown"), info.RunID)
 	w("- **Templates:** %d OPT files in `%s`, %d templates checked, %d files left out (an id read already, no id, or not matched by -only).\n",
 		s.Templates.Files, info.Templates, s.Templates.Kept, s.Templates.Skipped)
 	if info.Only != "" {
@@ -83,6 +90,7 @@ func markdown(info runInfo, s summary) string {
 		w("\n")
 	}
 	row("Templates accepted at upload", func(c cdrSummary) ratio { return c.TemplatesPresent })
+	row("EHRs created", func(c cdrSummary) ratio { return c.EHRsCreated })
 	row("SDK documents accepted", func(c cdrSummary) ratio { return c.DocumentsAccepted })
 	row("CDR's own examples fetched", func(c cdrSummary) ratio { return c.ExamplesFetched })
 	row("SDK validator: CDR examples valid", func(c cdrSummary) ratio { return c.ExamplesSDKValid })
@@ -120,6 +128,7 @@ func markdown(info runInfo, s summary) string {
 			w("- Examples not fetched, by status: %s.\n", strings.Join(st, ", "))
 		}
 		groupTable(&b, "Template upload refusals", c.UploadRefusals)
+		groupTable(&b, "EHR create refusals", c.EHRRefusals)
 		groupTable(&b, "SDK document refusals", c.DocumentRefusals)
 		groupTable(&b, "CDR example refusals", c.ExampleRefusals)
 	}

@@ -34,6 +34,9 @@ func cannedRun() runData {
 			{TemplateID: "B.xc1", Root: "COMPOSITION", Kept: true, RenamedFrom: "B"},
 		},
 		uploads: []uploadRecord{
+			// B's own uploads, superseded by B.xc1: kept, and left out of the counts.
+			{CDR: "ehrbase", TemplateID: "B", outcome: accepted, Present: true, SupersededBy: "B.xc1"},
+			{CDR: "ferroehr", TemplateID: "B", Status: 409, StoredSame: bad, SupersededBy: "B.xc1"},
 			{CDR: "ehrbase", TemplateID: "A", outcome: accepted, Present: true},
 			{CDR: "ehrbase", TemplateID: "B.xc1", outcome: accepted, Present: true},
 			{CDR: "ferroehr", TemplateID: "A", Status: 409, StoredSame: ok, Present: true},
@@ -57,6 +60,14 @@ func cannedRun() runData {
 			{CDR: "ehrbase", TemplateID: "A", Label: "medium-random1", Stage: "ehr", Status: 503},
 			post("ferroehr", "A", "medium-random1", accepted),
 			post("ehrbase", "B.xc1", "required-example", outcome{Status: 422, Body: "plain text refusal"}),
+			// Cut short by the end of the run: recorded, not counted.
+			post("ferroehr", "B.xc1", "required-example", outcome{Error: "context canceled", Stopped: true}),
+		},
+		ehrs: []ehrRecord{
+			{CDR: "ehrbase", TemplateID: "A", Label: "required-example", outcome: accepted},
+			{CDR: "ehrbase", TemplateID: "A", Label: "medium-random1", Status: 503, Body: `{"message":"unavailable"}`},
+			{CDR: "ferroehr", TemplateID: "A", Label: "required-example", outcome: accepted},
+			{CDR: "ferroehr", TemplateID: "B.xc1", Label: "required-example", Error: "context canceled", Stopped: true},
 		},
 		examples: []exampleRecord{
 			{CDR: "ehrbase", TemplateID: "A", Level: "default", File: "x", RootType: "COMPOSITION", outcome: accepted},
@@ -174,6 +185,15 @@ func TestSummarize_CannedRun_PROBE108_REQ107_REQ102(t *testing.T) {
 	}
 	if up := s.PerCDR[1].UploadRefusals; len(up) != 1 || up[0].Status != 400 || up[0].Templates != 1 {
 		t.Errorf("ferroehr upload refusals = %+v, want one 400 group on one template", up)
+	}
+	if got := s.PerCDR[1].StoredDiffers; !slices.Equal(got, []string{"B"}) {
+		t.Errorf("ferroehr stored differs = %q, want B, from its superseded upload", got)
+	}
+	if eb := s.PerCDR[0]; eb.EHRsCreated != (ratio{1, 2}) || len(eb.EHRRefusals) != 1 || eb.EHRRefusals[0].Status != 503 || eb.EHRRefusals[0].Detail != "unavailable" {
+		t.Errorf("ehrbase EHRs created %v, refusals %+v, want 1 / 2 and one 503 group", eb.EHRsCreated, eb.EHRRefusals)
+	}
+	if fe := s.PerCDR[1]; fe.EHRsCreated != (ratio{1, 1}) || len(fe.EHRRefusals) != 0 {
+		t.Errorf("ferroehr EHRs created %v, refusals %+v, want 1 / 1 and none: a stopped create is not counted", fe.EHRsCreated, fe.EHRRefusals)
 	}
 
 	if len(s.RefusedSDKValid) != 2 || s.RefusedSDKValid[0].TemplateID != "A" ||

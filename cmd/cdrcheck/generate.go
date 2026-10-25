@@ -121,22 +121,31 @@ type generated struct {
 	comp *rm.Composition
 }
 
-// generateAll runs every policy and fill on one template. A template that
-// does not parse or compile yields a record per policy and fill that says
-// so, so that a run counts templates × policies × fills either way.
-func generateAll(ctx context.Context, s *sink, cc *compiler, tpl templateRecord) []generated {
+// generateAll runs every policy and fill on one template and hands each
+// generation to emit as it completes. A template that does not parse or
+// compile yields a record per policy and fill that says so, so that a run
+// counts templates × policies × fills either way.
+//
+// It stops once ctx ends. A generation the end of the run cut short is not
+// handed on: it measured nothing, and it created nothing on a CDR.
+func generateAll(ctx context.Context, s *sink, cc *compiler, tpl templateRecord, emit func(generated)) {
 	compiled, stage, err := cc.get(tpl.File)
-	var out []generated
 	for _, p := range policies {
 		for _, f := range fills {
+			if ctx.Err() != nil {
+				return
+			}
 			if err != nil {
-				out = append(out, generated{rec: genRecord{TemplateID: tpl.TemplateID, Policy: p.String(), Fill: f.name, Stage: stage, Error: err.Error()}})
+				emit(generated{rec: genRecord{TemplateID: tpl.TemplateID, Policy: p.String(), Fill: f.name, Stage: stage, Error: err.Error()}})
 				continue
 			}
-			out = append(out, generateOne(ctx, s, compiled, tpl.TemplateID, p, f))
+			g := generateOne(ctx, s, compiled, tpl.TemplateID, p, f)
+			if g.rec.Stage == "generate" && ctx.Err() != nil {
+				return
+			}
+			emit(g)
 		}
 	}
-	return out
 }
 
 func generateOne(ctx context.Context, s *sink, compiled *templatecompile.Compiled, tid string, p instance.Policy, f fill) generated {

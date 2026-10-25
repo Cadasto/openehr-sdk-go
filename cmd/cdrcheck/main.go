@@ -31,14 +31,22 @@
 // a CDR already holds is compared with the OPT by a signature of its parsed
 // XML; where the content differs, the OPT is uploaded again under its id
 // plus ".xc1", to every CDR, and generated from under that id, so that the
-// SDK and every CDR read the same content. Every EHR id the run creates is
-// recorded in its output.
+// SDK and every CDR read the same content. The run names every EHR it
+// creates (PUT /ehr/{ehr_id}) with an id that begins with its per-run
+// identifier, which run.json records before the first request, and records
+// each create as it returns.
 //
-// The output is a new directory outside the repository (by default under the
-// system temp directory): one JSON Lines file per stage (templates, upload,
-// gen, post, examples, validate, cross), the documents and the CDRs'
-// examples, run.json, summary.json and summary.md. A credential never reaches
-// it, a progress line or an error.
+// The output is a directory outside the repository that no other run has
+// claimed, by default a new one under the system temp directory: one JSON
+// Lines file per stage (templates, upload, gen, ehrs, post, examples,
+// validate, cross), each line written as its record completes, the
+// documents and the CDRs' examples, run.json, summary.json and summary.md.
+// A run that stops early, on Ctrl-C or an error, keeps every record made
+// until then and writes a summary marked partial. A credential never reaches
+// the output, a progress line or an error.
+//
+// -only REGEXP checks only the templates whose id matches; the summary of
+// such a run says so.
 //
 // Usage:
 //
