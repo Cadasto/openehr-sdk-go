@@ -2522,3 +2522,10 @@ requirements:
     implementation: planned
     packages: [openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/ehrstatus, openehr/client/ehr/directory, openehr/client/demographic]
     probes: [PROBE-109]
+    tests:
+      - openehr/client/demographic/versioned_test.go
+      - openehr/client/ehr/composition/composition_test.go
+      - openehr/client/ehr/directory/directory_test.go
+      - openehr/client/ehr/ehr_test.go
+      - openehr/client/ehr/ehrstatus/ehrstatus_test.go
+      - openehr/client/ehr/version_at_time_test.go
