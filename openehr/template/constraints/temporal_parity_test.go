@@ -152,6 +152,9 @@ func TestREQ103TemporalRangeAgreesWithREQ123Order(t *testing.T) {
 			samples: []string{
 				"P0D", "PT24H", "P1D", "P1Y", "P12M", "P365D", "P366D", "P52W", "-P1D", "PT0.5S",
 				"P4Y", "P48M", "P1461D", "-PT0S",
+				// A month and a year at exactly their Time_definitions
+				// averages, so each pair compares equal.
+				"P1M", "P30DT10H4M48S", "P365DT5H45M36S",
 			},
 		},
 	}

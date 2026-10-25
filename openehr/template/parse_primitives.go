@@ -10,9 +10,10 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 )
 
-// xmlNumericInterval is the AOM 1.4 numeric range shape used by
-// C_INTEGER, C_REAL, and the magnitude / precision sub-intervals of
-// C_DV_QUANTITY. Distinct from xmlInterval (which models
+// xmlNumericInterval is the AOM 1.4 range shape used by C_INTEGER,
+// C_REAL, the magnitude / precision sub-intervals of C_DV_QUANTITY, and,
+// read by temporalRange, the ranges of C_DATE, C_TIME, C_DATE_TIME and
+// C_DURATION. Distinct from xmlInterval (which models
 // existence / occurrences as integer cardinalities) — primitive
 // ranges are float-typed and keep their inclusivity flags, where a
 // Multiplicity closes an excluded end instead. All four flags are
@@ -154,13 +155,17 @@ func buildPrimitive(o *xmlCObject, strict bool) (constraints.PrimitiveConstraint
 	case "C_STRING":
 		return buildString(o), nil
 	case "C_DATE":
-		return constraints.CDate{Pattern: strings.TrimSpace(o.PrimitivePattern)}, nil
+		r, err := temporalRange(o.Range, strict, "C_DATE", constraints.CDate{}.Validate)
+		return constraints.CDate{Pattern: strings.TrimSpace(o.PrimitivePattern), Range: r}, err
 	case "C_TIME":
-		return constraints.CTime{Pattern: strings.TrimSpace(o.PrimitivePattern)}, nil
+		r, err := temporalRange(o.Range, strict, "C_TIME", constraints.CTime{}.Validate)
+		return constraints.CTime{Pattern: strings.TrimSpace(o.PrimitivePattern), Range: r}, err
 	case "C_DATE_TIME":
-		return constraints.CDateTime{Pattern: strings.TrimSpace(o.PrimitivePattern)}, nil
+		r, err := temporalRange(o.Range, strict, "C_DATE_TIME", constraints.CDateTime{}.Validate)
+		return constraints.CDateTime{Pattern: strings.TrimSpace(o.PrimitivePattern), Range: r}, err
 	case "C_DURATION":
-		return buildDuration(o), nil
+		r, err := temporalRange(o.Range, strict, "C_DURATION", constraints.CDuration{}.Validate)
+		return constraints.CDuration{Pattern: strings.TrimSpace(o.PrimitivePattern), Range: r}, err
 	case "C_CODE_PHRASE":
 		return buildCodePhrase(o), nil
 	case "C_DV_QUANTITY":
@@ -269,12 +274,6 @@ func buildString(o *xmlCObject) constraints.CString {
 	// so an omitted or empty element leaves the list closed.
 	c.ListOpen = o.ListOpen.orFalse()
 	return c
-}
-
-func buildDuration(o *xmlCObject) constraints.CDuration {
-	return constraints.CDuration{
-		Pattern: strings.TrimSpace(o.PrimitivePattern),
-	}
 }
 
 func buildCodePhrase(o *xmlCObject) constraints.CodePhrase {
@@ -437,6 +436,58 @@ func numericRange(i *xmlNumericInterval, strict bool, ctx string) (constraints.N
 			return r, fmt.Errorf("%w: %s range.upper=%q is not a valid number", ErrInvalidOPT, ctx, upper)
 		} else {
 			r.UpperUnbounded = true
+		}
+	}
+	return r, nil
+}
+
+// temporalRange folds the wire range of a C_DATE, C_TIME, C_DATE_TIME or
+// C_DURATION into its TemporalRange, or the zero value, which
+// constrains nothing, when the OPT gives none. The flags read as
+// numericRange reads them. validate is the zero constraint of the type,
+// which accepts exactly the ISO 8601 text of the type, so a bound it refuses
+// is not one: in strict mode that surfaces as ErrInvalidOPT, and in lenient
+// mode the side falls through to unbounded, as numericRange does with a
+// bound that is not a number. ctx names the constraint type for the
+// diagnostic.
+func temporalRange(i *xmlNumericInterval, strict bool, ctx string, validate func(any) []constraints.Violation) (constraints.TemporalRange, error) {
+	if i == nil {
+		return constraints.TemporalRange{}, nil
+	}
+	lowerUnbounded, err := unboundedFlag(i.LowerUnbounded, i.Lower != nil, "lower")
+	if err != nil {
+		return constraints.TemporalRange{}, fmt.Errorf("%w: %s range: %w", ErrInvalidOPT, ctx, err)
+	}
+	upperUnbounded, err := unboundedFlag(i.UpperUnbounded, i.Upper != nil, "upper")
+	if err != nil {
+		return constraints.TemporalRange{}, fmt.Errorf("%w: %s range: %w", ErrInvalidOPT, ctx, err)
+	}
+	r := constraints.TemporalRange{
+		LowerUnbounded: lowerUnbounded,
+		UpperUnbounded: upperUnbounded,
+		LowerInclusive: includedFlag(i.LowerIncluded.ptr(), lowerUnbounded),
+		UpperInclusive: includedFlag(i.UpperIncluded.ptr(), upperUnbounded),
+	}
+	if !r.LowerUnbounded {
+		lower := strings.TrimSpace(stringOrEmpty(i.Lower))
+		switch {
+		case len(validate(lower)) == 0:
+			r.Lower = lower
+		case strict:
+			return r, fmt.Errorf("%w: %s range.lower=%q is not a valid ISO 8601 value of the type", ErrInvalidOPT, ctx, lower)
+		default:
+			r.LowerUnbounded, r.LowerInclusive = true, false
+		}
+	}
+	if !r.UpperUnbounded {
+		upper := strings.TrimSpace(stringOrEmpty(i.Upper))
+		switch {
+		case len(validate(upper)) == 0:
+			r.Upper = upper
+		case strict:
+			return r, fmt.Errorf("%w: %s range.upper=%q is not a valid ISO 8601 value of the type", ErrInvalidOPT, ctx, upper)
+		default:
+			r.UpperUnbounded, r.UpperInclusive = true, false
 		}
 	}
 	return r, nil

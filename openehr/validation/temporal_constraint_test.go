@@ -67,27 +67,43 @@ func TestValidate_REQ102_REQ103_TemporalPatternAndRange(t *testing.T) {
 		want  []pinnedIssue
 	}{
 		{name: "date with no day", child: partialDateChild, value: &rm.DVDate{Value: "2019-01"}},
-		{name: "date with a day", child: partialDateChild, value: &rm.DVDate{Value: "20190114"},
-			want: []pinnedIssue{templateFinding("pattern_mismatch", "/value/value")}},
+		{
+			name: "date with a day", child: partialDateChild, value: &rm.DVDate{Value: "20190114"},
+			want: []pinnedIssue{templateFinding("pattern_mismatch", "/value/value")},
+		},
 		{name: "width of 24 hours", child: widthChild, value: &rm.DVDuration{Value: "PT24H"}},
 		{name: "width of one day", child: widthChild, value: &rm.DVDuration{Value: "P1D"}},
-		{name: "width of zero", child: widthChild, value: &rm.DVDuration{Value: "P0D"},
-			want: []pinnedIssue{templateFinding("out_of_range", "/value")}},
+		{
+			name: "width of zero", child: widthChild, value: &rm.DVDuration{Value: "P0D"},
+			want: []pinnedIssue{templateFinding("out_of_range", "/value")},
+		},
 		{name: "age in years", child: ageChild, value: &rm.DVDuration{Value: "P45Y"}},
-		{name: "age in days", child: ageChild, value: &rm.DVDuration{Value: "P45D"},
-			want: []pinnedIssue{templateFinding("pattern_mismatch", "/value")}},
-		{name: "age over 150 years", child: ageChild, value: &rm.DVDuration{Value: "P151Y"},
-			want: []pinnedIssue{templateFinding("out_of_range", "/value")}},
-		{name: "age in hours and over the range", child: ageChild, value: &rm.DVDuration{Value: "-PT1H"},
-			want: []pinnedIssue{templateFinding("out_of_range", "/value"), templateFinding("pattern_mismatch", "/value")}},
+		{
+			name: "age in days", child: ageChild, value: &rm.DVDuration{Value: "P45D"},
+			want: []pinnedIssue{templateFinding("pattern_mismatch", "/value")},
+		},
+		{
+			name: "age over 150 years", child: ageChild, value: &rm.DVDuration{Value: "P151Y"},
+			want: []pinnedIssue{templateFinding("out_of_range", "/value")},
+		},
+		{
+			name: "age in hours and over the range", child: ageChild, value: &rm.DVDuration{Value: "-PT1H"},
+			want: []pinnedIssue{templateFinding("out_of_range", "/value"), templateFinding("pattern_mismatch", "/value")},
+		},
 		{name: "minutes", child: minutesChild, value: &rm.DVDuration{Value: "PT5M"}},
-		{name: "minutes and seconds", child: minutesChild, value: &rm.DVDuration{Value: "PT5M30S"},
-			want: []pinnedIssue{templateFinding("pattern_mismatch", "/value")}},
+		{
+			name: "minutes and seconds", child: minutesChild, value: &rm.DVDuration{Value: "PT5M30S"},
+			want: []pinnedIssue{templateFinding("pattern_mismatch", "/value")},
+		},
 		{name: "date-time with no seconds after the bound", child: stampChild, value: &rm.DVDateTime{Value: "2004-05-20T10:16Z"}},
-		{name: "date-time at the excluded bound minute", child: stampChild, value: &rm.DVDateTime{Value: "2004-05-20T10:15"},
-			want: []pinnedIssue{templateFinding("out_of_range", "/value")}},
-		{name: "date-time with seconds", child: stampChild, value: &rm.DVDateTime{Value: "2004-05-20T10:16:00"},
-			want: []pinnedIssue{templateFinding("pattern_mismatch", "/value")}},
+		{
+			name: "date-time at the excluded bound minute", child: stampChild, value: &rm.DVDateTime{Value: "2004-05-20T10:15"},
+			want: []pinnedIssue{templateFinding("out_of_range", "/value")},
+		},
+		{
+			name: "date-time with seconds", child: stampChild, value: &rm.DVDateTime{Value: "2004-05-20T10:16:00"},
+			want: []pinnedIssue{templateFinding("pattern_mismatch", "/value")},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

@@ -130,71 +130,135 @@ func TestREQ103TemporalPatternOutcomes(t *testing.T) {
 	stamp := func(p string) func(any) []constraints.Violation { return constraints.CDateTime{Pattern: p}.Validate }
 	span := func(p string) func(any) []constraints.Violation { return constraints.CDuration{Pattern: p}.Validate }
 	tests := []patternCase{
-		{name: "date, day not allowed", validate: date("yyyy-??-XX"), pattern: "yyyy-??-XX",
-			admitted: []string{"2019-01", "2019", "201901"}, refused: []string{"2019-01-14", "20190114"}},
-		{name: "date, full", validate: date("yyyy-mm-dd"), pattern: "yyyy-mm-dd",
-			admitted: []string{"2019-01-14", "20190114"}, refused: []string{"2019-01", "2019"}},
-		{name: "date, upper-case letters", validate: date("YYYY-MM-??"), pattern: "YYYY-MM-??",
-			admitted: []string{"2019-01-14", "2019-01"}, refused: []string{"2019"}},
-		{name: "date, month and no day", validate: date("yyyy-mm-XX"), pattern: "yyyy-mm-XX",
-			admitted: []string{"2019-01"}, refused: []string{"2019-01-14", "2019"}},
-		{name: "date, lower-case x", validate: date("yyyy-mm-xx"), pattern: "yyyy-mm-xx",
-			admitted: []string{"2019-01"}, refused: []string{"2019-01-14"}},
-		{name: "date, literal year", validate: date("1995-??-XX"), pattern: "1995-??-XX",
-			admitted: []string{"1995-03", "1995"}, refused: []string{"1996-03", "1995-03-01"}},
-		{name: "date, literal month", validate: date("yyyy-06-dd"), pattern: "yyyy-06-dd",
-			admitted: []string{"2019-06-14"}, refused: []string{"2019-07-14", "2019-06"}},
-		{name: "time, full", validate: clock("hh:mm:ss"), pattern: "hh:mm:ss",
-			admitted: []string{"10:30:00", "10:30:00.5", "10:30:00,5Z", "103000", "10:30:00+01:00"}, refused: []string{"10:30", "10"}},
-		{name: "time, no seconds", validate: clock("hh:mm:XX"), pattern: "hh:mm:XX",
-			admitted: []string{"10:30", "1030Z"}, refused: []string{"10:30:00", "10"}},
-		{name: "time, optional minutes", validate: clock("HH:??:XX"), pattern: "HH:??:XX",
-			admitted: []string{"10:30", "10"}, refused: []string{"10:30:00"}},
-		{name: "time, any", validate: clock("hh:??:??"), pattern: "hh:??:??",
-			admitted: []string{"10", "10:30", "10:30:00,5"}},
-		{name: "time, literal hour", validate: clock("09:mm:ss"), pattern: "09:mm:ss",
-			admitted: []string{"09:30:00"}, refused: []string{"10:30:00"}},
-		{name: "time, zone hh:mm required", validate: clock("hh:mm:ss±hh:mm"), pattern: "hh:mm:ss±hh:mm",
-			admitted: []string{"10:30:00+01:00", "10:30:00-0500", "10:30:00+01", "10:30:00Z"}, refused: []string{"10:30:00"}},
-		{name: "time, zone hh required", validate: clock("hh:mm:ss+hh"), pattern: "hh:mm:ss+hh",
-			admitted: []string{"10:30:00+01", "10:30:00-05:30", "10:30:00Z"}, refused: []string{"10:30:00"}},
-		{name: "time, zone hhmm required", validate: clock("hh:mm:ss-HHMM"), pattern: "hh:mm:ss-HHMM",
-			admitted: []string{"10:30:00+0100"}, refused: []string{"10:30:00.25"}},
-		{name: "time, zone Z required", validate: clock("hh:mm:ssZ"), pattern: "hh:mm:ssZ",
-			admitted: []string{"10:30:00Z"}, refused: []string{"10:30:00+00:00", "10:30:00"}},
-		{name: "date-time, full", validate: stamp("yyyy-mm-ddTHH:MM:SS"), pattern: "yyyy-mm-ddTHH:MM:SS",
+		{
+			name: "date, day not allowed", validate: date("yyyy-??-XX"), pattern: "yyyy-??-XX",
+			admitted: []string{"2019-01", "2019", "201901"}, refused: []string{"2019-01-14", "20190114"},
+		},
+		{
+			name: "date, full", validate: date("yyyy-mm-dd"), pattern: "yyyy-mm-dd",
+			admitted: []string{"2019-01-14", "20190114"}, refused: []string{"2019-01", "2019"},
+		},
+		{
+			name: "date, upper-case letters", validate: date("YYYY-MM-??"), pattern: "YYYY-MM-??",
+			admitted: []string{"2019-01-14", "2019-01"}, refused: []string{"2019"},
+		},
+		{
+			name: "date, month and no day", validate: date("yyyy-mm-XX"), pattern: "yyyy-mm-XX",
+			admitted: []string{"2019-01"}, refused: []string{"2019-01-14", "2019"},
+		},
+		{
+			name: "date, lower-case x", validate: date("yyyy-mm-xx"), pattern: "yyyy-mm-xx",
+			admitted: []string{"2019-01"}, refused: []string{"2019-01-14"},
+		},
+		{
+			name: "date, literal year", validate: date("1995-??-XX"), pattern: "1995-??-XX",
+			admitted: []string{"1995-03", "1995"}, refused: []string{"1996-03", "1995-03-01"},
+		},
+		{
+			name: "date, literal month", validate: date("yyyy-06-dd"), pattern: "yyyy-06-dd",
+			admitted: []string{"2019-06-14"}, refused: []string{"2019-07-14", "2019-06"},
+		},
+		{
+			name: "time, full", validate: clock("hh:mm:ss"), pattern: "hh:mm:ss",
+			admitted: []string{"10:30:00", "10:30:00.5", "10:30:00,5Z", "103000", "10:30:00+01:00"}, refused: []string{"10:30", "10"},
+		},
+		{
+			name: "time, no seconds", validate: clock("hh:mm:XX"), pattern: "hh:mm:XX",
+			admitted: []string{"10:30", "1030Z"}, refused: []string{"10:30:00", "10"},
+		},
+		{
+			name: "time, optional minutes", validate: clock("HH:??:XX"), pattern: "HH:??:XX",
+			admitted: []string{"10:30", "10"}, refused: []string{"10:30:00"},
+		},
+		{
+			name: "time, any", validate: clock("hh:??:??"), pattern: "hh:??:??",
+			admitted: []string{"10", "10:30", "10:30:00,5"},
+		},
+		{
+			name: "time, literal hour", validate: clock("09:mm:ss"), pattern: "09:mm:ss",
+			admitted: []string{"09:30:00"}, refused: []string{"10:30:00"},
+		},
+		{
+			name: "time, zone hh:mm required", validate: clock("hh:mm:ss±hh:mm"), pattern: "hh:mm:ss±hh:mm",
+			admitted: []string{"10:30:00+01:00", "10:30:00-0500", "10:30:00+01", "10:30:00Z"}, refused: []string{"10:30:00"},
+		},
+		{
+			name: "time, zone hh required", validate: clock("hh:mm:ss+hh"), pattern: "hh:mm:ss+hh",
+			admitted: []string{"10:30:00+01", "10:30:00-05:30", "10:30:00Z"}, refused: []string{"10:30:00"},
+		},
+		{
+			name: "time, zone hhmm required", validate: clock("hh:mm:ss-HHMM"), pattern: "hh:mm:ss-HHMM",
+			admitted: []string{"10:30:00+0100"}, refused: []string{"10:30:00.25"},
+		},
+		{
+			name: "time, zone Z required", validate: clock("hh:mm:ssZ"), pattern: "hh:mm:ssZ",
+			admitted: []string{"10:30:00Z"}, refused: []string{"10:30:00+00:00", "10:30:00"},
+		},
+		{
+			name: "date-time, full", validate: stamp("yyyy-mm-ddTHH:MM:SS"), pattern: "yyyy-mm-ddTHH:MM:SS",
 			admitted: []string{"2019-01-28T21:22:49,426+00:00", "2019-01-28T21:22:49", "20190128T212249Z"},
-			refused:  []string{"2019-01-28T21:22", "2019-01-28", "2019"}},
-		{name: "date-time, optional minutes and seconds", validate: stamp("yyyy-mm-ddTHH:??:??"), pattern: "yyyy-mm-ddTHH:??:??",
-			admitted: []string{"2019-01-28T21", "2019-01-28T21:22", "2019-01-28T21:22:49.5Z"}, refused: []string{"2019-01-28", "2019-01"}},
-		{name: "date-time, no seconds", validate: stamp("yyyy-mm-ddThh:mm:XX"), pattern: "yyyy-mm-ddThh:mm:XX",
-			admitted: []string{"2019-01-28T21:22Z"}, refused: []string{"2019-01-28T21:22:49", "2019-01-28T21"}},
-		{name: "date-time, any", validate: stamp("yyyy-??-??T??:??:??"), pattern: "yyyy-??-??T??:??:??",
-			admitted: []string{"2019", "2019-01", "2019-01-28", "2019-01-28T21", "2019-01-28T21:22:49"}},
-		{name: "date-time, no time", validate: stamp("yyyy-mm-ddTXX:XX:XX"), pattern: "yyyy-mm-ddTXX:XX:XX",
-			admitted: []string{"2019-01-28"}, refused: []string{"2019-01-28T21", "2019-01"}},
-		{name: "date-time, space before the time", validate: stamp("yyyy-mm-dd hh:mm:ss"), pattern: "yyyy-mm-dd hh:mm:ss",
-			admitted: []string{"2019-01-28T21:22:49"}, refused: []string{"2019-01-28T21:22"}},
-		{name: "date-time, zone required", validate: stamp("yyyy-mm-ddThh:mm:ss+hh:mm"), pattern: "yyyy-mm-ddThh:mm:ss+hh:mm",
-			admitted: []string{"2019-01-28T21:22:49+01:00", "2019-01-28T21:22:49Z"}, refused: []string{"2019-01-28T21:22:49"}},
-		{name: "duration, years", validate: span("PY"), pattern: "PY",
-			admitted: []string{"P45Y", "-P2Y", "P0Y"}, refused: []string{"P0D", "P1Y2M", "PT1H"}},
-		{name: "duration, years or months", validate: span("PYM"), pattern: "PYM",
-			admitted: []string{"P1Y2M", "P3M", "P1Y"}, refused: []string{"P1Y2D", "P1W"}},
-		{name: "duration, months weeks or days", validate: span("PMWD"), pattern: "PMWD",
-			admitted: []string{"P4W3D", "P2M", "P5D", "-P1M1W"}, refused: []string{"P1Y", "PT1H"}},
-		{name: "duration, any date part", validate: span("PYMWD"), pattern: "PYMWD",
-			admitted: []string{"P1Y2M3W4D"}, refused: []string{"P1DT1H"}},
-		{name: "duration, minutes", validate: span("PTM"), pattern: "PTM",
-			admitted: []string{"PT5M", "-PT5M"}, refused: []string{"PT5H", "P5M", "PT5M1S"}},
-		{name: "duration, lower-case letters", validate: span("Pwd"), pattern: "Pwd",
-			admitted: []string{"P4W", "P3D", "P4W3D"}, refused: []string{"P1M"}},
-		{name: "duration, hours or minutes", validate: span("PThm"), pattern: "PThm",
-			admitted: []string{"PT2H30M", "PT2H"}, refused: []string{"PT2H30M5S"}},
-		{name: "duration, seconds with a fraction", validate: span("PTS"), pattern: "PTS",
-			admitted: []string{"PT1.5S", "PT1,5S", "-PT0S"}, refused: []string{"PT1M"}},
-		{name: "duration, days and time", validate: span("PDTHMS"), pattern: "PDTHMS",
-			admitted: []string{"P1DT2H3M4S", "PT4S"}, refused: []string{"P1W", "P1Y"}},
+			refused:  []string{"2019-01-28T21:22", "2019-01-28", "2019"},
+		},
+		{
+			name: "date-time, optional minutes and seconds", validate: stamp("yyyy-mm-ddTHH:??:??"), pattern: "yyyy-mm-ddTHH:??:??",
+			admitted: []string{"2019-01-28T21", "2019-01-28T21:22", "2019-01-28T21:22:49.5Z"}, refused: []string{"2019-01-28", "2019-01"},
+		},
+		{
+			name: "date-time, no seconds", validate: stamp("yyyy-mm-ddThh:mm:XX"), pattern: "yyyy-mm-ddThh:mm:XX",
+			admitted: []string{"2019-01-28T21:22Z"}, refused: []string{"2019-01-28T21:22:49", "2019-01-28T21"},
+		},
+		{
+			name: "date-time, any", validate: stamp("yyyy-??-??T??:??:??"), pattern: "yyyy-??-??T??:??:??",
+			admitted: []string{"2019", "2019-01", "2019-01-28", "2019-01-28T21", "2019-01-28T21:22:49"},
+		},
+		{
+			name: "date-time, no time", validate: stamp("yyyy-mm-ddTXX:XX:XX"), pattern: "yyyy-mm-ddTXX:XX:XX",
+			admitted: []string{"2019-01-28"}, refused: []string{"2019-01-28T21", "2019-01"},
+		},
+		{
+			name: "date-time, space before the time", validate: stamp("yyyy-mm-dd hh:mm:ss"), pattern: "yyyy-mm-dd hh:mm:ss",
+			admitted: []string{"2019-01-28T21:22:49"}, refused: []string{"2019-01-28T21:22"},
+		},
+		{
+			name: "date-time, zone required", validate: stamp("yyyy-mm-ddThh:mm:ss+hh:mm"), pattern: "yyyy-mm-ddThh:mm:ss+hh:mm",
+			admitted: []string{"2019-01-28T21:22:49+01:00", "2019-01-28T21:22:49Z"}, refused: []string{"2019-01-28T21:22:49"},
+		},
+		{
+			name: "duration, years", validate: span("PY"), pattern: "PY",
+			admitted: []string{"P45Y", "-P2Y", "P0Y"}, refused: []string{"P0D", "P1Y2M", "PT1H"},
+		},
+		{
+			name: "duration, years or months", validate: span("PYM"), pattern: "PYM",
+			admitted: []string{"P1Y2M", "P3M", "P1Y"}, refused: []string{"P1Y2D", "P1W"},
+		},
+		{
+			name: "duration, months weeks or days", validate: span("PMWD"), pattern: "PMWD",
+			admitted: []string{"P4W3D", "P2M", "P5D", "-P1M1W"}, refused: []string{"P1Y", "PT1H"},
+		},
+		{
+			name: "duration, any date part", validate: span("PYMWD"), pattern: "PYMWD",
+			admitted: []string{"P1Y2M3W4D"}, refused: []string{"P1DT1H"},
+		},
+		{
+			name: "duration, minutes", validate: span("PTM"), pattern: "PTM",
+			admitted: []string{"PT5M", "-PT5M"}, refused: []string{"PT5H", "P5M", "PT5M1S"},
+		},
+		{
+			name: "duration, lower-case letters", validate: span("Pwd"), pattern: "Pwd",
+			admitted: []string{"P4W", "P3D", "P4W3D"}, refused: []string{"P1M"},
+		},
+		{
+			name: "duration, hours or minutes", validate: span("PThm"), pattern: "PThm",
+			admitted: []string{"PT2H30M", "PT2H"}, refused: []string{"PT2H30M5S"},
+		},
+		{
+			name: "duration, seconds with a fraction", validate: span("PTS"), pattern: "PTS",
+			admitted: []string{"PT1.5S", "PT1,5S", "-PT0S"}, refused: []string{"PT1M"},
+		},
+		{
+			name: "duration, days and time", validate: span("PDTHMS"), pattern: "PDTHMS",
+			admitted: []string{"P1DT2H3M4S", "PT4S"}, refused: []string{"P1W", "P1Y"},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -237,7 +301,7 @@ func TestREQ103TemporalPatternMalformed(t *testing.T) {
 			value:    "2019-01-14",
 			patterns: []string{
 				"yyyy-mm", "yyyy-XX-dd", "yyyy-??-dd", "????-mm-dd", "XXXX-mm-dd", "yyyy-mm-dd+hh:mm",
-				"yyyy/mm/dd", "yyyy-mX-dd", "yyyy-mm-ddT", "yyy-mm-dd", "PY", "195-??-XX",
+				"yyyy/mm/dd", "yyyy-mX-dd", "yyyy-mm-ddT", "yyy-mm-dd", "PY", "195-??-XX", "????-??-??", "XXXX-XX-XX",
 			},
 		},
 		{
@@ -246,7 +310,7 @@ func TestREQ103TemporalPatternMalformed(t *testing.T) {
 			value:    "10:30:00",
 			patterns: []string{
 				"??:mm:ss", "XX:mm:ss", "hh:mm", "hh:XX:ss", "hh:??:ss", "hh:mm:ss+h", "hh:mm:ssZZ",
-				"hh:mm:ss+hh:", "hh:mm:ss*hh", "hh-mm-ss",
+				"hh:mm:ss+hh:", "hh:mm:ss*hh", "hh-mm-ss", "??:??:??", "XX:XX:XX",
 			},
 		},
 		{

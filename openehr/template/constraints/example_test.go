@@ -253,9 +253,9 @@ func TestREQ107_CodePhraseEmptyListPlaceholder(t *testing.T) {
 }
 
 // TestREQ103_TemporalExampleValue pins REQ-103 § Example value emission on
-// the temporal constraints: the example is written to the pattern and taken
-// from the range's lower bound, else its upper bound, else the sentinel, and
-// Validate accepts it. Where no value satisfies the pattern and the range,
+// the temporal constraints: the example is the first of the sentinel, the
+// range's lower bound and its upper bound, each written to the pattern, that
+// Validate accepts, so the sentinel stays wherever it satisfies both. Where no value satisfies the pattern and the range,
 // or the pattern or a bound is malformed, it is the sentinel, which Validate
 // then refuses.
 func TestREQ103_TemporalExampleValue(t *testing.T) {
@@ -306,16 +306,18 @@ func TestREQ103_TemporalExampleValue(t *testing.T) {
 		{name: "duration, malformed bound", c: constraints.CDuration{Range: from("P1X", true)}, want: "P0D", unsatisfiable: true},
 		{name: "date, range", c: constraints.CDate{Range: closed("2004-05-20", "2004-06-02")}, want: "2004-05-20"},
 		{name: "date, day dropped inside the range", c: constraints.CDate{Pattern: "yyyy-mm-XX", Range: closed("2004-05-20", "2004-06-02")}, want: "2004-06"},
-		{name: "date, excluded lower", c: constraints.CDate{Range: from("2004-05-20", false)}, want: "2004-05-21"},
-		{name: "date, excluded lower at the year end", c: constraints.CDate{Range: from("2004-12-31", false)}, want: "2005-01-01"},
+		{name: "date, sentinel inside the range", c: constraints.CDate{Range: from("2004-05-20", false)}, want: "2020-01-01"},
+		{name: "date, excluded lower", c: constraints.CDate{Range: from("2024-05-20", false)}, want: "2024-05-21"},
+		{name: "date, excluded lower at the year end", c: constraints.CDate{Range: from("2024-12-31", false)}, want: "2025-01-01"},
 		{name: "date, excluded upper", c: constraints.CDate{Range: upTo("2004-03-01", false)}, want: "2004-02-29"},
 		{name: "date, literal year outside the range", c: constraints.CDate{Pattern: "1995-??-XX", Range: from("2000", true)}, want: "2020-01-01", unsatisfiable: true},
 		{name: "time, hour rounded up", c: constraints.CTime{Pattern: "hh:XX:XX", Range: closed("09:30:00", "10:00:00")}, want: "10"},
-		{name: "time, excluded lower", c: constraints.CTime{Range: from("09:30:00", false)}, want: "09:30:01"},
-		{name: "time, zone and range", c: constraints.CTime{Pattern: "hh:mm:ssZ", Range: from("09:30:00+02:00", true)}, want: "09:30:00Z"},
-		{name: "date-time, minute rounded up", c: constraints.CDateTime{Pattern: "yyyy-mm-ddThh:mm:XX", Range: from("2004-05-20T10:15:30", true)}, want: "2004-05-20T10:16Z"},
+		{name: "time, excluded lower", c: constraints.CTime{Range: from("13:30:00", false)}, want: "13:30:01"},
+		{name: "time, zone and range", c: constraints.CTime{Pattern: "hh:mm:ssZ", Range: from("13:30:00+02:00", true)}, want: "13:30:00Z"},
+		{name: "date-time, minute rounded up", c: constraints.CDateTime{Pattern: "yyyy-mm-ddThh:mm:XX", Range: from("2024-05-20T10:15:30", true)}, want: "2024-05-20T10:16Z"},
 		{name: "date-time, excluded upper across midnight", c: constraints.CDateTime{Pattern: "yyyy-mm-ddThh:XX:XX", Range: upTo("2004-01-01T00:00:00", false)}, want: "2003-12-31T23Z"},
-		{name: "date-time, date bound", c: constraints.CDateTime{Pattern: "yyyy-mm-ddThh:mm:ss", Range: from("2004-05-20", true)}, want: "2004-05-20T00:00:00Z"},
+		{name: "date-time, date bound", c: constraints.CDateTime{Pattern: "yyyy-mm-ddThh:mm:ss", Range: from("2024-05-20", true)}, want: "2024-05-20T00:00:00Z"},
+		{name: "duration, zero inside the range", c: constraints.CDuration{Range: from("PT0S", true)}, want: "P0D"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
