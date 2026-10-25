@@ -1093,6 +1093,12 @@ func TestParse_REQ103_TemporalRange(t *testing.T) {
 			want: constraints.CDuration{Range: constraints.TemporalRange{Lower: "PT0S", LowerInclusive: true, UpperUnbounded: true}},
 		},
 		{
+			name: "C_DURATION, lower excluded",
+			child: `<children xsi:type="C_DURATION"><rm_type_name>DURATION</rm_type_name><node_id/>` +
+				temporalRangeXML(`<lower_included>false</lower_included><lower>PT0S</lower>`) + `</children>`,
+			want: constraints.CDuration{Range: constraints.TemporalRange{Lower: "PT0S", UpperUnbounded: true}},
+		},
+		{
 			name: "C_DATE, upper excluded",
 			child: `<children xsi:type="C_DATE"><rm_type_name>DATE</rm_type_name><node_id/>
 				<pattern>yyyy-mm-dd</pattern>` + temporalRangeXML(`<upper_included>false</upper_included><lower> 2004-05-20 </lower><upper>2004-06-02</upper>`) + `</children>`,
