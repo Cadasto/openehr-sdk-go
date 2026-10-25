@@ -207,3 +207,67 @@ func TestREQ107_REQ102_LargeKeepsTheGapOfAnOpenOptionalSibling(t *testing.T) {
 		t.Errorf("ValidateComposition(generated) issues = %q (%v), want %q: the required sibling appears 0 times", got, r.Issues, want)
 	}
 }
+
+// requiredTwinText is the text the template fixes on the value of the
+// required sibling of optRequiredTwinAfterOptional.
+const requiredTwinText = "required"
+
+// optRequiredTwinAfterOptional is a CLUSTER template whose items, at
+// cardinality 1..1, hold two ELEMENTs that share the node id at0001 and
+// pin no name: an optional one whose DV_TEXT value the template leaves
+// open, then a required one whose value it fixes to requiredTwinText.
+func optRequiredTwinAfterOptional() string {
+	open := optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0001", 0, 1, optSingle("value", optNode("DV_TEXT", "")))
+	fixed := optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0001", 1, 1, optSingle("value", optNode("DV_TEXT", "",
+		optSingle("value", optPrimitive("STRING", "C_STRING", "<list>"+requiredTwinText+"</list>")))))
+	return optTemplate("CLUSTER", optCardinal("items", 1, 1, open, fixed))
+}
+
+// TestREQ107_REQ102_LargeLeavesNoRoomToAnOptionalSiblingBeforeARequiredOne
+// is the REQ-107 Exceptions and known gaps check that, under Large, an
+// optional sibling before a required one of its identity, neither pinning
+// a name, gets no member of its own where the list's cardinality upper
+// bound leaves it no room: in CLUSTER.items at cardinality 1..1 the
+// required sibling takes the one place (What a visit writes), so the one
+// member is built under the required sibling's constraints. The validator
+// binds that member to the optional sibling, which comes first, has room
+// and admits it (REQ-102 Structural — binding items), so the root fails by
+// the required sibling's occurrences, as under Medium, under both value
+// fills.
+func TestREQ107_REQ102_LargeLeavesNoRoomToAnOptionalSiblingBeforeARequiredOne(t *testing.T) {
+	c := compileOPTText(t, optRequiredTwinAfterOptional(), true)
+	for _, policy := range []instance.Policy{instance.Large, instance.Medium} {
+		for _, opts := range usesOptions(policy) {
+			t.Run(fmt.Sprintf("%v/%v", policy, opts.ValueFill), func(t *testing.T) {
+				out, err := instance.Generate(t.Context(), c, opts)
+				if err != nil {
+					t.Fatalf("Generate(%v): %v", policy, err)
+				}
+				cluster, ok := out.(*rm.Cluster)
+				if !ok {
+					t.Fatalf("Generate(%v) root = %T, want *rm.Cluster", policy, out)
+				}
+				if len(cluster.Items) != 1 {
+					t.Fatalf("Generate(%v) built %d items, want the one the cardinality upper bound leaves room for", policy, len(cluster.Items))
+				}
+				el, ok := cluster.Items[0].(*rm.Element)
+				if !ok {
+					t.Fatalf("Generate(%v) item is %T, want *rm.Element", policy, cluster.Items[0])
+				}
+				if text, isText := el.Value.(*rm.DVText); !isText || text.Value != requiredTwinText {
+					t.Errorf("Generate(%v) item value = %+v, want the DV_TEXT %q of the required sibling's member: the required sibling takes the room first", policy, el.Value, requiredTwinText)
+				}
+				r := validation.Validate(out, c)
+				want := []string{"cardinality /items[at0001]"}
+				var got []string
+				for _, iss := range r.Issues {
+					got = append(got, iss.Code+" "+iss.Path)
+				}
+				if !slices.Equal(got, want) || !strings.Contains(r.Issues[0].Detail, "appears 0 times") {
+					t.Errorf("Validate(generated) issues = %q (%v), want %q: the required sibling appears 0 times", got, r.Issues, want)
+				}
+				noFloorErrors(t, out)
+			})
+		}
+	}
+}
