@@ -187,15 +187,21 @@ func (r *runner) run(ctx context.Context, cfg config) error {
 		if err != nil {
 			return err
 		}
-		present = presence(r.uploads.records())
+		ups := r.uploads.records()
+		present = presence(ups)
+		// The line counts as the summary does: a superseded record is not
+		// one of the templates checked.
 		for _, c := range r.clients {
-			n := 0
-			for _, ok := range present[c.name] {
-				if ok {
-					n++
+			var n ratio
+			for _, u := range ups {
+				if u.CDR == c.name && u.counted() {
+					n.Of++
+					if u.Present {
+						n.N++
+					}
 				}
 			}
-			r.s.logf("upload %s: %d of %d templates present", c.name, n, len(tpls))
+			r.s.logf("upload %s: %d of %d templates present", c.name, n.N, n.Of)
 		}
 	}
 	if err := r.writeTemplates(); err != nil {

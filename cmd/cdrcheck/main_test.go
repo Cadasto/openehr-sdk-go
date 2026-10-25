@@ -755,7 +755,7 @@ func TestRun_SupersededUploadsKeptAndUncounted_REQ082(t *testing.T) {
 		"OPENEHR_LIVE_FERROEHR": fe.url(),
 		envAllowMutating:        "1",
 	}
-	_, _, out, err := runFor(t, e)
+	stdout, _, out, err := runFor(t, e)
 	if err != nil {
 		t.Fatalf("run = %v", err)
 	}
@@ -779,6 +779,10 @@ func TestRun_SupersededUploadsKeptAndUncounted_REQ082(t *testing.T) {
 	for _, c := range s.PerCDR {
 		if c.TemplatesPresent != (ratio{1, 1}) {
 			t.Errorf("%s templates present = %v, want 1 / 1: a superseded upload is not counted", c.Name, c.TemplatesPresent)
+		}
+		// The progress line counts as the summary does.
+		if want := "upload " + c.Name + ": 1 of 1 templates present\n"; !strings.Contains(stdout, want) {
+			t.Errorf("run printed\n%s\nwant the line %q: a superseded upload is not counted", stdout, want)
 		}
 		want := []string(nil)
 		if c.Name == "ferroehr" {

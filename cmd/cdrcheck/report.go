@@ -49,6 +49,10 @@ type uploadRecord struct {
 	SupersededBy string `json:"superseded_by,omitempty"`
 }
 
+// counted reports whether the counts take in u: not a record superseded by
+// a rename, nor one whose request the end of the run cut short.
+func (u uploadRecord) counted() bool { return u.SupersededBy == "" && !u.Stopped }
+
 // written is the record as upload.jsonl holds it.
 func (u uploadRecord) written() uploadRecord {
 	u.outcome = u.outcome.written()
@@ -411,7 +415,7 @@ func summarize(r runData) summary {
 			if u.StoredSame != nil && !*u.StoredSame {
 				cs.StoredDiffers = append(cs.StoredDiffers, u.TemplateID)
 			}
-			if u.SupersededBy != "" || u.Stopped {
+			if !u.counted() {
 				continue
 			}
 			cs.TemplatesPresent.Of++
