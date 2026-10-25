@@ -175,38 +175,33 @@ type guardCase struct {
 	// check, when set, runs on a control row's output after the RM-floor
 	// check.
 	check func(t *testing.T, call string, out any)
-	// unreached marks a row whose unnamed object sits under an optional
-	// attribute: Required does not visit it, so the walk never reaches the
-	// object, and the row is a control row under Required (REQ-107 Errors
-	// covers the objects the walk reaches).
-	unreached bool
 }
 
 // TestREQ107_UnnamedArchetypeRootIsRefused is the REQ-107 check that an
 // object of an archetype-root class (an ENTRY, a COMPOSITION, a PARTY,
 // EHR_STATUS or EHR_ACCESS) for which the OPT names no archetype id makes
 // Generate return an error wrapping ErrArchetypeIDMissing, and no root, at
-// every policy and either value fill, where the walk reaches the object;
-// under Required it does not reach one below an optional attribute, which
-// that row then generates as a control row does. That covers an OPT node
-// without an archetype id, an attribute whose cardinality asks for a
-// member that the OPT leaves without children, and the template root. It
-// runs every archetype-root class as the template root and every ENTRY
-// class as a content child. The error names the RM type and the OPT path,
-// and it wraps neither ErrSlotFillUnsupported nor
-// ErrConstraintUnsatisfiable.
+// every policy and either value fill, where the walk reaches the object,
+// which it does where the OPT or the RM requires it (REQ-107 Errors). That
+// covers an OPT node without an archetype id that the OPT does not leave
+// optional, an attribute whose cardinality asks for a member that the OPT
+// leaves without children, a COMPOSITION's content or a SECTION's items at
+// existence 1..1 that the OPT leaves without children, lists the RM makes
+// non-empty once present, whose member the BMM type would give
+// (What a visit writes), and the template root. It runs every
+// archetype-root class as the template root and every ENTRY class as a
+// content child. The error names the RM type and the OPT path, and it wraps
+// neither ErrSlotFillUnsupported nor ErrConstraintUnsatisfiable.
 //
 // The control rows still generate, and their output passes the RM floor:
-// an entry the OPT names, and an optional content attribute the OPT leaves
-// silent, written as multiple or as single, which gets no child at all. So
-// does a content or SECTION items list that only its existence requires
-// (What a visit writes): with no child, or only a slot, it gets no member,
-// so the walk reaches no object to refuse, and so does such a content list
-// the template writes as a single attribute, which is read as the list the
-// RM declares (TestREQ107_SingleAttributeRMListGetsNoMember). A required
-// slot is no such node: where the cardinality asks for a member, the
-// slot-fill rule stamps it with the RM-type-prefix archetype id instead,
-// and the fill passes the floor too.
+// an entry the OPT names; an optional content attribute the OPT leaves
+// silent, written as multiple or as single, which gets no child at all; and
+// an optional content whose only child is an optional unnamed entry, which
+// is undescribed content (Slot fills), so no policy visits the content and
+// the walk reaches no object to refuse. A required slot is no such node:
+// where the cardinality asks for a member, or the existence of a content the
+// RM makes non-empty once present, the slot-fill rule stamps it with the
+// RM-type-prefix archetype id instead, and the fill passes the floor too.
 func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 	checkGuardClasses(t)
 	cases := []guardCase{
@@ -234,12 +229,13 @@ func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 			detail: "OBSERVATION for COMPOSITION.content at / (required, but the template names no child)",
 		},
 		{
-			// The RM declares content a list, so it is read as one: only
-			// its existence asks for a member, nothing is built and there
-			// is no object to refuse (REQ-107 What a visit writes).
-			name:  "control: content only its existence requires, written as a single attribute without children",
-			opt:   guardOPT(guardCompositionID, guardSingle("content", guardExistence11)),
-			check: checkNoContent,
+			// The RM declares content a list, so it is read as one, which
+			// the RM makes non-empty once present: its existence asks for a
+			// member, which its BMM type would give as an OBSERVATION
+			// (REQ-107 What a visit writes).
+			name:   "content at existence 1..1, written as a single attribute without children",
+			opt:    guardOPT(guardCompositionID, guardSingle("content", guardExistence11)),
+			detail: "OBSERVATION for COMPOSITION.content at / (required, but the template names no child)",
 		},
 		{
 			name: "SECTION items whose cardinality requires a member, which the template leaves without children",
@@ -249,15 +245,24 @@ func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 			detail: "OBSERVATION for SECTION.items at /content[at0001] (required, but the template names no child)",
 		},
 		{
-			// The entry's data takes a HISTORY the template describes, so
-			// the entry needs no undescribed content (REQ-107 § Slot fills)
-			// and Large and Medium build it.
-			name: "optional content whose only child is an unnamed entry",
+			// The entry's data takes a HISTORY the template describes, but
+			// the entry itself is undescribed content (REQ-107 § Slot
+			// fills): no policy visits the optional content, so the walk
+			// reaches no object to refuse.
+			name: "control: optional content whose only child is an optional unnamed entry",
 			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence01,
 				guardChild("C_COMPLEX_OBJECT", "OBSERVATION", "at0000", guardOccurrences01, "",
 					guardSingle("data", guardExistence11, guardChild("C_COMPLEX_OBJECT", "HISTORY", "at0001", "", ""))))),
-			detail:    "OBSERVATION at /content[at0000]",
-			unreached: true,
+			check: checkNoContent,
+		},
+		{
+			// The 1..1 entry makes the optional content required (REQ-107
+			// Visit rule), so every policy reaches it.
+			name: "optional content whose only child is a 1..1 unnamed entry",
+			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence01,
+				guardChild("C_COMPLEX_OBJECT", "OBSERVATION", "at0000", guardOccurrences11, "",
+					guardSingle("data", guardExistence11, guardChild("C_COMPLEX_OBJECT", "HISTORY", "at0001", "", ""))))),
+			detail: "OBSERVATION at /content[at0000]",
 		},
 		{
 			name: "control: an entry the template names",
@@ -282,40 +287,35 @@ func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 			},
 		},
 		{
-			// Only the existence asks for a member, so nothing is built
-			// and there is no object to refuse (REQ-107 What a visit
-			// writes).
-			name:  "control: content only its existence requires, which the template leaves without children",
-			opt:   guardOPT(guardCompositionID, guardMultiple("content", guardExistence11)),
-			check: checkNoContent,
+			// The RM makes content non-empty once present, so its existence
+			// asks for a member, which its BMM type would give as an
+			// OBSERVATION (REQ-107 What a visit writes).
+			name:   "content at existence 1..1, which the template leaves without children",
+			opt:    guardOPT(guardCompositionID, guardMultiple("content", guardExistence11)),
+			detail: "OBSERVATION for COMPOSITION.content at / (required, but the template names no child)",
 		},
 		{
-			name: "control: SECTION items only their existence requires, which the template leaves without children",
+			// The RM makes a SECTION's items non-empty once present, as it
+			// does a COMPOSITION's content.
+			name: "SECTION items at existence 1..1, which the template leaves without children",
 			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
 				guardChild("C_COMPLEX_OBJECT", "SECTION", "at0001", guardOccurrences11, "",
 					guardMultiple("items", guardExistence11)))),
-			check: func(t *testing.T, call string, out any) {
-				t.Helper()
-				section, ok := firstContent(t, call, out).(*rm.Section)
-				if !ok {
-					t.Fatalf("%s: content[0] is not a SECTION", call)
-				}
-				if len(section.Items) != 0 {
-					t.Errorf("%s: SECTION.items has %d members, want none", call, len(section.Items))
-				}
-			},
+			detail: "OBSERVATION for SECTION.items at /content[at0001] (required, but the template names no child)",
 		},
 		{
-			// The slot gets no fill: only the content's existence asks for
-			// a member, and the slot needs undescribed content. Its
-			// occurrences of 1..1 do not ask for one, since the parser
-			// does not read a slot's occurrences (REQ-107 Known gap: slot
-			// occurrences); TestREQ107_ExistenceOnly pins the rule for a
-			// child whose occurrences it reads.
-			name: "control: content only its existence requires, whose one child is a slot",
+			// The RM makes content non-empty once present, so its existence
+			// asks for a member, and the top-up fills the slot, the only
+			// source (REQ-107 What a visit writes). Its occurrences of 1..1
+			// are not what asks, since the parser does not read a slot's
+			// occurrences (REQ-107 Known gap: slot occurrences).
+			name: "control: content at existence 1..1, whose one child is a slot",
 			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
 				guardChild("ARCHETYPE_SLOT", "OBSERVATION", "at0000", guardOccurrences11, ""))),
-			check: checkNoContent,
+			check: func(t *testing.T, call string, out any) {
+				t.Helper()
+				checkSlotFallbackStamp(t, call, firstContent(t, call, out), "OBSERVATION")
+			},
 		},
 	}
 	for _, class := range guardRootClasses {
@@ -344,9 +344,6 @@ func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 				call := fmt.Sprintf("Generate(%v, %v)", opts.Policy, opts.ValueFill)
 				out, err := instance.Generate(t.Context(), c, opts)
 				detail := tc.detail
-				if tc.unreached && opts.Policy == instance.Required {
-					detail = ""
-				}
 				if detail == "" {
 					if err != nil {
 						t.Fatalf("%s: %v, want a root", call, err)
@@ -368,55 +365,60 @@ func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 	}
 }
 
-// TestREQ107_SingleAttributeRMListGetsNoMember is the REQ-107 check of What
-// a visit writes on an attribute the RM declares a list that the template
-// writes as a C_SINGLE_ATTRIBUTE with no child, at an existence of 1..1:
-// COMPOSITION.content, and a SECTION's items. The BMM marks neither
-// mandatory, so it is read as the list the RM declares, as the template
-// validator reads it: only its existence asks for a member, so it gets none,
-// and Generate does not refuse it with ErrArchetypeIDMissing. A CLUSTER's
-// items, which the BMM marks mandatory, is a control: written so, it still
-// ends with one member, the placeholder ELEMENT the RM defaults put in an
-// empty CLUSTER's items after the walk. The root passes the RM floor under
-// every policy, both value fills and both compile modes, and the template
-// validator but for one finding: COMPOSITION.content and SECTION.items are
-// lists the RM makes non-empty once present, so the template's existence
-// asks them for a member (REQ-102 An existence lower bound alone asks for
-// no member), and the list left with none draws the template's `required`
-// there, as REQ-107 Exceptions and known gaps says of such a list.
+// TestREQ107_SingleAttributeRMListIsReadAsTheRMList is the REQ-107 check of
+// What a visit writes on an attribute the RM declares a list that the
+// template writes as a C_SINGLE_ATTRIBUTE with no child, at an existence of
+// 1..1: it is read as the list the RM declares, as the template validator
+// reads it. An ITEM_TREE's items, which the BMM does not mark mandatory and
+// the RM does not make non-empty once present, is one only its existence
+// asks a member of, so it gets none, Generate does not refuse it with
+// ErrArchetypeIDMissing, and the root passes the RM floor and the template
+// validator. A CLUSTER's items, which the BMM marks mandatory, is a control:
+// written so, it still ends with one member, the placeholder ELEMENT the RM
+// defaults put in an empty CLUSTER's items after the walk. A COMPOSITION's
+// content and a SECTION's items are lists the RM makes non-empty once
+// present, so their existence asks for a member (REQ-102 An existence lower
+// bound alone asks for no member), which their BMM type would give as an
+// OBSERVATION, an archetype root the template names no archetype id for, so
+// Generate returns ErrArchetypeIDMissing and no root. It holds under every
+// policy, both value fills and both compile modes.
 // TestREQ107_SingleAttributeRMListTheLookupRequires checks that a list the
 // BMM marks mandatory is not skipped.
-func TestREQ107_SingleAttributeRMListGetsNoMember(t *testing.T) {
+func TestREQ107_SingleAttributeRMListIsReadAsTheRMList(t *testing.T) {
 	cases := []struct {
-		name  string
-		opt   string
+		name string
+		opt  string
+		// check reads a control row's root.
 		check func(t *testing.T, call string, out any)
-		// required is the path of the template's one `required`, empty
-		// for none.
-		required string
+		// detail is what the error says after the sentinel's own text; ""
+		// marks a control row, which must generate.
+		detail string
 	}{
 		{
-			name:     "COMPOSITION.content",
-			opt:      guardOPT(guardCompositionID, guardSingle("content", guardExistence11)),
-			check:    checkNoContent,
-			required: "/content",
+			name: "ITEM_TREE.items",
+			opt:  guardRootOPT("ITEM_TREE", "", guardSingle("items", guardExistence11)),
+			check: func(t *testing.T, call string, out any) {
+				t.Helper()
+				tree, ok := out.(*rm.ItemTree)
+				if !ok {
+					t.Fatalf("%s returned %T, want an ITEM_TREE", call, out)
+				}
+				if n := len(tree.Items); n != 0 {
+					t.Errorf("%s: ITEM_TREE.items has %d members, want none", call, n)
+				}
+			},
+		},
+		{
+			name:   "COMPOSITION.content",
+			opt:    guardOPT(guardCompositionID, guardSingle("content", guardExistence11)),
+			detail: "OBSERVATION for COMPOSITION.content at / (required, but the template names no child)",
 		},
 		{
 			name: "SECTION.items",
 			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
 				guardChild("C_COMPLEX_OBJECT", "SECTION", "at0001", guardOccurrences11, "",
 					guardSingle("items", guardExistence11)))),
-			required: "/content[at0001]/items",
-			check: func(t *testing.T, call string, out any) {
-				t.Helper()
-				section, ok := firstContent(t, call, out).(*rm.Section)
-				if !ok {
-					t.Fatalf("%s: content[0] is not a SECTION", call)
-				}
-				if n := len(section.Items); n != 0 {
-					t.Errorf("%s: SECTION.items has %d members, want none", call, n)
-				}
-			},
+			detail: "OBSERVATION for SECTION.items at /content[at0001] (required, but the template names no child)",
 		},
 		{
 			name: "control: CLUSTER.items, which the BMM marks mandatory",
@@ -439,6 +441,13 @@ func TestREQ107_SingleAttributeRMListGetsNoMember(t *testing.T) {
 			for _, opts := range guardOptions() {
 				t.Run(fmt.Sprintf("%s/implicit=%t/%v/%v", tc.name, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
 					out, err := instance.Generate(t.Context(), c, opts)
+					if tc.detail != "" {
+						checkArchetypeIDMissing(t, "Generate", err, tc.detail)
+						if out != nil {
+							t.Errorf("Generate returned %T with the error, want no root", out)
+						}
+						return
+					}
 					if err != nil {
 						t.Fatalf("Generate: %v, want a root", err)
 					}
@@ -447,16 +456,7 @@ func TestREQ107_SingleAttributeRMListGetsNoMember(t *testing.T) {
 						t.Errorf("ValidateRM issues %+v, want none", r.Issues)
 					}
 					for _, iss := range templateErrors(out, c) {
-						if tc.required != "" && iss.Path == tc.required && iss.Code == "required" &&
-							iss.Layer == validation.LayerTemplate && iss.Rule == "existence" {
-							continue
-						}
 						t.Errorf("template validator: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
-					}
-					if tc.required != "" && !slices.ContainsFunc(templateErrors(out, c), func(iss validation.Issue) bool {
-						return iss.Path == tc.required && iss.Code == "required"
-					}) {
-						t.Errorf("template validator reports no required @ %s, want the template's existence there", tc.required)
 					}
 				})
 			}
@@ -478,7 +478,7 @@ func (l contentRequiredLookup) RequiredAttributes(rmType string) []string {
 }
 
 // TestREQ107_SingleAttributeRMListTheLookupRequires is the REQ-107 control
-// of TestREQ107_SingleAttributeRMListGetsNoMember: only a list the BMM does
+// of TestREQ107_SingleAttributeRMListIsReadAsTheRMList: only a list the BMM does
 // not mark mandatory is read as one that only its existence asks a member
 // of. Compiled with RM info that marks COMPOSITION.content mandatory, the
 // same template's content, written as a C_SINGLE_ATTRIBUTE with no child,

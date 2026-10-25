@@ -1575,6 +1575,7 @@ requirements:
       - openehr/instance/sample_test.go
       - openehr/instance/single_slot_fill_test.go
       - openehr/instance/sizing_rule_test.go
+      - openehr/instance/skipped_attributes_test.go
       - openehr/instance/string_attr_party_name_test.go
       - openehr/instance/string_leaf_internal_test.go
       - openehr/instance/string_leaf_test.go
@@ -1582,6 +1583,8 @@ requirements:
       - openehr/instance/uids_test.go
       - openehr/instance/uncarried_mandatory_test.go
       - openehr/instance/undescribed_content_test.go
+      - openehr/instance/unnamed_archetype_root_test.go
+      - openehr/instance/unsatisfiable_cardinality_test.go
       - openehr/instance/valuefill_leaves_test.go
       - openehr/instance/valuefill_test.go
       - openehr/instance/visit_rules_test.go
