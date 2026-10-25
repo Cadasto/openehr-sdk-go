@@ -38,7 +38,9 @@ func propertyQuantityChild(code string, units ...string) string {
 // (length). With a unit list, the list decides, as in the case
 // CONT-DV_QUANTITY-validate_property_units, list [cm, m]: km is a length unit
 // and is still refused. The NULL rows of both cases are the RM's, not the
-// constraint's, and are left out.
+// constraint's, and are left out. The volume rows pin the closed table: the
+// table lists mL under openehr::129 (volume), so ml, the same unit in another
+// UCUM spelling, is refused.
 func TestValidate_REQ102_REQ103_QuantityUnitsOfTheProperty(t *testing.T) {
 	t.Parallel()
 	refused := []pinnedIssue{templateFinding("unit_unknown", "/value")}
@@ -60,6 +62,8 @@ func TestValidate_REQ102_REQ103_QuantityUnitsOfTheProperty(t *testing.T) {
 		{name: "property and list, 1.0 cm", child: propertyQuantityChild("122", "cm", "m"), magnitude: 1, units: "cm"},
 		{name: "property and list, 5.7 cm", child: propertyQuantityChild("122", "cm", "m"), magnitude: 5.7, units: "cm"},
 		{name: "property and list, 10.0 cm", child: propertyQuantityChild("122", "cm", "m"), magnitude: 10, units: "cm"},
+		{name: "volume, 5.0 mL", child: propertyQuantityChild("129"), magnitude: 5, units: "mL"},
+		{name: "volume, 5.0 ml", child: propertyQuantityChild("129"), magnitude: 5, units: "ml", want: refused},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
