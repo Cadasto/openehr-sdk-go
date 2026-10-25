@@ -131,6 +131,7 @@ The table is generated from [`traceability.yaml`](traceability.yaml) by `make sp
 | REQ-170 | Unmatched content on decode | [wire.md](wire.md#req-170--unmatched-content-on-decode) | draft | landed |
 | REQ-171 | Validation engine | [clinical-modeling.md](clinical-modeling.md#req-171--validation-engine) | draft | landed |
 | REQ-172 | Typed 2xx body-read failure | [transport.md](transport.md#req-172--typed-2xx-body-read-failure) | draft | landed |
+| REQ-173 | Composition representation formats | [wire.md](wire.md#req-173--composition-representation-formats) | draft | landed |
 <!-- END GENERATED: registry -->
 
 **Impl.** column: `landed` (code + tests), `partial` (subset), `planned` (spec only), `retired` (a withdrawn requirement, **Stability** `deprecated`: normative text retained, implementation removed or not shipped; removal target in canonical spec).

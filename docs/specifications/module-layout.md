@@ -117,6 +117,7 @@ Application code (cmd/examples, downstream consumers)
 openehr/{serialize, instance, client/*} ──→ openehr/terminology/   (stdlib-only; sits below openehr/rm, which may import it later — REQ-034)
 openehr/{rm, rm/typereg, serialize/canjson} ──→ openehr/internal/refused/   (stdlib-only; carries a refused literal to DecodeError.Value)
 openehr/{rm/typereg, serialize/canjson} ──→ openehr/template/constraints/   (stdlib + internal/iso8601 only; the Redacted type DecodeError.Value holds)
+openehr/client/ehr/composition ──→ openehr/template/webtemplate/   (the Web Template its FLAT and STRUCTURED formats serialise against — REQ-173)
 
 cadasto/care      ──→ openehr/client/*
 cadasto/{extra, mpi, admin} ──→ transport/
@@ -129,7 +130,7 @@ testkit/  -. helpers for .-→ all of the above
 **Key invariants:**
 
 - `transport/` depends on `auth/`, never the reverse.
-- `openehr/client/*` depends on `transport/`, `openehr/rm/`, `openehr/serialize/`, never on `cadasto/…`.
+- `openehr/client/*` depends on `transport/`, `openehr/rm/`, `openehr/serialize/`, never on `cadasto/…`. `openehr/client/ehr/composition` also depends on `openehr/template/webtemplate/`, which its FLAT and STRUCTURED formats serialise against ([wire.md § REQ-173](wire.md#req-173--composition-representation-formats)); the template-side blocks never import a client ([§ REQ-013](#req-013--building-block-independence)), so the edge points down.
 - `openehr/rm/`'s generated marshal files import `openehr/serialize/canxml/` and `openehr/internal/xmlunmatched/`. That edge does not cycle: `canxml` imports only `openehr/rm/typereg/`, `openehr/serialize/internal/poly` and `openehr/internal/xmlunmatched/` from this module, and `xmlunmatched` imports only the standard library ([ADR 0002](../adr/0002-bmm-codegen-decisions.md) D9).
 - `openehr/rm/typereg/` imports `openehr/template/constraints/`, for the `Redacted` type that `DecodeError.Value` holds ([§ REQ-052 *Value-free decode errors*](wire.md#req-052)), and `openehr/internal/refused/`, which carries a literal an RM primitive codec refused to the codecs' entry points. `openehr/rm/` (its `Real`, `Integer` and `Character` codecs) imports `openehr/internal/refused/` to hand the literal over, and `openehr/serialize/canjson/` imports both packages to read it into `Value`. `refused` imports only the standard library, and `constraints` only the standard library and `internal/iso8601`, which itself imports only the standard library, so none of these edges cycles back into the RM or the codecs. `TestRefusedImportsOnlyTheStandardLibrary` holds this for `refused`, and `TestREQ103ValidatorsImportNoIO`, which admits a short list of standard-library packages and `internal/iso8601` and scans that package with the same list, for `constraints`.
 - `openehr/serialize/canjson/` reaches the RM's attribute tables through `internal/rmjsonwalk/`, which imports `openehr/rm/rminfo/` and `internal/rmjsonwalk/polyreg/`, never `openehr/rm/`; `openehr/rm/`'s generated init registers its interface table into `polyreg`, which imports only the standard library. `TestCanJSONDoesNotImportTheRM` holds this.
