@@ -35,6 +35,7 @@ What the `openehr-sdk-go` v1 surface includes and excludes. Out-of-scope items a
 |---|---|
 | FHIR resources, FHIR query, FHIR façade clients | A sibling Cadasto FHIR SDK proposal — not this module. |
 | openEHR EHR Extract (RM `ehr_extract` package) | Deferred — no v1 consumer. BMM definitions remain in `resources/bmm/openehr_rm_1.2.0.bmm.json`; generator skips this package. Wire in when a consumer needs the extract exchange surface. |
+| ITS-REST `IMPORTED_VERSION` bodies on the composition and EHR_STATUS version reads | Deferred with the EHR Extract, the exchange that creates imported versions: the version reads refuse them as a typed decode failure ([wire.md § REQ-174](wire.md#req-174--versioned-object-reads), [ADR 0031](../adr/0031-version-reads-refuse-imported-version.md)). |
 | AOM 2 / ADL 2 / OPT-2 | Deferred — `openehr_am_2.4.0.bmm.json` kept in `resources/bmm/` but not generated. AOM 1.4 covers v1's archetype/template parsing needs. |
 | openEHR LANG types as generated code | Deferred — `openehr_lang_1.1.0.bmm.json` kept as reference. The BMM meta-classes used by `openehr/bmm/` are hand-written against the P_BMM persistence shape for v1; auto-generating them is a future option. |
 | openEHR TERM service interface | Deferred — `openehr_term_3.1.0.bmm.json` kept in `resources/bmm/`. No v1 consumer requires a typed terminology-service interface; consumers integrate with a deployment-specific terminology backend directly. |
