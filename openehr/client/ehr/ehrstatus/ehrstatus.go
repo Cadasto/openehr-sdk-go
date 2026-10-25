@@ -62,7 +62,8 @@ func GetAtTime(ctx context.Context, c *transport.Client, ehrID openehrclient.EHR
 	return decode(ctx, c, req)
 }
 
-// GetVersioned returns the EHR_STATUS identified by versionUID.
+// GetVersioned returns the EHR_STATUS identified by versionUID, alone:
+// [GetVersionByID] returns the version envelope around it as well.
 //
 // Wire: GET /ehr/{ehr_id}/ehr_status/{version_uid}.
 func GetVersioned(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, versionUID openehrclient.VersionUID) (*rm.EHRStatus, *openehrclient.VersionMetadata, error) {
@@ -196,6 +197,11 @@ type Repository interface {
 	GetAtTime(ctx context.Context, ehrID openehrclient.EHRID, t time.Time) (*rm.EHRStatus, *openehrclient.VersionMetadata, error)
 	GetVersioned(ctx context.Context, ehrID openehrclient.EHRID, versionUID openehrclient.VersionUID) (*rm.EHRStatus, *openehrclient.VersionMetadata, error)
 	Put(ctx context.Context, ehrID openehrclient.EHRID, ifMatch string, status *rm.EHRStatus, opts ...PutOption) (*rm.EHRStatus, *openehrclient.VersionMetadata, error)
+	GetVersionedObject(ctx context.Context, ehrID openehrclient.EHRID) (*rm.VersionedEHRStatus, *openehrclient.VersionMetadata, error)
+	GetRevisionHistory(ctx context.Context, ehrID openehrclient.EHRID) (*rm.RevisionHistory, *openehrclient.VersionMetadata, error)
+	GetVersion(ctx context.Context, ehrID openehrclient.EHRID) (*Version, *openehrclient.VersionMetadata, error)
+	GetVersionAtTime(ctx context.Context, ehrID openehrclient.EHRID, t time.Time) (*Version, *openehrclient.VersionMetadata, error)
+	GetVersionByID(ctx context.Context, ehrID openehrclient.EHRID, versionUID openehrclient.VersionUID) (*Version, *openehrclient.VersionMetadata, error)
 }
 
 // NewRepository binds c to a Repository.
