@@ -179,11 +179,15 @@ func parseOPT(r io.Reader, strict bool) (*OperationalTemplate, error) {
 		return nil, fmt.Errorf("%w: missing definition", ErrInvalidOPT)
 	}
 
-	root, err := buildNode(wire.Definition, strict, 0)
+	root, err := buildNode(wire.Definition, strict, 0, &optPath{})
 	if err != nil {
-		// Use %w for the inner error so errors.Is reaches the
-		// builder sentinel (e.g. ErrUnsupportedNode) through the
-		// outer ErrInvalidOPT wrap.
+		// A builder error that already wraps ErrInvalidOPT carries its
+		// text; wrapping it again would print the prefix twice. Any
+		// other gains it here, with %w on both so errors.Is reaches the
+		// builder sentinel (e.g. ErrUnsupportedNode) as well.
+		if errors.Is(err, ErrInvalidOPT) {
+			return nil, err
+		}
 		return nil, fmt.Errorf("%w: %w", ErrInvalidOPT, err)
 	}
 
@@ -420,7 +424,68 @@ type xmlIdentifiedValue struct {
 
 // --- wire → public node tree --------------------------------------------
 
-func buildNode(o *xmlCObject, strict bool, depth int) (Node, error) {
+// optPath is the place in the OPT tree of the node being built: one step
+// per level from the root down to it. A parse keeps one, pushing a step as
+// it descends into a child and popping it on the way back, so that a
+// refusal can name where it is without the parse building a path for
+// every node. The path it writes holds structural names only: attribute
+// names and node or archetype ids, never a constraint value.
+type optPath struct {
+	steps []optStep
+}
+
+// optStep is one level of an [optPath].
+type optStep struct {
+	attr string // the attribute the node is a child of
+	id   string // the node's archetype id, else its node id; "" for neither
+}
+
+// push descends into the child c of the attribute attr. A nil c, which
+// buildNode refuses, has no id.
+func (p *optPath) push(attr string, c *xmlCObject) {
+	var id string
+	if c != nil {
+		id = strings.TrimSpace(c.ArchetypeID)
+		if id == "" {
+			id = strings.TrimSpace(c.NodeID)
+		}
+	}
+	p.steps = append(p.steps, optStep{attr: attr, id: id})
+}
+
+// pop returns to the parent of the node push descended into.
+func (p *optPath) pop() {
+	p.steps = p.steps[:len(p.steps)-1]
+}
+
+// String writes the path of the node being built, "/" for the root, with
+// each node's id as a predicate where it has one:
+// /content[openEHR-EHR-ACTION.medication.v1]/ism_transition[at0002].
+func (p *optPath) String() string {
+	if len(p.steps) == 0 {
+		return "/"
+	}
+	var b strings.Builder
+	for _, s := range p.steps {
+		b.WriteString("/" + s.attr)
+		if s.id != "" {
+			b.WriteString("[" + s.id + "]")
+		}
+	}
+	return b.String()
+}
+
+// attribute returns the path of the attribute name of the node being
+// built.
+func (p *optPath) attribute(name string) string {
+	if len(p.steps) == 0 {
+		return "/" + name
+	}
+	return p.String() + "/" + name
+}
+
+// buildNode builds the node o, whose place in the OPT tree path holds.
+func buildNode(o *xmlCObject, strict bool, depth int, path *optPath) (Node, error) {
 	if o == nil {
 		return nil, fmt.Errorf("%w: nil node", ErrInvalidOPT)
 	}
@@ -436,7 +501,7 @@ func buildNode(o *xmlCObject, strict bool, depth int) (Node, error) {
 	}
 	switch o.Type {
 	case "C_COMPLEX_OBJECT", "":
-		return buildComplexObject(o, strict, depth)
+		return buildComplexObject(o, strict, depth, path)
 	case "C_ARCHETYPE_ROOT", "T_ARCHETYPE_ROOT":
 		// REQ-100: some exporters write T_ARCHETYPE_ROOT for the node
 		// openEHR Template.xsd calls C_ARCHETYPE_ROOT. It is a second
@@ -447,7 +512,7 @@ func buildNode(o *xmlCObject, strict bool, depth int) (Node, error) {
 		// the parser does not map, such as one Template.xsd does not
 		// define for C_ARCHETYPE_ROOT, is skipped in both modes, not
 		// refused, so strict mode does not report it.
-		co, err := buildComplexObject(o, strict, depth)
+		co, err := buildComplexObject(o, strict, depth, path)
 		if err != nil {
 			return nil, err
 		}
@@ -503,7 +568,9 @@ func buildNode(o *xmlCObject, strict bool, depth int) (Node, error) {
 	}
 }
 
-func buildComplexObject(o *xmlCObject, strict bool, depth int) (*ComplexObject, error) {
+// buildComplexObject builds the node o, whose place in the OPT tree path
+// holds.
+func buildComplexObject(o *xmlCObject, strict bool, depth int, path *optPath) (*ComplexObject, error) {
 	occ, err := intervalToMultiplicity(o.Occurrences)
 	if err != nil {
 		return nil, fmt.Errorf("occurrences on %q (%s): %w", o.NodeID, o.RMTypeName, err)
@@ -517,12 +584,13 @@ func buildComplexObject(o *xmlCObject, strict bool, depth int) (*ComplexObject, 
 		// REQ-100: C_ATTRIBUTE is abstract in ITS-XML, so an <attributes>
 		// must name its concrete type in the XSI namespace. Strict mode
 		// refuses one that does not; the default mode reads it as a
-		// C_SINGLE_ATTRIBUTE (buildAttribute).
+		// C_SINGLE_ATTRIBUTE (buildAttribute). The refusal names the
+		// attribute's OPT path, structural names only.
 		if strict && a.Type == "" {
-			return nil, fmt.Errorf("%w: <attributes> %q of %s %q has no xsi:type in the XSI namespace (strict mode)",
-				ErrInvalidOPT, a.Name, o.RMTypeName, o.NodeID)
+			return nil, fmt.Errorf("%w: <attributes> at %q, of %s %q, has no xsi:type in the XSI namespace (strict mode)",
+				ErrInvalidOPT, path.attribute(a.Name), o.RMTypeName, o.NodeID)
 		}
-		attr, err := buildAttribute(a, strict, depth)
+		attr, err := buildAttribute(a, strict, depth, path)
 		if err != nil {
 			return nil, err
 		}
@@ -613,7 +681,9 @@ func fixedValueString(o *xmlCObject) string {
 	return ""
 }
 
-func buildAttribute(a *xmlCAttribute, strict bool, depth int) (*Attribute, error) {
+// buildAttribute builds the attribute a of the node whose place in the OPT
+// tree path holds, which it leaves as it found it.
+func buildAttribute(a *xmlCAttribute, strict bool, depth int, path *optPath) (*Attribute, error) {
 	existence, err := intervalToMultiplicity(a.Existence)
 	if err != nil {
 		return nil, fmt.Errorf("existence on attribute %q: %w", a.Name, err)
@@ -644,12 +714,15 @@ func buildAttribute(a *xmlCAttribute, strict bool, depth int) (*Attribute, error
 		// REQ-100: C_OBJECT is abstract in ITS-XML, so a <children> must
 		// name its concrete type in the XSI namespace. Strict mode refuses
 		// one that does not; the default mode reads it as a
-		// C_ARCHETYPE_ROOT or a C_COMPLEX_OBJECT (buildNode).
+		// C_ARCHETYPE_ROOT or a C_COMPLEX_OBJECT (buildNode). The refusal
+		// names the attribute's OPT path, structural names only.
 		if strict && c != nil && c.Type == "" {
-			return nil, fmt.Errorf("%w: <children> %d of attribute %q (%s %q) has no xsi:type in the XSI namespace (strict mode)",
-				ErrInvalidOPT, i+1, a.Name, c.RMTypeName, c.NodeID)
+			return nil, fmt.Errorf("%w: <children> %d of the attribute at %q (%s %q) has no xsi:type in the XSI namespace (strict mode)",
+				ErrInvalidOPT, i+1, path.attribute(a.Name), c.RMTypeName, c.NodeID)
 		}
-		node, err := buildNode(c, strict, depth+1)
+		path.push(a.Name, c)
+		node, err := buildNode(c, strict, depth+1, path)
+		path.pop()
 		if err != nil {
 			return nil, err
 		}

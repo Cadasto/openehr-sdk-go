@@ -3,6 +3,7 @@ package template_test
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -181,6 +182,119 @@ func TestREQ100_StrictRefusesNodeWithNoXSIType(t *testing.T) {
 			}
 			if !strings.Contains(err.Error(), tc.element) {
 				t.Errorf("ParseOPTStrict = %v, want the message to name %s", err, tc.element)
+			}
+		})
+	}
+}
+
+// TestREQ100_StrictRefusalNamesItsPath pins that strict mode's refusal of an
+// untyped <attributes> or <children> names the OPT path of the attribute,
+// built from attribute names and node or archetype ids only, so a reader can
+// find the element without the message carrying a constraint value.
+func TestREQ100_StrictRefusalNamesItsPath(t *testing.T) {
+	typed := fmt.Sprintf(untypedNodeOPT, xsiNamespace)
+	const actionID = `<archetype_id><value>openEHR-EHR-ACTION.minimal_2.v1</value></archetype_id>`
+	inAction := func(attributes string) string {
+		return strings.Replace(typed, actionID, attributes+"\n        "+actionID, 1)
+	}
+	tests := []struct {
+		name string
+		body string
+		path string
+	}{
+		{
+			name: "attributes on the root",
+			body: strings.Replace(typed, `<attributes xsi:type="C_MULTIPLE_ATTRIBUTE">`, `<attributes>`, 1),
+			path: "/content",
+		},
+		{
+			name: "children below a node with no id",
+			body: strings.Replace(typed, `<children xsi:type="C_CODE_PHRASE">`, `<children>`, 1),
+			path: "/category/defining_code",
+		},
+		{
+			name: "children with an archetype id",
+			body: strings.Replace(typed, `<children xsi:type="C_ARCHETYPE_ROOT">`, `<children>`, 1),
+			path: "/content",
+		},
+		{
+			name: "attributes inside an archetype root",
+			body: inAction(`<attributes><rm_attribute_name>ism_transition</rm_attribute_name></attributes>`),
+			path: "/content[openEHR-EHR-ACTION.minimal_2.v1]/ism_transition",
+		},
+		{
+			name: "children inside an archetype root",
+			body: inAction(`<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>ism_transition</rm_attribute_name>` +
+				`<children><rm_type_name>ISM_TRANSITION</rm_type_name><node_id>at0002</node_id></children></attributes>`),
+			path: "/content[openEHR-EHR-ACTION.minimal_2.v1]/ism_transition",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.body == typed {
+				t.Fatal("the row's body is the typed OPT: its replacement did not apply")
+			}
+			_, err := template.ParseOPTStrict(strings.NewReader(tc.body))
+			if !errors.Is(err, template.ErrInvalidOPT) {
+				t.Fatalf("ParseOPTStrict = %v, want an error wrapping ErrInvalidOPT", err)
+			}
+			if want := strconv.Quote(tc.path); !strings.Contains(err.Error(), want) {
+				t.Errorf("ParseOPTStrict = %v, want the message to name the path %s", err, want)
+			}
+			// 433 is the code the category's C_CODE_PHRASE lists: a value,
+			// not a structural name.
+			if strings.Contains(err.Error(), "433") {
+				t.Errorf("ParseOPTStrict = %v, want no constraint value in the message", err)
+			}
+		})
+	}
+}
+
+// TestREQ100_InvalidOPTPrefixOnce pins that a parse error carries the
+// ErrInvalidOPT prefix once, wherever the parser found the defect, and still
+// matches the sentinel, and ErrUnsupportedNode where that is the cause.
+func TestREQ100_InvalidOPTPrefixOnce(t *testing.T) {
+	typed := fmt.Sprintf(untypedNodeOPT, xsiNamespace)
+	const codePhrase = `<children xsi:type="C_CODE_PHRASE">
+            <rm_type_name>CODE_PHRASE</rm_type_name>
+            <node_id></node_id>
+            <terminology_id><value>openehr</value></terminology_id>
+            <code_list>433</code_list>
+          </children>`
+	if strings.Count(typed, codePhrase) != 1 {
+		t.Fatal("the C_CODE_PHRASE child is not found exactly once")
+	}
+	withLeaf := func(leaf string) string { return strings.Replace(typed, codePhrase, leaf, 1) }
+	tests := []struct {
+		name        string
+		body        string
+		strict      bool
+		unsupported bool
+	}{
+		{name: "untyped attributes", body: strings.Replace(typed, `<attributes xsi:type="C_MULTIPLE_ATTRIBUTE">`, `<attributes>`, 1), strict: true},
+		{name: "untyped children", body: strings.Replace(typed, `<children xsi:type="C_CODE_PHRASE">`, `<children>`, 1), strict: true},
+		{name: "CONSTRAINT_REF with no reference", body: withLeaf(`<children xsi:type="CONSTRAINT_REF"><rm_type_name>CODE_PHRASE</rm_type_name><node_id/></children>`), strict: true},
+		{name: "C_PRIMITIVE_OBJECT with no item", body: withLeaf(`<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>STRING</rm_type_name><node_id/></children>`), strict: true},
+		{name: "untyped item", body: withLeaf(`<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>STRING</rm_type_name><node_id/><item><list>a</list></item></children>`), strict: true},
+		{name: "unknown attribute type", body: strings.Replace(typed, `<attributes xsi:type="C_MULTIPLE_ATTRIBUTE">`, `<attributes xsi:type="C_OTHER_ATTRIBUTE">`, 1), unsupported: true},
+		{name: "missing template_id", body: strings.Replace(typed, `<template_id><value>untyped_node</value></template_id>`, ``, 1)},
+	}
+	prefix := template.ErrInvalidOPT.Error()
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			parse := template.ParseOPT
+			if tc.strict {
+				parse = template.ParseOPTStrict
+			}
+			_, err := parse(strings.NewReader(tc.body))
+			if !errors.Is(err, template.ErrInvalidOPT) {
+				t.Fatalf("parse = %v, want an error wrapping ErrInvalidOPT", err)
+			}
+			if got := strings.Count(err.Error(), prefix); got != 1 {
+				t.Errorf("parse = %q, carries %q %d times, want once", err, prefix, got)
+			}
+			if got := errors.Is(err, template.ErrUnsupportedNode); got != tc.unsupported {
+				t.Errorf("parse = %v, errors.Is(err, ErrUnsupportedNode) = %t, want %t", err, got, tc.unsupported)
 			}
 		})
 	}
