@@ -83,19 +83,11 @@ func describe(v any) string {
 // binds the DURATION node.
 func Bind(nodes []*tcimpl.CompiledNode, v any, eligible func(*tcimpl.CompiledNode) bool) *tcimpl.CompiledNode {
 	gotType := describe(v)
-	for _, c := range nodes {
-		if eligible(c) && namesRMType(c, gotType, v) {
-			return c
-		}
-	}
-	for _, c := range nodes {
-		if eligible(c) && wrapsShortName(c, gotType) {
-			return c
-		}
-	}
-	for _, c := range nodes {
-		if eligible(c) && conformsToChild(c, gotType, v) {
-			return c
+	for _, admits := range tiers {
+		for _, c := range nodes {
+			if eligible(c) && admits(c, gotType, v) {
+				return c
+			}
 		}
 	}
 	return nil
@@ -109,28 +101,26 @@ func Bind(nodes []*tcimpl.CompiledNode, v any, eligible func(*tcimpl.CompiledNod
 func Tier(dst, nodes []*tcimpl.CompiledNode, v any, eligible func(*tcimpl.CompiledNode) bool) []*tcimpl.CompiledNode {
 	gotType := describe(v)
 	from := len(dst)
-	for _, c := range nodes {
-		if eligible(c) && namesRMType(c, gotType, v) {
-			dst = append(dst, c)
+	for _, admits := range tiers {
+		for _, c := range nodes {
+			if eligible(c) && admits(c, gotType, v) {
+				dst = append(dst, c)
+			}
 		}
-	}
-	if len(dst) > from {
-		return dst
-	}
-	for _, c := range nodes {
-		if eligible(c) && wrapsShortName(c, gotType) {
-			dst = append(dst, c)
-		}
-	}
-	if len(dst) > from {
-		return dst
-	}
-	for _, c := range nodes {
-		if eligible(c) && conformsToChild(c, gotType, v) {
-			dst = append(dst, c)
+		if len(dst) > from {
+			break
 		}
 	}
 	return dst
+}
+
+// tiers holds the test of each of the three tiers of [Bind], in order: the
+// one rule Bind and [Tier] both apply. Each reports whether the node c
+// admits the value v of RM type gotType ([describe]).
+var tiers = [...]func(c *tcimpl.CompiledNode, gotType string, v any) bool{
+	namesRMType,
+	func(c *tcimpl.CompiledNode, gotType string, _ any) bool { return wrapsShortName(c, gotType) },
+	conformsToChild,
 }
 
 // namesRMType reports whether the node c names the value val's own RM type,
