@@ -3380,10 +3380,14 @@ const defaultTransition = "535"
 
 // applyStringLeaf writes a C_STRING leaf onto the String attribute attr
 // of rmValue, or onto its main string attribute when attr is "". The
-// value is a list member or a pattern match that the constraint accepts;
-// on a PARTY_REF's type it is also a class name PARTY_REF Type_validity
-// admits (see partyRefType), on an ACCESS_GROUP_REF's type the one type
-// its Type_validity admits, on a TERM_MAPPING's match a character
+// value is a list member or a pattern match that the constraint accepts,
+// or the example under a C_STRING with neither (stringForConstraint),
+// except on an ACTIVITY's action_archetype_id, where such a C_STRING gets
+// the RM default /.*/ (anyActionArchetype), as where the OPT leaves the
+// attribute silent (bmmStringDefault); on a PARTY_REF's type it is also a
+// class name PARTY_REF Type_validity admits (see partyRefType), on an
+// ACCESS_GROUP_REF's type the one type its Type_validity admits, on a
+// TERM_MAPPING's match a character
 // TERM_MAPPING Match_valid admits (see termMappingMatch), and on the
 // magnitude_status of a quantified value one of the strings DV_QUANTIFIED
 // Magnitude_status_valid admits (magnitudeStatuses), the first of them
