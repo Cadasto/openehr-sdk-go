@@ -1250,6 +1250,7 @@ requirements:
       - openehr/template/t_archetype_root_test.go
       - openehr/template/template_test.go
       - openehr/template/untyped_node_test.go
+      - openehr/templatecompile/not_in_rm_test.go
       - openehr/validation/attribute_not_in_rm_test.go
       - testkit/fixtures/corpus_xml_booleans_test.go
       - testkit/probes/instance/t_archetype_root_test.go

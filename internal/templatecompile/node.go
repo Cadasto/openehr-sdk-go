@@ -261,6 +261,7 @@ type CompiledAttribute struct {
 	rmTypeName        string // RM type from rminfo; empty when not resolved
 	implicit          bool   // true when injected from rminfo, not declared by OPT
 	required          bool   // BMM is_mandatory (true even when OPT silent)
+	notInRM           bool   // OPT-declared, and the parent's RM class does not have it
 	children          []*CompiledNode
 
 	// allowed and prohibited hold what a validation walk asks of the
@@ -320,6 +321,19 @@ func (a *CompiledAttribute) Implicit() bool { return a.implicit }
 // mandatory on the parent type. True implies the composition
 // builder must emit a value at this attribute's RM path.
 func (a *CompiledAttribute) Required() bool { return a.required }
+
+// NotInRM reports whether the template declares this attribute on a node
+// whose Reference Model class does not have it: the class, read without
+// generic parameters, has no property of this name in the RM information
+// the compile used, and the name is not one of the computed attributes a
+// template may constrain, DV_QUANTITY's and DV_PROPORTION's is_integral and
+// an event's offset, which rminfo.IsNonStorableAttr names. ISM_TRANSITION.name is
+// one. No RM instance can carry such an attribute, so the validators in
+// openehr/validation do not visit it and list its path in their result's
+// coverage instead. It is false for an attribute the compile injects and
+// for every attribute of a node whose class the RM information does not
+// know.
+func (a *CompiledAttribute) NotInRM() bool { return a.notInRM }
 
 // Children returns a defensive copy of the child nodes. Empty for
 // implicit attributes (no OPT-declared children) and for the

@@ -109,6 +109,11 @@ type walker struct {
 	// nodes of one owner type share it.
 	implicit map[implicitKey]*CompiledAttribute
 
+	// known holds, for each bare class an OPT-declared attribute has been
+	// looked up on and not found, whether the lookup knows the class
+	// ([walker.knowsClass]). Nil until the first such attribute.
+	known map[string]bool
+
 	// currentAttr is the wire-side *template.Attribute under whose
 	// Children() the immediately-recursed compileNode is descending.
 	// Set by buildAttribute around the per-child loop and consumed by
@@ -354,7 +359,7 @@ func (w *walker) requiredAttributes(class string) []string {
 // separate rminfo query. class is the bare class of parent's RM type,
 // and required the attributes that class requires.
 func (w *walker) buildAttribute(parent *CompiledNode, class string, required []string, a *template.Attribute) (*CompiledAttribute, error) {
-	rm, _ := w.attributeType(parent.rmTypeName, class, a.Name())
+	rm, isProperty := w.attributeType(parent.rmTypeName, class, a.Name())
 	ca := &CompiledAttribute{
 		name:              a.Name(),
 		cardinality:       a.Cardinality(),
@@ -362,6 +367,7 @@ func (w *walker) buildAttribute(parent *CompiledNode, class string, required []s
 		childMultiplicity: a.ChildMultiplicity(),
 		rmTypeName:        rm,
 		required:          slices.Contains(required, a.Name()),
+		notInRM:           !isProperty && w.absentFrom(class, a.Name()),
 	}
 	prevAttr := w.currentAttr
 	w.currentAttr = a
@@ -398,6 +404,30 @@ func (w *walker) attributeType(owner, class, attr string) (string, bool) {
 		return "", false
 	}
 	return bmmtype.Substitute(owner, rm), true
+}
+
+// absentFrom reports whether attr, which the lookup does not give the bare
+// class class as a property, is an attribute class does not have (REQ-100,
+// [CompiledAttribute.NotInRM]): the lookup knows class, and attr is not a
+// function [rminfo.IsNonStorableAttr] names, which a template may constrain
+// as if it were an attribute. A class the lookup does not know gives no
+// verdict, so its attributes are not marked.
+func (w *walker) absentFrom(class, attr string) bool {
+	return !rminfo.IsNonStorableAttr(class, attr) && w.knowsClass(class)
+}
+
+// knowsClass reports whether the lookup knows the bare class class, asking it
+// once per class and call.
+func (w *walker) knowsClass(class string) bool {
+	known, ok := w.known[class]
+	if !ok {
+		known = slices.Contains(w.lookup.KnownRMTypes(), class)
+		if w.known == nil {
+			w.known = map[string]bool{}
+		}
+		w.known[class] = known
+	}
+	return known
 }
 
 // childPath computes the AQL path of a child node reached from the
