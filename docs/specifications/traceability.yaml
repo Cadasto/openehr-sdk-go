@@ -1332,6 +1332,7 @@ requirements:
       - openehr/validation/primitive_empty_part_test.go
       - openehr/validation/primitive_input_test.go
       - openehr/validation/prohibited_test.go
+      - openehr/validation/quantity_property_test.go
       - openehr/validation/rmfloor_chained_corpus_test.go
       - openehr/validation/rmfloor_chained_internal_test.go
       - openehr/validation/rmfloor_chained_test.go
@@ -1375,6 +1376,7 @@ requirements:
       - openehr/validation/cstring_list_open_test.go
       - openehr/validation/optional_string_test.go
       - openehr/validation/ordinal_symbol_test.go
+      - openehr/validation/quantity_property_test.go
       - testkit/probes/template/constraint_fixtures_test.go
       - testkit/probes/template/probe_024_primitive_validate.go
       - testkit/probes/template/probes_test.go
@@ -1571,6 +1573,7 @@ requirements:
       - openehr/validation/inventory_dispatch_internal_test.go
       - openehr/validation/issuepath_test.go
       - openehr/validation/optional_string_test.go
+      - openehr/validation/quantity_property_test.go
       - openehr/validation/subtype_conformance_corpus_test.go
       - openehr/validation/subtype_conformance_test.go
       - openehr/validation/walk_primitive_test.go
