@@ -447,10 +447,9 @@ func TestREQ107_OrdinalAndScaleTakeTheirSymbolAndValue(t *testing.T) {
 			check: ordinal(2, "local::at0000"),
 		},
 		{
-			// The row TestREQ107_AttributeThePinnedRMDoesNotHaveIsRefused
-			// pinned before as a known gap: the symbol alone, as a node of
-			// its own. The
-			// value the OPT leaves silent keeps the zero the RM type holds.
+			// Once pinned as a known gap: the symbol alone, as a node of
+			// its own. The value the OPT leaves silent keeps the zero the
+			// RM type holds.
 			name:  "DV_ORDINAL symbol alone as a node of its own",
 			value: optNode("DV_ORDINAL", "", optSingle("symbol", optNode("DV_CODED_TEXT", ""))),
 			check: ordinal(0, "local::at0000"),

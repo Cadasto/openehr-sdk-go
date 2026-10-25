@@ -159,12 +159,13 @@ func TestREQ107_OptionalNodeHoldingOnlyUndescribedContentGetsNoMember(t *testing
 		{
 			// The tree's items have a lower bound of 1, but the template
 			// prohibits their one child, so the walk skips them and the tree
-			// needs no undescribed content: the optional protocol is kept.
+			// needs no undescribed content; it would hold no item, though,
+			// so the optional protocol is left out (Visit rule).
 			name: "optional single attribute whose child requires items the template prohibits",
 			opt: optTemplate("OBSERVATION", describedHistory, optOptionalSingleOver("protocol",
 				optNode("ITEM_TREE", "at0002", optCardinal("items", 1, -1,
 					optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0003", 0, 0))))),
-			large: "protocol=true", medium: "protocol=true", required: "protocol=false",
+			large: "protocol=false", medium: "protocol=false", required: "protocol=false",
 		},
 		{
 			// One level: the required CLUSTER needs undescribed content, and
@@ -206,16 +207,19 @@ func TestREQ107_OptionalNodeHoldingOnlyUndescribedContentGetsNoMember(t *testing
 		},
 		{
 			// Both children carry at0002, and only the second needs no
-			// undescribed content. The validator binds a member with node id
-			// at0002 to the first, so the top-up takes the first child that is
-			// not a slot rather than the second, and the RM requirement keeps
-			// its fill.
+			// undescribed content. Under Large the second gets its own
+			// member, which the validator binds to it by trial, since the
+			// first's slot does not admit it. Under Medium the second
+			// yields to the first, whose identity it shares, and the
+			// validator binds a member with node id at0002 to the first, so
+			// the top-up takes the first child that is not a slot rather
+			// than the second, and the RM requirement keeps its fill.
 			name: "top-up past a described child whose identity an earlier sibling carries",
 			opt: optTemplate("CLUSTER", optMultiple("items",
 				slotOnlyCluster("at0002", guardOccurrences01),
 				guardChild("C_COMPLEX_OBJECT", "CLUSTER", "at0002", guardOccurrences01, "",
 					optMultiple("items", optNode("ELEMENT", "at0003"))))),
-			large: "at0002(" + stub + "(at0000))", medium: "at0002(" + stub + "(at0000))",
+			large: "at0002(at0003)", medium: "at0002(" + stub + "(at0000))",
 			required: "at0002(" + stub + "(at0000))",
 		},
 		{

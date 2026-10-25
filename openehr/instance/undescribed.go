@@ -1,9 +1,11 @@
 package instance
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
+	"github.com/cadasto/openehr-sdk-go/internal/rmroots"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
@@ -15,38 +17,47 @@ import (
 // slot fill, whose body the template leaves to the caller, or a LOCATABLE
 // the walk builds from the BMM type of an attribute the template gives no
 // allowed child, such as the placeholder ELEMENT of a CLUSTER's items,
-// which the RM requires, or of an ITEM_LIST's items, whose cardinality
-// lower bound the template sets to 1, where the template leaves either
-// empty. A server that checks a composition against its template can find
-// no template node for either. So under Large and Medium the walk builds
-// an optional node only where it holds more than such content: an optional
+// which the RM requires, or of an ITEM_LIST's items that the template
+// requires by its existence and gives a cardinality lower bound of 1, where
+// the template leaves either empty. A server that checks a composition
+// against its template can find no template node for either. A template
+// node of a class that is always an archetype root, for which the template
+// names no archetype id, such as an ADMIN_ENTRY defined inline under a
+// SECTION, is read the same way, as a slot nothing can fill is: the
+// generator invents no archetype id, so it can build no member of it
+// (unnamedArchetypeRoot). So under Large and Medium the walk builds an
+// optional node only where it holds more than such content: an optional
 // child that needs it gets no member of its own, and an attribute that is
-// not required and whose members would all be undescribed or need
-// undescribed content is not visited, except a composition's context,
-// which RM defaults write under every policy. Under every policy a top-up
-// takes the first child that needs none and whose identity no earlier
-// sibling carries, where the attribute has one. Where only the
-// attribute's existence asks for the member, the top-up takes no other
-// child, so the attribute gets no undescribed member and is left with none
-// where it has no such child (topUpSeed): a list with no member meets its
-// existence. The check reads a node's own attributes only, and still
-// counts an attribute only its existence requires as required. Below a
-// node the template or the RM requires, the walk builds what it always
-// builds, undescribed members included where the BMM, the attribute's
-// cardinality or a child's occurrences asks for a member, so the described
-// content around them is kept.
+// not required, or that only its cardinality lower bound requires, and
+// whose members would all be undescribed or need undescribed content is
+// not visited (shouldVisit), except a composition's context, which RM
+// defaults write under every policy. Under every policy a top-up takes the
+// first child that needs none and whose identity no earlier sibling
+// carries, where the attribute has one. Where only the attribute's
+// existence asks for the member, the top-up takes no other child, so the
+// attribute gets no undescribed member and is left with none where it has
+// no such child (topUpSeed): a list with no member meets its existence. A
+// list the RM makes non-empty once present is not one only its existence
+// asks a member of. The check reads a node's own attributes only, and still
+// counts an attribute only its existence or its cardinality requires as
+// required. Below a node the template or the RM requires, the walk builds
+// what it always builds, undescribed members included where the BMM, a
+// child's occurrences, or the cardinality of a list one of those or its
+// existence requires asks for a member, so the described content around
+// them is kept.
 
 // needsUndescribed reports whether node, a template child, needs content
-// the template does not describe: node is a slot, or an attribute of node
-// that is required (visitRequired) and that the walk does not skip can only
-// be given undescribed members (onlyUndescribed). An attribute the BMM
+// the template does not describe: node is a slot or an unnamed archetype
+// root (undescribedNode), or an attribute of node that is required
+// (visitRequired) and that the walk does not skip can only be given
+// undescribed members (onlyUndescribed). An attribute the BMM
 // marks mandatory that node does not carry, as under
 // templatecompile.WithoutImplicitAttributes, counts as one with no allowed
 // child. A primitive leaf needs none: the walk values it and stops there.
 // The answer does not depend on the policy, and it is kept per node for
 // the call.
 func (g *generator) needsUndescribed(node *tcimpl.CompiledNode) bool {
-	if node.IsSlot() {
+	if undescribedNode(node) {
 		return true
 	}
 	if v, seen := g.undescribed[node]; seen {
@@ -94,24 +105,36 @@ func (g *generator) ownContentUndescribed(node *tcimpl.CompiledNode) bool {
 // onlyUndescribed reports whether attr of node can only be given
 // undescribed members: it has no allowed template child and the member the
 // walk builds from its BMM type is a LOCATABLE, it is single-valued and the
-// child that builds its member (bindingAlternative) is a slot, or it is
-// multi-valued and every allowed template child of it is a slot. Where
-// the child that builds a single-valued member is a primitive the walk
-// writes onto node itself, it is not a slot.
+// child that builds its member (bindingAlternative) is a slot or an unnamed
+// archetype root (undescribedNode), or it is multi-valued and every allowed
+// template child of it is one. Where the child that builds a single-valued
+// member is a primitive the walk writes onto node itself, it is neither.
 func (g *generator) onlyUndescribed(node *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
 	children := tcimpl.AllowedChildNodes(attr)
 	if len(children) == 0 {
 		return g.bmmMemberLocatable(node, attr)
 	}
 	if attr.Cardinality() == template.Single {
-		return bindingAlternative(children, builtRMType(children[0])).IsSlot()
+		return undescribedNode(bindingAlternative(children, builtRMType(children[0])))
 	}
-	for _, c := range children {
-		if !c.IsSlot() {
-			return false
-		}
-	}
-	return true
+	return !slices.ContainsFunc(children, func(c *tcimpl.CompiledNode) bool { return !undescribedNode(c) })
+}
+
+// undescribedNode reports whether node describes no member the generator
+// can build: it is a slot, whose fill the template does not describe, or an
+// unnamed archetype root (unnamedArchetypeRoot).
+func undescribedNode(node *tcimpl.CompiledNode) bool {
+	return node.IsSlot() || unnamedArchetypeRoot(node)
+}
+
+// unnamedArchetypeRoot reports whether node, a template node that is not a
+// slot, builds an object of a class that is always an archetype root (an
+// ENTRY, a COMPOSITION, a PARTY, EHR_STATUS or EHR_ACCESS), as the class
+// it names or its concrete substitute (concreteFor), and names no archetype
+// id for it. makeChild refuses such a node with ErrArchetypeIDMissing, so
+// a member of it is one the template does not describe.
+func unnamedArchetypeRoot(node *tcimpl.CompiledNode) bool {
+	return !node.IsSlot() && node.ArchetypeID() == "" && rmroots.IsArchetypeRoot(nodeClass(node))
 }
 
 // membersUndescribed reports whether every member the walk would build for

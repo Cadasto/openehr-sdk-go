@@ -414,7 +414,11 @@ func findInItemTree(t *rm.ItemTree) *rm.DVDuration {
 // Phase 2 of the plan landed `newHierObjectID()` returning
 // `*rm.HierObjectID`; this is now the regression gate.
 func TestGenerateUIDCarriesType(t *testing.T) {
-	c := compileFixture(t, "vital_signs")
+	// The entry's template requires its uid, so the generator writes one
+	// (REQ-107 Identity).
+	c := compileOPTText(t, optTemplate("COMPOSITION", optMultiple("content",
+		optArchetypeRoot("OBSERVATION", "openEHR-EHR-OBSERVATION.uid_type.v1",
+			optSingle("data", optNode("HISTORY", "at0001")), optRequiredSingle("uid")))), true)
 	name := "Test Composer"
 	out, err := instance.Generate(context.Background(), c, instance.Options{
 		Policy:    instance.Medium,

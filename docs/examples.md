@@ -277,13 +277,13 @@ go run ./cmd/examples/generate-example \
 | Flag | Default | Values |
 |---|---|---|
 | `--opt` | `vital_signs.opt` fixture | Path to an ADL 1.4 OPT |
-| `--policy` | `medium` | `required` builds only the data points the template makes mandatory and a composition's context: it builds an optional list where the list holds a mandatory item, and leaves one out where only the list's minimum item count asks for an item; `medium` also builds every attribute the template constrains, with at most one optional archetype under each, the first whose content the template describes; `large` builds every attribute and a member of every optional archetype the template names. `minimal` is another name for `required`, and `complete` for `large` for now. Case does not matter. `required` and `medium` are the ITS-REST template example's `detail_level` levels of those names; `large` stops short of its `complete` level. No policy builds an optional node whose only content the template leaves undescribed, such as a cluster that holds nothing but an open slot. Under each of them every primitive leaf holds its example value |
+| `--policy` | `medium` | `required` builds only the data points the template makes mandatory and a composition's context: it builds an optional list where the list holds a mandatory item, and leaves one out where only the list's minimum item count asks for an item; `medium` also builds every attribute the template constrains, with at most one optional archetype under each, the first whose content the template describes; `large` builds every attribute and a member of every optional archetype the template names, each of several uses of one archetype included, named or not. `minimal` is another name for `required`, and `complete` for `large` for now. Case does not matter. `required` and `medium` are the ITS-REST template example's `detail_level` levels of those names; `large` stops short of its `complete` level. No policy builds an optional node whose only content the template leaves undescribed, such as a cluster that holds nothing but an open slot, nor an optional structure that would hold no item, such as a protocol whose tree holds nothing but an open slot. No policy writes a `uid` the template does not require, on a composition, an entry or a party alike, so the server that stores the document gives it its id. Under each of them every primitive leaf holds its example value |
 | `--territory` | `NL` | ISO 3166-1 code; a COMPOSITION root requires one |
 | `--composer-name` | `Example Composer` | Name recorded as the composition's composer |
 
 **Packages:** `openehr/template`, `openehr/templatecompile`, `openehr/instance`, `openehr/rm`, `openehr/serialize/canjson`. **No `internal/` import.**
 
-The output is one line of JSON. Each run gets fresh uids and a wall-clock context start time, so two runs are never byte-identical; that is why this entry shows no sample block. Pipe the output to a file or into `validate-from-json` to see that generated data passes validation, the template constraints and the RM floor:
+The output is one line of JSON. Each run gets a wall-clock context start time, and fresh ids wherever it writes one, so two runs are never byte-identical; that is why this entry shows no sample block. Pipe the output to a file or into `validate-from-json` to see that generated data passes validation, the template constraints and the RM floor:
 
 ```bash
 go run ./cmd/examples/generate-example --policy medium > /tmp/generated.json
@@ -491,7 +491,7 @@ go run ./cmd/examples/compile-build-validate path/to/template.opt
 
 ```text
 template             : vital_signs (vital_signs.opt)
-composition          : 7066 bytes canonical JSON, round-tripped
+composition          : 6746 bytes canonical JSON, round-tripped
 validation           : OK, no issues
 ```
 

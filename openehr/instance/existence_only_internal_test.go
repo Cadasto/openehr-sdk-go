@@ -39,8 +39,9 @@ func existenceOnlyOccurrences(lower, upper int) string {
 // TestREQ107_ExistenceOnly is the REQ-107 check (What a visit writes) of
 // which multi-valued attribute only its existence asks a member of: its
 // existence lower bound is bounded and at least 1, the BMM does not mark
-// it mandatory, and neither its cardinality lower bound nor the
-// occurrences lower bound of a child it allows is bounded and at least 1.
+// it mandatory, neither its cardinality lower bound nor the occurrences
+// lower bound of a child it allows is bounded and at least 1, and it is no
+// list the RM makes non-empty once present, such as a SECTION's items.
 // A child the OPT gives no occurrences does not count, and neither does a
 // slot's, which the parser does not read (REQ-107 Known gap: slot
 // occurrences). The rule is read off the compiled attribute: a required
@@ -73,13 +74,16 @@ func TestREQ107_ExistenceOnly(t *testing.T) {
 		},
 		{name: "cardinality 1..*", rmType: "ITEM_TREE", items: existenceOnlyItems(1, 1, 1, "")},
 		{name: "the BMM marks the items mandatory", rmType: "CLUSTER", items: existenceOnlyItems(1, 1, 0, "")},
+		// The RM makes a SECTION's items non-empty once present, so their
+		// existence asks for a member as their cardinality would.
+		{name: "a list the RM makes non-empty once present", rmType: "SECTION", items: existenceOnlyItems(1, 1, 0, "")},
 		{name: "existence 0..1", rmType: "ITEM_TREE", items: existenceOnlyItems(0, 1, 0, "")},
 		{name: "no existence", rmType: "ITEM_TREE", items: existenceOnlyItems(-1, 0, 0, "")},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, attr := visitAttribute(t, visitRootOPT(tc.rmType, tc.items), "items")
-			if got := existenceOnly(attr); got != tc.want {
+			node, attr := visitAttribute(t, visitRootOPT(tc.rmType, tc.items), "items")
+			if got := existenceOnly(node, attr); got != tc.want {
 				t.Errorf("existenceOnly(%s.items) = %t, want %t", tc.rmType, got, tc.want)
 			}
 		})

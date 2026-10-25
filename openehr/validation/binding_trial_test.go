@@ -916,16 +916,19 @@ func TestValidate_REQ171_DepthStopFailsATrialWhetherReportedThereOrNot(t *testin
 }
 
 // REQ-107 Exceptions and known gaps, REQ-102 Structural — binding items —
-// the generator gives an optional sibling no member of its own where a
-// later, required one carries its identity and neither pins a name. The
-// member it builds for the required one validates under the optional one,
-// which comes first and has room, so the validator binds it there, and the
-// root fails by the required sibling's occurrences, under Large and Medium
-// alike. A composition that holds a member of each validates
+// under Medium the generator gives an optional sibling no member of its own
+// where a later, required one carries its identity and neither pins a name.
+// The member it builds for the required one validates under the optional
+// one, which comes first and has room, so the validator binds it there, and
+// the root fails by the required sibling's occurrences. Under Large the
+// optional sibling gets a member of its own, which fills its one
+// occurrence, and the root validates
+// (TestREQ107_REQ102_LargeFillsAnOptionalSiblingBeforeARequiredOne). A
+// composition that holds a member of each validates
 // (TestValidateComposition_REQ102_ItemsOfOneRankBindByRoomAndTrial).
 func TestGenerate_REQ107_REQ102_OptionalSiblingBeforeARequiredOneKeepsItsGap(t *testing.T) {
 	c := mustCompileSyntheticOPT(t, reusedArchetypeOPTWith(reusedObservationChild("", 0), reusedObservationChild("", 1)))
-	for _, policy := range []instance.Policy{instance.Large, instance.Medium} {
+	for _, policy := range []instance.Policy{instance.Medium} {
 		t.Run(fmt.Sprint(policy), func(t *testing.T) {
 			out, err := instance.Generate(t.Context(), c, instance.Options{
 				Policy:    policy,

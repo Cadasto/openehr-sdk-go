@@ -17,7 +17,7 @@ const guidelineOPT = `<?xml version="1.0" encoding="utf-8"?>
 <template_id><value>guideline</value></template_id><concept>guideline</concept>
 <definition><rm_type_name>COMPOSITION</rm_type_name><node_id>at0000</node_id>
 <attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>content</rm_attribute_name>
-<children xsi:type="C_ARCHETYPE_ROOT"><rm_type_name>OBSERVATION</rm_type_name><node_id>at0000</node_id>
+<children xsi:type="C_ARCHETYPE_ROOT"><rm_type_name>OBSERVATION</rm_type_name><occurrences><lower_included>true</lower_included><upper_included>true</upper_included><lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>1</lower><upper>1</upper></occurrences><node_id>at0000</node_id>
 <attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>guideline_id</rm_attribute_name>` + requiredExistence + `
 <children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>OBJECT_REF</rm_type_name><node_id></node_id>
 <attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>namespace</rm_attribute_name>` + requiredExistence + `

@@ -273,16 +273,32 @@ func censusExistenceItems(children ...string) string {
 		`<upper_unbounded>true</upper_unbounded><lower>0</lower></interval></cardinality></attributes>`
 }
 
+// censusRequiredItems is a C_MULTIPLE_ATTRIBUTE items over children with
+// an existence of 1..1 and a cardinality lower bound of 1: the existence
+// asks for the list, and the cardinality for its member.
+func censusRequiredItems(children ...string) string {
+	return `<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>items</rm_attribute_name>` +
+		`<existence><lower_included>true</lower_included><upper_included>true</upper_included>` +
+		`<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded>` +
+		`<lower>1</lower><upper>1</upper></existence>` + strings.Join(children, "") +
+		`<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval>` +
+		`<lower_included>true</lower_included><lower_unbounded>false</lower_unbounded>` +
+		`<upper_unbounded>true</upper_unbounded><lower>1</lower></interval></cardinality></attributes>`
+}
+
 // TestREQ107_CensusGrantsNoLastResortToAnExistenceOnlyList checks the
 // census's reading of a top-up (REQ-107 § Contract What a visit writes)
-// where only a list's existence asks for a member. The root is generated
-// from an ITEM_TREE whose items have a cardinality lower bound of 1 and one
-// child, the optional CLUSTER at0002, whose own items admit only a slot:
-// the top-up takes that CLUSTER as its last resort, so the census lists its
-// slot fill below an optional node and reports no violation. Read beside
-// the same tree whose items only their existence requires, where the
-// top-up takes no child that needs undescribed content, the same root
-// holds a violation.
+// where only a list's existence, or only its cardinality, asks for a
+// member. The root is generated from an ITEM_TREE whose items have an
+// existence of 1..1, a cardinality lower bound of 1 and one child, the
+// optional CLUSTER at0002, whose own items admit only a slot: the top-up
+// takes that CLUSTER as its last resort, so the census lists its slot fill
+// below an optional node and reports no violation. Read beside the same
+// tree whose items only their existence requires, where the top-up takes
+// no child that needs undescribed content, and beside the same tree whose
+// items only their cardinality requires, which Large and Medium do not
+// visit since every member they would get needs undescribed content
+// (REQ-107 Visit rule), the same root holds a violation.
 func TestREQ107_CensusGrantsNoLastResortToAnExistenceOnlyList(t *testing.T) {
 	slotOnly := censusOptional("CLUSTER", "at0002",
 		censusItems(`<children xsi:type="ARCHETYPE_SLOT"><rm_type_name>CLUSTER</rm_type_name><node_id>at0003</node_id></children>`))
@@ -291,10 +307,11 @@ func TestREQ107_CensusGrantsNoLastResortToAnExistenceOnlyList(t *testing.T) {
 		against   string
 		violation bool
 	}{
-		{name: "the template the root was generated from", against: censusTreeOPT(censusItems(slotOnly))},
+		{name: "the template the root was generated from", against: censusTreeOPT(censusRequiredItems(slotOnly))},
 		{name: "items only their existence requires", against: censusTreeOPT(censusExistenceItems(slotOnly)), violation: true},
+		{name: "items only their cardinality requires", against: censusTreeOPT(censusItems(slotOnly)), violation: true},
 	}
-	generated := compileCensusOPT(t, censusTreeOPT(censusItems(slotOnly)))
+	generated := compileCensusOPT(t, censusTreeOPT(censusRequiredItems(slotOnly)))
 	for _, policy := range []instance.Policy{instance.Large, instance.Medium} {
 		out, err := instance.Generate(t.Context(), generated, instance.Options{Policy: policy, Language: "en", Now: ratchetNow})
 		if err != nil {
@@ -447,10 +464,14 @@ func censusWalk(node *templatecompile.CompiledNode, value map[string]any, underO
 // child of attr. It returns the child that describes member, or the kind
 // of undescribed member it is: "bmm" for a LOCATABLE in an attribute with
 // no allowed child, "slot" for one only a slot admits, and "unbound" for
-// one no child admits. A member that is not a LOCATABLE binds to the first
-// allowed child of its RM type, else the first allowed child, else none,
-// and is never undescribed: only a LOCATABLE has a template node of its
-// own.
+// one no child admits. A LOCATABLE binds among the children that carry its
+// archetype_node_id, ranked by its name as the template validator ranks
+// them (REQ-102 Structural — binding items): the first that pins that
+// name, else the first that pins none, else the first of them, so each of
+// the named uses of one archetype Large writes binds to its own child. A
+// member that is not a LOCATABLE binds to the first allowed child of its
+// RM type, else the first allowed child, else none, and is never
+// undescribed: only a LOCATABLE has a template node of its own.
 func censusBind(attr *templatecompile.CompiledAttribute, member map[string]any) (*templatecompile.CompiledNode, string) {
 	children := allowedChildren(attr)
 	id, locatable := member["archetype_node_id"].(string)
@@ -469,13 +490,32 @@ func censusBind(attr *templatecompile.CompiledAttribute, member map[string]any) 
 	if len(children) == 0 {
 		return nil, "bmm"
 	}
+	name := ""
+	if n, ok := member["name"].(map[string]any); ok {
+		name, _ = n["value"].(string)
+	}
 	slot := false
+	var named, unnamed, carrier *templatecompile.CompiledNode
 	for _, c := range children {
 		if c.IsSlot() {
 			slot = true
 			continue
 		}
-		if c.ArchetypeID() == id || c.NodeID() == id {
+		if c.ArchetypeID() != id && c.NodeID() != id {
+			continue
+		}
+		switch {
+		case c.NodeName() != "" && c.NodeName() == name && named == nil:
+			named = c
+		case c.NodeName() == "" && unnamed == nil:
+			unnamed = c
+		}
+		if carrier == nil {
+			carrier = c
+		}
+	}
+	for _, c := range []*templatecompile.CompiledNode{named, unnamed, carrier} {
+		if c != nil {
 			return c, ""
 		}
 	}
@@ -555,11 +595,15 @@ func attrRequired(attr *templatecompile.CompiledAttribute) bool {
 // undescribed content (needsNoUndescribed) and has an identity no earlier
 // sibling carries. Where only the attribute's existence asks for a member,
 // the top-up takes only a child that needs no undescribed content, so it
-// has no last resort. A member built so is not one of node's own, which
-// § Slot fills keeps out, so the census lists what it holds rather than
-// calling it a violation. Unlike the generator's existenceOnly, this does
-// not read a child's occurrences, on purpose: a required child that is not
-// a slot gets a member of its own, so no top-up runs, and the parser does
+// has no last resort. Nor has a list that only its cardinality lower bound
+// requires when every allowed child needs undescribed content: Large and
+// Medium do not visit it (REQ-107 Visit rule), so it gets no top-up
+// (visitedThoughUndescribed). A member built so is not one of node's own,
+// which § Slot fills keeps out, so the census lists what it holds rather
+// than calling it a violation. Unlike the generator's existenceOnly, this
+// does not read a child's occurrences to decide whether the top-up asks
+// beyond the existence, on purpose: a required child that is not a slot
+// gets a member of its own, so no top-up runs for it, and the parser does
 // not read a slot's occurrences (REQ-107 Known gap: slot occurrences).
 // Reading them would only exempt a node that no top-up builds.
 func topUpLastResort(node *templatecompile.CompiledNode) bool {
@@ -578,7 +622,25 @@ func topUpLastResort(node *templatecompile.CompiledNode) bool {
 			return false
 		}
 	}
-	return true
+	return visitedThoughUndescribed(attr, children)
+}
+
+// visitedThoughUndescribed reports whether Large and Medium visit attr, a
+// list with the allowed children children, where a top-up of it can only
+// take a child that needs undescribed content: the list is required by
+// more than its cardinality lower bound, since the BMM marks it mandatory,
+// its existence lower bound is at least 1, or an allowed child that is not
+// a slot has an occurrences lower bound of at least 1, or one of its
+// children needs no undescribed content, so the rule on undescribed
+// content does not keep the walk out (REQ-107 Visit rule).
+func visitedThoughUndescribed(attr *templatecompile.CompiledAttribute, children []*templatecompile.CompiledNode) bool {
+	if attr.Required() || tcimpl.LowerAtLeastOne(attr.Existence()) {
+		return true
+	}
+	for range tcimpl.MandatoryListChildren(attr) {
+		return true
+	}
+	return slices.ContainsFunc(children, needsNoUndescribed)
 }
 
 // needsNoUndescribed reports whether node needs no undescribed content, as

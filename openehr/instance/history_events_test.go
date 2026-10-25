@@ -17,8 +17,14 @@ var historyEvent = optOccurring("C_COMPLEX_OBJECT", "POINT_EVENT", "at0002", 0, 
 	optSingle("data", optNode("ITEM_TREE", "at0003")))
 
 // historySummary is a HISTORY's summary at existence 0..1 over an
-// ITEM_TREE at0004.
+// ITEM_TREE at0004 with no items attribute, which would hold no item.
 var historySummary = guardSingle("summary", guardExistence01, optNode("ITEM_TREE", "at0004"))
+
+// historySummaryHolding is a HISTORY's summary at existence 0..1 over an
+// ITEM_TREE at0004 whose items hold an optional ELEMENT at0005, which Large
+// and Medium build.
+var historySummaryHolding = guardSingle("summary", guardExistence01,
+	optNode("ITEM_TREE", "at0004", optCardinal("items", 0, -1, optElement("at0005", 0, 1))))
 
 // historyExistence00 is an existence of 0..0: the OPT prohibits the
 // attribute.
@@ -99,9 +105,16 @@ func TestREQ107_HistoryGetsAnEventOrASummary(t *testing.T) {
 		},
 		{
 			name:    "optional events beside an optional summary",
-			opt:     optTemplate("HISTORY", origin, guardMultiple("events", guardExistence01, historyEvent), historySummary),
+			opt:     optTemplate("HISTORY", origin, guardMultiple("events", guardExistence01, historyEvent), historySummaryHolding),
 			want:    "events=[at0002] summary=",
 			visited: "events=[at0002] summary=at0004",
+		},
+		{
+			// The visit rule leaves out an optional summary that would hold
+			// no item, and the HISTORY keeps its event.
+			name: "optional events beside an optional summary that would hold no item",
+			opt:  optTemplate("HISTORY", origin, guardMultiple("events", guardExistence01, historyEvent), historySummary),
+			want: "events=[at0002] summary=",
 		},
 		{
 			name: "an optional summary, events not named",

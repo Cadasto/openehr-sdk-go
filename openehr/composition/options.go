@@ -115,8 +115,11 @@ func WithValueSource(src mrand.Source) Option {
 }
 
 // WithUIDSource sets instance.Options.UIDSource, the source of every uid
-// the skeleton carries, such as each ENTRY's. Nil, or no WithUIDSource,
-// leaves the generator's random version-4 UUIDs. With
+// the skeleton carries: the uid of each locatable whose template requires
+// one, and the id of each object reference the generator writes that
+// carries none. A locatable the template does not ask a uid of, an ENTRY
+// or the COMPOSITION included, gets none. Nil, or no WithUIDSource, leaves
+// the generator's random version-4 UUIDs. With
 // WithUIDSource(instance.UIDsFrom(rand.NewPCG(seed, seed))), WithNow and,
 // under instance.RandomFill, WithValueSource, a skeleton is reproducible:
 // two calls, each on fresh sources in the same state, give equal

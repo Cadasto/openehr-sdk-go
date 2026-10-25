@@ -187,6 +187,18 @@ The Corona pair is the largest fixture in the repo. That size is the cost of gua
 | `composition_minimal.xml` | Minimal COMPOSITION XML |
 | `dv_quantity.xml` | Leaf `DV_QUANTITY` XML |
 
+### SDK (`templates/`)
+
+**License:** MIT, as the rest of the SDK ([`LICENSING.md`](../../LICENSING.md)). These OPTs were written for this SDK, in the layout Ocean Template Designer exports, and carry no third-party or clinical content: their archetype ids, codes and texts are synthetic. Each holds shapes that the CDR cross-check ([§ REQ-082 *The CDR cross-check tool*](../../docs/specifications/conformance.md#the-cdr-cross-check-tool)) found and that the generator and the validators now handle, so the corpus ratchet (PROBE-027) and the cross-check exercise them. They are OPT only: no composition is vendored for them. All five are COMPOSITION-rooted and compile, every generated document passes both validators under every policy and value fill, and none of them holds an ELEMENT under `Required`.
+
+| Template id | Shapes it carries |
+|---|---|
+| `sdk_crosscheck_values.v1` | A C_STRING list with `list_open`. A C_DV_QUANTITY constrained by `property` alone. Date, time and date-time patterns that forbid a field (`yyyy-??-XX`, `HH:MM:XX`) or leave one optional. A mandatory and a disallowed `timezone_validity`. Date, time, date-time and duration ranges, the duration's excluding zero. A duration pattern in weeks alone. `DV_INTERVAL<DV_QUANTITY>` bounds with one side left without units, and with two unit lists that share one unit. SNOMED-CT codes whose terms the archetype defines under the bare code. A coded name whose text a C_STRING pins to its second code's term. |
+| `sdk_crosscheck_structure.v1` | A 1..1 OBSERVATION under an optional `content`, whose HISTORY leaves its `events` optional. An optional `protocol` and `other_context` whose ITEM_TREE holds no item. `participations`, a SECTION's `items` and an INSTRUCTION's `activities` at existence 1..1 over optional children. A SECTION whose required `items` can hold only an ADMIN_ENTRY the OPT names no archetype for. An ACTIVITY `action_archetype_id` as a C_STRING with neither pattern nor list, and as a list. |
+| `sdk_crosscheck_unwritten.v1` | Two ISM_TRANSITION alternatives of one ACTION, each constraining `name`, which the RM class does not have. An ELEMENT's `null_flavor`, spelt as in US English. An optional `feeder_audit` and `links`, which the generator has no writer for. |
+| `sdk_crosscheck_siblings.v1` | Two uses of one OBSERVATION archetype under `content` that pin no name. Two ELEMENTs of one node id that pin no name and whose values differ in type. |
+| `sdk_crosscheck_padded.v1` | `rm_type_name` and `rm_attribute_name` values broken onto a second line, as a pretty-printer that wraps long lines writes them. |
+
 ### ITS-REST
 
 See [`its_rest/README.md`](its_rest/README.md).

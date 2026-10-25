@@ -6,7 +6,6 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/rmwrite"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
@@ -156,8 +155,9 @@ func TestREQ107_TimeValidityPassesBothValidators(t *testing.T) {
 // either value fill and either compile mode, and passes both validators,
 // which bind such a member by its RM type. The language is the text the
 // template pins. A role whose template leaves it open takes the namespace
-// local, the type ROLE and an id drawn from UIDSource, after the PERSON's
-// own uid; a pattern on its type that admits ROLE among other names gives
+// local, the type ROLE and an id drawn from UIDSource, the first drawn,
+// since the PERSON gets no uid its template does not require (Identity); a
+// pattern on its type that admits ROLE among other names gives
 // ROLE too, and a list that names only another class keeps that one (a list
 // that names ROLE and another class keeps the member the value fill picks:
 // TestREQ107_RoleTypeListKeepsItsMemberOverTheDefault). These replace the
@@ -168,16 +168,16 @@ func TestREQ107_ActorLanguagesAndRolesTakeTheirMembers(t *testing.T) {
 		roleType []string // the attributes the template names on the role's PARTY_REF
 		want     string
 	}{
-		{name: "role left open", want: "PARTY_REF local::ROLE id HIER_OBJECT_ID uid-0002"},
+		{name: "role left open", want: "PARTY_REF local::ROLE id HIER_OBJECT_ID uid-0001"},
 		{
 			name:     "role type pattern .*",
 			roleType: []string{guardSingle("type", guardExistence11, optPrimitive("STRING", "C_STRING", "<pattern>.*</pattern>"))},
-			want:     "PARTY_REF local::ROLE id HIER_OBJECT_ID uid-0002",
+			want:     "PARTY_REF local::ROLE id HIER_OBJECT_ID uid-0001",
 		},
 		{
 			name:     "role type pinned PERSON",
 			roleType: []string{guardSingle("type", guardExistence11, guardString("PERSON"))},
-			want:     "PARTY_REF local::PERSON id HIER_OBJECT_ID uid-0002",
+			want:     "PARTY_REF local::PERSON id HIER_OBJECT_ID uid-0001",
 		},
 	}
 	for _, tc := range cases {
@@ -265,46 +265,6 @@ func TestREQ107_RoleTypeListKeepsItsMemberOverTheDefault(t *testing.T) {
 						t.Errorf("%s: role type = %q, want one of %v", call, got, tc.wantRandom)
 					}
 					checkBothValidators(t, call, out, c)
-				}
-			}
-		})
-	}
-}
-
-// TestREQ107_AttributeThePinnedRMDoesNotHaveIsRefused is the REQ-107 check
-// that an attribute the pinned RM does not have cannot be written, so
-// Generate returns an error wrapping rmwrite.ErrUnknownAttribute, and no
-// root, where a template puts an object under one, at every policy and
-// either value fill (§ Exceptions and known gaps, "An attribute the pinned
-// RM does not have"). Its row is a made-up attribute on a DV_ORDINAL, which
-// no writer can write. The rows it pinned as known gaps are written now: a
-// PERSON's languages and roles and a ROLE performer's id
-// (TestREQ107_ActorLanguagesAndRolesTakeTheirMembers,
-// TestREQ107_PerformerIDTakesAValueFromUIDSource), and a DV_ORDINAL's
-// symbol the template names as a node of its own
-// (TestREQ107_OrdinalAndScaleTakeTheirSymbolAndValue).
-func TestREQ107_AttributeThePinnedRMDoesNotHaveIsRefused(t *testing.T) {
-	cases := []struct {
-		name string
-		opt  string
-	}{
-		{
-			name: "DV_ORDINAL attribute the pinned RM does not have",
-			opt: optTemplate("ELEMENT", optSingle("value", optNode("DV_ORDINAL", "",
-				optSingle("no_such_attribute", optNode("DV_CODED_TEXT", ""))))),
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			c := compileOPTText(t, tc.opt, true)
-			for _, opts := range guardOptions() {
-				call := fmt.Sprintf("Generate(%v, %v)", opts.Policy, opts.ValueFill)
-				out, err := instance.Generate(t.Context(), c, opts)
-				if !errors.Is(err, rmwrite.ErrUnknownAttribute) {
-					t.Errorf("%s error = %v, want one wrapping rmwrite.ErrUnknownAttribute", call, err)
-				}
-				if out != nil {
-					t.Errorf("%s returned %T, want no root", call, out)
 				}
 			}
 		})

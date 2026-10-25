@@ -18,7 +18,10 @@
 // and [AbsenceReporter] interfaces, the [ClassMeta] and [AttrMeta] data
 // types, and the [Default], [New] and [NewWithAbsence] accessors. There
 // is no runtime BMM dependency: the generated tables are plain Go
-// literals.
+// literals. Two hand-written answers sit beside them: [IsNonStorableAttr],
+// the attributes no serialization carries, and [NonEmptyLists], the lists
+// an RM invariant keeps from being present and empty, which the
+// template-driven generator and the validator share.
 //
 // Typical uses are implicit attribute injection when compiling a
 // template, and composition-builder or validator code that needs to

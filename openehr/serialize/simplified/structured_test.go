@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
 )
 
@@ -600,6 +601,17 @@ func TestSubjectLeafThroughStructured(t *testing.T) {
 // composition the FLAT spelling gives.
 func TestUnderscoreKeysStructuredDecode(t *testing.T) {
 	comp, wt := genComposition(t, minimalObsOPT)
+	// The generator writes a uid only where the template requires one
+	// (REQ-107 Identity), and this one requires none, so the entry is given
+	// one here: the family under test.
+	if len(comp.Content) == 0 {
+		t.Fatal("fixture composition holds no content item")
+	}
+	entry, ok := comp.Content[0].(rm.MutableLocatable)
+	if !ok {
+		t.Fatalf("content[0] is %T, want a locatable", comp.Content[0])
+	}
+	entry.SetUID(&rm.HierObjectID{Value: "8f14e45f-ceea-467a-9575-4e1a8b2c3d4e"})
 	flat, err := simplified.MarshalFlat(comp, wt)
 	if err != nil {
 		t.Fatalf("MarshalFlat: %v", err)
@@ -608,8 +620,6 @@ func TestUnderscoreKeysStructuredDecode(t *testing.T) {
 	if err := json.Unmarshal(flat, &flatMap); err != nil {
 		t.Fatal(err)
 	}
-	// The fixture generator stamps a `uid` on every archetyped node, so the
-	// baseline FLAT already carries the family under test.
 	var sawUID bool
 	for k := range flatMap {
 		sawUID = sawUID || strings.HasSuffix(k, "/_uid")

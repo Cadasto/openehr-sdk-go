@@ -14,11 +14,11 @@ import (
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
-// uidClasses are the classes whose generated instances REQ-107 gives a
-// uid: the ENTRY concretes, GENERIC_ENTRY, the PARTY concretes and
-// PARTY_RELATIONSHIP. Every other locatable, a COMPOSITION included, gets
-// one only where its OPT requires it.
-var uidClasses = []string{
+// entryAndPartyClasses are the ENTRY concretes, GENERIC_ENTRY, the PARTY
+// concretes and PARTY_RELATIONSHIP. REQ-107 Identity gives each of them, as
+// every other locatable, a COMPOSITION included, a uid only where its OPT
+// requires one.
+var entryAndPartyClasses = []string{
 	"OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION", "ADMIN_ENTRY",
 	"GENERIC_ENTRY",
 	"PERSON", "ORGANISATION", "GROUP", "AGENT", "ROLE",
@@ -47,33 +47,6 @@ func identityOptions(policy instance.Policy, uids *recordingUIDs) instance.Optio
 		Composer:  testComposer(),
 		Now:       defaultsNow,
 		UIDSource: uids.next,
-	}
-}
-
-// TestREQ107_UIDClassRootsTakeUIDFromSource is the REQ-107 check that an
-// ENTRY, a GENERIC_ENTRY, a PARTY and a PARTY_RELATIONSHIP generated as
-// the template root carry a uid that Options.UIDSource issued, under every
-// policy (RM PARTY Uid_mandatory for the PARTY classes).
-func TestREQ107_UIDClassRootsTakeUIDFromSource(t *testing.T) {
-	for _, class := range uidClasses {
-		c := compileOPTText(t, optTemplate(class), true)
-		for _, policy := range everyPolicy {
-			t.Run(class+"/"+policy.String(), func(t *testing.T) {
-				uids := &recordingUIDs{}
-				out, err := instance.Generate(t.Context(), c, identityOptions(policy, uids))
-				if err != nil {
-					t.Fatalf("Generate: %v", err)
-				}
-				loc, ok := out.(rm.Locatable)
-				if !ok {
-					t.Fatalf("generated root is %T, want a locatable", out)
-				}
-				uid, _ := loc.GetUID().(*rm.HierObjectID)
-				if uid == nil || !slices.Contains(uids.issued, uid.Value) {
-					t.Errorf("%s.uid = %v, want a uid UIDSource issued (issued %v)", class, loc.GetUID(), uids.issued)
-				}
-			})
-		}
 	}
 }
 
@@ -181,11 +154,12 @@ func generatedLocatables(t *testing.T, out any) []generatedLocatable {
 	return found
 }
 
-// TestREQ107_OnlyUIDClassesCarryAUID is the REQ-107 check that the
-// generator gives a uid to every ENTRY, GENERIC_ENTRY, PARTY and
-// PARTY_RELATIONSHIP in a generated tree and to no other locatable whose
-// OPT does not require one, a COMPOSITION included, under every policy.
-func TestREQ107_OnlyUIDClassesCarryAUID(t *testing.T) {
+// TestREQ107_NoLocatableCarriesAUIDItsOPTDoesNotRequire is the REQ-107
+// Identity check that the generator gives no uid to a locatable in a
+// generated tree whose OPT does not require one, an ENTRY, a PARTY and a
+// COMPOSITION included, under every policy: none of these templates
+// requires a uid.
+func TestREQ107_NoLocatableCarriesAUIDItsOPTDoesNotRequire(t *testing.T) {
 	for _, tree := range identityTrees(t) {
 		for _, policy := range everyPolicy {
 			t.Run(tree.name+"/"+policy.String(), func(t *testing.T) {
@@ -198,8 +172,8 @@ func TestREQ107_OnlyUIDClassesCarryAUID(t *testing.T) {
 					t.Fatal("generated tree has no locatable")
 				}
 				for _, loc := range locs {
-					if want := slices.Contains(uidClasses, loc.rmType); loc.hasUID != want {
-						t.Errorf("%s at %q: uid present = %t, want %t", loc.rmType, loc.path, loc.hasUID, want)
+					if loc.hasUID {
+						t.Errorf("%s at %q carries a uid, want none: the OPT does not require it", loc.rmType, loc.path)
 					}
 				}
 			})
@@ -253,32 +227,27 @@ func TestREQ107_TemplateIDOnTheRootOnly(t *testing.T) {
 	}
 }
 
-// partyClasses are the PARTY concretes, whose uid the RM needs (PARTY
-// Uid_mandatory).
-var partyClasses = []string{"PERSON", "ORGANISATION", "GROUP", "AGENT", "ROLE"}
-
-// TestREQ107_ProhibitedUIDYieldsExceptOnAParty is the REQ-107 check that
-// the generator gives no uid to a COMPOSITION, an ENTRY, a GENERIC_ENTRY or
-// a PARTY_RELATIONSHIP whose OPT prohibits its uid, and gives a PARTY one
-// all the same, because the RM needs it. Each class is the template root;
-// a PARTY_RELATIONSHIP is also nested in a PERSON's relationships. It
-// holds under every policy, both value fills and both compile modes, and
-// the output passes the RM floor.
-func TestREQ107_ProhibitedUIDYieldsExceptOnAParty(t *testing.T) {
+// TestREQ107_ProhibitedUIDYields is the REQ-107 check that the generator
+// gives no uid to a COMPOSITION, an ENTRY, a GENERIC_ENTRY, a PARTY or a
+// PARTY_RELATIONSHIP whose OPT prohibits its uid. A PARTY without a uid
+// breaks PARTY Uid_mandatory, which the RM floor does not evaluate (REQ-107
+// Exceptions and known gaps). Each class is the template root; a
+// PARTY_RELATIONSHIP is also nested in a PERSON's relationships. It holds
+// under every policy, both value fills and both compile modes, and the
+// output passes the RM floor.
+func TestREQ107_ProhibitedUIDYields(t *testing.T) {
 	type tree struct {
 		name    string
 		opt     string
 		located func(t *testing.T, out any) rm.Locatable
-		wantUID bool
 	}
 	root := func(_ *testing.T, out any) rm.Locatable { return out.(rm.Locatable) }
 	var cases []tree
-	for _, class := range append([]string{"COMPOSITION"}, uidClasses...) {
+	for _, class := range append([]string{"COMPOSITION"}, entryAndPartyClasses...) {
 		cases = append(cases, tree{
 			name:    class + " root",
 			opt:     optTemplate(class, optProhibitedSingle("uid")),
 			located: root,
-			wantUID: slices.Contains(partyClasses, class),
 		})
 	}
 	cases = append(cases, tree{
@@ -305,9 +274,8 @@ func TestREQ107_ProhibitedUIDYieldsExceptOnAParty(t *testing.T) {
 					if err != nil {
 						t.Fatalf("Generate: %v", err)
 					}
-					uid := tc.located(t, out).GetUID()
-					if has := uid != nil && !rm.IsTypedNil(uid); has != tc.wantUID {
-						t.Errorf("uid = %v, present %t, want %t", uid, has, tc.wantUID)
+					if uid := tc.located(t, out).GetUID(); uid != nil && !rm.IsTypedNil(uid) {
+						t.Errorf("uid = %v, want none: the OPT prohibits it", uid)
 					}
 					noFloorErrors(t, out)
 				})
@@ -323,12 +291,13 @@ func optRequiredSingle(name string, children ...string) string {
 }
 
 // TestREQ107_UIDIsNotVisited is the REQ-107 check that the walk never
-// visits a locatable's uid, which the identity rule decides: an ENTRY
-// whose OPT names its uid, with no child or with a HIER_OBJECT_ID child,
-// and a COMPOSITION or a CLUSTER whose OPT requires it, keep the uid the
-// generator stamps from Options.UIDSource, and a COMPOSITION or a CLUSTER
-// whose OPT names an optional uid gets none. It holds under every policy,
-// both value fills and both compile modes.
+// visits a locatable's uid, which the identity rule decides: a
+// COMPOSITION, an OBSERVATION or a CLUSTER whose OPT requires it, with a
+// HIER_OBJECT_ID child, keeps the uid the generator stamps from
+// Options.UIDSource, not the value the OPT gives, and one whose OPT names
+// an optional uid, with no child or with a HIER_OBJECT_ID child, gets
+// none. It holds under every policy, both value fills and both compile
+// modes.
 func TestREQ107_UIDIsNotVisited(t *testing.T) {
 	hier := optNode("HIER_OBJECT_ID", "", optStringAttr("value", "<list>from-the-opt</list>"))
 	uidAttrs := map[string]string{
@@ -338,7 +307,7 @@ func TestREQ107_UIDIsNotVisited(t *testing.T) {
 	}
 	for shape, attr := range uidAttrs {
 		for _, class := range []string{"COMPOSITION", "OBSERVATION", "CLUSTER"} {
-			wantStamp := class == "OBSERVATION" || shape == "required, a HIER_OBJECT_ID"
+			wantStamp := shape == "required, a HIER_OBJECT_ID"
 			for _, implicit := range []bool{true, false} {
 				c := compileOPTText(t, optTemplate(class, attr), implicit)
 				for _, opts := range defaultsOptions() {
@@ -364,15 +333,17 @@ func TestREQ107_UIDIsNotVisited(t *testing.T) {
 	}
 }
 
-// TestREQ107_RequiredUIDOnOtherLocatables is the REQ-107 check that a
-// locatable outside the classes the identity rule names gets a uid only
-// where its OPT requires one (an existence lower bound of at least 1),
-// drawn from Options.UIDSource, or from the random fallback when that is
-// nil, and none where its OPT names the uid optional, under Large too.
-// It holds for a COMPOSITION root, and a CLUSTER and an ELEMENT at the
-// root and nested, under every policy, both value fills and both compile
-// modes, and the output passes the RM floor.
-func TestREQ107_RequiredUIDOnOtherLocatables(t *testing.T) {
+// TestREQ107_UIDOnlyWhereTheOPTRequiresIt is the REQ-107 Identity check
+// that a locatable gets a uid only where its OPT requires one (an existence
+// lower bound of at least 1), drawn from Options.UIDSource, or from the
+// random fallback when that is nil, and none where its OPT names the uid
+// optional or says nothing of it, under Large too. It holds for a
+// COMPOSITION root; a CLUSTER and an ELEMENT at the root and nested; each
+// ENTRY, GENERIC_ENTRY, PARTY and PARTY_RELATIONSHIP class as the root; an
+// OBSERVATION in a COMPOSITION's content and a PARTY_RELATIONSHIP in a
+// PERSON's relationships, under every policy, both value fills and both
+// compile modes, and the output passes the RM floor.
+func TestREQ107_UIDOnlyWhereTheOPTRequiresIt(t *testing.T) {
 	type place struct {
 		name   string
 		opt    func(uid string) string
@@ -409,13 +380,53 @@ func TestREQ107_RequiredUIDOnOtherLocatables(t *testing.T) {
 				return items[0].(rm.Locatable)
 			},
 		},
+		{
+			name: "OBSERVATION in COMPOSITION.content",
+			opt: func(uid string) string {
+				return optTemplate("COMPOSITION", optMultiple("content", optArchetypeRoot("OBSERVATION", "openEHR-EHR-OBSERVATION.nested.v1",
+					optSingle("data", optNode("HISTORY", "at0001")), uid)))
+			},
+			target: func(t *testing.T, out any) rm.Locatable {
+				content := out.(*rm.Composition).Content
+				if len(content) != 1 {
+					t.Fatalf("COMPOSITION.content has %d members, want 1", len(content))
+				}
+				return content[0].(rm.Locatable)
+			},
+		},
+		{
+			name: "PARTY_RELATIONSHIP in PERSON.relationships",
+			opt: func(uid string) string {
+				return optTemplate("PERSON", optMultiple("relationships", optNode("PARTY_RELATIONSHIP", "at0001", uid)))
+			},
+			target: func(t *testing.T, out any) rm.Locatable {
+				p := out.(*rm.Person)
+				if len(p.Relationships) != 1 {
+					t.Fatalf("PERSON.relationships has %d members, want 1", len(p.Relationships))
+				}
+				return &p.Relationships[0]
+			},
+		},
+	}
+	for _, class := range entryAndPartyClasses {
+		places = append(places, place{
+			name:   class + " root",
+			opt:    func(uid string) string { return optTemplate(class, uid) },
+			target: func(_ *testing.T, out any) rm.Locatable { return out.(rm.Locatable) },
+		})
+	}
+	uidAttrs := []struct {
+		name     string
+		attr     string
+		required bool
+	}{
+		{name: "silent", attr: ""},
+		{name: "optional", attr: optOptionalSingle("uid")},
+		{name: "required", attr: optRequiredSingle("uid"), required: true},
 	}
 	for _, p := range places {
-		for _, required := range []bool{true, false} {
-			uidAttr := optOptionalSingle("uid")
-			if required {
-				uidAttr = optRequiredSingle("uid")
-			}
+		for _, ua := range uidAttrs {
+			uidAttr, required := ua.attr, ua.required
 			for _, implicit := range []bool{true, false} {
 				c := compileOPTText(t, p.opt(uidAttr), implicit)
 				for _, opts := range defaultsOptions() {
@@ -427,7 +438,7 @@ func TestREQ107_RequiredUIDOnOtherLocatables(t *testing.T) {
 							opts.UIDSource = nil
 						}
 						opts.Territory, opts.Composer = "NL", testComposer()
-						t.Run(fmt.Sprintf("%s/required=%t/%s/implicit=%t/%v/%v", p.name, required, source, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+						t.Run(fmt.Sprintf("%s/%s/%s/implicit=%t/%v/%v", p.name, ua.name, source, implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
 							out, err := instance.Generate(t.Context(), c, opts)
 							if err != nil {
 								t.Fatalf("Generate: %v", err)
@@ -435,7 +446,7 @@ func TestREQ107_RequiredUIDOnOtherLocatables(t *testing.T) {
 							uid, _ := p.target(t, out).GetUID().(*rm.HierObjectID)
 							switch {
 							case !required && uid != nil:
-								t.Errorf("uid = %v, want none: the OPT names it optional", uid)
+								t.Errorf("uid = %v, want none: the OPT does not require it", uid)
 							case required && uid == nil:
 								t.Errorf("uid absent, want one: the OPT requires it")
 							case required && source == "UIDSource" && !slices.Contains(uids.issued, uid.Value):

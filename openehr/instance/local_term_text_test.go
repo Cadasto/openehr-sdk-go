@@ -122,8 +122,10 @@ func localCode(c rm.DVCodedText) bool {
 // rather than the open-string example or the code itself, and that a code
 // its own archetype defines no term for takes no other archetype's term
 // text for that code, under every policy, both value fills and several
-// fixed seeds. No vendored OPT limits such a text with a C_STRING that
-// rejects its term.
+// fixed seeds. One vendored OPT limits such a text with a C_STRING that
+// rejects a listed code's term: sdk_crosscheck_values.v1 pins the coded
+// name of at0016 to its second code's term, so the generator writes that
+// code.
 func TestREQ107_CorpusLocalCodedTextsTakeTheTermText(t *testing.T) {
 	checked, foreign := 0, 0
 	terms := make(map[string]archetypeTerms)

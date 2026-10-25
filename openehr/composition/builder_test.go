@@ -128,14 +128,15 @@ func TestNewSkeleton_requiresComposer(t *testing.T) {
 }
 
 // unnamedEntryOPT is a COMPOSITION template whose one content entry is an
-// OBSERVATION the template names no archetype for.
+// OBSERVATION the template names no archetype for, at occurrences 1..1, so
+// the content is required and the walk reaches the entry under every policy.
 const unnamedEntryOPT = `<?xml version="1.0" encoding="utf-8"?>
 <template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.openehr.org/v1">
 <language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
 <template_id><value>unnamed_entry</value></template_id><concept>unnamed_entry</concept>
 <definition><rm_type_name>COMPOSITION</rm_type_name><node_id>at0000</node_id>
 <attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>content</rm_attribute_name>
-<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>OBSERVATION</rm_type_name><node_id>at0000</node_id></children>
+<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>OBSERVATION</rm_type_name><occurrences><lower_included>true</lower_included><upper_included>true</upper_included><lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>1</lower><upper>1</upper></occurrences><node_id>at0000</node_id></children>
 <cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval><lower_included>true</lower_included><lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>1</lower></interval></cardinality>
 </attributes>
 <archetype_id><value>openEHR-EHR-COMPOSITION.encounter.v1</value></archetype_id></definition>

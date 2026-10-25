@@ -26,7 +26,13 @@
 // template allowed it; and it never visits one no serialization
 // carries, the BMM functions and RESOURCE_DESCRIPTION.parent_resource
 // that rminfo.IsNonStorableAttr names, nor a locatable's uid, which
-// the identity rule decides. Under every policy an RM rule can need
+// the identity rule decides: a locatable gets a uid only where the
+// template requires it, so the server that stores a generated object gives
+// it its id. Nor does it visit an optional attribute whose item structure,
+// an ITEM_TREE, ITEM_LIST or ITEM_TABLE, would hold no item, such as a
+// protocol whose tree holds an optional slot alone; one the RM or the
+// template requires, such as an event's data, is written with no items.
+// Under every policy an RM rule can need
 // more than the policy visits, such as an ELEMENT's value or null
 // flavour, or a DV_MULTIMEDIA's
 // uri where the template prohibits its data, which the generator then
@@ -49,9 +55,10 @@
 //     an optional archetype after the first optional
 //     archetype of the attribute that holds more than content the
 //     template does not describe (below) gets none, whatever its
-//     archetype. So Medium builds at most one optional archetype under an
-//     attribute, the medium level. It is the zero value, and so the
-//     default.
+//     archetype, and neither does an optional child whose identity a
+//     required or earlier sibling carries. So Medium builds at most one
+//     optional archetype under an attribute, the medium level. It is the
+//     zero value, and so the default.
 //   - Required: the required attributes, in the sense above, but not one
 //     that only its cardinality lower bound asks for, nor one merely
 //     because it has an allowed template child, except a composition's
@@ -66,36 +73,44 @@
 //     Medium's.
 //   - Large: every attribute the visit rule allows, the optional ones the
 //     template names included. A visited multi-valued attribute gets at
-//     least one member of each allowed child that is not a slot, except
-//     an optional child whose identity a required or earlier sibling
-//     carries. So Large builds a member of every optional archetype the
-//     template names, except one that holds only content the template does
+//     least one member of each allowed child that is not a slot, each
+//     use of one archetype, named or not, included. So Large builds a
+//     member of every optional archetype the template names, and of every
+//     use of one, except one that holds only content the template does
 //     not describe (below). It stops short of the complete level, every
 //     data point the template allows, which no level of its own builds yet.
 //
 // Under Large and Medium the generator builds an optional node only where
-// it holds more than content the template does not describe: a slot fill,
-// or a LOCATABLE built from the BMM type of an attribute the template gives
+// it holds more than content the template does not describe: a slot fill;
+// a LOCATABLE built from the BMM type of an attribute the template gives
 // no allowed child, such as the placeholder element of a list the template
-// leaves empty where the RM or the template's cardinality asks for a member.
-// An optional child gets no member of its own when
-// it is a slot, or when an attribute of its own that is required can only
-// be given such members: the attribute has no allowed child and its member
-// would be a LOCATABLE, every allowed child of it is a slot, or it is
-// single-valued and the child that builds its member is a slot. An
-// attribute that is not required, in the sense the Medium policy above
-// gives, is not visited when every member it would get is such content or
-// such a child. A list with a child that makes it required is visited, so
-// that child gets its members although they hold only such content. A
-// composition's context is
-// the exception: every policy writes one, so the walk visits it whatever
-// its members need. The first optional archetype Medium keeps is the first
+// leaves empty where the RM, or the cardinality of a list the template
+// requires by its existence, asks for a member; or a template node of a class that is always an archetype root
+// for which the template names no archetype id, such as an ADMIN_ENTRY
+// defined inline under a SECTION, since the generator invents no
+// archetype id. An optional child gets no member of its own when it is a
+// slot or such a node, or when an attribute of its own that is required
+// can only be given such members: the attribute has no allowed child and
+// its member would be a LOCATABLE, every allowed child of it is a slot or
+// such a node, or it is single-valued and the child that builds its member
+// is one. An attribute that is not required, in the sense the Medium
+// policy above gives, or that only its cardinality lower bound asks for,
+// is not visited when every member it would get is such content or such a
+// child: a cardinality lower bound counts the members of a list that
+// exists, so such a list is left out as Required leaves it out. A list with a child that makes it required
+// is visited, so that child gets its members although they hold only such
+// content. A composition's context is the exception: every policy writes
+// one, so the walk visits it whatever its members need. The first optional archetype Medium keeps is the first
 // that needs none. The check reads a node's own attributes only: below a
 // node the template or the RM requires, the walk builds what it always
 // builds, placeholders and slot fills included where something asks for a
 // member, so the described content around them is kept.
 //
-// Under every policy, an attribute left with fewer members than it needs
+// Under every policy, a visited multi-valued attribute gets no more
+// members than its cardinality upper bound, and within that bound the
+// children whose occurrences lower bound is at least 1 get the room for
+// their members first: any other child, before or after them, takes only
+// the room they leave. An attribute left with fewer members than it needs
 // is topped up with members of its first allowed child that needs no
 // such content and whose identity no earlier sibling carries, else of its
 // first allowed child that is not a slot, else with fills of its first
@@ -153,11 +168,19 @@
 // nearest enclosing archetype root, gives that code, in
 // [Options.Language]: under its code string for a local code, and under
 // <terminology id>::<code string>, such as SNOMED-CT::248152002, for a code
-// of an external terminology. Either way the walk's text stays where the
-// template's constraint on the text rejects the new one, and where the
-// group has no rubric for the code or its own archetype does not define
-// it, even where an enclosing archetype does. A DV_MULTIMEDIA carries inline
-// data, the seven bytes of the text "example" under both value fills,
+// of an external terminology, or, where the archetype defines no term
+// under that key, under the bare code string unless it is an at-code.
+// Either way the walk's text stays where the template's constraint on the
+// text rejects the new one, and where the group has no rubric for the
+// code or its own archetype does not define it, even where an enclosing
+// archetype does. A coded name whose text the template pins and whose
+// codes it lists is the exception: where the pin rejects the term text of
+// the code the walk wrote, the name takes the first listed code whose term
+// text the pin admits, with that text, and it keeps the walk's code and
+// text where the pin admits no listed code's term text. A code whose term
+// text the pin admits, such as one [RandomFill] drew, stays. A
+// DV_MULTIMEDIA carries inline data, the seven bytes of the text
+// "example" under both value fills,
 // with that byte count as its size, unless the template prohibits data or
 // its constraint on size rejects that count; where the template prohibits
 // data and names no child for the uri, the uri is http://example.com. A

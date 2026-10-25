@@ -193,7 +193,9 @@ func boundedPair(iv map[string]any) (lower, upper map[string]any, ok bool) {
 // land either way round, and that the two sides of a DV_QUANTITY interval
 // share one unit when both constraints allow it. A date, time, date-time,
 // proportion or ordinal interval is built by editing the vendored DV_COUNT
-// interval OPT, because no vendored OPT constrains those bounds. The
+// interval OPT. No vendored OPT constrains date, time, proportion or
+// ordinal bounds, and the one that constrains date-time bounds,
+// sdk_crosscheck_padded.v1 (at0006), gives them a pattern and no range. The
 // quantity case adds a second unit to the vendored DV_QUANTITY interval so
 // the two sides can otherwise draw different units.
 func TestREQ107_RandomFillIntervalOrder(t *testing.T) {

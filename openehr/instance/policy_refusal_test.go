@@ -52,19 +52,23 @@ func countedOptions(policy instance.Policy, fill instance.ValueFill, uids *int, 
 // Required and Large. It refuses before it builds anything, so it draws
 // no uid from UIDSource and no value from ValueSource. It holds on a
 // COMPOSITION root and on roots of other classes, under both value fills.
-// The OBSERVATION, and the vital_signs COMPOSITION through its entries,
-// draw a uid when they are built, which a control run under Large shows,
-// so their counters would catch a refusal made after building; a CLUSTER
-// or ELEMENT root draws neither, so those rows check the error and the
-// missing root only.
+// An OBSERVATION whose template requires its uid, and a COMPOSITION through
+// such an entry, draw a uid when they are built (Identity), which a control
+// run under Large shows, so their counters would catch a refusal made after
+// building; vital_signs, whose template requires no uid, a CLUSTER and an
+// ELEMENT root draw none, so those rows check the error, the missing root
+// and, under RandomFill, the value draws only.
 func TestREQ107_GenerateRefusesAnUndefinedPolicy(t *testing.T) {
+	observation := optArchetypeRoot("OBSERVATION", "openEHR-EHR-OBSERVATION.refused.v1",
+		optSingle("data", optNode("HISTORY", "at0001")), optRequiredSingle("uid"))
 	roots := []struct {
 		name     string
 		compiled *templatecompile.Compiled
 		draws    bool // building the root draws a uid
 	}{
-		{name: "COMPOSITION vital_signs", compiled: compileFixture(t, "vital_signs"), draws: true},
-		{name: "OBSERVATION", compiled: compileOPTText(t, optTemplate("OBSERVATION"), true), draws: true},
+		{name: "COMPOSITION vital_signs", compiled: compileFixture(t, "vital_signs")},
+		{name: "COMPOSITION with an entry that requires its uid", compiled: compileOPTText(t, optTemplate("COMPOSITION", optMultiple("content", observation)), true), draws: true},
+		{name: "OBSERVATION that requires its uid", compiled: compileOPTText(t, optTemplate("OBSERVATION", optRequiredSingle("uid")), true), draws: true},
 		{name: "CLUSTER", compiled: compileOPTText(t, optTemplate("CLUSTER"), true)},
 		{name: "ELEMENT", compiled: compileOPTText(t, optTemplate("ELEMENT"), true)},
 	}

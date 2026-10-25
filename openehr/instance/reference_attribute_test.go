@@ -102,8 +102,9 @@ func pinnedString(name, value string) string {
 // ENTRY's workflow_id and a CARE_ENTRY's guideline_id the template names
 // come out whole and pass both validators, at every policy, either value
 // fill and either compile mode. A workflow_id whose OBJECT_REF the template
-// leaves open takes an id drawn from UIDSource, after the OBSERVATION's own
-// uid, the namespace local and the type ANY. A guideline_id whose namespace,
+// leaves open takes an id drawn from UIDSource, the first the generator
+// draws, since the OBSERVATION gets no uid its template does not require
+// (Identity), the namespace local and the type ANY. A guideline_id whose namespace,
 // type and GENERIC_ID the template pins keeps every pin.
 func TestREQ107_EntryReferencesTakeTheirParts(t *testing.T) {
 	opt := guardRootOPT("OBSERVATION", guardObservationID,
@@ -117,7 +118,7 @@ func TestREQ107_EntryReferencesTakeTheirParts(t *testing.T) {
 		if !ok {
 			t.Fatalf("%s returned %T, want *rm.Observation", call, out)
 		}
-		if got, want := refString(obs.WorkflowID), "OBJECT_REF local::ANY id HIER_OBJECT_ID uid-0002"; got != want {
+		if got, want := refString(obs.WorkflowID), "OBJECT_REF local::ANY id HIER_OBJECT_ID uid-0001"; got != want {
 			t.Errorf("%s: workflow_id = %s, want %s", call, got, want)
 		}
 		if got, want := refString(obs.GuidelineID), "OBJECT_REF guidelines::GUIDELINE id GENERIC_ID NICE NICE-NG136"; got != want {
@@ -131,7 +132,7 @@ func TestREQ107_EntryReferencesTakeTheirParts(t *testing.T) {
 // passes both validators, at every policy, either value fill and either
 // compile mode. Its instruction_id is a LOCATABLE_REF whose abstract
 // UID_BASED_ID the generator builds as a HIER_OBJECT_ID with a value drawn
-// from UIDSource, after the ACTION's own uid, with the namespace local and
+// from UIDSource, the first drawn, with the namespace local and
 // the type INSTRUCTION; the path, the activity_id and the wf_details the
 // template constrains are kept.
 func TestREQ107_InstructionDetailsTakeTheirParts(t *testing.T) {
@@ -151,7 +152,7 @@ func TestREQ107_InstructionDetailsTakeTheirParts(t *testing.T) {
 		if d == nil {
 			t.Fatalf("%s: instruction_details is unset, want the one the template names", call)
 		}
-		if got, want := refString(&d.InstructionID), "LOCATABLE_REF local::INSTRUCTION id HIER_OBJECT_ID uid-0002"; got != want {
+		if got, want := refString(&d.InstructionID), "LOCATABLE_REF local::INSTRUCTION id HIER_OBJECT_ID uid-0001"; got != want {
 			t.Errorf("%s: instruction_id = %s, want %s", call, got, want)
 		}
 		if d.InstructionID.Path == nil || *d.InstructionID.Path != "/activities[at0001]" {
@@ -246,7 +247,7 @@ func TestREQ107_AccessGroupTypeIsAccessGroup(t *testing.T) {
 				if !ok {
 					t.Fatalf("%s returned %T, want *rm.Observation", call, out)
 				}
-				if got, want := refString(obs.WorkflowID), "ACCESS_GROUP_REF local::ACCESS_GROUP id HIER_OBJECT_ID uid-0002"; got != want {
+				if got, want := refString(obs.WorkflowID), "ACCESS_GROUP_REF local::ACCESS_GROUP id HIER_OBJECT_ID uid-0001"; got != want {
 					t.Errorf("%s: workflow_id = %s, want %s", call, got, want)
 				}
 			})
@@ -257,7 +258,7 @@ func TestREQ107_AccessGroupTypeIsAccessGroup(t *testing.T) {
 // TestREQ107_PerformerIDTakesAValueFromUIDSource is the REQ-107 check that
 // a ROLE performer whose template names its id as a HIER_OBJECT_ID, with
 // no constraint on the value, comes out with a value drawn from UIDSource,
-// after the ROLE's own uid, at every policy, either value fill and either
+// the first drawn, at every policy, either value fill and either
 // compile mode, and passes both validators. It replaces the known-gap row
 // in which rmwrite could not attach that id.
 func TestREQ107_PerformerIDTakesAValueFromUIDSource(t *testing.T) {
@@ -267,7 +268,7 @@ func TestREQ107_PerformerIDTakesAValueFromUIDSource(t *testing.T) {
 		if !ok {
 			t.Fatalf("%s returned %T, want *rm.Role", call, out)
 		}
-		if got, want := refString(&role.Performer), "PARTY_REF local::PERSON id HIER_OBJECT_ID uid-0002"; got != want {
+		if got, want := refString(&role.Performer), "PARTY_REF local::PERSON id HIER_OBJECT_ID uid-0001"; got != want {
 			t.Errorf("%s: performer = %s, want %s", call, got, want)
 		}
 	})
@@ -283,7 +284,7 @@ func TestREQ107_PerformerWithoutIDTakesOneFromUIDSource(t *testing.T) {
 		if !ok {
 			t.Fatalf("%s returned %T, want *rm.Role", call, out)
 		}
-		if got, want := refString(&role.Performer), "PARTY_REF local::PERSON id HIER_OBJECT_ID uid-0002"; got != want {
+		if got, want := refString(&role.Performer), "PARTY_REF local::PERSON id HIER_OBJECT_ID uid-0001"; got != want {
 			t.Errorf("%s: performer = %s, want %s", call, got, want)
 		}
 	})
@@ -321,8 +322,9 @@ func TestREQ107_UIDSourceReturningNilDoesNotPanic(t *testing.T) {
 // An existence of 1..1 alone would ask for no member (What a visit writes). A FOLDER's items hold an OBJECT_REF,
 // so the member takes the namespace local, the type ANY and an id drawn
 // from UIDSource; a PERSON's roles hold a PARTY_REF, so the member takes
-// the type ROLE, the one a role's reference has, and an id drawn after the
-// PERSON's own uid.
+// the type ROLE, the one a role's reference has, and an id drawn from
+// UIDSource too, the first drawn, since the PERSON gets no uid its template
+// does not require (Identity).
 func TestREQ107_RequiredReferenceTheTemplateNamesNoChildForIsBuilt(t *testing.T) {
 	cases := []struct {
 		name string
@@ -361,7 +363,7 @@ func TestREQ107_RequiredReferenceTheTemplateNamesNoChildForIsBuilt(t *testing.T)
 				}
 				return refString(&person.Roles[0])
 			},
-			want: "PARTY_REF local::ROLE id HIER_OBJECT_ID uid-0002",
+			want: "PARTY_REF local::ROLE id HIER_OBJECT_ID uid-0001",
 		},
 	}
 	for _, tc := range cases {
@@ -517,7 +519,7 @@ func eachIDCase(t *testing.T, fn func(t *testing.T, holder idHolder, form idForm
 // holds it, at every policy, either value fill and either compile mode, and
 // the output passes both validators. A HIER_OBJECT_ID, a GENERIC_ID, a
 // TEMPLATE_ID and a TERMINOLOGY_ID take the value of the uid drawn from
-// UIDSource, after the root's own uid; an OBJECT_VERSION_ID takes that value
+// UIDSource, the first drawn; an OBJECT_VERSION_ID takes that value
 // followed by ::example::1; and an ARCHETYPE_ID takes
 // openEHR-EHR-CLUSTER.example.v1, with no uid drawn. A class the rm package
 // parses accepts what the generator wrote.
@@ -526,7 +528,7 @@ func TestREQ107_EmptyReferenceIDTakesItsClassForm(t *testing.T) {
 		opt := holder.opt(requiredRef("id", form.class, form.attrs...))
 		generateEvery(t, opt, func(t *testing.T, call string, out any) {
 			ref, prefix := holder.ref(t, call, out)
-			if got, want := refString(ref), prefix+form.shown("uid-0002"); got != want {
+			if got, want := refString(ref), prefix+form.shown("uid-0001"); got != want {
 				t.Errorf("%s: reference = %s, want %s", call, got, want)
 			}
 			checkIDParses(t, call, ref, form)
