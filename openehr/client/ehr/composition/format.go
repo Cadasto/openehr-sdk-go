@@ -59,7 +59,7 @@ func (f Format) MediaType() string {
 // outside the four formats is named by its number.
 func (f Format) String() string {
 	// The FLAT and STRUCTURED names double as the values of the `format`
-	// query parameter WithFormatQuery sends (REQ-173).
+	// query parameter WithFormatQuery and WithGetFormatQuery send (REQ-173).
 	switch f {
 	case FormatJSON:
 		return "JSON"
@@ -115,29 +115,43 @@ func (f Format) marshal(comp *rm.Composition, wt *webtemplate.WebTemplate) ([]by
 	}
 }
 
+// unmarshal decodes body in f and returns the codec's own error unwrapped.
+// Only FLAT and STRUCTURED read wt. Callers refuse a format outside the four
+// with valid first, so the default arm is unreachable; it fails loudly
+// rather than return an empty composition.
+func (f Format) unmarshal(body []byte, wt *webtemplate.WebTemplate) (*rm.Composition, error) {
+	switch f {
+	case FormatJSON:
+		comp := new(rm.Composition)
+		if err := canjson.Unmarshal(body, comp); err != nil {
+			return nil, err
+		}
+		return comp, nil
+	case FormatXML:
+		comp := new(rm.Composition)
+		if err := canxml.Unmarshal(body, comp); err != nil {
+			return nil, err
+		}
+		return comp, nil
+	case FormatFlat:
+		return simplified.UnmarshalFlat(body, wt)
+	case FormatStructured:
+		return simplified.UnmarshalStructured(body, wt)
+	default:
+		return nil, errors.New("no codec for this format")
+	}
+}
+
 // decoder returns the function that decodes a write's representation body
 // in f. Canonical JSON keeps decodeComposition, the decoder every write used
 // before the other formats existed; the others wrap their codec's error the
 // same way, naming the format.
 func (f Format) decoder(wt *webtemplate.WebTemplate) func([]byte) (*rm.Composition, error) {
+	if f == FormatJSON {
+		return decodeComposition
+	}
 	return func(body []byte) (*rm.Composition, error) {
-		var (
-			comp *rm.Composition
-			err  error
-		)
-		switch f {
-		case FormatXML:
-			comp = new(rm.Composition)
-			err = canxml.Unmarshal(body, comp)
-		case FormatFlat:
-			comp, err = simplified.UnmarshalFlat(body, wt)
-		case FormatStructured:
-			comp, err = simplified.UnmarshalStructured(body, wt)
-		case FormatJSON:
-			return decodeComposition(body)
-		default:
-			err = errors.New("no codec for this format")
-		}
+		comp, err := f.unmarshal(body, wt)
 		if err != nil {
 			return nil, fmt.Errorf("composition: decode %s Composition: %w", f, err)
 		}

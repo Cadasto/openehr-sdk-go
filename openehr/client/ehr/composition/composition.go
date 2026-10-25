@@ -35,7 +35,18 @@ var ErrDeletedAtTime = errors.New("composition: deleted at requested time")
 // No Content response (the composition was deleted at the requested
 // version_at_time) returns a nil Composition with [ErrDeletedAtTime], a
 // typed success signal, distinct from transport.ErrInvalidShape.
-func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, ref openehrclient.Ref) (*rm.Composition, *openehrclient.VersionMetadata, error) {
+//
+// With no option, Get asks for canonical JSON and decodes it.
+// [WithGetFormat] asks for canonical XML, FLAT or STRUCTURED instead, and
+// decodes the body in that format whatever `Content-Type` the server labels
+// it with. A FLAT or STRUCTURED body is decoded only when a Web Template is
+// given; without one, Get returns a nil Composition, the version metadata
+// and a nil error. [WithRawBody] hands back the body as the server sent it.
+//
+// A body that does not decode returns a [*transport.DecodeError] beside the
+// version metadata. An empty or null body returns [transport.ErrInvalidShape]
+// in every format.
+func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, ref openehrclient.Ref, opts ...GetOption) (*rm.Composition, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("composition.Get: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
@@ -46,13 +57,21 @@ func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, re
 	if seg == "" {
 		return nil, nil, fmt.Errorf("composition.Get: %w: empty Ref path segment", transport.ErrInvalidConfig)
 	}
+	var cfg getConfig
+	for _, o := range opts {
+		if o != nil {
+			o(&cfg)
+		}
+	}
+	if err := cfg.check(); err != nil {
+		return nil, nil, err
+	}
 	req := &transport.Request{
 		Method: http.MethodGet,
 		Path:   "/ehr/" + string(ehrID) + "/composition/" + seg,
 		Route:  routeTemplate,
-	}
-	if qk, qv := ref.Query(); qk != "" {
-		req.Query = url.Values{qk: []string{qv}}
+		Query:  cfg.query(ref),
+		Accept: cfg.accept(),
 	}
 	resp, err := c.Do(ctx, req)
 	if err != nil {
@@ -62,21 +81,136 @@ func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, re
 		}
 		return nil, openehrclient.NewVersionMetadata(meta), err
 	}
+	meta := openehrclient.NewVersionMetadata(resp.Metadata)
 	if resp.StatusCode == http.StatusNoContent {
-		return nil, openehrclient.NewVersionMetadata(resp.Metadata), ErrDeletedAtTime
+		return nil, meta, ErrDeletedAtTime
+	}
+	if cfg.raw != nil && resp.StatusCode == http.StatusOK {
+		*cfg.raw = Raw{ContentType: resp.Header.Get("Content-Type"), Body: resp.Body}
 	}
 	if transport.IsNoRepresentationBody(resp.Body) {
-		return nil, openehrclient.NewVersionMetadata(resp.Metadata),
-			fmt.Errorf("composition.Get: %w: response body is empty or null", transport.ErrInvalidShape)
+		return nil, meta, fmt.Errorf("composition.Get: %w: response body is empty or null", transport.ErrInvalidShape)
 	}
-	out := new(rm.Composition)
-	if err := canjson.Unmarshal(resp.Body, out); err != nil {
-		return nil, openehrclient.NewVersionMetadata(resp.Metadata),
-			fmt.Errorf("composition.Get: %w", &transport.DecodeError{
-				Method: req.Method, Route: req.Route, Body: resp.Body, Inner: err,
-			})
+	if cfg.format.isSimplified() && cfg.webTemplate == nil {
+		return nil, meta, nil
 	}
-	return out, openehrclient.NewVersionMetadata(resp.Metadata), nil
+	out, err := cfg.format.unmarshal(resp.Body, cfg.webTemplate)
+	if err != nil {
+		return nil, meta, fmt.Errorf("composition.Get: %w", &transport.DecodeError{
+			Method: req.Method, Route: req.Route, Body: resp.Body, Inner: err,
+		})
+	}
+	return out, meta, nil
+}
+
+// getConfig is the resolved option set for [Get].
+type getConfig struct {
+	format      Format
+	webTemplate *webtemplate.WebTemplate
+	formatQuery bool
+	raw         *Raw
+	rawGiven    bool // WithRawBody was given, so a nil raw is refused
+}
+
+// GetOption shapes the request [Get] sends and how it decodes the response.
+type GetOption func(*getConfig)
+
+// WithGetFormat sets the representation the composition is read in. The
+// default is [FormatJSON]. When the option is given more than once, the last
+// one wins.
+//
+// Get sends f's media type as `Accept`, unless [WithGetFormatQuery] is also
+// given, and decodes a 200 body in f, whatever `Content-Type` the server
+// labels it with. Canonical XML needs no Web Template. FLAT and STRUCTURED
+// are decoded against wt. When wt is nil, Get does not decode a FLAT or
+// STRUCTURED body: it returns a nil composition, the version metadata and a
+// nil error, and [WithRawBody] can hand back the body. Canonical JSON and
+// XML ignore wt.
+//
+// Get fails with [transport.ErrInvalidConfig], before any request, when f is
+// not one of the four formats.
+func WithGetFormat(f Format, wt *webtemplate.WebTemplate) GetOption {
+	return func(c *getConfig) {
+		c.format = f
+		c.webTemplate = wt
+	}
+}
+
+// WithGetFormatQuery makes a FLAT or STRUCTURED read name its format with a
+// query parameter rather than with a media type. It is a deployment
+// extension outside ITS-REST 1.1.0, for servers that select the simplified
+// format from a `format` query parameter.
+//
+// With it, a FLAT or STRUCTURED read sends `format=FLAT` or
+// `format=STRUCTURED`, beside the `version_at_time` parameter the Ref may
+// carry, and `Accept: application/json`. The body is still decoded in the
+// format [WithGetFormat] names. The option is off by default and adds
+// nothing to a canonical JSON or XML read.
+func WithGetFormatQuery() GetOption {
+	return func(c *getConfig) { c.formatQuery = true }
+}
+
+// WithRawBody makes Get copy the response's `Content-Type` value and its
+// body bytes into dst on a 200, before any decode, so a body that does not
+// decode is still in hand. On any other outcome, an error or a 204, dst is
+// left as it was. It works with every format, the default included.
+//
+// A nil dst fails Get with [transport.ErrInvalidConfig] before any request.
+func WithRawBody(dst *Raw) GetOption {
+	return func(c *getConfig) {
+		c.raw = dst
+		c.rawGiven = true
+	}
+}
+
+// Raw is what the server sent for a composition read, as received. Get
+// fills it when [WithRawBody] is given.
+type Raw struct {
+	// ContentType is the response's `Content-Type` header value, parameters
+	// included. It is empty when the server sent none.
+	ContentType string
+	// Body is the response body. It is the same slice a
+	// [*transport.DecodeError] from the same call holds, not a copy. For a
+	// clinical composition it is patient data.
+	Body []byte
+}
+
+// check refuses, before any request, the option values Get cannot send: a
+// format outside the four, and a nil WithRawBody destination.
+func (c *getConfig) check() error {
+	if !c.format.valid() {
+		return fmt.Errorf("composition.Get: %w: unknown composition format %s", transport.ErrInvalidConfig, c.format)
+	}
+	if c.rawGiven && c.raw == nil {
+		return fmt.Errorf("composition.Get: %w: nil WithRawBody destination", transport.ErrInvalidConfig)
+	}
+	return nil
+}
+
+// accept returns the media type a read asks for: the format's own, or
+// application/json for FLAT and STRUCTURED under WithGetFormatQuery.
+func (c *getConfig) accept() string {
+	if c.formatQuery && c.format.isSimplified() {
+		return mediaTypeJSON
+	}
+	return c.format.MediaType()
+}
+
+// query returns a read's query parameters: the one ref may carry and, under
+// WithGetFormatQuery, the format parameter of FLAT and STRUCTURED. It is nil
+// when there are none, as it always was without options.
+func (c *getConfig) query(ref openehrclient.Ref) url.Values {
+	var q url.Values
+	if k, v := ref.Query(); k != "" {
+		q = url.Values{k: {v}}
+	}
+	if c.formatQuery && c.format.isSimplified() {
+		if q == nil {
+			q = url.Values{}
+		}
+		q.Set("format", c.format.String())
+	}
+	return q
 }
 
 // writeConfig is the resolved option set for Save / Update. It embeds
@@ -126,7 +260,9 @@ func WithTemplateID(id string) WriteOption {
 // `Content-Type`. Under [transport.PreferRepresentation] the write asks for
 // f's media type in `Accept` and decodes the response body in f; under any
 // other preference it asks for application/json, the media type of the
-// identifier body the server may return.
+// identifier body the server may return. A FLAT or STRUCTURED write that
+// also has [WithFormatQuery] sends application/json as both `Content-Type`
+// and `Accept` instead, and still writes and reads the body in f.
 //
 // FLAT and STRUCTURED are written and read against wt, which must then be
 // non-nil. They also always send the `openehr-template-id` header, holding
@@ -229,7 +365,10 @@ func WithDeleteAudit(a *rm.AuditDetails) DeleteOption {
 // The body is canonical JSON unless [WithFormat] names canonical XML,
 // FLAT or STRUCTURED. The format sets the body, its `Content-Type`, and,
 // under PreferRepresentation, the `Accept` header and the decode of the
-// returned composition; nothing else about the write changes.
+// returned composition. A FLAT or STRUCTURED write also sends the template
+// id, and [WithFormatQuery] adds query parameters. The `If-Match` header of
+// [Update], `Prefer`, the audit, lifecycle and item-tag headers, and the
+// version metadata returned stay what they are for canonical JSON.
 //
 // Audit details and the template id flow via the `openehr-*` header
 // family. A FLAT or STRUCTURED write always sends the template id, taken
@@ -493,7 +632,7 @@ func marshalItemTagHeaders(object, version []openehrclient.ItemTag) (objectHdr, 
 
 // Repository mirrors the package-level Composition functions.
 type Repository interface {
-	Get(ctx context.Context, ehrID openehrclient.EHRID, ref openehrclient.Ref) (*rm.Composition, *openehrclient.VersionMetadata, error)
+	Get(ctx context.Context, ehrID openehrclient.EHRID, ref openehrclient.Ref, opts ...GetOption) (*rm.Composition, *openehrclient.VersionMetadata, error)
 	Save(ctx context.Context, ehrID openehrclient.EHRID, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error)
 	Update(ctx context.Context, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, ifMatch string, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error)
 	Delete(ctx context.Context, ehrID openehrclient.EHRID, versionUID openehrclient.VersionUID, opts ...DeleteOption) (*openehrclient.VersionMetadata, error)
@@ -504,8 +643,8 @@ func NewRepository(c *transport.Client) Repository { return &repository{c: c} }
 
 type repository struct{ c *transport.Client }
 
-func (r *repository) Get(ctx context.Context, ehrID openehrclient.EHRID, ref openehrclient.Ref) (*rm.Composition, *openehrclient.VersionMetadata, error) {
-	return Get(ctx, r.c, ehrID, ref)
+func (r *repository) Get(ctx context.Context, ehrID openehrclient.EHRID, ref openehrclient.Ref, opts ...GetOption) (*rm.Composition, *openehrclient.VersionMetadata, error) {
+	return Get(ctx, r.c, ehrID, ref, opts...)
 }
 
 func (r *repository) Save(ctx context.Context, ehrID openehrclient.EHRID, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error) {
