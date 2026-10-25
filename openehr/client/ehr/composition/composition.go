@@ -119,13 +119,14 @@ type GetOption func(*getConfig)
 // default is [FormatJSON]. When the option is given more than once, the last
 // one wins.
 //
-// Get sends f's media type as `Accept`, unless [WithGetFormatQuery] is also
-// given, and decodes a 200 body in f, whatever `Content-Type` the server
-// labels it with. Canonical XML needs no Web Template. FLAT and STRUCTURED
-// are decoded against wt. When wt is nil, Get does not decode a FLAT or
-// STRUCTURED body: it returns a nil composition, the version metadata and a
-// nil error, and [WithRawBody] can hand back the body. Canonical JSON and
-// XML ignore wt.
+// Get sends f's media type as `Accept` and decodes a 200 body in f, whatever
+// `Content-Type` the server labels it with. A FLAT or STRUCTURED read that
+// also has [WithGetFormatQuery] sends `Accept: application/json` instead, and
+// still decodes the body in f. Canonical XML needs no Web Template. FLAT
+// and STRUCTURED are decoded against wt. When wt is nil, Get does not decode
+// a FLAT or STRUCTURED body: it returns a nil composition, the version
+// metadata and a nil error, and [WithRawBody] can hand back the body.
+// Canonical JSON and XML ignore wt.
 //
 // Get fails with [transport.ErrInvalidConfig], before any request, when f is
 // not one of the four formats.
@@ -151,9 +152,13 @@ func WithGetFormatQuery() GetOption {
 }
 
 // WithRawBody makes Get copy the response's `Content-Type` value and its
-// body bytes into dst on a 200, before any decode, so a body that does not
-// decode is still in hand. On any other outcome, an error or a 204, dst is
-// left as it was. It works with every format, the default included.
+// body bytes into dst when the server answers 200 and the body was read,
+// before any decode. Get fills dst even when it then fails: with
+// [transport.ErrInvalidShape] for an empty or null body, or with a
+// [*transport.DecodeError] for a body that does not decode. Every other
+// outcome leaves dst as it was: a status other than 200, such as a 204 or an
+// error status, a failure before any response arrives, or a body that could
+// not be read. It works with every format, the default included.
 //
 // A nil dst fails Get with [transport.ErrInvalidConfig] before any request.
 func WithRawBody(dst *Raw) GetOption {
@@ -363,12 +368,14 @@ func WithDeleteAudit(a *rm.AuditDetails) DeleteOption {
 // [*openehrclient.NoRepresentationError] carrying commit metadata.
 //
 // The body is canonical JSON unless [WithFormat] names canonical XML,
-// FLAT or STRUCTURED. The format sets the body, its `Content-Type`, and,
-// under PreferRepresentation, the `Accept` header and the decode of the
-// returned composition. A FLAT or STRUCTURED write also sends the template
-// id, and [WithFormatQuery] adds query parameters. The `If-Match` header of
-// [Update], `Prefer`, the audit, lifecycle and item-tag headers, and the
-// version metadata returned stay what they are for canonical JSON.
+// FLAT or STRUCTURED. The format sets how the body is written and how a
+// returned composition is decoded. It also sets `Content-Type` and, under
+// PreferRepresentation, `Accept`. A FLAT or STRUCTURED write with
+// [WithFormatQuery] is the exception: it sends application/json in both
+// headers, whatever the preference, and names the format and the template id
+// in query parameters. The `If-Match` header of [Update], `Prefer`, the
+// audit, lifecycle and item-tag headers, and the version metadata returned
+// stay what they are for canonical JSON.
 //
 // Audit details and the template id flow via the `openehr-*` header
 // family. A FLAT or STRUCTURED write always sends the template id, taken
