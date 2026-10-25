@@ -18,6 +18,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/contribution"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/sandbox"
+	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 	"github.com/cadasto/openehr-sdk-go/testkit/probe"
 	probes "github.com/cadasto/openehr-sdk-go/testkit/probes/versioned"
@@ -675,9 +676,16 @@ const (
 	probe109ImportedVersionUID openehrclient.VersionUID        = "5d6e7f80-91a2-4b3c-8d4e-5f6071829304::imported.example::1"
 	probe109PartyVOID          openehrclient.VersionedObjectID = "8849182c-82ad-4088-a07f-48ead4180515"
 
-	// probe109DroppedFraction is the pin's example time with its fraction
-	// of a second cut off: what a truncating formatter would send.
+	// probe109AtTimeWire is the version_at_time every at-time read must
+	// send: the pin's example time carried to nanoseconds, in UTC, every
+	// fraction digit kept.
+	probe109AtTimeWire = "2015-01-20T18:30:22.765432101Z"
+	// probe109DroppedFraction is the example time with its fraction of a
+	// second cut off: what a truncating formatter would send.
 	probe109DroppedFraction = "2015-01-20T18:30:22Z"
+	// probe109Milliseconds is the example time cut to milliseconds: what a
+	// formatter that keeps three fraction digits would send.
+	probe109Milliseconds = "2015-01-20T18:30:22.765Z"
 )
 
 func probe109Inputs() probes.Probe109Inputs {
@@ -841,10 +849,6 @@ func probe109Backend(t *testing.T, captured *[]*http.Request, plant probe109Plan
 		if hit && plant.body != "" {
 			body = plant.body
 		}
-		if status == http.StatusNoContent {
-			w.WriteHeader(status)
-			return
-		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(status)
 		_, _ = w.Write([]byte(body))
@@ -853,7 +857,8 @@ func probe109Backend(t *testing.T, captured *[]*http.Request, plant probe109Plan
 
 // TestProbe109VersionedObjectReadsPass runs PROBE-109 (REQ-174) against a
 // conformant backend: the ten versioned-object reads, the two IMPORTED_VERSION
-// refusals and the four at-time reads on the other leaves all pass.
+// refusals and the four at-time reads on the other leaves all pass, and the
+// six at-time reads send the example time with all nine fraction digits.
 func TestProbe109VersionedObjectReadsPass(t *testing.T) {
 	var captured []*http.Request
 	b := probe109Backend(t, &captured, probe109Plant{})
@@ -866,6 +871,46 @@ func TestProbe109VersionedObjectReadsPass(t *testing.T) {
 	}
 	if got, want := len(captured), 16; got != want {
 		t.Errorf("PROBE-109 issued %d requests, want %d (10 versioned-object reads, 2 refusals, 4 at-time reads)", got, want)
+	}
+	// The probe's example time must hold more digits than milliseconds, or a
+	// leaf that cuts the fraction to three digits would pass it.
+	var atTimes []string
+	for _, req := range captured {
+		atTimes = append(atTimes, req.URL.Query()["version_at_time"]...)
+	}
+	if want := slices.Repeat([]string{probe109AtTimeWire}, 6); !slices.Equal(atTimes, want) {
+		t.Errorf("version_at_time values sent = %q, want %q (the example time to nanoseconds, once per at-time read)", atTimes, want)
+	}
+}
+
+// TestProbe109OtherLeafRowsJudgeTheRequestOnly pins PROBE-109 (REQ-174): the
+// four at-time reads on the other leaves are judged on their request, not on
+// the read's result, so a read that fails on a well-formed request passes.
+// The plant "an at-time read on another leaf fails and cuts the fraction"
+// holds the other half: the request is still judged when the read fails.
+func TestProbe109OtherLeafRowsJudgeTheRequestOnly(t *testing.T) {
+	notFound := `{"message":"not found"}`
+	rows := map[string]probe109Match{
+		"composition.Get(LatestAtTime)": {path: probe109EHR + "/composition/" + string(compositionVOID), atTime: true},
+		"ehrstatus.GetAtTime":           {path: probe109EHR + "/ehr_status", atTime: true},
+		"directory.GetAtTime":           {path: probe109EHR + "/directory", atTime: true},
+		"demographic.GetVersionAtTime":  {path: probe109Base + "/demographic/versioned_party/" + string(probe109PartyVOID) + "/version", atTime: true},
+	}
+	for name, on := range rows {
+		t.Run(name, func(t *testing.T) {
+			var captured []*http.Request
+			b := probe109Backend(t, &captured, probe109Plant{on: on, status: http.StatusNotFound, body: notFound})
+			r, err := probes.Probe109VersionedObjectReads(t.Context(), newClient(t, b), &captured, probe109Inputs())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if r.Status != "pass" {
+				t.Errorf("PROBE-109 with %s answered 404 = %q, want pass: the row judges the request only (detail=%q)", name, r.Status, r.Detail)
+			}
+			if got, want := len(captured), 16; got != want {
+				t.Errorf("PROBE-109 issued %d requests, want %d", got, want)
+			}
+		})
 	}
 }
 
@@ -914,12 +959,12 @@ func TestProbe109VersionedObjectReadsFlagsPlants(t *testing.T) {
 		},
 		{
 			name:       "composition latest-version read sends version_at_time",
-			plant:      probe109Plant{on: probe109Match{path: probe109VC + "/version"}, record: setAtTime("2015-01-20T18:30:22.765Z")},
+			plant:      probe109Plant{on: probe109Match{path: probe109VC + "/version"}, record: setAtTime(probe109AtTimeWire)},
 			wantDetail: "composition.GetVersion: sent version_at_time",
 		},
 		{
 			name:       "EHR_STATUS latest-version read sends version_at_time",
-			plant:      probe109Plant{on: probe109Match{path: probe109VS + "/version"}, record: setAtTime("2015-01-20T18:30:22.765Z")},
+			plant:      probe109Plant{on: probe109Match{path: probe109VS + "/version"}, record: setAtTime(probe109AtTimeWire)},
 			wantDetail: "ehrstatus.GetVersion: sent version_at_time",
 		},
 		{
@@ -930,6 +975,16 @@ func TestProbe109VersionedObjectReadsFlagsPlants(t *testing.T) {
 		{
 			name:       "EHR_STATUS version-at-time read drops the fraction",
 			plant:      probe109Plant{on: probe109Match{path: probe109VS + "/version", atTime: true}, record: setAtTime(probe109DroppedFraction)},
+			wantDetail: "ehrstatus.GetVersionAtTime: version_at_time = ",
+		},
+		{
+			name:       "composition version-at-time read cuts the fraction to milliseconds",
+			plant:      probe109Plant{on: probe109Match{path: probe109VC + "/version", atTime: true}, record: setAtTime(probe109Milliseconds)},
+			wantDetail: "composition.GetVersionAtTime: version_at_time = ",
+		},
+		{
+			name:       "EHR_STATUS version-at-time read cuts the fraction to milliseconds",
+			plant:      probe109Plant{on: probe109Match{path: probe109VS + "/version", atTime: true}, record: setAtTime(probe109Milliseconds)},
 			wantDetail: "ehrstatus.GetVersionAtTime: version_at_time = ",
 		},
 		{
@@ -955,7 +1010,7 @@ func TestProbe109VersionedObjectReadsFlagsPlants(t *testing.T) {
 		{
 			name: "version-at-time read sends the value twice",
 			plant: probe109Plant{on: probe109Match{path: probe109VC + "/version", atTime: true}, record: func(r *http.Request) {
-				r.URL.RawQuery = "version_at_time=2015-01-20T18:30:22.765Z&version_at_time=2015-01-20T18:30:22.765Z"
+				r.URL.RawQuery = url.Values{"version_at_time": {probe109AtTimeWire, probe109AtTimeWire}}.Encode()
 			}},
 			wantDetail: "composition.GetVersionAtTime: version_at_time = ",
 		},
@@ -1005,14 +1060,36 @@ func TestProbe109VersionedObjectReadsFlagsPlants(t *testing.T) {
 			wantDetail: "ehrstatus.GetRevisionHistory failed: ",
 		},
 		{
-			name:       "an at-time read on another leaf fails",
-			plant:      probe109Plant{on: probe109Match{path: probe109EHR + "/directory", atTime: true}, status: http.StatusInternalServerError, body: `{"message":"boom"}`},
-			wantDetail: "directory.GetAtTime failed: ",
+			// The row judges the request only, so the read failing does not
+			// fail the probe, and does not spare the request either.
+			name:       "an at-time read on another leaf fails and cuts the fraction",
+			plant:      probe109Plant{on: probe109Match{path: probe109EHR + "/directory", atTime: true}, status: http.StatusNotFound, body: `{"message":"not found"}`, record: setAtTime(probe109Milliseconds)},
+			wantDetail: "directory.GetAtTime: version_at_time = ",
 		},
 		{
-			name:       "VERSIONED_PARTY version-at-time read answered without a version",
-			plant:      probe109Plant{on: probe109Match{path: partyVersion, atTime: true}, status: http.StatusNoContent},
-			wantDetail: "demographic.GetVersionAtTime: the body did not decode to a PARTY version",
+			name:       "composition refusal row sends another method",
+			plant:      probe109Plant{on: probe109Match{path: probe109VC + "/version/" + string(probe109ImportedVersionUID)}, record: setMethod(http.MethodPost)},
+			wantDetail: `composition.GetVersionByID on an IMPORTED_VERSION: method = "POST", want GET`,
+		},
+		{
+			name:       "composition refusal row sends another path",
+			plant:      probe109Plant{on: probe109Match{path: probe109VC + "/version/" + string(probe109ImportedVersionUID)}, record: setPath(probe109VC + "/version")},
+			wantDetail: "composition.GetVersionByID on an IMPORTED_VERSION: path = ",
+		},
+		{
+			name:       "composition refusal row sends version_at_time",
+			plant:      probe109Plant{on: probe109Match{path: probe109VC + "/version/" + string(probe109ImportedVersionUID)}, record: setAtTime("x")},
+			wantDetail: "composition.GetVersionByID on an IMPORTED_VERSION: sent version_at_time",
+		},
+		{
+			name:       "EHR_STATUS refusal row asks for XML",
+			plant:      probe109Plant{on: probe109Match{path: probe109VS + "/version/" + string(probe109ImportedVersionUID)}, record: setAccept("application/xml")},
+			wantDetail: "ehrstatus.GetVersionByID on an IMPORTED_VERSION: Accept = ",
+		},
+		{
+			name:       "EHR_STATUS refusal row issues two requests",
+			plant:      probe109Plant{on: probe109Match{path: probe109VS + "/version/" + string(probe109ImportedVersionUID)}, twice: true},
+			wantDetail: "ehrstatus.GetVersionByID on an IMPORTED_VERSION issued 2 request(s), want exactly 1",
 		},
 		{
 			name:       "ORIGINAL_VERSION served on the composition refusal row",
@@ -1069,11 +1146,39 @@ func TestProbe109VersionedObjectReadsRejectsMissingInputs(t *testing.T) {
 		"ImportedVersionUID":    func(in *probes.Probe109Inputs) { in.ImportedVersionUID = "" },
 		"PartyVOID":             func(in *probes.Probe109Inputs) { in.PartyVOID = "" },
 	}
-	for field, clear := range blank {
+	for field, blankOut := range blank {
 		in := probe109Inputs()
-		clear(&in)
+		blankOut(&in)
 		if _, err := probes.Probe109VersionedObjectReads(t.Context(), c, &captured, in); err == nil {
 			t.Errorf("empty %s: expected an error", field)
+		}
+	}
+
+	// The probe takes the base path from the client's openEHR REST service,
+	// so a catalog without that service, or with one that has no base URL,
+	// cannot run it.
+	noREST, err := discovery.NewStaticCatalog(discovery.StaticConfig{
+		Issuer:   "https://sandbox.local",
+		Services: map[string]discovery.ServiceEntry{},
+	})
+	if err != nil {
+		t.Fatalf("NewStaticCatalog rejected an empty services map (setup change?): %v", err)
+	}
+	noBaseURL := &discovery.ServiceCatalog{
+		Issuer:   "https://sandbox.local",
+		Services: map[string]discovery.ServiceEntry{discovery.ServiceIDOpenEHRRest: {ID: discovery.ServiceIDOpenEHRRest}},
+	}
+	catalogs := map[string]*discovery.ServiceCatalog{
+		"catalog without the openEHR REST service": noREST,
+		"openEHR REST service without a base URL":  noBaseURL,
+	}
+	for name, cat := range catalogs {
+		bare, err := transport.New(cat, transport.WithHTTPClient(c.HTTPClient()))
+		if err != nil {
+			t.Fatalf("%s: transport.New: %v", name, err)
+		}
+		if _, err := probes.Probe109VersionedObjectReads(t.Context(), bare, &captured, probe109Inputs()); err == nil {
+			t.Errorf("%s: expected an error", name)
 		}
 	}
 	if len(captured) != 0 {
