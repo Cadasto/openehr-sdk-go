@@ -284,6 +284,9 @@ func TestValidateRM_REQ112_REQ171_IntervalOrderSkipsUnorderedPairs(t *testing.T)
 		{name: "DV_DURATION, lower not a duration", root: new(rm.NewClosedDVInterval(rm.DVDuration{Value: "example"}, rm.DVDuration{Value: "-P1D"}))},
 		{name: "nil lower bound on a bounded side", root: closed(nil, rm.DVCount{Magnitude: -1})},
 		{name: "typed-nil lower bound on a bounded side", root: closed((*rm.DVCount)(nil), &rm.DVCount{Magnitude: -1})},
+		// The upper bound names no class, so the lower one, of another class
+		// than the nil pointer's, is not read as not strictly comparable.
+		{name: "typed-nil upper bound on a bounded side", root: closed(&rm.DVQuantity{Magnitude: 5, Units: "mm"}, (*rm.DVCount)(nil))},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
