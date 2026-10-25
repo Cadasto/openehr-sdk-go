@@ -187,6 +187,14 @@ func buildPrimitive(o *xmlCObject, strict bool) (constraints.PrimitiveConstraint
 			}
 			return nil, nil
 		}
+		// REQ-100: ITS-XML types <item> as the abstract C_PRIMITIVE, so
+		// the item must name its concrete type in the XSI namespace.
+		// Strict mode refuses one that does not, as it refuses a missing
+		// item; the default mode reads it as no constraint (the
+		// buildPrimitive default below).
+		if strict && o.Item.Type == "" {
+			return nil, fmt.Errorf("%w: <item> of C_PRIMITIVE_OBJECT for %q has no xsi:type in the XSI namespace (strict mode)", ErrInvalidOPT, o.RMTypeName)
+		}
 		return buildPrimitive(o.Item, strict)
 	}
 	return nil, nil

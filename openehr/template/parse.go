@@ -58,17 +58,18 @@ func ParseOPT(r io.Reader) (*OperationalTemplate, error) {
 // It also refuses an unparseable C_INTEGER or C_REAL bound, an
 // unparseable C_INTEGER or C_REAL list item, a C_PRIMITIVE_OBJECT
 // with no <item> child, a CONSTRAINT_REF with no <reference> or
-// a blank one, and an <attributes> or <children> inside <definition>
-// that has no xsi:type in the XML Schema instance namespace
+// a blank one, and an <attributes> or <children> inside <definition>,
+// or an <item> of a C_PRIMITIVE_OBJECT, that has no xsi:type in the
+// XML Schema instance namespace
 // (http://www.w3.org/2001/XMLSchema-instance), returning an error that
 // wraps ErrInvalidOPT. That last case covers a missing or empty type
 // and an xsi prefix bound to another namespace: openEHR ITS-XML makes
-// C_ATTRIBUTE and C_OBJECT abstract, so each such element must name a
-// concrete type. <definition> itself needs none. ParseOPT reads such
-// an <attributes> as C_SINGLE_ATTRIBUTE and such a <children> as
-// C_ARCHETYPE_ROOT when it carries an archetype id, as
-// C_COMPLEX_OBJECT otherwise, so any constraint its type would have
-// carried is lost.
+// C_ATTRIBUTE, C_OBJECT and C_PRIMITIVE abstract, so each such element
+// must name a concrete type. <definition> itself needs none. ParseOPT
+// reads such an <attributes> as C_SINGLE_ATTRIBUTE, such a <children>
+// as C_ARCHETYPE_ROOT when it carries an archetype id and as
+// C_COMPLEX_OBJECT otherwise, and such an <item> as no constraint, so
+// any constraint its type would have carried is lost.
 //
 // T_ARCHETYPE_ROOT and CONSTRAINT_REF are not unknown values, so
 // strict mode never refuses them as unsupported. It reads

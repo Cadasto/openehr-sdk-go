@@ -2,6 +2,7 @@ package template_test
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"path/filepath"
 	"slices"
@@ -977,6 +978,63 @@ func TestParse_CPrimitiveObject_StrictMissingItem(t *testing.T) {
 	</children>`, 1)
 	if _, err := template.ParseOPTStrict(strings.NewReader(body)); err == nil {
 		t.Error("ParseOPTStrict on C_PRIMITIVE_OBJECT without <item> should fail")
+	}
+}
+
+// TestREQ100_StrictRefusesPrimitiveItemWithNoXSIType pins § REQ-100 Strict
+// parse mode: ITS-XML types the <item> of a C_PRIMITIVE_OBJECT as the
+// abstract C_PRIMITIVE, so strict mode refuses one that carries no type in
+// the XSI namespace with ErrInvalidOPT, as it refuses a missing <item>. The
+// default mode reads it as no constraint. A typed item parses in both modes.
+func TestREQ100_StrictRefusesPrimitiveItemWithNoXSIType(t *testing.T) {
+	const wrapper = `<children xsi:type="C_PRIMITIVE_OBJECT">
+		<rm_type_name>DURATION</rm_type_name>
+		<node_id/>
+		%s
+	</children>`
+	tests := []struct {
+		name string
+		item string
+		// refused is true when strict mode refuses the item.
+		refused bool
+	}{
+		{name: "typed", item: `<item xsi:type="C_DURATION"><pattern>PThm</pattern></item>`},
+		{name: "no type", item: `<item><pattern>PThm</pattern></item>`, refused: true},
+		{name: "empty type", item: `<item xsi:type=""><pattern>PThm</pattern></item>`, refused: true},
+		{name: "type in another namespace", item: `<item xmlns:x="urn:example:not-xsi" x:type="C_DURATION"><pattern>PThm</pattern></item>`, refused: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			child := fmt.Sprintf(wrapper, tc.item)
+			lenient := parseOPTWithChild(t, child)
+			p := firstChildPrimitive(t, lenient)
+			if tc.refused && p != nil {
+				t.Errorf("ParseOPT: PrimitiveConstraint() = %#v, want none for an untyped <item>", p)
+			}
+			if !tc.refused {
+				if _, ok := p.(constraints.CDuration); !ok {
+					t.Errorf("ParseOPT: PrimitiveConstraint() = %T, want constraints.CDuration", p)
+				}
+			}
+
+			body := strings.Replace(primitiveOPTTemplate, "%s", child, 1)
+			strict, err := template.ParseOPTStrict(strings.NewReader(body))
+			if !tc.refused {
+				if err != nil {
+					t.Fatalf("ParseOPTStrict = %v, want nil error", err)
+				}
+				return
+			}
+			if !errors.Is(err, template.ErrInvalidOPT) || strict != nil {
+				t.Fatalf("ParseOPTStrict error = %v (template returned: %t), want an error wrapping ErrInvalidOPT and no template", err, strict != nil)
+			}
+			if errors.Is(err, template.ErrUnsupportedNode) {
+				t.Errorf("ParseOPTStrict = %v, want no ErrUnsupportedNode: the item has no type, not an unknown one", err)
+			}
+			if !strings.Contains(err.Error(), "<item>") {
+				t.Errorf("ParseOPTStrict = %v, want the message to name <item>", err)
+			}
+		})
 	}
 }
 
