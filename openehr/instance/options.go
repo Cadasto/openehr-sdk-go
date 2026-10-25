@@ -16,7 +16,9 @@ import (
 // mandatory, and never visits one no serialization carries, the BMM
 // functions and RESOURCE_DESCRIPTION.parent_resource that
 // rminfo.IsNonStorableAttr names, or a locatable's uid, which the
-// identity rule decides. Under every policy an RM rule can need more
+// identity rule decides. Nor does it visit an optional attribute whose
+// item structure would hold no item, such as a protocol whose ITEM_TREE
+// holds an optional slot alone. Under every policy an RM rule can need more
 // than the policy visits, such as an ELEMENT's value or null_flavour,
 // and a visited
 // multi-valued attribute is topped up to its lower bound. [ValueFill],
@@ -38,8 +40,10 @@ const (
 	// an optional archetype root after the first optional archetype root
 	// of the attribute, in OPT order, that holds more than content the
 	// template does not describe (see the package documentation) gets
-	// none of its own, whatever its archetype. Medium is the zero value,
-	// so Options with no Policy builds it.
+	// none of its own, whatever its archetype, and neither does an
+	// optional child whose identity a required sibling, or an earlier
+	// optional one, carries. Medium is the zero value, so Options with no
+	// Policy builds it.
 	Medium Policy = iota
 	// Required builds only the data points the template makes mandatory
 	// and a composition's context, what the ITS-REST template example
@@ -60,17 +64,18 @@ const (
 	// optional, so its tree is not always smaller than Medium's.
 	Required
 	// Large builds a member of every optional archetype the template
-	// names that holds more than content the template does not describe
-	// (see the package documentation). It visits every attribute the
-	// visit rule allows: every attribute the compiled node carries, the
-	// optional ones the OPT names included. A visited multi-valued
-	// attribute gets at least one member of each allowed OPT child that
-	// is not a slot, except an optional child that holds only such
-	// content, or whose identity a required sibling, or an earlier
-	// optional one, carries; optional archetype roots of different
-	// archetypes each get theirs. It stops short of the ITS-REST template
-	// example's detail_level=complete (every data point the template
-	// allows), which no level of its own builds yet.
+	// names, and of every use of one, that holds more than content the
+	// template does not describe (see the package documentation). It
+	// visits every attribute the visit rule allows: every attribute the
+	// compiled node carries, the optional ones the OPT names included. A
+	// visited multi-valued attribute gets at least one member of each
+	// allowed OPT child that is not a slot, except an optional child that
+	// holds only such content: optional archetype roots each get theirs,
+	// of one archetype or of several, whether the template tells them
+	// apart by a name or not, and so do optional siblings of one node id.
+	// It stops short of the ITS-REST template example's
+	// detail_level=complete (every data point the template allows), which
+	// no level of its own builds yet.
 	Large
 
 	// Minimal is another name for Required.
@@ -185,16 +190,17 @@ type Options struct {
 	Now time.Time
 
 	// UIDSource supplies the uids the generator writes: the uid of every
-	// ENTRY, GENERIC_ENTRY, PARTY and PARTY_RELATIONSHIP, of any other
 	// locatable whose OPT requires its uid, and the id value of every
 	// object reference it writes that carries none, a ROLE's performer and
 	// a PARTY_RELATIONSHIP's source and target among them. The id takes
 	// the uid's value in the form of its class: the value itself for a
 	// HIER_OBJECT_ID, a GENERIC_ID, a TEMPLATE_ID and a TERMINOLOGY_ID, and
 	// the value followed by "::example::1" for an OBJECT_VERSION_ID. An
-	// ARCHETYPE_ID takes a fixed id and draws no uid. A COMPOSITION gets a
-	// uid only where its OPT requires one, so the server that stores it
-	// gives it its version id. Nil falls back to a random RFC 9562 v4 UUID
+	// ARCHETYPE_ID takes a fixed id and draws no uid. Any other locatable,
+	// a COMPOSITION, an ENTRY, a GENERIC_ENTRY, a PARTY and a
+	// PARTY_RELATIONSHIP included, gets no uid, so the server that stores
+	// the object gives it its id; a PARTY then breaks the RM rule that it
+	// carry one until the server does. Nil falls back to a random RFC 9562 v4 UUID
 	// (stdlib uuid.NewV4). [UIDsFrom] gives version-4 uids drawn from a
 	// math/rand/v2.Source, so a seeded run is reproducible; tests also pin
 	// a counter for deterministic uids. A source that returns nil leaves

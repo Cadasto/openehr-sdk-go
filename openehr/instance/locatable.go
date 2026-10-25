@@ -23,9 +23,8 @@ import (
 // EHR_STATUS, the demographic PARTY family, …) now gets its identity
 // stamped rather than silently skipped. The uid comes from uidSource; a
 // nil uidSource stamps none, and neither does one that returns nil. The
-// caller decides: the classes stampsUID names get one unless their OPT
-// prohibits it, and any other locatable only where its OPT requires one
-// (setLocatableIdentity, uidFor).
+// caller decides: a locatable gets one only where its OPT requires it
+// (setLocatableIdentity), whatever its class.
 func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *rm.Archetyped, uidSource func() *rm.HierObjectID) {
 	m, ok := rmValue.(rm.MutableLocatable)
 	if !ok || rm.IsTypedNil(rmValue) {
@@ -46,37 +45,4 @@ func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *
 			}
 		}
 	}
-}
-
-// partyNeedsUID reports whether v is a PARTY, whose uid the RM needs
-// (PARTY Uid_mandatory), so the generator stamps it even where the OPT
-// prohibits uid.
-func partyNeedsUID(v any) bool {
-	switch v.(type) {
-	case *rm.Person, *rm.Organisation, *rm.Group, *rm.Agent, *rm.Role:
-		return true
-	}
-	return false
-}
-
-// stampsUID lists the classes whose generated instances carry a fresh
-// uid: the ENTRY concretes and GENERIC_ENTRY, the independently
-// addressable clinical objects, and the PARTY concretes, whose uid the RM
-// requires (PARTY Uid_mandatory). A PARTY_RELATIONSHIP takes its uid in
-// fillPartyRelationship instead. A COMPOSITION gets none, so the server
-// that stores it gives it its version id: a CDR can refuse a uid it did
-// not assign. Structure nodes (SECTION, ITEM_*, CLUSTER, ELEMENT,
-// HISTORY, events) and the other demographic locatables (PARTY_IDENTITY,
-// CONTACT, ADDRESS, CAPABILITY) deliberately get no generator-minted uid
-// either. Any of these gets one where its OPT requires it
-// (setLocatableIdentity). This is policy dispatch, not identity plumbing:
-// it stays a hand-written closed set, with no reflection.
-func stampsUID(v any) bool {
-	switch v.(type) {
-	case *rm.Observation, *rm.Evaluation,
-		*rm.Instruction, *rm.Action, *rm.AdminEntry, *rm.GenericEntry,
-		*rm.Person, *rm.Organisation, *rm.Group, *rm.Agent, *rm.Role:
-		return true
-	}
-	return false
 }

@@ -95,6 +95,16 @@ func TestREQ107_OptionalItemStructureWithNoItemIsLeftOut(t *testing.T) {
 			items: map[instance.Policy]int{instance.Large: -1, instance.Medium: -1, instance.Required: -1},
 		},
 		{
+			// The walk visits the items, which their existence requires,
+			// but gives them no member: the CLUSTER is optional and needs
+			// undescribed content, and only that existence asks for a
+			// member, so no top-up builds one (What a visit writes).
+			name: "an ITEM_TREE whose items only their existence requires, over an optional CLUSTER that needs undescribed content",
+			protocol: optOptionalSingleOver("protocol", optNode("ITEM_TREE", "at0010", optList("items", 1, 0,
+				optOccurring("C_COMPLEX_OBJECT", "CLUSTER", "at0011", 0, 1, optCardinal("items", 1, -1, optSlot("ELEMENT", "at0012")))))),
+			items: map[instance.Policy]int{instance.Large: -1, instance.Medium: -1, instance.Required: -1},
+		},
+		{
 			name: "an ITEM_TREE with an optional ELEMENT",
 			protocol: optOptionalSingleOver("protocol", optNode("ITEM_TREE", "at0010",
 				optCardinal("items", 0, -1, optElement("at0011", 0, 1)))),

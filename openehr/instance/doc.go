@@ -26,7 +26,13 @@
 // template allowed it; and it never visits one no serialization
 // carries, the BMM functions and RESOURCE_DESCRIPTION.parent_resource
 // that rminfo.IsNonStorableAttr names, nor a locatable's uid, which
-// the identity rule decides. Under every policy an RM rule can need
+// the identity rule decides: a locatable gets a uid only where the
+// template requires it, so the server that stores a generated object gives
+// it its id. Nor does it visit an optional attribute whose item structure,
+// an ITEM_TREE, ITEM_LIST or ITEM_TABLE, would hold no item, such as a
+// protocol whose tree holds an optional slot alone; one the RM or the
+// template requires, such as an event's data, is written with no items.
+// Under every policy an RM rule can need
 // more than the policy visits, such as an ELEMENT's value or null
 // flavour, or a DV_MULTIMEDIA's
 // uri where the template prohibits its data, which the generator then
@@ -49,9 +55,10 @@
 //     an optional archetype after the first optional
 //     archetype of the attribute that holds more than content the
 //     template does not describe (below) gets none, whatever its
-//     archetype. So Medium builds at most one optional archetype under an
-//     attribute, the medium level. It is the zero value, and so the
-//     default.
+//     archetype, and neither does an optional child whose identity a
+//     required or earlier sibling carries. So Medium builds at most one
+//     optional archetype under an attribute, the medium level. It is the
+//     zero value, and so the default.
 //   - Required: the required attributes, in the sense above, but not one
 //     that only its cardinality lower bound asks for, nor one merely
 //     because it has an allowed template child, except a composition's
@@ -66,10 +73,10 @@
 //     Medium's.
 //   - Large: every attribute the visit rule allows, the optional ones the
 //     template names included. A visited multi-valued attribute gets at
-//     least one member of each allowed child that is not a slot, except
-//     an optional child whose identity a required or earlier sibling
-//     carries. So Large builds a member of every optional archetype the
-//     template names, except one that holds only content the template does
+//     least one member of each allowed child that is not a slot, each
+//     use of one archetype, named or not, included. So Large builds a
+//     member of every optional archetype the template names, and of every
+//     use of one, except one that holds only content the template does
 //     not describe (below). It stops short of the complete level, every
 //     data point the template allows, which no level of its own builds yet.
 //

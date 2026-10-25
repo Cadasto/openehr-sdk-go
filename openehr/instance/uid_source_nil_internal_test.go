@@ -14,11 +14,11 @@ func nilUIDSource() *rm.HierObjectID { return nil }
 // the generator gives a locatable its uid, leaves that locatable with no
 // uid: GetUID returns nil, not an interface holding a nil pointer, so a
 // reader that asks whether the uid is there sees that it is not. It calls
-// the two places the generator stamps a uid: applyLocatableIdentity, for
-// an ENTRY, a PARTY and any locatable whose OPT requires its uid, and
-// fillPartyRelationship. The value the caller supplies is written as given
-// (§ Exceptions and known gaps), so the RM floor reports what it reports,
-// such as PARTY Uid_mandatory; this pins only that the uid is absent.
+// the one place the generator stamps a uid, applyLocatableIdentity, which
+// gives any locatable whose OPT requires its uid one, on an ENTRY, a PARTY
+// and a PARTY_RELATIONSHIP. The value the caller supplies is written as
+// given (§ Exceptions and known gaps), so the RM floor reports what it
+// reports; this pins only that the uid is absent.
 func TestREQ107_UIDSourceReturningNilLeavesALocatableWithNoUID(t *testing.T) {
 	cases := []struct {
 		name string
@@ -37,12 +37,9 @@ func TestREQ107_UIDSourceReturningNilLeavesALocatableWithNoUID(t *testing.T) {
 			v:     &rm.Person{},
 		},
 		{
-			name: "PARTY_RELATIONSHIP through fillPartyRelationship",
-			stamp: func(v rm.Locatable) {
-				g := &generator{opts: Options{UIDSource: nilUIDSource}}
-				g.fillPartyRelationship(nil, v.(*rm.PartyRelationship))
-			},
-			v: &rm.PartyRelationship{},
+			name:  "PARTY_RELATIONSHIP through applyLocatableIdentity",
+			stamp: func(v rm.Locatable) { applyLocatableIdentity(v, "at0000", "relationship", nil, nilUIDSource) },
+			v:     &rm.PartyRelationship{},
 		},
 	}
 	for _, tc := range cases {
