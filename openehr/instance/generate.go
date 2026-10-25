@@ -680,7 +680,7 @@ func (g *generator) shouldVisit(optNode *tcimpl.CompiledNode, attr *tcimpl.Compi
 	if !isContext && g.membersUndescribed(optNode, attr) {
 		return false
 	}
-	if attr.Cardinality() == template.Single && g.holdsNoItem(optNode, attr) {
+	if attr.Cardinality() == template.Single && g.holdsNoItem(attr) {
 		return false
 	}
 	if visitRequired(attr) {
@@ -700,21 +700,27 @@ var itemStructureContent = map[string]string{
 }
 
 // holdsNoItem reports whether the value a visit of attr, a single-valued
-// attribute of optNode, would write is an item structure that would hold no
-// item: an ITEM_TREE or ITEM_LIST whose items, or an ITEM_TABLE whose rows,
-// the walk under the policy in force would give no member. It reads what
-// the walk would write, not the OPT alone: the value is built from the
-// child the binding tiers name (bindingAlternative), or from the
-// attribute's BMM type where the OPT allows no child, and its content list
-// gets no member where that child does not carry it, the walk does not
-// visit it (visits), or the members the walk plans for it (planMembers,
-// implicitMembers) are none. A slot's fill holds its identity alone, so it
-// holds no item either.
-func (g *generator) holdsNoItem(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
+// attribute, would write is an item structure that would hold no item: an
+// ITEM_TREE or ITEM_LIST whose items, or an ITEM_TABLE whose rows, the walk
+// under the policy in force would give no member. It reads what the walk
+// would write, not the OPT alone: the value is built from the child the
+// binding tiers name (bindingAlternative), and its content list gets no
+// member where that child does not carry it, the walk does not visit it
+// (visits), or the members the walk builds for it are none: those of its
+// allowed children (planMembers), or, where it has none, those of its BMM
+// type (implicitMembers), which a list whose RM type is unknown, such as
+// the items of an ITEM_STRUCTURE, does not get. A list whose children ask
+// for more members than its cardinality upper bound admits
+// (checkCardinalityRoom) is refused by the walk, not left empty, so the
+// structure is visited and Generate returns that error. shouldVisit asks
+// only where membersUndescribed has not left attr out, which it does where
+// the child named is a slot, and where attr has no allowed child and its
+// BMM type builds a LOCATABLE, as every item structure is, so neither case
+// gets here as an item structure.
+func (g *generator) holdsNoItem(attr *tcimpl.CompiledAttribute) bool {
 	children := tcimpl.AllowedChildNodes(attr)
 	if len(children) == 0 {
-		_, structure := itemStructureContent[bmmtype.Class(concreteFor(attrType(optNode.RMTypeName(), attr.RMTypeName())))]
-		return structure
+		return false
 	}
 	built := builtRMType(children[0])
 	content, structure := itemStructureContent[bmmtype.Class(built)]
@@ -722,9 +728,6 @@ func (g *generator) holdsNoItem(optNode *tcimpl.CompiledNode, attr *tcimpl.Compi
 		return false
 	}
 	child := bindingAlternative(children, built)
-	if child.IsSlot() {
-		return true
-	}
 	list := child.Attribute(content)
 	if list == nil || !g.visits(child, list) {
 		return true
@@ -735,6 +738,9 @@ func (g *generator) holdsNoItem(optNode *tcimpl.CompiledNode, attr *tcimpl.Compi
 	members := tcimpl.AllowedChildNodes(list)
 	if len(members) == 0 {
 		return implicitMembers(child, list) == 0
+	}
+	if checkCardinalityRoom(child, list, members) != nil {
+		return false
 	}
 	return g.planMembers(child, list, members).members() == 0
 }

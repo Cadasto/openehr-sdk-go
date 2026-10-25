@@ -1,6 +1,7 @@
 package instance_test
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -50,12 +51,16 @@ func structureItems(s map[string]any) int {
 // would hold no item, decided by what the walk writes and not by the OPT
 // alone. An optional protocol whose ITEM_TREE names no items, or holds an
 // optional slot alone, whose ITEM_LIST holds a slot alone, whose ITEM_TABLE
-// names no rows, or whose ITEM_TREE holds an optional CLUSTER that needs
-// undescribed content, is left out under every policy, and so is an
-// event's optional state whose ITEM_TREE holds an optional slot alone. A
-// protocol whose ITEM_TREE holds an optional ELEMENT is written with that
-// ELEMENT under Large and Medium, and is left out under Required, which
-// visits no optional attribute. A protocol the OPT requires, and an event's
+// names no rows, whose ITEM_TREE holds an optional CLUSTER that needs
+// undescribed content, or whose ITEM_STRUCTURE's items name no child and
+// have no RM type to build a member from, is left out under every policy,
+// and so is an event's optional state whose ITEM_TREE holds an optional
+// slot alone. A protocol whose ITEM_TREE holds an optional ELEMENT, or
+// whose ITEM_TREE's items, which their cardinality requires, hold an
+// optional CLUSTER that needs undescribed content, of which the top-up
+// builds one, is written with that one item under Large and Medium, and is
+// left out under Required, which visits no optional attribute. A protocol
+// the OPT requires, and an event's
 // data, which the BMM requires, are written with no items. Every root
 // passes the template validator and the RM floor, under every policy, both
 // value fills and both compile modes.
@@ -105,6 +110,26 @@ func TestREQ107_OptionalItemStructureWithNoItemIsLeftOut(t *testing.T) {
 			items: map[instance.Policy]int{instance.Large: -1, instance.Medium: -1, instance.Required: -1},
 		},
 		{
+			// The template names the abstract ITEM_STRUCTURE, whose RM
+			// class has no items, so the compile gives the items no RM
+			// type. The walk builds an ITEM_TREE and visits the items,
+			// which their cardinality requires, but with no RM type it
+			// has nothing to build a member from (What a visit writes).
+			name:     "an ITEM_STRUCTURE whose items, at cardinality 1..*, name no child",
+			protocol: optOptionalSingleOver("protocol", optNode("ITEM_STRUCTURE", "at0010", optCardinal("items", 1, -1))),
+			items:    map[instance.Policy]int{instance.Large: -1, instance.Medium: -1, instance.Required: -1},
+		},
+		{
+			// The CLUSTER gets no member of its own, since it is optional
+			// and needs undescribed content, but the items' cardinality
+			// asks for one, so the top-up builds it from the CLUSTER (What
+			// a visit writes), and the protocol holds that one item.
+			name: "an ITEM_TREE whose items their cardinality requires, over an optional CLUSTER that needs undescribed content",
+			protocol: optOptionalSingleOver("protocol", optNode("ITEM_TREE", "at0010", optList("items", 1, 1,
+				optOccurring("C_COMPLEX_OBJECT", "CLUSTER", "at0011", 0, 1, optCardinal("items", 1, -1, optSlot("ELEMENT", "at0012")))))),
+			items: map[instance.Policy]int{instance.Large: 1, instance.Medium: 1, instance.Required: -1},
+		},
+		{
 			name: "an ITEM_TREE with an optional ELEMENT",
 			protocol: optOptionalSingleOver("protocol", optNode("ITEM_TREE", "at0010",
 				optCardinal("items", 0, -1, optElement("at0011", 0, 1)))),
@@ -151,6 +176,43 @@ func TestREQ107_OptionalItemStructureWithNoItemIsLeftOut(t *testing.T) {
 					noFloorErrors(t, out)
 				})
 			}
+		}
+	}
+}
+
+// TestREQ107_OptionalItemStructureOverAListPastItsRoomIsRefused is the
+// REQ-107 check of Errors that an OPT that contradicts itself is refused
+// where the list it contradicts itself on sits in an optional item
+// structure: an optional protocol whose ITEM_TREE's items, at cardinality
+// 0..0, hold an ELEMENT at occurrences 1..1. The Visit rule does not leave
+// the protocol out as one that would hold no item, since a visit of the
+// items refuses the template rather than giving them no member, so under
+// Large and Medium Generate returns no root and an error wrapping
+// ErrConstraintUnsatisfiable. Required visits no optional attribute, so the
+// contradiction does not reach it, and it returns a root without the
+// protocol (Exceptions and known gaps). It holds under both value fills
+// and both compile modes.
+func TestREQ107_OptionalItemStructureOverAListPastItsRoomIsRefused(t *testing.T) {
+	protocol := optOptionalSingleOver("protocol", optNode("ITEM_TREE", "at0010",
+		optCardinal("items", 0, 0, optElement("at0011", 1, 1))))
+	for _, implicit := range []bool{true, false} {
+		c := compileOPTText(t, optStructureObservation(protocol), implicit)
+		for _, opts := range guardOptions() {
+			t.Run(fmt.Sprintf("implicit=%t/%v/%v", implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+				out, err := instance.Generate(t.Context(), c, opts)
+				if opts.Policy != instance.Required {
+					if !errors.Is(err, instance.ErrConstraintUnsatisfiable) || out != nil {
+						t.Errorf("Generate(%v) = %T, %v, want no root and ErrConstraintUnsatisfiable: the items' cardinality upper bound 0 leaves no room for the required ELEMENT", opts.Policy, out, err)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatalf("Generate(Required) = %v, want a root: Required does not visit the optional protocol", err)
+				}
+				if p, present := jsonObject(decodedJSON(t, out))["protocol"]; present {
+					t.Errorf("Generate(Required) protocol = %v, want none: Required does not visit it", p)
+				}
+			})
 		}
 	}
 }
