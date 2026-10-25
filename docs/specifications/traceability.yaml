@@ -1467,6 +1467,7 @@ requirements:
       - openehr/template/constraints
       - openehr/instance
       - openehr/templatecompile
+      - openehr/rm/rminfo
       - internal/templateinstance/rmwrite
       - internal/rmroots
       - testkit/fixtures
