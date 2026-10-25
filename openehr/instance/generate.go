@@ -49,10 +49,12 @@ import (
 // when it has none, or refuses it with [ErrSlotFillUnsupported].
 //
 // A list whose children's occurrences lower bounds add up past its
-// cardinality upper bound, and an attribute the template requires that
-// the generator has no writer for, such as a LOCATABLE's feeder_audit or
-// links, make Generate return an error wrapping
-// [ErrConstraintUnsatisfiable] and no root. Where the template leaves
+// cardinality upper bound, where the walk visits it, and an attribute the
+// template requires that the generator has no writer for, such as a
+// LOCATABLE's feeder_audit or links, make Generate return an error
+// wrapping [ErrConstraintUnsatisfiable] and no root. A list that sits in
+// an optional node the policy builds no member of, as Required builds
+// none of an optional child, is not visited, and the root leaves it out. Where the template leaves
 // such an attribute optional, it is left out, as is an attribute the
 // node's RM class does not have, whatever the template asks of it.
 func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (any, error) {

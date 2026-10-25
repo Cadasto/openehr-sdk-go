@@ -248,9 +248,9 @@ var ErrSlotFillUnsupported = errors.New("instance.Generate: required slot fill c
 // ErrConstraintUnsatisfiable signals that no value the generator can
 // derive satisfies what the template asks for: a primitive leaf's
 // constraint, for example a C_STRING whose pattern and list admit no
-// string; a list whose children's occurrences lower bounds add up past its
-// cardinality upper bound, so that no instance holds every member they ask
-// for (ADL 1.4 VCOC, AOM 2 VACMCO); or an attribute the template requires
+// string; a list the walk visits whose children's occurrences lower bounds
+// add up past its cardinality upper bound, so that no instance holds every
+// member they ask for (ADL 1.4 VCOC, AOM 2 VACMCO); or an attribute the template requires
 // that the generator has no writer for, such as a LOCATABLE's feeder_audit
 // or links. The error names the RM type, the attribute and the OPT path,
 // and Generate returns no root. It is never wrapped together with

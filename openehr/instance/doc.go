@@ -74,22 +74,24 @@
 //     data point the template allows, which no level of its own builds yet.
 //
 // Under Large and Medium the generator builds an optional node only where
-// it holds more than content the template does not describe: a slot fill,
-// or a LOCATABLE built from the BMM type of an attribute the template gives
+// it holds more than content the template does not describe: a slot fill;
+// a LOCATABLE built from the BMM type of an attribute the template gives
 // no allowed child, such as the placeholder element of a list the template
-// leaves empty where the RM or the template's cardinality asks for a member.
-// An optional child gets no member of its own when
-// it is a slot, or when an attribute of its own that is required can only
-// be given such members: the attribute has no allowed child and its member
-// would be a LOCATABLE, every allowed child of it is a slot, or it is
-// single-valued and the child that builds its member is a slot. An
-// attribute that is not required, in the sense the Medium policy above
-// gives, is not visited when every member it would get is such content or
-// such a child. A list with a child that makes it required is visited, so
-// that child gets its members although they hold only such content. A
-// composition's context is
-// the exception: every policy writes one, so the walk visits it whatever
-// its members need. The first optional archetype Medium keeps is the first
+// leaves empty where the RM or the template's cardinality asks for a
+// member; or a template node of a class that is always an archetype root
+// for which the template names no archetype id, such as an ADMIN_ENTRY
+// defined inline under a SECTION, since the generator invents no
+// archetype id. An optional child gets no member of its own when it is a
+// slot or such a node, or when an attribute of its own that is required
+// can only be given such members: the attribute has no allowed child and
+// its member would be a LOCATABLE, every allowed child of it is a slot or
+// such a node, or it is single-valued and the child that builds its member
+// is one. An attribute that is not required, in the sense the Medium
+// policy above gives, is not visited when every member it would get is
+// such content or such a child. A list with a child that makes it required
+// is visited, so that child gets its members although they hold only such
+// content. A composition's context is the exception: every policy writes
+// one, so the walk visits it whatever its members need. The first optional archetype Medium keeps is the first
 // that needs none. The check reads a node's own attributes only: below a
 // node the template or the RM requires, the walk builds what it always
 // builds, placeholders and slot fills included where something asks for a
