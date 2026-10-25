@@ -957,7 +957,7 @@ The REST-binding probes assert the openEHR-REST 1.1.0 wire contract above `trans
 
 - **Title:** `composition.Save` and `composition.Get` in canonical XML, FLAT and STRUCTURED send the format's media types and the template id, and decode the server's body in the format asked for.
 - **Preconditions:** A backend that answers `POST /ehr/{ehr_id}/composition` with `Prefer: return=representation` and `GET /ehr/{ehr_id}/composition/{uid_based_id}` in the requested format; a Web Template and a composition that round-trip through FLAT and STRUCTURED.
-- **Wire assertion:** For each of canonical XML, FLAT and STRUCTURED, the write carries the format's `Content-Type` and `Accept`, a FLAT or STRUCTURED write carries `openehr-template-id` equal to the Web Template's id, and the representation and the read's `200` body decode into a composition equal on the paths the probe sets to the one written. Under the format query option a FLAT write carries `application/json` with `format=FLAT` and `templateId`. No request carries a `.schema`-suffixed media type.
+- **Wire assertion:** For each of canonical XML, FLAT and STRUCTURED, the write carries the format's `Content-Type` and `Accept`, a FLAT or STRUCTURED write carries `openehr-template-id` equal to the Web Template's id, and the representation and the read's `200` body decode into a composition equal on the paths the probe sets to the one written. Under the format query options a FLAT write carries `application/json` with `format=FLAT` and `templateId`, and its read carries `Accept: application/json` with `format=FLAT`. No request carries a `.schema`-suffixed media type.
 - **Effect:** writes one composition per arm in the sandbox; reads it back.
 - **Modes:** Sandbox.
 - **Status:** Draft.
