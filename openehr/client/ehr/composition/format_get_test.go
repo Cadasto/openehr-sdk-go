@@ -17,6 +17,8 @@ import (
 
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
@@ -706,4 +708,164 @@ func TestRepositoryGetTakesOptions(t *testing.T) {
 			t.Errorf("server saw %d requests, want 0", n)
 		}
 	})
+}
+
+// TestGetSimplifiedDecodeOptions pins REQ-173 Simplified decode options on
+// reads. A FLAT or STRUCTURED Get hands the decode options of WithGetFormat,
+// unchanged, to the decode of the body, and hands it none when WithGetFormat
+// has none. With simplified.WithTemplate the composition carries the names of
+// the nodes below the root; without a decode option it carries none. The
+// format query parameter decodes the same way.
+func TestGetSimplifiedDecodeOptions(t *testing.T) {
+	compiled, wt, comp := loadCompiledFormatFixture(t)
+	cases := []struct {
+		name     string
+		opts     []simplified.Option
+		wantName string
+	}{
+		{name: "with the compiled template", opts: []simplified.Option{simplified.WithTemplate(compiled)}, wantName: fixtureEntryName},
+		{name: "without decode options", wantName: ""},
+	}
+	for _, f := range []composition.Format{composition.FormatFlat, composition.FormatStructured} {
+		for _, byQuery := range []bool{false, true} {
+			for _, tc := range cases {
+				name := f.String() + "/" + tc.name
+				if byQuery {
+					name = f.String() + "/by query parameter/" + tc.name
+				}
+				t.Run(name, func(t *testing.T) {
+					body := encodeAs(t, f, comp, wt)
+					fs := newFormatServer(t, http.StatusOK, f.MediaType(), body)
+					opts := []composition.GetOption{composition.WithGetFormat(f, wt, tc.opts...)}
+					if byQuery {
+						opts = append(opts, composition.WithGetFormatQuery())
+					}
+					out, _, err := composition.Get(t.Context(), newClient(t, fs.srv), ehrIDFixture,
+						openehrclient.LatestOf(compositionVOID), opts...)
+					if err != nil {
+						t.Fatalf("Get(%v) error = %v", f, err)
+					}
+					if got := firstEntryName(t, out); got != tc.wantName {
+						t.Errorf("first content entry name = %q, want %q", got, tc.wantName)
+					}
+					sameComposition(t, "returned composition", out, decodeSimplified(t, f, body, wt, tc.opts...))
+				})
+			}
+		}
+	}
+}
+
+// TestGetDecodeOptionsGovernUnmatchedContent pins REQ-173 Simplified decode
+// options with REQ-151 on a FLAT body holding a key the Web Template does not
+// resolve. Without a decode option the body decodes; simplified.WithStrict
+// makes the read's decode fail with the typed *transport.DecodeError;
+// simplified.WithUnmatched sees the key. The options reach the codec in the
+// order given, so of two WithUnmatched the last one sees the key, and only
+// the last WithGetFormat's options count. A nil decode option is passed on
+// and the codec skips it.
+func TestGetDecodeOptionsGovernUnmatchedContent(t *testing.T) {
+	wt, comp := loadFormatFixture(t)
+	body := withUnmatchedKey(t, encodeAs(t, composition.FormatFlat, comp, wt))
+	get := func(t *testing.T, opts ...composition.GetOption) (*rm.Composition, *openehrclient.VersionMetadata, error) {
+		t.Helper()
+		fs := newFormatServer(t, http.StatusOK, mediaFlat, body)
+		return composition.Get(t.Context(), newClient(t, fs.srv), ehrIDFixture, openehrclient.LatestOf(compositionVOID), opts...)
+	}
+	t.Run("without decode options", func(t *testing.T) {
+		out, _, err := get(t, composition.WithGetFormat(composition.FormatFlat, wt))
+		if err != nil || out == nil {
+			t.Fatalf("Get(FLAT) of a body with an unmatched key = (%v, %v), want it decoded", out, err)
+		}
+	})
+	t.Run("WithStrict", func(t *testing.T) {
+		out, meta, err := get(t, composition.WithGetFormat(composition.FormatFlat, wt, simplified.WithStrict()))
+		de, ok := errors.AsType[*transport.DecodeError](err)
+		if !ok || de == nil {
+			t.Fatalf("Get(FLAT, WithStrict) error = %v, want a *transport.DecodeError", err)
+		}
+		if !errors.Is(err, simplified.ErrUnknownPath) {
+			t.Errorf("Get(FLAT, WithStrict) error = %v, want it to wrap simplified.ErrUnknownPath", err)
+		}
+		if !bytes.Equal(de.Body, body) {
+			t.Errorf("DecodeError.Body holds %d bytes, want the %d bytes the server sent", len(de.Body), len(body))
+		}
+		if out != nil {
+			t.Errorf("returned composition = %+v, want nil", out)
+		}
+		wantVersionMeta(t, meta)
+	})
+	t.Run("WithUnmatched", func(t *testing.T) {
+		var seen []string
+		out, _, err := get(t, composition.WithGetFormat(composition.FormatFlat, wt,
+			simplified.WithUnmatched(func(path string) { seen = append(seen, path) })))
+		if err != nil || out == nil {
+			t.Fatalf("Get(FLAT, WithUnmatched) = (%v, %v), want it decoded", out, err)
+		}
+		if len(seen) != 1 || seen[0] != unmatchedFlatKey {
+			t.Errorf("WithUnmatched saw %q, want [%q]", seen, unmatchedFlatKey)
+		}
+	})
+	t.Run("two WithUnmatched in order", func(t *testing.T) {
+		var first, last []string
+		_, _, err := get(t, composition.WithGetFormat(composition.FormatFlat, wt,
+			simplified.WithUnmatched(func(path string) { first = append(first, path) }),
+			simplified.WithUnmatched(func(path string) { last = append(last, path) })))
+		if err != nil {
+			t.Fatalf("Get error = %v", err)
+		}
+		if len(first) != 0 || len(last) != 1 {
+			t.Errorf("first WithUnmatched saw %q and the last %q, want the last one alone to see [%q]", first, last, unmatchedFlatKey)
+		}
+	})
+	t.Run("last WithGetFormat's options", func(t *testing.T) {
+		out, _, err := get(t,
+			composition.WithGetFormat(composition.FormatFlat, wt, simplified.WithStrict()),
+			composition.WithGetFormat(composition.FormatFlat, wt))
+		if err != nil || out == nil {
+			t.Fatalf("Get = (%v, %v), want it decoded without the earlier WithStrict", out, err)
+		}
+	})
+	t.Run("nil decode option", func(t *testing.T) {
+		out, _, err := get(t, composition.WithGetFormat(composition.FormatFlat, wt, nil))
+		if err != nil || out == nil {
+			t.Fatalf("Get(FLAT, nil decode option) = (%v, %v), want it decoded", out, err)
+		}
+	})
+}
+
+// TestGetCanonicalIgnoresDecodeOptions pins REQ-173: canonical JSON and XML do
+// not consult the decode options. A Get given simplified.WithStrict decodes the
+// canonical body as it would without it.
+func TestGetCanonicalIgnoresDecodeOptions(t *testing.T) {
+	_, comp := loadFormatFixture(t)
+	for _, f := range []composition.Format{composition.FormatJSON, composition.FormatXML} {
+		t.Run(f.String(), func(t *testing.T) {
+			fs := newFormatServer(t, http.StatusOK, f.MediaType(), encodeAs(t, f, comp, nil))
+			out, _, err := composition.Get(t.Context(), newClient(t, fs.srv), ehrIDFixture,
+				openehrclient.LatestOf(compositionVOID), composition.WithGetFormat(f, nil, simplified.WithStrict()))
+			if err != nil {
+				t.Fatalf("Get(%v, WithStrict) error = %v", f, err)
+			}
+			sameComposition(t, "returned composition", out, comp)
+		})
+	}
+}
+
+// TestWithGetFormatCopiesDecodeOptions pins that WithGetFormat keeps its own
+// copy of the decode options (REQ-173): a caller who changes its slice after
+// building the option does not change what the body is decoded with.
+func TestWithGetFormatCopiesDecodeOptions(t *testing.T) {
+	compiled, wt, comp := loadCompiledFormatFixture(t)
+	opts := []simplified.Option{simplified.WithTemplate(compiled)}
+	format := composition.WithGetFormat(composition.FormatFlat, wt, opts...)
+	opts[0] = simplified.WithStrict()
+	fs := newFormatServer(t, http.StatusOK, mediaFlat, withUnmatchedKey(t, encodeAs(t, composition.FormatFlat, comp, wt)))
+	out, _, err := composition.Get(t.Context(), newClient(t, fs.srv), ehrIDFixture,
+		openehrclient.LatestOf(compositionVOID), format)
+	if err != nil {
+		t.Fatalf("Get error = %v, want the body decoded with the options given to WithGetFormat", err)
+	}
+	if got := firstEntryName(t, out); got != fixtureEntryName {
+		t.Errorf("first content entry name = %q, want %q from the compiled template", got, fixtureEntryName)
+	}
 }

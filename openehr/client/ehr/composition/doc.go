@@ -15,6 +15,11 @@
 // simplified FLAT or STRUCTURED format ([FormatFlat], [FormatStructured]),
 // which need the template's Web Template; a returned composition is read in
 // the same format. [WithGetFormat] reads a composition in any of the four.
+// Both options also take the simplified codec's decode options and hand
+// them to every FLAT or STRUCTURED decode they govern. Without
+// [simplified.WithTemplate] a decoded composition lacks the names of the
+// nodes below the root and the reference model defaults the compiled
+// template completes, so a caller who needs a complete composition passes it.
 // Without a Web Template, Get leaves a FLAT or STRUCTURED body undecoded,
 // and [WithRawBody] hands back the body as the server sent it, in every
 // format. [WithFormatQuery] and [WithGetFormatQuery] are opt-ins for

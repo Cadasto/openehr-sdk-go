@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
@@ -94,7 +96,7 @@ func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, re
 	if cfg.format.isSimplified() && cfg.webTemplate == nil {
 		return nil, meta, nil
 	}
-	out, err := cfg.format.unmarshal(resp.Body, cfg.webTemplate)
+	out, err := cfg.format.unmarshal(resp.Body, cfg.webTemplate, cfg.decodeOptions)
 	if err != nil {
 		return nil, meta, fmt.Errorf("composition.Get: %w", &transport.DecodeError{
 			Method: req.Method, Route: req.Route, Body: resp.Body, Inner: err,
@@ -105,11 +107,12 @@ func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, re
 
 // getConfig is the resolved option set for [Get].
 type getConfig struct {
-	format      Format
-	webTemplate *webtemplate.WebTemplate
-	formatQuery bool
-	raw         *Raw
-	rawGiven    bool // WithRawBody was given, so a nil raw is refused
+	format        Format
+	webTemplate   *webtemplate.WebTemplate
+	decodeOptions []simplified.Option
+	formatQuery   bool
+	raw           *Raw
+	rawGiven      bool // WithRawBody was given, so a nil raw is refused
 }
 
 // GetOption shapes the request [Get] sends and how it decodes the response.
@@ -117,7 +120,7 @@ type GetOption func(*getConfig)
 
 // WithGetFormat sets the representation the composition is read in. The
 // default is [FormatJSON]. When the option is given more than once, the last
-// one wins.
+// one wins, decode options included.
 //
 // Get sends f's media type as `Accept` and decodes a 200 body in f, whatever
 // `Content-Type` the server labels it with. A FLAT or STRUCTURED read that
@@ -128,12 +131,24 @@ type GetOption func(*getConfig)
 // metadata and a nil error, and [WithRawBody] can hand back the body.
 // Canonical JSON and XML ignore wt.
 //
+// opts are the simplified codec's decode options, such as
+// [simplified.WithTemplate], [simplified.WithStrict] and
+// [simplified.WithUnmatched]. Get hands them, unchanged and in order, to the
+// decode of a FLAT or STRUCTURED body, and hands it none when opts is empty.
+// Canonical JSON and XML ignore them. Without [simplified.WithTemplate] the
+// decoded composition lacks the name of every node below the root and the
+// reference model defaults the compiled template completes, so a caller who
+// needs a complete composition passes the compiled template. WithGetFormat
+// keeps its own copy of opts.
+//
 // Get fails with [transport.ErrInvalidConfig], before any request, when f is
 // not one of the four formats.
-func WithGetFormat(f Format, wt *webtemplate.WebTemplate) GetOption {
+func WithGetFormat(f Format, wt *webtemplate.WebTemplate, opts ...simplified.Option) GetOption {
+	opts = slices.Clone(opts)
 	return func(c *getConfig) {
 		c.format = f
 		c.webTemplate = wt
+		c.decodeOptions = opts
 	}
 }
 
@@ -230,6 +245,7 @@ type writeConfig struct {
 	versionItemTags []openehrclient.ItemTag
 	format          Format
 	webTemplate     *webtemplate.WebTemplate
+	decodeOptions   []simplified.Option
 	formatQuery     bool
 }
 
@@ -259,7 +275,8 @@ func WithTemplateID(id string) WriteOption {
 
 // WithFormat sets the representation the composition is written in, and the
 // one a returned composition is read in. The default is [FormatJSON]. When
-// the option is given more than once, the last one wins.
+// the option is given more than once, the last one wins, decode options
+// included.
 //
 // The request body is serialised in f and sent with f's media type as
 // `Content-Type`. Under [transport.PreferRepresentation] the write asks for
@@ -274,15 +291,28 @@ func WithTemplateID(id string) WriteOption {
 // the id [WithTemplateID] names or, when that is absent or empty, wt's
 // template id. Canonical JSON and XML ignore wt.
 //
+// opts are the simplified codec's decode options, such as
+// [simplified.WithTemplate], [simplified.WithStrict] and
+// [simplified.WithUnmatched]. The write hands them, unchanged and in order,
+// to the decode of a FLAT or STRUCTURED representation, and hands it none
+// when opts is empty; they play no part in writing the body. Canonical JSON
+// and XML ignore them. Without [simplified.WithTemplate] the returned
+// composition lacks the name of every node below the root and the reference
+// model defaults the compiled template completes, so a caller who needs a
+// complete composition passes the compiled template. WithFormat keeps its
+// own copy of opts.
+//
 // The write fails with [transport.ErrInvalidConfig], before any request,
 // when f is not one of the four formats, when FLAT or STRUCTURED gets a nil
 // wt, and when the [WithTemplateID] id and wt's template id are both empty
 // or name different templates. A composition the codec cannot serialise
 // also fails before any request.
-func WithFormat(f Format, wt *webtemplate.WebTemplate) WriteOption {
+func WithFormat(f Format, wt *webtemplate.WebTemplate, opts ...simplified.Option) WriteOption {
+	opts = slices.Clone(opts)
 	return func(c *writeConfig) {
 		c.format = f
 		c.webTemplate = wt
+		c.decodeOptions = opts
 	}
 }
 
@@ -594,7 +624,7 @@ func (c *writeConfig) resolveFormat(op string, comp *rm.Composition) (formatWrit
 		contentType: f.MediaType(),
 		accept:      mediaTypeJSON, // the Identifier body is JSON
 		templateID:  templateID,
-		decode:      f.decoder(c.webTemplate),
+		decode:      f.decoder(c.webTemplate, c.decodeOptions),
 	}
 	if c.Prefer == transport.PreferRepresentation {
 		fw.accept = f.MediaType()

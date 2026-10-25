@@ -116,10 +116,11 @@ func (f Format) marshal(comp *rm.Composition, wt *webtemplate.WebTemplate) ([]by
 }
 
 // unmarshal decodes body in f and returns the codec's own error unwrapped.
-// Only FLAT and STRUCTURED read wt. Callers refuse a format outside the four
-// with valid first, so the default arm is unreachable; it fails loudly
-// rather than return an empty composition.
-func (f Format) unmarshal(body []byte, wt *webtemplate.WebTemplate) (*rm.Composition, error) {
+// Only FLAT and STRUCTURED read wt and opts, the simplified decode options
+// the caller gave, which they pass on unchanged and in order. Callers refuse
+// a format outside the four with valid first, so the default arm is
+// unreachable; it fails loudly rather than return an empty composition.
+func (f Format) unmarshal(body []byte, wt *webtemplate.WebTemplate, opts []simplified.Option) (*rm.Composition, error) {
 	switch f {
 	case FormatJSON:
 		comp := new(rm.Composition)
@@ -134,24 +135,25 @@ func (f Format) unmarshal(body []byte, wt *webtemplate.WebTemplate) (*rm.Composi
 		}
 		return comp, nil
 	case FormatFlat:
-		return simplified.UnmarshalFlat(body, wt)
+		return simplified.UnmarshalFlat(body, wt, opts...)
 	case FormatStructured:
-		return simplified.UnmarshalStructured(body, wt)
+		return simplified.UnmarshalStructured(body, wt, opts...)
 	default:
 		return nil, errors.New("no codec for this format")
 	}
 }
 
 // decoder returns the function that decodes a write's representation body
-// in f. Canonical JSON keeps decodeComposition, the decoder every write used
+// in f, FLAT and STRUCTURED with the simplified decode options opts.
+// Canonical JSON keeps decodeComposition, the decoder every write used
 // before the other formats existed; the others wrap their codec's error the
 // same way, naming the format.
-func (f Format) decoder(wt *webtemplate.WebTemplate) func([]byte) (*rm.Composition, error) {
+func (f Format) decoder(wt *webtemplate.WebTemplate, opts []simplified.Option) func([]byte) (*rm.Composition, error) {
 	if f == FormatJSON {
 		return decodeComposition
 	}
 	return func(body []byte) (*rm.Composition, error) {
-		comp, err := f.unmarshal(body, wt)
+		comp, err := f.unmarshal(body, wt, opts)
 		if err != nil {
 			return nil, fmt.Errorf("composition: decode %s Composition: %w", f, err)
 		}

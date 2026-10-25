@@ -43,6 +43,15 @@ const (
 // the matching canonical composition, the way PROBE-076 does.
 func loadFormatFixture(t *testing.T) (*webtemplate.WebTemplate, *rm.Composition) {
 	t.Helper()
+	_, wt, comp := loadCompiledFormatFixture(t)
+	return wt, comp
+}
+
+// loadCompiledFormatFixture is loadFormatFixture that also returns the
+// compiled template the Web Template is built from, the one
+// simplified.WithTemplate takes.
+func loadCompiledFormatFixture(t *testing.T) (*templatecompile.Compiled, *webtemplate.WebTemplate, *rm.Composition) {
+	t.Helper()
 	optBody, err := os.ReadFile(fixtures.TemplateOpt(formatTemplateID))
 	if err != nil {
 		t.Fatalf("read OPT: %v", err)
@@ -70,7 +79,70 @@ func loadFormatFixture(t *testing.T) (*webtemplate.WebTemplate, *rm.Composition)
 	if err := canjson.Unmarshal(compBody, &comp); err != nil {
 		t.Fatalf("decode composition: %v", err)
 	}
-	return wt, &comp
+	return compiled, wt, &comp
+}
+
+// fixtureEntryName is the name of the fixture's first content entry, an
+// OBSERVATION. FLAT and STRUCTURED carry no name below the root, so only a
+// decode given simplified.WithTemplate restores it (REQ-173 Simplified decode
+// options).
+const fixtureEntryName = "test123"
+
+// firstEntryName returns the name of comp's first content entry, or "" when
+// the entry carries none.
+func firstEntryName(t *testing.T, comp *rm.Composition) string {
+	t.Helper()
+	if comp == nil || len(comp.Content) == 0 {
+		t.Fatal("composition has no content entry")
+	}
+	entry, ok := comp.Content[0].(rm.Locatable)
+	if !ok || rm.IsTypedNil(entry) {
+		t.Fatalf("first content entry %T is not a LOCATABLE", comp.Content[0])
+	}
+	name := entry.GetName()
+	if name == nil || rm.IsTypedNil(name) {
+		return ""
+	}
+	return name.GetValue()
+}
+
+// decodeSimplified decodes body in f, FLAT or STRUCTURED, with the codec
+// itself and the decode options given: the composition the leaf returns
+// when it passes those options on unchanged.
+func decodeSimplified(t *testing.T, f composition.Format, body []byte, wt *webtemplate.WebTemplate, opts ...simplified.Option) *rm.Composition {
+	t.Helper()
+	var (
+		comp *rm.Composition
+		err  error
+	)
+	switch f {
+	case composition.FormatFlat:
+		comp, err = simplified.UnmarshalFlat(body, wt, opts...)
+	case composition.FormatStructured:
+		comp, err = simplified.UnmarshalStructured(body, wt, opts...)
+	case composition.FormatJSON, composition.FormatXML:
+		t.Fatalf("decodeSimplified: %v is not a simplified format", f)
+	default:
+		t.Fatalf("decodeSimplified: no codec for %v", f)
+	}
+	if err != nil {
+		t.Fatalf("decode %v with the codec: %v", f, err)
+	}
+	return comp
+}
+
+// unmatchedFlatKey is a FLAT key whose path the fixture's Web Template does
+// not resolve, so a decode leaves it unmatched.
+const unmatchedFlatKey = "test_dv_quantity_open_constraint.v0/no_such_node"
+
+// withUnmatchedKey returns the FLAT body with unmatchedFlatKey added in front
+// of the keys it holds.
+func withUnmatchedKey(t *testing.T, body []byte) []byte {
+	t.Helper()
+	if !bytes.HasPrefix(body, []byte("{")) {
+		t.Fatalf("FLAT body does not open an object: %s", body)
+	}
+	return append([]byte(`{"`+unmatchedFlatKey+`":"extra",`), body[1:]...)
 }
 
 // withoutTemplateID returns a copy of wt whose template id is empty.
@@ -828,5 +900,127 @@ func TestWriteRepresentationDecodeFailureIsCommitted(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// TestWriteSimplifiedDecodeOptions pins REQ-173 Simplified decode options on
+// writes. Under PreferRepresentation a FLAT or STRUCTURED Save or Update hands
+// the decode options of WithFormat, unchanged, to the decode of the
+// representation, and hands it none when WithFormat has none. With
+// simplified.WithTemplate the returned composition carries the names of the
+// nodes below the root; without a decode option it carries none.
+func TestWriteSimplifiedDecodeOptions(t *testing.T) {
+	compiled, wt, comp := loadCompiledFormatFixture(t)
+	cases := []struct {
+		name     string
+		opts     []simplified.Option
+		wantName string
+	}{
+		{name: "with the compiled template", opts: []simplified.Option{simplified.WithTemplate(compiled)}, wantName: fixtureEntryName},
+		{name: "without decode options", wantName: ""},
+	}
+	for _, op := range formatWriteOps {
+		status := http.StatusCreated
+		if op.method == http.MethodPut {
+			status = http.StatusOK
+		}
+		for _, f := range []composition.Format{composition.FormatFlat, composition.FormatStructured} {
+			for _, tc := range cases {
+				t.Run(op.name+"/"+f.String()+"/"+tc.name, func(t *testing.T) {
+					body := encodeAs(t, f, comp, wt)
+					fs := newFormatServer(t, status, f.MediaType(), body)
+					out, _, err := op.do(t.Context(), newClient(t, fs.srv), comp,
+						composition.WithFormat(f, wt, tc.opts...),
+						composition.WithPrefer(transport.PreferRepresentation))
+					if err != nil {
+						t.Fatalf("%s(%v, representation) error = %v", op.name, f, err)
+					}
+					if got := firstEntryName(t, out); got != tc.wantName {
+						t.Errorf("first content entry name = %q, want %q", got, tc.wantName)
+					}
+					sameComposition(t, "returned composition", out, decodeSimplified(t, f, body, wt, tc.opts...))
+				})
+			}
+		}
+	}
+}
+
+// TestWriteDecodeOptionsGovernRepresentation pins REQ-173 Simplified decode
+// options with REQ-094: the strict and unmatched options given to WithFormat
+// reach the decode of a FLAT representation. A representation holding
+// unmatched content decodes without a decode option, is a committed write
+// with an unusable representation under simplified.WithStrict, and shows its
+// unmatched key to simplified.WithUnmatched. Canonical JSON and XML ignore
+// the decode options.
+func TestWriteDecodeOptionsGovernRepresentation(t *testing.T) {
+	wt, comp := loadFormatFixture(t)
+	extra := withUnmatchedKey(t, encodeAs(t, composition.FormatFlat, comp, wt))
+	save := func(t *testing.T, contentType string, body []byte, opt composition.WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error) {
+		t.Helper()
+		fs := newFormatServer(t, http.StatusCreated, contentType, body)
+		return composition.Save(t.Context(), newClient(t, fs.srv), ehrIDFixture, comp,
+			opt, composition.WithPrefer(transport.PreferRepresentation))
+	}
+	t.Run("FLAT without decode options", func(t *testing.T) {
+		out, _, err := save(t, mediaFlat, extra, composition.WithFormat(composition.FormatFlat, wt))
+		if err != nil || out == nil {
+			t.Fatalf("Save(FLAT) of a representation with an unmatched key = (%v, %v), want it decoded", out, err)
+		}
+	})
+	t.Run("FLAT with WithStrict", func(t *testing.T) {
+		out, meta, err := save(t, mediaFlat, extra, composition.WithFormat(composition.FormatFlat, wt, simplified.WithStrict()))
+		nre, ok := errors.AsType[*openehrclient.NoRepresentationError](err)
+		if !ok || nre == nil {
+			t.Fatalf("Save(FLAT, WithStrict) error = %v, want *NoRepresentationError", err)
+		}
+		if !errors.Is(err, simplified.ErrUnknownPath) {
+			t.Errorf("Save(FLAT, WithStrict) error = %v, want it to wrap simplified.ErrUnknownPath", err)
+		}
+		if out != nil {
+			t.Errorf("returned composition = %+v, want nil", out)
+		}
+		if meta == nil || meta.VersionUID != compositionVUID {
+			t.Errorf("version metadata = %+v, want VersionUID %q", meta, compositionVUID)
+		}
+	})
+	t.Run("FLAT with WithUnmatched", func(t *testing.T) {
+		var seen []string
+		out, _, err := save(t, mediaFlat, extra, composition.WithFormat(composition.FormatFlat, wt,
+			simplified.WithUnmatched(func(path string) { seen = append(seen, path) })))
+		if err != nil || out == nil {
+			t.Fatalf("Save(FLAT, WithUnmatched) = (%v, %v), want it decoded", out, err)
+		}
+		if len(seen) != 1 || seen[0] != unmatchedFlatKey {
+			t.Errorf("WithUnmatched saw %q, want [%q]", seen, unmatchedFlatKey)
+		}
+	})
+	for _, f := range []composition.Format{composition.FormatJSON, composition.FormatXML} {
+		t.Run(f.String()+" with WithStrict", func(t *testing.T) {
+			out, _, err := save(t, f.MediaType(), encodeAs(t, f, comp, nil),
+				composition.WithFormat(f, nil, simplified.WithStrict()))
+			if err != nil {
+				t.Fatalf("Save(%v, WithStrict) error = %v", f, err)
+			}
+			sameComposition(t, "returned composition", out, comp)
+		})
+	}
+}
+
+// TestWithFormatCopiesDecodeOptions pins that WithFormat keeps its own copy of
+// the decode options (REQ-173): a caller who changes its slice after building
+// the option does not change what the representation is decoded with.
+func TestWithFormatCopiesDecodeOptions(t *testing.T) {
+	compiled, wt, comp := loadCompiledFormatFixture(t)
+	opts := []simplified.Option{simplified.WithTemplate(compiled)}
+	format := composition.WithFormat(composition.FormatFlat, wt, opts...)
+	opts[0] = simplified.WithStrict()
+	fs := newFormatServer(t, http.StatusCreated, mediaFlat, withUnmatchedKey(t, encodeAs(t, composition.FormatFlat, comp, wt)))
+	out, _, err := composition.Save(t.Context(), newClient(t, fs.srv), ehrIDFixture, comp,
+		format, composition.WithPrefer(transport.PreferRepresentation))
+	if err != nil {
+		t.Fatalf("Save error = %v, want the representation decoded with the options given to WithFormat", err)
+	}
+	if got := firstEntryName(t, out); got != fixtureEntryName {
+		t.Errorf("first content entry name = %q, want %q from the compiled template", got, fixtureEntryName)
 	}
 }
