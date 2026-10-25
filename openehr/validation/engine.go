@@ -20,6 +20,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/rmbind"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
@@ -933,12 +934,16 @@ func walkedOrNil(item any) bool {
 // the one walk.
 //
 // Admission: a present value of an attribute the template prohibits
-// ([isProhibited]) is reported once, as `prohibited`, and a value that binds
-// to none of the children the template allows is reported once by
-// [admitSingle]; either way the walk does not enter it. Presence: an absent
-// attribute is reported as [engine.checkAbsent] says. Then the admitted value
-// is walked against the child it binds to, or, where the template declares
-// no child, with the RM rules alone.
+// ([isProhibited]) is reported once, as `prohibited`, and a value whose type
+// no child the template allows admits, in any binding tier, is reported once
+// ([typeRefusal]); either way the walk does not enter it. Presence: an
+// absent attribute is reported as [engine.checkAbsent] says. Then the value
+// is bound among the children of the first tier that admits it
+// ([rmbind.Tier]): a tier of one child binds it to that child; a tier of more
+// binds it to the first child under whose constraints it validates, else to
+// the first child, whose findings stay ([engine.bindAmong]). Either way it is
+// walked against the child it binds to ([engine.admitSingle]); where the
+// template declares no child, it is walked with the RM rules alone.
 func (e *engine) visitDeclaredSingle(n *engineNode, a *engineAttr, r *attrReading, attrPath issuePath, role floorRole) {
 	if !r.present {
 		e.checkAbsent(n, a, attrPath)
@@ -948,14 +953,34 @@ func (e *engine) visitDeclaredSingle(n *engineNode, a *engineAttr, r *attrReadin
 		e.refuse(prohibitedIssue(a.decl, n.value, attrPath))
 		return
 	}
-	var child *tcimpl.CompiledNode
-	if children := allowedChildren(a.decl); len(children) > 0 {
-		bound, refusal, admitted := admitSingle(a.decl, children, r.value, attrPath)
-		if !admitted {
+	children := allowedChildren(a.decl)
+	if len(children) == 0 {
+		e.walk(engineNode{value: r.value, rmType: runtimeRMType(r.value, a.rmType), path: attrPath, role: role, depth: n.depth + 1})
+		return
+	}
+	var buf [4]*tcimpl.CompiledNode
+	tier := rmbind.Tier(buf[:0], children, r.value, anyChild)
+	switch len(tier) {
+	case 0:
+		e.refuse(typeRefusal(a.decl, children, r.value, attrPath))
+	case 1:
+		e.admitSingle(n, a, r, attrPath, role, tier[0])
+	default:
+		e.bindAmong(tier, nil, func(c *tcimpl.CompiledNode) { e.admitSingle(n, a, r, attrPath, role, c) }, true)
+	}
+}
+
+// admitSingle walks the value of the single-valued attribute a of node n,
+// read as r, at attrPath, in role, against child, a child the template
+// allows that admits the value's type. A slot child whose assertions the
+// value's archetype id does not satisfy refuses it instead: that is reported
+// once, as `slot_fill` ([slotRefusal]), and the value is not walked.
+func (e *engine) admitSingle(n *engineNode, a *engineAttr, r *attrReading, attrPath issuePath, role floorRole, child *tcimpl.CompiledNode) {
+	if child.IsSlot() {
+		if refusal, refused := slotRefusal(a.decl, child, r.value, attrPath); refused {
 			e.refuse(refusal)
 			return
 		}
-		child = bound
 	}
 	e.walk(engineNode{value: r.value, rmType: runtimeRMType(r.value, a.rmType), path: attrPath, role: role, depth: n.depth + 1, bound: child})
 }
@@ -966,7 +991,7 @@ func (e *engine) visitDeclaredSingle(n *engineNode, a *engineAttr, r *attrReadin
 //
 // Admission: a present attribute the template prohibits that holds an item
 // is reported once, as `prohibited`, and not entered; each item that binds to
-// none of the template's children ([bindItems]) is reported once
+// none of the template's children ([engine.bindItems]) is reported once
 // ([unboundItemIssue]) and not entered; each item bound to a child the
 // template does not allow ([allowedChildren]), one whose occurrences upper
 // bound is 0, is reported by that child's occurrences, among the counts, and
@@ -996,7 +1021,10 @@ func (e *engine) visitDeclaredItems(n *engineNode, a *engineAttr, r *attrReading
 	from := len(e.preds)
 	if len(children) > 0 && a.shape != shapeCounted {
 		var byNodeID []bool
-		bound, byNodeID = bindItems(n.bound.RMTypeName(), a.name, children, r.items)
+		bound, byNodeID = e.bindItems(n, a, children, r.items, attrPath, role)
+		if e.stopped {
+			return // the visit limit ended the walk inside a trial
+		}
 		e.preds = appendBoundPredicates(e.preds, r.items, bound, a.shape == shapeHash)
 		allowed := allowedChildren(a.decl)
 		admitted = make([]bool, len(r.items))

@@ -1313,6 +1313,7 @@ requirements:
       - openehr/instance/rm_defaults_yield_test.go
       - openehr/instance/sizing_rule_test.go
       - openehr/internal/rmbind/bind_test.go
+      - openehr/internal/rmbind/tier_test.go
       - openehr/validation/aql_test.go
       - openehr/validation/binding_by_name_test.go
       - openehr/validation/binding_trial_test.go

@@ -269,9 +269,14 @@ func TestIssuePath_REQ102_MissingNodeKeepsNamedOPTPredicate(t *testing.T) {
 
 // REQ-102, REQ-112, REQ-168 — a path never carries a value from the
 // instance: sibling items that share an id and carry distinct instance names
-// are written by position with a template and without, and the names appear
-// in no path. Each item carries a defect the RM rules report, so the RM
-// rules alone have paths under both items to inspect.
+// are written with the names the children they bind to pin, or by position
+// where those names do not tell them apart, with a template, and by position
+// without one; the instance names appear in no path. Under reusedArchetypeOPT
+// the two items, whose names neither child pins, bind one to each child
+// (REQ-102 Structural — binding items); under a template whose two children
+// pin one name, they are written by position. Each item carries a defect
+// the RM rules report, so the RM rules alone have paths under both items to
+// inspect.
 func TestIssuePath_REQ102_REQ112_NoInstanceNameInPath(t *testing.T) {
 	const planted = "PLANTED-SIBLING"
 	vital := mustCompile(t, "vital_signs")
@@ -299,7 +304,12 @@ func TestIssuePath_REQ102_REQ112_NoInstanceNameInPath(t *testing.T) {
 			}
 		}
 	}
-	byTemplate := validation.ValidateComposition(twice, reused)
+	byTemplate := validation.ValidateComposition(twice, mustCompileSyntheticOPT(t, reusedArchetypeOPTOf("Erste", "Erste")))
+	for _, iss := range byTemplate.Issues {
+		if strings.Contains(iss.Path, planted) {
+			t.Errorf("template, one pinned name: issue %s at %s carries an instance name", iss.Code, iss.Path)
+		}
+	}
 	if want := "/content[2]"; !slices.ContainsFunc(byTemplate.Issues, func(i validation.Issue) bool { return strings.HasPrefix(i.Path, want+"/") || i.Path == want }) {
 		t.Errorf("template validator: no issue under %s, the second item of a shared id; got %q", want, issueKeys(byTemplate.Issues))
 	}
