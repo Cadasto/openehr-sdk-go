@@ -80,7 +80,7 @@ HELP_FOOTER    = Before a pull request: make ci · docs site: make docs-serve (h
         terminology-sync terminology-drift \
         mod-tidy-check codegen-check termgen-check aqlgen-check flat-check crossformat-check terminology-check \
         spec-check sdd-check ci \
-        spec-context probe-status probe-record \
+        spec-context probe-status probe-record cdr-crosscheck \
         docs-sync docs-sync-offline docs-build docs-check docs-serve docs-clean
 
 ##@ Setup
@@ -241,6 +241,11 @@ probe-record: ## Record a REQ-082 cassette from a live CDR (ARGS=)
 	@rev="$$(git rev-parse HEAD 2>/dev/null)"; \
 	 if [ -n "$$(git status --porcelain 2>/dev/null)" ]; then rev="$$rev-dirty"; fi; \
 	 $(GO) run ./cmd/probe-record -sdk-commit "$$rev" $(ARGS)
+
+cdr-crosscheck: ## Cross-check generated documents and CDR examples against live CDRs (opt-in; OPENEHR_XC_TEMPLATES, OPENEHR_LIVE_*; ARGS=)
+	@rev="$$(git rev-parse HEAD 2>/dev/null)"; \
+	 if [ -n "$$(git status --porcelain 2>/dev/null)" ]; then rev="$$rev-dirty"; fi; \
+	 $(GO) run ./cmd/cdrcheck -sdk-commit "$$rev" $(ARGS)
 
 ##@ Docs
 

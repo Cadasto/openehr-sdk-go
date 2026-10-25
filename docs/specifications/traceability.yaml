@@ -1296,8 +1296,9 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/validation, internal/rmaccess, openehr/internal/rmbind, openehr/internal/rmnames, openehr/templatecompile, internal/templatecompile, testkit/probes/validation]
-    probes: [PROBE-025, PROBE-026, PROBE-074]
+    probes: [PROBE-025, PROBE-026, PROBE-074, PROBE-108]
     tests:
+      - cmd/cdrcheck/main_test.go
       - internal/rmaccess/interval_test.go
       - internal/rmaccess/reads_test.go
       - internal/templatecompile/compile_test.go
@@ -1465,8 +1466,9 @@ requirements:
       - internal/rmroots
       - testkit/fixtures
       - testkit/probes/instance
-    probes: [PROBE-027]
+    probes: [PROBE-027, PROBE-108]
     tests:
+      - cmd/cdrcheck/main_test.go
       - cmd/examples/generate-example/main_test.go
       - internal/rmaccess/reads_test.go
       - internal/templatecompile/members_internal_test.go
