@@ -13,7 +13,7 @@ package validation
 // class. DV_INTERVAL.Limits_consistent is ordered by the type of the bounds,
 // so its row breaks it with bounds of every concrete DV_ORDERED the pinned
 // RM declares, and a type newly declared fails the probe until its pair is
-// added.
+// added; it also breaks it with bounds that are not strictly comparable.
 
 import (
 	"maps"
@@ -64,8 +64,8 @@ func localSymbolJSON(code string) string {
 // (REQ-171 Finding identity), not the invariant's. more holds further pairs
 // of breaking and conforming members, each checked like the row's own, for
 // an invariant whose evaluator reads values of one class in more than one
-// way: Limits_consistent orders the bounds of a DV_INTERVAL by their type,
-// Fraction_validity holds on a fraction and on an integer fraction, and
+// way: Limits_consistent orders the bounds of a DV_INTERVAL by their type
+// and requires them to be strictly comparable, Fraction_validity holds on a fraction and on an integer fraction, and
 // Events_valid reads a HISTORY's events absent and empty.
 type matrixRow struct {
 	breaking, conforming string
@@ -105,6 +105,28 @@ var intervalOrderPairs = []matrixPair{
 	boundPair("DV_DURATION", `"value":"P2D"`, `"value":"P1D"`),
 }
 
+// intervalComparablePairs are the further pairs of
+// DV_INTERVAL.Limits_consistent whose breaking interval holds two bounds the
+// floor reads as not strictly comparable, in order by magnitude, so only
+// their comparability breaks the rule: two DV_QUANTITY in different units,
+// two DV_PROPORTION of different types, and bounds of two classes (REQ-112).
+// Each conforming interval holds the same magnitudes in one units, type or
+// class.
+var intervalComparablePairs = []matrixPair{
+	{
+		breaking:   `"lower":{"_type":"DV_QUANTITY","magnitude":1,"units":"mm"},"upper":{"_type":"DV_QUANTITY","magnitude":5,"units":"cm"}`,
+		conforming: `"lower":{"_type":"DV_QUANTITY","magnitude":1,"units":"cm"},"upper":{"_type":"DV_QUANTITY","magnitude":5,"units":"cm"}`,
+	},
+	{
+		breaking:   `"lower":{"_type":"DV_PROPORTION","numerator":1,"denominator":4,"type":0},"upper":{"_type":"DV_PROPORTION","numerator":3,"denominator":4,"type":3}`,
+		conforming: `"lower":{"_type":"DV_PROPORTION","numerator":1,"denominator":4,"type":3},"upper":{"_type":"DV_PROPORTION","numerator":3,"denominator":4,"type":3}`,
+	},
+	{
+		breaking:   `"lower":{"_type":"DV_COUNT","magnitude":1},"upper":{"_type":"DV_QUANTITY","magnitude":5,"units":"mm"}`,
+		conforming: `"lower":{"_type":"DV_COUNT","magnitude":1},"upper":{"_type":"DV_COUNT","magnitude":5}`,
+	},
+}
+
 // historyEventsPairs are the further pairs of HISTORY.Events_valid, whose
 // own pair breaks it with neither events nor a summary and keeps it with a
 // summary: events present and holding no item break it too, and an event
@@ -135,7 +157,7 @@ var invariantMatrix = map[string]matrixRow{
 	"DV_DATE.Value_valid":                   {breaking: `"value":"example"`, conforming: `"value":"2024-01-01"`},
 	"DV_DATE_TIME.Value_valid":              {breaking: `"value":"example"`, conforming: `"value":"2024-01-01T10:30:00Z"`},
 	"DV_DURATION.Value_valid":               {breaking: `"value":"example"`, conforming: `"value":"P1D"`},
-	"DV_INTERVAL.Limits_consistent":         {breaking: `"lower":{"_type":"DV_COUNT","magnitude":5},"upper":{"_type":"DV_COUNT","magnitude":1}`, conforming: `"lower":{"_type":"DV_COUNT","magnitude":5},"upper":{"_type":"DV_COUNT","magnitude":5}`, more: intervalOrderPairs},
+	"DV_INTERVAL.Limits_consistent":         {breaking: `"lower":{"_type":"DV_COUNT","magnitude":5},"upper":{"_type":"DV_COUNT","magnitude":1}`, conforming: `"lower":{"_type":"DV_COUNT","magnitude":5},"upper":{"_type":"DV_COUNT","magnitude":5}`, more: slices.Concat(intervalOrderPairs, intervalComparablePairs)},
 	"DV_PROPORTION.Fraction_validity":       {breaking: `"numerator":1.5,"denominator":2,"type":3`, conforming: `"numerator":1,"denominator":2,"type":3`, more: []matrixPair{{breaking: `"numerator":3,"denominator":2.5,"type":4`, conforming: `"numerator":3,"denominator":2,"type":4`}}},
 	"DV_PROPORTION.Percent_validity":        {breaking: `"numerator":1,"denominator":1,"type":2`, conforming: `"numerator":1,"denominator":100,"type":2`},
 	"DV_PROPORTION.Precision_validity":      {breaking: `"numerator":1.5,"denominator":2,"type":0,"precision":0`, conforming: `"numerator":1,"denominator":2,"type":0,"precision":0`},

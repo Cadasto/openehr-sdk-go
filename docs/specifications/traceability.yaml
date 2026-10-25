@@ -1526,6 +1526,7 @@ requirements:
       - openehr/instance/interval_order_internal_test.go
       - openehr/instance/interval_order_test.go
       - openehr/instance/interval_ordinal_pairs_internal_test.go
+      - openehr/instance/interval_shared_unit_test.go
       - openehr/instance/interval_temporal_internal_test.go
       - openehr/instance/interval_zone_test.go
       - openehr/instance/items_rule_test.go
@@ -1731,6 +1732,7 @@ requirements:
       - openehr/instance/coded_term_text_test.go
       - openehr/instance/coded_text_internal_test.go
       - openehr/instance/history_events_test.go
+      - openehr/instance/interval_shared_unit_test.go
       - openehr/instance/phase4_test.go
       - openehr/instance/proportion_kind_test.go
       - openehr/instance/quantified_rules_test.go
@@ -1770,6 +1772,7 @@ requirements:
       - openehr/validation/rmfloor_generated_access_test.go
       - openehr/validation/rmfloor_identity_internal_test.go
       - openehr/validation/rmfloor_interval_class_test.go
+      - openehr/validation/rmfloor_interval_comparable_test.go
       - openehr/validation/rmfloor_interval_flags_test.go
       - openehr/validation/rmfloor_interval_order_test.go
       - openehr/validation/rmfloor_invariant_matrix_internal_test.go
@@ -2333,6 +2336,7 @@ requirements:
       - openehr/validation/godoc_class_test.go
       - openehr/validation/issuepath_test.go
       - openehr/validation/prohibited_test.go
+      - openehr/validation/rmfloor_interval_comparable_test.go
       - openehr/validation/rmfloor_interval_flags_test.go
       - openehr/validation/rmfloor_interval_order_test.go
       - openehr/validation/rmfloor_proportion_test.go

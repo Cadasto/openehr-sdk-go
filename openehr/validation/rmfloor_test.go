@@ -728,7 +728,8 @@ func TestRMFloorDVCodedTextMappingsNullIsValid(t *testing.T) {
 // defines `<=` per type (DV_COUNT.less_than takes a DV_COUNT,
 // DV_QUANTITY.less_than a DV_QUANTITY), so a bare interval whose bounds are a
 // DV_COUNT and a unitless DV_QUANTITY has no ordering, and lower > upper is
-// not reported there.
+// not reported there; the two are not strictly comparable, which is
+// reported once, at the interval.
 func TestValidateRM_TypedIntervalBoundsWalked(t *testing.T) {
 	badPrecision := rm.Integer(-5)
 	emptyStatus := &rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr_normal_statuses"}}
@@ -843,14 +844,15 @@ func TestValidateRM_TypedIntervalBoundsWalked(t *testing.T) {
 		{
 			// The unitless DV_QUANTITY is itself incomplete (units is
 			// RM-mandatory); what the row pins is that its magnitude is not
-			// ordered against the DV_COUNT's.
-			// The mixed pair is not compared, and Limits_comparable is not checked.
+			// ordered against the DV_COUNT's. Bounds of two classes are not
+			// strictly comparable, which breaks Limits_consistent once, at
+			// the interval, whatever their magnitudes.
 			name: "bare DV_INTERVAL as root, a DV_COUNT bound over a unitless DV_QUANTITY bound",
 			root: &rm.DVInterval[rm.DVOrdered]{
 				Lower: rm.DVCount{Magnitude: 10}, LowerIncluded: true,
 				Upper: rm.DVQuantity{Magnitude: 5}, UpperIncluded: true,
 			},
-			want: []issue{{"/upper/units", "required"}},
+			want: []issue{{"/", "rm_invariant"}, {"/upper/units", "required"}},
 		},
 		{
 			name: "DV_QUANTITY under normal_range, upper unbounded",
