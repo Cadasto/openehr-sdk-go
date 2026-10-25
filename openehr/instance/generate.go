@@ -1654,9 +1654,14 @@ func includedPerOPT(optNode *tcimpl.CompiledNode, attrName string) bool {
 // with no occurrences, or an unbounded lower, counts as required
 // (childRequired) and gets one under every policy. Under Large and Medium a
 // child ownMemberSkipped names gets none of its own either. The overall attribute's
-// cardinality.upper (default unbounded) caps the total, and the count the
-// attribute needs (remainingLowerNeeded) is met by the top-up below under
-// every policy, from the child topUpSeed names. Where only the attribute's
+// cardinality.upper (default unbounded) caps the total. Within that cap the
+// members the children that ask the list for members want (askedMembers)
+// get the room first: any other child, before or after them, takes only
+// the room they leave, so an optional child cannot take the room a later
+// required sibling needs, which checkCardinalityRoom has proved exists.
+// The members stay in OPT order. The count the attribute needs
+// (remainingLowerNeeded) is met by the top-up below under every policy,
+// from the child topUpSeed names. Where only the attribute's
 // existence asks for a member, the top-up builds one only of a child that
 // needs no undescribed content, and none where there is no such child.
 func (g *generator) materialiseMultiple(
@@ -1685,6 +1690,7 @@ func (g *generator) materialiseMultiple(
 		return err
 	}
 	upperBound := memberCap(attr)
+	reserved := askedMembers(children)
 	total := 0
 	for i, child := range children {
 		// Slots are caller-filled; the synthesiser does not invent
@@ -1697,6 +1703,7 @@ func (g *generator) materialiseMultiple(
 		if g.ownMemberSkipped(children, i) {
 			continue
 		}
+		asks := asksMember(child)
 		childCount := 1
 		if occ := child.Occurrences(); occ != nil && !occ.LowerUnbounded() {
 			if occ.Lower() > 0 || g.opts.Policy == Required {
@@ -1710,8 +1717,10 @@ func (g *generator) materialiseMultiple(
 			// lower bound.
 		}
 		for range childCount {
-			if upperBound >= 0 && total >= upperBound {
-				return nil
+			// A child that asks for no member leaves the room the others
+			// still need to them.
+			if room := upperBound - total; upperBound >= 0 && (room <= 0 || !asks && room <= reserved) {
+				break
 			}
 			rmChild, err := g.buildChild(child)
 			if err != nil {
@@ -1721,6 +1730,9 @@ func (g *generator) materialiseMultiple(
 				return fmt.Errorf("append %s.%s: %w", optNode.RMTypeName(), attr.Name(), err)
 			}
 			total++
+			if asks {
+				reserved--
+			}
 		}
 	}
 	// Top-up to the count the attribute needs when the members appended
@@ -1776,17 +1788,34 @@ func checkCardinalityRoom(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAtt
 	if cm == nil || cm.UpperUnbounded() {
 		return nil
 	}
-	asked := 0
-	for _, c := range children {
-		if occ := c.Occurrences(); !c.IsSlot() && tcimpl.LowerAtLeastOne(occ) {
-			asked += occ.Lower()
-		}
-	}
+	asked := askedMembers(children)
 	if asked <= cm.Upper() {
 		return nil
 	}
 	return fmt.Errorf("%w: %s.%s at %s: the occurrences lower bounds of its children add up to %d, past its cardinality upper bound %d",
 		ErrConstraintUnsatisfiable, optNode.RMTypeName(), attr.Name(), optNode.AQLPath(), asked, cm.Upper())
+}
+
+// askedMembers returns the number of members children, the allowed children
+// of a list, ask the list for: the sum of the occurrences lower bounds of
+// those that ask for a member (asksMember).
+func askedMembers(children []*tcimpl.CompiledNode) int {
+	asked := 0
+	for _, c := range children {
+		if asksMember(c) {
+			asked += c.Occurrences().Lower()
+		}
+	}
+	return asked
+}
+
+// asksMember reports whether child asks its list for members: it is not a
+// slot, whose occurrences the parser does not read, and its occurrences
+// lower bound is bounded and at least 1. A child that states no
+// occurrences, or whose lower bound is unbounded, asks for none, although
+// materialiseMultiple gives it one member where there is room.
+func asksMember(child *tcimpl.CompiledNode) bool {
+	return !child.IsSlot() && tcimpl.LowerAtLeastOne(child.Occurrences())
 }
 
 // buildChild builds the RM value for the OPT child child and walks it. The

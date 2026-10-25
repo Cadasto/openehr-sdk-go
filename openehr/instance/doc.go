@@ -95,7 +95,11 @@
 // builds, placeholders and slot fills included where something asks for a
 // member, so the described content around them is kept.
 //
-// Under every policy, an attribute left with fewer members than it needs
+// Under every policy, a visited multi-valued attribute gets no more
+// members than its cardinality upper bound, and within that bound the
+// children whose occurrences lower bound is at least 1 get the room for
+// their members first: any other child, before or after them, takes only
+// the room they leave. An attribute left with fewer members than it needs
 // is topped up with members of its first allowed child that needs no
 // such content and whose identity no earlier sibling carries, else of its
 // first allowed child that is not a slot, else with fills of its first

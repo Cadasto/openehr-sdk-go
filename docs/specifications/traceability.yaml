@@ -1494,6 +1494,7 @@ requirements:
       - openehr/instance/binding_alternative_internal_test.go
       - openehr/instance/binding_alternative_test.go
       - openehr/instance/built_type_argument_internal_test.go
+      - openehr/instance/cardinality_room_test.go
       - openehr/instance/clock_defaults_test.go
       - openehr/instance/clock_test.go
       - openehr/instance/code_phrase_terminology_internal_test.go
