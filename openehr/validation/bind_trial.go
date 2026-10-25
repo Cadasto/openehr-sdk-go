@@ -127,17 +127,58 @@ func (e *engine) validatesSince(m walkMark) bool {
 	return e.depthCuts == m.depthCuts && !slices.ContainsFunc(e.found.issues[m.issues:], func(iss Issue) bool { return iss.Severity == Error })
 }
 
+// trialKey is a node of the walk, its path apart, at which the walk tries a
+// value under a child: the value, held by pointer ([hasIdentity]), the RM
+// type it is read as, its role, its depth and the child. Whether the value
+// validates there depends on nothing else, its path only naming where its
+// findings are, so the walk decides it once per key ([engine.verdicts]).
+type trialKey struct {
+	value  any
+	rmType string
+	role   floorRole
+	depth  int
+	bound  *tcimpl.CompiledNode
+}
+
+// verdict returns whether the value of n validates under n.bound, with
+// decided set where a trial has decided it for n's key ([trialKey]). A value
+// held by value has no identity the walk can recognise again, so its verdict
+// is never decided before its trial.
+func (e *engine) verdict(n engineNode) (validates, decided bool) {
+	if e.verdicts == nil || !hasIdentity(n.value) {
+		return false, false
+	}
+	validates, decided = e.verdicts[trialKey{value: n.value, rmType: n.rmType, role: n.role, depth: n.depth, bound: n.bound}]
+	return validates, decided
+}
+
+// decide records whether the value of n, tried under n.bound, validates, for
+// [engine.verdict] to return wherever the walk meets n's key again in this
+// call. A value held by value is not recorded. The walk records one verdict
+// per trial it runs, so what it holds is bounded by what it walks.
+func (e *engine) decide(n engineNode, validates bool) {
+	if !hasIdentity(n.value) {
+		return
+	}
+	if e.verdicts == nil {
+		e.verdicts = make(map[trialKey]bool)
+	}
+	e.verdicts[trialKey{value: n.value, rmType: n.rmType, role: n.role, depth: n.depth, bound: n.bound}] = validates
+}
+
 // bindAmong binds a value to one of candidates, the children of one binding
 // tier or rank, in OPT order, and returns the child (REQ-102). room reports
 // whether the candidate at an index has room for the value, the occurrences
 // of a list item's child; nil gives every candidate room, as for the value
-// of a single-valued attribute. trial walks the value under a candidate.
+// of a single-valued attribute. at is the value's node, its bound child
+// apart, and trial walks it under a candidate, set as its bound child.
 //
 // The value binds to the first candidate that has room and under which it
-// validates, the walk under it recording no error finding; failing that, to
-// the first that has room; failing that, to the first. Only where two or
-// more candidates have room is a trial needed; otherwise the value binds to
-// the one with room, or to the first, and bindAmong walks nothing.
+// validates, the walk under it recording no error finding and stopping
+// nowhere at the depth limit ([engine.validatesSince]); failing that, to the
+// first that has room; failing that, to the first. Only where two or more
+// candidates have room is a trial needed; otherwise the value binds to the
+// one with room, or to the first, and bindAmong walks nothing.
 //
 // With keep, the walk under the bound candidate stays recorded: the trial
 // that validated, or, where none did, the trial under the first candidate
@@ -148,11 +189,19 @@ func (e *engine) validatesSince(m walkMark) bool {
 // What a trial under a candidate the value does not bind to recorded is
 // withdrawn in both cases; its visits stay counted.
 //
+// A trial decides a verdict ([engine.decide]), and a candidate whose verdict
+// is decided is not tried again: one under which the value validates binds
+// it at once, walked with keep and not without, and one under which it does
+// not is passed over, to be walked at the end with keep should no candidate
+// validate it. A trial without keep runs withdrawn whole
+// ([engine].withdrawn), so a value inside it whose verdict is decided is not
+// walked at all ([engine.walk]).
+//
 // Where the visit limit ends the walk inside a trial, no binding is decided:
 // bindAmong withdraws what the trials recorded, the `max_depth` and
 // `max_nodes` issues of the trial the walk ended in excepted, and returns
 // nil.
-func (e *engine) bindAmong(candidates []*tcimpl.CompiledNode, room func(int) bool, trial func(*tcimpl.CompiledNode), keep bool) *tcimpl.CompiledNode {
+func (e *engine) bindAmong(candidates []*tcimpl.CompiledNode, room func(int) bool, at engineNode, trial func(engineNode), keep bool) *tcimpl.CompiledNode {
 	first, withRoom := -1, 0
 	for i := range candidates {
 		if room == nil || room(i) {
@@ -168,32 +217,60 @@ func (e *engine) bindAmong(candidates []*tcimpl.CompiledNode, room func(int) boo
 	case 1:
 		return candidates[first]
 	}
-	var firstFound walkSegment
+	var firstFound *walkSegment
 	for i, c := range candidates {
 		if room != nil && !room(i) {
 			continue
 		}
-		m := e.mark()
-		trial(c)
+		n := at
+		n.bound = c
+		validates, decided := e.verdict(n)
 		switch {
-		case e.stopped:
-			e.keepStops(m)
-			return nil
-		case e.validatesSince(m):
-			if !keep {
+		case decided && validates && keep:
+			trial(n) // the walk under the bound candidate, whose records stay
+		case !decided:
+			m := e.mark()
+			e.try(n, trial, keep)
+			if e.stopped {
+				e.keepStops(m)
+				return nil
+			}
+			validates = e.validatesSince(m)
+			e.decide(n, validates)
+			switch {
+			case validates && keep:
+			case keep && i == first:
+				s := e.setAside(m)
+				firstFound = &s
+			default:
 				e.rollback(m)
 			}
+		}
+		if validates {
 			return c
-		case keep && i == first:
-			firstFound = e.setAside(m)
-		default:
-			e.rollback(m)
 		}
 	}
 	if keep {
-		e.restore(firstFound)
+		if firstFound != nil {
+			e.restore(*firstFound)
+		} else {
+			n := at
+			n.bound = candidates[first]
+			trial(n) // passed over by its verdict: the walk whose findings stay
+		}
 	}
 	return candidates[first]
+}
+
+// try runs trial on n, withdrawn whole ([engine].withdrawn) without keep.
+func (e *engine) try(n engineNode, trial func(engineNode), keep bool) {
+	if keep {
+		trial(n)
+		return
+	}
+	e.withdrawn++
+	trial(n)
+	e.withdrawn--
 }
 
 // bindItems binds each of items, the items of the multi-valued attribute a
@@ -243,13 +320,8 @@ func (e *engine) bindRanked(n *engineNode, a *engineAttr, children []*tcimpl.Com
 	for i, item := range items {
 		rank := itemRank(buf[:0], children, item, byNodeID[i])
 		if len(rank) > 1 {
-			path := e.path.item(attrPath, e.preds[from+i])
-			bound[i] = e.bindAmong(rank,
-				func(j int) bool { return hasRoom(rank[j], counts[slices.Index(children, rank[j])]) },
-				func(c *tcimpl.CompiledNode) {
-					e.walk(engineNode{value: item, rmType: runtimeRMType(item, a.rmType), path: path, role: role, depth: n.depth + 1, bound: c})
-				},
-				false)
+			at := engineNode{value: item, rmType: runtimeRMType(item, a.rmType), path: e.path.item(attrPath, e.preds[from+i]), role: role, depth: n.depth + 1}
+			bound[i] = e.bindAmong(rank, func(j int) bool { return hasRoom(rank[j], counts[slices.Index(children, rank[j])]) }, at, e.walk, false)
 			if e.stopped {
 				break
 			}

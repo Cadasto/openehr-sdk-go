@@ -137,6 +137,16 @@ type engine struct {
 	// when it enters the list and drops it when it leaves, so a list of any
 	// length holds its predicates without a slice of its own.
 	preds []predicate
+	// verdicts holds, for each node the walk tried a value at, whether the
+	// value validates under the child tried, so that no value is tried
+	// twice under one child at one depth ([engine.verdict]). Nil until a
+	// trial decides one.
+	verdicts map[trialKey]bool
+	// withdrawn counts the trials the walk is inside whose findings are
+	// all withdrawn, those of a list item ([engine.bindAmong]): inside one,
+	// only whether the trial validates is read, so a value whose verdict is
+	// decided is not walked again ([engine.walk]).
+	withdrawn int
 }
 
 // newEngine returns the state of a walk within lim, each zero or negative
@@ -289,10 +299,19 @@ func visitedAt(a *engineAttr, present bool) bool {
 // value. A value with an identity that the walk is inside is a cycle: walk
 // reports `cyclic_value` at n's path and does not enter it again. Every
 // other value is visited, however many places hold it, so a value two places
-// share is validated at each, against each place's template node.
+// share is validated at each, against each place's template node. Inside a
+// trial withdrawn whole ([engine].withdrawn), only whether the trial
+// validates is read, so a node whose value a trial has found to validate
+// under its bound child ([engine.verdict]) is not visited again: it would
+// add nothing that is read.
 func (e *engine) walk(n engineNode) {
 	if e.stopped || n.value == nil || rmaccess.IsTypedNilPointer(n.value) {
 		return
+	}
+	if e.withdrawn > 0 && n.bound != nil {
+		if validates, decided := e.verdict(n); decided && validates {
+			return
+		}
 	}
 	if !hasIdentity(n.value) {
 		e.visit(n)
@@ -965,29 +984,31 @@ func (e *engine) visitDeclaredSingle(n *engineNode, a *engineAttr, r *attrReadin
 	}
 	var buf [4]*tcimpl.CompiledNode
 	tier := rmbind.Tier(buf[:0], children, r.value, anyChild)
-	switch len(tier) {
-	case 0:
+	if len(tier) == 0 {
 		e.refuse(typeRefusal(a.decl, children, r.value, attrPath))
-	case 1:
-		e.admitSingle(n, a, r, attrPath, role, tier[0])
-	default:
-		e.bindAmong(tier, nil, func(c *tcimpl.CompiledNode) { e.admitSingle(n, a, r, attrPath, role, c) }, true)
+		return
 	}
+	at := engineNode{value: r.value, rmType: runtimeRMType(r.value, a.rmType), path: attrPath, role: role, depth: n.depth + 1, bound: tier[0]}
+	if len(tier) == 1 {
+		e.admitSingle(a.decl, at)
+		return
+	}
+	e.bindAmong(tier, nil, at, func(v engineNode) { e.admitSingle(a.decl, v) }, true)
 }
 
-// admitSingle walks the value of the single-valued attribute a of node n,
-// read as r, at attrPath, in role, against child, a child the template
-// allows that admits the value's type. A slot child whose assertions the
-// value's archetype id does not satisfy refuses it instead: that is reported
-// once, as `slot_fill` ([slotRefusal]), and the value is not walked.
-func (e *engine) admitSingle(n *engineNode, a *engineAttr, r *attrReading, attrPath issuePath, role floorRole, child *tcimpl.CompiledNode) {
-	if child.IsSlot() {
-		if refusal, refused := slotRefusal(a.decl, child, r.value, attrPath); refused {
+// admitSingle walks v, the value of the single-valued attribute decl, against
+// its bound child, a child the template allows that admits the value's type.
+// A slot child whose assertions the value's archetype id does not satisfy
+// refuses it instead: that is reported once, as `slot_fill`
+// ([slotRefusal]), and the value is not walked.
+func (e *engine) admitSingle(decl *tcimpl.CompiledAttribute, v engineNode) {
+	if v.bound.IsSlot() {
+		if refusal, refused := slotRefusal(decl, v.bound, v.value, v.path); refused {
 			e.refuse(refusal)
 			return
 		}
 	}
-	e.walk(engineNode{value: r.value, rmType: runtimeRMType(r.value, a.rmType), path: attrPath, role: role, depth: n.depth + 1, bound: child})
+	e.walk(v)
 }
 
 // visitDeclaredItems visits the multi-valued attribute a of node n, a list or

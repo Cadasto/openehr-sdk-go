@@ -12,6 +12,7 @@ package validation_test
 
 import (
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -665,6 +666,50 @@ func TestValidate_REQ171_DepthLimitInsideATrial(t *testing.T) {
 			}
 			if depth != 1 || len(r.Coverage.Stopped) != 1 {
 				t.Errorf("Validate(state %s) within depth 3: issues %q, Coverage.Stopped %q, want one max_depth and one stop", state, issueKeys(r.Issues), r.Coverage.Stopped)
+			}
+		})
+	}
+}
+
+// REQ-171 One walk — a verdict a trial decides binds a value the same way
+// wherever the walk meets it again. An ELEMENT item, tried under the first
+// of two ELEMENT children of one rank, binds its value, a DV_QUANTITY held by
+// pointer, among two alternatives of other units: the walk under the child
+// the item binds to then binds the value by the verdicts its trial decided.
+// The value draws what it draws under one ELEMENT child, where nothing is
+// tried twice: nothing where it validates under the second alternative, and
+// the first alternative's findings where it validates under neither, with
+// the same Coverage.
+func TestValidate_REQ171_DecidedVerdictBindsAlike(t *testing.T) {
+	alternatives := quantityIn("kg") + quantityIn("[lb_av]")
+	ranked := mustCompileInline(t, clusterItemsOPT(alternatives, alternatives))
+	alone := mustCompileInline(t, clusterItemsOPT(alternatives))
+	cluster := func(q *rm.DVQuantity) any {
+		return &rm.Cluster{
+			ArchetypeNodeID:  "openEHR-EHR-CLUSTER.items.v1",
+			Name:             rm.DVText{Value: "cluster"},
+			ArchetypeDetails: archetypeDetails("openEHR-EHR-CLUSTER.items.v1"),
+			Items:            []rm.Item{&rm.Element{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "element"}, Value: q}},
+		}
+	}
+	for _, tc := range []struct {
+		name  string
+		value *rm.DVQuantity
+		want  []string
+	}{
+		{name: "the second alternative", value: &rm.DVQuantity{Magnitude: 80, Units: "[lb_av]"}},
+		{name: "neither alternative", value: &rm.DVQuantity{Magnitude: 2000, Units: "g"}, want: []string{"primitive_unit_unknown /items[at0001]/value"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r, single := validation.Validate(cluster(tc.value), ranked), validation.Validate(cluster(tc.value), alone)
+			if got := issueKeys(single.Issues); !slices.Equal(got, tc.want) {
+				t.Fatalf("Validate(%v %s) under one ELEMENT child issues = %q, want %q", tc.value.Magnitude, tc.value.Units, got, tc.want)
+			}
+			if got := issueKeys(r.Issues); !slices.Equal(got, tc.want) {
+				t.Errorf("Validate(%v %s) under two ELEMENT children issues = %q, want %q, as under one", tc.value.Magnitude, tc.value.Units, got, tc.want)
+			}
+			if !reflect.DeepEqual(r.Coverage, single.Coverage) {
+				t.Errorf("Validate(%v %s) under two ELEMENT children Coverage = %+v, want %+v, as under one", tc.value.Magnitude, tc.value.Units, r.Coverage, single.Coverage)
 			}
 		})
 	}
