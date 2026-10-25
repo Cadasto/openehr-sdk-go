@@ -404,7 +404,7 @@ The BMM `documentation` field on classes, properties, and functions **MUST** be 
 **Generated in v1:**
 - `openehr/rm/` from `openehr_rm_1.2.0` (excluding `ehr_extract`) + `openehr_base_1.3.0`.
 - `openehr/rm/typereg/` from the same.
-- `openehr/rm/rminfo/` from the same — the flattened attribute tables, the REQ-048 class graph, and the REQ-049 absence table.
+- `openehr/rm/rminfo/` from the same — the flattened attribute tables, the REQ-048 class graph, the REQ-049 absence table, and the REQ-112 function table that `rminfo.IsNonStorableAttr` reads.
 - `internal/rmaccess/access_gen.go` from the same — the attribute access of every registered class (REQ-171).
 - `openehr/validation/inventory_gen.go` from the same and the hand-kept `invariants.json` — the invariant inventory (REQ-171).
 - `openehr/aom/aom14/` from `openehr_am_1.4.0` + `openehr_base_1.3.0`.

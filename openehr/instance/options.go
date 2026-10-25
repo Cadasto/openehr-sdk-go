@@ -13,11 +13,12 @@ import (
 // Policy controls which attributes the generator visits. Under every
 // policy it skips an attribute the OPT prohibits (an existence of 0..0),
 // unless an RM rule needs it, such as an attribute the BMM marks
-// mandatory, and never visits one the RM computes rather than stores
-// (offset on POINT_EVENT and INTERVAL_EVENT, is_integral on DV_QUANTITY
-// and DV_PROPORTION) or a locatable's uid, which the identity rule
-// decides. Under every policy an RM rule can need more than the policy
-// visits, such as an ELEMENT's value or null_flavour, and a visited
+// mandatory, and never visits one no serialization carries, the BMM
+// functions and RESOURCE_DESCRIPTION.parent_resource that
+// rminfo.IsNonStorableAttr names, or a locatable's uid, which the
+// identity rule decides. Under every policy an RM rule can need more
+// than the policy visits, such as an ELEMENT's value or null_flavour,
+// and a visited
 // multi-valued attribute is topped up to its lower bound. [ValueFill],
 // not the policy, decides how a primitive leaf is valued. Medium,
 // Required and Large are the only levels, and Medium, the zero value, is

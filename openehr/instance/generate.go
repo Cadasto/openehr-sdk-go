@@ -324,10 +324,10 @@ func compositionDefaultOwns(class, attrName string) bool {
 // every policy it never visits an attribute the OPT prohibits (an
 // existence of 0..0, or OPT children it all prohibits) that no RM rule
 // needs (attrProhibited), whatever children the OPT names under it, nor
-// one the RM computes rather than stores (offset on POINT_EVENT and
-// INTERVAL_EVENT, is_integral on DV_QUANTITY and DV_PROPORTION): the
-// generator has nothing to write there. Nor does it visit a locatable's
-// uid, which setLocatableIdentity stamps, nor the normal_range or
+// one no serialization carries, the BMM functions and
+// RESOURCE_DESCRIPTION.parent_resource that rminfo.IsNonStorableAttr
+// names: the generator has nothing to write there. Nor does it visit a
+// locatable's uid, which setLocatableIdentity stamps, nor the normal_range or
 // other_reference_ranges of a bound of a REFERENCE_RANGE's range, which
 // the RM keeps absent (walkSkips). A prohibited ELEMENT null_flavour the RM
 // rule needs, because the OPT prohibits value too, is visited as if the OPT

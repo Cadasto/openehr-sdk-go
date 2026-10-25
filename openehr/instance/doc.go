@@ -23,11 +23,12 @@
 // Under every policy the generator skips an attribute the template
 // prohibits (an existence of 0..0), unless an RM rule needs it, such as
 // an attribute the BMM marks mandatory, which it then writes as if the
-// template allowed it; and it never visits one the RM computes rather
-// than stores (offset on an event, is_integral on DV_QUANTITY and
-// DV_PROPORTION), nor a locatable's uid, which the identity rule
-// decides. Under every policy an RM rule can need more than the policy
-// visits, such as an ELEMENT's value or null flavour, or a DV_MULTIMEDIA's
+// template allowed it; and it never visits one no serialization
+// carries, the BMM functions and RESOURCE_DESCRIPTION.parent_resource
+// that rminfo.IsNonStorableAttr names, nor a locatable's uid, which
+// the identity rule decides. Under every policy an RM rule can need
+// more than the policy visits, such as an ELEMENT's value or null
+// flavour, or a DV_MULTIMEDIA's
 // uri where the template prohibits its data, which the generator then
 // builds as a visit does, from the attribute's first allowed template
 // child where it has one; and a visited multi-valued attribute is topped
