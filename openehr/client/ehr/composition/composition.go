@@ -28,7 +28,10 @@ var ErrDeletedAtTime = errors.New("composition: deleted at requested time")
 // Get retrieves a Composition under the given EHR. The Ref selects
 // the target: [ehr.LatestOf](voID) for the latest version of a
 // versioned-object family, [ehr.LatestAtTime](voID, t) for the
-// as-of-time variant, or [ehr.VersionOf](uid) for a specific version.
+// as-of-time variant, or [ehr.VersionOf](uid) for a specific version. A
+// Ref whose time has a UTC year outside 0000-9999 fails with
+// [transport.ErrInvalidConfig] before any request, since RFC 3339 cannot
+// write it.
 //
 // Wire: GET /ehr/{ehr_id}/composition/{ref} [?version_at_time=...]. A 204
 // No Content response (the composition was deleted at the requested
@@ -40,6 +43,9 @@ func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, re
 	}
 	if ref == nil {
 		return nil, nil, fmt.Errorf("composition.Get: %w: nil Ref", transport.ErrInvalidConfig)
+	}
+	if err := ref.Validate(); err != nil {
+		return nil, nil, fmt.Errorf("composition.Get: %w", err)
 	}
 	seg := ref.PathSegment()
 	if seg == "" {

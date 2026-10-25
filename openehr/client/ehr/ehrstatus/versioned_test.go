@@ -98,6 +98,10 @@ const revisionHistoryJSON = `{
 // 20 January 2015; on the wire it is 2015-01-20T18:30:22.765Z.
 var atTime = time.Date(2015, 1, 20, 19, 30, 22, 765_000_000, time.FixedZone("", 3600))
 
+// year10000 is 23:59:59 at -05:00 on 31 December 9999, which is the year
+// 10000 in UTC: RFC 3339 has no form for it.
+var year10000 = time.Date(9999, 12, 31, 23, 59, 59, 0, time.FixedZone("", -5*3600))
+
 // versionedRead is one of the five versioned-object reads, reachable both as
 // a package function (call) and through the Repository (repoCall).
 type versionedRead struct {
@@ -414,8 +418,9 @@ func TestVersionedReadsNotFound(t *testing.T) {
 	}
 }
 
-// REQ-174: an empty ehr_id or version_uid, and a zero time on the
-// version-at-time read, fail with ErrInvalidConfig before any request.
+// REQ-174: an empty ehr_id or version_uid, and a zero time or a time whose
+// UTC year falls outside 0000-9999 on the version-at-time read, fail with
+// ErrInvalidConfig before any request.
 func TestVersionedReadsRefuseBeforeRequest(t *testing.T) {
 	cases := []struct {
 		name string
@@ -439,6 +444,10 @@ func TestVersionedReadsRefuseBeforeRequest(t *testing.T) {
 		}},
 		{name: "GetVersionAtTime/zero time", call: func(ctx context.Context, c *transport.Client) error {
 			_, _, err := ehrstatus.GetVersionAtTime(ctx, c, ehrIDFixture, time.Time{})
+			return err
+		}},
+		{name: "GetVersionAtTime/UTC year 10000", call: func(ctx context.Context, c *transport.Client) error {
+			_, _, err := ehrstatus.GetVersionAtTime(ctx, c, ehrIDFixture, year10000)
 			return err
 		}},
 		{name: "GetVersionByID/empty EHRID", call: func(ctx context.Context, c *transport.Client) error {

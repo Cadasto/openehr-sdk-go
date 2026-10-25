@@ -445,6 +445,27 @@ func TestGetAtTimeNoVersion(t *testing.T) {
 	}
 }
 
+// REQ-174: a Ref whose time has a UTC year outside 0000-9999 has no RFC 3339
+// version_at_time, so Get refuses it with ErrInvalidConfig before any
+// request. The client is live, so only the Ref check can refuse the call.
+func TestGetAtTimeRefusesYearOutsideRFC3339(t *testing.T) {
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	_, _, err := demographic.Get(t.Context(), newClient(t, srv),
+		demographic.Person, openehrclient.LatestAtTime(personVOID, year10000))
+	if !errors.Is(err, transport.ErrInvalidConfig) {
+		t.Errorf("Get(LatestAtTime(%v)) err = %v, want ErrInvalidConfig", year10000, err)
+	}
+	if n := hits.Load(); n != 0 {
+		t.Errorf("Get(LatestAtTime(%v)): server saw %d request(s), want none", year10000, n)
+	}
+}
+
 // TestGetEmptyBodyAnomaly guards the silent-failure fix: an empty body on a
 // non-204 2xx is a wire anomaly and must surface as ErrInvalidShape rather
 // than masquerading as "no version found".

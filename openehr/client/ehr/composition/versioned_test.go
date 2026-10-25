@@ -97,6 +97,10 @@ const versionedPath = "/openehr/v1/ehr/" + string(ehrIDFixture) + "/versioned_co
 // January 2015; atTimeWire is how it goes on the wire.
 var atTime = time.Date(2015, 1, 20, 19, 30, 22, 765_000_000, time.FixedZone("", 3600))
 
+// year10000 is 23:59:59 at -05:00 on 31 December 9999, which is the year
+// 10000 in UTC: RFC 3339 has no form for it.
+var year10000 = time.Date(9999, 12, 31, 23, 59, 59, 0, time.FixedZone("", -5*3600))
+
 const atTimeWire = "2015-01-20T18:30:22.765Z"
 
 // versionedRead is one of the five reads, called with valid arguments: the
@@ -409,8 +413,9 @@ func TestVersionedReadsNotFound(t *testing.T) { // REQ-174
 }
 
 // TestVersionedReadGuards pins REQ-174's preconditions: an empty ehr_id,
-// versioned_object_uid or version_uid, and a zero time, fail with
-// ErrInvalidConfig before any request. The transport's REQ-150 validator
+// versioned_object_uid or version_uid, a zero time, and a time whose UTC
+// year falls outside 0000-9999, fail with ErrInvalidConfig before any
+// request. The transport's REQ-150 validator
 // would refuse an empty path segment too, so each case also requires the
 // error not to be the transport's ErrInvalidPathSegment: the leaf refuses
 // first, naming the argument.
@@ -453,6 +458,10 @@ func TestVersionedReadGuards(t *testing.T) { // REQ-174
 		}},
 		{"GetVersionAtTime/zero time", func(ctx context.Context, c *transport.Client) error {
 			_, _, err := composition.GetVersionAtTime(ctx, c, ehrIDFixture, compositionVOID, time.Time{})
+			return err
+		}},
+		{"GetVersionAtTime/UTC year 10000", func(ctx context.Context, c *transport.Client) error {
+			_, _, err := composition.GetVersionAtTime(ctx, c, ehrIDFixture, compositionVOID, year10000)
 			return err
 		}},
 		{"GetVersionByID/empty EHRID", func(ctx context.Context, c *transport.Client) error {

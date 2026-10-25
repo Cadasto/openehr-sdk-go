@@ -113,7 +113,9 @@ func GetVersion(ctx context.Context, c *transport.Client, voUID openehrclient.Ve
 	return getVersion(ctx, c, req)
 }
 
-// GetVersionAtTime retrieves the VERSION that was current at t.
+// GetVersionAtTime retrieves the VERSION that was current at t. A t whose
+// UTC year falls outside 0000-9999 fails with [transport.ErrInvalidConfig]
+// before any request, since RFC 3339 cannot write it.
 //
 // Wire: GET /demographic/versioned_party/{vo_uid}/version?version_at_time={t},
 // with t sent in UTC with its fraction of a second.
@@ -124,11 +126,15 @@ func GetVersionAtTime(ctx context.Context, c *transport.Client, voUID openehrcli
 	if t.IsZero() {
 		return nil, nil, fmt.Errorf("demographic.GetVersionAtTime: %w: zero time — use GetVersion for the latest", transport.ErrInvalidConfig)
 	}
+	at, err := openehrclient.FormatVersionAtTime(t)
+	if err != nil {
+		return nil, nil, fmt.Errorf("demographic.GetVersionAtTime: %w", err)
+	}
 	req := &transport.Request{
 		Method: http.MethodGet,
 		Path:   versionedBase(voUID) + "/version",
 		Route:  routeVersion,
-		Query:  url.Values{"version_at_time": []string{openehrclient.FormatVersionAtTime(t)}},
+		Query:  url.Values{"version_at_time": []string{at}},
 	}
 	return getVersion(ctx, c, req)
 }

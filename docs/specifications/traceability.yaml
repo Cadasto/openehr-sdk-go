@@ -2527,6 +2527,7 @@ requirements:
     packages: [openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/ehrstatus, openehr/client/ehr/directory, openehr/client/demographic]
     probes: [PROBE-109]
     tests:
+      - openehr/client/demographic/party_test.go
       - openehr/client/demographic/versioned_test.go
       - openehr/client/ehr/composition/composition_test.go
       - openehr/client/ehr/composition/versioned_test.go

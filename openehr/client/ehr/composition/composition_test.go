@@ -140,6 +140,26 @@ func TestGetAtTimeKeepsFraction(t *testing.T) {
 	}
 }
 
+// REQ-174: a Ref whose time has a UTC year outside 0000-9999 has no RFC 3339
+// version_at_time, so Get refuses it with ErrInvalidConfig before any
+// request. The client is live, so only the Ref check can refuse the call.
+func TestGetAtTimeRefusesYearOutsideRFC3339(t *testing.T) {
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	_, _, err := composition.Get(t.Context(), newClient(t, srv), ehrIDFixture, openehrclient.LatestAtTime(compositionVOID, year10000))
+	if !errors.Is(err, transport.ErrInvalidConfig) {
+		t.Errorf("Get(LatestAtTime(%v)) err = %v, want ErrInvalidConfig", year10000, err)
+	}
+	if n := hits.Load(); n != 0 {
+		t.Errorf("Get(LatestAtTime(%v)): server saw %d request(s), want none", year10000, n)
+	}
+}
+
 func TestGetDeletedAtTimeReturns204Signal(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent) // 204_deleted_at_time

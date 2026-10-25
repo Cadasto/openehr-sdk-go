@@ -123,6 +123,26 @@ func TestGetAtTimeKeepsFraction(t *testing.T) {
 	}
 }
 
+// REQ-174: a time whose UTC year falls outside 0000-9999 has no RFC 3339
+// form, so GetAtTime refuses it with ErrInvalidConfig before any request.
+// The client is live, so only the year guard can refuse the call.
+func TestGetAtTimeRefusesYearOutsideRFC3339(t *testing.T) {
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	_, _, err := ehrstatus.GetAtTime(t.Context(), newClient(t, srv), ehrIDFixture, year10000)
+	if !errors.Is(err, transport.ErrInvalidConfig) {
+		t.Errorf("GetAtTime(%v) err = %v, want ErrInvalidConfig", year10000, err)
+	}
+	if n := hits.Load(); n != 0 {
+		t.Errorf("GetAtTime(%v): server saw %d request(s), want none", year10000, n)
+	}
+}
+
 func TestGetAtTimeRejectsZero(t *testing.T) {
 	_, _, err := ehrstatus.GetAtTime(t.Context(), nil, ehrIDFixture, time.Time{})
 	if !errors.Is(err, transport.ErrInvalidConfig) {

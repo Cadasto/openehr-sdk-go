@@ -70,7 +70,9 @@ func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, op
 	return decode(ctx, c, req)
 }
 
-// GetAtTime returns the Directory that was current at t.
+// GetAtTime returns the Directory that was current at t. A t whose UTC
+// year falls outside 0000-9999 fails with [transport.ErrInvalidConfig]
+// before any request, since RFC 3339 cannot write it.
 //
 // Wire: GET /ehr/{ehr_id}/directory?version_at_time={t} [&path=...],
 // with t sent in UTC with its fraction of a second.
@@ -81,12 +83,16 @@ func GetAtTime(ctx context.Context, c *transport.Client, ehrID openehrclient.EHR
 	if t.IsZero() {
 		return nil, nil, fmt.Errorf("directory.GetAtTime: %w: zero time — use Get for the latest", transport.ErrInvalidConfig)
 	}
+	at, err := openehrclient.FormatVersionAtTime(t)
+	if err != nil {
+		return nil, nil, fmt.Errorf("directory.GetAtTime: %w", err)
+	}
 	req := &transport.Request{
 		Method: http.MethodGet,
 		Path:   basePath(ehrID),
 		Route:  routeTemplate,
 		Query: url.Values{
-			"version_at_time": []string{openehrclient.FormatVersionAtTime(t)},
+			"version_at_time": []string{at},
 		},
 	}
 	applyPath(req, opts)

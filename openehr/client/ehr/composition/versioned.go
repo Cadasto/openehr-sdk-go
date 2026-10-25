@@ -128,7 +128,8 @@ func GetVersion(ctx context.Context, c *transport.Client, ehrID openehrclient.EH
 // GetVersionAtTime retrieves the version of the composition voID in the EHR
 // ehrID that was current at t. A zero t fails with
 // [transport.ErrInvalidConfig] before any request: [GetVersion] is the read
-// for the latest version.
+// for the latest version. A t whose UTC year falls outside 0000-9999 fails
+// the same way, since RFC 3339 cannot write it.
 //
 // Wire: GET /ehr/{ehr_id}/versioned_composition/{versioned_object_uid}/version?version_at_time={t},
 // with t sent in UTC with its fraction of a second.
@@ -142,11 +143,15 @@ func GetVersionAtTime(ctx context.Context, c *transport.Client, ehrID openehrcli
 	if t.IsZero() {
 		return nil, nil, fmt.Errorf("composition.GetVersionAtTime: %w: zero time — use GetVersion for the latest", transport.ErrInvalidConfig)
 	}
+	at, err := openehrclient.FormatVersionAtTime(t)
+	if err != nil {
+		return nil, nil, fmt.Errorf("composition.GetVersionAtTime: %w", err)
+	}
 	req := &transport.Request{
 		Method: http.MethodGet,
 		Path:   versionedBase(ehrID, voID) + "/version",
 		Route:  routeVersion,
-		Query:  url.Values{"version_at_time": []string{openehrclient.FormatVersionAtTime(t)}},
+		Query:  url.Values{"version_at_time": []string{at}},
 	}
 	return getVersion(ctx, c, req)
 }
