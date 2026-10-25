@@ -31,12 +31,29 @@ func namedElement(name, occ string) string {
 </children>`
 }
 
+// unnamedElement returns an ELEMENT[at0002] child on which the template
+// fixes no name, with the given occurrences and a DV_TEXT value.
+func unnamedElement(occ string) string {
+	return `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>ELEMENT</rm_type_name>` + occ + `<node_id>at0002</node_id>
+<attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>value</rm_attribute_name>
+<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>DV_TEXT</rm_type_name><node_id></node_id></children>
+</attributes>
+</children>`
+}
+
 // namedSiblingsOPT is a COMPOSITION template whose context's other_context
 // holds two ELEMENT[at0002] siblings that differ only by the name the
 // template fixes on each, 'A' then 'B', with the occurrences given for
 // each, in an items list whose cardinality upper bound is upper, or
 // unbounded when upper is empty.
 func namedSiblingsOPT(occA, occB, upper string) string {
+	return siblingsOPT(namedElement("A", occA)+namedElement("B", occB), upper)
+}
+
+// siblingsOPT is a COMPOSITION template whose context's other_context
+// holds the ELEMENT children siblings in an items list whose cardinality
+// upper bound is upper, or unbounded when upper is empty.
+func siblingsOPT(siblings, upper string) string {
 	bound := `<upper_unbounded>true</upper_unbounded>`
 	if upper != "" {
 		bound = `<upper_included>true</upper_included><upper_unbounded>false</upper_unbounded><upper>` + upper + `</upper>`
@@ -51,7 +68,7 @@ func namedSiblingsOPT(occA, occB, upper string) string {
 <attributes xsi:type="C_SINGLE_ATTRIBUTE"><rm_attribute_name>other_context</rm_attribute_name>
 <children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>ITEM_TREE</rm_type_name><node_id>at0001</node_id>
 <attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>items</rm_attribute_name>
-` + namedElement("A", occA) + namedElement("B", occB) + `
+` + siblings + `
 <cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval><lower_included>true</lower_included><lower_unbounded>false</lower_unbounded>` + bound + `<lower>0</lower></interval></cardinality>
 </attributes>
 </children>
@@ -264,5 +281,97 @@ func TestREQ101_REQ107_SetWritesAnOptionalNamedSibling(t *testing.T) {
 				t.Errorf("after Set(%s), sibling %s holds %q, want its skeleton value %q", tc.path, tc.other, after[tc.other], before[tc.other])
 			}
 		})
+	}
+}
+
+// The path of the ELEMENT[at0002] uses of an OPT built by siblingsOPT from
+// unnamedElement children, and the path of their value.
+const (
+	unnamedUsePath      = "/context/other_context/items[at0002]"
+	unnamedUseValuePath = unnamedUsePath + "/value"
+)
+
+// elementValues returns, in list order, the DV_TEXT value of each ELEMENT
+// in comp's other_context.
+func elementValues(t *testing.T, comp *rm.Composition) []string {
+	t.Helper()
+	if comp == nil || comp.Context == nil {
+		t.Fatal("composition has no context")
+	}
+	tree, ok := comp.Context.OtherContext.(*rm.ItemTree)
+	if !ok {
+		t.Fatalf("other_context is %T, want *rm.ItemTree", comp.Context.OtherContext)
+	}
+	values := make([]string, 0, len(tree.Items))
+	for i, it := range tree.Items {
+		el, ok := it.(*rm.Element)
+		if !ok {
+			t.Fatalf("items[%d] is %T, want *rm.Element", i, it)
+		}
+		text, ok := el.Value.(*rm.DVText)
+		if !ok {
+			t.Fatalf("items[%d] value is %T, want *rm.DVText", i, el.Value)
+		}
+		values = append(values, text.Value)
+	}
+	return values
+}
+
+// TestREQ101_REQ107_SetReachesTheFirstOfUnnamedUses checks the REQ-101
+// Skeleton policy reading of two optional uses of one node id on which the
+// template fixes no name. The Large skeleton NewBuilder seeds from holds a
+// member of each (REQ-107 What a visit writes), in OPT order, but the later
+// use has the compiled path of the first, so Set at that path reaches the
+// first use's member alone, and the member built for the later use keeps
+// the value the skeleton gave it.
+func TestREQ101_REQ107_SetReachesTheFirstOfUnnamedUses(t *testing.T) {
+	t.Parallel()
+	optional := occurrences("0", "1")
+	c := compileInline(t, siblingsOPT(unnamedElement(optional)+unnamedElement(optional), ""))
+	first, err := c.NodeAt(unnamedUsePath)
+	if err != nil {
+		t.Fatalf("NodeAt(%s): %v (fixture drift)", unnamedUsePath, err)
+	}
+	uses := first.Parent().Attribute("items").Children()
+	if len(uses) != 2 || uses[0] != first {
+		t.Fatalf("NodeAt(%s) is not the first of two uses under items (fixture drift)", unnamedUsePath)
+	}
+	if got := uses[1].AQLPath(); got != unnamedUsePath {
+		t.Fatalf("the later use compiled at %s, want the first use's path %s (fixture drift)", got, unnamedUsePath)
+	}
+
+	b, err := composition.NewBuilder(t.Context(), c,
+		composition.WithTerritory("NL"),
+		composition.WithComposer(testComposer()),
+	)
+	if err != nil {
+		t.Fatalf("NewBuilder: %v", err)
+	}
+	skeleton, err := b.Build()
+	if err != nil {
+		t.Fatalf("Build of the bare skeleton: %v", err)
+	}
+	before := elementValues(t, skeleton)
+	if len(before) != 2 {
+		t.Fatalf("skeleton holds ELEMENT values %q, want one member of each use: Large writes every optional use", before)
+	}
+
+	const written = "written"
+	if err := b.Set(unnamedUseValuePath, &rm.DVText{Value: written}); err != nil {
+		t.Fatalf("Set(%s) = %v, want nil", unnamedUseValuePath, err)
+	}
+	comp, err := b.Build()
+	if err != nil {
+		t.Fatalf("Build after Set(%s) = %v, want nil", unnamedUseValuePath, err)
+	}
+	after := elementValues(t, comp)
+	if len(after) != 2 {
+		t.Fatalf("after Set(%s), other_context holds ELEMENT values %q, want the skeleton's two members", unnamedUseValuePath, after)
+	}
+	if after[0] != written {
+		t.Errorf("after Set(%s), the first use's member holds %q, want %q", unnamedUseValuePath, after[0], written)
+	}
+	if after[1] != before[1] {
+		t.Errorf("after Set(%s), the later use's member holds %q, want its skeleton value %q", unnamedUseValuePath, after[1], before[1])
 	}
 }
