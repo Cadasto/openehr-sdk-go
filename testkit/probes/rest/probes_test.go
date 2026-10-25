@@ -2,12 +2,14 @@ package restprobes_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -981,6 +983,61 @@ func rewriteBody(t *testing.T, edit func(string) string) func(*http.Request) {
 	}
 }
 
+// withoutMember returns a copy of comp whose canonical JSON lacks the member
+// at, a slash-separated path of object members and array indexes. comp itself
+// is left as it is. A path that does not end on a member fails the test and
+// returns comp, so a plant cannot silently miss its target.
+func withoutMember(t *testing.T, comp *rm.Composition, at string) *rm.Composition {
+	t.Helper()
+	body, err := canjson.Marshal(comp)
+	if err != nil {
+		t.Errorf("render the composition as canonical JSON: %v", err)
+		return comp
+	}
+	dec := json.NewDecoder(bytes.NewReader(body))
+	dec.UseNumber()
+	var tree any
+	if err := dec.Decode(&tree); err != nil {
+		t.Errorf("decode the composition's canonical JSON: %v", err)
+		return comp
+	}
+	segs := strings.Split(at, "/")
+	node := tree
+	for _, seg := range segs[:len(segs)-1] {
+		switch n := node.(type) {
+		case map[string]any:
+			node = n[seg]
+		case []any:
+			i, err := strconv.Atoi(seg)
+			if err != nil || i < 0 || i >= len(n) {
+				node = nil
+				continue
+			}
+			node = n[i]
+		default:
+			node = nil
+		}
+	}
+	parent, ok := node.(map[string]any)
+	member := segs[len(segs)-1]
+	if !ok || parent[member] == nil {
+		t.Errorf("the composition has no member at %s to drop", at)
+		return comp
+	}
+	delete(parent, member)
+	edited, err := json.Marshal(tree)
+	if err != nil {
+		t.Errorf("render the edited composition: %v", err)
+		return comp
+	}
+	var out rm.Composition
+	if err := canjson.Unmarshal(edited, &out); err != nil {
+		t.Errorf("decode the composition without %s: %v", at, err)
+		return comp
+	}
+	return &out
+}
+
 func TestProbe108CompositionFormats(t *testing.T) { // PROBE-108, REQ-173
 	wt, comp := loadProbe108Fixture(t)
 	b, snap := formatBackend(t, wt, formatBackendConfig{})
@@ -1021,9 +1078,9 @@ func TestProbe108CompositionFormats(t *testing.T) { // PROBE-108, REQ-173
 // route; the last two plant a `.schema`-suffixed media type, so the detector
 // that guards "no request carries one" is shown to fire. Each case pins the
 // substring its Detail must carry, so a case cannot rot into failing for an
-// unrelated reason. A case that plants another composition value also names
-// the values its Detail must not carry: a mismatch names the path, not what
-// the compositions hold there.
+// unrelated reason. A case that plants another composition value, or drops
+// one, also names the values its Detail must not carry: a mismatch names the
+// path, not what the compositions hold there.
 func TestProbe108FlagsBrokenWire(t *testing.T) { // PROBE-108
 	wt, comp := loadProbe108Fixture(t)
 	cases := []struct {
@@ -1077,6 +1134,17 @@ func TestProbe108FlagsBrokenWire(t *testing.T) { // PROBE-108
 				}
 			}},
 			wantDetail: "XML read: the composition read back differs from the one written at archetype_node_id: value differs",
+		},
+		{
+			name: "read-back lacks the data value",
+			cfg: formatBackendConfig{tamper: func(r *http.Request, c *rm.Composition) {
+				if r.Method == http.MethodGet && r.Header.Get("Accept") == probe108MediaXML {
+					*c = *withoutMember(t, c, "content/0/data/events/0/data/items/0/value")
+				}
+			}},
+			wantDetail: "XML read: the composition read back differs from the one written at content/0/data/events/0/data/items/0/value: absent",
+			// The value dropped is the DV_QUANTITY 130 mmHg.
+			notInDetail: []string{"130", "mmHg"},
 		},
 		{
 			name:       "write names no version",
@@ -1250,6 +1318,10 @@ func TestProbe108RejectsMissingInputs(t *testing.T) { // PROBE-108
 		ehrID    openehrclient.EHRID
 		wt       *webtemplate.WebTemplate
 		comp     *rm.Composition
+		// wantErr, when set, is a substring the error must carry.
+		wantErr string
+		// notInErr are compared values the error must not carry.
+		notInErr []string
 	}{
 		{name: "nil client", captured: snap, ehrID: probe108EHRID, wt: wt, comp: comp},
 		{name: "nil recorder", c: c, ehrID: probe108EHRID, wt: wt, comp: comp},
@@ -1261,13 +1333,28 @@ func TestProbe108RejectsMissingInputs(t *testing.T) { // PROBE-108
 		// gives it nothing to compare: a precondition, not a deployment
 		// finding.
 		{name: "composition without content", c: c, captured: snap, ehrID: probe108EHRID, wt: wt, comp: &noContent},
-		{name: "composition that does not round-trip through FLAT", c: c, captured: snap, ehrID: probe108EHRID, wt: wt, comp: &otherRoot},
+		// The error names the path that does not come back, never the root
+		// archetype given or the one FLAT puts in its place.
+		{
+			name: "composition that does not round-trip through FLAT", c: c, captured: snap, ehrID: probe108EHRID, wt: wt, comp: &otherRoot,
+			wantErr:  "does not round-trip through FLAT on the compared paths (archetype_node_id: value differs)",
+			notInErr: []string{otherRoot.ArchetypeNodeID, comp.ArchetypeNodeID},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			r, err := restprobes.Probe108CompositionFormats(t.Context(), tc.c, tc.captured, tc.ehrID, tc.wt, tc.comp)
 			if err == nil {
-				t.Errorf("PROBE-108 = %s (%q), want an error", r.Status, r.Detail)
+				t.Fatalf("PROBE-108 = %s (%q), want an error", r.Status, r.Detail)
+			}
+			t.Logf("PROBE-108 error: %v", err)
+			if !strings.Contains(err.Error(), tc.wantErr) {
+				t.Errorf("PROBE-108 refused the input for the wrong reason:\n got: %v\nwant it to mention: %s", err, tc.wantErr)
+			}
+			for _, value := range tc.notInErr {
+				if strings.Contains(err.Error(), value) {
+					t.Errorf("PROBE-108 error carries the compared value %q:\n%v", value, err)
+				}
 			}
 		})
 	}
