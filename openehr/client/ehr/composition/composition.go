@@ -160,10 +160,10 @@ func WithDeleteAudit(a *rm.AuditDetails) DeleteOption {
 //     body (not `ORIGINAL_VERSION<COMPOSITION>`) which is decoded
 //     into the returned value. The audit / lifecycle / preceding-
 //     version fields that `ORIGINAL_VERSION` carries are not in the
-//     POST/PUT body; they are available via the version
-//     metadata (`ETag` → `VersionUID`) or via a follow-up
-//     [GetVersionByID], which reads the persisted `ORIGINAL_VERSION`
-//     envelope.
+//     POST/PUT body. The version metadata gives the new version's
+//     id (`ETag` → `VersionUID`), and a follow-up [GetVersionByID]
+//     with that id reads the persisted `ORIGINAL_VERSION` envelope
+//     that carries them.
 //   - PreferIdentifier: server returns the ITS-REST `Identifier` body
 //     (`{"uid": …}`); the returned `*rm.Composition` is nil and the
 //     identifier is resolved into the metadata `VersionUID` (the
