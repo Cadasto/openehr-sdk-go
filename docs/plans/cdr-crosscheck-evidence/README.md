@@ -4,7 +4,7 @@ kind: analysis
 
 # Cross-check of generated and validated examples against EHRbase and FerroEHR
 
-This note records two live cross-checks of the SDK's example generator ([§ REQ-107](../../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator)) and its template validator ([§ REQ-102](../../specifications/clinical-modeling.md#req-102--composition-validation)) against two openEHR CDRs. Run 1, on 2026-10-24, found the defects listed below. Run 2, on 2026-10-25, measured the SDK once they were fixed. Each finding names the specification section that now states the rule. CDR behaviour is described as observed, with the specification text that decides each case. Run 2 used the repository's cross-check tool, [PROBE-108](../../specifications/conformance.md#probe-108--generated-documents-and-cdr-examples-cross-checked-against-live-cdrs) (see *Reproducing*).
+This note records two live cross-checks of the SDK's example generator ([§ REQ-107](../../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator)) and its template validator ([§ REQ-102](../../specifications/clinical-modeling.md#req-102--composition-validation)) against two openEHR CDRs. Run 1, on 2026-10-24, found the defects listed below. Run 2, on 2026-10-25, measured the SDK once they were fixed. Each finding names the specification section that now states the rule. CDR behaviour is described as observed, with the specification text that decides each case. Run 2 used the repository's cross-check tool, [`cmd/cdrcheck`](../../specifications/conformance.md#the-cdr-cross-check-tool) (see *Reproducing*).
 
 ## Method
 
@@ -249,8 +249,8 @@ Neither CDR gives the same verdict as the other on every document, and no single
 
 ## Reproducing
 
-The cross-check is [PROBE-108](../../specifications/conformance.md#probe-108--generated-documents-and-cdr-examples-cross-checked-against-live-cdrs), an opt-in Go tool in `cmd/cdrcheck` that `make cdr-crosscheck` runs. It is not part of `make ci`.
+The cross-check is an opt-in Go tool in `cmd/cdrcheck` that `make cdr-crosscheck` runs ([§ REQ-082 *The CDR cross-check tool*](../../specifications/conformance.md#the-cdr-cross-check-tool)); it records and asserts nothing, so it is not a probe. It is not part of `make ci`.
 - It reads the template directory from `OPENEHR_XC_TEMPLATES`, and each CDR's REST base from `OPENEHR_LIVE_EHRBASE` or `OPENEHR_LIVE_FERROEHR`, with its Basic credential in the matching `_BASIC` variable. It writes to the CDRs only when `OPENEHR_LIVE_ALLOW_MUTATING` is set. With no template directory, it skips.
-- It uploads each template under its own id, as [§ REQ-082 *Live mode*](../../specifications/conformance.md#live-mode) allows the templates of a cross-check. It creates every EHR under an id that begins with its per-run identifier, and it deletes nothing.
+- It uploads each template under its own id, as [§ REQ-082 *The CDR cross-check tool*](../../specifications/conformance.md#the-cdr-cross-check-tool) says. It creates every EHR under an id that begins with its per-run identifier, and it deletes nothing.
 - It writes to a directory outside the repository (`OPENEHR_XC_OUT` or `-out`): one JSON Lines file per stage, the documents, the CDRs' examples and `summary.md`. The generation clock is fixed, so outputs compare across runs.
 - The template set and the CDRs' compose files stay outside the repository. Run 2 used the 202 templates of run 1 and the five vendored synthetic OPTs.
