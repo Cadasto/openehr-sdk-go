@@ -56,11 +56,11 @@ This note records two live cross-checks of the SDK's example generator ([§ REQ-
 
 ## What each CDR still refuses in run 2
 
-Every SDK document a CDR refuses in run 2 falls in one of these classes. Each class is a template defect, a template whose sibling uses cannot be told apart, or one CDR's own reading.
+Every SDK document a CDR refuses in run 2 falls in one of these classes. Each class is a template defect, a template whose sibling uses cannot be told apart, one CDR's own reading, or, in one case, the SDK's own reading of a template id.
 
 | Class | Documents refused | Templates | Reading |
 |---|---|---|---|
-| A composition names a `template_id` with two spaces in a row | EHRbase 9 | IDCR -  Adverse Reaction List.v1 | EHRbase's own: it stores the id with the spaces collapsed (see *CDR observations*) |
+| A composition names a `template_id` with two spaces in a row | EHRbase 9 | IDCR -  Adverse Reaction List.v1 | the SDK's own, which FerroEHR shares: both keep the id as written, while ITS-XML types OBJECT_ID's `value` as a `xs:token` (`NonEmptyToken`, `specifications-ITS-XML/components/RM/Release-1.0.2/BaseTypes.xsd:70-71,92`), whose value has the spaces collapsed, as EHRbase stores it ([§ REQ-100](../../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths) trims only leading and trailing white space; see *CDR observations*) |
 | EHRbase asks for a `null_flavour` beside a `value` | EHRbase 12, under `Medium` and `Large` | Demonstration.v1, Review | EHRbase's own; ELEMENT `Inv_null_flavour_indicated` forbids both |
 | EHRbase asks for the misspelt `null_flavor` beside a `value` | EHRbase 6, under `Large` | RIPPLE - Conformance Test template, sdk_crosscheck_unwritten.v1 | template defect (`null_flavor`), read as the row above; the SDK reads the attribute as `null_flavour` ([§ REQ-100](../../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths)) |
 | A coded name pins a text that no listed code's term carries | EHRbase 3, under `Large` | ePrescription (FHIR) | template defect (see *Template defects*) |
