@@ -124,9 +124,9 @@
 // inside that range where the status is N and outside it where the status
 // is any other, wherever the value compares with the range's bounds (a
 // count, a quantity in the bounds' units, a proportion of the bounds' type,
-// by ratio, an ordinal, by value, and a date, a time or a date-time the
-// template validator orders against them, as instants where the zones
-// differ), and an RM Integer, such as a DV_ORDINAL's value, inside
+// by ratio, an ordinal, by value, and a date, a time or a date-time in the
+// order the Reference Model checks give interval bounds, as instants where
+// the zones differ), and an RM Integer, such as a DV_ORDINAL's value, inside
 // its 32 bits, the example of a range bounded on one side alone staying on
 // that side. Where nothing is left, Generate returns an error wrapping
 // [ErrConstraintUnsatisfiable]. Where the template gives an RM attribute
