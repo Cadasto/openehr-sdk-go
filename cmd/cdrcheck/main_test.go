@@ -1,5 +1,7 @@
-// Tests of the CDR cross-check (PROBE-108, for REQ-107 and REQ-102). Every
+// Tests of the CDR cross-check tool (REQ-082), which measures the example
+// generator (REQ-107) and the validator (REQ-102) against live CDRs. Every
 // CDR here is a fakeCDR on httptest; no test reaches a live deployment.
+
 package main
 
 import (
@@ -59,7 +61,7 @@ func readSummary(t *testing.T, out string) summary {
 	return s
 }
 
-func TestRun_SkipsWhenUnset_PROBE108_REQ107(t *testing.T) {
+func TestRun_SkipsWhenUnset_REQ082_REQ107(t *testing.T) {
 	t.Parallel()
 	cdr := newFakeCDR(t)
 	cases := []struct {
@@ -90,7 +92,7 @@ func TestRun_SkipsWhenUnset_PROBE108_REQ107(t *testing.T) {
 	}
 }
 
-func TestRun_CDRStagesNeedTheWriteOptIn_PROBE108_REQ107(t *testing.T) {
+func TestRun_CDRStagesNeedTheWriteOptIn_REQ082_REQ107(t *testing.T) {
 	t.Parallel()
 	cdr := newFakeCDR(t)
 	e := env{
@@ -116,7 +118,7 @@ func TestRun_CDRStagesNeedTheWriteOptIn_PROBE108_REQ107(t *testing.T) {
 	}
 }
 
-func TestRun_PipelineAgainstTwoCDRs_PROBE108_REQ107_REQ102(t *testing.T) {
+func TestRun_PipelineAgainstTwoCDRs_REQ082_REQ107_REQ102(t *testing.T) {
 	t.Parallel()
 	eb, fe := newFakeCDR(t), newFakeCDR(t)
 	eb.example, fe.example = vendoredExample(t), vendoredExample(t)
@@ -177,7 +179,7 @@ func TestRun_PipelineAgainstTwoCDRs_PROBE108_REQ107_REQ102(t *testing.T) {
 	}
 }
 
-func TestRun_FreshEHRPerDocument_PROBE108_REQ107(t *testing.T) {
+func TestRun_FreshEHRPerDocument_REQ082_REQ107(t *testing.T) {
 	t.Parallel()
 	cdr := newFakeCDR(t)
 	cdr.persistent = true // a second composition in one EHR is refused
@@ -209,7 +211,7 @@ func TestRun_FreshEHRPerDocument_PROBE108_REQ107(t *testing.T) {
 	}
 }
 
-func TestNewEHR_SendsNoBodyAndNoContentType_PROBE108(t *testing.T) {
+func TestNewEHR_SendsNoBodyAndNoContentType_REQ082(t *testing.T) {
 	t.Parallel()
 	cdr := newFakeCDR(t) // answers 415 to a body or a Content-Type on an EHR create
 	c, err := newCDRClient(cdrTarget{name: "fake", base: cdr.url()}, 1, redactor{})
@@ -226,7 +228,7 @@ func TestNewEHR_SendsNoBodyAndNoContentType_PROBE108(t *testing.T) {
 	}
 }
 
-func TestRun_StripsTheByteOrderMarkBeforeUpload_PROBE108(t *testing.T) {
+func TestRun_StripsTheByteOrderMarkBeforeUpload_REQ082(t *testing.T) {
 	t.Parallel()
 	cdr := newFakeCDR(t) // refuses an OPT that starts with a BOM
 	e := env{
@@ -249,7 +251,7 @@ func TestRun_StripsTheByteOrderMarkBeforeUpload_PROBE108(t *testing.T) {
 	}
 }
 
-func TestRun_StoredCopyComparedBySignature_PROBE108(t *testing.T) {
+func TestRun_StoredCopyComparedBySignature_REQ082(t *testing.T) {
 	t.Parallel()
 	opt, err := os.ReadFile(vendoredOPT())
 	if err != nil {
@@ -322,7 +324,7 @@ func TestRun_StoredCopyComparedBySignature_PROBE108(t *testing.T) {
 	}
 }
 
-func TestRun_NeverWritesTheCredential_PROBE108(t *testing.T) {
+func TestRun_NeverWritesTheCredential_REQ082(t *testing.T) {
 	t.Parallel()
 	const user, pass = "operator", "s3cr3t-passphrase"
 	cdr := newFakeCDR(t)
@@ -372,7 +374,7 @@ func TestRun_NeverWritesTheCredential_PROBE108(t *testing.T) {
 	}
 }
 
-func TestLoadConfig_RefusalsNeverQuoteTheValue_PROBE108(t *testing.T) {
+func TestLoadConfig_RefusalsNeverQuoteTheValue_REQ082(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	cases := []struct {
@@ -405,7 +407,7 @@ func TestLoadConfig_RefusalsNeverQuoteTheValue_PROBE108(t *testing.T) {
 	}
 }
 
-func TestLoadConfig_OutputStaysOutsideTheRepository_PROBE108(t *testing.T) {
+func TestLoadConfig_OutputStaysOutsideTheRepository_REQ082(t *testing.T) {
 	t.Parallel()
 	wd, err := os.Getwd() // cmd/cdrcheck, inside the module
 	if err != nil {
@@ -423,7 +425,7 @@ func TestLoadConfig_OutputStaysOutsideTheRepository_PROBE108(t *testing.T) {
 	}
 }
 
-func TestRun_RefusesAnOutputDirectoryInUse_PROBE108(t *testing.T) {
+func TestRun_RefusesAnOutputDirectoryInUse_REQ082(t *testing.T) {
 	t.Parallel()
 	out := t.TempDir()
 	if err := os.WriteFile(filepath.Join(out, "summary.md"), []byte("an earlier run"), 0o644); err != nil {
@@ -435,7 +437,7 @@ func TestRun_RefusesAnOutputDirectoryInUse_PROBE108(t *testing.T) {
 	}
 }
 
-func TestRun_OnlyChecksTheMatchedTemplates_PROBE108(t *testing.T) {
+func TestRun_OnlyChecksTheMatchedTemplates_REQ082(t *testing.T) {
 	t.Parallel()
 	e := env{envTemplates: templateDir(t, nil, vendoredOPT(), fixtures.TemplateOptForName("minimal_observation.en.v1"))}
 	_, _, out, err := runFor(t, e, "-only", `^minimal_evaluation\.`)
@@ -488,7 +490,7 @@ func ehrIDsIn(t *testing.T, out string) map[string]bool {
 	return ids
 }
 
-func TestRun_EHRsCarryThePerRunIdentifier_PROBE108_REQ107(t *testing.T) {
+func TestRun_EHRsCarryThePerRunIdentifier_REQ082_REQ107(t *testing.T) {
 	t.Parallel()
 	cdr := newFakeCDR(t)
 	cdr.example = vendoredExample(t)
@@ -539,7 +541,7 @@ func TestRun_EHRsCarryThePerRunIdentifier_PROBE108_REQ107(t *testing.T) {
 	}
 }
 
-func TestRun_RefusedEHRCreateIsReported_PROBE108_REQ107(t *testing.T) {
+func TestRun_RefusedEHRCreateIsReported_REQ082_REQ107(t *testing.T) {
 	t.Parallel()
 	cdr := newFakeCDR(t)
 	cdr.refuseEHRCreate = true
@@ -584,7 +586,7 @@ func TestRun_RefusedEHRCreateIsReported_PROBE108_REQ107(t *testing.T) {
 	}
 }
 
-func TestRun_InterruptedRunKeepsEveryEHRID_PROBE108_REQ107(t *testing.T) {
+func TestRun_InterruptedRunKeepsEveryEHRID_REQ082_REQ107(t *testing.T) {
 	t.Parallel()
 	cdr := newFakeCDR(t)
 	ctx, cancel := context.WithCancel(t.Context())
@@ -639,7 +641,7 @@ func TestRun_InterruptedRunKeepsEveryEHRID_PROBE108_REQ107(t *testing.T) {
 	}
 }
 
-func TestRun_RedactsBeforeTheCut_PROBE108(t *testing.T) {
+func TestRun_RedactsBeforeTheCut_REQ082(t *testing.T) {
 	t.Parallel()
 	const user, pass = "operator", "s3cr3t-passphrase"
 	b64 := base64.StdEncoding.EncodeToString([]byte(user + ":" + pass))
@@ -689,7 +691,7 @@ func TestRun_RedactsBeforeTheCut_PROBE108(t *testing.T) {
 	}
 }
 
-func TestRun_GroupsARefusalOverTheCutWhole_PROBE108_REQ107(t *testing.T) {
+func TestRun_GroupsARefusalOverTheCutWhole_REQ082_REQ107(t *testing.T) {
 	t.Parallel()
 	const last = "the last finding, past the cut"
 	var findings []string
@@ -735,7 +737,7 @@ func TestRun_GroupsARefusalOverTheCutWhole_PROBE108_REQ107(t *testing.T) {
 	}
 }
 
-func TestRun_SupersededUploadsKeptAndUncounted_PROBE108(t *testing.T) {
+func TestRun_SupersededUploadsKeptAndUncounted_REQ082(t *testing.T) {
 	t.Parallel()
 	opt, err := os.ReadFile(vendoredOPT())
 	if err != nil {
@@ -788,7 +790,7 @@ func TestRun_SupersededUploadsKeptAndUncounted_PROBE108(t *testing.T) {
 	}
 }
 
-func TestLoadConfig_OutputThroughASymlinkStaysOutside_PROBE108(t *testing.T) {
+func TestLoadConfig_OutputThroughASymlinkStaysOutside_REQ082(t *testing.T) {
 	t.Parallel()
 	wd, err := os.Getwd() // cmd/cdrcheck, inside the module
 	if err != nil {
@@ -806,7 +808,7 @@ func TestLoadConfig_OutputThroughASymlinkStaysOutside_PROBE108(t *testing.T) {
 	}
 }
 
-func TestNewEHR_ReadsTheCDRsAnswer_PROBE108(t *testing.T) {
+func TestNewEHR_ReadsTheCDRsAnswer_REQ082(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name      string
@@ -844,7 +846,7 @@ func TestNewEHR_ReadsTheCDRsAnswer_PROBE108(t *testing.T) {
 	}
 }
 
-func TestRun_WritesEachRecordAsItCompletes_PROBE108_REQ107(t *testing.T) {
+func TestRun_WritesEachRecordAsItCompletes_REQ082_REQ107(t *testing.T) {
 	t.Parallel()
 	cdr := newFakeCDR(t)
 	out := filepath.Join(t.TempDir(), "out")

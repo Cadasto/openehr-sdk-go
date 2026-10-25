@@ -24,7 +24,7 @@ func escapeAll(s string) string {
 	return b.String()
 }
 
-func TestRedactor_FindsTheCredentialInEveryForm_PROBE108(t *testing.T) {
+func TestRedactor_FindsTheCredentialInEveryForm_REQ082(t *testing.T) {
 	t.Parallel()
 	b64 := func(user, pass string) string { return base64.StdEncoding.EncodeToString([]byte(user + ":" + pass)) }
 	// "ab?:cd>~" encodes to YWI/OmNkPn4=, with a slash and padding, and
@@ -54,7 +54,7 @@ func TestRedactor_FindsTheCredentialInEveryForm_PROBE108(t *testing.T) {
 	}
 }
 
-func TestFileName_DistinctForEveryTemplateID_PROBE108(t *testing.T) {
+func TestFileName_DistinctForEveryTemplateID_REQ082(t *testing.T) {
 	t.Parallel()
 	safe := regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 	pairs := [][2]string{
@@ -78,7 +78,7 @@ func TestFileName_DistinctForEveryTemplateID_PROBE108(t *testing.T) {
 	}
 }
 
-func TestPrepareOut_ClaimsTheDirectoryOnce_PROBE108(t *testing.T) {
+func TestPrepareOut_ClaimsTheDirectoryOnce_REQ082(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name    string
@@ -133,7 +133,7 @@ func TestPrepareOut_ClaimsTheDirectoryOnce_PROBE108(t *testing.T) {
 	}
 }
 
-func TestPrepareOut_ConcurrentRunsGetOneDirectoryEach_PROBE108(t *testing.T) {
+func TestPrepareOut_ConcurrentRunsGetOneDirectoryEach_REQ082(t *testing.T) {
 	t.Parallel()
 	dir := filepath.Join(t.TempDir(), "out")
 	var won atomic.Int32
@@ -151,7 +151,7 @@ func TestPrepareOut_ConcurrentRunsGetOneDirectoryEach_PROBE108(t *testing.T) {
 	}
 }
 
-func TestPrepareOut_DefaultIsANewDirectoryPerRun_PROBE108(t *testing.T) {
+func TestPrepareOut_DefaultIsANewDirectoryPerRun_REQ082(t *testing.T) {
 	t.Parallel()
 	root := filepath.Join(t.TempDir(), "openehr-cdrcheck")
 	seen := map[string]bool{}
@@ -167,7 +167,7 @@ func TestPrepareOut_DefaultIsANewDirectoryPerRun_PROBE108(t *testing.T) {
 	}
 }
 
-func TestCall_MarksARequestTheRunStopped_PROBE108(t *testing.T) {
+func TestCall_MarksARequestTheRunStopped_REQ082(t *testing.T) {
 	t.Parallel()
 	c := &cdrClient{name: "fake"}
 	live := c.call(t.Context(), func(context.Context) error { return errors.New("connection refused") })
@@ -182,7 +182,7 @@ func TestCall_MarksARequestTheRunStopped_PROBE108(t *testing.T) {
 	}
 }
 
-func TestStream_WritesARedactedLineAndStopsTheRunOnAFailure_PROBE108(t *testing.T) {
+func TestStream_WritesARedactedLineAndStopsTheRunOnAFailure_REQ082(t *testing.T) {
 	t.Parallel()
 	const user, pass = "operator", "s3cr3t"
 	s := &sink{dir: t.TempDir(), red: newRedactor([]cdrTarget{{name: "x", user: user, pass: pass}})}

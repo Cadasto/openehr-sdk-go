@@ -92,7 +92,7 @@ func cannedRun() runData {
 	}
 }
 
-func TestSummarize_CannedRun_PROBE108_REQ107_REQ102(t *testing.T) {
+func TestSummarize_CannedRun_REQ082_REQ107_REQ102(t *testing.T) {
 	t.Parallel()
 	s := summarize(cannedRun())
 
@@ -215,7 +215,7 @@ func TestSummarize_CannedRun_PROBE108_REQ107_REQ102(t *testing.T) {
 	}
 }
 
-func TestRefusalDetails_PROBE108(t *testing.T) {
+func TestRefusalDetails_REQ082(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name string
@@ -240,7 +240,7 @@ func TestRefusalDetails_PROBE108(t *testing.T) {
 	}
 }
 
-func TestWithoutUID_DropsTheTopLevelUIDOnly_PROBE108(t *testing.T) {
+func TestWithoutUID_DropsTheTopLevelUIDOnly_REQ082(t *testing.T) {
 	t.Parallel()
 	in := `{"_type":"COMPOSITION","uid":{"value":"u::x::1"},"name":{"value":"n"},"content":[{"_type":"OBSERVATION","uid":{"value":"keep"}}]}`
 	got, err := withoutUID([]byte(in))

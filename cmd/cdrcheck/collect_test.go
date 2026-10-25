@@ -22,7 +22,7 @@ const sigOPT = `<?xml version="1.0" encoding="UTF-8"?>
   </definition>
 </template>`
 
-func TestOPTSignature_PROBE108(t *testing.T) {
+func TestOPTSignature_REQ082(t *testing.T) {
 	t.Parallel()
 	base := signatureOf([]byte(sigOPT))
 	same := map[string]string{
@@ -62,7 +62,7 @@ func replaceOnce(s, old, repl string) string {
 	return string(bytes.Replace([]byte(s), []byte(old), []byte(repl), 1))
 }
 
-func TestRenamedOPT_RenamesTheTemplateIDOnly_PROBE108(t *testing.T) {
+func TestRenamedOPT_RenamesTheTemplateIDOnly_REQ082(t *testing.T) {
 	t.Parallel()
 	raw, err := os.ReadFile(vendoredOPT())
 	if err != nil {
@@ -91,7 +91,7 @@ func TestRenamedOPT_RenamesTheTemplateIDOnly_PROBE108(t *testing.T) {
 	}
 }
 
-func TestCollectTemplates_KeepsTheFirstOfOneID_PROBE108(t *testing.T) {
+func TestCollectTemplates_KeepsTheFirstOfOneID_REQ082(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	write := func(name, doc string) {
