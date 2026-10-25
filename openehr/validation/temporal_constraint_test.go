@@ -51,13 +51,20 @@ var (
             <lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded>
             <lower>2004-05-20T10:15:30</lower>
           </range>`)
+	// zonedTimeChild admits a TIME with a zone: a synthetic C_TIME with the
+	// ITS-XML timezone_validity 1001, which no vendored OPT writes.
+	zonedTimeChild = shortNameChild("TIME", "C_TIME", "<timezone_validity>1001</timezone_validity>")
+	// localStampChild admits a DATE_TIME with no zone (timezone_validity
+	// 1003).
+	localStampChild = shortNameChild("DATE_TIME", "C_DATE_TIME", "<pattern>yyyy-mm-ddThh:mm:ss</pattern><timezone_validity>1003</timezone_validity>")
 )
 
 // REQ-102, REQ-103 — the template validator reports a temporal value its
 // OPT's ADL 1.4 pattern or range refuses, as a primitive_pattern_mismatch or
 // a primitive_out_of_range: a DV_DATE with a day under yyyy-??-XX, a
-// DV_DURATION outside the range of exactly 24 hours or of 0 to 150 years, and
-// one with a designator its pattern does not name. A value both refuse gets
+// DV_DURATION outside the range of exactly 24 hours or of 0 to 150 years, one
+// with a designator its pattern does not name, and a DV_TIME or a
+// DV_DATE_TIME that breaks its timezone_validity. A value both refuse gets
 // both findings.
 func TestValidate_REQ102_REQ103_TemporalPatternAndRange(t *testing.T) {
 	t.Parallel()
@@ -105,6 +112,16 @@ func TestValidate_REQ102_REQ103_TemporalPatternAndRange(t *testing.T) {
 			name: "date-time with seconds", child: stampChild, value: &rm.DVDateTime{Value: "2004-05-20T10:16:00"},
 			want: []pinnedIssue{templateFinding("pattern_mismatch", "/value")},
 		},
+		{name: "time with a zone where one is mandatory", child: zonedTimeChild, value: &rm.DVTime{Value: "10:30:00+01:00"}},
+		{
+			name: "time with no zone where one is mandatory", child: zonedTimeChild, value: &rm.DVTime{Value: "10:30:00"},
+			want: []pinnedIssue{templateFinding("pattern_mismatch", "/value")},
+		},
+		{name: "date-time with no zone where one is disallowed", child: localStampChild, value: &rm.DVDateTime{Value: "2004-05-20T10:16:00"}},
+		{
+			name: "date-time with a zone where one is disallowed", child: localStampChild, value: &rm.DVDateTime{Value: "2004-05-20T10:16:00Z"},
+			want: []pinnedIssue{templateFinding("pattern_mismatch", "/value")},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -131,6 +148,8 @@ func TestGenerate_REQ107_REQ103_TemporalLeavesValidate(t *testing.T) {
 		{"age", ageChild},
 		{"minutes", minutesChild},
 		{"date-time", stampChild},
+		{"zoned time", zonedTimeChild},
+		{"local date-time", localStampChild},
 	} {
 		c := mustCompileInline(t, elementValueOPT(tc.child))
 		for _, fill := range []instance.ValueFill{instance.ExampleFill, instance.RandomFill} {

@@ -272,6 +272,9 @@ type xmlCObject struct {
 	Property         *xmlCodePhraseRef      `xml:"property"`
 	TerminologyID    *xmlValueWrapper       `xml:"terminology_id"`
 	CodeList         []string               `xml:"code_list"`
+	// TimezoneValidity is the timezone_validity of a C_DATE, C_TIME or
+	// C_DATE_TIME, a VALIDITY_KIND, as written; "" when the OPT omits it.
+	TimezoneValidity string `xml:"timezone_validity"`
 	// Item is the inner constraint of a C_PRIMITIVE_OBJECT wrapper.
 	// Populated only when Type == "C_PRIMITIVE_OBJECT"; the inner
 	// element carries its own xsi:type (`C_BOOLEAN`, `C_INTEGER`,

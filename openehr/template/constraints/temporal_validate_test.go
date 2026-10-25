@@ -345,6 +345,166 @@ func TestREQ103TemporalPatternMalformed(t *testing.T) {
 	}
 }
 
+// TestREQ103TemporalTimezoneValidity pins REQ-103 § Validate contract on
+// TimezoneValidity, the AOM 1.4 timezone_validity: mandatory refuses a time
+// or a date-time with no zone, a date-time with no time included, and
+// disallowed refuses one with a zone, each with one CodePatternMismatch that
+// holds the value in Value only; optional, the zero value, admits both. A
+// date has no zone, so disallowed admits every date. Where the pattern
+// writes a zone suffix too, both rules apply, each with its own violation.
+func TestREQ103TemporalTimezoneValidity(t *testing.T) {
+	t.Parallel()
+	const (
+		missing = "value carries no time zone, which timezone_validity makes mandatory"
+		present = "value carries a time zone, which timezone_validity disallows"
+	)
+	tests := []struct {
+		name     string
+		c        constraints.PrimitiveConstraint
+		admitted []string
+		refused  []string
+		detail   string
+	}{
+		{
+			name:     "time, mandatory",
+			c:        constraints.CTime{TimezoneValidity: constraints.ValidityMandatory},
+			admitted: []string{"10:30:00Z", "10:30+01:00", "10-05"},
+			refused:  []string{"10:30:00", "10", "103000,5"},
+			detail:   missing,
+		},
+		{
+			name:     "time, disallowed",
+			c:        constraints.CTime{TimezoneValidity: constraints.ValidityDisallowed},
+			admitted: []string{"10:30:00", "10", "103000,5"},
+			refused:  []string{"10:30:00Z", "10:30+01:00", "10-05"},
+			detail:   present,
+		},
+		{
+			name:     "time, optional",
+			c:        constraints.CTime{TimezoneValidity: constraints.ValidityOptional},
+			admitted: []string{"10:30:00", "10:30:00Z", "10:30+01:00"},
+		},
+		{
+			name:     "time, mandatory with a pattern that writes no zone",
+			c:        constraints.CTime{Pattern: "hh:mm:ss", TimezoneValidity: constraints.ValidityMandatory},
+			admitted: []string{"10:30:00Z", "10:30:00-03:00"},
+			refused:  []string{"10:30:00"},
+			detail:   missing,
+		},
+		{
+			name:     "date-time, mandatory",
+			c:        constraints.CDateTime{TimezoneValidity: constraints.ValidityMandatory},
+			admitted: []string{"2019-01-28T21:22:49Z", "20190128T2122+0100"},
+			refused:  []string{"2019-01-28T21:22:49", "2019-01-28", "2019"},
+			detail:   missing,
+		},
+		{
+			name:     "date-time, disallowed",
+			c:        constraints.CDateTime{TimezoneValidity: constraints.ValidityDisallowed},
+			admitted: []string{"2019-01-28T21:22:49", "2019-01-28", "2019"},
+			refused:  []string{"2019-01-28T21:22:49Z", "20190128T2122+0100"},
+			detail:   present,
+		},
+		{
+			name:     "date, disallowed",
+			c:        constraints.CDate{TimezoneValidity: constraints.ValidityDisallowed},
+			admitted: []string{"2019-01-28", "2019-01", "2019"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			for _, s := range tc.admitted {
+				if got := tc.c.Validate(s); len(got) != 0 {
+					t.Errorf("%#v.Validate(%q) = %+v, want no violation", tc.c, s, got)
+				}
+			}
+			for _, s := range tc.refused {
+				want := []constraints.Violation{{Code: constraints.CodePatternMismatch, Detail: tc.detail, Value: constraints.Redact(s)}}
+				if got := tc.c.Validate(s); !slices.Equal(got, want) {
+					t.Errorf("%#v.Validate(%q) = %+v, want %+v", tc.c, s, got, want)
+				}
+			}
+		})
+	}
+
+	// A zone suffix and timezone_validity disallowed both apply: no time
+	// passes, and each value gets the violation of the rule it breaks.
+	both := constraints.CTime{Pattern: "hh:mm:ss+hh:mm", TimezoneValidity: constraints.ValidityDisallowed}
+	for value, want := range map[string][]constraints.Violation{
+		"10:30:00":  {{Code: constraints.CodePatternMismatch, Detail: `value does not match pattern "hh:mm:ss+hh:mm"`, Value: constraints.Redact("10:30:00")}},
+		"10:30:00Z": {{Code: constraints.CodePatternMismatch, Detail: present, Value: constraints.Redact("10:30:00Z")}},
+	} {
+		if got := both.Validate(value); !slices.Equal(got, want) {
+			t.Errorf("%#v.Validate(%q) = %+v, want %+v", both, value, got, want)
+		}
+	}
+	// A value that breaks the pattern and timezone_validity gets both
+	// violations, the pattern's first, then the range's.
+	c := constraints.CTime{
+		Pattern:          "hh:mm:XX",
+		TimezoneValidity: constraints.ValidityMandatory,
+		Range:            constraints.TemporalRange{LowerUnbounded: true, Upper: "09:00", UpperInclusive: true},
+	}
+	want := []constraints.Violation{
+		{Code: constraints.CodePatternMismatch, Detail: `value does not match pattern "hh:mm:XX"`, Value: constraints.Redact("10:30:00")},
+		{Code: constraints.CodePatternMismatch, Detail: missing, Value: constraints.Redact("10:30:00")},
+		{Code: constraints.CodeOutOfRange, Detail: "value outside (*..09:00]", Value: constraints.Redact("10:30:00")},
+	}
+	if got := c.Validate("10:30:00"); !slices.Equal(got, want) {
+		t.Errorf("%#v.Validate(%q) = %+v, want %+v", c, "10:30:00", got, want)
+	}
+}
+
+// TestREQ103TemporalTimezoneValidityMalformed pins REQ-103 § Validate
+// contract on a TimezoneValidity no value can meet, set in code: mandatory
+// on a CDate, since a date has no zone, and a value outside the three
+// VALIDITY_KIND values. Every value, a valid one included, gets one
+// CodeInvalidValue that holds no Value.
+func TestREQ103TemporalTimezoneValidityMalformed(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		c      constraints.PrimitiveConstraint
+		value  string
+		detail string
+	}{
+		{
+			name:   "date, mandatory",
+			c:      constraints.CDate{TimezoneValidity: constraints.ValidityMandatory},
+			value:  "2019-01-28",
+			detail: "constraint timezone_validity mandatory cannot hold for a date, which carries no time zone",
+		},
+		{
+			name:   "time, not a VALIDITY_KIND",
+			c:      constraints.CTime{TimezoneValidity: constraints.ValidityDisallowed + 1},
+			value:  "10:30:00",
+			detail: "constraint timezone_validity 3 is not a VALIDITY_KIND",
+		},
+		{
+			name:   "date-time, not a VALIDITY_KIND",
+			c:      constraints.CDateTime{TimezoneValidity: 200},
+			value:  "2019-01-28T10:30:00Z",
+			detail: "constraint timezone_validity 200 is not a VALIDITY_KIND",
+		},
+		{
+			name:   "date, not a VALIDITY_KIND",
+			c:      constraints.CDate{TimezoneValidity: 9},
+			value:  "2019-01-28",
+			detail: "constraint timezone_validity 9 is not a VALIDITY_KIND",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			want := []constraints.Violation{{Code: constraints.CodeInvalidValue, Detail: tc.detail}}
+			if got := tc.c.Validate(tc.value); !slices.Equal(got, want) {
+				t.Errorf("%#v.Validate(%q) = %+v, want %+v", tc.c, tc.value, got, want)
+			}
+		})
+	}
+}
+
 // closedSpan is the TemporalRange from lower to upper, both included.
 func closedSpan(lower, upper string) constraints.TemporalRange {
 	return constraints.TemporalRange{Lower: lower, Upper: upper, LowerInclusive: true, UpperInclusive: true}

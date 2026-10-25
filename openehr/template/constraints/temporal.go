@@ -25,9 +25,16 @@ import (
 // Range is the AOM 1.4 range, in the order of rm.DVDate.Compare: a reduced
 // date stands for the first day of the period it names, so "2004-05" is
 // before "2004-05-20". A value outside it is a CodeOutOfRange.
+//
+// TimezoneValidity is the timezone_validity the ITS-XML C_DATE carries. A
+// date has no zone, so ValidityOptional and ValidityDisallowed admit every
+// date, and ValidityMandatory, which no date can meet, is a CodeInvalidValue
+// on every value; the OPT parser refuses it in strict mode and reads it as
+// optional otherwise.
 type CDate struct {
-	Pattern string
-	Range   TemporalRange
+	Pattern          string
+	Range            TemporalRange
+	TimezoneValidity ValidityKind
 }
 
 func (CDate) isPrimitive() {}
@@ -47,7 +54,7 @@ func (CDate) isPrimitive() {}
 // "2003-06-01" is valid. No OPT reaches that case: the ITS-XML pattern
 // grammar admits no literal.
 func (c CDate) ExampleValue() any {
-	return clockExample(clockDate, c.Pattern, c.Range, "2020-01-01")
+	return clockExample(clockDate, c.Pattern, c.Range, c.TimezoneValidity, "2020-01-01")
 }
 
 // Validate accepts a Go string that rm.DVDate.ValidISO8601 accepts as a
@@ -55,7 +62,7 @@ func (c CDate) ExampleValue() any {
 // Range. It reports any other string as not a valid ISO 8601 date, and
 // each clause the date fails with its own violation.
 func (c CDate) Validate(value any) []Violation {
-	return validateClock(clockDate, c.Pattern, c.Range, value)
+	return validateClock(clockDate, c.Pattern, c.Range, c.TimezoneValidity, value)
 }
 
 // CTime constrains an RM ISO_TIME value (C_TIME). With no Pattern and no
@@ -80,9 +87,15 @@ func (c CDate) Validate(value any) []Violation {
 // when one carries a zone and the other does not, so that bound does not
 // refuse it. "08:00:00Z" is after "09:30:00+02:00", and "09:00:00" is not
 // ordered against it. A value outside the range is a CodeOutOfRange.
+//
+// TimezoneValidity is the AOM 1.4 timezone_validity: ValidityMandatory
+// refuses a time with no zone, and ValidityDisallowed one with a zone, as a
+// CodePatternMismatch. Where Pattern writes a zone suffix too, both rules
+// apply.
 type CTime struct {
-	Pattern string
-	Range   TemporalRange
+	Pattern          string
+	Range            TemporalRange
+	TimezoneValidity ValidityKind
 }
 
 func (CTime) isPrimitive() {}
@@ -90,11 +103,12 @@ func (CTime) isPrimitive() {}
 // ExampleValue returns a time written to Pattern and inside Range, chosen
 // as [CDate.ExampleValue] chooses a date, where a literal minute or second
 // can move a bound out of the range. Written to the pattern, a time keeps
-// its zone, takes Z where the pattern requires a zone it lacks, and is read
-// in UTC where the pattern requires Z and it carries another zone. Its
+// its zone, takes Z where the pattern or TimezoneValidity requires a zone it
+// lacks, is read in UTC where the pattern requires Z and it carries another
+// zone, and drops its zone where TimezoneValidity disallows one. Its
 // sentinel is "12:00:00".
 func (c CTime) ExampleValue() any {
-	return clockExample(clockTime, c.Pattern, c.Range, "12:00:00")
+	return clockExample(clockTime, c.Pattern, c.Range, c.TimezoneValidity, "12:00:00")
 }
 
 // Validate accepts a Go string that rm.DVTime.ValidISO8601 accepts as a
@@ -102,7 +116,7 @@ func (c CTime) ExampleValue() any {
 // Range. It reports any other string as not a valid ISO 8601 time, and
 // each clause the time fails with its own violation.
 func (c CTime) Validate(value any) []Violation {
-	return validateClock(clockTime, c.Pattern, c.Range, value)
+	return validateClock(clockTime, c.Pattern, c.Range, c.TimezoneValidity, value)
 }
 
 // CDateTime constrains an RM ISO_DATE_TIME value (C_DATE_TIME). With no
@@ -123,9 +137,13 @@ func (c CTime) Validate(value any) []Violation {
 // as instants when both carry a zone and the designators differ, and not
 // at all when one carries a zone and the other does not. A date with no
 // time carries none. A value outside the range is a CodeOutOfRange.
+//
+// TimezoneValidity is read as [CTime] reads it; a date-time with no time has
+// no zone, so ValidityMandatory refuses it.
 type CDateTime struct {
-	Pattern string
-	Range   TemporalRange
+	Pattern          string
+	Range            TemporalRange
+	TimezoneValidity ValidityKind
 }
 
 func (CDateTime) isPrimitive() {}
@@ -135,7 +153,7 @@ func (CDateTime) isPrimitive() {}
 // [CTime.ExampleValue] writes it; a literal field after the year can move a
 // bound out of the range. Its sentinel is "2020-01-01T12:00:00Z".
 func (c CDateTime) ExampleValue() any {
-	return clockExample(clockDateTime, c.Pattern, c.Range, "2020-01-01T12:00:00Z")
+	return clockExample(clockDateTime, c.Pattern, c.Range, c.TimezoneValidity, "2020-01-01T12:00:00Z")
 }
 
 // Validate accepts a Go string that rm.DVDateTime.ValidISO8601 accepts as
@@ -144,7 +162,7 @@ func (c CDateTime) ExampleValue() any {
 // not a valid ISO 8601 date-time, and each clause the date-time fails with
 // its own violation.
 func (c CDateTime) Validate(value any) []Violation {
-	return validateClock(clockDateTime, c.Pattern, c.Range, value)
+	return validateClock(clockDateTime, c.Pattern, c.Range, c.TimezoneValidity, value)
 }
 
 // CDuration constrains an RM ISO_DURATION value (C_DURATION). With no
@@ -261,6 +279,23 @@ func (c CDuration) Validate(value any) []Violation {
 	}
 	return appendRangeViolation(out, c.Range, order, "duration", value)
 }
+
+// ValidityKind is the AOM 1.4 VALIDITY_KIND of the timezone_validity of a
+// C_DATE, C_TIME or C_DATE_TIME: whether a value must, may or must not carry
+// a time zone. The ITS-XML schema writes it as 1001 (mandatory), 1002
+// (optional) or 1003 (disallowed). The zero value is ValidityOptional, so a
+// constraint that sets none leaves the zone open.
+type ValidityKind uint8
+
+const (
+	// ValidityOptional admits a value with or without a zone: 1002, or no
+	// timezone_validity.
+	ValidityOptional ValidityKind = iota
+	// ValidityMandatory requires a zone: 1001.
+	ValidityMandatory
+	// ValidityDisallowed refuses a zone: 1003.
+	ValidityDisallowed
+)
 
 // TemporalRange is the AOM 1.4 range of a C_DATE, C_TIME, C_DATE_TIME or
 // C_DURATION: an interval whose bounds are ISO 8601 text of the
@@ -757,7 +792,7 @@ func (p clockPattern) admits(k clockKind, v clockValue) bool {
 
 // validateClock is the Validate of CDate, CTime and CDateTime, kind k
 // naming which.
-func validateClock(k clockKind, pattern string, r TemporalRange, value any) []Violation {
+func validateClock(k clockKind, pattern string, r TemporalRange, tz ValidityKind, value any) []Violation {
 	s, ok := value.(string)
 	if !ok {
 		return []Violation{{Code: CodeWrongType, Detail: fmt.Sprintf("expected string %s, got %T", k, value)}}
@@ -774,12 +809,39 @@ func validateClock(k clockKind, pattern string, r TemporalRange, value any) []Vi
 			out = append(out, patternMismatch(pattern, value))
 		}
 	}
+	out = appendZoneViolation(out, k, tz, v, value)
 	return appendRangeViolation(out, r, clockOrder(k, v), k.String(), value)
 }
 
+// appendZoneViolation appends to out the violation of the timezone_validity
+// clause tz for the value v of kind k, if any: a CodePatternMismatch for a
+// value with no zone where tz makes one mandatory, or with one where tz
+// disallows it, and a CodeInvalidValue, which holds no Value, for a tz no
+// value can meet: mandatory on a date, which carries no zone, or a value
+// outside the three kinds.
+func appendZoneViolation(out []Violation, k clockKind, tz ValidityKind, v clockValue, value any) []Violation {
+	switch tz {
+	case ValidityOptional:
+	case ValidityMandatory:
+		switch {
+		case k == clockDate:
+			return append(out, Violation{Code: CodeInvalidValue, Detail: "constraint timezone_validity mandatory cannot hold for a date, which carries no time zone"})
+		case v.zone() == "":
+			return append(out, Violation{Code: CodePatternMismatch, Detail: "value carries no time zone, which timezone_validity makes mandatory", Value: Redact(value)})
+		}
+	case ValidityDisallowed:
+		if v.zone() != "" {
+			return append(out, Violation{Code: CodePatternMismatch, Detail: "value carries a time zone, which timezone_validity disallows", Value: Redact(value)})
+		}
+	default:
+		return append(out, Violation{Code: CodeInvalidValue, Detail: fmt.Sprintf("constraint timezone_validity %d is not a VALIDITY_KIND", tz)})
+	}
+	return out
+}
+
 // clockExample is the ExampleValue of CDate, CTime and CDateTime, kind k
-// naming which; see [CDate.ExampleValue].
-func clockExample(k clockKind, pattern string, r TemporalRange, sentinel string) string {
+// naming which; see [CDate.ExampleValue] and [CTime.ExampleValue].
+func clockExample(k clockKind, pattern string, r TemporalRange, tz ValidityKind, sentinel string) string {
 	p := anyClock()
 	if pattern != "" {
 		var ok bool
@@ -789,24 +851,24 @@ func clockExample(k clockKind, pattern string, r TemporalRange, sentinel string)
 	}
 	var candidates []string
 	if v, ok := parseClock(k, sentinel); ok {
-		candidates = append(candidates, p.fit(k, v, 0, false))
+		candidates = append(candidates, p.fit(k, v, tz, 0, false))
 	}
 	if r.IsBounded() {
 		if !r.LowerUnbounded {
 			candidates = append(candidates, r.Lower)
 			if v, ok := parseClock(k, r.Lower); ok {
-				candidates = append(candidates, p.fit(k, v, 1, !r.LowerInclusive))
+				candidates = append(candidates, p.fit(k, v, tz, 1, !r.LowerInclusive))
 			}
 		}
 		if !r.UpperUnbounded {
 			candidates = append(candidates, r.Upper)
 			if v, ok := parseClock(k, r.Upper); ok {
-				candidates = append(candidates, p.fit(k, v, -1, !r.UpperInclusive))
+				candidates = append(candidates, p.fit(k, v, tz, -1, !r.UpperInclusive))
 			}
 		}
 	}
 	for _, s := range candidates {
-		if s != "" && len(validateClock(k, pattern, r, s)) == 0 {
+		if s != "" && len(validateClock(k, pattern, r, tz, s)) == 0 {
 			return s
 		}
 	}
@@ -814,13 +876,14 @@ func clockExample(k clockKind, pattern string, r TemporalRange, sentinel string)
 }
 
 // fit writes the value v of kind k with the fields the pattern allows,
-// fractions left out, and with the zone [clockPattern.zoneOf] gives it.
+// fractions left out, and with the zone [clockPattern.zoneOf] gives it
+// under the constraint's timezone_validity tz.
 // Toward 1 it moves the result up by one unit of its last field when that
 // drops a part of v, or when excluded asks for a value past v; toward -1 it
 // moves it down by one unit when excluded asks for a value before v. A
 // field the pattern writes as a literal takes that literal. It returns ""
 // when a move leaves the day of a time.
-func (p clockPattern) fit(k clockKind, v clockValue, toward int, excluded bool) string {
+func (p clockPattern) fit(k clockKind, v clockValue, tz ValidityKind, toward int, excluded bool) string {
 	lo, hi := k.span()
 	var f [fieldCount]int
 	for i := lo; i < hi; i++ {
@@ -830,7 +893,7 @@ func (p clockPattern) fit(k clockKind, v clockValue, toward int, excluded bool) 
 		}
 		f[i] = n
 	}
-	zone, shift := p.zoneOf(v)
+	zone, shift := p.zoneOf(v, tz)
 	if shift != 0 && !moveField(k, &f, fieldSecond, shift) {
 		return ""
 	}
@@ -864,13 +927,20 @@ func (p clockPattern) fit(k clockKind, v clockValue, toward int, excluded bool) 
 	return formatClock(k, f, cut, zone)
 }
 
-// zoneOf returns the zone a value written to the pattern carries: the zone
-// of v, Z where the pattern asks for a zone that v lacks, and Z where the
+// zoneOf returns the zone a value written to the pattern carries under the
+// timezone_validity tz: none where tz disallows one; else the zone of v, Z
+// where the pattern or tz asks for a zone that v lacks, and Z where the
 // pattern asks for Z and v carries another zone. In that last case shift is
 // the seconds that read the clock of v in UTC, its zone's offset from UTC
 // negated; it is 0 otherwise.
-func (p clockPattern) zoneOf(v clockValue) (zone string, shift int) {
+func (p clockPattern) zoneOf(v clockValue, tz ValidityKind) (zone string, shift int) {
+	if tz == ValidityDisallowed {
+		return "", 0
+	}
 	zone = v.zone()
+	if tz == ValidityMandatory && zone == "" {
+		zone = "Z"
+	}
 	switch p.zone {
 	case zoneUTC:
 		if zone != "" && zone != "Z" {

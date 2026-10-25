@@ -155,14 +155,14 @@ func buildPrimitive(o *xmlCObject, strict bool) (constraints.PrimitiveConstraint
 	case "C_STRING":
 		return buildString(o), nil
 	case "C_DATE":
-		r, err := temporalRange(o.Range, strict, "C_DATE", constraints.CDate{}.Validate)
-		return constraints.CDate{Pattern: strings.TrimSpace(o.PrimitivePattern), Range: r}, err
+		r, tz, err := clockParts(o, strict, "C_DATE", constraints.CDate{}.Validate)
+		return constraints.CDate{Pattern: strings.TrimSpace(o.PrimitivePattern), Range: r, TimezoneValidity: tz}, err
 	case "C_TIME":
-		r, err := temporalRange(o.Range, strict, "C_TIME", constraints.CTime{}.Validate)
-		return constraints.CTime{Pattern: strings.TrimSpace(o.PrimitivePattern), Range: r}, err
+		r, tz, err := clockParts(o, strict, "C_TIME", constraints.CTime{}.Validate)
+		return constraints.CTime{Pattern: strings.TrimSpace(o.PrimitivePattern), Range: r, TimezoneValidity: tz}, err
 	case "C_DATE_TIME":
-		r, err := temporalRange(o.Range, strict, "C_DATE_TIME", constraints.CDateTime{}.Validate)
-		return constraints.CDateTime{Pattern: strings.TrimSpace(o.PrimitivePattern), Range: r}, err
+		r, tz, err := clockParts(o, strict, "C_DATE_TIME", constraints.CDateTime{}.Validate)
+		return constraints.CDateTime{Pattern: strings.TrimSpace(o.PrimitivePattern), Range: r, TimezoneValidity: tz}, err
 	case "C_DURATION":
 		r, err := temporalRange(o.Range, strict, "C_DURATION", constraints.CDuration{}.Validate)
 		return constraints.CDuration{Pattern: strings.TrimSpace(o.PrimitivePattern), Range: r}, err
@@ -491,6 +491,48 @@ func temporalRange(i *xmlNumericInterval, strict bool, ctx string, validate func
 		}
 	}
 	return r, nil
+}
+
+// clockParts reads the range and the timezone_validity of a C_DATE, C_TIME
+// or C_DATE_TIME named ctx, as temporalRange and timezoneValidity read them.
+func clockParts(o *xmlCObject, strict bool, ctx string, validate func(any) []constraints.Violation) (constraints.TemporalRange, constraints.ValidityKind, error) {
+	r, err := temporalRange(o.Range, strict, ctx, validate)
+	if err != nil {
+		return r, constraints.ValidityOptional, err
+	}
+	tz, err := timezoneValidity(o.TimezoneValidity, strict, ctx)
+	return r, tz, err
+}
+
+// timezoneValidity reads the timezone_validity text of a C_DATE, C_TIME or
+// C_DATE_TIME named ctx, an ITS-XML VALIDITY_KIND: 1001 is mandatory, 1003
+// disallowed, and 1002, an omitted element or an empty one optional. Text
+// that names no VALIDITY_KIND, and 1001 on a C_DATE, which has no zone to
+// require, are OPT defects: strict mode surfaces them as ErrInvalidOPT, and
+// lenient mode reads them as optional, as temporalRange opens a side whose
+// bound is not ISO 8601 text.
+func timezoneValidity(text string, strict bool, ctx string) (constraints.ValidityKind, error) {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return constraints.ValidityOptional, nil
+	}
+	tz, ok := constraints.ValidityOptional, false
+	switch n, err := strconv.Atoi(text); {
+	case err != nil:
+	case n == 1001:
+		tz, ok = constraints.ValidityMandatory, ctx != "C_DATE"
+	case n == 1002:
+		ok = true
+	case n == 1003:
+		tz, ok = constraints.ValidityDisallowed, true
+	}
+	switch {
+	case ok:
+		return tz, nil
+	case strict:
+		return constraints.ValidityOptional, fmt.Errorf("%w: %s timezone_validity=%q is not a VALIDITY_KIND the type can meet", ErrInvalidOPT, ctx, text)
+	}
+	return constraints.ValidityOptional, nil
 }
 
 // stringOrEmpty returns the bound p points to, or "" for a bound the OPT

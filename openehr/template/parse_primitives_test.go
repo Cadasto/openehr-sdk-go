@@ -1138,6 +1138,114 @@ func TestParse_REQ103_TemporalRangeMalformedBound(t *testing.T) {
 	}
 }
 
+// tzChild is a C_DATE, C_TIME or C_DATE_TIME child of xsiType whose
+// timezone_validity element holds text, written in the place Archetype.xsd
+// gives it, after the pattern; a nil text leaves the element out.
+func tzChild(xsiType, rmType string, text *string) string {
+	el := ""
+	if text != nil {
+		el = "<timezone_validity>" + *text + "</timezone_validity>"
+	}
+	return `<children xsi:type="` + xsiType + `"><rm_type_name>` + rmType + `</rm_type_name><node_id/>` + el + `</children>`
+}
+
+// TestParse_REQ103_TimezoneValidity pins REQ-103 § Validate contract on the
+// parse of the ITS-XML timezone_validity, a VALIDITY_KIND: 1001 is
+// mandatory and 1003 disallowed, and 1002, an absent element or an empty
+// one is optional, in both modes, on C_TIME and C_DATE_TIME, and inside a
+// C_PRIMITIVE_OBJECT. A C_DATE keeps disallowed and optional.
+func TestParse_REQ103_TimezoneValidity(t *testing.T) {
+	t.Parallel()
+	text := func(s string) *string { return &s }
+	tests := []struct {
+		name  string
+		child string
+		want  constraints.PrimitiveConstraint
+	}{
+		{name: "C_TIME 1001", child: tzChild("C_TIME", "TIME", text("1001")), want: constraints.CTime{TimezoneValidity: constraints.ValidityMandatory}},
+		{name: "C_TIME 1002", child: tzChild("C_TIME", "TIME", text("1002")), want: constraints.CTime{TimezoneValidity: constraints.ValidityOptional}},
+		{name: "C_TIME 1003, padded", child: tzChild("C_TIME", "TIME", text(" 1003\n")), want: constraints.CTime{TimezoneValidity: constraints.ValidityDisallowed}},
+		{name: "C_TIME absent", child: tzChild("C_TIME", "TIME", nil), want: constraints.CTime{}},
+		{name: "C_TIME empty", child: tzChild("C_TIME", "TIME", text(" ")), want: constraints.CTime{}},
+		{name: "C_DATE_TIME 1001", child: tzChild("C_DATE_TIME", "DATE_TIME", text("1001")), want: constraints.CDateTime{TimezoneValidity: constraints.ValidityMandatory}},
+		{name: "C_DATE_TIME 1003", child: tzChild("C_DATE_TIME", "DATE_TIME", text("1003")), want: constraints.CDateTime{TimezoneValidity: constraints.ValidityDisallowed}},
+		{name: "C_DATE 1003", child: tzChild("C_DATE", "DATE", text("1003")), want: constraints.CDate{TimezoneValidity: constraints.ValidityDisallowed}},
+		{name: "C_DATE 1002", child: tzChild("C_DATE", "DATE", text("1002")), want: constraints.CDate{}},
+		{
+			name: "C_TIME inside C_PRIMITIVE_OBJECT, with a pattern and a range",
+			child: `<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>TIME</rm_type_name><node_id/>
+				<item xsi:type="C_TIME"><pattern>hh:mm:ss</pattern><timezone_validity>1001</timezone_validity>` +
+				temporalRangeXML(`<lower>09:30:00Z</lower>`) + `</item></children>`,
+			want: constraints.CTime{
+				Pattern: "hh:mm:ss", TimezoneValidity: constraints.ValidityMandatory,
+				Range: constraints.TemporalRange{Lower: "09:30:00Z", LowerInclusive: true, UpperUnbounded: true},
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			for _, strict := range []bool{false, true} {
+				body := strings.Replace(primitiveOPTTemplate, "%s", tc.child, 1)
+				parse := template.ParseOPT
+				if strict {
+					parse = template.ParseOPTStrict
+				}
+				tmpl, err := parse(strings.NewReader(body))
+				if err != nil {
+					t.Fatalf("strict=%t: parse: %v", strict, err)
+				}
+				if got := firstChildPrimitive(t, tmpl); got != tc.want {
+					t.Errorf("strict=%t: PrimitiveConstraint() = %#v, want %#v", strict, got, tc.want)
+				}
+			}
+		})
+	}
+}
+
+// TestParse_REQ103_TimezoneValidityMalformed pins REQ-103 § Validate
+// contract on a timezone_validity that is not one of the three VALIDITY_KIND
+// values, and on 1001 on a C_DATE, which has no zone: ParseOPTStrict fails
+// with ErrInvalidOPT, and ParseOPT reads it as optional, the rest of the
+// constraint kept.
+func TestParse_REQ103_TimezoneValidityMalformed(t *testing.T) {
+	t.Parallel()
+	text := func(s string) *string { return &s }
+	tests := []struct {
+		name    string
+		child   string
+		lenient constraints.PrimitiveConstraint
+	}{
+		{name: "C_TIME 1004", child: tzChild("C_TIME", "TIME", text("1004")), lenient: constraints.CTime{}},
+		{name: "C_TIME 0", child: tzChild("C_TIME", "TIME", text("0")), lenient: constraints.CTime{}},
+		{name: "C_TIME a name", child: tzChild("C_TIME", "TIME", text("mandatory")), lenient: constraints.CTime{}},
+		{name: "C_DATE_TIME a decimal", child: tzChild("C_DATE_TIME", "DATE_TIME", text("1001.0")), lenient: constraints.CDateTime{}},
+		{name: "C_DATE 1001", child: tzChild("C_DATE", "DATE", text("1001")), lenient: constraints.CDate{}},
+		{
+			name: "C_DATE 1001 with a pattern",
+			child: `<children xsi:type="C_DATE"><rm_type_name>DATE</rm_type_name><node_id/>
+				<pattern>yyyy-mm-??</pattern><timezone_validity>1001</timezone_validity></children>`,
+			lenient: constraints.CDate{Pattern: "yyyy-mm-??"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			body := strings.Replace(primitiveOPTTemplate, "%s", tc.child, 1)
+			if _, err := template.ParseOPTStrict(strings.NewReader(body)); !errors.Is(err, template.ErrInvalidOPT) {
+				t.Errorf("ParseOPTStrict err = %v, want errors.Is(err, ErrInvalidOPT)", err)
+			}
+			tmpl, err := template.ParseOPT(strings.NewReader(body))
+			if err != nil {
+				t.Fatalf("ParseOPT: %v", err)
+			}
+			if got := firstChildPrimitive(t, tmpl); got != tc.lenient {
+				t.Errorf("ParseOPT: PrimitiveConstraint() = %#v, want %#v", got, tc.lenient)
+			}
+		})
+	}
+}
+
 // TestParse_REQ103_TemporalRangeVendoredOPTs pins the parse of the C_DURATION
 // ranges the vendored OPTs write: the family history template's age of 0 to
 // 150 years, and the constrain_test template's width of exactly 24 hours and

@@ -335,6 +335,10 @@ func TestSampleValue_REQ103_TemporalPatterns(t *testing.T) {
 		{"date-time, optional seconds", constraints.CDateTime{Pattern: "yyyy-mm-ddTHH:??:??"}, []int{20}},
 		{"date-time, no seconds", constraints.CDateTime{Pattern: "yyyy-mm-ddThh:mm:XX"}, []int{17}},
 		{"date-time, no time", constraints.CDateTime{Pattern: "yyyy-mm-ddTXX:XX:XX"}, []int{10}},
+		{"time, zone mandatory", constraints.CTime{TimezoneValidity: constraints.ValidityMandatory}, []int{9}},
+		{"time, zone disallowed", constraints.CTime{TimezoneValidity: constraints.ValidityDisallowed}, []int{8}},
+		{"date-time, zone mandatory", constraints.CDateTime{TimezoneValidity: constraints.ValidityMandatory}, []int{20}},
+		{"date-time, zone disallowed", constraints.CDateTime{TimezoneValidity: constraints.ValidityDisallowed}, []int{19}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -363,6 +367,7 @@ func TestSampleValue_REQ103_TemporalPatterns(t *testing.T) {
 		constraints.CTime{Pattern: "hh:mm:XX", Range: constraints.TemporalRange{Lower: "09:30:00", LowerInclusive: true, UpperUnbounded: true}},
 		constraints.CDateTime{Range: constraints.TemporalRange{LowerUnbounded: true, Upper: "2004-01-01T00:00:00"}},
 		constraints.CDuration{Pattern: "PY", Range: constraints.TemporalRange{Lower: "P0Y", Upper: "P150Y", LowerInclusive: true, UpperInclusive: true}},
+		constraints.CTime{TimezoneValidity: constraints.ValidityMandatory, Range: constraints.TemporalRange{Lower: "13:30:00+02:00", Upper: "13:45:00+02:00", LowerInclusive: true, UpperInclusive: true}},
 	}
 	for _, c := range ranged {
 		want := c.ExampleValue()
