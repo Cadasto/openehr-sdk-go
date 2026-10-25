@@ -138,7 +138,11 @@ func (e *engine) validatesSince(m walkMark) bool {
 // value under a child: the value, held by pointer ([hasIdentity]), the RM
 // type it is read as, its role, its depth and the child. Whether the value
 // validates there depends on nothing else, its path only naming where its
-// findings are, so the walk decides it once per key ([engine.verdicts]).
+// findings are, so the walk decides it once per key ([engine.verdicts]). Nor
+// does it depend on the values the walk is inside ([engine].ancestry): a
+// value that reaches one of them lies on a cycle, so wherever the walk meets
+// it, its walk reports `cyclic_value`, an error, or stops at the depth limit
+// first, which fails the trial as well.
 type trialKey struct {
 	value  any
 	rmType string
