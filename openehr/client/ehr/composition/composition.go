@@ -1,6 +1,7 @@
 package composition
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
+	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
@@ -80,12 +82,16 @@ func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, re
 // writeConfig is the resolved option set for Save / Update. It embeds
 // the shared [openehrclient.WriteConfig] (Prefer / audit details /
 // lifecycle state) and adds composition's own extra options — template
-// id and item tags — that the other versioned-write leaves lack.
+// id, item tags and the representation format — that the other
+// versioned-write leaves lack.
 type writeConfig struct {
 	openehrclient.WriteConfig
 	templateID      string
 	objectItemTags  []openehrclient.ItemTag
 	versionItemTags []openehrclient.ItemTag
+	format          Format
+	webTemplate     *webtemplate.WebTemplate
+	formatQuery     bool
 }
 
 // WriteOption mutates the request shape for [Save] and [Update].
@@ -105,9 +111,54 @@ func WithAuditDetails(a *rm.AuditDetails) WriteOption {
 
 // WithTemplateID sets the `openehr-template-id` header so
 // the deployment can validate the payload against the declared
-// template. Empty omits the header.
+// template. On a canonical JSON or XML write, empty omits the header. A
+// FLAT or STRUCTURED write always sends the header, and takes the Web
+// Template's id when this one is empty; see [WithFormat].
 func WithTemplateID(id string) WriteOption {
 	return func(c *writeConfig) { c.templateID = id }
+}
+
+// WithFormat sets the representation the composition is written in, and the
+// one a returned composition is read in. The default is [FormatJSON]. When
+// the option is given more than once, the last one wins.
+//
+// The request body is serialised in f and sent with f's media type as
+// `Content-Type`. Under [transport.PreferRepresentation] the write asks for
+// f's media type in `Accept` and decodes the response body in f; under any
+// other preference it asks for application/json, the media type of the
+// identifier body the server may return.
+//
+// FLAT and STRUCTURED are written and read against wt, which must then be
+// non-nil. They also always send the `openehr-template-id` header, holding
+// the id [WithTemplateID] names or, when that is absent or empty, wt's
+// template id. Canonical JSON and XML ignore wt.
+//
+// The write fails with [transport.ErrInvalidConfig], before any request,
+// when f is not one of the four formats, when FLAT or STRUCTURED gets a nil
+// wt, and when the [WithTemplateID] id and wt's template id are both empty
+// or name different templates. A composition the codec cannot serialise
+// also fails before any request.
+func WithFormat(f Format, wt *webtemplate.WebTemplate) WriteOption {
+	return func(c *writeConfig) {
+		c.format = f
+		c.webTemplate = wt
+	}
+}
+
+// WithFormatQuery makes a FLAT or STRUCTURED write name its format with
+// query parameters rather than with a media type. It is a deployment
+// extension outside ITS-REST 1.1.0, for servers that select the simplified
+// format from a `format` query parameter and read the template id from a
+// `templateId` query parameter.
+//
+// With it, a FLAT or STRUCTURED write sends `format=FLAT` or
+// `format=STRUCTURED` and `templateId` holding the template id, with
+// `Content-Type` and `Accept` both application/json, whatever the preference.
+// The body is still written and read in the format [WithFormat] names, and
+// the `openehr-template-id` header is still sent. The option is off by
+// default and adds nothing to a canonical JSON or XML write.
+func WithFormatQuery() WriteOption {
+	return func(c *writeConfig) { c.formatQuery = true }
 }
 
 // WithLifecycleState sets the committed VERSION's lifecycle_state via the
@@ -175,8 +226,14 @@ func WithDeleteAudit(a *rm.AuditDetails) DeleteOption {
 // PreferRepresentation, an empty or undecodable body is a
 // [*openehrclient.NoRepresentationError] carrying commit metadata.
 //
+// The body is canonical JSON unless [WithFormat] names canonical XML,
+// FLAT or STRUCTURED. The format sets the body, its `Content-Type`, and,
+// under PreferRepresentation, the `Accept` header and the decode of the
+// returned composition; nothing else about the write changes.
+//
 // Audit details and the template id flow via the `openehr-*` header
-// family.
+// family. A FLAT or STRUCTURED write always sends the template id, taken
+// from [WithTemplateID] or from the Web Template given to [WithFormat].
 func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("composition.Save: %w: empty EHRID", transport.ErrInvalidConfig)
@@ -190,9 +247,9 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, c
 			o(&cfg)
 		}
 	}
-	body, err := canjson.Marshal(comp)
+	fw, err := cfg.resolveFormat("composition.Save", comp)
 	if err != nil {
-		return nil, nil, fmt.Errorf("composition.Save: marshal body: %w", err)
+		return nil, nil, err
 	}
 	auditHeader, err := cfg.ResolveAuditHeader("composition.Save")
 	if err != nil {
@@ -210,15 +267,18 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, c
 		Method:             http.MethodPost,
 		Path:               "/ehr/" + string(ehrID) + "/composition",
 		Route:              "/ehr/{ehr_id}/composition",
-		Body:               body,
+		Query:              fw.query,
+		Body:               fw.body,
+		ContentType:        fw.contentType,
+		Accept:             fw.accept,
 		Prefer:             cfg.Prefer,
 		AuditDetailsHeader: auditHeader,
 		RMVersion:          verHeader,
-		TemplateID:         cfg.templateID,
+		TemplateID:         fw.templateID,
 		ItemTag:            objectTags,
 		VersionItemTag:     versionTags,
 	}
-	return openehrclient.WriteResult(ctx, c, req, "composition", decodeComposition)
+	return openehrclient.WriteResult(ctx, c, req, "composition", fw.decode)
 }
 
 // Update modifies the Composition family identified by voID, attaching
@@ -238,7 +298,8 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, c
 // issuing a request.
 //
 // Response shape matches [Save]: bare `*rm.Composition` per the
-// ITS-REST OpenAPI `200_COMPOSITION_updated` response.
+// ITS-REST OpenAPI `200_COMPOSITION_updated` response. The format
+// options apply as they do for [Save].
 func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, ifMatch string, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("composition.Update: %w: empty EHRID", transport.ErrInvalidConfig)
@@ -258,9 +319,9 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 			o(&cfg)
 		}
 	}
-	body, err := canjson.Marshal(comp)
+	fw, err := cfg.resolveFormat("composition.Update", comp)
 	if err != nil {
-		return nil, nil, fmt.Errorf("composition.Update: marshal body: %w", err)
+		return nil, nil, err
 	}
 	auditHeader, err := cfg.ResolveAuditHeader("composition.Update")
 	if err != nil {
@@ -278,16 +339,19 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 		Method:             http.MethodPut,
 		Path:               "/ehr/" + string(ehrID) + "/composition/" + string(voID),
 		Route:              "/ehr/{ehr_id}/composition/{versioned_object_id}",
-		Body:               body,
+		Query:              fw.query,
+		Body:               fw.body,
+		ContentType:        fw.contentType,
+		Accept:             fw.accept,
 		IfMatch:            ifMatch,
 		Prefer:             cfg.Prefer,
 		AuditDetailsHeader: auditHeader,
 		RMVersion:          verHeader,
-		TemplateID:         cfg.templateID,
+		TemplateID:         fw.templateID,
 		ItemTag:            objectTags,
 		VersionItemTag:     versionTags,
 	}
-	return openehrclient.WriteResult(ctx, c, req, "composition", decodeComposition)
+	return openehrclient.WriteResult(ctx, c, req, "composition", fw.decode)
 }
 
 // Delete logically deletes the Composition version addressed by
@@ -340,6 +404,75 @@ func decodeComposition(body []byte) (*rm.Composition, error) {
 		return nil, fmt.Errorf("composition: decode Composition: %w", err)
 	}
 	return &comp, nil
+}
+
+// formatWrite is the part of a Save or Update request that the
+// representation format decides (REQ-173).
+type formatWrite struct {
+	body        []byte
+	contentType string
+	accept      string
+	templateID  string
+	query       url.Values
+	decode      func([]byte) (*rm.Composition, error)
+}
+
+// resolveFormat applies the format options to one write and serialises
+// comp. Every refusal comes before any request (REQ-173): a format outside
+// the four, FLAT or STRUCTURED with a nil Web Template, a template id the
+// rule in simplifiedTemplateID cannot resolve, and a composition the codec
+// cannot serialise. Canonical JSON with no format option yields the request
+// every write sent before the formats existed.
+func (c *writeConfig) resolveFormat(op string, comp *rm.Composition) (formatWrite, error) {
+	f := c.format
+	if !f.valid() {
+		return formatWrite{}, fmt.Errorf("%s: %w: unknown composition format %s", op, transport.ErrInvalidConfig, f)
+	}
+	templateID := c.templateID
+	if f.isSimplified() {
+		if c.webTemplate == nil {
+			return formatWrite{}, fmt.Errorf("%s: %w: %s needs a non-nil Web Template", op, transport.ErrInvalidConfig, f)
+		}
+		id, err := simplifiedTemplateID(c.templateID, c.webTemplate.TemplateID)
+		if err != nil {
+			return formatWrite{}, fmt.Errorf("%s: %w", op, err)
+		}
+		templateID = id
+	}
+	body, err := f.marshal(comp, c.webTemplate)
+	if err != nil {
+		return formatWrite{}, fmt.Errorf("%s: marshal body: %w", op, err)
+	}
+	fw := formatWrite{
+		body:        body,
+		contentType: f.MediaType(),
+		accept:      mediaTypeJSON, // the Identifier body is JSON
+		templateID:  templateID,
+		decode:      f.decoder(c.webTemplate),
+	}
+	if c.Prefer == transport.PreferRepresentation {
+		fw.accept = f.MediaType()
+	}
+	if c.formatQuery && f.isSimplified() {
+		fw.contentType = mediaTypeJSON
+		fw.accept = mediaTypeJSON
+		fw.query = url.Values{"format": {f.String()}, "templateId": {templateID}}
+	}
+	return fw, nil
+}
+
+// simplifiedTemplateID resolves the template id a FLAT or STRUCTURED write
+// sends (REQ-173): the WithTemplateID id, or the Web Template's when that
+// is empty. Two non-empty ids that differ, and two empty ids, are refused.
+// The error names neither id.
+func simplifiedTemplateID(option, webTemplate string) (string, error) {
+	switch {
+	case option != "" && webTemplate != "" && option != webTemplate:
+		return "", fmt.Errorf("%w: the WithTemplateID id differs from the Web Template's template id", transport.ErrInvalidConfig)
+	case option == "" && webTemplate == "":
+		return "", fmt.Errorf("%w: no template id: WithTemplateID and the Web Template's template id are both empty", transport.ErrInvalidConfig)
+	}
+	return cmp.Or(option, webTemplate), nil
 }
 
 func marshalItemTagHeaders(object, version []openehrclient.ItemTag) (objectHdr, versionHdr string, err error) {
