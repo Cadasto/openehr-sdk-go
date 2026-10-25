@@ -5,8 +5,8 @@ package instance
 import (
 	"math"
 	"strings"
-	"time"
 
+	"github.com/cadasto/openehr-sdk-go/internal/iso8601"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
@@ -19,15 +19,22 @@ import (
 // way round, and two sides with different constraints can give inverted
 // example values too.
 //
+// First it makes the two bounds strictly comparable where both sides admit
+// such a pair (shareComparable): two DV_QUANTITY bounds take one unit, and
+// two DV_PROPORTION bounds one type, that both sides admit, one in which an
+// ordered pair fits both sides where there is such a one, so that RM
+// DV_INTERVAL.Limits_consistent, which needs
+// lower.is_strictly_comparable_to(upper), can hold.
+//
 // It orders DV_COUNT, DV_QUANTITY, DV_DATE, DV_TIME, DV_DATE_TIME,
 // DV_PROPORTION and DV_ORDINAL bounds, in a DV_INTERVAL of that type and
 // in a DV_INTERVAL<DV_ORDERED> whose two bounds are the same one of those
 // types. Quantities are ordered only when both bounds share their units,
 // since magnitudes in different units do not compare. Proportions are
 // ordered by the ratio numerator/denominator, and only when both bounds
-// share their type (proportionScale). Date-times and times that carry a
-// zone are ordered as instants, and other dates, times and date-times as
-// text when both share one zoneless layout (temporalCompare). A pair that
+// share their type (proportionScale). Dates, times and date-times are
+// ordered as the RM floor orders them: by magnitude, and two times or
+// date-times in different zones as instants (temporalCompare). A pair that
 // does not compare is left alone.
 //
 // An inverted pair is replaced by the first of these two pairs that is in
@@ -90,6 +97,7 @@ import (
 // bounds are then left as they are, and the interval breaks
 // Limits_consistent.
 func orderIntervalBounds(optNode *tcimpl.CompiledNode, rmValue any, lang string) {
+	shareComparable(optNode, rmValue)
 	switch iv := rmValue.(type) {
 	case *rm.DVInterval[rm.DVCount]:
 		orderConcrete(&iv.Interval, optNode, countScale, countKeyOf, setCountKey)
@@ -452,7 +460,8 @@ func quantityFits(node *tcimpl.CompiledNode, k quantityKey) bool {
 
 // magnitudeEnd returns the lowest (low) or highest magnitude a DV_QUANTITY
 // bound node accepts in units: the end of the magnitude range of the first
-// entry for those units, which is the entry DvQuantity.Validate checks. At
+// entry for those units. DvQuantity.Validate accepts a value inside any
+// entry for its units, so a value inside the first one validates. At
 // an exclusive end it is the nearest float64 inside the range. It returns
 // false when there is no such entry, or when its range has no end in that
 // direction. Where the node is a C_COMPLEX_OBJECT, the end is that of the
@@ -550,10 +559,31 @@ func setOrderedQuantity(slot *rm.DVOrdered, k quantityKey) {
 // DV_DATE_TIME bounds (temporalCompare says how). A C_DATE, C_TIME or
 // C_DATE_TIME has no numeric end, so only a swap repairs an inversion.
 var (
-	dateScale     = temporalScale(temporalCompare("", noZone))
-	timeScale     = temporalScale(temporalCompare("15:04:05Z07:00", timeZoned))
-	dateTimeScale = temporalScale(temporalCompare(time.RFC3339, dateTimeZoned))
+	dateScale     = temporalScale(temporalCompare(dateOrderRead))
+	timeScale     = temporalScale(temporalCompare(timeOrderRead))
+	dateTimeScale = temporalScale(temporalCompare(dateTimeOrderRead))
 )
+
+// temporalRead reads an ISO 8601 value of one type as the order of its
+// type reads it: its magnitude, as the RM's Compare reads it; the zone
+// designator it is written with, "" for none; and whether the REQ-123 parse
+// accepts it.
+type temporalRead func(s string) (magnitude float64, zone string, ok bool)
+
+func dateOrderRead(s string) (float64, string, bool) {
+	d := rm.DVDate{Value: s}
+	return float64(d.Magnitude()), "", d.ValidISO8601()
+}
+
+func timeOrderRead(s string) (float64, string, bool) {
+	t := rm.DVTime{Value: s}
+	return float64(t.Magnitude()), t.Timezone(), t.ValidISO8601()
+}
+
+func dateTimeOrderRead(s string) (float64, string, bool) {
+	dt := rm.DVDateTime{Value: s}
+	return dt.Magnitude(), dt.Timezone(), dt.ValidISO8601()
+}
 
 func dateKeyOf(d rm.DVDate) string { return d.Value }
 
@@ -579,51 +609,31 @@ func temporalScale(compare func(a, b string) (int, bool)) scale[string] {
 	}
 }
 
-// temporalCompare compares two ISO 8601 values. When both parse under
-// layout, which carries a zone, they compare as instants. Otherwise they
-// compare as text, which is their chronological order only when both have
-// the same layout and no zone: then they are the same fixed-width shape.
-// Any other pair, such as a zoned value and a zoneless one, or a full date
-// and a partial one, does not compare. An empty layout skips the instant
-// step.
-func temporalCompare(layout string, zoned func(string) bool) func(a, b string) (int, bool) {
+// temporalCompare compares two ISO 8601 values of one type, read by read,
+// in the order the RM floor puts two bounds of that type in (REQ-112
+// DV_INTERVAL): by their magnitudes when they are written with one zone
+// designator, or both with none, a partial value standing for the start of
+// the period it names; and as instants, each by its magnitude less its
+// zone's offset from UTC ([iso8601.UTCMagnitude]), when both carry a zone
+// and the designators differ. A value with a zone does not compare with
+// one without, nor does a value the REQ-123 parse refuses with any.
+func temporalCompare(read temporalRead) func(a, b string) (int, bool) {
 	return func(a, b string) (int, bool) {
-		if layout != "" {
-			ta, errA := time.Parse(layout, a)
-			tb, errB := time.Parse(layout, b)
-			if errA == nil && errB == nil {
-				return ta.Compare(tb), true
-			}
-		}
-		if zoned(a) || zoned(b) || isoShape(a) != isoShape(b) {
+		aMag, aZone, aOK := read(a)
+		bMag, bZone, bOK := read(b)
+		if !aOK || !bOK {
 			return 0, false
 		}
-		return strings.Compare(a, b), true
-	}
-}
-
-func noZone(string) bool { return false }
-
-// timeZoned reports whether an ISO 8601 time carries a zone: Z or an
-// offset.
-func timeZoned(s string) bool { return strings.ContainsAny(s, "Z+-") }
-
-// dateTimeZoned reports whether an ISO 8601 date-time carries a zone after
-// its time part. A value with no time part has none.
-func dateTimeZoned(s string) bool {
-	_, clock, ok := strings.Cut(s, "T")
-	return ok && timeZoned(clock)
-}
-
-// isoShape is s with every digit replaced by 0, so two values have the same
-// shape exactly when they use the same layout.
-func isoShape(s string) string {
-	return strings.Map(func(r rune) rune {
-		if r >= '0' && r <= '9' {
-			return '0'
+		if aZone == bZone {
+			return compareOrdered(aMag, bMag), true
 		}
-		return r
-	}, s)
+		aUTC, aZoned := iso8601.UTCMagnitude(aMag, aZone)
+		bUTC, bZoned := iso8601.UTCMagnitude(bMag, bZone)
+		if !aZoned || !bZoned {
+			return 0, false
+		}
+		return compareOrdered(aUTC, bUTC), true
+	}
 }
 
 // proportionKey is the part of a DV_PROPORTION bound that is compared and
@@ -1124,10 +1134,219 @@ func setOrderedOrdinal(slot *rm.DVOrdered, k ordinalKey) {
 	}
 }
 
+// shareComparable gives the two bounds of a generated interval, both sides
+// bounded, one unit where they are two DV_QUANTITY (shareUnits), and one type
+// where they are two DV_PROPORTION (shareTypes), that both sides admit, in a
+// DV_INTERVAL of that type and in a DV_INTERVAL<DV_ORDERED> whose two bounds
+// are both of it, in value or pointer form. The unit or type is one in which
+// an ordered pair fits both sides where there is such a one, so two bounds
+// that share theirs can take another. A pair the two sides admit no such unit
+// or type for is left as it is, and so is a pair of two classes: the RM floor
+// reports either as not strictly comparable (REQ-112 DV_INTERVAL).
+func shareComparable(optNode *tcimpl.CompiledNode, rmValue any) {
+	switch iv := rmValue.(type) {
+	case *rm.DVInterval[rm.DVQuantity]:
+		if bothBounded(&iv.Interval) {
+			lowerNode, upperNode := boundNodes(optNode)
+			shareUnits(&iv.Lower, &iv.Upper, lowerNode, upperNode)
+		}
+	case *rm.DVInterval[rm.DVProportion]:
+		if bothBounded(&iv.Interval) {
+			lowerNode, upperNode := boundNodes(optNode)
+			shareTypes(&iv.Lower, &iv.Upper, lowerNode, upperNode)
+		}
+	case *rm.DVInterval[rm.DVOrdered]:
+		if !bothBounded(&iv.Interval) {
+			return
+		}
+		lowerNode, upperNode := boundNodes(optNode)
+		if lo, hi, ok := orderedPair(iv, asQuantity); ok && shareUnits(&lo, &hi, lowerNode, upperNode) {
+			setOrderedQuantity(&iv.Lower, quantityKeyOf(lo))
+			setOrderedQuantity(&iv.Upper, quantityKeyOf(hi))
+		}
+		if lo, hi, ok := orderedPair(iv, asProportion); ok && shareTypes(&lo, &hi, lowerNode, upperNode) {
+			setOrderedProportion(&iv.Lower, proportionKeyOf(lo))
+			setOrderedProportion(&iv.Upper, proportionKeyOf(hi))
+		}
+	}
+}
+
+// orderedPair reads both bounds of a DV_INTERVAL<DV_ORDERED> as copies of
+// one T, and reports false where either is not a T.
+func orderedPair[T any](iv *rm.DVInterval[rm.DVOrdered], read func(rm.DVOrdered) (T, bool)) (lower, upper T, ok bool) {
+	lower, lowerOK := read(iv.Lower)
+	upper, upperOK := read(iv.Upper)
+	return lower, upper, lowerOK && upperOK
+}
+
+// shareUnits gives two DV_QUANTITY bounds one unit both sides admit, and
+// reports whether it changed them. It tries, in this order, the lower
+// bound's units, the upper bound's, the units the lower side lists and then
+// those the upper side lists (listedUnits). Of those that both sides admit
+// (inUnits), it takes the first in which the two bounds can be put in order
+// (orderable), and the first of them where none can. A pair with none is left
+// as it is, and so is a pair in one unit that is the one it takes.
+func shareUnits(lower, upper *rm.DVQuantity, lowerNode, upperNode *tcimpl.CompiledNode) bool {
+	candidates := append([]string{lower.Units, upper.Units}, listedUnits(lowerNode)...)
+	candidates = append(candidates, listedUnits(upperNode)...)
+	lo, hi, ok := firstOrderable(candidates, func(units string) (rm.DVQuantity, rm.DVQuantity, bool) {
+		lo, loOK := inUnits(lowerNode, *lower, units)
+		hi, hiOK := inUnits(upperNode, *upper, units)
+		return lo, hi, loOK && hiOK
+	}, func(lo, hi rm.DVQuantity) bool {
+		return orderable(lo, hi, lowerNode, upperNode, quantityScale, quantityKeyOf, setQuantityKey)
+	})
+	if !ok || (lo.Units == lower.Units && hi.Units == upper.Units) {
+		return false
+	}
+	*lower, *upper = lo, hi
+	return true
+}
+
+// firstOrderable returns the pair as of the first candidate that both sides
+// admit (as) and in which the pair can be put in order (inOrder), else the
+// pair as of the first candidate that both sides admit, and false where both
+// sides admit none.
+func firstOrderable[C, T any](candidates []C, as func(C) (T, T, bool), inOrder func(lo, hi T) bool) (lower, upper T, ok bool) {
+	for _, c := range candidates {
+		lo, hi, admitted := as(c)
+		if !admitted {
+			continue
+		}
+		if inOrder(lo, hi) {
+			return lo, hi, true
+		}
+		if !ok {
+			lower, upper, ok = lo, hi, true
+		}
+	}
+	return lower, upper, ok
+}
+
+// orderable reports whether two bounds of T are in order, or can be put in
+// order inside their sides' constraints as orderConcrete puts them
+// (orderPair), each keeping its own normal_range rule (normalAt). A pair that
+// does not compare is not.
+func orderable[T, K any](lower, upper T, lowerNode, upperNode *tcimpl.CompiledNode, s scale[K], key func(T) K, apply func(*T, K)) bool {
+	c, ok := s.compare(key(lower), key(upper))
+	if !ok {
+		return false
+	}
+	if c <= 0 {
+		return true
+	}
+	lowerSide := orderSide[K]{node: lowerNode, narrow: normalAt(lower, lowerNode, key, apply, true)}
+	upperSide := orderSide[K]{node: upperNode, narrow: normalAt(upper, upperNode, key, apply, false)}
+	_, _, ok = orderPair(key(lower), key(upper), lowerSide, upperSide, s)
+	return ok
+}
+
+// listedUnits returns the units a side lists: those of the entries of the
+// C_DV_QUANTITY on its bound node, or, where it lists none, the units of the
+// property it names (PropertyUnits), which are the units it admits, or the
+// list of the C_STRING on the units of a bound the OPT builds attribute by
+// attribute. A side that lists none returns nil.
+func listedUnits(node *tcimpl.CompiledNode) []string {
+	if c, ok := primitiveOf(node).(constraints.DvQuantity); ok {
+		if len(c.Units) == 0 {
+			return c.PropertyUnits
+		}
+		units := make([]string, 0, len(c.Units))
+		for _, u := range c.Units {
+			units = append(units, u.Units)
+		}
+		return units
+	}
+	if c, ok := primitiveOf(bindingChild(node, "units")).(constraints.CString); ok {
+		return c.List
+	}
+	return nil
+}
+
+// inUnits returns q in units, and whether its side admits that: whether
+// node, the side's bound node, accepts the result (quantityFits). A
+// C_DV_QUANTITY that lists entries ties a magnitude range to each unit, so
+// there q takes the magnitude ExampleValue gives for the first entry in
+// units; on any other side q keeps its magnitude, which the side's
+// constraint on the magnitude accepted already. A bound that carries a
+// normal_range of its own admits only its own units: its range was settled
+// in them (settleNormalRange). A nil node constrains nothing.
+func inUnits(node *tcimpl.CompiledNode, q rm.DVQuantity, units string) (rm.DVQuantity, bool) {
+	if q.Units == units {
+		return q, true
+	}
+	if q.NormalRange != nil {
+		return q, false
+	}
+	if c, ok := primitiveOf(node).(constraints.DvQuantity); ok && len(c.Units) > 0 {
+		var entries []constraints.QuantityUnit
+		for _, u := range c.Units {
+			if u.Units == units {
+				entries = append(entries, u)
+			}
+		}
+		if len(entries) == 0 {
+			return q, false
+		}
+		example, ok := constraints.DvQuantity{Units: entries}.ExampleValue().(constraints.QuantityValue)
+		if !ok {
+			return q, false
+		}
+		q.Magnitude = rm.Real(example.Magnitude)
+	}
+	q.Units = units
+	return q, quantityFits(node, quantityKeyOf(q))
+}
+
+// shareTypes gives two DV_PROPORTION bounds one type both sides admit, and
+// reports whether it changed them. It tries, in this order, the lower
+// bound's type, the upper bound's, and every proportion kind in code order.
+// Of those that both sides admit (asKind), it takes the first in which the
+// two bounds can be put in order (orderable), and the first of them where
+// none can. A pair with none is left as it is, and so is a pair of one type
+// that is the one it takes.
+func shareTypes(lower, upper *rm.DVProportion, lowerNode, upperNode *tcimpl.CompiledNode) bool {
+	candidates := []int64{int64(lower.Type), int64(upper.Type)}
+	for kind := range int64(pkIntegerFraction + 1) {
+		candidates = append(candidates, kind)
+	}
+	lo, hi, ok := firstOrderable(candidates, func(kind int64) (rm.DVProportion, rm.DVProportion, bool) {
+		lo, loOK := asKind(lowerNode, *lower, kind)
+		hi, hiOK := asKind(upperNode, *upper, kind)
+		return lo, hi, loOK && hiOK
+	}, func(lo, hi rm.DVProportion) bool {
+		return orderable(lo, hi, lowerNode, upperNode, proportionScale, proportionKeyOf, setProportionKey)
+	})
+	if !ok || (lo.Type == lower.Type && hi.Type == upper.Type) {
+		return false
+	}
+	*lower, *upper = lo, hi
+	return true
+}
+
+// asKind returns p as a proportion of kind, and whether its side admits
+// that: p as it is where it is of kind already, which the walk settled
+// (settleProportion), and else p settled as that kind inside the OPT's
+// constraints on its parts under node (settleProportionAs). A bound that
+// carries a normal_range of its own admits only its own type: its range was
+// settled for it (settleNormalRange).
+func asKind(node *tcimpl.CompiledNode, p rm.DVProportion, kind int64) (rm.DVProportion, bool) {
+	if int64(p.Type) == kind {
+		return p, true
+	}
+	if p.NormalRange != nil || !settleProportionAs(node, &p, kind) {
+		return p, false
+	}
+	return p, true
+}
+
 // sharedQuantityUnit returns one unit both DV_QUANTITY bounds of an
-// interval can use, drawn from the intersection of their unit lists.
-// An empty intersection, or a side that is not a DV_QUANTITY constraint,
-// returns false so each side draws its own unit.
+// interval can use, drawn from the intersection of their unit lists, for
+// RandomFill to draw both bounds in. An empty intersection, or a side that
+// is not a C_DV_QUANTITY, returns false so each side draws its own unit;
+// shareComparable then gives the two bounds one unit where both sides admit
+// one, a side the OPT builds attribute by attribute included, and another
+// shared unit where an ordered pair fits both sides only in that one.
 func sharedQuantityUnit(node *tcimpl.CompiledNode, s sampler) (string, bool) {
 	if node == nil || !strings.HasPrefix(node.RMTypeName(), "DV_INTERVAL") {
 		return "", false

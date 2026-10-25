@@ -6,12 +6,14 @@ package validation_test
 // type, by the RM's less_than for that type, and it orders no other pair. Two
 // DV_TIME or DV_DATE_TIME values in different time zones are ordered as
 // instants, partial values and leap seconds included, and one with a zone is
-// not ordered against one without.
-// Whether two bounds are comparable is Interval.Limits_comparable, which the
-// floor does not evaluate, so Coverage.Unevaluated lists it (REQ-171
-// Coverage). PROBE-077 holds a breaking and a conforming interval of each
-// bound type as the registry decodes it; the tests here read every interval
-// form the floor reads, and the pairs it must not order.
+// not ordered against one without. A pair that is not strictly comparable
+// breaks DV_INTERVAL.Limits_consistent all the same
+// (rmfloor_interval_comparable_test.go). BASE Interval.Limits_comparable,
+// which DV_INTERVAL.Limits_consistent restates, is not evaluated on the BASE
+// intervals, so Coverage.Unevaluated lists it (REQ-171 Coverage). PROBE-077
+// holds a breaking and a conforming interval of each bound type as the
+// registry decodes it; the tests here read every interval form the floor
+// reads, and the pairs it must not order.
 
 import (
 	"math"
@@ -209,20 +211,23 @@ func TestValidateRM_REQ112_IntervalOrderEveryBoundType(t *testing.T) {
 	checkInOrder(t, "DV_TIME at one instant in two offsets", rm.DVTime{Value: "10:00:00+05:00"}, rm.DVTime{Value: "05:00:00Z"})
 }
 
-// REQ-112, REQ-171 — the floor orders no pair the RM does not make strictly
-// comparable, none whose bound has no magnitude to order, and none with an
-// unbounded side. Nor does it order a DV_TIME or DV_DATE_TIME with a time
-// zone against one without, although it orders two in different zones,
-// partial values and leap seconds included
-// ([TestValidateRM_REQ112_IntervalOrderEveryBoundType]). DV_ORDINAL and
-// DV_SCALE symbols are comparable only when they are coded in one named
-// terminology, so a symbol with an empty terminology id, on either side, is
-// not ordered. A side marked unbounded is not ordered even where it still
-// holds a bound, and a BASE Proper_interval, which is not a DV_INTERVAL, is
-// not ordered at all. In each row the lower bound reads above the upper one, so
-// ordering the pair would report it; no Limits_consistent issue is reported,
-// and Coverage.Unevaluated lists Interval.Limits_comparable, the rule an
-// incomparable pair breaks, which the floor does not evaluate.
+// REQ-112, REQ-171 — the floor neither orders nor reports a pair it reads as
+// strictly comparable but has no order for: one whose bound has no magnitude
+// to order, and a DV_TIME or DV_DATE_TIME with a time zone against one
+// without, although it orders two in different zones, partial values and
+// leap seconds included ([TestValidateRM_REQ112_IntervalOrderEveryBoundType]).
+// It reports nothing for an unbounded side, nor for a bounded side that holds
+// no bound. DV_ORDINAL and DV_SCALE symbols are comparable only when they are
+// coded in one named terminology, and the RM leaves the rest undefined, so a
+// pair coded in two terminologies, or a symbol with an empty terminology id
+// on either side, is neither ordered nor reported. A side marked unbounded is
+// not ordered even where it still holds a bound, and a BASE Proper_interval,
+// which is not a DV_INTERVAL, is not ordered at all. In each row the lower
+// bound reads above the upper one, so ordering the pair would report it; no
+// Limits_consistent issue is reported, and Coverage.Unevaluated lists
+// Interval.Limits_comparable, which the floor does not evaluate on a BASE
+// interval. The pairs it reads as not strictly comparable are reported
+// ([TestValidateRM_REQ112_IntervalBoundsOfTwoClasses] and its kin).
 func TestValidateRM_REQ112_REQ171_IntervalOrderSkipsUnorderedPairs(t *testing.T) {
 	t.Parallel()
 	closed := func(lower, upper rm.DVOrdered) any { return new(rm.NewClosedDVInterval(lower, upper)) }
@@ -253,7 +258,6 @@ func TestValidateRM_REQ112_REQ171_IntervalOrderSkipsUnorderedPairs(t *testing.T)
 		{name: "bare DV_COUNT, lower side unbounded with a bound held", root: &lowerOpenHeld},
 		{name: "Proper_interval of DV_COUNT", root: &proper},
 		{name: "DV_QUANTITY, upper magnitude NaN", root: new(rm.NewClosedDVInterval(rm.DVQuantity{Magnitude: 5, Units: "mm"}, rm.DVQuantity{Magnitude: rm.Real(math.NaN()), Units: "mm"}))},
-		{name: "DV_QUANTITY in different units", root: new(rm.NewClosedDVInterval(rm.DVQuantity{Magnitude: 5, Units: "cm"}, rm.DVQuantity{Magnitude: 1, Units: "m"}))},
 		{name: "DV_ORDINAL symbols in different terminologies", root: new(rm.NewClosedDVInterval(rm.DVOrdinal{Value: 3, Symbol: local}, rm.DVOrdinal{Value: 1, Symbol: snomed}))},
 		{name: "DV_ORDINAL symbols coded in no terminology", root: new(rm.NewClosedDVInterval(rm.DVOrdinal{Value: 3, Symbol: none}, rm.DVOrdinal{Value: 1, Symbol: none}))},
 		{name: "DV_ORDINAL, lower symbol coded in no terminology", root: new(rm.NewClosedDVInterval(rm.DVOrdinal{Value: 3, Symbol: none}, rm.DVOrdinal{Value: 1, Symbol: local}))},
@@ -262,7 +266,6 @@ func TestValidateRM_REQ112_REQ171_IntervalOrderSkipsUnorderedPairs(t *testing.T)
 		{name: "DV_SCALE symbols coded in no terminology", root: new(rm.NewClosedDVInterval(rm.DVScale{Value: 2.5, Symbol: none}, rm.DVScale{Value: 0.5, Symbol: none}))},
 		{name: "DV_SCALE, lower symbol coded in no terminology", root: new(rm.NewClosedDVInterval(rm.DVScale{Value: 2.5, Symbol: none}, rm.DVScale{Value: 0.5, Symbol: local}))},
 		{name: "DV_SCALE, upper symbol coded in no terminology", root: new(rm.NewClosedDVInterval(rm.DVScale{Value: 2.5, Symbol: local}, rm.DVScale{Value: 0.5, Symbol: none}))},
-		{name: "DV_PROPORTION of different types", root: new(rm.NewClosedDVInterval(rm.DVProportion{Numerator: 3, Denominator: 4, Type: 0}, rm.DVProportion{Numerator: 1, Denominator: 4, Type: 3}))},
 		{name: "DV_PROPORTION, lower denominator zero", root: new(rm.NewClosedDVInterval(rm.DVProportion{Numerator: 3, Denominator: 0}, rm.DVProportion{Numerator: 1, Denominator: 4}))},
 		{name: "DV_PROPORTION, upper denominator zero", root: new(rm.NewClosedDVInterval(rm.DVProportion{Numerator: 1, Denominator: 4}, rm.DVProportion{Numerator: -1, Denominator: 0}))},
 		{name: "DV_DATE, upper not a date", root: new(rm.NewClosedDVInterval(rm.DVDate{Value: "2025-01-01"}, rm.DVDate{Value: "example"}))},
@@ -279,12 +282,11 @@ func TestValidateRM_REQ112_REQ171_IntervalOrderSkipsUnorderedPairs(t *testing.T)
 		{name: "DV_DATE_TIME without a zone over one with", root: new(rm.NewClosedDVInterval(rm.DVDateTime{Value: "2025-01-01T10:00:00"}, rm.DVDateTime{Value: "2025-01-01T08:00:00Z"}))},
 		{name: "DV_DURATION, upper not a duration", root: new(rm.NewClosedDVInterval(rm.DVDuration{Value: "P2D"}, rm.DVDuration{Value: "example"}))},
 		{name: "DV_DURATION, lower not a duration", root: new(rm.NewClosedDVInterval(rm.DVDuration{Value: "example"}, rm.DVDuration{Value: "-P1D"}))},
-		{name: "DV_COUNT over a unitless DV_QUANTITY", root: closed(rm.DVCount{Magnitude: 10}, rm.DVQuantity{Magnitude: 5})},
-		{name: "unitless DV_QUANTITY over a DV_COUNT", root: closed(&rm.DVQuantity{Magnitude: 10}, &rm.DVCount{Magnitude: 5})},
-		{name: "DV_DATE_TIME over a DV_DATE", root: closed(rm.DVDateTime{Value: "2025-01-01T00:00:00Z"}, rm.DVDate{Value: "2024-01-01"})},
-		{name: "DV_ORDINAL over a DV_SCALE in one terminology", root: closed(rm.DVOrdinal{Value: 3, Symbol: local}, rm.DVScale{Value: 1, Symbol: local})},
 		{name: "nil lower bound on a bounded side", root: closed(nil, rm.DVCount{Magnitude: -1})},
 		{name: "typed-nil lower bound on a bounded side", root: closed((*rm.DVCount)(nil), &rm.DVCount{Magnitude: -1})},
+		// The upper bound names no class, so the lower one, of another class
+		// than the nil pointer's, is not read as not strictly comparable.
+		{name: "typed-nil upper bound on a bounded side", root: closed(&rm.DVQuantity{Magnitude: 5, Units: "mm"}, (*rm.DVCount)(nil))},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
