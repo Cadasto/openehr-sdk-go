@@ -281,3 +281,56 @@ func TestREQ171_FunctionConstraintIsLeftOut(t *testing.T) {
 		t.Errorf("Coverage.NotInRM = %q, want none: is_null is not marked", r.Coverage.NotInRM)
 	}
 }
+
+// TestREQ100_NullFlavorBesideNullFlavour pins § REQ-100 Node taxonomy end to
+// end for an ELEMENT that declares both spellings: the template compiles,
+// the null_flavour constraint applies to the ELEMENT's null_flavour, and
+// null_flavor, kept as written and marked by the compile, is left out of the
+// walk and listed in Coverage.NotInRM (§ REQ-171 Coverage).
+func TestREQ100_NullFlavorBesideNullFlavour(t *testing.T) {
+	// The null_flavour declaration lists 253, a valid null flavour the
+	// null_flavor declaration, which lists 271, does not.
+	const flavour = `<rm_attribute_name>null_flavor</rm_attribute_name>`
+	single := fmt.Sprintf(nullFlavorElementOPT, "null_flavor")
+	start := strings.Index(single, `<attributes xsi:type="C_SINGLE_ATTRIBUTE">`)
+	end := strings.LastIndex(single, `</attributes>`) + len(`</attributes>`)
+	if start < 0 || end < start || strings.Count(single, flavour) != 1 {
+		t.Fatal("the null_flavor declaration is not found exactly once")
+	}
+	decl := single[start:end]
+	second := strings.Replace(strings.Replace(decl, flavour, `<rm_attribute_name>null_flavour</rm_attribute_name>`, 1), "<code_list>271</code_list>", "<code_list>253</code_list>", 1)
+	both := single[:end] + "\n    " + second + single[end:]
+
+	c := compileStrictOPT(t, both)
+	if a := c.Root().Attribute("null_flavor"); a == nil || !a.NotInRM() {
+		t.Fatalf("Compile(ELEMENT null_flavor beside null_flavour): null_flavor %+v, want one marked NotInRM", a)
+	}
+	if a := c.Root().Attribute("null_flavour"); a == nil || a.NotInRM() || a.RMTypeName() != "DV_CODED_TEXT" {
+		t.Fatalf("Compile(ELEMENT null_flavor beside null_flavour): null_flavour %+v, want one of RM type DV_CODED_TEXT, not marked", a)
+	}
+	element := func(code string) *rm.Element {
+		return &rm.Element{
+			ArchetypeNodeID: "at0001",
+			Name:            rm.DVText{Value: "item"},
+			NullFlavour: &rm.DVCodedText{
+				Value:        "null flavour",
+				DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}, CodeString: code},
+			},
+		}
+	}
+	wantNotInRM := []string{"/null_flavor"}
+	r := validation.Validate(element("253"), c)
+	if len(r.Issues) != 0 {
+		t.Errorf("Validate(null_flavour 253, listed by null_flavour) issues = %q, want none", issueKeys(r.Issues))
+	}
+	if !slices.Equal(r.Coverage.NotInRM, wantNotInRM) {
+		t.Errorf("Coverage.NotInRM = %q, want %q", r.Coverage.NotInRM, wantNotInRM)
+	}
+	r = validation.Validate(element("271"), c)
+	if got, want := issueKeys(r.Issues), []string{"primitive_not_in_list /null_flavour/defining_code"}; !slices.Equal(got, want) {
+		t.Errorf("Validate(null_flavour 271, listed by null_flavor only) issues = %q, want %q", got, want)
+	}
+	if !slices.Equal(r.Coverage.NotInRM, wantNotInRM) {
+		t.Errorf("Coverage.NotInRM = %q, want %q", r.Coverage.NotInRM, wantNotInRM)
+	}
+}
