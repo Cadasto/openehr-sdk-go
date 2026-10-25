@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -168,7 +169,11 @@ func loadConfig(args []string, getenv func(string) string, usage io.Writer) (cfg
 	} else {
 		cfg.outRoot = abs
 	}
-	if root, inside := insideModule(abs); inside {
+	root, inside, err := insideModule(abs)
+	if err != nil {
+		return config{}, false, fmt.Errorf("output directory %s: cannot tell whether it is inside the repository: %w", abs, err)
+	}
+	if inside {
 		return config{}, false, fmt.Errorf("output directory %s is inside the repository at %s; the run's data stays outside it", abs, root)
 	}
 	return cfg, false, nil
@@ -204,13 +209,14 @@ func readTarget(spec cdrSpec, getenv func(string) string) (cdrTarget, bool, erro
 // insideModule reports whether dir is in a checkout of this module, as
 // written or with its symbolic links resolved (resolveLinks): dir or one of
 // its parents holds a go.mod declaring modulePath. root is that directory.
-func insideModule(dir string) (root string, inside bool) {
+// A go.mod on the way that cannot be read is an error (declaresModule).
+func insideModule(dir string) (root string, inside bool, err error) {
 	for _, d := range []string{filepath.Clean(dir), resolveLinks(dir)} {
-		if root, inside := moduleAt(d); inside {
-			return root, true
+		if root, inside, err := moduleAt(d); err != nil || inside {
+			return root, inside, err
 		}
 	}
-	return "", false
+	return "", false, nil
 }
 
 // resolveLinks returns dir with the symbolic links of its nearest existing
@@ -233,31 +239,38 @@ func resolveLinks(dir string) string {
 
 // moduleAt reports whether dir or one of its parents, as written, holds a
 // go.mod declaring modulePath.
-func moduleAt(dir string) (root string, inside bool) {
+func moduleAt(dir string) (root string, inside bool, err error) {
 	for d := filepath.Clean(dir); ; {
-		if declaresModule(filepath.Join(d, "go.mod")) {
-			return d, true
+		ok, err := declaresModule(filepath.Join(d, "go.mod"))
+		if err != nil || ok {
+			return d, ok, err
 		}
 		parent := filepath.Dir(d)
 		if parent == d {
-			return "", false
+			return "", false, nil
 		}
 		d = parent
 	}
 }
 
 // declaresModule reports whether the go.mod at path declares modulePath.
-func declaresModule(path string) bool {
+// Where there is a go.mod that cannot be read to its module line, it
+// returns the error, so that the caller refuses the directory rather than
+// take a checkout of this module for another.
+func declaresModule(path string) (bool, error) {
 	f, err := os.Open(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	}
 	if err != nil {
-		return false
+		return false, err
 	}
 	defer func() { _ = f.Close() }() // read-only
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
 		if mod, ok := strings.CutPrefix(strings.TrimSpace(sc.Text()), "module "); ok {
-			return strings.Trim(strings.TrimSpace(mod), `"`) == modulePath
+			return strings.Trim(strings.TrimSpace(mod), `"`) == modulePath, nil
 		}
 	}
-	return false
+	return false, sc.Err()
 }

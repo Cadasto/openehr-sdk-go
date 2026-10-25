@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -479,6 +480,58 @@ func TestLoadConfig_OutputStaysOutsideTheRepository_REQ082(t *testing.T) {
 	outside := filepath.Join(t.TempDir(), "out")
 	if _, _, err := loadConfig([]string{"-out", outside}, e.get, &bytes.Buffer{}); err != nil {
 		t.Errorf("loadConfig(-out %s) = %v, want nil", outside, err)
+	}
+}
+
+func TestLoadConfig_AnUnreadableGoModRefusesTheOutput_REQ082(t *testing.T) {
+	t.Parallel()
+	module := []byte("module " + modulePath + "\n")
+	cases := []struct {
+		name string
+		// goMod writes what a checkout at dir holds as its go.mod.
+		goMod   func(path string) error
+		refused bool
+		// noAccess says the case needs a file the test process cannot read.
+		noAccess bool
+	}{
+		{name: "a go.mod of another module", goMod: func(path string) error {
+			return os.WriteFile(path, []byte("module example.com/other\n"), 0o644)
+		}},
+		{name: "a go.mod of this module", refused: true, goMod: func(path string) error {
+			return os.WriteFile(path, module, 0o644)
+		}},
+		{
+			// The line is past the scanner's buffer, so the module line
+			// after it is never read.
+			name: "a go.mod of this module after a line too long to read", refused: true,
+			goMod: func(path string) error {
+				return os.WriteFile(path, append([]byte("// "+strings.Repeat("x", 1<<17)+"\n"), module...), 0o644)
+			},
+		},
+		{name: "a go.mod that is a directory", refused: true, goMod: func(path string) error { return os.Mkdir(path, 0o755) }},
+		{name: "a go.mod that cannot be opened", refused: true, noAccess: true, goMod: func(path string) error {
+			if err := os.WriteFile(path, module, 0o644); err != nil {
+				return err
+			}
+			return os.Chmod(path, 0)
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if tc.noAccess && (runtime.GOOS == "windows" || os.Geteuid() == 0) {
+				t.Skip("a file's mode keeps neither Windows nor root from reading it")
+			}
+			checkout := t.TempDir()
+			if err := tc.goMod(filepath.Join(checkout, "go.mod")); err != nil {
+				t.Fatal(err)
+			}
+			e := env{envTemplates: t.TempDir()}
+			_, _, err := loadConfig([]string{"-out", filepath.Join(checkout, "out")}, e.get, &bytes.Buffer{})
+			if refused := err != nil; refused != tc.refused {
+				t.Errorf("loadConfig(-out under %s) = %v, want refused %v: a go.mod that cannot be read may be this module's", tc.name, err, tc.refused)
+			}
+		})
 	}
 }
 
