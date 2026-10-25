@@ -113,11 +113,11 @@ func GetVersion(ctx context.Context, c *transport.Client, ehrID openehrclient.EH
 }
 
 // GetVersionAtTime returns the version of ehrID's EHR_STATUS that was current
-// at t.
+// at t. A zero t fails with [transport.ErrInvalidConfig] before any request:
+// [GetVersion] is the read for the latest version.
 //
 // Wire: GET /ehr/{ehr_id}/versioned_ehr_status/version?version_at_time={t},
 // with t sent in UTC with its fraction of a second.
-// Zero t is rejected, so pass a real time; use [GetVersion] for the latest.
 func GetVersionAtTime(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, t time.Time) (*Version, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("ehrstatus.GetVersionAtTime: %w: empty EHRID", transport.ErrInvalidConfig)

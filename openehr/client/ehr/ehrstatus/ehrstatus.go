@@ -39,11 +39,12 @@ func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID) (*
 	return decode(ctx, c, req)
 }
 
-// GetAtTime returns the EHR_STATUS that was current at t.
+// GetAtTime returns the EHR_STATUS that was current at t. A zero t fails
+// with [transport.ErrInvalidConfig] before any request: [Get] is the read
+// for the latest.
 //
 // Wire: GET /ehr/{ehr_id}/ehr_status?version_at_time={t}, with t sent
 // in UTC with its fraction of a second.
-// Zero t is rejected, so pass a real time; use [Get] for the latest.
 func GetAtTime(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, t time.Time) (*rm.EHRStatus, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("ehrstatus.GetAtTime: %w: empty EHRID", transport.ErrInvalidConfig)

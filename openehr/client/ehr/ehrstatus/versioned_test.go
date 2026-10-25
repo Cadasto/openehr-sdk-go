@@ -15,9 +15,9 @@ import (
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
-// The bodies below are canonical JSON. The EHR_STATUS is the package's corpus
-// fixture (testkit/corpus/its_rest/ehr/ehr_status.json); version 2 of it
-// follows version 1 (ehrStatusUID).
+// The bodies below are canonical JSON. A version's data is the package's
+// corpus EHR_STATUS (testkit/corpus/its_rest/ehr/ehr_status.json), read at
+// test time by versionBody; version 2 of it follows version 1 (ehrStatusUID).
 const (
 	statusVOUID                             = "f1e2d3c4-b5a6-4978-89ab-cdef01234567"
 	statusVersion2 openehrclient.VersionUID = statusVOUID + "::cdr.example::2"
@@ -25,29 +25,6 @@ const (
 	versionedPath                           = "/openehr/v1/ehr/" + string(ehrIDFixture) + "/versioned_ehr_status"
 	timeCreated                             = "2015-01-20T19:30:22.765+01:00"
 )
-
-const ehrStatusJSON = `{
-	"_type": "EHR_STATUS",
-	"name": {"_type": "DV_TEXT", "value": "EHR Status"},
-	"archetype_node_id": "openEHR-EHR-EHR_STATUS.generic.v1",
-	"archetype_details": {
-		"_type": "ARCHETYPED",
-		"archetype_id": {"_type": "ARCHETYPE_ID", "value": "openEHR-EHR-EHR_STATUS.generic.v1"},
-		"rm_version": "1.1.0"
-	},
-	"uid": {"_type": "HIER_OBJECT_ID", "value": "` + statusVOUID + `"},
-	"is_modifiable": true,
-	"is_queryable": true,
-	"subject": {
-		"_type": "PARTY_SELF",
-		"external_ref": {
-			"_type": "PARTY_REF",
-			"id": {"_type": "GENERIC_ID", "value": "patient-123", "scheme": "MRN"},
-			"namespace": "demographic",
-			"type": "PERSON"
-		}
-	}
-}`
 
 const creationAuditJSON = `{
 	"_type": "AUDIT_DETAILS",
@@ -86,14 +63,21 @@ const versionFields = `"uid": {"_type": "OBJECT_VERSION_ID", "value": "` + strin
 	"commit_audit": ` + modificationAuditJSON + `,
 	"contribution": ` + contributionJSON
 
-const (
-	versionJSON       = `{"_type": "ORIGINAL_VERSION", ` + versionFields + `, "data": ` + ehrStatusJSON + `}`
-	versionNoDataJSON = `{"_type": "ORIGINAL_VERSION", ` + versionFields + `}`
-	// importedVersionJSON is the other VERSION the pin's UVersionOfEhrStatus
-	// admits: an IMPORTED_VERSION wrapping the ORIGINAL_VERSION above.
-	importedVersionJSON = `{"_type": "IMPORTED_VERSION", "commit_audit": ` + creationAuditJSON +
-		`, "contribution": ` + contributionJSON + `, "item": ` + versionJSON + `}`
-)
+const versionNoDataJSON = `{"_type": "ORIGINAL_VERSION", ` + versionFields + `}`
+
+// versionBody returns an ORIGINAL_VERSION whose data is the corpus EHR_STATUS.
+func versionBody(t *testing.T) string {
+	t.Helper()
+	return `{"_type": "ORIGINAL_VERSION", ` + versionFields + `, "data": ` + string(readFixture(t)) + `}`
+}
+
+// importedVersionBody returns the other VERSION the pin's UVersionOfEhrStatus
+// admits: an IMPORTED_VERSION wrapping the ORIGINAL_VERSION of versionBody.
+func importedVersionBody(t *testing.T) string {
+	t.Helper()
+	return `{"_type": "IMPORTED_VERSION", "commit_audit": ` + creationAuditJSON +
+		`, "contribution": ` + contributionJSON + `, "item": ` + versionBody(t) + `}`
+}
 
 const versionedObjectJSON = `{
 	"_type": "VERSIONED_EHR_STATUS",
@@ -125,7 +109,9 @@ type versionedRead struct {
 	repoCall func(ctx context.Context, r ehrstatus.Repository) error
 }
 
-func versionedReads() []versionedRead {
+func versionedReads(t *testing.T) []versionedRead {
+	t.Helper()
+	version := versionBody(t)
 	return []versionedRead{
 		{
 			name: "GetVersionedObject",
@@ -156,7 +142,7 @@ func versionedReads() []versionedRead {
 		{
 			name: "GetVersion",
 			path: versionedPath + "/version",
-			body: versionJSON,
+			body: version,
 			call: func(ctx context.Context, c *transport.Client) error {
 				_, _, err := ehrstatus.GetVersion(ctx, c, ehrIDFixture)
 				return err
@@ -170,7 +156,7 @@ func versionedReads() []versionedRead {
 			name:  "GetVersionAtTime",
 			path:  versionedPath + "/version",
 			query: url.Values{"version_at_time": {"2015-01-20T18:30:22.765Z"}},
-			body:  versionJSON,
+			body:  version,
 			call: func(ctx context.Context, c *transport.Client) error {
 				_, _, err := ehrstatus.GetVersionAtTime(ctx, c, ehrIDFixture, atTime)
 				return err
@@ -183,7 +169,7 @@ func versionedReads() []versionedRead {
 		{
 			name: "GetVersionByID",
 			path: versionedPath + "/version/" + string(statusVersion2),
-			body: versionJSON,
+			body: version,
 			call: func(ctx context.Context, c *transport.Client) error {
 				_, _, err := ehrstatus.GetVersionByID(ctx, c, ehrIDFixture, statusVersion2)
 				return err
@@ -231,7 +217,7 @@ func serveBody(t *testing.T, body string) *httptest.Server {
 // fraction of a second. The server sends no ETag or Location, so each read
 // also succeeds without populated version metadata.
 func TestVersionedReadsWire(t *testing.T) {
-	for _, tc := range versionedReads() {
+	for _, tc := range versionedReads(t) {
 		t.Run(tc.name, func(t *testing.T) {
 			var captured *http.Request
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -300,9 +286,10 @@ func TestGetRevisionHistoryDecodes(t *testing.T) {
 // REQ-174: a version read decodes the ORIGINAL_VERSION envelope and its
 // EHR_STATUS.
 func TestGetVersionDecodesEnvelope(t *testing.T) {
+	body := versionBody(t)
 	for _, tc := range versionCalls() {
 		t.Run(tc.name, func(t *testing.T) {
-			srv := serveBody(t, versionJSON)
+			srv := serveBody(t, body)
 			v, _, err := tc.call(t.Context(), newClient(t, srv))
 			if err != nil {
 				t.Fatal(err)
@@ -361,15 +348,16 @@ func TestGetVersionWithoutData(t *testing.T) {
 // as the typed decode failure, keeping the body, and never decodes to an
 // empty version.
 func TestGetVersionRefusesImportedVersion(t *testing.T) {
+	body := importedVersionBody(t)
 	for _, tc := range versionCalls() {
 		t.Run(tc.name, func(t *testing.T) {
-			srv := serveBody(t, importedVersionJSON)
+			srv := serveBody(t, body)
 			v, _, err := tc.call(t.Context(), newClient(t, srv))
 			de, ok := errors.AsType[*transport.DecodeError](err)
 			if !ok || de == nil {
 				t.Fatalf("%s(IMPORTED_VERSION) err = %v (%T), want a *transport.DecodeError", tc.name, err, err)
 			}
-			if string(de.Body) != importedVersionJSON {
+			if string(de.Body) != body {
 				t.Errorf("%s(IMPORTED_VERSION) DecodeError.Body = %q, want the response body", tc.name, de.Body)
 			}
 			if v != nil {
@@ -391,7 +379,7 @@ func TestVersionedReadsRefuseNoBody(t *testing.T) {
 		{name: "null", status: http.StatusOK, body: "null"},
 		{name: "204", status: http.StatusNoContent, body: ""},
 	}
-	for _, tc := range versionedReads() {
+	for _, tc := range versionedReads(t) {
 		for _, a := range answers {
 			t.Run(tc.name+"/"+a.name, func(t *testing.T) {
 				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -411,7 +399,7 @@ func TestVersionedReadsRefuseNoBody(t *testing.T) {
 
 // REQ-174: a 404 maps to ErrNotFound on every read.
 func TestVersionedReadsNotFound(t *testing.T) {
-	for _, tc := range versionedReads() {
+	for _, tc := range versionedReads(t) {
 		t.Run(tc.name, func(t *testing.T) {
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusNotFound)
@@ -462,12 +450,13 @@ func TestVersionedReadsRefuseBeforeRequest(t *testing.T) {
 			return err
 		}},
 	}
+	body := versionBody(t)
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			var hits atomic.Int32
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				hits.Add(1)
-				_, _ = w.Write([]byte(versionJSON))
+				_, _ = w.Write([]byte(body))
 			}))
 			defer srv.Close()
 
@@ -491,9 +480,10 @@ func TestVersionedReadsRefuseBeforeRequest(t *testing.T) {
 // REQ-174, REQ-054: the ETag of a version-at-time response fills the
 // metadata's version id.
 func TestGetVersionAtTimeETag(t *testing.T) {
+	body := versionBody(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("ETag", `"`+string(statusVersion2)+`"`)
-		_, _ = w.Write([]byte(versionJSON))
+		_, _ = w.Write([]byte(body))
 	}))
 	defer srv.Close()
 
@@ -508,7 +498,7 @@ func TestGetVersionAtTimeETag(t *testing.T) {
 
 // REQ-174: each new Repository method reaches its route.
 func TestRepositoryVersionedReads(t *testing.T) {
-	for _, tc := range versionedReads() {
+	for _, tc := range versionedReads(t) {
 		t.Run(tc.name, func(t *testing.T) {
 			var captured *http.Request
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

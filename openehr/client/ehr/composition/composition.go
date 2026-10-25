@@ -162,8 +162,8 @@ func WithDeleteAudit(a *rm.AuditDetails) DeleteOption {
 //     version fields that `ORIGINAL_VERSION` carries are not in the
 //     POST/PUT body; they are available via the version
 //     metadata (`ETag` → `VersionUID`) or via a follow-up
-//     `GET /versioned_composition/{vo_uid}/version/{version_uid}`
-//     which is the canonical home for the `ORIGINAL_VERSION` envelope.
+//     [GetVersionByID], which reads the persisted `ORIGINAL_VERSION`
+//     envelope.
 //   - PreferIdentifier: server returns the ITS-REST `Identifier` body
 //     (`{"uid": …}`); the returned `*rm.Composition` is nil and the
 //     identifier is resolved into the metadata `VersionUID` (the
@@ -332,9 +332,8 @@ func Delete(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 // Per ITS-REST OpenAPI `201_COMPOSITION` / `200_COMPOSITION_updated`
 // (REQ-094), the response body is a bare `Composition` — not an
 // `ORIGINAL_VERSION<COMPOSITION>` envelope. The full audit / lifecycle
-// version envelope lives at `GET /versioned_composition/{vo_uid}/
-// version/{version_uid}` (`UVersionOfComposition`) which the
-// consumer can fetch when needed.
+// version envelope (`UVersionOfComposition`) is read by
+// [GetVersionByID], which the consumer can call when needed.
 func decodeComposition(body []byte) (*rm.Composition, error) {
 	var comp rm.Composition
 	if err := canjson.Unmarshal(body, &comp); err != nil {
