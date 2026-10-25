@@ -279,7 +279,7 @@ requirements:
     canonical: docs/specifications/rm-modeling.md#openehr-terminology-vocabulary-req-034
     status: draft
     implementation: landed
-    packages: [resources/terminology, openehr/terminology, internal/termgen, cmd/termgen, openehr/client/ehr, openehr/client/ehr/contribution, openehr/serialize/simplified, openehr/instance]
+    packages: [resources/terminology, openehr/terminology, internal/termgen, cmd/termgen, openehr/client/ehr, openehr/client/ehr/contribution, openehr/serialize/simplified, openehr/instance, openehr/template, openehr/validation]
     tests:
       - internal/termgen/parse_test.go
       - internal/termgen/render_test.go
