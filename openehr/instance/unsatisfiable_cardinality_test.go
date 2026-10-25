@@ -105,3 +105,40 @@ func TestREQ107_UnsatisfiableCardinalityIsRefused(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ107_UnsatisfiableCardinalityIsRefusedWhereVisited is the REQ-107
+// Errors and Exceptions check that a list whose children's occurrences lower
+// bounds add up past its cardinality upper bound is refused only where the
+// walk visits it: held by an optional SECTION, it makes Generate return an
+// error wrapping ErrConstraintUnsatisfiable and no root under Large and
+// Medium, which build that SECTION, and Required, which builds no member of
+// an optional child, returns a root without the list that passes the RM
+// floor and the template validator. It holds under both value fills and
+// both compile modes.
+func TestREQ107_UnsatisfiableCardinalityIsRefusedWhereVisited(t *testing.T) {
+	opt := optTemplate("SECTION", optCardinal("items", 0, 1,
+		optSectionChild("at0001", 0, 1, optCardinal("items", 0, 1, optSectionChild("at0002", 1, 1), optSectionChild("at0003", 1, 1)))))
+	for _, implicit := range []bool{true, false} {
+		c := compileOPTText(t, opt, implicit)
+		for _, opts := range guardOptions() {
+			t.Run(fmt.Sprintf("implicit=%t/%v/%v", implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+				out, err := instance.Generate(t.Context(), c, opts)
+				if opts.Policy == instance.Required {
+					if err != nil {
+						t.Fatalf("Generate: %v, want a root", err)
+					}
+					if n := len(sectionItems(t, out)); n != 0 {
+						t.Errorf("Generate wrote %d members in the root's items, want none", n)
+					}
+					checkValid(t, out, c)
+					return
+				}
+				checkUnsatisfiableDetail(t, "Generate", err,
+					"SECTION.items at /items[at0001]: the occurrences lower bounds of its children add up to 2, past its cardinality upper bound 1")
+				if out != nil {
+					t.Errorf("Generate returned %T with the error, want no root", out)
+				}
+			})
+		}
+	}
+}
