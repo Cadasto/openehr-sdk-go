@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	mrand "math/rand/v2"
 	"path"
@@ -32,9 +31,6 @@ var fills = []fill{{name: "example"}, {name: "random1", seed: 1}, {name: "random
 // generationNow is the generator's clock, fixed so that two runs write the
 // same date-times and their documents compare.
 var generationNow = time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
-
-// generateTimeout bounds one Generate call.
-const generateTimeout = 2 * time.Minute
 
 // issue is one validator finding.
 type issue struct {
@@ -162,9 +158,7 @@ func generateOne(ctx context.Context, s *sink, compiled *templatecompile.Compile
 		opts.ValueSource = mrand.NewPCG(f.seed, f.seed*7919)
 		opts.UIDSource = instance.UIDsFrom(mrand.NewPCG(f.seed+100, f.seed*104729))
 	}
-	gctx, cancel := context.WithTimeoutCause(ctx, generateTimeout, errors.New("generation took longer than its time limit"))
-	root, err := instance.Generate(gctx, compiled, opts)
-	cancel()
+	root, err := instance.Generate(ctx, compiled, opts)
 	rec.Millis = time.Since(start).Milliseconds()
 	if err != nil {
 		rec.Stage, rec.Error = "generate", err.Error()
