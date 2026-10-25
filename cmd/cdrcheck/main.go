@@ -42,7 +42,8 @@
 // validate, cross), each line written as its record completes, the
 // documents and the CDRs' examples, run.json, summary.json and summary.md.
 // A run that stops early, on Ctrl-C or an error, keeps every record made
-// until then and writes a summary marked partial. A credential never reaches
+// until then and writes a summary marked partial. A second Ctrl-C while it
+// winds down ends it at once, before the summary. A credential never reaches
 // the output, a progress line or an error.
 //
 // -only REGEXP checks only the templates whose id matches; the summary of
@@ -65,7 +66,7 @@ import (
 )
 
 func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, stop := interruptContext(context.Background(), signal.NotifyContext)
 	err := run(ctx, os.Args[1:], os.Getenv, os.Stdout, os.Stderr)
 	stop()
 	if errors.Is(err, flag.ErrHelp) {
@@ -75,6 +76,17 @@ func main() {
 		fmt.Fprintln(os.Stderr, "cdrcheck:", err)
 		os.Exit(1)
 	}
+}
+
+// interruptContext returns a context that ends on the first Ctrl-C
+// (os.Interrupt), as notify, signal.NotifyContext, gives it. Once that
+// context has ended, the stop notify returned runs at once and restores the
+// default handling of os.Interrupt, so a second Ctrl-C while the run winds
+// down ends the process instead of being swallowed.
+func interruptContext(parent context.Context, notify func(context.Context, ...os.Signal) (context.Context, context.CancelFunc)) (context.Context, context.CancelFunc) {
+	ctx, stop := notify(parent, os.Interrupt)
+	context.AfterFunc(ctx, stop)
+	return ctx, stop
 }
 
 // run reads the configuration and runs the cross-check. getenv, stdout and

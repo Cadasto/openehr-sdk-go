@@ -20,6 +20,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"uuid"
 
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
@@ -60,6 +61,43 @@ func readSummary(t *testing.T, out string) summary {
 		t.Fatal(err)
 	}
 	return s
+}
+
+func TestInterruptContext_RestoresTheDefaultOnceTheRunStops_REQ082(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		var interrupt context.CancelFunc
+		restored := make(chan struct{})
+		// notify stands in for signal.NotifyContext, so no signal reaches
+		// the test process: interrupt is the first Ctrl-C, and the stop it
+		// returns closes restored where the real one restores the default
+		// handling of os.Interrupt.
+		notify := func(parent context.Context, sigs ...os.Signal) (context.Context, context.CancelFunc) {
+			if !slices.Equal(sigs, []os.Signal{os.Interrupt}) {
+				t.Errorf("interruptContext asked for the signals %v, want only os.Interrupt", sigs)
+			}
+			ctx, cancel := context.WithCancel(parent)
+			interrupt = cancel
+			var once sync.Once
+			return ctx, func() { once.Do(func() { close(restored) }); cancel() }
+		}
+		ctx, stop := interruptContext(t.Context(), notify)
+		defer stop()
+		synctest.Wait()
+		select {
+		case <-restored:
+			t.Fatal("the default handling of Ctrl-C was restored before any Ctrl-C")
+		default:
+		}
+		interrupt()
+		<-ctx.Done()
+		synctest.Wait()
+		select {
+		case <-restored:
+		default:
+			t.Error("after the first Ctrl-C the default handling is not restored, so a second Ctrl-C is swallowed while the run winds down")
+		}
+	})
 }
 
 func TestRun_SkipsWhenUnset_REQ082_REQ107(t *testing.T) {
