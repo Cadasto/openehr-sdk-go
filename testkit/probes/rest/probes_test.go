@@ -2,8 +2,11 @@ package restprobes_test
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path"
 	"slices"
 	"strings"
 	"sync"
@@ -11,9 +14,15 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
+	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/sandbox"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 	"github.com/cadasto/openehr-sdk-go/testkit/probe"
 	restprobes "github.com/cadasto/openehr-sdk-go/testkit/probes/rest"
 	"github.com/cadasto/openehr-sdk-go/transport"
@@ -676,5 +685,556 @@ func TestProbe062RejectsMissingInputs(t *testing.T) { // PROBE-062
 	}
 	if _, err := restprobes.Probe062AuditDetailsHeader(t.Context(), c, snap, probe062EHRID, probe062ContribUID, probe062Audit(), nil); err == nil {
 		t.Error("nil composition: want an error")
+	}
+}
+
+// --- PROBE-108 composition formats ------------------------------------------
+
+const (
+	probe108EHRID openehrclient.EHRID = "55555555-5555-4555-8555-555555555555"
+	// probe108TemplateID names the vendored OPT and canonical composition the
+	// probe writes; PROBE-076 round-trips this pair through both simplified
+	// codecs, and the composition leaf's format tests use it too.
+	probe108TemplateID = "Test_dv_quantity_open_constraint.v0"
+	// probe108OtherVersion is a version uid the backend never assigned, for
+	// the plant that sends the read to another version's path.
+	probe108OtherVersion = "99999999-0000-4000-8000-000000000000::cdr.example::1"
+)
+
+// The media types the backend recognises, spelled out so the test pins the
+// strings on the wire rather than the constants the code under test uses.
+const (
+	probe108MediaJSON       = "application/json"
+	probe108MediaXML        = "application/xml"
+	probe108MediaFlat       = "application/openehr.wt.flat+json"
+	probe108MediaStructured = "application/openehr.wt.structured+json"
+)
+
+// loadProbe108Fixture builds the Web Template for probe108TemplateID and
+// decodes the matching canonical composition, the recipe the composition
+// leaf's format tests use.
+func loadProbe108Fixture(t *testing.T) (*webtemplate.WebTemplate, *rm.Composition) {
+	t.Helper()
+	optBody, err := os.ReadFile(fixtures.TemplateOpt(probe108TemplateID))
+	if err != nil {
+		t.Fatalf("read OPT: %v", err)
+	}
+	opt, err := fixtures.ParseOPTBytes(optBody)
+	if err != nil {
+		t.Fatalf("parse OPT: %v", err)
+	}
+	compiled, err := templatecompile.Compile(opt)
+	if err != nil {
+		t.Fatalf("compile OPT: %v", err)
+	}
+	wt, err := webtemplate.Build(compiled)
+	if err != nil {
+		t.Fatalf("build Web Template: %v", err)
+	}
+	if wt.TemplateID != probe108TemplateID {
+		t.Fatalf("Web Template id = %q, want %q", wt.TemplateID, probe108TemplateID)
+	}
+	compBody, err := os.ReadFile(fixtures.CompositionJSON(probe108TemplateID))
+	if err != nil {
+		t.Fatalf("read composition: %v", err)
+	}
+	var comp rm.Composition
+	if err := canjson.Unmarshal(compBody, &comp); err != nil {
+		t.Fatalf("decode composition: %v", err)
+	}
+	return wt, &comp
+}
+
+// wireFormat names the composition format a request asks for: the one its
+// media type names, or, beside application/json, the one its `format` query
+// parameter names. ok is false for a media type the backend does not serve.
+func wireFormat(mediaType, formatParam string) (f composition.Format, ok bool) {
+	switch mediaType {
+	case probe108MediaXML:
+		return composition.FormatXML, true
+	case probe108MediaFlat:
+		return composition.FormatFlat, true
+	case probe108MediaStructured:
+		return composition.FormatStructured, true
+	case probe108MediaJSON, "":
+		switch formatParam {
+		case "FLAT":
+			return composition.FormatFlat, true
+		case "STRUCTURED":
+			return composition.FormatStructured, true
+		case "":
+			return composition.FormatJSON, true
+		default:
+			return composition.FormatJSON, false
+		}
+	default:
+		return composition.FormatJSON, false
+	}
+}
+
+// wireMediaType is the media type the backend labels a body in f with.
+func wireMediaType(f composition.Format) string {
+	switch f {
+	case composition.FormatJSON:
+		return probe108MediaJSON
+	case composition.FormatXML:
+		return probe108MediaXML
+	case composition.FormatFlat:
+		return probe108MediaFlat
+	case composition.FormatStructured:
+		return probe108MediaStructured
+	default:
+		return ""
+	}
+}
+
+func encodeComposition(f composition.Format, comp *rm.Composition, wt *webtemplate.WebTemplate) ([]byte, error) {
+	switch f {
+	case composition.FormatJSON:
+		return canjson.Marshal(comp)
+	case composition.FormatXML:
+		return canxml.Marshal(comp)
+	case composition.FormatFlat:
+		return simplified.MarshalFlat(comp, wt)
+	case composition.FormatStructured:
+		return simplified.MarshalStructured(comp, wt)
+	default:
+		return nil, fmt.Errorf("no codec for %v", f)
+	}
+}
+
+func decodeComposition(f composition.Format, body []byte, wt *webtemplate.WebTemplate) (*rm.Composition, error) {
+	switch f {
+	case composition.FormatJSON:
+		var comp rm.Composition
+		if err := canjson.Unmarshal(body, &comp); err != nil {
+			return nil, err
+		}
+		return &comp, nil
+	case composition.FormatXML:
+		var comp rm.Composition
+		if err := canxml.Unmarshal(body, &comp); err != nil {
+			return nil, err
+		}
+		return &comp, nil
+	case composition.FormatFlat:
+		return simplified.UnmarshalFlat(body, wt)
+	case composition.FormatStructured:
+		return simplified.UnmarshalStructured(body, wt)
+	default:
+		return nil, fmt.Errorf("no codec for %v", f)
+	}
+}
+
+// formatBackendConfig shapes the composition backend PROBE-108 runs against.
+// The zero value is a faithful backend.
+type formatBackendConfig struct {
+	// mutate rewrites the recorded clone of a request, never the live one,
+	// so a plant can hand the probe a request the SDK did not send.
+	mutate func(*http.Request)
+	// answerAs picks the format a response body is sent in, given the one
+	// the request asked for. Nil answers in the format asked for.
+	answerAs func(r *http.Request, asked composition.Format) composition.Format
+	// tamper edits a shallow copy of the composition a response carries.
+	tamper func(r *http.Request, comp *rm.Composition)
+	// noVersion drops the ETag and Location that name the new version.
+	noVersion bool
+}
+
+// formatBackend is a scripted composition backend that keeps what it is
+// sent and answers in the format a request asks for. A write is decoded with
+// the codec its Content-Type names (or, beside application/json, its
+// `format` query parameter), kept under a fresh version uid named by the
+// ETag and the Location, and, under `Prefer: return=representation`,
+// serialised back in the format the Accept header (or the `format`
+// parameter) asks for. A read of a kept version answers the same way.
+func formatBackend(t *testing.T, wt *webtemplate.WebTemplate, cfg formatBackendConfig) (*sandbox.Backend, func() []*http.Request) {
+	t.Helper()
+	var (
+		mu     sync.Mutex
+		stored = map[string]*rm.Composition{}
+		n      int
+	)
+	answer := func(w http.ResponseWriter, r *http.Request, status int, comp *rm.Composition) {
+		asked, ok := wireFormat(r.Header.Get("Accept"), r.URL.Query().Get("format"))
+		if !ok {
+			w.WriteHeader(http.StatusNotAcceptable)
+			return
+		}
+		out := asked
+		if cfg.answerAs != nil {
+			out = cfg.answerAs(r, asked)
+		}
+		if cfg.tamper != nil {
+			cp := *comp
+			cfg.tamper(r, &cp)
+			comp = &cp
+		}
+		body, err := encodeComposition(out, comp, wt)
+		if err != nil {
+			t.Errorf("backend: encode %v: %v", out, err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", wireMediaType(out))
+		w.WriteHeader(status)
+		_, _ = w.Write(body)
+	}
+	return capturing(t, cfg.mutate, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/composition"):
+			in, ok := wireFormat(r.Header.Get("Content-Type"), r.URL.Query().Get("format"))
+			if !ok {
+				w.WriteHeader(http.StatusUnsupportedMediaType)
+				return
+			}
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Errorf("backend: read write body: %v", err)
+			}
+			comp, err := decodeComposition(in, body, wt)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			mu.Lock()
+			n++
+			uid := fmt.Sprintf("10800000-0000-4000-8000-%012d::cdr.example::1", n)
+			stored[uid] = comp
+			mu.Unlock()
+			if !cfg.noVersion {
+				w.Header().Set("ETag", `"`+uid+`"`)
+				w.Header().Set("Location", r.URL.Path+"/"+uid)
+			}
+			if !strings.Contains(r.Header.Get("Prefer"), "return=representation") {
+				w.WriteHeader(http.StatusCreated)
+				return
+			}
+			answer(w, r, http.StatusCreated, comp)
+		case r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/composition/"):
+			uid := path.Base(r.URL.Path)
+			mu.Lock()
+			comp, ok := stored[uid]
+			mu.Unlock()
+			if !ok {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			w.Header().Set("ETag", `"`+uid+`"`)
+			answer(w, r, http.StatusOK, comp)
+		default:
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	})
+}
+
+// onRequests returns a mutate that rewrites the recorded clone of every
+// request match selects and leaves the others alone.
+func onRequests(match func(*http.Request) bool, rewrite func(*http.Request)) func(*http.Request) {
+	return func(req *http.Request) {
+		if match(req) {
+			rewrite(req)
+		}
+	}
+}
+
+// isWrite selects the composition write sent with the given Content-Type.
+func isWrite(contentType string) func(*http.Request) bool {
+	return func(req *http.Request) bool {
+		return req.Method == http.MethodPost && req.Header.Get("Content-Type") == contentType
+	}
+}
+
+// isQueryWrite selects the composition write that names its format with the
+// `format` query parameter.
+func isQueryWrite(req *http.Request) bool {
+	return req.Method == http.MethodPost && req.URL.Query().Has("format")
+}
+
+// isRead selects the composition read sent with the given Accept.
+func isRead(accept string) func(*http.Request) bool {
+	return func(req *http.Request) bool {
+		return req.Method == http.MethodGet && req.Header.Get("Accept") == accept
+	}
+}
+
+// rewriteBody rewrites the recorded clone's body with edit. An edit that
+// changes nothing fails the test, so a plant cannot silently miss its target.
+func rewriteBody(t *testing.T, edit func(string) string) func(*http.Request) {
+	return func(req *http.Request) {
+		body, err := io.ReadAll(req.Body)
+		if err != nil {
+			t.Errorf("read the recorded body: %v", err)
+		}
+		edited := edit(string(body))
+		if edited == string(body) {
+			t.Errorf("the body edit changed nothing in %s", body)
+		}
+		setBody(req, edited)
+	}
+}
+
+func TestProbe108CompositionFormats(t *testing.T) { // PROBE-108, REQ-173
+	wt, comp := loadProbe108Fixture(t)
+	b, snap := formatBackend(t, wt, formatBackendConfig{})
+	r, err := restprobes.Probe108CompositionFormats(t.Context(), newClient(t, b), snap, probe108EHRID, wt, comp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Status != "pass" {
+		t.Fatalf("PROBE-108 = %s: %s", r.Status, r.Detail)
+	}
+	// Three writes read back, and the FLAT write under the format query
+	// option: a probe that skipped an arm would pass on fewer.
+	reqs := snap()
+	var writes, reads int
+	for _, req := range reqs {
+		switch req.Method {
+		case http.MethodPost:
+			writes++
+		case http.MethodGet:
+			reads++
+		}
+	}
+	if writes != 4 || reads != 3 || len(reqs) != 7 {
+		t.Errorf("backend saw %d writes and %d reads (%d requests), want 4 writes and 3 reads", writes, reads, len(reqs))
+	}
+}
+
+// TestProbe108FlagsBrokenWire breaks one assertion of the probe per case. The
+// first group is a backend that does not answer in the format asked for, or
+// answers with another composition; the second plants a write or read the
+// SDK did not send — a wrong media type, a missing or foreign template id, a
+// missing query parameter, a body that is not the composition, a wrong
+// route; the last two plant a `.schema`-suffixed media type, so the detector
+// that guards "no request carries one" is shown to fire. Each case pins the
+// substring its Detail must carry, so a case cannot rot into failing for an
+// unrelated reason.
+func TestProbe108FlagsBrokenWire(t *testing.T) { // PROBE-108
+	wt, comp := loadProbe108Fixture(t)
+	cases := []struct {
+		name       string
+		cfg        formatBackendConfig
+		wantDetail string
+	}{
+		{
+			name: "backend answers canonical JSON whatever the format asked",
+			cfg: formatBackendConfig{answerAs: func(*http.Request, composition.Format) composition.Format {
+				return composition.FormatJSON
+			}},
+			wantDetail: "XML write committed, but its representation did not decode as XML",
+		},
+		{
+			name: "backend answers a FLAT write in canonical JSON",
+			cfg: formatBackendConfig{answerAs: func(_ *http.Request, asked composition.Format) composition.Format {
+				if asked == composition.FormatFlat {
+					return composition.FormatJSON
+				}
+				return asked
+			}},
+			wantDetail: "FLAT write committed, but its representation did not decode as FLAT",
+		},
+		{
+			name: "backend answers the read in canonical JSON",
+			cfg: formatBackendConfig{answerAs: func(r *http.Request, asked composition.Format) composition.Format {
+				if r.Method == http.MethodGet {
+					return composition.FormatJSON
+				}
+				return asked
+			}},
+			wantDetail: "XML read failed",
+		},
+		{
+			name: "representation is another composition",
+			cfg: formatBackendConfig{tamper: func(r *http.Request, c *rm.Composition) {
+				if r.Method == http.MethodPost {
+					c.ArchetypeNodeID = "openEHR-EHR-COMPOSITION.other.v1"
+				}
+			}},
+			wantDetail: "XML write: the representation differs from the composition written at archetype_node_id",
+		},
+		{
+			name: "read-back is another composition",
+			cfg: formatBackendConfig{tamper: func(r *http.Request, c *rm.Composition) {
+				if r.Method == http.MethodGet {
+					c.ArchetypeNodeID = "openEHR-EHR-COMPOSITION.other.v1"
+				}
+			}},
+			wantDetail: "XML read: the composition read back differs from the one written at archetype_node_id",
+		},
+		{
+			name:       "write names no version",
+			cfg:        formatBackendConfig{noVersion: true},
+			wantDetail: "XML write named no version",
+		},
+		{
+			name: "write on another EHR's route",
+			cfg: formatBackendConfig{mutate: onRequests(isWrite(probe108MediaXML), func(req *http.Request) {
+				req.URL.Path = strings.Replace(req.URL.Path, string(probe108EHRID), probe060OtherEHRID, 1)
+			})},
+			wantDetail: "XML write went to",
+		},
+		{
+			name: "FLAT write labelled canonical JSON",
+			cfg: formatBackendConfig{mutate: onRequests(isWrite(probe108MediaFlat), func(req *http.Request) {
+				req.Header.Set("Content-Type", probe108MediaJSON)
+			})},
+			wantDetail: "FLAT write: Content-Type",
+		},
+		{
+			name: "STRUCTURED write accepts canonical JSON",
+			cfg: formatBackendConfig{mutate: onRequests(isWrite(probe108MediaStructured), func(req *http.Request) {
+				req.Header.Set("Accept", probe108MediaJSON)
+			})},
+			wantDetail: "STRUCTURED write: Accept",
+		},
+		{
+			name: "FLAT write without openehr-template-id",
+			cfg: formatBackendConfig{mutate: onRequests(isWrite(probe108MediaFlat), func(req *http.Request) {
+				req.Header.Del("openehr-template-id")
+			})},
+			wantDetail: "FLAT write: openehr-template-id",
+		},
+		{
+			name: "STRUCTURED write naming another template",
+			cfg: formatBackendConfig{mutate: onRequests(isWrite(probe108MediaStructured), func(req *http.Request) {
+				req.Header.Set("openehr-template-id", "Other_template.v1")
+			})},
+			wantDetail: "STRUCTURED write: openehr-template-id",
+		},
+		{
+			name:       "XML write body is not canonical XML",
+			cfg:        formatBackendConfig{mutate: onRequests(isWrite(probe108MediaXML), func(req *http.Request) { setBody(req, `{}`) })},
+			wantDetail: "XML write: the request body does not decode as XML",
+		},
+		{
+			name: "FLAT write body carries another data value",
+			cfg: formatBackendConfig{mutate: onRequests(isWrite(probe108MediaFlat), rewriteBody(t, func(body string) string {
+				return strings.ReplaceAll(body, `/any_event:0/my_dv_quantity|magnitude":130`, `/any_event:0/my_dv_quantity|magnitude":131`)
+			}))},
+			wantDetail: "FLAT write: the request body differs from the composition given at content/0/data/events/0/data/items/0/value",
+		},
+		{
+			name: "read on another version's route",
+			cfg: formatBackendConfig{mutate: onRequests(isRead(probe108MediaXML), func(req *http.Request) {
+				req.URL.Path = path.Dir(req.URL.Path) + "/" + probe108OtherVersion
+			})},
+			wantDetail: "XML read went to",
+		},
+		{
+			name: "XML read accepts canonical JSON",
+			cfg: formatBackendConfig{mutate: onRequests(isRead(probe108MediaXML), func(req *http.Request) {
+				req.Header.Set("Accept", probe108MediaJSON)
+			})},
+			wantDetail: "XML read: Accept",
+		},
+		{
+			name: "format-query write labelled FLAT",
+			cfg: formatBackendConfig{mutate: onRequests(isQueryWrite, func(req *http.Request) {
+				req.Header.Set("Content-Type", probe108MediaFlat)
+			})},
+			wantDetail: "FLAT (format query) write: Content-Type",
+		},
+		{
+			name: "format-query write without format",
+			cfg: formatBackendConfig{mutate: onRequests(isQueryWrite, func(req *http.Request) {
+				q := req.URL.Query()
+				q.Del("format")
+				req.URL.RawQuery = q.Encode()
+			})},
+			wantDetail: "FLAT (format query) write: query parameter format",
+		},
+		{
+			name: "format-query write without templateId",
+			cfg: formatBackendConfig{mutate: onRequests(isQueryWrite, func(req *http.Request) {
+				q := req.URL.Query()
+				q.Del("templateId")
+				req.URL.RawQuery = q.Encode()
+			})},
+			wantDetail: "FLAT (format query) write: query parameter templateId",
+		},
+		{
+			name: "format-query write without openehr-template-id",
+			cfg: formatBackendConfig{mutate: onRequests(isQueryWrite, func(req *http.Request) {
+				req.Header.Del("openehr-template-id")
+			})},
+			wantDetail: "FLAT (format query) write: openehr-template-id",
+		},
+		{
+			name: ".schema media type as a write's Content-Type",
+			cfg: formatBackendConfig{mutate: onRequests(isWrite(probe108MediaStructured), func(req *http.Request) {
+				req.Header.Set("Content-Type", "application/openehr.wt.structured.schema+json")
+			})},
+			wantDetail: "STRUCTURED write: Content-Type carries the retired .schema media type",
+		},
+		{
+			name: ".schema media type among a read's Accept values",
+			cfg: formatBackendConfig{mutate: onRequests(isRead(probe108MediaFlat), func(req *http.Request) {
+				req.Header.Set("Accept", probe108MediaFlat+", application/openehr.wt.flat.schema+json;q=0.5")
+			})},
+			wantDetail: "FLAT read: Accept carries the retired .schema media type",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			b, snap := formatBackend(t, wt, tc.cfg)
+			r, err := restprobes.Probe108CompositionFormats(t.Context(), newClient(t, b), snap, probe108EHRID, wt, comp)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Logf("PROBE-108 = %s: %s", r.Status, r.Detail)
+			if r.Status != "fail" {
+				t.Fatalf("PROBE-108 = %s, want fail (detail=%q)", r.Status, r.Detail)
+			}
+			if !strings.Contains(r.Detail, tc.wantDetail) {
+				t.Errorf("PROBE-108 failed for the wrong reason:\n got: %s\nwant it to mention: %s", r.Detail, tc.wantDetail)
+			}
+		})
+	}
+}
+
+func TestProbe108RejectsMissingInputs(t *testing.T) { // PROBE-108
+	wt, comp := loadProbe108Fixture(t)
+	b, snap := formatBackend(t, wt, formatBackendConfig{})
+	c := newClient(t, b)
+	noID := *wt
+	noID.TemplateID = ""
+	noContent := *comp
+	noContent.Content = nil
+	// FLAT takes the root archetype from the Web Template, so a composition
+	// whose root names another archetype does not come back as it went.
+	otherRoot := *comp
+	otherRoot.ArchetypeNodeID = "openEHR-EHR-COMPOSITION.other.v1"
+	cases := []struct {
+		name     string
+		c        *transport.Client
+		captured func() []*http.Request
+		ehrID    openehrclient.EHRID
+		wt       *webtemplate.WebTemplate
+		comp     *rm.Composition
+	}{
+		{name: "nil client", captured: snap, ehrID: probe108EHRID, wt: wt, comp: comp},
+		{name: "nil recorder", c: c, ehrID: probe108EHRID, wt: wt, comp: comp},
+		{name: "empty ehr id", c: c, captured: snap, wt: wt, comp: comp},
+		{name: "nil Web Template", c: c, captured: snap, ehrID: probe108EHRID, comp: comp},
+		{name: "Web Template without a template id", c: c, captured: snap, ehrID: probe108EHRID, wt: &noID, comp: comp},
+		{name: "nil composition", c: c, captured: snap, ehrID: probe108EHRID, wt: wt},
+		// The probe compares a data value, so a composition with no content
+		// gives it nothing to compare: a precondition, not a deployment
+		// finding.
+		{name: "composition without content", c: c, captured: snap, ehrID: probe108EHRID, wt: wt, comp: &noContent},
+		{name: "composition that does not round-trip through FLAT", c: c, captured: snap, ehrID: probe108EHRID, wt: wt, comp: &otherRoot},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r, err := restprobes.Probe108CompositionFormats(t.Context(), tc.c, tc.captured, tc.ehrID, tc.wt, tc.comp)
+			if err == nil {
+				t.Errorf("PROBE-108 = %s (%q), want an error", r.Status, r.Detail)
+			}
+		})
+	}
+	if n := len(snap()); n != 0 {
+		t.Errorf("backend saw %d requests, want none: a refused input must not reach the wire", n)
 	}
 }
