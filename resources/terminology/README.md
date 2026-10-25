@@ -67,6 +67,8 @@ with `make terminology-check` (see [the sync script](../../scripts/sync-terminol
   ASCII letter case, as those registers do, and a code of an openEHR-issued set exactly. The
   generator refuses an ISO or IANA set that lists two codes differing only in letter case.
   A UCUM code of the property-unit table matches exactly, since UCUM codes are case-sensitive.
+- **White space:** the generator takes a UCUM code trimmed, which changes one value of the
+  pin: statfarad's ` 11126.10-16F` under `openehr::501` *Electric capacitance* becomes `11126.10-16F`.
 
 It lives in-tree rather than behind an upstream URL for the same three reasons the
 [BMM pins](../bmm/README.md) do:
