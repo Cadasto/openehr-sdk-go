@@ -82,9 +82,9 @@ func Probe023BuilderRoundTrip(ctx context.Context, c *templatecompile.Compiled, 
 	// Unmarshal round-trip — the full PROBE-023 promise that
 	// REQ-107 Phase 2 unblocked. Decode the marshalled payload back
 	// into a fresh *rm.Composition (proving the canjson polymorphic
-	// dispatch on the entries' uids + nested DataValues works
-	// symmetrically), then re-marshal and assert the same fragment
-	// set survives the round-trip.
+	// dispatch on the nested DataValues works symmetrically), then
+	// re-marshal and assert the same fragment set survives the
+	// round-trip.
 	var decoded rm.Composition
 	if err := canjson.Unmarshal(payload, &decoded); err != nil {
 		failures = append(failures, fmt.Sprintf("canjson.Unmarshal: %v", err))

@@ -189,7 +189,7 @@ The Corona pair is the largest fixture in the repo. That size is the cost of gua
 
 ### SDK (`templates/`)
 
-**License:** MIT, as the rest of the SDK ([`LICENSING.md`](../../LICENSING.md)). These OPTs were written for this SDK, in the layout Ocean Template Designer exports, and carry no third-party or clinical content: their archetype ids, codes and texts are synthetic. Each holds shapes that the CDR cross-check (PROBE-108) found and that the generator and the validators now handle, so the corpus ratchet (PROBE-027) and the cross-check exercise them. They are OPT only: no composition is vendored for them. All five are COMPOSITION-rooted and compile, every generated document passes both validators under every policy and value fill, and none of them holds an ELEMENT under `Required`.
+**License:** MIT, as the rest of the SDK ([`LICENSING.md`](../../LICENSING.md)). These OPTs were written for this SDK, in the layout Ocean Template Designer exports, and carry no third-party or clinical content: their archetype ids, codes and texts are synthetic. Each holds shapes that the CDR cross-check ([§ REQ-082 *The CDR cross-check tool*](../../docs/specifications/conformance.md#the-cdr-cross-check-tool)) found and that the generator and the validators now handle, so the corpus ratchet (PROBE-027) and the cross-check exercise them. They are OPT only: no composition is vendored for them. All five are COMPOSITION-rooted and compile, every generated document passes both validators under every policy and value fill, and none of them holds an ELEMENT under `Required`.
 
 | Template id | Shapes it carries |
 |---|---|

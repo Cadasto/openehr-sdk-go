@@ -1016,7 +1016,7 @@ requirements:
     canonical: docs/specifications/conformance.md#req-082--runnability
     status: draft
     implementation: partial
-    packages: [testkit, testkit/probe, cmd/probe-record, sandbox, testkit/probes/serialize, testkit/probes/versioned, testkit/probes/definition, testkit/probes/demographic, testkit/probes/transport, testkit/probes/discovery, testkit/probes/template, testkit/probes/query, testkit/probes/rest]
+    packages: [testkit, testkit/probe, cmd/probe-record, cmd/cdrcheck, sandbox, testkit/probes/serialize, testkit/probes/versioned, testkit/probes/definition, testkit/probes/demographic, testkit/probes/transport, testkit/probes/discovery, testkit/probes/template, testkit/probes/query, testkit/probes/rest]
     tests:
       - cmd/probe-record/main_test.go
       - sandbox/backend_test.go
@@ -1297,7 +1297,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/validation, internal/rmaccess, openehr/internal/rmbind, openehr/internal/rmnames, openehr/templatecompile, internal/templatecompile, testkit/probes/validation]
-    probes: [PROBE-025, PROBE-026, PROBE-074, PROBE-108]
+    probes: [PROBE-025, PROBE-026, PROBE-074]
     tests:
       - cmd/cdrcheck/main_test.go
       - internal/rmaccess/interval_test.go
@@ -1470,7 +1470,7 @@ requirements:
       - internal/rmroots
       - testkit/fixtures
       - testkit/probes/instance
-    probes: [PROBE-027, PROBE-108]
+    probes: [PROBE-027]
     tests:
       - cmd/cdrcheck/main_test.go
       - cmd/examples/generate-example/main_test.go
