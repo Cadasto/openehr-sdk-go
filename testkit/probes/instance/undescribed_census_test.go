@@ -464,10 +464,14 @@ func censusWalk(node *templatecompile.CompiledNode, value map[string]any, underO
 // child of attr. It returns the child that describes member, or the kind
 // of undescribed member it is: "bmm" for a LOCATABLE in an attribute with
 // no allowed child, "slot" for one only a slot admits, and "unbound" for
-// one no child admits. A member that is not a LOCATABLE binds to the first
-// allowed child of its RM type, else the first allowed child, else none,
-// and is never undescribed: only a LOCATABLE has a template node of its
-// own.
+// one no child admits. A LOCATABLE binds among the children that carry its
+// archetype_node_id, ranked by its name as the template validator ranks
+// them (REQ-102 Structural — binding items): the first that pins that
+// name, else the first that pins none, else the first of them, so each of
+// the named uses of one archetype Large writes binds to its own child. A
+// member that is not a LOCATABLE binds to the first allowed child of its
+// RM type, else the first allowed child, else none, and is never
+// undescribed: only a LOCATABLE has a template node of its own.
 func censusBind(attr *templatecompile.CompiledAttribute, member map[string]any) (*templatecompile.CompiledNode, string) {
 	children := allowedChildren(attr)
 	id, locatable := member["archetype_node_id"].(string)
@@ -486,13 +490,32 @@ func censusBind(attr *templatecompile.CompiledAttribute, member map[string]any) 
 	if len(children) == 0 {
 		return nil, "bmm"
 	}
+	name := ""
+	if n, ok := member["name"].(map[string]any); ok {
+		name, _ = n["value"].(string)
+	}
 	slot := false
+	var named, unnamed, carrier *templatecompile.CompiledNode
 	for _, c := range children {
 		if c.IsSlot() {
 			slot = true
 			continue
 		}
-		if c.ArchetypeID() == id || c.NodeID() == id {
+		if c.ArchetypeID() != id && c.NodeID() != id {
+			continue
+		}
+		switch {
+		case c.NodeName() != "" && c.NodeName() == name && named == nil:
+			named = c
+		case c.NodeName() == "" && unnamed == nil:
+			unnamed = c
+		}
+		if carrier == nil {
+			carrier = c
+		}
+	}
+	for _, c := range []*templatecompile.CompiledNode{named, unnamed, carrier} {
+		if c != nil {
 			return c, ""
 		}
 	}

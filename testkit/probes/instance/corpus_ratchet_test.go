@@ -110,15 +110,14 @@ var mediumHollowBodies = []string{
 // Each reason is category plus a stable locator (type, attribute, code
 // and path, or JSON path).
 //
-// Large rows: under Large an optional child yields to a required sibling
-// with its identity and to an earlier optional one, and an archetype root's
-// identity is its archetype id (REQ-107 What a visit writes). So Large
-// builds one member of each optional archetype under an attribute, and
-// reaches the TestPerson.v2 identifier clusters and the
-// clinical_content_validation EVALUATION. It skips the repeated named
-// SECTION.adhoc.v1 roots of Corona_Anamnese after the first, so it never
-// reaches 'Allgemeine Angaben' and its unfillable slot. Under Large no
-// template's body is hollow: a hollow_body failure there fails the ratchet.
+// Large rows: under Large every optional child that needs no undescribed
+// content gets its member, each use of one archetype, named or not,
+// included (REQ-107 What a visit writes). So Large builds a member of each
+// optional archetype use under an attribute, and reaches the TestPerson.v2
+// identifier clusters, the clinical_content_validation EVALUATION and each
+// of the four named SECTION.adhoc.v1 roots of Corona_Anamnese, whose roots
+// all validate. Under Large no template's body is hollow: a hollow_body
+// failure there fails the ratchet.
 // The builder builds on Large when no WithPolicy is given, so its rows are
 // Large rows.
 //

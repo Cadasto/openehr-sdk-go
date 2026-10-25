@@ -111,7 +111,7 @@ func contentArchetypeIDs(tree any) []string {
 // content OBSERVATIONs alone, where Large builds a member of each and
 // Required none, and as many JSON values as instance.Generate under
 // Medium. Of two optional siblings that share an at-code, the default
-// builds the first alone, as Large and Medium do.
+// builds the first alone, as Medium does, where Large builds both.
 func TestREQ101_REQ107_NewSkeletonDefaultsToMedium(t *testing.T) {
 	t.Parallel()
 	t.Run("vital_signs", func(t *testing.T) {
@@ -165,7 +165,7 @@ func TestREQ101_REQ107_NewSkeletonDefaultsToMedium(t *testing.T) {
 			want []string
 		}{
 			{name: "no WithPolicy", opts: policyOptions(), want: []string{"A"}},
-			{name: "WithPolicy(Large)", opts: policyOptions(composition.WithPolicy(instance.Large)), want: []string{"A"}},
+			{name: "WithPolicy(Large)", opts: policyOptions(composition.WithPolicy(instance.Large)), want: []string{"A", "B"}},
 			{name: "WithPolicy(Medium)", opts: policyOptions(composition.WithPolicy(instance.Medium)), want: []string{"A"}},
 		}
 		for _, tc := range cases {

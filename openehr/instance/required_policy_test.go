@@ -107,14 +107,14 @@ func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 		{
 			name: "vital_signs",
 			want: map[instance.Policy]policyLevel{
-				instance.Large: {values: 365, archetypes: map[string]int{
+				instance.Large: {values: 353, archetypes: map[string]int{
 					encounter: 1,
 					"openEHR-EHR-OBSERVATION.blood_pressure.v1":   1,
 					"openEHR-EHR-OBSERVATION.body_temperature.v1": 1,
 					"openEHR-EHR-OBSERVATION.heart_rate.v1":       1,
 					"openEHR-EHR-OBSERVATION.respiration.v1":      1,
 				}},
-				instance.Medium: {values: 141, archetypes: map[string]int{
+				instance.Medium: {values: 138, archetypes: map[string]int{
 					encounter: 1,
 					"openEHR-EHR-OBSERVATION.blood_pressure.v1": 1,
 				}},
@@ -124,7 +124,7 @@ func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 		{
 			name: "social",
 			want: map[instance.Policy]policyLevel{
-				instance.Large: {values: 673, archetypes: map[string]int{
+				instance.Large: {values: 649, archetypes: map[string]int{
 					encounter: 1,
 					"openEHR-EHR-OBSERVATION.livingsituation.v1":        1,
 					"openEHR-EHR-OBSERVATION.languageproficiency.v1":    1,
@@ -134,7 +134,7 @@ func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 					"openEHR-EHR-EVALUATION.education_summary.v1":       1,
 					"openEHR-EHR-CLUSTER.contact_persons_context.v1":    1,
 				}},
-				instance.Medium: {values: 139, archetypes: map[string]int{
+				instance.Medium: {values: 130, archetypes: map[string]int{
 					encounter: 1,
 					"openEHR-EHR-OBSERVATION.livingsituation.v1": 1,
 				}},
@@ -179,7 +179,7 @@ func TestREQ107_PoliciesBuildTheirLevels(t *testing.T) {
 
 // TestREQ107_ZeroPolicyBuildsMedium is the REQ-107 check of Levels and
 // names on vital_signs: Options with no Policy builds the medium level, the
-// tree Medium builds in TestREQ107_PoliciesBuildTheirLevels, with 141 JSON
+// tree Medium builds in TestREQ107_PoliciesBuildTheirLevels, with 138 JSON
 // values and, besides the composition's own archetype, only the first
 // optional content OBSERVATION.
 func TestREQ107_ZeroPolicyBuildsMedium(t *testing.T) {
@@ -190,7 +190,7 @@ func TestREQ107_ZeroPolicyBuildsMedium(t *testing.T) {
 		Now:       defaultsNow,
 	})
 	tree := decodedJSON(t, comp)
-	if got, want := jsonValueCount(tree), 141; got != want {
+	if got, want := jsonValueCount(tree), 138; got != want {
 		t.Errorf("Generate(vital_signs) with no Policy holds %d JSON values, want Medium's %d", got, want)
 	}
 	got := make(map[string]int)
@@ -244,7 +244,8 @@ func TestREQ107_RequiredSkipsAnOptionalAttributeWithAnAllowedChild(t *testing.T)
 	}{
 		{
 			name: "single-valued OBSERVATION protocol",
-			opt:  optTemplate("OBSERVATION", optOptionalSingleOver("protocol", optNode("ITEM_TREE", "at0001"))),
+			opt: optTemplate("OBSERVATION", optOptionalSingleOver("protocol", optNode("ITEM_TREE", "at0001",
+				optMultipleLowerZero("items", optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0002", 0, 1))))),
 			present: func(t *testing.T, out any) bool {
 				t.Helper()
 				o, ok := out.(*rm.Observation)

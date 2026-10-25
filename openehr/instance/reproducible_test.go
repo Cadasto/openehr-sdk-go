@@ -151,19 +151,41 @@ func decodeJSON(t *testing.T, raw []byte) any {
 	return tree
 }
 
+// requiredUIDsOPT is a COMPOSITION template whose one content OBSERVATION
+// requires its uid, as does the one ELEMENT of its one event, whose
+// DV_COUNT takes a magnitude from 0 to 1000, so that RandomFill draws it.
+// The generator gives a uid only where the template requires one (REQ-107
+// Identity), and no vendored template requires one, so the uid checks run
+// on this one.
+func requiredUIDsOPT() string {
+	element := optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0004", 1, 1, optRequiredSingle("uid"),
+		optSingle("value", optNode("DV_COUNT", "", optSingle("magnitude", intRange("0", "1000")))))
+	event := optOccurring("C_COMPLEX_OBJECT", "POINT_EVENT", "at0002", 1, 1,
+		optSingle("data", optNode("ITEM_TREE", "at0003", optMultiple("items", element))))
+	return optTemplate("COMPOSITION", optMultiple("content",
+		optArchetypeRoot("OBSERVATION", "openEHR-EHR-OBSERVATION.required_uids.v1", optRequiredSingle("uid"),
+			optSingle("data", optNode("HISTORY", "at0001", optMultiple("events", event))))))
+}
+
 // TestREQ107_SeededGenerateReturnsEqualRoots is the REQ-107 Reproducible
-// uids check, over every vendored template that parses and compiles, that
-// two Generate calls with the same options, a fixed non-zero Now
-// included, and a UIDSource from UIDsFrom and a ValueSource each built on
-// a source in the same state, return roots with equal canonical JSON. It
-// holds under every policy, ExampleFill and RandomFill on several seeds.
-// A template Generate refuses must be refused by both calls with the same
-// class of error, and is otherwise not compared.
+// uids check, over every vendored template that parses and compiles and
+// over requiredUIDsOPT, whose roots carry uids, that two Generate calls
+// with the same options, a fixed non-zero Now included, and a UIDSource
+// from UIDsFrom and a ValueSource each built on a source in the same
+// state, return roots with equal canonical JSON. It holds under every
+// policy, ExampleFill and RandomFill on several seeds. A template Generate
+// refuses must be refused by both calls with the same class of error, and
+// is otherwise not compared.
 func TestREQ107_SeededGenerateReturnsEqualRoots(t *testing.T) {
 	refs, err := fixtures.ListAllOPTs()
 	if err != nil {
 		t.Fatalf("ListAllOPTs: %v", err)
 	}
+	type compiledTemplate struct {
+		name string
+		c    *templatecompile.Compiled
+	}
+	templates := []compiledTemplate{{name: "requiredUIDsOPT", c: compileOPTText(t, requiredUIDsOPT(), true)}}
 	var compared, refused, uids int
 	var unbuilt []string
 	for _, ref := range refs {
@@ -177,9 +199,13 @@ func TestREQ107_SeededGenerateReturnsEqualRoots(t *testing.T) {
 			unbuilt = append(unbuilt, ref.Name)
 			continue
 		}
+		templates = append(templates, compiledTemplate{name: ref.Name, c: c})
+	}
+	for _, tmpl := range templates {
+		c := tmpl.c
 		composition := c.Root() != nil && c.Root().RMTypeName() == "COMPOSITION"
 		for _, setting := range corpusSettings(composition) {
-			name := corpusRun{name: ref.Name, opts: setting.opts, seed: setting.seed}.String()
+			name := corpusRun{name: tmpl.name, opts: setting.opts, seed: setting.seed}.String()
 			first, firstErr := instance.Generate(t.Context(), c, seededOptions(setting.opts, setting.seed))
 			second, secondErr := instance.Generate(t.Context(), c, seededOptions(setting.opts, setting.seed))
 			if firstErr != nil || secondErr != nil {
@@ -251,8 +277,8 @@ func TestREQ107_SeededGenerateRefusesAlike(t *testing.T) {
 }
 
 // vitalSignsRandomLarge returns the options the ValueSource checks
-// generate vital_signs under: Large and RandomFill, with uids and values
-// drawn as given.
+// generate their templates under: Large and RandomFill, with uids and
+// values drawn as given.
 func vitalSignsRandomLarge(uids func() *rm.HierObjectID, values mrand.Source) instance.Options {
 	return instance.Options{
 		Policy:      instance.Large,
@@ -268,13 +294,14 @@ func vitalSignsRandomLarge(uids func() *rm.HierObjectID, values mrand.Source) in
 
 // TestREQ107_NoUIDDrawnFromValueSource is the REQ-107 Reproducible uids
 // check that the generator never draws a uid from ValueSource. On
-// vital_signs under Large and RandomFill, a run with UIDSource nil draws
-// as many values from ValueSource as a run whose UIDSource is UIDsFrom on
-// a separate source, and gives the same tree once the uids are masked; and
-// two runs with UIDSource nil and value sources in the same state give
-// different uids, so the random fallback, not ValueSource, issues them.
+// requiredUIDsOPT, whose root carries uids, under Large and RandomFill, a
+// run with UIDSource nil draws as many values from ValueSource as a run
+// whose UIDSource is UIDsFrom on a separate source, and gives the same tree
+// once the uids are masked; and two runs with UIDSource nil and value
+// sources in the same state give different uids, so the random fallback,
+// not ValueSource, issues them.
 func TestREQ107_NoUIDDrawnFromValueSource(t *testing.T) {
-	c := compileFixture(t, "vital_signs")
+	c := compileOPTText(t, requiredUIDsOPT(), true)
 	run := func(uids func() *rm.HierObjectID) (tree any, draws int) {
 		t.Helper()
 		values := &countingSource{src: mrand.NewPCG(42, 1)}
@@ -290,7 +317,7 @@ func TestREQ107_NoUIDDrawnFromValueSource(t *testing.T) {
 
 	fallbackUIDs := uidValues(fallback)
 	if len(fallbackUIDs) == 0 {
-		t.Fatal("vital_signs under Large carries no uid, so nothing was checked")
+		t.Fatal("requiredUIDsOPT under Large carries no uid, so nothing was checked")
 	}
 	if fallbackDraws != seededDraws {
 		t.Errorf("ValueSource draws: %d with UIDSource nil, %d with UIDsFrom on a separate source, want equal", fallbackDraws, seededDraws)
@@ -309,11 +336,11 @@ func TestREQ107_NoUIDDrawnFromValueSource(t *testing.T) {
 
 // TestREQ107_SharedSourceStaysReproducible is the REQ-107 Reproducible
 // uids check that one source shared between ValueSource and UIDsFrom
-// stays reproducible: two runs on vital_signs under Large and RandomFill,
-// each on a shared source in the same state, return roots with equal
-// canonical JSON.
+// stays reproducible: two runs on requiredUIDsOPT, whose root carries
+// uids, under Large and RandomFill, each on a shared source in the same
+// state, return roots with equal canonical JSON.
 func TestREQ107_SharedSourceStaysReproducible(t *testing.T) {
-	c := compileFixture(t, "vital_signs")
+	c := compileOPTText(t, requiredUIDsOPT(), true)
 	run := func() []byte {
 		t.Helper()
 		src := mrand.NewPCG(42, 1)

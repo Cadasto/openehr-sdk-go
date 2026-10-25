@@ -155,8 +155,9 @@ func TestREQ107_TimeValidityPassesBothValidators(t *testing.T) {
 // either value fill and either compile mode, and passes both validators,
 // which bind such a member by its RM type. The language is the text the
 // template pins. A role whose template leaves it open takes the namespace
-// local, the type ROLE and an id drawn from UIDSource, after the PERSON's
-// own uid; a pattern on its type that admits ROLE among other names gives
+// local, the type ROLE and an id drawn from UIDSource, the first drawn,
+// since the PERSON gets no uid its template does not require (Identity); a
+// pattern on its type that admits ROLE among other names gives
 // ROLE too, and a list that names only another class keeps that one (a list
 // that names ROLE and another class keeps the member the value fill picks:
 // TestREQ107_RoleTypeListKeepsItsMemberOverTheDefault). These replace the
@@ -167,16 +168,16 @@ func TestREQ107_ActorLanguagesAndRolesTakeTheirMembers(t *testing.T) {
 		roleType []string // the attributes the template names on the role's PARTY_REF
 		want     string
 	}{
-		{name: "role left open", want: "PARTY_REF local::ROLE id HIER_OBJECT_ID uid-0002"},
+		{name: "role left open", want: "PARTY_REF local::ROLE id HIER_OBJECT_ID uid-0001"},
 		{
 			name:     "role type pattern .*",
 			roleType: []string{guardSingle("type", guardExistence11, optPrimitive("STRING", "C_STRING", "<pattern>.*</pattern>"))},
-			want:     "PARTY_REF local::ROLE id HIER_OBJECT_ID uid-0002",
+			want:     "PARTY_REF local::ROLE id HIER_OBJECT_ID uid-0001",
 		},
 		{
 			name:     "role type pinned PERSON",
 			roleType: []string{guardSingle("type", guardExistence11, guardString("PERSON"))},
-			want:     "PARTY_REF local::PERSON id HIER_OBJECT_ID uid-0002",
+			want:     "PARTY_REF local::PERSON id HIER_OBJECT_ID uid-0001",
 		},
 	}
 	for _, tc := range cases {

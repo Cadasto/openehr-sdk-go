@@ -31,8 +31,9 @@ func identifierIDs(identifiers []rm.DVIdentifier) []string {
 // identifiers and an external_ref comes out with both, at every policy,
 // either value fill and either compile mode, and passes both validators.
 // The external_ref keeps the namespace the template pins and takes the
-// type PERSON and an id drawn from UIDSource, after the OBSERVATION's own
-// uid. With an identifier and an external_ref the party meets
+// type PERSON and an id drawn from UIDSource, the first drawn, since the
+// OBSERVATION gets no uid its template does not require (Identity). With an
+// identifier and an external_ref the party meets
 // Basic_validity, so it takes no name.
 func TestREQ107_PartyIdentifiedProviderTakesItsParts(t *testing.T) {
 	opt := guardRootOPT("OBSERVATION", guardObservationID,
@@ -51,7 +52,7 @@ func TestREQ107_PartyIdentifiedProviderTakesItsParts(t *testing.T) {
 		if got := identifierIDs(p.Identifiers); !slices.Equal(got, []string{"123456"}) {
 			t.Errorf("%s: provider identifiers = %v, want [123456]", call, got)
 		}
-		if got, want := refString(p.ExternalRef), "PARTY_REF demographic::PERSON id HIER_OBJECT_ID uid-0002"; got != want {
+		if got, want := refString(p.ExternalRef), "PARTY_REF demographic::PERSON id HIER_OBJECT_ID uid-0001"; got != want {
 			t.Errorf("%s: provider external_ref = %s, want %s", call, got, want)
 		}
 		if p.Name != nil {
@@ -66,7 +67,7 @@ func TestREQ107_PartyIdentifiedProviderTakesItsParts(t *testing.T) {
 // policy, either value fill and either compile mode, and passes both
 // validators: the name the template pins, the identifier, and an
 // external_ref with the namespace local, the type PERSON and an id drawn
-// from UIDSource, after the OBSERVATION's own uid. Its relationship takes
+// from UIDSource, the first drawn. Its relationship takes
 // the RM default openehr 253|unknown|.
 func TestREQ107_PartyRelatedSubjectTakesItsParts(t *testing.T) {
 	opt := guardRootOPT("OBSERVATION", guardObservationID,
@@ -90,7 +91,7 @@ func TestREQ107_PartyRelatedSubjectTakesItsParts(t *testing.T) {
 		if got := identifierIDs(p.Identifiers); !slices.Equal(got, []string{"998877"}) {
 			t.Errorf("%s: subject identifiers = %v, want [998877]", call, got)
 		}
-		if got, want := refString(p.ExternalRef), "PARTY_REF local::PERSON id HIER_OBJECT_ID uid-0002"; got != want {
+		if got, want := refString(p.ExternalRef), "PARTY_REF local::PERSON id HIER_OBJECT_ID uid-0001"; got != want {
 			t.Errorf("%s: subject external_ref = %s, want %s", call, got, want)
 		}
 		if p.Relationship.DefiningCode != unknown || p.Relationship.Value != "unknown" {
@@ -103,8 +104,8 @@ func TestREQ107_PartyRelatedSubjectTakesItsParts(t *testing.T) {
 // an ENTRY's subject the template names as a PARTY_SELF with an
 // external_ref comes out with it, at every policy, either value fill and
 // either compile mode, and passes both validators: the type the template
-// pins, the namespace local and an id drawn from UIDSource, after the
-// OBSERVATION's own uid.
+// pins, the namespace local and an id drawn from UIDSource, the first
+// drawn.
 func TestREQ107_PartySelfSubjectTakesItsExternalRef(t *testing.T) {
 	opt := guardRootOPT("OBSERVATION", guardObservationID,
 		requiredRef("subject", "PARTY_SELF", requiredRef("external_ref", "PARTY_REF", pinnedString("type", "GROUP"))))
@@ -117,7 +118,7 @@ func TestREQ107_PartySelfSubjectTakesItsExternalRef(t *testing.T) {
 		if !ok {
 			t.Fatalf("%s: subject is %T, want *rm.PartySelf", call, obs.Subject)
 		}
-		if got, want := refString(p.ExternalRef), "PARTY_REF local::GROUP id HIER_OBJECT_ID uid-0002"; got != want {
+		if got, want := refString(p.ExternalRef), "PARTY_REF local::GROUP id HIER_OBJECT_ID uid-0001"; got != want {
 			t.Errorf("%s: subject external_ref = %s, want %s", call, got, want)
 		}
 	})
@@ -130,8 +131,8 @@ func TestREQ107_PartySelfSubjectTakesItsExternalRef(t *testing.T) {
 // and passes both validators. Only the parts the template leaves empty take
 // a default: the source keeps its pinned namespace and type and takes an id
 // drawn from UIDSource; the target keeps its pinned id and takes the
-// namespace local and the type PERSON. The relationship's own uid is drawn
-// after the source id.
+// namespace local and the type PERSON. The relationship gets no uid, since
+// its template does not require one (Identity).
 func TestREQ107_PartyRelationshipKeepsItsPins(t *testing.T) {
 	const targetID = "6e4b1c2a-0000-4000-8000-00000000abcd"
 	opt := guardRootOPT("PARTY_RELATIONSHIP", "openEHR-DEMOGRAPHIC-PARTY_RELATIONSHIP.example.v1",
@@ -150,8 +151,8 @@ func TestREQ107_PartyRelationshipKeepsItsPins(t *testing.T) {
 		if got, want := refString(&rel.Target), "PARTY_REF local::PERSON id HIER_OBJECT_ID "+targetID; got != want {
 			t.Errorf("%s: target = %s, want %s", call, got, want)
 		}
-		if uid := hierIDText(rel.GetUID()); uid != "uid-0002" {
-			t.Errorf("%s: uid = %q, want uid-0002", call, uid)
+		if uid := rel.GetUID(); uid != nil {
+			t.Errorf("%s: uid = %v, want none: the template does not require it", call, uid)
 		}
 		if tree, ok := rel.Details.(*rm.ItemTree); !ok || tree.ArchetypeNodeID != "at0001" {
 			t.Errorf("%s: details = %#v, want the ITEM_TREE at0001", call, rel.Details)
@@ -195,8 +196,9 @@ func TestREQ107_ContactTakesItsNameAndTimeValidity(t *testing.T) {
 // what the RM requires, at every policy, either value fill and either
 // compile mode, and passes both validators: the node id at0000, a target
 // and a source, in the order the BMM declares them, with the namespace
-// local, the type PERSON and ids drawn from UIDSource, and then its own
-// uid (Identity).
+// local, the type PERSON and ids drawn from UIDSource, the first two drawn,
+// since neither the PERSON nor the relationship gets a uid its template
+// does not require (Identity).
 func TestREQ107_PartyRelationshipFromTheBMMTakesItsParts(t *testing.T) {
 	opt := guardRootOPT("PERSON", "openEHR-DEMOGRAPHIC-PERSON.example.v1", optMultiple("relationships"))
 	generateEvery(t, opt, func(t *testing.T, call string, out any) {
@@ -211,14 +213,14 @@ func TestREQ107_PartyRelationshipFromTheBMMTakesItsParts(t *testing.T) {
 		if rel.ArchetypeNodeID != "at0000" {
 			t.Errorf("%s: relationship node id = %q, want at0000", call, rel.ArchetypeNodeID)
 		}
-		if got, want := refString(&rel.Target), "PARTY_REF local::PERSON id HIER_OBJECT_ID uid-0002"; got != want {
+		if got, want := refString(&rel.Target), "PARTY_REF local::PERSON id HIER_OBJECT_ID uid-0001"; got != want {
 			t.Errorf("%s: target = %s, want %s", call, got, want)
 		}
-		if got, want := refString(&rel.Source), "PARTY_REF local::PERSON id HIER_OBJECT_ID uid-0003"; got != want {
+		if got, want := refString(&rel.Source), "PARTY_REF local::PERSON id HIER_OBJECT_ID uid-0002"; got != want {
 			t.Errorf("%s: source = %s, want %s", call, got, want)
 		}
-		if uid := hierIDText(rel.GetUID()); uid != "uid-0004" {
-			t.Errorf("%s: relationship uid = %q, want uid-0004", call, uid)
+		if uid := rel.GetUID(); uid != nil {
+			t.Errorf("%s: relationship uid = %v, want none: the template does not require it", call, uid)
 		}
 	})
 }

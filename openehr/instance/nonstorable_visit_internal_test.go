@@ -170,9 +170,22 @@ func TestREQ107_VisitsSkipsAnAttributeWithOnlyProhibitedChildren(t *testing.T) {
 	}
 }
 
-// visitTree is an ITEM_TREE the OPT describes: its items are optional in
-// the RM, so it needs no content the OPT does not describe.
-const visitTree = `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>ITEM_TREE</rm_type_name><node_id>at0001</node_id></children>`
+// visitTree is an ITEM_TREE the OPT describes, whose items hold an optional
+// ELEMENT: it needs no content the OPT does not describe, and holds an item
+// wherever the policy builds an optional child.
+const visitTree = `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>ITEM_TREE</rm_type_name><node_id>at0001</node_id>` +
+	`<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>items</rm_attribute_name>` +
+	`<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>ELEMENT</rm_type_name>` +
+	`<occurrences><lower_included>true</lower_included><upper_included>true</upper_included>` +
+	`<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded>` +
+	`<lower>0</lower><upper>1</upper></occurrences><node_id>at0002</node_id></children>` +
+	`<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval>` +
+	`<lower_included>true</lower_included><lower_unbounded>false</lower_unbounded>` +
+	`<upper_unbounded>true</upper_unbounded><lower>0</lower></interval></cardinality></attributes></children>`
+
+// visitEmptyTree is an ITEM_TREE the OPT describes with no attributes: its
+// items are optional in the RM, so it would hold no item.
+const visitEmptyTree = `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>ITEM_TREE</rm_type_name><node_id>at0001</node_id></children>`
 
 // TestREQ107_VisitsReadsAnOpenExistenceAsAllowed is the REQ-107 check that
 // an existence whose upper bound is unbounded does not prohibit the
@@ -200,7 +213,8 @@ func TestREQ107_VisitsReadsAnOpenExistenceAsAllowed(t *testing.T) {
 // not under Medium or Required, unless its member, built from its BMM
 // type, would be a LOCATABLE no OPT node describes: then Large does not
 // visit it either. One with a child the OPT describes is visited under
-// Large and Medium and not under Required.
+// Large and Medium and not under Required, unless that child is an item
+// structure that would hold no item: then no policy visits it.
 func TestREQ107_VisitsFollowsThePolicy(t *testing.T) {
 	cases := []struct {
 		name, rmType, attr, opt string
@@ -220,6 +234,11 @@ func TestREQ107_VisitsFollowsThePolicy(t *testing.T) {
 			name: "a structure with a described child", rmType: "OBSERVATION", attr: "protocol",
 			opt:  strings.Replace(visitOptionalSingle("protocol"), "</attributes>", visitTree+"</attributes>", 1),
 			want: map[Policy]bool{Large: true, Medium: true, Required: false},
+		},
+		{
+			name: "a structure that would hold no item", rmType: "OBSERVATION", attr: "protocol",
+			opt:  strings.Replace(visitOptionalSingle("protocol"), "</attributes>", visitEmptyTree+"</attributes>", 1),
+			want: map[Policy]bool{Large: false, Medium: false, Required: false},
 		},
 	}
 	for _, tc := range cases {

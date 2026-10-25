@@ -34,8 +34,13 @@ func namedElement(name, occ string) string {
 // namedSiblingsOPT is a COMPOSITION template whose context's other_context
 // holds two ELEMENT[at0002] siblings that differ only by the name the
 // template fixes on each, 'A' then 'B', with the occurrences given for
-// each.
-func namedSiblingsOPT(occA, occB string) string {
+// each, in an items list whose cardinality upper bound is upper, or
+// unbounded when upper is empty.
+func namedSiblingsOPT(occA, occB, upper string) string {
+	bound := `<upper_unbounded>true</upper_unbounded>`
+	if upper != "" {
+		bound = `<upper_included>true</upper_included><upper_unbounded>false</upper_unbounded><upper>` + upper + `</upper>`
+	}
 	return `<?xml version="1.0" encoding="utf-8"?>
 <template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.openehr.org/v1">
 <language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
@@ -47,7 +52,7 @@ func namedSiblingsOPT(occA, occB string) string {
 <children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>ITEM_TREE</rm_type_name><node_id>at0001</node_id>
 <attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>items</rm_attribute_name>
 ` + namedElement("A", occA) + namedElement("B", occB) + `
-<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval><lower_included>true</lower_included><lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>0</lower></interval></cardinality>
+<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval><lower_included>true</lower_included><lower_unbounded>false</lower_unbounded>` + bound + `<lower>0</lower></interval></cardinality>
 </attributes>
 </children>
 </attributes>
@@ -67,11 +72,19 @@ const (
 	siblingBValuePath = "/context/other_context/items[at0002,'B']/value"
 )
 
-// compileNamedSiblings compiles namedSiblingsOPT and checks that each
-// sibling compiled at its own name-predicated path.
+// compileNamedSiblings compiles namedSiblingsOPT with an unbounded items
+// list and checks that each sibling compiled at its own name-predicated
+// path.
 func compileNamedSiblings(t *testing.T, occA, occB string) *templatecompile.Compiled {
 	t.Helper()
-	c := compileInline(t, namedSiblingsOPT(occA, occB))
+	return compileNamedSiblingsWithin(t, occA, occB, "")
+}
+
+// compileNamedSiblingsWithin is compileNamedSiblings with the items list's
+// cardinality upper bound upper.
+func compileNamedSiblingsWithin(t *testing.T, occA, occB, upper string) *templatecompile.Compiled {
+	t.Helper()
+	c := compileInline(t, namedSiblingsOPT(occA, occB, upper))
 	for path, name := range map[string]string{siblingAValuePath: "A", siblingBValuePath: "B"} {
 		n, err := c.NodeAt(path)
 		if err != nil {
@@ -168,13 +181,13 @@ func TestREQ101_REQ116_SetWritesTheNamedSibling(t *testing.T) {
 // TestREQ101_REQ116_SetRefusesANamedSiblingTheSkeletonLacks checks that a
 // value set at the path of a named sibling the skeleton does not hold is
 // refused with ErrInvalidPath, not written into a sibling of another name
-// that shares the at-code. The template leaves both siblings optional, and
-// of optional siblings that share an at-code the skeleton holds the first
-// alone, 'A'.
+// that shares the at-code. The template leaves both siblings optional in a
+// list that holds one item at most, and the Large skeleton gives that room
+// to the first, 'A', in OPT order (REQ-107 What a visit writes).
 func TestREQ101_REQ116_SetRefusesANamedSiblingTheSkeletonLacks(t *testing.T) {
 	t.Parallel()
 	optional := occurrences("0", "1")
-	c := compileNamedSiblings(t, optional, optional)
+	c := compileNamedSiblingsWithin(t, optional, optional, "1")
 	b, err := composition.NewBuilder(t.Context(), c,
 		composition.WithTerritory("NL"),
 		composition.WithComposer(testComposer()),
@@ -200,5 +213,56 @@ func TestREQ101_REQ116_SetRefusesANamedSiblingTheSkeletonLacks(t *testing.T) {
 	}
 	if after := siblingValues(t, comp); after["A"] != before["A"] {
 		t.Errorf("after Set(%s), sibling A holds %q, want its skeleton value %q", siblingBValuePath, after["A"], before["A"])
+	}
+}
+
+// TestREQ101_REQ107_SetWritesAnOptionalNamedSibling checks that the Large
+// skeleton NewBuilder seeds from holds a member of each optional sibling
+// that shares an at-code and differs only by the name the template fixes
+// on it (REQ-107 What a visit writes), so Set writes into either sibling
+// its path names, the second included, and the other keeps its own value.
+func TestREQ101_REQ107_SetWritesAnOptionalNamedSibling(t *testing.T) {
+	t.Parallel()
+	optional := occurrences("0", "1")
+	c := compileNamedSiblings(t, optional, optional)
+	for _, tc := range []struct {
+		path, target, other string
+	}{
+		{path: siblingBValuePath, target: "B", other: "A"},
+		{path: siblingAValuePath, target: "A", other: "B"},
+	} {
+		t.Run(tc.target, func(t *testing.T) {
+			t.Parallel()
+			b, err := composition.NewBuilder(t.Context(), c,
+				composition.WithTerritory("NL"),
+				composition.WithComposer(testComposer()),
+			)
+			if err != nil {
+				t.Fatalf("NewBuilder: %v", err)
+			}
+			skeleton, err := b.Build()
+			if err != nil {
+				t.Fatalf("Build of the bare skeleton: %v", err)
+			}
+			before := siblingValues(t, skeleton)
+			if len(before) != 2 {
+				t.Fatalf("skeleton holds siblings %v, want A and B: Large writes every optional named sibling", before)
+			}
+			const written = "written"
+			if err := b.Set(tc.path, &rm.DVText{Value: written}); err != nil {
+				t.Fatalf("Set(%s) = %v, want nil", tc.path, err)
+			}
+			comp, err := b.Build()
+			if err != nil {
+				t.Fatalf("Build after Set(%s) = %v, want nil", tc.path, err)
+			}
+			after := siblingValues(t, comp)
+			if after[tc.target] != written {
+				t.Errorf("after Set(%s), sibling %s holds %q, want %q", tc.path, tc.target, after[tc.target], written)
+			}
+			if after[tc.other] != before[tc.other] {
+				t.Errorf("after Set(%s), sibling %s holds %q, want its skeleton value %q", tc.path, tc.other, after[tc.other], before[tc.other])
+			}
+		})
 	}
 }

@@ -429,19 +429,20 @@ func TestREQ107_FirstAllowedAlternativeWins(t *testing.T) {
 	}
 }
 
-// TestREQ107_LargeAndMediumSkipCollidingOptionalSiblings is the REQ-107
-// check that, under Large and Medium, an optional child whose identity an
-// earlier optional sibling shares gets no member, a choice of the
-// generator's own (REQ-107 What a visit writes). The two siblings are
-// ELEMENTs, whose identity is their node_id, told apart by their value's
-// RM type, so the members show that only the first was built. The root
-// passes the template validator under both policies. It holds under both
-// value fills and both compile modes.
-func TestREQ107_LargeAndMediumSkipCollidingOptionalSiblings(t *testing.T) {
+// TestREQ107_MediumSkipsACollidingOptionalSibling is the REQ-107 check
+// that, under Medium, an optional child whose identity an earlier optional
+// sibling shares gets no member, while under Large each gets its own
+// (REQ-107 What a visit writes). The two siblings are ELEMENTs, whose
+// identity is their node_id, told apart by their value's RM type, so the
+// members show which were built. The root passes the template validator
+// under both policies, which binds each member to the sibling that built
+// it (REQ-102 Structural — binding items). It holds under both value fills
+// and both compile modes.
+func TestREQ107_MediumSkipsACollidingOptionalSibling(t *testing.T) {
 	opt := optTemplate("CLUSTER", optCardinal("items", 1, -1,
 		optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0001", 0, 1, optSingle("value", optNode("DV_TEXT", ""))),
 		optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0001", 0, 1, optSingle("value", optNode("DV_COUNT", "")))))
-	want := []string{"DV_TEXT"}
+	wants := map[instance.Policy][]string{instance.Large: {"DV_TEXT", "DV_COUNT"}, instance.Medium: {"DV_TEXT"}}
 	for _, implicit := range []bool{true, false} {
 		c := compileOPTText(t, opt, implicit)
 		// Required gives an optional child no member of its own, which
@@ -460,7 +461,7 @@ func TestREQ107_LargeAndMediumSkipCollidingOptionalSiblings(t *testing.T) {
 					}
 					got = append(got, rmTypeName(el.Value))
 				}
-				if !slices.Equal(got, want) {
+				if want := wants[opts.Policy]; !slices.Equal(got, want) {
 					t.Errorf("CLUSTER.items values = %v, want %v", got, want)
 				}
 				noFloorErrors(t, out)
@@ -471,18 +472,19 @@ func TestREQ107_LargeAndMediumSkipCollidingOptionalSiblings(t *testing.T) {
 }
 
 // TestREQ107_KeepsTheFirstOptionalSiblingOfEachIdentity is the REQ-107
-// check that, under Large and Medium, an optional sibling yields to a
-// required one with its identity and to an earlier optional one with it;
-// the identity is the one the validator binds a member by: the node_id for
-// an ELEMENT, the archetype id for an archetype root. So the optional
-// at0001 ELEMENTs get no member beside the required one, while at0002,
-// which no required sibling carries, keeps its first optional sibling. Two
-// archetype roots of different archetypes both carry the node id at0000,
-// and under Large each gets its member; a second optional root of an
-// archetype already built gets none. Under Medium the optional root of the
-// second archetype gets none either, since it follows the first optional
-// archetype root. The root passes the template validator under both
-// policies. It holds under both value fills and both compile modes.
+// check that, under Medium, an optional sibling yields to a required one
+// with its identity and to an earlier optional one with it; the identity is
+// the one the validator binds a member by: the node_id for an ELEMENT, the
+// archetype id for an archetype root. So the optional at0001 ELEMENTs get
+// no member beside the required one, while at0002, which no required
+// sibling carries, keeps its first optional sibling, and the optional root
+// of the second archetype gets none, since it follows the first optional
+// archetype root. Under Large every sibling gets its member, in OPT order:
+// the optional ELEMENTs beside the required one of their node_id, and both
+// roots of one archetype. The root passes the template validator under both
+// policies, which binds each member to the first sibling with room under
+// which it validates (REQ-102 Structural — binding items). It holds under
+// both value fills and both compile modes.
 func TestREQ107_KeepsTheFirstOptionalSiblingOfEachIdentity(t *testing.T) {
 	element := func(nodeID string, lower int, valueType string) string {
 		return optOccurring("C_COMPLEX_OBJECT", "ELEMENT", nodeID, lower, 1, optSingle("value", optNode(valueType, "")))
@@ -504,7 +506,7 @@ func TestREQ107_KeepsTheFirstOptionalSiblingOfEachIdentity(t *testing.T) {
 		root(clusterA),
 		element("at0002", 0, "DV_DURATION")))
 	want := map[instance.Policy][]string{
-		instance.Large:  {"DV_BOOLEAN", clusterA, "DV_DATE", clusterB},
+		instance.Large:  {"DV_BOOLEAN", "DV_TEXT", clusterA, "DV_DATE", clusterB, "DV_COUNT", clusterA, "DV_DURATION"},
 		instance.Medium: {"DV_BOOLEAN", clusterA, "DV_DATE"},
 	}
 	for _, implicit := range []bool{true, false} {
@@ -541,39 +543,42 @@ func TestREQ107_KeepsTheFirstOptionalSiblingOfEachIdentity(t *testing.T) {
 	}
 }
 
-// TestREQ107_OptionalSiblingYieldsToARequiredOne is the REQ-107 check
-// that, under Large and Medium, an optional child whose identity a required
-// sibling carries gets no member of its own, whether that sibling comes
-// before or after it, and a slot with an ELEMENT's node_id does not count
-// as its sibling, while optional roots of different archetypes each get
-// theirs under Large and only the first gets one under Medium. The cases
-// are archetype roots of one archetype under CLUSTER.items in both orders,
-// ELEMENTs of one node_id, roots of two archetypes, and a slot before an
-// optional ELEMENT of its node_id, which a required ELEMENT of another
-// node_id precedes so that no top-up builds it; the siblings that share an
-// identity differ in content, so the members show which of them was built.
-// It holds under both value fills and both compile modes.
+// TestREQ107_OptionalSiblingBesideARequiredOne is the REQ-107 check that,
+// under Medium, an optional child whose identity a required sibling carries
+// gets no member of its own, whether that sibling comes before or after it,
+// while under Large it gets one, in OPT order. A slot with an ELEMENT's
+// node_id does not count as its sibling, and optional roots of different
+// archetypes each get theirs under Large and only the first gets one under
+// Medium. The cases are archetype roots of one archetype under
+// CLUSTER.items in both orders, ELEMENTs of one node_id, roots of two
+// archetypes, and a slot before an optional ELEMENT of its node_id, which a
+// required ELEMENT of another node_id precedes so that no top-up builds it;
+// the siblings that share an identity differ in content, so the members
+// show which of them was built. It holds under both value fills and both
+// compile modes.
 //
-// The skip leaves the top-up free. Where CLUSTER.items needs two members
-// and an optional root or ELEMENT yields to a required one after it, the
-// required child's member comes first, and the top-up then builds one of
-// the optional child, the first allowed child that is not a slot. Where the
-// optional ELEMENT yields to a required one before it, the top-up builds a
-// second member of the required one.
+// Medium's skip leaves the top-up free. Where CLUSTER.items needs two
+// members and an optional root or ELEMENT yields to a required one after
+// it, the required child's member comes first, and the top-up then builds
+// one of the optional child, the first allowed child that is not a slot.
+// Where the optional ELEMENT yields to a required one before it, the top-up
+// builds a second member of the required one. Under Large the two members
+// are each sibling's own, so no top-up is needed.
 //
 // Where siblings share an identity and pin no name, the template validator
 // binds each member to the first of them that has room and under which it
 // validates (REQ-102 Structural — binding items), so the members built for
 // siblings that differ in content bind to the children that built them and
-// the root passes it. Where the optional sibling comes first and its
-// content is the required one's, the member built for the required one
-// validates under the optional one too and binds there, so the root shows
-// the known gap (checkTemplateValidator), under both policies. Where the
-// top-up repeats the required ELEMENT past its occurrences, the extra
-// member binds to the optional ELEMENT of its node_id, which has room, and
-// breaks that child's value constraint (REQ-107 known gap, a top-up past a
-// child's occurrences).
-func TestREQ107_OptionalSiblingYieldsToARequiredOne(t *testing.T) {
+// the root passes it. Under Medium, where the optional sibling comes first
+// and its content is the required one's, the member built for the required
+// one validates under the optional one too and binds there, so the root
+// shows the known gap (checkTemplateValidator); under Large the optional
+// sibling's own member fills its one occurrence, and the root passes. Under
+// Medium, where the top-up repeats the required ELEMENT past its
+// occurrences, the extra member binds to the optional ELEMENT of its
+// node_id, which has room, and breaks that child's value constraint
+// (REQ-107 known gap, a top-up past a child's occurrences).
+func TestREQ107_OptionalSiblingBesideARequiredOne(t *testing.T) {
 	const clusterA, clusterB = "openEHR-EHR-CLUSTER.sibling_a.v1", "openEHR-EHR-CLUSTER.sibling_b.v1"
 	element := func(nodeID string, lower int, valueType string) string {
 		return optOccurring("C_COMPLEX_OBJECT", "ELEMENT", nodeID, lower, 1, optSingle("value", optNode(valueType, "")))
@@ -592,44 +597,44 @@ func TestREQ107_OptionalSiblingYieldsToARequiredOne(t *testing.T) {
 		children []string
 		// large and medium are the members built under each policy.
 		large, medium []string
-		// largeGap and mediumGap are the paths at which the root shows the
-		// known gap under each policy; none where it passes the template
-		// validator.
-		largeGap, mediumGap []string
-		// topUpBreak is the one template error, "code path", by which the
-		// root shows the top-up gap under both policies; empty for none.
-		topUpBreak string
+		// mediumGap holds the paths at which the root shows the known gap
+		// under Medium; none where it passes the template validator, as
+		// every root does under Large.
+		mediumGap []string
+		// mediumTopUpBreak is the one template error, "code path", by
+		// which the root shows the top-up gap under Medium; empty for
+		// none.
+		mediumTopUpBreak string
 	}{
 		{
 			name:     "required root then optional root",
 			lower:    1,
 			children: []string{root(clusterA, 1, "DV_TEXT"), root(clusterA, 0, "DV_COUNT")},
-			large:    []string{clusterA + "[DV_TEXT]"},
+			large:    []string{clusterA + "[DV_TEXT]", clusterA + "[DV_COUNT]"},
 			medium:   []string{clusterA + "[DV_TEXT]"},
 		},
 		{
 			name:     "optional root then required root",
 			lower:    1,
 			children: []string{root(clusterA, 0, "DV_COUNT"), root(clusterA, 1, "DV_TEXT")},
-			large:    []string{clusterA + "[DV_TEXT]"},
+			large:    []string{clusterA + "[DV_COUNT]", clusterA + "[DV_TEXT]"},
 			medium:   []string{clusterA + "[DV_TEXT]"},
 		},
 		{
-			// The optional root admits the member built for the required
-			// one, so the validator binds it there.
+			// Under Medium the optional root admits the member built for
+			// the required one, so the validator binds it there.
 			name:      "optional root then required root of one content",
 			lower:     1,
 			children:  []string{root(clusterA, 0, "DV_TEXT"), root(clusterA, 1, "DV_TEXT")},
-			large:     []string{clusterA + "[DV_TEXT]"},
+			large:     []string{clusterA + "[DV_TEXT]", clusterA + "[DV_TEXT]"},
 			medium:    []string{clusterA + "[DV_TEXT]"},
-			largeGap:  rootGap,
 			mediumGap: rootGap,
 		},
 		{
 			name:     "required element then optional element",
 			lower:    1,
 			children: []string{element("at0001", 1, "DV_TEXT"), element("at0001", 0, "DV_COUNT")},
-			large:    []string{"DV_TEXT"},
+			large:    []string{"DV_TEXT", "DV_COUNT"},
 			medium:   []string{"DV_TEXT"},
 		},
 		{
@@ -647,42 +652,41 @@ func TestREQ107_OptionalSiblingYieldsToARequiredOne(t *testing.T) {
 			medium:   []string{"DV_COUNT", "DV_TEXT"},
 		},
 		{
-			// The top-up builds a member of the optional root that yields
-			// to the required one.
+			// Under Medium the top-up builds a member of the optional root
+			// that yields to the required one.
 			name:     "optional root then required root, cardinality lower 2",
 			lower:    2,
 			children: []string{root(clusterA, 0, "DV_COUNT"), root(clusterA, 1, "DV_TEXT")},
-			large:    []string{clusterA + "[DV_TEXT]", clusterA + "[DV_COUNT]"},
+			large:    []string{clusterA + "[DV_COUNT]", clusterA + "[DV_TEXT]"},
 			medium:   []string{clusterA + "[DV_TEXT]", clusterA + "[DV_COUNT]"},
 		},
 		{
 			name:     "optional element then required element, cardinality lower 2",
 			lower:    2,
 			children: []string{element("at0001", 0, "DV_COUNT"), element("at0001", 1, "DV_TEXT")},
-			large:    []string{"DV_TEXT", "DV_COUNT"},
+			large:    []string{"DV_COUNT", "DV_TEXT"},
 			medium:   []string{"DV_TEXT", "DV_COUNT"},
 		},
 		{
-			// The optional ELEMENT admits the member built for the required
-			// one, so the validator binds it there.
+			// Under Medium the optional ELEMENT admits the member built for
+			// the required one, so the validator binds it there.
 			name:      "optional element then required element of one content",
 			lower:     1,
 			children:  []string{element("at0001", 0, "DV_TEXT"), element("at0001", 1, "DV_TEXT")},
-			large:     []string{"DV_TEXT"},
+			large:     []string{"DV_TEXT", "DV_TEXT"},
 			medium:    []string{"DV_TEXT"},
-			largeGap:  elementGap,
 			mediumGap: elementGap,
 		},
 		{
-			// The optional ELEMENT yields to the required one before it,
-			// and the top-up builds a second member of the required one,
-			// the first allowed child that is not a slot.
-			name:       "required element then optional element, cardinality lower 2",
-			lower:      2,
-			children:   []string{element("at0001", 1, "DV_TEXT"), element("at0001", 0, "DV_COUNT")},
-			large:      []string{"DV_TEXT", "DV_TEXT"},
-			medium:     []string{"DV_TEXT", "DV_TEXT"},
-			topUpBreak: "rm_type_mismatch /items[2]/value",
+			// Under Medium the optional ELEMENT yields to the required one
+			// before it, and the top-up builds a second member of the
+			// required one, the first allowed child that is not a slot.
+			name:             "required element then optional element, cardinality lower 2",
+			lower:            2,
+			children:         []string{element("at0001", 1, "DV_TEXT"), element("at0001", 0, "DV_COUNT")},
+			large:            []string{"DV_TEXT", "DV_COUNT"},
+			medium:           []string{"DV_TEXT", "DV_TEXT"},
+			mediumTopUpBreak: "rm_type_mismatch /items[2]/value",
 		},
 	}
 	for _, tc := range cases {
@@ -697,7 +701,7 @@ func TestREQ107_OptionalSiblingYieldsToARequiredOne(t *testing.T) {
 					if err != nil {
 						t.Fatalf("Generate: %v", err)
 					}
-					want, gap := tc.large, tc.largeGap
+					want, gap := tc.large, []string(nil)
 					if opts.Policy == instance.Medium {
 						want, gap = tc.medium, tc.mediumGap
 					}
@@ -705,9 +709,9 @@ func TestREQ107_OptionalSiblingYieldsToARequiredOne(t *testing.T) {
 						t.Errorf("CLUSTER.items members = %v, want %v", got, want)
 					}
 					noFloorErrors(t, out)
-					if tc.topUpBreak != "" {
-						if errs := templateErrors(out, c); len(errs) != 1 || errs[0].Code+" "+errs[0].Path != tc.topUpBreak {
-							t.Errorf("REQ-107 known gap, a top-up past a child's occurrences: Validate reports %s, want %s alone", issueSummary(errs), tc.topUpBreak)
+					if tc.mediumTopUpBreak != "" && opts.Policy == instance.Medium {
+						if errs := templateErrors(out, c); len(errs) != 1 || errs[0].Code+" "+errs[0].Path != tc.mediumTopUpBreak {
+							t.Errorf("REQ-107 known gap, a top-up past a child's occurrences: Validate reports %s, want %s alone", issueSummary(errs), tc.mediumTopUpBreak)
 						}
 						return
 					}
@@ -721,16 +725,15 @@ func TestREQ107_OptionalSiblingYieldsToARequiredOne(t *testing.T) {
 // TestREQ107_ArchetypeRootCarriesItsNodeID is the REQ-107 check that an
 // archetype root carries its node_id as well as its archetype id, as the
 // template validator binds a LOCATABLE member (REQ-102 Structural — binding
-// items). Under Large and Medium, an optional ELEMENT whose node_id is the
-// at0000 of an archetype root before it, or of a required root after it,
-// gets no member, so the root passes the template validator, while an
-// optional ELEMENT before an optional root keeps its member: the ELEMENT
-// does not carry the root's archetype id. Where the ELEMENT after the root
-// is required, both get their members, and the ELEMENT's member, which
-// carries the root's node_id, binds to the ELEMENT, since the root has no
-// room left (REQ-102 Structural — binding items). Each case holds one
-// archetype root, so Medium builds what Large does. It holds under both
-// value fills and both compile modes.
+// items). Under Medium, an optional ELEMENT whose node_id is the at0000 of
+// an archetype root before it, or of a required root after it, gets no
+// member, while an optional ELEMENT before an optional root keeps its
+// member: the ELEMENT does not carry the root's archetype id. Under Large
+// the optional ELEMENT gets its member in each case. Where both get their
+// members, the ELEMENT's member, which carries the root's node_id, binds to
+// the ELEMENT, since the root has no room left or does not admit it, so the
+// root passes the template validator (REQ-102 Structural — binding items).
+// It holds under both value fills and both compile modes.
 func TestREQ107_ArchetypeRootCarriesItsNodeID(t *testing.T) {
 	const clusterA = "openEHR-EHR-CLUSTER.sibling_a.v1"
 	element := func(lower int) string {
@@ -745,34 +748,39 @@ func TestREQ107_ArchetypeRootCarriesItsNodeID(t *testing.T) {
 	}
 	rootMember := clusterA + "[DV_TEXT]"
 	cases := []struct {
-		name     string
-		children []string
-		want     []string
+		name          string
+		children      []string
+		large, medium []string
 	}{
 		{
 			name:     "optional root then optional element",
 			children: []string{root(0), element(0)},
-			want:     []string{rootMember},
+			large:    []string{rootMember, "DV_COUNT"},
+			medium:   []string{rootMember},
 		},
 		{
 			name:     "required root then optional element",
 			children: []string{root(1), element(0)},
-			want:     []string{rootMember},
+			large:    []string{rootMember, "DV_COUNT"},
+			medium:   []string{rootMember},
 		},
 		{
 			name:     "optional element then required root",
 			children: []string{element(0), root(1)},
-			want:     []string{rootMember},
+			large:    []string{"DV_COUNT", rootMember},
+			medium:   []string{rootMember},
 		},
 		{
 			name:     "optional element then optional root",
 			children: []string{element(0), root(0)},
-			want:     []string{"DV_COUNT", rootMember},
+			large:    []string{"DV_COUNT", rootMember},
+			medium:   []string{"DV_COUNT", rootMember},
 		},
 		{
 			name:     "optional root then required element",
 			children: []string{root(0), element(1)},
-			want:     []string{rootMember, "DV_COUNT"},
+			large:    []string{rootMember, "DV_COUNT"},
+			medium:   []string{rootMember, "DV_COUNT"},
 		},
 	}
 	for _, tc := range cases {
@@ -787,8 +795,12 @@ func TestREQ107_ArchetypeRootCarriesItsNodeID(t *testing.T) {
 					if err != nil {
 						t.Fatalf("Generate: %v", err)
 					}
-					if got := memberLabels(t, out); !slices.Equal(got, tc.want) {
-						t.Errorf("CLUSTER.items members = %v, want %v", got, tc.want)
+					want := tc.large
+					if opts.Policy == instance.Medium {
+						want = tc.medium
+					}
+					if got := memberLabels(t, out); !slices.Equal(got, want) {
+						t.Errorf("CLUSTER.items members = %v, want %v", got, want)
 					}
 					noFloorErrors(t, out)
 					checkTemplateValidator(t, out, c)
@@ -840,7 +852,8 @@ func TestREQ107_NeverSkipsAChildWithNoIdentity(t *testing.T) {
 // archetype roots only: an optional ELEMENT between the two roots keeps
 // its member under Medium. Where the first optional root yields to a
 // required root of its archetype, it still counts as the first, so Medium
-// builds no optional archetype at all. Each root passes the template
+// builds no optional archetype at all, while Large builds both optional
+// roots beside the required one. Each root passes the template
 // validator and the RM floor. It holds under both value fills and both
 // compile modes.
 func TestREQ107_MediumBuildsOneOptionalArchetypePerAttribute(t *testing.T) {
@@ -881,7 +894,7 @@ func TestREQ107_MediumBuildsOneOptionalArchetypePerAttribute(t *testing.T) {
 				root(clusterB, 0, "DV_DATE"),
 			},
 			want: map[instance.Policy][]string{
-				instance.Large:    {clusterA + "[DV_TEXT]", clusterB + "[DV_DATE]"},
+				instance.Large:    {clusterA + "[DV_TEXT]", clusterA + "[DV_BOOLEAN]", clusterB + "[DV_DATE]"},
 				instance.Medium:   {clusterA + "[DV_TEXT]"},
 				instance.Required: {clusterA + "[DV_TEXT]"},
 			},
@@ -950,13 +963,13 @@ const sharedIdentityGap = "REQ-107 known gap, an optional sibling that carries a
 // checkTemplateValidator checks the template validator's verdict on out.
 // With no gaps, out must pass it: every error is reported. Otherwise out
 // holds an optional sibling that carries a later, required one's identity,
-// where neither pins a name; the generator built no member of the optional
-// one, and the validator binds the member built for the required one to
-// the optional one, under which it validates too (sharedIdentityGap). Each
-// path in gaps must carry the cardinality issue that shows it, and the
-// other errors that binding causes are expected. The day the generator
-// builds a member of each, the check fails, and the case should then
-// expect out to pass.
+// where neither pins a name; under Medium the generator built no member of
+// the optional one, and the validator binds the member built for the
+// required one to the optional one, under which it validates too
+// (sharedIdentityGap). Each path in gaps must carry the cardinality issue
+// that shows it, and the other errors that binding causes are expected.
+// The day the generator builds a member of each, the check fails, and the
+// case should then expect out to pass.
 func checkTemplateValidator(t *testing.T, out any, c *templatecompile.Compiled, gaps ...string) {
 	t.Helper()
 	errs := templateErrors(out, c)
