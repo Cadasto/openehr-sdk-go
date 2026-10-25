@@ -1021,13 +1021,17 @@ func TestProbe108CompositionFormats(t *testing.T) { // PROBE-108, REQ-173
 // route; the last two plant a `.schema`-suffixed media type, so the detector
 // that guards "no request carries one" is shown to fire. Each case pins the
 // substring its Detail must carry, so a case cannot rot into failing for an
-// unrelated reason.
+// unrelated reason. A case that plants another composition value also names
+// the values its Detail must not carry: a mismatch names the path, not what
+// the compositions hold there.
 func TestProbe108FlagsBrokenWire(t *testing.T) { // PROBE-108
 	wt, comp := loadProbe108Fixture(t)
 	cases := []struct {
 		name       string
 		cfg        formatBackendConfig
 		wantDetail string
+		// notInDetail are compared values the Detail must not carry.
+		notInDetail []string
 	}{
 		{
 			name: "backend answers canonical JSON whatever the format asked",
@@ -1063,7 +1067,7 @@ func TestProbe108FlagsBrokenWire(t *testing.T) { // PROBE-108
 					c.ArchetypeNodeID = "openEHR-EHR-COMPOSITION.other.v1"
 				}
 			}},
-			wantDetail: "XML write: the representation differs from the composition written at archetype_node_id",
+			wantDetail: "XML write: the representation differs from the composition written at archetype_node_id: value differs",
 		},
 		{
 			name: "read-back is another composition",
@@ -1072,7 +1076,7 @@ func TestProbe108FlagsBrokenWire(t *testing.T) { // PROBE-108
 					c.ArchetypeNodeID = "openEHR-EHR-COMPOSITION.other.v1"
 				}
 			}},
-			wantDetail: "XML read: the composition read back differs from the one written at archetype_node_id",
+			wantDetail: "XML read: the composition read back differs from the one written at archetype_node_id: value differs",
 		},
 		{
 			name:       "write names no version",
@@ -1124,7 +1128,8 @@ func TestProbe108FlagsBrokenWire(t *testing.T) { // PROBE-108
 			cfg: formatBackendConfig{mutate: onRequests(isWrite(probe108MediaFlat), rewriteBody(t, func(body string) string {
 				return strings.ReplaceAll(body, `/any_event:0/my_dv_quantity|magnitude":130`, `/any_event:0/my_dv_quantity|magnitude":131`)
 			}))},
-			wantDetail: "FLAT write: the request body differs from the composition given at content/0/data/events/0/data/items/0/value",
+			wantDetail:  "FLAT write: the request body differs from the composition given at content/0/data/events/0/data/items/0/value: value differs",
+			notInDetail: []string{"130", "131"},
 		},
 		{
 			name: "read on another version's route",
@@ -1216,6 +1221,11 @@ func TestProbe108FlagsBrokenWire(t *testing.T) { // PROBE-108
 			}
 			if !strings.Contains(r.Detail, tc.wantDetail) {
 				t.Errorf("PROBE-108 failed for the wrong reason:\n got: %s\nwant it to mention: %s", r.Detail, tc.wantDetail)
+			}
+			for _, value := range tc.notInDetail {
+				if strings.Contains(r.Detail, value) {
+					t.Errorf("PROBE-108 detail carries the compared value %q:\n%s", value, r.Detail)
+				}
 			}
 		})
 	}

@@ -427,7 +427,9 @@ func probe108Marks(comp *rm.Composition) (map[string]string, error) {
 
 // probe108Diff compares got with the marks of the composition written, on the
 // marks' own paths. It returns "" when every value is equal, and otherwise
-// the first differing path, in sorted order, with both values.
+// the first differing path, in sorted order, with the kind of mismatch:
+// absent, or a value that differs. It never names the values: they are
+// clinical data, and the result lands in the probe's Detail and in logs.
 func probe108Diff(want map[string]string, got *rm.Composition) (string, error) {
 	tree, err := canonicalTree(got)
 	if err != nil {
@@ -436,10 +438,10 @@ func probe108Diff(want map[string]string, got *rm.Composition) (string, error) {
 	for _, p := range slices.Sorted(maps.Keys(want)) {
 		v, ok := lookupPath(tree, p)
 		if !ok {
-			return fmt.Sprintf("%s: absent, want %s", p, want[p]), nil
+			return p + ": absent", nil
 		}
 		if v != want[p] {
-			return fmt.Sprintf("%s: got %s, want %s", p, v, want[p]), nil
+			return p + ": value differs", nil
 		}
 	}
 	return "", nil
