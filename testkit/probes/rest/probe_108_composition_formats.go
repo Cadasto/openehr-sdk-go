@@ -60,8 +60,8 @@ type probe108Arm struct {
 	// simplified marks FLAT and STRUCTURED, which are written and read
 	// against the Web Template and carry the template id.
 	simplified bool
-	// formatQuery makes the write name its format with query parameters;
-	// formatParam is the `format` value it must then send.
+	// formatQuery makes the write and the read name their format with query
+	// parameters; formatParam is the `format` value both must then send.
 	formatQuery bool
 	formatParam string
 	// readBack reads the written version back in the same format.
@@ -85,7 +85,7 @@ var probe108Arms = []probe108Arm{
 	{name: "XML", format: composition.FormatXML, readBack: true, contentType: probe108MediaXML, accept: probe108MediaXML},
 	{name: "FLAT", format: composition.FormatFlat, simplified: true, readBack: true, contentType: probe108MediaFlat, accept: probe108MediaFlat},
 	{name: "STRUCTURED", format: composition.FormatStructured, simplified: true, readBack: true, contentType: probe108MediaStructured, accept: probe108MediaStructured},
-	{name: "FLAT (format query)", format: composition.FormatFlat, simplified: true, formatQuery: true, formatParam: "FLAT", contentType: probe108MediaJSON, accept: probe108MediaJSON},
+	{name: "FLAT (format query)", format: composition.FormatFlat, simplified: true, formatQuery: true, formatParam: "FLAT", readBack: true, contentType: probe108MediaJSON, accept: probe108MediaJSON},
 }
 
 // Probe108CompositionFormats implements PROBE-108: a composition written and
@@ -97,7 +97,9 @@ var probe108Arms = []probe108Arm{
 // `Prefer: return=representation` and reads the version the write named back
 // in the same format. Then it saves comp in FLAT once more with the format
 // query option, which names the format and the template with query
-// parameters beside `application/json`.
+// parameters beside `application/json`, and reads that version back with the
+// read's format query option, which names the format with a query parameter
+// beside `Accept: application/json`.
 //
 // The probe holds two oracles of its own. The media types are spelled out
 // here, not read from the leaf. Each request body is decoded by the probe
@@ -160,7 +162,8 @@ func Probe108CompositionFormats(ctx context.Context, c *transport.Client, captur
 
 	r.Status = "pass"
 	r.Detail = fmt.Sprintf("XML, FLAT and STRUCTURED each wrote with their media types and read back equal on %d paths; "+
-		"FLAT under the format query option sent format=FLAT and templateId=%s; no .schema media type", len(want), wt.TemplateID)
+		"FLAT under the format query options wrote with format=FLAT and templateId=%s and read back with format=FLAT; "+
+		"no .schema media type", len(want), wt.TemplateID)
 	return r, nil
 }
 
@@ -237,12 +240,17 @@ func probe108Write(ctx context.Context, c *transport.Client, captured func() []*
 	return meta.VersionUID, ""
 }
 
-// probe108Read reads the version uid names back in the arm's format and
-// checks the request and the composition decoded from the 200 body. It
-// returns the probe detail of the first fault, or "".
+// probe108Read reads the version uid names back in the arm's format, by
+// query parameter when the arm names its format that way, and checks the
+// request and the composition decoded from the 200 body. It returns the probe
+// detail of the first fault, or "".
 func probe108Read(ctx context.Context, c *transport.Client, captured func() []*http.Request, ehrID openehrclient.EHRID, uid openehrclient.VersionUID, wt *webtemplate.WebTemplate, arm probe108Arm, readPath string, want map[string]string) string {
+	opts := []composition.GetOption{composition.WithGetFormat(arm.format, arm.webTemplate(wt))}
+	if arm.formatQuery {
+		opts = append(opts, composition.WithGetFormatQuery())
+	}
 	before := len(captured())
-	got, _, err := composition.Get(ctx, c, ehrID, openehrclient.VersionOf(uid), composition.WithGetFormat(arm.format, arm.webTemplate(wt)))
+	got, _, err := composition.Get(ctx, c, ehrID, openehrclient.VersionOf(uid), opts...)
 	reqs := requestsSince(captured, before)
 	if fault := schemaMediaTypeFault(reqs); fault != "" {
 		return arm.name + " read: " + fault
@@ -259,6 +267,11 @@ func probe108Read(ctx context.Context, c *transport.Client, captured func() []*h
 	}
 	if accept := req.Header.Get("Accept"); accept != arm.accept {
 		return fmt.Sprintf("%s read: Accept = %q, want %q", arm.name, accept, arm.accept)
+	}
+	if arm.formatQuery {
+		if format := req.URL.Query().Get("format"); format != arm.formatParam {
+			return fmt.Sprintf("%s read: query parameter format = %q, want %q", arm.name, format, arm.formatParam)
+		}
 	}
 	if got == nil {
 		return arm.name + " read returned no composition"

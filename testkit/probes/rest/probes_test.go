@@ -952,6 +952,12 @@ func isQueryWrite(req *http.Request) bool {
 	return req.Method == http.MethodPost && req.URL.Query().Has("format")
 }
 
+// isQueryRead selects the composition read that names its format with the
+// `format` query parameter.
+func isQueryRead(req *http.Request) bool {
+	return req.Method == http.MethodGet && req.URL.Query().Has("format")
+}
+
 // isRead selects the composition read sent with the given Accept.
 func isRead(accept string) func(*http.Request) bool {
 	return func(req *http.Request) bool {
@@ -985,20 +991,25 @@ func TestProbe108CompositionFormats(t *testing.T) { // PROBE-108, REQ-173
 	if r.Status != "pass" {
 		t.Fatalf("PROBE-108 = %s: %s", r.Status, r.Detail)
 	}
-	// Three writes read back, and the FLAT write under the format query
-	// option: a probe that skipped an arm would pass on fewer.
+	// Four writes, each read back: XML, FLAT and STRUCTURED by media type,
+	// and FLAT under the format query options. A probe that skipped an arm or
+	// its read would pass on fewer.
 	reqs := snap()
-	var writes, reads int
+	var writes, reads, queryReads int
 	for _, req := range reqs {
 		switch req.Method {
 		case http.MethodPost:
 			writes++
 		case http.MethodGet:
 			reads++
+			if isQueryRead(req) {
+				queryReads++
+			}
 		}
 	}
-	if writes != 4 || reads != 3 || len(reqs) != 7 {
-		t.Errorf("backend saw %d writes and %d reads (%d requests), want 4 writes and 3 reads", writes, reads, len(reqs))
+	if writes != 4 || reads != 4 || queryReads != 1 || len(reqs) != 8 {
+		t.Errorf("backend saw %d writes and %d reads, %d of them by format query (%d requests), want 4 writes and 4 reads, 1 by format query",
+			writes, reads, queryReads, len(reqs))
 	}
 }
 
@@ -1153,6 +1164,22 @@ func TestProbe108FlagsBrokenWire(t *testing.T) { // PROBE-108
 				req.URL.RawQuery = q.Encode()
 			})},
 			wantDetail: "FLAT (format query) write: query parameter templateId",
+		},
+		{
+			name: "format-query read without format",
+			cfg: formatBackendConfig{mutate: onRequests(isQueryRead, func(req *http.Request) {
+				q := req.URL.Query()
+				q.Del("format")
+				req.URL.RawQuery = q.Encode()
+			})},
+			wantDetail: "FLAT (format query) read: query parameter format",
+		},
+		{
+			name: "format-query read accepts the FLAT media type",
+			cfg: formatBackendConfig{mutate: onRequests(isQueryRead, func(req *http.Request) {
+				req.Header.Set("Accept", probe108MediaFlat)
+			})},
+			wantDetail: "FLAT (format query) read: Accept",
 		},
 		{
 			name: "format-query write without openehr-template-id",
