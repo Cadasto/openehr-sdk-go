@@ -152,7 +152,10 @@
 // nearest enclosing archetype root, gives that code, in
 // [Options.Language]: under its code string for a local code, and under
 // <terminology id>::<code string>, such as SNOMED-CT::248152002, for a code
-// of an external terminology. Either way the walk's text stays where the
+// of an external terminology, or, where the archetype defines no term
+// under that key, under the bare code string unless it is an at-code. A
+// coded name whose text the template pins takes the first listed code
+// whose term text the pin admits. Either way the walk's text stays where the
 // template's constraint on the text rejects the new one, and where the
 // group has no rubric for the code or its own archetype does not define
 // it, even where an enclosing archetype does. A DV_MULTIMEDIA carries inline
