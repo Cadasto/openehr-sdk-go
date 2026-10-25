@@ -291,6 +291,7 @@ requirements:
       - openehr/serialize/simplified/flat_decode_test.go
       - openehr/serialize/simplified/rmattr_encapsulated_test.go
       - openehr/serialize/simplified/rmattr_party_test.go
+      - openehr/template/parse_primitives_test.go
       - openehr/terminology/imports_test.go
       - openehr/terminology/property_units_test.go
       - openehr/terminology/tables_test.go
