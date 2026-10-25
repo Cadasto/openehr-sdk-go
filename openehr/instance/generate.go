@@ -1249,10 +1249,11 @@ func (g *generator) writeBMMString(parent any, attr string) {
 // valid ISO 8601 value; "=" for the magnitude_status of a quantified value
 // (a quantity, a count or a temporal value), the value its RM invariant
 // Magnitude_status_valid admits; defaultMatch for a TERM_MAPPING's match,
-// the RM default, which Match_valid admits; and the open-string example
-// otherwise. ok is false for a TERMINOLOGY_ID's value, which stays empty:
-// the code phrase it belongs to keeps the terminology it already carries
-// (replacesTerminology). It is false as well for the value of any other
+// the RM default, which Match_valid admits; anyActionArchetype, the RM
+// default, for an ACTIVITY's action_archetype_id; and the open-string
+// example otherwise. ok is false for a TERMINOLOGY_ID's value, which stays
+// empty: the code phrase it belongs to keeps the terminology it already
+// carries (replacesTerminology). It is false as well for the value of any other
 // identifier and for a reference's namespace and type, which stay empty
 // until the reference that holds them is settled (fillReference): its id
 // value is drawn like a uid, and its type depends on where it sits.
@@ -1278,9 +1279,17 @@ func (g *generator) bmmStringDefault(parent any, attr string) (string, bool) {
 		if attr == "match" {
 			return defaultMatch, true
 		}
+	case *rm.Activity:
+		if attr == "action_archetype_id" {
+			return anyActionArchetype, true
+		}
 	}
 	return "example", true
 }
+
+// anyActionArchetype is the RM default of ACTIVITY.action_archetype_id, a
+// pattern in // delimiters that matches the id of any archetype.
+const anyActionArchetype = "/.*/"
 
 // stringField returns a reference to the BMM String attribute attr of
 // parent, through which it is read and written. It covers every String
@@ -3410,6 +3419,13 @@ func applyStringLeaf(leaf *tcimpl.CompiledNode, rmValue any, attr string, cs con
 	case *rm.TermMapping:
 		if attr == "match" {
 			s, err = termMappingMatch(cs, s)
+		}
+	case *rm.Activity:
+		// A C_STRING with neither a pattern nor a list gives no id, so the
+		// RM default goes there, as where the OPT leaves the attribute
+		// silent (bmmStringDefault).
+		if attr == "action_archetype_id" && cs.Pattern == "" && len(cs.List) == 0 {
+			s, err = anyActionArchetype, nil
 		}
 	default:
 		if attr == "magnitude_status" && quantified(rmValue) {

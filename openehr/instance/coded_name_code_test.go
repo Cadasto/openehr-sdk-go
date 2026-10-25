@@ -3,6 +3,7 @@ package instance_test
 import (
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
@@ -32,11 +33,11 @@ func elementCodedName(t *testing.T, out any) rm.DVCodedText {
 // texts and whose defining code a C_CODE_PHRASE limits to codes of
 // terminologyID.
 func optCodedNameListing(texts []string, terminologyID string, codes ...string) string {
-	var list string
+	var list strings.Builder
 	for _, text := range texts {
-		list += "<list>" + text + "</list>"
+		list.WriteString("<list>" + text + "</list>")
 	}
-	return optNode("DV_CODED_TEXT", "", optStringAttr("value", list),
+	return optNode("DV_CODED_TEXT", "", optStringAttr("value", list.String()),
 		optSingle("defining_code", optCodePhrase(terminologyID, codes...)))
 }
 
@@ -131,6 +132,41 @@ func TestREQ107_CodedNameTakesTheCodeOfItsPinnedText(t *testing.T) {
 					checkValid(t, out, c)
 				})
 			}
+		}
+	}
+}
+
+// TestREQ107_CodedValueKeepsTheCodeTheWalkWrote is the REQ-107 term-text
+// check on the scope of the coded-name rule above: a coded text that is
+// not a name, here an ELEMENT's value, whose C_STRING rejects the term
+// text of the code the walk wrote keeps that code and the text the walk
+// wrote (Precedence 1), even where another listed code's term text is the
+// one the C_STRING admits. Under ExampleFill the walk writes the first
+// listed code. It holds under every policy and both value fills, and every
+// root validates.
+func TestREQ107_CodedValueKeepsTheCodeTheWalkWrote(t *testing.T) {
+	opt := optTemplate("ELEMENT",
+		`<term_definitions code="at0001"><items id="text">First</items></term_definitions>`+
+			`<term_definitions code="at0002"><items id="text">Second</items></term_definitions>`,
+		optSingle("value", optCodedNameListing([]string{"Second"}, "local", "at0001", "at0002")))
+	for _, implicit := range []bool{true, false} {
+		c := compileOPTText(t, opt, implicit)
+		for _, opts := range defaultsOptions() {
+			t.Run(fmt.Sprintf("implicit=%t/%v/%v", implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+				out, err := instance.Generate(t.Context(), c, opts)
+				if err != nil {
+					t.Fatalf("Generate: %v", err)
+				}
+				value := elementCodedText(t, out)
+				code := value.DefiningCode.CodeString
+				if value.Value != "Second" || !slices.Contains([]string{"at0001", "at0002"}, code) {
+					t.Errorf("ELEMENT value = %q coded %s, want the text \"Second\" and a listed code", value.Value, code)
+				}
+				if opts.ValueFill == instance.ExampleFill && code != "at0001" {
+					t.Errorf("ELEMENT value under ExampleFill = %q coded %s, want the first listed code at0001", value.Value, code)
+				}
+				checkValid(t, out, c)
+			})
 		}
 	}
 }

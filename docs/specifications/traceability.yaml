@@ -1487,6 +1487,7 @@ requirements:
       - openehr/composition/text_language_test.go
       - openehr/composition/uid_source_test.go
       - openehr/instance/accessors_test.go
+      - openehr/instance/activity_action_archetype_test.go
       - openehr/instance/allowed_alternative_test.go
       - openehr/instance/archetype_identity_test.go
       - openehr/instance/archetype_root_guard_internal_test.go
@@ -1499,8 +1500,10 @@ requirements:
       - openehr/instance/code_phrase_terminology_internal_test.go
       - openehr/instance/code_phrase_terminology_test.go
       - openehr/instance/coded_group_test.go
+      - openehr/instance/coded_name_code_test.go
       - openehr/instance/coded_rubric_test.go
       - openehr/instance/coded_settle_internal_test.go
+      - openehr/instance/coded_term_bare_test.go
       - openehr/instance/coded_term_text_test.go
       - openehr/instance/coded_text_internal_test.go
       - openehr/instance/composer_option_test.go
