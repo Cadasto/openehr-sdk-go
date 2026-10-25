@@ -21,6 +21,11 @@ import (
 //   - the class-graph facts, `Abstract` and `Parents`, the latter
 //     filtered to the universe so the emitted graph stays closed.
 //
+// A second map literal, `functionData`, lists per class the BMM
+// functions it declares or inherits that are not also its properties
+// ([effectiveFunctions]), which `rminfo.IsNonStorableAttr` names; a
+// class with none has no entry.
+//
 // Returns nil when the target is not the RM target (rminfo is only
 // generated alongside RM). The caller is expected to gate by target
 // before invoking.
@@ -30,7 +35,7 @@ import (
 // the merged BMM declaration order (ancestors first, then own), and
 // Parents preserves the BMM ancestor declaration order. Zero-valued
 // `Abstract` / `Parents` keys are omitted rather than emitted false
-// and empty.
+// and empty. Function names are sorted.
 func RenderRMInfoFile(plan *Plan) ([]byte, error) {
 	if plan.Target.GoPackage != "rm" {
 		return nil, nil
@@ -42,6 +47,7 @@ func RenderRMInfoFile(plan *Plan) ([]byte, error) {
 		order     []string
 		abstract  bool
 		parents   []string
+		functions []string
 	}
 
 	classNames := rmInfoUniverse(plan)
@@ -63,6 +69,7 @@ func RenderRMInfoFile(plan *Plan) ([]byte, error) {
 			order:     order,
 			abstract:  pc.Class.IsAbstract(),
 			parents:   rmInfoParents(pc, inUniverse),
+			functions: effectiveFunctions(plan, name),
 		})
 	}
 
@@ -112,6 +119,24 @@ func RenderRMInfoFile(plan *Plan) ([]byte, error) {
 			body.WriteString("},\n")
 		}
 		body.WriteString("\t},\n")
+	}
+	body.WriteString("}\n\n")
+	body.WriteString("// functionData lists, for each class above that has one, the BMM functions\n")
+	body.WriteString("// the class declares or inherits that are not also its properties, sorted.\n")
+	body.WriteString("// No serialization carries a function, so IsNonStorableAttr names them.\n")
+	body.WriteString("var functionData = map[string][]string{\n")
+	for _, e := range entries {
+		if len(e.functions) == 0 {
+			continue
+		}
+		fmt.Fprintf(&body, "\t%q: {", e.className)
+		for i, n := range e.functions {
+			if i > 0 {
+				body.WriteString(", ")
+			}
+			fmt.Fprintf(&body, "%q", n)
+		}
+		body.WriteString("},\n")
 	}
 	body.WriteString("}\n")
 	formatted, err := format.Source(body.Bytes())
@@ -239,6 +264,84 @@ func effectiveProperties(plan *Plan, className string) (map[string]rmAttr, []str
 	}
 	visit(className)
 	return out, order
+}
+
+// effectiveFunctions returns, sorted, the names of the BMM functions
+// className declares or inherits, less every name that is a property of
+// the class, declared there or inherited (REQ-112 Driver). A function an
+// ancestor declares that the class declares as a property, as DV_QUANTITY
+// does DV_QUANTIFIED's magnitude, is the class's property, not its
+// function.
+//
+// The walk reads the merged schema rather than the planned classes, so
+// an ancestor the class universe leaves out, a primitive_types entry
+// such as Any or Iso8601_duration, still gives the class its functions
+// and its properties. A plan built by hand with no schema is walked over
+// its planned classes.
+func effectiveFunctions(plan *Plan, className string) []string {
+	functions := make(map[string]bool)
+	properties := make(map[string]bool)
+	visited := make(map[string]bool)
+	var visit func(name string)
+	visit = func(name string) {
+		if visited[name] {
+			return
+		}
+		visited[name] = true
+		c, ok := declaredClass(plan, name)
+		if !ok {
+			return
+		}
+		for _, anc := range c.Ancestors() {
+			visit(anc)
+		}
+		props, _ := classProperties(c)
+		for n := range props {
+			properties[n] = true
+		}
+		for n := range classFunctions(c) {
+			functions[n] = true
+		}
+	}
+	visit(className)
+	out := make([]string, 0, len(functions))
+	for n := range functions {
+		if !properties[n] {
+			out = append(out, n)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+// declaredClass returns the class the merged schema of plan declares
+// under name ([schemaClass]), or, for a plan that carries no schema, the
+// planned class of that name.
+func declaredClass(plan *Plan, name string) (bmm.Class, bool) {
+	if plan.Schema != nil {
+		return schemaClass(plan.Schema, name)
+	}
+	pc, ok := plan.Classes[name]
+	if !ok {
+		return nil, false
+	}
+	return pc.Class, true
+}
+
+// classFunctions returns the BMM functions a class declares itself.
+// Every class kind can declare functions, an enumeration included
+// (PROPORTION_KIND's valid_proportion_kind).
+func classFunctions(c bmm.Class) map[string]*bmm.Function {
+	switch cls := c.(type) {
+	case *bmm.SimpleClass:
+		return cls.Functions
+	case *bmm.Interface:
+		return cls.Functions
+	case *bmm.Enumeration:
+		return cls.Functions
+	default:
+		return nil
+	}
 }
 
 // classProperties returns the BMM (properties, declarationOrder) of
