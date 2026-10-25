@@ -59,8 +59,10 @@ func TestREQ107_ShareComparableQuantity(t *testing.T) {
 			bounds: [2]quantityKey{q(5, "mg"), q(3, "g")}, want: [2]quantityKey{q(2, "g"), q(3, "g")},
 		},
 		{
+			// Both sides admit g and cg; g comes first in the lower side's
+			// list, cg in the upper side's.
 			name:   "else the first units the lower side lists that both admit",
-			node:   listed(entry("mg", 0, 1000)+entry("g", 2, 10), entry("kg", 0, 1)+entry("g", 1, 10)),
+			node:   listed(entry("mg", 0, 1000)+entry("g", 2, 10)+entry("cg", 0, 100), entry("kg", 0, 1)+entry("cg", 0, 100)+entry("g", 1, 10)),
 			bounds: [2]quantityKey{q(5, "mg"), q(0.5, "kg")}, want: [2]quantityKey{q(2, "g"), q(1, "g")},
 		},
 		{
