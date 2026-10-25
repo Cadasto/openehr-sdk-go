@@ -1315,6 +1315,7 @@ requirements:
       - openehr/internal/rmbind/bind_test.go
       - openehr/validation/aql_test.go
       - openehr/validation/binding_by_name_test.go
+      - openehr/validation/binding_trial_test.go
       - openehr/validation/character_binding_test.go
       - openehr/validation/composition_test.go
       - openehr/validation/constraint_fixtures_test.go
@@ -1580,6 +1581,7 @@ requirements:
       - openehr/template/constraints/constraint_ref_test.go
       - openehr/template/constraints/example_test.go
       - openehr/validation/binding_by_name_test.go
+      - openehr/validation/binding_trial_test.go
       - openehr/validation/constraint_fixtures_test.go
       - openehr/validation/inventory_dispatch_internal_test.go
       - openehr/validation/issuepath_test.go
@@ -2408,6 +2410,7 @@ requirements:
       - internal/templatecompile/walkfacts_test.go
       - openehr/instance/rm_defaults_yield_test.go
       - openehr/validation/attribute_not_in_rm_test.go
+      - openehr/validation/binding_trial_test.go
       - openehr/validation/class_facts_internal_test.go
       - openehr/validation/composition_test.go
       - openehr/validation/coverage_test.go
