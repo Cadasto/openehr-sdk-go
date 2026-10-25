@@ -65,7 +65,8 @@ func localSymbolJSON(code string) string {
 // of breaking and conforming members, each checked like the row's own, for
 // an invariant whose evaluator reads values of one class in more than one
 // way: Limits_consistent orders the bounds of a DV_INTERVAL by their type,
-// and Fraction_validity holds on a fraction and on an integer fraction.
+// Fraction_validity holds on a fraction and on an integer fraction, and
+// Events_valid reads a HISTORY's events absent and empty.
 type matrixRow struct {
 	breaking, conforming string
 	rule, path           string
@@ -104,6 +105,14 @@ var intervalOrderPairs = []matrixPair{
 	boundPair("DV_DURATION", `"value":"P2D"`, `"value":"P1D"`),
 }
 
+// historyEventsPairs are the further pairs of HISTORY.Events_valid, whose
+// own pair breaks it with neither events nor a summary and keeps it with a
+// summary: events present and holding no item break it too, and an event
+// keeps it.
+var historyEventsPairs = []matrixPair{
+	{breaking: `"events":[]`, conforming: `"events":[{"_type":"POINT_EVENT","archetype_node_id":"at0002","name":{"_type":"DV_TEXT","value":"x"},"time":{"_type":"DV_DATE_TIME","value":"2024-01-01T00:00:00Z"}}]`},
+}
+
 // pairs returns the row's own pair followed by its further pairs.
 func (r matrixRow) pairs() []matrixPair {
 	return append([]matrixPair{{breaking: r.breaking, conforming: r.conforming}}, r.more...)
@@ -119,31 +128,37 @@ func (r matrixRow) pairs() []matrixPair {
 // the value itself, for a numerator or denominator that is not whole under
 // the precision of 0 the RM reads is_integral as.
 var invariantMatrix = map[string]matrixRow{
-	"ARCHETYPED.Rm_version_valid":        {breaking: `"archetype_id":{"_type":"ARCHETYPE_ID","value":"openEHR-EHR-OBSERVATION.x.v1"}`, conforming: `"archetype_id":{"_type":"ARCHETYPE_ID","value":"openEHR-EHR-OBSERVATION.x.v1"},"rm_version":"1.1.0"`},
-	"COMPOSITION.Is_archetype_root":      {breaking: ``, conforming: archetypeDetailsMember},
-	"DV_DATE.Value_valid":                {breaking: `"value":"example"`, conforming: `"value":"2024-01-01"`},
-	"DV_DATE_TIME.Value_valid":           {breaking: `"value":"example"`, conforming: `"value":"2024-01-01T10:30:00Z"`},
-	"DV_DURATION.Value_valid":            {breaking: `"value":"example"`, conforming: `"value":"P1D"`},
-	"DV_INTERVAL.Limits_consistent":      {breaking: `"lower":{"_type":"DV_COUNT","magnitude":5},"upper":{"_type":"DV_COUNT","magnitude":1}`, conforming: `"lower":{"_type":"DV_COUNT","magnitude":5},"upper":{"_type":"DV_COUNT","magnitude":5}`, more: intervalOrderPairs},
-	"DV_PROPORTION.Fraction_validity":    {breaking: `"numerator":1.5,"denominator":2,"type":3`, conforming: `"numerator":1,"denominator":2,"type":3`, more: []matrixPair{{breaking: `"numerator":3,"denominator":2.5,"type":4`, conforming: `"numerator":3,"denominator":2,"type":4`}}},
-	"DV_PROPORTION.Percent_validity":     {breaking: `"numerator":1,"denominator":1,"type":2`, conforming: `"numerator":1,"denominator":100,"type":2`},
-	"DV_PROPORTION.Precision_validity":   {breaking: `"numerator":1.5,"denominator":2,"type":0,"precision":0`, conforming: `"numerator":1,"denominator":2,"type":0,"precision":0`},
-	"DV_PROPORTION.Type_validity":        {breaking: `"numerator":1,"denominator":2,"type":5`, conforming: `"numerator":1,"denominator":2,"type":0`},
-	"DV_PROPORTION.Unitary_validity":     {breaking: `"numerator":1,"denominator":2,"type":1`, conforming: `"numerator":1,"denominator":1,"type":1`},
-	"DV_PROPORTION.Valid_denominator":    {breaking: `"numerator":1,"denominator":0,"type":0`, conforming: `"numerator":1,"denominator":2,"type":0`},
-	"DV_TEXT.Mappings_valid":             {breaking: `"value":"x","mappings":[]`, conforming: `"value":"x","mappings":[{"_type":"TERM_MAPPING","match":"="}]`},
-	"DV_TIME.Value_valid":                {breaking: `"value":"example"`, conforming: `"value":"10:30:00"`},
-	"EHR_ACCESS.Is_archetype_root":       {breaking: ``, conforming: archetypeDetailsMember},
-	"EHR_STATUS.Is_archetype_root":       {breaking: ``, conforming: archetypeDetailsMember},
-	"ELEMENT.Inv_null_flavour_indicated": {breaking: ``, conforming: `"value":{"_type":"DV_TEXT","value":"x"}`},
-	"ENTRY.Is_archetype_root":            {breaking: ``, conforming: archetypeDetailsMember},
-	"Interval.Lower_included_valid":      {breaking: `"lower_unbounded":true,"lower_included":true`, conforming: `"lower_unbounded":true,"lower_included":false`},
-	"Interval.Upper_included_valid":      {breaking: `"upper_unbounded":true,"upper_included":true`, conforming: `"upper_unbounded":true,"upper_included":false`},
-	"PARTY.Is_archetype_root":            {breaking: ``, conforming: archetypeDetailsMember},
-	"PARTY_IDENTIFIED.Basic_validity":    {breaking: ``, conforming: `"name":"x"`},
-	"PARTY_IDENTIFIED.Identifiers_valid": {breaking: `"identifiers":[]`, conforming: `"identifiers":[{"_type":"DV_IDENTIFIER","id":"x"}]`},
-	"PARTY_IDENTIFIED.Name_valid":        {breaking: `"name":""`, conforming: `"name":"x"`},
-	"TERM_MAPPING.Match_valid":           {breaking: `"match":"x"`, conforming: `"match":"="`},
+	"ARCHETYPED.Rm_version_valid":           {breaking: `"archetype_id":{"_type":"ARCHETYPE_ID","value":"openEHR-EHR-OBSERVATION.x.v1"}`, conforming: `"archetype_id":{"_type":"ARCHETYPE_ID","value":"openEHR-EHR-OBSERVATION.x.v1"},"rm_version":"1.1.0"`},
+	"ATTESTATION.Items_valid":               {breaking: `"items":[]`, conforming: `"items":[{"_type":"DV_EHR_URI","value":"ehr://example.org/x"}]`},
+	"COMPOSITION.Content_valid":             {breaking: `"content":[]`, conforming: `"content":[{"_type":"SECTION","archetype_node_id":"at0001","name":{"_type":"DV_TEXT","value":"x"}}]`},
+	"COMPOSITION.Is_archetype_root":         {breaking: ``, conforming: archetypeDetailsMember},
+	"DV_DATE.Value_valid":                   {breaking: `"value":"example"`, conforming: `"value":"2024-01-01"`},
+	"DV_DATE_TIME.Value_valid":              {breaking: `"value":"example"`, conforming: `"value":"2024-01-01T10:30:00Z"`},
+	"DV_DURATION.Value_valid":               {breaking: `"value":"example"`, conforming: `"value":"P1D"`},
+	"DV_INTERVAL.Limits_consistent":         {breaking: `"lower":{"_type":"DV_COUNT","magnitude":5},"upper":{"_type":"DV_COUNT","magnitude":1}`, conforming: `"lower":{"_type":"DV_COUNT","magnitude":5},"upper":{"_type":"DV_COUNT","magnitude":5}`, more: intervalOrderPairs},
+	"DV_PROPORTION.Fraction_validity":       {breaking: `"numerator":1.5,"denominator":2,"type":3`, conforming: `"numerator":1,"denominator":2,"type":3`, more: []matrixPair{{breaking: `"numerator":3,"denominator":2.5,"type":4`, conforming: `"numerator":3,"denominator":2,"type":4`}}},
+	"DV_PROPORTION.Percent_validity":        {breaking: `"numerator":1,"denominator":1,"type":2`, conforming: `"numerator":1,"denominator":100,"type":2`},
+	"DV_PROPORTION.Precision_validity":      {breaking: `"numerator":1.5,"denominator":2,"type":0,"precision":0`, conforming: `"numerator":1,"denominator":2,"type":0,"precision":0`},
+	"DV_PROPORTION.Type_validity":           {breaking: `"numerator":1,"denominator":2,"type":5`, conforming: `"numerator":1,"denominator":2,"type":0`},
+	"DV_PROPORTION.Unitary_validity":        {breaking: `"numerator":1,"denominator":2,"type":1`, conforming: `"numerator":1,"denominator":1,"type":1`},
+	"DV_PROPORTION.Valid_denominator":       {breaking: `"numerator":1,"denominator":0,"type":0`, conforming: `"numerator":1,"denominator":2,"type":0`},
+	"DV_TEXT.Mappings_valid":                {breaking: `"value":"x","mappings":[]`, conforming: `"value":"x","mappings":[{"_type":"TERM_MAPPING","match":"="}]`},
+	"DV_TIME.Value_valid":                   {breaking: `"value":"example"`, conforming: `"value":"10:30:00"`},
+	"EHR_ACCESS.Is_archetype_root":          {breaking: ``, conforming: archetypeDetailsMember},
+	"EHR_STATUS.Is_archetype_root":          {breaking: ``, conforming: archetypeDetailsMember},
+	"ELEMENT.Inv_null_flavour_indicated":    {breaking: ``, conforming: `"value":{"_type":"DV_TEXT","value":"x"}`},
+	"ENTRY.Is_archetype_root":               {breaking: ``, conforming: archetypeDetailsMember},
+	"EVENT_CONTEXT.Participations_validity": {breaking: `"participations":[]`, conforming: `"participations":[{"_type":"PARTICIPATION","function":{"_type":"DV_TEXT","value":"x"},"performer":{"_type":"PARTY_SELF"}}]`},
+	"HISTORY.Events_valid":                  {breaking: ``, conforming: `"summary":{"_type":"ITEM_TREE","archetype_node_id":"at0001","name":{"_type":"DV_TEXT","value":"x"}}`, more: historyEventsPairs},
+	"INSTRUCTION.Activities_valid":          {breaking: `"activities":[]`, conforming: `"activities":[{"_type":"ACTIVITY","archetype_node_id":"at0001","name":{"_type":"DV_TEXT","value":"x"}}]`},
+	"Interval.Lower_included_valid":         {breaking: `"lower_unbounded":true,"lower_included":true`, conforming: `"lower_unbounded":true,"lower_included":false`},
+	"Interval.Upper_included_valid":         {breaking: `"upper_unbounded":true,"upper_included":true`, conforming: `"upper_unbounded":true,"upper_included":false`},
+	"PARTY.Is_archetype_root":               {breaking: ``, conforming: archetypeDetailsMember},
+	"PARTY_IDENTIFIED.Basic_validity":       {breaking: ``, conforming: `"name":"x"`},
+	"PARTY_IDENTIFIED.Identifiers_valid":    {breaking: `"identifiers":[]`, conforming: `"identifiers":[{"_type":"DV_IDENTIFIER","id":"x"}]`},
+	"PARTY_IDENTIFIED.Name_valid":           {breaking: `"name":""`, conforming: `"name":"x"`},
+	"SECTION.Items_valid":                   {breaking: `"items":[]`, conforming: `"items":[{"_type":"SECTION","archetype_node_id":"at0001","name":{"_type":"DV_TEXT","value":"x"}}]`},
+	"TERM_MAPPING.Match_valid":              {breaking: `"match":"x"`, conforming: `"match":"="`},
 
 	"COMPOSITION.Category_validity":                    {breaking: `"category":` + bogusCoded, conforming: `"category":` + codedTextJSON("433")},
 	"COMPOSITION.Language_valid":                       {breaking: `"language":` + bogusPhrase, conforming: `"language":` + codePhraseJSON("ISO_639-1", "en")},

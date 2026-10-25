@@ -142,7 +142,7 @@ func TestValidateRM_REQ112_NonEmptyLists(t *testing.T) {
 		{name: "ATTESTATION items absent", root: &rm.Attestation{}, rule: "ATTESTATION.Items_valid"},
 		{
 			name: "ATTESTATION items holding an item",
-			root: &rm.Attestation{Items: []rm.DVEHRURI{{DVURI: rm.DVURI{Value: "ehr://example.org/x"}}}},
+			root: &rm.Attestation{Items: []rm.DVEHRURI{{Value: "ehr://example.org/x"}}},
 			rule: "ATTESTATION.Items_valid",
 		},
 	}

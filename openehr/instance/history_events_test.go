@@ -47,11 +47,14 @@ func historyShape(t *testing.T, out any) string {
 // Precedence 2 for HISTORY Events_valid, (events /= Void and then not
 // events.is_empty) or summary /= Void (REQ-112 Non-empty lists). A HISTORY
 // the walk leaves with neither, as Required leaves an optional events
-// alone, gets one member of the first allowed child of events that is not a
-// slot; else, where the OPT allows no event, the summary its first allowed
-// child builds; and, where the OPT allows neither, neither, which is the
-// one case whose root breaks the rule (Exceptions and known gaps, An OPT
-// that contradicts itself). Under Large and Medium the walk writes an event
+// alone, gets the first of these the OPT allows: a member of the first
+// allowed child of events that is not a slot; the summary the first allowed
+// child of summary that is not a slot builds; a member of events built from
+// its BMM type, where the OPT names no child under events; a summary built
+// from its BMM type, where it names no child under summary. An attribute the
+// OPT prohibits allows none, and where the OPT allows none of them the
+// HISTORY gets neither, the one case whose root breaks the rule
+// (Exceptions and known gaps, An OPT that contradicts itself). Under Large and Medium the walk writes an event
 // already, and a summary the OPT allows beside it. Every root but the last passes the RM floor and the template
 // validator, under every policy, both value fills and both compile modes.
 func TestREQ107_HistoryGetsAnEventOrASummary(t *testing.T) {
@@ -87,8 +90,24 @@ func TestREQ107_HistoryGetsAnEventOrASummary(t *testing.T) {
 			want: "events=[] summary=at0004",
 		},
 		{
-			name:   "neither allowed",
-			opt:    optTemplate("HISTORY", origin, guardMultiple("events", historyExistence00, historyEvent)),
+			name: "events and summary not named",
+			opt:  optTemplate("HISTORY", origin),
+			want: "events=[at0000] summary=",
+		},
+		{
+			name: "events named with no child, summary not named",
+			opt:  optTemplate("HISTORY", origin, guardMultiple("events", guardExistence01)),
+			want: "events=[at0000] summary=",
+		},
+		{
+			name: "events prohibited, summary not named",
+			opt:  optTemplate("HISTORY", origin, guardMultiple("events", historyExistence00, historyEvent)),
+			want: "events=[] summary=at0000",
+		},
+		{
+			name: "neither allowed",
+			opt: optTemplate("HISTORY", origin, guardMultiple("events", historyExistence00, historyEvent),
+				guardSingle("summary", historyExistence00, optNode("ITEM_TREE", "at0004"))),
 			want:   "events=[] summary=",
 			breaks: "HISTORY.Events_valid",
 		},
@@ -124,6 +143,35 @@ func TestREQ107_HistoryGetsAnEventOrASummary(t *testing.T) {
 					}
 				})
 			}
+		}
+	}
+}
+
+// TestREQ107_HistoryBuiltFromItsBMMTypeGetsAnEvent is the REQ-107 check of
+// Precedence 2 for a HISTORY no OPT node describes: an OBSERVATION whose
+// OPT leaves its data silent gets a HISTORY built from its BMM type, and
+// that HISTORY gets one event built from its BMM type, since the OPT names
+// no child under its events, so RM Events_valid holds (REQ-112 Non-empty
+// lists). The root passes the RM floor and the template validator, under
+// every policy, both value fills and both compile modes.
+func TestREQ107_HistoryBuiltFromItsBMMTypeGetsAnEvent(t *testing.T) {
+	for _, implicit := range []bool{true, false} {
+		c := compileOPTText(t, optTemplate("OBSERVATION"), implicit)
+		for _, opts := range guardOptions() {
+			t.Run(fmt.Sprintf("implicit=%t/%v/%v", implicit, opts.Policy, opts.ValueFill), func(t *testing.T) {
+				out, err := instance.Generate(t.Context(), c, opts)
+				if err != nil {
+					t.Fatalf("Generate: %v", err)
+				}
+				obs, ok := out.(*rm.Observation)
+				if !ok {
+					t.Fatalf("generated root is %T, want *rm.Observation", out)
+				}
+				if n := len(obs.Data.Events); n != 1 {
+					t.Errorf("OBSERVATION.data.events has %d members, want 1", n)
+				}
+				checkValid(t, out, c)
+			})
 		}
 	}
 }

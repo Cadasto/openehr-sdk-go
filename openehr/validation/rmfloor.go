@@ -899,3 +899,76 @@ func (f *findings) checkTermMapping(value any, path issuePath) {
 		})
 	}
 }
+
+// listMembers is what an RM rule that asks a list for a member reads: the
+// list, and, for a rule that a second attribute also keeps, that attribute,
+// whose presence keeps the rule while the list holds no item.
+type listMembers struct {
+	list, alternative string
+}
+
+// listMemberRules names the list each RM invariant of the REQ-112 Non-empty
+// lists entry reads, keyed CLASS.Invariant as the inventory keys it. Five
+// read `x /= Void implies not x.is_empty` for their list x, so a list that is
+// present holds a member; HISTORY Events_valid reads `(events /= Void and
+// then not events.is_empty) or summary /= Void`, so a HISTORY carries an
+// event or a summary. The rules are evaluated by
+// [findings.checkListMembers], and a class the rules of one of them run on
+// asks the template's existence on its list for a member
+// ([classRules.asksForMember]).
+var listMemberRules = map[string]listMembers{
+	"ATTESTATION.Items_valid":               {list: "items"},
+	"COMPOSITION.Content_valid":             {list: "content"},
+	"EVENT_CONTEXT.Participations_validity": {list: "participations"},
+	"HISTORY.Events_valid":                  {list: "events", alternative: "summary"},
+	"INSTRUCTION.Activities_valid":          {list: "activities"},
+	"SECTION.Items_valid":                   {list: "items"},
+}
+
+// checkListMembers enforces the REQ-112 Non-empty lists rule that
+// dispatched it, rule, on the node value at path, of RM type rmType. A rule
+// that reads its list alone reports the list when it is present and holds
+// no item, at the list's path; an absent list keeps it. A rule that a
+// second attribute keeps too, HISTORY Events_valid, reports the node, at
+// its own path, when its list is absent or holds no item and the second
+// attribute is absent, as the floor reports PARTY_IDENTIFIED Basic_validity
+// and ELEMENT Inv_null_flavour_indicated, the other rules over more than one
+// attribute. Presence is the generated access's reading (REQ-171 Structural
+// access): a list is present when it is not nil, so only a decoded `[]` is
+// present and empty, and an absent key and JSON null both read as absent.
+//
+// Under a template the finding gives way to the template's report of the
+// same list at the list's path ([engine.withdrawGivenWay]). The diagnostic
+// names the class and the attributes, never a value (REQ-168).
+func (f *findings) checkListMembers(value any, rmType string, path issuePath, rule string) {
+	m, ok := listMemberRules[rule]
+	if !ok {
+		return
+	}
+	n, present := rmaccess.Len(value, m.list)
+	if m.alternative == "" {
+		if present && n == 0 {
+			f.emit(Issue{
+				Path:   path.join("/" + m.list),
+				Code:   "rm_invariant",
+				Layer:  LayerRM,
+				Rule:   rule,
+				Detail: fmt.Sprintf("%s.%s is present but holds no item (RM %s)", bareClass(rmType), m.list, rule),
+			})
+		}
+		return
+	}
+	if n > 0 {
+		return
+	}
+	if _, kept := rmaccess.Single(value, m.alternative); kept {
+		return
+	}
+	f.emit(Issue{
+		Path:   path.String(),
+		Code:   "rm_invariant",
+		Layer:  LayerRM,
+		Rule:   rule,
+		Detail: fmt.Sprintf("%s has no item in %s and no %s; one of them must be present (RM %s)", bareClass(rmType), m.list, m.alternative, rule),
+	})
+}

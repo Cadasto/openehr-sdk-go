@@ -84,6 +84,9 @@
 //     two present but empty);
 //   - a DV_TEXT mappings list that is not empty when present, and a
 //     TERM_MAPPING match from its closed set;
+//   - a COMPOSITION content, EVENT_CONTEXT participations, INSTRUCTION
+//     activities, SECTION items and ATTESTATION items list that is not
+//     empty when present, and an event or a summary on every HISTORY;
 //   - archetype_details on every archetype root (COMPOSITION, EHR_STATUS,
 //     EHR_ACCESS, and every PARTY and ENTRY), and a non-empty archetype_id
 //     and rm_version on every ARCHETYPED;

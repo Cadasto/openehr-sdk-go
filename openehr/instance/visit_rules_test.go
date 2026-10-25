@@ -143,9 +143,13 @@ func requireAttribute(t *testing.T, c *templatecompile.Compiled, name string, ex
 // by the OPT without children gets no member, also under Large, which
 // visits it: an optional attribute the OPT leaves silent MUST get no child.
 // HISTORY.events is optional in the RM, and its member would be an event,
-// not an archetype root. It holds in both compile modes.
+// not an archetype root. The HISTORY's summary, which the OPT requires,
+// keeps RM Events_valid, so no RM rule needs an event (REQ-107 Precedence
+// 2; TestREQ107_HistoryGetsAnEventOrASummary checks the HISTORY that has
+// no summary). It holds in both compile modes.
 func TestREQ107_OptionalSilentEventsGetNoMember(t *testing.T) {
-	opt := optTemplate("OBSERVATION", optSingle("data", optNode("HISTORY", "at0001", optOptionalMultiple("events"))))
+	opt := optTemplate("OBSERVATION", optSingle("data", optNode("HISTORY", "at0001",
+		optOptionalMultiple("events"), optSingle("summary", optNode("ITEM_TREE", "at0002")))))
 	for _, implicit := range []bool{true, false} {
 		c := compileOPTText(t, opt, implicit)
 		for _, opts := range defaultsOptions() {

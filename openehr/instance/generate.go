@@ -264,9 +264,16 @@ func (g *generator) fillUncarriedRequired(optNode *tcimpl.CompiledNode, rmValue 
 // uri and the OPT prohibits its data, which it then never gets (RM
 // Not_empty). finishNode then gives each the RM default it gives a visited
 // one, and builds one with no allowed OPT child from its BMM type; a uri
-// with none takes the default settleMultimedia writes.
+// with none takes the default settleMultimedia writes. A HISTORY with
+// neither events nor a summary gets one of them from the OPT alone
+// (writeEventOrSummary).
 func (g *generator) writeRMNeeded(optNode *tcimpl.CompiledNode, rmValue any) error {
 	switch v := rmValue.(type) {
+	case *rm.History[rm.ItemStructure]:
+		if len(v.Events) > 0 || (v.Summary != nil && !rm.IsTypedNil(v.Summary)) {
+			return nil
+		}
+		return g.writeEventOrSummary(optNode, v)
 	case *rm.DVMultimedia:
 		if (v.URI != nil && !rm.IsTypedNil(v.URI)) || len(v.Data) > 0 || !prohibited(optNode, "data") {
 			return nil
@@ -292,6 +299,64 @@ func (g *generator) writeRMNeeded(optNode *tcimpl.CompiledNode, rmValue any) err
 		return g.visitNeeded(optNode, "name", v)
 	}
 	return nil
+}
+
+// writeEventOrSummary gives h, a HISTORY the walk left with neither events
+// nor a summary, what RM Events_valid needs, (events /= Void and then not
+// events.is_empty) or summary /= Void (REQ-107 Precedence 2). It writes the
+// first of these that optNode allows: a member of events from its first
+// allowed child that is not a slot; a summary from its first allowed child
+// that is not a slot; a member of events built from its BMM type, where
+// optNode names no child under events; a summary built from its BMM type,
+// where optNode names no child under summary. An attribute optNode
+// prohibits allows none, and nor does an events whose cardinality leaves no
+// room for a member. Where optNode allows none of them, h is left as it is,
+// and the root breaks the rule (REQ-107 Exceptions and known gaps).
+func (g *generator) writeEventOrSummary(optNode *tcimpl.CompiledNode, h *rm.History[rm.ItemStructure]) error {
+	for _, name := range historyMembers {
+		attr := optNode.Attribute(name)
+		if attr == nil || !historyAllows(optNode, attr) {
+			continue
+		}
+		if child := firstNonSlot(tcimpl.AllowedChildNodes(attr)); child != nil {
+			built, err := g.buildChild(child)
+			if err != nil {
+				return err
+			}
+			if name == "events" {
+				err = rmwrite.AppendMultiple(h, name, built)
+			} else {
+				err = rmwrite.EnsureSingle(h, name, built)
+			}
+			if err != nil {
+				return fmt.Errorf("attach %s.%s: %w", optNode.RMTypeName(), name, err)
+			}
+			return nil
+		}
+	}
+	for _, name := range historyMembers {
+		attr := optNode.Attribute(name)
+		if attr != nil && (len(tcimpl.ChildNodes(attr)) > 0 || !historyAllows(optNode, attr)) {
+			continue
+		}
+		g.fillBMMAttr(h, "HISTORY", name, 0)
+		return nil
+	}
+	return nil
+}
+
+// historyMembers are the attributes of a HISTORY that keep RM Events_valid,
+// in the order writeEventOrSummary tries them.
+var historyMembers = []string{"events", "summary"}
+
+// historyAllows reports whether optNode, a HISTORY, allows attr, its events
+// or its summary, a member: the OPT does not prohibit it, and, for events,
+// its cardinality leaves room for one.
+func historyAllows(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
+	if prohibited(optNode, attr.Name()) {
+		return false
+	}
+	return attr.Name() != "events" || memberCap(attr) != 0
 }
 
 // visitNeeded builds attrName of optNode, an attribute an RM rule needs,
@@ -861,13 +926,20 @@ func attrType(parentType, declared string) string {
 // other pass does: an ISM_TRANSITION's current state and a DV_MULTIMEDIA's
 // media type (settleCoded), a party's name, a DV_MULTIMEDIA's data and
 // size, such as a thumbnail the OPT names with no child, the id, namespace
-// and type of a reference (fillReference), and a PARTY_RELATIONSHIP's node
-// id, uid and references (fillPartyRelationship). attr is the attribute v
-// is built for, which decides the type of a reference. No attribute of the
-// pinned RM has the type PARTY_RELATED, so the BMM alone never builds one,
-// and its relationship is finishNode's alone.
+// and type of a reference (fillReference), a PARTY_RELATIONSHIP's node
+// id, uid and references (fillPartyRelationship), and a HISTORY's event,
+// built from its BMM type, which RM Events_valid needs where the HISTORY
+// has no summary either (REQ-107 Precedence 2: no OPT node names a child
+// under its events). attr is the attribute v is built for, which decides
+// the type of a reference. No attribute of the pinned RM has the type
+// PARTY_RELATED, so the BMM alone never builds one, and its relationship
+// is finishNode's alone.
 func (g *generator) settleBuilt(v any, attr string) {
 	switch b := v.(type) {
+	case *rm.History[rm.ItemStructure]:
+		if len(b.Events) == 0 && (b.Summary == nil || rm.IsTypedNil(b.Summary)) {
+			g.fillBMMAttr(b, "HISTORY", "events", 0)
+		}
 	case *rm.IsmTransition:
 		g.settleCoded(nil, b)
 	case *rm.DVMultimedia:

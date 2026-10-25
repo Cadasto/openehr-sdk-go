@@ -406,6 +406,12 @@ func primitiveLeaf(value any, a *engineAttr) bool {
 // visit goes no further, and the first node to reach it reports
 // `max_depth`.
 //
+// A finding of the node's rules that a list holds no item, at the list's
+// path or, for a HISTORY's events, at the node's, is withdrawn once the
+// attributes are visited where the template reported that list at the list's
+// path: the template's finding is the one report for the list
+// ([engine.withdrawGivenWay]).
+//
 // A rule of the node's class may read below the node, into one of its
 // attributes. Where the template refused content below the node, an
 // attribute it prohibits, a value that binds to no child or an item bound to
@@ -455,6 +461,9 @@ func (e *engine) visit(n engineNode) {
 	e.visitAttributes(n, class, entry)
 	if held != nil {
 		e.settle(held)
+	}
+	if n.bound != nil && rulesTo > rulesFrom {
+		rulesTo = e.withdrawGivenWay(n, rulesFrom, rulesTo)
 	}
 	if refusals := e.refused[refusedFrom:]; len(refusals) > 0 && rulesTo > rulesFrom {
 		e.withdrawInside(rulesFrom, rulesTo, refusals)
@@ -1191,9 +1200,10 @@ func (e *engine) refuse(iss Issue) {
 // checkAbsent reports the attribute a of node n, which the template declares
 // and the instance lacks, at attrPath, once. Where the template requires it
 // ([templateRequires]: its existence, and for a list or a Hash a cardinality
-// or a child's occurrences that asks for a member too), it is the template's
-// `required`. A Hash is read as multi-valued here, as a list is, although
-// [attrShape.multiValued] leaves it out. Otherwise it is the RM's
+// or a child's occurrences that asks for a member too, or an RM rule of the
+// node's class that makes the list hold a member, [asksForMember]), it is
+// the template's `required`. A Hash is read as multi-valued here, as a list
+// is, although [attrShape.multiValued] leaves it out. Otherwise it is the RM's
 // `required` where the RM marks it mandatory for the value's class, as the
 // RM rules alone read it (a.mandatory), which leave out the part of a
 // reference, whose own rule reports it, and a value the node's role lets be
@@ -1202,7 +1212,7 @@ func (e *engine) refuse(iss Issue) {
 // mandatory bit the compiled template carries for it.
 func (e *engine) checkAbsent(n *engineNode, a *engineAttr, attrPath issuePath) {
 	multiValued := a.shape != shapeSingle
-	if iss, required := absentIssue(a.decl, n.value, attrPath, multiValued); required {
+	if iss, required := absentIssue(a.decl, n.value, attrPath, multiValued, multiValued && asksForMember(n, a.name)); required {
 		e.found.emit(iss)
 		return
 	}
@@ -1214,7 +1224,9 @@ func (e *engine) checkAbsent(n *engineNode, a *engineAttr, attrPath issuePath) {
 // checkEmpty reports the multi-valued attribute a of node n, at attrPath,
 // which is present and holds no item, once. Where the template requires it
 // ([templateRequires]: its existence, and a cardinality or a child's
-// occurrences that asks for a member), it is the template's `required`.
+// occurrences that asks for a member, or an RM rule of the node's class that
+// makes the list hold a member, [asksForMember]), it is the template's
+// `required`.
 // Where only the RM requires it, read from the value's class alone as
 // [engine.checkAbsent] reads it, it is the RM's `cardinality`, rule
 // cardinality, unless the template reports the same container itself
@@ -1222,13 +1234,69 @@ func (e *engine) checkAbsent(n *engineNode, a *engineAttr, attrPath issuePath) {
 // no mandatory rule, as the RM rules alone read it, however the template
 // declares it.
 func (e *engine) checkEmpty(n *engineNode, a *engineAttr, attrPath issuePath, reported bool) {
-	if iss, required := emptyIssue(a.decl, n.value, attrPath); required {
+	if iss, required := emptyIssue(a.decl, n.value, attrPath, asksForMember(n, a.name)); required {
 		e.found.emit(iss)
 		return
 	}
 	if a.mandatory && a.shape.multiValued() && !reported {
 		e.found.checkMandatory(n.rmType, a.name, attrPath, true, true, 0)
 	}
+}
+
+// asksForMember reports whether an RM rule of the class of node n makes its
+// list attr hold a member ([classRules.asksForMember]), so that the
+// template's existence lower bound of 1 or more on the list asks for one
+// (REQ-102 An existence lower bound alone asks for no member). The rules are
+// those of the value's class, as the RM rules alone read it.
+func asksForMember(n *engineNode, attr string) bool {
+	rules, _ := rulesFor(n.rmType)
+	return rules.asksForMember(n.value, attr)
+}
+
+// withdrawGivenWay removes, from the issues the RM rules of node n reported
+// at positions from up to to, each finding of a rule of the REQ-112
+// Non-empty lists entry ([listMemberRules]) whose list the template reported
+// at the list's path once the walk visited n's attributes, and returns where
+// the findings of n's rules now end. A list that holds no item is then one
+// finding, the template's (REQ-171 One walk, step 2): its `required`, its
+// cardinality, or the occurrences of a child that declares no id, written at
+// the list's path. The issues after to keep their order.
+func (e *engine) withdrawGivenWay(n engineNode, from, to int) int {
+	issues := e.found.issues
+	if !slices.ContainsFunc(issues[from:to], isListMemberFinding) {
+		return to
+	}
+	later := issues[to:]
+	kept := issues[:from]
+	for _, iss := range issues[from:to] {
+		if !isListMemberFinding(iss) || !templateReportsAt(later, n.path.join("/"+listMemberRules[iss.Rule].list)) {
+			kept = append(kept, iss)
+		}
+	}
+	if len(kept) == to {
+		return to
+	}
+	end := len(kept)
+	kept = append(kept, later...)
+	clear(issues[len(kept):])
+	e.found.issues = kept
+	return end
+}
+
+// isListMemberFinding reports whether iss is a finding of a rule of the
+// REQ-112 Non-empty lists entry ([listMemberRules]).
+func isListMemberFinding(iss Issue) bool {
+	if iss.Layer != LayerRM {
+		return false
+	}
+	_, ok := listMemberRules[iss.Rule]
+	return ok
+}
+
+// templateReportsAt reports whether one of issues is the template's, at
+// path.
+func templateReportsAt(issues []Issue, path string) bool {
+	return slices.ContainsFunc(issues, func(iss Issue) bool { return iss.Layer == LayerTemplate && iss.Path == path })
 }
 
 // unboundPredicates appends to the walk's predicates ([engine].preds) the
