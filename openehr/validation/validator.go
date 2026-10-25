@@ -25,17 +25,24 @@ type Limits struct {
 	// its class and its coded terms, and the template's value constraint.
 	// But it reports none of the node's absent attributes or empty lists,
 	// and walks none of its attributes. The walk reports the first place it
-	// stops as a max_depth issue. 256 by default.
+	// stops as a max_depth issue. Where it binds a value by trying it under
+	// several template nodes, a trial the limit stops counts as one the
+	// value fails, and a stop inside a trial the walk withdraws is not
+	// reported. 256 by default.
 	//
 	// There is no upper cap. Raising it raises the cost of walking a deeply
 	// nested value faster than in proportion to the depth, since the path
 	// written for each node grows with its depth.
 	Depth int
 
-	// Nodes is the number of values the walk visits in one call before it
+	// Nodes is the number of visits the walk makes in one call before it
 	// stops, reporting a max_nodes issue where it stopped. An item of a list
 	// that holds no value, a nil element or a nil pointer, counts as one
-	// visit too, though the walk does not enter it. 100,000 by default.
+	// visit too, though the walk does not enter it. Where the walk binds a
+	// value by trying it under several template nodes, each trial counts its
+	// visits, so a value can count more than once, though one held by
+	// pointer is tried under a node only once, and a node reached only
+	// inside a trial the walk withdraws reports nothing. 100,000 by default.
 	//
 	// The stop ends the template check as well as the Reference Model
 	// rules, since both run in the one walk. A node reached before the stop
