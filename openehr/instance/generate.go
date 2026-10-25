@@ -2008,27 +2008,19 @@ func existenceOnly(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute)
 		!rmNonEmptyList(optNode, attr)
 }
 
-// rmNonEmptyLists names, per class, the list an RM invariant of the REQ-112
-// Non-empty lists entry keeps from being present and empty
-// (`x /= Void implies not x.is_empty`): COMPOSITION Content_valid,
-// EVENT_CONTEXT Participations_validity, INSTRUCTION Activities_valid,
-// SECTION Items_valid and ATTESTATION Items_valid. The template validator
-// lets the existence of such a list ask for a member, so a list left with
-// none draws its `required`. HISTORY Events_valid is not here: a summary
-// keeps it too, and writeEventOrSummary gives a HISTORY one of the two.
-var rmNonEmptyLists = map[string]string{
-	"ATTESTATION":   "items",
-	"COMPOSITION":   "content",
-	"EVENT_CONTEXT": "participations",
-	"INSTRUCTION":   "activities",
-	"SECTION":       "items",
-}
-
 // rmNonEmptyList reports whether attr of optNode is a list the RM makes
-// non-empty once present (rmNonEmptyLists).
+// non-empty once present and that nothing but an item of it keeps so: one
+// rminfo.NonEmptyLists names with no alternative, as COMPOSITION
+// Content_valid, EVENT_CONTEXT Participations_validity, INSTRUCTION
+// Activities_valid, SECTION Items_valid and ATTESTATION Items_valid name
+// theirs (`x /= Void implies not x.is_empty`). The template validator reads
+// the same table and lets the existence of such a list ask for a member, so
+// a list left with none draws its `required`. A HISTORY's events are not
+// such a list: Events_valid names the summary as their alternative, and
+// writeEventOrSummary gives a HISTORY one of the two.
 func rmNonEmptyList(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
-	list, ok := rmNonEmptyLists[nodeClass(optNode)]
-	return ok && list == attr.Name()
+	l, ok := rminfo.NonEmptyListOf(nodeClass(optNode), attr.Name())
+	return ok && l.Alternative == ""
 }
 
 // makeChild constructs a fresh RM instance for the OPT child's

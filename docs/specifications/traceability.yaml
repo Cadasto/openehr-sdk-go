@@ -1739,6 +1739,7 @@ requirements:
       - openehr/instance/proportion_kind_test.go
       - openehr/instance/quantified_rules_test.go
       - openehr/rm/interval_bound_test.go
+      - openehr/rm/rminfo/nonempty_test.go
       - openehr/rm/rminfo/nonstorable_test.go
       - openehr/rm/temporal_iso_test.go
       - openehr/serialize/canjson/interval_open_side_test.go
@@ -1761,6 +1762,7 @@ requirements:
       - openehr/validation/limits_test.go
       - openehr/validation/multi_nonlocatable_test.go
       - openehr/validation/noncomposition_test.go
+      - openehr/validation/nonempty_lists_internal_test.go
       - openehr/validation/nonstorable_generic_test.go
       - openehr/validation/primitive_empty_part_test.go
       - openehr/validation/rmfloor_archetype_test.go

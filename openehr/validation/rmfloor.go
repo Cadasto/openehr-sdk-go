@@ -28,6 +28,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
 
@@ -908,21 +909,25 @@ type listMembers struct {
 }
 
 // listMemberRules names the list each RM invariant of the REQ-112 Non-empty
-// lists entry reads, keyed CLASS.Invariant as the inventory keys it. Five
-// read `x /= Void implies not x.is_empty` for their list x, so a list that is
-// present holds a member; HISTORY Events_valid reads `(events /= Void and
-// then not events.is_empty) or summary /= Void`, so a HISTORY carries an
-// event or a summary. The rules are evaluated by
-// [findings.checkListMembers], and a class the rules of one of them run on
-// asks the template's existence on its list for a member
+// lists entry reads, keyed CLASS.Invariant as the inventory keys it. The
+// lists are the ones [rminfo.NonEmptyLists] names, which the generator reads
+// too, so the two cannot drift apart. Five read `x /= Void implies not
+// x.is_empty` for their list x, so a list that is present holds a member;
+// HISTORY Events_valid reads `(events /= Void and then not events.is_empty)
+// or summary /= Void`, so a HISTORY carries an event or a summary. The rules
+// are evaluated by [findings.checkListMembers], and a class the rules of one
+// of them run on asks the template's existence on its list for a member
 // ([classRules.asksForMember]).
-var listMemberRules = map[string]listMembers{
-	"ATTESTATION.Items_valid":               {list: "items"},
-	"COMPOSITION.Content_valid":             {list: "content"},
-	"EVENT_CONTEXT.Participations_validity": {list: "participations"},
-	"HISTORY.Events_valid":                  {list: "events", alternative: "summary"},
-	"INSTRUCTION.Activities_valid":          {list: "activities"},
-	"SECTION.Items_valid":                   {list: "items"},
+var listMemberRules = listMemberRulesOf(rminfo.NonEmptyLists())
+
+// listMemberRulesOf keys each of lists by its class and invariant,
+// CLASS.Invariant, with the list it reads and its alternative.
+func listMemberRulesOf(lists []rminfo.NonEmptyList) map[string]listMembers {
+	rules := make(map[string]listMembers, len(lists))
+	for _, l := range lists {
+		rules[l.Class+"."+l.Invariant] = listMembers{list: l.List, alternative: l.Alternative}
+	}
+	return rules
 }
 
 // checkListMembers enforces the REQ-112 Non-empty lists rule that
