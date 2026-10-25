@@ -349,7 +349,7 @@ func TestPutWithAuditDetails(t *testing.T) {
 		Committer: rm.PartyIdentified{Name: &aliceName},
 		ChangeType: rm.DVCodedText{
 			DVText:       rm.DVText{Value: "modification"},
-			DefiningCode: rm.CodePhrase{CodeString: "249"},
+			DefiningCode: rm.CodePhrase{CodeString: "251"},
 		},
 		TimeCommitted: rm.DVDateTime{Value: "2026-05-17T10:00:00Z"},
 	}
