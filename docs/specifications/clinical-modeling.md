@@ -457,6 +457,7 @@ The `c *templatecompile.Compiled` argument is the compiled-template form. It was
 - **AQL lint** (`ValidateAQL`) — **landed** as a separate entry point under REQ-109 (see below); it does not change the composition-validation surface. **Demographic validator** (`ValidateDemographic`) remains deferred.
 - **Validating wire bytes / canonical JSON** — callers decode first, validate second ([REQ-013](module-layout.md#req-013--building-block-independence)).
 - **External terminology lookup** — value-set membership against SNOMED CT / LOINC / external services. REQ-103 closed-code-list checking is the v1 ceiling.
+- **A coded text's `value` against its code's term text** — no RM invariant ties a DV_CODED_TEXT's `value` to the term text of its `defining_code`, so the template validator does not compare them, although some CDRs do; the generator writes the term text ([§ REQ-107](#req-107--template-driven-rm-instance-example-generator)).
 - **Cross-archetype slot-fill resolution** — no federated archetype repository; slot fit is local to parsed REQ-104 assertions, with RM-type-prefix fallback only when no include assertions were parsed.
 - **Full ADL2 / AOM 2 validation semantics.**
 
