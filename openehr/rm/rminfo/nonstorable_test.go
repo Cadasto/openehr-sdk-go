@@ -34,9 +34,11 @@ func TestIsNonStorableAttr(t *testing.T) {
 
 // TestIsNonStorableAttr_REQ112_EveryBMMFunction pins § REQ-112 Driver: the
 // set IsNonStorableAttr names is every BMM function of the class or of an
-// ancestor that is not also a property of the class. A function the class
-// declares, one an ancestor declares, and a name that is a function on one
-// class and a property on another are each answered for the class asked.
+// ancestor that is a property neither of the class nor of any class
+// descending from it. A function the class declares, one an ancestor
+// declares, and a name that is a function on one class and a property on
+// another are each answered for the class asked; a function of an abstract
+// class that a descendant stores as a property is not named.
 func TestIsNonStorableAttr_REQ112_EveryBMMFunction(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -52,7 +54,11 @@ func TestIsNonStorableAttr_REQ112_EveryBMMFunction(t *testing.T) {
 		{class: "DV_DURATION", attr: "years", want: true},             // declared on Iso8601_duration, a BASE primitive type
 		{class: "DV_QUANTITY", attr: "magnitude", want: false},        // a function of DV_QUANTIFIED, a property here
 		{class: "DV_COUNT", attr: "magnitude", want: false},
-		{class: "VERSION", attr: "data", want: true},
+		{class: "DV_AMOUNT", attr: "magnitude", want: false},     // a property of the descendant DV_QUANTITY
+		{class: "DV_QUANTIFIED", attr: "magnitude", want: false}, // a property of the descendants DV_QUANTITY and DV_COUNT
+		{class: "DV_PROPORTION", attr: "magnitude", want: true},  // a function here, and DV_PROPORTION has no descendant
+		{class: "VERSION", attr: "data", want: false},            // a property of the descendant ORIGINAL_VERSION
+		{class: "VERSION", attr: "is_branch", want: true},
 		{class: "ORIGINAL_VERSION", attr: "data", want: false}, // a function of VERSION, a property here
 		{class: "EVENT", attr: "width", want: false},           // a property of a descendant, not a function
 		{class: "ISM_TRANSITION", attr: "name", want: false},
@@ -86,6 +92,45 @@ func TestIsNonStorableAttr_REQ112_NoPropertyIsAFunction(t *testing.T) {
 	}
 	if want := []string{"RESOURCE_DESCRIPTION.parent_resource"}; !slices.Equal(named, want) {
 		t.Errorf("properties IsNonStorableAttr names = %q, want %q", named, want)
+	}
+}
+
+// TestIsNonStorableAttr_REQ112_NoDescendantPropertyIsAFunction pins § REQ-112
+// Driver's descendant rule: a name IsNonStorableAttr names on a class is a
+// property of no class descending from it, so no instance the class denotes
+// stores it. A generator walk or a validator that asks with an abstract class,
+// as an OPT node typed DV_AMOUNT does, then never skips what the concrete
+// DV_QUANTITY it builds or reads carries. The census covers every class
+// Default knows against every class that conforms to it.
+func TestIsNonStorableAttr_REQ112_NoDescendantPropertyIsAFunction(t *testing.T) {
+	t.Parallel()
+	lister, ok := rminfo.Default.(rminfo.AttributeLister)
+	if !ok {
+		t.Fatal("rminfo.Default does not implement rminfo.AttributeLister")
+	}
+	h, ok := rminfo.Default.(rminfo.Hierarchy)
+	if !ok {
+		t.Fatal("rminfo.Default does not implement rminfo.Hierarchy")
+	}
+	classes := rminfo.Default.KnownRMTypes()
+	var named []string
+	for _, class := range classes {
+		for _, sub := range classes {
+			if sub == class {
+				continue
+			}
+			if conforms, _ := h.ConformsTo(sub, class); !conforms {
+				continue
+			}
+			for _, attr := range lister.AttributeNames(sub) {
+				if rminfo.IsNonStorableAttr(class, attr) {
+					named = append(named, class+"."+attr+" (a property of "+sub+")")
+				}
+			}
+		}
+	}
+	if len(named) > 0 {
+		t.Errorf("IsNonStorableAttr names a property of a descendant: %q", named)
 	}
 }
 

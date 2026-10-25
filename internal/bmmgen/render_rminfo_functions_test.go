@@ -23,29 +23,35 @@ func withFunctions(sc *bmm.SimpleClass, names ...string) *bmm.SimpleClass {
 
 // TestEffectiveFunctionsFoldsAncestorsLessProperties_REQ112 pins the set §
 // REQ-112 Driver gives rminfo.IsNonStorableAttr: the functions a class
-// declares or inherits, less every name that is a property of the class,
-// declared there or inherited. A name an ancestor declares as a function and
-// the class as a property is the class's property, and a property an
-// ancestor declares hides a function of the same name further down.
+// declares or inherits, less every name that is a property of the class or
+// of a class descending from it, declared there or inherited. A name an
+// ancestor declares as a function and the class as a property is the class's
+// property, a property an ancestor declares hides a function of the same name
+// further down, and a property of a descendant, a child or a grandchild, hides
+// the function on every class above it. A property of a sibling hides
+// nothing.
 func TestEffectiveFunctionsFoldsAncestorsLessProperties_REQ112(t *testing.T) {
 	plan := &Plan{
 		Target: TargetRM,
 		Classes: map[string]*PlannedClass{
 			"BASE": {BMMName: "BASE", Class: withFunctions(synthClass(
-				"BASE", nil, []string{"base_prop"}, []string{"String"}), "shared", "base_fn")},
+				"BASE", nil, []string{"base_prop"}, []string{"String"}), "shared", "base_fn", "deep")},
 			"MID": {BMMName: "MID", Class: withFunctions(synthClass(
 				"MID", []string{"BASE"}, []string{"shared"}, []string{"Real"}), "mid_fn")},
 			"LEAF": {BMMName: "LEAF", Class: withFunctions(synthClass(
-				"LEAF", []string{"MID"}, nil, nil), "leaf_fn", "base_prop")},
+				"LEAF", []string{"MID"}, []string{"deep"}, []string{"Real"}), "leaf_fn", "base_prop")},
+			"OTHER": {BMMName: "OTHER", Class: synthClass(
+				"OTHER", []string{"BASE"}, nil, nil)},
 		},
 	}
 	tests := []struct {
 		class string
 		want  []string
 	}{
-		{class: "BASE", want: []string{"base_fn", "shared"}},
-		{class: "MID", want: []string{"base_fn", "mid_fn"}},
+		{class: "BASE", want: []string{"base_fn"}},          // shared is MID's property, deep LEAF's
+		{class: "MID", want: []string{"base_fn", "mid_fn"}}, // deep is a property of its child LEAF
 		{class: "LEAF", want: []string{"base_fn", "leaf_fn", "mid_fn"}},
+		{class: "OTHER", want: []string{"base_fn", "deep", "shared"}}, // MID and LEAF are not its descendants
 	}
 	for _, tc := range tests {
 		if got := effectiveFunctions(plan, tc.class); !slices.Equal(got, tc.want) {
@@ -75,9 +81,10 @@ func functionEntry(t *testing.T, src, class string) ([]string, bool) {
 
 // TestRenderRMInfoEmitsFunctions_REQ112 pins the rendered function table on
 // the pinned RM: a function the class declares and one an ancestor declares
-// are listed, one of an ancestor the class universe leaves out included, and
-// a name an ancestor declares as a function and the class as a property is
-// not.
+// are listed, one of an ancestor the class universe leaves out included; a
+// name an ancestor declares as a function and the class as a property is
+// not, and nor is a function of an abstract class that a descendant declares
+// as a property.
 func TestRenderRMInfoEmitsFunctions_REQ112(t *testing.T) {
 	out, err := RenderRMInfoFile(rmInfoTestPlan(t))
 	if err != nil {
@@ -95,7 +102,10 @@ func TestRenderRMInfoEmitsFunctions_REQ112(t *testing.T) {
 		{class: "DV_DURATION", name: "years", want: true}, // declared on Iso8601_duration, outside the class universe
 		{class: "DV_QUANTITY", name: "magnitude", want: false},
 		{class: "DV_QUANTITY", name: "is_integral", want: true},
-		{class: "VERSION", name: "data", want: true},
+		{class: "DV_AMOUNT", name: "magnitude", want: false}, // DV_QUANTITY's property
+		{class: "DV_AMOUNT", name: "is_strictly_comparable_to", want: true},
+		{class: "VERSION", name: "data", want: false}, // ORIGINAL_VERSION's property
+		{class: "VERSION", name: "is_branch", want: true},
 		{class: "ORIGINAL_VERSION", name: "data", want: false},
 	}
 	for _, tc := range tests {
