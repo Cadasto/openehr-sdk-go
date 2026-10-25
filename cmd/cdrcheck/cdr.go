@@ -144,16 +144,18 @@ func (c *cdrClient) call(ctx context.Context, fn func(ctx context.Context) error
 	return o
 }
 
-// clip cuts s to maxBodyText bytes, on a rune boundary.
+// clip cuts s to maxBodyText bytes, on a rune boundary: where the cut falls
+// inside a character, it moves back to that character's first byte. A byte
+// that is not UTF-8, before the cut, stays as it is.
 func clip(s string) string {
 	if len(s) <= maxBodyText {
 		return s
 	}
-	s = s[:maxBodyText]
-	for !utf8.ValidString(s) {
-		s = s[:len(s)-1]
+	cut := maxBodyText
+	for back := 0; back < utf8.UTFMax-1 && cut > 0 && !utf8.RuneStart(s[cut]); back++ {
+		cut--
 	}
-	return s + "…"
+	return s[:cut] + "…"
 }
 
 // refusedAsPresent reports whether an upload refusal says the CDR holds a

@@ -54,6 +54,45 @@ func TestRedactor_FindsTheCredentialInEveryForm_REQ082(t *testing.T) {
 	}
 }
 
+func TestClip_CutsAtTheLimitOnARuneBoundary_REQ082(t *testing.T) {
+	t.Parallel()
+	pad := func(n int) string { return strings.Repeat("x", n) }
+	cases := []struct {
+		name, text, want string
+	}{
+		{name: "a text within the limit", text: pad(maxBodyText), want: pad(maxBodyText)},
+		{name: "a text past the limit", text: pad(maxBodyText + 3), want: pad(maxBodyText) + "…"},
+		{
+			// A CDR's text need not be UTF-8: a byte that starts no
+			// character, far before the cut, stays and moves no cut.
+			name: "a Latin-1 byte near the start",
+			text: "ab\xe9" + pad(maxBodyText),
+			want: "ab\xe9" + pad(maxBodyText-3) + "…",
+		},
+		{
+			// é is two bytes, the second of them at the limit.
+			name: "a character across the limit",
+			text: pad(maxBodyText-1) + "é" + pad(3),
+			want: pad(maxBodyText-1) + "…",
+		},
+		{
+			// 🔑 is four bytes, the last three of them past the limit.
+			name: "a four-byte character across the limit",
+			text: pad(maxBodyText-1) + "🔑" + pad(3),
+			want: pad(maxBodyText-1) + "…",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := clip(tc.text); got != tc.want {
+				t.Errorf("clip(%d bytes) = %d bytes ending %q, want %d bytes ending %q",
+					len(tc.text), len(got), got[max(0, len(got)-8):], len(tc.want), tc.want[max(0, len(tc.want)-8):])
+			}
+		})
+	}
+}
+
 func TestFileName_DistinctForEveryTemplateID_REQ082(t *testing.T) {
 	t.Parallel()
 	safe := regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
