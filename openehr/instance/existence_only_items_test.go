@@ -35,6 +35,10 @@ func existenceOnlyShape(out any) string {
 // identity no earlier sibling carries, and builds nothing where there is
 // none, so an ITEM_TREE or ITEM_LIST whose items have no child, only
 // slots, or only a child that needs undescribed content gets no items.
+// An ITEM_TREE whose items carry a cardinality of 0..0 gets none either,
+// although an optional described child would give the member: the list
+// gets no more members than its cardinality upper bound, and the RM asks
+// it for none (Precedence 2), so that bound wins over the existence.
 // The controls keep the top-up they had: an optional described child
 // still gives the one member, and a list whose cardinality lower bound is
 // 1, or a CLUSTER's items, which the BMM marks mandatory, is still topped
@@ -80,6 +84,16 @@ func TestREQ107_ExistenceOnlyItemsGetNoUndescribedMember(t *testing.T) {
 			name: "control: ITEM_TREE items with a slot before an optional described ELEMENT",
 			opt:  optTemplate("ITEM_TREE", guardMultiple("items", guardExistence11, optSlot("CLUSTER", "at0001"), element)),
 			want: "at0002",
+		},
+		{
+			// The existence asks for the member the ELEMENT could give, but
+			// the cardinality upper bound 0 leaves no room for it, and the
+			// RM needs none: the list keeps no member.
+			name: "ITEM_TREE items at cardinality 0..0 with an optional described ELEMENT",
+			opt: optTemplate("ITEM_TREE", `<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>items</rm_attribute_name>`+
+				guardExistence11+element+
+				`<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval>`+
+				optInterval(0, 0)+`</interval></cardinality></attributes>`),
 		},
 		{
 			name: "control: ITEM_TREE items at cardinality 1..* with no child",
