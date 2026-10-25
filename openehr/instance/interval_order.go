@@ -20,10 +20,11 @@ import (
 // example values too.
 //
 // First it makes the two bounds strictly comparable where both sides admit
-// such a pair (shareComparable): two DV_QUANTITY bounds in different units
-// take one unit, and two DV_PROPORTION bounds of different types one type,
-// that both sides admit, so that RM DV_INTERVAL.Limits_consistent, which
-// needs lower.is_strictly_comparable_to(upper), can hold.
+// such a pair (shareComparable): two DV_QUANTITY bounds take one unit, and
+// two DV_PROPORTION bounds one type, that both sides admit, one in which an
+// ordered pair fits both sides where there is such a one, so that RM
+// DV_INTERVAL.Limits_consistent, which needs
+// lower.is_strictly_comparable_to(upper), can hold.
 //
 // It orders DV_COUNT, DV_QUANTITY, DV_DATE, DV_TIME, DV_DATE_TIME,
 // DV_PROPORTION and DV_ORDINAL bounds, in a DV_INTERVAL of that type and
@@ -1134,13 +1135,14 @@ func setOrderedOrdinal(slot *rm.DVOrdered, k ordinalKey) {
 }
 
 // shareComparable gives the two bounds of a generated interval, both sides
-// bounded, one unit where they are two DV_QUANTITY in different units
-// (shareUnits), and one type where they are two DV_PROPORTION of different
-// types (shareTypes), that both sides admit, in a DV_INTERVAL of that type
-// and in a DV_INTERVAL<DV_ORDERED> whose two bounds are both of it, in value
-// or pointer form. A pair the two sides admit no such unit or type for is
-// left as it is, and so is a pair of two classes: the RM floor reports either
-// as not strictly comparable (REQ-112 DV_INTERVAL).
+// bounded, one unit where they are two DV_QUANTITY (shareUnits), and one type
+// where they are two DV_PROPORTION (shareTypes), that both sides admit, in a
+// DV_INTERVAL of that type and in a DV_INTERVAL<DV_ORDERED> whose two bounds
+// are both of it, in value or pointer form. The unit or type is one in which
+// an ordered pair fits both sides where there is such a one, so two bounds
+// that share theirs can take another. A pair the two sides admit no such unit
+// or type for is left as it is, and so is a pair of two classes: the RM floor
+// reports either as not strictly comparable (REQ-112 DV_INTERVAL).
 func shareComparable(optNode *tcimpl.CompiledNode, rmValue any) {
 	switch iv := rmValue.(type) {
 	case *rm.DVInterval[rm.DVQuantity]:
@@ -1177,32 +1179,73 @@ func orderedPair[T any](iv *rm.DVInterval[rm.DVOrdered], read func(rm.DVOrdered)
 	return lower, upper, lowerOK && upperOK
 }
 
-// shareUnits gives two DV_QUANTITY bounds in different units one unit both
-// sides admit, and reports whether it changed them. It tries, in this order,
-// the lower bound's units, the upper bound's, the units the lower side lists
-// and then those the upper side lists (listedUnits), and takes the first
-// that both sides admit (inUnits). A pair with none is left as it is.
+// shareUnits gives two DV_QUANTITY bounds one unit both sides admit, and
+// reports whether it changed them. It tries, in this order, the lower
+// bound's units, the upper bound's, the units the lower side lists and then
+// those the upper side lists (listedUnits). Of those that both sides admit
+// (inUnits), it takes the first in which the two bounds can be put in order
+// (orderable), and the first of them where none can. A pair with none is left
+// as it is, and so is a pair in one unit that is the one it takes.
 func shareUnits(lower, upper *rm.DVQuantity, lowerNode, upperNode *tcimpl.CompiledNode) bool {
-	if lower.Units == upper.Units {
-		return false
-	}
 	candidates := append([]string{lower.Units, upper.Units}, listedUnits(lowerNode)...)
 	candidates = append(candidates, listedUnits(upperNode)...)
-	for _, units := range candidates {
+	lo, hi, ok := firstOrderable(candidates, func(units string) (rm.DVQuantity, rm.DVQuantity, bool) {
 		lo, loOK := inUnits(lowerNode, *lower, units)
 		hi, hiOK := inUnits(upperNode, *upper, units)
-		if loOK && hiOK {
-			*lower, *upper = lo, hi
-			return true
+		return lo, hi, loOK && hiOK
+	}, func(lo, hi rm.DVQuantity) bool {
+		return orderable(lo, hi, lowerNode, upperNode, quantityScale, quantityKeyOf, setQuantityKey)
+	})
+	if !ok || (lo.Units == lower.Units && hi.Units == upper.Units) {
+		return false
+	}
+	*lower, *upper = lo, hi
+	return true
+}
+
+// firstOrderable returns the pair as of the first candidate that both sides
+// admit (as) and in which the pair can be put in order (inOrder), else the
+// pair as of the first candidate that both sides admit, and false where both
+// sides admit none.
+func firstOrderable[C, T any](candidates []C, as func(C) (T, T, bool), inOrder func(lo, hi T) bool) (lower, upper T, ok bool) {
+	for _, c := range candidates {
+		lo, hi, admitted := as(c)
+		if !admitted {
+			continue
+		}
+		if inOrder(lo, hi) {
+			return lo, hi, true
+		}
+		if !ok {
+			lower, upper, ok = lo, hi, true
 		}
 	}
-	return false
+	return lower, upper, ok
+}
+
+// orderable reports whether two bounds of T are in order, or can be put in
+// order inside their sides' constraints as orderConcrete puts them
+// (orderPair), each keeping its own normal_range rule (normalAt). A pair that
+// does not compare is not.
+func orderable[T, K any](lower, upper T, lowerNode, upperNode *tcimpl.CompiledNode, s scale[K], key func(T) K, apply func(*T, K)) bool {
+	c, ok := s.compare(key(lower), key(upper))
+	if !ok {
+		return false
+	}
+	if c <= 0 {
+		return true
+	}
+	lowerSide := orderSide[K]{node: lowerNode, narrow: normalAt(lower, lowerNode, key, apply, true)}
+	upperSide := orderSide[K]{node: upperNode, narrow: normalAt(upper, upperNode, key, apply, false)}
+	_, _, ok = orderPair(key(lower), key(upper), lowerSide, upperSide, s)
+	return ok
 }
 
 // listedUnits returns the units a side lists: those of the entries of the
-// C_DV_QUANTITY on its bound node, or, where it lists none, those of the
-// property it names, or the list of the C_STRING on the units of a bound
-// the OPT builds attribute by attribute. A side that lists none returns nil.
+// C_DV_QUANTITY on its bound node, or, where it lists none, the units of the
+// property it names (PropertyUnits), which are the units it admits, or the
+// list of the C_STRING on the units of a bound the OPT builds attribute by
+// attribute. A side that lists none returns nil.
 func listedUnits(node *tcimpl.CompiledNode) []string {
 	if c, ok := primitiveOf(node).(constraints.DvQuantity); ok {
 		if len(c.Units) == 0 {
@@ -1255,28 +1298,30 @@ func inUnits(node *tcimpl.CompiledNode, q rm.DVQuantity, units string) (rm.DVQua
 	return q, quantityFits(node, quantityKeyOf(q))
 }
 
-// shareTypes gives two DV_PROPORTION bounds of different types one type both
-// sides admit, and reports whether it changed them. It tries, in this
-// order, the lower bound's type, the upper bound's, and every proportion
-// kind in code order, and takes the first that both sides admit (asKind). A
-// pair with none is left as it is.
+// shareTypes gives two DV_PROPORTION bounds one type both sides admit, and
+// reports whether it changed them. It tries, in this order, the lower
+// bound's type, the upper bound's, and every proportion kind in code order.
+// Of those that both sides admit (asKind), it takes the first in which the
+// two bounds can be put in order (orderable), and the first of them where
+// none can. A pair with none is left as it is, and so is a pair of one type
+// that is the one it takes.
 func shareTypes(lower, upper *rm.DVProportion, lowerNode, upperNode *tcimpl.CompiledNode) bool {
-	if lower.Type == upper.Type {
-		return false
-	}
 	candidates := []int64{int64(lower.Type), int64(upper.Type)}
 	for kind := range int64(pkIntegerFraction + 1) {
 		candidates = append(candidates, kind)
 	}
-	for _, kind := range candidates {
+	lo, hi, ok := firstOrderable(candidates, func(kind int64) (rm.DVProportion, rm.DVProportion, bool) {
 		lo, loOK := asKind(lowerNode, *lower, kind)
 		hi, hiOK := asKind(upperNode, *upper, kind)
-		if loOK && hiOK {
-			*lower, *upper = lo, hi
-			return true
-		}
+		return lo, hi, loOK && hiOK
+	}, func(lo, hi rm.DVProportion) bool {
+		return orderable(lo, hi, lowerNode, upperNode, proportionScale, proportionKeyOf, setProportionKey)
+	})
+	if !ok || (lo.Type == lower.Type && hi.Type == upper.Type) {
+		return false
 	}
-	return false
+	*lower, *upper = lo, hi
+	return true
 }
 
 // asKind returns p as a proportion of kind, and whether its side admits
@@ -1300,7 +1345,8 @@ func asKind(node *tcimpl.CompiledNode, p rm.DVProportion, kind int64) (rm.DVProp
 // RandomFill to draw both bounds in. An empty intersection, or a side that
 // is not a C_DV_QUANTITY, returns false so each side draws its own unit;
 // shareComparable then gives the two bounds one unit where both sides admit
-// one, a side the OPT builds attribute by attribute included.
+// one, a side the OPT builds attribute by attribute included, and another
+// shared unit where an ordered pair fits both sides only in that one.
 func sharedQuantityUnit(node *tcimpl.CompiledNode, s sampler) (string, bool) {
 	if node == nil || !strings.HasPrefix(node.RMTypeName(), "DV_INTERVAL") {
 		return "", false

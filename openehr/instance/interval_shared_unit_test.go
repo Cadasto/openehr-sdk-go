@@ -118,11 +118,12 @@ func generateInterval[T rm.DVOrdered](t *testing.T, c *templatecompile.Compiled,
 // TestREQ107_IntervalQuantityBoundsShareOneUnit is the REQ-107 Intervals
 // check that the two bounds of a DV_INTERVAL<DV_QUANTITY> take one unit both
 // sides admit before they are ordered, whether the OPT constrains a bound by
-// one C_DV_QUANTITY or attribute by attribute, under both value fills: the
-// lower bound's unit where the upper side admits it, else the upper bound's,
-// else the first both admit. A side the OPT leaves without units takes the
-// other side's. Where the sides admit no one unit, the bounds keep their own
-// and the floor reports them as not strictly comparable.
+// one C_DV_QUANTITY or attribute by attribute, under both value fills: of the
+// lower bound's unit, the upper bound's and those the sides list, the first
+// both admit in which an ordered pair fits both sides. A side the OPT leaves
+// without units takes the other side's. Where the sides admit no one unit,
+// the bounds keep their own and the floor reports them as not strictly
+// comparable.
 func TestREQ107_IntervalQuantityBoundsShareOneUnit(t *testing.T) {
 	runSharedPairs(t, "DV_QUANTITY", []sharedPairCase{
 		{
@@ -154,6 +155,16 @@ func TestREQ107_IntervalQuantityBoundsShareOneUnit(t *testing.T) {
 			want:  "g",
 		},
 		{
+			// Both sides admit g and kg, but no ordered pair fits both in g,
+			// the lower side starting at 5 g and the upper one ending at 1 g.
+			// ExampleFill writes 5 g below and 0 kg above, and RandomFill can
+			// draw both bounds in g; in kg an ordered pair fits.
+			name:  "C_DV_QUANTITY lists [g from 5, kg] and [kg, g to 1]",
+			lower: listedQuantity(instance.QuantityEntry("g", instance.Closed(5), instance.Closed(10)), unitEntry("kg", 1)),
+			upper: listedQuantity(unitEntry("kg", 1), unitEntry("g", 1)),
+			want:  "kg",
+		},
+		{
 			name:  "a C_DV_QUANTITY listing [mg] below and no units above",
 			lower: listedQuantity(unitEntry("mg", 10)),
 			upper: perAttributeQuantity(),
@@ -171,19 +182,33 @@ func TestREQ107_IntervalQuantityBoundsShareOneUnit(t *testing.T) {
 // TestREQ107_IntervalProportionBoundsShareOneType is the REQ-107 Intervals
 // check that the two bounds of a DV_INTERVAL<DV_PROPORTION> take one type
 // both sides admit, settled as that kind inside each side's constraints,
-// before they are ordered: ExampleFill writes a ratio below and a percent
-// above, and RandomFill can draw a ratio below and a fraction above, which
-// neither side admits of the other. Where the sides admit no one type, the
-// bounds keep their own and the floor reports them as not strictly
-// comparable.
+// before they are ordered: of the lower bound's type, the upper bound's and
+// every kind in code order, the first both admit in which an ordered pair
+// fits both sides. Where the sides admit no one type, the bounds keep their
+// own and the floor reports them as not strictly comparable.
 func TestREQ107_IntervalProportionBoundsShareOneType(t *testing.T) {
 	numerators := instance.RealRange(instance.Closed(0), instance.Closed(100))
+	one := instance.RealList(1)
 	runSharedPairs(t, "DV_PROPORTION", []sharedPairCase{
 		{
+			// ExampleFill writes a ratio below and a percent above, and
+			// RandomFill can draw a ratio below and a fraction above, which
+			// neither side admits of the other.
 			name:  "types [ratio, percent] and [percent, fraction]",
 			lower: instance.ProportionKindBound(numerators, instance.IntList(0, 2), ""),
 			upper: instance.ProportionKindBound(numerators, instance.IntList(2, 3), ""),
 			want:  "2",
+		},
+		{
+			// Both sides admit fractions and ratios over 1, but as fractions,
+			// which need whole numerators, the lower side starts at 6 and the
+			// upper one ends at 5, so no ordered pair fits both. ExampleFill
+			// writes a fraction below and a ratio above, and RandomFill can
+			// draw two fractions; as ratios an ordered pair fits.
+			name:  "types [fraction, ratio] and [ratio, fraction], an ordered pair only as ratios",
+			lower: instance.ProportionKindBoundOver(instance.RealRange(instance.Closed(5.2), instance.Closed(6)), one, instance.IntList(3, 0), ""),
+			upper: instance.ProportionKindBoundOver(instance.RealRange(instance.Closed(5), instance.Closed(5.5)), one, instance.IntList(0, 3), ""),
+			want:  "0",
 		},
 		{
 			name:      "types [ratio] and [fraction], no type fits both",

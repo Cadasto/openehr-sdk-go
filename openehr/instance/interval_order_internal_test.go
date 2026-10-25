@@ -444,9 +444,9 @@ func orderedString(v rm.DVOrdered) string {
 // DV_PROPORTION. The compared key is the ratio numerator/denominator, and
 // only when both bounds have the same type; DV_PROPORTION.magnitude is not
 // implemented on the generated type. A zero denominator does not compare.
-// Two bounds of different types are first given one type both sides admit
-// (TestREQ107_ShareComparableProportion pins how), and are left alone where
-// there is none.
+// Two bounds are first given one type both sides admit, one in which an
+// ordered pair fits where there is one (TestREQ107_ShareComparableProportion
+// pins how), and are left alone where there is none.
 func TestOrderIntervalBoundsProportion(t *testing.T) {
 	p := func(num, den float64, kind int32) rm.DVProportion {
 		return rm.DVProportion{Numerator: rm.Real(num), Denominator: rm.Real(den), Type: rm.Integer(kind)}
@@ -489,9 +489,20 @@ func TestOrderIntervalBoundsProportion(t *testing.T) {
 			want:   [2]rm.DVProportion{p(2, 1, 0), p(1, 2, 1)},
 		},
 		{
-			name:   "zero denominator: left alone",
+			// Both sides admit only ratios, so the pair keeps its type.
+			name: "zero denominator: left alone",
+			node: intervalNode(t, RetargetInterval(t, opt, "DV_PROPORTION",
+				ProportionKindBound(RealRange(Closed(0), Closed(10)), IntList(0), ""),
+				ProportionKindBound(RealRange(Closed(0), Closed(10)), IntList(0), ""))),
 			bounds: [2]rm.DVProportion{p(1, 0, 0), p(1, 1, 0)},
 			want:   [2]rm.DVProportion{p(1, 0, 0), p(1, 1, 0)},
+		},
+		{
+			// No ordered pair is a ratio over the denominator 0, and the sides,
+			// which the OPT leaves open, admit a unitary proportion, over 1.
+			name:   "zero denominator, no OPT: the first type with an ordered pair",
+			bounds: [2]rm.DVProportion{p(1, 0, 0), p(1, 1, 0)},
+			want:   [2]rm.DVProportion{p(1, 1, 1), p(1, 1, 1)},
 		},
 		{
 			// 10 is not in the lower list, so no swap; 12 and 15 are the ends.
