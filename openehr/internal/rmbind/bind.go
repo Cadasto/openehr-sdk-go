@@ -83,9 +83,9 @@ func describe(v any) string {
 // binds the DURATION node.
 func Bind(nodes []*tcimpl.CompiledNode, v any, eligible func(*tcimpl.CompiledNode) bool) *tcimpl.CompiledNode {
 	gotType := describe(v)
-	for _, admits := range tiers {
+	for tier := range tierCount {
 		for _, c := range nodes {
-			if eligible(c) && admits(c, gotType, v) {
+			if eligible(c) && admits(tier, c, gotType, v) {
 				return c
 			}
 		}
@@ -101,9 +101,9 @@ func Bind(nodes []*tcimpl.CompiledNode, v any, eligible func(*tcimpl.CompiledNod
 func Tier(dst, nodes []*tcimpl.CompiledNode, v any, eligible func(*tcimpl.CompiledNode) bool) []*tcimpl.CompiledNode {
 	gotType := describe(v)
 	from := len(dst)
-	for _, admits := range tiers {
+	for tier := range tierCount {
 		for _, c := range nodes {
-			if eligible(c) && admits(c, gotType, v) {
+			if eligible(c) && admits(tier, c, gotType, v) {
 				dst = append(dst, c)
 			}
 		}
@@ -114,13 +114,21 @@ func Tier(dst, nodes []*tcimpl.CompiledNode, v any, eligible func(*tcimpl.Compil
 	return dst
 }
 
-// tiers holds the test of each of the three tiers of [Bind], in order: the
-// one rule Bind and [Tier] both apply. Each reports whether the node c
-// admits the value v of RM type gotType ([describe]).
-var tiers = [...]func(c *tcimpl.CompiledNode, gotType string, v any) bool{
-	namesRMType,
-	func(c *tcimpl.CompiledNode, gotType string, _ any) bool { return wrapsShortName(c, gotType) },
-	conformsToChild,
+// tierCount is the number of binding tiers [admits] tests.
+const tierCount = 3
+
+// admits reports whether the node c admits the value v of RM type gotType
+// ([describe]) in the binding tier numbered tier, from 0, of the three
+// [Bind] lists: the one rule Bind and [Tier] both apply.
+func admits(tier int, c *tcimpl.CompiledNode, gotType string, v any) bool {
+	switch tier {
+	case 0:
+		return namesRMType(c, gotType, v)
+	case 1:
+		return wrapsShortName(c, gotType)
+	default:
+		return conformsToChild(c, gotType, v)
+	}
 }
 
 // namesRMType reports whether the node c names the value val's own RM type,
