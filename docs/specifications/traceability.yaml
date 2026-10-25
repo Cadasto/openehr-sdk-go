@@ -1018,6 +1018,7 @@ requirements:
     implementation: partial
     packages: [testkit, testkit/probe, cmd/probe-record, cmd/cdrcheck, sandbox, testkit/probes/serialize, testkit/probes/versioned, testkit/probes/definition, testkit/probes/demographic, testkit/probes/transport, testkit/probes/discovery, testkit/probes/template, testkit/probes/query, testkit/probes/rest]
     tests:
+      - cmd/cdrcheck/main_test.go
       - cmd/probe-record/main_test.go
       - sandbox/backend_test.go
       - sandbox/independence_test.go
