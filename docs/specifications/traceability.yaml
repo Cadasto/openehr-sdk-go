@@ -1372,6 +1372,7 @@ requirements:
       - openehr/template/constraints/string_cache_test.go
       - openehr/template/constraints/temporal_parity_test.go
       - openehr/template/constraints/temporal_validate_test.go
+      - openehr/template/constraints/value_free_test.go
       - openehr/template/interval_flags_test.go
       - openehr/template/parse_primitives_test.go
       - openehr/template/webtemplate/inputs_test.go

@@ -991,7 +991,7 @@ func TestParse_CPrimitiveObject_Duration(t *testing.T) {
 		<rm_type_name>DURATION</rm_type_name>
 		<node_id/>
 		<item xsi:type="C_DURATION">
-			<pattern>PThhHmmM</pattern>
+			<pattern>PThm</pattern>
 		</item>
 	</children>`)
 	p := firstChildPrimitive(t, tmpl)
@@ -999,8 +999,8 @@ func TestParse_CPrimitiveObject_Duration(t *testing.T) {
 	if !ok {
 		t.Fatalf("PrimitiveConstraint() = %T, want constraints.CDuration", p)
 	}
-	if cd.Pattern != "PThhHmmM" {
-		t.Errorf("CDuration.Pattern = %q, want PThhHmmM", cd.Pattern)
+	if cd.Pattern != "PThm" {
+		t.Errorf("CDuration.Pattern = %q, want PThm", cd.Pattern)
 	}
 }
 

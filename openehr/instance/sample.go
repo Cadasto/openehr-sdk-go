@@ -55,12 +55,12 @@ func (s sampler) float64() float64 {
 // It falls back to pc.ExampleValue() — silently, and identically on every
 // call — whenever the constraint carries nothing enumerable to sample
 // (unconstrained primitive, pattern-only CString, CDuration, a CDate,
-// CTime or CDateTime with a Range) or a drawn candidate fails pc.Validate. Several *bounded* shapes therefore also
-// degrade to the fixed example with no signal: an empty list∩range
-// intersection, a single-value range, a collapsed exclusive-integer
-// window, and the exclusive-lower real edge (a [lo,hi) draw can land on
-// the excluded bound). Output stays valid, but RandomFill can equal
-// ExampleFill for such a leaf. REQ-107.
+// CTime or CDateTime with a Range) or a drawn candidate fails pc.Validate.
+// Several *bounded* shapes therefore also degrade to the fixed example
+// with no signal: an empty list∩range intersection, a single-value range,
+// a collapsed exclusive-integer window, and the exclusive-lower real edge
+// (a [lo,hi) draw can land on the excluded bound). Output stays valid, but
+// RandomFill can equal ExampleFill for such a leaf. REQ-107.
 func sampleValue(pc constraints.PrimitiveConstraint, s sampler) any {
 	v := sampleByConstraint(pc, s)
 	if v == nil || len(pc.Validate(v)) != 0 {
