@@ -42,14 +42,6 @@ import (
 // Detect with errors.Is(err, rm.ErrTemporalConversion).
 var ErrTemporalConversion = errors.New("rm: temporal value not convertible")
 
-// openEHR nominal duration constants (foundation_types TIME_DEFINITIONS):
-// average days per year / month, used by DV_DURATION.magnitude.
-const (
-	nominalDaysInYear  = 365.24
-	nominalDaysInMonth = 30.42
-	secondsPerDay      = 86400.0
-)
-
 // leapSecond is the seconds value of a positive leap second (hh:mm:60). ISO
 // 8601 allows it, but time.Date would carry it into the next minute.
 const leapSecond = 60
@@ -101,7 +93,7 @@ func (d *DVDate) Magnitude() Integer {
 	if err != nil {
 		return 0
 	}
-	return Integer(dateMagnitudeDays(p))
+	return Integer(p.Magnitude())
 }
 
 // Compare orders this date against other by magnitude (-1 / 0 / +1).
@@ -174,7 +166,7 @@ func (d *DVTime) Magnitude() Real {
 	if err != nil {
 		return 0
 	}
-	return Real(float64(p.Hour*3600+p.Minute*60+p.Second) + p.Fraction)
+	return Real(p.Magnitude())
 }
 
 // Compare orders this time against other by magnitude (-1 / 0 / +1).
@@ -282,7 +274,7 @@ func (d *DVDateTime) Magnitude() float64 {
 	if err != nil {
 		return 0
 	}
-	return float64(dateMagnitudeDays(dp))*secondsPerDay + float64(tp.Hour*3600+tp.Minute*60+tp.Second) + tp.Fraction
+	return iso8601.DateTimeMagnitude(dp, tp)
 }
 
 // Compare orders this date-time against other by magnitude.
@@ -361,23 +353,19 @@ func (d *DVDuration) IsNegative() bool {
 	return p.Negative
 }
 
-// Magnitude returns the duration as a number of seconds, using the
-// openEHR nominal year (365.24 d) and month (30.42 d) averages for the
-// calendar-nominal components. Negative when the duration is negative.
-// Components are scaled in floating point, so a long duration keeps its
-// length in seconds within float64 precision.
+// Magnitude returns the duration as a number of seconds, BASE
+// Iso8601_duration.to_seconds, using the openEHR nominal year (365.24 d) and
+// month (30.42 d) averages for the calendar-nominal components. Negative
+// when the duration is negative. Components are scaled in floating point,
+// so a long duration keeps its length in seconds within float64 precision.
+// The template layer's C_DURATION range check shares the computation
+// (iso8601.Duration.ToSeconds).
 func (d *DVDuration) Magnitude() float64 {
 	p, err := iso8601.ParseDuration(d.isoValue())
 	if err != nil {
 		return 0
 	}
-	secs := float64(p.Years)*nominalDaysInYear*secondsPerDay +
-		float64(p.Months)*nominalDaysInMonth*secondsPerDay +
-		definiteSeconds(p)
-	if p.Negative {
-		return -secs
-	}
-	return secs
+	return p.ToSeconds()
 }
 
 // Compare orders this duration against other by magnitude.
@@ -408,17 +396,6 @@ func (d *DVDuration) ToDuration() (time.Duration, error) {
 		return 0, fmt.Errorf("%w: duration %q does not fit in a time.Duration", ErrTemporalConversion, d.isoValue())
 	}
 	return time.Duration(ns), nil
-}
-
-// definiteSeconds is the length of the week, day and clock components in
-// seconds. Each component is converted to float64 before it is scaled, so
-// a large hour count is not multiplied in int.
-func definiteSeconds(p iso8601.Duration) float64 {
-	return float64(p.Weeks)*7*secondsPerDay +
-		float64(p.Days)*secondsPerDay +
-		float64(p.Hours)*3600 +
-		float64(p.Minutes)*60 +
-		float64(p.Seconds) + p.Fraction
 }
 
 // definiteNanos is the week, day and clock length in nanoseconds, with the
@@ -508,40 +485,6 @@ func addU(a, b uint64) (uint64, bool) {
 		return 0, false
 	}
 	return c, true
-}
-
-// dateMagnitudeDays returns days since 0001-01-01, treating an unknown
-// month or day as 1.
-func dateMagnitudeDays(p iso8601.Date) int {
-	m, dd := p.Month, p.Day
-	if !p.MonthKnown {
-		m = 1
-	}
-	if !p.DayKnown {
-		dd = 1
-	}
-	return daysFromCivil(p.Year, m, dd) - daysFromCivil(1, 1, 1)
-}
-
-// daysFromCivil returns the number of days since the Unix epoch
-// (1970-01-01) for a proleptic-Gregorian date (Howard Hinnant's
-// algorithm). Used as a stable day index for date magnitude across the
-// multi-millennium span where time.Duration would overflow.
-func daysFromCivil(y, m, d int) int {
-	if m <= 2 {
-		y--
-	}
-	var era int
-	if y >= 0 {
-		era = y / 400
-	} else {
-		era = (y - 399) / 400
-	}
-	yoe := y - era*400
-	mp := (m + 9) % 12
-	doy := (153*mp+2)/5 + d - 1
-	doe := yoe*365 + yoe/4 - yoe/100 + doy
-	return era*146097 + doe - 719468
 }
 
 // tzLocation builds a *time.Location from parsed timezone parts,

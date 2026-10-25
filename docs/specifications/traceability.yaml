@@ -1355,6 +1355,7 @@ requirements:
     packages: [openehr/template, openehr/template/constraints, internal/templatecompile, testkit/probes/template]
     probes: [PROBE-024, PROBE-025, PROBE-074]
     tests:
+      - internal/iso8601/magnitude_test.go
       - internal/templatecompile/compile_test.go
       - internal/templatecompile/node_primitive_test.go
       - openehr/instance/placeholder_test.go
@@ -1972,6 +1973,7 @@ requirements:
       - openehr/rm
       - internal/iso8601
     tests:
+      - internal/iso8601/magnitude_test.go
       - internal/iso8601/scan_test.go
       - openehr/rm/temporal_funcs_test.go
       - openehr/rm/temporal_iso_test.go
