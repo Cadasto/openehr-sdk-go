@@ -72,7 +72,7 @@ var corpusCompileFailures = []string{
 // the hollow-body floor under that policy. Required builds only what the
 // template makes mandatory and gives an optional child no member of its
 // own (REQ-107 Visit rule, What a visit writes), so a template that
-// requires no ELEMENT gets a body with none by design: the other 58
+// requires no ELEMENT gets a body with none by design: the other 63
 // compiling COMPOSITION templates, whose ELEMENTs all sit below an
 // optional attribute or child (an optional content, or a required entry
 // whose items are optional), and Address.v2, which is ADDRESS-rooted, has

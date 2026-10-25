@@ -1,7 +1,7 @@
 # REQ-116 compiled-path snapshot — templates pinning at least one node name.
 # Phase 3 adds name predicates to these paths; the diff on this file
 # is the deliberately recorded delta.
-# corpus: 62 OPTs — 9 pin a name, 52 pin none, 1 do not compile
+# corpus: 67 OPTs — 11 pin a name, 55 pin none, 1 do not compile
 
 ## templates/IDCR -  Adverse Reaction List.v1  nodes=67
 /
@@ -199,6 +199,90 @@
 /content[openEHR-EHR-OBSERVATION.validation_observation_test.v0]/data
 /content[openEHR-EHR-OBSERVATION.validation_observation_test.v0]/data/events[at0002]
 /content[openEHR-EHR-OBSERVATION.validation_observation_test.v0]/data/events[at0002]/data
+
+## templates/sdk_crosscheck_unwritten.v1  nodes=31
+/
+/category
+/category/defining_code
+/content[openEHR-EHR-ACTION.sdk_unwritten.v1]
+/content[openEHR-EHR-ACTION.sdk_unwritten.v1]/ism_transition
+/content[openEHR-EHR-ACTION.sdk_unwritten.v1]/ism_transition/current_state
+/content[openEHR-EHR-ACTION.sdk_unwritten.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-ACTION.sdk_unwritten.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-ACTION.sdk_unwritten.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-ACTION.sdk_unwritten.v1]/ism_transition/name
+/content[openEHR-EHR-ACTION.sdk_unwritten.v1]/ism_transition/name/value
+/content[openEHR-EHR-ACTION.sdk_unwritten.v1]/ism_transition
+/content[openEHR-EHR-ACTION.sdk_unwritten.v1]/ism_transition/current_state
+/content[openEHR-EHR-ACTION.sdk_unwritten.v1]/ism_transition/current_state/defining_code
+/content[openEHR-EHR-ACTION.sdk_unwritten.v1]/ism_transition/careflow_step
+/content[openEHR-EHR-ACTION.sdk_unwritten.v1]/ism_transition/careflow_step/defining_code
+/content[openEHR-EHR-ACTION.sdk_unwritten.v1]/ism_transition/name
+/content[openEHR-EHR-ACTION.sdk_unwritten.v1]/ism_transition/name/value
+/content[openEHR-EHR-ACTION.sdk_unwritten.v1]/description
+/content[openEHR-EHR-ACTION.sdk_unwritten.v1]/description/items[at0002]
+/content[openEHR-EHR-ACTION.sdk_unwritten.v1]/description/items[at0002]/value
+/content[openEHR-EHR-OBSERVATION.sdk_unwritten.v1]
+/content[openEHR-EHR-OBSERVATION.sdk_unwritten.v1]/data
+/content[openEHR-EHR-OBSERVATION.sdk_unwritten.v1]/data/events[at0002]
+/content[openEHR-EHR-OBSERVATION.sdk_unwritten.v1]/data/events[at0002]/data
+/content[openEHR-EHR-OBSERVATION.sdk_unwritten.v1]/data/events[at0002]/data/items[at0004]
+/content[openEHR-EHR-OBSERVATION.sdk_unwritten.v1]/data/events[at0002]/data/items[at0004]/value
+/content[openEHR-EHR-OBSERVATION.sdk_unwritten.v1]/data/events[at0002]/data/items[at0004]/null_flavour
+/content[openEHR-EHR-OBSERVATION.sdk_unwritten.v1]/data/events[at0002]/data/items[at0004]/null_flavour/defining_code
+/content[openEHR-EHR-OBSERVATION.sdk_unwritten.v1]/feeder_audit
+/content[openEHR-EHR-OBSERVATION.sdk_unwritten.v1]/links[@1]
+
+## templates/sdk_crosscheck_values.v1  nodes=49
+/
+/category
+/category/defining_code
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0004]
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0004]/value
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0004]/value/value
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0005]
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0005]/value
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0006]
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0006]/value
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0006]/value/value
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0007]
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0007]/value
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0007]/value/value
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0008]
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0008]/value
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0008]/value/value
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0009]
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0009]/value
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0009]/value/value
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0010]
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0010]/value
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0010]/value/value
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0011]
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0011]/value
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0011]/value/value
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0012]
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0012]/value
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0012]/value/value
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0013]
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0013]/value
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0013]/value/lower
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0013]/value/upper
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0014]
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0014]/value
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0014]/value/lower
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0014]/value/upper
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0015]
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0015]/value
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0015]/value/defining_code
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0016,'Second option']
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0016,'Second option']/value
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0016,'Second option']/name
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0016,'Second option']/name/value
+/content[openEHR-EHR-OBSERVATION.sdk_values.v1]/data/events[at0002]/data/items[at0016,'Second option']/name/defining_code
 
 ## templates/test_template_rename_node  nodes=57
 /
