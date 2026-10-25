@@ -4,9 +4,10 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
 
-// applyLocatableIdentity stamps archetype_node_id, name, and (where
-// the RM mandates) uid + archetype_details on a freshly-constructed
-// RM value. Identity writes go through the generated
+// applyLocatableIdentity stamps archetype_node_id and name on a
+// freshly-constructed RM value, archetype_details where archetypeDetails
+// is non-nil, and a uid where uidSource gives one. Identity writes go
+// through the generated
 // rm.MutableLocatable surface (ADR 0013) — REQ-024, no reflection.
 //
 // archetypeDetails is non-nil only for archetype-root pins and the
