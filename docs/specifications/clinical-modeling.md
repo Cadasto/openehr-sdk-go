@@ -232,7 +232,7 @@ The zero-value `NumericRange{}` (no fields set) is treated as "any value accepte
 - **`ARCHETYPE_SLOT` assertion grammar** — landed under REQ-104 (see below).
 - **External terminology lookup** — REQ-105 surfaces bindings carried in the OPT; neither REQ-103 nor REQ-105 calls into a remote terminology service during `Validate`.
 - **AOM 2 `tuple_constraint`** — not used by ADL 1.4.
-- **UCUM dimension analysis** — the specifications-CNF conformance schedule's case `CONT-DV_QUANTITY-validate_property` notes that "all units for the `property` are allowed, so the validation should look into UCUM for all the possible units of measure or that physical property". That is the fuller reading: any UCUM code of the property's dimension. v1 checks the closed TERM property-unit table instead, with exact matching (§ *Validate contract*).
+- **UCUM dimension analysis** — the specifications-CNF conformance schedule's case `CONT-DV_QUANTITY-validate_property` notes that "all units for the `property` are allowed" and that the validation is to look "into UCUM for all the possible units of measure" of that physical property. That is the fuller reading: any UCUM code of the property's dimension. v1 checks the closed TERM property-unit table instead, with exact matching (§ *Validate contract*).
 
 ### Building-block independence (REQ-013)
 
