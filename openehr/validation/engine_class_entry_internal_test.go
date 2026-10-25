@@ -173,14 +173,16 @@ func compileOPTText(t *testing.T, xml string) *templatecompile.Compiled {
 // REQ-171 § One walk — at a node a template binds, an attribute the
 // template declares twice is visited at each declaration, in the template's
 // order, and not again in the class's order; an attribute it declares that
-// the class does not list is visited as the template declares it; and the
-// attributes the class marks mandatory that the template does not declare
-// are visited in the class's order. On a root holding none of them each
-// visit reports the attribute once, so language twice, by the template's
-// existence; on a root holding language and territory the walk enters
-// language twice and territory once. The issues and the visit counts were
-// read off the walk before the attributes the template declares were marked
-// by their position in the class's table.
+// the class does not have is left out, whatever its existence, and its path
+// listed in Coverage.NotInRM (§ Coverage); and the attributes the class
+// marks mandatory that the template does not declare are visited in the
+// class's order. On a root holding none of them each visit reports the
+// attribute once, so language twice, by the template's existence; on a root
+// holding language and territory the walk enters language twice and
+// territory once. The issues and the visit counts were read off the walk
+// before the attributes the template declares were marked by their position
+// in the class's table, and the required issue no_such_attribute drew then
+// was dropped when REQ-171 One walk came to leave such an attribute out.
 func TestREQ171_AnAttributeTheTemplateDeclaresTwiceIsVisitedPerDeclaration(t *testing.T) {
 	t.Parallel()
 	c := compileOPTText(t, declaredTwiceOPT)
@@ -202,7 +204,6 @@ func TestREQ171_AnAttributeTheTemplateDeclaresTwiceIsVisitedPerDeclaration(t *te
 				"code_not_in_value_set /language rm",
 				"code_not_in_value_set /territory rm",
 				"required /language template",
-				"required /no_such_attribute template",
 				"required /language template",
 				"required /territory rm",
 				"required /name rm",
@@ -216,7 +217,6 @@ func TestREQ171_AnAttributeTheTemplateDeclaresTwiceIsVisitedPerDeclaration(t *te
 			issues: []string{
 				"is_archetype_root /archetype_details rm",
 				"code_not_in_value_set /category/defining_code rm",
-				"required /no_such_attribute template",
 				"required /name rm",
 				"required /archetype_node_id rm",
 				"required /category rm",
@@ -236,6 +236,9 @@ func TestREQ171_AnAttributeTheTemplateDeclaresTwiceIsVisitedPerDeclaration(t *te
 			}
 			if e.visits != tc.visits || !slices.Equal(got, tc.issues) {
 				t.Errorf("engineWalk(%s) visits %d values and reports %q; want %d values and %q", tc.name, e.visits, got, tc.visits, tc.issues)
+			}
+			if want := []string{"/no_such_attribute"}; !slices.Equal(r.Coverage.NotInRM, want) {
+				t.Errorf("engineWalk(%s) Coverage.NotInRM = %q, want %q", tc.name, r.Coverage.NotInRM, want)
 			}
 		})
 	}

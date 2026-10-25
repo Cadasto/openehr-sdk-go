@@ -365,6 +365,16 @@ type Coverage struct {
 	// terminology is outside every check it makes.
 	External []string
 
+	// NotInRM lists, in walk order and once per node, the path of each
+	// attribute the template declares on a node whose Reference Model class
+	// does not have it, such as a name on an ISM_TRANSITION (see
+	// CompiledAttribute.NotInRM in package templatecompile). No instance can
+	// carry such an attribute, so the walk did not visit it and reported
+	// nothing for it, whatever the template asks of it. That constraint is
+	// a defect of the template, not a part of the instance the call left
+	// unchecked, so [Coverage.Complete] does not read NotInRM.
+	NotInRM []string
+
 	// Unevaluated lists, sorted and once each, the Reference Model
 	// invariants the validator does not evaluate on the classes the walk
 	// visited, those their ancestors declare included, each written
@@ -384,7 +394,8 @@ type Coverage struct {
 // stopped the walk, and no node was bound to a CONSTRAINT_REF, whose value
 // set the validator cannot consult. It is true exactly when Stopped and
 // External are both empty, so the zero Coverage is complete. It says nothing
-// of Unevaluated, which lists rules the validator evaluates on no instance.
+// of Unevaluated, which lists rules the validator evaluates on no instance,
+// nor of NotInRM, which lists attributes no instance can carry.
 func (c Coverage) Complete() bool {
 	return len(c.Stopped) == 0 && len(c.External) == 0
 }

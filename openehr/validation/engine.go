@@ -107,6 +107,10 @@ type engine struct {
 	// CONSTRAINT_REF, whose value set is outside the SDK
 	// ([Coverage.External]). Nil until one is met.
 	external []string
+	// notInRM holds, in walk order, the path of each attribute a bound
+	// template node declares that the node's RM class does not have, which
+	// the walk left out ([Coverage.NotInRM]). Nil until one is met.
+	notInRM []string
 	// refused holds, in walk order, the path of each attribute, value or
 	// item the template did not admit, which the walk reported once and did
 	// not enter; an item bound to a child the template does not allow is
@@ -147,7 +151,12 @@ func newEngine(lim Limits) *engine {
 // coverage.
 func (e *engine) result() Result {
 	r := resultFromIssues(e.found.issues)
-	r.Coverage = Coverage{Stopped: e.stoppedAt, External: e.external, Unevaluated: unevaluatedIn(e.found.visited)}
+	r.Coverage = Coverage{
+		Stopped:     e.stoppedAt,
+		External:    e.external,
+		NotInRM:     e.notInRM,
+		Unevaluated: unevaluatedIn(e.found.visited),
+	}
 	return r
 }
 
@@ -633,8 +642,11 @@ func (e *engine) settle(h *heldJudgement) {
 // node's class ([tcimpl.CompiledAttribute.Implicit]); an injected attribute
 // the value's class does not list is not visited, so it draws no finding.
 // It leaves out an attribute no serialization carries
-// ([rminfo.IsNonStorableAttr]), and one the metadata gives no type that the
-// template does not declare. A value of no registered RM class
+// ([rminfo.IsNonStorableAttr]), one the template declares that the value's
+// class does not list and the compile marks as absent from the bound node's
+// class ([tcimpl.CompiledAttribute.NotInRM]), whose path it records for
+// [Coverage.NotInRM], and one the metadata gives no type that the template
+// does not declare. A value of no registered RM class
 // ([rmaccess.Covers]) has no attributes the access reads and no class the
 // metadata lists attributes for: the attributes the template declares on
 // the node it binds to are each read as absent, and only the template
@@ -663,6 +675,7 @@ func (e *engine) visitAttributes(n engineNode, class string, entry classEntry) {
 	}
 	var declared attrMarks
 	if n.bound != nil {
+		leftOutFrom := len(e.notInRM)
 		for _, decl := range tcimpl.NodeAttributes(n.bound) {
 			if e.stopped {
 				return // the visit limit ended the walk below this node
@@ -675,8 +688,11 @@ func (e *engine) visitAttributes(n engineNode, class string, entry classEntry) {
 				walked = &table.walked[i]
 				declared |= 1 << i
 			}
-			if a, visited := declaredAttr(n, decl, walked); visited {
+			a, visited := declaredAttr(n, decl, walked)
+			if visited {
 				e.visitAttribute(&n, class, &a)
+			} else if decl.NotInRM() {
+				e.leaveOutNotInRM(n.path, decl.Name(), leftOutFrom)
 			}
 		}
 	}
@@ -704,21 +720,36 @@ func (e *engine) visitAttributes(n engineNode, class string, entry classEntry) {
 // table walks more attributes than it has bits; a test keeps it so.
 type attrMarks uint64
 
+// leaveOutNotInRM records, for [Coverage.NotInRM], the path of the attribute
+// name of the node at p, which the node's bound template node declares and
+// the node's RM class does not have, so the walk left it out
+// ([declaredAttr]). The paths recorded since from are those of the node and
+// of the nodes below it, so a path among them is not recorded again: one
+// node lists each such attribute once, however many declarations name it.
+func (e *engine) leaveOutNotInRM(p issuePath, name string, from int) {
+	path := p.join("/" + name)
+	if !slices.Contains(e.notInRM[from:], path) {
+		e.notInRM = append(e.notInRM, path)
+	}
+}
+
 // declaredAttr returns the attribute decl the bound template node of n
 // declares, as the walk visits it, with visited set, given walked, the
 // attribute as the value's class table walks it
 // ([classAttributeTable.position]), nil when the table walks none by decl's
 // name. An attribute the class lists, a serialization carries and the
 // metadata types is read as the class metadata gives it, in n's role. Any other is read as the template
-// declares it, single-valued or a list; it is not visited when no
-// serialization of the bound node's class carries it.
+// declares it, single-valued or a list. Of those, it is not visited when no
+// instance can carry it: when no serialization of the bound node's class
+// carries it, and when the compile marks it as one that class does not have
+// ([tcimpl.CompiledAttribute.NotInRM]), which REQ-171 One walk leaves out.
 func declaredAttr(n engineNode, decl *tcimpl.CompiledAttribute, walked *engineAttr) (a engineAttr, visited bool) {
 	if walked != nil {
 		a = walked.inRole(n.role)
 		a.decl = decl
 		return a, true
 	}
-	if rminfo.IsNonStorableAttr(bmmtype.Class(n.bound.RMTypeName()), decl.Name()) {
+	if decl.NotInRM() || rminfo.IsNonStorableAttr(bmmtype.Class(n.bound.RMTypeName()), decl.Name()) {
 		return a, false
 	}
 	a = engineAttr{name: decl.Name(), rmType: decl.RMTypeName(), shape: shapeSingle, decl: decl}
