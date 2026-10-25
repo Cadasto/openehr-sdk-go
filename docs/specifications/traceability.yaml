@@ -1231,7 +1231,7 @@ requirements:
     canonical: docs/specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths
     status: draft
     implementation: landed
-    packages: [openehr/template, testkit/probes/template]
+    packages: [openehr/template, internal/templatecompile, openehr/templatecompile, testkit/probes/template]
     probes: [PROBE-022]
     tests:
       - internal/bmmtype/bmmtype_test.go
@@ -1367,7 +1367,7 @@ requirements:
     canonical: docs/specifications/clinical-modeling.md#req-103--primitive-constraint-introspection
     status: draft
     implementation: landed
-    packages: [openehr/template, openehr/template/constraints, internal/templatecompile, testkit/probes/template]
+    packages: [openehr/template, openehr/template/constraints, internal/iso8601, internal/templatecompile, testkit/probes/template]
     probes: [PROBE-024, PROBE-025, PROBE-074]
     tests:
       - internal/iso8601/magnitude_test.go
@@ -1719,6 +1719,8 @@ requirements:
     packages:
       - openehr/validation
       - openehr/rm/rminfo
+      - internal/bmmgen
+      - internal/iso8601
       - internal/rmaccess
       - openehr/internal/rmnames
       - internal/rmroots
