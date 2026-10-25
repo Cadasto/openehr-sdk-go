@@ -7,6 +7,8 @@ package validation
 // they are tried under do not compound.
 
 import (
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -63,9 +65,13 @@ func clusterChainOPT(depth int, single bool) string {
 
 // clusterChain returns a CLUSTER of clusterChainOPT holding a chain of depth
 // CLUSTER at0001 items, each the one item of the one before, the last of
-// which holds an ELEMENT.
-func clusterChain(depth int) *rm.Cluster {
-	var item rm.Item = &rm.Element{ArchetypeNodeID: "at0002", Name: rm.DVText{Value: "element"}, Value: &rm.DVText{Value: "x"}}
+// which holds an ELEMENT, named unless unnamed.
+func clusterChain(depth int, unnamed bool) *rm.Cluster {
+	element := &rm.Element{ArchetypeNodeID: "at0002", Name: rm.DVText{Value: "element"}, Value: &rm.DVText{Value: "x"}}
+	if unnamed {
+		element.Name = rm.DVText{}
+	}
+	var item rm.Item = element
 	for range depth {
 		item = &rm.Cluster{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "cluster"}, Items: []rm.Item{item}}
 	}
@@ -77,42 +83,53 @@ func clusterChain(depth int) *rm.Cluster {
 	}
 }
 
-// REQ-171 One walk — the trials of nested lists do not compound where each
-// item validates under the first child it is tried under. Each level of a
-// chain of CLUSTERs offers its item two children of one node id, the second
-// a leaf, so the item is tried under the first, validates there, and is
-// walked under it again once its path is known. Each verdict is decided
-// once: that walk binds the items below by the verdicts their trials
-// decided, and a trial, whose findings are withdrawn, takes the verdict of
-// an item below in place of walking it again. So the visits grow by 8 a
-// level, against 4 a level where each level offers the first child alone,
-// and chains 17 and 32 levels deep validate within the default limits.
-// Without the reuse the visits of the first doubled with each level, and a
-// chain 16 levels deep stopped at the visit limit.
-func TestEngine_REQ171_NestedTrialsDoNotCompound(t *testing.T) {
+// REQ-171 One walk — the trials of nested lists compound only where an item
+// must be tried under distinct subtrees. Each level of a chain of CLUSTERs
+// offers its item two children of one node id, the second a leaf, so the
+// item is tried under the first. Each verdict is decided once: the walk
+// under the child an item binds to binds the items below by the verdicts
+// their trials decided, and a trial, whose findings are withdrawn, takes the
+// verdict of an item below in place of walking it again.
+//
+// Where the chain validates, each item validates under the first child, so
+// the visits grow by 8 a level, against 4 a level where each level offers
+// the first child alone, and chains 17 and 32 levels deep validate within
+// the default limits; without the reuse the visits doubled with each level,
+// and a chain 16 levels deep stopped at the visit limit. Where the ELEMENT
+// at the end has no name, each item fails under both children, the leaf
+// walking what is below it with the Reference Model rules alone, so the
+// visits grow with the square of the depth, and the walk reports the one
+// defect, at the path of the ELEMENT.
+func TestEngine_REQ171_NestedTrialsCompoundOnlyOverDistinctSubtrees(t *testing.T) {
 	tests := []struct {
 		depth int
 		// single and pair are the visits with one child a level and with
-		// two.
-		single, pair int
+		// two, and unnamed with two and an ELEMENT without a name.
+		single, pair, unnamed int
 	}{
-		{depth: 1, single: 18, pair: 28},
-		{depth: 2, single: 22, pair: 36},
-		{depth: 4, single: 30, pair: 52},
-		{depth: 8, single: 46, pair: 84},
-		{depth: 16, single: 78, pair: 148},
-		{depth: 17, single: 82, pair: 156},
-		{depth: 32, single: 142, pair: 276},
+		{depth: 1, single: 18, pair: 28, unnamed: 32},
+		{depth: 2, single: 22, pair: 36, unnamed: 52},
+		{depth: 4, single: 30, pair: 52, unnamed: 104},
+		{depth: 8, single: 46, pair: 84, unnamed: 256},
+		{depth: 16, single: 78, pair: 148, unnamed: 752},
+		{depth: 17, single: 82, pair: 156, unnamed: 832},
+		{depth: 32, single: 142, pair: 276, unnamed: 2512},
 	}
 	for _, tc := range tests {
+		defect := "required /" + strings.Repeat("items[at0001]/", tc.depth) + "items[at0002]/name"
 		for _, mode := range []struct {
-			name   string
-			single bool
-			want   int
-		}{{name: "one child a level", single: true, want: tc.single}, {name: "two children a level", want: tc.pair}} {
-			r, e := engineWalk(clusterChain(tc.depth), compileOPTText(t, clusterChainOPT(tc.depth, mode.single)), Limits{})
-			if !r.OK || len(r.Issues) != 0 {
-				t.Errorf("a chain %d levels deep, %s: OK %t, issues %q, want OK with none within the default limits", tc.depth, mode.name, r.OK, keys(r.Issues))
+			name            string
+			single, unnamed bool
+			want            int
+			issues          []string
+		}{
+			{name: "one child a level", single: true, want: tc.single},
+			{name: "two children a level", want: tc.pair},
+			{name: "two children a level and an ELEMENT without a name", unnamed: true, want: tc.unnamed, issues: []string{defect}},
+		} {
+			r, e := engineWalk(clusterChain(tc.depth, mode.unnamed), compileOPTText(t, clusterChainOPT(tc.depth, mode.single)), Limits{})
+			if got := keys(r.Issues); !slices.Equal(got, mode.issues) {
+				t.Errorf("a chain %d levels deep, %s: issues %q, want %q within the default limits", tc.depth, mode.name, got, mode.issues)
 			}
 			if e.visits != mode.want {
 				t.Errorf("a chain %d levels deep, %s: the walk visits %d values, want %d", tc.depth, mode.name, e.visits, mode.want)

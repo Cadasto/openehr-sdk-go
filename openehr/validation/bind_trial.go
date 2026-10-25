@@ -14,13 +14,13 @@ import (
 )
 
 // walkMark is how far the walk's records reach at one point: the issues, the
-// refusals, the coverage entries, the stops, reported or not, and the classes
-// visited. A trial returns the records to its mark when what it found is
-// withdrawn.
+// refusals, the coverage entries, the stops, reported or not, the values
+// refuted by a decided verdict and the classes visited. A trial returns the
+// records to its mark when what it found is withdrawn.
 type walkMark struct {
-	issues, refused, external, notInRM, stoppedAt, depthCuts int
-	depthStopped                                             bool
-	visited                                                  indexSet
+	issues, refused, external, notInRM, stoppedAt, depthCuts, refuted int
+	depthStopped                                                      bool
+	visited                                                           indexSet
 }
 
 // mark returns how far the walk's records reach now.
@@ -32,6 +32,7 @@ func (e *engine) mark() walkMark {
 		notInRM:      len(e.notInRM),
 		stoppedAt:    len(e.stoppedAt),
 		depthCuts:    e.depthCuts,
+		refuted:      e.refuted,
 		depthStopped: e.depthStopped,
 		visited:      slices.Clone(e.found.visited),
 	}
@@ -43,6 +44,7 @@ func (e *engine) rollback(m walkMark) {
 	e.truncate(m)
 	e.stoppedAt = e.stoppedAt[:m.stoppedAt]
 	e.depthCuts = m.depthCuts
+	e.refuted = m.refuted
 	e.depthStopped = m.depthStopped
 }
 
@@ -62,7 +64,7 @@ func (e *engine) truncate(m walkMark) {
 type walkSegment struct {
 	issues                              []Issue
 	refused, external, notInRM, stopped []string
-	depthCuts                           int
+	depthCuts, refuted                  int
 	depthStopped                        bool
 	visited                             indexSet
 }
@@ -77,6 +79,7 @@ func (e *engine) setAside(m walkMark) walkSegment {
 		notInRM:      slices.Clone(e.notInRM[m.notInRM:]),
 		stopped:      slices.Clone(e.stoppedAt[m.stoppedAt:]),
 		depthCuts:    e.depthCuts - m.depthCuts,
+		refuted:      e.refuted - m.refuted,
 		depthStopped: e.depthStopped,
 		visited:      slices.Clone(e.found.visited),
 	}
@@ -93,6 +96,7 @@ func (e *engine) restore(s walkSegment) {
 	e.notInRM = append(e.notInRM, s.notInRM...)
 	e.stoppedAt = append(e.stoppedAt, s.stopped...)
 	e.depthCuts += s.depthCuts
+	e.refuted += s.refuted
 	e.depthStopped = s.depthStopped
 	e.found.visited = append(e.found.visited[:0], s.visited...)
 }
@@ -119,12 +123,15 @@ func (e *engine) keepStops(m walkMark) {
 }
 
 // validatesSince reports whether the walk recorded no error finding since m,
-// nothing that makes [Result.OK] false, and the depth limit stopped it
-// nowhere since m. A stop of the depth limit is reported once per walk, so
-// one an earlier part of the walk reported leaves none to report since m;
-// the count of stops tells it all the same.
+// nothing that makes [Result.OK] false, the depth limit stopped it nowhere
+// since m, and no decided verdict refuted a value it did not walk again since
+// m. A stop of the depth limit is reported once per walk, so one an earlier
+// part of the walk reported leaves none to report since m; the count of
+// stops tells it all the same. A refuted value's walk would have recorded an
+// error finding or a stop ([engine.walk]).
 func (e *engine) validatesSince(m walkMark) bool {
-	return e.depthCuts == m.depthCuts && !slices.ContainsFunc(e.found.issues[m.issues:], func(iss Issue) bool { return iss.Severity == Error })
+	return e.depthCuts == m.depthCuts && e.refuted == m.refuted &&
+		!slices.ContainsFunc(e.found.issues[m.issues:], func(iss Issue) bool { return iss.Severity == Error })
 }
 
 // trialKey is a node of the walk, its path apart, at which the walk tries a

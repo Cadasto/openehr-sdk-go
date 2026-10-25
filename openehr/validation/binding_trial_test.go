@@ -752,6 +752,57 @@ func TestValidate_REQ171_DecidedVerdictBindsAlike(t *testing.T) {
 	}
 }
 
+// REQ-171 One walk — inside the trial of a list item, a value below it whose
+// verdict is that it does not validate is not walked again, and fails the
+// trial all the same. A CLUSTER item is tried under the first of two CLUSTER
+// children of one node id, whose items offer its ELEMENT two children, of
+// kg and of g, and then under the second, which constrains nothing below
+// it. Its ELEMENT, in pounds, validates under neither ELEMENT child, so the
+// trial under the first CLUSTER child fails, and the item binds to the
+// second and validates.
+func TestValidate_REQ171_RefutedVerdictFailsTheTrial(t *testing.T) {
+	elements := clusterItemsOPT(quantityIn("kg"), quantityIn("g"))
+	const items = "<rm_attribute_name>items</rm_attribute_name>"
+	start, end := strings.Index(elements, items)+len(items), strings.LastIndex(elements, "\n    </attributes>")
+	if start < len(items) || end < start {
+		t.Fatal("clusterItemsOPT no longer declares its items as this test reads them: update the test")
+	}
+	cluster := func(attrs string) string {
+		return `
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>CLUSTER</rm_type_name>
+        <occurrences>
+          <lower_included>true</lower_included><upper_included>true</upper_included>
+          <lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded>
+          <lower>0</lower><upper>1</upper>
+        </occurrences>
+        <node_id>at0003</node_id>` + attrs + `
+      </children>`
+	}
+	constrained := cluster(`
+        <attributes xsi:type="C_MULTIPLE_ATTRIBUTE">
+          <rm_attribute_name>items</rm_attribute_name>` + elements[start:end] + `
+        </attributes>`)
+	withChildren := func(children ...string) *templatecompile.Compiled {
+		return mustCompileInline(t, elements[:start]+strings.Join(children, "")+elements[end:])
+	}
+	root := func() any {
+		element := &rm.Element{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "element"}, Value: &rm.DVQuantity{Magnitude: 80, Units: "[lb_av]"}}
+		return &rm.Cluster{
+			ArchetypeNodeID:  "openEHR-EHR-CLUSTER.items.v1",
+			Name:             rm.DVText{Value: "cluster"},
+			ArchetypeDetails: archetypeDetails("openEHR-EHR-CLUSTER.items.v1"),
+			Items:            []rm.Item{&rm.Cluster{ArchetypeNodeID: "at0003", Name: rm.DVText{Value: "inner"}, Items: []rm.Item{element}}},
+		}
+	}
+	if r := validation.Validate(root(), withChildren(constrained)); r.OK {
+		t.Fatalf("Validate under the first CLUSTER child alone is OK, want its ELEMENT refused, so the trial shows nothing")
+	}
+	if r := validation.Validate(root(), withChildren(constrained, cluster(""))); !r.OK || len(r.Issues) != 0 {
+		t.Errorf("Validate under both CLUSTER children = OK %t, issues %q, want OK with none: the item binds to the second", r.OK, issueKeys(r.Issues))
+	}
+}
+
 // declaredBefore returns opt with decl inserted before the declaration of
 // the attribute name, or, with name empty, after the root's last attribute.
 func declaredBefore(t *testing.T, opt, decl, name string) string {

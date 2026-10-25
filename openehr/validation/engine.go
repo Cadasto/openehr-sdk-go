@@ -145,8 +145,11 @@ type engine struct {
 	// withdrawn counts the trials the walk is inside whose findings are
 	// all withdrawn, those of a list item ([engine.bindAmong]): inside one,
 	// only whether the trial validates is read, so a value whose verdict is
-	// decided is not walked again ([engine.walk]).
-	withdrawn int
+	// decided is not walked again ([engine.walk]). refuted counts the values
+	// not walked again because their verdict is that they do not validate,
+	// so that the trial they are in fails as their walk would have made it
+	// fail ([engine.validatesSince]).
+	withdrawn, refuted int
 }
 
 // newEngine returns the state of a walk within lim, each zero or negative
@@ -301,15 +304,19 @@ func visitedAt(a *engineAttr, present bool) bool {
 // other value is visited, however many places hold it, so a value two places
 // share is validated at each, against each place's template node. Inside a
 // trial withdrawn whole ([engine].withdrawn), only whether the trial
-// validates is read, so a node whose value a trial has found to validate
-// under its bound child ([engine.verdict]) is not visited again: it would
-// add nothing that is read.
+// validates is read, so a node whose value's verdict under its bound child a
+// trial has decided ([engine.verdict]) is not visited again: a value that
+// validates would add nothing that is read, and one that does not is counted
+// as refuted, which fails the trial as its walk would have.
 func (e *engine) walk(n engineNode) {
 	if e.stopped || n.value == nil || rmaccess.IsTypedNilPointer(n.value) {
 		return
 	}
 	if e.withdrawn > 0 && n.bound != nil {
-		if validates, decided := e.verdict(n); decided && validates {
+		if validates, decided := e.verdict(n); decided {
+			if !validates {
+				e.refuted++
+			}
 			return
 		}
 	}
