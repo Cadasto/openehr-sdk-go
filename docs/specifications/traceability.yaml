@@ -1138,6 +1138,7 @@ requirements:
       - openehr/client/ehr/composition/body_read_error_test.go
       - openehr/client/ehr/composition/composition_test.go
       - openehr/client/ehr/composition/decode_error_test.go
+      - openehr/client/ehr/composition/format_write_test.go
       - openehr/client/ehr/contribution/body_read_error_test.go
       - openehr/client/ehr/contribution/decode_error_test.go
       - openehr/client/ehr/contribution/representation_test.go
@@ -2144,6 +2145,7 @@ requirements:
       - openehr/client/demographic/null_body_test.go
       - openehr/client/demographic/versioned_test.go
       - openehr/client/ehr/composition/decode_error_test.go
+      - openehr/client/ehr/composition/format_get_test.go
       - openehr/client/ehr/composition/null_body_test.go
       - openehr/client/ehr/contribution/decode_error_test.go
       - openehr/client/ehr/decode_error_test.go
@@ -2495,3 +2497,17 @@ requirements:
       - transport/errors_test.go
       - transport/nilwiredereference_internal_test.go
       - transport/span_status_test.go
+
+  - id: REQ-173
+    title: Composition representation formats
+    canonical: docs/specifications/wire.md#req-173--composition-representation-formats
+    status: draft
+    implementation: landed
+    packages: [openehr/client/ehr/composition, testkit/probes/rest]
+    probes: [PROBE-108]
+    tests:
+      - openehr/client/ehr/composition/doc_guard_test.go
+      - openehr/client/ehr/composition/format_get_test.go
+      - openehr/client/ehr/composition/format_write_test.go
+      - testkit/probes/rest/probe_108_composition_formats.go
+      - testkit/probes/rest/probes_test.go

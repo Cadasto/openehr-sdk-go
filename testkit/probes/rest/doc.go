@@ -1,7 +1,8 @@
 // Package restprobes hosts openEHR REST-binding conformance probes for the
 // System capabilities operation, the Admin bulk-delete surface, the Definition
-// example endpoint, the openehr-audit-details header grammar, and the EHR
-// creation round-trip. Probes are plain functions returning (Result, error);
+// example endpoint, the openehr-audit-details header grammar, the EHR creation
+// round-trip, and the composition representation formats (canonical XML, FLAT
+// and STRUCTURED). Probes are plain functions returning (Result, error);
 // they are request-capture probes (they assert the shape of the request the SDK
 // puts on the wire and the response it decodes), driven in Sandbox mode against
 // a sandbox scripted route.

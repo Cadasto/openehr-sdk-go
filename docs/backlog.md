@@ -1,6 +1,6 @@
 ---
 kind: plan
-harvested_through: 2026-10-24T10:55:38Z
+harvested_through: 2026-10-25T18:38:13Z
 ---
 # Backlog
 
@@ -31,6 +31,10 @@ Decisions first in transport.md where a sentence changes, then code in transport
 - transport/errors.go:94 · OpenEHRErrorDetail decodes `coded_text`, but the ITS-REST overview example names the coded list `errors` (DV_CODED_TEXT entries), so a server that follows the example gets no coded detail; decide whether to read `errors` into CodedText · by: sdd-implementer · from: fix/composition-write-errors
 - transport/options.go:70 · WithTokenSource and WithReauthOn401 accept a typed-nil provider (a nil *smart.Source in an interface), which panics inside Do instead of being refused at New (client.go:80 checks only an untyped nil) · by: go-reviewer · from: fix/transport-smart-review
 
+## Error text: spec identifiers callers see (REQ-054, REQ-140)
+Code in openehr/client and openehr/serialize/simplified; decide first whether error text follows the godoc rule that keeps spec-process ids out of what SDK users read (AGENTS.md). Lane: maintenance. Size: S.
+- openehr/client/ehr/composition/composition.go:487 · five leaf refusals read `empty If-Match (REQ-054)` (also ehrstatus/ehrstatus.go:146, directory/directory.go:227 and :276, demographic/party.go:195), and the simplified codec's underscore-grammar refusals end in `(REQ-140)` (rmattr_value.go:796, rmattr_value_encode.go:127 and :463, rmattr_encode.go:45, among five files), so a caller's error names a requirement id · by: sdd-implementer · from: feat/composition-formats
+
 ## SMART auth and discovery: refresh, key sets, secrets, cache lifetime and the injected client (REQ-062, REQ-063, REQ-071)
 Decisions first in auth.md and service-discovery.md, then code in auth/ and smart/discovery/. Lane: full; maintenance for the injected client. Size: M.
 - auth/smart/source.go:1069 · the refresh POST runs under the leading caller's context, so a caller that gives up mid-flight can lose a refresh token the server already rotated (RFC 9700 §4.14.2) and the session is cleared on the next refresh · by: go-reviewer · from: fix/transport-smart-review
@@ -59,6 +63,7 @@ Code in openehr/composition and internal/templatecompile where Set and Build dis
 Code in openehr/serialize/simplified. Lane: maintenance. Size: S.
 - openehr/serialize/simplified/flat_decode.go:949 · putCtx's conflict error prints both payload values (%#v), so two disagreeing spellings of a composer name put patient-adjacent data in the error; name the two keys only · by: sdd-implementer · from: fix/flat-decode-backlog
 - openehr/serialize/simplified/flat_decode.go:2426 · the FLAT decoder rebuilds a DV_ORDINAL symbol as local::<code> whatever terminology the template's C_DV_ORDINAL pair names, so a FLAT composition for a template whose ordinals are coded outside local draws primitive_not_in_list on every ordinal; take the terminology from the compiled pair (no corpus OPT has a non-local ordinal) · by: go-coding:go-reviewer · from: fix/validation-backlog
+- openehr/serialize/simplified/flat_encode.go:178 · the FLAT encoder's ctx/setting refusals (:178-192) quote the setting's value, code string and terminology id, which composition.Save now returns for a FLAT write; canonical JSON's errors were made value-free in issue 278, so name the attribute, not its value · by: go-reviewer · from: feat/composition-formats
 
 ## Web Template projection: parity with the reference's FLAT (REQ-106, PROBE-086, PROBE-105)
 Code in openehr/template/webtemplate/build.go that restores the reference's node model REQ-106 already requires, where FLAT encode drops data or decode loses the reference's keys, and the term lookup its labels use. Lane: maintenance. Size: L.

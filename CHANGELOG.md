@@ -8,6 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-10-25
+
+Fortieth `v0.x` minor: the composition client writes and reads canonical XML, FLAT and STRUCTURED as well as canonical JSON. **Breaking:** `composition.Repository.Get` takes a trailing `...GetOption`, so a type that implements the interface must add it.
+
+### Added
+
+- **`composition.Save`, `Update` and `Get` handle canonical XML, FLAT and STRUCTURED through `WithFormat`, `WithGetFormat` and `WithRawBody` (REQ-173, PROBE-108).** Opt-in `WithFormatQuery` and `WithGetFormatQuery` send the `format` and `templateId` query form instead.
+
+### Changed
+
+- **Breaking: `composition.Get` and `Repository.Get` take trailing `...GetOption` (REQ-173).** Existing calls compile unchanged; a type implementing `composition.Repository` must add the parameter.
+
 ## [0.39.0] - 2026-10-24
 
 Thirty-ninth `v0.x` minor: the instance generator writes every attribute an OPT can constrain and can reproduce seeded uids, a list's existence asks only for its container, and `admin.ReadyBody` returns the readiness body. **Breaking:** `Generate` now refuses an OPT whose constraint, once an RM rule narrows it, admits no value.
