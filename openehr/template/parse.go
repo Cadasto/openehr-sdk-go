@@ -48,8 +48,18 @@ func ParseOPT(r io.Reader) (*OperationalTemplate, error) {
 // Returns ErrUnsupportedNode (wrapped) on the first such occurrence.
 // It also refuses an unparseable C_INTEGER or C_REAL bound, an
 // unparseable C_INTEGER or C_REAL list item, a C_PRIMITIVE_OBJECT
-// with no <item> child, and a CONSTRAINT_REF with no <reference> or
-// a blank one, returning an error that wraps ErrInvalidOPT.
+// with no <item> child, a CONSTRAINT_REF with no <reference> or
+// a blank one, and an <attributes> or <children> inside <definition>
+// that has no xsi:type in the XML Schema instance namespace
+// (http://www.w3.org/2001/XMLSchema-instance), returning an error that
+// wraps ErrInvalidOPT. That last case covers a missing or empty type
+// and an xsi prefix bound to another namespace: openEHR ITS-XML makes
+// C_ATTRIBUTE and C_OBJECT abstract, so each such element must name a
+// concrete type. <definition> itself needs none. ParseOPT reads such
+// an <attributes> as C_SINGLE_ATTRIBUTE and such a <children> as
+// C_ARCHETYPE_ROOT when it carries an archetype id, as
+// C_COMPLEX_OBJECT otherwise, so any constraint its type would have
+// carried is lost.
 //
 // T_ARCHETYPE_ROOT and CONSTRAINT_REF are not unknown values, so
 // strict mode never refuses them as unsupported. It reads
@@ -494,6 +504,14 @@ func buildComplexObject(o *xmlCObject, strict bool, depth int) (*ComplexObject, 
 		occurrences: occ,
 	}
 	for _, a := range o.Attributes {
+		// REQ-100: C_ATTRIBUTE is abstract in ITS-XML, so an <attributes>
+		// must name its concrete type in the XSI namespace. Strict mode
+		// refuses one that does not; the default mode reads it as a
+		// C_SINGLE_ATTRIBUTE (buildAttribute).
+		if strict && a.Type == "" {
+			return nil, fmt.Errorf("%w: <attributes> %q of %s %q has no xsi:type in the XSI namespace (strict mode)",
+				ErrInvalidOPT, a.Name, o.RMTypeName, o.NodeID)
+		}
 		attr, err := buildAttribute(a, strict, depth)
 		if err != nil {
 			return nil, err
@@ -594,7 +612,15 @@ func buildAttribute(a *xmlCAttribute, strict bool, depth int) (*Attribute, error
 	default:
 		return nil, fmt.Errorf("%w: attribute xsi:type=%q", ErrUnsupportedNode, a.Type)
 	}
-	for _, c := range a.Children {
+	for i, c := range a.Children {
+		// REQ-100: C_OBJECT is abstract in ITS-XML, so a <children> must
+		// name its concrete type in the XSI namespace. Strict mode refuses
+		// one that does not; the default mode reads it as a
+		// C_ARCHETYPE_ROOT or a C_COMPLEX_OBJECT (buildNode).
+		if strict && c != nil && c.Type == "" {
+			return nil, fmt.Errorf("%w: <children> %d of attribute %q (%s %q) has no xsi:type in the XSI namespace (strict mode)",
+				ErrInvalidOPT, i+1, a.Name, c.RMTypeName, c.NodeID)
+		}
 		node, err := buildNode(c, strict, depth+1)
 		if err != nil {
 			return nil, err
