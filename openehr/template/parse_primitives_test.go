@@ -9,6 +9,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
+	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 )
 
 // REQ-103 — buildPrimitive maps each closed-set xsi:type onto the
@@ -639,6 +640,136 @@ func TestParse_CDvQuantity(t *testing.T) {
 	}
 	if v := c.Validate(constraints.QuantityValue{Magnitude: 500, Units: "mm[Hg]"}); len(v) != 1 || v[0].Code != constraints.CodeOutOfRange {
 		t.Errorf("Validate(500) = %v, want CodeOutOfRange", v)
+	}
+}
+
+// quantityChildXML is a C_DV_QUANTITY child whose property is
+// terminology::code, with list as its <list> elements (none when empty).
+func quantityChildXML(terminology, code, list string) string {
+	return `<children xsi:type="C_DV_QUANTITY">
+		<rm_type_name>DV_QUANTITY</rm_type_name>
+		<node_id />
+		<property>
+			<terminology_id><value>` + terminology + `</value></terminology_id>
+			<code_string>` + code + `</code_string>
+		</property>` + list + `
+	</children>`
+}
+
+// parsedQuantity parses an OPT holding child and returns its DvQuantity.
+func parsedQuantity(t *testing.T, child string) constraints.DvQuantity {
+	t.Helper()
+	p := firstChildPrimitive(t, parseOPTWithChild(t, child))
+	c, ok := p.(constraints.DvQuantity)
+	if !ok {
+		t.Fatalf("want DvQuantity, got %T", p)
+	}
+	return c
+}
+
+// propertyUnitsOf is what the parser fills PropertyUnits with for an openehr
+// property code: the units the pinned table lists for it, primary units first
+// and each part in source order.
+func propertyUnitsOf(t *testing.T, code string) []string {
+	t.Helper()
+	p, ok := terminology.QuantityPropertyByCode(code)
+	if !ok {
+		t.Fatalf("the pinned property-unit table does not list openehr::%s", code)
+	}
+	var primary, other []string
+	for u := range p.All() {
+		if u.Primary {
+			primary = append(primary, u.UCUM)
+		} else {
+			other = append(other, u.UCUM)
+		}
+	}
+	return slices.Concat(primary, other)
+}
+
+// REQ-103 — a C_DV_QUANTITY whose property is openehr::125 (pressure) and
+// which lists no units parses to a constraint whose PropertyUnits are the
+// pressure units of the pinned property-unit table, primary first. Its
+// example validates, in the primary unit, and a mass unit is refused.
+func TestParse_REQ103_CDvQuantityPropertyWithoutList(t *testing.T) {
+	c := parsedQuantity(t, quantityChildXML("openehr", "125", ""))
+	if len(c.Units) != 0 {
+		t.Fatalf("Units = %+v, want none", c.Units)
+	}
+	if want := propertyUnitsOf(t, "125"); !slices.Equal(c.PropertyUnits, want) {
+		t.Errorf("PropertyUnits = %q, want %q", c.PropertyUnits, want)
+	}
+	ex, ok := c.ExampleValue().(constraints.QuantityValue)
+	if !ok {
+		t.Fatalf("ExampleValue() = %T, want QuantityValue", c.ExampleValue())
+	}
+	// N/m2 is the primary pressure unit of TERM Release-3.0.0.
+	if ex.Units != "N/m2" {
+		t.Errorf("ExampleValue().Units = %q, want the primary pressure unit N/m2", ex.Units)
+	}
+	if v := c.Validate(ex); len(v) != 0 {
+		t.Errorf("Validate(ExampleValue()) = %v, want nil", v)
+	}
+	if v := c.Validate(constraints.QuantityValue{Magnitude: 120, Units: "mm[Hg]", Precision: -1}); len(v) != 0 {
+		t.Errorf("Validate(120 mm[Hg]) = %v, want nil", v)
+	}
+	if v := c.Validate(constraints.QuantityValue{Magnitude: 1, Units: "mg", Precision: -1}); len(v) != 1 || v[0].Code != constraints.CodeUnitUnknown {
+		t.Errorf("Validate(1 mg) = %v, want one CodeUnitUnknown", v)
+	}
+}
+
+// REQ-103 — the parser puts the property's primary units first and keeps
+// the rest in source order: the pinned table lists Length's primary unit m
+// seventh.
+func TestParse_REQ103_CDvQuantityPropertyUnitsPrimaryFirst(t *testing.T) {
+	c := parsedQuantity(t, quantityChildXML("openehr", "122", ""))
+	if len(c.PropertyUnits) < 3 || c.PropertyUnits[0] != "m" || c.PropertyUnits[1] != "[in_i]/1000" || c.PropertyUnits[2] != "cm" {
+		t.Errorf("PropertyUnits = %q, want m, then [in_i]/1000, cm, … in source order", c.PropertyUnits)
+	}
+	if want := propertyUnitsOf(t, "122"); !slices.Equal(c.PropertyUnits, want) {
+		t.Errorf("PropertyUnits = %q, want %q", c.PropertyUnits, want)
+	}
+}
+
+// REQ-103 — a Units list keeps precedence over the property: km, a length
+// unit, is refused against the list [cm, m] (the CNF case
+// CONT-DV_QUANTITY-validate_property_units), and a listed unit outside the
+// property is accepted. PropertyUnits is still filled, for inspection.
+func TestParse_REQ103_CDvQuantityListKeepsPrecedence(t *testing.T) {
+	c := parsedQuantity(t, quantityChildXML("openehr", "122", `
+		<list><units>cm</units></list>
+		<list><units>m</units></list>
+		<list><units>mg</units></list>`))
+	if want := propertyUnitsOf(t, "122"); !slices.Equal(c.PropertyUnits, want) {
+		t.Errorf("PropertyUnits = %q, want %q", c.PropertyUnits, want)
+	}
+	if v := c.Validate(constraints.QuantityValue{Magnitude: 0, Units: "km", Precision: -1}); len(v) != 1 || v[0].Code != constraints.CodeUnitUnknown {
+		t.Errorf("Validate(0 km) = %v, want one CodeUnitUnknown", v)
+	}
+	for _, units := range []string{"cm", "mg"} {
+		if v := c.Validate(constraints.QuantityValue{Magnitude: 0, Units: units, Precision: -1}); len(v) != 0 {
+			t.Errorf("Validate(0 %s) = %v, want nil", units, v)
+		}
+	}
+}
+
+// REQ-103 — only an openehr property code the table lists has units: a
+// property in another terminology, or an openehr code the table does not
+// list, leaves PropertyUnits empty, and Validate accepts any units.
+func TestParse_REQ103_CDvQuantityPropertyOutsideTheTable(t *testing.T) {
+	for _, tc := range []struct{ terminology, code string }{
+		{"local", "125"},
+		{"SNOMED-CT", "122"},
+		{"openehr", "433"},
+		{"openehr", ""},
+	} {
+		c := parsedQuantity(t, quantityChildXML(tc.terminology, tc.code, ""))
+		if len(c.PropertyUnits) != 0 {
+			t.Errorf("%s::%s: PropertyUnits = %q, want none", tc.terminology, tc.code, c.PropertyUnits)
+		}
+		if v := c.Validate(constraints.QuantityValue{Magnitude: 1, Units: "mg", Precision: -1}); len(v) != 0 {
+			t.Errorf("%s::%s: Validate(1 mg) = %v, want nil", tc.terminology, tc.code, v)
+		}
 	}
 }
 

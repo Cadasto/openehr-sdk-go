@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
+	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 )
 
 // xmlNumericInterval is the AOM 1.4 numeric range shape used by
@@ -289,6 +290,29 @@ func buildCodePhrase(o *xmlCObject) constraints.CodePhrase {
 	return c
 }
 
+// propertyUnits returns the UCUM units the pinned property-unit table lists
+// for the openehr property code, its primary units first and each part in
+// source order (REQ-103), or nil when the table lists the code with no units
+// or not at all. The slice is the caller's own.
+func propertyUnits(code string) []string {
+	p, ok := terminology.QuantityPropertyByCode(code)
+	if !ok || p.Len() == 0 {
+		return nil
+	}
+	out := make([]string, 0, p.Len())
+	for u := range p.All() {
+		if u.Primary {
+			out = append(out, u.UCUM)
+		}
+	}
+	for u := range p.All() {
+		if !u.Primary {
+			out = append(out, u.UCUM)
+		}
+	}
+	return out
+}
+
 func buildDvQuantity(o *xmlCObject) (constraints.DvQuantity, error) {
 	c := constraints.DvQuantity{}
 	if o.Property != nil {
@@ -299,6 +323,9 @@ func buildDvQuantity(o *xmlCObject) (constraints.DvQuantity, error) {
 		ref.CodeString = strings.TrimSpace(o.Property.CodeString)
 		if ref.Terminology != "" || ref.CodeString != "" {
 			c.Property = &ref
+		}
+		if ref.Terminology == terminology.ID {
+			c.PropertyUnits = propertyUnits(ref.CodeString)
 		}
 	}
 	for _, item := range o.PrimitiveList {
