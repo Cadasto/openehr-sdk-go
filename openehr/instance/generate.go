@@ -534,10 +534,11 @@ func attrTypedByRMClass(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttri
 // materialiseSingle synthesises and attaches one child under a
 // C_SINGLE_ATTRIBUTE. The built value takes the RM type the first
 // allowed alternative names, or that alternative's concrete
-// substitute, and is built under the constraints of the alternative
-// the validator binds a value of that type to ([bindingAlternative]),
-// so validation checks what the generator built against the child
-// whose constraints built it (REQ-107, What a visit writes).
+// substitute, and is built under the constraints of the first child of
+// the first binding tier that admits that type ([bindingAlternative]),
+// which the validator tries first. The value validates there, so
+// validation checks what the generator built against the child whose
+// constraints built it (REQ-107, What a visit writes).
 //
 // Implicit BMM-mandatory attributes (no OPT children) get a default
 // RM value materialised from the attribute's BMM type so the
@@ -2327,12 +2328,13 @@ func optionalArchetypeRoot(child *tcimpl.CompiledNode) bool {
 // identityTaken reports whether children[i] is optional and a sibling
 // carries its identity: a required sibling before or after it, or an
 // optional sibling before it. Under Large and Medium such a child gets no
-// member of its own, so the validator's binding of members to children
-// stays unambiguous, though the top-up to the attribute's lower bound can
-// still build one, from the child it takes (materialiseMultiple); a
-// required child is always built. A slot does not count as a sibling. A
-// sibling carries an identity as the validator binds a member by it
-// (carriesIdentity), so an archetype root also carries its node id: an
+// member of its own, a choice of the generator's own (the validator binds
+// such members by occurrences room and by trial), though the top-up to the
+// attribute's lower bound can still build one, from the child it takes
+// (materialiseMultiple); a required child is always built. A slot does not
+// count as a sibling. A sibling carries an identity as the validator binds
+// a member by it (carriesIdentity), so an archetype root also carries its
+// node id: an
 // optional child that is not a root gets no member after a root with its
 // node id, while optional archetype roots of different archetypes are not
 // skipped here, since a root's identity is its archetype id

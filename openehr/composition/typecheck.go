@@ -16,10 +16,11 @@ import (
 // when the path writes no RM attribute or one that cannot hold v
 // ([attributeHolds]).
 //
-// It binds by the rule the validator binds a value with ([rmbind.Bind]),
-// so v binds the node the validator would bind it to. The rule tries
-// three tiers in order and returns the first node, in OPT order, of the
-// first tier that admits v:
+// It binds by the tier rule ([rmbind.Bind]), which tries three tiers in
+// order and returns the first node, in OPT order, of the first tier that
+// admits v. The validator tries that node first; where the tier holds more
+// nodes, it binds v to the first of them under whose constraints v
+// validates, so it can bind v to a later node than this one. The tiers:
 //
 //  1. a node that names v's own RM type, a typed DV_INTERVAL<T> included;
 //  2. a node that names the AOM 1.4 primitive short name whose canonical

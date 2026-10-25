@@ -136,12 +136,12 @@ var ErrUnknownPath = errors.New("composition: path not in template")
 
 // ErrTypeMismatch signals that the value supplied to Builder.Set is
 // not one the template allows at the path: it binds none of the nodes
-// the template allows there, by the rule the validator binds a value
-// with. A value binds a node whose RM type it has or descends from, a
-// node typed with an AOM 1.4 primitive short name it carries (a
-// DV_DURATION at DURATION), an untyped node, and a typed interval node
-// DV_INTERVAL<T> when each of its bounds is a T; Builder.Set lists the
-// cases. Every alternative the template lists at the path counts, except
+// the template allows there by its type, under the binding tiers the
+// validator also starts from. A value binds a node whose RM type it has
+// or descends from, a node typed with an AOM 1.4 primitive short name it
+// carries (a DV_DURATION at DURATION), an untyped node, and a typed
+// interval node DV_INTERVAL<T> when each of its bounds is a T; Builder.Set
+// lists the cases. Every alternative the template lists at the path counts, except
 // one whose occurrences are 0..0. A value that binds a node there but
 // that the RM attribute at the path cannot hold is refused too: a
 // DV_DURATION at the DURATION node under a DV_DURATION's value, which
