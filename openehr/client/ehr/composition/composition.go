@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"time"
 
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -364,6 +365,11 @@ type Repository interface {
 	Save(ctx context.Context, ehrID openehrclient.EHRID, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error)
 	Update(ctx context.Context, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, ifMatch string, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error)
 	Delete(ctx context.Context, ehrID openehrclient.EHRID, versionUID openehrclient.VersionUID, opts ...DeleteOption) (*openehrclient.VersionMetadata, error)
+	GetVersionedObject(ctx context.Context, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID) (*rm.VersionedComposition, *openehrclient.VersionMetadata, error)
+	GetRevisionHistory(ctx context.Context, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID) (*rm.RevisionHistory, *openehrclient.VersionMetadata, error)
+	GetVersion(ctx context.Context, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID) (*Version, *openehrclient.VersionMetadata, error)
+	GetVersionAtTime(ctx context.Context, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, t time.Time) (*Version, *openehrclient.VersionMetadata, error)
+	GetVersionByID(ctx context.Context, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, versionUID openehrclient.VersionUID) (*Version, *openehrclient.VersionMetadata, error)
 }
 
 // NewRepository binds c to a Repository.
