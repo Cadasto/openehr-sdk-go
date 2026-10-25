@@ -16,9 +16,17 @@ import (
 // range carries no normal_range and no other_reference_ranges, so
 // REFERENCE_RANGE Range_is_simple holds, which neither validator evaluates.
 // The OPT names those two attributes on the bounds, as optional and as
-// required, and the generator writes neither. A bound whose OPT requires the
-// normal_range therefore fails the template validator, which reports that
-// attribute absent and nothing else.
+// required, the other_reference_ranges by their cardinality alone, and the
+// generator writes neither. A bound whose OPT requires the normal_range
+// therefore fails the template validator, which reports that attribute
+// absent and nothing else: a list that only its cardinality asks a member
+// of is not required by the template while it is absent (REQ-102).
+
+// boundReferenceRanges is a bound's other_reference_ranges over children,
+// with a cardinality of 1..* and no existence.
+func boundReferenceRanges(children ...string) string {
+	return optCardinal("other_reference_ranges", 1, -1, children...)
+}
 
 // refRangeNode is a REFERENCE_RANGE whose meaning a C_STRING pins to
 // "critical" and whose range is rng.
@@ -81,15 +89,15 @@ var simpleBoundShapes = []simpleBoundShape{
 		return []string{guardMultiple("other_reference_ranges", guardExistence01, refRangeNode(ordInterval(c.class, c.value("3"), "")))}
 	}},
 	{name: "required other_reference_ranges", attrs: func(c simpleBoundClass) []string {
-		return []string{ordReferenceRange(ordInterval(c.class, c.value("3"), ""))}
+		return []string{boundReferenceRanges(refRangeNode(ordInterval(c.class, c.value("3"), "")))}
 	}},
 	{name: "required other_reference_ranges with no child", attrs: func(simpleBoundClass) []string {
-		return []string{optMultiple("other_reference_ranges")}
+		return []string{boundReferenceRanges()}
 	}},
 	{name: "both required", requiresNormalRange: true, attrs: func(c simpleBoundClass) []string {
 		return []string{
 			optSingle("normal_range", ordInterval(c.class, c.value("1"), c.value("9"))),
-			ordReferenceRange(ordInterval(c.class, c.value("3"), "")),
+			boundReferenceRanges(refRangeNode(ordInterval(c.class, c.value("3"), ""))),
 		}
 	}},
 }

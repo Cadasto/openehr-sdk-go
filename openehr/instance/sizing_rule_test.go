@@ -213,8 +213,8 @@ func TestREQ107_ProhibitedAlternativeIsSkipped(t *testing.T) {
 }
 
 // TestREQ107_SilentRequiredMultipleIsToppedUp is the REQ-107 check that a
-// multi-valued attribute the OPT names without children, whose cardinality
-// lower bound is above 1, is topped up to that bound with members built
+// required multi-valued attribute the OPT names without children, whose
+// cardinality lower bound is above 1, is topped up to that bound with members built
 // from its BMM type, and to no more than its cardinality upper bound,
 // except the member the BMM requires (REQ-107 Precedence 2).
 func TestREQ107_SilentRequiredMultipleIsToppedUp(t *testing.T) {
@@ -224,7 +224,10 @@ func TestREQ107_SilentRequiredMultipleIsToppedUp(t *testing.T) {
 		want int
 	}{
 		{name: "CLUSTER items, lower 2", opt: optTemplate("CLUSTER", optCardinal("items", 2, -1)), want: 2},
-		{name: "ITEM_TREE items, lower 3", opt: optTemplate("ITEM_TREE", optCardinal("items", 3, -1)), want: 3},
+		// The RM leaves an ITEM_TREE's items optional, so the existence
+		// requires them: a cardinality lower bound alone does not make
+		// Required visit a list (REQ-107 Visit rule).
+		{name: "ITEM_TREE items, existence 1, lower 3", opt: optTemplate("ITEM_TREE", optRequiredCardinal("items", 3, -1)), want: 3},
 		// Existence 1..1 alone asks for no member, and cardinality 0..0
 		// allows none, so the list stays empty.
 		{name: "ITEM_TREE items, existence 1, upper 0", opt: optTemplate("ITEM_TREE", optRequiredCardinal("items", 0, 0)), want: 0},

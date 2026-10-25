@@ -162,7 +162,7 @@ func TestREQ107_OptionalNodeHoldingOnlyUndescribedContentGetsNoMember(t *testing
 			// needs no undescribed content: the optional protocol is kept.
 			name: "optional single attribute whose child requires items the template prohibits",
 			opt: optTemplate("OBSERVATION", describedHistory, optOptionalSingleOver("protocol",
-				optNode("ITEM_TREE", "at0002", optMultiple("items",
+				optNode("ITEM_TREE", "at0002", optCardinal("items", 1, -1,
 					optOccurring("C_COMPLEX_OBJECT", "ELEMENT", "at0003", 0, 0))))),
 			large: "protocol=true", medium: "protocol=true", required: "protocol=false",
 		},

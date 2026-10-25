@@ -436,12 +436,16 @@ func attrProhibited(attr *tcimpl.CompiledAttribute) bool {
 // shouldVisit decides whether an attribute is in scope under the
 // current policy. Under Large: every attribute, but for the rule on
 // undescribed content below. Under Required: every attribute that is
-// required, because the BMM marks it mandatory or its existence or
-// cardinality lower bound is bounded and at least 1, and no other. Under
-// Medium: every attribute that is required in that sense, OR that has
-// OPT-pinned children the OPT does not prohibit. The "has
-// OPT children" arm captures the case where the OPT explicitly
-// constrains a structurally optional attribute (e.g. COMPOSITION.content
+// required (isRequired), because the BMM marks it mandatory, its existence
+// lower bound is bounded and at least 1, or it is a list with an allowed
+// child, not a slot, whose occurrences lower bound is bounded and at least
+// 1, and no other: a cardinality lower bound alone does not make Required
+// visit a list, since it counts the members of a list that exists and does
+// not ask for the list. Under Medium: every attribute that is required in
+// the wider sense of visitRequired, which a cardinality lower bound of 1
+// or more also meets, OR that has OPT-pinned children the OPT does not
+// prohibit. The "has OPT children" arm captures the case where the OPT
+// explicitly constrains a structurally optional attribute (e.g. COMPOSITION.content
 // with archetype-root pins): under Medium the act of pinning is itself
 // a signal that the resulting tree should carry those children. Required
 // does not take that arm, so it builds only what the template makes
@@ -459,22 +463,26 @@ func attrProhibited(attr *tcimpl.CompiledAttribute) bool {
 // without them. No other Policy value gets here: Generate refuses one
 // before the walk starts.
 func (g *generator) shouldVisit(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttribute) bool {
+	isContext := compositionContext(optNode, attr)
+	if g.opts.Policy == Required && !isContext {
+		return isRequired(attr)
+	}
 	if visitRequired(attr) {
 		return true
 	}
-	if !compositionContext(optNode, attr) {
-		if g.opts.Policy == Required || g.membersUndescribed(optNode, attr) {
-			return false
-		}
+	if !isContext && g.membersUndescribed(optNode, attr) {
+		return false
 	}
 	return g.opts.Policy == Large || len(tcimpl.AllowedChildNodes(attr)) > 0
 }
 
 // visitRequired reports whether attr is required as the visit rule reads
-// it, so every policy visits it: the BMM marks it mandatory, or its
-// existence or cardinality lower bound is bounded and at least 1.
-// Cardinality lower and existence are separate, so a 1..* list is required
-// when existence does not say so.
+// it, so Large and Medium visit it: it is required (isRequired), or its
+// cardinality lower bound is bounded and at least 1. Cardinality lower and
+// existence are separate, so a 1..* list is required when existence does
+// not say so. Required leaves out a list only that cardinality requires
+// (shouldVisit); the rule on undescribed content reads this wider sense
+// under every policy.
 func visitRequired(attr *tcimpl.CompiledAttribute) bool {
 	return isRequired(attr) || tcimpl.LowerAtLeastOne(attr.ChildMultiplicity())
 }
@@ -2261,12 +2269,28 @@ func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 	return nil
 }
 
-// isRequired reports whether the BMM marks attr mandatory or its existence
-// lower bound is bounded and at least 1. On a multi-valued attribute that
-// existence asks for the container alone: existenceOnly tells where it is
-// the only thing that asks for a member.
+// isRequired reports whether the BMM marks attr mandatory, its existence
+// lower bound is bounded and at least 1, or it holds a mandatory child
+// (holdsRequiredChild). On a multi-valued attribute that existence asks
+// for the container alone: existenceOnly tells where it is the only thing
+// that asks for a member. Its cardinality is not read: visitRequired adds
+// it.
 func isRequired(attr *tcimpl.CompiledAttribute) bool {
-	return attr.Required() || tcimpl.LowerAtLeastOne(attr.Existence())
+	return attr.Required() || tcimpl.LowerAtLeastOne(attr.Existence()) || holdsRequiredChild(attr)
+}
+
+// holdsRequiredChild reports whether the OPT declares attr multi-valued and
+// an allowed child of it that is not a slot has a bounded occurrences lower
+// bound of 1 or more ([tcimpl.HasMandatoryChild]). ADL 1.4 makes such a
+// child mandatory in its container, and the container is then required
+// too: the reading the REQ-107 Visit rule chooses, which the template
+// validator applies to an absent list (REQ-102). A child that states no
+// occurrences does not count, although materialiseMultiple builds one
+// member of it once the list is visited: the validator asks it for none.
+// The child of a single-valued attribute never counts, since the
+// attribute's existence decides how often that child occurs.
+func holdsRequiredChild(attr *tcimpl.CompiledAttribute) bool {
+	return attr.Cardinality() == template.Multiple && tcimpl.HasMandatoryChild(attr)
 }
 
 // newHierObjectID generates a HierObjectID with a random RFC 9562

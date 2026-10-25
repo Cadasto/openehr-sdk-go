@@ -72,20 +72,20 @@ var corpusCompileFailures = []string{
 // the hollow-body floor under that policy. Required builds only what the
 // template makes mandatory and gives an optional child no member of its
 // own (REQ-107 Visit rule, What a visit writes), so a template that
-// requires no ELEMENT gets a body with none by design: the other 55
+// requires no ELEMENT gets a body with none by design: the other 58
 // compiling COMPOSITION templates, whose ELEMENTs all sit below an
 // optional attribute or child (an optional content, or a required entry
 // whose items are optional), and Address.v2, which is ADDRESS-rooted, has
-// no content attribute, and leaves its details optional. A listed
-// template that becomes hollow under Required fails the ratchet, and so
-// does an unlisted one that stops being hollow, as a listed row that now
-// passes does.
+// no content attribute, and leaves its details optional. An optional
+// content that only its cardinality asks a member of, at existence 0..1
+// and cardinality 1..* over optional archetype roots, is one Required
+// leaves out, as body_weight, clinical_notes.v0 and GECCO_Diagnose have
+// it. A listed template that becomes hollow under Required fails the
+// ratchet, and so does an unlisted one that stops being hollow, as a
+// listed row that now passes does.
 var requiredBodies = []string{
 	"templates/TestPerson.v2",
-	"templates/body_weight",
-	"templates/clinical_notes.v0",
 	"templates/test_template_rename_node_2",
-	"webtemplate/GECCO_Diagnose",
 }
 
 // mediumHollowBodies names the compiling vendored templates of which a root

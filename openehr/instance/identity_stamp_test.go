@@ -105,7 +105,7 @@ func identityTrees(t *testing.T) []identityTree {
 	for _, name := range []string{
 		"templates/vital_signs", "templates/nested.en.v1", "templates/TestPerson.v2", "templates/cluster-slot.ehrbase.org.v0",
 	} {
-		bare := name == "templates/vital_signs" || name == "templates/nested.en.v1"
+		bare := name == "templates/vital_signs" || name == "templates/nested.en.v1" || name == "templates/cluster-slot.ehrbase.org.v0"
 		trees = append(trees, identityTree{name: name, c: compileCorpusOPT(t, name), nested: true, requiredBare: bare})
 	}
 	return trees
