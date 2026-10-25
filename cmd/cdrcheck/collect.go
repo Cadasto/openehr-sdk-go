@@ -56,9 +56,10 @@ type optInfo struct {
 // The bytes must have no byte-order mark.
 //
 // The signature is a SHA-256 over the parsed document: each element's local
-// name, its attributes (local name, and the value after its last colon, so
-// that an xsi:type prefix does not count) sorted, and its trimmed text, in
-// document order. Namespace declarations are left out. A CDR that stores a
+// name, its attributes (local name and value, the value of a namespaced
+// type attribute after its last colon, so that an xsi:type prefix does not
+// count, while a term code keeps its terminology) sorted, and its trimmed
+// text, in document order. Namespace declarations are left out. A CDR that stores a
 // template and serves it back re-serialised, with other prefixes, other
 // indentation or another attribute order, yields the same signature; a
 // different template does not.
@@ -94,8 +95,10 @@ func scanOPT(b []byte) (optInfo, error) {
 					continue
 				}
 				v := a.Value
-				if i := strings.LastIndex(v, ":"); i >= 0 {
-					v = v[i+1:]
+				if a.Name.Local == "type" && a.Name.Space != "" {
+					if i := strings.LastIndex(v, ":"); i >= 0 {
+						v = v[i+1:]
+					}
 				}
 				attrs = append(attrs, a.Name.Local+"="+v)
 			}
