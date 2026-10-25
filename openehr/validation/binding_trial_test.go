@@ -952,6 +952,42 @@ func TestGenerate_REQ107_REQ102_OptionalSiblingBeforeARequiredOneKeepsItsGap(t *
 	}
 }
 
+// REQ-107 Exceptions and known gaps — an earlier sibling with room, here a
+// required one with no occurrences upper bound, that carries a later
+// required one's identity takes every member built for either, so the later
+// one appears 0 times under every policy.
+func TestGenerate_REQ107_REQ102_EarlierSiblingWithRoomBeforeARequiredOneKeepsItsGap(t *testing.T) {
+	open := strings.Replace(reusedObservationChild("", 1),
+		"<upper_unbounded>false</upper_unbounded>", "<upper_unbounded>true</upper_unbounded>", 1)
+	open = strings.Replace(open, "<upper>1</upper>", "", 1)
+	c := mustCompileSyntheticOPT(t, reusedArchetypeOPTWith(open, reusedObservationChild("", 1)))
+	for _, policy := range []instance.Policy{instance.Large, instance.Medium, instance.Required} {
+		t.Run(fmt.Sprint(policy), func(t *testing.T) {
+			out, err := instance.Generate(t.Context(), c, instance.Options{
+				Policy:    policy,
+				Territory: "NL",
+				Composer:  &rm.PartyIdentified{Name: new("Dr Jones")},
+				Now:       time.Date(2026, 10, 25, 9, 0, 0, 0, time.UTC),
+			})
+			if err != nil {
+				t.Fatalf("Generate: %v", err)
+			}
+			comp, ok := out.(*rm.Composition)
+			if !ok {
+				t.Fatalf("Generate root = %T, want *rm.Composition", out)
+			}
+			if len(comp.Content) != 2 {
+				t.Fatalf("Generate built %d content items, want one for each required sibling", len(comp.Content))
+			}
+			r := validation.ValidateComposition(comp, c)
+			want := []string{"cardinality /content[" + reusedID + "]"}
+			if got := issueKeys(r.Issues); !slices.Equal(got, want) || !strings.Contains(r.Issues[0].Detail, "appears 0 times") {
+				t.Errorf("ValidateComposition(generated) issues = %q (%v), want %q: the later required sibling appears 0 times", got, r.Issues, want)
+			}
+		})
+	}
+}
+
 // REQ-102 Structural — alternatives — two slots of one RM type under a
 // single-valued attribute share the first tier, and a slot is a child the
 // value validates under only where its assertions admit the value's
