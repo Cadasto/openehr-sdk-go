@@ -8,6 +8,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
@@ -152,5 +153,158 @@ func TestGenerate_REQ107_REQ103_TemporalLeavesValidate(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// orderCase is one temporal type for TestREQ103TemporalRangeAgreesWithREQ112Order.
+type orderCase struct {
+	name string
+	// admits reports whether the type's constraint with the range r
+	// admits s.
+	admits func(r constraints.TemporalRange, s string) bool
+	// above reports whether the floor puts a above b: whether the
+	// DV_INTERVAL from a to b breaks Limits_consistent.
+	above func(a, b string) bool
+	// clockAbove reports whether a is above b by the clock-local magnitude
+	// of the RM's Compare (REQ-123), with no zone applied.
+	clockAbove func(a, b string) bool
+	// zoned reports whether s carries a time zone; nil for a type with
+	// no zones.
+	zoned   func(s string) bool
+	samples []string
+}
+
+// limitsBroken reports whether the closed interval from lower to upper
+// breaks Limits_consistent under the RM floor (REQ-112).
+func limitsBroken[T rm.DVOrdered](lower, upper T) bool {
+	return len(limitsIssues(validation.ValidateRM(rm.NewClosedDVInterval(lower, upper)))) > 0
+}
+
+// TestREQ103TemporalRangeAgreesWithREQ112Order holds a REQ-103 TemporalRange
+// to the order REQ-112 gives the two bounds of a DV_INTERVAL, which the floor
+// reports through Limits_consistent. For each pair of samples a and b, a
+// range from b, included, admits a exactly when the floor does not put b
+// above a; a range from b, excluded, exactly when it puts a above b; a range
+// up to b, included, exactly when it does not put a above b; and a range up
+// to b, excluded, exactly when it puts b above a. A zoned value and one
+// without a zone are not ordered: the floor puts neither above the other,
+// and each range admits a. The samples mix full and partial
+// values, both layouts, zones on neither, one or both sides, a leap second,
+// and the to_seconds averages of a year and a month. For times and
+// date-times some zoned pairs order one way by their clocks and the other as
+// instants, so a clock-local range check fails the test.
+func TestREQ103TemporalRangeAgreesWithREQ112Order(t *testing.T) {
+	t.Parallel()
+	tests := []orderCase{
+		{
+			name: "DV_DATE",
+			admits: func(r constraints.TemporalRange, s string) bool {
+				return len(constraints.CDate{Range: r}.Validate(s)) == 0
+			},
+			above: func(a, b string) bool { return limitsBroken(rm.DVDate{Value: a}, rm.DVDate{Value: b}) },
+			clockAbove: func(a, b string) bool {
+				return (&rm.DVDate{Value: a}).Compare(rm.DVDate{Value: b}) > 0
+			},
+			samples: []string{
+				"2004", "2004-05", "2004-05-01", "2004-05-20", "20040521", "200406", "2005-01-01",
+				"0001-01-01", "2024-02-29",
+			},
+		},
+		{
+			name: "DV_TIME",
+			admits: func(r constraints.TemporalRange, s string) bool {
+				return len(constraints.CTime{Range: r}.Validate(s)) == 0
+			},
+			above: func(a, b string) bool { return limitsBroken(rm.DVTime{Value: a}, rm.DVTime{Value: b}) },
+			clockAbove: func(a, b string) bool {
+				return (&rm.DVTime{Value: a}).Compare(rm.DVTime{Value: b}) > 0
+			},
+			zoned: func(s string) bool { return (&rm.DVTime{Value: s}).Timezone() != "" },
+			samples: []string{
+				"09", "09:30", "09:30:00", "09:30:00.5", "0930", "23:59:60",
+				"09:30:00+05:00", "09:00:00-05:00", "00:00:00Z", "14:00Z", "08:00:00Z", "07:30:00Z",
+				"09:30:00+02:00", "0930+0200", "10:00:00+0200", "23:59:60Z", "09:30+05:30",
+			},
+		},
+		{
+			name: "DV_DATE_TIME",
+			admits: func(r constraints.TemporalRange, s string) bool {
+				return len(constraints.CDateTime{Range: r}.Validate(s)) == 0
+			},
+			above: func(a, b string) bool { return limitsBroken(rm.DVDateTime{Value: a}, rm.DVDateTime{Value: b}) },
+			clockAbove: func(a, b string) bool {
+				return (&rm.DVDateTime{Value: a}).Compare(rm.DVDateTime{Value: b}) > 0
+			},
+			zoned: func(s string) bool { return (&rm.DVDateTime{Value: s}).Timezone() != "" },
+			samples: []string{
+				"2004-05-20", "2004-05-20T00", "2004-05-20T00:00:00", "20040520T100000", "2004-05",
+				"2004-05-20T23:59:59.9", "2004", "2004-05-20T10:00:00+02:00", "2004-05-20T09:00:00Z",
+				"2004-05-20T08:00:00Z", "2004-05-21T00:30:00+01:00", "2004-05-20T23:30Z",
+				"20040520T100000-0500", "2016-12-31T23:59:60Z", "2017-01-01T00:59:60+01:00",
+			},
+		},
+		{
+			name: "DV_DURATION",
+			admits: func(r constraints.TemporalRange, s string) bool {
+				return len(constraints.CDuration{Range: r}.Validate(s)) == 0
+			},
+			above: func(a, b string) bool { return limitsBroken(rm.DVDuration{Value: a}, rm.DVDuration{Value: b}) },
+			clockAbove: func(a, b string) bool {
+				return (&rm.DVDuration{Value: a}).Compare(rm.DVDuration{Value: b}) > 0
+			},
+			samples: []string{
+				"P0D", "PT24H", "P1D", "P1Y", "P12M", "P365D", "P366D", "P52W", "-P1D", "PT0.5S",
+				"P4Y", "P48M", "P1461D", "-PT0S",
+				// A month and a year at exactly their Time_definitions
+				// averages, so each pair compares equal.
+				"P1M", "P30DT10H4M48S", "P365DT5H45M36S",
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var admitted, refused, unordered, clockDisagrees int
+			for _, b := range tc.samples {
+				from := constraints.TemporalRange{Lower: b, LowerInclusive: true, UpperUnbounded: true}
+				after := constraints.TemporalRange{Lower: b, UpperUnbounded: true}
+				upTo := constraints.TemporalRange{LowerUnbounded: true, Upper: b, UpperInclusive: true}
+				before := constraints.TemporalRange{LowerUnbounded: true, Upper: b}
+				for _, a := range tc.samples {
+					aAbove, bAbove := tc.above(a, b), tc.above(b, a)
+					wantFrom, wantAfter, wantUpTo, wantBefore := !bAbove, aAbove, !aAbove, bAbove
+					if tc.zoned != nil && tc.zoned(a) != tc.zoned(b) {
+						unordered++
+						if aAbove || bAbove {
+							t.Errorf("the floor orders %q against %q, want a zoned value not ordered against one without a zone", a, b)
+						}
+						wantFrom, wantAfter, wantUpTo, wantBefore = true, true, true, true
+					} else if aAbove != tc.clockAbove(a, b) {
+						clockDisagrees++
+					}
+					for _, check := range []struct {
+						r    constraints.TemporalRange
+						want bool
+					}{{from, wantFrom}, {after, wantAfter}, {upTo, wantUpTo}, {before, wantBefore}} {
+						got := tc.admits(check.r, a)
+						if got != check.want {
+							t.Errorf("%s range %s: Validate(%q) admits = %t, want %t (the floor puts %q above %q: %t, %q above %q: %t)",
+								tc.name, check.r, a, got, check.want, a, b, aAbove, b, a, bAbove)
+						}
+						if got {
+							admitted++
+						} else {
+							refused++
+						}
+					}
+				}
+			}
+			if admitted == 0 || refused == 0 {
+				t.Errorf("%s samples: the ranges admit %d and refuse %d, want at least one of each", tc.name, admitted, refused)
+			}
+			if tc.zoned != nil && (unordered == 0 || clockDisagrees == 0) {
+				t.Errorf("%s samples: %d unordered pairs and %d pairs whose clocks and instants disagree, want at least one of each", tc.name, unordered, clockDisagrees)
+			}
+		})
 	}
 }

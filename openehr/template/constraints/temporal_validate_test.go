@@ -355,8 +355,11 @@ func closedSpan(lower, upper string) constraints.TemporalRange {
 // one CodeOutOfRange that names the range and holds the value in Value only.
 // Durations order by BASE Iso8601_duration.to_seconds, so P1D equals PT24H
 // and 48 months (1460.16 days) fall short of 4 years (1460.96 days). A
-// partial date or time stands for the start of the period it names, and the
-// order is clock-local, so a zone on the value or on a bound is not applied.
+// partial date or time stands for the start of the period it names. A time
+// or a date-time is ordered against a bound by its clock when the two carry
+// one zone designator or none, as instants when both carry a zone, and not
+// at all when one carries a zone and the other does not, so that bound does
+// not refuse it (REQ-112 DV_INTERVAL).
 func TestREQ103TemporalRangeOutcomes(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -409,18 +412,32 @@ func TestREQ103TemporalRangeOutcomes(t *testing.T) {
 			refused:  []string{"2004-05-19", "2004-06-03", "2004-05", "2004"},
 		},
 		{
-			name:     "time, at or after 09:30",
+			name:     "time, at or after 09:30, no zone on the bound",
 			validate: constraints.CTime{Range: constraints.TemporalRange{Lower: "09:30:00", LowerInclusive: true, UpperUnbounded: true}}.Validate,
 			detail:   "value outside [09:30:00..*)",
-			admitted: []string{"09:30:00", "10", "09:30:00+05:00", "0930"},
-			refused:  []string{"09:29:59", "09", "09:00:00-05:00", "09:29:59.999Z"},
+			admitted: []string{"09:30:00", "10", "0930", "09:30:00+05:00", "09:00:00-05:00", "09:29:59.999Z"},
+			refused:  []string{"09:29:59", "09", "09:29:59.999"},
 		},
 		{
-			name:     "time, after 09:30",
+			name:     "time, after 09:30 at +02:00",
 			validate: constraints.CTime{Range: constraints.TemporalRange{Lower: "09:30:00+02:00", UpperUnbounded: true}}.Validate,
 			detail:   "value outside (09:30:00+02:00..*)",
-			admitted: []string{"09:30:00.5", "09:31", "09:30:01Z"},
-			refused:  []string{"09:30:00", "09:30", "09:30:00+02:00", "08:30:00Z"},
+			admitted: []string{"09:30:01+02:00", "08:00:00Z", "07:30:01Z", "09:30:00", "09:31", "13:00-0300"},
+			refused:  []string{"09:30:00+02:00", "07:30:00Z", "09:30:00+0200", "09:30:00+03:00", "09:00:00+02:00", "10:00:00+04"},
+		},
+		{
+			name:     "time, before 10:00 at +02:00",
+			validate: constraints.CTime{Range: constraints.TemporalRange{LowerUnbounded: true, Upper: "10:00:00+02:00"}}.Validate,
+			detail:   "value outside (*..10:00:00+02:00)",
+			admitted: []string{"09:59:59+02:00", "07:59Z", "10:00:00", "11:00", "06:30:00-01:00"},
+			refused:  []string{"10:00:00+02:00", "08:00:00Z", "10:00:00+0200", "09:00:00+01:00", "10:30:00+02:00"},
+		},
+		{
+			name:     "time, between 09:00 and 10:00 in UTC",
+			validate: constraints.CTime{Range: closedSpan("09:00:00Z", "10:00:00Z")}.Validate,
+			detail:   "value outside [09:00:00Z..10:00:00Z]",
+			admitted: []string{"11:30:00+02:00", "10:30:00+00:30", "04:00-05", "09:30Z", "15:00:00"},
+			refused:  []string{"12:30:00+02:00", "08:59:59Z", "10:00:01+00:00", "05:01:00-05:00"},
 		},
 		{
 			name:     "date-time",
@@ -433,8 +450,14 @@ func TestREQ103TemporalRangeOutcomes(t *testing.T) {
 			name:     "date-time, zone on the bound",
 			validate: constraints.CDateTime{Range: constraints.TemporalRange{Lower: "2004-05-20T10:00:00+02:00", LowerInclusive: true, UpperUnbounded: true}}.Validate,
 			detail:   "value outside [2004-05-20T10:00:00+02:00..*)",
-			admitted: []string{"2004-05-20T10:00:00-05:00", "2004-05-20T10:00:00", "2004-05-20T10:00Z"},
-			refused:  []string{"2004-05-20T09:00:00Z", "2004-05-20T09:59:59+02:00", "2004-05-20"},
+			admitted: []string{
+				"2004-05-20T10:00:00-05:00", "2004-05-20T08:00:00Z", "2004-05-20T03:00-05:00",
+				"2004-05-20T10:00:00", "2004-05-20", "2004-05-19T23:00:00",
+			},
+			refused: []string{
+				"2004-05-20T07:59:59Z", "2004-05-20T09:59:59+02:00", "2004-05-20T10:00:00+05:00",
+				"2004-05-19T23:59:59-08:00",
+			},
 		},
 	}
 	for _, tc := range tests {

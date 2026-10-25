@@ -1720,6 +1720,8 @@ requirements:
       - openehr/serialize/canjson/interval_open_side_test.go
       - openehr/serialize/canjson/mappings_presence_test.go
       - openehr/serialize/canxml/interval_open_side_test.go
+      - openehr/template/constraints/temporal_parity_test.go
+      - openehr/template/constraints/temporal_validate_test.go
       - openehr/templatecompile/compile_test.go
       - openehr/validation/constraint_ref_walk_test.go
       - openehr/validation/coverage_test.go
@@ -1764,6 +1766,7 @@ requirements:
       - openehr/validation/rmfloor_reference_part_internal_test.go
       - openehr/validation/rmfloor_temporal_element_test.go
       - openehr/validation/rmfloor_test.go
+      - openehr/validation/temporal_constraint_test.go
       - openehr/validation/validator_test.go
       - sandbox/rmvalid_test.go
       - testkit/conformance/webtemplate/archetype_details_test.go
@@ -1984,6 +1987,7 @@ requirements:
       - openehr/validation/rmfloor_interval_order_test.go
       - openehr/validation/rmfloor_invariant_matrix_internal_test.go
       - openehr/validation/rmfloor_temporal_element_test.go
+      - openehr/validation/temporal_constraint_test.go
 
   - id: REQ-130
     title: Contribution builder

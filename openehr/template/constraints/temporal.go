@@ -37,9 +37,15 @@ func (CDate) isPrimitive() {}
 // bound, the first that Validate accepts. The sentinel takes the fields
 // the pattern allows; a bound is tried as written, then with those fields,
 // moved inside the range by one unit of its last field where that drops a
-// part of it or its end is excluded. When none passes, as when no date
+// part of it or its end is excluded. When none passes, it returns
+// "2020-01-01", which Validate then refuses. That happens when no date
 // meets both the pattern and the range, or the pattern or a bound is
-// malformed, it returns "2020-01-01", which Validate then refuses.
+// malformed, and also, though a date meets both, when the pattern writes
+// the month or the day as a literal number beside a range: written to the
+// pattern, a bound takes the literal, which can move it out of the range.
+// "yyyy-06-dd" with the range up to 2004-05-20 gives "2020-01-01", though
+// "2003-06-01" is valid. No OPT reaches that case: the ITS-XML pattern
+// grammar admits no literal.
 func (c CDate) ExampleValue() any {
 	return clockExample(clockDate, c.Pattern, c.Range, "2020-01-01")
 }
@@ -63,11 +69,17 @@ func (c CDate) Validate(value any) []Violation {
 // "hh:??:XX"), read as [CDate] reads a date pattern. A fraction is allowed
 // wherever seconds are. A trailing timezone pattern makes a zone
 // mandatory: "Z" admits Z only, and ±hh, ±hh:mm or ±hhmm, signed +, - or ±,
-// admits any zone, Z included. Without one, a zone is optional.
+// admits any zone, Z included, whatever shape the suffix writes. Without
+// one, a zone is optional.
 //
-// Range is the AOM 1.4 range, in the order of rm.DVTime.Compare: clock-local,
-// so a zone on the value or on a bound is not applied, and a minute or a
-// second the time leaves out counts as 0.
+// Range is the AOM 1.4 range. A time is ordered against each bound as the
+// RM floor orders two DV_TIME bounds of a DV_INTERVAL: by
+// rm.DVTime.Compare, clock-local, when the two carry one zone designator or
+// none, a minute or a second the time leaves out counting as 0; as
+// instants, each clock read in UTC, when both carry a zone; and not at all
+// when one carries a zone and the other does not, so that bound does not
+// refuse it. "08:00:00Z" is after "09:30:00+02:00", and "09:00:00" is not
+// ordered against it. A value outside the range is a CodeOutOfRange.
 type CTime struct {
 	Pattern string
 	Range   TemporalRange
@@ -76,8 +88,11 @@ type CTime struct {
 func (CTime) isPrimitive() {}
 
 // ExampleValue returns a time written to Pattern and inside Range, chosen
-// as [CDate.ExampleValue] chooses a date, with the zone Z where the pattern
-// requires one. Its sentinel is "12:00:00".
+// as [CDate.ExampleValue] chooses a date, where a literal minute or second
+// can move a bound out of the range. Written to the pattern, a time keeps
+// its zone, takes Z where the pattern requires a zone it lacks, and is read
+// in UTC where the pattern requires Z and it carries another zone. Its
+// sentinel is "12:00:00".
 func (c CTime) ExampleValue() any {
 	return clockExample(clockTime, c.Pattern, c.Range, "12:00:00")
 }
@@ -102,9 +117,12 @@ func (c CTime) Validate(value any) []Violation {
 // ("yyyy-mm-ddTHH:MM:SS", "yyyy-mm-ddThh:??:??"), read as [CDate] and
 // [CTime] read theirs; "T" or a space separates its date from its time.
 //
-// Range is the AOM 1.4 range, in the order of rm.DVDateTime.Compare: a
-// reduced value stands for the start of the period it names, and the order
-// is clock-local, so a zone is not applied.
+// Range is the AOM 1.4 range, in the order of rm.DVDateTime.Compare, where
+// a reduced value stands for the start of the period it names, and the
+// zones read as [CTime] reads them: a date-time is ordered against a bound
+// as instants when both carry a zone and the designators differ, and not
+// at all when one carries a zone and the other does not. A date with no
+// time carries none. A value outside the range is a CodeOutOfRange.
 type CDateTime struct {
 	Pattern string
 	Range   TemporalRange
@@ -113,8 +131,9 @@ type CDateTime struct {
 func (CDateTime) isPrimitive() {}
 
 // ExampleValue returns a date-time written to Pattern and inside Range,
-// chosen as [CDate.ExampleValue] chooses a date. A value with a time
-// carries the zone Z. Its sentinel is "2020-01-01T12:00:00Z".
+// chosen as [CDate.ExampleValue] chooses a date, with the zone written as
+// [CTime.ExampleValue] writes it; a literal field after the year can move a
+// bound out of the range. Its sentinel is "2020-01-01T12:00:00Z".
 func (c CDateTime) ExampleValue() any {
 	return clockExample(clockDateTime, c.Pattern, c.Range, "2020-01-01T12:00:00Z")
 }
@@ -235,7 +254,12 @@ func (c CDuration) Validate(value any) []Violation {
 			out = append(out, patternMismatch(c.Pattern, value))
 		}
 	}
-	return appendRangeViolation(out, c.Range, d.ToSeconds(), durationSeconds, "duration", value)
+	secs := d.ToSeconds()
+	order := func(bound string) (cmp int, ordered, ok bool) {
+		b, ok := durationSeconds(bound)
+		return compareFloat(secs, b), true, ok
+	}
+	return appendRangeViolation(out, c.Range, order, "duration", value)
 }
 
 // TemporalRange is the AOM 1.4 range of a C_DATE, C_TIME, C_DATE_TIME or
@@ -303,37 +327,59 @@ func (r TemporalRange) String() string {
 	return sb.String()
 }
 
-// contains reports whether a value of magnitude mag lies in the range,
-// magnitude reading each bound in the same order. ok is false when a side
-// that is not unbounded has a bound magnitude cannot read.
-func (r TemporalRange) contains(mag float64, magnitude func(string) (float64, bool)) (in, ok bool) {
+// boundOrder compares a value with a bound written as ISO 8601 text: cmp
+// is the sign of the value less the bound, ordered is false for a pair the
+// order leaves unordered, and ok is false for a bound that is not ISO 8601
+// text of the constrained type.
+type boundOrder func(bound string) (cmp int, ordered, ok bool)
+
+// contains reports whether a value lies in the range, order comparing it
+// with each bound. A bound the value is not ordered against does not
+// exclude it. ok is false when a side that is not unbounded has a bound
+// order cannot read.
+func (r TemporalRange) contains(order boundOrder) (in, ok bool) {
 	if !r.IsBounded() {
 		return true, true
 	}
 	in = true
 	if !r.LowerUnbounded {
-		lo, ok := magnitude(r.Lower)
+		c, ordered, ok := order(r.Lower)
 		if !ok {
 			return false, false
 		}
-		in = mag > lo || (r.LowerInclusive && mag == lo)
+		if ordered {
+			in = c > 0 || (r.LowerInclusive && c == 0)
+		}
 	}
 	if !r.UpperUnbounded {
-		hi, ok := magnitude(r.Upper)
+		c, ordered, ok := order(r.Upper)
 		if !ok {
 			return false, false
 		}
-		in = in && (mag < hi || (r.UpperInclusive && mag == hi))
+		if ordered {
+			in = in && (c < 0 || (r.UpperInclusive && c == 0))
+		}
 	}
 	return in, true
 }
 
+// compareFloat returns the sign of a less b.
+func compareFloat(a, b float64) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	}
+	return 0
+}
+
 // appendRangeViolation appends to out the violation of the range clause
-// for a value of magnitude mag, if any: a CodeInvalidValue for a bound
-// magnitude cannot read, or a CodeOutOfRange for a value outside r. kind
-// names the constrained type for the Detail.
-func appendRangeViolation(out []Violation, r TemporalRange, mag float64, magnitude func(string) (float64, bool), kind string, value any) []Violation {
-	in, ok := r.contains(mag, magnitude)
+// for a value that order compares with each bound, if any: a
+// CodeInvalidValue for a bound order cannot read, or a CodeOutOfRange for a
+// value outside r. kind names the constrained type for the Detail.
+func appendRangeViolation(out []Violation, r TemporalRange, order boundOrder, kind string, value any) []Violation {
+	in, ok := r.contains(order)
 	switch {
 	case !ok:
 		return append(out, Violation{Code: CodeInvalidValue, Detail: fmt.Sprintf("constraint range %s has a bound that is not a valid ISO 8601 %s", r, kind)})
@@ -649,12 +695,36 @@ func (v clockValue) magnitude(k clockKind) float64 {
 	return iso8601.DateTimeMagnitude(v.date, v.time)
 }
 
-// clockMagnitude returns the function that reads a bound of kind k as its
-// magnitude.
-func clockMagnitude(k clockKind) func(string) (float64, bool) {
-	return func(s string) (float64, bool) {
-		v, ok := parseClock(k, s)
-		return v.magnitude(k), ok
+// zone returns the zone designator the value carries, as written, or ""
+// for a date, a time with no zone, or a date-time with no time.
+func (v clockValue) zone() string {
+	return v.time.Zone
+}
+
+// clockOrder returns the order of the value v of kind k against a bound,
+// the order REQ-112 gives two DV_TIME or DV_DATE_TIME bounds of a
+// DV_INTERVAL: by the clock-local magnitudes when the two carry one zone
+// designator or none, as instants (iso8601.UTCMagnitude) when both carry a
+// zone and the designators differ, and not ordered when one carries a zone
+// and the other does not. A date carries none, so dates are ordered by
+// their magnitudes.
+func clockOrder(k clockKind, v clockValue) boundOrder {
+	mag, zone := v.magnitude(k), v.zone()
+	return func(bound string) (cmp int, ordered, ok bool) {
+		b, ok := parseClock(k, bound)
+		if !ok {
+			return 0, false, false
+		}
+		bmag, bzone := b.magnitude(k), b.zone()
+		if zone == bzone {
+			return compareFloat(mag, bmag), true, true
+		}
+		utc, zoned := iso8601.UTCMagnitude(mag, zone)
+		butc, bzoned := iso8601.UTCMagnitude(bmag, bzone)
+		if !zoned || !bzoned {
+			return 0, false, true
+		}
+		return compareFloat(utc, butc), true, true
 	}
 }
 
@@ -704,7 +774,7 @@ func validateClock(k clockKind, pattern string, r TemporalRange, value any) []Vi
 			out = append(out, patternMismatch(pattern, value))
 		}
 	}
-	return appendRangeViolation(out, r, v.magnitude(k), clockMagnitude(k), k.String(), value)
+	return appendRangeViolation(out, r, clockOrder(k, v), k.String(), value)
 }
 
 // clockExample is the ExampleValue of CDate, CTime and CDateTime, kind k
@@ -744,11 +814,12 @@ func clockExample(k clockKind, pattern string, r TemporalRange, sentinel string)
 }
 
 // fit writes the value v of kind k with the fields the pattern allows,
-// fractions left out. Toward 1 it moves the result up by one unit of its
-// last field when that drops a part of v, or when excluded asks for a
-// value past v; toward -1 it moves it down by one unit when excluded asks
-// for a value before v. A field the pattern writes as a literal takes that
-// literal. It returns "" when the move leaves the day of a time.
+// fractions left out, and with the zone [clockPattern.zoneOf] gives it.
+// Toward 1 it moves the result up by one unit of its last field when that
+// drops a part of v, or when excluded asks for a value past v; toward -1 it
+// moves it down by one unit when excluded asks for a value before v. A
+// field the pattern writes as a literal takes that literal. It returns ""
+// when a move leaves the day of a time.
 func (p clockPattern) fit(k clockKind, v clockValue, toward int, excluded bool) string {
 	lo, hi := k.span()
 	var f [fieldCount]int
@@ -758,6 +829,10 @@ func (p clockPattern) fit(k clockKind, v clockValue, toward int, excluded bool) 
 			n = fieldMinimum[i]
 		}
 		f[i] = n
+	}
+	zone, shift := p.zoneOf(v)
+	if shift != 0 && !moveField(k, &f, fieldSecond, shift) {
+		return ""
 	}
 	cut := hi
 	for i := lo; i < hi; i++ {
@@ -786,7 +861,31 @@ func (p clockPattern) fit(k clockKind, v clockValue, toward int, excluded bool) 
 			f[i] = lit
 		}
 	}
-	return formatClock(k, f, cut, p.zone)
+	return formatClock(k, f, cut, zone)
+}
+
+// zoneOf returns the zone a value written to the pattern carries: the zone
+// of v, Z where the pattern asks for a zone that v lacks, and Z where the
+// pattern asks for Z and v carries another zone. In that last case shift is
+// the seconds that read the clock of v in UTC, its zone's offset from UTC
+// negated; it is 0 otherwise.
+func (p clockPattern) zoneOf(v clockValue) (zone string, shift int) {
+	zone = v.zone()
+	switch p.zone {
+	case zoneUTC:
+		if zone != "" && zone != "Z" {
+			// v parsed, so its zone does.
+			offset, _ := iso8601.ParseZone(zone)
+			shift = -offset
+		}
+		zone = "Z"
+	case zoneRequired:
+		if zone == "" {
+			zone = "Z"
+		}
+	case zoneOptional:
+	}
+	return zone, shift
 }
 
 // moveField adds step units of field i to the fields f of a value of kind
@@ -832,9 +931,8 @@ func setDate(f *[fieldCount]int, days int) {
 }
 
 // formatClock writes the fields of f before cut in the extended layout of
-// kind k. A time gets the zone Z where zone asks for one, and the time of
-// a date-time always does.
-func formatClock(k clockKind, f [fieldCount]int, cut int, zone zoneRule) string {
+// kind k, and zone after them when they reach the hour.
+func formatClock(k clockKind, f [fieldCount]int, cut int, zone string) string {
 	lo, _ := k.span()
 	var sb strings.Builder
 	for i := lo; i < cut; i++ {
@@ -847,8 +945,8 @@ func formatClock(k clockKind, f [fieldCount]int, cut int, zone zoneRule) string 
 			fmt.Fprintf(&sb, "%02d", f[i])
 		}
 	}
-	if cut > fieldHour && (zone != zoneOptional || k == clockDateTime) {
-		sb.WriteByte('Z')
+	if cut > fieldHour {
+		sb.WriteString(zone)
 	}
 	return sb.String()
 }
