@@ -2404,6 +2404,7 @@ requirements:
       - internal/rmaccess/reads_test.go
       - internal/templatecompile/walkfacts_test.go
       - openehr/instance/rm_defaults_yield_test.go
+      - openehr/validation/attribute_not_in_rm_test.go
       - openehr/validation/class_facts_internal_test.go
       - openehr/validation/composition_test.go
       - openehr/validation/coverage_test.go

@@ -99,3 +99,66 @@ func TestREQ100_NullFlavorConstraintApplies(t *testing.T) {
 		})
 	}
 }
+
+// ismNameOPT is the minimal_action shape: a COMPOSITION whose content holds
+// an ACTION whose ISM_TRANSITION the OPT constrains with a name, at
+// existence 1..1, which ISM_TRANSITION, a PATHABLE and not a LOCATABLE, does
+// not have.
+const ismNameOPT = `<?xml version="1.0" encoding="UTF-8"?>
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <template_id><value>ism_transition_name</value></template_id>
+  <concept>ism_transition_name</concept>
+  <definition>
+    <rm_type_name>COMPOSITION</rm_type_name>
+    <node_id>at0000</node_id>
+    <attributes xsi:type="C_MULTIPLE_ATTRIBUTE">
+      <rm_attribute_name>content</rm_attribute_name>
+      <existence><lower>0</lower><upper>1</upper></existence>
+      <children xsi:type="C_ARCHETYPE_ROOT">
+        <rm_type_name>ACTION</rm_type_name>
+        <occurrences><lower>0</lower><upper_unbounded>true</upper_unbounded></occurrences>
+        <node_id>at0000</node_id>
+        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+          <rm_attribute_name>ism_transition</rm_attribute_name>
+          <existence><lower>1</lower><upper>1</upper></existence>
+          <children xsi:type="C_COMPLEX_OBJECT">
+            <rm_type_name>ISM_TRANSITION</rm_type_name>
+            <node_id></node_id>
+            <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+              <rm_attribute_name>name</rm_attribute_name>
+              <existence><lower>1</lower><upper>1</upper></existence>
+              <children xsi:type="C_COMPLEX_OBJECT">
+                <rm_type_name>DV_TEXT</rm_type_name>
+                <node_id></node_id>
+              </children>
+            </attributes>
+          </children>
+        </attributes>
+        <archetype_id><value>openEHR-EHR-ACTION.medication.v1</value></archetype_id>
+      </children>
+      <cardinality><interval><lower>0</lower><upper_unbounded>true</upper_unbounded></interval></cardinality>
+    </attributes>
+    <archetype_id><value>openEHR-EHR-COMPOSITION.encounter.v1</value></archetype_id>
+  </definition>
+</template>`
+
+// ismNameComposition returns a COMPOSITION that holds two ACTIONs, each with
+// an ISM_TRANSITION, which carries no name since no ISM_TRANSITION can.
+func ismNameComposition() *rm.Composition {
+	comp := codedComposition()
+	comp.Context = codedContext()
+	comp.Content = []rm.ContentItem{ismAction(nil), ismAction(nil)}
+	return comp
+}
+
+// TestREQ171_AttributeNotInRMIsLeftOut pins § REQ-171 One walk: an attribute
+// the OPT declares that its node's RM class does not have, here
+// ISM_TRANSITION.name at existence 1..1, is left out of the walk, so an
+// instance, which cannot carry it, draws no issue for it.
+func TestREQ171_AttributeNotInRMIsLeftOut(t *testing.T) {
+	c := compileStrictOPT(t, ismNameOPT)
+	r := validation.Validate(ismNameComposition(), c)
+	if len(r.Issues) != 0 {
+		t.Errorf("Validate(ACTIONs whose ISM_TRANSITION has no name) issues = %q, want none", issueKeys(r.Issues))
+	}
+}
