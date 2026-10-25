@@ -2523,7 +2523,7 @@ requirements:
     title: Versioned-object reads
     canonical: docs/specifications/wire.md#req-174--versioned-object-reads
     status: draft
-    implementation: planned
+    implementation: landed
     packages: [openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/ehrstatus, openehr/client/ehr/directory, openehr/client/demographic]
     probes: [PROBE-109]
     tests:
@@ -2535,3 +2535,5 @@ requirements:
       - openehr/client/ehr/ehrstatus/ehrstatus_test.go
       - openehr/client/ehr/ehrstatus/versioned_test.go
       - openehr/client/ehr/version_at_time_test.go
+      - testkit/probes/versioned/probe_109_versioned_object_reads.go
+      - testkit/probes/versioned/probes_test.go
