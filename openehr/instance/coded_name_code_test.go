@@ -2,6 +2,8 @@ package instance_test
 
 import (
 	"fmt"
+	"maps"
+	mrand "math/rand/v2"
 	"slices"
 	"strings"
 	"testing"
@@ -41,6 +43,12 @@ func optCodedNameListing(texts []string, terminologyID string, codes ...string) 
 		optSingle("defining_code", optCodePhrase(terminologyID, codes...)))
 }
 
+// localNameTerms are the term definitions of at0001, at0002 and at0003,
+// with the texts First, Second and Third.
+const localNameTerms = `<term_definitions code="at0001"><items id="text">First</items></term_definitions>` +
+	`<term_definitions code="at0002"><items id="text">Second</items></term_definitions>` +
+	`<term_definitions code="at0003"><items id="text">Third</items></term_definitions>`
+
 // TestREQ107_CodedNameTakesTheCodeOfItsPinnedText is the REQ-107 term-text
 // check on a locatable's name coded in a terminology other than openehr,
 // whose value a C_STRING limits and whose defining code a C_CODE_PHRASE
@@ -54,9 +62,6 @@ func optCodedNameListing(texts []string, terminologyID string, codes ...string) 
 // keeps the text the walk wrote and a listed code. It holds under every
 // policy and both value fills, and every root validates.
 func TestREQ107_CodedNameTakesTheCodeOfItsPinnedText(t *testing.T) {
-	localTerms := `<term_definitions code="at0001"><items id="text">First</items></term_definitions>` +
-		`<term_definitions code="at0002"><items id="text">Second</items></term_definitions>` +
-		`<term_definitions code="at0003"><items id="text">Third</items></term_definitions>`
 	qualifiedTerms := `<term_definitions code="SNOMED-CT::111"><items id="text">One</items></term_definitions>` +
 		`<term_definitions code="SNOMED-CT::222"><items id="text">Two</items></term_definitions>`
 	bareTerms := bareTerm("111", "One") + bareTerm("222", "Two")
@@ -76,7 +81,7 @@ func TestREQ107_CodedNameTakesTheCodeOfItsPinnedText(t *testing.T) {
 	}{
 		{
 			name:  "local codes, the second code's text pinned",
-			opt:   optTemplate("ELEMENT", localTerms, optSingle("name", optCodedNameListing([]string{"Second"}, "local", "at0001", "at0002"))),
+			opt:   optTemplate("ELEMENT", localNameTerms, optSingle("name", optCodedNameListing([]string{"Second"}, "local", "at0001", "at0002"))),
 			codes: []string{"at0002"}, exampleCode: "at0002",
 		},
 		{
@@ -90,17 +95,20 @@ func TestREQ107_CodedNameTakesTheCodeOfItsPinnedText(t *testing.T) {
 			codes: []string{"222"}, exampleCode: "222",
 		},
 		{
-			// The C_STRING admits the second and third code's texts: the
-			// first of them in the list wins over the first listed code,
-			// while a drawn code whose text it admits keeps its own.
+			// The C_STRING admits the second and third code's texts: under
+			// ExampleFill the first of them in the list wins over the first
+			// listed code, while a drawn code whose text it admits keeps
+			// its own, which
+			// TestREQ107_CodedNameKeepsADrawnCodeWhoseTextThePinAdmits
+			// holds over many seeds.
 			name: "local codes, two texts pinned",
-			opt: optTemplate("ELEMENT", localTerms, optSingle("name",
+			opt: optTemplate("ELEMENT", localNameTerms, optSingle("name",
 				optCodedNameListing([]string{"Second", "Third"}, "local", "at0001", "at0002", "at0003"))),
 			codes: []string{"at0002", "at0003"}, exampleCode: "at0002",
 		},
 		{
 			name: "local codes, no listed code's text pinned",
-			opt: optTemplate("ELEMENT", localTerms, optSingle("name",
+			opt: optTemplate("ELEMENT", localNameTerms, optSingle("name",
 				optCodedNameListing([]string{"Neither"}, "local", "at0001", "at0002"))),
 			codes: []string{"at0001", "at0002"}, exampleCode: "at0001", text: "Neither",
 		},
@@ -132,6 +140,54 @@ func TestREQ107_CodedNameTakesTheCodeOfItsPinnedText(t *testing.T) {
 					checkValid(t, out, c)
 				})
 			}
+		}
+	}
+}
+
+// TestREQ107_CodedNameKeepsADrawnCodeWhoseTextThePinAdmits is the REQ-107
+// term-text check that a coded name takes another listed code only where
+// the C_STRING rejects the term text of the code the walk wrote. The
+// C_CODE_PHRASE lists at0001, at0002 and at0003, and the C_STRING admits
+// the term texts of at0002 and at0003 only. Under RandomFill the walk
+// draws a listed code, so over many seeds the name carries both at0002
+// and at0003, each with its term text, and never at0001: a drawn at0003
+// keeps its code rather than taking at0002, the first listed code whose
+// term text the C_STRING admits. It holds under every policy, and every
+// root validates.
+func TestREQ107_CodedNameKeepsADrawnCodeWhoseTextThePinAdmits(t *testing.T) {
+	const seeds = 64
+	opt := optTemplate("ELEMENT", localNameTerms, optSingle("name",
+		optCodedNameListing([]string{"Second", "Third"}, "local", "at0001", "at0002", "at0003")))
+	admitted := map[string]string{"at0002": "Second", "at0003": "Third"}
+	for _, implicit := range []bool{true, false} {
+		c := compileOPTText(t, opt, implicit)
+		for _, policy := range everyPolicy {
+			t.Run(fmt.Sprintf("implicit=%t/%v/%v", implicit, policy, instance.RandomFill), func(t *testing.T) {
+				carried := make(map[string]int)
+				for seed := range uint64(seeds) {
+					out, err := instance.Generate(t.Context(), c, instance.Options{
+						Policy:      policy,
+						ValueFill:   instance.RandomFill,
+						ValueSource: mrand.NewPCG(seed, 2),
+						Now:         defaultsNow,
+					})
+					if err != nil {
+						t.Fatalf("seed=%d: Generate: %v", seed, err)
+					}
+					name := elementCodedName(t, out)
+					code := name.DefiningCode.CodeString
+					carried[code]++
+					if want, ok := admitted[code]; !ok || name.Value != want {
+						t.Errorf("seed=%d: ELEMENT name = %q coded %s, want at0002 \"Second\" or at0003 \"Third\"", seed, name.Value, code)
+					}
+					checkValid(t, out, c)
+				}
+				for _, code := range slices.Sorted(maps.Keys(admitted)) {
+					if carried[code] == 0 {
+						t.Errorf("over %d seeds the ELEMENT name never carried %s, whose term text %q the C_STRING admits; codes carried: %v", seeds, code, admitted[code], carried)
+					}
+				}
+			})
 		}
 	}
 }

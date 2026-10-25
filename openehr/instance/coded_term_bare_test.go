@@ -46,8 +46,11 @@ func nestedBareTermOPT(outer, inner string) string {
 // a bare term the own archetype defines wins over a qualified one an
 // enclosing archetype defines. A code string that is an at-code, such as
 // at0001.1, names a term of the archetype's own and takes no bare term's
-// text. It holds under every policy and both value
-// fills, in every language asked for, and every root validates.
+// text, while one that is not, such as attack, at or at0001., takes it. A
+// term with an empty text gives no text: a qualified one gives way to the
+// bare term, and a bare one keeps the walk's text. It holds under every
+// policy and both value fills, in every language asked for, and every root
+// validates.
 func TestREQ107_ExternalCodedTextTakesTheTermUnderItsBareCode(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -95,6 +98,51 @@ func TestREQ107_ExternalCodedTextTakesTheTermUnderItsBareCode(t *testing.T) {
 			name: "ELEMENT value coded in another terminology with a specialised at-code",
 			opt: optTemplate("ELEMENT", bareTerm("at0001.1", "Own term"),
 				optSingle("value", optCodedText("ICD10", "at0001.1"))),
+			coded: elementCodedText,
+			want:  walkText,
+		},
+		{
+			// A code string that starts with "at" but has no digits after
+			// it is not an at-code, so its bare term is read.
+			name: "ELEMENT value coded in another terminology with a code that starts with at",
+			opt: optTemplate("ELEMENT", bareTerm("attack", "Attack (bare)"),
+				optSingle("value", optCodedText("SNOMED-CT", "attack"))),
+			coded: elementCodedText,
+			want:  "Attack (bare)",
+		},
+		{
+			// ADL 1.4 Node Identification gives an at-code digits after
+			// "at"; "at" alone has none, so it is not an at-code.
+			name: "ELEMENT value coded in another terminology with the code at",
+			opt: optTemplate("ELEMENT", bareTerm("at", "At (bare)"),
+				optSingle("value", optCodedText("SNOMED-CT", "at"))),
+			coded: elementCodedText,
+			want:  "At (bare)",
+		},
+		{
+			// A dot extension of an at-code is digits, as in at0010.2; an
+			// empty extension makes at0001. no at-code.
+			name: "ELEMENT value coded in another terminology with at-code digits and an empty dot extension",
+			opt: optTemplate("ELEMENT", bareTerm("at0001.", "At0001 dot (bare)"),
+				optSingle("value", optCodedText("SNOMED-CT", "at0001."))),
+			coded: elementCodedText,
+			want:  "At0001 dot (bare)",
+		},
+		{
+			// A term under the qualified key with no text gives no text,
+			// so the bare term's text is read.
+			name: "ELEMENT value whose qualified term has an empty text and whose bare term has a text",
+			opt: optTemplate("ELEMENT", snomedFemale(""), bareTerm("248152002", bareFemale),
+				optSingle("value", optCodedText("SNOMED-CT", "248152002"))),
+			coded: elementCodedText,
+			want:  bareFemale,
+		},
+		{
+			// A bare term with no text gives no text either, so the walk's
+			// text stays.
+			name: "ELEMENT value whose bare term has an empty text",
+			opt: optTemplate("ELEMENT", bareTerm("248152002", ""),
+				optSingle("value", optCodedText("SNOMED-CT", "248152002"))),
 			coded: elementCodedText,
 			want:  walkText,
 		},
