@@ -7,6 +7,7 @@ import (
 	"flag"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -659,6 +660,424 @@ func TestProbe092ContributionGetRejectsMissingInputs(t *testing.T) {
 	}
 	if _, err := probes.Probe092ContributionGet(context.Background(), newClient(t, b), nil, ehrIDFixture, "u", "m"); err == nil {
 		t.Error("nil recorder: expected an error")
+	}
+}
+
+// The PROBE-109 backend routes on full request paths: newClient's service
+// base, then the pinned route.
+const (
+	probe109Base = "/openehr/v1"
+	probe109EHR  = probe109Base + "/ehr/" + string(ehrIDFixture)
+	probe109VC   = probe109EHR + "/versioned_composition/" + string(compositionVOID)
+	probe109VS   = probe109EHR + "/versioned_ehr_status"
+
+	probe109StatusVersionUID   openehrclient.VersionUID        = "f1e2d3c4-b5a6-4978-89ab-cdef01234567::cdr.example::2"
+	probe109ImportedVersionUID openehrclient.VersionUID        = "5d6e7f80-91a2-4b3c-8d4e-5f6071829304::imported.example::1"
+	probe109PartyVOID          openehrclient.VersionedObjectID = "8849182c-82ad-4088-a07f-48ead4180515"
+
+	// probe109DroppedFraction is the pin's example time with its fraction
+	// of a second cut off: what a truncating formatter would send.
+	probe109DroppedFraction = "2015-01-20T18:30:22Z"
+)
+
+func probe109Inputs() probes.Probe109Inputs {
+	return probes.Probe109Inputs{
+		EHRID:                 ehrIDFixture,
+		CompositionVOID:       compositionVOID,
+		CompositionVersionUID: updatedVUID,
+		StatusVersionUID:      probe109StatusVersionUID,
+		ImportedVersionUID:    probe109ImportedVersionUID,
+		PartyVOID:             probe109PartyVOID,
+	}
+}
+
+const (
+	probe109AuditJSON = `{"_type":"AUDIT_DETAILS","system_id":"cdr.example",` +
+		`"time_committed":{"_type":"DV_DATE_TIME","value":"2015-01-20T18:30:22.765Z"},` +
+		`"change_type":{"_type":"DV_CODED_TEXT","value":"modification","defining_code":{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"openehr"},"code_string":"251"}},` +
+		`"committer":{"_type":"PARTY_IDENTIFIED","name":"Dr Alice"}}`
+	probe109ContributionJSON = `{"_type":"OBJECT_REF","id":{"_type":"HIER_OBJECT_ID","value":"5c1a6d0e-2f3b-4c8d-9e7f-0a1b2c3d4e5f"},"namespace":"local","type":"CONTRIBUTION"}`
+)
+
+// probe109VersionedObject is a VERSIONED_COMPOSITION or VERSIONED_EHR_STATUS
+// (rmType) whose uid is uid.
+func probe109VersionedObject(rmType, uid string) string {
+	return `{"_type":"` + rmType + `","uid":{"_type":"HIER_OBJECT_ID","value":"` + uid + `"},` +
+		`"owner_id":{"_type":"OBJECT_REF","id":{"_type":"HIER_OBJECT_ID","value":"` + string(ehrIDFixture) + `"},"namespace":"local","type":"EHR"},` +
+		`"time_created":{"_type":"DV_DATE_TIME","value":"2015-01-20T18:30:22.765Z"}}`
+}
+
+// probe109RevisionHistory is a REVISION_HISTORY with one item per version id.
+func probe109RevisionHistory(versionUIDs ...string) string {
+	items := make([]string, 0, len(versionUIDs))
+	for _, uid := range versionUIDs {
+		items = append(items, `{"_type":"REVISION_HISTORY_ITEM","version_id":{"_type":"OBJECT_VERSION_ID","value":"`+uid+`"},"audits":[`+probe109AuditJSON+`]}`)
+	}
+	return `{"_type":"REVISION_HISTORY","items":[` + strings.Join(items, ",") + `]}`
+}
+
+// probe109Version is an ORIGINAL_VERSION whose uid is uid and whose data is
+// the raw JSON data; an empty data leaves the member out.
+func probe109Version(uid, data string) string {
+	s := `{"_type":"ORIGINAL_VERSION","uid":{"_type":"OBJECT_VERSION_ID","value":"` + uid + `"},` +
+		`"lifecycle_state":{"_type":"DV_CODED_TEXT","value":"complete","defining_code":{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"openehr"},"code_string":"532"}},` +
+		`"commit_audit":` + probe109AuditJSON + `,"contribution":` + probe109ContributionJSON
+	if data != "" {
+		s += `,"data":` + data
+	}
+	return s + "}"
+}
+
+// probe109Imported is an IMPORTED_VERSION wrapping the version item: the
+// other VERSION the pin's version schemas admit.
+func probe109Imported(item string) string {
+	return `{"_type":"IMPORTED_VERSION","commit_audit":` + probe109AuditJSON +
+		`,"contribution":` + probe109ContributionJSON + `,"item":` + item + `}`
+}
+
+// probe109Corpus holds the payloads PROBE-109's backend serves, read from
+// the vendored corpus.
+type probe109Corpus struct {
+	composition, status, folder, partyVersion string
+}
+
+func probe109ReadCorpus(t *testing.T) probe109Corpus {
+	t.Helper()
+	read := func(path string) string {
+		t.Helper()
+		b, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read PROBE-109 corpus fixture: %v", err)
+		}
+		return string(b)
+	}
+	itsREST := filepath.Join(fixtures.CorpusRoot(), "its_rest")
+	return probe109Corpus{
+		composition:  read(fixtures.CompositionJSON("minimal_evaluation.en.v1")),
+		status:       read(filepath.Join(itsREST, "ehr", "ehr_status.json")),
+		folder:       read(filepath.Join(itsREST, "ehr", "folder.json")),
+		partyVersion: read(filepath.Join(itsREST, "demographic", "original_version.json")),
+	}
+}
+
+// probe109Routes maps each full request path PROBE-109 reads to the 200 body
+// a conformant server answers it with.
+func probe109Routes(t *testing.T) map[string]string {
+	t.Helper()
+	c := probe109ReadCorpus(t)
+	compositionVersion := probe109Version(string(updatedVUID), c.composition)
+	statusVersion := probe109Version(string(probe109StatusVersionUID), c.status)
+	return map[string]string{
+		// The composition family's versioned-object reads.
+		probe109VC:                                                    probe109VersionedObject("VERSIONED_COMPOSITION", string(compositionVOID)),
+		probe109VC + "/revision_history":                              probe109RevisionHistory(string(initialVUID), string(updatedVUID)),
+		probe109VC + "/version":                                       compositionVersion,
+		probe109VC + "/version/" + string(updatedVUID):                compositionVersion,
+		probe109VC + "/version/" + string(probe109ImportedVersionUID): probe109Imported(compositionVersion),
+
+		// The EHR_STATUS family's versioned-object reads.
+		probe109VS:                       probe109VersionedObject("VERSIONED_EHR_STATUS", "f1e2d3c4-b5a6-4978-89ab-cdef01234567"),
+		probe109VS + "/revision_history": probe109RevisionHistory(string(probe109StatusVersionUID)),
+		probe109VS + "/version":          statusVersion,
+		probe109VS + "/version/" + string(probe109StatusVersionUID):   statusVersion,
+		probe109VS + "/version/" + string(probe109ImportedVersionUID): probe109Imported(statusVersion),
+
+		// The other leaves' at-time reads.
+		probe109EHR + "/composition/" + string(compositionVOID): c.composition,
+		probe109EHR + "/ehr_status":                             c.status,
+		probe109EHR + "/directory":                              c.folder,
+		probe109Base + "/demographic/versioned_party/" + string(probe109PartyVOID) + "/version": c.partyVersion,
+	}
+}
+
+// probe109Match picks the request a plant applies to: its full path, and
+// whether it carries version_at_time (the latest-version and version-at-time
+// reads share a path).
+type probe109Match struct {
+	path   string
+	atTime bool
+}
+
+func (m probe109Match) hits(r *http.Request) bool {
+	return m.path != "" && r.URL.Path == m.path && r.URL.Query().Has("version_at_time") == m.atTime
+}
+
+// probe109Plant changes what the PROBE-109 backend does for the one request
+// on matches: record rewrites the copy the probe reads, body and status
+// replace the response, and twice records the request a second time.
+type probe109Plant struct {
+	on     probe109Match
+	record func(*http.Request)
+	body   string
+	status int
+	twice  bool
+}
+
+// probe109Backend serves probe109Routes, recording every request in
+// captured, with plant applied.
+func probe109Backend(t *testing.T, captured *[]*http.Request, plant probe109Plant) *sandbox.Backend {
+	t.Helper()
+	routes := probe109Routes(t)
+	return sandbox.Scripted(func(w http.ResponseWriter, r *http.Request) {
+		hit := plant.on.hits(r)
+		rec := r.Clone(r.Context())
+		if hit && plant.record != nil {
+			plant.record(rec)
+		}
+		*captured = append(*captured, rec)
+		if hit && plant.twice {
+			*captured = append(*captured, rec)
+		}
+		body, ok := routes[r.URL.Path]
+		if !ok {
+			t.Errorf("PROBE-109 backend: no route for %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		status := http.StatusOK
+		if hit && plant.status != 0 {
+			status = plant.status
+		}
+		if hit && plant.body != "" {
+			body = plant.body
+		}
+		if status == http.StatusNoContent {
+			w.WriteHeader(status)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(body))
+	})
+}
+
+// TestProbe109VersionedObjectReadsPass runs PROBE-109 (REQ-174) against a
+// conformant backend: the ten versioned-object reads, the two IMPORTED_VERSION
+// refusals and the four at-time reads on the other leaves all pass.
+func TestProbe109VersionedObjectReadsPass(t *testing.T) {
+	var captured []*http.Request
+	b := probe109Backend(t, &captured, probe109Plant{})
+	r, err := probes.Probe109VersionedObjectReads(t.Context(), newClient(t, b), &captured, probe109Inputs())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Status != "pass" {
+		t.Fatalf("PROBE-109 status = %q, want pass (detail=%q)", r.Status, r.Detail)
+	}
+	if got, want := len(captured), 16; got != want {
+		t.Errorf("PROBE-109 issued %d requests, want %d (10 versioned-object reads, 2 refusals, 4 at-time reads)", got, want)
+	}
+}
+
+// TestProbe109VersionedObjectReadsFlagsPlants proves each PROBE-109 (REQ-174)
+// assertion can fail: every case plants one defect on a recorded request or a
+// served body, and the probe must report fail naming it. Asserting only
+// `status == "fail"` would let a case rot into failing for an unrelated reason.
+func TestProbe109VersionedObjectReadsFlagsPlants(t *testing.T) {
+	setMethod := func(m string) func(*http.Request) { return func(r *http.Request) { r.Method = m } }
+	setPath := func(p string) func(*http.Request) { return func(r *http.Request) { r.URL.Path = p } }
+	setAccept := func(a string) func(*http.Request) { return func(r *http.Request) { r.Header.Set("Accept", a) } }
+	setAtTime := func(v string) func(*http.Request) {
+		return func(r *http.Request) { r.URL.RawQuery = url.Values{"version_at_time": {v}}.Encode() }
+	}
+	partyVersion := probe109Base + "/demographic/versioned_party/" + string(probe109PartyVOID) + "/version"
+
+	cases := []struct {
+		name       string
+		plant      probe109Plant
+		wantDetail string
+	}{
+		{
+			name:       "wrong method on the versioned-object read",
+			plant:      probe109Plant{on: probe109Match{path: probe109VC}, record: setMethod(http.MethodPost)},
+			wantDetail: `composition.GetVersionedObject: method = "POST", want GET`,
+		},
+		{
+			name:       "wrong path on the revision-history read",
+			plant:      probe109Plant{on: probe109Match{path: probe109VC + "/revision_history"}, record: setPath(probe109VC + "/revisions")},
+			wantDetail: "composition.GetRevisionHistory: path = ",
+		},
+		{
+			name:       "wrong path on the EHR_STATUS version-by-id read",
+			plant:      probe109Plant{on: probe109Match{path: probe109VS + "/version/" + string(probe109StatusVersionUID)}, record: setPath(probe109EHR + "/ehr_status/" + string(probe109StatusVersionUID))},
+			wantDetail: "ehrstatus.GetVersionByID: path = ",
+		},
+		{
+			name:       "Accept other than canonical JSON",
+			plant:      probe109Plant{on: probe109Match{path: probe109VS + "/version/" + string(probe109StatusVersionUID)}, record: setAccept("application/xml")},
+			wantDetail: "ehrstatus.GetVersionByID: Accept = ",
+		},
+		{
+			name:       "two requests for one read",
+			plant:      probe109Plant{on: probe109Match{path: probe109VS}, twice: true},
+			wantDetail: "ehrstatus.GetVersionedObject issued 2 request(s), want exactly 1",
+		},
+		{
+			name:       "composition latest-version read sends version_at_time",
+			plant:      probe109Plant{on: probe109Match{path: probe109VC + "/version"}, record: setAtTime("2015-01-20T18:30:22.765Z")},
+			wantDetail: "composition.GetVersion: sent version_at_time",
+		},
+		{
+			name:       "EHR_STATUS latest-version read sends version_at_time",
+			plant:      probe109Plant{on: probe109Match{path: probe109VS + "/version"}, record: setAtTime("2015-01-20T18:30:22.765Z")},
+			wantDetail: "ehrstatus.GetVersion: sent version_at_time",
+		},
+		{
+			name:       "composition version-at-time read drops the fraction",
+			plant:      probe109Plant{on: probe109Match{path: probe109VC + "/version", atTime: true}, record: setAtTime(probe109DroppedFraction)},
+			wantDetail: "composition.GetVersionAtTime: version_at_time = ",
+		},
+		{
+			name:       "EHR_STATUS version-at-time read drops the fraction",
+			plant:      probe109Plant{on: probe109Match{path: probe109VS + "/version", atTime: true}, record: setAtTime(probe109DroppedFraction)},
+			wantDetail: "ehrstatus.GetVersionAtTime: version_at_time = ",
+		},
+		{
+			name:       "composition read by a Ref with a time drops the fraction",
+			plant:      probe109Plant{on: probe109Match{path: probe109EHR + "/composition/" + string(compositionVOID), atTime: true}, record: setAtTime(probe109DroppedFraction)},
+			wantDetail: "composition.Get(LatestAtTime): version_at_time = ",
+		},
+		{
+			name:       "EHR_STATUS read at a time drops the fraction",
+			plant:      probe109Plant{on: probe109Match{path: probe109EHR + "/ehr_status", atTime: true}, record: setAtTime(probe109DroppedFraction)},
+			wantDetail: "ehrstatus.GetAtTime: version_at_time = ",
+		},
+		{
+			name:       "directory read at a time drops the fraction",
+			plant:      probe109Plant{on: probe109Match{path: probe109EHR + "/directory", atTime: true}, record: setAtTime(probe109DroppedFraction)},
+			wantDetail: "directory.GetAtTime: version_at_time = ",
+		},
+		{
+			name:       "VERSIONED_PARTY version-at-time read drops the fraction",
+			plant:      probe109Plant{on: probe109Match{path: partyVersion, atTime: true}, record: setAtTime(probe109DroppedFraction)},
+			wantDetail: "demographic.GetVersionAtTime: version_at_time = ",
+		},
+		{
+			name: "version-at-time read sends the value twice",
+			plant: probe109Plant{on: probe109Match{path: probe109VC + "/version", atTime: true}, record: func(r *http.Request) {
+				r.URL.RawQuery = "version_at_time=2015-01-20T18:30:22.765Z&version_at_time=2015-01-20T18:30:22.765Z"
+			}},
+			wantDetail: "composition.GetVersionAtTime: version_at_time = ",
+		},
+		{
+			name:       "versioned object without a uid",
+			plant:      probe109Plant{on: probe109Match{path: probe109VC}, body: probe109VersionedObject("VERSIONED_COMPOSITION", "")},
+			wantDetail: "composition.GetVersionedObject: the body did not decode to a VERSIONED_COMPOSITION with a uid",
+		},
+		{
+			name:       "EHR_STATUS versioned object without a uid",
+			plant:      probe109Plant{on: probe109Match{path: probe109VS}, body: probe109VersionedObject("VERSIONED_EHR_STATUS", "")},
+			wantDetail: "ehrstatus.GetVersionedObject: the body did not decode to a VERSIONED_EHR_STATUS with a uid",
+		},
+		{
+			name:       "revision history without items",
+			plant:      probe109Plant{on: probe109Match{path: probe109VS + "/revision_history"}, body: probe109RevisionHistory()},
+			wantDetail: "ehrstatus.GetRevisionHistory: the body did not decode to a REVISION_HISTORY with items",
+		},
+		{
+			name:       "composition revision history without items",
+			plant:      probe109Plant{on: probe109Match{path: probe109VC + "/revision_history"}, body: probe109RevisionHistory()},
+			wantDetail: "composition.GetRevisionHistory: the body did not decode to a REVISION_HISTORY with items",
+		},
+		{
+			name:       "version without a uid",
+			plant:      probe109Plant{on: probe109Match{path: probe109VC + "/version/" + string(updatedVUID)}, body: probe109Version("", bareCompositionBody)},
+			wantDetail: "composition.GetVersionByID: the body did not decode to an ORIGINAL_VERSION with a uid",
+		},
+		{
+			name:       "EHR_STATUS version without a uid",
+			plant:      probe109Plant{on: probe109Match{path: probe109VS + "/version", atTime: true}, body: probe109Version("", probe109ReadCorpus(t).status)},
+			wantDetail: "ehrstatus.GetVersionAtTime: the body did not decode to an ORIGINAL_VERSION with a uid",
+		},
+		{
+			name:       "composition version without data",
+			plant:      probe109Plant{on: probe109Match{path: probe109VC + "/version"}, body: probe109Version(string(updatedVUID), "")},
+			wantDetail: "composition.GetVersion: the version's data did not decode to a COMPOSITION",
+		},
+		{
+			name:       "EHR_STATUS version without data",
+			plant:      probe109Plant{on: probe109Match{path: probe109VS + "/version", atTime: true}, body: probe109Version(string(probe109StatusVersionUID), "")},
+			wantDetail: "ehrstatus.GetVersionAtTime: the version's data did not decode to an EHR_STATUS",
+		},
+		{
+			name:       "a versioned-object read fails",
+			plant:      probe109Plant{on: probe109Match{path: probe109VS + "/revision_history"}, status: http.StatusInternalServerError, body: `{"message":"boom"}`},
+			wantDetail: "ehrstatus.GetRevisionHistory failed: ",
+		},
+		{
+			name:       "an at-time read on another leaf fails",
+			plant:      probe109Plant{on: probe109Match{path: probe109EHR + "/directory", atTime: true}, status: http.StatusInternalServerError, body: `{"message":"boom"}`},
+			wantDetail: "directory.GetAtTime failed: ",
+		},
+		{
+			name:       "VERSIONED_PARTY version-at-time read answered without a version",
+			plant:      probe109Plant{on: probe109Match{path: partyVersion, atTime: true}, status: http.StatusNoContent},
+			wantDetail: "demographic.GetVersionAtTime: the body did not decode to a PARTY version",
+		},
+		{
+			name:       "ORIGINAL_VERSION served on the composition refusal row",
+			plant:      probe109Plant{on: probe109Match{path: probe109VC + "/version/" + string(probe109ImportedVersionUID)}, body: probe109Version(string(probe109ImportedVersionUID), bareCompositionBody)},
+			wantDetail: "composition.GetVersionByID on an IMPORTED_VERSION succeeded, want a typed decode error",
+		},
+		{
+			name:       "ORIGINAL_VERSION served on the EHR_STATUS refusal row",
+			plant:      probe109Plant{on: probe109Match{path: probe109VS + "/version/" + string(probe109ImportedVersionUID)}, body: probe109Version(string(probe109ImportedVersionUID), probe109ReadCorpus(t).status)},
+			wantDetail: "ehrstatus.GetVersionByID on an IMPORTED_VERSION succeeded, want a typed decode error",
+		},
+		{
+			// A refusal must be the typed decode failure, not any error: a 404
+			// errors too, but as a wire error.
+			name:       "refusal row fails with an error that is not a decode error",
+			plant:      probe109Plant{on: probe109Match{path: probe109VS + "/version/" + string(probe109ImportedVersionUID)}, status: http.StatusNotFound, body: `{"message":"not found"}`},
+			wantDetail: "ehrstatus.GetVersionByID on an IMPORTED_VERSION failed with an error that is not a *transport.DecodeError",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var captured []*http.Request
+			b := probe109Backend(t, &captured, tc.plant)
+			r, err := probes.Probe109VersionedObjectReads(t.Context(), newClient(t, b), &captured, probe109Inputs())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if r.Status != "fail" {
+				t.Errorf("PROBE-109 status = %q, want fail (detail=%q)", r.Status, r.Detail)
+			}
+			if !strings.Contains(r.Detail, tc.wantDetail) {
+				t.Errorf("PROBE-109 failed for the wrong reason:\n got: %s\nwant it to mention: %s", r.Detail, tc.wantDetail)
+			}
+		})
+	}
+}
+
+// TestProbe109VersionedObjectReadsRejectsMissingInputs: PROBE-109 (REQ-174)
+// returns an error, never a result, when it cannot run.
+func TestProbe109VersionedObjectReadsRejectsMissingInputs(t *testing.T) {
+	var captured []*http.Request
+	c := newClient(t, probe109Backend(t, &captured, probe109Plant{}))
+	if _, err := probes.Probe109VersionedObjectReads(t.Context(), nil, &captured, probe109Inputs()); err == nil {
+		t.Error("nil client: expected an error")
+	}
+	if _, err := probes.Probe109VersionedObjectReads(t.Context(), c, nil, probe109Inputs()); err == nil {
+		t.Error("nil recorder: expected an error")
+	}
+	blank := map[string]func(*probes.Probe109Inputs){
+		"EHRID":                 func(in *probes.Probe109Inputs) { in.EHRID = "" },
+		"CompositionVOID":       func(in *probes.Probe109Inputs) { in.CompositionVOID = "" },
+		"CompositionVersionUID": func(in *probes.Probe109Inputs) { in.CompositionVersionUID = "" },
+		"StatusVersionUID":      func(in *probes.Probe109Inputs) { in.StatusVersionUID = "" },
+		"ImportedVersionUID":    func(in *probes.Probe109Inputs) { in.ImportedVersionUID = "" },
+		"PartyVOID":             func(in *probes.Probe109Inputs) { in.PartyVOID = "" },
+	}
+	for field, clear := range blank {
+		in := probe109Inputs()
+		clear(&in)
+		if _, err := probes.Probe109VersionedObjectReads(t.Context(), c, &captured, in); err == nil {
+			t.Errorf("empty %s: expected an error", field)
+		}
+	}
+	if len(captured) != 0 {
+		t.Errorf("PROBE-109 issued %d request(s) on missing inputs, want 0", len(captured))
 	}
 }
 
