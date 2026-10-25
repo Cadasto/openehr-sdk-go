@@ -459,7 +459,8 @@ func quantityFits(node *tcimpl.CompiledNode, k quantityKey) bool {
 
 // magnitudeEnd returns the lowest (low) or highest magnitude a DV_QUANTITY
 // bound node accepts in units: the end of the magnitude range of the first
-// entry for those units, which is the entry DvQuantity.Validate checks. At
+// entry for those units. DvQuantity.Validate accepts a value inside any
+// entry for its units, so a value inside the first one validates. At
 // an exclusive end it is the nearest float64 inside the range. It returns
 // false when there is no such entry, or when its range has no end in that
 // direction. Where the node is a C_COMPLEX_OBJECT, the end is that of the

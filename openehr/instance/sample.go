@@ -180,8 +180,9 @@ func firstAccepted(pc constraints.PrimitiveConstraint, ranged bool, forms []stri
 
 // quantityUnitEntry returns the first entry whose units equal name.
 // An empty name, or a name the constraint does not list, is not an entry:
-// the caller then draws a unit of its own. DvQuantity.Validate checks
-// the first entry for a unit, so this is that entry.
+// the caller then draws a unit of its own. DvQuantity.Validate accepts a
+// value inside any entry for its units, so drawing inside the first one
+// gives a valid value.
 func quantityUnitEntry(c constraints.DvQuantity, name string) (constraints.QuantityUnit, bool) {
 	if name == "" {
 		return constraints.QuantityUnit{}, false
