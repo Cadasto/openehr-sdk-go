@@ -2279,18 +2279,26 @@ func isRequired(attr *tcimpl.CompiledAttribute) bool {
 	return attr.Required() || tcimpl.LowerAtLeastOne(attr.Existence()) || holdsRequiredChild(attr)
 }
 
-// holdsRequiredChild reports whether the OPT declares attr multi-valued and
-// an allowed child of it that is not a slot has a bounded occurrences lower
-// bound of 1 or more ([tcimpl.HasMandatoryChild]). ADL 1.4 makes such a
-// child mandatory in its container, and the container is then required
-// too: the reading the REQ-107 Visit rule chooses, which the template
-// validator applies to an absent list (REQ-102). A child that states no
-// occurrences does not count, although materialiseMultiple builds one
-// member of it once the list is visited: the validator asks it for none.
-// The child of a single-valued attribute never counts, since the
-// attribute's existence decides how often that child occurs.
+// holdsRequiredChild reports whether a child asks the list attr for a
+// member while the list holds none ([tcimpl.MandatoryListChildren]): an
+// allowed child that is not a slot, with a bounded occurrences lower bound
+// of 1 or more, of a list the OPT declares multi-valued. ADL 1.4 makes
+// such a child mandatory in its container, and the container is then
+// required too, which is the reading the visit rule chooses. The template
+// validator reads the same children, and reports each as missing where an
+// optional list holds no item, so a list Required leaves out is one it
+// accepts as absent. No child counts where the OPT prohibits the list, or
+// where the RM types its items as primitive values, such as a
+// DV_MULTIMEDIA's data, to which no item binds and of which makeChild
+// builds no member. Nor does the child of a single-valued attribute, whose
+// existence decides how often that child occurs, or a child that states no
+// occurrences, although materialiseMultiple builds one member of it once
+// the list is visited for another reason.
 func holdsRequiredChild(attr *tcimpl.CompiledAttribute) bool {
-	return attr.Cardinality() == template.Multiple && tcimpl.HasMandatoryChild(attr)
+	for range tcimpl.MandatoryListChildren(attr) {
+		return true // one such child is enough
+	}
+	return false
 }
 
 // newHierObjectID generates a HierObjectID with a random RFC 9562

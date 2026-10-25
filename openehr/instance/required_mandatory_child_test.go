@@ -8,6 +8,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
 // optList is a C_MULTIPLE_ATTRIBUTE called name over children, with an
@@ -246,6 +247,167 @@ func TestREQ107_FamilyHistoryRequiredLeavesOutItsOptionalContent(t *testing.T) {
 					t.Errorf("EVALUATION data/items = %v, want the CLUSTER at0003", ids)
 				}
 			})
+		}
+	}
+}
+
+// optListWithin is a C_MULTIPLE_ATTRIBUTE called name over children, with
+// an existence of existenceLower..existenceUpper and no cardinality.
+func optListWithin(name string, existenceLower, existenceUpper int, children ...string) string {
+	return `<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>` + name + `</rm_attribute_name>` +
+		`<existence>` + optInterval(existenceLower, existenceUpper) + `</existence>` +
+		strings.Join(children, "") + `</attributes>`
+}
+
+// optElementLowerUnbounded is an ELEMENT child at nodeID whose occurrences
+// write a lower bound of 1 but flag the lower side unbounded, so they have
+// no lower bound.
+func optElementLowerUnbounded(nodeID string) string {
+	return `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>ELEMENT</rm_type_name>` +
+		`<occurrences><lower_unbounded>true</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>1</lower></occurrences>` +
+		`<node_id>` + nodeID + `</node_id></children>`
+}
+
+// optOctetData is a DV_MULTIMEDIA's data, a list of octets, at existence
+// 0..1 over an OCTET child at occurrences 1..1.
+func optOctetData() string {
+	return optListWithin("data", 0, 1, optOccurring("C_COMPLEX_OBJECT", "OCTET", "at0001", 1, 1))
+}
+
+// TestREQ107_RequiredLeavesOutAListOfPrimitiveValues is the REQ-107 check
+// of the Visit rule on a list whose items the RM types as primitive
+// values: a DV_MULTIMEDIA's data at existence 0..1 over an OCTET child at
+// occurrences 1..1. No item of such a list binds to a child, so the child
+// does not make the list required, and Required does not visit it, where
+// a visit would build a member of the OCTET child and fail. The RM
+// defaults still give the DV_MULTIMEDIA its inline example payload. It
+// holds at the root and as an ELEMENT's value, under both value fills and
+// both compile modes, and each tree passes the RM floor and the template
+// validator.
+func TestREQ107_RequiredLeavesOutAListOfPrimitiveValues(t *testing.T) {
+	for _, place := range multimediaPlacements {
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, place.opt([]string{optOctetData()}), implicit)
+			for _, opts := range corpusOptions(instance.Required) {
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v", place.name, implicit, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err != nil {
+						t.Fatalf("Generate: %v", err)
+					}
+					checkSizedData(t, place.multimedia(t, out))
+					checkValid(t, out, c)
+				})
+			}
+		}
+	}
+}
+
+// TestREQ102_REQ107_RequiredAndTheValidatorAgreeOnAnOptionalList is the
+// check that the example generator's Required policy (REQ-107 Visit rule)
+// and the template validator (REQ-102 A mandatory child under an optional
+// list) read the children that ask an optional list for a member alike,
+// over a table of attribute shapes. Where the list rule asks for the child,
+// Required writes a member of it, and the validator, given the tree with
+// the list taken out, reports the child's occurrences; where it does not,
+// Required writes none, and the validator reports nothing on the list's
+// children. Either way the tree Required writes passes the RM floor and the
+// template validator. The rule asks for a 1..1 child of a list. It does not
+// for the child of a single-valued attribute, of a list the template
+// prohibits, or of a list of primitive values, nor for a slot, a child that
+// states no occurrences, or one whose occurrences have no lower bound.
+func TestREQ102_REQ107_RequiredAndTheValidatorAgreeOnAnOptionalList(t *testing.T) {
+	// listOf reads the list under test from the generated root: the members
+	// Generate wrote, and a function that takes the list out.
+	type listOf func(t *testing.T, out any) (members []string, takeOut func())
+	itemTreeItems := func(t *testing.T, out any) ([]string, func()) {
+		t.Helper()
+		tree, ok := out.(*rm.ItemTree)
+		if !ok {
+			t.Fatalf("generated root is %T, want *rm.ItemTree", out)
+		}
+		return itemIDs(t, out), func() { tree.Items = nil }
+	}
+	multimediaData := func(t *testing.T, out any) ([]string, func()) {
+		t.Helper()
+		mm, ok := out.(*rm.DVMultimedia)
+		if !ok {
+			t.Fatalf("generated root is %T, want *rm.DVMultimedia", out)
+		}
+		// Its items are octets, which bind to no child: none is a member
+		// of the OCTET child.
+		return []string{}, func() { mm.Data = nil }
+	}
+	cases := []struct {
+		name string
+		opt  string
+		list listOf
+		// asks is whether the list rule asks for the child: Required then
+		// writes it, and the validator reports it missing.
+		asks bool
+	}{
+		{
+			name: "a list over a 1..1 child",
+			opt:  optTemplate("ITEM_TREE", optListWithin("items", 0, 1, optElement("at0001", 1, 1))),
+			list: itemTreeItems,
+			asks: true,
+		},
+		{
+			name: "a single-valued attribute over a 1..1 child",
+			opt:  optTemplate("ITEM_TREE", optOptionalSingleOver("items", optElement("at0001", 1, 1))),
+			list: itemTreeItems,
+		},
+		{
+			name: "a list the template prohibits, over a 1..1 child",
+			opt:  optTemplate("ITEM_TREE", optListWithin("items", 0, 0, optElement("at0001", 1, 1))),
+			list: itemTreeItems,
+		},
+		{
+			name: "a list of primitive values, over a 1..1 child",
+			opt:  optTemplate("DV_MULTIMEDIA", optOctetData()),
+			list: multimediaData,
+		},
+		{
+			name: "a list over a slot",
+			opt:  optTemplate("ITEM_TREE", optListWithin("items", 0, 1, optSlot("CLUSTER", "at0001"))),
+			list: itemTreeItems,
+		},
+		{
+			name: "a list over a child with no occurrences",
+			opt:  optTemplate("ITEM_TREE", optListWithin("items", 0, 1, optNode("ELEMENT", "at0001"))),
+			list: itemTreeItems,
+		},
+		{
+			name: "a list over a child whose occurrences have no lower bound",
+			opt:  optTemplate("ITEM_TREE", optListWithin("items", 0, 1, optElementLowerUnbounded("at0001"))),
+			list: itemTreeItems,
+		},
+	}
+	for _, tc := range cases {
+		for _, implicit := range []bool{true, false} {
+			c := compileOPTText(t, tc.opt, implicit)
+			for _, opts := range corpusOptions(instance.Required) {
+				t.Run(fmt.Sprintf("%s/implicit=%t/%v", tc.name, implicit, opts.ValueFill), func(t *testing.T) {
+					out, err := instance.Generate(t.Context(), c, opts)
+					if err != nil {
+						t.Fatalf("Generate: %v", err)
+					}
+					checkValid(t, out, c)
+					members, takeOut := tc.list(t, out)
+					if wrote := slices.Contains(members, "at0001"); wrote != tc.asks {
+						t.Errorf("Generate(Required) wrote %v, so a member of the child = %t, want %t", members, wrote, tc.asks)
+					}
+					takeOut()
+					var missing []string
+					for _, iss := range validation.Validate(out, c).Issues {
+						if iss.Layer == validation.LayerTemplate && iss.Rule == "occurrences" {
+							missing = append(missing, iss.Path)
+						}
+					}
+					if reported := len(missing) > 0; reported != tc.asks {
+						t.Errorf("Validate(the tree without the list) reports occurrences at %q, so the child missing = %t, want %t", missing, reported, tc.asks)
+					}
+				})
+			}
 		}
 	}
 }

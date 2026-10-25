@@ -88,18 +88,3 @@ func primitiveItems(a *CompiledAttribute) bool {
 // hashType is the RM type the pinned Reference Model declares for every
 // Hash attribute.
 const hashType = "Hash"
-
-// HasMandatoryChild reports whether a child the template allows under the
-// attribute a ([AllowedChildNodes]), other than a slot, has an occurrences
-// lower bound that is bounded and 1 or more ([LowerAtLeastOne]): a child
-// ADL 1.4 calls mandatory in its container. A child that states no
-// occurrences counts for none, as in [AsksForMember], and the attribute's
-// cardinality is not read. The example generator reads a multi-valued
-// attribute this way when it decides whether a child makes the attribute
-// required; the template validator counts the same children against their
-// occurrences on an absent list, so the two cannot drift apart.
-func HasMandatoryChild(a *CompiledAttribute) bool {
-	return slices.ContainsFunc(a.allowed, func(c *CompiledNode) bool {
-		return !c.IsSlot() && LowerAtLeastOne(c.Occurrences())
-	})
-}

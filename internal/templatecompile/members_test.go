@@ -185,6 +185,9 @@ func TestREQ102_REQ107_MandatoryListChildren(t *testing.T) {
 			opt:  attributeShapeOPT("ITEM_TREE", list, "items", closedInterval(1, 1), element("at0001", closedInterval(1, 1))),
 			want: []string{"at0001"},
 		},
+		{name: "no child", attr: "items", opt: membersOPT("")},
+		{name: "cardinality 1..* and no child", attr: "items", opt: membersOPT(openAboveInterval(1))},
+		{name: "cardinality 1..* over an optional child", attr: "items", opt: membersOPT(openAboveInterval(1), closedInterval(0, 1))},
 		{name: "an optional child", attr: "items", opt: attributeShapeOPT("ITEM_TREE", list, "items", "", element("at0001", closedInterval(0, 1)))},
 		{name: "a child with no occurrences", attr: "items", opt: attributeShapeOPT("ITEM_TREE", list, "items", "", element("at0001", ""))},
 		{
@@ -231,59 +234,6 @@ func TestREQ102_REQ107_MandatoryListChildren(t *testing.T) {
 			}
 			if want := append([]string{}, tc.want...); !slices.Equal(got, want) {
 				t.Errorf("MandatoryListChildren(%s) yields %q, want %q", tc.attr, got, want)
-			}
-		})
-	}
-}
-
-// TestREQ107_HasMandatoryChild checks the reader the example generator
-// (REQ-107 Visit rule) uses to decide whether a child makes a multi-valued
-// attribute required: a child the template allows whose occurrences lower
-// bound is bounded and at least 1. The attribute's cardinality is not
-// read, and a child that states no occurrences, or occurrences with an
-// unbounded lower bound, counts for none, as AsksForMember reads it.
-func TestREQ107_HasMandatoryChild(t *testing.T) {
-	cases := []struct {
-		name        string
-		cardinality string
-		occurrences []string
-		want        bool
-	}{
-		{name: "no child"},
-		{name: "cardinality 1..* and no child", cardinality: openAboveInterval(1)},
-		{name: "cardinality 1..* over an optional child", cardinality: openAboveInterval(1), occurrences: []string{closedInterval(0, 1)}},
-		{name: "a required child", cardinality: openAboveInterval(0), occurrences: []string{closedInterval(1, 1)}, want: true},
-		{name: "a 2..5 child and no cardinality", occurrences: []string{closedInterval(2, 5)}, want: true},
-		{name: "a child with no occurrences", cardinality: openAboveInterval(0), occurrences: []string{""}},
-		{
-			name: "a child whose occurrences have an unbounded lower side", cardinality: openAboveInterval(0),
-			occurrences: []string{unboundedLowerInterval},
-		},
-		{
-			name: "a required child after an optional one", cardinality: openAboveInterval(0),
-			occurrences: []string{closedInterval(0, 1), closedInterval(1, 1)}, want: true,
-		},
-		{
-			name: "a prohibited child", cardinality: openAboveInterval(0),
-			occurrences: []string{closedInterval(0, 0)},
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			opt, err := template.ParseOPT(strings.NewReader(membersOPT(tc.cardinality, tc.occurrences...)))
-			if err != nil {
-				t.Fatalf("ParseOPT: %v", err)
-			}
-			c, err := templatecompile.Compile(opt)
-			if err != nil {
-				t.Fatalf("Compile: %v", err)
-			}
-			items := c.Root().Attribute("items")
-			if items == nil {
-				t.Fatal("compiled root has no items attribute")
-			}
-			if got := templatecompile.HasMandatoryChild(items); got != tc.want {
-				t.Errorf("HasMandatoryChild(items) = %t, want %t", got, tc.want)
 			}
 		})
 	}
