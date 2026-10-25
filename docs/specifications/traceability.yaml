@@ -1248,6 +1248,7 @@ requirements:
       - openehr/template/path_test.go
       - openehr/template/t_archetype_root_test.go
       - openehr/template/template_test.go
+      - openehr/template/untyped_node_test.go
       - testkit/fixtures/corpus_xml_booleans_test.go
       - testkit/probes/instance/t_archetype_root_test.go
       - testkit/probes/template/probe_022_opt_path_resolution.go
