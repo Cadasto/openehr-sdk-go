@@ -47,8 +47,12 @@
 //     archetype. So Medium builds at most one optional archetype under an
 //     attribute, the medium level. It is the zero value, and so the
 //     default.
-//   - Required: the required attributes only, not one merely because it
-//     has an allowed template child, except a composition's context,
+//   - Required: the attributes the BMM marks mandatory, those whose
+//     existence lower bound is at least 1, and the multi-valued ones that
+//     hold an allowed template child, not a slot, whose occurrences lower
+//     bound is at least 1; not one that only its cardinality lower bound
+//     asks for, nor one merely because it has an allowed template child,
+//     except a composition's context,
 //     which it visits as Medium does, so the context every policy writes
 //     is built under the template's constraints. A visited multi-valued
 //     attribute gets each allowed child that is not a slot as many times

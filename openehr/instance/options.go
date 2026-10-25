@@ -44,10 +44,12 @@ const (
 	// Required builds only the data points the template makes mandatory
 	// and a composition's context, what the ITS-REST template example
 	// calls detail_level=required. It visits only the required
-	// attributes: an attribute the BMM marks mandatory, or one whose
-	// existence or cardinality lower bound is bounded and at least 1; it
-	// does not visit an attribute merely because it has an allowed OPT
-	// child, except a COMPOSITION's context, which it visits as Medium
+	// attributes: an attribute the BMM marks mandatory, one whose
+	// existence lower bound is bounded and at least 1, or a multi-valued
+	// one holding an allowed OPT child that is not a slot and whose
+	// occurrences lower bound is at least 1; a cardinality lower bound
+	// alone does not make it visit an attribute, and nor does an allowed
+	// OPT child, except a COMPOSITION's context, which it visits as Medium
 	// does, so the context every policy writes is built under the OPT's
 	// constraints. A visited multi-valued attribute gets
 	// occurrences.lower members of each allowed OPT child that is not a
