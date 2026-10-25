@@ -47,12 +47,14 @@ type DvQuantity struct {
 func (DvQuantity) isPrimitive() {}
 
 // ExampleValue returns a minimal-valid [QuantityValue].
-// The first entry of Units drives the example: the magnitude comes from
-// the entry's range (lower bound when set; midpoint or zero otherwise)
-// and the units are copied verbatim. With no Units, the example is
-// magnitude 0 in the first entry of PropertyUnits, a primary unit of the
-// property when it has one. It falls back to QuantityValue{0, "1"}
-// when the constraint is open-ended (any units / any magnitude).
+// An entry of Units gives the example its units, copied verbatim, and a
+// magnitude from the entry's range (lower bound when set; midpoint or zero
+// otherwise). The example is that of the first entry whose range admits
+// that magnitude, or the first entry's when none does, as when every range
+// is inverted. With no Units, the example is magnitude 0 in the first
+// entry of PropertyUnits, a primary unit of the property when it has one.
+// It falls back to QuantityValue{0, "1"} when the constraint is open-ended
+// (any units / any magnitude).
 func (c DvQuantity) ExampleValue() any {
 	if len(c.Units) == 0 {
 		if len(c.PropertyUnits) > 0 {
@@ -60,9 +62,18 @@ func (c DvQuantity) ExampleValue() any {
 		}
 		return QuantityValue{Magnitude: 0, Units: "1", Precision: -1}
 	}
-	u := c.Units[0]
-	mag := exampleMagnitude(u.Magnitude)
-	return QuantityValue{Magnitude: mag, Units: u.Units, Precision: -1}
+	for _, u := range c.Units {
+		if q := u.example(); len(u.violations(q)) == 0 {
+			return q
+		}
+	}
+	return c.Units[0].example()
+}
+
+// example returns the quantity in u's units whose magnitude
+// [exampleMagnitude] picks from u's range, its precision unknown.
+func (u QuantityUnit) example() QuantityValue {
+	return QuantityValue{Magnitude: exampleMagnitude(u.Magnitude), Units: u.Units, Precision: -1}
 }
 
 // exampleMagnitude picks an in-range float from r, for a quantity

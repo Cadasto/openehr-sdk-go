@@ -165,7 +165,8 @@ func TestREQ103_CStringExampleValue(t *testing.T) {
 // REQ-103 — with no Units list, DvQuantity.ExampleValue gives magnitude 0
 // in the first entry of PropertyUnits, the primary unit the parser puts
 // first; a Units list keeps precedence, and with neither the example is
-// {0, "1"}.
+// {0, "1"}. With a Units list the example is that of the first entry whose
+// magnitude range admits it, or the first entry's when none does.
 func TestREQ103_DvQuantityExampleValue(t *testing.T) {
 	cases := []struct {
 		name string
@@ -189,6 +190,22 @@ func TestREQ103_DvQuantityExampleValue(t *testing.T) {
 			name: "neither",
 			c:    constraints.DvQuantity{},
 			want: constraints.QuantityValue{Magnitude: 0, Units: "1", Precision: -1},
+		},
+		{
+			name: "a first entry that admits no magnitude",
+			c: constraints.DvQuantity{Units: []constraints.QuantityUnit{
+				{Units: "mg", Magnitude: constraints.NumericRange{Lower: 5, Upper: 3, LowerInclusive: true, UpperInclusive: true}},
+				{Units: "g", Magnitude: constraints.NumericRange{Lower: 1, Upper: 10, LowerInclusive: true, UpperInclusive: true}},
+			}},
+			want: constraints.QuantityValue{Magnitude: 1, Units: "g", Precision: -1},
+		},
+		{
+			name: "no entry that admits a magnitude",
+			c: constraints.DvQuantity{Units: []constraints.QuantityUnit{
+				{Units: "mg", Magnitude: constraints.NumericRange{Lower: 5, Upper: 3, LowerInclusive: true, UpperInclusive: true}},
+				{Units: "g", Magnitude: constraints.NumericRange{Lower: 9, Upper: 2, LowerInclusive: true, UpperInclusive: true}},
+			}},
+			want: constraints.QuantityValue{Magnitude: 5, Units: "mg", Precision: -1},
 		},
 	}
 	for _, tc := range cases {

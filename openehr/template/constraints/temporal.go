@@ -106,7 +106,10 @@ func (CTime) isPrimitive() {}
 // its zone, takes Z where the pattern or TimezoneValidity requires a zone it
 // lacks, is read in UTC where the pattern requires Z and it carries another
 // zone, and drops its zone where TimezoneValidity disallows one. Its
-// sentinel is "12:00:00".
+// sentinel is "12:00:00". No candidate carries a fraction of a second or
+// changes its zone, so a range only such a time meets gives the sentinel,
+// which Validate refuses: the range above 23:59:59 gives "12:00:00",
+// though "23:59:59.5" is valid.
 func (c CTime) ExampleValue() any {
 	return clockExample(clockTime, c.Pattern, c.Range, c.TimezoneValidity, "12:00:00")
 }
@@ -151,7 +154,10 @@ func (CDateTime) isPrimitive() {}
 // ExampleValue returns a date-time written to Pattern and inside Range,
 // chosen as [CDate.ExampleValue] chooses a date, with the zone written as
 // [CTime.ExampleValue] writes it; a literal field after the year can move a
-// bound out of the range. Its sentinel is "2020-01-01T12:00:00Z".
+// bound out of the range. Its sentinel is "2020-01-01T12:00:00Z". No
+// candidate carries a fraction of a second, so a range only such a
+// date-time meets, one whose excluded bounds are a second apart, gives the
+// sentinel, which Validate refuses.
 func (c CDateTime) ExampleValue() any {
 	return clockExample(clockDateTime, c.Pattern, c.Range, c.TimezoneValidity, "2020-01-01T12:00:00Z")
 }
@@ -201,7 +207,10 @@ func (CDuration) isPrimitive() {}
 // pattern names, rounded up and moved past an excluded end; the upper bound
 // likewise, rounded down. When none passes, as when no duration meets both
 // the pattern and the range, or the pattern or a bound is malformed, it
-// returns "P0D", which Validate then refuses.
+// returns "P0D", which Validate then refuses. No candidate carries a
+// fraction of a second, so it returns "P0D" too where only such a duration
+// meets the range: the range between PT0S and PT0.5S, both excluded,
+// though "PT0.25S" is valid.
 func (c CDuration) ExampleValue() any {
 	allowed := allDesignators
 	if c.Pattern != "" {
