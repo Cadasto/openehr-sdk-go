@@ -938,7 +938,9 @@ var listMemberRules = map[string]listMembers{
 // present and empty, and an absent key and JSON null both read as absent.
 //
 // Under a template the finding gives way to the template's report of the
-// same list at the list's path ([engine.withdrawGivenWay]). The diagnostic
+// same list, while it holds no item, at the list's path or below it, and,
+// for a HISTORY's events, to its report of the summary
+// ([engine.withdrawGivenWay]). The diagnostic
 // names the class and the attributes, never a value (REQ-168).
 func (f *findings) checkListMembers(value any, rmType string, path issuePath, rule string) {
 	m, ok := listMemberRules[rule]
