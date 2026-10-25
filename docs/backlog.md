@@ -7,6 +7,8 @@ harvested_through: 2026-10-24T10:55:38Z
 Leftovers of merged branches: suggestions, and findings the maintainer deferred here. Each line is a lead, not a finding: verify it before acting. Lines are grouped by theme so one delivery can take a whole group; the sentence under each heading says what such a delivery is. A delivery whose `Files` touch a line's path verifies it, and fixes it or finds it stale; the next `/sdd-triage --backlog` deletes what is settled. `sdd-pr harvest` and `sdd-pr flip --carry` add new lines under `## Unsorted`, defects first; the next `/sdd-triage --backlog` sorts them into a group. Edit freely.
 
 ## Unsorted
+- openehr/serialize/simplified/flat_encode.go:178 · The FLAT encoder's refusal text quotes the EVENT_CONTEXT.setting value, code and terminology, which now reaches composition.Save errors, while canonical JSON errors were made value-free in issue 278. · by: go-reviewer · from: feat/composition-formats
+- openehr/client/ehr/composition/composition.go:450 · Update's refusal text 'empty If-Match (REQ-054)' shows a requirement id in an error callers see; other leaf errors name no spec identifiers. · by: sdd-implementer · from: feat/composition-formats
 
 ## Generator: trees Generate builds that the template refuses, or shapes it fails on (REQ-107)
 Code in openehr/instance and internal/templateinstance/rmwrite where Generate builds a tree the template refuses, or fails on a shape the template allows. Lane: full for the top-up and the Required visit (REQ-107 § What a visit writes and *Visit rule* first), maintenance for the rest. Size: M.
