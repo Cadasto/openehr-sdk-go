@@ -222,8 +222,10 @@ func membersUnderEveryPolicy(n int) map[instance.Policy]int {
 // lower bound is above 1, is topped up to that bound with members built
 // from its BMM type, and to no more than its cardinality upper bound,
 // except the member the BMM requires (REQ-107 Precedence 2), under each
-// policy that visits it. Required leaves out such a list where only that
-// cardinality asks for a member (REQ-107 Visit rule).
+// policy that visits it. Where only that cardinality asks for a member, no
+// policy visits such a list: Required leaves it out by its own rule, and
+// Large and Medium because every member it would get is undescribed
+// (REQ-107 Visit rule).
 func TestREQ107_SilentRequiredMultipleIsToppedUp(t *testing.T) {
 	cases := []struct {
 		name string
@@ -235,12 +237,10 @@ func TestREQ107_SilentRequiredMultipleIsToppedUp(t *testing.T) {
 		// The RM leaves an ITEM_TREE's items optional and the OPT names no
 		// child, so only the cardinality asks for a member: a cardinality
 		// lower bound counts the members of a list that exists and does not
-		// make Required visit the list (REQ-107 Visit rule).
-		{
-			name: "ITEM_TREE items, lower 3",
-			opt:  optTemplate("ITEM_TREE", optCardinal("items", 3, -1)),
-			want: map[instance.Policy]int{instance.Large: 3, instance.Medium: 3, instance.Required: 0},
-		},
+		// make Required visit the list, nor make Large and Medium visit one
+		// whose members, placeholder ELEMENTs built from the BMM type, the
+		// template does not describe (REQ-107 Visit rule).
+		{name: "ITEM_TREE items, lower 3", opt: optTemplate("ITEM_TREE", optCardinal("items", 3, -1)), want: membersUnderEveryPolicy(0)},
 		// The existence requires the same list, so every policy visits it
 		// and its cardinality tops it up.
 		{name: "ITEM_TREE items, existence 1, lower 3", opt: optTemplate("ITEM_TREE", optRequiredCardinal("items", 3, -1)), want: membersUnderEveryPolicy(3)},

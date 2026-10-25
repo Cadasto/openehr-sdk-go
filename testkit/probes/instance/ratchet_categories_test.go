@@ -131,15 +131,16 @@ func TestREQ107_HollowBodyFloor(t *testing.T) {
 	}
 }
 
-// archetypeIDMissingOPT is a COMPOSITION template whose required content
-// attribute names no child, so Generate refuses the OBSERVATION it would
-// build there.
+// archetypeIDMissingOPT is a COMPOSITION template whose content, required
+// by its existence and its cardinality, names no child, so Generate refuses
+// the OBSERVATION it would build there.
 const archetypeIDMissingOPT = `<?xml version="1.0" encoding="utf-8"?>
 <template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.openehr.org/v1">
 <language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
 <template_id><value>archetype_id_missing</value></template_id><concept>archetype_id_missing</concept>
 <definition><rm_type_name>COMPOSITION</rm_type_name><node_id>at0000</node_id>
 <attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>content</rm_attribute_name>
+<existence><lower_included>true</lower_included><upper_included>true</upper_included><lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded><lower>1</lower><upper>1</upper></existence>
 <cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval><lower_included>true</lower_included><lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>1</lower></interval></cardinality>
 </attributes>
 <archetype_id><value>openEHR-EHR-COMPOSITION.encounter.v1</value></archetype_id></definition>

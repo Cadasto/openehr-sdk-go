@@ -664,11 +664,14 @@ func attrProhibited(attr *tcimpl.CompiledAttribute) bool {
 // policy, so the walk builds it under the OPT's constraints (a pinned
 // setting, a required other_context) rather than leaving it bare. Inside
 // the context Required's own rule applies. Under Large and Medium, an
-// attribute that is not required, other than that context, is not visited
-// either when every member the walk would build for it is undescribed or
-// needs undescribed content (membersUndescribed): a slot fill, a LOCATABLE
-// built from a BMM type where the OPT names no node, or a node with a
-// required attribute that can only hold such members. The context is
+// attribute that is not required (isRequired), other than that context, is
+// not visited either when every member the walk would build for it is
+// undescribed or needs undescribed content (membersUndescribed): a slot
+// fill, a LOCATABLE built from a BMM type where the OPT names no node, an
+// unnamed archetype root, or a node with a required attribute that can only
+// hold such members. A list that only its cardinality lower bound requires
+// is not required here, as Required reads it: that bound counts the members
+// of a list that exists and does not ask for the list. The context is
 // visited whatever its members need, since RM defaults would write it
 // without them. No other Policy value gets here: Generate refuses one
 // before the walk starts.
@@ -677,11 +680,14 @@ func (g *generator) shouldVisit(optNode *tcimpl.CompiledNode, attr *tcimpl.Compi
 	if g.opts.Policy == Required && !isContext {
 		return isRequired(attr)
 	}
-	if visitRequired(attr) {
+	if isRequired(attr) {
 		return true
 	}
 	if !isContext && g.membersUndescribed(optNode, attr) {
 		return false
+	}
+	if visitRequired(attr) {
+		return true
 	}
 	return g.opts.Policy == Large || len(tcimpl.AllowedChildNodes(attr)) > 0
 }
@@ -690,9 +696,11 @@ func (g *generator) shouldVisit(optNode *tcimpl.CompiledNode, attr *tcimpl.Compi
 // it, so Large and Medium visit it: it is required (isRequired), or its
 // cardinality lower bound is bounded and at least 1. Cardinality lower and
 // existence are separate, so a 1..* list is required when existence does
-// not say so. Required leaves out a list only that cardinality requires
-// (shouldVisit); the rule on undescribed content reads this wider sense
-// under every policy.
+// not say so. Required leaves out a list only that cardinality requires,
+// and so do Large and Medium where every member it would get is
+// undescribed or needs undescribed content (shouldVisit). Whether a node
+// needs undescribed content (needsUndescribed) reads this wider sense under
+// every policy.
 func visitRequired(attr *tcimpl.CompiledAttribute) bool {
 	return isRequired(attr) || tcimpl.LowerAtLeastOne(attr.ChildMultiplicity())
 }

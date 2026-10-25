@@ -163,8 +163,11 @@ func TestREQ107_RequiredVisitsAListForItsMandatoryChild(t *testing.T) {
 // cardinality asks for a member, and a cardinality lower bound counts the
 // members of a list that exists: Required leaves the content out, while
 // Large and Medium, under which that bound still makes the content
-// required, write the one member. It holds under both value fills, and each
-// tree passes the RM floor and the template validator.
+// required, write the one member. Where that root holds content no template
+// node describes, the bound does not make the content required for the rule
+// on undescribed content either, so Large and Medium leave it out too. It
+// holds under both value fills, and each tree passes the RM floor and the
+// template validator.
 func TestREQ107_RequiredContentFollowsItsChildrenNotItsCardinality(t *testing.T) {
 	cases := []struct {
 		name string
@@ -187,12 +190,21 @@ func TestREQ107_RequiredContentFollowsItsChildrenNotItsCardinality(t *testing.T)
 		},
 		{
 			name: "cardinality 1..* over an optional archetype root",
-			opt:  optTemplate("COMPOSITION", optList("content", 0, 1, optRootOccurring("EVALUATION", evaluationID, 0, 1))),
+			opt: optTemplate("COMPOSITION", optList("content", 0, 1,
+				optRootOccurring("EVALUATION", evaluationID, 0, 1, optSingle("data", optNode("ITEM_TREE", "at0001"))))),
 			want: policyIDs{
 				instance.Large:    {evaluationID},
 				instance.Medium:   {evaluationID},
 				instance.Required: {},
 			},
+		},
+		{
+			// The EVALUATION's data is built from its BMM type, so the
+			// root needs undescribed content, and a content only its
+			// cardinality requires is left out under every policy.
+			name: "cardinality 1..* over an optional archetype root whose data the OPT leaves silent",
+			opt:  optTemplate("COMPOSITION", optList("content", 0, 1, optRootOccurring("EVALUATION", evaluationID, 0, 1))),
+			want: sameUnderEveryPolicy(),
 		},
 	}
 	for _, tc := range cases {
