@@ -670,6 +670,118 @@ func TestValidate_REQ171_DepthLimitInsideATrial(t *testing.T) {
 	}
 }
 
+// declaredBefore returns opt with decl inserted before the declaration of
+// the attribute name, or, with name empty, after the root's last attribute.
+func declaredBefore(t *testing.T, opt, decl, name string) string {
+	t.Helper()
+	at := strings.Index(opt, "\n    <archetype_id>")
+	if name != "" {
+		attr := "\n      <rm_attribute_name>" + name + "</rm_attribute_name>"
+		if strings.Count(opt, attr) != 1 {
+			t.Fatalf("the OPT does not declare %q once at its root: update the insertion", name)
+		}
+		at = strings.LastIndex(opt[:strings.Index(opt, attr)], "\n    <attributes")
+	}
+	if at < 0 {
+		t.Fatalf("the OPT has no place to declare an attribute before %q: update the insertion", name)
+	}
+	return opt[:at] + decl + opt[at:]
+}
+
+// REQ-171 One walk — a trial the depth limit stops does not validate,
+// whether the walk reports that stop inside the trial or reported max_depth
+// already, at a place walked before it. So the binding does not turn on the
+// order the template declares its attributes in: with an attribute the
+// depth limit stops declared before the one bound by trial, and after it,
+// the value binds to the first child, under which every trial stops, and
+// draws its finding. It holds of a single-valued attribute, an ACTION's
+// ISM_TRANSITION whose first alternative requires a transition the value
+// lacks, and of a list item, an ELEMENT whose first child admits other
+// units than the value's.
+func TestValidate_REQ171_DepthStopFailsATrialWhetherReportedThereOrNot(t *testing.T) {
+	const (
+		requiresTransition = `
+        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+          <rm_attribute_name>transition</rm_attribute_name>
+          <existence><lower>1</lower><upper>1</upper></existence>
+          <children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>DV_CODED_TEXT</rm_type_name><node_id></node_id></children>
+        </attributes>`
+		description = `
+    <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+      <rm_attribute_name>description</rm_attribute_name>
+      <existence><lower>1</lower><upper>1</upper></existence>
+      <children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>ITEM_TREE</rm_type_name><node_id>at0017</node_id></children>
+    </attributes>`
+		detailsDecl = `
+    <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+      <rm_attribute_name>archetype_details</rm_attribute_name>
+    </attributes>`
+	)
+	pounds := func() any {
+		return &rm.Cluster{
+			ArchetypeNodeID:  "openEHR-EHR-CLUSTER.items.v1",
+			Name:             rm.DVText{Value: "cluster"},
+			ArchetypeDetails: archetypeDetails("openEHR-EHR-CLUSTER.items.v1"),
+			Items:            []rm.Item{&rm.Element{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "element"}, Value: rm.DVQuantity{Magnitude: 80, Units: "[lb_av]"}}},
+		}
+	}
+	tests := []struct {
+		name string
+		// opt is the template; bound names the attribute bound by trial,
+		// and earlier declares the attribute the depth limit stops first.
+		opt, bound, earlier string
+		root                func() any
+		depth               int
+		// want is the finding the value draws under the first child.
+		want string
+	}{
+		{
+			name:    "an alternative of a single-valued attribute",
+			opt:     actionTransitionsOPT(transitionChild("at0005", "532", "at0006", requiresTransition), completedTransition),
+			bound:   "ism_transition",
+			earlier: description,
+			root:    func() any { return transitionAction("532", "at0006") },
+			depth:   2,
+			want:    "required /ism_transition/transition",
+		},
+		{
+			name:    "a list item of a rank of two",
+			opt:     clusterItemsOPT(quantityIn("kg"), quantityIn("[lb_av]")),
+			bound:   "items",
+			earlier: detailsDecl,
+			root:    pounds,
+			depth:   2,
+			want:    "primitive_unit_unknown /items[at0001]/value",
+		},
+	}
+	for _, tc := range tests {
+		for _, order := range []struct {
+			name   string
+			before string
+		}{{name: "declared after", before: ""}, {name: "declared before", before: tc.bound}} {
+			t.Run(tc.name+"/"+order.name, func(t *testing.T) {
+				c := mustCompileInline(t, declaredBefore(t, tc.opt, tc.earlier, order.before))
+				r := validation.New(validation.WithLimits(validation.Limits{Depth: tc.depth})).Validate(tc.root(), c)
+				var others []string
+				depth := 0
+				for _, iss := range r.Issues {
+					if iss.Code == "max_depth" {
+						depth++
+						continue
+					}
+					others = append(others, iss.Code+" "+iss.Path)
+				}
+				if depth != 1 || len(r.Coverage.Stopped) != 1 {
+					t.Errorf("Validate within depth %d: issues %q, Coverage.Stopped %q, want one max_depth and one stop", tc.depth, issueKeys(r.Issues), r.Coverage.Stopped)
+				}
+				if want := []string{tc.want}; !slices.Equal(others, want) {
+					t.Errorf("Validate within depth %d: issues %q, want max_depth and %q: every trial stops, so the value binds to the first child", tc.depth, issueKeys(r.Issues), want)
+				}
+			})
+		}
+	}
+}
+
 // REQ-107 Exceptions and known gaps, REQ-102 Structural — binding items —
 // the generator gives an optional sibling no member of its own where a
 // later, required one carries its identity and neither pins a name. The

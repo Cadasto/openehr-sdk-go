@@ -14,12 +14,13 @@ import (
 )
 
 // walkMark is how far the walk's records reach at one point: the issues, the
-// refusals, the coverage entries, the stops and the classes visited. A trial
-// returns the records to its mark when what it found is withdrawn.
+// refusals, the coverage entries, the stops, reported or not, and the classes
+// visited. A trial returns the records to its mark when what it found is
+// withdrawn.
 type walkMark struct {
-	issues, refused, external, notInRM, stoppedAt int
-	depthStopped                                  bool
-	visited                                       indexSet
+	issues, refused, external, notInRM, stoppedAt, depthCuts int
+	depthStopped                                             bool
+	visited                                                  indexSet
 }
 
 // mark returns how far the walk's records reach now.
@@ -30,6 +31,7 @@ func (e *engine) mark() walkMark {
 		external:     len(e.external),
 		notInRM:      len(e.notInRM),
 		stoppedAt:    len(e.stoppedAt),
+		depthCuts:    e.depthCuts,
 		depthStopped: e.depthStopped,
 		visited:      slices.Clone(e.found.visited),
 	}
@@ -40,6 +42,7 @@ func (e *engine) mark() walkMark {
 func (e *engine) rollback(m walkMark) {
 	e.truncate(m)
 	e.stoppedAt = e.stoppedAt[:m.stoppedAt]
+	e.depthCuts = m.depthCuts
 	e.depthStopped = m.depthStopped
 }
 
@@ -59,6 +62,7 @@ func (e *engine) truncate(m walkMark) {
 type walkSegment struct {
 	issues                              []Issue
 	refused, external, notInRM, stopped []string
+	depthCuts                           int
 	depthStopped                        bool
 	visited                             indexSet
 }
@@ -72,6 +76,7 @@ func (e *engine) setAside(m walkMark) walkSegment {
 		external:     slices.Clone(e.external[m.external:]),
 		notInRM:      slices.Clone(e.notInRM[m.notInRM:]),
 		stopped:      slices.Clone(e.stoppedAt[m.stoppedAt:]),
+		depthCuts:    e.depthCuts - m.depthCuts,
 		depthStopped: e.depthStopped,
 		visited:      slices.Clone(e.found.visited),
 	}
@@ -87,6 +92,7 @@ func (e *engine) restore(s walkSegment) {
 	e.external = append(e.external, s.external...)
 	e.notInRM = append(e.notInRM, s.notInRM...)
 	e.stoppedAt = append(e.stoppedAt, s.stopped...)
+	e.depthCuts += s.depthCuts
 	e.depthStopped = s.depthStopped
 	e.found.visited = append(e.found.visited[:0], s.visited...)
 }
@@ -112,10 +118,13 @@ func (e *engine) keepStops(m walkMark) {
 	})
 }
 
-// validatesSince reports whether the walk recorded no error finding since m:
-// nothing that makes [Result.OK] false.
+// validatesSince reports whether the walk recorded no error finding since m,
+// nothing that makes [Result.OK] false, and the depth limit stopped it
+// nowhere since m. A stop of the depth limit is reported once per walk, so
+// one an earlier part of the walk reported leaves none to report since m;
+// the count of stops tells it all the same.
 func (e *engine) validatesSince(m walkMark) bool {
-	return !slices.ContainsFunc(e.found.issues[m.issues:], func(iss Issue) bool { return iss.Severity == Error })
+	return e.depthCuts == m.depthCuts && !slices.ContainsFunc(e.found.issues[m.issues:], func(iss Issue) bool { return iss.Severity == Error })
 }
 
 // bindAmong binds a value to one of candidates, the children of one binding

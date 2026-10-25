@@ -101,9 +101,13 @@ type engine struct {
 	maxDepth, maxNodes int
 	// stoppedAt holds the path of the max_depth issue and of the max_nodes
 	// issue, in the order the walk reported them; depthStopped is set once
-	// the first depth stop is reported, so later ones are silent.
+	// the first depth stop is reported, so later ones are silent. depthCuts
+	// counts every place the depth limit stopped the walk, reported or not,
+	// so that a trial the limit stopped fails though it reports nothing
+	// ([engine.validatesSince]).
 	stoppedAt    []string
 	depthStopped bool
+	depthCuts    int
 	// external holds, in walk order, the path of each node bound to a
 	// CONSTRAINT_REF, whose value set is outside the SDK
 	// ([Coverage.External]). Nil until one is met.
@@ -408,6 +412,7 @@ func (e *engine) visit(n engineNode) {
 		return
 	}
 	if n.depth >= e.maxDepth {
+		e.depthCuts++
 		if !e.depthStopped {
 			e.depthStopped = true
 			at := n.path.String()
