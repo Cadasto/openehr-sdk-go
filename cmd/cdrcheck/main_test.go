@@ -904,6 +904,84 @@ func TestRun_SupersededUploadsKeptAndUncounted_REQ082(t *testing.T) {
 	}
 }
 
+func TestRun_OtherContentUnderTheNewIDLeavesThatCDROut_REQ082(t *testing.T) {
+	t.Parallel()
+	opt, err := os.ReadFile(vendoredOPT())
+	if err != nil {
+		t.Fatal(err)
+	}
+	other := bytes.Replace(opt, []byte("<concept>Minimal evaluation</concept>"), []byte("<concept>Another template</concept>"), 1)
+	newID := testTemplate + renameSuffix
+	otherNew, err := renamedOPT(other, newID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	eb, fe := newFakeCDR(t), newFakeCDR(t)
+	// EHRbase holds other content under the id and under the new id too;
+	// FerroEHR holds neither.
+	eb.templates[testTemplate], eb.templates[newID] = other, otherNew
+	eb.example, fe.example = vendoredExample(t), vendoredExample(t)
+	e := env{
+		envTemplates:            templateDir(t, nil, vendoredOPT()),
+		"OPENEHR_LIVE_EHRBASE":  eb.url(),
+		"OPENEHR_LIVE_FERROEHR": fe.url(),
+		envAllowMutating:        "1",
+	}
+	_, _, out, err := runFor(t, e)
+	if err != nil {
+		t.Fatalf("run = %v", err)
+	}
+	got := map[string]uploadRecord{}
+	for _, u := range readJSONL[uploadRecord](t, out, "upload.jsonl") {
+		if strings.HasSuffix(u.TemplateID, renameSuffix+renameSuffix) {
+			t.Errorf("%s uploaded %s, want a template renamed once at most", u.CDR, u.TemplateID)
+		}
+		got[u.CDR+" "+u.TemplateID] = u
+	}
+	if u := got["ehrbase "+newID]; u.Present || u.StoredSame == nil || *u.StoredSame || u.SupersededBy != "" {
+		t.Errorf("EHRbase's upload of %s = %+v, want it absent, other content, not superseded", newID, u)
+	}
+	if u := got["ferroehr "+newID]; !u.Present {
+		t.Errorf("FerroEHR's upload of %s = %+v, want it present", newID, u)
+	}
+	for name, n := range map[string]int{"ehrbase": len(eb.state().uploads), "ferroehr": len(fe.state().uploads)} {
+		if n != 2 {
+			t.Errorf("%s saw %d uploads, want 2: the id and the new id, no third", name, n)
+		}
+	}
+	for _, g := range readJSONL[genRecord](t, out, "gen.jsonl") {
+		if g.TemplateID != newID {
+			t.Errorf("generated %s under %s, want %s: the SDK goes on under the new id", g.label(), g.TemplateID, newID)
+		}
+	}
+	ebs, fes := eb.state(), fe.state()
+	if len(ebs.posted) != 0 || len(ebs.exampleAsks) != 0 {
+		t.Errorf("EHRbase got %d compositions and %d example requests, want none: it holds other content under %s", len(ebs.posted), len(ebs.exampleAsks), newID)
+	}
+	// FerroEHR gets every SDK document and its own examples, at three levels.
+	if want := len(policies)*len(fills) + 3; len(fes.posted) != want || len(fes.exampleAsks) != 3 {
+		t.Errorf("FerroEHR got %d compositions and %d example requests, want %d and 3", len(fes.posted), len(fes.exampleAsks), want)
+	}
+	sdkDocs := 0
+	for _, p := range fes.posted {
+		if bytes.Contains(p.body, []byte(`"value":"`+newID+`"`)) {
+			sdkDocs++
+		}
+	}
+	if want := len(policies) * len(fills); sdkDocs != want {
+		t.Errorf("FerroEHR got %d compositions of template %s, want %d", sdkDocs, newID, want)
+	}
+	for _, c := range readSummary(t, out).PerCDR {
+		want := ratio{1, 1}
+		if c.Name == "ehrbase" {
+			want = ratio{0, 1}
+		}
+		if c.TemplatesPresent != want {
+			t.Errorf("%s templates present = %v, want %v", c.Name, c.TemplatesPresent, want)
+		}
+	}
+}
+
 func TestLoadConfig_OutputThroughASymlinkStaysOutside_REQ082(t *testing.T) {
 	t.Parallel()
 	wd, err := os.Getwd() // cmd/cdrcheck, inside the module
