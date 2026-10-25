@@ -440,8 +440,8 @@ func TestGetAtTimeNoVersion(t *testing.T) {
 	if meta == nil {
 		t.Error("204 read: expected non-nil metadata")
 	}
-	if q := captured.URL.Query().Get("version_at_time"); q != at.Format(time.RFC3339) {
-		t.Errorf("version_at_time = %q, want %q", q, at.Format(time.RFC3339))
+	if q, want := captured.URL.Query().Get("version_at_time"), "2026-05-17T10:00:00Z"; q != want {
+		t.Errorf("version_at_time = %q, want %q", q, want)
 	}
 }
 
