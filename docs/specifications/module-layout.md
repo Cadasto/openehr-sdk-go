@@ -105,7 +105,6 @@ Application code (cmd/examples, downstream consumers)
     ├──→ openehr/aql/
     ├──→ openehr/client/*
     │       └──→ transport/         openehr/rm/         openehr/serialize/
-    │       (openehr/client/ehr/composition also ──→ openehr/template/webtemplate/, the Web Template its FLAT and STRUCTURED formats need)
     │              └──→ auth/        └──→ openehr/rm/typereg/
     │                     └──→ net/http.Client (injected)
     │
@@ -118,6 +117,7 @@ Application code (cmd/examples, downstream consumers)
 openehr/{serialize, instance, client/*} ──→ openehr/terminology/   (stdlib-only; sits below openehr/rm, which may import it later — REQ-034)
 openehr/{rm, rm/typereg, serialize/canjson} ──→ openehr/internal/refused/   (stdlib-only; carries a refused literal to DecodeError.Value)
 openehr/{rm/typereg, serialize/canjson} ──→ openehr/template/constraints/   (stdlib + internal/iso8601 only; the Redacted type DecodeError.Value holds)
+openehr/client/ehr/composition ──→ openehr/template/webtemplate/   (the Web Template its FLAT and STRUCTURED formats serialise against — REQ-173)
 
 cadasto/care      ──→ openehr/client/*
 cadasto/{extra, mpi, admin} ──→ transport/
