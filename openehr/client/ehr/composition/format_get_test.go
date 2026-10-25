@@ -761,8 +761,8 @@ func TestGetSimplifiedDecodeOptions(t *testing.T) {
 // makes the read's decode fail with the typed *transport.DecodeError;
 // simplified.WithUnmatched sees the key. The options reach the codec in the
 // order given, so of two WithUnmatched the last one sees the key, and only
-// the last WithGetFormat's options count. A nil decode option is passed on
-// and the codec skips it.
+// the last WithGetFormat's options count. A nil decode option does not break
+// the read.
 func TestGetDecodeOptionsGovernUnmatchedContent(t *testing.T) {
 	wt, comp := loadFormatFixture(t)
 	body := withUnmatchedKey(t, encodeAs(t, composition.FormatFlat, comp, wt))
