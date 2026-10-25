@@ -56,10 +56,10 @@ been run against.
 | [`smart/discovery`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/smart/discovery) | Service catalog |
 | [`smart`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/smart) | SMART launch context and ID-token claims after the `auth/smart` exchange (**partial**: app registration is open) |
 | [`openehr/client/ehr`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/client/ehr) | EHR identity and version metadata |
-| [`openehr/client/ehr/composition`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition) | Composition CRUD |
+| [`openehr/client/ehr/composition`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition) | Composition CRUD, revision history and version reads |
 | [`openehr/client/ehr/contribution`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/client/ehr/contribution) | Multi-version commits |
 | [`openehr/client/ehr/directory`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/client/ehr/directory) | Directory / folder |
-| [`openehr/client/ehr/ehrstatus`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/client/ehr/ehrstatus) | EHR_STATUS |
+| [`openehr/client/ehr/ehrstatus`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/client/ehr/ehrstatus) | EHR_STATUS, its revision history and version reads |
 | [`openehr/client/ehr/itemtags`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/client/ehr/itemtags) | `openehr-item-tag` headers on composition, EHR_STATUS and directory reads and on composition writes (**partial**; the dedicated ITEM_TAG endpoints are deferred) |
 | [`openehr/client/query`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/client/query) | Ad-hoc and stored AQL |
 | [`openehr/client/definition`](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go/openehr/client/definition) | Templates and stored queries |
