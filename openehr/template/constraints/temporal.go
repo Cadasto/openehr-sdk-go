@@ -52,8 +52,8 @@ func (CDate) isPrimitive() {}
 // the month or the day as a literal number beside a range: written to the
 // pattern, a bound takes the literal, which can move it out of the range.
 // "yyyy-06-dd" with the range up to 2004-05-20 gives "2020-01-01", though
-// "2003-06-01" is valid. No OPT reaches that case: the ITS-XML pattern
-// grammar admits no literal.
+// "2003-06-01" is valid. Only an OPT that breaks the ITS-XML pattern
+// grammar, which admits no literal, reaches that case.
 func (c CDate) ExampleValue() any {
 	return clockExample(clockDate, c.Pattern, c.Range, c.TimezoneValidity, "2020-01-01")
 }
