@@ -477,9 +477,10 @@ func snomedCodedText(code string) func(t *testing.T, out any) rm.DVCodedText {
 // OPT limits the text with a C_STRING that rejects the term text, the text
 // the walk wrote stays (Precedence 1); a code its own archetype does not
 // define keeps the walk's text, even where an enclosing archetype defines
-// it, and so does a code the archetype defines only under its bare code
-// string, the key of a local code. It holds under every policy and both
-// value fills, in every language asked for.
+// it, while a code the archetype defines only under its bare code string
+// takes that term's text (TestREQ107_ExternalCodedTextTakesTheTermUnderItsBareCode
+// covers that reading). It holds under every policy and both value fills,
+// in every language asked for.
 func TestREQ107_ExternalCodedTextTakesTheTermText(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -517,7 +518,7 @@ func TestREQ107_ExternalCodedTextTakesTheTermText(t *testing.T) {
 			opt: optTemplate("ELEMENT", `<term_definitions code="248152002"><items id="text">Bare</items></term_definitions>`,
 				optSingle("value", optCodedText("SNOMED-CT", "248152002"))),
 			coded: elementCodedText,
-			want:  walkText,
+			want:  "Bare",
 		},
 		{
 			name:  "ELEMENT value whose code only an enclosing archetype defines",

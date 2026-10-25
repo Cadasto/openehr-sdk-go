@@ -160,11 +160,19 @@
 // nearest enclosing archetype root, gives that code, in
 // [Options.Language]: under its code string for a local code, and under
 // <terminology id>::<code string>, such as SNOMED-CT::248152002, for a code
-// of an external terminology. Either way the walk's text stays where the
-// template's constraint on the text rejects the new one, and where the
-// group has no rubric for the code or its own archetype does not define
-// it, even where an enclosing archetype does. A DV_MULTIMEDIA carries inline
-// data, the seven bytes of the text "example" under both value fills,
+// of an external terminology, or, where the archetype defines no term
+// under that key, under the bare code string unless it is an at-code.
+// Either way the walk's text stays where the template's constraint on the
+// text rejects the new one, and where the group has no rubric for the
+// code or its own archetype does not define it, even where an enclosing
+// archetype does. A coded name whose text the template pins and whose
+// codes it lists is the exception: where the pin rejects the term text of
+// the code the walk wrote, the name takes the first listed code whose term
+// text the pin admits, with that text, and it keeps the walk's code and
+// text where the pin admits no listed code's term text. A code whose term
+// text the pin admits, such as one [RandomFill] drew, stays. A
+// DV_MULTIMEDIA carries inline data, the seven bytes of the text
+// "example" under both value fills,
 // with that byte count as its size, unless the template prohibits data or
 // its constraint on size rejects that count; where the template prohibits
 // data and names no child for the uri, the uri is http://example.com. A

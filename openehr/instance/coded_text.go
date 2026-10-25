@@ -2,10 +2,12 @@ package instance
 
 import (
 	"slices"
+	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 )
 
@@ -77,33 +79,87 @@ func nodeGroup(node *tcimpl.CompiledNode) *terminology.Group {
 
 // useTermText sets the text of v, a coded text the walk built under node,
 // to the text of the term that node's own archetype, its nearest enclosing
-// archetype root, defines for its code under termKey, where node admits
-// that text (takeText). The term is the one tcimpl.RootTermItem reads.
-// lang is the language asked for: an OPT carries one document language,
-// whose term a language it has no translation for gets too, so the term
-// is the same in every lang. A code its own archetype defines no term for
-// keeps its text, even where an enclosing archetype defines the same code,
-// since that term names another concept; so does an openehr code, whose
-// text is its rubric. For an ordinal's symbol node is the C_DV_ORDINAL,
-// which constrains the symbol's code and not its text. A nil node leaves
-// v alone.
+// archetype root, defines for its code (termText), where node admits that
+// text (takeText). lang is the language asked for: an OPT carries one
+// document language, whose term a language it has no translation for gets
+// too, so the term is the same in every lang. A code its own archetype
+// defines no term for keeps its text, even where an enclosing archetype
+// defines the same code, since that term names another concept; so does
+// an openehr code, whose text is its rubric. A locatable's name whose
+// code's term text node rejects takes another code node lists instead
+// (useListedCode). For an ordinal's symbol node is the C_DV_ORDINAL, which
+// constrains the symbol's code and not its text. A nil node leaves v
+// alone.
 func useTermText(node *tcimpl.CompiledNode, v *rm.DVCodedText, lang string) {
-	key, ok := termKey(v.DefiningCode)
-	if node == nil || !ok {
+	if node == nil {
 		return
 	}
 	_ = lang // one document language per OPT; see above.
-	if text, ok := tcimpl.RootTermItem(node, key, "text"); ok && text != "" {
-		takeText(node, v, text)
+	text, ok := termText(node, v.DefiningCode)
+	if !ok {
+		return
 	}
+	takeText(node, v, text)
+	if v.Value != text && holdingAttribute(node) == "name" {
+		useListedCode(node, v)
+	}
+}
+
+// useListedCode gives v, a locatable's name the walk built under node, the
+// first code that the C_CODE_PHRASE on node's defining_code lists whose
+// term text (termText) node admits, with that text, so that the name's
+// text is its code's term. v keeps the code and the text the walk wrote
+// where node lists no such code.
+func useListedCode(node *tcimpl.CompiledNode, v *rm.DVCodedText) {
+	cp, ok := primitiveOf(bindingChild(node, "defining_code")).(constraints.CodePhrase)
+	if !ok {
+		return
+	}
+	for _, code := range cp.CodeList {
+		listed := *v
+		listed.DefiningCode.CodeString = code
+		text, ok := termText(node, listed.DefiningCode)
+		if !ok {
+			continue
+		}
+		listed.Value = text
+		if codedTextAdmits(node, listed) {
+			*v = listed
+			return
+		}
+	}
+}
+
+// termText returns the text of the term that node's own archetype, its
+// nearest enclosing archetype root, defines for code, as
+// tcimpl.RootTermItem reads it: under termKey, else, for a code of a
+// terminology other than local whose code string is not an at-code
+// (atCode), under that code string alone, the key some OPTs give such a
+// term. An at-code under its bare key names a term of the archetype's own,
+// whatever terminology the code phrase names. ok is false where neither
+// key gives a text.
+func termText(node *tcimpl.CompiledNode, code rm.CodePhrase) (string, bool) {
+	key, ok := termKey(code)
+	if !ok {
+		return "", false
+	}
+	if text, ok := tcimpl.RootTermItem(node, key, "text"); ok && text != "" {
+		return text, true
+	}
+	if code.TerminologyID.Value == "local" || atCode(code.CodeString) {
+		return "", false
+	}
+	text, ok := tcimpl.RootTermItem(node, code.CodeString, "text")
+	return text, ok && text != ""
 }
 
 // termKey returns the key under which an OPT's archetype defines the term
 // for code: the code string of a local code, and
 // "<terminology id>::<code string>" for a code of any terminology other
-// than openehr, such as "SNOMED-CT::248152002". It reports false for an
-// openehr code, a code with no terminology, and a code with no code string
-// or the placeholder at0000 (noCode).
+// than openehr, such as "SNOMED-CT::248152002", which termText also reads
+// under the code string alone. It reports false for an openehr code, a
+// code with no terminology, and a code with no code string or the
+// placeholder at0000 (noCode).
 func termKey(code rm.CodePhrase) (string, bool) {
 	tid := code.TerminologyID.Value
 	switch {
@@ -114,4 +170,20 @@ func termKey(code rm.CodePhrase) (string, bool) {
 	default:
 		return tid + "::" + code.CodeString, true
 	}
+}
+
+// atCode reports whether code is an archetype term code: "at" followed by
+// digits, with any dot extensions of digits for a specialisation, such as
+// at0010 or at0010.2 (ADL 1.4, Node Identification).
+func atCode(code string) bool {
+	rest, ok := strings.CutPrefix(code, "at")
+	if !ok {
+		return false
+	}
+	for part := range strings.SplitSeq(rest, ".") {
+		if part == "" || strings.Trim(part, "0123456789") != "" {
+			return false
+		}
+	}
+	return true
 }
