@@ -1031,10 +1031,14 @@ func (e *engine) admitSingle(decl *tcimpl.CompiledAttribute, v engineNode) {
 // not entered. Presence: an absent attribute is
 // reported as [engine.checkAbsent] says, and one that is present and holds
 // no item as [engine.checkEmpty] says. Counts: the template's child count and
-// each child's occurrences. Then each admitted item is walked against the
-// child it binds to, at the path the shared path rule writes for it, with
-// the name the child pins where a sibling shares its id
-// ([appendBoundPredicates]); where the template declares no child, each item
+// each child's occurrences. A list the template leaves optional by its
+// existence ([optionalList]) has its children counted when it is absent
+// too, and its child count is not reported while it holds no item, absent
+// or present: canonical JSON carries the one as the other. Then each
+// admitted item is walked against the child it binds to, at the path the
+// shared path rule writes for it, with the name the child pins where a
+// sibling shares its id ([appendBoundPredicates]); where the template
+// declares no child, each item
 // is walked with the RM rules alone, which report an item that holds no RM
 // value ([engine.walkUnconstrained]). A nil item under an attribute that
 // declares children binds to none, so it is refused above and the RM rules
@@ -1042,6 +1046,11 @@ func (e *engine) admitSingle(decl *tcimpl.CompiledAttribute, v engineNode) {
 func (e *engine) visitDeclaredItems(n *engineNode, a *engineAttr, r *attrReading, attrPath issuePath, role floorRole) {
 	if !r.present {
 		e.checkAbsent(n, a, attrPath)
+		if optionalList(a.decl) && a.shape != shapeCounted {
+			// No item binds to any child, so a child whose occurrences
+			// lower bound is 1 or more is missing.
+			e.found.issues = appendOccurrenceIssues(e.found.issues, a.decl, tcimpl.ChildNodes(a.decl), nil, attrPath)
+		}
 		return
 	}
 	if r.count > 0 && isProhibited(a.decl) {
@@ -1075,6 +1084,11 @@ func (e *engine) visitDeclaredItems(n *engineNode, a *engineAttr, r *attrReading
 		}
 	}
 	countIssue, countOut := childCountIssue(a.decl, r.count, attrPath)
+	if r.count == 0 && optionalList(a.decl) {
+		// An empty optional list reads as an absent one, whose child count
+		// is not reported.
+		countOut = false
+	}
 	var occurrences []Issue
 	if bound != nil {
 		occurrences = appendOccurrenceIssues(nil, a.decl, children, bound, attrPath)
@@ -1101,6 +1115,23 @@ func (e *engine) visitDeclaredItems(n *engineNode, a *engineAttr, r *attrReading
 		}
 	}
 	e.preds = e.preds[:from]
+}
+
+// optionalList reports whether the template declares attr multi-valued and
+// leaves it optional by its existence, whose lower bound is not bounded and
+// at least 1. On an object the instance carries, each child of such a list
+// is counted against its occurrences whether the list holds items, is
+// present and empty, or is absent: ADL 1.4 makes a child whose occurrences
+// lower bound is 1 or more mandatory in its container, and the REQ-102
+// reading makes it ask for the container too. The list's own child count
+// binds only a container that exists (ADL 1.4: "optional, but if present"),
+// so it is not reported while the list holds no item, absent or present,
+// since canonical JSON carries the one as the other. A list the template
+// requires by its existence fails existence alone when it is absent
+// ([engine.checkAbsent]); the children of a list the template writes as a
+// single-valued attribute are alternatives, which its existence decides.
+func optionalList(attr *tcimpl.CompiledAttribute) bool {
+	return attr.Cardinality() == template.Multiple && !tcimpl.LowerAtLeastOne(attr.Existence())
 }
 
 // reportsAt reports whether one of issues is at path. The path is written

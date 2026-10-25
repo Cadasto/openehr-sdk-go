@@ -1335,6 +1335,7 @@ requirements:
       - openehr/validation/issuepath_test.go
       - openehr/validation/multi_nonlocatable_test.go
       - openehr/validation/open_name_list_test.go
+      - openehr/validation/optional_list_counts_test.go
       - openehr/validation/ordinal_symbol_test.go
       - openehr/validation/pointer_primitive_census_internal_test.go
       - openehr/validation/pointer_primitive_test.go
@@ -1589,6 +1590,7 @@ requirements:
       - openehr/validation/constraint_fixtures_test.go
       - openehr/validation/inventory_dispatch_internal_test.go
       - openehr/validation/issuepath_test.go
+      - openehr/validation/optional_list_counts_test.go
       - openehr/validation/optional_string_test.go
       - openehr/validation/quantity_property_test.go
       - openehr/validation/subtype_conformance_corpus_test.go
@@ -2437,6 +2439,7 @@ requirements:
       - openehr/validation/limits_test.go
       - openehr/validation/locatable_attributes_test.go
       - openehr/validation/noncomposition_test.go
+      - openehr/validation/optional_list_counts_test.go
       - openehr/validation/primitive_empty_part_test.go
       - openehr/validation/prohibited_test.go
       - openehr/validation/registry_roots_test.go
