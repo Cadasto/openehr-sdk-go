@@ -1526,6 +1526,7 @@ requirements:
       - openehr/instance/interval_order_internal_test.go
       - openehr/instance/interval_order_test.go
       - openehr/instance/interval_ordinal_pairs_internal_test.go
+      - openehr/instance/interval_shared_unit_internal_test.go
       - openehr/instance/interval_shared_unit_test.go
       - openehr/instance/interval_temporal_internal_test.go
       - openehr/instance/interval_zone_test.go

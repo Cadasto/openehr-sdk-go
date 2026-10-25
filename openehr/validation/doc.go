@@ -73,8 +73,9 @@
 //     denominator of 1 on a unitary proportion and of 100 on a percent,
 //     whole-number operands on a fraction or an integer fraction, and no
 //     denominator of 0;
-//   - DV_INTERVAL numeric bounds in order, and no side both unbounded and
-//     included;
+//   - DV_INTERVAL bounds that are strictly comparable (of one class, two
+//     DV_QUANTITY in one unit, two DV_PROPORTION of one type) and in order,
+//     and no side both unbounded and included;
 //   - an ISO 8601 value on DV_DATE, DV_TIME, DV_DATE_TIME and DV_DURATION
 //     (an empty value is a missing mandatory attribute, reported once, as
 //     `required`);

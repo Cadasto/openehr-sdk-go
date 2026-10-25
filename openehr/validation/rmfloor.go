@@ -670,21 +670,44 @@ func (f *findings) checkElementNullFlavour(value any, path issuePath) {
 
 // checkDVInterval enforces the spec floor on DV_INTERVAL. The boundary
 // flags are checked on every interval ([findings.checkIntervalFlags]).
-// The bound order is checked when neither side is unbounded and the two
-// bounds are strictly comparable as the RM defines is_strictly_comparable_to
-// for their type ([dvIntervalOrder]): lower MUST be ≤ upper by the RM's
-// less_than for that type, except that two times or date-times in different
-// time zones are ordered as instants. A pair the RM does not make strictly
-// comparable is not ordered, nor is a time or date-time with a zone against
-// one without.
+// When neither side is unbounded and each holds a bound
+// ([intervalBounds]), the bounds are checked against RM
+// DV_INTERVAL.Limits_consistent, lower.is_strictly_comparable_to(upper) and
+// lower <= upper. A pair the floor reads as not strictly comparable (bounds
+// of two classes, two DV_QUANTITY in different units, two DV_PROPORTION of
+// different types: [notStrictlyComparable]) breaks the rule whatever its
+// order, and is reported once, with no Value. A strictly comparable pair
+// MUST have lower ≤ upper by the RM's less_than for its type, except that two
+// times or date-times in different time zones are ordered as instants
+// ([orderBounds]). A strictly comparable pair the floor has no order for,
+// such as a time or date-time with a zone against one without, is not
+// reported.
 //
-// The Detail names the rule and the type of the bounds, never the bounds; the
-// two compared magnitudes are carried in Issue.Value, lower first, as a
-// [2]float64 (REQ-168), each in UTC for two values ordered as instants.
-// rmType is the node's RM type, which the flag check names.
+// Each Detail names the rule and the type of the bounds, never the bounds;
+// for an out-of-order pair the two compared magnitudes are carried in
+// Issue.Value, lower first, as a [2]float64 (REQ-168), each in UTC for two
+// values ordered as instants. rmType is the node's RM type, which the flag
+// check names. Interval.Limits_comparable, which BASE declares and
+// DV_INTERVAL.Limits_consistent restates, is not evaluated on the BASE
+// intervals ([intervalBounds] reads no Proper_interval or Point_interval),
+// so Coverage lists it.
 func (f *findings) checkDVInterval(value any, rmType string, path issuePath) {
 	f.checkIntervalFlags(value, rmType, path)
-	order, ok := dvIntervalOrder(value)
+	lower, upper, bounded := intervalBounds(value)
+	if !bounded {
+		return
+	}
+	if detail, apart := notStrictlyComparable(lower, upper); apart {
+		f.emit(Issue{
+			Path:   path.String(),
+			Code:   "rm_invariant",
+			Layer:  LayerRM,
+			Rule:   ruleIntervalLimits,
+			Detail: detail,
+		})
+		return
+	}
+	order, ok := orderBounds(lower, upper)
 	if !ok || !order.inverted {
 		return
 	}
