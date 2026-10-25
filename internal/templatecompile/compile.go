@@ -409,11 +409,13 @@ func (w *walker) attributeType(owner, class, attr string) (string, bool) {
 
 // absentFrom reports whether attr, which the lookup does not give the bare
 // class class as a property, is a name no class in class's hierarchy has
-// (REQ-100, [CompiledAttribute.NotInRM]): it is not a function of class or
-// of an ancestor, which [rminfo.IsNonStorableAttr] names and a template may
+// (REQ-100, [CompiledAttribute.NotInRM]): it is not one of the functions
+// [rminfo.IsNonStorableAttr] names for class, which a template may
 // constrain as if it were an attribute, and it is neither a property nor
 // such a function of any class descending from class, such as ITEM_TREE's
-// items under an ITEM_STRUCTURE. The lookup's properties of class already
+// items under an ITEM_STRUCTURE, or DV_QUANTITY's magnitude under a
+// DV_AMOUNT, a function there that the predicate leaves out because its
+// descendant stores it. The lookup's properties of class already
 // hold those of its ancestors. A class the lookup does not know, and any
 // class when the lookup gives no class hierarchy, gives no verdict, so its
 // attributes are not marked.
