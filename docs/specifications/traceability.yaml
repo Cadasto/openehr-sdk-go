@@ -1244,11 +1244,13 @@ requirements:
       - openehr/template/imports_test.go
       - openehr/template/interval_flags_test.go
       - openehr/template/node_name_test.go
+      - openehr/template/null_flavor_test.go
       - openehr/template/parse_primitives_test.go
       - openehr/template/path_test.go
       - openehr/template/t_archetype_root_test.go
       - openehr/template/template_test.go
       - openehr/template/untyped_node_test.go
+      - openehr/validation/attribute_not_in_rm_test.go
       - testkit/fixtures/corpus_xml_booleans_test.go
       - testkit/probes/instance/t_archetype_root_test.go
       - testkit/probes/template/probe_022_opt_path_resolution.go
