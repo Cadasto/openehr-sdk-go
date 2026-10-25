@@ -489,11 +489,13 @@ func compositionContext(optNode *tcimpl.CompiledNode, attr *tcimpl.CompiledAttri
 // bindingAlternative returns the allowed alternative of a single-valued
 // attribute whose constraints the walk builds under. built is the RM
 // type the walk builds: the type the first alternative names, or its
-// concrete substitute ([builtRMType]). The template validator
-// binds a value of that type to the first alternative that names the
-// type exactly, else to the first that is the AOM 1.4 primitive short
-// name the type wraps, else to the first alternative (REQ-102
-// alternatives rule, REQ-107 What a visit writes). Under
+// concrete substitute ([builtRMType]). It is the first child of the
+// binding tier for that type: the first alternative that names the type
+// exactly, else the first that is the AOM 1.4 primitive short name the
+// type wraps, else the first alternative. The template validator tries
+// that child first and keeps it when the value validates there, which a
+// value built under its constraints does (REQ-102 alternatives rule,
+// REQ-107 What a visit writes). Under
 // [DATA_VALUE, DV_TEXT] the walk therefore builds a DV_TEXT under the
 // DV_TEXT alternative's constraints, not the open DATA_VALUE's.
 func bindingAlternative(children []*tcimpl.CompiledNode, built string) *tcimpl.CompiledNode {
