@@ -217,14 +217,15 @@ const itemStructureItemsOPT = `<?xml version="1.0" encoding="UTF-8"?>
 </template>`
 
 // TestREQ171_AttributeTheValueClassHasIsVisited pins the limit of § REQ-171
-// One walk's exception: the walk leaves out a marked attribute only where the
-// value's class does not have it either. Here the OPT declares items on an
-// ITEM_STRUCTURE, which the compile marks, and the value is an ITEM_TREE,
-// which has items, so the walk visits them and reports a missing member.
+// One walk's exception: an attribute an instance can carry is visited. Here
+// the OPT declares items on an ITEM_STRUCTURE, which has no property of that
+// name while its descendants ITEM_TREE and ITEM_LIST do, so the compile does
+// not mark it (§ REQ-100 Node taxonomy); the value is an ITEM_TREE, so the
+// walk visits items and reports a missing member.
 func TestREQ171_AttributeTheValueClassHasIsVisited(t *testing.T) {
 	c := compileStrictOPT(t, itemStructureItemsOPT)
-	if a := c.Root().Attribute("items"); a == nil || !a.NotInRM() {
-		t.Fatalf("Compile(ITEM_STRUCTURE.items): attribute %+v, want one marked NotInRM", a)
+	if a := c.Root().Attribute("items"); a == nil || a.NotInRM() {
+		t.Fatalf("Compile(ITEM_STRUCTURE.items): attribute %+v, want one not marked NotInRM: its descendants have items", a)
 	}
 	empty := &rm.ItemTree{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "tree"}}
 	r := validation.Validate(empty, c)
@@ -241,5 +242,42 @@ func TestREQ171_AttributeTheValueClassHasIsVisited(t *testing.T) {
 	}
 	if r := validation.Validate(full, c); len(r.Issues) != 0 {
 		t.Errorf("Validate(ITEM_TREE with one item) issues = %q, want none", issueKeys(r.Issues))
+	}
+}
+
+// elementIsNullOPT is an OPT rooted at an ELEMENT that constrains is_null, a
+// function ELEMENT declares in the BMM, at existence 1..1.
+const elementIsNullOPT = `<?xml version="1.0" encoding="UTF-8"?>
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <template_id><value>element_is_null</value></template_id>
+  <concept>element_is_null</concept>
+  <definition xsi:type="C_COMPLEX_OBJECT">
+    <rm_type_name>ELEMENT</rm_type_name>
+    <node_id>at0001</node_id>
+    <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+      <rm_attribute_name>is_null</rm_attribute_name>
+      <existence><lower>1</lower><upper>1</upper></existence>
+    </attributes>
+  </definition>
+</template>`
+
+// TestREQ171_FunctionConstraintIsLeftOut pins § REQ-171 One walk with §
+// REQ-112 Driver's set: a template that constrains a BMM function, here
+// ELEMENT.is_null at existence 1..1, constrains nothing an instance holds.
+// The walk leaves it out as an attribute no serialization carries, so it
+// draws no issue, and lists it nowhere in Coverage, since the compile does
+// not mark a function (§ REQ-100 Node taxonomy).
+func TestREQ171_FunctionConstraintIsLeftOut(t *testing.T) {
+	c := compileStrictOPT(t, elementIsNullOPT)
+	if a := c.Root().Attribute("is_null"); a == nil || a.NotInRM() {
+		t.Fatalf("Compile(ELEMENT.is_null): attribute %+v, want one not marked NotInRM: is_null is a function of ELEMENT", a)
+	}
+	el := &rm.Element{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "item"}, Value: &rm.DVText{Value: "text"}}
+	r := validation.Validate(el, c)
+	if len(r.Issues) != 0 || !r.OK {
+		t.Errorf("Validate(ELEMENT, is_null required by the OPT) = OK %t, issues %q, want OK with none", r.OK, issueKeys(r.Issues))
+	}
+	if len(r.Coverage.NotInRM) != 0 {
+		t.Errorf("Coverage.NotInRM = %q, want none: is_null is not marked", r.Coverage.NotInRM)
 	}
 }

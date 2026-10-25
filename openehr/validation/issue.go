@@ -367,12 +367,16 @@ type Coverage struct {
 
 	// NotInRM lists, in walk order and once per node, the path of each
 	// attribute the template declares on a node whose Reference Model class
-	// does not have it, such as a name on an ISM_TRANSITION (see
-	// CompiledAttribute.NotInRM in package templatecompile). No instance can
-	// carry such an attribute, so the walk did not visit it and reported
-	// nothing for it, whatever the template asks of it. That constraint is
-	// a defect of the template, not a part of the instance the call left
-	// unchecked, so [Coverage.Complete] does not read NotInRM.
+	// cannot have it, such as a name on an ISM_TRANSITION: no property or
+	// function of the class, of an ancestor or of a descendant has its name
+	// (see CompiledAttribute.NotInRM in package templatecompile). No
+	// instance can carry such an attribute, so the walk did not visit it and
+	// reported nothing for it, whatever the template asks of it. That
+	// constraint is a defect of the template, not a part of the instance the
+	// call left unchecked, so [Coverage.Complete] does not read NotInRM. A
+	// function the template constrains, such as ELEMENT.is_null, is not
+	// listed: the walk leaves it out, as it does every attribute no
+	// serialization carries.
 	NotInRM []string
 
 	// Unevaluated lists, sorted and once each, the Reference Model

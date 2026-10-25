@@ -47,11 +47,12 @@ func compileOneAttribute(t *testing.T, rmType, attr string, opts ...templatecomp
 }
 
 // TestREQ100_CompileMarksAttributeNotInRM pins § REQ-100 Node taxonomy: the
-// compile marks a declared attribute whose node's RM class, read without
-// generic parameters, has no property of that name in the pinned BMM and
-// that is not a function rminfo.IsNonStorableAttr names. A property, one
-// of those functions, and an attribute of a class the lookup does not know
-// stay unmarked, and so does every attribute the compile injects.
+// compile marks a declared attribute whose name is neither a property nor a
+// function, in the pinned BMM, of its node's RM class read without generic
+// parameters, of an ancestor, or of a descendant. A property of the class or
+// of a descendant, a function of the class or of an ancestor, and an
+// attribute of a class the lookup does not know stay unmarked, and so does
+// every attribute the compile injects.
 func TestREQ100_CompileMarksAttributeNotInRM(t *testing.T) {
 	tests := []struct {
 		rmType, attr string
@@ -66,6 +67,19 @@ func TestREQ100_CompileMarksAttributeNotInRM(t *testing.T) {
 		{rmType: "POINT_EVENT", attr: "offset", want: false},
 		{rmType: "INTERVAL_EVENT", attr: "offset", want: false},
 		{rmType: "POINT_EVENT<ITEM_TREE>", attr: "offset", want: false},
+		// A function the abstract class itself declares.
+		{rmType: "EVENT", attr: "offset", want: false},
+		{rmType: "EVENT<ITEM_TREE>", attr: "offset", want: false},
+		// A property of a descendant: ITEM_TREE and ITEM_LIST have items,
+		// INTERVAL_EVENT has width.
+		{rmType: "ITEM_STRUCTURE", attr: "items", want: false},
+		{rmType: "EVENT", attr: "width", want: false},
+		{rmType: "EVENT<ITEM_TREE>", attr: "width", want: false},
+		// Other functions of the class or of an ancestor.
+		{rmType: "INTERVAL_EVENT", attr: "interval_start_time", want: false},
+		{rmType: "ELEMENT", attr: "is_null", want: false},
+		{rmType: "DV_DURATION", attr: "magnitude", want: false},
+		{rmType: "COMPOSITION", attr: "is_persistent", want: false},
 		{rmType: "NOT_AN_RM_CLASS", attr: "name", want: false},
 	}
 	for _, tc := range tests {
@@ -89,15 +103,26 @@ func TestREQ100_CompileMarksAttributeNotInRM(t *testing.T) {
 
 // TestREQ100_CompileMarksAttributeNotInRMByItsLookup pins that the mark comes
 // from the lookup the compile uses: a class the lookup knows is judged by
-// the properties the lookup gives it, and a class it does not know is not
-// judged at all, whatever the pinned RM says of either.
+// the properties the lookup gives it and its descendants, a class it does
+// not know is not judged at all, whatever the pinned RM says of either, and
+// a lookup that gives no class hierarchy, so no descendants, judges none.
 func TestREQ100_CompileMarksAttributeNotInRMByItsLookup(t *testing.T) {
-	lookup := rminfo.New(map[string]rminfo.ClassMeta{
+	data := map[string]rminfo.ClassMeta{
 		"ISM_TRANSITION": {
 			Attributes: map[string]rminfo.AttrMeta{"name": {TypeName: "DV_TEXT", DeclaredIn: "ISM_TRANSITION"}},
 			AttrOrder:  []string{"name"},
 		},
-	})
+		"SYNTH_BASE": {
+			Attributes: map[string]rminfo.AttrMeta{},
+			AttrOrder:  []string{},
+			Abstract:   true,
+		},
+		"SYNTH_LEAF": {
+			Attributes: map[string]rminfo.AttrMeta{"leaf_only": {TypeName: "DV_TEXT", DeclaredIn: "SYNTH_LEAF"}},
+			AttrOrder:  []string{"leaf_only"},
+			Parents:    []string{"SYNTH_BASE"},
+		},
+	}
 	tests := []struct {
 		rmType, attr string
 		want         bool
@@ -105,16 +130,39 @@ func TestREQ100_CompileMarksAttributeNotInRMByItsLookup(t *testing.T) {
 		{rmType: "ISM_TRANSITION", attr: "name", want: false},
 		{rmType: "ISM_TRANSITION", attr: "current_state", want: true},
 		{rmType: "ELEMENT", attr: "flavour", want: false},
+		{rmType: "SYNTH_BASE", attr: "leaf_only", want: false}, // a property of the descendant SYNTH_LEAF
+		{rmType: "SYNTH_BASE", attr: "nowhere", want: true},
+		{rmType: "SYNTH_LEAF", attr: "nowhere", want: true},
 	}
-	for _, tc := range tests {
-		t.Run(tc.rmType+"."+tc.attr, func(t *testing.T) {
-			a := compileOneAttribute(t, tc.rmType, tc.attr, templatecompile.WithRMInfo(lookup)).Attribute(tc.attr)
-			if a == nil {
-				t.Fatalf("Compile(%s.%s): no attribute %s", tc.rmType, tc.attr, tc.attr)
-			}
-			if got := a.NotInRM(); got != tc.want {
-				t.Errorf("Compile(%s.%s) with a synthetic lookup: NotInRM() = %t, want %t", tc.rmType, tc.attr, got, tc.want)
-			}
-		})
+	lookups := []struct {
+		name   string
+		lookup rminfo.Lookup
+		// hierarchy is false for a lookup that gives no class hierarchy,
+		// under which no attribute is marked.
+		hierarchy bool
+	}{
+		{name: "synthetic lookup", lookup: rminfo.New(data), hierarchy: true},
+		{name: "synthetic lookup with no hierarchy", lookup: lookupOnly{rminfo.New(data)}},
+	}
+	if _, ok := lookups[1].lookup.(rminfo.Hierarchy); ok {
+		t.Fatal("lookupOnly implements rminfo.Hierarchy, so the row tests nothing")
+	}
+	for _, l := range lookups {
+		for _, tc := range tests {
+			t.Run(l.name+"/"+tc.rmType+"."+tc.attr, func(t *testing.T) {
+				a := compileOneAttribute(t, tc.rmType, tc.attr, templatecompile.WithRMInfo(l.lookup)).Attribute(tc.attr)
+				if a == nil {
+					t.Fatalf("Compile(%s.%s): no attribute %s", tc.rmType, tc.attr, tc.attr)
+				}
+				want := tc.want && l.hierarchy
+				if got := a.NotInRM(); got != want {
+					t.Errorf("Compile(%s.%s) with a %s: NotInRM() = %t, want %t", tc.rmType, tc.attr, l.name, got, want)
+				}
+			})
+		}
 	}
 }
+
+// lookupOnly is a Lookup that implements no optional capability, rminfo.
+// Hierarchy among them: embedding the interface promotes its methods alone.
+type lookupOnly struct{ rminfo.Lookup }

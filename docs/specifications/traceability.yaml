@@ -1730,6 +1730,7 @@ requirements:
       - openehr/template/constraints/temporal_parity_test.go
       - openehr/template/constraints/temporal_validate_test.go
       - openehr/templatecompile/compile_test.go
+      - openehr/validation/attribute_not_in_rm_test.go
       - openehr/validation/constraint_ref_walk_test.go
       - openehr/validation/coverage_test.go
       - openehr/validation/coverage_unevaluated_test.go
