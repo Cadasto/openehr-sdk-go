@@ -251,22 +251,24 @@ func (g *generator) fillUncarriedRequired(optNode *tcimpl.CompiledNode, rmValue 
 }
 
 // writeRMNeeded writes, as a visit writes it, an attribute of rmValue that
-// an RM rule needs and the walk left unwritten, where optNode names an
-// allowed OPT child for it: the policy did not visit it, as Required
-// leaves an optional attribute alone, or the OPT prohibits it (REQ-107
-// Precedence 2). The attribute is built from its first allowed child
-// (materialiseSingle), as the walk would build it, so it keeps the OPT's
-// constraints rather than taking a default of its BMM type. The
-// attributes are an ELEMENT's null_flavour when it has no value, or its
-// value where the OPT prohibits the null_flavour and allows the value,
-// a PARTY_IDENTIFIED's or PARTY_RELATED's name when it has no name,
+// an RM rule needs and the walk left unwritten: the policy did not visit
+// it, as Required leaves an optional attribute alone, or the OPT prohibits
+// it (REQ-107 Precedence 2). For an ELEMENT, a PARTY_IDENTIFIED, a
+// PARTY_RELATED and a DV_MULTIMEDIA it writes only where optNode names an
+// allowed OPT child for the attribute, and builds the attribute from its
+// first allowed child (materialiseSingle), as the walk would build it, so
+// it keeps the OPT's constraints rather than taking a default of its BMM
+// type. The attributes are an ELEMENT's null_flavour when it has no value,
+// or its value where the OPT prohibits the null_flavour and allows the
+// value, a PARTY_IDENTIFIED's or PARTY_RELATED's name when it has no name,
 // identifiers or external_ref, and a DV_MULTIMEDIA's uri when it has no
 // uri and the OPT prohibits its data, which it then never gets (RM
 // Not_empty). finishNode then gives each the RM default it gives a visited
 // one, and builds one with no allowed OPT child from its BMM type; a uri
 // with none takes the default settleMultimedia writes. A HISTORY with
-// neither events nor a summary gets one of them from the OPT alone
-// (writeEventOrSummary).
+// neither events nor a summary gets one of them (writeEventOrSummary):
+// from an allowed OPT child, or from its BMM type where the OPT names no
+// child under it.
 func (g *generator) writeRMNeeded(optNode *tcimpl.CompiledNode, rmValue any) error {
 	switch v := rmValue.(type) {
 	case *rm.History[rm.ItemStructure]:
@@ -305,34 +307,21 @@ func (g *generator) writeRMNeeded(optNode *tcimpl.CompiledNode, rmValue any) err
 // nor a summary, what RM Events_valid needs, (events /= Void and then not
 // events.is_empty) or summary /= Void (REQ-107 Precedence 2). It writes the
 // first of these that optNode allows: a member of events from its first
-// allowed child that is not a slot; a summary from its first allowed child
-// that is not a slot; a member of events built from its BMM type, where
+// allowed child that needs no content the OPT does not describe
+// (needsUndescribed, which a slot always needs); a summary from such a
+// child of summary; a member of events built from its BMM type, where
 // optNode names no child under events; a summary built from its BMM type,
-// where optNode names no child under summary. An attribute optNode
-// prohibits allows none, and nor does an events whose cardinality leaves no
-// room for a member. Where optNode allows none of them, h is left as it is,
-// and the root breaks the rule (REQ-107 Exceptions and known gaps).
+// where optNode names no child under summary; a member of events from its
+// first allowed child that is not a slot; a summary from such a child of
+// summary. So a child that needs undescribed content, which can make
+// Generate fail on a slot it cannot fill, is passed over while a later
+// source is allowed. An attribute optNode prohibits allows none, and nor
+// does an events whose cardinality leaves no room for a member. Where
+// optNode allows none of them, h is left as it is, and the root breaks the
+// rule (REQ-107 Exceptions and known gaps).
 func (g *generator) writeEventOrSummary(optNode *tcimpl.CompiledNode, h *rm.History[rm.ItemStructure]) error {
-	for _, name := range historyMembers {
-		attr := optNode.Attribute(name)
-		if attr == nil || !historyAllows(optNode, attr) {
-			continue
-		}
-		if child := firstNonSlot(tcimpl.AllowedChildNodes(attr)); child != nil {
-			built, err := g.buildChild(child)
-			if err != nil {
-				return err
-			}
-			if name == "events" {
-				err = rmwrite.AppendMultiple(h, name, built)
-			} else {
-				err = rmwrite.EnsureSingle(h, name, built)
-			}
-			if err != nil {
-				return fmt.Errorf("attach %s.%s: %w", optNode.RMTypeName(), name, err)
-			}
-			return nil
-		}
+	if name, child := historySource(optNode, g.firstNeedingNone); child != nil {
+		return g.attachHistoryMember(optNode, h, name, child)
 	}
 	for _, name := range historyMembers {
 		attr := optNode.Attribute(name)
@@ -341,6 +330,56 @@ func (g *generator) writeEventOrSummary(optNode *tcimpl.CompiledNode, h *rm.Hist
 		}
 		g.fillBMMAttr(h, "HISTORY", name, 0)
 		return nil
+	}
+	if name, child := historySource(optNode, firstNonSlot); child != nil {
+		return g.attachHistoryMember(optNode, h, name, child)
+	}
+	return nil
+}
+
+// historySource returns the first of historyMembers that optNode, a
+// HISTORY, allows a member of (historyAllows) and the child pick returns
+// among its allowed children, or nil where there is none.
+func historySource(optNode *tcimpl.CompiledNode, pick func([]*tcimpl.CompiledNode) *tcimpl.CompiledNode) (string, *tcimpl.CompiledNode) {
+	for _, name := range historyMembers {
+		attr := optNode.Attribute(name)
+		if attr == nil || !historyAllows(optNode, attr) {
+			continue
+		}
+		if child := pick(tcimpl.AllowedChildNodes(attr)); child != nil {
+			return name, child
+		}
+	}
+	return "", nil
+}
+
+// firstNeedingNone returns the first of children that needs no content the
+// OPT does not describe (needsUndescribed), or nil where every one of them
+// needs some. A slot always needs it.
+func (g *generator) firstNeedingNone(children []*tcimpl.CompiledNode) *tcimpl.CompiledNode {
+	for _, c := range children {
+		if !g.needsUndescribed(c) {
+			return c
+		}
+	}
+	return nil
+}
+
+// attachHistoryMember builds child, an allowed child of name, the events or
+// the summary of optNode, and attaches it to h: as a member of events, or
+// as its summary.
+func (g *generator) attachHistoryMember(optNode *tcimpl.CompiledNode, h *rm.History[rm.ItemStructure], name string, child *tcimpl.CompiledNode) error {
+	built, err := g.buildChild(child)
+	if err != nil {
+		return err
+	}
+	if name == "events" {
+		err = rmwrite.AppendMultiple(h, name, built)
+	} else {
+		err = rmwrite.EnsureSingle(h, name, built)
+	}
+	if err != nil {
+		return fmt.Errorf("attach %s.%s: %w", optNode.RMTypeName(), name, err)
 	}
 	return nil
 }

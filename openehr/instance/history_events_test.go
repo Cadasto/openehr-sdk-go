@@ -24,6 +24,25 @@ var historySummary = guardSingle("summary", guardExistence01, optNode("ITEM_TREE
 // attribute.
 var historyExistence00 = `<existence>` + optInterval(0, 0) + `</existence>`
 
+// historyEventsCapped is a HISTORY's events at existence 0..1 over
+// historyEvent whose cardinality of 0..0 leaves no room for a member.
+var historyEventsCapped = `<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>events</rm_attribute_name>` +
+	guardExistence01 + historyEvent +
+	`<cardinality><is_ordered>true</is_ordered><is_unique>false</is_unique><interval>` +
+	optInterval(0, 0) + `</interval></cardinality></attributes>`
+
+// historyEventOver is a POINT_EVENT child at0002 of a HISTORY's events, at
+// occurrences 0..*, whose data, which the RM requires, admits slot alone, so
+// the event needs content the OPT does not describe (REQ-107 Slot fills).
+func historyEventOver(slot string) string {
+	return optOccurring("C_COMPLEX_OBJECT", "POINT_EVENT", "at0002", 0, -1,
+		optSingle("time", optNode("DV_DATE_TIME", "")),
+		optSingle("data", slot))
+}
+
+// historySummaryProhibited is a HISTORY's summary the OPT prohibits.
+var historySummaryProhibited = guardSingle("summary", historyExistence00, optNode("ITEM_TREE", "at0004"))
+
 // historyShape renders what a generated HISTORY carries: the archetype node
 // ids of its events, then "summary=" and its summary's, "" for none.
 func historyShape(t *testing.T, out any) string {
@@ -48,15 +67,20 @@ func historyShape(t *testing.T, out any) string {
 // events.is_empty) or summary /= Void (REQ-112 Non-empty lists). A HISTORY
 // the walk leaves with neither, as Required leaves an optional events
 // alone, gets the first of these the OPT allows: a member of the first
-// allowed child of events that is not a slot; the summary the first allowed
-// child of summary that is not a slot builds; a member of events built from
-// its BMM type, where the OPT names no child under events; a summary built
-// from its BMM type, where it names no child under summary. An attribute the
-// OPT prohibits allows none, and where the OPT allows none of them the
-// HISTORY gets neither, the one case whose root breaks the rule
-// (Exceptions and known gaps, An OPT that contradicts itself). Under Large and Medium the walk writes an event
-// already, and a summary the OPT allows beside it. Every root but the last passes the RM floor and the template
-// validator, under every policy, both value fills and both compile modes.
+// allowed child of events that needs no undescribed content (Slot fills; a
+// slot always needs it); the summary such a child of summary builds; a
+// member of events built from its BMM type, where the OPT names no child
+// under events; a summary built from its BMM type, where it names no child
+// under summary; a member of the first allowed child of events that is not a
+// slot; the summary such a child of summary builds. An attribute the OPT
+// prohibits allows none, and nor does an events whose cardinality is 0..0.
+// Where the OPT allows none of them the HISTORY gets neither, the one case
+// whose root breaks the rule (Exceptions and known gaps, An OPT that
+// contradicts itself). Under Large and Medium the walk writes an event
+// already where the event needs no undescribed content, and a summary the
+// OPT allows beside it. Every root but the last passes the RM floor and the
+// template validator, under every policy, both value fills and both compile
+// modes.
 func TestREQ107_HistoryGetsAnEventOrASummary(t *testing.T) {
 	origin := optSingle("origin", optNode("DV_DATE_TIME", ""))
 	cases := []struct {
@@ -105,9 +129,34 @@ func TestREQ107_HistoryGetsAnEventOrASummary(t *testing.T) {
 			want: "events=[] summary=at0000",
 		},
 		{
+			name: "an optional summary, events capped at 0",
+			opt:  optTemplate("HISTORY", origin, historyEventsCapped, historySummary),
+			want: "events=[] summary=at0004",
+		},
+		{
+			name: "events holding only a slot, summary not named",
+			opt:  optTemplate("HISTORY", origin, guardMultiple("events", guardExistence01, optSlot("POINT_EVENT", "at0002"))),
+			want: "events=[] summary=at0000",
+		},
+		{
+			name: "an optional summary, events holding an event whose data no slot fill can give",
+			opt: optTemplate("HISTORY", origin,
+				guardMultiple("events", guardExistence01,
+					historyEventOver(optSlotIncluding("ITEM_TREE", "at0003", `openEHR-EHR-ITEM_TREE\..*`))),
+				historySummary),
+			want: "events=[] summary=at0004",
+		},
+		{
+			name: "summary prohibited, events holding an event whose data is a slot fill",
+			opt: optTemplate("HISTORY", origin,
+				guardMultiple("events", guardExistence01, historyEventOver(optSlot("ITEM_TREE", "at0003"))),
+				historySummaryProhibited),
+			want: "events=[at0002] summary=",
+		},
+		{
 			name: "neither allowed",
 			opt: optTemplate("HISTORY", origin, guardMultiple("events", historyExistence00, historyEvent),
-				guardSingle("summary", historyExistence00, optNode("ITEM_TREE", "at0004"))),
+				historySummaryProhibited),
 			want:   "events=[] summary=",
 			breaks: "HISTORY.Events_valid",
 		},
