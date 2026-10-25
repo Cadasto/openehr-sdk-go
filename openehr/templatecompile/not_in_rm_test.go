@@ -49,10 +49,10 @@ func compileOneAttribute(t *testing.T, rmType, attr string, opts ...templatecomp
 // TestREQ100_CompileMarksAttributeNotInRM pins § REQ-100 Node taxonomy: the
 // compile marks a declared attribute whose name is neither a property nor a
 // function, in the pinned BMM, of its node's RM class read without generic
-// parameters, of an ancestor, or of a descendant. A property of the class or
-// of a descendant, a function of the class or of an ancestor, and an
-// attribute of a class the lookup does not know stay unmarked, and so does
-// every attribute the compile injects.
+// parameters, of an ancestor, or of a descendant. A property or a function
+// of the class, of an ancestor or of a descendant, and an attribute of a
+// class the lookup does not know stay unmarked, and so does every attribute
+// the compile injects.
 func TestREQ100_CompileMarksAttributeNotInRM(t *testing.T) {
 	tests := []struct {
 		rmType, attr string
@@ -80,6 +80,10 @@ func TestREQ100_CompileMarksAttributeNotInRM(t *testing.T) {
 		{rmType: "ELEMENT", attr: "is_null", want: false},
 		{rmType: "DV_DURATION", attr: "magnitude", want: false},
 		{rmType: "COMPOSITION", attr: "is_persistent", want: false},
+		// A function only a descendant declares: INTERVAL_EVENT has
+		// interval_start_time, ITEM_TABLE row_count.
+		{rmType: "EVENT", attr: "interval_start_time", want: false},
+		{rmType: "ITEM_STRUCTURE", attr: "row_count", want: false},
 		{rmType: "NOT_AN_RM_CLASS", attr: "name", want: false},
 	}
 	for _, tc := range tests {

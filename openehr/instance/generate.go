@@ -51,8 +51,9 @@ import (
 // A list whose children's occurrences lower bounds add up past its
 // cardinality upper bound, where the walk visits it, and an attribute the
 // template requires that the generator has no writer for, such as a
-// LOCATABLE's feeder_audit or links, make Generate return an error
-// wrapping [ErrConstraintUnsatisfiable] and no root. A list that sits in
+// LOCATABLE's feeder_audit or links, other than a list that only its
+// existence or its cardinality asks a member of, make Generate return an
+// error wrapping [ErrConstraintUnsatisfiable] and no root. A list that sits in
 // an optional node the policy builds no member of, as Required builds
 // none of an optional child, is not visited, and the root leaves it out. Where the template leaves
 // such an attribute optional, it is left out, as is an attribute the
@@ -2329,8 +2330,10 @@ func (g *generator) applyPrimitiveExample(leaf *tcimpl.CompiledNode, rmValue any
 		return err
 	}
 	if g.opts.ValueFill == RandomFill {
-		// In-constraint sampled value (valid by construction); same Go
-		// shape as ExampleValue so the switch below is unchanged. REQ-107.
+		// A value sampled inside the constraint, in the Go shape of
+		// ExampleValue so the switch below is unchanged (REQ-107). A
+		// CString draw can be a list entry its pattern refuses, which
+		// applyStringLeaf replaces (stringForConstraint).
 		ex = sampleValue(pc, g.valueSampler)
 	}
 	if cs, ok := pc.(constraints.CString); ok {
