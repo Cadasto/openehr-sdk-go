@@ -623,6 +623,19 @@ func TestRefConstruction(t *testing.T) {
 	}
 }
 
+// REQ-174: a Ref that carries a sub-second time sends version_at_time
+// in UTC with its fraction of a second.
+func TestLatestAtTimeQueryKeepsFraction(t *testing.T) {
+	at := time.Date(2015, 1, 20, 19, 30, 22, 765_000_000, time.FixedZone("", 3600))
+	k, v := openehrclient.LatestAtTime("voID", at).Query()
+	if k != "version_at_time" {
+		t.Errorf("LatestAtTime Query key = %q, want version_at_time", k)
+	}
+	if want := "2015-01-20T18:30:22.765Z"; v != want {
+		t.Errorf("LatestAtTime Query value = %q, want %q", v, want)
+	}
+}
+
 // TestNilClientLeavesDoNotPanic pins the consequence of the REQ-025
 // guard in transport.Do: every exported leaf takes a *transport.Client
 // and calls c.Do, so a nil client used to crash inside the transport.

@@ -30,8 +30,9 @@ type Ref interface {
 type ByVersionedObjectID struct {
 	VOID VersionedObjectID
 	// AtTime optionally requests the version that was current at the
-	// given instant. Zero time omits the version_at_time query param
-	// and returns the absolute latest.
+	// given instant, sent in UTC with its fraction of a second. Zero
+	// time omits the version_at_time query param and returns the
+	// absolute latest.
 	AtTime time.Time
 }
 
@@ -40,12 +41,13 @@ func (r ByVersionedObjectID) isRef() {}
 // PathSegment implements Ref, yielding the versioned-object id.
 func (r ByVersionedObjectID) PathSegment() string { return string(r.VOID) }
 
-// Query implements Ref, adding version_at_time when AtTime is set.
+// Query implements Ref, adding version_at_time when AtTime is set,
+// written by [FormatVersionAtTime].
 func (r ByVersionedObjectID) Query() (string, string) {
 	if r.AtTime.IsZero() {
 		return "", ""
 	}
-	return "version_at_time", r.AtTime.UTC().Format(time.RFC3339)
+	return "version_at_time", FormatVersionAtTime(r.AtTime)
 }
 
 // ByVersionUID addresses one specific version of a versioned resource.
@@ -68,7 +70,7 @@ func (r ByVersionUID) Query() (string, string) { return "", "" }
 func LatestOf(voID VersionedObjectID) Ref { return ByVersionedObjectID{VOID: voID} }
 
 // LatestAtTime returns a Ref addressing the version of voID that was
-// current at t.
+// current at t. The time is sent in UTC with its fraction of a second.
 func LatestAtTime(voID VersionedObjectID, t time.Time) Ref {
 	return ByVersionedObjectID{VOID: voID, AtTime: t}
 }

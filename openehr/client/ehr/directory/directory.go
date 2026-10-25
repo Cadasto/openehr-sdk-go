@@ -72,7 +72,8 @@ func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, op
 
 // GetAtTime returns the Directory that was current at t.
 //
-// Wire: GET /ehr/{ehr_id}/directory?version_at_time={t} [&path=...].
+// Wire: GET /ehr/{ehr_id}/directory?version_at_time={t} [&path=...],
+// with t sent in UTC with its fraction of a second.
 func GetAtTime(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, t time.Time, opts ...GetOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("directory.GetAtTime: %w: empty EHRID", transport.ErrInvalidConfig)
@@ -85,7 +86,7 @@ func GetAtTime(ctx context.Context, c *transport.Client, ehrID openehrclient.EHR
 		Path:   basePath(ehrID),
 		Route:  routeTemplate,
 		Query: url.Values{
-			"version_at_time": []string{t.UTC().Format(time.RFC3339)},
+			"version_at_time": []string{openehrclient.FormatVersionAtTime(t)},
 		},
 	}
 	applyPath(req, opts)

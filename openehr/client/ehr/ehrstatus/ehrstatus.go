@@ -41,7 +41,8 @@ func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID) (*
 
 // GetAtTime returns the EHR_STATUS that was current at t.
 //
-// Wire: GET /ehr/{ehr_id}/ehr_status?version_at_time={t}.
+// Wire: GET /ehr/{ehr_id}/ehr_status?version_at_time={t}, with t sent
+// in UTC with its fraction of a second.
 // Zero t is rejected, so pass a real time; use [Get] for the latest.
 func GetAtTime(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, t time.Time) (*rm.EHRStatus, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
@@ -55,7 +56,7 @@ func GetAtTime(ctx context.Context, c *transport.Client, ehrID openehrclient.EHR
 		Path:   basePath(ehrID),
 		Route:  routeTemplate,
 		Query: url.Values{
-			"version_at_time": []string{t.UTC().Format(time.RFC3339)},
+			"version_at_time": []string{openehrclient.FormatVersionAtTime(t)},
 		},
 	}
 	return decode(ctx, c, req)

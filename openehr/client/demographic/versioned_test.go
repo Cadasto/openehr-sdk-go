@@ -325,6 +325,27 @@ func TestGetVersionAtTime(t *testing.T) {
 	}
 }
 
+// REQ-174: a sub-second time reaches the wire with its fraction of a
+// second, in UTC.
+func TestGetVersionAtTimeKeepsFraction(t *testing.T) {
+	var captured *http.Request
+	body := fixture(t, "original_version.json")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+
+	at := time.Date(2015, 1, 20, 19, 30, 22, 765_000_000, time.FixedZone("", 3600))
+	_, _, err := demographic.GetVersionAtTime(t.Context(), newClient(t, srv), personVOID, at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := captured.URL.Query().Get("version_at_time"), "2015-01-20T18:30:22.765Z"; got != want {
+		t.Errorf("version_at_time = %q, want %q", got, want)
+	}
+}
+
 func TestGetVersionByID(t *testing.T) {
 	var captured *http.Request
 	body := fixture(t, "original_version.json")

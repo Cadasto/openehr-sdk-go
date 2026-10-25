@@ -115,7 +115,8 @@ func GetVersion(ctx context.Context, c *transport.Client, voUID openehrclient.Ve
 
 // GetVersionAtTime retrieves the VERSION that was current at t.
 //
-// Wire: GET /demographic/versioned_party/{vo_uid}/version?version_at_time={t}.
+// Wire: GET /demographic/versioned_party/{vo_uid}/version?version_at_time={t},
+// with t sent in UTC with its fraction of a second.
 func GetVersionAtTime(ctx context.Context, c *transport.Client, voUID openehrclient.VersionedObjectID, t time.Time) (*PartyVersion, *openehrclient.VersionMetadata, error) {
 	if voUID == "" {
 		return nil, nil, fmt.Errorf("demographic.GetVersionAtTime: %w: empty VersionedObjectID", transport.ErrInvalidConfig)
@@ -127,7 +128,7 @@ func GetVersionAtTime(ctx context.Context, c *transport.Client, voUID openehrcli
 		Method: http.MethodGet,
 		Path:   versionedBase(voUID) + "/version",
 		Route:  routeVersion,
-		Query:  url.Values{"version_at_time": []string{t.UTC().Format(time.RFC3339)}},
+		Query:  url.Values{"version_at_time": []string{openehrclient.FormatVersionAtTime(t)}},
 	}
 	return getVersion(ctx, c, req)
 }
