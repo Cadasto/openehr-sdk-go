@@ -37,24 +37,26 @@
 // The three policies follow the levels of the ITS-REST template
 // example's detail_level:
 //
-//   - Medium: the required attributes (the BMM marks them mandatory, or
-//     their existence or cardinality lower bound is at least 1), and those
-//     with an allowed template child (one whose occurrences upper bound is
-//     not 0). A visited multi-valued attribute gets its members as under
-//     Large, except that an optional archetype after the first optional
+//   - Medium: the required attributes, and those with an allowed template
+//     child (one whose occurrences upper bound is not 0). An attribute is
+//     required when the BMM marks it mandatory, when its existence or
+//     cardinality lower bound is at least 1, or when it is a list that
+//     holds an allowed template child, not a slot, whose occurrences lower
+//     bound is at least 1. Such a child makes no list required where the
+//     template prohibits the list, or where the RM types its items as
+//     primitive values, such as a DV_MULTIMEDIA's data. A visited
+//     multi-valued attribute gets its members as under Large, except that
+//     an optional archetype after the first optional
 //     archetype of the attribute that holds more than content the
 //     template does not describe (below) gets none, whatever its
 //     archetype. So Medium builds at most one optional archetype under an
 //     attribute, the medium level. It is the zero value, and so the
 //     default.
-//   - Required: the attributes the BMM marks mandatory, those whose
-//     existence lower bound is at least 1, and the multi-valued ones that
-//     hold an allowed template child, not a slot, whose occurrences lower
-//     bound is at least 1; not one that only its cardinality lower bound
-//     asks for, nor one merely because it has an allowed template child,
-//     except a composition's context,
-//     which it visits as Medium does, so the context every policy writes
-//     is built under the template's constraints. A visited multi-valued
+//   - Required: the required attributes, in the sense above, but not one
+//     that only its cardinality lower bound asks for, nor one merely
+//     because it has an allowed template child, except a composition's
+//     context, which it visits as Medium does, so the context every
+//     policy writes is built under the template's constraints. A visited multi-valued
 //     attribute gets each allowed child that is not a slot as many times
 //     as its occurrences lower bound says, so an optional child gets none.
 //     It builds the data points the template makes mandatory and a
@@ -81,8 +83,11 @@
 // be given such members: the attribute has no allowed child and its member
 // would be a LOCATABLE, every allowed child of it is a slot, or it is
 // single-valued and the child that builds its member is a slot. An
-// attribute that is not required is not visited when every member it
-// would get is such content or such a child. A composition's context is
+// attribute that is not required, in the sense the Medium policy above
+// gives, is not visited when every member it would get is such content or
+// such a child. A list with a child that makes it required is visited, so
+// that child gets its members although they hold only such content. A
+// composition's context is
 // the exception: every policy writes one, so the walk visits it whatever
 // its members need. The first optional archetype Medium keeps is the first
 // that needs none. The check reads a node's own attributes only: below a

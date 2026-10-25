@@ -439,9 +439,10 @@ func attrProhibited(attr *tcimpl.CompiledAttribute) bool {
 // required (isRequired), because the BMM marks it mandatory, its existence
 // lower bound is bounded and at least 1, or it is a list with an allowed
 // child, not a slot, whose occurrences lower bound is bounded and at least
-// 1, and no other: a cardinality lower bound alone does not make Required
-// visit a list, since it counts the members of a list that exists and does
-// not ask for the list. Under Medium: every attribute that is required in
+// 1 (holdsRequiredChild, which leaves out a list the OPT prohibits and one
+// of primitive values), and no other: a cardinality lower bound alone does
+// not make Required visit a list, since it counts the members of a list
+// that exists and does not ask for the list. Under Medium: every attribute that is required in
 // the wider sense of visitRequired, which a cardinality lower bound of 1
 // or more also meets, OR that has OPT-pinned children the OPT does not
 // prohibit. The "has OPT children" arm captures the case where the OPT
@@ -1684,10 +1685,11 @@ func memberCap(attr *tcimpl.CompiledAttribute) int {
 
 // remainingLowerNeeded returns the count of members attr still needs,
 // given current: its cardinality lower bound (when present), or one member
-// when that bound is 0 and the BMM marks the attribute mandatory or its
-// existence lower bound is at least 1. Cardinality and existence are
-// separate in AOM 1.4: existence asks for the container and cardinality
-// for its members. So where only the existence asks for the member
+// when that bound is 0 and the attribute is required (isRequired): the BMM
+// marks it mandatory, its existence lower bound is at least 1, or a child
+// asks the list for a member (holdsRequiredChild). Cardinality and
+// existence are separate in AOM 1.4: existence asks for the container and
+// cardinality for its members. So where only the existence asks for the member
 // (existenceOnly), the top-up takes it only from a child that needs no
 // undescribed content (topUpSeed), and materialiseImplicitMultiple builds
 // none: a list with no member meets that existence.
@@ -2777,8 +2779,9 @@ func valueGivesWay(opt *tcimpl.CompiledNode) bool {
 	return requiresAttr(opt, "null_flavour") || requiresAttr(opt, "null_reason")
 }
 
-// requiresAttr reports whether opt names attrName as required: the BMM
-// marks it mandatory or its existence lower bound is at least 1.
+// requiresAttr reports whether opt names attrName as required
+// (isRequired): the BMM marks it mandatory, its existence lower bound is
+// at least 1, or a child asks the list for a member (holdsRequiredChild).
 func requiresAttr(opt *tcimpl.CompiledNode, attrName string) bool {
 	attr := opt.Attribute(attrName)
 	return attr != nil && isRequired(attr)
