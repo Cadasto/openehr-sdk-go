@@ -20,6 +20,9 @@ const (
 	// externalPinFile is the vendored external code sets inside
 	// ResourcesDir: ISO and IANA, as the Foundation snapshots them.
 	externalPinFile = "openehr_external_terminologies.xml"
+	// unitsPinFile is the vendored property-unit table inside ResourcesDir:
+	// the UCUM units of each code of the property group.
+	unitsPinFile = "PropertyUnitData.xml"
 	// manifestFile is the provenance scripts/sync-terminology.sh writes
 	// beside the pin; its `ref:` line names the TERM release.
 	manifestFile = "MANIFEST.txt"
@@ -54,12 +57,13 @@ type Result struct {
 }
 
 // Run reads <ResourcesDir>/openehr_terminology.xml,
-// <ResourcesDir>/openehr_external_terminologies.xml and the `ref:` line of
+// <ResourcesDir>/openehr_external_terminologies.xml,
+// <ResourcesDir>/PropertyUnitData.xml and the `ref:` line of
 // <ResourcesDir>/MANIFEST.txt, renders openehr_gen.go under
 // <OutDir>/openehr/terminology/, and either writes it atomically or, with
 // Verify, compares it with the file on disk, reporting Drift / Missing
-// without writing anything. The table records both files' sha256, so a
-// change to either one is drift.
+// without writing anything. The table records each file's sha256, so a
+// change to any one of them is drift.
 //
 // The sha256 the generated file carries is computed here, over the very bytes
 // that were parsed: the manifest's own hashes are the sync script's integrity
@@ -83,12 +87,22 @@ func Run(opts Options) (Result, error) {
 	if err != nil {
 		return res, fmt.Errorf("%s with %s: %w", pinFile, externalPinFile, err)
 	}
+	unitsPath := filepath.Join(opts.ResourcesDir, unitsPinFile)
+	units, unitsSum, err := readPinFile(unitsPath)
+	if err != nil {
+		return res, err
+	}
+	if term.Properties, err = ParsePropertyUnits(bytes.NewReader(units)); err != nil {
+		return res, fmt.Errorf("%s: %w", unitsPath, err)
+	}
 	body, err := Render(term, SourceInfo{
 		Ref:            ref,
 		Path:           headerDir + pinFile,
 		SHA256:         coreSum,
 		ExternalPath:   headerDir + externalPinFile,
 		ExternalSHA256: externalSum,
+		UnitsPath:      headerDir + unitsPinFile,
+		UnitsSHA256:    unitsSum,
 	})
 	if err != nil {
 		return res, err
@@ -122,19 +136,29 @@ func Run(opts Options) (Result, error) {
 	return res, nil
 }
 
-// parsePinFile reads and parses one file of the pin, and returns it with the
-// hex sha256 of the bytes it parsed. A refusal names the file.
+// parsePinFile reads and parses one terminology file of the pin, and returns
+// it with the hex sha256 of the bytes it parsed. A refusal names the file.
 func parsePinFile(path string) (*Terminology, string, error) {
-	data, err := os.ReadFile(path)
+	data, sum, err := readPinFile(path)
 	if err != nil {
-		return nil, "", fmt.Errorf("read the pinned terminology: %w", err)
+		return nil, "", err
 	}
 	term, err := Parse(bytes.NewReader(data))
 	if err != nil {
 		return nil, "", fmt.Errorf("%s: %w", path, err)
 	}
+	return term, sum, nil
+}
+
+// readPinFile reads one file of the pin and returns its bytes with their hex
+// sha256, the value the generated table records for it.
+func readPinFile(path string) ([]byte, string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, "", fmt.Errorf("read the pinned terminology: %w", err)
+	}
 	sum := sha256.Sum256(data)
-	return term, hex.EncodeToString(sum[:]), nil
+	return data, hex.EncodeToString(sum[:]), nil
 }
 
 // manifestRef returns the TERM release recorded on the manifest's `ref:`

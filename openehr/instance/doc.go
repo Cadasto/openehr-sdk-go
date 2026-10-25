@@ -23,11 +23,12 @@
 // Under every policy the generator skips an attribute the template
 // prohibits (an existence of 0..0), unless an RM rule needs it, such as
 // an attribute the BMM marks mandatory, which it then writes as if the
-// template allowed it; and it never visits one the RM computes rather
-// than stores (offset on an event, is_integral on DV_QUANTITY and
-// DV_PROPORTION), nor a locatable's uid, which the identity rule
-// decides. Under every policy an RM rule can need more than the policy
-// visits, such as an ELEMENT's value or null flavour, or a DV_MULTIMEDIA's
+// template allowed it; and it never visits one no serialization
+// carries, the BMM functions and RESOURCE_DESCRIPTION.parent_resource
+// that rminfo.IsNonStorableAttr names, nor a locatable's uid, which
+// the identity rule decides. Under every policy an RM rule can need
+// more than the policy visits, such as an ELEMENT's value or null
+// flavour, or a DV_MULTIMEDIA's
 // uri where the template prohibits its data, which the generator then
 // builds as a visit does, from the attribute's first allowed template
 // child where it has one; and a visited multi-valued attribute is topped
@@ -36,20 +37,26 @@
 // The three policies follow the levels of the ITS-REST template
 // example's detail_level:
 //
-//   - Medium: the required attributes (the BMM marks them mandatory, or
-//     their existence or cardinality lower bound is at least 1), and those
-//     with an allowed template child (one whose occurrences upper bound is
-//     not 0). A visited multi-valued attribute gets its members as under
-//     Large, except that an optional archetype after the first optional
+//   - Medium: the required attributes, and those with an allowed template
+//     child (one whose occurrences upper bound is not 0). An attribute is
+//     required when the BMM marks it mandatory, when its existence or
+//     cardinality lower bound is at least 1, or when it is a list that
+//     holds an allowed template child, not a slot, whose occurrences lower
+//     bound is at least 1. Such a child makes no list required where the
+//     template prohibits the list, or where the RM types its items as
+//     primitive values, such as a DV_MULTIMEDIA's data. A visited
+//     multi-valued attribute gets its members as under Large, except that
+//     an optional archetype after the first optional
 //     archetype of the attribute that holds more than content the
 //     template does not describe (below) gets none, whatever its
 //     archetype. So Medium builds at most one optional archetype under an
 //     attribute, the medium level. It is the zero value, and so the
 //     default.
-//   - Required: the required attributes only, not one merely because it
-//     has an allowed template child, except a composition's context,
-//     which it visits as Medium does, so the context every policy writes
-//     is built under the template's constraints. A visited multi-valued
+//   - Required: the required attributes, in the sense above, but not one
+//     that only its cardinality lower bound asks for, nor one merely
+//     because it has an allowed template child, except a composition's
+//     context, which it visits as Medium does, so the context every
+//     policy writes is built under the template's constraints. A visited multi-valued
 //     attribute gets each allowed child that is not a slot as many times
 //     as its occurrences lower bound says, so an optional child gets none.
 //     It builds the data points the template makes mandatory and a
@@ -76,8 +83,11 @@
 // be given such members: the attribute has no allowed child and its member
 // would be a LOCATABLE, every allowed child of it is a slot, or it is
 // single-valued and the child that builds its member is a slot. An
-// attribute that is not required is not visited when every member it
-// would get is such content or such a child. A composition's context is
+// attribute that is not required, in the sense the Medium policy above
+// gives, is not visited when every member it would get is such content or
+// such a child. A list with a child that makes it required is visited, so
+// that child gets its members although they hold only such content. A
+// composition's context is
 // the exception: every policy writes one, so the walk visits it whatever
 // its members need. The first optional archetype Medium keeps is the first
 // that needs none. The check reads a node's own attributes only: below a
@@ -114,8 +124,9 @@
 // inside that range where the status is N and outside it where the status
 // is any other, wherever the value compares with the range's bounds (a
 // count, a quantity in the bounds' units, a proportion of the bounds' type,
-// by ratio, an ordinal, by value, and a date, a time or a date-time of the
-// bounds' layout), and an RM Integer, such as a DV_ORDINAL's value, inside
+// by ratio, an ordinal, by value, and a date, a time or a date-time in the
+// order the Reference Model checks give interval bounds, as instants where
+// the zones differ), and an RM Integer, such as a DV_ORDINAL's value, inside
 // its 32 bits, the example of a range bounded on one side alone staying on
 // that side. Where nothing is left, Generate returns an error wrapping
 // [ErrConstraintUnsatisfiable]. Where the template gives an RM attribute

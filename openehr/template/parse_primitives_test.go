@@ -2,12 +2,17 @@ package template_test
 
 import (
 	"errors"
+	"fmt"
 	"io"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
+	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 // REQ-103 — buildPrimitive maps each closed-set xsi:type onto the
@@ -396,6 +401,84 @@ func TestParse_CString(t *testing.T) {
 	}
 }
 
+// REQ-103 — the parser reads AOM 1.4 C_STRING.list_open onto
+// CString.ListOpen in both parse modes, on a bare C_STRING and on the
+// C_STRING item of a C_PRIMITIVE_OBJECT. The ITS-XML AM 1.4 schema makes
+// the element optional with no default, so an absent, empty or
+// whitespace-only element reads as false: the list stays closed.
+func TestParse_REQ103_CStringListOpen(t *testing.T) {
+	t.Parallel()
+	parsers := []struct {
+		name  string
+		parse func(io.Reader) (*template.OperationalTemplate, error)
+	}{
+		{name: "ParseOPT", parse: template.ParseOPT},
+		{name: "ParseOPTStrict", parse: template.ParseOPTStrict},
+	}
+	wrappers := []struct {
+		name string
+		wrap func(cString string) string
+	}{
+		{name: "C_STRING", wrap: func(s string) string {
+			return `<children xsi:type="C_STRING"><rm_type_name>STRING</rm_type_name><node_id/>` + s + `</children>`
+		}},
+		{name: "C_PRIMITIVE_OBJECT", wrap: func(s string) string {
+			return `<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>STRING</rm_type_name><node_id/><item xsi:type="C_STRING">` + s + `</item></children>`
+		}},
+	}
+	cases := []struct {
+		name     string
+		listOpen string
+		want     bool
+	}{
+		{name: "absent", listOpen: ``, want: false},
+		{name: "true", listOpen: `<list_open>true</list_open>`, want: true},
+		{name: "false", listOpen: `<list_open>false</list_open>`, want: false},
+		{name: "padded_one", listOpen: `<list_open> 1 </list_open>`, want: true},
+		{name: "self_closing", listOpen: `<list_open/>`, want: false},
+		{name: "whitespace", listOpen: "<list_open> \n\t</list_open>", want: false},
+	}
+	for _, p := range parsers {
+		for _, w := range wrappers {
+			for _, tc := range cases {
+				t.Run(p.name+"/"+w.name+"/"+tc.name, func(t *testing.T) {
+					t.Parallel()
+					child := w.wrap(`<list>Husten</list>` + tc.listOpen)
+					tmpl, err := p.parse(strings.NewReader(strings.Replace(primitiveOPTTemplate, "%s", child, 1)))
+					if err != nil {
+						t.Fatalf("%s(%s) error = %v, want nil", p.name, child, err)
+					}
+					prim := firstChildPrimitive(t, tmpl)
+					c, ok := prim.(constraints.CString)
+					if !ok {
+						t.Fatalf("%s(%s) constraint = %T, want CString", p.name, child, prim)
+					}
+					if c.ListOpen != tc.want {
+						t.Errorf("%s(%s) ListOpen = %v, want %v", p.name, child, c.ListOpen, tc.want)
+					}
+					if !slices.Equal(c.List, []string{"Husten"}) {
+						t.Errorf("%s(%s) List = %v, want [Husten]", p.name, child, c.List)
+					}
+				})
+			}
+		}
+	}
+}
+
+// REQ-103 — a list_open element whose text is not a boolean fails the
+// parse in both modes, as a C_BOOLEAN flag does.
+func TestParse_REQ103_CStringListOpenNonBooleanRefused(t *testing.T) {
+	t.Parallel()
+	child := `<children xsi:type="C_STRING"><rm_type_name>STRING</rm_type_name><node_id/><list>Husten</list><list_open>yes</list_open></children>`
+	body := strings.Replace(primitiveOPTTemplate, "%s", child, 1)
+	if _, err := template.ParseOPT(strings.NewReader(body)); !errors.Is(err, template.ErrInvalidOPT) {
+		t.Errorf("ParseOPT(<list_open>yes</list_open>) error = %v, want errors.Is(err, ErrInvalidOPT)", err)
+	}
+	if _, err := template.ParseOPTStrict(strings.NewReader(body)); !errors.Is(err, template.ErrInvalidOPT) {
+		t.Errorf("ParseOPTStrict(<list_open>yes</list_open>) error = %v, want errors.Is(err, ErrInvalidOPT)", err)
+	}
+}
+
 func TestParse_CReal(t *testing.T) {
 	tmpl := parseOPTWithChild(t, `<children xsi:type="C_REAL">
 		<rm_type_name>REAL</rm_type_name>
@@ -560,6 +643,140 @@ func TestParse_CDvQuantity(t *testing.T) {
 	}
 	if v := c.Validate(constraints.QuantityValue{Magnitude: 500, Units: "mm[Hg]"}); len(v) != 1 || v[0].Code != constraints.CodeOutOfRange {
 		t.Errorf("Validate(500) = %v, want CodeOutOfRange", v)
+	}
+}
+
+// quantityChildXML is a C_DV_QUANTITY child whose property is
+// terminology::code, with list as its <list> elements (none when empty).
+func quantityChildXML(terminology, code, list string) string {
+	return `<children xsi:type="C_DV_QUANTITY">
+		<rm_type_name>DV_QUANTITY</rm_type_name>
+		<node_id />
+		<property>
+			<terminology_id><value>` + terminology + `</value></terminology_id>
+			<code_string>` + code + `</code_string>
+		</property>` + list + `
+	</children>`
+}
+
+// parsedQuantity parses an OPT holding child and returns its DvQuantity.
+func parsedQuantity(t *testing.T, child string) constraints.DvQuantity {
+	t.Helper()
+	p := firstChildPrimitive(t, parseOPTWithChild(t, child))
+	c, ok := p.(constraints.DvQuantity)
+	if !ok {
+		t.Fatalf("want DvQuantity, got %T", p)
+	}
+	return c
+}
+
+// propertyUnitsOf is what the parser fills PropertyUnits with for an openehr
+// property code: the units the pinned table lists for it, primary units first
+// and each part in source order.
+func propertyUnitsOf(t *testing.T, code string) []string {
+	t.Helper()
+	p, ok := terminology.QuantityPropertyByCode(code)
+	if !ok {
+		t.Fatalf("the pinned property-unit table does not list openehr::%s", code)
+	}
+	var primary, other []string
+	for u := range p.All() {
+		if u.Primary {
+			primary = append(primary, u.UCUM)
+		} else {
+			other = append(other, u.UCUM)
+		}
+	}
+	return slices.Concat(primary, other)
+}
+
+// REQ-103 — a C_DV_QUANTITY whose property is openehr::125 (pressure) and
+// which lists no units parses to a constraint whose PropertyUnits are the
+// pressure units of the pinned property-unit table, primary first. Its
+// example validates, in the primary unit, and a mass unit is refused.
+func TestParse_REQ103_CDvQuantityPropertyWithoutList(t *testing.T) {
+	c := parsedQuantity(t, quantityChildXML("openehr", "125", ""))
+	if len(c.Units) != 0 {
+		t.Fatalf("Units = %+v, want none", c.Units)
+	}
+	if want := propertyUnitsOf(t, "125"); !slices.Equal(c.PropertyUnits, want) {
+		t.Errorf("PropertyUnits = %q, want %q", c.PropertyUnits, want)
+	}
+	ex, ok := c.ExampleValue().(constraints.QuantityValue)
+	if !ok {
+		t.Fatalf("ExampleValue() = %T, want QuantityValue", c.ExampleValue())
+	}
+	// N/m2 is the primary pressure unit of TERM Release-3.0.0.
+	if ex.Units != "N/m2" {
+		t.Errorf("ExampleValue().Units = %q, want the primary pressure unit N/m2", ex.Units)
+	}
+	if v := c.Validate(ex); len(v) != 0 {
+		t.Errorf("Validate(ExampleValue()) = %v, want nil", v)
+	}
+	if v := c.Validate(constraints.QuantityValue{Magnitude: 120, Units: "mm[Hg]", Precision: -1}); len(v) != 0 {
+		t.Errorf("Validate(120 mm[Hg]) = %v, want nil", v)
+	}
+	if v := c.Validate(constraints.QuantityValue{Magnitude: 1, Units: "mg", Precision: -1}); len(v) != 1 || v[0].Code != constraints.CodeUnitUnknown {
+		t.Errorf("Validate(1 mg) = %v, want one CodeUnitUnknown", v)
+	}
+}
+
+// REQ-103 — the parser puts the property's primary units first and keeps
+// the rest in source order: the pinned table lists Length's primary unit m
+// seventh.
+func TestParse_REQ103_CDvQuantityPropertyUnitsPrimaryFirst(t *testing.T) {
+	c := parsedQuantity(t, quantityChildXML("openehr", "122", ""))
+	if len(c.PropertyUnits) < 3 || c.PropertyUnits[0] != "m" || c.PropertyUnits[1] != "[in_i]/1000" || c.PropertyUnits[2] != "cm" {
+		t.Errorf("PropertyUnits = %q, want m, then [in_i]/1000, cm, … in source order", c.PropertyUnits)
+	}
+	if want := propertyUnitsOf(t, "122"); !slices.Equal(c.PropertyUnits, want) {
+		t.Errorf("PropertyUnits = %q, want %q", c.PropertyUnits, want)
+	}
+}
+
+// REQ-103 — a Units list keeps precedence over the property: km, a length
+// unit, is refused against the list [cm, m] (the CNF case
+// CONT-DV_QUANTITY-validate_property_units), and a listed unit outside the
+// property is accepted. PropertyUnits is still filled, for inspection.
+func TestParse_REQ103_CDvQuantityListKeepsPrecedence(t *testing.T) {
+	c := parsedQuantity(t, quantityChildXML("openehr", "122", `
+		<list><units>cm</units></list>
+		<list><units>m</units></list>
+		<list><units>mg</units></list>`))
+	if want := propertyUnitsOf(t, "122"); !slices.Equal(c.PropertyUnits, want) {
+		t.Errorf("PropertyUnits = %q, want %q", c.PropertyUnits, want)
+	}
+	if v := c.Validate(constraints.QuantityValue{Magnitude: 0, Units: "km", Precision: -1}); len(v) != 1 || v[0].Code != constraints.CodeUnitUnknown {
+		t.Errorf("Validate(0 km) = %v, want one CodeUnitUnknown", v)
+	}
+	for _, units := range []string{"cm", "mg"} {
+		if v := c.Validate(constraints.QuantityValue{Magnitude: 0, Units: units, Precision: -1}); len(v) != 0 {
+			t.Errorf("Validate(0 %s) = %v, want nil", units, v)
+		}
+	}
+}
+
+// REQ-103 — only an openehr property code the table lists has units: a
+// property in another terminology, or an openehr code the table does not
+// list, leaves PropertyUnits empty, and Validate accepts any units. The
+// terminology name matches exactly, as an openEHR-issued lookup does
+// (REQ-034), so OPENEHR and openEHR are other terminologies.
+func TestParse_REQ103_CDvQuantityPropertyOutsideTheTable(t *testing.T) {
+	for _, tc := range []struct{ terminology, code string }{
+		{"local", "125"},
+		{"SNOMED-CT", "122"},
+		{"OPENEHR", "122"},
+		{"openEHR", "122"},
+		{"openehr", "433"},
+		{"openehr", ""},
+	} {
+		c := parsedQuantity(t, quantityChildXML(tc.terminology, tc.code, ""))
+		if len(c.PropertyUnits) != 0 {
+			t.Errorf("%s::%s: PropertyUnits = %q, want none", tc.terminology, tc.code, c.PropertyUnits)
+		}
+		if v := c.Validate(constraints.QuantityValue{Magnitude: 1, Units: "mg", Precision: -1}); len(v) != 0 {
+			t.Errorf("%s::%s: Validate(1 mg) = %v, want nil", tc.terminology, tc.code, v)
+		}
 	}
 }
 
@@ -764,6 +981,63 @@ func TestParse_CPrimitiveObject_StrictMissingItem(t *testing.T) {
 	}
 }
 
+// TestREQ100_StrictRefusesPrimitiveItemWithNoXSIType pins § REQ-100 Strict
+// parse mode: ITS-XML types the <item> of a C_PRIMITIVE_OBJECT as the
+// abstract C_PRIMITIVE, so strict mode refuses one that carries no type in
+// the XSI namespace with ErrInvalidOPT, as it refuses a missing <item>. The
+// default mode reads it as no constraint. A typed item parses in both modes.
+func TestREQ100_StrictRefusesPrimitiveItemWithNoXSIType(t *testing.T) {
+	const wrapper = `<children xsi:type="C_PRIMITIVE_OBJECT">
+		<rm_type_name>DURATION</rm_type_name>
+		<node_id/>
+		%s
+	</children>`
+	tests := []struct {
+		name string
+		item string
+		// refused is true when strict mode refuses the item.
+		refused bool
+	}{
+		{name: "typed", item: `<item xsi:type="C_DURATION"><pattern>PThm</pattern></item>`},
+		{name: "no type", item: `<item><pattern>PThm</pattern></item>`, refused: true},
+		{name: "empty type", item: `<item xsi:type=""><pattern>PThm</pattern></item>`, refused: true},
+		{name: "type in another namespace", item: `<item xmlns:x="urn:example:not-xsi" x:type="C_DURATION"><pattern>PThm</pattern></item>`, refused: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			child := fmt.Sprintf(wrapper, tc.item)
+			lenient := parseOPTWithChild(t, child)
+			p := firstChildPrimitive(t, lenient)
+			if tc.refused && p != nil {
+				t.Errorf("ParseOPT: PrimitiveConstraint() = %#v, want none for an untyped <item>", p)
+			}
+			if !tc.refused {
+				if _, ok := p.(constraints.CDuration); !ok {
+					t.Errorf("ParseOPT: PrimitiveConstraint() = %T, want constraints.CDuration", p)
+				}
+			}
+
+			body := strings.Replace(primitiveOPTTemplate, "%s", child, 1)
+			strict, err := template.ParseOPTStrict(strings.NewReader(body))
+			if !tc.refused {
+				if err != nil {
+					t.Fatalf("ParseOPTStrict = %v, want nil error", err)
+				}
+				return
+			}
+			if !errors.Is(err, template.ErrInvalidOPT) || strict != nil {
+				t.Fatalf("ParseOPTStrict error = %v (template returned: %t), want an error wrapping ErrInvalidOPT and no template", err, strict != nil)
+			}
+			if errors.Is(err, template.ErrUnsupportedNode) {
+				t.Errorf("ParseOPTStrict = %v, want no ErrUnsupportedNode: the item has no type, not an unknown one", err)
+			}
+			if !strings.Contains(err.Error(), "<item>") {
+				t.Errorf("ParseOPTStrict = %v, want the message to name <item>", err)
+			}
+		})
+	}
+}
+
 // TestParse_CPrimitiveObject_Duration is the focused phase-0 regression
 // gate for the C_PRIMITIVE_OBJECT inner-`<item>` extraction (now
 // landed with the wire-parser fix in PR 21).
@@ -775,7 +1049,7 @@ func TestParse_CPrimitiveObject_Duration(t *testing.T) {
 		<rm_type_name>DURATION</rm_type_name>
 		<node_id/>
 		<item xsi:type="C_DURATION">
-			<pattern>PThhHmmM</pattern>
+			<pattern>PThm</pattern>
 		</item>
 	</children>`)
 	p := firstChildPrimitive(t, tmpl)
@@ -783,7 +1057,320 @@ func TestParse_CPrimitiveObject_Duration(t *testing.T) {
 	if !ok {
 		t.Fatalf("PrimitiveConstraint() = %T, want constraints.CDuration", p)
 	}
-	if cd.Pattern != "PThhHmmM" {
-		t.Errorf("CDuration.Pattern = %q, want PThhHmmM", cd.Pattern)
+	if cd.Pattern != "PThm" {
+		t.Errorf("CDuration.Pattern = %q, want PThm", cd.Pattern)
 	}
+}
+
+// temporalRangeXML is an AOM 1.4 range element holding the given children.
+func temporalRangeXML(children string) string {
+	return "<range>" + children + "</range>"
+}
+
+// TestParse_REQ103_TemporalRange pins REQ-103 § Validate contract on the
+// parse: the range of a C_DATE, C_TIME, C_DATE_TIME or C_DURATION is read
+// into its TemporalRange, its bounds trimmed and its omitted flags read by
+// wire.md § REQ-169, and a constraint with no range keeps the zero value.
+func TestParse_REQ103_TemporalRange(t *testing.T) {
+	t.Parallel()
+	closedFlags := `<lower_included>true</lower_included><upper_included>true</upper_included>` +
+		`<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded>`
+	tests := []struct {
+		name  string
+		child string
+		want  constraints.PrimitiveConstraint
+	}{
+		{
+			name: "C_DURATION, closed, with a pattern",
+			child: `<children xsi:type="C_DURATION"><rm_type_name>DURATION</rm_type_name><node_id/>
+				<pattern>PY</pattern>` + temporalRangeXML(closedFlags+`<lower>P0Y</lower><upper>P150Y</upper>`) + `</children>`,
+			want: constraints.CDuration{Pattern: "PY", Range: constraints.TemporalRange{Lower: "P0Y", Upper: "P150Y", LowerInclusive: true, UpperInclusive: true}},
+		},
+		{
+			name: "C_DURATION, lower bound only, flags omitted",
+			child: `<children xsi:type="C_DURATION"><rm_type_name>DURATION</rm_type_name><node_id/>` +
+				temporalRangeXML(`<lower>PT0S</lower>`) + `</children>`,
+			want: constraints.CDuration{Range: constraints.TemporalRange{Lower: "PT0S", LowerInclusive: true, UpperUnbounded: true}},
+		},
+		{
+			name: "C_DURATION, lower excluded",
+			child: `<children xsi:type="C_DURATION"><rm_type_name>DURATION</rm_type_name><node_id/>` +
+				temporalRangeXML(`<lower_included>false</lower_included><lower>PT0S</lower>`) + `</children>`,
+			want: constraints.CDuration{Range: constraints.TemporalRange{Lower: "PT0S", UpperUnbounded: true}},
+		},
+		{
+			name: "C_DATE, upper excluded",
+			child: `<children xsi:type="C_DATE"><rm_type_name>DATE</rm_type_name><node_id/>
+				<pattern>yyyy-mm-dd</pattern>` + temporalRangeXML(`<upper_included>false</upper_included><lower> 2004-05-20 </lower><upper>2004-06-02</upper>`) + `</children>`,
+			want: constraints.CDate{Pattern: "yyyy-mm-dd", Range: constraints.TemporalRange{Lower: "2004-05-20", Upper: "2004-06-02", LowerInclusive: true}},
+		},
+		{
+			name: "C_TIME, upper bound only",
+			child: `<children xsi:type="C_TIME"><rm_type_name>TIME</rm_type_name><node_id/>` +
+				temporalRangeXML(`<lower_unbounded>true</lower_unbounded><upper_unbounded>false</upper_unbounded><upper>09:30:00+02:00</upper>`) + `</children>`,
+			want: constraints.CTime{Range: constraints.TemporalRange{Upper: "09:30:00+02:00", UpperInclusive: true, LowerUnbounded: true}},
+		},
+		{
+			name: "C_DATE_TIME, inside C_PRIMITIVE_OBJECT",
+			child: `<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>DATE_TIME</rm_type_name><node_id/>
+				<item xsi:type="C_DATE_TIME"><pattern>yyyy-mm-ddTHH:MM:SS</pattern>` +
+				temporalRangeXML(closedFlags+`<lower>2004-05-20T00:00:00Z</lower><upper>2005-05-19T23:59:59Z</upper>`) + `</item></children>`,
+			want: constraints.CDateTime{Pattern: "yyyy-mm-ddTHH:MM:SS", Range: constraints.TemporalRange{
+				Lower: "2004-05-20T00:00:00Z", Upper: "2005-05-19T23:59:59Z", LowerInclusive: true, UpperInclusive: true,
+			}},
+		},
+		{
+			name:  "C_DATE, no range",
+			child: `<children xsi:type="C_DATE"><rm_type_name>DATE</rm_type_name><node_id/><pattern>yyyy-??-XX</pattern></children>`,
+			want:  constraints.CDate{Pattern: "yyyy-??-XX"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			for _, strict := range []bool{false, true} {
+				body := strings.Replace(primitiveOPTTemplate, "%s", tc.child, 1)
+				parse := template.ParseOPT
+				if strict {
+					parse = template.ParseOPTStrict
+				}
+				tmpl, err := parse(strings.NewReader(body))
+				if err != nil {
+					t.Fatalf("strict=%t: parse: %v", strict, err)
+				}
+				if got := firstChildPrimitive(t, tmpl); got != tc.want {
+					t.Errorf("strict=%t: PrimitiveConstraint() = %#v, want %#v", strict, got, tc.want)
+				}
+			}
+		})
+	}
+}
+
+// TestParse_REQ103_TemporalRangeMalformedBound pins REQ-103 § Validate
+// contract on a bound that the ISO 8601 parse of the constrained type
+// refuses: ParseOPTStrict fails with ErrInvalidOPT, and ParseOPT reads that
+// side as unbounded, the other side kept.
+func TestParse_REQ103_TemporalRangeMalformedBound(t *testing.T) {
+	t.Parallel()
+	closedFlags := `<lower_included>true</lower_included><upper_included>true</upper_included>` +
+		`<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded>`
+	tests := []struct {
+		name    string
+		child   string
+		lenient constraints.PrimitiveConstraint
+	}{
+		{
+			name: "C_DURATION lower",
+			child: `<children xsi:type="C_DURATION"><rm_type_name>DURATION</rm_type_name><node_id/>` +
+				temporalRangeXML(closedFlags+`<lower>P1X</lower><upper>P150Y</upper>`) + `</children>`,
+			lenient: constraints.CDuration{Range: constraints.TemporalRange{Upper: "P150Y", UpperInclusive: true, LowerUnbounded: true}},
+		},
+		{
+			name: "C_DATE upper",
+			child: `<children xsi:type="C_DATE"><rm_type_name>DATE</rm_type_name><node_id/>` +
+				temporalRangeXML(closedFlags+`<lower>2004-01-01</lower><upper>2004-02-30</upper>`) + `</children>`,
+			lenient: constraints.CDate{Range: constraints.TemporalRange{Lower: "2004-01-01", LowerInclusive: true, UpperUnbounded: true}},
+		},
+		{
+			name: "C_TIME lower",
+			child: `<children xsi:type="C_TIME"><rm_type_name>TIME</rm_type_name><node_id/>` +
+				temporalRangeXML(closedFlags+`<lower>25:00</lower><upper>10:00</upper>`) + `</children>`,
+			lenient: constraints.CTime{Range: constraints.TemporalRange{Upper: "10:00", UpperInclusive: true, LowerUnbounded: true}},
+		},
+		{
+			name: "C_DATE_TIME bound of another type",
+			child: `<children xsi:type="C_DATE_TIME"><rm_type_name>DATE_TIME</rm_type_name><node_id/>` +
+				temporalRangeXML(closedFlags+`<lower>2004-05-20T10:00</lower><upper>PT1H</upper>`) + `</children>`,
+			lenient: constraints.CDateTime{Range: constraints.TemporalRange{Lower: "2004-05-20T10:00", LowerInclusive: true, UpperUnbounded: true}},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			body := strings.Replace(primitiveOPTTemplate, "%s", tc.child, 1)
+			if _, err := template.ParseOPTStrict(strings.NewReader(body)); !errors.Is(err, template.ErrInvalidOPT) {
+				t.Errorf("ParseOPTStrict err = %v, want errors.Is(err, ErrInvalidOPT)", err)
+			}
+			tmpl, err := template.ParseOPT(strings.NewReader(body))
+			if err != nil {
+				t.Fatalf("ParseOPT: %v", err)
+			}
+			if got := firstChildPrimitive(t, tmpl); got != tc.lenient {
+				t.Errorf("ParseOPT: PrimitiveConstraint() = %#v, want %#v", got, tc.lenient)
+			}
+		})
+	}
+}
+
+// tzChild is a C_DATE, C_TIME or C_DATE_TIME child of xsiType whose
+// timezone_validity element holds text, written in the place Archetype.xsd
+// gives it, after the pattern; a nil text leaves the element out.
+func tzChild(xsiType, rmType string, text *string) string {
+	el := ""
+	if text != nil {
+		el = "<timezone_validity>" + *text + "</timezone_validity>"
+	}
+	return `<children xsi:type="` + xsiType + `"><rm_type_name>` + rmType + `</rm_type_name><node_id/>` + el + `</children>`
+}
+
+// TestParse_REQ103_TimezoneValidity pins REQ-103 § Validate contract on the
+// parse of the ITS-XML timezone_validity, a VALIDITY_KIND: 1001 is
+// mandatory and 1003 disallowed, and 1002, an absent element or an empty
+// one is optional, in both modes, on C_TIME and C_DATE_TIME, and inside a
+// C_PRIMITIVE_OBJECT. A C_DATE keeps disallowed and optional.
+func TestParse_REQ103_TimezoneValidity(t *testing.T) {
+	t.Parallel()
+	text := func(s string) *string { return &s }
+	tests := []struct {
+		name  string
+		child string
+		want  constraints.PrimitiveConstraint
+	}{
+		{name: "C_TIME 1001", child: tzChild("C_TIME", "TIME", text("1001")), want: constraints.CTime{TimezoneValidity: constraints.ValidityMandatory}},
+		{name: "C_TIME 1002", child: tzChild("C_TIME", "TIME", text("1002")), want: constraints.CTime{TimezoneValidity: constraints.ValidityOptional}},
+		{name: "C_TIME 1003, padded", child: tzChild("C_TIME", "TIME", text(" 1003\n")), want: constraints.CTime{TimezoneValidity: constraints.ValidityDisallowed}},
+		{name: "C_TIME absent", child: tzChild("C_TIME", "TIME", nil), want: constraints.CTime{}},
+		{name: "C_TIME empty", child: tzChild("C_TIME", "TIME", text(" ")), want: constraints.CTime{}},
+		{name: "C_DATE_TIME 1001", child: tzChild("C_DATE_TIME", "DATE_TIME", text("1001")), want: constraints.CDateTime{TimezoneValidity: constraints.ValidityMandatory}},
+		{name: "C_DATE_TIME 1003", child: tzChild("C_DATE_TIME", "DATE_TIME", text("1003")), want: constraints.CDateTime{TimezoneValidity: constraints.ValidityDisallowed}},
+		{name: "C_DATE 1003", child: tzChild("C_DATE", "DATE", text("1003")), want: constraints.CDate{TimezoneValidity: constraints.ValidityDisallowed}},
+		{name: "C_DATE 1002", child: tzChild("C_DATE", "DATE", text("1002")), want: constraints.CDate{}},
+		{
+			name: "C_TIME inside C_PRIMITIVE_OBJECT, with a pattern and a range",
+			child: `<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>TIME</rm_type_name><node_id/>
+				<item xsi:type="C_TIME"><pattern>hh:mm:ss</pattern><timezone_validity>1001</timezone_validity>` +
+				temporalRangeXML(`<lower>09:30:00Z</lower>`) + `</item></children>`,
+			want: constraints.CTime{
+				Pattern: "hh:mm:ss", TimezoneValidity: constraints.ValidityMandatory,
+				Range: constraints.TemporalRange{Lower: "09:30:00Z", LowerInclusive: true, UpperUnbounded: true},
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			for _, strict := range []bool{false, true} {
+				body := strings.Replace(primitiveOPTTemplate, "%s", tc.child, 1)
+				parse := template.ParseOPT
+				if strict {
+					parse = template.ParseOPTStrict
+				}
+				tmpl, err := parse(strings.NewReader(body))
+				if err != nil {
+					t.Fatalf("strict=%t: parse: %v", strict, err)
+				}
+				if got := firstChildPrimitive(t, tmpl); got != tc.want {
+					t.Errorf("strict=%t: PrimitiveConstraint() = %#v, want %#v", strict, got, tc.want)
+				}
+			}
+		})
+	}
+}
+
+// TestParse_REQ103_TimezoneValidityMalformed pins REQ-103 § Validate
+// contract on a timezone_validity that is not one of the three VALIDITY_KIND
+// values, and on 1001 on a C_DATE, which has no zone: ParseOPTStrict fails
+// with ErrInvalidOPT, and ParseOPT reads it as optional, the rest of the
+// constraint kept.
+func TestParse_REQ103_TimezoneValidityMalformed(t *testing.T) {
+	t.Parallel()
+	text := func(s string) *string { return &s }
+	tests := []struct {
+		name    string
+		child   string
+		lenient constraints.PrimitiveConstraint
+	}{
+		{name: "C_TIME 1004", child: tzChild("C_TIME", "TIME", text("1004")), lenient: constraints.CTime{}},
+		{name: "C_TIME 0", child: tzChild("C_TIME", "TIME", text("0")), lenient: constraints.CTime{}},
+		{name: "C_TIME a name", child: tzChild("C_TIME", "TIME", text("mandatory")), lenient: constraints.CTime{}},
+		{name: "C_DATE_TIME a decimal", child: tzChild("C_DATE_TIME", "DATE_TIME", text("1001.0")), lenient: constraints.CDateTime{}},
+		{name: "C_DATE 1001", child: tzChild("C_DATE", "DATE", text("1001")), lenient: constraints.CDate{}},
+		{
+			name: "C_DATE 1001 with a pattern",
+			child: `<children xsi:type="C_DATE"><rm_type_name>DATE</rm_type_name><node_id/>
+				<pattern>yyyy-mm-??</pattern><timezone_validity>1001</timezone_validity></children>`,
+			lenient: constraints.CDate{Pattern: "yyyy-mm-??"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			body := strings.Replace(primitiveOPTTemplate, "%s", tc.child, 1)
+			if _, err := template.ParseOPTStrict(strings.NewReader(body)); !errors.Is(err, template.ErrInvalidOPT) {
+				t.Errorf("ParseOPTStrict err = %v, want errors.Is(err, ErrInvalidOPT)", err)
+			}
+			tmpl, err := template.ParseOPT(strings.NewReader(body))
+			if err != nil {
+				t.Fatalf("ParseOPT: %v", err)
+			}
+			if got := firstChildPrimitive(t, tmpl); got != tc.lenient {
+				t.Errorf("ParseOPT: PrimitiveConstraint() = %#v, want %#v", got, tc.lenient)
+			}
+		})
+	}
+}
+
+// TestParse_REQ103_TemporalRangeVendoredOPTs pins the parse of the C_DURATION
+// ranges the vendored OPTs write: the family history template's age of 0 to
+// 150 years, and the constrain_test template's width of exactly 24 hours and
+// age of at least 4 years.
+func TestParse_REQ103_TemporalRangeVendoredOPTs(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		path string
+		want []constraints.CDuration
+	}{
+		{
+			name: "family_history",
+			path: filepath.Join(fixtures.CrossFormatRoot(), "family_history", "template.opt"),
+			want: []constraints.CDuration{
+				{Pattern: "PY", Range: constraints.TemporalRange{Lower: "P0Y", Upper: "P150Y", LowerInclusive: true, UpperInclusive: true}},
+			},
+		},
+		{
+			name: "constrain_test",
+			path: fixtures.WebTemplateOpt("constrain_test"),
+			want: []constraints.CDuration{
+				{Range: constraints.TemporalRange{Lower: "PT24H", Upper: "PT24H", LowerInclusive: true, UpperInclusive: true}},
+				{Pattern: "PYMWD", Range: constraints.TemporalRange{Lower: "P4Y", LowerInclusive: true, UpperUnbounded: true}},
+				{Pattern: "PY"},
+				{Pattern: "PMWD"},
+				{Pattern: "PYM"},
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			tmpl, err := template.ParseFileStrict(tc.path)
+			if err != nil {
+				t.Fatalf("ParseFileStrict: %v", err)
+			}
+			if got := durationsOf(tmpl.Root()); !slices.Equal(got, tc.want) {
+				t.Errorf("C_DURATION constraints in document order =\n  %#v\nwant\n  %#v", got, tc.want)
+			}
+		})
+	}
+}
+
+// durationsOf returns the CDuration constraints under n, in document order.
+func durationsOf(n template.Node) []constraints.CDuration {
+	co, ok := n.(interface {
+		Attributes() []*template.Attribute
+		PrimitiveConstraint() constraints.PrimitiveConstraint
+	})
+	if !ok {
+		return nil
+	}
+	var out []constraints.CDuration
+	if d, ok := co.PrimitiveConstraint().(constraints.CDuration); ok {
+		out = append(out, d)
+	}
+	for _, a := range co.Attributes() {
+		for _, c := range a.Children() {
+			out = append(out, durationsOf(c)...)
+		}
+	}
+	return out
 }

@@ -7,11 +7,13 @@ import (
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
+	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
 )
 
-// xmlNumericInterval is the AOM 1.4 numeric range shape used by
-// C_INTEGER, C_REAL, and the magnitude / precision sub-intervals of
-// C_DV_QUANTITY. Distinct from xmlInterval (which models
+// xmlNumericInterval is the AOM 1.4 range shape used by C_INTEGER,
+// C_REAL, the magnitude / precision sub-intervals of C_DV_QUANTITY, and,
+// read by temporalRange, the ranges of C_DATE, C_TIME, C_DATE_TIME and
+// C_DURATION. Distinct from xmlInterval (which models
 // existence / occurrences as integer cardinalities) — primitive
 // ranges are float-typed and keep their inclusivity flags, where a
 // Multiplicity closes an excluded end instead. All four flags are
@@ -37,6 +39,7 @@ type xmlNumericInterval struct {
 }
 
 // xmlBoolFlag is the true_valid or false_valid element of a C_BOOLEAN,
+// the list_open element of a C_STRING,
 // or one of the four boundary flags (lower_included, upper_included,
 // lower_unbounded, upper_unbounded) of an interval: an occurrences,
 // existence or cardinality interval, or a numeric range.
@@ -70,6 +73,12 @@ func (f *xmlBoolFlag) UnmarshalText(b []byte) error {
 // or empty.
 func (f xmlBoolFlag) orTrue() bool {
 	return !f.set || f.value
+}
+
+// orFalse returns the flag's value, or false when the element was omitted
+// or empty.
+func (f xmlBoolFlag) orFalse() bool {
+	return f.set && f.value
 }
 
 // ptr returns a pointer to the flag's value, or nil when the element was
@@ -146,13 +155,17 @@ func buildPrimitive(o *xmlCObject, strict bool) (constraints.PrimitiveConstraint
 	case "C_STRING":
 		return buildString(o), nil
 	case "C_DATE":
-		return constraints.CDate{Pattern: strings.TrimSpace(o.PrimitivePattern)}, nil
+		r, tz, err := clockParts(o, strict, "C_DATE", constraints.CDate{}.Validate)
+		return constraints.CDate{Pattern: strings.TrimSpace(o.PrimitivePattern), Range: r, TimezoneValidity: tz}, err
 	case "C_TIME":
-		return constraints.CTime{Pattern: strings.TrimSpace(o.PrimitivePattern)}, nil
+		r, tz, err := clockParts(o, strict, "C_TIME", constraints.CTime{}.Validate)
+		return constraints.CTime{Pattern: strings.TrimSpace(o.PrimitivePattern), Range: r, TimezoneValidity: tz}, err
 	case "C_DATE_TIME":
-		return constraints.CDateTime{Pattern: strings.TrimSpace(o.PrimitivePattern)}, nil
+		r, tz, err := clockParts(o, strict, "C_DATE_TIME", constraints.CDateTime{}.Validate)
+		return constraints.CDateTime{Pattern: strings.TrimSpace(o.PrimitivePattern), Range: r, TimezoneValidity: tz}, err
 	case "C_DURATION":
-		return buildDuration(o), nil
+		r, err := temporalRange(o.Range, strict, "C_DURATION", constraints.CDuration{}.Validate)
+		return constraints.CDuration{Pattern: strings.TrimSpace(o.PrimitivePattern), Range: r}, err
 	case "C_CODE_PHRASE":
 		return buildCodePhrase(o), nil
 	case "C_DV_QUANTITY":
@@ -173,6 +186,14 @@ func buildPrimitive(o *xmlCObject, strict bool) (constraints.PrimitiveConstraint
 				return nil, fmt.Errorf("%w: C_PRIMITIVE_OBJECT for %q has no <item> child", ErrInvalidOPT, o.RMTypeName)
 			}
 			return nil, nil
+		}
+		// REQ-100: ITS-XML types <item> as the abstract C_PRIMITIVE, so
+		// the item must name its concrete type in the XSI namespace.
+		// Strict mode refuses one that does not, as it refuses a missing
+		// item; the default mode reads it as no constraint (the
+		// buildPrimitive default below).
+		if strict && o.Item.Type == "" {
+			return nil, fmt.Errorf("%w: <item> of C_PRIMITIVE_OBJECT for %q has no xsi:type in the XSI namespace (strict mode)", ErrInvalidOPT, o.RMTypeName)
 		}
 		return buildPrimitive(o.Item, strict)
 	}
@@ -256,13 +277,11 @@ func buildString(o *xmlCObject) constraints.CString {
 			list = append(list, s)
 		}
 	}
-	return constraints.NewCString(pattern, list, assumed)
-}
-
-func buildDuration(o *xmlCObject) constraints.CDuration {
-	return constraints.CDuration{
-		Pattern: strings.TrimSpace(o.PrimitivePattern),
-	}
+	c := constraints.NewCString(pattern, list, assumed)
+	// The ITS-XML AM 1.4 schema makes list_open optional with no default,
+	// so an omitted or empty element leaves the list closed.
+	c.ListOpen = o.ListOpen.orFalse()
+	return c
 }
 
 func buildCodePhrase(o *xmlCObject) constraints.CodePhrase {
@@ -278,6 +297,29 @@ func buildCodePhrase(o *xmlCObject) constraints.CodePhrase {
 	return c
 }
 
+// propertyUnits returns the UCUM units the pinned property-unit table lists
+// for the openehr property code, its primary units first and each part in
+// source order (REQ-103), or nil when the table lists the code with no units
+// or not at all. The slice is the caller's own.
+func propertyUnits(code string) []string {
+	p, ok := terminology.QuantityPropertyByCode(code)
+	if !ok || p.Len() == 0 {
+		return nil
+	}
+	out := make([]string, 0, p.Len())
+	for u := range p.All() {
+		if u.Primary {
+			out = append(out, u.UCUM)
+		}
+	}
+	for u := range p.All() {
+		if !u.Primary {
+			out = append(out, u.UCUM)
+		}
+	}
+	return out
+}
+
 func buildDvQuantity(o *xmlCObject) (constraints.DvQuantity, error) {
 	c := constraints.DvQuantity{}
 	if o.Property != nil {
@@ -288,6 +330,9 @@ func buildDvQuantity(o *xmlCObject) (constraints.DvQuantity, error) {
 		ref.CodeString = strings.TrimSpace(o.Property.CodeString)
 		if ref.Terminology != "" || ref.CodeString != "" {
 			c.Property = &ref
+		}
+		if ref.Terminology == terminology.ID {
+			c.PropertyUnits = propertyUnits(ref.CodeString)
 		}
 	}
 	for _, item := range o.PrimitiveList {
@@ -402,6 +447,100 @@ func numericRange(i *xmlNumericInterval, strict bool, ctx string) (constraints.N
 		}
 	}
 	return r, nil
+}
+
+// temporalRange folds the wire range of a C_DATE, C_TIME, C_DATE_TIME or
+// C_DURATION into its TemporalRange, or the zero value, which
+// constrains nothing, when the OPT gives none. The flags read as
+// numericRange reads them. validate is the zero constraint of the type,
+// which accepts exactly the ISO 8601 text of the type, so a bound it refuses
+// is not one: in strict mode that surfaces as ErrInvalidOPT, and in lenient
+// mode the side falls through to unbounded, as numericRange does with a
+// bound that is not a number. ctx names the constraint type for the
+// diagnostic.
+func temporalRange(i *xmlNumericInterval, strict bool, ctx string, validate func(any) []constraints.Violation) (constraints.TemporalRange, error) {
+	if i == nil {
+		return constraints.TemporalRange{}, nil
+	}
+	lowerUnbounded, err := unboundedFlag(i.LowerUnbounded, i.Lower != nil, "lower")
+	if err != nil {
+		return constraints.TemporalRange{}, fmt.Errorf("%w: %s range: %w", ErrInvalidOPT, ctx, err)
+	}
+	upperUnbounded, err := unboundedFlag(i.UpperUnbounded, i.Upper != nil, "upper")
+	if err != nil {
+		return constraints.TemporalRange{}, fmt.Errorf("%w: %s range: %w", ErrInvalidOPT, ctx, err)
+	}
+	r := constraints.TemporalRange{
+		LowerUnbounded: lowerUnbounded,
+		UpperUnbounded: upperUnbounded,
+		LowerInclusive: includedFlag(i.LowerIncluded.ptr(), lowerUnbounded),
+		UpperInclusive: includedFlag(i.UpperIncluded.ptr(), upperUnbounded),
+	}
+	if !r.LowerUnbounded {
+		lower := strings.TrimSpace(stringOrEmpty(i.Lower))
+		switch {
+		case len(validate(lower)) == 0:
+			r.Lower = lower
+		case strict:
+			return r, fmt.Errorf("%w: %s range.lower=%q is not a valid ISO 8601 value of the type", ErrInvalidOPT, ctx, lower)
+		default:
+			r.LowerUnbounded, r.LowerInclusive = true, false
+		}
+	}
+	if !r.UpperUnbounded {
+		upper := strings.TrimSpace(stringOrEmpty(i.Upper))
+		switch {
+		case len(validate(upper)) == 0:
+			r.Upper = upper
+		case strict:
+			return r, fmt.Errorf("%w: %s range.upper=%q is not a valid ISO 8601 value of the type", ErrInvalidOPT, ctx, upper)
+		default:
+			r.UpperUnbounded, r.UpperInclusive = true, false
+		}
+	}
+	return r, nil
+}
+
+// clockParts reads the range and the timezone_validity of a C_DATE, C_TIME
+// or C_DATE_TIME named ctx, as temporalRange and timezoneValidity read them.
+func clockParts(o *xmlCObject, strict bool, ctx string, validate func(any) []constraints.Violation) (constraints.TemporalRange, constraints.ValidityKind, error) {
+	r, err := temporalRange(o.Range, strict, ctx, validate)
+	if err != nil {
+		return r, constraints.ValidityOptional, err
+	}
+	tz, err := timezoneValidity(o.TimezoneValidity, strict, ctx)
+	return r, tz, err
+}
+
+// timezoneValidity reads the timezone_validity text of a C_DATE, C_TIME or
+// C_DATE_TIME named ctx, an ITS-XML VALIDITY_KIND: 1001 is mandatory, 1003
+// disallowed, and 1002, an omitted element or an empty one optional. Text
+// that names no VALIDITY_KIND, and 1001 on a C_DATE, which has no zone to
+// require, are OPT defects: strict mode surfaces them as ErrInvalidOPT, and
+// lenient mode reads them as optional, as temporalRange opens a side whose
+// bound is not ISO 8601 text.
+func timezoneValidity(text string, strict bool, ctx string) (constraints.ValidityKind, error) {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return constraints.ValidityOptional, nil
+	}
+	tz, ok := constraints.ValidityOptional, false
+	switch n, err := strconv.Atoi(text); {
+	case err != nil:
+	case n == 1001:
+		tz, ok = constraints.ValidityMandatory, ctx != "C_DATE"
+	case n == 1002:
+		ok = true
+	case n == 1003:
+		tz, ok = constraints.ValidityDisallowed, true
+	}
+	switch {
+	case ok:
+		return tz, nil
+	case strict:
+		return constraints.ValidityOptional, fmt.Errorf("%w: %s timezone_validity=%q is not a VALIDITY_KIND the type can meet", ErrInvalidOPT, ctx, text)
+	}
+	return constraints.ValidityOptional, nil
 }
 
 // stringOrEmpty returns the bound p points to, or "" for a bound the OPT

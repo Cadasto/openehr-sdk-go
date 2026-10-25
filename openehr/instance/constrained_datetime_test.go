@@ -16,9 +16,8 @@ import (
 )
 
 // dateTimeAttrs are the attributes the OPT gives a DV_DATE_TIME node: a
-// value constrained by a pattern-only C_DATE_TIME, the one form the
-// template parser reads (it reads no C_DATE_TIME range), or none, so the
-// node carries no primitive constraint.
+// value constrained by a C_DATE_TIME with a full date-time pattern and no
+// range, or none, so the node carries no primitive constraint.
 func dateTimeAttrs(constrained bool) []string {
 	if !constrained {
 		return nil

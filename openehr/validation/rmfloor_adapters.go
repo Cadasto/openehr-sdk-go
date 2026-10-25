@@ -9,6 +9,7 @@ package validation
 // covers every DV_INTERVAL instantiation the registry knows.
 
 import (
+	"github.com/cadasto/openehr-sdk-go/internal/iso8601"
 	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
@@ -205,30 +206,44 @@ type intervalOrder struct {
 	magnitudes [2]float64
 }
 
-// dvIntervalOrder reads the order of the two bounds of a DV_INTERVAL when
-// neither side is unbounded and the floor orders the pair. The RM states the
-// rule as DV_INTERVAL.Limits_consistent: with neither side open,
-// lower.is_strictly_comparable_to(upper) and lower <= upper, where `<=` is
-// the less_than of the bounds' type, whose precondition Pre_comparable is
-// is_strictly_comparable_to(other). So the floor orders two bounds only when
-// the RM makes them strictly comparable ([orderBounds] says when). It reads
-// every DV_INTERVAL the RM types hold, typed (DVInterval[DVQuantity] is a
-// DV_QUANTITY's normal_range, DVInterval[DVDate] a PARTY's time_validity) or
-// bare (DVInterval[DVOrdered], which the registry decodes), by value or by
-// pointer. ok is false for an unbounded side, where the comparison is
-// undefined, and for a pair the floor does not order.
+// notStrictlyComparable reports whether the floor reads two bounds of a
+// DV_INTERVAL, neither side unbounded, as not strictly comparable, and gives
+// the Detail of the finding that says so. The RM states the rule as
+// DV_INTERVAL.Limits_consistent: with neither side open,
+// lower.is_strictly_comparable_to(upper) and lower <= upper. Each class
+// defines is_strictly_comparable_to against its own class, so bounds of two
+// classes are not strictly comparable, a DV_COUNT beside another DV_ORDERED
+// included, although DV_COUNT's definition sets no condition. Of two bounds
+// of one class:
 //
-// The check is a conservative subset of Limits_consistent: it tests
-// lower <= upper only where the RM defines that comparison, and reports
-// nothing for a pair that is not strictly comparable, although the invariant
-// cannot hold for one. That half is Interval.Limits_comparable, which the
-// floor does not evaluate, so Coverage lists it.
-func dvIntervalOrder(value any) (order intervalOrder, ok bool) {
-	lower, upper, bounded := intervalBounds(value)
-	if !bounded {
-		return intervalOrder{}, false
+//   - two DV_QUANTITY are not when their units differ, an empty units
+//     included. The RM's definition also asks for a matching units_system
+//     where one is set, which is not compared;
+//   - two DV_PROPORTION are not when their types differ.
+//
+// Every other pair of one class is read as strictly comparable, two
+// DV_ORDINAL or DV_SCALE coded in different terminologies or in none
+// included: the RM leaves theirs undefined, so the floor reports nothing for
+// them, and orders them only where [codedInOneTerminology] holds
+// ([orderBounds]). A nil or typed-nil bound names no class, so a pair that
+// holds one is not reported either.
+//
+// The Detail names the classes of the bounds and never a bound's value,
+// units or type (REQ-168).
+func notStrictlyComparable(lower, upper rm.DVOrdered) (detail string, apart bool) {
+	lowerClass, _ := rm.RMTypeName(lower)
+	upperClass, _ := rm.RMTypeName(upper)
+	switch {
+	case lowerClass == "" || upperClass == "":
+		return "", false
+	case lowerClass != upperClass:
+		return "DV_INTERVAL: lower " + lowerClass + " and upper " + upperClass + " are not strictly comparable (RM Limits_consistent)", true
+	case lowerClass == "DV_QUANTITY" && boundAs[rm.DVQuantity](lower).Units != boundAs[rm.DVQuantity](upper).Units:
+		return "DV_INTERVAL<DV_QUANTITY>: lower and upper are not strictly comparable, their units differ (RM Limits_consistent)", true
+	case lowerClass == "DV_PROPORTION" && boundAs[rm.DVProportion](lower).Type != boundAs[rm.DVProportion](upper).Type:
+		return "DV_INTERVAL<DV_PROPORTION>: lower and upper are not strictly comparable, their types differ (RM Limits_consistent)", true
 	}
-	return orderBounds(lower, upper)
+	return "", false
 }
 
 // intervalBounds returns the lower and upper bounds of a DV_INTERVAL when
@@ -262,10 +277,14 @@ func intervalBounds(value any) (lower, upper rm.DVOrdered, bounded bool) {
 
 // orderBounds reads the order of two bounds that the RM makes strictly
 // comparable, by the RM's less_than for their type, and returns ok=false for
-// any other pair. Two bounds of different types are never ordered, a DV_COUNT
-// beside a unitless DV_QUANTITY included: no less_than takes both. A nil
-// bound names no type, so it is not ordered either. For two bounds of one
-// type:
+// any other pair, and for a pair it has no order for. The RM's less_than,
+// which DV_INTERVAL.Limits_consistent reads as `<=`, has the precondition
+// Pre_comparable, is_strictly_comparable_to(other), so the floor orders two
+// bounds only when the RM makes them strictly comparable; a pair it reads as
+// not strictly comparable is reported as that ([notStrictlyComparable]).
+// Two bounds of different types are never ordered, a DV_COUNT beside a
+// unitless DV_QUANTITY included: no less_than takes both. A nil bound names
+// no type, so it is not ordered either. For two bounds of one type:
 //
 //   - DV_COUNT: always comparable; ordered by magnitude.
 //   - DV_QUANTITY: comparable when the units are equal; ordered by
@@ -397,7 +416,9 @@ func temporalOrder(class string, sign int, lowerMag, upperMag float64, lowerVali
 // magnitudes the order compares. That holds for every value the parse
 // accepts: a partial value is ordered by its magnitude, as it is in one zone,
 // and so is a value that holds a leap second. Two designators of one offset,
-// Z and +00:00 or +05:00 and +0500, order a pair as its clocks would.
+// Z and +00:00 or +05:00 and +0500, order a pair as its clocks would. The
+// subtraction is [iso8601.UTCMagnitude], which the REQ-103 temporal range
+// check shares, so the two order zoned values alike.
 //
 // The pair is not ordered when either value has no zone: a value without one
 // names no instant to set against a value with one. A value the parse refuses
@@ -405,31 +426,12 @@ func temporalOrder(class string, sign int, lowerMag, upperMag float64, lowerVali
 // [temporalOrder] says: an empty value as `required` at its …/value, any
 // other by its own Value_valid.
 func instantOrder(class, lowerZone, upperZone string, lowerMag, upperMag float64) (intervalOrder, bool) {
-	lowerOffset, lowerZoned := zoneOffset(lowerZone)
-	upperOffset, upperZoned := zoneOffset(upperZone)
+	lowerUTC, lowerZoned := iso8601.UTCMagnitude(lowerMag, lowerZone)
+	upperUTC, upperZoned := iso8601.UTCMagnitude(upperMag, upperZone)
 	if !lowerZoned || !upperZoned {
 		return intervalOrder{}, false
 	}
-	lowerUTC, upperUTC := lowerMag-float64(lowerOffset), upperMag-float64(upperOffset)
 	return intervalOrder{class: class, inverted: lowerUTC > upperUTC, magnitudes: [2]float64{lowerUTC, upperUTC}}, true
-}
-
-// zoneOffset returns the offset from UTC, in seconds east, of a time zone
-// designator that the REQ-123 parse read from a DV_TIME or a DV_DATE_TIME: Z,
-// ±hh, ±hhmm or ±hh:mm. It reads the offset through that same parse, as the
-// zone of a full DV_TIME at midnight. ok is false when tz is empty, since the
-// value then names no zone. It is false as well if the parse refuses tz,
-// which it does not do for a designator it has read.
-func zoneOffset(tz string) (offset int, ok bool) {
-	if tz == "" {
-		return 0, false
-	}
-	midnight, err := (&rm.DVTime{Value: "00:00:00" + tz}).ToTime()
-	if err != nil {
-		return 0, false
-	}
-	_, offset = midnight.Zone()
-	return offset, true
 }
 
 // codedInOneTerminology reports whether the symbols of two DV_ORDINAL or

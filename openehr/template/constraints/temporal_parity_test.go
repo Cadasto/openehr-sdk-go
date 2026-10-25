@@ -5,6 +5,8 @@ package constraints_test
 // so a value the template accepts is one the RM floor accepts, and the other
 // way round. For each sample this holds CDate, CTime, CDateTime and CDuration
 // Validate to accept exactly when the matching rm.DV*.ValidISO8601 is true.
+// The range order's agreement with the floor's DV_INTERVAL order (REQ-112)
+// is held in openehr/validation, which can run the floor.
 
 import (
 	"testing"

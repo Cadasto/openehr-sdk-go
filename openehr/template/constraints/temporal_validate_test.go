@@ -7,7 +7,9 @@ package constraints_test
 // CodeWrongType violation with no Value for a value that is not a string.
 
 import (
+	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
@@ -98,6 +100,649 @@ func TestREQ103TemporalValidateOutcomes(t *testing.T) {
 			want := []constraints.Violation{{Code: constraints.CodeWrongType, Detail: tc.wrongType}}
 			if got := tc.validate(42); !slices.Equal(got, want) {
 				t.Errorf("%s{}.Validate(42) = %+v, want %+v", tc.name, got, want)
+			}
+		})
+	}
+}
+
+// patternCase is one ADL 1.4 pattern with values it admits and values it
+// refuses, every one an ISO 8601 form the RM's temporal parse accepts.
+type patternCase struct {
+	name     string
+	validate func(any) []constraints.Violation
+	pattern  string
+	admitted []string
+	refused  []string
+}
+
+// TestREQ103TemporalPatternOutcomes pins REQ-103 § Validate contract on the
+// ADL 1.4 date, time, date/time and duration patterns: a value its pattern
+// admits has no violation, and one it refuses has one CodePatternMismatch
+// that holds the value in Value only. The rows hold the patterns the
+// vendored OPTs write, in both cases of their letters, and each rule of the
+// reading: a mandatory, optional and disallowed field, a literal number, the
+// three zone patterns, a fraction on the seconds, and a duration's
+// designators either side of T.
+func TestREQ103TemporalPatternOutcomes(t *testing.T) {
+	t.Parallel()
+	date := func(p string) func(any) []constraints.Violation { return constraints.CDate{Pattern: p}.Validate }
+	clock := func(p string) func(any) []constraints.Violation { return constraints.CTime{Pattern: p}.Validate }
+	stamp := func(p string) func(any) []constraints.Violation { return constraints.CDateTime{Pattern: p}.Validate }
+	span := func(p string) func(any) []constraints.Violation { return constraints.CDuration{Pattern: p}.Validate }
+	tests := []patternCase{
+		{
+			name: "date, day not allowed", validate: date("yyyy-??-XX"), pattern: "yyyy-??-XX",
+			admitted: []string{"2019-01", "2019", "201901"}, refused: []string{"2019-01-14", "20190114"},
+		},
+		{
+			name: "date, full", validate: date("yyyy-mm-dd"), pattern: "yyyy-mm-dd",
+			admitted: []string{"2019-01-14", "20190114"}, refused: []string{"2019-01", "2019"},
+		},
+		{
+			name: "date, upper-case letters", validate: date("YYYY-MM-??"), pattern: "YYYY-MM-??",
+			admitted: []string{"2019-01-14", "2019-01"}, refused: []string{"2019"},
+		},
+		{
+			name: "date, month and no day", validate: date("yyyy-mm-XX"), pattern: "yyyy-mm-XX",
+			admitted: []string{"2019-01"}, refused: []string{"2019-01-14", "2019"},
+		},
+		{
+			name: "date, lower-case x", validate: date("yyyy-mm-xx"), pattern: "yyyy-mm-xx",
+			admitted: []string{"2019-01"}, refused: []string{"2019-01-14"},
+		},
+		{
+			name: "date, literal year", validate: date("1995-??-XX"), pattern: "1995-??-XX",
+			admitted: []string{"1995-03", "1995"}, refused: []string{"1996-03", "1995-03-01"},
+		},
+		{
+			name: "date, literal month", validate: date("yyyy-06-dd"), pattern: "yyyy-06-dd",
+			admitted: []string{"2019-06-14"}, refused: []string{"2019-07-14", "2019-06"},
+		},
+		{
+			name: "time, full", validate: clock("hh:mm:ss"), pattern: "hh:mm:ss",
+			admitted: []string{"10:30:00", "10:30:00.5", "10:30:00,5Z", "103000", "10:30:00+01:00"}, refused: []string{"10:30", "10"},
+		},
+		{
+			name: "time, no seconds", validate: clock("hh:mm:XX"), pattern: "hh:mm:XX",
+			admitted: []string{"10:30", "1030Z"}, refused: []string{"10:30:00", "10"},
+		},
+		{
+			name: "time, optional minutes", validate: clock("HH:??:XX"), pattern: "HH:??:XX",
+			admitted: []string{"10:30", "10"}, refused: []string{"10:30:00"},
+		},
+		{
+			name: "time, any", validate: clock("hh:??:??"), pattern: "hh:??:??",
+			admitted: []string{"10", "10:30", "10:30:00,5"},
+		},
+		{
+			name: "time, literal hour", validate: clock("09:mm:ss"), pattern: "09:mm:ss",
+			admitted: []string{"09:30:00"}, refused: []string{"10:30:00"},
+		},
+		{
+			name: "time, zone hh:mm required", validate: clock("hh:mm:ss±hh:mm"), pattern: "hh:mm:ss±hh:mm",
+			admitted: []string{"10:30:00+01:00", "10:30:00-0500", "10:30:00+01", "10:30:00Z"}, refused: []string{"10:30:00"},
+		},
+		{
+			name: "time, zone hh required", validate: clock("hh:mm:ss+hh"), pattern: "hh:mm:ss+hh",
+			admitted: []string{"10:30:00+01", "10:30:00-05:30", "10:30:00Z"}, refused: []string{"10:30:00"},
+		},
+		{
+			name: "time, zone hhmm required", validate: clock("hh:mm:ss-HHMM"), pattern: "hh:mm:ss-HHMM",
+			admitted: []string{"10:30:00+0100"}, refused: []string{"10:30:00.25"},
+		},
+		{
+			name: "time, zone Z required", validate: clock("hh:mm:ssZ"), pattern: "hh:mm:ssZ",
+			admitted: []string{"10:30:00Z"}, refused: []string{"10:30:00+00:00", "10:30:00"},
+		},
+		{
+			name: "date-time, full", validate: stamp("yyyy-mm-ddTHH:MM:SS"), pattern: "yyyy-mm-ddTHH:MM:SS",
+			admitted: []string{"2019-01-28T21:22:49,426+00:00", "2019-01-28T21:22:49", "20190128T212249Z"},
+			refused:  []string{"2019-01-28T21:22", "2019-01-28", "2019"},
+		},
+		{
+			name: "date-time, optional minutes and seconds", validate: stamp("yyyy-mm-ddTHH:??:??"), pattern: "yyyy-mm-ddTHH:??:??",
+			admitted: []string{"2019-01-28T21", "2019-01-28T21:22", "2019-01-28T21:22:49.5Z"}, refused: []string{"2019-01-28", "2019-01"},
+		},
+		{
+			name: "date-time, no seconds", validate: stamp("yyyy-mm-ddThh:mm:XX"), pattern: "yyyy-mm-ddThh:mm:XX",
+			admitted: []string{"2019-01-28T21:22Z"}, refused: []string{"2019-01-28T21:22:49", "2019-01-28T21"},
+		},
+		{
+			name: "date-time, any", validate: stamp("yyyy-??-??T??:??:??"), pattern: "yyyy-??-??T??:??:??",
+			admitted: []string{"2019", "2019-01", "2019-01-28", "2019-01-28T21", "2019-01-28T21:22:49"},
+		},
+		{
+			name: "date-time, no time", validate: stamp("yyyy-mm-ddTXX:XX:XX"), pattern: "yyyy-mm-ddTXX:XX:XX",
+			admitted: []string{"2019-01-28"}, refused: []string{"2019-01-28T21", "2019-01"},
+		},
+		{
+			name: "date-time, space before the time", validate: stamp("yyyy-mm-dd hh:mm:ss"), pattern: "yyyy-mm-dd hh:mm:ss",
+			admitted: []string{"2019-01-28T21:22:49"}, refused: []string{"2019-01-28T21:22"},
+		},
+		{
+			name: "date-time, zone required", validate: stamp("yyyy-mm-ddThh:mm:ss+hh:mm"), pattern: "yyyy-mm-ddThh:mm:ss+hh:mm",
+			admitted: []string{"2019-01-28T21:22:49+01:00", "2019-01-28T21:22:49Z"}, refused: []string{"2019-01-28T21:22:49"},
+		},
+		{
+			name: "duration, years", validate: span("PY"), pattern: "PY",
+			admitted: []string{"P45Y", "-P2Y", "P0Y"}, refused: []string{"P0D", "P1Y2M", "PT1H"},
+		},
+		{
+			name: "duration, years or months", validate: span("PYM"), pattern: "PYM",
+			admitted: []string{"P1Y2M", "P3M", "P1Y"}, refused: []string{"P1Y2D", "P1W"},
+		},
+		{
+			name: "duration, months weeks or days", validate: span("PMWD"), pattern: "PMWD",
+			admitted: []string{"P4W3D", "P2M", "P5D", "-P1M1W"}, refused: []string{"P1Y", "PT1H"},
+		},
+		{
+			name: "duration, any date part", validate: span("PYMWD"), pattern: "PYMWD",
+			admitted: []string{"P1Y2M3W4D"}, refused: []string{"P1DT1H"},
+		},
+		{
+			name: "duration, minutes", validate: span("PTM"), pattern: "PTM",
+			admitted: []string{"PT5M", "-PT5M"}, refused: []string{"PT5H", "P5M", "PT5M1S"},
+		},
+		{
+			name: "duration, lower-case letters", validate: span("Pwd"), pattern: "Pwd",
+			admitted: []string{"P4W", "P3D", "P4W3D"}, refused: []string{"P1M"},
+		},
+		{
+			name: "duration, hours or minutes", validate: span("PThm"), pattern: "PThm",
+			admitted: []string{"PT2H30M", "PT2H"}, refused: []string{"PT2H30M5S"},
+		},
+		{
+			name: "duration, seconds with a fraction", validate: span("PTS"), pattern: "PTS",
+			admitted: []string{"PT1.5S", "PT1,5S", "-PT0S"}, refused: []string{"PT1M"},
+		},
+		{
+			name: "duration, days and time", validate: span("PDTHMS"), pattern: "PDTHMS",
+			admitted: []string{"P1DT2H3M4S", "PT4S"}, refused: []string{"P1W", "P1Y"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			for _, s := range tc.admitted {
+				if got := tc.validate(s); len(got) != 0 {
+					t.Errorf("pattern %q: Validate(%q) = %+v, want no violation", tc.pattern, s, got)
+				}
+			}
+			for _, s := range tc.refused {
+				want := []constraints.Violation{{
+					Code:   constraints.CodePatternMismatch,
+					Detail: fmt.Sprintf("value does not match pattern %q", tc.pattern),
+					Value:  constraints.Redact(s),
+				}}
+				if got := tc.validate(s); !slices.Equal(got, want) {
+					t.Errorf("pattern %q: Validate(%q) = %+v, want %+v", tc.pattern, s, got, want)
+				}
+			}
+		})
+	}
+}
+
+// TestREQ103TemporalPatternMalformed pins REQ-103 § Validate contract on a
+// pattern outside the ADL 1.4 grammar, or one that breaks its validity rules
+// for ?? and XX: every value, a valid one included, gets one
+// CodeInvalidValue that names the pattern and holds no Value, as a malformed
+// CString regex does.
+func TestREQ103TemporalPatternMalformed(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		kind     string
+		validate func(pattern string) func(any) []constraints.Violation
+		value    string
+		patterns []string
+	}{
+		{
+			kind:     "date",
+			validate: func(p string) func(any) []constraints.Violation { return constraints.CDate{Pattern: p}.Validate },
+			value:    "2019-01-14",
+			patterns: []string{
+				"yyyy-mm", "yyyy-XX-dd", "yyyy-??-dd", "????-mm-dd", "XXXX-mm-dd", "yyyy-mm-dd+hh:mm",
+				"yyyy/mm/dd", "yyyy-mX-dd", "yyyy-mm-ddT", "yyy-mm-dd", "PY", "195-??-XX", "????-??-??", "XXXX-XX-XX",
+			},
+		},
+		{
+			kind:     "time",
+			validate: func(p string) func(any) []constraints.Violation { return constraints.CTime{Pattern: p}.Validate },
+			value:    "10:30:00",
+			patterns: []string{
+				"??:mm:ss", "XX:mm:ss", "hh:mm", "hh:XX:ss", "hh:??:ss", "hh:mm:ss+h", "hh:mm:ssZZ",
+				"hh:mm:ss+hh:", "hh:mm:ss*hh", "hh-mm-ss", "??:??:??", "XX:XX:XX",
+			},
+		},
+		{
+			kind:     "date-time",
+			validate: func(p string) func(any) []constraints.Violation { return constraints.CDateTime{Pattern: p}.Validate },
+			value:    "2019-01-28T21:22:49",
+			patterns: []string{
+				"yyyy-mm-dd", "yyyy-mm-ddThh:mm", "yyyy-??-ddThh:mm:ss", "yyyy-mm-??Thh:mm:ss",
+				"yyyy-mm-ddTXX:XX:XX+hh", "yyyy-mm-ddXhh:mm:ss", "hh:mm:ss",
+			},
+		},
+		{
+			kind:     "duration",
+			validate: func(p string) func(any) []constraints.Violation { return constraints.CDuration{Pattern: p}.Validate },
+			value:    "P1D",
+			patterns: []string{"P", "PT", "PYY", "PDY", "PTY", "Y", "PH", "P1Y", "PTT", "PTHT", "yyyy-mm-dd"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.kind, func(t *testing.T) {
+			t.Parallel()
+			for _, p := range tc.patterns {
+				want := []constraints.Violation{{
+					Code:   constraints.CodeInvalidValue,
+					Detail: fmt.Sprintf("constraint pattern %q is not a valid ADL 1.4 %s pattern", p, tc.kind),
+				}}
+				if got := tc.validate(p)(tc.value); !slices.Equal(got, want) {
+					t.Errorf("pattern %q: Validate(%q) = %+v, want %+v", p, tc.value, got, want)
+				}
+			}
+		})
+	}
+}
+
+// TestREQ103TemporalTimezoneValidity pins REQ-103 § Validate contract on
+// TimezoneValidity, the AOM 1.4 timezone_validity: mandatory refuses a time
+// or a date-time with no zone, a date-time with no time included, and
+// disallowed refuses one with a zone, each with one CodePatternMismatch that
+// holds the value in Value only; optional, the zero value, admits both. A
+// date has no zone, so disallowed admits every date. Where the pattern
+// writes a zone suffix too, both rules apply, each with its own violation.
+func TestREQ103TemporalTimezoneValidity(t *testing.T) {
+	t.Parallel()
+	const (
+		missing = "value carries no time zone, which timezone_validity makes mandatory"
+		present = "value carries a time zone, which timezone_validity disallows"
+	)
+	tests := []struct {
+		name     string
+		c        constraints.PrimitiveConstraint
+		admitted []string
+		refused  []string
+		detail   string
+	}{
+		{
+			name:     "time, mandatory",
+			c:        constraints.CTime{TimezoneValidity: constraints.ValidityMandatory},
+			admitted: []string{"10:30:00Z", "10:30+01:00", "10-05"},
+			refused:  []string{"10:30:00", "10", "103000,5"},
+			detail:   missing,
+		},
+		{
+			name:     "time, disallowed",
+			c:        constraints.CTime{TimezoneValidity: constraints.ValidityDisallowed},
+			admitted: []string{"10:30:00", "10", "103000,5"},
+			refused:  []string{"10:30:00Z", "10:30+01:00", "10-05"},
+			detail:   present,
+		},
+		{
+			name:     "time, optional",
+			c:        constraints.CTime{TimezoneValidity: constraints.ValidityOptional},
+			admitted: []string{"10:30:00", "10:30:00Z", "10:30+01:00"},
+		},
+		{
+			name:     "time, mandatory with a pattern that writes no zone",
+			c:        constraints.CTime{Pattern: "hh:mm:ss", TimezoneValidity: constraints.ValidityMandatory},
+			admitted: []string{"10:30:00Z", "10:30:00-03:00"},
+			refused:  []string{"10:30:00"},
+			detail:   missing,
+		},
+		{
+			name:     "date-time, mandatory",
+			c:        constraints.CDateTime{TimezoneValidity: constraints.ValidityMandatory},
+			admitted: []string{"2019-01-28T21:22:49Z", "20190128T2122+0100"},
+			refused:  []string{"2019-01-28T21:22:49", "2019-01-28", "2019"},
+			detail:   missing,
+		},
+		{
+			name:     "date-time, disallowed",
+			c:        constraints.CDateTime{TimezoneValidity: constraints.ValidityDisallowed},
+			admitted: []string{"2019-01-28T21:22:49", "2019-01-28", "2019"},
+			refused:  []string{"2019-01-28T21:22:49Z", "20190128T2122+0100"},
+			detail:   present,
+		},
+		{
+			name:     "date, disallowed",
+			c:        constraints.CDate{TimezoneValidity: constraints.ValidityDisallowed},
+			admitted: []string{"2019-01-28", "2019-01", "2019"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			for _, s := range tc.admitted {
+				if got := tc.c.Validate(s); len(got) != 0 {
+					t.Errorf("%#v.Validate(%q) = %+v, want no violation", tc.c, s, got)
+				}
+			}
+			for _, s := range tc.refused {
+				want := []constraints.Violation{{Code: constraints.CodePatternMismatch, Detail: tc.detail, Value: constraints.Redact(s)}}
+				if got := tc.c.Validate(s); !slices.Equal(got, want) {
+					t.Errorf("%#v.Validate(%q) = %+v, want %+v", tc.c, s, got, want)
+				}
+			}
+		})
+	}
+
+	// A zone suffix and timezone_validity disallowed both apply: no time
+	// passes, and each value gets the violation of the rule it breaks.
+	both := constraints.CTime{Pattern: "hh:mm:ss+hh:mm", TimezoneValidity: constraints.ValidityDisallowed}
+	for value, want := range map[string][]constraints.Violation{
+		"10:30:00":  {{Code: constraints.CodePatternMismatch, Detail: `value does not match pattern "hh:mm:ss+hh:mm"`, Value: constraints.Redact("10:30:00")}},
+		"10:30:00Z": {{Code: constraints.CodePatternMismatch, Detail: present, Value: constraints.Redact("10:30:00Z")}},
+	} {
+		if got := both.Validate(value); !slices.Equal(got, want) {
+			t.Errorf("%#v.Validate(%q) = %+v, want %+v", both, value, got, want)
+		}
+	}
+	// A value that breaks the pattern and timezone_validity gets both
+	// violations, the pattern's first, then the range's.
+	c := constraints.CTime{
+		Pattern:          "hh:mm:XX",
+		TimezoneValidity: constraints.ValidityMandatory,
+		Range:            constraints.TemporalRange{LowerUnbounded: true, Upper: "09:00", UpperInclusive: true},
+	}
+	want := []constraints.Violation{
+		{Code: constraints.CodePatternMismatch, Detail: `value does not match pattern "hh:mm:XX"`, Value: constraints.Redact("10:30:00")},
+		{Code: constraints.CodePatternMismatch, Detail: missing, Value: constraints.Redact("10:30:00")},
+		{Code: constraints.CodeOutOfRange, Detail: "value outside (*..09:00]", Value: constraints.Redact("10:30:00")},
+	}
+	if got := c.Validate("10:30:00"); !slices.Equal(got, want) {
+		t.Errorf("%#v.Validate(%q) = %+v, want %+v", c, "10:30:00", got, want)
+	}
+}
+
+// TestREQ103TemporalTimezoneValidityMalformed pins REQ-103 § Validate
+// contract on a TimezoneValidity no value can meet, set in code: mandatory
+// on a CDate, since a date has no zone, and a value outside the three
+// VALIDITY_KIND values. Every value, a valid one included, gets one
+// CodeInvalidValue that holds no Value.
+func TestREQ103TemporalTimezoneValidityMalformed(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		c      constraints.PrimitiveConstraint
+		value  string
+		detail string
+	}{
+		{
+			name:   "date, mandatory",
+			c:      constraints.CDate{TimezoneValidity: constraints.ValidityMandatory},
+			value:  "2019-01-28",
+			detail: "constraint timezone_validity mandatory cannot hold for a date, which carries no time zone",
+		},
+		{
+			name:   "time, not a VALIDITY_KIND",
+			c:      constraints.CTime{TimezoneValidity: constraints.ValidityDisallowed + 1},
+			value:  "10:30:00",
+			detail: "constraint timezone_validity 3 is not a VALIDITY_KIND",
+		},
+		{
+			name:   "date-time, not a VALIDITY_KIND",
+			c:      constraints.CDateTime{TimezoneValidity: 200},
+			value:  "2019-01-28T10:30:00Z",
+			detail: "constraint timezone_validity 200 is not a VALIDITY_KIND",
+		},
+		{
+			name:   "date, not a VALIDITY_KIND",
+			c:      constraints.CDate{TimezoneValidity: 9},
+			value:  "2019-01-28",
+			detail: "constraint timezone_validity 9 is not a VALIDITY_KIND",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			want := []constraints.Violation{{Code: constraints.CodeInvalidValue, Detail: tc.detail}}
+			if got := tc.c.Validate(tc.value); !slices.Equal(got, want) {
+				t.Errorf("%#v.Validate(%q) = %+v, want %+v", tc.c, tc.value, got, want)
+			}
+		})
+	}
+}
+
+// closedSpan is the TemporalRange from lower to upper, both included.
+func closedSpan(lower, upper string) constraints.TemporalRange {
+	return constraints.TemporalRange{Lower: lower, Upper: upper, LowerInclusive: true, UpperInclusive: true}
+}
+
+// TestREQ103TemporalRangeOutcomes pins REQ-103 § Validate contract on a
+// temporal range: a value inside it has no violation, and one outside it has
+// one CodeOutOfRange that names the range and holds the value in Value only.
+// Durations order by BASE Iso8601_duration.to_seconds, so P1D equals PT24H
+// and 48 months (1460.16 days) fall short of 4 years (1460.96 days). A
+// partial date or time stands for the start of the period it names. A time
+// or a date-time is ordered against a bound by its clock when the two carry
+// one zone designator or none, as instants when both carry a zone, and not
+// at all when one carries a zone and the other does not, so that bound does
+// not refuse it (REQ-112 DV_INTERVAL).
+func TestREQ103TemporalRangeOutcomes(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		validate func(any) []constraints.Violation
+		detail   string // Detail of the CodeOutOfRange violation
+		admitted []string
+		refused  []string
+	}{
+		{
+			name:     "duration, PT24H only",
+			validate: constraints.CDuration{Range: closedSpan("PT24H", "PT24H")}.Validate,
+			detail:   "value outside [PT24H..PT24H]",
+			admitted: []string{"PT24H", "P1D", "PT1440M", "PT86400S"},
+			refused:  []string{"P0D", "PT23H", "P2D", "-PT24H"},
+		},
+		{
+			name:     "duration, years with a pattern",
+			validate: constraints.CDuration{Pattern: "PY", Range: closedSpan("P0Y", "P150Y")}.Validate,
+			detail:   "value outside [P0Y..P150Y]",
+			admitted: []string{"P0Y", "P150Y", "P45Y"},
+			refused:  []string{"P151Y", "-P1Y"},
+		},
+		{
+			name:     "duration, at least 4 years",
+			validate: constraints.CDuration{Range: constraints.TemporalRange{Lower: "P4Y", LowerInclusive: true, UpperUnbounded: true}}.Validate,
+			detail:   "value outside [P4Y..*)",
+			admitted: []string{"P4Y", "P1461D", "P49M", "P5Y"},
+			refused:  []string{"P3Y", "P1460D", "P48M"},
+		},
+		{
+			name:     "duration, both ends excluded",
+			validate: constraints.CDuration{Range: constraints.TemporalRange{Lower: "PT0S", Upper: "PT1H"}}.Validate,
+			detail:   "value outside (PT0S..PT1H)",
+			admitted: []string{"PT1S", "PT59M", "PT0.5S"},
+			refused:  []string{"PT0S", "PT1H", "-PT1S", "P0D"},
+		},
+		{
+			name:     "duration, at most zero",
+			validate: constraints.CDuration{Range: constraints.TemporalRange{LowerUnbounded: true, Upper: "P0Y", UpperInclusive: true}}.Validate,
+			detail:   "value outside (*..P0Y]",
+			admitted: []string{"-P5D", "P0D", "-P1Y2M"},
+			refused:  []string{"P1D", "PT1S"},
+		},
+		{
+			name:     "date",
+			validate: constraints.CDate{Range: closedSpan("2004-05-20", "2004-06-02")}.Validate,
+			detail:   "value outside [2004-05-20..2004-06-02]",
+			admitted: []string{"2004-05-20", "2004-06-02", "20040525", "2004-06"},
+			refused:  []string{"2004-05-19", "2004-06-03", "2004-05", "2004"},
+		},
+		{
+			name:     "time, at or after 09:30, no zone on the bound",
+			validate: constraints.CTime{Range: constraints.TemporalRange{Lower: "09:30:00", LowerInclusive: true, UpperUnbounded: true}}.Validate,
+			detail:   "value outside [09:30:00..*)",
+			admitted: []string{"09:30:00", "10", "0930", "09:30:00+05:00", "09:00:00-05:00", "09:29:59.999Z"},
+			refused:  []string{"09:29:59", "09", "09:29:59.999"},
+		},
+		{
+			name:     "time, after 09:30 at +02:00",
+			validate: constraints.CTime{Range: constraints.TemporalRange{Lower: "09:30:00+02:00", UpperUnbounded: true}}.Validate,
+			detail:   "value outside (09:30:00+02:00..*)",
+			admitted: []string{"09:30:01+02:00", "08:00:00Z", "07:30:01Z", "09:30:00", "09:31", "13:00-0300"},
+			refused:  []string{"09:30:00+02:00", "07:30:00Z", "09:30:00+0200", "09:30:00+03:00", "09:00:00+02:00", "10:00:00+04"},
+		},
+		{
+			name:     "time, before 10:00 at +02:00",
+			validate: constraints.CTime{Range: constraints.TemporalRange{LowerUnbounded: true, Upper: "10:00:00+02:00"}}.Validate,
+			detail:   "value outside (*..10:00:00+02:00)",
+			admitted: []string{"09:59:59+02:00", "07:59Z", "10:00:00", "11:00", "06:30:00-01:00"},
+			refused:  []string{"10:00:00+02:00", "08:00:00Z", "10:00:00+0200", "09:00:00+01:00", "10:30:00+02:00"},
+		},
+		{
+			name:     "time, between 09:00 and 10:00 in UTC",
+			validate: constraints.CTime{Range: closedSpan("09:00:00Z", "10:00:00Z")}.Validate,
+			detail:   "value outside [09:00:00Z..10:00:00Z]",
+			admitted: []string{"11:30:00+02:00", "10:30:00+00:30", "04:00-05", "09:30Z", "15:00:00"},
+			refused:  []string{"12:30:00+02:00", "08:59:59Z", "10:00:01+00:00", "05:01:00-05:00"},
+		},
+		{
+			name:     "date-time",
+			validate: constraints.CDateTime{Range: closedSpan("2004-05-20T00:00:00", "2005-05-19T23:59:59")}.Validate,
+			detail:   "value outside [2004-05-20T00:00:00..2005-05-19T23:59:59]",
+			admitted: []string{"2004-05-20T00:00:00", "2004-05-20", "2004-06", "2005-05-19T23:59:59Z", "20041231T120000"},
+			refused:  []string{"2004-05-19T23:59:59", "2005-05-20", "2004-05", "2005-05-19T23:59:59.5"},
+		},
+		{
+			name:     "date-time, zone on the bound",
+			validate: constraints.CDateTime{Range: constraints.TemporalRange{Lower: "2004-05-20T10:00:00+02:00", LowerInclusive: true, UpperUnbounded: true}}.Validate,
+			detail:   "value outside [2004-05-20T10:00:00+02:00..*)",
+			admitted: []string{
+				"2004-05-20T10:00:00-05:00", "2004-05-20T08:00:00Z", "2004-05-20T03:00-05:00",
+				"2004-05-20T10:00:00", "2004-05-20", "2004-05-19T23:00:00",
+			},
+			refused: []string{
+				"2004-05-20T07:59:59Z", "2004-05-20T09:59:59+02:00", "2004-05-20T10:00:00+05:00",
+				"2004-05-19T23:59:59-08:00",
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			for _, s := range tc.admitted {
+				if got := tc.validate(s); len(got) != 0 {
+					t.Errorf("Validate(%q) = %+v, want no violation", s, got)
+				}
+			}
+			for _, s := range tc.refused {
+				want := []constraints.Violation{{Code: constraints.CodeOutOfRange, Detail: tc.detail, Value: constraints.Redact(s)}}
+				if got := tc.validate(s); !slices.Equal(got, want) {
+					t.Errorf("Validate(%q) = %+v, want %+v", s, got, want)
+				}
+			}
+		})
+	}
+}
+
+// TestREQ103TemporalPatternAndRangeBothReported pins the Validate contract's
+// one violation per failing clause: a duration that both its pattern and its
+// range refuse gets the CodePatternMismatch, then the CodeOutOfRange.
+func TestREQ103TemporalPatternAndRangeBothReported(t *testing.T) {
+	t.Parallel()
+	c := constraints.CDuration{Pattern: "PY", Range: constraints.TemporalRange{Lower: "P1Y", LowerInclusive: true, UpperUnbounded: true}}
+	want := []constraints.Violation{
+		{Code: constraints.CodePatternMismatch, Detail: `value does not match pattern "PY"`, Value: constraints.Redact("PT1H")},
+		{Code: constraints.CodeOutOfRange, Detail: "value outside [P1Y..*)", Value: constraints.Redact("PT1H")},
+	}
+	if got := c.Validate("PT1H"); !slices.Equal(got, want) {
+		t.Errorf("Validate(%q) = %+v, want %+v", "PT1H", got, want)
+	}
+	date := constraints.CDate{Pattern: "yyyy-mm-dd", Range: closedSpan("2004-05-20", "2004-06-02")}
+	wantDate := []constraints.Violation{
+		{Code: constraints.CodePatternMismatch, Detail: `value does not match pattern "yyyy-mm-dd"`, Value: constraints.Redact("2004-05")},
+		{Code: constraints.CodeOutOfRange, Detail: "value outside [2004-05-20..2004-06-02]", Value: constraints.Redact("2004-05")},
+	}
+	if got := date.Validate("2004-05"); !slices.Equal(got, wantDate) {
+		t.Errorf("Validate(%q) = %+v, want %+v", "2004-05", got, wantDate)
+	}
+}
+
+// TestREQ103TemporalRangeMalformedBound pins REQ-103 § Validate contract on
+// a TemporalRange built in code with a bound that the ISO 8601 parse of the
+// constrained type refuses, on a side that is not unbounded: every value, a
+// valid one included, gets one CodeInvalidValue that names the range and
+// holds no Value.
+func TestREQ103TemporalRangeMalformedBound(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		validate func(any) []constraints.Violation
+		value    string
+		detail   string
+	}{
+		{
+			name:     "duration lower",
+			validate: constraints.CDuration{Range: constraints.TemporalRange{Lower: "P1X", LowerInclusive: true, UpperUnbounded: true}}.Validate,
+			value:    "P1D",
+			detail:   "constraint range [P1X..*) has a bound that is not a valid ISO 8601 duration",
+		},
+		{
+			name:     "date upper",
+			validate: constraints.CDate{Range: closedSpan("2004-01-01", "2004-02-30")}.Validate,
+			value:    "2004-01-10",
+			detail:   "constraint range [2004-01-01..2004-02-30] has a bound that is not a valid ISO 8601 date",
+		},
+		{
+			name:     "time upper left empty",
+			validate: constraints.CTime{Range: constraints.TemporalRange{LowerUnbounded: true, UpperInclusive: true}}.Validate,
+			value:    "10:00",
+			detail:   "constraint range (*..] has a bound that is not a valid ISO 8601 time",
+		},
+		{
+			name:     "date-time lower of another type",
+			validate: constraints.CDateTime{Range: constraints.TemporalRange{Lower: "P1D", LowerInclusive: true, UpperUnbounded: true}}.Validate,
+			value:    "2004-01-10",
+			detail:   "constraint range [P1D..*) has a bound that is not a valid ISO 8601 date-time",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			want := []constraints.Violation{{Code: constraints.CodeInvalidValue, Detail: tc.detail}}
+			if got := tc.validate(tc.value); !slices.Equal(got, want) {
+				t.Errorf("Validate(%q) = %+v, want %+v", tc.value, got, want)
+			}
+		})
+	}
+}
+
+// TestREQ168TemporalViolationsValueFree pins REQ-168 on the temporal pattern
+// and range clauses: neither Code nor Detail repeats any part of the value,
+// which sits in Value alone. The values carry digits no pattern or bound in
+// this test does.
+func TestREQ168TemporalViolationsValueFree(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		c      constraints.PrimitiveConstraint
+		value  string
+		needle string
+	}{
+		{name: "date pattern", c: constraints.CDate{Pattern: "yyyy-??-XX"}, value: "1987-06-05", needle: "1987"},
+		{name: "date range", c: constraints.CDate{Range: closedSpan("2004-05-20", "2004-06-02")}, value: "1987-06-05", needle: "1987"},
+		{name: "time pattern", c: constraints.CTime{Pattern: "hh:mm:XX"}, value: "13:47:39", needle: "47:39"},
+		{name: "time range", c: constraints.CTime{Range: closedSpan("09:00:00", "10:00:00")}, value: "13:47:39", needle: "47:39"},
+		{name: "date-time pattern", c: constraints.CDateTime{Pattern: "yyyy-mm-ddThh:mm:XX"}, value: "1987-06-05T13:47:39", needle: "1987"},
+		{name: "date-time range", c: constraints.CDateTime{Range: closedSpan("2004-05-20", "2004-06-02")}, value: "1987-06-05T13:47:39", needle: "1987"},
+		{name: "duration pattern", c: constraints.CDuration{Pattern: "PY"}, value: "P987654321D", needle: "987654321"},
+		{name: "duration range", c: constraints.CDuration{Range: closedSpan("P0D", "P1D")}, value: "P987654321D", needle: "987654321"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := tc.c.Validate(tc.value)
+			if len(got) != 1 {
+				t.Fatalf("Validate(%q) = %+v, want one violation", tc.value, got)
+			}
+			if v := got[0]; strings.Contains(string(v.Code), tc.needle) || strings.Contains(v.Detail, tc.needle) {
+				t.Errorf("Validate(%q) = %+v: Code or Detail holds %q from the value", tc.value, v, tc.needle)
+			}
+			if got[0].Value != constraints.Redact(tc.value) {
+				t.Errorf("Validate(%q).Value = %v, want the value", tc.value, got[0].Value)
 			}
 		})
 	}

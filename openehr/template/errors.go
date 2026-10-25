@@ -12,7 +12,10 @@ var (
 	// so callers can match either with errors.Is(err, ErrInvalidOPT)
 	// or unwrap to the inner decoder error. In strict mode it also
 	// signals a malformed primitive constraint, such as a
-	// CONSTRAINT_REF with no reference (see [ParseOPTStrict]).
+	// CONSTRAINT_REF with no reference, and an element whose type the
+	// document must name but does not, in the XML Schema instance
+	// namespace: an <attributes> or <children> inside <definition>, or
+	// the <item> of a C_PRIMITIVE_OBJECT (see [ParseOPTStrict]).
 	ErrInvalidOPT = errors.New("template: invalid OPT")
 
 	// ErrNotOPTFile signals ParseFile was called with a path whose

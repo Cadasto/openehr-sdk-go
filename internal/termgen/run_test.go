@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// pin writes the two fixture files and a manifest into a fresh resources
+// pin writes the three fixture files and a manifest into a fresh resources
 // directory and returns it alongside an output module root, mirroring the
 // two paths resources/terminology/ and the repo root have in a real run.
 func pin(t *testing.T, manifest string) (resources, outDir string) {
@@ -22,6 +22,7 @@ func pin(t *testing.T, manifest string) (resources, outDir string) {
 	files := map[string]string{
 		"openehr_terminology.xml":            fixture,
 		"openehr_external_terminologies.xml": externalFixture,
+		"PropertyUnitData.xml":               propertyUnitsFixture,
 		"MANIFEST.txt":                       manifest,
 	}
 	for name, body := range files {
@@ -66,6 +67,7 @@ func TestRunWritesTheTableThenVerifiesItClean(t *testing.T) {
 	for _, wantConst := range []string{
 		`const SourceSHA256 = "` + sha256Hex(fixture) + `"`,
 		`const ExternalSourceSHA256 = "` + sha256Hex(externalFixture) + `"`,
+		`const PropertyUnitSourceSHA256 = "` + sha256Hex(propertyUnitsFixture) + `"`,
 	} {
 		if !bytes.Contains(body, []byte(wantConst)) {
 			t.Errorf("generated table does not carry %s", wantConst)
@@ -75,6 +77,10 @@ func TestRunWritesTheTableThenVerifiesItClean(t *testing.T) {
 	// terminology file's own.
 	if !bytes.Contains(body, []byte("var codeSets = []*CodeSet{NormalStatuses, Languages, CharacterSets}")) {
 		t.Error("generated registry does not list the code sets of both files in source order")
+	}
+	// The property-unit table is in the table, from the third file.
+	if !bytes.Contains(body, []byte(`newQuantityProperty("125", "Pressure", []PropertyUnit{`)) {
+		t.Error("generated table does not carry the property-unit table of PropertyUnitData.xml")
 	}
 	// The release in the header comes from the manifest's ref: line.
 	if !bytes.Contains(body, []byte("openEHR TERM Release-9.9.9")) {
@@ -133,13 +139,13 @@ func TestRunVerifyReportsDriftWithoutWriting(t *testing.T) {
 	}
 }
 
-// REQ-034: the generated table follows both pinned files, so the drift check
-// fails when either one moves under a committed table. Each row changes the
-// bytes of one file only (a trailing XML comment keeps it a valid pin), and
-// the verdict must be drift.
-func TestRunVerifyReportsDriftFromEitherPinnedFile(t *testing.T) {
+// REQ-034: the generated table follows the three pinned files, so the drift
+// check fails when any one of them moves under a committed table. Each row
+// changes the bytes of one file only (a trailing XML comment keeps it a valid
+// pin), and the verdict must be drift.
+func TestRunVerifyReportsDriftFromEveryPinnedFile(t *testing.T) {
 	t.Parallel()
-	for _, file := range []string{"openehr_terminology.xml", "openehr_external_terminologies.xml"} {
+	for _, file := range []string{"openehr_terminology.xml", "openehr_external_terminologies.xml", "PropertyUnitData.xml"} {
 		t.Run(file, func(t *testing.T) {
 			t.Parallel()
 			resources, outDir := pin(t, fixtureManifest)
@@ -170,23 +176,49 @@ func TestRunVerifyReportsDriftFromEitherPinnedFile(t *testing.T) {
 	}
 }
 
-// REQ-034: the pin is the two files together; a resources directory missing
-// the external one is a broken sync, refused before anything is written.
-func TestRunRefusesAPinWithoutTheExternalFile(t *testing.T) {
+// REQ-034: the pin is the three files together; a resources directory
+// missing the external file or the property-unit table is a broken sync,
+// refused before anything is written.
+func TestRunRefusesAPinWithoutOneOfItsFiles(t *testing.T) {
+	t.Parallel()
+	for _, file := range []string{"openehr_external_terminologies.xml", "PropertyUnitData.xml"} {
+		t.Run(file, func(t *testing.T) {
+			t.Parallel()
+			resources, outDir := pin(t, fixtureManifest)
+			if err := os.Remove(filepath.Join(resources, file)); err != nil {
+				t.Fatalf("remove %s: %v", file, err)
+			}
+			_, err := Run(Options{ResourcesDir: resources, OutDir: outDir})
+			if err == nil {
+				t.Fatalf("Run without %s = _, nil; want a refusal", file)
+			}
+			if !strings.Contains(err.Error(), file) {
+				t.Errorf("Run error = %q, want it to name the missing file %s", err, file)
+			}
+			if _, err := os.Stat(filepath.Join(outDir, "openehr", "terminology", "openehr_gen.go")); err == nil {
+				t.Errorf("Run wrote a table despite the missing %s", file)
+			}
+		})
+	}
+}
+
+// REQ-034: a refusal of the property-unit table names that file.
+func TestRunNamesThePropertyUnitTableItRefuses(t *testing.T) {
 	t.Parallel()
 	resources, outDir := pin(t, fixtureManifest)
-	if err := os.Remove(filepath.Join(resources, "openehr_external_terminologies.xml")); err != nil {
-		t.Fatalf("remove the external file: %v", err)
+	broken := strings.Replace(propertyUnitsFixture, `primary="true" UCUM="m"`, `primary="maybe" UCUM="m"`, 1)
+	if broken == propertyUnitsFixture {
+		t.Fatal("the fixture no longer carries the primary m unit this test breaks")
+	}
+	if err := os.WriteFile(filepath.Join(resources, "PropertyUnitData.xml"), []byte(broken), 0o644); err != nil {
+		t.Fatalf("write the broken property-unit table: %v", err)
 	}
 	_, err := Run(Options{ResourcesDir: resources, OutDir: outDir})
 	if err == nil {
-		t.Fatal("Run without openehr_external_terminologies.xml = _, nil; want a refusal")
+		t.Fatal("Run over a property-unit table with a malformed primary flag = _, nil; want a refusal")
 	}
-	if !strings.Contains(err.Error(), "openehr_external_terminologies.xml") {
-		t.Errorf("Run error = %q, want it to name the missing file", err)
-	}
-	if _, err := os.Stat(filepath.Join(outDir, "openehr", "terminology", "openehr_gen.go")); err == nil {
-		t.Error("Run wrote a table despite the missing file")
+	if !strings.Contains(err.Error(), "PropertyUnitData.xml") || !strings.Contains(err.Error(), "primary") {
+		t.Errorf("Run error = %q, want it to name PropertyUnitData.xml and the primary flag", err)
 	}
 }
 

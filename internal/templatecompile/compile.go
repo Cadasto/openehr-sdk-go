@@ -109,6 +109,12 @@ type walker struct {
 	// nodes of one owner type share it.
 	implicit map[implicitKey]*CompiledAttribute
 
+	// descendants holds, for each bare class an OPT-declared attribute has
+	// been looked up on and not found, every class the lookup says descends
+	// from it, or nil when the lookup gives no verdict on the class
+	// ([walker.descendantsOf]). Nil until the first such attribute.
+	descendants map[string][]string
+
 	// currentAttr is the wire-side *template.Attribute under whose
 	// Children() the immediately-recursed compileNode is descending.
 	// Set by buildAttribute around the per-child loop and consumed by
@@ -354,7 +360,7 @@ func (w *walker) requiredAttributes(class string) []string {
 // separate rminfo query. class is the bare class of parent's RM type,
 // and required the attributes that class requires.
 func (w *walker) buildAttribute(parent *CompiledNode, class string, required []string, a *template.Attribute) (*CompiledAttribute, error) {
-	rm, _ := w.attributeType(parent.rmTypeName, class, a.Name())
+	rm, isProperty := w.attributeType(parent.rmTypeName, class, a.Name())
 	ca := &CompiledAttribute{
 		name:              a.Name(),
 		cardinality:       a.Cardinality(),
@@ -362,6 +368,7 @@ func (w *walker) buildAttribute(parent *CompiledNode, class string, required []s
 		childMultiplicity: a.ChildMultiplicity(),
 		rmTypeName:        rm,
 		required:          slices.Contains(required, a.Name()),
+		notInRM:           !isProperty && w.absentFrom(class, a.Name()),
 	}
 	prevAttr := w.currentAttr
 	w.currentAttr = a
@@ -398,6 +405,61 @@ func (w *walker) attributeType(owner, class, attr string) (string, bool) {
 		return "", false
 	}
 	return bmmtype.Substitute(owner, rm), true
+}
+
+// absentFrom reports whether attr, which the lookup does not give the bare
+// class class as a property, is a name no class in class's hierarchy has
+// (REQ-100, [CompiledAttribute.NotInRM]): it is not one of the functions
+// [rminfo.IsNonStorableAttr] names for class, which a template may
+// constrain as if it were an attribute, and it is neither a property nor
+// such a function of any class descending from class, such as ITEM_TREE's
+// items under an ITEM_STRUCTURE, or DV_QUANTITY's magnitude under a
+// DV_AMOUNT, a function there that the predicate leaves out because its
+// descendant stores it. The lookup's properties of class already
+// hold those of its ancestors. A class the lookup does not know, and any
+// class when the lookup gives no class hierarchy, gives no verdict, so its
+// attributes are not marked.
+func (w *walker) absentFrom(class, attr string) bool {
+	if rminfo.IsNonStorableAttr(class, attr) {
+		return false
+	}
+	descendants, ok := w.descendantsOf(class)
+	if !ok {
+		return false
+	}
+	for _, d := range descendants {
+		if _, isProperty := w.lookup.AttributeRMType(d, attr); isProperty || rminfo.IsNonStorableAttr(d, attr) {
+			return false
+		}
+	}
+	return true
+}
+
+// descendantsOf returns every class the lookup says descends from the bare
+// class class, abstract ones included, asking the lookup once per class and
+// call. ok is false when the lookup does not know class or gives no class
+// hierarchy ([rminfo.Hierarchy]).
+func (w *walker) descendantsOf(class string) (descendants []string, ok bool) {
+	if d, seen := w.descendants[class]; seen {
+		return d, d != nil
+	}
+	if w.descendants == nil {
+		w.descendants = map[string][]string{}
+	}
+	h, isHierarchy := w.lookup.(rminfo.Hierarchy)
+	known := w.lookup.KnownRMTypes()
+	if !isHierarchy || !slices.Contains(known, class) {
+		w.descendants[class] = nil
+		return nil, false
+	}
+	d := []string{}
+	for _, k := range known {
+		if conforms, _ := h.ConformsTo(k, class); conforms && k != class {
+			d = append(d, k)
+		}
+	}
+	w.descendants[class] = d
+	return d, true
 }
 
 // childPath computes the AQL path of a child node reached from the

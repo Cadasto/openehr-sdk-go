@@ -1,6 +1,7 @@
 package templatecompile_test
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -117,6 +118,122 @@ func TestREQ102_REQ107_AsksForMember(t *testing.T) {
 			}
 			if got := templatecompile.AsksForMember(items); got != tc.wantAsks {
 				t.Errorf("AsksForMember(items) = %t, want %t", got, tc.wantAsks)
+			}
+		})
+	}
+}
+
+// occurringChild is a C_COMPLEX_OBJECT child of rmType at nodeID with the
+// occurrences interval body occurrences ("" for none).
+func occurringChild(rmType, nodeID, occurrences string) string {
+	if occurrences != "" {
+		occurrences = `<occurrences>` + occurrences + `</occurrences>`
+	}
+	return `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>` + rmType + `</rm_type_name>` +
+		occurrences + `<node_id>` + nodeID + `</node_id></children>`
+}
+
+// attributeShapeOPT is a template whose root, of rmType, carries the
+// attribute name, written as the attribute xsiType names, with the
+// existence interval body existence ("" for none), over children.
+func attributeShapeOPT(rmType, xsiType, name, existence string, children ...string) string {
+	if existence != "" {
+		existence = `<existence>` + existence + `</existence>`
+	}
+	return `<?xml version="1.0" encoding="utf-8"?>
+<template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.openehr.org/v1">
+<language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
+<template_id><value>members</value></template_id><concept>members</concept>
+<definition><rm_type_name>` + rmType + `</rm_type_name><node_id>at0000</node_id>
+<attributes xsi:type="` + xsiType + `"><rm_attribute_name>` + name + `</rm_attribute_name>` + existence +
+		strings.Join(children, "") + `</attributes></definition>
+</template>`
+}
+
+// TestREQ102_REQ107_MandatoryListChildren checks the one reading the
+// template validator (REQ-102 A mandatory child under an optional list) and
+// the example generator (REQ-107 Visit rule) share of the children that ask
+// a list holding no item for a member: each child the template allows,
+// other than a slot, whose occurrences lower bound is bounded and at least
+// 1, in template order. The attribute's existence is not read. It yields
+// none for an attribute the template writes as single-valued, for a list
+// the template prohibits, and for a list whose items the RM types as
+// primitive values, such as a DV_MULTIMEDIA's data.
+func TestREQ102_REQ107_MandatoryListChildren(t *testing.T) {
+	const (
+		list   = "C_MULTIPLE_ATTRIBUTE"
+		single = "C_SINGLE_ATTRIBUTE"
+	)
+	element := func(nodeID, occurrences string) string { return occurringChild("ELEMENT", nodeID, occurrences) }
+	cases := []struct {
+		name string
+		opt  string
+		// attr is the root attribute the case reads.
+		attr string
+		// want is the node id of each child yielded, in order.
+		want []string
+	}{
+		{name: "a 1..1 child", attr: "items", opt: attributeShapeOPT("ITEM_TREE", list, "items", "", element("at0001", closedInterval(1, 1))), want: []string{"at0001"}},
+		{name: "a 1..* child", attr: "items", opt: attributeShapeOPT("ITEM_TREE", list, "items", "", element("at0001", openAboveInterval(1))), want: []string{"at0001"}},
+		{
+			name: "existence 0..1 over a 1..1 child", attr: "items",
+			opt:  attributeShapeOPT("ITEM_TREE", list, "items", closedInterval(0, 1), element("at0001", closedInterval(1, 1))),
+			want: []string{"at0001"},
+		},
+		{
+			name: "existence 1..1 over a 1..1 child", attr: "items",
+			opt:  attributeShapeOPT("ITEM_TREE", list, "items", closedInterval(1, 1), element("at0001", closedInterval(1, 1))),
+			want: []string{"at0001"},
+		},
+		{name: "no child", attr: "items", opt: membersOPT("")},
+		{name: "cardinality 1..* and no child", attr: "items", opt: membersOPT(openAboveInterval(1))},
+		{name: "cardinality 1..* over an optional child", attr: "items", opt: membersOPT(openAboveInterval(1), closedInterval(0, 1))},
+		{name: "an optional child", attr: "items", opt: attributeShapeOPT("ITEM_TREE", list, "items", "", element("at0001", closedInterval(0, 1)))},
+		{name: "a child with no occurrences", attr: "items", opt: attributeShapeOPT("ITEM_TREE", list, "items", "", element("at0001", ""))},
+		{
+			name: "a child whose occurrences have an unbounded lower side", attr: "items",
+			opt: attributeShapeOPT("ITEM_TREE", list, "items", "", element("at0001", unboundedLowerInterval)),
+		},
+		{name: "a child the template does not allow", attr: "items", opt: attributeShapeOPT("ITEM_TREE", list, "items", "", element("at0001", closedInterval(0, 0)))},
+		{
+			name: "mandatory children around an optional one", attr: "items",
+			opt: attributeShapeOPT("ITEM_TREE", list, "items", "",
+				element("at0001", closedInterval(1, 1)), element("at0002", closedInterval(0, 1)), element("at0003", closedInterval(2, 5))),
+			want: []string{"at0001", "at0003"},
+		},
+		{
+			name: "a single-valued attribute over a 1..1 child", attr: "items",
+			opt: attributeShapeOPT("ITEM_TREE", single, "items", "", element("at0001", closedInterval(1, 1))),
+		},
+		{
+			name: "a list the template prohibits, over a 1..1 child", attr: "items",
+			opt: attributeShapeOPT("ITEM_TREE", list, "items", closedInterval(0, 0), element("at0001", closedInterval(1, 1))),
+		},
+		{
+			name: "a list of primitive values, over a 1..1 child", attr: "data",
+			opt: attributeShapeOPT("DV_MULTIMEDIA", list, "data", closedInterval(0, 1), occurringChild("OCTET", "at0001", closedInterval(1, 1))),
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			opt, err := template.ParseOPT(strings.NewReader(tc.opt))
+			if err != nil {
+				t.Fatalf("ParseOPT: %v", err)
+			}
+			c, err := templatecompile.Compile(opt)
+			if err != nil {
+				t.Fatalf("Compile: %v", err)
+			}
+			a := c.Root().Attribute(tc.attr)
+			if a == nil {
+				t.Fatalf("compiled root has no %s attribute", tc.attr)
+			}
+			got := []string{}
+			for child := range templatecompile.MandatoryListChildren(a) {
+				got = append(got, child.NodeID())
+			}
+			if want := append([]string{}, tc.want...); !slices.Equal(got, want) {
+				t.Errorf("MandatoryListChildren(%s) yields %q, want %q", tc.attr, got, want)
 			}
 		})
 	}

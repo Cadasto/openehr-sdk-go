@@ -27,6 +27,14 @@ const (
 	markerPrecision = 7
 )
 
+// Temporal markers, valid ISO 8601 text whose digits no pattern or bound in
+// these tests contains.
+var (
+	markerDate     = "1987-06-05"
+	markerTime     = "13:47:39"
+	markerDuration = "P" + strconv.Itoa(markerInt) + "D"
+)
+
 var (
 	// closedRange prints as [0..100] and precisionRange as [0..3]: neither
 	// contains the digits of a marker.
@@ -203,6 +211,97 @@ func valueFreeCases() []valueFreeCase {
 			needles:    []string{markerString},
 		},
 
+		// Temporal pattern, timezone_validity and range clauses (REQ-103).
+		// The values carry digits that no pattern or bound here does.
+		{
+			name:       "CDate pattern mismatch",
+			constraint: constraints.CDate{Pattern: "yyyy-??-XX"},
+			input:      markerDate,
+			wantCode:   constraints.CodePatternMismatch,
+			wantValue:  markerDate,
+			needles:    []string{markerDate, "1987"},
+		},
+		{
+			name:       "CDate outside range",
+			constraint: constraints.CDate{Range: closedSpan("2004-05-20", "2004-06-02")},
+			input:      markerDate,
+			wantCode:   constraints.CodeOutOfRange,
+			wantValue:  markerDate,
+			needles:    []string{markerDate, "1987"},
+		},
+		{
+			name:       "CTime pattern mismatch",
+			constraint: constraints.CTime{Pattern: "hh:mm:XX"},
+			input:      markerTime,
+			wantCode:   constraints.CodePatternMismatch,
+			wantValue:  markerTime,
+			needles:    []string{markerTime, "47:39"},
+		},
+		{
+			name:       "CTime zone missing where mandatory",
+			constraint: constraints.CTime{TimezoneValidity: constraints.ValidityMandatory},
+			input:      markerTime,
+			wantCode:   constraints.CodePatternMismatch,
+			wantValue:  markerTime,
+			needles:    []string{markerTime, "47:39"},
+		},
+		{
+			name:       "CTime zone present where disallowed",
+			constraint: constraints.CTime{TimezoneValidity: constraints.ValidityDisallowed},
+			input:      markerTime + "+05:30",
+			wantCode:   constraints.CodePatternMismatch,
+			wantValue:  markerTime + "+05:30",
+			needles:    []string{markerTime, "47:39", "+05:30"},
+		},
+		{
+			name:       "CTime outside range",
+			constraint: constraints.CTime{Range: closedSpan("09:00:00", "10:00:00")},
+			input:      markerTime,
+			wantCode:   constraints.CodeOutOfRange,
+			wantValue:  markerTime,
+			needles:    []string{markerTime, "47:39"},
+		},
+		{
+			name:       "CDateTime pattern mismatch",
+			constraint: constraints.CDateTime{Pattern: "yyyy-mm-ddThh:mm:XX"},
+			input:      markerDate + "T" + markerTime,
+			wantCode:   constraints.CodePatternMismatch,
+			wantValue:  markerDate + "T" + markerTime,
+			needles:    []string{markerDate, markerTime, "1987", "47:39"},
+		},
+		{
+			name:       "CDateTime zone missing where mandatory",
+			constraint: constraints.CDateTime{TimezoneValidity: constraints.ValidityMandatory},
+			input:      markerDate + "T" + markerTime,
+			wantCode:   constraints.CodePatternMismatch,
+			wantValue:  markerDate + "T" + markerTime,
+			needles:    []string{markerDate, markerTime, "1987", "47:39"},
+		},
+		{
+			name:       "CDateTime outside range",
+			constraint: constraints.CDateTime{Range: closedSpan("2004-05-20", "2004-06-02")},
+			input:      markerDate + "T" + markerTime,
+			wantCode:   constraints.CodeOutOfRange,
+			wantValue:  markerDate + "T" + markerTime,
+			needles:    []string{markerDate, markerTime, "1987", "47:39"},
+		},
+		{
+			name:       "CDuration pattern mismatch",
+			constraint: constraints.CDuration{Pattern: "PY"},
+			input:      markerDuration,
+			wantCode:   constraints.CodePatternMismatch,
+			wantValue:  markerDuration,
+			needles:    []string{markerDuration, strconv.Itoa(markerInt)},
+		},
+		{
+			name:       "CDuration outside range",
+			constraint: constraints.CDuration{Range: closedSpan("P0D", "P1D")},
+			input:      markerDuration,
+			wantCode:   constraints.CodeOutOfRange,
+			wantValue:  markerDuration,
+			needles:    []string{markerDuration, strconv.Itoa(markerInt)},
+		},
+
 		// CodePhrase: Value is the one field of the input the clause tested,
 		// and neither field may appear in Detail.
 		{
@@ -350,11 +449,21 @@ func emptyValueCases() []emptyValueCase {
 		{name: "ConstraintRef wrong type", constraint: constraints.ConstraintRef{Reference: "ac0001"}, input: markerInt, wantCode: constraints.CodeWrongType},
 		{name: "CString unparseable pattern", constraint: constraints.CString{Pattern: "("}, input: markerString, wantCode: constraints.CodeInvalidValue},
 		{name: "CString unparseable pattern from NewCString", constraint: constraints.NewCString("(", nil, ""), input: markerString, wantCode: constraints.CodeInvalidValue},
+		{name: "CDate malformed pattern", constraint: constraints.CDate{Pattern: "yyyy/mm/dd"}, input: markerDate, wantCode: constraints.CodeInvalidValue},
+		{name: "CTime malformed pattern", constraint: constraints.CTime{Pattern: "hh-mm-ss"}, input: markerTime, wantCode: constraints.CodeInvalidValue},
+		{name: "CDateTime malformed pattern", constraint: constraints.CDateTime{Pattern: "yyyy-mm-dd"}, input: markerDate, wantCode: constraints.CodeInvalidValue},
+		{name: "CDuration malformed pattern", constraint: constraints.CDuration{Pattern: "PX"}, input: markerDuration, wantCode: constraints.CodeInvalidValue},
+		{name: "CDate malformed range bound", constraint: constraints.CDate{Range: closedSpan("2004-01-01", "2004-02-30")}, input: markerDate, wantCode: constraints.CodeInvalidValue},
+		{name: "CDuration malformed range bound", constraint: constraints.CDuration{Range: closedSpan("P1X", "P1D")}, input: markerDuration, wantCode: constraints.CodeInvalidValue},
+		{name: "CDate zone mandatory", constraint: constraints.CDate{TimezoneValidity: constraints.ValidityMandatory}, input: markerDate, wantCode: constraints.CodeInvalidValue},
+		{name: "CTime not a VALIDITY_KIND", constraint: constraints.CTime{TimezoneValidity: 7}, input: markerTime, wantCode: constraints.CodeInvalidValue},
 	}
 }
 
 // TestREQ168_ViolationValueIsEmptyWhenNoClauseTestedTheInput pins the cases
-// where Value holds nothing: CodeWrongType, and a pattern that does not parse.
+// where Value holds nothing: CodeWrongType, and a constraint at fault, such
+// as a pattern that does not parse, a temporal range bound that is not ISO
+// 8601 text, or a timezone_validity no value can meet.
 func TestREQ168_ViolationValueIsEmptyWhenNoClauseTestedTheInput(t *testing.T) {
 	t.Parallel()
 	for _, tc := range emptyValueCases() {

@@ -59,9 +59,15 @@ func optSingle(name string, children ...string) string {
 		`<lower>1</lower><upper>1</upper></existence>` + strings.Join(children, "") + `</attributes>`
 }
 
-// optMultiple is a C_MULTIPLE_ATTRIBUTE called name over children.
+// optMultiple is a C_MULTIPLE_ATTRIBUTE called name over children that the
+// OPT requires: an existence of 1..1 and a cardinality of 1..*, so that
+// every policy visits it, Required included, which a cardinality lower
+// bound alone does not make visit a list (REQ-107 Visit rule).
 func optMultiple(name string, children ...string) string {
 	return `<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>` + name + `</rm_attribute_name>` +
+		`<existence><lower_included>true</lower_included><upper_included>true</upper_included>` +
+		`<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded>` +
+		`<lower>1</lower><upper>1</upper></existence>` +
 		strings.Join(children, "") +
 		`<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval>` +
 		`<lower_included>true</lower_included><lower_unbounded>false</lower_unbounded>` +

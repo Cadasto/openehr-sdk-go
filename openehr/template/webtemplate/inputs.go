@@ -16,7 +16,7 @@ import (
 func inputsFor(v *templatecompile.CompiledNode) []Input {
 	switch v.RMTypeName() {
 	case "DV_TEXT":
-		return []Input{{Type: "TEXT"}}
+		return textInputs(v)
 	case "DV_CODED_TEXT":
 		return codedTextInputs(v)
 	case "DV_QUANTITY":
@@ -41,6 +41,21 @@ func inputsFor(v *templatecompile.CompiledNode) []Input {
 		return partyProxyInputs()
 	}
 	return nil
+}
+
+// textInputs emits the single TEXT input for DV_TEXT. The C_STRING
+// constraint lives on the value node's value child; its list becomes the
+// input's list, each entry labelled with its own string, and its list_open
+// flag becomes listOpen, mirroring the reference. This listOpen is the
+// OPT's flag, not the empty-list reading codedTextInputs applies.
+func textInputs(v *templatecompile.CompiledNode) []Input {
+	in := Input{Type: "TEXT"}
+	cs := childConstraint[constraints.CString](v, "value")
+	for _, s := range cs.List {
+		in.List = append(in.List, InputListItem{Value: s, Label: s})
+	}
+	in.ListOpen = cs.ListOpen
+	return []Input{in}
 }
 
 // codedTextInputs emits the single "code" input for DV_CODED_TEXT. The

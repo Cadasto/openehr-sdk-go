@@ -16,9 +16,12 @@ type PrimitiveConstraint interface {
 	// ExampleValue returns a minimal-valid Go example value for this
 	// constraint, in the shape Validate() expects.
 	//
-	// Contract: for bounded constraints, Validate(c.ExampleValue())
-	// returns an empty Violation slice. Unbounded primitives
-	// return a documented sentinel (e.g. "example", 0, "2020-01-01").
+	// Contract: for bounded constraints that admit a value,
+	// Validate(c.ExampleValue()) returns an empty Violation slice. A
+	// constraint that admits none, such as a closed CString list whose
+	// Pattern matches no entry, has no example Validate accepts.
+	// Unbounded primitives return a documented sentinel (e.g. "example",
+	// 0, "2020-01-01").
 	ExampleValue() any
 
 	// isPrimitive seals the interface to this package.

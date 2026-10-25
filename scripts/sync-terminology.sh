@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 #
 # sync-terminology.sh — vendor / verify the openEHR Terminology
-# (openehr_terminology.xml and openehr_external_terminologies.xml) into
-# resources/terminology/ (REQ-034).
+# (openehr_terminology.xml, openehr_external_terminologies.xml and
+# PropertyUnitData.xml) into resources/terminology/ (REQ-034).
 #
 # Source: https://github.com/openEHR/specifications-TERM
 #         computable/XML/en/openehr_terminology.xml
 #         computable/XML/openehr_external_terminologies.xml
+#         computable/XML/PropertyUnitData.xml
 #
 # These are the openEHR Foundation's computable form of the openEHR
 # Terminology. openehr_terminology.xml holds the `openehr` terminology
@@ -16,7 +17,10 @@
 # invariants reference. openehr_external_terminologies.xml holds the
 # Foundation's snapshot of the external code sets the RM names (ISO 639-1
 # languages, ISO 3166-1 countries, IANA character sets, IANA media types).
-# Both are small, closed, and versioned with the specifications — so the SDK
+# PropertyUnitData.xml holds the property-unit table: for each code of the
+# `property` group, the units of measure (with their UCUM codes) that measure
+# it, which a C_DV_QUANTITY constraint's property names.
+# All three are small, closed, and versioned with the specifications — so the SDK
 # pins them in-tree and generates from them the way it does the BMM
 # (REQ-034), rather than fetching them at build time or treating them as a
 # runtime terminology-service lookup.
@@ -24,7 +28,7 @@
 # Subcommands:
 #   sync     Resolve TERMINOLOGY_REF (default: the ref pinned in MANIFEST.txt,
 #            else the latest GitHub release tag) to a commit sha, download
-#            both files at that one sha, write them byte-identical, regenerate
+#            every file at that one sha, write them byte-identical, regenerate
 #            MANIFEST.txt. Then run `make termgen` so the generated tables
 #            follow the pin (skipped when TERMINOLOGY_SKIP_GEN=1).
 #   verify   Offline: recompute each file's sha256 and compare it to
@@ -39,8 +43,8 @@
 #   GITHUB_TOKEN           optional; raises the unauthenticated API rate limit.
 #
 # Reproducibility: `sync` resolves the ref to a concrete commit sha and
-# downloads both files at that sha, so two syncs of the same ref are
-# byte-identical and the two files always come from the same commit. The
+# downloads every file at that sha, so two syncs of the same ref are
+# byte-identical and the files always come from the same commit. The
 # resolved sha is recorded in MANIFEST.txt.
 set -euo pipefail
 
@@ -50,8 +54,9 @@ readonly REPO="openEHR/specifications-TERM"
 readonly SRC_PATHS=(
   "computable/XML/en/openehr_terminology.xml"
   "computable/XML/openehr_external_terminologies.xml"
+  "computable/XML/PropertyUnitData.xml"
 )
-# The upstream directory both files live under, for the manifest's tree link.
+# The upstream directory every file lives under, for the manifest's tree link.
 readonly SRC_TREE="computable/XML"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 readonly DEST="$ROOT/resources/terminology"
@@ -160,9 +165,9 @@ cmd_sync() {
 
   # Download every file beside the pin first, and move them into place only
   # once all of them pass the guards below. A failed or bogus fetch (a ref
-  # whose tree lacks one of the files, say) then leaves the vendored pair and
-  # its manifest untouched: the two files only ever move together.
-  local src name tmp head_bytes
+  # whose tree lacks one of the files, say) then leaves the vendored files and
+  # their manifest untouched: the files only ever move together.
+  local src name tmp head_bytes root
   local -a tmps=()
   for src in "${SRC_PATHS[@]}"; do
     name="$(basename "$src")"
@@ -174,10 +179,16 @@ cmd_sync() {
 
     # Guard against a truncated body or an error page that still returned
     # HTTP 200 — don't let a corrupt file become the canonical (hashed) copy.
+    # The property-unit table has its own root element; the other files are
+    # <terminology> documents.
     [[ -s "$tmp" ]] || { rm -f "${tmps[@]}"; die "download produced an empty file: $src"; }
-    head_bytes="$(head -c 64 "$tmp")"
-    [[ "$head_bytes" == *"<terminology"* ]] \
-      || { rm -f "${tmps[@]}"; die "download is not openEHR Terminology XML (no <terminology root): $src"; }
+    case "$name" in
+      PropertyUnitData.xml) root="<PropertyUnits" ;;
+      *) root="<terminology" ;;
+    esac
+    head_bytes="$(head -c 128 "$tmp")"
+    [[ "$head_bytes" == *"$root"* ]] \
+      || { rm -f "${tmps[@]}"; die "download is not the expected openEHR Terminology XML (no $root root): $src"; }
   done
   for src in "${SRC_PATHS[@]}"; do
     name="$(basename "$src")"

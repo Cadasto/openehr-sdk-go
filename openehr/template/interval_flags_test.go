@@ -909,3 +909,119 @@ func TestREQ169_REQ103_NumericRangeClosedSideWithNoBoundRefused(t *testing.T) {
 		}
 	}
 }
+
+// temporalRangeSites lists every primitive constraint whose temporal range
+// the parser reads from OPT XML, each with a bound of its type.
+// {{interval}} marks the range.
+var temporalRangeSites = []struct {
+	name, child, bound string
+}{
+	{
+		name:  "C_DATE",
+		child: `<children xsi:type="C_DATE"><rm_type_name>DATE</rm_type_name><node_id/><range>{{interval}}</range></children>`,
+		bound: "2004-05-20",
+	},
+	{
+		name:  "C_TIME",
+		child: `<children xsi:type="C_TIME"><rm_type_name>TIME</rm_type_name><node_id/><range>{{interval}}</range></children>`,
+		bound: "09:30:00",
+	},
+	{
+		name:  "C_DATE_TIME",
+		child: `<children xsi:type="C_DATE_TIME"><rm_type_name>DATE_TIME</rm_type_name><node_id/><range>{{interval}}</range></children>`,
+		bound: "2004-05-20T10:00:00Z",
+	},
+	{
+		name:  "C_DURATION",
+		child: `<children xsi:type="C_DURATION"><rm_type_name>DURATION</rm_type_name><node_id/><range>{{interval}}</range></children>`,
+		bound: "PT1H",
+	},
+	{
+		name: "C_PRIMITIVE_OBJECT/C_DURATION",
+		child: `<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>DURATION</rm_type_name><node_id/>` +
+			`<item xsi:type="C_DURATION"><range>{{interval}}</range></item></children>`,
+		bound: "PT1H",
+	},
+}
+
+func temporalRangeOf(t *testing.T, p constraints.PrimitiveConstraint) constraints.TemporalRange {
+	t.Helper()
+	switch c := p.(type) {
+	case constraints.CDate:
+		return c.Range
+	case constraints.CTime:
+		return c.Range
+	case constraints.CDateTime:
+		return c.Range
+	case constraints.CDuration:
+		return c.Range
+	}
+	t.Fatalf("PrimitiveConstraint() = %T, want a temporal constraint", p)
+	return constraints.TemporalRange{}
+}
+
+// REQ-169: the temporal ranges of C_DATE, C_TIME, C_DATE_TIME and C_DURATION
+// read an omitted unbounded flag by their side's bound too, in both parse
+// modes.
+func TestREQ169_REQ103_TemporalRangeUnboundedFollowsItsBound(t *testing.T) {
+	for _, p := range intervalParsers {
+		for _, site := range temporalRangeSites {
+			cases := []struct {
+				name string
+				iv   wireInterval
+				want constraints.TemporalRange
+			}{
+				{name: "only_upper_is_open_below", iv: wireInterval{upper: site.bound}, want: constraints.TemporalRange{Upper: site.bound, UpperInclusive: true, LowerUnbounded: true}},
+				{name: "only_lower_is_open_above", iv: wireInterval{lower: site.bound}, want: constraints.TemporalRange{Lower: site.bound, LowerInclusive: true, UpperUnbounded: true}},
+			}
+			for _, tc := range cases {
+				t.Run(p.name+"/"+site.name+"/"+tc.name, func(t *testing.T) {
+					child := strings.ReplaceAll(site.child, "{{interval}}", tc.iv.xml())
+					body := strings.Replace(primitiveOPTTemplate, "%s", child, 1)
+					opt, err := p.parse(strings.NewReader(body))
+					if err != nil {
+						t.Fatalf("%s(%s %q) error = %v, want nil", p.name, site.name, tc.iv.xml(), err)
+					}
+					if got := temporalRangeOf(t, firstChildPrimitive(t, opt)); got != tc.want {
+						t.Errorf("%s(%s %q) range = %+v, want %+v", p.name, site.name, tc.iv.xml(), got, tc.want)
+					}
+				})
+			}
+		}
+	}
+}
+
+// REQ-169: a temporal range side written bounded with no bound is refused in
+// both parse modes, wrapping ErrInvalidOPT and naming the flag, although
+// ParseOPT reads a bound that is not ISO 8601 text as unbounded. The cases
+// are closedSideCases with each bound given in the site's type.
+//
+// Can-fail control: drop the refusal and ParseOPT reads the side as
+// unbounded, while ParseOPTStrict refuses its empty bound without naming the
+// flag.
+func TestREQ169_REQ103_TemporalRangeClosedSideWithNoBoundRefused(t *testing.T) {
+	for _, p := range intervalParsers {
+		for _, site := range temporalRangeSites {
+			for _, tc := range closedSideCases {
+				iv := tc.iv
+				if iv.lower != "" {
+					iv.lower = site.bound
+				}
+				if iv.upper != "" {
+					iv.upper = site.bound
+				}
+				t.Run(p.name+"/"+site.name+"/"+tc.name, func(t *testing.T) {
+					child := strings.ReplaceAll(site.child, "{{interval}}", iv.xml())
+					body := strings.Replace(primitiveOPTTemplate, "%s", child, 1)
+					_, err := p.parse(strings.NewReader(body))
+					if !errors.Is(err, template.ErrInvalidOPT) {
+						t.Fatalf("%s(%s %q) error = %v, want one wrapping ErrInvalidOPT", p.name, site.name, iv.xml(), err)
+					}
+					if flag := tc.side + "_unbounded"; !strings.Contains(err.Error(), flag) {
+						t.Errorf("%s(%s %q) error = %v, want it to name %s", p.name, site.name, iv.xml(), err, flag)
+					}
+				})
+			}
+		}
+	}
+}

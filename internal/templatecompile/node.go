@@ -261,6 +261,7 @@ type CompiledAttribute struct {
 	rmTypeName        string // RM type from rminfo; empty when not resolved
 	implicit          bool   // true when injected from rminfo, not declared by OPT
 	required          bool   // BMM is_mandatory (true even when OPT silent)
+	notInRM           bool   // OPT-declared, and the parent's RM class does not have it
 	children          []*CompiledNode
 
 	// allowed and prohibited hold what a validation walk asks of the
@@ -320,6 +321,22 @@ func (a *CompiledAttribute) Implicit() bool { return a.implicit }
 // mandatory on the parent type. True implies the composition
 // builder must emit a value at this attribute's RM path.
 func (a *CompiledAttribute) Required() bool { return a.required }
+
+// NotInRM reports whether the template declares this attribute on a node
+// whose Reference Model class cannot have it: the name is neither a
+// property nor a function of the class, read without generic parameters,
+// of any of its ancestors, or of any of its descendants. The properties
+// and the class hierarchy are those of the RM information the compile
+// used; the functions, which a template may constrain as if they were
+// attributes, are those rminfo.IsNonStorableAttr names. ISM_TRANSITION.name
+// is one; EVENT.offset, a function, and ITEM_STRUCTURE.items, a property
+// of ITEM_TREE, are not. No instance of the class can carry such an
+// attribute, so the validators in openehr/validation do not visit it and
+// list its path in their result's coverage instead. It is false for an
+// attribute the compile injects, for every attribute of a node whose class
+// the RM information does not know, and for every attribute when that
+// information gives no class hierarchy.
+func (a *CompiledAttribute) NotInRM() bool { return a.notInRM }
 
 // Children returns a defensive copy of the child nodes. Empty for
 // implicit attributes (no OPT-declared children) and for the

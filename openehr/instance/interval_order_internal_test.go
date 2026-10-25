@@ -127,7 +127,10 @@ func TestOrderIntervalBoundsCount(t *testing.T) {
 
 // TestOrderIntervalBoundsQuantity pins the REQ-107 ordering rule on a
 // DV_INTERVAL<DV_QUANTITY>: its units rule and the magnitude ends it reads
-// from a C_DV_QUANTITY entry. A case with no entries uses no OPT at all.
+// from a C_DV_QUANTITY entry. A case with no entries uses no OPT at all. Two
+// bounds in different units are first given one unit both sides admit
+// (TestREQ107_ShareComparableQuantity pins how), and are left alone where
+// there is none.
 func TestOrderIntervalBoundsQuantity(t *testing.T) {
 	opt := ReadVendoredOPT(t, QuantityIntervalOPT)
 	q := func(m float64, units string) quantityKey { return quantityKey{magnitude: m, units: units} }
@@ -138,7 +141,15 @@ func TestOrderIntervalBoundsQuantity(t *testing.T) {
 		bounds, want [2]quantityKey
 	}{
 		{
-			name:   "different units: left alone",
+			// The upper side admits any units, so it takes kg, keeping its
+			// magnitude, and the pair is then ordered (shareComparable).
+			name:   "different units, no OPT: one unit, then swapped",
+			bounds: [2]quantityKey{q(10, "kg"), q(5, "g")}, want: [2]quantityKey{q(5, "kg"), q(10, "kg")},
+		},
+		{
+			name:   "different units, no unit fits both: left alone",
+			lower:  QuantityEntry("kg", Closed(0), Closed(100)),
+			upper:  QuantityEntry("g", Closed(0), Closed(100)),
 			bounds: [2]quantityKey{q(10, "kg"), q(5, "g")}, want: [2]quantityKey{q(10, "kg"), q(5, "g")},
 		},
 		{
@@ -305,9 +316,9 @@ func TestOrderIntervalBoundsOrdered(t *testing.T) {
 }
 
 // TestOrderIntervalBoundsTemporal pins the REQ-107 ordering rule on
-// DV_DATE, DV_TIME and DV_DATE_TIME bounds the generator writes: UTC
-// date-times compare as instants, and zoneless values of one layout as
-// text (TestREQ107_TemporalBoundsCompareAsInstants pins the rest). A C_DATE,
+// DV_DATE, DV_TIME and DV_DATE_TIME bounds the generator writes: values in
+// one zone, or with none, compare by magnitude
+// (TestREQ107_TemporalBoundsCompareAsInstants pins the rest). A C_DATE,
 // C_TIME or C_DATE_TIME has no numeric end, so an inversion is repaired
 // by swapping, and a side the OPT leaves open is left alone.
 func TestOrderIntervalBoundsTemporal(t *testing.T) {
@@ -433,6 +444,9 @@ func orderedString(v rm.DVOrdered) string {
 // DV_PROPORTION. The compared key is the ratio numerator/denominator, and
 // only when both bounds have the same type; DV_PROPORTION.magnitude is not
 // implemented on the generated type. A zero denominator does not compare.
+// Two bounds are first given one type both sides admit, one in which an
+// ordered pair fits where there is one (TestREQ107_ShareComparableProportion
+// pins how), and are left alone where there is none.
 func TestOrderIntervalBoundsProportion(t *testing.T) {
 	p := func(num, den float64, kind int32) rm.DVProportion {
 		return rm.DVProportion{Numerator: rm.Real(num), Denominator: rm.Real(den), Type: rm.Integer(kind)}
@@ -460,14 +474,35 @@ func TestOrderIntervalBoundsProportion(t *testing.T) {
 			want:   [2]rm.DVProportion{p(2, 8, 0), p(1, 2, 0)},
 		},
 		{
-			name:   "different types: left alone",
+			// The upper side admits a ratio, so it is settled as one, keeping
+			// 1/2, and the pair is then ordered (shareComparable).
+			name:   "different types, no OPT: one type, then swapped",
+			bounds: [2]rm.DVProportion{p(2, 1, 0), p(1, 2, 1)},
+			want:   [2]rm.DVProportion{p(1, 2, 0), p(2, 1, 0)},
+		},
+		{
+			name: "different types, no type fits both: left alone",
+			node: intervalNode(t, RetargetInterval(t, opt, "DV_PROPORTION",
+				ProportionKindBound(RealRange(Closed(0), Closed(10)), IntList(0), ""),
+				ProportionKindBound(RealRange(Closed(0), Closed(10)), IntList(1), ""))),
 			bounds: [2]rm.DVProportion{p(2, 1, 0), p(1, 2, 1)},
 			want:   [2]rm.DVProportion{p(2, 1, 0), p(1, 2, 1)},
 		},
 		{
-			name:   "zero denominator: left alone",
+			// Both sides admit only ratios, so the pair keeps its type.
+			name: "zero denominator: left alone",
+			node: intervalNode(t, RetargetInterval(t, opt, "DV_PROPORTION",
+				ProportionKindBound(RealRange(Closed(0), Closed(10)), IntList(0), ""),
+				ProportionKindBound(RealRange(Closed(0), Closed(10)), IntList(0), ""))),
 			bounds: [2]rm.DVProportion{p(1, 0, 0), p(1, 1, 0)},
 			want:   [2]rm.DVProportion{p(1, 0, 0), p(1, 1, 0)},
+		},
+		{
+			// No ordered pair is a ratio over the denominator 0, and the sides,
+			// which the OPT leaves open, admit a unitary proportion, over 1.
+			name:   "zero denominator, no OPT: the first type with an ordered pair",
+			bounds: [2]rm.DVProportion{p(1, 0, 0), p(1, 1, 0)},
+			want:   [2]rm.DVProportion{p(1, 1, 1), p(1, 1, 1)},
 		},
 		{
 			// 10 is not in the lower list, so no swap; 12 and 15 are the ends.

@@ -31,8 +31,10 @@ type CompiledNode = impl.CompiledNode
 
 // CompiledAttribute is one attribute on a [CompiledNode] (e.g. "content",
 // "data", "value"): its Name, Cardinality, Existence, ChildMultiplicity,
-// RMTypeName, whether it is BMM-Required or an Implicit RM injection, and
-// its child nodes (Children).
+// RMTypeName, whether it is BMM-Required or an Implicit RM injection,
+// whether the template declares it under a name no class in the node's
+// class hierarchy (the class, its ancestors and its descendants) has as
+// a property or a function (NotInRM), and its child nodes (Children).
 type CompiledAttribute = impl.CompiledAttribute
 
 // Option configures [Compile]. Functional options keep the engine's

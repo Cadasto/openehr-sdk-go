@@ -19,12 +19,13 @@ import (
 // its own and restores them, so every test that reads the real registry
 // stays on the serial run.
 
-// pinPath and externalPinPath are the two vendored files of the pin, relative
-// to this package directory — `go test` runs each package with its own
-// directory as the working one.
+// pinPath, externalPinPath and unitsPinPath are the three vendored files of
+// the pin, relative to this package directory — `go test` runs each package
+// with its own directory as the working one.
 const (
 	pinPath         = "../../resources/terminology/openehr_terminology.xml"
 	externalPinPath = "../../resources/terminology/openehr_external_terminologies.xml"
+	unitsPinPath    = "../../resources/terminology/PropertyUnitData.xml"
 )
 
 func TestPinnedRelease(t *testing.T) {
@@ -37,6 +38,7 @@ func TestPinnedRelease(t *testing.T) {
 	for _, tc := range []struct{ name, got, path string }{
 		{"SourceSHA256", terminology.SourceSHA256, pinPath},
 		{"ExternalSourceSHA256", terminology.ExternalSourceSHA256, externalPinPath},
+		{"PropertyUnitSourceSHA256", terminology.PropertyUnitSourceSHA256, unitsPinPath},
 	} {
 		pin, err := os.ReadFile(tc.path)
 		if err != nil {
@@ -317,5 +319,124 @@ func wantLen(t *testing.T, g *terminology.Group, want int) {
 	t.Helper()
 	if got := g.Len(); got != want {
 		t.Errorf("%s.Len() = %d, want %d", g.ID(), got, want)
+	}
+}
+
+// REQ-034: the property-unit table of TERM Release-3.0.0, over the generated
+// table. The counts are the pin's: 86 properties, whose 493 units with a UCUM
+// code are 490 once each within their property. Each spot pin anchors a unit
+// to a human-known literal independently of the pin.
+func TestPropertyUnitTableOverThePin(t *testing.T) {
+	props := slices.Collect(terminology.QuantityProperties())
+	if len(props) != 86 {
+		t.Errorf("QuantityProperties() yields %d properties, want 86", len(props))
+	}
+	units, primaries := 0, 0
+	for _, p := range props {
+		for u := range p.All() {
+			units++
+			if u.Primary {
+				primaries++
+			}
+		}
+		// Every property code of the table is a code of the property
+		// group, the codes a C_DV_QUANTITY property names.
+		if !terminology.Property.Has(p.Code()) {
+			t.Errorf("property %s (%q) is not a member of the property group", p.Code(), p.Name())
+		}
+	}
+	if units != 490 || primaries != 86 {
+		t.Errorf("the properties hold %d units, %d of them primary; want 490 and 86", units, primaries)
+	}
+	if len(props) > 0 && (props[0].Code() != "122" || props[len(props)-1].Code() != "760") {
+		t.Errorf("first and last properties = %s and %s, want 122 (Length) and 760 (Enzyme activity), the source order",
+			props[0].Code(), props[len(props)-1].Code())
+	}
+
+	tests := []struct {
+		code, name string
+		ucum       string
+		want       bool
+	}{
+		{"122", "Length", "cm", true},
+		{"122", "Length", "m", true},
+		{"122", "Length", "km", true},
+		{"122", "Length", "[in_i]", true},
+		// The CNF case CONT-DV_QUANTITY-validate_property: mg is not a
+		// length unit.
+		{"122", "Length", "mg", false},
+		{"122", "Length", "CM", false},
+		{"124", "Mass", "mg", true},
+		{"125", "Pressure", "mm[Hg]", true},
+		{"125", "Pressure", "kPa", true},
+		{"125", "Pressure", "mm[hg]", false},
+		// The pin spells statfarad " 11126.10-16F"; the table carries it
+		// without the white space.
+		{"501", "Electric capacitance", "11126.10-16F", true},
+		{"501", "Electric capacitance", " 11126.10-16F", false},
+		{"382", "Frequency", "MHz", true},
+		{"382", "Frequency", "mHz", true},
+		{"382", "Frequency", "mhz", false},
+	}
+	for _, tc := range tests {
+		p, ok := terminology.QuantityPropertyByCode(tc.code)
+		if !ok {
+			t.Errorf("QuantityPropertyByCode(%q) reports absence, want %s", tc.code, tc.name)
+			continue
+		}
+		if p.Name() != tc.name {
+			t.Errorf("QuantityPropertyByCode(%q).Name() = %q, want %q", tc.code, p.Name(), tc.name)
+		}
+		if got := p.Has(tc.ucum); got != tc.want {
+			t.Errorf("%s (%s).Has(%q) = %v, want %v", tc.name, tc.code, tc.ucum, got, tc.want)
+		}
+	}
+
+	// The table lists um twice for Length; the accessor carries it once.
+	length, _ := terminology.QuantityPropertyByCode("122")
+	var um int
+	for u := range length.All() {
+		if u.UCUM == "um" {
+			um++
+		}
+	}
+	if um != 1 {
+		t.Errorf("Length lists um %d times, want once", um)
+	}
+
+	wantPrimaries := []struct {
+		code string
+		want []string
+	}{
+		{"122", []string{"m"}},
+		{"125", []string{"N/m2"}},
+		// Frequency and Arbitrary have several primary units, and
+		// Concentration none.
+		{"382", []string{"/min", "Hz"}},
+		{"755", []string{"U", "[arb'U]", "[arb'U]{p.d.u.}", "[arb'U]{SQ-U}", "[arb'U]{SQ-T}", "[arb'U]{SQ-HDM}", "[arb'U]{SQ-Bet}"}},
+		{"119", nil},
+	}
+	for _, tc := range wantPrimaries {
+		p, _ := terminology.QuantityPropertyByCode(tc.code)
+		var got []string
+		for u := range p.All() {
+			if u.Primary {
+				got = append(got, u.UCUM)
+			}
+		}
+		if !slices.Equal(got, tc.want) {
+			t.Errorf("%s primary units = %q, want %q", p.Name(), got, tc.want)
+		}
+	}
+
+	// A property the table lists with no UCUM unit is found, with no units;
+	// a code the table does not list reports absence.
+	if p, ok := terminology.QuantityPropertyByCode("130"); !ok || p.Name() != "Work" || p.Len() != 0 {
+		t.Errorf("QuantityPropertyByCode(130) = %q with %d units, %v; want Work with none, true", p.Name(), p.Len(), ok)
+	}
+	for _, code := range []string{"433", "", "122 "} {
+		if p, ok := terminology.QuantityPropertyByCode(code); ok || p != nil {
+			t.Errorf("QuantityPropertyByCode(%q) = %v, %v; want nil, false", code, p, ok)
+		}
 	}
 }

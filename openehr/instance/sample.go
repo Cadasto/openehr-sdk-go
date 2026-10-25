@@ -54,13 +54,13 @@ func (s sampler) float64() float64 {
 //
 // It falls back to pc.ExampleValue() — silently, and identically on every
 // call — whenever the constraint carries nothing enumerable to sample
-// (unconstrained primitive, pattern-only CString, CDuration) or a drawn
-// candidate fails pc.Validate. Several *bounded* shapes therefore also
-// degrade to the fixed example with no signal: an empty list∩range
-// intersection, a single-value range, a collapsed exclusive-integer
-// window, and the exclusive-lower real edge (a [lo,hi) draw can land on
-// the excluded bound). Output stays valid, but RandomFill can equal
-// ExampleFill for such a leaf. REQ-107.
+// (unconstrained primitive, pattern-only CString, CDuration, a CDate,
+// CTime or CDateTime with a Range) or a drawn candidate fails pc.Validate.
+// Several *bounded* shapes therefore also degrade to the fixed example
+// with no signal: an empty list∩range intersection, a single-value range,
+// a collapsed exclusive-integer window, and the exclusive-lower real edge
+// (a [lo,hi) draw can land on the excluded bound). Output stays valid, but
+// RandomFill can equal ExampleFill for such a leaf. REQ-107.
 func sampleValue(pc constraints.PrimitiveConstraint, s sampler) any {
 	v := sampleByConstraint(pc, s)
 	if v == nil || len(pc.Validate(v)) != 0 {
@@ -151,20 +151,38 @@ func sampleByConstraint(pc constraints.PrimitiveConstraint, s sampler) any {
 		return constraints.QuantityValue{Magnitude: mag, Units: u.Units, Precision: -1}
 
 	case constraints.CDate:
-		return s.randomDate()
+		return firstAccepted(pc, c.Range.IsBounded(), s.randomDate())
 	case constraints.CTime:
-		return s.randomTime()
+		return firstAccepted(pc, c.Range.IsBounded(), s.randomTime())
 	case constraints.CDateTime:
-		return s.randomDateTime()
+		return firstAccepted(pc, c.Range.IsBounded(), s.randomDateTime())
 	}
 	// CDuration and any unknown constraint: ExampleValue sentinel.
 	return nil
 }
 
+// firstAccepted returns the first of forms, one drawn value written in
+// fewer fields each time, that pc accepts, so a draw is written to the
+// pattern of a CDate, CTime or CDateTime. It returns nil when
+// ranged, since the draw does not see the range, or when pc accepts no
+// form; the caller then falls back to pc.ExampleValue, which keeps to both.
+func firstAccepted(pc constraints.PrimitiveConstraint, ranged bool, forms []string) any {
+	if ranged {
+		return nil
+	}
+	for _, f := range forms {
+		if len(pc.Validate(f)) == 0 {
+			return f
+		}
+	}
+	return nil
+}
+
 // quantityUnitEntry returns the first entry whose units equal name.
 // An empty name, or a name the constraint does not list, is not an entry:
-// the caller then draws a unit of its own. DvQuantity.Validate checks
-// the first entry for a unit, so this is that entry.
+// the caller then draws a unit of its own. DvQuantity.Validate accepts a
+// value inside any entry for its units, so drawing inside the first one
+// gives a valid value.
 func quantityUnitEntry(c constraints.DvQuantity, name string) (constraints.QuantityUnit, bool) {
 	if name == "" {
 		return constraints.QuantityUnit{}, false
@@ -281,19 +299,38 @@ func filterFloats(list []float64, r constraints.NumericRange) []float64 {
 	return out
 }
 
-// randomDate returns an extended ISO 8601 date the CDate validator
-// accepts. Day is capped at 28 so every month is valid.
-func (s sampler) randomDate() string {
-	return fmt.Sprintf("%04d-%02d-%02d", 2000+s.intN(31), 1+s.intN(12), 1+s.intN(28))
+// randomDate draws an extended ISO 8601 date the CDate validator accepts
+// and returns it with its day, then without it, then as its year alone.
+// Day is capped at 28 so every month is valid.
+func (s sampler) randomDate() []string {
+	y, m, d := 2000+s.intN(31), 1+s.intN(12), 1+s.intN(28)
+	return []string{
+		fmt.Sprintf("%04d-%02d-%02d", y, m, d),
+		fmt.Sprintf("%04d-%02d", y, m),
+		fmt.Sprintf("%04d", y),
+	}
 }
 
-// randomTime returns an extended ISO 8601 time (hh:mm:ss).
-func (s sampler) randomTime() string {
-	return fmt.Sprintf("%02d:%02d:%02d", s.intN(24), s.intN(60), s.intN(60))
+// randomTime draws an extended ISO 8601 time and returns it as hh:mm:ss,
+// hh:mm and hh, each first without a zone and then with Z.
+func (s sampler) randomTime() []string {
+	h, m, sec := s.intN(24), s.intN(60), s.intN(60)
+	var out []string
+	for _, t := range []string{fmt.Sprintf("%02d:%02d:%02d", h, m, sec), fmt.Sprintf("%02d:%02d", h, m), fmt.Sprintf("%02d", h)} {
+		out = append(out, t, t+"Z")
+	}
+	return out
 }
 
-// randomDateTime returns an RFC 3339 timestamp (UTC) the CDateTime
-// validator accepts.
-func (s sampler) randomDateTime() string {
-	return fmt.Sprintf("%sT%sZ", s.randomDate(), s.randomTime())
+// randomDateTime draws an RFC 3339 timestamp (UTC) the CDateTime
+// validator accepts and returns it first, then with fewer fields: its time
+// as randomTime writes it, with Z first, and then its date alone as
+// randomDate writes it.
+func (s sampler) randomDateTime() []string {
+	dates, times := s.randomDate(), s.randomTime()
+	var out []string
+	for i := 0; i < len(times); i += 2 {
+		out = append(out, dates[0]+"T"+times[i+1], dates[0]+"T"+times[i])
+	}
+	return append(out, dates...)
 }

@@ -193,14 +193,14 @@ failure, not a deviation.
 - **`listOpen`** — emitted (`true`) for an open coded list: an empty constraint list, or
   a DV_CODED_TEXT with a DV_TEXT alternative (the free-text `other` input admits values
   beyond the enumerated codes), mirroring the reference (pinned by `TestInputParity`).
-- **Oracle input deltas (pre-REQ-116, now visible)** — extending `TestInputParity` to
-  the two oracles in Phase 4 surfaced a gap this builder always had, unrelated to node
-  naming: where the reference enumerates a constrained DV_TEXT's allowed values in the
-  input `list`, this builder emits the bare `:TEXT` input. **Corona 20 deltas, GECCO 1**
-  (`problem_diagnosis…/items[at0002]/value`, golden 2 inputs vs 1 — the plan predicted
-  this one); `constrain_test` remains 104/104 exact. Structural parity is exact for all
-  three, so only the input signature differs. The counts are pinned per fixture in
-  `TestInputParity`, so the gap must shrink deliberately and cannot grow unnoticed.
+- **Oracle input deltas** — a constrained DV_TEXT's TEXT input carries the C_STRING
+  `list` and `listOpen` as the reference does, which closed 19 of Corona's 20 deltas.
+  **Corona 1 delta, GECCO 1** remain: Corona's `medication_use` node `at0027` (golden
+  `code:TEXT` + `value:TEXT`, ours `code:CODED_TEXT` open) and GECCO's
+  `problem_diagnosis…/items[at0002]/value` (golden 2 inputs vs 1); `constrain_test`
+  remains 104/104 exact. Structural parity is exact for all three, so only the input
+  signature differs. The counts are pinned per fixture in `TestInputParity`, so the gap
+  must shrink deliberately and cannot grow unnoticed.
 
 ## Scope
 

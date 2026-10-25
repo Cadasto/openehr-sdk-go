@@ -189,20 +189,25 @@ func TestValidateComposition_REQ102_REQ112_FloorTakesBoundNames(t *testing.T) {
 }
 
 // REQ-102 — the template may report one code twice at one path for two
-// clauses, and both stay: a participations that is present and empty breaks
-// the attribute's own cardinality, and the PARTICIPATION child it requires
+// clauses, and both stay: a participations the template requires by its
+// existence that is present and empty breaks that existence and the
+// attribute's own cardinality, and the PARTICIPATION child it requires
 // once, which declares no id and is written at the attribute's path, occurs
-// too seldom.
+// too seldom. The existence keeps the list's own cardinality in the count:
+// on a list the template leaves optional, an empty list reads as an absent
+// one, whose cardinality is not reported (§ A mandatory child under an
+// optional list).
 func TestValidateComposition_REQ102_TemplateRepeatsStay(t *testing.T) {
 	c := mustCompileSyntheticOPT(t, strings.Replace(
 		strings.Replace(participationsOPT, "<lower>0</lower>", "<lower>1</lower>", 1),
 		"<rm_attribute_name>participations</rm_attribute_name>",
 		"<rm_attribute_name>participations</rm_attribute_name>"+
+			"<existence>"+fiInterval("1", "1")+"</existence>"+
 			"<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique>"+
 			"<interval><lower_unbounded>false</lower_unbounded><upper_unbounded>true</upper_unbounded><lower>1</lower></interval></cardinality>",
 		1))
 	r := validation.ValidateComposition(participationsComposition([]rm.Participation{}...), c)
-	want := []string{"cardinality /context/participations", "cardinality /context/participations"}
+	want := []string{"cardinality /context/participations", "cardinality /context/participations", "required /context/participations"}
 	if !equalKeys(r.Issues, want) {
 		t.Errorf("ValidateComposition issues = %q, want %q", issueKeys(r.Issues), want)
 	}

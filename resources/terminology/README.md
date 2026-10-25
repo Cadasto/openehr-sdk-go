@@ -1,6 +1,6 @@
 # `resources/terminology/` — the pinned openEHR Terminology
 
-The openEHR Foundation's computable form of the **openEHR Terminology**, in two files:
+The openEHR Foundation's computable form of the **openEHR Terminology**, in three files:
 
 - `openehr_terminology.xml`: the `openehr` terminology's **groups** (*audit change type*,
   *version lifecycle state*, *setting*, *participation mode*, *composition category*, …) and
@@ -10,8 +10,12 @@ The openEHR Foundation's computable form of the **openEHR Terminology**, in two 
   beside them: *countries* (ISO 3166-1), *character sets* (IANA), *languages* (ISO 639-1) and
   *media types* (IANA). They are the Foundation's snapshot for the release, not the live ISO
   and IANA registers.
+- `PropertyUnitData.xml`: the **property-unit table**. For each code of the *property* group
+  (`openehr::122` *Length*, `openehr::125` *Pressure*, …) it lists the units of measure that
+  measure it, most with their UCUM code, and marks the primary ones. A `C_DV_QUANTITY`
+  constraint's `property` names such a code.
 
-The Reference Model's own invariants reference them: `AUDIT_DETAILS.Change_type_valid`,
+The Reference Model's own invariants reference the first two: `AUDIT_DETAILS.Change_type_valid`,
 `EVENT_CONTEXT.Setting_valid`, `PARTICIPATION.Mode_valid`, `DV_ORDERED.Normal_status_validity`,
 `ENTRY.Language_valid`, and their siblings.
 
@@ -32,11 +36,12 @@ fetched at build time and not looked up in a terminology service at run time. Co
 
 | Property | Value |
 |---|---|
-| Files | `openehr_terminology.xml` (13,860 bytes) · `openehr_external_terminologies.xml` (30,342 bytes) |
-| TERM release | `Release-3.0.0`, both files from the same upstream commit |
-| Root attributes | `openehr_terminology.xml`: `name="openehr" language="en" version="3.0.0" date="2023-03-05"` · `openehr_external_terminologies.xml`: `name="openehr" language="en" version="3.0.0" date="2023-02-11"` |
+| Files | `openehr_terminology.xml` (13,860 bytes) · `openehr_external_terminologies.xml` (30,342 bytes) · `PropertyUnitData.xml` (59,277 bytes) |
+| TERM release | `Release-3.0.0`, all three files from the same upstream commit |
+| Root attributes | `openehr_terminology.xml`: `name="openehr" language="en" version="3.0.0" date="2023-03-05"` · `openehr_external_terminologies.xml`: `name="openehr" language="en" version="3.0.0" date="2023-02-11"` · `PropertyUnitData.xml`: a `PropertyUnits` root with no attributes, in the namespace `http://tempuri.org/PropertyUnits.xsd` |
 | Contents of `openehr_terminology.xml` | **17** groups · **3** code sets (issuer `openehr`) · **249** concepts · **19** code-set codes |
 | Contents of `openehr_external_terminologies.xml` | **4** code sets · **624** codes: *countries* `ISO_3166-1` (250) · *character sets* `IANA_character-sets` (14) · *languages* `ISO_639-1` (253) · *media types* `IANA_media-types` (107) |
+| Contents of `PropertyUnitData.xml` | **86** properties · **521** units, **493** with a UCUM code (**490** once each within their property; **4** properties have none) · **86** primary units |
 
 The exact upstream commit, each file's `sha256` and the fetch timestamp
 are recorded in [`MANIFEST.txt`](MANIFEST.txt), and nowhere else. The sync
@@ -46,19 +51,24 @@ with `make terminology-check` (see [the sync script](../../scripts/sync-terminol
 ## Provenance
 
 - **Source:** [`openEHR/specifications-TERM`](https://github.com/openEHR/specifications-TERM),
-  files `computable/XML/en/openehr_terminology.xml` and
-  `computable/XML/openehr_external_terminologies.xml` (the second sits directly under
-  `computable/XML/`, not under a language directory).
+  files `computable/XML/en/openehr_terminology.xml`,
+  `computable/XML/openehr_external_terminologies.xml` and
+  `computable/XML/PropertyUnitData.xml` (the last two sit directly under `computable/XML/`,
+  not under a language directory).
 - **Copy fidelity:** a byte-identical copy of each file at the pinned commit. `sync`
-  resolves the ref to one concrete commit sha and downloads both files at that sha, so two
-  syncs of the same ref produce the same bytes and the two files never come from different
+  resolves the ref to one concrete commit sha and downloads every file at that sha, so two
+  syncs of the same ref produce the same bytes and the files never come from different
   commits.
 - **Language:** the `en` variant of `openehr_terminology.xml` only. The sibling translations
   upstream (`es`, `ja`, `pt`) carry the same code structure with localised rubrics and are
-  intentionally not vendored. `openehr_external_terminologies.xml` has no translations.
+  intentionally not vendored. `openehr_external_terminologies.xml` and `PropertyUnitData.xml`
+  have no translations.
 - **Letter case:** the generated accessor matches a code of the ISO and IANA sets ignoring
   ASCII letter case, as those registers do, and a code of an openEHR-issued set exactly. The
   generator refuses an ISO or IANA set that lists two codes differing only in letter case.
+  A UCUM code of the property-unit table matches exactly, since UCUM codes are case-sensitive.
+- **White space:** the generator takes a UCUM code trimmed, which changes one value of the
+  pin: statfarad's ` 11126.10-16F` under `openehr::501` *Electric capacitance* becomes `11126.10-16F`.
 
 It lives in-tree rather than behind an upstream URL for the same three reasons the
 [BMM pins](../bmm/README.md) do:
@@ -73,8 +83,8 @@ It lives in-tree rather than behind an upstream URL for the same three reasons t
 
 | Consumer | Relationship |
 |---|---|
-| `openehr/terminology` | The generated, stdlib-only accessor. It exposes every group and code set of this pin as typed, closed, source-ordered values: groups with code → rubric, rubric → code, and membership lookups; code sets with membership lookups and the issuer and external id the pin gives each; plus the pinned release version (§ REQ-034). |
-| `cmd/termgen` | The generator: reads both files of this pin, emits those tables. `make termgen` regenerates them; `make termgen-check` fails the gate when they drift from either file (the [REQ-042](../../docs/specifications/bmm-conformance.md#req-042--generated-code-drift-detected) rule). |
+| `openehr/terminology` | The generated, stdlib-only accessor. It exposes every group and code set of this pin as typed, closed, source-ordered values: groups with code → rubric, rubric → code, and membership lookups; code sets with membership lookups and the issuer and external id the pin gives each; plus the pinned release version; and the property-unit table, with each property's UCUM units in source order, the primary ones marked (§ REQ-034). |
+| `cmd/termgen` | The generator: reads the three files of this pin, emits those tables. `make termgen` regenerates them; `make termgen-check` fails the gate when they drift from any of the files (the [REQ-042](../../docs/specifications/bmm-conformance.md#req-042--generated-code-drift-detected) rule). |
 
 The generator and the accessor land with the rest of the REQ-034 work; this pin is their
 only input. Nothing else in the SDK parses these XML files at build or run time.
@@ -86,15 +96,15 @@ TERMINOLOGY_REF=Release-X.Y.Z make terminology-sync   # pin a named TERM release
 make terminology-drift                                # integrity + "is there a newer release?"
 ```
 
-`terminology-sync` rewrites both XML files and `MANIFEST.txt`, then runs `make termgen` so
-the generated tables follow the pin. It downloads both files before it replaces either, so
-a failed fetch leaves the old pair in place. A bump is one explicit, reviewable commit that
-moves both files together:
+`terminology-sync` rewrites the three XML files and `MANIFEST.txt`, then runs `make termgen` so
+the generated tables follow the pin. It downloads every file before it replaces any, so
+a failed fetch leaves the old files in place. A bump is one explicit, reviewable commit that
+moves them together:
 
 1. Run the sync at the new release tag.
-2. Review the diffs: both XML files and the regenerated tables. A code or rubric that
-   changed meaning, or a group or code set that lost a member, is a behaviour change; treat
-   it as one.
+2. Review the diffs: the XML files and the regenerated tables. A code or rubric that
+   changed meaning, a group or code set that lost a member, or a property that lost a unit,
+   is a behaviour change; treat it as one.
 3. Update the pin table in this README (release tag, byte sizes, root attributes, counts) and
    the release tag in the [`resources/README.md`](../README.md) inventory row. The manifest
    cannot update either of them.
@@ -111,9 +121,9 @@ make terminology-check   # offline sha256 against MANIFEST.txt; run by `make ci`
 ```
 
 `terminology-check` needs no network and no `curl`/`jq`, only `sha256sum` or `shasum`,
-so it is safe inside the gate. It checks both files. It reports `FAILED … (sha256 mismatch)`
+so it is safe inside the gate. It checks every file. It reports `FAILED … (sha256 mismatch)`
 on any edit to a vendored file, `MISSING` when a file is gone, `NOT PINNED` when the manifest
-has no hash line for one of the two files, and `UNTRACKED` for an XML in this directory that
+has no hash line for one of the three files, and `UNTRACKED` for an XML in this directory that
 the manifest does not list. **Never hand-edit the pin.** Its value lies in being byte-identical to
 upstream ([AGENTS.md](../../AGENTS.md) § Gotchas); re-sync instead.
 

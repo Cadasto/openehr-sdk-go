@@ -73,8 +73,9 @@
 //     denominator of 1 on a unitary proportion and of 100 on a percent,
 //     whole-number operands on a fraction or an integer fraction, and no
 //     denominator of 0;
-//   - DV_INTERVAL numeric bounds in order, and no side both unbounded and
-//     included;
+//   - DV_INTERVAL bounds that are strictly comparable (of one class, two
+//     DV_QUANTITY in one unit, two DV_PROPORTION of one type) and in order,
+//     and no side both unbounded and included;
 //   - an ISO 8601 value on DV_DATE, DV_TIME, DV_DATE_TIME and DV_DURATION
 //     (an empty value is a missing mandatory attribute, reported once, as
 //     `required`);
@@ -84,6 +85,9 @@
 //     two present but empty);
 //   - a DV_TEXT mappings list that is not empty when present, and a
 //     TERM_MAPPING match from its closed set;
+//   - a COMPOSITION content, EVENT_CONTEXT participations, INSTRUCTION
+//     activities, SECTION items and ATTESTATION items list that is not
+//     empty when present, and an event or a summary on every HISTORY;
 //   - archetype_details on every archetype root (COMPOSITION, EHR_STATUS,
 //     EHR_ACCESS, and every PARTY and ENTRY), and a non-empty archetype_id
 //     and rm_version on every ARCHETYPED;
@@ -155,8 +159,9 @@
 // built with no options.
 //
 // [WithLimits] sets the two [Limits] of the walk: the nesting depth below
-// which it does not descend (256 by default) and the number of values it
-// visits in one call (100,000 by default). They stop a value built in Go
+// which it does not descend (256 by default) and the number of visits it
+// makes in one call (100,000 by default), where a value tried under several
+// template nodes counts once for each. They stop a value built in Go
 // that nests without end or holds itself, and a decoded document can reach
 // either: a large one the visit limit, a deeply nested one the depth limit.
 // A walk that reaches the depth limit reports one max_depth issue, at the

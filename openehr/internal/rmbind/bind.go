@@ -2,10 +2,12 @@
 // an operational template allows under one attribute, and the type tests
 // that rule reads.
 //
-// The validator (openehr/validation) binds each value it walks by [Bind],
-// and the composition builder (openehr/composition) binds each value Set is
-// given by the same function, so the builder binds an RM value to the node
-// the validator binds it to. The builder accepts less than [Bind] admits: it
+// The composition builder (openehr/composition) binds each value Set is
+// given by [Bind]. The validator (openehr/validation) takes the nodes of the
+// tier Bind chooses from ([Tier]) and binds a value within it to the first
+// node under whose constraints the value validates, so a value built under
+// the node Bind returns, which validates there, binds to that node in both.
+// The builder accepts less than [Bind] admits: it
 // takes only RM values, where the validator also binds a Go primitive at a
 // leaf, and it checks on its own that the RM attribute at the path can hold
 // the value. The validator's RM type match also reads
@@ -81,22 +83,52 @@ func describe(v any) string {
 // binds the DURATION node.
 func Bind(nodes []*tcimpl.CompiledNode, v any, eligible func(*tcimpl.CompiledNode) bool) *tcimpl.CompiledNode {
 	gotType := describe(v)
-	for _, c := range nodes {
-		if eligible(c) && namesRMType(c, gotType, v) {
-			return c
-		}
-	}
-	for _, c := range nodes {
-		if eligible(c) && wrapsShortName(c, gotType) {
-			return c
-		}
-	}
-	for _, c := range nodes {
-		if eligible(c) && conformsToChild(c, gotType, v) {
-			return c
+	for tier := range tierCount {
+		for _, c := range nodes {
+			if eligible(c) && admits(tier, c, gotType, v) {
+				return c
+			}
 		}
 	}
 	return nil
+}
+
+// Tier appends to dst the nodes, among those eligible accepts, of the first
+// of the three tiers of [Bind] that admits the value v, in the order of
+// nodes, and returns the extended slice; it appends none when no node admits
+// v. Its first node is the one Bind returns. The builder takes that node; the
+// validator binds v within the tier by walking it under each node in turn.
+func Tier(dst, nodes []*tcimpl.CompiledNode, v any, eligible func(*tcimpl.CompiledNode) bool) []*tcimpl.CompiledNode {
+	gotType := describe(v)
+	from := len(dst)
+	for tier := range tierCount {
+		for _, c := range nodes {
+			if eligible(c) && admits(tier, c, gotType, v) {
+				dst = append(dst, c)
+			}
+		}
+		if len(dst) > from {
+			break
+		}
+	}
+	return dst
+}
+
+// tierCount is the number of binding tiers [admits] tests.
+const tierCount = 3
+
+// admits reports whether the node c admits the value v of RM type gotType
+// ([describe]) in the binding tier numbered tier, from 0, of the three
+// [Bind] lists: the one rule Bind and [Tier] both apply.
+func admits(tier int, c *tcimpl.CompiledNode, gotType string, v any) bool {
+	switch tier {
+	case 0:
+		return namesRMType(c, gotType, v)
+	case 1:
+		return wrapsShortName(c, gotType)
+	default:
+		return conformsToChild(c, gotType, v)
+	}
 }
 
 // namesRMType reports whether the node c names the value val's own RM type,

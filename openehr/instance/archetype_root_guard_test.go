@@ -377,26 +377,36 @@ func TestREQ107_UnnamedArchetypeRootIsRefused(t *testing.T) {
 // and Generate does not refuse it with ErrArchetypeIDMissing. A CLUSTER's
 // items, which the BMM marks mandatory, is a control: written so, it still
 // ends with one member, the placeholder ELEMENT the RM defaults put in an
-// empty CLUSTER's items after the walk. The root passes the RM floor and
-// the template validator, under every policy, both value fills and both
-// compile modes. TestREQ107_SingleAttributeRMListTheLookupRequires checks
-// that a list the BMM marks mandatory is not skipped.
+// empty CLUSTER's items after the walk. The root passes the RM floor under
+// every policy, both value fills and both compile modes, and the template
+// validator but for one finding: COMPOSITION.content and SECTION.items are
+// lists the RM makes non-empty once present, so the template's existence
+// asks them for a member (REQ-102 An existence lower bound alone asks for
+// no member), and the list left with none draws the template's `required`
+// there, as REQ-107 Exceptions and known gaps says of such a list.
+// TestREQ107_SingleAttributeRMListTheLookupRequires checks that a list the
+// BMM marks mandatory is not skipped.
 func TestREQ107_SingleAttributeRMListGetsNoMember(t *testing.T) {
 	cases := []struct {
 		name  string
 		opt   string
 		check func(t *testing.T, call string, out any)
+		// required is the path of the template's one `required`, empty
+		// for none.
+		required string
 	}{
 		{
-			name:  "COMPOSITION.content",
-			opt:   guardOPT(guardCompositionID, guardSingle("content", guardExistence11)),
-			check: checkNoContent,
+			name:     "COMPOSITION.content",
+			opt:      guardOPT(guardCompositionID, guardSingle("content", guardExistence11)),
+			check:    checkNoContent,
+			required: "/content",
 		},
 		{
 			name: "SECTION.items",
 			opt: guardOPT(guardCompositionID, guardMultiple("content", guardExistence11,
 				guardChild("C_COMPLEX_OBJECT", "SECTION", "at0001", guardOccurrences11, "",
 					guardSingle("items", guardExistence11)))),
+			required: "/content[at0001]/items",
 			check: func(t *testing.T, call string, out any) {
 				t.Helper()
 				section, ok := firstContent(t, call, out).(*rm.Section)
@@ -437,7 +447,16 @@ func TestREQ107_SingleAttributeRMListGetsNoMember(t *testing.T) {
 						t.Errorf("ValidateRM issues %+v, want none", r.Issues)
 					}
 					for _, iss := range templateErrors(out, c) {
+						if tc.required != "" && iss.Path == tc.required && iss.Code == "required" &&
+							iss.Layer == validation.LayerTemplate && iss.Rule == "existence" {
+							continue
+						}
 						t.Errorf("template validator: %s @ %s: %s", iss.Code, iss.Path, iss.Detail)
+					}
+					if tc.required != "" && !slices.ContainsFunc(templateErrors(out, c), func(iss validation.Issue) bool {
+						return iss.Path == tc.required && iss.Code == "required"
+					}) {
+						t.Errorf("template validator reports no required @ %s, want the template's existence there", tc.required)
 					}
 				})
 			}

@@ -3,6 +3,7 @@ package instance
 import (
 	"fmt"
 	mrand "math/rand/v2"
+	"slices"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
@@ -310,5 +311,73 @@ func TestSamplerNonPositiveLimit(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestSampleValue_REQ103_TemporalPatterns covers REQ-107 with the temporal
+// patterns and ranges of REQ-103: a date, time or date-time draw is written
+// to the constraint's pattern, so it validates and still varies, rather than
+// falling back to the fixed example; a range falls back to the example,
+// which keeps to it. Each row gives the lengths a draw written to its
+// pattern may have.
+func TestSampleValue_REQ103_TemporalPatterns(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		c       constraints.PrimitiveConstraint
+		lengths []int
+	}{
+		{"date, day not allowed", constraints.CDate{Pattern: "yyyy-??-XX"}, []int{7}},
+		{"date, full", constraints.CDate{Pattern: "yyyy-mm-dd"}, []int{10}},
+		{"time, no seconds", constraints.CTime{Pattern: "hh:mm:XX"}, []int{5}},
+		{"time, zone required", constraints.CTime{Pattern: "hh:mm:ss+hh:mm"}, []int{9}},
+		{"date-time, full", constraints.CDateTime{Pattern: "yyyy-mm-ddTHH:MM:SS"}, []int{20}},
+		{"date-time, optional seconds", constraints.CDateTime{Pattern: "yyyy-mm-ddTHH:??:??"}, []int{20}},
+		{"date-time, no seconds", constraints.CDateTime{Pattern: "yyyy-mm-ddThh:mm:XX"}, []int{17}},
+		{"date-time, no time", constraints.CDateTime{Pattern: "yyyy-mm-ddTXX:XX:XX"}, []int{10}},
+		{"time, zone mandatory", constraints.CTime{TimezoneValidity: constraints.ValidityMandatory}, []int{9}},
+		{"time, zone disallowed", constraints.CTime{TimezoneValidity: constraints.ValidityDisallowed}, []int{8}},
+		{"date-time, zone mandatory", constraints.CDateTime{TimezoneValidity: constraints.ValidityMandatory}, []int{20}},
+		{"date-time, zone disallowed", constraints.CDateTime{TimezoneValidity: constraints.ValidityDisallowed}, []int{19}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			vals := draws(tc.c, newSampler(mrand.NewPCG(21, 22)), 16)
+			for _, v := range vals {
+				s, ok := v.(string)
+				if !ok {
+					t.Fatalf("draw is %T, want string", v)
+				}
+				if got := tc.c.Validate(s); len(got) != 0 {
+					t.Errorf("draw %q fails its own Validate: %v", s, got)
+				}
+				if !slices.Contains(tc.lengths, len(s)) {
+					t.Errorf("draw %q has length %d, want one of %v, a value written to the pattern", s, len(s), tc.lengths)
+				}
+			}
+			if n := distinct(vals); n < 2 {
+				t.Errorf("16 draws gave %d distinct values, want them to vary", n)
+			}
+		})
+	}
+
+	ranged := []constraints.PrimitiveConstraint{
+		constraints.CDate{Range: constraints.TemporalRange{Lower: "2004-05-20", Upper: "2004-06-02", LowerInclusive: true, UpperInclusive: true}},
+		constraints.CTime{Pattern: "hh:mm:XX", Range: constraints.TemporalRange{Lower: "09:30:00", LowerInclusive: true, UpperUnbounded: true}},
+		constraints.CDateTime{Range: constraints.TemporalRange{LowerUnbounded: true, Upper: "2004-01-01T00:00:00"}},
+		constraints.CDuration{Pattern: "PY", Range: constraints.TemporalRange{Lower: "P0Y", Upper: "P150Y", LowerInclusive: true, UpperInclusive: true}},
+		constraints.CTime{TimezoneValidity: constraints.ValidityMandatory, Range: constraints.TemporalRange{Lower: "13:30:00+02:00", Upper: "13:45:00+02:00", LowerInclusive: true, UpperInclusive: true}},
+	}
+	for _, c := range ranged {
+		want := c.ExampleValue()
+		for _, v := range draws(c, newSampler(mrand.NewPCG(23, 24)), 4) {
+			if v != want {
+				t.Errorf("%#v: draw %#v, want the example %#v", c, v, want)
+			}
+			if got := c.Validate(v); len(got) != 0 {
+				t.Errorf("%#v: draw %#v fails its own Validate: %v", c, v, got)
+			}
+		}
 	}
 }

@@ -2,6 +2,7 @@ package constraints
 
 import (
 	"fmt"
+	"slices"
 )
 
 // QuantityValue is the runtime value shape accepted by
@@ -27,28 +28,52 @@ type QuantityUnit struct {
 // DvQuantity constrains an RM DV_QUANTITY value (C_DV_QUANTITY).
 // Units enumerates the allowed (units, range) combinations; the
 // value must match one of them on units and lie inside that entry's
-// magnitude range. Property is the optional terminology binding for
-// the measured quantity (e.g. "blood pressure"); it is exposed for
-// inspection but Validate does not enforce it.
+// magnitude range. Property is the optional binding of the physical
+// property the quantity measures, such as openehr::125 (pressure).
+//
+// PropertyUnits lists the UCUM units that property admits, its primary
+// units first and each part in source order. The OPT parser fills it from
+// the openEHR property-unit table (TERM PropertyUnitData.xml, exposed by
+// openehr/terminology) when Property is an openehr code the table lists,
+// and leaves it empty otherwise. [DvQuantity.Validate] checks the units
+// against it only when Units is empty: a Units list takes precedence, so a
+// listed unit the property does not admit is accepted.
 type DvQuantity struct {
-	Units    []QuantityUnit
-	Property *CodedTermRef
+	Units         []QuantityUnit
+	Property      *CodedTermRef
+	PropertyUnits []string
 }
 
 func (DvQuantity) isPrimitive() {}
 
 // ExampleValue returns a minimal-valid [QuantityValue].
-// The first entry of Units drives the example: the magnitude comes from
-// the entry's range (lower bound when set; midpoint or zero otherwise)
-// and the units are copied verbatim. It falls back to QuantityValue{0, "1"}
-// when the constraint is open-ended (any units / any magnitude).
+// An entry of Units gives the example its units, copied verbatim, and a
+// magnitude from the entry's range (lower bound when set; midpoint or zero
+// otherwise). The example is that of the first entry whose range admits
+// that magnitude, or the first entry's when none does, as when every range
+// is inverted. With no Units, the example is magnitude 0 in the first
+// entry of PropertyUnits, a primary unit of the property when it has one.
+// It falls back to QuantityValue{0, "1"} when the constraint is open-ended
+// (any units / any magnitude).
 func (c DvQuantity) ExampleValue() any {
 	if len(c.Units) == 0 {
+		if len(c.PropertyUnits) > 0 {
+			return QuantityValue{Magnitude: 0, Units: c.PropertyUnits[0], Precision: -1}
+		}
 		return QuantityValue{Magnitude: 0, Units: "1", Precision: -1}
 	}
-	u := c.Units[0]
-	mag := exampleMagnitude(u.Magnitude)
-	return QuantityValue{Magnitude: mag, Units: u.Units, Precision: -1}
+	for _, u := range c.Units {
+		if q := u.example(); len(u.violations(q)) == 0 {
+			return q
+		}
+	}
+	return c.Units[0].example()
+}
+
+// example returns the quantity in u's units whose magnitude
+// [exampleMagnitude] picks from u's range, its precision unknown.
+func (u QuantityUnit) example() QuantityValue {
+	return QuantityValue{Magnitude: exampleMagnitude(u.Magnitude), Units: u.Units, Precision: -1}
 }
 
 // exampleMagnitude picks an in-range float from r, for a quantity
@@ -81,17 +106,20 @@ func exampleMagnitude(r NumericRange) float64 {
 
 // Validate accepts a [QuantityValue]. Anything else returns
 // CodeWrongType. When Units is empty the constraint accepts any
-// units / magnitude: the OPT may have omitted a list to mark the
-// node "DV_QUANTITY without further constraint". When several entries
-// have the value's units, any one whose ranges admit the value is
-// enough; when none does, the violations name the first of them.
+// magnitude, and any units the property admits: units outside a
+// non-empty PropertyUnits are a CodeUnitUnknown, and with PropertyUnits
+// empty too any units are accepted, the OPT having marked the node
+// "DV_QUANTITY without further constraint". A non-empty Units decides
+// the units alone. When several entries have the value's units, any one
+// whose ranges admit the value is enough; when none does, the violations
+// name the first of them.
 func (c DvQuantity) Validate(value any) []Violation {
 	q, ok := value.(QuantityValue)
 	if !ok {
 		return []Violation{{Code: CodeWrongType, Detail: fmt.Sprintf("expected QuantityValue, got %T", value)}}
 	}
 	if len(c.Units) == 0 {
-		return nil
+		return c.propertyViolations(q)
 	}
 	// Any entry with the supplied units that admits the value is
 	// enough. When none does, report the ranges of the first one.
@@ -122,6 +150,24 @@ func (c DvQuantity) Validate(value any) []Violation {
 	return []Violation{{
 		Code:   CodeUnitUnknown,
 		Detail: fmt.Sprintf("units not in allowed %v", allowed),
+		Value:  Redact(q.Units),
+	}}
+}
+
+// propertyViolations checks the units of q against PropertyUnits, for a
+// constraint with no Units list. Matching is exact, as UCUM codes are
+// case-sensitive.
+func (c DvQuantity) propertyViolations(q QuantityValue) []Violation {
+	if len(c.PropertyUnits) == 0 || slices.Contains(c.PropertyUnits, q.Units) {
+		return nil
+	}
+	property := "the property"
+	if c.Property != nil {
+		property = "property " + c.Property.String()
+	}
+	return []Violation{{
+		Code:   CodeUnitUnknown,
+		Detail: fmt.Sprintf("units not among the units %v of %s", c.PropertyUnits, property),
 		Value:  Redact(q.Units),
 	}}
 }

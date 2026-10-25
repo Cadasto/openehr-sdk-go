@@ -2,6 +2,7 @@ package constraints_test
 
 import (
 	"math"
+	"slices"
 	"strings"
 	"testing"
 
@@ -307,6 +308,41 @@ func TestCString_Validate(t *testing.T) {
 	}
 }
 
+// REQ-103 — an open CString list (AOM 1.4 C_STRING.list_open) is not
+// exhaustive, so Validate reports no value outside it, and it still checks
+// the pattern. A closed list still reports a value outside it.
+func TestCString_Validate_REQ103_ListOpen(t *testing.T) {
+	t.Parallel()
+	openWithPattern := constraints.NewCString(`[A-Z][a-z]+`, []string{"Husten"}, "")
+	openWithPattern.ListOpen = true
+	tests := []struct {
+		name  string
+		c     constraints.CString
+		value string
+		want  []constraints.ViolationCode
+	}{
+		{name: "open list, value outside", c: constraints.CString{List: []string{"Husten"}, ListOpen: true}, value: "Schnupfen"},
+		{name: "open list, value inside", c: constraints.CString{List: []string{"Husten"}, ListOpen: true}, value: "Husten"},
+		{name: "closed list, value outside", c: constraints.CString{List: []string{"Husten"}}, value: "Schnupfen", want: []constraints.ViolationCode{constraints.CodeNotInList}},
+		{name: "open list, value outside matches pattern", c: openWithPattern, value: "Schnupfen"},
+		{name: "open list, value outside fails pattern", c: openWithPattern, value: "schnupfen", want: []constraints.ViolationCode{constraints.CodePatternMismatch}},
+		{name: "open list, pattern compiled on first use", c: constraints.CString{Pattern: `[A-Z][a-z]+`, List: []string{"Husten"}, ListOpen: true}, value: "schnupfen", want: []constraints.ViolationCode{constraints.CodePatternMismatch}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var got []constraints.ViolationCode
+			for _, v := range tc.c.Validate(tc.value) {
+				got = append(got, v.Code)
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("CString{Pattern: %q, List: %v, ListOpen: %v}.Validate(%q) codes = %v, want %v",
+					tc.c.Pattern, tc.c.List, tc.c.ListOpen, tc.value, got, tc.want)
+			}
+		})
+	}
+}
+
 // REQ-103 — temporal validators accept exactly the ISO 8601 forms the
 // RM's temporal parse accepts (rm.DVDate.ValidISO8601 and its DV_TIME,
 // DV_DATE_TIME and DV_DURATION siblings), partial dates included, and
@@ -394,6 +430,75 @@ func TestDvQuantity_Validate(t *testing.T) {
 	v = c.Validate("not a quantity")
 	if len(v) != 1 || v[0].Code != constraints.CodeWrongType {
 		t.Errorf("Validate(wrong type) = %v, want CodeWrongType", v)
+	}
+}
+
+// REQ-103 — with no Units list, DvQuantity.Validate refuses units outside
+// the property's, as the specifications-CNF conformance schedule's case
+// CONT-DV_QUANTITY-validate_property does under openehr::122 (length). A
+// Units list takes precedence, so the property is not consulted: the case
+// CONT-DV_QUANTITY-validate_property_units refuses km, a length unit, against
+// the list [cm, m], and a listed unit outside the property is accepted. With
+// neither, any units are accepted. The NULL rows of both cases are the RM's.
+func TestREQ103_DvQuantityPropertyUnits(t *testing.T) {
+	length := &constraints.CodedTermRef{Terminology: "openehr", CodeString: "122"}
+	lengthUnits := []string{"m", "[in_i]/1000", "cm", "km", "mm", "um"}
+	list := func(units ...string) []constraints.QuantityUnit {
+		out := make([]constraints.QuantityUnit, len(units))
+		for i, u := range units {
+			out[i] = constraints.QuantityUnit{Units: u}
+		}
+		return out
+	}
+	tests := []struct {
+		name      string
+		c         constraints.DvQuantity
+		magnitude float64
+		units     string
+		want      bool // accepted
+	}{
+		// CONT-DV_QUANTITY-validate_property.
+		{name: "property, 0.0 mg", c: constraints.DvQuantity{Property: length, PropertyUnits: lengthUnits}, magnitude: 0, units: "mg"},
+		{name: "property, 0.0 cm", c: constraints.DvQuantity{Property: length, PropertyUnits: lengthUnits}, magnitude: 0, units: "cm", want: true},
+		{name: "property, 1.0 cm", c: constraints.DvQuantity{Property: length, PropertyUnits: lengthUnits}, magnitude: 1, units: "cm", want: true},
+		{name: "property, 5.7 cm", c: constraints.DvQuantity{Property: length, PropertyUnits: lengthUnits}, magnitude: 5.7, units: "cm", want: true},
+		{name: "property, 10.0 cm", c: constraints.DvQuantity{Property: length, PropertyUnits: lengthUnits}, magnitude: 10, units: "cm", want: true},
+		// UCUM codes are case-sensitive.
+		{name: "property, 1.0 CM", c: constraints.DvQuantity{Property: length, PropertyUnits: lengthUnits}, magnitude: 1, units: "CM"},
+		// CONT-DV_QUANTITY-validate_property_units.
+		{name: "property and list, 0.0 mg", c: constraints.DvQuantity{Property: length, PropertyUnits: lengthUnits, Units: list("cm", "m")}, magnitude: 0, units: "mg"},
+		{name: "property and list, 0.0 cm", c: constraints.DvQuantity{Property: length, PropertyUnits: lengthUnits, Units: list("cm", "m")}, magnitude: 0, units: "cm", want: true},
+		{name: "property and list, 0.0 km", c: constraints.DvQuantity{Property: length, PropertyUnits: lengthUnits, Units: list("cm", "m")}, magnitude: 0, units: "km"},
+		{name: "property and list, 1.0 cm", c: constraints.DvQuantity{Property: length, PropertyUnits: lengthUnits, Units: list("cm", "m")}, magnitude: 1, units: "cm", want: true},
+		{name: "property and list, 5.7 cm", c: constraints.DvQuantity{Property: length, PropertyUnits: lengthUnits, Units: list("cm", "m")}, magnitude: 5.7, units: "cm", want: true},
+		{name: "property and list, 10.0 cm", c: constraints.DvQuantity{Property: length, PropertyUnits: lengthUnits, Units: list("cm", "m")}, magnitude: 10, units: "cm", want: true},
+		// The list keeps precedence: a listed unit the property does not
+		// admit is accepted.
+		{name: "property and a list naming mg, 1.0 mg", c: constraints.DvQuantity{Property: length, PropertyUnits: lengthUnits, Units: list("mg")}, magnitude: 1, units: "mg", want: true},
+		// No list and no property units: any units.
+		{name: "property the table does not list, 1.0 mg", c: constraints.DvQuantity{Property: &constraints.CodedTermRef{Terminology: "local", CodeString: "at0001"}}, magnitude: 1, units: "mg", want: true},
+		{name: "no constraint, 1.0 furlong", c: constraints.DvQuantity{}, magnitude: 1, units: "furlong", want: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.c.Validate(constraints.QuantityValue{Magnitude: tc.magnitude, Units: tc.units, Precision: -1})
+			if tc.want {
+				if len(got) != 0 {
+					t.Errorf("Validate(%v %s) = %v, want accepted", tc.magnitude, tc.units, got)
+				}
+				return
+			}
+			if len(got) != 1 || got[0].Code != constraints.CodeUnitUnknown {
+				t.Fatalf("Validate(%v %s) = %v, want one CodeUnitUnknown", tc.magnitude, tc.units, got)
+			}
+			// REQ-168: the units travel in Value alone, redacted.
+			if r := got[0].Value.Reveal(); r != tc.units {
+				t.Errorf("Validate(%v %s) Value.Reveal() = %v, want %q", tc.magnitude, tc.units, r, tc.units)
+			}
+			if strings.Contains(got[0].Detail, tc.units) {
+				t.Errorf("Validate(%v %s) Detail = %q repeats the units under validation", tc.magnitude, tc.units, got[0].Detail)
+			}
+		})
 	}
 }
 

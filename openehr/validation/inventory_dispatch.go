@@ -17,6 +17,7 @@ import (
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmtype"
+	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 )
 
@@ -87,6 +88,13 @@ type invariantCheck struct {
 // run on every class.
 const mandatoryCheck = "checkMandatory"
 
+// listMembersCheck is the function that evaluates the rules of the REQ-112
+// Non-empty lists entry, [findings.checkListMembers]. On a class one of them
+// runs on, [inventorySource.build] records the list the rule reads
+// ([listMemberRules]), so the template's existence on that list asks for a
+// member ([classRules.asksForMember]).
+const listMembersCheck = "checkListMembers"
+
 // nodeCheck binds an evaluator that reads the node's value and path.
 func nodeCheck(function string, f func(*findings, any, issuePath)) invariantCheck {
 	return invariantCheck{function: function, run: func(into *findings, n floorNode, _ string) {
@@ -146,31 +154,37 @@ func coveredCheck(function string, _ any) invariantCheck {
 // under which that check reports an operand that is not whole as
 // DV_PROPORTION.Precision_validity.
 var invariantChecks = map[string]invariantCheck{
-	"ARCHETYPED.Rm_version_valid":        nodeCheck("checkArchetyped", (*findings).checkArchetyped),
-	"COMPOSITION.Is_archetype_root":      ruleCheck("checkArchetypeRoot", (*findings).checkArchetypeRoot),
-	"DV_DATE.Value_valid":                ruleCheck("checkTemporalValue", (*findings).checkTemporalValue),
-	"DV_DATE_TIME.Value_valid":           ruleCheck("checkTemporalValue", (*findings).checkTemporalValue),
-	"DV_DURATION.Value_valid":            ruleCheck("checkTemporalValue", (*findings).checkTemporalValue),
-	"DV_INTERVAL.Limits_consistent":      typeCheck("checkDVInterval", (*findings).checkDVInterval),
-	"DV_PROPORTION.Fraction_validity":    nodeCheck("checkDVProportion", (*findings).checkDVProportion),
-	"DV_PROPORTION.Percent_validity":     nodeCheck("checkDVProportion", (*findings).checkDVProportion),
-	"DV_PROPORTION.Precision_validity":   nodeCheck("checkDVProportion", (*findings).checkDVProportion),
-	"DV_PROPORTION.Type_validity":        nodeCheck("checkDVProportion", (*findings).checkDVProportion),
-	"DV_PROPORTION.Unitary_validity":     nodeCheck("checkDVProportion", (*findings).checkDVProportion),
-	"DV_PROPORTION.Valid_denominator":    nodeCheck("checkDVProportion", (*findings).checkDVProportion),
-	"DV_TEXT.Mappings_valid":             nodeCheck("checkTermMappings", (*findings).checkTermMappings),
-	"DV_TIME.Value_valid":                ruleCheck("checkTemporalValue", (*findings).checkTemporalValue),
-	"EHR_ACCESS.Is_archetype_root":       ruleCheck("checkArchetypeRoot", (*findings).checkArchetypeRoot),
-	"EHR_STATUS.Is_archetype_root":       ruleCheck("checkArchetypeRoot", (*findings).checkArchetypeRoot),
-	"ELEMENT.Inv_null_flavour_indicated": nodeCheck("checkElementNullFlavour", (*findings).checkElementNullFlavour),
-	"ENTRY.Is_archetype_root":            ruleCheck("checkArchetypeRoot", (*findings).checkArchetypeRoot),
-	"Interval.Lower_included_valid":      typeCheck("checkDVInterval", (*findings).checkDVInterval),
-	"Interval.Upper_included_valid":      typeCheck("checkDVInterval", (*findings).checkDVInterval),
-	"PARTY.Is_archetype_root":            ruleCheck("checkArchetypeRoot", (*findings).checkArchetypeRoot),
-	"PARTY_IDENTIFIED.Basic_validity":    nodeCheck("checkPartyIdentified", (*findings).checkPartyIdentified),
-	"PARTY_IDENTIFIED.Identifiers_valid": nodeCheck("checkPartyIdentified", (*findings).checkPartyIdentified),
-	"PARTY_IDENTIFIED.Name_valid":        nodeCheck("checkPartyIdentified", (*findings).checkPartyIdentified),
-	"TERM_MAPPING.Match_valid":           nodeCheck("checkTermMapping", (*findings).checkTermMapping),
+	"ARCHETYPED.Rm_version_valid":           nodeCheck("checkArchetyped", (*findings).checkArchetyped),
+	"ATTESTATION.Items_valid":               ruleCheck("checkListMembers", (*findings).checkListMembers),
+	"COMPOSITION.Content_valid":             ruleCheck("checkListMembers", (*findings).checkListMembers),
+	"COMPOSITION.Is_archetype_root":         ruleCheck("checkArchetypeRoot", (*findings).checkArchetypeRoot),
+	"DV_DATE.Value_valid":                   ruleCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"DV_DATE_TIME.Value_valid":              ruleCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"DV_DURATION.Value_valid":               ruleCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"DV_INTERVAL.Limits_consistent":         typeCheck("checkDVInterval", (*findings).checkDVInterval),
+	"DV_PROPORTION.Fraction_validity":       nodeCheck("checkDVProportion", (*findings).checkDVProportion),
+	"DV_PROPORTION.Percent_validity":        nodeCheck("checkDVProportion", (*findings).checkDVProportion),
+	"DV_PROPORTION.Precision_validity":      nodeCheck("checkDVProportion", (*findings).checkDVProportion),
+	"DV_PROPORTION.Type_validity":           nodeCheck("checkDVProportion", (*findings).checkDVProportion),
+	"DV_PROPORTION.Unitary_validity":        nodeCheck("checkDVProportion", (*findings).checkDVProportion),
+	"DV_PROPORTION.Valid_denominator":       nodeCheck("checkDVProportion", (*findings).checkDVProportion),
+	"DV_TEXT.Mappings_valid":                nodeCheck("checkTermMappings", (*findings).checkTermMappings),
+	"DV_TIME.Value_valid":                   ruleCheck("checkTemporalValue", (*findings).checkTemporalValue),
+	"EHR_ACCESS.Is_archetype_root":          ruleCheck("checkArchetypeRoot", (*findings).checkArchetypeRoot),
+	"EHR_STATUS.Is_archetype_root":          ruleCheck("checkArchetypeRoot", (*findings).checkArchetypeRoot),
+	"ELEMENT.Inv_null_flavour_indicated":    nodeCheck("checkElementNullFlavour", (*findings).checkElementNullFlavour),
+	"ENTRY.Is_archetype_root":               ruleCheck("checkArchetypeRoot", (*findings).checkArchetypeRoot),
+	"EVENT_CONTEXT.Participations_validity": ruleCheck("checkListMembers", (*findings).checkListMembers),
+	"HISTORY.Events_valid":                  ruleCheck("checkListMembers", (*findings).checkListMembers),
+	"INSTRUCTION.Activities_valid":          ruleCheck("checkListMembers", (*findings).checkListMembers),
+	"Interval.Lower_included_valid":         typeCheck("checkDVInterval", (*findings).checkDVInterval),
+	"Interval.Upper_included_valid":         typeCheck("checkDVInterval", (*findings).checkDVInterval),
+	"PARTY.Is_archetype_root":               ruleCheck("checkArchetypeRoot", (*findings).checkArchetypeRoot),
+	"PARTY_IDENTIFIED.Basic_validity":       nodeCheck("checkPartyIdentified", (*findings).checkPartyIdentified),
+	"PARTY_IDENTIFIED.Identifiers_valid":    nodeCheck("checkPartyIdentified", (*findings).checkPartyIdentified),
+	"PARTY_IDENTIFIED.Name_valid":           nodeCheck("checkPartyIdentified", (*findings).checkPartyIdentified),
+	"SECTION.Items_valid":                   ruleCheck("checkListMembers", (*findings).checkListMembers),
+	"TERM_MAPPING.Match_valid":              nodeCheck("checkTermMapping", (*findings).checkTermMapping),
 
 	"COMPOSITION.Category_validity":                    codedCheck(&ruleCompositionCategory),
 	"COMPOSITION.Language_valid":                       codedCheck(&ruleCompositionLanguage),
@@ -315,6 +329,9 @@ type classRules struct {
 	coded       []*codedRule
 	owned       []string
 	unevaluated indexSet
+	// lists holds what each rule of the REQ-112 Non-empty lists entry the
+	// class is subject to reads, for [classRules.asksForMember].
+	lists []listMembers
 }
 
 // leavesOut reports whether the required-set check leaves the RM-mandatory
@@ -323,6 +340,31 @@ type classRules struct {
 // registered class has, leave nothing out.
 func (r *classRules) leavesOut(attr string) bool {
 	return r != nil && slices.Contains(r.owned, attr)
+}
+
+// asksForMember reports whether an RM rule of the class makes its list attr
+// hold a member on the node value, so that a template's existence lower
+// bound of 1 or more on the list asks for one (REQ-102 An existence lower
+// bound alone asks for no member): a rule of the REQ-112 Non-empty lists
+// entry the class is subject to reads attr, and, for a rule a second
+// attribute keeps too (HISTORY events and summary), that attribute is
+// absent on value. Nil rules, those of a type no registered class has, ask
+// for none.
+func (r *classRules) asksForMember(value any, attr string) bool {
+	if r == nil {
+		return false
+	}
+	for _, m := range r.lists {
+		if m.list != attr {
+			continue
+		}
+		if m.alternative == "" {
+			return true
+		}
+		_, kept := rmaccess.Single(value, m.alternative)
+		return !kept
+	}
+	return false
 }
 
 // inventoryRules is the RM rules' dispatch, built once from the inventory.
@@ -534,6 +576,9 @@ func (src inventorySource) build() inventoryRules {
 				continue
 			}
 			runs[c.function] = true
+			if c.function == listMembersCheck {
+				r.lists = append(r.lists, listMemberRules[key])
+			}
 			id := c.function
 			if c.perRule {
 				id += " " + key

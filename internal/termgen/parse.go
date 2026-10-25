@@ -1,10 +1,12 @@
 // Package termgen generates the openehr/terminology tables from the pinned
 // openEHR Terminology XML under resources/terminology/: the Foundation's
-// openehr_terminology.xml and openehr_external_terminologies.xml.
+// openehr_terminology.xml, openehr_external_terminologies.xml and
+// PropertyUnitData.xml.
 //
 // It is the terminology counterpart of internal/bmmgen: [Parse] decodes and
-// validates one file of the pin, [Merge] joins the two files into one
-// vocabulary, [Render] emits one gofmt-clean openehr_gen.go, and [Run]
+// validates one of the two terminology files, [Merge] joins them into one
+// vocabulary, [ParsePropertyUnits] decodes and validates the property-unit
+// table, [Render] emits one gofmt-clean openehr_gen.go, and [Run]
 // either writes that file or, in verify mode, reports how it drifts from
 // the pin without touching it. cmd/termgen is the CLI; `make termgen` and
 // `make termgen-check` are the entry points.
@@ -36,16 +38,19 @@ const openEHRIssuer = "openehr"
 // words joined by underscores. It is what makes [GoName]'s mangling total.
 var idPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 
-// Terminology is one parsed file of the pin, or the two files joined by
+// Terminology is one parsed terminology file of the pin, or the two joined by
 // [Merge]: the release metadata plus every code set and group, in source
-// order.
+// order. Properties is the property-unit table of PropertyUnitData.xml, in
+// source order, which [Run] attaches before it renders; [Parse] and [Merge]
+// leave it empty.
 type Terminology struct {
-	Name     string
-	Language string
-	Version  string
-	Date     string
-	CodeSets []CodeSetDef
-	Groups   []GroupDef
+	Name       string
+	Language   string
+	Version    string
+	Date       string
+	CodeSets   []CodeSetDef
+	Groups     []GroupDef
+	Properties []PropertyDef
 }
 
 // CodeSetDef is one <codeset> of the pin: a value set of bare codes with no
@@ -147,7 +152,7 @@ func Parse(r io.Reader) (*Terminology, error) {
 	// encoding/xml stops at the first element, so a second <terminology> or any
 	// trailing element would vanish silently past the sha256 pin. Require the
 	// document to hold exactly one terminology root.
-	if err := expectEOF(dec); err != nil {
+	if err := expectEOF(dec, "terminology"); err != nil {
 		return nil, err
 	}
 
@@ -226,19 +231,20 @@ func Merge(core, external *Terminology) (*Terminology, error) {
 }
 
 // expectEOF reports an error when the decoder holds any further element after
-// the terminology root — a well-formed pin carries exactly one. Trailing
-// whitespace, comments and processing instructions are ignored.
-func expectEOF(dec *xml.Decoder) error {
+// the root element, named root — a well-formed file of the pin carries
+// exactly one. Trailing whitespace, comments and processing instructions are
+// ignored.
+func expectEOF(dec *xml.Decoder, root string) error {
 	for {
 		tok, err := dec.Token()
 		if errors.Is(err, io.EOF) {
 			return nil
 		}
 		if err != nil {
-			return fmt.Errorf("read past the terminology root: %w", err)
+			return fmt.Errorf("read past the %s root: %w", root, err)
 		}
 		if se, ok := tok.(xml.StartElement); ok {
-			return fmt.Errorf("trailing <%s> after the terminology root — the pin must hold exactly one terminology element", se.Name.Local)
+			return fmt.Errorf("trailing <%s> after the %s root — the file must hold exactly one %s element", se.Name.Local, root, root)
 		}
 	}
 }

@@ -35,6 +35,7 @@ var pureImports = map[string]struct {
 	reason string
 	banned []string
 }{
+	"cmp":     {reason: "compares ordered values in memory"},
 	"errors":  {reason: "builds error values in memory"},
 	"fmt":     {reason: "formats strings and errors in memory; Print* write to standard output and Scan* read standard input", banned: []string{"Print", "Printf", "Println", "Scan", "Scanf", "Scanln"}},
 	"regexp":  {reason: "compiles and matches patterns in memory"},

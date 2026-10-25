@@ -10,6 +10,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -35,6 +36,22 @@ import (
 // *ComplexObject whose PrimitiveConstraint is a
 // [constraints.ConstraintRef] carrying its <reference>. A missing or
 // blank reference leaves that constraint with an empty Reference.
+//
+// An attribute named null_flavor on an ELEMENT node, the US spelling some
+// OPTs write, is read as null_flavour, the Reference Model attribute, so
+// its constraint applies there, unless the node also declares
+// null_flavour: null_flavor is then kept as written, and each attribute
+// keeps its own constraint. ParseOPTStrict reads it the same way. Every
+// other attribute name is kept as written, whether or not the RM class
+// has it.
+//
+// Both modes read each identifier without the white space a pretty-printer
+// can put around it, as they read codes and list entries: the xsi:type of
+// an <attributes>, a <children> or an <item>, an rm_attribute_name, an
+// rm_type_name, a node_id, the <value> of an archetype_id or a template_id,
+// and the path of an <annotations>. So "defining_code\n   " is read as
+// defining_code, and an xsi:type that holds only white space reads as an
+// empty one.
 func ParseOPT(r io.Reader) (*OperationalTemplate, error) {
 	return parseOPT(r, false)
 }
@@ -48,8 +65,19 @@ func ParseOPT(r io.Reader) (*OperationalTemplate, error) {
 // Returns ErrUnsupportedNode (wrapped) on the first such occurrence.
 // It also refuses an unparseable C_INTEGER or C_REAL bound, an
 // unparseable C_INTEGER or C_REAL list item, a C_PRIMITIVE_OBJECT
-// with no <item> child, and a CONSTRAINT_REF with no <reference> or
-// a blank one, returning an error that wraps ErrInvalidOPT.
+// with no <item> child, a CONSTRAINT_REF with no <reference> or
+// a blank one, and an <attributes> or <children> inside <definition>,
+// or an <item> of a C_PRIMITIVE_OBJECT, that has no xsi:type in the
+// XML Schema instance namespace
+// (http://www.w3.org/2001/XMLSchema-instance), returning an error that
+// wraps ErrInvalidOPT. That last case covers a missing or empty type
+// and an xsi prefix bound to another namespace: openEHR ITS-XML makes
+// C_ATTRIBUTE, C_OBJECT and C_PRIMITIVE abstract, so each such element
+// must name a concrete type. <definition> itself needs none. ParseOPT
+// reads such an <attributes> as C_SINGLE_ATTRIBUTE, such a <children>
+// as C_ARCHETYPE_ROOT when it carries an archetype id and as
+// C_COMPLEX_OBJECT otherwise, and such an <item> as no constraint, so
+// any constraint its type would have carried is lost.
 //
 // T_ARCHETYPE_ROOT and CONSTRAINT_REF are not unknown values, so
 // strict mode never refuses them as unsupported. It reads
@@ -159,11 +187,15 @@ func parseOPT(r io.Reader, strict bool) (*OperationalTemplate, error) {
 		return nil, fmt.Errorf("%w: missing definition", ErrInvalidOPT)
 	}
 
-	root, err := buildNode(wire.Definition, strict, 0)
+	root, err := buildNode(wire.Definition, strict, 0, &optPath{})
 	if err != nil {
-		// Use %w for the inner error so errors.Is reaches the
-		// builder sentinel (e.g. ErrUnsupportedNode) through the
-		// outer ErrInvalidOPT wrap.
+		// A builder error that already wraps ErrInvalidOPT carries its
+		// text; wrapping it again would print the prefix twice. Any
+		// other gains it here, with %w on both so errors.Is reaches the
+		// builder sentinel (e.g. ErrUnsupportedNode) as well.
+		if errors.Is(err, ErrInvalidOPT) {
+			return nil, err
+		}
 		return nil, fmt.Errorf("%w: %w", ErrInvalidOPT, err)
 	}
 
@@ -233,6 +265,24 @@ type xmlValueWrapper struct {
 	Value string `xml:"value"`
 }
 
+// xmlName is the text of an element, or the value of an XML attribute,
+// that holds an identifier: an xsi:type, an RM attribute or type name, a
+// node id, an archetype id, a template id or the path of an annotation. It
+// is read without its leading and trailing white space, as the parser reads
+// codes and list entries. A pretty-printed OPT can break the line inside
+// such an element, writing "defining_code\n   " for defining_code, and no
+// identifier holds white space at either end, so one that holds only white
+// space reads as empty.
+type xmlName string
+
+// UnmarshalText reads the element's text, or the attribute's value. Like a
+// string field, it gets the element's own character data, without that of
+// any child element.
+func (n *xmlName) UnmarshalText(b []byte) error {
+	*n = xmlName(bytes.TrimSpace(b))
+	return nil
+}
+
 type xmlCodePhrase struct {
 	TerminologyID *xmlValueWrapper `xml:"terminology_id"`
 	CodeString    string           `xml:"code_string"`
@@ -242,16 +292,16 @@ type xmlCodePhrase struct {
 // element. The Type attribute (xsi:type local name) discriminates;
 // the buildNode dispatch interprets which fields are meaningful.
 type xmlCObject struct {
-	Type        string           `xml:"http://www.w3.org/2001/XMLSchema-instance type,attr"`
-	RMTypeName  string           `xml:"rm_type_name"`
-	NodeID      string           `xml:"node_id"`
+	Type        xmlName          `xml:"http://www.w3.org/2001/XMLSchema-instance type,attr"`
+	RMTypeName  xmlName          `xml:"rm_type_name"`
+	NodeID      xmlName          `xml:"node_id"`
 	Occurrences *xmlInterval     `xml:"occurrences"`
 	Attributes  []*xmlCAttribute `xml:"attributes"`
 	// C_ARCHETYPE_ROOT extras — the archetype_id element wraps a
 	// <value> child in the openEHR OPT shape, and so does the optional
 	// template_id Template.xsd allows after it.
-	ArchetypeID     string               `xml:"archetype_id>value"`
-	TemplateID      string               `xml:"template_id>value"`
+	ArchetypeID     xmlName              `xml:"archetype_id>value"`
+	TemplateID      xmlName              `xml:"template_id>value"`
 	TermDefinitions []xmlTermDefSection  `xml:"term_definitions"`
 	TermBindings    []xmlTermBindSection `xml:"term_bindings"`
 	// ARCHETYPE_SLOT extras (raw text — assertion grammar not
@@ -267,10 +317,14 @@ type xmlCObject struct {
 	Range            *xmlNumericInterval    `xml:"range"`
 	PrimitivePattern string                 `xml:"pattern"`
 	PrimitiveList    []xmlPrimitiveListItem `xml:"list"`
+	ListOpen         xmlBoolFlag            `xml:"list_open"`
 	AssumedValue     string                 `xml:"assumed_value"`
 	Property         *xmlCodePhraseRef      `xml:"property"`
 	TerminologyID    *xmlValueWrapper       `xml:"terminology_id"`
 	CodeList         []string               `xml:"code_list"`
+	// TimezoneValidity is the timezone_validity of a C_DATE, C_TIME or
+	// C_DATE_TIME, a VALIDITY_KIND, as written; "" when the OPT omits it.
+	TimezoneValidity string `xml:"timezone_validity"`
 	// Item is the inner constraint of a C_PRIMITIVE_OBJECT wrapper.
 	// Populated only when Type == "C_PRIMITIVE_OBJECT"; the inner
 	// element carries its own xsi:type (`C_BOOLEAN`, `C_INTEGER`,
@@ -318,8 +372,8 @@ type xmlTermBindSection struct {
 }
 
 type xmlCAttribute struct {
-	Type      string       `xml:"http://www.w3.org/2001/XMLSchema-instance type,attr"`
-	Name      string       `xml:"rm_attribute_name"`
+	Type      xmlName      `xml:"http://www.w3.org/2001/XMLSchema-instance type,attr"`
+	Name      xmlName      `xml:"rm_attribute_name"`
 	Existence *xmlInterval `xml:"existence"`
 	// Cardinality is the AOM 1.4 CARDINALITY block on
 	// C_MULTIPLE_ATTRIBUTE. The is_ordered / is_unique flags are
@@ -369,7 +423,7 @@ type xmlAssertion struct {
 // MAY be empty (the schema permits annotations without a path,
 // targeting the OPT as a whole).
 type xmlAnnotation struct {
-	Path  string              `xml:"path,attr"`
+	Path  xmlName             `xml:"path,attr"`
 	Items []xmlAnnotationItem `xml:"items"`
 }
 
@@ -396,7 +450,68 @@ type xmlIdentifiedValue struct {
 
 // --- wire → public node tree --------------------------------------------
 
-func buildNode(o *xmlCObject, strict bool, depth int) (Node, error) {
+// optPath is the place in the OPT tree of the node being built: one step
+// per level from the root down to it. A parse keeps one, pushing a step as
+// it descends into a child and popping it on the way back, so that a
+// refusal can name where it is without the parse building a path for
+// every node. The path it writes holds structural names only: attribute
+// names and node or archetype ids, never a constraint value.
+type optPath struct {
+	steps []optStep
+}
+
+// optStep is one level of an [optPath].
+type optStep struct {
+	attr string // the attribute the node is a child of
+	id   string // the node's archetype id, else its node id; "" for neither
+}
+
+// push descends into the child c of the attribute attr. A nil c, which
+// buildNode refuses, has no id.
+func (p *optPath) push(attr string, c *xmlCObject) {
+	var id string
+	if c != nil {
+		id = string(c.ArchetypeID)
+		if id == "" {
+			id = string(c.NodeID)
+		}
+	}
+	p.steps = append(p.steps, optStep{attr: attr, id: id})
+}
+
+// pop returns to the parent of the node push descended into.
+func (p *optPath) pop() {
+	p.steps = p.steps[:len(p.steps)-1]
+}
+
+// String writes the path of the node being built, "/" for the root, with
+// each node's id as a predicate where it has one:
+// /content[openEHR-EHR-ACTION.medication.v1]/ism_transition[at0002].
+func (p *optPath) String() string {
+	if len(p.steps) == 0 {
+		return "/"
+	}
+	var b strings.Builder
+	for _, s := range p.steps {
+		b.WriteString("/" + s.attr)
+		if s.id != "" {
+			b.WriteString("[" + s.id + "]")
+		}
+	}
+	return b.String()
+}
+
+// attribute returns the path of the attribute name of the node being
+// built.
+func (p *optPath) attribute(name string) string {
+	if len(p.steps) == 0 {
+		return "/" + name
+	}
+	return p.String() + "/" + name
+}
+
+// buildNode builds the node o, whose place in the OPT tree path holds.
+func buildNode(o *xmlCObject, strict bool, depth int, path *optPath) (Node, error) {
 	if o == nil {
 		return nil, fmt.Errorf("%w: nil node", ErrInvalidOPT)
 	}
@@ -407,12 +522,12 @@ func buildNode(o *xmlCObject, strict bool, depth int) (Node, error) {
 	// behaves as a C_ARCHETYPE_ROOT when an archetype_id is present
 	// (the XSD declares the slot as the concrete type). Detect that
 	// shape before the generic complex-object path.
-	if (o.Type == "" || o.Type == "C_COMPLEX_OBJECT") && strings.TrimSpace(o.ArchetypeID) != "" {
+	if (o.Type == "" || o.Type == "C_COMPLEX_OBJECT") && o.ArchetypeID != "" {
 		o.Type = "C_ARCHETYPE_ROOT"
 	}
 	switch o.Type {
 	case "C_COMPLEX_OBJECT", "":
-		return buildComplexObject(o, strict, depth)
+		return buildComplexObject(o, strict, depth, path)
 	case "C_ARCHETYPE_ROOT", "T_ARCHETYPE_ROOT":
 		// REQ-100: some exporters write T_ARCHETYPE_ROOT for the node
 		// openEHR Template.xsd calls C_ARCHETYPE_ROOT. It is a second
@@ -423,13 +538,13 @@ func buildNode(o *xmlCObject, strict bool, depth int) (Node, error) {
 		// the parser does not map, such as one Template.xsd does not
 		// define for C_ARCHETYPE_ROOT, is skipped in both modes, not
 		// refused, so strict mode does not report it.
-		co, err := buildComplexObject(o, strict, depth)
+		co, err := buildComplexObject(o, strict, depth, path)
 		if err != nil {
 			return nil, err
 		}
 		return &ArchetypeRoot{
-			archetypeID:   strings.TrimSpace(o.ArchetypeID),
-			templateID:    strings.TrimSpace(o.TemplateID),
+			archetypeID:   string(o.ArchetypeID),
+			templateID:    string(o.TemplateID),
 			ComplexObject: *co,
 			terms:         collectTermDefs(o.TermDefinitions),
 			termBindings:  collectTermBindings(o.TermBindings),
@@ -438,8 +553,8 @@ func buildNode(o *xmlCObject, strict bool, depth int) (Node, error) {
 		includes := collectAssertions(o.Includes)
 		excludes := collectAssertions(o.Excludes)
 		return &Slot{
-			rmTypeName:     o.RMTypeName,
-			nodeID:         o.NodeID,
+			rmTypeName:     string(o.RMTypeName),
+			nodeID:         string(o.NodeID),
 			includes:       includes,
 			excludes:       excludes,
 			parsedIncludes: parseSlotAssertions(o.Includes),
@@ -460,7 +575,10 @@ func buildNode(o *xmlCObject, strict bool, depth int) (Node, error) {
 		// genuinely unknown shapes.
 		primitive, err := buildPrimitive(o, strict)
 		if err != nil {
-			return nil, fmt.Errorf("%s (%s): %w", o.NodeID, o.RMTypeName, err)
+			// The error leads with ErrInvalidOPT, which parseOPT adds
+			// where it does not; the node's OPT path, structural names
+			// only, follows the defect, as in the other refusals.
+			return nil, fmt.Errorf("%w, at %q (%s %q)", err, path.String(), o.RMTypeName, o.NodeID)
 		}
 		if strict && primitive == nil && len(o.Attributes) > 0 {
 			return nil, fmt.Errorf("%w: unknown xsi:type=%q on %q with %d nested attributes (strict mode)",
@@ -471,43 +589,72 @@ func buildNode(o *xmlCObject, strict bool, depth int) (Node, error) {
 			return nil, fmt.Errorf("occurrences on %q (%s): %w", o.NodeID, o.RMTypeName, err)
 		}
 		return &ComplexObject{
-			rmTypeName:  o.RMTypeName,
-			nodeID:      o.NodeID,
+			rmTypeName:  string(o.RMTypeName),
+			nodeID:      string(o.NodeID),
 			occurrences: occ,
 			primitive:   primitive,
 		}, nil
 	}
 }
 
-func buildComplexObject(o *xmlCObject, strict bool, depth int) (*ComplexObject, error) {
+// buildComplexObject builds the node o, whose place in the OPT tree path
+// holds.
+func buildComplexObject(o *xmlCObject, strict bool, depth int, path *optPath) (*ComplexObject, error) {
 	occ, err := intervalToMultiplicity(o.Occurrences)
 	if err != nil {
 		return nil, fmt.Errorf("occurrences on %q (%s): %w", o.NodeID, o.RMTypeName, err)
 	}
 	co := &ComplexObject{
-		rmTypeName:  o.RMTypeName,
-		nodeID:      o.NodeID,
+		rmTypeName:  string(o.RMTypeName),
+		nodeID:      string(o.NodeID),
 		occurrences: occ,
 	}
 	for _, a := range o.Attributes {
-		attr, err := buildAttribute(a, strict, depth)
+		// REQ-100: C_ATTRIBUTE is abstract in ITS-XML, so an <attributes>
+		// must name its concrete type in the XSI namespace. Strict mode
+		// refuses one that does not; the default mode reads it as a
+		// C_SINGLE_ATTRIBUTE (buildAttribute). The refusal names the
+		// attribute's OPT path, structural names only.
+		if strict && a.Type == "" {
+			return nil, fmt.Errorf("%w: <attributes> at %q, of %s %q, has no xsi:type in the XSI namespace (strict mode)",
+				ErrInvalidOPT, path.attribute(string(a.Name)), o.RMTypeName, o.NodeID)
+		}
+		attr, err := buildAttribute(a, strict, depth, path)
 		if err != nil {
 			return nil, err
 		}
+		attr.name = attributeName(o, attr.name)
 		co.attributes = append(co.attributes, attr)
 	}
 	co.nodeName = deriveNodeName(o.Attributes)
 	return co, nil
 }
 
+// attributeName returns the name the parser gives an attribute the OPT
+// names name on the node o. REQ-100: an ELEMENT's null_flavor, the US
+// spelling some OPTs write, is read as the RM attribute null_flavour, so
+// its constraint applies; that is the only name read otherwise than as
+// written. Where the ELEMENT also declares null_flavour, null_flavor is
+// kept as written, so the node does not declare null_flavour twice and
+// each attribute keeps its own constraint.
+func attributeName(o *xmlCObject, name string) string {
+	if o.RMTypeName != "ELEMENT" || name != "null_flavor" {
+		return name
+	}
+	if slices.ContainsFunc(o.Attributes, func(a *xmlCAttribute) bool { return a.Name == "null_flavour" }) {
+		return name
+	}
+	return "null_flavour"
+}
+
 // deriveNodeName extracts the template-level node name (REQ-116): the
 // fixed C_STRING the OPT pins on the node's name attribute — name →
 // a DV_TEXT/DV_CODED_TEXT child → value → C_STRING whose list holds
-// exactly one non-blank entry, taken trimmed. Anything looser (no
-// name attribute, an open pattern, a multi-entry list, a lone blank
-// entry — a whitespace-only name is useless as a disambiguator) is
-// not a *fixed* name and yields "" — the archetype concept term is
-// never substituted. When the name attribute carries alternatives,
+// exactly one non-blank entry, taken trimmed, and is closed. Anything
+// looser (no name attribute, an open pattern, a multi-entry list, an
+// open list, a lone blank entry — a whitespace-only name is useless
+// as a disambiguator) is not a *fixed* name and yields "" — the
+// archetype concept term is never substituted. When the name attribute carries alternatives,
 // the first child that pins a fixed value wins (a non-pinning or
 // blank-pinning alternative falls through to the next), matching the
 // first-alternative convention used across the parse and compile
@@ -534,7 +681,9 @@ func deriveNodeName(attrs []*xmlCAttribute) string {
 
 // fixedValueString returns the single fixed string pinned on the
 // value attribute of a wire name-constraint node, or "" when the
-// constraint does not pin exactly one raw non-blank <list> entry.
+// constraint does not pin exactly one raw non-blank <list> entry in a
+// closed list. A list whose list_open is true admits other strings, so
+// it pins nothing; an omitted or empty list_open leaves it closed.
 // Handles both wire spellings: a C_PRIMITIVE_OBJECT wrapper carrying
 // <item xsi:type="C_STRING">, and a direct C_STRING child.
 func fixedValueString(o *xmlCObject) string {
@@ -550,7 +699,7 @@ func fixedValueString(o *xmlCObject) string {
 			if leaf.Type == "C_PRIMITIVE_OBJECT" && leaf.Item != nil {
 				leaf = leaf.Item
 			}
-			if leaf.Type != "C_STRING" || len(leaf.PrimitiveList) != 1 {
+			if leaf.Type != "C_STRING" || len(leaf.PrimitiveList) != 1 || leaf.ListOpen.orFalse() {
 				continue
 			}
 			if s := strings.TrimSpace(leaf.PrimitiveList[0].Text); s != "" {
@@ -561,13 +710,15 @@ func fixedValueString(o *xmlCObject) string {
 	return ""
 }
 
-func buildAttribute(a *xmlCAttribute, strict bool, depth int) (*Attribute, error) {
+// buildAttribute builds the attribute a of the node whose place in the OPT
+// tree path holds, which it leaves as it found it.
+func buildAttribute(a *xmlCAttribute, strict bool, depth int, path *optPath) (*Attribute, error) {
 	existence, err := intervalToMultiplicity(a.Existence)
 	if err != nil {
 		return nil, fmt.Errorf("existence on attribute %q: %w", a.Name, err)
 	}
 	attr := &Attribute{
-		name:      a.Name,
+		name:      string(a.Name),
 		existence: existence,
 	}
 	switch a.Type {
@@ -588,8 +739,19 @@ func buildAttribute(a *xmlCAttribute, strict bool, depth int) (*Attribute, error
 	default:
 		return nil, fmt.Errorf("%w: attribute xsi:type=%q", ErrUnsupportedNode, a.Type)
 	}
-	for _, c := range a.Children {
-		node, err := buildNode(c, strict, depth+1)
+	for i, c := range a.Children {
+		// REQ-100: C_OBJECT is abstract in ITS-XML, so a <children> must
+		// name its concrete type in the XSI namespace. Strict mode refuses
+		// one that does not; the default mode reads it as a
+		// C_ARCHETYPE_ROOT or a C_COMPLEX_OBJECT (buildNode). The refusal
+		// names the attribute's OPT path, structural names only.
+		if strict && c != nil && c.Type == "" {
+			return nil, fmt.Errorf("%w: <children> %d of the attribute at %q (%s %q) has no xsi:type in the XSI namespace (strict mode)",
+				ErrInvalidOPT, i+1, path.attribute(string(a.Name)), c.RMTypeName, c.NodeID)
+		}
+		path.push(string(a.Name), c)
+		node, err := buildNode(c, strict, depth+1, path)
+		path.pop()
 		if err != nil {
 			return nil, err
 		}
@@ -730,7 +892,7 @@ func collectAnnotations(xs []xmlAnnotation) map[string][]Annotation {
 			if value == "" && strings.TrimSpace(item.ID) == "" {
 				continue
 			}
-			out[x.Path] = append(out[x.Path], Annotation{
+			out[string(x.Path)] = append(out[string(x.Path)], Annotation{
 				ID:    strings.TrimSpace(item.ID),
 				Value: value,
 			})

@@ -10,6 +10,7 @@ package validation
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -43,64 +44,62 @@ func isConstraintRef(pc constraints.PrimitiveConstraint) bool {
 	return isRef
 }
 
-// admitSingle binds val, the value of the single-valued attribute attr at
-// attrPath, to one of children, the children the OPT allows, by
-// [matchSingleAlternative]. It returns the child, with admitted set, or the
-// one issue that refuses the value, which is then not walked: a slot child
-// whose assertions the value's archetype id does not satisfy is a
-// `slot_fill`; no child at all is an `rm_type_mismatch` when the attribute
-// allows one child (a plain type constraint) and an `alternative_mismatch`
-// when it allows more, listing their RM types.
-func admitSingle(attr *tcimpl.CompiledAttribute, children []*tcimpl.CompiledNode, val any, attrPath issuePath) (child *tcimpl.CompiledNode, refusal Issue, admitted bool) {
-	child = matchSingleAlternative(children, val)
-	if child != nil && child.IsSlot() {
-		archetypeID := locatableArchetypeNodeID(val)
-		if archetypeID == "" || !child.AllowsArchetypeID(archetypeID) {
-			return nil, Issue{
-				Path:     attrPath.String(),
-				Code:     "slot_fill",
-				Layer:    LayerTemplate,
-				Rule:     ruleSlot,
-				Detail:   fmt.Sprintf("RM value %s under %q does not satisfy slot %s", describeLocatableID(val), attr.Name(), child.NodeID()),
-				Severity: Error,
-			}, false
-		}
+// slotRefusal returns the `slot_fill` issue that refuses val, the value of
+// the single-valued attribute attr at attrPath, under the slot child slot,
+// with refused set, when the value's archetype id is empty or does not
+// satisfy the slot's assertions. The value is then not walked.
+func slotRefusal(attr *tcimpl.CompiledAttribute, slot *tcimpl.CompiledNode, val any, attrPath issuePath) (refusal Issue, refused bool) {
+	archetypeID := locatableArchetypeNodeID(val)
+	if archetypeID != "" && slot.AllowsArchetypeID(archetypeID) {
+		return refusal, false
 	}
-	if child != nil {
-		return child, refusal, true
-	}
+	return Issue{
+		Path:     attrPath.String(),
+		Code:     "slot_fill",
+		Layer:    LayerTemplate,
+		Rule:     ruleSlot,
+		Detail:   fmt.Sprintf("RM value %s under %q does not satisfy slot %s", describeLocatableID(val), attr.Name(), slot.NodeID()),
+		Severity: Error,
+	}, true
+}
+
+// typeRefusal returns the issue that refuses val, the value of the
+// single-valued attribute attr at attrPath, when none of children, the
+// children the OPT allows, admits its RM type in any binding tier
+// ([rmbind.Tier]): an `rm_type_mismatch` when the attribute allows one child
+// (a plain type constraint) and an `alternative_mismatch` when it allows
+// more, listing their RM types. The value is then not walked.
+func typeRefusal(attr *tcimpl.CompiledAttribute, children []*tcimpl.CompiledNode, val any, attrPath issuePath) Issue {
 	// With multiple OPT children the OPT declared AnyOf alternatives; with
 	// a single child it is a plain type constraint. The Issue.Code tells
 	// "wrong type" from "didn't match any of N allowed types".
 	if len(children) == 1 {
-		return nil, Issue{
+		return Issue{
 			Path:     attrPath.String(),
 			Code:     "rm_type_mismatch",
 			Layer:    LayerTemplate,
 			Rule:     ruleType,
 			Detail:   fmt.Sprintf("RM value of type %s under %q does not satisfy template RM type %s", describeRMType(val), attr.Name(), children[0].RMTypeName()),
 			Severity: Error,
-		}, false
+		}
 	}
-	return nil, Issue{
+	return Issue{
 		Path:     attrPath.String(),
 		Code:     "alternative_mismatch",
 		Layer:    LayerTemplate,
 		Rule:     ruleType,
 		Detail:   fmt.Sprintf("RM value of type %s under %q matches none of the OPT alternatives %s", describeRMType(val), attr.Name(), formatAllowedTypes(children)),
 		Severity: Error,
-	}, false
+	}
 }
 
-// matchSingleAlternative picks the OPT child of a single-valued
-// attribute that binds the RM value, slot children included, by the
-// three binding tiers of [rmbind.Bind] (REQ-102). Returns nil when no
-// child fits. With exactly one child the function is effectively "does
-// the child fit?"; the alternative_mismatch case fires only when the
-// OPT declared more than one alternative.
-func matchSingleAlternative(children []*tcimpl.CompiledNode, val any) *tcimpl.CompiledNode {
-	return rmbind.Bind(children, val, func(*tcimpl.CompiledNode) bool { return true })
-}
+// anyChild admits every child to the binding tiers of a single-valued
+// attribute's value, a slot included ([rmbind.Tier]).
+func anyChild(*tcimpl.CompiledNode) bool { return true }
+
+// nonSlot admits every child but a slot to the binding tiers of an item that
+// carries no archetype_node_id ([matchChildByRMType]).
+func nonSlot(c *tcimpl.CompiledNode) bool { return !c.IsSlot() }
 
 // formatAllowedTypes renders the OPT child RM types for inclusion
 // in alternative_mismatch Detail messages.
@@ -116,11 +115,12 @@ func formatAllowedTypes(children []*tcimpl.CompiledNode) string {
 // of parentRM, at attrPath, when the instance lacks it and the template
 // requires it ([templateRequires]): `required`, on the template layer, rule
 // existence, with required set. A multi-valued attribute is required only
-// where the template asks for a member too ([tcimpl.AsksForMember]), and is
-// described as one. The RM's requirement is not read here: the walk reads it
-// from the value's class ([engine.checkAbsent]).
-func absentIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath issuePath, multiValued bool) (iss Issue, required bool) {
-	if !templateRequires(attr, multiValued) {
+// where the template asks for a member too ([tcimpl.AsksForMember]), or
+// where an RM rule of parentRM's class makes the list hold a member
+// (rmAsks), and is described as one. The RM's requirement is not read here:
+// the walk reads it from the value's class ([engine.checkAbsent]).
+func absentIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath issuePath, multiValued, rmAsks bool) (iss Issue, required bool) {
+	if !templateRequires(attr, multiValued, rmAsks) {
 		return iss, false
 	}
 	detail := fmt.Sprintf("required attribute %q absent on %s", attr.Name(), describeRMType(parentRM))
@@ -141,11 +141,13 @@ func absentIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath issuePat
 // attribute attr of parentRM, at attrPath, when it is present and holds no
 // item and the template requires it ([templateRequires]), which it does only
 // where its cardinality, or the occurrences of a child it allows, asks for at
-// least one member ([tcimpl.AsksForMember]): `required`, on the template layer,
-// rule existence, with required set. The RM's requirement is not read here:
-// the walk reads it from the value's class ([engine.checkEmpty]).
-func emptyIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath issuePath) (iss Issue, required bool) {
-	if !templateRequires(attr, true) {
+// least one member ([tcimpl.AsksForMember]), or where an RM rule of
+// parentRM's class makes the list hold a member (rmAsks): `required`, on the
+// template layer, rule existence, with required set. The RM's requirement is
+// not read here: the walk reads it from the value's class
+// ([engine.checkEmpty]).
+func emptyIssue(attr *tcimpl.CompiledAttribute, parentRM any, attrPath issuePath, rmAsks bool) (iss Issue, required bool) {
+	if !templateRequires(attr, true, rmAsks) {
 		return iss, false
 	}
 	return Issue{
@@ -228,36 +230,44 @@ func appendOccurrenceIssues(issues []Issue, attr *tcimpl.CompiledAttribute, chil
 		if childPath == nil {
 			childPath = optChildPaths(attrPath.String(), children)
 		}
-		issues = append(issues, Issue{
-			Path:     childPath[i],
-			Code:     "cardinality",
-			Layer:    LayerTemplate,
-			Rule:     ruleOccurrences,
-			Detail:   fmt.Sprintf("OPT child %s appears %d times under %q; occurrences %s", childIdentity(c), got, attr.Name(), formatInterval(occ)),
-			Severity: Error,
-		})
+		issues = append(issues, occurrencesIssue(childPath[i], c, got, attr))
 	}
 	return issues
 }
 
-// bindItems binds each of the items of the multi-valued attribute
-// attrName, on a node of RM type parentRMType, to one of its OPT
-// children: a LOCATABLE by its archetype_node_id ([matchChildByID]),
-// any other item by its RM type ([matchChildByRMType]). bound holds the
-// child each item binds to, nil when none does, and byNodeID whether the
-// item binds by its id.
-func bindItems(parentRMType, attrName string, children []*tcimpl.CompiledNode, items []any) (bound []*tcimpl.CompiledNode, byNodeID []bool) {
-	bound = make([]*tcimpl.CompiledNode, len(items))
-	byNodeID = make([]bool, len(items))
-	for idx, item := range items {
-		byNodeID[idx] = bindsByNodeID(item, parentRMType, attrName)
-		if byNodeID[idx] {
-			bound[idx] = matchChildByID(children, item)
-		} else {
-			bound[idx] = matchChildByRMType(children, item)
-		}
+// occurrencesIssue is the `cardinality` issue, rule occurrences, at path
+// for the OPT child c of the attribute attr, to which got items bind
+// outside its occurrences interval.
+func occurrencesIssue(path string, c *tcimpl.CompiledNode, got int, attr *tcimpl.CompiledAttribute) Issue {
+	return Issue{
+		Path:     path,
+		Code:     "cardinality",
+		Layer:    LayerTemplate,
+		Rule:     ruleOccurrences,
+		Detail:   fmt.Sprintf("OPT child %s appears %d times under %q; occurrences %s", childIdentity(c), got, attr.Name(), formatInterval(c.Occurrences())),
+		Severity: Error,
 	}
-	return bound, byNodeID
+}
+
+// itemRank appends to dst the children of a multi-valued attribute an item
+// binds among, in OPT order, and returns the extended slice: for an item
+// that binds by its archetype_node_id (byNodeID), the rank
+// [matchChildByID] gives; for any other, the binding tier
+// [matchChildByRMType] gives. It appends none when no child takes the item.
+func itemRank(dst, children []*tcimpl.CompiledNode, item any, byNodeID bool) []*tcimpl.CompiledNode {
+	if byNodeID {
+		return matchChildByID(dst, children, item)
+	}
+	return matchChildByRMType(dst, children, item)
+}
+
+// hasRoom reports whether the OPT child c has room for one more item, given
+// that bound items of the list are bound to it already: its occurrences upper
+// bound is not reached yet, or it states none (REQ-102 Structural — binding
+// items).
+func hasRoom(c *tcimpl.CompiledNode, bound int) bool {
+	occ := c.Occurrences()
+	return occ == nil || occ.UpperUnbounded() || bound < occ.Upper()
 }
 
 // childIdentity describes an OPT child for inclusion in cardinality
@@ -378,15 +388,18 @@ func primitiveInput(rmValue any) any {
 // existence asks for the container alone and the counts for its members, and
 // an instance cannot show a list with no member apart from a missing one, so
 // it is required only where the template asks for a member as well
-// ([tcimpl.AsksForMember]). The mandatory bit the compile carries from the
-// lookup it was given ([tcimpl.CompiledAttribute.Required]) is not the
-// template's requirement and is not read: the RM rules read the pinned
-// Reference Model, from the value's class.
-func templateRequires(attr *tcimpl.CompiledAttribute, multiValued bool) bool {
+// ([tcimpl.AsksForMember]), or where an RM rule makes the list, once
+// present, hold a member (rmAsks, [classRules.asksForMember]): there the
+// container the existence asks for cannot exist without one. The mandatory
+// bit the compile carries from the lookup it was given
+// ([tcimpl.CompiledAttribute.Required]) is not the template's requirement
+// and is not read: the RM rules read the pinned Reference Model, from the
+// value's class.
+func templateRequires(attr *tcimpl.CompiledAttribute, multiValued, rmAsks bool) bool {
 	if !tcimpl.LowerAtLeastOne(attr.Existence()) {
 		return false
 	}
-	return !multiValued || tcimpl.AsksForMember(attr)
+	return !multiValued || rmAsks || tcimpl.AsksForMember(attr)
 }
 
 // isProhibited reports whether the OPT prohibits the compiled attribute:
@@ -491,40 +504,40 @@ func isNilItem(item any) bool {
 	return item == nil || rmaccess.IsTypedNilPointer(item)
 }
 
-// matchChildByID picks the OPT child whose ArchetypeID (for
-// archetype-root pins) or NodeID (for at-code pins) matches the RM
-// item's archetype_node_id, then the first slot whose parsed
-// assertions admit it. Where several non-slot children carry the id,
-// as when a template reuses one archetype under distinct names, the
-// item's name picks among them ([matchChildByPinnedName]). It serves
-// only items that [bindsByNodeID] accepts. Returns nil when none
-// match, and always for an empty or unreadable id (a typed-nil
-// LOCATABLE, a nil under a LOCATABLE attribute); the caller then
-// emits slot_fill.
-func matchChildByID(children []*tcimpl.CompiledNode, item any) *tcimpl.CompiledNode {
+// matchChildByID appends to dst the OPT children an item that binds by its
+// archetype_node_id binds among, and returns the extended slice: the
+// non-slot children whose ArchetypeID (for archetype-root pins) or NodeID
+// (for at-code pins) matches the item's id, in OPT order; failing any, the
+// first slot whose parsed assertions admit the id. Where several non-slot
+// children carry the id, as when a template reuses one archetype under
+// distinct names, the item's name ranks them ([rankByPinnedName]). It
+// serves only items that [bindsByNodeID] accepts. It appends none when no
+// child matches, and always for an empty or unreadable id (a typed-nil
+// LOCATABLE, a nil under a LOCATABLE attribute); the caller then emits
+// slot_fill.
+func matchChildByID(dst, children []*tcimpl.CompiledNode, item any) []*tcimpl.CompiledNode {
 	id := locatableArchetypeNodeID(item)
 	if id == "" {
-		return nil
+		return dst
 	}
-	var first *tcimpl.CompiledNode
+	from := len(dst)
 	for _, c := range children {
-		if c.IsSlot() || !carriesID(c, id) {
-			continue
+		if !c.IsSlot() && carriesID(c, id) {
+			dst = append(dst, c)
 		}
-		if first != nil {
-			return matchChildByPinnedName(children, id, locatableName(item))
-		}
-		first = c
 	}
-	if first != nil {
-		return first
+	switch carriers := len(dst) - from; {
+	case carriers > 1:
+		return rankByPinnedName(dst, from, locatableName(item))
+	case carriers == 1:
+		return dst
 	}
 	for _, c := range children {
 		if c.IsSlot() && slotFitsArchetypeID(c, id) {
-			return c
+			return append(dst, c)
 		}
 	}
-	return nil
+	return dst
 }
 
 // carriesID reports whether the OPT child c pins id: as its archetype id
@@ -533,33 +546,32 @@ func carriesID(c *tcimpl.CompiledNode, id string) bool {
 	return (c.ArchetypeID() != "" && c.ArchetypeID() == id) || (c.NodeID() != "" && c.NodeID() == id)
 }
 
-// matchChildByPinnedName picks, among the non-slot children that carry
-// id, the one an item named name binds to: the child whose pinned name
-// (the template-level node name) is name; failing that, the first that
-// pins no name; failing that, the first, whose name constraint then
-// reports the mismatch. The name only decides the binding; no issue
-// path or message carries it.
-func matchChildByPinnedName(children []*tcimpl.CompiledNode, id, name string) *tcimpl.CompiledNode {
-	var first, unnamed *tcimpl.CompiledNode
-	for _, c := range children {
-		if c.IsSlot() || !carriesID(c, id) {
-			continue
-		}
-		pinned := c.NodeName()
-		if pinned != "" && pinned == name {
-			return c
-		}
-		if first == nil {
-			first = c
-		}
-		if pinned == "" && unnamed == nil {
-			unnamed = c
-		}
+// rankByPinnedName keeps, of dst[from:], the non-slot children that carry
+// one id, the rank an item named name binds among, in OPT order, and returns
+// dst cut to them: those whose pinned name (the template-level node name) is
+// name; failing any, those that pin no name; failing any, all of them, where
+// the name constraint of the child the item binds to then reports the
+// mismatch. The name only ranks the children; no issue path or message
+// carries it.
+func rankByPinnedName(dst []*tcimpl.CompiledNode, from int, name string) []*tcimpl.CompiledNode {
+	pins := func(c *tcimpl.CompiledNode) bool { return name != "" && c.NodeName() == name }
+	if slices.ContainsFunc(dst[from:], pins) {
+		return keepRank(dst, from, pins)
 	}
-	if unnamed != nil {
-		return unnamed
+	if slices.ContainsFunc(dst[from:], pinsNoName) {
+		return keepRank(dst, from, pinsNoName)
 	}
-	return first
+	return dst
+}
+
+// pinsNoName reports whether the OPT child c pins no template-level name.
+func pinsNoName(c *tcimpl.CompiledNode) bool { return c.NodeName() == "" }
+
+// keepRank keeps, of dst[from:], the children inRank holds, in order, and
+// returns dst cut to them.
+func keepRank(dst []*tcimpl.CompiledNode, from int, inRank func(*tcimpl.CompiledNode) bool) []*tcimpl.CompiledNode {
+	kept := slices.DeleteFunc(dst[from:], func(c *tcimpl.CompiledNode) bool { return !inRank(c) })
+	return dst[:from+len(kept)]
 }
 
 // locatableName returns the value of a LOCATABLE item's name, a DV_TEXT
@@ -581,17 +593,18 @@ func locatableName(item any) string {
 	return text.Value
 }
 
-// matchChildByRMType binds an item that carries no archetype_node_id
-// (REQ-102) to a non-slot child whose RMTypeName admits the item's RM
-// type, by the three tiers a single-valued attribute uses
-// ([rmbind.Bind]); a slot child is skipped in every tier. A nil or
-// typed-nil item has no value to bind, so no child takes it, not even
-// an untyped one. Returns nil when no child admits the item.
-func matchChildByRMType(children []*tcimpl.CompiledNode, item any) *tcimpl.CompiledNode {
+// matchChildByRMType appends to dst the non-slot children an item that
+// carries no archetype_node_id (REQ-102) binds among, and returns the
+// extended slice: those of the first of the three tiers a single-valued
+// attribute uses that admits the item's RM type ([rmbind.Tier]), in OPT
+// order; a slot child is skipped in every tier. A nil or typed-nil item has
+// no value to bind, so no child takes it, not even an untyped one. It
+// appends none when no child admits the item.
+func matchChildByRMType(dst, children []*tcimpl.CompiledNode, item any) []*tcimpl.CompiledNode {
 	if isNilItem(item) {
-		return nil
+		return dst
 	}
-	return rmbind.Bind(children, item, func(c *tcimpl.CompiledNode) bool { return !c.IsSlot() })
+	return rmbind.Tier(dst, children, item, nonSlot)
 }
 
 // unboundItemIssue reports an item of a multi-valued attribute that

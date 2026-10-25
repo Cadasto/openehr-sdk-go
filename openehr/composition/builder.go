@@ -40,7 +40,8 @@ var errNotMade = errors.New("composition: Builder not made by NewBuilder")
 
 // pendingAssignment is one queued (path, value) pair plus the compiled
 // node the value binds: of the nodes the template allows at the path,
-// the one the validator would bind it to ([bindRMType]). Resolving
+// the first node of the first binding tier that admits its type, which
+// the validator tries first ([bindRMType]). Resolving
 // the node and checking the type at Set time surfaces an unknown path
 // and a type mismatch eagerly. Only where the template and the pinned RM
 // give no type to check against, as under a parent the template leaves
@@ -192,10 +193,11 @@ func (b *Builder) Set(path string, v any) error {
 		return wrapped
 	}
 	// The template may list several alternatives at path; NodeAt returns
-	// the first, and the value binds the one the validator would bind it
-	// to (REQ-101, REQ-102). They share the path, so Build reaches the
-	// same RM attribute through any of them, and bindRMType checks that
-	// the attribute can hold the value.
+	// the first, and the value binds the first node of the first tier that
+	// admits its type, which the validator tries first (REQ-101, REQ-102).
+	// They share the path, so Build reaches the same RM attribute through
+	// any of them, and bindRMType checks that the attribute can hold the
+	// value.
 	bound, err := bindRMType(node, v)
 	if err != nil {
 		wrapped := fmt.Errorf("%s: %w", path, err)

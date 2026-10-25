@@ -521,11 +521,14 @@ func emptyContainerCases(t *testing.T) []emptyContainerCase {
 			want: []string{"cardinality template cardinality", "required template existence"},
 		},
 		{
-			name: "under the template's child count",
+			// An empty list the template leaves optional by its existence
+			// reads as an absent one, whose child count is not reported
+			// (REQ-102 § A mandatory child under an optional list).
+			name: "under the child count of a list the template leaves optional",
 			root: probes.PersonEmptyIdentities(),
 			c:    mustCompileInline(t, personIdentitiesOPT(open, "1")),
 			path: "/identities",
-			want: []string{"cardinality template cardinality"},
+			want: []string{"cardinality rm cardinality"},
 		},
 		{
 			name: "under its child's occurrences, written at the container",
@@ -553,12 +556,13 @@ func emptyContainerCases(t *testing.T) []emptyContainerCase {
 // Where no template clause covers it, it is the RM's `cardinality`: under a
 // template node that carries only the BMM's mandatory bit, below a slot the
 // template does not constrain, and under a template whose existence alone
-// requires it, since an existence alone asks for no member (REQ-102). Where
-// the template's existence and its child count both require it, it is the
-// template's `required` and `cardinality`, one per clause; where the
-// template's child count alone reports it, the template's `cardinality`
-// alone; and so where a child's occurrences report it, at the container's
-// own path. Occurrences written at the child's own path report the child,
+// requires it, since an existence alone asks for no member (REQ-102), and
+// under a child count of a list the template leaves optional by its
+// existence, since an empty such list reads as an absent one, whose child
+// count is not reported (REQ-102). Where the template's existence and its
+// child count both require it, it is the template's `required` and
+// `cardinality`, one per clause; and where a child's occurrences report it,
+// at the container's own path, the template's `cardinality` alone. Occurrences written at the child's own path report the child,
 // not the container: the RM's `cardinality` stays beside them, and the
 // empty list's child that occurs once is still counted.
 func TestREQ171_EngineReportsAnEmptyMandatoryContainerOnce(t *testing.T) {
