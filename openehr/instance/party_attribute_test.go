@@ -6,7 +6,6 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/rmwrite"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
@@ -265,46 +264,6 @@ func TestREQ107_RoleTypeListKeepsItsMemberOverTheDefault(t *testing.T) {
 						t.Errorf("%s: role type = %q, want one of %v", call, got, tc.wantRandom)
 					}
 					checkBothValidators(t, call, out, c)
-				}
-			}
-		})
-	}
-}
-
-// TestREQ107_AttributeThePinnedRMDoesNotHaveIsRefused is the REQ-107 check
-// that an attribute the pinned RM does not have cannot be written, so
-// Generate returns an error wrapping rmwrite.ErrUnknownAttribute, and no
-// root, where a template puts an object under one, at every policy and
-// either value fill (§ Exceptions and known gaps, "An attribute the pinned
-// RM does not have"). Its row is a made-up attribute on a DV_ORDINAL, which
-// no writer can write. The rows it pinned as known gaps are written now: a
-// PERSON's languages and roles and a ROLE performer's id
-// (TestREQ107_ActorLanguagesAndRolesTakeTheirMembers,
-// TestREQ107_PerformerIDTakesAValueFromUIDSource), and a DV_ORDINAL's
-// symbol the template names as a node of its own
-// (TestREQ107_OrdinalAndScaleTakeTheirSymbolAndValue).
-func TestREQ107_AttributeThePinnedRMDoesNotHaveIsRefused(t *testing.T) {
-	cases := []struct {
-		name string
-		opt  string
-	}{
-		{
-			name: "DV_ORDINAL attribute the pinned RM does not have",
-			opt: optTemplate("ELEMENT", optSingle("value", optNode("DV_ORDINAL", "",
-				optSingle("no_such_attribute", optNode("DV_CODED_TEXT", ""))))),
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			c := compileOPTText(t, tc.opt, true)
-			for _, opts := range guardOptions() {
-				call := fmt.Sprintf("Generate(%v, %v)", opts.Policy, opts.ValueFill)
-				out, err := instance.Generate(t.Context(), c, opts)
-				if !errors.Is(err, rmwrite.ErrUnknownAttribute) {
-					t.Errorf("%s error = %v, want one wrapping rmwrite.ErrUnknownAttribute", call, err)
-				}
-				if out != nil {
-					t.Errorf("%s returned %T, want no root", call, out)
 				}
 			}
 		})

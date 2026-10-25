@@ -12,11 +12,13 @@ import (
 // TestREQ107_AttributeNotInRMIsNotVisited is the REQ-107 Visit rule check
 // that an attribute the compile marks as one the node's RM class does not
 // have (templatecompile NotInRM) is not visited, whatever existence the OPT
-// gives it: an ACTION whose ISM_TRANSITION constrains name at 1..1, and an
-// ELEMENT that declares null_flavor beside null_flavour. Generate returns a
-// root under every policy, both value fills and both compile modes, the
-// root passes the RM floor and the template validator, and the validator
-// leaves the attribute out and lists its path in Coverage.NotInRM.
+// gives it and whatever it puts under it: an ACTION whose ISM_TRANSITION
+// constrains name at 1..1, an ELEMENT that declares null_flavor beside
+// null_flavour, and a DV_ORDINAL attribute no RM class has, which Generate
+// refused before with rmwrite.ErrUnknownAttribute. Generate returns a root
+// under every policy, both value fills and both compile modes, the root
+// passes the RM floor and the template validator, and the validator leaves
+// the attribute out and lists its path in Coverage.NotInRM.
 func TestREQ107_AttributeNotInRMIsNotVisited(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -35,6 +37,12 @@ func TestREQ107_AttributeNotInRMIsNotVisited(t *testing.T) {
 				optSingle("null_flavour", optCodedText("openehr", "253")),
 				optSingle("null_flavor", optCodedText("openehr", "271"))),
 			notInRM: []string{"/null_flavor"},
+		},
+		{
+			name: "DV_ORDINAL attribute no RM class has, over a DV_CODED_TEXT",
+			opt: optTemplate("ELEMENT", optSingle("value", optNode("DV_ORDINAL", "",
+				optSingle("no_such_attribute", optNode("DV_CODED_TEXT", ""))))),
+			notInRM: []string{"/value/no_such_attribute"},
 		},
 	}
 	for _, tc := range cases {

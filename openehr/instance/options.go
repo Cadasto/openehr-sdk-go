@@ -246,13 +246,17 @@ var ErrNilCompiled = errors.New("instance.Generate: nil compiled template")
 var ErrSlotFillUnsupported = errors.New("instance.Generate: required slot fill cannot be synthesized")
 
 // ErrConstraintUnsatisfiable signals that no value the generator can
-// derive satisfies a primitive leaf's constraint, for example a C_STRING
-// whose pattern and list admit no string. The error names the RM type,
-// the attribute and the OPT path of the leaf, and Generate returns no
-// root. It is never wrapped together with [ErrSlotFillUnsupported], which
-// concerns slots only, nor with [ErrArchetypeIDMissing], which concerns
-// archetype roots only.
-var ErrConstraintUnsatisfiable = errors.New("instance.Generate: no value satisfies the primitive constraint")
+// derive satisfies what the template asks for: a primitive leaf's
+// constraint, for example a C_STRING whose pattern and list admit no
+// string; a list whose children's occurrences lower bounds add up past its
+// cardinality upper bound, so that no instance holds every member they ask
+// for (ADL 1.4 VCOC, AOM 2 VACMCO); or an attribute the template requires
+// that the generator has no writer for, such as a LOCATABLE's feeder_audit
+// or links. The error names the RM type, the attribute and the OPT path,
+// and Generate returns no root. It is never wrapped together with
+// [ErrSlotFillUnsupported], which concerns slots only, nor with
+// [ErrArchetypeIDMissing], which concerns archetype roots only.
+var ErrConstraintUnsatisfiable = errors.New("instance.Generate: no value satisfies the template's constraint")
 
 // ErrArchetypeIDMissing signals that the template asks for an object of an
 // RM class that is always an archetype root (an ENTRY, a COMPOSITION, a
@@ -262,8 +266,12 @@ var ErrConstraintUnsatisfiable = errors.New("instance.Generate: no value satisfi
 // that. A slot is not such an object: the slot-fill rule stamps it with an
 // archetype id, or refuses it with [ErrSlotFillUnsupported]. An archetype
 // id the template carries under an xsi:type the parser does not recognise
-// is dropped by lenient parsing, so this error covers that case too. The
-// error names the RM type and the OPT path, and Generate returns no root.
+// is dropped by lenient parsing, so this error covers that case too. Such
+// a template node is content the template does not describe, so the walk
+// meets it only where the template or the RM requires it: under Large and
+// Medium an optional one gets no member and an optional attribute whose
+// members would all need one is left out. The error names the RM type and
+// the OPT path, and Generate returns no root.
 // It wraps neither [ErrSlotFillUnsupported] nor
 // [ErrConstraintUnsatisfiable], and ErrConstraintUnsatisfiable never wraps
 // it.
