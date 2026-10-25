@@ -409,7 +409,8 @@ func primitiveLeaf(value any, a *engineAttr) bool {
 // A finding of the node's rules that a list holds no item, at the list's
 // path or, for a HISTORY's events, at the node's, is withdrawn once the
 // attributes are visited where the template reported that list at the list's
-// path: the template's finding is the one report for the list
+// path or below it, or, for a HISTORY's events, reported its summary: the
+// template's finding is the one report for the list
 // ([engine.withdrawGivenWay]).
 //
 // A rule of the node's class may read below the node, into one of its
@@ -1256,11 +1257,14 @@ func asksForMember(n *engineNode, attr string) bool {
 // withdrawGivenWay removes, from the issues the RM rules of node n reported
 // at positions from up to to, each finding of a rule of the REQ-112
 // Non-empty lists entry ([listMemberRules]) whose list the template reported
-// at the list's path once the walk visited n's attributes, and returns where
-// the findings of n's rules now end. A list that holds no item is then one
-// finding, the template's (REQ-171 One walk, step 2): its `required`, its
-// cardinality, or the occurrences of a child that declares no id, written at
-// the list's path. The issues after to keep their order.
+// once the walk visited n's attributes, and returns where the findings of
+// n's rules now end. The template reports the list at the list's path or
+// below it ([templateReportsList]): its `required` or its cardinality at the
+// list's path, or the occurrences of a child the list allows below it, and,
+// for HISTORY Events_valid, the `required` of n's summary. A list that holds
+// no item is then one finding, the template's (REQ-171 One walk, step 2).
+// A template report on another attribute of n withdraws nothing. The issues
+// after to keep their order.
 func (e *engine) withdrawGivenWay(n engineNode, from, to int) int {
 	issues := e.found.issues
 	if !slices.ContainsFunc(issues[from:to], isListMemberFinding) {
@@ -1269,7 +1273,7 @@ func (e *engine) withdrawGivenWay(n engineNode, from, to int) int {
 	later := issues[to:]
 	kept := issues[:from]
 	for _, iss := range issues[from:to] {
-		if !isListMemberFinding(iss) || !templateReportsAt(later, n.path.join("/"+listMemberRules[iss.Rule].list)) {
+		if !isListMemberFinding(iss) || !templateReportsList(later, n.path, listMemberRules[iss.Rule]) {
 			kept = append(kept, iss)
 		}
 	}
@@ -1293,10 +1297,22 @@ func isListMemberFinding(iss Issue) bool {
 	return ok
 }
 
-// templateReportsAt reports whether one of issues is the template's, at
+// templateReportsList reports whether one of issues is the template's, at
+// or below ([isAtOrBelow]) the path of the list m reads on the node at path,
+// or, for a rule a second attribute keeps, at or below that attribute's
 // path.
-func templateReportsAt(issues []Issue, path string) bool {
-	return slices.ContainsFunc(issues, func(iss Issue) bool { return iss.Layer == LayerTemplate && iss.Path == path })
+func templateReportsList(issues []Issue, path issuePath, m listMembers) bool {
+	list := path.join("/" + m.list)
+	alternative := ""
+	if m.alternative != "" {
+		alternative = path.join("/" + m.alternative)
+	}
+	return slices.ContainsFunc(issues, func(iss Issue) bool {
+		if iss.Layer != LayerTemplate {
+			return false
+		}
+		return isAtOrBelow(iss.Path, list) || (alternative != "" && isAtOrBelow(iss.Path, alternative))
+	})
 }
 
 // unboundPredicates appends to the walk's predicates ([engine].preds) the

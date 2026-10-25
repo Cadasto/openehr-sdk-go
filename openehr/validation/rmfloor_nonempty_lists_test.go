@@ -11,7 +11,8 @@ package validation_test
 // template, an existence lower bound of 1 or more on one of these lists asks
 // for a member, so the template reports the list as `required`, absent or
 // empty, and the RM rule gives way where the template reports the list at
-// its path: one defect, one finding.
+// its path or below it, or, for a HISTORY's events, reports its summary:
+// one defect, one finding.
 
 import (
 	"slices"
@@ -339,5 +340,97 @@ func TestValidator_REQ171_NonEmptyListsMatchTheFloor(t *testing.T) {
 	}
 	if !slices.ContainsFunc(got, func(k string) bool { return strings.HasSuffix(k, " rm COMPOSITION.Content_valid") }) {
 		t.Errorf("Validate(root, nil) issues = %q, want one under COMPOSITION.Content_valid", got)
+	}
+}
+
+// listAttribute returns a multi-valued attribute name with the existence
+// interval body existence, the cardinality interval body cardinality and
+// children, each a <children> element.
+func listAttribute(name, existence, cardinality string, children ...string) string {
+	return `<attributes xsi:type="C_MULTIPLE_ATTRIBUTE"><rm_attribute_name>` + name + `</rm_attribute_name>` +
+		`<existence>` + existence + `</existence>` + strings.Join(children, "") +
+		`<cardinality><is_ordered>false</is_ordered><is_unique>false</is_unique><interval>` + cardinality + `</interval></cardinality></attributes>`
+}
+
+// occurringChild returns a C_COMPLEX_OBJECT child of RM type rmType at
+// nodeID with the occurrences interval body occurrences.
+func occurringChild(rmType, nodeID, occurrences string) string {
+	return `<children xsi:type="C_COMPLEX_OBJECT"><rm_type_name>` + rmType + `</rm_type_name>` +
+		`<occurrences>` + occurrences + `</occurrences><node_id>` + nodeID + `</node_id></children>`
+}
+
+// REQ-171 — one absence, one finding: a list that holds no item draws the
+// template's finding alone where the template reports it at the list's path
+// or below it, as the occurrences of a child the list allows, and, for a
+// HISTORY's events, where it reports that HISTORY's summary. A template
+// report on another attribute withdraws nothing: the RM rule stays beside
+// it.
+func TestValidate_REQ171_EmptyListGivesWayToATemplateReportBelowIt(t *testing.T) {
+	t.Parallel()
+	optional := fiInterval("0", "1")
+	required := fiInterval("1", "1")
+	zeroOrMore := fromLowerUnbounded("0")
+	historyWith := func(attrs ...string) string { return rootOPT("HISTORY", historyArchetype, attrs...) }
+	optionalEvents := listAttribute("events", optional, zeroOrMore, occurringChild("POINT_EVENT", "at0002", zeroOrMore))
+	contentEmpty := participationsComposition()
+	contentEmpty.Content = []rm.ContentItem{}
+	tests := []struct {
+		name string
+		opt  string
+		root any
+		want []string
+	}{
+		{
+			name: "HISTORY events optional over a POINT_EVENT at 1..1, events absent, no summary",
+			opt:  historyWith(listAttribute("events", optional, zeroOrMore, occurringChild("POINT_EVENT", "at0002", required))),
+			root: rmHistory(nil, nil),
+			want: []string{"cardinality /events[at0002] template occurrences"},
+		},
+		{
+			name: "HISTORY events optional over a POINT_EVENT at 1..1, events present and empty, no summary",
+			opt:  historyWith(listAttribute("events", optional, zeroOrMore, occurringChild("POINT_EVENT", "at0002", required))),
+			root: rmHistory([]rm.Event{}, nil),
+			want: []string{"cardinality /events[at0002] template occurrences"},
+		},
+		{
+			name: "COMPOSITION content optional over a SECTION at 1..1, content present and empty",
+			opt: rootOPT("COMPOSITION", "openEHR-EHR-COMPOSITION.participations.v1",
+				listAttribute("content", optional, zeroOrMore, occurringChild("SECTION", "at0001", required))),
+			root: contentEmpty,
+			want: []string{"cardinality /content[at0001] template occurrences"},
+		},
+		{
+			name: "HISTORY events optional, summary required, both absent",
+			opt:  historyWith(optionalEvents, singleAttribute("summary", "1", "1", occurringChild("ITEM_TREE", "at0004", required))),
+			root: rmHistory(nil, nil),
+			want: []string{"required /summary template existence"},
+		},
+		{
+			name: "HISTORY events optional, summary required, events present and empty, summary absent",
+			opt:  historyWith(optionalEvents, singleAttribute("summary", "1", "1", occurringChild("ITEM_TREE", "at0004", required))),
+			root: rmHistory([]rm.Event{}, nil),
+			want: []string{"required /summary template existence"},
+		},
+		{
+			name: "HISTORY events optional, period required, no events and no summary",
+			opt:  historyWith(optionalEvents, singleAttribute("period", "1", "1", occurringChild("DV_DURATION", "", required))),
+			root: rmHistory(nil, nil),
+			want: []string{"required /period template existence", "rm_invariant / rm HISTORY.Events_valid"},
+		},
+		{
+			name: "COMPOSITION content present and empty, context participations required and absent",
+			opt:  participationsExistenceOPT(required, zeroOrMore),
+			root: contentEmpty,
+			want: []string{"required /context/participations template existence", "rm_invariant /content rm COMPOSITION.Content_valid"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			c := mustCompileInline(t, tc.opt)
+			if got := identityKeys(validation.Validate(tc.root, c).Issues); !slices.Equal(got, tc.want) {
+				t.Errorf("Validate(%s) issues = %q, want %q (REQ-171 One walk, step 2)", tc.name, got, tc.want)
+			}
+		})
 	}
 }
