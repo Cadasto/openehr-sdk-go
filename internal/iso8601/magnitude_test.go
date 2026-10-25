@@ -136,3 +136,52 @@ func TestREQ123_TimeAndDateTimeMagnitude(t *testing.T) {
 		}
 	}
 }
+
+// TestREQ103_UTCMagnitude pins the instant order REQ-103's temporal range
+// shares with REQ-112's DV_INTERVAL bound order: a magnitude less its zone's
+// offset from UTC, east positive. A value with no zone names no instant, and
+// neither does a designator the zone parse refuses.
+func TestREQ103_UTCMagnitude(t *testing.T) {
+	t.Parallel()
+	const mag = 10 * 3600.0
+	tests := []struct {
+		zone string
+		want float64
+		ok   bool
+	}{
+		{zone: "Z", want: mag, ok: true},
+		{zone: "+00:00", want: mag, ok: true},
+		{zone: "-00", want: mag, ok: true},
+		{zone: "+02:00", want: mag - 7200, ok: true},
+		{zone: "+0530", want: mag - 19800, ok: true},
+		{zone: "-05", want: mag + 18000, ok: true},
+		{zone: "+14:00", want: mag - 50400, ok: true},
+		{zone: "", ok: false},
+		{zone: "+15", ok: false},
+		{zone: "+02:0", ok: false},
+		{zone: "02:00", ok: false},
+	}
+	for _, tc := range tests {
+		got, ok := UTCMagnitude(mag, tc.zone)
+		if ok != tc.ok || (ok && got != tc.want) {
+			t.Errorf("UTCMagnitude(%v, %q) = %v, %t; want %v, %t", mag, tc.zone, got, ok, tc.want, tc.ok)
+		}
+	}
+	// The magnitudes of two zoned values compare as their instants do:
+	// 10:00+02:00 is 08:00Z, before 09:00Z, and 2004-05-20T00:30+01:00
+	// is the day before's 23:30Z.
+	early, _ := ParseTime("10:00:00+02:00")
+	late, _ := ParseTime("09:00:00Z")
+	e, _ := UTCMagnitude(early.Magnitude(), early.Zone)
+	l, _ := UTCMagnitude(late.Magnitude(), late.Zone)
+	if e >= l {
+		t.Errorf("UTCMagnitude of 10:00:00+02:00 = %v, of 09:00:00Z = %v; want the first below the second", e, l)
+	}
+	d, tm, _ := ParseDateTime("2004-05-20T00:30:00+01:00")
+	prev, prevTime, _ := ParseDateTime("2004-05-19T23:30:00Z")
+	a, _ := UTCMagnitude(DateTimeMagnitude(d, tm), tm.Zone)
+	b, _ := UTCMagnitude(DateTimeMagnitude(prev, prevTime), prevTime.Zone)
+	if a != b {
+		t.Errorf("UTCMagnitude of 2004-05-20T00:30:00+01:00 = %v, of 2004-05-19T23:30:00Z = %v; want them equal", a, b)
+	}
+}

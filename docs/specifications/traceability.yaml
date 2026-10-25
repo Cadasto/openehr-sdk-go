@@ -1701,6 +1701,7 @@ requirements:
     probes: [PROBE-077, PROBE-081]
     tests:
       - internal/bmmgen/container_bounds_test.go
+      - internal/iso8601/magnitude_test.go
       - internal/rmaccess/interval_test.go
       - internal/rmaccess/presence_test.go
       - internal/rmaccess/reads_test.go

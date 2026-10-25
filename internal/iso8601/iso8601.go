@@ -1,12 +1,18 @@
 // Package iso8601 parses the ISO 8601 date, time, date-time and duration text
 // that openEHR's temporal data values carry, in the forms the openEHR BASE
 // predicates valid_iso8601_date, valid_iso8601_time, valid_iso8601_date_time
-// and valid_iso8601_duration define.
+// and valid_iso8601_duration define, and orders the values it parses.
 //
 // It is the one parser behind the RM's temporal helpers (openehr/rm) and the
 // template layer's temporal validators (openehr/template/constraints), so the
-// two accept exactly the same text. The template layer may not import the RM
-// package, which is why the parser lives here.
+// two accept exactly the same text. It also holds the order the two share:
+// the openEHR BASE Time_definitions constants, BASE
+// Iso8601_duration.to_seconds ([Duration.ToSeconds]), the date, time and
+// date-time magnitudes ([Date.Magnitude], [Time.Magnitude],
+// [DateTimeMagnitude]) with [DateOfMagnitude], their inverse on dates, and
+// the instant order of two zoned values ([UTCMagnitude]), which the
+// validation floor (openehr/validation) uses too. The template layer may not
+// import the RM package, which is why all this lives here.
 //
 // Every function works on the string in memory: none reads a clock, a file or
 // the time zone database, and none panics on malformed input.

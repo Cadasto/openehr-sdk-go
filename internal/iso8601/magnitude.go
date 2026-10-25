@@ -67,11 +67,26 @@ func (p Time) Magnitude() float64 {
 }
 
 // DateTimeMagnitude returns the seconds from 0001-01-01T00:00:00 to the
-// date-time of date d and time t, which is zero when the date-time has no
-// time. It is clock-local, as [Time.Magnitude] is, and reads a part the
-// date or the time leaves out as they do.
+// date-time of date d and time t. A date-time with no time passes the zero
+// Time, so it stands for the start of its date. It is clock-local, as
+// [Time.Magnitude] is, and reads a part the date or the time leaves out as
+// they do.
 func DateTimeMagnitude(d Date, t Time) float64 {
 	return float64(d.Magnitude())*secondsPerDay + float64(t.Hour*3600+t.Minute*60+t.Second) + t.Fraction
+}
+
+// UTCMagnitude returns mag, the clock-local magnitude of a time or a
+// date-time written with the zone designator zone, less the zone's offset
+// from UTC ([ParseZone]): the magnitude of the same instant read in UTC, so
+// two values in different zones compare as instants. ok is false when
+// ParseZone refuses zone, the empty zone of a value that names no instant
+// included.
+func UTCMagnitude(mag float64, zone string) (utc float64, ok bool) {
+	offset, err := ParseZone(zone)
+	if err != nil {
+		return 0, false
+	}
+	return mag - float64(offset), true
 }
 
 // daysFromCivil returns the number of days since the Unix epoch

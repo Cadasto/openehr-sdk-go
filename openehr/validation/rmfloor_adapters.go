@@ -9,6 +9,7 @@ package validation
 // covers every DV_INTERVAL instantiation the registry knows.
 
 import (
+	"github.com/cadasto/openehr-sdk-go/internal/iso8601"
 	"github.com/cadasto/openehr-sdk-go/internal/rmaccess"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
@@ -397,7 +398,9 @@ func temporalOrder(class string, sign int, lowerMag, upperMag float64, lowerVali
 // magnitudes the order compares. That holds for every value the parse
 // accepts: a partial value is ordered by its magnitude, as it is in one zone,
 // and so is a value that holds a leap second. Two designators of one offset,
-// Z and +00:00 or +05:00 and +0500, order a pair as its clocks would.
+// Z and +00:00 or +05:00 and +0500, order a pair as its clocks would. The
+// subtraction is [iso8601.UTCMagnitude], which the REQ-103 temporal range
+// check shares, so the two order zoned values alike.
 //
 // The pair is not ordered when either value has no zone: a value without one
 // names no instant to set against a value with one. A value the parse refuses
@@ -405,31 +408,12 @@ func temporalOrder(class string, sign int, lowerMag, upperMag float64, lowerVali
 // [temporalOrder] says: an empty value as `required` at its …/value, any
 // other by its own Value_valid.
 func instantOrder(class, lowerZone, upperZone string, lowerMag, upperMag float64) (intervalOrder, bool) {
-	lowerOffset, lowerZoned := zoneOffset(lowerZone)
-	upperOffset, upperZoned := zoneOffset(upperZone)
+	lowerUTC, lowerZoned := iso8601.UTCMagnitude(lowerMag, lowerZone)
+	upperUTC, upperZoned := iso8601.UTCMagnitude(upperMag, upperZone)
 	if !lowerZoned || !upperZoned {
 		return intervalOrder{}, false
 	}
-	lowerUTC, upperUTC := lowerMag-float64(lowerOffset), upperMag-float64(upperOffset)
 	return intervalOrder{class: class, inverted: lowerUTC > upperUTC, magnitudes: [2]float64{lowerUTC, upperUTC}}, true
-}
-
-// zoneOffset returns the offset from UTC, in seconds east, of a time zone
-// designator that the REQ-123 parse read from a DV_TIME or a DV_DATE_TIME: Z,
-// ±hh, ±hhmm or ±hh:mm. It reads the offset through that same parse, as the
-// zone of a full DV_TIME at midnight. ok is false when tz is empty, since the
-// value then names no zone. It is false as well if the parse refuses tz,
-// which it does not do for a designator it has read.
-func zoneOffset(tz string) (offset int, ok bool) {
-	if tz == "" {
-		return 0, false
-	}
-	midnight, err := (&rm.DVTime{Value: "00:00:00" + tz}).ToTime()
-	if err != nil {
-		return 0, false
-	}
-	_, offset = midnight.Zone()
-	return offset, true
 }
 
 // codedInOneTerminology reports whether the symbols of two DV_ORDINAL or
