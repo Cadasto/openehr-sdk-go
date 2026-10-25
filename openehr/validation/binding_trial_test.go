@@ -601,6 +601,43 @@ func visitsNeeded(t *testing.T, root any, c *templatecompile.Compiled, ceiling i
 	return 0
 }
 
+// REQ-171 One walk — where the visit limit ends the walk inside the trial of
+// a list item, the stop is reported at the path of the list's attribute,
+// whatever the limit: the item's own path waits on the binding the stop left
+// undecided. Of two members under two siblings that share an id and pin no
+// name, the first is tried under the first sibling; every limit that ends
+// the walk inside that trial reports max_nodes at /content alone, and, with
+// a depth limit the trial reaches first, max_depth there too.
+func TestValidate_REQ171_StopInsideAnItemTrialIsAtItsList(t *testing.T) {
+	c := mustCompileSyntheticOPT(t, reusedArchetypeOPTWith(reusedObservationChild("", 0), reusedObservationChild("", 1)))
+	root := func() any { return reusedComposition("Erste", "Zweite") }
+	if r := validation.Validate(root(), c); !r.OK || len(r.Issues) != 0 {
+		t.Fatalf("Validate within the default limits = OK %t, issues %q, want OK with none", r.OK, issueKeys(r.Issues))
+	}
+	tests := []struct {
+		name  string
+		depth int
+		nodes []int
+		want  []string
+	}{
+		{name: "the visit limit", nodes: []int{1, 2, 10, 40, 64}, want: []string{"max_nodes /content"}},
+		{name: "the depth limit, then the visit limit", depth: 3, nodes: []int{4, 10, 40}, want: []string{"max_depth /content", "max_nodes /content"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, n := range tc.nodes {
+				r := validation.New(validation.WithLimits(validation.Limits{Depth: tc.depth, Nodes: n})).Validate(root(), c)
+				if got := issueKeys(r.Issues); !slices.Equal(got, tc.want) {
+					t.Errorf("Validate within %d visits: issues %q, want %q", n, got, tc.want)
+				}
+				if want := slices.Repeat([]string{"/content"}, len(tc.want)); !slices.Equal(r.Coverage.Stopped, want) {
+					t.Errorf("Validate within %d visits: Coverage.Stopped %q, want %q", n, r.Coverage.Stopped, want)
+				}
+			}
+		})
+	}
+}
+
 // REQ-171 One walk — the visits of a trial count toward the visit limit, and
 // where the limit ends the walk inside a trial no binding is decided: the
 // result holds one max_nodes, one stop in Coverage, and no finding from the

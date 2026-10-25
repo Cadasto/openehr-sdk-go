@@ -311,7 +311,10 @@ func (e *engine) bindItems(n *engineNode, a *engineAttr, children []*tcimpl.Comp
 // how each item binds. Each trial walks the item at the path the shared path
 // rule writes for it under that first binding, against the child tried; the
 // trials are withdrawn, and the caller walks each item once its binding,
-// and so its path, is known.
+// and so its path, is known. Where the visit limit ends the walk inside the
+// trials of an item, that path is not one the item has, and would change
+// with the limit: the stops kept from the trial are reported at attrPath,
+// the path of the list ([engine.stopAt]).
 func (e *engine) bindRanked(n *engineNode, a *engineAttr, children []*tcimpl.CompiledNode, items []any, bound []*tcimpl.CompiledNode, byNodeID []bool, attrPath issuePath, role floorRole) {
 	from := len(e.preds)
 	e.preds = appendBoundPredicates(e.preds, items, bound, a.shape == shapeHash)
@@ -321,8 +324,10 @@ func (e *engine) bindRanked(n *engineNode, a *engineAttr, children []*tcimpl.Com
 		rank := itemRank(buf[:0], children, item, byNodeID[i])
 		if len(rank) > 1 {
 			at := engineNode{value: item, rmType: runtimeRMType(item, a.rmType), path: e.path.item(attrPath, e.preds[from+i]), role: role, depth: n.depth + 1}
+			issues, stops := len(e.found.issues), len(e.stoppedAt)
 			bound[i] = e.bindAmong(rank, func(j int) bool { return hasRoom(rank[j], counts[slices.Index(children, rank[j])]) }, at, e.walk, false)
 			if e.stopped {
+				e.stopAt(issues, stops, attrPath)
 				break
 			}
 		}
@@ -331,4 +336,18 @@ func (e *engine) bindRanked(n *engineNode, a *engineAttr, children []*tcimpl.Com
 		}
 	}
 	e.preds = e.preds[:from]
+}
+
+// stopAt reports at the path at the issues the walk recorded from position
+// issues on, and the stops from position stops on: the `max_depth` and
+// `max_nodes` issues [engine.bindAmong] kept from the trial of a list item in
+// which the visit limit ended the walk, and their stops.
+func (e *engine) stopAt(issues, stops int, at issuePath) {
+	path := at.String()
+	for i := issues; i < len(e.found.issues); i++ {
+		e.found.issues[i].Path = path
+	}
+	for i := stops; i < len(e.stoppedAt); i++ {
+		e.stoppedAt[i] = path
+	}
 }
