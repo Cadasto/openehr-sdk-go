@@ -35,6 +35,12 @@ import (
 // *ComplexObject whose PrimitiveConstraint is a
 // [constraints.ConstraintRef] carrying its <reference>. A missing or
 // blank reference leaves that constraint with an empty Reference.
+//
+// An attribute named null_flavor on an ELEMENT node, the US spelling some
+// OPTs write, is read as null_flavour, the Reference Model attribute, so
+// its constraint applies there; ParseOPTStrict reads it the same way.
+// Every other attribute name is kept as written, whether or not the RM
+// class has it.
 func ParseOPT(r io.Reader) (*OperationalTemplate, error) {
 	return parseOPT(r, false)
 }
@@ -516,10 +522,23 @@ func buildComplexObject(o *xmlCObject, strict bool, depth int) (*ComplexObject, 
 		if err != nil {
 			return nil, err
 		}
+		attr.name = attributeName(o.RMTypeName, attr.name)
 		co.attributes = append(co.attributes, attr)
 	}
 	co.nodeName = deriveNodeName(o.Attributes)
 	return co, nil
+}
+
+// attributeName returns the name the parser gives an attribute the OPT
+// names name on a node of RM type rmType. REQ-100: an ELEMENT's
+// null_flavor, the US spelling some OPTs write, is read as the RM
+// attribute null_flavour, so its constraint applies; that is the only
+// name read otherwise than as written.
+func attributeName(rmType, name string) string {
+	if rmType == "ELEMENT" && name == "null_flavor" {
+		return "null_flavour"
+	}
+	return name
 }
 
 // deriveNodeName extracts the template-level node name (REQ-116): the
