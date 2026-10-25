@@ -49,7 +49,9 @@ func TestOPTSignature_REQ082(t *testing.T) {
 	other := map[string]string{
 		"another concept":   replaceOnce(sigOPT, "<concept>Signature</concept>", "<concept>Other</concept>"),
 		"another attribute": replaceOnce(sigOPT, `kind="x"`, `kind="y"`),
-		"another node":      replaceOnce(sigOPT, "<rm_attribute_name>category</rm_attribute_name>", "<rm_attribute_name>category</rm_attribute_name><existence/>"),
+		// A term code names its terminology before the colon.
+		"another terminology in an attribute value": replaceOnce(sigOPT, `kind="x"`, `kind="SNOMED-CT::x"`),
+		"another node": replaceOnce(sigOPT, "<rm_attribute_name>category</rm_attribute_name>", "<rm_attribute_name>category</rm_attribute_name><existence/>"),
 	}
 	for name, doc := range other {
 		if got := signatureOf([]byte(doc)); got == base {
