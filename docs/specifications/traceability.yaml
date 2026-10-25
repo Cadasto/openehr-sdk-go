@@ -601,6 +601,7 @@ requirements:
       - openehr/client/ehr/directory/directory_test.go
       - openehr/client/ehr/ehr_test.go
       - openehr/client/ehr/ehrstatus/ehrstatus_test.go
+      - openehr/client/ehr/ehrstatus/versioned_test.go
       - openehr/client/ehr/ids_test.go
       - testkit/probes/versioned/probe_010_put_without_if_match.go
       - testkit/probes/versioned/probe_011_put_stale_if_match.go
@@ -2137,6 +2138,7 @@ requirements:
     probes: [PROBE-091]
     tests:
       - openehr/client/ehr/composition/composition_test.go
+      - openehr/client/ehr/composition/versioned_test.go
       - openehr/client/ehr/contribution/contribution_test.go
       - openehr/client/route_guard_test.go
       - testkit/probes/transport/probe_091_path_segment_validation.go
@@ -2164,9 +2166,11 @@ requirements:
       - openehr/client/demographic/versioned_test.go
       - openehr/client/ehr/composition/decode_error_test.go
       - openehr/client/ehr/composition/null_body_test.go
+      - openehr/client/ehr/composition/versioned_test.go
       - openehr/client/ehr/contribution/decode_error_test.go
       - openehr/client/ehr/decode_error_test.go
       - openehr/client/ehr/ehr_test.go
+      - openehr/client/ehr/ehrstatus/versioned_test.go
       - openehr/client/ehr/resource_test.go
       - openehr/client/system/decode_error_test.go
       - openehr/client/system/null_body_test.go
@@ -2525,7 +2529,9 @@ requirements:
     tests:
       - openehr/client/demographic/versioned_test.go
       - openehr/client/ehr/composition/composition_test.go
+      - openehr/client/ehr/composition/versioned_test.go
       - openehr/client/ehr/directory/directory_test.go
       - openehr/client/ehr/ehr_test.go
       - openehr/client/ehr/ehrstatus/ehrstatus_test.go
+      - openehr/client/ehr/ehrstatus/versioned_test.go
       - openehr/client/ehr/version_at_time_test.go
