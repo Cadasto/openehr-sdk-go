@@ -15,15 +15,24 @@ var fixtureSource = SourceInfo{
 	SHA256:         "abc",
 	ExternalPath:   "resources/terminology/openehr_external_terminologies.xml",
 	ExternalSHA256: "def",
+	UnitsPath:      "resources/terminology/PropertyUnitData.xml",
+	UnitsSHA256:    "ghi",
 }
 
-// mergedFixture is the two fixture files as one pin, the shape Render takes.
+// mergedFixture is the three fixture files as one pin, the shape Render
+// takes: the two terminology files merged, and the property-unit table
+// attached as Run attaches it.
 func mergedFixture(t *testing.T) *Terminology {
 	t.Helper()
 	term, err := Merge(mustParse(t, fixture), mustParse(t, externalFixture))
 	if err != nil {
 		t.Fatalf("Merge(fixture, externalFixture) = _, %v", err)
 	}
+	props, err := ParsePropertyUnits(strings.NewReader(propertyUnitsFixture))
+	if err != nil {
+		t.Fatalf("ParsePropertyUnits(propertyUnitsFixture) = _, %v", err)
+	}
+	term.Properties = props
 	return term
 }
 
@@ -46,12 +55,14 @@ func TestRenderEmitsTheGeneratedTable(t *testing.T) {
 	want := []string{
 		"// Source: openEHR TERM Release-9.9.9 (terminology version 9.9.9):",
 		"resources/terminology/openehr_terminology.xml (sha256 abc)",
-		"resources/terminology/openehr_external_terminologies.xml (sha256 def)",
+		"resources/terminology/openehr_external_terminologies.xml (sha256 def) and",
+		"resources/terminology/PropertyUnitData.xml (sha256 ghi).",
 		"// Regenerate: make termgen. Verify: make termgen-check.",
 		"package terminology",
 		`const Version = "9.9.9"`,
 		`const SourceSHA256 = "abc"`,
 		`const ExternalSourceSHA256 = "def"`,
+		`const PropertyUnitSourceSHA256 = "ghi"`,
 		`var AuditChangeType = newGroup("audit_change_type", "audit change type", []Concept{`,
 		`{Code: "249", Rubric: "creation"},`,
 		`{Code: "523", Rubric: "deleted"},`,
@@ -67,6 +78,22 @@ func TestRenderEmitsTheGeneratedTable(t *testing.T) {
 		`"UTF-8",`,
 		"var groups = []*Group{AuditChangeType}",
 		"var codeSets = []*CodeSet{NormalStatuses, Languages, CharacterSets}",
+		// The property-unit table, in source order: the units once each,
+		// in source order, the primary ones marked; a property with no
+		// units carries nil.
+		"// quantityProperties is the pin's 4 properties",
+		"var quantityProperties = []*QuantityProperty{",
+		`newQuantityProperty("122", "Length", []PropertyUnit{`,
+		`{UCUM: "cm"},`,
+		`{UCUM: "um"},`,
+		`{UCUM: "m", Primary: true},`,
+		`{UCUM: "km"},`,
+		`newQuantityProperty("125", "Pressure", []PropertyUnit{`,
+		`{UCUM: "mm[Hg]"},`,
+		`newQuantityProperty("382", "Frequency", []PropertyUnit{`,
+		`{UCUM: "/min", Primary: true},`,
+		`{UCUM: "Hz", Primary: true},`,
+		`newQuantityProperty("130", "Work", nil),`,
 	}
 	at := 0
 	for _, w := range want {

@@ -203,6 +203,7 @@ requirements:
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/mediatype_fuzz_test.go
       - openehr/serialize/simplified/mediatype_test.go
+      - openehr/terminology/property_units_test.go
       - openehr/terminology/terminology_test.go
       - sandbox/nilhandler_test.go
       - smart/discovery/memory_cache_test.go
@@ -283,6 +284,7 @@ requirements:
       - internal/termgen/parse_test.go
       - internal/termgen/render_test.go
       - internal/termgen/run_test.go
+      - internal/termgen/units_test.go
       - openehr/client/ehr/contribution/builder_test.go
       - openehr/client/ehr/version_header_test.go
       - openehr/instance/instance_test.go
@@ -290,6 +292,7 @@ requirements:
       - openehr/serialize/simplified/rmattr_encapsulated_test.go
       - openehr/serialize/simplified/rmattr_party_test.go
       - openehr/terminology/imports_test.go
+      - openehr/terminology/property_units_test.go
       - openehr/terminology/tables_test.go
       - openehr/terminology/terminology_test.go
       - testkit/probes/versioned/probe_084_built_contribution_body.go

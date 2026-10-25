@@ -38,3 +38,21 @@ func ExampleCodeSet_Has() {
 	// true false
 	// true false
 }
+
+// Look up the units of the physical property a C_DV_QUANTITY constraint
+// names, openehr::122 (Length). Membership is exact, as UCUM codes are
+// case-sensitive, and mg measures mass, not length.
+func ExampleQuantityPropertyByCode() {
+	length, ok := terminology.QuantityPropertyByCode("122")
+	fmt.Println(length.Name(), ok)
+	fmt.Println(length.Has("cm"), length.Has("CM"), length.Has("mg"))
+	for u := range length.All() {
+		if u.Primary {
+			fmt.Println("primary:", u.UCUM)
+		}
+	}
+	// Output:
+	// Length true
+	// true false false
+	// primary: m
+}
