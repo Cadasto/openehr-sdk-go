@@ -1557,6 +1557,7 @@ requirements:
       - openehr/instance/reference_uid_internal_test.go
       - openehr/instance/reproducible_test.go
       - openehr/instance/required_context_test.go
+      - openehr/instance/required_mandatory_child_test.go
       - openehr/instance/required_policy_test.go
       - openehr/instance/required_rm_rule_fill_test.go
       - openehr/instance/rm_defaults_named_test.go
