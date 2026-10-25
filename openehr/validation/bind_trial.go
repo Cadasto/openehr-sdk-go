@@ -246,6 +246,7 @@ func (e *engine) bindAmong(candidates []*tcimpl.CompiledNode, room func(int) boo
 			e.decide(n, validates)
 			switch {
 			case validates && keep:
+				// The trial was the kept walk: its records stay as they are.
 			case keep && i == first:
 				s := e.setAside(m)
 				firstFound = &s

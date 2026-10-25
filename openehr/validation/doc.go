@@ -155,8 +155,9 @@
 // built with no options.
 //
 // [WithLimits] sets the two [Limits] of the walk: the nesting depth below
-// which it does not descend (256 by default) and the number of values it
-// visits in one call (100,000 by default). They stop a value built in Go
+// which it does not descend (256 by default) and the number of visits it
+// makes in one call (100,000 by default), where a value tried under several
+// template nodes counts once for each. They stop a value built in Go
 // that nests without end or holds itself, and a decoded document can reach
 // either: a large one the visit limit, a deeply nested one the depth limit.
 // A walk that reaches the depth limit reports one max_depth issue, at the
