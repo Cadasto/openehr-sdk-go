@@ -44,6 +44,14 @@ import (
 // keeps its own constraint. ParseOPTStrict reads it the same way. Every
 // other attribute name is kept as written, whether or not the RM class
 // has it.
+//
+// Both modes read each identifier without the white space a pretty-printer
+// can put around it, as they read codes and list entries: the xsi:type of
+// an <attributes>, a <children> or an <item>, an rm_attribute_name, an
+// rm_type_name, a node_id, the <value> of an archetype_id or a template_id,
+// and the path of an <annotations>. So "defining_code\n   " is read as
+// defining_code, and an xsi:type that holds only white space reads as an
+// empty one.
 func ParseOPT(r io.Reader) (*OperationalTemplate, error) {
 	return parseOPT(r, false)
 }
@@ -257,6 +265,24 @@ type xmlValueWrapper struct {
 	Value string `xml:"value"`
 }
 
+// xmlName is the text of an element, or the value of an XML attribute,
+// that holds an identifier: an xsi:type, an RM attribute or type name, a
+// node id, an archetype id, a template id or the path of an annotation. It
+// is read without its leading and trailing white space, as the parser reads
+// codes and list entries. A pretty-printed OPT can break the line inside
+// such an element, writing "defining_code\n   " for defining_code, and no
+// identifier holds white space at either end, so one that holds only white
+// space reads as empty.
+type xmlName string
+
+// UnmarshalText reads the element's text, or the attribute's value. Like a
+// string field, it gets the element's own character data, without that of
+// any child element.
+func (n *xmlName) UnmarshalText(b []byte) error {
+	*n = xmlName(bytes.TrimSpace(b))
+	return nil
+}
+
 type xmlCodePhrase struct {
 	TerminologyID *xmlValueWrapper `xml:"terminology_id"`
 	CodeString    string           `xml:"code_string"`
@@ -266,16 +292,16 @@ type xmlCodePhrase struct {
 // element. The Type attribute (xsi:type local name) discriminates;
 // the buildNode dispatch interprets which fields are meaningful.
 type xmlCObject struct {
-	Type        string           `xml:"http://www.w3.org/2001/XMLSchema-instance type,attr"`
-	RMTypeName  string           `xml:"rm_type_name"`
-	NodeID      string           `xml:"node_id"`
+	Type        xmlName          `xml:"http://www.w3.org/2001/XMLSchema-instance type,attr"`
+	RMTypeName  xmlName          `xml:"rm_type_name"`
+	NodeID      xmlName          `xml:"node_id"`
 	Occurrences *xmlInterval     `xml:"occurrences"`
 	Attributes  []*xmlCAttribute `xml:"attributes"`
 	// C_ARCHETYPE_ROOT extras — the archetype_id element wraps a
 	// <value> child in the openEHR OPT shape, and so does the optional
 	// template_id Template.xsd allows after it.
-	ArchetypeID     string               `xml:"archetype_id>value"`
-	TemplateID      string               `xml:"template_id>value"`
+	ArchetypeID     xmlName              `xml:"archetype_id>value"`
+	TemplateID      xmlName              `xml:"template_id>value"`
 	TermDefinitions []xmlTermDefSection  `xml:"term_definitions"`
 	TermBindings    []xmlTermBindSection `xml:"term_bindings"`
 	// ARCHETYPE_SLOT extras (raw text — assertion grammar not
@@ -346,8 +372,8 @@ type xmlTermBindSection struct {
 }
 
 type xmlCAttribute struct {
-	Type      string       `xml:"http://www.w3.org/2001/XMLSchema-instance type,attr"`
-	Name      string       `xml:"rm_attribute_name"`
+	Type      xmlName      `xml:"http://www.w3.org/2001/XMLSchema-instance type,attr"`
+	Name      xmlName      `xml:"rm_attribute_name"`
 	Existence *xmlInterval `xml:"existence"`
 	// Cardinality is the AOM 1.4 CARDINALITY block on
 	// C_MULTIPLE_ATTRIBUTE. The is_ordered / is_unique flags are
@@ -397,7 +423,7 @@ type xmlAssertion struct {
 // MAY be empty (the schema permits annotations without a path,
 // targeting the OPT as a whole).
 type xmlAnnotation struct {
-	Path  string              `xml:"path,attr"`
+	Path  xmlName             `xml:"path,attr"`
 	Items []xmlAnnotationItem `xml:"items"`
 }
 
@@ -445,9 +471,9 @@ type optStep struct {
 func (p *optPath) push(attr string, c *xmlCObject) {
 	var id string
 	if c != nil {
-		id = strings.TrimSpace(c.ArchetypeID)
+		id = string(c.ArchetypeID)
 		if id == "" {
-			id = strings.TrimSpace(c.NodeID)
+			id = string(c.NodeID)
 		}
 	}
 	p.steps = append(p.steps, optStep{attr: attr, id: id})
@@ -496,7 +522,7 @@ func buildNode(o *xmlCObject, strict bool, depth int, path *optPath) (Node, erro
 	// behaves as a C_ARCHETYPE_ROOT when an archetype_id is present
 	// (the XSD declares the slot as the concrete type). Detect that
 	// shape before the generic complex-object path.
-	if (o.Type == "" || o.Type == "C_COMPLEX_OBJECT") && strings.TrimSpace(o.ArchetypeID) != "" {
+	if (o.Type == "" || o.Type == "C_COMPLEX_OBJECT") && o.ArchetypeID != "" {
 		o.Type = "C_ARCHETYPE_ROOT"
 	}
 	switch o.Type {
@@ -517,8 +543,8 @@ func buildNode(o *xmlCObject, strict bool, depth int, path *optPath) (Node, erro
 			return nil, err
 		}
 		return &ArchetypeRoot{
-			archetypeID:   strings.TrimSpace(o.ArchetypeID),
-			templateID:    strings.TrimSpace(o.TemplateID),
+			archetypeID:   string(o.ArchetypeID),
+			templateID:    string(o.TemplateID),
 			ComplexObject: *co,
 			terms:         collectTermDefs(o.TermDefinitions),
 			termBindings:  collectTermBindings(o.TermBindings),
@@ -527,8 +553,8 @@ func buildNode(o *xmlCObject, strict bool, depth int, path *optPath) (Node, erro
 		includes := collectAssertions(o.Includes)
 		excludes := collectAssertions(o.Excludes)
 		return &Slot{
-			rmTypeName:     o.RMTypeName,
-			nodeID:         o.NodeID,
+			rmTypeName:     string(o.RMTypeName),
+			nodeID:         string(o.NodeID),
 			includes:       includes,
 			excludes:       excludes,
 			parsedIncludes: parseSlotAssertions(o.Includes),
@@ -563,8 +589,8 @@ func buildNode(o *xmlCObject, strict bool, depth int, path *optPath) (Node, erro
 			return nil, fmt.Errorf("occurrences on %q (%s): %w", o.NodeID, o.RMTypeName, err)
 		}
 		return &ComplexObject{
-			rmTypeName:  o.RMTypeName,
-			nodeID:      o.NodeID,
+			rmTypeName:  string(o.RMTypeName),
+			nodeID:      string(o.NodeID),
 			occurrences: occ,
 			primitive:   primitive,
 		}, nil
@@ -579,8 +605,8 @@ func buildComplexObject(o *xmlCObject, strict bool, depth int, path *optPath) (*
 		return nil, fmt.Errorf("occurrences on %q (%s): %w", o.NodeID, o.RMTypeName, err)
 	}
 	co := &ComplexObject{
-		rmTypeName:  o.RMTypeName,
-		nodeID:      o.NodeID,
+		rmTypeName:  string(o.RMTypeName),
+		nodeID:      string(o.NodeID),
 		occurrences: occ,
 	}
 	for _, a := range o.Attributes {
@@ -591,7 +617,7 @@ func buildComplexObject(o *xmlCObject, strict bool, depth int, path *optPath) (*
 		// attribute's OPT path, structural names only.
 		if strict && a.Type == "" {
 			return nil, fmt.Errorf("%w: <attributes> at %q, of %s %q, has no xsi:type in the XSI namespace (strict mode)",
-				ErrInvalidOPT, path.attribute(a.Name), o.RMTypeName, o.NodeID)
+				ErrInvalidOPT, path.attribute(string(a.Name)), o.RMTypeName, o.NodeID)
 		}
 		attr, err := buildAttribute(a, strict, depth, path)
 		if err != nil {
@@ -692,7 +718,7 @@ func buildAttribute(a *xmlCAttribute, strict bool, depth int, path *optPath) (*A
 		return nil, fmt.Errorf("existence on attribute %q: %w", a.Name, err)
 	}
 	attr := &Attribute{
-		name:      a.Name,
+		name:      string(a.Name),
 		existence: existence,
 	}
 	switch a.Type {
@@ -721,9 +747,9 @@ func buildAttribute(a *xmlCAttribute, strict bool, depth int, path *optPath) (*A
 		// names the attribute's OPT path, structural names only.
 		if strict && c != nil && c.Type == "" {
 			return nil, fmt.Errorf("%w: <children> %d of the attribute at %q (%s %q) has no xsi:type in the XSI namespace (strict mode)",
-				ErrInvalidOPT, i+1, path.attribute(a.Name), c.RMTypeName, c.NodeID)
+				ErrInvalidOPT, i+1, path.attribute(string(a.Name)), c.RMTypeName, c.NodeID)
 		}
-		path.push(a.Name, c)
+		path.push(string(a.Name), c)
 		node, err := buildNode(c, strict, depth+1, path)
 		path.pop()
 		if err != nil {
@@ -866,7 +892,7 @@ func collectAnnotations(xs []xmlAnnotation) map[string][]Annotation {
 			if value == "" && strings.TrimSpace(item.ID) == "" {
 				continue
 			}
-			out[x.Path] = append(out[x.Path], Annotation{
+			out[string(x.Path)] = append(out[string(x.Path)], Annotation{
 				ID:    strings.TrimSpace(item.ID),
 				Value: value,
 			})
