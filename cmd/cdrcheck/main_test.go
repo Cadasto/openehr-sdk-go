@@ -849,13 +849,15 @@ func TestNewEHR_ReadsTheCDRsAnswer_REQ082(t *testing.T) {
 func TestRun_WritesEachRecordAsItCompletes_REQ082_REQ107(t *testing.T) {
 	t.Parallel()
 	cdr := newFakeCDR(t)
+	// Each post record then holds the refusal text, which has spaces in it.
+	cdr.refusal = func(string) string { return `{"message":"refused, as a CDR words it"}` }
 	out := filepath.Join(t.TempDir(), "out")
 	lines := func(name string) []string {
 		b, err := os.ReadFile(filepath.Join(out, name))
 		if err != nil {
 			t.Errorf("read %s mid-run: %v", name, err)
 		}
-		return strings.Fields(string(b))
+		return slices.Collect(strings.Lines(string(b)))
 	}
 	var mu sync.Mutex // the hook runs on the fake's goroutine
 	var onDisk struct{ ehrs, posts, gens []string }
@@ -885,6 +887,11 @@ func TestRun_WritesEachRecordAsItCompletes_REQ082_REQ107(t *testing.T) {
 	for i, line := range onDisk.ehrs {
 		if !strings.Contains(line, ids[i]) {
 			t.Errorf("ehrs.jsonl line %d = %s, want EHR %s", i+1, line, ids[i])
+		}
+	}
+	for i, line := range onDisk.posts {
+		if !strings.Contains(line, "as a CDR words it") {
+			t.Errorf("post.jsonl line %d = %s, want the refusal text, spaces and all", i+1, line)
 		}
 	}
 }
