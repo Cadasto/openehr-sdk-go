@@ -93,3 +93,97 @@ func TestREQ103TemporalValidateAgreesWithREQ123Parse(t *testing.T) {
 		})
 	}
 }
+
+// TestREQ103TemporalRangeAgreesWithREQ123Order holds a TemporalRange to the
+// order of the RM's Compare (REQ-123), which REQ-103 § Validate contract
+// names: for each pair of samples, a range from the second, included,
+// admits the first exactly when Compare orders it at or after the second; a
+// range from the second, excluded, exactly when after; and a range up to the
+// second, included, exactly when at or before. The samples mix full and
+// partial values, both layouts, zones and the to_seconds averages of a year
+// and a month.
+func TestREQ103TemporalRangeAgreesWithREQ123Order(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		validate func(constraints.TemporalRange, string) bool
+		compare  func(a, b string) int
+		samples  []string
+	}{
+		{
+			name: "CDate",
+			validate: func(r constraints.TemporalRange, s string) bool {
+				return len(constraints.CDate{Range: r}.Validate(s)) == 0
+			},
+			compare: func(a, b string) int { return (&rm.DVDate{Value: a}).Compare(rm.DVDate{Value: b}) },
+			samples: []string{
+				"2004", "2004-05", "2004-05-01", "2004-05-20", "20040521", "200406", "2005-01-01",
+				"0001-01-01", "2024-02-29",
+			},
+		},
+		{
+			name: "CTime",
+			validate: func(r constraints.TemporalRange, s string) bool {
+				return len(constraints.CTime{Range: r}.Validate(s)) == 0
+			},
+			compare: func(a, b string) int { return (&rm.DVTime{Value: a}).Compare(rm.DVTime{Value: b}) },
+			samples: []string{
+				"09", "09:30", "09:30:00", "09:30:00.5", "09:30:00+05:00", "09:00:00-05:00", "0930",
+				"23:59:60", "00:00:00Z", "14:00Z",
+			},
+		},
+		{
+			name: "CDateTime",
+			validate: func(r constraints.TemporalRange, s string) bool {
+				return len(constraints.CDateTime{Range: r}.Validate(s)) == 0
+			},
+			compare: func(a, b string) int { return (&rm.DVDateTime{Value: a}).Compare(rm.DVDateTime{Value: b}) },
+			samples: []string{
+				"2004-05-20", "2004-05-20T00", "2004-05-20T00:00:00", "2004-05-20T10:00:00+02:00",
+				"2004-05-20T09:00:00Z", "20040520T100000", "2004-05", "2004-05-20T23:59:59.9", "2004",
+			},
+		},
+		{
+			name: "CDuration",
+			validate: func(r constraints.TemporalRange, s string) bool {
+				return len(constraints.CDuration{Range: r}.Validate(s)) == 0
+			},
+			compare: func(a, b string) int { return (&rm.DVDuration{Value: a}).Compare(rm.DVDuration{Value: b}) },
+			samples: []string{
+				"P0D", "PT24H", "P1D", "P1Y", "P12M", "P365D", "P366D", "P52W", "-P1D", "PT0.5S",
+				"P4Y", "P48M", "P1461D", "-PT0S",
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var admitted, refused int
+			for _, b := range tc.samples {
+				from := constraints.TemporalRange{Lower: b, LowerInclusive: true, UpperUnbounded: true}
+				after := constraints.TemporalRange{Lower: b, UpperUnbounded: true}
+				upTo := constraints.TemporalRange{LowerUnbounded: true, Upper: b, UpperInclusive: true}
+				for _, a := range tc.samples {
+					order := tc.compare(a, b)
+					for _, check := range []struct {
+						r    constraints.TemporalRange
+						want bool
+					}{{from, order >= 0}, {after, order > 0}, {upTo, order <= 0}} {
+						got := tc.validate(check.r, a)
+						if got != check.want {
+							t.Errorf("%s{Range: %+v}.Validate(%q) admits = %t, but the RM's Compare(%q, %q) = %d", tc.name, check.r, a, got, a, b, order)
+						}
+						if got {
+							admitted++
+						} else {
+							refused++
+						}
+					}
+				}
+			}
+			if admitted == 0 || refused == 0 {
+				t.Errorf("%s samples: the ranges admit %d and refuse %d, want at least one of each", tc.name, admitted, refused)
+			}
+		})
+	}
+}

@@ -16,6 +16,7 @@ import (
 // "202605"), with the month and day checked against the calendar.
 type CDate struct {
 	Pattern string
+	Range   TemporalRange
 }
 
 func (CDate) isPrimitive() {}
@@ -48,6 +49,7 @@ func (c CDate) Validate(value any) []Violation {
 // second may be 60 for a leap second.
 type CTime struct {
 	Pattern string
+	Range   TemporalRange
 }
 
 func (CTime) isPrimitive() {}
@@ -79,6 +81,7 @@ func (c CTime) Validate(value any) []Violation {
 // zone may be written in either layout.
 type CDateTime struct {
 	Pattern string
+	Range   TemporalRange
 }
 
 func (CDateTime) isPrimitive() {}
@@ -115,6 +118,7 @@ func (c CDateTime) Validate(value any) []Violation {
 // do. The AOM pattern is not enforced either.
 type CDuration struct {
 	Pattern string
+	Range   TemporalRange
 }
 
 func (CDuration) isPrimitive() {}
@@ -135,4 +139,12 @@ func (c CDuration) Validate(value any) []Violation {
 		return nil
 	}
 	return []Violation{{Code: CodeInvalidValue, Detail: "value is not a valid ISO 8601 duration", Value: Redact(value)}}
+}
+
+// TemporalRange is the AOM 1.4 range of a C_DATE, C_TIME, C_DATE_TIME or
+// C_DURATION, its bounds ISO 8601 text of the constrained type.
+type TemporalRange struct {
+	Lower, Upper                   string
+	LowerInclusive, UpperInclusive bool
+	LowerUnbounded, UpperUnbounded bool
 }

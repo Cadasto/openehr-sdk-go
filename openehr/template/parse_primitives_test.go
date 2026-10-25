@@ -3,6 +3,7 @@ package template_test
 import (
 	"errors"
 	"io"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 	"github.com/cadasto/openehr-sdk-go/openehr/terminology"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 // REQ-103 — buildPrimitive maps each closed-set xsi:type onto the
@@ -1000,4 +1002,203 @@ func TestParse_CPrimitiveObject_Duration(t *testing.T) {
 	if cd.Pattern != "PThhHmmM" {
 		t.Errorf("CDuration.Pattern = %q, want PThhHmmM", cd.Pattern)
 	}
+}
+
+// temporalRangeXML is an AOM 1.4 range element holding the given children.
+func temporalRangeXML(children string) string {
+	return "<range>" + children + "</range>"
+}
+
+// TestParse_REQ103_TemporalRange pins REQ-103 § Validate contract on the
+// parse: the range of a C_DATE, C_TIME, C_DATE_TIME or C_DURATION is read
+// into its TemporalRange, its bounds trimmed and its omitted flags read by
+// wire.md § REQ-169, and a constraint with no range keeps the zero value.
+func TestParse_REQ103_TemporalRange(t *testing.T) {
+	t.Parallel()
+	closedFlags := `<lower_included>true</lower_included><upper_included>true</upper_included>` +
+		`<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded>`
+	tests := []struct {
+		name  string
+		child string
+		want  constraints.PrimitiveConstraint
+	}{
+		{
+			name: "C_DURATION, closed, with a pattern",
+			child: `<children xsi:type="C_DURATION"><rm_type_name>DURATION</rm_type_name><node_id/>
+				<pattern>PY</pattern>` + temporalRangeXML(closedFlags+`<lower>P0Y</lower><upper>P150Y</upper>`) + `</children>`,
+			want: constraints.CDuration{Pattern: "PY", Range: constraints.TemporalRange{Lower: "P0Y", Upper: "P150Y", LowerInclusive: true, UpperInclusive: true}},
+		},
+		{
+			name: "C_DURATION, lower bound only, flags omitted",
+			child: `<children xsi:type="C_DURATION"><rm_type_name>DURATION</rm_type_name><node_id/>` +
+				temporalRangeXML(`<lower>PT0S</lower>`) + `</children>`,
+			want: constraints.CDuration{Range: constraints.TemporalRange{Lower: "PT0S", LowerInclusive: true, UpperUnbounded: true}},
+		},
+		{
+			name: "C_DATE, upper excluded",
+			child: `<children xsi:type="C_DATE"><rm_type_name>DATE</rm_type_name><node_id/>
+				<pattern>yyyy-mm-dd</pattern>` + temporalRangeXML(`<upper_included>false</upper_included><lower> 2004-05-20 </lower><upper>2004-06-02</upper>`) + `</children>`,
+			want: constraints.CDate{Pattern: "yyyy-mm-dd", Range: constraints.TemporalRange{Lower: "2004-05-20", Upper: "2004-06-02", LowerInclusive: true}},
+		},
+		{
+			name: "C_TIME, upper bound only",
+			child: `<children xsi:type="C_TIME"><rm_type_name>TIME</rm_type_name><node_id/>` +
+				temporalRangeXML(`<lower_unbounded>true</lower_unbounded><upper_unbounded>false</upper_unbounded><upper>09:30:00+02:00</upper>`) + `</children>`,
+			want: constraints.CTime{Range: constraints.TemporalRange{Upper: "09:30:00+02:00", UpperInclusive: true, LowerUnbounded: true}},
+		},
+		{
+			name: "C_DATE_TIME, inside C_PRIMITIVE_OBJECT",
+			child: `<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>DATE_TIME</rm_type_name><node_id/>
+				<item xsi:type="C_DATE_TIME"><pattern>yyyy-mm-ddTHH:MM:SS</pattern>` +
+				temporalRangeXML(closedFlags+`<lower>2004-05-20T00:00:00Z</lower><upper>2005-05-19T23:59:59Z</upper>`) + `</item></children>`,
+			want: constraints.CDateTime{Pattern: "yyyy-mm-ddTHH:MM:SS", Range: constraints.TemporalRange{
+				Lower: "2004-05-20T00:00:00Z", Upper: "2005-05-19T23:59:59Z", LowerInclusive: true, UpperInclusive: true,
+			}},
+		},
+		{
+			name:  "C_DATE, no range",
+			child: `<children xsi:type="C_DATE"><rm_type_name>DATE</rm_type_name><node_id/><pattern>yyyy-??-XX</pattern></children>`,
+			want:  constraints.CDate{Pattern: "yyyy-??-XX"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			for _, strict := range []bool{false, true} {
+				body := strings.Replace(primitiveOPTTemplate, "%s", tc.child, 1)
+				parse := template.ParseOPT
+				if strict {
+					parse = template.ParseOPTStrict
+				}
+				tmpl, err := parse(strings.NewReader(body))
+				if err != nil {
+					t.Fatalf("strict=%t: parse: %v", strict, err)
+				}
+				if got := firstChildPrimitive(t, tmpl); got != tc.want {
+					t.Errorf("strict=%t: PrimitiveConstraint() = %#v, want %#v", strict, got, tc.want)
+				}
+			}
+		})
+	}
+}
+
+// TestParse_REQ103_TemporalRangeMalformedBound pins REQ-103 § Validate
+// contract on a bound that the ISO 8601 parse of the constrained type
+// refuses: ParseOPTStrict fails with ErrInvalidOPT, and ParseOPT reads that
+// side as unbounded, the other side kept.
+func TestParse_REQ103_TemporalRangeMalformedBound(t *testing.T) {
+	t.Parallel()
+	closedFlags := `<lower_included>true</lower_included><upper_included>true</upper_included>` +
+		`<lower_unbounded>false</lower_unbounded><upper_unbounded>false</upper_unbounded>`
+	tests := []struct {
+		name    string
+		child   string
+		lenient constraints.PrimitiveConstraint
+	}{
+		{
+			name: "C_DURATION lower",
+			child: `<children xsi:type="C_DURATION"><rm_type_name>DURATION</rm_type_name><node_id/>` +
+				temporalRangeXML(closedFlags+`<lower>P1X</lower><upper>P150Y</upper>`) + `</children>`,
+			lenient: constraints.CDuration{Range: constraints.TemporalRange{Upper: "P150Y", UpperInclusive: true, LowerUnbounded: true}},
+		},
+		{
+			name: "C_DATE upper",
+			child: `<children xsi:type="C_DATE"><rm_type_name>DATE</rm_type_name><node_id/>` +
+				temporalRangeXML(closedFlags+`<lower>2004-01-01</lower><upper>2004-02-30</upper>`) + `</children>`,
+			lenient: constraints.CDate{Range: constraints.TemporalRange{Lower: "2004-01-01", LowerInclusive: true, UpperUnbounded: true}},
+		},
+		{
+			name: "C_TIME lower",
+			child: `<children xsi:type="C_TIME"><rm_type_name>TIME</rm_type_name><node_id/>` +
+				temporalRangeXML(closedFlags+`<lower>25:00</lower><upper>10:00</upper>`) + `</children>`,
+			lenient: constraints.CTime{Range: constraints.TemporalRange{Upper: "10:00", UpperInclusive: true, LowerUnbounded: true}},
+		},
+		{
+			name: "C_DATE_TIME bound of another type",
+			child: `<children xsi:type="C_DATE_TIME"><rm_type_name>DATE_TIME</rm_type_name><node_id/>` +
+				temporalRangeXML(closedFlags+`<lower>2004-05-20T10:00</lower><upper>PT1H</upper>`) + `</children>`,
+			lenient: constraints.CDateTime{Range: constraints.TemporalRange{Lower: "2004-05-20T10:00", LowerInclusive: true, UpperUnbounded: true}},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			body := strings.Replace(primitiveOPTTemplate, "%s", tc.child, 1)
+			if _, err := template.ParseOPTStrict(strings.NewReader(body)); !errors.Is(err, template.ErrInvalidOPT) {
+				t.Errorf("ParseOPTStrict err = %v, want errors.Is(err, ErrInvalidOPT)", err)
+			}
+			tmpl, err := template.ParseOPT(strings.NewReader(body))
+			if err != nil {
+				t.Fatalf("ParseOPT: %v", err)
+			}
+			if got := firstChildPrimitive(t, tmpl); got != tc.lenient {
+				t.Errorf("ParseOPT: PrimitiveConstraint() = %#v, want %#v", got, tc.lenient)
+			}
+		})
+	}
+}
+
+// TestParse_REQ103_TemporalRangeVendoredOPTs pins the parse of the C_DURATION
+// ranges the vendored OPTs write: the family history template's age of 0 to
+// 150 years, and the constrain_test template's width of exactly 24 hours and
+// age of at least 4 years.
+func TestParse_REQ103_TemporalRangeVendoredOPTs(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		path string
+		want []constraints.CDuration
+	}{
+		{
+			name: "family_history",
+			path: filepath.Join(fixtures.CrossFormatRoot(), "family_history", "template.opt"),
+			want: []constraints.CDuration{
+				{Pattern: "PY", Range: constraints.TemporalRange{Lower: "P0Y", Upper: "P150Y", LowerInclusive: true, UpperInclusive: true}},
+			},
+		},
+		{
+			name: "constrain_test",
+			path: fixtures.WebTemplateOpt("constrain_test"),
+			want: []constraints.CDuration{
+				{Range: constraints.TemporalRange{Lower: "PT24H", Upper: "PT24H", LowerInclusive: true, UpperInclusive: true}},
+				{Pattern: "PYMWD", Range: constraints.TemporalRange{Lower: "P4Y", LowerInclusive: true, UpperUnbounded: true}},
+				{Pattern: "PY"},
+				{Pattern: "PMWD"},
+				{Pattern: "PYM"},
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			tmpl, err := template.ParseFileStrict(tc.path)
+			if err != nil {
+				t.Fatalf("ParseFileStrict: %v", err)
+			}
+			if got := durationsOf(tmpl.Root()); !slices.Equal(got, tc.want) {
+				t.Errorf("C_DURATION constraints in document order =\n  %#v\nwant\n  %#v", got, tc.want)
+			}
+		})
+	}
+}
+
+// durationsOf returns the CDuration constraints under n, in document order.
+func durationsOf(n template.Node) []constraints.CDuration {
+	co, ok := n.(interface {
+		Attributes() []*template.Attribute
+		PrimitiveConstraint() constraints.PrimitiveConstraint
+	})
+	if !ok {
+		return nil
+	}
+	var out []constraints.CDuration
+	if d, ok := co.PrimitiveConstraint().(constraints.CDuration); ok {
+		out = append(out, d)
+	}
+	for _, a := range co.Attributes() {
+		for _, c := range a.Children() {
+			out = append(out, durationsOf(c)...)
+		}
+	}
+	return out
 }
