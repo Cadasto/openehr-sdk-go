@@ -71,8 +71,9 @@ func optLink(lower, upper int) string {
 
 // TestREQ107_AttributeWithoutWriterIsVisitedOnlyWhereRequired is the REQ-107
 // Visit rule and Errors check on an attribute the generator has no writer
-// for: a LOCATABLE's feeder_audit and links, and a DV_MULTIMEDIA's
-// integrity_check. Where the OPT leaves it optional, whatever it puts under
+// for: a LOCATABLE's feeder_audit and links, an EHR_ACCESS's settings, whose
+// RM type ACCESS_CONTROL_SETTINGS has no concrete class, and a
+// DV_MULTIMEDIA's integrity_check. Where the OPT leaves it optional, whatever it puts under
 // it, it is not visited, and Generate returns a root that passes the RM
 // floor and the template validator; so it is for a list only its existence
 // or only its cardinality asks a member of, which may stay absent. Where the
@@ -111,6 +112,10 @@ func TestREQ107_AttributeWithoutWriterIsVisitedOnlyWhereRequired(t *testing.T) {
 			opt:  optTemplate("CLUSTER", optCardinal("links", 1, -1, optLink(0, 1))),
 		},
 		{
+			name: "optional settings of an EHR_ACCESS over an ACCESS_CONTROL_SETTINGS",
+			opt:  optTemplate("EHR_ACCESS", optOptionalSingleOver("settings", optNode("ACCESS_CONTROL_SETTINGS", ""))),
+		},
+		{
 			name: "optional integrity_check over an OCTET",
 			opt:  optTemplate("DV_MULTIMEDIA", optListWithin("integrity_check", 0, 1, optOccurring("C_COMPLEX_OBJECT", "OCTET", "at0001", 1, 1))),
 		},
@@ -139,6 +144,11 @@ func TestREQ107_AttributeWithoutWriterIsVisitedOnlyWhereRequired(t *testing.T) {
 			name:   "links at existence 1..1 and cardinality 1..*",
 			opt:    optTemplate("CLUSTER", optMultiple("links", optLink(0, 1))),
 			detail: "CLUSTER.links at / (required, but the generator has no writer for it)",
+		},
+		{
+			name:   "settings of an EHR_ACCESS at existence 1..1 over an ACCESS_CONTROL_SETTINGS",
+			opt:    optTemplate("EHR_ACCESS", optSingle("settings", optNode("ACCESS_CONTROL_SETTINGS", ""))),
+			detail: "EHR_ACCESS.settings at / (required, but the generator has no writer for it)",
 		},
 		{
 			name:   "integrity_check at existence 1..1 and cardinality 1..*",

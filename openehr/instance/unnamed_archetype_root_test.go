@@ -35,11 +35,13 @@ func sectionItems(t *testing.T, out any) []rm.ContentItem {
 // returns a root with that attribute empty, which passes the RM floor and
 // the template validator; Required does not visit such an attribute either.
 // That holds for the SECTION's own items, and for a COMPOSITION's content
-// whose optional SECTION requires its items, as section_admin_test has it.
-// Where the OPT or the RM requires the entry, as a 1..1 child, or as the
-// only source of a member of a SECTION's items or a COMPOSITION's content at
-// existence 1..1, lists the RM makes non-empty once present, Generate
-// returns ErrArchetypeIDMissing and no root. Both hold under every policy,
+// whose optional SECTION requires its items. Where the OPT or the RM
+// requires the entry, as a 1..1 child, also below a 1..1 SECTION that an
+// optional content holds, which the list rule makes the content and the
+// SECTION's items required for, or as the only source of a member of a
+// SECTION's items or a COMPOSITION's content at existence 1..1, lists the
+// RM makes non-empty once present, Generate returns ErrArchetypeIDMissing
+// and no root. Both hold under every policy,
 // both value fills and both compile modes.
 func TestREQ107_UnnamedArchetypeRootIsUndescribed(t *testing.T) {
 	cases := []struct {
@@ -76,6 +78,12 @@ func TestREQ107_UnnamedArchetypeRootIsUndescribed(t *testing.T) {
 			name:   "SECTION items over a 1..1 inline ADMIN_ENTRY",
 			opt:    optTemplate("SECTION", optListWithin("items", 0, 1, optInlineAdminEntry(1))),
 			detail: "ADMIN_ENTRY at /items[at0001]",
+		},
+		{
+			name: "optional content over a 1..1 SECTION whose optional items hold a 1..1 inline ADMIN_ENTRY",
+			opt: optTemplate("COMPOSITION", optListWithin("content", 0, 1,
+				optRootOccurring("SECTION", "openEHR-EHR-SECTION.adhoc.v1", 1, 1, optListWithin("items", 0, 1, optInlineAdminEntry(1))))),
+			detail: "ADMIN_ENTRY at /content[openEHR-EHR-SECTION.adhoc.v1]/items[at0001]",
 		},
 		{
 			name:   "SECTION items at existence 1..1 over an optional inline ADMIN_ENTRY",
