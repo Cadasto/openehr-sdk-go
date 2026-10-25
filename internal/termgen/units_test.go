@@ -112,6 +112,19 @@ func TestParsePropertyUnitsRefusesABrokenTable(t *testing.T) {
 			wants: []string{"no properties"},
 		},
 		{
+			// A renamed Unit element leaves the properties without units,
+			// which would switch the property check off.
+			name:  "units under a renamed element",
+			in:    doc(length + `<UnitDef property_id="0" Text="m" primary="true" UCUM="m"/>`),
+			wants: []string{"no UCUM unit"},
+		},
+		{
+			// So does a renamed UCUM attribute.
+			name:  "units with a renamed UCUM attribute",
+			in:    doc(length + `<Unit property_id="0" Text="m" primary="true" ucum="m"/>`),
+			wants: []string{"no UCUM unit"},
+		},
+		{
 			name:  "a property with no openEHR code",
 			in:    doc(`<Property id="0" Text="Length" />`),
 			wants: []string{`"0"`, "openEHR"},

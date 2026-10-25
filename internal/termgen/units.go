@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 )
 
@@ -56,11 +57,12 @@ type xmlUnit struct {
 // code carries.
 //
 // It refuses a document that is not the table, or holds anything after it;
-// a table with no properties; a property with no id or no openEHR code, or
-// one whose id or code another property already has; a unit naming no
-// property; and a primary flag other than "true" or "false". Every refusal
-// names what it refuses: the table is vendored from upstream, so a bad one is
-// a version-bump surprise the maintainer has to read.
+// a table with no properties, or whose properties hold no UCUM unit at all;
+// a property with no id or no openEHR code, or one whose id or code another
+// property already has; a unit naming no property; and a primary flag other
+// than "true" or "false". Every refusal names what it refuses: the table is
+// vendored from upstream, so a bad one is a version-bump surprise the
+// maintainer has to read.
 func ParsePropertyUnits(r io.Reader) ([]PropertyDef, error) {
 	var doc xmlPropertyUnits
 	dec := xml.NewDecoder(r)
@@ -125,6 +127,9 @@ func ParsePropertyUnits(r io.Reader) ([]PropertyDef, error) {
 		}
 		seen[key] = len(props[i].Units)
 		props[i].Units = append(props[i].Units, UnitDef{UCUM: ucum, Primary: primary})
+	}
+	if !slices.ContainsFunc(props, func(p PropertyDef) bool { return len(p.Units) > 0 }) {
+		return nil, errors.New("the property-unit table's properties hold no UCUM unit — a renamed Unit element or UCUM attribute would otherwise switch the property check off")
 	}
 	return props, nil
 }
