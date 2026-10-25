@@ -87,6 +87,8 @@ Author the canonical contract first, so Phases 1–3 cite an existing REQ. The t
    | structural | warning | draft lifecycle_state, empty slot includes |
    | flat_impact | info/warning | Web Template path collision, digit-prefixed id sanitisation |
 
+   The CDR cross-check of 2026-10-24 adds author-facing checks the SDK reads past or reads leniently today, each seen in public OPTs ([evidence](cdr-crosscheck-evidence/README.md), *Template defects* and *CDR observations*): an existence looser than the RM's (AOM 2 VCAEX), children whose occurrences lower bounds add up past the attribute's cardinality upper bound (ADL 1.4 VCOC, AOM 2 VACMCO), an attribute the RM class does not have (AOM 2 VCARM, such as `ISM_TRANSITION.name`), `null_flavor` spelt as in US English, a UTF-8 byte-order mark, an `xsi` prefix bound to a misspelt namespace, and an identifier with white space inside it (a `template_id` with two spaces in a row, an `rm_attribute_name` broken across lines).
+
    and the **stable `opt.` code catalogue** (durable identifiers — canonical in the spec):
    - `opt.xml_malformed`, `opt.missing_template_id`, `opt.unknown_rm_type`
    - `opt.missing_term_definition`, `opt.unparsed_slot_assertion`
