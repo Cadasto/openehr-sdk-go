@@ -5,8 +5,8 @@ package instance
 import (
 	"math"
 	"strings"
-	"time"
 
+	"github.com/cadasto/openehr-sdk-go/internal/iso8601"
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
@@ -31,9 +31,9 @@ import (
 // types. Quantities are ordered only when both bounds share their units,
 // since magnitudes in different units do not compare. Proportions are
 // ordered by the ratio numerator/denominator, and only when both bounds
-// share their type (proportionScale). Date-times and times that carry a
-// zone are ordered as instants, and other dates, times and date-times as
-// text when both share one zoneless layout (temporalCompare). A pair that
+// share their type (proportionScale). Dates, times and date-times are
+// ordered as the RM floor orders them: by magnitude, and two times or
+// date-times in different zones as instants (temporalCompare). A pair that
 // does not compare is left alone.
 //
 // An inverted pair is replaced by the first of these two pairs that is in
@@ -557,10 +557,31 @@ func setOrderedQuantity(slot *rm.DVOrdered, k quantityKey) {
 // DV_DATE_TIME bounds (temporalCompare says how). A C_DATE, C_TIME or
 // C_DATE_TIME has no numeric end, so only a swap repairs an inversion.
 var (
-	dateScale     = temporalScale(temporalCompare("", noZone))
-	timeScale     = temporalScale(temporalCompare("15:04:05Z07:00", timeZoned))
-	dateTimeScale = temporalScale(temporalCompare(time.RFC3339, dateTimeZoned))
+	dateScale     = temporalScale(temporalCompare(dateOrderRead))
+	timeScale     = temporalScale(temporalCompare(timeOrderRead))
+	dateTimeScale = temporalScale(temporalCompare(dateTimeOrderRead))
 )
+
+// temporalRead reads an ISO 8601 value of one type as the order of its
+// type reads it: its magnitude, as the RM's Compare reads it; the zone
+// designator it is written with, "" for none; and whether the REQ-123 parse
+// accepts it.
+type temporalRead func(s string) (magnitude float64, zone string, ok bool)
+
+func dateOrderRead(s string) (float64, string, bool) {
+	d := rm.DVDate{Value: s}
+	return float64(d.Magnitude()), "", d.ValidISO8601()
+}
+
+func timeOrderRead(s string) (float64, string, bool) {
+	t := rm.DVTime{Value: s}
+	return float64(t.Magnitude()), t.Timezone(), t.ValidISO8601()
+}
+
+func dateTimeOrderRead(s string) (float64, string, bool) {
+	dt := rm.DVDateTime{Value: s}
+	return dt.Magnitude(), dt.Timezone(), dt.ValidISO8601()
+}
 
 func dateKeyOf(d rm.DVDate) string { return d.Value }
 
@@ -586,51 +607,31 @@ func temporalScale(compare func(a, b string) (int, bool)) scale[string] {
 	}
 }
 
-// temporalCompare compares two ISO 8601 values. When both parse under
-// layout, which carries a zone, they compare as instants. Otherwise they
-// compare as text, which is their chronological order only when both have
-// the same layout and no zone: then they are the same fixed-width shape.
-// Any other pair, such as a zoned value and a zoneless one, or a full date
-// and a partial one, does not compare. An empty layout skips the instant
-// step.
-func temporalCompare(layout string, zoned func(string) bool) func(a, b string) (int, bool) {
+// temporalCompare compares two ISO 8601 values of one type, read by read,
+// in the order the RM floor puts two bounds of that type in (REQ-112
+// DV_INTERVAL): by their magnitudes when they are written with one zone
+// designator, or both with none, a partial value standing for the start of
+// the period it names; and as instants, each by its magnitude less its
+// zone's offset from UTC ([iso8601.UTCMagnitude]), when both carry a zone
+// and the designators differ. A value with a zone does not compare with
+// one without, nor does a value the REQ-123 parse refuses with any.
+func temporalCompare(read temporalRead) func(a, b string) (int, bool) {
 	return func(a, b string) (int, bool) {
-		if layout != "" {
-			ta, errA := time.Parse(layout, a)
-			tb, errB := time.Parse(layout, b)
-			if errA == nil && errB == nil {
-				return ta.Compare(tb), true
-			}
-		}
-		if zoned(a) || zoned(b) || isoShape(a) != isoShape(b) {
+		aMag, aZone, aOK := read(a)
+		bMag, bZone, bOK := read(b)
+		if !aOK || !bOK {
 			return 0, false
 		}
-		return strings.Compare(a, b), true
-	}
-}
-
-func noZone(string) bool { return false }
-
-// timeZoned reports whether an ISO 8601 time carries a zone: Z or an
-// offset.
-func timeZoned(s string) bool { return strings.ContainsAny(s, "Z+-") }
-
-// dateTimeZoned reports whether an ISO 8601 date-time carries a zone after
-// its time part. A value with no time part has none.
-func dateTimeZoned(s string) bool {
-	_, clock, ok := strings.Cut(s, "T")
-	return ok && timeZoned(clock)
-}
-
-// isoShape is s with every digit replaced by 0, so two values have the same
-// shape exactly when they use the same layout.
-func isoShape(s string) string {
-	return strings.Map(func(r rune) rune {
-		if r >= '0' && r <= '9' {
-			return '0'
+		if aZone == bZone {
+			return compareOrdered(aMag, bMag), true
 		}
-		return r
-	}, s)
+		aUTC, aZoned := iso8601.UTCMagnitude(aMag, aZone)
+		bUTC, bZoned := iso8601.UTCMagnitude(bMag, bZone)
+		if !aZoned || !bZoned {
+			return 0, false
+		}
+		return compareOrdered(aUTC, bUTC), true
+	}
 }
 
 // proportionKey is the part of a DV_PROPORTION bound that is compared and

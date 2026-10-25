@@ -1734,6 +1734,7 @@ requirements:
       - openehr/instance/coded_text_internal_test.go
       - openehr/instance/history_events_test.go
       - openehr/instance/interval_shared_unit_test.go
+      - openehr/instance/interval_temporal_internal_test.go
       - openehr/instance/phase4_test.go
       - openehr/instance/proportion_kind_test.go
       - openehr/instance/quantified_rules_test.go
