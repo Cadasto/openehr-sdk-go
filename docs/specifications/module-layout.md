@@ -84,6 +84,7 @@ Application-specific layer. Shipped in the same module in v1 for adoption conven
 |---|---|
 | `cmd/examples/` | Worked example programs for each named use case. |
 | `cmd/bmmgen/` | CLI entry point for the BMM-driven code generator (REQ-042). |
+| `cmd/cdrcheck/` | Opt-in cross-check of the example generator (REQ-107) and the template validator (REQ-102) against live CDRs ([PROBE-108](conformance.md#probe-108--generated-documents-and-cdr-examples-cross-checked-against-live-cdrs)), driven by `make cdr-crosscheck`. Reads a directory of OPTs and the CDRs from the environment, and writes its output outside the repository. Not part of `make ci`. |
 | `internal/` | Implementation helpers excluded from BC promises (Go convention). |
 | `internal/bmmgen/` | BMM code-generator implementation. Reads `resources/bmm/*.bmm.json` via `openehr/bmm/` and emits `openehr/rm/`, `openehr/aom/aom14/`, and the `typereg` registry. Not part of the public API. |
 | `internal/noredirect/` | The HTTP client for requests that carry a credential: a copy of the caller's client that returns a 3xx answer instead of following it (REQ-060). Shared by `auth/smart`, `auth/clientcreds` and `auth/jwtbearer`; not part of the public API. |
