@@ -84,6 +84,15 @@ func TestPrimitiveConstraint_ExampleValueValidates(t *testing.T) {
 			{Units: "kPa", Magnitude: constraints.NumericRange{Lower: 0, Upper: 40, LowerInclusive: true, UpperInclusive: true}},
 		}}},
 		{"DvQuantity/open", constraints.DvQuantity{}},
+		// REQ-103: a property's units bound the units when no list does.
+		{"DvQuantity/property-units", constraints.DvQuantity{
+			Property:      &constraints.CodedTermRef{Terminology: "openehr", CodeString: "125"},
+			PropertyUnits: []string{"N/m2", "mm[Hg]", "kPa"},
+		}},
+		{"DvQuantity/property-units-and-list", constraints.DvQuantity{
+			Units:         []constraints.QuantityUnit{{Units: "mg"}},
+			PropertyUnits: []string{"N/m2", "mm[Hg]"},
+		}},
 
 		// CDvOrdinal — closed value list.
 		{"CDvOrdinal/values", constraints.CDvOrdinal{Values: []constraints.OrdinalSymbol{
@@ -127,6 +136,44 @@ func TestREQ103_CStringExampleValue(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := tc.c.ExampleValue(); got != tc.want {
 				t.Errorf("CString{List: %q, Pattern: %q, ListOpen: %t}.ExampleValue() = %#v, want %q", tc.c.List, tc.c.Pattern, tc.c.ListOpen, got, tc.want)
+			}
+		})
+	}
+}
+
+// REQ-103 — with no Units list, DvQuantity.ExampleValue gives magnitude 0
+// in the first entry of PropertyUnits, the primary unit the parser puts
+// first; a Units list keeps precedence, and with neither the example is
+// {0, "1"}.
+func TestREQ103_DvQuantityExampleValue(t *testing.T) {
+	cases := []struct {
+		name string
+		c    constraints.DvQuantity
+		want constraints.QuantityValue
+	}{
+		{
+			name: "property units, no list",
+			c:    constraints.DvQuantity{PropertyUnits: []string{"N/m2", "mm[Hg]"}},
+			want: constraints.QuantityValue{Magnitude: 0, Units: "N/m2", Precision: -1},
+		},
+		{
+			name: "property units and a list",
+			c: constraints.DvQuantity{
+				Units:         []constraints.QuantityUnit{{Units: "mm[Hg]", Magnitude: constraints.NumericRange{Lower: 5, Upper: 10, LowerInclusive: true, UpperInclusive: true}}},
+				PropertyUnits: []string{"N/m2"},
+			},
+			want: constraints.QuantityValue{Magnitude: 5, Units: "mm[Hg]", Precision: -1},
+		},
+		{
+			name: "neither",
+			c:    constraints.DvQuantity{},
+			want: constraints.QuantityValue{Magnitude: 0, Units: "1", Precision: -1},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.c.ExampleValue(); got != tc.want {
+				t.Errorf("DvQuantity{Units: %v, PropertyUnits: %q}.ExampleValue() = %#v, want %#v", tc.c.Units, tc.c.PropertyUnits, got, tc.want)
 			}
 		})
 	}
