@@ -29,7 +29,7 @@ date: 2026-10-25
 
 **The composition and EHR_STATUS version reads read `ORIGINAL_VERSION` only, and refuse an `IMPORTED_VERSION` body as a typed decode failure, never as an empty version.** [§ REQ-174](../specifications/wire.md#req-174--versioned-object-reads) *Responses* states the rule, and [§ REQ-095](../specifications/wire.md#req-095) lists the refusal as a keyed exception.
 
-The exception is tied to the EHR Extract scope. It lapses when the extract exchange comes into scope: the version reads then take `IMPORTED_VERSION` and this ADR is superseded by the one that decides what an imported version reports.
+The exception is tied to the EHR Extract scope and is revisited when the extract exchange comes into scope. Whether the reads then take `IMPORTED_VERSION`, and what an imported version reports, is that later decision's; an ADR that reads imported versions would supersede this one.
 
 ## Consequences
 
