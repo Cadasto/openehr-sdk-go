@@ -52,7 +52,8 @@ var (
             <lower>2004-05-20T10:15:30</lower>
           </range>`)
 	// zonedTimeChild admits a TIME with a zone: a synthetic C_TIME with the
-	// ITS-XML timezone_validity 1001, which no vendored OPT writes.
+	// ITS-XML timezone_validity 1001. No vendored OPT writes 1001 on a
+	// C_TIME; sdk_crosscheck_values.v1 writes it on a C_DATE_TIME (at0008).
 	zonedTimeChild = shortNameChild("TIME", "C_TIME", "<timezone_validity>1001</timezone_validity>")
 	// localStampChild admits a DATE_TIME with no zone (timezone_validity
 	// 1003).
