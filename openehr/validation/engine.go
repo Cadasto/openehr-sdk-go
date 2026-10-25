@@ -1033,8 +1033,10 @@ func (e *engine) admitSingle(decl *tcimpl.CompiledAttribute, v engineNode) {
 // no item as [engine.checkEmpty] says. Counts: the template's child count and
 // each child's occurrences. A list the template leaves optional by its
 // existence ([optionalList]) has its children counted when it is absent
-// too, and its child count is not reported while it holds no item, absent
-// or present: canonical JSON carries the one as the other. Then each
+// too; while it holds no item, absent or present, the children counted are
+// those that ask a list for a member ([appendMissingChildIssues]), and its
+// child count is not reported: canonical JSON carries the one as the other.
+// Then each
 // admitted item is walked against the child it binds to, at the path the
 // shared path rule writes for it, with the name the child pins where a
 // sibling shares its id ([appendBoundPredicates]); where the template
@@ -1046,10 +1048,10 @@ func (e *engine) admitSingle(decl *tcimpl.CompiledAttribute, v engineNode) {
 func (e *engine) visitDeclaredItems(n *engineNode, a *engineAttr, r *attrReading, attrPath issuePath, role floorRole) {
 	if !r.present {
 		e.checkAbsent(n, a, attrPath)
-		if optionalList(a.decl) && a.shape != shapeCounted {
-			// No item binds to any child, so a child whose occurrences
-			// lower bound is 1 or more is missing.
-			e.found.issues = appendOccurrenceIssues(e.found.issues, a.decl, tcimpl.ChildNodes(a.decl), nil, attrPath)
+		if optionalList(a.decl) {
+			// No item binds to any child, so each child that asks the
+			// list for a member is missing.
+			e.found.issues = appendMissingChildIssues(e.found.issues, a.decl, attrPath)
 		}
 		return
 	}
@@ -1084,13 +1086,15 @@ func (e *engine) visitDeclaredItems(n *engineNode, a *engineAttr, r *attrReading
 		}
 	}
 	countIssue, countOut := childCountIssue(a.decl, r.count, attrPath)
-	if r.count == 0 && optionalList(a.decl) {
-		// An empty optional list reads as an absent one, whose child count
-		// is not reported.
-		countOut = false
-	}
 	var occurrences []Issue
-	if bound != nil {
+	switch {
+	case r.count == 0 && optionalList(a.decl):
+		// An empty optional list reads as an absent one: its child count
+		// is not reported, and its children are counted as an absent
+		// list's are.
+		countOut = false
+		occurrences = appendMissingChildIssues(nil, a.decl, attrPath)
+	case bound != nil:
 		occurrences = appendOccurrenceIssues(nil, a.decl, children, bound, attrPath)
 	}
 	if r.count == 0 && (a.shape.multiValued() || a.decl.Cardinality() == template.Multiple) {
@@ -1119,19 +1123,52 @@ func (e *engine) visitDeclaredItems(n *engineNode, a *engineAttr, r *attrReading
 
 // optionalList reports whether the template declares attr multi-valued and
 // leaves it optional by its existence, whose lower bound is not bounded and
-// at least 1. On an object the instance carries, each child of such a list
-// is counted against its occurrences whether the list holds items, is
-// present and empty, or is absent: ADL 1.4 makes a child whose occurrences
-// lower bound is 1 or more mandatory in its container, and the REQ-102
-// reading makes it ask for the container too. The list's own child count
-// binds only a container that exists (ADL 1.4: "optional, but if present"),
-// so it is not reported while the list holds no item, absent or present,
-// since canonical JSON carries the one as the other. A list the template
-// requires by its existence fails existence alone when it is absent
-// ([engine.checkAbsent]); the children of a list the template writes as a
-// single-valued attribute are alternatives, which its existence decides.
+// at least 1. On an object the instance carries, the children of such a
+// list are counted against their occurrences whether the list holds items,
+// is present and empty, or is absent: ADL 1.4 makes a child whose
+// occurrences lower bound is 1 or more mandatory in its container, and the
+// reading the generator's Required policy shares makes it ask for the
+// container too. While the list holds no item, absent or present, only the
+// children that ask a list for a member are counted
+// ([appendMissingChildIssues]), and the list's own child count, which binds
+// only a container that exists (ADL 1.4: "optional, but if present"), is
+// not reported, since canonical JSON carries the one as the other. A list
+// the template requires by its existence fails existence alone when it is
+// absent ([engine.checkAbsent]); the children of a list the template writes
+// as a single-valued attribute are alternatives, which its existence
+// decides.
 func optionalList(attr *tcimpl.CompiledAttribute) bool {
 	return attr.Cardinality() == template.Multiple && !tcimpl.LowerAtLeastOne(attr.Existence())
+}
+
+// appendMissingChildIssues appends to issues, for the multi-valued
+// attribute attr at attrPath, which holds no item, the occurrences issue of
+// each child that asks such a list for a member
+// ([tcimpl.MandatoryListChildren]), the one the example generator's
+// Required policy builds members of: no item binds to it, so it appears 0
+// times. The issue is the one [appendOccurrenceIssues] writes for a child
+// the items miss, at the path the child has among all the attribute's
+// children ([optChildPaths]). A list the template prohibits, one of
+// primitive values, and the children of an attribute the template writes
+// as single-valued draw none.
+func appendMissingChildIssues(issues []Issue, attr *tcimpl.CompiledAttribute, attrPath issuePath) []Issue {
+	children := tcimpl.ChildNodes(attr)
+	var childPath []string
+	for c := range tcimpl.MandatoryListChildren(attr) {
+		if childPath == nil {
+			childPath = optChildPaths(attrPath.String(), children)
+		}
+		occ := c.Occurrences()
+		issues = append(issues, Issue{
+			Path:     childPath[slices.Index(children, c)],
+			Code:     "cardinality",
+			Layer:    LayerTemplate,
+			Rule:     ruleOccurrences,
+			Detail:   fmt.Sprintf("OPT child %s appears 0 times under %q; occurrences %s", childIdentity(c), attr.Name(), formatInterval(occ)),
+			Severity: Error,
+		})
+	}
+	return issues
 }
 
 // reportsAt reports whether one of issues is at path. The path is written

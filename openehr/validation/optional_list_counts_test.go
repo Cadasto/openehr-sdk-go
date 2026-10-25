@@ -5,7 +5,9 @@ package validation_test
 // multi-valued attribute that is not a slot is counted against its
 // occurrences whether the list holds items, is present and empty, or is
 // absent, except an absent list the template requires by its existence,
-// which fails existence alone. On a list the template leaves optional by its
+// which fails existence alone, a list of primitive values, and a list the
+// template prohibits, which holding no item draws nothing from its
+// children. On a list the template leaves optional by its
 // existence, the list's own cardinality is not reported when the list is
 // absent or present and empty, since canonical JSON carries the one as the
 // other.
@@ -53,13 +55,17 @@ func optionalListOPT(existence, cardinality string, children ...string) string {
 // both when the list is absent and when it is present and empty. The list's
 // own cardinality is reported in neither case, and still is when the list
 // holds an item. A child that is optional, or that states no occurrences,
-// draws nothing on an absent list. A list the template requires by its
+// draws nothing on an absent list. A list the template prohibits (existence
+// 0..0) draws nothing from its children while it holds none, absent or
+// present and empty, so an instance that leaves it out validates; holding
+// an item, it draws `prohibited` alone. A list the template requires by its
 // existence keeps its rules: absent, it draws `required` alone; present and
 // empty, `required`, its cardinality and the child's occurrences.
 func TestValidate_REQ102_MandatoryChildUnderAnOptionalList(t *testing.T) {
 	t.Parallel()
 	optional := fiInterval("0", "1")
 	required := fiInterval("1", "1")
+	prohibited := fiInterval("0", "0")
 	oneOrMore := fromLowerUnbounded("1")
 	tests := []struct {
 		name string
@@ -108,6 +114,21 @@ func TestValidate_REQ102_MandatoryChildUnderAnOptionalList(t *testing.T) {
 			opt:   optionalListOPT(optional, fromLowerUnbounded("2"), containerElement("1")),
 			items: []rm.Item{textElement()},
 			want:  []string{"cardinality /items template cardinality"},
+		},
+		{
+			name: "absent prohibited list, child at occurrences 1..1",
+			opt:  optionalListOPT(prohibited, oneOrMore, containerElement("1")),
+		},
+		{
+			name:  "present empty prohibited list, child at occurrences 1..1",
+			opt:   optionalListOPT(prohibited, oneOrMore, containerElement("1")),
+			items: []rm.Item{},
+		},
+		{
+			name:  "prohibited list holding an item, child at occurrences 1..1",
+			opt:   optionalListOPT(prohibited, oneOrMore, containerElement("1")),
+			items: []rm.Item{textElement()},
+			want:  []string{"prohibited /items template existence"},
 		},
 		{
 			name: "absent required list, child at occurrences 1..1",
