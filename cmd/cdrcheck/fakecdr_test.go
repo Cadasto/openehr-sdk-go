@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -45,6 +46,13 @@ type fakeCDR struct {
 	// serveStored rewrites a stored OPT on the way out; nil serves it as
 	// uploaded.
 	serveStored func([]byte) []byte
+	// storedStatus, when set, answers every fetch of a stored OPT with this
+	// status and no OPT.
+	storedStatus int
+	// dupStatus, when set, is the status of the refusal of an OPT whose id
+	// the fake holds, in place of a 409; its text says the id exists
+	// already.
+	dupStatus int
 	// example is served for every template the fake holds.
 	example []byte
 
@@ -149,7 +157,7 @@ func (f *fakeCDR) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		id := string(m[1])
 		if _, dup := f.templates[id]; dup {
-			writeJSONError(w, http.StatusConflict, fmt.Sprintf(`{"message":"Operational template with this template ID %s already exists"}`, id))
+			writeJSONError(w, cmp.Or(f.dupStatus, http.StatusConflict), fmt.Sprintf(`{"message":"Operational template with this template ID %s already exists"}`, id))
 			return
 		}
 		f.templates[id] = body
@@ -168,6 +176,10 @@ func (f *fakeCDR) serve(w http.ResponseWriter, r *http.Request) {
 		stored, ok := f.templates[strings.TrimPrefix(p, tplRoute+"/")]
 		if !ok {
 			writeJSONError(w, http.StatusNotFound, `{"message":"not found"}`)
+			return
+		}
+		if f.storedStatus != 0 {
+			writeJSONError(w, f.storedStatus, `{"message":"the stored template cannot be read"}`)
 			return
 		}
 		if f.serveStored != nil {

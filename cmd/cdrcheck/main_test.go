@@ -324,6 +324,63 @@ func TestRun_StoredCopyComparedBySignature_REQ082(t *testing.T) {
 	}
 }
 
+func TestRun_UnreadableStoredCopyIsPresentOnlyAfterA409_REQ082(t *testing.T) {
+	t.Parallel()
+	opt, err := os.ReadFile(vendoredOPT())
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name string
+		// dup is the status of the refusal that says the CDR holds the id.
+		dup         int
+		wantPresent bool
+	}{
+		// A 409 says the CDR holds the template: present, with no
+		// signature compared.
+		{name: "a 409", dup: http.StatusConflict, wantPresent: true},
+		// Another refusal that says so is taken at its word only where the
+		// copy can be read: unread, the template is absent.
+		{name: "a 400 whose text says already", dup: http.StatusBadRequest},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			cdr := newFakeCDR(t)
+			cdr.templates[testTemplate] = opt
+			cdr.dupStatus = tc.dup
+			cdr.storedStatus = http.StatusInternalServerError // the copy cannot be fetched
+			cdr.example = vendoredExample(t)
+			e := env{
+				envTemplates:           templateDir(t, nil, vendoredOPT()),
+				"OPENEHR_LIVE_EHRBASE": cdr.url(),
+				envAllowMutating:       "1",
+			}
+			_, _, out, err := runFor(t, e)
+			if err != nil {
+				t.Fatalf("run = %v", err)
+			}
+			ups := readJSONL[uploadRecord](t, out, "upload.jsonl")
+			if len(ups) != 1 {
+				t.Fatalf("upload.jsonl = %+v, want one record: no copy was read, so nothing is renamed", ups)
+			}
+			// The failed fetch is the record's only trace of the copy.
+			if u := ups[0]; u.Status != tc.dup || u.Present != tc.wantPresent || u.StoredSame != nil || u.StoredStatus != http.StatusInternalServerError {
+				t.Errorf("upload of %s = status %d, present %v, stored same %v, stored status %d; want %d, present %v, no comparison, stored status 500",
+					u.TemplateID, u.Status, u.Present, u.StoredSame, u.StoredStatus, tc.dup, tc.wantPresent)
+			}
+			st := cdr.state()
+			wantPosts, wantAsks := 0, 0
+			if tc.wantPresent {
+				wantPosts, wantAsks = len(policies)*len(fills)+1, 1 // its documents and its own example
+			}
+			if len(st.posted) != wantPosts || len(st.exampleAsks) != wantAsks {
+				t.Errorf("the CDR got %d compositions and %d example requests, want %d and %d", len(st.posted), len(st.exampleAsks), wantPosts, wantAsks)
+			}
+		})
+	}
+}
+
 func TestRun_NeverWritesTheCredential_REQ082(t *testing.T) {
 	t.Parallel()
 	const user, pass = "operator", "s3cr3t-passphrase"
