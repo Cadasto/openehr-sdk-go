@@ -187,16 +187,28 @@ func TestREQ100_StrictRefusesNodeWithNoXSIType(t *testing.T) {
 	}
 }
 
+// untypedCodePhrase is the C_CODE_PHRASE child of the category's
+// defining_code in untypedNodeOPT, the leaf a row replaces to put another
+// primitive constraint there.
+const untypedCodePhrase = `<children xsi:type="C_CODE_PHRASE">
+            <rm_type_name>CODE_PHRASE</rm_type_name>
+            <node_id></node_id>
+            <terminology_id><value>openehr</value></terminology_id>
+            <code_list>433</code_list>
+          </children>`
+
 // TestREQ100_StrictRefusalNamesItsPath pins that strict mode's refusal of an
-// untyped <attributes> or <children> names the OPT path of the attribute,
-// built from attribute names and node or archetype ids only, so a reader can
-// find the element without the message carrying a constraint value.
+// untyped <attributes> or <children>, and of a primitive constraint it cannot
+// read, names the OPT path of the attribute or the node, built from attribute
+// names and node or archetype ids only, so a reader can find the element
+// without the message carrying a constraint value.
 func TestREQ100_StrictRefusalNamesItsPath(t *testing.T) {
 	typed := fmt.Sprintf(untypedNodeOPT, xsiNamespace)
 	const actionID = `<archetype_id><value>openEHR-EHR-ACTION.minimal_2.v1</value></archetype_id>`
 	inAction := func(attributes string) string {
 		return strings.Replace(typed, actionID, attributes+"\n        "+actionID, 1)
 	}
+	withLeaf := func(leaf string) string { return strings.Replace(typed, untypedCodePhrase, leaf, 1) }
 	tests := []struct {
 		name string
 		body string
@@ -228,6 +240,16 @@ func TestREQ100_StrictRefusalNamesItsPath(t *testing.T) {
 				`<children><rm_type_name>ISM_TRANSITION</rm_type_name><node_id>at0002</node_id></children></attributes>`),
 			path: "/content[openEHR-EHR-ACTION.minimal_2.v1]/ism_transition",
 		},
+		{
+			name: "primitive with no item, named by its node id",
+			body: withLeaf(`<children xsi:type="C_PRIMITIVE_OBJECT"><rm_type_name>STRING</rm_type_name><node_id>at0005</node_id></children>`),
+			path: "/category/defining_code[at0005]",
+		},
+		{
+			name: "primitive with no node id",
+			body: withLeaf(`<children xsi:type="CONSTRAINT_REF"><rm_type_name>CODE_PHRASE</rm_type_name><node_id/></children>`),
+			path: "/category/defining_code",
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -250,21 +272,16 @@ func TestREQ100_StrictRefusalNamesItsPath(t *testing.T) {
 	}
 }
 
-// TestREQ100_InvalidOPTPrefixOnce pins that a parse error carries the
-// ErrInvalidOPT prefix once, wherever the parser found the defect, and still
-// matches the sentinel, and ErrUnsupportedNode where that is the cause.
+// TestREQ100_InvalidOPTPrefixOnce pins that a parse error leads with the
+// ErrInvalidOPT prefix and carries it once, wherever the parser found the
+// defect, and still matches the sentinel, and ErrUnsupportedNode where that is
+// the cause.
 func TestREQ100_InvalidOPTPrefixOnce(t *testing.T) {
 	typed := fmt.Sprintf(untypedNodeOPT, xsiNamespace)
-	const codePhrase = `<children xsi:type="C_CODE_PHRASE">
-            <rm_type_name>CODE_PHRASE</rm_type_name>
-            <node_id></node_id>
-            <terminology_id><value>openehr</value></terminology_id>
-            <code_list>433</code_list>
-          </children>`
-	if strings.Count(typed, codePhrase) != 1 {
+	if strings.Count(typed, untypedCodePhrase) != 1 {
 		t.Fatal("the C_CODE_PHRASE child is not found exactly once")
 	}
-	withLeaf := func(leaf string) string { return strings.Replace(typed, codePhrase, leaf, 1) }
+	withLeaf := func(leaf string) string { return strings.Replace(typed, untypedCodePhrase, leaf, 1) }
 	tests := []struct {
 		name        string
 		body        string
@@ -292,6 +309,9 @@ func TestREQ100_InvalidOPTPrefixOnce(t *testing.T) {
 			}
 			if got := strings.Count(err.Error(), prefix); got != 1 {
 				t.Errorf("parse = %q, carries %q %d times, want once", err, prefix, got)
+			}
+			if !strings.HasPrefix(err.Error(), prefix) {
+				t.Errorf("parse = %q, want it to start with %q", err, prefix)
 			}
 			if got := errors.Is(err, template.ErrUnsupportedNode); got != tc.unsupported {
 				t.Errorf("parse = %v, errors.Is(err, ErrUnsupportedNode) = %t, want %t", err, got, tc.unsupported)

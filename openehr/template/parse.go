@@ -549,7 +549,10 @@ func buildNode(o *xmlCObject, strict bool, depth int, path *optPath) (Node, erro
 		// genuinely unknown shapes.
 		primitive, err := buildPrimitive(o, strict)
 		if err != nil {
-			return nil, fmt.Errorf("%s (%s): %w", o.NodeID, o.RMTypeName, err)
+			// The error leads with ErrInvalidOPT, which parseOPT adds
+			// where it does not; the node's OPT path, structural names
+			// only, follows the defect, as in the other refusals.
+			return nil, fmt.Errorf("%w, at %q (%s %q)", err, path.String(), o.RMTypeName, o.NodeID)
 		}
 		if strict && primitive == nil && len(o.Attributes) > 0 {
 			return nil, fmt.Errorf("%w: unknown xsi:type=%q on %q with %d nested attributes (strict mode)",
