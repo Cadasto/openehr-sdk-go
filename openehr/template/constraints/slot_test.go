@@ -6,7 +6,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
 
-// REQ-104: a parsed archetype_id matches assertion is a compiled regexp over
+// REQ-103: a parsed archetype_id matches assertion is a compiled regexp over
 // the archetype id.
 func TestSlotAssertion_MatchesArchetypeID(t *testing.T) {
 	a, err := constraints.NewSlotAssertion(`openEHR-EHR-CLUSTER\.device(-[a-zA-Z0-9_]+)*\.v1`)
@@ -45,7 +45,7 @@ func TestSlotRules_AllowsArchetypeID(t *testing.T) {
 	}
 }
 
-// REQ-104: with no parsed include, AllowsArchetypeID falls back to the
+// REQ-103: with no parsed include, AllowsArchetypeID falls back to the
 // RM-type-prefix rule.
 func TestSlotRules_PrefixFallback(t *testing.T) {
 	rules := constraints.SlotRules{RMTypeName: "SECTION"}
@@ -57,7 +57,7 @@ func TestSlotRules_PrefixFallback(t *testing.T) {
 	}
 }
 
-// REQ-104: AllowsArchetypeID applies excludes before includes.
+// REQ-103: AllowsArchetypeID applies excludes before includes.
 func TestSlotRules_ExcludeWins(t *testing.T) {
 	ex, err := constraints.NewSlotAssertion(`openEHR-EHR-OBSERVATION\.body_weight\..*`)
 	if err != nil {

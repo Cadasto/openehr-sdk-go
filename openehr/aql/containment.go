@@ -147,7 +147,7 @@ func (c Containment) NotContains(child Containment) Containment {
 // two derivations from the same operand cannot write the same backing array
 // (`base.Contains(x)` and `base.Contains(y)` are independent).
 //
-// A junction receiver is REFUSED (REQ-117). The grammar admits no
+// A junction receiver is REFUSED (REQ-163). The grammar admits no
 // `(A OR B) CONTAINS C` form, and appending to a junction would not nest
 // anything: the child would become one more boolean OPERAND, and because an
 // operand carries no connector its negation would be dropped — silently
@@ -195,7 +195,7 @@ func containmentJunction(j containsJoin, operands []Containment) Containment {
 	switch len(operands) {
 	case 0:
 		// Nothing to join. The zero value fails Build loudly rather than
-		// emitting an empty CONTAINS (no silent loss, REQ-117).
+		// emitting an empty CONTAINS (no silent loss, REQ-163).
 		return Containment{}
 	case 1:
 		return operands[0]
@@ -416,7 +416,7 @@ func (c Containment) validateTree(seen map[string]bool) error {
 			return fmt.Errorf("%w: duplicate alias %q", ErrInvalidQuery, c.alias)
 		}
 		seen[c.alias] = true
-		// REQ-117: a class node's children are a CONTAINS chain, so the
+		// REQ-163: a class node's children are a CONTAINS chain, so the
 		// junction-placement rule applies. A junction node's children are
 		// unordered operands — no CONTAINS keyword separates them — so the
 		// rule deliberately does NOT apply there.
@@ -433,7 +433,7 @@ func (c Containment) validateTree(seen map[string]bool) error {
 }
 
 // validateContainsChain refuses a junction anywhere but the END of a CONTAINS
-// chain (REQ-117). The grammar takes a parenthesised group as a whole
+// chain (REQ-163). The grammar takes a parenthesised group as a whole
 // alternative — `containsExpr : classExprOperand (NOT? CONTAINS containsExpr)?
 // | '(' containsExpr ')' | …` — so nothing may follow one with a CONTAINS
 // keyword, and a junction with a further term after it emits AQL the parser

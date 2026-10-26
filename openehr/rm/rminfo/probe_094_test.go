@@ -73,7 +73,7 @@ var probeExcludedPackagePrefixes = []string{
 // same reason probeExcludedClasses is: the duplication confronts the
 // generator's list from the other side.
 //
-// It is the second half of REQ-049's primitive rule, "declared as (or mapped
+// It is the second half of REQ-048's primitive rule, "declared as (or mapped
 // to) a § Primitive type mapping entry": the generator answers *primitive*
 // when the merged schema's `primitive_types` map declares the name OR this
 // mapping names it. A reduction reading only `primitive_types` would be
@@ -117,7 +117,7 @@ type bmmReduction struct {
 	//
 	// primitive holds `primitive_types` DECLARATIONS only — arm (d) of
 	// PROBE-098 reads it with exactly that meaning. The other half of
-	// REQ-049's primitive rule, the § Primitive type mapping table, is
+	// REQ-048's primitive rule, the § Primitive type mapping table, is
 	// probePrimitiveMappedNames, joined in at exclusionKindOf.
 	primitive   map[string]bool
 	enumeration map[string]bool
@@ -195,7 +195,7 @@ func packagePaths(schema *bmm.Schema) map[string]string {
 
 // exclusionKind is WHICH rule of the universe rule keeps a name out — the
 // typed half of the same account exclusionReason renders as prose. The two are
-// derived in one place because PROBE-098 (REQ-049) compares this kind against
+// derived in one place because PROBE-098 (REQ-048) compares this kind against
 // the shipped AbsenceReason, and deriving the answer twice would let the two
 // probes disagree about the same name.
 //
@@ -208,7 +208,7 @@ const (
 	// inTheUniverse and the last two kinds are NOT exclusions — they are
 	// the three outcomes exclusionReason reports as unaccounted.
 	inTheUniverse exclusionKind = iota
-	// The four real exclusions, in REQ-049's fixed precedence order: what
+	// The four real exclusions, in REQ-048's fixed precedence order: what
 	// a name IS ranks ahead of why it was SKIPPED.
 	excludedAsPrimitive
 	excludedAsEnumeration
@@ -219,10 +219,10 @@ const (
 )
 
 // exclusionKindOf accounts for a name the universe does not contain, under
-// REQ-049's fixed precedence: primitive, then enumeration, then excluded class,
+// REQ-048's fixed precedence: primitive, then enumeration, then excluded class,
 // then excluded package.
 //
-// The primitive arm reads BOTH halves of REQ-049's primitive row — declared as
+// The primitive arm reads BOTH halves of REQ-048's primitive row — declared as
 // a `primitive_types` entry, or mapped to one by § Primitive type mapping —
 // because that is the rule the generator applies. Reading only the first half
 // would leave this reduction narrower than what it audits.
@@ -267,10 +267,10 @@ func (r *bmmReduction) exclusionReason(name string) (reason string, accounted bo
 		return "in an excluded package (" + r.packageOf[name] + ")", true
 	case notDeclaredAtAll:
 		// NOT an exclusion: a BMM ancestor the pinned schemas do not define
-		// is a REQ-047 divergence to raise upstream, not a licence to drop
+		// is a BMM divergence to raise upstream (REQ-041), not a licence to drop
 		// the edge. Saying so here is the difference between this arm
 		// catching that day and blessing it.
-		return "NOT DEFINED by the pinned schemas — a REQ-047 divergence, not an exclusion", false
+		return "NOT DEFINED by the pinned schemas — a BMM divergence (REQ-041), not an exclusion", false
 	case unaccountedFor:
 		return "no declared exclusion matches", false
 	}
@@ -310,7 +310,7 @@ func TestProbe094UniverseEqualsThePinnedBMM(t *testing.T) {
 }
 
 // TestProbe094PerClassFactsEqualThePinnedBMM — arm (b). Abstractness is the
-// BMM flag verbatim (REQ-047), parents are the BMM ancestors filtered to the
+// BMM flag verbatim (REQ-041), parents are the BMM ancestors filtered to the
 // universe in declaration order, and ancestors/descendants are the closures of
 // that edge set, computed here rather than read from the table.
 func TestProbe094PerClassFactsEqualThePinnedBMM(t *testing.T) {

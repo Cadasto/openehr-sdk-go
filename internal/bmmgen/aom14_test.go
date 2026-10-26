@@ -13,7 +13,7 @@ import (
 // TestAOM14PlanFileAssignments asserts that the small load-bearing
 // subset of AOM 1.4 classes lands in the expected files.
 //
-// REQ-043: § Mapping rules, Schema → Go package set. The AOM 1.4 target also
+// REQ-041: § Mapping rules, Schema → Go package set. The AOM 1.4 target also
 // emits one Go file per BMM package.
 func TestAOM14PlanFileAssignments(t *testing.T) {
 	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, bmm.FSResolver{Root: testResources})
@@ -115,7 +115,7 @@ func TestAOM14ConcreteRegistry(t *testing.T) {
 // pointer on both sides, in the plan and in the rendered structs.
 // Without the pointer the Go compiler reports "invalid recursive type".
 //
-// REQ-043: § Mapping rules, Property → Go field. A mandatory property that
+// REQ-041: § Mapping rules, Property → Go field. A mandatory property that
 // closes a cycle of mandatory struct-typed properties becomes a pointer,
 // since Go cannot declare a struct that contains itself by value. Like any
 // mandatory pointer, its tag carries omitzero, so a nil one is left out of
@@ -164,7 +164,7 @@ func TestAOM14CyclicSinglePropDetection(t *testing.T) {
 //	cp openehr/aom/aom14/archetype_gen.go \
 //	   internal/bmmgen/testdata/aom14_archetype_gen.go.golden
 //
-// REQ-043: § Mapping rules, for the AOM target. The golden holds the class,
+// REQ-041: § Mapping rules, for the AOM target. The golden holds the class,
 // property and function mapping of the ARCHETYPE file.
 func TestGoldenAOM14Archetype(t *testing.T) {
 	plan, err := BuildPlanForTarget(context.Background(), TargetAOM14, bmm.FSResolver{Root: testResources})
@@ -201,7 +201,7 @@ func TestGoldenAOM14Archetype(t *testing.T) {
 // non-determinism specific to AOM emission (e.g. cross-target import
 // emission triggered by map-iteration order).
 //
-// REQ-042: the AOM 1.4 target is reproducible too, and a fresh generation
+// REQ-041: the AOM 1.4 target is reproducible too, and a fresh generation
 // passes the drift check.
 func TestAOM14IdempotentAndVerifyClean(t *testing.T) {
 	dir1 := t.TempDir()
@@ -240,7 +240,7 @@ func TestAOM14IdempotentAndVerifyClean(t *testing.T) {
 // package prefix and emits the corresponding import. This is the
 // concrete check that Option C (one-way aom14 → rm dep) is wired.
 //
-// REQ-043: § Mapping rules, Schema → Go package set. openehr/aom/aom14 is a
+// REQ-041: § Mapping rules, Schema → Go package set. openehr/aom/aom14 is a
 // sibling of openehr/rm and names the base types through it. The snippets also
 // pin § Property → Go field: the mandatory archetype_id is a value and the
 // optional uid a pointer.

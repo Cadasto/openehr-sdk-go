@@ -6,143 +6,37 @@ kind: specification
 
 **Status:** Draft
 
-Rules for representing the openEHR Reference Model (RM) in Go. Covers REQ-030 through REQ-040.
+Rules for representing the openEHR Reference Model (RM) in Go. Covers REQ-034 and REQ-040; the retired REQ-030 to REQ-033 are [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4, summarised in [§ The shape of the RM in Go](#the-shape-of-the-rm-in-go).
 
 The RM types in `openehr/rm/` are **generated** from the pinned BMM schemas in [`../resources/bmm/`](../../resources/bmm); the rules below state the *shape* the generator emits. Generator semantics (mapping rules per P_BMM construct, primitive types, file conventions) are in [bmm-conformance.md](bmm-conformance.md).
 
-The RM has deep polymorphism: `LOCATABLE → ENTRY → COMPOSITION`; `DATA_VALUE → DV_QUANTITY → DV_DURATION`. Go's type system does not have inheritance, and emulating inheritance leads to runtime-tag confusion and reflection-heavy decoders. This SDK takes a different approach: **concrete structs**, **embedded base structs**, **interfaces for abstract categories**, and **a central type registry for `_type`**.
+## The shape of the RM in Go
 
-## Concrete types (REQ-030)
+The RM has deep polymorphism: `LOCATABLE → ENTRY → COMPOSITION`; `DATA_VALUE → DV_QUANTITY → DV_DURATION`. Go's type system does not have inheritance, and emulating it leads to runtime-tag confusion, reflection-heavy decoders and runtime errors that belong at compile time. The generator's output rule is [ADR 0002](../adr/0002-bmm-codegen-decisions.md) D4; in brief:
 
-Every concrete openEHR RM type **MUST** be expressed as a concrete Go struct. There is no `LocatableBase struct` that everything inherits from at runtime.
-
-```go
-// Concrete types
-type Composition struct { ... }
-type Observation struct { ... }
-type DVQuantity   struct { ... }
-type DVCodedText  struct { ... }
-type DVText       struct { ... }
-```
-
-The SDK **MUST NOT** emulate inheritance via:
-
-- A single `RM` struct with a `Type` discriminator field and a typed payload.
-- A `Base` struct embedded into a `Composition` plus a runtime cast that pretends `*Base` "is" a `Composition`.
-- An `interface{}`-typed `Data` field with a `Kind` enum.
-
-These are common in dynamic-language ports. They produce reflection-heavy decoders, unergonomic call sites, and runtime errors that should have been compile-time errors.
-
-## Embedded base structs (REQ-031)
-
-Shared RM fields **MUST** be expressed as embedded structs in concrete types.
-
-> **Generator output.** The example below teaches the conceptual layering REQ-031 requires. The actual `bmmgen` output diverges per [`../docs/adr/0002-bmm-codegen-decisions.md`](../adr/0002-bmm-codegen-decisions.md) D4: abstract non-generic ancestors are emitted as Go marker interfaces and their properties are **flattened** into every concrete descendant struct. The generated `Composition` therefore carries `Name`, `ArchetypeNodeID`, `UID`, etc. as own fields rather than via a `Locatable` embed. Only concrete ancestors and whitelisted abstract-generic ancestors (e.g. `EVENT` per ADR 0003) appear as Go-level embeds. The teaching example below remains the normative *model* of the layering REQ-031 expresses; ADR 0002 D4 is the canonical *output rule*.
-
-```go
-// Locatable carries the fields that every LOCATABLE descendant shares.
-type Locatable struct {
-    Name            DVText
-    ArchetypeNodeID string
-    UID             *UIDBasedID
-}
-
-// Pathable carries the parent-pointer that PATHABLE descendants share.
-// (In the wire format this is implicit; in the in-memory model it's optional
-// and set by the parser when reconstructing a tree.)
-type Pathable struct {
-    parent any // unexported; set by the parser
-}
-
-// Identified is a common base for entities with a system_id.
-type Identified struct {
-    SystemID HierObjectID
-}
-
-// Concrete COMPOSITION uses embeds:
-type Composition struct {
-    Locatable
-    Identified
-    // Composition-specific fields:
-    Language        CodePhrase
-    Territory       CodePhrase
-    Category        DVCodedText
-    Context         *EventContext
-    Composer        PartyProxy
-    Content         []ContentItem
-}
-```
-
-Rules for embedded base structs:
-
-- Each base struct **SHOULD** correspond to a real RM ancestor (`LOCATABLE`, `PATHABLE`, `ENTRY`, `EVENT`).
-- Embedded fields **MUST NOT** be promoted into a "do-everything" base; if `EVENT` and `INSTRUCTION` share three fields by accident, define a third base struct rather than packing all six fields into `Entry`.
-- Embeds **MUST NOT** be used as interface implementations by composition trickery (e.g. embed a base struct that "implements" `DataValue` to make every descendant satisfy it) — interfaces are method sets (see § Abstract categories below); embeds carry data, not behaviour.
-
-### Generated LOCATABLE identity surface
-
-Because ADR 0002 D4 flattens the `LOCATABLE` fields into every concrete descendant, the generator **MUST** also emit a polymorphic identity surface over them ([ADR 0013](../adr/0013-generated-locatable-identity-surface.md)):
-
-- Every LOCATABLE concrete **MUST** carry four value-receiver read accessors — `GetArchetypeNodeID() string`, `GetName() DVTextLike`, `GetUID() UIDBasedID`, `GetArchetypeDetails() *Archetyped` — whose return types **MUST** equal the flattened field's declared type. The sealed `rm.Locatable` interface lists them; both `T` and `*T` satisfy it.
-- Every LOCATABLE concrete **MUST** carry the four matching pointer-receiver setters, collected behind the sealed `rm.MutableLocatable` interface (satisfied by `*T` only).
-- Accessors return the field verbatim: a getter invoked on a typed-nil `*T` panics, so callers **MUST** guard with `rm.IsTypedNil` (§ Type registry below) before asserting/calling.
-- The surface is machine-owned: accessor emission resolves types through the same rules as struct-field rendering, and `make codegen-check` gates drift (REQ-042).
-
-## Abstract categories (REQ-032)
-
-Abstract RM categories — types that no instance can be directly — **MUST** be expressed as Go interfaces:
-
-```go
-// DATA_VALUE is abstract in the RM; every DV_* type is concrete.
-type DataValue interface {
-    isDataValue() // unexported marker — concrete types implement it
-}
-
-// ITEM_STRUCTURE is abstract; ITEM_TREE, ITEM_LIST, ITEM_SINGLE, ITEM_TABLE are concrete.
-type ItemStructure interface {
-    isItemStructure()
-}
-
-// ENTRY is abstract; OBSERVATION, EVALUATION, INSTRUCTION, ACTION, ADMIN_ENTRY are concrete.
-type Entry interface {
-    isEntry()
-    // Entry-level methods that all concrete entries must support:
-    Language() CodePhrase
-    Encoding() CodePhrase
-}
-```
-
-Implementation rules:
-
-- A concrete type satisfies the interface by virtue of its method set; **MUST NOT** require explicit registration.
-- For abstract categories with no shared behaviour (pure type tags), use an unexported marker method (e.g. `isDataValue()`). This prevents external packages from declaring "imposter" types that satisfy the interface accidentally.
-- For abstract categories with shared behaviour (e.g. `Entry.Language()`), declare those methods in the interface and implement them per concrete type — typically by promotion from an embedded base struct.
-
-## No inheritance emulation (REQ-033)
-
-The combination of REQ-030, REQ-031, REQ-032 is **the** way the SDK models openEHR polymorphism. The SDK **MUST NOT**:
-
-- Use tag-magic alone to dispatch on `_type` (e.g. `json.RawMessage` + a switch on a peeked string field with no central registry — REQ-040 below).
-- Provide a "generic RM node" type that holds any kind of RM value indistinguishably (`type RMNode struct { Type string; Data map[string]any }`).
-- Generate Go types from the RM dictionary as a single mega-file — generation **MAY** be used per package, but the rules above still apply to the output.
+- **Concrete structs.** Every concrete RM class is a concrete Go struct (`Composition`, `Observation`, `DVQuantity`, …). There is no runtime base struct that types inherit from, no single RM struct with a `Type` discriminator field, and no `interface{}`-typed payload with a `Kind` enum.
+- **Flattened ancestors.** An abstract non-generic ancestor's properties are flattened into every concrete descendant: the generated `Composition` carries `Name`, `ArchetypeNodeID`, `UID` and the other `LOCATABLE` fields as its own. Only concrete ancestors and whitelisted abstract-generic ancestors (such as `EVENT`, [ADR 0003](../adr/0003-rm-event-polymorphism.md)) appear as embedded structs.
+- **Marker interfaces for abstract categories.** An abstract RM category (`DATA_VALUE`, `ITEM_STRUCTURE`, `ENTRY`, …) is a Go interface with an unexported marker method (`isDataValue()`), which keeps a type outside the package from satisfying it by accident; a concrete type satisfies it through its method set, with no registration.
+- **The type registry for `_type`.** The `_type` discriminator maps onto a concrete Go type only through the type registry ([§ Type registry (REQ-040)](#type-registry-req-040)): no tag-magic dispatch on a peeked `_type`, and no generic "RM node" that holds any kind of RM value indistinguishably.
 
 ## openEHR terminology vocabulary (REQ-034)
 
-The openEHR Terminology — the `openehr` terminology's **groups** (*audit change type*, *version lifecycle state*, *setting*, *participation mode*, *composition category*, …) and **code sets** (*normal statuses*, *compression algorithms*, *integrity check algorithms*), and the **external code sets** the Foundation publishes beside them (*languages* ISO_639-1, *countries* ISO_3166-1, *character sets* IANA_character-sets, *media types* IANA_media-types), that the RM's own invariants reference (`EVENT_CONTEXT.Setting_valid`, `AUDIT_DETAILS.Change_type_valid`, `PARTICIPATION.Mode_valid`, `DV_ORDERED.Normal_status_validity`, `ENTRY.Language_valid`, …) — is part of the specifications the SDK targets, published as a computable artefact by the openEHR Foundation. It is small, closed and versioned with the specifications; it is **not** a runtime terminology-service lookup. The external code sets are the snapshots the Foundation publishes with the TERM release, not the live ISO and IANA registers. Beside them the release publishes the **property-unit table**, `PropertyUnitData.xml`: for each code of the *property* group, the units of measure that measure it, with their UCUM codes, which a `C_DV_QUANTITY` constraint's `property` names ([clinical-modeling.md § REQ-103](clinical-modeling.md#req-103--primitive-constraint-introspection)). The SDK **MUST** carry the terminology the way it carries the BMM ([bmm-conformance.md § REQ-041](bmm-conformance.md#req-041--pinned-bmm-sources) / [§ REQ-042](bmm-conformance.md#req-042--generated-code-drift-detected)):
+The openEHR Terminology — the `openehr` terminology's **groups** (*audit change type*, *version lifecycle state*, *setting*, *participation mode*, *composition category*, …) and **code sets** (*normal statuses*, *compression algorithms*, *integrity check algorithms*), and the **external code sets** the Foundation publishes beside them (*languages* ISO_639-1, *countries* ISO_3166-1, *character sets* IANA_character-sets, *media types* IANA_media-types), that the RM's own invariants reference (`EVENT_CONTEXT.Setting_valid`, `AUDIT_DETAILS.Change_type_valid`, `PARTICIPATION.Mode_valid`, `DV_ORDERED.Normal_status_validity`, `ENTRY.Language_valid`, …) — is part of the specifications the SDK targets, published as a computable artefact by the openEHR Foundation. It is small, closed and versioned with the specifications; it is **not** a runtime terminology-service lookup. The external code sets are the snapshots the Foundation publishes with the TERM release, not the live ISO and IANA registers. Beside them the release publishes the **property-unit table**, `PropertyUnitData.xml`: for each code of the *property* group, the units of measure that measure it, with their UCUM codes, which a `C_DV_QUANTITY` constraint's `property` names ([clinical-modeling.md § REQ-103](clinical-modeling.md#req-103--primitive-constraint-introspection)). The SDK carries the terminology the way it carries the BMM ([bmm-conformance.md § REQ-041](bmm-conformance.md#req-041--pinned-bmm-sources)):
 
-- **Pinned source.** The Foundation's `openehr_terminology.xml`, `openehr_external_terminologies.xml` and `PropertyUnitData.xml` for one named TERM release, all three taken from the same upstream commit, **MUST** be vendored byte-identical under `resources/terminology/`, with the release, the upstream commit and each file's sha256 recorded beside them. A version bump is an explicit, reviewable commit that moves them together; the pin **MUST NOT** be hand-edited, and the build gate **MUST** fail when a vendored file no longer matches its recorded sha256.
-- **Generated, drift-detected accessor.** A stdlib-only building-block package, `openehr/terminology`, **MUST** expose every group and every code set of the pin as typed, closed, source-ordered values — groups with code → rubric, rubric → code and membership lookups, code sets with membership lookups and the issuer and external identifier the pin gives each (`ISO_639-1`, `IANA_character-sets`, `openehr_normal_statuses`, …) — plus the pinned release version. It **MUST** expose the property-unit table in the same form: for each property code, the UCUM codes of the units the table lists for it, taken trimmed, once each and in source order, with the primary units marked, and a membership lookup that is exact, because UCUM codes are case-sensitive; a unit the table gives no UCUM code contributes none. A code set's membership lookup **MUST** ignore letter case when the pin names an issuer other than openEHR (the ISO and IANA sets), because those issuers do: the IANA character-set registry makes no distinction between upper and lower case, RFC 6838 §4.2 makes media type names case-insensitive, and RFC 5646 §2.1.1 treats the ISO 639 language and ISO 3166-1 region subtags of a language tag as case-insensitive. It **MUST** be exact for an openEHR-issued code set, as a group's lookups are. The lookup **MUST** accept only a code the pinned set lists, under the letter-case rule above: a code the live ISO or IANA register holds and the pinned snapshot leaves out, such as one the register added after the release, is not a member until a release bump brings it in, and nor is an IANA alias the set leaves out, such as `ISO-8859-1` beside the listed name `ISO_8859-1:1987`. Its tables **MUST** be generated from the pin and the build gate **MUST** fail when they drift from it (the REQ-042 rule). The package **MUST** import nothing outside the Go standard library — it sits *below* `openehr/rm` so RM-level consumers can adopt it without a cycle — and it joins the [REQ-013](module-layout.md#req-013--building-block-independence) building-block set, where its independence is enforced (`TestTerminologyForbiddenImports`).
-- **One home per code.** SDK code that mints, defaults, validates, or reconstructs an `openehr`-terminology coded value from a bare code or a bare rubric **MUST** take the code set, the rubric and the membership verdict from the accessor; a hand-typed openEHR code table or rubric outside it is a defect. A codec that instead *transports* a caller-supplied code-and-rubric pair whole — the FLAT `ctx/setting` `|code`+`|value`, say — transcribes it and does **not** re-validate its membership here; enforcing the RM instance invariants (`EVENT_CONTEXT.Setting_valid`, …) on decoded values is [REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)'s, not this requirement's. A surface **MAY** keep named constants for the codes it promotes (`LifecycleStateComplete`, `ChangeTypeCreation`, …), but a code's validity at that surface **MUST** be its group membership, and a `DV_CODED_TEXT` the SDK builds from a code **MUST** carry that code's pinned rubric as its `value` — never a rubric typed beside the code.
-- **Negative space.** A lookup of an unknown code or rubric **MUST** report absence (a false second return) rather than a fabricated value, and **MUST NOT** panic — on a nil group or property either (REQ-025). A surface that refused a code outside its group before adopting the accessor **MUST** keep refusing it afterwards; the guard tests carry that bar.
+- **Pinned source.** The Foundation's `openehr_terminology.xml`, `openehr_external_terminologies.xml` and `PropertyUnitData.xml` for one named TERM release, all three taken from the same upstream commit, are vendored byte-identical under `resources/terminology/`, with the release, the upstream commit and each file's sha256 recorded beside them. A version bump is an explicit, reviewable commit that moves them together; the pin is never hand-edited, and the build gate fails when a vendored file no longer matches its recorded sha256.
+- **Generated accessor.** A building-block package, `openehr/terminology`, **MUST** expose every group and every code set of the pin as typed, closed, source-ordered values — groups with code → rubric, rubric → code and membership lookups, code sets with membership lookups and the issuer and external identifier the pin gives each (`ISO_639-1`, `IANA_character-sets`, `openehr_normal_statuses`, …) — plus the pinned release version and the property-unit table: for each property code, the UCUM codes of the units the table lists for it, taken trimmed, once each and in source order, with the primary units marked, and a membership lookup. A unit the table gives no UCUM code contributes none. Its tables are generated from the pin, and the build gate fails when they drift from it; its import rule is in [module-layout.md § REQ-013](module-layout.md#req-013--building-block-independence).
+- **Membership.** A code set's membership lookup **MUST** ignore letter case when the pin names an issuer other than openEHR (the ISO and IANA sets), because those issuers do: the IANA character-set registry makes no distinction between upper and lower case, RFC 6838 §4.2 makes media type names case-insensitive, and RFC 5646 §2.1.1 treats the ISO 639 language and ISO 3166-1 region subtags of a language tag as case-insensitive. A membership lookup **MUST** be exact for an openEHR-issued code set, as a group's lookups are, and for a UCUM code, which is case-sensitive. A lookup **MUST** accept only a code the pinned set lists, under the letter-case rule above: a code the live ISO or IANA register holds and the pinned snapshot leaves out, such as one the register added after the release, is not a member until a release bump brings it in, and nor is an IANA alias the set leaves out, such as `ISO-8859-1` beside the listed name `ISO_8859-1:1987`.
+- **One home per code.** SDK code that mints, defaults, validates, or reconstructs an `openehr`-terminology coded value from a bare code or a bare rubric takes the code set, the rubric and the membership verdict from the accessor; a hand-typed openEHR code table or rubric outside it is a defect. A surface can keep named constants for the codes it promotes (`LifecycleStateComplete`, `ChangeTypeCreation`, …), but a surface that validates such a code **MUST** judge it by its group membership in the pin, and a `DV_CODED_TEXT` the SDK builds from a code **MUST** carry that code's pinned rubric as its `value`, never a rubric typed beside the code. A codec that instead *transports* a caller-supplied code-and-rubric pair whole — the FLAT `ctx/setting` `|code`+`|value`, say — transcribes it and does **not** re-validate its membership here; enforcing the RM instance invariants (`EVENT_CONTEXT.Setting_valid`, …) on decoded values is [REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor)'s, not this requirement's.
+- **Negative space.** A lookup of an unknown code or rubric **MUST** report absence (a false second return) rather than a fabricated value or a panic, on a nil group or property too.
 
-*Out of scope:* external terminologies (SNOMED CT, LOINC, …) — [REQ-105](clinical-modeling.md#req-105--terminology-bindings) covers the bindings an OPT declares, and a terminology *service* stays a consumer concern. Evaluating the RM's coded invariants against the accessor on an RM instance is the template-less RM floor's ([REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor) § *Coded invariants*), not this requirement's.
+*Out of scope:* external terminologies (SNOMED CT, LOINC, …) — [REQ-111](clinical-modeling.md#req-111--public-compiled-template-bridge) covers the bindings an OPT declares, and a terminology *service* stays a consumer concern. Evaluating the RM's coded invariants against the accessor on an RM instance is the template-less RM floor's ([REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor) § *Coded invariants*), not this requirement's.
 
 ## Type registry (REQ-040)
 
-A central type registry in `openehr/rm/typereg` **MUST** map each `_type` string to the constructor of its concrete Go type. Polymorphic JSON decoding of RM fields **MUST** consult the registry.
+A central type registry in `openehr/rm/typereg` maps each `_type` string to the constructor of its concrete Go type, and polymorphic JSON decoding of RM fields goes through it.
 
 ```go
-// openehr/rm/typereg/registry.go (sketch)
+// package typereg (sketch)
 
 type Registry struct { ... }
 
@@ -161,20 +55,30 @@ func (r *Registry) Decode(data []byte) (any, error)
 
 Rules:
 
-- The registry **MUST** be append-only at runtime. Calling `Register` twice for the same `_type` with different constructors **MUST** panic — a name collision is a programmer error, not a recoverable condition.
-- The `rm` package's `init()` **MUST** register every concrete RM type. Consumers do not register types unless they extend the RM (which the SDK does not actively support, but must not actively prevent).
-- The registry **MUST NOT** use reflection to instantiate types — the constructor closure is the only sanctioned mechanism.
-- A decoded value of static type `any` **MUST** be type-asserted at the call site. The SDK provides generic helpers (`typereg.DecodeAs[T DataValue](data)`) where useful.
+- The registry **MUST** decode the `_type` of every concrete RM type the SDK generates; the `rm` package's `init()` registers each one. A `_type` the registry does not know **MUST** fail with an error that carries `typereg.ErrUnknownType`. A missing `_type` **MUST** fail with an error that carries `typereg.ErrMissingType` where no declared type fixes the value, at the top level (`Registry.Decode`) and at an abstract slot; a narrow-interface slot whose declared parent is concrete reads it as that parent type ([wire.md § Polymorphic substitution](wire.md#polymorphic-substitution)). Neither case decodes as a guessed type.
+- The registry is append-only at runtime. Calling `Register` twice for the same `_type` with different constructors **MUST** panic — a name collision is a programmer error, not a recoverable condition. Consumers do not register types unless they extend the RM, which the SDK does not actively support but does not prevent either.
+- The constructor closure is the only mechanism that instantiates a type: the registry uses no reflection ([idiom.md § Generics and reflection](idiom.md#generics-and-reflection)).
+- A decoded value of static type `any` is type-asserted at the call site. The SDK provides generic helpers (`typereg.DecodeAs[T DataValue](data)`) where useful.
 
 The registry is also **reversible** ([ADR 0013](../adr/0013-generated-locatable-identity-surface.md)):
 
-- A generated `rm.RMTypeName(any) (string, bool)` **MUST** map every registered concrete Go type — including generic instantiations over the parameter bound's closed descendant set — back to its bare registration name (`DVInterval[DVQuantity]` → `"DV_INTERVAL"`). Nil interfaces, typed-nil pointers, and non-RM values report `("", false)`.
-- A generated `rm.IsTypedNil(any) bool` **MUST** report whether a value is an interface carrying a typed-nil pointer to a registered concrete; it is the sanctioned guard before calling `Locatable` accessors.
-- The reflection rule of [idiom.md § Generics policy (REQ-024)](idiom.md#generics-policy-req-024) applies to both unchanged, and both **MUST** be regenerated with the forward registrations, so forward and reverse mappings cannot drift.
+- A generated `rm.RMTypeName(any) (string, bool)` **MUST** map every registered concrete Go type — including generic instantiations over the parameter bound's closed descendant set — back to its bare registration name (`DVInterval[DVQuantity]` → `"DV_INTERVAL"`), and report `("", false)` for a nil interface, a typed-nil pointer or a non-RM value.
+- A generated `rm.IsTypedNil(any) bool` **MUST** report whether a value is an interface carrying a typed-nil pointer to a registered concrete type; it is the guard to use before calling `Locatable` accessors.
+
+Both are generated with the forward registrations, so forward and reverse mappings cannot drift, and neither uses reflection.
+
+### Generated LOCATABLE identity surface
+
+Because ADR 0002 D4 flattens the `LOCATABLE` fields into every concrete descendant, the generator also emits a polymorphic identity surface over them ([ADR 0013](../adr/0013-generated-locatable-identity-surface.md)):
+
+- Every LOCATABLE concrete type **MUST** satisfy the sealed `rm.Locatable` interface through four value-receiver read accessors — `GetArchetypeNodeID() string`, `GetName() DVTextLike`, `GetUID() UIDBasedID`, `GetArchetypeDetails() *Archetyped` — each returning the flattened field's declared type, so both `T` and `*T` satisfy it.
+- For every LOCATABLE concrete type `T`, `*T` **MUST** satisfy the sealed `rm.MutableLocatable` interface, which collects the four matching pointer-receiver setters.
+- Accessors return the field verbatim, so a getter called on a typed-nil `*T` panics; a caller guards with `rm.IsTypedNil` before asserting or calling.
+- The surface is machine-owned: accessor emission resolves types through the same rules as struct-field rendering, and the generator's drift check covers it ([bmm-conformance.md § REQ-041](bmm-conformance.md#req-041--pinned-bmm-sources)).
 
 ## Generics for clients, validators, repositories
 
-Client, validator and repository generics follow [idiom.md § Generics policy (REQ-024)](idiom.md#generics-policy-req-024).
+Client, validator and repository generics follow [idiom.md § Generics and reflection](idiom.md#generics-and-reflection).
 
 ```go
 // openehr/client/ehr/composition (sketch)

@@ -60,7 +60,7 @@ func ValidateComposition(comp *rm.Composition, c *templatecompile.Compiled) Resu
 // half reads polymorphically through rm.Locatable.
 //
 // Returns ("", "", false) for nil, typed-nil, and non-RM Go values.
-// REQ-024 — no reflection.
+// No reflection.
 func rmTypeInfo(v any) (rmType string, archetypeNodeID string, ok bool) {
 	name, ok := rmbind.TypeName(v)
 	if !ok {

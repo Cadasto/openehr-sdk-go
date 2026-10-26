@@ -683,12 +683,12 @@ func TestResolveSurfacesAuthMetadata(t *testing.T) { // REQ-062, REQ-070
 		t.Errorf("ManagementEndpoint = %v, want https://auth.example.com/manage", got)
 	}
 
-	// --- auth-methods list (may already be surfaced by Phase 1; verify value) ---
+	// --- auth-methods list (feeds the method cross-check; verify value) ---
 	if !slices.Contains(auth.TokenEndpointAuthMethodsSupported, "private_key_jwt") {
 		t.Errorf("TokenEndpointAuthMethodsSupported = %v, want [private_key_jwt ...]", auth.TokenEndpointAuthMethodsSupported)
 	}
 
-	// --- token-endpoint signing-alg list (feeds Phase 3b G-3; surface only) ---
+	// --- token-endpoint signing-alg list (feeds the client-assertion algorithm check; surface only) ---
 	if !slices.Contains(auth.TokenEndpointAuthSigningAlgValuesSupported, "RS384") {
 		t.Errorf("TokenEndpointAuthSigningAlgValuesSupported = %v, want [RS384 ES384]", auth.TokenEndpointAuthSigningAlgValuesSupported)
 	}
@@ -696,7 +696,7 @@ func TestResolveSurfacesAuthMetadata(t *testing.T) { // REQ-062, REQ-070
 		t.Errorf("TokenEndpointAuthSigningAlgValuesSupported = %v, want [RS384 ES384]", auth.TokenEndpointAuthSigningAlgValuesSupported)
 	}
 
-	// --- id-token signing-alg list (feeds Phase 3e verify allowlist; surface only) ---
+	// --- id-token signing-alg list (feeds the ID-token verify allowlist; surface only) ---
 	if !slices.Contains(auth.IDTokenSigningAlgValuesSupported, "RS256") {
 		t.Errorf("IDTokenSigningAlgValuesSupported = %v, want [RS256 ES384]", auth.IDTokenSigningAlgValuesSupported)
 	}

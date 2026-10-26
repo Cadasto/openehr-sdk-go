@@ -21,7 +21,7 @@ const Probe020CanonicalQuery = "SELECT o FROM EHR e CONTAINS COMPOSITION c " +
 	"WHERE e/ehr_id/value = $ehr_id"
 
 // probe088Constructs are the builder constructs PROBE-088 pins, in assertion
-// order — REQ-117's containment algebra and in-text paging, REQ-118's
+// order — REQ-163's containment algebra and in-text paging, the
 // deprecated `SELECT TOP`, and REQ-163's three write-side carriers (the VERSION
 // predicate, the class standing predicate, the typed projection). Each name is
 // the base name of its golden file (`<name>.aql`) under
@@ -110,7 +110,7 @@ var probe088Constructs = []struct {
 		},
 	},
 	{
-		// REQ-118: the DEPRECATED `SELECT TOP n` row limit — deprecated by
+		// REQ-163: the DEPRECATED `SELECT TOP n` row limit — deprecated by
 		// openEHR QUERY Release-1.1.0 §4.4.3, still buildable because the SDK
 		// must be able to author a shape a client may legitimately send until
 		// the announced removal.
@@ -118,7 +118,7 @@ var probe088Constructs = []struct {
 		build: func() (aql.Query, error) { return inlinePagingQuery().Top(5).Build() },
 	},
 	{
-		// REQ-118: `TOP n BACKWARD` — the direction is part of the bound, so
+		// REQ-163: `TOP n BACKWARD` — the direction is part of the bound, so
 		// dropping it would select the opposite end of the ordered result.
 		name: "select_top_backward",
 		build: func() (aql.Query, error) {
@@ -308,8 +308,8 @@ func probe088ProjectionQuery(cols ...aql.SelectField) (aql.Query, error) {
 		Build()
 }
 
-// probe088Refusals are the build-time refusals REQ-117, REQ-118 and REQ-163
-// require. Each MUST return an error wrapping [aql.ErrInvalidQuery] — never a
+// probe088Refusals are the build-time refusals REQ-163
+// requires. Each MUST return an error wrapping [aql.ErrInvalidQuery] — never a
 // silently combined, ungrammatical, or question-changing emission.
 var probe088Refusals = []struct {
 	name  string
@@ -328,19 +328,19 @@ var probe088Refusals = []struct {
 		build: func() (aql.Query, error) { return inlinePagingQuery().OffsetInline(100).Build() },
 	},
 	{
-		// REQ-118: openEHR QUERY Release-1.1.0 §4.4.3 — "It is not allowed to
+		// REQ-163: openEHR QUERY Release-1.1.0 §4.4.3 — "It is not allowed to
 		// use TOP while also using LIMIT clause in the same query."
 		name:  "top_with_in_text_limit",
 		build: func() (aql.Query, error) { return inlinePagingQuery().Top(5).LimitInline(50).Build() },
 	},
 	{
-		// REQ-118: a TOP is an in-text row bound, so it is exclusive with the
+		// REQ-163: a TOP is an in-text row bound, so it is exclusive with the
 		// request envelope's bound too — two bounds on one query.
 		name:  "top_with_envelope_limit",
 		build: func() (aql.Query, error) { return inlinePagingQuery().Top(5).Limit(20).Build() },
 	},
 	{
-		// REQ-118: the `top` production admits no sign.
+		// REQ-163: the `top` production admits no sign.
 		name:  "negative_top_count",
 		build: func() (aql.Query, error) { return inlinePagingQuery().Top(-1).Build() },
 	},
@@ -392,7 +392,7 @@ var probe088Refusals = []struct {
 // Probe088Constructs returns the construct names PROBE-088 asserts, in
 // assertion order, so a caller can read the matching
 // openehr/aql/testdata/wire/<name>.aql goldens without restating the list.
-func Probe088Constructs() []string { // PROBE-088 (REQ-117, REQ-118, REQ-163)
+func Probe088Constructs() []string { // PROBE-088 (REQ-163)
 	out := make([]string, 0, len(probe088Constructs))
 	for _, c := range probe088Constructs {
 		out = append(out, c.name)
@@ -422,7 +422,7 @@ func Probe088Constructs() []string { // PROBE-088 (REQ-117, REQ-118, REQ-163)
 // goldens maps construct name to committed canonical form; the caller reads
 // the files (probes take no filesystem dependency). The probe needs no
 // client or server.
-func Probe088BuilderContainmentAndPaging(goldens map[string]string, probe020Golden string) (Result, error) { // PROBE-088 (REQ-117, REQ-118, REQ-163)
+func Probe088BuilderContainmentAndPaging(goldens map[string]string, probe020Golden string) (Result, error) { // PROBE-088 (REQ-163)
 	r := Result{Probe: "PROBE-088"}
 	if len(goldens) == 0 {
 		return r, errors.New("PROBE-088: goldens required, one per Probe088Constructs entry")
@@ -463,7 +463,7 @@ func Probe088BuilderContainmentAndPaging(goldens map[string]string, probe020Gold
 		fail("style parity: %s", msg)
 	}
 
-	// The pre-REQ-117 canonical form is untouched — from both directions.
+	// The base canonical form (PROBE-020's) is untouched — from both directions.
 	if probe020Golden != Probe020CanonicalQuery {
 		fail("PROBE-020 golden drifted from the pinned canonical form:\n golden: %q\n pinned: %q",
 			probe020Golden, Probe020CanonicalQuery)
@@ -495,7 +495,7 @@ func Probe088BuilderContainmentAndPaging(goldens map[string]string, probe020Gold
 }
 
 // probe088ReferenceQuery rebuilds the PROBE-020 reference query through the
-// pre-REQ-117 API surface only (Contains with a single Archetype, envelope
+// base API surface only (Contains with a single Archetype, envelope
 // paging untouched).
 func probe088ReferenceQuery() (aql.Query, error) {
 	return aql.NewBuilder().

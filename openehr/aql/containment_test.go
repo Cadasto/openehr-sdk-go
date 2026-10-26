@@ -1,6 +1,6 @@
 package aql_test
 
-// containment_test.go pins the REQ-117 builder containment algebra: the
+// containment_test.go pins the REQ-163 builder containment algebra: the
 // negated (`NOT CONTAINS`) connector, sibling AND / OR junctions, and the
 // parenthesisation rule (NOT binds tightest, then AND, then OR; parentheses
 // only where the grouping is load-bearing). The canonical strings asserted
@@ -19,7 +19,7 @@ import (
 // TestContainmentEmission tables the canonical form of every containment
 // shape the algebra can build. Each case emits from the FROM root `EHR e`
 // so only the containment text varies.
-// REQ-117
+// REQ-163
 func TestContainmentEmission(t *testing.T) {
 	tests := []struct {
 		name string
@@ -162,7 +162,7 @@ func TestContainmentEmission(t *testing.T) {
 // contract: the combinators return a NEW Containment, so a shared operand
 // can be reused across expressions without one derivation clobbering
 // another's children (a slice-aliasing hazard).
-// REQ-117
+// REQ-163
 func TestContainmentValuesAreImmutable(t *testing.T) {
 	base := aql.Class("COMPOSITION", "c")
 	first := base.Contains(aql.Class("OBSERVATION", "o"))
@@ -188,8 +188,8 @@ func TestContainmentValuesAreImmutable(t *testing.T) {
 
 // TestContainmentChainedCalls verifies the flat Contains channel still
 // chains across repeated calls and composes with an expression argument
-// (the pre-REQ-117 behaviour, now on the widened signature).
-// REQ-117
+// (the original single-class behaviour, now on the widened signature).
+// REQ-163
 func TestContainmentChainedCalls(t *testing.T) {
 	q, err := aql.NewBuilder().Select(aql.Col("x")).From("EHR", "e").
 		Contains(aql.Class("COMPOSITION", "c")).
@@ -207,7 +207,7 @@ func TestContainmentChainedCalls(t *testing.T) {
 // TestContainmentBuildRefusals locks the fail-loud contract: every
 // structurally unusable containment tree errors at Build rather than
 // emitting invalid AQL or silently dropping an operand.
-// REQ-117
+// REQ-163
 func TestContainmentBuildRefusals(t *testing.T) {
 	tests := map[string]aql.Containment{
 		"empty junction":              aql.ContainsAnd(),
@@ -229,7 +229,7 @@ func TestContainmentBuildRefusals(t *testing.T) {
 	}
 }
 
-// TestContainmentJunctionMustTerminateChain locks the grammar limit REQ-117
+// TestContainmentJunctionMustTerminateChain locks the grammar limit REQ-163
 // works within: `containsExpr` admits a parenthesised group only as a WHOLE
 // alternative (`'(' containsExpr ')'`), which no `CONTAINS` may follow. A
 // junction therefore has to END the containment chain it sits in; a junction
@@ -239,7 +239,7 @@ func TestContainmentBuildRefusals(t *testing.T) {
 // Re-shaping the tree instead — distributing the tail under the junction's
 // operands — would silently change what the query means, so the builder fails
 // closed and the caller writes the nesting they meant.
-// REQ-117
+// REQ-163
 func TestContainmentJunctionMustTerminateChain(t *testing.T) {
 	junction := func() aql.Containment {
 		return aql.ContainsOr(aql.Class("OBSERVATION", "o"), aql.Class("EVALUATION", "ev"))
@@ -351,7 +351,7 @@ func TestContainmentJunctionMustTerminateChain(t *testing.T) {
 // NOT of a NotContains is dropped and an EXCLUSION silently becomes an
 // alternative. No round-trip or golden assertion can catch that, which is
 // why it is pinned here at Build time.
-// REQ-117
+// REQ-163
 func TestContainmentJunctionRefusesNestedContains(t *testing.T) {
 	sel := func() *aql.Builder {
 		return aql.NewBuilder().Select(aql.Col("x")).From("EHR", "e")
@@ -396,7 +396,7 @@ func TestContainmentJunctionRefusesNestedContains(t *testing.T) {
 // TestContainmentNoStrayKeywords guards the whitespace rule of the
 // canonical form: exactly one space around every keyword, no doubled
 // spaces, no space inside the parentheses.
-// REQ-117
+// REQ-163
 func TestContainmentNoStrayKeywords(t *testing.T) {
 	q, err := aql.NewBuilder().Select(aql.Col("x")).From("EHR", "e").
 		Contains(aql.ContainsAnd(

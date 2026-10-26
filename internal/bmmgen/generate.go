@@ -438,7 +438,7 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, result *Result)
 	// compile step without dragging in the full rm package.
 	//
 	// lookup_gen.go carries the class universe (REQ-048); absence_gen.go
-	// carries the declared-but-omitted names behind it (REQ-049). One run
+	// carries the declared-but-omitted names behind it (REQ-048). One run
 	// emits both, so the two halves can never describe different BMMs.
 	lookupBody, err := RenderRMInfoFile(plan)
 	if err != nil {

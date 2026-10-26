@@ -613,7 +613,7 @@ func contributionGetBackend(t *testing.T, captured *[]*http.Request, presentUID 
 	})
 }
 
-// REQ-142: PROBE-092 reads a contribution back by id on the contribution
+// REQ-174: PROBE-092 reads a contribution back by id on the contribution
 // endpoint.
 func TestProbe092ContributionGetPass(t *testing.T) {
 	const presentUID = "0826851c-c4c2-4d61-92b9-410fb8275ff0"

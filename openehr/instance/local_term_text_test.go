@@ -233,7 +233,7 @@ const optOrdinal = `<children xsi:type="C_DV_ORDINAL"><rm_type_name>DV_ORDINAL</
 // symbol, a locatable's name, an ISM_TRANSITION's careflow step): the
 // coded text takes the text of the term its own archetype, the nearest
 // enclosing archetype root, defines for the code, in Options.Language as
-// REQ-105 resolves it (a language the OPT has no translation for gets the
+// REQ-111 resolves it (a language the OPT has no translation for gets the
 // document language's term). Where the OPT limits the text with a C_STRING
 // that rejects the term text, the text the walk wrote stays (Precedence
 // 1), and a code its own archetype defines no term for, even where an

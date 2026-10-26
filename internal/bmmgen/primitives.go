@@ -136,7 +136,7 @@ func isSkippedClass(name string) bool {
 // the generator skips wholesale. Any class whose package path starts
 // with one of these is omitted from emission.
 //
-// Per REQ-042, org.openehr.rm.ehr_extract is excluded. The
+// Per REQ-041, org.openehr.rm.ehr_extract is excluded. The
 // foundation_types.functional and foundation_types.builtins packages
 // are also excluded — see plan § "Skip foundation_types.functional".
 var skippedPackagePrefixes = []string{

@@ -1,8 +1,8 @@
 package contain_test
 
 // unavoidable_test.go: TypeRelation.Unavoidable — the reachability-avoiding-a-
-// vertex query REQ-164 § The redundant-step ruling names, asked in REQ-160
-// § Reachability semantics' route vocabulary.
+// vertex query the redundant containment step of REQ-164 § Path-shape checks
+// names, asked in REQ-160 § Reachability semantics' route vocabulary.
 //
 // The rows are acceptance-style, like TestCanContainAcceptanceTable's: each is
 // a claim about the pinned RM, so a failing row means either the exclusion walk

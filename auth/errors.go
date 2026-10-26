@@ -154,7 +154,7 @@ func (e *ExchangeError) Terminal() bool {
 		// Not an RFC 6749 §5.2 token-endpoint code (it belongs to RFC 6750
 		// resource-server responses), but some authorization servers return it
 		// on a rejected refresh_token grant. Treat it as terminal so the stored
-		// refresh token is cleared rather than re-POSTed in a loop (F-L).
+		// refresh token is cleared rather than re-POSTed in a loop (REQ-063).
 		return true
 	}
 	return false

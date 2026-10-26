@@ -239,7 +239,7 @@ func TestREQ107_EntryParentsAddressTheirReferences(t *testing.T) {
 
 // TestREQ107_EHRContainerParentsAddressTheirAttributes is the REQ-107
 // check that rmwrite writes the attributes an OPT can name on an
-// EHR_STATUS and a FOLDER, the EHR-wide roots REQ-110 validates, so the
+// EHR_STATUS and a FOLDER, the EHR-wide roots REQ-102 validates, so the
 // generator can build either as a template root: an EHR_STATUS's name,
 // PARTY_SELF subject, other_details and the two Boolean flags, and a
 // FOLDER's name, details, sub-folders and items, which take any class of

@@ -12,7 +12,7 @@ import (
 )
 
 // REQ-102 (Validation dimensions, Issue codes, Items that are not a
-// LOCATABLE) and REQ-110 (Implementation) — an RM value satisfies an OPT
+// LOCATABLE, Roots beyond COMPOSITION) — an RM value satisfies an OPT
 // child when its type equals the child's RMTypeName or descends from it in
 // the pinned BMM, whether that ancestor is abstract or concrete. The value
 // binds to the most specific child, in three tiers: a child of its own type,
@@ -116,7 +116,7 @@ func localCoded(code string) rm.DVCodedText {
 }
 
 // REQ-102 — a DV_CODED_TEXT descends from DV_TEXT, so an ACTOR.languages
-// item coded as one binds to a DV_TEXT child (REQ-110: a demographic root).
+// item coded as one binds to a DV_TEXT child (REQ-102: a demographic root).
 // It used to be refused as rm_type_mismatch.
 func TestValidateDemographic_REQ102_CodedTextLanguageUnderTextChild(t *testing.T) {
 	t.Parallel()
@@ -132,7 +132,7 @@ func TestValidateDemographic_REQ102_CodedTextLanguageUnderTextChild(t *testing.T
 
 // REQ-102 — a PARTY_REF or a LOCATABLE_REF descends from OBJECT_REF, so a
 // FOLDER.items reference of either type binds to an OBJECT_REF child and is
-// walked there (REQ-110: an EHR-IM root). A PARTY_REF used to be refused as
+// walked there (REQ-102: an EHR-IM root). A PARTY_REF used to be refused as
 // rm_type_mismatch. Going the other way, an OBJECT_REF under a PARTY_REF
 // child, or a sibling under a LOCATABLE_REF child, does not conform.
 func TestValidateFolder_REQ102_ReferenceSubtypeUnderObjectRefChild(t *testing.T) {
@@ -484,7 +484,7 @@ const (
       </children>`
 )
 
-// REQ-110, REQ-102 — a C_INTEGER on DV_COUNT.magnitude reads the magnitude, an
+// REQ-102 — a C_INTEGER on DV_COUNT.magnitude reads the magnitude, an
 // rm.Integer64, as the integer it holds. A count the range admits binds the
 // INTEGER child and passes; one it refuses is reported as
 // primitive_out_of_range at the magnitude, never as primitive_wrong_type or
@@ -593,12 +593,12 @@ func TestValidate_REQ102_AlternativeTiers(t *testing.T) {
 	}
 }
 
-// REQ-102, REQ-110 — a round-tripped bare DV_INTERVAL with no bound present
+// REQ-102 — a round-tripped bare DV_INTERVAL with no bound present
 // has no parameter, so only a bare DV_INTERVAL child names its type. Under
 // [DV_INTERVAL<DV_COUNT>, DV_INTERVAL] it binds the bare child in either
 // order, and the typed child's mandatory upper bound is not reported. Under a
 // DV_INTERVAL<DV_COUNT> child alone it is still admitted, in the third tier
-// (REQ-110 Known limitations): it is walked under that child, so a mandatory
+// (REQ-102 Roots beyond COMPOSITION): it is walked under that child, so a mandatory
 // upper bound is reported there, and no type mismatch is.
 //
 // The third-tier admission holds only when no bound is present. A bare
@@ -695,7 +695,7 @@ func orderedIntervalBound(side string) string {
         </attributes>`
 }
 
-// REQ-110, REQ-102 (RM type match) — under a DV_INTERVAL<T> whose T is
+// REQ-102 (RM type match) — under a DV_INTERVAL<T> whose T is
 // abstract, each present bound has to be a T: a bound of a type that
 // conforms to T, such as a DV_COUNT under DV_ORDERED, is one. That holds for
 // the bare interval a round trip decodes and for a typed one whose parameter
@@ -752,7 +752,7 @@ func TestValidate_REQ110_IntervalBoundsConformToAbstractParameter(t *testing.T) 
 	}
 }
 
-// REQ-107, REQ-110 — the generator's output for a DV_INTERVAL<DV_ORDERED>
+// REQ-107, REQ-102 — the generator's output for a DV_INTERVAL<DV_ORDERED>
 // with DV_COUNT bounds, under both policies, validates against that OPT.
 func TestGenerate_REQ107_REQ110_AbstractIntervalParameterValidates(t *testing.T) {
 	t.Parallel()

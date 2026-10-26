@@ -1,6 +1,6 @@
 package system_test
 
-// body_read_error_test.go — REQ-172 § Metadata still arrives, held against the
+// body_read_error_test.go — REQ-151 § Metadata still arrives, held against the
 // System leaf: Capabilities against a 200 whose body is cut mid-read still
 // hands back the response headers beside the *transport.BodyReadError.
 
@@ -19,7 +19,7 @@ import (
 // 200 whose body is cut to return no capabilities, the metadata carrying the
 // ETag the server sent, and an error from which the *transport.BodyReadError
 // is recovered.
-func TestCapabilitiesCutBodyKeepsMetadata(t *testing.T) { // REQ-172
+func TestCapabilitiesCutBodyKeepsMetadata(t *testing.T) { // REQ-151
 	const etag = "caps-1"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -43,7 +43,7 @@ func TestCapabilitiesCutBodyKeepsMetadata(t *testing.T) { // REQ-172
 		t.Errorf("Capabilities returned %+v beside a body-read failure; a partial body is not the representation", caps)
 	}
 	if meta == nil {
-		t.Fatal("Capabilities returned nil *transport.Metadata; REQ-172 requires the response headers come back beside the error")
+		t.Fatal("Capabilities returned nil *transport.Metadata; REQ-151 requires the response headers come back beside the error")
 	}
 	if meta.ETag != etag {
 		t.Errorf("Metadata.ETag = %q, want %q", meta.ETag, etag)

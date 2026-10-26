@@ -25,7 +25,7 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 **Decision:** The SDK is specified and built as an independent module — its surface is defined by the specs, not derived from or gated on any existing codebase. Where a reference CDR already implements a primitive (an HTTP wrapper, RM mapping, auth scaffolding), reuse is opportunistic and case-by-case: generalisable primitives belong in the SDK; consumer-specific concerns stay in the consumer.
 
-**Codified in:** the building-block and boundary rules (REQ-010..014).
+**Codified in:** the building-block and boundary rules (REQ-013 and [module-layout.md § Boundary rules](module-layout.md#boundary-rules)).
 
 ---
 
@@ -33,7 +33,7 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 **Status:** Cancelled.
 
-**Rationale:** Not pursued. The SDK is hand-written and independent; wire-level conformance is guaranteed by the openEHR conformance probe suite (REQ-080), so no shared contract source or code-generation pipeline is needed.
+**Rationale:** Not pursued. The SDK is hand-written and independent; wire-level conformance is guaranteed by the openEHR conformance probe suite ([conformance.md](conformance.md)), so no shared contract source or code-generation pipeline is needed.
 
 ---
 
@@ -41,7 +41,7 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 **Status:** Resolved.
 
-**Decision:** Package-level functions are the primary surface; repository structs are offered as a convenience for injection seams. Settled by the landed client surface and codified in REQ-021..024 ([idiom.md](idiom.md)) — the SDK follows idiomatic Go rather than mirroring another SDK's source shape.
+**Decision:** Package-level functions are the primary surface; repository structs are offered as a convenience for injection seams. Settled by the landed client surface and codified in REQ-021 and [idiom.md § API conventions](idiom.md#api-conventions) — the SDK follows idiomatic Go rather than mirroring another SDK's source shape.
 
 ---
 
@@ -98,7 +98,7 @@ PR 280 cuts cost with no budget line crossed. It stops rebuilding the json/v2 op
 
 **Resolution form (remaining):** the full-inventory and performance sub-questions resolve through plan tasks and benchmarks, not a new ADR. The codec choice is already resolved by [ADR 0022](../adr/0022-canonical-json-encoding-json-v2.md) (which also touched the codegen policy in [ADR 0002](../adr/0002-bmm-codegen-decisions.md), since it changed what the generator emits); a future codec swap, were it revisited, would amend REQ-052 / REQ-053 and possibly REQ-040.
 
-**Implementation gate:** Phase 1b — affects every read path in `openehr/client/*` and openEHR wire conformance (REQ-080).
+**Implementation gate:** Phase 1b — affects every read path in `openehr/client/*` and openEHR wire conformance ([conformance.md](conformance.md)).
 
 ---
 
@@ -174,7 +174,7 @@ PR 280 cuts cost with no budget line crossed. It stops rebuilding the json/v2 op
 
 **Open until:** v1 is in production for at least one minor release. Premature resolution is worse than no resolution.
 
-**Boundary held in v1** (regardless of resolution): REQ-010, REQ-011, REQ-012 enforce the cut line so an extraction would be mechanical, not a rewrite.
+**Boundary held in v1** (regardless of resolution): the [module-layout.md § Boundary rules](module-layout.md#boundary-rules) hold the cut line so an extraction would be mechanical, not a rewrite.
 
 ---
 
@@ -198,7 +198,7 @@ PR 280 cuts cost with no budget line crossed. It stops rebuilding the json/v2 op
 
 **Why it's open:** the FLAT encoder treats resolution failure as an absent optional (`skipNotFound`), which is correct for the unpopulated case and silent data loss for the unknown-attribute case — the exact defect class PROBE-086 surfaced (`EVENT.time`, `INSTRUCTION.narrative`/`expiry_time`, `EVENT_CONTEXT.other_context`, `ACTIVITY.timing`). Because the encoder cannot tell the two conditions apart, the coverage rule in [rm-functions.md § REQ-121](rm-functions.md#req-121--locatable-path-read-access) is enforced by a hand-kept guard test and exemption list rather than derived from the API.
 
-**Resolution options:** a distinct sentinel (e.g. `ErrUnknownAttribute`) letting `skipNotFound` fail loudly on unmodelled attributes and retiring the exemption list; or keeping the single sentinel and the guard-test enforcement. The first adds an exported error to a landed surface (REQ-024 compatibility question); the second keeps the hazard class alive but contained.
+**Resolution options:** a distinct sentinel (e.g. `ErrUnknownAttribute`) letting `skipNotFound` fail loudly on unmodelled attributes and retiring the exemption list; or keeping the single sentinel and the guard-test enforcement. The first adds an exported error to a landed surface ([idiom.md § API conventions](idiom.md#api-conventions) compatibility question); the second keeps the hazard class alive but contained.
 
 **Evidence needed:** whether the exemption list churns (each churn is an argument for the sentinel); whether any consumer outside the encoder needs the distinction. First datum — **2026-08-03 PROBE-086 coverage ratchet:** ten `unserialisableIC` exemptions deleted (ENTRY `language` / `encoding` across all five subtypes) and `rmpath` extended to resolve them, so the list churned once already.
 
@@ -222,21 +222,21 @@ PR 280 cuts cost with no budget line crossed. It stops rebuilding the json/v2 op
 
 **Status:** Open — opened by the REQ-048 specification pass ([PR 113](https://github.com/Cadasto/openehr-sdk-go/pull/113)).
 
-**Question:** should the RM meta-model introspection surface ([REQ-048](bmm-conformance.md#req-048--rm-meta-model-introspection-surface)) report a `P_BMM_INTERFACE` class as abstract even though the pinned BMM sets no `is_abstract` flag on it — and is the missing flag an upstream BMM defect this SDK should raise per [REQ-047](bmm-conformance.md#req-047--bmm-spec-divergence-resolution)?
+**Question:** should the RM meta-model introspection surface ([REQ-048](bmm-conformance.md#req-048--rm-meta-model-introspection-surface)) report a `P_BMM_INTERFACE` class as abstract even though the pinned BMM sets no `is_abstract` flag on it — and is the missing flag an upstream BMM defect this SDK should raise per [REQ-041](bmm-conformance.md#req-041--pinned-bmm-sources)?
 
-**Why it's open:** six classes in REQ-048's universe carry no `is_abstract` flag: `MEASUREMENT_SERVICE`, `TERMINOLOGY_SERVICE`, `OPENEHR_CODE_SET_IDENTIFIERS`, `OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS`, and — the sharp cases — `CODE_SET_ACCESS` and `TERMINOLOGY_ACCESS`, which are `P_BMM_INTERFACE` declarations the generator renders as Go **interfaces**. Nothing can instantiate a Go interface, so the surface reports "not abstract" for a class that is unquestionably not instantiable, and a concrete-descendant expansion hands it back. REQ-047 settles the immediate behaviour — the BMM wins, the SDK reports the flag verbatim, and REQ-048 says so normatively — but it does not settle whether the *question* is the right one.
+**Why it's open:** six classes in REQ-048's universe carry no `is_abstract` flag: `MEASUREMENT_SERVICE`, `TERMINOLOGY_SERVICE`, `OPENEHR_CODE_SET_IDENTIFIERS`, `OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS`, and — the sharp cases — `CODE_SET_ACCESS` and `TERMINOLOGY_ACCESS`, which are `P_BMM_INTERFACE` declarations the generator renders as Go **interfaces**. Nothing can instantiate a Go interface, so the surface reports "not abstract" for a class that is unquestionably not instantiable, and a concrete-descendant expansion hands it back. REQ-041 settles the immediate behaviour — the BMM wins, the SDK reports the flag verbatim, and REQ-048 says so normatively — but it does not settle whether the *question* is the right one.
 
 **The trade-off:**
 
 - **Report the flag only** (today's behaviour). One rule, one source, no local model of instantiability; a caller needing the decodable set uses the [REQ-040 registry](rm-modeling.md#type-registry-req-040), which is the authority for what Go can construct. Against it: a caller who reads "not abstract" as "instantiable" is misled on six classes, and the surface offers no way to notice.
-- **Widen abstractness to cover BMM interfaces** — report `is_abstract || _type == P_BMM_INTERFACE`. Matches what the generator actually emits and what a caller means. Against it: it is the SDK second-guessing the BMM, which REQ-047 forbids as a general practice precisely because local corrections diverge silently from every other openEHR implementation reading the same file.
+- **Widen abstractness to cover BMM interfaces** — report `is_abstract || _type == P_BMM_INTERFACE`. Matches what the generator actually emits and what a caller means. Against it: it is the SDK second-guessing the BMM, which REQ-041 forbids as a general practice precisely because local corrections diverge silently from every other openEHR implementation reading the same file.
 - **Raise it upstream and keep reporting the flag** until the schema changes. Correct in the long run and costs nothing locally; the timescale is not ours to set.
 
 **Evidence needed:** whether the openEHR BMM treats a missing `is_abstract` on `P_BMM_INTERFACE` as implicit (in which case every consumer must infer it, and inferring is not second-guessing) or as an oversight in these six declarations. That is a question for the openEHR specifications repository, not for this tree.
 
 **Resolution form:** an upstream issue first; then either an ADR widening the abstractness question, or a documented acceptance that the flag is the whole answer. Until then the interim rule is REQ-048's — its § *Abstract is the BMM's flag, not a storability verdict* forbids pre-empting this strand in code.
 
-**Affects:** REQ-048, and REQ-047's divergence-reporting duty.
+**Affects:** REQ-048, and REQ-041's divergence-reporting duty.
 
 ---
 
@@ -262,7 +262,7 @@ This is a pre-existing emission gap, not a REQ-048 regression — REQ-048 only m
 
 **Resolution form:** an ADR amending the § Mapping rules inheritance rule, plus a regenerated tree, if either folding option wins; otherwise a documented mapping exemption. Until then the interim prohibition is [REQ-048 § The attribute tables are complete against the BMM](bmm-conformance.md#the-attribute-tables-are-complete-against-the-bmm)'s: the drop is pinned by name, cannot grow silently, and folding it in ahead of this strand fails [PROBE-094](conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm)'s completeness arm (`unshippedProperties`).
 
-**Affects:** REQ-042, REQ-043, REQ-046, REQ-048.
+**Affects:** REQ-041, REQ-046, REQ-048.
 
 ---
 
@@ -270,7 +270,7 @@ This is a pre-existing emission gap, not a REQ-048 regression — REQ-048 only m
 
 **Status:** Resolved 2026-10-11 by [ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md): template-driven validation includes the floor, each defect reported once, with no template-only option. Opened 2026-09-05 from the review round of the RM canonical-JSON fidelity work ([PR 145](https://github.com/Cadasto/openehr-sdk-go/pull/145)), whose plan text claimed `ValidateComposition` would report the new `TERM_MAPPING` invariants; it never has, and the claim was corrected in the plan rather than in code.
 
-**Question:** should `ValidateComposition` ([REQ-102](clinical-modeling.md#req-102--composition-validation)) and the [REQ-110](clinical-modeling.md#req-110--template-driven-validation-beyond-composition) entry points run the [REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor) per-type invariant catalogue as part of a template-driven pass, or stay exactly template conformance with the floor a separate call?
+**Question:** should `ValidateComposition` and the other template-driven entry points ([REQ-102](clinical-modeling.md#req-102--composition-validation)) run the [REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor) per-type invariant catalogue as part of a template-driven pass, or stay exactly template conformance with the floor a separate call?
 
 **Why it was open:** until ADR 0025 the two layers composed but did not chain. Template validity covers RM-mandatory presence, so a template-driven pass already reports the floor's (a) arm; the floor's (b) arm — `DV_INTERVAL` lower > upper, `TERM_MAPPING.match` outside its value set, `Mappings_valid`, `DV_QUANTITY.precision` and `DV_PROPORTION.precision` below -1 (-1 means no limit) — fired only through `ValidateRM`. A caller who ran only `ValidateComposition` could therefore commit an RM-invalid composition that was template-valid. Whether that was a gap or a deliberate separation of concerns was the fork.
 
@@ -284,9 +284,9 @@ This is a pre-existing emission gap, not a REQ-048 regression — REQ-048 only m
 
 **Evidence so far (2026-10-01):** until [PR 196](https://github.com/Cadasto/openehr-sdk-go/pull/196), the SDK's own generator produced template-valid, RM-invalid compositions on the default path. Over the four corpus templates `vital_signs`, `Demonstration.v1`, `BMI` and `body_weight`, generated under both `Policy` values and both `ValueFill` values (16 runs) before that PR, `ValidateComposition` returned OK on all 16. `ValidateRM` reported no issue for `BMI` and `body_weight`, whose bodies carried placeholder `DV_DATE_TIME` values and unregistered ENTRY `language` and `encoding` codes, and only presence and cardinality issues for `vital_signs` and `Demonstration.v1`. Those presence and cardinality breaches are floor arm (a) findings the template pass missed as well. Most sit on nodes the OPT does not model (a state ELEMENT, a protocol CLUSTER, a slot filler). One does not: a DV_ORDINAL with no `symbol`, a mandatory attribute, on a node whose `C_DV_ORDINAL` list pairs each value with a coded symbol. So the premise above, that a template-driven pass already reports arm (a), fails even on nodes a template models. An independent CDR that enforces RM invariants on commit refused the v0.28.0 bodies of all six templates it was tried with. PR 196 removed those defects, and one more RM-invalid shape showed in the same 16 runs: ELEMENTs that carry neither `value` nor `null_flavour`, or both, which break `ELEMENT.Inv_null_flavour_indicated`. Both validators passed them then, because the floor did not evaluate that rule; the floor now reports it and the generator no longer emits it. This was evidence for the fork, not a resolution: fixing the generator did not chain the floor into the template pass.
 
-**Resolution:** [ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md) took the first option: the template-driven entry points chain the floor, and an issue both walks report at one path with one code appears once. It amends REQ-102 § RM floor, REQ-110 and REQ-112's composition sentence. Over the corpus, no floor finding survived beside a template finding with a different code at the same path, and the chained cost is about the sum of the two walks.
+**Resolution:** [ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md) took the first option: the template-driven entry points chain the floor, and an issue both walks report at one path with one code appears once. It amends REQ-102 (its § RM floor and its entry points beyond composition) and REQ-112's composition sentence. Over the corpus, no floor finding survived beside a template finding with a different code at the same path, and the chained cost is about the sum of the two walks.
 
-**Affects:** REQ-102, REQ-110, REQ-112.
+**Affects:** REQ-102, REQ-112.
 
 ---
 
@@ -335,7 +335,7 @@ Three candidates are named and none is built:
 
 **Resolution form:** each candidate resolves on its own, by an amendment to REQ-171's *Surface* and *Coverage* with the option's contract; an ADR only where an option changes what an existing result means.
 
-**Affects:** REQ-102, REQ-110, REQ-171.
+**Affects:** REQ-102, REQ-171.
 
 ---
 
@@ -343,19 +343,19 @@ Three candidates are named and none is built:
 
 | Strand | Title | Status | Affects |
 |---|---|---|---|
-| [STRAND-01](#strand-01--extraction-from-reference-cdr) | Extraction from reference CDR | **Resolved** | REQ-010..014 |
+| [STRAND-01](#strand-01--extraction-from-reference-cdr) | Extraction from reference CDR | **Resolved** | REQ-013, [Boundary rules](module-layout.md#boundary-rules) |
 | [STRAND-02](#strand-02--shared-contract-source-of-truth-php--go) | Shared contract source-of-truth | **Cancelled** | — |
-| [STRAND-03](#strand-03--go-idiomatic-surface-validation) | Go-idiomatic surface | **Resolved** | REQ-021..024 |
-| [STRAND-04](#strand-04--rm-polymorphism-and-codec-performance) | RM polymorphism + codec perf | **Partially resolved** | REQ-024, REQ-040, REQ-052..053 |
+| [STRAND-03](#strand-03--go-idiomatic-surface-validation) | Go-idiomatic surface | **Resolved** | REQ-021, [API conventions](idiom.md#api-conventions) |
+| [STRAND-04](#strand-04--rm-polymorphism-and-codec-performance) | RM polymorphism + codec perf | **Partially resolved** | [Generics and reflection](idiom.md#generics-and-reflection), REQ-040, REQ-052..053 |
 | [STRAND-05](#strand-05--smart-on-openehr-auth-library) | SMART-on-openEHR auth library | **Resolved** ([ADR 0009](../adr/0009-smart-auth-library-scope.md)) | REQ-061..064 |
 | [STRAND-06](#strand-06--concurrency-and-transport-hygiene) | Concurrency / transport hygiene | Open | REQ-021, REQ-026 |
 | [STRAND-07](#strand-07--versioning-and-module-path) | Versioning + module path | **Resolved** | REQ-001, REQ-004, REQ-005 |
-| [STRAND-08](#strand-08--cadasto-extras-boundary-criteria-conditional-extraction) | Cadasto-extras extraction | Open (long-term) | REQ-010, REQ-011 |
+| [STRAND-08](#strand-08--cadasto-extras-boundary-criteria-conditional-extraction) | Cadasto-extras extraction | Open (long-term) | [Boundary rules](module-layout.md#boundary-rules) |
 | [STRAND-09](#strand-09--its-rest-conformance-follow-ups) | ITS-REST conformance follow-ups (REST probes; stored-query paging) | **Resolved** ([ADR 0026](../adr/0026-stored-query-paging-fields-only-when-set.md)) | REQ-057, REQ-059, REQ-095, REQ-099 |
 | [STRAND-10](#strand-10--rmpath-one-sentinel-for-two-not-found-conditions) | rmpath not-found sentinel split | Open | REQ-053, REQ-121 |
 | [STRAND-11](#strand-11--probe-recording-format-har-or-a-purpose-built-yaml) | Probe recording format (HAR vs YAML) | **Resolved** ([ADR 0020](../adr/0020-cassette-recording-har.md)) | REQ-082 |
-| [STRAND-12](#strand-12--bmm-interface-classes-carry-no-is_abstract-flag) | BMM interface classes carry no `is_abstract` | Open | REQ-047, REQ-048 |
-| [STRAND-13](#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped) | Properties inherited from a primitive-mapped ancestor are dropped | Open | REQ-042, REQ-043, REQ-046, REQ-048 |
-| [STRAND-14](#strand-14--should-template-driven-validation-also-run-the-rm-floor-invariants) | Template-driven validation and the RM floor | **Resolved** ([ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md)) | REQ-102, REQ-110, REQ-112 |
+| [STRAND-12](#strand-12--bmm-interface-classes-carry-no-is_abstract-flag) | BMM interface classes carry no `is_abstract` | Open | REQ-041, REQ-048 |
+| [STRAND-13](#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped) | Properties inherited from a primitive-mapped ancestor are dropped | Open | REQ-041, REQ-046, REQ-048 |
+| [STRAND-14](#strand-14--should-template-driven-validation-also-run-the-rm-floor-invariants) | Template-driven validation and the RM floor | **Resolved** ([ADR 0025](../adr/0025-template-validation-includes-the-rm-floor.md)) | REQ-102, REQ-112 |
 | [STRAND-15](#strand-15--decode-time-presence-and-unmatched-member-capture-on-the-generated-types) | Decode-time presence and unmatched-member capture | Open | REQ-040, REQ-052, REQ-112, REQ-170 |
-| [STRAND-16](#strand-16--validator-policy-beyond-the-limits) | Validator policy beyond the limits | Open | REQ-102, REQ-110, REQ-171 |
+| [STRAND-16](#strand-16--validator-policy-beyond-the-limits) | Validator policy beyond the limits | Open | REQ-102, REQ-171 |

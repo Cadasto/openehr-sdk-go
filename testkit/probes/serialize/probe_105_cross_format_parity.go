@@ -1,7 +1,7 @@
 package serializeprobes
 
-// PROBE-105: upstream cross-format parity (REQ-080; exercises REQ-052,
-// REQ-053 and REQ-056). For one set of the vendored cross-format corpus, carry
+// PROBE-105: upstream cross-format parity (REQ-052, REQ-053 and
+// REQ-056). For one set of the vendored cross-format corpus, carry
 // the composition from each format the set gives to each other through the
 // SDK codecs, compare with the upstream sibling, and require every leg's
 // outcome to equal the outcome recorded for it.
@@ -44,7 +44,7 @@ import (
 //
 // Framework misuse (a set with no name, no OPT, or fewer than two formats
 // that share a leg) returns a non-nil error.
-func Probe105CrossFormatParity(set fixtures.CrossFormatSet) (Result, error) { // PROBE-105 (REQ-080, REQ-052, REQ-053, REQ-056)
+func Probe105CrossFormatParity(set fixtures.CrossFormatSet) (Result, error) { // PROBE-105 (REQ-052, REQ-053, REQ-056)
 	r := Result{Probe: "PROBE-105"}
 	switch {
 	case set.Name == "":

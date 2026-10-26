@@ -155,7 +155,7 @@ const (
 // COMPARISON_OPERATOR admits. Operator is a named string so a parsed query
 // keeps its wire spelling, which leaves the type open — [Compare] is the
 // first constructor to take one from the caller, so the value is checked at
-// validate time rather than emitted verbatim (REQ-117).
+// validate time rather than emitted verbatim (REQ-119).
 func (o Operator) known() bool {
 	switch o {
 	case OpEq, OpNe, OpGt, OpGe, OpLt, OpLe:
@@ -211,7 +211,7 @@ func (c Comparison) expr() string {
 }
 
 // leftToken renders the left operand: the structured [Comparison.Left]
-// value when present, the raw path otherwise (REQ-117).
+// value when present, the raw path otherwise (REQ-113).
 //
 // It routes through [FormatValue] rather than calling token directly, so it is
 // TOTAL over every shape the field can hold. token has a value receiver, which
@@ -239,7 +239,7 @@ func (c Comparison) validate() error {
 	}
 	// Path and Left are the two spellings of ONE left operand, so setting
 	// both is a caller error, not a precedence question: leftToken would
-	// silently discard Path (REQ-117). The sibling MatchesExpr counts its
+	// silently discard Path (REQ-119). The sibling MatchesExpr counts its
 	// operand forms the same way.
 	if c.Left != nil && strings.TrimSpace(c.Path) != "" {
 		return fmt.Errorf("%w: comparison sets both Path %q and a structured Left operand",
@@ -531,7 +531,7 @@ func (m MatchesExpr) validate() error {
 		return fmt.Errorf("%w: empty path in MATCHES", ErrInvalidQuery)
 	}
 	// The three operand forms are mutually exclusive: emitting more than
-	// one would silently drop an operand (REQ-117).
+	// one would silently drop an operand (REQ-119).
 	forms := 0
 	if len(m.Values) > 0 {
 		forms++

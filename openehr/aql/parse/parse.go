@@ -267,7 +267,7 @@ func (d *Document) QueryErr() error {
 func (d *Document) populate() {
 	if sc := d.tree.SelectClause(); sc != nil {
 		d.Distinct = sc.DISTINCT() != nil
-		// REQ-118: the deprecated TOP clause, mirrored into the flat view for
+		// REQ-109: the deprecated TOP clause, mirrored into the flat view for
 		// the lint gate. HasTop records PRESENCE from the tree; Top records
 		// the DECODED bound and stays nil when the count is unrepresentable,
 		// in lockstep with the structured extractor's topClause — nothing is
@@ -284,7 +284,7 @@ func (d *Document) populate() {
 			if e.SYM_ASTERISK() != nil {
 				d.Star = true
 			}
-			// REQ-117: `columnExpr AS alias` — the only IDENTIFIER that is a
+			// REQ-109: `columnExpr AS alias` — the only IDENTIFIER that is a
 			// direct child of selectExpr is the AS alias (a columnExpr's own
 			// identifiers sit deeper). Kept in lockstep with the structured
 			// extractor's extractSelectItem.

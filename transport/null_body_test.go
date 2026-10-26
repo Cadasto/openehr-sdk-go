@@ -1,8 +1,8 @@
 package transport_test
 
-// null_body_test.go — REQ-151 § An empty 2xx body keeps its existing
-// per-surface contract: "empty" means zero bytes, whitespace only, or the JSON
-// `null` literal, and transport.IsNoRepresentationBody is the one predicate.
+// null_body_test.go — REQ-151 § The taxonomy: "empty" means zero bytes,
+// whitespace only, or the JSON `null` literal, and
+// transport.IsNoRepresentationBody is the one predicate.
 
 import (
 	"errors"

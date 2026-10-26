@@ -1,6 +1,6 @@
 package bmmgen
 
-// REQ-041 / REQ-042 / REQ-044 — rm.Release is generated from the primary RM
+// REQ-041 — rm.Release is generated from the primary RM
 // schema's rm_release, drift-checked by verify mode, and never hand-written.
 
 import (
@@ -70,7 +70,7 @@ func releaseConst(t *testing.T, src []byte) (value string, ok bool) {
 	return "", false
 }
 
-// TestREQ041_RenderReleaseFileEmitsSchemaRMRelease — REQ-041 / REQ-044: the constant
+// TestREQ041_RenderReleaseFileEmitsSchemaRMRelease — REQ-041: the constant
 // the SDK writes into ARCHETYPED.rm_version is generated from the primary RM
 // schema's rm_release, in package rm, under the standard generated header.
 func TestREQ041_RenderReleaseFileEmitsSchemaRMRelease(t *testing.T) {

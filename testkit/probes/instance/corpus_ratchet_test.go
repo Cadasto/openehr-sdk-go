@@ -357,7 +357,7 @@ func outputReasons(t *testing.T, root any, compiled *templatecompile.Compiled, c
 		}
 		note(validation.ValidateComposition(comp, compiled))
 	} else {
-		// REQ-110: non-COMPOSITION roots use the generic validator.
+		// REQ-102: non-COMPOSITION roots use the generic validator.
 		note(validation.Validate(root, compiled))
 	}
 	scanned, err := bodyReasons(root)

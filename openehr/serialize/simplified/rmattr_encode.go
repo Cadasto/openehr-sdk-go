@@ -160,8 +160,9 @@ func nullRMAttrs(out map[string]any, base string, el rm.Element) error {
 // LOCATABLE the grammar models at all.
 //
 // `uid` rides the generated rm.Locatable.GetUID accessor (ADR 0013), but
-// LOCATABLE.links and LOCATABLE.feeder_audit have none, and reflection is
-// forbidden (REQ-024) — so the composition-tree LOCATABLE set is enumerated here.
+// LOCATABLE.links and LOCATABLE.feeder_audit have none, and the SDK uses no
+// reflection (idiom.md § API conventions) — so the composition-tree LOCATABLE
+// set is enumerated here.
 // Demographic LOCATABLEs (PERSON, ROLE, PARTY_IDENTITY, …) are deliberately absent:
 // no COMPOSITION attribute reaches one, and admitting a type the walk cannot
 // produce would weaken the fail-loud report [rmattrEncode] makes of a miss.

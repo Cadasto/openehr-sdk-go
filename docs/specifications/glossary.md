@@ -13,7 +13,7 @@ Terms used in the SDK specifications, source code, and AI-agent prompts. When a 
 ## openEHR core
 
 **Reference Model (RM)**
-The information model that defines the abstract data structures of openEHR — `LOCATABLE`, `PATHABLE`, `COMPOSITION`, `OBSERVATION`, `EVALUATION`, `INSTRUCTION`, `ACTION`, `DATA_VALUE` and its specialisations, the demographic `PARTY` hierarchy, etc. Authoritative definition: openEHR Reference Model specification. In this SDK the RM Go types are **generated** from the pinned `openehr_rm_*.bmm.json` schema (REQ-041, REQ-042).
+The information model that defines the abstract data structures of openEHR — `LOCATABLE`, `PATHABLE`, `COMPOSITION`, `OBSERVATION`, `EVALUATION`, `INSTRUCTION`, `ACTION`, `DATA_VALUE` and its specialisations, the demographic `PARTY` hierarchy, etc. Authoritative definition: openEHR Reference Model specification. In this SDK the RM Go types are **generated** from the pinned `openehr_rm_*.bmm.json` schema (REQ-041).
 
 **BMM (Basic Meta-Model)**
 The openEHR meta-model that describes information models (RM, AM, BASE, LANG, TERM) as a compact, computable alternative to UML/XMI. Defined in the openEHR LANG specification. In this SDK the BMM files in [`../resources/bmm/`](../../resources/bmm) are the source of truth for the openEHR domain model; see [bmm-conformance.md](bmm-conformance.md).
@@ -127,7 +127,7 @@ The in-memory `http.RoundTripper` that backs REQ-082's Sandbox mode ([`sandbox.B
 The package tree `testkit/` carrying the conformance probes (`testkit/probes/`), the shared result type and catalog runner (`testkit/probe/`), vendored fixture documents (`testkit/corpus/`), fixture-path resolution (`testkit/fixtures/`), and corpus-scale conformance harnesses (`testkit/conformance/`). Cassette-mode HAR recordings (ADR 0020) live under `testkit/recordings/`; `cmd/probe-record` captures them and `testkit/probe` replays them.
 
 **Cut line**
-A package-tree boundary that nothing on the upstream side may import from. The `cadasto/` subtree is the load-bearing cut line for v1 (REQ-010, REQ-011).
+A package-tree boundary that nothing on the upstream side may import from. The `cadasto/` subtree is the load-bearing cut line for v1 ([module-layout.md § Boundary rules](module-layout.md#boundary-rules)).
 
 ---
 
@@ -159,7 +159,7 @@ A consumer pattern: multiple SDK clients pointed at multiple openEHR backends, w
 The pre-implementation design document for this SDK, maintained alongside Cadasto architectural sources. Its content is reflected in this `docs/specifications/` tree; this tree is the day-to-day source of truth.
 
 **Conformance probe**
-The openEHR wire-conformance assertion behind a stable `PROBE-NNN`: a single-definition check that the SDK's wire output conforms to the openEHR spec against a reference deployment (REQ-080).
+The openEHR wire-conformance assertion behind a stable `PROBE-NNN`: a single-definition check that the SDK's wire output conforms to the openEHR spec against a reference deployment ([conformance.md](conformance.md)).
 
 ---
 

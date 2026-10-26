@@ -68,8 +68,8 @@ func ListCrossFormatSets() ([]CrossFormatSet, error) {
 // listCrossFormatSets is [ListCrossFormatSets] over the corpus rooted at
 // corpusRoot, so tests can run it against a scratch corpus.
 func listCrossFormatSets(corpusRoot string) ([]CrossFormatSet, error) {
-	// PROBE-105 (REQ-080): the manifest, not the directory listing, names the
-	// sets, so a file without recorded provenance never reaches the probe.
+	// PROBE-105: the manifest, not the directory listing, names the sets, so a
+	// file without recorded provenance never reaches the probe.
 	m, err := readCrossFormatManifest(filepath.Join(corpusRoot, "crossformat", crossFormatManifest))
 	if err != nil {
 		return nil, err
@@ -164,9 +164,9 @@ func readCrossFormatManifest(path string) (crossFormatManifestData, error) {
 // kind's field count, every file and opt record must name a declared source,
 // and no file or set may be recorded twice.
 func parseCrossFormatManifest(r io.Reader) (crossFormatManifestData, error) {
-	// PROBE-105 (REQ-080): per file, the manifest must yield the source
-	// repository, commit, upstream path and sha256, so a record that cannot
-	// be resolved to all four is an error, not a skipped line.
+	// PROBE-105: per file, the manifest must yield the source repository,
+	// commit, upstream path and sha256, so a record that cannot be resolved to
+	// all four is an error, not a skipped line.
 	var m crossFormatManifestData
 	sc := bufio.NewScanner(r)
 	for n := 1; sc.Scan(); n++ {

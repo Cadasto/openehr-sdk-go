@@ -12,11 +12,11 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
 )
 
-// PROBE-097 — the REQ-160/161/162 semantic and portability lint corpus.
+// PROBE-097 — the REQ-160/161 semantic and portability lint corpus.
 //
 // Two adapters share one rule engine (openehr/aql/internal/semcheck): the
 // read-side linter (openehr/aql/lint, REQ-161) and the write-side builder
-// verification ((*aql.Builder).VerifyContainment, REQ-162). This probe pins
+// verification ((*aql.Builder).VerifyContainment, REQ-161 § Builder adapter). This probe pins
 // the OBSERVABLE behaviour of both without importing semcheck itself — it is
 // internal to openehr/aql, unreachable from testkit's import position (Go's
 // internal-visibility rule) — mirroring how PROBE-028 pins openehr/aql/lint
@@ -58,10 +58,10 @@ var semanticCodesAll = []string{
 // semanticCodes returns [semanticCodesAll]; that var's doc carries the contract.
 func semanticCodes() []string { return semanticCodesAll }
 
-// containmentCodesAll is the REQ-162 § Contract five-code subset arm (c) scopes
+// containmentCodesAll is the REQ-161 § Builder adapter five-code subset arm (c) scopes
 // parity to. The three portability advisories in [semanticCodesAll] are
 // read-side only and never appear from [aql.Builder.VerifyContainment] —
-// REQ-162 § Contract is explicit that parity is scoped to this subset, not the
+// REQ-161 § Builder adapter is explicit that parity is scoped to this subset, not the
 // full catalogue. A package-level var for the same reason as
 // [semanticCodesAll].
 var containmentCodesAll = []string{
@@ -207,7 +207,7 @@ type SemanticCorpus struct {
 // Probe097SemanticLint runs every row of every arm and aggregates all
 // failures into one [Result] (collect-all, like [Probe028AQLLint]: a single
 // early failure would hide the rest of the corpus from the report).
-func Probe097SemanticLint(c SemanticCorpus) (Result, error) { // PROBE-097 (REQ-160, REQ-161, REQ-162, REQ-163)
+func Probe097SemanticLint(c SemanticCorpus) (Result, error) { // PROBE-097 (REQ-160, REQ-161, REQ-163)
 	r := Result{Probe: "PROBE-097"}
 	if len(c.Fire) == 0 || len(c.Silent) == 0 || len(c.Additivity) == 0 || len(c.Parity) == 0 {
 		return r, errors.New("PROBE-097: all four corpus fields (Fire, Silent, Additivity, Parity) are required")
@@ -371,7 +371,7 @@ func runSemanticSilent(tc SemanticSilentCase) string {
 	return ""
 }
 
-// runParity runs one arm-(c) row (REQ-162 § Contract): build → emit →
+// runParity runs one arm-(c) row (REQ-161 § Builder adapter): build → emit →
 // compare [aql.Builder.VerifyContainment] against [lint.LintString]'s
 // [containmentCodes] subset, mirroring the comparison discipline of
 // openehr/aql/verify_parity_test.go's own TestReadWriteParity.

@@ -7,7 +7,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
 
-// TestPrimitiveInput_RealMagnitude pins REQ-110: a REAL constraint
+// TestPrimitiveInput_RealMagnitude pins REQ-102: a REAL constraint
 // reached on a DV_QUANTITY.magnitude scalar channel receives a named
 // rm.Real (rm.DVQuantity.Magnitude's type). primitiveInput must
 // normalise it to a bare float64 so CReal.Validate accepts it —
@@ -36,7 +36,7 @@ func TestPrimitiveInput_IntegerMagnitude(t *testing.T) {
 }
 
 // TestPrimitiveInput_Integer64Magnitude is the DV_COUNT.magnitude pin
-// (REQ-110): rm.Integer64 normalises to int64 so CInteger.Validate accepts
+// (REQ-102): rm.Integer64 normalises to int64 so CInteger.Validate accepts
 // it, the constraints package being unable to name the RM type.
 func TestPrimitiveInput_Integer64Magnitude(t *testing.T) {
 	got := primitiveInput(rm.Integer64(7))

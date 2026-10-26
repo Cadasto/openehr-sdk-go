@@ -1,6 +1,6 @@
 package aql
 
-// top.go: REQ-118 — the deprecated `SELECT TOP n [FORWARD|BACKWARD]` row
+// top.go: REQ-113 and REQ-163 — the deprecated `SELECT TOP n [FORWARD|BACKWARD]` row
 // limit, shared by the read side ([parse.SelectClause.Top]) and the write
 // side ([Builder.Top] / [Builder.TopDirected]) so one model serves both
 // (the REQ-113 rule).

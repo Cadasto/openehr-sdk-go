@@ -9,7 +9,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/lint"
 )
 
-// This file is the read/write parity gate of REQ-162 § Contract:
+// This file is the read/write parity gate of REQ-161 § Builder adapter:
 //
 //	for a query expressible through the builder, the verification's code
 //	multiset MUST equal the containment-check subset of lint.LintString over
@@ -26,7 +26,7 @@ import (
 // openehr/aql/internal/semcheck: reachable from both adapters without either
 // importing the other.
 
-// containmentCodes is the five-code subset REQ-162 § Contract scopes parity to.
+// containmentCodes is the five-code subset REQ-161 § Builder adapter scopes parity to.
 // The three REQ-161 portability advisories are read-side-only (PROBE-097
 // § parity), so they are filtered out of the lint side rather than expected from
 // the write side.
@@ -189,7 +189,7 @@ var parityCases = []struct {
 			Contains(aql.Class("VERSION", "v").Contains(aql.Class("COMPOSITION", "c")))
 	}},
 	{
-		// REQ-163's motivating shape, and the REQ-162 § Contract row the
+		// REQ-163's motivating shape, and the REQ-161 § Builder adapter row the
 		// standing-predicate carrier owes: the class-position predicate is not
 		// an archetype predicate, so BOTH adapters must stay silent about it —
 		// a write side that fed the bracket text to the archetype check would
@@ -226,7 +226,7 @@ var parityCases = []struct {
 	}},
 }
 
-// TestReadWriteParity is the REQ-162 § Contract MUST: build → emit →
+// TestReadWriteParity is the REQ-161 § Builder adapter MUST: build → emit →
 // [lint.LintString], and the two code multisets agree over the five containment
 // codes.
 //

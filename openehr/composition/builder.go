@@ -468,7 +468,7 @@ func descendOne(cur any, s pathSegment) (any, error) {
 		// (skeleton at-code vs path archetype id, multiple siblings,
 		// slot-fill mismatch). The skeleton's slot-fill stamping (the
 		// REQ-107 ".example.v1" heuristic) is exposed here as
-		// ErrInvalidPath. The REQ-104 assertion grammar now drives
+		// ErrInvalidPath. The REQ-103 slot assertion grammar now drives
 		// slot-fit in validation and instance synthesis; this builder
 		// routing still matches by archetype-id equality and does not
 		// yet consult that grammar.

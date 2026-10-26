@@ -20,7 +20,7 @@ import (
 // dropped silently. A container property with no cardinality passes: P_BMM
 // reads a missing cardinality as |0..*|.
 //
-// REQ-043: § Mapping rules, Cardinality.
+// REQ-041: § Mapping rules, Cardinality.
 func TestREQ043_PinnedContainersHaveNoFiniteUpper(t *testing.T) {
 	for _, root := range pinnedSchemaRoots {
 		schema, err := bmm.LoadAll(root, bmm.FSResolver{Root: testResources})

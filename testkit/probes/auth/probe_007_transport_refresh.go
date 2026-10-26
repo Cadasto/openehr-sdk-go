@@ -5,8 +5,7 @@
 // Probes are plain Go functions returning (Result, error) and are designed to
 // be invocable from:
 //
-//   - the SDK's own test suite (via TestProbeNNN);
-//   - the conformance harness in `make conformance`;
+//   - the SDK's own test suite (via TestProbeNNN), which `make test` runs;
 //   - third-party consumers checking their integration.
 //
 // The probes deliberately avoid testing.T so they can run outside go test.

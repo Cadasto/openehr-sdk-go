@@ -572,9 +572,10 @@ func FromConfig(cfg Config) (*Source, error) {
 // assertion key and a client secret), builds the private_key_jwt assertion
 // with jwtbearer.NewClientAssertion after checking its algorithm against the
 // server's token_endpoint_auth_signing_alg_values_supported, and performs the
-// G-3 discovery cross-check: when the authorization server advertises
-// token_endpoint_auth_methods_supported, the method implied by the configured
-// credential MUST be listed. An empty or absent list is not constraining.
+// discovery cross-check (auth.md § Method cross-check against discovery): when
+// the authorization server advertises token_endpoint_auth_methods_supported,
+// the method implied by the configured credential MUST be listed. An empty or
+// absent list is not constraining.
 func configureClientAuth(cfg *Config) error {
 	hasSecret := cfg.ClientSecret != ""
 	hasAssertion := cfg.clientAssertion != nil
@@ -616,8 +617,9 @@ func configureClientAuth(cfg *Config) error {
 		return nil
 	}
 
-	// G-3: fail fast only when the server advertises methods and the
-	// configured one is absent. Empty/absent list is not constraining.
+	// The discovery cross-check: fail fast only when the server advertises
+	// methods and the configured one is absent. Empty/absent list is not
+	// constraining.
 	if advertised := cfg.Auth.TokenEndpointAuthMethodsSupported; len(advertised) > 0 &&
 		!slices.Contains(advertised, method) {
 		return fmt.Errorf("%w: configured client auth method %q is not in the server's advertised token_endpoint_auth_methods_supported %v",
@@ -981,8 +983,8 @@ func (s *Source) tryToken(ctx context.Context) (tok auth.Token, retry bool, err 
 	cur := s.cur
 	if refreshTok == "" && cur.IsZero() {
 		// The source holds neither an access token nor a refresh token: it is
-		// new, Revoke signed it out, or a terminal refresh failure cleared both
-		// (F-L). Return immediately without touching inflight — there is
+		// new, Revoke signed it out, or a terminal refresh failure cleared
+		// both. Return immediately without touching inflight — there is
 		// nothing to exchange (REQ-063).
 		s.mu.Unlock()
 		return auth.Token{}, false, &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: errors.New("no token or refresh_token")}
@@ -1090,11 +1092,11 @@ func (s *Source) installRefresh(ctx context.Context, ex *tokenExchange, cur, tok
 		}
 		s.queueChangeLocked(ctx, TokenChange{Access: tok, RefreshToken: refreshTok, Response: s.lastTR})
 	} else {
-		// F-L: on a terminal failure clear the refresh token and the cached
-		// access token so that subsequent Token() calls deterministically
-		// return ErrReauthRequired without issuing another doomed POST.
-		// On transient failures (5xx, network, ctx) retain both so callers
-		// may retry (REQ-063).
+		// On a terminal failure clear the refresh token and the cached access
+		// token so that subsequent Token() calls deterministically return
+		// ErrReauthRequired without issuing another doomed POST. On transient
+		// failures (5xx, network, ctx) retain both so callers may retry
+		// (REQ-063).
 		ex2, ok := errors.AsType[*auth.ExchangeError](err)
 		if ok && ex2.Terminal() {
 			s.setTokensLocked(auth.Token{}, "")

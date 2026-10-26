@@ -8,8 +8,8 @@ import "github.com/cadasto/openehr-sdk-go/openehr/aql/contain"
 // They live here rather than in semcheck.go because the package doc's invariant
 // — "neither adapter classifies a verdict of its own" — is what the shared
 // engine exists to enforce: an exported Verdict() would hand an adapter the raw
-// [contain.Verdict] to branch on, which is precisely the parity break REQ-162
-// § Contract makes a MUST-not, and an exported RMType()/Suppresses() would offer
+// [contain.Verdict] to branch on, which is precisely the parity break REQ-161
+// § Builder adapter makes a MUST-not, and an exported RMType()/Suppresses() would offer
 // an adapter the pieces to re-derive the suppression rule for itself. Neither
 // adapter ever called any of the three; only the tests did. Keeping them
 // test-only makes the invariant structural instead of merely discouraged, and

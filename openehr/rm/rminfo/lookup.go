@@ -154,7 +154,7 @@ type AttrMeta struct {
 type lookup struct {
 	data map[string]ClassMeta
 	// absence records why each declared-but-omitted class is outside data —
-	// the universe's negative space (REQ-049, see absence.go). The GENERATED
+	// the universe's negative space (REQ-048, see absence.go). The GENERATED
 	// table never overlaps data; a synthetic one from [NewWithAbsence] may,
 	// and data wins. It may be nil: undeclared is computed, not stored.
 	absence   map[string]AbsenceReason

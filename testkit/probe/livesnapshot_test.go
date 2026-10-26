@@ -132,8 +132,8 @@ func coreLiveEntries(id openehrclient.EHRID) []probe.Entry {
 					// SHOULD-level). A 404 is that endpoint being absent, so it is
 					// an unmet precondition (REQ-082 skip), not a failed assertion.
 					// EHRbase 2.35.1 does not implement it — an accepted deployment
-					// deviation recorded in conformance.md § REQ-082. The probe
-					// passes against a deployment that serves it.
+					// deviation recorded in development-process.md § Live mode. The
+					// probe passes against a deployment that serves it.
 					if errors.Is(err, transport.ErrNotFound) {
 						return probe.Result{Status: probe.StatusSkip, Detail: "precondition absent: deployment does not expose the System capabilities endpoint (OPTIONS /) — spec-defined, EHRbase 2.35.1 does not implement it (accepted deviation)"}, nil
 					}

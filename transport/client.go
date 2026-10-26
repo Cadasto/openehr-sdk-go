@@ -268,11 +268,11 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		wait := c.cfg.retry.backoff(attempt)
 		span.SetAttributes(attribute.Int64("retry.backoff_ms", wait.Milliseconds()))
 		if err := retryWait(ctx, wait); err != nil {
-			// REQ-172: a response whose body could not be read keeps its
+			// REQ-091: a response whose body could not be read keeps its
 			// arm's error when ctx ends during the backoff: the *BodyReadError
 			// on a 2xx, the *WireError and the read failure on any other
 			// status. The status the server sent is then not reported as a
-			// bare context error; ctx's error is wrapped beside it (REQ-091).
+			// bare context error; ctx's error is wrapped beside it.
 			// Any other error is replaced by ctx's, as before.
 			if isBodyReadFailure(lastErr) {
 				lastErr = fmt.Errorf("%w: retry wait: %w", lastErr, err)
@@ -284,7 +284,7 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 	}
 	// REQ-090: the status code goes on the span whenever a response arrived,
 	// a failed request's included, and so does the response size when the body
-	// was read in full. A body that could not be read (REQ-172) has no size:
+	// was read in full. A body that could not be read (REQ-151) has no size:
 	// its Response carries an empty Body, so a 0 would be a false value.
 	if resp != nil {
 		span.SetAttributes(attribute.Int("http.status_code", resp.StatusCode))
@@ -458,7 +458,7 @@ func (c *Client) doOnce(ctx context.Context, req *Request, targetURL, safeURL st
 	}
 	is2xx := httpResp.StatusCode >= 200 && httpResp.StatusCode < 300
 	if readErr != nil {
-		// REQ-172: the status and headers arrived, so they are kept even
+		// REQ-151: the status and headers arrived, so they are kept even
 		// though the body is lost. The bytes read before the failure are
 		// dropped: a partial body is not the representation, and an error
 		// that carried them could leak payload values.
@@ -685,7 +685,7 @@ func challengePermitsReauth(err error) bool {
 
 // isBodyReadFailure reports whether err is a response whose body could not be
 // read, on either arm: a *BodyReadError on a 2xx, or the bodyReadFailure doOnce
-// wraps beside the *WireError on any other status (REQ-172). A boxed typed-nil
+// wraps beside the *WireError on any other status (REQ-151). A boxed typed-nil
 // *BodyReadError counts too, since the callers read the request and ctx, never
 // a field of the error.
 func isBodyReadFailure(err error) bool {
@@ -708,10 +708,10 @@ func (c *Client) shouldRetry(ctx context.Context, req *Request, resp *Response, 
 		return false
 	}
 	if err != nil {
-		// REQ-172: once ctx has ended, a body read that failed was most likely
+		// REQ-091: once ctx has ended, a body read that failed was most likely
 		// stopped by it, and another attempt could only fail before a response
-		// arrives and lose the status and headers kept here (REQ-091: retries
-		// respect ctx cancellation). This holds on both arms, so it comes
+		// arrives and lose the status and headers kept here (retries respect
+		// ctx cancellation). This holds on both arms, so it comes
 		// before the *WireError arm's status-based retry.
 		if ctx.Err() != nil && isBodyReadFailure(err) {
 			return false
@@ -724,7 +724,7 @@ func (c *Client) shouldRetry(ctx context.Context, req *Request, resp *Response, 
 		if we, ok := errors.AsType[*WireError](err); ok && we != nil {
 			return c.cfg.retry.retriable(req.effectiveMethod(), we.StatusCode)
 		}
-		// REQ-172: a 2xx whose body could not be read means the server
+		// REQ-091: a 2xx whose body could not be read means the server
 		// acted on the request, so only a safe method (RFC 9110 §9.2.1) is
 		// sent again, whatever RetryNonIdempotent says. A second PUT with
 		// the same If-Match would fail as stale and hide the version the
@@ -735,7 +735,7 @@ func (c *Client) shouldRetry(ctx context.Context, req *Request, resp *Response, 
 		if _, ok := errors.AsType[*BodyReadError](err); ok {
 			// A body over the WithMaxResponseBody ceiling would stop at the
 			// same ceiling on every attempt, after reading up to it again, so
-			// it is not sent again; REQ-172 allows the retry but does not
+			// it is not sent again; REQ-091 allows the retry but does not
 			// require it. This sits inside the 2xx arm: the *WireError arm
 			// above has already returned, so a status over the ceiling is
 			// still retried by its status.

@@ -141,11 +141,11 @@ func TestMatchesURIGuardTracksTheGrammar(t *testing.T) {
 	}
 }
 
-// TestEmitRefusesMisplacedJunction — REQ-117 requires a containment junction
+// TestEmitRefusesMisplacedJunction — REQ-119 requires a containment junction
 // to END its chain: the grammar takes a parenthesised group as a whole
 // `containsExpr`, so no CONTAINS keyword may follow one.
 //
-// [aql.Builder] has refused this since REQ-117, but [Query.Emit] did not, and
+// [aql.Builder] has refused this from the start (REQ-163), but [Query.Emit] did not, and
 // [Query] explicitly blesses direct construction — so a consumer assembling or
 // rewriting an AST by hand got `… CONTAINS (A OR B) CONTAINS C` with err ==
 // nil, text the SDK's own parser rejects. The extractor cannot produce such a

@@ -1,13 +1,14 @@
 package contribution_test
 
-// decode_error_test.go — REQ-151 § Keyed exclusions, held at contribution.Commit.
+// decode_error_test.go — the *ehr.NoRepresentationError row of REQ-151
+// § The taxonomy, held at contribution.Commit.
 //
-// Commit is named in the write-result funnel bullet: its
-// committed-but-unusable arm is REQ-094's *ehr.NoRepresentationError and MUST
-// NOT be re-typed by REQ-151. The distinction is not cosmetic — a Commit that
-// reaches this arm has already been persisted by the server, so the caller's
-// recovery is to re-read the contribution, not to re-parse the body a read
-// failed on. Handing back a *transport.DecodeError would say the opposite.
+// Commit is named in that row: its committed-but-unusable arm is REQ-094's
+// *ehr.NoRepresentationError, never a *transport.DecodeError. The distinction
+// is not cosmetic — a Commit that reaches this arm has already been persisted
+// by the server, so the caller's recovery is to re-read the contribution, not
+// to re-parse the body a read failed on. Handing back a *transport.DecodeError
+// would say the opposite.
 
 import (
 	"errors"
@@ -55,8 +56,8 @@ func TestCommitUndecodableIsNotDecodeError(t *testing.T) { // REQ-151
 		t.Errorf("commit metadata must survive: meta=%v nre.Meta=%v", meta, nre.Meta)
 	}
 
-	// The keyed exclusion itself.
+	// The disjointness itself: no *transport.DecodeError.
 	if de, ok := errors.AsType[*transport.DecodeError](err); ok {
-		t.Errorf("contribution.Commit's decode failure surfaced as *transport.DecodeError (%v); REQ-151 § Keyed exclusions leaves it to REQ-094's *ehr.NoRepresentationError", de)
+		t.Errorf("contribution.Commit's decode failure surfaced as *transport.DecodeError (%v); REQ-151 § The taxonomy reports it as REQ-094's *ehr.NoRepresentationError", de)
 	}
 }

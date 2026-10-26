@@ -21,7 +21,7 @@ const censusFile = "CENSUS.md"
 // TestCensus regenerates the PROBE-105 census and fails when the committed
 // CENSUS.md differs from it, so the published outcomes and reasons are always
 // the ones the harness and recorded.go produce, never a copy kept by hand
-// (REQ-080). With -update it writes the file instead:
+// (REQ-052, REQ-053, REQ-056). With -update it writes the file instead:
 //
 //	go test ./testkit/conformance/crossformat/ -run TestCensus -update
 func TestCensus(t *testing.T) {

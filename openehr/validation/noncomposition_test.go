@@ -14,7 +14,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
-// REQ-110 — the template-driven walker validates archetypeable RM roots
+// REQ-102 — the template-driven walker validates archetypeable RM roots
 // beyond COMPOSITION: the demographic PARTY hierarchy and the EHR-IM
 // roots FOLDER / EHR_STATUS, through the same compiled-OPT machinery.
 
@@ -71,7 +71,7 @@ func mustCompileInline(t *testing.T, body string) *templatecompile.Compiled {
 	return c
 }
 
-// REQ-110 — a real demographic OPT (PERSON root, 174 compiled nodes) +
+// REQ-102 — a real demographic OPT (PERSON root, 174 compiled nodes) +
 // its instance walk end-to-end through ValidateDemographic. The walk
 // descends the full PARTY hierarchy (identities / contacts → addresses /
 // details → cluster trees) and the template reports nothing. The
@@ -159,7 +159,7 @@ func TestValidateDemographic_PersonFixture(t *testing.T) {
 	}
 }
 
-// REQ-110 — a real ADDRESS OPT + instance validate clean through the
+// REQ-102 — a real ADDRESS OPT + instance validate clean through the
 // generic Validate (ADDRESS is not a PARTY, so no typed wrapper).
 func TestValidate_AddressFixture(t *testing.T) {
 	c := mustCompileOPT(t, "Address.v2")
@@ -175,7 +175,7 @@ func TestValidate_AddressFixture(t *testing.T) {
 	}
 }
 
-// REQ-110 — a PERSON validated against an ORGANISATION-rooted OPT
+// REQ-102 — a PERSON validated against an ORGANISATION-rooted OPT
 // surfaces rm_type_mismatch at the root, not a silent pass.
 func TestValidateDemographic_RootTypeMismatch(t *testing.T) {
 	const body = `<?xml version="1.0"?>
@@ -200,7 +200,7 @@ func TestValidateDemographic_RootTypeMismatch(t *testing.T) {
 	}
 }
 
-// REQ-110 — an OPT pinning PERSON.identities existence >= 1 and
+// REQ-102 — an OPT pinning PERSON.identities existence >= 1 and
 // cardinality >= 1, so asking for a member, flags a person with no
 // identities as `required` on the template layer, rule existence. The RM
 // also marks identities mandatory, but one absence draws one finding, the
@@ -230,7 +230,7 @@ func TestValidateDemographic_RequiredIdentities(t *testing.T) {
 	}
 }
 
-// REQ-110 — FOLDER validates against an OPT (synthetic root) and the
+// REQ-102 — FOLDER validates against an OPT (synthetic root) and the
 // walker descends sub-folders.
 func TestValidateFolder_Synthetic(t *testing.T) {
 	const body = `<?xml version="1.0"?>
@@ -260,7 +260,7 @@ func TestValidateFolder_Synthetic(t *testing.T) {
 	}
 }
 
-// REQ-110 — EHR_STATUS validates against an OPT root.
+// REQ-102 — EHR_STATUS validates against an OPT root.
 func TestValidateEHRStatus_Synthetic(t *testing.T) {
 	const body = `<?xml version="1.0"?>
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -287,7 +287,7 @@ func TestValidateEHRStatus_Synthetic(t *testing.T) {
 	}
 }
 
-// REQ-110 — nil-root guards across the typed wrappers and generic entry.
+// REQ-102 — nil-root guards across the typed wrappers and generic entry.
 func TestValidate_NilGuards(t *testing.T) {
 	c := mustCompileInline(t, `<?xml version="1.0"?>
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -321,7 +321,7 @@ func TestValidate_NilGuards(t *testing.T) {
 	}
 }
 
-// REQ-110 — an ORGANISATION instance validates clean against its own
+// REQ-102 — an ORGANISATION instance validates clean against its own
 // ORGANISATION-rooted OPT (the positive counterpart to the
 // PERSON-under-ORGANISATION rm_type_mismatch), proving the ACTOR
 // subtype routing accepts a matching root.

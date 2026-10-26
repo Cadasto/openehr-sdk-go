@@ -17,9 +17,8 @@ import (
 // TestProbe030 runs PROBE-030 across the canonical input set and
 // asserts every input produces Status == "pass". The set spans leaf
 // RM values and full composition fixtures vendored under
-// testkit/corpus/compositions/ and testkit/corpus/rm/. The conformance harness in
-// `make conformance` invokes the same probe function against shared
-// openEHR conformance fixtures (REQ-080).
+// testkit/corpus/compositions/ and testkit/corpus/rm/. `make test` runs it
+// with the rest of the suite.
 func TestProbe030(t *testing.T) {
 	// Sanity-check the input set: at least one leaf entry AND at
 	// least one fixture entry — guards against a silent regression
@@ -257,7 +256,7 @@ func TestProbe076(t *testing.T) {
 }
 
 // TestProbe086 — upstream FLAT serialisation parity over the pinned EHRbase
-// conformance corpus (REQ-080). Unlike PROBE-076 above, the input is FLAT
+// conformance corpus (REQ-053). Unlike PROBE-076 above, the input is FLAT
 // this SDK did not write, so it can catch a path the SDK never emits or a
 // leaf it silently drops.
 //
@@ -453,7 +452,7 @@ func TestProbe086FrameworkMisuse(t *testing.T) {
 // TestProbe105 runs upstream cross-format parity over every set of the vendored
 // cross-format corpus. Every leg a set runs must match the outcome recorded for
 // it, so a gap that opens or closes without its record changing in the same
-// commit fails here (REQ-080).
+// commit fails here (REQ-052, REQ-053, REQ-056).
 func TestProbe105(t *testing.T) {
 	sets, err := fixtures.ListCrossFormatSets()
 	if err != nil {

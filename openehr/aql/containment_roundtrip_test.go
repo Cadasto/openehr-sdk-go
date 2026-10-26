@@ -1,8 +1,8 @@
 package aql_test
 
 // containment_roundtrip_test.go is the equivalence pin between the two
-// canonicalisers of REQ-117 and, since the rows below gained REQ-163's three
-// write-side carriers, of those too: the builder's (openehr/aql, this package's
+// canonicalisers of REQ-163's containment algebra and of its three
+// write-side carriers: the builder's (openehr/aql, this package's
 // subject) and the parser's (openehr/aql/parse). openehr/aql cannot import
 // openehr/aql/parse — the dependency runs the other way — so the paren,
 // precedence and canonical-bracket rules are stated twice; this test proves the
@@ -19,7 +19,7 @@ package aql_test
 // this file is where that MUST is discharged: the read side re-emits a class or
 // VERSION bracket verbatim and upper-cases a projected function name, so any
 // builder spelling but the canonical one comes back different.
-// REQ-117 · REQ-163 · PROBE-088
+// REQ-163 · PROBE-088
 
 import (
 	"errors"
@@ -30,7 +30,7 @@ import (
 )
 
 // builderRoundTripCases are the builder programs whose output must survive a
-// parse → emit round trip byte-for-byte. Every construct the REQ-117 builder
+// parse → emit round trip byte-for-byte. Every construct the REQ-163 builder
 // API adds appears here.
 func builderRoundTripCases() []struct {
 	name  string
@@ -364,7 +364,7 @@ func builderRoundTripCases() []struct {
 	}
 }
 
-// TestBuilderOutputRoundTripsThroughParse is the REQ-117 definition-of-done
+// TestBuilderOutputRoundTripsThroughParse is the REQ-163 definition-of-done
 // tie-in: every builder output parses with an EMPTY catalogue-gap diagnostic
 // (no aql.ErrIncompleteAST) and re-emits to the same bytes.
 // PROBE-088

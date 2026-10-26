@@ -12,15 +12,15 @@ import (
 //   - REQ-013 (docs/specifications/module-layout.md § REQ-013): neither the
 //     package nor any package of this module it pulls in imports transport,
 //     auth or openehr/client.
-//   - REQ-162 (docs/specifications/clinical-modeling.md § REQ-162,
-//     Building-block independence): the package's own non-test files import
+//   - REQ-013 (docs/specifications/module-layout.md § REQ-013, the
+//     semcheck row): the package's own non-test files import
 //     only openehr/aql/contain and the standard library. It cannot cover what
 //     they pull in: contain reaches openehr/rm, whose generated marshal files
 //     import openehr/serialize/canxml.
 //
 // The second rule matters in both directions. Downward it keeps the engine
 // free of transport, auth, client and serialize, like the relation below it.
-// Upward it is what lets two adapters share the engine (REQ-162 § Contract,
+// Upward it is what lets two adapters share the engine (REQ-161 § Builder adapter,
 // one engine, two adapters): an import of openehr/aql or openehr/aql/lint
 // would put the engine above one of its adapters and make the other one's use
 // of it a cycle. The lint imports the engine, never the reverse.
@@ -44,7 +44,7 @@ func TestSemcheckForbiddenImports(t *testing.T) {
 	}
 	for _, imp := range imports {
 		if !importguard.Standard(imp) && imp != allowed {
-			t.Errorf("openehr/aql/internal/semcheck MUST NOT import %q in its own files (REQ-162: semcheck imports only openehr/aql/contain and the standard library)", imp)
+			t.Errorf("openehr/aql/internal/semcheck MUST NOT import %q in its own files (REQ-013: semcheck imports only openehr/aql/contain and the standard library)", imp)
 		}
 	}
 }

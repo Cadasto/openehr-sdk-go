@@ -22,7 +22,7 @@ func hier(t *testing.T) rminfo.Hierarchy {
 
 // TestIsAbstractReportsTheBMMFlag — REQ-048. Abstractness is the pinned BMM's
 // is_abstract flag verbatim, including the classes where the flag is absent
-// and the BMM's answer looks wrong (REQ-047: the BMM wins; STRAND-12 holds the
+// and the BMM's answer looks wrong (REQ-041: the BMM wins; STRAND-12 holds the
 // wider question open). An unknown class is not a third boolean value — it is
 // known=false.
 func TestIsAbstractReportsTheBMMFlag(t *testing.T) {

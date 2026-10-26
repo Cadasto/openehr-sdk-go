@@ -30,7 +30,7 @@ fetched at build time and not looked up in a terminology service at run time. Co
 > the generated `openehr/terminology` accessor. A hand-typed openEHR code table or rubric
 > anywhere else is a defect (§ REQ-034, *One home per code*). Other external terminologies
 > (SNOMED CT, LOINC, …) are out of scope here; see
-> [REQ-105](../../docs/specifications/clinical-modeling.md#req-105--terminology-bindings).
+> [REQ-111](../../docs/specifications/clinical-modeling.md#req-111--public-compiled-template-bridge).
 
 ## The pin
 
@@ -84,7 +84,7 @@ It lives in-tree rather than behind an upstream URL for the same three reasons t
 | Consumer | Relationship |
 |---|---|
 | `openehr/terminology` | The generated, stdlib-only accessor. It exposes every group and code set of this pin as typed, closed, source-ordered values: groups with code → rubric, rubric → code, and membership lookups; code sets with membership lookups and the issuer and external id the pin gives each; plus the pinned release version; and the property-unit table, with each property's UCUM units in source order, the primary ones marked (§ REQ-034). |
-| `cmd/termgen` | The generator: reads the three files of this pin, emits those tables. `make termgen` regenerates them; `make termgen-check` fails the gate when they drift from any of the files (the [REQ-042](../../docs/specifications/bmm-conformance.md#req-042--generated-code-drift-detected) rule). |
+| `cmd/termgen` | The generator: reads the three files of this pin, emits those tables. `make termgen` regenerates them; `make termgen-check` fails the gate when they drift from any of the files, as the drift check of the BMM-generated code does ([REQ-041](../../docs/specifications/bmm-conformance.md#req-041--pinned-bmm-sources)). |
 
 The generator and the accessor land with the rest of the REQ-034 work; this pin is their
 only input. Nothing else in the SDK parses these XML files at build or run time.

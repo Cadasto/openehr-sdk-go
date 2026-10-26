@@ -183,7 +183,7 @@ func TestValidateVersionPredicate(t *testing.T) {
 		{"escapes_bracket", "commit_audit/time > '2020'] CONTAINS COMPOSITION c[at0001", true},
 		// `versionPredicate` has no junction alternative, so a top-level AND /
 		// OR / MATCHES is never legal here — unlike the class position, where
-		// nodePredicate makes it lawful. REQ-119 § Amends the VERSION position.
+		// nodePredicate makes it lawful. REQ-119 § The class predicate positions.
 		{"junction_and", "a/b='c' AND d/e='f'", true},
 		{"junction_or", "a/b='c' OR d/e='f'", true},
 		{"junction_lowercase", "a/b='c' and d/e='f'", true},

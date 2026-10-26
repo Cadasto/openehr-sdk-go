@@ -237,10 +237,10 @@ const contributionGetFixture = `{
   ]
 }`
 
-// TestGetRejectsInputs pins REQ-142's fail-before-request rule: an empty
-// ehr_id or contribution_uid is refused with ErrInvalidConfig and MUST
-// NOT issue a request (an empty interpolated segment is what REQ-150's
-// validator refuses; the sentinel contract has one home).
+// TestGetRejectsInputs pins the fail-before-request rule on the REQ-174
+// contribution read: an empty ehr_id or contribution_uid is refused with
+// ErrInvalidConfig and MUST NOT issue a request (an empty interpolated segment
+// is what REQ-150's validator refuses; the sentinel contract has one home).
 func TestGetRejectsInputs(t *testing.T) {
 	var requests int
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -259,11 +259,11 @@ func TestGetRejectsInputs(t *testing.T) {
 		t.Errorf("empty contributionUID: expected ErrInvalidConfig, got %v", err)
 	}
 	if requests != 0 {
-		t.Errorf("issued %d request(s); REQ-142 requires failing before any request", requests)
+		t.Errorf("issued %d request(s); REQ-150 requires failing before any request", requests)
 	}
 }
 
-// TestGet pins the REQ-142 / PROBE-092 request shape (method, path, and
+// TestGet pins the REQ-174 / PROBE-092 request shape (method, path, and
 // the canonical-JSON Accept) and the 200 decode down to versions[0]'s
 // concrete OBJECT_REF and its fields — the read-side inverse of
 // TestCommitSubmissionShape. Per the vendored pin, 200_CONTRIBUTION
@@ -318,7 +318,8 @@ func TestGet(t *testing.T) {
 	}
 }
 
-// TestGetMapsNotFound pins REQ-142's 404 -> ErrNotFound mapping.
+// TestGetMapsNotFound pins the 404 -> ErrNotFound mapping (REQ-093) on the
+// REQ-174 contribution read.
 func TestGetMapsNotFound(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)

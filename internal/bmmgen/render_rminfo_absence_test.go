@@ -1,6 +1,6 @@
 package bmmgen
 
-// REQ-049 — the generated absence table: every name the RM generation
+// REQ-048 — the generated absence table: every name the RM generation
 // target's pinned schemas declare that the class universe omits, with the
 // reason it is out, under the fixed precedence
 // (primitive → enumeration → excluded class → excluded package).
@@ -66,7 +66,7 @@ func absencePlan(t *testing.T) *Plan {
 
 // TestRMInfoAbsenceReasonsUnderTheFixedPrecedence pins one name per rule and,
 // for the two names two rules match, pins that the EARLIER rule wins: what a
-// name IS (primitive, enumeration) ranks ahead of why it was SKIPPED (REQ-049).
+// name IS (primitive, enumeration) ranks ahead of why it was SKIPPED (REQ-048).
 func TestRMInfoAbsenceReasonsUnderTheFixedPrecedence(t *testing.T) {
 	entries, err := rmInfoAbsence(absencePlan(t))
 	if err != nil {
@@ -106,7 +106,7 @@ func TestRMInfoAbsenceReasonsUnderTheFixedPrecedence(t *testing.T) {
 		}
 	}
 	// KEEPER is the one class in the universe: a universe member must never
-	// appear in the table (REQ-049 § Generated, accounted, computed).
+	// appear in the table (REQ-048 § Absence reasons).
 	if reason, ok := got["KEEPER"]; ok {
 		t.Errorf("KEEPER is in the class universe but the table reports %q", reason)
 	}
@@ -131,7 +131,7 @@ func TestRMInfoAbsenceIsSortedByClassName(t *testing.T) {
 
 // TestRMInfoAbsenceUnaccountedNameFailsGeneration — a declared name the
 // universe omits that no rule accounts for is a generation ERROR naming the
-// class, not a silent *undeclared* (REQ-049: that failure is what keeps a
+// class, not a silent *undeclared* (REQ-048: that failure is what keeps a
 // future exclusion change from reclassifying a real openEHR class as a name no
 // schema declares).
 //
@@ -179,7 +179,7 @@ func TestRMInfoAbsenceNeedsTheSchema(t *testing.T) {
 
 // TestRMInfoAbsenceAccountsForThePinnedBMM — on the real pinned schemas the
 // table and the universe partition the declared names: no name in both, no
-// declared name in neither (REQ-049 § Generated, accounted, computed). The
+// declared name in neither (REQ-048 § Absence reasons). The
 // independent BMM reduction is PROBE-098's job; this asserts the generator's
 // own two halves add up.
 func TestRMInfoAbsenceAccountsForThePinnedBMM(t *testing.T) {
@@ -241,7 +241,7 @@ func TestRMInfoAbsenceAccountsForThePinnedBMM(t *testing.T) {
 
 // TestRenderRMInfoAbsenceFile checks the emitted file: the generated header,
 // the map declaration, determinism across runs, and that no computed reason is
-// ever stored (REQ-049 — *undeclared* is computed, *none* means in-universe).
+// ever stored (REQ-048 — *undeclared* is computed, *none* means in-universe).
 func TestRenderRMInfoAbsenceFile(t *testing.T) {
 	plan, err := BuildPlanForTarget(context.Background(), TargetRM, bmm.FSResolver{Root: testResources})
 	if err != nil {

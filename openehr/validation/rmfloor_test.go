@@ -8,7 +8,7 @@ package validation_test
 //     invariant violation with a path and a stable code;
 //   - structurally-valid roots must report OK;
 //   - the typed sugars guard against nil and typed-nil roots without
-//     panicking, mirroring REQ-110's nil_* contract.
+//     panicking, mirroring REQ-102's nil_* contract.
 
 import (
 	"encoding/json"
@@ -350,7 +350,7 @@ func TestValidateRM_UnknownType(t *testing.T) {
 	}
 }
 
-// TestValidateRMFolder_NilGuard mirrors REQ-110's nil-typed-wrapper
+// TestValidateRMFolder_NilGuard mirrors REQ-102's nil-typed-wrapper
 // contract: a nil *rm.Folder surfaces nil_folder (not nil_root) so the
 // caller can distinguish wrapper-side guards from generic ones.
 func TestValidateRMFolder_NilGuard(t *testing.T) {

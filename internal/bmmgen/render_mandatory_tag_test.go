@@ -240,7 +240,7 @@ func TestREQ052_GenericRootIsInterface(t *testing.T) {
 // null, is left out. No field generated today takes either path, so `make
 // codegen-check` shows no diff when renderField stops asking.
 //
-// REQ-043: § Mapping rules, Property → Go field. REQ-052 § An absent
+// REQ-041: § Mapping rules, Property → Go field. REQ-052 § An absent
 // mandatory member: a mandatory member with no value is left out on encode,
 // never written as null.
 func TestREQ052_RenderFieldPolymorphicMandatoryTag(t *testing.T) {

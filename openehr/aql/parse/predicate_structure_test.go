@@ -199,7 +199,7 @@ func predicateRows() []predicateRow {
 			at:      both,
 		},
 		{
-			// ENUMERATED UNSTRUCTURED: the REQ-119 § Amends REQ-117 residual.
+			// ENUMERATED UNSTRUCTURED: the REQ-113 residual.
 			name:    "comparison with an out-of-range numeric operand",
 			alts:    nil, // a primitive spelling, covered above; listed for the enumeration
 			pred:    "magnitude=99999999999999999999999999",

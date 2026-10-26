@@ -94,10 +94,11 @@ func newDecodeClient(t *testing.T, status int, body string, header http.Header, 
 }
 
 // TestDecodeTypedErrorCarriesBody pins the whole positive contract of
-// REQ-151 § The typed error: the failure is recoverable as a
-// *transport.DecodeError, it carries the bytes the server delivered, it
-// attributes the request, it still unwraps to the decoder's own typed
-// diagnostics, and the metadata beside it survives (§ Metadata still arrives).
+// REQ-151 § What each typed error carries and § A body that does not decode:
+// the failure is recoverable as a *transport.DecodeError, it carries the bytes
+// the server delivered, it attributes the request, it still unwraps to the
+// decoder's own typed diagnostics, and the metadata beside it survives
+// (§ Metadata still arrives).
 func TestDecodeTypedErrorCarriesBody(t *testing.T) { // REQ-151
 	const body = `[1, 2, 3]`
 	c := newDecodeClient(t, http.StatusOK, body, http.Header{"ETag": {`"v1"`}})
@@ -163,10 +164,11 @@ func undecodableBody(n int) string {
 	return "[" + strings.Repeat("1", n-2) + "]"
 }
 
-// TestDecodeErrorBodyInheritsTheResponseCap pins REQ-151's "Body inherits the
-// caller's configured ceiling; it does not add one of its own" against both
-// shapes WithMaxResponseBody takes (REQ-093): an explicit positive limit, and
-// the negative escape hatch that disables the cap outright.
+// TestDecodeErrorBodyInheritsTheResponseCap pins REQ-151 § A body that does
+// not decode, whose Body is bounded only by the client's WithMaxResponseBody
+// ceiling, against both shapes WithMaxResponseBody takes (REQ-093): an
+// explicit positive limit, and the negative escape hatch that disables the cap
+// outright.
 func TestDecodeErrorBodyInheritsTheResponseCap(t *testing.T) { // REQ-151
 	const (
 		limit     = 128
@@ -347,9 +349,9 @@ func TestDecodeNon2xxStaysWireError(t *testing.T) { // REQ-151
 	}
 }
 
-// TestDecodeEmptyBodyStaysInvalidShape pins REQ-151 § An empty 2xx body keeps
-// its existing contract: an absent body is not an unusable one, so callers
-// keying on transport.ErrInvalidShape keep working unchanged.
+// TestDecodeEmptyBodyStaysInvalidShape pins the empty-body row of REQ-151
+// § The taxonomy: an absent body is not an unusable one, so callers keying on
+// transport.ErrInvalidShape keep working unchanged.
 func TestDecodeEmptyBodyStaysInvalidShape(t *testing.T) { // REQ-151
 	c := newDecodeClient(t, http.StatusOK, "", nil)
 

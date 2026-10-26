@@ -1,7 +1,7 @@
 package serializeprobes
 
-// PROBE-086 — upstream FLAT serialisation parity (REQ-080; exercises REQ-053
-// and REQ-106). For one body of the pinned EHRbase FLAT conformance corpus,
+// PROBE-086 — upstream FLAT serialisation parity (REQ-053; exercises
+// REQ-106). For one body of the pinned EHRbase FLAT conformance corpus,
 // decode it through the REQ-053 codec and re-encode it, then compare against
 // the upstream-authored original.
 //
@@ -52,7 +52,7 @@ import (
 //
 // Framework misuse (nil target, a case with no FLAT path) returns a non-nil
 // error.
-func Probe086UpstreamFlatParity(target *conformance.Target, c conformance.Case) (Result, error) { // PROBE-086 (REQ-053, REQ-080, REQ-106)
+func Probe086UpstreamFlatParity(target *conformance.Target, c conformance.Case) (Result, error) { // PROBE-086 (REQ-053, REQ-106)
 	r := Result{Probe: "PROBE-086"}
 	if target == nil {
 		return r, errors.New("PROBE-086: nil target")

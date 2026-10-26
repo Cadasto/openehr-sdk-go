@@ -263,8 +263,9 @@ func TestREQ169FlatClosedSideWithNoBound(t *testing.T) {
 // TestREQ169NormalRangeBoundByValueMatchesRM — REQ-169. The decode refuses a
 // closed side with no bound where the RM holds the normal range's bound by
 // value, and reads which datatypes those are off a table, since the codec
-// takes no reflection (REQ-024). The table must name exactly the datatypes
-// whose normal_range bound the generated RM types hold as a concrete type.
+// takes no reflection (idiom.md § API conventions). The table must name
+// exactly the datatypes whose normal_range bound the generated RM types hold
+// as a concrete type.
 func TestREQ169NormalRangeBoundByValueMatchesRM(t *testing.T) {
 	for name, v := range map[string]any{
 		"DV_COUNT": rm.DVCount{}, "DV_QUANTITY": rm.DVQuantity{}, "DV_PROPORTION": rm.DVProportion{},

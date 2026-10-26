@@ -275,7 +275,7 @@ func TestWalk_VisitsEveryNode(t *testing.T) {
 // Phase 5 — *Slot leaves still receive both PreHandle and
 // PostHandle, but the walker does NOT descend into them: their
 // Includes / Excludes assertions are slot-fill semantics surfaced on
-// the slot node itself (REQ-104), not descendable children. Verify
+// the slot node itself (REQ-103), not descendable children. Verify
 // by visiting a known CLUSTER slot
 // in vital_signs.opt and asserting (a) both hooks fire and (b) no
 // descendant of the slot's AQL path appears.

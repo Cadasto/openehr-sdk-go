@@ -28,11 +28,12 @@ type (
 )
 
 // TestBoundOfMapsTheTypeParameterField pins how a generic target binds its
-// type parameter (REQ-170 *Scope*, REQ-024 field mapping): the Go field whose
-// JSON tag is a type-parameter attribute, peeled of its pointer, names the
-// class; a polymorphic RM interface binds the class it stands for, and Go's
-// any binds nothing. Attributes of one parameter must agree, and attributes
-// of two parameters cannot share one binding: either way there is none.
+// type parameter (REQ-170 *Scope*; field mapping, idiom.md § API
+// conventions): the Go field whose JSON tag is a type-parameter attribute,
+// peeled of its pointer, names the class; a polymorphic RM interface binds
+// the class it stands for, and Go's any binds nothing. Attributes of one
+// parameter must agree, and attributes of two parameters cannot share one
+// binding: either way there is none.
 func TestBoundOfMapsTheTypeParameterField(t *testing.T) {
 	attr := func(typ string) rminfo.AttrMeta { return rminfo.AttrMeta{TypeName: typ, DeclaredIn: "PAIR"} }
 	class := func(attrs map[string]rminfo.AttrMeta, order ...string) rminfo.ClassMeta {

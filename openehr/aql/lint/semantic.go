@@ -23,9 +23,9 @@ import (
 // This function is an ADAPTER, not a rule engine. Every verdict→code decision,
 // and the suppression rule between the operand codes and the pair codes, lives
 // in openehr/aql/internal/semcheck — shared verbatim with the write-side
-// builder verification, which REQ-162 § Contract holds to an identical code
+// builder verification, which REQ-161 § Builder adapter holds to an identical code
 // multiset (a subset that the three portability advisories are NOT part of —
-// REQ-162 § Contract scopes read/write parity to the containment-check codes
+// REQ-161 § Builder adapter scopes read/write parity to the containment-check codes
 // alone). What is added here is what only the read side has: the Span on the
 // offending class expression, the Path spelling, and the severity lookup.
 //
@@ -120,13 +120,13 @@ type containCheck struct {
 //
 // role is the POSITION this node occupies — see [semcheck.Role.Next], which owns
 // the assignment rule so the write-side adapter cannot pick a different answer
-// (REQ-162 § Contract). A junction's operands INHERIT the junction's role rather
+// (REQ-161 § Builder adapter). A junction's operands INHERIT the junction's role rather
 // than being labelled contained for being junction children, so a root junction
 // holds roots. Assigning by tree shape here is what made the two spellings of a
 // root position disagree.
 //
 // Both threadings compose the same way at depth: same-operator junctions arrive
-// pre-flattened (`A OR B OR C` is ONE node with three operands, REQ-117) while
+// pre-flattened (`A OR B OR C` is ONE node with three operands, REQ-113) while
 // mixed AND/OR nesting does not, so a junction operand may itself be a junction.
 func (c *containCheck) walk(parent semcheck.Operand, role semcheck.Role, n parse.Containment) semcheck.Operand {
 	if isJunction(n) {
@@ -618,7 +618,7 @@ func fanoutIssues(doc *parse.Document) []Issue {
 // class-expression operands reached from n without crossing a non-AND (or
 // negated) junction (REQ-161's flattening rule, applied regardless of how deep
 // the AND-only nesting runs — same-operator junctions arrive pre-flattened by
-// the extractor already, REQ-117, but this recurses regardless so a hand-built
+// the extractor already, REQ-113, but this recurses regardless so a hand-built
 // or future unflattened AST is handled identically — see
 // [TestAndFrontierFlattensHandBuiltNestedAnd]). boundary is every node the
 // flatten explicitly did NOT explore: a non-AND (OR) node, or a NEGATED node,

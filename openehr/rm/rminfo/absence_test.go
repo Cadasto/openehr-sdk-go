@@ -28,7 +28,7 @@ func reporter(t *testing.T, l rminfo.Lookup) rminfo.AbsenceReporter {
 	return r
 }
 
-// TestAbsenceNoneIsTheDistinguishedZeroValue — REQ-049. The none answer is the
+// TestAbsenceNoneIsTheDistinguishedZeroValue — REQ-048. The none answer is the
 // reason type's zero value and every real reason differs from it, so the
 // accessor cannot be misread as a membership test with inverted sense. The
 // reasons are also pairwise distinct: collapsing two would re-fold facts the
@@ -57,7 +57,7 @@ func TestAbsenceNoneIsTheDistinguishedZeroValue(t *testing.T) {
 	}
 }
 
-// TestNewFallsBackToUndeclared — REQ-049 § Synthetic seam. A Lookup built
+// TestNewFallsBackToUndeclared — REQ-048 § Absence reasons. A Lookup built
 // without an absence table reports undeclared for every out-of-universe name,
 // and none for every member. That is the documented fallback, not a defect.
 func TestNewFallsBackToUndeclared(t *testing.T) {
@@ -78,7 +78,7 @@ func TestNewFallsBackToUndeclared(t *testing.T) {
 	}
 }
 
-// TestNewWithAbsenceReportsTheStoredReason — REQ-049 § The reason taxonomy.
+// TestNewWithAbsenceReportsTheStoredReason — REQ-048 § Absence reasons.
 // Each member of the closed set survives the round trip through the synthetic
 // table, and a name in neither map still falls back to undeclared.
 func TestNewWithAbsenceReportsTheStoredReason(t *testing.T) {
@@ -110,7 +110,7 @@ func TestNewWithAbsenceReportsTheStoredReason(t *testing.T) {
 	}
 }
 
-// TestUniverseWinsOverAnAbsenceEntry — REQ-049 § Synthetic seam. Where the
+// TestUniverseWinsOverAnAbsenceEntry — REQ-048 § Absence reasons. Where the
 // class data and the absence table name the same class the universe wins, so a
 // member can never be reported absent — the two surfaces must not disagree
 // about membership.
@@ -123,7 +123,7 @@ func TestUniverseWinsOverAnAbsenceEntry(t *testing.T) {
 	}
 }
 
-// TestStoredNoneIsTableSilence — REQ-049 § Surface shape. A synthetic absence
+// TestStoredNoneIsTableSilence — REQ-048 § Absence reasons. A synthetic absence
 // entry whose value is the *none* reason is treated as table silence: the name
 // is not in the class data, so reporting *none* for it would claim a
 // membership KnownRMTypes() does not list, and the two surfaces must not
@@ -143,7 +143,7 @@ func TestStoredNoneIsTableSilence(t *testing.T) {
 	}
 }
 
-// TestAbsenceReasonString — REQ-049. The string form names the kind only: it
+// TestAbsenceReasonString — REQ-048. The string form names the kind only: it
 // never echoes the queried name, and a value outside the closed set formats
 // numerically rather than masquerading as a member.
 func TestAbsenceReasonString(t *testing.T) {
@@ -167,7 +167,7 @@ func TestAbsenceReasonString(t *testing.T) {
 	}
 }
 
-// TestDefaultImplementsAbsenceReporter — REQ-049 § Surface shape. Default
+// TestDefaultImplementsAbsenceReporter — REQ-048 § Absence reasons. Default
 // carries the capability; consumers reach it by exactly this assertion.
 //
 // The answers come from the GENERATED table (absence_gen.go), so what this

@@ -11,7 +11,7 @@ import (
 // PROBE-074 — template-driven validation extends beyond COMPOSITION to
 // the demographic PARTY hierarchy and the EHR-IM roots. The issue-code
 // multiset per (OPT, root) shape is stable across conformant
-// implementations (REQ-110).
+// implementations (REQ-102).
 func TestProbe074NonCompositionValidate(t *testing.T) {
 	addr, err := probes.AddressFixture()
 	if err != nil {

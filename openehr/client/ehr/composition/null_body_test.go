@@ -12,12 +12,13 @@ import (
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
-// TestGetNullBodyIsInvalidShape pins § REQ-151's refusal arm on the hand-rolled
-// composition read: a 200 whose body is the JSON `null` literal carries no
-// representation and MUST classify as transport.ErrInvalidShape — never as a
-// *transport.DecodeError, and never as a populated all-zero *rm.Composition,
-// which is what canjson.Unmarshal would silently produce for `null`. Reverting
-// the leaf to a len(body) == 0 check fails this test with a nil error.
+// TestGetNullBodyIsInvalidShape pins the empty-body row of REQ-151
+// § The taxonomy on the hand-rolled composition read: a 200 whose body is the
+// JSON `null` literal carries no representation and MUST classify as
+// transport.ErrInvalidShape — never as a *transport.DecodeError, and never as
+// a populated all-zero *rm.Composition, which is what canjson.Unmarshal would
+// silently produce for `null`. Reverting the leaf to a len(body) == 0 check
+// fails this test with a nil error.
 func TestGetNullBodyIsInvalidShape(t *testing.T) { // REQ-151
 	for _, body := range []string{"null", "\n null \n"} {
 		t.Run(body, func(t *testing.T) {

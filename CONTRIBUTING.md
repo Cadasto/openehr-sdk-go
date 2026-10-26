@@ -39,7 +39,7 @@
 ```
 feat(transport): add Idempotency-Key header support
 fix(canjson): handle nil interface in polymorphic decode
-docs(plans): track REQ-110 follow-up
+docs(plans): track REQ-102 follow-up
 ```
 
 Write the subject in the imperative mood. The body explains *why*; the diff already shows the *what*. Reference REQ-NNN / PROBE-NNN / issue numbers when relevant. If an AI tool helped write the change, add an `Assisted-by:` trailer. See [AI-assisted contributions](#ai-assisted-contributions).
@@ -84,8 +84,8 @@ Nothing runs on commit, so run `make lint` yourself before opening a PR. If you 
 
 The detailed, normative idiom spec is [`docs/specifications/idiom.md`](docs/specifications/idiom.md). It covers context propagation, `*http.Client` injection, functional options, generics-no-reflection, error wrapping / typed errors, concurrency, imports & naming, and public-API stability. Formatting, lint, and commit conventions are in [AGENTS.md § Code style and conventions](AGENTS.md#code-style-and-conventions). Read those first. The points below trip up most PRs:
 
-- **Building-block independence (REQ-013)**: the openEHR building-block packages and the AQL blocks MUST be usable standalone, with no `transport/` or `auth/` import. The exact package set and the per-package import guards are in [AGENTS.md § Module layout & boundaries](AGENTS.md#module-layout--boundaries) and [`docs/specifications/module-layout.md` § REQ-013](docs/specifications/module-layout.md#req-013--building-block-independence).
-- **No reflection** beyond the exceptions in [idiom.md § Generics policy (REQ-024)](docs/specifications/idiom.md#generics-policy-req-024): `_type` dispatch goes through the type registry, and generics are fine.
+- **Building-block independence (REQ-013)**: the openEHR building-block packages and the AQL blocks are usable standalone, with no `transport/` or `auth/` import. The exact package set and each package's import rule are in the table in [`docs/specifications/module-layout.md` § REQ-013](docs/specifications/module-layout.md#req-013--building-block-independence).
+- **No reflection** beyond the exceptions in [idiom.md § API conventions](docs/specifications/idiom.md#api-conventions): `_type` dispatch goes through the type registry, and generics are fine.
 - **Strict-encode / permissive-decode** numerics per [ADR 0004](docs/adr/0004-numeric-wire-tolerance.md).
 - **Comments**: explain WHY, not WHAT; identifiers carry the WHAT. Do NOT cite issue numbers or commit SHAs (those rot). Where REQ-NNN / PROBE-NNN citations go, and how godoc on exported API is written, follow [AGENTS.md § Documentation](AGENTS.md#documentation). Godoc states the behaviour a caller needs in plain English, at whatever length that takes.
 - **Test contexts**: in the I/O-bearing test packages (`transport/`, `auth/`, `smart/`, `openehr/client/*`) use `t.Context()` (Go 1.24+) for request-scoped contexts. Because it is cancelled at test cleanup, leaks surface. Don't reintroduce `context.Background()` there; derive timeouts/cancellation from `t.Context()`. Pure-compute test packages are unaffected.

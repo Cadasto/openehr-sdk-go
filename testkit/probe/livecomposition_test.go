@@ -109,7 +109,7 @@ func compositionLiveEntries(id openehrclient.EHRID, templateID string, optBody [
 // TestLiveCompositionSnapshot runs the clinical write/read path against a live
 // deployment (REQ-082 Live): create a per-run EHR, upload the per-run OPT,
 // commit its canonical composition, and read the committed version back. It
-// exercises the REQ-080 wire — the SDK's own canonical composition encoding has
+// exercises the REQ-052 wire — the SDK's own canonical composition encoding has
 // to be accepted by a real CDR — without being a catalog PROBE. Opt-in and
 // skipped in CI, sharing the runLiveSnapshot harness with TestLiveCoreSnapshot.
 //

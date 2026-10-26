@@ -16,8 +16,8 @@
 # Pin the dev toolchain to a specific recent PATCH for reproducible builds.
 # This is the build toolchain, not the module floor: it only has to be >=
 # go.mod's `go` line (which stays at the minor's `.0`, e.g. 1.27.0, per
-# REQ-002). Bump explicitly when a new stable patch ships — same policy as
-# the Makefile's LINT_IMAGE pin.
+# docs/releases.md § Minimum Go version). Bump explicitly when a new stable
+# patch ships — same policy as the Makefile's LINT_IMAGE pin.
 ARG GO_VERSION=1.27.1
 # No Alpine pin: the `dev` stage inherits whatever Alpine
 # `golang:${GO_VERSION}-alpine` ships. Pinning it separately needs the

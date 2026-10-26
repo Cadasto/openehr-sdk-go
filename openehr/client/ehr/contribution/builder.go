@@ -206,9 +206,9 @@ func Deletion[T Versionable](precedingUID string, data *T, opts ...VersionOption
 // T is instantiated at the call site, so the type-set is a compile-time
 // fact. The public constructors stay package-level functions returning
 // an inert [Change] that a non-generic [Builder.Add] accumulates
-// (REQ-130, REQ-023). Go 1.27 allows generic methods; four generic Add*
-// methods would still be a worse fluent surface than four constructors
-// plus Add.
+// (REQ-130; idiom.md § API conventions). Go 1.27 allows generic methods;
+// four generic Add* methods would still be a worse fluent surface than four
+// constructors plus Add.
 //
 // A nil payload is refused for every change type except a deletion, whose
 // version carries Void data (REQ-130 § Deletion). That exemption sits on the

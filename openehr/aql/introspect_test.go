@@ -103,7 +103,7 @@ func TestParamValueStripsLeadingDollar(t *testing.T) {
 	}
 }
 
-// REQ-117: PathValue puts an identified path in a value position (a
+// REQ-113: PathValue puts an identified path in a value position (a
 // path-vs-path comparison RHS or a function argument). The write-side
 // constructor sets Raw; the parser additionally decomposes alias +
 // segments.
@@ -134,7 +134,7 @@ func TestPathValueIntrospection(t *testing.T) {
 	}
 }
 
-// REQ-117: FuncCall is a function call in a value position — a comparison
+// REQ-113: FuncCall is a function call in a value position — a comparison
 // operand on either side, or a nested argument. Emission upper-cases the
 // name and joins arguments with the package's `, ` convention.
 func TestFuncCallIntrospection(t *testing.T) {
@@ -158,7 +158,7 @@ func TestFuncCallIntrospection(t *testing.T) {
 	}
 }
 
-// REQ-117: Compare builds a comparison whose LEFT operand is a structured
+// REQ-113: Compare builds a comparison whose LEFT operand is a structured
 // value rather than a path — the write-side mirror of the parser's
 // function-call WHERE LHS.
 func TestCompareFunctionLeftOperand(t *testing.T) {
@@ -178,7 +178,7 @@ func TestCompareFunctionLeftOperand(t *testing.T) {
 	}
 }
 
-// REQ-117: an empty left operand and a nil value stay build-time errors —
+// REQ-113: an empty left operand and a nil value stay build-time errors —
 // the new shapes do not widen what the emitter will improvise.
 func TestComparisonRejectsMalformedOperands(t *testing.T) {
 	for name, w := range map[string]aql.WhereExpr{
@@ -195,7 +195,7 @@ func TestComparisonRejectsMalformedOperands(t *testing.T) {
 	}
 }
 
-// REQ-117: the two non-value-list MATCHES operands are constructible and
+// REQ-113: the two non-value-list MATCHES operands are constructible and
 // introspectable on the write side too — a bare TERMINOLOGY(...) call and a
 // `{URI}` operand.
 func TestMatchesOperandForms(t *testing.T) {
@@ -224,7 +224,7 @@ func TestMatchesOperandForms(t *testing.T) {
 	}
 }
 
-// REQ-117: the MATCHES operand forms are mutually exclusive and an empty
+// REQ-113: the MATCHES operand forms are mutually exclusive and an empty
 // operand stays a build-time error — no silent widening.
 func TestMatchesRejectsAmbiguousOperands(t *testing.T) {
 	for name, w := range map[string]aql.WhereExpr{
@@ -327,7 +327,7 @@ func TestNullValueTokenIsUnquoted(t *testing.T) {
 // ordinary form, Left for the structured (function-call) form, and setting
 // BOTH must be refused rather than resolved by silently discarding Path.
 // The sibling MatchesExpr already counts its operand forms this way.
-// REQ-117
+// REQ-113
 func TestComparisonRefusesConflictingOperands(t *testing.T) {
 	_, err := aql.FormatWhere(aql.Comparison{
 		Path: "o/discarded",
@@ -347,7 +347,7 @@ func TestComparisonRefusesConflictingOperands(t *testing.T) {
 // drawn from the closed Op* set. [aql.Compare] is the first constructor that
 // takes an Operator from the caller, so an empty or arbitrary string would
 // otherwise interpolate straight into the emitted AQL.
-// REQ-117
+// REQ-113
 func TestComparisonRefusesUnknownOperator(t *testing.T) {
 	for name, op := range map[string]aql.Operator{
 		"empty":      "",

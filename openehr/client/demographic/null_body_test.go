@@ -22,12 +22,12 @@ import (
 // is pinned by the empty-bodied 204 tests in party_test.go / versioned_test.go
 // (they fail when it is deleted).
 
-// TestGetNullBodyIsInvalidShape pins § REQ-151's refusal arm on the
-// polymorphic demographic read: a 200 whose body is the JSON `null` literal is
-// a wire anomaly exactly like an empty one — it MUST surface as
-// transport.ErrInvalidShape rather than as "no version" (which only a 204 may
-// mean) or as a *transport.DecodeError. The version read shares the arm, so the
-// versioned_party/{uid}/version route is exercised too.
+// TestGetNullBodyIsInvalidShape pins the empty-body row of REQ-151
+// § The taxonomy on the polymorphic demographic read: a 200 whose body is the
+// JSON `null` literal is a wire anomaly exactly like an empty one — it MUST
+// surface as transport.ErrInvalidShape rather than as "no version" (which only
+// a 204 may mean) or as a *transport.DecodeError. The version read shares the
+// arm, so the versioned_party/{uid}/version route is exercised too.
 func TestGetNullBodyIsInvalidShape(t *testing.T) { // REQ-151
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

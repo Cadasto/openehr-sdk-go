@@ -79,7 +79,7 @@ func probe088Goldens(t *testing.T) map[string]string {
 // emitting a SELECT that does not read back as the recorded projection — is a
 // build-time error.
 //
-// REQ-118: PROBE-088's goldens include the deprecated SELECT TOP clause, so
+// REQ-163: PROBE-088's goldens include the deprecated SELECT TOP clause, so
 // the builder's TOP emission is held byte for byte.
 func TestProbe088BuilderContainmentAndPaging(t *testing.T) {
 	r, err := aqlprobes.Probe088BuilderContainmentAndPaging(probe088Goldens(t), goldenWire(t))
@@ -110,7 +110,7 @@ func TestProbe088DetectsGoldenDrift(t *testing.T) {
 }
 
 // TestProbe088DetectsProbe020Drift locks the semver contract from the other
-// side: a rewritten PROBE-020 golden fails PROBE-088 even though every REQ-117
+// side: a rewritten PROBE-020 golden fails PROBE-088 even though every REQ-163
 // construct still matches (wire.md § REQ-055 — canonicalisation is semver).
 func TestProbe088DetectsProbe020Drift(t *testing.T) {
 	r, err := aqlprobes.Probe088BuilderContainmentAndPaging(probe088Goldens(t),
@@ -124,8 +124,8 @@ func TestProbe088DetectsProbe020Drift(t *testing.T) {
 }
 
 // TestProbe020GoldenIsBytePinned asserts the committed PROBE-020 golden file
-// equals the literal pinned in the probe package — the REQ-117 additions are
-// semver-minor, so the pre-REQ-117 canonical form MUST be untouched.
+// equals the literal pinned in the probe package — the REQ-163 additions are
+// semver-minor, so the base canonical form MUST be untouched.
 func TestProbe020GoldenIsBytePinned(t *testing.T) {
 	if got := goldenWire(t); got != aqlprobes.Probe020CanonicalQuery {
 		t.Fatalf("PROBE-020 golden drifted:\n  file: %q\npinned: %q", got, aqlprobes.Probe020CanonicalQuery)
@@ -135,7 +135,7 @@ func TestProbe020GoldenIsBytePinned(t *testing.T) {
 // TestProbe088GoldensRoundTripThroughParse ties PROBE-088 to PROBE-087: every
 // committed golden MUST parse with no catalogue gap (no aql.ErrIncompleteAST)
 // and re-emit to the same bytes, so the builder's canonical form and the
-// parser's are provably the same form (REQ-117).
+// parser's are provably the same form (REQ-163).
 //
 // Since REQ-163 the goldens include that REQ's three write-side carriers — the
 // VERSION predicate bracket, the class-position standing comparison and the
@@ -281,11 +281,11 @@ func TestProbe028DetectsCodeDrift(t *testing.T) {
 // stands: probe028Cases has since taken a REQ-164 re-baseline (an unaliased
 // projection on two fixtures), and no REQ-161 code is among what it gained.
 //
-// Arm (c), REQ-162 § Contract: for every corpus query expressible through the
+// Arm (c), REQ-161 § Builder adapter: for every corpus query expressible through the
 // builder, (*aql.Builder).VerifyContainment's code multiset equals
 // lint.LintString's containment-code subset over the emitted text.
-// VerifyContainment never emits the three portability codes at all — REQ-162
-// § Contract scopes parity to the five containment codes — so they have no
+// VerifyContainment never emits the three portability codes at all — REQ-161
+// § Builder adapter scopes parity to the five containment codes — so they have no
 // row in probe097ParityCases by scope, not by omission; a builder QUERY can
 // still trip one of the three (e.g. a bare VERSION operand raises
 // aql_version_no_predicate on the read side), it is only the write-side
@@ -577,8 +577,8 @@ func probe097AdditivityCases(t *testing.T) []aqlprobes.LintCase {
 // rows stay green regardless. What
 // they actually pin is read/write PARITY for these shapes — that
 // VerifyContainment reports aql_unknown_rm_class for them too, exactly as
-// LintString does. The three portability codes are out of REQ-162
-// § Contract's scope entirely (never producible by VerifyContainment), so
+// LintString does. The three portability codes are out of REQ-161
+// § Builder adapter's scope entirely (never producible by VerifyContainment), so
 // they have no row here.
 func probe097ParityCases() []aqlprobes.ParityCase {
 	return []aqlprobes.ParityCase{

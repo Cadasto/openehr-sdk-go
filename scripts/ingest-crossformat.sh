@@ -10,7 +10,7 @@
 # already vendored elsewhere in testkit/corpus/ carries no template.opt; its
 # manifest records an `opt` pointer to that file instead, and the ingest checks
 # that the pointed-to file is byte-identical to the upstream OPT. The sets are
-# the input to PROBE-105 (REQ-080).
+# the input to PROBE-105 (REQ-052, REQ-053, REQ-056).
 #
 # Only files that describe the same instance form a set. Upstream often has
 # several files for one template whose values disagree (another instance of the

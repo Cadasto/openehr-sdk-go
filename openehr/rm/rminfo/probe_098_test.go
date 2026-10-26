@@ -1,7 +1,7 @@
 package rminfo_test
 
 // PROBE-098 — the compiled-in absence table accounts for the class universe's
-// negative space (REQ-049).
+// negative space (REQ-048).
 //
 // The expectation is the SAME independent reduction PROBE-094 builds
 // (probe_094_test.go: the pinned schemas read through the openehr/bmm loader,
@@ -14,7 +14,7 @@ package rminfo_test
 //
 // HOW THE ARMS REACH THE TABLE. Most of them ask the shipped surface about
 // names, because that is what a consumer sees. That view alone cannot carry all
-// of REQ-049: (*lookup).AbsenceReason answers membership first, so a stored
+// of REQ-048: (*lookup).AbsenceReason answers membership first, so a stored
 // entry for a universe member is invisible through it (absence_test.go's
 // TestUniverseWinsOverAnAbsenceEntry pins that masking as intended behaviour).
 // Arm (b) therefore reads the table's own entries, through export_test.go's
@@ -38,7 +38,7 @@ import (
 //
 // isAnAnswer=false for the three kinds that are not exclusions. For a name the
 // pinned schemas DECLARE and the universe omits, those are not answers at all:
-// REQ-049 § Generated, accounted, computed makes an unaccounted declared name a
+// REQ-048 § Absence reasons makes an unaccounted declared name a
 // generation failure, never an *undeclared* reading — that failure mode is what
 // keeps a widened package skip from silently reclassifying a real openEHR class
 // as a name nobody declared.
@@ -60,13 +60,13 @@ func shippedReasonFor(kind exclusionKind) (reason rminfo.AbsenceReason, isAnAnsw
 	// A kind added to exclusionKind without a mapping lands here. Reporting
 	// isAnAnswer=false makes that a named failure at the call site rather
 	// than a silent *none* — the fail-closed posture this probe adopts for
-	// its own taxonomy, which REQ-049's godoc advises of callers.
+	// its own taxonomy, which the AbsenceReason godoc advises of callers (REQ-048).
 	return rminfo.AbsenceNone, false
 }
 
 // declaredNames is the reduction's declared set — `class_definitions` ∪
 // `primitive_types`, which is exactly what bmmReduction.classOf keys (see its
-// field comment). Both maps, because REQ-049 § Generated, accounted, computed
+// field comment). Both maps, because REQ-048 § Absence reasons
 // names both as the accounting's input: a primitive_types-only name such as
 // `Interval` is declared, omitted, and must carry a reason.
 //
@@ -87,7 +87,7 @@ var absenceReasonOrder = []rminfo.AbsenceReason{
 }
 
 // syntheticUndeclared are names no pinned schema mentions at all — the shapes a
-// caller actually supplies by mistake. The empty string is deliberate: REQ-049
+// caller actually supplies by mistake. The empty string is deliberate: REQ-048
 // requires it to report *undeclared* rather than the zero-valued *none* an
 // inverted membership test would give.
 var syntheticUndeclared = []string{
@@ -101,7 +101,7 @@ var syntheticUndeclared = []string{
 // TestProbe098AbsenceAccountsForTheNegativeSpace — arm (a). Accounting, both
 // directions, over every name the pinned schemas declare: the universe's
 // members must report *none* and every omission must report the reason the
-// reduction derives for it, under REQ-049's fixed precedence.
+// reduction derives for it, under REQ-048's fixed precedence.
 //
 // Walking the DECLARED set rather than only the omissions is what makes this
 // arm answer for universe members too: a table entry for a name the reduction
@@ -118,7 +118,7 @@ func TestProbe098AbsenceAccountsForTheNegativeSpace(t *testing.T) {
 		want, isAnAnswer := shippedReasonFor(r.exclusionKindOf(name))
 		if !isAnAnswer {
 			reason, _ := r.exclusionReason(name)
-			t.Errorf("declared name %q is out of the universe but %s — REQ-049 makes that a "+
+			t.Errorf("declared name %q is out of the universe but %s — REQ-048 makes that a "+
 				"generation failure naming the class, never an *undeclared* answer", name, reason)
 			continue
 		}
@@ -161,7 +161,7 @@ func TestProbe098AbsenceAccountsForTheNegativeSpace(t *testing.T) {
 		}
 	}
 	// The two halves must partition the declared names — no name in both, no
-	// declared name in neither (REQ-049 § Generated, accounted, computed).
+	// declared name in neither (REQ-048 § Absence reasons).
 	if census[rminfo.AbsenceNone] != len(r.universe) {
 		t.Errorf("%d declared names report none, but the reduction's universe holds %d",
 			census[rminfo.AbsenceNone], len(r.universe))
@@ -180,8 +180,8 @@ func TestProbe098AbsenceAccountsForTheNegativeSpace(t *testing.T) {
 //
 // Three assertions, in widening order. First, membership and absence never
 // disagree, in both directions: every KnownRMTypes member reports *none*, and
-// every declared name reporting *none* is a KnownRMTypes member (REQ-049
-// § Negative-space consistency).
+// every declared name reporting *none* is a KnownRMTypes member (REQ-048
+// § Absence reasons).
 //
 // Then the table's own entries, read through export_test.go's AbsenceTable
 // because no sequence of AbsenceReason calls can see a masked one. The stored
@@ -192,7 +192,7 @@ func TestProbe098AbsenceAccountsForTheNegativeSpace(t *testing.T) {
 // keys rather than inferred from the answers.
 //
 // Last, no stored VALUE is *none* or *undeclared*: the accessor computes both,
-// and REQ-049 § Generated, accounted, computed stores neither.
+// and REQ-048 § Absence reasons stores neither.
 func TestProbe098NoOverlapWithTheUniverse(t *testing.T) {
 	r := reducePinnedBMM(t)
 	rep := reporter(t, rminfo.Default)
@@ -251,7 +251,7 @@ func TestProbe098NoOverlapWithTheUniverse(t *testing.T) {
 	for _, name := range storedNames {
 		if reason := stored[name]; reason == rminfo.AbsenceNone || reason == rminfo.AbsenceUndeclared {
 			t.Errorf("the table stores %q as %v — the accessor COMPUTES both of those, and "+
-				"REQ-049 stores neither", name, reason)
+				"REQ-048 stores neither", name, reason)
 		}
 	}
 	t.Logf("%d universe members reporting none, %d stored entries checked against the reduction",
@@ -288,7 +288,7 @@ func TestProbe098UndeclaredIsComputedNotStored(t *testing.T) {
 	t.Logf("mentioned but not declared: %v", mentioned)
 }
 
-// TestProbe098PrecedenceIsFixed — arm (d). REQ-049's order — primitive, then
+// TestProbe098PrecedenceIsFixed — arm (d). REQ-048's order — primitive, then
 // enumeration, then excluded class, then excluded package — puts what a name IS
 // ahead of why it was SKIPPED, so a redundant restatement in the generator's
 // exclusion lists cannot decide the reported reason.
@@ -384,7 +384,7 @@ func TestProbe098PrecedenceIsFixed(t *testing.T) {
 
 // TestProbe098AbsentNamesAreUnknownEverywhere — arm (e). Consistency with the
 // negative space: a name reporting any absence reason reports not-known on
-// every Lookup and Hierarchy question (REQ-049 § Negative-space consistency).
+// every Lookup and Hierarchy question (REQ-048 § Absence reasons).
 // PROBE-094 arm (e) holds the converse for universe members.
 //
 // Every out-of-universe name the other four arms exercise is swept here — all

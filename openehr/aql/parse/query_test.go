@@ -199,7 +199,7 @@ func TestParseQueryStarSelect(t *testing.T) {
 	}
 }
 
-// TestParseQuerySelectPrimitiveLiteral pins REQ-117 catalogue shape 1: a
+// TestParseQuerySelectPrimitiveLiteral pins REQ-113 catalogue shape 1: a
 // primitive literal projected from SELECT is a [parse.LiteralExpr] carrying
 // the shared [aql.Value] vocabulary, in source order alongside path items.
 // PROBE-087
@@ -229,7 +229,7 @@ func TestParseQuerySelectPrimitiveLiteral(t *testing.T) {
 
 // TestParseQuerySelectLiteralAlias covers an aliased string literal
 // projection (`SELECT 'x' AS label`) — the literal carries the shared
-// StringValue and the AS alias survives on the item (REQ-117).
+// StringValue and the AS alias survives on the item (REQ-113).
 // PROBE-087
 func TestParseQuerySelectLiteralAlias(t *testing.T) {
 	q, err := parse.ParseQuery("SELECT 'urgent' AS label FROM EHR e")
@@ -314,10 +314,10 @@ func TestParseQuerySelectKeywordWithPathTailStaysPath(t *testing.T) {
 	}
 }
 
-// TestParseQuerySelectStarWithColumns pins REQ-117 catalogue shape 2: a
+// TestParseQuerySelectStarWithColumns pins REQ-113 catalogue shape 2: a
 // star mixed with column projections is an ORDER-PRESERVING item list
 // carrying a [parse.StarExpr] at the star's position, while the
-// query-level Star flag keeps its pre-REQ-117 meaning.
+// query-level Star flag keeps its original meaning.
 // PROBE-087
 func TestParseQuerySelectStarWithColumns(t *testing.T) {
 	const src = "SELECT *, c/uid/value FROM EHR e CONTAINS COMPOSITION c"
@@ -351,7 +351,7 @@ func TestParseQuerySelectStarWithColumns(t *testing.T) {
 }
 
 // TestParseQuerySelectColumnAfterStarOrder pins that the star's POSITION
-// is preserved — `SELECT col, *` keeps the column first (REQ-117).
+// is preserved — `SELECT col, *` keeps the column first (REQ-113).
 // PROBE-087
 func TestParseQuerySelectColumnAfterStarOrder(t *testing.T) {
 	q, err := parse.ParseQuery("SELECT c/uid/value, * FROM EHR e CONTAINS COMPOSITION c")
@@ -369,7 +369,7 @@ func TestParseQuerySelectColumnAfterStarOrder(t *testing.T) {
 	}
 }
 
-// TestParseQuerySelectFunctionArguments pins REQ-117 catalogue shape 7 on
+// TestParseQuerySelectFunctionArguments pins REQ-113 catalogue shape 7 on
 // the SELECT side: primitive, parameter, and nested-function arguments in a
 // function call all model structurally, in argument order.
 // PROBE-087
@@ -417,7 +417,7 @@ func TestParseQuerySelectFunctionArguments(t *testing.T) {
 // TestParseQuerySelectTerminologyFunction pins the grammar's
 // `functionCall : terminologyFunction` alternative in a SELECT column: the
 // TERMINOLOGY call models as a named FunctionCall with its three string
-// arguments, upper-cased canonically (REQ-117).
+// arguments, upper-cased canonically (REQ-113).
 // PROBE-087
 func TestParseQuerySelectTerminologyFunction(t *testing.T) {
 	q, err := parse.ParseQuery("SELECT terminology('SNOMED-CT','near','12345') FROM EHR e")
@@ -510,7 +510,7 @@ func TestParseQueryNotContains(t *testing.T) {
 	}
 }
 
-// TestParseQueryFromRootJunction pins REQ-117 catalogue shape 6: a boolean
+// TestParseQueryFromRootJunction pins REQ-113 catalogue shape 6: a boolean
 // junction at the FROM root is carried by [parse.FromClause.Junction] — the
 // same containment tree the nested side uses — with Root left zero because
 // the clause has no single root class.
@@ -551,7 +551,7 @@ func TestParseQueryFromRootJunction(t *testing.T) {
 // TestParseQueryFromRootJunctionFlattened pins that a same-operator FROM
 // junction chain is ONE node with three operands (the parser's left-nesting
 // is flattened), and that a nested junction of the OTHER operator keeps its
-// grouping parentheses on emit (REQ-117).
+// grouping parentheses on emit (REQ-113).
 // PROBE-087
 func TestParseQueryFromRootJunctionFlattened(t *testing.T) {
 	q, err := parse.ParseQuery("SELECT c1 FROM COMPOSITION c1 OR COMPOSITION c2 OR EHR e")
@@ -586,7 +586,7 @@ func TestParseQueryFromRootJunctionFlattened(t *testing.T) {
 }
 
 // TestParseQueryFromRootJunctionDuplicateAlias pins that the emitter's
-// alias-uniqueness guard also walks a FROM-root junction (REQ-117).
+// alias-uniqueness guard also walks a FROM-root junction (REQ-113).
 // PROBE-087
 func TestParseQueryFromRootJunctionDuplicateAlias(t *testing.T) {
 	q, err := parse.ParseQuery("SELECT c FROM COMPOSITION c OR OBSERVATION c")
@@ -601,7 +601,7 @@ func TestParseQueryFromRootJunctionDuplicateAlias(t *testing.T) {
 
 // TestParseQuerySingleRootUnaffectedByJunctionField pins the compatibility
 // half of shape 6: an ordinary single-root FROM still populates Root (and
-// Contains) with Junction nil (REQ-117).
+// Contains) with Junction nil (REQ-113).
 // PROBE-087
 func TestParseQuerySingleRootUnaffectedByJunctionField(t *testing.T) {
 	q, err := parse.ParseQuery("SELECT c FROM EHR e CONTAINS COMPOSITION c")
@@ -810,7 +810,7 @@ func TestParseQueryWhereMatchesExpr(t *testing.T) {
 	}
 }
 
-// TestParseQueryMatchesTerminologyOperand pins REQ-117 catalogue shape 4:
+// TestParseQueryMatchesTerminologyOperand pins REQ-113 catalogue shape 4:
 // a `MATCHES TERMINOLOGY('op','api','params')` operand models structurally
 // (function name + three string arguments), not as raw text.
 // PROBE-087
@@ -856,7 +856,7 @@ func TestParseQueryMatchesTerminologyOperand(t *testing.T) {
 }
 
 // TestParseQueryMatchesURIOperand pins the `{URI}` MATCHES operand form:
-// the URI is carried verbatim on the structured predicate (REQ-117).
+// the URI is carried verbatim on the structured predicate (REQ-113).
 // PROBE-087
 func TestParseQueryMatchesURIOperand(t *testing.T) {
 	const src = "SELECT o FROM EHR e CONTAINS OBSERVATION o " +
@@ -882,7 +882,7 @@ func TestParseQueryMatchesURIOperand(t *testing.T) {
 
 // TestParseQueryMatchesValueListTerminology pins the grammar's
 // `valueListItem : terminologyFunction` alternative — a terminology call
-// INSIDE the braces is one value of the list (REQ-117).
+// INSIDE the braces is one value of the list (REQ-113).
 // PROBE-087
 func TestParseQueryMatchesValueListTerminology(t *testing.T) {
 	q, err := parse.ParseQuery("SELECT o FROM EHR e CONTAINS OBSERVATION o " +
@@ -909,7 +909,7 @@ func TestParseQueryMatchesValueListTerminology(t *testing.T) {
 	}
 }
 
-// TestParseQueryWhereFunctionLHS pins REQ-117 catalogue shape 3: a
+// TestParseQueryWhereFunctionLHS pins REQ-113 catalogue shape 3: a
 // function call as the LEFT operand of a WHERE comparison models as an
 // [aql.Comparison] whose Left carries the structured [aql.FuncCall]
 // (Path stays empty — the left operand is not a path).
@@ -957,7 +957,7 @@ func TestParseQueryWhereFunctionLHS(t *testing.T) {
 
 // TestParseQueryWhereFunctionRHS pins the grammar's `terminal :
 // functionCall` alternative on the right of a comparison — the function
-// call is a structured [aql.FuncCall] in the value position (REQ-117).
+// call is a structured [aql.FuncCall] in the value position (REQ-113).
 // PROBE-087
 func TestParseQueryWhereFunctionRHS(t *testing.T) {
 	q, err := parse.ParseQuery("SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x = LENGTH(o/y)")
@@ -977,7 +977,7 @@ func TestParseQueryWhereFunctionRHS(t *testing.T) {
 	}
 }
 
-// TestParseQueryPathVsPathComparison pins REQ-117 catalogue shape 5: an
+// TestParseQueryPathVsPathComparison pins REQ-113 catalogue shape 5: an
 // identified path as the RIGHT operand models as an introspectable
 // [aql.PathValue] (alias + segments), not raw text.
 // PROBE-087
@@ -1009,7 +1009,7 @@ func TestParseQueryPathVsPathComparison(t *testing.T) {
 	}
 }
 
-// TestParseQueryWhereFunctionArguments pins REQ-117 catalogue shape 7 on
+// TestParseQueryWhereFunctionArguments pins REQ-113 catalogue shape 7 on
 // the WHERE side: parameter, primitive, and nested-function arguments
 // inside a function call in a comparison.
 // PROBE-087
@@ -1041,7 +1041,7 @@ func TestParseQueryWhereFunctionArguments(t *testing.T) {
 	}
 }
 
-// TestParseQueryWhereJunctionOverNewOperands pins REQ-117 catalogue
+// TestParseQueryWhereJunctionOverNewOperands pins REQ-113 catalogue
 // shape 8: a junction is in-catalogue exactly when all its operands are,
 // so an AND/OR over the newly modelled operands models without a gap and
 // keeps its operand order.
@@ -1093,7 +1093,7 @@ func TestDocumentQueryErrContract(t *testing.T) {
 		t.Errorf("QueryErr on clean parse = %v, want nil", qerr)
 	}
 	// Same accessor on a catalogue-gap query returns the gap error. The
-	// residual gap after REQ-117 is the LIMIT/OFFSET int-overflow guard.
+	// REQ-113 residual covers the LIMIT/OFFSET int-overflow guard.
 	gapDoc, err := parse.Parse("SELECT e FROM EHR e LIMIT 9223372036854775808")
 	if err != nil {
 		t.Fatal(err)
@@ -1128,7 +1128,7 @@ func TestParseQueryLimitOverflow(t *testing.T) {
 // over as IDENTIFIER, so without the lift the argument would model as a
 // PathExpr and typed consumers would read the same construct differently
 // depending on the clause it sits in.
-// REQ-117
+// REQ-113
 func TestSelectFunctionArgLiftsBareKeyword(t *testing.T) {
 	cases := map[string]struct {
 		in       string
@@ -1186,12 +1186,12 @@ func TestSelectFunctionArgLiftsBareKeyword(t *testing.T) {
 }
 
 // TestParseQueryTopClause pins the deprecated `SELECT TOP n [FORWARD|BACKWARD]`
-// clause as an IN-CATALOGUE shape (REQ-118): the count and the direction are
+// clause as an IN-CATALOGUE shape (REQ-113): the count and the direction are
 // both carried, an absent clause stays nil (so `TOP 0` is distinguishable from
 // no bound at all), and emission is the canonical upper-cased form. The clause
 // is deprecated upstream (QUERY Release-1.1.0 §4.4.3) but must still be
 // readable — the SDK does not author the queries it is handed.
-// REQ-118 · PROBE-087
+// REQ-113 · PROBE-087
 func TestParseQueryTopClause(t *testing.T) {
 	cases := map[string]struct {
 		in       string
@@ -1269,7 +1269,7 @@ func TestParseQueryTopClause(t *testing.T) {
 
 // TestParseQueryNoTopClauseIsNil asserts the absent clause stays nil, so a
 // consumer reading Select.Top can never mistake "no bound" for `TOP 0`.
-// REQ-118 · PROBE-087
+// REQ-113 · PROBE-087
 func TestParseQueryNoTopClauseIsNil(t *testing.T) {
 	q, err := parse.ParseQuery("SELECT c/uid/value FROM COMPOSITION c LIMIT 5")
 	if err != nil {
@@ -1281,12 +1281,12 @@ func TestParseQueryNoTopClauseIsNil(t *testing.T) {
 }
 
 // TestParseQueryLiteralSourceText pins the literal's SOURCE TEXT as written
-// (REQ-118). The openEHR result schema names a projected column with no AS
+// (REQ-113). The openEHR result schema names a projected column with no AS
 // alias by its expression text; a path falls back on IdentifiedPath.Raw and a
 // literal had nothing, so re-rendering the typed value was the only option —
 // and that yields the CANONICAL form, which differs from the source in every
 // case below. Emission stays canonical: Raw is read-side fidelity only.
-// REQ-118 · PROBE-087
+// REQ-113 · PROBE-087
 func TestParseQueryLiteralSourceText(t *testing.T) {
 	cases := map[string]struct {
 		in       string
@@ -1347,7 +1347,7 @@ func TestParseQueryLiteralSourceText(t *testing.T) {
 // TestParseQueryLiteralSourceTextInFunctionArgument asserts the source text
 // reaches a literal nested in a function-call argument too, so a consumer
 // walking a projected CONCAT sees the same fidelity as a bare literal.
-// REQ-118 · PROBE-087
+// REQ-113 · PROBE-087
 func TestParseQueryLiteralSourceTextInFunctionArgument(t *testing.T) {
 	q, err := parse.ParseQuery(`SELECT CONCAT("a", 1.50, $p) FROM EHR e`)
 	if err != nil {
@@ -1376,7 +1376,7 @@ func TestParseQueryLiteralSourceTextInFunctionArgument(t *testing.T) {
 // other half: Raw is populated by the PARSER only. A directly-constructed AST
 // has no source, so Raw is empty there and emission still works — a consumer
 // MUST NOT treat it as a required field.
-// REQ-118
+// REQ-113
 func TestParseQueryConstructedLiteralHasNoSourceText(t *testing.T) {
 	q := &parse.Query{
 		Select: parse.SelectClause{Items: []parse.SelectItem{{Expr: parse.LiteralExpr{Value: aql.Int(1)}}}},

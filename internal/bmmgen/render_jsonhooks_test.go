@@ -10,8 +10,9 @@ import (
 )
 
 // TestRenderJSONHooksRegistersTheWalkersTable pins the interface table the RM
-// hooks file registers for the canonical-JSON walker (REQ-170, REQ-024,
-// module-layout: canjson does not import openehr/rm). polymorphicClass is
+// hooks file registers for the canonical-JSON walker (REQ-170; no reflection,
+// idiom.md § API conventions; module-layout: canjson does not import
+// openehr/rm). polymorphicClass is
 // unexported, so the table adds no public API; it has one case per hooked
 // interface, naming the BMM class the interface stands for, which for a
 // narrow interface is the parent class its hook falls back to and for any
