@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"time"
 
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -31,7 +32,10 @@ var ErrDeletedAtTime = errors.New("composition: deleted at requested time")
 // Get retrieves a Composition under the given EHR. The Ref selects
 // the target: [ehr.LatestOf](voID) for the latest version of a
 // versioned-object family, [ehr.LatestAtTime](voID, t) for the
-// as-of-time variant, or [ehr.VersionOf](uid) for a specific version.
+// as-of-time variant, or [ehr.VersionOf](uid) for a specific version. A
+// Ref whose time has a UTC year outside 0000-9999 fails with
+// [transport.ErrInvalidConfig] before any request, since RFC 3339 cannot
+// write it.
 //
 // Wire: GET /ehr/{ehr_id}/composition/{ref} [?version_at_time=...]. A 204
 // No Content response (the composition was deleted at the requested
@@ -54,6 +58,9 @@ func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, re
 	}
 	if ref == nil {
 		return nil, nil, fmt.Errorf("composition.Get: %w: nil Ref", transport.ErrInvalidConfig)
+	}
+	if err := ref.Validate(); err != nil {
+		return nil, nil, fmt.Errorf("composition.Get: %w", err)
 	}
 	seg := ref.PathSegment()
 	if seg == "" {
@@ -381,10 +388,10 @@ func WithDeleteAudit(a *rm.AuditDetails) DeleteOption {
 //     body (not `ORIGINAL_VERSION<COMPOSITION>`) which is decoded
 //     into the returned value. The audit / lifecycle / preceding-
 //     version fields that `ORIGINAL_VERSION` carries are not in the
-//     POST/PUT body; they are available via the version
-//     metadata (`ETag` → `VersionUID`) or via a follow-up
-//     `GET /versioned_composition/{vo_uid}/version/{version_uid}`
-//     which is the canonical home for the `ORIGINAL_VERSION` envelope.
+//     POST/PUT body. The version metadata gives the new version's
+//     id (`ETag` → `VersionUID`), and a follow-up [GetVersionByID]
+//     with that id reads the persisted `ORIGINAL_VERSION` envelope
+//     that carries them.
 //   - PreferIdentifier: server returns the ITS-REST `Identifier` body
 //     (`{"uid": …}`); the returned `*rm.Composition` is nil and the
 //     identifier is resolved into the metadata `VersionUID` (the
@@ -571,9 +578,8 @@ func Delete(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 // Per ITS-REST OpenAPI `201_COMPOSITION` / `200_COMPOSITION_updated`
 // (REQ-094), the response body is a bare `Composition` — not an
 // `ORIGINAL_VERSION<COMPOSITION>` envelope. The full audit / lifecycle
-// version envelope lives at `GET /versioned_composition/{vo_uid}/
-// version/{version_uid}` (`UVersionOfComposition`) which the
-// consumer can fetch when needed.
+// version envelope (`UVersionOfComposition`) is read by
+// [GetVersionByID], which the consumer can call when needed.
 func decodeComposition(body []byte) (*rm.Composition, error) {
 	var comp rm.Composition
 	if err := canjson.Unmarshal(body, &comp); err != nil {
@@ -673,6 +679,11 @@ type Repository interface {
 	Save(ctx context.Context, ehrID openehrclient.EHRID, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error)
 	Update(ctx context.Context, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, ifMatch string, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error)
 	Delete(ctx context.Context, ehrID openehrclient.EHRID, versionUID openehrclient.VersionUID, opts ...DeleteOption) (*openehrclient.VersionMetadata, error)
+	GetVersionedObject(ctx context.Context, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID) (*rm.VersionedComposition, *openehrclient.VersionMetadata, error)
+	GetRevisionHistory(ctx context.Context, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID) (*rm.RevisionHistory, *openehrclient.VersionMetadata, error)
+	GetVersion(ctx context.Context, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID) (*Version, *openehrclient.VersionMetadata, error)
+	GetVersionAtTime(ctx context.Context, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, t time.Time) (*Version, *openehrclient.VersionMetadata, error)
+	GetVersionByID(ctx context.Context, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, versionUID openehrclient.VersionUID) (*Version, *openehrclient.VersionMetadata, error)
 }
 
 // NewRepository binds c to a Repository.

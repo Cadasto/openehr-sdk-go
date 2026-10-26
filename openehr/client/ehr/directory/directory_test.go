@@ -149,6 +149,49 @@ func TestGetAtTime(t *testing.T) {
 	}
 }
 
+// REQ-174: a sub-second time reaches the wire with its fraction of a
+// second, in UTC.
+func TestGetAtTimeKeepsFraction(t *testing.T) {
+	var captured *http.Request
+	body := readFixture(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+
+	at := time.Date(2015, 1, 20, 19, 30, 22, 765_000_000, time.FixedZone("", 3600))
+	_, _, err := directory.GetAtTime(t.Context(), newClient(t, srv), ehrIDFixture, at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := captured.URL.Query().Get("version_at_time"), "2015-01-20T18:30:22.765Z"; got != want {
+		t.Errorf("version_at_time = %q, want %q", got, want)
+	}
+}
+
+// REQ-174: a time whose UTC year falls outside 0000-9999 has no RFC 3339
+// form, so GetAtTime refuses it with ErrInvalidConfig before any request.
+// The client is live, so only the year guard can refuse the call.
+func TestGetAtTimeRefusesYearOutsideRFC3339(t *testing.T) {
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	// 31 December 9999 at -05:00 is the year 10000 in UTC.
+	at := time.Date(9999, 12, 31, 23, 59, 59, 0, time.FixedZone("", -5*3600))
+	_, _, err := directory.GetAtTime(t.Context(), newClient(t, srv), ehrIDFixture, at)
+	if !errors.Is(err, transport.ErrInvalidConfig) {
+		t.Errorf("GetAtTime(%v) err = %v, want ErrInvalidConfig", at, err)
+	}
+	if n := hits.Load(); n != 0 {
+		t.Errorf("GetAtTime(%v): server saw %d request(s), want none", at, n)
+	}
+}
+
 func TestGetVersioned(t *testing.T) {
 	var captured *http.Request
 	body := readFixture(t)

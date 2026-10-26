@@ -601,6 +601,7 @@ requirements:
       - openehr/client/ehr/directory/directory_test.go
       - openehr/client/ehr/ehr_test.go
       - openehr/client/ehr/ehrstatus/ehrstatus_test.go
+      - openehr/client/ehr/ehrstatus/versioned_test.go
       - openehr/client/ehr/ids_test.go
       - testkit/probes/versioned/probe_010_put_without_if_match.go
       - testkit/probes/versioned/probe_011_put_stale_if_match.go
@@ -2141,6 +2142,7 @@ requirements:
     probes: [PROBE-091]
     tests:
       - openehr/client/ehr/composition/composition_test.go
+      - openehr/client/ehr/composition/versioned_test.go
       - openehr/client/ehr/contribution/contribution_test.go
       - openehr/client/route_guard_test.go
       - testkit/probes/transport/probe_091_path_segment_validation.go
@@ -2169,9 +2171,11 @@ requirements:
       - openehr/client/ehr/composition/decode_error_test.go
       - openehr/client/ehr/composition/format_get_test.go
       - openehr/client/ehr/composition/null_body_test.go
+      - openehr/client/ehr/composition/versioned_test.go
       - openehr/client/ehr/contribution/decode_error_test.go
       - openehr/client/ehr/decode_error_test.go
       - openehr/client/ehr/ehr_test.go
+      - openehr/client/ehr/ehrstatus/versioned_test.go
       - openehr/client/ehr/resource_test.go
       - openehr/client/system/decode_error_test.go
       - openehr/client/system/null_body_test.go
@@ -2533,3 +2537,23 @@ requirements:
       - openehr/client/ehr/composition/format_write_test.go
       - testkit/probes/rest/probe_108_composition_formats.go
       - testkit/probes/rest/probes_test.go
+
+  - id: REQ-174
+    title: Versioned-object reads
+    canonical: docs/specifications/wire.md#req-174--versioned-object-reads
+    status: draft
+    implementation: landed
+    packages: [openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/ehrstatus, openehr/client/ehr/directory, openehr/client/demographic]
+    probes: [PROBE-109]
+    tests:
+      - openehr/client/demographic/party_test.go
+      - openehr/client/demographic/versioned_test.go
+      - openehr/client/ehr/composition/composition_test.go
+      - openehr/client/ehr/composition/versioned_test.go
+      - openehr/client/ehr/directory/directory_test.go
+      - openehr/client/ehr/ehr_test.go
+      - openehr/client/ehr/ehrstatus/ehrstatus_test.go
+      - openehr/client/ehr/ehrstatus/versioned_test.go
+      - openehr/client/ehr/version_at_time_test.go
+      - testkit/probes/versioned/probe_109_versioned_object_reads.go
+      - testkit/probes/versioned/probes_test.go

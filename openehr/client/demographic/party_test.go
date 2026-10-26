@@ -440,8 +440,29 @@ func TestGetAtTimeNoVersion(t *testing.T) {
 	if meta == nil {
 		t.Error("204 read: expected non-nil metadata")
 	}
-	if q := captured.URL.Query().Get("version_at_time"); q != at.Format(time.RFC3339) {
-		t.Errorf("version_at_time = %q, want %q", q, at.Format(time.RFC3339))
+	if q, want := captured.URL.Query().Get("version_at_time"), "2026-05-17T10:00:00Z"; q != want {
+		t.Errorf("version_at_time = %q, want %q", q, want)
+	}
+}
+
+// REQ-174: a Ref whose time has a UTC year outside 0000-9999 has no RFC 3339
+// version_at_time, so Get refuses it with ErrInvalidConfig before any
+// request. The client is live, so only the Ref check can refuse the call.
+func TestGetAtTimeRefusesYearOutsideRFC3339(t *testing.T) {
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	_, _, err := demographic.Get(t.Context(), newClient(t, srv),
+		demographic.Person, openehrclient.LatestAtTime(personVOID, year10000))
+	if !errors.Is(err, transport.ErrInvalidConfig) {
+		t.Errorf("Get(LatestAtTime(%v)) err = %v, want ErrInvalidConfig", year10000, err)
+	}
+	if n := hits.Load(); n != 0 {
+		t.Errorf("Get(LatestAtTime(%v)): server saw %d request(s), want none", year10000, n)
 	}
 }
 

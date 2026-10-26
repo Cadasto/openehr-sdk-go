@@ -42,6 +42,8 @@ Open decisions (those that would be ADRs once resolved) live in this repo as **r
 | ADR-0028 | Generated attribute access replaces the hand-written RM readers | Accepted | 2026-10-13 | Amends: REQ-101, REQ-102, REQ-110, REQ-112, REQ-013 |
 | ADR-0029 | FLAT: the composer rides its real path when the `ctx/` short forms cannot carry it | Accepted | 2026-10-15 | Amends: ADR-0015, REQ-053, REQ-140, REQ-170 |
 | ADR-0030 | Composition calls send the format query parameters only when the caller opts in, departing from the pinned composition operations | Accepted | 2026-10-25 | Amends: REQ-173, REQ-095 |
+| ADR-0031 | The composition and EHR_STATUS version reads refuse an IMPORTED_VERSION, departing from the pinned version schemas | Accepted | 2026-10-25 | Amends: REQ-095, REQ-174 |
+| ADR-0032 | The composition and EHR_STATUS version reads accept an ORIGINAL_VERSION without data, the RM's logical deletion, departing from the pinned version schemas | Accepted | 2026-10-26 | Amends: REQ-095, REQ-174 |
 
 <!-- /sdd:generated -->
 

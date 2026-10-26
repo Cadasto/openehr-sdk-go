@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -322,6 +323,51 @@ func TestGetVersionAtTime(t *testing.T) {
 	}
 	if got := captured.URL.Query().Get("version_at_time"); got != "2026-06-16T08:00:00Z" {
 		t.Errorf("version_at_time = %q", got)
+	}
+}
+
+// REQ-174: a sub-second time reaches the wire with its fraction of a
+// second, in UTC.
+func TestGetVersionAtTimeKeepsFraction(t *testing.T) {
+	var captured *http.Request
+	body := fixture(t, "original_version.json")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+
+	at := time.Date(2015, 1, 20, 19, 30, 22, 765_000_000, time.FixedZone("", 3600))
+	_, _, err := demographic.GetVersionAtTime(t.Context(), newClient(t, srv), personVOID, at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := captured.URL.Query().Get("version_at_time"), "2015-01-20T18:30:22.765Z"; got != want {
+		t.Errorf("version_at_time = %q, want %q", got, want)
+	}
+}
+
+// year10000 is 23:59:59 at -05:00 on 31 December 9999, which is the year
+// 10000 in UTC: RFC 3339 has no form for it.
+var year10000 = time.Date(9999, 12, 31, 23, 59, 59, 0, time.FixedZone("", -5*3600))
+
+// REQ-174: a time whose UTC year falls outside 0000-9999 has no RFC 3339
+// form, so GetVersionAtTime refuses it with ErrInvalidConfig before any
+// request. The client is live, so only the year guard can refuse the call.
+func TestGetVersionAtTimeRefusesYearOutsideRFC3339(t *testing.T) {
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	_, _, err := demographic.GetVersionAtTime(t.Context(), newClient(t, srv), personVOID, year10000)
+	if !errors.Is(err, transport.ErrInvalidConfig) {
+		t.Errorf("GetVersionAtTime(%v) err = %v, want ErrInvalidConfig", year10000, err)
+	}
+	if n := hits.Load(); n != 0 {
+		t.Errorf("GetVersionAtTime(%v): server saw %d request(s), want none", year10000, n)
 	}
 }
 

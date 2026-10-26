@@ -25,4 +25,11 @@
 // format. [WithFormatQuery] and [WithGetFormatQuery] are opt-ins for
 // deployments that select the simplified formats with query parameters
 // instead of media types.
+//
+// The package also reads a composition's version history: its versioned
+// object ([GetVersionedObject]), its revision history
+// ([GetRevisionHistory]), and its versions, each with the commit audit
+// around the COMPOSITION: the latest ([GetVersion]), the one current at a
+// time ([GetVersionAtTime]), or one by its id ([GetVersionByID]). These
+// reads take canonical JSON only.
 package composition

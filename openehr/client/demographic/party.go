@@ -63,7 +63,9 @@ func basePath(t Type) string { return "/demographic/" + string(t) }
 // Get retrieves a PARTY of the given type. The Ref selects the target:
 // [ehr.LatestOf](voID) for the latest version of a versioned-object family,
 // [ehr.LatestAtTime](voID, t) for the as-of-time variant, or
-// [ehr.VersionOf](uid) for a specific version. The returned value is the
+// [ehr.VersionOf](uid) for a specific version. A Ref whose time has a UTC
+// year outside 0000-9999 fails with [transport.ErrInvalidConfig] before any
+// request, since RFC 3339 cannot write it. The returned value is the
 // concrete type ([*rm.Person] etc.) behind the [rm.Party] interface, decoded
 // polymorphically by its `_type` discriminator.
 //
@@ -76,6 +78,9 @@ func Get(ctx context.Context, c *transport.Client, t Type, ref openehrclient.Ref
 	}
 	if ref == nil {
 		return nil, nil, fmt.Errorf("demographic.Get: %w: nil Ref", transport.ErrInvalidConfig)
+	}
+	if err := ref.Validate(); err != nil {
+		return nil, nil, fmt.Errorf("demographic.Get: %w", err)
 	}
 	seg := ref.PathSegment()
 	if seg == "" {

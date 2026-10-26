@@ -125,7 +125,7 @@ What `openehr/client/*` decodes today, and whether a vendored body under this di
 | ITEM_TAG | **gap** | header-carried today (REQ-059 `partial`); no tag bodies until the dedicated endpoints land |
 | `Identifier` write response (`{"uid": …}`, `Prefer: return=identifier`) | **gap** | decoded by `openehr/client/ehr/identifier.go` `ResolveIdentifierBody`; hand-built in tests only, e.g. `openehr/client/ehr/composition/composition_test.go`; no vendored body |
 | Admin | n/a | `204` by contract, no bodies |
-| VERSIONED_COMPOSITION / VERSIONED_EHR_STATUS | n/a | family not implemented (roadmap: deferred under STRAND-09) |
+| VERSIONED_COMPOSITION / VERSIONED_EHR_STATUS, their REVISION_HISTORY and ORIGINAL_VERSION | **gap** | hand-built in `openehr/client/ehr/composition/versioned_test.go`, `openehr/client/ehr/ehrstatus/versioned_test.go` and PROBE-109's harness (`testkit/probes/versioned/probes_test.go`); no vendored body |
 | Error envelopes | yes | `errors/` |
 | SMART discovery | yes | `discovery/` |
 
