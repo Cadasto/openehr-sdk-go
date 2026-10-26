@@ -724,16 +724,26 @@ func probe109RevisionHistory(versionUIDs ...string) string {
 	return `{"_type":"REVISION_HISTORY","items":[` + strings.Join(items, ",") + `]}`
 }
 
-// probe109Version is an ORIGINAL_VERSION whose uid is uid and whose data is
-// the raw JSON data; an empty data leaves the member out.
+// probe109Version is a complete ORIGINAL_VERSION whose uid is uid and whose
+// data is the raw JSON data. probe109DeletedVersion is the one without data.
 func probe109Version(uid, data string) string {
-	s := `{"_type":"ORIGINAL_VERSION","uid":{"_type":"OBJECT_VERSION_ID","value":"` + uid + `"},` +
+	return `{"_type":"ORIGINAL_VERSION","uid":{"_type":"OBJECT_VERSION_ID","value":"` + uid + `"},` +
 		`"lifecycle_state":{"_type":"DV_CODED_TEXT","value":"complete","defining_code":{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"openehr"},"code_string":"532"}},` +
-		`"commit_audit":` + probe109AuditJSON + `,"contribution":` + probe109ContributionJSON
-	if data != "" {
-		s += `,"data":` + data
-	}
-	return s + "}"
+		`"commit_audit":` + probe109AuditJSON + `,"contribution":` + probe109ContributionJSON +
+		`,"data":` + data + `}`
+}
+
+// probe109DeletedVersion is the ORIGINAL_VERSION of a logical deletion whose
+// uid is uid: its lifecycle state and its change type are both deleted (code
+// 523), and it carries no data.
+func probe109DeletedVersion(uid string) string {
+	const deleted = `{"_type":"DV_CODED_TEXT","value":"deleted","defining_code":{"_type":"CODE_PHRASE","terminology_id":{"_type":"TERMINOLOGY_ID","value":"openehr"},"code_string":"523"}}`
+	return `{"_type":"ORIGINAL_VERSION","uid":{"_type":"OBJECT_VERSION_ID","value":"` + uid + `"},` +
+		`"lifecycle_state":` + deleted + `,` +
+		`"commit_audit":{"_type":"AUDIT_DETAILS","system_id":"cdr.example",` +
+		`"time_committed":{"_type":"DV_DATE_TIME","value":"2015-01-20T18:30:22.765Z"},` +
+		`"change_type":` + deleted + `,"committer":{"_type":"PARTY_IDENTIFIED","name":"Dr Alice"}},` +
+		`"contribution":` + probe109ContributionJSON + `}`
 }
 
 // probe109Imported is an IMPORTED_VERSION wrapping the version item: the
@@ -914,6 +924,47 @@ func TestProbe109OtherLeafRowsJudgeTheRequestOnly(t *testing.T) {
 	}
 }
 
+// TestProbe109PassesAVersionWithoutData pins PROBE-109 (REQ-174): a version
+// that carries no data is the RM's logical deletion, which a version read
+// returns as no payload and no error, so the probe passes it. Each case
+// serves the deletion on one of the six version reads; the served count
+// shows the deletion reached the read, so a plant that matched nothing
+// cannot pass for it.
+func TestProbe109PassesAVersionWithoutData(t *testing.T) {
+	compositionDeleted := probe109DeletedVersion(string(updatedVUID))
+	statusDeleted := probe109DeletedVersion(string(probe109StatusVersionUID))
+	cases := []struct {
+		read string
+		on   probe109Match
+		body string
+	}{
+		{read: "composition.GetVersion", on: probe109Match{path: probe109VC + "/version"}, body: compositionDeleted},
+		{read: "composition.GetVersionAtTime", on: probe109Match{path: probe109VC + "/version", atTime: true}, body: compositionDeleted},
+		{read: "composition.GetVersionByID", on: probe109Match{path: probe109VC + "/version/" + string(updatedVUID)}, body: compositionDeleted},
+		{read: "ehrstatus.GetVersion", on: probe109Match{path: probe109VS + "/version"}, body: statusDeleted},
+		{read: "ehrstatus.GetVersionAtTime", on: probe109Match{path: probe109VS + "/version", atTime: true}, body: statusDeleted},
+		{read: "ehrstatus.GetVersionByID", on: probe109Match{path: probe109VS + "/version/" + string(probe109StatusVersionUID)}, body: statusDeleted},
+	}
+	for _, tc := range cases {
+		t.Run(tc.read, func(t *testing.T) {
+			var captured []*http.Request
+			served := 0
+			plant := probe109Plant{on: tc.on, body: tc.body, record: func(*http.Request) { served++ }}
+			b := probe109Backend(t, &captured, plant)
+			r, err := probes.Probe109VersionedObjectReads(t.Context(), newClient(t, b), &captured, probe109Inputs())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if served != 1 {
+				t.Fatalf("the deletion was served %d time(s), want 1 (the plant does not match the %s request?)", served, tc.read)
+			}
+			if r.Status != "pass" {
+				t.Errorf("PROBE-109 with %s answered by a version without data = %q, want pass (detail=%q)", tc.read, r.Status, r.Detail)
+			}
+		})
+	}
+}
+
 // TestProbe109VersionedObjectReadsFlagsPlants proves each PROBE-109 (REQ-174)
 // assertion can fail: every case plants one defect on a recorded request or a
 // served body, and the probe must report fail naming it. Asserting only
@@ -1045,14 +1096,16 @@ func TestProbe109VersionedObjectReadsFlagsPlants(t *testing.T) {
 			wantDetail: "ehrstatus.GetVersionAtTime: the body did not decode to an ORIGINAL_VERSION with a uid",
 		},
 		{
-			name:       "composition version without data",
-			plant:      probe109Plant{on: probe109Match{path: probe109VC + "/version"}, body: probe109Version(string(updatedVUID), "")},
-			wantDetail: "composition.GetVersion: the version's data did not decode to a COMPOSITION",
+			// A version that carries data must carry the family's type: the
+			// leaf's decode refuses any other, and the probe fails the read.
+			name:       "composition version whose data is an EHR_STATUS",
+			plant:      probe109Plant{on: probe109Match{path: probe109VC + "/version"}, body: probe109Version(string(updatedVUID), probe109ReadCorpus(t).status)},
+			wantDetail: "composition.GetVersion failed: transport: decode GET ",
 		},
 		{
-			name:       "EHR_STATUS version without data",
-			plant:      probe109Plant{on: probe109Match{path: probe109VS + "/version", atTime: true}, body: probe109Version(string(probe109StatusVersionUID), "")},
-			wantDetail: "ehrstatus.GetVersionAtTime: the version's data did not decode to an EHR_STATUS",
+			name:       "EHR_STATUS version whose data is a COMPOSITION",
+			plant:      probe109Plant{on: probe109Match{path: probe109VS + "/version", atTime: true}, body: probe109Version(string(probe109StatusVersionUID), bareCompositionBody)},
+			wantDetail: "ehrstatus.GetVersionAtTime failed: transport: decode GET ",
 		},
 		{
 			name:       "a versioned-object read fails",

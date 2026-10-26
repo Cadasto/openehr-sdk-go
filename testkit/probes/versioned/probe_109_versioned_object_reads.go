@@ -39,10 +39,10 @@ type Probe109Inputs struct {
 	// composition read by a Ref with a time.
 	CompositionVOID openehrclient.VersionedObjectID
 	// CompositionVersionUID is a version of CompositionVOID, answered with an
-	// ORIGINAL_VERSION whose data is a COMPOSITION.
+	// ORIGINAL_VERSION whose data, when it has any, is a COMPOSITION.
 	CompositionVersionUID openehrclient.VersionUID
 	// StatusVersionUID is a version of EHRID's EHR_STATUS, answered with an
-	// ORIGINAL_VERSION whose data is an EHR_STATUS.
+	// ORIGINAL_VERSION whose data, when it has any, is an EHR_STATUS.
 	StatusVersionUID openehrclient.VersionUID
 	// ImportedVersionUID is a version id that both families' by-id reads
 	// answer with an IMPORTED_VERSION.
@@ -83,7 +83,11 @@ type probe109Read struct {
 // revision history, the latest version, the version at a time and a version
 // by id, for each family). Each must issue exactly one GET to its pinned path
 // under the client's base path with Accept: application/json, and decode its
-// 200 body. The version-at-time reads take the pin's example time carried to
+// 200 body. A version read's data, when present, decodes to the family's
+// type, a COMPOSITION or an EHR_STATUS: the leaf refuses any other, and that
+// read error fails the probe. A version with no data is the RM's logical
+// deletion; it reads as no payload, and the probe does not fail it. The
+// version-at-time reads take the pin's example time carried to
 // nanoseconds and must send exactly 2015-01-20T18:30:22.765432101Z, so a
 // value cut to milliseconds fails; every other read must send no
 // version_at_time. A by-id read answered with an IMPORTED_VERSION must fail
@@ -290,28 +294,28 @@ func probe109CheckRequest(req *http.Request, rd probe109Read) string {
 	return ""
 }
 
-// probe109CompositionVersion judges a composition version read's result.
+// probe109CompositionVersion judges a composition version read's result. A
+// nil Composition is a logical deletion and passes. The leaf's decode
+// refuses data of another type, so that case arrives as err.
 func probe109CompositionVersion(v *composition.Version, _ *openehrclient.VersionMetadata, err error) (string, error) {
 	switch {
 	case err != nil:
 		return "", err
 	case v == nil || v.UID.Value == "":
 		return "the body did not decode to an ORIGINAL_VERSION with a uid", nil
-	case v.Composition == nil:
-		return "the version's data did not decode to a COMPOSITION", nil
 	}
 	return "", nil
 }
 
-// probe109StatusVersion judges an EHR_STATUS version read's result.
+// probe109StatusVersion judges an EHR_STATUS version read's result. A nil
+// Status is a logical deletion and passes. The leaf's decode refuses data
+// of another type, so that case arrives as err.
 func probe109StatusVersion(v *ehrstatus.Version, _ *openehrclient.VersionMetadata, err error) (string, error) {
 	switch {
 	case err != nil:
 		return "", err
 	case v == nil || v.UID.Value == "":
 		return "the body did not decode to an ORIGINAL_VERSION with a uid", nil
-	case v.Status == nil:
-		return "the version's data did not decode to an EHR_STATUS", nil
 	}
 	return "", nil
 }
