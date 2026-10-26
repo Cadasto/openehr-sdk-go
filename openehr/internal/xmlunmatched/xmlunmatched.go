@@ -646,13 +646,26 @@ func (e *conversionError) Error() string { return e.cause.Error() }
 // Unwrap returns the refusal.
 func (e *conversionError) Unwrap() error { return e.cause }
 
-// asText returns v in a [textConversion] when encoding/xml reads v through its
-// UnmarshalText method, that is when v is a TextUnmarshaler and no
-// xml.Unmarshaler, and v itself otherwise.
+// asText returns, in a [textConversion], the TextUnmarshaler whose
+// UnmarshalText method encoding/xml reads v through, and v itself when
+// encoding/xml reads v otherwise. That TextUnmarshaler is v itself when v is
+// one and no xml.Unmarshaler. When v is a pointer to a pointer, it is the
+// pointer v points to, under the same condition, which asText allocates when
+// it is nil, as encoding/xml would: a member typed as a pointer to a
+// TextUnmarshaler, such as *time.Time, is decoded through the address of
+// that pointer.
 func asText(v any) any {
+	if _, ok := v.(xml.Unmarshaler); ok {
+		return v
+	}
 	if u, ok := v.(encoding.TextUnmarshaler); ok {
-		if _, ok := v.(xml.Unmarshaler); !ok {
-			return &textConversion{u: u}
+		return &textConversion{u: u}
+	}
+	if p, ok := pointee(v); ok {
+		if _, ok := p.(xml.Unmarshaler); !ok {
+			if u, ok := p.(encoding.TextUnmarshaler); ok {
+				return &textConversion{u: u}
+			}
 		}
 	}
 	return v
@@ -747,7 +760,8 @@ func CheckUnmatchedTextBefore(dec *xml.Decoder, text []byte) error {
 
 // DecodeElement decodes the element start opens into v, as
 // dec.DecodeElement(v, start) does. v is a pointer to a primitive, such as a
-// string, a number or a boolean, or to a type with an UnmarshalXML method.
+// string, a number, a boolean or a TextUnmarshaler, a pointer to a pointer
+// to a TextUnmarshaler, or a pointer to a type with an UnmarshalXML method.
 // start must be the token the decoder read last.
 //
 // A primitive decodes from the element's text alone: by default, as with
@@ -803,8 +817,8 @@ func untrackedFailure(start *xml.StartElement, v any, err error) error {
 //     that already holds a value is decoded into ([decodeInterface]).
 //   - T is a pointer to a type with an UnmarshalXML method: encoding/xml
 //     allocates it and that method checks its own content.
-//   - Any other T, a primitive or a type with an UnmarshalXML method on its
-//     pointer, goes to [DecodeElement].
+//   - Any other T, a primitive, a pointer to a TextUnmarshaler or a type
+//     with an UnmarshalXML method on its pointer, goes to [DecodeElement].
 //
 // Text that does not decode as a primitive's type fails as in
 // [DecodeElement], whichever way the member decodes.

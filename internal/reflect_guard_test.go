@@ -76,6 +76,11 @@ var reflectReviewed = map[string]struct {
 		[]string{reflectValueComparison},
 		"equality of two BMM class definitions reached through a shared ancestor",
 	},
+	"openehr/internal/xmlunmatched/pointers.go": {
+		[]string{"New", "Pointer", "ValueOf"},
+		[]string{reflectAddressableCopy},
+		"allocates the nil pointer a pointer to a pointer holds, as encoding/xml does, to reach the pointer-receiver UnmarshalText of what it points to and mark its refusal; the Go type is the member's own, never one chosen from xsi:type",
+	},
 	"openehr/rm/typereg/streaming.go": {
 		[]string{"TypeFor"},
 		[]string{reflectTypeName},
