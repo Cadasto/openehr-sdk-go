@@ -122,7 +122,9 @@ Rationale and the wider picture: [architecture.md § Dependencies](docs/architec
 
 Use the openEHR MCP skills before guessing RM paths, terminology codes, or ITS-JSON shapes — see [ai-workflow.md § openEHR ground truth](docs/ai-workflow.md#openehr-ground-truth-mcp--skills). The openEHR conformance probe suite is the source of truth for wire-level semantics; the openEHR spec is authoritative for class invariants.
 
-**REST API schema.** For any endpoint path, request/response body, header, or status code, read the vendored OpenAPI pin in [`resources/its-rest/`](resources/its-rest/README.md) (`*-validation.openapi.yaml`) rather than guessing — it is the machine-readable contract. Refresh/verify with `make its-rest-sync` / `make its-rest-drift`. EHRbase-specific deployment extensions that a call still uses (for example `PurgeTemplates`) are documented on that call and in REQ-099, not by a second OpenAPI pin. In-tree third-party licences are inventoried in [`LICENSING.md`](LICENSING.md).
+**REST API schema.** For any endpoint path, request/response body, header, or status code, read the vendored OpenAPI pin in [`resources/its-rest/`](resources/its-rest/README.md) (`*-validation.openapi.yaml`) rather than guessing — it is the machine-readable contract. Refresh/verify with `make its-rest-sync` / `make its-rest-drift`. EHRbase-specific deployment extensions that a call still uses (for example `PurgeTemplates`) are documented on that call and in REQ-099, not by a second OpenAPI pin.
+
+**XML schema.** For a canonical XML or ADL 1.4 OPT element, attribute or type, read the pinned ITS-XML schemas in [`resources/its-xml/`](resources/its-xml/README.md), a reference only; they declare the `v2` namespace where the SDK writes `v1`. In-tree third-party licences are inventoried in [`LICENSING.md`](LICENSING.md).
 
 ## Do not touch (yet)
 

@@ -72,6 +72,11 @@ jobs:
       - name: Vendored BMM integrity
         run: make bmm-check
 
+      # The pinned ITS-XML schemas are a reference only; the same offline
+      # sha256 guard keeps them byte-identical to their upstream commit.
+      - name: Vendored ITS-XML integrity
+        run: make its-xml-check
+
       - name: Build
         run: make build
 

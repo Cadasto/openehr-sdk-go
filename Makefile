@@ -68,7 +68,7 @@ HELP_FOOTER    = Before a pull request: make ci · docs site: make docs-serve (h
 
 ##= REQ=094 | the requirement spec-context bundles
 ##= ARGS='-base URL -deployment NAME ...' | probe-record flags
-##= BMM_REF= ITS_REST_REF= ... | pin a Vendor sync (TERMINOLOGY_REF too; EHRbase pins: testkit/corpus/UPSTREAM_PINS.txt)
+##= BMM_REF= ITS_XML_REF= ... | pin a Vendor sync (ITS_REST_REF, TERMINOLOGY_REF too; EHRbase pins: testkit/corpus/UPSTREAM_PINS.txt)
 ##= DOCS_SYNC=docs-sync-offline | build the docs site from the cached brand files
 
 .PHONY: help doctor go-version build-dev build-antlr \
@@ -76,9 +76,9 @@ HELP_FOOTER    = Before a pull request: make ci · docs site: make docs-serve (h
         fmt fmt-check vet lint mod-tidy \
         test test-race \
         codegen termgen aqlgen spec-generate \
-        bmm-sync bmm-drift its-rest-sync its-rest-drift flat-sync flat-drift crossformat-sync corpus-pins-drift \
+        bmm-sync bmm-drift its-xml-sync its-xml-drift its-rest-sync its-rest-drift flat-sync flat-drift crossformat-sync corpus-pins-drift \
         terminology-sync terminology-drift \
-        mod-tidy-check codegen-check termgen-check aqlgen-check bmm-check flat-check crossformat-check corpus-pins-check terminology-check \
+        mod-tidy-check codegen-check termgen-check aqlgen-check bmm-check its-xml-check flat-check crossformat-check corpus-pins-check terminology-check \
         spec-check sdd-check ci \
         spec-context probe-status probe-record cdr-crosscheck \
         docs-sync docs-sync-offline docs-build docs-check docs-serve docs-clean
@@ -173,6 +173,12 @@ bmm-sync: ## Vendor the BMM schemas from ITS-BMM and regenerate (network; BMM_RE
 bmm-drift: ## Verify the BMM schemas; report upstream changes (network)
 	@./scripts/sync-bmm.sh check
 
+its-xml-sync: ## Vendor the ITS-XML schemas, a reference only (network; ITS_XML_REF)
+	@./scripts/sync-its-xml.sh sync
+
+its-xml-drift: ## Verify the ITS-XML schemas; report upstream changes (network)
+	@./scripts/sync-its-xml.sh check
+
 its-rest-sync: ## Vendor the ITS-REST OpenAPI specs (network; ITS_REST_REF)
 	@./scripts/sync-its-rest-specs.sh sync
 
@@ -222,6 +228,9 @@ aqlgen-check: build-antlr ## Fail if the AQL parser drifts from its grammar
 
 bmm-check: ## Verify the vendored BMM schemas (offline sha256)
 	@./scripts/sync-bmm.sh verify
+
+its-xml-check: ## Verify the vendored ITS-XML schemas (offline sha256)
+	@./scripts/sync-its-xml.sh verify
 
 flat-check: ## Verify the vendored FLAT corpus (offline sha256)
 	@./scripts/sync-flat-conformance.sh verify
@@ -454,4 +463,4 @@ docs-clean: ## Remove the site build, brand layer and caches
 
 ##@ Gates
 
-ci: fmt-check mod-tidy-check vet test lint spec-check bmm-check flat-check corpus-pins-check terminology-check build ## Run the full PR gate (docs/ci.md)
+ci: fmt-check mod-tidy-check vet test lint spec-check bmm-check its-xml-check flat-check corpus-pins-check terminology-check build ## Run the full PR gate (docs/ci.md)
