@@ -1,6 +1,7 @@
 package templatecompile_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,18 +14,28 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 )
 
-// robotRoot is the ehrbase integration-tests Robot fixture tree (sibling clone).
+// robotRoot is the tests/robot/_resources/test_data_sets directory of an
+// ehrbase/integration-tests clone: ROBOT_ROOT when set, as for the two
+// Robot ingest scripts, else that directory of a sibling clone, four
+// levels up from internal/templatecompile. Its callers reach it only
+// after opting in with SCAN_ROBOT=1, so a missing directory fails the
+// test instead of skipping it.
 func robotRoot(t *testing.T) string {
 	t.Helper()
-	// A sibling ehrbase/integration-tests clone, four levels up from
-	// internal/templatecompile.
-	root := filepath.Join("..", "..", "..", "..", "ehrbase", "integration-tests", "tests", "robot", "_resources", "test_data_sets")
+	root := os.Getenv("ROBOT_ROOT")
+	if root == "" {
+		root = filepath.Join("..", "..", "..", "..", "ehrbase", "integration-tests", "tests", "robot", "_resources", "test_data_sets")
+	}
 	abs, err := filepath.Abs(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(abs); err != nil {
-		t.Skipf("robot test data not present at %s", abs)
+	info, err := os.Stat(abs)
+	if err == nil && !info.IsDir() {
+		err = errors.New("not a directory")
+	}
+	if err != nil {
+		t.Fatalf("SCAN_ROBOT is set but the robot test data at %s is unusable: %v; set ROBOT_ROOT to the tests/robot/_resources/test_data_sets directory of an ehrbase/integration-tests clone", abs, err)
 	}
 	return abs
 }
