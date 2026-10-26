@@ -124,7 +124,7 @@ Runtime dependencies are kept few and auditable, and adding one needs a reason. 
 
 The SDK has no globals. You inject every external resource, which keeps the SDK testable and lets one process serve many tenants:
 
-- **Inject the `*http.Client`.** The SDK never allocates a transport. You own connection pooling, TLS posture, and timeouts. Production callers MUST supply a strict-mode client (see [SECURITY.md](../SECURITY.md)).
+- **Inject the `*http.Client`.** The SDK never allocates a transport. You own connection pooling, TLS posture, and timeouts. In production, supply a strict-mode client (see [SECURITY.md](../SECURITY.md)).
 - **Provide a `ServiceCatalog`.** There is no "base URL" parameter. Use `smart/discovery` for SMART-discovering backends, or build a static catalog by hand for a fixed deployment (EHRbase, a local CDR).
 - **Wire a `TokenSource`.** Attach it once at construction (`transport.WithTokenSource`) or per-request via `context` (`auth.WithTokenSource`) for MCP / multi-tenant fan-out.
 - **`context.Context` is the first argument** on every I/O method. Cancellation, deadlines, and per-request auth all travel on it.

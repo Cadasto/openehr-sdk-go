@@ -6,7 +6,7 @@
 
 A first-party **Go SDK for openEHR** — `github.com/cadasto/openehr-sdk-go`, MIT. **openEHR-first**: openEHR REST `1.1.0`, the Reference Model, AQL, ADL 1.4 OPT, and SMART-on-openEHR auth are the normative scope. Cadasto-platform extras (Datamap, MPI, Extra API, Admin, Care) ship in the same module for v1, behind a clean `cadasto/` cut line so later extraction is a subtree move, not a rewrite.
 
-Go `1.27.x`, module floor `1.27.0` ([REQ-002](docs/specifications/packaging.md#req-002--go-version)). **Pre-1.0**: a minor release can change the public API ([releases.md § Pre-1.0](docs/releases.md#pre-10)). Status per REQ in [REQ.md](docs/specifications/REQ.md), open work in [docs/roadmap.md](docs/roadmap.md).
+Go `1.27.x`, module floor `1.27.0` ([releases.md § Minimum Go version](docs/releases.md#minimum-go-version)). **Pre-1.0**: a minor release can change the public API ([releases.md § Pre-1.0](docs/releases.md#pre-10)). Status per REQ in [REQ.md](docs/specifications/REQ.md), open work in [docs/roadmap.md](docs/roadmap.md).
 
 ## Source of truth
 
@@ -53,14 +53,14 @@ Full taxonomy and the package tree are in [module-layout.md](docs/specifications
 - No `cadasto/<X>` imports another `cadasto/<Y>` directly — share through openEHR-core types or interface contracts.
 - `auth/` is layered: generic `TokenSource` at the bottom; SMART (`auth/smart`) and other providers on top.
 - `internal/…` is consumer-invisible and excluded from semver promises.
-- **Building-block independence (REQ-013):** the offline blocks (`openehr/rm`, `bmm`, `serialize/…`, `validation`, `instance`, `composition`, `template`, `templatecompile`, `template/webtemplate`, `terminology`) and the AQL blocks (`openehr/aql`, `aql/parse`, `aql/lint`, `aql/contain`, `aql/internal/semcheck`) MUST NOT import `transport/`, `auth/` or `openehr/client/*`, directly or through any package they import. The template-side blocks also keep `openehr/serialize/` out of their own files. The canonical list and its `Test*ForbiddenImports` guards are in [module-layout.md § REQ-013](docs/specifications/module-layout.md#req-013--building-block-independence); a block with a narrower rule (for example `openehr/terminology`, stdlib-only below `openehr/rm`, REQ-034) states it in its own section.
+- **Building-block independence (REQ-013):** the offline and AQL building blocks never import `transport/`, `auth/` or `openehr/client/*`, directly or through any package they import. The block list and each block's own import rule are in the table in [module-layout.md § REQ-013](docs/specifications/module-layout.md#req-013--building-block-independence).
 
 ## Code style and conventions
 
 The elaborate, normative idiom spec is [`idiom.md`](docs/specifications/idiom.md) (context propagation, `*http.Client` injection, functional options, generics-no-reflection, errors, concurrency, naming, public-API stability) — read it. The quick version:
 
 - **Format / lint:** `make fmt` (gofumpt + goimports via `golangci-lint fmt`) and `make lint` (golangci-lint v2 + `modernize` / `errorlint`), both pinned in the [Makefile](Makefile); `make ci` gates them.
-- **Idioms:** `context.Context` first on every I/O method; inject `*http.Client` (never allocate one); functional options; package-level functions as the primary surface; generics only to remove a reflection hop; **no reflection** beyond the exceptions in [idiom.md § Generics policy (REQ-024)](docs/specifications/idiom.md#generics-policy-req-024), and no inheritance emulation (concrete structs + `typereg` for `_type` decoding).
+- **Idioms:** `context.Context` first on every I/O method; inject `*http.Client` (never allocate one); functional options; package-level functions as the primary surface; generics only to remove a reflection hop; **no reflection** beyond the exceptions in [idiom.md § API conventions](docs/specifications/idiom.md#api-conventions), and no inheritance emulation (concrete structs + `typereg` for `_type` decoding).
 - **Errors:** wrap with `fmt.Errorf("…: %w", err)`; typed sentinels at boundaries; no panics in library code.
 - **JSON:** non-test code decodes RM and AOM 1.4 values with `encoding/json/v2` (or `canjson`), never v1 — v1's lenient options (duplicate names, case-insensitive matching, invalid UTF-8) would reach the generated decoders (REQ-052). `internal/v1_rm_decode_guard_test.go` scans for it.
 - **Tests:** stdlib `testing` only — no assertion libraries — plus helpers in [`testkit/`](testkit/); behaviour tests for a public surface belong in the external `_test` package, so they exercise what consumers can reach. Guards carry the bar their spec sets — typically *removing the guard MUST fail a named test*.
@@ -129,5 +129,5 @@ Use the openEHR MCP skills before guessing RM paths, terminology codes, or ITS-J
 - Promoting new numbered ADRs without updating [`docs/adr/README.md`](docs/adr/README.md) and naming the REQs they amend in their header (the map lists no ADRs). Open decisions stay as [research strands](docs/specifications/research-strands.md) until an ADR lands.
 - `internal/bmmgen` and `internal/bmmdiff` — generator tooling, not public API; structural changes need rationale in [architecture.md](docs/architecture.md) and [ADR 0002](docs/adr/0002-bmm-codegen-decisions.md).
 - Module path — locked at `github.com/cadasto/openehr-sdk-go` (REQ-001).
-- The `go.mod` `go` directive — the minor line's `.0` patch, never the toolchain patch you happen to run (REQ-002): a mid-line floor makes every consumer and CI image on an earlier patch fetch a new toolchain, breaking air-gapped builds. Dev-image pins ([Dockerfile](Dockerfile)) move independently.
+- The `go.mod` `go` directive — the minor line's `.0` patch, never the toolchain patch you happen to run ([releases.md § Minimum Go version](docs/releases.md#minimum-go-version)): a mid-line floor makes every consumer and CI image on an earlier patch fetch a new toolchain, breaking air-gapped builds. Dev-image pins ([Dockerfile](Dockerfile)) move independently.
 - REQ-NNN / PROBE-NNN / STRAND-NN identifiers — **stable** once published; never renumber or reuse.
