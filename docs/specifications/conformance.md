@@ -49,6 +49,7 @@ Its non-test source imports neither `auth/` nor `transport/`, and neither of the
 A recording is a captured HTTP exchange: method, URL, request and response headers, status and both bodies. Its encoding is HTTP Archive 1.2 (`.har`), settled by [ADR 0020](../adr/0020-cassette-recording-har.md); provenance and the redaction record sit on `log` as a `_req082` object, since HAR has no native slot for them.
 
 - Credentials (`Authorization`, cookies, tokens, client secrets, JWKS private material) and patient-identifying data **MUST NOT** reach disk. The recorder redacts them at capture time, never at review time, and the recording records that redaction ran, so an unredacted capture is detectable rather than merely unlikely.
+- A recording **MUST** record that redaction ran; one that does not, or that still carries a credential, **MUST** be refused rather than replayed.
 - A recording **MUST** carry its provenance: the deployment it came from, the date, and the SDK commit that captured it. A recording whose provenance cannot be stated **MUST** be refused rather than replayed.
 - The replayer **MUST** fail an unmatched request, and **MUST NOT** pass a request through to a network or synthesise a plausible response: a recording with a gap is recaptured.
 
