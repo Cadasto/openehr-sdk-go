@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aom/aom14"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -54,6 +55,12 @@ func isBase64Error(err error) bool {
 	return ok
 }
 
+// isTimeParseError reports whether err's chain holds a *time.ParseError.
+func isTimeParseError(err error) bool {
+	pe, ok := errors.AsType[*time.ParseError](err)
+	return ok && pe != nil
+}
+
 // anyError holds for every error: the cause has no type of its own to reach,
 // only its text.
 func anyError(error) bool { return true }
@@ -61,8 +68,8 @@ func anyError(error) bool { return true }
 // primitiveCases covers each primitive kind the RM decodes from text, outside
 // a polymorphic slot and inside one, a Character refused through its
 // UnmarshalText, an Octet list that is not base64, an AOM 1.4 interval bound,
-// a bound held in an interface-typed member, and an interval boundary flag
-// that is no boolean.
+// a bound held in an interface-typed member, a bound typed as a pointer to a
+// TextUnmarshaler, and an interval boundary flag that is no boolean.
 func primitiveCases(t *testing.T) []primitiveCase {
 	t.Helper()
 	st := &rm.EHRStatus{
@@ -178,6 +185,22 @@ func primitiveCases(t *testing.T) []primitiveCase {
 			path: "/iv[1]/lower[1]", alone: "/lower",
 			cause: "rm.Character: must be exactly one character, got 4", raw: "rm.Character: must be exactly one character, got 4",
 			value: "Jane", reach: anyError,
+		},
+		{
+			name: "Character behind a pointer-typed bound",
+			in:   `<iv ` + ucNS + `><lower>Jane</lower></iv>`,
+			into: func() any { return new(rm.Interval[*rm.Character]) },
+			path: "/iv[1]/lower[1]", alone: "/lower",
+			cause: "rm.Character: must be exactly one character, got 4", raw: "rm.Character: must be exactly one character, got 4",
+			value: "Jane", reach: anyError,
+		},
+		{
+			name: "time behind a pointer-typed bound",
+			in:   `<iv ` + ucNS + `><lower>Jane-7777</lower></iv>`,
+			into: func() any { return new(rm.Interval[*time.Time]) },
+			path: "/iv[1]/lower[1]", alone: "/lower",
+			cause: "cause withheld (*time.ParseError)", raw: `parsing time "Jane-7777" as "2006-01-02T15:04:05Z07:00": cannot parse "Jane-7777" as "2006"`,
+			value: "Jane-7777", reach: isTimeParseError,
 		},
 		{
 			name: "interval flag of a DV_COUNT normal range",
