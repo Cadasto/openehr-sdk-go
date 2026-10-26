@@ -17,9 +17,8 @@ import (
 // TestProbe030 runs PROBE-030 across the canonical input set and
 // asserts every input produces Status == "pass". The set spans leaf
 // RM values and full composition fixtures vendored under
-// testkit/corpus/compositions/ and testkit/corpus/rm/. The conformance harness in
-// `make conformance` invokes the same probe function against shared
-// openEHR conformance fixtures.
+// testkit/corpus/compositions/ and testkit/corpus/rm/. `make test` runs it
+// with the rest of the suite.
 func TestProbe030(t *testing.T) {
 	// Sanity-check the input set: at least one leaf entry AND at
 	// least one fixture entry — guards against a silent regression

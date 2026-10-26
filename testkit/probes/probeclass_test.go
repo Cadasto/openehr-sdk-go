@@ -94,7 +94,7 @@ var (
 // in the other packages of this module that its package imports, directly or
 // through another package, including whatever runs when those packages load.
 func TestREQ082ProbeClassMatchesModes(t *testing.T) {
-	// § REQ-082 in docs/specifications/conformance.md: an in-repo probe MUST declare In-repo.
+	// REQ-082, docs/development-process.md § Modes: an in-repo probe declares In-repo.
 	t.Parallel()
 	root := filepath.Join("..", "..")
 
@@ -174,7 +174,7 @@ func reportClassMismatch(r mismatchReporter, msg string) {
 // today, so without this test the class check could stop reporting a
 // disagreement and stay green.
 func TestREQ082ProbeClassMismatch(t *testing.T) {
-	// § REQ-082: an in-repo probe MUST declare In-repo; this pins the comparison that enforces it.
+	// REQ-082, development-process.md § Modes: an in-repo probe declares In-repo; this pins the comparison that enforces it.
 	t.Parallel()
 	backendFree := []probeFunc{{name: "Probe901Local"}}
 	backendFacing := []probeFunc{
@@ -249,7 +249,7 @@ func TestREQ082ProbeClassMismatch(t *testing.T) {
 // catalogue currently mismatches nothing, so replacing that report with
 // `_ = msg` would leave TestREQ082ProbeClassMatchesModes green.
 func TestREQ082CatalogueReportsClassMismatch(t *testing.T) {
-	// § REQ-082: the catalogue must report a class disagreement, not only compute it.
+	// REQ-082, development-process.md § Modes: the catalogue reports a class disagreement, not only computes it.
 	t.Parallel()
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, "probeclass_test.go", nil, parser.SkipObjectResolution)
@@ -308,7 +308,7 @@ func TestREQ082CatalogueReportsClassMismatch(t *testing.T) {
 // the class walk would otherwise follow. No probe in the catalogue does this,
 // so deleting the refusal would leave the catalogue test green.
 func TestREQ082DotImportRefused(t *testing.T) {
-	// § REQ-082: scopeOf refuses a dot import whose names this check cannot see.
+	// REQ-082, development-process.md § Modes: scopeOf refuses a dot import whose names this check cannot see.
 	t.Parallel()
 	tests := []struct {
 		name string
