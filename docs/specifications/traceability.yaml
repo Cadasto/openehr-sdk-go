@@ -618,6 +618,8 @@ requirements:
       - openehr/aom/aom14
       - testkit/corpus
       - testkit/fixtures
+      - internal/bmmgen
+      - resources/its-xml
     probes: [PROBE-033, PROBE-034, PROBE-105]
     tests:
       - internal/bmmgen/render_interval_bound_test.go
