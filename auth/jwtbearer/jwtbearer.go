@@ -28,6 +28,11 @@ const GrantType = "urn:ietf:params:oauth:grant-type:jwt-bearer"
 // token counts as stale when the configuration sets no threshold.
 const defaultRefreshThreshold = 30 * time.Second
 
+// firstBackoff is how long the source holds back the next exchange after the
+// first transient failure in a row, while it serves the cached access token.
+// Each further failure doubles it.
+const firstBackoff = time.Second
+
 // Config carries the constructor inputs. Use New(...Option) for the
 // idiomatic call site; Config is exposed for declarative configuration.
 //
@@ -164,6 +169,12 @@ type Source struct {
 	mu       sync.Mutex
 	cur      auth.Token
 	inflight *exchange
+	// retryAt is when Token may send an exchange again after a transient
+	// failure left the cached access token to be served, never after its
+	// ExpiresAt; zero when no backoff holds. backoff is how long the next
+	// such failure holds the exchange back. setTokenLocked resets both.
+	retryAt time.Time
+	backoff time.Duration
 }
 
 // String describes s by three values fixed when s was built: its token URL,
@@ -192,6 +203,12 @@ type exchange struct {
 	done  chan struct{}
 	token auth.Token
 	err   error
+	// held is the access token the exchange's callers get in place of err,
+	// except Reauth, when serveHeld reports that the exchange failed
+	// transiently while held was still valid. Both are written before done
+	// is closed.
+	held      auth.Token
+	serveHeld bool
 	// abandoned reports that the exchange has no result for the callers
 	// waiting on it: it failed only because the context of the caller
 	// running it ended, or a panic unwound that caller before the result was
@@ -249,13 +266,35 @@ var _ auth.Reauther = (*Source)(nil)
 // from the HTTP client's RoundTripper or the assertion source for example,
 // goes up through the caller running it, unchanged, and the callers waiting
 // on that exchange start a new one the same way.
+//
+// An exchange that fails without being terminal (a server or network error,
+// a timeout, an answer the source cannot read, or an assertion the
+// AssertionSource cannot give) leaves the cached token in place. While that
+// token is not yet past its ExpiresAt, Token then returns it without an
+// error, and sends no new exchange until a backoff ends: one second after
+// the first such failure, twice as long after each further failure in a
+// row, and never later than that ExpiresAt. Until then Token returns the
+// cached token without a request. A successful exchange ends the backoff.
+// Past ExpiresAt the failure is returned, matching
+// [auth.ErrTokenExchangeFailed], and each call tries again. The calls
+// waiting on an exchange get the same outcome, the cached token included;
+// [Source.Reauth] gets the failure.
 func (s *Source) Token(ctx context.Context) (auth.Token, error) {
+	return s.token(ctx, false)
+}
+
+// token is Token. forced reports a call by Reauth, which exchanges during a
+// backoff and gets the failure of an exchange that Token would answer with
+// the cached token.
+func (s *Source) token(ctx context.Context, forced bool) (auth.Token, error) {
 	for {
 		if err := ctx.Err(); err != nil {
 			return auth.Token{}, err
 		}
 		s.mu.Lock()
-		if !s.stale() {
+		if !s.stale() || (!forced && time.Now().Before(s.retryAt)) {
+			// The token is fresh, or a transient failure left it to be served
+			// until the backoff ends, which is no later than its ExpiresAt.
 			t := s.cur
 			s.mu.Unlock()
 			return t, nil
@@ -265,7 +304,7 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 			ex = &exchange{done: make(chan struct{})}
 			s.inflight = ex
 			s.mu.Unlock()
-			return s.lead(ctx, ex)
+			return s.lead(ctx, ex, forced)
 		}
 		s.mu.Unlock()
 		select {
@@ -274,7 +313,7 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 			return auth.Token{}, ctx.Err()
 		}
 		if !ex.abandoned {
-			return ex.token, ex.err
+			return ex.outcome(forced)
 		}
 		// The caller running ex gave up or panicked, and this caller's
 		// context is live: go round again to run a new exchange or wait on a
@@ -297,43 +336,95 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 // first, Reauth starts a new exchange rather than returning that caller's
 // cancellation. Reauth returns the exchange's error, which is an
 // [*auth.ExchangeError] wrapping [auth.ErrTokenExchangeFailed], or the
-// context's error when ctx ends first. A Reauth whose context has already
-// ended keeps the cached token. After a failed exchange no token is cached,
-// and the next Token call tries again.
+// context's error when ctx ends first. It exchanges even while a backoff
+// after a transient failure holds [Source.Token] back. A Reauth whose
+// context has already ended keeps the cached token. After a failed exchange
+// no token is cached, and the next Token call tries again.
 func (s *Source) Reauth(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 	s.mu.Lock()
-	s.cur = auth.Token{}
+	s.setTokenLocked(auth.Token{})
 	s.mu.Unlock()
-	_, err := s.Token(ctx)
+	_, err := s.token(ctx, true)
 	return err
 }
 
 // lead runs the exchange ex on behalf of every caller waiting on it, caches
-// the token it obtains, and publishes the result to those callers.
+// the token it obtains, and publishes the result to those callers. forced
+// reports that the caller is Reauth.
 //
 // A panic in the exchange unwinds lead before the result is published. The
 // deferred release still takes ex out of flight and wakes the waiters, with
 // ex marked abandoned so that they start a new exchange, and the panic goes
 // on to the caller as it was raised.
-func (s *Source) lead(ctx context.Context, ex *exchange) (auth.Token, error) {
+func (s *Source) lead(ctx context.Context, ex *exchange, forced bool) (auth.Token, error) {
 	// ex stays abandoned unless the exchange returns and its result is
 	// published below.
 	ex.abandoned = true
 	defer s.release(ex)
 
 	tok, err := s.fetch(ctx)
-	if err == nil {
-		s.mu.Lock()
-		s.cur = tok
-		s.mu.Unlock()
+	abandoned := coalesce.EndedByContext(ctx, err)
+	s.mu.Lock()
+	switch {
+	case err == nil:
+		s.setTokenLocked(tok)
+	case !abandoned && !terminal(err) && s.backOffLocked():
+		// A transient failure, and the cached token is still valid: it is
+		// served in place of the failure until the backoff ends (REQ-063).
+		ex.held = s.cur
+		ex.serveHeld = true
 	}
+	s.mu.Unlock()
 	ex.token = tok
 	ex.err = err
-	ex.abandoned = coalesce.EndedByContext(ctx, err)
-	return tok, err
+	ex.abandoned = abandoned
+	return ex.outcome(forced)
+}
+
+// terminal reports whether err is a permanent token-endpoint failure, as
+// [auth.ExchangeError.Terminal] decides it.
+func terminal(err error) bool {
+	exErr, ok := errors.AsType[*auth.ExchangeError](err)
+	return ok && exErr.Terminal()
+}
+
+// outcome returns what a caller of the exchange ex stands for gets: the
+// cached access token in place of a transient failure that left it to be
+// served, unless forced reports a call by Reauth, and otherwise the
+// exchange's own token and error.
+func (ex *exchange) outcome(forced bool) (auth.Token, error) {
+	if ex.serveHeld && !forced {
+		return ex.held, nil
+	}
+	return ex.token, ex.err
+}
+
+// setTokenLocked caches tok, a new token or none, and ends the backoff of
+// the token it replaces. The caller holds s.mu.
+func (s *Source) setTokenLocked(tok auth.Token) {
+	s.cur = tok
+	s.retryAt = time.Time{}
+	s.backoff = 0
+}
+
+// backOffLocked records an exchange that failed transiently. While the
+// cached access token is not yet past its ExpiresAt, it holds Token's next
+// exchange back until the backoff ends, never later than that ExpiresAt,
+// doubles the backoff for the next failure in a row, and reports true: the
+// token is to be served in place of the failure. The caller holds s.mu.
+func (s *Source) backOffLocked() bool {
+	now := time.Now()
+	left := s.cur.ExpiresAt.Sub(now)
+	if left <= 0 {
+		return false
+	}
+	wait := min(cmp.Or(s.backoff, firstBackoff), left)
+	s.retryAt = now.Add(wait)
+	s.backoff = 2 * wait
+	return true
 }
 
 // release takes ex out of flight, unless a newer exchange has replaced it
