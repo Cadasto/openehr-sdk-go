@@ -589,6 +589,7 @@ requirements:
       - openehr/client/ehr/ehrstatus/ehrstatus_test.go
       - openehr/client/ehr/ehrstatus/versioned_test.go
       - openehr/client/ehr/ids_test.go
+      - testkit/probe/cassette_versioned_test.go
       - testkit/probes/versioned/probe_010_put_without_if_match.go
       - testkit/probes/versioned/probe_011_put_stale_if_match.go
       - testkit/probes/versioned/probe_012_etag_round_trip.go
@@ -612,6 +613,7 @@ requirements:
       - openehr/aql/projection_test.go
       - openehr/aql/value_test.go
       - openehr/client/query/query_test.go
+      - testkit/probe/cassette_errors_test.go
       - testkit/probes/aql/probe_020_builder_stability.go
       - testkit/probes/aql/probes_test.go
       - testkit/probes/query/probe_078_verb_aware_scoping.go
@@ -999,7 +1001,9 @@ requirements:
       - sandbox/independence_test.go
       - sandbox/roundtrip_test.go
       - sandbox/script_test.go
+      - testkit/probe/cassette_errors_test.go
       - testkit/probe/cassette_test.go
+      - testkit/probe/cassette_versioned_test.go
       - testkit/probe/har_test.go
       - testkit/probe/live_test.go
       - testkit/probe/livecomposition_test.go
@@ -1088,6 +1092,7 @@ requirements:
       - openehr/rm/character_test.go
       - openehr/rm/real_test.go
       - openehr/validation/rmfloor_party_proxy_test.go
+      - testkit/probe/cassette_errors_test.go
       - testkit/probe/har_test.go
       - testkit/probe/record_test.go
       - testkit/probe/run_test.go
@@ -1129,6 +1134,7 @@ requirements:
       - openehr/client/ehr/resource_test.go
       - openehr/client/ehr/write_test.go
       - testkit/probe/cassette_test.go
+      - testkit/probe/cassette_versioned_test.go
       - testkit/probe/livestatus_test.go
       - testkit/probes/versioned/probe_065_minimal_return_round_trip.go
       - testkit/probes/versioned/probe_065_test.go

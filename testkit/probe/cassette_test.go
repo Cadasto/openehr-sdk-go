@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -64,7 +65,14 @@ func TestCassette_ReplaysEHRLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const want = "5fdb1b6a-fd89-4610-973e-e6a4d20b2cb5"
+	// The id the capture read back is the last segment of its recorded GET:
+	// the server minted it, so a recapture changes it, and the create must
+	// return it.
+	getURL, err := url.Parse(recordedEntry(t, &har, "GET", anyPath).Request.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := path.Base(getURL.Path)
 
 	rec, meta, err := ehr.Create(t.Context(), c)
 	if err != nil {
@@ -193,7 +201,7 @@ func recordingFile(t *testing.T, name string) string {
 	if !ok {
 		t.Fatal("runtime.Caller failed")
 	}
-	return filepath.Join(filepath.Dir(file), "..", "recordings", name)
+	return filepath.Join(filepath.Dir(file), "..", "recordings", filepath.FromSlash(name))
 }
 
 // loadRecording reads and validates one vendored HAR. Each call reads the
@@ -604,6 +612,30 @@ func TestCassette_ScenarioChecksFailOnAMutatedRecording_REQ082_REQ095_REQ094_REQ
 		_, err := replayStoredQuery(t.Context(), c)
 		return err
 	}
+	// The error-envelopes checks read the envelope message, which only a
+	// client built with raw error bodies keeps, so they replay through one.
+	errorEnvelopes := func(t *testing.T, _ *transport.Client, har probe.HAR) error {
+		return replayErrorEnvelopes(t.Context(), rawReplayClientFor(t, har), har)
+	}
+	compositionUpdate := func(t *testing.T, c *transport.Client, _ probe.HAR) error {
+		return replayCompositionUpdate(t.Context(), c)
+	}
+	// compositionWrites returns the recording's writes to one composition
+	// path suffix, in capture order: the saves on "/composition", the
+	// updates on the versioned object's path.
+	compositionWrites := func(t *testing.T, har *probe.HAR, method string) []*probe.HAREntry {
+		t.Helper()
+		var out []*probe.HAREntry
+		for _, e := range recordedEntries(har, method, "") {
+			if strings.Contains(e.Request.URL, "/composition") {
+				out = append(out, e)
+			}
+		}
+		if len(out) < 2 {
+			t.Fatalf("the recording holds %d %s composition exchanges, want at least 2", len(out), method)
+		}
+		return out
+	}
 	const otherEHRID = "00000000-0000-4000-8000-000000000000"
 
 	for _, tc := range []struct {
@@ -801,6 +833,77 @@ func TestCassette_ScenarioChecksFailOnAMutatedRecording_REQ082_REQ095_REQ094_REQ
 			},
 			replay: storedQuery,
 			want:   "result row value",
+		},
+		{
+			name:      "error-envelopes unknown EHR answered 500",
+			recording: "error-envelopes.har",
+			mutate: func(t *testing.T, har *probe.HAR) {
+				recordedEntry(t, har, "GET", "/ehr/"+cassetteUnknownEHRID).Response.Status = 500
+			},
+			replay: errorEnvelopes,
+			want:   "unknown EHR",
+		},
+		{
+			name:      "error-envelopes query refusal answered 501",
+			recording: "error-envelopes.har",
+			mutate: func(t *testing.T, har *probe.HAR) {
+				recordedQueries(t, har)[2].Response.Status = 501
+			},
+			replay: errorEnvelopes,
+			want:   "capability gap",
+		},
+		{
+			name:      "error-envelopes query envelope without a message",
+			recording: "error-envelopes.har",
+			mutate: func(t *testing.T, har *probe.HAR) {
+				editResponseJSON(t, recordedQueries(t, har)[1], func(b map[string]any) {
+					delete(b, "message")
+				})
+			},
+			replay: errorEnvelopes,
+			want:   "envelope message",
+		},
+		{
+			name:      "composition-update save answers an ORIGINAL_VERSION",
+			recording: "composition-update.har",
+			mutate: func(t *testing.T, har *probe.HAR) {
+				editResponseJSON(t, compositionWrites(t, har, "POST")[0], func(b map[string]any) {
+					b["_type"] = "ORIGINAL_VERSION"
+				})
+			},
+			replay: compositionUpdate,
+			want:   "PROBE-061",
+		},
+		{
+			name:      "composition-update update advertises no new version",
+			recording: "composition-update.har",
+			mutate: func(t *testing.T, har *probe.HAR) {
+				put := compositionWrites(t, har, "PUT")[0]
+				dropResponseHeader(t, put, "ETag")
+				dropResponseHeader(t, put, "Location")
+			},
+			replay: compositionUpdate,
+			want:   "PROBE-012",
+		},
+		{
+			name:      "composition-update stale update answered 409",
+			recording: "composition-update.har",
+			mutate: func(t *testing.T, har *probe.HAR) {
+				compositionWrites(t, har, "PUT")[1].Response.Status = 409
+			},
+			replay: compositionUpdate,
+			want:   "PROBE-011",
+		},
+		{
+			name:      "composition-update second save answers an ORIGINAL_VERSION",
+			recording: "composition-update.har",
+			mutate: func(t *testing.T, har *probe.HAR) {
+				editResponseJSON(t, compositionWrites(t, har, "POST")[1], func(b map[string]any) {
+					b["_type"] = "ORIGINAL_VERSION"
+				})
+			},
+			replay: compositionUpdate,
+			want:   "PROBE-071",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

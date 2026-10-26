@@ -242,7 +242,7 @@ The HL7 Inferno **SMART App Launch Test Kit STU2.2 _Client_** suite serves as an
 - **Preconditions:** Composition has been updated since the SDK's cached `version_uid`.
 - **Wire assertion:** PUT returns `412`, and the SDK maps it to `ErrPreconditionFailed`. The vendored ITS-REST pin answers a stale `If-Match` on a PUT with `412` and lists no `409` for it, so a `409` fails the probe.
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Implemented (Sandbox).
+- **Status:** Implemented (Sandbox). A scenario recording on EHRbase 2.37.0-SNAPSHOT (`next`) and on FerroEHR 5.0.0 (`composition-update.har`, `ferroehr/composition-update.har`) is replayed through the probe function by its own test, outside the runner, so it is not yet this probe's Cassette mode. EHRbase 2.36.0 cannot be recorded here: it refuses the quoted `If-Match` the pin requires with `400`, a refusal its later builds no longer make.
 - **Satisfies:** REQ-054, REQ-093
 
 #### PROBE-012 — ETag survives round trip
@@ -251,7 +251,7 @@ The HL7 Inferno **SMART App Launch Test Kit STU2.2 _Client_** suite serves as an
 - **Preconditions:** Read-then-write workflow.
 - **Wire assertion:** GET response carries `ETag`; PUT carries the same value as `If-Match`; PUT returns `204` or `200`.
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Implemented (Sandbox).
+- **Status:** Implemented (Sandbox). A scenario recording on EHRbase 2.37.0-SNAPSHOT (`next`) and on FerroEHR 5.0.0 (`composition-update.har`, `ferroehr/composition-update.har`) is replayed through the probe function by its own test, outside the runner, so it is not yet this probe's Cassette mode.
 - **Satisfies:** REQ-054
 
 #### PROBE-013 — Cross-EHR isolation
@@ -280,7 +280,7 @@ The HL7 Inferno **SMART App Launch Test Kit STU2.2 _Client_** suite serves as an
 - **Preconditions:** Reference deployment that validates AQL against templates.
 - **Wire assertion:** The typed builders cannot emit syntactically invalid AQL (structural guarantee). Execution of a query referencing a non-existent path returns the backend's AQL error envelope; the SDK maps it to `*query.AQLError`, which satisfies `errors.Is(err, aql.ErrPathResolution)`. A **501** response maps to `*query.AQLError` satisfying `errors.Is(err, aql.ErrEngineCapability)` and never `aql.ErrPathResolution`: the capability gap is read from the status alone, with an envelope or bare, never from message text (REQ-055).
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Implemented (Sandbox) — the error mapping is tested against synthesised backend responses: a path-resolution envelope, and a 501 capability gap with an envelope and bare. Cassette and Live ratification wait for a reference deployment.
+- **Status:** Implemented (Sandbox) — the error mapping is tested against synthesised backend responses: a path-resolution envelope, and a 501 capability gap with an envelope and bare. Cassette and Live ratification wait for a reference deployment. Scenario recordings of three query refusals by EHRbase 2.36.0 and FerroEHR 5.0.0 (`error-envelopes.har`, `ferroehr/error-envelopes.har`) are replayed by their own test, outside the runner: each surfaces as `*query.AQLError` and none as a capability gap, but neither deployment's unknown-attribute refusal (`400`) is classified as `aql.ErrPathResolution`, so that half stays unratified.
 - **Satisfies:** REQ-055.
 
 #### PROBE-028 — AQL lint stability
@@ -640,7 +640,7 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 - **Preconditions:** Existing EHR; a valid Composition body conforming to a deployed template.
 - **Wire assertion:** Request carries `Prefer: return=representation`; response body decodes as bare `*rm.Composition` per the ITS-REST OpenAPI `201_COMPOSITION` schema (oneOf: `Composition` | `Identifier`) — **not** an `ORIGINAL_VERSION<COMPOSITION>` envelope, which lives at `GET /versioned_composition/{vo_uid}/version/{version_uid}` (`UVersionOfComposition`). The response `ETag` is captured into `VersionMetadata`.
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Implemented (Sandbox) via PROBE-071 — PROBE-071 checks the bare-body response for the POST and the symmetric PUT, with the strict rejection of an `ORIGINAL_VERSION` body; this entry stays as the named POST probe.
+- **Status:** Implemented (Sandbox) via PROBE-071 — PROBE-071 checks the bare-body response for the POST and the symmetric PUT, with the strict rejection of an `ORIGINAL_VERSION` body; this entry stays as the named POST probe. A scenario recording on EHRbase 2.37.0-SNAPSHOT (`next`) and on FerroEHR 5.0.0 (`composition-update.har`, `ferroehr/composition-update.har`) is replayed through the save it names by its own test, outside the runner, so it is not yet this probe's Cassette mode.
 - **Satisfies:** REQ-094 (`return=representation` arm only).
 
 #### PROBE-062 — `openehr-audit-details` header round-trip
@@ -701,7 +701,7 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 - **Preconditions:** Cassette of a real 400 error envelope.
 - **Wire assertion:** `errors.As(err, &wire)` succeeds; `wire.OpenEHR.Message`, `wire.OpenEHR.Code` are set from the envelope; `wire.RawBody` preserves the raw bytes.
 - **Modes:** Sandbox, Cassette.
-- **Status:** Draft.
+- **Status:** Draft. Scenario recordings of real refusals by EHRbase 2.36.0 and FerroEHR 5.0.0 (`error-envelopes.har`, `ferroehr/error-envelopes.har`) are replayed by their own test, outside the runner, so they are not yet this probe's Cassette mode: the `400` envelope's `message` decodes and `RawBody` keeps the bytes, but neither envelope carries a `code`, so the `OpenEHR.Code` half is not witnessed.
 
 #### PROBE-069 — `Idempotency-Key` header round-trip
 
@@ -727,7 +727,7 @@ The REST-binding probes check the openEHR REST 1.1.0 wire contract above `transp
 - **Preconditions:** Existing EHR; a valid Composition body conforming to a deployed template.
 - **Wire assertion:** Response body decodes cleanly as `*rm.Composition` per the ITS-REST OpenAPI `201_COMPOSITION` / `200_COMPOSITION_updated` schemas. A server that returns `{"_type":"ORIGINAL_VERSION", ...}` on these paths is non-conformant; the SDK surfaces that as a decode error (strict-against-spec posture per REQ-094). The full version envelope is reached via `GET /versioned_composition/{vo_uid}/version/{version_uid}` (`UVersionOfComposition`).
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Implemented (Sandbox) — the probe exercises the POST and PUT arms in one invocation when a versioned-object id and an `If-Match` are supplied; otherwise it skips the PUT arm and passes on POST alone. Leaf unit tests cover both verbs and both halves of the strict-against-spec contract, and the same shape for `directory.Save` and `directory.Update` (`201_directory`, `200_FOLDER_retrieved`).
+- **Status:** Implemented (Sandbox) — the probe exercises the POST and PUT arms in one invocation when a versioned-object id and an `If-Match` are supplied; otherwise it skips the PUT arm and passes on POST alone. Leaf unit tests cover both verbs and both halves of the strict-against-spec contract, and the same shape for `directory.Save` and `directory.Update` (`201_directory`, `200_FOLDER_retrieved`). A scenario recording on EHRbase 2.37.0-SNAPSHOT (`next`) and on FerroEHR 5.0.0 (`composition-update.har`, `ferroehr/composition-update.har`) is replayed through the probe function by its own test, outside the runner, so it is not yet this probe's Cassette mode.
 - **Satisfies:** REQ-094 (`return=representation` arm only).
 
 #### PROBE-072 — Contribution submission body matches `Contribution_create`

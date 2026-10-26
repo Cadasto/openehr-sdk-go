@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/query"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
@@ -42,6 +43,55 @@ var scenarios = map[string]scenario{
 		desc:    "POST /ehr, PUT a fixed stored query, then POST its execution",
 		capture: captureStoredQuery,
 	},
+	"composition-update": {
+		name:    "composition-update",
+		desc:    "POST /ehr, upload a fixed OPT, save, update with the latest ETag, update again with that stale ETag (412), then save and update with return=representation",
+		capture: captureCompositionUpdate,
+	},
+	"error-envelopes": {
+		name:    "error-envelopes",
+		desc:    "GET an unknown EHR (404), then POST three AQL queries the server refuses (400)",
+		capture: captureErrorEnvelopes,
+	},
+}
+
+// The error-envelopes scenario reads only: one fixed EHR id no deployment
+// holds, and three fixed queries a server refuses. Fixed values keep the
+// recorded paths and bodies the same on every capture.
+const (
+	cassetteUnknownEHRID = "7d44b88c-4199-4bad-97dc-d78268e01398"
+	// cassetteMalformedAQL stops after FROM, so it does not parse.
+	cassetteMalformedAQL = "SELECT e/ehr_id/value FROM"
+	// cassetteUnknownAttributeAQL parses, but COMPOSITION has no such
+	// attribute.
+	cassetteUnknownAttributeAQL = "SELECT c/no_such_attribute FROM EHR e CONTAINS COMPOSITION c"
+	// cassetteUnsupportedPathAQL parses, but selects an EHR attribute that
+	// does not exist.
+	cassetteUnsupportedPathAQL = "SELECT e/no_such_attribute FROM EHR e"
+)
+
+// captureErrorEnvelopes records the error responses PROBE-068 and
+// PROBE-021 decode: a GET of an EHR id the server does not hold, then three
+// ad-hoc queries it refuses. Each call must be refused, or the capture
+// fails rather than record a success in their place.
+func captureErrorEnvelopes(ctx context.Context, c *transport.Client) error {
+	_, _, err := ehr.Get(ctx, c, ehr.EHRID(cassetteUnknownEHRID))
+	if err == nil {
+		return errors.New("get an unknown EHR: answered, want a 404 refusal")
+	}
+	if !errors.Is(err, transport.ErrNotFound) {
+		return fmt.Errorf("get an unknown EHR: want a 404 refusal: %w", err)
+	}
+	for _, q := range []string{cassetteMalformedAQL, cassetteUnknownAttributeAQL, cassetteUnsupportedPathAQL} {
+		_, _, err := query.ExecuteString(ctx, c, q, nil)
+		if err == nil {
+			return fmt.Errorf("execute %q: answered, want a 4xx refusal", q)
+		}
+		if we, ok := errors.AsType[*transport.WireError](err); !ok || we == nil || we.StatusCode/100 != 4 {
+			return fmt.Errorf("execute %q: want a 4xx refusal: %w", q, err)
+		}
+	}
+	return nil
 }
 
 func scenarioNames() []string {
