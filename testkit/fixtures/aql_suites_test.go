@@ -219,9 +219,9 @@ func TestIngestRobotAQLWritesSuiteCorpus_PROBE107_REQ160(t *testing.T) {
 			}
 			got := tree(t, filepath.Join(sdk, suitesDir))
 			// The suite corpus is the one AQL corpus: the run writes
-			// nothing else under testkit/corpus/aql.
-			for _, rel := range slices.Sorted(maps.Keys(tree(t, filepath.Join(sdk, aqlCorpusDir)))) {
-				if !strings.HasPrefix(rel, "suites/") {
+			// nothing else under testkit/corpus/aql, file or directory.
+			for _, rel := range entries(t, filepath.Join(sdk, aqlCorpusDir)) {
+				if rel != "." && rel != "suites" && !strings.HasPrefix(rel, "suites/") {
 					t.Errorf("the ingest wrote %s/%s; want it to write only under %s", aqlCorpusDir, rel, suitesDir)
 				}
 			}
@@ -542,7 +542,7 @@ func TestIngestRobotAQLRefusesBeforeWriting_PROBE107_REQ160(t *testing.T) {
 			if out, err := h.ingest(t, sdk, up, ""); err != nil {
 				t.Fatalf("ingest at the base pin: %v\n%s", err, out)
 			}
-			before := tree(t, filepath.Join(sdk, aqlCorpusDir))
+			before, beforeEntries := tree(t, filepath.Join(sdk, aqlCorpusDir)), entries(t, filepath.Join(sdk, aqlCorpusDir))
 
 			if tc.change != nil {
 				tc.change(t, up)
@@ -558,6 +558,9 @@ func TestIngestRobotAQLRefusesBeforeWriting_PROBE107_REQ160(t *testing.T) {
 			}
 			if !strings.Contains(out, tc.want) {
 				t.Errorf("ingest refused with %q; want the refusal to name %q", out, tc.want)
+			}
+			if after := entries(t, filepath.Join(sdk, aqlCorpusDir)); !slices.Equal(after, beforeEntries) {
+				t.Errorf("the refusal left testkit/corpus/aql holding %q; want %q", after, beforeEntries)
 			}
 			if changed := changedFiles(before, tree(t, filepath.Join(sdk, aqlCorpusDir))); len(changed) > 0 {
 				t.Errorf("the refusal changed %q under testkit/corpus/aql; want nothing changed", changed)
