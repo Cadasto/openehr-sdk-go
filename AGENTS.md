@@ -12,7 +12,7 @@ Go `1.27.x`, module floor `1.27.0` ([REQ-002](docs/specifications/packaging.md#r
 
 The normative spec lives **in this repo** under [`docs/specifications/`](docs/specifications/) — self-contained; implementing or reviewing the SDK needs no external sources. Conventions (RFC-2119 keywords, status headers, identifiers, traceability): [`docs/specifications/README.md`](docs/specifications/README.md).
 
-`docs/specifications/` carries the RFC-2119 statements code, plans, and tests are measured against; `docs/architecture.md` carries the design narrative. **When anything disagrees with the specs, the specs win.** Never silently resolve an open [research strand](docs/specifications/research-strands.md) in code — surface the decision or land an [ADR](docs/adr/).
+`docs/specifications/` carries the RFC-2119 statements code, plans, and tests are measured against; `docs/architecture.md` carries the design narrative. **The specs record the contract; the maintainer's instruction outranks them.** When a request contradicts a sentence, name the sentence once, do the work and amend it in the same change. Without the maintainer, anything that disagrees with the specs is a finding and the specs win, except a section marked *implementation-aligned*, where code leads and the spec is reconciled in the same PR. A `draft` section binds once it merges. Never silently resolve an open [research strand](docs/specifications/research-strands.md) in code — surface the decision or land an [ADR](docs/adr/).
 
 ## Documentation
 
@@ -40,9 +40,9 @@ Reading order — the specialized docs are **canonical**; defer to them rather t
 - **Godoc is for SDK users.** Package docs and doc comments on exported identifiers carry no spec-process identifiers (REQ, ADR, STRAND, plan or spec paths) and no RFC-2119 capitals. State the behaviour a caller needs in plain English. A probe's own `PROBE-NNN` id and public openEHR specification citations are fine.
 - **`REQ`/`PROBE` is the feature register; there is no `SDK-GAP` identifier.** A discovered gap is worked under a REQ (extend or create via `sdd-specify`) with a `PROBE` for wire conformance. No GAP-style label appears anywhere — not in plan filenames, `traceability.yaml`, test names, `doc.go`, or normative prose ([ADR 0012](docs/adr/0012-retire-sdk-gap-identifier.md)).
 - Keep [`cmd/examples/`](cmd/examples/) docs in sync **in the same PR** as the program — checklist in [ai-workflow.md § Examples](docs/ai-workflow.md#examples).
-- **Write short.** Lead with the result; a finding is one sentence of about 30 words, a PR body about 300 words besides its checklist; quote only the output that proves a claim.
+- **Write short.** Lead with the result; a finding is one sentence of about 30 words, a PR body about 450 words; quote only the output that proves a claim.
 
-**Descriptor & process.** The `sdd-*` skills read [`docs/.sdd.yaml`](docs/.sdd.yaml) first; the lanes, the ladder and the Definition of Ready / Done are in [`docs/development-process.md`](docs/development-process.md), and the SDD-vs-superpowers split in [development-process.md § superpowers + SDD](docs/development-process.md#superpowers--sdd). Plans go in [`docs/plans/`](docs/plans/), never a parallel `docs/superpowers/` tree. They are committed working notes outside the traceability chain: no gate, generator or map reads them; brainstorming docs are narrative input, not a normative source.
+**Descriptor & process.** The `sdd-*` skills read [`docs/.sdd.yaml`](docs/.sdd.yaml) first; the lanes, the ladder and the Definition of Ready / Done are in [`docs/development-process.md`](docs/development-process.md), and the SDD-vs-superpowers split in [development-process.md § superpowers + SDD](docs/development-process.md#superpowers--sdd). Plans go in [`docs/plans/`](docs/plans/), never a parallel `docs/superpowers/` tree. They are committed working notes outside the traceability chain: no generator or map reads them, though the drift gate checks them like any other document ([plans/README.md](docs/plans/README.md)); brainstorming docs are narrative input, not a normative source.
 
 ## Module layout & boundaries
 
