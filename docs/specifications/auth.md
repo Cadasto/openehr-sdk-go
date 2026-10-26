@@ -529,7 +529,7 @@ The SDK does not apply scope strings as application policy: which scopes to gran
 
 - Pass scope strings verbatim from configuration through to the authorization request.
 - Round-trip the granted scope from the token response back to the application via `LaunchContext.Scopes`.
-- Provide a small helper (`auth.BuildScope(compartment, resource, permission)`) for composing scopes of the shape `<compartment>/<resource>.<permission>` without templating strings. `BuildScope` is lexical: it **MUST** trim surrounding white space on each part and otherwise take the parts as given, without validating them, so it serves SMART on FHIR scopes as well. It **MUST** leave out an empty compartment or permission together with its separator, and keep an empty resource, separator included: `BuildScope("patient", "", "rs")` is `patient/.rs`, `BuildScope("patient", "", "")` is `patient/`, and `BuildScope("", "launch", "")` is `launch`.
+- Provide a small helper (`auth.BuildScope(compartment, resource, permission)`) for composing scopes of the shape `<compartment>/<resource>.<permission>` without templating strings. `BuildScope` is lexical: it **MUST** trim surrounding white space on each part and not validate the parts, so it serves SMART on FHIR scopes as well. It **MUST** leave out an empty compartment or permission together with its separator, and keep an empty resource, separator included: `BuildScope("patient", "", "rs")` is `patient/.rs`, `BuildScope("patient", "", "")` is `patient/`, and `BuildScope("", "launch", "")` is `launch`.
 - Provide a typed builder and reader for the openEHR resource scopes of SMART on openEHR § Resource Scopes, `<compartment>/<resource>-<pattern>.<permissions>`:
 
 ```go
