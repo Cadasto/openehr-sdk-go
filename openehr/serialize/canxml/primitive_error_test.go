@@ -61,7 +61,8 @@ func anyError(error) bool { return true }
 // primitiveCases covers each primitive kind the RM decodes from text, outside
 // a polymorphic slot and inside one, a Character refused through its
 // UnmarshalText, an Octet list that is not base64, an AOM 1.4 interval bound,
-// and a bound held in an interface-typed member.
+// a bound held in an interface-typed member, and an interval boundary flag
+// that is no boolean.
 func primitiveCases(t *testing.T) []primitiveCase {
 	t.Helper()
 	st := &rm.EHRStatus{
@@ -177,6 +178,41 @@ func primitiveCases(t *testing.T) []primitiveCase {
 			path: "/iv[1]/lower[1]", alone: "/lower",
 			cause: "rm.Character: must be exactly one character, got 4", raw: "rm.Character: must be exactly one character, got 4",
 			value: "Jane", reach: anyError,
+		},
+		{
+			name: "interval flag of a DV_COUNT normal range",
+			in: `<dv_count ` + ucNS + `><normal_range><lower xsi:type="DV_COUNT"><magnitude>1</magnitude></lower>` +
+				`<lower_included>yes7777</lower_included></normal_range><magnitude>5</magnitude></dv_count>`,
+			into: func() any { return new(rm.DVCount) },
+			path: "/dv_count[1]/normal_range[1]/lower_included[1]", alone: "/lower_included",
+			cause: "strconv.ParseBool: invalid syntax", raw: `strconv.ParseBool: parsing "yes7777": invalid syntax`,
+			value: "yes7777", reach: isNumError,
+		},
+		{
+			name: "interval flag of a DV_INTERVAL in a slot",
+			in: slotElement("DV_INTERVAL", `<lower xsi:type="DV_COUNT"><magnitude>1</magnitude></lower>`+
+				`<upper xsi:type="DV_COUNT"><magnitude>5</magnitude></upper><upper_included>yes7777</upper_included>`),
+			into: func() any { return new(rm.Element) },
+			path: "/element[1]/value[1]/upper_included[1]", alone: "/upper_included", slot: `decode /value (_type="DV_INTERVAL"): `,
+			cause: "strconv.ParseBool: invalid syntax", raw: `strconv.ParseBool: parsing "yes7777": invalid syntax`,
+			value: "yes7777", reach: isNumError,
+		},
+		{
+			name: "interval flag of AOM 1.4 occurrences",
+			in: `<c_complex_object ` + ucNS + `><rm_type_name>OBSERVATION</rm_type_name><occurrences><lower>1</lower><upper>1</upper>` +
+				`<lower_unbounded>yes7777</lower_unbounded></occurrences><node_id>at0000</node_id></c_complex_object>`,
+			into: func() any { return new(aom14.CComplexObject) },
+			path: "/c_complex_object[1]/occurrences[1]/lower_unbounded[1]", alone: "/lower_unbounded",
+			cause: "strconv.ParseBool: invalid syntax", raw: `strconv.ParseBool: parsing "yes7777": invalid syntax`,
+			value: "yes7777", reach: isNumError,
+		},
+		{
+			name: "interval flag of a Go-typed Interval",
+			in:   `<iv ` + ucNS + `><lower>1</lower><upper_unbounded>yes7777</upper_unbounded></iv>`,
+			into: func() any { return new(rm.Interval[int]) },
+			path: "/iv[1]/upper_unbounded[1]", alone: "/upper_unbounded",
+			cause: "strconv.ParseBool: invalid syntax", raw: `strconv.ParseBool: parsing "yes7777": invalid syntax`,
+			value: "yes7777", reach: isNumError,
 		},
 	}
 }
