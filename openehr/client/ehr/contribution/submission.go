@@ -1,12 +1,12 @@
 package contribution
 
 import (
-	"encoding/json"
 	jsonv2 "encoding/json/v2"
 	"errors"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
 // Submission is the request-side payload for POST /ehr/{ehr_id}/contribution,
@@ -174,9 +174,15 @@ type submissionJSON struct {
 
 // MarshalJSON emits the canonical `Contribution_create` wire shape. The
 // closed type-set is enforced before encoding via Validate.
+//
+// The body is encoded with encoding/json/v2 and the canonical-JSON
+// options the RM types use, whichever package calls MarshalJSON, so a
+// polymorphic RM slot in a version's data that holds a typed-nil pointer
+// is left out, as canjson.Marshal leaves it out, never written as `null`.
+// `<`, `>` and `&` are written literally, as canjson.Marshal writes them.
 func (s *Submission) MarshalJSON() ([]byte, error) {
 	if err := s.Validate(); err != nil {
 		return nil, err
 	}
-	return json.Marshal(&submissionJSON{Audit: s.Audit, Versions: s.Versions})
+	return jsonv2.Marshal(&submissionJSON{Audit: s.Audit, Versions: s.Versions}, typereg.EncodeOptions())
 }
