@@ -488,6 +488,59 @@ func TestRetryOptIntoNonIdempotent(t *testing.T) {
 	}
 }
 
+// TestRetryPUTAndDELETEOnlyUnderRetryNonIdempotent pins that a PUT or a DELETE
+// answered 503 is sent once by default and retried only when the policy sets
+// RetryNonIdempotent. An openEHR PUT or DELETE names the version it changes,
+// so a retry after a gateway error that hid a committed write would answer 412
+// or 409 for a write that succeeded. The GET case is the contrast: it is still
+// retried without the opt-in.
+func TestRetryPUTAndDELETEOnlyUnderRetryNonIdempotent(t *testing.T) { // REQ-091
+	const attempts = 3
+	cases := []struct {
+		method        string
+		nonIdempotent bool
+		wantHits      int32
+	}{
+		{method: http.MethodPut, wantHits: 1},
+		{method: http.MethodDelete, wantHits: 1},
+		{method: http.MethodPut, nonIdempotent: true, wantHits: attempts},
+		{method: http.MethodDelete, nonIdempotent: true, wantHits: attempts},
+		{method: http.MethodGet, wantHits: attempts},
+	}
+	for _, tc := range cases {
+		t.Run(fmt.Sprintf("%s/RetryNonIdempotent=%t", tc.method, tc.nonIdempotent), func(t *testing.T) {
+			var hits atomic.Int32
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				hits.Add(1)
+				w.WriteHeader(http.StatusServiceUnavailable)
+			}))
+			defer srv.Close()
+			c, err := New(
+				newCatalog(t, srv),
+				WithHTTPClient(srv.Client()),
+				WithRetry(RetryPolicy{
+					MaxAttempts:        attempts,
+					InitialBackoff:     time.Millisecond,
+					RetryNonIdempotent: tc.nonIdempotent,
+				}),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req := &Request{Method: tc.method, Path: "/ehr/abc/composition/def", IfMatch: "def::node::1"}
+			if tc.method == http.MethodPut {
+				req.Body = []byte(`{}`)
+			}
+			if _, err := c.Do(t.Context(), req); !errors.Is(err, ErrServerError) {
+				t.Errorf("Do(%s) error = %v, want one matching ErrServerError", tc.method, err)
+			}
+			if got := hits.Load(); got != tc.wantHits {
+				t.Errorf("%s answered 503 with RetryNonIdempotent=%t hit the server %d times, want %d", tc.method, tc.nonIdempotent, got, tc.wantHits)
+			}
+		})
+	}
+}
+
 func TestRetryDisabledByDefault(t *testing.T) {
 	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

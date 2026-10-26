@@ -78,9 +78,10 @@ func boxedNilBodyReadError() error {
 // method and reads no field of the error, so it takes a boxed nil
 // *BodyReadError as it is: a safe method is sent again, any other is not.
 // Adding a `bre != nil` check there sends the nil to the generic arm, which
-// retries the PUT as a transient failure.
+// retries the PUT as a transient failure. The policy sets RetryNonIdempotent,
+// so the method check alone does not stop the PUT.
 func TestShouldRetryGatesABoxedNilBodyReadErrorByMethod(t *testing.T) { // REQ-091, REQ-025
-	c := &Client{cfg: config{retry: RetryPolicy{MaxAttempts: 3}}}
+	c := &Client{cfg: config{retry: RetryPolicy{MaxAttempts: 3, RetryNonIdempotent: true}}}
 
 	boxed := boxedNilBodyReadError()
 	if bre, ok := errors.AsType[*BodyReadError](boxed); !ok || bre != nil {

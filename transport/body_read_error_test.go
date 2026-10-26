@@ -584,7 +584,9 @@ func TestBodyReadErrorTrailerTextStaysOut(t *testing.T) { // REQ-151
 // TestBodyReadErrorRetryGate pins REQ-091's retry gate. With retries enabled,
 // a 2xx whose body could not be read is sent again only for GET, HEAD or
 // OPTIONS: the server acted on any other method, so a second send would repeat
-// it. The non-2xx arm keeps the status-based retry of any *WireError.
+// it. The writes run under RetryNonIdempotent, so the method check lets them
+// through and the body-read gate is what stops them. The non-2xx arm keeps the
+// status-based retry of any *WireError.
 func TestBodyReadErrorRetryGate(t *testing.T) { // REQ-091, REQ-151
 	const attempts = 3
 	cases := []struct {
@@ -596,12 +598,13 @@ func TestBodyReadErrorRetryGate(t *testing.T) { // REQ-091, REQ-151
 	}{
 		{name: "GET 200 is sent again", method: http.MethodGet, status: http.StatusOK, wantHits: attempts},
 		{name: "OPTIONS 200 is sent again", method: http.MethodOptions, status: http.StatusOK, wantHits: attempts},
-		{name: "PUT 200 is sent once", method: http.MethodPut, status: http.StatusOK, wantHits: 1},
-		{name: "DELETE 200 is sent once", method: http.MethodDelete, status: http.StatusOK, wantHits: 1},
+		{name: "PUT 200 under RetryNonIdempotent is sent once", method: http.MethodPut, status: http.StatusOK, nonIdempotent: true, wantHits: 1},
+		{name: "DELETE 200 under RetryNonIdempotent is sent once", method: http.MethodDelete, status: http.StatusOK, nonIdempotent: true, wantHits: 1},
 		{name: "POST 201 under RetryNonIdempotent is sent once", method: http.MethodPost, status: http.StatusCreated, nonIdempotent: true, wantHits: 1},
 		{name: "PATCH 200 under RetryNonIdempotent is sent once", method: http.MethodPatch, status: http.StatusOK, nonIdempotent: true, wantHits: 1},
 		{name: "GET 503 is retried by status", method: http.MethodGet, status: http.StatusServiceUnavailable, wantHits: attempts},
-		{name: "PUT 503 is retried by status", method: http.MethodPut, status: http.StatusServiceUnavailable, wantHits: attempts},
+		{name: "PUT 503 under RetryNonIdempotent is retried by status", method: http.MethodPut, status: http.StatusServiceUnavailable, nonIdempotent: true, wantHits: attempts},
+		{name: "PUT 503 is sent once by default", method: http.MethodPut, status: http.StatusServiceUnavailable, wantHits: 1},
 		{name: "GET 404 is not retried by status", method: http.MethodGet, status: http.StatusNotFound, wantHits: 1},
 	}
 	for _, tc := range cases {
@@ -710,7 +713,8 @@ func TestBodyReadErrorOverLimitIsNotSentAgain(t *testing.T) { // REQ-091, REQ-15
 // methods. net/http never reads the body of a response to HEAD, so an
 // httptest server cannot make that read fail; a RoundTripper hands back a 2xx
 // whose Body fails instead. A PUT through the same RoundTripper is the
-// contrast that shows the gate is what decides.
+// contrast that shows the gate is what decides; the policy sets
+// RetryNonIdempotent, so the method check alone does not stop the PUT.
 func TestBodyReadErrorRetryGateHEAD(t *testing.T) { // REQ-091
 	const attempts = 3
 	cases := []struct {
@@ -731,9 +735,10 @@ func TestBodyReadErrorRetryGateHEAD(t *testing.T) { // REQ-091
 					Body:       errReadCloser{err: io.ErrUnexpectedEOF},
 				}, nil
 			}, transport.WithRetry(transport.RetryPolicy{
-				MaxAttempts:    attempts,
-				InitialBackoff: time.Millisecond,
-				MaxBackoff:     time.Millisecond,
+				MaxAttempts:        attempts,
+				InitialBackoff:     time.Millisecond,
+				MaxBackoff:         time.Millisecond,
+				RetryNonIdempotent: true,
 			}))
 
 			resp, err := c.Do(t.Context(), &transport.Request{Method: tc.method, Path: "/ehr/abc", Route: "/ehr/{ehr_id}"})
